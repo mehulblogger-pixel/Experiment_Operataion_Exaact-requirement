@@ -37,10 +37,24 @@ Open <http://127.0.0.1:8000/> and sign in.
 No database server, SMTP account or extra services are needed to run it — SQLite
 is the default and emails print to the terminal until you configure SMTP.
 
-## Switching to Postgres + real email (production)
+## Deploying on your own server (with HTTPS)
 
-Copy `.env.example` to `.env` and set the `POSTGRES_*` and `EMAIL_*` variables
-(the app reads them automatically — see `config/settings.py`). Then:
+The repo ships a one-command Docker stack (Postgres + gunicorn + Caddy with
+automatic HTTPS). On your server:
+
+```bash
+cp .env.production.example .env   # fill in DOMAIN, passwords, admin login
+docker compose up -d --build
+```
+
+Full step-by-step instructions (DNS, backups, scheduling the daily digest) are
+in **[`docs/DEPLOY.md`](docs/DEPLOY.md)**.
+
+### Switching to Postgres + real email manually
+
+If you are not using Docker, copy `.env.example` to `.env`, set the `POSTGRES_*`
+and `EMAIL_*` variables (the app reads them automatically — see
+`config/settings.py`), then:
 
 ```bash
 DJANGO_DEBUG=False python manage.py collectstatic --noinput

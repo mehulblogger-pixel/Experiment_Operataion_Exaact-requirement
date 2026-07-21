@@ -1,5 +1,7 @@
 Django>=5.1,<5.2
 whitenoise>=6.6
+# Production WSGI server
+gunicorn>=22.0
 # Postgres driver (only needed when POSTGRES_DB is set; harmless otherwise)
 psycopg[binary]>=3.1
 # Excel import for the seed command / data migration from the dashboard
