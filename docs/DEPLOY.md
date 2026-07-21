@@ -9,12 +9,12 @@ Docker, so the only things you install on the server are Docker and Git.
 1. A Linux server (Ubuntu 22.04+ recommended) with a public IP — any VPS
    (Hetzner, DigitalOcean, AWS Lightsail, Linode…) with **2 GB RAM** is enough
    to start.
-2. A domain or subdomain you control (e.g. `ops.yourcompany.com`).
+2. A domain or subdomain you control (e.g. `schedule.mghaiapps.com`).
 3. SSH access to the server.
 
 ## Step 1 — Point your domain at the server
 
-In your domain's DNS settings, add an **A record** for `ops.yourcompany.com`
+In your domain's DNS settings, add an **A record** for `schedule.mghaiapps.com`
 pointing to your server's public IP. (HTTPS won't work until DNS resolves.)
 
 ## Step 2 — Install Docker on the server
@@ -58,7 +58,7 @@ That's it. The stack starts three containers:
 - **web** — the Django app (runs migrations + seeds masters + creates your admin)
 - **caddy** — reverse proxy that fetches a free HTTPS certificate automatically
 
-Open `https://ops.yourcompany.com/` and sign in with the admin user you set.
+Open `https://schedule.mghaiapps.com/` and sign in with the admin user you set.
 
 ## Everyday operations
 
