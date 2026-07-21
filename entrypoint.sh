@@ -10,13 +10,9 @@ if [ "${SEED_ON_START:-true}" = "true" ]; then
   python manage.py seed_masters || true
 fi
 
-# Optionally create the first admin from env vars (only if it doesn't exist).
-if [ -n "${DJANGO_SUPERUSER_USERNAME:-}" ] && [ -n "${DJANGO_SUPERUSER_PASSWORD:-}" ]; then
-  echo "Ensuring superuser '${DJANGO_SUPERUSER_USERNAME}' exists..."
-  python manage.py createsuperuser --noinput \
-    --username "${DJANGO_SUPERUSER_USERNAME}" \
-    --email "${DJANGO_SUPERUSER_EMAIL:-admin@example.com}" 2>/dev/null || true
-fi
+# Create or update the admin from env vars (idempotent; always applies the
+# configured password, so login works on every deploy with no shell steps).
+python manage.py ensure_admin || true
 
 echo "Starting gunicorn..."
 exec gunicorn config.wsgi:application \

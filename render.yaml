@@ -17,7 +17,7 @@ services:
     plan: starter        # small paid web instance (stays online 24x7)
     region: singapore    # closest Render region to India; change if you prefer
     buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput"
-    preDeployCommand: "python manage.py migrate && python manage.py seed_masters && (python manage.py createsuperuser --noinput || true)"
+    preDeployCommand: "python manage.py migrate && python manage.py seed_masters && python manage.py ensure_admin"
     startCommand: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT"
     healthCheckPath: /accounts/login/
     envVars:
