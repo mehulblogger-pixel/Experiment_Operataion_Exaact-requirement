@@ -18,6 +18,7 @@
     <a href="{% url 'operations:call_create' %}">+ New Call</a>
     <a href="{% url 'masters:client_list' %}">Clients</a>
     <a href="{% url 'masters:vendor_list' %}">Vendors</a>
+    {% if user.can_manage_users %}<a href="{% url 'accounts:user_list' %}">Users</a>{% endif %}
     <a href="/admin/">Admin / Config</a>
   </nav>
   <span class="user">

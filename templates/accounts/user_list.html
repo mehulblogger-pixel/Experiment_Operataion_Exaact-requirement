@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+  <div>
+    <h1>Users</h1>
+    <p class="sub">Add your team, assign roles, and manage seats.</p>
+  </div>
+  {% if seats_available > 0 %}
+    <a class="btn" href="{% url 'accounts:user_create' %}">+ Add User</a>
+  {% else %}
+    <span class="btn secondary" title="No seats free — deactivate a user or increase your licence" style="opacity:.6;cursor:not-allowed;">+ Add User</span>
+  {% endif %}
+</div>
+
+<div class="stats" style="margin-bottom:6px;">
+  <div class="tile"><div class="n">{{ seats_used }}</div><div class="l">Seats in use (active users)</div></div>
+  <div class="tile {% if seats_available == 0 %}red{% else %}green{% endif %}"><div class="n">{{ seats_available }}</div><div class="l">Seats available</div></div>
+  <div class="tile"><div class="n">{{ lic.licensed_seats }}</div><div class="l">Licensed seats</div></div>
+</div>
+{% if seats_available == 0 %}
+<div class="msg msg-warning">All licensed seats are in use. Deactivate a user who has left to free a seat — their past records are always kept.</div>
+{% endif %}
+
+<table class="grid">
+  <tr><th>Username</th><th>Name</th><th>Role</th><th>Office</th><th>Status</th><th>Actions</th></tr>
+  {% for u in users %}
+  <tr>
+    <td>{{ u.username }}{% if u.is_superuser %} <span class="badge AMBER">system</span>{% endif %}</td>
+    <td>{{ u.get_full_name|default:"—" }}</td>
+    <td>{{ u.get_role_display }}</td>
+    <td>{{ u.home_office|default:"—" }}</td>
+    <td>{% if u.is_active %}<span class="badge GREEN">Active</span>{% else %}<span class="badge RED">Inactive</span>{% endif %}</td>
+    <td>
+      <a class="btn small secondary" href="{% url 'accounts:user_edit' u.pk %}">Edit</a>
+      <a class="btn small secondary" href="{% url 'accounts:user_password' u.pk %}">Password</a>
+      {% if u != request.user and not u.is_superuser %}
+      <form method="post" action="{% url 'accounts:user_toggle' u.pk %}" style="display:inline;">
+        {% csrf_token %}
+        {% if u.is_active %}
+          <button class="btn small danger" type="submit" onclick="return confirm('Deactivate {{ u.username }}? Their seat frees up and all their records are kept.');">Deactivate</button>
+        {% else %}
+          <button class="btn small" type="submit">Reactivate</button>
+        {% endif %}
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+<p class="sub" style="margin-top:16px;">
+  <strong>How seats work:</strong> a seat = one active user. When someone leaves,
+  click <em>Deactivate</em> — their login is disabled, the seat frees up for a new
+  person, and everything they did stays in the system under their name.
+</p>
+{% endblock %}
