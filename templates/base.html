@@ -1,0 +1,37 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Inspection Operations{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="{% url 'dashboard:home' %}">Inspection&nbsp;Ops</a>
+  {% if user.is_authenticated %}
+  <nav>
+    <a href="{% url 'dashboard:home' %}">Dashboard</a>
+    <a href="{% url 'operations:schedule_board' %}">Schedule Board</a>
+    <a href="{% url 'operations:call_list' %}">Calls</a>
+    <a href="{% url 'operations:call_create' %}">+ New Call</a>
+    <a href="/admin/">Admin / Config</a>
+  </nav>
+  <span class="user">
+    {{ user.get_full_name|default:user.username }} · {{ user.get_role_display }}
+    <a class="logout" href="{% url 'logout' %}">Logout</a>
+  </span>
+  {% endif %}
+</header>
+
+<main class="container">
+  {% if messages %}
+    {% for message in messages %}
+      <div class="msg msg-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

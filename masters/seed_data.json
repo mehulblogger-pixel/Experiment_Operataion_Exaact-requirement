@@ -1,0 +1,922 @@
+{
+ "offices": [
+  "AHMEDABAD",
+  "BANGALORE",
+  "BHOPAL",
+  "CHENNAI",
+  "COIMBATORE",
+  "GURGAON",
+  "HYDERABAD",
+  "INDORE",
+  "KOLKATA",
+  "LUDHIANA",
+  "MUMBAI",
+  "MUMBAI_EXIM",
+  "NAGPUR",
+  "NIC",
+  "PUNE",
+  "VADODARA"
+ ],
+ "sbus": {
+  "I03": "Mining Energy & Power",
+  "I23": "Manufacturing",
+  "I04": "Water Distribution & Infrastructure"
+ },
+ "activities": {
+  "53002": "I03",
+  "5102": "I03",
+  "5132": "I23",
+  "5133": "I23",
+  "5142": "I04",
+  "5103": "I03",
+  "51002": "I03",
+  "5122": "I04",
+  "5143": "I04"
+ },
+ "product_categories": [
+  "Agitator",
+  "Brass Ferrule",
+  "CNG Dispenser",
+  "Cable",
+  "Cable Trays & Ladders",
+  "Cascade",
+  "Casting Components",
+  "Chlorination System",
+  "Civil Inspection",
+  "Coating & Painting",
+  "Coil",
+  "Conductor",
+  "Container",
+  "Control Panels",
+  "Cylinder",
+  "DI Pipe",
+  "Dedusting System",
+  "Dust Suppression System",
+  "Electric Pole",
+  "Electrical Cables (Power/Control)",
+  "Electrical Heater",
+  "Electrofussion Fittings",
+  "Expediting Visit",
+  "FRP Material Structural/ tank / others",
+  "Fabrication",
+  "Fasteners (Bolts, Nuts, Washers)",
+  "Febrication Meterial",
+  "Fire Extinguisher",
+  "Fittings (Elbows, Tees, Reducers)",
+  "Flanges (Forged/Plate)",
+  "Forging Components",
+  "Gas meters",
+  "Generators",
+  "Grinding Media",
+  "HT/LT Project",
+  "Instrumentation (Gauges, Transmitters)",
+  "Insulators",
+  "LED Light",
+  "Lab Testing",
+  "Material Handling / Crane / EOT / Over Head Crane",
+  "Mechanical Screen",
+  "Motors",
+  "Non Destructive Testing",
+  "Others",
+  "PDI",
+  "PTFE Lining",
+  "PVC / UPVC / HDPE / MDPE / LDPE / PIPES & FITTINGS",
+  "PVC / UPVC / HDPE / MDPE / LDPE / PIPES & FITTINGS / WARNING MAT",
+  "Pipes / Tubes",
+  "Plant ShutDown",
+  "Plastic Miscellaneous",
+  "Plates & Sheets",
+  "Pouring",
+  "Pre Cast",
+  "Pre Dispatch Inspection",
+  "Pressure Vessel / Heat Exchangers / Columns / Storage tanks",
+  "Pump",
+  "QAC Support",
+  "Rail Wagon",
+  "Refractory Materials",
+  "Rollers",
+  "Rolls",
+  "Rotary Equipment / Compressor / Blower / Fans",
+  "SCADA & MPPC system",
+  "SOLAR PCS",
+  "Shaft Overlay",
+  "Solar Module",
+  "Stamp Transfer",
+  "Storage Tank",
+  "Structural Material (Beams, Channels, Angles)",
+  "TMT BARS",
+  "Transformers",
+  "Tubes (Heat Exchanger/Boiler)",
+  "Turbine Blade",
+  "UPS",
+  "UPS System",
+  "Valves (Gate, Globe, Check, Ball, Butterfly)",
+  "Vendor Evaluation / Vendor Audit / Capacity Assessment / NSIC Audit"
+ ],
+ "vendor_locations": [
+  "Ahmedabad",
+  "Bakrol",
+  "Baramati",
+  "Bavla",
+  "Bharuch",
+  "Bhavnagar",
+  "Chanderiya",
+  "Chhatral",
+  "Dholera",
+  "Dholka",
+  "Gandhinagar",
+  "Halol",
+  "Haridwar",
+  "Haryana",
+  "Himatnagar",
+  "Jamnagar",
+  "Jasdan",
+  "Junagadh",
+  "Kachchh",
+  "Kalol",
+  "Karjan",
+  "Kheda",
+  "Mahesana",
+  "Morbi",
+  "Nadiad",
+  "Raipur",
+  "Rajasthan",
+  "Rajkot",
+  "Sabarkantha",
+  "Surat",
+  "Surendranagar",
+  "Udaipur",
+  "Vadodara"
+ ],
+ "clients": [
+  "2MM BETON",
+  "A A Vasani Polypipe Llp",
+  "AGGARWAL BATH CONCEPTS",
+  "AGP City Gas Private Limited",
+  "ALK INFRA",
+  "AMAN MACHINE TOOLS PRIVATE LIMITED",
+  "AMBICA TRADING",
+  "AMPLUS SUN BEAT PRIVATE LIMITED",
+  "AMPO VALVES INDIA PRIVATE LIMITED",
+  "ANANTA PROCON",
+  "ARHAM RENEWTECH INDIA PRIVATE LIMITED",
+  "ARTSON LIMITED ((A TATA ENTERPRISES)",
+  "Acme Air Equipments Company Private Limited",
+  "Acme Solar Holding Private Limited",
+  "Acmefil Engineering Systems Private Limited",
+  "Adani Energy Solutions Limited (KHAVDA POWER IV A TRANSMISSION LIMITED)",
+  "Adani Green Energy Limited",
+  "Adani Infra India Limited",
+  "Adani Water Limited",
+  "Adaptive Engineering Private Limited",
+  "Aditya Birla",
+  "Aditya Birla\nRenewables Limited",
+  "Aditya Sales Corporation",
+  "Aeon Software Private Limited",
+  "Aeron Composite Limited",
+  "Afrzen Private Limited",
+  "Agro Pulping Machinery Private Limited",
+  "Aia Engineering Limited",
+  "Aira 4 Matic Global Valve Automation Private Limited",
+  "Airox Nigen Equipments Private Limited",
+  "Alpha Devraj Renewable Energy Llp",
+  "Amplus KN One Power Private Limited",
+  "Angelique International Limited",
+  "Antelopus Selan Energy Limited",
+  "Apollo Screens Private Limited",
+  "Aqua Machineries Private Limited",
+  "Arcelor Mittal Nippon Steel India Limited",
+  "Arcons Infrastructures & Constructions Private Limited",
+  "Argo Solar Private Limited",
+  "Artson Engineering Limited",
+  "Arvensis Energy Private Limited",
+  "Arvinox Stainless LLP",
+  "Avolate Technologies",
+  "Axis Solutions Private Limited",
+  "Azure Power India Privte Limited",
+  "Bayer Vapi Private Limited",
+  "Beijing Henson Engineering Technology Company Limited",
+  "Bentlay Fittings Limited",
+  "Biyani Alloys Private Limited",
+  "Boundless Environment Resource Solutions",
+  "Brevitee International",
+  "Brothers Plast Tech Private Limited",
+  "Burckhardt Compression India Private Limited",
+  "CECO ENVIRONMENTAL SOLUTIONS INDIA PRIVATE LIMITED",
+  "CHIRIPAL PLOYFLIMS LIMITED",
+  "CIVET PROJECTS PRIVATE LIMITED",
+  "CMR Infrastructure Private Limited",
+  "COHIZON LIFE SCIENCES LIMITED",
+  "Cair Euromatic Automation Private Limited",
+  "Capital Innotech Private Limited",
+  "Cargil India Private Limited",
+  "Chamunda EletroMech Solution",
+  "Chamunda Plastic Private Limited",
+  "Chennai Metropolitan Water Supply And Sewerage Board",
+  "Chief Engineer Megalift Bhubhaneshwa",
+  "Cimcon Software India Private Limited",
+  "CleanMax Enviro Energy Solutions Limited",
+  "Clout Hitech Innovation Private Limited",
+  "Continual Renewable Energy Private LImited",
+  "Covestro",
+  "Ctci",
+  "D P World Limited",
+  "DIPIETRO INDIA Private Limited",
+  "Darling Muesco India Private Limited",
+  "Darshinal Electromation Private Limted",
+  "Deem Roll Tech Limited",
+  "Deep Seals India Limited",
+  "Detox Green Energy Private Limited",
+  "Detox Group Of Companies",
+  "Digital Engineering Projects Private Limited",
+  "Dineshchandra R Agrawal Infracon Private Limited",
+  "Divine Tubes Private Limited",
+  "Duker Solutions Gmbh",
+  "ERABLUE TECHNOLOGY Private Limited",
+  "Eagle Infra Pravite Limited",
+  "Earth Water Pipe Fittings Private Limited",
+  "Eco Protection Engineers Private Limited",
+  "Ecoren Energy India Private Ltd",
+  "Ecoren Energy India Pvt Ltd",
+  "Eiffil Water Infra Private Limited",
+  "Electrotherm India Limited",
+  "Energy Emission India Private Limited",
+  "Enerparc Energy Private Limited",
+  "Enviro infra Engineers Limited",
+  "Envision Energy India Private Limited",
+  "Epp Composites Private Limited",
+  "Essens Renewable Private Limited",
+  "Euro Global Gas Cylinders Llp",
+  "Evercrest Projects Private Limited",
+  "Everest Kanto Cylinder Limited",
+  "Everest Multitech",
+  "Evren Energy Private Limited",
+  "Exxonmobil Global Services Company",
+  "G M Engineering Private Limited",
+  "GA INFRA PRIVATE LIMITED",
+  "GSJ ENVO LIMITED",
+  "GYSCOAL Enterprise",
+  "Gangotri Submersible Pump",
+  "Gayatri Private Limited",
+  "Gimex India Projects And Enigneering Private Limited",
+  "Gokul Poly Valves Private Limited",
+  "Goodluck Metallics Private Limited",
+  "Gratik Tubes Private Limited",
+  "Greenleaf Envirotech Limited",
+  "Growmech Industries Private Limited",
+  "Gujarat Alkalies And Chemicals Limited",
+  "Gujarat Fluorochemicals Limited",
+  "Gujarat Industries Power Company Limited",
+  "Gvpr Engineers Limited",
+  "HD Fire Protect Limited",
+  "Havells India Limited",
+  "Hero Future Energies",
+  "Hexa Climate Solutions Private Limited",
+  "Hindustan Zinc Limited",
+  "Hitech Flow Solutions Limited",
+  "Hnb Engineers Private Limited",
+  "ITT SpA",
+  "Indian Oil Corporation Limited",
+  "Indo Asia Copper Limited",
+  "Insolare energy limited",
+  "Inspiron Engineering Private Limited",
+  "International Refreshments India Private Limited",
+  "Ion Exchange India Limited",
+  "Ion Exchange Projects And Engineering Limited",
+  "Isgec Heavy Engineering Limited",
+  "Itt Engineering India Private Limited",
+  "J K Lakshmi Cement Limited",
+  "J P Polyplast Private Limited",
+  "J V Hussein Atieh and Sons Company and Passavant Energy and Environment",
+  "JK Fluid Controls",
+  "Jainson Cables India Private Limited",
+  "Jainsons",
+  "Japs Projects",
+  "Jasco Pump Private Limited",
+  "Jeet Pumps Private Limited",
+  "Jindal Saw Limited",
+  "Jindal Steel and Power",
+  "Jio Bp Mobility Limited",
+  "Jnk India Limited",
+  "Juniper Green Energy Private Limited",
+  "Jwil Infra Limited",
+  "KARELIYA STEEL INDUSTRIES",
+  "KBH ENERGY AND INFRA SERVICES",
+  "KRR Engineer Priavte limited",
+  "Kalpa Power Private Limited",
+  "Kamath Transformers Privete Limited",
+  "Kamlesh Kumar Singh Engineers Private Limited",
+  "Ketan Engineering Works",
+  "Khilari Infrastructure Private Limited",
+  "Kilburn Engineering Limited",
+  "Kirloskar Brothers Limited",
+  "Kirloskar Ebara Pumps Limited",
+  "L & T Energy Hydrocarbon",
+  "L & T Engineering and Construction Company",
+  "L C Infra Projects Private Limited",
+  "LAXMI ORGANIC INDUSTRIES Limited",
+  "LCC Engineering Private Limited",
+  "Larsen and Toubro Limited",
+  "Larsen and Toubro Limited  (Energy Products and Systems Engineering)",
+  "Larsen and Toubro Limited (Energy Products and Systems Engineering)",
+  "Laxmi Civil Engineering Services Private Limited",
+  "Linde India Limited",
+  "Lohum Materials Private Limited",
+  "Lubi Industries Llp",
+  "M G Worldwide Private Limited",
+  "M/s. Texmaco West Rail Limited",
+  "M/s. Ultratech cement limited_Aditya Birla",
+  "MURER SANFIELD PRIVATE LIMITED",
+  "Macons Socage Platforms Private Limited",
+  "Mahanagar Gas Limited",
+  "Maharashtra Jeevan Pradhikaran",
+  "Mahdi and Mohammad Mechanical and Engineering Equipment Trading L.L.C",
+  "Mangukiya Brothers Project Private Limited",
+  "Manikaran Renewables Limited",
+  "Maxim Tubes Company Private Limited",
+  "Mbh Pumps Gujarat Private Limited",
+  "Mbm Tubes Private Limited",
+  "Mc Dermott",
+  "Megha Engineering And Infrastructures Limited",
+  "Miraj Pipes And Fittings Private Limited",
+  "Modern Engineering Company",
+  "Mounting Renewable Power Limited",
+  "Mundra Petrochemical Limited",
+  "N & T ENGITECH Prative Limited",
+  "National Small Industries Corporation",
+  "Navitas Planet Private Limited",
+  "Nayara Energy Limited",
+  "Ncc Limited",
+  "Nidhi Engineering Industries",
+  "Nrpulse",
+  "Nuclear Power Corporation Of India Limited",
+  "Nutral Powertech",
+  "OEC Group",
+  "One Box Warehouse Private Limited",
+  "Onnyx Electronisys Private Limited",
+  "Orbit Engineers Limited Liability Partnership",
+  "Oriano Clean Energy Private Limited",
+  "Orkan Enenrgy Privte Limited",
+  "Oswal Energies Limited",
+  "Oswal Industries Limited",
+  "Oyak Sentetik Karbon Urunleri Sanayi Ve Ticaret A.S.",
+  "P Prabhudas Engineering Private Limited",
+  "PRAMUKH AGRO EXPORT",
+  "Palava Induslogic 4 Private Limited",
+  "Paramount Limited",
+  "Patels Airtemp India Limited",
+  "Pearls Salt Works Private Limited",
+  "Pietro Fiorentini Db India Private Limited",
+  "Praj Industries Limited",
+  "Pratik Corporation",
+  "Precision Infratech Private Limited",
+  "Pride LED",
+  "Primier Energies",
+  "Prozeal Green Energy Limited",
+  "R K M Powergen Private Limited",
+  "RHN IMPEX",
+  "RYSA Infratech Limited",
+  "Rainson Pipe Industries Private Limited",
+  "Rajasthan Urban Drinking Water Sewerage and Infrastructure Corporation Limited",
+  "Rajasthan Urban Infrastructure Development Project",
+  "Rajendra Engineering Works",
+  "Rajsha Chemicals Private Limited",
+  "Rama Cylinders Private Limited",
+  "Ramalingam Construction company Limited",
+  "Rashmi Metaliks Limited",
+  "Ratnamani Metal And Tube Limited - C S Division",
+  "Reliance Industries Limited",
+  "Reliance Infrastructure Limited",
+  "Reliance OSBL Project I Bechtel India Private Limited",
+  "Renew Power Private Limited",
+  "Rhythm Automation Control Private Limited",
+  "S A Infracom",
+  "SAMRAT CONSTRUCTIONS",
+  "SAP Control Systems & Engineers Private Limited",
+  "SKN Gas",
+  "SOPAN PROCESS TECHNOLOGIES Private Limited",
+  "STILONN VALVES AND CONTROLS PRIVATE LIMITED",
+  "SV Power link Private Limited",
+  "Safex Industries Limited",
+  "Sagoma Impex Private Limited",
+  "Sahaj Constructions Private Limited",
+  "Saisanket Industries Private Limited",
+  "Sany",
+  "Saravana Engineering and Infratech Private Limited",
+  "Sarju Impex Limited",
+  "Sattva Engineering Construction Limite",
+  "Sauni Yojana Project",
+  "Sealmech Valves",
+  "Serentica Renewables India 3 Private Limited",
+  "Sevitsil Solution in Silicone",
+  "Shah Bhogilal Jethalal And Bros",
+  "Shree Cement Limited",
+  "Shri Navkar Metals Limited",
+  "Shri Ram Construction Company",
+  "Shyam Enterprise",
+  "Silox India Private Limited",
+  "Silver Bay Marine Gear Private Limited",
+  "Sima Labs",
+  "Simon India Limited",
+  "Singhal Industries Private Limited",
+  "Sintex Advance Plastic Limited",
+  "Solarworld Energy Solutions Limited",
+  "Solid Blue Infra",
+  "Solidus Techno Power Private Limited",
+  "Sopan O And M Company Private Limited",
+  "Sophisticated Industrial Materials Analytic Labs Private Limited",
+  "South East Construction Company Private Limited",
+  "Sprng Energy Private Limited",
+  "Sprng Vayu Vidyut Private Limited",
+  "Subway Network for Trading and Services",
+  "Sun Pharmaceutical Industries Limited",
+  "Sun Trading Co",
+  "Sun Trading Company",
+  "Surya Roshni Limited",
+  "TECHNOCRAFT CONSTRUCTION PVT. LTD. - EMS LTD.",
+  "Tata Power Limited",
+  "Tata Project Limited",
+  "Tata project Limited",
+  "Taurant Projects Limited",
+  "Tawi Engineering India Private Limited",
+  "Technimont Private Limited",
+  "Texmaco West Rail Limited",
+  "The Wesman Engineering Company Private Limited",
+  "Torrent Power Limited",
+  "Training",
+  "Udhna Project",
+  "Ultratech Cement Limited",
+  "Unifrax India Limited",
+  "Unipro Techno Infrastructure Private Li mited",
+  "Univeral Cranes and Lifts",
+  "Universal Piping Systems",
+  "Unnati Pump Enterprise",
+  "Unnati Pump Private Limited",
+  "Usha Compressor Private Limited",
+  "VERKORA PRIVATE LIMITED",
+  "VEXL Environ Projects Private Limited",
+  "VOLTAGESHIFT ENGINEERING SOLUTIONS LLP",
+  "Vapco Engineers Private Limited",
+  "Vasani Polymers Private limited",
+  "Vijay Kumar Mishra Construction Private Limited",
+  "Vishvaraj Environment Private Limited",
+  "Volcur Electrix Private Limited",
+  "WALTER TOSTO WTB S.R.L",
+  "WEFS TECHWORKS LLP",
+  "Waaree Renewable Technologies Limited",
+  "Weg Industries India Private Limited",
+  "Welspun Corporation Limited",
+  "Welspun DI",
+  "Welspun Enterprise Limited",
+  "Welspun Speciality Solution Limited",
+  "Weltreat Systems Private Limited",
+  "Wide Space Technosolution Private Limited",
+  "Wpil Limited",
+  "YASHO INDUSTRIES",
+  "YUKON INDUSTRIES",
+  "Yaha Water Systems Private Limited",
+  "Ycube Engineered Solutions Private Limited"
+ ],
+ "inspectors": [
+  {
+   "name": "Abhay Mehta",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Abhishek Sukla",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Ajay Sanathara",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Akash Prosad",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Akib Shaikh_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Anand Kumar_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Ashok Kumar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Azaz Shaikh_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Bhagirathsinh Zala",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Bharat Ahir_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Chetram Sharma",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Chirag Gohel_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Darshan bambhaniya_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Deegpalsinh Jadeja_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Deeppal Singh Jadeja_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Dharmesh Patel_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Dilip Parmar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Dishant Gandhi",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Dishav Moradiya",
+   "type": "Employee",
+   "discipline": "Civil"
+  },
+  {
+   "name": "Divyarajshinh Sarvaiya",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Dixit Dave_DKA",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Gyandipsinh Jadeja_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Hardas Vasra",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Hardik Kasodariya",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Hardik Pedva",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Harish Ajwaliya",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Hemil Shah",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Jalpesh Gohel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Jay Mandalia",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Jaydeep Parmar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Jaydeep Raval",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Jignesh Maheta",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Jignesh Pitrola",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Kalpesh Patel",
+   "type": "Employee",
+   "discipline": "Electrical"
+  },
+  {
+   "name": "Kamal Kumar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Kana Gadhvi_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Kirtirajsinh Joddha",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Kishan Dodiya_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Laxman Ghedia",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Mahendra Patel",
+   "type": "Employee",
+   "discipline": "Electrical"
+  },
+  {
+   "name": "Mahideepsinh Zala_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Mayanksinh Solanki",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Mukesh Bhatt_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nagji Kalal",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nakul Parmar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nayan Suthar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nikhil Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nikul Zaru",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nikunj Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nilant Khopkar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nilesh Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nirav Chaudhari_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nirav Chaudhary_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nirmal Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nishant Nimavat",
+   "type": "Employee",
+   "discipline": "Electrical"
+  },
+  {
+   "name": "Pankaj Kumar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Pankaj Sharma",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Paresh Bhalala",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Parth Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Pratik Shah",
+   "type": "Employee",
+   "discipline": "Electrical"
+  },
+  {
+   "name": "Prince Tiwari_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Pritesh Khalashi",
+   "type": "Employee",
+   "discipline": "Civil"
+  },
+  {
+   "name": "Quasid Rabbani",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Radhanath Samanta",
+   "type": "Employee",
+   "discipline": "Civil"
+  },
+  {
+   "name": "Rahul Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Rajiv Devmurari",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Ravji Sorathiya_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Ronak Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Sachin Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Sanjay Vyas_DKA",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Shaikh Mohammad Zaid",
+   "type": "Employee",
+   "discipline": "Electrical"
+  },
+  {
+   "name": "Shasikumar Bhagat",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Sonu Singh_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Surinder Kumar_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Ullas Joshi",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Viraj Patel",
+   "type": "Employee",
+   "discipline": "Electrical"
+  },
+  {
+   "name": "Viral Sathvara",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Viral Sathwara",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Vivek Baldaniya",
+   "type": "Employee",
+   "discipline": "Electrical"
+  },
+  {
+   "name": "Vixit Gondaliya",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Yahya Shaikh_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Yogesh Bhavsar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Yogesh Makwana",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "🗓️ Inspector Role by Month (optional – split Supply Chain vs Projects)",
+   "type": "Employee",
+   "discipline": ""
+  },
+  {
+   "name": "Month Year",
+   "type": "Inspection Engineer Name",
+   "discipline": ""
+  },
+  {
+   "name": "2026-01-01 00:00:00",
+   "type": "Ajay Sanathara",
+   "discipline": ""
+  },
+  {
+   "name": "2026-02-01 00:00:00",
+   "type": "(select)",
+   "discipline": ""
+  },
+  {
+   "name": "2026-03-01 00:00:00",
+   "type": "(select)",
+   "discipline": ""
+  }
+ ]
+}

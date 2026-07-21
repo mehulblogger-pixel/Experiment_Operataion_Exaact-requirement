@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Operations Dashboard</h1>
+<p class="sub">Live view of open, pending and closed inspection calls (requirement 14).</p>
+
+<div class="stats">
+  <div class="tile"><div class="n">{{ stats.open }}</div><div class="l">Open calls</div></div>
+  <div class="tile amber"><div class="n">{{ stats.pending_schedule }}</div><div class="l">Pending scheduling</div></div>
+  <div class="tile red"><div class="n">{{ stats.overdue }}</div><div class="l">Overdue / not scheduled</div></div>
+  <div class="tile"><div class="n">{{ stats.invoice_pending }}</div><div class="l">Invoice pending</div></div>
+  <div class="tile green"><div class="n">{{ stats.completed }}</div><div class="l">Completed</div></div>
+  <div class="tile"><div class="n">₹{{ stats.revenue_month|floatformat:0 }}</div><div class="l">Revenue (this month)</div></div>
+</div>
+
+<h2>By status</h2>
+<table class="grid">
+  <tr><th>Status</th><th>Count</th></tr>
+  {% for row in status_rows %}
+    <tr><td>{{ row.label }}</td><td>{{ row.count }}</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Recently registered</h2>
+<table class="grid">
+  <tr><th>Ref</th><th>Client</th><th>Job type</th><th>Required</th><th>Executing office</th><th>Status</th></tr>
+  {% for c in recent %}
+  <tr>
+    <td><a href="{% url 'operations:call_detail' c.pk %}">{{ c.call_ref }}</a></td>
+    <td>{{ c.client }}</td>
+    <td>{{ c.job_type }}</td>
+    <td>{{ c.date_inspection_required }}</td>
+    <td>{{ c.executing_office }}</td>
+    <td><span class="badge {{ c.colour_status }}">{{ c.get_status_display }}</span></td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="6">No calls yet. <a href="{% url 'operations:call_create' %}">Register the first call</a>.</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

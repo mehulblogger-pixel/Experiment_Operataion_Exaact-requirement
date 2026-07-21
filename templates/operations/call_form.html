@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Register Call{% endblock %}
+{% block content %}
+<h1>Register Inspection Call</h1>
+<p class="sub">All lists below are configurable dropdowns — add new options in
+<a href="/admin/">Admin / Config</a> (requirements 6, 8, 18).</p>
+
+<form method="post" class="stack panel">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="msg msg-error">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="form-grid">
+    {% for field in form %}
+      <div style="{% if field.name == 'inspection_address' or field.name == 'report_formats' %}grid-column:1/-1;{% endif %}">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<div class="helptext">{{ field.help_text }}</div>{% endif %}
+        {% if field.errors %}<ul class="errorlist">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  <div style="margin-top:18px;">
+    <button class="btn" type="submit">Register call</button>
+    <a class="btn secondary" href="{% url 'operations:call_list' %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}
