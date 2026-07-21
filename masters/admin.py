@@ -99,9 +99,10 @@ class InspectorAdmin(ActiveAdmin):
         "name",
         "inspector_type",
         "discipline",
+        "email",
         "home_office",
         "is_active",
     )
     list_filter = ("inspector_type", "discipline", "home_office", "is_active")
-    search_fields = ("name",)
+    search_fields = ("name", "email")
     filter_horizontal = ("competencies",)

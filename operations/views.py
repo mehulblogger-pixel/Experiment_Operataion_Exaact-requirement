@@ -1,17 +1,27 @@
+from datetime import timedelta
+
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from .forms import AllocateInspectorForm, InspectionCallForm, RejectCallForm
+from .forms import (
+    AllocateInspectorForm,
+    DeliverableSubmitForm,
+    InspectionCallForm,
+    RejectCallForm,
+)
 from .models import (
     CallEvent,
     CallStatus,
     ColourStatus,
     InspectionCall,
+    ReportDeliverable,
     ScheduleAssignment,
 )
+from .notifications import notify_inspector_allocated
 
 
 def _visible_calls(user):
@@ -126,7 +136,7 @@ def allocate_inspector(request, pk):
         if form.is_valid():
             # Reshuffle: deactivate any current active assignment.
             call.assignments.filter(is_active=True).update(is_active=False)
-            ScheduleAssignment.objects.create(
+            assignment = ScheduleAssignment.objects.create(
                 call=call,
                 inspector=form.cleaned_data["inspector"],
                 inspector_kind=form.cleaned_data["inspector_kind"],
@@ -140,11 +150,29 @@ def allocate_inspector(request, pk):
             call.save(update_fields=["date_call_allocated", "status", "updated_at"])
             CallEvent.objects.create(
                 call=call, kind=CallEvent.Kind.SCHEDULED, actor=request.user,
-                note=f"Allocated to {form.cleaned_data['inspector']} "
-                f"on {form.cleaned_data['scheduled_date']}"
-                + (" (tentative)" if form.cleaned_data["is_tentative"] else ""),
+                note=f"Allocated to {assignment.inspector} "
+                f"on {assignment.scheduled_date}"
+                + (" (tentative)" if assignment.is_tentative else ""),
             )
-            messages.success(request, "Inspector allocated.")
+
+            # Start the TAT clock: create a deliverable per selected report format.
+            if call.reporting_required and not call.deliverables.exists():
+                due = assignment.scheduled_date + timedelta(
+                    days=settings.REPORT_TAT_DAYS
+                )
+                for fmt in call.report_formats.all():
+                    ReportDeliverable.objects.create(
+                        call=call, report_format=fmt, due_date=due
+                    )
+
+            # Notify the inspector (requirement 6d).
+            emailed = notify_inspector_allocated(call, assignment)
+            messages.success(
+                request,
+                "Inspector allocated."
+                + (" Notification emailed." if emailed else
+                   " (No inspector email on file — add one to notify by email.)"),
+            )
             return redirect("operations:call_detail", pk=call.pk)
     else:
         form = AllocateInspectorForm()
@@ -200,3 +228,96 @@ def complete_call(request, pk):
         messages.success(request, "Job marked complete.")
         return redirect("operations:call_detail", pk=call.pk)
     return render(request, "operations/complete.html", {"call": call})
+
+
+@login_required
+def reports_pending(request):
+    """Deliverables not yet submitted, TAT-overdue highlighted (Reporting a-d)."""
+    calls = _visible_calls(request.user)
+    qs = (
+        ReportDeliverable.objects.filter(call__in=calls, submitted_at__isnull=True)
+        .select_related("call", "call__client", "report_format", "call__executing_office")
+        .order_by("due_date")
+    )
+    today = timezone.localdate()
+    rows = list(qs)
+    overdue = sum(1 for d in rows if d.due_date and d.due_date < today)
+    return render(
+        request,
+        "operations/reports_pending.html",
+        {"deliverables": rows, "overdue": overdue, "today": today},
+    )
+
+
+@login_required
+def deliverable_submit(request, pk):
+    """Mark a deliverable submitted (Reporting c/e). Fetches call via visibility."""
+    deliverable = get_object_or_404(
+        ReportDeliverable.objects.filter(call__in=_visible_calls(request.user)), pk=pk
+    )
+    if request.method == "POST":
+        form = DeliverableSubmitForm(request.POST, request.FILES)
+        if form.is_valid():
+            deliverable.submitted_at = timezone.now()
+            if form.cleaned_data.get("document"):
+                deliverable.document = form.cleaned_data["document"]
+            deliverable.uploaded_to_sharepoint = form.cleaned_data[
+                "uploaded_to_sharepoint"
+            ]
+            if form.cleaned_data.get("notes"):
+                deliverable.notes = form.cleaned_data["notes"]
+            deliverable.save()
+            # If all deliverables are in, move the call out of report-pending.
+            call = deliverable.call
+            if not call.deliverables.filter(submitted_at__isnull=True).exists():
+                if call.status == CallStatus.REPORT_PENDING:
+                    call.status = CallStatus.IN_PROGRESS
+                    call.save(update_fields=["status", "updated_at"])
+            messages.success(request, f"“{deliverable.report_format}” submitted.")
+            return redirect("operations:call_detail", pk=deliverable.call.pk)
+    else:
+        form = DeliverableSubmitForm()
+    return render(
+        request,
+        "operations/deliverable_submit.html",
+        {"form": form, "deliverable": deliverable},
+    )
+
+
+@login_required
+def invoice_pending(request):
+    """Calls flagged for invoicing (requirement 5h)."""
+    calls = _visible_calls(request.user).filter(status=CallStatus.INVOICE_PENDING)
+    return render(
+        request,
+        "operations/invoice_pending.html",
+        {"calls": calls.order_by("-updated_at")},
+    )
+
+
+@login_required
+def my_work(request):
+    """Inspector self-service: their assignments and deliverables to submit."""
+    profile = request.user.inspector_profile
+    if not profile:
+        return render(request, "operations/my_work.html", {"no_profile": True})
+    assignments = (
+        ScheduleAssignment.objects.filter(inspector=profile, is_active=True)
+        .select_related("call", "call__client", "call__vendor")
+        .order_by("-scheduled_date")
+    )
+    pending = (
+        ReportDeliverable.objects.filter(
+            call__assignments__inspector=profile,
+            call__assignments__is_active=True,
+            submitted_at__isnull=True,
+        )
+        .select_related("call", "report_format")
+        .distinct()
+        .order_by("due_date")
+    )
+    return render(
+        request,
+        "operations/my_work.html",
+        {"assignments": assignments, "pending": pending, "today": timezone.localdate()},
+    )

@@ -3,8 +3,10 @@ from datetime import timedelta
 from django.test import TestCase
 from django.utils import timezone
 
+from django.core import mail
+
 from accounts.models import Role, User
-from masters.models import Client, Inspector, JobType, Office, SBU
+from masters.models import Client, Inspector, JobType, Office, ReportFormat, SBU
 from operations.models import CallStatus, ColourStatus, InspectionCall
 
 
@@ -109,3 +111,43 @@ class WorkflowViewTests(TestCase):
         call.refresh_from_db()
         self.assertEqual(call.status, CallStatus.REJECTED)
         self.assertIn("No inspector", call.rejection_reason)
+
+    def test_allocation_creates_deliverables_and_emails_inspector(self):
+        call = self._call()
+        call.reporting_required = True
+        call.save()
+        fmt = ReportFormat.objects.create(name="Inspection Report")
+        call.report_formats.add(fmt)
+        self.inspector.email = "insp@example.com"
+        self.inspector.save()
+
+        self.client.post(
+            f"/ops/calls/{call.pk}/allocate/",
+            {
+                "inspector": self.inspector.pk,
+                "inspector_kind": "SGS_ASSET",
+                "scheduled_date": str(timezone.localdate()),
+            },
+        )
+        # One deliverable (TAT) created, and the inspector was emailed.
+        self.assertEqual(call.deliverables.count(), 1)
+        self.assertTrue(call.deliverables.first().due_date)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(call.call_ref, mail.outbox[0].subject)
+
+    def test_deliverable_submit_marks_submitted(self):
+        call = self._call()
+        fmt = ReportFormat.objects.create(name="Release Note")
+        d = call.deliverables.create(report_format=fmt)
+        self.assertIsNone(d.submitted_at)
+        self.client.post(f"/ops/deliverables/{d.pk}/submit/", {})
+        d.refresh_from_db()
+        self.assertIsNotNone(d.submitted_at)
+
+    def test_my_work_requires_inspector_profile(self):
+        resp = self.client.get("/ops/my-work/")
+        self.assertContains(resp, "isn't linked to an inspector")
+        self.user.inspector_profile = self.inspector
+        self.user.save()
+        resp = self.client.get("/ops/my-work/")
+        self.assertContains(resp, "My Assignments")

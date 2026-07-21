@@ -107,3 +107,18 @@ class RejectCallForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
         help_text="Recorded permanently and reflected in branch-wise reports.",
     )
+
+
+class DeliverableSubmitForm(forms.Form):
+    document = forms.FileField(
+        required=False,
+        widget=forms.ClearableFileInput(attrs={"class": "form-control"}),
+        help_text="Upload the report file (optional).",
+    )
+    uploaded_to_sharepoint = forms.BooleanField(
+        required=False, label="Also uploaded to SharePoint"
+    )
+    notes = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+    )

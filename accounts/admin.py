@@ -30,8 +30,8 @@ class UserAdmin(DjangoUserAdmin):
     list_filter = ("role", "home_office", "sbu", "is_active", "is_staff")
     search_fields = ("username", "first_name", "last_name", "email")
     fieldsets = DjangoUserAdmin.fieldsets + (
-        ("Operations profile", {"fields": ("role", "home_office", "sbu", "phone")}),
+        ("Operations profile", {"fields": ("role", "home_office", "sbu", "phone", "inspector_profile")}),
     )
     add_fieldsets = DjangoUserAdmin.add_fieldsets + (
-        ("Operations profile", {"fields": ("role", "home_office", "sbu", "phone")}),
+        ("Operations profile", {"fields": ("role", "home_office", "sbu", "phone", "inspector_profile")}),
     )

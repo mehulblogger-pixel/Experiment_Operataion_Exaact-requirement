@@ -21,7 +21,7 @@ class UserCreateForm(_StyledMixin, forms.ModelForm):
     class Meta:
         model = User
         fields = ["username", "first_name", "last_name", "email", "role",
-                  "home_office", "sbu", "phone"]
+                  "home_office", "sbu", "phone", "inspector_profile"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -44,7 +44,7 @@ class UserEditForm(_StyledMixin, forms.ModelForm):
     class Meta:
         model = User
         fields = ["first_name", "last_name", "email", "role",
-                  "home_office", "sbu", "phone"]
+                  "home_office", "sbu", "phone", "inspector_profile"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

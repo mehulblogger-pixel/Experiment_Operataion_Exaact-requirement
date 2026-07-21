@@ -8,7 +8,8 @@
   <div class="tile"><div class="n">{{ stats.open }}</div><div class="l">Open calls</div></div>
   <div class="tile amber"><div class="n">{{ stats.pending_schedule }}</div><div class="l">Pending scheduling</div></div>
   <div class="tile red"><div class="n">{{ stats.overdue }}</div><div class="l">Overdue / not scheduled</div></div>
-  <div class="tile"><div class="n">{{ stats.invoice_pending }}</div><div class="l">Invoice pending</div></div>
+  <div class="tile"><div class="n"><a href="{% url 'operations:invoice_pending' %}">{{ stats.invoice_pending }}</a></div><div class="l">Invoice pending</div></div>
+  <div class="tile {% if stats.reports_overdue %}red{% endif %}"><div class="n"><a href="{% url 'operations:reports_pending' %}">{{ stats.reports_pending }}</a></div><div class="l">Reports pending{% if stats.reports_overdue %} ({{ stats.reports_overdue }} overdue){% endif %}</div></div>
   <div class="tile green"><div class="n">{{ stats.completed }}</div><div class="l">Completed</div></div>
   <div class="tile"><div class="n">₹{{ stats.revenue_month|floatformat:0 }}</div><div class="l">Revenue (this month)</div></div>
 </div>

@@ -52,6 +52,15 @@ class User(AbstractUser):
         help_text="SBU for SBU Heads / relevant roles.",
     )
     phone = models.CharField(max_length=32, blank=True)
+    inspector_profile = models.ForeignKey(
+        "masters.Inspector",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="user_accounts",
+        help_text="Link an inspector-role user to their inspector record so they "
+        "see their own assignments.",
+    )
 
     class Meta:
         ordering = ["username"]

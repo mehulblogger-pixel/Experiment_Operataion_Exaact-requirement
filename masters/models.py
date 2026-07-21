@@ -214,6 +214,8 @@ class Inspector(TimeStamped):
     discipline = models.CharField(
         max_length=80, blank=True, help_text="e.g. Mechanical, Civil, Electrical"
     )
+    email = models.EmailField(blank=True, help_text="Used to notify on allocation.")
+    phone = models.CharField(max_length=32, blank=True)
     sgs_asset_default = models.CharField(max_length=80, blank=True)
     home_office = models.ForeignKey(
         Office, on_delete=models.SET_NULL, null=True, blank=True, related_name="inspectors"

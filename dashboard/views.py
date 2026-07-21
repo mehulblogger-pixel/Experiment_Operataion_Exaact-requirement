@@ -3,7 +3,7 @@ from django.db.models import Count, Sum
 from django.shortcuts import render
 from django.utils import timezone
 
-from operations.models import CallStatus, InspectionCall
+from operations.models import CallStatus, InspectionCall, ReportDeliverable
 from operations.views import _visible_calls
 
 
@@ -33,11 +33,18 @@ def home(request):
         for code, label in CallStatus.choices
     ]
 
+    reports_pending = ReportDeliverable.objects.filter(
+        call__in=calls, submitted_at__isnull=True
+    )
+    reports_overdue = reports_pending.filter(due_date__lt=today).count()
+
     stats = {
         "open": calls.filter(status__in=open_statuses).count(),
         "pending_schedule": pending_schedule.count(),
         "overdue": len(overdue),
         "invoice_pending": calls.filter(status=CallStatus.INVOICE_PENDING).count(),
+        "reports_pending": reports_pending.count(),
+        "reports_overdue": reports_overdue,
         "completed": calls.filter(status=CallStatus.COMPLETED).count(),
         "rejected": calls.filter(status=CallStatus.REJECTED).count(),
         "revenue_month": calls.filter(

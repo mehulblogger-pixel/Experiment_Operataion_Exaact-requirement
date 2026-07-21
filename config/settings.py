@@ -179,3 +179,5 @@ ESCALATION_TO_BRANCH_MANAGER_DAYS = int(
 ESCALATION_TO_SBU_HEAD_DAYS = int(
     os.environ.get("ESCALATION_TO_SBU_HEAD_DAYS", "5")
 )
+# Turnaround time (days after the scheduled inspection) to submit each report.
+REPORT_TAT_DAYS = int(os.environ.get("REPORT_TAT_DAYS", "3"))

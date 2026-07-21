@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Submit report{% endblock %}
+{% block content %}
+<h1>Submit Report</h1>
+<p class="sub">{{ deliverable.call.call_ref }} · {{ deliverable.call.client }} · <strong>{{ deliverable.report_format }}</strong>
+{% if deliverable.due_date %}· due {{ deliverable.due_date }}{% endif %}</p>
+
+<form method="post" enctype="multipart/form-data" class="stack panel" style="max-width:560px;">
+  {% csrf_token %}
+  {% for field in form %}
+    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field }}
+    {% if field.help_text %}<div class="helptext">{{ field.help_text }}</div>{% endif %}
+    {% if field.errors %}<ul class="errorlist">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+  {% endfor %}
+  <div style="margin-top:16px;">
+    <button class="btn" type="submit">Mark submitted</button>
+    <a class="btn secondary" href="{% url 'operations:call_detail' deliverable.call.pk %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}
