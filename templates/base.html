@@ -16,6 +16,8 @@
     <a href="{% url 'operations:schedule_board' %}">Schedule Board</a>
     <a href="{% url 'operations:call_list' %}">Calls</a>
     <a href="{% url 'operations:call_create' %}">+ New Call</a>
+    <a href="{% url 'masters:client_list' %}">Clients</a>
+    <a href="{% url 'masters:vendor_list' %}">Vendors</a>
     <a href="/admin/">Admin / Config</a>
   </nav>
   <span class="user">
@@ -33,5 +35,6 @@
   {% endif %}
   {% block content %}{% endblock %}
 </main>
+<script src="{% static 'js/searchable-select.js' %}"></script>
 </body>
 </html>

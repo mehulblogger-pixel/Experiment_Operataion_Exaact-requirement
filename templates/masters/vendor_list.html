@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Vendors{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+  <div>
+    <h1>Vendors / Manufacturers</h1>
+    <p class="sub">{{ total }} vendor{{ total|pluralize }} in the master.</p>
+  </div>
+  <a class="btn" href="{% url 'masters:vendor_create' %}">+ Add Vendor</a>
+</div>
+
+<form method="get" style="margin:6px 0 16px;">
+  <input class="form-control" type="text" name="q" value="{{ q }}"
+         placeholder="Search by name, contact person or location…" style="max-width:420px;display:inline-block;">
+  <button class="btn secondary" type="submit">Search</button>
+  {% if q %}<a class="btn secondary" href="{% url 'masters:vendor_list' %}">Clear</a>{% endif %}
+</form>
+
+<table class="grid">
+  <tr><th>Name</th><th>Location</th><th>Contact person</th><th>Email</th><th>Mobile</th><th>Active</th><th></th></tr>
+  {% for v in page %}
+  <tr>
+    <td>{{ v.name }}</td>
+    <td>{{ v.location|default:"—" }}</td>
+    <td>{{ v.contact_person|default:"—" }}</td>
+    <td>{{ v.contact_email|default:"—" }}</td>
+    <td>{{ v.contact_mobile|default:"—" }}</td>
+    <td>{% if v.is_active %}Yes{% else %}<span class="badge RED">No</span>{% endif %}</td>
+    <td><a class="btn small secondary" href="{% url 'masters:vendor_edit' v.pk %}">Edit</a></td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="7">No vendors found{% if q %} for “{{ q }}”{% endif %}.</td></tr>
+  {% endfor %}
+</table>
+
+{% include "masters/_pagination.html" %}
+{% endblock %}
