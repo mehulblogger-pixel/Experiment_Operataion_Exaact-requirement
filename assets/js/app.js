@@ -192,11 +192,45 @@
     toggle();
   }
 
+  // ---- Narrow Type-of-inspection to the selected client's configured types ----
+  function initClientInspection() {
+    var client = document.getElementById('client_sel');
+    var insp = document.getElementById('insp_sel');
+    if (!client || !insp || !window.INSPTYPES) return;
+    var all = window.INSPTYPES;
+    function rebuild(codes) {
+      var keep = insp.value;
+      var use = (codes && codes.length) ? codes : Object.keys(all);
+      insp.innerHTML = '<option value="">—</option>';
+      use.forEach(function (c) {
+        if (!all[c]) return;
+        var op = document.createElement('option'); op.value = c; op.textContent = all[c];
+        if (c === keep) op.selected = true;
+        insp.appendChild(op);
+      });
+      // reflect into the searchable wrapper, if any
+      if (insp.dataset.enh === '1' && insp.parentNode && insp.parentNode.className === 'ss-wrap') {
+        var inpEl = insp.parentNode.querySelector('input.form-control');
+        if (inpEl) inpEl.value = insp.options[insp.selectedIndex] ? insp.options[insp.selectedIndex].textContent : '';
+      }
+    }
+    function load() {
+      var id = client.value;
+      if (!id) { rebuild(null); return; }
+      fetch('/partner-meta?id=' + encodeURIComponent(id))
+        .then(function (r) { return r.json(); })
+        .then(function (res) { rebuild(res.inspection_types || []); })
+        .catch(function () { rebuild(null); });
+    }
+    client.addEventListener('change', load);
+  }
+
   function init() {
     gstAutofill();
     initCascades();
     initActivity();
     initCustomFreq();
+    initClientInspection();
     initQuickAdd();
     Array.prototype.forEach.call(document.querySelectorAll('select.searchable'), enhanceSelect);
   }
