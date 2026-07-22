@@ -20,6 +20,7 @@ const DELIVERABLES = ['IR'=>'Inspection Report (IR)','IRN'=>'Inspection Release 
 const ATT_STATUS = ['PRESENT_NB'=>'Present (non-billable)','TRAINING'=>'Training','MEETING'=>'Meeting','LEAVE'=>'Leave','WFH'=>'Work from home','COMPOFF'=>'Comp-off taken','HOLIDAY'=>'Holiday'];
 const JOB_TYPES = ['INSPECTION'=>'Inspection (day-based)','DEPUTATION'=>'Project deputation (site)'];
 const EXPENSE_HEADINGS = ['TRAVEL'=>'Travel','LOCAL'=>'Local conveyance','FOOD'=>'Food','LODGING'=>'Lodging','MISC'=>'Misc'];
+const DEPARTMENTS = ['QUALITY'=>'Quality','PROJECTS'=>'Projects','ENGINEERING'=>'Engineering','DESIGN'=>'Design','INSPECTION'=>'Inspection','PROCUREMENT'=>'Procurement / Purchase','PRODUCTION'=>'Production','MAINTENANCE'=>'Maintenance','SAFETY'=>'Safety / HSE','COMMERCIAL'=>'Commercial / Finance','STORES'=>'Stores','PLANNING'=>'Planning','OWNER'=>'Owner','PARTNER'=>'Partner','DIRECTOR'=>'Director','MANAGEMENT'=>'Management','OTHER'=>'Other'];
 const EXP_LEVELS = ['JUNIOR'=>'Junior','MID'=>'Mid','SENIOR'=>'Senior','EXPERT'=>'Expert / Lead'];
 const RATE_TYPES = ['MANDAY'=>'Per man-day','MANMONTH'=>'Per man-month'];
 const BOSS_STATUS = ['ACTIVE'=>'Active','CLOSED'=>'Closed','HOLD'=>'On hold'];
@@ -121,6 +122,13 @@ function ops_migrate() {
     ensure_column('business_partners', 'inspection_types', "VARCHAR(600) DEFAULT ''");
     // contracting branch that registered the company (drives the code)
     ensure_column('business_partners', 'home_branch_id', 'INT NULL');
+    // richer address (town/village + district) and contact (department + project)
+    ensure_column('partner_addresses', 'town_village', "VARCHAR(150) DEFAULT ''");
+    ensure_column('partner_addresses', 'district', "VARCHAR(150) DEFAULT ''");
+    ensure_column('partner_contacts', 'project', "VARCHAR(200) DEFAULT ''");
+    // contracts / purchase orders carry SBU for revenue attribution
+    ensure_column('partner_contracts', 'sbu', "VARCHAR(20) DEFAULT ''");
+    ensure_column('partner_purchase_orders', 'sbu', "VARCHAR(20) DEFAULT ''");
     // inspector master overhaul: names, trade, multi-SBU, multi-skill
     ensure_column('inspectors', 'first_name', "VARCHAR(80) DEFAULT ''");
     ensure_column('inspectors', 'middle_name', "VARCHAR(80) DEFAULT ''");
@@ -206,6 +214,15 @@ function gen_partner_code($branchId, $name) {
     $last = ops_val("SELECT code FROM business_partners WHERE code LIKE ? ORDER BY code DESC LIMIT 1", ["$prefix%"]);
     $seq = ($last && preg_match('/-(\d{5})$/', $last, $m)) ? (int)$m[1] + 1 : 1;
     return sprintf("%s-%s-%s-%05d", $bc, $yy, partner_short_name($name), $seq);
+}
+// "Other (add new)…" on a lookup dropdown → create the value and return its code.
+function resolve_new_lookup($typeKey, $val, $newText) {
+    if ($val !== '__new__') return $val;
+    $newText = trim($newText);
+    if ($newText === '') return '';
+    $code = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $newText), 0, 20)) ?: strtoupper(substr(md5($newText), 0, 8));
+    lk_ensure_value($typeKey, $code, $newText);
+    return $code;
 }
 // Find an existing company by GSTIN / PAN / TAN / normalized name (avoids duplicates).
 function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {

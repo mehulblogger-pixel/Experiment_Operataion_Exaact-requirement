@@ -272,6 +272,16 @@
     exec.addEventListener('change', sync); sync();
   }
 
+  // ---- "Other (add new)…" on a dropdown reveals a text box ----
+  function initOtherNew() {
+    Array.prototype.forEach.call(document.querySelectorAll('input[data-newfor]'), function (inp) {
+      var sel = document.querySelector('[name="' + inp.getAttribute('data-newfor') + '"]');
+      if (!sel) return;
+      function sync() { inp.style.display = (sel.value === '__new__') ? 'block' : 'none'; if (sel.value !== '__new__') inp.value = ''; }
+      sel.addEventListener('change', sync); sync();
+    });
+  }
+
   // ---- Sub-contractor ⇒ also a Vendor (manpower supplier) ----
   function initSubconVendor() {
     var sc = document.getElementById('is_subcon');
@@ -280,11 +290,23 @@
     sc.addEventListener('change', function () { if (sc.checked) ven.checked = true; });
   }
 
+  // ---- Registration: number auto-fills from the company's GSTIN/PAN/TAN/CIN ----
+  function initRegAutofill() {
+    var doc = document.getElementById('reg_doc');
+    var num = document.getElementById('reg_number');
+    if (!doc || !num || !window.REGDATA) return;
+    function sync() { var v = window.REGDATA[doc.value]; if (v && !num.value) num.value = v; }
+    doc.addEventListener('change', function () { var v = window.REGDATA[doc.value] || ''; num.value = v; });
+    sync();
+  }
+
   function init() {
     gstAutofill();
     initDisplayName();
     initForwardCredit();
     initSubconVendor();
+    initRegAutofill();
+    initOtherNew();
     initCascades();
     initActivity();
     initCustomFreq();

@@ -166,6 +166,8 @@ if ($route === 'partner-new') {
         if ($dup) {
             return view('form', $formVars + ['error' => "This company already exists as {$dup['row']['code']} — {$dup['row']['legal_name']} (matched by {$dup['by']}). Open it from the Clients/Vendors list and tick the extra role instead of creating a duplicate."]);
         }
+        $b['client_type'] = resolve_new_lookup('client_type', $b['client_type'] ?? '', $b['client_type_new'] ?? '');
+        $b['industry'] = resolve_new_lookup('industry', $b['industry'] ?? '', $b['industry_new'] ?? '');
         $branchId = ($b['home_branch_id'] ?? '') !== '' ? (int)$b['home_branch_id'] : null;
         $code = gen_partner_code($branchId, ($b['display_name'] ?? '') ?: ($b['legal_name'] ?? ''));
         $ins = $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,is_subcontractor,client_type,industry,ownership_type,status,gstin,pan,cin,tan,msme_udyam,state,website,description,home_branch_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
@@ -185,6 +187,8 @@ if ($route === 'partner-edit') {
     if ($method === 'POST') {
         $b = $_POST;
         if (!empty($b['is_subcontractor'])) $b['is_vendor'] = 1; // sub-contractor ⇒ vendor
+        $b['client_type'] = resolve_new_lookup('client_type', $b['client_type'] ?? '', $b['client_type_new'] ?? '');
+        $b['industry'] = resolve_new_lookup('industry', $b['industry'] ?? '', $b['industry_new'] ?? '');
         $gstin = clean_gstin($b['gstin'] ?? '');
         $pan = $gstin ? pan_from_gstin($gstin) : $p['pan'];
         $state = $gstin ? state_from_gstin($gstin) : $p['state'];
@@ -209,10 +213,10 @@ if ($route === 'partner-add' && $method === 'POST') {
     $kind = $_GET['kind'] ?? '';
     $b = $_POST;
     $map = [
-        'contact' => ['partner_contacts', ['name','designation','department','email','mobile','phone','address_id'], 'contacts'],
-        'address' => ['partner_addresses', ['address_type','label','line1','line2','city','state','pincode','country'], 'addresses'],
+        'contact' => ['partner_contacts', ['name','designation','department','project','email','mobile','phone','address_id'], 'contacts'],
+        'address' => ['partner_addresses', ['address_type','label','line1','line2','town_village','district','city','state','pincode','country'], 'addresses'],
         'registration' => ['partner_registrations', ['doc_type','number','valid_to','notes'], 'registration'],
-        'contract' => ['partner_contracts', ['contract_number','title','value','start_date','end_date','notes'], 'contracts'],
+        'contract' => ['partner_contracts', ['contract_number','title','sbu','value','start_date','end_date','notes'], 'contracts'],
         'relationship' => ['partner_relationships', ['relation_type','related_id','notes'], 'relationships'],
     ];
     if ($kind === 'note') {
@@ -222,8 +226,8 @@ if ($route === 'partner-add' && $method === 'POST') {
         redirect("/partner?id={$p['id']}&tab=notes");
     }
     if ($kind === 'po') {
-        $pdo->prepare("INSERT INTO partner_purchase_orders (partner_id,contract_id,po_number,po_type,title,value,start_date,end_date,notes) VALUES (?,?,?,?,?,?,?,?,?)")
-            ->execute([$p['id'], ($b['contract_id'] ?? '') !== '' ? $b['contract_id'] : null, $b['po_number'] ?? '', $b['po_type'] ?? 'REGULAR', $b['title'] ?? '', ($b['value'] ?? '') !== '' ? $b['value'] : null, $b['start_date'] ?? '', $b['end_date'] ?? '', $b['notes'] ?? '']);
+        $pdo->prepare("INSERT INTO partner_purchase_orders (partner_id,contract_id,sbu,po_number,po_type,title,value,start_date,end_date,notes) VALUES (?,?,?,?,?,?,?,?,?,?)")
+            ->execute([$p['id'], ($b['contract_id'] ?? '') !== '' ? $b['contract_id'] : null, $b['sbu'] ?? '', $b['po_number'] ?? '', $b['po_type'] ?? 'REGULAR', $b['title'] ?? '', ($b['value'] ?? '') !== '' ? $b['value'] : null, $b['start_date'] ?? '', $b['end_date'] ?? '', $b['notes'] ?? '']);
         flash('Purchase order added.');
         redirect('/po?id=' . $pdo->lastInsertId());
     }
@@ -260,6 +264,7 @@ if ($route === 'partner') {
         'pos' => children('partner_purchase_orders', $p['id']),
         'rels' => (function() use ($pdo, $p) { $s = $pdo->prepare("SELECT r.*, b.legal_name rn, b.display_name rd, b.id rid FROM partner_relationships r LEFT JOIN business_partners b ON b.id=r.related_id WHERE r.partner_id=?"); $s->execute([$p['id']]); return $s->fetchAll(); })(),
         'all_partners' => (function() use ($pdo, $p) { $s = $pdo->prepare("SELECT id, legal_name, display_name FROM business_partners WHERE id <> ? ORDER BY legal_name"); $s->execute([$p['id']]); return $s->fetchAll(); })(),
+        'cityList' => array_values(array_filter(array_column($pdo->query("SELECT DISTINCT city FROM partner_addresses WHERE city <> '' ORDER BY city")->fetchAll(), 'city'))),
     ]);
 }
 
