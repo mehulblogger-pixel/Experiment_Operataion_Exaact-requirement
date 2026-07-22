@@ -1,0 +1,2732 @@
+{
+ "offices": [
+  "AHMEDABAD",
+  "BANGALORE",
+  "BHOPAL",
+  "CHENNAI",
+  "COIMBATORE",
+  "GURGAON",
+  "HYDERABAD",
+  "INDORE",
+  "KOLKATA",
+  "LUDHIANA",
+  "MUMBAI",
+  "MUMBAI_EXIM",
+  "NAGPUR",
+  "NIC",
+  "PUNE",
+  "VADODARA"
+ ],
+ "sbus": {
+  "I03": "Mining Energy & Power",
+  "I23": "Manufacturing",
+  "I04": "Water Distribution & Infrastructure"
+ },
+ "activities": {
+  "53002": "I03",
+  "5102": "I03",
+  "5132": "I23",
+  "5133": "I23",
+  "5142": "I04",
+  "5103": "I03",
+  "51002": "I03",
+  "5122": "I04",
+  "5143": "I04"
+ },
+ "product_categories": [
+  "Agitator",
+  "Brass Ferrule",
+  "CNG Dispenser",
+  "Cable",
+  "Cable Trays & Ladders",
+  "Cascade",
+  "Casting Components",
+  "Chlorination System",
+  "Civil Inspection",
+  "Coating & Painting",
+  "Coil",
+  "Conductor",
+  "Container",
+  "Control Panels",
+  "Cylinder",
+  "DI Pipe",
+  "Dedusting System",
+  "Dust Suppression System",
+  "Electric Pole",
+  "Electrical Cables (Power/Control)",
+  "Electrical Heater",
+  "Electrofussion Fittings",
+  "Expediting Visit",
+  "FRP Material Structural/ tank / others",
+  "Fabrication",
+  "Fasteners (Bolts, Nuts, Washers)",
+  "Febrication Meterial",
+  "Fire Extinguisher",
+  "Fittings (Elbows, Tees, Reducers)",
+  "Flanges (Forged/Plate)",
+  "Forging Components",
+  "Gas meters",
+  "Generators",
+  "Grinding Media",
+  "HT/LT Project",
+  "Instrumentation (Gauges, Transmitters)",
+  "Insulators",
+  "LED Light",
+  "Lab Testing",
+  "Material Handling / Crane / EOT / Over Head Crane",
+  "Mechanical Screen",
+  "Motors",
+  "Non Destructive Testing",
+  "Others",
+  "PDI",
+  "PTFE Lining",
+  "PVC / UPVC / HDPE / MDPE / LDPE / PIPES & FITTINGS",
+  "PVC / UPVC / HDPE / MDPE / LDPE / PIPES & FITTINGS / WARNING MAT",
+  "Pipes / Tubes",
+  "Plant ShutDown",
+  "Plastic Miscellaneous",
+  "Plates & Sheets",
+  "Pouring",
+  "Pre Cast",
+  "Pre Dispatch Inspection",
+  "Pressure Vessel / Heat Exchangers / Columns / Storage tanks",
+  "Pump",
+  "QAC Support",
+  "Rail Wagon",
+  "Refractory Materials",
+  "Rollers",
+  "Rolls",
+  "Rotary Equipment / Compressor / Blower / Fans",
+  "SCADA & MPPC system",
+  "SOLAR PCS",
+  "Shaft Overlay",
+  "Solar Module",
+  "Stamp Transfer",
+  "Storage Tank",
+  "Structural Material (Beams, Channels, Angles)",
+  "TMT BARS",
+  "Transformers",
+  "Tubes (Heat Exchanger/Boiler)",
+  "Turbine Blade",
+  "UPS",
+  "UPS System",
+  "Valves (Gate, Globe, Check, Ball, Butterfly)",
+  "Vendor Evaluation / Vendor Audit / Capacity Assessment / NSIC Audit"
+ ],
+ "vendor_locations": [
+  "Ahmedabad",
+  "Bakrol",
+  "Baramati",
+  "Bavla",
+  "Bharuch",
+  "Bhavnagar",
+  "Chanderiya",
+  "Chhatral",
+  "Dholera",
+  "Dholka",
+  "Gandhinagar",
+  "Halol",
+  "Haridwar",
+  "Haryana",
+  "Himatnagar",
+  "Jamnagar",
+  "Jasdan",
+  "Junagadh",
+  "Kachchh",
+  "Kalol",
+  "Karjan",
+  "Kheda",
+  "Mahesana",
+  "Morbi",
+  "Nadiad",
+  "Raipur",
+  "Rajasthan",
+  "Rajkot",
+  "Sabarkantha",
+  "Surat",
+  "Surendranagar",
+  "Udaipur",
+  "Vadodara"
+ ],
+ "clients": [
+  "2MM BETON",
+  "A A Vasani Polypipe Llp",
+  "AGGARWAL BATH CONCEPTS",
+  "AGP City Gas Private Limited",
+  "ALK INFRA",
+  "AMAN MACHINE TOOLS PRIVATE LIMITED",
+  "AMBICA TRADING",
+  "AMPLUS SUN BEAT PRIVATE LIMITED",
+  "AMPO VALVES INDIA PRIVATE LIMITED",
+  "ANANTA PROCON",
+  "ARHAM RENEWTECH INDIA PRIVATE LIMITED",
+  "ARTSON LIMITED ((A TATA ENTERPRISES)",
+  "Acme Air Equipments Company Private Limited",
+  "Acme Solar Holding Private Limited",
+  "Acmefil Engineering Systems Private Limited",
+  "Adani Energy Solutions Limited (KHAVDA POWER IV A TRANSMISSION LIMITED)",
+  "Adani Green Energy Limited",
+  "Adani Infra India Limited",
+  "Adani Water Limited",
+  "Adaptive Engineering Private Limited",
+  "Aditya Birla",
+  "Aditya Birla\nRenewables Limited",
+  "Aditya Sales Corporation",
+  "Aeon Software Private Limited",
+  "Aeron Composite Limited",
+  "Afrzen Private Limited",
+  "Agro Pulping Machinery Private Limited",
+  "Aia Engineering Limited",
+  "Aira 4 Matic Global Valve Automation Private Limited",
+  "Airox Nigen Equipments Private Limited",
+  "Alpha Devraj Renewable Energy Llp",
+  "Amplus KN One Power Private Limited",
+  "Angelique International Limited",
+  "Antelopus Selan Energy Limited",
+  "Apollo Screens Private Limited",
+  "Aqua Machineries Private Limited",
+  "Arcelor Mittal Nippon Steel India Limited",
+  "Arcons Infrastructures & Constructions Private Limited",
+  "Argo Solar Private Limited",
+  "Artson Engineering Limited",
+  "Arvensis Energy Private Limited",
+  "Arvinox Stainless LLP",
+  "Avolate Technologies",
+  "Axis Solutions Private Limited",
+  "Azure Power India Privte Limited",
+  "Bayer Vapi Private Limited",
+  "Beijing Henson Engineering Technology Company Limited",
+  "Bentlay Fittings Limited",
+  "Biyani Alloys Private Limited",
+  "Boundless Environment Resource Solutions",
+  "Brevitee International",
+  "Brothers Plast Tech Private Limited",
+  "Burckhardt Compression India Private Limited",
+  "CECO ENVIRONMENTAL SOLUTIONS INDIA PRIVATE LIMITED",
+  "CHIRIPAL PLOYFLIMS LIMITED",
+  "CIVET PROJECTS PRIVATE LIMITED",
+  "CMR Infrastructure Private Limited",
+  "COHIZON LIFE SCIENCES LIMITED",
+  "Cair Euromatic Automation Private Limited",
+  "Capital Innotech Private Limited",
+  "Cargil India Private Limited",
+  "Chamunda EletroMech Solution",
+  "Chamunda Plastic Private Limited",
+  "Chennai Metropolitan Water Supply And Sewerage Board",
+  "Chief Engineer Megalift Bhubhaneshwa",
+  "Cimcon Software India Private Limited",
+  "CleanMax Enviro Energy Solutions Limited",
+  "Clout Hitech Innovation Private Limited",
+  "Continual Renewable Energy Private LImited",
+  "Covestro",
+  "Ctci",
+  "D P World Limited",
+  "DIPIETRO INDIA Private Limited",
+  "Darling Muesco India Private Limited",
+  "Darshinal Electromation Private Limted",
+  "Deem Roll Tech Limited",
+  "Deep Seals India Limited",
+  "Detox Green Energy Private Limited",
+  "Detox Group Of Companies",
+  "Digital Engineering Projects Private Limited",
+  "Dineshchandra R Agrawal Infracon Private Limited",
+  "Divine Tubes Private Limited",
+  "Duker Solutions Gmbh",
+  "ERABLUE TECHNOLOGY Private Limited",
+  "Eagle Infra Pravite Limited",
+  "Earth Water Pipe Fittings Private Limited",
+  "Eco Protection Engineers Private Limited",
+  "Ecoren Energy India Private Ltd",
+  "Ecoren Energy India Pvt Ltd",
+  "Eiffil Water Infra Private Limited",
+  "Electrotherm India Limited",
+  "Energy Emission India Private Limited",
+  "Enerparc Energy Private Limited",
+  "Enviro infra Engineers Limited",
+  "Envision Energy India Private Limited",
+  "Epp Composites Private Limited",
+  "Essens Renewable Private Limited",
+  "Euro Global Gas Cylinders Llp",
+  "Evercrest Projects Private Limited",
+  "Everest Kanto Cylinder Limited",
+  "Everest Multitech",
+  "Evren Energy Private Limited",
+  "Exxonmobil Global Services Company",
+  "G M Engineering Private Limited",
+  "GA INFRA PRIVATE LIMITED",
+  "GSJ ENVO LIMITED",
+  "GYSCOAL Enterprise",
+  "Gangotri Submersible Pump",
+  "Gayatri Private Limited",
+  "Gimex India Projects And Enigneering Private Limited",
+  "Gokul Poly Valves Private Limited",
+  "Goodluck Metallics Private Limited",
+  "Gratik Tubes Private Limited",
+  "Greenleaf Envirotech Limited",
+  "Growmech Industries Private Limited",
+  "Gujarat Alkalies And Chemicals Limited",
+  "Gujarat Fluorochemicals Limited",
+  "Gujarat Industries Power Company Limited",
+  "Gvpr Engineers Limited",
+  "HD Fire Protect Limited",
+  "Havells India Limited",
+  "Hero Future Energies",
+  "Hexa Climate Solutions Private Limited",
+  "Hindustan Zinc Limited",
+  "Hitech Flow Solutions Limited",
+  "Hnb Engineers Private Limited",
+  "ITT SpA",
+  "Indian Oil Corporation Limited",
+  "Indo Asia Copper Limited",
+  "Insolare energy limited",
+  "Inspiron Engineering Private Limited",
+  "International Refreshments India Private Limited",
+  "Ion Exchange India Limited",
+  "Ion Exchange Projects And Engineering Limited",
+  "Isgec Heavy Engineering Limited",
+  "Itt Engineering India Private Limited",
+  "J K Lakshmi Cement Limited",
+  "J P Polyplast Private Limited",
+  "J V Hussein Atieh and Sons Company and Passavant Energy and Environment",
+  "JK Fluid Controls",
+  "Jainson Cables India Private Limited",
+  "Jainsons",
+  "Japs Projects",
+  "Jasco Pump Private Limited",
+  "Jeet Pumps Private Limited",
+  "Jindal Saw Limited",
+  "Jindal Steel and Power",
+  "Jio Bp Mobility Limited",
+  "Jnk India Limited",
+  "Juniper Green Energy Private Limited",
+  "Jwil Infra Limited",
+  "KARELIYA STEEL INDUSTRIES",
+  "KBH ENERGY AND INFRA SERVICES",
+  "KRR Engineer Priavte limited",
+  "Kalpa Power Private Limited",
+  "Kamath Transformers Privete Limited",
+  "Kamlesh Kumar Singh Engineers Private Limited",
+  "Ketan Engineering Works",
+  "Khilari Infrastructure Private Limited",
+  "Kilburn Engineering Limited",
+  "Kirloskar Brothers Limited",
+  "Kirloskar Ebara Pumps Limited",
+  "L & T Energy Hydrocarbon",
+  "L & T Engineering and Construction Company",
+  "L C Infra Projects Private Limited",
+  "LAXMI ORGANIC INDUSTRIES Limited",
+  "LCC Engineering Private Limited",
+  "Larsen and Toubro Limited",
+  "Larsen and Toubro Limited  (Energy Products and Systems Engineering)",
+  "Larsen and Toubro Limited (Energy Products and Systems Engineering)",
+  "Laxmi Civil Engineering Services Private Limited",
+  "Linde India Limited",
+  "Lohum Materials Private Limited",
+  "Lubi Industries Llp",
+  "M G Worldwide Private Limited",
+  "M/s. Texmaco West Rail Limited",
+  "M/s. Ultratech cement limited_Aditya Birla",
+  "MURER SANFIELD PRIVATE LIMITED",
+  "Macons Socage Platforms Private Limited",
+  "Mahanagar Gas Limited",
+  "Maharashtra Jeevan Pradhikaran",
+  "Mahdi and Mohammad Mechanical and Engineering Equipment Trading L.L.C",
+  "Mangukiya Brothers Project Private Limited",
+  "Manikaran Renewables Limited",
+  "Maxim Tubes Company Private Limited",
+  "Mbh Pumps Gujarat Private Limited",
+  "Mbm Tubes Private Limited",
+  "Mc Dermott",
+  "Megha Engineering And Infrastructures Limited",
+  "Miraj Pipes And Fittings Private Limited",
+  "Modern Engineering Company",
+  "Mounting Renewable Power Limited",
+  "Mundra Petrochemical Limited",
+  "N & T ENGITECH Prative Limited",
+  "National Small Industries Corporation",
+  "Navitas Planet Private Limited",
+  "Nayara Energy Limited",
+  "Ncc Limited",
+  "Nidhi Engineering Industries",
+  "Nrpulse",
+  "Nuclear Power Corporation Of India Limited",
+  "Nutral Powertech",
+  "OEC Group",
+  "One Box Warehouse Private Limited",
+  "Onnyx Electronisys Private Limited",
+  "Orbit Engineers Limited Liability Partnership",
+  "Oriano Clean Energy Private Limited",
+  "Orkan Enenrgy Privte Limited",
+  "Oswal Energies Limited",
+  "Oswal Industries Limited",
+  "Oyak Sentetik Karbon Urunleri Sanayi Ve Ticaret A.S.",
+  "P Prabhudas Engineering Private Limited",
+  "PRAMUKH AGRO EXPORT",
+  "Palava Induslogic 4 Private Limited",
+  "Paramount Limited",
+  "Patels Airtemp India Limited",
+  "Pearls Salt Works Private Limited",
+  "Pietro Fiorentini Db India Private Limited",
+  "Praj Industries Limited",
+  "Pratik Corporation",
+  "Precision Infratech Private Limited",
+  "Pride LED",
+  "Primier Energies",
+  "Prozeal Green Energy Limited",
+  "R K M Powergen Private Limited",
+  "RHN IMPEX",
+  "RYSA Infratech Limited",
+  "Rainson Pipe Industries Private Limited",
+  "Rajasthan Urban Drinking Water Sewerage and Infrastructure Corporation Limited",
+  "Rajasthan Urban Infrastructure Development Project",
+  "Rajendra Engineering Works",
+  "Rajsha Chemicals Private Limited",
+  "Rama Cylinders Private Limited",
+  "Ramalingam Construction company Limited",
+  "Rashmi Metaliks Limited",
+  "Ratnamani Metal And Tube Limited - C S Division",
+  "Reliance Industries Limited",
+  "Reliance Infrastructure Limited",
+  "Reliance OSBL Project I Bechtel India Private Limited",
+  "Renew Power Private Limited",
+  "Rhythm Automation Control Private Limited",
+  "S A Infracom",
+  "SAMRAT CONSTRUCTIONS",
+  "SAP Control Systems & Engineers Private Limited",
+  "SKN Gas",
+  "SOPAN PROCESS TECHNOLOGIES Private Limited",
+  "STILONN VALVES AND CONTROLS PRIVATE LIMITED",
+  "SV Power link Private Limited",
+  "Safex Industries Limited",
+  "Sagoma Impex Private Limited",
+  "Sahaj Constructions Private Limited",
+  "Saisanket Industries Private Limited",
+  "Sany",
+  "Saravana Engineering and Infratech Private Limited",
+  "Sarju Impex Limited",
+  "Sattva Engineering Construction Limite",
+  "Sauni Yojana Project",
+  "Sealmech Valves",
+  "Serentica Renewables India 3 Private Limited",
+  "Sevitsil Solution in Silicone",
+  "Shah Bhogilal Jethalal And Bros",
+  "Shree Cement Limited",
+  "Shri Navkar Metals Limited",
+  "Shri Ram Construction Company",
+  "Shyam Enterprise",
+  "Silox India Private Limited",
+  "Silver Bay Marine Gear Private Limited",
+  "Sima Labs",
+  "Simon India Limited",
+  "Singhal Industries Private Limited",
+  "Sintex Advance Plastic Limited",
+  "Solarworld Energy Solutions Limited",
+  "Solid Blue Infra",
+  "Solidus Techno Power Private Limited",
+  "Sopan O And M Company Private Limited",
+  "Sophisticated Industrial Materials Analytic Labs Private Limited",
+  "South East Construction Company Private Limited",
+  "Sprng Energy Private Limited",
+  "Sprng Vayu Vidyut Private Limited",
+  "Subway Network for Trading and Services",
+  "Sun Pharmaceutical Industries Limited",
+  "Sun Trading Co",
+  "Sun Trading Company",
+  "Surya Roshni Limited",
+  "TECHNOCRAFT CONSTRUCTION PVT. LTD. - EMS LTD.",
+  "Tata Power Limited",
+  "Tata Project Limited",
+  "Tata project Limited",
+  "Taurant Projects Limited",
+  "Tawi Engineering India Private Limited",
+  "Technimont Private Limited",
+  "Texmaco West Rail Limited",
+  "The Wesman Engineering Company Private Limited",
+  "Torrent Power Limited",
+  "Training",
+  "Udhna Project",
+  "Ultratech Cement Limited",
+  "Unifrax India Limited",
+  "Unipro Techno Infrastructure Private Li mited",
+  "Univeral Cranes and Lifts",
+  "Universal Piping Systems",
+  "Unnati Pump Enterprise",
+  "Unnati Pump Private Limited",
+  "Usha Compressor Private Limited",
+  "VERKORA PRIVATE LIMITED",
+  "VEXL Environ Projects Private Limited",
+  "VOLTAGESHIFT ENGINEERING SOLUTIONS LLP",
+  "Vapco Engineers Private Limited",
+  "Vasani Polymers Private limited",
+  "Vijay Kumar Mishra Construction Private Limited",
+  "Vishvaraj Environment Private Limited",
+  "Volcur Electrix Private Limited",
+  "WALTER TOSTO WTB S.R.L",
+  "WEFS TECHWORKS LLP",
+  "Waaree Renewable Technologies Limited",
+  "Weg Industries India Private Limited",
+  "Welspun Corporation Limited",
+  "Welspun DI",
+  "Welspun Enterprise Limited",
+  "Welspun Speciality Solution Limited",
+  "Weltreat Systems Private Limited",
+  "Wide Space Technosolution Private Limited",
+  "Wpil Limited",
+  "YASHO INDUSTRIES",
+  "YUKON INDUSTRIES",
+  "Yaha Water Systems Private Limited",
+  "Ycube Engineered Solutions Private Limited"
+ ],
+ "inspectors": [
+  {
+   "name": "Abhay Mehta",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Abhishek Sukla",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Ajay Sanathara",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Akash Prosad",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Akib Shaikh_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Anand Kumar_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Ashok Kumar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Azaz Shaikh_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Bhagirathsinh Zala",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Bharat Ahir_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Chetram Sharma",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Chirag Gohel_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Darshan bambhaniya_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Deegpalsinh Jadeja_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Deeppal Singh Jadeja_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Dharmesh Patel_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Dilip Parmar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Dishant Gandhi",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Dishav Moradiya",
+   "type": "Employee",
+   "discipline": "Civil"
+  },
+  {
+   "name": "Divyarajshinh Sarvaiya",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Dixit Dave_DKA",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Gyandipsinh Jadeja_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Hardas Vasra",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Hardik Kasodariya",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Hardik Pedva",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Harish Ajwaliya",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Hemil Shah",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Jalpesh Gohel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Jay Mandalia",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Jaydeep Parmar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Jaydeep Raval",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Jignesh Maheta",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Jignesh Pitrola",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Kalpesh Patel",
+   "type": "Employee",
+   "discipline": "Electrical"
+  },
+  {
+   "name": "Kamal Kumar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Kana Gadhvi_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Kirtirajsinh Joddha",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Kishan Dodiya_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Laxman Ghedia",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Mahendra Patel",
+   "type": "Employee",
+   "discipline": "Electrical"
+  },
+  {
+   "name": "Mahideepsinh Zala_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Mayanksinh Solanki",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Mukesh Bhatt_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nagji Kalal",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nakul Parmar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nayan Suthar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nikhil Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nikul Zaru",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nikunj Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nilant Khopkar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nilesh Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nirav Chaudhari_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nirav Chaudhary_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nirmal Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Nishant Nimavat",
+   "type": "Employee",
+   "discipline": "Electrical"
+  },
+  {
+   "name": "Pankaj Kumar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Pankaj Sharma",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Paresh Bhalala",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Parth Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Pratik Shah",
+   "type": "Employee",
+   "discipline": "Electrical"
+  },
+  {
+   "name": "Prince Tiwari_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Pritesh Khalashi",
+   "type": "Employee",
+   "discipline": "Civil"
+  },
+  {
+   "name": "Quasid Rabbani",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Radhanath Samanta",
+   "type": "Employee",
+   "discipline": "Civil"
+  },
+  {
+   "name": "Rahul Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Rajiv Devmurari",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Ravji Sorathiya_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Ronak Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Sachin Patel",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Sanjay Vyas_DKA",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Shaikh Mohammad Zaid",
+   "type": "Employee",
+   "discipline": "Electrical"
+  },
+  {
+   "name": "Shasikumar Bhagat",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Sonu Singh_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Surinder Kumar_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Ullas Joshi",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Viraj Patel",
+   "type": "Employee",
+   "discipline": "Electrical"
+  },
+  {
+   "name": "Viral Sathvara",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Viral Sathwara",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Vivek Baldaniya",
+   "type": "Employee",
+   "discipline": "Electrical"
+  },
+  {
+   "name": "Vixit Gondaliya",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Yahya Shaikh_ACS",
+   "type": "Subcon",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Yogesh Bhavsar",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "Yogesh Makwana",
+   "type": "Employee",
+   "discipline": "Mechanical"
+  },
+  {
+   "name": "🗓️ Inspector Role by Month (optional – split Supply Chain vs Projects)",
+   "type": "Employee",
+   "discipline": ""
+  },
+  {
+   "name": "Month Year",
+   "type": "Inspection Engineer Name",
+   "discipline": ""
+  },
+  {
+   "name": "2026-01-01 00:00:00",
+   "type": "Ajay Sanathara",
+   "discipline": ""
+  },
+  {
+   "name": "2026-02-01 00:00:00",
+   "type": "(select)",
+   "discipline": ""
+  },
+  {
+   "name": "2026-03-01 00:00:00",
+   "type": "(select)",
+   "discipline": ""
+  }
+ ],
+ "vendors": [
+  {
+   "name": "3Ginfratech",
+   "location": "Surat"
+  },
+  {
+   "name": "A A Vasani Polypipe Llp",
+   "location": "Sabarkantha"
+  },
+  {
+   "name": "A H Marine",
+   "location": "Bhavnagar"
+  },
+  {
+   "name": "A K Industries",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "ALTRA FINE STEEL PRIVATE LIMITED",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "AMCON CASTINGS PRIVATE LIMITED",
+   "location": "Rajkot"
+  },
+  {
+   "name": "APPL Containers Limited",
+   "location": "Bhavnagar"
+  },
+  {
+   "name": "ARCELLOR CONTROLS INDIA",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "ARRIS TECHNOLOGIS",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "AUM Steel Industries",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Aarohi Embedded Systems",
+   "location": "Rajkot"
+  },
+  {
+   "name": "AbhiRaj Steel Buildings LLP",
+   "location": "Gandhinagar"
+  },
+  {
+   "name": "Accord Tubes And Profiles Llp",
+   "location": "Chhatral"
+  },
+  {
+   "name": "Accu Panels Energy Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Acme Air Equipments Company Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Acmefil Engineering Systems Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Acs Engitech Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Activa Engineers",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Adani Infra India Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Adani New Industries Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Adaptive Engineering Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Aditya Birla\nRenewables Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Aegis Engineering Company Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Aegis Valve Industries Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Aero Engineers Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Aeron Composite Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Aia Engineering Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Air Control And Chemical Engineering Co Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Aira 4 Matic Global Valve Automation Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Aira Euro Automation Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Airox Nigen Equipments Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Ajanta Metals",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Alfa Pumps Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Alleima India Private Limited",
+   "location": "Chhatral"
+  },
+  {
+   "name": "Alnico Electric Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Alpha Laboratory Services Pvt. Ltd.",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Amba Tubes Industries",
+   "location": "Chhatral"
+  },
+  {
+   "name": "Ambica Poles Private Limited",
+   "location": "Bavla"
+  },
+  {
+   "name": "Ames Impex Electricals Private Limited",
+   "location": "Mahesana"
+  },
+  {
+   "name": "Ami Refractahold",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Anil Metal And Alloys Private Limited",
+   "location": "Kheda"
+  },
+  {
+   "name": "Anup Engineering Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Apollo Screens Private Limited",
+   "location": "Gandhinagar"
+  },
+  {
+   "name": "Aqua Machineries Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Arcedges Building India Limited Liability Partnership",
+   "location": "Himatnagar"
+  },
+  {
+   "name": "Arsh Industries",
+   "location": "Bavla"
+  },
+  {
+   "name": "Artech Engineers",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Arvin Engineers",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Arvinox Stainless LLP",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Ashwin Fasteners Private Limited",
+   "location": "Gandhinagar"
+  },
+  {
+   "name": "Asian Flooring India Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Asian Mills Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Asian Tubes Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Astral Limited",
+   "location": "Chhatral"
+  },
+  {
+   "name": "Asva Corporation",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Austin Alloycast Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Automat Irrigation Private Limited",
+   "location": "Haridwar"
+  },
+  {
+   "name": "Avolate Technologies",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Axegic Group Incorporation",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Axis Solutions Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Ayan Fabrication",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "BRIGHTECH VALVES AND CONTROLS Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Bentlay Fittings Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Bosch Rexroth Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Brady And Morris Engineering Company Limited",
+   "location": "Kheda"
+  },
+  {
+   "name": "Brothers Plast Tech Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Bunitech Metallurgical Services Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "C G Metal Lab",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "C I Network Technologies Private limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "C N Fabricators",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "CB Doctor Ventilators Privte Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "CHIRIPAL PLOYFLIMS LIMITED",
+   "location": "Kheda"
+  },
+  {
+   "name": "CIMEC Technologies Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Cair Euromatic Automation Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Calderys India Refractories Limited",
+   "location": "Morbi"
+  },
+  {
+   "name": "Capital Innotech Private Limited",
+   "location": "Udaipur"
+  },
+  {
+   "name": "Cast And Blower Company Gujarat Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Chamunda EletroMech Solution",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Chamunda Plastic Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Chandresh Cable Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Chem Process Systems Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Chembond Clean Water Technologies Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Chicago Blower India Private Limited",
+   "location": "Kheda"
+  },
+  {
+   "name": "Chintan Rubber Industries",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Cimcon Lab",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Cimcon Software India Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Citizen Solar Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Clartech Engineers Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Comfit And Valves Private Limited",
+   "location": "Chhatral"
+  },
+  {
+   "name": "Crude Oil Terminal Project",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Cse Solutions Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Cubuilt Renewables Energy Private Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "D L Valve Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Darling Muesco India Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Dee Fabricom India Private Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Deem Roll Tech Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Deep Seals India Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Delta Technocast Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Demor Cranes",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Deora Wire N Machines Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Divine Metallurgical Services Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Divine Tubes Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Dudhat Infra Products Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Dynamic Equipments Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Dynamic Rubbers Private Limited",
+   "location": "Kheda"
+  },
+  {
+   "name": "Dynemix India Engineering Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "EIT AUTOMATION",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "EQUINOX ALLOYS CAST LLP",
+   "location": "Rajkot"
+  },
+  {
+   "name": "ERABLUE TECHNOLOGY Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Earth Water Pipe Fittings Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Eco Turnkey Solutions Private Limited",
+   "location": "Haryana"
+  },
+  {
+   "name": "Ele+mech Engineering Solutions",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Electro Control Systems India Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Electronic Instrumentation And Control Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Electrotherm India Limited",
+   "location": "Gandhinagar"
+  },
+  {
+   "name": "Elegant Enterprise",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Elegant Green Energy Private Limited",
+   "location": "Bavla"
+  },
+  {
+   "name": "Energy Emission India Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Energy Tech Crane Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Envision Energy India Private Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Epp Composites Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Euro Global Gas Cylinders Llp",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Evercrest Projects Private Limited",
+   "location": "Jamnagar"
+  },
+  {
+   "name": "Everest Kanto Cylinder Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Evergreen Engineering Solutions",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Fabmount Engineering Llp",
+   "location": "Himatnagar"
+  },
+  {
+   "name": "Fabtech Industries",
+   "location": "Udaipur"
+  },
+  {
+   "name": "Falcon Pumps Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Flair Strainers & Filters Private Limited",
+   "location": "Kheda"
+  },
+  {
+   "name": "Flotek Industries Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Flowchem Industries Private Limited",
+   "location": "Gandhinagar"
+  },
+  {
+   "name": "Flowjet Valves Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Flowrain Pipe and Fittings",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Flowtek Valves And Controls Incorporation",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Fluid Logic Systems Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Fluidline Valves Company Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Fuildline Exactra Internation Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "G M Engineering Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "G M Flowlines Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "G M Valve Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "G R Infraprojects Limited",
+   "location": "Bavla"
+  },
+  {
+   "name": "GENVISS Technology Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "GM FLOWTECH Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "GYSCOAL Enterprise",
+   "location": "Gandhinagar"
+  },
+  {
+   "name": "Game change Solar Warehouse",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Ganesh Green Bharat Limited",
+   "location": "Mahesana"
+  },
+  {
+   "name": "Gangotri Submersible Pump",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Gaurav Industries Building Systems Private Limited",
+   "location": "Baramati"
+  },
+  {
+   "name": "German Green Steel And Power Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Gmm Pfaudler Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Gokul Poly Valves Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Goldee Sun Private Limited",
+   "location": "Surat"
+  },
+  {
+   "name": "Goodluck Metallics Private Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Gratik Tubes Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Gujarat Lathe Manufacturing Company Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Gujarat otofit",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "HEMPAL FORGE",
+   "location": "Kheda"
+  },
+  {
+   "name": "HP Automation and Consultant",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "HYDCO Engineering Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Hardmech Engineering",
+   "location": "Mahesana"
+  },
+  {
+   "name": "Hawa Engineers Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Heavy Metal And Tubes India Private Limited",
+   "location": "Chhatral"
+  },
+  {
+   "name": "Hem'S Incorporation",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Hertz Testing And Training Centre Llp",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Hex Cable Accessories Private Limited",
+   "location": "Jamnagar"
+  },
+  {
+   "name": "Hina Industries",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Hindustan Zinc Limited",
+   "location": "Udaipur"
+  },
+  {
+   "name": "Hitachi Hi Rel Power Electronics Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Hitech Applicator",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Hitech Engineers",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Hitech Flow Solutions Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Hitech Pipes Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Hitech Saw Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Horizon Polymer Engineering Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Hydroflex Pipes Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "INVENT CAST PRIVATE LIMITED",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Impression Equipments Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Impulse Technocast",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Industrial Controls Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Industrial Testing Center Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Inox Solar Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Inspiron Engineering Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Instronix Process Controls",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "International Refreshments India Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Iris Automation Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Itorrent Industires Private LImited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "J P Polyplast Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "JAYANT PIPE SYNDICATE",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "JSW Steel Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "JUBILANT PIPING SOLUTION PRIVATE LI MITED",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Jack Well Engineering",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Jainson Cables India Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Japs Projects",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Jasco Pump Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Jash Energy Private Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Jay Ambe Engineering",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Jaybanas Metals Private Limited",
+   "location": "Kheda"
+  },
+  {
+   "name": "Jeet Pumps Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Jinal Enterprises",
+   "location": "Jamnagar"
+  },
+  {
+   "name": "Jindal Saw Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Johnson Screens India Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Juniper Green Energy Private Limited",
+   "location": "Jasdan"
+  },
+  {
+   "name": "Jyotex energy",
+   "location": "Gandhinagar"
+  },
+  {
+   "name": "Jyoti Limited",
+   "location": "Vadodara"
+  },
+  {
+   "name": "K M Metal",
+   "location": "Rajkot"
+  },
+  {
+   "name": "K M STRIPS",
+   "location": "Chhatral"
+  },
+  {
+   "name": "KAD Engitech Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "KARELIYA STEEL INDUSTRIES",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "KEI INDUSTRIES LIMITED",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Kanext Equipments",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Karamtara Engineering Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Keepsake Engineering Consultancy Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Ketan Engineering Works",
+   "location": "Surendranagar"
+  },
+  {
+   "name": "Key Products Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Khodiyar Engineers",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Kohinoor Manufacturing",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Kosol Energie Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "L & T Engineering and Construction Company",
+   "location": "Chanderiya"
+  },
+  {
+   "name": "LNG FILTERS",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Lakshya Powertech Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Lattice Zinccare Private Limited",
+   "location": "Morbi"
+  },
+  {
+   "name": "Loyal Equipments Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Lubi Industries Llp",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "M/s. Texmaco West Rail Limited",
+   "location": "Karjan"
+  },
+  {
+   "name": "MANISHA INDUSTRIES",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "MASK HYDRAULIC MACHINERIES",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "MIDRINA OIL AND GAS SERVICES",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Macons Socage Platforms Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Mahabaleshwar Fabricators",
+   "location": "Jamnagar"
+  },
+  {
+   "name": "Mahendra Indutries",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Man Industries India Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Marathon Electric Motors (India) Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Marck and Care Engineers Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Maruti Bitumen Private Limited",
+   "location": "Mahesana"
+  },
+  {
+   "name": "Maruti Infinity",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Masfab Technology",
+   "location": ""
+  },
+  {
+   "name": "Massibus Automation and Instrumentation Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Max Fiber India",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Max Industries",
+   "location": "Kheda"
+  },
+  {
+   "name": "Maxim Tubes Company Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Mazda Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Mbh Pumps Gujarat Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Mbm Tubes Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Mech Well Fittings Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Metal Forge India Pvt Ltd",
+   "location": "Chhatral"
+  },
+  {
+   "name": "Metalab Analytical Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Metalkraft Forming Industries Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Micro Metals",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Microtech Boilers Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Minuteman Products",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Miraj Pipes And Fittings Private Limited",
+   "location": "Udaipur"
+  },
+  {
+   "name": "Modern Engineering Company",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Modern Insulator Limited",
+   "location": "Rajasthan"
+  },
+  {
+   "name": "Mountix structure LLP",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Multitech Technologies",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Myra Metal Crop",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "NATIONAL FIN INDUSTRIES",
+   "location": "Chhatral"
+  },
+  {
+   "name": "ND Indutraies",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Nandan Steels and Power Limited",
+   "location": "Raipur"
+  },
+  {
+   "name": "National Refractories",
+   "location": "Morbi"
+  },
+  {
+   "name": "Nayara Energy Limited",
+   "location": "Jamnagar"
+  },
+  {
+   "name": "Neoplast Engineering Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Neoseal Engineering Private LImited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Nessa Illumination Technologies Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "New Ambica Cranes Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Newage Fire Fighting Company Limited",
+   "location": "Surendranagar"
+  },
+  {
+   "name": "Nexgen Composite Industries",
+   "location": "Jamnagar"
+  },
+  {
+   "name": "Nextgen Power Control",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Nijanand Engineering Works",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Nuclear Power Corporation Of India Limited",
+   "location": "Vadodara"
+  },
+  {
+   "name": "Nutech Controls Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "OEC Group",
+   "location": "Jamnagar"
+  },
+  {
+   "name": "ORION SALES & SERVICES",
+   "location": "Vadodara"
+  },
+  {
+   "name": "Om Galvanizing",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Orbit Engineers Limited Liability Partnership",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Ornet Transformers Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Oswal Foundry Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Oswal Industries Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "P Prabhudas Engineering Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "PAGODA STEELS Private Limited",
+   "location": "Bhavnagar"
+  },
+  {
+   "name": "POSCO India Processing Center Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "PRAMUKH AGRO EXPORT",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "PYROTECH TECHNOLOGIES PRIVATE LIMITED",
+   "location": "Udaipur"
+  },
+  {
+   "name": "Parmar Metal Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Parmeshwar Wire Products",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Parthiv Poly Extrusions Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Patels Airflow Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Patels Airtemp India Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Petrotec India Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Petrotec Retail Petroleum Equipment India Private Limited",
+   "location": "Gandhinagar"
+  },
+  {
+   "name": "Phenix Construction Technologies",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Pinnacle Projects Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Pmea Solar System Private Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Polycab Limited",
+   "location": "Halol"
+  },
+  {
+   "name": "Power Drive Bearing Prative Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Powerlink",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Powerstatic Solutions India Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Ppi Pumps Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Praj Industries Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Prarthna Alloys Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Prasad Koch Technik Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Prasad Pneucon Automation LLp",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Prathana Alloys Privte Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Prayas Transmission",
+   "location": "Morbi"
+  },
+  {
+   "name": "Precision Gasification Services",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Precision Infratech Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Premier Engineering and Equipments",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Prestine Plastic Industries",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Pride LED",
+   "location": "Gandhinagar"
+  },
+  {
+   "name": "Prime Operations & Solutions India",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Prince Spintex Private Limited",
+   "location": "Dholka"
+  },
+  {
+   "name": "Procyon Technology",
+   "location": "Mahesana"
+  },
+  {
+   "name": "Purshotam Profiles Private Limited",
+   "location": ""
+  },
+  {
+   "name": "Pyrotech Electronics Private Limited",
+   "location": "Udaipur"
+  },
+  {
+   "name": "R K Engineering & Solution",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "R.R. STEEL RE-ROLLING MILLS",
+   "location": "Kachchh"
+  },
+  {
+   "name": "RATNATECH STAUL PRIVATE LIMITED",
+   "location": "Kalol"
+  },
+  {
+   "name": "RIL PV Solar Glass Limited",
+   "location": "Jamnagar"
+  },
+  {
+   "name": "RND INDUSTRIAL SOLUTION PRIVATE",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Rainson Pipe Industries Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Rajendra Engineering Works",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Rajeshwar Metal And Tubes Private Limited",
+   "location": "Chhatral"
+  },
+  {
+   "name": "Rajjan Steel Fabricators",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Rajkot Metlab Services Llp",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Rama Cylinders Private Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Ratnadeep Metals And Tubes Limited - SS Division",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Ratnaflex Engineering Private Limited",
+   "location": "Chhatral"
+  },
+  {
+   "name": "Ratnamani Metal And Tube Limited - C S Division",
+   "location": "Gandhinagar"
+  },
+  {
+   "name": "Ratnamani Metal And Tube Limited - S S Division",
+   "location": "Chhatral"
+  },
+  {
+   "name": "ReNew Photovoltaics Private Limited",
+   "location": "Dholera"
+  },
+  {
+   "name": "Reliance Industries Limited",
+   "location": "Jamnagar"
+  },
+  {
+   "name": "Renew Power Private Limited",
+   "location": "Dholera"
+  },
+  {
+   "name": "S R Engineering",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "SANY WIND ENERGY INDIA PRIVATE LIMITED",
+   "location": "Kachchh"
+  },
+  {
+   "name": "SAVAS Engineering Co Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "SHK Polymers Manufacturing Company",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "SIDDHARTH TECHNOCAST",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "SOPAN PROCESS TECHNOLOGIES Private Limited",
+   "location": "Kheda"
+  },
+  {
+   "name": "SOVISY INDIA PRIVATE LIMITED",
+   "location": "Chhatral"
+  },
+  {
+   "name": "SR Engineering",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "SRB ENGINEERS",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "SRP CRANE CONTROLS INDIA Pravite Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "STILONN VALVES AND CONTROLS PRIVATE LIMITED",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Sachin Industries Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Sadashiva Infra steel Private Limited",
+   "location": "Haryana"
+  },
+  {
+   "name": "Safex Electromech Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Safex Energy Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Safex Engineers Private LImited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Safex Industries Limited",
+   "location": "Kheda"
+  },
+  {
+   "name": "Sahjanand Alloys",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Sainest Tubes Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Samudra Power Products",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Santosh Engineers",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Sarju Impex Limited",
+   "location": "Bharuch"
+  },
+  {
+   "name": "Sark Epc Projects Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Sauni Yojana Project",
+   "location": "Junagadh"
+  },
+  {
+   "name": "Scoda Tubes Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Sealexcel India Private Limited",
+   "location": "Mahesana"
+  },
+  {
+   "name": "Sealmech Valves",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Secure Meters Limited",
+   "location": "Udaipur"
+  },
+  {
+   "name": "Shah Bhogilal Jethalal And Bros",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Shaifali Steels Limited",
+   "location": "Gandhinagar"
+  },
+  {
+   "name": "Shakti Forge Industries Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Shree Gayatri Engineering & Glvanizing",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Shree Radhe Hygiene Products Private Limited",
+   "location": "Nadiad"
+  },
+  {
+   "name": "Shree Samarth Switchgear And Transmission Private Limited",
+   "location": "Jamnagar"
+  },
+  {
+   "name": "Shri Navkar Metals Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Shyam Enterprise",
+   "location": "Jamnagar"
+  },
+  {
+   "name": "Sia Engineering Projects India Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Siddhivinayak Industries",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Simcon Technology Private Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Singhal Industries Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Smartmeters Technologies Private Limited",
+   "location": "Dholka"
+  },
+  {
+   "name": "Smith Structures India Private Limited",
+   "location": "Kheda"
+  },
+  {
+   "name": "Solarworld Energy Solutions Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Sopan O And M Company Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Sparetech Engineers Private Limited",
+   "location": "Udaipur"
+  },
+  {
+   "name": "Spx Flow Technology India Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Starlite Renewables",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Steelfit Engineering Company",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Stellar ADP Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Strolar Mounting System Private Limited",
+   "location": "Mahesana"
+  },
+  {
+   "name": "Sukan Equipments Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Sumip Composites Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Sun Engineering Services",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Sunchaser Structure Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Sunrise Microtech",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Sunshine Fastener Private Limited",
+   "location": "Surendranagar"
+  },
+  {
+   "name": "Supernova Engineers Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Suresh Enterprises",
+   "location": "Mahesana"
+  },
+  {
+   "name": "Surya Roshni Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Suzlon Energy Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Swami Industries",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Swati Switchgears India Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Swelore Engineering Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "TRAIT VALVE MANUFACTURING COMPANY",
+   "location": ""
+  },
+  {
+   "name": "TURNKEY SYSTEM INTERGARTOR",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Team Rotek Engineering Private Limited",
+   "location": ""
+  },
+  {
+   "name": "Techflow Enterprise private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Techno Industries Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Tempsens Instruments India Private Limited",
+   "location": "Udaipur"
+  },
+  {
+   "name": "Test well laboratory",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Texmaco West Rail Limited",
+   "location": "Vadodara"
+  },
+  {
+   "name": "Themis Automation",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Tiranga Infra Projects Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Tmvt Industries Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Topline Switchgear Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Torrent Electricals Limited",
+   "location": "Nadiad"
+  },
+  {
+   "name": "Torrent Power Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Trackler Engineering Privte Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Transformers And Rectifiers India Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Trayo Construction Private Limited",
+   "location": "Jamnagar"
+  },
+  {
+   "name": "Trilok Infratech Private Limited",
+   "location": "Surat"
+  },
+  {
+   "name": "Tryon Builltcare",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "ULTRATECH ENGINEERS",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Udhna Project",
+   "location": "Surat"
+  },
+  {
+   "name": "Uflow Automation India Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "Unifrax India Limited",
+   "location": "Surendranagar"
+  },
+  {
+   "name": "Unimech Industries",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Unitech Metallurgical Services Private Limited",
+   "location": "Rajkot"
+  },
+  {
+   "name": "United Engineering Works",
+   "location": "Udaipur"
+  },
+  {
+   "name": "Universal Piping Systems",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Unnati Pump Enterprise",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Unnati Pump Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Urbanaac Infrastructures Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Usha Compressor Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "VALIANT INSTRUMENT",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "VD ZINCARE",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Valson Valves Manufacturing Company",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Varahi Polymers",
+   "location": "Bhavnagar"
+  },
+  {
+   "name": "Vardhaman Stampings Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Vasani Polymers Private limited",
+   "location": "Sabarkantha"
+  },
+  {
+   "name": "Venus Pipes And Tubes Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Verito Engineering Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Vertiv Energy Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Vinayak Engineering Company",
+   "location": "Mahesana"
+  },
+  {
+   "name": "Vinayak Enigneering Company",
+   "location": "Mahesana"
+  },
+  {
+   "name": "Vishakha Renewables Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Vishiv Infrastructural",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Volcur Electrix Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Volga Agency Ahmedabad",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "WAGH ENGINEERING ENTERPRISE",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "WEFS TECHWORKS LLP",
+   "location": "Gandhinagar"
+  },
+  {
+   "name": "Well Cast Industries",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Wellbore Engineering Company",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Welspun Corporation Limited",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Welspun DI",
+   "location": "Kachchh"
+  },
+  {
+   "name": "Whirler Centrifugals Private Limited",
+   "location": "Kheda"
+  },
+  {
+   "name": "YUKON INDUSTRIES",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "Yadav Measurements Private Limited",
+   "location": "Udaipur"
+  },
+  {
+   "name": "Ycube Engineered Solutions Private Limited",
+   "location": "Ahmedabad"
+  },
+  {
+   "name": "kanex Fire Solution Limited",
+   "location": "Bhavnagar"
+  }
+ ]
+}
