@@ -1,8 +1,39 @@
 <?php
 session_start();
-require __DIR__ . '/lib/db.php';
-require __DIR__ . '/lib/helpers.php';
-require __DIR__ . '/lib/ops.php';
+
+// --- Readable error page instead of a blank 500 (so problems are diagnosable) ---
+function ops_fatal($title, $hint, $detail = '') {
+    if (!headers_sent()) http_response_code(500);
+    echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+    echo '<div style="font-family:Segoe UI,Arial,sans-serif;max-width:660px;margin:50px auto;padding:26px;border:1px solid #e2ddd6;border-radius:12px">';
+    echo '<h2 style="color:#b8480f;margin:0 0 10px">' . htmlspecialchars($title) . '</h2>';
+    echo '<p style="color:#4d4d4d;font-size:15px">' . $hint . '</p>';
+    if ($detail !== '') echo '<pre style="background:#f7f6f4;border:1px solid #e2ddd6;padding:12px;border-radius:8px;overflow:auto;font-size:13px;white-space:pre-wrap">' . htmlspecialchars($detail) . '</pre>';
+    echo '</div>';
+    exit;
+}
+// Catch fatals that try/catch can't (missing require, parse errors) via shutdown.
+register_shutdown_function(function () {
+    $e = error_get_last();
+    if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_COMPILE_ERROR, E_CORE_ERROR], true)) {
+        $msg = $e['message'];
+        if (stripos($msg, 'ops.php') !== false || stripos($msg, 'failed to open') !== false || stripos($msg, 'No such file') !== false) {
+            ops_fatal('A program file is missing', 'It looks like not all files uploaded. Re-upload the whole app, making sure the <b>lib/</b> folder (with <code>ops.php</code>) and the <b>views/ops/</b> folder are present.', $msg . "\n" . $e['file'] . ':' . $e['line']);
+        }
+        ops_fatal('The app hit an error', 'Please screenshot this and send it over.', $msg . "\n" . $e['file'] . ':' . $e['line']);
+    }
+});
+set_exception_handler(function ($ex) {
+    ops_fatal('The app hit an error', 'Please screenshot this and send it over.', $ex->getMessage() . "\n" . $ex->getFile() . ':' . $ex->getLine());
+});
+
+try {
+    require __DIR__ . '/lib/db.php';
+    require __DIR__ . '/lib/helpers.php';
+    require __DIR__ . '/lib/ops.php';
+} catch (Throwable $e) {
+    ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine());
+}
 
 // Bootstrap / upgrade: this quick probe fails on a fresh install (no table) or
 // when a new table/column is missing, which triggers the idempotent boot/migrate.
@@ -13,12 +44,13 @@ try {
     try {
         boot();
     } catch (Throwable $e2) {
-        http_response_code(500);
-        echo "<h2 style='font-family:sans-serif'>Database not connected</h2>" .
-             "<p style='font-family:sans-serif'>Open <code>config.php</code> and enter your MySQL " .
-             "database name, user and password (from MilesWeb → Databases).</p>" .
-             "<pre>" . e($e2->getMessage()) . "</pre>";
-        exit;
+        $m = $e2->getMessage();
+        $isConn = stripos($m, 'connect') !== false || stripos($m, 'access denied') !== false
+               || stripos($m, 'unknown database') !== false || stripos($m, 'no such file') !== false;
+        $hint = $isConn
+            ? 'Open <code>config.php</code> and enter your MySQL database name, user and password (from MilesWeb → Databases).'
+            : 'The database is reachable but a table could not be set up. Send this message over and it will be fixed quickly.';
+        ops_fatal($isConn ? 'Database not connected' : 'Database setup error', $hint, $m . "\n" . $e2->getFile() . ':' . $e2->getLine());
     }
 }
 
