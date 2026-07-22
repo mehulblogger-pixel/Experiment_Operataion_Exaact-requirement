@@ -1,0 +1,13 @@
+# Route all requests (except real files/folders) to index.php
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L]
+
+# Protect config and data
+<FilesMatch "^(config\.php)$">
+    Require all denied
+</FilesMatch>
+<IfModule mod_rewrite.c>
+    RewriteRule ^data/ - [F]
+</IfModule>
