@@ -87,9 +87,106 @@
     });
   }
 
+  // Set a select's value, adding the option if needed, and refresh a searchable wrapper.
+  function setSelectValue(select, value, label) {
+    if (!select) return;
+    var found = false;
+    Array.prototype.forEach.call(select.options, function (o) { if (o.value == value) found = true; });
+    if (!found) { var op = document.createElement('option'); op.value = value; op.textContent = label; select.appendChild(op); }
+    select.value = value;
+    // if wrapped by the searchable enhancer, update its visible input text
+    if (select.dataset.enh === '1' && select.parentNode && select.parentNode.className === 'ss-wrap') {
+      var inp = select.parentNode.querySelector('input.form-control');
+      if (inp) inp.value = label;
+    }
+    select.dispatchEvent(new Event('change'));
+  }
+
+  // ---- Activity dropdown linked to the chosen SBU (SBU → Activity) ----
+  function initActivity() {
+    var sbu = document.getElementById('sbu_sel');
+    var act = document.getElementById('activity_sel');
+    if (!sbu || !act || !window.ACTIVITY) return;
+    function fill(keepId) {
+      var code = sbu.value;
+      var opts = window.ACTIVITY[code] || [];
+      act.innerHTML = '<option value="">' + (code ? 'Select activity…' : '— pick SBU first —') + '</option>';
+      opts.forEach(function (o) {
+        var op = document.createElement('option'); op.value = o.id; op.textContent = o.label;
+        if (String(o.id) === String(keepId)) op.selected = true;
+        act.appendChild(op);
+      });
+    }
+    var initial = act.value;
+    fill(initial);
+    sbu.addEventListener('change', function () { fill(''); });
+    window._activityFill = fill; // so quick-add can refresh after adding
+  }
+
+  // ---- Quick-add ("+ Add new") modal on the New Call form ----
+  function initQuickAdd() {
+    var back = document.getElementById('qa_back');
+    if (!back) return;
+    var kind = '', targetId = '';
+    var byId = function (id) { return document.getElementById(id); };
+    function show(sel) { Array.prototype.forEach.call(document.querySelectorAll(sel), function (n) { n.style.display = 'block'; }); }
+    function hideAll() { Array.prototype.forEach.call(document.querySelectorAll('.qa-field'), function (n) { n.style.display = 'none'; }); }
+    function open(k) {
+      kind = k; hideAll(); byId('qa_err').style.display = 'none';
+      byId('qa_name').value = ''; byId('qa_gstin').value = '';
+      var titles = { client: 'Add Client', vendor: 'Add Vendor', office: 'Add Executing office', product: 'Add Product category', activity: 'Add Activity code' };
+      byId('qa_title').textContent = titles[k] || 'Add';
+      targetId = { client: 'client_sel', vendor: 'vendor_sel', office: 'exec_sel', product: 'product_sel', activity: 'activity_sel' }[k];
+      if (k === 'client' || k === 'vendor') { show('.qa-cv'); if (byId('qa_both')) byId('qa_both').checked = false; }
+      if (k === 'office') show('.qa-office');
+      if (k === 'activity') show('.qa-activity');
+      back.style.display = 'flex'; byId('qa_name').focus();
+    }
+    function close() { back.style.display = 'none'; }
+    Array.prototype.forEach.call(document.querySelectorAll('.addlink'), function (a) {
+      a.addEventListener('click', function (e) { e.preventDefault(); open(a.getAttribute('data-qa')); });
+    });
+    byId('qa_cancel').addEventListener('click', close);
+    back.addEventListener('click', function (e) { if (e.target === back) close(); });
+    byId('qa_save').addEventListener('click', function () {
+      var name = byId('qa_name').value.trim();
+      if (!name) { byId('qa_err').textContent = 'Enter a name.'; byId('qa_err').style.display = 'block'; return; }
+      var k = kind;
+      var body = new URLSearchParams(); body.append('name', name);
+      if (k === 'client' || k === 'vendor') {
+        body.append('gstin', byId('qa_gstin').value);
+        if (byId('qa_both') && byId('qa_both').checked) k = 'both';
+      }
+      if (k === 'office') {
+        body.append('code', byId('qa_code').value); body.append('city', byId('qa_city').value);
+        body.append('coordinator_name', byId('qa_cname').value); body.append('coordinator_email', byId('qa_cemail').value);
+        body.append('manager_name', byId('qa_mname').value); body.append('manager_email', byId('qa_memail').value);
+      }
+      if (k === 'activity') { var s = byId('sbu_sel'); if (!s || !s.value) { byId('qa_err').textContent = 'Pick an SBU on the form first.'; byId('qa_err').style.display = 'block'; return; } body.append('sbu', s.value); }
+      fetch('/quick-add?kind=' + encodeURIComponent(k), { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (!res.ok) { byId('qa_err').textContent = res.error || 'Could not add.'; byId('qa_err').style.display = 'block'; return; }
+          if (k === 'both') {
+            setSelectValue(byId('client_sel'), res.id, res.label);
+            setSelectValue(byId('vendor_sel'), res.id, res.label);
+          } else if (k === 'activity') {
+            var act = byId('activity_sel');
+            var op = document.createElement('option'); op.value = res.id; op.textContent = res.label; op.selected = true; act.appendChild(op);
+          } else {
+            setSelectValue(byId(targetId), res.id, res.label);
+          }
+          close();
+        })
+        .catch(function () { byId('qa_err').textContent = 'Network error.'; byId('qa_err').style.display = 'block'; });
+    });
+  }
+
   function init() {
     gstAutofill();
     initCascades();
+    initActivity();
+    initQuickAdd();
     Array.prototype.forEach.call(document.querySelectorAll('select.searchable'), enhanceSelect);
   }
   if (document.readyState !== 'loading') init();

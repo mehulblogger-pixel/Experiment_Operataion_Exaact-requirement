@@ -82,3 +82,13 @@ form.stack label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4
 /* ---- Cascading (dependent) master dropdowns ---- */
 .cascade{display:flex;flex-direction:column;gap:6px}
 .cascade .cascade-sel{width:100%}
+
+/* ---- Quick-add modal + inline add links ---- */
+.addlink{font-size:12px;font-weight:600;color:var(--brand);text-decoration:none;margin-left:6px}
+.addlink:hover{text-decoration:underline}
+.modal-back{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;z-index:50;padding:40px 16px;overflow:auto}
+.modal{background:#fff;border-radius:12px;padding:22px 24px;max-width:460px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal h3{margin:0 0 14px}
+.modal .ff{margin-bottom:10px}
+.qa-field{display:none}
+.qa-field .ff{margin-bottom:10px}
