@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p class="sub">Client Code is generated automatically on save. Enter GSTIN once —
+PAN and State fill in automatically.</p>
+
+<form method="post" class="stack panel">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="msg msg-error">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="form-grid">
+    {% for field in form %}
+      <div class="ff{% if field.field.widget.input_type == 'checkbox' %} ff-check{% endif %}{% if field.name == 'description' %} ff-wide{% endif %}">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<div class="helptext">{{ field.help_text }}</div>{% endif %}
+        {% if field.errors %}<ul class="errorlist">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  <div style="margin-top:18px;">
+    <button class="btn" type="submit">Save</button>
+    {% if partner %}<a class="btn secondary" href="{% url 'partners:detail' partner.pk %}">Cancel</a>
+    {% else %}<a class="btn secondary" href="{% url 'partners:client_list' %}">Cancel</a>{% endif %}
+  </div>
+</form>
+{% endblock %}
