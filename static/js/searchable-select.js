@@ -10,6 +10,7 @@
   function enhance(select) {
     if (select.dataset.enhanced === "1") return;
     if (select.multiple) return; // multi-selects keep native UI
+    if (select.dataset.noSearch === "1") return; // dependent selects stay native
     select.dataset.enhanced = "1";
 
     var wrap = document.createElement("div");

@@ -63,9 +63,25 @@ class InspectionCall(models.Model):
     )
 
     # Commercial linkage
-    client = models.ForeignKey("masters.Client", on_delete=models.PROTECT)
+    client = models.ForeignKey(
+        "partners.BusinessPartner", on_delete=models.PROTECT, null=True,
+        related_name="client_calls", limit_choices_to={"is_client": True},
+    )
+    client_contact = models.ForeignKey(
+        "partners.PartnerContact", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="client_calls",
+        help_text="Contact person at the client for this call.",
+    )
     quotation_number = models.CharField(max_length=64, blank=True)
     contract_number = models.CharField(max_length=64, blank=True)
+    contract = models.ForeignKey(
+        "partners.PartnerContract", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="calls",
+    )
+    purchase_order = models.ForeignKey(
+        "partners.PartnerPurchaseOrder", on_delete=models.SET_NULL, null=True,
+        blank=True, related_name="calls",
+    )
 
     # Job classification
     job_type = models.ForeignKey(
@@ -100,7 +116,18 @@ class InspectionCall(models.Model):
     )
     inspection_address = models.TextField(blank=True)
     vendor = models.ForeignKey(
-        "masters.Vendor", on_delete=models.PROTECT, null=True, blank=True
+        "partners.BusinessPartner", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="vendor_calls", limit_choices_to={"is_vendor": True},
+    )
+    vendor_contact = models.ForeignKey(
+        "partners.PartnerContact", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="vendor_calls",
+        help_text="Contact person at the vendor / manufacturer.",
+    )
+    site_address = models.ForeignKey(
+        "partners.PartnerAddress", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="site_calls",
+        help_text="Inspection site (a plant/factory/site address of the vendor).",
     )
     vendor_location = models.ForeignKey(
         "masters.VendorLocation", on_delete=models.PROTECT, null=True, blank=True

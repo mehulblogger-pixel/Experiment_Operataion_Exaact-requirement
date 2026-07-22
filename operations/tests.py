@@ -6,7 +6,8 @@ from django.utils import timezone
 from django.core import mail
 
 from accounts.models import Role, User
-from masters.models import Client, Inspector, JobType, Office, ReportFormat, SBU
+from masters.models import Inspector, JobType, Office, ReportFormat, SBU
+from partners.models import BusinessPartner
 from operations.models import CallStatus, ColourStatus, InspectionCall
 
 
@@ -17,7 +18,7 @@ class CallLogicTests(TestCase):
         cls.mum = Office.objects.create(code="MUMBAI")
         cls.sbu = SBU.objects.create(code="I03", name="Mining Energy & Power")
         cls.jt = JobType.objects.create(name="Inspection")
-        cls.client_obj = Client.objects.create(name="Acme Ltd")
+        cls.client_obj = BusinessPartner.objects.create(legal_name="Acme Ltd", is_client=True)
         cls.today = timezone.localdate()
 
     def _make(self, offset, status=CallStatus.PENDING_SCHEDULE, exe=None):
@@ -66,7 +67,7 @@ class WorkflowViewTests(TestCase):
         cls.ahd = Office.objects.create(code="AHMEDABAD")
         cls.sbu = SBU.objects.create(code="I03", name="Power")
         cls.jt = JobType.objects.create(name="Inspection")
-        cls.client_obj = Client.objects.create(name="Acme Ltd")
+        cls.client_obj = BusinessPartner.objects.create(legal_name="Acme Ltd", is_client=True)
         cls.inspector = Inspector.objects.create(name="Ravi Kumar")
         cls.user = User.objects.create_user(
             username="coord", password="pw", role=Role.INSPECTION_COORDINATOR,

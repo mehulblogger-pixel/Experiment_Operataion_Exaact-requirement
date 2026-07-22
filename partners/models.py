@@ -264,6 +264,99 @@ class PartnerNote(models.Model):
         return self.note[:60]
 
 
+class PartnerContract(models.Model):
+    partner = models.ForeignKey(
+        BusinessPartner, on_delete=models.CASCADE, related_name="contracts"
+    )
+    contract_number = models.CharField(max_length=64)
+    title = models.CharField(max_length=200, blank=True)
+    value = models.DecimalField(max_digits=16, decimal_places=2, null=True, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    notes = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["-start_date", "contract_number"]
+
+    def __str__(self):
+        return self.contract_number
+
+
+class POType(models.TextChoices):
+    REGULAR = "REGULAR", "Regular (fixed value)"
+    OPEN = "OPEN", "Open order (no PO / ARC)"
+    ARC = "ARC", "ARC / Rate contract"
+
+
+class PartnerPurchaseOrder(models.Model):
+    partner = models.ForeignKey(
+        BusinessPartner, on_delete=models.CASCADE, related_name="purchase_orders"
+    )
+    contract = models.ForeignKey(
+        PartnerContract, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="purchase_orders",
+    )
+    po_number = models.CharField(max_length=64, blank=True)
+    po_type = models.CharField(max_length=12, choices=POType.choices, default=POType.REGULAR)
+    title = models.CharField(max_length=200, blank=True)
+    value = models.DecimalField(max_digits=16, decimal_places=2, null=True, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    notes = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ["-start_date", "po_number"]
+
+    def __str__(self):
+        return self.po_number or f"{self.get_po_type_display()} ({self.partner})"
+
+
+class POLineItemType(models.TextChoices):
+    MANDAYS = "MANDAYS", "Man-days"
+    MONTHS = "MONTHS", "Months (deputation)"
+    AUDIT_DAYS = "AUDIT_DAYS", "Technical audit days"
+    VISITS = "VISITS", "Visits"
+    LOT = "LOT", "Lot / Lumpsum"
+    OTHER = "OTHER", "Other"
+
+
+class PurchaseOrderLineItem(models.Model):
+    """Line items for open/ARC orders (requirement 17): how many days, months,
+    audit days, etc. entered by the sales rep once the contract is generated."""
+
+    purchase_order = models.ForeignKey(
+        PartnerPurchaseOrder, on_delete=models.CASCADE, related_name="line_items"
+    )
+    description = models.CharField(max_length=200)
+    item_type = models.CharField(
+        max_length=12, choices=POLineItemType.choices, default=POLineItemType.MANDAYS
+    )
+    quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    rate = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    consumed = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="Quantity used so far (for tracking open-order balance).",
+    )
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.description} ({self.quantity} {self.get_item_type_display()})"
+
+    @property
+    def balance(self):
+        return (self.quantity or 0) - (self.consumed or 0)
+
+    @property
+    def amount(self):
+        if self.rate is None:
+            return None
+        return (self.quantity or 0) * self.rate
+
+
 class RelationType(models.TextChoices):
     SUBSIDIARY = "SUBSIDIARY", "Subsidiary of"
     JV = "JV", "Joint Venture with"
