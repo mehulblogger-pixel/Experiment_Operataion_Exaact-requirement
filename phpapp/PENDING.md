@@ -33,6 +33,18 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
       one-time setup fee + monthly per-user recurring. (Roadmap artifact already
       shared.)
 
+## Dashboards — refinements to follow
+
+- [ ] **Per-SBU configurable expense headings** — expenses are currently entered
+      under 5 fixed headings (travel/local/food/lodging/misc) and the financial
+      dashboard breaks them down accordingly. An `expense_heading` master now
+      exists; the remaining work is dynamic heading entry configurable per SBU.
+- [ ] **Persona landing pages** — today all four dashboard families live on one
+      /reports page with each section gated by permission (so each person sees
+      only their allowed sections). A future refinement gives each role a
+      tailored default landing layout (Director = office comparison, SBU Head =
+      SBU-across-offices, etc.).
+
 ## Nice-to-have / minor
 
 - [ ] Generic master "checkbox" fields default to ticked on new records (fine for

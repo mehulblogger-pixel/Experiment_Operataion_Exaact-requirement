@@ -42,6 +42,7 @@ function lk_migrate() {
     ]);
     lk_ensure_type_map('inspection_type', 'Type of inspection', INSPECTION_TYPES);
     lk_ensure_type_map('deliverable', 'Deliverable / report format', DELIVERABLES);
+    lk_ensure_type_map('expense_heading', 'Expense heading', EXPENSE_HEADINGS);
     // back-fill any newly-added coded values into existing lists (idempotent)
     lk_ensure_values_from_map('inspection_type', INSPECTION_TYPES);
     lk_ensure_values_from_map('deliverable', DELIVERABLES);
@@ -179,6 +180,8 @@ function lk_seed() {
     $i = 0; foreach (INSPECTION_TYPES as $code => $lab) lk_add_value($it, null, $code, $lab, $i++);
     $dl = lk_add_type('deliverable', 'Deliverable / report format', null, 0, $so++);
     $i = 0; foreach (DELIVERABLES as $code => $lab) lk_add_value($dl, null, $code, $lab, $i++);
+    $eh = lk_add_type('expense_heading', 'Expense heading', null, 0, $so++);
+    $i = 0; foreach (EXPENSE_HEADINGS as $code => $lab) lk_add_value($eh, null, $code, $lab, $i++);
     lk_seed_trade_skill();
 
     // demo custom field so the candles cascade shows live on the New Call form
