@@ -13,7 +13,7 @@
     <td><?= e($u['username']) ?></td>
     <td><?= e(trim(($u['first_name'] ?? '').' '.($u['last_name'] ?? '')) ?: '—') ?></td>
     <td><?= e($u['email'] ?: '—') ?></td>
-    <td><?= e(OPS_ROLES[!empty($u['is_superuser'])?'MASTER_ADMIN':strtoupper($u['role'] ?? 'ADMIN')] ?? $u['role']) ?></td>
+    <td><?= e(ORG_ROLES[!empty($u['is_superuser'])?'MASTER_ADMIN':strtoupper($u['role'] ?? 'ADMIN')] ?? $u['role']) ?></td>
     <td><?= $u['is_active'] ? '<span class="badge GREEN">Yes</span>' : '<span class="badge RED">No</span>' ?></td>
     <td class="row-actions"><a class="btn small" href="/user-edit?id=<?= (int)$u['id'] ?>">Edit</a></td>
   </tr>

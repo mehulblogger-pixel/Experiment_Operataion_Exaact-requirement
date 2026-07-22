@@ -17,8 +17,9 @@
       <a href="/clients">Clients</a>
       <a href="/vendors">Vendors</a>
       <a href="/masters">Masters</a>
-      <?php if (is_admin_level()): ?><a href="/reports">Dashboards</a><?php endif; ?>
-      <?php if (is_admin_level()): ?><a href="/users">Users</a><?php endif; ?>
+      <?php if (can('dash.operations') || can('dash.financial') || can('dash.utilization') || can('dash.people')): ?><a href="/reports">Dashboards</a><?php endif; ?>
+      <?php if (can('users.manage.branch') || can('users.manage.global')): ?><a href="/users">Users</a><?php endif; ?>
+      <?php if (can('settings.manage')): ?><a href="/settings">Settings</a><?php endif; ?>
     <?php endif; ?>
   </nav>
   <span class="user"><?= e(user_name($u)) ?> · <?= e(role_label($u)) ?>
