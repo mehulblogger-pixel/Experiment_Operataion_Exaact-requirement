@@ -28,6 +28,7 @@
         <?php endif; ?>
       </div>
     <?php endforeach; ?>
+    <?php render_custom_fields('m:' . $key, $cfvals ?? []); ?>
   </div>
   <div style="margin-top:16px;">
     <button class="btn" type="submit">Save</button>

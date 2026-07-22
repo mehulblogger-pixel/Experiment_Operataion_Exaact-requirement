@@ -1,10 +1,12 @@
 <div class="master-head">
-  <div><h1>Custom fields — <?= $entity === 'call' ? 'Call' : 'Job' ?> form</h1>
-    <p class="sub">Add your own fields. They appear on the <?= $entity === 'call' ? 'New Call' : 'Allocate Job' ?> form automatically. A dropdown field can use any master list — pick a dependent list to get cascading selects.</p></div>
-  <div class="row-actions">
-    <a class="btn <?= $entity==='call'?'':'secondary' ?>" href="/custom-fields?entity=call">Call fields</a>
-    <a class="btn <?= $entity==='job'?'':'secondary' ?>" href="/custom-fields?entity=job">Job fields</a>
-  </div>
+  <div><h1>Custom fields — <?= e(custom_entity_label($entity)) ?> form</h1>
+    <p class="sub">Add your own text boxes or dropdowns to any form — they appear automatically. A dropdown field can use any master list; pick a dependent list to get cascading selects.</p></div>
+</div>
+<div class="ff" style="max-width:420px;">
+  <label>Choose the form to customise</label>
+  <select class="form-control searchable" onchange="location.href='/custom-fields?entity='+encodeURIComponent(this.value)">
+    <?php foreach (custom_entities() as $ek=>$el): ?><option value="<?= e($ek) ?>" <?= $entity===$ek?'selected':'' ?>><?= e($el) ?></option><?php endforeach; ?>
+  </select>
 </div>
 
 <table class="grid">

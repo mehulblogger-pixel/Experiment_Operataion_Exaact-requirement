@@ -53,6 +53,10 @@
       <input class="form-control" name="inspection_types_other" value="<?= e($p['inspection_types_other'] ?? '') ?>" placeholder="e.g. Rope-access survey, Drone inspection"></div>
   </div>
   <?php if (!$p): ?><p class="muted" style="margin-top:6px;">Code preview: <strong><?= substr(date('Y'),2,2) ?></strong> · roles become letters <strong>C</strong>lient / <strong>V</strong>endor / <strong>M</strong>anufacturer / <strong>T</strong>rader / <strong>S</strong>ub-contractor, e.g. <code>AHM-<?= substr(date('Y'),2,2) ?>-CV-ADANI-00042</code>.</p><?php endif; ?>
+  <?php // Admin-defined custom fields on the Client/Vendor form (Masters → Custom fields → Client / Vendor)
+    if (function_exists('custom_fields_for') && custom_fields_for('partner')): ?>
+    <div class="form-grid" style="margin-top:6px;"><?php render_custom_fields('partner', $p ? custom_values_map('partner', $p['id']) : []); ?></div>
+  <?php endif; ?>
   <div style="margin-top:18px;">
     <button class="btn" type="submit">Save</button>
     <a class="btn secondary" href="<?= $p ? '/partner?id=' . (int)$p['id'] : '/clients' ?>">Cancel</a>

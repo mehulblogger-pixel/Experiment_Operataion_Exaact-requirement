@@ -182,6 +182,7 @@ if ($route === 'partner-new') {
         $id = $pdo->lastInsertId();
         $pdo->prepare("UPDATE business_partners SET inspection_types=?, inspection_types_other=? WHERE id=?")
             ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), trim($b['inspection_types_other'] ?? ''), $id]);
+        custom_save('partner', $id, $b);
         flash("$code created.");
         redirect("/partner?id=$id");
     }
@@ -207,6 +208,7 @@ if ($route === 'partner-edit') {
             ->execute([$b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $industry, $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $p['id']]);
         $pdo->prepare("UPDATE business_partners SET inspection_types=?, inspection_types_other=? WHERE id=?")
             ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), trim($b['inspection_types_other'] ?? ''), $p['id']]);
+        custom_save('partner', $p['id'], $b);
         flash('Updated.');
         redirect("/partner?id={$p['id']}");
     }

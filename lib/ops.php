@@ -808,6 +808,7 @@ function ops_master_handle($key, $cfg, $action, $method) {
             $set = implode(',', array_map(fn($c) => "$c=?", $cols));
             $vals[] = $id;
             $pdo->prepare("UPDATE $table SET $set WHERE id=?")->execute($vals);
+            custom_save('m:' . $key, $id, $b);
             flash("{$cfg['label']}: saved.");
         } else {
             $ph = implode(',', array_fill(0, count($cols), '?'));
@@ -815,15 +816,16 @@ function ops_master_handle($key, $cfg, $action, $method) {
                 $cols[] = 'created_at'; $vals[] = date('c'); $ph .= ',?';
             }
             $pdo->prepare("INSERT INTO $table (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
+            custom_save('m:' . $key, $pdo->lastInsertId(), $b);
             flash("{$cfg['label']}: added.");
         }
         redirect("/m/$key");
     }
-    if ($action === 'new') { view('ops/master_form', ['cfg' => $cfg, 'key' => $key, 'row' => null]); return; }
+    if ($action === 'new') { view('ops/master_form', ['cfg' => $cfg, 'key' => $key, 'row' => null, 'cfvals' => []]); return; }
     if ($action === 'edit') {
         $row = ops_one("SELECT * FROM $table WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$row) { http_response_code(404); view('notfound'); return; }
-        view('ops/master_form', ['cfg' => $cfg, 'key' => $key, 'row' => $row]); return;
+        view('ops/master_form', ['cfg' => $cfg, 'key' => $key, 'row' => $row, 'cfvals' => custom_values_map('m:' . $key, $row['id'])]); return;
     }
     // list
     $q = trim($_GET['q'] ?? '');

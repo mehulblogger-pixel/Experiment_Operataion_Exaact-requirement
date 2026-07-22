@@ -347,6 +347,14 @@ function lk_value_path($valueId) {
 }
 
 // ---- Custom fields ---------------------------------------------------------
+// Every form that can carry admin-defined custom fields: Call, Job, the partner
+// (Client/Vendor) form, and every generic master list.
+function custom_entities() {
+    $out = ['call' => 'Call', 'job' => 'Job', 'partner' => 'Client / Vendor'];
+    if (function_exists('ops_masters')) foreach (ops_masters() as $k => $cfg) $out['m:' . $k] = $cfg['label'];
+    return $out;
+}
+function custom_entity_label($entity) { return custom_entities()[$entity] ?? $entity; }
 function custom_fields_for($entity, $activeOnly = true) {
     return ops_all("SELECT * FROM custom_fields WHERE entity=?" . ($activeOnly ? " AND active=1" : "") . " ORDER BY sort_order, id", [$entity]);
 }
@@ -449,7 +457,8 @@ function lk_admin($route, $method) {
     }
 
     if ($route === 'custom-fields') {
-        $entity = in_array($_GET['entity'] ?? 'call', ['call', 'job'], true) ? $_GET['entity'] : 'call';
+        $valid = array_keys(custom_entities());
+        $entity = in_array($_GET['entity'] ?? 'call', $valid, true) ? $_GET['entity'] : 'call';
         if ($method === 'POST') {
             $label = trim($_POST['label'] ?? '');
             $type = in_array($_POST['field_type'] ?? '', ['text', 'number', 'date', 'select', 'dependent'], true) ? $_POST['field_type'] : 'text';
