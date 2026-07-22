@@ -66,6 +66,22 @@ function short_token($name) {
     $t = preg_replace('/[^A-Z0-9]/', '', strtoupper($first));
     return substr($t, 0, 8) ?: 'PARTNER';
 }
+// Legible ink (near-black or white) for text sitting on a given background colour.
+// Keeps every label readable whatever brand colour is chosen (requirement: legible at any cost).
+function brand_ink($hex) {
+    $hex = ltrim((string)$hex, '#');
+    if (strlen($hex) === 3) $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
+    if (strlen($hex) !== 6 || !ctype_xdigit($hex)) return '#ffffff';
+    $r = hexdec(substr($hex,0,2)); $g = hexdec(substr($hex,2,2)); $b = hexdec(substr($hex,4,2));
+    // relative luminance (sRGB) — high = light background → dark ink.
+    $lum = (0.2126*$r + 0.7152*$g + 0.0722*$b) / 255;
+    return $lum > 0.6 ? '#111827' : '#ffffff';
+}
+function valid_hex_color($hex, $default = '#1e40af') {
+    $h = '#' . ltrim((string)$hex, '#');
+    return preg_match('/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/', $h) ? $h : $default;
+}
+
 // Uniform storage for a place / free-typed proper noun (Ahmedabad, not "ahmedabad"/"AHMEDABAD ").
 function normalize_place($s) {
     $s = trim(preg_replace('/\s+/', ' ', (string)$s));

@@ -1405,6 +1405,23 @@ function ops_settings($method) {
         $m = (int)($_POST['fy_start_month'] ?? 4);
         setting_set('fy_start_month', ($m >= 1 && $m <= 12) ? $m : 4);
         setting_set('tat_threshold_days', (int)($_POST['tat_threshold_days'] ?? 3));
+        // Branding: agency name + theme colour (text auto-stays legible) + logo upload.
+        setting_set('brand_name', trim($_POST['brand_name'] ?? ''));
+        setting_set('brand_color', valid_hex_color($_POST['brand_color'] ?? '#1e40af'));
+        if (($_POST['remove_logo'] ?? '') === '1') setting_set('brand_logo', '');
+        if (!empty($_FILES['logo']['tmp_name']) && is_uploaded_file($_FILES['logo']['tmp_name'])) {
+            $ext = strtolower(pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION));
+            $allowed = ['png','jpg','jpeg','gif','webp','svg'];
+            if (in_array($ext, $allowed, true) && $_FILES['logo']['size'] <= 2*1024*1024) {
+                $dir = __DIR__ . '/../assets/uploads';
+                if (!is_dir($dir)) @mkdir($dir, 0775, true);
+                $fname = 'logo.' . $ext;
+                foreach ($allowed as $e) @unlink("$dir/logo.$e"); // one logo only
+                if (@move_uploaded_file($_FILES['logo']['tmp_name'], "$dir/$fname"))
+                    setting_set('brand_logo', '/assets/uploads/' . $fname . '?v=' . time());
+                else flash('Could not save the logo (check folder permissions on assets/uploads).', 'error');
+            } else flash('Logo must be PNG/JPG/GIF/WEBP/SVG under 2 MB.', 'error');
+        }
         flash('Settings saved.');
         redirect('/settings');
     }

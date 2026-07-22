@@ -3,9 +3,24 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($title ?? 'Inspection Ops') ?></title>
 <link rel="stylesheet" href="/assets/css/app.css">
+<?php
+  $brandColor = valid_hex_color(setting_get('brand_color', '#1e40af'));
+  $brandInk = brand_ink($brandColor);
+  $brandLogo = setting_get('brand_logo', '');
+  $brandName = setting_get('brand_name', '') ?: 'Inspection Ops';
+?>
+<style>
+  :root{--brand:<?= $brandColor ?>;--brand-ink:<?= $brandInk ?>;}
+  .topbar{background:var(--brand);color:var(--brand-ink)}
+  .topbar .brand,.topbar .user,.topbar nav a,.topbar nav a:hover,.logout{color:var(--brand-ink)}
+  .topbar nav a{opacity:.85}.topbar nav a:hover{opacity:1}
+  .btn{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+  .btn.secondary{background:#fff;color:var(--brand)}
+  .brand-logo{height:30px;width:auto;vertical-align:middle;margin-right:10px;border-radius:4px;background:#fff;padding:2px}
+</style>
 </head><body>
 <header class="topbar">
-  <a class="brand" href="/">Inspection&nbsp;Ops</a>
+  <a class="brand" href="/"><?php if ($brandLogo): ?><img class="brand-logo" src="<?= e($brandLogo) ?>" alt="logo"><?php endif; ?><?= e($brandName) ?></a>
   <?php if ($u): ?>
   <nav>
     <a href="/">Dashboard</a>
