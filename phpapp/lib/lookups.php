@@ -161,20 +161,6 @@ function lk_seed() {
     if (isset($sbuVals['IND'])) { lk_add_value($activity, $sbuVals['IND'], '', 'Vendor Inspection', 0); lk_add_value($activity, $sbuVals['IND'], '', 'Stage Inspection', 1); lk_add_value($activity, $sbuVals['IND'], '', 'Final Inspection', 2); }
     if (isset($sbuVals['OGC'])) { lk_add_value($activity, $sbuVals['OGC'], '', 'Welding Inspection', 0); lk_add_value($activity, $sbuVals['OGC'], '', 'NDT Witness', 1); }
 
-    // demo hierarchy 2: Product family -> Wax type -> Tier (your candles example)
-    $pf = lk_add_type('product_family', 'Product family', null, 0, $so++);
-    $candles = lk_add_value($pf, null, '', 'Candles', 0);
-    $diffusers = lk_add_value($pf, null, '', 'Diffusers', 1);
-    $wt = lk_add_type('wax_type', 'Wax type', $pf, 0, $so++);
-    $paraffin = lk_add_value($wt, $candles, '', 'Paraffin', 0);
-    $soy = lk_add_value($wt, $candles, '', 'Soy wax', 1);
-    lk_add_value($wt, $diffusers, '', 'Reed', 0);
-    $tier = lk_add_type('tier', 'Tier', $wt, 0, $so++);
-    lk_add_value($tier, $paraffin, '', 'Premium', 0);
-    lk_add_value($tier, $paraffin, '', 'Tiny Treat', 1);
-    lk_add_value($tier, $soy, '', 'Premium', 0);
-    lk_add_value($tier, $soy, '', 'Classic', 1);
-
     // deputation type (flat list)
     $dep = lk_add_type('deputation_type', 'Deputation type', null, 0, $so++);
     foreach (['Daily (single day)', 'Multiple days', 'Continuous days', 'Monthly (PM deputation)'] as $i => $d) lk_add_value($dep, null, '', $d, $i);
@@ -186,13 +172,6 @@ function lk_seed() {
     $eh = lk_add_type('expense_heading', 'Expense heading', null, 0, $so++);
     $i = 0; foreach (EXPENSE_HEADINGS as $code => $lab) lk_add_value($eh, null, $code, $lab, $i++);
     lk_seed_trade_skill();
-
-    // demo custom field so the candles cascade shows live on the New Call form
-    if ((int)ops_val("SELECT COUNT(*) FROM custom_fields") === 0) {
-        $tierType = lk_type('tier');
-        db()->prepare("INSERT INTO custom_fields (entity,field_key,label,field_type,lookup_type_id,required,sort_order,active,created_at)
-            VALUES ('call','product_line','Product line','dependent',?,0,0,1,?)")->execute([$tierType['id'], date('c')]);
-    }
 }
 
 // ---- Type helpers ----------------------------------------------------------

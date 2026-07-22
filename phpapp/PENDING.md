@@ -43,6 +43,35 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
       one-time setup fee + monthly per-user recurring. (Roadmap artifact already
       shared.)
 
+## Module B (Calls) — remaining sub-items
+
+- [ ] PO / line-item selection on a call (open PO ok; where line items/project
+      defined, make them selectable and track each qty; e-mail manager + branch
+      manager when a qty nears completion before validity).
+- [ ] Project/site deputation → when inspection type = deputation and a client is
+      chosen, show that client's sites in a dropdown that only appears then.
+- [ ] Executing-branch confirmation status on the call ("assigned to X inspector
+      for Y date; engineer is SGS asset / freelancer / sub-contractor").
+
+## Module A (Client/Vendor) — remaining sub-items
+
+- [ ] PO line items: manpower, site, trade→subcategory (Other→add), and
+      GST / Tax / Total columns reflecting to contract & PO value; activity per
+      line respecting the PO's SBU (multi-SBU).
+- [ ] Projects tab: list the actual inspection calls linked to this client.
+- [ ] City/State "auto-correct" of near-duplicate spellings (currently: State is
+      a fixed dropdown; City has autocomplete from prior entries).
+- [ ] Types-of-inspection "Other" free text on the call (multiple others).
+
+## Modules C / D / E — not yet started
+
+- [ ] C: Logo upload + editable theme (kept legible); per-SBU expense headings.
+- [ ] D: inspection lifecycle/status flow; designations master (Inspector,
+      Sr. Inspector, Sr. Executive…); back-office staff with costing (CTC,
+      allowances).
+- [ ] E: add your own dropdown/text box to any master form (custom fields on
+      masters).
+
 ## Dashboards — refinements to follow
 
 - [ ] **Per-SBU configurable expense headings** — expenses are currently entered
