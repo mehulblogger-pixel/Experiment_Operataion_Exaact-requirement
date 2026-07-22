@@ -17,7 +17,8 @@ const REPORT_FREQ = ['DAILY'=>'Daily','ALTERNATE'=>'Alternate day','WEEKLY'=>'We
 const INSPECTION_TYPES = ['INSPECTION'=>'Inspection (third-party / TPI)','EXPEDITING'=>'Expediting','DEPUTATION'=>'Project deputation / Resident','VENDOR_ASSESS'=>'Vendor assessment','VENDOR_AUDIT'=>'Vendor audit','PRE_PROD'=>'Pre-production inspection','DURING_PROD'=>'During-production inspection','STAGE'=>'Stage / In-process inspection','FINAL'=>'Final inspection','FRI'=>'Final random inspection (FRI)','PSI'=>'Pre-shipment inspection (PSI)','WITNESS'=>'Witness / Test witnessing','FAT'=>'Factory Acceptance Test (FAT)','SAT'=>'Site Acceptance Test (SAT)','SOURCE'=>'Source inspection','SURVEILLANCE'=>'Surveillance','LOADING'=>'Loading / container supervision','SAMPLING'=>'Sampling','DIMENSIONAL'=>'Dimensional inspection','WELDING'=>'Welding inspection','NDT'=>'NDT witnessing','PMI'=>'Material verification (PMI)','COATING'=>'Painting / coating inspection','MECH_TEST'=>'Mechanical testing witness','CALIB'=>'Calibration verification','SAFETY_AUDIT'=>'Safety audit','SYSTEM_AUDIT'=>'Management-system audit','SECOND_PARTY'=>'Second-party audit','DESKTOP'=>'Desktop / Document review','TECH_AUDIT'=>'Technical audit'];
 // Deliverables / report formats produced after a job.
 const DELIVERABLES = ['IR'=>'Inspection Report (IR)','IRN'=>'Inspection Release Note (IRN)','NCR'=>'Non-Conformance Report (NCR)','COC'=>'Certificate of Conformity (CoC)','EXP_REP'=>'Expediting Report','VA_REP'=>'Vendor Assessment Report','AUDIT_REP'=>'Audit Report','TC_REVIEW'=>'Test Certificate Review','DPR'=>'Daily Progress Report','FINAL_REP'=>'Final Report','PUNCH'=>'Punch List','PHOTO'=>'Photographic Report','DIM_REP'=>'Dimensional Report','RN'=>'Release Note (RN)'];
-const ATT_STATUS = ['PRESENT_NB'=>'Present (non-billable)','TRAINING'=>'Training','MEETING'=>'Meeting','LEAVE'=>'Leave','COMPOFF'=>'Comp-off taken','HOLIDAY'=>'Holiday'];
+const ATT_STATUS = ['PRESENT_NB'=>'Present (non-billable)','TRAINING'=>'Training','MEETING'=>'Meeting','LEAVE'=>'Leave','WFH'=>'Work from home','COMPOFF'=>'Comp-off taken','HOLIDAY'=>'Holiday'];
+const JOB_TYPES = ['INSPECTION'=>'Inspection (day-based)','DEPUTATION'=>'Project deputation (site)'];
 const EXP_LEVELS = ['JUNIOR'=>'Junior','MID'=>'Mid','SENIOR'=>'Senior','EXPERT'=>'Expert / Lead'];
 const RATE_TYPES = ['MANDAY'=>'Per man-day','MANMONTH'=>'Per man-month'];
 const BOSS_STATUS = ['ACTIVE'=>'Active','CLOSED'=>'Closed','HOLD'=>'On hold'];
@@ -117,6 +118,20 @@ function ops_migrate() {
     ensure_column('jobs', 'deliverables', "VARCHAR(500) DEFAULT ''");
     // a client can carry the inspection types it typically needs (carried into calls)
     ensure_column('business_partners', 'inspection_types', "VARCHAR(600) DEFAULT ''");
+    // inspector master overhaul: names, trade, multi-SBU, multi-skill
+    ensure_column('inspectors', 'first_name', "VARCHAR(80) DEFAULT ''");
+    ensure_column('inspectors', 'middle_name', "VARCHAR(80) DEFAULT ''");
+    ensure_column('inspectors', 'last_name', "VARCHAR(80) DEFAULT ''");
+    ensure_column('inspectors', 'trade_id', 'INT NULL');
+    ensure_column('inspectors', 'sbus', "VARCHAR(200) DEFAULT ''");
+    ensure_column('inspectors', 'skill_ids', "VARCHAR(600) DEFAULT ''");
+    // job type (inspection vs project deputation)
+    ensure_column('jobs', 'job_type', "VARCHAR(20) DEFAULT 'INSPECTION'");
+    // certifications per inspector, with validity + reminder tracking
+    db()->exec("CREATE TABLE IF NOT EXISTS inspector_certs (
+        id " . pk_clause() . ", inspector_id INT, name VARCHAR(200), number VARCHAR(80) DEFAULT '',
+        issued_date VARCHAR(20) DEFAULT '', valid_to VARCHAR(20) DEFAULT '', status VARCHAR(20) DEFAULT 'VALID',
+        last_reminder VARCHAR(20) DEFAULT '', updated_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
 }
 
 // Seed offices (Ahmedabad + affiliate IBOs) once.
@@ -323,6 +338,26 @@ function ops_run_reminders($today = null) {
             $sent++;
         }
     }
+    $sent += ops_run_cert_reminders($today);
+    return $sent;
+}
+
+// E-mail the inspector + QA/QC nominee when a certificate is within 30 days of expiry.
+function ops_run_cert_reminders($today = null) {
+    $today = $today ?: date('Y-m-d');
+    $qac = getenv('QAC_EMAIL') ?: coordinator_emails();
+    $sent = 0;
+    foreach (ops_all("SELECT c.*, i.name inspector_name, i.email inspector_email FROM inspector_certs c JOIN inspectors i ON i.id=c.inspector_id WHERE c.valid_to <> ''") as $c) {
+        $days = days_between($today, $c['valid_to']);
+        if ($days === null || $days > 30) continue;      // only within a month (or overdue)
+        if ($c['last_reminder'] === $today) continue;      // once per day
+        $when = $days < 0 ? "expired " . abs($days) . " day(s) ago" : "expires in $days day(s)";
+        $body = "Certificate follow-up.\n\nInspector: {$c['inspector_name']}\nCertificate: {$c['name']} ({$c['number']})\n"
+            . "Valid to: {$c['valid_to']} — {$when}.\n\nPlease renew and submit the hard copy so the QA/QC nominee can update the date in the system.\n\nSGS Ahmedabad";
+        ops_mail($c['inspector_email'] ?? '', "Certificate expiry: {$c['name']} — {$c['inspector_name']} ($when)", $body, $qac, 'cert');
+        db()->prepare("UPDATE inspector_certs SET last_reminder=? WHERE id=?")->execute([$today, $c['id']]);
+        $sent++;
+    }
     return $sent;
 }
 
@@ -495,6 +530,7 @@ function ops_dispatch($route, $method) {
         if (!isset($masters[$key])) return false;
         $cfg = $masters[$key];
         ops_require(master_access_ok($cfg['access']), "Only " . ($cfg['access']) . "-level users can open {$cfg['label']}.");
+        if ($key === 'inspectors') { ops_inspectors($action, $method); return true; } // dedicated screen
         ops_master_handle($key, $cfg, $action, $method);
         return true;
     }
@@ -641,6 +677,90 @@ function column_exists($table, $col) {
     } catch (Throwable $e) { return false; }
 }
 
+// ---- Inspector master (dedicated: names, trade, multi-SBU, multi-skill, certs) ----
+function ops_inspectors($action, $method) {
+    $pdo = db();
+    if ($action === 'delete' && $method === 'POST') {
+        $id = (int)($_GET['id'] ?? 0);
+        $pdo->prepare("DELETE FROM inspector_certs WHERE inspector_id=?")->execute([$id]);
+        $pdo->prepare("DELETE FROM inspectors WHERE id=?")->execute([$id]);
+        flash('Inspector deleted.');
+        redirect('/m/inspectors');
+    }
+    if ($action === 'new' || $action === 'edit') {
+        $ins = null;
+        if ($action === 'edit') {
+            $ins = ops_one("SELECT * FROM inspectors WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+            if (!$ins) { http_response_code(404); view('notfound'); return; }
+        }
+        if ($method === 'POST') {
+            $b = $_POST;
+            // certification sub-actions on the edit page
+            if (($b['_do'] ?? '') === 'cert_add' && $ins) {
+                $pdo->prepare("INSERT INTO inspector_certs (inspector_id,name,number,issued_date,valid_to,status,updated_by,created_at) VALUES (?,?,?,?,?,?,?,?)")
+                    ->execute([$ins['id'], $b['cert_name'] ?? '', $b['cert_number'] ?? '', $b['cert_issued'] ?? '', $b['cert_valid_to'] ?? '', 'VALID', user_name(current_user()), date('c')]);
+                flash('Certification added.');
+                redirect('/m/inspectors/edit?id=' . $ins['id']);
+            }
+            if (($b['_do'] ?? '') === 'cert_update' && $ins) {
+                $pdo->prepare("UPDATE inspector_certs SET valid_to=?, number=?, updated_by=? WHERE id=? AND inspector_id=?")
+                    ->execute([$b['cert_valid_to'] ?? '', $b['cert_number'] ?? '', user_name(current_user()), (int)$b['cert_id'], $ins['id']]);
+                flash('Certification validity updated.');
+                redirect('/m/inspectors/edit?id=' . $ins['id']);
+            }
+            if (($b['_do'] ?? '') === 'cert_del' && $ins) {
+                $pdo->prepare("DELETE FROM inspector_certs WHERE id=? AND inspector_id=?")->execute([(int)$b['cert_id'], $ins['id']]);
+                flash('Certification removed.');
+                redirect('/m/inspectors/edit?id=' . $ins['id']);
+            }
+            // main save
+            $full = trim(trim(($b['first_name'] ?? '') . ' ' . ($b['middle_name'] ?? '')) . ' ' . ($b['last_name'] ?? ''));
+            $sbus = implode(',', array_filter((array)($b['sbus'] ?? [])));
+            $skills = implode(',', array_filter((array)($b['skill_ids'] ?? [])));
+            $trade = ($b['trade_id'] ?? '') !== '' ? (int)$b['trade_id'] : null;
+            $salary = can_see_salary() ? (($b['salary_ctc'] ?? '') !== '' ? $b['salary_ctc'] : 0) : null;
+            if ($ins) {
+                $sql = "UPDATE inspectors SET first_name=?,middle_name=?,last_name=?,name=?,emp_code=?,trade_id=?,sbus=?,sbu=?,skill_ids=?,email=?,mobile=?,status=?";
+                $args = [$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $b['emp_code'] ?? '', $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $b['status'] ?? 'ACTIVE'];
+                if ($salary !== null) { $sql .= ",salary_ctc=?"; $args[] = $salary; }
+                $sql .= " WHERE id=?"; $args[] = $ins['id'];
+                $pdo->prepare($sql)->execute($args);
+                flash('Inspector saved.');
+                redirect('/m/inspectors/edit?id=' . $ins['id']);
+            } else {
+                $pdo->prepare("INSERT INTO inspectors (first_name,middle_name,last_name,name,emp_code,trade_id,sbus,sbu,skill_ids,email,mobile,salary_ctc,status,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $b['emp_code'] ?? '', $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $salary ?: 0, $b['status'] ?? 'ACTIVE', date('c')]);
+                $id = $pdo->lastInsertId();
+                flash('Inspector added. You can now add certifications.');
+                redirect('/m/inspectors/edit?id=' . $id);
+            }
+        }
+        $certs = $ins ? ops_all("SELECT * FROM inspector_certs WHERE inspector_id=? ORDER BY valid_to", [$ins['id']]) : [];
+        view('ops/inspector_form', ['ins' => $ins, 'certs' => $certs, 'skillsByTrade' => skills_by_trade()]);
+        return;
+    }
+    // list
+    $q = trim($_GET['q'] ?? '');
+    $where = "1=1"; $args = [];
+    if ($q) { $where = "(name LIKE ? OR emp_code LIKE ? OR skills LIKE ?)"; $args = ["%$q%", "%$q%", "%$q%"]; }
+    $rows = ops_all("SELECT * FROM inspectors WHERE $where ORDER BY name", $args);
+    view('ops/inspector_list', ['rows' => $rows, 'q' => $q]);
+}
+// Human labels for an inspector's stored SBU codes / skill ids / trade.
+function sbu_labels($csv) {
+    if (!$csv) return '—';
+    $map = lk_options_or('sbu', OPS_SBUS);
+    return implode(', ', array_map(fn($c) => $map[$c] ?? $c, array_filter(explode(',', $csv)))) ?: '—';
+}
+function skill_labels($csv) {
+    if (!$csv) return '—';
+    $out = [];
+    foreach (array_filter(explode(',', $csv)) as $id) { $v = lk_value((int)$id); if ($v) $out[] = $v['label']; }
+    return $out ? implode(', ', $out) : '—';
+}
+function trade_label($id) { $v = $id ? lk_value($id) : null; return $v ? $v['label'] : '—'; }
+
 // ---- Calls -----------------------------------------------------------------
 function ops_calls($route, $method) {
     $pdo = db();
@@ -781,7 +901,7 @@ function ops_jobs($route, $method) {
         }
         if ($method === 'POST') {
             $b = $_POST;
-            $fields = ['executing_office_id','inspector_id','subcon_id','scheduled_date','inspection_start_date','inspection_end_date',
+            $fields = ['executing_office_id','inspector_id','subcon_id','job_type','scheduled_date','inspection_start_date','inspection_end_date',
                 'random_date1','random_date2','random_date3','folder_link','boss_id','expected_credit','credit_type','credit_direction',
                 'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost'];
             // deliverables come as a checkbox array -> stored as CSV of codes

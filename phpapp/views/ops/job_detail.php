@@ -11,6 +11,7 @@
 <div class="panel">
   <div class="kv-grid">
     <div><span class="k">Call</span><?= e($job['call_code'] ?: '—') ?></div>
+    <div><span class="k">Job type</span><?= e(JOB_TYPES[$job['job_type'] ?? 'INSPECTION'] ?? '—') ?></div>
     <div><span class="k">Executing office</span><?= e($job['office_name'] ?: '—') ?></div>
     <div><span class="k">Inspector</span><?= e($job['inspector_name'] ?: '—') ?></div>
     <div><span class="k">Sub-con</span><?= e($job['subcon_agency'] ?: '—') ?></div>

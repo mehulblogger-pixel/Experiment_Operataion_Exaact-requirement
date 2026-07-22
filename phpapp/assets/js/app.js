@@ -225,12 +225,35 @@
     client.addEventListener('change', load);
   }
 
+  // ---- Inspector: skills checkboxes driven by the chosen trade ----
+  function initTradeSkills() {
+    var trade = document.getElementById('trade_sel');
+    var box = document.getElementById('skills_box');
+    if (!trade || !box || !window.SKILLS) return;
+    var selected = window.SKILLS_SELECTED || [];
+    function render() {
+      var tid = trade.value;
+      var list = (tid && window.SKILLS[tid]) ? window.SKILLS[tid] : [];
+      if (!list.length) { box.innerHTML = '<span class="muted">' + (tid ? 'No skills under this trade yet — add them under Skill.' : 'Pick a trade to see its skills.') + '</span>'; return; }
+      var html = '<div class="checkgrid">';
+      list.forEach(function (s) {
+        var on = selected.indexOf(s.id) !== -1 ? 'checked' : '';
+        html += '<label class="chk"><input type="checkbox" name="skill_ids[]" value="' + s.id + '" ' + on + '> ' + s.label + '</label>';
+      });
+      html += '</div>';
+      box.innerHTML = html;
+    }
+    trade.addEventListener('change', function () { selected = []; render(); });
+    render();
+  }
+
   function init() {
     gstAutofill();
     initCascades();
     initActivity();
     initCustomFreq();
     initClientInspection();
+    initTradeSkills();
     initQuickAdd();
     Array.prototype.forEach.call(document.querySelectorAll('select.searchable'), enhanceSelect);
   }

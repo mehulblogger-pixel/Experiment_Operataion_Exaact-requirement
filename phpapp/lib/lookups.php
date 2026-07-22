@@ -47,6 +47,45 @@ function lk_migrate() {
     lk_ensure_values_from_map('deliverable', DELIVERABLES);
     // add CUSTOM to reporting frequency on existing installs
     lk_ensure_value('reporting_frequency', 'CUSTOM', 'Custom (every N days)');
+    // trade + skills (skills depend on trade) — seed on upgrade if missing
+    if ((int)ops_val("SELECT COUNT(*) FROM lookup_types") > 0 && !lk_type('trade')) lk_seed_trade_skill();
+}
+
+// Discipline / trade → skills. Researched, exhaustive starting set; fully editable.
+function trade_skill_data() {
+    return [
+        'Mechanical' => ['Tubes & Pipes','Piping & Pipelines','Fire Fighting','Valves','Pressure Vessels','Heat Exchangers','Storage Tanks','Rotating Equipment','Static Equipment','Structural Fabrication','Site QA/QC','Commissioning','Installation & Maintenance','Shutdown / Turnaround','HVAC','Bolting & Torquing'],
+        'Electrical' => ['Cables','Panels & Switchboards','Transformers','Switchgear (HV/LV)','Motors','Earthing & Lightning','Lighting','Batteries & UPS','Relays & Protection'],
+        'Civil' => ['Structure','Concrete & Cement','Reinforcement','Foundations','Roads & Pavements','Finishing','Waterproofing','Soil / Geotech'],
+        'Instrumentation' => ['Field Instruments','Control Systems (DCS/PLC)','Calibration','Analysers','Cabling & Loop Check'],
+        'Environmental' => ['Air / Emission Monitoring','Water & Effluent','Waste Management','Noise','EIA / Compliance'],
+        'Safety (HSE)' => ['HSE Audit','Fire & Safety','Scaffolding','Work at Height','Confined Space','Lifting & Rigging'],
+        'Painting & Coating' => ['Surface Preparation','Blasting','Coating Inspection (NACE)','Galvanising','FBE / 3LPE'],
+        'Welding' => ['Welding Inspection (CSWIP/AWS)','WPS/PQR Review','Welder Qualification'],
+        'NDT' => ['RT','UT','MT','PT','Visual','PAUT / TOFD'],
+    ];
+}
+function lk_seed_trade_skill() {
+    if (lk_type('trade')) return;
+    $tradeType = lk_add_type('trade', 'Trade / discipline', null, 0, 60);
+    $skillType = lk_add_type('skill', 'Skill', $tradeType, 0, 61);
+    $ti = 0;
+    foreach (trade_skill_data() as $trade => $skills) {
+        $tvid = lk_add_value($tradeType, null, '', $trade, $ti++);
+        $si = 0;
+        foreach ($skills as $sk) lk_add_value($skillType, $tvid, '', $sk, $si++);
+    }
+}
+// skills grouped by their parent trade value id — for the trade→skill picker.
+function skills_by_trade() {
+    $st = lk_type('skill');
+    if (!$st) return [];
+    $out = [];
+    foreach (lk_all_values($st['id']) as $v) {
+        if ($v['parent_value_id'] === null) continue;
+        $out[(int)$v['parent_value_id']][] = ['id' => (int)$v['id'], 'label' => $v['label']];
+    }
+    return $out;
 }
 // Like lk_ensure_type but seeds coded values from a [code=>label] map.
 function lk_ensure_type_map($key, $label, $map) {
@@ -140,6 +179,7 @@ function lk_seed() {
     $i = 0; foreach (INSPECTION_TYPES as $code => $lab) lk_add_value($it, null, $code, $lab, $i++);
     $dl = lk_add_type('deliverable', 'Deliverable / report format', null, 0, $so++);
     $i = 0; foreach (DELIVERABLES as $code => $lab) lk_add_value($dl, null, $code, $lab, $i++);
+    lk_seed_trade_skill();
 
     // demo custom field so the candles cascade shows live on the New Call form
     if ((int)ops_val("SELECT COUNT(*) FROM custom_fields") === 0) {
@@ -276,10 +316,17 @@ function lk_admin($route, $method) {
             $label = trim($_POST['label'] ?? '');
             $code = trim($_POST['code'] ?? '');
             $parentVal = ($_POST['parent_value_id'] ?? '') !== '' ? (int)$_POST['parent_value_id'] : null;
+            $editId = (int)($_POST['edit_id'] ?? 0);
             if ($label === '') { flash('Enter a value label.', 'error'); redirect('/lookup?key=' . $t['type_key']); }
             if ($parentType && !$parentVal) { flash('Pick which ' . $parentType['label'] . ' this belongs under.', 'error'); redirect('/lookup?key=' . $t['type_key']); }
-            lk_add_value($t['id'], $parentVal, $code, $label, 99);
-            flash('Value added.');
+            if ($editId) {
+                $pdo->prepare("UPDATE lookup_values SET label=?, code=?, parent_value_id=? WHERE id=? AND type_id=?")
+                    ->execute([$label, $code, $parentVal, $editId, $t['id']]);
+                flash('Value updated.');
+            } else {
+                lk_add_value($t['id'], $parentVal, $code, $label, 99);
+                flash('Value added.');
+            }
             redirect('/lookup?key=' . $t['type_key']);
         }
         if (($_GET['del'] ?? '') !== '') {
@@ -288,7 +335,8 @@ function lk_admin($route, $method) {
             redirect('/lookup?key=' . $t['type_key']);
         }
         $parentValues = $parentType ? lk_all_values($parentType['id']) : [];
-        view('ops/lookup_values', ['t' => $t, 'parentType' => $parentType, 'values' => lk_all_values($t['id']), 'parentValues' => $parentValues]);
+        $editRow = ($_GET['edit'] ?? '') !== '' ? lk_value((int)$_GET['edit']) : null;
+        view('ops/lookup_values', ['t' => $t, 'parentType' => $parentType, 'values' => lk_all_values($t['id']), 'parentValues' => $parentValues, 'editRow' => $editRow]);
         return;
     }
 

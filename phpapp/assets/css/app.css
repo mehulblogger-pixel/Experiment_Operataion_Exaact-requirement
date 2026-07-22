@@ -102,3 +102,9 @@ table.mini th{text-align:left;font-size:11px;text-transform:uppercase;letter-spa
 table.mini td{padding:4px 8px;border-bottom:1px solid var(--line,#e2ddd6)}
 .checkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 14px;margin-top:4px}
 .checkgrid .chk{font-weight:400;font-size:13.5px;padding:3px 0}
+
+/* ---- Breadcrumbs ---- */
+.crumbs{font-size:12.5px;color:var(--muted,#808080);margin:0 0 10px}
+.crumbs a{color:var(--brand);text-decoration:none}
+.crumbs a:hover{text-decoration:underline}
+.skill-box{border:1px solid var(--line,#e2ddd6);border-radius:8px;padding:10px 12px;background:#fff}

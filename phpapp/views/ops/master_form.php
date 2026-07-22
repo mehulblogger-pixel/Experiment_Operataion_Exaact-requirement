@@ -1,3 +1,4 @@
+<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › <a href="/m/<?= e($key) ?>"><?= e($cfg['label']) ?></a> › <?= $row ? 'Edit' : 'Add' ?></div>
 <h1><?= $row ? 'Edit' : 'Add' ?> — <?= e($cfg['label']) ?></h1>
 <form method="post" action="/m/<?= e($key) ?>/<?= $row ? 'edit?id=' . (int)$row['id'] : 'new' ?>" class="panel">
   <div class="form-grid">

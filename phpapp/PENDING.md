@@ -4,6 +4,20 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
 
 ## Parked (agreed to do later)
 
+- [ ] **Full organisation structure** — model the hierarchy Business Director →
+      SBU Heads → Branch Managers → Managers → Asst. Managers → Coordinators →
+      Inspectors, with **multiple** Operation Managers and Coordinators **per
+      office**, and users linked to their office. Today each office stores a
+      single coordinator + manager email (used for forwarding/notifications), and
+      there are 4 access roles. This is a role/permission + org redesign for a
+      dedicated pass.
+- [ ] **Multi-SBU cost distribution in dashboards** — inspectors can now be
+      tagged to multiple SBUs; split their monthly loaded cost across those SBUs
+      in the profitability/utilization reports (currently cost sits on the job's
+      single SBU). The data (inspectors.sbus) is captured; the report split is
+      pending.
+
+
 - [ ] **Reminder cron jobs** — set up the two cPanel Cron entries (07:00 report-due,
       18:00 overdue-closure) pointing at `cron.php`. Deferred by user; steps are in
       `README-MilesWeb-PHP.md`.
