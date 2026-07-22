@@ -52,7 +52,21 @@
         <?php foreach (lk_options_or('deputation_type', ['Daily (single day)'=>'Daily (single day)','Multiple days'=>'Multiple days','Continuous days'=>'Continuous days','Monthly (PM deputation)'=>'Monthly (PM deputation)']) as $k=>$v): ?>
           <option value="<?= e($v) ?>" <?= ($call && ($call['deputation_type']??'')===$v)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff"></div>
+    <?php // Client site — only shown for project/site deputation, populated from the client's sites ?>
+    <div class="ff" id="site_wrap" style="display:none;"><label>Client site (deputation)</label>
+      <select class="form-control searchable" id="site_sel" name="site_address_id"><option value="">—</option>
+        <?php if ($call && ($call['site_address_id']??null)) { $sa = ops_one("SELECT id,address_type,label,city FROM partner_addresses WHERE id=?", [$call['site_address_id']]); if ($sa) echo '<option value="'.(int)$sa['id'].'" selected>'.e((ADDRESS_TYPES[$sa['address_type']]??$sa['address_type']).($sa['label']?' — '.$sa['label']:'')).'</option>'; } ?>
+      </select></div>
+
+    <div class="ff"><label>Purchase order <span class="muted">(open PO → leave blank)</span></label>
+      <select class="form-control searchable" id="po_sel" name="po_id"><option value="">— none / open —</option>
+        <?php if ($call && ($call['po_id']??null)) { $cpo = ops_one("SELECT id,po_number,title FROM partner_purchase_orders WHERE id=?", [$call['po_id']]); if ($cpo) echo '<option value="'.(int)$cpo['id'].'" selected>'.e(($cpo['po_number']?:'(open)').($cpo['title']?' — '.$cpo['title']:'')).'</option>'; } ?>
+      </select></div>
+    <div class="ff"><label>PO line item <span class="muted">(to track its quantity)</span></label>
+      <select class="form-control searchable" id="poline_sel" name="po_line_item_id"><option value="">—</option>
+        <?php if ($call && ($call['po_line_item_id']??null)) { $cli = ops_one("SELECT id,description FROM po_line_items WHERE id=?", [$call['po_line_item_id']]); if ($cli) echo '<option value="'.(int)$cli['id'].'" selected>'.e($cli['description']).'</option>'; } ?>
+      </select></div>
+    <div class="ff"><label>Project / reference</label><input class="form-control" name="project_ref" value="<?= e($call['project_ref'] ?? '') ?>"></div>
 
     <div class="ff"><label>Credit to executing branch (₹) <span class="muted">— required when forwarding</span></label>
       <input class="form-control" type="number" step="0.01" name="expected_credit" value="<?= e($call['expected_credit'] ?? '') ?>"></div>

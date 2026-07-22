@@ -319,11 +319,60 @@
     trade.addEventListener('change', rebuild); rebuild();
   }
 
+  // ---- New Call: load the client's POs / line items / sites; site shows for deputation ----
+  function initCallClient() {
+    var client = document.getElementById('client_sel');
+    var poSel = document.getElementById('po_sel');
+    var lineSel = document.getElementById('poline_sel');
+    var siteSel = document.getElementById('site_sel');
+    var siteWrap = document.getElementById('site_wrap');
+    var insp = document.getElementById('insp_sel');
+    if (!client || (!poSel && !siteSel)) return;
+    var META = { pos: [], sites: [] };
+    function fillPos() {
+      if (!poSel) return;
+      var keep = poSel.value;
+      poSel.innerHTML = '<option value="">— none / open —</option>';
+      META.pos.forEach(function (p) { var o = document.createElement('option'); o.value = p.id; o.textContent = p.label; if (String(p.id) === keep) o.selected = true; poSel.appendChild(o); });
+      fillLines();
+    }
+    function fillLines() {
+      if (!lineSel) return;
+      var keep = lineSel.value;
+      lineSel.innerHTML = '<option value="">—</option>';
+      var po = META.pos.filter(function (p) { return String(p.id) === String(poSel && poSel.value); })[0];
+      (po ? po.items : []).forEach(function (i) { var o = document.createElement('option'); o.value = i.id; o.textContent = i.label; if (String(i.id) === keep) o.selected = true; lineSel.appendChild(o); });
+    }
+    function fillSites() {
+      if (!siteSel) return;
+      var keep = siteSel.value;
+      siteSel.innerHTML = '<option value="">—</option>';
+      META.sites.forEach(function (s) { var o = document.createElement('option'); o.value = s.id; o.textContent = s.label; if (String(s.id) === keep) o.selected = true; siteSel.appendChild(o); });
+    }
+    function toggleSite() {
+      if (!siteWrap) return;
+      var dep = insp && insp.value === 'DEPUTATION';
+      siteWrap.style.display = dep ? '' : 'none';
+    }
+    function load() {
+      if (!client.value) { META = { pos: [], sites: [] }; fillPos(); fillSites(); return; }
+      fetch('/call-client-meta?id=' + encodeURIComponent(client.value))
+        .then(function (r) { return r.json(); })
+        .then(function (res) { META = { pos: res.pos || [], sites: res.sites || [] }; fillPos(); fillSites(); })
+        .catch(function () {});
+    }
+    client.addEventListener('change', load);
+    if (poSel) poSel.addEventListener('change', fillLines);
+    if (insp) insp.addEventListener('change', toggleSite);
+    toggleSite();
+  }
+
   function init() {
     gstAutofill();
     initOtherToggles();
     initRegAutofill();
     initPoSubcat();
+    initCallClient();
     initDisplayName();
     initForwardCredit();
     initSubconVendor();

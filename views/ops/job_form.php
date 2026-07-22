@@ -60,6 +60,9 @@
       <select class="form-control searchable" name="inspector_id"><option value="">—</option>
         <?php foreach ($inspectors as $i): ?><option value="<?= (int)$i['id'] ?>" <?= ($job && $job['inspector_id']==$i['id'])?'selected':'' ?>><?= e($i['name']) ?><?= $i['emp_code']?' ('.e($i['emp_code']).')':'' ?></option><?php endforeach; ?>
       </select></div>
+    <div class="ff"><label>Engineer status</label>
+      <?php $curEt = $job['engineer_type'] ?? 'ASSET'; ?>
+      <select class="form-control" name="engineer_type"><?php foreach (['ASSET'=>'SGS asset (own)','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor'] as $k=>$v): ?><option value="<?= $k ?>" <?= $curEt===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Sub-contractor (if used)</label>
       <select class="form-control searchable" name="subcon_id"><option value="">—</option>
         <?php foreach ($subcons as $s): ?><option value="<?= (int)$s['id'] ?>" <?= ($job && $job['subcon_id']==$s['id'])?'selected':'' ?>><?= e($s['agency']) ?><?= $s['inspector_name']?' — '.e($s['inspector_name']):'' ?></option><?php endforeach; ?>

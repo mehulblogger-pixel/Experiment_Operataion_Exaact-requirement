@@ -116,6 +116,7 @@ function migrate() {
     ensure_column('po_line_items', 'subcategory_other', "VARCHAR(150) DEFAULT ''");
     ensure_column('po_line_items', 'activity_id', 'INT NULL');
     ensure_column('po_line_items', 'gst_pct', 'DECIMAL(6,2) DEFAULT 18');
+    ensure_column('po_line_items', 'last_alert', "VARCHAR(20) DEFAULT ''"); // near-completion email dedupe
     // Free-typed extra inspection types on a partner (kept off the master, per requirement).
     ensure_column('business_partners', 'inspection_types_other', "VARCHAR(400) DEFAULT ''");
     // Per-branch role of a partner (Client under Ahmedabad, Vendor under Mumbai, …).

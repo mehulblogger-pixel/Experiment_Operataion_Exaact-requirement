@@ -21,8 +21,22 @@
       <a class="btn secondary" href="/call-edit?id=<?= (int)$call['id'] ?>">Edit call</a>
       <a class="btn" href="/job-new?call=<?= (int)$call['id'] ?>">+ Allocate Job</a>
     <?php endif; ?>
+    <?php if (is_admin_level()): ?>
+      <form method="post" action="/call-delete?id=<?= (int)$call['id'] ?>" style="display:inline" onsubmit="return confirm('Delete this call and its allocated jobs? This cannot be undone.');">
+        <button class="btn small" style="background:#c0392b" type="submit">Delete call</button></form>
+    <?php endif; ?>
   </div>
 </div>
+<?php
+  // Confirmation banner: once an inspector + date are set, show who it's assigned to.
+  $assigned = null; foreach ($jobs as $jj) { if (!empty($jj['inspector_name']) && !empty($jj['scheduled_date'])) { $assigned = $jj; break; } }
+  $etypes = ['ASSET'=>'SGS asset','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor'];
+  if ($assigned):
+?>
+  <div class="msg msg-success">✔ This call is assigned to <strong><?= e($assigned['inspector_name']) ?></strong>
+    (<?= e($etypes[$assigned['engineer_type'] ?? 'ASSET'] ?? 'SGS asset') ?>) for <strong><?= e($assigned['scheduled_date']) ?></strong>
+    — job <?= e($assigned['job_code']) ?><?php if (!empty($assigned['confirmed_at'])): ?>, confirmed <?= e(substr($assigned['confirmed_at'],0,10)) ?><?php endif; ?>.</div>
+<?php endif; ?>
 
 <div class="panel">
   <div class="kv-grid">
@@ -34,6 +48,14 @@
     <div><span class="k">Activity</span><?= e($call['activity_id'] ? lk_value_path($call['activity_id']) : '—') ?></div>
     <div><span class="k">Product</span><?= e((lk_options_or('product', PRODUCT_CATS)[$call['product_category']] ?? '') ?: ($call['product_other'] ?: '—')) ?></div>
     <div><span class="k">Deputation</span><?= e($call['deputation_type'] ?: '—') ?></div>
+    <div><span class="k">Type of inspection</span><?= e(INSPECTION_TYPES[$call['inspection_type'] ?? ''] ?? ($call['inspection_type'] ?: '—')) ?></div>
+    <?php if (!empty($call['po_id'])): $cpo = ops_one("SELECT po_number,title FROM partner_purchase_orders WHERE id=?", [$call['po_id']]); ?>
+      <div><span class="k">Purchase order</span><?= e($cpo ? (($cpo['po_number']?:'(open)').' '.$cpo['title']) : '—') ?></div><?php endif; ?>
+    <?php if (!empty($call['po_line_item_id'])): $cli = ops_one("SELECT description FROM po_line_items WHERE id=?", [$call['po_line_item_id']]); ?>
+      <div><span class="k">PO line item</span><?= e($cli['description'] ?? '—') ?></div><?php endif; ?>
+    <?php if (!empty($call['project_ref'])): ?><div><span class="k">Project / ref</span><?= e($call['project_ref']) ?></div><?php endif; ?>
+    <?php if (!empty($call['site_address_id'])): $sa = ops_one("SELECT address_type,label,city FROM partner_addresses WHERE id=?", [$call['site_address_id']]); ?>
+      <div><span class="k">Client site</span><?= e($sa ? ((ADDRESS_TYPES[$sa['address_type']]??$sa['address_type']).($sa['label']?' — '.$sa['label']:'').($sa['city']?', '.$sa['city']:'')) : '—') ?></div><?php endif; ?>
     <div><span class="k">Credit to branch</span><?= fmoney($call['expected_credit']) ?><?= $call['credit_type'] ? ' <small class="muted">('.e(CREDIT_TYPES[$call['credit_type']] ?? '').')</small>' : '' ?></div>
     <div><span class="k">Status</span><?= e($call['status']) ?></div>
     <div class="kv-wide"><span class="k">Notes</span><?= e($call['notes'] ?: '—') ?></div>

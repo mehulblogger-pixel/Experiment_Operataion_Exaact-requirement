@@ -366,17 +366,35 @@ function job_email_context($jobId) {
         LEFT JOIN offices o ON o.id=j.executing_office_id
         WHERE j.id=?", [$jobId]);
 }
+// Primary contact + head-office address for a partner (for the allocation email).
+function partner_email_bits($partnerId) {
+    if (!$partnerId) return ['contact' => '', 'mobile' => '', 'email' => '', 'address' => ''];
+    $c = ops_one("SELECT name, mobile, phone, email FROM partner_contacts WHERE partner_id=? ORDER BY is_primary DESC, id LIMIT 1", [$partnerId]);
+    $a = ops_one("SELECT line1, line2, village, district, city, state, pincode FROM partner_addresses WHERE partner_id=? ORDER BY is_primary DESC, id LIMIT 1", [$partnerId]);
+    $addr = $a ? implode(', ', array_filter([$a['line1'], $a['line2'], $a['village'], $a['district'], $a['city'], $a['state'], $a['pincode']])) : '';
+    return ['contact' => $c['name'] ?? '', 'mobile' => trim(($c['mobile'] ?? '') . ' ' . ($c['phone'] ?? '')), 'email' => $c['email'] ?? '', 'address' => $addr];
+}
 function send_assignment_email($jobId) {
     $j = job_email_context($jobId);
     if (!$j || !$j['inspector_id']) return;
     $client = $j['client_disp'] ?: $j['client_name'];
+    $call = ops_one("SELECT * FROM calls WHERE id=?", [$j['call_id']]);
+    $cli = partner_email_bits($call['client_id'] ?? null);
+    $ven = partner_email_bits($call['vendor_id'] ?? null);
+    $product = $call ? (($call['product_other'] ?? '') ?: (PRODUCT_CATS[$call['product_category'] ?? ''] ?? '')) : '';
+    $etype = ['ASSET'=>'SGS asset','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor'][$j['engineer_type'] ?? 'ASSET'] ?? '';
     $body = "Dear {$j['inspector_name']},\n\nYou have been assigned the following inspection job.\n\n"
-        . "Job: {$j['job_code']}\nClient: {$client}\nVendor/Site: {$j['vendor_name']}\n"
-        . "Region: " . (OPS_REGIONS[$j['region']] ?? $j['region']) . "\nSBU: " . (OPS_SBUS[$j['sbu']] ?? $j['sbu']) . "\n"
-        . "BOSS No.: {$j['boss_number']}\nScheduled: {$j['scheduled_date']}\n"
-        . "Inspection dates: {$j['inspection_start_date']} to {$j['inspection_end_date']}\n"
-        . "Reporting: " . (REPORT_FREQ[$j['reporting_frequency']] ?? '') . "\n"
-        . "Report folder: {$j['folder_link']}\n\nRegards,\nSGS Ahmedabad Coordination";
+        . "Job: {$j['job_code']}\nType of inspection: " . (INSPECTION_TYPES[$j['inspection_type'] ?? ''] ?? ($j['inspection_type'] ?? '')) . "\n"
+        . "Engineer status: {$etype}\n"
+        . "Region: " . (OPS_REGIONS[$j['region']] ?? $j['region']) . "   SBU: " . (OPS_SBUS[$j['sbu']] ?? $j['sbu']) . "\n"
+        . "BOSS No.: {$j['boss_number']}\nScheduled: {$j['scheduled_date']}   Inspection: {$j['inspection_start_date']} to {$j['inspection_end_date']}\n"
+        . "Client's required date: " . ($call['inspection_required_date'] ?? '') . "\n"
+        . "Product: " . ($product ?: '—') . "\n"
+        . "\n--- CLIENT ---\n{$client}\nContact: {$cli['contact']}   Mob: {$cli['mobile']}   Email: {$cli['email']}\nAddress: {$cli['address']}\n"
+        . "\n--- VENDOR / SITE ---\n{$j['vendor_name']}\nContact: {$ven['contact']}   Mob: {$ven['mobile']}   Email: {$ven['email']}\nAddress: {$ven['address']}\n"
+        . "\nNotes: " . ($call['notes'] ?? '') . "\n"
+        . "Reporting: " . (REPORT_FREQ[$j['reporting_frequency']] ?? '') . "   Report folder: {$j['folder_link']}\n"
+        . "\nRegards,\nSGS Ahmedabad Coordination";
     ops_mail($j['inspector_email'] ?? '', "Job Assignment: {$j['job_code']} — {$client}", $body, coordinator_emails(), 'assignment');
 }
 function send_closure_email($jobId) {
@@ -429,6 +447,35 @@ function ops_run_reminders($today = null) {
         }
     }
     $sent += ops_run_cert_reminders($today);
+    $sent += ops_run_po_alerts($today);
+    return $sent;
+}
+
+// Alert manager/branch when a PO line item's quantity is nearly consumed (≥80%) or the
+// PO validity is within 15 days while a balance remains — once per line item.
+function ops_run_po_alerts($today = null) {
+    $today = $today ?: date('Y-m-d');
+    $sent = 0;
+    $rows = ops_all("SELECT li.*, po.po_number, po.end_date, po.partner_id, bp.legal_name, bp.display_name
+        FROM po_line_items li JOIN partner_purchase_orders po ON po.id=li.purchase_order_id
+        LEFT JOIN business_partners bp ON bp.id=po.partner_id
+        WHERE COALESCE(po.is_active,1)=1 AND li.quantity > 0");
+    foreach ($rows as $li) {
+        if (($li['last_alert'] ?? '') === $today) continue;
+        $qty = (float)$li['quantity']; $cons = (float)$li['consumed']; $bal = $qty - $cons;
+        $pctDone = $qty > 0 ? $cons / $qty : 0;
+        $daysToExpiry = $li['end_date'] ? days_between($today, $li['end_date']) : null;
+        $why = '';
+        if ($pctDone >= 0.8 && $bal > 0) $why = round($pctDone * 100) . "% consumed, {$bal} left";
+        elseif ($daysToExpiry !== null && $daysToExpiry >= 0 && $daysToExpiry <= 15 && $bal > 0) $why = "PO expires in {$daysToExpiry} day(s) with {$bal} left";
+        if ($why === '') continue;
+        $client = $li['display_name'] ?: $li['legal_name'];
+        $body = "PO alert for {$client}.\n\nPO: {$li['po_number']}\nLine: {$li['description']}\nQuantity: {$qty}  Consumed: {$cons}  Balance: {$bal}\n"
+            . "Reason: {$why}\nPO validity: " . ($li['end_date'] ?: '—') . "\n\nPlease arrange renewal / a fresh PO.\n\nSGS Ahmedabad";
+        ops_mail(coordinator_emails(), "PO nearing completion: {$li['po_number']} — {$client}", $body, getenv('BRANCH_MANAGER_EMAIL') ?: '', 'po_alert');
+        db()->prepare("UPDATE po_line_items SET last_alert=? WHERE id=?")->execute([$today, $li['id']]);
+        $sent++;
+    }
     return $sent;
 }
 
@@ -649,8 +696,12 @@ function ops_dispatch($route, $method) {
         return true;
     }
     switch (true) {
-        case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call':
+        case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call' || $route === 'call-delete':
             ops_calls($route, $method); return true;
+        case $route === 'call-client-meta':
+            header('Content-Type: application/json');
+            echo json_encode(call_client_meta((int)($_GET['id'] ?? 0)));
+            return true;
         case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close':
             ops_jobs($route, $method); return true;
         case $route === 'my-jobs':
@@ -886,8 +937,36 @@ function sbu_csv_labels($csv, $opts = null) {
 }
 
 // ---- Calls -----------------------------------------------------------------
+// A client's purchase orders (+ line items) and project-site addresses, for the New Call form.
+function call_client_meta($clientId) {
+    if (!$clientId) return ['pos' => [], 'sites' => []];
+    $pos = [];
+    foreach (ops_all("SELECT id, po_number, po_type, title FROM partner_purchase_orders WHERE partner_id=? AND is_active=1 ORDER BY id DESC", [$clientId]) as $po) {
+        $items = ops_all("SELECT id, description, quantity, consumed, item_type FROM po_line_items WHERE purchase_order_id=? ORDER BY id", [$po['id']]);
+        $pos[] = ['id' => (int)$po['id'], 'label' => ($po['po_number'] ?: '(open)') . ($po['title'] ? ' — ' . $po['title'] : ''),
+            'type' => $po['po_type'],
+            'items' => array_map(fn($i) => ['id' => (int)$i['id'], 'label' => $i['description'] . ' (' . ((float)$i['quantity'] - (float)$i['consumed']) . ' ' . $i['item_type'] . ' left)'], $items)];
+    }
+    $sites = [];
+    foreach (ops_all("SELECT id, address_type, label, city FROM partner_addresses WHERE partner_id=? AND address_type IN ('PROJECT_SITE','SITE_OFFICE','PLANT','FACTORY') ORDER BY id", [$clientId]) as $a) {
+        $sites[] = ['id' => (int)$a['id'], 'label' => (ADDRESS_TYPES[$a['address_type']] ?? $a['address_type']) . ($a['label'] ? ' — ' . $a['label'] : '') . ($a['city'] ? ', ' . $a['city'] : '')];
+    }
+    return ['pos' => $pos, 'sites' => $sites];
+}
 function ops_calls($route, $method) {
     $pdo = db();
+    if ($route === 'call-delete') {
+        ops_require(is_admin_level(), 'Only a Branch App Manager, Manager or Super Admin can delete a call.');
+        $cid = (int)($_GET['id'] ?? 0);
+        if ($method === 'POST' && $cid) {
+            foreach (ops_all("SELECT id FROM jobs WHERE call_id=?", [$cid]) as $j)
+                $pdo->prepare("DELETE FROM expenses WHERE job_id=?")->execute([$j['id']]);
+            $pdo->prepare("DELETE FROM jobs WHERE call_id=?")->execute([$cid]);
+            $pdo->prepare("DELETE FROM calls WHERE id=?")->execute([$cid]);
+            flash('Call deleted.');
+        }
+        redirect('/calls');
+    }
     if ($route === 'calls') {
         $q = trim($_GET['q'] ?? '');
         [$scopeW, $args] = scope_clause('c.executing_office_id', 'c.sbu');
@@ -918,6 +997,7 @@ function ops_calls($route, $method) {
             }
             $fields = ['client_id','vendor_id','ibo_office_id','executing_office_id','region','sbu','activity_id',
                 'inspection_type','product_category','product_other','deputation_type','expected_credit','credit_type',
+                'po_id','po_line_item_id','project_ref','site_address_id',
                 'call_received_date','inspection_required_date','notes'];
             $wasForwarded = $call ? ($call['executing_office_id'] ?? null) : null;
             $forwardNow = $execOffice && !$wasForwarded; // first time it gets an executing branch
@@ -974,7 +1054,7 @@ function ops_calls($route, $method) {
 }
 function nz($v) { return $v === '' ? null : $v; }
 function nzc_call($f, $v) {
-    if (in_array($f, ['client_id','vendor_id','ibo_office_id','executing_office_id','activity_id'], true)) return $v === '' ? null : (int)$v;
+    if (in_array($f, ['client_id','vendor_id','ibo_office_id','executing_office_id','activity_id','po_id','po_line_item_id','site_address_id'], true)) return $v === '' ? null : (int)$v;
     if ($f === 'expected_credit') return $v === '' ? 0 : $v;
     return $v;
 }
@@ -1026,7 +1106,7 @@ function ops_jobs($route, $method) {
         }
         if ($method === 'POST') {
             $b = $_POST;
-            $fields = ['executing_office_id','inspector_id','subcon_id','job_type','scheduled_date','inspection_start_date','inspection_end_date',
+            $fields = ['executing_office_id','inspector_id','subcon_id','engineer_type','job_type','scheduled_date','inspection_start_date','inspection_end_date',
                 'random_date1','random_date2','random_date3','folder_link','boss_id','expected_credit','credit_type','credit_direction',
                 'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost'];
             // deliverables come as a checkbox array -> stored as CSV of codes
@@ -1059,9 +1139,14 @@ function ops_jobs($route, $method) {
             custom_save('job', $jobId, $b);
             // comp-off if any inspection date is a Sunday
             ops_check_compoff($jobId);
-            // assignment email when an inspector + schedule exist
+            // assignment email + call confirmation when an inspector + schedule exist
             $jj = ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]);
-            if ($jj['inspector_id'] && $jj['scheduled_date']) send_assignment_email($jobId);
+            if ($jj['inspector_id'] && $jj['scheduled_date']) {
+                send_assignment_email($jobId);
+                $pdo->prepare("UPDATE jobs SET confirmed_at=?, confirmed_by=? WHERE id=? AND (confirmed_at='' OR confirmed_at IS NULL)")
+                    ->execute([date('c'), user_name(current_user()), $jobId]);
+                $pdo->prepare("UPDATE calls SET status='CONFIRMED' WHERE id=?")->execute([$call['id']]);
+            }
             redirect('/job?id=' . $jobId);
         }
         view('ops/job_form', ['job'=>$job,'call'=>$call,'error'=>null,'offices'=>offices_list(),
