@@ -34,7 +34,36 @@ function lk_ensure_schema() {
     ];
     foreach ($t as $sql) $pdo->exec($sql);
 }
-function lk_migrate() { lk_ensure_schema(); }
+function lk_migrate() {
+    lk_ensure_schema();
+    // Idempotent: seed lists that were added after the first release.
+    lk_ensure_type('deputation_type', 'Deputation type', [
+        'Daily (single day)', 'Multiple days', 'Continuous days', 'Monthly (PM deputation)',
+    ]);
+}
+
+// Create a lookup type + flat values only if it doesn't exist yet (safe on upgrades).
+function lk_ensure_type($key, $label, $values) {
+    if (lk_type($key)) return;
+    if ((int)ops_val("SELECT COUNT(*) FROM lookup_types") === 0) return; // fresh install: lk_seed handles it
+    $tid = lk_add_type($key, $label, null, 0, 50);
+    $so = 0;
+    foreach ($values as $v) lk_add_value($tid, null, '', $v, $so++);
+}
+
+// Activity values grouped by their parent SBU code — for the SBU→Activity picker.
+function activity_options_by_sbu() {
+    $act = lk_type('activity');
+    if (!$act) return [];
+    $out = [];
+    foreach (lk_all_values($act['id']) as $v) {
+        $parent = $v['parent_value_id'] ? lk_value($v['parent_value_id']) : null;
+        if (!$parent) continue;
+        $code = $parent['code'] !== '' ? $parent['code'] : (string)$parent['id'];
+        $out[$code][] = ['id' => (int)$v['id'], 'label' => $v['label']];
+    }
+    return $out;
+}
 
 // ---- Seed system lists (from the old fixed choice lists) + demo hierarchies -
 function lk_seed() {
@@ -75,6 +104,10 @@ function lk_seed() {
     lk_add_value($tier, $paraffin, '', 'Tiny Treat', 1);
     lk_add_value($tier, $soy, '', 'Premium', 0);
     lk_add_value($tier, $soy, '', 'Classic', 1);
+
+    // deputation type (flat list)
+    $dep = lk_add_type('deputation_type', 'Deputation type', null, 0, $so++);
+    foreach (['Daily (single day)', 'Multiple days', 'Continuous days', 'Monthly (PM deputation)'] as $i => $d) lk_add_value($dep, null, '', $d, $i);
 
     // demo custom field so the candles cascade shows live on the New Call form
     if ((int)ops_val("SELECT COUNT(*) FROM custom_fields") === 0) {

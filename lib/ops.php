@@ -91,6 +91,19 @@ function ops_migrate() {
     ops_ensure_schema();
     // users gets role plumbing for the 4-role model + inspector self-service link
     ensure_column('users', 'inspector_id', 'INT NULL');
+    // offices carry their branch coordinator + manager (for forwarding & emails)
+    ensure_column('offices', 'coordinator_name', "VARCHAR(150) DEFAULT ''");
+    ensure_column('offices', 'coordinator_email', "VARCHAR(200) DEFAULT ''");
+    ensure_column('offices', 'manager_name', "VARCHAR(150) DEFAULT ''");
+    ensure_column('offices', 'manager_email', "VARCHAR(200) DEFAULT ''");
+    // calls gain forwarding, credit, activity, deputation and timing fields
+    ensure_column('calls', 'executing_office_id', 'INT NULL');
+    ensure_column('calls', 'expected_credit', 'DECIMAL(14,2) DEFAULT 0');
+    ensure_column('calls', 'credit_type', "VARCHAR(20) DEFAULT ''");
+    ensure_column('calls', 'deputation_type', "VARCHAR(30) DEFAULT ''");
+    ensure_column('calls', 'activity_id', 'INT NULL');
+    ensure_column('calls', 'notify_manager', 'INT DEFAULT 0');
+    ensure_column('calls', 'forwarded_at', "VARCHAR(30) DEFAULT ''");
 }
 
 // Seed offices (Ahmedabad + affiliate IBOs) once.
@@ -142,7 +155,8 @@ function ops_next_code($table, $col, $prefix) {
 }
 function clients_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_client=1 ORDER BY legal_name"); }
 function vendors_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_vendor=1 ORDER BY legal_name"); }
-function offices_list() { return ops_all("SELECT id, code, name FROM offices ORDER BY is_ahmedabad DESC, name"); }
+function offices_list() { return ops_all("SELECT * FROM offices ORDER BY is_ahmedabad DESC, name"); }
+function office($id) { return $id ? ops_one("SELECT * FROM offices WHERE id=?", [$id]) : null; }
 function inspectors_list($activeOnly = true) { return ops_all("SELECT id, name, emp_code, sbu, salary_ctc FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name"); }
 function subcons_list($activeOnly = true) { return ops_all("SELECT id, agency, inspector_name, skill FROM subcons" . ($activeOnly ? " WHERE active=1" : "") . " ORDER BY agency"); }
 function boss_for_client($cid) { return $cid ? ops_all("SELECT id, boss_number, status FROM boss_numbers WHERE client_id=? ORDER BY boss_number", [$cid]) : []; }
@@ -302,6 +316,21 @@ function ops_run_reminders($today = null) {
 // Each master is a config array driving one list view + one form view.
 function ops_masters() {
     return [
+        'offices' => [
+            'label' => 'Offices / branches (IBO)', 'table' => 'offices', 'access' => 'admin', 'order' => 'is_ahmedabad DESC, name',
+            'fields' => [
+                ['code','Code','text',['req'=>1]],
+                ['name','Office name','text',['req'=>1]],
+                ['city','City','text',[]],
+                ['coordinator_name','Coordinator name','text',[]],
+                ['coordinator_email','Coordinator email','text',[]],
+                ['manager_name','Manager name','text',[]],
+                ['manager_email','Manager email','text',[]],
+                ['is_ahmedabad','This is the Ahmedabad (managing) office','check',[]],
+            ],
+            'list' => ['code'=>'Code','name'=>'Office','city'=>'City','coordinator_name'=>'Coordinator','manager_name'=>'Manager'],
+            'list_labels' => [],
+        ],
         'inspectors' => [
             'label' => 'Inspectors', 'table' => 'inspectors', 'code' => null, 'access' => 'admin',
             'order' => 'name',
@@ -473,8 +502,65 @@ function ops_dispatch($route, $method) {
             view('ops/masters', ['masters' => ops_masters()]); return true;
         case $route === 'lookups' || $route === 'lookup' || $route === 'custom-fields':
             lk_admin($route, $method); return true;
+        case $route === 'quick-add':
+            ops_quick_add(); return true;
     }
     return false;
+}
+
+// Inline "+ Add new" from the New Call form. Returns JSON {ok,id,label}.
+function ops_quick_add() {
+    header('Content-Type: application/json');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !is_coordinator_level()) { echo json_encode(['ok' => false, 'error' => 'Not allowed']); return; }
+    $pdo = db(); $kind = $_GET['kind'] ?? ''; $b = $_POST;
+    $name = trim($b['name'] ?? '');
+    if ($name === '') { echo json_encode(['ok' => false, 'error' => 'Enter a name.']); return; }
+    try {
+        if (in_array($kind, ['client', 'vendor', 'both'], true)) {
+            $isClient = ($kind === 'client' || $kind === 'both') ? 1 : 0;
+            $isVendor = ($kind === 'vendor' || $kind === 'both') ? 1 : 0;
+            $gstin = clean_gstin($b['gstin'] ?? '');
+            $pan = $gstin ? pan_from_gstin($gstin) : '';
+            $state = $gstin ? state_from_gstin($gstin) : '';
+            $token = short_token($name);
+            $last = ops_val("SELECT code FROM business_partners WHERE code LIKE ? ORDER BY code DESC LIMIT 1", ["GEN-$token-%"]);
+            $seq = $last ? ((int)substr($last, strrpos($last, '-') + 1)) + 1 : 1;
+            $code = sprintf("GEN-%s-%04d", $token, $seq);
+            $pdo->prepare("INSERT INTO business_partners (code,legal_name,is_client,is_vendor,status,gstin,pan,state,created_at) VALUES (?,?,?,?, 'ACTIVE', ?,?,?,?)")
+                ->execute([$code, $name, $isClient, $isVendor, $gstin, $pan, $state, date('c')]);
+            echo json_encode(['ok' => true, 'id' => $pdo->lastInsertId(), 'label' => $name, 'roles' => ['client' => $isClient, 'vendor' => $isVendor]]);
+            return;
+        }
+        if ($kind === 'office') {
+            $code = strtoupper(trim($b['code'] ?? '')) ?: strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $name), 0, 3));
+            $pdo->prepare("INSERT INTO offices (code,name,city,coordinator_name,coordinator_email,manager_name,manager_email,is_ahmedabad) VALUES (?,?,?,?,?,?,?,0)")
+                ->execute([$code, $name, $b['city'] ?? '', $b['coordinator_name'] ?? '', $b['coordinator_email'] ?? '', $b['manager_name'] ?? '', $b['manager_email'] ?? '']);
+            echo json_encode(['ok' => true, 'id' => $pdo->lastInsertId(), 'label' => $name]);
+            return;
+        }
+        if ($kind === 'product') {
+            $t = lk_type('product');
+            if (!$t) { echo json_encode(['ok' => false, 'error' => 'No product list']); return; }
+            $code = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $name), 0, 12));
+            $id = lk_add_value($t['id'], null, $code, $name, 99);
+            echo json_encode(['ok' => true, 'id' => $code ?: $id, 'label' => $name]);
+            return;
+        }
+        if ($kind === 'activity') {
+            $t = lk_type('activity');
+            $sbu = lk_type('sbu');
+            if (!$t || !$sbu) { echo json_encode(['ok' => false, 'error' => 'No activity list']); return; }
+            $sbuCode = $b['sbu'] ?? '';
+            $sbuVal = ops_one("SELECT * FROM lookup_values WHERE type_id=? AND (code=? OR id=?)", [$sbu['id'], $sbuCode, (int)$sbuCode]);
+            if (!$sbuVal) { echo json_encode(['ok' => false, 'error' => 'Pick an SBU first.']); return; }
+            $id = lk_add_value($t['id'], $sbuVal['id'], '', $name, 99);
+            echo json_encode(['ok' => true, 'id' => $id, 'label' => $name, 'sbu' => $sbuCode]);
+            return;
+        }
+        echo json_encode(['ok' => false, 'error' => 'Unknown type']);
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+    }
 }
 
 // ---- Generic master handler ------------------------------------------------
@@ -558,41 +644,95 @@ function ops_calls($route, $method) {
         }
         if ($method === 'POST') {
             $b = $_POST;
-            $fields = ['client_id','vendor_id','ibo_office_id','region','sbu','product_category','product_other','call_received_date','inspection_required_date','notes'];
+            $execOffice = ($b['executing_office_id'] ?? '') !== '' ? (int)$b['executing_office_id'] : null;
+            // Forwarding to an executing branch → credit is mandatory.
+            if ($execOffice && (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0)) {
+                view('ops/call_form', ['call' => $call, 'clients' => clients_list(), 'vendors' => vendors_list(),
+                    'offices' => offices_list(), 'error' => 'Enter the credit amount to give the executing branch (mandatory when forwarding).',
+                    'cfvals' => $call ? custom_values_map('call', $call['id']) : []]);
+                return;
+            }
+            $fields = ['client_id','vendor_id','ibo_office_id','executing_office_id','region','sbu','activity_id',
+                'product_category','product_other','deputation_type','expected_credit','credit_type',
+                'call_received_date','inspection_required_date','notes'];
+            $wasForwarded = $call ? ($call['executing_office_id'] ?? null) : null;
+            $forwardNow = $execOffice && !$wasForwarded; // first time it gets an executing branch
+            $notifyMgr = !empty($b['notify_manager']) ? 1 : 0;
             if ($call) {
                 $set = implode(',', array_map(fn($f)=>"$f=?", $fields));
-                $vals = array_map(fn($f)=> nz($b[$f] ?? ''), $fields); $vals[] = $call['id'];
+                $vals = array_map(fn($f)=> nzc_call($f, $b[$f] ?? ''), $fields); $vals[] = $call['id'];
                 $pdo->prepare("UPDATE calls SET $set WHERE id=?")->execute($vals);
+                $pdo->prepare("UPDATE calls SET notify_manager=? WHERE id=?")->execute([$notifyMgr, $call['id']]);
+                if ($forwardNow) $pdo->prepare("UPDATE calls SET forwarded_at=?, status='FORWARDED' WHERE id=?")->execute([date('c'), $call['id']]);
                 custom_save('call', $call['id'], $b);
-                flash("Call {$call['call_code']} updated.");
+                if ($forwardNow) send_forward_email($call['id']);
+                flash("Call {$call['call_code']} updated." . ($forwardNow ? ' Forwarded — email sent to the branch.' : ''));
                 redirect('/call?id=' . $call['id']);
             } else {
                 $code = ops_next_code('calls', 'call_code', 'CALL');
-                $cols = array_merge(['call_code'], $fields, ['status','created_by','created_at']);
-                $vals = array_merge([$code], array_map(fn($f)=> nz($b[$f] ?? ''), $fields), ['OPEN', user_name(current_user()), date('c')]);
+                $cols = array_merge(['call_code'], $fields, ['notify_manager','forwarded_at','status','created_by','created_at']);
+                $vals = array_merge([$code], array_map(fn($f)=> nzc_call($f, $b[$f] ?? ''), $fields),
+                    [$notifyMgr, $execOffice ? date('c') : '', $execOffice ? 'FORWARDED' : 'OPEN', user_name(current_user()), date('c')]);
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO calls (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
                 custom_save('call', $id, $b);
-                flash("$code created. Now allocate a job.");
+                if ($execOffice) send_forward_email($id);
+                flash("$code created." . ($execOffice ? ' Forwarded to the branch — email sent.' : ' Now allocate a job.'));
                 redirect('/call?id=' . $id);
             }
         }
         view('ops/call_form', ['call' => $call, 'clients' => clients_list(), 'vendors' => vendors_list(),
-            'offices' => offices_list(), 'cfvals' => $call ? custom_values_map('call', $call['id']) : []]);
+            'offices' => offices_list(), 'error' => null, 'cfvals' => $call ? custom_values_map('call', $call['id']) : []]);
         return;
     }
     if ($route === 'call') {
-        $call = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name, o.name ibo_name
+        $call = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name,
+            o.name ibo_name, x.name exec_name, x.coordinator_name, x.coordinator_email, x.manager_name, x.manager_email
             FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id
-            LEFT JOIN business_partners v ON v.id=c.vendor_id LEFT JOIN offices o ON o.id=c.ibo_office_id WHERE c.id=?", [(int)($_GET['id'] ?? 0)]);
+            LEFT JOIN business_partners v ON v.id=c.vendor_id LEFT JOIN offices o ON o.id=c.ibo_office_id
+            LEFT JOIN offices x ON x.id=c.executing_office_id WHERE c.id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$call) { http_response_code(404); view('notfound'); return; }
         $jobs = ops_all("SELECT j.*, i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.call_id=? ORDER BY j.id DESC", [$call['id']]);
-        view('ops/call_detail', ['call' => $call, 'jobs' => $jobs]);
+        // lead-time metrics
+        $firstJob = $jobs ? end($jobs) : null; // earliest allocated
+        $allocDate = $firstJob ? ($firstJob['scheduled_date'] ?: substr($firstJob['created_at'], 0, 10)) : '';
+        $fwdDate = $call['forwarded_at'] ? substr($call['forwarded_at'], 0, 10) : '';
+        $lead = [
+            'client_to_sgs' => days_between($call['call_received_date'], $call['inspection_required_date']),
+            'to_executing'  => ($fwdDate && $call['inspection_required_date']) ? days_between($fwdDate, $call['inspection_required_date']) : null,
+            'sched_delay'   => ($fwdDate && $allocDate) ? days_between($fwdDate, $allocDate) : null,
+            'alloc_date'    => $allocDate,
+        ];
+        view('ops/call_detail', ['call' => $call, 'jobs' => $jobs, 'lead' => $lead]);
         return;
     }
 }
 function nz($v) { return $v === '' ? null : $v; }
+function nzc_call($f, $v) {
+    if (in_array($f, ['client_id','vendor_id','ibo_office_id','executing_office_id','activity_id'], true)) return $v === '' ? null : (int)$v;
+    if ($f === 'expected_credit') return $v === '' ? 0 : $v;
+    return $v;
+}
+// Email the executing branch's coordinator (+ manager if ticked) when a call is forwarded.
+function send_forward_email($callId) {
+    $c = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name, o.name office_name,
+        o.coordinator_email, o.coordinator_name, o.manager_email, o.manager_name
+        FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id LEFT JOIN business_partners v ON v.id=c.vendor_id
+        LEFT JOIN offices o ON o.id=c.executing_office_id WHERE c.id=?", [$callId]);
+    if (!$c || !$c['coordinator_email']) return;
+    $client = $c['client_disp'] ?: $c['client_name'];
+    $to = $c['coordinator_email'];
+    $cc = (!empty($c['notify_manager']) && $c['manager_email']) ? $c['manager_email'] : '';
+    $body = "Dear {$c['coordinator_name']},\n\nAn inspection call is forwarded to {$c['office_name']} for execution.\n\n"
+        . "Call: {$c['call_code']}\nClient: {$client}\nVendor/Site: {$c['vendor_name']}\n"
+        . "Region: " . (OPS_REGIONS[$c['region']] ?? $c['region']) . "\nSBU: " . (OPS_SBUS[$c['sbu']] ?? $c['sbu']) . "\n"
+        . "Activity: " . ($c['activity_id'] ? lk_value_path($c['activity_id']) : '—') . "\n"
+        . "Client required date: {$c['inspection_required_date']}\n"
+        . "Credit to executing branch: " . fmoney($c['expected_credit']) . " (" . (CREDIT_TYPES[$c['credit_type']] ?? '') . ")\n"
+        . "Please allocate an inspector.\n\nRegards,\nSGS Ahmedabad (Managing office)";
+    ops_mail($to, "Call forwarded: {$c['call_code']} — {$client}", $body, $cc, 'forward');
+}
 
 // ---- Jobs ------------------------------------------------------------------
 function ops_jobs($route, $method) {
