@@ -1,7 +1,0 @@
-{% if page.has_other_pages %}
-<div class="pill-row" style="margin-top:14px;align-items:center;">
-  {% if page.has_previous %}<a class="btn small secondary" href="?q={{ q|urlencode }}&status={{ status }}&page={{ page.previous_page_number }}">← Prev</a>{% endif %}
-  <span style="font-size:13px;color:var(--muted);">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
-  {% if page.has_next %}<a class="btn small secondary" href="?q={{ q|urlencode }}&status={{ status }}&page={{ page.next_page_number }}">Next →</a>{% endif %}
-</div>
-{% endif %}
