@@ -157,6 +157,7 @@ function boot() {
     migrate();
     if (function_exists('ops_migrate')) { ops_migrate(); ops_seed(); }
     if (function_exists('lk_migrate')) { lk_migrate(); lk_seed(); }
+    if (function_exists('access_migrate')) access_migrate();
     ensure_admin();
     auto_seed();
 }

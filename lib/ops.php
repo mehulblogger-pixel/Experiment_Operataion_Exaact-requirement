@@ -155,18 +155,17 @@ function ops_seed() {
 
 // ---- Roles & permissions ---------------------------------------------------
 function user_role($u = null) {
-    $u = $u ?: current_user();
-    if (!$u) return 'GUEST';
+    if ($u === null) return ua()['role'];
     if (!empty($u['is_superuser'])) return 'MASTER_ADMIN';
     $r = strtoupper($u['role'] ?? 'ADMIN');
-    return isset(OPS_ROLES[$r]) ? $r : 'ADMIN';
+    return (defined('ORG_ROLES') && isset(ORG_ROLES[$r])) ? $r : 'ADMIN';
 }
-function role_label($u = null) { return OPS_ROLES[user_role($u)] ?? 'User'; }
-function is_master() { return user_role() === 'MASTER_ADMIN'; }
-function is_admin_level() { return in_array(user_role(), ['MASTER_ADMIN','ADMIN']); }
-function is_coordinator_level() { return in_array(user_role(), ['MASTER_ADMIN','ADMIN','COORDINATOR']); }
+function role_label($u = null) { $roles = defined('ORG_ROLES') ? ORG_ROLES : []; return $roles[user_role($u)] ?? 'User'; }
+function is_master() { return ua()['master']; }
+function is_admin_level() { return in_array(user_role(), MGMT_ROLES, true); }
+function is_coordinator_level() { return is_admin_level() || in_array(user_role(), ['ASST_MANAGER','COORDINATOR'], true); }
 function is_inspector() { return user_role() === 'INSPECTOR'; }
-function can_see_salary() { return is_master(); } // salary/cost columns: Master Admin only
+function can_see_salary() { return can('data.salary'); } // salary/cost visibility
 // A convenient guard for handlers.
 function ops_require($ok, $msg = 'You do not have access to that screen.') {
     if (!$ok) { flash($msg, 'error'); redirect('/'); }
@@ -547,6 +546,8 @@ function ops_dispatch($route, $method) {
             ops_users($route, $method); return true;
         case $route === 'change-password':
             ops_change_password($method); return true;
+        case $route === 'settings':
+            ops_settings($method); return true;
         case $route === 'masters':
             ops_require(is_coordinator_level());
             view('ops/masters', ['masters' => ops_masters()]); return true;
@@ -766,8 +767,9 @@ function ops_calls($route, $method) {
     $pdo = db();
     if ($route === 'calls') {
         $q = trim($_GET['q'] ?? '');
-        $where = "1=1"; $args = [];
-        if ($q) { $where .= " AND (c.call_code LIKE ? OR bp.legal_name LIKE ? OR v.legal_name LIKE ?)"; $args = ["%$q%","%$q%","%$q%"]; }
+        [$scopeW, $args] = scope_clause('c.executing_office_id', 'c.sbu');
+        $where = $scopeW;
+        if ($q) { $where .= " AND (c.call_code LIKE ? OR bp.legal_name LIKE ? OR v.legal_name LIKE ?)"; array_push($args, "%$q%","%$q%","%$q%"); }
         $rows = ops_all("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name,
             (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) job_count
             FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id
@@ -878,10 +880,10 @@ function ops_jobs($route, $method) {
     $pdo = db();
     if ($route === 'jobs') {
         $q = trim($_GET['q'] ?? ''); $filter = $_GET['status'] ?? '';
-        $where = "1=1"; $args = [];
+        [$where, $args] = scope_clause('j.executing_office_id', 'j.sbu');
         if ($filter === 'open') $where .= " AND j.closed_flag=0";
         if ($filter === 'closed') $where .= " AND j.closed_flag=1";
-        if ($q) { $where .= " AND (j.job_code LIKE ? OR bp.legal_name LIKE ?)"; $args = ["%$q%","%$q%"]; }
+        if ($q) { $where .= " AND (j.job_code LIKE ? OR bp.legal_name LIKE ?)"; array_push($args, "%$q%","%$q%"); }
         $rows = ops_all("SELECT j.*, c.call_code, bp.legal_name client_name, bp.display_name client_disp,
             i.name inspector_name FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
             LEFT JOIN business_partners bp ON bp.id=c.client_id LEFT JOIN inspectors i ON i.id=j.inspector_id
@@ -1041,11 +1043,12 @@ function ops_my_jobs() {
 
 // ---- Dashboards / reports --------------------------------------------------
 function ops_reports() {
-    ops_require(is_admin_level(), 'Only admins can view the dashboards.');
+    ops_require(can('dash.operations') || can('dash.financial') || can('dash.utilization') || can('dash.people'), 'You do not have dashboard access.');
+    [$scopeW, $scopeArgs] = scope_clause('j.executing_office_id', 'j.sbu');
     $jobs = ops_all("SELECT j.*, i.salary_ctc, i.name inspector_name, i.id ins_id, bp.legal_name client_name, bp.display_name client_disp,
         c.region, o.name ibo_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id
         LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
-        LEFT JOIN offices o ON o.id=j.executing_office_id");
+        LEFT JOIN offices o ON o.id=j.executing_office_id WHERE $scopeW", $scopeArgs);
     // Profitability per job + rollups
     $totCredit=0;$totCost=0;$totExp=0;$totSub=0;$totProfit=0;
     $byInspector=[]; $tatOn=0;$tatLate=0;$tatTotal=0;
@@ -1082,39 +1085,67 @@ function ops_reports() {
     ]);
 }
 
-// ---- Users, roles, seats ---------------------------------------------------
+// ---- Users, roles, access --------------------------------------------------
 function ops_users($route, $method) {
-    ops_require(is_admin_level(), 'Only admins can manage users.');
+    ops_require(can('users.manage.branch') || can('users.manage.global'), 'You cannot manage users.');
     $pdo = db();
+    $globalMgr = can('users.manage.global');          // Master Admin / Branch Manager (global)
+    $myOffice = current_user()['home_office_id'] ?? null;
     if ($route === 'user-new' || $route === 'user-edit') {
         $user = null;
         if ($route === 'user-edit') {
             $user = ops_one("SELECT * FROM users WHERE id=?", [(int)($_GET['id'] ?? 0)]);
             if (!$user) { http_response_code(404); view('notfound'); return; }
+            // branch app manager may only touch users in their own office
+            if (!$globalMgr && (int)($user['home_office_id'] ?? 0) !== (int)$myOffice) { flash('You can only manage users in your own office.', 'error'); redirect('/users'); }
         }
         if ($method === 'POST') {
             $b = $_POST;
-            $role = in_array($b['role'] ?? '', array_keys(OPS_ROLES)) ? $b['role'] : 'COORDINATOR';
+            $allowedRoles = $globalMgr ? array_keys(ORG_ROLES) : ['OPERATION_MANAGER','ASST_MANAGER','COORDINATOR','INSPECTOR'];
+            $role = in_array($b['role'] ?? '', $allowedRoles, true) ? $b['role'] : 'COORDINATOR';
             $isSuper = $role === 'MASTER_ADMIN' ? 1 : 0;
             $insId = ($b['inspector_id'] ?? '') !== '' ? (int)$b['inspector_id'] : null;
+            // scope: global managers set anything; branch managers pin to their office
+            $homeOffice = $globalMgr ? (($b['home_office_id'] ?? '') !== '' ? (int)$b['home_office_id'] : null) : $myOffice;
+            $scopeOffices = $globalMgr ? trim($b['scope_offices'] ?? '') : '';   // '' = OWN(home)
+            $scopeSbus = trim($b['scope_sbus'] ?? '');
+            // permissions: branch mgr can only grant a safe subset (no salary/global/settings)
+            $chosen = array_filter((array)($b['permissions'] ?? []));
+            if (!$globalMgr) $chosen = array_intersect($chosen, ['dash.operations','dash.utilization','data.credit','ops.call.create','ops.job.allocate','ops.job.close','master.manage']);
+            $perms = implode(',', $chosen);
             if ($user) {
-                $pdo->prepare("UPDATE users SET username=?,first_name=?,last_name=?,email=?,role=?,is_superuser=?,is_active=?,inspector_id=? WHERE id=?")
-                    ->execute([$b['username'], $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, !empty($b['is_active'])?1:0, $insId, $user['id']]);
+                $pdo->prepare("UPDATE users SET username=?,first_name=?,last_name=?,email=?,role=?,is_superuser=?,is_active=?,inspector_id=?,home_office_id=?,scope_offices=?,scope_sbus=?,permissions=? WHERE id=?")
+                    ->execute([$b['username'], $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, !empty($b['is_active'])?1:0, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $user['id']]);
                 if (!empty($b['password'])) $pdo->prepare("UPDATE users SET password_hash=? WHERE id=?")->execute([password_hash($b['password'], PASSWORD_DEFAULT), $user['id']]);
                 flash('User saved.');
             } else {
                 $hash = password_hash($b['password'] ?: 'changeme123', PASSWORD_DEFAULT);
-                $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id)
-                    VALUES (?,?,?,?,?,?,?,1,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId]);
+                $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id,home_office_id,scope_offices,scope_sbus,permissions)
+                    VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms]);
                 flash('User created.');
             }
             redirect('/users');
         }
-        view('ops/user_form', ['user'=>$user,'inspectors'=>inspectors_list(false)]); return;
+        view('ops/user_form', ['user'=>$user,'inspectors'=>inspectors_list(false),'offices'=>offices_list(),
+            'sbuOpts'=>lk_options_or('sbu', OPS_SBUS),'globalMgr'=>$globalMgr,'defaults'=>role_defaults($user['role'] ?? 'COORDINATOR')]); return;
     }
-    $rows = ops_all("SELECT * FROM users ORDER BY username");
+    $where = $globalMgr ? "1=1" : "home_office_id = " . (int)$myOffice;
+    $rows = ops_all("SELECT * FROM users WHERE $where ORDER BY username");
     $seats = getenv('SEAT_LIMIT') ?: '';
-    view('ops/users', ['rows'=>$rows,'seats'=>$seats,'active'=>(int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1")]);
+    view('ops/users', ['rows'=>$rows,'seats'=>$seats,'active'=>(int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1"),'globalMgr'=>$globalMgr]);
+}
+
+// ---- System settings (financial year, etc.) --------------------------------
+function ops_settings($method) {
+    ops_require(can('settings.manage'), 'Only admins can change settings.');
+    if ($method === 'POST') {
+        $m = (int)($_POST['fy_start_month'] ?? 4);
+        setting_set('fy_start_month', ($m >= 1 && $m <= 12) ? $m : 4);
+        setting_set('tat_threshold_days', (int)($_POST['tat_threshold_days'] ?? 3));
+        flash('Settings saved.');
+        redirect('/settings');
+    }
+    view('ops/settings', []);
 }
 
 function ops_change_password($method) {
