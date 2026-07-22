@@ -1,0 +1,39 @@
+<%- include('../partials/head') %>
+<%- include('../partials/nav') %>
+<% const p = partner; %>
+<h1><%= title %></h1>
+<p class="sub">Client Code is generated automatically on save. Enter GSTIN once — PAN and State fill in automatically.</p>
+<% if (error) { %><div class="msg msg-error"><%= error %></div><% } %>
+
+<form method="post" action="<%= p ? `/partners/${p.id}/edit` : '/partners/new' %>" class="panel">
+  <div class="form-grid">
+    <div class="ff"><label>Legal name *</label><input class="form-control" name="legalName" required value="<%= p?p.legalName:'' %>"></div>
+    <div class="ff"><label>Display name</label><input class="form-control" name="displayName" value="<%= p?p.displayName:'' %>"></div>
+
+    <div class="ff ff-check"><input type="checkbox" name="isClient" <%= (p?p.isClient:(defaultRole==='isClient'))?'checked':'' %>><label>Is a Client</label></div>
+    <div class="ff ff-check"><input type="checkbox" name="isVendor" <%= (p?p.isVendor:(defaultRole==='isVendor'))?'checked':'' %>><label>Is a Vendor</label></div>
+    <div class="ff ff-check"><input type="checkbox" name="isSubcontractor" <%= (p&&p.isSubcontractor)?'checked':'' %>><label>Is a Sub-contractor</label></div>
+    <div class="ff"></div>
+
+    <div class="ff"><label>Client type</label><select class="form-control" name="clientType"><option value="">—</option>
+      <% Object.keys(choices.CLIENT_TYPES).forEach(function(k){ %><option value="<%= k %>" <%= (p&&p.clientType===k)?'selected':'' %>><%= choices.CLIENT_TYPES[k] %></option><% }); %></select></div>
+    <div class="ff"><label>Industry</label><select class="form-control" name="industry"><option value="">—</option>
+      <% Object.keys(choices.INDUSTRIES).forEach(function(k){ %><option value="<%= k %>" <%= (p&&p.industry===k)?'selected':'' %>><%= choices.INDUSTRIES[k] %></option><% }); %></select></div>
+    <div class="ff"><label>Ownership type</label><select class="form-control" name="ownershipType"><option value="">—</option>
+      <% Object.keys(choices.OWNERSHIP).forEach(function(k){ %><option value="<%= k %>" <%= (p&&p.ownershipType===k)?'selected':'' %>><%= choices.OWNERSHIP[k] %></option><% }); %></select></div>
+    <div class="ff"><label>Status</label><select class="form-control" name="status">
+      <% Object.keys(choices.STATUSES).forEach(function(k){ %><option value="<%= k %>" <%= (p?p.status:'ACTIVE')===k?'selected':'' %>><%= choices.STATUSES[k] %></option><% }); %></select></div>
+
+    <div class="ff"><label>GSTIN</label><input class="form-control" name="gstin" value="<%= p?p.gstin:'' %>"></div>
+    <div class="ff"><label>CIN</label><input class="form-control" name="cin" value="<%= p?p.cin:'' %>"></div>
+    <div class="ff"><label>TAN</label><input class="form-control" name="tan" value="<%= p?p.tan:'' %>"></div>
+    <div class="ff"><label>MSME / Udyam</label><input class="form-control" name="msmeUdyam" value="<%= p?p.msmeUdyam:'' %>"></div>
+    <div class="ff"><label>Website</label><input class="form-control" name="website" value="<%= p?p.website:'' %>"></div>
+    <div class="ff ff-wide"><label>Description</label><input class="form-control" name="description" value="<%= p?p.description:'' %>"></div>
+  </div>
+  <div style="margin-top:18px;">
+    <button class="btn" type="submit">Save</button>
+    <a class="btn secondary" href="<%= p ? `/partners/${p.id}` : '/partners/clients' %>">Cancel</a>
+  </div>
+</form>
+<%- include('../partials/foot') %>

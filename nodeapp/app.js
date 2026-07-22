@@ -39,6 +39,7 @@ app.use(attachUser);
 
 // Routes
 app.use('/', require('./routes/auth'));
+app.use('/', requireLogin, require('./routes/partners'));
 app.use('/', requireLogin, require('./routes/dashboard'));
 
 // 404
@@ -54,6 +55,7 @@ async function start() {
   await sessionStore.sync();
   await db.sequelize.sync();
   await ensureAdmin();
+  await autoSeed();
   app.listen(PORT, () => console.log(`InspexOps running on port ${PORT}`));
 }
 
@@ -73,6 +75,21 @@ async function ensureAdmin() {
   user.setPassword(password);
   await user.save();
   console.log(`Admin ready: username="${username}"`);
+}
+
+// On first boot (empty database), load the master data so the Clients/Vendors
+// lists are populated without any manual step on the server.
+async function autoSeed() {
+  try {
+    const count = await db.BusinessPartner.count();
+    if (count === 0) {
+      const { seedAll } = require('./scripts/seed');
+      const n = await seedAll(db);
+      console.log(`Auto-seeded ${n} business partners on first boot.`);
+    }
+  } catch (e) {
+    console.error('Auto-seed skipped:', e.message);
+  }
 }
 
 start().catch((err) => {

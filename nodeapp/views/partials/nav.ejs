@@ -5,8 +5,6 @@
     <a href="/">Dashboard</a>
     <a href="/partners/clients">Clients</a>
     <a href="/partners/vendors">Vendors</a>
-    <a href="/ops/calls">Calls</a>
-    <% if (currentUser.canManageUsers()) { %><a href="/team/users">Users</a><% } %>
   </nav>
   <span class="user">
     <%= currentUser.fullName() %> · <%= currentUser.roleLabel() %>
