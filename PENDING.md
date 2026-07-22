@@ -1,6 +1,23 @@
 # Pending / parked items — SGS Ahmedabad Inspection Management System
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
+See `STATUS.md` for the full completed-vs-pending matrix.
+
+## Delivered in the module build (2026-07-22) — for reference
+- [x] Designation master + Back-office staff master with full costing (CTC + allowances).
+- [x] City / State / Site-work sub-category masters; free-typed "Other" values auto-corrected & added.
+- [x] Client/Vendor form: village/district, department, contact project, industry-Other,
+      extra inspection types, role-coded numbering (C/V/M/T), per-branch roles, PO/contract SBU,
+      PO line items with man-power/site/trade/sub-category/activity/GST, PO-before-Contract,
+      role-based tab visibility, Projects tab wired, registration GSTIN/PAN autofill.
+- [x] Calls: admin-gated delete, PO/line-item/project/site linkage, engineer status,
+      confirmation banner, full allocation email, PO near-completion cron alert.
+- [x] Invoicing & reconciliation per inspection line + dashboard rollup.
+- [x] Settings: logo upload + editable theme with guaranteed-legible text.
+- [x] Custom fields on any master form + the Client/Vendor form.
+- [x] Master record + inspector deletion restricted to Super Admin.
+
+## Still open (need your input / agreed last)
 
 ## Additional features (user will provide details / build later)
 
