@@ -21,7 +21,9 @@
   <a href="?tab=contracts" class="{% if tab == 'contracts' %}active{% endif %}">Contract Numbers</a>
   <a href="?tab=purchase_orders" class="{% if tab == 'purchase_orders' %}active{% endif %}">Purchase Orders</a>
   <a href="?tab=projects" class="{% if tab == 'projects' %}active{% endif %}">Projects</a>
+  <a href="?tab=relationships" class="{% if tab == 'relationships' %}active{% endif %}">Relationships</a>
   <a href="?tab=notes" class="{% if tab == 'notes' %}active{% endif %}">Notes</a>
+  <a href="?tab=timeline" class="{% if tab == 'timeline' %}active{% endif %}">Timeline</a>
 </div>
 
 <div class="panel tab-body">
@@ -162,6 +164,21 @@
     <button class="btn small" type="submit">Add PO</button>
   </form>
 
+{% elif tab == 'relationships' %}
+  <table class="grid">
+    <tr><th>This company…</th><th>Related company</th><th>Notes</th></tr>
+    {% for r in relationships %}
+    <tr><td>{{ r.get_relation_type_display }}</td>
+      <td><a href="{% url 'partners:detail' r.related.pk %}">{{ r.related.name }}</a></td>
+      <td>{{ r.notes|default:"—" }}</td></tr>
+    {% empty %}<tr><td colspan="3">No relationships recorded.</td></tr>{% endfor %}
+  </table>
+  <h3 class="tab-sub">Add a relationship</h3>
+  <form method="post" action="{% url 'partners:add_relationship' p.pk %}" class="inline-add">
+    {% csrf_token %}{% include "partners/_form_fields.html" with form=relationship_form %}
+    <button class="btn small" type="submit">Add Relationship</button>
+  </form>
+
 {% elif tab == 'notes' %}
   {% for n in notes %}
   <div class="note-item"><div class="muted">{{ n.created_at|date:"d M Y H:i" }} · {{ n.author|default:"—" }}</div>{{ n.note }}</div>
@@ -171,6 +188,17 @@
     {% csrf_token %}{% include "partners/_form_fields.html" with form=note_form %}
     <button class="btn small" type="submit">Add Note</button>
   </form>
+
+{% elif tab == 'timeline' %}
+  <div class="timeline">
+    {% for e in timeline %}
+    <div class="tl-item">
+      <span class="tl-icon">{{ e.icon }}</span>
+      <span class="tl-date">{{ e.date|date:"d M Y"|default:"—" }}</span>
+      <span class="tl-text">{{ e.text }}</span>
+    </div>
+    {% empty %}<p>No activity yet.</p>{% endfor %}
+  </div>
 {% endif %}
 </div>
 {% endblock %}

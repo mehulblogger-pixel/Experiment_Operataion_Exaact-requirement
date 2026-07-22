@@ -56,9 +56,31 @@ class PartnerViewTests(TestCase):
 
     def test_detail_tabs_render(self):
         for tab in ["overview", "general", "registration", "addresses",
-                    "contacts", "projects", "notes"]:
+                    "contacts", "contracts", "purchase_orders", "projects",
+                    "relationships", "notes", "timeline"]:
             resp = self.client.get(f"/partners/{self.client_p.pk}/?tab={tab}")
             self.assertEqual(resp.status_code, 200)
+
+    def test_contract_po_and_line_item(self):
+        self.client.post(f"/partners/{self.client_p.pk}/contract/add/",
+                         {"contract_number": "C-1", "is_active": "on"})
+        self.assertEqual(self.client_p.contracts.count(), 1)
+        self.client.post(f"/partners/{self.client_p.pk}/po/add/",
+                         {"po_number": "PO-1", "po_type": "ARC", "is_active": "on"})
+        po = self.client_p.purchase_orders.first()
+        self.assertIsNotNone(po)
+        self.client.post(f"/partners/po/{po.pk}/",
+                         {"description": "Mandays", "item_type": "MANDAYS",
+                          "quantity": "50", "rate": "1000", "consumed": "5"})
+        li = po.line_items.first()
+        self.assertEqual(li.balance, 45)
+        self.assertEqual(li.amount, 50000)
+
+    def test_add_relationship(self):
+        other = BusinessPartner.objects.create(legal_name="Parent Group", is_client=True)
+        self.client.post(f"/partners/{self.client_p.pk}/relationship/add/",
+                         {"relation_type": "SUBSIDIARY", "related": other.pk})
+        self.assertEqual(self.client_p.relationships.count(), 1)
 
     def test_create_requires_a_role(self):
         resp = self.client.post("/partners/new/", {

@@ -13,9 +13,37 @@ from .forms import (
     PartnerNoteForm,
     PartnerPurchaseOrderForm,
     PartnerRegistrationForm,
+    PartnerRelationshipForm,
     POLineItemForm,
 )
 from .models import BusinessPartner, PartnerPurchaseOrder, PartnerStatus
+
+
+def _timeline(p):
+    """Read-only activity timeline synthesised from the partner's records."""
+    ev = []
+    if p.created_at:
+        ev.append((p.created_at.date(), "🏢", f"Partner record created ({p.code})"))
+    for n in p.notes.all():
+        who = n.author.get_full_name() if n.author else "—"
+        ev.append((n.created_at.date(), "📝", f"Note by {who}: {n.note[:70]}"))
+    for ct in p.contracts.all():
+        ev.append((ct.start_date, "📄", f"Contract {ct.contract_number} added"))
+    for po in p.purchase_orders.all():
+        ev.append((po.start_date, "🧾",
+                   f"PO {po.po_number or '(open)'} — {po.get_po_type_display()}"))
+    for r in p.registrations.all():
+        ev.append((r.valid_from, "📇", f"{r.get_doc_type_display()} {r.number} recorded"))
+    if p.is_client:
+        for call in p.client_calls.all()[:100]:
+            ev.append((call.created_at.date(), "🔧",
+                       f"Call {call.call_ref} — {call.get_status_display()}"))
+    if p.is_vendor:
+        for call in p.vendor_calls.all()[:100]:
+            ev.append((call.created_at.date(), "🏭",
+                       f"Inspection {call.call_ref} at this vendor"))
+    ev.sort(key=lambda e: (e[0] is not None, e[0]), reverse=True)
+    return [{"date": d, "icon": i, "text": t} for d, i, t in ev]
 
 
 def _partner_list(request, role, title, subtitle):
@@ -62,8 +90,11 @@ def partner_detail(request, pk):
         "subsidiaries": p.subsidiaries.all(),
         "contracts": p.contracts.all(),
         "purchase_orders": p.purchase_orders.select_related("contract").prefetch_related("line_items"),
+        "relationships": p.relationships.select_related("related"),
         "contract_form": PartnerContractForm(),
         "po_form": PartnerPurchaseOrderForm(partner=p),
+        "relationship_form": PartnerRelationshipForm(partner=p),
+        "timeline": _timeline(p),
         # client_calls / vendor_calls related managers appear once the operations
         # module is re-pointed to BusinessPartner (Pass 2). Guard until then.
         "calls": (p.client_calls.select_related("executing_office")[:50]
@@ -167,6 +198,22 @@ def add_purchase_order(request, pk):
         for e in errs:
             messages.error(request, e)
     return redirect(_detail_url(partner, "purchase_orders"))
+
+
+@login_required
+def add_relationship(request, pk):
+    partner = get_object_or_404(BusinessPartner, pk=pk)
+    form = PartnerRelationshipForm(request.POST or None, partner=partner)
+    if request.method == "POST" and form.is_valid():
+        rel = form.save(commit=False)
+        rel.partner = partner
+        rel.save()
+        messages.success(request, "Relationship added.")
+    else:
+        for errs in form.errors.values():
+            for e in errs:
+                messages.error(request, e)
+    return redirect(_detail_url(partner, "relationships"))
 
 
 @login_required

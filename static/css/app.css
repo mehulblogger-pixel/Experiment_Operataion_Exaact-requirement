@@ -127,6 +127,14 @@ form.stack label { display: block; font-size: 13px; color: var(--muted); margin:
 .addr-card { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
 .note-item { border-left: 3px solid var(--brand); padding: 6px 12px; margin-bottom: 10px; background: #f8fafc; border-radius: 0 8px 8px 0; }
 
+/* Timeline */
+.timeline { border-left: 2px solid var(--line); margin-left: 8px; padding-left: 4px; }
+.tl-item { display: flex; align-items: baseline; gap: 10px; padding: 8px 0 8px 14px; position: relative; font-size: 14px; }
+.tl-item::before { content: ""; position: absolute; left: -7px; top: 14px; width: 10px; height: 10px; border-radius: 50%; background: var(--brand); }
+.tl-icon { font-size: 15px; }
+.tl-date { color: var(--muted); min-width: 90px; font-size: 13px; }
+.tl-text { flex: 1; }
+
 /* Inline add forms on tabs */
 .inline-add { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; align-items: end; background: #f8fafc; border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
 .inline-add .ff-wide, .inline-add button { grid-column: 1 / -1; }

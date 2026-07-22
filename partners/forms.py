@@ -9,6 +9,7 @@ from .models import (
     PartnerNote,
     PartnerPurchaseOrder,
     PartnerRegistration,
+    PartnerRelationship,
     PurchaseOrderLineItem,
 )
 from .utils import is_valid_gstin
@@ -132,3 +133,17 @@ class POLineItemForm(_Styled):
     class Meta:
         model = PurchaseOrderLineItem
         fields = ["description", "item_type", "quantity", "rate", "consumed"]
+
+
+class PartnerRelationshipForm(_Styled):
+    class Meta:
+        model = PartnerRelationship
+        fields = ["relation_type", "related", "notes"]
+
+    def __init__(self, *args, partner=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        qs = BusinessPartner.objects.all()
+        if partner is not None:
+            qs = qs.exclude(pk=partner.pk)
+        self.fields["related"].queryset = qs
+        self.fields["related"].label = "Related company"
