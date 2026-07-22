@@ -2,11 +2,13 @@
 session_start();
 require __DIR__ . '/lib/db.php';
 require __DIR__ . '/lib/helpers.php';
+require __DIR__ . '/lib/ops.php';
 
 // Bootstrap / upgrade: this quick probe fails on a fresh install (no table) or
-// when a new column is missing, which triggers the idempotent boot/migrate.
+// when a new table/column is missing, which triggers the idempotent boot/migrate.
 try {
     db()->query("SELECT address_id FROM partner_contacts LIMIT 1");
+    db()->query("SELECT id FROM offices LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();
@@ -218,6 +220,9 @@ if ($route === 'po') {
     $li = $pdo->prepare("SELECT * FROM po_line_items WHERE purchase_order_id = ?"); $li->execute([$po['id']]);
     return view('po_detail', ['po' => $po, 'items' => $li->fetchAll()]);
 }
+
+// --- Operations & Finance modules (Calls, Jobs, masters, reports, users) ---
+if (ops_dispatch($route, $method)) return;
 
 http_response_code(404);
 return view('notfound');

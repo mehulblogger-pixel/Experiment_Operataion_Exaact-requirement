@@ -1,0 +1,832 @@
+<?php
+// ============================================================================
+//  Operations & Finance engine for the SGS Ahmedabad Inspection Management System
+//  Phases 1-5: Calls, Jobs, Closure/Expenses, SubCon/Attendance/Holidays,
+//  Credit logic, Dashboards + Reconciliation. Plus roles, email and reminders.
+//  Kept in one file so a non-coder can find everything about "operations" here.
+// ============================================================================
+
+// ---- Choice lists (labels shown in dropdowns) ------------------------------
+const OPS_REGIONS = ['WEST'=>'West','NORTH'=>'North','SOUTH'=>'South','EAST'=>'East','CENTRAL'=>'Central','OVERSEAS'=>'Overseas'];
+const OPS_SBUS = ['IND'=>'Industrial','OGC'=>'Oil, Gas & Chemicals','MIN'=>'Minerals','GIS'=>'Governments & Institutions','AGRI'=>'Agriculture & Food','CRS'=>'Consumer & Retail','ENV'=>'Environment','OTHER'=>'Other'];
+const PRODUCT_CATS = ['ELEC'=>'Electrical equipment','MECH'=>'Mechanical equipment','STRUCT'=>'Structural / Fabrication','PIPE'=>'Pipes & Fittings','VALVE'=>'Valves','PUMP'=>'Pumps & Rotating','TRANSFORMER'=>'Transformers','CABLE'=>'Cables','INSTRUMENT'=>'Instrumentation','CIVIL'=>'Civil / Construction','OTHER'=>'Others'];
+const CREDIT_TYPES = ['MANDAY'=>'Man-day','MANMONTH'=>'Man-month','LUMP'=>'Lumpsum','LATER'=>'Decide later','OTHER'=>'Other'];
+const CREDIT_DIRECTIONS = ['RECEIVED'=>'Received (IBO → Ahmedabad)','GIVEN'=>'Given (Ahmedabad → IBO)'];
+const REPORT_FREQ = ['DAILY'=>'Daily','ALTERNATE'=>'Alternate day','WEEKLY'=>'Weekly','FORTNIGHTLY'=>'Fortnightly','MONTHLY'=>'Monthly','NOREPORT'=>'No report'];
+const ATT_STATUS = ['PRESENT_NB'=>'Present (non-billable)','TRAINING'=>'Training','MEETING'=>'Meeting','LEAVE'=>'Leave','COMPOFF'=>'Comp-off taken','HOLIDAY'=>'Holiday'];
+const EXP_LEVELS = ['JUNIOR'=>'Junior','MID'=>'Mid','SENIOR'=>'Senior','EXPERT'=>'Expert / Lead'];
+const RATE_TYPES = ['MANDAY'=>'Per man-day','MANMONTH'=>'Per man-month'];
+const BOSS_STATUS = ['ACTIVE'=>'Active','CLOSED'=>'Closed','HOLD'=>'On hold'];
+const OPS_ROLES = ['MASTER_ADMIN'=>'Master Admin','ADMIN'=>'Admin','COORDINATOR'=>'Coordinator','INSPECTOR'=>'Inspector'];
+const OVERHEAD_PCT = 8; // salary overhead %
+
+// ---- Schema ----------------------------------------------------------------
+function ops_ensure_schema() {
+    $pdo = db(); $pk = pk_clause();
+    $t = [
+        "CREATE TABLE IF NOT EXISTS offices (
+            id $pk, code VARCHAR(20), name VARCHAR(150), city VARCHAR(120) DEFAULT '',
+            is_ahmedabad INT DEFAULT 0)",
+        "CREATE TABLE IF NOT EXISTS inspectors (
+            id $pk, name VARCHAR(150), emp_code VARCHAR(40) DEFAULT '', sbu VARCHAR(20) DEFAULT '',
+            skills VARCHAR(255) DEFAULT '', email VARCHAR(200) DEFAULT '', mobile VARCHAR(40) DEFAULT '',
+            salary_ctc DECIMAL(14,2) DEFAULT 0, status VARCHAR(20) DEFAULT 'ACTIVE',
+            leave_balance DECIMAL(6,1) DEFAULT 0, compoff_balance DECIMAL(6,1) DEFAULT 0,
+            created_at VARCHAR(30) DEFAULT '')",
+        "CREATE TABLE IF NOT EXISTS subcons (
+            id $pk, agency VARCHAR(150), inspector_name VARCHAR(150) DEFAULT '', skill VARCHAR(150) DEFAULT '',
+            experience_level VARCHAR(20) DEFAULT '', regions VARCHAR(200) DEFAULT '', email VARCHAR(200) DEFAULT '',
+            mobile VARCHAR(40) DEFAULT '', compliance VARCHAR(200) DEFAULT '', active INT DEFAULT 1,
+            created_at VARCHAR(30) DEFAULT '')",
+        "CREATE TABLE IF NOT EXISTS subcon_rates (
+            id $pk, subcon_id INT NULL, agency VARCHAR(150) DEFAULT '', skill VARCHAR(150) DEFAULT '',
+            experience_level VARCHAR(20) DEFAULT '', region VARCHAR(20) DEFAULT '',
+            rate_type VARCHAR(20) DEFAULT 'MANDAY', rate DECIMAL(12,2) DEFAULT 0)",
+        "CREATE TABLE IF NOT EXISTS boss_numbers (
+            id $pk, client_id INT, boss_number VARCHAR(60), start_date VARCHAR(20) DEFAULT '',
+            end_date VARCHAR(20) DEFAULT '', status VARCHAR(20) DEFAULT 'ACTIVE', comments VARCHAR(255) DEFAULT '')",
+        "CREATE TABLE IF NOT EXISTS holidays (
+            id $pk, hol_date VARCHAR(20), name VARCHAR(150), region VARCHAR(20) DEFAULT '')",
+        "CREATE TABLE IF NOT EXISTS calls (
+            id $pk, call_code VARCHAR(30), client_id INT NULL, vendor_id INT NULL, ibo_office_id INT NULL,
+            region VARCHAR(20) DEFAULT '', sbu VARCHAR(20) DEFAULT '', product_category VARCHAR(30) DEFAULT '',
+            product_other VARCHAR(150) DEFAULT '', call_received_date VARCHAR(20) DEFAULT '',
+            inspection_required_date VARCHAR(20) DEFAULT '', notes TEXT, status VARCHAR(20) DEFAULT 'OPEN',
+            created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
+        "CREATE TABLE IF NOT EXISTS jobs (
+            id $pk, job_code VARCHAR(30), call_id INT NULL, executing_office_id INT NULL,
+            inspector_id INT NULL, subcon_id INT NULL, scheduled_date VARCHAR(20) DEFAULT '',
+            inspection_start_date VARCHAR(20) DEFAULT '', inspection_end_date VARCHAR(20) DEFAULT '',
+            random_date1 VARCHAR(20) DEFAULT '', random_date2 VARCHAR(20) DEFAULT '', random_date3 VARCHAR(20) DEFAULT '',
+            folder_link VARCHAR(500) DEFAULT '', boss_id INT NULL, expected_credit DECIMAL(14,2) DEFAULT 0,
+            credit_type VARCHAR(20) DEFAULT 'MANDAY', credit_direction VARCHAR(20) DEFAULT 'RECEIVED',
+            reporting_frequency VARCHAR(20) DEFAULT 'NOREPORT', report_upload_date VARCHAR(20) DEFAULT '',
+            report_link VARCHAR(500) DEFAULT '', closed_flag INT DEFAULT 0, closed_at VARCHAR(30) DEFAULT '',
+            tat_days INT NULL, sbu VARCHAR(20) DEFAULT '', mandays DECIMAL(8,1) DEFAULT 0,
+            subcon_cost DECIMAL(14,2) DEFAULT 0, last_reminder VARCHAR(20) DEFAULT '',
+            created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
+        "CREATE TABLE IF NOT EXISTS expenses (
+            id $pk, job_id INT, inspector_id INT NULL, sbu VARCHAR(20) DEFAULT '',
+            travel DECIMAL(12,2) DEFAULT 0, local DECIMAL(12,2) DEFAULT 0, food DECIMAL(12,2) DEFAULT 0,
+            lodging DECIMAL(12,2) DEFAULT 0, misc DECIMAL(12,2) DEFAULT 0, exp_date VARCHAR(20) DEFAULT '',
+            notes VARCHAR(255) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
+        "CREATE TABLE IF NOT EXISTS attendance (
+            id $pk, att_date VARCHAR(20), inspector_id INT, status VARCHAR(20) DEFAULT 'PRESENT_NB',
+            remarks VARCHAR(255) DEFAULT '', compoff_earned INT DEFAULT 0, compoff_expiry VARCHAR(20) DEFAULT '',
+            compoff_used INT DEFAULT 0, created_at VARCHAR(30) DEFAULT '')",
+        "CREATE TABLE IF NOT EXISTS credit_recon (
+            id $pk, month VARCHAR(10), ibo_office_id INT NULL, client_id INT NULL, boss_number VARCHAR(60) DEFAULT '',
+            direction VARCHAR(20) DEFAULT 'RECEIVED', credit_actual DECIMAL(14,2) DEFAULT 0,
+            notes VARCHAR(255) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
+        "CREATE TABLE IF NOT EXISTS email_log (
+            id $pk, to_addr VARCHAR(255), cc_addr VARCHAR(255) DEFAULT '', subject VARCHAR(255),
+            body TEXT, kind VARCHAR(40) DEFAULT '', sent_ok INT DEFAULT 0, error VARCHAR(255) DEFAULT '',
+            created_at VARCHAR(30) DEFAULT '')",
+    ];
+    foreach ($t as $sql) $pdo->exec($sql);
+}
+
+// Idempotent migration: new tables + columns added over time.
+function ops_migrate() {
+    ops_ensure_schema();
+    // users gets role plumbing for the 4-role model + inspector self-service link
+    ensure_column('users', 'inspector_id', 'INT NULL');
+}
+
+// Seed offices (Ahmedabad + affiliate IBOs) once.
+function ops_seed() {
+    $pdo = db();
+    if ((int)$pdo->query("SELECT COUNT(*) FROM offices")->fetchColumn() > 0) return;
+    $offices = [
+        ['AHM','SGS Ahmedabad','Ahmedabad',1],
+        ['MUM','SGS Mumbai','Mumbai',0], ['DEL','SGS Delhi','New Delhi',0],
+        ['CHE','SGS Chennai','Chennai',0], ['KOL','SGS Kolkata','Kolkata',0],
+        ['BLR','SGS Bengaluru','Bengaluru',0], ['HYD','SGS Hyderabad','Hyderabad',0],
+        ['PUN','SGS Pune','Pune',0], ['BRD','SGS Vadodara','Vadodara',0],
+        ['VIZ','SGS Visakhapatnam','Visakhapatnam',0], ['KOC','SGS Kochi','Kochi',0],
+        ['JAI','SGS Jaipur','Jaipur',0], ['IND','SGS Indore','Indore',0],
+        ['NAG','SGS Nagpur','Nagpur',0], ['BHU','SGS Bhubaneswar','Bhubaneswar',0],
+        ['LKO','SGS Lucknow','Lucknow',0], ['CHD','SGS Chandigarh','Chandigarh',0],
+    ];
+    $ins = $pdo->prepare("INSERT INTO offices (code,name,city,is_ahmedabad) VALUES (?,?,?,?)");
+    foreach ($offices as $o) $ins->execute($o);
+}
+
+// ---- Roles & permissions ---------------------------------------------------
+function user_role($u = null) {
+    $u = $u ?: current_user();
+    if (!$u) return 'GUEST';
+    if (!empty($u['is_superuser'])) return 'MASTER_ADMIN';
+    $r = strtoupper($u['role'] ?? 'ADMIN');
+    return isset(OPS_ROLES[$r]) ? $r : 'ADMIN';
+}
+function role_label($u = null) { return OPS_ROLES[user_role($u)] ?? 'User'; }
+function is_master() { return user_role() === 'MASTER_ADMIN'; }
+function is_admin_level() { return in_array(user_role(), ['MASTER_ADMIN','ADMIN']); }
+function is_coordinator_level() { return in_array(user_role(), ['MASTER_ADMIN','ADMIN','COORDINATOR']); }
+function is_inspector() { return user_role() === 'INSPECTOR'; }
+function can_see_salary() { return is_master(); } // salary/cost columns: Master Admin only
+// A convenient guard for handlers.
+function ops_require($ok, $msg = 'You do not have access to that screen.') {
+    if (!$ok) { flash($msg, 'error'); redirect('/'); }
+}
+
+// ---- Small data helpers ----------------------------------------------------
+function ops_all($sql, $args = []) { $s = db()->prepare($sql); $s->execute($args); return $s->fetchAll(); }
+function ops_one($sql, $args = []) { $s = db()->prepare($sql); $s->execute($args); return $s->fetch(); }
+function ops_val($sql, $args = []) { $s = db()->prepare($sql); $s->execute($args); return $s->fetchColumn(); }
+function ops_next_code($table, $col, $prefix) {
+    $last = ops_val("SELECT $col FROM $table WHERE $col LIKE ? ORDER BY $col DESC LIMIT 1", ["$prefix-%"]);
+    $seq = $last ? ((int)substr($last, strrpos($last, '-') + 1)) + 1 : 1;
+    return sprintf("%s-%05d", $prefix, $seq);
+}
+function clients_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_client=1 ORDER BY legal_name"); }
+function vendors_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_vendor=1 ORDER BY legal_name"); }
+function offices_list() { return ops_all("SELECT id, code, name FROM offices ORDER BY is_ahmedabad DESC, name"); }
+function inspectors_list($activeOnly = true) { return ops_all("SELECT id, name, emp_code, sbu, salary_ctc FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name"); }
+function subcons_list($activeOnly = true) { return ops_all("SELECT id, agency, inspector_name, skill FROM subcons" . ($activeOnly ? " WHERE active=1" : "") . " ORDER BY agency"); }
+function boss_for_client($cid) { return $cid ? ops_all("SELECT id, boss_number, status FROM boss_numbers WHERE client_id=? ORDER BY boss_number", [$cid]) : []; }
+function pname($p) { return $p ? ($p['display_name'] ?: $p['legal_name']) : '—'; }
+function fmoney($v) { return $v === null || $v === '' ? '—' : '₹' . number_format((float)$v, 0); }
+
+// ---- Calculations ----------------------------------------------------------
+// Working days in a month = calendar days − Sundays − public holidays.
+function working_days_in_month($year, $month) {
+    $days = (int)date('t', mktime(0, 0, 0, $month, 1, $year));
+    $sundays = 0;
+    for ($d = 1; $d <= $days; $d++) {
+        if ((int)date('w', mktime(0, 0, 0, $month, $d, $year)) === 0) $sundays++;
+    }
+    $mm = sprintf('%04d-%02d', $year, $month);
+    $hol = (int)ops_val("SELECT COUNT(*) FROM holidays WHERE hol_date LIKE ?", ["$mm-%"]);
+    $wd = $days - $sundays - $hol;
+    return $wd > 0 ? $wd : ($days - $sundays);
+}
+// Loaded daily cost for an inspector (salary + overhead) / working days this month.
+function inspector_daily_cost($salary_ctc, $year = null, $month = null) {
+    $year = $year ?: (int)date('Y'); $month = $month ?: (int)date('n');
+    $loadedMonthly = ((float)$salary_ctc / 12) * (1 + OVERHEAD_PCT / 100);
+    $wd = working_days_in_month($year, $month);
+    return $wd > 0 ? $loadedMonthly / $wd : 0;
+}
+function days_between($a, $b) {
+    if (!$a || !$b) return null;
+    $ta = strtotime($a); $tb = strtotime($b);
+    if ($ta === false || $tb === false) return null;
+    return (int)round(($tb - $ta) / 86400);
+}
+function job_mandays($job) {
+    if ((float)($job['mandays'] ?? 0) > 0) return (float)$job['mandays'];
+    $d = days_between($job['inspection_start_date'] ?? '', $job['inspection_end_date'] ?? '');
+    return $d !== null ? max(1, $d + 1) : 1;
+}
+function job_expenses_total($jobId) {
+    $r = ops_one("SELECT COALESCE(SUM(travel+local+food+lodging+misc),0) t FROM expenses WHERE job_id=?", [$jobId]);
+    return (float)($r['t'] ?? 0);
+}
+// Full profitability breakdown for a job (Master Admin sees the salary part).
+function job_profit($job) {
+    $mandays = job_mandays($job);
+    $salary_ctc = $job['inspector_id'] ? (float)ops_val("SELECT salary_ctc FROM inspectors WHERE id=?", [$job['inspector_id']]) : 0;
+    $daily = $salary_ctc ? inspector_daily_cost($salary_ctc) : 0;
+    $labour = $daily * $mandays;
+    $expenses = job_expenses_total($job['id']);
+    $subcon = (float)($job['subcon_cost'] ?? 0);
+    $credit = (float)($job['expected_credit'] ?? 0);
+    return [
+        'mandays' => $mandays, 'daily_cost' => $daily, 'labour' => $labour,
+        'expenses' => $expenses, 'subcon' => $subcon, 'credit' => $credit,
+        'profit' => $credit - $labour - $expenses - $subcon,
+    ];
+}
+
+// ---- Email (real send when configured, always logged) ----------------------
+function ops_mail($to, $subject, $body, $cc = '', $kind = '') {
+    $enabled = getenv('OPS_MAIL_ENABLED');
+    $from = getenv('OPS_MAIL_FROM') ?: 'no-reply@mghaiapps.com';
+    $ok = 0; $err = '';
+    if ($enabled && $to) {
+        $headers = "From: SGS Ahmedabad Ops <$from>\r\n";
+        if ($cc) $headers .= "Cc: $cc\r\n";
+        $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+        try { $ok = @mail($to, $subject, $body, $headers) ? 1 : 0; if (!$ok) $err = 'mail() returned false'; }
+        catch (Throwable $e) { $err = $e->getMessage(); }
+    } else {
+        $err = $enabled ? 'no recipient' : 'mail disabled (set OPS_MAIL_ENABLED=1)';
+    }
+    db()->prepare("INSERT INTO email_log (to_addr,cc_addr,subject,body,kind,sent_ok,error,created_at) VALUES (?,?,?,?,?,?,?,?)")
+        ->execute([$to, $cc, $subject, $body, $kind, $ok, $err, date('c')]);
+    return $ok;
+}
+function coordinator_emails() {
+    $rows = ops_all("SELECT email FROM users WHERE role IN ('COORDINATOR','ADMIN') AND email <> '' AND is_active=1");
+    return implode(',', array_filter(array_column($rows, 'email')));
+}
+function job_email_context($jobId) {
+    return ops_one("SELECT j.*, c.call_code, c.region, c.sbu csbu, bp.legal_name client_name, bp.display_name client_disp,
+        v.legal_name vendor_name, i.name inspector_name, i.email inspector_email, bn.boss_number, o.name office_name
+        FROM jobs j
+        LEFT JOIN calls c ON c.id=j.call_id
+        LEFT JOIN business_partners bp ON bp.id=c.client_id
+        LEFT JOIN business_partners v ON v.id=c.vendor_id
+        LEFT JOIN inspectors i ON i.id=j.inspector_id
+        LEFT JOIN boss_numbers bn ON bn.id=j.boss_id
+        LEFT JOIN offices o ON o.id=j.executing_office_id
+        WHERE j.id=?", [$jobId]);
+}
+function send_assignment_email($jobId) {
+    $j = job_email_context($jobId);
+    if (!$j || !$j['inspector_id']) return;
+    $client = $j['client_disp'] ?: $j['client_name'];
+    $body = "Dear {$j['inspector_name']},\n\nYou have been assigned the following inspection job.\n\n"
+        . "Job: {$j['job_code']}\nClient: {$client}\nVendor/Site: {$j['vendor_name']}\n"
+        . "Region: " . (OPS_REGIONS[$j['region']] ?? $j['region']) . "\nSBU: " . (OPS_SBUS[$j['sbu']] ?? $j['sbu']) . "\n"
+        . "BOSS No.: {$j['boss_number']}\nScheduled: {$j['scheduled_date']}\n"
+        . "Inspection dates: {$j['inspection_start_date']} to {$j['inspection_end_date']}\n"
+        . "Reporting: " . (REPORT_FREQ[$j['reporting_frequency']] ?? '') . "\n"
+        . "Report folder: {$j['folder_link']}\n\nRegards,\nSGS Ahmedabad Coordination";
+    ops_mail($j['inspector_email'] ?? '', "Job Assignment: {$j['job_code']} — {$client}", $body, coordinator_emails(), 'assignment');
+}
+function send_closure_email($jobId) {
+    $j = job_email_context($jobId);
+    if (!$j) return;
+    $client = $j['client_disp'] ?: $j['client_name'];
+    $exp = job_expenses_total($jobId);
+    $body = "Inspection job closed.\n\nJob: {$j['job_code']}\nClient: {$client}\nInspector: {$j['inspector_name']}\n"
+        . "Inspection end: {$j['inspection_end_date']}\nReport uploaded: {$j['report_upload_date']}\n"
+        . "TAT: {$j['tat_days']} day(s)\nExpenses: " . fmoney($exp) . "\nReport folder: {$j['folder_link']}\n\n"
+        . "Regards,\nSGS Ahmedabad";
+    $to = coordinator_emails() ?: ($j['inspector_email'] ?? '');
+    ops_mail($to, "Job Closed: {$j['job_code']} — {$client} (TAT {$j['tat_days']}d)", $body, '', 'closure');
+}
+
+// ---- Reminders (called by cron.php) ----------------------------------------
+function ops_run_reminders($today = null) {
+    $today = $today ?: date('Y-m-d');
+    $sent = 0;
+    $open = ops_all("SELECT * FROM jobs WHERE closed_flag=0 AND inspector_id IS NOT NULL");
+    foreach ($open as $j) {
+        if ($j['reporting_frequency'] === 'NOREPORT') {
+            // only overdue-closure reminder applies
+        }
+        $due = false; $why = '';
+        $end = $j['inspection_end_date'] ?: $j['scheduled_date'];
+        $last = $j['report_upload_date'] ?: $j['inspection_start_date'] ?: $j['scheduled_date'];
+        $since = days_between($last, $today);
+        switch ($j['reporting_frequency']) {
+            case 'DAILY': if ($since !== null && $since >= 1) { $due = true; $why = 'daily report'; } break;
+            case 'ALTERNATE': if ($since !== null && $since >= 2) { $due = true; $why = 'alternate-day report'; } break;
+            case 'WEEKLY': if ($since !== null && $since >= 7) { $due = true; $why = 'weekly report'; } break;
+            case 'FORTNIGHTLY': if ($since !== null && $since >= 14) { $due = true; $why = 'fortnightly report'; } break;
+            case 'MONTHLY': if ($since !== null && $since >= 30) { $due = true; $why = 'monthly report'; } break;
+        }
+        // Overdue closure: past inspection end and still open
+        $pastEnd = $end && days_between($end, $today) !== null && days_between($end, $today) > 0;
+        if ($pastEnd) { $due = true; $why = $why ?: 'overdue closure'; }
+        // one reminder per job per day
+        if ($due && $j['last_reminder'] !== $today) {
+            $ctx = job_email_context($j['id']);
+            $client = $ctx['client_disp'] ?: $ctx['client_name'];
+            $body = "Reminder ({$why}) for job {$ctx['job_code']} — {$client}.\n"
+                . "Inspection dates: {$ctx['inspection_start_date']} to {$ctx['inspection_end_date']}.\n"
+                . "Please upload the report / close the job.\n\nSGS Ahmedabad";
+            ops_mail($ctx['inspector_email'] ?? '', "Reminder: {$ctx['job_code']} ({$why})", $body, coordinator_emails(), 'reminder');
+            db()->prepare("UPDATE jobs SET last_reminder=? WHERE id=?")->execute([$today, $j['id']]);
+            $sent++;
+        }
+    }
+    return $sent;
+}
+
+// ---- Generic master engine (simple CRUD screens) ---------------------------
+// Each master is a config array driving one list view + one form view.
+function ops_masters() {
+    return [
+        'inspectors' => [
+            'label' => 'Inspectors', 'table' => 'inspectors', 'code' => null, 'access' => 'admin',
+            'order' => 'name',
+            'fields' => [
+                ['name','Name','text',['req'=>1]],
+                ['emp_code','Employee code','text',[]],
+                ['sbu','SBU','select',['opts'=>OPS_SBUS]],
+                ['skills','Skills','text',[]],
+                ['email','Email','text',[]],
+                ['mobile','Mobile','text',[]],
+                ['salary_ctc','Annual CTC (₹)','money',['salary'=>1]],
+                ['leave_balance','Leave balance (days)','number',[]],
+                ['compoff_balance','Comp-off balance (days)','number',[]],
+                ['status','Status','select',['opts'=>['ACTIVE'=>'Active','INACTIVE'=>'Inactive']]],
+            ],
+            'list' => ['name'=>'Name','emp_code'=>'Emp code','sbu'=>'SBU','skills'=>'Skills','status'=>'Status'],
+            'list_labels' => ['sbu'=>OPS_SBUS],
+        ],
+        'subcons' => [
+            'label' => 'Sub-contractors', 'table' => 'subcons', 'access' => 'coordinator', 'order' => 'agency',
+            'fields' => [
+                ['agency','Agency','text',['req'=>1]],
+                ['inspector_name','Inspector name','text',[]],
+                ['skill','Skill','text',[]],
+                ['experience_level','Experience','select',['opts'=>EXP_LEVELS]],
+                ['regions','Regions covered','text',[]],
+                ['email','Email','text',[]],
+                ['mobile','Mobile','text',[]],
+                ['compliance','Compliance / docs','text',[]],
+                ['active','Active','check',[]],
+            ],
+            'list' => ['agency'=>'Agency','inspector_name'=>'Inspector','skill'=>'Skill','experience_level'=>'Experience','regions'=>'Regions'],
+            'list_labels' => ['experience_level'=>EXP_LEVELS],
+        ],
+        'subcon-rates' => [
+            'label' => 'Sub-con rate matrix', 'table' => 'subcon_rates', 'access' => 'coordinator', 'order' => 'agency',
+            'fields' => [
+                ['subcon_id','Sub-contractor','ref',['ref'=>'subcons','optfn'=>'subcons_list','optlabel'=>'agency_inspector']],
+                ['agency','Agency (if not linked)','text',[]],
+                ['skill','Skill','text',[]],
+                ['experience_level','Experience','select',['opts'=>EXP_LEVELS]],
+                ['region','Region','select',['opts'=>OPS_REGIONS]],
+                ['rate_type','Rate type','select',['opts'=>RATE_TYPES]],
+                ['rate','Rate (₹)','money',[]],
+            ],
+            'list' => ['agency'=>'Agency','skill'=>'Skill','experience_level'=>'Experience','region'=>'Region','rate_type'=>'Type','rate'=>'Rate'],
+            'list_labels' => ['experience_level'=>EXP_LEVELS,'region'=>OPS_REGIONS,'rate_type'=>RATE_TYPES],
+            'money_cols' => ['rate'],
+        ],
+        'boss' => [
+            'label' => 'BOSS numbers', 'table' => 'boss_numbers', 'access' => 'coordinator', 'order' => 'boss_number',
+            'fields' => [
+                ['client_id','Client','ref',['req'=>1,'ref'=>'clients','optfn'=>'clients_list','optlabel'=>'partner']],
+                ['boss_number','BOSS number','text',['req'=>1]],
+                ['start_date','Start date','date',[]],
+                ['end_date','End date','date',[]],
+                ['status','Status','select',['opts'=>BOSS_STATUS]],
+                ['comments','Comments','text',[]],
+            ],
+            'list' => ['boss_number'=>'BOSS number','client_id'=>'Client','start_date'=>'Start','end_date'=>'End','status'=>'Status'],
+            'list_labels' => ['status'=>BOSS_STATUS],
+            'ref_cols' => ['client_id'=>['clients','partner']],
+        ],
+        'holidays' => [
+            'label' => 'Holidays', 'table' => 'holidays', 'access' => 'admin', 'order' => 'hol_date',
+            'fields' => [
+                ['hol_date','Date','date',['req'=>1]],
+                ['name','Holiday name','text',['req'=>1]],
+                ['region','Region','select',['opts'=>OPS_REGIONS]],
+            ],
+            'list' => ['hol_date'=>'Date','name'=>'Holiday','region'=>'Region'],
+            'list_labels' => ['region'=>OPS_REGIONS],
+        ],
+        'attendance' => [
+            'label' => 'Attendance / non-billable', 'table' => 'attendance', 'access' => 'coordinator', 'order' => 'att_date DESC',
+            'fields' => [
+                ['att_date','Date','date',['req'=>1]],
+                ['inspector_id','Inspector','ref',['req'=>1,'ref'=>'inspectors','optfn'=>'inspectors_list','optlabel'=>'name']],
+                ['status','Status','select',['opts'=>ATT_STATUS]],
+                ['remarks','Remarks','text',[]],
+            ],
+            'list' => ['att_date'=>'Date','inspector_id'=>'Inspector','status'=>'Status','remarks'=>'Remarks'],
+            'list_labels' => ['status'=>ATT_STATUS],
+            'ref_cols' => ['inspector_id'=>['inspectors','name']],
+        ],
+        'credit-recon' => [
+            'label' => 'Credit reconciliation', 'table' => 'credit_recon', 'access' => 'admin', 'order' => 'month DESC',
+            'fields' => [
+                ['month','Month (YYYY-MM)','text',['req'=>1]],
+                ['ibo_office_id','IBO / Office','ref',['ref'=>'offices','optfn'=>'offices_list','optlabel'=>'name']],
+                ['client_id','Client','ref',['ref'=>'clients','optfn'=>'clients_list','optlabel'=>'partner']],
+                ['boss_number','BOSS number','text',[]],
+                ['direction','Direction','select',['opts'=>CREDIT_DIRECTIONS]],
+                ['credit_actual','Actual credit (₹)','money',[]],
+                ['notes','Notes','text',[]],
+            ],
+            'list' => ['month'=>'Month','client_id'=>'Client','boss_number'=>'BOSS','direction'=>'Direction','credit_actual'=>'Actual'],
+            'list_labels' => ['direction'=>CREDIT_DIRECTIONS],
+            'ref_cols' => ['client_id'=>['clients','partner'],'ibo_office_id'=>['offices','name']],
+            'money_cols' => ['credit_actual'],
+        ],
+    ];
+}
+function master_access_ok($access) {
+    if ($access === 'admin') return is_admin_level();
+    if ($access === 'coordinator') return is_coordinator_level();
+    if ($access === 'master') return is_master();
+    return true;
+}
+function ref_label($col, $val, $cfg) {
+    if ($val === null || $val === '') return '—';
+    $rc = $cfg['ref_cols'][$col] ?? null;
+    if (!$rc) return $val;
+    [$kind] = $rc;
+    if ($kind === 'clients' || $kind === 'vendors') {
+        $r = ops_one("SELECT legal_name, display_name FROM business_partners WHERE id=?", [$val]);
+        return $r ? pname($r) : $val;
+    }
+    if ($kind === 'inspectors') return ops_val("SELECT name FROM inspectors WHERE id=?", [$val]) ?: $val;
+    if ($kind === 'offices') return ops_val("SELECT name FROM offices WHERE id=?", [$val]) ?: $val;
+    if ($kind === 'subcons') return ops_val("SELECT agency FROM subcons WHERE id=?", [$val]) ?: $val;
+    return $val;
+}
+function option_rows($fieldMeta) {
+    $fn = $fieldMeta['optfn'] ?? null;
+    if (!$fn || !function_exists($fn)) return [];
+    $rows = $fn();
+    $label = $fieldMeta['optlabel'] ?? '';
+    $out = [];
+    foreach ($rows as $r) {
+        if ($label === 'partner') $txt = pname($r);
+        elseif ($label === 'agency_inspector') $txt = trim(($r['agency'] ?? '') . (($r['inspector_name'] ?? '') ? ' — ' . $r['inspector_name'] : ''));
+        elseif ($label === 'name') $txt = $r['name'] . (($r['emp_code'] ?? '') ? " ({$r['emp_code']})" : '');
+        else $txt = $r[$label] ?? reset($r);
+        $out[] = ['id' => $r['id'], 'text' => $txt];
+    }
+    return $out;
+}
+
+// ============================================================================
+//  Dispatcher — returns true if it handled the route
+// ============================================================================
+function ops_dispatch($route, $method) {
+    // ----- Generic masters: /m/<entity>, /m/<entity>/new, /m/<entity>/edit
+    if (preg_match('#^m/([a-z-]+)(?:/(new|edit|delete))?$#', $route, $mm)) {
+        $key = $mm[1]; $action = $mm[2] ?? 'list';
+        $masters = ops_masters();
+        if (!isset($masters[$key])) return false;
+        $cfg = $masters[$key];
+        ops_require(master_access_ok($cfg['access']), "Only " . ($cfg['access']) . "-level users can open {$cfg['label']}.");
+        ops_master_handle($key, $cfg, $action, $method);
+        return true;
+    }
+    switch (true) {
+        case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call':
+            ops_calls($route, $method); return true;
+        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close':
+            ops_jobs($route, $method); return true;
+        case $route === 'my-jobs':
+            ops_my_jobs(); return true;
+        case $route === 'reports':
+            ops_reports(); return true;
+        case $route === 'users' || $route === 'user-new' || $route === 'user-edit':
+            ops_users($route, $method); return true;
+        case $route === 'change-password':
+            ops_change_password($method); return true;
+        case $route === 'masters':
+            ops_require(is_coordinator_level());
+            view('ops/masters', ['masters' => ops_masters()]); return true;
+    }
+    return false;
+}
+
+// ---- Generic master handler ------------------------------------------------
+function ops_master_handle($key, $cfg, $action, $method) {
+    $pdo = db(); $table = $cfg['table'];
+    if ($action === 'delete' && $method === 'POST') {
+        $pdo->prepare("DELETE FROM $table WHERE id=?")->execute([(int)($_GET['id'] ?? 0)]);
+        flash("{$cfg['label']}: record deleted.");
+        redirect("/m/$key");
+    }
+    if (($action === 'new' || $action === 'edit') && $method === 'POST') {
+        $b = $_POST; $cols = []; $vals = [];
+        foreach ($cfg['fields'] as $f) {
+            [$name, , $type] = $f;
+            $v = $b[$name] ?? '';
+            if ($type === 'check') $v = !empty($b[$name]) ? 1 : 0;
+            elseif (($type === 'ref' || $type === 'money' || $type === 'number') && $v === '') $v = null;
+            $cols[] = $name; $vals[] = $v;
+        }
+        if ($action === 'edit') {
+            $id = (int)($_GET['id'] ?? 0);
+            $set = implode(',', array_map(fn($c) => "$c=?", $cols));
+            $vals[] = $id;
+            $pdo->prepare("UPDATE $table SET $set WHERE id=?")->execute($vals);
+            flash("{$cfg['label']}: saved.");
+        } else {
+            $ph = implode(',', array_fill(0, count($cols), '?'));
+            if (in_array('created_at', array_column($cfg['fields'], 0)) === false && column_exists($table, 'created_at')) {
+                $cols[] = 'created_at'; $vals[] = date('c'); $ph .= ',?';
+            }
+            $pdo->prepare("INSERT INTO $table (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
+            flash("{$cfg['label']}: added.");
+        }
+        redirect("/m/$key");
+    }
+    if ($action === 'new') { view('ops/master_form', ['cfg' => $cfg, 'key' => $key, 'row' => null]); return; }
+    if ($action === 'edit') {
+        $row = ops_one("SELECT * FROM $table WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$row) { http_response_code(404); view('notfound'); return; }
+        view('ops/master_form', ['cfg' => $cfg, 'key' => $key, 'row' => $row]); return;
+    }
+    // list
+    $q = trim($_GET['q'] ?? '');
+    $rows = ops_all("SELECT * FROM $table ORDER BY {$cfg['order']}");
+    if ($q !== '') {
+        $rows = array_filter($rows, function($r) use ($q) {
+            foreach ($r as $v) if (stripos((string)$v, $q) !== false) return true; return false;
+        });
+    }
+    view('ops/master_list', ['cfg' => $cfg, 'key' => $key, 'rows' => $rows, 'q' => $q]);
+}
+function column_exists($table, $col) {
+    try {
+        if (db_driver() === 'sqlite') {
+            foreach (db()->query("PRAGMA table_info($table)")->fetchAll() as $c) if ($c['name'] === $col) return true;
+            return false;
+        }
+        $s = db()->prepare("SHOW COLUMNS FROM `$table` LIKE ?"); $s->execute([$col]); return (bool)$s->fetch();
+    } catch (Throwable $e) { return false; }
+}
+
+// ---- Calls -----------------------------------------------------------------
+function ops_calls($route, $method) {
+    $pdo = db();
+    if ($route === 'calls') {
+        $q = trim($_GET['q'] ?? '');
+        $where = "1=1"; $args = [];
+        if ($q) { $where .= " AND (c.call_code LIKE ? OR bp.legal_name LIKE ? OR v.legal_name LIKE ?)"; $args = ["%$q%","%$q%","%$q%"]; }
+        $rows = ops_all("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name,
+            (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) job_count
+            FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id
+            LEFT JOIN business_partners v ON v.id=c.vendor_id WHERE $where ORDER BY c.id DESC", $args);
+        view('ops/calls', ['rows' => $rows, 'q' => $q]); return;
+    }
+    if ($route === 'call-new' || $route === 'call-edit') {
+        ops_require(is_coordinator_level(), 'Only coordinators and admins can create calls.');
+        $call = null;
+        if ($route === 'call-edit') {
+            $call = ops_one("SELECT * FROM calls WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+            if (!$call) { http_response_code(404); view('notfound'); return; }
+        }
+        if ($method === 'POST') {
+            $b = $_POST;
+            $fields = ['client_id','vendor_id','ibo_office_id','region','sbu','product_category','product_other','call_received_date','inspection_required_date','notes'];
+            if ($call) {
+                $set = implode(',', array_map(fn($f)=>"$f=?", $fields));
+                $vals = array_map(fn($f)=> nz($b[$f] ?? ''), $fields); $vals[] = $call['id'];
+                $pdo->prepare("UPDATE calls SET $set WHERE id=?")->execute($vals);
+                flash("Call {$call['call_code']} updated.");
+                redirect('/call?id=' . $call['id']);
+            } else {
+                $code = ops_next_code('calls', 'call_code', 'CALL');
+                $cols = array_merge(['call_code'], $fields, ['status','created_by','created_at']);
+                $vals = array_merge([$code], array_map(fn($f)=> nz($b[$f] ?? ''), $fields), ['OPEN', user_name(current_user()), date('c')]);
+                $ph = implode(',', array_fill(0, count($cols), '?'));
+                $pdo->prepare("INSERT INTO calls (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
+                $id = $pdo->lastInsertId();
+                flash("$code created. Now allocate a job.");
+                redirect('/call?id=' . $id);
+            }
+        }
+        view('ops/call_form', ['call' => $call, 'clients' => clients_list(), 'vendors' => vendors_list(), 'offices' => offices_list()]);
+        return;
+    }
+    if ($route === 'call') {
+        $call = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name, o.name ibo_name
+            FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id
+            LEFT JOIN business_partners v ON v.id=c.vendor_id LEFT JOIN offices o ON o.id=c.ibo_office_id WHERE c.id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$call) { http_response_code(404); view('notfound'); return; }
+        $jobs = ops_all("SELECT j.*, i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.call_id=? ORDER BY j.id DESC", [$call['id']]);
+        view('ops/call_detail', ['call' => $call, 'jobs' => $jobs]);
+        return;
+    }
+}
+function nz($v) { return $v === '' ? null : $v; }
+
+// ---- Jobs ------------------------------------------------------------------
+function ops_jobs($route, $method) {
+    $pdo = db();
+    if ($route === 'jobs') {
+        $q = trim($_GET['q'] ?? ''); $filter = $_GET['status'] ?? '';
+        $where = "1=1"; $args = [];
+        if ($filter === 'open') $where .= " AND j.closed_flag=0";
+        if ($filter === 'closed') $where .= " AND j.closed_flag=1";
+        if ($q) { $where .= " AND (j.job_code LIKE ? OR bp.legal_name LIKE ?)"; $args = ["%$q%","%$q%"]; }
+        $rows = ops_all("SELECT j.*, c.call_code, bp.legal_name client_name, bp.display_name client_disp,
+            i.name inspector_name FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
+            LEFT JOIN business_partners bp ON bp.id=c.client_id LEFT JOIN inspectors i ON i.id=j.inspector_id
+            WHERE $where ORDER BY j.id DESC", $args);
+        view('ops/jobs', ['rows' => $rows, 'q' => $q, 'filter' => $filter]); return;
+    }
+    if ($route === 'job-new' || $route === 'job-edit') {
+        ops_require(is_coordinator_level(), 'Only coordinators and admins can allocate jobs.');
+        $job = null; $call = null;
+        if ($route === 'job-edit') {
+            $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+            if (!$job) { http_response_code(404); view('notfound'); return; }
+            $call = ops_one("SELECT * FROM calls WHERE id=?", [$job['call_id']]);
+        } else {
+            $call = ops_one("SELECT * FROM calls WHERE id=?", [(int)($_GET['call'] ?? 0)]);
+            if (!$call) { flash('Pick a call to allocate first.', 'error'); redirect('/calls'); }
+        }
+        if ($method === 'POST') {
+            $b = $_POST;
+            $fields = ['executing_office_id','inspector_id','subcon_id','scheduled_date','inspection_start_date','inspection_end_date',
+                'random_date1','random_date2','random_date3','folder_link','boss_id','expected_credit','credit_type','credit_direction',
+                'reporting_frequency','sbu','mandays','subcon_cost'];
+            // validation: expected credit mandatory at allocation
+            if (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0) {
+                view('ops/job_form', ['job'=>$job,'call'=>$call,'error'=>'Expected credit is mandatory at allocation.',
+                    'offices'=>offices_list(),'inspectors'=>inspectors_list(),'subcons'=>subcons_list(),
+                    'boss'=>boss_for_client($call['client_id'])]);
+                return;
+            }
+            if ($job) {
+                $set = implode(',', array_map(fn($f)=>"$f=?", $fields));
+                $vals = array_map(fn($f)=> nzc($f, $b[$f] ?? ''), $fields); $vals[] = $job['id'];
+                $pdo->prepare("UPDATE jobs SET $set WHERE id=?")->execute($vals);
+                $jobId = $job['id'];
+                flash("Job {$job['job_code']} updated.");
+            } else {
+                $code = ops_next_code('jobs', 'job_code', 'JOB');
+                $cols = array_merge(['job_code','call_id'], $fields, ['created_by','created_at']);
+                $vals = array_merge([$code, $call['id']], array_map(fn($f)=> nzc($f, $b[$f] ?? ''), $fields), [user_name(current_user()), date('c')]);
+                $ph = implode(',', array_fill(0, count($cols), '?'));
+                $pdo->prepare("INSERT INTO jobs (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
+                $jobId = $pdo->lastInsertId();
+                $pdo->prepare("UPDATE calls SET status='ALLOCATED' WHERE id=?")->execute([$call['id']]);
+                flash("$code allocated. Assignment email sent to inspector.");
+            }
+            // comp-off if any inspection date is a Sunday
+            ops_check_compoff($jobId);
+            // assignment email when an inspector + schedule exist
+            $jj = ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]);
+            if ($jj['inspector_id'] && $jj['scheduled_date']) send_assignment_email($jobId);
+            redirect('/job?id=' . $jobId);
+        }
+        view('ops/job_form', ['job'=>$job,'call'=>$call,'error'=>null,'offices'=>offices_list(),
+            'inspectors'=>inspectors_list(),'subcons'=>subcons_list(),'boss'=>boss_for_client($call['client_id'])]);
+        return;
+    }
+    if ($route === 'job-close') {
+        // Inspector (or coordinator) closes: report + expenses required
+        $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$job) { http_response_code(404); view('notfound'); return; }
+        if ($method === 'POST') {
+            $b = $_POST;
+            $reportDate = $b['report_upload_date'] ?? '';
+            if ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate === '') {
+                view('ops/job_close', ['job'=>$job,'error'=>'A report upload date is required before closing this job.']); return;
+            }
+            // save expenses row (same-day at closure)
+            $pdo->prepare("INSERT INTO expenses (job_id,inspector_id,sbu,travel,local,food,lodging,misc,exp_date,notes,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)")->execute([
+                $job['id'], $job['inspector_id'], $b['sbu'] ?: $job['sbu'],
+                num($b['travel']), num($b['local']), num($b['food']), num($b['lodging']), num($b['misc']),
+                $reportDate ?: date('Y-m-d'), $b['exp_notes'] ?? '', date('c')]);
+            $tat = days_between($job['inspection_end_date'], $reportDate);
+            $pdo->prepare("UPDATE jobs SET closed_flag=1, closed_at=?, report_upload_date=?, report_link=?, tat_days=? WHERE id=?")
+                ->execute([date('c'), $reportDate, $b['report_link'] ?? '', $tat, $job['id']]);
+            send_closure_email($job['id']);
+            flash("Job {$job['job_code']} closed. TAT " . ($tat === null ? '—' : $tat) . " day(s). Closure email sent.");
+            redirect('/job?id=' . $job['id']);
+        }
+        view('ops/job_close', ['job'=>$job,'error'=>null]); return;
+    }
+    if ($route === 'job') {
+        $job = ops_one("SELECT j.*, c.call_code, c.region, c.product_category, bp.legal_name client_name, bp.display_name client_disp,
+            v.legal_name vendor_name, i.name inspector_name, i.salary_ctc, s.agency subcon_agency, bn.boss_number, o.name office_name
+            FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
+            LEFT JOIN business_partners bp ON bp.id=c.client_id LEFT JOIN business_partners v ON v.id=c.vendor_id
+            LEFT JOIN inspectors i ON i.id=j.inspector_id LEFT JOIN subcons s ON s.id=j.subcon_id
+            LEFT JOIN boss_numbers bn ON bn.id=j.boss_id LEFT JOIN offices o ON o.id=j.executing_office_id
+            WHERE j.id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$job) { http_response_code(404); view('notfound'); return; }
+        $expenses = ops_all("SELECT * FROM expenses WHERE job_id=? ORDER BY id", [$job['id']]);
+        view('ops/job_detail', ['job'=>$job,'expenses'=>$expenses,'profit'=>job_profit($job)]);
+        return;
+    }
+}
+function nzc($f, $v) {
+    $nullable = ['executing_office_id','inspector_id','subcon_id','boss_id'];
+    if (in_array($f, $nullable) && $v === '') return null;
+    if (in_array($f, ['expected_credit','mandays','subcon_cost']) && $v === '') return 0;
+    return $v;
+}
+function num($v) { return $v === '' || $v === null ? 0 : (float)$v; }
+
+// Grant comp-off if any of the job's inspection dates falls on a Sunday.
+function ops_check_compoff($jobId) {
+    $j = ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]);
+    if (!$j || !$j['inspector_id']) return;
+    $dates = array_filter([$j['scheduled_date'], $j['inspection_start_date'], $j['inspection_end_date'], $j['random_date1'], $j['random_date2'], $j['random_date3']]);
+    foreach ($dates as $d) {
+        $ts = strtotime($d); if ($ts === false) continue;
+        if ((int)date('w', $ts) === 0) { // Sunday
+            $exists = ops_val("SELECT COUNT(*) FROM attendance WHERE inspector_id=? AND att_date=? AND compoff_earned=1", [$j['inspector_id'], $d]);
+            if (!$exists) {
+                $expiry = date('Y-m-d', strtotime($d . ' +30 days'));
+                db()->prepare("INSERT INTO attendance (att_date,inspector_id,status,remarks,compoff_earned,compoff_expiry,created_at)
+                    VALUES (?,?,?,?,?,?,?)")->execute([$d, $j['inspector_id'], 'PRESENT_NB', "Sunday work on {$j['job_code']}", 1, $expiry, date('c')]);
+                db()->prepare("UPDATE inspectors SET compoff_balance = compoff_balance + 1 WHERE id=?")->execute([$j['inspector_id']]);
+            }
+        }
+    }
+}
+
+// ---- Inspector self-service: my jobs ---------------------------------------
+function ops_my_jobs() {
+    $u = current_user();
+    $insId = $u['inspector_id'] ?? null;
+    if (!$insId && !is_coordinator_level()) { flash('Your login is not linked to an inspector yet. Ask an admin.', 'error'); redirect('/'); }
+    if ($insId) {
+        $rows = ops_all("SELECT j.*, c.call_code, bp.legal_name client_name, bp.display_name client_disp
+            FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
+            WHERE j.inspector_id=? ORDER BY j.closed_flag, j.scheduled_date DESC", [$insId]);
+    } else {
+        $rows = ops_all("SELECT j.*, c.call_code, bp.legal_name client_name, bp.display_name client_disp
+            FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
+            WHERE j.closed_flag=0 ORDER BY j.scheduled_date DESC");
+    }
+    view('ops/my_jobs', ['rows' => $rows]);
+}
+
+// ---- Dashboards / reports --------------------------------------------------
+function ops_reports() {
+    ops_require(is_admin_level(), 'Only admins can view the dashboards.');
+    $jobs = ops_all("SELECT j.*, i.salary_ctc, i.name inspector_name, i.id ins_id, bp.legal_name client_name, bp.display_name client_disp,
+        c.region, o.name ibo_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id
+        LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
+        LEFT JOIN offices o ON o.id=j.executing_office_id");
+    // Profitability per job + rollups
+    $totCredit=0;$totCost=0;$totExp=0;$totSub=0;$totProfit=0;
+    $byInspector=[]; $tatOn=0;$tatLate=0;$tatTotal=0;
+    $creditRecv=0;$creditGiven=0;
+    foreach ($jobs as &$j) {
+        $p = job_profit($j);
+        $j['_p'] = $p;
+        $totCredit+=$p['credit'];$totCost+=$p['labour'];$totExp+=$p['expenses'];$totSub+=$p['subcon'];$totProfit+=$p['profit'];
+        if ($j['credit_direction']==='RECEIVED') $creditRecv+=$p['credit']; else $creditGiven+=$p['credit'];
+        $key = $j['ins_id'] ?: 0;
+        if (!isset($byInspector[$key])) $byInspector[$key]=['name'=>$j['inspector_name']?:'(unassigned)','credit'=>0,'cost'=>0,'exp'=>0,'profit'=>0,'jobs'=>0,'mandays'=>0];
+        $byInspector[$key]['credit']+=$p['credit'];$byInspector[$key]['cost']+=$p['labour'];
+        $byInspector[$key]['exp']+=$p['expenses'];$byInspector[$key]['profit']+=$p['profit'];
+        $byInspector[$key]['jobs']++;$byInspector[$key]['mandays']+=$p['mandays'];
+        if ($j['closed_flag'] && $j['tat_days']!==null) { $tatTotal++; if ($j['tat_days']<=3) $tatOn++; else $tatLate++; }
+    }
+    unset($j);
+    // Utilization: mandays vs working days (rough, current month)
+    $wd = working_days_in_month((int)date('Y'), (int)date('n'));
+    $util=[];
+    foreach (inspectors_list(false) as $ins) {
+        $md = 0;
+        foreach ($jobs as $j) if ($j['ins_id']==$ins['id']) $md += job_mandays($j);
+        $util[] = ['name'=>$ins['name'],'mandays'=>$md,'working'=>$wd,'pct'=>$wd?round($md/$wd*100):0];
+    }
+    // reconciliation compare: expected (from jobs) vs actual (from credit_recon) by direction
+    $reconActualRecv=(float)ops_val("SELECT COALESCE(SUM(credit_actual),0) FROM credit_recon WHERE direction='RECEIVED'");
+    $reconActualGiven=(float)ops_val("SELECT COALESCE(SUM(credit_actual),0) FROM credit_recon WHERE direction='GIVEN'");
+    view('ops/reports', [
+        'jobs'=>$jobs,'totCredit'=>$totCredit,'totCost'=>$totCost,'totExp'=>$totExp,'totSub'=>$totSub,'totProfit'=>$totProfit,
+        'byInspector'=>$byInspector,'tatOn'=>$tatOn,'tatLate'=>$tatLate,'tatTotal'=>$tatTotal,
+        'creditRecv'=>$creditRecv,'creditGiven'=>$creditGiven,'util'=>$util,
+        'reconRecv'=>$reconActualRecv,'reconGiven'=>$reconActualGiven,
+    ]);
+}
+
+// ---- Users, roles, seats ---------------------------------------------------
+function ops_users($route, $method) {
+    ops_require(is_admin_level(), 'Only admins can manage users.');
+    $pdo = db();
+    if ($route === 'user-new' || $route === 'user-edit') {
+        $user = null;
+        if ($route === 'user-edit') {
+            $user = ops_one("SELECT * FROM users WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+            if (!$user) { http_response_code(404); view('notfound'); return; }
+        }
+        if ($method === 'POST') {
+            $b = $_POST;
+            $role = in_array($b['role'] ?? '', array_keys(OPS_ROLES)) ? $b['role'] : 'COORDINATOR';
+            $isSuper = $role === 'MASTER_ADMIN' ? 1 : 0;
+            $insId = ($b['inspector_id'] ?? '') !== '' ? (int)$b['inspector_id'] : null;
+            if ($user) {
+                $pdo->prepare("UPDATE users SET username=?,first_name=?,last_name=?,email=?,role=?,is_superuser=?,is_active=?,inspector_id=? WHERE id=?")
+                    ->execute([$b['username'], $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, !empty($b['is_active'])?1:0, $insId, $user['id']]);
+                if (!empty($b['password'])) $pdo->prepare("UPDATE users SET password_hash=? WHERE id=?")->execute([password_hash($b['password'], PASSWORD_DEFAULT), $user['id']]);
+                flash('User saved.');
+            } else {
+                $hash = password_hash($b['password'] ?: 'changeme123', PASSWORD_DEFAULT);
+                $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id)
+                    VALUES (?,?,?,?,?,?,?,1,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId]);
+                flash('User created.');
+            }
+            redirect('/users');
+        }
+        view('ops/user_form', ['user'=>$user,'inspectors'=>inspectors_list(false)]); return;
+    }
+    $rows = ops_all("SELECT * FROM users ORDER BY username");
+    $seats = getenv('SEAT_LIMIT') ?: '';
+    view('ops/users', ['rows'=>$rows,'seats'=>$seats,'active'=>(int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1")]);
+}
+
+function ops_change_password($method) {
+    $pdo = db(); $u = current_user();
+    if ($method === 'POST') {
+        $b = $_POST;
+        if (!password_verify($b['current'] ?? '', $u['password_hash'])) {
+            view('ops/change_password', ['error'=>'Current password is incorrect.']); return;
+        }
+        if (strlen($b['new'] ?? '') < 8) { view('ops/change_password', ['error'=>'New password must be at least 8 characters.']); return; }
+        if (($b['new'] ?? '') !== ($b['confirm'] ?? '')) { view('ops/change_password', ['error'=>'New password and confirmation do not match.']); return; }
+        $pdo->prepare("UPDATE users SET password_hash=? WHERE id=?")->execute([password_hash($b['new'], PASSWORD_DEFAULT), $u['id']]);
+        flash('Password changed.');
+        redirect('/');
+    }
+    view('ops/change_password', ['error'=>null]);
+}

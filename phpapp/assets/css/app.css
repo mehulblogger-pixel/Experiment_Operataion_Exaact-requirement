@@ -57,3 +57,24 @@ form.stack label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4
 .ss-item{padding:8px 12px;font-size:14px;cursor:pointer}.ss-item:hover{background:#eef2ff}.ss-item.ss-none{color:var(--muted);cursor:default}
 .readonly-field{background:#f8fafc;color:var(--muted)}
 .row-actions{display:flex;gap:6px}
+
+/* ---- Operations & Finance module styles ---- */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:16px}
+.master-card{display:flex;flex-direction:column;gap:6px;padding:16px 18px;border:1px solid var(--line,#e2ddd6);border-radius:10px;background:var(--panel,#f7f6f4);text-decoration:none;color:inherit}
+.master-card:hover{border-color:var(--brand);text-decoration:none}
+.master-card strong{font-size:15px}
+.kv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px 22px}
+.kv-grid>div{display:flex;flex-direction:column;gap:2px;font-size:14px}
+.kv-grid .k{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#808080);font-weight:600}
+.kv-grid .kv-wide{grid-column:1/-1}
+.panel-split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.panel-split>.panel{margin:0}
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:8px 0 20px}
+.stat-card{background:var(--panel,#f7f6f4);border:1px solid var(--line,#e2ddd6);border-radius:10px;padding:16px}
+.sc-num{font-size:24px;font-weight:800;line-height:1}
+.sc-lbl{font-size:12px;color:var(--muted,#808080);margin-top:6px}
+.bar{height:8px;border-radius:999px;background:#e5e7eb;overflow:hidden;margin:6px 0 2px;max-width:220px}
+.bar-fill{height:100%;background:var(--brand);border-radius:999px}
+.chk{display:inline-flex;align-items:center;gap:6px;font-weight:400}
+.btn.small.danger{background:var(--red);border-color:var(--red)}
+@media(max-width:720px){.panel-split{grid-template-columns:1fr}}
