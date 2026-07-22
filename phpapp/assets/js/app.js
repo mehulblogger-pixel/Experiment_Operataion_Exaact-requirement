@@ -182,10 +182,21 @@
     });
   }
 
+  // ---- Reporting frequency: show the "every N days" box only for Custom ----
+  function initCustomFreq() {
+    var sel = document.getElementById('freq_sel');
+    var wrap = document.getElementById('custom_days_wrap');
+    if (!sel || !wrap) return;
+    function toggle() { wrap.style.display = sel.value === 'CUSTOM' ? '' : 'none'; }
+    sel.addEventListener('change', toggle);
+    toggle();
+  }
+
   function init() {
     gstAutofill();
     initCascades();
     initActivity();
+    initCustomFreq();
     initQuickAdd();
     Array.prototype.forEach.call(document.querySelectorAll('select.searchable'), enhanceSelect);
   }

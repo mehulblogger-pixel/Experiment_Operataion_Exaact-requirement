@@ -12,7 +12,11 @@ const OPS_SBUS = ['IND'=>'Industrial','OGC'=>'Oil, Gas & Chemicals','MIN'=>'Mine
 const PRODUCT_CATS = ['ELEC'=>'Electrical equipment','MECH'=>'Mechanical equipment','STRUCT'=>'Structural / Fabrication','PIPE'=>'Pipes & Fittings','VALVE'=>'Valves','PUMP'=>'Pumps & Rotating','TRANSFORMER'=>'Transformers','CABLE'=>'Cables','INSTRUMENT'=>'Instrumentation','CIVIL'=>'Civil / Construction','OTHER'=>'Others'];
 const CREDIT_TYPES = ['MANDAY'=>'Man-day','MANMONTH'=>'Man-month','LUMP'=>'Lumpsum','LATER'=>'Decide later','OTHER'=>'Other'];
 const CREDIT_DIRECTIONS = ['RECEIVED'=>'Received (IBO → Ahmedabad)','GIVEN'=>'Given (Ahmedabad → IBO)'];
-const REPORT_FREQ = ['DAILY'=>'Daily','ALTERNATE'=>'Alternate day','WEEKLY'=>'Weekly','FORTNIGHTLY'=>'Fortnightly','MONTHLY'=>'Monthly','NOREPORT'=>'No report'];
+const REPORT_FREQ = ['DAILY'=>'Daily','ALTERNATE'=>'Alternate day','WEEKLY'=>'Weekly','FORTNIGHTLY'=>'Fortnightly','MONTHLY'=>'Monthly','CUSTOM'=>'Custom (every N days)','NOREPORT'=>'No report'];
+// Types of inspection service (third-party inspection industry).
+const INSPECTION_TYPES = ['INSPECTION'=>'Inspection (third-party)','EXPEDITING'=>'Expediting','DEPUTATION'=>'Project deputation / Resident','VENDOR_ASSESS'=>'Vendor assessment','VENDOR_AUDIT'=>'Vendor audit','STAGE'=>'Stage / In-process inspection','FINAL'=>'Final inspection','PSI'=>'Pre-shipment inspection','WITNESS'=>'Witness / Test witnessing','FAT'=>'Factory Acceptance Test (FAT)','SOURCE'=>'Source inspection','SURVEILLANCE'=>'Surveillance','LOADING'=>'Loading supervision','DESKTOP'=>'Desktop / Document review','TECH_AUDIT'=>'Technical audit'];
+// Deliverables / report formats produced after a job.
+const DELIVERABLES = ['IR'=>'Inspection Report (IR)','IRN'=>'Inspection Release Note (IRN)','NCR'=>'Non-Conformance Report (NCR)','COC'=>'Certificate of Conformity (CoC)','EXP_REP'=>'Expediting Report','VA_REP'=>'Vendor Assessment Report','AUDIT_REP'=>'Audit Report','TC_REVIEW'=>'Test Certificate Review','DPR'=>'Daily Progress Report','FINAL_REP'=>'Final Report','PUNCH'=>'Punch List','PHOTO'=>'Photographic Report','DIM_REP'=>'Dimensional Report','RN'=>'Release Note (RN)'];
 const ATT_STATUS = ['PRESENT_NB'=>'Present (non-billable)','TRAINING'=>'Training','MEETING'=>'Meeting','LEAVE'=>'Leave','COMPOFF'=>'Comp-off taken','HOLIDAY'=>'Holiday'];
 const EXP_LEVELS = ['JUNIOR'=>'Junior','MID'=>'Mid','SENIOR'=>'Senior','EXPERT'=>'Expert / Lead'];
 const RATE_TYPES = ['MANDAY'=>'Per man-day','MANMONTH'=>'Per man-month'];
@@ -104,6 +108,13 @@ function ops_migrate() {
     ensure_column('calls', 'activity_id', 'INT NULL');
     ensure_column('calls', 'notify_manager', 'INT DEFAULT 0');
     ensure_column('calls', 'forwarded_at', "VARCHAR(30) DEFAULT ''");
+    ensure_column('calls', 'inspection_type', "VARCHAR(40) DEFAULT ''");
+    // jobs gain type of inspection (carried from call), custom report frequency,
+    // activity and the required deliverables/report formats.
+    ensure_column('jobs', 'inspection_type', "VARCHAR(40) DEFAULT ''");
+    ensure_column('jobs', 'activity_id', 'INT NULL');
+    ensure_column('jobs', 'report_custom_days', 'INT NULL');
+    ensure_column('jobs', 'deliverables', "VARCHAR(500) DEFAULT ''");
 }
 
 // Seed offices (Ahmedabad + affiliate IBOs) once.
@@ -293,6 +304,7 @@ function ops_run_reminders($today = null) {
             case 'WEEKLY': if ($since !== null && $since >= 7) { $due = true; $why = 'weekly report'; } break;
             case 'FORTNIGHTLY': if ($since !== null && $since >= 14) { $due = true; $why = 'fortnightly report'; } break;
             case 'MONTHLY': if ($since !== null && $since >= 30) { $due = true; $why = 'monthly report'; } break;
+            case 'CUSTOM': $n = (int)($j['report_custom_days'] ?? 0); if ($n > 0 && $since !== null && $since >= $n) { $due = true; $why = "report (every $n days)"; } break;
         }
         // Overdue closure: past inspection end and still open
         $pastEnd = $end && days_between($end, $today) !== null && days_between($end, $today) > 0;
@@ -653,7 +665,7 @@ function ops_calls($route, $method) {
                 return;
             }
             $fields = ['client_id','vendor_id','ibo_office_id','executing_office_id','region','sbu','activity_id',
-                'product_category','product_other','deputation_type','expected_credit','credit_type',
+                'inspection_type','product_category','product_other','deputation_type','expected_credit','credit_type',
                 'call_received_date','inspection_required_date','notes'];
             $wasForwarded = $call ? ($call['executing_office_id'] ?? null) : null;
             $forwardNow = $execOffice && !$wasForwarded; // first time it gets an executing branch
@@ -764,24 +776,28 @@ function ops_jobs($route, $method) {
             $b = $_POST;
             $fields = ['executing_office_id','inspector_id','subcon_id','scheduled_date','inspection_start_date','inspection_end_date',
                 'random_date1','random_date2','random_date3','folder_link','boss_id','expected_credit','credit_type','credit_direction',
-                'reporting_frequency','sbu','mandays','subcon_cost'];
+                'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost'];
+            // deliverables come as a checkbox array -> stored as CSV of codes
+            $deliverables = implode(',', array_filter((array)($b['deliverables'] ?? [])));
             // validation: expected credit mandatory at allocation
             if (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0) {
                 view('ops/job_form', ['job'=>$job,'call'=>$call,'error'=>'Expected credit is mandatory at allocation.',
                     'offices'=>offices_list(),'inspectors'=>inspectors_list(),'subcons'=>subcons_list(),
-                    'boss'=>boss_for_client($call['client_id'])]);
+                    'boss'=>boss_for_client($call['client_id']),'clientInfo'=>partner_full($call['client_id']),
+                    'vendorInfo'=>partner_full($call['vendor_id']),'cfvals'=>$job?custom_values_map('job',$job['id']):[]]);
                 return;
             }
             if ($job) {
                 $set = implode(',', array_map(fn($f)=>"$f=?", $fields));
                 $vals = array_map(fn($f)=> nzc($f, $b[$f] ?? ''), $fields); $vals[] = $job['id'];
                 $pdo->prepare("UPDATE jobs SET $set WHERE id=?")->execute($vals);
+                $pdo->prepare("UPDATE jobs SET deliverables=? WHERE id=?")->execute([$deliverables, $job['id']]);
                 $jobId = $job['id'];
                 flash("Job {$job['job_code']} updated.");
             } else {
                 $code = ops_next_code('jobs', 'job_code', 'JOB');
-                $cols = array_merge(['job_code','call_id'], $fields, ['created_by','created_at']);
-                $vals = array_merge([$code, $call['id']], array_map(fn($f)=> nzc($f, $b[$f] ?? ''), $fields), [user_name(current_user()), date('c')]);
+                $cols = array_merge(['job_code','call_id'], $fields, ['deliverables','created_by','created_at']);
+                $vals = array_merge([$code, $call['id']], array_map(fn($f)=> nzc($f, $b[$f] ?? ''), $fields), [$deliverables, user_name(current_user()), date('c')]);
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO jobs (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $jobId = $pdo->lastInsertId();
@@ -798,6 +814,7 @@ function ops_jobs($route, $method) {
         }
         view('ops/job_form', ['job'=>$job,'call'=>$call,'error'=>null,'offices'=>offices_list(),
             'inspectors'=>inspectors_list(),'subcons'=>subcons_list(),'boss'=>boss_for_client($call['client_id']),
+            'clientInfo'=>partner_full($call['client_id']),'vendorInfo'=>partner_full($call['vendor_id']),
             'cfvals'=>$job ? custom_values_map('job', $job['id']) : []]);
         return;
     }
@@ -841,10 +858,21 @@ function ops_jobs($route, $method) {
     }
 }
 function nzc($f, $v) {
-    $nullable = ['executing_office_id','inspector_id','subcon_id','boss_id'];
+    $nullable = ['executing_office_id','inspector_id','subcon_id','boss_id','activity_id','report_custom_days'];
     if (in_array($f, $nullable) && $v === '') return null;
     if (in_array($f, ['expected_credit','mandays','subcon_cost']) && $v === '') return 0;
     return $v;
+}
+// Full partner detail (record + contacts + addresses) for the allocate-job info panel.
+function partner_full($id) {
+    if (!$id) return null;
+    $p = ops_one("SELECT * FROM business_partners WHERE id=?", [$id]);
+    if (!$p) return null;
+    return [
+        'p' => $p,
+        'contacts' => ops_all("SELECT * FROM partner_contacts WHERE partner_id=? ORDER BY is_primary DESC, id", [$id]),
+        'addresses' => ops_all("SELECT * FROM partner_addresses WHERE partner_id=? ORDER BY is_primary DESC, id", [$id]),
+    ];
 }
 function num($v) { return $v === '' || $v === null ? 0 : (float)$v; }
 

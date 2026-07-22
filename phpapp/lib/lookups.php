@@ -40,6 +40,25 @@ function lk_migrate() {
     lk_ensure_type('deputation_type', 'Deputation type', [
         'Daily (single day)', 'Multiple days', 'Continuous days', 'Monthly (PM deputation)',
     ]);
+    lk_ensure_type_map('inspection_type', 'Type of inspection', INSPECTION_TYPES);
+    lk_ensure_type_map('deliverable', 'Deliverable / report format', DELIVERABLES);
+    // add CUSTOM to reporting frequency on existing installs
+    lk_ensure_value('reporting_frequency', 'CUSTOM', 'Custom (every N days)');
+}
+// Like lk_ensure_type but seeds coded values from a [code=>label] map.
+function lk_ensure_type_map($key, $label, $map) {
+    if (lk_type($key)) return;
+    if ((int)ops_val("SELECT COUNT(*) FROM lookup_types") === 0) return;
+    $tid = lk_add_type($key, $label, null, 0, 50);
+    $so = 0;
+    foreach ($map as $code => $lab) lk_add_value($tid, null, $code, $lab, $so++);
+}
+// Ensure a single coded value exists in an existing type (safe on upgrades).
+function lk_ensure_value($typeKey, $code, $label) {
+    $t = lk_type($typeKey);
+    if (!$t) return;
+    $exists = ops_val("SELECT COUNT(*) FROM lookup_values WHERE type_id=? AND code=?", [$t['id'], $code]);
+    if (!$exists) lk_add_value($t['id'], null, $code, $label, 90);
 }
 
 // Create a lookup type + flat values only if it doesn't exist yet (safe on upgrades).
@@ -108,6 +127,11 @@ function lk_seed() {
     // deputation type (flat list)
     $dep = lk_add_type('deputation_type', 'Deputation type', null, 0, $so++);
     foreach (['Daily (single day)', 'Multiple days', 'Continuous days', 'Monthly (PM deputation)'] as $i => $d) lk_add_value($dep, null, '', $d, $i);
+    // inspection types + deliverables (coded flat lists)
+    $it = lk_add_type('inspection_type', 'Type of inspection', null, 0, $so++);
+    $i = 0; foreach (INSPECTION_TYPES as $code => $lab) lk_add_value($it, null, $code, $lab, $i++);
+    $dl = lk_add_type('deliverable', 'Deliverable / report format', null, 0, $so++);
+    $i = 0; foreach (DELIVERABLES as $code => $lab) lk_add_value($dl, null, $code, $lab, $i++);
 
     // demo custom field so the candles cascade shows live on the New Call form
     if ((int)ops_val("SELECT COUNT(*) FROM custom_fields") === 0) {

@@ -17,12 +17,19 @@
     <div><span class="k">BOSS no.</span><?= e($job['boss_number'] ?: '—') ?></div>
     <div><span class="k">Scheduled</span><?= e($job['scheduled_date'] ?: '—') ?></div>
     <div><span class="k">Inspection</span><?= e(($job['inspection_start_date'] ?: '?') . ' → ' . ($job['inspection_end_date'] ?: '?')) ?></div>
-    <div><span class="k">Reporting</span><?= e(REPORT_FREQ[$job['reporting_frequency']] ?? '—') ?></div>
+    <div><span class="k">Type of inspection</span><?= e(INSPECTION_TYPES[$job['inspection_type']] ?? ($job['inspection_type'] ?: '—')) ?></div>
+    <div><span class="k">Activity</span><?= e(($job['activity_id']??null) ? lk_value_path($job['activity_id']) : '—') ?></div>
+    <div><span class="k">Reporting</span><?= e(REPORT_FREQ[$job['reporting_frequency']] ?? '—') ?><?= ($job['reporting_frequency']==='CUSTOM' && !empty($job['report_custom_days'])) ? ' (every '.(int)$job['report_custom_days'].' days)' : '' ?></div>
     <div><span class="k">Credit direction</span><?= e(CREDIT_DIRECTIONS[$job['credit_direction']] ?? '—') ?></div>
     <div><span class="k">Expected credit</span><?= fmoney($job['expected_credit']) ?></div>
     <div><span class="k">Report uploaded</span><?= e($job['report_upload_date'] ?: '—') ?></div>
     <div><span class="k">TAT</span><?= $job['tat_days']===null?'—':(int)$job['tat_days'].' day(s)' ?></div>
     <div class="kv-wide"><span class="k">Report folder</span><?php if ($job['folder_link']): ?><a href="<?= e($job['folder_link']) ?>" target="_blank" rel="noopener"><?= e($job['folder_link']) ?></a><?php else: ?>—<?php endif; ?></div>
+    <div class="kv-wide"><span class="k">Deliverables required</span><?php
+      $dl = $job['deliverables'] !== '' ? explode(',', $job['deliverables']) : [];
+      $map = lk_options_or('deliverable', DELIVERABLES);
+      echo $dl ? e(implode(', ', array_map(fn($c) => $map[$c] ?? $c, $dl))) : '—';
+    ?></div>
     <?php foreach (custom_display('job', $job['id']) as $cf): ?>
       <div><span class="k"><?= e($cf['label']) ?></span><?= e($cf['value']) ?></div>
     <?php endforeach; ?>

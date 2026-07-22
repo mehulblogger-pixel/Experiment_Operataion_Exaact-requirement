@@ -92,3 +92,13 @@ form.stack label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4
 .modal .ff{margin-bottom:10px}
 .qa-field{display:none}
 .qa-field .ff{margin-bottom:10px}
+
+/* ---- Allocate-job info panel + deliverables ---- */
+.info-panel{background:var(--panel-2,#f1efec)}
+.info-role{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#808080);font-weight:700;margin-bottom:4px}
+.info-party strong{font-size:15px}
+table.mini{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+table.mini th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted,#808080);padding:4px 8px;border-bottom:1px solid var(--line,#e2ddd6)}
+table.mini td{padding:4px 8px;border-bottom:1px solid var(--line,#e2ddd6)}
+.checkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 14px;margin-top:4px}
+.checkgrid .chk{font-weight:400;font-size:13.5px;padding:3px 0}
