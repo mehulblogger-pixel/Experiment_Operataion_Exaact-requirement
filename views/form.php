@@ -23,7 +23,14 @@
       </div>
       <small class="muted">Tick both Client and Vendor for a company that is both. A Sub-contractor (manpower supplier) is automatically also a Vendor.</small></div>
     <div class="ff"><label>Client type</label><select class="form-control" name="client_type"><option value="">—</option><?php foreach (CLIENT_TYPES as $k=>$v): ?><option value="<?= $k ?>" <?= ($p && $p['client_type']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Industry</label><select class="form-control" name="industry"><option value="">—</option><?php foreach (INDUSTRIES as $k=>$v): ?><option value="<?= $k ?>" <?= ($p && $p['industry']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <?php $indOpts = lk_options_or('industry', INDUSTRIES); $curInd = $p['industry'] ?? ''; $indKnown = array_key_exists($curInd, $indOpts); ?>
+    <div class="ff"><label>Industry</label>
+      <select class="form-control searchable other-toggle" name="industry" data-other="industry_other_wrap"><option value="">—</option>
+        <?php foreach ($indOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($curInd===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
+        <option value="__other__" <?= ($curInd!=='' && !$indKnown)?'selected':'' ?>>Other (type it)…</option>
+      </select>
+      <div id="industry_other_wrap" style="margin-top:6px;<?= ($curInd!=='' && !$indKnown)?'':'display:none;' ?>">
+        <input class="form-control" name="industry_other" placeholder="New industry — will be added &amp; spelling-corrected" value="<?= e(!$indKnown ? $curInd : '') ?>"></div></div>
     <div class="ff"><label>Ownership type</label><select class="form-control" name="ownership_type"><option value="">—</option><?php foreach (OWNERSHIP as $k=>$v): ?><option value="<?= $k ?>" <?= ($p && $p['ownership_type']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Status</label><select class="form-control" name="status"><?php foreach (STATUSES as $k=>$v): ?><option value="<?= $k ?>" <?= (($p['status'] ?? 'ACTIVE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>GSTIN</label><input class="form-control" name="gstin" value="<?= e($p['gstin'] ?? '') ?>" placeholder="e.g. 24ADUPL3517E2ZJ"></div>
@@ -42,7 +49,10 @@
         <?php endforeach; ?>
       </div>
       <small class="muted">Tick all that apply. In a new call for this client the Type-of-inspection list is narrowed to these. Manage the master under <a href="/lookup?key=inspection_type">Type of inspection</a>.</small></div>
+    <div class="ff ff-wide"><label>Other inspection type(s) <span class="muted">— free text, not added to the master; separate multiple with commas</span></label>
+      <input class="form-control" name="inspection_types_other" value="<?= e($p['inspection_types_other'] ?? '') ?>" placeholder="e.g. Rope-access survey, Drone inspection"></div>
   </div>
+  <?php if (!$p): ?><p class="muted" style="margin-top:6px;">Code preview: <strong><?= substr(date('Y'),2,2) ?></strong> · roles become letters <strong>C</strong>lient / <strong>V</strong>endor / <strong>M</strong>anufacturer / <strong>T</strong>rader / <strong>S</strong>ub-contractor, e.g. <code>AHM-<?= substr(date('Y'),2,2) ?>-CV-ADANI-00042</code>.</p><?php endif; ?>
   <div style="margin-top:18px;">
     <button class="btn" type="submit">Save</button>
     <a class="btn secondary" href="<?= $p ? '/partner?id=' . (int)$p['id'] : '/clients' ?>">Cancel</a>

@@ -174,12 +174,14 @@ if ($route === 'partner-new') {
             return view('form', $formVars + ['error' => "This company already exists as {$dup['row']['code']} — {$dup['row']['legal_name']} (matched by {$dup['by']}). Open it from the Clients/Vendors list and tick the extra role instead of creating a duplicate."]);
         }
         $branchId = ($b['home_branch_id'] ?? '') !== '' ? (int)$b['home_branch_id'] : null;
-        $code = gen_partner_code($branchId, ($b['display_name'] ?? '') ?: ($b['legal_name'] ?? ''));
+        $industry = resolve_industry($b);
+        $roleStr = partner_role_letters(!empty($b['is_client']), !empty($b['is_vendor']), $b['client_type'] ?? '', !empty($b['is_subcontractor']));
+        $code = gen_partner_code($branchId, ($b['display_name'] ?? '') ?: ($b['legal_name'] ?? ''), $roleStr);
         $ins = $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,is_subcontractor,client_type,industry,ownership_type,status,gstin,pan,cin,tan,msme_udyam,state,website,description,home_branch_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-        $ins->execute([$code, $b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $branchId, date('c')]);
+        $ins->execute([$code, $b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $industry, $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $branchId, date('c')]);
         $id = $pdo->lastInsertId();
-        $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
-            ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $id]);
+        $pdo->prepare("UPDATE business_partners SET inspection_types=?, inspection_types_other=? WHERE id=?")
+            ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), trim($b['inspection_types_other'] ?? ''), $id]);
         flash("$code created.");
         redirect("/partner?id=$id");
     }
@@ -200,10 +202,11 @@ if ($route === 'partner-edit') {
             return view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'offices' => offices_list(),
                 'error' => "Another company already uses these details: {$dup['row']['code']} — {$dup['row']['legal_name']} (matched by {$dup['by']})."]);
         }
+        $industry = resolve_industry($b);
         $pdo->prepare("UPDATE business_partners SET legal_name=?,display_name=?,is_client=?,is_vendor=?,is_subcontractor=?,client_type=?,industry=?,ownership_type=?,status=?,gstin=?,pan=?,cin=?,tan=?,msme_udyam=?,state=?,website=?,description=? WHERE id=?")
-            ->execute([$b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $p['id']]);
-        $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
-            ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $p['id']]);
+            ->execute([$b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $industry, $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $p['id']]);
+        $pdo->prepare("UPDATE business_partners SET inspection_types=?, inspection_types_other=? WHERE id=?")
+            ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), trim($b['inspection_types_other'] ?? ''), $p['id']]);
         flash('Updated.');
         redirect("/partner?id={$p['id']}");
     }
@@ -215,13 +218,29 @@ if ($route === 'partner-add' && $method === 'POST') {
     if (!$p) { http_response_code(404); return view('notfound'); }
     $kind = $_GET['kind'] ?? '';
     $b = $_POST;
+    // Master fields that support "Other → type it": auto-correct spelling & add to the master.
+    // City/State keep uniform names; Department grows its master; all reusable everywhere.
+    $resolveOther = function(&$b, $field, $typeKey, $persist = true) {
+        if (($b[$field] ?? '') === '__other__') {
+            $r = lk_resolve_or_add($typeKey, $b[$field . '_other'] ?? '', $persist);
+            $b[$field] = $r ? $r['label'] : '';
+        }
+    };
+    if ($kind === 'address') { $resolveOther($b, 'city', 'city'); $resolveOther($b, 'state', 'state_in'); }
+    if ($kind === 'contact') { $resolveOther($b, 'department', 'department'); }
     $map = [
-        'contact' => ['partner_contacts', ['name','designation','department','email','mobile','phone','address_id'], 'contacts'],
-        'address' => ['partner_addresses', ['address_type','label','line1','line2','city','state','pincode','country'], 'addresses'],
+        'contact' => ['partner_contacts', ['name','designation','department','project','email','mobile','phone','address_id'], 'contacts'],
+        'address' => ['partner_addresses', ['address_type','label','line1','line2','village','district','city','state','pincode','country'], 'addresses'],
         'registration' => ['partner_registrations', ['doc_type','number','valid_to','notes'], 'registration'],
-        'contract' => ['partner_contracts', ['contract_number','title','value','start_date','end_date','notes'], 'contracts'],
+        'contract' => ['partner_contracts', ['contract_number','title','value','sbu','start_date','end_date','notes'], 'contracts'],
         'relationship' => ['partner_relationships', ['relation_type','related_id','notes'], 'relationships'],
     ];
+    if ($kind === 'branch_role') {
+        $pdo->prepare("INSERT INTO partner_branch_roles (partner_id,branch_id,role,notes,created_at) VALUES (?,?,?,?,?)")
+            ->execute([$p['id'], ($b['branch_id'] ?? '') !== '' ? (int)$b['branch_id'] : null, $b['role'] ?? 'CLIENT', $b['notes'] ?? '', date('c')]);
+        flash('Branch role added.');
+        redirect("/partner?id={$p['id']}&tab=branch_roles");
+    }
     if ($kind === 'note') {
         $pdo->prepare("INSERT INTO partner_notes (partner_id,note,author_name,created_at) VALUES (?,?,?,?)")
             ->execute([$p['id'], $b['note'] ?? '', user_name(current_user()), date('c')]);
@@ -229,8 +248,9 @@ if ($route === 'partner-add' && $method === 'POST') {
         redirect("/partner?id={$p['id']}&tab=notes");
     }
     if ($kind === 'po') {
-        $pdo->prepare("INSERT INTO partner_purchase_orders (partner_id,contract_id,po_number,po_type,title,value,start_date,end_date,notes) VALUES (?,?,?,?,?,?,?,?,?)")
-            ->execute([$p['id'], ($b['contract_id'] ?? '') !== '' ? $b['contract_id'] : null, $b['po_number'] ?? '', $b['po_type'] ?? 'REGULAR', $b['title'] ?? '', ($b['value'] ?? '') !== '' ? $b['value'] : null, $b['start_date'] ?? '', $b['end_date'] ?? '', $b['notes'] ?? '']);
+        $sbu = implode(',', array_filter((array)($b['sbu'] ?? [])));
+        $pdo->prepare("INSERT INTO partner_purchase_orders (partner_id,contract_id,po_number,po_type,title,value,sbu,start_date,end_date,notes) VALUES (?,?,?,?,?,?,?,?,?,?)")
+            ->execute([$p['id'], ($b['contract_id'] ?? '') !== '' ? $b['contract_id'] : null, $b['po_number'] ?? '', $b['po_type'] ?? 'REGULAR', $b['title'] ?? '', ($b['value'] ?? '') !== '' ? $b['value'] : null, $sbu, $b['start_date'] ?? '', $b['end_date'] ?? '', $b['notes'] ?? '']);
         flash('Purchase order added.');
         redirect('/po?id=' . $pdo->lastInsertId());
     }
@@ -241,6 +261,7 @@ if ($route === 'partner-add' && $method === 'POST') {
         $vals = [$p['id']];
         foreach ($fields as $f) {
             $v = $b[$f] ?? '';
+            if (is_array($v)) $v = implode(',', array_filter($v));   // multi-select (e.g. SBU) → CSV
             if (($f === 'address_id' || $f === 'related_id' || $f === 'value') && $v === '') $v = null;
             $vals[] = $v;
         }
@@ -267,6 +288,8 @@ if ($route === 'partner') {
         'pos' => children('partner_purchase_orders', $p['id']),
         'rels' => (function() use ($pdo, $p) { $s = $pdo->prepare("SELECT r.*, b.legal_name rn, b.display_name rd, b.id rid FROM partner_relationships r LEFT JOIN business_partners b ON b.id=r.related_id WHERE r.partner_id=?"); $s->execute([$p['id']]); return $s->fetchAll(); })(),
         'all_partners' => (function() use ($pdo, $p) { $s = $pdo->prepare("SELECT id, legal_name, display_name FROM business_partners WHERE id <> ? ORDER BY legal_name"); $s->execute([$p['id']]); return $s->fetchAll(); })(),
+        'partner_calls' => partner_calls($p['id']),
+        'branch_roles' => (function() use ($pdo, $p) { $s = $pdo->prepare("SELECT br.*, o.name office_name, o.code office_code FROM partner_branch_roles br LEFT JOIN offices o ON o.id=br.branch_id WHERE br.partner_id=? ORDER BY o.name"); $s->execute([$p['id']]); return $s->fetchAll(); })(),
     ]);
 }
 
@@ -277,13 +300,25 @@ if ($route === 'po') {
     if (!$po) { http_response_code(404); return view('notfound'); }
     if ($method === 'POST') {
         $b = $_POST;
-        $pdo->prepare("INSERT INTO po_line_items (purchase_order_id,description,item_type,quantity,rate,consumed) VALUES (?,?,?,?,?,?)")
-            ->execute([$po['id'], $b['description'], $b['item_type'] ?? 'MANDAYS', $b['quantity'] ?: 0, $b['rate'] ?: null, $b['consumed'] ?: 0]);
+        // Trade sub-category "Other" → add it under the chosen trade so it's there next time.
+        $subId = ($b['subcategory_id'] ?? '') !== '' && $b['subcategory_id'] !== '__other__' ? (int)$b['subcategory_id'] : null;
+        $tradeId = ($b['trade_id'] ?? '') !== '' ? (int)$b['trade_id'] : null;
+        if (($b['subcategory_id'] ?? '') === '__other__' && trim($b['subcategory_other'] ?? '') !== '' && $tradeId) {
+            $wt = lk_type('work_subcategory');
+            if ($wt) $subId = (int)lk_add_value($wt['id'], $tradeId, '', normalize_place($b['subcategory_other']), 99);
+        }
+        $actId = ($b['activity_id'] ?? '') !== '' ? (int)$b['activity_id'] : null;
+        $pdo->prepare("INSERT INTO po_line_items (purchase_order_id,description,item_type,quantity,rate,consumed,manpower_count,site_text,trade_id,subcategory_id,subcategory_other,activity_id,gst_pct) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+            ->execute([$po['id'], $b['description'], $b['item_type'] ?? 'MANDAYS', $b['quantity'] ?: 0, $b['rate'] ?: null, $b['consumed'] ?: 0,
+                ($b['manpower_count'] ?? '') !== '' ? (int)$b['manpower_count'] : null, $b['site_text'] ?? '', $tradeId, $subId, $b['subcategory_other'] ?? '', $actId, ($b['gst_pct'] ?? '') !== '' ? $b['gst_pct'] : 18]);
         flash('Line item added.');
         redirect('/po?id=' . $po['id']);
     }
     $li = $pdo->prepare("SELECT * FROM po_line_items WHERE purchase_order_id = ?"); $li->execute([$po['id']]);
-    return view('po_detail', ['po' => $po, 'items' => $li->fetchAll()]);
+    // contract this PO belongs to (to reflect line totals against the contract value)
+    $contract = $po['contract_id'] ? (function() use ($pdo, $po) { $s = $pdo->prepare("SELECT * FROM partner_contracts WHERE id=?"); $s->execute([$po['contract_id']]); return $s->fetch(); })() : null;
+    return view('po_detail', ['po' => $po, 'items' => $li->fetchAll(), 'contract' => $contract,
+        'trades' => lk_values_as_options('trade'), 'worksub' => worksub_by_trade(), 'activities' => activity_options_by_sbu()]);
 }
 
 // --- Operations & Finance modules (Calls, Jobs, masters, reports, users) ---

@@ -179,6 +179,18 @@ function skills_by_trade() {
     }
     return $out;
 }
+// Site-work sub-categories grouped by their parent trade value id (for the PO cascade).
+function worksub_by_trade() {
+    $st = lk_type('work_subcategory');
+    if (!$st) return [];
+    $out = [];
+    foreach (lk_all_values($st['id']) as $v) {
+        if ($v['parent_value_id'] === null) continue;
+        $out[(int)$v['parent_value_id']][] = ['id' => (int)$v['id'], 'label' => $v['label']];
+    }
+    return $out;
+}
+
 // Like lk_ensure_type but seeds coded values from a [code=>label] map.
 function lk_ensure_type_map($key, $label, $map) {
     if (lk_type($key)) return;

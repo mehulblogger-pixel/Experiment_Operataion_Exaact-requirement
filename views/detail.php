@@ -2,14 +2,29 @@
 function fdate($d) { if (!$d) return '—'; $t = strtotime($d); return $t ? date('d M Y', $t) : e($d); }
 $badge = $p['status']==='ACTIVE'?'GREEN':($p['status']==='BLACKLISTED'?'RED':'AMBER');
 $id = (int)$p['id'];
-$tabs = ['overview'=>'Overview','general'=>'General','registration'=>'Registration','addresses'=>'Addresses','contacts'=>'Contacts','contracts'=>'Contract Numbers','purchase_orders'=>'Purchase Orders','projects'=>'Projects','relationships'=>'Relationships','notes'=>'Notes','timeline'=>'Timeline'];
+$isClient = !empty($p['is_client']);
+// Contract Numbers / Purchase Orders / Projects only for clients — hidden for a pure
+// vendor / manufacturer / trader / supplier (requirement 17). PO tab sits before Contracts (10).
+$tabs = ['overview'=>'Overview','general'=>'General','registration'=>'Registration','addresses'=>'Addresses','contacts'=>'Contacts'];
+if ($isClient) { $tabs['purchase_orders']='Purchase Orders'; $tabs['contracts']='Contract Numbers'; $tabs['projects']='Projects'; }
+$tabs += ['branch_roles'=>'Branch Roles','relationships'=>'Relationships','notes'=>'Notes','timeline'=>'Timeline'];
+$sbuOpts = lk_options_or('sbu', OPS_SBUS);
 // Cross-tab data flow: primary contact/address and links between them.
 $primaryContact = null; foreach ($contacts as $c) { if ($c['is_primary']) { $primaryContact = $c; break; } } if (!$primaryContact && $contacts) $primaryContact = $contacts[0];
 $primaryAddress = null; foreach ($addresses as $a) { if ($a['is_primary']) { $primaryAddress = $a; break; } } if (!$primaryAddress && $addresses) $primaryAddress = $addresses[0];
 $addrById = []; foreach ($addresses as $a) $addrById[$a['id']] = $a;
 $contactsByAddr = []; foreach ($contacts as $c) { $contactsByAddr[$c['address_id'] ?: 0][] = $c; }
-function addr_line($a) { return implode(', ', array_filter([$a['line1'],$a['line2'],$a['city'],$a['state'],$a['pincode']])); }
+function addr_line($a) { return implode(', ', array_filter([$a['line1'],$a['line2'],$a['village']??'',$a['district']??'',$a['city'],$a['state'],$a['pincode']])); }
 function addr_name($a) { return (ADDRESS_TYPES[$a['address_type']] ?? $a['address_type']) . ($a['label'] ? ' — '.$a['label'] : ''); }
+// Reusable City/State/Department dropdown with an "Other → type it" option.
+function master_select($name, $typeKey, $current, $extraClass='') {
+    $opts = lk_values_as_options($typeKey);
+    $known = false; $out = '<select class="form-control searchable other-toggle '.$extraClass.'" name="'.e($name).'" data-other="'.e($name).'_other_wrap"><option value="">—</option>';
+    foreach ($opts as $o) { $sel = ($current!=='' && strcasecmp($current,$o['label'])===0)?' selected':''; if ($sel) $known=true; $out .= '<option value="'.e($o['label']).'"'.$sel.'>'.e($o['label']).'</option>'; }
+    $out .= '<option value="__other__"'.(($current!=='' && !$known)?' selected':'').'>Other (type it)…</option></select>';
+    $out .= '<div id="'.e($name).'_other_wrap" style="margin-top:6px;'.(($current!=='' && !$known)?'':'display:none;').'"><input class="form-control" name="'.e($name).'_other" placeholder="Type it — spelling auto-corrected" value="'.e(!$known?$current:'').'"></div>';
+    return $out;
+}
 ?>
 <div class="master-head">
   <div><h1><?= e(partner_name($p)) ?></h1>
@@ -26,7 +41,7 @@ function addr_name($a) { return (ADDRESS_TYPES[$a['address_type']] ?? $a['addres
   <dl class="kv">
     <dt>Roles</dt><dd><?= e(roles_label($p)) ?></dd>
     <dt>Client type</dt><dd><?= e(CLIENT_TYPES[$p['client_type']] ?? '—') ?></dd>
-    <dt>Industry</dt><dd><?= e(INDUSTRIES[$p['industry']] ?? '—') ?></dd>
+    <dt>Industry</dt><dd><?= e(industry_label($p['industry'])) ?></dd>
     <dt>Ownership</dt><dd><?= e(OWNERSHIP[$p['ownership_type']] ?? '—') ?></dd>
     <dt>GSTIN</dt><dd><?= e($p['gstin'] ?: '—') ?><?php if ($p['state']): ?> <span class="muted">(<?= e($p['state']) ?>)</span><?php endif; ?></dd>
     <dt>PAN</dt><dd><?= e($p['pan'] ?: '—') ?></dd>
@@ -59,9 +74,11 @@ function addr_name($a) { return (ADDRESS_TYPES[$a['address_type']] ?? $a['addres
     <?php foreach ($registrations as $r): ?><tr><td><?= e(REG_TYPES[$r['doc_type']] ?? $r['doc_type']) ?></td><td><?= e($r['number'] ?: '—') ?></td><td><?= fdate($r['valid_to']) ?></td></tr><?php endforeach; ?>
     <?php if (!$registrations): ?><tr><td colspan="3">No registrations yet.</td></tr><?php endif; ?></table>
   <h3 class="tab-sub">Add registration</h3>
-  <form method="post" action="/partner-add?id=<?= $id ?>&kind=registration" class="inline-add">
-    <div class="ff"><label>Document</label><select class="form-control" name="doc_type"><?php foreach (REG_TYPES as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Number</label><input class="form-control" name="number"></div>
+  <p class="muted">Pick GSTIN or PAN and the number auto-fills from the company's General details (still editable).</p>
+  <form method="post" action="/partner-add?id=<?= $id ?>&kind=registration" class="inline-add" id="reg_form"
+        data-gstin="<?= e($p['gstin'] ?? '') ?>" data-pan="<?= e($p['pan'] ?? '') ?>">
+    <div class="ff"><label>Document</label><select class="form-control" id="reg_doc_type" name="doc_type"><?php foreach (REG_TYPES as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Number</label><input class="form-control" id="reg_number" name="number"></div>
     <div class="ff"><label>Valid till</label><input class="form-control" type="date" name="valid_to"></div>
     <div class="ff"><label>Notes</label><input class="form-control" name="notes"></div>
     <button class="btn small" type="submit">Add</button>
@@ -80,20 +97,24 @@ function addr_name($a) { return (ADDRESS_TYPES[$a['address_type']] ?? $a['addres
     <div class="ff"><label>Type</label><select class="form-control" name="address_type"><?php foreach (ADDRESS_TYPES as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Label</label><input class="form-control" name="label"></div>
     <div class="ff"><label>Address line</label><input class="form-control" name="line1"></div>
-    <div class="ff"><label>City</label><input class="form-control" name="city"></div>
-    <div class="ff"><label>State</label><input class="form-control" name="state"></div>
+    <div class="ff"><label>Town / Village</label><input class="form-control" name="village"></div>
+    <div class="ff"><label>District</label><input class="form-control" name="district"></div>
+    <div class="ff"><label>City</label><?= master_select('city', 'city', '') ?></div>
+    <div class="ff"><label>State</label><?= master_select('state', 'state_in', '') ?></div>
     <div class="ff"><label>Pincode</label><input class="form-control" name="pincode"></div>
     <button class="btn small" type="submit">Add Address</button>
   </form>
 
 <?php elseif ($tab === 'contacts'): ?>
-  <table class="grid"><tr><th>Name</th><th>Designation</th><th>Mobile</th><th>Email</th><th>At (site / office)</th></tr>
-    <?php foreach ($contacts as $c): ?><tr><td><?= e($c['name']) ?><?php if ($c['is_primary']): ?> <span class="badge AMBER">primary</span><?php endif; ?></td><td><?= e($c['designation'] ?: '—') ?></td><td><?= e($c['mobile'] ?: '—') ?></td><td><?= e($c['email'] ?: '—') ?></td><td><?= isset($addrById[$c['address_id']]) ? e(addr_name($addrById[$c['address_id']])) : '—' ?></td></tr><?php endforeach; ?>
-    <?php if (!$contacts): ?><tr><td colspan="5">No contacts yet.</td></tr><?php endif; ?></table>
+  <table class="grid"><tr><th>Name</th><th>Designation</th><th>Department</th><th>Project</th><th>Mobile</th><th>Email</th><th>At (site / office)</th></tr>
+    <?php foreach ($contacts as $c): ?><tr><td><?= e($c['name']) ?><?php if ($c['is_primary']): ?> <span class="badge AMBER">primary</span><?php endif; ?></td><td><?= e($c['designation'] ?: '—') ?></td><td><?= e(($c['department'] ?? '') ?: '—') ?></td><td><?= e(($c['project'] ?? '') ?: '—') ?></td><td><?= e($c['mobile'] ?: '—') ?></td><td><?= e($c['email'] ?: '—') ?></td><td><?= isset($addrById[$c['address_id']]) ? e(addr_name($addrById[$c['address_id']])) : '—' ?></td></tr><?php endforeach; ?>
+    <?php if (!$contacts): ?><tr><td colspan="7">No contacts yet.</td></tr><?php endif; ?></table>
   <h3 class="tab-sub">Add a contact</h3>
   <form method="post" action="/partner-add?id=<?= $id ?>&kind=contact" class="inline-add">
     <div class="ff"><label>Name</label><input class="form-control" name="name" required></div>
-    <div class="ff"><label>Designation</label><input class="form-control" name="designation"></div>
+    <div class="ff"><label>Designation</label><input class="form-control" name="designation" placeholder="e.g. Sr. Engineer"></div>
+    <div class="ff"><label>Department</label><?= master_select('department', 'department', '') ?></div>
+    <div class="ff"><label>Project <span class="muted">(optional)</span></label><input class="form-control" name="project" placeholder="Project he/she works under"></div>
     <div class="ff"><label>Mobile</label><input class="form-control" name="mobile"></div>
     <div class="ff"><label>Email</label><input class="form-control" name="email"></div>
     <div class="ff"><label>At which site / office</label><select class="form-control searchable" name="address_id"><option value="">— (none / head office) —</option><?php foreach ($addresses as $a): ?><option value="<?= (int)$a['id'] ?>"><?= e(addr_name($a)) ?></option><?php endforeach; ?></select><?php if (!$addresses): ?><div class="helptext">Add addresses first to link a contact to a site.</div><?php endif; ?></div>
@@ -101,36 +122,64 @@ function addr_name($a) { return (ADDRESS_TYPES[$a['address_type']] ?? $a['addres
   </form>
 
 <?php elseif ($tab === 'contracts'): ?>
-  <table class="grid"><tr><th>Contract No.</th><th>Title</th><th>Value</th><th>Start</th><th>End</th></tr>
-    <?php foreach ($contracts as $c): ?><tr><td><?= e($c['contract_number']) ?></td><td><?= e($c['title'] ?: '—') ?></td><td><?= $c['value']!==null?'₹'.e($c['value']):'—' ?></td><td><?= fdate($c['start_date']) ?></td><td><?= fdate($c['end_date']) ?></td></tr><?php endforeach; ?>
-    <?php if (!$contracts): ?><tr><td colspan="5">No contracts yet.</td></tr><?php endif; ?></table>
+  <p class="muted">A contract is normally recorded after its purchase order is received.</p>
+  <table class="grid"><tr><th>Contract No.</th><th>Title</th><th>SBU</th><th>Value</th><th>Start</th><th>End</th></tr>
+    <?php foreach ($contracts as $c): ?><tr><td><?= e($c['contract_number']) ?></td><td><?= e($c['title'] ?: '—') ?></td><td><?= e(sbu_csv_labels($c['sbu'] ?? '', $sbuOpts)) ?></td><td><?= $c['value']!==null?'₹'.e($c['value']):'—' ?></td><td><?= fdate($c['start_date']) ?></td><td><?= fdate($c['end_date']) ?></td></tr><?php endforeach; ?>
+    <?php if (!$contracts): ?><tr><td colspan="6">No contracts yet.</td></tr><?php endif; ?></table>
   <h3 class="tab-sub">Add a contract</h3>
   <form method="post" action="/partner-add?id=<?= $id ?>&kind=contract" class="inline-add">
     <div class="ff"><label>Contract number</label><input class="form-control" name="contract_number" required></div>
     <div class="ff"><label>Title</label><input class="form-control" name="title"></div>
-    <div class="ff"><label>Value</label><input class="form-control" type="number" name="value"></div>
+    <div class="ff"><label>SBU(s) <span class="muted">— revenue owner</span></label>
+      <select class="form-control" name="sbu[]" multiple size="4"><?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Value</label><input class="form-control" type="number" step="0.01" name="value"></div>
     <div class="ff"><label>Start date</label><input class="form-control" type="date" name="start_date"></div>
     <button class="btn small" type="submit">Add Contract</button>
   </form>
 
 <?php elseif ($tab === 'purchase_orders'): ?>
   <?php $ctById = []; foreach ($contracts as $ct) $ctById[$ct['id']] = $ct; ?>
-  <table class="grid"><tr><th>PO No.</th><th>Type</th><th>Title</th><th>Value</th><th>Contract</th></tr>
-    <?php foreach ($pos as $o): ?><tr><td><a href="/po?id=<?= (int)$o['id'] ?>"><?= e($o['po_number'] ?: '(open)') ?></a></td><td><?= e(PO_TYPES[$o['po_type']] ?? $o['po_type']) ?></td><td><?= e($o['title'] ?: '—') ?></td><td><?= $o['value']!==null?'₹'.e($o['value']):'—' ?></td><td><?= isset($ctById[$o['contract_id']]) ? e($ctById[$o['contract_id']]['contract_number']) : '—' ?></td></tr><?php endforeach; ?>
-    <?php if (!$pos): ?><tr><td colspan="5">No purchase orders yet.</td></tr><?php endif; ?></table>
+  <table class="grid"><tr><th>PO No.</th><th>Type</th><th>Title</th><th>SBU</th><th>Value</th><th>Contract</th></tr>
+    <?php foreach ($pos as $o): ?><tr><td><a href="/po?id=<?= (int)$o['id'] ?>"><?= e($o['po_number'] ?: '(open)') ?></a></td><td><?= e(PO_TYPES[$o['po_type']] ?? $o['po_type']) ?></td><td><?= e($o['title'] ?: '—') ?></td><td><?= e(sbu_csv_labels($o['sbu'] ?? '', $sbuOpts)) ?></td><td><?= $o['value']!==null?'₹'.e($o['value']):'—' ?></td><td><?= isset($ctById[$o['contract_id']]) ? e($ctById[$o['contract_id']]['contract_number']) : '—' ?></td></tr><?php endforeach; ?>
+    <?php if (!$pos): ?><tr><td colspan="6">No purchase orders yet.</td></tr><?php endif; ?></table>
   <h3 class="tab-sub">Add a purchase order</h3>
-  <p class="muted">For open / ARC orders, save the PO then add line items (days, months, audit days).</p>
+  <p class="muted">For open / ARC orders, save the PO then add line items (manpower, trade, sub-category, GST).</p>
   <form method="post" action="/partner-add?id=<?= $id ?>&kind=po" class="inline-add">
     <div class="ff"><label>PO number</label><input class="form-control" name="po_number"></div>
     <div class="ff"><label>Type</label><select class="form-control" name="po_type"><?php foreach (PO_TYPES as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Against contract</label><select class="form-control searchable" name="contract_id"><option value="">— none —</option><?php foreach ($contracts as $ct): ?><option value="<?= (int)$ct['id'] ?>"><?= e($ct['contract_number'].' '.$ct['title']) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>SBU(s) <span class="muted">— revenue owner</span></label>
+      <select class="form-control" name="sbu[]" multiple size="4"><?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Title</label><input class="form-control" name="title"></div>
-    <div class="ff"><label>Value</label><input class="form-control" type="number" name="value"></div>
+    <div class="ff"><label>Value</label><input class="form-control" type="number" step="0.01" name="value"></div>
     <button class="btn small" type="submit">Add PO</button>
   </form>
 
 <?php elseif ($tab === 'projects'): ?>
-  <p class="muted">Inspection calls linked to this partner will appear here once the Operations module is added (next stage).</p>
+  <p class="sub">Inspection calls where this company is the client or the vendor / site.</p>
+  <table class="grid"><tr><th>Call</th><th>Role</th><th>Type</th><th>Required date</th><th>Executing office</th><th>Status</th></tr>
+    <?php foreach (($partner_calls ?? []) as $c): ?><tr>
+      <td><a href="/call?id=<?= (int)$c['id'] ?>"><?= e($c['call_code']) ?></a></td>
+      <td><?= !empty($c['as_client']) ? 'Client' : 'Vendor / site' ?></td>
+      <td><?= e(INSPECTION_TYPES[$c['inspection_type']] ?? ($c['inspection_type'] ?: '—')) ?></td>
+      <td><?= fdate($c['inspection_required_date']) ?></td>
+      <td><?= e($c['exec_name'] ?: 'Ahmedabad') ?></td>
+      <td><span class="badge <?= ($c['status']==='CLOSED'?'GREEN':'AMBER') ?>"><?= e($c['status']) ?></span></td></tr><?php endforeach; ?>
+    <?php if (empty($partner_calls)): ?><tr><td colspan="6">No inspection calls linked yet.</td></tr><?php endif; ?></table>
+
+<?php elseif ($tab === 'branch_roles'): ?>
+  <p class="sub">The same company can be a <strong>Client</strong> under one branch and a <strong>Vendor</strong> under another — recorded here without creating a duplicate record.</p>
+  <table class="grid"><tr><th>Branch</th><th>Role at that branch</th><th>Notes</th></tr>
+    <?php $roleNames=['CLIENT'=>'Client','VENDOR'=>'Vendor','BOTH'=>'Client &amp; Vendor','MANUFACTURER'=>'Manufacturer','TRADER'=>'Trader','SUBCON'=>'Sub-contractor'];
+    foreach (($branch_roles ?? []) as $br): ?><tr><td><?= e($br['office_name'] ?: '—') ?> <span class="muted"><?= e($br['office_code'] ?? '') ?></span></td><td><?= $roleNames[$br['role']] ?? e($br['role']) ?></td><td><?= e($br['notes'] ?: '—') ?></td></tr><?php endforeach; ?>
+    <?php if (empty($branch_roles)): ?><tr><td colspan="3">No branch-specific roles yet — global roles (<?= e(roles_label($p)) ?>) apply everywhere.</td></tr><?php endif; ?></table>
+  <h3 class="tab-sub">Add a branch role</h3>
+  <form method="post" action="/partner-add?id=<?= $id ?>&kind=branch_role" class="inline-add">
+    <div class="ff"><label>Branch</label><select class="form-control searchable" name="branch_id" required><option value="">— select —</option><?php foreach (offices_list() as $o): ?><option value="<?= (int)$o['id'] ?>"><?= e($o['name']).' ('.e($o['code']).')' ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Role at this branch</label><select class="form-control" name="role"><option value="CLIENT">Client</option><option value="VENDOR">Vendor</option><option value="BOTH">Client &amp; Vendor</option><option value="MANUFACTURER">Manufacturer</option><option value="TRADER">Trader</option><option value="SUBCON">Sub-contractor</option></select></div>
+    <div class="ff"><label>Notes</label><input class="form-control" name="notes"></div>
+    <button class="btn small" type="submit">Add</button>
+  </form>
 
 <?php elseif ($tab === 'relationships'): ?>
   <table class="grid"><tr><th>This company…</th><th>Related company</th><th>Notes</th></tr>

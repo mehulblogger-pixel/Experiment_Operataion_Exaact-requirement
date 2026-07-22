@@ -280,8 +280,50 @@
     sc.addEventListener('change', function () { if (sc.checked) ven.checked = true; });
   }
 
+  // ---- Generic "Other → type it": reveal a text box when a select is __other__ ----
+  function initOtherToggles() {
+    Array.prototype.forEach.call(document.querySelectorAll('select.other-toggle'), function (sel) {
+      var wrap = document.getElementById(sel.getAttribute('data-other'));
+      if (!wrap) return;
+      function sync() { wrap.style.display = sel.value === '__other__' ? '' : 'none'; }
+      sel.addEventListener('change', sync); sync();
+    });
+  }
+
+  // ---- Registration: fill the number from GSTIN/PAN on the General details ----
+  function initRegAutofill() {
+    var form = document.getElementById('reg_form');
+    var sel = document.getElementById('reg_doc_type');
+    var num = document.getElementById('reg_number');
+    if (!form || !sel || !num) return;
+    var map = { GSTIN: form.getAttribute('data-gstin') || '', PAN: form.getAttribute('data-pan') || '' };
+    var touched = false;
+    num.addEventListener('input', function () { touched = true; });
+    function fill() { if (touched && num.value) return; if (map[sel.value] !== undefined) num.value = map[sel.value]; }
+    sel.addEventListener('change', function () { touched = false; fill(); });
+    fill();
+  }
+
+  // ---- PO line item: Trade → Sub-category cascade (+ Other) ----
+  function initPoSubcat() {
+    var trade = document.getElementById('po_trade');
+    var sub = document.getElementById('po_subcat');
+    if (!trade || !sub || !window.WORKSUB) return;
+    function rebuild() {
+      var list = window.WORKSUB[trade.value] || [];
+      sub.innerHTML = '<option value="">' + (trade.value ? 'Select sub-category…' : '— pick trade first —') + '</option>';
+      list.forEach(function (o) { var op = document.createElement('option'); op.value = o.id; op.textContent = o.label; sub.appendChild(op); });
+      var ot = document.createElement('option'); ot.value = '__other__'; ot.textContent = 'Other (type it)…'; sub.appendChild(ot);
+      sub.dispatchEvent(new Event('change'));
+    }
+    trade.addEventListener('change', rebuild); rebuild();
+  }
+
   function init() {
     gstAutofill();
+    initOtherToggles();
+    initRegAutofill();
+    initPoSubcat();
     initDisplayName();
     initForwardCredit();
     initSubconVendor();

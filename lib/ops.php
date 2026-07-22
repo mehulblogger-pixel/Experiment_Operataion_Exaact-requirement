@@ -203,6 +203,15 @@ function ops_next_code($table, $col, $prefix) {
 function clients_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_client=1 ORDER BY legal_name"); }
 function vendors_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_vendor=1 ORDER BY legal_name"); }
 function offices_list() { return ops_all("SELECT * FROM offices ORDER BY is_ahmedabad DESC, name"); }
+// Inspection calls where this partner is the client or the vendor/site (Projects tab).
+function partner_calls($pid) {
+    if (!$pid) return [];
+    try {
+        return ops_all("SELECT c.*, o.name exec_name,
+            (c.client_id=? ) AS as_client FROM calls c LEFT JOIN offices o ON o.id=c.executing_office_id
+            WHERE c.client_id=? OR c.vendor_id=? ORDER BY c.id DESC", [$pid, $pid, $pid]);
+    } catch (Throwable $e) { return []; }
+}
 function office($id) { return $id ? ops_one("SELECT * FROM offices WHERE id=?", [$id]) : null; }
 
 // ---- Client/Vendor coding: BRANCH-YY-SHORTNAME-SEQ (e.g. AHM-26-ADANI-00042) ----
@@ -216,13 +225,25 @@ function partner_short_name($name) {
     $n = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', normalize_name($name)));
     return substr($n, 0, 5) ?: 'XXXXX';
 }
-function gen_partner_code($branchId, $name) {
+// Role letters for the code: C client, V vendor, M manufacturer, T trader, S sub-contractor.
+function partner_role_letters($isClient, $isVendor, $clientType = '', $isSubcon = 0) {
+    $L = [];
+    if ($isClient) $L[] = 'C';
+    if ($isVendor) $L[] = 'V';
+    if ($clientType === 'MANUFACTURER') $L[] = 'M';
+    if ($clientType === 'TRADER') $L[] = 'T';
+    if ($isSubcon) $L[] = 'S';
+    return implode('', array_unique($L)) ?: 'X';
+}
+// Code = BRANCH-YY-ROLE-SHORTNAME-SEQ  e.g. AHM-26-CV-ADANI-00042
+function gen_partner_code($branchId, $name, $roleStr = '') {
     $bc = branch_abbr($branchId);
     $yy = substr((string)date('Y'), 2, 2);
+    $role = $roleStr !== '' ? $roleStr : 'X';
     $prefix = "$bc-$yy-";
     $last = ops_val("SELECT code FROM business_partners WHERE code LIKE ? ORDER BY code DESC LIMIT 1", ["$prefix%"]);
     $seq = ($last && preg_match('/-(\d{5})$/', $last, $m)) ? (int)$m[1] + 1 : 1;
-    return sprintf("%s-%s-%s-%05d", $bc, $yy, partner_short_name($name), $seq);
+    return sprintf("%s-%s-%s-%s-%05d", $bc, $yy, $role, partner_short_name($name), $seq);
 }
 // Find an existing company by GSTIN / PAN / TAN / normalized name (avoids duplicates).
 function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
@@ -247,6 +268,18 @@ function subcons_list($activeOnly = true) { return ops_all("SELECT id, agency, i
 function boss_for_client($cid) { return $cid ? ops_all("SELECT id, boss_number, status FROM boss_numbers WHERE client_id=? ORDER BY boss_number", [$cid]) : []; }
 function pname($p) { return $p ? ($p['display_name'] ?: $p['legal_name']) : '—'; }
 function fmoney($v) { return $v === null || $v === '' ? '—' : '₹' . number_format((float)$v, 0); }
+// Industry: if "Other" was chosen, spelling-correct/add the typed value and return its code.
+function resolve_industry($b) {
+    $sel = $b['industry'] ?? '';
+    if ($sel !== '__other__') return $sel;
+    $r = lk_resolve_or_add('industry', $b['industry_other'] ?? '', true);
+    return $r ? ($r['code'] ?: $r['label']) : '';
+}
+function industry_label($code) {
+    if ($code === '' || $code === null) return '—';
+    $m = function_exists('lk_options_or') ? lk_options_or('industry', INDUSTRIES) : INDUSTRIES;
+    return $m[$code] ?? $code;
+}
 
 // ---- Calculations ----------------------------------------------------------
 // Working days in a month = calendar days − Sundays − public holidays.
@@ -845,6 +878,12 @@ function skill_labels($csv) {
     return $out ? implode(', ', $out) : '—';
 }
 function trade_label($id) { $v = $id ? lk_value($id) : null; return $v ? $v['label'] : '—'; }
+// CSV of SBU codes → readable labels (shared by partner + PO views).
+function sbu_csv_labels($csv, $opts = null) {
+    if (!$csv) return '—';
+    $opts = $opts ?: lk_options_or('sbu', OPS_SBUS);
+    return implode(', ', array_map(fn($c) => $opts[$c] ?? $c, array_filter(explode(',', $csv)))) ?: '—';
+}
 
 // ---- Calls -----------------------------------------------------------------
 function ops_calls($route, $method) {
