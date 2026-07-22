@@ -301,11 +301,12 @@ function lk_admin($route, $method) {
         }
         if (($_GET['del'] ?? '') !== '') {
             $t = lk_type_by_id((int)$_GET['del']);
-            if ($t && !$t['is_system']) {
+            // Super Admin may delete any list; others only custom lists.
+            if ($t && (is_master() || !$t['is_system'])) {
                 $pdo->prepare("DELETE FROM lookup_values WHERE type_id=?")->execute([$t['id']]);
                 $pdo->prepare("DELETE FROM lookup_types WHERE id=?")->execute([$t['id']]);
-                flash('Master list deleted.');
-            } else flash('Built-in lists cannot be deleted (you can still edit their values).', 'error');
+                flash('Master list deleted.' . ($t['is_system'] ? ' (built-in — dropdowns fall back to defaults.)' : ''));
+            } else flash('Only the Super Admin can delete built-in lists.', 'error');
             redirect('/lookups');
         }
         view('ops/lookups', ['types' => lk_types()]); return;
