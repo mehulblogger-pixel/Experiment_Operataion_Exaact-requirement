@@ -19,6 +19,7 @@ const INSPECTION_TYPES = ['INSPECTION'=>'Inspection (third-party / TPI)','EXPEDI
 const DELIVERABLES = ['IR'=>'Inspection Report (IR)','IRN'=>'Inspection Release Note (IRN)','NCR'=>'Non-Conformance Report (NCR)','COC'=>'Certificate of Conformity (CoC)','EXP_REP'=>'Expediting Report','VA_REP'=>'Vendor Assessment Report','AUDIT_REP'=>'Audit Report','TC_REVIEW'=>'Test Certificate Review','DPR'=>'Daily Progress Report','FINAL_REP'=>'Final Report','PUNCH'=>'Punch List','PHOTO'=>'Photographic Report','DIM_REP'=>'Dimensional Report','RN'=>'Release Note (RN)'];
 const ATT_STATUS = ['PRESENT_NB'=>'Present (non-billable)','TRAINING'=>'Training','MEETING'=>'Meeting','LEAVE'=>'Leave','WFH'=>'Work from home','COMPOFF'=>'Comp-off taken','HOLIDAY'=>'Holiday'];
 const JOB_TYPES = ['INSPECTION'=>'Inspection (day-based)','DEPUTATION'=>'Project deputation (site)'];
+const EXPENSE_HEADINGS = ['TRAVEL'=>'Travel','LOCAL'=>'Local conveyance','FOOD'=>'Food','LODGING'=>'Lodging','MISC'=>'Misc'];
 const EXP_LEVELS = ['JUNIOR'=>'Junior','MID'=>'Mid','SENIOR'=>'Senior','EXPERT'=>'Expert / Lead'];
 const RATE_TYPES = ['MANDAY'=>'Per man-day','MANMONTH'=>'Per man-month'];
 const BOSS_STATUS = ['ACTIVE'=>'Active','CLOSED'=>'Closed','HOLD'=>'On hold'];
@@ -1041,47 +1042,102 @@ function ops_my_jobs() {
     view('ops/my_jobs', ['rows' => $rows]);
 }
 
-// ---- Dashboards / reports --------------------------------------------------
+// ---- Dashboards / reports (scoped + filtered) ------------------------------
+function job_eff_date($j) { return ($j['scheduled_date'] ?? '') !== '' ? $j['scheduled_date'] : substr($j['created_at'] ?? '', 0, 10); }
+
 function ops_reports() {
     ops_require(can('dash.operations') || can('dash.financial') || can('dash.utilization') || can('dash.people'), 'You do not have dashboard access.');
+    $seeFin = can('dash.financial'); $seeSalary = can('data.salary');
+    // ---- filters ----
+    $F = [
+        'fy'    => $_GET['fy'] ?? current_fy(),
+        'month' => $_GET['month'] ?? '',
+        'office'=> $_GET['office'] ?? '',
+        'sbu'   => $_GET['sbu'] ?? '',
+        'insp'  => $_GET['insp'] ?? '',
+        'act'   => $_GET['act'] ?? '',
+        'itype' => $_GET['itype'] ?? '',
+    ];
+    [$fyFrom, $fyTo] = fy_range($F['fy']);
+    // ---- scoped data ----
     [$scopeW, $scopeArgs] = scope_clause('j.executing_office_id', 'j.sbu');
-    $jobs = ops_all("SELECT j.*, i.salary_ctc, i.name inspector_name, i.id ins_id, bp.legal_name client_name, bp.display_name client_disp,
-        c.region, o.name ibo_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id
+    $jobs = ops_all("SELECT j.*, i.salary_ctc, i.name inspector_name, i.id ins_id, i.trade_id, bp.legal_name client_name, bp.display_name client_disp,
+        c.region, o.name office_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id
         LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
         LEFT JOIN offices o ON o.id=j.executing_office_id WHERE $scopeW", $scopeArgs);
-    // Profitability per job + rollups
-    $totCredit=0;$totCost=0;$totExp=0;$totSub=0;$totProfit=0;
-    $byInspector=[]; $tatOn=0;$tatLate=0;$tatTotal=0;
-    $creditRecv=0;$creditGiven=0;
-    foreach ($jobs as &$j) {
+    [$cScopeW, $cScopeArgs] = scope_clause('c.executing_office_id', 'c.sbu');
+    $calls = ops_all("SELECT c.*, (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id AND j.scheduled_date<>'') sched_jobs
+        FROM calls c WHERE $cScopeW", $cScopeArgs);
+    // ---- apply filters in PHP (FY/month/office/sbu/inspector/activity/type) ----
+    $filt = function($rows) use ($F, $fyFrom, $fyTo) {
+        return array_values(array_filter($rows, function($r) use ($F, $fyFrom, $fyTo) {
+            $d = isset($r['job_code']) ? job_eff_date($r) : (($r['call_received_date'] ?? '') ?: substr($r['created_at'] ?? '', 0, 10));
+            if ($d) { if ($d < $fyFrom || $d > $fyTo) return false; if ($F['month'] !== '' && (int)substr($d,5,2) !== (int)$F['month']) return false; }
+            if ($F['office'] !== '' && (int)($r['executing_office_id'] ?? 0) !== (int)$F['office']) return false;
+            if ($F['sbu'] !== '' && ($r['sbu'] ?? '') !== $F['sbu']) return false;
+            if ($F['insp'] !== '' && (int)($r['inspector_id'] ?? 0) !== (int)$F['insp']) return false;
+            if ($F['act'] !== '' && (int)($r['activity_id'] ?? 0) !== (int)$F['act']) return false;
+            if ($F['itype'] !== '' && ($r['inspection_type'] ?? '') !== $F['itype']) return false;
+            return true;
+        }));
+    };
+    $jobs = $filt($jobs); $calls = $filt($calls);
+    $tatThresh = (int)setting_get('tat_threshold_days', 3);
+
+    // ---- OPERATIONS ----
+    $op = ['calls'=>count($calls), 'pending'=>0, 'open'=>0, 'closed'=>0, 'overdue'=>0, 'tatOn'=>0, 'tatLate'=>0, 'tatTotal'=>0, 'tatSum'=>0];
+    foreach ($calls as $c) if ((int)$c['sched_jobs'] === 0 && ($c['status'] ?? '') !== 'CLOSED') $op['pending']++;
+    $today = date('Y-m-d');
+    foreach ($jobs as $j) {
+        if ($j['closed_flag']) { $op['closed']++; if ($j['tat_days']!==null){ $op['tatTotal']++; $op['tatSum']+=(int)$j['tat_days']; if ((int)$j['tat_days']<=$tatThresh) $op['tatOn']++; else $op['tatLate']++; } }
+        else { $op['open']++; $end=$j['inspection_end_date']?:$j['scheduled_date']; if ($end && $end<$today) $op['overdue']++; }
+    }
+
+    // ---- FINANCIAL ----
+    $fin = ['credit'=>0,'recv'=>0,'given'=>0,'labour'=>0,'exp'=>0,'subcon'=>0,'profit'=>0,'bySbu'=>[],'byOffice'=>[],'expHead'=>['travel'=>0,'local'=>0,'food'=>0,'lodging'=>0,'misc'=>0]];
+    $byInspector=[];
+    foreach ($jobs as $j) {
         $p = job_profit($j);
-        $j['_p'] = $p;
-        $totCredit+=$p['credit'];$totCost+=$p['labour'];$totExp+=$p['expenses'];$totSub+=$p['subcon'];$totProfit+=$p['profit'];
-        if ($j['credit_direction']==='RECEIVED') $creditRecv+=$p['credit']; else $creditGiven+=$p['credit'];
-        $key = $j['ins_id'] ?: 0;
+        $fin['credit']+=$p['credit']; $fin['labour']+=$p['labour']; $fin['exp']+=$p['expenses']; $fin['subcon']+=$p['subcon']; $fin['profit']+=$p['profit'];
+        if (($j['credit_direction']??'')==='GIVEN') $fin['given']+=$p['credit']; else $fin['recv']+=$p['credit'];
+        $sk=$j['sbu']?:'—'; $fin['bySbu'][$sk]=($fin['bySbu'][$sk]??0)+$p['credit'];
+        $ok=$j['office_name']?:'Ahmedabad'; $fin['byOffice'][$ok]=($fin['byOffice'][$ok]??0)+$p['credit'];
+        foreach (ops_all("SELECT * FROM expenses WHERE job_id=?", [$j['id']]) as $x)
+            foreach (['travel','local','food','lodging','misc'] as $h) $fin['expHead'][$h]+=(float)$x[$h];
+        $key=$j['ins_id']?:0;
         if (!isset($byInspector[$key])) $byInspector[$key]=['name'=>$j['inspector_name']?:'(unassigned)','credit'=>0,'cost'=>0,'exp'=>0,'profit'=>0,'jobs'=>0,'mandays'=>0];
-        $byInspector[$key]['credit']+=$p['credit'];$byInspector[$key]['cost']+=$p['labour'];
-        $byInspector[$key]['exp']+=$p['expenses'];$byInspector[$key]['profit']+=$p['profit'];
-        $byInspector[$key]['jobs']++;$byInspector[$key]['mandays']+=$p['mandays'];
-        if ($j['closed_flag'] && $j['tat_days']!==null) { $tatTotal++; if ($j['tat_days']<=3) $tatOn++; else $tatLate++; }
+        $byInspector[$key]['credit']+=$p['credit'];$byInspector[$key]['cost']+=$p['labour'];$byInspector[$key]['exp']+=$p['expenses'];$byInspector[$key]['profit']+=$p['profit'];$byInspector[$key]['jobs']++;$byInspector[$key]['mandays']+=$p['mandays'];
     }
-    unset($j);
-    // Utilization: mandays vs working days (rough, current month)
+    $recF=$F['fy']; // reconciliation is by month string; keep simple totals across scope for now
+    $fin['reconRecv']=(float)ops_val("SELECT COALESCE(SUM(credit_actual),0) FROM credit_recon WHERE direction='RECEIVED'");
+    $fin['reconGiven']=(float)ops_val("SELECT COALESCE(SUM(credit_actual),0) FROM credit_recon WHERE direction='GIVEN'");
+
+    // ---- UTILIZATION ----
     $wd = working_days_in_month((int)date('Y'), (int)date('n'));
-    $util=[];
-    foreach (inspectors_list(false) as $ins) {
-        $md = 0;
-        foreach ($jobs as $j) if ($j['ins_id']==$ins['id']) $md += job_mandays($j);
-        $util[] = ['name'=>$ins['name'],'mandays'=>$md,'working'=>$wd,'pct'=>$wd?round($md/$wd*100):0];
-    }
-    // reconciliation compare: expected (from jobs) vs actual (from credit_recon) by direction
-    $reconActualRecv=(float)ops_val("SELECT COALESCE(SUM(credit_actual),0) FROM credit_recon WHERE direction='RECEIVED'");
-    $reconActualGiven=(float)ops_val("SELECT COALESCE(SUM(credit_actual),0) FROM credit_recon WHERE direction='GIVEN'");
+    $util=[]; $mdBySbu=[]; $depMd=0;$inspMd=0;$subMd=0;
+    foreach ($jobs as $j) { $md=job_mandays($j); $sk=$j['sbu']?:'—'; $mdBySbu[$sk]=($mdBySbu[$sk]??0)+$md;
+        if (($j['job_type']??'')==='DEPUTATION') $depMd+=$md; else $inspMd+=$md; if ($j['subcon_id']) $subMd+=$md; }
+    foreach (inspectors_list(false) as $ins) { $md=0; foreach ($jobs as $j) if ($j['ins_id']==$ins['id']) $md+=job_mandays($j);
+        if ($md>0 || $F['insp']==='' ) $util[]=['name'=>$ins['name'],'mandays'=>$md,'working'=>$wd,'pct'=>$wd?round($md/$wd*100):0]; }
+
+    // ---- PEOPLE & COMPLIANCE ----
+    $certExp = ops_all("SELECT c.*, i.name inspector_name FROM inspector_certs c JOIN inspectors i ON i.id=c.inspector_id WHERE c.valid_to<>'' ORDER BY c.valid_to");
+    $certSoon=[]; foreach ($certExp as $c){ $dleft=days_between($today,$c['valid_to']); if ($dleft!==null && $dleft<=90){ $c['days']=$dleft; $certSoon[]=$c; } }
+    $byTrade=[]; foreach (ops_all("SELECT trade_id, COUNT(*) n FROM inspectors WHERE status='ACTIVE' GROUP BY trade_id") as $r){ $byTrade[trade_label($r['trade_id'])]=$r['n']; }
+
+    // ---- filter option lists (scope-limited) ----
+    $offOpts = scope_offices()==='ALL' ? offices_list() : array_filter(offices_list(), fn($o)=>in_array((int)$o['id'], scope_offices()));
+    $sbuAll = lk_options_or('sbu', OPS_SBUS);
+    $sbuOpts = scope_sbus()==='ALL' ? $sbuAll : array_intersect_key($sbuAll, array_flip(scope_sbus()));
+
     view('ops/reports', [
-        'jobs'=>$jobs,'totCredit'=>$totCredit,'totCost'=>$totCost,'totExp'=>$totExp,'totSub'=>$totSub,'totProfit'=>$totProfit,
-        'byInspector'=>$byInspector,'tatOn'=>$tatOn,'tatLate'=>$tatLate,'tatTotal'=>$tatTotal,
-        'creditRecv'=>$creditRecv,'creditGiven'=>$creditGiven,'util'=>$util,
-        'reconRecv'=>$reconActualRecv,'reconGiven'=>$reconActualGiven,
+        'F'=>$F, 'seeFin'=>$seeFin, 'seeSalary'=>$seeSalary, 'tatThresh'=>$tatThresh,
+        'op'=>$op, 'fin'=>$fin, 'byInspector'=>$byInspector, 'util'=>$util, 'mdBySbu'=>$mdBySbu,
+        'depMd'=>$depMd, 'inspMd'=>$inspMd, 'subMd'=>$subMd, 'certSoon'=>$certSoon, 'byTrade'=>$byTrade,
+        'fyOpts'=>fy_options(6), 'offOpts'=>$offOpts, 'sbuOpts'=>$sbuOpts,
+        'inspOpts'=>inspectors_list(false), 'actType'=>lk_type('activity'),
+        'itypeOpts'=>lk_options_or('inspection_type', INSPECTION_TYPES),
+        'canOps'=>can('dash.operations'),'canUtil'=>can('dash.utilization'),'canPeople'=>can('dash.people'),
     ]);
 }
 

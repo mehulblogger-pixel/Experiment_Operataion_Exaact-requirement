@@ -54,8 +54,8 @@ function role_defaults($role) {
         case 'ASST_MANAGER':
             return ['perms' => ['dash.operations','ops.call.create','ops.job.allocate'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'COORDINATOR':
-            // per decision: Operations + read-only revenue
-            return ['perms' => ['dash.operations','data.credit','ops.call.create','ops.job.allocate','ops.job.close'], 'offices' => 'OWN', 'sbus' => 'OWN'];
+            // per decision: Operations + read-only revenue (financial section visible, but no salary/profit)
+            return ['perms' => ['dash.operations','dash.financial','data.credit','ops.call.create','ops.job.allocate','ops.job.close'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'FINANCE':
             return ['perms' => ['dash.financial','data.credit','data.salary','finance.reconcile'], 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'INSPECTOR':
