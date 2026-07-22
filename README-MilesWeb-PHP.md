@@ -44,3 +44,62 @@ just: upload the changed files. Done.
   `ADMIN_PASSWORD` value in `config.php`).
 - `.htaccess` gives clean URLs; MilesWeb (Apache/LiteSpeed) supports it out of
   the box — the same mechanism WordPress uses.
+
+---
+
+## Operations & Finance modules (all 5 phases)
+
+The app now covers the full SGS Ahmedabad blueprint:
+
+- **Calls** — call register (client, vendor, IBO, region, SBU, product, dates).
+- **Jobs** — allocation, inspector/sub-con assignment, BOSS number, schedule &
+  random dates, expected credit (mandatory), credit direction (received/given),
+  reporting frequency, folder link.
+- **Closure** — inspector uploads report + enters SBU-wise expenses; TAT is
+  computed automatically; job locks.
+- **Masters** — Inspectors, Sub-contractors, Sub-con rate matrix, BOSS numbers,
+  Holidays, Attendance, Credit reconciliation.
+- **Comp-off** — earned automatically when a job date falls on a Sunday
+  (30-day expiry).
+- **Dashboards** — profitability (salary + 8% overhead), utilization, TAT,
+  credit received vs given, reconciliation (expected vs actual).
+
+### Roles
+Set a user's role on the **Users** screen (Admin only):
+
+- **Master Admin** — everything, including salary & profit figures.
+- **Admin** — scheduling, reconciliation, dashboards (no salary).
+- **Coordinator** — create calls & jobs, pick BOSS, enter expected credit.
+- **Inspector** — sees only *My Jobs*; uploads reports & expenses.
+
+Link an Inspector login to their inspector record (Users → Linked inspector)
+so *My Jobs* shows the right jobs.
+
+### Assignment / closure / reminder emails
+Emails are **logged** by default. To actually **send** them, add these to
+`config.php` (or as environment variables):
+
+```php
+putenv('OPS_MAIL_ENABLED=1');
+putenv('OPS_MAIL_FROM=ops@mghaiapps.com');
+```
+
+### Automatic reminders (cPanel Cron)
+MilesWeb panel → **Cron Jobs** → add two jobs pointing at `cron.php`:
+
+```
+0 7  * * *   php /home/USER/public_html/cron.php   # report-due, 07:00
+0 18 * * *   php /home/USER/public_html/cron.php   # overdue-closure, 18:00
+```
+
+(Replace the path with your real one from File Manager.) One reminder per job
+per day; frequency-aware (daily / alternate / weekly / fortnightly / monthly).
+
+### Per-user billing (seats)
+Set `SEAT_LIMIT` (e.g. `putenv('SEAT_LIMIT=10');` in `config.php`). The Users
+screen then blocks adding active users beyond the limit — deactivate one to free
+a seat; the old user's data stays intact.
+
+### First-run security
+Change the default `admin` / `admin12345` password immediately via the
+**Password** link in the top bar.

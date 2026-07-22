@@ -9,10 +9,20 @@
   <?php if ($u): ?>
   <nav>
     <a href="/">Dashboard</a>
-    <a href="/clients">Clients</a>
-    <a href="/vendors">Vendors</a>
+    <?php if (is_inspector()): ?>
+      <a href="/my-jobs">My Jobs</a>
+    <?php else: ?>
+      <a href="/calls">Calls</a>
+      <a href="/jobs">Jobs</a>
+      <a href="/clients">Clients</a>
+      <a href="/vendors">Vendors</a>
+      <a href="/masters">Masters</a>
+      <?php if (is_admin_level()): ?><a href="/reports">Dashboards</a><?php endif; ?>
+      <?php if (is_admin_level()): ?><a href="/users">Users</a><?php endif; ?>
+    <?php endif; ?>
   </nav>
-  <span class="user"><?= e(user_name($u)) ?> · Admin
+  <span class="user"><?= e(user_name($u)) ?> · <?= e(role_label($u)) ?>
+    <a class="logout" href="/change-password">Password</a>
     <a class="logout" href="/logout">Logout</a></span>
   <?php endif; ?>
 </header>

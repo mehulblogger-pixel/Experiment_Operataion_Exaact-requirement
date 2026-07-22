@@ -155,6 +155,7 @@ function auto_seed() {
 
 function boot() {
     migrate();
+    if (function_exists('ops_migrate')) { ops_migrate(); ops_seed(); }
     ensure_admin();
     auto_seed();
 }
