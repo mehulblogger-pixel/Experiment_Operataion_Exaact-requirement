@@ -119,6 +119,8 @@ function ops_migrate() {
     ensure_column('jobs', 'deliverables', "VARCHAR(500) DEFAULT ''");
     // a client can carry the inspection types it typically needs (carried into calls)
     ensure_column('business_partners', 'inspection_types', "VARCHAR(600) DEFAULT ''");
+    // contracting branch that registered the company (drives the code)
+    ensure_column('business_partners', 'home_branch_id', 'INT NULL');
     // inspector master overhaul: names, trade, multi-SBU, multi-skill
     ensure_column('inspectors', 'first_name', "VARCHAR(80) DEFAULT ''");
     ensure_column('inspectors', 'middle_name', "VARCHAR(80) DEFAULT ''");
@@ -185,6 +187,37 @@ function clients_list() { return ops_all("SELECT id, legal_name, display_name FR
 function vendors_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_vendor=1 ORDER BY legal_name"); }
 function offices_list() { return ops_all("SELECT * FROM offices ORDER BY is_ahmedabad DESC, name"); }
 function office($id) { return $id ? ops_one("SELECT * FROM offices WHERE id=?", [$id]) : null; }
+
+// ---- Client/Vendor coding: BRANCH-YY-SHORTNAME-SEQ (e.g. AHM-26-ADANI-00042) ----
+function branch_abbr($branchId) {
+    $o = $branchId ? office($branchId) : null;
+    if (!$o) $o = ops_one("SELECT * FROM offices WHERE is_ahmedabad=1 LIMIT 1");
+    $code = $o ? ($o['code'] ?: substr($o['name'], 4, 3)) : 'AHM';
+    return strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $code), 0, 4)) ?: 'AHM';
+}
+function partner_short_name($name) {
+    $n = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', normalize_name($name)));
+    return substr($n, 0, 5) ?: 'XXXXX';
+}
+function gen_partner_code($branchId, $name) {
+    $bc = branch_abbr($branchId);
+    $yy = substr((string)date('Y'), 2, 2);
+    $prefix = "$bc-$yy-";
+    $last = ops_val("SELECT code FROM business_partners WHERE code LIKE ? ORDER BY code DESC LIMIT 1", ["$prefix%"]);
+    $seq = ($last && preg_match('/-(\d{5})$/', $last, $m)) ? (int)$m[1] + 1 : 1;
+    return sprintf("%s-%s-%s-%05d", $bc, $yy, partner_short_name($name), $seq);
+}
+// Find an existing company by GSTIN / PAN / TAN / normalized name (avoids duplicates).
+function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
+    $g = strtoupper(clean_gstin($gstin)); $p = strtoupper(trim($pan)); $t = strtoupper(trim($tan)); $norm = normalize_name($name);
+    foreach (ops_all("SELECT id, code, legal_name, gstin, pan, tan FROM business_partners WHERE id <> ?", [$excludeId]) as $r) {
+        if ($g && $r['gstin'] && strtoupper($r['gstin']) === $g) return ['row' => $r, 'by' => 'GSTIN'];
+        if ($p && $r['pan'] && strtoupper($r['pan']) === $p) return ['row' => $r, 'by' => 'PAN'];
+        if ($t && ($r['tan'] ?? '') && strtoupper($r['tan']) === $t) return ['row' => $r, 'by' => 'TAN'];
+        if ($norm !== '' && normalize_name($r['legal_name']) === $norm) return ['row' => $r, 'by' => 'name'];
+    }
+    return null;
+}
 function inspectors_list($activeOnly = true) { return ops_all("SELECT id, name, emp_code, sbu, salary_ctc FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name"); }
 function subcons_list($activeOnly = true) { return ops_all("SELECT id, agency, inspector_name, skill FROM subcons" . ($activeOnly ? " WHERE active=1" : "") . " ORDER BY agency"); }
 function boss_for_client($cid) { return $cid ? ops_all("SELECT id, boss_number, status FROM boss_numbers WHERE client_id=? ORDER BY boss_number", [$cid]) : []; }

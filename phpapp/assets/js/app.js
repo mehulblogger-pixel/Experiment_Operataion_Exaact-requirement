@@ -272,10 +272,19 @@
     exec.addEventListener('change', sync); sync();
   }
 
+  // ---- Sub-contractor ⇒ also a Vendor (manpower supplier) ----
+  function initSubconVendor() {
+    var sc = document.getElementById('is_subcon');
+    var ven = document.getElementById('is_vendor');
+    if (!sc || !ven) return;
+    sc.addEventListener('change', function () { if (sc.checked) ven.checked = true; });
+  }
+
   function init() {
     gstAutofill();
     initDisplayName();
     initForwardCredit();
+    initSubconVendor();
     initCascades();
     initActivity();
     initCustomFreq();

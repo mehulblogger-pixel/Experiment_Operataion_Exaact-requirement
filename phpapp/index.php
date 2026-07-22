@@ -51,6 +51,7 @@ try {
     db()->query("SELECT id FROM inspector_certs LIMIT 1");
     db()->query("SELECT scope_offices FROM users LIMIT 1");
     db()->query("SELECT skey FROM settings LIMIT 1");
+    db()->query("SELECT home_branch_id FROM business_partners LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();
@@ -148,30 +149,34 @@ if ($route === 'clients' || $route === 'vendors') {
 if ($route === 'partner-new') {
     if ($method === 'POST') {
         $b = $_POST;
+        $formVars = ['partner' => null, 'defaultRole' => 'is_client', 'offices' => offices_list()];
         if (!empty($b['gstin']) && !is_valid_gstin($b['gstin'])) {
-            return view('form', ['partner' => null, 'defaultRole' => 'is_client', 'error' => 'GSTIN should be 15 characters, e.g. 24ADUPL3517E2ZJ.']);
+            return view('form', $formVars + ['error' => 'GSTIN should be 15 characters, e.g. 24ADUPL3517E2ZJ.']);
         }
+        // sub-contractor is a manpower vendor → force the vendor role on
+        if (!empty($b['is_subcontractor'])) $b['is_vendor'] = 1;
         if (empty($b['is_client']) && empty($b['is_vendor']) && empty($b['is_subcontractor'])) {
-            return view('form', ['partner' => null, 'defaultRole' => 'is_client', 'error' => 'Select at least one role.']);
+            return view('form', $formVars + ['error' => 'Select at least one role (Client / Vendor / Both).']);
         }
         $gstin = clean_gstin($b['gstin'] ?? '');
         $pan = $gstin ? pan_from_gstin($gstin) : '';
         $state = $gstin ? state_from_gstin($gstin) : '';
-        $token = short_token($b['display_name'] ?: $b['legal_name']);
-        $q = $pdo->prepare("SELECT code FROM business_partners WHERE code LIKE ? ORDER BY code DESC LIMIT 1");
-        $q->execute(["GEN-$token-%"]);
-        $last = $q->fetchColumn();
-        $seq = $last ? ((int)substr($last, strrpos($last, '-') + 1)) + 1 : 1;
-        $code = sprintf("GEN-%s-%04d", $token, $seq);
-        $ins = $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,is_subcontractor,client_type,industry,ownership_type,status,gstin,pan,cin,tan,msme_udyam,state,website,description,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-        $ins->execute([$code, $b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', date('c')]);
+        // duplicate guard — by GSTIN / PAN / TAN / name
+        $dup = find_duplicate_partner($b['legal_name'] ?? '', $gstin, $pan, $b['tan'] ?? '', 0);
+        if ($dup) {
+            return view('form', $formVars + ['error' => "This company already exists as {$dup['row']['code']} — {$dup['row']['legal_name']} (matched by {$dup['by']}). Open it from the Clients/Vendors list and tick the extra role instead of creating a duplicate."]);
+        }
+        $branchId = ($b['home_branch_id'] ?? '') !== '' ? (int)$b['home_branch_id'] : null;
+        $code = gen_partner_code($branchId, ($b['display_name'] ?? '') ?: ($b['legal_name'] ?? ''));
+        $ins = $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,is_subcontractor,client_type,industry,ownership_type,status,gstin,pan,cin,tan,msme_udyam,state,website,description,home_branch_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        $ins->execute([$code, $b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $branchId, date('c')]);
         $id = $pdo->lastInsertId();
         $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
             ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $id]);
         flash("$code created.");
         redirect("/partner?id=$id");
     }
-    return view('form', ['partner' => null, 'defaultRole' => $_GET['role'] ?? 'is_client', 'error' => null]);
+    return view('form', ['partner' => null, 'defaultRole' => $_GET['role'] ?? 'is_client', 'error' => null, 'offices' => offices_list()]);
 }
 
 if ($route === 'partner-edit') {
@@ -179,9 +184,15 @@ if ($route === 'partner-edit') {
     if (!$p) { http_response_code(404); return view('notfound'); }
     if ($method === 'POST') {
         $b = $_POST;
+        if (!empty($b['is_subcontractor'])) $b['is_vendor'] = 1; // sub-contractor ⇒ vendor
         $gstin = clean_gstin($b['gstin'] ?? '');
         $pan = $gstin ? pan_from_gstin($gstin) : $p['pan'];
         $state = $gstin ? state_from_gstin($gstin) : $p['state'];
+        $dup = find_duplicate_partner($b['legal_name'] ?? '', $gstin, $pan ?: ($p['pan'] ?? ''), $b['tan'] ?? '', $p['id']);
+        if ($dup) {
+            return view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'offices' => offices_list(),
+                'error' => "Another company already uses these details: {$dup['row']['code']} — {$dup['row']['legal_name']} (matched by {$dup['by']})."]);
+        }
         $pdo->prepare("UPDATE business_partners SET legal_name=?,display_name=?,is_client=?,is_vendor=?,is_subcontractor=?,client_type=?,industry=?,ownership_type=?,status=?,gstin=?,pan=?,cin=?,tan=?,msme_udyam=?,state=?,website=?,description=? WHERE id=?")
             ->execute([$b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $p['id']]);
         $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
@@ -189,7 +200,7 @@ if ($route === 'partner-edit') {
         flash('Updated.');
         redirect("/partner?id={$p['id']}");
     }
-    return view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'error' => null]);
+    return view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'error' => null, 'offices' => offices_list()]);
 }
 
 if ($route === 'partner-add' && $method === 'POST') {
