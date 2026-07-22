@@ -33,6 +33,21 @@
 </div>
 <?php endif; ?>
 
+<?php if ($canOps || $seeFin): ?>
+<h3 class="tab-sub">🧾 Invoicing &amp; reconciliation</h3>
+<div class="stat-row">
+  <div class="stat-card"><div class="sc-num"><?= (int)$inv['raised'] ?>/<?= (int)$inv['lines'] ?></div><div class="sc-lbl">Invoices raised</div></div>
+  <?php if ($seeFin): ?><div class="stat-card"><div class="sc-num"><?= fmoney($inv['invAmt']) ?></div><div class="sc-lbl">Invoiced value</div></div><?php endif; ?>
+  <div class="stat-card"><div class="sc-num"><?= (int)$inv['paid'] ?></div><div class="sc-lbl">Payments received (local)</div></div>
+  <?php if ($seeFin): ?><div class="stat-card"><div class="sc-num"><?= fmoney($inv['paidAmt']) ?></div><div class="sc-lbl">Payment value</div></div><?php endif; ?>
+  <div class="stat-card"><div class="sc-num"><?= (int)$inv['payPending'] ?></div><div class="sc-lbl">Payment pending</div></div>
+  <div class="stat-card"><div class="sc-num"><?= (int)$inv['creditRecv'] ?></div><div class="sc-lbl">Credit received (cross-office)</div></div>
+  <div class="stat-card"><div class="sc-num"><?= (int)$inv['creditPending'] ?></div><div class="sc-lbl">Credit pending</div></div>
+  <div class="stat-card"><div class="sc-num" style="color:<?= $inv['overdue']?'#c0392b':'inherit' ?>"><?= (int)$inv['overdue'] ?></div><div class="sc-lbl">Overdue</div></div>
+</div>
+<p class="muted">Local = contracting &amp; executing office are the same (track payment). Cross-office = forwarded to another branch (track credit). Set per job on its detail page.</p>
+<?php endif; ?>
+
 <?php if ($seeFin): ?>
 <h3 class="tab-sub">💰 Financial</h3>
 <div class="stat-row">

@@ -37,6 +37,36 @@
   </div>
 </div>
 
+<div class="panel">
+  <h3 class="tab-sub">Invoicing &amp; reconciliation
+    <span class="badge <?= (($isLocal ?? true)?'GREEN':'AMBER') ?>"><?= ($isLocal ?? true) ? 'Local (contracting = executing)' : 'Cross-office (credit)' ?></span></h3>
+  <?php $canInv = is_coordinator_level() || can('data.credit') || can('finance.reconcile'); ?>
+  <form method="post" action="/job-invoice?id=<?= (int)$job['id'] ?>" class="inline-add">
+    <div class="ff ff-check"><input type="checkbox" name="invoice_raised" id="inv_raised" <?= !empty($job['invoice_raised'])?'checked':'' ?> <?= $canInv?'':'disabled' ?>><label>Invoice raised?</label></div>
+    <div class="ff"><label>Invoice number</label><input class="form-control" name="invoice_number" value="<?= e($job['invoice_number'] ?? '') ?>" <?= $canInv?'':'disabled' ?>></div>
+    <div class="ff"><label>Invoice date</label><input class="form-control" type="date" name="invoice_date" value="<?= e($job['invoice_date'] ?? '') ?>" <?= $canInv?'':'disabled' ?>></div>
+    <div class="ff"><label>Due date</label><input class="form-control" type="date" name="invoice_due_date" value="<?= e($job['invoice_due_date'] ?? '') ?>" <?= $canInv?'':'disabled' ?>></div>
+    <div class="ff"><label>Invoice amount (₹)</label><input class="form-control" type="number" step="0.01" name="invoice_amount" value="<?= e($job['invoice_amount'] ?? '') ?>" <?= $canInv?'':'disabled' ?>></div>
+    <?php if ($isLocal ?? true): ?>
+      <div class="ff ff-check"><input type="checkbox" name="payment_received" <?= !empty($job['payment_received'])?'checked':'' ?> <?= $canInv?'':'disabled' ?>><label>Payment received?</label></div>
+      <div class="ff"><label>Payment date</label><input class="form-control" type="date" name="payment_date" value="<?= e($job['payment_date'] ?? '') ?>" <?= $canInv?'':'disabled' ?>></div>
+    <?php else: ?>
+      <div class="ff ff-check"><input type="checkbox" name="credit_received_flag" <?= !empty($job['credit_received_flag'])?'checked':'' ?> <?= $canInv?'':'disabled' ?>><label>Credit received from executing branch?</label></div>
+    <?php endif; ?>
+    <?php if ($canInv): ?><div class="ff"><button class="btn small" type="submit">Save invoicing</button></div><?php endif; ?>
+  </form>
+  <?php
+    $due = $job['invoice_due_date'] ?? ''; $today = date('Y-m-d');
+    $overdue = $due && $due < $today && empty($job['payment_received']) && empty($job['credit_received_flag']);
+  ?>
+  <p class="muted">Status:
+    <?= !empty($job['invoice_raised']) ? 'Invoiced'.($job['invoice_number']?' ('.e($job['invoice_number']).')':'') : 'Not invoiced' ?>
+    · <?= ($isLocal ?? true)
+        ? (!empty($job['payment_received']) ? 'Payment received'.($job['payment_date']?' on '.e($job['payment_date']):'') : 'Payment pending')
+        : (!empty($job['credit_received_flag']) ? 'Credit received' : 'Credit pending') ?>
+    <?php if ($overdue): ?><span class="badge RED">overdue</span><?php endif; ?></p>
+</div>
+
 <div class="panel-split">
   <div class="panel">
     <h3 class="tab-sub">Expenses</h3>

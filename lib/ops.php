@@ -702,7 +702,7 @@ function ops_dispatch($route, $method) {
             header('Content-Type: application/json');
             echo json_encode(call_client_meta((int)($_GET['id'] ?? 0)));
             return true;
-        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close':
+        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice':
             ops_jobs($route, $method); return true;
         case $route === 'my-jobs':
             ops_my_jobs(); return true;
@@ -1180,9 +1180,25 @@ function ops_jobs($route, $method) {
         }
         view('ops/job_close', ['job'=>$job,'error'=>null]); return;
     }
+    // Invoice / payment / credit reconciliation against a job (one inspection line).
+    if ($route === 'job-invoice') {
+        ops_require(is_coordinator_level() || can('data.credit') || can('finance.reconcile'), 'You cannot update invoicing.');
+        $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$job) { http_response_code(404); view('notfound'); return; }
+        if ($method === 'POST') {
+            $b = $_POST;
+            $pdo->prepare("UPDATE jobs SET invoice_raised=?, invoice_number=?, invoice_date=?, invoice_due_date=?, invoice_amount=?, payment_received=?, payment_date=?, credit_received_flag=? WHERE id=?")
+                ->execute([
+                    !empty($b['invoice_raised'])?1:0, $b['invoice_number'] ?? '', $b['invoice_date'] ?? '', $b['invoice_due_date'] ?? '',
+                    ($b['invoice_amount'] ?? '') !== '' ? $b['invoice_amount'] : 0,
+                    !empty($b['payment_received'])?1:0, $b['payment_date'] ?? '', !empty($b['credit_received_flag'])?1:0, $job['id']]);
+            flash("Invoicing updated for {$job['job_code']}.");
+        }
+        redirect('/job?id=' . $job['id']);
+    }
     if ($route === 'job') {
-        $job = ops_one("SELECT j.*, c.call_code, c.region, c.product_category, bp.legal_name client_name, bp.display_name client_disp,
-            v.legal_name vendor_name, i.name inspector_name, i.salary_ctc, s.agency subcon_agency, bn.boss_number, o.name office_name
+        $job = ops_one("SELECT j.*, c.call_code, c.region, c.product_category, c.ibo_office_id, bp.legal_name client_name, bp.display_name client_disp,
+            v.legal_name vendor_name, i.name inspector_name, i.salary_ctc, s.agency subcon_agency, bn.boss_number, o.name office_name, o.is_ahmedabad exec_is_ahm
             FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
             LEFT JOIN business_partners bp ON bp.id=c.client_id LEFT JOIN business_partners v ON v.id=c.vendor_id
             LEFT JOIN inspectors i ON i.id=j.inspector_id LEFT JOIN subcons s ON s.id=j.subcon_id
@@ -1190,7 +1206,9 @@ function ops_jobs($route, $method) {
             WHERE j.id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$job) { http_response_code(404); view('notfound'); return; }
         $expenses = ops_all("SELECT * FROM expenses WHERE job_id=? ORDER BY id", [$job['id']]);
-        view('ops/job_detail', ['job'=>$job,'expenses'=>$expenses,'profit'=>job_profit($job)]);
+        // Local = Ahmedabad both contracts & executes; cross-office = forwarded to another branch.
+        $isLocal = empty($job['executing_office_id']) || !empty($job['exec_is_ahm']);
+        view('ops/job_detail', ['job'=>$job,'expenses'=>$expenses,'profit'=>job_profit($job),'isLocal'=>$isLocal]);
         return;
     }
 }
@@ -1269,7 +1287,7 @@ function ops_reports() {
     // ---- scoped data ----
     [$scopeW, $scopeArgs] = scope_clause('j.executing_office_id', 'j.sbu');
     $jobs = ops_all("SELECT j.*, i.salary_ctc, i.name inspector_name, i.id ins_id, i.trade_id, bp.legal_name client_name, bp.display_name client_disp,
-        c.region, o.name office_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id
+        c.region, o.name office_name, o.is_ahmedabad exec_is_ahm FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id
         LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
         LEFT JOIN offices o ON o.id=j.executing_office_id WHERE $scopeW", $scopeArgs);
     [$cScopeW, $cScopeArgs] = scope_clause('c.executing_office_id', 'c.sbu');
@@ -1319,6 +1337,23 @@ function ops_reports() {
     $fin['reconRecv']=(float)ops_val("SELECT COALESCE(SUM(credit_actual),0) FROM credit_recon WHERE direction='RECEIVED'");
     $fin['reconGiven']=(float)ops_val("SELECT COALESCE(SUM(credit_actual),0) FROM credit_recon WHERE direction='GIVEN'");
 
+    // ---- INVOICING & RECONCILIATION (per inspection line) ----
+    $today = date('Y-m-d');
+    $inv = ['lines'=>count($jobs),'raised'=>0,'notraised'=>0,'invAmt'=>0,'paid'=>0,'paidAmt'=>0,'payPending'=>0,'creditRecv'=>0,'creditPending'=>0,'overdue'=>0];
+    foreach ($jobs as $j) {
+        $local = empty($j['executing_office_id']) || !empty($j['exec_is_ahm']);
+        if (!empty($j['invoice_raised'])) { $inv['raised']++; $inv['invAmt']+=(float)($j['invoice_amount']??0); } else { $inv['notraised']++; }
+        if ($local) {
+            if (!empty($j['payment_received'])) { $inv['paid']++; $inv['paidAmt']+=(float)($j['invoice_amount']??0); }
+            elseif (!empty($j['invoice_raised'])) { $inv['payPending']++; }
+        } else {
+            if (!empty($j['credit_received_flag'])) $inv['creditRecv']++;
+            elseif (!empty($j['invoice_raised'])) $inv['creditPending']++;
+        }
+        $due=$j['invoice_due_date']??'';
+        if ($due && $due<$today && empty($j['payment_received']) && empty($j['credit_received_flag'])) $inv['overdue']++;
+    }
+
     // ---- UTILIZATION ----
     $wd = working_days_in_month((int)date('Y'), (int)date('n'));
     $util=[]; $mdBySbu=[]; $depMd=0;$inspMd=0;$subMd=0;
@@ -1339,7 +1374,7 @@ function ops_reports() {
 
     view('ops/reports', [
         'F'=>$F, 'seeFin'=>$seeFin, 'seeSalary'=>$seeSalary, 'tatThresh'=>$tatThresh,
-        'op'=>$op, 'fin'=>$fin, 'byInspector'=>$byInspector, 'util'=>$util, 'mdBySbu'=>$mdBySbu,
+        'op'=>$op, 'fin'=>$fin, 'inv'=>$inv, 'byInspector'=>$byInspector, 'util'=>$util, 'mdBySbu'=>$mdBySbu,
         'depMd'=>$depMd, 'inspMd'=>$inspMd, 'subMd'=>$subMd, 'certSoon'=>$certSoon, 'byTrade'=>$byTrade,
         'fyOpts'=>fy_options(6), 'offOpts'=>$offOpts, 'sbuOpts'=>$sbuOpts,
         'inspOpts'=>inspectors_list(false), 'actType'=>lk_type('activity'),
