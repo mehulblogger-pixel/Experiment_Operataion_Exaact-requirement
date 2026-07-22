@@ -48,7 +48,7 @@ function ensure_schema() {
             state VARCHAR(60) DEFAULT '', website VARCHAR(255) DEFAULT '', description TEXT,
             created_at VARCHAR(30) DEFAULT '')",
         "CREATE TABLE IF NOT EXISTS partner_contacts (
-            id $pk, partner_id INT, name VARCHAR(150), designation VARCHAR(120) DEFAULT '',
+            id $pk, partner_id INT, address_id INT NULL, name VARCHAR(150), designation VARCHAR(120) DEFAULT '',
             department VARCHAR(120) DEFAULT '', email VARCHAR(200) DEFAULT '',
             mobile VARCHAR(40) DEFAULT '', phone VARCHAR(40) DEFAULT '', is_primary INT DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS partner_addresses (
@@ -79,6 +79,27 @@ function ensure_schema() {
             notes VARCHAR(255) DEFAULT '')",
     ];
     foreach ($tables as $sql) $pdo->exec($sql);
+}
+
+// Add a column to an existing table if it's missing (safe on upgrades).
+function ensure_column($table, $col, $def) {
+    $pdo = db();
+    if (db_driver() === 'sqlite') {
+        foreach ($pdo->query("PRAGMA table_info($table)")->fetchAll() as $c) {
+            if ($c['name'] === $col) return;
+        }
+    } else {
+        $q = $pdo->prepare("SHOW COLUMNS FROM `$table` LIKE ?");
+        $q->execute([$col]);
+        if ($q->fetch()) return;
+    }
+    $pdo->exec("ALTER TABLE $table ADD COLUMN $col $def");
+}
+
+// Idempotent: create tables, apply column migrations.
+function migrate() {
+    ensure_schema();
+    ensure_column('partner_contacts', 'address_id', 'INT NULL');
 }
 
 function ensure_admin() {
@@ -133,7 +154,7 @@ function auto_seed() {
 }
 
 function boot() {
-    ensure_schema();
+    migrate();
     ensure_admin();
     auto_seed();
 }
