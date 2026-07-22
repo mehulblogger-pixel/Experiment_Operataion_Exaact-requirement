@@ -25,8 +25,11 @@ from masters.models import (
     ProductCategory,
     ReportFormat,
     SBU,
+    Vendor,
     VendorLocation,
 )
+from partners.models import BusinessPartner
+from partners.utils import normalize_name
 
 SEED_FILE = Path(__file__).resolve().parents[2] / "seed_data.json"
 
@@ -105,9 +108,38 @@ class Command(BaseCommand):
         for name in data.get("vendor_locations", []):
             VendorLocation.objects.get_or_create(name=name[:120])
 
-        # Clients
+        # Clients / Vendors (legacy tables still used by the call form until the
+        # operations module is re-pointed to partners in Pass 2).
         for name in data.get("clients", []):
             Client.objects.get_or_create(name=name[:255])
+        for row in data.get("vendors", []):
+            vname = row["name"] if isinstance(row, dict) else row
+            Vendor.objects.get_or_create(name=vname[:255])
+
+        # Business partners (unified clients + vendors), deduped by normalized
+        # name so a company that is both a client and a vendor is one record.
+        by_norm = {
+            normalize_name(bp.legal_name): bp for bp in BusinessPartner.objects.all()
+        }
+
+        def ensure_partner(name):
+            key = normalize_name(name)
+            bp = by_norm.get(key)
+            if not bp:
+                bp = BusinessPartner.objects.create(legal_name=name[:255])
+                by_norm[key] = bp
+            return bp
+
+        for name in data.get("clients", []):
+            bp = ensure_partner(name)
+            if not bp.is_client:
+                bp.is_client = True
+                bp.save(update_fields=["is_client"])
+        for row in data.get("vendors", []):
+            bp = ensure_partner(row["name"] if isinstance(row, dict) else row)
+            if not bp.is_vendor:
+                bp.is_vendor = True
+                bp.save(update_fields=["is_vendor"])
 
         # Inspectors
         type_map = {
