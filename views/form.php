@@ -6,11 +6,22 @@
 <form method="post" action="<?= $p ? '/partner-edit?id=' . (int)$p['id'] : '/partner-new' ?>" class="panel">
   <div class="form-grid">
     <div class="ff"><label>Legal name *</label><input class="form-control" name="legal_name" required value="<?= e($p['legal_name'] ?? '') ?>"></div>
-    <div class="ff"><label>Display name</label><input class="form-control" name="display_name" value="<?= e($p['display_name'] ?? '') ?>"></div>
-    <div class="ff ff-check"><input type="checkbox" name="is_client" <?= ($p ? $p['is_client'] : ($defaultRole==='is_client')) ? 'checked' : '' ?>><label>Is a Client</label></div>
-    <div class="ff ff-check"><input type="checkbox" name="is_vendor" <?= ($p ? $p['is_vendor'] : ($defaultRole==='is_vendor')) ? 'checked' : '' ?>><label>Is a Vendor</label></div>
-    <div class="ff ff-check"><input type="checkbox" name="is_subcontractor" <?= ($p && $p['is_subcontractor']) ? 'checked' : '' ?>><label>Is a Sub-contractor</label></div>
-    <div class="ff"></div>
+    <div class="ff"><label>Display name <span class="muted">(auto from legal, editable)</span></label><input class="form-control" name="display_name" value="<?= e($p['display_name'] ?? '') ?>"></div>
+    <?php if (!$p): ?>
+    <div class="ff"><label>Contracting branch <span class="muted">(drives the code)</span></label>
+      <select class="form-control searchable" name="home_branch_id">
+        <?php foreach (($offices ?? []) as $o): ?><option value="<?= (int)$o['id'] ?>" <?= $o['code']==='AHM'?'selected':'' ?>><?= e($o['name']) ?> (<?= e($o['code']) ?>)</option><?php endforeach; ?>
+      </select><small class="muted">Code will look like <strong>AHM-<?= substr(date('Y'),2,2) ?>-NAME-00001</strong>.</small></div>
+    <?php else: ?>
+    <div class="ff"><label>Code</label><input class="form-control readonly-field" value="<?= e($p['code']) ?>" readonly></div>
+    <?php endif; ?>
+    <div class="ff ff-wide"><label>Roles</label>
+      <div class="checkgrid" style="grid-template-columns:repeat(3,minmax(150px,1fr));">
+        <label class="chk"><input type="checkbox" name="is_client" <?= ($p ? $p['is_client'] : ($defaultRole==='is_client')) ? 'checked' : '' ?>> Is a Client</label>
+        <label class="chk"><input type="checkbox" id="is_vendor" name="is_vendor" <?= ($p ? $p['is_vendor'] : ($defaultRole==='is_vendor')) ? 'checked' : '' ?>> Is a Vendor</label>
+        <label class="chk"><input type="checkbox" id="is_subcon" name="is_subcontractor" <?= ($p && $p['is_subcontractor']) ? 'checked' : '' ?>> Is a Sub-contractor</label>
+      </div>
+      <small class="muted">Tick both Client and Vendor for a company that is both. A Sub-contractor (manpower supplier) is automatically also a Vendor.</small></div>
     <div class="ff"><label>Client type</label><select class="form-control" name="client_type"><option value="">—</option><?php foreach (CLIENT_TYPES as $k=>$v): ?><option value="<?= $k ?>" <?= ($p && $p['client_type']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Industry</label><select class="form-control" name="industry"><option value="">—</option><?php foreach (INDUSTRIES as $k=>$v): ?><option value="<?= $k ?>" <?= ($p && $p['industry']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Ownership type</label><select class="form-control" name="ownership_type"><option value="">—</option><?php foreach (OWNERSHIP as $k=>$v): ?><option value="<?= $k ?>" <?= ($p && $p['ownership_type']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
