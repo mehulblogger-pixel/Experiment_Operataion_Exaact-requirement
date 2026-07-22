@@ -66,6 +66,26 @@ function short_token($name) {
     $t = preg_replace('/[^A-Z0-9]/', '', strtoupper($first));
     return substr($t, 0, 8) ?: 'PARTNER';
 }
+// Uniform storage for a place / free-typed proper noun (Ahmedabad, not "ahmedabad"/"AHMEDABAD ").
+function normalize_place($s) {
+    $s = trim(preg_replace('/\s+/', ' ', (string)$s));
+    return $s === '' ? '' : ucwords(strtolower($s));
+}
+// Closest existing label to $typed within a spelling tolerance; '' if nothing close.
+// Used to auto-correct city/state/industry etc. so the master stays clean.
+function closest_label($typed, array $labels) {
+    $t = strtolower(trim((string)$typed));
+    if ($t === '') return '';
+    $best = ''; $bestD = PHP_INT_MAX;
+    foreach ($labels as $lab) {
+        $l = strtolower(trim((string)$lab));
+        if ($l === $t) return $lab;                    // exact (case-insensitive)
+        $d = levenshtein($t, $l);
+        $tol = max(1, (int)floor(max(strlen($t), strlen($l)) * 0.2)); // ~20% edit distance
+        if ($d <= $tol && $d < $bestD) { $bestD = $d; $best = $lab; }
+    }
+    return $best;
+}
 
 // --- Choice lists (labels) ---
 const CLIENT_TYPES = ['OWNER'=>'Owner / End Client','EPC'=>'EPC Contractor','PMC'=>'PMC / Project Management','CONSULTANT'=>'Consultant','MANUFACTURER'=>'Manufacturer / Supplier','TRADER'=>'Trader / Distributor','SUBVENDOR'=>'Sub-vendor','OTHER'=>'Other'];

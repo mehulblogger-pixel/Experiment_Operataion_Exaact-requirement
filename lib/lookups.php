@@ -50,6 +50,10 @@ function lk_migrate() {
     lk_ensure_value('reporting_frequency', 'CUSTOM', 'Custom (every N days)');
     // trade + skills (skills depend on trade) — seed on upgrade if missing
     if ((int)ops_val("SELECT COUNT(*) FROM lookup_types") > 0 && !lk_type('trade')) lk_seed_trade_skill();
+    // extra masters added later: designation, department, city, state, work sub-categories
+    lk_seed_masters_ext();
+    // industry as an editable master (so "Other" can grow it) — seed from the constant
+    lk_ensure_type_map('industry', 'Industry', INDUSTRIES);
 }
 
 // Discipline / trade → skills. Researched, exhaustive starting set; fully editable.
@@ -77,6 +81,93 @@ function lk_seed_trade_skill() {
         foreach ($skills as $sk) lk_add_value($skillType, $tvid, '', $sk, $si++);
     }
 }
+// ---- Extra masters (designation, department, city, state, site-work sub-cats) ----
+function master_ext_data() {
+    return [
+        'designation' => ['Designation', [
+            'Trainee Inspector','Inspector','Sr. Inspector','Lead Inspector','Chief Inspector',
+            'Executive','Sr. Executive','Engineer','Sr. Engineer','Lead Engineer','Principal Engineer',
+            'QA/QC Engineer','Coordinator','Sr. Coordinator','Asst. Manager','Deputy Manager',
+            'Manager','Sr. Manager','Operation Manager','Branch Manager','SBU Head','Business Director',
+            'Technical Assistant','Document Controller','Proprietor','Partner','Director',
+        ]],
+        'department' => ['Department', [
+            'Quality','Quality Assurance','Quality Control','Projects','Engineering','Design',
+            'Inspection','Procurement','Operations','Planning','Commercial','Contracts',
+            'Finance & Accounts','HR & Admin','Stores & Logistics','Production','Maintenance',
+            'Safety (HSE)','Marketing & Sales','Business Development','Management','Owner','Partner','IT',
+        ]],
+        'city' => ['City / Town', [
+            'Ahmedabad','Gandhinagar','Vadodara','Surat','Rajkot','Bhavnagar','Jamnagar','Junagadh',
+            'Mehsana','Anand','Nadiad','Bharuch','Ankleshwar','Vapi','Morbi','Gandhidham','Mundra',
+            'Hazira','Dahej','Mumbai','Navi Mumbai','Thane','Pune','Nagpur','Nashik','Aurangabad',
+            'Delhi','New Delhi','Noida','Greater Noida','Gurugram','Faridabad','Ghaziabad',
+            'Chennai','Coimbatore','Madurai','Trichy','Kolkata','Howrah','Durgapur',
+            'Bengaluru','Mysuru','Hubli','Belagavi','Mangaluru','Hyderabad','Secunderabad',
+            'Visakhapatnam','Vijayawada','Kochi','Thiruvananthapuram','Kozhikode',
+            'Jaipur','Jodhpur','Udaipur','Kota','Bhilwara','Indore','Bhopal','Jabalpur','Gwalior',
+            'Lucknow','Kanpur','Varanasi','Prayagraj','Chandigarh','Ludhiana','Amritsar','Jalandhar',
+            'Patna','Ranchi','Jamshedpur','Dhanbad','Bhubaneswar','Rourkela','Cuttack','Angul',
+            'Raipur','Bhilai','Korba','Guwahati','Dibrugarh','Dehradun','Haridwar','Rudrapur',
+            'Panaji','Vasco da Gama','Shimla','Srinagar','Jammu',
+        ]],
+        'state_in' => ['State / UT', array_values(array_unique(array_values(GST_STATES)))],
+    ];
+}
+function lk_seed_masters_ext() {
+    if ((int)ops_val("SELECT COUNT(*) FROM lookup_types") === 0) return; // fresh install: lk_seed drives it
+    $so = 70;
+    foreach (master_ext_data() as $key => [$label, $values]) {
+        if (!lk_type($key)) {
+            $tid = lk_add_type($key, $label, null, 0, $so++);
+            $i = 0; foreach ($values as $v) lk_add_value($tid, null, '', $v, $i++);
+        }
+    }
+    // Site-work sub-categories, hanging off the existing Trade list (Mechanical→Structure…).
+    lk_seed_work_subcategories();
+}
+// Researched, elaborative site-work sub-categories per trade (fully editable afterwards).
+function work_subcat_data() {
+    return [
+        'Mechanical' => ['Structural Fabrication','Erection','Piping','Pipeline','Equipment Installation','Rotating Equipment','Static Equipment','Pressure Vessels','Storage Tanks','Heat Exchangers','Boilers','Pre-commissioning','Commissioning','Shutdown / Turnaround','Maintenance','HVAC','Fire Fighting','Bolting & Torquing','Hydro Testing','Insulation & Refractory'],
+        'Electrical' => ['Cable Laying','Panel Installation','Transformer Erection','Switchgear (HV/LV)','Motors','Earthing & Lightning','Lighting','Testing & Commissioning','Relay & Protection','Battery & UPS'],
+        'Civil' => ['Structure','Concreting','Reinforcement','Shuttering','Foundations','Piling','Roads & Pavements','Finishing','Waterproofing','Earthwork','Grouting','Precast','Demolition'],
+        'Instrumentation' => ['Field Instruments','Control Systems (DCS/PLC)','Calibration','Loop Checking','Analysers','Cable & Tray','Commissioning'],
+        'Environmental' => ['Air / Emission Monitoring','Water & Effluent','Waste Management','Noise Monitoring','EIA / Compliance'],
+        'Safety (HSE)' => ['HSE Audit','Fire & Safety','Scaffolding','Work at Height','Confined Space','Lifting & Rigging','Toolbox Talk'],
+        'Painting & Coating' => ['Surface Preparation','Blasting','Coating Inspection','Galvanising','FBE / 3LPE','Fireproofing'],
+        'Welding' => ['Welding Inspection','WPS/PQR Review','Welder Qualification','Weld Visual','Joint Fit-up'],
+        'NDT' => ['RT','UT','MT','PT','Visual','PAUT / TOFD','Hardness Testing','PMI'],
+    ];
+}
+function lk_seed_work_subcategories() {
+    $trade = lk_type('trade');
+    if (!$trade || lk_type('work_subcategory')) return;
+    $sub = lk_add_type('work_subcategory', 'Site-work sub-category', $trade['id'], 0, 62);
+    $tradeVals = [];
+    foreach (lk_all_values($trade['id']) as $v) $tradeVals[$v['label']] = $v['id'];
+    foreach (work_subcat_data() as $tradeLabel => $subs) {
+        if (!isset($tradeVals[$tradeLabel])) continue;
+        $i = 0; foreach ($subs as $s) lk_add_value($sub, $tradeVals[$tradeLabel], '', $s, $i++);
+    }
+}
+// Resolve a typed value against a master list, auto-correcting spelling; add it if new.
+// Returns ['code'=>, 'label'=>, 'id'=>] or null for an empty input. When $addIfNew is
+// false (e.g. "Other" that must NOT persist) a new value is returned without storing it.
+function lk_resolve_or_add($typeKey, $typed, $addIfNew = true) {
+    $label = normalize_place($typed);
+    if ($label === '') return null;
+    $t = lk_type($typeKey);
+    if (!$t) return ['code' => '', 'label' => $label, 'id' => null];
+    $vals = lk_root_values($t['id']);
+    $close = closest_label($label, array_column($vals, 'label'));
+    if ($close !== '') foreach ($vals as $v) if ($v['label'] === $close) return ['code' => $v['code'], 'label' => $v['label'], 'id' => (int)$v['id']];
+    if (!$addIfNew) return ['code' => '', 'label' => $label, 'id' => null];
+    $code = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $label), 0, 14));
+    $id = lk_add_value($t['id'], null, $code, $label, 99);
+    return ['code' => $code, 'label' => $label, 'id' => (int)$id];
+}
+
 // skills grouped by their parent trade value id — for the trade→skill picker.
 function skills_by_trade() {
     $st = lk_type('skill');
@@ -183,6 +274,7 @@ function lk_seed() {
     $eh = lk_add_type('expense_heading', 'Expense heading', null, 0, $so++);
     $i = 0; foreach (EXPENSE_HEADINGS as $code => $lab) lk_add_value($eh, null, $code, $lab, $i++);
     lk_seed_trade_skill();
+    lk_seed_masters_ext();
 
     // demo custom field so the candles cascade shows live on the New Call form
     if ((int)ops_val("SELECT COUNT(*) FROM custom_fields") === 0) {

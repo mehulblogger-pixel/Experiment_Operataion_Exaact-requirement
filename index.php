@@ -52,6 +52,13 @@ try {
     db()->query("SELECT scope_offices FROM users LIMIT 1");
     db()->query("SELECT skey FROM settings LIMIT 1");
     db()->query("SELECT home_branch_id FROM business_partners LIMIT 1");
+    db()->query("SELECT district FROM partner_addresses LIMIT 1");
+    db()->query("SELECT sbu FROM partner_purchase_orders LIMIT 1");
+    db()->query("SELECT gst_pct FROM po_line_items LIMIT 1");
+    db()->query("SELECT engineer_type FROM jobs LIMIT 1");
+    db()->query("SELECT po_id FROM calls LIMIT 1");
+    db()->query("SELECT COUNT(*) FROM backoffice_staff");
+    db()->query("SELECT COUNT(*) FROM partner_branch_roles");
 } catch (Throwable $ex) {
     try {
         boot();

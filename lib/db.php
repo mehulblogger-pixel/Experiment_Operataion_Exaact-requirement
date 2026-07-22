@@ -100,6 +100,36 @@ function ensure_column($table, $col, $def) {
 function migrate() {
     ensure_schema();
     ensure_column('partner_contacts', 'address_id', 'INT NULL');
+    // Contacts: department picked from a master, plus the project they work under.
+    ensure_column('partner_contacts', 'project', "VARCHAR(200) DEFAULT ''");
+    // Addresses: Town/Village + District as separate fields (used everywhere an address is entered).
+    ensure_column('partner_addresses', 'village', "VARCHAR(150) DEFAULT ''");
+    ensure_column('partner_addresses', 'district', "VARCHAR(150) DEFAULT ''");
+    // Contracts & POs carry the SBU(s) whose revenue they represent.
+    ensure_column('partner_contracts', 'sbu', "VARCHAR(120) DEFAULT ''");
+    ensure_column('partner_purchase_orders', 'sbu', "VARCHAR(120) DEFAULT ''");
+    // PO line items: manpower/site/trade/sub-category + GST so a full taxed amount can be shown.
+    ensure_column('po_line_items', 'manpower_count', 'INT NULL');
+    ensure_column('po_line_items', 'site_text', "VARCHAR(200) DEFAULT ''");
+    ensure_column('po_line_items', 'trade_id', 'INT NULL');
+    ensure_column('po_line_items', 'subcategory_id', 'INT NULL');
+    ensure_column('po_line_items', 'subcategory_other', "VARCHAR(150) DEFAULT ''");
+    ensure_column('po_line_items', 'activity_id', 'INT NULL');
+    ensure_column('po_line_items', 'gst_pct', 'DECIMAL(6,2) DEFAULT 18');
+    // Free-typed extra inspection types on a partner (kept off the master, per requirement).
+    ensure_column('business_partners', 'inspection_types_other', "VARCHAR(400) DEFAULT ''");
+    // Per-branch role of a partner (Client under Ahmedabad, Vendor under Mumbai, …).
+    db()->exec("CREATE TABLE IF NOT EXISTS partner_branch_roles (
+        id " . pk_clause() . ", partner_id INT, branch_id INT, role VARCHAR(20) DEFAULT 'CLIENT',
+        notes VARCHAR(200) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // Back-office staff with full costing (CTC + allowances).
+    db()->exec("CREATE TABLE IF NOT EXISTS backoffice_staff (
+        id " . pk_clause() . ", name VARCHAR(150), emp_code VARCHAR(40) DEFAULT '',
+        designation_id INT NULL, department_id INT NULL, office_id INT NULL, sbu VARCHAR(20) DEFAULT '',
+        email VARCHAR(200) DEFAULT '', mobile VARCHAR(40) DEFAULT '',
+        ctc DECIMAL(14,2) DEFAULT 0, hra DECIMAL(14,2) DEFAULT 0, conveyance DECIMAL(14,2) DEFAULT 0,
+        special_allowance DECIMAL(14,2) DEFAULT 0, other_allowance DECIMAL(14,2) DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'ACTIVE', created_at VARCHAR(30) DEFAULT '')");
 }
 
 function ensure_admin() {

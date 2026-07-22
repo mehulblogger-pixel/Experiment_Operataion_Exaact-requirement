@@ -130,6 +130,23 @@ function ops_migrate() {
     ensure_column('inspectors', 'skill_ids', "VARCHAR(600) DEFAULT ''");
     // job type (inspection vs project deputation)
     ensure_column('jobs', 'job_type', "VARCHAR(20) DEFAULT 'INSPECTION'");
+    // calls: link to a purchase order / line item / project + client site for deputation
+    ensure_column('calls', 'po_id', 'INT NULL');
+    ensure_column('calls', 'po_line_item_id', 'INT NULL');
+    ensure_column('calls', 'project_ref', "VARCHAR(200) DEFAULT ''");
+    ensure_column('calls', 'site_address_id', 'INT NULL');
+    // jobs: engineer classification, executing-branch confirmation, and per-line invoicing/payment
+    ensure_column('jobs', 'engineer_type', "VARCHAR(20) DEFAULT 'ASSET'");
+    ensure_column('jobs', 'confirmed_at', "VARCHAR(30) DEFAULT ''");
+    ensure_column('jobs', 'confirmed_by', "VARCHAR(150) DEFAULT ''");
+    ensure_column('jobs', 'invoice_raised', 'INT DEFAULT 0');
+    ensure_column('jobs', 'invoice_number', "VARCHAR(60) DEFAULT ''");
+    ensure_column('jobs', 'invoice_date', "VARCHAR(20) DEFAULT ''");
+    ensure_column('jobs', 'invoice_due_date', "VARCHAR(20) DEFAULT ''");
+    ensure_column('jobs', 'invoice_amount', 'DECIMAL(14,2) DEFAULT 0');
+    ensure_column('jobs', 'payment_received', 'INT DEFAULT 0');
+    ensure_column('jobs', 'payment_date', "VARCHAR(20) DEFAULT ''");
+    ensure_column('jobs', 'credit_received_flag', 'INT DEFAULT 0');
     // certifications per inspector, with validity + reminder tracking
     db()->exec("CREATE TABLE IF NOT EXISTS inspector_certs (
         id " . pk_clause() . ", inspector_id INT, name VARCHAR(200), number VARCHAR(80) DEFAULT '',
@@ -219,6 +236,13 @@ function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
     return null;
 }
 function inspectors_list($activeOnly = true) { return ops_all("SELECT id, name, emp_code, sbu, salary_ctc FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name"); }
+// Values of a master list as ref-options ({id,label}) for the generic master engine.
+function lk_values_as_options($typeKey) {
+    $t = lk_type($typeKey); if (!$t) return [];
+    return array_map(fn($v) => ['id' => (int)$v['id'], 'label' => $v['label'], 'name' => $v['label']], lk_root_values($t['id']));
+}
+function designation_list() { return lk_values_as_options('designation'); }
+function department_list() { return lk_values_as_options('department'); }
 function subcons_list($activeOnly = true) { return ops_all("SELECT id, agency, inspector_name, skill FROM subcons" . ($activeOnly ? " WHERE active=1" : "") . " ORDER BY agency"); }
 function boss_for_client($cid) { return $cid ? ops_all("SELECT id, boss_number, status FROM boss_numbers WHERE client_id=? ORDER BY boss_number", [$cid]) : []; }
 function pname($p) { return $p ? ($p['display_name'] ?: $p['legal_name']) : '—'; }
@@ -476,6 +500,29 @@ function ops_masters() {
             'list_labels' => ['status'=>BOSS_STATUS],
             'ref_cols' => ['client_id'=>['clients','partner']],
         ],
+        'backoffice' => [
+            'label' => 'Back-office staff (with costing)', 'table' => 'backoffice_staff', 'access' => 'admin', 'order' => 'name',
+            'fields' => [
+                ['name','Name','text',['req'=>1]],
+                ['emp_code','Employee code','text',[]],
+                ['designation_id','Designation','ref',['ref'=>'designation','optfn'=>'designation_list','optlabel'=>'label']],
+                ['department_id','Department','ref',['ref'=>'department','optfn'=>'department_list','optlabel'=>'label']],
+                ['office_id','Office / branch','ref',['ref'=>'offices','optfn'=>'offices_list','optlabel'=>'name']],
+                ['sbu','SBU','select',['opts'=>OPS_SBUS]],
+                ['email','Email','text',[]],
+                ['mobile','Mobile','text',[]],
+                ['ctc','Annual CTC (₹)','money',['salary'=>1]],
+                ['hra','HRA (₹/yr)','money',['salary'=>1]],
+                ['conveyance','Conveyance (₹/yr)','money',['salary'=>1]],
+                ['special_allowance','Special allowance (₹/yr)','money',['salary'=>1]],
+                ['other_allowance','Other allowance (₹/yr)','money',['salary'=>1]],
+                ['status','Status','select',['opts'=>['ACTIVE'=>'Active','INACTIVE'=>'Inactive']]],
+            ],
+            'list' => ['name'=>'Name','emp_code'=>'Emp code','designation_id'=>'Designation','department_id'=>'Department','sbu'=>'SBU','status'=>'Status'],
+            'list_labels' => ['sbu'=>OPS_SBUS],
+            'ref_cols' => ['designation_id'=>['lookup','label'],'department_id'=>['lookup','label'],'office_id'=>['offices','name']],
+            'money_cols' => ['ctc','hra','conveyance','special_allowance','other_allowance'],
+        ],
         'holidays' => [
             'label' => 'Holidays', 'table' => 'holidays', 'access' => 'admin', 'order' => 'hol_date',
             'fields' => [
@@ -534,6 +581,7 @@ function ref_label($col, $val, $cfg) {
     if ($kind === 'inspectors') return ops_val("SELECT name FROM inspectors WHERE id=?", [$val]) ?: $val;
     if ($kind === 'offices') return ops_val("SELECT name FROM offices WHERE id=?", [$val]) ?: $val;
     if ($kind === 'subcons') return ops_val("SELECT agency FROM subcons WHERE id=?", [$val]) ?: $val;
+    if ($kind === 'lookup') { $v = lk_value((int)$val); return $v ? $v['label'] : $val; }
     return $val;
 }
 function option_rows($fieldMeta) {
@@ -657,6 +705,7 @@ function ops_quick_add() {
 function ops_master_handle($key, $cfg, $action, $method) {
     $pdo = db(); $table = $cfg['table'];
     if ($action === 'delete' && $method === 'POST') {
+        if (!is_master()) { flash('Only the Super Admin can delete master records.', 'error'); redirect("/m/$key"); }
         $pdo->prepare("DELETE FROM $table WHERE id=?")->execute([(int)($_GET['id'] ?? 0)]);
         flash("{$cfg['label']}: record deleted.");
         redirect("/m/$key");
@@ -716,6 +765,7 @@ function column_exists($table, $col) {
 function ops_inspectors($action, $method) {
     $pdo = db();
     if ($action === 'delete' && $method === 'POST') {
+        if (!is_master()) { flash('Only the Super Admin can delete an inspector.', 'error'); redirect('/m/inspectors'); }
         $id = (int)($_GET['id'] ?? 0);
         $pdo->prepare("DELETE FROM inspector_certs WHERE inspector_id=?")->execute([$id]);
         $pdo->prepare("DELETE FROM inspectors WHERE id=?")->execute([$id]);
