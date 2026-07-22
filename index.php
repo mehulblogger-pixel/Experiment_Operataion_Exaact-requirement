@@ -3,9 +3,10 @@ session_start();
 require __DIR__ . '/lib/db.php';
 require __DIR__ . '/lib/helpers.php';
 
-// First-run bootstrap: create tables + admin + seed once.
+// Bootstrap / upgrade: this quick probe fails on a fresh install (no table) or
+// when a new column is missing, which triggers the idempotent boot/migrate.
 try {
-    db()->query("SELECT 1 FROM users LIMIT 1");
+    db()->query("SELECT address_id FROM partner_contacts LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();
@@ -148,7 +149,7 @@ if ($route === 'partner-add' && $method === 'POST') {
     $kind = $_GET['kind'] ?? '';
     $b = $_POST;
     $map = [
-        'contact' => ['partner_contacts', ['name','designation','department','email','mobile','phone'], 'contacts'],
+        'contact' => ['partner_contacts', ['name','designation','department','email','mobile','phone','address_id'], 'contacts'],
         'address' => ['partner_addresses', ['address_type','label','line1','line2','city','state','pincode','country'], 'addresses'],
         'registration' => ['partner_registrations', ['doc_type','number','valid_to','notes'], 'registration'],
         'contract' => ['partner_contracts', ['contract_number','title','value','start_date','end_date','notes'], 'contracts'],
@@ -161,8 +162,8 @@ if ($route === 'partner-add' && $method === 'POST') {
         redirect("/partner?id={$p['id']}&tab=notes");
     }
     if ($kind === 'po') {
-        $pdo->prepare("INSERT INTO partner_purchase_orders (partner_id,po_number,po_type,title,value,start_date,end_date,notes) VALUES (?,?,?,?,?,?,?,?)")
-            ->execute([$p['id'], $b['po_number'] ?? '', $b['po_type'] ?? 'REGULAR', $b['title'] ?? '', $b['value'] ?: null, $b['start_date'] ?? '', $b['end_date'] ?? '', $b['notes'] ?? '']);
+        $pdo->prepare("INSERT INTO partner_purchase_orders (partner_id,contract_id,po_number,po_type,title,value,start_date,end_date,notes) VALUES (?,?,?,?,?,?,?,?,?)")
+            ->execute([$p['id'], ($b['contract_id'] ?? '') !== '' ? $b['contract_id'] : null, $b['po_number'] ?? '', $b['po_type'] ?? 'REGULAR', $b['title'] ?? '', ($b['value'] ?? '') !== '' ? $b['value'] : null, $b['start_date'] ?? '', $b['end_date'] ?? '', $b['notes'] ?? '']);
         flash('Purchase order added.');
         redirect('/po?id=' . $pdo->lastInsertId());
     }
@@ -171,7 +172,11 @@ if ($route === 'partner-add' && $method === 'POST') {
         $cols = array_merge(['partner_id'], $fields);
         $ph = implode(',', array_fill(0, count($cols), '?'));
         $vals = [$p['id']];
-        foreach ($fields as $f) $vals[] = $b[$f] ?? '';
+        foreach ($fields as $f) {
+            $v = $b[$f] ?? '';
+            if (($f === 'address_id' || $f === 'related_id' || $f === 'value') && $v === '') $v = null;
+            $vals[] = $v;
+        }
         $pdo->prepare("INSERT INTO $table (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
         flash('Added.');
         redirect("/partner?id={$p['id']}&tab=$tab");
@@ -194,6 +199,7 @@ if ($route === 'partner') {
         'contracts' => children('partner_contracts', $p['id']),
         'pos' => children('partner_purchase_orders', $p['id']),
         'rels' => (function() use ($pdo, $p) { $s = $pdo->prepare("SELECT r.*, b.legal_name rn, b.display_name rd, b.id rid FROM partner_relationships r LEFT JOIN business_partners b ON b.id=r.related_id WHERE r.partner_id=?"); $s->execute([$p['id']]); return $s->fetchAll(); })(),
+        'all_partners' => (function() use ($pdo, $p) { $s = $pdo->prepare("SELECT id, legal_name, display_name FROM business_partners WHERE id <> ? ORDER BY legal_name"); $s->execute([$p['id']]); return $s->fetchAll(); })(),
     ]);
 }
 

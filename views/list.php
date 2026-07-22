@@ -16,7 +16,7 @@
 </form>
 
 <table class="grid">
-  <tr><th>Code</th><th>Name</th><th>Roles</th><th>Industry</th><th>GSTIN</th><th>Status</th></tr>
+  <tr><th>Code</th><th>Name</th><th>Roles</th><th>Industry</th><th>GSTIN</th><th>Status</th><th>Actions</th></tr>
   <?php foreach ($rows as $p): ?>
   <tr>
     <td><a href="/partner?id=<?= (int)$p['id'] ?>"><?= e($p['code']) ?></a></td>
@@ -25,9 +25,13 @@
     <td><?= e(INDUSTRIES[$p['industry']] ?? '—') ?></td>
     <td><?= e($p['gstin'] ?: '—') ?></td>
     <td><span class="badge <?= $p['status']==='ACTIVE'?'GREEN':($p['status']==='BLACKLISTED'?'RED':'AMBER') ?>"><?= e(STATUSES[$p['status']] ?? $p['status']) ?></span></td>
+    <td class="row-actions">
+      <a class="btn small secondary" href="/partner?id=<?= (int)$p['id'] ?>">Open</a>
+      <a class="btn small" href="/partner-edit?id=<?= (int)$p['id'] ?>">Edit</a>
+    </td>
   </tr>
   <?php endforeach; ?>
-  <?php if (!$rows): ?><tr><td colspan="6">No records found. <a href="/partner-new?role=<?= e($roleField) ?>">Add one</a>.</td></tr><?php endif; ?>
+  <?php if (!$rows): ?><tr><td colspan="7">No records found. <a href="/partner-new?role=<?= e($roleField) ?>">Add one</a>.</td></tr><?php endif; ?>
 </table>
 
 <?php if ($pages > 1): ?>
