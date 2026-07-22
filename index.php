@@ -46,6 +46,8 @@ try {
     db()->query("SELECT id FROM lookup_types LIMIT 1");
     db()->query("SELECT deliverables FROM jobs LIMIT 1");
     db()->query("SELECT inspection_types FROM business_partners LIMIT 1");
+    db()->query("SELECT trade_id FROM inspectors LIMIT 1");
+    db()->query("SELECT id FROM inspector_certs LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();
