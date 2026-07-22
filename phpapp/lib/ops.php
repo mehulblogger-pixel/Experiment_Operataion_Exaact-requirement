@@ -14,7 +14,7 @@ const CREDIT_TYPES = ['MANDAY'=>'Man-day','MANMONTH'=>'Man-month','LUMP'=>'Lumps
 const CREDIT_DIRECTIONS = ['RECEIVED'=>'Received (IBO → Ahmedabad)','GIVEN'=>'Given (Ahmedabad → IBO)'];
 const REPORT_FREQ = ['DAILY'=>'Daily','ALTERNATE'=>'Alternate day','WEEKLY'=>'Weekly','FORTNIGHTLY'=>'Fortnightly','MONTHLY'=>'Monthly','CUSTOM'=>'Custom (every N days)','NOREPORT'=>'No report'];
 // Types of inspection service (third-party inspection industry).
-const INSPECTION_TYPES = ['INSPECTION'=>'Inspection (third-party)','EXPEDITING'=>'Expediting','DEPUTATION'=>'Project deputation / Resident','VENDOR_ASSESS'=>'Vendor assessment','VENDOR_AUDIT'=>'Vendor audit','STAGE'=>'Stage / In-process inspection','FINAL'=>'Final inspection','PSI'=>'Pre-shipment inspection','WITNESS'=>'Witness / Test witnessing','FAT'=>'Factory Acceptance Test (FAT)','SOURCE'=>'Source inspection','SURVEILLANCE'=>'Surveillance','LOADING'=>'Loading supervision','DESKTOP'=>'Desktop / Document review','TECH_AUDIT'=>'Technical audit'];
+const INSPECTION_TYPES = ['INSPECTION'=>'Inspection (third-party / TPI)','EXPEDITING'=>'Expediting','DEPUTATION'=>'Project deputation / Resident','VENDOR_ASSESS'=>'Vendor assessment','VENDOR_AUDIT'=>'Vendor audit','PRE_PROD'=>'Pre-production inspection','DURING_PROD'=>'During-production inspection','STAGE'=>'Stage / In-process inspection','FINAL'=>'Final inspection','FRI'=>'Final random inspection (FRI)','PSI'=>'Pre-shipment inspection (PSI)','WITNESS'=>'Witness / Test witnessing','FAT'=>'Factory Acceptance Test (FAT)','SAT'=>'Site Acceptance Test (SAT)','SOURCE'=>'Source inspection','SURVEILLANCE'=>'Surveillance','LOADING'=>'Loading / container supervision','SAMPLING'=>'Sampling','DIMENSIONAL'=>'Dimensional inspection','WELDING'=>'Welding inspection','NDT'=>'NDT witnessing','PMI'=>'Material verification (PMI)','COATING'=>'Painting / coating inspection','MECH_TEST'=>'Mechanical testing witness','CALIB'=>'Calibration verification','SAFETY_AUDIT'=>'Safety audit','SYSTEM_AUDIT'=>'Management-system audit','SECOND_PARTY'=>'Second-party audit','DESKTOP'=>'Desktop / Document review','TECH_AUDIT'=>'Technical audit'];
 // Deliverables / report formats produced after a job.
 const DELIVERABLES = ['IR'=>'Inspection Report (IR)','IRN'=>'Inspection Release Note (IRN)','NCR'=>'Non-Conformance Report (NCR)','COC'=>'Certificate of Conformity (CoC)','EXP_REP'=>'Expediting Report','VA_REP'=>'Vendor Assessment Report','AUDIT_REP'=>'Audit Report','TC_REVIEW'=>'Test Certificate Review','DPR'=>'Daily Progress Report','FINAL_REP'=>'Final Report','PUNCH'=>'Punch List','PHOTO'=>'Photographic Report','DIM_REP'=>'Dimensional Report','RN'=>'Release Note (RN)'];
 const ATT_STATUS = ['PRESENT_NB'=>'Present (non-billable)','TRAINING'=>'Training','MEETING'=>'Meeting','LEAVE'=>'Leave','COMPOFF'=>'Comp-off taken','HOLIDAY'=>'Holiday'];
@@ -115,6 +115,8 @@ function ops_migrate() {
     ensure_column('jobs', 'activity_id', 'INT NULL');
     ensure_column('jobs', 'report_custom_days', 'INT NULL');
     ensure_column('jobs', 'deliverables', "VARCHAR(500) DEFAULT ''");
+    // a client can carry the inspection types it typically needs (carried into calls)
+    ensure_column('business_partners', 'inspection_types', "VARCHAR(600) DEFAULT ''");
 }
 
 // Seed offices (Ahmedabad + affiliate IBOs) once.
@@ -516,6 +518,11 @@ function ops_dispatch($route, $method) {
             lk_admin($route, $method); return true;
         case $route === 'quick-add':
             ops_quick_add(); return true;
+        case $route === 'partner-meta':
+            header('Content-Type: application/json');
+            $r = ops_one("SELECT inspection_types FROM business_partners WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+            echo json_encode(['inspection_types' => ($r && $r['inspection_types'] !== '') ? explode(',', $r['inspection_types']) : []]);
+            return true;
     }
     return false;
 }

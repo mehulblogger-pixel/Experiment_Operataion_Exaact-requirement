@@ -42,6 +42,9 @@ function lk_migrate() {
     ]);
     lk_ensure_type_map('inspection_type', 'Type of inspection', INSPECTION_TYPES);
     lk_ensure_type_map('deliverable', 'Deliverable / report format', DELIVERABLES);
+    // back-fill any newly-added coded values into existing lists (idempotent)
+    lk_ensure_values_from_map('inspection_type', INSPECTION_TYPES);
+    lk_ensure_values_from_map('deliverable', DELIVERABLES);
     // add CUSTOM to reporting frequency on existing installs
     lk_ensure_value('reporting_frequency', 'CUSTOM', 'Custom (every N days)');
 }
@@ -52,6 +55,11 @@ function lk_ensure_type_map($key, $label, $map) {
     $tid = lk_add_type($key, $label, null, 0, 50);
     $so = 0;
     foreach ($map as $code => $lab) lk_add_value($tid, null, $code, $lab, $so++);
+}
+// Back-fill all coded values from a [code=>label] map into an existing type.
+function lk_ensure_values_from_map($typeKey, $map) {
+    if (!lk_type($typeKey)) return;
+    foreach ($map as $code => $label) lk_ensure_value($typeKey, $code, $label);
 }
 // Ensure a single coded value exists in an existing type (safe on upgrades).
 function lk_ensure_value($typeKey, $code, $label) {

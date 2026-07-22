@@ -37,8 +37,8 @@
         <?php if ($call && ($call['activity_id']??null)) { $curAct = lk_value($call['activity_id']); if ($curAct) echo '<option value="'.(int)$curAct['id'].'" selected>'.e($curAct['label']).'</option>'; } ?>
       </select></div>
 
-    <div class="ff"><label>Type of inspection</label>
-      <select class="form-control searchable" name="inspection_type"><option value="">—</option>
+    <div class="ff"><label>Type of inspection <span class="muted">(narrows to the client's types)</span></label>
+      <select class="form-control searchable" id="insp_sel" name="inspection_type"><option value="">—</option>
         <?php foreach (lk_options_or('inspection_type', INSPECTION_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($call && ($call['inspection_type']??'')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"><label>Product category <a href="#" class="addlink" data-qa="product">+ Add new</a></label>
@@ -99,4 +99,5 @@
     </div>
   </div>
 </div>
-<script>window.ACTIVITY = <?= json_encode($act) ?>;</script>
+<script>window.ACTIVITY = <?= json_encode($act) ?>;
+window.INSPTYPES = <?= json_encode(lk_options_or('inspection_type', INSPECTION_TYPES)) ?>;</script>

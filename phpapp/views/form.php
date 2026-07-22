@@ -23,6 +23,14 @@
     <div class="ff"><label>MSME / Udyam</label><input class="form-control" name="msme_udyam" value="<?= e($p['msme_udyam'] ?? '') ?>"></div>
     <div class="ff"><label>Website</label><input class="form-control" name="website" value="<?= e($p['website'] ?? '') ?>"></div>
     <div class="ff ff-wide"><label>Description</label><input class="form-control" name="description" value="<?= e($p['description'] ?? '') ?>"></div>
+    <?php $selInsp = ($p && !empty($p['inspection_types'])) ? explode(',', $p['inspection_types']) : []; ?>
+    <div class="ff ff-wide"><label>Types of inspection this client needs <span class="muted">— carried into new calls</span></label>
+      <div class="checkgrid">
+        <?php foreach (lk_options_or('inspection_type', INSPECTION_TYPES) as $k=>$v): ?>
+          <label class="chk"><input type="checkbox" name="inspection_types[]" value="<?= e($k) ?>" <?= in_array($k, $selInsp, true)?'checked':'' ?>> <?= e($v) ?></label>
+        <?php endforeach; ?>
+      </div>
+      <small class="muted">Tick all that apply. In a new call for this client the Type-of-inspection list is narrowed to these. Manage the master under <a href="/lookup?key=inspection_type">Type of inspection</a>.</small></div>
   </div>
   <div style="margin-top:18px;">
     <button class="btn" type="submit">Save</button>

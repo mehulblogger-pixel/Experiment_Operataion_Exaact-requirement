@@ -39,9 +39,13 @@ try {
 // Bootstrap / upgrade: this quick probe fails on a fresh install (no table) or
 // when a new table/column is missing, which triggers the idempotent boot/migrate.
 try {
+    // Probe the NEWEST additions too — a miss here triggers boot(), whose
+    // idempotent migrate() then adds every pending table/column in one pass.
     db()->query("SELECT address_id FROM partner_contacts LIMIT 1");
     db()->query("SELECT id FROM offices LIMIT 1");
     db()->query("SELECT id FROM lookup_types LIMIT 1");
+    db()->query("SELECT deliverables FROM jobs LIMIT 1");
+    db()->query("SELECT inspection_types FROM business_partners LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();
@@ -157,6 +161,8 @@ if ($route === 'partner-new') {
         $ins = $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,is_subcontractor,client_type,industry,ownership_type,status,gstin,pan,cin,tan,msme_udyam,state,website,description,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
         $ins->execute([$code, $b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', date('c')]);
         $id = $pdo->lastInsertId();
+        $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
+            ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $id]);
         flash("$code created.");
         redirect("/partner?id=$id");
     }
@@ -173,6 +179,8 @@ if ($route === 'partner-edit') {
         $state = $gstin ? state_from_gstin($gstin) : $p['state'];
         $pdo->prepare("UPDATE business_partners SET legal_name=?,display_name=?,is_client=?,is_vendor=?,is_subcontractor=?,client_type=?,industry=?,ownership_type=?,status=?,gstin=?,pan=?,cin=?,tan=?,msme_udyam=?,state=?,website=?,description=? WHERE id=?")
             ->execute([$b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $p['id']]);
+        $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
+            ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $p['id']]);
         flash('Updated.');
         redirect("/partner?id={$p['id']}");
     }
