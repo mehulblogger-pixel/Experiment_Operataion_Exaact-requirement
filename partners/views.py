@@ -9,10 +9,13 @@ from .forms import (
     BusinessPartnerForm,
     PartnerAddressForm,
     PartnerContactForm,
+    PartnerContractForm,
     PartnerNoteForm,
+    PartnerPurchaseOrderForm,
     PartnerRegistrationForm,
+    POLineItemForm,
 )
-from .models import BusinessPartner, PartnerStatus
+from .models import BusinessPartner, PartnerPurchaseOrder, PartnerStatus
 
 
 def _partner_list(request, role, title, subtitle):
@@ -57,6 +60,10 @@ def partner_detail(request, pk):
         "registrations": p.registrations.all(),
         "notes": p.notes.select_related("author"),
         "subsidiaries": p.subsidiaries.all(),
+        "contracts": p.contracts.all(),
+        "purchase_orders": p.purchase_orders.select_related("contract").prefetch_related("line_items"),
+        "contract_form": PartnerContractForm(),
+        "po_form": PartnerPurchaseOrderForm(partner=p),
         # client_calls / vendor_calls related managers appear once the operations
         # module is re-pointed to BusinessPartner (Pass 2). Guard until then.
         "calls": (p.client_calls.select_related("executing_office")[:50]
@@ -139,3 +146,44 @@ def add_registration(request, pk):
 @login_required
 def add_note(request, pk):
     return _add_child(request, pk, PartnerNoteForm, "notes", "Note added.")
+
+
+@login_required
+def add_contract(request, pk):
+    return _add_child(request, pk, PartnerContractForm, "contracts", "Contract added.")
+
+
+@login_required
+def add_purchase_order(request, pk):
+    partner = get_object_or_404(BusinessPartner, pk=pk)
+    form = PartnerPurchaseOrderForm(request.POST or None, partner=partner)
+    if request.method == "POST" and form.is_valid():
+        po = form.save(commit=False)
+        po.partner = partner
+        po.save()
+        messages.success(request, "Purchase order added.")
+        return redirect(f"{reverse('partners:po_detail', args=[po.pk])}")
+    for errs in form.errors.values():
+        for e in errs:
+            messages.error(request, e)
+    return redirect(_detail_url(partner, "purchase_orders"))
+
+
+@login_required
+def po_detail(request, pk):
+    po = get_object_or_404(
+        PartnerPurchaseOrder.objects.select_related("partner", "contract"), pk=pk
+    )
+    if request.method == "POST":
+        form = POLineItemForm(request.POST)
+        if form.is_valid():
+            item = form.save(commit=False)
+            item.purchase_order = po
+            item.save()
+            messages.success(request, "Line item added.")
+            return redirect("partners:po_detail", pk=po.pk)
+    else:
+        form = POLineItemForm()
+    return render(request, "partners/po_detail.html", {
+        "po": po, "line_items": po.line_items.all(), "form": form,
+    })

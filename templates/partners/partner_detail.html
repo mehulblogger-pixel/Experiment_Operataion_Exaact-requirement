@@ -18,6 +18,8 @@
   <a href="?tab=registration" class="{% if tab == 'registration' %}active{% endif %}">Registration</a>
   <a href="?tab=addresses" class="{% if tab == 'addresses' %}active{% endif %}">Addresses</a>
   <a href="?tab=contacts" class="{% if tab == 'contacts' %}active{% endif %}">Contacts</a>
+  <a href="?tab=contracts" class="{% if tab == 'contracts' %}active{% endif %}">Contract Numbers</a>
+  <a href="?tab=purchase_orders" class="{% if tab == 'purchase_orders' %}active{% endif %}">Purchase Orders</a>
   <a href="?tab=projects" class="{% if tab == 'projects' %}active{% endif %}">Projects</a>
   <a href="?tab=notes" class="{% if tab == 'notes' %}active{% endif %}">Notes</a>
 </div>
@@ -127,7 +129,38 @@
     {% empty %}<tr><td colspan="4">No inspections yet.</td></tr>{% endfor %}
   </table>
   {% endif %}
-  <p class="muted" style="margin-top:12px;">Purchase Orders &amp; Contract Numbers tabs arrive in the next update.</p>
+{% elif tab == 'contracts' %}
+  <table class="grid">
+    <tr><th>Contract No.</th><th>Title</th><th>Value</th><th>Start</th><th>End</th><th>Active</th></tr>
+    {% for ct in contracts %}
+    <tr><td>{{ ct.contract_number }}</td><td>{{ ct.title|default:"—" }}</td>
+      <td>{% if ct.value %}₹{{ ct.value|floatformat:0 }}{% else %}—{% endif %}</td>
+      <td>{{ ct.start_date|default:"—" }}</td><td>{{ ct.end_date|default:"—" }}</td>
+      <td>{% if ct.is_active %}Yes{% else %}No{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="6">No contracts yet.</td></tr>{% endfor %}
+  </table>
+  <h3 class="tab-sub">Add a contract</h3>
+  <form method="post" action="{% url 'partners:add_contract' p.pk %}" class="inline-add">
+    {% csrf_token %}{% include "partners/_form_fields.html" with form=contract_form %}
+    <button class="btn small" type="submit">Add Contract</button>
+  </form>
+
+{% elif tab == 'purchase_orders' %}
+  <table class="grid">
+    <tr><th>PO No.</th><th>Type</th><th>Title</th><th>Value</th><th>Contract</th><th>Line items</th></tr>
+    {% for po in purchase_orders %}
+    <tr><td><a href="{% url 'partners:po_detail' po.pk %}">{{ po.po_number|default:"(open)" }}</a></td>
+      <td>{{ po.get_po_type_display }}</td><td>{{ po.title|default:"—" }}</td>
+      <td>{% if po.value %}₹{{ po.value|floatformat:0 }}{% else %}—{% endif %}</td>
+      <td>{{ po.contract|default:"—" }}</td><td>{{ po.line_items.count }}</td></tr>
+    {% empty %}<tr><td colspan="6">No purchase orders yet.</td></tr>{% endfor %}
+  </table>
+  <h3 class="tab-sub">Add a purchase order</h3>
+  <p class="muted">For open / ARC orders, save the PO then add line items (days, months, audit days…).</p>
+  <form method="post" action="{% url 'partners:add_po' p.pk %}" class="inline-add">
+    {% csrf_token %}{% include "partners/_form_fields.html" with form=po_form %}
+    <button class="btn small" type="submit">Add PO</button>
+  </form>
 
 {% elif tab == 'notes' %}
   {% for n in notes %}

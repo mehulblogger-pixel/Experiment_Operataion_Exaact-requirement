@@ -5,8 +5,11 @@ from .models import (
     BusinessPartner,
     PartnerAddress,
     PartnerContact,
+    PartnerContract,
     PartnerNote,
+    PartnerPurchaseOrder,
     PartnerRegistration,
+    PurchaseOrderLineItem,
 )
 from .utils import is_valid_gstin
 
@@ -95,3 +98,37 @@ class PartnerNoteForm(_Styled):
         model = PartnerNote
         fields = ["note"]
         widgets = {"note": forms.Textarea(attrs={"rows": 3})}
+
+
+class PartnerContractForm(_Styled):
+    class Meta:
+        model = PartnerContract
+        fields = ["contract_number", "title", "value", "start_date", "end_date",
+                  "is_active", "notes"]
+        widgets = {
+            "start_date": forms.DateInput(attrs={"type": "date"}),
+            "end_date": forms.DateInput(attrs={"type": "date"}),
+        }
+
+
+class PartnerPurchaseOrderForm(_Styled):
+    class Meta:
+        model = PartnerPurchaseOrder
+        fields = ["po_number", "po_type", "title", "contract", "value",
+                  "start_date", "end_date", "is_active", "notes"]
+        widgets = {
+            "start_date": forms.DateInput(attrs={"type": "date"}),
+            "end_date": forms.DateInput(attrs={"type": "date"}),
+        }
+
+    def __init__(self, *args, partner=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if partner is not None:
+            self.fields["contract"].queryset = partner.contracts.all()
+            self.fields["contract"].required = False
+
+
+class POLineItemForm(_Styled):
+    class Meta:
+        model = PurchaseOrderLineItem
+        fields = ["description", "item_type", "quantity", "rate", "consumed"]

@@ -4,9 +4,12 @@ from .models import (
     BusinessPartner,
     PartnerAddress,
     PartnerContact,
+    PartnerContract,
     PartnerNote,
+    PartnerPurchaseOrder,
     PartnerRegistration,
     PartnerRelationship,
+    PurchaseOrderLineItem,
 )
 
 
@@ -62,3 +65,24 @@ class BusinessPartnerAdmin(admin.ModelAdmin):
 class PartnerRelationshipAdmin(admin.ModelAdmin):
     list_display = ("partner", "relation_type", "related")
     autocomplete_fields = ("partner", "related")
+
+
+@admin.register(PartnerContract)
+class PartnerContractAdmin(admin.ModelAdmin):
+    list_display = ("contract_number", "partner", "value", "start_date", "end_date", "is_active")
+    search_fields = ("contract_number", "partner__legal_name")
+    autocomplete_fields = ("partner",)
+
+
+class LineItemInline(admin.TabularInline):
+    model = PurchaseOrderLineItem
+    extra = 1
+
+
+@admin.register(PartnerPurchaseOrder)
+class PartnerPurchaseOrderAdmin(admin.ModelAdmin):
+    list_display = ("po_number", "partner", "po_type", "value", "start_date", "is_active")
+    list_filter = ("po_type", "is_active")
+    search_fields = ("po_number", "partner__legal_name")
+    autocomplete_fields = ("partner", "contract")
+    inlines = [LineItemInline]
