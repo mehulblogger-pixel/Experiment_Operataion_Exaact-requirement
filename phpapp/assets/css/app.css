@@ -78,3 +78,7 @@ form.stack label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4
 .chk{display:inline-flex;align-items:center;gap:6px;font-weight:400}
 .btn.small.danger{background:var(--red);border-color:var(--red)}
 @media(max-width:720px){.panel-split{grid-template-columns:1fr}}
+
+/* ---- Cascading (dependent) master dropdowns ---- */
+.cascade{display:flex;flex-direction:column;gap:6px}
+.cascade .cascade-sel{width:100%}

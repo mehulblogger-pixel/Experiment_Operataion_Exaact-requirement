@@ -471,6 +471,8 @@ function ops_dispatch($route, $method) {
         case $route === 'masters':
             ops_require(is_coordinator_level());
             view('ops/masters', ['masters' => ops_masters()]); return true;
+        case $route === 'lookups' || $route === 'lookup' || $route === 'custom-fields':
+            lk_admin($route, $method); return true;
     }
     return false;
 }
@@ -561,6 +563,7 @@ function ops_calls($route, $method) {
                 $set = implode(',', array_map(fn($f)=>"$f=?", $fields));
                 $vals = array_map(fn($f)=> nz($b[$f] ?? ''), $fields); $vals[] = $call['id'];
                 $pdo->prepare("UPDATE calls SET $set WHERE id=?")->execute($vals);
+                custom_save('call', $call['id'], $b);
                 flash("Call {$call['call_code']} updated.");
                 redirect('/call?id=' . $call['id']);
             } else {
@@ -570,11 +573,13 @@ function ops_calls($route, $method) {
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO calls (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
+                custom_save('call', $id, $b);
                 flash("$code created. Now allocate a job.");
                 redirect('/call?id=' . $id);
             }
         }
-        view('ops/call_form', ['call' => $call, 'clients' => clients_list(), 'vendors' => vendors_list(), 'offices' => offices_list()]);
+        view('ops/call_form', ['call' => $call, 'clients' => clients_list(), 'vendors' => vendors_list(),
+            'offices' => offices_list(), 'cfvals' => $call ? custom_values_map('call', $call['id']) : []]);
         return;
     }
     if ($route === 'call') {
@@ -643,6 +648,7 @@ function ops_jobs($route, $method) {
                 $pdo->prepare("UPDATE calls SET status='ALLOCATED' WHERE id=?")->execute([$call['id']]);
                 flash("$code allocated. Assignment email sent to inspector.");
             }
+            custom_save('job', $jobId, $b);
             // comp-off if any inspection date is a Sunday
             ops_check_compoff($jobId);
             // assignment email when an inspector + schedule exist
@@ -651,7 +657,8 @@ function ops_jobs($route, $method) {
             redirect('/job?id=' . $jobId);
         }
         view('ops/job_form', ['job'=>$job,'call'=>$call,'error'=>null,'offices'=>offices_list(),
-            'inspectors'=>inspectors_list(),'subcons'=>subcons_list(),'boss'=>boss_for_client($call['client_id'])]);
+            'inspectors'=>inspectors_list(),'subcons'=>subcons_list(),'boss'=>boss_for_client($call['client_id']),
+            'cfvals'=>$job ? custom_values_map('job', $job['id']) : []]);
         return;
     }
     if ($route === 'job-close') {

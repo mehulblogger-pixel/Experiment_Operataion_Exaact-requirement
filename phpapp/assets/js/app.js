@@ -53,8 +53,43 @@
     input.addEventListener('blur', function () { setTimeout(function () { list.style.display = 'none'; input.value = cur(); }, 150); });
   }
 
+  // ---- Cascading (dependent) master-list dropdowns ----
+  // A .cascade block holds one <select class="cascade-sel" data-level> per level.
+  // When a parent select changes, the next level repopulates with only the
+  // values whose parent matches the chosen value; deeper levels reset.
+  function initCascades() {
+    var data = window.LKDATA || {};
+    Array.prototype.forEach.call(document.querySelectorAll('.cascade'), function (block) {
+      var field = block.getAttribute('data-field');
+      var meta = data[field];
+      if (!meta) return;
+      var sels = block.querySelectorAll('select.cascade-sel');
+      function fill(level) {
+        var sel = sels[level];
+        if (!sel) return;
+        var parentVal = level === 0 ? null : parseInt(sels[level - 1].value || '0', 10) || null;
+        var keep = sel.value;
+        // wipe options except the placeholder (first)
+        while (sel.options.length > 1) sel.remove(1);
+        (meta.byType[level] || []).forEach(function (o) {
+          if (level > 0 && o.parent !== parentVal) return;
+          var op = document.createElement('option');
+          op.value = o.id; op.textContent = o.label;
+          if (String(o.id) === String(keep)) op.selected = true;
+          sel.appendChild(op);
+        });
+      }
+      Array.prototype.forEach.call(sels, function (sel, i) {
+        sel.addEventListener('change', function () {
+          for (var d = i + 1; d < sels.length; d++) { sels[d].value = ''; fill(d); }
+        });
+      });
+    });
+  }
+
   function init() {
     gstAutofill();
+    initCascades();
     Array.prototype.forEach.call(document.querySelectorAll('select.searchable'), enhanceSelect);
   }
   if (document.readyState !== 'loading') init();

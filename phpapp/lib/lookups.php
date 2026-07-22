@@ -1,0 +1,317 @@
+<?php
+// ============================================================================
+//  Configurable master lists ("lookups") + hierarchical (dependent) lists
+//  + custom fields. This is what makes the app adaptable to any field-ops
+//  company without code: admins add their own lists and fields, and they
+//  appear in the forms automatically.
+//
+//  lookup_types  : each master list. parent_type_id makes it depend on another
+//                  list (e.g. Activity depends on SBU; Wax Type depends on
+//                  Product; Tier depends on Wax Type — any depth).
+//  lookup_values : the values. parent_value_id links a value to its parent
+//                  value, so child lists filter by the chosen parent value.
+//  custom_fields : extra fields an admin adds to Calls/Jobs (text/number/date
+//                  or a dropdown backed by any lookup, cascading if hierarchical).
+//  custom_values : the values entered for those custom fields, per record.
+// ============================================================================
+
+function lk_ensure_schema() {
+    $pdo = db(); $pk = pk_clause();
+    $t = [
+        "CREATE TABLE IF NOT EXISTS lookup_types (
+            id $pk, type_key VARCHAR(60), label VARCHAR(150), parent_type_id INT NULL,
+            is_system INT DEFAULT 0, sort_order INT DEFAULT 0, created_at VARCHAR(30) DEFAULT '')",
+        "CREATE TABLE IF NOT EXISTS lookup_values (
+            id $pk, type_id INT, parent_value_id INT NULL, code VARCHAR(60) DEFAULT '',
+            label VARCHAR(200), sort_order INT DEFAULT 0, active INT DEFAULT 1, created_at VARCHAR(30) DEFAULT '')",
+        "CREATE TABLE IF NOT EXISTS custom_fields (
+            id $pk, entity VARCHAR(20), field_key VARCHAR(60), label VARCHAR(150),
+            field_type VARCHAR(20) DEFAULT 'text', lookup_type_id INT NULL, required INT DEFAULT 0,
+            sort_order INT DEFAULT 0, active INT DEFAULT 1, created_at VARCHAR(30) DEFAULT '')",
+        "CREATE TABLE IF NOT EXISTS custom_values (
+            id $pk, entity VARCHAR(20), record_id INT, field_key VARCHAR(60),
+            value_text VARCHAR(500) DEFAULT '', value_id INT NULL, created_at VARCHAR(30) DEFAULT '')",
+    ];
+    foreach ($t as $sql) $pdo->exec($sql);
+}
+function lk_migrate() { lk_ensure_schema(); }
+
+// ---- Seed system lists (from the old fixed choice lists) + demo hierarchies -
+function lk_seed() {
+    if ((int)ops_val("SELECT COUNT(*) FROM lookup_types") > 0) return;
+    // system (flat) lists — become editable, keep the same codes so logic still works
+    $system = [
+        ['sbu','SBU', OPS_SBUS], ['region','Region', OPS_REGIONS], ['product','Product category', PRODUCT_CATS],
+        ['credit_type','Credit type', CREDIT_TYPES], ['credit_direction','Credit direction', CREDIT_DIRECTIONS],
+        ['reporting_frequency','Reporting frequency', REPORT_FREQ], ['attendance_status','Attendance status', ATT_STATUS],
+        ['experience_level','Experience level', EXP_LEVELS], ['rate_type','Rate type', RATE_TYPES],
+        ['boss_status','BOSS status', BOSS_STATUS], ['client_type','Client type', CLIENT_TYPES],
+        ['industry','Industry', INDUSTRIES], ['ownership','Ownership type', OWNERSHIP], ['partner_status','Partner status', STATUSES],
+    ];
+    $so = 0;
+    foreach ($system as [$key, $label, $map]) {
+        $tid = lk_add_type($key, $label, null, 1, $so++);
+        $vso = 0;
+        foreach ($map as $code => $vlabel) lk_add_value($tid, null, $code, $vlabel, $vso++);
+    }
+    // demo hierarchy 1: Activity under SBU (the scenario you raised)
+    $sbu = lk_type('sbu');
+    $activity = lk_add_type('activity', 'Activity code', $sbu['id'], 0, $so++);
+    $sbuVals = [];
+    foreach (lk_root_values($sbu['id']) as $v) $sbuVals[$v['code']] = $v['id'];
+    if (isset($sbuVals['IND'])) { lk_add_value($activity, $sbuVals['IND'], '', 'Vendor Inspection', 0); lk_add_value($activity, $sbuVals['IND'], '', 'Stage Inspection', 1); lk_add_value($activity, $sbuVals['IND'], '', 'Final Inspection', 2); }
+    if (isset($sbuVals['OGC'])) { lk_add_value($activity, $sbuVals['OGC'], '', 'Welding Inspection', 0); lk_add_value($activity, $sbuVals['OGC'], '', 'NDT Witness', 1); }
+
+    // demo hierarchy 2: Product family -> Wax type -> Tier (your candles example)
+    $pf = lk_add_type('product_family', 'Product family', null, 0, $so++);
+    $candles = lk_add_value($pf, null, '', 'Candles', 0);
+    $diffusers = lk_add_value($pf, null, '', 'Diffusers', 1);
+    $wt = lk_add_type('wax_type', 'Wax type', $pf, 0, $so++);
+    $paraffin = lk_add_value($wt, $candles, '', 'Paraffin', 0);
+    $soy = lk_add_value($wt, $candles, '', 'Soy wax', 1);
+    lk_add_value($wt, $diffusers, '', 'Reed', 0);
+    $tier = lk_add_type('tier', 'Tier', $wt, 0, $so++);
+    lk_add_value($tier, $paraffin, '', 'Premium', 0);
+    lk_add_value($tier, $paraffin, '', 'Tiny Treat', 1);
+    lk_add_value($tier, $soy, '', 'Premium', 0);
+    lk_add_value($tier, $soy, '', 'Classic', 1);
+
+    // demo custom field so the candles cascade shows live on the New Call form
+    if ((int)ops_val("SELECT COUNT(*) FROM custom_fields") === 0) {
+        $tierType = lk_type('tier');
+        db()->prepare("INSERT INTO custom_fields (entity,field_key,label,field_type,lookup_type_id,required,sort_order,active,created_at)
+            VALUES ('call','product_line','Product line','dependent',?,0,0,1,?)")->execute([$tierType['id'], date('c')]);
+    }
+}
+
+// ---- Type helpers ----------------------------------------------------------
+function lk_add_type($key, $label, $parentTypeId = null, $isSystem = 0, $sort = 0) {
+    db()->prepare("INSERT INTO lookup_types (type_key,label,parent_type_id,is_system,sort_order,created_at) VALUES (?,?,?,?,?,?)")
+        ->execute([$key, $label, $parentTypeId, $isSystem, $sort, date('c')]);
+    return db()->lastInsertId();
+}
+function lk_add_value($typeId, $parentValueId, $code, $label, $sort = 0) {
+    db()->prepare("INSERT INTO lookup_values (type_id,parent_value_id,code,label,sort_order,active,created_at) VALUES (?,?,?,?,?,1,?)")
+        ->execute([$typeId, $parentValueId, $code, $label, $sort, date('c')]);
+    return db()->lastInsertId();
+}
+function lk_types() { return ops_all("SELECT * FROM lookup_types ORDER BY sort_order, label"); }
+function lk_type($key) { return ops_one("SELECT * FROM lookup_types WHERE type_key=?", [$key]); }
+function lk_type_by_id($id) { return $id ? ops_one("SELECT * FROM lookup_types WHERE id=?", [$id]) : null; }
+function lk_root_types() { return ops_all("SELECT * FROM lookup_types WHERE parent_type_id IS NULL ORDER BY sort_order, label"); }
+
+// ---- Value helpers ---------------------------------------------------------
+function lk_root_values($typeId, $active = true) {
+    return ops_all("SELECT * FROM lookup_values WHERE type_id=? AND parent_value_id IS NULL" . ($active ? " AND active=1" : "") . " ORDER BY sort_order, label", [$typeId]);
+}
+function lk_child_values($typeId, $parentValueId, $active = true) {
+    return ops_all("SELECT * FROM lookup_values WHERE type_id=? AND parent_value_id=?" . ($active ? " AND active=1" : "") . " ORDER BY sort_order, label", [$typeId, $parentValueId]);
+}
+function lk_all_values($typeId) { return ops_all("SELECT * FROM lookup_values WHERE type_id=? ORDER BY sort_order, label", [$typeId]); }
+function lk_value($id) { return $id ? ops_one("SELECT * FROM lookup_values WHERE id=?", [$id]) : null; }
+
+// Editable map for the old fixed dropdowns: use lookup values if present, else the constant.
+function lk_options_or($key, $const) {
+    $t = lk_type($key);
+    if (!$t) return $const;
+    $rows = lk_root_values($t['id']);
+    if (!$rows) return $const;
+    $out = [];
+    foreach ($rows as $r) $out[$r['code'] !== '' ? $r['code'] : $r['id']] = $r['label'];
+    return $out;
+}
+
+// The chain of types from root to this leaf type (for cascading render).
+function lk_chain($typeId) {
+    $chain = []; $t = lk_type_by_id($typeId); $guard = 0;
+    while ($t && $guard++ < 10) { array_unshift($chain, $t); $t = $t['parent_type_id'] ? lk_type_by_id($t['parent_type_id']) : null; }
+    return $chain;
+}
+// "Candles › Soy wax › Premium" for a stored leaf value id.
+function lk_value_path($valueId) {
+    $labels = []; $v = lk_value($valueId); $guard = 0;
+    while ($v && $guard++ < 10) { array_unshift($labels, $v['label']); $v = $v['parent_value_id'] ? lk_value($v['parent_value_id']) : null; }
+    return implode(' › ', $labels);
+}
+
+// ---- Custom fields ---------------------------------------------------------
+function custom_fields_for($entity, $activeOnly = true) {
+    return ops_all("SELECT * FROM custom_fields WHERE entity=?" . ($activeOnly ? " AND active=1" : "") . " ORDER BY sort_order, id", [$entity]);
+}
+function custom_values_map($entity, $recordId) {
+    $out = [];
+    foreach (ops_all("SELECT * FROM custom_values WHERE entity=? AND record_id=?", [$entity, $recordId]) as $r) {
+        $out[$r['field_key']] = $r;
+    }
+    return $out;
+}
+function custom_save($entity, $recordId, $post) {
+    $pdo = db();
+    foreach (custom_fields_for($entity) as $f) {
+        $key = 'cf_' . $f['field_key'];
+        $val = trim((string)($post[$key] ?? ''));
+        $pdo->prepare("DELETE FROM custom_values WHERE entity=? AND record_id=? AND field_key=?")->execute([$entity, $recordId, $f['field_key']]);
+        if ($val === '') continue;
+        if (in_array($f['field_type'], ['select', 'dependent'], true)) {
+            $pdo->prepare("INSERT INTO custom_values (entity,record_id,field_key,value_id,created_at) VALUES (?,?,?,?,?)")
+                ->execute([$entity, $recordId, $f['field_key'], (int)$val, date('c')]);
+        } else {
+            $pdo->prepare("INSERT INTO custom_values (entity,record_id,field_key,value_text,created_at) VALUES (?,?,?,?,?)")
+                ->execute([$entity, $recordId, $f['field_key'], $val, date('c')]);
+        }
+    }
+}
+function custom_display($entity, $recordId) {
+    $vals = custom_values_map($entity, $recordId); $out = [];
+    foreach (custom_fields_for($entity) as $f) {
+        $v = $vals[$f['field_key']] ?? null;
+        if (!$v) continue;
+        if (in_array($f['field_type'], ['select', 'dependent'], true)) $disp = lk_value_path($v['value_id']);
+        else $disp = $v['value_text'];
+        if ($disp !== '' && $disp !== null) $out[] = ['label' => $f['label'], 'value' => $disp];
+    }
+    return $out;
+}
+
+// ---- Admin handlers (master-list & custom-field management) -----------------
+function lk_admin($route, $method) {
+    ops_require(is_admin_level(), 'Only admins can manage master lists.');
+    $pdo = db();
+
+    if ($route === 'lookups') {
+        if ($method === 'POST') {
+            $label = trim($_POST['label'] ?? '');
+            $rawKey = trim($_POST['type_key'] ?? '');
+            if ($rawKey === '') $rawKey = $label; // auto-derive the key from the name
+            $key = trim(strtolower(preg_replace('/[^a-zA-Z0-9_]+/', '_', $rawKey)), '_');
+            $parent = ($_POST['parent_type_id'] ?? '') !== '' ? (int)$_POST['parent_type_id'] : null;
+            if ($key === '' || $label === '') { flash('Give the list a name.', 'error'); redirect('/lookups'); }
+            if (lk_type($key)) { flash('A list with that key already exists.', 'error'); redirect('/lookups'); }
+            lk_add_type($key, $label, $parent, 0, 99);
+            flash("Master list \"$label\" created. Now add its values.");
+            redirect('/lookup?key=' . $key);
+        }
+        if (($_GET['del'] ?? '') !== '') {
+            $t = lk_type_by_id((int)$_GET['del']);
+            if ($t && !$t['is_system']) {
+                $pdo->prepare("DELETE FROM lookup_values WHERE type_id=?")->execute([$t['id']]);
+                $pdo->prepare("DELETE FROM lookup_types WHERE id=?")->execute([$t['id']]);
+                flash('Master list deleted.');
+            } else flash('Built-in lists cannot be deleted (you can still edit their values).', 'error');
+            redirect('/lookups');
+        }
+        view('ops/lookups', ['types' => lk_types()]); return;
+    }
+
+    if ($route === 'lookup') {
+        $t = lk_type($_GET['key'] ?? '');
+        if (!$t) { http_response_code(404); view('notfound'); return; }
+        $parentType = lk_type_by_id($t['parent_type_id']);
+        if ($method === 'POST') {
+            $label = trim($_POST['label'] ?? '');
+            $code = trim($_POST['code'] ?? '');
+            $parentVal = ($_POST['parent_value_id'] ?? '') !== '' ? (int)$_POST['parent_value_id'] : null;
+            if ($label === '') { flash('Enter a value label.', 'error'); redirect('/lookup?key=' . $t['type_key']); }
+            if ($parentType && !$parentVal) { flash('Pick which ' . $parentType['label'] . ' this belongs under.', 'error'); redirect('/lookup?key=' . $t['type_key']); }
+            lk_add_value($t['id'], $parentVal, $code, $label, 99);
+            flash('Value added.');
+            redirect('/lookup?key=' . $t['type_key']);
+        }
+        if (($_GET['del'] ?? '') !== '') {
+            $pdo->prepare("DELETE FROM lookup_values WHERE id=? AND type_id=?")->execute([(int)$_GET['del'], $t['id']]);
+            flash('Value removed.');
+            redirect('/lookup?key=' . $t['type_key']);
+        }
+        $parentValues = $parentType ? lk_all_values($parentType['id']) : [];
+        view('ops/lookup_values', ['t' => $t, 'parentType' => $parentType, 'values' => lk_all_values($t['id']), 'parentValues' => $parentValues]);
+        return;
+    }
+
+    if ($route === 'custom-fields') {
+        $entity = in_array($_GET['entity'] ?? 'call', ['call', 'job'], true) ? $_GET['entity'] : 'call';
+        if ($method === 'POST') {
+            $label = trim($_POST['label'] ?? '');
+            $type = in_array($_POST['field_type'] ?? '', ['text', 'number', 'date', 'select', 'dependent'], true) ? $_POST['field_type'] : 'text';
+            $lt = ($_POST['lookup_type_id'] ?? '') !== '' ? (int)$_POST['lookup_type_id'] : null;
+            $req = !empty($_POST['required']) ? 1 : 0;
+            if ($label === '') { flash('Enter a field label.', 'error'); redirect('/custom-fields?entity=' . $entity); }
+            if (in_array($type, ['select', 'dependent'], true) && !$lt) { flash('Pick which master list this dropdown uses.', 'error'); redirect('/custom-fields?entity=' . $entity); }
+            $fkey = strtolower(trim(preg_replace('/[^a-zA-Z0-9_]+/', '_', $label)));
+            $pdo->prepare("INSERT INTO custom_fields (entity,field_key,label,field_type,lookup_type_id,required,sort_order,active,created_at)
+                VALUES (?,?,?,?,?,?,?,1,?)")->execute([$entity, $fkey, $label, $type, $lt, $req, 99, date('c')]);
+            flash("Field \"$label\" added to the " . ($entity === 'call' ? 'Call' : 'Job') . " form.");
+            redirect('/custom-fields?entity=' . $entity);
+        }
+        if (($_GET['del'] ?? '') !== '') {
+            $pdo->prepare("DELETE FROM custom_fields WHERE id=? AND entity=?")->execute([(int)$_GET['del'], $entity]);
+            flash('Field removed.');
+            redirect('/custom-fields?entity=' . $entity);
+        }
+        view('ops/custom_fields', ['entity' => $entity, 'fields' => custom_fields_for($entity, false), 'types' => lk_types()]);
+        return;
+    }
+}
+
+// ---- Render helpers (used inside views) ------------------------------------
+// Render all custom fields for an entity as .ff blocks; $vals = custom_values_map().
+function render_custom_fields($entity, $vals = []) {
+    foreach (custom_fields_for($entity) as $f) {
+        $key = 'cf_' . $f['field_key'];
+        $cur = $vals[$f['field_key']] ?? null;
+        echo '<div class="ff">';
+        echo '<label>' . e($f['label']) . ($f['required'] ? ' *' : '') . '</label>';
+        if ($f['field_type'] === 'text' || $f['field_type'] === 'number' || $f['field_type'] === 'date') {
+            $type = $f['field_type'] === 'text' ? 'text' : $f['field_type'];
+            echo '<input class="form-control" type="' . $type . '" name="' . e($key) . '" value="' . e($cur['value_text'] ?? '') . '"' . ($f['required'] ? ' required' : '') . '>';
+        } elseif ($f['field_type'] === 'select') {
+            $t = lk_type_by_id($f['lookup_type_id']);
+            echo '<select class="form-control searchable" name="' . e($key) . '"><option value="">—</option>';
+            if ($t) foreach (lk_root_values($t['id']) as $v) {
+                $sel = $cur && (int)$cur['value_id'] === (int)$v['id'] ? ' selected' : '';
+                echo '<option value="' . (int)$v['id'] . '"' . $sel . '>' . e($v['label']) . '</option>';
+            }
+            echo '</select>';
+        } elseif ($f['field_type'] === 'dependent') {
+            render_cascade_field($f, $cur ? (int)$cur['value_id'] : 0);
+        }
+        echo '</div>';
+    }
+}
+// Cascading selects for a hierarchical lookup (root → … → leaf). Stores leaf id.
+function render_cascade_field($f, $selectedLeafId = 0) {
+    $chain = lk_chain($f['lookup_type_id']);
+    if (!$chain) return;
+    // Determine the selected value at each level from the stored leaf id.
+    $selPath = [];
+    if ($selectedLeafId) {
+        $v = lk_value($selectedLeafId); $g = 0;
+        while ($v && $g++ < 10) { array_unshift($selPath, (int)$v['id']); $v = $v['parent_value_id'] ? lk_value($v['parent_value_id']) : null; }
+    }
+    $fieldName = 'cf_' . $f['field_key'];
+    $data = ['levels' => count($chain), 'byType' => []];
+    foreach ($chain as $lvl => $t) {
+        $rows = $lvl === 0 ? lk_root_values($t['id']) : lk_all_values($t['id']);
+        $data['byType'][$lvl] = array_map(fn($r) => ['id' => (int)$r['id'], 'label' => $r['label'], 'parent' => $r['parent_value_id'] !== null ? (int)$r['parent_value_id'] : null], $rows);
+    }
+    echo '<div class="cascade" data-field="' . e($f['field_key']) . '">';
+    foreach ($chain as $lvl => $t) {
+        $isLeaf = $lvl === count($chain) - 1;
+        $name = $isLeaf ? $fieldName : '';
+        $sel = $selPath[$lvl] ?? 0;
+        echo '<select class="form-control cascade-sel"' . ($name ? ' name="' . e($name) . '"' : '') . ' data-level="' . $lvl . '" data-field="' . e($f['field_key']) . '">';
+        echo '<option value="">' . e($t['label']) . '…</option>';
+        $rows = $lvl === 0 ? lk_root_values($t['id']) : lk_all_values($t['id']);
+        foreach ($rows as $r) {
+            // On first render only show the correct options per selected parent; JS keeps it in sync after.
+            if ($lvl > 0) {
+                $parentSel = $selPath[$lvl - 1] ?? 0;
+                if (!$parentSel || (int)$r['parent_value_id'] !== (int)$parentSel) continue;
+            }
+            $s = ($sel && (int)$r['id'] === (int)$sel) ? ' selected' : '';
+            echo '<option value="' . (int)$r['id'] . '"' . $s . '>' . e($r['label']) . '</option>';
+        }
+        echo '</select>';
+    }
+    echo '<script>window.LKDATA=window.LKDATA||{};window.LKDATA[' . json_encode($f['field_key']) . ']=' . json_encode($data) . ';</script>';
+    echo '</div>';
+}

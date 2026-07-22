@@ -23,6 +23,9 @@
     <div><span class="k">Report uploaded</span><?= e($job['report_upload_date'] ?: '—') ?></div>
     <div><span class="k">TAT</span><?= $job['tat_days']===null?'—':(int)$job['tat_days'].' day(s)' ?></div>
     <div class="kv-wide"><span class="k">Report folder</span><?php if ($job['folder_link']): ?><a href="<?= e($job['folder_link']) ?>" target="_blank" rel="noopener"><?= e($job['folder_link']) ?></a><?php else: ?>—<?php endif; ?></div>
+    <?php foreach (custom_display('job', $job['id']) as $cf): ?>
+      <div><span class="k"><?= e($cf['label']) ?></span><?= e($cf['value']) ?></div>
+    <?php endforeach; ?>
   </div>
 </div>
 

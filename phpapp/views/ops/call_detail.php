@@ -20,6 +20,9 @@
     <div><span class="k">Required by</span><?= e($call['inspection_required_date'] ?: '—') ?></div>
     <div><span class="k">Status</span><?= e($call['status']) ?></div>
     <div class="kv-wide"><span class="k">Notes</span><?= e($call['notes'] ?: '—') ?></div>
+    <?php foreach (custom_display('call', $call['id']) as $cf): ?>
+      <div><span class="k"><?= e($cf['label']) ?></span><?= e($cf['value']) ?></div>
+    <?php endforeach; ?>
   </div>
 </div>
 
