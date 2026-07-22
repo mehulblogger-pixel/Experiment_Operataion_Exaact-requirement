@@ -21,6 +21,10 @@
       <a class="btn secondary" href="/call-edit?id=<?= (int)$call['id'] ?>">Edit call</a>
       <a class="btn" href="/job-new?call=<?= (int)$call['id'] ?>">+ Allocate Job</a>
     <?php endif; ?>
+    <?php if (is_master() || can('ops.call.delete')): ?>
+      <form method="post" action="/call-delete?id=<?= (int)$call['id'] ?>" style="display:inline" onsubmit="return confirm('Delete this call and its jobs? This cannot be undone.')">
+        <button class="btn danger" type="submit">Delete call</button></form>
+    <?php endif; ?>
   </div>
 </div>
 

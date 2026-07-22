@@ -330,14 +330,34 @@ function send_assignment_email($jobId) {
     $j = job_email_context($jobId);
     if (!$j || !$j['inspector_id']) return;
     $client = $j['client_disp'] ?: $j['client_name'];
-    $body = "Dear {$j['inspector_name']},\n\nYou have been assigned the following inspection job.\n\n"
-        . "Job: {$j['job_code']}\nClient: {$client}\nVendor/Site: {$j['vendor_name']}\n"
-        . "Region: " . (OPS_REGIONS[$j['region']] ?? $j['region']) . "\nSBU: " . (OPS_SBUS[$j['sbu']] ?? $j['sbu']) . "\n"
-        . "BOSS No.: {$j['boss_number']}\nScheduled: {$j['scheduled_date']}\n"
-        . "Inspection dates: {$j['inspection_start_date']} to {$j['inspection_end_date']}\n"
-        . "Reporting: " . (REPORT_FREQ[$j['reporting_frequency']] ?? '') . "\n"
-        . "Report folder: {$j['folder_link']}\n\nRegards,\nSGS Ahmedabad Coordination";
-    ops_mail($j['inspector_email'] ?? '', "Job Assignment: {$j['job_code']} — {$client}", $body, coordinator_emails(), 'assignment');
+    // pull client & vendor primary contact + address for a complete brief
+    $call = ops_one("SELECT * FROM calls WHERE id=?", [$j['call_id']]);
+    $cc = $call ? partner_primary_contact($call['client_id']) : null;
+    $vc = $call ? partner_primary_contact($call['vendor_id']) : null;
+    $va = $call ? partner_primary_address($call['vendor_id']) : null;
+    $notes = $call['notes'] ?? '';
+    $product = $call ? ((lk_options_or('product', PRODUCT_CATS)[$call['product_category']] ?? '') ?: ($call['product_other'] ?? '')) : '';
+    $b  = "Dear {$j['inspector_name']},\n\nYou have been assigned the following inspection. Full details below.\n\n";
+    $b .= "JOB: {$j['job_code']}   (Call {$j['call_code']})\n";
+    $b .= "Type: " . (INSPECTION_TYPES[$call['inspection_type'] ?? ''] ?? '') . "\n";
+    $b .= "Scheduled: {$j['scheduled_date']}   Inspection: {$j['inspection_start_date']} to {$j['inspection_end_date']}\n";
+    $b .= "Client required date: " . ($call['inspection_required_date'] ?? '') . "\n";
+    $b .= "Reporting: " . (REPORT_FREQ[$j['reporting_frequency']] ?? '') . "   BOSS: {$j['boss_number']}\n\n";
+    $b .= "-- CLIENT --\n{$client}\n";
+    if ($cc) $b .= "Contact: {$cc['name']} " . ($cc['designation'] ? "({$cc['designation']})" : '') . "  M: " . ($cc['mobile'] ?: $cc['phone']) . "  E: {$cc['email']}\n";
+    $b .= "\n-- VENDOR / SITE --\n{$j['vendor_name']}\n";
+    if ($va) $b .= "Address: " . trim(($va['line1'] ?? '') . ' ' . ($va['town_village'] ?? '') . ' ' . ($va['district'] ?? '') . ' ' . ($va['city'] ?? '') . ' ' . ($va['state'] ?? '') . ' ' . ($va['pincode'] ?? '')) . "\n";
+    if ($vc) $b .= "Contact: {$vc['name']} " . ($vc['designation'] ? "({$vc['designation']})" : '') . "  M: " . ($vc['mobile'] ?: $vc['phone']) . "  E: {$vc['email']}\n";
+    if ($product) $b .= "\nProduct: {$product}\n";
+    if ($notes) $b .= "\nNotes: {$notes}\n";
+    $b .= "\nReport folder: {$j['folder_link']}\n\nRegards,\nSGS Ahmedabad Coordination";
+    ops_mail($j['inspector_email'] ?? '', "Job Assignment: {$j['job_code']} — {$client}", $b, coordinator_emails(), 'assignment');
+}
+function partner_primary_contact($pid) {
+    return $pid ? ops_one("SELECT * FROM partner_contacts WHERE partner_id=? ORDER BY is_primary DESC, id LIMIT 1", [$pid]) : null;
+}
+function partner_primary_address($pid) {
+    return $pid ? ops_one("SELECT * FROM partner_addresses WHERE partner_id=? ORDER BY is_primary DESC, id LIMIT 1", [$pid]) : null;
 }
 function send_closure_email($jobId) {
     $j = job_email_context($jobId);
@@ -585,7 +605,7 @@ function ops_dispatch($route, $method) {
         return true;
     }
     switch (true) {
-        case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call':
+        case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call' || $route === 'call-delete':
             ops_calls($route, $method); return true;
         case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close':
             ops_jobs($route, $method); return true;
@@ -816,6 +836,16 @@ function trade_label($id) { $v = $id ? lk_value($id) : null; return $v ? $v['lab
 // ---- Calls -----------------------------------------------------------------
 function ops_calls($route, $method) {
     $pdo = db();
+    if ($route === 'call-delete') {
+        ops_require(is_master() || can('ops.call.delete'), 'Only the Super Admin or a Branch Application Manager can delete calls.');
+        if ($method === 'POST') {
+            $cid = (int)($_GET['id'] ?? 0);
+            $pdo->prepare("DELETE FROM jobs WHERE call_id=?")->execute([$cid]);
+            $pdo->prepare("DELETE FROM calls WHERE id=?")->execute([$cid]);
+            flash('Call deleted.');
+        }
+        redirect('/calls');
+    }
     if ($route === 'calls') {
         $q = trim($_GET['q'] ?? '');
         [$scopeW, $args] = scope_clause('c.executing_office_id', 'c.sbu');

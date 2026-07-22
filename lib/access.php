@@ -28,6 +28,7 @@ const PERMISSIONS = [
     'ops.call.create' => 'Create / edit calls',
     'ops.job.allocate'=> 'Allocate / edit jobs',
     'ops.job.close'   => 'Close jobs',
+    'ops.call.delete' => 'Delete calls',
     'master.manage'   => 'Manage master data',
     'finance.reconcile'=> 'Credit reconciliation',
     'users.manage.branch' => 'Manage users in own office',
@@ -48,7 +49,7 @@ function role_defaults($role) {
         case 'BRANCH_MANAGER':
             return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','ops.call.create','ops.job.allocate','ops.job.close','master.manage','users.manage.branch'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'BRANCH_APP_MANAGER':
-            return ['perms' => ['dash.operations','dash.utilization','users.manage.branch','master.manage'], 'offices' => 'OWN', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.operations','dash.utilization','users.manage.branch','master.manage','ops.call.delete'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'OPERATION_MANAGER':
             return ['perms' => ['dash.operations','dash.utilization','ops.call.create','ops.job.allocate','ops.job.close'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'ASST_MANAGER':
@@ -176,4 +177,15 @@ function access_migrate() {
     ensure_column('users', 'permissions', "VARCHAR(600) DEFAULT ''");
     ensure_column('users', 'reports_to_id', 'INT NULL');
     if (setting_get('fy_start_month') === null) setting_set('fy_start_month', '4');
+    // One-time: remove the Candles/Wax/Tier demo (the confusing "Product line" field).
+    if (setting_get('demo_removed') === null) {
+        try {
+            db()->exec("DELETE FROM custom_fields WHERE entity='call' AND field_key='product_line'");
+            foreach (['tier','wax_type','product_family'] as $k) {
+                $t = ops_one("SELECT id FROM lookup_types WHERE type_key=? AND is_system=0", [$k]);
+                if ($t) { db()->prepare("DELETE FROM lookup_values WHERE type_id=?")->execute([$t['id']]); db()->prepare("DELETE FROM lookup_types WHERE id=?")->execute([$t['id']]); }
+            }
+        } catch (Throwable $e) {}
+        setting_set('demo_removed', '1');
+    }
 }
