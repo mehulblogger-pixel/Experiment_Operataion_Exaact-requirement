@@ -103,3 +103,26 @@ a seat; the old user's data stays intact.
 ### First-run security
 Change the default `admin` / `admin12345` password immediately via the
 **Password** link in the top bar.
+
+---
+
+## Making it your own — configurable master lists & custom fields (Admin)
+
+The app adapts to any field-operations company **without code changes**, from
+**Masters → "Make it your own"**:
+
+- **Master lists & dropdowns** (`/lookups`) — every dropdown in the app is an
+  editable list. Add/remove values, or create a whole new list.
+- **Dependent (cascading) lists** — when you create a list, pick a "Depends on"
+  parent to make it filter by the parent's value. Examples that ship built-in:
+  - **SBU → Activity code** (Activity values belong under an SBU)
+  - **Product family → Wax type → Tier** (e.g. Candles → Soy wax → Premium)
+  Any depth is supported.
+- **Custom fields** (`/custom-fields`) — add your own fields to the **Call** or
+  **Job** form (text / number / date / dropdown). A dropdown field can use any
+  master list; pick the deepest list of a dependent chain to get cascading
+  selects automatically. New fields appear on the form and the detail page
+  instantly — no code, no redeploy.
+
+Built-in lists are marked "Built-in": you can edit their values but not delete
+the list. Lists you create are fully removable.

@@ -31,6 +31,7 @@ try {
     require __DIR__ . '/lib/db.php';
     require __DIR__ . '/lib/helpers.php';
     require __DIR__ . '/lib/ops.php';
+    require __DIR__ . '/lib/lookups.php';
 } catch (Throwable $e) {
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine());
 }
@@ -40,6 +41,7 @@ try {
 try {
     db()->query("SELECT address_id FROM partner_contacts LIMIT 1");
     db()->query("SELECT id FROM offices LIMIT 1");
+    db()->query("SELECT id FROM lookup_types LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();

@@ -31,14 +31,15 @@
     <div class="ff"><label>Man-days (0 = auto from dates)</label><input class="form-control" type="number" step="0.5" name="mandays" value="<?= e($job['mandays'] ?? '0') ?>"></div>
     <div class="ff"><label>Expected credit (₹) *</label><input class="form-control" type="number" step="0.01" name="expected_credit" value="<?= e($job['expected_credit'] ?? '') ?>" required></div>
     <div class="ff"><label>Credit type</label>
-      <select class="form-control" name="credit_type"><?php foreach (CREDIT_TYPES as $k=>$v): ?><option value="<?= $k ?>" <?= ($job && $job['credit_type']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+      <select class="form-control searchable" name="credit_type"><?php foreach (lk_options_or('credit_type', CREDIT_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($job && $job['credit_type']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Credit direction</label>
-      <select class="form-control" name="credit_direction"><?php foreach (CREDIT_DIRECTIONS as $k=>$v): ?><option value="<?= $k ?>" <?= ($job && $job['credit_direction']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+      <select class="form-control searchable" name="credit_direction"><?php foreach (lk_options_or('credit_direction', CREDIT_DIRECTIONS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($job && $job['credit_direction']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Reporting frequency</label>
-      <select class="form-control" name="reporting_frequency"><?php foreach (REPORT_FREQ as $k=>$v): ?><option value="<?= $k ?>" <?= ($job && $job['reporting_frequency']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+      <select class="form-control searchable" name="reporting_frequency"><?php foreach (lk_options_or('reporting_frequency', REPORT_FREQ) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($job && $job['reporting_frequency']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>SBU</label>
-      <select class="form-control" name="sbu"><option value="">—</option><?php foreach (OPS_SBUS as $k=>$v): ?><option value="<?= $k ?>" <?= ($job && $job['sbu']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+      <select class="form-control searchable" name="sbu"><option value="">—</option><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($job && $job['sbu']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff ff-wide"><label>Report folder link (SharePoint / Drive)</label><input class="form-control" name="folder_link" value="<?= e($job['folder_link'] ?? '') ?>" placeholder="Paste the folder URL"></div>
+    <?php render_custom_fields('job', $cfvals ?? []); ?>
   </div>
   <div style="margin-top:16px;">
     <button class="btn" type="submit"><?= $job ? 'Save job' : 'Allocate & send email' ?></button>
