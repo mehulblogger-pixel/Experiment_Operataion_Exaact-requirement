@@ -13,8 +13,8 @@
     <td><?= $t['is_system'] ? '<span class="badge">Built-in</span>' : '<span class="badge GREEN">Custom</span>' ?></td>
     <td class="row-actions">
       <a class="btn small" href="/lookup?key=<?= e($t['type_key']) ?>">Edit values</a>
-      <?php if (!$t['is_system']): ?>
-        <a class="btn small danger" href="/lookups?del=<?= (int)$t['id'] ?>" onclick="return confirm('Delete this whole list and its values?')">Delete</a>
+      <?php if (!$t['is_system'] || is_master()): ?>
+        <a class="btn small danger" href="/lookups?del=<?= (int)$t['id'] ?>" onclick="return confirm('Delete this whole list and its values?<?= $t['is_system']?' Built-in dropdowns will fall back to defaults.':'' ?>')">Delete</a>
       <?php endif; ?>
     </td>
   </tr>

@@ -247,8 +247,35 @@
     render();
   }
 
+  // ---- Auto-fill Display name from Legal name (until user edits it) ----
+  function initDisplayName() {
+    var legal = document.querySelector('input[name="legal_name"]');
+    var disp = document.querySelector('input[name="display_name"]');
+    if (!legal || !disp) return;
+    var touched = disp.value.trim() !== '';
+    disp.addEventListener('input', function () { touched = true; });
+    legal.addEventListener('input', function () { if (!touched) disp.value = legal.value; });
+  }
+
+  // ---- Make credit mandatory (visibly) when a call is forwarded to a branch ----
+  function initForwardCredit() {
+    var exec = document.getElementById('exec_sel');
+    var credit = document.querySelector('input[name="expected_credit"]');
+    if (!exec || !credit) return;
+    function sync() {
+      var on = exec.value !== '';
+      credit.required = on;
+      var lbl = credit.closest('.ff') && credit.closest('.ff').querySelector('label');
+      if (lbl && on && lbl.textContent.indexOf('★') === -1) lbl.innerHTML = lbl.innerHTML + ' <span style="color:#c0392b">★ required</span>';
+      if (on) { credit.style.borderColor = '#F37021'; }
+    }
+    exec.addEventListener('change', sync); sync();
+  }
+
   function init() {
     gstAutofill();
+    initDisplayName();
+    initForwardCredit();
     initCascades();
     initActivity();
     initCustomFreq();

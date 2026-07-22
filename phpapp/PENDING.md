@@ -2,6 +2,16 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## Additional features (user will provide details / build later)
+
+- [ ] **Inspector expenses linked strictly to the job done** — an inspector's
+      expenses must attach only to the job they performed (fuller rules to be
+      provided by the user).
+- [ ] **CV / hiring pipeline (deputation resourcing)** — for projects/clients
+      needing a deputed engineer: submit CV → client shortlists → interview →
+      Hold / Reject / Accept(=Hired). Track submitted candidates with trade,
+      proposed site, CV-received date, current stage. Additional module.
+
 ## Parked (agreed to do later)
 
 - [ ] **Full organisation structure** — model the hierarchy Business Director →
