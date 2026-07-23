@@ -1490,6 +1490,27 @@ function ops_reports() {
     $fin['reconRecv']=(float)ops_val("SELECT COALESCE(SUM(credit_actual),0) FROM credit_recon WHERE direction='RECEIVED'");
     $fin['reconGiven']=(float)ops_val("SELECT COALESCE(SUM(credit_actual),0) FROM credit_recon WHERE direction='GIVEN'");
 
+    // ---- Loaded cost distributed across each engineer's tagged SBUs (monthly snapshot) ----
+    // An inspector tagged to multiple SBUs has their monthly loaded cost split
+    // equally across those SBUs, so cost shows where the head-count sits — not
+    // only where jobs happened to land. Respects SBU scope + the SBU/inspector filter.
+    $fin['costBySbu']=[]; $fin['costBySbuTotal']=0;
+    if ($seeSalary) {
+        $scopeSbuSet = scope_sbus();
+        foreach (ops_all("SELECT id, sbus, sbu, salary_ctc FROM inspectors WHERE status='ACTIVE'") as $ins) {
+            if ($F['insp']!=='' && (int)$ins['id']!==(int)$F['insp']) continue;
+            $ctc=(float)($ins['salary_ctc'] ?? 0); if ($ctc<=0) continue;
+            $loadedMonthly=($ctc/12)*(1+OVERHEAD_PCT/100);
+            $sbus=array_values(array_filter(array_map('trim', explode(',', ($ins['sbus'] ?: ($ins['sbu'] ?? ''))))));
+            if (!$sbus) $sbus=['—'];
+            if ($scopeSbuSet!=='ALL') $sbus=array_values(array_intersect($sbus,$scopeSbuSet));
+            if ($F['sbu']!=='') $sbus=in_array($F['sbu'],$sbus,true)?[$F['sbu']]:[];
+            if (!$sbus) continue;
+            $share=$loadedMonthly/count($sbus);
+            foreach ($sbus as $s){ $fin['costBySbu'][$s]=($fin['costBySbu'][$s]??0)+$share; $fin['costBySbuTotal']+=$share; }
+        }
+    }
+
     // ---- UTILIZATION ----
     $wd = working_days_in_month((int)date('Y'), (int)date('n'));
     $util=[]; $mdBySbu=[]; $depMd=0;$inspMd=0;$subMd=0;
