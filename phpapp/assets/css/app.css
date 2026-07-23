@@ -1,6 +1,6 @@
-:root{--bg:#f4f6f9;--card:#fff;--ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;--brand:#1e40af;--green:#16a34a;--amber:#d97706;--red:#dc2626}
+:root{--bg:#f4f6f9;--card:#fff;--ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;--brand:#1e40af;--accent:#0ea5e9;--soft:#f8fafc;--panel:#f7f6f4;--fs:14px;--green:#16a34a;--amber:#d97706;--red:#dc2626}
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:var(--fs)}
 a{color:var(--brand);text-decoration:none}a:hover{text-decoration:underline}
 .topbar{display:flex;align-items:center;gap:18px;background:var(--brand);color:#fff;padding:10px 20px;flex-wrap:wrap}
 .topbar .brand{color:#fff;font-weight:700;font-size:18px}
@@ -27,7 +27,7 @@ h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:24px 0 10px}
 .btn.small{padding:4px 10px;font-size:13px}
 table.grid{width:100%;border-collapse:collapse;background:var(--card);border-radius:10px;overflow:hidden}
 table.grid th,table.grid td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);font-size:14px}
-table.grid th{background:#f8fafc;color:var(--muted);font-weight:600}
+table.grid th{background:var(--soft);color:var(--muted);font-weight:600}
 form.stack label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px;font-weight:600}
 .form-control{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px}
@@ -40,10 +40,10 @@ form.stack label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4
 .filter-bar{display:flex;gap:8px;margin:10px 0 18px;flex-wrap:wrap}.filter-bar .form-control{max-width:320px}.filter-bar select.form-control{max-width:200px}
 .kv{display:grid;grid-template-columns:200px 1fr;gap:6px 12px;font-size:14px}.kv dt{color:var(--muted)}.kv dd{margin:0}
 .pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;align-items:center}
-.hierarchy{background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:12px 14px}.hierarchy .child{margin-left:18px;font-size:14px;margin-top:4px}
+.hierarchy{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:12px 14px}.hierarchy .child{margin-left:18px;font-size:14px;margin-top:4px}
 .addr-card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px}
-.note-item{border-left:3px solid var(--brand);padding:6px 12px;margin-bottom:10px;background:#f8fafc;border-radius:0 8px 8px 0}
-.inline-add{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;align-items:end;background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:14px}
+.note-item{border-left:3px solid var(--brand);padding:6px 12px;margin-bottom:10px;background:var(--soft);border-radius:0 8px 8px 0}
+.inline-add{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;align-items:end;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:14px}
 .inline-add .ff-wide,.inline-add button{grid-column:1/-1}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px}.form-grid .ff-wide{grid-column:1/-1}
 .ff label{display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:3px}
@@ -55,7 +55,7 @@ form.stack label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4
 .ss-wrap{position:relative}
 .ss-list{position:absolute;z-index:50;left:0;right:0;top:100%;max-height:240px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:8px;margin-top:3px;box-shadow:0 6px 20px rgba(0,0,0,.12)}
 .ss-item{padding:8px 12px;font-size:14px;cursor:pointer}.ss-item:hover{background:#eef2ff}.ss-item.ss-none{color:var(--muted);cursor:default}
-.readonly-field{background:#f8fafc;color:var(--muted)}
+.readonly-field{background:var(--soft);color:var(--muted)}
 .row-actions{display:flex;gap:6px}
 
 /* ---- Operations & Finance module styles ---- */

@@ -28,6 +28,18 @@ const RATE_TYPES = ['MANDAY'=>'Per man-day','MANMONTH'=>'Per man-month'];
 const BOSS_STATUS = ['ACTIVE'=>'Active','CLOSED'=>'Closed','HOLD'=>'On hold'];
 const OPS_ROLES = ['MASTER_ADMIN'=>'Master Admin','ADMIN'=>'Admin','COORDINATOR'=>'Coordinator','INSPECTOR'=>'Inspector'];
 const OVERHEAD_PCT = 8; // salary overhead %
+// Built-in theme presets: primary, accent, page background, surface (cards), text.
+const THEME_PRESETS = [
+    'blue'     => ['label'=>'Corporate Blue',  'primary'=>'#1e40af','accent'=>'#0ea5e9','bg'=>'#f4f6f9','surface'=>'#ffffff','text'=>'#1f2937'],
+    'orange'   => ['label'=>'SGS Orange',      'primary'=>'#c2410c','accent'=>'#f59e0b','bg'=>'#fbf7f4','surface'=>'#ffffff','text'=>'#292524'],
+    'forest'   => ['label'=>'Forest Green',    'primary'=>'#15803d','accent'=>'#10b981','bg'=>'#f1f7f3','surface'=>'#ffffff','text'=>'#14261c'],
+    'purple'   => ['label'=>'Royal Purple',    'primary'=>'#6d28d9','accent'=>'#a78bfa','bg'=>'#f7f5fb','surface'=>'#ffffff','text'=>'#1f1b2e'],
+    'teal'     => ['label'=>'Teal',            'primary'=>'#0f766e','accent'=>'#14b8a6','bg'=>'#eff7f6','surface'=>'#ffffff','text'=>'#14312e'],
+    'crimson'  => ['label'=>'Crimson',         'primary'=>'#be123c','accent'=>'#fb7185','bg'=>'#fdf5f6','surface'=>'#ffffff','text'=>'#2a1216'],
+    'midnight' => ['label'=>'Midnight (dark)', 'primary'=>'#1e293b','accent'=>'#38bdf8','bg'=>'#0f172a','surface'=>'#1e293b','text'=>'#e2e8f0'],
+];
+// Chart palette (used by dashboard SVG charts; theme accent leads).
+const CHART_COLORS = ['#0ea5e9','#f59e0b','#10b981','#a78bfa','#fb7185','#14b8a6','#f97316','#6366f1','#84cc16','#ec4899'];
 // CV / hiring (deputation resourcing) pipeline: a candidate's CV moves through
 // these stages when a client needs a deputed / resident engineer.
 const CAND_STAGES = [
@@ -2287,8 +2299,15 @@ function ops_settings($method) {
         setting_set('fy_start_month', ($m >= 1 && $m <= 12) ? $m : 4);
         setting_set('tat_threshold_days', (int)($_POST['tat_threshold_days'] ?? 3));
         setting_set('app_name', trim($_POST['app_name'] ?? ''));
-        $bc = trim($_POST['brand_color'] ?? '');
-        if (preg_match('/^#[0-9a-fA-F]{6}$/', $bc)) setting_set('brand_color', $bc);
+        // Theme builder: preset + 4 colours + text colour + font size
+        foreach (['c_primary','c_accent','c_bg','c_surface','c_text'] as $k) {
+            $v = trim($_POST[$k] ?? '');
+            if (preg_match('/^#[0-9a-fA-F]{6}$/', $v)) setting_set($k, $v);
+        }
+        $fs = (int)($_POST['font_size'] ?? 14); setting_set('font_size', ($fs >= 12 && $fs <= 20) ? $fs : 14);
+        setting_set('theme_preset', trim($_POST['theme_preset'] ?? ''));
+        // keep brand_color in sync (used as fallback + logo backdrop)
+        if (preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['c_primary'] ?? '')) setting_set('brand_color', $_POST['c_primary']);
         if (($_POST['clear_logo'] ?? '') === '1') setting_set('logo_data', '');
         // logo upload → stored as a data URI (works without file permissions)
         if (!empty($_FILES['logo']['tmp_name']) && is_uploaded_file($_FILES['logo']['tmp_name'])) {
