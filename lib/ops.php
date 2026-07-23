@@ -1602,6 +1602,12 @@ function ops_candidates($route, $method) {
 
 // ---- Monthly voucher (P3: auto-fill skeleton) ------------------------------
 function my_inspector_id() { $u = current_user(); return $u['inspector_id'] ?? null; }
+// Friendly, actionable message when an Inspector login has no inspector profile linked.
+function inspector_link_msg() {
+    return 'Your login isn’t linked to an inspector profile yet, so "My Jobs" and "My Voucher" can’t open. '
+         . 'An administrator can fix this in Users → open your name → set "Linked inspector" '
+         . '(if your inspector record doesn’t exist yet, add it under Inspectors first).';
+}
 function voucher_owner_is_me($v) { return my_inspector_id() && (int)$v['inspector_id'] === (int)my_inspector_id(); }
 function can_view_voucher($v) { return is_coordinator_level() || voucher_owner_is_me($v); }
 function can_edit_voucher($v) { return ($v['status'] === 'DRAFT') && (is_coordinator_level() || voucher_owner_is_me($v)); }
@@ -1687,7 +1693,8 @@ function ops_vouchers($route, $method) {
     $pdo = db();
 
     if ($route === 'vouchers') {
-        if (is_inspector() && my_inspector_id()) {
+        if (is_inspector()) {
+            if (!my_inspector_id()) { flash(inspector_link_msg(), 'error'); redirect('/'); }
             $rows = ops_all("SELECT * FROM vouchers WHERE inspector_id=? ORDER BY month DESC", [my_inspector_id()]);
             view('ops/voucher_list', ['rows' => $rows, 'mine' => true, 'inspectors' => []]);
             return;
@@ -2031,7 +2038,7 @@ function ops_check_compoff($jobId) {
 function ops_my_jobs() {
     $u = current_user();
     $insId = $u['inspector_id'] ?? null;
-    if (!$insId && !is_coordinator_level()) { flash('Your login is not linked to an inspector yet. Ask an admin.', 'error'); redirect('/'); }
+    if (!$insId && !is_coordinator_level()) { flash(inspector_link_msg(), 'error'); redirect('/'); }
     if ($insId) {
         $rows = ops_all("SELECT j.*, c.call_code, bp.legal_name client_name, bp.display_name client_disp
             FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
