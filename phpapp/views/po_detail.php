@@ -1,22 +1,51 @@
+<div class="crumbs"><a href="/">Home</a> › <a href="/partner?id=<?= (int)$po['partner_id'] ?>&tab=purchase_orders">Purchase Orders</a> › <?= e($po['po_number'] ?: 'Open Order') ?></div>
 <div class="master-head">
   <div><h1><?= e($po['po_number'] ?: 'Open Order') ?></h1>
-    <p class="sub"><?= e($po['pdn'] ?: $po['pn']) ?> · <?= e(PO_TYPES[$po['po_type']] ?? $po['po_type']) ?><?php if ($po['value']!==null): ?> · ₹<?= e($po['value']) ?><?php endif; ?></p></div>
+    <p class="sub"><?= e($po['pdn'] ?: $po['pn']) ?> · <?= e(PO_TYPES[$po['po_type']] ?? $po['po_type']) ?><?php if ($po['value']!==null): ?> · <strong>₹<?= number_format((float)$po['value'],0) ?></strong> (from line items)<?php endif; ?></p></div>
   <a class="btn secondary" href="/partner?id=<?= (int)$po['partner_id'] ?>&tab=purchase_orders">← Back</a>
 </div>
 <h2>Line items</h2>
+<div class="tbl-scroll" style="overflow-x:auto">
 <table class="grid">
-  <tr><th>Description</th><th>Type</th><th>Quantity</th><th>Consumed</th><th>Balance</th><th>Rate</th><th>Amount</th></tr>
-  <?php foreach ($items as $li): $bal = (float)$li['quantity'] - (float)$li['consumed']; $amt = $li['rate']!==null ? (float)$li['quantity'] * (float)$li['rate'] : null; ?>
-  <tr><td><?= e($li['description']) ?></td><td><?= e(PO_ITEM_TYPES[$li['item_type']] ?? $li['item_type']) ?></td><td><?= e($li['quantity']) ?></td><td><?= e($li['consumed']) ?></td><td><strong><?= e($bal) ?></strong></td><td><?= $li['rate']!==null?'₹'.e($li['rate']):'—' ?></td><td><?= $amt!==null?'₹'.e($amt):'—' ?></td></tr>
+  <tr><th>Description</th><th>Trade / skill</th><th>Site</th><th>Men</th><th>Qty</th><th>Consumed</th><th>Bal</th><th>Rate</th><th>Base</th><th>GST%</th><th>Tax</th><th>Total</th></tr>
+  <?php $gt=0; foreach ($items as $li): $bal = (float)$li['quantity'] - (float)$li['consumed']; $gt += (float)$li['total_amount']; ?>
+  <tr>
+    <td><?= e($li['description']) ?><br><span class="muted" style="font-size:11px"><?= e(PO_ITEM_TYPES[$li['item_type']] ?? $li['item_type']) ?><?= $li['activity_label']?' · '.e($li['activity_label']):'' ?></span></td>
+    <td><?= e($li['trade_label'] ?: '—') ?><?= $li['skill_label']?'<br><span class="muted" style="font-size:11px">'.e($li['skill_label']).'</span>':'' ?></td>
+    <td><?= e($li['site'] ?: '—') ?></td>
+    <td><?= (int)$li['manpower'] ?: '—' ?></td>
+    <td><?= e($li['quantity']) ?></td><td><?= e($li['consumed']) ?></td><td><strong class="<?= $bal<=0?'':'' ?>"><?= e($bal) ?></strong></td>
+    <td><?= $li['rate']!==null?'₹'.e($li['rate']):'—' ?></td>
+    <td>₹<?= number_format((float)$li['base_amount'],0) ?></td>
+    <td><?= e($li['gst_pct']) ?>%</td>
+    <td>₹<?= number_format((float)$li['tax_amount'],0) ?></td>
+    <td><strong>₹<?= number_format((float)$li['total_amount'],0) ?></strong></td>
+  </tr>
   <?php endforeach; ?>
-  <?php if (!$items): ?><tr><td colspan="7">No line items yet.</td></tr><?php endif; ?>
+  <?php if (!$items): ?><tr><td colspan="12">No line items yet.</td></tr>
+  <?php else: ?><tr><td colspan="11" style="text-align:right"><strong>PO total</strong></td><td><strong>₹<?= number_format($gt,0) ?></strong></td></tr><?php endif; ?>
 </table>
+</div>
+
 <h3 class="tab-sub">Add line item</h3>
-<form method="post" action="/po?id=<?= (int)$po['id'] ?>" class="inline-add">
-  <div class="ff"><label>Description</label><input class="form-control" name="description" required></div>
-  <div class="ff"><label>Type</label><select class="form-control" name="item_type"><?php foreach (PO_ITEM_TYPES as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
-  <div class="ff"><label>Quantity</label><input class="form-control" type="number" step="0.01" name="quantity"></div>
-  <div class="ff"><label>Rate</label><input class="form-control" type="number" step="0.01" name="rate"></div>
-  <div class="ff"><label>Consumed</label><input class="form-control" type="number" step="0.01" name="consumed"></div>
-  <button class="btn small" type="submit">Add line item</button>
+<form method="post" action="/po?id=<?= (int)$po['id'] ?>" class="panel">
+  <div class="form-grid">
+    <div class="ff"><label>Description</label><input class="form-control" name="description" required></div>
+    <div class="ff"><label>Type</label><select class="form-control" name="item_type"><?php foreach (PO_ITEM_TYPES as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Trade</label>
+      <select class="form-control searchable" id="trade_sel" name="trade_id"><option value="">—</option>
+        <?php foreach ($trades as $t): ?><option value="<?= (int)$t['id'] ?>"><?= e($t['label']) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Sub-category (skill)</label>
+      <select class="form-control" id="skill_sel" name="skill_id"><option value="">— pick trade —</option></select>
+      <small class="muted">Not listed? Add it under <a href="/lookup?key=skill">Skill</a>.</small></div>
+    <div class="ff"><label>Site of deployment</label><input class="form-control" name="site"></div>
+    <div class="ff"><label>Manpower required</label><input class="form-control" type="number" name="manpower" value="0"></div>
+    <div class="ff"><label>Quantity</label><input class="form-control" type="number" step="0.01" name="quantity"></div>
+    <div class="ff"><label>Rate (₹)</label><input class="form-control" type="number" step="0.01" name="rate"></div>
+    <div class="ff"><label>Consumed</label><input class="form-control" type="number" step="0.01" name="consumed" value="0"></div>
+    <div class="ff"><label>GST %</label><input class="form-control" type="number" step="0.01" name="gst_pct" value="18"></div>
+  </div>
+  <p class="muted" style="margin:4px 2px">Base = Qty × Rate; Tax = Base × GST%; the PO (and its contract) value updates to the sum of line totals.</p>
+  <div style="margin-top:8px;"><button class="btn small" type="submit">Add line item</button></div>
 </form>
+<script>window.SKILLS = <?= json_encode($skillsByTrade) ?>; window.SKILLS_SELECTED = [];</script>

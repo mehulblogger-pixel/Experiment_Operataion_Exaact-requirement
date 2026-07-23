@@ -300,9 +300,22 @@
     sync();
   }
 
+  // ---- Trade → Skill as a single dropdown (PO line items) ----
+  function initSkillSelect() {
+    var trade = document.getElementById('trade_sel');
+    var skill = document.getElementById('skill_sel');
+    if (!trade || !skill || !window.SKILLS) return;
+    trade.addEventListener('change', function () {
+      var list = window.SKILLS[trade.value] || [];
+      skill.innerHTML = '<option value="">' + (trade.value ? 'Select sub-category…' : '— pick trade —') + '</option>';
+      list.forEach(function (s) { var o = document.createElement('option'); o.value = s.id; o.textContent = s.label; skill.appendChild(o); });
+    });
+  }
+
   function init() {
     gstAutofill();
     initDisplayName();
+    initSkillSelect();
     initForwardCredit();
     initSubconVendor();
     initRegAutofill();

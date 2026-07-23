@@ -277,13 +277,31 @@ if ($route === 'po') {
     if (!$po) { http_response_code(404); return view('notfound'); }
     if ($method === 'POST') {
         $b = $_POST;
-        $pdo->prepare("INSERT INTO po_line_items (purchase_order_id,description,item_type,quantity,rate,consumed) VALUES (?,?,?,?,?,?)")
-            ->execute([$po['id'], $b['description'], $b['item_type'] ?? 'MANDAYS', $b['quantity'] ?: 0, $b['rate'] ?: null, $b['consumed'] ?: 0]);
-        flash('Line item added.');
+        $qty = (float)($b['quantity'] ?? 0); $rate = (float)($b['rate'] ?? 0); $gst = (float)($b['gst_pct'] ?? 0);
+        $base = $qty * $rate; $tax = round($base * $gst / 100, 2); $total = $base + $tax;
+        $pdo->prepare("INSERT INTO po_line_items (purchase_order_id,description,item_type,trade_id,skill_id,activity_id,site,manpower,quantity,rate,consumed,gst_pct,base_amount,tax_amount,total_amount)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+            ->execute([$po['id'], $b['description'], $b['item_type'] ?? 'MANDAYS',
+                ($b['trade_id'] ?? '') !== '' ? (int)$b['trade_id'] : null,
+                ($b['skill_id'] ?? '') !== '' ? (int)$b['skill_id'] : null,
+                ($b['activity_id'] ?? '') !== '' ? (int)$b['activity_id'] : null,
+                $b['site'] ?? '', (int)(($b['manpower'] ?? 0) ?: 0), $qty, $rate ?: null, (float)(($b['consumed'] ?? 0) ?: 0), $gst, $base, $tax, $total]);
+        // roll the PO value up to the sum of its line-item totals
+        $sum = (float)$pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM po_line_items WHERE purchase_order_id=" . (int)$po['id'])->fetchColumn();
+        $pdo->prepare("UPDATE partner_purchase_orders SET value=? WHERE id=?")->execute([$sum, $po['id']]);
+        // if the PO is against a contract, roll the contract value up too
+        if ($po['contract_id']) {
+            $cSum = (float)$pdo->query("SELECT COALESCE(SUM(value),0) FROM partner_purchase_orders WHERE contract_id=" . (int)$po['contract_id'])->fetchColumn();
+            $pdo->prepare("UPDATE partner_contracts SET value=? WHERE id=?")->execute([$cSum, $po['contract_id']]);
+        }
+        flash('Line item added. PO value updated to ₹' . number_format($sum, 0) . '.');
         redirect('/po?id=' . $po['id']);
     }
-    $li = $pdo->prepare("SELECT * FROM po_line_items WHERE purchase_order_id = ?"); $li->execute([$po['id']]);
-    return view('po_detail', ['po' => $po, 'items' => $li->fetchAll()]);
+    $li = $pdo->prepare("SELECT l.*, t.label trade_label, s.label skill_label, a.label activity_label
+        FROM po_line_items l LEFT JOIN lookup_values t ON t.id=l.trade_id LEFT JOIN lookup_values s ON s.id=l.skill_id
+        LEFT JOIN lookup_values a ON a.id=l.activity_id WHERE l.purchase_order_id = ?");
+    $li->execute([$po['id']]);
+    return view('po_detail', ['po' => $po, 'items' => $li->fetchAll(), 'skillsByTrade' => skills_by_trade(), 'trades' => lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : []]);
 }
 
 // --- Operations & Finance modules (Calls, Jobs, masters, reports, users) ---
