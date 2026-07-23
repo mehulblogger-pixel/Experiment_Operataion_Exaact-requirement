@@ -872,6 +872,8 @@ function ops_dispatch($route, $method) {
             ops_my_jobs(); return true;
         case $route === 'reports':
             ops_reports(); return true;
+        case $route === 'profitability':
+            ops_profitability(); return true;
         case $route === 'users' || $route === 'user-new' || $route === 'user-edit':
             ops_users($route, $method); return true;
         case $route === 'change-password':
@@ -1871,6 +1873,58 @@ function ops_my_jobs() {
 
 // ---- Dashboards / reports (scoped + filtered) ------------------------------
 function job_eff_date($j) { return ($j['scheduled_date'] ?? '') !== '' ? $j['scheduled_date'] : substr($j['created_at'] ?? '', 0, 10); }
+
+// ---- Profitability by BOSS / contract number (P7) --------------------------
+// Revenue − labour − expenses − subcon, rolling voucher expenses + job closure
+// expenses into each BOSS number. Labour is only counted when salary is visible.
+function boss_profit($bossId) {
+    $seeSal = can_see_salary();
+    $jobs = ops_all("SELECT * FROM jobs WHERE boss_id=?", [$bossId]);
+    $revenue = 0; $labour = 0; $subcon = 0; $jobExp = 0; $invoiced = 0; $paid = 0;
+    foreach ($jobs as $j) {
+        $revenue += (float)(($j['invoice_amount'] ?? 0) ?: ($j['expected_credit'] ?? 0));
+        $invoiced += (float)($j['invoice_amount'] ?? 0);
+        $paid += !empty($j['payment_received']) ? (float)($j['payment_amount'] ?? 0) : 0;
+        $subcon += (float)($j['subcon_cost'] ?? 0);
+        if ($seeSal) {
+            $sal = $j['inspector_id'] ? (float)ops_val("SELECT salary_ctc FROM inspectors WHERE id=?", [$j['inspector_id']]) : 0;
+            $labour += ($sal ? inspector_daily_cost($sal) : 0) * job_mandays($j);
+        }
+        $jobExp += job_expenses_total($j['id']);
+    }
+    $vExp = (float)ops_val("SELECT COALESCE(SUM(row_total),0) FROM voucher_entries WHERE boss_id=?", [$bossId]);
+    $expenses = $jobExp + $vExp;
+    $margin = $revenue - $labour - $expenses - $subcon;
+    return ['jobs' => count($jobs), 'revenue' => $revenue, 'labour' => $labour, 'expenses' => $expenses,
+        'vExp' => $vExp, 'jobExp' => $jobExp, 'subcon' => $subcon, 'margin' => $margin,
+        'pct' => $revenue ? round($margin / $revenue * 100, 1) : null, 'invoiced' => $invoiced, 'paid' => $paid];
+}
+function ops_profitability() {
+    ops_require(can('data.profitability'), 'You do not have access to profitability figures.');
+    $bossId = (int)($_GET['boss'] ?? 0);
+    if ($bossId) {
+        $boss = ops_one("SELECT bn.*, bp.legal_name client_name, bp.display_name client_disp FROM boss_numbers bn LEFT JOIN business_partners bp ON bp.id=bn.client_id WHERE bn.id=?", [$bossId]);
+        if (!$boss) { http_response_code(404); view('notfound'); return; }
+        $p = boss_profit($bossId);
+        // expense drill-down (voucher lines) — which inspector visited which vendor, cost
+        $lines = ops_all("SELECT e.entry_date, e.hours, e.km, e.travel_amount, e.amounts, e.row_total, e.line_no,
+            i.name inspector_name, vn.display_name vendor_disp, vn.legal_name vendor_leg
+            FROM voucher_entries e LEFT JOIN vouchers v ON v.id=e.voucher_id LEFT JOIN inspectors i ON i.id=v.inspector_id
+            LEFT JOIN business_partners vn ON vn.id=e.vendor_id WHERE e.boss_id=? AND e.row_total>0 ORDER BY e.entry_date", [$bossId]);
+        // invoice drill-down (jobs)
+        $invLines = ops_all("SELECT j.job_code, j.invoice_number, j.invoice_amount, j.invoice_date, j.payment_received, j.payment_amount,
+            i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.boss_id=? ORDER BY j.id", [$bossId]);
+        view('ops/profitability_detail', ['boss' => $boss, 'p' => $p, 'lines' => $lines, 'invLines' => $invLines,
+            'headLabels' => expense_head_label_map(), 'seeSal' => can_see_salary()]);
+        return;
+    }
+    // list all BOSS numbers with profitability
+    $rows = [];
+    foreach (ops_all("SELECT bn.*, bp.display_name client_disp, bp.legal_name client_name FROM boss_numbers bn LEFT JOIN business_partners bp ON bp.id=bn.client_id ORDER BY bn.boss_number") as $b) {
+        $rows[] = $b + ['p' => boss_profit($b['id'])];
+    }
+    view('ops/profitability_list', ['rows' => $rows, 'seeSal' => can_see_salary()]);
+}
 
 function ops_reports() {
     ops_require(can('dash.operations') || can('dash.financial') || can('dash.utilization') || can('dash.people'), 'You do not have dashboard access.');

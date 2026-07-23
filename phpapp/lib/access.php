@@ -25,6 +25,7 @@ const PERMISSIONS = [
     'dash.people'     => 'People & compliance dashboard',
     'data.credit'     => 'See credit / revenue figures',
     'data.salary'     => 'See salary / loaded cost',
+    'data.profitability' => 'See BOSS / contract profitability',
     'ops.call.create' => 'Create / edit calls',
     'ops.job.allocate'=> 'Allocate / edit jobs',
     'ops.job.close'   => 'Close jobs',
@@ -43,22 +44,23 @@ function role_defaults($role) {
         case 'MASTER_ADMIN': case 'ADMIN':
             return ['perms' => $all, 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'BUSINESS_DIRECTOR':
-            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary'], 'offices' => 'ALL', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability'], 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'SBU_HEAD':
-            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary'], 'offices' => 'ALL', 'sbus' => 'OWN'];
+            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability'], 'offices' => 'ALL', 'sbus' => 'OWN'];
         case 'BRANCH_MANAGER':
-            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','ops.call.create','ops.job.allocate','ops.job.close','master.manage','users.manage.branch'], 'offices' => 'OWN', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability','ops.call.create','ops.job.allocate','ops.job.close','master.manage','users.manage.branch'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'BRANCH_APP_MANAGER':
             return ['perms' => ['dash.operations','dash.utilization','users.manage.branch','master.manage','ops.call.delete'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'OPERATION_MANAGER':
-            return ['perms' => ['dash.operations','dash.utilization','ops.call.create','ops.job.allocate','ops.job.close'], 'offices' => 'OWN', 'sbus' => 'OWN'];
+            // "manager under the branch manager" — may see BOSS/contract profitability
+            return ['perms' => ['dash.operations','dash.utilization','data.profitability','ops.call.create','ops.job.allocate','ops.job.close'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'ASST_MANAGER':
             return ['perms' => ['dash.operations','ops.call.create','ops.job.allocate'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'COORDINATOR':
             // per decision: Operations + read-only revenue (financial section visible, but no salary/profit)
             return ['perms' => ['dash.operations','dash.financial','data.credit','ops.call.create','ops.job.allocate','ops.job.close'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'FINANCE':
-            return ['perms' => ['dash.financial','data.credit','data.salary','finance.reconcile'], 'offices' => 'ALL', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.financial','data.credit','data.salary','data.profitability','finance.reconcile'], 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'INSPECTOR':
             return ['perms' => [], 'offices' => 'OWN', 'sbus' => 'OWN'];
     }
