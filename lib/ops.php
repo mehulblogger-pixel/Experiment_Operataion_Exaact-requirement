@@ -178,6 +178,26 @@ function ops_ensure_schema() {
         "CREATE TABLE IF NOT EXISTS inspector_allowances (
             id $pk, inspector_id INT, kind VARCHAR(10), code VARCHAR(30),
             allowed INT DEFAULT 0, rate_override DECIMAL(12,2) NULL)",
+        // Monthly inspector voucher ("Statement of Travelling Expenses").
+        "CREATE TABLE IF NOT EXISTS vouchers (
+            id $pk, inspector_id INT, office_id INT NULL, month VARCHAR(7),
+            status VARCHAR(20) DEFAULT 'DRAFT', nature VARCHAR(30) DEFAULT '',
+            advance DECIMAL(12,2) DEFAULT 0, office_incurred DECIMAL(12,2) DEFAULT 0,
+            supporting_file MEDIUMTEXT, supporting_name VARCHAR(200) DEFAULT '',
+            total DECIMAL(14,2) DEFAULT 0, submitted_at VARCHAR(30) DEFAULT '',
+            checked_by VARCHAR(150) DEFAULT '', approved_by VARCHAR(150) DEFAULT '',
+            authorized_by VARCHAR(150) DEFAULT '', approved_at VARCHAR(30) DEFAULT '',
+            created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
+        // One row per day-segment (a site visit, office, or leave). Multiple per date.
+        "CREATE TABLE IF NOT EXISTS voucher_entries (
+            id $pk, voucher_id INT, entry_date VARCHAR(20), day_type VARCHAR(15) DEFAULT 'WORK',
+            job_id INT NULL, boss_id INT NULL, client_id INT NULL, vendor_id INT NULL,
+            file_no VARCHAR(60) DEFAULT '', line_no VARCHAR(30) DEFAULT '', sbu VARCHAR(20) DEFAULT '',
+            site_label VARCHAR(255) DEFAULT '', hours DECIMAL(5,2) DEFAULT 0,
+            mode_code VARCHAR(30) DEFAULT '', km DECIMAL(8,1) DEFAULT 0, travel_amount DECIMAL(12,2) DEFAULT 0,
+            amounts TEXT, row_total DECIMAL(12,2) DEFAULT 0,
+            leave_code VARCHAR(20) DEFAULT '', office_code VARCHAR(20) DEFAULT '', notes VARCHAR(255) DEFAULT '',
+            is_auto INT DEFAULT 0, sort_order INT DEFAULT 0)",
     ];
     foreach ($t as $sql) $pdo->exec($sql);
 }
@@ -841,6 +861,8 @@ function ops_dispatch($route, $method) {
             ops_jobs($route, $method); return true;
         case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage':
             ops_candidates($route, $method); return true;
+        case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry':
+            ops_vouchers($route, $method); return true;
         case $route === 'my-jobs':
             ops_my_jobs(); return true;
         case $route === 'reports':
@@ -1395,6 +1417,117 @@ function ops_candidates($route, $method) {
         $events = ops_all("SELECT * FROM candidate_events WHERE candidate_id=? ORDER BY id DESC", [$cand['id']]);
         view('ops/candidate_detail', ['cand' => $cand, 'events' => $events]);
         return;
+    }
+}
+
+// ---- Monthly voucher (P3: auto-fill skeleton) ------------------------------
+function my_inspector_id() { $u = current_user(); return $u['inspector_id'] ?? null; }
+function voucher_owner_is_me($v) { return my_inspector_id() && (int)$v['inspector_id'] === (int)my_inspector_id(); }
+function can_view_voucher($v) { return is_coordinator_level() || voucher_owner_is_me($v); }
+function can_edit_voucher($v) { return ($v['status'] === 'DRAFT') && (is_coordinator_level() || voucher_owner_is_me($v)); }
+
+// Build the month's day rows from the inspector's jobs (idempotent — skips days
+// already pulled for the same job). Returns how many rows were added.
+function voucher_generate($v) {
+    $pdo = db();
+    [$y, $m] = array_map('intval', explode('-', $v['month']));
+    $from = sprintf('%04d-%02d-01', $y, $m);
+    $to = date('Y-m-t', strtotime($from));
+    $jobs = ops_all("SELECT j.id, j.boss_id, j.sbu, j.scheduled_date, j.inspection_start_date, j.inspection_end_date,
+        c.client_id, c.vendor_id, bn.boss_number,
+        vn.display_name vdisp, vn.legal_name vleg, cl.display_name cdisp, cl.legal_name cleg
+        FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN boss_numbers bn ON bn.id=j.boss_id
+        LEFT JOIN business_partners vn ON vn.id=c.vendor_id LEFT JOIN business_partners cl ON cl.id=c.client_id
+        WHERE j.inspector_id=?", [$v['inspector_id']]);
+    $added = 0;
+    $ins = $pdo->prepare("INSERT INTO voucher_entries (voucher_id,entry_date,day_type,job_id,boss_id,client_id,vendor_id,file_no,line_no,sbu,site_label,hours,is_auto)
+        VALUES (?,?, 'WORK', ?,?,?,?,?,'',?,?, ?, 1)");
+    foreach ($jobs as $j) {
+        $s = $j['inspection_start_date'] ?: ($j['scheduled_date'] ?: '');
+        $e = $j['inspection_end_date'] ?: $s;
+        if (!$s) continue;
+        $start = max(strtotime($from), strtotime($s));
+        $stop  = min(strtotime($to), strtotime($e ?: $s));
+        for ($d = $start; $d !== false && $d <= $stop; $d = strtotime('+1 day', $d)) {
+            $date = date('Y-m-d', $d);
+            if ((int)ops_val("SELECT COUNT(*) FROM voucher_entries WHERE voucher_id=? AND job_id=? AND entry_date=?", [$v['id'], $j['id'], $date])) continue;
+            $site = $j['vdisp'] ?: ($j['vleg'] ?: ($j['cdisp'] ?: ($j['cleg'] ?: '')));
+            $ins->execute([$v['id'], $date, $j['id'], $j['boss_id'], $j['client_id'], $j['vendor_id'], $j['boss_number'] ?: '', $j['sbu'], $site, 8]);
+            $added++;
+        }
+    }
+    return $added;
+}
+
+function ops_vouchers($route, $method) {
+    $pdo = db();
+
+    if ($route === 'vouchers') {
+        if (is_inspector() && my_inspector_id()) {
+            $rows = ops_all("SELECT * FROM vouchers WHERE inspector_id=? ORDER BY month DESC", [my_inspector_id()]);
+            view('ops/voucher_list', ['rows' => $rows, 'mine' => true, 'inspectors' => []]);
+            return;
+        }
+        ops_require(is_coordinator_level(), 'You cannot view vouchers.');
+        $rows = ops_all("SELECT v.*, i.name inspector_name FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id ORDER BY v.month DESC, i.name");
+        view('ops/voucher_list', ['rows' => $rows, 'mine' => false, 'inspectors' => inspectors_list(false)]);
+        return;
+    }
+
+    if ($route === 'voucher') {
+        $id = (int)($_GET['id'] ?? 0);
+        if (!$id) { // find-or-create for inspector + month
+            $insId = is_coordinator_level() ? (int)($_GET['ins'] ?? 0) : (int)my_inspector_id();
+            $month = preg_match('/^\d{4}-\d{2}$/', $_GET['month'] ?? '') ? $_GET['month'] : date('Y-m');
+            if (!$insId) { flash('Pick an inspector first.', 'error'); redirect('/vouchers'); }
+            $v = ops_one("SELECT * FROM vouchers WHERE inspector_id=? AND month=?", [$insId, $month]);
+            if (!$v) {
+                $pdo->prepare("INSERT INTO vouchers (inspector_id,office_id,month,status,created_by,created_at) VALUES (?,?,?, 'DRAFT', ?,?)")
+                    ->execute([$insId, current_user()['home_office_id'] ?? null, $month, user_name(current_user()), date('c')]);
+                $id = $pdo->lastInsertId();
+            } else { $id = $v['id']; }
+            redirect('/voucher?id=' . $id);
+        }
+        $v = ops_one("SELECT v.*, i.name inspector_name, i.emp_code, i.sbu FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id WHERE v.id=?", [$id]);
+        if (!$v) { http_response_code(404); view('notfound'); return; }
+        ops_require(can_view_voucher($v), 'You cannot view this voucher.');
+        $entries = ops_all("SELECT * FROM voucher_entries WHERE voucher_id=? ORDER BY entry_date, id", [$id]);
+        view('ops/voucher_detail', ['v' => $v, 'entries' => $entries, 'canEdit' => can_edit_voucher($v),
+            'leaveOpts' => lk_options_or('leave_type', LEAVE_TYPES), 'dayOpts' => lk_options_or('day_code', DAY_CODES)]);
+        return;
+    }
+
+    if ($route === 'voucher-generate' && $method === 'POST') {
+        $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$v) { http_response_code(404); view('notfound'); return; }
+        ops_require(can_edit_voucher($v), 'This voucher can no longer be edited.');
+        $n = voucher_generate($v);
+        flash($n ? "$n working day(s) pulled from jobs." : 'No new job days found for this month.');
+        redirect('/voucher?id=' . $v['id']);
+    }
+
+    if ($route === 'voucher-entry' && $method === 'POST') {
+        $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$v) { http_response_code(404); view('notfound'); return; }
+        ops_require(can_edit_voucher($v), 'This voucher can no longer be edited.');
+        $b = $_POST; $do = $b['_do'] ?? '';
+        if ($do === 'update') {
+            $pdo->prepare("UPDATE voucher_entries SET hours=?, line_no=?, file_no=?, notes=? WHERE id=? AND voucher_id=?")
+                ->execute([(float)($b['hours'] ?? 0), $b['line_no'] ?? '', $b['file_no'] ?? '', $b['notes'] ?? '', (int)$b['entry_id'], $v['id']]);
+            flash('Row updated.');
+        } elseif ($do === 'add') {
+            $dt = in_array($b['day_type'] ?? '', ['OFFICE','LEAVE','HOLIDAY','WEEKOFF','WORK'], true) ? $b['day_type'] : 'OFFICE';
+            $pdo->prepare("INSERT INTO voucher_entries (voucher_id,entry_date,day_type,sbu,site_label,hours,leave_code,office_code,is_auto)
+                VALUES (?,?,?,?,?,?,?,?,0)")
+                ->execute([$v['id'], $b['entry_date'] ?? '', $dt, $b['sbu'] ?? '',
+                    $dt === 'LEAVE' ? 'On leave' : ($dt === 'OFFICE' ? 'In office' : ucfirst(strtolower($dt))),
+                    (float)($b['hours'] ?? 0), $dt === 'LEAVE' ? ($b['leave_code'] ?? '') : '', $dt === 'OFFICE' ? ($b['office_code'] ?? '') : '']);
+            flash('Day added.');
+        } elseif ($do === 'del') {
+            $pdo->prepare("DELETE FROM voucher_entries WHERE id=? AND voucher_id=?")->execute([(int)$b['entry_id'], $v['id']]);
+            flash('Row removed.');
+        }
+        redirect('/voucher?id=' . $v['id']);
     }
 }
 

@@ -23,10 +23,16 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
       work for Super Admin; a normal inspector save does NOT wipe the
       entitlements; and a Branch Manager cannot see the panel nor POST to it
       (0 rows written). Boot probe added.
-- [ ] **P3 · Voucher auto-fill** — `vouchers`/`voucher_days`/`voucher_lines`;
-      generate the month from Jobs (date, vendor display, BOSS+Line, SBU); **many
-      rows per date** (multi-site + office split) each with its own **hours** &
-      **km**; per-day hours subtotal. File No auto, **Line No editable** (Accounts).
+- [x] **P3 · Voucher auto-fill** — DONE. `vouchers` + `voucher_entries` tables;
+      new **Vouchers** tab (inspectors see "My Voucher"). Open/create a voucher
+      per inspector+month; **"Pull working days from jobs"** auto-fills one row per
+      inspection day (date, **vendor display name** as site, **File No = BOSS**,
+      SBU, 8h, tagged `auto`) — idempotent, never duplicates. **Multiple rows per
+      date** supported with a per-day **hours subtotal** + month total; hours
+      **editable**; **Line No editable** (from Accounts), File No editable on work
+      rows. Add non-inspection days (Office / Leave-with-code / Holiday / Week-off).
+      Access: inspector = own; coordinator+ = any. Verified end-to-end; boot probe
+      added. (KM/expense columns + totals arrive in P4.)
 - [ ] **P4 · Fast entry** — km dropdown auto-filled + **remembered per vendor**
       (editable); auto-calc km×rate; entitlement-limited heads/modes; bill fields;
       **one supporting file per voucher** backs all bill claims; live totals.
