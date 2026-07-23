@@ -57,8 +57,9 @@
     <?php if(!$sbuKeys):?><tr><td colspan="<?= $seeSalary?4:2 ?>">No data.</td></tr><?php endif;?></table>
     <?php if ($seeSalary): ?><p class="muted" style="margin-top:6px;">Loaded cost is each active engineer's monthly cost (CTC/12 + <?= OVERHEAD_PCT ?>% overhead) split equally across the SBUs they're tagged to.</p><?php endif; ?></div>
   <div class="panel"><h3 class="tab-sub">Expenses by heading</h3><table class="grid"><tr><th>Heading</th><th>Amount</th></tr>
-    <?php foreach (['travel'=>'Travel','local'=>'Local conveyance','food'=>'Food','lodging'=>'Lodging','misc'=>'Misc'] as $k=>$v): ?><tr><td><?= $v ?></td><td><?= fmoney($fin['expHead'][$k]) ?></td></tr><?php endforeach; ?></table>
-    <p class="muted" style="margin-top:6px;">Headings are configurable under <a href="/lookup?key=expense_heading">Expense headings</a>.</p></div>
+    <?php foreach (expense_heading_labels() as $k=>$v): ?><tr><td><?= e($v) ?></td><td><?= fmoney($fin['expHead'][$k]) ?></td></tr><?php endforeach; ?>
+    <?php $extraLbls = expense_extra_headings(); foreach ($fin['expHeadExtra'] as $code=>$amt): ?><tr><td><?= e($extraLbls[$code] ?? $code) ?></td><td><?= fmoney($amt) ?></td></tr><?php endforeach; ?></table>
+    <p class="muted" style="margin-top:6px;">Add or rename headings under <a href="/lookup?key=expense_heading">Expense headings</a> — new ones flow to the close form and this report automatically.</p></div>
 </div>
 <div class="stat-row">
   <div class="stat-card"><div class="sc-num"><?= fmoney($fin['invoiced']) ?></div><div class="sc-lbl">Invoiced</div></div>

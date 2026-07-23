@@ -43,10 +43,11 @@
     <h3 class="tab-sub">Expenses</h3>
     <table class="grid">
       <tr><th>Date</th><th>SBU</th><th>Travel</th><th>Local</th><th>Food</th><th>Lodging</th><th>Misc</th><th>Total</th></tr>
-      <?php $etot=0; foreach ($expenses as $x): $rt=$x['travel']+$x['local']+$x['food']+$x['lodging']+$x['misc']; $etot+=$rt; ?>
+      <?php $etot=0; $extraLbls=expense_extra_headings(); foreach ($expenses as $x): $ex=expense_extra_decode($x['extra']??''); $rt=$x['travel']+$x['local']+$x['food']+$x['lodging']+$x['misc']+array_sum($ex); $etot+=$rt; ?>
       <tr><td><?= e($x['exp_date']) ?></td><td><?= e(OPS_SBUS[$x['sbu']] ?? $x['sbu']) ?></td>
         <td><?= fmoney($x['travel']) ?></td><td><?= fmoney($x['local']) ?></td><td><?= fmoney($x['food']) ?></td>
         <td><?= fmoney($x['lodging']) ?></td><td><?= fmoney($x['misc']) ?></td><td><strong><?= fmoney($rt) ?></strong></td></tr>
+      <?php if ($ex): ?><tr><td colspan="8" class="muted" style="font-size:12px">+ <?= e(implode(', ', array_map(fn($c,$a)=>($extraLbls[$c]??$c).': '.fmoney($a), array_keys($ex), array_values($ex)))) ?></td></tr><?php endif; ?>
       <?php endforeach; ?>
       <?php if (!$expenses): ?><tr><td colspan="8">No expenses recorded (entered at closure).</td></tr><?php endif; ?>
     </table>
