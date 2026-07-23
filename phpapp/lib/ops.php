@@ -28,6 +28,20 @@ const RATE_TYPES = ['MANDAY'=>'Per man-day','MANMONTH'=>'Per man-month'];
 const BOSS_STATUS = ['ACTIVE'=>'Active','CLOSED'=>'Closed','HOLD'=>'On hold'];
 const OPS_ROLES = ['MASTER_ADMIN'=>'Master Admin','ADMIN'=>'Admin','COORDINATOR'=>'Coordinator','INSPECTOR'=>'Inspector'];
 const OVERHEAD_PCT = 8; // salary overhead %
+// CV / hiring (deputation resourcing) pipeline: a candidate's CV moves through
+// these stages when a client needs a deputed / resident engineer.
+const CAND_STAGES = [
+    'RECEIVED'   => 'CV received',
+    'SUBMITTED'  => 'Submitted to client',
+    'SHORTLISTED'=> 'Shortlisted',
+    'INTERVIEW'  => 'Interview scheduled',
+    'HOLD'       => 'On hold',
+    'REJECTED'   => 'Rejected',
+    'ACCEPTED'   => 'Accepted (Hired)',
+    'WITHDRAWN'  => 'Withdrawn',
+];
+// Where a candidate is sourced from (mirrors inspector engineer-type).
+const CAND_SOURCES = ['ASSET'=>'SGS asset (employee)','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor'];
 
 // ---- Schema ----------------------------------------------------------------
 function ops_ensure_schema() {
@@ -96,6 +110,24 @@ function ops_ensure_schema() {
             id $pk, to_addr VARCHAR(255), cc_addr VARCHAR(255) DEFAULT '', subject VARCHAR(255),
             body TEXT, kind VARCHAR(40) DEFAULT '', sent_ok INT DEFAULT 0, error VARCHAR(255) DEFAULT '',
             created_at VARCHAR(30) DEFAULT '')",
+        // CV / hiring pipeline (deputation resourcing) — one row per candidate CV.
+        "CREATE TABLE IF NOT EXISTS candidates (
+            id $pk, cand_code VARCHAR(30) DEFAULT '', first_name VARCHAR(80) DEFAULT '',
+            middle_name VARCHAR(80) DEFAULT '', last_name VARCHAR(80) DEFAULT '',
+            client_id INT NULL, call_id INT NULL, trade_id INT NULL, skill_id INT NULL,
+            designation VARCHAR(40) DEFAULT '', source VARCHAR(20) DEFAULT 'FREELANCER',
+            agency VARCHAR(150) DEFAULT '', proposed_site VARCHAR(200) DEFAULT '',
+            sbu VARCHAR(20) DEFAULT '', experience_years DECIMAL(5,1) DEFAULT 0,
+            email VARCHAR(200) DEFAULT '', mobile VARCHAR(40) DEFAULT '',
+            cv_link VARCHAR(500) DEFAULT '', expected_rate DECIMAL(12,2) DEFAULT 0,
+            rate_type VARCHAR(20) DEFAULT 'MANDAY', cv_received_date VARCHAR(20) DEFAULT '',
+            stage VARCHAR(20) DEFAULT 'RECEIVED', decided_at VARCHAR(30) DEFAULT '',
+            inspector_id INT NULL, remarks TEXT, created_by VARCHAR(150) DEFAULT '',
+            created_at VARCHAR(30) DEFAULT '')",
+        // stage-change log for a candidate (who moved it, when, note).
+        "CREATE TABLE IF NOT EXISTS candidate_events (
+            id $pk, candidate_id INT, from_stage VARCHAR(20) DEFAULT '', to_stage VARCHAR(20) DEFAULT '',
+            remark VARCHAR(500) DEFAULT '', actor VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
     ];
     foreach ($t as $sql) $pdo->exec($sql);
 }
@@ -688,6 +720,8 @@ function ops_dispatch($route, $method) {
             ops_calls($route, $method); return true;
         case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice':
             ops_jobs($route, $method); return true;
+        case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage':
+            ops_candidates($route, $method); return true;
         case $route === 'my-jobs':
             ops_my_jobs(); return true;
         case $route === 'reports':
@@ -1076,6 +1110,120 @@ function send_forward_email($callId) {
         . "Credit to executing branch: " . fmoney($c['expected_credit']) . " (" . (CREDIT_TYPES[$c['credit_type']] ?? '') . ")\n"
         . "Please allocate an inspector.\n\nRegards,\nSGS Ahmedabad (Managing office)";
     ops_mail($to, "Call forwarded: {$c['call_code']} — {$client}", $body, $cc, 'forward');
+}
+
+// ---- CV / hiring pipeline (deputation resourcing) --------------------------
+function candidate_name($c) {
+    return trim(($c['first_name'] ?? '') . ' ' . ($c['middle_name'] ?? '') . ' ' . ($c['last_name'] ?? '')) ?: '(no name)';
+}
+function nzc_cand($f, $v) {
+    if (in_array($f, ['client_id','call_id','trade_id','skill_id'], true)) return $v === '' ? null : (int)$v;
+    if (in_array($f, ['experience_years','expected_rate'], true)) return $v === '' ? 0 : $v;
+    return $v;
+}
+function ops_candidates($route, $method) {
+    $pdo = db();
+
+    // stage transition (+ optional hire = create inspector)
+    if ($route === 'candidate-stage') {
+        ops_require(is_coordinator_level(), 'Only coordinators and admins can move a candidate.');
+        $id = (int)($_GET['id'] ?? 0);
+        $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
+        if (!$cand) { http_response_code(404); view('notfound'); return; }
+        if ($method === 'POST') {
+            $to = $_POST['to_stage'] ?? '';
+            if (!isset(CAND_STAGES[$to])) { flash('Unknown stage.', 'error'); redirect('/candidate?id=' . $id); }
+            $remark = trim($_POST['remark'] ?? '');
+            $decided = in_array($to, ['ACCEPTED','REJECTED','WITHDRAWN'], true) ? date('c') : ($cand['decided_at'] ?: '');
+            $pdo->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")->execute([$to, $decided, $id]);
+            $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
+                ->execute([$id, $cand['stage'], $to, $remark, user_name(current_user()), date('c')]);
+            $msg = 'Candidate moved to ' . CAND_STAGES[$to] . '.';
+            // Hired: create an inspector/resource record from the accepted candidate.
+            if ($to === 'ACCEPTED' && !empty($_POST['make_inspector']) && empty($cand['inspector_id'])) {
+                $name = candidate_name($cand);
+                $pdo->prepare("INSERT INTO inspectors (name,first_name,middle_name,last_name,email,mobile,trade_id,skill_ids,sbus,sbu,designation,staff_kind,status,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)")
+                    ->execute([$name, $cand['first_name'], $cand['middle_name'], $cand['last_name'], $cand['email'], $cand['mobile'],
+                        $cand['trade_id'], (string)($cand['skill_id'] ?: ''), $cand['sbu'], $cand['sbu'], $cand['designation'], $cand['source'], date('c')]);
+                $insId = $pdo->lastInsertId();
+                $pdo->prepare("UPDATE candidates SET inspector_id=? WHERE id=?")->execute([$insId, $id]);
+                $msg .= ' Added to Inspectors — you can now allocate deputation jobs to them.';
+            }
+            flash($msg);
+        }
+        redirect('/candidate?id=' . $id);
+    }
+
+    // list + stage filter
+    if ($route === 'candidates') {
+        ops_require(is_coordinator_level(), 'Only coordinators and admins can view the hiring pipeline.');
+        $q = trim($_GET['q'] ?? ''); $stage = $_GET['stage'] ?? '';
+        $where = '1=1'; $args = [];
+        if ($stage !== '' && isset(CAND_STAGES[$stage])) { $where .= ' AND c.stage=?'; $args[] = $stage; }
+        if ($q) { $where .= " AND (c.first_name LIKE ? OR c.last_name LIKE ? OR c.cand_code LIKE ? OR c.proposed_site LIKE ?)"; array_push($args, "%$q%","%$q%","%$q%","%$q%"); }
+        $rows = ops_all("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, t.label trade_label
+            FROM candidates c LEFT JOIN business_partners bp ON bp.id=c.client_id
+            LEFT JOIN lookup_values t ON t.id=c.trade_id WHERE $where ORDER BY c.id DESC", $args);
+        $counts = [];
+        foreach (ops_all("SELECT stage, COUNT(*) n FROM candidates GROUP BY stage") as $r) $counts[$r['stage']] = (int)$r['n'];
+        view('ops/candidate_list', ['rows' => $rows, 'q' => $q, 'stage' => $stage, 'counts' => $counts]);
+        return;
+    }
+
+    // new / edit
+    if ($route === 'candidate-new' || $route === 'candidate-edit') {
+        ops_require(is_coordinator_level(), 'Only coordinators and admins can add candidates.');
+        $cand = null;
+        if ($route === 'candidate-edit') {
+            $cand = ops_one("SELECT * FROM candidates WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+            if (!$cand) { http_response_code(404); view('notfound'); return; }
+        }
+        if ($method === 'POST') {
+            $b = $_POST;
+            $fields = ['first_name','middle_name','last_name','client_id','call_id','trade_id','skill_id',
+                'designation','source','agency','proposed_site','sbu','experience_years','email','mobile',
+                'cv_link','expected_rate','rate_type','cv_received_date','remarks'];
+            if ($cand) {
+                $set = implode(',', array_map(fn($f) => "$f=?", $fields));
+                $vals = array_map(fn($f) => nzc_cand($f, $b[$f] ?? ''), $fields); $vals[] = $cand['id'];
+                $pdo->prepare("UPDATE candidates SET $set WHERE id=?")->execute($vals);
+                flash('Candidate updated.');
+                redirect('/candidate?id=' . $cand['id']);
+            } else {
+                $code = ops_next_code('candidates', 'cand_code', 'CV');
+                $cols = array_merge(['cand_code'], $fields, ['stage','created_by','created_at']);
+                $vals = array_merge([$code], array_map(fn($f) => nzc_cand($f, $b[$f] ?? ''), $fields),
+                    ['RECEIVED', user_name(current_user()), date('c')]);
+                $ph = implode(',', array_fill(0, count($cols), '?'));
+                $pdo->prepare("INSERT INTO candidates (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
+                $id = $pdo->lastInsertId();
+                $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
+                    ->execute([$id, '', 'RECEIVED', 'CV received', user_name(current_user()), date('c')]);
+                flash("$code added to the hiring pipeline.");
+                redirect('/candidate?id=' . $id);
+            }
+        }
+        // client's deputation calls (to link the candidate to a specific requirement)
+        $depCalls = ops_all("SELECT id, call_code, inspection_type FROM calls ORDER BY id DESC");
+        view('ops/candidate_form', ['cand' => $cand, 'clients' => clients_list(), 'depCalls' => $depCalls,
+            'trades' => lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [], 'skillsByTrade' => skills_by_trade()]);
+        return;
+    }
+
+    // detail
+    if ($route === 'candidate') {
+        ops_require(is_coordinator_level());
+        $cand = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp,
+            t.label trade_label, s.label skill_label, ca.call_code
+            FROM candidates c LEFT JOIN business_partners bp ON bp.id=c.client_id
+            LEFT JOIN lookup_values t ON t.id=c.trade_id LEFT JOIN lookup_values s ON s.id=c.skill_id
+            LEFT JOIN calls ca ON ca.id=c.call_id WHERE c.id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$cand) { http_response_code(404); view('notfound'); return; }
+        $events = ops_all("SELECT * FROM candidate_events WHERE candidate_id=? ORDER BY id DESC", [$cand['id']]);
+        view('ops/candidate_detail', ['cand' => $cand, 'events' => $events]);
+        return;
+    }
 }
 
 // ---- Jobs ------------------------------------------------------------------

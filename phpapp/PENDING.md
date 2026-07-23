@@ -7,10 +7,16 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
 - [ ] **Inspector expenses linked strictly to the job done** — an inspector's
       expenses must attach only to the job they performed (fuller rules to be
       provided by the user).
-- [ ] **CV / hiring pipeline (deputation resourcing)** — for projects/clients
-      needing a deputed engineer: submit CV → client shortlists → interview →
-      Hold / Reject / Accept(=Hired). Track submitted candidates with trade,
-      proposed site, CV-received date, current stage. Additional module.
+- [x] **CV / hiring pipeline (deputation resourcing)** — DONE. New "Hiring" tab.
+      Add a candidate CV (name, trade→skill, client, against-call, proposed site,
+      SBU, designation, source [asset/freelancer/sub-con], experience, rate, CV
+      link, CV-received date). Move through **CV received → Submitted to client →
+      Shortlisted → Interview → Hold / Reject / Accept(=Hired) / Withdrawn**, each
+      transition logged with a remark + who/when (full history on the candidate).
+      On **Accept** you can tick "add to Inspectors" and the person is created as
+      an inspector (carrying trade/skill/SBU/designation and the freelancer/
+      sub-con type) ready for deputation-job allocation. Stage filter chips +
+      counts on the list. Tables: `candidates`, `candidate_events`.
 
 ## Parked (agreed to do later)
 
