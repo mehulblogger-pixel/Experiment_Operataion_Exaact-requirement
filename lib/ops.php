@@ -280,6 +280,8 @@ function ops_migrate() {
     ensure_column('jobs', 'credit_received', 'INT DEFAULT 0'); // inter-office: credit received flag
     // extra (configurable) expense headings beyond the fixed 5, stored as JSON {code:amount}
     ensure_column('expenses', 'extra', 'TEXT');
+    // voucher supporting-file mime (voucher table itself is created in ensure_schema)
+    ensure_column('vouchers', 'supporting_mime', "VARCHAR(100) DEFAULT ''");
     // certifications per inspector, with validity + reminder tracking
     db()->exec("CREATE TABLE IF NOT EXISTS inspector_certs (
         id " . pk_clause() . ", inspector_id INT, name VARCHAR(200), number VARCHAR(80) DEFAULT '',
@@ -864,7 +866,7 @@ function ops_dispatch($route, $method) {
             ops_jobs($route, $method); return true;
         case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage':
             ops_candidates($route, $method); return true;
-        case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry' || $route === 'voucher-save':
+        case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry' || $route === 'voucher-save' || $route === 'voucher-header' || $route === 'voucher-status' || $route === 'voucher-print' || $route === 'voucher-file':
             ops_vouchers($route, $method); return true;
         case $route === 'my-jobs':
             ops_my_jobs(); return true;
@@ -1491,6 +1493,20 @@ function vendor_km_remember($insId, $vendorId, $mode, $km) {
     if ($ex) $pdo->prepare("UPDATE vendor_km_memory SET mode_code=?, km=? WHERE id=?")->execute([$mode, $km, $ex]);
     else $pdo->prepare("INSERT INTO vendor_km_memory (inspector_id,vendor_id,mode_code,km) VALUES (?,?,?,?)")->execute([$insId, $vendorId, $mode, $km]);
 }
+// Roll the voucher's entries into the summary "particulars": travel + per head.
+function voucher_summary($voucherId) {
+    $travel = 0; $heads = [];
+    foreach (ops_all("SELECT travel_amount, amounts FROM voucher_entries WHERE voucher_id=?", [$voucherId]) as $r) {
+        $travel += (float)$r['travel_amount'];
+        foreach (expense_extra_decode($r['amounts'] ?? '') as $c => $a) $heads[$c] = ($heads[$c] ?? 0) + (float)$a;
+    }
+    return ['travel' => $travel, 'heads' => $heads, 'grand' => $travel + array_sum($heads)];
+}
+function expense_head_label_map() {
+    $out = ['KMTRAVEL' => 'Travel charges (KM × rate)'];
+    foreach (ops_all("SELECT code, label FROM expense_heads") as $h) $out[$h['code']] = $h['label'];
+    return $out;
+}
 
 function ops_vouchers($route, $method) {
     $pdo = db();
@@ -1528,7 +1544,72 @@ function ops_vouchers($route, $method) {
         view('ops/voucher_detail', ['v' => $v, 'entries' => $entries, 'canEdit' => can_edit_voucher($v),
             'leaveOpts' => lk_options_or('leave_type', LEAVE_TYPES), 'dayOpts' => lk_options_or('day_code', DAY_CODES),
             'heads' => voucher_heads_for($v['inspector_id']), 'modes' => voucher_modes_for($v['inspector_id']),
-            'rates' => voucher_mode_rates($v['inspector_id'])]);
+            'rates' => voucher_mode_rates($v['inspector_id']), 'sum' => voucher_summary($v['id']),
+            'headLabels' => expense_head_label_map(), 'canApprove' => is_coordinator_level(),
+            'natureOpts' => ['REVENUE'=>'Revenue','NONREV'=>'Non-Revenue','SUPPORT'=>'Support function','MD'=>'MD']]);
+        return;
+    }
+
+    if ($route === 'voucher-header' && $method === 'POST') {
+        $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$v) { http_response_code(404); view('notfound'); return; }
+        ops_require(can_edit_voucher($v), 'This voucher can no longer be edited.');
+        $pdo->prepare("UPDATE vouchers SET nature=?, advance=?, office_incurred=? WHERE id=?")
+            ->execute([$_POST['nature'] ?? '', (float)($_POST['advance'] ?? 0), (float)($_POST['office_incurred'] ?? 0), $v['id']]);
+        if (!empty($_FILES['support']['tmp_name']) && (int)$_FILES['support']['error'] === 0) {
+            if ((int)$_FILES['support']['size'] <= 6 * 1024 * 1024) {
+                $data = base64_encode(file_get_contents($_FILES['support']['tmp_name']));
+                $pdo->prepare("UPDATE vouchers SET supporting_file=?, supporting_name=?, supporting_mime=? WHERE id=?")
+                    ->execute([$data, substr($_FILES['support']['name'], 0, 200), $_FILES['support']['type'] ?: 'application/octet-stream', $v['id']]);
+            } else { flash('Supporting file is larger than 6 MB — please compress it.', 'error'); redirect('/voucher?id=' . $v['id']); }
+        }
+        flash('Voucher details saved.');
+        redirect('/voucher?id=' . $v['id']);
+    }
+
+    if ($route === 'voucher-file') {
+        $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$v || !$v['supporting_file']) { http_response_code(404); echo 'No supporting file.'; return; }
+        ops_require(can_view_voucher($v), 'You cannot view this file.');
+        header('Content-Type: ' . ($v['supporting_mime'] ?: 'application/octet-stream'));
+        header('Content-Disposition: inline; filename="' . preg_replace('/[^\w.\- ]/', '', $v['supporting_name'] ?: 'support') . '"');
+        echo base64_decode($v['supporting_file']);
+        return;
+    }
+
+    if ($route === 'voucher-status' && $method === 'POST') {
+        $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$v) { http_response_code(404); view('notfound'); return; }
+        $act = $_POST['action'] ?? '';
+        if ($act === 'submit') {
+            ops_require(($v['status'] === 'DRAFT') && (is_coordinator_level() || voucher_owner_is_me($v)), 'Cannot submit this voucher.');
+            $pdo->prepare("UPDATE vouchers SET status='SUBMITTED', submitted_at=? WHERE id=?")->execute([date('c'), $v['id']]);
+            flash('Voucher submitted for approval.');
+        } elseif ($act === 'approve') {
+            ops_require(is_coordinator_level() && $v['status'] === 'SUBMITTED', 'Only a manager can approve a submitted voucher.');
+            $pdo->prepare("UPDATE vouchers SET status='APPROVED', checked_by=?, approved_by=?, authorized_by=?, approved_at=? WHERE id=?")
+                ->execute([$_POST['checked_by'] ?? '', ($_POST['approved_by'] ?? '') ?: user_name(current_user()), $_POST['authorized_by'] ?? '', date('c'), $v['id']]);
+            flash('Voucher approved.');
+        } elseif ($act === 'paid') {
+            ops_require(is_coordinator_level() && $v['status'] === 'APPROVED', 'Only an approved voucher can be marked paid.');
+            $pdo->prepare("UPDATE vouchers SET status='PAID' WHERE id=?")->execute([$v['id']]);
+            flash('Voucher marked as paid.');
+        } elseif ($act === 'reopen') {
+            ops_require(is_coordinator_level(), 'Only a manager can reopen a voucher.');
+            $pdo->prepare("UPDATE vouchers SET status='DRAFT' WHERE id=?")->execute([$v['id']]);
+            flash('Voucher reopened for editing.');
+        }
+        redirect('/voucher?id=' . $v['id']);
+    }
+
+    if ($route === 'voucher-print') {
+        $v = ops_one("SELECT v.*, i.name inspector_name, i.emp_code, i.sbu FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id WHERE v.id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$v) { http_response_code(404); view('notfound'); return; }
+        ops_require(can_view_voucher($v), 'You cannot view this voucher.');
+        $entries = ops_all("SELECT * FROM voucher_entries WHERE voucher_id=? ORDER BY entry_date, id", [$v['id']]);
+        $sum = voucher_summary($v['id']);
+        $headLabels = expense_head_label_map();
+        require __DIR__ . '/../views/ops/voucher_print.php';
         return;
     }
 

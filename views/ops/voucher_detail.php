@@ -121,6 +121,72 @@
   <p class="muted" style="margin-top:8px">KM auto-fills from what you last entered for that vendor (↺) and stays editable. Travel ₹ = KM × your rate; the bottom row totals every column. Only the heads &amp; modes you're entitled to appear.</p>
 <?php endif; ?>
 
+<div class="panel-split" style="margin-top:16px">
+  <div class="panel">
+    <h3 class="tab-sub">Summary — particulars</h3>
+    <table class="grid">
+      <tr><th>Particular</th><th style="text-align:right">Amount</th></tr>
+      <tr><td>Travel charges (KM × rate)</td><td style="text-align:right">₹<?= number_format($sum['travel'],0) ?></td></tr>
+      <?php foreach ($sum['heads'] as $code=>$amt): if ($amt==0) continue; ?>
+        <tr><td><?= e($headLabels[$code] ?? $code) ?></td><td style="text-align:right">₹<?= number_format($amt,0) ?></td></tr>
+      <?php endforeach; ?>
+      <tr style="background:#f7f6f4"><td><strong>Grand Total</strong></td><td style="text-align:right"><strong>₹<?= number_format($sum['grand'],0) ?></strong></td></tr>
+      <tr><td>Less: Advance</td><td style="text-align:right">₹<?= number_format((float)$v['advance'],0) ?></td></tr>
+      <tr><td>Less: Expenses incurred by Office</td><td style="text-align:right">₹<?= number_format((float)$v['office_incurred'],0) ?></td></tr>
+      <?php $bal = $sum['grand'] - (float)$v['advance'] - (float)$v['office_incurred']; ?>
+      <tr style="background:#f7f6f4"><td><strong>Balance to be paid / (recovered)</strong></td><td style="text-align:right"><strong>₹<?= number_format($bal,0) ?></strong></td></tr>
+    </table>
+    <div style="margin-top:10px"><a class="btn secondary" href="/voucher-print?id=<?= (int)$v['id'] ?>" target="_blank">🖨 Print statement</a></div>
+  </div>
+
+  <div class="panel">
+    <h3 class="tab-sub">Voucher details &amp; approval</h3>
+    <?php if ($canEdit): ?>
+    <form method="post" action="/voucher-header?id=<?= (int)$v['id'] ?>" enctype="multipart/form-data">
+      <div class="form-grid">
+        <div class="ff"><label>Nature of spend</label>
+          <select class="form-control" name="nature"><option value="">—</option><?php foreach ($natureOpts as $k=>$vv): ?><option value="<?= e($k) ?>" <?= $v['nature']===$k?'selected':'' ?>><?= e($vv) ?></option><?php endforeach; ?></select></div>
+        <div class="ff"><label>Less Advance (₹)</label><input class="form-control" type="number" step="0.01" name="advance" value="<?= e($v['advance']) ?>"></div>
+        <div class="ff"><label>Less Office-incurred (₹)</label><input class="form-control" type="number" step="0.01" name="office_incurred" value="<?= e($v['office_incurred']) ?>"></div>
+        <div class="ff ff-wide"><label>Supporting file — one file for all bills (PDF/JPG, max 6 MB)</label><input class="form-control" type="file" name="support"></div>
+      </div>
+      <div style="margin-top:8px"><button class="btn small" type="submit">Save details / upload</button></div>
+    </form>
+    <?php else: ?>
+      <div class="kv-grid">
+        <div><span class="k">Nature</span><span class="v"><?= e($natureOpts[$v['nature']] ?? $v['nature'] ?: '—') ?></span></div>
+        <div><span class="k">Advance</span><span class="v">₹<?= number_format((float)$v['advance'],0) ?></span></div>
+        <div><span class="k">Office-incurred</span><span class="v">₹<?= number_format((float)$v['office_incurred'],0) ?></span></div>
+      </div>
+    <?php endif; ?>
+    <?php if ($v['supporting_file']): ?><p style="margin-top:8px">📎 Supporting: <a href="/voucher-file?id=<?= (int)$v['id'] ?>" target="_blank"><?= e($v['supporting_name'] ?: 'file') ?></a></p><?php endif; ?>
+
+    <hr style="margin:12px 0;border:none;border-top:1px solid #eee">
+    <p><strong>Status:</strong> <span class="badge <?= $statusBadge[$v['status']] ?? 'AMBER' ?>"><?= e($v['status']) ?></span>
+      <?php if ($v['approved_by']): ?><span class="muted"> · approved by <?= e($v['approved_by']) ?></span><?php endif; ?></p>
+    <div class="row-actions" style="flex-wrap:wrap;gap:6px">
+      <?php if ($v['status']==='DRAFT' && ($canApprove || voucher_owner_is_me($v))): ?>
+        <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="submit"><button class="btn" type="submit">Submit for approval</button></form>
+      <?php endif; ?>
+      <?php if ($v['status']==='SUBMITTED' && $canApprove): ?>
+        <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" class="inline-add" style="align-items:flex-end">
+          <input type="hidden" name="action" value="approve">
+          <div class="ff"><label>Checked by</label><input class="form-control" name="checked_by"></div>
+          <div class="ff"><label>Approved by</label><input class="form-control" name="approved_by" value="<?= e(user_name(current_user())) ?>"></div>
+          <div class="ff"><label>Authorized by</label><input class="form-control" name="authorized_by"></div>
+          <button class="btn" type="submit">Approve</button>
+        </form>
+      <?php endif; ?>
+      <?php if ($v['status']==='APPROVED' && $canApprove): ?>
+        <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="paid"><button class="btn" type="submit">Mark paid</button></form>
+      <?php endif; ?>
+      <?php if ($v['status']!=='DRAFT' && $canApprove): ?>
+        <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" onsubmit="return confirm('Reopen for editing?')"><input type="hidden" name="action" value="reopen"><button class="btn secondary" type="submit">Reopen</button></form>
+      <?php endif; ?>
+    </div>
+  </div>
+</div>
+
 <script>
   (function(){
     var t=document.getElementById('add_daytype'), o=document.getElementById('add_office'), l=document.getElementById('add_leave');
