@@ -129,20 +129,20 @@ function seed_demo() {
         $c['boss'] = count($boss);
 
         // ---------- Calls ----------
-        $insC = $pdo->prepare("INSERT INTO calls(call_code,client_id,vendor_id,ibo_office_id,region,sbu,product_category,call_received_date,inspection_required_date,notes,status,executing_office_id,expected_credit,credit_type,inspection_type,created_by,created_at)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'demo', ?)");
-        // [code, client, vendor, iboOffice(null=same), region, sbu, prodcat, recd, reqBy, status, execOffice, credit, credit_type, itype]
+        $insC = $pdo->prepare("INSERT INTO calls(call_code,client_id,vendor_id,ibo_office_id,contracting_office_id,region,sbu,product_category,call_received_date,inspection_required_date,notes,status,executing_office_id,expected_credit,credit_type,billable_value,billable_basis,inspection_type,created_by,created_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'demo', ?)");
+        // [code, client, vendor, ibo, contracting, region, sbu, prodcat, recd, reqBy, status, exec, credit, credit_type, billable, billable_basis, itype]
         $calls = [
-            ['C-2607-001',$cid['CL-RIL'],$vid['VN-VAP'],null,'WEST','IND','Pressure vessel',$d(-20),$d(-10),'Same office (Ahmedabad) — no inter-office credit','CLOSED',$oid['AMD'],0,'MANDAY','INSPECTION'],
-            ['C-2607-002',$cid['CL-ADN'],$vid['VN-MUN'],$oid['MUM'],'WEST','OGC','Structural',$d(-18),$d(-8),'Contracted by Mumbai, executed by Ahmedabad — credit to AMD','CLOSED',$oid['AMD'],184000,'MANDAY','INSPECTION'],
-            ['C-2607-003',$cid['CL-LNT'],null,$oid['MUM'],'WEST','IND','Piping',$d(-16),$d(-6),'Contracted by Mumbai, executed by Pune','CLOSED',$oid['PUN'],96000,'MANDAY','INSPECTION'],
-            ['C-2607-004',$cid['CL-RIL'],$vid['VN-VAP'],null,'WEST','IND','Welding audit',$d(-4),$d(3),'Ahmedabad own job — in progress','OPEN',$oid['AMD'],0,'MANDAY','INSPECTION'],
-            ['C-2607-005',$cid['CL-ADN'],$vid['VN-MUN'],null,'WEST','MIN','Crane / lifting',$d(-3),$d(4),'Pune — sub-con deployed','OPEN',$oid['PUN'],0,'MANDAY','INSPECTION'],
-            ['C-2607-006',$cid['CL-LNT'],null,$oid['MUM'],'WEST','OGC','Coating',$d(-12),$d(-2),'Cross-office, overdue closure','OPEN',$oid['AMD'],110000,'MANDAY','INSPECTION'],
+            ['C-2607-001',$cid['CL-RIL'],$vid['VN-VAP'],null,$oid['AMD'],'WEST','IND','Pressure vessel',$d(-20),$d(-10),'Same office (Ahmedabad) — billable only, no inter-office credit','CLOSED',$oid['AMD'],0,'',150000,'MANDAY','INSPECTION'],
+            ['C-2607-002',$cid['CL-ADN'],$vid['VN-MUN'],$oid['MUM'],$oid['MUM'],'WEST','OGC','Structural',$d(-18),$d(-8),'Contracted by Mumbai, executed by Ahmedabad — credit to AMD','CLOSED',$oid['AMD'],184000,'MANDAY',0,'','INSPECTION'],
+            ['C-2607-003',$cid['CL-LNT'],null,$oid['MUM'],$oid['MUM'],'WEST','IND','Piping',$d(-16),$d(-6),'Contracted by Mumbai, executed by Pune','CLOSED',$oid['PUN'],96000,'MANDAY',0,'','INSPECTION'],
+            ['C-2607-004',$cid['CL-RIL'],$vid['VN-VAP'],null,$oid['AMD'],'WEST','IND','Welding audit',$d(-4),$d(3),'Ahmedabad own job — in progress (billable only)','OPEN',$oid['AMD'],0,'',80000,'MANDAY','INSPECTION'],
+            ['C-2607-005',$cid['CL-ADN'],$vid['VN-MUN'],null,$oid['PUN'],'WEST','MIN','Crane / lifting',$d(-3),$d(4),'Pune own job — sub-con deployed','OPEN',$oid['PUN'],0,'',60000,'MANDAY','INSPECTION'],
+            ['C-2607-006',$cid['CL-LNT'],null,$oid['MUM'],$oid['MUM'],'WEST','OGC','Coating',$d(-12),$d(-2),'Cross-office, overdue closure — credit to AMD','OPEN',$oid['AMD'],110000,'MANDAY',0,'','INSPECTION'],
         ];
         $callid = [];
         foreach ($calls as $r) {
-            $insC->execute([$r[0],$r[1],$r[2],$r[3],$r[4],$r[5],$r[6],$r[7],$r[8],$r[9],$r[10],$r[11],$r[12],$r[13],$now]);
+            $insC->execute([$r[0],$r[1],$r[2],$r[3],$r[4],$r[5],$r[6],$r[7],$r[8],$r[9],$r[10],$r[11],$r[12],$r[13],$r[14],$r[15],$r[16],$r[17],$now]);
             $callid[$r[0]] = (int)$pdo->lastInsertId();
         }
         $c['calls'] = count($calls);

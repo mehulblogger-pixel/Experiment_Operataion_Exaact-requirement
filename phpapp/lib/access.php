@@ -204,9 +204,10 @@ function scope_clause($officeCol, $sbuCol) {
     if ($off !== 'ALL' && is_array($off) && $off) {
         static $ahm = null;
         if ($ahm === null) $ahm = (int)(ops_val("SELECT id FROM offices WHERE is_ahmedabad=1 LIMIT 1") ?: 0);
-        $ph = implode(',', array_fill(0, count($off), '?'));
-        $w[] = "COALESCE($officeCol, $ahm) IN ($ph)";
-        foreach ($off as $o) $args[] = $o;
+        // Inline integer office ids: PDO binds params as strings, and a COALESCE()
+        // expression drops integer affinity, so a bound '20' would not match int 20.
+        $ids = implode(',', array_map('intval', $off));
+        $w[] = "COALESCE($officeCol, $ahm) IN ($ids)";
     }
     if ($sbu !== 'ALL' && is_array($sbu) && $sbu) {
         $ph = implode(',', array_fill(0, count($sbu), '?'));
