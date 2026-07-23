@@ -136,6 +136,16 @@ function ops_migrate() {
     // contracts / purchase orders carry SBU for revenue attribution
     ensure_column('partner_contracts', 'sbu', "VARCHAR(20) DEFAULT ''");
     ensure_column('partner_purchase_orders', 'sbu', "VARCHAR(20) DEFAULT ''");
+    // PO line items: manpower / site / trade→subcategory + GST/Tax/Total
+    ensure_column('po_line_items', 'trade_id', 'INT NULL');
+    ensure_column('po_line_items', 'skill_id', 'INT NULL');
+    ensure_column('po_line_items', 'site', "VARCHAR(200) DEFAULT ''");
+    ensure_column('po_line_items', 'manpower', 'INT DEFAULT 0');
+    ensure_column('po_line_items', 'activity_id', 'INT NULL');
+    ensure_column('po_line_items', 'gst_pct', 'DECIMAL(6,2) DEFAULT 0');
+    ensure_column('po_line_items', 'base_amount', 'DECIMAL(14,2) DEFAULT 0');
+    ensure_column('po_line_items', 'tax_amount', 'DECIMAL(14,2) DEFAULT 0');
+    ensure_column('po_line_items', 'total_amount', 'DECIMAL(14,2) DEFAULT 0');
     // inspector master overhaul: names, trade, multi-SBU, multi-skill
     ensure_column('inspectors', 'first_name', "VARCHAR(80) DEFAULT ''");
     ensure_column('inspectors', 'middle_name', "VARCHAR(80) DEFAULT ''");
