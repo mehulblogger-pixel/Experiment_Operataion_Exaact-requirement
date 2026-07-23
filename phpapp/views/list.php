@@ -15,6 +15,7 @@
   <?php if ($q || $status): ?><a class="btn secondary" href="/<?= $isClient ? 'clients' : 'vendors' ?>">Clear</a><?php endif; ?>
 </form>
 
+<div class="tbl-scroll" style="overflow-x:auto">
 <table class="grid">
   <tr><th>Code</th><th>Name</th><th>Roles</th><th>Industry</th><th>GSTIN</th><th>Status</th><th>Actions</th></tr>
   <?php foreach ($rows as $p): ?>
@@ -33,6 +34,7 @@
   <?php endforeach; ?>
   <?php if (!$rows): ?><tr><td colspan="7">No records found. <a href="/partner-new?role=<?= e($roleField) ?>">Add one</a>.</td></tr><?php endif; ?>
 </table>
+</div>
 
 <?php if ($pages > 1): ?>
 <div class="pill-row" style="margin-top:14px;">
