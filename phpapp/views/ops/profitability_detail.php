@@ -14,6 +14,7 @@
   <div class="stat-card"><div class="sc-num"><?= fmoney($p['subcon']) ?></div><div class="sc-lbl">Sub-con</div></div>
   <?php if ($seeSal): ?>
   <div class="stat-card"><div class="sc-num"><?= fmoney($p['labour']) ?></div><div class="sc-lbl">Loaded labour</div></div>
+  <?php if (($p['contingency'] ?? 0) > 0): ?><div class="stat-card"><div class="sc-num"><?= fmoney($p['contingency']) ?></div><div class="sc-lbl">Contingency</div></div><?php endif; ?>
   <div class="stat-card"><div class="sc-num" style="color:<?= $p['margin']>=0?'#1f8a4c':'#c0392b' ?>"><?= fmoney($p['margin']) ?></div><div class="sc-lbl">Margin<?= $p['pct']!==null?' ('.$p['pct'].'%)':'' ?></div></div>
   <?php else: ?>
   <div class="stat-card"><div class="sc-num"><?= fmoney($p['revenue']-$p['expenses']-$p['subcon']) ?></div><div class="sc-lbl">Contribution (labour hidden)</div></div>

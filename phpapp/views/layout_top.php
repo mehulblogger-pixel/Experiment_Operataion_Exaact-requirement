@@ -25,6 +25,7 @@
       <?php if (can('dash.operations') || can('dash.financial') || can('dash.utilization') || can('dash.people')): ?><a href="/reports">Dashboards</a><?php endif; ?>
       <?php if (can('data.profitability')): ?><a href="/profitability">Profitability</a><?php endif; ?>
       <?php if (can('users.manage.branch') || can('users.manage.global')): ?><a href="/users">Users</a><?php endif; ?>
+      <?php if (is_admin_level()): ?><a href="/office-finance">Overheads</a><?php endif; ?>
       <?php if (can('settings.manage')): ?><a href="/settings">Settings</a><?php endif; ?>
     <?php endif; ?>
   </nav>
