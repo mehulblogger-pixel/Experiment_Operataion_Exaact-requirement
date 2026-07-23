@@ -2,6 +2,43 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🚧 Expense / Inspector-Voucher module (IN PROGRESS — the profitability engine)
+
+Modelled on the real "Statement of Travelling Expenses" the inspectors use.
+Wide grid: one column per configurable expense head, TOTAL row at bottom + grand
+total. Auto-fills from Jobs; inspector only enters hours + km + bills.
+
+- [x] **P1 · Masters & codes** — `expense_heads` master (code, type PER_KM/BILL/
+      ALLOWANCE, default rate, needs-receipt, column order — each is a voucher
+      column); `travel_modes` master (Bike ₹6, Car ₹12, Own-car, Ola/Uber, Auto,
+      Bus, Train, Air — per-km vs actual); `leave_type` + `day_code` lookups
+      (CL/SL/PL/LWP/COMPOFF/ML + OFFICE/WFH/TRAINING/HOLIDAY/WEEKOFF). Seeded on
+      fresh + upgrade; both masters on the Masters page; boot probes added.
+- [ ] **P2 · Inspector entitlements (Super-Admin only)** — `inspector_allowances`:
+      which heads/modes each inspector may use + per-inspector rate override
+      (Mehul car ₹12, Hardik bike ₹6). Hidden from everyone except Super Admin.
+- [ ] **P3 · Voucher auto-fill** — `vouchers`/`voucher_days`/`voucher_lines`;
+      generate the month from Jobs (date, vendor display, BOSS+Line, SBU); **many
+      rows per date** (multi-site + office split) each with its own **hours** &
+      **km**; per-day hours subtotal. File No auto, **Line No editable** (Accounts).
+- [ ] **P4 · Fast entry** — km dropdown auto-filled + **remembered per vendor**
+      (editable); auto-calc km×rate; entitlement-limited heads/modes; bill fields;
+      **one supporting file per voucher** backs all bill claims; live totals.
+- [ ] **P5 · Output & workflow** — summary "particulars" page (Railway/Bus/Hotel/
+      Meals/Telephone/Outstation/Local/Others + Grand Total + Less Advance/Office +
+      Balance); printable Statement; 3-level approval (Checked→Approved→Authorized).
+- [ ] **P6 · Attendance reconciliation** — upload HR payroll export, parse **in
+      memory only** (do NOT store the company doc), match by Employee Code, flag
+      day-type mismatches (claimed visit vs HR leave); save only the result.
+- [ ] **P7 · Profitability by BOSS/Contract** — roll voucher lines → job → BOSS;
+      Revenue − labour − expenses − subcon = margin %; **+ icon drill-down** per
+      expense/invoice line (date, inspector, vendor, hours, cost). Clickable
+      File/Line + profitability visible ONLY to Super Admin / Branch Manager /
+      manager-under-branch-manager (new `data.profitability` perm) — not
+      inspector/coordinator.
+- [ ] **P8 · Contract/BOSS carry-forward** — renew/supersede a BOSS/contract
+      (Open/ARC) → new number, carry PO/open jobs/lines forward, show old number.
+
 ## Additional features (user will provide details / build later)
 
 - [ ] **Inspector expenses linked strictly to the job done** — an inspector's
