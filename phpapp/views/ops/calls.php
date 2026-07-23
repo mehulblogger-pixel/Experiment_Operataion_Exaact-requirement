@@ -10,7 +10,10 @@
 <div class="master-head">
   <div><h1>Call Register</h1>
   <p class="sub" style="margin:2px 0 0">Inspection calls received — open one to allocate a job, or edit the details.</p></div>
-  <?php if (is_coordinator_level()): ?><a class="btn" href="/call-new">➕ New Call</a><?php endif; ?>
+  <div style="display:flex;gap:8px">
+    <a class="btn secondary" href="/calls?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ CSV</a>
+    <?php if (is_coordinator_level()): ?><a class="btn" href="/call-new">➕ New Call</a><?php endif; ?>
+  </div>
 </div>
 
 <div class="chip-row">

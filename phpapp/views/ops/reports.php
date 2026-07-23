@@ -28,6 +28,18 @@
   <a class="btn small secondary" href="/reports">Reset</a>
 </form>
 
+<div class="panel" style="margin-bottom:4px">
+  <h4 class="tab-sub" style="margin-top:0">⬇ Download reports (Excel / CSV)</h4>
+  <p class="sub" style="margin:0 0 10px">Open in Excel or Google Sheets for your own analysis. Each export respects your access scope.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <?php $of = $F['office'] ? '&office='.(int)$F['office'] : ''; $sb = $F['sbu'] ? '&sbu='.e($F['sbu']) : ''; ?>
+    <a class="btn small secondary" href="/jobs?export=csv">Job register</a>
+    <a class="btn small secondary" href="/calls?export=csv">Call register</a>
+    <?php if (can('data.credit') || can('finance.reconcile')): ?><a class="btn small secondary" href="/invoicing?f=all&export=csv">Invoicing &amp; payments</a><?php endif; ?>
+    <?php if (can('data.profitability')): ?><a class="btn small secondary" href="/profitability?export=csv">Profitability by BOSS</a><?php endif; ?>
+  </div>
+</div>
+
 <?php if ($canOps): ?>
 <h3 class="tab-sub fam">🛠️ Operations</h3>
 <div class="stat-row">

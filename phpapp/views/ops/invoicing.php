@@ -11,6 +11,7 @@
 <div class="master-head">
   <div><h1>Invoicing &amp; payments</h1>
   <p class="sub" style="margin:2px 0 0">Confirm invoicing, payment received and inter-office credit. Tick each job — it feeds profitability.</p></div>
+  <a class="btn secondary" href="/invoicing?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ Download CSV</a>
 </div>
 
 <div class="qcards" style="margin-top:16px">
