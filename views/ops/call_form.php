@@ -18,11 +18,16 @@
       <select class="form-control searchable" name="ibo_office_id"><option value="">— Ahmedabad's own —</option>
         <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ($call && $call['ibo_office_id']==$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
       </select></div>
+    <div class="ff"><label>Contracting office <span class="muted">(who owns the client / PO)</span></label>
+      <select class="form-control searchable" id="con_sel" name="contracting_office_id"><option value="">— my office —</option>
+        <?php $conCur = $call['contracting_office_id'] ?? (current_user()['home_office_id'] ?? null);
+          foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ($conCur==$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
+      </select></div>
     <div class="ff"><label>Executing office (branch) <a href="#" class="addlink" data-qa="office">+ Add new</a></label>
-      <select class="form-control searchable" id="exec_sel" name="executing_office_id"><option value="">— Ahmedabad executes —</option>
+      <select class="form-control searchable" id="exec_sel" name="executing_office_id"><option value="">— same office executes —</option>
         <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ($call && ($call['executing_office_id']??null)==$o['id'])?'selected':'' ?>><?= e($o['name']) ?><?= $o['coordinator_name']?' · '.e($o['coordinator_name']):'' ?></option><?php endforeach; ?>
       </select>
-      <small class="muted">Forwarding to a branch e-mails its coordinator and needs a credit amount below.</small></div>
+      <small class="muted">Same as contracting = billable value only (no inter-office credit). A different office opens the credit fields.</small></div>
 
     <div class="ff"><label>Region</label>
       <select class="form-control searchable" name="region"><option value="">—</option>
@@ -60,12 +65,27 @@
       </select></div>
     <div class="ff"></div>
 
-    <div class="ff"><label>Credit to executing branch (₹) <span class="muted">— required when forwarding</span></label>
-      <input class="form-control" type="number" step="0.01" name="expected_credit" value="<?= e($call['expected_credit'] ?? '') ?>"></div>
-    <div class="ff"><label>Credit type</label>
-      <select class="form-control" name="credit_type"><option value="">—</option>
-        <?php foreach (CREDIT_TYPES as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($call && ($call['credit_type']??'')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
-      </select></div>
+    <!-- SAME office → billable value only (ex-GST); DIFFERENT office → inter-office credit -->
+    <div class="ff ff-wide" id="billbox">
+      <div class="form-grid" id="samebox">
+        <div class="ff"><label>Billable value to client — <strong>excluding GST</strong> (₹)</label>
+          <input class="form-control" type="number" step="0.01" name="billable_value" value="<?= e($call['billable_value'] ?? '') ?>"></div>
+        <div class="ff"><label>Basis</label>
+          <select class="form-control" name="billable_basis"><option value="">—</option>
+            <?php foreach (CREDIT_TYPES as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($call && ($call['billable_basis']??'')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
+          </select></div>
+        <p class="muted ff-wide" style="margin:2px 2px 0">Same contracting &amp; executing office — no inter-office credit; this is the client-billable value (ex-GST).</p>
+      </div>
+      <div class="form-grid" id="crossbox" style="display:none">
+        <div class="ff"><label>Credit to executing office (₹) <span class="muted">— required</span></label>
+          <input class="form-control" type="number" step="0.01" name="expected_credit" value="<?= e($call['expected_credit'] ?? '') ?>"></div>
+        <div class="ff"><label>Credit type</label>
+          <select class="form-control" name="credit_type"><option value="">—</option>
+            <?php foreach (CREDIT_TYPES as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($call && ($call['credit_type']??'')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
+          </select></div>
+        <p class="muted ff-wide" style="margin:2px 2px 0">Contracting office proposes the credit; the executing office can revert with the credit it requires (on the call page after saving).</p>
+      </div>
+    </div>
 
     <div class="ff"><label>Against PO (client's orders)</label>
       <select class="form-control searchable" id="po_sel" name="po_id"><option value="">— open / none —</option>
@@ -87,6 +107,21 @@
     <a class="btn secondary" href="/calls">Cancel</a>
   </div>
 </form>
+
+<script>
+(function(){
+  var con=document.getElementById('con_sel'), ex=document.getElementById('exec_sel');
+  var same=document.getElementById('samebox'), cross=document.getElementById('crossbox');
+  if(!(con&&ex&&same&&cross)) return;
+  function sync(){
+    var e=ex.value||'', c=con.value||'';
+    var isSame = (e==='') || (c!=='' && e===c);   // no executing branch, or executing == contracting
+    same.style.display  = isSame ? '' : 'none';
+    cross.style.display = isSame ? 'none' : '';
+  }
+  con.addEventListener('change', sync); ex.addEventListener('change', sync); sync();
+})();
+</script>
 
 <!-- Quick-add modal -->
 <div class="modal-back" id="qa_back" style="display:none;">

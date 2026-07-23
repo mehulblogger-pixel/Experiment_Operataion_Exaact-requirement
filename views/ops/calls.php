@@ -22,8 +22,9 @@
 
 <form method="get" action="/calls" class="filter-bar">
   <input class="form-control" type="text" name="q" value="<?= e($q) ?>" placeholder="🔍 Search code, client or vendor…">
+  <input class="form-control" type="number" name="mincost" value="<?= e($minCost ?? '') ?>" placeholder="Min cost ₹" style="max-width:140px">
   <button class="btn secondary" type="submit">Search</button>
-  <?php if ($q): ?><a class="btn secondary" href="/calls">Clear</a><?php endif; ?>
+  <?php if ($q || ($minCost ?? '') !== ''): ?><a class="btn secondary" href="/calls">Clear</a><?php endif; ?>
 </form>
 
 <div class="panel" style="padding:0;overflow:hidden">
@@ -33,7 +34,7 @@
   <?php else: ?>
   <table class="dt">
     <thead><tr>
-      <th>Call</th><th>Client</th><th>Vendor / Site</th><th>Region</th><th>SBU</th><th>Required by</th><th class="num">Jobs</th><th>Status</th><th></th>
+      <th>Call</th><th>Client</th><th>Vendor / Site</th><th>SBU</th><th>Required by</th><th class="num">Jobs</th><th class="num">Cost incurred</th><th>Status</th><th></th>
     </tr></thead>
     <tbody>
     <?php foreach ($rows as $c):
@@ -46,10 +47,10 @@
         <td><a href="/call?id=<?= (int)$c['id'] ?>"><b><?= e($c['call_code']) ?></b></a></td>
         <td><?= e($c['client_disp'] ?: $c['client_name'] ?: '—') ?></td>
         <td><?= $c['vendor_name'] ? e($c['vendor_name']) : '<span class="muted">—</span>' ?></td>
-        <td><?= e(OPS_REGIONS[$c['region']] ?? '—') ?></td>
         <td><?= e(OPS_SBUS[$c['sbu']] ?? '—') ?></td>
         <td><?= $req ? ($reqOverdue ? '<span class="down" style="font-weight:600">'.e($req).'</span>' : e($req)) : '<span class="muted">—</span>' ?></td>
         <td class="num"><?= (int)$c['job_count'] ?: '<span class="muted">0</span>' ?></td>
+        <td class="num"><?= ((float)($c['cost_incurred'] ?? 0))>0 ? fmoney($c['cost_incurred']) : '<span class="muted">—</span>' ?></td>
         <td>
           <?php if ($closed): ?><span class="pill p-ok">Closed</span>
           <?php elseif ($needs): ?><span class="pill p-warn">To schedule</span>

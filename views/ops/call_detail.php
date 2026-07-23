@@ -43,13 +43,44 @@
       <div><span class="k">Against PO</span><?= e($po['po_number'] ?? '—') ?><?= $liw ? ' · '.e($liw['description']) : '' ?></div><?php endif; ?>
     <div><span class="k">Product</span><?= e((lk_options_or('product', PRODUCT_CATS)[$call['product_category']] ?? '') ?: ($call['product_other'] ?: '—')) ?></div>
     <div><span class="k">Deputation</span><?= e($call['deputation_type'] ?: '—') ?></div>
-    <div><span class="k">Credit to branch</span><?= fmoney($call['expected_credit']) ?><?= $call['credit_type'] ? ' <small class="muted">('.e(CREDIT_TYPES[$call['credit_type']] ?? '').')</small>' : '' ?></div>
+    <?php if (!empty($sameOffice)): ?>
+      <div><span class="k">Billable (ex-GST)</span><?= fmoney($call['billable_value']) ?><?= ($call['billable_basis']??'') ? ' <small class="muted">('.e(CREDIT_TYPES[$call['billable_basis']] ?? '').')</small>' : '' ?></div>
+    <?php else: ?>
+      <div><span class="k">Credit to executing</span><?= fmoney($call['expected_credit']) ?><?= $call['credit_type'] ? ' <small class="muted">('.e(CREDIT_TYPES[$call['credit_type']] ?? '').')</small>' : '' ?></div>
+    <?php endif; ?>
     <div><span class="k">Status</span><?= e($call['status']) ?></div>
     <div class="kv-wide"><span class="k">Notes</span><?= e($call['notes'] ?: '—') ?></div>
     <?php foreach (custom_display('call', $call['id']) as $cf): ?>
       <div><span class="k"><?= e($cf['label']) ?></span><?= e($cf['value']) ?></div>
     <?php endforeach; ?>
   </div>
+</div>
+
+<div class="panel" id="credit">
+  <h3 class="tab-sub" style="margin-top:0">Credit / billing &amp; cost</h3>
+  <div class="kv-grid">
+    <div><span class="k">Contracting office</span><?= e($call['con_name'] ?: '—') ?></div>
+    <div><span class="k">Executing office</span><?= e($call['exec_name'] ?: ($call['con_name'] ?: 'Same office')) ?></div>
+    <div><span class="k">Cost incurred so far</span><strong><?= fmoney($costIncurred ?? 0) ?></strong> <small class="muted">(vouchers + expenses)</small></div>
+  </div>
+  <?php if (!empty($sameOffice)): ?>
+    <p class="sub" style="margin-top:10px"><span class="pill p-mut">Same office</span> No inter-office credit — the client-billable value (ex-GST) is <strong><?= fmoney($call['billable_value']) ?></strong><?= ($call['billable_basis']??'') ? ' ('.e(CREDIT_TYPES[$call['billable_basis']] ?? '').')' : '' ?>.</p>
+  <?php else: ?>
+    <div class="kv-grid" style="margin-top:10px">
+      <div><span class="k">Credit proposed (to executing)</span><strong><?= fmoney($call['expected_credit']) ?></strong><?= $call['credit_type'] ? ' <small class="muted">('.e(CREDIT_TYPES[$call['credit_type']] ?? '').')</small>' : '' ?></div>
+      <div><span class="k">Credit required by executing</span><?= ($call['credit_required']??0)>0 ? '<strong>'.fmoney($call['credit_required']).'</strong>' : '<span class="muted">not set</span>' ?><?= ($call['credit_status']??'') ? ' <span class="pill '.(($call['credit_status']==='AGREED')?'p-ok':'p-warn').'">'.e(ucfirst(strtolower($call['credit_status']))).'</span>' : '' ?></div>
+    </div>
+    <?php if (can('mod.calls.edit') || is_coordinator_level()): ?>
+    <form method="post" action="/call-credit?id=<?= (int)$call['id'] ?>" class="inline-add" style="align-items:flex-end;margin-top:10px">
+      <div class="ff"><label>Executing office — credit you require (₹)</label><input class="form-control" type="number" step="0.01" name="credit_required" value="<?= e($call['credit_required'] ?: '') ?>"></div>
+      <div class="ff"><label>Status</label><select class="form-control" name="credit_status">
+        <option value="COUNTERED" <?= ($call['credit_status']??'')==='COUNTERED'?'selected':'' ?>>Counter — revert to contracting</option>
+        <option value="AGREED" <?= ($call['credit_status']??'')==='AGREED'?'selected':'' ?>>Agreed</option>
+      </select></div>
+      <button class="btn small" type="submit">Save required credit</button>
+    </form>
+    <?php endif; ?>
+  <?php endif; ?>
 </div>
 
 <div class="panel">

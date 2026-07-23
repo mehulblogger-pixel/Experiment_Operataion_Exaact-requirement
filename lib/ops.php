@@ -242,6 +242,12 @@ function ops_migrate() {
     ensure_column('calls', 'site_address_id', 'INT NULL');
     ensure_column('calls', 'po_id', 'INT NULL');
     ensure_column('calls', 'po_line_item_id', 'INT NULL');
+    // Contracting-vs-executing credit model
+    ensure_column('calls', 'contracting_office_id', 'INT NULL');       // office that owns the client/PO
+    ensure_column('calls', 'billable_value', 'DECIMAL(14,2) DEFAULT 0'); // ex-GST value when same office
+    ensure_column('calls', 'billable_basis', "VARCHAR(20) DEFAULT ''"); // MANDAY / MANMONTH / …
+    ensure_column('calls', 'credit_required', 'DECIMAL(14,2) DEFAULT 0'); // executing office's counter value
+    ensure_column('calls', 'credit_status', "VARCHAR(20) DEFAULT ''");  // PROPOSED / COUNTERED / AGREED
     // jobs gain type of inspection (carried from call), custom report frequency,
     // activity and the required deliverables/report formats.
     ensure_column('jobs', 'inspection_type', "VARCHAR(40) DEFAULT ''");
@@ -1053,7 +1059,7 @@ function ops_dispatch($route, $method) {
         return true;
     }
     switch (true) {
-        case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call' || $route === 'call-delete':
+        case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call' || $route === 'call-delete' || $route === 'call-credit':
             ops_calls($route, $method); return true;
         case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice':
             ops_jobs($route, $method); return true;
@@ -1411,14 +1417,29 @@ function ops_calls($route, $method) {
     }
     if ($route === 'calls') {
         $q = trim($_GET['q'] ?? '');
-        [$scopeW, $args] = scope_clause('c.executing_office_id', 'c.sbu');
-        $where = $scopeW;
+        $minCost = ($_GET['mincost'] ?? '') !== '' ? (float)$_GET['mincost'] : null;
+        // Visible to BOTH the contracting and the executing office (peer offices).
+        $off = scope_offices(); $sbu = scope_sbus();
+        $conds = []; $args = [];
+        if ($off !== 'ALL' && is_array($off) && $off) {
+            $ahm = (int)(ops_val("SELECT id FROM offices WHERE is_ahmedabad=1 LIMIT 1") ?: 0);
+            $ids = implode(',', array_map('intval', $off)); // inline ints (COALESCE drops bind affinity)
+            $conds[] = "(COALESCE(c.executing_office_id,$ahm) IN ($ids) OR c.contracting_office_id IN ($ids))";
+        }
+        if ($sbu !== 'ALL' && is_array($sbu) && $sbu) {
+            $ph = implode(',', array_fill(0, count($sbu), '?'));
+            $conds[] = "c.sbu IN ($ph)"; foreach ($sbu as $s) $args[] = $s;
+        }
+        $where = $conds ? implode(' AND ', $conds) : '1=1';
         if ($q) { $where .= " AND (c.call_code LIKE ? OR bp.legal_name LIKE ? OR v.legal_name LIKE ?)"; array_push($args, "%$q%","%$q%","%$q%"); }
+        $costExpr = "((SELECT COALESCE(SUM(ve.row_total),0) FROM voucher_entries ve JOIN jobs jv ON jv.id=ve.job_id WHERE jv.call_id=c.id)"
+                  . " + (SELECT COALESCE(SUM(ex.travel+ex.local+ex.food+ex.lodging+ex.misc),0) FROM expenses ex JOIN jobs je ON je.id=ex.job_id WHERE je.call_id=c.id))";
         $rows = ops_all("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name,
-            (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) job_count
+            (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) job_count, $costExpr AS cost_incurred
             FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id
             LEFT JOIN business_partners v ON v.id=c.vendor_id WHERE $where ORDER BY c.id DESC", $args);
-        view('ops/calls', ['rows' => $rows, 'q' => $q]); return;
+        if ($minCost !== null) $rows = array_values(array_filter($rows, fn($r) => (float)$r['cost_incurred'] >= $minCost));
+        view('ops/calls', ['rows' => $rows, 'q' => $q, 'minCost' => $_GET['mincost'] ?? '']); return;
     }
     if ($route === 'call-new' || $route === 'call-edit') {
         ops_require(is_coordinator_level(), 'Only coordinators and admins can create calls.');
@@ -1430,17 +1451,23 @@ function ops_calls($route, $method) {
         if ($method === 'POST') {
             $b = $_POST;
             $execOffice = ($b['executing_office_id'] ?? '') !== '' ? (int)$b['executing_office_id'] : null;
-            // Forwarding to an executing branch → credit is mandatory.
-            if ($execOffice && (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0)) {
+            // Default the contracting office to the creator's home office if blank.
+            if (($b['contracting_office_id'] ?? '') === '') {
+                $b['contracting_office_id'] = ($call['contracting_office_id'] ?? '') ?: (current_user()['home_office_id'] ?? '');
+            }
+            $conOffice = ($b['contracting_office_id'] ?? '') !== '' ? (int)$b['contracting_office_id'] : null;
+            $crossOffice = $execOffice && (!$conOffice || $conOffice !== $execOffice);
+            // Cross-office (contracting ≠ executing) → credit to executing is mandatory.
+            if ($crossOffice && (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0)) {
                 view('ops/call_form', ['call' => $call, 'clients' => clients_list(), 'vendors' => vendors_list(),
-                    'offices' => offices_list(), 'error' => 'Enter the credit amount to give the executing branch (mandatory when forwarding).',
+                    'offices' => offices_list(), 'error' => 'This call is executed by a different office, so enter the credit amount to give the executing branch.',
                     'cfvals' => $call ? custom_values_map('call', $call['id']) : []]);
                 return;
             }
-            $fields = ['client_id','vendor_id','ibo_office_id','executing_office_id','region','sbu','activity_id',
+            $fields = ['client_id','vendor_id','ibo_office_id','executing_office_id','contracting_office_id','region','sbu','activity_id',
                 'inspection_type','inspection_type_other','site_address_id','po_id','po_line_item_id',
                 'product_category','product_other','deputation_type','expected_credit','credit_type',
-                'call_received_date','inspection_required_date','notes'];
+                'billable_value','billable_basis','call_received_date','inspection_required_date','notes'];
             $wasForwarded = $call ? ($call['executing_office_id'] ?? null) : null;
             $forwardNow = $execOffice && !$wasForwarded; // first time it gets an executing branch
             $notifyMgr = !empty($b['notify_manager']) ? 1 : 0;
@@ -1472,12 +1499,27 @@ function ops_calls($route, $method) {
             'offices' => offices_list(), 'error' => null, 'cfvals' => $call ? custom_values_map('call', $call['id']) : []]);
         return;
     }
+    // Executing office reverts with the credit it requires for a cross-office call.
+    if ($route === 'call-credit') {
+        $call = ops_one("SELECT * FROM calls WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$call) { http_response_code(404); view('notfound'); return; }
+        ops_require(can('mod.calls.edit') || is_coordinator_level(), 'You cannot set the required credit.');
+        if ($method === 'POST') {
+            $req = ($_POST['credit_required'] ?? '') === '' ? 0 : (float)$_POST['credit_required'];
+            $st  = $_POST['credit_status'] ?? 'COUNTERED';
+            $pdo->prepare("UPDATE calls SET credit_required=?, credit_status=? WHERE id=?")->execute([$req, $st, $call['id']]);
+            flash($st === 'AGREED' ? 'Credit agreed.' : 'Required credit sent back to the contracting office.');
+        }
+        redirect('/call?id=' . $call['id']);
+    }
     if ($route === 'call') {
         $call = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name,
-            o.name ibo_name, x.name exec_name, x.coordinator_name, x.coordinator_email, x.manager_name, x.manager_email
+            o.name ibo_name, x.name exec_name, x.coordinator_name, x.coordinator_email, x.manager_name, x.manager_email,
+            cx.name con_name
             FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id
             LEFT JOIN business_partners v ON v.id=c.vendor_id LEFT JOIN offices o ON o.id=c.ibo_office_id
-            LEFT JOIN offices x ON x.id=c.executing_office_id WHERE c.id=?", [(int)($_GET['id'] ?? 0)]);
+            LEFT JOIN offices x ON x.id=c.executing_office_id
+            LEFT JOIN offices cx ON cx.id=c.contracting_office_id WHERE c.id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$call) { http_response_code(404); view('notfound'); return; }
         $jobs = ops_all("SELECT j.*, i.name inspector_name, i.staff_kind, s.agency subcon_agency FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id LEFT JOIN subcons s ON s.id=j.subcon_id WHERE j.call_id=? ORDER BY j.id DESC", [$call['id']]);
         // lead-time metrics
@@ -1490,7 +1532,8 @@ function ops_calls($route, $method) {
             'sched_delay'   => ($fwdDate && $allocDate) ? days_between($fwdDate, $allocDate) : null,
             'alloc_date'    => $allocDate,
         ];
-        view('ops/call_detail', ['call' => $call, 'jobs' => $jobs, 'lead' => $lead]);
+        view('ops/call_detail', ['call' => $call, 'jobs' => $jobs, 'lead' => $lead,
+            'sameOffice' => call_same_office($call), 'costIncurred' => call_cost_incurred($call['id'])]);
         return;
     }
 }
@@ -1511,9 +1554,29 @@ function normalise_city($input) {
     return $c;
 }
 function nzc_call($f, $v) {
-    if (in_array($f, ['client_id','vendor_id','ibo_office_id','executing_office_id','activity_id','site_address_id','po_id','po_line_item_id'], true)) return $v === '' ? null : (int)$v;
-    if ($f === 'expected_credit') return $v === '' ? 0 : $v;
+    if (in_array($f, ['client_id','vendor_id','ibo_office_id','executing_office_id','contracting_office_id','activity_id','site_address_id','po_id','po_line_item_id'], true)) return $v === '' ? null : (int)$v;
+    if (in_array($f, ['expected_credit','billable_value','credit_required'], true)) return $v === '' ? 0 : $v;
     return $v;
+}
+// True when the call is executed by the same office that contracted it (or has
+// no separate executing branch) — then there is no inter-office credit, only a
+// billable value to the client (ex-GST).
+function call_same_office($call) {
+    $con = (int)($call['contracting_office_id'] ?? 0);
+    $exe = (int)($call['executing_office_id'] ?? 0);
+    if (!$exe) return true;       // no executing branch → same office executes
+    if (!$con) return false;      // contracting unknown but executing set → cross-office
+    return $con === $exe;
+}
+// Total cost incurred on a call = voucher lines (travel + bills) + job-closure
+// expenses across every job under the call. Shown to both offices.
+function call_cost_incurred($callId) {
+    $jobIds = array_column(ops_all("SELECT id FROM jobs WHERE call_id=?", [$callId]), 'id');
+    if (!$jobIds) return 0.0;
+    $ph = implode(',', array_fill(0, count($jobIds), '?'));
+    $vouch = (float)ops_val("SELECT COALESCE(SUM(row_total),0) FROM voucher_entries WHERE job_id IN ($ph)", $jobIds);
+    $exp   = (float)ops_val("SELECT COALESCE(SUM(travel+local+food+lodging+misc),0) FROM expenses WHERE job_id IN ($ph)", $jobIds);
+    return $vouch + $exp;
 }
 // Email the executing branch's coordinator (+ manager if ticked) when a call is forwarded.
 function send_forward_email($callId) {
