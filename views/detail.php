@@ -139,14 +139,23 @@ function addr_name($a) { return (ADDRESS_TYPES[$a['address_type']] ?? $a['addres
     <div class="ff"><label>PO number</label><input class="form-control" name="po_number"></div>
     <div class="ff"><label>Type</label><select class="form-control" name="po_type"><?php foreach (PO_TYPES as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Against contract</label><select class="form-control searchable" name="contract_id"><option value="">— none —</option><?php foreach ($contracts as $ct): ?><option value="<?= (int)$ct['id'] ?>"><?= e($ct['contract_number'].' '.$ct['title']) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>SBU (revenue)</label><select class="form-control searchable" name="sbu"><option value="">—</option><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff ff-wide"><label>SBU(s) — revenue (tick one or more)</label>
+      <div class="checkgrid"><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><label class="chk"><input type="checkbox" name="po_sbu[]" value="<?= e($k) ?>"> <?= e($v) ?></label><?php endforeach; ?></div></div>
     <div class="ff"><label>Title</label><input class="form-control" name="title"></div>
-    <div class="ff"><label>Value</label><input class="form-control" type="number" name="value"></div>
+    <div class="ff"><label>Value (auto from line items)</label><input class="form-control" type="number" name="value"></div>
     <button class="btn small" type="submit">Add PO</button>
   </form>
 
 <?php elseif ($tab === 'projects'): ?>
-  <p class="muted">Inspection calls linked to this partner will appear here once the Operations module is added (next stage).</p>
+  <table class="grid"><tr><th>Call</th><th>Type</th><th>Received</th><th>Required by</th><th>Status</th><th></th></tr>
+    <?php foreach (($linkedCalls ?? []) as $lc): ?><tr>
+      <td><a href="/call?id=<?= (int)$lc['id'] ?>"><?= e($lc['call_code']) ?></a></td>
+      <td><?= e(INSPECTION_TYPES[$lc['inspection_type']] ?? ($lc['inspection_type'] ?: '—')) ?></td>
+      <td><?= fdate($lc['call_received_date']) ?></td><td><?= fdate($lc['inspection_required_date']) ?></td>
+      <td><span class="badge <?= ($lc['status']??'')==='CLOSED'?'GREEN':'AMBER' ?>"><?= e($lc['status']) ?></span></td>
+      <td class="row-actions"><a class="btn small secondary" href="/call?id=<?= (int)$lc['id'] ?>">Open</a></td>
+    </tr><?php endforeach; ?>
+    <?php if (empty($linkedCalls)): ?><tr><td colspan="6">No inspection calls for this partner yet. <a href="/call-new">Create one</a>.</td></tr><?php endif; ?></table>
 
 <?php elseif ($tab === 'relationships'): ?>
   <table class="grid"><tr><th>This company…</th><th>Related company</th><th>Notes</th></tr>

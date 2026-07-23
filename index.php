@@ -228,8 +228,9 @@ if ($route === 'partner-add' && $method === 'POST') {
         redirect("/partner?id={$p['id']}&tab=notes");
     }
     if ($kind === 'po') {
+        $poSbu = isset($b['po_sbu']) ? implode(',', array_filter((array)$b['po_sbu'])) : ($b['sbu'] ?? '');
         $pdo->prepare("INSERT INTO partner_purchase_orders (partner_id,contract_id,sbu,po_number,po_type,title,value,start_date,end_date,notes) VALUES (?,?,?,?,?,?,?,?,?,?)")
-            ->execute([$p['id'], ($b['contract_id'] ?? '') !== '' ? $b['contract_id'] : null, $b['sbu'] ?? '', $b['po_number'] ?? '', $b['po_type'] ?? 'REGULAR', $b['title'] ?? '', ($b['value'] ?? '') !== '' ? $b['value'] : null, $b['start_date'] ?? '', $b['end_date'] ?? '', $b['notes'] ?? '']);
+            ->execute([$p['id'], ($b['contract_id'] ?? '') !== '' ? $b['contract_id'] : null, $poSbu, $b['po_number'] ?? '', $b['po_type'] ?? 'REGULAR', $b['title'] ?? '', ($b['value'] ?? '') !== '' ? $b['value'] : null, $b['start_date'] ?? '', $b['end_date'] ?? '', $b['notes'] ?? '']);
         flash('Purchase order added.');
         redirect('/po?id=' . $pdo->lastInsertId());
     }
@@ -268,6 +269,10 @@ if ($route === 'partner') {
         'rels' => (function() use ($pdo, $p) { $s = $pdo->prepare("SELECT r.*, b.legal_name rn, b.display_name rd, b.id rid FROM partner_relationships r LEFT JOIN business_partners b ON b.id=r.related_id WHERE r.partner_id=?"); $s->execute([$p['id']]); return $s->fetchAll(); })(),
         'all_partners' => (function() use ($pdo, $p) { $s = $pdo->prepare("SELECT id, legal_name, display_name FROM business_partners WHERE id <> ? ORDER BY legal_name"); $s->execute([$p['id']]); return $s->fetchAll(); })(),
         'cityList' => array_values(array_filter(array_column($pdo->query("SELECT DISTINCT city FROM partner_addresses WHERE city <> '' ORDER BY city")->fetchAll(), 'city'))),
+        'linkedCalls' => (function() use ($pdo, $p) {
+            try { $s = $pdo->prepare("SELECT id, call_code, inspection_type, status, call_received_date, inspection_required_date FROM calls WHERE client_id=? OR vendor_id=? ORDER BY id DESC"); $s->execute([$p['id'], $p['id']]); return $s->fetchAll(); }
+            catch (Throwable $e) { return []; }
+        })(),
     ]);
 }
 
@@ -302,7 +307,14 @@ if ($route === 'po') {
         FROM po_line_items l LEFT JOIN lookup_values t ON t.id=l.trade_id LEFT JOIN lookup_values s ON s.id=l.skill_id
         LEFT JOIN lookup_values a ON a.id=l.activity_id WHERE l.purchase_order_id = ?");
     $li->execute([$po['id']]);
-    return view('po_detail', ['po' => $po, 'items' => $li->fetchAll(), 'skillsByTrade' => skills_by_trade(), 'trades' => lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : []]);
+    // activities available for this PO's SBU(s)
+    $poSbus = array_filter(explode(',', $po['sbu'] ?? ''));
+    $actBySbu = activity_options_by_sbu();
+    $poActivities = [];
+    foreach ($poSbus as $sc) foreach (($actBySbu[$sc] ?? []) as $a) $poActivities[] = $a;
+    if (!$poActivities) foreach ($actBySbu as $list) foreach ($list as $a) $poActivities[] = $a; // fallback: all
+    return view('po_detail', ['po' => $po, 'items' => $li->fetchAll(), 'skillsByTrade' => skills_by_trade(),
+        'trades' => lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [], 'poActivities' => $poActivities]);
 }
 
 // --- Operations & Finance modules (Calls, Jobs, masters, reports, users) ---
