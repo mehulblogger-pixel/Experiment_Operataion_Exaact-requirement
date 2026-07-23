@@ -91,6 +91,17 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
       ₹2,472 contingency, margin 55k→48.1k. (Replaces the flat 8% constant, which
       remains only as the ultimate fallback.)
 
+## 💡 Separate product idea (future — not part of this app)
+
+- [ ] **Freelancer ⇄ Agency connect platform** — a standalone application (its own
+      product, separate from the SGS inspection system) where **freelancers and
+      agencies can find and connect with each other**: freelancers publish
+      profiles/skills/availability/rates, agencies post requirements, and the two
+      sides discover, message and engage each other (a two-sided marketplace).
+      Could reuse concepts from our CV/hiring pipeline (candidate profiles, trade/
+      skill masters, shortlisting) but is a NEW app for a broader audience — to be
+      scoped separately later. Owner's idea, parked here so it isn't forgotten.
+
 ## Additional features (user will provide details / build later)
 
 - [ ] **Inspector expenses linked strictly to the job done** — an inspector's
