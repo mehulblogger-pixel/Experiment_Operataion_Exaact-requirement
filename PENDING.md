@@ -66,8 +66,13 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
       voucher `row_total` (by boss_id) + job-closure expenses. Labour counted only
       when salary is visible (else "Contribution"). Verified: revenue 50k, expenses
       668, margin/%, drill-down. Super Admin can grant/revoke the perm per user.
-- [ ] **P8 · Contract/BOSS carry-forward** — renew/supersede a BOSS/contract
-      (Open/ARC) → new number, carry PO/open jobs/lines forward, show old number.
+- [x] **P8 · Contract/BOSS carry-forward** — DONE. On a BOSS profitability page,
+      **Renew / change contract number (ARC/Open)** creates a new BOSS number
+      linked to the old (`supersedes`/`superseded_by`), carries the **open jobs
+      (and their voucher lines) forward** to the new number, closes the old, and
+      shows the chain both ways ("continues from…", "renewed as…"). Closed/
+      historical jobs stay on the old number. Verified: open job → new, closed job
+      stays, chain linked.
 
 ## Additional features (user will provide details / build later)
 
