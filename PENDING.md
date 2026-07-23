@@ -79,6 +79,18 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
       historical jobs stay on the old number. Verified: open job → new, closed job
       stays, chain linked.
 
+## Per-office finance (overhead / contingency) — DONE
+
+- [x] **Per-office Overhead % + Contingency %** — new **Overheads** screen
+      (`/office-finance`). Each office sets its own Overhead % and Contingency %
+      (Branch Application Manager edits their own office; global managers edit any
+      office + the global default). Loaded labour = (CTC/12 × (1 + Overhead%)) /
+      working days; Contingency % adds a buffer on (labour + expenses + sub-con).
+      Both flow into `job_profit` and `boss_profit` → Profitability + Financial
+      dashboards. Verified: OH 20% + contingency 5% raised labour 40k→44.4k, added
+      ₹2,472 contingency, margin 55k→48.1k. (Replaces the flat 8% constant, which
+      remains only as the ultimate fallback.)
+
 ## Additional features (user will provide details / build later)
 
 - [ ] **Inspector expenses linked strictly to the job done** — an inspector's

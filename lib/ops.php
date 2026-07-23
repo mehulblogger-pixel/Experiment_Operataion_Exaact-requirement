@@ -284,6 +284,9 @@ function ops_migrate() {
     ensure_column('expenses', 'extra', 'TEXT');
     // voucher supporting-file mime (voucher table itself is created in ensure_schema)
     ensure_column('vouchers', 'supporting_mime', "VARCHAR(100) DEFAULT ''");
+    // per-office finance params (overhead % + contingency %) for accurate profitability
+    ensure_column('offices', 'overhead_pct', 'DECIMAL(6,2) NULL');
+    ensure_column('offices', 'contingency_pct', 'DECIMAL(6,2) NULL');
     // BOSS / contract carry-forward chain (renewal / ARC → new number, old kept visible)
     ensure_column('boss_numbers', 'supersedes', 'INT NULL');       // this row continues an older BOSS
     ensure_column('boss_numbers', 'superseded_by', 'INT NULL');    // this row was renewed into a newer BOSS
@@ -418,10 +421,23 @@ function working_days_in_month($year, $month) {
     $wd = $days - $sundays - $hol;
     return $wd > 0 ? $wd : ($days - $sundays);
 }
+// Overhead / contingency %: per-office if set, else a global default, else the
+// hard-coded fallback. Lets each independent office tune its own profitability.
+function global_overhead_pct() { $v = setting_get('overhead_pct', ''); return $v !== '' ? (float)$v : OVERHEAD_PCT; }
+function global_contingency_pct() { $v = setting_get('contingency_pct', ''); return $v !== '' ? (float)$v : 0; }
+function office_overhead_pct($officeId) {
+    if ($officeId) { $v = ops_val("SELECT overhead_pct FROM offices WHERE id=?", [$officeId]); if ($v !== null && $v !== '') return (float)$v; }
+    return global_overhead_pct();
+}
+function office_contingency_pct($officeId) {
+    if ($officeId) { $v = ops_val("SELECT contingency_pct FROM offices WHERE id=?", [$officeId]); if ($v !== null && $v !== '') return (float)$v; }
+    return global_contingency_pct();
+}
 // Loaded daily cost for an inspector (salary + overhead) / working days this month.
-function inspector_daily_cost($salary_ctc, $year = null, $month = null) {
+function inspector_daily_cost($salary_ctc, $year = null, $month = null, $officeId = null) {
     $year = $year ?: (int)date('Y'); $month = $month ?: (int)date('n');
-    $loadedMonthly = ((float)$salary_ctc / 12) * (1 + OVERHEAD_PCT / 100);
+    $oh = $officeId !== null ? office_overhead_pct($officeId) : global_overhead_pct();
+    $loadedMonthly = ((float)$salary_ctc / 12) * (1 + $oh / 100);
     $wd = working_days_in_month($year, $month);
     return $wd > 0 ? $loadedMonthly / $wd : 0;
 }
@@ -468,16 +484,18 @@ function expense_heading_labels() {
 // Full profitability breakdown for a job (Master Admin sees the salary part).
 function job_profit($job) {
     $mandays = job_mandays($job);
+    $office = $job['executing_office_id'] ?? null;
     $salary_ctc = $job['inspector_id'] ? (float)ops_val("SELECT salary_ctc FROM inspectors WHERE id=?", [$job['inspector_id']]) : 0;
-    $daily = $salary_ctc ? inspector_daily_cost($salary_ctc) : 0;
+    $daily = $salary_ctc ? inspector_daily_cost($salary_ctc, null, null, $office) : 0;
     $labour = $daily * $mandays;
     $expenses = job_expenses_total($job['id']);
     $subcon = (float)($job['subcon_cost'] ?? 0);
     $credit = (float)($job['expected_credit'] ?? 0);
+    $contingency = round(($labour + $expenses + $subcon) * office_contingency_pct($office) / 100, 2);
     return [
         'mandays' => $mandays, 'daily_cost' => $daily, 'labour' => $labour,
-        'expenses' => $expenses, 'subcon' => $subcon, 'credit' => $credit,
-        'profit' => $credit - $labour - $expenses - $subcon,
+        'expenses' => $expenses, 'subcon' => $subcon, 'credit' => $credit, 'contingency' => $contingency,
+        'profit' => $credit - $labour - $expenses - $subcon - $contingency,
     ];
 }
 
@@ -890,6 +908,8 @@ function ops_dispatch($route, $method) {
             ops_change_password($method); return true;
         case $route === 'settings':
             ops_settings($method); return true;
+        case $route === 'office-finance':
+            ops_office_finance(); return true;
         case $route === 'masters':
             ops_require(is_coordinator_level());
             view('ops/masters', ['masters' => ops_masters()]); return true;
@@ -1898,25 +1918,59 @@ function job_eff_date($j) { return ($j['scheduled_date'] ?? '') !== '' ? $j['sch
 function boss_profit($bossId) {
     $seeSal = can_see_salary();
     $jobs = ops_all("SELECT * FROM jobs WHERE boss_id=?", [$bossId]);
-    $revenue = 0; $labour = 0; $subcon = 0; $jobExp = 0; $invoiced = 0; $paid = 0;
+    $revenue = 0; $labour = 0; $subcon = 0; $jobExp = 0; $invoiced = 0; $paid = 0; $contingency = 0;
     foreach ($jobs as $j) {
+        $office = $j['executing_office_id'] ?? null;
         $revenue += (float)(($j['invoice_amount'] ?? 0) ?: ($j['expected_credit'] ?? 0));
         $invoiced += (float)($j['invoice_amount'] ?? 0);
         $paid += !empty($j['payment_received']) ? (float)($j['payment_amount'] ?? 0) : 0;
-        $subcon += (float)($j['subcon_cost'] ?? 0);
+        $jSub = (float)($j['subcon_cost'] ?? 0); $subcon += $jSub;
+        $jLab = 0;
         if ($seeSal) {
             $sal = $j['inspector_id'] ? (float)ops_val("SELECT salary_ctc FROM inspectors WHERE id=?", [$j['inspector_id']]) : 0;
-            $labour += ($sal ? inspector_daily_cost($sal) : 0) * job_mandays($j);
+            $jLab = ($sal ? inspector_daily_cost($sal, null, null, $office) : 0) * job_mandays($j);
+            $labour += $jLab;
         }
-        $jobExp += job_expenses_total($j['id']);
+        $jExp = job_expenses_total($j['id']); $jobExp += $jExp;
+        $contingency += round(($jLab + $jExp + $jSub) * office_contingency_pct($office) / 100, 2);
     }
     $vExp = (float)ops_val("SELECT COALESCE(SUM(row_total),0) FROM voucher_entries WHERE boss_id=?", [$bossId]);
     $expenses = $jobExp + $vExp;
-    $margin = $revenue - $labour - $expenses - $subcon;
+    $margin = $revenue - $labour - $expenses - $subcon - $contingency;
     return ['jobs' => count($jobs), 'revenue' => $revenue, 'labour' => $labour, 'expenses' => $expenses,
-        'vExp' => $vExp, 'jobExp' => $jobExp, 'subcon' => $subcon, 'margin' => $margin,
+        'vExp' => $vExp, 'jobExp' => $jobExp, 'subcon' => $subcon, 'contingency' => $contingency, 'margin' => $margin,
         'pct' => $revenue ? round($margin / $revenue * 100, 1) : null, 'invoiced' => $invoiced, 'paid' => $paid];
 }
+// Per-office overhead % + contingency % (Branch Application Manager edits their
+// own office; global managers edit any + the global default).
+function ops_office_finance() {
+    ops_require(is_admin_level() || can('settings.manage'), 'You cannot edit office finance settings.');
+    $pdo = db();
+    $global = is_master() || can('users.manage.global') || can('settings.manage');
+    $myOffice = current_user()['home_office_id'] ?? null;
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (isset($_POST['global_default'])) {
+            ops_require(can('settings.manage') || is_master(), 'Only an admin can set the global default.');
+            setting_set('overhead_pct', ($_POST['overhead_pct'] ?? '') === '' ? '' : (string)(float)$_POST['overhead_pct']);
+            setting_set('contingency_pct', ($_POST['contingency_pct'] ?? '') === '' ? '' : (string)(float)$_POST['contingency_pct']);
+            flash('Global default saved.');
+            redirect('/office-finance');
+        }
+        $oid = (int)($_POST['office_id'] ?? 0);
+        if (!$global && $oid !== (int)$myOffice) { flash('You can only edit your own office.', 'error'); redirect('/office-finance'); }
+        $oh = ($_POST['overhead_pct'] ?? '') === '' ? null : (float)$_POST['overhead_pct'];
+        $cg = ($_POST['contingency_pct'] ?? '') === '' ? null : (float)$_POST['contingency_pct'];
+        $pdo->prepare("UPDATE offices SET overhead_pct=?, contingency_pct=? WHERE id=?")->execute([$oh, $cg, $oid]);
+        flash('Office finance settings saved.');
+        redirect('/office-finance');
+    }
+    $offices = $global ? ops_all("SELECT * FROM offices ORDER BY is_ahmedabad DESC, name")
+                       : ($myOffice ? ops_all("SELECT * FROM offices WHERE id=?", [$myOffice]) : []);
+    view('ops/office_finance', ['offices' => $offices, 'global' => $global,
+        'defOh' => global_overhead_pct(), 'defCg' => global_contingency_pct(),
+        'canGlobal' => can('settings.manage') || is_master()]);
+}
+
 function ops_profitability() {
     ops_require(can('data.profitability'), 'You do not have access to profitability figures.');
     $bossId = (int)($_GET['boss'] ?? 0);
