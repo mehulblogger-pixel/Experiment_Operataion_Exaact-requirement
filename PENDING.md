@@ -60,8 +60,19 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
       no linked inspector profile now gets one actionable message on My Jobs and
       My Voucher (Users → Linked inspector) instead of "You cannot view vouchers".
 
-### 2. Credit tab — driven by contracting vs executing office
-- [ ] **Same contracting & executing office** → the **Credit tab is DISABLED**
+### 2. Credit tab — driven by contracting vs executing office — ✅ DONE
+- [x] **DONE** — calls carry a **contracting office** + executing office. On the
+      call form the credit section toggles: **same office → "Billable value
+      (ex-GST)" + basis** (no inter-office credit); **different office → "Credit
+      to executing office" + type** (mandatory). Call detail shows a "Credit /
+      billing & cost" panel; for cross-office the **executing office can revert
+      with the credit it requires** (COUNTERED / AGREED). **Cost incurred**
+      (vouchers + expenses) is shown to **both** offices, and the calls list is
+      visible to both contracting & executing offices with a **cost column +
+      min-cost filter**. (Also fixed a latent scope bug so branch users actually
+      see their office's records.) *Follow-ups: voucher auto-download+submit step;
+      email the executing office when credit is proposed/countered.*
+- [ ] *(original ask, for reference)* **Same contracting & executing office** → the **Credit tab is DISABLED**
       (no inter-office credit to record), BUT the call must still **show the
       billable value** — invoice / **man-day** / **man-month** value —
       **excluding GST**. (So a single-office job still shows what it's worth,
