@@ -1,17 +1,32 @@
 <?php
   $statusBadge = ['DRAFT'=>'AMBER','SUBMITTED'=>'AMBER','APPROVED'=>'GREEN','PAID'=>'GREEN'];
+  $pillMap = ['DRAFT'=>['p-warn','Draft'],'SUBMITTED'=>['p-info','Submitted'],'APPROVED'=>['p-ok','Approved'],'PAID'=>['p-ok','Paid']];
+  $vpill = $pillMap[$v['status']] ?? ['p-warn', ucfirst(strtolower($v['status']))];
   // group entries by date for per-day hour subtotals
   $byDate = [];
   foreach ($entries as $e) $byDate[$e['entry_date']][] = $e;
   ksort($byDate);
   $monthHours = 0;
+  // headline figures for the KPI strip
+  $vGrand = (float)($sum['grand'] ?? 0);
+  $vBal = $vGrand - (float)$v['advance'] - (float)$v['office_incurred'];
+  $vHours = 0; foreach ($entries as $e) $vHours += (float)$e['hours'];
+  $vHoursFmt = rtrim(rtrim(number_format($vHours, 1, '.', ''), '0'), '.') ?: '0';
+  $vDays = count($byDate);
 ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/vouchers">Vouchers</a> › <?= e($v['month']) ?></div>
 <div class="master-head">
   <div><h1>Statement of Travelling Expenses
-      <span class="badge <?= $statusBadge[$v['status']] ?? 'AMBER' ?>" style="vertical-align:middle"><?= e($v['status']) ?></span></h1>
-    <p class="sub"><strong><?= e($v['inspector_name']) ?></strong><?= $v['emp_code']?' · '.e($v['emp_code']):'' ?> · Month <?= e($v['month']) ?> · SBU <?= e(lk_options_or('sbu',OPS_SBUS)[$v['sbu']] ?? $v['sbu'] ?: '—') ?></p></div>
+      <span class="pill <?= $vpill[0] ?>" style="vertical-align:middle;font-size:12px"><?= e($vpill[1]) ?></span></h1>
+    <p class="sub" style="margin:2px 0 0"><strong><?= e($v['inspector_name']) ?></strong><?= $v['emp_code']?' · '.e($v['emp_code']):'' ?> · Month <?= e($v['month']) ?> · SBU <?= e(lk_options_or('sbu',OPS_SBUS)[$v['sbu']] ?? $v['sbu'] ?: '—') ?></p></div>
   <a class="btn secondary" href="/vouchers">← Back</a>
+</div>
+
+<div class="kpi-row" style="margin:16px 0">
+  <div class="kpi"><span class="kic">₹</span><div class="k">Grand total</div><div class="v"><?= fmoney_short($vGrand) ?></div><div class="d"><?= $vDays ?> day(s) · <?= e($vHoursFmt) ?> hrs</div></div>
+  <div class="kpi"><span class="kic">💳</span><div class="k">Balance <?= $vBal < 0 ? '(recover)' : 'to pay' ?></div><div class="v"><?= fmoney_short(abs($vBal)) ?></div><div class="d">after advance &amp; office</div></div>
+  <div class="kpi"><span class="kic">🧾</span><div class="k">Travel</div><div class="v"><?= fmoney_short($sum['travel']) ?></div><div class="d">km × your rate</div></div>
+  <div class="kpi"><span class="kic">📌</span><div class="k">Status</div><div class="v" style="font-size:17px;margin-top:8px"><span class="pill <?= $vpill[0] ?>"><?= e($vpill[1]) ?></span></div><div class="d"><?= $v['approved_by'] ? 'by '.e($v['approved_by']) : 'not yet approved' ?></div></div>
 </div>
 
 <?php if ($canEdit): ?>
@@ -46,10 +61,12 @@
 ?>
 <?php if ($canEdit): ?><form method="post" action="/voucher-save?id=<?= (int)$v['id'] ?>" id="vform"><?php endif; ?>
 <style>
-  #vgrid th{position:sticky;top:52px;background:var(--soft);z-index:3}
-  #vgrid td,#vgrid th{padding:6px 8px;white-space:nowrap}
+  #vgrid th{position:sticky;top:56px;background:var(--soft);z-index:3;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  #vgrid td,#vgrid th{padding:7px 8px;white-space:nowrap}
   #vgrid .form-control{padding:6px 8px;font-size:13px;background:var(--card)}
   #vgrid .v-travel,#vgrid .v-rowtotal{font-variant-numeric:tabular-nums;text-align:right}
+  #vgrid tr[data-eid]:hover td{background:color-mix(in srgb,var(--brand) 4%,transparent)}
+  .tbl-scroll{border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-sm)}
 </style>
 <div class="tbl-scroll" style="overflow-x:auto">
 <table class="grid" id="vgrid">
@@ -105,7 +122,7 @@
   <?php endforeach; ?>
   <?php if (!$entries): ?><tr><td colspan="<?= $ncol ?>">No days yet. <?= $canEdit?'Click “Pull working days from jobs”.':'' ?></td></tr><?php endif; ?>
   <?php if ($entries): ?>
-  <tr style="background:#f7f6f4">
+  <tr style="background:var(--soft)">
     <td colspan="4" style="text-align:right"><strong>TOTAL</strong></td>
     <td><strong class="tot-hours"><?= e($fmt($monthHours)) ?></strong></td>
     <td></td><td></td>
@@ -136,11 +153,11 @@
       <?php foreach ($sum['heads'] as $code=>$amt): if ($amt==0) continue; ?>
         <tr><td><?= e($headLabels[$code] ?? $code) ?></td><td style="text-align:right">₹<?= number_format($amt,0) ?></td></tr>
       <?php endforeach; ?>
-      <tr style="background:#f7f6f4"><td><strong>Grand Total</strong></td><td style="text-align:right"><strong>₹<?= number_format($sum['grand'],0) ?></strong></td></tr>
+      <tr style="background:var(--soft)"><td><strong>Grand Total</strong></td><td style="text-align:right"><strong>₹<?= number_format($sum['grand'],0) ?></strong></td></tr>
       <tr><td>Less: Advance</td><td style="text-align:right">₹<?= number_format((float)$v['advance'],0) ?></td></tr>
       <tr><td>Less: Expenses incurred by Office</td><td style="text-align:right">₹<?= number_format((float)$v['office_incurred'],0) ?></td></tr>
       <?php $bal = $sum['grand'] - (float)$v['advance'] - (float)$v['office_incurred']; ?>
-      <tr style="background:#f7f6f4"><td><strong>Balance to be paid / (recovered)</strong></td><td style="text-align:right"><strong>₹<?= number_format($bal,0) ?></strong></td></tr>
+      <tr style="background:var(--soft)"><td><strong>Balance to be paid / (recovered)</strong></td><td style="text-align:right"><strong>₹<?= number_format($bal,0) ?></strong></td></tr>
     </table>
     <div style="margin-top:10px"><a class="btn secondary" href="/voucher-print?id=<?= (int)$v['id'] ?>" target="_blank">🖨 Print statement</a></div>
   </div>
