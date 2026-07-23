@@ -1424,7 +1424,8 @@ function ops_calls($route, $method) {
         if ($off !== 'ALL' && is_array($off) && $off) {
             $ahm = (int)(ops_val("SELECT id FROM offices WHERE is_ahmedabad=1 LIMIT 1") ?: 0);
             $ids = implode(',', array_map('intval', $off)); // inline ints (COALESCE drops bind affinity)
-            $conds[] = "(COALESCE(c.executing_office_id,$ahm) IN ($ids) OR c.contracting_office_id IN ($ids))";
+            // Visible to BOTH the managing/contracting office (IBO) and the executing office.
+            $conds[] = "(COALESCE(c.executing_office_id,$ahm) IN ($ids) OR c.ibo_office_id IN ($ids))";
         }
         if ($sbu !== 'ALL' && is_array($sbu) && $sbu) {
             $ph = implode(',', array_fill(0, count($sbu), '?'));
@@ -1451,20 +1452,20 @@ function ops_calls($route, $method) {
         if ($method === 'POST') {
             $b = $_POST;
             $execOffice = ($b['executing_office_id'] ?? '') !== '' ? (int)$b['executing_office_id'] : null;
-            // Default the contracting office to the creator's home office if blank.
-            if (($b['contracting_office_id'] ?? '') === '') {
-                $b['contracting_office_id'] = ($call['contracting_office_id'] ?? '') ?: (current_user()['home_office_id'] ?? '');
+            // Default the managing / contracting office (IBO) to the creator's home office if blank.
+            if (($b['ibo_office_id'] ?? '') === '') {
+                $b['ibo_office_id'] = ($call['ibo_office_id'] ?? '') ?: (current_user()['home_office_id'] ?? '');
             }
-            $conOffice = ($b['contracting_office_id'] ?? '') !== '' ? (int)$b['contracting_office_id'] : null;
-            $crossOffice = $execOffice && (!$conOffice || $conOffice !== $execOffice);
-            // Cross-office (contracting ≠ executing) → credit to executing is mandatory.
+            $mngOffice = ($b['ibo_office_id'] ?? '') !== '' ? (int)$b['ibo_office_id'] : null;
+            $crossOffice = $execOffice && (!$mngOffice || $mngOffice !== $execOffice);
+            // Cross-office (managing ≠ executing) → credit to the executing office is mandatory.
             if ($crossOffice && (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0)) {
                 view('ops/call_form', ['call' => $call, 'clients' => clients_list(), 'vendors' => vendors_list(),
                     'offices' => offices_list(), 'error' => 'This call is executed by a different office, so enter the credit amount to give the executing branch.',
                     'cfvals' => $call ? custom_values_map('call', $call['id']) : []]);
                 return;
             }
-            $fields = ['client_id','vendor_id','ibo_office_id','executing_office_id','contracting_office_id','region','sbu','activity_id',
+            $fields = ['client_id','vendor_id','ibo_office_id','executing_office_id','region','sbu','activity_id',
                 'inspection_type','inspection_type_other','site_address_id','po_id','po_line_item_id',
                 'product_category','product_other','deputation_type','expected_credit','credit_type',
                 'billable_value','billable_basis','call_received_date','inspection_required_date','notes'];
@@ -1514,12 +1515,10 @@ function ops_calls($route, $method) {
     }
     if ($route === 'call') {
         $call = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name,
-            o.name ibo_name, x.name exec_name, x.coordinator_name, x.coordinator_email, x.manager_name, x.manager_email,
-            cx.name con_name
+            o.name ibo_name, x.name exec_name, x.coordinator_name, x.coordinator_email, x.manager_name, x.manager_email
             FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id
             LEFT JOIN business_partners v ON v.id=c.vendor_id LEFT JOIN offices o ON o.id=c.ibo_office_id
-            LEFT JOIN offices x ON x.id=c.executing_office_id
-            LEFT JOIN offices cx ON cx.id=c.contracting_office_id WHERE c.id=?", [(int)($_GET['id'] ?? 0)]);
+            LEFT JOIN offices x ON x.id=c.executing_office_id WHERE c.id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$call) { http_response_code(404); view('notfound'); return; }
         $jobs = ops_all("SELECT j.*, i.name inspector_name, i.staff_kind, s.agency subcon_agency FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id LEFT JOIN subcons s ON s.id=j.subcon_id WHERE j.call_id=? ORDER BY j.id DESC", [$call['id']]);
         // lead-time metrics
@@ -1558,15 +1557,14 @@ function nzc_call($f, $v) {
     if (in_array($f, ['expected_credit','billable_value','credit_required'], true)) return $v === '' ? 0 : $v;
     return $v;
 }
-// True when the call is executed by the same office that contracted it (or has
-// no separate executing branch) — then there is no inter-office credit, only a
-// billable value to the client (ex-GST).
+// True when the managing / contracting office (IBO) also executes the call (or
+// there is no separate executing branch) — then there is no inter-office credit,
+// only a billable value to the client (ex-GST). The managing office = ibo_office_id.
 function call_same_office($call) {
-    $con = (int)($call['contracting_office_id'] ?? 0);
     $exe = (int)($call['executing_office_id'] ?? 0);
-    if (!$exe) return true;       // no executing branch → same office executes
-    if (!$con) return false;      // contracting unknown but executing set → cross-office
-    return $con === $exe;
+    if (!$exe) return true;                    // no executing branch → same office
+    $mng = (int)($call['ibo_office_id'] ?? 0);  // managing / contracting office
+    return $mng !== 0 && $mng === $exe;         // managing office executes it itself
 }
 // Total cost incurred on a call = voucher lines (travel + bills) + job-closure
 // expenses across every job under the call. Shown to both offices.

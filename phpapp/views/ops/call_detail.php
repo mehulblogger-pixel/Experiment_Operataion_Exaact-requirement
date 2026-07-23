@@ -59,8 +59,8 @@
 <div class="panel" id="credit">
   <h3 class="tab-sub" style="margin-top:0">Credit / billing &amp; cost</h3>
   <div class="kv-grid">
-    <div><span class="k">Contracting office</span><?= e($call['con_name'] ?: '—') ?></div>
-    <div><span class="k">Executing office</span><?= e($call['exec_name'] ?: ($call['con_name'] ?: 'Same office')) ?></div>
+    <div><span class="k">Managing / contracting office</span><?= e($call['ibo_name'] ?: '—') ?></div>
+    <div><span class="k">Executing office</span><?= e($call['exec_name'] ?: ($call['ibo_name'] ?: 'Same office')) ?></div>
     <div><span class="k">Cost incurred so far</span><strong><?= fmoney($costIncurred ?? 0) ?></strong> <small class="muted">(vouchers + expenses)</small></div>
   </div>
   <?php if (!empty($sameOffice)): ?>
