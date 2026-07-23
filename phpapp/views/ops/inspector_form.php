@@ -18,6 +18,12 @@
     <div class="ff"><label>Employee code</label><input class="form-control" name="emp_code" value="<?= e($ins['emp_code'] ?? '') ?>"></div>
     <div class="ff"><label>Email</label><input class="form-control" name="email" value="<?= e($ins['email'] ?? '') ?>"></div>
     <div class="ff"><label>Mobile</label><input class="form-control" name="mobile" value="<?= e($ins['mobile'] ?? '') ?>"></div>
+    <div class="ff"><label>Designation</label>
+      <select class="form-control searchable" name="designation"><option value="">—</option>
+        <?php foreach (lk_options_or('designation', DESIGNATIONS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ins['designation'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
+      </select></div>
+    <div class="ff"><label>Engineer type</label>
+      <select class="form-control" name="staff_kind"><?php foreach (['ASSET'=>'SGS asset (employee)','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor'] as $k=>$v): ?><option value="<?= $k ?>" <?= (($ins['staff_kind'] ?? 'ASSET')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Trade / discipline</label>
       <select class="form-control searchable" id="trade_sel" name="trade_id"><option value="">—</option>
         <?php foreach ($trades as $t): ?><option value="<?= (int)$t['id'] ?>" <?= (string)$curTrade===(string)$t['id']?'selected':'' ?>><?= e($t['label']) ?></option><?php endforeach; ?>

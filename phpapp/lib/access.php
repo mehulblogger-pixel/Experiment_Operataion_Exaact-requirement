@@ -122,8 +122,27 @@ function scope_clause($officeCol, $sbuCol) {
 
 // ---- Settings (key/value) --------------------------------------------------
 function ensure_settings_schema() {
-    db()->exec("CREATE TABLE IF NOT EXISTS settings (skey VARCHAR(60) PRIMARY KEY, svalue VARCHAR(255))");
+    db()->exec("CREATE TABLE IF NOT EXISTS settings (skey VARCHAR(60) PRIMARY KEY, svalue TEXT)");
+    // widen an older VARCHAR(255) svalue so it can hold a base64 logo (MySQL)
+    if (db_driver() !== 'sqlite') { try { db()->exec("ALTER TABLE settings MODIFY svalue MEDIUMTEXT"); } catch (Throwable $e) {} }
 }
+
+// Theme <style> from settings — overrides --brand and keeps top-bar text legible.
+function theme_style_tag() {
+    $c = setting_get('brand_color', '');
+    if (!$c || !preg_match('/^#[0-9a-fA-F]{6}$/', $c)) return '';
+    $r = hexdec(substr($c, 1, 2)); $g = hexdec(substr($c, 3, 2)); $b = hexdec(substr($c, 5, 2));
+    $lum = 0.299 * $r + 0.587 * $g + 0.114 * $b;           // perceived brightness
+    $light = $lum > 150;
+    $navtext = $light ? '#111827' : '#ffffff';
+    $navlink = $light ? 'rgba(17,24,39,.72)' : '#dbeafe';
+    return "<style>:root{--brand:$c}.topbar .brand,.topbar .user{color:$navtext}.topbar nav a{color:$navlink}.topbar nav a:hover{color:$navtext}</style>";
+}
+function logo_html() {
+    $d = setting_get('logo_data', '');
+    return $d ? '<img src="' . e($d) . '" alt="logo" style="height:30px;vertical-align:middle;background:#fff;border-radius:4px;padding:2px 6px">' : '';
+}
+function app_name() { return setting_get('app_name', '') ?: 'Inspection Ops'; }
 function setting_get($k, $def = null) {
     static $cache = null;
     if ($cache === null) {
