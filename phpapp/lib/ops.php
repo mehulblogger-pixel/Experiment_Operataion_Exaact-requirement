@@ -515,19 +515,67 @@ function job_profit($job) {
 }
 
 // ---- Email (real send when configured, always logged) ----------------------
-function ops_mail($to, $subject, $body, $cc = '', $kind = '') {
-    $enabled = getenv('OPS_MAIL_ENABLED');
-    $from = getenv('OPS_MAIL_FROM') ?: 'no-reply@mghaiapps.com';
-    $ok = 0; $err = '';
-    if ($enabled && $to) {
-        $headers = "From: SGS Ahmedabad Ops <$from>\r\n";
-        if ($cc) $headers .= "Cc: $cc\r\n";
-        $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
-        try { $ok = @mail($to, $subject, $body, $headers) ? 1 : 0; if (!$ok) $err = 'mail() returned false'; }
-        catch (Throwable $e) { $err = $e->getMessage(); }
-    } else {
-        $err = $enabled ? 'no recipient' : 'mail disabled (set OPS_MAIL_ENABLED=1)';
+// SMTP settings (e.g. Office 365) come from Settings, or env overrides. Null = not configured.
+function smtp_config() {
+    $host = getenv('OPS_SMTP_HOST') ?: setting_get('smtp_host', '');
+    if (!$host) return null;
+    return [
+        'host' => $host,
+        'port' => (int)(getenv('OPS_SMTP_PORT') ?: (setting_get('smtp_port', '') ?: 587)),
+        'user' => getenv('OPS_SMTP_USER') ?: setting_get('smtp_user', ''),
+        'pass' => getenv('OPS_SMTP_PASS') ?: setting_get('smtp_pass', ''),
+        'from' => getenv('OPS_SMTP_FROM') ?: (setting_get('smtp_from', '') ?: (setting_get('smtp_user', '') ?: 'no-reply@mghaiapps.com')),
+    ];
+}
+// Minimal SMTP client (STARTTLS + AUTH LOGIN) — enough for Office 365 / Gmail relay.
+// Throws on any protocol error; the caller logs it and the app keeps working.
+function smtp_send($cfg, $to, $subject, $body, $cc = '') {
+    $port = (int)$cfg['port'];
+    $fp = @fsockopen(($port === 465 ? 'ssl://' : '') . $cfg['host'], $port, $errno, $errstr, 15);
+    if (!$fp) throw new Exception("connect failed: $errstr ($errno)");
+    stream_set_timeout($fp, 15);
+    $read = function() use ($fp) { $d = ''; while (($ln = fgets($fp, 515)) !== false) { $d .= $ln; if (isset($ln[3]) && $ln[3] === ' ') break; } return $d; };
+    $say  = function($c) use ($fp, $read) { if ($c !== null) fwrite($fp, $c . "\r\n"); return $read(); };
+    $need = function($resp, $code) { if (strncmp($resp, $code, 3) !== 0) throw new Exception('SMTP expected ' . $code . ', got ' . trim($resp)); };
+    $ehlo = 'EHLO ' . ($_SERVER['SERVER_NAME'] ?? 'localhost');
+    $need($read(), '220');
+    $need($say($ehlo), '250');
+    if ($port === 587) {
+        $need($say('STARTTLS'), '220');
+        if (!stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) throw new Exception('TLS negotiation failed');
+        $need($say($ehlo), '250');
     }
+    $need($say('AUTH LOGIN'), '334');
+    $need($say(base64_encode($cfg['user'])), '334');
+    $need($say(base64_encode($cfg['pass'])), '235');
+    $need($say('MAIL FROM:<' . $cfg['from'] . '>'), '250');
+    foreach (array_filter(array_map('trim', array_merge(explode(',', $to), explode(',', $cc)))) as $rcpt)
+        $need($say('RCPT TO:<' . $rcpt . '>'), '250');
+    $need($say('DATA'), '354');
+    $headers = 'From: ' . app_name() . ' <' . $cfg['from'] . ">\r\nTo: $to\r\n" . ($cc ? "Cc: $cc\r\n" : '')
+        . 'Subject: ' . $subject . "\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n";
+    $data = $headers . preg_replace('/^\./m', '..', str_replace("\r\n", "\n", $body)) . "\r\n.";
+    $need($say($data), '250');
+    $say('QUIT');
+    fclose($fp);
+    return true;
+}
+function ops_mail($to, $subject, $body, $cc = '', $kind = '') {
+    $ok = 0; $err = '';
+    if ($to) {
+        $smtp = smtp_config();
+        if ($smtp) {
+            try { smtp_send($smtp, $to, $subject, $body, $cc); $ok = 1; }
+            catch (Throwable $e) { $err = 'SMTP: ' . $e->getMessage(); }
+        } elseif (getenv('OPS_MAIL_ENABLED')) {
+            $from = getenv('OPS_MAIL_FROM') ?: 'no-reply@mghaiapps.com';
+            $headers = 'From: ' . app_name() . " <$from>\r\n" . ($cc ? "Cc: $cc\r\n" : '') . "Content-Type: text/plain; charset=UTF-8\r\n";
+            try { $ok = @mail($to, $subject, $body, $headers) ? 1 : 0; if (!$ok) $err = 'mail() returned false'; }
+            catch (Throwable $e) { $err = $e->getMessage(); }
+        } else {
+            $err = 'mail disabled (configure Office 365 SMTP in Settings, or set OPS_MAIL_ENABLED=1)';
+        }
+    } else { $err = 'no recipient'; }
     db()->prepare("INSERT INTO email_log (to_addr,cc_addr,subject,body,kind,sent_ok,error,created_at) VALUES (?,?,?,?,?,?,?,?)")
         ->execute([$to, $cc, $subject, $body, $kind, $ok, $err, date('c')]);
     return $ok;
@@ -2379,6 +2427,12 @@ function ops_settings($method) {
         setting_set('theme_preset', trim($_POST['theme_preset'] ?? ''));
         // keep brand_color in sync (used as fallback + logo backdrop)
         if (preg_match('/^#[0-9a-fA-F]{6}$/', $_POST['c_primary'] ?? '')) setting_set('brand_color', $_POST['c_primary']);
+        // Office 365 (SMTP) auto-send settings
+        setting_set('smtp_host', trim($_POST['smtp_host'] ?? ''));
+        setting_set('smtp_port', (int)($_POST['smtp_port'] ?? 587) ?: 587);
+        setting_set('smtp_user', trim($_POST['smtp_user'] ?? ''));
+        if (($_POST['smtp_pass'] ?? '') !== '') setting_set('smtp_pass', $_POST['smtp_pass']); // keep existing if left blank
+        setting_set('smtp_from', trim($_POST['smtp_from'] ?? ''));
         if (($_POST['clear_logo'] ?? '') === '1') setting_set('logo_data', '');
         // logo upload → stored as a data URI (works without file permissions)
         if (!empty($_FILES['logo']['tmp_name']) && is_uploaded_file($_FILES['logo']['tmp_name'])) {
