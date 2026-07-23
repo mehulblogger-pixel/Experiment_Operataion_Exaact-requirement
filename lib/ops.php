@@ -422,6 +422,64 @@ function subcons_list($activeOnly = true) { return ops_all("SELECT id, agency, i
 function boss_for_client($cid) { return $cid ? ops_all("SELECT id, boss_number, status FROM boss_numbers WHERE client_id=? ORDER BY boss_number", [$cid]) : []; }
 function pname($p) { return $p ? ($p['display_name'] ?: $p['legal_name']) : '—'; }
 function fmoney($v) { return $v === null || $v === '' ? '—' : '₹' . number_format((float)$v, 0); }
+// Compact Indian money for KPI tiles: ₹1.84 L / ₹4.82 Cr / ₹6,200.
+function fmoney_short($v) {
+    $n = (float)$v; $s = $n < 0 ? '-' : ''; $n = abs($n);
+    if ($n >= 1e7)  return $s . '₹' . rtrim(rtrim(number_format($n / 1e7, 2, '.', ''), '0'), '.') . ' Cr';
+    if ($n >= 1e5)  return $s . '₹' . rtrim(rtrim(number_format($n / 1e5, 2, '.', ''), '0'), '.') . ' L';
+    return $s . '₹' . number_format($n, 0);
+}
+
+// ---- Accountant "money desk": counts + worklist of jobs needing action ------
+// Uses the invoice / payment / inter-office-credit fields already on `jobs`.
+// Scoped to the user's offices/SBUs so a branch accountant sees only their own.
+function ops_invoicing_counts() {
+    [$jw, $ja] = scope_clause('j.executing_office_id', 'j.sbu');
+    $today = date('Y-m-d');
+    $q = function($extra, $args = []) use ($jw, $ja) {
+        return (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE $jw AND $extra", array_merge($ja, $args));
+    };
+    return [
+        'pending'    => $q("j.closed_flag=1 AND j.invoice_raised=0 AND j.credit_direction<>'GIVEN'"),
+        'awaiting'   => $q("j.invoice_raised=1 AND j.payment_received=0"),
+        'overdue'    => $q("j.invoice_raised=1 AND j.payment_received=0 AND j.invoice_due_date<>'' AND j.invoice_due_date<?", [$today]),
+        'credit'     => $q("j.closed_flag=1 AND j.credit_direction<>'GIVEN' AND j.executing_office_id IS NOT NULL AND j.credit_received=0"),
+        'unbilled'   => (float)ops_val("SELECT COALESCE(SUM(j.expected_credit),0) FROM jobs j WHERE $jw AND j.closed_flag=1 AND j.invoice_raised=0", $ja),
+        'outstanding'=> (float)ops_val("SELECT COALESCE(SUM(j.invoice_amount),0) FROM jobs j WHERE $jw AND j.invoice_raised=1 AND j.payment_received=0", $ja),
+    ];
+}
+
+// SQL fragment for a money-desk filter bucket.
+function invoicing_filter_sql($f, $today) {
+    switch ($f) {
+        case 'awaiting': return ["j.invoice_raised=1 AND j.payment_received=0", []];
+        case 'overdue':  return ["j.invoice_raised=1 AND j.payment_received=0 AND j.invoice_due_date<>'' AND j.invoice_due_date<?", [$today]];
+        case 'credit':   return ["j.closed_flag=1 AND j.credit_direction<>'GIVEN' AND j.executing_office_id IS NOT NULL AND j.credit_received=0", []];
+        case 'pending':  return ["j.closed_flag=1 AND j.invoice_raised=0 AND j.credit_direction<>'GIVEN'", []];
+        default:         return ["j.closed_flag=1 AND (j.invoice_raised=0 OR j.payment_received=0)", []]; // 'all' open money items
+    }
+}
+
+function ops_invoicing() {
+    ops_require(can('data.credit') || can('finance.reconcile'), 'You cannot open Invoicing.');
+    $f = $_GET['f'] ?? 'all';
+    $today = date('Y-m-d');
+    [$jw, $ja] = scope_clause('j.executing_office_id', 'j.sbu');
+    [$fw, $fa] = invoicing_filter_sql($f, $today);
+    $rows = ops_all(
+        "SELECT j.id, j.job_code, j.invoice_raised, j.invoice_number, j.invoice_amount, j.invoice_date, j.invoice_due_date,
+                j.payment_received, j.payment_amount, j.expected_credit, j.credit_direction, j.credit_received,
+                bp.display_name, bp.legal_name, bn.boss_number, o.name office_name
+         FROM jobs j
+         LEFT JOIN calls c ON c.id = j.call_id
+         LEFT JOIN business_partners bp ON bp.id = c.client_id
+         LEFT JOIN boss_numbers bn ON bn.id = j.boss_id
+         LEFT JOIN offices o ON o.id = j.executing_office_id
+         WHERE $jw AND ($fw)
+         ORDER BY (j.invoice_due_date <> '') DESC, j.invoice_due_date ASC, j.id DESC",
+        array_merge($ja, $fa));
+    view('ops/invoicing', ['counts' => ops_invoicing_counts(), 'rows' => $rows, 'f' => $f, 'today' => $today]);
+}
 
 // ---- Calculations ----------------------------------------------------------
 // Working days in a month = calendar days − Sundays − public holidays.
@@ -961,6 +1019,8 @@ function ops_dispatch($route, $method) {
             ops_reports(); return true;
         case $route === 'profitability':
             ops_profitability(); return true;
+        case $route === 'invoicing':
+            ops_invoicing(); return true;
         case $route === 'boss-renew':
             ops_boss_renew(); return true;
         case $route === 'attendance-recon':
