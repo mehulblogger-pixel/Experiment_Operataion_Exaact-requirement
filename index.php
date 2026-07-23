@@ -101,6 +101,10 @@ function children($table, $pid, $order = 'id') {
 }
 
 // --- Public routes ---
+function render_login($error) {
+    require __DIR__ . '/views/login_page.php';
+    exit;
+}
 if ($route === 'login') {
     if ($method === 'POST') {
         $q = $pdo->prepare("SELECT * FROM users WHERE username = ?");
@@ -111,10 +115,10 @@ if ($route === 'login') {
             flash('Welcome, ' . user_name($u) . '.');
             redirect('/');
         }
-        return view('login', ['error' => 'Invalid username or password.']);
+        return render_login('Invalid username or password.');
     }
     if (current_user()) redirect('/');
-    return view('login', ['error' => null]);
+    return render_login(null);
 }
 if ($route === 'logout') { session_destroy(); redirect('/login'); }
 

@@ -79,6 +79,22 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
       historical jobs stay on the old number. Verified: open job → new, closed job
       stays, chain linked.
 
+## UI/UX refresh — DONE
+
+- [x] **Professional UI refresh** — a design layer on top of `app.css` (sticky
+      top bar with pill-hover nav, softer card radii + real elevation, gradient
+      buttons with coloured shadow, soft form fields with focus rings, hover-lift
+      stat/master cards, gentle table row-hover). Kept as a layer so it restyles
+      **every existing screen** while the **theme builder** still drives all
+      colours. `theme_style_tag()` now also emits `--field` and a luminance-aware
+      `--shadow` (dark themes get proper dark fields/shadows).
+- [x] **Landing / sign-in redesign** — `views/login_page.php`: a branded
+      split-screen sign-in (value story + live chips on the left, clean sign-in
+      card on the right, show/hide password), rendered standalone (no top-bar) and
+      fully theme-driven (brand-gradient from `--brand`, accent glow from
+      `--accent`). Verified: renders 200, theme (Forest) applies app-wide, no
+      warnings.
+
 ## Per-office finance (overhead / contingency) — DONE
 
 - [x] **Per-office Overhead % + Contingency %** — new **Overheads** screen
