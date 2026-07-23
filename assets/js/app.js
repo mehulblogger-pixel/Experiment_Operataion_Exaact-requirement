@@ -123,6 +123,38 @@
     window._activityFill = fill; // so quick-add can refresh after adding
   }
 
+  // ---- Call: deputation-site + PO/line-item pickers, and "Other" type ----
+  function fillSelect(sel, rows, keep) {
+    if (!sel) return;
+    sel.innerHTML = '<option value="">—</option>';
+    rows.forEach(function (r) { var o = document.createElement('option'); o.value = r.id; o.textContent = r.label; if (String(r.id) === String(keep)) o.selected = true; sel.appendChild(o); });
+  }
+  function initCallLinks() {
+    var client = document.getElementById('client_sel');
+    var insp = document.getElementById('insp_sel');
+    var siteFf = document.getElementById('site_ff');
+    var site = document.getElementById('site_sel');
+    var po = document.getElementById('po_sel');
+    var poLine = document.getElementById('po_line_sel');
+    var other = document.getElementById('insp_other');
+    if (!client && !insp) return;
+    function toggleOther() { if (other && insp) other.style.display = insp.value === 'OTHER' ? 'block' : 'none'; }
+    function toggleSite() { if (siteFf && insp) siteFf.style.display = insp.value === 'DEPUTATION' ? 'block' : 'none'; }
+    if (insp) insp.addEventListener('change', function () { toggleOther(); toggleSite(); });
+    toggleOther(); toggleSite();
+    function loadClientLinks() {
+      var id = client ? client.value : '';
+      if (!id) { fillSelect(site, [], ''); fillSelect(po, [], ''); fillSelect(poLine, [], ''); return; }
+      if (site) fetch('/partner-sites?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (rows) { fillSelect(site, rows, site.value); }).catch(function () {});
+      if (po) fetch('/partner-pos?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (rows) { fillSelect(po, rows, po.value); }).catch(function () {});
+    }
+    if (client) client.addEventListener('change', loadClientLinks);
+    if (po && poLine) po.addEventListener('change', function () {
+      if (!po.value) { fillSelect(poLine, [], ''); return; }
+      fetch('/po-lines?id=' + encodeURIComponent(po.value)).then(function (r) { return r.json(); }).then(function (rows) { fillSelect(poLine, rows, poLine.value); }).catch(function () {});
+    });
+  }
+
   // ---- Quick-add ("+ Add new") modal on the New Call form ----
   function initQuickAdd() {
     var back = document.getElementById('qa_back');
@@ -324,6 +356,7 @@
     initActivity();
     initCustomFreq();
     initClientInspection();
+    initCallLinks();
     initTradeSkills();
     initQuickAdd();
     Array.prototype.forEach.call(document.querySelectorAll('select.searchable'), enhanceSelect);

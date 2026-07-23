@@ -40,6 +40,12 @@
     <div class="ff"><label>Type of inspection <span class="muted">(narrows to the client's types)</span></label>
       <select class="form-control searchable" id="insp_sel" name="inspection_type"><option value="">—</option>
         <?php foreach (lk_options_or('inspection_type', INSPECTION_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($call && ($call['inspection_type']??'')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
+        <option value="OTHER" <?= ($call && ($call['inspection_type']??'')==='OTHER')?'selected':'' ?>>Other (type below)…</option>
+      </select>
+      <input class="form-control" id="insp_other" name="inspection_type_other" value="<?= e($call['inspection_type_other'] ?? '') ?>" placeholder="Other inspection type" style="margin-top:6px;<?= ($call && ($call['inspection_type']??'')==='OTHER')?'':'display:none' ?>"></div>
+    <div class="ff" id="site_ff" style="<?= ($call && ($call['inspection_type']??'')==='DEPUTATION')?'':'display:none' ?>"><label>Deputation site (client's site)</label>
+      <select class="form-control searchable" id="site_sel" name="site_address_id"><option value="">—</option>
+        <?php if ($call && ($call['site_address_id']??null)) { $sa=ops_one("SELECT id,label,city FROM partner_addresses WHERE id=?", [$call['site_address_id']]); if ($sa) echo '<option value="'.(int)$sa['id'].'" selected>'.e(($sa['label']?:'Site').' '.$sa['city']).'</option>'; } ?>
       </select></div>
     <div class="ff"><label>Product category <a href="#" class="addlink" data-qa="product">+ Add new</a></label>
       <select class="form-control searchable" id="product_sel" name="product_category"><option value="">—</option>
@@ -61,6 +67,14 @@
         <?php foreach (CREDIT_TYPES as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($call && ($call['credit_type']??'')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
 
+    <div class="ff"><label>Against PO (client's orders)</label>
+      <select class="form-control searchable" id="po_sel" name="po_id"><option value="">— open / none —</option>
+        <?php if ($call && ($call['po_id']??null)) { $po=ops_one("SELECT id,po_number FROM partner_purchase_orders WHERE id=?", [$call['po_id']]); if ($po) echo '<option value="'.(int)$po['id'].'" selected>'.e($po['po_number']?:'Open order').'</option>'; } ?>
+      </select></div>
+    <div class="ff"><label>PO line item (tracks qty)</label>
+      <select class="form-control searchable" id="po_line_sel" name="po_line_item_id"><option value="">—</option>
+        <?php if ($call && ($call['po_line_item_id']??null)) { $li=ops_one("SELECT id,description FROM po_line_items WHERE id=?", [$call['po_line_item_id']]); if ($li) echo '<option value="'.(int)$li['id'].'" selected>'.e($li['description']).'</option>'; } ?>
+      </select></div>
     <div class="ff"><label>Call received from client (date)</label><input class="form-control" type="date" name="call_received_date" value="<?= e($call['call_received_date'] ?? date('Y-m-d')) ?>"></div>
     <div class="ff"><label>Client's expected inspection date</label><input class="form-control" type="date" name="inspection_required_date" value="<?= e($call['inspection_required_date'] ?? '') ?>"></div>
 
