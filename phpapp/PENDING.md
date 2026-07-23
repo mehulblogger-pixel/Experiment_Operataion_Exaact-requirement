@@ -30,6 +30,26 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
       and the money desk all show live figures immediately. Delivered as a
       one-click "Load demo data" action or an importable seed the owner can run.
 
+### 1b. Full access / permission control (every module & feature)
+- [ ] **Comprehensive access matrix** — today only ~17 permissions exist and most
+      screens are gated by *role level* (coordinator/admin), not fine permissions.
+      Owner wants the super admin to grant/deny **each and every module and
+      feature**, not a limited set, and to manage it **in Settings** (like the
+      permission checkboxes already in the user-create panel, but complete).
+      Build: (a) expand the `PERMISSIONS` catalogue to one "can access" entry per
+      module — Calls, Jobs, Vouchers, Invoicing, Profitability, Hiring, Reconcile,
+      Clients, Vendors, Masters, Overheads, Reports, Users, Settings — plus the
+      finer action perms (create call, allocate/close job, see credit, see salary,
+      manage masters, reconcile, etc.), grouped by module in the user panel;
+      (b) gate the sidebar nav + each route on these perms (defaulting them ON for
+      roles that have access today, so nothing locks out); (c) a **Settings →
+      Roles & access** editor — a role × permission grid the super admin edits,
+      stored in settings and overriding `role_defaults()`. Backbone change —
+      scope confirmed with owner before building.
+- [x] **Clearer "inspector not linked" message** — DONE. An Inspector login with
+      no linked inspector profile now gets one actionable message on My Jobs and
+      My Voucher (Users → Linked inspector) instead of "You cannot view vouchers".
+
 ### 2. Credit tab — driven by contracting vs executing office
 - [ ] **Same contracting & executing office** → the **Credit tab is DISABLED**
       (no inter-office credit to record), BUT the call must still **show the
