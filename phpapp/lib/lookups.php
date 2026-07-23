@@ -47,6 +47,9 @@ function lk_migrate() {
     lk_ensure_type_map('department', 'Department', DEPARTMENTS);
     lk_ensure_type_map('client_type', 'Client type', CLIENT_TYPES);
     lk_ensure_type_map('designation', 'Designation', DESIGNATIONS);
+    // voucher attendance codes: leave types + office/WFH/holiday day codes
+    lk_ensure_type_map('leave_type', 'Leave type', LEAVE_TYPES);
+    lk_ensure_type_map('day_code', 'Day / office code', DAY_CODES);
     // back-fill any newly-added coded values into existing lists (idempotent)
     lk_ensure_values_from_map('inspection_type', INSPECTION_TYPES);
     lk_ensure_values_from_map('deliverable', DELIVERABLES);
@@ -147,6 +150,7 @@ function lk_seed() {
         ['experience_level','Experience level', EXP_LEVELS], ['rate_type','Rate type', RATE_TYPES],
         ['boss_status','BOSS status', BOSS_STATUS], ['client_type','Client type', CLIENT_TYPES],
         ['industry','Industry', INDUSTRIES], ['ownership','Ownership type', OWNERSHIP], ['partner_status','Partner status', STATUSES], ['department','Department', DEPARTMENTS], ['designation','Designation', DESIGNATIONS],
+        ['leave_type','Leave type', LEAVE_TYPES], ['day_code','Day / office code', DAY_CODES],
     ];
     $so = 0;
     foreach ($system as [$key, $label, $map]) {

@@ -43,6 +43,42 @@ const CAND_STAGES = [
 // Where a candidate is sourced from (mirrors inspector engineer-type).
 const CAND_SOURCES = ['ASSET'=>'SGS asset (employee)','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor'];
 
+// ---- Expense / voucher module (P1: masters & codes) ------------------------
+// How an expense head behaves. PER_KM = km × rate (rate from the travel mode /
+// inspector); BILL = actual amount from a receipt; ALLOWANCE = fixed/daily amount.
+const EXP_HEAD_TYPES = ['PER_KM'=>'Per-km (km × rate)','BILL'=>'Actual bill','ALLOWANCE'=>'Fixed allowance'];
+const TRAVEL_BASIS = ['PER_KM'=>'Per km','ACTUAL'=>'Actual (ticket / bill)'];
+// Seed rows for the monthly "Statement of Travelling Expenses" columns.
+const EXPENSE_HEADS_SEED = [
+    // code, label, head_type, needs_receipt, sort
+    ['KMTRAVEL','Travel charges (KM × rate)','PER_KM',0,10],
+    ['BUS','Bus ticket','BILL',1,20],
+    ['TRAIN','Train ticket','BILL',1,30],
+    ['AIR','Air ticket','BILL',1,40],
+    ['HOTEL','Hotel / Boarding & Lodging (out-station)','BILL',1,50],
+    ['FOOD','Food allowance (meals)','BILL',1,60],
+    ['CAB','Ola / Uber','BILL',1,70],
+    ['AUTO','Auto / local conveyance','BILL',1,80],
+    ['TEL','Telephone & communication','BILL',1,90],
+    ['OUTSTN','Outstation allowance','ALLOWANCE',0,100],
+    ['CASH','Cash purchase bills','BILL',1,110],
+    ['OTHER','Others (specify)','BILL',0,120],
+];
+const TRAVEL_MODES_SEED = [
+    // code, label, basis, default_rate
+    ['BIKE','Bike / Two-wheeler','PER_KM',6],
+    ['CAR','Car (four-wheeler)','PER_KM',12],
+    ['OWNCAR','Own car','PER_KM',12],
+    ['OLA','Ola / Uber','ACTUAL',0],
+    ['AUTO','Auto / local','ACTUAL',0],
+    ['BUS','Bus','ACTUAL',0],
+    ['TRAIN','Train','ACTUAL',0],
+    ['AIR','Air','ACTUAL',0],
+];
+// Leave-type and day (office/WFH/holiday) codes for the voucher's attendance column.
+const LEAVE_TYPES = ['CL'=>'Casual Leave','SL'=>'Sick Leave','PL'=>'Privilege / Earned Leave','LWP'=>'Leave Without Pay','COMPOFF'=>'Comp-off','ML'=>'Maternity Leave','OTHER'=>'Other leave'];
+const DAY_CODES   = ['OFFICE'=>'In office','WFH'=>'Work from home','TRAINING'=>'Training','HOLIDAY'=>'Holiday','WEEKOFF'=>'Week-off'];
+
 // ---- Schema ----------------------------------------------------------------
 function ops_ensure_schema() {
     $pdo = db(); $pk = pk_clause();
@@ -128,6 +164,15 @@ function ops_ensure_schema() {
         "CREATE TABLE IF NOT EXISTS candidate_events (
             id $pk, candidate_id INT, from_stage VARCHAR(20) DEFAULT '', to_stage VARCHAR(20) DEFAULT '',
             remark VARCHAR(500) DEFAULT '', actor VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
+        // Expense/voucher module — configurable expense heads (one column each on the voucher).
+        "CREATE TABLE IF NOT EXISTS expense_heads (
+            id $pk, code VARCHAR(30), label VARCHAR(150), head_type VARCHAR(20) DEFAULT 'BILL',
+            default_rate DECIMAL(12,2) DEFAULT 0, needs_receipt INT DEFAULT 0, sort_order INT DEFAULT 100,
+            active INT DEFAULT 1)",
+        // Travel modes (bike/car/…): per-km vs actual, with a default rate.
+        "CREATE TABLE IF NOT EXISTS travel_modes (
+            id $pk, code VARCHAR(30), label VARCHAR(150), basis VARCHAR(20) DEFAULT 'PER_KM',
+            default_rate DECIMAL(12,2) DEFAULT 0, active INT DEFAULT 1)",
     ];
     foreach ($t as $sql) $pdo->exec($sql);
 }
@@ -212,6 +257,20 @@ function ops_migrate() {
         id " . pk_clause() . ", inspector_id INT, name VARCHAR(200), number VARCHAR(80) DEFAULT '',
         issued_date VARCHAR(20) DEFAULT '', valid_to VARCHAR(20) DEFAULT '', status VARCHAR(20) DEFAULT 'VALID',
         last_reminder VARCHAR(20) DEFAULT '', updated_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    ops_seed_expense_masters();
+}
+// Seed the expense-head and travel-mode masters once (idempotent — count-guarded,
+// so it runs on a fresh install and on an upgrade of an existing database).
+function ops_seed_expense_masters() {
+    $pdo = db();
+    if ((int)$pdo->query("SELECT COUNT(*) FROM expense_heads")->fetchColumn() === 0) {
+        $ins = $pdo->prepare("INSERT INTO expense_heads (code,label,head_type,needs_receipt,sort_order,active) VALUES (?,?,?,?,?,1)");
+        foreach (EXPENSE_HEADS_SEED as $h) $ins->execute($h);
+    }
+    if ((int)$pdo->query("SELECT COUNT(*) FROM travel_modes")->fetchColumn() === 0) {
+        $ins = $pdo->prepare("INSERT INTO travel_modes (code,label,basis,default_rate,active) VALUES (?,?,?,?,1)");
+        foreach (TRAVEL_MODES_SEED as $m) $ins->execute($m);
+    }
 }
 
 // Seed offices (Ahmedabad + affiliate IBOs) once.
@@ -650,6 +709,34 @@ function ops_masters() {
             'list' => ['boss_number'=>'BOSS number','client_id'=>'Client','start_date'=>'Start','end_date'=>'End','status'=>'Status'],
             'list_labels' => ['status'=>BOSS_STATUS],
             'ref_cols' => ['client_id'=>['clients','partner']],
+        ],
+        'expense-heads' => [
+            'label' => 'Expense heads (voucher columns)', 'table' => 'expense_heads', 'access' => 'admin', 'order' => 'sort_order, id',
+            'fields' => [
+                ['code','Code','text',['req'=>1]],
+                ['label','Heading (column title)','text',['req'=>1]],
+                ['head_type','Type','select',['opts'=>EXP_HEAD_TYPES]],
+                ['default_rate','Default rate / amount (₹)','money',[]],
+                ['needs_receipt','Needs a receipt / bill','check',[]],
+                ['sort_order','Column order','number',[]],
+                ['active','Active','check',[]],
+            ],
+            'list' => ['code'=>'Code','label'=>'Heading','head_type'=>'Type','default_rate'=>'Rate','needs_receipt'=>'Receipt?','sort_order'=>'Order'],
+            'list_labels' => ['head_type'=>EXP_HEAD_TYPES],
+            'money_cols' => ['default_rate'],
+        ],
+        'travel-modes' => [
+            'label' => 'Travel modes & per-km rates', 'table' => 'travel_modes', 'access' => 'admin', 'order' => 'id',
+            'fields' => [
+                ['code','Code','text',['req'=>1]],
+                ['label','Mode','text',['req'=>1]],
+                ['basis','Basis','select',['opts'=>TRAVEL_BASIS]],
+                ['default_rate','Default rate (₹/km)','money',[]],
+                ['active','Active','check',[]],
+            ],
+            'list' => ['code'=>'Code','label'=>'Mode','basis'=>'Basis','default_rate'=>'₹/km'],
+            'list_labels' => ['basis'=>TRAVEL_BASIS],
+            'money_cols' => ['default_rate'],
         ],
         'holidays' => [
             'label' => 'Holidays', 'table' => 'holidays', 'access' => 'admin', 'order' => 'hol_date',
