@@ -92,6 +92,44 @@
 </div>
 <?php endif; ?>
 
+<?php if ($ins && is_master()): ?>
+<div class="panel" style="border:1px solid #d9b38c;background:#fffaf3">
+  <h3 class="tab-sub">🔒 Allowances &amp; rates <span class="muted">— Super Admin only. Not visible to anyone else.</span></h3>
+  <p class="sub">Tick what this inspector is entitled to claim on the monthly voucher, and set their personal rate where it differs from the default. Blank rate = use the master default.</p>
+  <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>">
+    <input type="hidden" name="_do" value="allow_save">
+
+    <h4 class="tab-sub" style="margin-top:6px">Travel modes (per-km)</h4>
+    <table class="grid">
+      <tr><th>Allowed</th><th>Mode</th><th>Basis</th><th>Default</th><th>This inspector's rate (₹/km)</th></tr>
+      <?php foreach ($travelModes as $m): $a = $allowMap['MODE'][$m['code']] ?? null; ?>
+      <tr>
+        <td><label class="chk"><input type="checkbox" name="allow_mode[<?= e($m['code']) ?>]" value="1" <?= ($a && $a['allowed'])?'checked':'' ?>></label></td>
+        <td><strong><?= e($m['label']) ?></strong> <span class="muted">(<?= e($m['code']) ?>)</span></td>
+        <td><?= e(TRAVEL_BASIS[$m['basis']] ?? $m['basis']) ?></td>
+        <td><?= $m['basis']==='PER_KM' ? '₹'.e($m['default_rate']).'/km' : '—' ?></td>
+        <td><?php if ($m['basis']==='PER_KM'): ?><input class="form-control" style="width:130px" type="number" step="0.01" name="mode_rate[<?= e($m['code']) ?>]" value="<?= e($a['rate'] ?? '') ?>" placeholder="<?= e($m['default_rate']) ?>"><?php else: ?><span class="muted">actual bill</span><?php endif; ?></td>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+
+    <h4 class="tab-sub" style="margin-top:14px">Expense heads</h4>
+    <table class="grid">
+      <tr><th>Allowed</th><th>Head</th><th>Type</th><th>Override amount/rate (₹)</th></tr>
+      <?php foreach ($expHeads as $h): $a = $allowMap['HEAD'][$h['code']] ?? null; ?>
+      <tr>
+        <td><label class="chk"><input type="checkbox" name="allow_head[<?= e($h['code']) ?>]" value="1" <?= ($a && $a['allowed'])?'checked':'' ?>></label></td>
+        <td><strong><?= e($h['label']) ?></strong> <span class="muted">(<?= e($h['code']) ?>)</span></td>
+        <td><?= e(EXP_HEAD_TYPES[$h['head_type']] ?? $h['head_type']) ?></td>
+        <td><?php if ($h['head_type']!=='BILL'): ?><input class="form-control" style="width:130px" type="number" step="0.01" name="head_rate[<?= e($h['code']) ?>]" value="<?= e($a['rate'] ?? '') ?>" placeholder="<?= e($h['default_rate']) ?>"><?php else: ?><span class="muted">actual bill</span><?php endif; ?></td>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+    <div style="margin-top:12px"><button class="btn" type="submit">Save allowances &amp; rates</button></div>
+  </form>
+</div>
+<?php endif; ?>
+
 <script>
 window.SKILLS = <?= json_encode(skills_by_trade()) ?>;
 window.SKILLS_SELECTED = <?= json_encode(array_map('intval', $selSkills)) ?>;
