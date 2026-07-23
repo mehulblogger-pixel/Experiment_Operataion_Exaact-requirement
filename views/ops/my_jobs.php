@@ -1,5 +1,14 @@
 <?php
   $today = date('Y-m-d');
+  $f = $f ?? '';
+  // optional focused filter from a dashboard card
+  $filters = [
+    'open'    => ['Open jobs to do',   fn($j)=>!$j['closed_flag']],
+    'overdue' => ['Overdue jobs',       fn($j)=>!$j['closed_flag'] && ($j['inspection_end_date']?:$j['scheduled_date']) && ($j['inspection_end_date']?:$j['scheduled_date'])<$today],
+    'reports' => ['Reports pending',    fn($j)=>!$j['closed_flag'] && ($j['reporting_frequency']??'')!=='NOREPORT' && ($j['reporting_frequency']??'')!=='' && ($j['report_upload_date']??'')===''],
+    'closed'  => ['Completed jobs',     fn($j)=>(bool)$j['closed_flag']],
+  ];
+  if ($f && isset($filters[$f])) $rows = array_values(array_filter($rows, $filters[$f][1]));
   $open = array_values(array_filter($rows, fn($j)=>!$j['closed_flag']));
   $closed = array_values(array_filter($rows, fn($j)=>$j['closed_flag']));
   // sort open by urgency (earliest scheduled / overdue first)
@@ -29,9 +38,10 @@
     <?php return ob_get_clean();
   };
 ?>
-<div class="home-hero"><div><h1>My Jobs</h1>
-  <p class="sub" style="margin:0">Your assigned inspections. Open a job to see details, or upload the report and close it.</p></div>
-  <span class="scope-tag"><?= count($open) ?> open</span>
+<div class="home-hero"><div>
+  <h1><?= ($f && isset($filters[$f])) ? e($filters[$f][0]) : 'My Jobs' ?></h1>
+  <p class="sub" style="margin:0"><?php if ($f && isset($filters[$f])): ?><a href="/my-jobs">← All my jobs</a><?php else: ?>Your assigned inspections. Open a job to see details, or upload the report and close it.<?php endif; ?></p></div>
+  <span class="scope-tag"><?= count($rows) ?> shown</span>
 </div>
 
 <?php if (!$rows): ?>

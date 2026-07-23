@@ -2098,7 +2098,7 @@ function ops_my_jobs() {
             FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
             WHERE j.closed_flag=0 ORDER BY j.scheduled_date DESC");
     }
-    view('ops/my_jobs', ['rows' => $rows]);
+    view('ops/my_jobs', ['rows' => $rows, 'f' => $_GET['f'] ?? '']);
 }
 
 // ---- Dashboards / reports (scoped + filtered) ------------------------------
