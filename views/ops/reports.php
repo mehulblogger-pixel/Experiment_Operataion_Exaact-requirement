@@ -31,6 +31,12 @@
   <div class="stat-card"><div class="sc-num"><?= $op['tatTotal']?round($op['tatOn']/$op['tatTotal']*100):0 ?>%</div><div class="sc-lbl">TAT on-time (≤<?= (int)$tatThresh ?>d)</div></div>
   <div class="stat-card"><div class="sc-num"><?= $op['tatTotal']?round($op['tatSum']/$op['tatTotal'],1):0 ?></div><div class="sc-lbl">Avg TAT (days)</div></div>
 </div>
+<div class="panel-split">
+  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Job status</h4>
+    <?= svg_donut(['Open'=>$op['open'],'Closed'=>$op['closed'],'Overdue'=>$op['overdue']]) ?></div>
+  <div class="panel" style="text-align:center"><h4 class="tab-sub" style="margin-top:0">On-time delivery</h4>
+    <?= svg_gauge($op['tatTotal']?$op['tatOn']/$op['tatTotal']*100:0, '≤'.(int)$tatThresh.'d TAT') ?></div>
+</div>
 <?php endif; ?>
 
 <?php if ($seeFin): ?>
@@ -45,6 +51,20 @@
   <div class="stat-card"><div class="sc-num"><?= fmoney($fin['labour']) ?></div><div class="sc-lbl">Loaded labour</div></div>
   <div class="stat-card"><div class="sc-num" style="color:<?= $fin['profit']>=0?'#1f8a4c':'#c0392b' ?>"><?= fmoney($fin['profit']) ?></div><div class="sc-lbl">Net profit</div></div>
   <?php endif; ?>
+</div>
+<?php
+  $expByHead = [];
+  foreach (expense_heading_labels() as $col=>$lbl) if (($fin['expHead'][$col]??0)>0) $expByHead[$lbl] = $fin['expHead'][$col];
+  $exLbls = expense_extra_headings();
+  foreach (($fin['expHeadExtra']??[]) as $code=>$amt) if ($amt>0) $expByHead[$exLbls[$code]??$code] = $amt;
+?>
+<div class="panel-split">
+  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Credit by SBU</h4><?= svg_donut(chart_relabel_sbu($fin['bySbu']), true) ?></div>
+  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Credit by office</h4><?= svg_hbars($fin['byOffice'], true) ?></div>
+</div>
+<div class="panel-split">
+  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Expenses by heading</h4><?= svg_hbars($expByHead, true) ?></div>
+  <?php if ($seeSalary): ?><div class="panel"><h4 class="tab-sub" style="margin-top:0">Loaded cost by SBU</h4><?= svg_donut(chart_relabel_sbu($fin['costBySbu']??[]), true) ?></div><?php endif; ?>
 </div>
 <div class="panel-split">
   <div class="panel"><h3 class="tab-sub">By SBU<?= $seeSalary?' — credit vs distributed cost':'' ?></h3>
@@ -90,9 +110,16 @@
     <?php if(!$util):?><tr><td colspan="3">No inspectors.</td></tr><?php endif;?></table></div>
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0;">Man-days by SBU</h3>
-    <table class="grid"><tr><th>SBU</th><th>Man-days</th></tr><?php foreach ($mdBySbu as $k=>$v): ?><tr><td><?= e(lk_options_or('sbu',OPS_SBUS)[$k]??$k) ?></td><td><?= e($v) ?></td></tr><?php endforeach; ?><?php if(!$mdBySbu):?><tr><td colspan="2">—</td></tr><?php endif;?></table>
+    <?= svg_hbars(chart_relabel_sbu($mdBySbu)) ?>
     <p class="muted" style="margin-top:8px;">Deputation: <?= e($depMd) ?> md · Day-based: <?= e($inspMd) ?> md · Sub-con: <?= e($subMd) ?> md</p>
   </div>
+</div>
+<div class="panel-split">
+  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Man-days: work type</h4>
+    <?= svg_donut(['Day-based'=>$inspMd,'Deputation'=>$depMd,'Sub-con'=>$subMd]) ?></div>
+  <div class="panel" style="text-align:center"><h4 class="tab-sub" style="margin-top:0">Avg utilization</h4>
+    <?php $avgU = $util ? array_sum(array_map(fn($r)=>(float)$r['pct'],$util))/max(1,count($util)) : 0; ?>
+    <?= svg_gauge($avgU, 'this month') ?></div>
 </div>
 <?php endif; ?>
 
@@ -104,6 +131,6 @@
       <?php foreach ($certSoon as $c): ?><tr><td><?= e($c['inspector_name']) ?></td><td><?= e($c['name']) ?></td><td><?= e($c['valid_to']) ?></td><td><?php $d=$c['days']; ?><span class="badge <?= $d<0?'RED':($d<=30?'AMBER':'GREEN') ?>"><?= $d<0?abs($d).'d over':$d.'d' ?></span></td></tr><?php endforeach; ?>
       <?php if(!$certSoon):?><tr><td colspan="4">No certificates due.</td></tr><?php endif;?></table></div>
   <div class="panel"><h3 class="tab-sub" style="margin-top:0;">Inspectors by trade</h3>
-    <table class="grid"><tr><th>Trade</th><th>Count</th></tr><?php foreach ($byTrade as $k=>$v): ?><tr><td><?= e($k) ?></td><td><?= (int)$v ?></td></tr><?php endforeach; ?><?php if(!$byTrade):?><tr><td colspan="2">—</td></tr><?php endif;?></table></div>
+    <?= svg_hbars($byTrade) ?></div>
 </div>
 <?php endif; ?>
