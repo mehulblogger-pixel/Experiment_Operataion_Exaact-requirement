@@ -52,9 +52,14 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
       Approved / Authorized** captured, edit-locked once out of DRAFT, and Reopen.
       Verified: total ₹1,611, balance ₹1,011, file round-trip, print page, all
       transitions. `supporting_mime` migration + boot-safe.
-- [ ] **P6 · Attendance reconciliation** — upload HR payroll export, parse **in
-      memory only** (do NOT store the company doc), match by Employee Code, flag
-      day-type mismatches (claimed visit vs HR leave); save only the result.
+- [x] **P6 · Attendance reconciliation** — DONE. New **Reconcile** tab. Upload the
+      HR payroll Leave &amp; Attendance export **saved as CSV**; it is parsed **in
+      memory only and never stored** (respects "don't copy the company doc").
+      Auto-detects the header row + Employee Code / Present / Leave columns, matches
+      by Employee Code to the inspector master, and compares **HR present/leave vs
+      the app's voucher-derived present/leave** for the month — flagging OK /
+      MISMATCH / In-HR-only / In-app-only with the differing cells highlighted.
+      Verified: match=OK, HR4-vs-app2=MISMATCH, unknown code=In-HR-only.
 - [x] **P7 · Profitability by BOSS/Contract** — DONE. New **Profitability** tab
       (gated by new `data.profitability` perm — granted to Master Admin, Business
       Director, SBU Head, Branch Manager, **Operation Manager** [manager under the

@@ -17,6 +17,7 @@
       <a href="/calls">Calls</a>
       <a href="/jobs">Jobs</a>
       <?php if (is_coordinator_level()): ?><a href="/vouchers">Vouchers</a><?php endif; ?>
+      <?php if (is_coordinator_level()): ?><a href="/attendance-recon">Reconcile</a><?php endif; ?>
       <?php if (is_coordinator_level()): ?><a href="/candidates">Hiring</a><?php endif; ?>
       <a href="/clients">Clients</a>
       <a href="/vendors">Vendors</a>

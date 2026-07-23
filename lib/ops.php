@@ -882,6 +882,8 @@ function ops_dispatch($route, $method) {
             ops_profitability(); return true;
         case $route === 'boss-renew':
             ops_boss_renew(); return true;
+        case $route === 'attendance-recon':
+            ops_attendance_recon(); return true;
         case $route === 'users' || $route === 'user-new' || $route === 'user-edit':
             ops_users($route, $method); return true;
         case $route === 'change-password':
@@ -1944,6 +1946,84 @@ function ops_profitability() {
         $rows[] = $b + ['p' => boss_profit($b['id'])];
     }
     view('ops/profitability_list', ['rows' => $rows, 'seeSal' => can_see_salary()]);
+}
+
+// P6 — Attendance reconciliation. Upload the HR payroll export (CSV); it is
+// parsed IN MEMORY ONLY and NEVER stored — we keep only the comparison result.
+function ops_attendance_recon() {
+    ops_require(is_coordinator_level(), 'You cannot run attendance reconciliation.');
+    $month = preg_match('/^\d{4}-\d{2}$/', $_POST['month'] ?? '') ? $_POST['month'] : (preg_match('/^\d{4}-\d{2}$/', $_GET['month'] ?? '') ? $_GET['month'] : date('Y-m'));
+    $result = null; $error = '';
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        if (empty($_FILES['hr']['tmp_name']) || (int)$_FILES['hr']['error'] !== 0) {
+            $error = 'Choose the HR export saved as a .csv file.';
+        } else {
+            [$hr, $error] = attendance_parse_csv($_FILES['hr']['tmp_name']);
+            if (!$error) {
+                // our side: distinct present/leave days per inspector for the month (from vouchers)
+                $ours = [];
+                foreach (ops_all("SELECT i.emp_code, i.name,
+                    COUNT(DISTINCT CASE WHEN e.day_type IN ('WORK','OFFICE','WFH','TRAINING') THEN e.entry_date END) present,
+                    COUNT(DISTINCT CASE WHEN e.day_type='LEAVE' THEN e.entry_date END) leaves
+                    FROM voucher_entries e JOIN vouchers v ON v.id=e.voucher_id JOIN inspectors i ON i.id=v.inspector_id
+                    WHERE v.month=? GROUP BY i.emp_code, i.name", [$month]) as $r) {
+                    $ours[strtoupper(trim($r['emp_code']))] = $r;
+                }
+                $rows = []; $keys = array_unique(array_merge(array_keys($hr), array_keys($ours)));
+                foreach ($keys as $code) {
+                    if ($code === '') continue;
+                    $h = $hr[$code] ?? null; $o = $ours[$code] ?? null;
+                    $hp = $h ? (float)$h['present'] : null; $hl = $h ? (float)$h['leave'] : null;
+                    $op = $o ? (int)$o['present'] : null; $ol = $o ? (int)$o['leaves'] : null;
+                    $flag = 'OK';
+                    if (!$h) $flag = 'In app only';
+                    elseif (!$o) $flag = 'In HR only';
+                    elseif ($hp !== (float)$op || $hl !== (float)$ol) $flag = 'MISMATCH';
+                    $rows[] = ['code' => $code, 'name' => $h['name'] ?? ($o['name'] ?? ''),
+                        'hrP' => $hp, 'hrL' => $hl, 'ourP' => $op, 'ourL' => $ol, 'flag' => $flag];
+                }
+                // mismatches / one-sided first
+                usort($rows, fn($a, $b) => [$a['flag'] === 'OK' ? 1 : 0, $a['name']] <=> [$b['flag'] === 'OK' ? 1 : 0, $b['name']]);
+                $result = ['rows' => $rows, 'hrCount' => count($hr), 'oursCount' => count($ours)];
+            }
+        }
+    }
+    view('ops/attendance_recon', ['month' => $month, 'result' => $result, 'error' => $error]);
+}
+// Parse the HR CSV in memory. Returns [ ['CODE'=>['name','present','leave'], ...], errorString ].
+function attendance_parse_csv($tmp) {
+    $all = [];
+    if (($fh = fopen($tmp, 'r')) === false) return [[], 'Could not read the file.'];
+    while (($r = fgetcsv($fh)) !== false) $all[] = $r;
+    fclose($fh);
+    if (!$all) return [[], 'The file is empty.'];
+    // find the header row (first row containing an "employee code"/"code" cell)
+    $hIdx = -1;
+    foreach ($all as $i => $r) {
+        foreach ($r as $c) { $cl = strtolower(trim((string)$c));
+            if ($cl === 'employee code' || $cl === 'emp code' || $cl === 'employee id' || $cl === 'emp id' || $cl === 'code') { $hIdx = $i; break 2; } }
+    }
+    if ($hIdx < 0) return [[], 'Could not find an "Employee Code" column — please make sure the HR export has that header, saved as CSV.'];
+    $header = array_map(fn($h) => strtolower(trim((string)$h)), $all[$hIdx]);
+    $find = function($needles) use ($header) {
+        foreach ($header as $i => $h) foreach ($needles as $n) if (strpos($h, $n) !== false) return $i;
+        return -1;
+    };
+    $ci = $find(['employee code','emp code','employee id','emp id','code']);
+    $ni = $find(['name']);
+    $pi = $find(['present','payable','worked']);
+    $li = $find(['leave','lop','absent']);
+    if ($pi < 0 && $li < 0) return [[], 'Could not find a "Present days" or "Leave days" column in the HR export.'];
+    $out = [];
+    for ($i = $hIdx + 1; $i < count($all); $i++) {
+        $r = $all[$i];
+        $code = strtoupper(trim((string)($r[$ci] ?? '')));
+        if ($code === '' || !ctype_alnum(str_replace(['-', '_', ' '], '', $code))) continue;
+        $out[$code] = ['name' => trim((string)($r[$ni] ?? '')),
+            'present' => $pi >= 0 ? (float)($r[$pi] ?? 0) : 0, 'leave' => $li >= 0 ? (float)($r[$li] ?? 0) : 0];
+    }
+    if (!$out) return [[], 'No employee rows found under the header.'];
+    return [$out, ''];
 }
 
 // P8 — renew / carry a BOSS/contract forward (ARC / renewal). Creates a new
