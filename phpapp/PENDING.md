@@ -4,8 +4,17 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
 
 ## 🆕 Requested — to build next (noted 2026-07, owner)
 
-### 1. Complete demo / seed dataset (uploadable, all expected values)
-- [ ] A **ready-made sample dataset** that can be loaded into a fresh install so
+### 1. Complete demo / seed dataset (uploadable, all expected values) — ✅ DONE
+- [x] **DONE** — `lib/seed_demo.php` + a Master-Admin-only **"Load demo data"**
+      button in **Settings** (POST `/seed-demo`, idempotent via `demo_seeded`).
+      One click inserts 3 peer offices (Mumbai HO + Ahmedabad + Pune), 11 users
+      (every role, password `demo12345`), 4 inspectors (incl. an agency sub-con)
+      with entitlements, 3 clients + 2 vendors, 3 BOSS numbers, 6 calls, 6 jobs
+      across the full lifecycle (paid / awaiting / overdue / unbilled / in-progress
+      / sub-con), closure expenses, and 2 vouchers (DRAFT + APPROVED). Every
+      screen shows live figures immediately. *Follow-ups when the credit rules
+      below land: extend the seed with same-vs-different-office credit examples.*
+- [ ] *(original ask, for reference)* A **ready-made sample dataset** that can be loaded into a fresh install so
       the whole system can be explored end-to-end with realistic values —
       **from user creation → multiple offices → clients/vendors → BOSS/contract
       numbers → calls → job allocation & scheduling → inspection → voucher
