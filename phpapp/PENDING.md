@@ -70,10 +70,14 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
 
 ## Dashboards — refinements to follow
 
-- [ ] **Per-SBU configurable expense headings** — expenses are currently entered
-      under 5 fixed headings (travel/local/food/lodging/misc) and the financial
-      dashboard breaks them down accordingly. An `expense_heading` master now
-      exists; the remaining work is dynamic heading entry configurable per SBU.
+- [x] **Configurable expense headings** — DONE (global). The 5 base headings can
+      now be **renamed** via the `expense_heading` list, and **any extra headings**
+      you add there appear automatically on the job-close form, flow into the job
+      total/profit, the job-detail expense table, and the Financial dashboard's
+      "Expenses by heading" breakdown. Extras are stored per expense row as JSON
+      (`expenses.extra`), so nothing about the fixed 5 columns changed — fully
+      backward-compatible. *Remaining refinement:* scope headings **per SBU**
+      (make `expense_heading` a child list under SBU) — small follow-up.
 - [ ] **Persona landing pages** — today all four dashboard families live on one
       /reports page with each section gated by permission (so each person sees
       only their allowed sections). A future refinement gives each role a

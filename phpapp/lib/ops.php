@@ -205,6 +205,8 @@ function ops_migrate() {
     ensure_column('jobs', 'payment_date', "VARCHAR(20) DEFAULT ''");
     ensure_column('jobs', 'payment_amount', 'DECIMAL(14,2) DEFAULT 0');
     ensure_column('jobs', 'credit_received', 'INT DEFAULT 0'); // inter-office: credit received flag
+    // extra (configurable) expense headings beyond the fixed 5, stored as JSON {code:amount}
+    ensure_column('expenses', 'extra', 'TEXT');
     // certifications per inspector, with validity + reminder tracking
     db()->exec("CREATE TABLE IF NOT EXISTS inspector_certs (
         id " . pk_clause() . ", inspector_id INT, name VARCHAR(200), number VARCHAR(80) DEFAULT '',
@@ -340,8 +342,33 @@ function job_mandays($job) {
     return $d !== null ? max(1, $d + 1) : 1;
 }
 function job_expenses_total($jobId) {
-    $r = ops_one("SELECT COALESCE(SUM(travel+local+food+lodging+misc),0) t FROM expenses WHERE job_id=?", [$jobId]);
-    return (float)($r['t'] ?? 0);
+    $base = (float)(ops_one("SELECT COALESCE(SUM(travel+local+food+lodging+misc),0) t FROM expenses WHERE job_id=?", [$jobId])['t'] ?? 0);
+    $extra = 0;
+    foreach (ops_all("SELECT extra FROM expenses WHERE job_id=? AND extra IS NOT NULL AND extra<>''", [$jobId]) as $r)
+        foreach (expense_extra_decode($r['extra']) as $v) $extra += (float)$v;
+    return $base + $extra;
+}
+// Codes handled by the fixed columns; everything else in the expense_heading list is an "extra".
+const EXPENSE_BASE_CODES = ['TRAVEL','LOCAL','FOOD','LODGING','MISC'];
+// Configurable headings beyond the fixed 5 (added by the user under expense_heading).
+function expense_extra_headings() {
+    $out = [];
+    foreach (lk_options_or('expense_heading', EXPENSE_HEADINGS) as $code=>$label)
+        if (!in_array($code, EXPENSE_BASE_CODES, true)) $out[$code] = $label;
+    return $out;
+}
+function expense_extra_decode($json) {
+    if (!$json) return [];
+    $a = json_decode($json, true);
+    return is_array($a) ? $a : [];
+}
+// Merge legacy base labels (renamable via expense_heading list) with extras.
+function expense_heading_labels() {
+    $lk = lk_options_or('expense_heading', EXPENSE_HEADINGS);
+    $out = [];
+    foreach (['TRAVEL'=>'travel','LOCAL'=>'local','FOOD'=>'food','LODGING'=>'lodging','MISC'=>'misc'] as $code=>$col)
+        $out[$col] = $lk[$code] ?? EXPENSE_HEADINGS[$code];
+    return $out; // col => label for the 5 base columns
 }
 // Full profitability breakdown for a job (Master Admin sees the salary part).
 function job_profit($job) {
@@ -1331,12 +1358,18 @@ function ops_jobs($route, $method) {
             if ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate === '') {
                 view('ops/job_close', ['job'=>$job,'error'=>'A report upload date is required before closing this job.']); return;
             }
+            // collect any configurable (extra) headings into JSON {code:amount}
+            $extra = [];
+            foreach (expense_extra_headings() as $code=>$label) {
+                $amt = num($_POST['extra'][$code] ?? 0);
+                if ($amt != 0) $extra[$code] = $amt;
+            }
             // save expenses row (same-day at closure)
-            $pdo->prepare("INSERT INTO expenses (job_id,inspector_id,sbu,travel,local,food,lodging,misc,exp_date,notes,created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?)")->execute([
+            $pdo->prepare("INSERT INTO expenses (job_id,inspector_id,sbu,travel,local,food,lodging,misc,extra,exp_date,notes,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")->execute([
                 $job['id'], $job['inspector_id'], $b['sbu'] ?: $job['sbu'],
                 num($b['travel']), num($b['local']), num($b['food']), num($b['lodging']), num($b['misc']),
-                $reportDate ?: date('Y-m-d'), $b['exp_notes'] ?? '', date('c')]);
+                $extra ? json_encode($extra) : '', $reportDate ?: date('Y-m-d'), $b['exp_notes'] ?? '', date('c')]);
             $tat = days_between($job['inspection_end_date'], $reportDate);
             $pdo->prepare("UPDATE jobs SET closed_flag=1, closed_at=?, report_upload_date=?, report_link=?, tat_days=? WHERE id=?")
                 ->execute([date('c'), $reportDate, $b['report_link'] ?? '', $tat, $job['id']]);
@@ -1467,7 +1500,7 @@ function ops_reports() {
     }
 
     // ---- FINANCIAL ----
-    $fin = ['credit'=>0,'recv'=>0,'given'=>0,'labour'=>0,'exp'=>0,'subcon'=>0,'profit'=>0,'bySbu'=>[],'byOffice'=>[],'expHead'=>['travel'=>0,'local'=>0,'food'=>0,'lodging'=>0,'misc'=>0],
+    $fin = ['credit'=>0,'recv'=>0,'given'=>0,'labour'=>0,'exp'=>0,'subcon'=>0,'profit'=>0,'bySbu'=>[],'byOffice'=>[],'expHead'=>['travel'=>0,'local'=>0,'food'=>0,'lodging'=>0,'misc'=>0],'expHeadExtra'=>[],
         'invoiced'=>0,'paid'=>0,'outstanding'=>0,'overdue'=>0,'creditRecvCnt'=>0,'creditPendCnt'=>0];
     $byInspector=[]; $todayD=date('Y-m-d');
     foreach ($jobs as $j) {
@@ -1480,8 +1513,10 @@ function ops_reports() {
         if (($j['credit_direction']??'')!=='GIVEN' && (($j['executing_office_id']??null))) { if (!empty($j['credit_received'])) $fin['creditRecvCnt']++; else $fin['creditPendCnt']++; }
         $sk=$j['sbu']?:'—'; $fin['bySbu'][$sk]=($fin['bySbu'][$sk]??0)+$p['credit'];
         $ok=$j['office_name']?:'Ahmedabad'; $fin['byOffice'][$ok]=($fin['byOffice'][$ok]??0)+$p['credit'];
-        foreach (ops_all("SELECT * FROM expenses WHERE job_id=?", [$j['id']]) as $x)
+        foreach (ops_all("SELECT * FROM expenses WHERE job_id=?", [$j['id']]) as $x) {
             foreach (['travel','local','food','lodging','misc'] as $h) $fin['expHead'][$h]+=(float)$x[$h];
+            foreach (expense_extra_decode($x['extra'] ?? '') as $code=>$amt) $fin['expHeadExtra'][$code]=($fin['expHeadExtra'][$code]??0)+(float)$amt;
+        }
         $key=$j['ins_id']?:0;
         if (!isset($byInspector[$key])) $byInspector[$key]=['name'=>$j['inspector_name']?:'(unassigned)','credit'=>0,'cost'=>0,'exp'=>0,'profit'=>0,'jobs'=>0,'mandays'=>0];
         $byInspector[$key]['credit']+=$p['credit'];$byInspector[$key]['cost']+=$p['labour'];$byInspector[$key]['exp']+=$p['expenses'];$byInspector[$key]['profit']+=$p['profit'];$byInspector[$key]['jobs']++;$byInspector[$key]['mandays']+=$p['mandays'];
