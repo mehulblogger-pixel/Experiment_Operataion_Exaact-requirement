@@ -152,9 +152,13 @@ function theme_style_tag() {
     $soft  = theme_mix($surface, $ink, 0.05);
     $line  = theme_mix($surface, $ink, 0.14);
     $muted = theme_mix($surface, $ink, 0.45);
+    $field = theme_mix($surface, $ink, 0.04);
+    $isDark = theme_lum($surface) < 128;
+    $shadow   = $isDark ? '0 1px 2px rgba(0,0,0,.4), 0 12px 34px rgba(0,0,0,.5)' : '0 1px 2px rgba(18,32,60,.05), 0 10px 30px rgba(18,32,60,.08)';
+    $shadowSm = $isDark ? '0 1px 2px rgba(0,0,0,.45)' : '0 1px 2px rgba(18,32,60,.06)';
     $navtext = theme_lum($primary) > 150 ? '#111827' : '#ffffff';
     $navlink = theme_lum($primary) > 150 ? 'rgba(17,24,39,.72)' : 'rgba(255,255,255,.82)';
-    return "<style>:root{--brand:$primary;--accent:$accent;--bg:$bg;--card:$surface;--panel:$soft;--ink:$ink;--soft:$soft;--line:$line;--muted:$muted;--fs:{$fs}px}"
+    return "<style>:root{--brand:$primary;--accent:$accent;--bg:$bg;--card:$surface;--panel:$soft;--ink:$ink;--soft:$soft;--line:$line;--muted:$muted;--field:$field;--field-line:$line;--shadow:$shadow;--shadow-sm:$shadowSm;--fs:{$fs}px}"
         . "body{font-size:var(--fs)}.stat-card,.master-card{background:var(--soft)}"
         . ".topbar .brand,.topbar .user{color:$navtext}.topbar nav a{color:$navlink}.topbar nav a:hover{color:$navtext}"
         . "</style>";
