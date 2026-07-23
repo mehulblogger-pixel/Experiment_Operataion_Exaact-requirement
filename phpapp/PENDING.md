@@ -30,8 +30,18 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
       and the money desk all show live figures immediately. Delivered as a
       one-click "Load demo data" action or an importable seed the owner can run.
 
-### 1b. Full access / permission control (every module & feature)
-- [ ] **Comprehensive access matrix** — today only ~17 permissions exist and most
+### 1b. Full access / permission control (every module & feature) — ✅ DONE
+- [x] **DONE** — per-module **View + Edit** permissions for all 14 modules
+      (Calls, Jobs, Vouchers, Invoicing, Profitability, Hiring, Reconcile,
+      Clients, Vendors, Masters, Overheads, Reports, Users, Settings) plus the
+      fine data/feature perms. Managed **both** ways: a **Settings → Roles &
+      access** editor (per-role, "edit implies view", stored as an override) and
+      the **per-user** panel (full checklist). Sidebar + every module route are
+      gated on the view perm; inspector My Jobs/My Voucher stay exempt;
+      backward-compatible for users saved before the change. Verified across all
+      demo roles. *Follow-up ideas: office-scoped module grants; an audit log of
+      access changes.*
+- [ ] *(original ask, for reference)* **Comprehensive access matrix** — today only ~17 permissions exist and most
       screens are gated by *role level* (coordinator/admin), not fine permissions.
       Owner wants the super admin to grant/deny **each and every module and
       feature**, not a limited set, and to manage it **in Settings** (like the
