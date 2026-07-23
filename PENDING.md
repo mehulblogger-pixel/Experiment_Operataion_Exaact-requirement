@@ -20,13 +20,18 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
 
 ## Parked (agreed to do later)
 
-- [ ] **Full organisation structure** — model the hierarchy Business Director →
-      SBU Heads → Branch Managers → Managers → Asst. Managers → Coordinators →
-      Inspectors, with **multiple** Operation Managers and Coordinators **per
-      office**, and users linked to their office. Today each office stores a
-      single coordinator + manager email (used for forwarding/notifications), and
-      there are 4 access roles. This is a role/permission + org redesign for a
-      dedicated pass.
+- [ ] **Full organisation structure** — model **independent, peer offices**.
+      IMPORTANT org model (confirmed by owner): commercially the **HO is Mumbai**,
+      but **operationally there is NO head office** — every office is its own unit
+      with **its own targets, operations and P&L**. Offices are peers; inter-office
+      work is a **credit handoff between equals**, never HQ→branch. Build: users
+      linked to their office; **multiple** Operation Managers / Coordinators per
+      office; per-office targets; each office's dashboards default to *its own*
+      numbers, with cross-office roll-ups only for roles whose scope spans offices
+      (e.g. a commercial/Director view from Mumbai). Do **not** treat Ahmedabad (or
+      any office) as a managing HQ — the old `is_ahmedabad` "managing office" idea
+      is being unwound. This is a role/permission + org redesign for a dedicated
+      pass; needs the owner's intended per-office roles before building.
 - [x] **Multi-SBU cost distribution in dashboards** — DONE. The Financial
       dashboard's "By SBU" panel now shows Credit vs **distributed loaded cost**
       vs Net per SBU. Each active engineer's monthly loaded cost (CTC/12 + 8%
