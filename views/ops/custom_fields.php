@@ -1,10 +1,18 @@
+<?php
+  $entLabels = ['call'=>'Call','job'=>'Job','partner'=>'Client / Vendor'];
+  foreach (ops_masters() as $mk=>$mc) $entLabels[$mk] = $mc['label'];
+  $curLabel = $entLabels[$entity] ?? $entity;
+?>
+<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › Custom fields</div>
 <div class="master-head">
-  <div><h1>Custom fields — <?= $entity === 'call' ? 'Call' : 'Job' ?> form</h1>
-    <p class="sub">Add your own fields. They appear on the <?= $entity === 'call' ? 'New Call' : 'Allocate Job' ?> form automatically. A dropdown field can use any master list — pick a dependent list to get cascading selects.</p></div>
-  <div class="row-actions">
-    <a class="btn <?= $entity==='call'?'':'secondary' ?>" href="/custom-fields?entity=call">Call fields</a>
-    <a class="btn <?= $entity==='job'?'':'secondary' ?>" href="/custom-fields?entity=job">Job fields</a>
-  </div>
+  <div><h1>Custom fields — <?= e($curLabel) ?></h1>
+    <p class="sub">Add your own fields to this form. They appear automatically. A dropdown field can use any master list — pick a dependent list to get cascading selects.</p></div>
+  <form method="get" action="/custom-fields" class="row-actions">
+    <label class="muted" style="align-self:center">Form:</label>
+    <select class="form-control searchable" name="entity" onchange="this.form.submit()">
+      <?php foreach ($entities as $en): ?><option value="<?= e($en) ?>" <?= $entity===$en?'selected':'' ?>><?= e($entLabels[$en] ?? $en) ?></option><?php endforeach; ?>
+    </select>
+  </form>
 </div>
 
 <table class="grid">

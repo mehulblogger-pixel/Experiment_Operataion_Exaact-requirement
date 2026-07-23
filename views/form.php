@@ -44,6 +44,7 @@
         <?php endforeach; ?>
       </div>
       <small class="muted">Tick all that apply. In a new call for this client the Type-of-inspection list is narrowed to these. Manage the master under <a href="/lookup?key=inspection_type">Type of inspection</a>.</small></div>
+    <?php if (function_exists('render_custom_fields')) render_custom_fields('partner', $pcfvals ?? []); ?>
   </div>
   <div style="margin-top:18px;">
     <button class="btn" type="submit">Save</button>

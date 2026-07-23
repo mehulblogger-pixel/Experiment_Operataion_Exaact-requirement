@@ -40,6 +40,9 @@ function addr_name($a) { return (ADDRESS_TYPES[$a['address_type']] ?? $a['addres
     <dt>Primary contact</dt><dd><?php if ($primaryContact): ?><?= e($primaryContact['name']) ?><?php if ($primaryContact['designation']): ?> <span class="muted">(<?= e($primaryContact['designation']) ?>)</span><?php endif; ?> — <?= e(trim($primaryContact['mobile'].' '.$primaryContact['email'])) ?: '—' ?><?php else: ?>—<?php endif; ?></dd>
     <dt>Head office</dt><dd><?php if ($primaryAddress): ?><?= e(addr_line($primaryAddress) ?: addr_name($primaryAddress)) ?><?php else: ?>—<?php endif; ?></dd>
     <dt>Description</dt><dd><?= e($p['description'] ?: '—') ?></dd>
+    <?php if (function_exists('custom_display')) foreach (custom_display('partner', $p['id']) as $cf): ?>
+      <dt><?= e($cf['label']) ?></dt><dd><?= e($cf['value']) ?></dd>
+    <?php endforeach; ?>
   </dl>
   <h3 class="tab-sub">Company hierarchy</h3>
   <div class="hierarchy">

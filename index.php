@@ -175,10 +175,11 @@ if ($route === 'partner-new') {
         $id = $pdo->lastInsertId();
         $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
             ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $id]);
+        custom_save('partner', $id, $b);
         flash("$code created.");
         redirect("/partner?id=$id");
     }
-    return view('form', ['partner' => null, 'defaultRole' => $_GET['role'] ?? 'is_client', 'error' => null, 'offices' => offices_list()]);
+    return view('form', ['partner' => null, 'defaultRole' => $_GET['role'] ?? 'is_client', 'error' => null, 'offices' => offices_list(), 'pcfvals' => []]);
 }
 
 if ($route === 'partner-edit') {
@@ -201,10 +202,11 @@ if ($route === 'partner-edit') {
             ->execute([$b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $p['id']]);
         $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
             ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $p['id']]);
+        custom_save('partner', $p['id'], $b);
         flash('Updated.');
         redirect("/partner?id={$p['id']}");
     }
-    return view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'error' => null, 'offices' => offices_list()]);
+    return view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'error' => null, 'offices' => offices_list(), 'pcfvals' => custom_values_map('partner', $p['id'])]);
 }
 
 if ($route === 'partner-add' && $method === 'POST') {
