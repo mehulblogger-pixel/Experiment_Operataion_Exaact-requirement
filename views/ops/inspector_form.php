@@ -32,6 +32,8 @@
       <select class="form-control" name="status"><?php foreach (['ACTIVE'=>'Active','INACTIVE'=>'Inactive'] as $k=>$v): ?><option value="<?= $k ?>" <?= (($ins['status'] ?? 'ACTIVE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <?php if (can_see_salary()): ?>
     <div class="ff"><label>Annual CTC (₹) <span class="muted">— cost split across SBUs</span></label><input class="form-control" type="number" step="0.01" name="salary_ctc" value="<?= e($ins['salary_ctc'] ?? '') ?>"></div>
+    <div class="ff"><label>Hiring agency <span class="muted">— if engaged via an external agency</span></label><input class="form-control" name="agency_name" value="<?= e($ins['agency_name'] ?? '') ?>" placeholder="e.g. Patel Manpower"></div>
+    <div class="ff"><label>Agency hiring cost (₹/yr) <span class="muted">— extra cost paid to the agency</span></label><input class="form-control" type="number" step="0.01" name="agency_cost" value="<?= e($ins['agency_cost'] ?? '') ?>"></div>
     <?php endif; ?>
 
     <div class="ff ff-wide"><label>SBUs (multi — monthly cost is distributed across these)</label>

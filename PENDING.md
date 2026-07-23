@@ -81,6 +81,22 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
 
 ## UI/UX refresh — DONE
 
+- [x] **Role-appropriate landing** — every user lands on the **home dashboard**
+      after login (login → `/`); it is role-aware (managers get New Call / Jobs /
+      Vouchers / Profitability / Dashboards / Masters; inspectors get My Jobs /
+      My Voucher) with KPI cards + a live status chart, and all other screens are
+      reached from there.
+- [x] **Agency hiring cost on inspector** — when an engineer is engaged via an
+      external agency, capture the **hiring agency** + **annual agency cost** on
+      the inspector (salary-gated). It adds to that engineer's loaded labour
+      (`salary_ctc + agency_cost`) so profitability/dashboards reflect the true
+      cost. Verified: ₹240k agency cost on ₹600k CTC raised loaded labour
+      correctly.
+- [x] **Dashboards visual polish** — filter bar is now a sticky card; the four
+      family sections (Operations / Financial / Utilization / People) have bold
+      accent-underlined headers; chart panel sub-headers tidied.
+
+
 - [x] **Professional UI refresh** — a design layer on top of `app.css` (sticky
       top bar with pill-hover nav, softer card radii + real elevation, gradient
       buttons with coloured shadow, soft form fields with focus rings, hover-lift
