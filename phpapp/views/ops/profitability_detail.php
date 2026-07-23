@@ -1,7 +1,10 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/profitability">Profitability</a> › <?= e($boss['boss_number']) ?></div>
 <div class="master-head">
-  <div><h1>BOSS <?= e($boss['boss_number']) ?></h1>
-    <p class="sub"><?= e($boss['client_disp'] ?: $boss['client_name'] ?: '—') ?> · <?= (int)$p['jobs'] ?> job(s)</p></div>
+  <div><h1>BOSS <?= e($boss['boss_number']) ?>
+      <?php if (!empty($boss['superseded_by'])): ?><span class="badge AMBER" style="vertical-align:middle">Renewed</span><?php endif; ?></h1>
+    <p class="sub"><?= e($boss['client_disp'] ?: $boss['client_name'] ?: '—') ?> · <?= (int)$p['jobs'] ?> job(s)
+      <?php if (!empty($boss['prev_no'])): ?> · <span class="muted">continues from <a href="/profitability?boss=<?= (int)$boss['prev_id'] ?>"><?= e($boss['prev_no']) ?></a></span><?php endif; ?>
+      <?php if (!empty($boss['next_no'])): ?> · <span class="muted">renewed as <a href="/profitability?boss=<?= (int)$boss['next_id'] ?>"><?= e($boss['next_no']) ?></a></span><?php endif; ?></p></div>
   <a class="btn secondary" href="/profitability">← Back</a>
 </div>
 
@@ -66,6 +69,20 @@
     <?php if (!$invLines): ?><tr><td colspan="6">No jobs linked to this BOSS.</td></tr><?php endif; ?>
   </table>
 </div>
+
+<?php if (empty($boss['superseded_by'])): ?>
+<div class="panel">
+  <h3 class="tab-sub">Renew / change contract number (ARC / Open order)</h3>
+  <p class="sub">Creates a new BOSS/contract number, carries the <strong>open jobs</strong> forward to it, and keeps this old number visible in the chain.</p>
+  <form method="post" action="/boss-renew" class="inline-add" style="align-items:flex-end" onsubmit="return confirm('Renew this contract? Open jobs will move to the new number.')">
+    <input type="hidden" name="old_id" value="<?= (int)$boss['id'] ?>">
+    <div class="ff"><label>New BOSS / contract number *</label><input class="form-control" name="new_number" required></div>
+    <div class="ff"><label>Start date</label><input class="form-control" type="date" name="start_date"></div>
+    <div class="ff"><label>End date</label><input class="form-control" type="date" name="end_date"></div>
+    <button class="btn" type="submit">Renew &amp; carry forward</button>
+  </form>
+</div>
+<?php endif; ?>
 
 <script>
   document.querySelectorAll('.xpand').forEach(function(b){

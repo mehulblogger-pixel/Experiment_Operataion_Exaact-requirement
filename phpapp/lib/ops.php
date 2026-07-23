@@ -284,6 +284,10 @@ function ops_migrate() {
     ensure_column('expenses', 'extra', 'TEXT');
     // voucher supporting-file mime (voucher table itself is created in ensure_schema)
     ensure_column('vouchers', 'supporting_mime', "VARCHAR(100) DEFAULT ''");
+    // BOSS / contract carry-forward chain (renewal / ARC → new number, old kept visible)
+    ensure_column('boss_numbers', 'supersedes', 'INT NULL');       // this row continues an older BOSS
+    ensure_column('boss_numbers', 'superseded_by', 'INT NULL');    // this row was renewed into a newer BOSS
+    ensure_column('boss_numbers', 'carried_at', "VARCHAR(30) DEFAULT ''");
     // certifications per inspector, with validity + reminder tracking
     db()->exec("CREATE TABLE IF NOT EXISTS inspector_certs (
         id " . pk_clause() . ", inspector_id INT, name VARCHAR(200), number VARCHAR(80) DEFAULT '',
@@ -876,6 +880,8 @@ function ops_dispatch($route, $method) {
             ops_reports(); return true;
         case $route === 'profitability':
             ops_profitability(); return true;
+        case $route === 'boss-renew':
+            ops_boss_renew(); return true;
         case $route === 'users' || $route === 'user-new' || $route === 'user-edit':
             ops_users($route, $method); return true;
         case $route === 'change-password':
@@ -1913,7 +1919,11 @@ function ops_profitability() {
     ops_require(can('data.profitability'), 'You do not have access to profitability figures.');
     $bossId = (int)($_GET['boss'] ?? 0);
     if ($bossId) {
-        $boss = ops_one("SELECT bn.*, bp.legal_name client_name, bp.display_name client_disp FROM boss_numbers bn LEFT JOIN business_partners bp ON bp.id=bn.client_id WHERE bn.id=?", [$bossId]);
+        $boss = ops_one("SELECT bn.*, bp.legal_name client_name, bp.display_name client_disp,
+            old.id prev_id, old.boss_number prev_no, nw.id next_id, nw.boss_number next_no
+            FROM boss_numbers bn LEFT JOIN business_partners bp ON bp.id=bn.client_id
+            LEFT JOIN boss_numbers old ON old.id=bn.supersedes LEFT JOIN boss_numbers nw ON nw.id=bn.superseded_by
+            WHERE bn.id=?", [$bossId]);
         if (!$boss) { http_response_code(404); view('notfound'); return; }
         $p = boss_profit($bossId);
         // expense drill-down (voucher lines) — which inspector visited which vendor, cost
@@ -1934,6 +1944,31 @@ function ops_profitability() {
         $rows[] = $b + ['p' => boss_profit($b['id'])];
     }
     view('ops/profitability_list', ['rows' => $rows, 'seeSal' => can_see_salary()]);
+}
+
+// P8 — renew / carry a BOSS/contract forward (ARC / renewal). Creates a new
+// number linked to the old one, carries OPEN jobs forward, keeps the old visible.
+function ops_boss_renew() {
+    ops_require(can('data.profitability') || is_coordinator_level(), 'You cannot renew a contract.');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('/profitability'); }
+    $pdo = db();
+    $old = ops_one("SELECT * FROM boss_numbers WHERE id=?", [(int)($_POST['old_id'] ?? 0)]);
+    if (!$old) { flash('BOSS/contract not found.', 'error'); redirect('/profitability'); }
+    if (!empty($old['superseded_by'])) { flash('This contract has already been renewed.', 'error'); redirect('/profitability?boss=' . $old['id']); }
+    $newNo = trim($_POST['new_number'] ?? '');
+    if ($newNo === '') { flash('Enter the new BOSS / contract number.', 'error'); redirect('/profitability?boss=' . $old['id']); }
+    $pdo->prepare("INSERT INTO boss_numbers (client_id,boss_number,start_date,end_date,status,comments,supersedes,carried_at) VALUES (?,?,?,?, 'ACTIVE', ?, ?, ?)")
+        ->execute([$old['client_id'], $newNo, $_POST['start_date'] ?? '', $_POST['end_date'] ?? '', 'Carried forward from ' . $old['boss_number'], $old['id'], date('c')]);
+    $newId = $pdo->lastInsertId();
+    $pdo->prepare("UPDATE boss_numbers SET superseded_by=?, status='CLOSED' WHERE id=?")->execute([$newId, $old['id']]);
+    // carry OPEN jobs (and their voucher lines) to the new number
+    $jobs = ops_all("SELECT id FROM jobs WHERE boss_id=? AND (closed_flag=0 OR closed_flag IS NULL)", [$old['id']]);
+    foreach ($jobs as $j) {
+        $pdo->prepare("UPDATE jobs SET boss_id=? WHERE id=?")->execute([$newId, $j['id']]);
+        $pdo->prepare("UPDATE voucher_entries SET boss_id=?, file_no=? WHERE job_id=? AND boss_id=?")->execute([$newId, $newNo, $j['id'], $old['id']]);
+    }
+    flash("Renewed to {$newNo}. " . count($jobs) . " open job(s) carried forward; the old number {$old['boss_number']} stays visible.");
+    redirect('/profitability?boss=' . $newId);
 }
 
 function ops_reports() {
