@@ -2,6 +2,82 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🆕 Requested — to build next (noted 2026-07, owner)
+
+### 1. Complete demo / seed dataset (uploadable, all expected values)
+- [ ] A **ready-made sample dataset** that can be loaded into a fresh install so
+      the whole system can be explored end-to-end with realistic values —
+      **from user creation → multiple offices → clients/vendors → BOSS/contract
+      numbers → calls → job allocation & scheduling → inspection → voucher
+      (km + bills) → closure → invoicing → payment → inter-office credit.**
+      Purpose: demos, training, and testing every screen with data already in
+      place. Should include: several **offices** (peer offices + Mumbai as the
+      commercial HO), **users of every role** (Master Admin, Business Director,
+      SBU Head, Branch/Branch-App Manager, Operation/Asst. Manager, Coordinator,
+      Accountant, Inspector), **inspectors** with salary + entitlements, a few
+      **clients/vendors/sites**, **BOSS numbers**, a spread of **calls & jobs**
+      (some same-office, some cross-office), **completed vouchers**, and
+      **invoiced + paid + credit-settled** examples so profitability, dashboards
+      and the money desk all show live figures immediately. Delivered as a
+      one-click "Load demo data" action or an importable seed the owner can run.
+
+### 2. Credit tab — driven by contracting vs executing office
+- [ ] **Same contracting & executing office** → the **Credit tab is DISABLED**
+      (no inter-office credit to record), BUT the call must still **show the
+      billable value** — invoice / **man-day** / **man-month** value —
+      **excluding GST**. (So a single-office job still shows what it's worth,
+      just with no credit hand-off.)
+- [ ] **Different contracting & executing office** → the **Credit tab is FULLY
+      OPEN**. The **credit to be given to the executing office** is **clearly
+      stated** on the call. The **executing office can revert with the value of
+      credit it requires** for that call (a counter-value / negotiation back to
+      the contracting office), so both sides agree the credit.
+- [ ] **Voucher officially downloaded & submitted** — the prepared voucher
+      (Statement of Travelling Expenses) must be **officially downloadable** and
+      **submitted** as the record for the call (PDF download + submit step).
+- [ ] **Both offices see the spend** — the **contracting office AND the executing
+      office** can both **check the amount spent on the call**. Both can **filter
+      the inspection list and see the cost incurred** (including **all expenses**)
+      for each inspection, shown to each office **according to its scope**
+      (contracting sees its calls; executing sees the calls it executed).
+
+### 3. Downloadable reports — research (for ops / finance / efficiency analysis)
+Goal: let every function pull the data it needs as a file (Excel/CSV for
+analysis, PDF for official statements). Proposed catalogue to build:
+
+**Operations**
+- [ ] Call register (with lead-times, status, pending-scheduling flag)
+- [ ] Job register / allocation report (inspector, dates, BOSS, status)
+- [ ] **TAT report** — on-time vs late, average TAT, by office / SBU / inspector
+- [ ] Overdue-closure report (jobs past scheduled/required date)
+- [ ] Scheduling / dispatch board export (what's due, who's free)
+- [ ] Inspection volume by client / vendor / site / inspection-type
+
+**Finance**
+- [ ] **Profitability by BOSS / contract** (revenue − labour − exp − subcon − OH − contingency)
+- [ ] **Office P&L** (per peer office; own targets vs achieved)
+- [ ] **SBU P&L** (credit vs distributed loaded cost vs net)
+- [ ] **Voucher / expense register** (per inspector/month, per expense head)
+- [ ] **Invoicing & payment** — raised / received / outstanding / **overdue aging** (30/60/90)
+- [ ] **Inter-office credit statement** — given vs received, expected vs actual, reconciliation
+- [ ] Expense analysis by head (travel, food, lodging, bills, …)
+- [ ] Cost-per-call and cost-per-man-day
+- [ ] **Billable value (ex-GST)** per call — man-day / man-month / invoice value
+
+**Efficiency / People**
+- [ ] **Inspector utilization** (man-days, % of working days) monthly + trend
+- [ ] Attendance / leave summary (from voucher-derived present/leave)
+- [ ] Inspector productivity (jobs, man-days, credit, cost, net)
+- [ ] Work-type mix (day-based vs deputation vs sub-con)
+- [ ] Certificate-expiry / compliance report
+
+**Formats & mechanics to decide**: CSV + Excel (`.xls` via HTML table or
+`.csv`, no library needed on MilesWeb) for data; **PDF/print** for official
+statements (voucher, credit note, invoice summary) using the existing
+print-page approach; every report **respects the user's office/SBU scope** and
+the current dashboard **filters** (FY, month, office, SBU, inspector).
+
+
 ## 🚧 Expense / Inspector-Voucher module (IN PROGRESS — the profitability engine)
 
 Modelled on the real "Statement of Travelling Expenses" the inspectors use.
@@ -78,6 +154,33 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
       shows the chain both ways ("continues from…", "renewed as…"). Closed/
       historical jobs stay on the old number. Verified: open job → new, closed job
       stays, chain linked.
+
+## UI/UX rebuild v2 (staged, signed off) — DONE
+
+Full app-wide rebuild on the new design system, done screen-by-screen with
+sign-off between stages. Sidebar + slim top bar replace the old header; a
+role-aware dashboard, an accountant money desk, and every core screen now share
+the same cards / status pills / summary chips / clean tables — all driven by
+the theme builder (no colour hardcoded, no CSS variable renamed).
+
+- [x] **Sidebar shell** — grouped left rail (Operations / Money / Insights /
+      Directory / Admin) with active highlighting + per-role visibility; slim
+      top bar (office + FY chips, search, user); mobile drawer + scrim.
+- [x] **Role-aware dashboard** — one template filled per role & scope (Director,
+      SBU Head, Branch/Branch-App Manager, Manager/Asst, Coordinator, Accountant,
+      Inspector); KPI tiles, money desk, expected-credit-by-office bars, job
+      donut, quick actions, pending-scheduling — sections shown by permission,
+      ordered per role.
+- [x] **Accountant money desk** (`/invoicing`) — confirm-cards (Invoice pending /
+      Awaiting payment / Overdue / Credit not received) over a worklist that
+      writes the invoice/payment/credit fields already on jobs; office-scoped.
+- [x] **Inspector phone view** — card-based My Jobs (To do / Completed, overdue
+      flag) + a mobile bottom tab bar (Home / My Jobs / Voucher).
+- [x] **Jobs & Calls lists** — summary chips + clean tables + status/money pills.
+- [x] **Voucher grid** — status pill + headline KPI strip; mechanics (form=,
+      live recalc, totals) untouched.
+- [x] **Profitability list + detail** — KPI cards, margin pills, clean drill-down.
+- [x] **Reports/Dashboards** — theme-variable colours; sticky filter re-aligned.
 
 ## UI/UX refresh — DONE
 
