@@ -76,11 +76,3 @@
   </table>
   <?php endif; ?>
 </div>
-
-<style>
-  .chip-row{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 6px}
-  .chip-row .ct{display:inline-flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);
-    border-radius:20px;padding:5px 12px;font-size:12.5px;font-weight:600;color:var(--ink)}
-  .chip-row .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
-  .dot-warn{background:var(--warn)}.dot-bad{background:var(--bad)}.dot-ok{background:var(--ok)}
-</style>
