@@ -42,6 +42,8 @@
         <?php foreach ($offices as $o): $sel = $job ? $job['executing_office_id']==$o['id'] : (($call['executing_office_id']??null)? $call['executing_office_id']==$o['id'] : $o['code']==='AHM'); ?>
           <option value="<?= (int)$o['id'] ?>" <?= $sel?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
       </select></div>
+    <div class="ff"><label>Stage</label>
+      <select class="form-control" name="stage"><?php foreach (JOB_STAGES as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($job['stage'] ?? 'ALLOCATED')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Job type</label>
       <select class="form-control" name="job_type"><?php foreach (JOB_TYPES as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($job['job_type'] ?? 'INSPECTION')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
       <small class="muted">For deputation at site, set the start and completion dates over the deputation period.</small></div>

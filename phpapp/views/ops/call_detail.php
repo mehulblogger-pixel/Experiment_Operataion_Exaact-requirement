@@ -60,18 +60,26 @@
   </div>
 </div>
 
+<?php
+  // Assignment confirmation banner (executing branch has allocated an inspector)
+  $engKind = ['ASSET'=>'SGS asset','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor'];
+  foreach ($jobs as $aj) { if ($aj['inspector_name'] && $aj['scheduled_date']): ?>
+    <div class="msg msg-success">✅ Call assigned to <strong><?= e($aj['inspector_name']) ?></strong> for <strong><?= e($aj['scheduled_date']) ?></strong> — engineer is <?= e($engKind[$aj['staff_kind'] ?? 'ASSET'] ?? 'SGS asset') ?><?= $aj['subcon_agency'] ? ' (' . e($aj['subcon_agency']) . ')' : '' ?>. Job <?= e($aj['job_code']) ?>, stage: <?= e(JOB_STAGES[$aj['stage'] ?? 'ALLOCATED'] ?? '') ?>.</div>
+  <?php endif; } ?>
 <h3 class="tab-sub">Jobs allocated from this call</h3>
 <table class="grid">
-  <tr><th>Job</th><th>Inspector</th><th>Scheduled</th><th>Expected credit</th><th>Closed</th><th></th></tr>
+  <tr><th>Job</th><th>Inspector</th><th>Engineer</th><th>Scheduled</th><th>Stage</th><th>Expected credit</th><th>Closed</th><th></th></tr>
   <?php foreach ($jobs as $j): ?>
   <tr>
     <td><a href="/job?id=<?= (int)$j['id'] ?>"><?= e($j['job_code']) ?></a></td>
-    <td><?= e($j['inspector_name'] ?: '—') ?></td>
+    <td><?= e($j['inspector_name'] ?: ($j['subcon_agency'] ?: '—')) ?></td>
+    <td><?= e($engKind[$j['staff_kind'] ?? 'ASSET'] ?? '—') ?></td>
     <td><?= e($j['scheduled_date'] ?: '—') ?></td>
+    <td><span class="badge <?= ($j['stage']??'')==='CLOSED'?'GREEN':'AMBER' ?>"><?= e(JOB_STAGES[$j['stage'] ?? 'ALLOCATED'] ?? '') ?></span></td>
     <td><?= fmoney($j['expected_credit']) ?></td>
     <td><?= $j['closed_flag'] ? '<span class="badge GREEN">Closed</span>' : '<span class="badge AMBER">Open</span>' ?></td>
     <td class="row-actions"><a class="btn small secondary" href="/job?id=<?= (int)$j['id'] ?>">Open</a></td>
   </tr>
   <?php endforeach; ?>
-  <?php if (!$jobs): ?><tr><td colspan="6">No jobs yet. <?php if (is_coordinator_level()): ?><a href="/job-new?call=<?= (int)$call['id'] ?>">Allocate one</a>.<?php endif; ?></td></tr><?php endif; ?>
+  <?php if (!$jobs): ?><tr><td colspan="8">No jobs yet. <?php if (is_coordinator_level()): ?><a href="/job-new?call=<?= (int)$call['id'] ?>">Allocate one</a>.<?php endif; ?></td></tr><?php endif; ?>
 </table>
