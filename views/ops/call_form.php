@@ -14,20 +14,16 @@
         <?php foreach ($vendors as $v): ?><option value="<?= (int)$v['id'] ?>" <?= ($call && $call['vendor_id']==$v['id'])?'selected':'' ?>><?= e(pname($v)) ?></option><?php endforeach; ?>
       </select></div>
 
-    <div class="ff"><label>Managing / IBO office</label>
-      <select class="form-control searchable" name="ibo_office_id"><option value="">— Ahmedabad's own —</option>
-        <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ($call && $call['ibo_office_id']==$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
-      </select></div>
-    <div class="ff"><label>Contracting office <span class="muted">(who owns the client / PO)</span></label>
-      <select class="form-control searchable" id="con_sel" name="contracting_office_id"><option value="">— my office —</option>
-        <?php $conCur = $call['contracting_office_id'] ?? (current_user()['home_office_id'] ?? null);
-          foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ($conCur==$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
+    <div class="ff"><label>Managing / contracting office (IBO) <span class="muted">(who owns the order)</span></label>
+      <select class="form-control searchable" id="ibo_sel" name="ibo_office_id"><option value="">— my office —</option>
+        <?php $iboCur = $call['ibo_office_id'] ?? (current_user()['home_office_id'] ?? null);
+          foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ($iboCur==$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"><label>Executing office (branch) <a href="#" class="addlink" data-qa="office">+ Add new</a></label>
       <select class="form-control searchable" id="exec_sel" name="executing_office_id"><option value="">— same office executes —</option>
         <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ($call && ($call['executing_office_id']??null)==$o['id'])?'selected':'' ?>><?= e($o['name']) ?><?= $o['coordinator_name']?' · '.e($o['coordinator_name']):'' ?></option><?php endforeach; ?>
       </select>
-      <small class="muted">Same as contracting = billable value only (no inter-office credit). A different office opens the credit fields.</small></div>
+      <small class="muted">Same as the managing office = billable value only (no inter-office credit). A different office opens the credit fields.</small></div>
 
     <div class="ff"><label>Region</label>
       <select class="form-control searchable" name="region"><option value="">—</option>
@@ -110,16 +106,16 @@
 
 <script>
 (function(){
-  var con=document.getElementById('con_sel'), ex=document.getElementById('exec_sel');
+  var ibo=document.getElementById('ibo_sel'), ex=document.getElementById('exec_sel');
   var same=document.getElementById('samebox'), cross=document.getElementById('crossbox');
-  if(!(con&&ex&&same&&cross)) return;
+  if(!(ibo&&ex&&same&&cross)) return;
   function sync(){
-    var e=ex.value||'', c=con.value||'';
-    var isSame = (e==='') || (c!=='' && e===c);   // no executing branch, or executing == contracting
+    var e=ex.value||'', m=ibo.value||'';
+    var isSame = (e==='') || (e===m);   // no executing branch, or executing == managing office
     same.style.display  = isSame ? '' : 'none';
     cross.style.display = isSame ? 'none' : '';
   }
-  con.addEventListener('change', sync); ex.addEventListener('change', sync); sync();
+  ibo.addEventListener('change', sync); ex.addEventListener('change', sync); sync();
 })();
 </script>
 
