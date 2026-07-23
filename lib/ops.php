@@ -188,6 +188,9 @@ function ops_ensure_schema() {
             checked_by VARCHAR(150) DEFAULT '', approved_by VARCHAR(150) DEFAULT '',
             authorized_by VARCHAR(150) DEFAULT '', approved_at VARCHAR(30) DEFAULT '',
             created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
+        // Remembered km per inspector+vendor (so it auto-fills next visit).
+        "CREATE TABLE IF NOT EXISTS vendor_km_memory (
+            id $pk, inspector_id INT, vendor_id INT, mode_code VARCHAR(30) DEFAULT '', km DECIMAL(8,1) DEFAULT 0)",
         // One row per day-segment (a site visit, office, or leave). Multiple per date.
         "CREATE TABLE IF NOT EXISTS voucher_entries (
             id $pk, voucher_id INT, entry_date VARCHAR(20), day_type VARCHAR(15) DEFAULT 'WORK',
@@ -861,7 +864,7 @@ function ops_dispatch($route, $method) {
             ops_jobs($route, $method); return true;
         case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage':
             ops_candidates($route, $method); return true;
-        case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry':
+        case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry' || $route === 'voucher-save':
             ops_vouchers($route, $method); return true;
         case $route === 'my-jobs':
             ops_my_jobs(); return true;
@@ -1459,6 +1462,36 @@ function voucher_generate($v) {
     return $added;
 }
 
+// Travel modes / expense heads this inspector may use (entitlement-limited; if
+// the Super Admin hasn't configured any, default to all active — usable out of the box).
+function voucher_modes_for($insId) {
+    if ((int)ops_val("SELECT COUNT(*) FROM inspector_allowances WHERE inspector_id=? AND kind='MODE'", [$insId]))
+        return ops_all("SELECT tm.* FROM travel_modes tm JOIN inspector_allowances a ON a.code=tm.code AND a.kind='MODE' AND a.allowed=1 WHERE a.inspector_id=? AND tm.active=1 ORDER BY tm.id", [$insId]);
+    return ops_all("SELECT * FROM travel_modes WHERE active=1 ORDER BY id");
+}
+function voucher_heads_for($insId) {
+    if ((int)ops_val("SELECT COUNT(*) FROM inspector_allowances WHERE inspector_id=? AND kind='HEAD'", [$insId]))
+        $rows = ops_all("SELECT eh.* FROM expense_heads eh JOIN inspector_allowances a ON a.code=eh.code AND a.kind='HEAD' AND a.allowed=1 WHERE a.inspector_id=? AND eh.active=1 ORDER BY eh.sort_order, eh.id", [$insId]);
+    else $rows = ops_all("SELECT * FROM expense_heads WHERE active=1 ORDER BY sort_order, id");
+    return array_values(array_filter($rows, fn($h) => $h['code'] !== 'KMTRAVEL')); // travel is computed from mode × km
+}
+function voucher_mode_rates($insId) {
+    $out = [];
+    foreach (voucher_modes_for($insId) as $m) if ($m['basis'] === 'PER_KM') $out[$m['code']] = inspector_mode_rate($insId, $m['code']);
+    return $out;
+}
+function vendor_km_lookup($insId, $vendorId) {
+    if (!$insId || !$vendorId) return null;
+    return ops_one("SELECT mode_code, km FROM vendor_km_memory WHERE inspector_id=? AND vendor_id=?", [$insId, $vendorId]);
+}
+function vendor_km_remember($insId, $vendorId, $mode, $km) {
+    if (!$insId || !$vendorId || $km <= 0) return;
+    $pdo = db();
+    $ex = ops_val("SELECT id FROM vendor_km_memory WHERE inspector_id=? AND vendor_id=?", [$insId, $vendorId]);
+    if ($ex) $pdo->prepare("UPDATE vendor_km_memory SET mode_code=?, km=? WHERE id=?")->execute([$mode, $km, $ex]);
+    else $pdo->prepare("INSERT INTO vendor_km_memory (inspector_id,vendor_id,mode_code,km) VALUES (?,?,?,?)")->execute([$insId, $vendorId, $mode, $km]);
+}
+
 function ops_vouchers($route, $method) {
     $pdo = db();
 
@@ -1493,8 +1526,37 @@ function ops_vouchers($route, $method) {
         ops_require(can_view_voucher($v), 'You cannot view this voucher.');
         $entries = ops_all("SELECT * FROM voucher_entries WHERE voucher_id=? ORDER BY entry_date, id", [$id]);
         view('ops/voucher_detail', ['v' => $v, 'entries' => $entries, 'canEdit' => can_edit_voucher($v),
-            'leaveOpts' => lk_options_or('leave_type', LEAVE_TYPES), 'dayOpts' => lk_options_or('day_code', DAY_CODES)]);
+            'leaveOpts' => lk_options_or('leave_type', LEAVE_TYPES), 'dayOpts' => lk_options_or('day_code', DAY_CODES),
+            'heads' => voucher_heads_for($v['inspector_id']), 'modes' => voucher_modes_for($v['inspector_id']),
+            'rates' => voucher_mode_rates($v['inspector_id'])]);
         return;
+    }
+
+    if ($route === 'voucher-save' && $method === 'POST') {
+        $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$v) { http_response_code(404); view('notfound'); return; }
+        ops_require(can_edit_voucher($v), 'This voucher can no longer be edited.');
+        $heads = voucher_heads_for($v['inspector_id']);
+        $rates = voucher_mode_rates($v['inspector_id']);
+        $grand = 0;
+        foreach (($_POST['rows'] ?? []) as $eid => $r) {
+            $e = ops_one("SELECT * FROM voucher_entries WHERE id=? AND voucher_id=?", [(int)$eid, $v['id']]);
+            if (!$e) continue;
+            $mode = $r['mode'] ?? '';
+            $km = (float)($r['km'] ?? 0);
+            $travel = round($km * (float)($rates[$mode] ?? 0), 2);
+            $amounts = [];
+            foreach ($heads as $h) { $a = (float)($r['amt'][$h['code']] ?? 0); if ($a != 0) $amounts[$h['code']] = $a; }
+            $rowTotal = $travel + array_sum($amounts);
+            $pdo->prepare("UPDATE voucher_entries SET hours=?, line_no=?, file_no=?, mode_code=?, km=?, travel_amount=?, amounts=?, row_total=? WHERE id=? AND voucher_id=?")
+                ->execute([(float)($r['hours'] ?? 0), $r['line_no'] ?? '', $r['file_no'] ?? '', $mode, $km, $travel,
+                    $amounts ? json_encode($amounts) : '', $rowTotal, $e['id'], $v['id']]);
+            if ($e['day_type'] === 'WORK' && $e['vendor_id'] && $km > 0) vendor_km_remember($v['inspector_id'], $e['vendor_id'], $mode, $km);
+            $grand += $rowTotal;
+        }
+        $pdo->prepare("UPDATE vouchers SET total=? WHERE id=?")->execute([$grand, $v['id']]);
+        flash('Voucher saved. Total ₹' . number_format($grand, 0) . '.');
+        redirect('/voucher?id=' . $v['id']);
     }
 
     if ($route === 'voucher-generate' && $method === 'POST') {

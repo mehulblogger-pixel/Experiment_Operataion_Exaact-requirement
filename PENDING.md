@@ -33,9 +33,15 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
       rows. Add non-inspection days (Office / Leave-with-code / Holiday / Week-off).
       Access: inspector = own; coordinator+ = any. Verified end-to-end; boot probe
       added. (KM/expense columns + totals arrive in P4.)
-- [ ] **P4 · Fast entry** — km dropdown auto-filled + **remembered per vendor**
-      (editable); auto-calc km×rate; entitlement-limited heads/modes; bill fields;
-      **one supporting file per voucher** backs all bill claims; live totals.
+- [x] **P4 · Fast entry** — DONE. Wide grid: per row a **Mode** select + **KM**
+      (auto-filled from vendor memory ↺, editable) → **Travel ₹ = km × the
+      inspector's entitled rate**, plus one **bill column per entitled expense
+      head** (only the heads/modes the Super Admin allowed appear). **Bottom TOTAL
+      row** sums every column + **Grand Total**; JS recomputes live as you type,
+      server recomputes authoritatively on **Save all**. `vendor_km_memory`
+      remembers km per inspector+vendor. Verified: Bike ₹6 → 38/40/38 km, Food/
+      Hotel bills, grand total ₹1,839, memory stored, Bus/Train hidden (not
+      entitled). Boot probe added. *(One supporting file per voucher lands in P5.)*
 - [ ] **P5 · Output & workflow** — summary "particulars" page (Railway/Bus/Hotel/
       Meals/Telephone/Outstation/Local/Others + Grand Total + Less Advance/Office +
       Balance); printable Statement; 3-level approval (Checked→Approved→Authorized).

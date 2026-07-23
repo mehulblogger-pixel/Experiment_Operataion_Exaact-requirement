@@ -38,51 +38,118 @@
 </div>
 <?php endif; ?>
 
+<?php
+  $fmt = fn($n) => rtrim(rtrim(number_format((float)$n, 2, '.', ''), '0'), '.') ?: '0';
+  // running column totals
+  $tTravel = 0; $tHead = []; foreach ($heads as $h) $tHead[$h['code']] = 0; $grand = 0;
+  $ncol = 8 + count($heads) + ($canEdit ? 2 : 1); // Date,Site,File,Line,Hrs,Mode,KM,Travel + heads + Row(+✕)
+?>
+<?php if ($canEdit): ?><form method="post" action="/voucher-save?id=<?= (int)$v['id'] ?>" id="vform"><?php endif; ?>
 <div class="tbl-scroll" style="overflow-x:auto">
-<table class="grid">
-  <tr><th>Date</th><th>Attendance / Site</th><th>File No (BOSS)</th><th>Line No</th><th>SBU</th><th>Hours</th><?php if ($canEdit): ?><th>Save / remove</th><?php endif; ?></tr>
+<table class="grid" id="vgrid">
+  <tr>
+    <th>Date</th><th>Attendance / Site</th><th>File No (BOSS)</th><th>Line No</th><th>Hrs</th>
+    <th>Mode</th><th>KM</th><th>Travel ₹</th>
+    <?php foreach ($heads as $h): ?><th title="<?= e($h['code']) ?>"><?= e($h['label']) ?></th><?php endforeach; ?>
+    <th>Row ₹</th><?php if ($canEdit): ?><th></th><?php endif; ?>
+  </tr>
   <?php foreach ($byDate as $date => $rows): $dayHours = 0; ?>
-    <?php foreach ($rows as $e): $dayHours += (float)$e['hours']; $monthHours += (float)$e['hours'];
+    <?php foreach ($rows as $e):
+      $dayHours += (float)$e['hours']; $monthHours += (float)$e['hours'];
       $isWork = $e['day_type']==='WORK';
-      $att = $isWork ? ($e['site_label'] ?: '(site)') : ($e['day_type']==='LEAVE' ? ('Leave'.($e['leave_code']?' · '.($leaveOpts[$e['leave_code']]??$e['leave_code']):'')) : ($e['day_type']==='OFFICE' ? ('Office'.($e['office_code']?' · '.($dayOpts[$e['office_code']]??$e['office_code']):'')) : ucfirst(strtolower($e['day_type'])))); ?>
-    <tr>
-      <?php if ($canEdit): $fid = 've_'.(int)$e['id']; ?>
-      <td><form id="<?= $fid ?>" method="post" action="/voucher-entry?id=<?= (int)$v['id'] ?>"><input type="hidden" name="_do" value="update"><input type="hidden" name="entry_id" value="<?= (int)$e['id'] ?>"></form><?= e(date('d-M', strtotime($date))) ?><?= $e['is_auto']?' <span class="badge GREEN" style="font-size:10px">auto</span>':'' ?></td>
+      $att = $isWork ? ($e['site_label'] ?: '(site)') : ($e['day_type']==='LEAVE' ? ('Leave'.($e['leave_code']?' · '.($leaveOpts[$e['leave_code']]??$e['leave_code']):'')) : ($e['day_type']==='OFFICE' ? ('Office'.($e['office_code']?' · '.($dayOpts[$e['office_code']]??$e['office_code']):'')) : ucfirst(strtolower($e['day_type']))));
+      $amt = expense_extra_decode($e['amounts'] ?? '');
+      // km / mode prefill from vendor memory when not yet filled
+      $mem = ((float)$e['km']>0 || !$isWork) ? null : vendor_km_lookup($v['inspector_id'], $e['vendor_id']);
+      $kmVal = (float)$e['km']>0 ? $e['km'] : ($mem['km'] ?? '');
+      $modeVal = $e['mode_code'] ?: ($mem['mode_code'] ?? '');
+      $tTravel += (float)$e['travel_amount']; $grand += (float)$e['row_total'];
+      foreach ($heads as $h) $tHead[$h['code']] += (float)($amt[$h['code']] ?? 0);
+      $eid = (int)$e['id']; $P = "rows[$eid]";
+    ?>
+    <tr data-eid="<?= $eid ?>">
+      <td><?= e(date('d-M', strtotime($date))) ?><?= $e['is_auto']?' <span class="badge GREEN" style="font-size:10px">auto</span>':'' ?><?= $mem?' <span class="muted" title="km remembered for this vendor" style="font-size:11px">↺</span>':'' ?></td>
       <td><?= e($att) ?></td>
-      <td><input form="<?= $fid ?>" class="form-control" style="width:120px" name="file_no" value="<?= e($e['file_no']) ?>" <?= $isWork?'':'readonly' ?>></td>
-      <td><input form="<?= $fid ?>" class="form-control" style="width:90px" name="line_no" value="<?= e($e['line_no']) ?>" placeholder="from accounts"></td>
-      <td><?= e(lk_options_or('sbu',OPS_SBUS)[$e['sbu']] ?? $e['sbu'] ?: '—') ?></td>
-      <td><input form="<?= $fid ?>" class="form-control" style="width:80px" type="number" step="0.25" name="hours" value="<?= e(rtrim(rtrim((string)$e['hours'],'0'),'.') ?: '0') ?>"></td>
-      <td class="row-actions">
-        <button form="<?= $fid ?>" class="btn small" type="submit">Save</button>
-        <form method="post" action="/voucher-entry?id=<?= (int)$v['id'] ?>" style="display:inline" onsubmit="return confirm('Remove this row?')">
-          <input type="hidden" name="_do" value="del"><input type="hidden" name="entry_id" value="<?= (int)$e['id'] ?>">
-          <button class="btn small danger" type="submit">✕</button>
-        </form>
-      </td>
+      <?php if ($canEdit): ?>
+      <td><input form="vform" class="form-control" style="width:110px" name="<?= $P ?>[file_no]" value="<?= e($e['file_no']) ?>" <?= $isWork?'':'readonly' ?>></td>
+      <td><input form="vform" class="form-control" style="width:80px" name="<?= $P ?>[line_no]" value="<?= e($e['line_no']) ?>" placeholder="acct"></td>
+      <td><input form="vform" class="form-control v-hours" style="width:64px" type="number" step="0.25" name="<?= $P ?>[hours]" value="<?= e($fmt($e['hours'])) ?>"></td>
+      <td><select form="vform" class="form-control v-mode" style="width:110px" name="<?= $P ?>[mode]"><option value="">—</option>
+        <?php foreach ($modes as $m): ?><option value="<?= e($m['code']) ?>" <?= $modeVal===$m['code']?'selected':'' ?>><?= e($m['label']) ?></option><?php endforeach; ?></select></td>
+      <td><input form="vform" class="form-control v-km" style="width:70px" type="number" step="0.1" name="<?= $P ?>[km]" value="<?= e($kmVal!==''?$fmt($kmVal):'') ?>"></td>
+      <td class="v-travel" data-eid="<?= $eid ?>">₹<?= $fmt($e['travel_amount']) ?></td>
+      <?php foreach ($heads as $h): ?>
+        <td><input form="vform" class="form-control v-amt" data-code="<?= e($h['code']) ?>" style="width:80px" type="number" step="0.01" name="<?= $P ?>[amt][<?= e($h['code']) ?>]" value="<?= e(isset($amt[$h['code']])?$fmt($amt[$h['code']]):'') ?>" <?= $h['head_type']==='BILL'?'title="actual bill"':'' ?>></td>
+      <?php endforeach; ?>
+      <td class="v-rowtotal" data-eid="<?= $eid ?>"><strong>₹<?= $fmt($e['row_total']) ?></strong></td>
+      <td class="row-actions"><button form="del_<?= $eid ?>" class="btn small danger" type="submit" onclick="return confirm('Remove this row?')">✕</button></td>
       <?php else: ?>
-      <td><?= e(date('d-M', strtotime($date))) ?></td>
-      <td><?= e($att) ?></td>
       <td><?= e($e['file_no'] ?: '—') ?></td>
       <td><?= e($e['line_no'] ?: '—') ?></td>
-      <td><?= e(lk_options_or('sbu',OPS_SBUS)[$e['sbu']] ?? $e['sbu'] ?: '—') ?></td>
-      <td><?= e(rtrim(rtrim((string)$e['hours'],'0'),'.') ?: '0') ?></td>
+      <td><?= e($fmt($e['hours'])) ?></td>
+      <td><?= e($e['mode_code'] ?: '—') ?></td>
+      <td><?= (float)$e['km']>0 ? e($fmt($e['km'])) : '—' ?></td>
+      <td>₹<?= $fmt($e['travel_amount']) ?></td>
+      <?php foreach ($heads as $h): ?><td><?= isset($amt[$h['code']]) ? '₹'.$fmt($amt[$h['code']]) : '—' ?></td><?php endforeach; ?>
+      <td><strong>₹<?= $fmt($e['row_total']) ?></strong></td>
       <?php endif; ?>
     </tr>
     <?php endforeach; ?>
-    <?php if (count($rows) > 1): ?><tr class="muted" style="font-size:12px"><td></td><td colspan="<?= $canEdit?6:5 ?>">↳ <?= e($date) ?> total hours: <strong><?= e(rtrim(rtrim((string)$dayHours,'0'),'.') ?: '0') ?></strong></td></tr><?php endif; ?>
+    <?php if (count($rows) > 1): ?><tr class="muted" style="font-size:12px"><td colspan="<?= $ncol ?>">↳ <?= e($date) ?> — day total hours: <strong><?= e($fmt($dayHours)) ?></strong></td></tr><?php endif; ?>
   <?php endforeach; ?>
-  <?php if (!$entries): ?><tr><td colspan="<?= $canEdit?7:6 ?>">No days yet. <?= $canEdit?'Click “Pull working days from jobs”.':'' ?></td></tr><?php endif; ?>
-  <?php if ($entries): ?><tr><td colspan="5" style="text-align:right"><strong>Total hours (month)</strong></td><td><strong><?= e(rtrim(rtrim((string)$monthHours,'0'),'.') ?: '0') ?></strong></td><?php if ($canEdit): ?><td></td><?php endif; ?></tr><?php endif; ?>
+  <?php if (!$entries): ?><tr><td colspan="<?= $ncol ?>">No days yet. <?= $canEdit?'Click “Pull working days from jobs”.':'' ?></td></tr><?php endif; ?>
+  <?php if ($entries): ?>
+  <tr style="background:#f7f6f4">
+    <td colspan="4" style="text-align:right"><strong>TOTAL</strong></td>
+    <td><strong class="tot-hours"><?= e($fmt($monthHours)) ?></strong></td>
+    <td></td><td></td>
+    <td id="tot-travel"><strong>₹<?= $fmt($tTravel) ?></strong></td>
+    <?php foreach ($heads as $h): ?><td id="tot-amt-<?= e($h['code']) ?>"><strong>₹<?= $fmt($tHead[$h['code']]) ?></strong></td><?php endforeach; ?>
+    <td id="tot-grand"><strong>₹<?= $fmt($grand) ?></strong></td>
+    <?php if ($canEdit): ?><td></td><?php endif; ?>
+  </tr>
+  <tr><td colspan="<?= $ncol - 1 ?>" style="text-align:right"><strong>Grand Total</strong></td><td id="tot-grand2"><strong>₹<?= $fmt($grand) ?></strong></td></tr>
+  <?php endif; ?>
 </table>
 </div>
-<p class="muted" style="margin-top:8px">KM, travel charges and the expense-head columns (bus, train, hotel, food…) come next — you'll enter km and bills per row and the money totals compute automatically.</p>
+<?php if ($canEdit): ?>
+  <div style="margin-top:12px"><button class="btn" type="submit">💾 Save all rows &amp; totals</button></div>
+  </form>
+  <?php foreach ($entries as $e): ?>
+    <form id="del_<?= (int)$e['id'] ?>" method="post" action="/voucher-entry?id=<?= (int)$v['id'] ?>"><input type="hidden" name="_do" value="del"><input type="hidden" name="entry_id" value="<?= (int)$e['id'] ?>"></form>
+  <?php endforeach; ?>
+  <p class="muted" style="margin-top:8px">KM auto-fills from what you last entered for that vendor (↺) and stays editable. Travel ₹ = KM × your rate; the bottom row totals every column. Only the heads &amp; modes you're entitled to appear.</p>
+<?php endif; ?>
 
 <script>
   (function(){
     var t=document.getElementById('add_daytype'), o=document.getElementById('add_office'), l=document.getElementById('add_leave');
-    if(!t) return;
-    function sync(){ var v=t.value; o.style.display=(v==='OFFICE')?'':'none'; l.style.display=(v==='LEAVE')?'':'none'; }
-    t.addEventListener('change', sync); sync();
+    if(t){ function sync(){ var v=t.value; o.style.display=(v==='OFFICE')?'':'none'; l.style.display=(v==='LEAVE')?'':'none'; } t.addEventListener('change', sync); sync(); }
+
+    var RATES = <?= json_encode($rates) ?>;
+    var grid = document.getElementById('vgrid');
+    if (!grid) return;
+    function money(n){ return '₹' + (Math.round(n*100)/100).toLocaleString('en-IN'); }
+    function recalc(){
+      var totTravel=0, totGrand=0, totHead={};
+      grid.querySelectorAll('tr[data-eid]').forEach(function(tr){
+        var km = parseFloat(tr.querySelector('.v-km') ? tr.querySelector('.v-km').value : 0) || 0;
+        var mode = tr.querySelector('.v-mode') ? tr.querySelector('.v-mode').value : '';
+        var travel = km * (RATES[mode] || 0);
+        var row = travel;
+        tr.querySelectorAll('.v-amt').forEach(function(inp){
+          var val = parseFloat(inp.value)||0; row += val;
+          totHead[inp.dataset.code] = (totHead[inp.dataset.code]||0) + val;
+        });
+        var tCell = tr.querySelector('.v-travel'); if (tCell) tCell.innerHTML = money(travel);
+        var rCell = tr.querySelector('.v-rowtotal'); if (rCell) rCell.innerHTML = '<strong>'+money(row)+'</strong>';
+        totTravel += travel; totGrand += row;
+      });
+      var tt=document.getElementById('tot-travel'); if(tt) tt.innerHTML='<strong>'+money(totTravel)+'</strong>';
+      Object.keys(totHead).forEach(function(c){ var el=document.getElementById('tot-amt-'+c); if(el) el.innerHTML='<strong>'+money(totHead[c])+'</strong>'; });
+      var g=document.getElementById('tot-grand'); if(g) g.innerHTML='<strong>'+money(totGrand)+'</strong>';
+      var g2=document.getElementById('tot-grand2'); if(g2) g2.innerHTML='<strong>'+money(totGrand)+'</strong>';
+    }
+    grid.addEventListener('input', recalc); grid.addEventListener('change', recalc); recalc();
   })();
 </script>
