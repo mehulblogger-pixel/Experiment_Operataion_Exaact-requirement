@@ -174,11 +174,13 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
 - [ ] **Reminder cron jobs** — set up the two cPanel Cron entries (07:00 report-due,
       18:00 overdue-closure) pointing at `cron.php`. Deferred by user; steps are in
       `README-MilesWeb-PHP.md`.
-- [ ] **Office 365 automatic email sending (SMTP)** — send assignment/closure/
-      forward/reminder emails automatically from a real mailbox, no clicking.
-      Needs a sending mailbox + 3 settings in `config.php`. (Today: emails are
-      logged, and each Call/Job has an **Open in Outlook** button that pre-fills
-      the mail so the user can attach the original client email and send.)
+- [x] **Office 365 automatic email sending (SMTP)** — DONE. A **Settings → Email
+      (Office 365 SMTP)** section takes host / port / username / app-password /
+      from. When filled, assignment/closure/forward/reminder emails **auto-send**
+      via a built-in SMTP client (STARTTLS + AUTH LOGIN, no library — works on
+      MilesWeb). Left blank = current behaviour (logged + Open-in-Outlook). Safe:
+      SMTP failures are caught and logged, never crash. Password blank-keeps the
+      stored one. *(User just needs to enter their mailbox + app password.)*
 - [ ] **License server + per-user billing** — support **both** deployment models
       (client's own server **and** our hosted server) for different industries,
       with remote seat-limit enforcement, subscription expiry, module toggles, and

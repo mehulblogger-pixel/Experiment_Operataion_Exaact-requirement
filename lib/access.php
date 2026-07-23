@@ -168,19 +168,24 @@ function logo_html() {
     return $d ? '<img src="' . e($d) . '" alt="logo" style="height:30px;vertical-align:middle;background:#fff;border-radius:4px;padding:2px 6px">' : '';
 }
 function app_name() { return setting_get('app_name', '') ?: 'Inspection Ops'; }
-function setting_get($k, $def = null) {
+function &settings_cache() {
     static $cache = null;
     if ($cache === null) {
         $cache = [];
         try { foreach (ops_all("SELECT skey, svalue FROM settings") as $r) $cache[$r['skey']] = $r['svalue']; }
         catch (Throwable $e) { $cache = []; }
     }
+    return $cache;
+}
+function setting_get($k, $def = null) {
+    $cache = &settings_cache();
     return array_key_exists($k, $cache) ? $cache[$k] : $def;
 }
 function setting_set($k, $v) {
     $pdo = db();
     if (db_driver() === 'sqlite') $pdo->prepare("INSERT INTO settings (skey,svalue) VALUES (?,?) ON CONFLICT(skey) DO UPDATE SET svalue=excluded.svalue")->execute([$k, $v]);
     else $pdo->prepare("INSERT INTO settings (skey,svalue) VALUES (?,?) ON DUPLICATE KEY UPDATE svalue=VALUES(svalue)")->execute([$k, $v]);
+    $cache = &settings_cache(); $cache[$k] = $v; // keep in-memory cache fresh
 }
 
 // ---- Financial year (start month is a setting; default April) --------------

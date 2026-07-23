@@ -70,6 +70,18 @@
     <div class="ff"><label>On-time TAT threshold (days)</label>
       <input class="form-control" type="number" min="0" name="tat_threshold_days" value="<?= e(setting_get('tat_threshold_days', 3)) ?>"></div>
   </div>
+
+  <h3 class="tab-sub">Email — automatic sending (Office 365 SMTP)</h3>
+  <p class="sub" style="margin-bottom:10px">Fill these to send assignment / closure / reminder emails <strong>automatically</strong> from your mailbox. Leave blank to keep the current behaviour (emails are logged and opened in Outlook to send by hand).</p>
+  <div class="form-grid">
+    <div class="ff"><label>SMTP host</label><input class="form-control" name="smtp_host" value="<?= e(setting_get('smtp_host','')) ?>" placeholder="smtp.office365.com"></div>
+    <div class="ff"><label>Port</label><input class="form-control" type="number" name="smtp_port" value="<?= e(setting_get('smtp_port', 587)) ?>" placeholder="587"></div>
+    <div class="ff"><label>Username (mailbox)</label><input class="form-control" name="smtp_user" value="<?= e(setting_get('smtp_user','')) ?>" placeholder="ops@yourcompany.com" autocomplete="off"></div>
+    <div class="ff"><label>Password / app password</label><input class="form-control" type="password" name="smtp_pass" value="" placeholder="<?= setting_get('smtp_pass','') ? '•••••••• (leave blank to keep)' : 'enter to enable' ?>" autocomplete="new-password"></div>
+    <div class="ff ff-wide"><label>From address <span class="muted">(usually same as the mailbox)</span></label><input class="form-control" name="smtp_from" value="<?= e(setting_get('smtp_from','')) ?>" placeholder="ops@yourcompany.com"></div>
+  </div>
+  <p class="muted" style="margin:6px 2px">Office 365: host <code>smtp.office365.com</code>, port <code>587</code>. Use an app password if MFA is on. <?= smtp_config() ? '<strong style="color:#15803d">✓ SMTP is configured — emails will auto-send.</strong>' : 'Not configured yet — emails are logged only.' ?></p>
+
   <div style="margin-top:16px;"><button class="btn" type="submit">Save settings</button></div>
 </form>
 
