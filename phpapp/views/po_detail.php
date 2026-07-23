@@ -1,7 +1,8 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/partner?id=<?= (int)$po['partner_id'] ?>&tab=purchase_orders">Purchase Orders</a> › <?= e($po['po_number'] ?: 'Open Order') ?></div>
 <div class="master-head">
   <div><h1><?= e($po['po_number'] ?: 'Open Order') ?></h1>
-    <p class="sub"><?= e($po['pdn'] ?: $po['pn']) ?> · <?= e(PO_TYPES[$po['po_type']] ?? $po['po_type']) ?><?php if ($po['value']!==null): ?> · <strong>₹<?= number_format((float)$po['value'],0) ?></strong> (from line items)<?php endif; ?></p></div>
+    <p class="sub"><?= e($po['pdn'] ?: $po['pn']) ?> · <?= e(PO_TYPES[$po['po_type']] ?? $po['po_type']) ?><?php if ($po['value']!==null): ?> · <strong>₹<?= number_format((float)$po['value'],0) ?></strong> (from line items)<?php endif; ?>
+      <?php $psb = array_filter(explode(',', $po['sbu'] ?? '')); if ($psb): ?> · SBU: <?= e(implode(', ', array_map(fn($s)=>lk_options_or('sbu',OPS_SBUS)[$s]??$s, $psb))) ?><?php endif; ?></p></div>
   <a class="btn secondary" href="/partner?id=<?= (int)$po['partner_id'] ?>&tab=purchase_orders">← Back</a>
 </div>
 <h2>Line items</h2>
@@ -38,6 +39,9 @@
     <div class="ff"><label>Sub-category (skill)</label>
       <select class="form-control" id="skill_sel" name="skill_id"><option value="">— pick trade —</option></select>
       <small class="muted">Not listed? Add it under <a href="/lookup?key=skill">Skill</a>.</small></div>
+    <div class="ff"><label>Activity (per PO's SBU)</label>
+      <select class="form-control searchable" name="activity_id"><option value="">—</option>
+        <?php foreach (($poActivities ?? []) as $a): ?><option value="<?= (int)$a['id'] ?>"><?= e($a['label']) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Site of deployment</label><input class="form-control" name="site"></div>
     <div class="ff"><label>Manpower required</label><input class="form-control" type="number" name="manpower" value="0"></div>
     <div class="ff"><label>Quantity</label><input class="form-control" type="number" step="0.01" name="quantity"></div>
