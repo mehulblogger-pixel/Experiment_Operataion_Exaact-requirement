@@ -406,13 +406,18 @@ DB_DRIVER=sqlite php -S 127.0.0.1:8000 index.php
 
 ---
 
-## 15. Legacy prototypes (reference only — do not extend)
+## 15. Repository layout
 
-| Folder | Stack | Status |
-|---|---|---|
-| `accounts/ masters/ operations/ dashboard/ config/ templates/` | Django + SQLite/Postgres | Superseded prototype |
-| `nodeapp/` | Node/Express | Superseded prototype |
-| **`phpapp/`** | **PHP 8 + MySQL** | **✅ Live app — all work here** |
+This branch contains **only the live application**:
 
-The Docker/Caddy/render.yaml files at the root belong to the Django prototype.
-They are not used by the PHP app, which deploys by file upload to MilesWeb.
+| Path | What it is |
+|---|---|
+| **`phpapp/`** | **The live app — PHP 8 + MySQL. All work happens here.** |
+| `README.md` | This architecture reference |
+| `.gitignore` | Repo ignore rules |
+
+The earlier **Django** prototype (`accounts/ masters/ operations/ dashboard/
+config/ templates/ static/ partners/`), the **Node** prototype (`nodeapp/`),
+`docs/`, and their Docker/Caddy/render deployment files have been **removed from
+this branch** — they were superseded by `phpapp/` and are still available in the
+git history if ever needed.
