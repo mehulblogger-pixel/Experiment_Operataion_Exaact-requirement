@@ -1,10 +1,22 @@
-# SGS Ahmedabad — Inspection Management System
+# SGS Inspection Management System
 
 **This file is the single source of truth for the architecture.** It is kept at
 the repo root so it is present on every branch. If you (or another Claude
 session) pick this up on a new branch, read this first — it explains what the
 live app is, how it is built, every table, every route, and how to run and
 extend it.
+
+> 🏢 **Organisation model — read this before touching offices, targets or scope.**
+> **Commercially**, the **Head Office is Mumbai** (the registered/commercial HO).
+> **Operationally, there is NO head office.** Every office is an **independent
+> office** with **its own targets, its own operations, its own P&L**, and runs
+> its own calls/jobs/inspectors. Offices are peers — not branches reporting up to
+> a managing office. Ahmedabad is simply one such office (the one this instance
+> was first configured for); it is **not** a headquarters and must not be treated
+> as one. Inter-office work is a **peer handoff with credit** between two equal
+> offices, never "HQ → branch". Design every feature (dashboards, scope, targets,
+> reminders) so each office stands alone by default, with roll-ups only for people
+> whose access explicitly spans offices.
 
 > ⚠️ **The live application is `phpapp/` — plain PHP 8 + MySQL.**
 > It runs on **MilesWeb shared hosting** by simply uploading files (no build
@@ -18,9 +30,12 @@ extend it.
 ## 1. What the system does
 
 An operations & finance system for a third-party inspection (TPI) services
-network — HQ **Ahmedabad** plus affiliate branch offices (IBOs). It replaces a
-planned Microsoft SharePoint/Power Apps/Power Automate/Power BI build with a
-self-hosted PHP app that needs **no Microsoft licenses**.
+network of **independent, peer offices** across India. Each office owns its
+targets, operations and P&L; the **commercial HO is Mumbai**, but operations are
+**decentralised — there is no operational head office**. Offices collaborate on
+work through inter-office **credit** (a peer handoff, not an HQ→branch flow). It
+replaces a planned Microsoft SharePoint/Power Apps/Power Automate/Power BI build
+with a self-hosted PHP app that needs **no Microsoft licenses**.
 
 Covered today:
 
@@ -190,10 +205,17 @@ columns added by `ensure_column()` in `migrate()` / `ops_migrate()`.
 - `partner_notes`, `partner_relationships`.
 
 **Operations**
-- `offices` — code, name, city, is_ahmedabad, `coordinator_name/email`,
-  `manager_name/email` (forwarding & notifications).
-- `calls` — call_code, client_id, vendor_id, ibo_office_id,
-  `executing_office_id`, region, sbu, `activity_id`, `inspection_type`,
+- `offices` — code, name, city, `is_ahmedabad`, `coordinator_name/email`,
+  `manager_name/email` (per-office coordinator/manager for handoff &
+  notifications). Offices are **peers** — each independent with its own targets
+  and P&L. `is_ahmedabad` is only a legacy "primary office" flag from the first
+  install; it does **not** confer HQ status and should not be used to grant any
+  office authority over others. (Historical note: an earlier version modelled
+  Ahmedabad as a managing office — that framing is wrong and is being unwound;
+  see the Organisation model at the top.)
+- `calls` — call_code, client_id, vendor_id, ibo_office_id (the peer office a
+  call originated from / is credited to), `executing_office_id` (the peer office
+  that will do the work), region, sbu, `activity_id`, `inspection_type`,
   `inspection_type_other`, `site_address_id`, `po_id`, `po_line_item_id`,
   product_category/other, `deputation_type`, `expected_credit`, `credit_type`,
   `notify_manager`, `forwarded_at`, call_received_date, inspection_required_date,
