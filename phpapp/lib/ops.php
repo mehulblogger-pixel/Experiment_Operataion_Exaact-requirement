@@ -158,6 +158,16 @@ function ops_migrate() {
     // job type (inspection vs project deputation) + lifecycle stage
     ensure_column('jobs', 'job_type', "VARCHAR(20) DEFAULT 'INSPECTION'");
     ensure_column('jobs', 'stage', "VARCHAR(20) DEFAULT 'ALLOCATED'");
+    // Invoicing & payment / inter-office credit per job
+    ensure_column('jobs', 'invoice_raised', 'INT DEFAULT 0');
+    ensure_column('jobs', 'invoice_number', "VARCHAR(60) DEFAULT ''");
+    ensure_column('jobs', 'invoice_date', "VARCHAR(20) DEFAULT ''");
+    ensure_column('jobs', 'invoice_due_date', "VARCHAR(20) DEFAULT ''");
+    ensure_column('jobs', 'invoice_amount', 'DECIMAL(14,2) DEFAULT 0');
+    ensure_column('jobs', 'payment_received', 'INT DEFAULT 0');
+    ensure_column('jobs', 'payment_date', "VARCHAR(20) DEFAULT ''");
+    ensure_column('jobs', 'payment_amount', 'DECIMAL(14,2) DEFAULT 0');
+    ensure_column('jobs', 'credit_received', 'INT DEFAULT 0'); // inter-office: credit received flag
     // certifications per inspector, with validity + reminder tracking
     db()->exec("CREATE TABLE IF NOT EXISTS inspector_certs (
         id " . pk_clause() . ", inspector_id INT, name VARCHAR(200), number VARCHAR(80) DEFAULT '',
@@ -645,7 +655,7 @@ function ops_dispatch($route, $method) {
     switch (true) {
         case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call' || $route === 'call-delete':
             ops_calls($route, $method); return true;
-        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close':
+        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice':
             ops_jobs($route, $method); return true;
         case $route === 'my-jobs':
             ops_my_jobs(); return true;
@@ -1069,6 +1079,23 @@ function ops_jobs($route, $method) {
             'cfvals'=>$job ? custom_values_map('job', $job['id']) : []]);
         return;
     }
+    if ($route === 'job-invoice') {
+        ops_require(can('data.credit') || can('finance.reconcile'), 'You cannot record invoices.');
+        $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$job) { http_response_code(404); view('notfound'); return; }
+        if ($method === 'POST') {
+            $b = $_POST;
+            $pdo->prepare("UPDATE jobs SET invoice_raised=?, invoice_number=?, invoice_date=?, invoice_due_date=?, invoice_amount=?,
+                payment_received=?, payment_date=?, payment_amount=?, credit_received=? WHERE id=?")
+                ->execute([
+                    !empty($b['invoice_raised']) ? 1 : 0, $b['invoice_number'] ?? '', $b['invoice_date'] ?? '', $b['invoice_due_date'] ?? '',
+                    num($b['invoice_amount'] ?? ''), !empty($b['payment_received']) ? 1 : 0, $b['payment_date'] ?? '', num($b['payment_amount'] ?? ''),
+                    !empty($b['credit_received']) ? 1 : 0, $job['id']]);
+            flash('Invoice / payment updated.');
+            redirect('/job?id=' . $job['id']);
+        }
+        redirect('/job?id=' . $job['id']);
+    }
     if ($route === 'job-close') {
         // Inspector (or coordinator) closes: report + expenses required
         $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
@@ -1215,12 +1242,17 @@ function ops_reports() {
     }
 
     // ---- FINANCIAL ----
-    $fin = ['credit'=>0,'recv'=>0,'given'=>0,'labour'=>0,'exp'=>0,'subcon'=>0,'profit'=>0,'bySbu'=>[],'byOffice'=>[],'expHead'=>['travel'=>0,'local'=>0,'food'=>0,'lodging'=>0,'misc'=>0]];
-    $byInspector=[];
+    $fin = ['credit'=>0,'recv'=>0,'given'=>0,'labour'=>0,'exp'=>0,'subcon'=>0,'profit'=>0,'bySbu'=>[],'byOffice'=>[],'expHead'=>['travel'=>0,'local'=>0,'food'=>0,'lodging'=>0,'misc'=>0],
+        'invoiced'=>0,'paid'=>0,'outstanding'=>0,'overdue'=>0,'creditRecvCnt'=>0,'creditPendCnt'=>0];
+    $byInspector=[]; $todayD=date('Y-m-d');
     foreach ($jobs as $j) {
         $p = job_profit($j);
         $fin['credit']+=$p['credit']; $fin['labour']+=$p['labour']; $fin['exp']+=$p['expenses']; $fin['subcon']+=$p['subcon']; $fin['profit']+=$p['profit'];
         if (($j['credit_direction']??'')==='GIVEN') $fin['given']+=$p['credit']; else $fin['recv']+=$p['credit'];
+        // invoicing / payment / inter-office credit
+        if (!empty($j['invoice_raised'])) { $fin['invoiced']+=(float)$j['invoice_amount']; if (empty($j['payment_received']) && ($j['invoice_due_date']??'') && $j['invoice_due_date']<$todayD) $fin['overdue']++; }
+        if (!empty($j['payment_received'])) $fin['paid']+=(float)$j['payment_amount'];
+        if (($j['credit_direction']??'')!=='GIVEN' && (($j['executing_office_id']??null))) { if (!empty($j['credit_received'])) $fin['creditRecvCnt']++; else $fin['creditPendCnt']++; }
         $sk=$j['sbu']?:'—'; $fin['bySbu'][$sk]=($fin['bySbu'][$sk]??0)+$p['credit'];
         $ok=$j['office_name']?:'Ahmedabad'; $fin['byOffice'][$ok]=($fin['byOffice'][$ok]??0)+$p['credit'];
         foreach (ops_all("SELECT * FROM expenses WHERE job_id=?", [$j['id']]) as $x)

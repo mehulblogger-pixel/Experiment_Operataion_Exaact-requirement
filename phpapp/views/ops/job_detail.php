@@ -70,3 +70,25 @@
     </div>
   </div>
 </div>
+
+<?php if (can('data.credit') || can('finance.reconcile')): ?>
+<div class="panel">
+  <h3 class="tab-sub">Invoice &amp; payment / credit</h3>
+  <?php $isInter = ($job['credit_direction'] ?? '') === 'GIVEN'; ?>
+  <form method="post" action="/job-invoice?id=<?= (int)$job['id'] ?>">
+    <div class="form-grid">
+      <div class="ff ff-check"><input type="checkbox" name="invoice_raised" <?= !empty($job['invoice_raised'])?'checked':'' ?>><label>Invoice raised</label></div>
+      <div class="ff"><label>Invoice number</label><input class="form-control" name="invoice_number" value="<?= e($job['invoice_number'] ?? '') ?>"></div>
+      <div class="ff"><label>Invoice date</label><input class="form-control" type="date" name="invoice_date" value="<?= e($job['invoice_date'] ?? '') ?>"></div>
+      <div class="ff"><label>Due date</label><input class="form-control" type="date" name="invoice_due_date" value="<?= e($job['invoice_due_date'] ?? '') ?>"></div>
+      <div class="ff"><label>Invoice amount (₹)</label><input class="form-control" type="number" step="0.01" name="invoice_amount" value="<?= e($job['invoice_amount'] ?? '') ?>"></div>
+      <div class="ff ff-check"><input type="checkbox" name="payment_received" <?= !empty($job['payment_received'])?'checked':'' ?>><label>Payment received</label></div>
+      <div class="ff"><label>Payment date</label><input class="form-control" type="date" name="payment_date" value="<?= e($job['payment_date'] ?? '') ?>"></div>
+      <div class="ff"><label>Payment amount (₹)</label><input class="form-control" type="number" step="0.01" name="payment_amount" value="<?= e($job['payment_amount'] ?? '') ?>"></div>
+      <div class="ff ff-check"><input type="checkbox" name="credit_received" <?= !empty($job['credit_received'])?'checked':'' ?>><label>Inter-office credit received<?= $isInter?' (this job is credit-given)':'' ?></label></div>
+    </div>
+    <p class="muted" style="margin:4px 2px">For a local client (same contracting &amp; executing office) use invoice + payment. When the executing branch is different, use the inter-office credit received flag.</p>
+    <div style="margin-top:8px"><button class="btn small" type="submit">Save invoice / payment</button></div>
+  </form>
+</div>
+<?php endif; ?>
