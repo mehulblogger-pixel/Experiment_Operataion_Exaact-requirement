@@ -956,7 +956,7 @@ function ops_calls($route, $method) {
             LEFT JOIN business_partners v ON v.id=c.vendor_id LEFT JOIN offices o ON o.id=c.ibo_office_id
             LEFT JOIN offices x ON x.id=c.executing_office_id WHERE c.id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$call) { http_response_code(404); view('notfound'); return; }
-        $jobs = ops_all("SELECT j.*, i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.call_id=? ORDER BY j.id DESC", [$call['id']]);
+        $jobs = ops_all("SELECT j.*, i.name inspector_name, i.staff_kind, s.agency subcon_agency FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id LEFT JOIN subcons s ON s.id=j.subcon_id WHERE j.call_id=? ORDER BY j.id DESC", [$call['id']]);
         // lead-time metrics
         $firstJob = $jobs ? end($jobs) : null; // earliest allocated
         $allocDate = $firstJob ? ($firstJob['scheduled_date'] ?: substr($firstJob['created_at'], 0, 10)) : '';
@@ -1025,7 +1025,7 @@ function ops_jobs($route, $method) {
         }
         if ($method === 'POST') {
             $b = $_POST;
-            $fields = ['executing_office_id','inspector_id','subcon_id','job_type','scheduled_date','inspection_start_date','inspection_end_date',
+            $fields = ['executing_office_id','inspector_id','subcon_id','job_type','stage','scheduled_date','inspection_start_date','inspection_end_date',
                 'random_date1','random_date2','random_date3','folder_link','boss_id','expected_credit','credit_type','credit_direction',
                 'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost'];
             // deliverables come as a checkbox array -> stored as CSV of codes
