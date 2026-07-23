@@ -93,7 +93,15 @@ function ensure_column($table, $col, $def) {
         $q->execute([$col]);
         if ($q->fetch()) return;
     }
-    $pdo->exec("ALTER TABLE $table ADD COLUMN $col $def");
+    try {
+        $pdo->exec("ALTER TABLE $table ADD COLUMN $col $def");
+    } catch (Throwable $e) {
+        // Idempotent: if the column already exists (e.g. two requests both ran
+        // boot() at once, or the check raced the add), that's fine — swallow the
+        // "duplicate column" error (MySQL 1060 / SQLSTATE 42S21). Re-throw the rest.
+        $m = $e->getMessage();
+        if (stripos($m, 'duplicate column') === false && strpos($m, '1060') === false && strpos($m, '42S21') === false) throw $e;
+    }
 }
 
 // Idempotent: create tables, apply column migrations.
