@@ -235,6 +235,7 @@ if ($route === 'partner-add' && $method === 'POST') {
     }
     if (isset($map[$kind])) {
         [$table, $fields, $tab] = $map[$kind];
+        if ($kind === 'address' && !empty($b['city'])) $b['city'] = normalise_city($b['city']); // light spell-normalise
         $cols = array_merge(['partner_id'], $fields);
         $ph = implode(',', array_fill(0, count($cols), '?'));
         $vals = [$p['id']];

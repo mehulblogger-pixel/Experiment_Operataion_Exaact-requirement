@@ -119,6 +119,10 @@ function ops_migrate() {
     ensure_column('calls', 'notify_manager', 'INT DEFAULT 0');
     ensure_column('calls', 'forwarded_at', "VARCHAR(30) DEFAULT ''");
     ensure_column('calls', 'inspection_type', "VARCHAR(40) DEFAULT ''");
+    ensure_column('calls', 'inspection_type_other', "VARCHAR(150) DEFAULT ''");
+    ensure_column('calls', 'site_address_id', 'INT NULL');
+    ensure_column('calls', 'po_id', 'INT NULL');
+    ensure_column('calls', 'po_line_item_id', 'INT NULL');
     // jobs gain type of inspection (carried from call), custom report frequency,
     // activity and the required deliverables/report formats.
     ensure_column('jobs', 'inspection_type', "VARCHAR(40) DEFAULT ''");
@@ -146,6 +150,7 @@ function ops_migrate() {
     ensure_column('po_line_items', 'base_amount', 'DECIMAL(14,2) DEFAULT 0');
     ensure_column('po_line_items', 'tax_amount', 'DECIMAL(14,2) DEFAULT 0');
     ensure_column('po_line_items', 'total_amount', 'DECIMAL(14,2) DEFAULT 0');
+    ensure_column('po_line_items', 'last_alert', "VARCHAR(20) DEFAULT ''");
     // inspector master overhaul: names, trade, multi-SBU, multi-skill
     ensure_column('inspectors', 'first_name', "VARCHAR(80) DEFAULT ''");
     ensure_column('inspectors', 'middle_name', "VARCHAR(80) DEFAULT ''");
@@ -439,7 +444,33 @@ function ops_run_reminders($today = null) {
         }
     }
     $sent += ops_run_cert_reminders($today);
+    $sent += ops_run_po_alerts($today);
     return $sent;
+}
+
+// Alert managers when a PO line item's quantity is ~85%+ consumed (before validity).
+function ops_run_po_alerts($today = null) {
+    $today = $today ?: date('Y-m-d');
+    $sent = 0;
+    foreach (ops_all("SELECT l.*, po.po_number, po.end_date, po.partner_id FROM po_line_items l JOIN partner_purchase_orders po ON po.id=l.purchase_order_id WHERE l.quantity > 0") as $l) {
+        $ratio = (float)$l['consumed'] / (float)$l['quantity'];
+        if ($ratio < 0.85) continue;
+        if ($l['last_alert'] === $today) continue;
+        $bp = ops_one("SELECT legal_name, display_name FROM business_partners WHERE id=?", [$l['partner_id']]);
+        $client = $bp ? ($bp['display_name'] ?: $bp['legal_name']) : '';
+        $bal = (float)$l['quantity'] - (float)$l['consumed'];
+        $body = "PO quantity nearing completion.\n\nClient: {$client}\nPO: {$l['po_number']}\nLine: {$l['description']}\n"
+            . "Consumed: {$l['consumed']} of {$l['quantity']} (balance {$bal}).\nPO valid till: {$l['end_date']}.\n\nPlease arrange a fresh PO / extension.\n\nSGS Ahmedabad";
+        ops_mail(manager_emails(), "PO nearing completion: {$l['po_number']} — {$client}", $body, '', 'po_alert');
+        db()->prepare("UPDATE po_line_items SET last_alert=? WHERE id=?")->execute([$today, $l['id']]);
+        $sent++;
+    }
+    return $sent;
+}
+// Emails of managers + branch managers (for PO alerts).
+function manager_emails() {
+    $rows = ops_all("SELECT email FROM users WHERE role IN ('BRANCH_MANAGER','OPERATION_MANAGER','ADMIN','MASTER_ADMIN','SBU_HEAD') AND email <> '' AND is_active=1");
+    return implode(',', array_filter(array_column($rows, 'email'))) ?: coordinator_emails();
 }
 
 // E-mail the inspector + QA/QC nominee when a certificate is within 30 days of expiry.
@@ -679,6 +710,30 @@ function ops_dispatch($route, $method) {
             $r = ops_one("SELECT inspection_types FROM business_partners WHERE id=?", [(int)($_GET['id'] ?? 0)]);
             echo json_encode(['inspection_types' => ($r && $r['inspection_types'] !== '') ? explode(',', $r['inspection_types']) : []]);
             return true;
+        case $route === 'partner-sites':
+            header('Content-Type: application/json');
+            $out = [];
+            foreach (ops_all("SELECT id, address_type, label, town_village, district, city, state FROM partner_addresses WHERE partner_id=? ORDER BY is_primary DESC, id", [(int)($_GET['id'] ?? 0)]) as $a) {
+                $lbl = trim(($a['label'] ?: (ADDRESS_TYPES[$a['address_type']] ?? $a['address_type'])) . ' — ' . implode(', ', array_filter([$a['town_village'], $a['district'], $a['city'], $a['state']])), ' —');
+                $out[] = ['id' => (int)$a['id'], 'label' => $lbl];
+            }
+            echo json_encode($out); return true;
+        case $route === 'partner-pos':
+            header('Content-Type: application/json');
+            $out = [];
+            foreach (ops_all("SELECT id, po_number, po_type, value FROM partner_purchase_orders WHERE partner_id=? ORDER BY id DESC", [(int)($_GET['id'] ?? 0)]) as $o) {
+                $hasLines = (int)ops_val("SELECT COUNT(*) FROM po_line_items WHERE purchase_order_id=?", [$o['id']]);
+                $out[] = ['id' => (int)$o['id'], 'label' => ($o['po_number'] ?: 'Open order') . ' (' . (PO_TYPES[$o['po_type']] ?? $o['po_type']) . ')', 'lines' => $hasLines];
+            }
+            echo json_encode($out); return true;
+        case $route === 'po-lines':
+            header('Content-Type: application/json');
+            $out = [];
+            foreach (ops_all("SELECT id, description, quantity, consumed, item_type FROM po_line_items WHERE purchase_order_id=? ORDER BY id", [(int)($_GET['id'] ?? 0)]) as $l) {
+                $bal = (float)$l['quantity'] - (float)$l['consumed'];
+                $out[] = ['id' => (int)$l['id'], 'label' => $l['description'] . ' — bal ' . $bal . ' ' . (PO_ITEM_TYPES[$l['item_type']] ?? '')];
+            }
+            echo json_encode($out); return true;
     }
     return false;
 }
@@ -926,7 +981,8 @@ function ops_calls($route, $method) {
                 return;
             }
             $fields = ['client_id','vendor_id','ibo_office_id','executing_office_id','region','sbu','activity_id',
-                'inspection_type','product_category','product_other','deputation_type','expected_credit','credit_type',
+                'inspection_type','inspection_type_other','site_address_id','po_id','po_line_item_id',
+                'product_category','product_other','deputation_type','expected_credit','credit_type',
                 'call_received_date','inspection_required_date','notes'];
             $wasForwarded = $call ? ($call['executing_office_id'] ?? null) : null;
             $forwardNow = $execOffice && !$wasForwarded; // first time it gets an executing branch
@@ -982,8 +1038,23 @@ function ops_calls($route, $method) {
     }
 }
 function nz($v) { return $v === '' ? null : $v; }
+// Normalise a city name and reuse an existing near-match spelling (light auto-correct).
+function normalise_city($input) {
+    $c = ucwords(strtolower(trim(preg_replace('/\s+/', ' ', $input))));
+    if ($c === '') return '';
+    $best = null; $bestD = 999;
+    foreach (ops_all("SELECT DISTINCT city FROM partner_addresses WHERE city <> ''") as $r) {
+        $existing = $r['city'];
+        if (strcasecmp($existing, $c) === 0) return $existing;              // exact (case-insensitive)
+        $d = levenshtein(strtolower($existing), strtolower($c));
+        if ($d < $bestD) { $bestD = $d; $best = $existing; }
+    }
+    // reuse existing spelling only for a very close match (1-2 edits on a name of decent length)
+    if ($best !== null && $bestD <= 2 && strlen($c) >= 5) return $best;
+    return $c;
+}
 function nzc_call($f, $v) {
-    if (in_array($f, ['client_id','vendor_id','ibo_office_id','executing_office_id','activity_id'], true)) return $v === '' ? null : (int)$v;
+    if (in_array($f, ['client_id','vendor_id','ibo_office_id','executing_office_id','activity_id','site_address_id','po_id','po_line_item_id'], true)) return $v === '' ? null : (int)$v;
     if ($f === 'expected_credit') return $v === '' ? 0 : $v;
     return $v;
 }
@@ -1066,6 +1137,12 @@ function ops_jobs($route, $method) {
                 flash("$code allocated. Assignment email sent to inspector.");
             }
             custom_save('job', $jobId, $b);
+            // consume the linked PO line item by this job's man-days (new jobs only)
+            if (!$job && $call && ($call['po_line_item_id'] ?? null)) {
+                $jj0 = ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]);
+                $md = job_mandays($jj0);
+                $pdo->prepare("UPDATE po_line_items SET consumed = consumed + ? WHERE id=?")->execute([$md, $call['po_line_item_id']]);
+            }
             // comp-off if any inspection date is a Sunday
             ops_check_compoff($jobId);
             // assignment email when an inspector + schedule exist
