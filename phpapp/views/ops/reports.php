@@ -4,7 +4,7 @@
 
 <style>
   .filter-bar{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-    box-shadow:var(--shadow-sm);padding:12px 14px;position:sticky;top:64px;z-index:20}
+    box-shadow:var(--shadow-sm);padding:12px 14px;position:sticky;top:56px;z-index:20}
   h3.tab-sub.fam{font-size:18px;font-weight:800;letter-spacing:-.01em;margin:30px 0 12px;padding-bottom:8px;
     border-bottom:2px solid color-mix(in srgb,var(--brand) 22%,var(--line))}
   #reports .panel h4.tab-sub{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
@@ -32,10 +32,10 @@
 <h3 class="tab-sub fam">🛠️ Operations</h3>
 <div class="stat-row">
   <div class="stat-card"><div class="sc-num"><?= (int)$op['calls'] ?></div><div class="sc-lbl">Calls</div></div>
-  <div class="stat-card"><div class="sc-num" style="color:<?= $op['pending']?'#b8791a':'#1f8a4c' ?>"><?= (int)$op['pending'] ?></div><div class="sc-lbl">Pending scheduling</div></div>
+  <div class="stat-card"><div class="sc-num" style="color:<?= $op['pending']?'var(--warn)':'var(--ok)' ?>"><?= (int)$op['pending'] ?></div><div class="sc-lbl">Pending scheduling</div></div>
   <div class="stat-card"><div class="sc-num"><?= (int)$op['open'] ?></div><div class="sc-lbl">Open jobs</div></div>
   <div class="stat-card"><div class="sc-num"><?= (int)$op['closed'] ?></div><div class="sc-lbl">Closed jobs</div></div>
-  <div class="stat-card"><div class="sc-num" style="color:<?= $op['overdue']?'#c0392b':'#1f8a4c' ?>"><?= (int)$op['overdue'] ?></div><div class="sc-lbl">Overdue closure</div></div>
+  <div class="stat-card"><div class="sc-num" style="color:<?= $op['overdue']?'var(--bad)':'var(--ok)' ?>"><?= (int)$op['overdue'] ?></div><div class="sc-lbl">Overdue closure</div></div>
   <div class="stat-card"><div class="sc-num"><?= $op['tatTotal']?round($op['tatOn']/$op['tatTotal']*100):0 ?>%</div><div class="sc-lbl">TAT on-time (≤<?= (int)$tatThresh ?>d)</div></div>
   <div class="stat-card"><div class="sc-num"><?= $op['tatTotal']?round($op['tatSum']/$op['tatTotal'],1):0 ?></div><div class="sc-lbl">Avg TAT (days)</div></div>
 </div>
@@ -57,7 +57,7 @@
   <div class="stat-card"><div class="sc-num"><?= fmoney($fin['subcon']) ?></div><div class="sc-lbl">Sub-con cost</div></div>
   <?php if ($seeSalary): ?>
   <div class="stat-card"><div class="sc-num"><?= fmoney($fin['labour']) ?></div><div class="sc-lbl">Loaded labour</div></div>
-  <div class="stat-card"><div class="sc-num" style="color:<?= $fin['profit']>=0?'#1f8a4c':'#c0392b' ?>"><?= fmoney($fin['profit']) ?></div><div class="sc-lbl">Net profit</div></div>
+  <div class="stat-card"><div class="sc-num" style="color:<?= $fin['profit']>=0?'var(--ok)':'var(--bad)' ?>"><?= fmoney($fin['profit']) ?></div><div class="sc-lbl">Net profit</div></div>
   <?php endif; ?>
 </div>
 <?php
@@ -80,7 +80,7 @@
     <table class="grid"><tr><th>SBU</th><th>Credit</th><?php if ($seeSalary): ?><th>Loaded cost</th><th>Net</th><?php endif; ?></tr>
     <?php foreach ($sbuKeys as $k): $cr=$fin['bySbu'][$k]??0; $co=$fin['costBySbu'][$k]??0; ?>
       <tr><td><?= e(lk_options_or('sbu',OPS_SBUS)[$k]??$k) ?></td><td><?= fmoney($cr) ?></td>
-      <?php if ($seeSalary): ?><td><?= fmoney($co) ?></td><td><strong style="color:<?= ($cr-$co)>=0?'#1f8a4c':'#c0392b' ?>"><?= fmoney($cr-$co) ?></strong></td><?php endif; ?></tr>
+      <?php if ($seeSalary): ?><td><?= fmoney($co) ?></td><td><strong style="color:<?= ($cr-$co)>=0?'var(--ok)':'var(--bad)' ?>"><?= fmoney($cr-$co) ?></strong></td><?php endif; ?></tr>
     <?php endforeach; ?>
     <?php if(!$sbuKeys):?><tr><td colspan="<?= $seeSalary?4:2 ?>">No data.</td></tr><?php endif;?></table>
     <?php if ($seeSalary): ?><p class="muted" style="margin-top:6px;">Loaded cost is each active engineer's monthly cost (CTC/12 + <?= OVERHEAD_PCT ?>% overhead) split equally across the SBUs they're tagged to.</p><?php endif; ?></div>
@@ -91,9 +91,9 @@
 </div>
 <div class="stat-row">
   <div class="stat-card"><div class="sc-num"><?= fmoney($fin['invoiced']) ?></div><div class="sc-lbl">Invoiced</div></div>
-  <div class="stat-card"><div class="sc-num" style="color:#1f8a4c"><?= fmoney($fin['paid']) ?></div><div class="sc-lbl">Payment received</div></div>
-  <div class="stat-card"><div class="sc-num" style="color:<?= ($fin['invoiced']-$fin['paid'])>0?'#b8791a':'#1f8a4c' ?>"><?= fmoney($fin['invoiced']-$fin['paid']) ?></div><div class="sc-lbl">Outstanding</div></div>
-  <div class="stat-card"><div class="sc-num" style="color:<?= $fin['overdue']?'#c0392b':'#1f8a4c' ?>"><?= (int)$fin['overdue'] ?></div><div class="sc-lbl">Invoices overdue</div></div>
+  <div class="stat-card"><div class="sc-num" style="color:var(--ok)"><?= fmoney($fin['paid']) ?></div><div class="sc-lbl">Payment received</div></div>
+  <div class="stat-card"><div class="sc-num" style="color:<?= ($fin['invoiced']-$fin['paid'])>0?'var(--warn)':'var(--ok)' ?>"><?= fmoney($fin['invoiced']-$fin['paid']) ?></div><div class="sc-lbl">Outstanding</div></div>
+  <div class="stat-card"><div class="sc-num" style="color:<?= $fin['overdue']?'var(--bad)':'var(--ok)' ?>"><?= (int)$fin['overdue'] ?></div><div class="sc-lbl">Invoices overdue</div></div>
   <div class="stat-card"><div class="sc-num"><?= (int)$fin['creditRecvCnt'] ?>/<?= (int)($fin['creditRecvCnt']+$fin['creditPendCnt']) ?></div><div class="sc-lbl">Inter-office credit received</div></div>
 </div>
 <div class="panel"><h3 class="tab-sub">Credit received vs actual (reconciliation)</h3>
@@ -103,7 +103,7 @@
 <?php if ($seeSalary): ?>
 <div class="panel"><h3 class="tab-sub">Inspector profitability</h3>
   <table class="grid"><tr><th>Inspector</th><th>Jobs</th><th>Man-days</th><th>Credit</th><th>Labour</th><th>Expenses</th><th>Net</th></tr>
-    <?php foreach ($byInspector as $r): ?><tr><td><?= e($r['name']) ?></td><td><?= (int)$r['jobs'] ?></td><td><?= e($r['mandays']) ?></td><td><?= fmoney($r['credit']) ?></td><td><?= fmoney($r['cost']) ?></td><td><?= fmoney($r['exp']) ?></td><td><strong style="color:<?= $r['profit']>=0?'#1f8a4c':'#c0392b' ?>"><?= fmoney($r['profit']) ?></strong></td></tr><?php endforeach; ?>
+    <?php foreach ($byInspector as $r): ?><tr><td><?= e($r['name']) ?></td><td><?= (int)$r['jobs'] ?></td><td><?= e($r['mandays']) ?></td><td><?= fmoney($r['credit']) ?></td><td><?= fmoney($r['cost']) ?></td><td><?= fmoney($r['exp']) ?></td><td><strong style="color:<?= $r['profit']>=0?'var(--ok)':'var(--bad)' ?>"><?= fmoney($r['profit']) ?></strong></td></tr><?php endforeach; ?>
     <?php if(!$byInspector):?><tr><td colspan="7">No job data.</td></tr><?php endif;?></table></div>
 <?php endif; ?>
 <?php elseif ($canOps): ?>
