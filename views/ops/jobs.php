@@ -11,6 +11,7 @@
 <div class="master-head">
   <div><h1>Job Register</h1>
   <p class="sub" style="margin:2px 0 0">Allocated inspection jobs — open one to schedule, record the report, or close it.</p></div>
+  <a class="btn secondary" href="/jobs?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ Download CSV</a>
 </div>
 
 <div class="chip-row">

@@ -159,7 +159,11 @@
       <?php $bal = $sum['grand'] - (float)$v['advance'] - (float)$v['office_incurred']; ?>
       <tr style="background:var(--soft)"><td><strong>Balance to be paid / (recovered)</strong></td><td style="text-align:right"><strong>₹<?= number_format($bal,0) ?></strong></td></tr>
     </table>
-    <div style="margin-top:10px"><a class="btn secondary" href="/voucher-print?id=<?= (int)$v['id'] ?>" target="_blank">🖨 Print statement</a></div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn secondary" href="/voucher-print?id=<?= (int)$v['id'] ?>" target="_blank">🖨 Print / Save PDF</a>
+      <a class="btn secondary" href="/voucher-csv?id=<?= (int)$v['id'] ?>">⬇ Download (Excel/CSV)</a>
+    </div>
+    <p class="muted" style="margin:6px 2px 0;font-size:12px">Print → "Save as PDF" for the signed statement; Download for the spreadsheet accounts can file.</p>
   </div>
 
   <div class="panel">

@@ -436,6 +436,23 @@ function fmoney_short($v) {
     return $s . '₹' . number_format($n, 0);
 }
 
+// ---- CSV export (dependency-free; works on MilesWeb shared hosting) ---------
+// $rows = array of rows (each an array of cells); stream as a downloadable file.
+function csv_download($filename, array $rows) {
+    if (headers_sent()) return;
+    $safe = preg_replace('/[^A-Za-z0-9._-]/', '_', $filename);
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $safe . '"');
+    header('Cache-Control: no-store');
+    $out = fopen('php://output', 'w');
+    fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM so Excel shows ₹ / accents correctly
+    foreach ($rows as $r) fputcsv($out, $r);
+    fclose($out);
+    exit;
+}
+// True when the current request asked for a CSV download (?export=csv).
+function wants_csv() { return ($_GET['export'] ?? '') === 'csv'; }
+
 // ---- Accountant "money desk": counts + worklist of jobs needing action ------
 // Uses the invoice / payment / inter-office-credit fields already on `jobs`.
 // Scoped to the user's offices/SBUs so a branch accountant sees only their own.
@@ -484,6 +501,16 @@ function ops_invoicing() {
          WHERE $jw AND ($fw)
          ORDER BY (j.invoice_due_date <> '') DESC, j.invoice_due_date ASC, j.id DESC",
         array_merge($ja, $fa));
+    if (wants_csv()) {
+        $csv = [['Job','BOSS','Client','Office','Amount','Invoice raised','Invoice no','Invoice date','Due date','Payment received','Payment amount','Credit direction','Credit received']];
+        foreach ($rows as $r) {
+            $csv[] = [$r['job_code'], $r['boss_number'], $r['display_name'] ?: $r['legal_name'], $r['office_name'],
+                (float)($r['invoice_amount'] ?: $r['expected_credit']), !empty($r['invoice_raised']) ? 'Yes' : 'No', $r['invoice_number'],
+                $r['invoice_date'], $r['invoice_due_date'], !empty($r['payment_received']) ? 'Yes' : 'No', (float)$r['payment_amount'],
+                $r['credit_direction'], !empty($r['credit_received']) ? 'Yes' : 'No'];
+        }
+        csv_download('invoicing-' . ($f ?: 'all') . '-' . date('Y-m-d') . '.csv', $csv);
+    }
     view('ops/invoicing', ['counts' => ops_invoicing_counts(), 'rows' => $rows, 'f' => $f, 'today' => $today]);
 }
 
@@ -1065,7 +1092,7 @@ function ops_dispatch($route, $method) {
             ops_jobs($route, $method); return true;
         case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage':
             ops_candidates($route, $method); return true;
-        case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry' || $route === 'voucher-save' || $route === 'voucher-header' || $route === 'voucher-status' || $route === 'voucher-print' || $route === 'voucher-file':
+        case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry' || $route === 'voucher-save' || $route === 'voucher-header' || $route === 'voucher-status' || $route === 'voucher-print' || $route === 'voucher-file' || $route === 'voucher-csv':
             ops_vouchers($route, $method); return true;
         case $route === 'my-jobs':
             ops_my_jobs(); return true;
@@ -1440,6 +1467,15 @@ function ops_calls($route, $method) {
             FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id
             LEFT JOIN business_partners v ON v.id=c.vendor_id WHERE $where ORDER BY c.id DESC", $args);
         if ($minCost !== null) $rows = array_values(array_filter($rows, fn($r) => (float)$r['cost_incurred'] >= $minCost));
+        if (wants_csv()) {
+            $csv = [['Call','Client','Vendor / Site','SBU','Required by','Jobs','Cost incurred','Status']];
+            foreach ($rows as $c) {
+                $st = ($c['status'] ?? '') === 'CLOSED' ? 'Closed' : ((int)$c['job_count'] === 0 ? 'To schedule' : 'In progress');
+                $csv[] = [$c['call_code'], $c['client_disp'] ?: $c['client_name'], $c['vendor_name'], OPS_SBUS[$c['sbu']] ?? $c['sbu'],
+                    $c['inspection_required_date'], (int)$c['job_count'], (float)($c['cost_incurred'] ?? 0), $st];
+            }
+            csv_download('calls-' . date('Y-m-d') . '.csv', $csv);
+        }
         view('ops/calls', ['rows' => $rows, 'q' => $q, 'minCost' => $_GET['mincost'] ?? '']); return;
     }
     if ($route === 'call-new' || $route === 'call-edit') {
@@ -1860,6 +1896,41 @@ function ops_vouchers($route, $method) {
         redirect('/voucher?id=' . $v['id']);
     }
 
+    if ($route === 'voucher-csv') {
+        $v = ops_one("SELECT v.*, i.name inspector_name, i.emp_code FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id WHERE v.id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$v) { http_response_code(404); echo 'Not found.'; return; }
+        ops_require(can_view_voucher($v), 'You cannot download this voucher.');
+        $heads = voucher_heads_for($v['inspector_id']);
+        $entries = ops_all("SELECT * FROM voucher_entries WHERE voucher_id=? ORDER BY entry_date, id", [$v['id']]);
+        $rows = [];
+        $rows[] = ['Statement of Travelling Expenses'];
+        $rows[] = ['Inspector', $v['inspector_name'], 'Emp code', $v['emp_code'], 'Month', $v['month'], 'Status', $v['status']];
+        $rows[] = [];
+        $hdr = ['Date','Attendance / Site','File No (BOSS)','Line No','Hours','Mode','KM','Travel'];
+        foreach ($heads as $h) $hdr[] = $h['label'];
+        $hdr[] = 'Row total';
+        $rows[] = $hdr;
+        $tTravel = 0; $grand = 0; $tHours = 0; $tHead = []; foreach ($heads as $h) $tHead[$h['code']] = 0;
+        foreach ($entries as $e) {
+            $amt = expense_extra_decode($e['amounts'] ?? '');
+            $att = $e['day_type'] === 'WORK' ? ($e['site_label'] ?: '') : trim($e['day_type'] . ' ' . ($e['leave_code'] ?: $e['office_code'] ?: ''));
+            $line = [$e['entry_date'], $att, $e['file_no'], $e['line_no'], (float)$e['hours'], $e['mode_code'], (float)$e['km'], (float)$e['travel_amount']];
+            foreach ($heads as $h) { $val = (float)($amt[$h['code']] ?? 0); $line[] = $val; $tHead[$h['code']] += $val; }
+            $line[] = (float)$e['row_total'];
+            $rows[] = $line;
+            $tTravel += (float)$e['travel_amount']; $grand += (float)$e['row_total']; $tHours += (float)$e['hours'];
+        }
+        $tot = ['TOTAL', '', '', '', $tHours, '', '', $tTravel];
+        foreach ($heads as $h) $tot[] = $tHead[$h['code']];
+        $tot[] = $grand;
+        $rows[] = $tot;
+        $rows[] = [];
+        $rows[] = ['Less: Advance', (float)$v['advance']];
+        $rows[] = ['Less: Office-incurred', (float)$v['office_incurred']];
+        $rows[] = ['Balance to be paid / (recovered)', $grand - (float)$v['advance'] - (float)$v['office_incurred']];
+        csv_download('Voucher-' . preg_replace('/[^A-Za-z0-9]/', '', (string)$v['inspector_name']) . '-' . $v['month'] . '.csv', $rows);
+    }
+
     if ($route === 'voucher-file') {
         $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$v || !$v['supporting_file']) { http_response_code(404); echo 'No supporting file.'; return; }
@@ -1980,6 +2051,16 @@ function ops_jobs($route, $method) {
             i.name inspector_name FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
             LEFT JOIN business_partners bp ON bp.id=c.client_id LEFT JOIN inspectors i ON i.id=j.inspector_id
             WHERE $where ORDER BY j.id DESC", $args);
+        if (wants_csv()) {
+            $seeCredit = can('data.credit'); $today = date('Y-m-d');
+            $csv = [array_merge(['Job','Client','Inspector','Scheduled','Reporting'], $seeCredit ? ['Expected credit'] : [], ['TAT days','Status','Money'])];
+            foreach ($rows as $j) {
+                $money = $j['closed_flag'] ? (empty($j['invoice_raised']) ? 'Unbilled' : (empty($j['payment_received']) ? 'Awaiting payment' : 'Paid')) : '';
+                $csv[] = array_merge([$j['job_code'], $j['client_disp'] ?: $j['client_name'], $j['inspector_name'], $j['scheduled_date'], REPORT_FREQ[$j['reporting_frequency']] ?? ''],
+                    $seeCredit ? [(float)$j['expected_credit']] : [], [$j['tat_days'], $j['closed_flag'] ? 'Closed' : 'Open', $money]);
+            }
+            csv_download('jobs-' . date('Y-m-d') . '.csv', $csv);
+        }
         view('ops/jobs', ['rows' => $rows, 'q' => $q, 'filter' => $filter]); return;
     }
     if ($route === 'job-new' || $route === 'job-edit') {
@@ -2316,6 +2397,15 @@ function ops_profitability() {
     $rows = [];
     foreach (ops_all("SELECT bn.*, bp.display_name client_disp, bp.legal_name client_name FROM boss_numbers bn LEFT JOIN business_partners bp ON bp.id=bn.client_id ORDER BY bn.boss_number") as $b) {
         $rows[] = $b + ['p' => boss_profit($b['id'])];
+    }
+    if (wants_csv()) {
+        $seeSal = can_see_salary();
+        $csv = [array_merge(['BOSS / Contract','Client','Jobs','Revenue','Expenses','Sub-con'], $seeSal ? ['Loaded labour','Margin','Margin %'] : [])];
+        foreach ($rows as $r) { $p = $r['p'];
+            $csv[] = array_merge([$r['boss_number'], $r['client_disp'] ?: $r['client_name'], (int)$p['jobs'], (float)$p['revenue'], (float)$p['expenses'], (float)$p['subcon']],
+                $seeSal ? [(float)$p['labour'], (float)$p['margin'], $p['pct'] === null ? '' : $p['pct']] : []);
+        }
+        csv_download('profitability-' . date('Y-m-d') . '.csv', $csv);
     }
     view('ops/profitability_list', ['rows' => $rows, 'seeSal' => can_see_salary()]);
 }

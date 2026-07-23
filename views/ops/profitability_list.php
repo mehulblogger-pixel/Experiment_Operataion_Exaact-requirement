@@ -8,6 +8,7 @@
 <div class="master-head">
   <div><h1>Profitability by BOSS / Contract</h1>
     <p class="sub" style="margin:2px 0 0">Revenue − labour − expenses − sub-con, per BOSS number. Click a BOSS for the line-by-line drill-down.</p></div>
+  <a class="btn secondary" href="/profitability?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ Download CSV</a>
 </div>
 
 <div class="chip-row">
