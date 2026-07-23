@@ -2,6 +2,14 @@
 <h1>Dashboards</h1>
 <p class="sub">Live figures within your access. <?= role_label() ?> · scope applied automatically.</p>
 
+<style>
+  .filter-bar{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow-sm);padding:12px 14px;position:sticky;top:64px;z-index:20}
+  h3.tab-sub.fam{font-size:18px;font-weight:800;letter-spacing:-.01em;margin:30px 0 12px;padding-bottom:8px;
+    border-bottom:2px solid color-mix(in srgb,var(--brand) 22%,var(--line))}
+  #reports .panel h4.tab-sub{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+</style>
+<div id="reports">
 <form method="get" action="/reports" class="filter-bar" style="flex-wrap:wrap;gap:8px;">
   <select class="form-control" name="fy" onchange="this.form.submit()"><?php foreach ($fyOpts as $fy): ?><option value="<?= e($fy) ?>" <?= $F['fy']===$fy?'selected':'' ?>>FY <?= e($fy) ?></option><?php endforeach; ?></select>
   <select class="form-control" name="month" onchange="this.form.submit()"><option value="">All months</option>
@@ -21,7 +29,7 @@
 </form>
 
 <?php if ($canOps): ?>
-<h3 class="tab-sub">🛠️ Operations</h3>
+<h3 class="tab-sub fam">🛠️ Operations</h3>
 <div class="stat-row">
   <div class="stat-card"><div class="sc-num"><?= (int)$op['calls'] ?></div><div class="sc-lbl">Calls</div></div>
   <div class="stat-card"><div class="sc-num" style="color:<?= $op['pending']?'#b8791a':'#1f8a4c' ?>"><?= (int)$op['pending'] ?></div><div class="sc-lbl">Pending scheduling</div></div>
@@ -40,7 +48,7 @@
 <?php endif; ?>
 
 <?php if ($seeFin): ?>
-<h3 class="tab-sub">💰 Financial</h3>
+<h3 class="tab-sub fam">💰 Financial</h3>
 <div class="stat-row">
   <div class="stat-card"><div class="sc-num"><?= fmoney($fin['credit']) ?></div><div class="sc-lbl">Total credit</div></div>
   <div class="stat-card"><div class="sc-num"><?= fmoney($fin['recv']) ?></div><div class="sc-lbl">Received (IBO→branch)</div></div>
@@ -103,7 +111,7 @@
 <?php endif; ?>
 
 <?php if ($canUtil): ?>
-<h3 class="tab-sub">📈 Utilization <span class="muted">(this month · <?= (int)($util[0]['working'] ?? 0) ?> working days)</span></h3>
+<h3 class="tab-sub fam">📈 Utilization <span class="muted">(this month · <?= (int)($util[0]['working'] ?? 0) ?> working days)</span></h3>
 <div class="panel-split">
   <div class="panel"><table class="grid"><tr><th>Inspector</th><th>Man-days</th><th>Utilization</th></tr>
     <?php foreach ($util as $r): ?><tr><td><?= e($r['name']) ?></td><td><?= e($r['mandays']) ?></td><td><div class="bar"><div class="bar-fill" style="width:<?= min(100,(int)$r['pct']) ?>%"></div></div><?= (int)$r['pct'] ?>%</td></tr><?php endforeach; ?>
@@ -124,7 +132,7 @@
 <?php endif; ?>
 
 <?php if ($canPeople): ?>
-<h3 class="tab-sub">🧑‍🔧 People &amp; Compliance</h3>
+<h3 class="tab-sub fam">🧑‍🔧 People &amp; Compliance</h3>
 <div class="panel-split">
   <div class="panel"><h3 class="tab-sub" style="margin-top:0;">Certificates expiring (≤90 days)</h3>
     <table class="grid"><tr><th>Inspector</th><th>Certificate</th><th>Valid to</th><th>Left</th></tr>
@@ -134,3 +142,5 @@
     <?= svg_hbars($byTrade) ?></div>
 </div>
 <?php endif; ?>
+
+</div><!-- #reports -->

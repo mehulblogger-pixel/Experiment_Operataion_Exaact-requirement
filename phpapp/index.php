@@ -59,6 +59,7 @@ try {
     db()->query("SELECT id FROM inspector_allowances LIMIT 1");
     db()->query("SELECT id FROM voucher_entries LIMIT 1");
     db()->query("SELECT id FROM vendor_km_memory LIMIT 1");
+    db()->query("SELECT agency_cost FROM inspectors LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();

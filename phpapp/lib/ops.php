@@ -279,6 +279,9 @@ function ops_migrate() {
     ensure_column('inspectors', 'skill_ids', "VARCHAR(600) DEFAULT ''");
     ensure_column('inspectors', 'designation', "VARCHAR(40) DEFAULT ''");
     ensure_column('inspectors', 'staff_kind', "VARCHAR(20) DEFAULT 'ASSET'"); // asset / freelancer / subcon
+    // extra annual cost paid to an external agency when this engineer is hired via one
+    ensure_column('inspectors', 'agency_name', "VARCHAR(150) DEFAULT ''");
+    ensure_column('inspectors', 'agency_cost', 'DECIMAL(14,2) DEFAULT 0');
     // job type (inspection vs project deputation) + lifecycle stage
     ensure_column('jobs', 'job_type', "VARCHAR(20) DEFAULT 'INSPECTION'");
     ensure_column('jobs', 'stage', "VARCHAR(20) DEFAULT 'ALLOCATED'");
@@ -497,7 +500,7 @@ function expense_heading_labels() {
 function job_profit($job) {
     $mandays = job_mandays($job);
     $office = $job['executing_office_id'] ?? null;
-    $salary_ctc = $job['inspector_id'] ? (float)ops_val("SELECT salary_ctc FROM inspectors WHERE id=?", [$job['inspector_id']]) : 0;
+    $salary_ctc = $job['inspector_id'] ? (float)ops_val("SELECT salary_ctc + COALESCE(agency_cost,0) FROM inspectors WHERE id=?", [$job['inspector_id']]) : 0;
     $daily = $salary_ctc ? inspector_daily_cost($salary_ctc, null, null, $office) : 0;
     $labour = $daily * $mandays;
     $expenses = job_expenses_total($job['id']);
@@ -1134,19 +1137,22 @@ function ops_inspectors($action, $method) {
             $skills = implode(',', array_filter((array)($b['skill_ids'] ?? [])));
             $trade = ($b['trade_id'] ?? '') !== '' ? (int)$b['trade_id'] : null;
             $salary = can_see_salary() ? (($b['salary_ctc'] ?? '') !== '' ? $b['salary_ctc'] : 0) : null;
+            $agencyName = $b['agency_name'] ?? '';
+            $agencyCost = can_see_salary() ? (($b['agency_cost'] ?? '') !== '' ? (float)$b['agency_cost'] : 0) : null;
             $desig = $b['designation'] ?? ''; $kind = in_array($b['staff_kind'] ?? '', ['ASSET','FREELANCER','SUBCON'], true) ? $b['staff_kind'] : 'ASSET';
             if ($ins) {
-                $sql = "UPDATE inspectors SET first_name=?,middle_name=?,last_name=?,name=?,emp_code=?,designation=?,staff_kind=?,trade_id=?,sbus=?,sbu=?,skill_ids=?,email=?,mobile=?,status=?";
-                $args = [$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $b['emp_code'] ?? '', $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $b['status'] ?? 'ACTIVE'];
+                $sql = "UPDATE inspectors SET first_name=?,middle_name=?,last_name=?,name=?,emp_code=?,designation=?,staff_kind=?,trade_id=?,sbus=?,sbu=?,skill_ids=?,email=?,mobile=?,agency_name=?,status=?";
+                $args = [$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $b['emp_code'] ?? '', $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $b['status'] ?? 'ACTIVE'];
                 if ($salary !== null) { $sql .= ",salary_ctc=?"; $args[] = $salary; }
+                if ($agencyCost !== null) { $sql .= ",agency_cost=?"; $args[] = $agencyCost; }
                 $sql .= " WHERE id=?"; $args[] = $ins['id'];
                 $pdo->prepare($sql)->execute($args);
                 flash('Inspector saved.');
                 redirect('/m/inspectors/edit?id=' . $ins['id']);
             } else {
-                $pdo->prepare("INSERT INTO inspectors (first_name,middle_name,last_name,name,emp_code,designation,staff_kind,trade_id,sbus,sbu,skill_ids,email,mobile,salary_ctc,status,created_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $b['emp_code'] ?? '', $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $salary ?: 0, $b['status'] ?? 'ACTIVE', date('c')]);
+                $pdo->prepare("INSERT INTO inspectors (first_name,middle_name,last_name,name,emp_code,designation,staff_kind,trade_id,sbus,sbu,skill_ids,email,mobile,agency_name,agency_cost,salary_ctc,status,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $b['emp_code'] ?? '', $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $agencyCost ?: 0, $salary ?: 0, $b['status'] ?? 'ACTIVE', date('c')]);
                 $id = $pdo->lastInsertId();
                 flash('Inspector added. You can now add certifications.');
                 redirect('/m/inspectors/edit?id=' . $id);
@@ -2004,7 +2010,7 @@ function boss_profit($bossId) {
         $jSub = (float)($j['subcon_cost'] ?? 0); $subcon += $jSub;
         $jLab = 0;
         if ($seeSal) {
-            $sal = $j['inspector_id'] ? (float)ops_val("SELECT salary_ctc FROM inspectors WHERE id=?", [$j['inspector_id']]) : 0;
+            $sal = $j['inspector_id'] ? (float)ops_val("SELECT salary_ctc + COALESCE(agency_cost,0) FROM inspectors WHERE id=?", [$j['inspector_id']]) : 0;
             $jLab = ($sal ? inspector_daily_cost($sal, null, null, $office) : 0) * job_mandays($j);
             $labour += $jLab;
         }
@@ -2263,7 +2269,7 @@ function ops_reports() {
     $fin['costBySbu']=[]; $fin['costBySbuTotal']=0;
     if ($seeSalary) {
         $scopeSbuSet = scope_sbus();
-        foreach (ops_all("SELECT id, sbus, sbu, salary_ctc FROM inspectors WHERE status='ACTIVE'") as $ins) {
+        foreach (ops_all("SELECT id, sbus, sbu, salary_ctc + COALESCE(agency_cost,0) salary_ctc FROM inspectors WHERE status='ACTIVE'") as $ins) {
             if ($F['insp']!=='' && (int)$ins['id']!==(int)$F['insp']) continue;
             $ctc=(float)($ins['salary_ctc'] ?? 0); if ($ctc<=0) continue;
             $loadedMonthly=($ctc/12)*(1+OVERHEAD_PCT/100);
