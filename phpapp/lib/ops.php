@@ -173,6 +173,11 @@ function ops_ensure_schema() {
         "CREATE TABLE IF NOT EXISTS travel_modes (
             id $pk, code VARCHAR(30), label VARCHAR(150), basis VARCHAR(20) DEFAULT 'PER_KM',
             default_rate DECIMAL(12,2) DEFAULT 0, active INT DEFAULT 1)",
+        // Per-inspector entitlements — which heads/modes each inspector may claim,
+        // plus a rate override. Managed ONLY by the Super Admin.
+        "CREATE TABLE IF NOT EXISTS inspector_allowances (
+            id $pk, inspector_id INT, kind VARCHAR(10), code VARCHAR(30),
+            allowed INT DEFAULT 0, rate_override DECIMAL(12,2) NULL)",
     ];
     foreach ($t as $sql) $pdo->exec($sql);
 }
@@ -1038,6 +1043,13 @@ function ops_inspectors($action, $method) {
                 flash('Certification removed.');
                 redirect('/m/inspectors/edit?id=' . $ins['id']);
             }
+            // Allowances & rates grid (Super Admin only)
+            if (($b['_do'] ?? '') === 'allow_save' && $ins) {
+                ops_require(is_master(), 'Only the Super Admin can set allowances.');
+                save_inspector_allowances($ins['id'], $b);
+                flash('Allowances & rates updated.');
+                redirect('/m/inspectors/edit?id=' . $ins['id']);
+            }
             // main save
             $full = trim(trim(($b['first_name'] ?? '') . ' ' . ($b['middle_name'] ?? '')) . ' ' . ($b['last_name'] ?? ''));
             $sbus = implode(',', array_filter((array)($b['sbus'] ?? [])));
@@ -1063,7 +1075,10 @@ function ops_inspectors($action, $method) {
             }
         }
         $certs = $ins ? ops_all("SELECT * FROM inspector_certs WHERE inspector_id=? ORDER BY valid_to", [$ins['id']]) : [];
-        view('ops/inspector_form', ['ins' => $ins, 'certs' => $certs, 'skillsByTrade' => skills_by_trade()]);
+        view('ops/inspector_form', ['ins' => $ins, 'certs' => $certs, 'skillsByTrade' => skills_by_trade(),
+            'expHeads' => ops_all("SELECT * FROM expense_heads WHERE active=1 ORDER BY sort_order, id"),
+            'travelModes' => ops_all("SELECT * FROM travel_modes WHERE active=1 ORDER BY id"),
+            'allowMap' => $ins ? inspector_allow_map($ins['id']) : ['HEAD'=>[], 'MODE'=>[]]]);
         return;
     }
     // list
@@ -1073,6 +1088,49 @@ function ops_inspectors($action, $method) {
     $rows = ops_all("SELECT * FROM inspectors WHERE $where ORDER BY name", $args);
     view('ops/inspector_list', ['rows' => $rows, 'q' => $q]);
 }
+// ---- Inspector entitlements (P2) — Super-Admin only ------------------------
+// Effective map of what an inspector may claim: ['HEAD'=>[code=>['allowed','rate']], 'MODE'=>[...]]
+function inspector_allow_map($insId) {
+    $out = ['HEAD' => [], 'MODE' => []];
+    if (!$insId) return $out;
+    foreach (ops_all("SELECT kind, code, allowed, rate_override FROM inspector_allowances WHERE inspector_id=?", [$insId]) as $r) {
+        $out[$r['kind']][$r['code']] = ['allowed' => (int)$r['allowed'], 'rate' => $r['rate_override']];
+    }
+    return $out;
+}
+// Effective per-km rate for a mode: the inspector's override, else the mode default.
+function inspector_mode_rate($insId, $modeCode) {
+    $ov = ops_val("SELECT rate_override FROM inspector_allowances WHERE inspector_id=? AND kind='MODE' AND code=? AND rate_override IS NOT NULL", [$insId, $modeCode]);
+    if ($ov !== null && $ov !== false && $ov !== '') return (float)$ov;
+    return (float)(ops_val("SELECT default_rate FROM travel_modes WHERE code=?", [$modeCode]) ?: 0);
+}
+function inspector_head_allowed($insId, $code) {
+    return (int)ops_val("SELECT allowed FROM inspector_allowances WHERE inspector_id=? AND kind='HEAD' AND code=?", [$insId, $code]) === 1;
+}
+function inspector_mode_allowed($insId, $code) {
+    return (int)ops_val("SELECT allowed FROM inspector_allowances WHERE inspector_id=? AND kind='MODE' AND code=?", [$insId, $code]) === 1;
+}
+// Save the entitlement grid (Super Admin only). Stores a row when allowed OR a
+// rate override is given; clears the inspector's set first so unticks are honoured.
+function save_inspector_allowances($insId, $b) {
+    if (!is_master() || !$insId) return;
+    $pdo = db();
+    $pdo->prepare("DELETE FROM inspector_allowances WHERE inspector_id=?")->execute([$insId]);
+    $ins = $pdo->prepare("INSERT INTO inspector_allowances (inspector_id,kind,code,allowed,rate_override) VALUES (?,?,?,?,?)");
+    foreach (ops_all("SELECT code FROM expense_heads") as $h) {
+        $code = $h['code'];
+        $allowed = !empty($b['allow_head'][$code]) ? 1 : 0;
+        $rate = (($b['head_rate'][$code] ?? '') !== '') ? (float)$b['head_rate'][$code] : null;
+        if ($allowed || $rate !== null) $ins->execute([$insId, 'HEAD', $code, $allowed, $rate]);
+    }
+    foreach (ops_all("SELECT code FROM travel_modes") as $m) {
+        $code = $m['code'];
+        $allowed = !empty($b['allow_mode'][$code]) ? 1 : 0;
+        $rate = (($b['mode_rate'][$code] ?? '') !== '') ? (float)$b['mode_rate'][$code] : null;
+        if ($allowed || $rate !== null) $ins->execute([$insId, 'MODE', $code, $allowed, $rate]);
+    }
+}
+
 // Human labels for an inspector's stored SBU codes / skill ids / trade.
 function sbu_labels($csv) {
     if (!$csv) return '—';

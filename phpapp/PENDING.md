@@ -14,9 +14,15 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
       Bus, Train, Air — per-km vs actual); `leave_type` + `day_code` lookups
       (CL/SL/PL/LWP/COMPOFF/ML + OFFICE/WFH/TRAINING/HOLIDAY/WEEKOFF). Seeded on
       fresh + upgrade; both masters on the Masters page; boot probes added.
-- [ ] **P2 · Inspector entitlements (Super-Admin only)** — `inspector_allowances`:
-      which heads/modes each inspector may use + per-inspector rate override
-      (Mehul car ₹12, Hardik bike ₹6). Hidden from everyone except Super Admin.
+- [x] **P2 · Inspector entitlements (Super-Admin only)** — DONE.
+      `inspector_allowances` table + a "🔒 Allowances & rates" panel on the
+      inspector edit page. Per inspector: tick which travel modes & expense heads
+      they may claim, and set a **personal rate override** (blank = master
+      default). Helpers `inspector_mode_rate()` / `inspector_head_allowed()` /
+      `inspector_mode_allowed()` drive the voucher later. Verified: panel + save
+      work for Super Admin; a normal inspector save does NOT wipe the
+      entitlements; and a Branch Manager cannot see the panel nor POST to it
+      (0 rows written). Boot probe added.
 - [ ] **P3 · Voucher auto-fill** — `vouchers`/`voucher_days`/`voucher_lines`;
       generate the month from Jobs (date, vendor display, BOSS+Line, SBU); **many
       rows per date** (multi-site + office split) each with its own **hours** &

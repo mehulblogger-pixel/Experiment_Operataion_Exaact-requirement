@@ -56,6 +56,7 @@ try {
     db()->query("SELECT extra FROM expenses LIMIT 1");
     db()->query("SELECT id FROM expense_heads LIMIT 1");
     db()->query("SELECT id FROM travel_modes LIMIT 1");
+    db()->query("SELECT id FROM inspector_allowances LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();
