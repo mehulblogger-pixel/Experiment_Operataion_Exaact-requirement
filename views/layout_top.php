@@ -1,11 +1,12 @@
 <?php $u = current_user(); ?><!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?= e($title ?? 'Inspection Ops') ?></title>
+<title><?= e($title ?? app_name()) ?></title>
 <link rel="stylesheet" href="/assets/css/app.css">
+<?= theme_style_tag() ?>
 </head><body>
 <header class="topbar">
-  <a class="brand" href="/">Inspection&nbsp;Ops</a>
+  <a class="brand" href="/"><?php $lg = logo_html(); echo $lg ?: e(app_name()); ?></a>
   <?php if ($u): ?>
   <nav>
     <a href="/">Dashboard</a>

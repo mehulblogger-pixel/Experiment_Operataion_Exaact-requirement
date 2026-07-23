@@ -21,6 +21,8 @@ const ATT_STATUS = ['PRESENT_NB'=>'Present (non-billable)','TRAINING'=>'Training
 const JOB_TYPES = ['INSPECTION'=>'Inspection (day-based)','DEPUTATION'=>'Project deputation (site)'];
 const EXPENSE_HEADINGS = ['TRAVEL'=>'Travel','LOCAL'=>'Local conveyance','FOOD'=>'Food','LODGING'=>'Lodging','MISC'=>'Misc'];
 const DEPARTMENTS = ['QUALITY'=>'Quality','PROJECTS'=>'Projects','ENGINEERING'=>'Engineering','DESIGN'=>'Design','INSPECTION'=>'Inspection','PROCUREMENT'=>'Procurement / Purchase','PRODUCTION'=>'Production','MAINTENANCE'=>'Maintenance','SAFETY'=>'Safety / HSE','COMMERCIAL'=>'Commercial / Finance','STORES'=>'Stores','PLANNING'=>'Planning','OWNER'=>'Owner','PARTNER'=>'Partner','DIRECTOR'=>'Director','MANAGEMENT'=>'Management','OTHER'=>'Other'];
+const DESIGNATIONS = ['INSPECTOR'=>'Inspector','SR_INSPECTOR'=>'Sr. Inspector','LEAD_INSPECTOR'=>'Lead Inspector','EXECUTIVE'=>'Executive','SR_EXECUTIVE'=>'Sr. Executive','ENGINEER'=>'Engineer','SR_ENGINEER'=>'Sr. Engineer','LEAD_ENGINEER'=>'Lead Engineer','COORDINATOR'=>'Coordinator','SR_COORDINATOR'=>'Sr. Coordinator','ASST_MANAGER'=>'Asst. Manager','DY_MANAGER'=>'Deputy Manager','MANAGER'=>'Manager','SR_MANAGER'=>'Sr. Manager','BRANCH_MANAGER'=>'Branch Manager','SBU_HEAD'=>'SBU Head','GM'=>'General Manager','DIRECTOR'=>'Director','OTHER'=>'Other'];
+const JOB_STAGES = ['ALLOCATED'=>'Allocated','TRAVELLING'=>'Travelling','IN_PROGRESS'=>'Inspection in progress','REPORT_PENDING'=>'Report pending','SUBMITTED'=>'Report submitted','CLOSED'=>'Closed','ON_HOLD'=>'On hold','CANCELLED'=>'Cancelled'];
 const EXP_LEVELS = ['JUNIOR'=>'Junior','MID'=>'Mid','SENIOR'=>'Senior','EXPERT'=>'Expert / Lead'];
 const RATE_TYPES = ['MANDAY'=>'Per man-day','MANMONTH'=>'Per man-month'];
 const BOSS_STATUS = ['ACTIVE'=>'Active','CLOSED'=>'Closed','HOLD'=>'On hold'];
@@ -34,6 +36,11 @@ function ops_ensure_schema() {
         "CREATE TABLE IF NOT EXISTS offices (
             id $pk, code VARCHAR(20), name VARCHAR(150), city VARCHAR(120) DEFAULT '',
             is_ahmedabad INT DEFAULT 0)",
+        "CREATE TABLE IF NOT EXISTS back_office_staff (
+            id $pk, name VARCHAR(150), emp_code VARCHAR(40) DEFAULT '', designation VARCHAR(40) DEFAULT '',
+            department VARCHAR(40) DEFAULT '', office_id INT NULL, email VARCHAR(200) DEFAULT '',
+            mobile VARCHAR(40) DEFAULT '', ctc DECIMAL(14,2) DEFAULT 0, allowances DECIMAL(14,2) DEFAULT 0,
+            status VARCHAR(20) DEFAULT 'ACTIVE', created_at VARCHAR(30) DEFAULT '')",
         "CREATE TABLE IF NOT EXISTS inspectors (
             id $pk, name VARCHAR(150), emp_code VARCHAR(40) DEFAULT '', sbu VARCHAR(20) DEFAULT '',
             skills VARCHAR(255) DEFAULT '', email VARCHAR(200) DEFAULT '', mobile VARCHAR(40) DEFAULT '',
@@ -136,8 +143,11 @@ function ops_migrate() {
     ensure_column('inspectors', 'trade_id', 'INT NULL');
     ensure_column('inspectors', 'sbus', "VARCHAR(200) DEFAULT ''");
     ensure_column('inspectors', 'skill_ids', "VARCHAR(600) DEFAULT ''");
-    // job type (inspection vs project deputation)
+    ensure_column('inspectors', 'designation', "VARCHAR(40) DEFAULT ''");
+    ensure_column('inspectors', 'staff_kind', "VARCHAR(20) DEFAULT 'ASSET'"); // asset / freelancer / subcon
+    // job type (inspection vs project deputation) + lifecycle stage
     ensure_column('jobs', 'job_type', "VARCHAR(20) DEFAULT 'INSPECTION'");
+    ensure_column('jobs', 'stage', "VARCHAR(20) DEFAULT 'ALLOCATED'");
     // certifications per inspector, with validity + reminder tracking
     db()->exec("CREATE TABLE IF NOT EXISTS inspector_certs (
         id " . pk_clause() . ", inspector_id INT, name VARCHAR(200), number VARCHAR(80) DEFAULT '',
@@ -449,6 +459,24 @@ function ops_masters() {
             ],
             'list' => ['code'=>'Code','name'=>'Office','city'=>'City','coordinator_name'=>'Coordinator','manager_name'=>'Manager'],
             'list_labels' => [],
+        ],
+        'back-office' => [
+            'label' => 'Back-office staff', 'table' => 'back_office_staff', 'access' => 'admin', 'order' => 'name',
+            'fields' => [
+                ['name','Name','text',['req'=>1]],
+                ['emp_code','Employee code','text',[]],
+                ['designation','Designation','select',['opts'=>DESIGNATIONS]],
+                ['department','Department','select',['opts'=>DEPARTMENTS]],
+                ['office_id','Office','ref',['ref'=>'offices','optfn'=>'offices_list','optlabel'=>'name']],
+                ['email','Email','text',[]],
+                ['mobile','Mobile','text',[]],
+                ['ctc','Annual CTC (₹)','money',['salary'=>1]],
+                ['allowances','Allowances (₹/yr)','money',['salary'=>1]],
+                ['status','Status','select',['opts'=>['ACTIVE'=>'Active','INACTIVE'=>'Inactive']]],
+            ],
+            'list' => ['name'=>'Name','designation'=>'Designation','department'=>'Department','office_id'=>'Office','status'=>'Status'],
+            'list_labels' => ['designation'=>DESIGNATIONS,'department'=>DEPARTMENTS],
+            'ref_cols' => ['office_id'=>['offices','name']],
         ],
         'inspectors' => [
             'label' => 'Inspectors', 'table' => 'inspectors', 'code' => null, 'access' => 'admin',
@@ -791,18 +819,19 @@ function ops_inspectors($action, $method) {
             $skills = implode(',', array_filter((array)($b['skill_ids'] ?? [])));
             $trade = ($b['trade_id'] ?? '') !== '' ? (int)$b['trade_id'] : null;
             $salary = can_see_salary() ? (($b['salary_ctc'] ?? '') !== '' ? $b['salary_ctc'] : 0) : null;
+            $desig = $b['designation'] ?? ''; $kind = in_array($b['staff_kind'] ?? '', ['ASSET','FREELANCER','SUBCON'], true) ? $b['staff_kind'] : 'ASSET';
             if ($ins) {
-                $sql = "UPDATE inspectors SET first_name=?,middle_name=?,last_name=?,name=?,emp_code=?,trade_id=?,sbus=?,sbu=?,skill_ids=?,email=?,mobile=?,status=?";
-                $args = [$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $b['emp_code'] ?? '', $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $b['status'] ?? 'ACTIVE'];
+                $sql = "UPDATE inspectors SET first_name=?,middle_name=?,last_name=?,name=?,emp_code=?,designation=?,staff_kind=?,trade_id=?,sbus=?,sbu=?,skill_ids=?,email=?,mobile=?,status=?";
+                $args = [$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $b['emp_code'] ?? '', $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $b['status'] ?? 'ACTIVE'];
                 if ($salary !== null) { $sql .= ",salary_ctc=?"; $args[] = $salary; }
                 $sql .= " WHERE id=?"; $args[] = $ins['id'];
                 $pdo->prepare($sql)->execute($args);
                 flash('Inspector saved.');
                 redirect('/m/inspectors/edit?id=' . $ins['id']);
             } else {
-                $pdo->prepare("INSERT INTO inspectors (first_name,middle_name,last_name,name,emp_code,trade_id,sbus,sbu,skill_ids,email,mobile,salary_ctc,status,created_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $b['emp_code'] ?? '', $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $salary ?: 0, $b['status'] ?? 'ACTIVE', date('c')]);
+                $pdo->prepare("INSERT INTO inspectors (first_name,middle_name,last_name,name,emp_code,designation,staff_kind,trade_id,sbus,sbu,skill_ids,email,mobile,salary_ctc,status,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $b['emp_code'] ?? '', $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $salary ?: 0, $b['status'] ?? 'ACTIVE', date('c')]);
                 $id = $pdo->lastInsertId();
                 flash('Inspector added. You can now add certifications.');
                 redirect('/m/inspectors/edit?id=' . $id);
@@ -1278,6 +1307,21 @@ function ops_settings($method) {
         $m = (int)($_POST['fy_start_month'] ?? 4);
         setting_set('fy_start_month', ($m >= 1 && $m <= 12) ? $m : 4);
         setting_set('tat_threshold_days', (int)($_POST['tat_threshold_days'] ?? 3));
+        setting_set('app_name', trim($_POST['app_name'] ?? ''));
+        $bc = trim($_POST['brand_color'] ?? '');
+        if (preg_match('/^#[0-9a-fA-F]{6}$/', $bc)) setting_set('brand_color', $bc);
+        if (($_POST['clear_logo'] ?? '') === '1') setting_set('logo_data', '');
+        // logo upload → stored as a data URI (works without file permissions)
+        if (!empty($_FILES['logo']['tmp_name']) && is_uploaded_file($_FILES['logo']['tmp_name'])) {
+            $sz = (int)($_FILES['logo']['size'] ?? 0);
+            $info = @getimagesize($_FILES['logo']['tmp_name']);
+            if ($info && $sz > 0 && $sz <= 600000 && in_array($info['mime'], ['image/png','image/jpeg','image/gif','image/webp','image/svg+xml'], true)) {
+                $data = file_get_contents($_FILES['logo']['tmp_name']);
+                setting_set('logo_data', 'data:' . $info['mime'] . ';base64,' . base64_encode($data));
+            } else {
+                flash('Logo must be a PNG/JPG/GIF/WEBP/SVG under 600 KB.', 'error');
+            }
+        }
         flash('Settings saved.');
         redirect('/settings');
     }
