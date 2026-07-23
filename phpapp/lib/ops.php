@@ -1924,6 +1924,71 @@ function ops_my_jobs() {
 // ---- Dashboards / reports (scoped + filtered) ------------------------------
 function job_eff_date($j) { return ($j['scheduled_date'] ?? '') !== '' ? $j['scheduled_date'] : substr($j['created_at'] ?? '', 0, 10); }
 
+// ---- Dashboard charts (dependency-free inline SVG, theme-reactive) ---------
+function chart_color($i) { $c = CHART_COLORS; return $c[$i % count($c)]; }
+function chart_no_data() { return '<p class="muted" style="padding:8px 0">No data for this filter.</p>'; }
+// Horizontal colourful bars. $data = [label => value].
+function svg_hbars($data, $money = false, $unit = '') {
+    $data = array_filter($data, fn($v) => (float)$v != 0);
+    if (!$data) return chart_no_data();
+    arsort($data);
+    $max = max(array_map('abs', array_map('floatval', $data)));
+    $rowH = 24; $gap = 7; $labelW = 130; $barW = 240; $w = $labelW + $barW + 90;
+    $h = count($data) * ($rowH + $gap) + 4; $y = 2; $i = 0;
+    $svg = "<svg viewBox='0 0 $w $h' width='100%' style='max-width:560px' role='img'>";
+    foreach ($data as $label => $val) {
+        $bw = $max > 0 ? max(1, round(abs($val) / $max * $barW)) : 1; $col = chart_color($i); $vy = $y + $rowH * 0.68;
+        $lab = htmlspecialchars(mb_strimwidth((string)$label, 0, 20, '…'), ENT_QUOTES);
+        $vv = $money ? '₹' . number_format((float)$val) : (rtrim(rtrim(number_format((float)$val, 1, '.', ''), '0'), '.') . $unit);
+        $svg .= "<text x='0' y='$vy' font-size='12' fill='var(--muted)'>$lab</text>";
+        $svg .= "<rect x='$labelW' y='$y' width='$bw' height='" . ($rowH - 5) . "' rx='4' fill='$col'></rect>";
+        $svg .= "<text x='" . ($labelW + $bw + 6) . "' y='$vy' font-size='12' fill='var(--ink)'>$vv</text>";
+        $y += $rowH + $gap; $i++;
+    }
+    return $svg . "</svg>";
+}
+// Donut with legend. $data = [label => value].
+function svg_donut($data, $money = false) {
+    $data = array_filter($data, fn($v) => (float)$v > 0);
+    if (!$data) return chart_no_data();
+    arsort($data);
+    $total = array_sum(array_map('floatval', $data));
+    $cx = 70; $cy = 75; $r = 52; $sw = 26; $C = 2 * M_PI * $r; $off = 0; $i = 0;
+    $legH = max(150, count($data) * 18 + 20);
+    $svg = "<svg viewBox='0 0 340 $legH' width='100%' style='max-width:440px' role='img'>";
+    foreach ($data as $label => $val) {
+        $len = $val / $total * $C; $col = chart_color($i);
+        $svg .= "<circle cx='$cx' cy='$cy' r='$r' fill='none' stroke='$col' stroke-width='$sw' stroke-dasharray='$len " . ($C - $len) . "' stroke-dashoffset='" . (-$off) . "' transform='rotate(-90 $cx $cy)'></circle>";
+        $off += $len; $i++;
+    }
+    $svg .= "<text x='$cx' y='" . ($cy + 4) . "' text-anchor='middle' font-size='13' font-weight='700' fill='var(--ink)'>" . ($money ? '₹' . number_format($total) : rtrim(rtrim(number_format($total, 1, '.', ''), '0'), '.')) . "</text>";
+    $ly = 22; $i = 0;
+    foreach ($data as $label => $val) {
+        $col = chart_color($i); $pct = round($val / $total * 100);
+        $lab = htmlspecialchars(mb_strimwidth((string)$label, 0, 22, '…'), ENT_QUOTES);
+        $svg .= "<rect x='158' y='" . ($ly - 9) . "' width='11' height='11' rx='2' fill='$col'></rect>";
+        $svg .= "<text x='174' y='$ly' font-size='11.5' fill='var(--ink)'>$lab · $pct%</text>";
+        $ly += 18; $i++;
+    }
+    return $svg . "</svg>";
+}
+// Big % ring (utilization / on-time). Accent-coloured.
+function svg_gauge($pct, $label) {
+    $pct = max(0, min(100, (float)$pct)); $r = 42; $C = 2 * M_PI * $r; $len = $pct / 100 * $C;
+    $svg = "<svg viewBox='0 0 120 120' width='118' height='118' role='img'>";
+    $svg .= "<circle cx='60' cy='60' r='$r' fill='none' stroke='var(--soft)' stroke-width='13'></circle>";
+    $svg .= "<circle cx='60' cy='60' r='$r' fill='none' stroke='var(--accent)' stroke-width='13' stroke-linecap='round' stroke-dasharray='$len " . ($C - $len) . "' transform='rotate(-90 60 60)'></circle>";
+    $svg .= "<text x='60' y='58' text-anchor='middle' font-size='21' font-weight='800' fill='var(--ink)'>" . round($pct) . "%</text>";
+    $svg .= "<text x='60' y='76' text-anchor='middle' font-size='10' fill='var(--muted)'>" . htmlspecialchars($label, ENT_QUOTES) . "</text>";
+    return $svg . "</svg>";
+}
+// Map SBU-coded aggregates to their labels for charts.
+function chart_relabel_sbu($data) {
+    $map = lk_options_or('sbu', OPS_SBUS); $out = [];
+    foreach ($data as $k => $v) $out[$map[$k] ?? $k] = $v;
+    return $out;
+}
+
 // ---- Profitability by BOSS / contract number (P7) --------------------------
 // Revenue − labour − expenses − subcon, rolling voucher expenses + job closure
 // expenses into each BOSS number. Labour is only counted when salary is visible.
