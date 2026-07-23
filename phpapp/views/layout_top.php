@@ -30,40 +30,38 @@
         <a class="s-item<?= $navOn(['my-jobs']) ?>" href="/my-jobs"><span class="s-ic">🗂</span><span>My Jobs</span></a>
         <a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span>My Voucher</span></a>
       <?php else: ?>
+        <?php if (can('mod.calls.view')||can('mod.jobs.view')||can('mod.vouchers.view')||can('mod.hiring.view')||can('mod.reconcile.view')): ?>
         <div class="s-grp">Operations</div>
-        <a class="s-item<?= $navOn(['calls','call']) ?>" href="/calls"><span class="s-ic">☎️</span><span>Calls</span></a>
-        <a class="s-item<?= $navOn(['jobs','job']) ?>" href="/jobs"><span class="s-ic">🗂</span><span>Jobs</span></a>
-        <?php if (is_coordinator_level()): ?>
-          <a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span>Vouchers</span></a>
-          <a class="s-item<?= $navOn(['candidates','candidate']) ?>" href="/candidates"><span class="s-ic">🧑‍💼</span><span>Hiring</span></a>
-          <a class="s-item<?= $navOn(['attendance-recon']) ?>" href="/attendance-recon"><span class="s-ic">✅</span><span>Reconcile</span></a>
+        <?php if (can('mod.calls.view')): ?><a class="s-item<?= $navOn(['calls','call']) ?>" href="/calls"><span class="s-ic">☎️</span><span>Calls</span></a><?php endif; ?>
+        <?php if (can('mod.jobs.view')): ?><a class="s-item<?= $navOn(['jobs','job']) ?>" href="/jobs"><span class="s-ic">🗂</span><span>Jobs</span></a><?php endif; ?>
+        <?php if (can('mod.vouchers.view')): ?><a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span>Vouchers</span></a><?php endif; ?>
+        <?php if (can('mod.hiring.view')): ?><a class="s-item<?= $navOn(['candidates','candidate']) ?>" href="/candidates"><span class="s-ic">🧑‍💼</span><span>Hiring</span></a><?php endif; ?>
+        <?php if (can('mod.reconcile.view')): ?><a class="s-item<?= $navOn(['attendance-recon']) ?>" href="/attendance-recon"><span class="s-ic">✅</span><span>Reconcile</span></a><?php endif; ?>
         <?php endif; ?>
 
-        <?php if (can('data.credit') || can('finance.reconcile') || can('data.profitability') || can('dash.financial')): ?>
+        <?php if (can('mod.invoicing.view') || can('mod.profitability.view')): ?>
         <div class="s-grp">Money</div>
-        <?php if (can('data.credit') || can('finance.reconcile')): ?>
-          <a class="s-item<?= $navOn(['invoicing']) ?>" href="/invoicing"><span class="s-ic">💳</span><span>Invoicing</span></a>
-        <?php endif; ?>
-        <?php if (can('data.profitability')): ?>
-          <a class="s-item<?= $navOn(['profitability']) ?>" href="/profitability"><span class="s-ic">💹</span><span>Profitability</span></a>
-        <?php endif; ?>
+        <?php if (can('mod.invoicing.view')): ?><a class="s-item<?= $navOn(['invoicing']) ?>" href="/invoicing"><span class="s-ic">💳</span><span>Invoicing</span></a><?php endif; ?>
+        <?php if (can('mod.profitability.view')): ?><a class="s-item<?= $navOn(['profitability']) ?>" href="/profitability"><span class="s-ic">💹</span><span>Profitability</span></a><?php endif; ?>
         <?php endif; ?>
 
-        <?php if (can('dash.operations')||can('dash.financial')||can('dash.utilization')||can('dash.people')): ?>
+        <?php if (can('mod.reports.view')): ?>
         <div class="s-grp">Insights</div>
           <a class="s-item<?= $navOn(['reports']) ?>" href="/reports"><span class="s-ic">📊</span><span>Dashboards</span></a>
         <?php endif; ?>
 
+        <?php if (can('mod.clients.view') || can('mod.vendors.view')): ?>
         <div class="s-grp">Directory</div>
-        <a class="s-item<?= $navOn(['clients']) ?>" href="/clients"><span class="s-ic">🏢</span><span>Clients</span></a>
-        <a class="s-item<?= $navOn(['vendors']) ?>" href="/vendors"><span class="s-ic">🚚</span><span>Vendors</span></a>
+        <?php if (can('mod.clients.view')): ?><a class="s-item<?= $navOn(['clients']) ?>" href="/clients"><span class="s-ic">🏢</span><span>Clients</span></a><?php endif; ?>
+        <?php if (can('mod.vendors.view')): ?><a class="s-item<?= $navOn(['vendors']) ?>" href="/vendors"><span class="s-ic">🚚</span><span>Vendors</span></a><?php endif; ?>
+        <?php endif; ?>
 
-        <?php if (is_coordinator_level() || is_admin_level() || can('users.manage.branch') || can('users.manage.global') || can('settings.manage')): ?>
+        <?php if (can('mod.masters.view')||can('mod.overheads.view')||can('mod.users.view')||can('mod.settings.view')): ?>
         <div class="s-grp">Admin</div>
-          <?php if (is_coordinator_level()): ?><a class="s-item<?= $navOn(['masters','m/']) ?>" href="/masters"><span class="s-ic">📋</span><span>Masters</span></a><?php endif; ?>
-          <?php if (is_admin_level()): ?><a class="s-item<?= $navOn(['office-finance']) ?>" href="/office-finance"><span class="s-ic">📐</span><span>Overheads</span></a><?php endif; ?>
-          <?php if (can('users.manage.branch')||can('users.manage.global')): ?><a class="s-item<?= $navOn(['users','user-new','user-edit']) ?>" href="/users"><span class="s-ic">👥</span><span>Users</span></a><?php endif; ?>
-          <?php if (can('settings.manage')): ?><a class="s-item<?= $navOn(['settings']) ?>" href="/settings"><span class="s-ic">⚙️</span><span>Settings</span></a><?php endif; ?>
+          <?php if (can('mod.masters.view')): ?><a class="s-item<?= $navOn(['masters','m/']) ?>" href="/masters"><span class="s-ic">📋</span><span>Masters</span></a><?php endif; ?>
+          <?php if (can('mod.overheads.view')): ?><a class="s-item<?= $navOn(['office-finance']) ?>" href="/office-finance"><span class="s-ic">📐</span><span>Overheads</span></a><?php endif; ?>
+          <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['users','user-new','user-edit']) ?>" href="/users"><span class="s-ic">👥</span><span>Users</span></a><?php endif; ?>
+          <?php if (can('mod.settings.view')): ?><a class="s-item<?= $navOn(['settings','access']) ?>" href="/settings"><span class="s-ic">⚙️</span><span>Settings</span></a><?php endif; ?>
         <?php endif; ?>
       <?php endif; ?>
     </nav>

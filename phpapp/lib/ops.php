@@ -992,7 +992,55 @@ function option_rows($fieldMeta) {
 // ============================================================================
 //  Dispatcher — returns true if it handled the route
 // ============================================================================
+// Per-module view-access gate. Maps a route to its module and blocks it if the
+// user lacks mod.<module>.view. Inspector-owned paths (my-jobs, vouchers) and
+// utility routes are intentionally NOT mapped, so they stay reachable.
+function ops_module_gate($route) {
+    $base = (strncmp($route, 'm/', 2) === 0) ? 'masters' : $route;
+    static $map = [
+        'calls'=>'calls','call'=>'calls','call-new'=>'calls','call-edit'=>'calls','call-delete'=>'calls',
+        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-invoice'=>'invoicing',
+        'invoicing'=>'invoicing',
+        'profitability'=>'profitability','boss-renew'=>'profitability',
+        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring',
+        'attendance-recon'=>'reconcile',
+        'masters'=>'masters',
+        'office-finance'=>'overheads',
+        'reports'=>'reports',
+        'users'=>'users','user-new'=>'users','user-edit'=>'users',
+        'settings'=>'settings','access'=>'settings',
+    ];
+    $mod = $map[$base] ?? null;
+    if ($mod && !can("mod.$mod.view")) {
+        ops_require(false, 'You don’t have access to the ' . (ACCESS_MODULES[$mod] ?? $mod) . ' module. Ask your administrator.');
+    }
+}
+
+// Settings → Roles & access: edit each role's default permission set.
+function ops_access($method) {
+    ops_require(is_master(), 'Only the Master Admin can edit role access.');
+    $roles = ORG_ROLES; unset($roles['MASTER_ADMIN']); // Master Admin always has everything
+    $sel = $_GET['role'] ?? 'COORDINATOR';
+    if (!isset($roles[$sel])) $sel = array_key_first($roles);
+    if ($method === 'POST') {
+        $sel = $_POST['role'] ?? $sel;
+        if (!isset($roles[$sel])) $sel = array_key_first($roles);
+        $valid = array_keys(all_permissions());
+        $checked = array_values(array_intersect(array_keys($_POST['perms'] ?? []), $valid));
+        // edit implies view for every module
+        foreach ($checked as $p) if (preg_match('/^mod\.(\w+)\.edit$/', $p, $mm)) $checked[] = "mod.{$mm[1]}.view";
+        $checked = array_values(array_unique($checked));
+        $store = json_decode(setting_get('role_access', ''), true); if (!is_array($store)) $store = [];
+        $store[$sel] = $checked;
+        setting_set('role_access', json_encode($store));
+        flash('Access for ' . ORG_ROLES[$sel] . ' saved.');
+        redirect('/access?role=' . $sel);
+    }
+    view('ops/access', ['roles' => $roles, 'sel' => $sel, 'current' => role_perms($sel)]);
+}
+
 function ops_dispatch($route, $method) {
+    ops_module_gate($route);
     // ----- Generic masters: /m/<entity>, /m/<entity>/new, /m/<entity>/edit
     if (preg_match('#^m/([a-z-]+)(?:/(new|edit|delete))?$#', $route, $mm)) {
         $key = $mm[1]; $action = $mm[2] ?? 'list';
@@ -1040,6 +1088,8 @@ function ops_dispatch($route, $method) {
             ops_change_password($method); return true;
         case $route === 'settings':
             ops_settings($method); return true;
+        case $route === 'access':
+            ops_access($method); return true;
         case $route === 'office-finance':
             ops_office_finance(); return true;
         case $route === 'masters':
