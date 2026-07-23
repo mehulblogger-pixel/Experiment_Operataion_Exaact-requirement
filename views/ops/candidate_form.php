@@ -15,14 +15,14 @@
     <div class="ff"><label>Middle name</label><input class="form-control" name="middle_name" value="<?= e($cand['middle_name'] ?? '') ?>"></div>
     <div class="ff"><label>Last name</label><input class="form-control" name="last_name" value="<?= e($cand['last_name'] ?? '') ?>"></div>
 
-    <div class="ff"><label>Client (who needs the resource)</label>
-      <select class="form-control searchable" name="client_id"><option value="">—</option>
+    <div class="ff"><label>Client (who needs the resource) <a href="#" class="addlink" data-qa="client">+ Add new</a></label>
+      <select class="form-control searchable" id="client_sel" name="client_id"><option value="">—</option>
         <?php foreach ($clients as $cl): ?><option value="<?= (int)$cl['id'] ?>" <?= (string)($cand['client_id'] ?? '')===(string)$cl['id']?'selected':'' ?>><?= e($cl['display_name'] ?: $cl['legal_name']) ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff"><label>Against call / requirement</label>
+    <div class="ff"><label>Against call / requirement <a href="/call-new" target="_blank" class="muted" style="font-size:12px">＋ New call (full form) ↗</a></label>
       <select class="form-control searchable" name="call_id"><option value="">— optional —</option>
         <?php foreach ($depCalls as $dc): ?><option value="<?= (int)$dc['id'] ?>" <?= (string)($cand['call_id'] ?? '')===(string)$dc['id']?'selected':'' ?>><?= e($dc['call_code']) ?><?= $dc['inspection_type']?' · '.e(INSPECTION_TYPES[$dc['inspection_type']] ?? $dc['inspection_type']):'' ?></option><?php endforeach; ?>
-      </select></div>
+      </select><small class="muted">Not listed? Open the full New Call form, add it, then reopen this form to pick it.</small></div>
     <div class="ff"><label>Proposed site / location</label><input class="form-control" name="proposed_site" value="<?= e($cand['proposed_site'] ?? '') ?>"></div>
 
     <div class="ff"><label>Trade / discipline</label>
@@ -43,8 +43,14 @@
         <?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($cand['sbu'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"><label>Source</label>
-      <select class="form-control" name="source"><?php foreach (CAND_SOURCES as $k=>$v): ?><option value="<?= $k ?>" <?= (($cand['source'] ?? 'FREELANCER')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Agency (if sub-con / freelancer)</label><input class="form-control" name="agency" value="<?= e($cand['agency'] ?? '') ?>"></div>
+      <select class="form-control" id="cand_source" name="source"><?php foreach (CAND_SOURCES as $k=>$v): ?><option value="<?= $k ?>" <?= (($cand['source'] ?? 'FREELANCER')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label id="agency_lbl">Agency (sub-con / HR agency) <a href="#" class="addlink" data-qa="agency">+ Add new</a></label>
+      <?php $curAgency = $cand['agency'] ?? ''; $inList = in_array($curAgency, $agencies, true); ?>
+      <select class="form-control searchable" id="agency_sel" name="agency">
+        <option value="">—</option>
+        <?php if ($curAgency && !$inList): ?><option value="<?= e($curAgency) ?>" selected><?= e($curAgency) ?></option><?php endif; ?>
+        <?php foreach ($agencies as $a): ?><option value="<?= e($a) ?>" <?= $curAgency===$a?'selected':'' ?>><?= e($a) ?></option><?php endforeach; ?>
+      </select></div>
 
     <div class="ff"><label>Experience (years)</label><input class="form-control" type="number" step="0.5" name="experience_years" value="<?= e($cand['experience_years'] ?? '') ?>"></div>
     <div class="ff"><label>Email</label><input class="form-control" name="email" value="<?= e($cand['email'] ?? '') ?>"></div>
@@ -63,4 +69,29 @@
     <a class="btn secondary" href="/candidates">Cancel</a>
   </div>
 </form>
-<script>window.SKILLS = <?= json_encode($skillsByTrade) ?>;</script>
+<!-- Quick-add modal (shared markup — client + agency) -->
+<div class="modal-back" id="qa_back" style="display:none;">
+  <div class="modal">
+    <h3 id="qa_title">Add</h3>
+    <div class="ff"><label>Name *</label><input class="form-control" id="qa_name" autocomplete="off"></div>
+    <div class="qa-field qa-cv">
+      <div class="ff"><label>GSTIN (optional — auto PAN/State)</label><input class="form-control" id="qa_gstin"></div>
+      <div class="ff ff-check"><input type="checkbox" id="qa_both"><label>Add to <strong>both</strong> Client &amp; Vendor lists</label></div>
+    </div>
+    <div id="qa_err" class="msg msg-error" style="display:none;"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;">
+      <button class="btn" type="button" id="qa_save">Add &amp; select</button>
+      <button class="btn secondary" type="button" id="qa_cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+<script>
+window.SKILLS = <?= json_encode($skillsByTrade) ?>;
+(function(){
+  // Emphasise Agency when the source is a sub-con / HR agency
+  var src=document.getElementById('cand_source'), lbl=document.getElementById('agency_lbl'), sel=document.getElementById('agency_sel');
+  var need=<?= json_encode(CAND_AGENCY_SOURCES) ?>;
+  function sync(){ var on=need.indexOf(src.value)>=0; if(lbl) lbl.style.fontWeight=on?'700':''; if(sel){ sel.style.borderColor=on?'#d98a2b':''; } }
+  if(src){ src.addEventListener('change', sync); sync(); }
+})();
+</script>

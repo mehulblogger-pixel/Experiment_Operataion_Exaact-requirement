@@ -166,9 +166,9 @@
     function open(k) {
       kind = k; hideAll(); byId('qa_err').style.display = 'none';
       byId('qa_name').value = ''; byId('qa_gstin').value = '';
-      var titles = { client: 'Add Client', vendor: 'Add Vendor', office: 'Add Executing office', product: 'Add Product category', activity: 'Add Activity code' };
+      var titles = { client: 'Add Client', vendor: 'Add Vendor', office: 'Add Executing office', product: 'Add Product category', activity: 'Add Activity code', agency: 'Add Agency (sub-con / HR)' };
       byId('qa_title').textContent = titles[k] || 'Add';
-      targetId = { client: 'client_sel', vendor: 'vendor_sel', office: 'exec_sel', product: 'product_sel', activity: 'activity_sel' }[k];
+      targetId = { client: 'client_sel', vendor: 'vendor_sel', office: 'exec_sel', product: 'product_sel', activity: 'activity_sel', agency: 'agency_sel' }[k];
       if (k === 'client' || k === 'vendor') { show('.qa-cv'); if (byId('qa_both')) byId('qa_both').checked = false; }
       if (k === 'office') show('.qa-office');
       if (k === 'activity') show('.qa-activity');
