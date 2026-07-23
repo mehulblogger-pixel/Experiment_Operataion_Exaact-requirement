@@ -37,8 +37,92 @@ const PERMISSIONS = [
     'settings.manage' => 'Manage system settings',
 ];
 
+// ---- Module access catalogue (per-module View + Edit) ----------------------
+// Each module yields two permissions: mod.<key>.view and mod.<key>.edit.
+// These gate the sidebar and the module routes; the super admin can grant /
+// deny any of them per role (Settings → Roles & access) or per user.
+const ACCESS_MODULES = [
+    'calls'         => 'Calls',
+    'jobs'          => 'Jobs',
+    'vouchers'      => 'Vouchers',
+    'invoicing'     => 'Invoicing',
+    'profitability' => 'Profitability',
+    'hiring'        => 'Hiring / candidates',
+    'reconcile'     => 'Attendance reconcile',
+    'clients'       => 'Clients',
+    'vendors'       => 'Vendors',
+    'masters'       => 'Masters',
+    'overheads'     => 'Overheads (office finance)',
+    'reports'       => 'Dashboards / reports',
+    'users'         => 'Users & access',
+    'settings'      => 'Settings',
+];
+
+// Full permission map = fine-grained perms + per-module view/edit perms.
+function all_permissions() {
+    $p = PERMISSIONS;
+    foreach (ACCESS_MODULES as $k => $lbl) {
+        $p["mod.$k.view"] = "$lbl — view";
+        $p["mod.$k.edit"] = "$lbl — add / edit";
+    }
+    return $p;
+}
+
+// Which modules each role can view / edit by default (edit implies view).
+// Used as the starting point; the super admin can override per role / per user.
+function module_defaults($role) {
+    $edit = []; $view = [];
+    $all = array_keys(ACCESS_MODULES);
+    switch ($role) {
+        case 'MASTER_ADMIN': case 'ADMIN': $edit = $all; break;
+        case 'BUSINESS_DIRECTOR': $view = $all; break;
+        case 'SBU_HEAD':
+            $view = ['calls','jobs','vouchers','invoicing','profitability','hiring','reconcile','clients','vendors','masters','reports']; break;
+        case 'BRANCH_MANAGER':
+            $edit = ['calls','jobs','vouchers','hiring','reconcile','clients','vendors','masters','reports','users'];
+            $view = ['invoicing','profitability','overheads']; break;
+        case 'BRANCH_APP_MANAGER':
+            $edit = ['masters','overheads','users'];
+            $view = ['calls','jobs','reports']; break;
+        case 'OPERATION_MANAGER':
+            $edit = ['calls','jobs','vouchers','hiring','reconcile'];
+            $view = ['clients','vendors','masters','profitability','reports']; break;
+        case 'ASST_MANAGER':
+            $edit = ['calls','jobs'];
+            $view = ['clients','vendors','reports']; break;
+        case 'COORDINATOR':
+            $edit = ['calls','jobs','vouchers','hiring','reconcile'];
+            $view = ['clients','vendors','masters','reports','invoicing']; break;
+        case 'FINANCE':
+            $edit = ['invoicing'];
+            $view = ['profitability','reports','jobs','calls','vouchers']; break;
+        case 'INSPECTOR': break; // inspectors use My Jobs / My Voucher (their own)
+    }
+    $out = [];
+    foreach ($view as $k) $out[] = "mod.$k.view";
+    foreach ($edit as $k) { $out[] = "mod.$k.view"; $out[] = "mod.$k.edit"; }
+    return array_values(array_unique($out));
+}
+
+// Effective default permission set for a role: a super-admin override stored in
+// settings (Roles & access) wins; otherwise the built-in role defaults.
+function role_perms($role) {
+    $raw = setting_get('role_access', '');
+    if ($raw !== '') {
+        $ov = json_decode($raw, true);
+        if (is_array($ov) && isset($ov[$role]) && is_array($ov[$role])) return array_values($ov[$role]);
+    }
+    return role_defaults($role)['perms'];
+}
+
 // Role defaults: permissions granted, and scope (offices/sbus: ALL | OWN).
+// Wrapper merges the per-module view/edit defaults onto the fine-grained ones.
 function role_defaults($role) {
+    $d = role_defaults_base($role);
+    $d['perms'] = array_values(array_unique(array_merge($d['perms'], module_defaults($role))));
+    return $d;
+}
+function role_defaults_base($role) {
     $all = array_keys(PERMISSIONS);
     switch ($role) {
         case 'MASTER_ADMIN': case 'ADMIN':
@@ -76,9 +160,19 @@ function ua() {
     $role = !empty($u['is_superuser']) ? 'MASTER_ADMIN' : strtoupper($u['role'] ?? 'ADMIN');
     if (!isset(ORG_ROLES[$role])) $role = 'ADMIN';
     $def = role_defaults($role);
-    // permissions: stored csv overrides default; master gets everything
-    $perms = ($role === 'MASTER_ADMIN') ? array_keys(PERMISSIONS)
-        : (trim((string)($u['permissions'] ?? '')) !== '' ? array_filter(explode(',', $u['permissions'])) : $def['perms']);
+    // permissions: per-user csv override wins; else the role's effective set
+    // (which itself honours a Settings → Roles & access override). Master = all.
+    if ($role === 'MASTER_ADMIN') {
+        $perms = array_keys(all_permissions());
+    } elseif (trim((string)($u['permissions'] ?? '')) !== '') {
+        $perms = array_values(array_filter(explode(',', $u['permissions'])));
+        // backward-compat: users configured before module perms existed keep
+        // module access from their role defaults (until re-saved with the new UI).
+        $hasMod = false; foreach ($perms as $p) if (strncmp($p, 'mod.', 4) === 0) { $hasMod = true; break; }
+        if (!$hasMod) $perms = array_merge($perms, module_defaults($role));
+    } else {
+        $perms = role_perms($role);
+    }
     // office scope
     $so = trim((string)($u['scope_offices'] ?? ''));
     if ($role === 'MASTER_ADMIN' || $def['offices'] === 'ALL' && $so === '') $offices = 'ALL';

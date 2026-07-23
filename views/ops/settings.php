@@ -87,6 +87,12 @@
 
 <?php if (is_master()): ?>
 <div class="panel" style="max-width:620px;margin-top:18px">
+  <h3 class="tab-sub" style="margin-top:0;">Roles &amp; access</h3>
+  <p class="sub" style="margin-bottom:10px">Control which <strong>modules and features</strong> each role can view or edit — Calls, Jobs, Vouchers, Invoicing, Profitability, Masters, Users, Settings and more. Set defaults per role; fine-tune per person under Users.</p>
+  <a class="btn" href="/access">Open Roles &amp; access</a>
+</div>
+
+<div class="panel" style="max-width:620px;margin-top:18px">
   <h3 class="tab-sub" style="margin-top:0;">Demo / sample data</h3>
   <?php if (demo_seeded()): ?>
     <p class="sub" style="margin:0 0 6px"><span class="pill p-ok">Loaded</span> The sample dataset is already in the system.</p>

@@ -134,6 +134,7 @@ if ($route === '') {
 }
 
 if ($route === 'clients' || $route === 'vendors') {
+    ops_require(can('mod.' . $route . '.view'), 'You don’t have access to the ' . ucfirst($route) . ' module. Ask your administrator.');
     $roleField = $route === 'clients' ? 'is_client' : 'is_vendor';
     $q = trim($_GET['q'] ?? '');
     $status = trim($_GET['status'] ?? '');
