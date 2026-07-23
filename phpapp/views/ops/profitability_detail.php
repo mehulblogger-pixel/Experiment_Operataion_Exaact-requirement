@@ -1,44 +1,48 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/profitability">Profitability</a> › <?= e($boss['boss_number']) ?></div>
 <div class="master-head">
   <div><h1>BOSS <?= e($boss['boss_number']) ?>
-      <?php if (!empty($boss['superseded_by'])): ?><span class="badge AMBER" style="vertical-align:middle">Renewed</span><?php endif; ?></h1>
-    <p class="sub"><?= e($boss['client_disp'] ?: $boss['client_name'] ?: '—') ?> · <?= (int)$p['jobs'] ?> job(s)
+      <?php if (!empty($boss['superseded_by'])): ?><span class="pill p-warn" style="vertical-align:middle;font-size:12px">Renewed</span><?php endif; ?></h1>
+    <p class="sub" style="margin:2px 0 0"><?= e($boss['client_disp'] ?: $boss['client_name'] ?: '—') ?> · <?= (int)$p['jobs'] ?> job(s)
       <?php if (!empty($boss['prev_no'])): ?> · <span class="muted">continues from <a href="/profitability?boss=<?= (int)$boss['prev_id'] ?>"><?= e($boss['prev_no']) ?></a></span><?php endif; ?>
       <?php if (!empty($boss['next_no'])): ?> · <span class="muted">renewed as <a href="/profitability?boss=<?= (int)$boss['next_id'] ?>"><?= e($boss['next_no']) ?></a></span><?php endif; ?></p></div>
   <a class="btn secondary" href="/profitability">← Back</a>
 </div>
 
-<div class="stat-row">
-  <div class="stat-card"><div class="sc-num"><?= fmoney($p['revenue']) ?></div><div class="sc-lbl">Revenue</div></div>
-  <div class="stat-card"><div class="sc-num"><?= fmoney($p['expenses']) ?></div><div class="sc-lbl">Expenses (voucher + closure)</div></div>
-  <div class="stat-card"><div class="sc-num"><?= fmoney($p['subcon']) ?></div><div class="sc-lbl">Sub-con</div></div>
+<div class="kpi-row">
+  <div class="kpi"><span class="kic">₹</span><div class="k">Revenue</div><div class="v"><?= fmoney_short($p['revenue']) ?></div><div class="d"><?= (int)$p['jobs'] ?> job(s)</div></div>
+  <div class="kpi"><span class="kic">🧾</span><div class="k">Expenses</div><div class="v"><?= fmoney_short($p['expenses']) ?></div><div class="d">voucher + closure</div></div>
+  <div class="kpi"><span class="kic">🤝</span><div class="k">Sub-con</div><div class="v"><?= fmoney_short($p['subcon']) ?></div><div class="d">agency / outsourced</div></div>
   <?php if ($seeSal): ?>
-  <div class="stat-card"><div class="sc-num"><?= fmoney($p['labour']) ?></div><div class="sc-lbl">Loaded labour</div></div>
-  <?php if (($p['contingency'] ?? 0) > 0): ?><div class="stat-card"><div class="sc-num"><?= fmoney($p['contingency']) ?></div><div class="sc-lbl">Contingency</div></div><?php endif; ?>
-  <div class="stat-card"><div class="sc-num" style="color:<?= $p['margin']>=0?'#1f8a4c':'#c0392b' ?>"><?= fmoney($p['margin']) ?></div><div class="sc-lbl">Margin<?= $p['pct']!==null?' ('.$p['pct'].'%)':'' ?></div></div>
+    <div class="kpi"><span class="kic">👷</span><div class="k">Loaded labour</div><div class="v"><?= fmoney_short($p['labour']) ?></div><div class="d">salary + agency + OH</div></div>
+    <?php if (($p['contingency'] ?? 0) > 0): ?><div class="kpi"><span class="kic">➕</span><div class="k">Contingency</div><div class="v"><?= fmoney_short($p['contingency']) ?></div><div class="d">office %</div></div><?php endif; ?>
+    <div class="kpi" style="border-color:color-mix(in srgb,var(--<?= $p['margin']>=0?'ok':'bad' ?>) 45%,var(--line))">
+      <span class="kic"><?= $p['margin']>=0?'📈':'📉' ?></span><div class="k">Margin</div>
+      <div class="v <?= $p['margin']>=0?'up':'down' ?>"><?= fmoney_short($p['margin']) ?></div>
+      <div class="d"><?= $p['pct']!==null ? e($p['pct']).'% of revenue' : '—' ?></div></div>
   <?php else: ?>
-  <div class="stat-card"><div class="sc-num"><?= fmoney($p['revenue']-$p['expenses']-$p['subcon']) ?></div><div class="sc-lbl">Contribution (labour hidden)</div></div>
+    <div class="kpi"><span class="kic">📊</span><div class="k">Contribution</div><div class="v"><?= fmoney_short($p['revenue']-$p['expenses']-$p['subcon']) ?></div><div class="d">labour hidden</div></div>
   <?php endif; ?>
 </div>
 
-<div class="panel">
-  <h3 class="tab-sub">Expense lines — which inspector visited which vendor, and the cost</h3>
+<div class="panel" style="padding:0;overflow:hidden;margin-top:16px">
+  <h3 class="tab-sub" style="padding:14px 18px 0;margin-top:0">Expense lines — who visited which vendor, and the cost</h3>
   <div class="tbl-scroll" style="overflow-x:auto">
-  <table class="grid">
-    <tr><th></th><th>Date</th><th>Inspector</th><th>Vendor / Site</th><th>Hrs</th><th>Line No</th><th>Travel ₹</th><th>Bills ₹</th><th>Line total</th></tr>
+  <table class="dt">
+    <thead><tr><th></th><th>Date</th><th>Inspector</th><th>Vendor / Site</th><th class="num">Hrs</th><th>Line No</th><th class="num">Travel ₹</th><th class="num">Bills ₹</th><th class="num">Line total</th></tr></thead>
+    <tbody>
     <?php $tot=0; foreach ($lines as $i=>$l): $amt = expense_extra_decode($l['amounts'] ?? ''); $bills = array_sum($amt); $tot += (float)$l['row_total']; ?>
     <tr>
       <td><button type="button" class="btn small secondary xpand" data-t="dl<?= $i ?>" title="Show expense breakdown">+</button></td>
       <td><?= e(date('d-M-Y', strtotime($l['entry_date']))) ?></td>
       <td><?= e($l['inspector_name'] ?: '—') ?></td>
       <td><?= e($l['vendor_disp'] ?: $l['vendor_leg'] ?: '—') ?></td>
-      <td><?= e(rtrim(rtrim((string)$l['hours'],'0'),'.') ?: '0') ?></td>
+      <td class="num"><?= e(rtrim(rtrim((string)$l['hours'],'0'),'.') ?: '0') ?></td>
       <td><?= e($l['line_no'] ?: '—') ?></td>
-      <td><?= fmoney($l['travel_amount']) ?></td>
-      <td><?= fmoney($bills) ?></td>
-      <td><strong><?= fmoney($l['row_total']) ?></strong></td>
+      <td class="num"><?= fmoney($l['travel_amount']) ?></td>
+      <td class="num"><?= fmoney($bills) ?></td>
+      <td class="num"><strong><?= fmoney($l['row_total']) ?></strong></td>
     </tr>
-    <tr id="dl<?= $i ?>" class="drill" style="display:none;background:#faf8f4">
+    <tr id="dl<?= $i ?>" class="drill" style="display:none;background:var(--soft)">
       <td></td>
       <td colspan="8" class="muted" style="font-size:12px">
         <?= (float)$l['km']>0 ? 'KM '.e(rtrim(rtrim((string)$l['km'],'0'),'.')).' → Travel '.fmoney($l['travel_amount']) : '' ?>
@@ -47,33 +51,36 @@
       </td>
     </tr>
     <?php endforeach; ?>
-    <?php if (!$lines): ?><tr><td colspan="9">No inspector expenses recorded against this BOSS yet.</td></tr><?php endif; ?>
-    <?php if ($lines): ?><tr style="background:#f7f6f4"><td colspan="8" style="text-align:right"><strong>Total voucher expenses</strong></td><td><strong><?= fmoney($tot) ?></strong></td></tr><?php endif; ?>
+    <?php if (!$lines): ?><tr><td colspan="9" class="muted" style="padding:16px">No inspector expenses recorded against this BOSS yet.</td></tr><?php endif; ?>
+    <?php if ($lines): ?><tr style="background:var(--soft)"><td colspan="8" style="text-align:right"><strong>Total voucher expenses</strong></td><td class="num"><strong><?= fmoney($tot) ?></strong></td></tr><?php endif; ?>
+    </tbody>
   </table>
   </div>
 </div>
 
-<div class="panel">
-  <h3 class="tab-sub">Invoices / jobs</h3>
-  <table class="grid">
-    <tr><th>Job</th><th>Inspector</th><th>Invoice No</th><th>Invoice ₹</th><th>Invoice date</th><th>Payment</th></tr>
+<div class="panel" style="padding:0;overflow:hidden;margin-top:16px">
+  <h3 class="tab-sub" style="padding:14px 18px 0;margin-top:0">Invoices / jobs</h3>
+  <table class="dt">
+    <thead><tr><th>Job</th><th>Inspector</th><th>Invoice No</th><th class="num">Invoice ₹</th><th>Invoice date</th><th>Payment</th></tr></thead>
+    <tbody>
     <?php foreach ($invLines as $j): ?>
     <tr>
-      <td><?= e($j['job_code']) ?></td>
+      <td><b><?= e($j['job_code']) ?></b></td>
       <td><?= e($j['inspector_name'] ?: '—') ?></td>
       <td><?= e($j['invoice_number'] ?: '—') ?></td>
-      <td><?= (float)$j['invoice_amount']>0?fmoney($j['invoice_amount']):'—' ?></td>
+      <td class="num"><?= (float)$j['invoice_amount']>0?fmoney($j['invoice_amount']):'—' ?></td>
       <td><?= e($j['invoice_date'] ?: '—') ?></td>
-      <td><?= !empty($j['payment_received'])?'<span class="badge GREEN">Paid '.fmoney($j['payment_amount']).'</span>':'<span class="badge AMBER">Pending</span>' ?></td>
+      <td><?= !empty($j['payment_received'])?'<span class="pill p-ok">Paid '.fmoney($j['payment_amount']).'</span>':'<span class="pill p-warn">Pending</span>' ?></td>
     </tr>
     <?php endforeach; ?>
-    <?php if (!$invLines): ?><tr><td colspan="6">No jobs linked to this BOSS.</td></tr><?php endif; ?>
+    <?php if (!$invLines): ?><tr><td colspan="6" class="muted" style="padding:16px">No jobs linked to this BOSS.</td></tr><?php endif; ?>
+    </tbody>
   </table>
 </div>
 
 <?php if (empty($boss['superseded_by'])): ?>
-<div class="panel">
-  <h3 class="tab-sub">Renew / change contract number (ARC / Open order)</h3>
+<div class="panel" style="margin-top:16px">
+  <h3 class="tab-sub" style="margin-top:0">Renew / change contract number (ARC / Open order)</h3>
   <p class="sub">Creates a new BOSS/contract number, carries the <strong>open jobs</strong> forward to it, and keeps this old number visible in the chain.</p>
   <form method="post" action="/boss-renew" class="inline-add" style="align-items:flex-end" onsubmit="return confirm('Renew this contract? Open jobs will move to the new number.')">
     <input type="hidden" name="old_id" value="<?= (int)$boss['id'] ?>">
