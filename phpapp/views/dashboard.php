@@ -17,15 +17,21 @@
 
 <?php if (is_inspector()): ?>
   <?php $myId = $u['inspector_id'] ?? 0;
-    $myOpen = $myId ? (int)ops_val("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND closed_flag=0", [$myId]) : 0;
-    $myOverdue = $myId ? (int)ops_val("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND closed_flag=0 AND ((inspection_end_date<>'' AND inspection_end_date<?) OR (inspection_end_date='' AND scheduled_date<>'' AND scheduled_date<?))", [$myId,$today,$today]) : 0; ?>
-  <div class="kpi-row" style="grid-template-columns:repeat(2,1fr);margin-top:18px">
-    <div class="kpi"><span class="kic">🗂</span><div class="k">My open jobs</div><div class="v"><a href="/my-jobs"><?= $myOpen ?></a></div><div class="d"><?= $myOverdue ? '<span class="down">'.$myOverdue.' overdue</span>' : 'All on time' ?></div></div>
-    <div class="kpi"><span class="kic">🧾</span><div class="k">This month</div><div class="v"><a href="/vouchers">Voucher →</a></div><div class="d">Enter km &amp; expenses</div></div>
+    $mc = fn($sql, $extra = []) => $myId ? (int)ops_val("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND $sql", array_merge([$myId], $extra)) : 0;
+    $myOpen    = $mc("closed_flag=0");
+    $myOverdue = $mc("closed_flag=0 AND ((inspection_end_date<>'' AND inspection_end_date<?) OR (inspection_end_date='' AND scheduled_date<>'' AND scheduled_date<?))", [$today, $today]);
+    $myReports = $mc("closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')");
+    $myDone    = $mc("closed_flag=1");
+  ?>
+  <div class="qcards" style="margin-top:18px">
+    <a class="qcard tone-info" href="/my-jobs?f=open"><div class="qic">🗂</div><div class="qn"><?= $myOpen ?></div><div class="ql">Open jobs to do</div></a>
+    <a class="qcard tone-warn" href="/my-jobs?f=reports"><div class="qic">📄</div><div class="qn"><?= $myReports ?></div><div class="ql">Reports pending</div></a>
+    <a class="qcard tone-bad" href="/my-jobs?f=overdue"><div class="qic">⏰</div><div class="qn"><?= $myOverdue ?></div><div class="ql">Overdue</div></a>
+    <a class="qcard tone-ok" href="/vouchers"><div class="qic">🧾</div><div class="qn">₹</div><div class="ql">This month's voucher</div></a>
   </div>
   <div class="qcards" style="grid-template-columns:repeat(2,1fr)">
-    <a class="qcard tone-info" href="/my-jobs"><div class="qic">🗂</div><div class="qn">My Jobs</div><div class="ql">Assignments · upload reports · close</div></a>
-    <a class="qcard tone-ok" href="/vouchers"><div class="qic">🧾</div><div class="qn">My Voucher</div><div class="ql">Km &amp; expenses for the month</div></a>
+    <a class="qcard" href="/my-jobs"><div class="qic">🗂</div><div class="qn" style="font-size:18px">All my jobs</div><div class="ql"><?= $myOpen ?> open · <?= $myDone ?> completed</div></a>
+    <a class="qcard" href="/vouchers"><div class="qic">🧾</div><div class="qn" style="font-size:18px">My Voucher</div><div class="ql">Enter km &amp; expenses</div></a>
   </div>
 
 <?php else: ?>
