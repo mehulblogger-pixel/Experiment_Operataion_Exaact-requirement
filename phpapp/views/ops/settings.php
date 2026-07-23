@@ -85,6 +85,22 @@
   <div style="margin-top:16px;"><button class="btn" type="submit">Save settings</button></div>
 </form>
 
+<?php if (is_master()): ?>
+<div class="panel" style="max-width:620px;margin-top:18px">
+  <h3 class="tab-sub" style="margin-top:0;">Demo / sample data</h3>
+  <?php if (demo_seeded()): ?>
+    <p class="sub" style="margin:0 0 6px"><span class="pill p-ok">Loaded</span> The sample dataset is already in the system.</p>
+    <p class="muted" style="margin:0">Demo logins: <code>director</code>, <code>bmanager</code>, <code>account</code>, <code>coord.amd</code>, <code>insp.ravi</code> … — all with password <code>demo12345</code>.</p>
+  <?php else: ?>
+    <p class="sub" style="margin-bottom:10px">One-click load of a complete example — <strong>offices, users of every role, inspectors, clients, BOSS numbers, calls, jobs, vouchers, invoicing &amp; credit</strong> — so every screen shows live figures. Safe to explore; you can delete records later. It runs only once.</p>
+    <form method="post" action="/seed-demo" onsubmit="return confirm('Load the demo/sample dataset now? This adds example records across the whole app.')">
+      <button class="btn" type="submit">Load demo data</button>
+    </form>
+    <p class="muted" style="margin-top:8px">Creates demo logins (director, sbuhead, bmanager, appmanager, opmanager, asstmgr, coord.amd, coord.pun, account, insp.ravi, insp.anil) — all password <code>demo12345</code>. Use a fresh/test install, not a database that already holds real data.</p>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <style>
   .theme-swatches{display:flex;flex-wrap:wrap;gap:10px}
   .theme-sw{cursor:pointer;border:2px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:5px;align-items:center;min-width:90px}
