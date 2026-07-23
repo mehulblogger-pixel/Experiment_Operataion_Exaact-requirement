@@ -198,3 +198,130 @@ table.grid tr:hover td{background:color-mix(in srgb,var(--brand) 5%,transparent)
 /* keep wide tables from pushing the page sideways on small screens */
 @media (max-width:640px){table.grid{display:block;overflow-x:auto;white-space:nowrap}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ============================================================
+   Sidebar shell + role dashboard (2026 rebuild).
+   Desk roles get a grouped left rail and a slim top bar.
+   Theme-builder variables still drive every colour; only new
+   semantic status vars are added (nothing renamed).
+   ============================================================ */
+:root{
+  --ok:#15803d;--ok-bg:#ecfdf5;--warn:#b45309;--warn-bg:#fffbeb;
+  --bad:#b91c1c;--bad-bg:#fef2f2;--info:#0369a1;--info-bg:#eff6ff;
+  --side-w:238px;
+}
+body.app{background:var(--bg)}
+.shell{display:flex;min-height:100vh;align-items:stretch}
+
+/* ---- Left rail ---- */
+.side{width:var(--side-w);flex:0 0 var(--side-w);background:var(--card);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;z-index:60}
+.side-brand{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.sb-logo{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:800;font-size:16px;text-decoration:none;min-width:0}
+.sb-logo:hover{text-decoration:none}
+.sb-logo b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-mono{width:32px;height:32px;flex:0 0 32px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--accent));
+  color:#fff;display:grid;place-items:center;font-weight:800;font-size:15px}
+.side-close{display:none;background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;line-height:1}
+.side-nav{flex:1;overflow-y:auto;padding:8px 10px 16px}
+.s-grp{font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);padding:14px 12px 5px;font-weight:700}
+.s-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;color:var(--ink);
+  font-weight:500;text-decoration:none;margin:1px 0;font-size:14px}
+.s-item:hover{background:var(--soft);text-decoration:none}
+.s-item.on{background:color-mix(in srgb,var(--brand) 12%,transparent);color:var(--brand);font-weight:700}
+.s-ic{width:20px;text-align:center;font-size:15px;flex:0 0 20px}
+.side-foot{border-top:1px solid var(--line);padding:12px 14px;display:flex;gap:10px;align-items:center}
+.sf-av{width:34px;height:34px;flex:0 0 34px;border-radius:50%;background:var(--brand);color:#fff;
+  display:grid;place-items:center;font-weight:700;font-size:12.5px}
+.sf-id{min-width:0}.sf-id b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sf-id small{color:var(--muted);font-size:11.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---- Main column + slim top bar ---- */
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar-slim{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:12px;
+  background:color-mix(in srgb,var(--card) 92%,transparent);backdrop-filter:saturate(140%) blur(6px);
+  border-bottom:1px solid var(--line);padding:10px 20px}
+.topbar-slim .nav-toggle{display:none;background:var(--soft);border:1px solid var(--line);color:var(--ink);
+  width:38px;height:36px;border-radius:9px;font-size:17px;cursor:pointer;line-height:1;margin:0}
+.tb-brand{display:none;font-weight:800;font-size:16px;color:var(--ink)}
+.tb-brand:hover{text-decoration:none}
+.tb-spacer{flex:1}
+.tb-chip{background:var(--soft);border:1px solid var(--line);border-radius:20px;padding:5px 11px;font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap}
+.tb-user{display:flex;align-items:center;gap:12px}
+.tb-user a{font-size:13px;font-weight:600}
+.tb-logout{color:var(--muted)}
+.app .container{max-width:1200px;margin:22px auto;padding:0 24px;width:100%}
+.scrim{display:none;position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:55}
+.scrim.on{display:block}
+
+/* ---- KPI stat cards ---- */
+.kpi-row{display:grid;gap:16px;grid-template-columns:repeat(4,1fr);margin-bottom:16px}
+.kpi{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px 18px;box-shadow:var(--shadow-sm)}
+.kpi .k{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.kpi .v{font-size:26px;font-weight:800;letter-spacing:-.5px;line-height:1.1;margin:6px 0 3px;font-variant-numeric:tabular-nums}
+.kpi .v a{color:var(--ink)}
+.kpi .d{font-size:12.5px;font-weight:600;color:var(--muted)}
+.kpi .kic{position:absolute;right:16px;top:14px;font-size:17px;opacity:.55}
+.up{color:var(--ok)}.down{color:var(--bad)}
+
+/* ---- Action / queue cards (money desk, coordinator queue) ---- */
+.qcards{display:grid;gap:14px;grid-template-columns:repeat(4,1fr);margin-bottom:16px}
+.qcard{display:block;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px;box-shadow:var(--shadow-sm);text-decoration:none;color:var(--ink);
+  transition:transform .12s,box-shadow .16s}
+.qcard:hover{transform:translateY(-2px);box-shadow:var(--shadow);text-decoration:none}
+.qcard .qic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;font-size:18px;margin-bottom:10px}
+.qcard .qn{font-size:24px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.qcard .ql{color:var(--muted);font-size:13px;margin-top:3px;font-weight:600}
+.tone-ok .qic{background:var(--ok-bg);color:var(--ok)}
+.tone-warn .qic{background:var(--warn-bg);color:var(--warn)}
+.tone-bad .qic{background:var(--bad-bg);color:var(--bad)}
+.tone-info .qic{background:var(--info-bg);color:var(--info)}
+
+/* ---- Status pills ---- */
+.pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.pill.p-ok{background:var(--ok-bg);color:var(--ok)}
+.pill.p-warn{background:var(--warn-bg);color:var(--warn)}
+.pill.p-bad{background:var(--bad-bg);color:var(--bad)}
+.pill.p-info{background:var(--info-bg);color:var(--info)}
+.pill.p-mut{background:var(--soft);color:var(--muted)}
+
+/* ---- Two-column dashboard row + horizontal bars ---- */
+.dash-2col{display:grid;gap:16px;grid-template-columns:2fr 1fr;margin-bottom:16px}
+.ctitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.ctitle h3{margin:0;font-size:15px}
+.ctitle a{font-size:12.5px;font-weight:600}
+.hbars{display:flex;flex-direction:column;gap:11px}
+.hbar{display:grid;grid-template-columns:120px 1fr 58px;align-items:center;gap:10px;font-size:13px}
+.hbar .track{background:var(--soft);border-radius:6px;height:12px;overflow:hidden}
+.hbar .fill{height:100%;border-radius:6px;background:var(--brand)}
+.hbar .val{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.dl{display:flex;align-items:center;gap:16px}
+
+/* ---- Money-desk / dashboard table ---- */
+table.dt{width:100%;border-collapse:collapse;font-size:13.5px}
+table.dt th,table.dt td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+table.dt th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700}
+table.dt tbody tr:hover{background:var(--soft)}
+table.dt td.num,table.dt th.num{text-align:right;font-variant-numeric:tabular-nums}
+
+@media(max-width:1000px){
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+  .qcards{grid-template-columns:repeat(2,1fr)}
+  .dash-2col{grid-template-columns:1fr}
+}
+@media(max-width:820px){
+  .side{position:fixed;left:0;top:0;transform:translateX(-100%);transition:transform .2s ease;box-shadow:0 0 40px rgba(0,0,0,.2)}
+  .side.open{transform:none}
+  .side-close{display:block}
+  .topbar-slim .nav-toggle{display:block}
+  .tb-brand{display:block}
+  .app .container{margin:18px auto;padding:0 16px}
+}
+@media(max-width:560px){
+  .kpi-row{grid-template-columns:1fr}
+  .qcards{grid-template-columns:repeat(2,1fr)}
+  .tb-chip{display:none}
+  table.dt{display:block;overflow-x:auto;white-space:nowrap}
+}

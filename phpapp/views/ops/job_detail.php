@@ -73,7 +73,7 @@
 </div>
 
 <?php if (can('data.credit') || can('finance.reconcile')): ?>
-<div class="panel">
+<div class="panel" id="invoice">
   <h3 class="tab-sub">Invoice &amp; payment / credit</h3>
   <?php $isInter = ($job['credit_direction'] ?? '') === 'GIVEN'; ?>
   <form method="post" action="/job-invoice?id=<?= (int)$job['id'] ?>">
