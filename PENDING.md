@@ -98,7 +98,17 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
       respect the user's scope, and the filtered view should also be exportable
       (ties into the downloadable-reports item below).
 
-### 3. Downloadable reports — research (for ops / finance / efficiency analysis)
+### 3. Downloadable reports — ✅ PHASE 1 DONE (CSV exports)
+- [x] **DONE** — dependency-free CSV export (UTF-8 BOM for Excel). "Download CSV"
+      buttons on **Jobs, Calls (with cost incurred), Invoicing, Profitability**
+      (each respects the current scope + filters), a **Download-reports** section
+      on the Dashboards page (permission-gated), and **voucher download**
+      (`/voucher-csv` → full Statement of Travelling Expenses, plus Print/Save-PDF).
+      *Remaining from the catalogue below (future): TAT report, office/SBU P&L,
+      utilization/productivity, overdue-aging, inter-office credit statement,
+      and PDF statements for invoices/credit notes.*
+
+### 3b. Downloadable reports — remaining catalogue (research, for later)
 Goal: let every function pull the data it needs as a file (Excel/CSV for
 analysis, PDF for official statements). Proposed catalogue to build:
 
