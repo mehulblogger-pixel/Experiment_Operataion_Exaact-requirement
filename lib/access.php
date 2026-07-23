@@ -130,15 +130,34 @@ function ensure_settings_schema() {
 }
 
 // Theme <style> from settings — overrides --brand and keeps top-bar text legible.
+function theme_hex($s) { $s = trim((string)$s); return preg_match('/^#[0-9a-fA-F]{6}$/', $s) ? strtolower($s) : ''; }
+function theme_lum($h) { return 0.299 * hexdec(substr($h, 1, 2)) + 0.587 * hexdec(substr($h, 3, 2)) + 0.114 * hexdec(substr($h, 5, 2)); }
+// Mix hex $a toward $b by fraction $t (0..1). Used to derive soft/line/muted so
+// both light and dark themes stay coherent from just surface + text colours.
+function theme_mix($a, $b, $t) {
+    $o = '#';
+    for ($i = 1; $i < 6; $i += 2) {
+        $ca = hexdec(substr($a, $i, 2)); $cb = hexdec(substr($b, $i, 2));
+        $o .= str_pad(dechex(max(0, min(255, (int)round($ca * (1 - $t) + $cb * $t)))), 2, '0', STR_PAD_LEFT);
+    }
+    return $o;
+}
 function theme_style_tag() {
-    $c = setting_get('brand_color', '');
-    if (!$c || !preg_match('/^#[0-9a-fA-F]{6}$/', $c)) return '';
-    $r = hexdec(substr($c, 1, 2)); $g = hexdec(substr($c, 3, 2)); $b = hexdec(substr($c, 5, 2));
-    $lum = 0.299 * $r + 0.587 * $g + 0.114 * $b;           // perceived brightness
-    $light = $lum > 150;
-    $navtext = $light ? '#111827' : '#ffffff';
-    $navlink = $light ? 'rgba(17,24,39,.72)' : '#dbeafe';
-    return "<style>:root{--brand:$c}.topbar .brand,.topbar .user{color:$navtext}.topbar nav a{color:$navlink}.topbar nav a:hover{color:$navtext}</style>";
+    $primary = theme_hex(setting_get('c_primary', '')) ?: (theme_hex(setting_get('brand_color', '')) ?: '#1e40af');
+    $accent  = theme_hex(setting_get('c_accent', ''))  ?: '#0ea5e9';
+    $bg      = theme_hex(setting_get('c_bg', ''))       ?: '#f4f6f9';
+    $surface = theme_hex(setting_get('c_surface', ''))  ?: '#ffffff';
+    $ink     = theme_hex(setting_get('c_text', ''))     ?: '#1f2937';
+    $fs = (int)(setting_get('font_size', '') ?: 14); if ($fs < 12 || $fs > 20) $fs = 14;
+    $soft  = theme_mix($surface, $ink, 0.05);
+    $line  = theme_mix($surface, $ink, 0.14);
+    $muted = theme_mix($surface, $ink, 0.45);
+    $navtext = theme_lum($primary) > 150 ? '#111827' : '#ffffff';
+    $navlink = theme_lum($primary) > 150 ? 'rgba(17,24,39,.72)' : 'rgba(255,255,255,.82)';
+    return "<style>:root{--brand:$primary;--accent:$accent;--bg:$bg;--card:$surface;--panel:$soft;--ink:$ink;--soft:$soft;--line:$line;--muted:$muted;--fs:{$fs}px}"
+        . "body{font-size:var(--fs)}.stat-card,.master-card{background:var(--soft)}"
+        . ".topbar .brand,.topbar .user{color:$navtext}.topbar nav a{color:$navlink}.topbar nav a:hover{color:$navtext}"
+        . "</style>";
 }
 function logo_html() {
     $d = setting_get('logo_data', '');
