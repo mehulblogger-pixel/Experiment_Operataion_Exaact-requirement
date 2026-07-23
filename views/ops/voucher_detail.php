@@ -45,6 +45,12 @@
   $ncol = 8 + count($heads) + ($canEdit ? 2 : 1); // Date,Site,File,Line,Hrs,Mode,KM,Travel + heads + Row(+✕)
 ?>
 <?php if ($canEdit): ?><form method="post" action="/voucher-save?id=<?= (int)$v['id'] ?>" id="vform"><?php endif; ?>
+<style>
+  #vgrid th{position:sticky;top:52px;background:var(--soft);z-index:3}
+  #vgrid td,#vgrid th{padding:6px 8px;white-space:nowrap}
+  #vgrid .form-control{padding:6px 8px;font-size:13px;background:var(--card)}
+  #vgrid .v-travel,#vgrid .v-rowtotal{font-variant-numeric:tabular-nums;text-align:right}
+</style>
 <div class="tbl-scroll" style="overflow-x:auto">
 <table class="grid" id="vgrid">
   <tr>
