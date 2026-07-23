@@ -42,9 +42,16 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
       remembers km per inspector+vendor. Verified: Bike ₹6 → 38/40/38 km, Food/
       Hotel bills, grand total ₹1,839, memory stored, Bus/Train hidden (not
       entitled). Boot probe added. *(One supporting file per voucher lands in P5.)*
-- [ ] **P5 · Output & workflow** — summary "particulars" page (Railway/Bus/Hotel/
-      Meals/Telephone/Outstation/Local/Others + Grand Total + Less Advance/Office +
-      Balance); printable Statement; 3-level approval (Checked→Approved→Authorized).
+- [x] **P5 · Output & workflow** — DONE. On the voucher: a **Summary — particulars**
+      panel (Travel + each head → Grand Total, Less Advance, Less Office-incurred,
+      **Balance to be paid/recovered**); a **single supporting file** per voucher
+      (one upload backs all bills; streamed via `/voucher-file`); a **printable
+      "Statement of Travelling Expenses"** (`/voucher-print`, standalone, browser
+      print) matching the real format with the 3 signature blocks; and the
+      **status workflow** DRAFT → SUBMITTED → APPROVED → PAID with **Checked /
+      Approved / Authorized** captured, edit-locked once out of DRAFT, and Reopen.
+      Verified: total ₹1,611, balance ₹1,011, file round-trip, print page, all
+      transitions. `supporting_mime` migration + boot-safe.
 - [ ] **P6 · Attendance reconciliation** — upload HR payroll export, parse **in
       memory only** (do NOT store the company doc), match by Employee Code, flag
       day-type mismatches (claimed visit vs HR leave); save only the result.
