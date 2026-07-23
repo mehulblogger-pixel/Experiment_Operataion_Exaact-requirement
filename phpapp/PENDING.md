@@ -40,6 +40,13 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
       the inspection list and see the cost incurred** (including **all expenses**)
       for each inspection, shown to each office **according to its scope**
       (contracting sees its calls; executing sees the calls it executed).
+- [ ] **Invoicing filters** — the Invoicing / money desk (`/invoicing`) needs a
+      **filter bar** like the Dashboards: **Financial Year, Month**, plus office,
+      SBU, client and status bucket (pending / awaiting / overdue / credit). The
+      counts and worklist recompute for the chosen period so an accountant can
+      pull, e.g., "unpaid invoices for FY 2026-27, July, Ahmedabad." Filters
+      respect the user's scope, and the filtered view should also be exportable
+      (ties into the downloadable-reports item below).
 
 ### 3. Downloadable reports — research (for ops / finance / efficiency analysis)
 Goal: let every function pull the data it needs as a file (Excel/CSV for
