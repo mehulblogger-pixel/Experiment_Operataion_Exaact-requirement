@@ -55,12 +55,17 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
 - [ ] **P6 · Attendance reconciliation** — upload HR payroll export, parse **in
       memory only** (do NOT store the company doc), match by Employee Code, flag
       day-type mismatches (claimed visit vs HR leave); save only the result.
-- [ ] **P7 · Profitability by BOSS/Contract** — roll voucher lines → job → BOSS;
-      Revenue − labour − expenses − subcon = margin %; **+ icon drill-down** per
-      expense/invoice line (date, inspector, vendor, hours, cost). Clickable
-      File/Line + profitability visible ONLY to Super Admin / Branch Manager /
-      manager-under-branch-manager (new `data.profitability` perm) — not
-      inspector/coordinator.
+- [x] **P7 · Profitability by BOSS/Contract** — DONE. New **Profitability** tab
+      (gated by new `data.profitability` perm — granted to Master Admin, Business
+      Director, SBU Head, Branch Manager, **Operation Manager** [manager under the
+      branch manager] and Finance; **not** Coordinator/Inspector). List of BOSS
+      numbers with Revenue / Expenses / Sub-con / Labour / **Margin ₹ + %**;
+      detail page with stat row + **expense drill-down** (each line shows which
+      inspector visited which vendor, hours, travel + bills + line total, with a
+      **+ toggle** for the per-head breakdown) + invoice/job lines. Expenses roll
+      voucher `row_total` (by boss_id) + job-closure expenses. Labour counted only
+      when salary is visible (else "Contribution"). Verified: revenue 50k, expenses
+      668, margin/%, drill-down. Super Admin can grant/revoke the perm per user.
 - [ ] **P8 · Contract/BOSS carry-forward** — renew/supersede a BOSS/contract
       (Open/ARC) → new number, carry PO/open jobs/lines forward, show old number.
 
