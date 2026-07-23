@@ -27,11 +27,11 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
       single coordinator + manager email (used for forwarding/notifications), and
       there are 4 access roles. This is a role/permission + org redesign for a
       dedicated pass.
-- [ ] **Multi-SBU cost distribution in dashboards** — inspectors can now be
-      tagged to multiple SBUs; split their monthly loaded cost across those SBUs
-      in the profitability/utilization reports (currently cost sits on the job's
-      single SBU). The data (inspectors.sbus) is captured; the report split is
-      pending.
+- [x] **Multi-SBU cost distribution in dashboards** — DONE. The Financial
+      dashboard's "By SBU" panel now shows Credit vs **distributed loaded cost**
+      vs Net per SBU. Each active engineer's monthly loaded cost (CTC/12 + 8%
+      overhead) is split equally across the SBUs they're tagged to, respecting
+      SBU scope + the SBU/inspector filter. Salary-gated (`data.salary`).
 
 
 - [ ] **Reminder cron jobs** — set up the two cPanel Cron entries (07:00 report-due,

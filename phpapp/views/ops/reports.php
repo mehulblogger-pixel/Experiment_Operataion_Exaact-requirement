@@ -47,9 +47,15 @@
   <?php endif; ?>
 </div>
 <div class="panel-split">
-  <div class="panel"><h3 class="tab-sub">Credit by SBU</h3><table class="grid"><tr><th>SBU</th><th>Credit</th></tr>
-    <?php foreach ($fin['bySbu'] as $k=>$v): ?><tr><td><?= e(lk_options_or('sbu',OPS_SBUS)[$k]??$k) ?></td><td><?= fmoney($v) ?></td></tr><?php endforeach; ?>
-    <?php if(!$fin['bySbu']):?><tr><td colspan="2">No data.</td></tr><?php endif;?></table></div>
+  <div class="panel"><h3 class="tab-sub">By SBU<?= $seeSalary?' — credit vs distributed cost':'' ?></h3>
+    <?php $sbuKeys = array_unique(array_merge(array_keys($fin['bySbu']), array_keys($fin['costBySbu'] ?? []))); ?>
+    <table class="grid"><tr><th>SBU</th><th>Credit</th><?php if ($seeSalary): ?><th>Loaded cost</th><th>Net</th><?php endif; ?></tr>
+    <?php foreach ($sbuKeys as $k): $cr=$fin['bySbu'][$k]??0; $co=$fin['costBySbu'][$k]??0; ?>
+      <tr><td><?= e(lk_options_or('sbu',OPS_SBUS)[$k]??$k) ?></td><td><?= fmoney($cr) ?></td>
+      <?php if ($seeSalary): ?><td><?= fmoney($co) ?></td><td><strong style="color:<?= ($cr-$co)>=0?'#1f8a4c':'#c0392b' ?>"><?= fmoney($cr-$co) ?></strong></td><?php endif; ?></tr>
+    <?php endforeach; ?>
+    <?php if(!$sbuKeys):?><tr><td colspan="<?= $seeSalary?4:2 ?>">No data.</td></tr><?php endif;?></table>
+    <?php if ($seeSalary): ?><p class="muted" style="margin-top:6px;">Loaded cost is each active engineer's monthly cost (CTC/12 + <?= OVERHEAD_PCT ?>% overhead) split equally across the SBUs they're tagged to.</p><?php endif; ?></div>
   <div class="panel"><h3 class="tab-sub">Expenses by heading</h3><table class="grid"><tr><th>Heading</th><th>Amount</th></tr>
     <?php foreach (['travel'=>'Travel','local'=>'Local conveyance','food'=>'Food','lodging'=>'Lodging','misc'=>'Misc'] as $k=>$v): ?><tr><td><?= $v ?></td><td><?= fmoney($fin['expHead'][$k]) ?></td></tr><?php endforeach; ?></table>
     <p class="muted" style="margin-top:6px;">Headings are configurable under <a href="/lookup?key=expense_heading">Expense headings</a>.</p></div>
