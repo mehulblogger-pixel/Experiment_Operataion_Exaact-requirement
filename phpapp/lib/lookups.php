@@ -328,7 +328,8 @@ function lk_admin($route, $method) {
     }
 
     if ($route === 'custom-fields') {
-        $entity = in_array($_GET['entity'] ?? 'call', ['call', 'job'], true) ? $_GET['entity'] : 'call';
+        $allowedEntities = array_merge(['call', 'job', 'partner'], array_keys(ops_masters()));
+        $entity = in_array($_GET['entity'] ?? 'call', $allowedEntities, true) ? $_GET['entity'] : 'call';
         if ($method === 'POST') {
             $label = trim($_POST['label'] ?? '');
             $type = in_array($_POST['field_type'] ?? '', ['text', 'number', 'date', 'select', 'dependent'], true) ? $_POST['field_type'] : 'text';
@@ -347,7 +348,7 @@ function lk_admin($route, $method) {
             flash('Field removed.');
             redirect('/custom-fields?entity=' . $entity);
         }
-        view('ops/custom_fields', ['entity' => $entity, 'fields' => custom_fields_for($entity, false), 'types' => lk_types()]);
+        view('ops/custom_fields', ['entity' => $entity, 'fields' => custom_fields_for($entity, false), 'types' => lk_types(), 'entities' => $allowedEntities]);
         return;
     }
 }

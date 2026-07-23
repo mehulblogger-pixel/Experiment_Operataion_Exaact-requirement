@@ -28,6 +28,7 @@
         <?php endif; ?>
       </div>
     <?php endforeach; ?>
+    <?php if (function_exists('custom_fields_for') && custom_fields_for($key)) render_custom_fields($key, $row ? custom_values_map($key, $row['id']) : []); ?>
   </div>
   <div style="margin-top:16px;">
     <button class="btn" type="submit">Save</button>

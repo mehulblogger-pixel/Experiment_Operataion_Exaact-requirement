@@ -28,5 +28,6 @@
   <a class="master-card" href="/lookups"><strong>⚙️ All master lists</strong><span class="muted">Add a new list, or a dependent list (e.g. SBU → Activity)</span></a>
   <a class="master-card" href="/custom-fields?entity=call"><strong>➕ Custom fields — Calls</strong><span class="muted">Add your own fields to the Call form</span></a>
   <a class="master-card" href="/custom-fields?entity=job"><strong>➕ Custom fields — Jobs</strong><span class="muted">Add your own fields to the Job form</span></a>
+  <a class="master-card" href="/custom-fields?entity=partner"><strong>➕ Custom fields — anywhere</strong><span class="muted">Add fields to Client/Vendor or any master form</span></a>
 </div>
 <?php endif; ?>

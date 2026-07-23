@@ -740,6 +740,7 @@ function ops_master_handle($key, $cfg, $action, $method) {
             $set = implode(',', array_map(fn($c) => "$c=?", $cols));
             $vals[] = $id;
             $pdo->prepare("UPDATE $table SET $set WHERE id=?")->execute($vals);
+            custom_save($key, $id, $_POST);
             flash("{$cfg['label']}: saved.");
         } else {
             $ph = implode(',', array_fill(0, count($cols), '?'));
@@ -747,6 +748,7 @@ function ops_master_handle($key, $cfg, $action, $method) {
                 $cols[] = 'created_at'; $vals[] = date('c'); $ph .= ',?';
             }
             $pdo->prepare("INSERT INTO $table (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
+            custom_save($key, $pdo->lastInsertId(), $_POST);
             flash("{$cfg['label']}: added.");
         }
         redirect("/m/$key");
