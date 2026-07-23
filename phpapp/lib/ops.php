@@ -41,7 +41,9 @@ const CAND_STAGES = [
     'WITHDRAWN'  => 'Withdrawn',
 ];
 // Where a candidate is sourced from (mirrors inspector engineer-type).
-const CAND_SOURCES = ['ASSET'=>'SGS asset (employee)','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor'];
+const CAND_SOURCES = ['ASSET'=>'SGS asset (employee)','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor','HR_AGENCY'=>'HR / Manpower agency'];
+// Sources that draw their Agency from the sub-contractor / agency master.
+const CAND_AGENCY_SOURCES = ['SUBCON','HR_AGENCY'];
 
 // ---- Expense / voucher module (P1: masters & codes) ------------------------
 // How an expense head behaves. PER_KM = km × rate (rate from the travel mode /
@@ -950,6 +952,13 @@ function ops_quick_add() {
             echo json_encode(['ok' => true, 'id' => $pdo->lastInsertId(), 'label' => $name]);
             return;
         }
+        if ($kind === 'agency') {
+            // agency for candidates (sub-con / HR). Stored on subcons so it's reusable.
+            $exists = ops_val("SELECT agency FROM subcons WHERE agency=? LIMIT 1", [$name]);
+            if (!$exists) $pdo->prepare("INSERT INTO subcons (agency,active,created_at) VALUES (?,1,?)")->execute([$name, date('c')]);
+            echo json_encode(['ok' => true, 'id' => $name, 'label' => $name]);
+            return;
+        }
         if ($kind === 'product') {
             $t = lk_type('product');
             if (!$t) { echo json_encode(['ok' => false, 'error' => 'No product list']); return; }
@@ -1407,7 +1416,8 @@ function ops_candidates($route, $method) {
         }
         // client's deputation calls (to link the candidate to a specific requirement)
         $depCalls = ops_all("SELECT id, call_code, inspection_type FROM calls ORDER BY id DESC");
-        view('ops/candidate_form', ['cand' => $cand, 'clients' => clients_list(), 'depCalls' => $depCalls,
+        $agencies = array_values(array_filter(array_column(ops_all("SELECT DISTINCT agency FROM subcons WHERE agency<>'' ORDER BY agency"), 'agency')));
+        view('ops/candidate_form', ['cand' => $cand, 'clients' => clients_list(), 'depCalls' => $depCalls, 'agencies' => $agencies,
             'trades' => lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [], 'skillsByTrade' => skills_by_trade()]);
         return;
     }
