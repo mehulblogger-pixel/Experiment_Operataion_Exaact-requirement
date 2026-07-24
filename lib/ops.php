@@ -1164,7 +1164,7 @@ function ops_module_gate($route) {
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring',
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring',
         'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries',
-        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-approve'=>'quotes','quote-approval-rules'=>'quotes',
+        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-approve'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes',
         'attendance-recon'=>'reconcile',
         'masters'=>'masters',
         'office-finance'=>'overheads',
@@ -1223,7 +1223,7 @@ function ops_dispatch($route, $method) {
             ops_candidates($route, $method); return true;
         case $route === 'inquiries' || $route === 'inquiry-new' || $route === 'inquiry-edit':
             ops_crm_inquiries($route, $method); return true;
-        case $route === 'quotes' || $route === 'quote' || $route === 'quote-new' || $route === 'quote-edit' || $route === 'quote-revise' || $route === 'quote-status' || $route === 'quote-doc' || $route === 'quote-approve':
+        case $route === 'quotes' || $route === 'quote' || $route === 'quote-new' || $route === 'quote-edit' || $route === 'quote-revise' || $route === 'quote-status' || $route === 'quote-doc' || $route === 'quote-approve' || $route === 'quote-contract' || $route === 'quote-float':
             ops_crm_quotes($route, $method); return true;
         case $route === 'crm-templates' || $route === 'crm-template-new' || $route === 'crm-template-edit' || $route === 'crm-template-delete' || $route === 'crm-template-download':
             ops_crm_templates($route, $method); return true;

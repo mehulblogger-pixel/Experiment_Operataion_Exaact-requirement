@@ -372,7 +372,9 @@ function ops_crm_quotes($route, $method) {
             'approvals' => crm_approvals($q['id']),
             'lostReasons' => lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS),
             'canApprove' => can('crm.quote.approve') || is_master(), 'canSend' => can('crm.quote.send') || is_master(),
-            'canEdit' => can('crm.quote.create') || can('mod.quotes.edit') || is_master()]);
+            'canEdit' => can('crm.quote.create') || can('mod.quotes.edit') || is_master(),
+            'canContract' => can('crm.contract.register') || is_master(),
+            'clientReg' => !empty($q['client_id']) ? ops_one("SELECT code, legal_name FROM business_partners WHERE id=?", [$q['client_id']]) : null]);
         return;
     }
     if ($route === 'quote-status' && $method === 'POST') {
@@ -471,6 +473,87 @@ function ops_crm_quotes($route, $method) {
         }
         redirect('/quote?id=' . $q['id']);
     }
+    // §12/§13 — Accounts registers the client + contract number, which floats the
+    // Operations packet (client, quote/contract no, contacts, service req, TC proposal).
+    if ($route === 'quote-contract' && $method === 'POST') {
+        $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
+        ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office can register the contract.');
+        $cid = crm_register_client_for_quote($q);
+        $contractNo = trim($_POST['contract_number'] ?? '');
+        $start = $_POST['start_date'] ?? ''; $end = $_POST['end_date'] ?? '';
+        $contractId = $q['contract_id'] ?: null;
+        if ($contractNo !== '' && $cid) {
+            $ex = ops_one("SELECT id FROM partner_contracts WHERE partner_id=? AND contract_number=?", [$cid, $contractNo]);
+            if ($ex) $contractId = (int)$ex['id'];
+            else {
+                $pdo->prepare("INSERT INTO partner_contracts (partner_id,contract_number,title,value,start_date,end_date,notes) VALUES (?,?,?,?,?,?,?)")
+                    ->execute([$cid, $contractNo, $q['subject'], (float)$q['total_amount'], $start, $end, 'From quotation ' . $q['quote_no']]);
+                $contractId = (int)$pdo->lastInsertId();
+            }
+        }
+        $pdo->prepare("UPDATE quotations SET client_id=?, contract_number=?, contract_id=? WHERE id=?")->execute([$cid, $contractNo, $contractId, $q['id']]);
+        $ok = crm_float_ops_packet(crm_quote_get($q['id']));
+        flash($ok ? 'Client & contract registered — the operations packet has been e-mailed to the team.' : 'Client & contract registered. The ops packet was logged (configure SMTP in Settings to e-mail it).', $ok ? 'success' : 'warning');
+        redirect('/quote?id=' . $q['id']);
+    }
+    if ($route === 'quote-float' && $method === 'POST') {
+        $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
+        ops_require(can('crm.contract.register') || can('crm.quote.send') || is_master(), 'You cannot float this to operations.');
+        $ok = crm_float_ops_packet($q);
+        flash($ok ? 'Operations packet re-sent.' : 'Operations packet logged (configure SMTP to e-mail it).', $ok ? 'success' : 'warning');
+        redirect('/quote?id=' . $q['id']);
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  Acceptance → client/contract registration → Operations hand-off (§12,§13)
+// ---------------------------------------------------------------------------
+// Ensure the quote's customer is a registered client; create one if only a name
+// was typed. Returns the business_partner id (or null if there is nothing to use).
+function crm_register_client_for_quote($q) {
+    if (!empty($q['client_id'])) return (int)$q['client_id'];
+    $name = trim($q['client_name'] ?? ''); if ($name === '') return null;
+    $ex = ops_val("SELECT id FROM business_partners WHERE is_client=1 AND (legal_name=? OR display_name=?) LIMIT 1", [$name, $name]);
+    if ($ex) return (int)$ex;
+    $token = function_exists('short_token') ? short_token($name) : strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $name), 0, 4));
+    $last = ops_val("SELECT code FROM business_partners WHERE code LIKE ? ORDER BY code DESC LIMIT 1", ["GEN-$token-%"]);
+    $seq = $last ? ((int)substr($last, strrpos($last, '-') + 1)) + 1 : 1;
+    $code = sprintf("GEN-%s-%04d", $token, $seq);
+    db()->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,status,created_at) VALUES (?,?,?,1,0,'ACTIVE',?)")
+        ->execute([$code, $name, $name, date('c')]);
+    return (int)db()->lastInsertId();
+}
+// Build + send the Operations packet: client, quote/contract no, contacts, service
+// requirement, order lines (open vs line-item), advance/payment flags, TC proposal.
+function crm_float_ops_packet($q) {
+    $lines = crm_quote_lines($q['id']);
+    $svc = $q['subject'] ?: '';
+    if (!empty($q['inquiry_id'])) { $ir = ops_one("SELECT service_requirement FROM crm_inquiries WHERE id=?", [$q['inquiry_id']]); if ($ir && trim($ir['service_requirement'] ?? '') !== '') $svc = $ir['service_requirement']; }
+    $b = "New confirmed order — please action.\n\n"
+        . "Client: " . $q['client_name'] . "\n"
+        . "Quotation: " . quote_label($q) . "\n"
+        . "Contract: " . ($q['contract_number'] ?: '(pending)') . "\n"
+        . "Contact: " . trim($q['contact_name'] . ' · ' . $q['contact_email'] . ' · ' . $q['contact_mobile'], ' ·') . "\n"
+        . "SBU: " . (lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu']) . "\n"
+        . "Location: " . ($q['site_location'] ?: '—') . " (" . (QUOTE_LOCATION_TYPES[$q['location_type']] ?? $q['location_type']) . ")\n"
+        . "Value: ₹" . number_format((float)$q['total_amount'], 0) . "\n"
+        . ($q['advance_required'] ? "** ADVANCE REQUIRED before scheduling (" . rtrim(rtrim(number_format((float)$q['advance_pct'], 2), '0'), '.') . "%) **\n" : "")
+        . ($q['report_vs_payment'] ? "** Deliverable/report only against payment **\n" : "")
+        . "\nService requirement:\n" . $svc . "\n\nOrder lines:\n";
+    foreach ($lines as $i => $l) {
+        $b .= ($i + 1) . ". [" . (ORDER_TYPES[$l['order_type']] ?? $l['order_type']) . "] " . $l['description']
+            . " — " . rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.') . " " . (QUOTE_UNITS[$l['unit']] ?? $l['unit'])
+            . " × ₹" . number_format((float)$l['rate'], 0) . " = ₹" . number_format((float)$l['amount'], 0) . "\n";
+    }
+    $att = [];
+    $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' AND active=1 ORDER BY is_default DESC, id DESC");
+    if ($tpl && ($tpl['file_data'] ?? '') !== '') {
+        [$bin, $err] = docx_fill(base64_decode($tpl['file_data']), quote_doc_map($q, $tpl), $lines);
+        if (!$err && $bin) $att[] = ['name' => 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no']) . '.docx', 'data' => $bin, 'type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    }
+    $to = implode(',', array_filter([coordinator_emails(), manager_emails()]));
+    $subject = "Order confirmed: " . $q['client_name'] . " — " . quote_label($q) . ($q['contract_number'] ? " (" . $q['contract_number'] . ")" : "");
+    return ops_mail($to, $subject, $b, '', 'ops_packet', $att);
 }
 
 // ---------------------------------------------------------------------------
