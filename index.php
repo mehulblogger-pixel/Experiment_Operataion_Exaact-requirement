@@ -69,6 +69,8 @@ try {
     db()->query("SELECT billable_value FROM calls LIMIT 1");
     db()->query("SELECT id FROM agencies LIMIT 1");
     db()->query("SELECT agency_id FROM inspectors LIMIT 1");
+    db()->query("SELECT id FROM requisitions LIMIT 1");
+    db()->query("SELECT fee_status FROM inspectors LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();
