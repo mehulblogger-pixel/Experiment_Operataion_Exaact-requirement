@@ -155,7 +155,25 @@ afterwards (current landing dashboard "is not what we're expecting").**
   defect — every CLI run and the create/status/lost paths are fine). **Production is
   MySQL, which uses real prepared statements and is unaffected.** Verify "Revise" once
   on the live site; if a revision ever copies blank there, tell me.
-- **Next (P2):** the .docx template engine (upload format, field map, auto-fill).
+### ✅ P2 shipped (2026-07) — .docx quote template engine
+- **Quote templates admin** (CRM → Quotations → Templates, gated by
+  `crm.template.manage`): upload the Word quotation **format** (.docx), set it default,
+  activate/deactivate, re-upload a revised format anytime, download the original.
+- **Controlled-document identity carried from the uploaded format** (owner's ask):
+  each template stores a **Document number, Format number, Revision and Issue date**;
+  these stamp onto every generated quote via `{{doc_number}}` / `{{format_number}}` /
+  `{{doc_rev}}` / `{{doc_date}}`. Upload a revised format with a new number → new quotes
+  show the new number automatically.
+- **Token engine** (no external library — `ZipArchive` + string replace): fills header
+  tokens (quote no, client, contacts, SBU, commercials, totals, **amount in words**),
+  **repeats a table row per line item** (`{{l_desc}}` etc.), and **repairs tokens Word
+  splits across runs** (verified: `{{cli|ent_name}}` rejoined correctly). Tokens are
+  documented on the template form.
+- **"⬇ Generate Word quote"** button on the quote detail → downloads the filled .docx.
+- Verified end-to-end over HTTP (upload → create quote → generate): doc/format numbers
+  stamped, line rows repeated, totals + words correct, no unreplaced tokens.
+- **Next (P3):** approval-chain config (amount band and/or SBU) → send-to-customer email
+  → follow-up template emails. (Follow-up rows already schedule on "Sent".)
 
 ### 🤖 PARKED — AI keys in master settings (owner request, 2026-07)
 Administrator can, under master settings, enter **API keys for multiple AI

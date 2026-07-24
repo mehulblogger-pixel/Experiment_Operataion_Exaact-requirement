@@ -11,6 +11,7 @@
   <div><h1><?= e(quote_label($q)) ?> <span class="pill <?= $stPill[$st] ?? 'p-mut' ?>" style="font-size:13px;vertical-align:middle"><?= e(QUOTE_STATUS[$st] ?? $st) ?></span></h1>
     <p class="sub" style="margin:2px 0 0"><?= e($q['subject'] ?: '—') ?></p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <a class="btn" href="/quote-doc?id=<?= (int)$q['id'] ?>">⬇ Generate Word quote</a>
     <?php if ($canEdit && in_array($st, ['DRAFT','PENDING_APPROVAL'], true)): ?><a class="btn secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>">Edit</a><?php endif; ?>
     <a class="btn secondary" href="/quotes">← Back</a>
   </div>
