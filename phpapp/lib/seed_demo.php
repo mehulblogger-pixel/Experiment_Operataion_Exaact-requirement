@@ -101,8 +101,8 @@ function seed_demo() {
         $c['users'] = $made;
 
         // ---------- Clients & vendors ----------
-        $insP = $pdo->prepare("INSERT INTO business_partners(code,legal_name,display_name,is_client,is_vendor,status,state,created_at)
-            VALUES(?,?,?,?,?, 'ACTIVE', ?, ?)");
+        $insP = $pdo->prepare("INSERT INTO business_partners(code,legal_name,display_name,is_client,is_vendor,status,state)
+            VALUES(?,?,?,?,?, 'ACTIVE', ?)");
         $clients = [
             ['CL-RIL','Reliance Industries Ltd','Reliance',1,0,'Gujarat'],
             ['CL-ADN','Adani Ports & SEZ Ltd','Adani Ports',1,0,'Gujarat'],
