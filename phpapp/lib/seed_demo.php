@@ -85,6 +85,12 @@ function seed_demo() {
         $pdo->prepare("UPDATE inspectors SET agency_id=?, placement_fee=50000, fee_status='PROVISIONAL', guarantee_upto=? WHERE id=?")->execute([$agRec, $d(45), $iid['EMP03']]);
         $pdo->prepare("UPDATE inspectors SET agency_id=?, placement_fee=45000, fee_status='CONFIRMED', guarantee_upto=? WHERE id=?")->execute([$agRec, $d(-30), $iid['EMP01']]);
 
+        // ---------- Manpower requisitions (approvals) ----------
+        $insReq = $pdo->prepare("INSERT INTO requisitions(req_code,office_id,sbu,designation,project_site,req_type,outgoing_inspector_id,budgeted_cost,approved_by,approval_ref,approval_date,status,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?, 'demo', ?)");
+        $insReq->execute(['REQ-2607-01',$oid['PUN'],'IND','INSPECTOR','Adani Mundra — new project','NEW',null,75000,'Neha Iyer','HR-APP-2026-014',$d(-20),'OPEN',$now]);
+        $insReq->execute(['REQ-2607-02',$oid['AMD'],'OGC','SR_INSPECTOR','Reliance Jamnagar — replacement','REPLACEMENT',$iid['EMP02'],95000,'Meena Shah','HR-APP-2026-021',$d(-10),'OPEN',$now]);
+        $c['requisitions'] = 2;
+
         // ---------- Users (one per role; inspectors linked) ----------
         $insU = $pdo->prepare("INSERT INTO users(username,password_hash,first_name,last_name,email,role,is_superuser,is_active,home_office_id,inspector_id)
             VALUES(?,?,?,?,?,?,0,1,?,?)");
@@ -309,6 +315,7 @@ function seed_demo_remove() {
         $del("DELETE FROM inspectors WHERE emp_code IN $emps");
         $del("DELETE FROM boss_numbers WHERE boss_number IN ('40231','40198','40155') OR boss_number LIKE '5090%'");
         $del("DELETE FROM agencies WHERE name IN ('TalentFirst Recruitment','SiteForce Manpower')");
+        $del("DELETE FROM requisitions WHERE created_by='demo'");
         $del("DELETE FROM business_partners WHERE code IN ('CL-RIL','CL-ADN','CL-LNT','VN-VAP','VN-MUN') OR code LIKE 'EC-%' OR code LIKE 'EV-%'");
         // Demo login accounts
         $unames = array_map(fn($a) => $a[0], demo_accounts());

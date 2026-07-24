@@ -10,6 +10,14 @@
 </div>
 
 <form method="post" action="/<?= $cand ? 'candidate-edit?id=' . (int)$cand['id'] : 'candidate-new' ?>" class="panel">
+  <div class="ff ff-wide" style="background:var(--soft);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">
+    <label>Against requisition (management approval) *</label>
+    <select class="form-control searchable" name="requisition_id" required>
+      <option value="">— pick an approved requisition —</option>
+      <?php foreach (($requisitions ?? []) as $rq): ?><option value="<?= (int)$rq['id'] ?>" <?= (string)($preReq ?? '')===(string)$rq['id']?'selected':'' ?>><?= e($rq['req_code']) ?> · <?= e(DESIGNATIONS[$rq['designation']] ?? $rq['designation']) ?> · <?= e(REQ_TYPES[$rq['req_type']] ?? '') ?></option><?php endforeach; ?>
+    </select>
+    <small class="muted">Every hire must trace to an approved requisition. Not listed? <a href="/requisition-new">Raise one first</a>.</small>
+  </div>
   <div class="form-grid">
     <div class="ff"><label>First name *</label><input class="form-control" name="first_name" required value="<?= e($cand['first_name'] ?? '') ?>"></div>
     <div class="ff"><label>Middle name</label><input class="form-control" name="middle_name" value="<?= e($cand['middle_name'] ?? '') ?>"></div>

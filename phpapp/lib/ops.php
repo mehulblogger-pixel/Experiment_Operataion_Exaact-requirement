@@ -33,6 +33,9 @@ const ROLL_TYPES = ['SGS'=>'On SGS roll (we pay salary)', 'AGENCY'=>'On agency r
 // provisional while inside the window, confirmed if the person stays past it,
 // waived (₹0, free replacement) if they leave within it.
 const FEE_STATUS = ['PROVISIONAL'=>'Provisional (within guarantee)', 'CONFIRMED'=>'Confirmed (payable)', 'WAIVED'=>'Waived (left within guarantee)'];
+// Manpower requisition (management approval for a position — mandatory before hiring).
+const REQ_TYPES  = ['NEW'=>'New position (new project / expansion)', 'REPLACEMENT'=>'Replacement (engineer who left)'];
+const REQ_STATUS = ['OPEN'=>'Open (approved, sourcing)', 'PROPOSED'=>'Candidate proposed', 'OFFERED'=>'Offer released', 'HIRED'=>'Hired (filled)', 'CLOSED'=>'Closed', 'CANCELLED'=>'Cancelled'];
 const BOSS_STATUS = ['ACTIVE'=>'Active','CLOSED'=>'Closed','HOLD'=>'On hold'];
 const OPS_ROLES = ['MASTER_ADMIN'=>'Master Admin','ADMIN'=>'Admin','COORDINATOR'=>'Coordinator','INSPECTOR'=>'Inspector'];
 const OVERHEAD_PCT = 8; // salary overhead %
@@ -225,6 +228,15 @@ function ops_ensure_schema() {
             amounts TEXT, row_total DECIMAL(12,2) DEFAULT 0,
             leave_code VARCHAR(20) DEFAULT '', office_code VARCHAR(20) DEFAULT '', notes VARCHAR(255) DEFAULT '',
             is_auto INT DEFAULT 0, sort_order INT DEFAULT 0)",
+        // Manpower requisition / position approval — the front of the hiring chain
+        "CREATE TABLE IF NOT EXISTS requisitions (
+            id $pk, req_code VARCHAR(30) DEFAULT '', office_id INT NULL, sbu VARCHAR(20) DEFAULT '',
+            designation VARCHAR(40) DEFAULT '', project_site VARCHAR(200) DEFAULT '',
+            req_type VARCHAR(20) DEFAULT 'NEW', outgoing_inspector_id INT NULL,
+            budgeted_cost DECIMAL(14,2) DEFAULT 0, approved_by VARCHAR(150) DEFAULT '',
+            approval_ref VARCHAR(80) DEFAULT '', approval_date VARCHAR(20) DEFAULT '',
+            status VARCHAR(20) DEFAULT 'OPEN', hired_inspector_id INT NULL,
+            notes VARCHAR(255) DEFAULT '', created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
         // Recruitment / manpower agencies + their contracts (renewal reminders)
         "CREATE TABLE IF NOT EXISTS agencies (
             id $pk, name VARCHAR(150), agency_type VARCHAR(20) DEFAULT 'MANPOWER',
@@ -314,6 +326,7 @@ function ops_migrate() {
     ensure_column('inspectors', 'fee_status', "VARCHAR(20) DEFAULT ''");     // PROVISIONAL | CONFIRMED | WAIVED
     ensure_column('inspectors', 'guarantee_upto', "VARCHAR(20) DEFAULT ''"); // fee is provisional until this date
     ensure_column('agencies', 'guarantee_days', 'INT DEFAULT 90');           // free-replacement window
+    ensure_column('candidates', 'requisition_id', 'INT NULL');               // hire is against an approved requisition
     // job type (inspection vs project deputation) + lifecycle stage
     ensure_column('jobs', 'job_type', "VARCHAR(20) DEFAULT 'INSPECTION'");
     ensure_column('jobs', 'stage', "VARCHAR(20) DEFAULT 'ALLOCATED'");
@@ -1111,6 +1124,7 @@ function ops_module_gate($route) {
         'invoicing'=>'invoicing',
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring',
+        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring',
         'attendance-recon'=>'reconcile',
         'masters'=>'masters',
         'office-finance'=>'overheads',
@@ -1167,6 +1181,8 @@ function ops_dispatch($route, $method) {
             ops_jobs($route, $method); return true;
         case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage':
             ops_candidates($route, $method); return true;
+        case $route === 'requisitions' || $route === 'requisition-new' || $route === 'requisition-edit' || $route === 'requisition':
+            ops_requisitions($route, $method); return true;
         case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry' || $route === 'voucher-save' || $route === 'voucher-header' || $route === 'voucher-status' || $route === 'voucher-print' || $route === 'voucher-file' || $route === 'voucher-csv':
             ops_vouchers($route, $method); return true;
         case $route === 'my-jobs':
@@ -1715,12 +1731,62 @@ function send_forward_email($callId) {
     ops_mail($to, "Call forwarded: {$c['call_code']} — {$client}", $body, $cc, 'forward');
 }
 
+// ---- Manpower requisition / position approval (mandatory before hiring) ----
+function requisitions_list($openOnly = false) {
+    return ops_all("SELECT id, req_code, designation, req_type, status FROM requisitions" . ($openOnly ? " WHERE status IN ('OPEN','PROPOSED','OFFERED')" : "") . " ORDER BY id DESC");
+}
+function ops_requisitions($route, $method) {
+    $pdo = db();
+    if ($route === 'requisitions') {
+        [$scopeW, $args] = scope_clause('r.office_id', 'r.sbu');
+        $q = trim($_GET['q'] ?? ''); $where = $scopeW;
+        if ($q) { $where .= " AND (r.req_code LIKE ? OR r.designation LIKE ? OR r.project_site LIKE ?)"; array_push($args, "%$q%","%$q%","%$q%"); }
+        $rows = ops_all("SELECT r.*, o.name office_name, oi.name outgoing_name, hi.name hired_name
+            FROM requisitions r LEFT JOIN offices o ON o.id=r.office_id
+            LEFT JOIN inspectors oi ON oi.id=r.outgoing_inspector_id
+            LEFT JOIN inspectors hi ON hi.id=r.hired_inspector_id
+            WHERE $where ORDER BY r.id DESC", $args);
+        view('ops/requisition_list', ['rows' => $rows, 'q' => $q]); return;
+    }
+    if ($route === 'requisition-new' || $route === 'requisition-edit') {
+        ops_require(is_coordinator_level(), 'Only coordinators / managers can raise requisitions.');
+        $req = null;
+        if ($route === 'requisition-edit') { $req = ops_one("SELECT * FROM requisitions WHERE id=?", [(int)($_GET['id'] ?? 0)]); if (!$req) { http_response_code(404); view('notfound'); return; } }
+        if ($method === 'POST') {
+            $b = $_POST;
+            $fields = ['office_id','sbu','designation','project_site','req_type','outgoing_inspector_id','budgeted_cost','approved_by','approval_ref','approval_date','status','notes'];
+            $norm = function($f, $v) { if (in_array($f, ['office_id','outgoing_inspector_id'], true)) return $v === '' ? null : (int)$v; if ($f === 'budgeted_cost') return $v === '' ? 0 : (float)$v; return $v; };
+            if ($req) {
+                $set = implode(',', array_map(fn($f)=>"$f=?", $fields)); $vals = array_map(fn($f)=>$norm($f, $b[$f] ?? ''), $fields); $vals[] = $req['id'];
+                $pdo->prepare("UPDATE requisitions SET $set WHERE id=?")->execute($vals);
+                flash("Requisition {$req['req_code']} updated."); redirect('/requisition?id=' . $req['id']);
+            } else {
+                $code = ops_next_code('requisitions', 'req_code', 'REQ');
+                $cols = array_merge(['req_code'], $fields, ['created_by','created_at']);
+                $vals = array_merge([$code], array_map(fn($f)=>$norm($f, $b[$f] ?? ''), $fields), [user_name(current_user()), date('c')]);
+                $ph = implode(',', array_fill(0, count($cols), '?'));
+                $pdo->prepare("INSERT INTO requisitions (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
+                $id = $pdo->lastInsertId(); flash("$code created — now add candidates against it."); redirect('/requisition?id=' . $id);
+            }
+        }
+        view('ops/requisition_form', ['req' => $req, 'offices' => offices_list(), 'inspectors' => inspectors_list(false)]); return;
+    }
+    if ($route === 'requisition') {
+        $req = ops_one("SELECT r.*, o.name office_name FROM requisitions r LEFT JOIN offices o ON o.id=r.office_id WHERE r.id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$req) { http_response_code(404); view('notfound'); return; }
+        $outgoing = $req['outgoing_inspector_id'] ? ops_one("SELECT id,name,salary_ctc,agency_cost FROM inspectors WHERE id=?", [$req['outgoing_inspector_id']]) : null;
+        $hired = $req['hired_inspector_id'] ? ops_one("SELECT id,name,salary_ctc,agency_cost,placement_fee,roll_type FROM inspectors WHERE id=?", [$req['hired_inspector_id']]) : null;
+        $cands = ops_all("SELECT * FROM candidates WHERE requisition_id=? ORDER BY id DESC", [$req['id']]);
+        view('ops/requisition_detail', ['req' => $req, 'outgoing' => $outgoing, 'hired' => $hired, 'cands' => $cands]); return;
+    }
+}
+
 // ---- CV / hiring pipeline (deputation resourcing) --------------------------
 function candidate_name($c) {
     return trim(($c['first_name'] ?? '') . ' ' . ($c['middle_name'] ?? '') . ' ' . ($c['last_name'] ?? '')) ?: '(no name)';
 }
 function nzc_cand($f, $v) {
-    if (in_array($f, ['client_id','call_id','trade_id','skill_id'], true)) return $v === '' ? null : (int)$v;
+    if (in_array($f, ['client_id','call_id','trade_id','skill_id','requisition_id'], true)) return $v === '' ? null : (int)$v;
     if (in_array($f, ['experience_years','expected_rate'], true)) return $v === '' ? 0 : $v;
     return $v;
 }
@@ -1764,6 +1830,11 @@ function ops_candidates($route, $method) {
                         $agId, $roll, $agName, $agCost, $placement, $feeStatus, $guarUpto, date('c')]);
                 $insId = $pdo->lastInsertId();
                 $pdo->prepare("UPDATE candidates SET inspector_id=? WHERE id=?")->execute([$insId, $id]);
+                // Fill the requisition this candidate was raised against.
+                if (!empty($cand['requisition_id'])) {
+                    $pdo->prepare("UPDATE requisitions SET hired_inspector_id=?, status='HIRED' WHERE id=?")->execute([$insId, (int)$cand['requisition_id']]);
+                    $msg .= ' Requisition filled.';
+                }
                 $msg .= ' Added to Inspectors (' . ($roll === 'AGENCY' ? 'on agency roll' : 'on SGS roll') . ') — you can now allocate deputation jobs to them.';
             }
             flash($msg);
@@ -1799,7 +1870,7 @@ function ops_candidates($route, $method) {
             $b = $_POST;
             $fields = ['first_name','middle_name','last_name','client_id','call_id','trade_id','skill_id',
                 'designation','source','agency','proposed_site','sbu','experience_years','email','mobile',
-                'cv_link','expected_rate','rate_type','cv_received_date','remarks'];
+                'cv_link','expected_rate','rate_type','cv_received_date','remarks','requisition_id'];
             if ($cand) {
                 $set = implode(',', array_map(fn($f) => "$f=?", $fields));
                 $vals = array_map(fn($f) => nzc_cand($f, $b[$f] ?? ''), $fields); $vals[] = $cand['id'];
@@ -1823,7 +1894,9 @@ function ops_candidates($route, $method) {
         // client's deputation calls (to link the candidate to a specific requirement)
         $depCalls = ops_all("SELECT id, call_code, inspection_type FROM calls ORDER BY id DESC");
         $agencies = array_values(array_filter(array_column(ops_all("SELECT DISTINCT agency FROM subcons WHERE agency<>'' ORDER BY agency"), 'agency')));
+        $preReq = $cand ? ($cand['requisition_id'] ?? null) : (($_GET['req'] ?? '') !== '' ? (int)$_GET['req'] : null);
         view('ops/candidate_form', ['cand' => $cand, 'clients' => clients_list(), 'depCalls' => $depCalls, 'agencies' => $agencies,
+            'requisitions' => requisitions_list(true), 'preReq' => $preReq,
             'trades' => lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [], 'skillsByTrade' => skills_by_trade()]);
         return;
     }

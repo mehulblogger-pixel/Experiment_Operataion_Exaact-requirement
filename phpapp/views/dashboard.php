@@ -157,6 +157,19 @@
       <div class="kpi"><span class="kic">✅</span><div class="k">Confirmed (payable)</div><div class="v"><?= fmoney_short($pf['conf_amt']) ?></div><div class="d"><?= (int)$pf['conf_n'] ?> past guarantee</div></div>
     </div>
   <?php endif; ?>
+  <?php $openReqs = $deskAdmin ? ops_all("SELECT id, req_code, designation, req_type, project_site, status FROM requisitions WHERE status IN ('OPEN','PROPOSED','OFFERED') ORDER BY id DESC") : [];
+    if ($openReqs): ?>
+    <h3 class="tab-sub" style="margin-top:26px;">📋 Open manpower requisitions <span class="muted">(<?= count($openReqs) ?>)</span></h3>
+    <div class="card-grid">
+      <?php foreach (array_slice($openReqs, 0, 9) as $rq): ?>
+        <a class="master-card" href="/requisition?id=<?= (int)$rq['id'] ?>">
+          <strong><?= e($rq['req_code']) ?> · <?= e(DESIGNATIONS[$rq['designation']] ?? $rq['designation']) ?></strong>
+          <span class="muted"><?= $rq['req_type']==='REPLACEMENT'?'Replacement':'New' ?><?= $rq['project_site'] ? ' · '.e($rq['project_site']) : '' ?></span>
+          <span class="muted"><span class="badge AMBER"><?= e(REQ_STATUS[$rq['status']] ?? $rq['status']) ?></span></span>
+        </a>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
   <?php $agRenew = $deskAdmin ? agencies_renewing(30) : [];
     if ($agRenew): ?>
     <h3 class="tab-sub" style="margin-top:26px;">⏰ Agency contracts renewing soon <span class="muted">(<?= count($agRenew) ?>)</span></h3>
