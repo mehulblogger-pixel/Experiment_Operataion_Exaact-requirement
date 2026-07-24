@@ -1,0 +1,159 @@
+<?php
+// ============================================================================
+//  AI providers & models — the administrator stores API keys per provider and
+//  picks which model(s) to use. Model lists auto-refresh from each provider's
+//  "list models" endpoint (retired models drop off automatically); providers
+//  without such an endpoint fall back to a curated known-model list.
+//  Keys live in the settings table and are masked in the UI.
+// ============================================================================
+
+// Provider registry. `list_url` empty = no live model API (use fallback).
+function ai_providers() {
+    return [
+        'openai' => [
+            'label' => 'OpenAI', 'key_hint' => 'sk-…', 'auth' => 'bearer',
+            'list_url' => 'https://api.openai.com/v1/models', 'parse' => 'data_id',
+            'docs' => 'https://platform.openai.com/api-keys',
+            'fallback' => ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini', 'o3', 'o4-mini', 'gpt-4-turbo'],
+        ],
+        'anthropic' => [
+            'label' => 'Claude (Anthropic)', 'key_hint' => 'sk-ant-…', 'auth' => 'anthropic',
+            'list_url' => 'https://api.anthropic.com/v1/models', 'parse' => 'data_id',
+            'docs' => 'https://console.anthropic.com/settings/keys',
+            'fallback' => ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001', 'claude-fable-5', 'claude-3-5-sonnet-20241022'],
+        ],
+        'gemini' => [
+            'label' => 'Google Gemini', 'key_hint' => 'AIza…', 'auth' => 'query',
+            'list_url' => 'https://generativelanguage.googleapis.com/v1beta/models', 'parse' => 'gemini',
+            'docs' => 'https://aistudio.google.com/app/apikey',
+            'fallback' => ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'],
+        ],
+        'perplexity' => [
+            'label' => 'Perplexity', 'key_hint' => 'pplx-…', 'auth' => 'bearer',
+            'list_url' => '', 'parse' => '',   // no public list endpoint
+            'docs' => 'https://www.perplexity.ai/settings/api',
+            'fallback' => ['sonar', 'sonar-pro', 'sonar-reasoning', 'sonar-reasoning-pro', 'sonar-deep-research'],
+        ],
+        'copilot' => [
+            'label' => 'GitHub Copilot / Models', 'key_hint' => 'GitHub token (models:read)', 'auth' => 'bearer',
+            'list_url' => 'https://models.github.ai/catalog/models', 'parse' => 'copilot',
+            'docs' => 'https://github.com/settings/tokens',
+            'fallback' => ['gpt-4o', 'gpt-4o-mini', 'o3-mini', 'claude-3.5-sonnet', 'llama-3.3-70b-instruct', 'phi-4'],
+        ],
+    ];
+}
+function ai_config() {
+    $raw = setting_get('ai_config', '');
+    $c = $raw ? json_decode($raw, true) : [];
+    return is_array($c) ? $c : [];
+}
+function ai_provider_cfg($p) {
+    $c = ai_config();
+    return ($c[$p] ?? []) + ['enabled' => 0, 'key' => '', 'base' => '', 'models' => [], 'active' => [], 'refreshed' => '', 'note' => ''];
+}
+function ai_save_config($c) { setting_set('ai_config', json_encode($c)); }
+function ai_key_mask($key) { $key = (string)$key; $n = strlen($key); return $n === 0 ? '' : '••••••••' . substr($key, -4); }
+// A key input is "unchanged" if left blank or still showing the mask.
+function ai_key_is_placeholder($v) { $v = trim((string)$v); return $v === '' || strpos($v, '•') !== false; }
+
+// Whether any provider is enabled with a key (used as the AI seam for features).
+function ai_enabled() {
+    foreach (ai_config() as $p) if (!empty($p['enabled']) && trim((string)($p['key'] ?? '')) !== '') return true;
+    return false;
+}
+// The first enabled provider + its first active model, for feature calls.
+function ai_active() {
+    foreach (ai_config() as $name => $p) {
+        if (empty($p['enabled']) || trim((string)($p['key'] ?? '')) === '') continue;
+        $m = $p['active'][0] ?? ($p['models'][0] ?? '');
+        if ($m) return ['provider' => $name, 'model' => $m];
+    }
+    return null;
+}
+
+// ---- HTTP (cURL) — proxy/CA aware for hosts that use one; short timeouts ----
+function ai_http_get($url, $headers, $timeout = 12) {
+    if (!function_exists('curl_init')) return [null, 0, 'cURL not available on this server'];
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $proxy = getenv('HTTPS_PROXY') ?: getenv('https_proxy');
+    if ($proxy) { curl_setopt($ch, CURLOPT_PROXY, $proxy); if (is_file('/root/.ccr/ca-bundle.crt')) curl_setopt($ch, CURLOPT_CAINFO, '/root/.ccr/ca-bundle.crt'); }
+    $body = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+    if ($body === false) return [null, $code, $err ?: 'request failed'];
+    return [$body, $code, $code >= 400 ? "HTTP $code" : null];
+}
+function ai_parse_models($mode, $data) {
+    $ids = [];
+    if ($mode === 'gemini') { foreach (($data['models'] ?? []) as $m) { $n = $m['name'] ?? ''; if ($n) $ids[] = preg_replace('#^models/#', '', $n); } }
+    elseif ($mode === 'copilot') { $list = $data['models'] ?? ($data['data'] ?? (is_array($data) ? $data : [])); foreach ($list as $m) { $id = is_array($m) ? ($m['id'] ?? $m['name'] ?? '') : (string)$m; if ($id) $ids[] = $id; } }
+    else { foreach (($data['data'] ?? []) as $m) { $id = $m['id'] ?? ''; if ($id) $ids[] = $id; } }
+    return array_values(array_unique(array_filter($ids)));
+}
+// Refresh a provider's model list. Returns [models[], note]. Retired models drop
+// off (we return exactly what the provider lists now); note explains any fallback.
+function ai_refresh_models($provider) {
+    $reg = ai_providers()[$provider] ?? null;
+    if (!$reg) return [[], 'unknown provider'];
+    $cfg = ai_provider_cfg($provider); $key = trim((string)$cfg['key']);
+    if ($reg['list_url'] === '') return [$reg['fallback'], 'This provider has no live model list — showing known models.'];
+    if ($key === '') return [$reg['fallback'], 'Enter and save an API key, then refresh — showing known models.'];
+    $url = ($cfg['base'] ?: $reg['list_url']); $headers = ['Accept: application/json'];
+    switch ($reg['auth']) {
+        case 'bearer': $headers[] = 'Authorization: Bearer ' . $key; break;
+        case 'anthropic': $headers[] = 'x-api-key: ' . $key; $headers[] = 'anthropic-version: 2023-06-01'; break;
+        case 'query': $url .= (strpos($url, '?') === false ? '?' : '&') . 'key=' . urlencode($key); break;
+    }
+    [$body, $code, $err] = ai_http_get($url, $headers);
+    if ($err) return [$reg['fallback'], 'Live refresh failed (' . $err . ') — showing known models.'];
+    $data = json_decode($body, true);
+    $ids = ai_parse_models($reg['parse'], is_array($data) ? $data : []);
+    if (!$ids) return [$reg['fallback'], 'No models returned — showing known models.'];
+    sort($ids);
+    return [$ids, ''];
+}
+
+// ---------------------------------------------------------------------------
+//  Handler
+// ---------------------------------------------------------------------------
+function ops_ai_settings($method) {
+    ops_require(is_master() || can('settings.manage'), 'Only an administrator can manage AI settings.');
+    $providers = ai_providers();
+    $cfg = ai_config();
+    if ($method === 'POST') {
+        if (isset($_POST['refresh'])) {
+            $p = $_POST['refresh'];
+            if (isset($providers[$p])) {
+                $pc = $cfg[$p] ?? [];
+                $keyIn = $_POST['key'][$p] ?? '';
+                if (!ai_key_is_placeholder($keyIn)) $pc['key'] = trim($keyIn);   // save a just-typed key first
+                $cfg[$p] = $pc; ai_save_config($cfg);
+                [$models, $note] = ai_refresh_models($p);
+                $cfg[$p]['models'] = $models;
+                $cfg[$p]['active'] = array_values(array_intersect($cfg[$p]['active'] ?? [], $models));  // drop retired
+                $cfg[$p]['refreshed'] = date('c'); $cfg[$p]['note'] = $note;
+                ai_save_config($cfg);
+                flash($note ?: (count($models) . ' models refreshed for ' . $providers[$p]['label'] . '.'), $note ? 'warning' : 'success');
+            }
+            redirect('/ai-settings');
+        }
+        // full save
+        foreach ($providers as $p => $reg) {
+            $pc = $cfg[$p] ?? ['key' => '', 'models' => [], 'active' => []];
+            $pc['enabled'] = !empty($_POST['enabled'][$p]) ? 1 : 0;
+            $keyIn = $_POST['key'][$p] ?? '';
+            if (!empty($_POST['clearkey'][$p])) $pc['key'] = '';
+            elseif (!ai_key_is_placeholder($keyIn)) $pc['key'] = trim($keyIn);
+            $pc['base'] = trim($_POST['base'][$p] ?? '');
+            $avail = !empty($pc['models']) ? $pc['models'] : $reg['fallback'];
+            $pc['active'] = array_values(array_intersect((array)($_POST['active'][$p] ?? []), $avail));
+            $cfg[$p] = $pc;
+        }
+        ai_save_config($cfg);
+        flash('AI provider settings saved.');
+        redirect('/ai-settings');
+    }
+    view('ops/ai_settings', ['providers' => $providers, 'cfg' => $cfg]);
+}
