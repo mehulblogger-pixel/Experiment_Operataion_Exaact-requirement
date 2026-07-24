@@ -1191,7 +1191,7 @@ function ops_module_gate($route) {
         'office-finance'=>'overheads',
         'reports'=>'reports',
         'users'=>'users','user-new'=>'users','user-edit'=>'users',
-        'settings'=>'settings','access'=>'settings',
+        'settings'=>'settings','access'=>'settings','ai-settings'=>'settings',
     ];
     $mod = $map[$base] ?? null;
     if ($mod && !can("mod.$mod.view")) {
@@ -1293,6 +1293,8 @@ function ops_dispatch($route, $method) {
             ops_settings($method); return true;
         case $route === 'access':
             ops_access($method); return true;
+        case $route === 'ai-settings':
+            ops_ai_settings($method); return true;
         case $route === 'office-finance':
             ops_office_finance(); return true;
         case $route === 'masters':

@@ -1020,7 +1020,7 @@ function cv_domain_terms() {
 }
 // Whether an AI provider could enhance extraction (the AI-keys feature is not built
 // yet; kept as a seam so the engine can be upgraded without touching callers).
-function cv_ai_available() { return false; }
+function cv_ai_available() { return function_exists('ai_enabled') && ai_enabled(); }
 // Extract keywords from CV text: (1) domain-vocabulary hits, (2) trade/skill master
 // hits, (3) top frequent significant terms. Returns a de-duplicated CSV.
 function cv_extract_keywords($text) {

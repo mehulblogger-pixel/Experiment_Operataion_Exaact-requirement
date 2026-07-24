@@ -93,6 +93,12 @@
 </div>
 
 <div class="panel" style="max-width:620px;margin-top:18px">
+  <h3 class="tab-sub" style="margin-top:0;">🤖 AI providers &amp; models</h3>
+  <p class="sub" style="margin-bottom:10px">Enter API keys for OpenAI, Claude, Gemini, Perplexity or GitHub Copilot / Models, refresh each provider's live model list (retired models drop off), and pick which models to use.</p>
+  <a class="btn" href="/ai-settings">Open AI settings</a>
+</div>
+
+<div class="panel" style="max-width:620px;margin-top:18px">
   <h3 class="tab-sub" style="margin-top:0;">Demo / sample data</h3>
   <?php if (demo_seeded()): ?>
     <p class="sub" style="margin:0 0 6px"><span class="pill p-ok">Loaded</span> The sample dataset is already in the system.</p>

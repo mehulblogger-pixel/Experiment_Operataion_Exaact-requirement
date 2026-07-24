@@ -266,7 +266,24 @@ deliverables) → CV analysis + client-submission tracking → sales dashboard/r
 Remaining big items: the **AI-keys** master-settings feature, then **dashboards for all
 roles** (incl. the Executive-Director rebuild).
 
-### 🤖 PARKED — AI keys in master settings (owner request, 2026-07)
+### ✅ AI keys in master settings — SHIPPED (2026-07)
+- **Settings → AI providers & models** (`/ai-settings`, master/settings.manage): store an
+  **API key per provider** — OpenAI, Claude (Anthropic), Google Gemini, Perplexity,
+  GitHub Copilot / Models — masked in the UI (never shown in full; re-save with the mask
+  keeps the key; "Clear key" removes it). Per-provider **enable** toggle + optional base URL.
+- **Auto-refreshing model lists:** "Refresh models" pulls each provider's live list
+  (OpenAI `/v1/models`, Anthropic models list, Gemini `/v1beta/models`; Copilot catalog);
+  **retired models drop off** (active selection is intersected with the fresh list).
+  Providers without a public list API (Perplexity) use a curated known-model list; any
+  refresh failure falls back to known models so a model can still be picked.
+- **Pick active model(s)** per provider (checkbox grid).
+- Foundation helpers `ai_enabled()` / `ai_active()` + a proxy/CA-aware cURL client;
+  `cv_ai_available()` now reflects the config so the CV keyword engine can defer to AI.
+- Verified: save/mask/enable/select, masked re-save keeps key, refresh fallback works.
+- **Follow-up (not yet wired):** actually calling the selected model in features (e.g.
+  CV analysis, quote drafting) — a generic `ai_chat()` per provider. Keys/models are ready.
+
+### 🤖 (superseded) original AI-keys request note
 Administrator can, under master settings, enter **API keys for multiple AI
 platforms** of their choice — **Copilot, Gemini, Claude, Perplexity, OpenAI** —
 and then **select which model(s)** to use under each provider. Requirements:
