@@ -8,8 +8,23 @@
   </div>
 </div>
 
+<?php $holds = function_exists('job_hold_reasons') ? job_hold_reasons($job) : []; if ($holds): ?>
+<div class="panel" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent)">
+  <b style="color:var(--bad)">🚫 HOLD — do not issue the report / deliverable to the client:</b> <?= e(implode('; ', $holds)) ?>.
+  <?php if (!empty($job['adv_required']) && empty($job['adv_received']) && (is_coordinator_level() || can('data.credit') || can('finance.reconcile'))): ?>
+    <form method="post" action="/job-advance?id=<?= (int)$job['id'] ?>" style="margin-top:8px"><input type="hidden" name="adv_received" value="1"><button class="btn small" type="submit">Mark advance received</button></form>
+  <?php endif; ?>
+</div>
+<?php elseif (!empty($job['quotation_id']) && (!empty($job['adv_required']) || !empty($job['report_hold']))): ?>
+<div class="panel" style="border:1px solid var(--ok)"><b style="color:var(--ok)">✓ Payment conditions cleared</b> — advance/payment received; the deliverable may be issued.</div>
+<?php endif; ?>
+
 <div class="panel">
   <div class="kv-grid">
+    <?php if (!empty($job['quotation_id'])): $lq = ops_one("SELECT quote_no, rev, contract_number FROM quotations WHERE id=?", [$job['quotation_id']]); ?>
+    <div><span class="k">Against quotation</span><?= $lq ? e($lq['quote_no'].((int)$lq['rev']>0?' R'.$lq['rev']:'')) : '—' ?><?= ($lq && $lq['contract_number'])?' · '.e($lq['contract_number']):'' ?></div>
+    <?php endif; ?>
+    <?php if (!empty($job['adv_required'])): ?><div><span class="k">Advance</span><?= rtrim(rtrim(number_format((float)$job['adv_pct'],2),'0'),'.') ?>% · <?= !empty($job['adv_received'])?'<span style="color:var(--ok)">received</span>':'<span style="color:var(--bad)">pending</span>' ?></div><?php endif; ?>
     <div><span class="k">Call</span><?= e($job['call_code'] ?: '—') ?></div>
     <div><span class="k">Job type</span><?= e(JOB_TYPES[$job['job_type'] ?? 'INSPECTION'] ?? '—') ?></div>
     <div><span class="k">Stage</span><?= e(JOB_STAGES[$job['stage'] ?? 'ALLOCATED'] ?? '—') ?></div>

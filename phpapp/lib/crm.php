@@ -374,7 +374,8 @@ function ops_crm_quotes($route, $method) {
             'canApprove' => can('crm.quote.approve') || is_master(), 'canSend' => can('crm.quote.send') || is_master(),
             'canEdit' => can('crm.quote.create') || can('mod.quotes.edit') || is_master(),
             'canContract' => can('crm.contract.register') || is_master(),
-            'clientReg' => !empty($q['client_id']) ? ops_one("SELECT code, legal_name FROM business_partners WHERE id=?", [$q['client_id']]) : null]);
+            'clientReg' => !empty($q['client_id']) ? ops_one("SELECT code, legal_name FROM business_partners WHERE id=?", [$q['client_id']]) : null,
+            'orderJobs' => ops_all("SELECT j.id, j.job_code, j.stage, j.closed_flag, j.invoice_raised, j.invoice_amount, j.payment_received, j.payment_amount, i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.quotation_id=? ORDER BY j.id", [$q['id']])]);
         return;
     }
     if ($route === 'quote-status' && $method === 'POST') {
@@ -503,6 +504,40 @@ function ops_crm_quotes($route, $method) {
         flash($ok ? 'Operations packet re-sent.' : 'Operations packet logged (configure SMTP to e-mail it).', $ok ? 'success' : 'warning');
         redirect('/quote?id=' . $q['id']);
     }
+}
+
+// ---------------------------------------------------------------------------
+//  Operations link (§16 revenue, §21/§22 HOLD, §24 deliverables)
+// ---------------------------------------------------------------------------
+// Accepted / in-flight quotes a job can be booked against (client-scoped).
+function job_linkable_quotes($clientId) {
+    $clientId = (int)$clientId;
+    if ($clientId) return ops_all("SELECT id, quote_no, rev, contract_number, total_amount FROM quotations WHERE is_current=1 AND status IN ('ACCEPTED','APPROVED','SENT') AND client_id=? ORDER BY (status='ACCEPTED') DESC, id DESC", [$clientId]);
+    return ops_all("SELECT id, quote_no, rev, contract_number, total_amount FROM quotations WHERE is_current=1 AND status='ACCEPTED' ORDER BY id DESC LIMIT 50");
+}
+// Inherit the advance / report-vs-payment conditions (and blank deliverables) from
+// the linked quotation onto the job, so the inspector sees the right HOLD (§21,§22,§24).
+function crm_apply_quote_to_job($jobId) {
+    $j = ops_one("SELECT quotation_id, deliverables FROM jobs WHERE id=?", [(int)$jobId]);
+    if (!$j || empty($j['quotation_id'])) return;
+    $q = ops_one("SELECT advance_required, advance_pct, report_vs_payment FROM quotations WHERE id=?", [(int)$j['quotation_id']]);
+    if (!$q) return;
+    db()->prepare("UPDATE jobs SET adv_required=?, adv_pct=?, report_hold=? WHERE id=?")
+        ->execute([(int)$q['advance_required'], (float)$q['advance_pct'], (int)$q['report_vs_payment'], (int)$jobId]);
+    // §24: if the job has no deliverables yet, pull any listed on the quote's lines.
+    if (trim((string)($j['deliverables'] ?? '')) === '') {
+        $dl = [];
+        foreach (ops_all("SELECT deliverables FROM quote_lines WHERE quote_id=? AND deliverables<>''", [(int)$j['quotation_id']]) as $l)
+            foreach (explode(',', $l['deliverables']) as $d) { $d = trim($d); if ($d !== '') $dl[$d] = 1; }
+        if ($dl) db()->prepare("UPDATE jobs SET deliverables=? WHERE id=?")->execute([implode(',', array_keys($dl)), (int)$jobId]);
+    }
+}
+// HOLD reasons an inspector must not ignore before issuing the deliverable.
+function job_hold_reasons($j) {
+    $r = [];
+    if (!empty($j['adv_required']) && empty($j['adv_received'])) $r[] = 'advance payment not yet received';
+    if (!empty($j['report_hold']) && empty($j['payment_received'])) $r[] = 'payment pending — report only against payment';
+    return $r;
 }
 
 // ---------------------------------------------------------------------------
