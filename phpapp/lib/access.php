@@ -133,13 +133,25 @@ function module_defaults($role) {
     return array_values(array_unique($out));
 }
 
+// Modules added AFTER the access editor first shipped. A saved role/user permission
+// set from before these existed simply doesn't mention them, so we grant the role's
+// default view/edit for them. Safe because these modules are genuinely new — a saved
+// set could never have "deliberately removed" them, so nothing existing is resurrected.
+const NEW_MODULES = ['inquiries', 'quotes', 'crm_orders', 'crm_reports'];
+function merge_new_module_defaults($perms, $role) {
+    foreach (module_defaults($role) as $dp) {
+        if (preg_match('/^mod\.(\w+)\.(view|edit)$/', $dp, $m) && in_array($m[1], NEW_MODULES, true) && !in_array($dp, $perms, true)) $perms[] = $dp;
+    }
+    return array_values(array_unique($perms));
+}
+
 // Effective default permission set for a role: a super-admin override stored in
 // settings (Roles & access) wins; otherwise the built-in role defaults.
 function role_perms($role) {
     $raw = setting_get('role_access', '');
     if ($raw !== '') {
         $ov = json_decode($raw, true);
-        if (is_array($ov) && isset($ov[$role]) && is_array($ov[$role])) return array_values($ov[$role]);
+        if (is_array($ov) && isset($ov[$role]) && is_array($ov[$role])) return merge_new_module_defaults(array_values($ov[$role]), $role);
     }
     return role_defaults($role)['perms'];
 }
@@ -205,6 +217,7 @@ function ua() {
         // module access from their role defaults (until re-saved with the new UI).
         $hasMod = false; foreach ($perms as $p) if (strncmp($p, 'mod.', 4) === 0) { $hasMod = true; break; }
         if (!$hasMod) $perms = array_merge($perms, module_defaults($role));
+        else $perms = merge_new_module_defaults($perms, $role);   // grant brand-new modules (e.g. CRM)
     } else {
         $perms = role_perms($role);
     }
