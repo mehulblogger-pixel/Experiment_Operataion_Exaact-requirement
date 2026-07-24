@@ -172,8 +172,26 @@ afterwards (current landing dashboard "is not what we're expecting").**
 - **"⬇ Generate Word quote"** button on the quote detail → downloads the filled .docx.
 - Verified end-to-end over HTTP (upload → create quote → generate): doc/format numbers
   stamped, line rows repeated, totals + words correct, no unreplaced tokens.
-- **Next (P3):** approval-chain config (amount band and/or SBU) → send-to-customer email
-  → follow-up template emails. (Follow-up rows already schedule on "Sent".)
+### ✅ P3 shipped (2026-07) — approval chain + send + follow-up emails
+- **Configurable approval matrix** (Quotations → Approval rules): rules by **amount
+  band** and/or **SBU**, with a **level** (chain order) and an **approver role or a
+  specific person**. On "Submit for approval" the matching rules become the quote's
+  chain; with no rule it needs one approval from any approver.
+- **Approval flow**: each approver sees Approve/Reject (with remarks) for their step
+  on the quote; the quote auto-moves to **Approved** when all steps pass; a reject
+  sends it back to draft. Gated by the "Approve quotations" permission.
+- **Send to customer** (§10): "✉ Send to customer" generates the .docx and **e-mails
+  it (attached) to the contact** using the EMAIL_QUOTE template (or a sensible default),
+  marks Sent, and schedules the follow-ups. Uses the existing SMTP settings; if SMTP
+  isn't set it's logged (email_log) and still marked sent.
+- **E-mail now supports attachments** (multipart/mixed added to smtp_send/ops_mail).
+- **Follow-up e-mails** (§11): `crm_run_followups()` (wired into cron.php) sends any due
+  3/6/9-day, fortnight, month follow-up whose quote is still awaiting a reply, using the
+  EMAIL_FOLLOWUP template; skips once the quote is accepted/lost.
+- Verified end-to-end: rule match → chain built → approve → Approved → send (logged) →
+  follow-up cron sends the due one and skips the rest.
+- **Next (P4):** acceptance → register client + contract number → auto-float the
+  Operations packet (§12,§13); open (ARC) vs line-item orders (§17).
 
 ### 🤖 PARKED — AI keys in master settings (owner request, 2026-07)
 Administrator can, under master settings, enter **API keys for multiple AI

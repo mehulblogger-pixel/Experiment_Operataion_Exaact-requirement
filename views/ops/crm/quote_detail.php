@@ -22,14 +22,11 @@
   <span class="muted">Move this quote:</span>
   <?php if ($st==='DRAFT'): ?>
     <?= $act('PENDING_APPROVAL','Submit for approval') ?>
-    <?php if ($canApprove): ?><?= $act('APPROVED','Approve','btn small') ?><?php endif; ?>
-  <?php elseif ($st==='PENDING_APPROVAL'): ?>
-    <?php if ($canApprove): ?><?= $act('APPROVED','Approve') ?><?php endif; ?>
-    <?= $act('DRAFT','Send back to draft','btn small secondary') ?>
   <?php elseif ($st==='APPROVED'): ?>
-    <?php if ($canSend): ?><?= $act('SENT','Mark as sent to customer') ?><?php endif; ?>
+    <?php if ($canSend): ?><?= $act('SENT','✉ Send to customer') ?><?php endif; ?>
   <?php elseif ($st==='SENT'): ?>
     <?= $act('ACCEPTED','Mark accepted (won)') ?>
+    <a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Re-download Word</a>
   <?php endif; ?>
   <?php if (in_array($st, ['DRAFT','PENDING_APPROVAL','APPROVED','SENT'], true)): ?>
     <button class="btn small danger" type="button" onclick="document.getElementById('lostbox').style.display='block'">Mark lost</button>
@@ -38,6 +35,33 @@
     <button class="btn small secondary" type="button" onclick="document.getElementById('revbox').style.display='block'" style="margin-left:auto">Revise (new rev)</button>
   <?php endif; ?>
 </div>
+
+<?php if ($st==='PENDING_APPROVAL' && $approvals): ?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Approval chain</h3>
+  <table class="grid"><tr><th>Level</th><th>Approver</th><th>Status</th><th>Acted</th><th></th></tr>
+    <?php foreach ($approvals as $a): $who = $a['approver_user_id'] ? ('User #'.$a['approver_user_id']) : ($a['approver_role'] ? (ORG_ROLES[$a['approver_role']] ?? $a['approver_role']) : 'Any approver'); ?>
+    <tr>
+      <td><b><?= (int)$a['level'] ?></b></td>
+      <td><?= e($who) ?></td>
+      <td><span class="pill <?= $a['status']==='APPROVED'?'p-ok':($a['status']==='REJECTED'?'p-bad':'p-warn') ?>"><?= e($a['status']) ?></span></td>
+      <td class="muted"><?= $a['acted_by'] ? e($a['acted_by']).' · '.e(substr((string)$a['acted_at'],0,10)) : '—' ?><?= $a['remarks']?'<div style="font-size:11px">'.e($a['remarks']).'</div>':'' ?></td>
+      <td class="num" style="white-space:nowrap">
+        <?php if (crm_can_act_approval($a)): ?>
+        <form method="post" action="/quote-approve?id=<?= (int)$q['id'] ?>" style="display:inline-flex;gap:4px;align-items:center">
+          <input type="hidden" name="step" value="<?= (int)$a['id'] ?>">
+          <input class="form-control" name="remarks" placeholder="remarks" style="width:130px">
+          <button class="btn small" name="decision" value="approve" type="submit">Approve</button>
+          <button class="btn small danger" name="decision" value="reject" type="submit">Reject</button>
+        </form>
+        <?php endif; ?>
+      </td>
+    </tr>
+    <?php endforeach; ?>
+  </table>
+  <p class="muted" style="margin-top:6px">The quote becomes <strong>Approved</strong> automatically once every step is approved. Configure the chain under <a href="/quote-approval-rules">Approval rules</a>.</p>
+</div>
+<?php endif; ?>
 
 <div id="lostbox" class="panel" style="display:none;border:1px solid var(--bad)">
   <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>">

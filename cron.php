@@ -14,6 +14,9 @@
 require __DIR__ . '/lib/db.php';
 require __DIR__ . '/lib/helpers.php';
 require __DIR__ . '/lib/ops.php';
+require __DIR__ . '/lib/lookups.php';
+require __DIR__ . '/lib/access.php';
+require __DIR__ . '/lib/crm.php';
 
 // When invoked over HTTP, require a matching key so strangers can't trigger it.
 if (PHP_SAPI !== 'cli') {
@@ -36,3 +39,9 @@ echo "Reminders processed. Emails queued/sent: $sent\n";
 // agency's free-replacement guarantee window has passed.
 confirm_lapsed_placement_fees();
 echo "Placement-fee guarantees checked.\n";
+
+// Send any due quotation follow-up e-mails (3/6/9-day, fortnight, month).
+if (function_exists('crm_run_followups')) {
+    $fu = crm_run_followups();
+    echo "Quote follow-ups sent: $fu\n";
+}
