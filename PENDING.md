@@ -65,18 +65,32 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
       no linked inspector profile now gets one actionable message on My Jobs and
       My Voucher (Users → Linked inspector) instead of "You cannot view vouchers".
 
-### 1c. Hiring roll-conversion + agency types (noted 2026-07, owner)
-- [ ] **On Accept, choose the roll** — today accepting a candidate can "add to
-      Inspectors" and copies the source, but does NOT ask whether they go **on
-      SGS roll** (we pay salary/CTC) or **on the agency's roll** (we pay the
-      agency a **monthly charge**), nor capture the agency + monthly cost. Add
-      that choice; agency-roll writes `agency_name` + `agency_cost` (already on
-      the inspector, already flows into loaded-cost/profitability).
-- [ ] **Two agency types** — model **Recruitment agency** (supplies CVs only →
-      hire goes on SGS roll) vs **Manpower agency** (supplies CVs; person can be
-      on our roll OR stay on their roll with a monthly charge). Likely a flag on
-      the agency master (subcons/business_partners) + used to drive the roll
-      choice above.
+### 1c. Agency master + contracts + roll-conversion + costing (noted 2026-07, owner)
+Two agency types, each with a contract and a different fee model — both feed
+**inspector costing** and need **renewal reminders**.
+
+- [ ] **Agency master with a type**: **Recruitment agency** (CVs only, one-time
+      placement) vs **Manpower / supply agency** (supplies people we run).
+      Reuse/extend `subcons` or `business_partners` (is_subcontractor) with a
+      `agency_type` flag.
+- [ ] **Agency CONTRACT with renewal reminder** — every agency engagement is a
+      contract with a start/end (or renewal) date. Send a **reminder ~1 month
+      before the due/renewal date** (reuse the existing cert-expiry reminder
+      pattern in `cron.php` + a dashboard "expiring soon" card). Applies to
+      BOTH recruitment and manpower agencies.
+- [ ] **Fee model by type → inspector costing**:
+      • **Recruitment** → person is on **SGS roll** (salary CTC) **plus a
+        one-time fixed placement/consulting fee** paid to the agency; that fee is
+        **included in the inspector's costing** (decide: one-time in the hire
+        month vs amortised over expected tenure — confirm with owner).
+      • **Manpower** → agency **bills us monthly**; that monthly charge is the
+        inspector's `agency_cost`, and **we invoice the client** for the manpower
+        (pass-through — ties to §1d monthly invoicing).
+- [ ] **On Accept, choose the roll + agency + fee**: SGS roll (salary) vs agency
+      roll (monthly charge); pick the agency (from the master) and its
+      contract; capture the one-time fee (recruitment) or monthly charge
+      (manpower). Writes `agency_name` + `agency_cost` (+ new one-time-fee field)
+      on the inspector so loaded-cost/profitability already reflect it.
 
 ### 1d. Monthly / recurring invoicing for deputation (man-month / man-day)
 - [ ] **NOT built yet.** Invoicing is currently **one invoice per job**. A
