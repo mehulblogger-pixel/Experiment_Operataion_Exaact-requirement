@@ -1111,6 +1111,14 @@ function ops_dispatch($route, $method) {
                 else { $x = $res['counts']; flash("Demo data loaded — {$x['offices']} offices, {$x['users']} users, {$x['inspectors']} inspectors, {$x['partners']} clients/vendors, {$x['boss']} BOSS, {$x['calls']} calls, {$x['jobs']} jobs, {$x['vouchers']} vouchers, plus " . ($x['edge_cases'] ?? 0) . " generated edge-case records. Log in as any demo user (e.g. director, account, insp.ravi) with password demo12345."); }
             }
             redirect('/settings'); return true;
+        case $route === 'seed-demo-remove':
+            ops_require(is_master(), 'Only the Master Admin can remove demo data.');
+            if ($method === 'POST') {
+                $res = seed_demo_remove();
+                if (!empty($res['error'])) flash('Could not remove demo data: ' . $res['error'], 'error');
+                else flash('Demo data removed — ' . (int)($res['deleted'] ?? 0) . ' records deleted. You can load it again anytime.');
+            }
+            redirect('/settings'); return true;
         case $route === 'boss-renew':
             ops_boss_renew(); return true;
         case $route === 'attendance-recon':

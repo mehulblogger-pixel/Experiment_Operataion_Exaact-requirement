@@ -277,3 +277,37 @@ function seed_demo() {
     }
     return ['counts' => $c];
 }
+
+// Remove ONLY the records the demo seed created (identified by the seed's own
+// markers), leaving any real data untouched. Lets the demo be loaded again.
+function seed_demo_remove() {
+    $pdo = db();
+    $n = 0;
+    $pdo->beginTransaction();
+    try {
+        $del = function($sql, $args = []) use ($pdo, &$n) { $st = $pdo->prepare($sql); $st->execute($args); $n += $st->rowCount(); };
+        // Transactional records carry created_by='demo'
+        $del("DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE created_by='demo')");
+        $del("DELETE FROM vouchers WHERE created_by='demo'");
+        $del("DELETE FROM expenses WHERE job_id IN (SELECT id FROM jobs WHERE created_by='demo')");
+        $del("DELETE FROM jobs WHERE created_by='demo'");
+        $del("DELETE FROM calls WHERE created_by='demo'");
+        // Masters the seed created, by their known codes
+        $emps = "('EMP01','EMP02','EMP03','EMP04')";
+        $del("DELETE FROM inspector_allowances WHERE inspector_id IN (SELECT id FROM inspectors WHERE emp_code IN $emps)");
+        $del("DELETE FROM vendor_km_memory WHERE inspector_id IN (SELECT id FROM inspectors WHERE emp_code IN $emps)");
+        $del("DELETE FROM inspectors WHERE emp_code IN $emps");
+        $del("DELETE FROM boss_numbers WHERE boss_number IN ('40231','40198','40155') OR boss_number LIKE '5090%'");
+        $del("DELETE FROM business_partners WHERE code IN ('CL-RIL','CL-ADN','CL-LNT','VN-VAP','VN-MUN') OR code LIKE 'EC-%' OR code LIKE 'EV-%'");
+        // Demo login accounts
+        $unames = array_map(fn($a) => $a[0], demo_accounts());
+        $ph = implode(',', array_fill(0, count($unames), '?'));
+        $del("DELETE FROM users WHERE username IN ($ph)", $unames);
+        setting_set('demo_seeded', '');
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        return ['error' => $e->getMessage()];
+    }
+    return ['deleted' => $n];
+}
