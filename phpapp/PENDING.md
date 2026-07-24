@@ -4,6 +4,47 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
 
 ## 🆕 Requested — to build next (noted 2026-07, owner)
 
+### 1a-i. Recruitment-fee costing — the GUARANTEE model (resolves owner's confusion)
+The one-time recruitment fee is **conditional**, so it is NOT a fixed cost:
+- Agency contract carries a **guarantee / replacement period** (e.g. 90 days).
+- On the hire, the fee has a status: **Provisional** (still inside the guarantee
+  window) → **Confirmed** (person stayed past it → fee is a real cost) OR
+  **Waived** (person left inside the window → we don't pay; agency gives a free
+  replacement → fee cost = 0, carried to the replacement).
+- **Costing rule:** the fee counts in the inspector's cost **only when Confirmed**;
+  shown as "provisional" until the guarantee lapses; ₹0 if Waived. No arbitrary
+  monthly spreading. Build: `guarantee_days` on the agency; `fee_status` +
+  `guarantee_upto` on the inspector; a small daily check (cron) that flips
+  Provisional→Confirmed when the date passes; a "provisional fees / guarantees
+  lapsing" dashboard card.
+
+### 1a-ii. Offer stage: released → declined (candidate reneges)
+- Add pipeline stages **Offer released** and **Offer declined** (candidate backed
+  out at the last moment) so we can see offer-decline rate and re-open the
+  requisition to the next candidate.
+
+### 1e. Manpower Requisition / Position Approval module (elaborate — research done)
+Management approves **every position** (new or replacement); the whole hiring
+chain hangs off that approval.
+- [ ] **`requisitions` table**: req_code, office, SBU, designation/position,
+      project/site, **type NEW vs REPLACEMENT**, budgeted monthly cost, approved_by,
+      approval ref + date, status (Open → Proposed → Offer released → Hired →
+      Closed / Cancelled), notes.
+- [ ] **Replacement linkage**: when REPLACEMENT, link the **outgoing (resigned)
+      inspector** — auto-fetch their current salary/cost as the benchmark.
+- [ ] **Candidate ↔ requisition**: a candidate CV is raised **against a
+      requisition**; the pipeline (with the new offer stages) runs inside it; on
+      Accept the **hired candidate → inspector** is linked back to the requisition
+      and it closes.
+- [ ] **Auto-fetch salary / cost comparison**: pull the proposed candidate's
+      expected rate and the hired inspector's salary_ctc / agency_cost; for a
+      replacement, show **outgoing vs new** cost side by side (budget vs actual).
+- [ ] **Dashboard**: open requisitions, positions pending fill, replacements in
+      progress; approval register export (CSV/PDF).
+This becomes the front of the hiring flow:
+**Requisition (approval) → Candidate(s) → Offer → Hire (inspector) → close**,
+and feeds the agency/roll/fee logic already built.
+
 ### 1. Complete demo / seed dataset (uploadable, all expected values) — ✅ DONE
 - [x] **200+ edge cases** — DONE. The seed now generates **332 edge-case records**
       (150 calls + 150 jobs + 32 vouchers) covering same/cross office, missing
