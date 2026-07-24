@@ -12,10 +12,16 @@ const ORG_ROLES = [
     'SBU_HEAD' => 'SBU Head', 'BRANCH_MANAGER' => 'Branch Manager',
     'BRANCH_APP_MANAGER' => 'Branch Application Manager', 'OPERATION_MANAGER' => 'Operation Manager',
     'ASST_MANAGER' => 'Asst. Manager', 'COORDINATOR' => 'Coordinator',
+    // Marketing & Sales (CRM) roles
+    'BUSINESS_DEV_MANAGER' => 'Business Development Manager', 'KEY_ACCOUNTS_MANAGER' => 'Key Accounts Manager',
+    'MARKETING_MANAGER' => 'Marketing Manager', 'MARKETING_EXECUTIVE' => 'Marketing Executive',
     'FINANCE' => 'Finance', 'INSPECTOR' => 'Inspector', 'ADMIN' => 'Admin (legacy)',
 ];
 // Management-level roles (kept compatible with existing is_admin_level gates)
-const MGMT_ROLES = ['MASTER_ADMIN','ADMIN','BUSINESS_DIRECTOR','SBU_HEAD','BRANCH_MANAGER','BRANCH_APP_MANAGER','OPERATION_MANAGER','FINANCE'];
+const MGMT_ROLES = ['MASTER_ADMIN','ADMIN','BUSINESS_DIRECTOR','SBU_HEAD','BRANCH_MANAGER','BRANCH_APP_MANAGER','OPERATION_MANAGER',
+    'BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','FINANCE'];
+// Marketing & Sales roles (CRM funnel owners)
+const SALES_ROLES = ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'];
 
 // ---- Permission catalogue --------------------------------------------------
 const PERMISSIONS = [
@@ -35,6 +41,13 @@ const PERMISSIONS = [
     'users.manage.branch' => 'Manage users in own office',
     'users.manage.global' => 'Manage all users & access',
     'settings.manage' => 'Manage system settings',
+    // ---- CRM / Marketing & Sales (fine-grained actions) ----
+    'crm.quote.create'    => 'Create / edit quotations',
+    'crm.quote.approve'   => 'Approve quotations (approval chain)',
+    'crm.quote.send'      => 'Send quotation to the customer',
+    'crm.followup.manage' => 'Manage quote follow-ups & reminders',
+    'crm.contract.register' => 'Register client & contract (Accounts)',
+    'crm.template.manage' => 'Manage quote / e-mail templates',
 ];
 
 // ---- Module access catalogue (per-module View + Edit) ----------------------
@@ -42,6 +55,12 @@ const PERMISSIONS = [
 // These gate the sidebar and the module routes; the super admin can grant /
 // deny any of them per role (Settings → Roles & access) or per user.
 const ACCESS_MODULES = [
+    // CRM / Marketing & Sales (the pre-operations funnel)
+    'inquiries'     => 'CRM — Inquiries',
+    'quotes'        => 'CRM — Quotations',
+    'crm_orders'    => 'CRM — Orders / contracts',
+    'crm_reports'   => 'CRM — Sales reports',
+    // Operations
     'calls'         => 'Calls',
     'jobs'          => 'Jobs',
     'vouchers'      => 'Vouchers',
@@ -77,25 +96,35 @@ function module_defaults($role) {
         case 'MASTER_ADMIN': case 'ADMIN': $edit = $all; break;
         case 'BUSINESS_DIRECTOR': $view = $all; break;
         case 'SBU_HEAD':
-            $view = ['calls','jobs','vouchers','invoicing','profitability','hiring','reconcile','clients','vendors','masters','reports']; break;
+            $view = ['inquiries','quotes','crm_orders','crm_reports','calls','jobs','vouchers','invoicing','profitability','hiring','reconcile','clients','vendors','masters','reports']; break;
         case 'BRANCH_MANAGER':
             $edit = ['calls','jobs','vouchers','hiring','reconcile','clients','vendors','masters','reports','users'];
-            $view = ['invoicing','profitability','overheads']; break;
+            $view = ['inquiries','quotes','crm_orders','crm_reports','invoicing','profitability','overheads']; break;
         case 'BRANCH_APP_MANAGER':
             $edit = ['masters','overheads','users'];
             $view = ['calls','jobs','reports']; break;
         case 'OPERATION_MANAGER':
             $edit = ['calls','jobs','vouchers','hiring','reconcile'];
-            $view = ['clients','vendors','masters','profitability','reports']; break;
+            $view = ['crm_orders','clients','vendors','masters','profitability','reports']; break;
         case 'ASST_MANAGER':
             $edit = ['calls','jobs'];
             $view = ['clients','vendors','reports']; break;
         case 'COORDINATOR':
             $edit = ['calls','jobs','vouchers','hiring','reconcile'];
-            $view = ['clients','vendors','masters','reports','invoicing']; break;
+            $view = ['crm_orders','clients','vendors','masters','reports','invoicing']; break;
+        // ---- Marketing & Sales (CRM) ----
+        case 'BUSINESS_DEV_MANAGER': case 'KEY_ACCOUNTS_MANAGER':
+            $edit = ['inquiries','quotes','crm_orders'];
+            $view = ['crm_reports','clients','reports']; break;
+        case 'MARKETING_MANAGER':
+            $edit = ['inquiries','quotes','crm_orders','crm_reports','clients'];
+            $view = ['reports','profitability']; break;
+        case 'MARKETING_EXECUTIVE':
+            $edit = ['inquiries','quotes'];
+            $view = ['crm_orders','crm_reports','clients']; break;
         case 'FINANCE':
-            $edit = ['invoicing'];
-            $view = ['profitability','reports','jobs','calls','vouchers']; break;
+            $edit = ['invoicing','crm_orders'];
+            $view = ['quotes','crm_reports','profitability','reports','jobs','calls','vouchers']; break;
         case 'INSPECTOR': break; // inspectors use My Jobs / My Voucher (their own)
     }
     $out = [];
@@ -143,8 +172,14 @@ function role_defaults_base($role) {
         case 'COORDINATOR':
             // per decision: Operations + read-only revenue (financial section visible, but no salary/profit)
             return ['perms' => ['dash.operations','dash.financial','data.credit','ops.call.create','ops.job.allocate','ops.job.close'], 'offices' => 'OWN', 'sbus' => 'OWN'];
+        case 'BUSINESS_DEV_MANAGER': case 'KEY_ACCOUNTS_MANAGER':
+            return ['perms' => ['dash.operations','dash.financial','data.credit','crm.quote.create','crm.quote.send','crm.followup.manage'], 'offices' => 'OWN', 'sbus' => 'ALL'];
+        case 'MARKETING_MANAGER':
+            return ['perms' => ['dash.operations','dash.financial','data.credit','data.profitability','crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.template.manage'], 'offices' => 'ALL', 'sbus' => 'ALL'];
+        case 'MARKETING_EXECUTIVE':
+            return ['perms' => ['crm.quote.create','crm.followup.manage'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'FINANCE':
-            return ['perms' => ['dash.financial','data.credit','data.salary','data.profitability','finance.reconcile'], 'offices' => 'ALL', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.financial','data.credit','data.salary','data.profitability','finance.reconcile','crm.contract.register'], 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'INSPECTOR':
             return ['perms' => [], 'offices' => 'OWN', 'sbus' => 'OWN'];
     }

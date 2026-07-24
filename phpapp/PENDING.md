@@ -116,6 +116,40 @@ afterwards (current landing dashboard "is not what we're expecting").**
   → auto credential-request email (configurable template).
 - P7 CRM dashboards + monthly report + win/loss analytics.
 
+### ✅ P0 shipped (2026-07) — CRM foundations
+- **4 sales roles** added (Business Development Manager, Key Accounts Manager,
+  Marketing Manager, Marketing Executive) with sensible scope + management
+  classification; they appear in the user-creation role dropdown.
+- **CRM permission selection list** built: 4 access modules (Inquiries, Quotations,
+  Orders/contracts, Sales reports) each with View/Edit, plus fine-grained actions
+  (create / approve / send quote, manage follow-ups, register client+contract,
+  manage templates) — all editable per role (Settings → Roles & access) and per user.
+- **Lost-reason master** (`quote_lost_reason`, 12 researched reasons incl. "Other
+  (specify)" → free-text on the form in P1) + **CRM service-type master**
+  (`crm_service_type`, §18/§25) — both editable lookups.
+- **CRM data model created** (idempotent, SQLite+MySQL): `crm_inquiries`,
+  `quotations` (+rev/parent for §23 revisions, advance/report-vs-payment flags),
+  `quote_lines` (SBU per line, order type, units), `quote_revisions`,
+  `quote_approvals`, `quote_approval_rules` (amount band and/or SBU — §owner),
+  `quote_followups`, `crm_templates` (docx + email, with a JSON field map for §6).
+- Boot probe extended so live MySQL auto-creates the CRM tables on next load.
+- **Next: P1** — Inquiry + Quotation screens (list/form/detail), quote numbering,
+  revisions, dropdown-driven entry.
+
+### 🤖 PARKED — AI keys in master settings (owner request, 2026-07)
+Administrator can, under master settings, enter **API keys for multiple AI
+platforms** of their choice — **Copilot, Gemini, Claude, Perplexity, OpenAI** —
+and then **select which model(s)** to use under each provider. Requirements:
+- Per-provider key entry (stored in settings; masked in the UI).
+- Model list **auto-updates** from each provider and **auto-discards** old/retired
+  models no longer offered (so the dropdown always reflects live availability).
+- Select one/more active models per enabled provider.
+- Research note: auto-refresh needs each provider's "list models" endpoint (e.g.
+  OpenAI `/v1/models`, Gemini `/v1beta/models`, Anthropic models list); "Copilot"
+  has no public models API — confirm whether that means GitHub Models or Azure
+  OpenAI. Outbound network from MilesWeb must be confirmed. To sequence after (or
+  alongside) CRM — owner to confirm ordering.
+
 ### PARKED (do after CRM): Executive-Director dashboard rebuild
 Current landing dashboard for the Business/Executive Director "is not what we're
 expecting." Rebuild to a strategic C-suite view (pipeline value, win rate, revenue
