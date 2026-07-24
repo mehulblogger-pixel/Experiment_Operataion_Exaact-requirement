@@ -369,6 +369,7 @@ function ops_crm_quotes($route, $method) {
             'revs' => ops_all("SELECT id, rev, status, total_amount, is_current, created_at FROM quotations WHERE quote_no=? ORDER BY rev", [$q['quote_no']]),
             'hist' => ops_all("SELECT * FROM quote_revisions WHERE quote_id=? ORDER BY rev DESC, id DESC", [$base]),
             'followups' => ops_all("SELECT * FROM quote_followups WHERE quote_id=? ORDER BY due_date", [$q['id']]),
+            'approvals' => crm_approvals($q['id']),
             'lostReasons' => lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS),
             'canApprove' => can('crm.quote.approve') || is_master(), 'canSend' => can('crm.quote.send') || is_master(),
             'canEdit' => can('crm.quote.create') || can('mod.quotes.edit') || is_master()]);
@@ -380,13 +381,21 @@ function ops_crm_quotes($route, $method) {
         if (!isset(QUOTE_STATUS[$to])) { flash('Unknown status.', 'error'); redirect('/quote?id=' . $q['id']); }
         if ($to === 'APPROVED') ops_require(can('crm.quote.approve') || is_master(), 'You cannot approve quotations.');
         if ($to === 'SENT') ops_require(can('crm.quote.send') || is_master(), 'You cannot send quotations.');
-        if ($to === 'LOST') {
+        if ($to === 'PENDING_APPROVAL') {
+            $n = crm_build_approvals($q);   // build the approval chain from the rules
+            $pdo->prepare("UPDATE quotations SET status='PENDING_APPROVAL' WHERE id=?")->execute([$q['id']]);
+            flash('Submitted for approval — ' . $n . ' approval step(s) created.');
+            redirect('/quote?id=' . $q['id']);
+        } elseif ($to === 'LOST') {
             $pdo->prepare("UPDATE quotations SET status='LOST', lost_reason=?, lost_reason_other=? WHERE id=?")
                 ->execute([$_POST['lost_reason'] ?? '', trim($_POST['lost_reason_other'] ?? ''), $q['id']]);
             $pdo->prepare("UPDATE quote_followups SET status='SKIPPED' WHERE quote_id=? AND status='PENDING'")->execute([$q['id']]);
         } elseif ($to === 'SENT') {
+            [$sent, $msg] = crm_send_quote_email($q);
             $pdo->prepare("UPDATE quotations SET status='SENT', sent_at=? WHERE id=?")->execute([date('c'), $q['id']]);
             crm_schedule_followups($q['id']);
+            flash($sent ? ('Quotation e-mailed to ' . $q['contact_email'] . ' and marked sent — follow-ups scheduled.') : ('Marked sent and follow-ups scheduled; ' . $msg), $sent ? 'success' : 'warning');
+            redirect('/quote?id=' . $q['id']);
         } elseif ($to === 'ACCEPTED') {
             $pdo->prepare("UPDATE quotations SET status='ACCEPTED', accepted_date=? WHERE id=?")->execute([date('Y-m-d'), $q['id']]);
             $pdo->prepare("UPDATE quote_followups SET status='SKIPPED' WHERE quote_id=? AND status='PENDING'")->execute([$q['id']]);
@@ -441,6 +450,160 @@ function ops_crm_quotes($route, $method) {
         header('Content-Disposition: attachment; filename="' . $fname . '"');
         header('Content-Length: ' . strlen($bin));
         echo $bin; exit;
+    }
+    if ($route === 'quote-approve' && $method === 'POST') {
+        $step = ops_one("SELECT * FROM quote_approvals WHERE id=?", [(int)($_POST['step'] ?? 0)]);
+        if (!$step) { flash('Approval step not found.', 'error'); redirect('/quotes'); }
+        $q = crm_quote_get($step['quote_id']); if (!$q) { http_response_code(404); view('notfound'); return; }
+        ops_require(crm_can_act_approval($step), 'You are not an approver for this step.');
+        $remarks = trim($_POST['remarks'] ?? '');
+        if (($_POST['decision'] ?? '') === 'reject') {
+            $pdo->prepare("UPDATE quote_approvals SET status='REJECTED', acted_by=?, acted_at=?, remarks=? WHERE id=?")
+                ->execute([user_name(current_user()), date('c'), $remarks, $step['id']]);
+            $pdo->prepare("UPDATE quotations SET status='DRAFT' WHERE id=?")->execute([$q['id']]);
+            flash('Rejected — quotation sent back to draft.');
+        } else {
+            $pdo->prepare("UPDATE quote_approvals SET status='APPROVED', acted_by=?, acted_at=?, remarks=? WHERE id=?")
+                ->execute([user_name(current_user()), date('c'), $remarks, $step['id']]);
+            $pending = (int)ops_val("SELECT COUNT(*) FROM quote_approvals WHERE quote_id=? AND status='PENDING'", [$q['id']]);
+            if ($pending === 0) { $pdo->prepare("UPDATE quotations SET status='APPROVED' WHERE id=?")->execute([$q['id']]); flash('All approvals complete — quotation approved and ready to send.'); }
+            else flash('Your approval is recorded. ' . $pending . ' step(s) still pending.');
+        }
+        redirect('/quote?id=' . $q['id']);
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  Approvals (§9) — configurable matrix by amount band and/or SBU
+// ---------------------------------------------------------------------------
+function crm_approvals($qid) { return ops_all("SELECT * FROM quote_approvals WHERE quote_id=? ORDER BY level, id", [(int)$qid]); }
+// Build the approval steps for a quote from the active rules. A rule matches when
+// its SBU matches (or it is "any SBU") and the quote total falls in its amount band
+// (max 0 = no upper limit). If nothing matches, one generic step (any approver).
+function crm_build_approvals($q) {
+    $pdo = db();
+    $pdo->prepare("DELETE FROM quote_approvals WHERE quote_id=?")->execute([$q['id']]);
+    $amt = (float)$q['total_amount']; $sbu = $q['sbu'];
+    $steps = [];
+    foreach (ops_all("SELECT * FROM quote_approval_rules WHERE active=1 ORDER BY level, id") as $r) {
+        if (($r['match_type'] ?? 'ANY') === 'SBU' && ($r['sbu'] ?? '') !== '' && $r['sbu'] !== $sbu) continue;
+        if ($amt < (float)$r['min_amount']) continue;
+        if ((float)$r['max_amount'] > 0 && $amt > (float)$r['max_amount']) continue;
+        $steps[] = $r;
+    }
+    if (!$steps) {
+        $pdo->prepare("INSERT INTO quote_approvals (quote_id,level,approver_role,approver_user_id,status) VALUES (?,1,'',NULL,'PENDING')")->execute([$q['id']]);
+        return 1;
+    }
+    $ins = $pdo->prepare("INSERT INTO quote_approvals (quote_id,level,approver_role,approver_user_id,status) VALUES (?,?,?,?,'PENDING')");
+    foreach ($steps as $s) $ins->execute([$q['id'], (int)$s['level'], $s['approver_role'] ?? '', ($s['approver_user_id'] ?? null) ?: null]);
+    return count($steps);
+}
+// May the current user act on this approval step?
+function crm_can_act_approval($step) {
+    if (!can('crm.quote.approve') && !is_master()) return false;
+    if (($step['status'] ?? '') !== 'PENDING') return false;
+    $u = current_user();
+    if (!empty($step['approver_user_id'])) return (int)$step['approver_user_id'] === (int)($u['id'] ?? 0) || is_master();
+    if (($step['approver_role'] ?? '') !== '') return user_role() === $step['approver_role'] || is_master();
+    return true;   // generic step — any approver
+}
+
+// ---------------------------------------------------------------------------
+//  E-mail: send the quote to the customer (§10) + follow-ups (§11)
+// ---------------------------------------------------------------------------
+// Fill {{token}}s in an e-mail subject/body from the quotation.
+function crm_fill_email($text, $q) {
+    $m = [
+        'quote_no' => $q['quote_no'], 'quote_label' => quote_label($q), 'subject' => $q['subject'],
+        'client_name' => $q['client_name'], 'contact_name' => $q['contact_name'],
+        'total_amount' => '₹' . number_format((float)$q['total_amount'], 0), 'validity_days' => $q['validity_days'],
+        'sbu' => lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu'], 'app_name' => app_name(),
+    ];
+    foreach ($m as $k => $v) $text = str_replace('{{' . $k . '}}', (string)$v, $text);
+    return $text;
+}
+function crm_default_quote_email($q) {
+    return "Dear " . ($q['contact_name'] ?: 'Sir/Madam') . ",\n\n"
+        . "Please find attached our quotation " . quote_label($q) . " for " . ($q['subject'] ?: 'your requirement') . ".\n"
+        . "Total value: ₹" . number_format((float)$q['total_amount'], 0) . " (valid " . (int)$q['validity_days'] . " days).\n\n"
+        . "We look forward to your confirmation.\n\nBest regards,\n" . app_name();
+}
+function crm_default_followup_email($q, $kind) {
+    return "Dear " . ($q['contact_name'] ?: 'Sir/Madam') . ",\n\n"
+        . "Gentle follow-up on our quotation " . quote_label($q) . " for " . ($q['subject'] ?: 'your requirement')
+        . " (₹" . number_format((float)$q['total_amount'], 0) . ").\n"
+        . "We would be glad to address any questions or revise as needed.\n\nBest regards,\n" . app_name();
+}
+// Generate the .docx and e-mail it to the customer. Returns [sentBool, message].
+function crm_send_quote_email($q) {
+    if (($q['contact_email'] ?? '') === '') return [false, 'no customer e-mail on the quotation (it was not e-mailed).'];
+    $att = [];
+    $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' AND active=1 ORDER BY is_default DESC, id DESC");
+    if ($tpl && ($tpl['file_data'] ?? '') !== '') {
+        [$bin, $err] = docx_fill(base64_decode($tpl['file_data']), quote_doc_map($q, $tpl), crm_quote_lines($q['id']));
+        if (!$err && $bin) $att[] = ['name' => 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no']) . '.docx', 'data' => $bin, 'type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    }
+    $et = ops_one("SELECT * FROM crm_templates WHERE kind='EMAIL_QUOTE' AND active=1 ORDER BY is_default DESC, id DESC");
+    $subject = ($et && $et['subject']) ? crm_fill_email($et['subject'], $q) : ('Quotation ' . $q['quote_no'] . ' — ' . app_name());
+    $body = ($et && $et['body']) ? crm_fill_email($et['body'], $q) : crm_default_quote_email($q);
+    $ok = ops_mail($q['contact_email'], $subject, $body, '', 'quote_send', $att);
+    return [(bool)$ok, $ok ? '' : 'e-mail could not be sent now (check Settings → SMTP) — it has been logged.'];
+}
+// Cron: send any due follow-ups whose quote is still awaiting a reply (§11).
+function crm_run_followups($today = null) {
+    $today = $today ?: date('Y-m-d'); $sent = 0; $pdo = db();
+    $due = ops_all("SELECT f.id fid, f.kind, q.id qid, q.status qstatus, q.contact_email
+        FROM quote_followups f JOIN quotations q ON q.id=f.quote_id
+        WHERE f.status='PENDING' AND f.due_date<=?", [$today]);
+    $et = ops_one("SELECT * FROM crm_templates WHERE kind='EMAIL_FOLLOWUP' AND active=1 ORDER BY is_default DESC, id DESC");
+    foreach ($due as $f) {
+        if ($f['qstatus'] !== 'SENT' || ($f['contact_email'] ?? '') === '') { $pdo->prepare("UPDATE quote_followups SET status='SKIPPED' WHERE id=?")->execute([$f['fid']]); continue; }
+        $q = crm_quote_get($f['qid']);
+        $subject = ($et && $et['subject']) ? crm_fill_email($et['subject'], $q) : ('Following up — quotation ' . $q['quote_no']);
+        $body = ($et && $et['body']) ? crm_fill_email($et['body'], $q) : crm_default_followup_email($q, $f['kind']);
+        ops_mail($q['contact_email'], $subject, $body, '', 'quote_followup');
+        $pdo->prepare("UPDATE quote_followups SET status='SENT', sent_at=? WHERE id=?")->execute([date('c'), $f['fid']]);
+        $sent++;
+    }
+    return $sent;
+}
+
+// ---------------------------------------------------------------------------
+//  Handlers — approval-rule matrix admin
+// ---------------------------------------------------------------------------
+function ops_crm_approval_rules($route, $method) {
+    ops_require(can('crm.quote.approve') || is_master(), 'You cannot manage approval rules.');
+    $pdo = db();
+    if ($route === 'quote-approval-rules') {
+        $rows = ops_all("SELECT r.*, u.username, u.first_name, u.last_name FROM quote_approval_rules r LEFT JOIN users u ON u.id=r.approver_user_id ORDER BY r.level, r.id");
+        view('ops/crm/approval_rule_list', ['rows' => $rows]); return;
+    }
+    if ($route === 'quote-approval-rule-delete' && $method === 'POST') {
+        $pdo->prepare("DELETE FROM quote_approval_rules WHERE id=?")->execute([(int)($_GET['id'] ?? 0)]);
+        flash('Approval rule deleted.'); redirect('/quote-approval-rules');
+    }
+    if ($route === 'quote-approval-rule-new' || $route === 'quote-approval-rule-edit') {
+        $r = null;
+        if ($route === 'quote-approval-rule-edit') { $r = ops_one("SELECT * FROM quote_approval_rules WHERE id=?", [(int)($_GET['id'] ?? 0)]); if (!$r) { http_response_code(404); view('notfound'); return; } }
+        if ($method === 'POST') {
+            $b = $_POST;
+            $mt = ($b['match_type'] ?? 'ANY') === 'SBU' ? 'SBU' : 'ANY';
+            $vals = [trim($b['name'] ?? ''), $mt, $mt === 'SBU' ? ($b['sbu'] ?? '') : '', (float)($b['min_amount'] ?? 0), (float)($b['max_amount'] ?? 0),
+                max(1, (int)($b['level'] ?? 1)), $b['approver_role'] ?? '', ($b['approver_user_id'] ?? '') !== '' ? (int)$b['approver_user_id'] : null, !empty($b['active']) ? 1 : 0];
+            if ($r) {
+                $pdo->prepare("UPDATE quote_approval_rules SET name=?,match_type=?,sbu=?,min_amount=?,max_amount=?,level=?,approver_role=?,approver_user_id=?,active=? WHERE id=?")
+                    ->execute(array_merge($vals, [$r['id']]));
+                flash('Approval rule saved.');
+            } else {
+                $pdo->prepare("INSERT INTO quote_approval_rules (name,match_type,sbu,min_amount,max_amount,level,approver_role,approver_user_id,active,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
+                    ->execute(array_merge($vals, [date('c')]));
+                flash('Approval rule added.');
+            }
+            redirect('/quote-approval-rules');
+        }
+        view('ops/crm/approval_rule_form', ['r' => $r, 'sbuOpts' => lk_options_or('sbu', OPS_SBUS), 'roles' => ORG_ROLES,
+            'users' => ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username")]); return;
     }
 }
 

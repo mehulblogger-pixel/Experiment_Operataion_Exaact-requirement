@@ -712,7 +712,7 @@ function smtp_config() {
 }
 // Minimal SMTP client (STARTTLS + AUTH LOGIN) — enough for Office 365 / Gmail relay.
 // Throws on any protocol error; the caller logs it and the app keeps working.
-function smtp_send($cfg, $to, $subject, $body, $cc = '') {
+function smtp_send($cfg, $to, $subject, $body, $cc = '', $attachments = []) {
     $port = (int)$cfg['port'];
     $fp = @fsockopen(($port === 465 ? 'ssl://' : '') . $cfg['host'], $port, $errno, $errstr, 15);
     if (!$fp) throw new Exception("connect failed: $errstr ($errno)");
@@ -735,20 +735,33 @@ function smtp_send($cfg, $to, $subject, $body, $cc = '') {
     foreach (array_filter(array_map('trim', array_merge(explode(',', $to), explode(',', $cc)))) as $rcpt)
         $need($say('RCPT TO:<' . $rcpt . '>'), '250');
     $need($say('DATA'), '354');
-    $headers = 'From: ' . app_name() . ' <' . $cfg['from'] . ">\r\nTo: $to\r\n" . ($cc ? "Cc: $cc\r\n" : '')
-        . 'Subject: ' . $subject . "\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n";
-    $data = $headers . preg_replace('/^\./m', '..', str_replace("\r\n", "\n", $body)) . "\r\n.";
+    $hdrTop = 'From: ' . app_name() . ' <' . $cfg['from'] . ">\r\nTo: $to\r\n" . ($cc ? "Cc: $cc\r\n" : '') . 'Subject: ' . $subject . "\r\nMIME-Version: 1.0\r\n";
+    if ($attachments) {
+        $bnd = 'b_' . bin2hex(random_bytes(10));
+        $headers = $hdrTop . "Content-Type: multipart/mixed; boundary=\"$bnd\"\r\n\r\n";
+        $mime = "--$bnd\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n" . str_replace("\r\n", "\n", $body) . "\r\n";
+        foreach ($attachments as $a) {
+            $mime .= "--$bnd\r\nContent-Type: " . ($a['type'] ?? 'application/octet-stream') . "; name=\"" . $a['name'] . "\"\r\n"
+                . "Content-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename=\"" . $a['name'] . "\"\r\n\r\n"
+                . chunk_split(base64_encode($a['data'])) . "\r\n";
+        }
+        $mime .= "--$bnd--";
+        $data = $headers . preg_replace('/^\./m', '..', $mime) . "\r\n.";
+    } else {
+        $headers = $hdrTop . "Content-Type: text/plain; charset=UTF-8\r\n\r\n";
+        $data = $headers . preg_replace('/^\./m', '..', str_replace("\r\n", "\n", $body)) . "\r\n.";
+    }
     $need($say($data), '250');
     $say('QUIT');
     fclose($fp);
     return true;
 }
-function ops_mail($to, $subject, $body, $cc = '', $kind = '') {
+function ops_mail($to, $subject, $body, $cc = '', $kind = '', $attachments = []) {
     $ok = 0; $err = '';
     if ($to) {
         $smtp = smtp_config();
         if ($smtp) {
-            try { smtp_send($smtp, $to, $subject, $body, $cc); $ok = 1; }
+            try { smtp_send($smtp, $to, $subject, $body, $cc, $attachments); $ok = 1; }
             catch (Throwable $e) { $err = 'SMTP: ' . $e->getMessage(); }
         } elseif (getenv('OPS_MAIL_ENABLED')) {
             $from = getenv('OPS_MAIL_FROM') ?: 'no-reply@mghaiapps.com';
@@ -1151,7 +1164,7 @@ function ops_module_gate($route) {
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring',
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring',
         'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries',
-        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes',
+        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-approve'=>'quotes','quote-approval-rules'=>'quotes',
         'attendance-recon'=>'reconcile',
         'masters'=>'masters',
         'office-finance'=>'overheads',
@@ -1210,10 +1223,12 @@ function ops_dispatch($route, $method) {
             ops_candidates($route, $method); return true;
         case $route === 'inquiries' || $route === 'inquiry-new' || $route === 'inquiry-edit':
             ops_crm_inquiries($route, $method); return true;
-        case $route === 'quotes' || $route === 'quote' || $route === 'quote-new' || $route === 'quote-edit' || $route === 'quote-revise' || $route === 'quote-status' || $route === 'quote-doc':
+        case $route === 'quotes' || $route === 'quote' || $route === 'quote-new' || $route === 'quote-edit' || $route === 'quote-revise' || $route === 'quote-status' || $route === 'quote-doc' || $route === 'quote-approve':
             ops_crm_quotes($route, $method); return true;
         case $route === 'crm-templates' || $route === 'crm-template-new' || $route === 'crm-template-edit' || $route === 'crm-template-delete' || $route === 'crm-template-download':
             ops_crm_templates($route, $method); return true;
+        case $route === 'quote-approval-rules' || $route === 'quote-approval-rule-new' || $route === 'quote-approval-rule-edit' || $route === 'quote-approval-rule-delete':
+            ops_crm_approval_rules($route, $method); return true;
         case $route === 'requisitions' || $route === 'requisition-new' || $route === 'requisition-edit' || $route === 'requisition':
             ops_requisitions($route, $method); return true;
         case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry' || $route === 'voucher-save' || $route === 'voucher-header' || $route === 'voucher-status' || $route === 'voucher-print' || $route === 'voucher-file' || $route === 'voucher-csv':

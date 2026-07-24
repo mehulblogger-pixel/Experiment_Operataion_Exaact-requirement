@@ -7,6 +7,7 @@
   <div><h1>Quotations</h1>
     <p class="sub" style="margin:2px 0 0">Quote → approval → send → follow-up → acceptance. <?= count($rows) ?> shown.</p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <?php if (can('crm.quote.approve') || is_master()): ?><a class="btn secondary" href="/quote-approval-rules">Approval rules</a><?php endif; ?>
     <?php if (can('crm.template.manage') || is_master()): ?><a class="btn secondary" href="/crm-templates">Templates</a><?php endif; ?>
     <?php if (can('crm.quote.create') || can('mod.quotes.edit')): ?><a class="btn" href="/quote-new">+ New quotation</a><?php endif; ?>
   </div>
