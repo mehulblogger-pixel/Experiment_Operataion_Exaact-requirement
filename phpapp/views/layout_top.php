@@ -30,10 +30,11 @@
         <a class="s-item<?= $navOn(['my-jobs']) ?>" href="/my-jobs"><span class="s-ic">🗂</span><span>My Jobs</span></a>
         <a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span>My Voucher</span></a>
       <?php else: ?>
-        <?php if (can('mod.inquiries.view')||can('mod.quotes.view')): ?>
+        <?php if (can('mod.inquiries.view')||can('mod.quotes.view')||can('mod.crm_reports.view')): ?>
         <div class="s-grp">Sales / CRM</div>
         <?php if (can('mod.inquiries.view')): ?><a class="s-item<?= $navOn(['inquiries','inquiry']) ?>" href="/inquiries"><span class="s-ic">📨</span><span>Inquiries</span></a><?php endif; ?>
         <?php if (can('mod.quotes.view')): ?><a class="s-item<?= $navOn(['quotes','quote']) ?>" href="/quotes"><span class="s-ic">📝</span><span>Quotations</span></a><?php endif; ?>
+        <?php if (can('mod.crm_reports.view')): ?><a class="s-item<?= $navOn(['crm-reports']) ?>" href="/crm-reports"><span class="s-ic">📈</span><span>Sales dashboard</span></a><?php endif; ?>
         <?php endif; ?>
 
         <?php if (can('mod.calls.view')||can('mod.jobs.view')||can('mod.vouchers.view')||can('mod.hiring.view')||can('mod.reconcile.view')): ?>

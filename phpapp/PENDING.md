@@ -236,8 +236,21 @@ afterwards (current landing dashboard "is not what we're expecting").**
   CV, salary slips, IDs, certificates (EMAIL_CREDENTIAL template or a sensible default).
 - Verified: keyword extraction, keyword search hit, tracking saved, credential e-mail
   logged to the candidate.
-- **CRM roadmap (P0–P6) is now functionally complete.** Remaining big items: the
-  **AI-keys** master-settings feature, then the **Executive-Director dashboard** rebuild.
+### ✅ P7 shipped (2026-07) — Sales / CRM dashboard + monthly report + win/loss
+- **Sales dashboard** (CRM → Sales dashboard, gated `mod.crm_reports.view`): FY-filtered,
+  scope-aware. KPIs — quotations, **open pipeline value**, **won value**, **win rate**.
+- Charts: quotes by status (donut), quoted value by SBU, **top customers by quoted &
+  by won value**, and **"Why we lost" win/loss** breakdown by reason (§ lost-reason master).
+- **Monthly performance table** (§15): per month — raised / won / lost / won value.
+- **CSV export** of all quotes in scope for the FY.
+
+### ✅ CRM ROADMAP COMPLETE (P0–P7)
+Inquiry → quotation (+ revisions, Word template w/ doc & format numbers) → approval
+chain (amount/SBU) → send-to-customer (Word attached) → follow-up e-mails → acceptance
+→ client + contract registration → Operations hand-off → job link (revenue, HOLD,
+deliverables) → CV analysis + client-submission tracking → sales dashboard/reports.
+Remaining big items: the **AI-keys** master-settings feature, then **dashboards for all
+roles** (incl. the Executive-Director rebuild).
 
 ### 🤖 PARKED — AI keys in master settings (owner request, 2026-07)
 Administrator can, under master settings, enter **API keys for multiple AI

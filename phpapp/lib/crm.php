@@ -889,6 +889,49 @@ function ops_crm_templates($route, $method) {
         view('ops/crm/template_form', ['t' => $t, 'kinds' => CRM_TEMPLATE_KINDS]); return;
     }
 }
+// ---------------------------------------------------------------------------
+//  Sales / CRM dashboard + monthly report + win/loss analytics (§14,§15)
+// ---------------------------------------------------------------------------
+function ops_crm_reports() {
+    ops_require(can('mod.crm_reports.view') || is_master(), 'You do not have access to sales reports.');
+    $fy = $_GET['fy'] ?? current_fy();
+    [$from, $to] = fy_range($fy);
+    [$sw, $sa] = scope_clause('q.office_id', 'q.sbu');
+    $rows = ops_all("SELECT q.*, bp.display_name client_disp FROM quotations q LEFT JOIN business_partners bp ON bp.id=q.client_id WHERE q.is_current=1 AND $sw", $sa);
+    // keep FY by created date
+    $rows = array_values(array_filter($rows, function ($r) use ($from, $to) { $d = substr((string)$r['created_at'], 0, 10); return $d >= $from && $d <= $to; }));
+
+    $sbuLbl = lk_options_or('sbu', OPS_SBUS); $lostLbl = lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS);
+    $byStatus = []; $bySbu = []; $byClient = []; $wonByClient = []; $lost = []; $months = [];
+    $totVal = 0; $wonVal = 0; $openVal = 0; $nWon = 0; $nLost = 0;
+    foreach ($rows as $r) {
+        $st = $r['status']; $v = (float)$r['total_amount'];
+        $byStatus[QUOTE_STATUS[$st] ?? $st] = ($byStatus[QUOTE_STATUS[$st] ?? $st] ?? 0) + 1;
+        $sk = $sbuLbl[$r['sbu']] ?? ($r['sbu'] ?: '—'); $bySbu[$sk] = ($bySbu[$sk] ?? 0) + $v;
+        $ck = $r['client_disp'] ?: ($r['client_name'] ?: '—'); $byClient[$ck] = ($byClient[$ck] ?? 0) + $v;
+        $totVal += $v;
+        $mo = substr((string)$r['created_at'], 0, 7);
+        if (!isset($months[$mo])) $months[$mo] = ['raised' => 0, 'won' => 0, 'lost' => 0, 'wonVal' => 0];
+        $months[$mo]['raised']++;
+        if ($st === 'ACCEPTED') { $nWon++; $wonVal += $v; $wonByClient[$ck] = ($wonByClient[$ck] ?? 0) + $v; $months[$mo]['won']++; $months[$mo]['wonVal'] += $v; }
+        elseif (in_array($st, ['LOST', 'EXPIRED'], true)) { $nLost++; $lr = $r['lost_reason'] ?: '—'; $lbl = ($lr === 'OTHER' && $r['lost_reason_other']) ? $r['lost_reason_other'] : ($lostLbl[$lr] ?? $lr); $lost[$lbl] = ($lost[$lbl] ?? 0) + 1; $months[$mo]['lost']++; }
+        elseif (in_array($st, QUOTE_OPEN_STATES, true)) $openVal += $v;
+    }
+    if (wants_csv()) {
+        $csv = [['Quote', 'Client', 'SBU', 'Status', 'Total', 'Created', 'Accepted', 'Lost reason', 'Contract']];
+        foreach ($rows as $r) $csv[] = [quote_label($r), $r['client_disp'] ?: $r['client_name'], $sbuLbl[$r['sbu']] ?? $r['sbu'],
+            QUOTE_STATUS[$r['status']] ?? $r['status'], (float)$r['total_amount'], substr((string)$r['created_at'], 0, 10),
+            $r['accepted_date'], ($r['lost_reason'] === 'OTHER' && $r['lost_reason_other']) ? $r['lost_reason_other'] : ($lostLbl[$r['lost_reason']] ?? $r['lost_reason']), $r['contract_number']];
+        csv_download('sales-quotes-' . $fy . '.csv', $csv);
+    }
+    arsort($byClient); arsort($wonByClient); arsort($lost); krsort($months);
+    view('ops/crm/reports', [
+        'fy' => $fy, 'fyOpts' => fy_options(6), 'total' => count($rows), 'totVal' => $totVal, 'wonVal' => $wonVal, 'openVal' => $openVal,
+        'nWon' => $nWon, 'nLost' => $nLost, 'winRate' => ($nWon + $nLost) > 0 ? round($nWon / ($nWon + $nLost) * 100) : 0,
+        'byStatus' => $byStatus, 'bySbu' => $bySbu, 'topClients' => array_slice($byClient, 0, 10, true),
+        'wonClients' => array_slice($wonByClient, 0, 10, true), 'lost' => $lost, 'months' => $months]);
+}
+
 // ===========================================================================
 //  CV analysis — dependency-free keyword extraction (§20 + owner's ask)
 //  Internal engine now (works offline on shared hosting). AI-ready: when the
