@@ -1250,6 +1250,8 @@ function ops_dispatch($route, $method) {
             ops_crm_templates($route, $method); return true;
         case $route === 'quote-approval-rules' || $route === 'quote-approval-rule-new' || $route === 'quote-approval-rule-edit' || $route === 'quote-approval-rule-delete':
             ops_crm_approval_rules($route, $method); return true;
+        case $route === 'crm-reports':
+            ops_crm_reports(); return true;
         case $route === 'requisitions' || $route === 'requisition-new' || $route === 'requisition-edit' || $route === 'requisition':
             ops_requisitions($route, $method); return true;
         case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry' || $route === 'voucher-save' || $route === 'voucher-header' || $route === 'voucher-status' || $route === 'voucher-print' || $route === 'voucher-file' || $route === 'voucher-csv':
