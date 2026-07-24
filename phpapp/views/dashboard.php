@@ -140,11 +140,42 @@
     <?php else: ?><p class="muted">Nothing pending — all calls are scheduled. 🎉</p><?php endif; ?>
     <?php endif; $secSched = ob_get_clean();
 
+    // ---------- section: Sales / CRM pipeline ----------
+    $crmView = can('mod.quotes.view'); $secCrm = ''; $isExec = in_array($role, ['BUSINESS_DIRECTOR','SBU_HEAD','BRANCH_MANAGER'], true) || is_master();
+    if ($crmView) {
+      [$qw, $qa] = scope_clause('q.office_id', 'q.sbu');
+      $qs = ops_one("SELECT
+          SUM(CASE WHEN status IN ('DRAFT','PENDING_APPROVAL','APPROVED','SENT') THEN 1 ELSE 0 END) open_n,
+          SUM(CASE WHEN status IN ('DRAFT','PENDING_APPROVAL','APPROVED','SENT') THEN total_amount ELSE 0 END) open_val,
+          SUM(CASE WHEN status='SENT' THEN 1 ELSE 0 END) sent_n,
+          SUM(CASE WHEN status='ACCEPTED' THEN total_amount ELSE 0 END) won_val,
+          SUM(CASE WHEN status='ACCEPTED' THEN 1 ELSE 0 END) won_n,
+          SUM(CASE WHEN status IN ('LOST','EXPIRED') THEN 1 ELSE 0 END) lost_n
+          FROM quotations q WHERE is_current=1 AND $qw", $qa) ?: [];
+      $fuDue = (int)ops_val("SELECT COUNT(*) FROM quote_followups f JOIN quotations q ON q.id=f.quote_id WHERE f.status='PENDING' AND f.due_date<=? AND q.status='SENT' AND $qw", array_merge([$today], $qa));
+      $pendApprove = (can('crm.quote.approve') || is_master()) ? (int)ops_val("SELECT COUNT(*) FROM quote_approvals a JOIN quotations q ON q.id=a.quote_id WHERE a.status='PENDING' AND q.status='PENDING_APPROVAL' AND $qw", $qa) : 0;
+      $winRate = ((int)$qs['won_n'] + (int)$qs['lost_n']) > 0 ? round((int)$qs['won_n'] / ((int)$qs['won_n'] + (int)$qs['lost_n']) * 100) : 0;
+      ob_start(); ?>
+      <div class="ctitle" style="margin-top:22px"><h3>Sales pipeline</h3><a href="/quotes">Quotations →</a><?php if (can('mod.crm_reports.view')): ?> <a href="/crm-reports" style="margin-left:8px">Sales dashboard →</a><?php endif; ?></div>
+      <div class="qcards">
+        <a class="qcard tone-info" href="/quotes?v=open"><div class="qic">📝</div><div class="qn"><?= (int)$qs['open_n'] ?></div><div class="ql">Open quotes</div></a>
+        <a class="qcard tone-warn" href="/quotes?v=pending"><div class="qic">◷</div><div class="qn"><?= (int)$qs['sent_n'] ?></div><div class="ql">Awaiting reply</div></a>
+        <?php if ($pendApprove): ?><a class="qcard tone-bad" href="/quotes?v=pending"><div class="qic">✔</div><div class="qn"><?= $pendApprove ?></div><div class="ql">Pending your approval</div></a>
+        <?php elseif ($fuDue): ?><a class="qcard tone-bad" href="/quotes?v=pending"><div class="qic">✉</div><div class="qn"><?= $fuDue ?></div><div class="ql">Follow-ups due</div></a>
+        <?php else: ?><a class="qcard tone-ok" href="/quotes?v=closed"><div class="qic">🏆</div><div class="qn"><?= (int)$qs['won_n'] ?></div><div class="ql">Won this FY</div></a><?php endif; ?>
+        <a class="qcard tone-ok" href="/quotes?v=open"><div class="qic">💰</div><div class="qn" style="font-size:16px"><?= fmoney_short($qs['open_val']) ?></div><div class="ql">Pipeline value<?= $isExec ? ' · '.$winRate.'% win' : '' ?></div></a>
+      </div>
+      <?php $secCrm = ob_get_clean();
+    }
+
     // ---------- role-based ordering ----------
     echo $secKpi;
-    if ($moneyFirst)      { echo $secMoney; echo $secCharts; echo $secSched; echo $secQuick; }
-    elseif ($schedFirst)  { echo $secSched; echo $secMoney; echo $secCharts; echo $secQuick; }
-    else                  { echo $secMoney; echo $secCharts; echo $secQuick; echo $secSched; }
+    if ($isExec)          { echo $secCrm; echo $secMoney; echo $secCharts; echo $secQuick; echo $secSched; }
+    elseif (in_array($role, ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'], true))
+                          { echo $secCrm; echo $secQuick; echo $secMoney; echo $secCharts; }
+    elseif ($moneyFirst)  { echo $secMoney; echo $secCharts; echo $secSched; echo $secQuick; echo $secCrm; }
+    elseif ($schedFirst)  { echo $secSched; echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; }
+    else                  { echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; echo $secSched; }
   ?>
   <?php
     $deskAdmin = is_coordinator_level() || is_admin_level();
