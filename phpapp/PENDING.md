@@ -190,8 +190,25 @@ afterwards (current landing dashboard "is not what we're expecting").**
   EMAIL_FOLLOWUP template; skips once the quote is accepted/lost.
 - Verified end-to-end: rule match → chain built → approve → Approved → send (logged) →
   follow-up cron sends the due one and skips the rest.
-- **Next (P4):** acceptance → register client + contract number → auto-float the
-  Operations packet (§12,§13); open (ARC) vs line-item orders (§17).
+### ✅ P4 shipped (2026-07) — acceptance → contract → Operations hand-off
+- **Acceptance → register client** (§12): marking a quote **Accepted (won)** opens an
+  Accounts panel; entering the **contract number** auto-registers the customer as a
+  client (if only a name was typed → `GEN-<name>-####`) and links `client_id`.
+- **Contract record** (§13): a `partner_contracts` row is created (number, title,
+  value, dates) and linked to the quotation (`contract_id`, `contract_number`).
+- **Operations packet auto-floated** (§13): on contract entry an e-mail goes to the
+  coordinators + ops managers with **client, quotation no, contract no, contact
+  person/email/mobile, SBU, location, value, advance/report-vs-payment flags, the
+  service requirement, and the order lines** — with the **techno-commercial (.docx)
+  attached**. A "Re-send to operations" button re-floats it.
+- **Open (ARC) vs line-item orders** (§17): each order line is labelled
+  **[Open order (ARC / call-off)]** or **[Line-item order]** in the packet (the type
+  is captured per line on the quote).
+- Verified end-to-end: typed-name client auto-registered (GEN-BRAND-0001), contract
+  linked (₹7,67,000), packet body correct with ARC vs line-item labels + service req.
+- **Next (P5):** link quote/contract line items to jobs → revenue line-item-wise per
+  quote & contract (§16); advance-payment + report-vs-payment HOLD visible to the
+  inspector (§21,§22); deliverables fetched from the quote (§24).
 
 ### 🤖 PARKED — AI keys in master settings (owner request, 2026-07)
 Administrator can, under master settings, enter **API keys for multiple AI

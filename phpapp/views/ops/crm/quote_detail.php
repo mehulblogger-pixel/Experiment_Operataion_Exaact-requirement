@@ -141,6 +141,33 @@
   </div>
 </div>
 
+<?php if ($st==='ACCEPTED'): ?>
+<div class="panel" style="border:1px solid var(--ok)">
+  <h3 class="tab-sub" style="margin-top:0">✅ Won — client &amp; contract registration (Accounts)</h3>
+  <?php if ($q['contract_number']): ?>
+    <table class="kv">
+      <tr><td class="muted">Registered client</td><td><?= $clientReg ? e($clientReg['legal_name']).' <span class="muted">('.e($clientReg['code']).')</span>' : e($q['client_name']) ?></td></tr>
+      <tr><td class="muted">Contract number</td><td><b><?= e($q['contract_number']) ?></b></td></tr>
+    </table>
+    <p class="sub" style="margin:8px 0 0">Operations packet (client, quote/contract no, contacts, service requirement, order lines, techno-commercial) has been floated to the team.</p>
+    <form method="post" action="/quote-float?id=<?= (int)$q['id'] ?>" style="margin-top:8px"><button class="btn small secondary" type="submit">Re-send to operations</button></form>
+  <?php elseif ($canContract): ?>
+    <p class="sub">Enter the contract number to register the client (if new) and float the order to operations.</p>
+    <form method="post" action="/quote-contract?id=<?= (int)$q['id'] ?>">
+      <div class="form-grid">
+        <div class="ff"><label>Contract number *</label><input class="form-control" name="contract_number" required placeholder="e.g. SGS/CON/2026/0142"></div>
+        <div class="ff"><label>Contract start</label><input class="form-control" type="date" name="start_date"></div>
+        <div class="ff"><label>Contract end</label><input class="form-control" type="date" name="end_date"></div>
+      </div>
+      <?php if (empty($q['client_id']) && $q['client_name']): ?><p class="muted" style="margin:6px 2px">"<?= e($q['client_name']) ?>" will be registered as a client automatically.</p><?php endif; ?>
+      <div style="margin-top:10px"><button class="btn" type="submit">Register &amp; float to operations</button></div>
+    </form>
+  <?php else: ?>
+    <p class="sub">Awaiting Accounts to register the client &amp; contract number.</p>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php if ($st==='LOST' && $q['lost_reason']): ?>
 <div class="panel" style="border:1px solid var(--bad)"><b>Lost reason:</b> <?= e(lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS)[$q['lost_reason']] ?? $q['lost_reason']) ?><?= $q['lost_reason_other']?' — '.e($q['lost_reason_other']):'' ?></div>
 <?php endif; ?>
