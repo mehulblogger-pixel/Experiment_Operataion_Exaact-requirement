@@ -244,6 +244,20 @@ afterwards (current landing dashboard "is not what we're expecting").**
 - **Monthly performance table** (§15): per month — raised / won / lost / won value.
 - **CSV export** of all quotes in scope for the FY.
 
+### ✅ Client PDF + signature + customisable letterhead (2026-07)
+- **Client-facing quote is now a PDF** (the .docx stays for internal editing). A
+  dependency-free pure-PHP writer (`lib/pdf.php`, no Composer/library) renders a
+  professional quotation — line items, totals, amount-in-words, terms — and the
+  **"Send to customer" e-mail now attaches the PDF**. Buttons on the quote: **PDF (for
+  client)** + **Word (editable)**.
+- **Signature image** (upload PNG/JPG under CRM → Templates) + name/designation are
+  **stamped on the PDF** (GD normalises PNG → JPEG; embedded via DCTDecode).
+- **Customisable per-company letterhead** (owner's ask): upload **logo**, set company
+  **name / address / contact line / footer** — rendered as the PDF letterhead; the
+  document & format numbers from the uploaded format print top-right.
+- Verified: valid PDF (correct xref/EOF), letterhead + logo + signature embedded,
+  generated over HTTP (application/pdf), admin panels save.
+
 ### ✅ CRM ROADMAP COMPLETE (P0–P7)
 Inquiry → quotation (+ revisions, Word template w/ doc & format numbers) → approval
 chain (amount/SBU) → send-to-customer (Word attached) → follow-up e-mails → acceptance

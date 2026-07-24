@@ -34,6 +34,7 @@ try {
     require __DIR__ . '/lib/lookups.php';
     require __DIR__ . '/lib/access.php';
     require __DIR__ . '/lib/crm.php';
+    require __DIR__ . '/lib/pdf.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine());

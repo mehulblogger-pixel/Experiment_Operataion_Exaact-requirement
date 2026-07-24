@@ -17,6 +17,7 @@ require __DIR__ . '/lib/ops.php';
 require __DIR__ . '/lib/lookups.php';
 require __DIR__ . '/lib/access.php';
 require __DIR__ . '/lib/crm.php';
+require __DIR__ . '/lib/pdf.php';
 
 // When invoked over HTTP, require a matching key so strangers can't trigger it.
 if (PHP_SAPI !== 'cli') {
