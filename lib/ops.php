@@ -1218,7 +1218,7 @@ function ops_dispatch($route, $method) {
             ops_require(is_master(), 'Only the Master Admin can load demo data.');
             if ($method === 'POST') {
                 $res = seed_demo();
-                if (!empty($res['skipped'])) flash('Demo data is already loaded.', 'warning');
+                if (!empty($res['skipped'])) flash('Demo data is already loaded. To refresh it with the latest sample records (e.g. agencies, requisitions), click "Remove demo data" first, then "Load demo data" again.', 'warning');
                 elseif (!empty($res['error'])) flash('Could not load demo data: ' . $res['error'], 'error');
                 else { $x = $res['counts']; flash("Demo data loaded — {$x['offices']} offices, {$x['users']} users, {$x['inspectors']} inspectors, {$x['partners']} clients/vendors, {$x['boss']} BOSS, {$x['calls']} calls, {$x['jobs']} jobs, {$x['vouchers']} vouchers, plus " . ($x['edge_cases'] ?? 0) . " generated edge-case records. Log in as any demo user (e.g. director, account, insp.ravi) with password demo12345."); }
             }
@@ -2728,13 +2728,15 @@ function ops_reports() {
         'insp'  => $_GET['insp'] ?? '',
         'act'   => $_GET['act'] ?? '',
         'itype' => $_GET['itype'] ?? '',
+        'client'=> $_GET['client'] ?? '',
     ];
     [$fyFrom, $fyTo] = fy_range($F['fy']);
     // ---- scoped data ----
     [$scopeW, $scopeArgs] = scope_clause('j.executing_office_id', 'j.sbu');
     $jobs = ops_all("SELECT j.*, i.salary_ctc, i.name inspector_name, i.id ins_id, i.trade_id, bp.legal_name client_name, bp.display_name client_disp,
-        c.region, o.name office_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id
+        c.client_id, c.region, o.name office_name, bn.boss_number FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id
         LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
+        LEFT JOIN boss_numbers bn ON bn.id=j.boss_id
         LEFT JOIN offices o ON o.id=j.executing_office_id WHERE $scopeW", $scopeArgs);
     [$cScopeW, $cScopeArgs] = scope_clause('c.executing_office_id', 'c.sbu');
     $calls = ops_all("SELECT c.*, (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id AND j.scheduled_date<>'') sched_jobs
@@ -2747,6 +2749,7 @@ function ops_reports() {
             if ($F['office'] !== '' && (int)($r['executing_office_id'] ?? 0) !== (int)$F['office']) return false;
             if ($F['sbu'] !== '' && ($r['sbu'] ?? '') !== $F['sbu']) return false;
             if ($F['insp'] !== '' && (int)($r['inspector_id'] ?? 0) !== (int)$F['insp']) return false;
+            if ($F['client'] !== '' && (int)($r['client_id'] ?? 0) !== (int)$F['client']) return false;
             if ($F['act'] !== '' && (int)($r['activity_id'] ?? 0) !== (int)$F['act']) return false;
             if ($F['itype'] !== '' && ($r['inspection_type'] ?? '') !== $F['itype']) return false;
             return true;
@@ -2765,7 +2768,7 @@ function ops_reports() {
     }
 
     // ---- FINANCIAL ----
-    $fin = ['credit'=>0,'recv'=>0,'given'=>0,'labour'=>0,'exp'=>0,'subcon'=>0,'profit'=>0,'bySbu'=>[],'byOffice'=>[],'expHead'=>['travel'=>0,'local'=>0,'food'=>0,'lodging'=>0,'misc'=>0],'expHeadExtra'=>[],
+    $fin = ['credit'=>0,'recv'=>0,'given'=>0,'labour'=>0,'exp'=>0,'subcon'=>0,'profit'=>0,'bySbu'=>[],'byOffice'=>[],'byClient'=>[],'byProject'=>[],'expHead'=>['travel'=>0,'local'=>0,'food'=>0,'lodging'=>0,'misc'=>0],'expHeadExtra'=>[],
         'invoiced'=>0,'paid'=>0,'outstanding'=>0,'overdue'=>0,'creditRecvCnt'=>0,'creditPendCnt'=>0];
     $byInspector=[]; $todayD=date('Y-m-d');
     foreach ($jobs as $j) {
@@ -2778,6 +2781,11 @@ function ops_reports() {
         if (($j['credit_direction']??'')!=='GIVEN' && (($j['executing_office_id']??null))) { if (!empty($j['credit_received'])) $fin['creditRecvCnt']++; else $fin['creditPendCnt']++; }
         $sk=$j['sbu']?:'—'; $fin['bySbu'][$sk]=($fin['bySbu'][$sk]??0)+$p['credit'];
         $ok=$j['office_name']?:'Ahmedabad'; $fin['byOffice'][$ok]=($fin['byOffice'][$ok]??0)+$p['credit'];
+        // Revenue = invoiced value where raised, else expected credit. Grouped by
+        // customer (top-10 chart) and by project/BOSS (revenue-by-project chart).
+        $rev=(float)($j['invoice_amount']??0); if ($rev<=0) $rev=$p['credit'];
+        if ($rev!=0){ $ck=$j['client_disp']?:($j['client_name']?:'(no client)'); $fin['byClient'][$ck]=($fin['byClient'][$ck]??0)+$rev;
+            $pk=$j['boss_number']?:'(no BOSS)'; $fin['byProject'][$pk]=($fin['byProject'][$pk]??0)+$rev; }
         foreach (ops_all("SELECT * FROM expenses WHERE job_id=?", [$j['id']]) as $x) {
             foreach (['travel','local','food','lodging','misc'] as $h) $fin['expHead'][$h]+=(float)$x[$h];
             foreach (expense_extra_decode($x['extra'] ?? '') as $code=>$amt) $fin['expHeadExtra'][$code]=($fin['expHeadExtra'][$code]??0)+(float)$amt;
@@ -2824,7 +2832,12 @@ function ops_reports() {
     $certSoon=[]; foreach ($certExp as $c){ $dleft=days_between($today,$c['valid_to']); if ($dleft!==null && $dleft<=90){ $c['days']=$dleft; $certSoon[]=$c; } }
     $byTrade=[]; foreach (ops_all("SELECT trade_id, COUNT(*) n FROM inspectors WHERE status='ACTIVE' GROUP BY trade_id") as $r){ $byTrade[trade_label($r['trade_id'])]=$r['n']; }
 
+    // ---- top-10 customers by revenue + revenue by project (BOSS) ----
+    arsort($fin['byClient']); $fin['byClientTop'] = array_slice($fin['byClient'], 0, 10, true);
+    arsort($fin['byProject']); $fin['byProjectTop'] = array_slice($fin['byProject'], 0, 10, true);
+
     // ---- filter option lists (scope-limited) ----
+    $clientOpts = ops_all("SELECT id, COALESCE(NULLIF(display_name,''), legal_name) name FROM business_partners WHERE is_client=1 ORDER BY name");
     $offOpts = scope_offices()==='ALL' ? offices_list() : array_filter(offices_list(), fn($o)=>in_array((int)$o['id'], scope_offices()));
     $sbuAll = lk_options_or('sbu', OPS_SBUS);
     $sbuOpts = scope_sbus()==='ALL' ? $sbuAll : array_intersect_key($sbuAll, array_flip(scope_sbus()));
@@ -2833,10 +2846,11 @@ function ops_reports() {
         'F'=>$F, 'seeFin'=>$seeFin, 'seeSalary'=>$seeSalary, 'tatThresh'=>$tatThresh,
         'op'=>$op, 'fin'=>$fin, 'byInspector'=>$byInspector, 'util'=>$util, 'mdBySbu'=>$mdBySbu,
         'depMd'=>$depMd, 'inspMd'=>$inspMd, 'subMd'=>$subMd, 'certSoon'=>$certSoon, 'byTrade'=>$byTrade,
-        'fyOpts'=>fy_options(6), 'offOpts'=>$offOpts, 'sbuOpts'=>$sbuOpts,
+        'fyOpts'=>fy_options(6), 'offOpts'=>$offOpts, 'sbuOpts'=>$sbuOpts, 'clientOpts'=>$clientOpts,
         'inspOpts'=>inspectors_list(false), 'actType'=>lk_type('activity'),
         'itypeOpts'=>lk_options_or('inspection_type', INSPECTION_TYPES),
         'canOps'=>can('dash.operations'),'canUtil'=>can('dash.utilization'),'canPeople'=>can('dash.people'),
+        'hideCerts'=>((current_user()['role'] ?? '')==='BUSINESS_DIRECTOR'),
     ]);
 }
 

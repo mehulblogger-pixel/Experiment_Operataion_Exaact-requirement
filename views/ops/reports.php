@@ -19,6 +19,8 @@
     <?php foreach ($offOpts as $o): ?><option value="<?= (int)$o['id'] ?>" <?= (string)$F['office']===(string)$o['id']?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?></select>
   <select class="form-control" name="sbu" onchange="this.form.submit()"><option value="">All SBUs</option>
     <?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= $F['sbu']===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
+  <select class="form-control searchable" name="client" onchange="this.form.submit()"><option value="">All clients</option>
+    <?php foreach (($clientOpts ?? []) as $cl): ?><option value="<?= (int)$cl['id'] ?>" <?= (string)$F['client']===(string)$cl['id']?'selected':'' ?>><?= e($cl['name']) ?></option><?php endforeach; ?></select>
   <select class="form-control" name="insp" onchange="this.form.submit()"><option value="">All inspectors</option>
     <?php foreach ($inspOpts as $i): ?><option value="<?= (int)$i['id'] ?>" <?= (string)$F['insp']===(string)$i['id']?'selected':'' ?>><?= e($i['name']) ?></option><?php endforeach; ?></select>
   <?php if ($actType): ?><select class="form-control" name="act" onchange="this.form.submit()"><option value="">All activities</option>
@@ -78,6 +80,10 @@
   $exLbls = expense_extra_headings();
   foreach (($fin['expHeadExtra']??[]) as $code=>$amt) if ($amt>0) $expByHead[$exLbls[$code]??$code] = $amt;
 ?>
+<div class="panel-split">
+  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Top 10 customers by revenue</h4><?= svg_hbars($fin['byClientTop'] ?? [], true) ?></div>
+  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Revenue by project (BOSS)</h4><?= svg_hbars($fin['byProjectTop'] ?? [], true) ?></div>
+</div>
 <div class="panel-split">
   <div class="panel"><h4 class="tab-sub" style="margin-top:0">Credit by SBU</h4><?= svg_donut(chart_relabel_sbu($fin['bySbu']), true) ?></div>
   <div class="panel"><h4 class="tab-sub" style="margin-top:0">Credit by office</h4><?= svg_hbars($fin['byOffice'], true) ?></div>
@@ -146,10 +152,12 @@
 <?php if ($canPeople): ?>
 <h3 class="tab-sub fam">🧑‍🔧 People &amp; Compliance</h3>
 <div class="panel-split">
+  <?php if (empty($hideCerts)): ?>
   <div class="panel"><h3 class="tab-sub" style="margin-top:0;">Certificates expiring (≤90 days)</h3>
     <table class="grid"><tr><th>Inspector</th><th>Certificate</th><th>Valid to</th><th>Left</th></tr>
       <?php foreach ($certSoon as $c): ?><tr><td><?= e($c['inspector_name']) ?></td><td><?= e($c['name']) ?></td><td><?= e($c['valid_to']) ?></td><td><?php $d=$c['days']; ?><span class="badge <?= $d<0?'RED':($d<=30?'AMBER':'GREEN') ?>"><?= $d<0?abs($d).'d over':$d.'d' ?></span></td></tr><?php endforeach; ?>
       <?php if(!$certSoon):?><tr><td colspan="4">No certificates due.</td></tr><?php endif;?></table></div>
+  <?php endif; ?>
   <div class="panel"><h3 class="tab-sub" style="margin-top:0;">Inspectors by trade</h3>
     <?= svg_hbars($byTrade) ?></div>
 </div>
