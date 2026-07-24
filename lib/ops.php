@@ -55,6 +55,8 @@ const CAND_STAGES = [
     'SUBMITTED'  => 'Submitted to client',
     'SHORTLISTED'=> 'Shortlisted',
     'INTERVIEW'  => 'Interview scheduled',
+    'OFFERED'    => 'Offer released',
+    'OFFER_DECLINED' => 'Offer declined (backed out)',
     'HOLD'       => 'On hold',
     'REJECTED'   => 'Rejected',
     'ACCEPTED'   => 'Accepted (Hired)',
@@ -1735,7 +1737,7 @@ function ops_candidates($route, $method) {
             $to = $_POST['to_stage'] ?? '';
             if (!isset(CAND_STAGES[$to])) { flash('Unknown stage.', 'error'); redirect('/candidate?id=' . $id); }
             $remark = trim($_POST['remark'] ?? '');
-            $decided = in_array($to, ['ACCEPTED','REJECTED','WITHDRAWN'], true) ? date('c') : ($cand['decided_at'] ?: '');
+            $decided = in_array($to, ['ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED'], true) ? date('c') : ($cand['decided_at'] ?: '');
             $pdo->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")->execute([$to, $decided, $id]);
             $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
                 ->execute([$id, $cand['stage'], $to, $remark, user_name(current_user()), date('c')]);
