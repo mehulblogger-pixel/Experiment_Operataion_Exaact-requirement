@@ -33,6 +33,7 @@ try {
     require __DIR__ . '/lib/ops.php';
     require __DIR__ . '/lib/lookups.php';
     require __DIR__ . '/lib/access.php';
+    require __DIR__ . '/lib/crm.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine());
@@ -71,6 +72,10 @@ try {
     db()->query("SELECT agency_id FROM inspectors LIMIT 1");
     db()->query("SELECT id FROM requisitions LIMIT 1");
     db()->query("SELECT fee_status FROM inspectors LIMIT 1");
+    // CRM module tables (Phase 0) — a miss creates the whole CRM data model.
+    db()->query("SELECT quote_no FROM quotations LIMIT 1");
+    db()->query("SELECT id FROM crm_inquiries LIMIT 1");
+    db()->query("SELECT id FROM quote_approval_rules LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();
