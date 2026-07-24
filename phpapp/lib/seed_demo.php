@@ -75,6 +75,12 @@ function seed_demo() {
             foreach (['FOOD','HOTEL','AUTO'] as $hc) $insA->execute([$ins,'HEAD',$hc]);
         }
 
+        // ---------- Agencies (recruitment + manpower, with contract dates) ----------
+        $insAg = $pdo->prepare("INSERT INTO agencies(name,agency_type,contact_person,email,mobile,contract_number,contract_start,contract_end,one_time_fee,monthly_rate,active,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,1,?)");
+        $insAg->execute(['TalentFirst Recruitment','RECRUITMENT','R. Menon','hr@talentfirst.example','9820011111','TF-2026-07',$d(-300),$d(20),50000,0,$now]); // renewing soon
+        $insAg->execute(['SiteForce Manpower','MANPOWER','K. Patil','ops@siteforce.example','9820022222','SF-2026-04',$d(-200),$d(180),0,90000,$now]);
+        $c['agencies'] = 2;
+
         // ---------- Users (one per role; inspectors linked) ----------
         $insU = $pdo->prepare("INSERT INTO users(username,password_hash,first_name,last_name,email,role,is_superuser,is_active,home_office_id,inspector_id)
             VALUES(?,?,?,?,?,?,0,1,?,?)");
@@ -298,6 +304,7 @@ function seed_demo_remove() {
         $del("DELETE FROM vendor_km_memory WHERE inspector_id IN (SELECT id FROM inspectors WHERE emp_code IN $emps)");
         $del("DELETE FROM inspectors WHERE emp_code IN $emps");
         $del("DELETE FROM boss_numbers WHERE boss_number IN ('40231','40198','40155') OR boss_number LIKE '5090%'");
+        $del("DELETE FROM agencies WHERE name IN ('TalentFirst Recruitment','SiteForce Manpower')");
         $del("DELETE FROM business_partners WHERE code IN ('CL-RIL','CL-ADN','CL-LNT','VN-VAP','VN-MUN') OR code LIKE 'EC-%' OR code LIKE 'EV-%'");
         // Demo login accounts
         $unames = array_map(fn($a) => $a[0], demo_accounts());

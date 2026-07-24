@@ -146,6 +146,19 @@
     elseif ($schedFirst)  { echo $secSched; echo $secMoney; echo $secCharts; echo $secQuick; }
     else                  { echo $secMoney; echo $secCharts; echo $secQuick; echo $secSched; }
   ?>
+  <?php $agRenew = (is_coordinator_level() || is_admin_level()) ? agencies_renewing(30) : [];
+    if ($agRenew): ?>
+    <h3 class="tab-sub" style="margin-top:26px;">⏰ Agency contracts renewing soon <span class="muted">(<?= count($agRenew) ?>)</span></h3>
+    <div class="card-grid">
+      <?php foreach ($agRenew as $a): $dl = (int)$a['days_left']; ?>
+        <a class="master-card" href="/m/agencies/edit?id=<?= (int)$a['id'] ?>">
+          <strong><?= e($a['name']) ?></strong>
+          <span class="muted"><?= e(AGENCY_TYPES[$a['agency_type']] ?? '') ?><?= $a['contract_number'] ? ' · '.e($a['contract_number']) : '' ?></span>
+          <span class="muted">Renewal <?= e($a['contract_end']) ?> · <span class="badge <?= $dl<0?'RED':($dl<=15?'AMBER':'GREEN') ?>"><?= $dl<0 ? abs($dl).'d overdue' : $dl.'d left' ?></span></span>
+        </a>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
 <?php endif; ?>
 
 <style>

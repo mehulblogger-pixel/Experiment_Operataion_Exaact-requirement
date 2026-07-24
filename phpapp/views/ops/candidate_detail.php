@@ -49,7 +49,20 @@
       <div class="ff ff-wide"><label>Remark (decision note, interview feedback…)</label><input class="form-control" name="remark" placeholder="e.g. Client shortlisted; interview on 25th"></div>
     </div>
     <?php if (empty($cand['inspector_id'])): ?>
-    <label class="chk" id="hire_chk" style="margin:8px 2px;display:none"><input type="checkbox" name="make_inspector" value="1"> On <strong>Accept</strong>, also add this person to Inspectors (as <?= e(CAND_SOURCES[$cand['source']] ?? $cand['source']) ?>)</label>
+    <label class="chk" id="hire_chk" style="margin:8px 2px;display:none"><input type="checkbox" name="make_inspector" id="mk_insp" value="1"> On <strong>Accept</strong>, also add this person to Inspectors</label>
+    <div id="hire_details" class="panel" style="display:none;background:var(--soft);margin-top:6px">
+      <div class="form-grid">
+        <div class="ff"><label>Supplied by agency <span class="muted">(optional)</span></label>
+          <select class="form-control" name="agency_id" id="ag_sel"><option value="" data-type="" data-fee="0" data-monthly="0">— none / direct —</option>
+            <?php foreach (agencies_list() as $a): ?><option value="<?= (int)$a['id'] ?>" data-type="<?= e($a['agency_type']) ?>" data-fee="<?= e($a['one_time_fee']) ?>" data-monthly="<?= e($a['monthly_rate']) ?>"><?= e($a['name']) ?> · <?= e(AGENCY_TYPES[$a['agency_type']] ?? $a['agency_type']) ?></option><?php endforeach; ?>
+          </select></div>
+        <div class="ff"><label>On whose roll?</label>
+          <select class="form-control" name="roll_type" id="roll_sel"><?php foreach (ROLL_TYPES as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+        <div class="ff" id="fee_one"><label>One-time placement fee (₹) <span class="muted">recruitment</span></label><input class="form-control" type="number" step="0.01" name="placement_fee" value=""></div>
+        <div class="ff" id="fee_month"><label>Monthly agency charge (₹) <span class="muted">manpower</span></label><input class="form-control" type="number" step="0.01" name="agency_cost" value=""></div>
+      </div>
+      <p class="muted" style="margin:2px 2px 0;font-size:12px">Recruitment → SGS roll + one-time fee (added to costing, one-time). Manpower → agency roll + monthly charge (their bill; we invoice the client our rate).</p>
+    </div>
     <?php endif; ?>
     <div style="margin-top:8px"><button class="btn" type="submit">Update stage</button></div>
   </form>
@@ -58,8 +71,24 @@
   (function(){
     var sel = document.getElementById('cand_stage'), chk = document.getElementById('hire_chk');
     if (!sel) return;
-    function sync(){ if (chk) chk.style.display = (sel.value === 'ACCEPTED') ? 'inline-flex' : 'none'; }
-    sel.addEventListener('change', sync); sync();
+    var mk = document.getElementById('mk_insp'), det = document.getElementById('hire_details');
+    var ag = document.getElementById('ag_sel'), roll = document.getElementById('roll_sel');
+    var feeOne = document.getElementById('fee_one'), feeMonth = document.getElementById('fee_month');
+    function syncStage(){ if (chk) chk.style.display = (sel.value === 'ACCEPTED') ? 'inline-flex' : 'none'; if (sel.value!=='ACCEPTED' && det) det.style.display='none'; }
+    function syncHire(){ if (det) det.style.display = (mk && mk.checked && sel.value==='ACCEPTED') ? 'block' : 'none'; }
+    function syncAgency(){
+      if (!ag) return; var o = ag.options[ag.selectedIndex], t = o.getAttribute('data-type');
+      if (roll) roll.value = (t === 'MANPOWER') ? 'AGENCY' : 'SGS';
+      if (feeOne)   feeOne.style.display   = (t === 'RECRUITMENT' || t==='') ? '' : 'none';
+      if (feeMonth) feeMonth.style.display = (t === 'MANPOWER') ? '' : 'none';
+      var f = feeOne && feeOne.querySelector('input'), m = feeMonth && feeMonth.querySelector('input');
+      if (f && t==='RECRUITMENT' && !f.value) f.value = o.getAttribute('data-fee')||'';
+      if (m && t==='MANPOWER' && !m.value) m.value = o.getAttribute('data-monthly')||'';
+    }
+    sel.addEventListener('change', function(){ syncStage(); syncHire(); });
+    if (mk) mk.addEventListener('change', syncHire);
+    if (ag) ag.addEventListener('change', syncAgency);
+    syncStage(); syncHire(); syncAgency();
   })();
 </script>
 <?php endif; ?>
