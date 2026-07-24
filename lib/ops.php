@@ -83,7 +83,8 @@ const EXPENSE_HEADS_SEED = [
     ['TRAIN','Train ticket','BILL',1,30],
     ['AIR','Air ticket','BILL',1,40],
     ['HOTEL','Hotel / Boarding & Lodging (out-station)','BILL',1,50],
-    ['FOOD','Food allowance (meals)','BILL',1,60],
+    ['FOOD','Food allowance (meals)','ALLOWANCE',0,60],
+    ['FOODBILL','Food bills (actual)','BILL',1,65],
     ['CAB','Ola / Uber','BILL',1,70],
     ['AUTO','Auto / local conveyance','BILL',1,80],
     ['TEL','Telephone & communication','BILL',1,90],
@@ -362,10 +363,13 @@ function ops_migrate() {
 // so it runs on a fresh install and on an upgrade of an existing database).
 function ops_seed_expense_masters() {
     $pdo = db();
-    if ((int)$pdo->query("SELECT COUNT(*) FROM expense_heads")->fetchColumn() === 0) {
-        $ins = $pdo->prepare("INSERT INTO expense_heads (code,label,head_type,needs_receipt,sort_order,active) VALUES (?,?,?,?,?,1)");
-        foreach (EXPENSE_HEADS_SEED as $h) $ins->execute($h);
-    }
+    // Ensure each standard head exists BY CODE (not just when the table is empty),
+    // so heads added in a later release — e.g. "Food bills (actual)" — appear on the
+    // next boot of an already-populated database without disturbing custom heads.
+    $have = [];
+    foreach ($pdo->query("SELECT code FROM expense_heads")->fetchAll(PDO::FETCH_COLUMN) as $c) $have[strtoupper($c)] = 1;
+    $ins = $pdo->prepare("INSERT INTO expense_heads (code,label,head_type,needs_receipt,sort_order,active) VALUES (?,?,?,?,?,1)");
+    foreach (EXPENSE_HEADS_SEED as $h) { if (!isset($have[strtoupper($h[0])])) $ins->execute($h); }
     if ((int)$pdo->query("SELECT COUNT(*) FROM travel_modes")->fetchColumn() === 0) {
         $ins = $pdo->prepare("INSERT INTO travel_modes (code,label,basis,default_rate,active) VALUES (?,?,?,?,1)");
         foreach (TRAVEL_MODES_SEED as $m) $ins->execute($m);
@@ -463,6 +467,23 @@ function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
     return null;
 }
 function inspectors_list($activeOnly = true) { return ops_all("SELECT id, name, emp_code, sbu, salary_ctc FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name"); }
+// Employee-code prefix per engagement kind. Sub-contractors and freelancers get a
+// visibly DIFFERENT code series from regular SGS assets so payroll/accounts can tell
+// them apart at a glance: SC-#### for sub-cons, FL-#### for freelancers, EMP## for staff.
+const EMP_CODE_PREFIX = ['ASSET' => 'EMP', 'SUBCON' => 'SC-', 'FREELANCER' => 'FL-'];
+function emp_code_prefix($kind) { return EMP_CODE_PREFIX[$kind] ?? 'EMP'; }
+// Next free auto code for a kind. Scans existing codes that share the prefix and
+// bumps the highest trailing number. Regular staff pad to 2 digits (EMP07), the
+// contractor series to 3 (SC-014) — either way the running number never collides.
+function next_emp_code($kind) {
+    $prefix = emp_code_prefix($kind);
+    $pad = ($prefix === 'EMP') ? 2 : 3;
+    $max = 0;
+    foreach (ops_all("SELECT emp_code FROM inspectors WHERE emp_code LIKE ?", [$prefix . '%']) as $r) {
+        if (preg_match('/(\d+)\s*$/', (string)$r['emp_code'], $m)) $max = max($max, (int)$m[1]);
+    }
+    return $prefix . str_pad((string)($max + 1), $pad, '0', STR_PAD_LEFT);
+}
 function subcons_list($activeOnly = true) { return ops_all("SELECT id, agency, inspector_name, skill FROM subcons" . ($activeOnly ? " WHERE active=1" : "") . " ORDER BY agency"); }
 function agencies_list($activeOnly = true) { return ops_all("SELECT id, name, agency_type, one_time_fee, monthly_rate FROM agencies" . ($activeOnly ? " WHERE active=1" : "") . " ORDER BY name"); }
 function agency_get($id) { return $id ? ops_one("SELECT * FROM agencies WHERE id=?", [(int)$id]) : null; }
@@ -1439,9 +1460,11 @@ function ops_inspectors($action, $method) {
             $agencyName = $b['agency_name'] ?? '';
             $agencyCost = can_see_salary() ? (($b['agency_cost'] ?? '') !== '' ? (float)$b['agency_cost'] : 0) : null;
             $desig = $b['designation'] ?? ''; $kind = in_array($b['staff_kind'] ?? '', ['ASSET','FREELANCER','SUBCON'], true) ? $b['staff_kind'] : 'ASSET';
+            $empCode = trim($b['emp_code'] ?? '');
+            if ($empCode === '' && !$ins) $empCode = next_emp_code($kind); // auto: SC-/FL- for contractors, EMP for staff
             if ($ins) {
                 $sql = "UPDATE inspectors SET first_name=?,middle_name=?,last_name=?,name=?,emp_code=?,designation=?,staff_kind=?,trade_id=?,sbus=?,sbu=?,skill_ids=?,email=?,mobile=?,agency_name=?,status=?";
-                $args = [$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $b['emp_code'] ?? '', $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $b['status'] ?? 'ACTIVE'];
+                $args = [$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $b['status'] ?? 'ACTIVE'];
                 if ($salary !== null) { $sql .= ",salary_ctc=?"; $args[] = $salary; }
                 if ($agencyCost !== null) { $sql .= ",agency_cost=?"; $args[] = $agencyCost; }
                 $sql .= " WHERE id=?"; $args[] = $ins['id'];
@@ -1451,7 +1474,7 @@ function ops_inspectors($action, $method) {
             } else {
                 $pdo->prepare("INSERT INTO inspectors (first_name,middle_name,last_name,name,emp_code,designation,staff_kind,trade_id,sbus,sbu,skill_ids,email,mobile,agency_name,agency_cost,salary_ctc,status,created_at)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $b['emp_code'] ?? '', $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $agencyCost ?: 0, $salary ?: 0, $b['status'] ?? 'ACTIVE', date('c')]);
+                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $agencyCost ?: 0, $salary ?: 0, $b['status'] ?? 'ACTIVE', date('c')]);
                 $id = $pdo->lastInsertId();
                 flash('Inspector added. You can now add certifications.');
                 redirect('/m/inspectors/edit?id=' . $id);
@@ -2562,21 +2585,32 @@ function ops_profitability() {
             'headLabels' => expense_head_label_map(), 'seeSal' => can_see_salary()]);
         return;
     }
-    // list all BOSS numbers with profitability
+    // list all BOSS numbers with profitability + renewal hierarchy (prev / next BOSS)
     $rows = [];
-    foreach (ops_all("SELECT bn.*, bp.display_name client_disp, bp.legal_name client_name FROM boss_numbers bn LEFT JOIN business_partners bp ON bp.id=bn.client_id ORDER BY bn.boss_number") as $b) {
+    foreach (ops_all("SELECT bn.*, bp.display_name client_disp, bp.legal_name client_name,
+                nw.boss_number next_no, old.boss_number prev_no
+            FROM boss_numbers bn
+            LEFT JOIN business_partners bp ON bp.id=bn.client_id
+            LEFT JOIN boss_numbers nw ON nw.id=bn.superseded_by
+            LEFT JOIN boss_numbers old ON old.id=bn.supersedes
+            ORDER BY bn.boss_number") as $b) {
         $rows[] = $b + ['p' => boss_profit($b['id'])];
     }
+    $seeSal = can_see_salary();
     if (wants_csv()) {
-        $seeSal = can_see_salary();
-        $csv = [array_merge(['BOSS / Contract','Client','Jobs','Revenue','Expenses','Sub-con'], $seeSal ? ['Loaded labour','Margin','Margin %'] : [])];
-        foreach ($rows as $r) { $p = $r['p'];
-            $csv[] = array_merge([$r['boss_number'], $r['client_disp'] ?: $r['client_name'], (int)$p['jobs'], (float)$p['revenue'], (float)$p['expenses'], (float)$p['subcon']],
-                $seeSal ? [(float)$p['labour'], (float)$p['margin'], $p['pct'] === null ? '' : $p['pct']] : []);
+        $head = ['Sr No','BOSS number','Client','Status','Created on','Expires on','Renewed into','Jobs','Invoicing done','Expenses booked'];
+        if ($seeSal) $head = array_merge($head, ['Salary costing','Profit INR','Profit %']);
+        $csv = [$head];
+        $sr = 0;
+        foreach ($rows as $r) { $p = $r['p']; $sr++;
+            $line = [$sr, $r['boss_number'], $r['client_disp'] ?: $r['client_name'], BOSS_STATUS[$r['status']] ?? $r['status'],
+                $r['start_date'], $r['end_date'], $r['next_no'] ?: '', (int)$p['jobs'], (float)$p['invoiced'], (float)$p['expenses']];
+            if ($seeSal) $line = array_merge($line, [(float)$p['labour'], (float)$p['margin'], $p['pct'] === null ? '' : $p['pct']]);
+            $csv[] = $line;
         }
-        csv_download('profitability-' . date('Y-m-d') . '.csv', $csv);
+        csv_download('boss-numbers-' . date('Y-m-d') . '.csv', $csv);
     }
-    view('ops/profitability_list', ['rows' => $rows, 'seeSal' => can_see_salary()]);
+    view('ops/profitability_list', ['rows' => $rows, 'seeSal' => $seeSal]);
 }
 
 // P6 — Attendance reconciliation. Upload the HR payroll export (CSV); it is

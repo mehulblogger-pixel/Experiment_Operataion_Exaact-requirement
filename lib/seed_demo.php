@@ -57,7 +57,7 @@ function seed_demo() {
             ['Ravi Kumar','Ravi','Kumar','EMP01','IND','IND','Welding, NDT','ravi@example.com','9800000001',720000,'Sr. Inspector','ASSET','',0],
             ['Anil Sharma','Anil','Sharma','EMP02','OGC','OGC','Piping, Coating','anil@example.com','9800000002',840000,'Inspector','ASSET','',0],
             ['Priya Nair','Priya','Nair','EMP03','IND','IND','Mechanical','priya@example.com','9800000003',600000,'Inspector','ASSET','',0],
-            ['Mohan Rao','Mohan','Rao','EMP04','MIN','MIN','Lifting, Cranes','mohan@example.com','9800000004',0,'Inspector','SUBCON','TechInspect Services',480000],
+            ['Mohan Rao','Mohan','Rao','SC-001','MIN','MIN','Lifting, Cranes','mohan@example.com','9800000004',0,'Inspector','SUBCON','TechInspect Services',480000],
         ];
         // row indices: 0 name,1 first,2 last,3 emp,4 sbu,5 sbus,6 skills,7 email,
         //              8 mobile,9 ctc,10 designation,11 staff_kind,12 agency,13 agency_cost
@@ -309,7 +309,7 @@ function seed_demo_remove() {
         $del("DELETE FROM jobs WHERE created_by='demo'");
         $del("DELETE FROM calls WHERE created_by='demo'");
         // Masters the seed created, by their known codes
-        $emps = "('EMP01','EMP02','EMP03','EMP04')";
+        $emps = "('EMP01','EMP02','EMP03','EMP04','SC-001')";
         $del("DELETE FROM inspector_allowances WHERE inspector_id IN (SELECT id FROM inspectors WHERE emp_code IN $emps)");
         $del("DELETE FROM vendor_km_memory WHERE inspector_id IN (SELECT id FROM inspectors WHERE emp_code IN $emps)");
         $del("DELETE FROM inspectors WHERE emp_code IN $emps");

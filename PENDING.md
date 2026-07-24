@@ -2,6 +2,24 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ Just shipped (2026-07 — owner's screenshot batch)
+- **Distinct employee-code series for contractors.** A new inspector saved with a
+  blank Employee code now auto-gets a code by engagement kind: **SC-###** for
+  sub-contractors, **FL-###** for freelancers, **EMP##** for SGS staff — so
+  payroll/accounts can tell them apart at a glance. Manually typed codes are kept
+  as-is. Demo sub-con Mohan reseeds as **SC-001**. (`next_emp_code()` in ops.php.)
+- **"Food bills (actual)" expense head** added alongside "Food allowance (meals)"
+  (now an ALLOWANCE; the new head is an actual BILL needing a receipt). Expense
+  heads are now ensured **by code** on boot, so existing live databases gain the
+  new head automatically without wiping custom heads.
+- **BOSS numbers list** (Profitability screen) rebuilt as an accessible table with
+  **Sr No · BOSS number · Client · Status · Created on · Expires on · Renewed into
+  (renewal hierarchy) · Jobs · Invoicing done · Expenses booked** + salary-gated
+  **Salary costing · Profit INR · Profit %**, KPI cards, expiry pills, and CSV.
+- **Vouchers screen role-scoped cards** — Total expense claimed · This month ·
+  Awaiting approval · Paid, scoped to the role (inspector sees only their own).
+- Remaining voucher/BOSS polish parked below (§ Reports Phase 2, deputation).
+
 ## 🆕 Requested — to build next (noted 2026-07, owner)
 
 ### 1a-i. Recruitment-fee costing — the GUARANTEE model (resolves owner's confusion)
