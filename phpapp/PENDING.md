@@ -18,6 +18,14 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
   **Salary costing · Profit INR · Profit %**, KPI cards, expiry pills, and CSV.
 - **Vouchers screen role-scoped cards** — Total expense claimed · This month ·
   Awaiting approval · Paid, scoped to the role (inspector sees only their own).
+- **Insights dashboard (/reports):** added a **client-name filter** to the filter
+  bar, a **Top 10 customers by revenue** chart and a **Revenue by project (BOSS)**
+  chart in the Financial section. The **Certificates-expiring** panel is now hidden
+  for the **Business Director** role (strategic view, not an ops-compliance task).
+- **Demo reload guidance:** the "already loaded" message now tells the user to
+  Remove + Load again to pick up newer sample records. Root cause of "agencies /
+  requisitions look empty" is the one-shot `demo_seeded` flag — the seed itself is
+  correct (verified: 2 agencies, 2 requisitions render for admin *and* director).
 - Remaining voucher/BOSS polish parked below (§ Reports Phase 2, deputation).
 
 ## 🆕 Requested — to build next (noted 2026-07, owner)
