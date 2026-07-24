@@ -220,9 +220,24 @@ afterwards (current landing dashboard "is not what we're expecting").**
   ones listed on the quote's lines.
 - Verified: inherit set adv_required/adv_pct/report_hold + deliverables (IR,COC), both
   HOLD reasons shown when unpaid and cleared when paid, revenue panel + advance toggle.
-- **Next (P6):** CV-to-client submission tracking (§20) — submit CVs, client feedback,
-  interview, selection → credential-request e-mail. Then the AI-keys feature + the
-  Executive-Director dashboard rebuild.
+### ✅ P6 shipped (2026-07) — CV analysis + client-submission tracking
+- **CV keyword analysis &amp; search** (owner's ask): on the candidate, upload the CV
+  (.docx / .txt; .pdf best-effort) or paste the text → an **internal, dependency-free
+  engine** extracts keywords (a curated inspection/QA-QC/TIC vocabulary — CSWIP, NACE,
+  ASNT, NDT methods, API/ASME codes, disciplines, sectors — plus the trade/skill masters
+  and top frequent terms) and stores them. Keywords show as clickable chips; the hiring
+  search now matches **cv_keywords + cv_text**, so you can find CVs by skill for future
+  requirements. **AI-ready:** `cv_extract_keywords()` has a `cv_ai_available()` seam so
+  it can defer to a provider once the AI-keys feature lands — no caller changes needed.
+- **CV-to-client tracking** (§20): per candidate — CV submitted-to-client date, client
+  feedback (Shortlisted / Rejected) + date + note, interview required / planned-for /
+  completed-on / outcome (Selected / Rejected / Hold).
+- **On Selected → credential-request e-mail** (§20): one click e-mails the candidate for
+  CV, salary slips, IDs, certificates (EMAIL_CREDENTIAL template or a sensible default).
+- Verified: keyword extraction, keyword search hit, tracking saved, credential e-mail
+  logged to the candidate.
+- **CRM roadmap (P0–P6) is now functionally complete.** Remaining big items: the
+  **AI-keys** master-settings feature, then the **Executive-Director dashboard** rebuild.
 
 ### 🤖 PARKED — AI keys in master settings (owner request, 2026-07)
 Administrator can, under master settings, enter **API keys for multiple AI

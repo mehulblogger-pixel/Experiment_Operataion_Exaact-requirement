@@ -889,6 +889,120 @@ function ops_crm_templates($route, $method) {
         view('ops/crm/template_form', ['t' => $t, 'kinds' => CRM_TEMPLATE_KINDS]); return;
     }
 }
+// ===========================================================================
+//  CV analysis — dependency-free keyword extraction (§20 + owner's ask)
+//  Internal engine now (works offline on shared hosting). AI-ready: when the
+//  AI-keys feature lands, cv_extract_keywords() can defer to a provider.
+// ===========================================================================
+// Curated inspection / QA-QC / TIC domain vocabulary. Multi-word phrases first.
+function cv_domain_terms() {
+    static $t = null;
+    if ($t !== null) return $t;
+    $t = [
+        // certifications / codes
+        'CSWIP 3.1','CSWIP 3.2','CSWIP','BGAS','PCN','ASNT Level II','ASNT Level III','ASNT','NACE','AMPP','AWS CWI','API 510','API 570','API 571','API 653','API 580','API',
+        'ASME','ASME IX','ASME VIII','ASME B31.3','AWS D1.1','AWS','ISO 9001','ISO 45001','ISO 14001','ISO 17020','ISO 17025','IRCA','PMP','Six Sigma',
+        // NDT methods
+        'RT','UT','MT','PT','VT','ET','PAUT','TOFD','LRUT','phased array','radiography','ultrasonic','magnetic particle','dye penetrant','eddy current','hardness testing',
+        // welding
+        'welding inspection','welding','WPS','PQR','WPQ','welder qualification','weld visual','GTAW','SMAW','GMAW','FCAW','SAW','brazing',
+        // coating / painting
+        'painting inspection','coating inspection','coating','painting','blasting','sandblasting','DFT','holiday test','galvanizing','NACE coating',
+        // disciplines
+        'piping','structural','mechanical','electrical','instrumentation','civil','rotating equipment','static equipment','pressure vessel','heat exchanger','storage tank','pipeline','boiler',
+        // activities
+        'third party inspection','TPI','vendor inspection','vendor assessment','vendor audit','expediting','stage inspection','final inspection','pre-shipment inspection','source inspection','witness inspection','FAT','SAT','surveillance','dimensional inspection','PMI','positive material identification','material verification',
+        // project / deputation
+        'QA/QC','QAQC','QA','QC','commissioning','erection','O&M','site supervision','resident engineer','construction','fabrication','shutdown','turnaround','HSE','HSE officer','safety',
+        // sectors
+        'oil and gas','oil & gas','refinery','petrochemical','power plant','solar','wind','renewable','steel plant','cement','marine','shipbuilding','mining','automotive','pharma','food',
+        // education
+        'B.E.','B.Tech','BE Mechanical','Diploma','ITI','M.Tech','MBA','degree','diploma',
+    ];
+    return $t;
+}
+// Whether an AI provider could enhance extraction (the AI-keys feature is not built
+// yet; kept as a seam so the engine can be upgraded without touching callers).
+function cv_ai_available() { return false; }
+// Extract keywords from CV text: (1) domain-vocabulary hits, (2) trade/skill master
+// hits, (3) top frequent significant terms. Returns a de-duplicated CSV.
+function cv_extract_keywords($text) {
+    $text = (string)$text;
+    if (trim($text) === '') return '';
+    $lc = ' ' . mb_strtolower($text) . ' ';
+    $found = [];   // display term => 1 (preserve nice casing)
+    foreach (cv_domain_terms() as $term) {
+        $needle = mb_strtolower($term);
+        // word-ish boundary match (terms may contain . / & spaces)
+        if (strpos($lc, ' ' . $needle . ' ') !== false || strpos($lc, $needle) !== false && preg_match('/(?<![a-z0-9])' . preg_quote($needle, '/') . '(?![a-z0-9])/u', $lc)) {
+            $found[$term] = 1;
+        }
+    }
+    // trade + skill masters (so the org's own vocabulary is recognised)
+    foreach (['trade', 'skill'] as $tk) {
+        $lt = function_exists('lk_type') ? lk_type($tk) : null;
+        if ($lt) foreach (lk_all_values($lt['id']) as $v) {
+            $lab = trim($v['label'] ?? ''); if (mb_strlen($lab) < 3) continue;
+            if (preg_match('/(?<![a-z0-9])' . preg_quote(mb_strtolower($lab), '/') . '(?![a-z0-9])/u', $lc)) $found[$lab] = 1;
+        }
+    }
+    // years of experience, if stated
+    if (preg_match('/(\d{1,2})\s*\+?\s*(?:years|yrs)\b/i', $text, $m)) $found[$m[1] . ' yrs exp'] = 1;
+    // top frequent significant terms (fallback / augment)
+    $stop = array_flip(['the','and','for','with','from','that','this','have','has','are','was','will','your','you','our','their','not','all','any','can','per','via','etc','was','were','been','into','over','under','also','such','used','using','work','worked','working','experience','project','projects','company','ltd','pvt','india','name','date','email','mobile','phone','address','responsible','responsibilities','role','job','team','years','year','yrs']);
+    $words = preg_split('/[^a-z0-9]+/', mb_strtolower($text));
+    $freq = [];
+    foreach ($words as $w) { if (mb_strlen($w) < 4 || isset($stop[$w]) || ctype_digit($w)) continue; $freq[$w] = ($freq[$w] ?? 0) + 1; }
+    arsort($freq);
+    $i = 0;
+    foreach ($freq as $w => $n) { if ($n < 2) break; if (isset($found[$w])) continue; $found[ucfirst($w)] = 1; if (++$i >= 12) break; }
+    return implode(', ', array_keys($found));
+}
+// Pull plain text from an uploaded CV. .txt direct; .docx via ZipArchive; .pdf is
+// best-effort (advise pasting text). Returns [text, note].
+function cv_text_from_upload($tmp, $name) {
+    $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    $raw = @file_get_contents($tmp);
+    if ($raw === false) return ['', 'could not read the file'];
+    if ($ext === 'txt') return [$raw, ''];
+    if ($ext === 'docx') {
+        if (!class_exists('ZipArchive')) return ['', 'zip extension not available'];
+        $tf = tempnam(sys_get_temp_dir(), 'cv'); file_put_contents($tf, $raw);
+        $zip = new ZipArchive(); $txt = '';
+        if ($zip->open($tf) === true) {
+            for ($i = 0; $i < $zip->numFiles; $i++) { $n = $zip->getNameIndex($i); if (preg_match('#^word/(document|header\d+|footer\d+)\.xml$#', $n)) { $x = $zip->getFromName($n); $x = preg_replace('/<\/w:p>/', "\n", $x); $txt .= ' ' . strip_tags($x); } }
+            $zip->close();
+        }
+        @unlink($tf);
+        $txt = html_entity_decode(preg_replace('/[ \t]+/', ' ', $txt), ENT_QUOTES | ENT_XML1, 'UTF-8');
+        return [trim($txt), $txt === '' ? 'no text found in the .docx' : ''];
+    }
+    if ($ext === 'pdf') {
+        // crude: pull readable ASCII runs; scanned PDFs won't yield text.
+        $t = preg_replace('/[^\x20-\x7E\n]/', ' ', $raw);
+        $t = preg_match_all('/\(([^)]{2,})\)/', $t, $mm) ? implode(' ', $mm[1]) : '';
+        return [trim($t), 'PDF text extraction is limited — paste the CV text for best results.'];
+    }
+    return ['', 'unsupported file type — upload .docx or .txt, or paste the text'];
+}
+// Credential-request e-mail to a selected candidate (§20). Uses EMAIL_CREDENTIAL
+// template if present, else a default; logs like every other mail.
+function cv_send_credential_request($cand) {
+    $to = trim($cand['email'] ?? ''); if ($to === '') return [false, 'no candidate e-mail on file.'];
+    $name = candidate_name($cand);
+    $et = ops_one("SELECT * FROM crm_templates WHERE kind='EMAIL_CREDENTIAL' AND active=1 ORDER BY is_default DESC, id DESC");
+    if ($et && trim($et['body'] ?? '') !== '') {
+        $subject = str_replace(['{{candidate_name}}', '{{app_name}}'], [$name, app_name()], $et['subject'] ?: 'Documents required');
+        $body = str_replace(['{{candidate_name}}', '{{app_name}}'], [$name, app_name()], $et['body']);
+    } else {
+        $subject = 'Congratulations — documents required to proceed';
+        $body = "Dear " . $name . ",\n\nWe are pleased to inform you that you have been selected. To proceed with onboarding, please share the following at the earliest:\n\n"
+            . "1. Updated CV\n2. Latest salary slips (last 3 months)\n3. Government photo ID (Aadhaar / PAN / Passport)\n4. Education & experience certificates\n5. Relevant technical certifications (CSWIP / NACE / ASNT etc.)\n6. Two references\n\nReply to this e-mail with the documents attached.\n\nBest regards,\n" . app_name();
+    }
+    $ok = ops_mail($to, $subject, $body, '', 'cv_credential');
+    return [(bool)$ok, $ok ? '' : 'e-mail could not be sent now (check SMTP) — it has been logged.'];
+}
+
 // The tokens a quote-doc template may use (shown on the template form).
 function quote_doc_tokens() {
     return [

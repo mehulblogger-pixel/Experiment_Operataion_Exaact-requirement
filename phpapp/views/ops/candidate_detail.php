@@ -37,6 +37,62 @@
   <?php endif; ?>
 </div>
 
+<!-- CV analysis + keyword search -->
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">CV analysis <span class="muted">— keywords are stored for searching</span></h3>
+  <?php $kw = array_filter(array_map('trim', explode(',', (string)($cand['cv_keywords'] ?? '')))); ?>
+  <?php if ($kw): ?>
+    <div class="chip-row" style="margin-bottom:6px">
+      <?php foreach ($kw as $k): ?><a class="ct" href="/candidates?q=<?= e(urlencode($k)) ?>" title="Find candidates with this keyword"><?= e($k) ?></a><?php endforeach; ?>
+    </div>
+    <p class="muted" style="font-size:12px">Analysed <?= e(substr((string)($cand['cv_analyzed_at'] ?? ''),0,10)) ?><?= $cand['cv_file_name']?' · '.e($cand['cv_file_name']):'' ?>. Click a keyword to find similar CVs.</p>
+  <?php else: ?>
+    <p class="sub">No keywords yet — upload the CV (.docx / .txt) or paste the text below and analyse.</p>
+  <?php endif; ?>
+  <?php if (is_coordinator_level()): ?>
+  <form method="post" action="/candidate-cv?id=<?= (int)$cand['id'] ?>" enctype="multipart/form-data" style="margin-top:8px">
+    <div class="form-grid">
+      <div class="ff"><label>Upload CV (.docx / .txt / .pdf)</label><input class="form-control" type="file" name="cv_file" accept=".docx,.txt,.pdf"></div>
+    </div>
+    <div class="ff ff-wide"><label>…or paste CV text</label><textarea class="form-control" name="cv_text" rows="4" placeholder="Paste the CV text here for the most accurate keyword extraction"><?= e($cand['cv_text'] ?? '') ?></textarea></div>
+    <div style="margin-top:8px"><button class="btn" type="submit">Analyse &amp; save keywords</button></div>
+  </form>
+  <?php endif; ?>
+</div>
+
+<!-- §20 client submission & interview tracking -->
+<?php if (is_coordinator_level()): $fb = $cand['client_feedback'] ?? ''; $io = $cand['interview_outcome'] ?? ''; ?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Client submission &amp; interview</h3>
+  <form method="post" action="/candidate-client?id=<?= (int)$cand['id'] ?>">
+    <div class="form-grid">
+      <div class="ff"><label>CV submitted to client on</label><input class="form-control" type="date" name="submitted_client_date" value="<?= e($cand['submitted_client_date'] ?? '') ?>"></div>
+      <div class="ff"><label>Client feedback</label>
+        <select class="form-control" name="client_feedback"><option value="">—</option>
+          <?php foreach (['PENDING'=>'Awaiting','SHORTLISTED'=>'Shortlisted','REJECTED'=>'Rejected'] as $k=>$v): ?><option value="<?= $k ?>" <?= $fb===$k?'selected':'' ?>><?= $v ?></option><?php endforeach; ?></select></div>
+      <div class="ff"><label>Feedback date</label><input class="form-control" type="date" name="client_feedback_date" value="<?= e($cand['client_feedback_date'] ?? '') ?>"></div>
+
+      <div class="ff" style="align-self:end"><label class="chk"><input type="checkbox" name="interview_required" value="1" <?= !empty($cand['interview_required'])?'checked':'' ?>> Interview required</label></div>
+      <div class="ff"><label>Interview planned for</label><input class="form-control" type="date" name="interview_date" value="<?= e($cand['interview_date'] ?? '') ?>"></div>
+      <div class="ff"><label>Interview completed on</label><input class="form-control" type="date" name="interview_done_date" value="<?= e($cand['interview_done_date'] ?? '') ?>"></div>
+
+      <div class="ff"><label>Interview outcome</label>
+        <select class="form-control" name="interview_outcome"><option value="">—</option>
+          <?php foreach (['SELECTED'=>'Selected','REJECTED'=>'Rejected','HOLD'=>'On hold'] as $k=>$v): ?><option value="<?= $k ?>" <?= $io===$k?'selected':'' ?>><?= $v ?></option><?php endforeach; ?></select></div>
+      <div class="ff ff-wide"><label>Client feedback note</label><input class="form-control" name="client_feedback_note" value="<?= e($cand['client_feedback_note'] ?? '') ?>"></div>
+    </div>
+    <div style="margin-top:8px"><button class="btn" type="submit">Save tracking</button></div>
+  </form>
+  <?php if ($io === 'SELECTED'): ?>
+  <div style="margin-top:10px;padding:10px;border:1px solid var(--ok);border-radius:8px">
+    <b style="color:var(--ok)">✓ Selected.</b> Request the candidate's credentials (CV, salary slips, IDs, certificates).
+    <form method="post" action="/candidate-credential?id=<?= (int)$cand['id'] ?>" style="display:inline;margin-left:8px"><button class="btn small" type="submit"><?= !empty($cand['credential_requested'])?'Re-send credential request':'Send credential request' ?></button></form>
+    <?php if (!empty($cand['credential_requested'])): ?><span class="pill p-ok" style="margin-left:6px">requested</span><?php endif; ?>
+  </div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php if (is_coordinator_level() && !in_array($cur, ['ACCEPTED','WITHDRAWN'], true)): ?>
 <div class="panel">
   <h3 class="tab-sub">Move this candidate</h3>
