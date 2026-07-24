@@ -76,10 +76,14 @@ function seed_demo() {
         }
 
         // ---------- Agencies (recruitment + manpower, with contract dates) ----------
-        $insAg = $pdo->prepare("INSERT INTO agencies(name,agency_type,contact_person,email,mobile,contract_number,contract_start,contract_end,one_time_fee,monthly_rate,active,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,1,?)");
-        $insAg->execute(['TalentFirst Recruitment','RECRUITMENT','R. Menon','hr@talentfirst.example','9820011111','TF-2026-07',$d(-300),$d(20),50000,0,$now]); // renewing soon
-        $insAg->execute(['SiteForce Manpower','MANPOWER','K. Patil','ops@siteforce.example','9820022222','SF-2026-04',$d(-200),$d(180),0,90000,$now]);
+        $insAg = $pdo->prepare("INSERT INTO agencies(name,agency_type,contact_person,email,mobile,contract_number,contract_start,contract_end,one_time_fee,monthly_rate,guarantee_days,active,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,1,?)");
+        $insAg->execute(['TalentFirst Recruitment','RECRUITMENT','R. Menon','hr@talentfirst.example','9820011111','TF-2026-07',$d(-300),$d(20),50000,0,90,$now]); // renewing soon
+        $agRec = (int)$pdo->lastInsertId();
+        $insAg->execute(['SiteForce Manpower','MANPOWER','K. Patil','ops@siteforce.example','9820022222','SF-2026-04',$d(-200),$d(180),0,90000,90,$now]);
         $c['agencies'] = 2;
+        // demo placement fees: Priya = provisional (guarantee not yet lapsed), Ravi = confirmed (past guarantee)
+        $pdo->prepare("UPDATE inspectors SET agency_id=?, placement_fee=50000, fee_status='PROVISIONAL', guarantee_upto=? WHERE id=?")->execute([$agRec, $d(45), $iid['EMP03']]);
+        $pdo->prepare("UPDATE inspectors SET agency_id=?, placement_fee=45000, fee_status='CONFIRMED', guarantee_upto=? WHERE id=?")->execute([$agRec, $d(-30), $iid['EMP01']]);
 
         // ---------- Users (one per role; inspectors linked) ----------
         $insU = $pdo->prepare("INSERT INTO users(username,password_hash,first_name,last_name,email,role,is_superuser,is_active,home_office_id,inspector_id)

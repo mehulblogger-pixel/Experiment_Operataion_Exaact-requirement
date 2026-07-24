@@ -146,7 +146,18 @@
     elseif ($schedFirst)  { echo $secSched; echo $secMoney; echo $secCharts; echo $secQuick; }
     else                  { echo $secMoney; echo $secCharts; echo $secQuick; echo $secSched; }
   ?>
-  <?php $agRenew = (is_coordinator_level() || is_admin_level()) ? agencies_renewing(30) : [];
+  <?php
+    $deskAdmin = is_coordinator_level() || is_admin_level();
+    if ($deskAdmin) confirm_lapsed_placement_fees(); // flip provisional→confirmed once guarantees lapse
+    $pf = $deskAdmin ? placement_fee_summary(30) : null;
+    if ($pf && ($pf['prov_n'] || $pf['conf_n'])): ?>
+    <h3 class="tab-sub" style="margin-top:26px;">🎓 Recruitment placement fees</h3>
+    <div class="kpi-row" style="grid-template-columns:repeat(2,1fr)">
+      <div class="kpi"><span class="kic">⏳</span><div class="k">Provisional (within guarantee)</div><div class="v"><?= fmoney_short($pf['prov_amt']) ?></div><div class="d"><?= (int)$pf['prov_n'] ?> hire(s)<?= $pf['lapsing'] ? ' · '.(int)$pf['lapsing'].' lapsing ≤30d' : '' ?></div></div>
+      <div class="kpi"><span class="kic">✅</span><div class="k">Confirmed (payable)</div><div class="v"><?= fmoney_short($pf['conf_amt']) ?></div><div class="d"><?= (int)$pf['conf_n'] ?> past guarantee</div></div>
+    </div>
+  <?php endif; ?>
+  <?php $agRenew = $deskAdmin ? agencies_renewing(30) : [];
     if ($agRenew): ?>
     <h3 class="tab-sub" style="margin-top:26px;">⏰ Agency contracts renewing soon <span class="muted">(<?= count($agRenew) ?>)</span></h3>
     <div class="card-grid">
