@@ -23,7 +23,21 @@ The one-time recruitment fee is **conditional**, so it is NOT a fixed cost:
   out at the last moment) so we can see offer-decline rate and re-open the
   requisition to the next candidate.
 
-### 1e. Manpower Requisition / Position Approval module (elaborate — research done)
+### 1e. Manpower Requisition / Position Approval module — ✅ CORE DONE
+- [x] **DONE** — `requisitions` (New/Replacement, office/SBU/designation/site,
+      budgeted cost, approval ref/date/by, status Open→Proposed→Offer→Hired→
+      Closed); Requisitions screen (list/form/detail) under Hiring; REPLACEMENT
+      links the outgoing engineer; detail shows **Outgoing vs Budgeted vs Hired**
+      monthly-cost comparison (salary-gated); the candidate CV form **requires an
+      approved requisition** and Accept auto-fills it (status→HIRED, inspector
+      linked); sidebar item + dashboard "open requisitions" card. Guarantee-fee
+      costing + Offer/Declined stages also done (§1a-i, §1a-ii).
+- [ ] **Remaining polish**: hard-block hiring if no requisition (currently the
+      form requires it, but server doesn't reject a hand-crafted post); WAIVE the
+      placement fee automatically when a replacement is raised for someone who
+      left within guarantee; requisition CSV/PDF approval register; email on
+      approval / on fill.
+- [ ] *(original design, for reference)* Management approves **every position**
 Management approves **every position** (new or replacement); the whole hiring
 chain hangs off that approval.
 - [ ] **`requisitions` table**: req_code, office, SBU, designation/position,
