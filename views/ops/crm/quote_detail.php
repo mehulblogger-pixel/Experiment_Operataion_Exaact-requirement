@@ -141,6 +141,29 @@
   </div>
 </div>
 
+<?php if (!empty($orderJobs)):
+  $oInv=0;$oPaid=0; foreach($orderJobs as $oj){ $oInv+=(float)$oj['invoice_amount']; $oPaid+= !empty($oj['payment_received'])?(float)$oj['payment_amount']:0; } ?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Jobs &amp; revenue against this order</h3>
+  <div class="chip-row" style="margin-bottom:8px">
+    <span class="ct">Ordered <b>₹<?= number_format((float)$q['total_amount'],0) ?></b></span>
+    <span class="ct">Invoiced <b>₹<?= number_format($oInv,0) ?></b></span>
+    <span class="ct">Received <b>₹<?= number_format($oPaid,0) ?></b></span>
+    <span class="ct"><?= count($orderJobs) ?> job<?= count($orderJobs)==1?'':'s' ?></span>
+  </div>
+  <table class="grid"><tr><th>Job</th><th>Inspector</th><th>Stage</th><th class="num">Invoiced</th><th class="num">Received</th></tr>
+    <?php foreach ($orderJobs as $oj): ?>
+    <tr><td><a href="/job?id=<?= (int)$oj['id'] ?>"><?= e($oj['job_code']) ?></a></td>
+      <td><?= e($oj['inspector_name'] ?: '—') ?></td>
+      <td><?= $oj['closed_flag']?'Closed':'Open' ?></td>
+      <td class="num"><?= (float)$oj['invoice_amount']>0?'₹'.number_format((float)$oj['invoice_amount'],0):'—' ?></td>
+      <td class="num"><?= !empty($oj['payment_received'])?'₹'.number_format((float)$oj['payment_amount'],0):'—' ?></td></tr>
+    <?php endforeach; ?>
+  </table>
+  <p class="muted" style="margin-top:6px">Revenue booked against quote <?= e($q['quote_no']) ?><?= $q['contract_number']?' / contract '.e($q['contract_number']):'' ?>. Link more jobs from the job form ("Against quotation / contract").</p>
+</div>
+<?php endif; ?>
+
 <?php if ($st==='ACCEPTED'): ?>
 <div class="panel" style="border:1px solid var(--ok)">
   <h3 class="tab-sub" style="margin-top:0">✅ Won — client &amp; contract registration (Accounts)</h3>

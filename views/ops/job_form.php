@@ -73,6 +73,12 @@
       </select>
       <?php if (!$boss): ?><small class="muted">No BOSS numbers for this client yet — add under <a href="/m/boss/new">BOSS numbers</a>.</small><?php endif; ?></div>
 
+    <div class="ff"><label>Against quotation / contract <span class="muted">(CRM)</span></label>
+      <select class="form-control searchable" name="quotation_id"><option value="">— none —</option>
+        <?php foreach (($quotes ?? []) as $qq): ?><option value="<?= (int)$qq['id'] ?>" <?= ($job && $job['quotation_id']==$qq['id'])?'selected':'' ?>><?= e($qq['quote_no']) ?><?= (int)$qq['rev']>0?' R'.$qq['rev']:'' ?><?= $qq['contract_number']?' · '.e($qq['contract_number']):'' ?> · ₹<?= number_format((float)$qq['total_amount'],0) ?></option><?php endforeach; ?>
+      </select>
+      <small class="muted">Links this job to the order — advance / payment-hold rules and deliverables carry over, and revenue is tracked against the quote.</small></div>
+
     <div class="ff"><label>Scheduled date</label><input class="form-control" type="date" name="scheduled_date" value="<?= e($job['scheduled_date'] ?? '') ?>"></div>
     <div class="ff"><label>Inspection start</label><input class="form-control" type="date" name="inspection_start_date" value="<?= e($job['inspection_start_date'] ?? '') ?>"></div>
     <div class="ff"><label>Inspection end</label><input class="form-control" type="date" name="inspection_end_date" value="<?= e($job['inspection_end_date'] ?? '') ?>"></div>

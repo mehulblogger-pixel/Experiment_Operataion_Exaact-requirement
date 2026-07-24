@@ -341,6 +341,13 @@ function ops_migrate() {
     ensure_column('jobs', 'payment_date', "VARCHAR(20) DEFAULT ''");
     ensure_column('jobs', 'payment_amount', 'DECIMAL(14,2) DEFAULT 0');
     ensure_column('jobs', 'credit_received', 'INT DEFAULT 0'); // inter-office: credit received flag
+    // CRM link: a job may be booked against an accepted quotation. Advance/report
+    // conditions inherit from the quote so the inspector sees a HOLD when unpaid.
+    ensure_column('jobs', 'quotation_id', 'INT NULL');
+    ensure_column('jobs', 'adv_required', 'INT DEFAULT 0');
+    ensure_column('jobs', 'adv_pct', 'DECIMAL(6,2) DEFAULT 0');
+    ensure_column('jobs', 'adv_received', 'INT DEFAULT 0');
+    ensure_column('jobs', 'report_hold', 'INT DEFAULT 0');   // deliverable held until payment
     // extra (configurable) expense headings beyond the fixed 5, stored as JSON {code:amount}
     ensure_column('expenses', 'extra', 'TEXT');
     // voucher supporting-file mime (voucher table itself is created in ensure_schema)
@@ -1158,7 +1165,7 @@ function ops_module_gate($route) {
     $base = (strncmp($route, 'm/', 2) === 0) ? 'masters' : $route;
     static $map = [
         'calls'=>'calls','call'=>'calls','call-new'=>'calls','call-edit'=>'calls','call-delete'=>'calls',
-        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-invoice'=>'invoicing',
+        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-invoice'=>'invoicing','job-advance'=>'jobs',
         'invoicing'=>'invoicing',
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring',
@@ -1217,7 +1224,7 @@ function ops_dispatch($route, $method) {
     switch (true) {
         case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call' || $route === 'call-delete' || $route === 'call-credit':
             ops_calls($route, $method); return true;
-        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice':
+        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-advance':
             ops_jobs($route, $method); return true;
         case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage':
             ops_candidates($route, $method); return true;
@@ -2297,7 +2304,7 @@ function ops_jobs($route, $method) {
             $b = $_POST;
             $fields = ['executing_office_id','inspector_id','subcon_id','job_type','stage','scheduled_date','inspection_start_date','inspection_end_date',
                 'random_date1','random_date2','random_date3','folder_link','boss_id','expected_credit','credit_type','credit_direction',
-                'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost'];
+                'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost','quotation_id'];
             // deliverables come as a checkbox array -> stored as CSV of codes
             $deliverables = implode(',', array_filter((array)($b['deliverables'] ?? [])));
             // validation: expected credit mandatory at allocation
@@ -2305,7 +2312,7 @@ function ops_jobs($route, $method) {
                 view('ops/job_form', ['job'=>$job,'call'=>$call,'error'=>'Expected credit is mandatory at allocation.',
                     'offices'=>offices_list(),'inspectors'=>inspectors_list(),'subcons'=>subcons_list(),
                     'boss'=>boss_for_client($call['client_id']),'clientInfo'=>partner_full($call['client_id']),
-                    'vendorInfo'=>partner_full($call['vendor_id']),'cfvals'=>$job?custom_values_map('job',$job['id']):[]]);
+                    'vendorInfo'=>partner_full($call['vendor_id']),'quotes'=>job_linkable_quotes($call['client_id']),'cfvals'=>$job?custom_values_map('job',$job['id']):[]]);
                 return;
             }
             if ($job) {
@@ -2326,6 +2333,8 @@ function ops_jobs($route, $method) {
                 flash("$code allocated. Assignment email sent to inspector.");
             }
             custom_save('job', $jobId, $b);
+            // inherit advance / report-vs-payment conditions from a linked quotation
+            if (function_exists('crm_apply_quote_to_job')) crm_apply_quote_to_job($jobId);
             // consume the linked PO line item by this job's man-days (new jobs only)
             if (!$job && $call && ($call['po_line_item_id'] ?? null)) {
                 $jj0 = ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]);
@@ -2342,8 +2351,17 @@ function ops_jobs($route, $method) {
         view('ops/job_form', ['job'=>$job,'call'=>$call,'error'=>null,'offices'=>offices_list(),
             'inspectors'=>inspectors_list(),'subcons'=>subcons_list(),'boss'=>boss_for_client($call['client_id']),
             'clientInfo'=>partner_full($call['client_id']),'vendorInfo'=>partner_full($call['vendor_id']),
+            'quotes'=>job_linkable_quotes($call['client_id']),
             'cfvals'=>$job ? custom_values_map('job', $job['id']) : []]);
         return;
+    }
+    if ($route === 'job-advance' && $method === 'POST') {
+        ops_require(is_coordinator_level() || can('data.credit') || can('finance.reconcile'), 'You cannot update advance status.');
+        $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$job) { http_response_code(404); view('notfound'); return; }
+        $pdo->prepare("UPDATE jobs SET adv_received=? WHERE id=?")->execute([!empty($_POST['adv_received']) ? 1 : 0, $job['id']]);
+        flash(!empty($_POST['adv_received']) ? 'Advance marked received — scheduling can proceed.' : 'Advance marked NOT received.');
+        redirect('/job?id=' . $job['id']);
     }
     if ($route === 'job-invoice') {
         ops_require(can('data.credit') || can('finance.reconcile'), 'You cannot record invoices.');
@@ -2408,7 +2426,7 @@ function ops_jobs($route, $method) {
     }
 }
 function nzc($f, $v) {
-    $nullable = ['executing_office_id','inspector_id','subcon_id','boss_id','activity_id','report_custom_days'];
+    $nullable = ['executing_office_id','inspector_id','subcon_id','boss_id','activity_id','report_custom_days','quotation_id'];
     if (in_array($f, $nullable) && $v === '') return null;
     if (in_array($f, ['expected_credit','mandays','subcon_cost']) && $v === '') return 0;
     return $v;

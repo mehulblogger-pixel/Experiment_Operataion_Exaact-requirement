@@ -206,9 +206,23 @@ afterwards (current landing dashboard "is not what we're expecting").**
   is captured per line on the quote).
 - Verified end-to-end: typed-name client auto-registered (GEN-BRAND-0001), contract
   linked (₹7,67,000), packet body correct with ARC vs line-item labels + service req.
-- **Next (P5):** link quote/contract line items to jobs → revenue line-item-wise per
-  quote & contract (§16); advance-payment + report-vs-payment HOLD visible to the
-  inspector (§21,§22); deliverables fetched from the quote (§24).
+### ✅ P5 shipped (2026-07) — operations / revenue integration
+- **Job ↔ quotation link** (§16): the job allocate/edit form has an "Against quotation
+  / contract" picker (accepted/in-flight quotes for that client); `jobs.quotation_id`.
+- **Revenue per quote/contract** (§16): the quote detail shows a "Jobs &amp; revenue
+  against this order" panel — ordered vs invoiced vs received, with each linked job.
+- **Advance / report HOLD for the inspector** (§21,§22): linking a job inherits the
+  quote's **advance-required / advance-% / report-vs-payment** onto the job; the
+  inspector's **My Jobs** cards and the job detail show a red **"HOLD — do not issue the
+  report/deliverable"** banner while the advance/payment is pending. Coordinator/Accounts
+  can **Mark advance received** (`/job-advance`); the hold clears on payment.
+- **Deliverables from the quote** (§24): a linked job with no deliverables inherits the
+  ones listed on the quote's lines.
+- Verified: inherit set adv_required/adv_pct/report_hold + deliverables (IR,COC), both
+  HOLD reasons shown when unpaid and cleared when paid, revenue panel + advance toggle.
+- **Next (P6):** CV-to-client submission tracking (§20) — submit CVs, client feedback,
+  interview, selection → credential-request e-mail. Then the AI-keys feature + the
+  Executive-Director dashboard rebuild.
 
 ### 🤖 PARKED — AI keys in master settings (owner request, 2026-07)
 Administrator can, under master settings, enter **API keys for multiple AI

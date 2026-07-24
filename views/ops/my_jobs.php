@@ -30,6 +30,11 @@
         <?php if ($sched): ?><span>📅 <?= e($sched) ?></span><?php endif; ?>
         <?php if (($j['reporting_frequency'] ?? '') && ($j['reporting_frequency']!=='NOREPORT')): ?><span>📄 <?= e(REPORT_FREQ[$j['reporting_frequency']] ?? '') ?></span><?php endif; ?>
       </div>
+      <?php $holds = function_exists('job_hold_reasons') ? job_hold_reasons($j) : []; if ($holds): ?>
+      <div style="margin:6px 0;padding:8px 10px;border:1px solid var(--bad);border-radius:8px;background:color-mix(in srgb,var(--bad) 10%,transparent);font-size:12.5px">
+        🚫 <b>HOLD — do not issue the report/deliverable:</b> <?= e(implode('; ', $holds)) ?>.
+      </div>
+      <?php endif; ?>
       <div class="jc-actions">
         <a class="btn secondary" href="/job?id=<?= (int)$j['id'] ?>">Open</a>
         <?php if (!$j['closed_flag']): ?><a class="btn" href="/job-close?id=<?= (int)$j['id'] ?>">Upload &amp; Close</a><?php endif; ?>
