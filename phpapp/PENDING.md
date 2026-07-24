@@ -65,9 +65,22 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
       no linked inspector profile now gets one actionable message on My Jobs and
       My Voucher (Users → Linked inspector) instead of "You cannot view vouchers".
 
-### 1c. Agency master + contracts + roll-conversion + costing (noted 2026-07, owner)
+### 1c. Agency master + contracts + roll-conversion + costing — ✅ CORE DONE
 Two agency types, each with a contract and a different fee model — both feed
 **inspector costing** and need **renewal reminders**.
+- [x] **DONE** — `agencies` master (type Recruitment/Manpower, contact, contract
+      no. + start/end, one-time fee, monthly rate); **renewal reminder card** on
+      the dashboard (≤30 days, colour-coded); Candidate **Accept** now picks the
+      supplying agency + roll (SGS vs agency) + fee, and the new inspector stores
+      agency_id / roll_type / placement_fee (one-time, tracked separately) /
+      agency_cost (monthly, into loaded cost). One-time recruitment fee is
+      **recorded, not amortised** (owner: tenure is unpredictable).
+- [ ] **Remaining follow-ups**: (a) show/edit agency, roll, placement fee on the
+      **inspector edit form** + inspector costing breakdown; (b) turn the renewal
+      reminder into an **email** via `cron.php` (currently a dashboard card only);
+      (c) **manpower pass-through invoicing** — we invoice the client our rate
+      while the agency bills SGS their monthly charge (margin = our rate − agency
+      charge); ties into §1d monthly invoicing.
 
 - [ ] **Agency master with a type**: **Recruitment agency** (CVs only, one-time
       placement) vs **Manpower / supply agency** (supplies people we run).
