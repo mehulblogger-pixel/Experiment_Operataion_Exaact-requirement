@@ -31,3 +31,8 @@ try { boot(); } catch (Throwable $e) { echo "Boot error: " . $e->getMessage() . 
 
 $sent = ops_run_reminders();
 echo "Reminders processed. Emails queued/sent: $sent\n";
+
+// Flip recruitment placement fees from provisional to confirmed once the
+// agency's free-replacement guarantee window has passed.
+confirm_lapsed_placement_fees();
+echo "Placement-fee guarantees checked.\n";

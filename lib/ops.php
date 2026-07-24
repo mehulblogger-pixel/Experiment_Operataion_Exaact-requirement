@@ -29,6 +29,10 @@ const RATE_TYPES = ['MANDAY'=>'Per man-day','MANMONTH'=>'Per man-month'];
 // manpower = supplies people on the AGENCY's roll, bills SGS monthly (pass-through to client).
 const AGENCY_TYPES = ['RECRUITMENT'=>'Recruitment agency (CVs only · one-time fee)', 'MANPOWER'=>'Manpower / supply agency (monthly bill)'];
 const ROLL_TYPES = ['SGS'=>'On SGS roll (we pay salary)', 'AGENCY'=>'On agency roll (agency bills us monthly)'];
+// Recruitment fee is conditional on the agency's free-replacement guarantee:
+// provisional while inside the window, confirmed if the person stays past it,
+// waived (₹0, free replacement) if they leave within it.
+const FEE_STATUS = ['PROVISIONAL'=>'Provisional (within guarantee)', 'CONFIRMED'=>'Confirmed (payable)', 'WAIVED'=>'Waived (left within guarantee)'];
 const BOSS_STATUS = ['ACTIVE'=>'Active','CLOSED'=>'Closed','HOLD'=>'On hold'];
 const OPS_ROLES = ['MASTER_ADMIN'=>'Master Admin','ADMIN'=>'Admin','COORDINATOR'=>'Coordinator','INSPECTOR'=>'Inspector'];
 const OVERHEAD_PCT = 8; // salary overhead %
@@ -226,6 +230,7 @@ function ops_ensure_schema() {
             gstin VARCHAR(20) DEFAULT '', contract_number VARCHAR(60) DEFAULT '',
             contract_start VARCHAR(20) DEFAULT '', contract_end VARCHAR(20) DEFAULT '',
             one_time_fee DECIMAL(14,2) DEFAULT 0, monthly_rate DECIMAL(14,2) DEFAULT 0,
+            guarantee_days INT DEFAULT 90,
             notes VARCHAR(255) DEFAULT '', active INT DEFAULT 1, created_at VARCHAR(30) DEFAULT '')",
     ];
     foreach ($t as $sql) $pdo->exec($sql);
@@ -304,6 +309,9 @@ function ops_migrate() {
     ensure_column('inspectors', 'agency_id', 'INT NULL');
     ensure_column('inspectors', 'roll_type', "VARCHAR(20) DEFAULT 'SGS'"); // SGS | AGENCY
     ensure_column('inspectors', 'placement_fee', 'DECIMAL(14,2) DEFAULT 0'); // one-time recruitment fee
+    ensure_column('inspectors', 'fee_status', "VARCHAR(20) DEFAULT ''");     // PROVISIONAL | CONFIRMED | WAIVED
+    ensure_column('inspectors', 'guarantee_upto', "VARCHAR(20) DEFAULT ''"); // fee is provisional until this date
+    ensure_column('agencies', 'guarantee_days', 'INT DEFAULT 90');           // free-replacement window
     // job type (inspection vs project deputation) + lifecycle stage
     ensure_column('jobs', 'job_type', "VARCHAR(20) DEFAULT 'INSPECTION'");
     ensure_column('jobs', 'stage', "VARCHAR(20) DEFAULT 'ALLOCATED'");
@@ -451,6 +459,23 @@ function agencies_renewing($days = 30) {
         FROM agencies WHERE active=1 AND contract_end<>'' AND contract_end<=? ORDER BY contract_end", [$limit]);
     foreach ($rows as &$r) $r['days_left'] = (int)round((strtotime($r['contract_end']) - strtotime($today)) / 86400);
     return $rows;
+}
+// Flip provisional placement fees to CONFIRMED once the guarantee window has
+// passed for a still-active inspector. Safe to run any time (idempotent).
+function confirm_lapsed_placement_fees() {
+    $today = date('Y-m-d');
+    db()->prepare("UPDATE inspectors SET fee_status='CONFIRMED'
+        WHERE fee_status='PROVISIONAL' AND status='ACTIVE' AND guarantee_upto<>'' AND guarantee_upto < ?")
+        ->execute([$today]);
+}
+// Placement-fee summary for the dashboard: provisional (₹ at risk / not yet due),
+// confirmed (real cost), and how many guarantees lapse within `$soon` days.
+function placement_fee_summary($soon = 30) {
+    $today = date('Y-m-d'); $limit = date('Y-m-d', strtotime("+$soon days"));
+    $prov = ops_one("SELECT COUNT(*) n, COALESCE(SUM(placement_fee),0) amt FROM inspectors WHERE fee_status='PROVISIONAL' AND placement_fee>0");
+    $conf = ops_one("SELECT COUNT(*) n, COALESCE(SUM(placement_fee),0) amt FROM inspectors WHERE fee_status='CONFIRMED' AND placement_fee>0");
+    $lapsing = (int)ops_val("SELECT COUNT(*) FROM inspectors WHERE fee_status='PROVISIONAL' AND placement_fee>0 AND guarantee_upto<>'' AND guarantee_upto<=?", [$limit]);
+    return ['prov_n'=>(int)$prov['n'], 'prov_amt'=>(float)$prov['amt'], 'conf_n'=>(int)$conf['n'], 'conf_amt'=>(float)$conf['amt'], 'lapsing'=>$lapsing];
 }
 function boss_for_client($cid) { return $cid ? ops_all("SELECT id, boss_number, status FROM boss_numbers WHERE client_id=? ORDER BY boss_number", [$cid]) : []; }
 function pname($p) { return $p ? ($p['display_name'] ?: $p['legal_name']) : '—'; }
@@ -896,6 +921,7 @@ function ops_masters() {
                 ['contract_end','Contract end / renewal due','date',[]],
                 ['one_time_fee','One-time placement fee (recruitment) ₹','money',[]],
                 ['monthly_rate','Monthly charge (manpower) ₹','money',[]],
+                ['guarantee_days','Free-replacement guarantee (days)','text',[]],
                 ['notes','Notes','text',[]],
                 ['active','Active','check',[]],
             ],
@@ -1725,11 +1751,15 @@ function ops_candidates($route, $method) {
                 $agCost = ($_POST['agency_cost'] ?? '') !== '' ? (float)$_POST['agency_cost'] : 0;
                 // On agency roll → costed as a sub-con (monthly agency charge); on SGS roll → asset (salary).
                 $kind = ($roll === 'AGENCY') ? 'SUBCON' : 'ASSET';
-                $pdo->prepare("INSERT INTO inspectors (name,first_name,middle_name,last_name,email,mobile,trade_id,skill_ids,sbus,sbu,designation,staff_kind,agency_id,roll_type,agency_name,agency_cost,placement_fee,status,created_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)")
+                // Recruitment placement fee is provisional until the agency's guarantee window passes.
+                $gd = (int)($ag['guarantee_days'] ?? 90) ?: 90;
+                $feeStatus = $placement > 0 ? 'PROVISIONAL' : '';
+                $guarUpto  = $placement > 0 ? date('Y-m-d', strtotime("+$gd days")) : '';
+                $pdo->prepare("INSERT INTO inspectors (name,first_name,middle_name,last_name,email,mobile,trade_id,skill_ids,sbus,sbu,designation,staff_kind,agency_id,roll_type,agency_name,agency_cost,placement_fee,fee_status,guarantee_upto,status,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)")
                     ->execute([$name, $cand['first_name'], $cand['middle_name'], $cand['last_name'], $cand['email'], $cand['mobile'],
                         $cand['trade_id'], (string)($cand['skill_id'] ?: ''), $cand['sbu'], $cand['sbu'], $cand['designation'], $kind,
-                        $agId, $roll, $agName, $agCost, $placement, date('c')]);
+                        $agId, $roll, $agName, $agCost, $placement, $feeStatus, $guarUpto, date('c')]);
                 $insId = $pdo->lastInsertId();
                 $pdo->prepare("UPDATE candidates SET inspector_id=? WHERE id=?")->execute([$insId, $id]);
                 $msg .= ' Added to Inspectors (' . ($roll === 'AGENCY' ? 'on agency roll' : 'on SGS roll') . ') — you can now allocate deputation jobs to them.';
