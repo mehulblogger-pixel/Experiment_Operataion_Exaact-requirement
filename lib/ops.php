@@ -328,6 +328,20 @@ function ops_migrate() {
     ensure_column('inspectors', 'guarantee_upto', "VARCHAR(20) DEFAULT ''"); // fee is provisional until this date
     ensure_column('agencies', 'guarantee_days', 'INT DEFAULT 90');           // free-replacement window
     ensure_column('candidates', 'requisition_id', 'INT NULL');               // hire is against an approved requisition
+    // CV analysis (keyword extraction for search) + client-submission / interview tracking (§20)
+    ensure_column('candidates', 'cv_text', 'MEDIUMTEXT');
+    ensure_column('candidates', 'cv_keywords', 'TEXT');
+    ensure_column('candidates', 'cv_file_name', "VARCHAR(200) DEFAULT ''");
+    ensure_column('candidates', 'cv_analyzed_at', "VARCHAR(30) DEFAULT ''");
+    ensure_column('candidates', 'submitted_client_date', "VARCHAR(20) DEFAULT ''");
+    ensure_column('candidates', 'client_feedback', "VARCHAR(20) DEFAULT ''");        // SHORTLISTED / REJECTED / PENDING
+    ensure_column('candidates', 'client_feedback_date', "VARCHAR(20) DEFAULT ''");
+    ensure_column('candidates', 'client_feedback_note', "VARCHAR(400) DEFAULT ''");
+    ensure_column('candidates', 'interview_required', 'INT DEFAULT 0');
+    ensure_column('candidates', 'interview_date', "VARCHAR(20) DEFAULT ''");         // planned
+    ensure_column('candidates', 'interview_done_date', "VARCHAR(20) DEFAULT ''");
+    ensure_column('candidates', 'interview_outcome', "VARCHAR(20) DEFAULT ''");      // SELECTED / REJECTED / HOLD
+    ensure_column('candidates', 'credential_requested', 'INT DEFAULT 0');
     // job type (inspection vs project deputation) + lifecycle stage
     ensure_column('jobs', 'job_type', "VARCHAR(20) DEFAULT 'INSPECTION'");
     ensure_column('jobs', 'stage', "VARCHAR(20) DEFAULT 'ALLOCATED'");
@@ -1168,7 +1182,7 @@ function ops_module_gate($route) {
         'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-invoice'=>'invoicing','job-advance'=>'jobs',
         'invoicing'=>'invoicing',
         'profitability'=>'profitability','boss-renew'=>'profitability',
-        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring',
+        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring',
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring',
         'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries',
         'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-approve'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes',
@@ -1226,7 +1240,7 @@ function ops_dispatch($route, $method) {
             ops_calls($route, $method); return true;
         case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-advance':
             ops_jobs($route, $method); return true;
-        case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage':
+        case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage' || $route === 'candidate-cv' || $route === 'candidate-client' || $route === 'candidate-credential':
             ops_candidates($route, $method); return true;
         case $route === 'inquiries' || $route === 'inquiry-new' || $route === 'inquiry-edit':
             ops_crm_inquiries($route, $method); return true;
@@ -1851,6 +1865,40 @@ function ops_candidates($route, $method) {
     $pdo = db();
 
     // stage transition (+ optional hire = create inspector)
+    if ($route === 'candidate-cv' && $method === 'POST') {
+        ops_require(is_coordinator_level(), 'You cannot update CVs.');
+        $id = (int)($_GET['id'] ?? 0); $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
+        if (!$cand) { http_response_code(404); view('notfound'); return; }
+        $text = trim($_POST['cv_text'] ?? ''); $fileName = $cand['cv_file_name'] ?? ''; $note = '';
+        if (!empty($_FILES['cv_file']['tmp_name']) && (int)$_FILES['cv_file']['error'] === 0) {
+            [$ext, $n2] = cv_text_from_upload($_FILES['cv_file']['tmp_name'], $_FILES['cv_file']['name']);
+            if ($ext !== '') $text = $ext; $fileName = $_FILES['cv_file']['name']; if ($n2) $note = $n2;
+        }
+        $kw = cv_extract_keywords($text);
+        $pdo->prepare("UPDATE candidates SET cv_text=?, cv_keywords=?, cv_file_name=?, cv_analyzed_at=? WHERE id=?")->execute([$text, $kw, $fileName, date('c'), $id]);
+        flash(($kw !== '' ? (substr_count($kw, ',') + 1) . ' keyword(s) extracted for search.' : 'CV saved (no keywords found — paste more text).') . ($note ? ' Note: ' . $note : ''));
+        redirect('/candidate?id=' . $id);
+    }
+    if ($route === 'candidate-client' && $method === 'POST') {
+        ops_require(is_coordinator_level(), 'You cannot update client tracking.');
+        $id = (int)($_GET['id'] ?? 0); $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
+        if (!$cand) { http_response_code(404); view('notfound'); return; }
+        $b = $_POST;
+        $pdo->prepare("UPDATE candidates SET submitted_client_date=?, client_feedback=?, client_feedback_date=?, client_feedback_note=?, interview_required=?, interview_date=?, interview_done_date=?, interview_outcome=? WHERE id=?")
+            ->execute([$b['submitted_client_date'] ?? '', $b['client_feedback'] ?? '', $b['client_feedback_date'] ?? '', trim($b['client_feedback_note'] ?? ''),
+                !empty($b['interview_required']) ? 1 : 0, $b['interview_date'] ?? '', $b['interview_done_date'] ?? '', $b['interview_outcome'] ?? '', $id]);
+        flash('Client submission / interview tracking updated.');
+        redirect('/candidate?id=' . $id);
+    }
+    if ($route === 'candidate-credential' && $method === 'POST') {
+        ops_require(is_coordinator_level(), 'You cannot send credential requests.');
+        $id = (int)($_GET['id'] ?? 0); $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
+        if (!$cand) { http_response_code(404); view('notfound'); return; }
+        [$ok, $msg] = cv_send_credential_request($cand);
+        $pdo->prepare("UPDATE candidates SET credential_requested=1 WHERE id=?")->execute([$id]);
+        flash($ok ? 'Credential-request e-mail sent to the candidate.' : ('Logged; ' . $msg), $ok ? 'success' : 'warning');
+        redirect('/candidate?id=' . $id);
+    }
     if ($route === 'candidate-stage') {
         ops_require(is_coordinator_level(), 'Only coordinators and admins can move a candidate.');
         $id = (int)($_GET['id'] ?? 0);
@@ -1905,7 +1953,7 @@ function ops_candidates($route, $method) {
         $q = trim($_GET['q'] ?? ''); $stage = $_GET['stage'] ?? '';
         $where = '1=1'; $args = [];
         if ($stage !== '' && isset(CAND_STAGES[$stage])) { $where .= ' AND c.stage=?'; $args[] = $stage; }
-        if ($q) { $where .= " AND (c.first_name LIKE ? OR c.last_name LIKE ? OR c.cand_code LIKE ? OR c.proposed_site LIKE ?)"; array_push($args, "%$q%","%$q%","%$q%","%$q%"); }
+        if ($q) { $where .= " AND (c.first_name LIKE ? OR c.last_name LIKE ? OR c.cand_code LIKE ? OR c.proposed_site LIKE ? OR c.cv_keywords LIKE ? OR c.cv_text LIKE ?)"; array_push($args, "%$q%","%$q%","%$q%","%$q%","%$q%","%$q%"); }
         $rows = ops_all("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, t.label trade_label
             FROM candidates c LEFT JOIN business_partners bp ON bp.id=c.client_id
             LEFT JOIN lookup_values t ON t.id=c.trade_id WHERE $where ORDER BY c.id DESC", $args);
