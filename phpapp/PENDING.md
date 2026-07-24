@@ -65,6 +65,30 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
       no linked inspector profile now gets one actionable message on My Jobs and
       My Voucher (Users → Linked inspector) instead of "You cannot view vouchers".
 
+### 1c. Hiring roll-conversion + agency types (noted 2026-07, owner)
+- [ ] **On Accept, choose the roll** — today accepting a candidate can "add to
+      Inspectors" and copies the source, but does NOT ask whether they go **on
+      SGS roll** (we pay salary/CTC) or **on the agency's roll** (we pay the
+      agency a **monthly charge**), nor capture the agency + monthly cost. Add
+      that choice; agency-roll writes `agency_name` + `agency_cost` (already on
+      the inspector, already flows into loaded-cost/profitability).
+- [ ] **Two agency types** — model **Recruitment agency** (supplies CVs only →
+      hire goes on SGS roll) vs **Manpower agency** (supplies CVs; person can be
+      on our roll OR stay on their roll with a monthly charge). Likely a flag on
+      the agency master (subcons/business_partners) + used to drive the roll
+      choice above.
+
+### 1d. Monthly / recurring invoicing for deputation (man-month / man-day)
+- [ ] **NOT built yet.** Invoicing is currently **one invoice per job**. A
+      man-month resident deputation (or a man-day contract billed monthly) needs
+      a **billing schedule**: for a deputation job with a rate + start/end,
+      generate a **monthly invoice line** per active month, so the accountant
+      gets a **month-wise list of pending invoices** ("Deputations to bill for
+      July", man-day contracts rolling up that month's man-days, etc.). Pairs
+      with the Invoicing FY/Month filter (item under §2 reports). Applies to
+      man-month, man-day and lumpsum. New model: an `invoices` / `billing_lines`
+      table keyed by job + month, feeding the money desk and CSV/PDF exports.
+
 ### 2. Credit tab — driven by contracting vs executing office — ✅ DONE
 - [x] **DONE** — calls carry a **contracting office** + executing office. On the
       call form the credit section toggles: **same office → "Billable value
