@@ -5,6 +5,11 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
 ## 🆕 Requested — to build next (noted 2026-07, owner)
 
 ### 1. Complete demo / seed dataset (uploadable, all expected values) — ✅ DONE
+- [x] **200+ edge cases** — DONE. The seed now generates **332 edge-case records**
+      (150 calls + 150 jobs + 32 vouchers) covering same/cross office, missing
+      vendor/dates, overdue, zero & large amounts, billable-vs-credit, every
+      invoice/payment/credit state, sub-con, zero man-days, 0-day/null TAT, all
+      stages, and voucher statuses incl. leave-only zero-total. Count shown on load.
 - [x] **DONE** — `lib/seed_demo.php` + a Master-Admin-only **"Load demo data"**
       button in **Settings** (POST `/seed-demo`, idempotent via `demo_seeded`).
       One click inserts 3 peer offices (Mumbai HO + Ahmedabad + Pune), 11 users
@@ -292,6 +297,34 @@ the theme builder (no colour hardcoded, no CSS variable renamed).
       dashboards. Verified: OH 20% + contingency 5% raised labour 40k→44.4k, added
       ₹2,472 contingency, margin 55k→48.1k. (Replaces the flat 8% constant, which
       remains only as the ultimate fallback.)
+
+## 🔮 Future phases (noted 2026-07, owner)
+
+### Reports — Phase 2 (advanced, downloadable)
+- [ ] Beyond the Phase-1 CSV exports (Jobs / Calls / Invoicing / Profitability /
+      voucher), build the deeper analytics from the catalogue: **TAT report**
+      (on-time vs late, avg, by office/SBU/inspector), **Office P&L** and **SBU
+      P&L**, **inspector utilization & productivity**, **overdue aging (30/60/90)**
+      on receivables, **inter-office credit statement** (given/received, expected
+      vs actual reconciliation), and **true PDF** documents for invoices / credit
+      notes / the signed voucher (currently print-to-PDF). Reuse the same
+      scope + dashboard-filter pattern; add FY/Month/office/SBU pickers to each.
+
+### CRM system (new module — before the Call in the chain)
+- [ ] **CRM / quotation pipeline** — a front-end sales process that feeds the
+      existing operations spine: **Lead / Enquiry → Quotation → Follow-up →
+      Won/Lost → (on Won) auto-create a Call/BOSS**. Scope to define with owner,
+      but likely includes: enquiry capture (client, contact, SBU, scope, source),
+      **quotation builder** (line items, rates, GST, validity, revisions,
+      PDF/print + email to client), **follow-up reminders & status** (open /
+      quoted / negotiating / won / lost with reason), a **sales pipeline board**
+      + conversion dashboard, and a hand-off that turns a won quotation into a
+      **BOSS number + Call** (carrying client, SBU, PO, agreed value) so nothing
+      is re-keyed. Reuses clients/contacts, offices, SBUs, access control and the
+      CSV/PDF export already built. Sits *before* Calls in the Enquiry → Quotation
+      → Call → Job → Voucher → Profitability chain. **Note:** the git branch is
+      already named `…quotation-management-workflow…`, but no CRM/quotation code
+      exists yet — this item is that module.
 
 ## 💡 Separate product idea (future — not part of this app)
 
