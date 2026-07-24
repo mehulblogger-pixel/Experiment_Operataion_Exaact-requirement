@@ -25,6 +25,10 @@ const DESIGNATIONS = ['INSPECTOR'=>'Inspector','SR_INSPECTOR'=>'Sr. Inspector','
 const JOB_STAGES = ['ALLOCATED'=>'Allocated','TRAVELLING'=>'Travelling','IN_PROGRESS'=>'Inspection in progress','REPORT_PENDING'=>'Report pending','SUBMITTED'=>'Report submitted','CLOSED'=>'Closed','ON_HOLD'=>'On hold','CANCELLED'=>'Cancelled'];
 const EXP_LEVELS = ['JUNIOR'=>'Junior','MID'=>'Mid','SENIOR'=>'Senior','EXPERT'=>'Expert / Lead'];
 const RATE_TYPES = ['MANDAY'=>'Per man-day','MANMONTH'=>'Per man-month'];
+// Agency types: recruitment = CVs only, one-time placement fee, person on SGS roll;
+// manpower = supplies people on the AGENCY's roll, bills SGS monthly (pass-through to client).
+const AGENCY_TYPES = ['RECRUITMENT'=>'Recruitment agency (CVs only · one-time fee)', 'MANPOWER'=>'Manpower / supply agency (monthly bill)'];
+const ROLL_TYPES = ['SGS'=>'On SGS roll (we pay salary)', 'AGENCY'=>'On agency roll (agency bills us monthly)'];
 const BOSS_STATUS = ['ACTIVE'=>'Active','CLOSED'=>'Closed','HOLD'=>'On hold'];
 const OPS_ROLES = ['MASTER_ADMIN'=>'Master Admin','ADMIN'=>'Admin','COORDINATOR'=>'Coordinator','INSPECTOR'=>'Inspector'];
 const OVERHEAD_PCT = 8; // salary overhead %
@@ -215,6 +219,14 @@ function ops_ensure_schema() {
             amounts TEXT, row_total DECIMAL(12,2) DEFAULT 0,
             leave_code VARCHAR(20) DEFAULT '', office_code VARCHAR(20) DEFAULT '', notes VARCHAR(255) DEFAULT '',
             is_auto INT DEFAULT 0, sort_order INT DEFAULT 0)",
+        // Recruitment / manpower agencies + their contracts (renewal reminders)
+        "CREATE TABLE IF NOT EXISTS agencies (
+            id $pk, name VARCHAR(150), agency_type VARCHAR(20) DEFAULT 'MANPOWER',
+            contact_person VARCHAR(150) DEFAULT '', email VARCHAR(200) DEFAULT '', mobile VARCHAR(40) DEFAULT '',
+            gstin VARCHAR(20) DEFAULT '', contract_number VARCHAR(60) DEFAULT '',
+            contract_start VARCHAR(20) DEFAULT '', contract_end VARCHAR(20) DEFAULT '',
+            one_time_fee DECIMAL(14,2) DEFAULT 0, monthly_rate DECIMAL(14,2) DEFAULT 0,
+            notes VARCHAR(255) DEFAULT '', active INT DEFAULT 1, created_at VARCHAR(30) DEFAULT '')",
     ];
     foreach ($t as $sql) $pdo->exec($sql);
 }
@@ -288,6 +300,10 @@ function ops_migrate() {
     // extra annual cost paid to an external agency when this engineer is hired via one
     ensure_column('inspectors', 'agency_name', "VARCHAR(150) DEFAULT ''");
     ensure_column('inspectors', 'agency_cost', 'DECIMAL(14,2) DEFAULT 0');
+    // Agency linkage + roll: which agency supplied them, on whose roll, one-time fee
+    ensure_column('inspectors', 'agency_id', 'INT NULL');
+    ensure_column('inspectors', 'roll_type', "VARCHAR(20) DEFAULT 'SGS'"); // SGS | AGENCY
+    ensure_column('inspectors', 'placement_fee', 'DECIMAL(14,2) DEFAULT 0'); // one-time recruitment fee
     // job type (inspection vs project deputation) + lifecycle stage
     ensure_column('jobs', 'job_type', "VARCHAR(20) DEFAULT 'INSPECTION'");
     ensure_column('jobs', 'stage', "VARCHAR(20) DEFAULT 'ALLOCATED'");
@@ -425,6 +441,17 @@ function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
 }
 function inspectors_list($activeOnly = true) { return ops_all("SELECT id, name, emp_code, sbu, salary_ctc FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name"); }
 function subcons_list($activeOnly = true) { return ops_all("SELECT id, agency, inspector_name, skill FROM subcons" . ($activeOnly ? " WHERE active=1" : "") . " ORDER BY agency"); }
+function agencies_list($activeOnly = true) { return ops_all("SELECT id, name, agency_type, one_time_fee, monthly_rate FROM agencies" . ($activeOnly ? " WHERE active=1" : "") . " ORDER BY name"); }
+function agency_get($id) { return $id ? ops_one("SELECT * FROM agencies WHERE id=?", [(int)$id]) : null; }
+// Agency contracts whose renewal is due within $days (default 30) — for reminders + a dashboard card.
+// Days-left is computed in PHP so it works the same on MySQL and SQLite.
+function agencies_renewing($days = 30) {
+    $today = date('Y-m-d'); $limit = date('Y-m-d', strtotime("+$days days"));
+    $rows = ops_all("SELECT id, name, agency_type, contract_number, contract_end
+        FROM agencies WHERE active=1 AND contract_end<>'' AND contract_end<=? ORDER BY contract_end", [$limit]);
+    foreach ($rows as &$r) $r['days_left'] = (int)round((strtotime($r['contract_end']) - strtotime($today)) / 86400);
+    return $rows;
+}
 function boss_for_client($cid) { return $cid ? ops_all("SELECT id, boss_number, status FROM boss_numbers WHERE client_id=? ORDER BY boss_number", [$cid]) : []; }
 function pname($p) { return $p ? ($p['display_name'] ?: $p['legal_name']) : '—'; }
 function fmoney($v) { return $v === null || $v === '' ? '—' : '₹' . number_format((float)$v, 0); }
@@ -854,6 +881,26 @@ function ops_masters() {
             'list' => ['name'=>'Name','designation'=>'Designation','department'=>'Department','office_id'=>'Office','status'=>'Status'],
             'list_labels' => ['designation'=>DESIGNATIONS,'department'=>DEPARTMENTS],
             'ref_cols' => ['office_id'=>['offices','name']],
+        ],
+        'agencies' => [
+            'label' => 'Recruitment / manpower agencies', 'table' => 'agencies', 'access' => 'admin', 'order' => 'name',
+            'fields' => [
+                ['name','Agency name','text',['req'=>1]],
+                ['agency_type','Type','select',['opts'=>AGENCY_TYPES]],
+                ['contact_person','Contact person','text',[]],
+                ['email','Email','text',[]],
+                ['mobile','Mobile','text',[]],
+                ['gstin','GSTIN','text',[]],
+                ['contract_number','Contract / agreement no.','text',[]],
+                ['contract_start','Contract start','date',[]],
+                ['contract_end','Contract end / renewal due','date',[]],
+                ['one_time_fee','One-time placement fee (recruitment) ₹','money',[]],
+                ['monthly_rate','Monthly charge (manpower) ₹','money',[]],
+                ['notes','Notes','text',[]],
+                ['active','Active','check',[]],
+            ],
+            'list' => ['name'=>'Agency','agency_type'=>'Type','contract_number'=>'Contract','contract_end'=>'Renewal due','active'=>'Active'],
+            'list_labels' => ['agency_type'=>AGENCY_TYPES],
         ],
         'inspectors' => [
             'label' => 'Inspectors', 'table' => 'inspectors', 'code' => null, 'access' => 'admin',
@@ -1670,13 +1717,22 @@ function ops_candidates($route, $method) {
             // Hired: create an inspector/resource record from the accepted candidate.
             if ($to === 'ACCEPTED' && !empty($_POST['make_inspector']) && empty($cand['inspector_id'])) {
                 $name = candidate_name($cand);
-                $pdo->prepare("INSERT INTO inspectors (name,first_name,middle_name,last_name,email,mobile,trade_id,skill_ids,sbus,sbu,designation,staff_kind,status,created_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)")
+                $agId = ($_POST['agency_id'] ?? '') !== '' ? (int)$_POST['agency_id'] : null;
+                $ag = $agId ? agency_get($agId) : null;
+                $roll = ($_POST['roll_type'] ?? '') === 'AGENCY' ? 'AGENCY' : 'SGS';
+                $agName = $ag['name'] ?? '';
+                $placement = ($_POST['placement_fee'] ?? '') !== '' ? (float)$_POST['placement_fee'] : 0;
+                $agCost = ($_POST['agency_cost'] ?? '') !== '' ? (float)$_POST['agency_cost'] : 0;
+                // On agency roll → costed as a sub-con (monthly agency charge); on SGS roll → asset (salary).
+                $kind = ($roll === 'AGENCY') ? 'SUBCON' : 'ASSET';
+                $pdo->prepare("INSERT INTO inspectors (name,first_name,middle_name,last_name,email,mobile,trade_id,skill_ids,sbus,sbu,designation,staff_kind,agency_id,roll_type,agency_name,agency_cost,placement_fee,status,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)")
                     ->execute([$name, $cand['first_name'], $cand['middle_name'], $cand['last_name'], $cand['email'], $cand['mobile'],
-                        $cand['trade_id'], (string)($cand['skill_id'] ?: ''), $cand['sbu'], $cand['sbu'], $cand['designation'], $cand['source'], date('c')]);
+                        $cand['trade_id'], (string)($cand['skill_id'] ?: ''), $cand['sbu'], $cand['sbu'], $cand['designation'], $kind,
+                        $agId, $roll, $agName, $agCost, $placement, date('c')]);
                 $insId = $pdo->lastInsertId();
                 $pdo->prepare("UPDATE candidates SET inspector_id=? WHERE id=?")->execute([$insId, $id]);
-                $msg .= ' Added to Inspectors — you can now allocate deputation jobs to them.';
+                $msg .= ' Added to Inspectors (' . ($roll === 'AGENCY' ? 'on agency roll' : 'on SGS roll') . ') — you can now allocate deputation jobs to them.';
             }
             flash($msg);
         }
