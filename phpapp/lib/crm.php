@@ -182,13 +182,22 @@ function crm_ensure_schema() {
         "CREATE TABLE IF NOT EXISTS crm_templates (
             id $pk, kind VARCHAR(30) DEFAULT 'EMAIL_FOLLOWUP', name VARCHAR(150) DEFAULT '',
             subject VARCHAR(255) DEFAULT '', body MEDIUMTEXT, file_name VARCHAR(200) DEFAULT '', file_data MEDIUMTEXT,
-            fields MEDIUMTEXT, active INT DEFAULT 1, is_default INT DEFAULT 0, created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
+            fields MEDIUMTEXT, document_number VARCHAR(80) DEFAULT '', format_number VARCHAR(80) DEFAULT '',
+            doc_revision VARCHAR(40) DEFAULT '', issue_date VARCHAR(20) DEFAULT '',
+            active INT DEFAULT 1, is_default INT DEFAULT 0, created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
     ];
     foreach ($t as $sql) $pdo->exec($sql);
 }
 
 function crm_migrate() {
     crm_ensure_schema();
+    // Quote-template control fields added after P0 (safe on already-created tables).
+    if (function_exists('ensure_column')) {
+        ensure_column('crm_templates', 'document_number', "VARCHAR(80) DEFAULT ''");
+        ensure_column('crm_templates', 'format_number', "VARCHAR(80) DEFAULT ''");
+        ensure_column('crm_templates', 'doc_revision', "VARCHAR(40) DEFAULT ''");
+        ensure_column('crm_templates', 'issue_date', "VARCHAR(20) DEFAULT ''");
+    }
     // Editable master for lost reasons (§ owner: research a dropdown + "Other").
     if (function_exists('lk_ensure_type_map')) lk_ensure_type_map('quote_lost_reason', 'Quote lost reason', QUOTE_LOST_REASONS);
     // Editable master for CRM service / job types (§18, §25).
@@ -419,4 +428,193 @@ function ops_crm_quotes($route, $method) {
         flash('Created revision ' . str_pad((string)$newRev, 2, '0', STR_PAD_LEFT) . '. Edit it below.');
         redirect('/quote-edit?id=' . $nid);
     }
+    if ($route === 'quote-doc') {
+        $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
+        $tplId = (int)($_GET['tpl'] ?? 0);
+        $tpl = $tplId ? ops_one("SELECT * FROM crm_templates WHERE id=? AND kind='QUOTE_DOC'", [$tplId])
+                      : ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' AND active=1 ORDER BY is_default DESC, id DESC");
+        if (!$tpl || ($tpl['file_data'] ?? '') === '') { flash('No quotation Word template is uploaded yet. Add one under CRM → Quote templates.', 'error'); redirect('/quote?id=' . $q['id']); }
+        [$bin, $err] = docx_fill(base64_decode($tpl['file_data']), quote_doc_map($q, $tpl), crm_quote_lines($q['id']));
+        if ($err) { flash('Could not generate the Word file: ' . $err, 'error'); redirect('/quote?id=' . $q['id']); }
+        $fname = 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no'] . ($q['rev'] > 0 ? '-R' . $q['rev'] : '')) . '.docx';
+        header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        header('Content-Disposition: attachment; filename="' . $fname . '"');
+        header('Content-Length: ' . strlen($bin));
+        echo $bin; exit;
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  .docx template engine (no external library — ZipArchive + token replace)
+// ---------------------------------------------------------------------------
+// Escape a value for inclusion inside a <w:t> text node; newlines → spaces so
+// the resulting XML stays valid.
+function docx_escape($s) {
+    $s = str_replace(["\r\n", "\r", "\n"], ' ', (string)$s);
+    return htmlspecialchars($s, ENT_QUOTES | ENT_XML1, 'UTF-8');
+}
+// Word often splits a typed token across several <w:r>/<w:t> runs. Rejoin the two
+// braces of {{ and }} when tags sit between them, then strip any tags INSIDE a
+// token so its name is contiguous and can be matched.
+function docx_repair_tokens($xml) {
+    $xml = preg_replace('/\{(?:<[^>]+>)+\{/u', '{{', $xml);
+    $xml = preg_replace('/\}(?:<[^>]+>)+\}/u', '}}', $xml);
+    $xml = preg_replace_callback('/\{\{(.*?)\}\}/us', function ($m) { return '{{' . preg_replace('/<[^>]+>/u', '', $m[1]) . '}}'; }, $xml);
+    return $xml;
+}
+// Per-line token map for a repeated table row.
+function docx_line_map($l, $i) {
+    return [
+        'l_no' => $i, 'l_sbu' => lk_options_or('sbu', OPS_SBUS)[$l['sbu']] ?? $l['sbu'],
+        'l_service' => lk_options_or('crm_service_type', CRM_SERVICE_TYPES)[$l['service_type']] ?? $l['service_type'],
+        'l_subtypes' => $l['subtypes'], 'l_desc' => $l['description'], 'l_location' => $l['location'],
+        'l_order' => ORDER_TYPES[$l['order_type']] ?? $l['order_type'],
+        'l_qty' => rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.'),
+        'l_unit' => QUOTE_UNITS[$l['unit']] ?? $l['unit'],
+        'l_rate' => number_format((float)$l['rate'], 2), 'l_amount' => number_format((float)$l['amount'], 2),
+    ];
+}
+// If a table row contains {{l_desc}}, clone that row once per line item.
+function docx_expand_line_rows($xml, $lines) {
+    if (!preg_match('/(<w:tr\b(?:(?!<w:tr\b).)*?\{\{l_desc\}\}.*?<\/w:tr>)/us', $xml, $mm)) return $xml;
+    $rowTpl = $mm[1]; $out = '';
+    $i = 0;
+    foreach ($lines as $l) {
+        $i++; $row = $rowTpl;
+        foreach (docx_line_map($l, $i) as $k => $v) $row = str_replace('{{' . $k . '}}', docx_escape($v), $row);
+        $out .= $row;
+    }
+    if ($out === '') $out = preg_replace('/\{\{l_[a-z_]+\}\}/u', '', $rowTpl);   // no lines → blank the row
+    return str_replace($rowTpl, $out, $xml);
+}
+function docx_replace($xml, $map) {
+    foreach ($map as $k => $v) $xml = str_replace('{{' . $k . '}}', docx_escape($v), $xml);
+    return $xml;
+}
+// Fill a .docx (binary) with $map + repeated line rows. Returns [binary, error].
+function docx_fill($binary, $map, $lines) {
+    if (!class_exists('ZipArchive')) return [null, 'The "zip" PHP extension is not enabled on this server.'];
+    $tmp = tempnam(sys_get_temp_dir(), 'qz');
+    if ($tmp === false || file_put_contents($tmp, $binary) === false) return [null, 'Could not write a temporary file.'];
+    $zip = new ZipArchive();
+    if ($zip->open($tmp) !== true) { @unlink($tmp); return [null, 'The template is not a valid .docx file.']; }
+    $parts = [];
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $n = $zip->getNameIndex($i);
+        if (preg_match('#^word/(document|header\d+|footer\d+)\.xml$#', $n)) $parts[$n] = $zip->getFromName($n);
+    }
+    foreach ($parts as $n => $xml) {
+        $xml = docx_repair_tokens($xml);
+        if (strpos($n, 'document.xml') !== false) $xml = docx_expand_line_rows($xml, $lines);
+        $xml = docx_replace($xml, $map);
+        $zip->deleteName($n); $zip->addFromString($n, $xml);
+    }
+    $zip->close();
+    $out = file_get_contents($tmp); @unlink($tmp);
+    return [$out, null];
+}
+// Header token map from a quotation + the template's control numbers.
+function quote_doc_map($q, $tpl) {
+    $off = $q['office_id'] ? ops_val("SELECT name FROM offices WHERE id=?", [$q['office_id']]) : '';
+    return [
+        'quote_no' => $q['quote_no'], 'quote_label' => quote_label($q),
+        'quote_rev' => (int)$q['rev'] > 0 ? 'Rev ' . str_pad((string)$q['rev'], 2, '0', STR_PAD_LEFT) : '',
+        'quote_date' => date('d M Y', strtotime($q['created_at'] ?: 'now')),
+        'client_name' => $q['client_name'], 'contact_name' => $q['contact_name'],
+        'contact_email' => $q['contact_email'], 'contact_mobile' => $q['contact_mobile'],
+        'sbu' => lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu'], 'subject' => $q['subject'],
+        'site_location' => $q['site_location'], 'location_type' => QUOTE_LOCATION_TYPES[$q['location_type']] ?? $q['location_type'],
+        'validity_days' => $q['validity_days'], 'payment_terms' => $q['payment_terms'],
+        'advance_pct' => rtrim(rtrim(number_format((float)$q['advance_pct'], 2), '0'), '.'),
+        'currency' => $q['currency'], 'office_name' => $off ?: '',
+        'subtotal' => number_format((float)$q['subtotal'], 2), 'gst_pct' => rtrim(rtrim(number_format((float)$q['gst_pct'], 2), '0'), '.'),
+        'gst_amount' => number_format((float)$q['gst_amount'], 2), 'total_amount' => number_format((float)$q['total_amount'], 2),
+        'total_in_words' => amount_in_words_inr((float)$q['total_amount']),
+        // Controlled-document identity carried from the uploaded FORMAT
+        'doc_number' => $tpl['document_number'] ?? '', 'format_number' => $tpl['format_number'] ?? '',
+        'doc_rev' => $tpl['doc_revision'] ?? '', 'doc_date' => $tpl['issue_date'] ?? '',
+    ];
+}
+// Indian-format amount in words (rupees). Compact; good enough for a quote footer.
+function amount_in_words_inr($n) {
+    $n = (int)round($n); if ($n === 0) return 'Zero Rupees Only';
+    $ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    $tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    $two = function ($x) use ($ones, $tens) { if ($x < 20) return $ones[$x]; return trim($tens[intdiv($x, 10)] . ' ' . $ones[$x % 10]); };
+    $three = function ($x) use ($ones, $two) { $h = intdiv($x, 100); $r = $x % 100; return trim(($h ? $ones[$h] . ' Hundred' . ($r ? ' ' : '') : '') . ($r ? $two($r) : '')); };
+    $parts = [];
+    $crore = intdiv($n, 10000000); $n %= 10000000;
+    $lakh = intdiv($n, 100000); $n %= 100000;
+    $thou = intdiv($n, 1000); $n %= 1000;
+    if ($crore) $parts[] = $three($crore) . ' Crore';
+    if ($lakh) $parts[] = $three($lakh) . ' Lakh';
+    if ($thou) $parts[] = $three($thou) . ' Thousand';
+    if ($n) $parts[] = $three($n);
+    return trim(implode(' ', $parts)) . ' Rupees Only';
+}
+
+// ---------------------------------------------------------------------------
+//  Handlers — quote / e-mail templates (§5, §6)
+// ---------------------------------------------------------------------------
+function ops_crm_templates($route, $method) {
+    ops_require(can('crm.template.manage') || is_master(), 'You cannot manage CRM templates.');
+    $pdo = db();
+    if ($route === 'crm-templates') {
+        $rows = ops_all("SELECT id, kind, name, document_number, format_number, doc_revision, issue_date, file_name, active, is_default FROM crm_templates ORDER BY kind, name");
+        view('ops/crm/template_list', ['rows' => $rows]); return;
+    }
+    if ($route === 'crm-template-download') {
+        $t = ops_one("SELECT * FROM crm_templates WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$t || ($t['file_data'] ?? '') === '') { flash('No file on this template.', 'error'); redirect('/crm-templates'); }
+        $bin = base64_decode($t['file_data']);
+        header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        header('Content-Disposition: attachment; filename="' . preg_replace('/[^A-Za-z0-9_.-]/', '_', $t['file_name'] ?: 'template.docx') . '"');
+        header('Content-Length: ' . strlen($bin)); echo $bin; exit;
+    }
+    if ($route === 'crm-template-delete' && $method === 'POST') {
+        $pdo->prepare("DELETE FROM crm_templates WHERE id=?")->execute([(int)($_GET['id'] ?? 0)]);
+        flash('Template deleted.'); redirect('/crm-templates');
+    }
+    if ($route === 'crm-template-new' || $route === 'crm-template-edit') {
+        $t = null;
+        if ($route === 'crm-template-edit') { $t = ops_one("SELECT * FROM crm_templates WHERE id=?", [(int)($_GET['id'] ?? 0)]); if (!$t) { http_response_code(404); view('notfound'); return; } }
+        if ($method === 'POST') {
+            $b = $_POST;
+            $kind = isset(CRM_TEMPLATE_KINDS[$b['kind'] ?? '']) ? $b['kind'] : 'QUOTE_DOC';
+            $isDef = !empty($b['is_default']) ? 1 : 0;
+            $active = !empty($b['active']) ? 1 : 0;
+            // optional new file upload (.docx)
+            $fileName = $t['file_name'] ?? ''; $fileData = $t['file_data'] ?? '';
+            if (!empty($_FILES['file']['tmp_name']) && (int)$_FILES['file']['error'] === 0) {
+                $raw = file_get_contents($_FILES['file']['tmp_name']);
+                if (strncmp($raw, "PK", 2) !== 0) { flash('The template must be a .docx (Word) file.', 'error'); redirect($t ? '/crm-template-edit?id=' . $t['id'] : '/crm-template-new'); }
+                $fileName = $_FILES['file']['name']; $fileData = base64_encode($raw);
+            }
+            $fields = [$kind, trim($b['name'] ?? ''), trim($b['subject'] ?? ''), $b['body'] ?? '', $fileName, $fileData,
+                trim($b['document_number'] ?? ''), trim($b['format_number'] ?? ''), trim($b['doc_revision'] ?? ''), trim($b['issue_date'] ?? ''), $active, $isDef];
+            if ($t) {
+                $pdo->prepare("UPDATE crm_templates SET kind=?,name=?,subject=?,body=?,file_name=?,file_data=?,document_number=?,format_number=?,doc_revision=?,issue_date=?,active=?,is_default=? WHERE id=?")
+                    ->execute(array_merge($fields, [$t['id']]));
+                $newId = $t['id']; flash('Template saved.');
+            } else {
+                $pdo->prepare("INSERT INTO crm_templates (kind,name,subject,body,file_name,file_data,document_number,format_number,doc_revision,issue_date,active,is_default,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                    ->execute(array_merge($fields, [user_name(current_user()), date('c')]));
+                $newId = (int)$pdo->lastInsertId(); flash('Template added.');
+            }
+            // only one default per kind
+            if ($isDef) $pdo->prepare("UPDATE crm_templates SET is_default=0 WHERE kind=? AND id<>?")->execute([$kind, $newId]);
+            redirect('/crm-templates');
+        }
+        view('ops/crm/template_form', ['t' => $t, 'kinds' => CRM_TEMPLATE_KINDS]); return;
+    }
+}
+// The tokens a quote-doc template may use (shown on the template form).
+function quote_doc_tokens() {
+    return [
+        'Document control (from this format)' => ['doc_number', 'format_number', 'doc_rev', 'doc_date'],
+        'Quotation' => ['quote_no', 'quote_label', 'quote_rev', 'quote_date', 'subject', 'sbu', 'office_name', 'validity_days'],
+        'Customer' => ['client_name', 'contact_name', 'contact_email', 'contact_mobile', 'site_location', 'location_type'],
+        'Commercials' => ['currency', 'payment_terms', 'advance_pct', 'subtotal', 'gst_pct', 'gst_amount', 'total_amount', 'total_in_words'],
+        'Line-item row (put inside ONE table row)' => ['l_no', 'l_sbu', 'l_service', 'l_subtypes', 'l_desc', 'l_location', 'l_order', 'l_qty', 'l_unit', 'l_rate', 'l_amount'],
+    ];
 }

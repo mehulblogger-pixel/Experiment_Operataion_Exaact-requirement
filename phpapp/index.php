@@ -76,6 +76,7 @@ try {
     db()->query("SELECT quote_no FROM quotations LIMIT 1");
     db()->query("SELECT id FROM crm_inquiries LIMIT 1");
     db()->query("SELECT id FROM quote_approval_rules LIMIT 1");
+    db()->query("SELECT document_number FROM crm_templates LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();
