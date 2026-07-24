@@ -15,7 +15,8 @@
     <div class="ff"><label>First name *</label><input class="form-control" name="first_name" required value="<?= e($ins['first_name'] ?? '') ?>"></div>
     <div class="ff"><label>Middle name</label><input class="form-control" name="middle_name" value="<?= e($ins['middle_name'] ?? '') ?>"></div>
     <div class="ff"><label>Last name</label><input class="form-control" name="last_name" value="<?= e($ins['last_name'] ?? '') ?>"></div>
-    <div class="ff"><label>Employee code</label><input class="form-control" name="emp_code" value="<?= e($ins['emp_code'] ?? '') ?>"></div>
+    <div class="ff"><label>Employee code</label><input class="form-control" id="emp_code" name="emp_code" value="<?= e($ins['emp_code'] ?? '') ?>" placeholder="auto">
+      <small class="muted" id="emp_code_hint"><?= $ins ? 'Leave as-is to keep this code.' : 'Leave blank to auto-generate. Sub-contractors get <b>SC-###</b>, freelancers <b>FL-###</b>, staff <b>EMP##</b>.' ?></small></div>
     <div class="ff"><label>Email</label><input class="form-control" name="email" value="<?= e($ins['email'] ?? '') ?>"></div>
     <div class="ff"><label>Mobile</label><input class="form-control" name="mobile" value="<?= e($ins['mobile'] ?? '') ?>"></div>
     <div class="ff"><label>Designation</label>
@@ -135,4 +136,15 @@
 <script>
 window.SKILLS = <?= json_encode(skills_by_trade()) ?>;
 window.SKILLS_SELECTED = <?= json_encode(array_map('intval', $selSkills)) ?>;
+<?php if (!$ins): ?>
+(function(){
+  var kindSel=document.querySelector('select[name="staff_kind"]'), code=document.getElementById('emp_code'), hint=document.getElementById('emp_code_hint');
+  var PFX={ASSET:'EMP##',SUBCON:'SC-###',FREELANCER:'FL-###'};
+  function sync(){ if(!hint) return; var k=kindSel?kindSel.value:'ASSET';
+    hint.innerHTML = code && code.value.trim() ? 'Using the code you typed.' : ('Blank → auto <b>'+(PFX[k]||'EMP##')+'</b> on save.'); }
+  if(kindSel) kindSel.addEventListener('change', sync);
+  if(code) code.addEventListener('input', sync);
+  sync();
+})();
+<?php endif; ?>
 </script>
