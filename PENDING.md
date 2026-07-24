@@ -136,6 +136,27 @@ afterwards (current landing dashboard "is not what we're expecting").**
 - **Next: P1** — Inquiry + Quotation screens (list/form/detail), quote numbering,
   revisions, dropdown-driven entry.
 
+### ✅ P1 shipped (2026-07) — Inquiry + Quotation core
+- **Inquiry register** (§1): list + new/edit, auto `INQ-#####` number, client/contact/
+  SBU/source/status, "Quote" button that carries an inquiry into a new quotation.
+- **Quotation core** (§2,3,4,8,14,23): list with **Open / Pending / Closed(won) / Lost**
+  views + KPI counts; new/edit form with header (client, contacts, SBU, site +
+  location type, validity, payment terms, **advance % + advance-required**,
+  **report-vs-payment** flag, GST) and **dynamic line items** (SBU per line, service
+  type, order type OPEN/LINE, qty/unit/rate, live totals); auto `Q-#####` number.
+- **Status workflow**: Draft → Submit → Approve → Send → Accepted / Lost, gated by
+  the CRM permissions; on **Sent** the 3/6/9-day, fortnight, month **follow-ups are
+  scheduled**; on **Lost** the researched reason dropdown + "Other (specify)" free text.
+- **Revisions** (§23): "Revise" creates Rev 01/02… as a fresh draft, keeps the old
+  version + a change-note in history; list shows only the current revision.
+- CRM nav group (Sales / CRM → Inquiries, Quotations) gated on the CRM modules.
+- **KNOWN DEV-ONLY QUIRK:** the *revise* row-copy binds only leading columns under
+  **SQLite + PHP's built-in `php -S` dev server** (a pdo_sqlite/built-in-server
+  defect — every CLI run and the create/status/lost paths are fine). **Production is
+  MySQL, which uses real prepared statements and is unaffected.** Verify "Revise" once
+  on the live site; if a revision ever copies blank there, tell me.
+- **Next (P2):** the .docx template engine (upload format, field map, auto-fill).
+
 ### 🤖 PARKED — AI keys in master settings (owner request, 2026-07)
 Administrator can, under master settings, enter **API keys for multiple AI
 platforms** of their choice — **Copilot, Gemini, Claude, Perplexity, OpenAI** —
