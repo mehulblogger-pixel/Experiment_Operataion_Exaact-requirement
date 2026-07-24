@@ -2,6 +2,126 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🧭 NEXT BIG BUILD — CRM / Marketing & Sales module (roadmap pending owner approval, 2026-07)
+
+The whole pre-operations sales funnel: **inquiry → quotation → approval → send →
+follow-up → acceptance → client/contract registration → hand-off to Operations →
+revenue tracking.** To be built as a new module that plugs into the EXISTING
+operations system (do NOT duplicate — reuse the tables/masters/email/roles below).
+**Build CRM first; the Executive-Director dashboard rebuild is parked to do
+afterwards (current landing dashboard "is not what we're expecting").**
+
+### Owner's 25-point requirement (verbatim intent, condensed)
+1. Customer inquiry received via email (capture it).
+2. Quotation number generation (auto).
+3. Quotation generation (the document).
+4. Allocate to different SBU(s) when generating the quote (per line if needed).
+5. Upload the quote WORD format; it must adapt to a new/revised format whenever a
+   new .docx is uploaded (template-driven, hot-swappable).
+6. Fields designable — create / edit / delete fields to match the new format.
+7. Person only enters data → system auto-creates the quotation document.
+8. Every data field should be able to offer drop-downs for fast entry.
+9. After creation it moves through an approval chain as required.
+10. Once fully approved → sent to the customer directly on their email.
+11. Auto follow-up reminder emails at 3 / 6 / 9 days, fortnight, month, with a
+    pre-drafted follow-up message. Templates editable by admin / marketing mgr.
+12. If acceptance arrives mid-chain → close the follow-up chain → route to Accounts
+    to register the client → create a contract + contract number (here or external).
+13. On contract-number entry, auto-float an Operations packet: client name, quote
+    no., contract no., contact person / email / mobile, service requirement,
+    techno-commercial proposal.
+14. Always show OPEN / PENDING / CLOSED (accepted) quotes.
+15. Monthly report.
+16. Integrate operations so revenue is tracked line-item-wise against each quote
+    number AND contract number.
+17. Two order types: OPEN (no PO — e.g. ARC) vs line-item orders (X days, Y months,
+    technical-audit days, …). Sales rep enters the order lines once the contract
+    number is generated.
+18. Job type configurable: Inspection, Project deputation, … Inspection sub-cats:
+    Product Inspection, Expediting Visit, Tender Document Review, Document Review,
+    Vendor Assessment, Vendor Audit, …; Project-deputation sub-cats: Site QA/QC,
+    Commissioning, O&M, Erection, … — multiple-selection allowed.
+19. Inspection location may differ from the client's registered/contract address —
+    "agreed location" or "Pan-India" must be clearly stated.
+20. CV-to-client tracking for deputation: client requirement, which CVs submitted &
+    when, client feedback (shortlisted / rejected), interview required? planned for /
+    completed on / outcome; on selection → auto-email candidate requesting all
+    credentials (CV, salary slip, …) via a configurable template.
+21. Advance-payment flag so Operations knows payment must be received BEFORE
+    scheduling the inspection.
+22. Payment-linked deliverable: report released only against payment; show the
+    inspector a HOLD so they don't issue the deliverable; fetch this rule from the
+    quotation / final accepted terms.
+23. Quote revision is compulsory when needed → auto Rev. 01 numbering, with an edit
+    history of what changed (reuse the BOSS supersede/hierarchy pattern).
+24. Fetch the required deliverable(s) from the quote into Operations.
+25. Job types (full list): Inspection, Project deputation, Supply-chain deputation,
+    Site supervision, Commissioning & Installation, Site QA/QC, Technical audit,
+    Type test, Vendor Assessment, Vendor Audit, Document Review, Tender Review, …
+
+### What ALREADY EXISTS to reuse (integration surface — researched)
+- `business_partners` (clients/vendors, GSTIN, `contract_number`, inspection_types),
+  `partner_contacts` (name/email/mobile), `partner_site_addresses` (locations),
+  `partner_contracts` (contract_number/title/sbu/value/dates),
+  `partner_purchase_orders` + `po_line_items` (trade/skill/site/manpower/activity/
+  gst/base/tax/total — this is largely the "order line items" of §17), BOSS numbers.
+- Calls→Jobs pipeline with `inspection_type`, `job_type` (INSPECTION/DEPUTATION),
+  `deliverables`, `site_address_id`, `po_id`, `po_line_item_id`, activity, SBU,
+  mandays; invoicing + payment + credit + profitability.
+- Masters/lookups engine (configurable dropdowns → §8), `INSPECTION_TYPES` (30+),
+  `JOB_TYPES`, `DELIVERABLES` constants + lookup overrides (§18/§25).
+- Candidate + Requisition + offer-stage pipeline (partial base for §20).
+- Email infra (`ops_mail`, SMTP settings) + daily reminder cron (`ops_run_reminders`,
+  cert reminders) — the scaffold for §11 follow-ups.
+- Access/roles + per-module View/Edit + scope; theme/masters admin.
+
+### GAPS I flagged (owner may have missed / to confirm)
+- **No quotation/inquiry module at all** — quotations, quote numbers, quote line
+  items, revisions, approval chain, send-to-customer: all NEW.
+- **Marketing/Sales roles missing** — add BDM, Key Accounts Manager, Marketing
+  Manager, Marketing Executive (Business Development). Map to access modules.
+- **Word-template engine (§5–7) is the key technical decision.** On MilesWeb shared
+  PHP (no Composer/PHPWord), the pragmatic path is a **.docx with placeholder tokens**
+  (e.g. `{{client_name}}`, `{{line_items}}`) that we fill by unzipping the docx with
+  PHP `ZipArchive` and string-replacing in `word/document.xml` — no library, upload-
+  and-go, hot-swappable format. Alternative: HTML→print-to-PDF. Needs owner's pick.
+- **Approval chain needs a rule/matrix** — "as required" must become configurable
+  (levels by value threshold and/or SBU, with named approvers). Confirm the rule.
+- **Lost/Rejected quote status** — owner listed Open/Pending/Closed(accepted) only;
+  need a LOST/REGRETTED state + reason for win/loss analytics.
+- **One quote → multiple SBUs** (§4) implies SBU per quote line (split), not one SBU
+  per quote — confirm.
+- **Advance %/payment terms & "report-vs-payment" gate** need explicit fields on the
+  quote that flow to the job and show the inspector a HOLD (§21/§22).
+- **Revision history** — capture field-level diff, not just a new rev number (§23).
+- **Duplicate-inquiry / duplicate-quote** guard; attachments (techno-commercial PDF).
+
+### Proposed phased roadmap (see chat for the approved-pending version)
+- P0 Foundations: sales roles + access modules; CRM masters (job-type / inspection
+  sub-category as multi-select configurable masters); quote/inquiry numbering.
+- P1 Inquiry + Quotation core: inquiry capture, quote header + line items (SBU per
+  line), auto quote number, revisions (Rev 01) + history, dropdown-driven entry.
+- P2 Template engine: upload .docx template, map/define fields (add/edit/delete),
+  auto-fill via ZipArchive token replacement → downloadable quote.
+- P3 Approval + send + follow-up: configurable approval chain → approve → auto-email
+  customer with the quote → 3/6/9/fortnight/month follow-ups with editable templates;
+  Open / Pending / Closed / Lost states.
+- P4 Acceptance → hand-off: acceptance closes follow-ups → Accounts registers client +
+  contract number → auto-float Operations packet (§13); OPEN (ARC) vs line-item
+  orders (§17) entered by sales rep after contract number.
+- P5 Ops integration + revenue: link quote/contract line items to calls/jobs; revenue
+  line-item-wise per quote & contract (§16); advance-payment flag + payment-before-
+  report HOLD visible to inspector (§21/§22); deliverables/terms fetched from quote.
+- P6 CV-to-client tracking (§20): client submission → feedback → interview → selection
+  → auto credential-request email (configurable template).
+- P7 CRM dashboards + monthly report + win/loss analytics.
+
+### PARKED (do after CRM): Executive-Director dashboard rebuild
+Current landing dashboard for the Business/Executive Director "is not what we're
+expecting." Rebuild to a strategic C-suite view (pipeline value, win rate, revenue
+by SBU/customer/project, forecast vs actual, top accounts) — AFTER the CRM lands so
+it can draw on real pipeline data.
+
 ## ✅ Just shipped (2026-07 — owner's screenshot batch)
 - **Distinct employee-code series for contractors.** A new inspector saved with a
   blank Employee code now auto-gets a code by engagement kind: **SC-###** for
