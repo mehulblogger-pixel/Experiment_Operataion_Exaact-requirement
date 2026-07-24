@@ -415,8 +415,12 @@ function ops_require($ok, $msg = 'You do not have access to that screen.') {
 
 // ---- Small data helpers ----------------------------------------------------
 function ops_all($sql, $args = []) { $s = db()->prepare($sql); $s->execute($args); return $s->fetchAll(); }
-function ops_one($sql, $args = []) { $s = db()->prepare($sql); $s->execute($args); return $s->fetch(); }
-function ops_val($sql, $args = []) { $s = db()->prepare($sql); $s->execute($args); return $s->fetchColumn(); }
+// NOTE: a partial fetch (fetch()/fetchColumn without draining all rows) leaves the
+// SQLite cursor OPEN on the shared connection. A later multi-parameter INSERT can
+// then bind only partially (silent, engine-specific). closeCursor() finalises the
+// statement so every write that follows binds all its parameters correctly.
+function ops_one($sql, $args = []) { $s = db()->prepare($sql); $s->execute($args); $r = $s->fetch(); $s->closeCursor(); return $r; }
+function ops_val($sql, $args = []) { $s = db()->prepare($sql); $s->execute($args); $v = $s->fetchColumn(); $s->closeCursor(); return $v; }
 function ops_next_code($table, $col, $prefix) {
     $last = ops_val("SELECT $col FROM $table WHERE $col LIKE ? ORDER BY $col DESC LIMIT 1", ["$prefix-%"]);
     $seq = $last ? ((int)substr($last, strrpos($last, '-') + 1)) + 1 : 1;
@@ -1146,6 +1150,8 @@ function ops_module_gate($route) {
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring',
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring',
+        'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries',
+        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes',
         'attendance-recon'=>'reconcile',
         'masters'=>'masters',
         'office-finance'=>'overheads',
@@ -1202,6 +1208,10 @@ function ops_dispatch($route, $method) {
             ops_jobs($route, $method); return true;
         case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage':
             ops_candidates($route, $method); return true;
+        case $route === 'inquiries' || $route === 'inquiry-new' || $route === 'inquiry-edit':
+            ops_crm_inquiries($route, $method); return true;
+        case $route === 'quotes' || $route === 'quote' || $route === 'quote-new' || $route === 'quote-edit' || $route === 'quote-revise' || $route === 'quote-status':
+            ops_crm_quotes($route, $method); return true;
         case $route === 'requisitions' || $route === 'requisition-new' || $route === 'requisition-edit' || $route === 'requisition':
             ops_requisitions($route, $method); return true;
         case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry' || $route === 'voucher-save' || $route === 'voucher-header' || $route === 'voucher-status' || $route === 'voucher-print' || $route === 'voucher-file' || $route === 'voucher-csv':
