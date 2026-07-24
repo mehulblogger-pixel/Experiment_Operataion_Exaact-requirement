@@ -61,6 +61,12 @@ try {
     db()->query("SELECT id FROM voucher_entries LIMIT 1");
     db()->query("SELECT id FROM vendor_km_memory LIMIT 1");
     db()->query("SELECT agency_cost FROM inspectors LIMIT 1");
+    // Newest columns — a miss here triggers the idempotent upgrade so live
+    // databases set up on an older version gain every pending column at once.
+    db()->query("SELECT overhead_pct FROM offices LIMIT 1");
+    db()->query("SELECT invoice_raised FROM jobs LIMIT 1");
+    db()->query("SELECT supersedes FROM boss_numbers LIMIT 1");
+    db()->query("SELECT billable_value FROM calls LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();
