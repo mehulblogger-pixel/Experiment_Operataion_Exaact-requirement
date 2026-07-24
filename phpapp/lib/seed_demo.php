@@ -191,6 +191,84 @@ function seed_demo() {
         $pdo->prepare("UPDATE vouchers SET total=? WHERE id=?")->execute([3440,$vB]);
         $c['vouchers'] = 2;
 
+        // ================= 200+ EDGE CASES (deterministic generator) =================
+        // Extra masters for spread
+        for ($i = 1; $i <= 10; $i++) { $insP->execute(['EC-'.$i,'Edge Client '.sprintf('%02d',$i),'EdgeCli'.$i,1,0,'Gujarat']); $cid['EC'.$i] = (int)$pdo->lastInsertId(); }
+        for ($i = 1; $i <= 6;  $i++) { $insP->execute(['EV-'.$i,'Edge Vendor '.sprintf('%02d',$i),'EdgeVen'.$i,0,1,'Maharashtra']); $vid['EV'.$i] = (int)$pdo->lastInsertId(); }
+        $clientPool = array_values($cid); $vendorPool = array_values($vid); $bossPool = array_values($bid);
+        for ($i = 1; $i <= 12; $i++) { $cc = $clientPool[$i % count($clientPool)]; $insB->execute([$cc,'5090'.sprintf('%02d',$i),$d(-100),$d(260)]); $bossPool[] = (int)$pdo->lastInsertId(); }
+        $offK = ['AMD','PUN','MUM']; $sbus = ['IND','OGC','MIN','GIS','AGRI','CRS','ENV','OTHER'];
+        $inspPool = array_values($iid);
+        $edge = 0;
+
+        // 150 calls, each with a job — every index toggles a different edge dimension
+        for ($i = 0; $i < 150; $i++) {
+            $office = $oid[$offK[$i % 3]];
+            $cross  = ($i % 5 === 0);                                   // 1 in 5 is cross-office
+            $ibo    = $cross ? $oid[$offK[($i + 1) % 3]] : $office;      // managing/contracting office
+            $sbu    = $sbus[$i % 8];
+            $client = $clientPool[$i % count($clientPool)];
+            $vendor = ($i % 4 === 0) ? null : $vendorPool[$i % count($vendorPool)]; // some have no vendor
+            $boss   = $bossPool[$i % count($bossPool)];
+            $req    = ($i % 6 === 0) ? '' : $d(-25 + ($i % 50));         // some missing / past / future
+            $recd   = $d(-45 + ($i % 30));
+            $closed = ($i % 3 !== 2);                                    // ~2/3 closed
+            $status = $closed ? 'CLOSED' : 'OPEN';
+            $credit = $cross ? (10000 * (1 + ($i % 20))) : 0;           // cross-office credit; edge: up to 200k
+            $billable = $cross ? 0 : (($i % 9 === 0) ? 0 : (40000 + 1000 * ($i % 60))); // same-office billable; some ₹0
+            $ccode = 'CALL-E' . sprintf('%04d', $i);
+            $insC->execute([$ccode,$client,$vendor,$ibo,'WEST',$sbu,'',$recd,$req,'Edge case #'.$i.($cross?' (cross-office)':' (same office)'),$status,$office,$credit,$cross?'MANDAY':'',$billable,$cross?'':'MANDAY','INSPECTION',$now]);
+            $callId = (int)$pdo->lastInsertId();
+
+            $sched = $closed ? $d(-20 + ($i % 15)) : (($i % 4 === 0) ? $d(-8) : $d(3 + ($i % 10))); // some open+overdue
+            $insp  = ($i % 8 === 0) ? null : $inspPool[$i % count($inspPool)]; // some unassigned
+            $subcost = ($i % 11 === 0) ? (12000 + ($i % 5) * 3000) : 0;        // some sub-con cost
+            $freq  = ($i % 2 === 0) ? 'SINGLE' : 'NOREPORT';
+            $reportUp = ($closed && $freq === 'SINGLE' && $i % 3 === 0) ? $d(-18) : ''; // some reports pending
+            $tat   = $closed ? ($i % 6) : null;                          // edge: 0-day TAT, and null
+            $mandays = ($i % 10 === 0) ? 0 : (1 + ($i % 4));             // some zero man-days
+            $stage = $closed ? 'CLOSED' : ['ALLOCATED','TRAVELLING','IN_PROGRESS','REPORT_PENDING'][$i % 4];
+            $invRaised = 0; $invNo = ''; $invDate = ''; $invDue = ''; $invAmt = 0; $payRecv = 0; $payDate = ''; $payAmt = 0;
+            if ($closed) {
+                $mod = $i % 3; $amt = $credit ?: ($billable ?: 50000);
+                if ($mod === 1) { $invRaised = 1; $invNo = 'INV-E'.$i; $invDate = $d(-15); $invDue = ($i % 2 === 0) ? $d(-3) : $d(20); $invAmt = $amt; } // awaiting / overdue
+                elseif ($mod === 2) { $invRaised = 1; $invNo = 'INV-E'.$i; $invDate = $d(-15); $invDue = $d(15); $invAmt = $amt; $payRecv = 1; $payDate = $d(-2); $payAmt = $amt; } // paid
+            }
+            $creditRecv = $cross ? ($closed ? ($i % 2) : 0) : 1;         // same-office excluded from "credit pending"
+            $jr = ['JOB-E'.sprintf('%04d',$i),$callId,$office,$insp,null,$sched,$closed?$sched:'',$closed?$d(-19+($i%15)):'',$boss,$credit,'MANDAY',$cross?'RECEIVED':'RECEIVED',$freq,$reportUp,$closed?1:0,$closed?$d(-19):'',$tat,$sbu,$mandays,$subcost,$stage,$invRaised,$invNo,$invDate,$invDue,$invAmt,$payRecv,$payDate,$payAmt,$creditRecv];
+            $insJ->execute(array_merge($jr, [$now]));
+            $edge += 2;
+        }
+
+        // 32 vouchers across 4 inspectors × 8 months — statuses, leave-only, high km, many bills
+        $vStat = ['DRAFT','SUBMITTED','APPROVED','PAID'];
+        $rate = ['BIKE' => 6, 'CAR' => 12];
+        $vi = 0;
+        foreach ($inspPool as $ins) {
+            for ($k = 1; $k <= 8; $k++) {
+                $mm = date('Y-m', strtotime("first day of -$k months"));
+                $st = $vStat[$vi % 4];
+                $adv = ($vi % 3 === 0) ? 500 : 0;
+                $insV->execute([$ins,$oid['AMD'],$mm,$st,$adv,0,0,($st==='APPROVED'||$st==='PAID')?'Meena Shah':'',$now]);
+                $vv = (int)$pdo->lastInsertId();
+                $total = 0;
+                if ($vi % 5 !== 0) { // most have a work day; 1 in 5 is leave-only (₹0 edge)
+                    $mode = ($vi % 2 === 0) ? 'BIKE' : 'CAR';
+                    $km = 20 + ($vi % 9) * 15;                 // edge: up to ~140 km
+                    $travel = $km * $rate[$mode];
+                    $bills = ($vi % 4 === 0) ? ['HOTEL' => 1800, 'FOOD' => 250, 'AUTO' => 120] : ['FOOD' => 150];
+                    $rowTot = $travel + array_sum($bills);
+                    $insVE->execute([$vv,$mm.'-08','WORK',null,null,$vendorPool[$vi % count($vendorPool)],'','','IND','Edge site',8,$mode,$km,$travel,json_encode($bills),$rowTot,'',0]);
+                    $total += $rowTot;
+                }
+                $insVE->execute([$vv,$mm.'-09','LEAVE',null,null,null,'','','','',0,'',0,0,'',0,($vi%2?'SL':'CL'),0]);
+                $pdo->prepare("UPDATE vouchers SET total=? WHERE id=?")->execute([$total, $vv]);
+                $vi++; $edge++;
+            }
+        }
+        $c['edge_cases'] = $edge;
+        // ================= end edge cases =================
+
         setting_set('demo_seeded', '1');
         $pdo->commit();
     } catch (Throwable $e) {

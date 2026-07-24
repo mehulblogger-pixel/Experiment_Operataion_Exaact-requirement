@@ -1108,7 +1108,7 @@ function ops_dispatch($route, $method) {
                 $res = seed_demo();
                 if (!empty($res['skipped'])) flash('Demo data is already loaded.', 'warning');
                 elseif (!empty($res['error'])) flash('Could not load demo data: ' . $res['error'], 'error');
-                else { $x = $res['counts']; flash("Demo data loaded — {$x['offices']} offices, {$x['users']} users, {$x['inspectors']} inspectors, {$x['partners']} clients/vendors, {$x['boss']} BOSS, {$x['calls']} calls, {$x['jobs']} jobs, {$x['vouchers']} vouchers. Log in as any demo user (e.g. director, account, insp.ravi) with password demo12345."); }
+                else { $x = $res['counts']; flash("Demo data loaded — {$x['offices']} offices, {$x['users']} users, {$x['inspectors']} inspectors, {$x['partners']} clients/vendors, {$x['boss']} BOSS, {$x['calls']} calls, {$x['jobs']} jobs, {$x['vouchers']} vouchers, plus " . ($x['edge_cases'] ?? 0) . " generated edge-case records. Log in as any demo user (e.g. director, account, insp.ravi) with password demo12345."); }
             }
             redirect('/settings'); return true;
         case $route === 'boss-renew':
