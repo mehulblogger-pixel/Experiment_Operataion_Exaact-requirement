@@ -1,8 +1,42 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/quotes">Quotations</a> › Templates</div>
 <div class="master-head">
   <div><h1>Quote &amp; e-mail templates</h1>
-    <p class="sub" style="margin:2px 0 0">Upload your Word quotation format. The generated quote adopts it automatically and stamps the document / format number from the format.</p></div>
+    <p class="sub" style="margin:2px 0 0">Upload your Word quotation format (for editing) and the signature that appears on the <strong>client PDF</strong>. The generated quote stamps the document / format number from the format.</p></div>
   <a class="btn" href="/crm-template-new">+ Add template</a>
+</div>
+
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">🏢 Letterhead for client PDF <span class="muted">— per company</span></h3>
+  <p class="sub">The customer receives the quotation as a PDF on this letterhead. Fully customisable to your company.</p>
+  <form method="post" action="/crm-letterhead" enctype="multipart/form-data">
+    <div class="form-grid">
+      <div class="ff"><label>Company logo (PNG / JPG) <?= !empty($lhLogo)?'<span class="pill p-ok">on file</span>':'' ?></label><input class="form-control" type="file" name="logo" accept=".png,.jpg,.jpeg"></div>
+      <div class="ff"><label>Company name</label><input class="form-control" name="lh_name" value="<?= e($lhName ?? '') ?>" placeholder="e.g. SGS India Pvt Ltd"></div>
+      <div class="ff"><label>Contact line <span class="muted">(phone · email · web · GSTIN)</span></label><input class="form-control" name="lh_contact" value="<?= e($lhContact ?? '') ?>" placeholder="+91 … · sales@… · www… · GSTIN …"></div>
+    </div>
+    <div class="ff ff-wide"><label>Address (one line each)</label><textarea class="form-control" name="lh_address" rows="2" placeholder="Building / street&#10;City, State – PIN"><?= e($lhAddress ?? '') ?></textarea></div>
+    <div class="ff ff-wide"><label>Footer note (optional)</label><input class="form-control" name="lh_footer" value="<?= e($lhFooter ?? '') ?>" placeholder="e.g. This is a computer-generated quotation."></div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+      <button class="btn" type="submit">Save letterhead</button>
+      <?php if (!empty($lhLogo)): ?><label class="chk"><input type="checkbox" name="clear_logo" value="1"> Remove current logo</label><?php endif; ?>
+    </div>
+  </form>
+</div>
+
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">✍ Signature for client PDFs</h3>
+  <p class="sub">The customer receives the quotation as a <strong>PDF</strong>; this signature image + name are stamped on it.</p>
+  <form method="post" action="/crm-signature" enctype="multipart/form-data">
+    <div class="form-grid">
+      <div class="ff"><label>Signature image (PNG / JPG) <?= !empty($sigSet)?'<span class="pill p-ok">on file</span>':'' ?></label><input class="form-control" type="file" name="sig" accept=".png,.jpg,.jpeg"></div>
+      <div class="ff"><label>Signatory name</label><input class="form-control" name="sig_name" value="<?= e($sigName ?? '') ?>" placeholder="e.g. R. Sharma"></div>
+      <div class="ff"><label>Designation</label><input class="form-control" name="sig_desig" value="<?= e($sigDesig ?? '') ?>" placeholder="e.g. Marketing Manager"></div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+      <button class="btn" type="submit">Save signature</button>
+      <?php if (!empty($sigSet)): ?><label class="chk"><input type="checkbox" name="clear_sig" value="1"> Remove current image</label><?php endif; ?>
+    </div>
+  </form>
 </div>
 
 <div class="panel" style="padding:0;overflow:hidden">

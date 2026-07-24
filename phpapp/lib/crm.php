@@ -454,6 +454,16 @@ function ops_crm_quotes($route, $method) {
         header('Content-Length: ' . strlen($bin));
         echo $bin; exit;
     }
+    if ($route === 'quote-pdf') {
+        $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
+        $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' ORDER BY is_default DESC, id DESC");   // for doc/format numbers
+        $pdf = quote_pdf_build($q, crm_quote_lines($q["id"]), $tpl ?: [], quote_signature(), quote_letterhead());
+        $fname = 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no'] . ($q['rev'] > 0 ? '-R' . $q['rev'] : '')) . '.pdf';
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="' . $fname . '"');
+        header('Content-Length: ' . strlen($pdf));
+        echo $pdf; exit;
+    }
     if ($route === 'quote-approve' && $method === 'POST') {
         $step = ops_one("SELECT * FROM quote_approvals WHERE id=?", [(int)($_POST['step'] ?? 0)]);
         if (!$step) { flash('Approval step not found.', 'error'); redirect('/quotes'); }
@@ -653,15 +663,29 @@ function crm_default_followup_email($q, $kind) {
         . " (₹" . number_format((float)$q['total_amount'], 0) . ").\n"
         . "We would be glad to address any questions or revise as needed.\n\nBest regards,\n" . app_name();
 }
-// Generate the .docx and e-mail it to the customer. Returns [sentBool, message].
+// Current signature to stamp on quote PDFs (uploaded under CRM → Templates).
+function quote_signature() {
+    $img = setting_get('quote_sig_img', '');
+    return ['img' => $img ? base64_decode($img) : '', 'name' => setting_get('quote_sig_name', ''), 'desig' => setting_get('quote_sig_desig', '')];
+}
+// Customisable letterhead for the client PDF (company logo / name / address / contact).
+function quote_letterhead() {
+    $logo = setting_get('quote_lh_logo', '');
+    return [
+        'logo' => $logo ? base64_decode($logo) : '',
+        'name' => setting_get('quote_lh_name', '') ?: app_name(),
+        'address' => setting_get('quote_lh_address', ''),
+        'contact' => setting_get('quote_lh_contact', ''),
+        'footer' => setting_get('quote_lh_footer', ''),
+    ];
+}
+// Generate the signed PDF and e-mail it to the customer. Returns [sentBool, message].
 function crm_send_quote_email($q) {
     if (($q['contact_email'] ?? '') === '') return [false, 'no customer e-mail on the quotation (it was not e-mailed).'];
     $att = [];
-    $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' AND active=1 ORDER BY is_default DESC, id DESC");
-    if ($tpl && ($tpl['file_data'] ?? '') !== '') {
-        [$bin, $err] = docx_fill(base64_decode($tpl['file_data']), quote_doc_map($q, $tpl), crm_quote_lines($q['id']));
-        if (!$err && $bin) $att[] = ['name' => 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no']) . '.docx', 'data' => $bin, 'type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    }
+    $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' ORDER BY is_default DESC, id DESC");
+    $pdf = quote_pdf_build($q, crm_quote_lines($q["id"]), $tpl ?: [], quote_signature(), quote_letterhead());
+    if ($pdf) $att[] = ['name' => 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no']) . '.pdf', 'data' => $pdf, 'type' => 'application/pdf'];
     $et = ops_one("SELECT * FROM crm_templates WHERE kind='EMAIL_QUOTE' AND active=1 ORDER BY is_default DESC, id DESC");
     $subject = ($et && $et['subject']) ? crm_fill_email($et['subject'], $q) : ('Quotation ' . $q['quote_no'] . ' — ' . app_name());
     $body = ($et && $et['body']) ? crm_fill_email($et['body'], $q) : crm_default_quote_email($q);
@@ -840,9 +864,39 @@ function amount_in_words_inr($n) {
 function ops_crm_templates($route, $method) {
     ops_require(can('crm.template.manage') || is_master(), 'You cannot manage CRM templates.');
     $pdo = db();
+    if ($route === 'crm-signature' && $method === 'POST') {
+        if (!empty($_FILES['sig']['tmp_name']) && (int)$_FILES['sig']['error'] === 0) {
+            [$jpg, $err] = signature_to_jpeg(file_get_contents($_FILES['sig']['tmp_name']));
+            if ($err) { flash('Signature: ' . $err, 'error'); redirect('/crm-templates'); }
+            setting_set('quote_sig_img', base64_encode($jpg));
+        }
+        if (!empty($_POST['clear_sig'])) setting_set('quote_sig_img', '');
+        setting_set('quote_sig_name', trim($_POST['sig_name'] ?? ''));
+        setting_set('quote_sig_desig', trim($_POST['sig_desig'] ?? ''));
+        flash('Signature settings saved — they will appear on generated quote PDFs.');
+        redirect('/crm-templates');
+    }
+    if ($route === 'crm-letterhead' && $method === 'POST') {
+        if (!empty($_FILES['logo']['tmp_name']) && (int)$_FILES['logo']['error'] === 0) {
+            [$jpg, $err] = signature_to_jpeg(file_get_contents($_FILES['logo']['tmp_name']));
+            if ($err) { flash('Logo: ' . $err, 'error'); redirect('/crm-templates'); }
+            setting_set('quote_lh_logo', base64_encode($jpg));
+        }
+        if (!empty($_POST['clear_logo'])) setting_set('quote_lh_logo', '');
+        setting_set('quote_lh_name', trim($_POST['lh_name'] ?? ''));
+        setting_set('quote_lh_address', trim($_POST['lh_address'] ?? ''));
+        setting_set('quote_lh_contact', trim($_POST['lh_contact'] ?? ''));
+        setting_set('quote_lh_footer', trim($_POST['lh_footer'] ?? ''));
+        flash('Letterhead saved — it appears on the client PDF.');
+        redirect('/crm-templates');
+    }
     if ($route === 'crm-templates') {
         $rows = ops_all("SELECT id, kind, name, document_number, format_number, doc_revision, issue_date, file_name, active, is_default FROM crm_templates ORDER BY kind, name");
-        view('ops/crm/template_list', ['rows' => $rows]); return;
+        view('ops/crm/template_list', ['rows' => $rows,
+            'sigSet' => setting_get('quote_sig_img', '') !== '', 'sigName' => setting_get('quote_sig_name', ''), 'sigDesig' => setting_get('quote_sig_desig', ''),
+            'lhLogo' => setting_get('quote_lh_logo', '') !== '', 'lhName' => setting_get('quote_lh_name', ''), 'lhAddress' => setting_get('quote_lh_address', ''),
+            'lhContact' => setting_get('quote_lh_contact', ''), 'lhFooter' => setting_get('quote_lh_footer', '')]);
+        return;
     }
     if ($route === 'crm-template-download') {
         $t = ops_one("SELECT * FROM crm_templates WHERE id=?", [(int)($_GET['id'] ?? 0)]);
