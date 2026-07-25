@@ -106,6 +106,10 @@
       <small class="muted">Rename <?= e(Tlp('client')) ?>, <?= e(Tlp('call')) ?>, <?= e(Tlp('job')) ?> and every other business word.</small></div>
   </div>
 
+  <h3 class="tab-sub">Default terms &amp; conditions</h3>
+  <p class="sub" style="margin-bottom:10px">Carried onto every new <?= e(Tl('quote')) ?>, where it can still be edited for that one <?= e(Tl('quote')) ?>. Changing it here does not alter <?= e(Tlp('quote')) ?> already written.</p>
+  <textarea class="form-control" name="quote_terms" rows="10" style="font-family:inherit"><?= e(setting_get('quote_terms','') !== '' ? setting_get('quote_terms') : crm_default_terms()) ?></textarea>
+
   <h3 class="tab-sub">Reporting controls</h3>
   <div class="form-grid">
     <div class="ff ff-wide"><label>Source documents a complete inspection pack must contain</label>

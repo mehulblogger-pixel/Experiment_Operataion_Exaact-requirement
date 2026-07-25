@@ -77,6 +77,27 @@
   </div>
 </div>
 
+<?php if (!empty($quoteDocs)): ?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0"><?= e(T('client')) ?> documents <span class="muted">— filed with the order, for this <?= e(Tl('job')) ?></span></h3>
+  <table class="dt">
+    <thead><tr><th>Document</th><th>Kind</th><th>Note</th><th>Added</th></tr></thead>
+    <tbody>
+    <?php foreach ($quoteDocs as $d): ?>
+      <tr>
+        <td><a href="/quote-file?id=<?= (int)$d['id'] ?>">⬇ <?= e($d['file_name']) ?></a>
+            <span class="muted" style="font-size:11px">(<?= e(number_format(((int)$d['b64len']) * 3 / 4 / 1024, 0)) ?> KB)</span></td>
+        <td><?= e(QUOTE_FILE_KINDS[$d['kind']] ?? $d['kind']) ?></td>
+        <td class="muted"><?= e($d['note'] ?: '—') ?></td>
+        <td class="muted"><?= e(fdate(substr((string)$d['uploaded_at'],0,10))) ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <p class="muted" style="margin-top:6px">The purchase order, specification, drawing and QAP the <?= e(Tl('client')) ?> sent when the <?= e(Tl('quote')) ?> was accepted.</p>
+</div>
+<?php endif; ?>
+
 <div class="panel-split">
   <div class="panel">
     <h3 class="tab-sub">Expenses</h3>

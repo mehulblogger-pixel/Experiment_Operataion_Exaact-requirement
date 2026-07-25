@@ -931,7 +931,7 @@ function ops_crm_quotes($route, $method) {
     if ($route === 'quote-pdf') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' ORDER BY is_default DESC, id DESC");   // for doc/format numbers
-        $pdf = quote_pdf_build($q, crm_quote_lines($q["id"]), $tpl ?: [], quote_signature(), quote_letterhead());
+        $pdf = quote_pdf_build($q, crm_quote_lines($q["id"]), $tpl ?: [], quote_signature($q), quote_letterhead());
         $fname = 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no'] . ($q['rev'] > 0 ? '-R' . $q['rev'] : '')) . '.pdf';
         header('Content-Type: application/pdf');
         header('Content-Disposition: attachment; filename="' . $fname . '"');
@@ -1176,6 +1176,23 @@ const QUOTE_FILE_KINDS = [
     'INSP_DOC'   => 'Inspection document (spec, drawing, QAP)',
 ];
 const QUOTE_FILE_MAX = 8388608;   // 8 MB per file
+// §xxiv — the documents filed against the quote that the field engineer needs:
+// the PO, the specification, the drawing, the QAP. Reached from the job (which
+// carries quotation_id) and from the call behind it, so whoever the call is
+// allocated to sees exactly what the client sent.
+function quote_docs_for_job($jobId) {
+    $qid = (int)ops_val("SELECT quotation_id FROM jobs WHERE id=?", [(int)$jobId]);
+    return $qid ? quote_docs_shared($qid) : [];
+}
+function quote_docs_for_call($callId) {
+    $qid = (int)ops_val("SELECT COALESCE(MAX(quotation_id),0) FROM jobs WHERE call_id=? AND quotation_id IS NOT NULL", [(int)$callId]);
+    return $qid ? quote_docs_shared($qid) : [];
+}
+function quote_docs_shared($qid) {
+    return ops_all("SELECT id, kind, file_name, mime, note, uploaded_at, LENGTH(file_data) AS b64len
+                    FROM quote_files WHERE quote_id=? AND share_with_inspector=1
+                      AND kind IN ('PO','INSP_DOC','CLIENT_DOC') ORDER BY kind, id", [(int)$qid]);
+}
 function crm_quote_files($qid, $kind = null) {
     $sql = "SELECT id, quote_id, kind, file_name, mime, note, share_with_inspector, uploaded_by, uploaded_at,
                    LENGTH(file_data) AS b64len FROM quote_files WHERE quote_id=?";
@@ -1249,14 +1266,14 @@ function crm_float_ops_packet($q) {
         . "Contact: " . trim($q['contact_name'] . ' · ' . $q['contact_email'] . ' · ' . $q['contact_mobile'], ' ·') . "\n"
         . "SBU: " . (lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu']) . "\n"
         . "Location: " . ($q['site_location'] ?: '—') . " (" . (lk_options_or('quote_location_type', QUOTE_LOCATION_TYPES)[$q['location_type']] ?? $q['location_type']) . ")\n"
-        . "Value: ₹" . number_format((float)$q['total_amount'], 0) . "\n"
+        . "Value: " . cur_sym() . number_format((float)$q['total_amount'], 0) . "\n"
         . ($q['advance_required'] ? "** ADVANCE REQUIRED before scheduling (" . rtrim(rtrim(number_format((float)$q['advance_pct'], 2), '0'), '.') . "%) **\n" : "")
         . ($q['report_vs_payment'] ? "** Deliverable/report only against payment **\n" : "")
         . "\nService requirement:\n" . $svc . "\n\nOrder lines:\n";
     foreach ($lines as $i => $l) {
         $b .= ($i + 1) . ". [" . (lk_options_or('order_type', ORDER_TYPES)[$l['order_type']] ?? $l['order_type']) . "] " . $l['description']
             . " — " . rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.') . " " . (lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit'])
-            . " × ₹" . number_format((float)$l['rate'], 0) . " = ₹" . number_format((float)$l['amount'], 0) . "\n";
+            . " x " . cur_sym() . number_format((float)$l['rate'], 0) . " = " . cur_sym() . number_format((float)$l['amount'], 0) . "\n";
     }
     $att = [];
     $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' AND active=1 ORDER BY is_default DESC, id DESC");
@@ -1390,7 +1407,7 @@ function crm_fill_email($text, $q) {
     $m = [
         'quote_no' => $q['quote_no'], 'quote_label' => quote_label($q), 'subject' => $q['subject'],
         'client_name' => $q['client_name'], 'contact_name' => $q['contact_name'],
-        'total_amount' => '₹' . number_format((float)$q['total_amount'], 0), 'validity_days' => $q['validity_days'],
+        'total_amount' => cur_sym() . number_format((float)$q['total_amount'], 0), 'validity_days' => $q['validity_days'],
         'sbu' => lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu'], 'app_name' => app_name(),
     ];
     foreach ($m as $k => $v) $text = str_replace('{{' . $k . '}}', (string)$v, $text);
@@ -1399,17 +1416,35 @@ function crm_fill_email($text, $q) {
 function crm_default_quote_email($q) {
     return "Dear " . ($q['contact_name'] ?: 'Sir/Madam') . ",\n\n"
         . "Please find attached our quotation " . quote_label($q) . " for " . ($q['subject'] ?: 'your requirement') . ".\n"
-        . "Total value: ₹" . number_format((float)$q['total_amount'], 0) . " (valid " . (int)$q['validity_days'] . " days).\n\n"
+        . "Total value: " . cur_sym() . number_format((float)$q['total_amount'], 0) . " (valid " . (int)$q['validity_days'] . " days).\n\n"
         . "We look forward to your confirmation.\n\nBest regards,\n" . app_name();
 }
 function crm_default_followup_email($q, $kind) {
     return "Dear " . ($q['contact_name'] ?: 'Sir/Madam') . ",\n\n"
         . "Gentle follow-up on our quotation " . quote_label($q) . " for " . ($q['subject'] ?: 'your requirement')
-        . " (₹" . number_format((float)$q['total_amount'], 0) . ").\n"
+        . " (" . cur_sym() . number_format((float)$q['total_amount'], 0) . ").\n"
         . "We would be glad to address any questions or revise as needed.\n\nBest regards,\n" . app_name();
 }
-// Current signature to stamp on quote PDFs (uploaded under CRM → Templates).
-function quote_signature() {
+// §xx — the signature stamped on a quote PDF. If the quote names a signatory,
+// their signature stored in the system is used, so the PDF is signed by the
+// person who actually authorised it. Otherwise the company signature applies.
+function quote_signature($q = null) {
+    if ($q && !empty($q['signatory_user_id'])) {
+        $u = ops_one("SELECT first_name, last_name, username, role, signature FROM users WHERE id=?", [(int)$q['signatory_user_id']]);
+        if ($u && trim((string)$u['signature']) !== '') {
+            $raw = (string)$u['signature'];
+            // stored as a data URL; take the payload
+            if (strpos($raw, 'base64,') !== false) $raw = substr($raw, strpos($raw, 'base64,') + 7);
+            $img = base64_decode($raw, true);
+            if ($img !== false && $img !== '') {
+                return [
+                    'img'   => $img,
+                    'name'  => trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: $u['username'],
+                    'desig' => ORG_ROLES[$u['role'] ?? ''] ?? ($u['role'] ?? ''),
+                ];
+            }
+        }
+    }
     $img = setting_get('quote_sig_img', '');
     return ['img' => $img ? base64_decode($img) : '', 'name' => setting_get('quote_sig_name', ''), 'desig' => setting_get('quote_sig_desig', '')];
 }
@@ -1429,7 +1464,7 @@ function crm_send_quote_email($q) {
     if (($q['contact_email'] ?? '') === '') return [false, 'no customer e-mail on the quotation (it was not e-mailed).'];
     $att = [];
     $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' ORDER BY is_default DESC, id DESC");
-    $pdf = quote_pdf_build($q, crm_quote_lines($q["id"]), $tpl ?: [], quote_signature(), quote_letterhead());
+    $pdf = quote_pdf_build($q, crm_quote_lines($q["id"]), $tpl ?: [], quote_signature($q), quote_letterhead());
     if ($pdf) $att[] = ['name' => 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no']) . '.pdf', 'data' => $pdf, 'type' => 'application/pdf'];
     $et = ops_one("SELECT * FROM crm_templates WHERE kind='EMAIL_QUOTE' AND active=1 ORDER BY is_default DESC, id DESC");
     $subject = ($et && $et['subject']) ? crm_fill_email($et['subject'], $q) : ('Quotation ' . $q['quote_no'] . ' — ' . app_name());

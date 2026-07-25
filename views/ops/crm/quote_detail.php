@@ -234,13 +234,13 @@
       <tr><td class="muted">Registered client</td><td><?= $clientReg ? e($clientReg['legal_name']).' <span class="muted">('.e($clientReg['code']).')</span>' : e($q['client_name']) ?></td></tr>
       <tr><td class="muted">Contract number</td><td><b><?= e($q['contract_number']) ?></b></td></tr>
     </table>
-    <p class="sub" style="margin:8px 0 0">Operations packet (client, quote/contract no, contacts, service requirement, order lines, techno-commercial) has been floated to the team.</p>
+    <p class="sub" style="margin:8px 0 0">The <strong>handover to operations</strong> — <?= e(Tl('client')) ?>, <?= e(Tl('quote')) ?> and contract number, contacts, what was sold, the order lines and the commercial conditions — has gone to the delivery team, so they can raise <?= e(Tlp('call')) ?> against it without asking Sales for anything. It is saved in the system either way; it is also e-mailed once SMTP is set up in Settings.</p>
     <form method="post" action="/quote-float?id=<?= (int)$q['id'] ?>" style="margin-top:8px"><button class="btn small secondary" type="submit">Re-send to operations</button></form>
   <?php elseif ($canContract): ?>
     <p class="sub">Enter the contract number to register the client (if new) and float the order to operations.</p>
     <form method="post" action="/quote-contract?id=<?= (int)$q['id'] ?>">
       <div class="form-grid">
-        <div class="ff"><label>Contract number *</label><input class="form-control" name="contract_number" required placeholder="e.g. CON/2026/0142"></div>
+        <div class="ff"><label>Contract number *</label><input class="form-control" name="contract_number" required placeholder="e.g. CON/2026/0142"><small class="muted">Entered by Accounts or the administrator once the order is confirmed.</small></div>
         <div class="ff"><label>Contract start</label><input class="form-control" type="date" name="start_date"></div>
         <div class="ff"><label>Contract end</label><input class="form-control" type="date" name="end_date"></div>
       </div>
@@ -271,9 +271,48 @@
       </tr>
       <?php endforeach; ?>
     </table>
-    <?php if ($hist): ?><div style="margin-top:8px">
-      <?php foreach ($hist as $h): ?><div class="muted" style="font-size:12px;padding:2px 0">Rev <?= str_pad((string)$h['rev'],2,'0',STR_PAD_LEFT) ?> · <?= e($h['summary']) ?> — <?= e($h['changed_by']) ?>, <?= e(substr((string)$h['changed_at'],0,10)) ?></div><?php endforeach; ?>
-    </div><?php endif; ?>
+    <?php if ($st === 'ACCEPTED'): ?>
+      <div class="panel" style="margin:10px 0 0;background:var(--soft)">
+        <b>Final copy</b> <span class="muted">— the accepted version, as sent.</span>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+          <a class="btn small" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF</a>
+          <a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">⬇ Word</a>
+        </div>
+      </div>
+    <?php endif; ?>
+    <?php if ($hist): ?>
+      <h4 class="tab-sub" style="font-size:13px;margin:14px 0 6px">What changed</h4>
+      <table class="dt">
+        <thead><tr><th>Rev</th><th>Change</th><th>By</th><th>When</th></tr></thead>
+        <tbody>
+        <?php foreach ($hist as $hi => $h):
+          // Compare each entry with the one before it, so the list reads as a
+          // running record of what actually changed rather than just "edited".
+          $prev = $hist[$hi + 1] ?? null;
+          $diff = $prev ? crm_diff_snapshots(json_decode((string)$prev['snapshot'], true), json_decode((string)$h['snapshot'], true)) : [];
+        ?>
+          <tr>
+            <td><?= str_pad((string)$h['rev'],2,'0',STR_PAD_LEFT) ?></td>
+            <td><?= e($h['summary']) ?>
+              <?php if ($diff): ?>
+                <details style="margin-top:4px"><summary class="muted" style="cursor:pointer;font-size:12px"><?= count($diff) ?> field(s)</summary>
+                  <div style="font-size:12px;margin-top:4px">
+                  <?php foreach (array_slice($diff, 0, 12) as $d): ?>
+                    <div><b><?= e(str_replace('_', ' ', $d['field'])) ?>:</b>
+                      <span class="muted"><?= e($d['from'] === '' ? '(blank)' : mb_substr($d['from'], 0, 60)) ?></span>
+                      → <?= e($d['to'] === '' ? '(blank)' : mb_substr($d['to'], 0, 60)) ?></div>
+                  <?php endforeach; ?>
+                  </div>
+                </details>
+              <?php endif; ?>
+            </td>
+            <td class="muted"><?= e($h['changed_by']) ?></td>
+            <td class="muted"><?= e(fdate(substr((string)$h['changed_at'],0,10))) ?></td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
   </div>
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0">Follow-ups</h3>
