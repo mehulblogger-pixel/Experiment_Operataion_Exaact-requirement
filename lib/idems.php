@@ -127,6 +127,12 @@ function idems_migrate() {
     // ---- Phase 4: digital signatures on profiles ----
     ensure_column('users', 'signature', 'MEDIUMTEXT');          // base64 data-URL of the signature image
     ensure_column('inspectors', 'signature', 'MEDIUMTEXT');
+    // ---- Phase 5: client-specific report templates (uploaded .docx, token-mapped) ----
+    $pdo->exec("CREATE TABLE IF NOT EXISTS report_templates (
+        id $pk, name VARCHAR(150) DEFAULT '', report_type_id INT NULL, client_id INT NULL, office_id INT NULL,
+        file_name VARCHAR(200) DEFAULT '', file_data MEDIUMTEXT,
+        document_number VARCHAR(80) DEFAULT '', format_number VARCHAR(80) DEFAULT '', doc_revision VARCHAR(40) DEFAULT '', issue_date VARCHAR(20) DEFAULT '',
+        active INT DEFAULT 1, is_default INT DEFAULT 0, created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
     idems_seed_report_types();
 }
 // Portable "add a unique index if missing" (ignores errors if it already exists).
@@ -1098,6 +1104,163 @@ function ops_idems_timestamp($method) {
     idems_log('report_doc', $doc['id'], 'TIMESTAMP_EDIT', ['irn'=>$doc['irn'], 'field'=>$field, 'old'=>$old, 'new'=>$new, 'reason'=>$reason]);
     flash('Date adjusted and logged in the tamper-proof audit trail.');
     redirect('/document?id=' . $doc['id']);
+    return true;
+}
+
+// ===========================================================================
+//  Phase 5: client-specific formats — fill an uploaded .docx so output matches
+//  the client's own approved template exactly (their fonts / headers / footers /
+//  logo / tables). No client names are seeded; you upload your own templates.
+// ===========================================================================
+// Standard tokens available in every template, plus the report type's designed fields.
+function idems_standard_tokens($doc) {
+    return [
+        'irn'=>$doc['irn'] ?? '', 'report_type'=>$doc['type_name'] ?? ($doc['type_code'] ?? ''), 'type_code'=>$doc['type_code'] ?? '',
+        'title'=>$doc['title'] ?? '', 'client'=>$doc['client_disp'] ?: ($doc['client_name'] ?? ''), 'vendor'=>$doc['vendor_disp'] ?: ($doc['vendor_name'] ?? ''),
+        'project'=>trim(($doc['project_code'] ?? '').' '.($doc['project_name'] ?? '')), 'project_code'=>$doc['project_code'] ?? '', 'project_name'=>$doc['project_name'] ?? '',
+        'po'=>$doc['po_ref'] ?? '', 'drawing'=>trim(($doc['drawing_no'] ?? '').' '.($doc['drawing_rev']?'Rev '.$doc['drawing_rev']:'')),
+        'drawing_no'=>$doc['drawing_no'] ?? '', 'drawing_rev'=>$doc['drawing_rev'] ?? '', 'qap_rev'=>$doc['qap_rev'] ?? '',
+        'standards'=>$doc['standards'] ?? '', 'location'=>$doc['location'] ?? '', 'product_category'=>$doc['product_category'] ?? '', 'material_grade'=>$doc['material_grade'] ?? '',
+        'inspection_date'=>$doc['inspection_date'] ?? '', 'issue_date'=>$doc['issue_date'] ?? '',
+        'inspector'=>$doc['inspector_name'] ?? '', 'approver'=>$doc['approved_by'] ?? '',
+        'result'=>IDEMS_RESULTS[$doc['result']] ?? '', 'release'=>IDEMS_RELEASE[$doc['release_status']] ?? '', 'remarks'=>$doc['remarks'] ?? '',
+        'company'=>idems_company_code(), 'branch'=>$doc['branch_code'] ?? '', 'today'=>date('d M Y'),
+        'status'=>IDEMS_STATUS[$doc['status']] ?? ($doc['status'] ?? ''),
+    ];
+}
+// Build [scalarMap, tablesMap] for a report from standard tokens + its designed fields.
+function idems_doc_token_map($doc, $fields, $data, $tpl = null) {
+    $map = idems_standard_tokens($doc);
+    if ($tpl) { $map['doc_number']=$tpl['document_number'] ?? ''; $map['format_number']=$tpl['format_number'] ?? ''; $map['doc_revision']=$tpl['doc_revision'] ?? ''; $map['format_issue_date']=$tpl['issue_date'] ?? ''; }
+    $tables = [];
+    foreach ($fields as $f) {
+        $k = $f['fkey']; $v = $data[$k] ?? '';
+        if ($f['ftype'] === 'table') { $tables[$k] = is_array($v) ? array_map(fn($r)=>(array)$r, $v) : []; continue; }
+        if (in_array($f['ftype'], ['photo','file','signature'], true)) continue;
+        if ($f['ftype'] === 'multiselect' && is_array($v)) { $o=idems_field_options($f); $v=implode(', ', array_map(fn($x)=>$o[$x]??$x,$v)); }
+        elseif (in_array($f['ftype'], ['select','radio'], true)) { $o=idems_field_options($f); $v=$o[$v]??$v; }
+        elseif ($f['ftype'] === 'checkbox') $v = ($v==='1'||$v===1)?'Yes':'No';
+        $map[$k] = is_array($v) ? '' : (string)$v;
+    }
+    return [$map, $tables];
+}
+// Generic repeatable-table row expansion: a <w:tr> containing {{fkey.col}} tokens
+// is cloned once per data row (mirrors the quote line-row mechanism, generalised).
+function report_docx_expand_tables($xml, $tables) {
+    foreach ($tables as $fkey => $rows) {
+        $q = preg_quote($fkey, '/');
+        $pat = '/(<w:tr\b(?:(?!<w:tr\b).)*?\{\{' . $q . '\.[a-z0-9_]+\}\}.*?<\/w:tr>)/us';
+        if (!preg_match($pat, $xml, $mm)) continue;
+        $rowTpl = $mm[1]; $out = '';
+        foreach ($rows as $r) {
+            $row = preg_replace_callback('/\{\{' . $q . '\.([a-z0-9_]+)\}\}/u', function ($m) use ($r) { return docx_escape($r[$m[1]] ?? ''); }, $rowTpl);
+            $out .= $row;
+        }
+        if ($out === '') $out = preg_replace('/\{\{' . $q . '\.[a-z0-9_]+\}\}/u', '', $rowTpl);
+        $xml = str_replace($rowTpl, $out, $xml);
+    }
+    return $xml;
+}
+// Fill a .docx template with the report's scalar map + repeatable tables.
+function report_docx_fill($binary, $map, $tables) {
+    if (!class_exists('ZipArchive')) return [null, 'The "zip" PHP extension is not enabled on this server.'];
+    $tmp = tempnam(sys_get_temp_dir(), 'idz');
+    if ($tmp === false || file_put_contents($tmp, $binary) === false) return [null, 'Could not write a temporary file.'];
+    $zip = new ZipArchive();
+    if ($zip->open($tmp) !== true) { @unlink($tmp); return [null, 'The template is not a valid .docx file.']; }
+    $parts = [];
+    for ($i = 0; $i < $zip->numFiles; $i++) { $n = $zip->getNameIndex($i); if (preg_match('#^word/(document|header\d+|footer\d+)\.xml$#', $n)) $parts[$n] = $zip->getFromName($n); }
+    foreach ($parts as $n => $xml) {
+        $xml = docx_repair_tokens($xml);
+        if (strpos($n, 'document.xml') !== false) $xml = report_docx_expand_tables($xml, $tables);
+        $xml = docx_replace($xml, $map);
+        $zip->deleteName($n); $zip->addFromString($n, $xml);
+    }
+    $zip->close();
+    $out = file_get_contents($tmp); @unlink($tmp);
+    return [$out, null];
+}
+// Choose the most-specific active template for a report (client+type > type > client > office > any).
+function idems_pick_template($doc) {
+    $cands = ops_all("SELECT * FROM report_templates WHERE active=1 AND file_data<>''
+        AND (report_type_id IS NULL OR report_type_id=?) AND (client_id IS NULL OR client_id=?) AND (office_id IS NULL OR office_id=?)",
+        [$doc['report_type_id'] ?: 0, $doc['client_id'] ?: 0, $doc['office_id'] ?: 0]);
+    if (!$cands) return null;
+    $score = function($t) use ($doc) { $s=0; if($t['report_type_id'])$s+=4; if($t['client_id'])$s+=2; if($t['office_id'])$s+=1; if($t['is_default'])$s+=0.5; return $s; };
+    usort($cands, fn($a,$b)=>$score($b)<=>$score($a));
+    return $cands[0];
+}
+// Available token names for a report type (for the reference panel).
+function idems_type_tokens($typeId) {
+    $std = ['irn','report_type','title','client','vendor','project','po','drawing','qap_rev','standards','location','inspection_date','issue_date','inspector','approver','result','release','remarks','company','branch','today','doc_number','format_number','doc_revision'];
+    $fieldTokens = []; $tableTokens = [];
+    foreach (idems_fields($typeId) as $f) {
+        if (in_array($f['ftype'], ['heading','note','photo','file','signature'], true)) continue;
+        if ($f['ftype'] === 'table') { foreach (idems_table_cols($f) as $ck=>$cl) $tableTokens[] = $f['fkey'].'.'.$ck; }
+        else $fieldTokens[] = $f['fkey'];
+    }
+    return ['standard'=>$std, 'fields'=>$fieldTokens, 'tables'=>$tableTokens];
+}
+
+// ---- Handler: generate the filled client-format .docx for a report ----
+function ops_idems_docx($method) {
+    $doc = ops_one("SELECT d.*, bp.display_name client_disp, bp.legal_name client_name, v.display_name vendor_disp, v.legal_name vendor_name, i.name inspector_name, rt.name type_name
+        FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN inspectors i ON i.id=d.inspector_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
+        WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? 0)]);
+    if (!$doc) { http_response_code(404); echo 'Not found'; return true; }
+    ops_require(is_master() || can('mod.idems.view'), 'You cannot generate this report.');
+    $tpl = idems_pick_template($doc);
+    if (!$tpl) { flash('No client-format template is set for this report type/client. Add one under Report templates, or use the PDF.', 'error'); redirect('/document?id=' . $doc['id']); }
+    $fields = idems_fields($doc['report_type_id']);
+    $data = json_decode($doc['data'] ?: '[]', true) ?: [];
+    [$map, $tables] = idems_doc_token_map($doc, $fields, $data, $tpl);
+    [$bin, $err] = report_docx_fill(base64_decode($tpl['file_data']), $map, $tables);
+    if ($err) { flash('Could not generate the document: ' . $err, 'error'); redirect('/document?id=' . $doc['id']); }
+    idems_log('report_doc', $doc['id'], 'DOCX', ['irn'=>$doc['irn']]);
+    header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    header('Content-Disposition: attachment; filename="' . preg_replace('/[^A-Za-z0-9._-]/','_',$doc['irn']) . '.docx"');
+    echo $bin; return true;
+}
+
+// ---- Handler: report template manager (upload / map client formats) ----
+function ops_idems_templates($route, $method) {
+    ops_require(is_master() || can('idems.type.manage') || can('crm.template.manage'), 'You cannot manage report templates.');
+    $pdo = db();
+    if ($route === 'report-template-download') {
+        $t = ops_one("SELECT * FROM report_templates WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$t || !$t['file_data']) { http_response_code(404); echo 'Not found'; return true; }
+        header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        header('Content-Disposition: attachment; filename="' . preg_replace('/[^A-Za-z0-9._-]/','_',$t['file_name'] ?: 'template') . '"');
+        echo base64_decode($t['file_data']); return true;
+    }
+    if ($method === 'POST') {
+        if (($_POST['_do'] ?? '') === 'del') { $pdo->prepare("DELETE FROM report_templates WHERE id=?")->execute([(int)($_POST['id'] ?? 0)]); flash('Template removed.'); redirect('/report-templates'); }
+        $id = (int)($_POST['id'] ?? 0);
+        $vals = [
+            'name'=>trim($_POST['name'] ?? ''), 'report_type_id'=>($_POST['report_type_id'] ?? '')!==''?(int)$_POST['report_type_id']:null,
+            'client_id'=>($_POST['client_id'] ?? '')!==''?(int)$_POST['client_id']:null, 'office_id'=>($_POST['office_id'] ?? '')!==''?(int)$_POST['office_id']:null,
+            'document_number'=>trim($_POST['document_number'] ?? ''), 'format_number'=>trim($_POST['format_number'] ?? ''),
+            'doc_revision'=>trim($_POST['doc_revision'] ?? ''), 'issue_date'=>trim($_POST['issue_date'] ?? ''),
+            'active'=>!empty($_POST['active'])?1:0, 'is_default'=>!empty($_POST['is_default'])?1:0,
+        ];
+        // uploaded .docx
+        if (!empty($_FILES['tpl']['tmp_name']) && is_uploaded_file($_FILES['tpl']['tmp_name'])) {
+            $bytes = file_get_contents($_FILES['tpl']['tmp_name']);
+            if ($bytes !== false && strlen($bytes) < 8*1024*1024) { $vals['file_name'] = substr($_FILES['tpl']['name'], 0, 200); $vals['file_data'] = base64_encode($bytes); }
+        }
+        if ($id) { $set=implode('=?, ',array_keys($vals)).'=?'; $args=array_values($vals); $args[]=$id; $pdo->prepare("UPDATE report_templates SET $set WHERE id=?")->execute($args); }
+        else { $vals2=$vals+['created_by'=>user_name(current_user()),'created_at'=>date('c')]; $cols=array_keys($vals2); $ph=implode(',',array_fill(0,count($cols),'?')); $pdo->prepare("INSERT INTO report_templates (".implode(',',$cols).") VALUES ($ph)")->execute(array_values($vals2)); }
+        flash('Report template saved.'); redirect('/report-templates');
+    }
+    $edit = ($route === 'report-template-edit') ? ops_one("SELECT * FROM report_templates WHERE id=?", [(int)($_GET['id'] ?? 0)]) : null;
+    $tokRefType = (int)($_GET['tokens'] ?? ($edit['report_type_id'] ?? 0));
+    view('ops/idems/templates', [
+        'rows'=>ops_all("SELECT t.*, rt.name type_name, rt.code type_code, bp.display_name client_name, o.name office_name FROM report_templates t LEFT JOIN report_types rt ON rt.id=t.report_type_id LEFT JOIN business_partners bp ON bp.id=t.client_id LEFT JOIN offices o ON o.id=t.office_id ORDER BY t.id DESC"),
+        'edit'=>$edit, 'types'=>idems_types(false),
+        'clients'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 ORDER BY nm"),
+        'offices'=>ops_all("SELECT id, name FROM offices ORDER BY name"),
+        'tokRefType'=>$tokRefType, 'tokens'=>$tokRefType ? idems_type_tokens($tokRefType) : null,
+        'zipOk'=>class_exists('ZipArchive')]);
     return true;
 }
 
