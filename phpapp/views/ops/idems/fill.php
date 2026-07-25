@@ -11,15 +11,17 @@
   };
 
   $sugg = $sugg ?? [];
-  $renderField = function($f) use ($data, $filesByField, $condAttr, $sugg) {
+  $auto = $auto ?? [];
+  $renderField = function($f) use ($data, $filesByField, $condAttr, $sugg, $auto) {
     $k = $f['fkey']; $val = $data[$k] ?? '';
     $span = (int)$f['col_span'] === 2 ? ' ff-wide' : '';
     $req = $f['required'] ? ' <span style="color:var(--bad)">*</span>' : '';
+    $autoTag = isset($auto[$k]) ? ' <span class="pill p-ok" style="padding:0 5px;font-size:10px" title="Filled in from the inspection call — change it if needed">auto</span>' : '';
     $reqAttr = $f['required'] ? ' data-req="1"' : '';
     if ($f['ftype'] === 'heading') { echo '<h3 class="tab-sub" style="grid-column:1/-1"'.$condAttr($f).'>'.e($f['label']).'</h3>'; return; }
     if ($f['ftype'] === 'note')    { echo '<p class="muted" style="grid-column:1/-1"'.$condAttr($f).'>'.e($f['label'] ?: $f['help']).'</p>'; return; }
     echo '<div class="ff'.$span.'" data-fieldwrap="'.e($k).'"'.$condAttr($f).'>';
-    echo '<label>'.e($f['label']).$req.'</label>';
+    echo '<label>'.e($f['label']).$req.$autoTag.'</label>';
     $opts = idems_field_options($f);
     switch ($f['ftype']) {
       case 'textarea':
@@ -95,6 +97,13 @@
   <p class="sub" style="margin:2px 0 0"><?= e($doc['title'] ?: $doc['type_code']) ?></p></div>
   <a class="btn secondary" href="/document?id=<?= (int)$doc['id'] ?>">← Back</a>
 </div>
+
+<?php if ($auto): ?>
+<div class="panel" style="border:1px solid var(--ok);background:color-mix(in srgb,var(--ok) 6%,transparent)">
+  <b style="color:var(--ok)">✓ <?= count($auto) ?> field(s) filled in for you</b>
+  <span class="muted">— taken from the inspection call, the job and this report's details. They are marked <span class="pill p-ok" style="padding:0 5px;font-size:10px">auto</span>; change any of them if the site differs.</span>
+</div>
+<?php endif; ?>
 
 <?php if (!$fields): ?>
   <div class="panel"><p class="muted">No form has been designed for this report type yet. An administrator can design it under <a href="/report-builder?type=<?= (int)$doc['report_type_id'] ?>">Form builder</a>.</p></div>
