@@ -515,9 +515,114 @@ function org_hierarchy_tree() {
 // -------------------------------------------------------------------------
 //  Handler: organisation hierarchy (view / print the N+1 chart)
 // -------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//  Placing people in the chain
+//
+//  The chart can only be a tree if people actually have a reporting manager. On
+//  a fresh install nobody does, so every person is a root and the chart is a
+//  flat row of boxes. This proposes the obvious chain from the role ladder —
+//  each role reports to the one above it, preferring somebody in the same
+//  office — so the org can be arranged in one click and then corrected by hand.
+// ---------------------------------------------------------------------------
+function org_role_ladder() {
+    return [
+        'SBU_HEAD'             => ['BUSINESS_DIRECTOR'],
+        'BRANCH_MANAGER'       => ['SBU_HEAD', 'BUSINESS_DIRECTOR'],
+        'BRANCH_APP_MANAGER'   => ['BRANCH_MANAGER', 'SBU_HEAD'],
+        'OPERATION_MANAGER'    => ['BRANCH_MANAGER', 'SBU_HEAD'],
+        'ASST_MANAGER'         => ['OPERATION_MANAGER', 'BRANCH_MANAGER'],
+        'COORDINATOR'          => ['ASST_MANAGER', 'OPERATION_MANAGER', 'BRANCH_MANAGER'],
+        'INSPECTOR'            => ['COORDINATOR', 'OPERATION_MANAGER', 'BRANCH_MANAGER'],
+        'BUSINESS_DEV_MANAGER' => ['BUSINESS_DIRECTOR'],
+        'KEY_ACCOUNTS_MANAGER' => ['BUSINESS_DEV_MANAGER', 'BUSINESS_DIRECTOR'],
+        'MARKETING_MANAGER'    => ['BUSINESS_DEV_MANAGER', 'BUSINESS_DIRECTOR'],
+        'MARKETING_EXECUTIVE'  => ['MARKETING_MANAGER', 'BUSINESS_DEV_MANAGER'],
+        'FINANCE'              => ['BUSINESS_DIRECTOR'],
+    ];
+}
+// Work out who each unplaced person should report to. Returns the proposals;
+// nothing is written unless $apply is true, so it can be previewed first.
+function org_auto_arrange($apply = false, $onlyUnplaced = true) {
+    $users = ops_all("SELECT id, first_name, last_name, username, role, home_office_id, reports_to_id FROM users WHERE is_active=1");
+    $byRole = [];
+    foreach ($users as $u) $byRole[$u['role']][] = $u;
+    $ladder = org_role_ladder();
+    $name = fn($u) => trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: $u['username'];
+    $out = [];
+    foreach ($users as $u) {
+        if ($onlyUnplaced && (int)($u['reports_to_id'] ?? 0)) continue;
+        $cands = $ladder[$u['role']] ?? [];
+        $pick = null;
+        foreach ($cands as $r) {
+            $pool = $byRole[$r] ?? [];
+            if (!$pool) continue;
+            // same office first — a coordinator reports to their own branch manager
+            foreach ($pool as $p) {
+                if ((int)$p['id'] === (int)$u['id']) continue;
+                if ((int)($p['home_office_id'] ?? 0) && (int)$p['home_office_id'] === (int)($u['home_office_id'] ?? 0)) { $pick = $p; break 2; }
+            }
+            foreach ($pool as $p) { if ((int)$p['id'] !== (int)$u['id']) { $pick = $p; break 2; } }
+        }
+        if (!$pick) continue;   // nobody above them exists — they stay a root
+        $out[] = ['user_id' => (int)$u['id'], 'user' => $name($u), 'role' => $u['role'],
+                  'manager_id' => (int)$pick['id'], 'manager' => $name($pick), 'manager_role' => $pick['role']];
+    }
+    if ($apply) {
+        $st = db()->prepare("UPDATE users SET reports_to_id=?, reports_to_name=?, reports_to_position=? WHERE id=?");
+        foreach ($out as $p)
+            $st->execute([$p['manager_id'], $p['manager'], ORG_ROLES[$p['manager_role']] ?? $p['manager_role'], $p['user_id']]);
+    }
+    return $out;
+}
+// Count everyone underneath a node, so a card can say "4 direct · 17 total".
+function org_count_below(&$node) {
+    $total = 0;
+    foreach ($node['children'] as &$c) { $total += 1 + org_count_below($c); }
+    unset($c);
+    $node['direct_n'] = count($node['children']);
+    $node['total_n']  = $total;
+    return $total;
+}
+
 function ops_hierarchy($method) {
     ops_require(is_master() || can('org.hierarchy.view') || can('users.manage.global') || can('users.manage.branch') || can('settings.manage'), 'You cannot view the organisation hierarchy.');
-    view('ops/hierarchy', ['tree' => org_hierarchy_tree()]);
+    $canEdit = is_master() || can('users.manage.global');
+    if ($method === 'POST') {
+        ops_require($canEdit, 'You cannot change reporting lines.');
+        if (($_POST['do'] ?? '') === 'auto') {
+            $n = count(org_auto_arrange(true, true));
+            flash($n ? ($n . ' person(s) placed under a reporting manager. Correct any of them from Users.')
+                     : 'Nothing to place — everyone already reports to somebody, or there is nobody above them.');
+        } elseif (($_POST['do'] ?? '') === 'set') {
+            $uid = (int)($_POST['user_id'] ?? 0); $mid = (int)($_POST['manager_id'] ?? 0);
+            if ($uid && $uid !== $mid) {
+                if ($mid) {
+                    $m = ops_one("SELECT first_name, last_name, username, role FROM users WHERE id=?", [$mid]);
+                    $mn = $m ? (trim(($m['first_name'] ?? '') . ' ' . ($m['last_name'] ?? '')) ?: $m['username']) : '';
+                    db()->prepare("UPDATE users SET reports_to_id=?, reports_to_name=?, reports_to_position=? WHERE id=?")
+                        ->execute([$mid, $mn, $m ? (ORG_ROLES[$m['role']] ?? $m['role']) : '', $uid]);
+                } else {
+                    db()->prepare("UPDATE users SET reports_to_id=NULL, reports_to_name='', reports_to_position='' WHERE id=?")->execute([$uid]);
+                }
+                flash('Reporting line updated.');
+            }
+        }
+        redirect('/hierarchy');
+    }
+    $tree = org_hierarchy_tree();
+    foreach ($tree as &$root) org_count_below($root);
+    unset($root);
+    // Everyone, for the inline "reports to" picker.
+    $all = ops_all("SELECT id, first_name, last_name, username, role FROM users WHERE is_active=1 ORDER BY first_name, username");
+    view('ops/hierarchy', [
+        'tree' => $tree, 'canEdit' => $canEdit,
+        'all' => $all,
+        // When nobody is placed, every person is a root and the chart is a flat
+        // row — say so, and offer the fix, rather than showing a wall of boxes.
+        'unplaced' => count($tree),
+        'totalPeople' => (int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1"),
+        'proposals' => $canEdit ? org_auto_arrange(false, true) : [],
+    ]);
     return true;
 }
 

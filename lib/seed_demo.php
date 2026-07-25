@@ -285,6 +285,10 @@ function seed_demo() {
         $c['edge_cases'] = $edge;
         // ================= end edge cases =================
 
+        // Place the demo users under a reporting manager, so the organisation
+        // chart shows an actual tree rather than a flat row of roots.
+        if (function_exists('org_auto_arrange')) $c['reporting_lines'] = count(org_auto_arrange(true, true));
+
         setting_set('demo_seeded', '1');
         $pdo->commit();
     } catch (Throwable $e) {
