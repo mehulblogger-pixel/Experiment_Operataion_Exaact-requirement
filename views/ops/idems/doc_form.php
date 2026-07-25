@@ -43,7 +43,12 @@
     <div class="ff"><label>Report type *
       <?php if ($narrowed): ?><span class="muted">— limited to what this <?= e(Tl('job')) ?> owes</span><?php endif; ?></label>
       <select class="form-control searchable" name="report_type_id" required><option value="">— select —</option>
-        <?php foreach ($types as $t): ?><option value="<?= (int)$t['id'] ?>" <?= ($doc && (int)$doc['report_type_id']===(int)$t['id'])?'selected':'' ?>><?= e($t['code']) ?> — <?= e($t['name']) ?></option><?php endforeach; ?>
+        <?php // §v — arriving from a deliverable on a job ("Write it") names the
+              // format in the URL, so the engineer lands on the right one rather
+              // than picking it out of a list they were meant to be narrowed to.
+              $wantType = trim((string)($_GET['type'] ?? '')); ?>
+        <?php foreach ($types as $t): $selT = $doc ? ((int)$doc['report_type_id'] === (int)$t['id']) : ($wantType !== '' && $t['code'] === $wantType); ?>
+          <option value="<?= (int)$t['id'] ?>" <?= $selT?'selected':'' ?>><?= e($t['code']) ?> — <?= e($t['name']) ?></option><?php endforeach; ?>
       </select>
       <?php if ($freqLbl !== ''): ?>
         <small class="muted">Reporting frequency on this <?= e(Tl('job')) ?>: <b><?= e($freqLbl) ?></b></small>

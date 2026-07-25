@@ -59,13 +59,37 @@ const CONTRACT_STATES = [
     'EXHAUSTED' => 'Quantity exhausted',
 ];
 const OVERRIDE_KINDS = ['EXPIRED' => 'Expired contract', 'EXHAUSTED' => 'Quantity exhausted'];
-// PENDING -> ENDORSED -> APPROVED, or REFUSED at either step.
+// Two different routes, because they are two different decisions.
+//
+//   EXPIRED    working past the end date is a matter of company risk, and one
+//              person carries it: PENDING -> APPROVED. The Super Admin alone.
+//
+//   EXHAUSTED  serving more than the order was sold for costs money that
+//              somebody has to own locally first: PENDING -> ENDORSED by the
+//              Branch Manager -> APPROVED by the Super Admin.
+//
+// Either can be REFUSED at any step it has reached.
 const OVERRIDE_STATUS = [
-    'PENDING'  => 'Awaiting Branch Manager',
+    'PENDING'  => 'Awaiting decision',
     'ENDORSED' => 'Awaiting Super Admin',
     'APPROVED' => 'Approved',
     'REFUSED'  => 'Refused',
 ];
+// Does this kind need a Branch Manager to endorse it before the Super Admin?
+function override_needs_endorsement($kind) { return $kind === 'EXHAUSTED'; }
+// Who the request is sitting with right now, in words.
+function override_status_text($row) {
+    $st = $row['status'] ?? 'PENDING';
+    if ($st === 'PENDING')
+        return override_needs_endorsement($row['kind'] ?? '') ? 'Awaiting Branch Manager' : 'Awaiting Super Admin';
+    return OVERRIDE_STATUS[$st] ?? $st;
+}
+// The rule, stated in one sentence, for whichever kind is in play.
+function override_flow_text($kind) {
+    return override_needs_endorsement($kind)
+        ? 'The Branch Manager endorses that the extra work is genuinely needed, then the Super Admin decides whether the company will carry it.'
+        : 'Only the Super Admin can allow work against an expired contract.';
+}
 
 // How many days ahead counts as "expiring soon". Configurable, defaults to a month.
 function contract_warn_days() {
@@ -296,9 +320,14 @@ function ops_contract_overrides($route, $method) {
                 ->execute([$qid, $st['contract_id'], (int)($_POST['call_id'] ?? 0) ?: null, $kind, $reason,
                            user_name(current_user()), current_user()['id'] ?? null, date('c'),
                            max(1, (int)($_POST['uses_allowed'] ?? 1)), date('c')]);
-            // Tell the people who have to act on it.
+            // Tell the people who have to act on it — and only them. An expired
+            // contract is the Super Admin's call, so the branch is not copied in
+            // on a decision it cannot take.
+            $sql = override_needs_endorsement($kind)
+                ? "SELECT email FROM users WHERE is_active=1 AND (is_superuser=1 OR role IN ('BRANCH_MANAGER','SBU_HEAD','BUSINESS_DIRECTOR'))"
+                : "SELECT email FROM users WHERE is_active=1 AND is_superuser=1";
             $to = [];
-            foreach (ops_all("SELECT email FROM users WHERE is_active=1 AND (is_superuser=1 OR role IN ('BRANCH_MANAGER','SBU_HEAD','BUSINESS_DIRECTOR'))") as $u)
+            foreach (ops_all($sql) as $u)
                 if (trim((string)$u['email']) !== '') $to[] = $u['email'];
             if ($to) {
                 $q = ops_one("SELECT quote_no, rev, client_name FROM quotations WHERE id=?", [$qid]);
@@ -306,10 +335,10 @@ function ops_contract_overrides($route, $method) {
                     'Exception requested: ' . (OVERRIDE_KINDS[$kind] ?? $kind) . ' — ' . ($q ? quote_label($q) : ''),
                     user_name(current_user()) . " has asked to schedule work against " . ($q ? quote_label($q) : 'an order')
                     . " for " . ($q['client_name'] ?? '—') . ".\n\nReason given:\n" . $reason
-                    . "\n\nIt needs a Branch Manager to endorse it, then the Super Admin to grant it.\n\n" . app_name(),
+                    . "\n\n" . override_flow_text($kind) . "\n\n" . app_name(),
                     '', 'contract_override');
             }
-            flash('Exception requested. A Branch Manager must endorse it, then the Super Admin decides.');
+            flash('Exception requested. ' . override_flow_text($kind));
             redirect($back);
         }
 
@@ -319,13 +348,20 @@ function ops_contract_overrides($route, $method) {
 
         if ($do === 'endorse') {
             ops_require(can_endorse_override(), 'Only a Branch Manager or above can endorse an exception.');
+            if (!override_needs_endorsement($row['kind'])) {
+                flash('An expired contract goes straight to the Super Admin — there is nothing to endorse.', 'warning');
+                redirect('/contract-overrides');
+            }
             if ($row['status'] !== 'PENDING') { flash('That request has already moved on.', 'warning'); redirect('/contract-overrides'); }
             $pdo->prepare("UPDATE contract_overrides SET status='ENDORSED', endorsed_by=?, endorsed_at=?, endorse_note=? WHERE id=?")
                 ->execute([user_name(current_user()), date('c'), $note, $row['id']]);
             flash('Endorsed — it is now with the Super Admin.');
         } elseif ($do === 'grant') {
             ops_require(can_grant_override(), 'Only the Super Admin can grant an exception.');
-            if ($row['status'] !== 'ENDORSED') { flash('It needs a Branch Manager to endorse it first.', 'error'); redirect('/contract-overrides'); }
+            // An exhausted order must be endorsed locally first; an expired one
+            // comes straight here, because that risk is the Super Admin's alone.
+            $ready = override_needs_endorsement($row['kind']) ? ($row['status'] === 'ENDORSED') : in_array($row['status'], ['PENDING','ENDORSED'], true);
+            if (!$ready) { flash('It needs a Branch Manager to endorse it first.', 'error'); redirect('/contract-overrides'); }
             $uses = max(1, (int)($_POST['uses_allowed'] ?? $row['uses_allowed']));
             $until = trim($_POST['valid_until'] ?? '');
             $pdo->prepare("UPDATE contract_overrides SET status='APPROVED', decided_by=?, decided_at=?, decide_note=?, uses_allowed=?, valid_until=? WHERE id=?")

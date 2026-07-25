@@ -66,7 +66,7 @@
         <span class="muted">by <?= e($cgate['override']['decided_by']) ?> —
           <?= (int)$cgate['override']['uses_taken'] ?> of <?= (int)$cgate['override']['uses_allowed'] ?> allocation(s) used.</span></div>
     <?php elseif (!empty($cgate['pending'])): ?>
-      <div style="margin-top:8px"><span class="pill p-warn"><?= e(OVERRIDE_STATUS[$cgate['pending']['status']] ?? 'Pending') ?></span>
+      <div style="margin-top:8px"><span class="pill p-warn"><?= e(override_status_text($cgate['pending'])) ?></span>
         <span class="muted">requested by <?= e($cgate['pending']['requested_by']) ?>.</span>
         <a class="btn small secondary" href="/contract-overrides" style="margin-left:6px">See the request</a></div>
     <?php elseif (is_coordinator_level() || is_master()): ?>
@@ -82,7 +82,7 @@
           <input class="form-control" type="number" name="uses_allowed" value="1" min="1" max="99" style="width:120px"></div>
         <button class="btn small" type="submit">Request an exception</button>
       </form>
-      <p class="muted" style="margin:6px 0 0">A Branch Manager endorses it, then the Super Admin grants it.</p>
+      <p class="muted" style="margin:6px 0 0"><?= e(override_flow_text($cinfo['state'] === 'EXPIRED' ? 'EXPIRED' : 'EXHAUSTED')) ?></p>
     <?php endif; ?>
   <?php endif; ?>
 </div>
