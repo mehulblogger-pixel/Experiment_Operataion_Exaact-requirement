@@ -4,11 +4,11 @@
   $act = function($to, $label, $cls='btn small') use ($q) {
     return '<form method="post" action="/quote-status?id='.(int)$q['id'].'" style="display:inline"><input type="hidden" name="to" value="'.e($to).'"><button class="'.$cls.'" type="submit">'.e($label).'</button></form>';
   };
-  $locT = QUOTE_LOCATION_TYPES;
+  $locT = lk_options_or('quote_location_type', QUOTE_LOCATION_TYPES);
 ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/quotes"><?= e(TP('quote')) ?></a> › <?= e(quote_label($q)) ?></div>
 <div class="master-head">
-  <div><h1><?= e(quote_label($q)) ?> <span class="pill <?= $stPill[$st] ?? 'p-mut' ?>" style="font-size:13px;vertical-align:middle"><?= e(QUOTE_STATUS[$st] ?? $st) ?></span></h1>
+  <div><h1><?= e(quote_label($q)) ?> <span class="pill <?= $stPill[$st] ?? 'p-mut' ?>" style="font-size:13px;vertical-align:middle"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st) ?></span></h1>
     <p class="sub" style="margin:2px 0 0"><?= e($q['subject'] ?: '—') ?></p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <a class="btn" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
@@ -124,9 +124,9 @@
         <td><?= e(lk_options_or('crm_service_type', CRM_SERVICE_TYPES)[$l['service_type']] ?? $l['service_type'] ?: '—') ?><?= $l['subtypes']?'<div class="muted" style="font-size:11px">'.e($l['subtypes']).'</div>':'' ?></td>
         <td><?= e($l['description'] ?: '—') ?></td>
         <td><?= e($l['location'] ?: '—') ?></td>
-        <td><span class="pill <?= $l['order_type']==='OPEN'?'p-info':'p-mut' ?>"><?= e(ORDER_TYPES[$l['order_type']] ?? $l['order_type']) ?></span></td>
+        <td><span class="pill <?= $l['order_type']==='OPEN'?'p-info':'p-mut' ?>"><?= e(lk_options_or('order_type', ORDER_TYPES)[$l['order_type']] ?? $l['order_type']) ?></span></td>
         <td class="num"><?= rtrim(rtrim(number_format((float)$l['qty'],2),'0'),'.') ?></td>
-        <td><?= e(QUOTE_UNITS[$l['unit']] ?? $l['unit']) ?></td>
+        <td><?= e(lk_options_or('quote_unit', QUOTE_UNITS)[$l['unit']] ?? $l['unit']) ?></td>
         <td class="num"><?= e(cur_sym()) ?><?= number_format((float)$l['rate'],0) ?></td>
         <td class="num"><?= e(cur_sym()) ?><?= number_format((float)$l['amount'],0) ?></td>
       </tr>
@@ -203,7 +203,7 @@
       <?php foreach ($revs as $rv): ?>
       <tr>
         <td><b><?= $rv['rev']>0?'Rev '.str_pad((string)$rv['rev'],2,'0',STR_PAD_LEFT):'Original' ?></b> <?= $rv['is_current']?'<span class="pill p-ok">current</span>':'' ?></td>
-        <td><?= e(QUOTE_STATUS[$rv['status']] ?? $rv['status']) ?></td>
+        <td><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$rv['status']] ?? $rv['status']) ?></td>
         <td class="num"><?= e(cur_sym()) ?><?= number_format((float)$rv['total_amount'],0) ?></td>
         <td class="muted"><?= e(substr((string)$rv['created_at'],0,10)) ?></td>
         <td><?= $rv['is_current']?'':'<a class="btn small secondary" href="/quote?id='.(int)$rv['id'].'">view</a>' ?></td>
@@ -218,7 +218,7 @@
     <h3 class="tab-sub" style="margin-top:0">Follow-ups</h3>
     <?php if ($followups): ?>
     <table class="grid"><tr><th>When</th><th>Due date</th><th>Status</th></tr>
-      <?php foreach ($followups as $f): ?><tr><td><?= e(FOLLOWUP_KINDS[$f['kind']] ?? $f['kind']) ?></td><td><?= e($f['due_date']) ?></td><td><span class="pill <?= $f['status']==='SENT'?'p-ok':($f['status']==='SKIPPED'?'p-mut':'p-warn') ?>"><?= e($f['status']) ?></span></td></tr><?php endforeach; ?>
+      <?php foreach ($followups as $f): ?><tr><td><?= e(lk_options_or('followup_kind', FOLLOWUP_KINDS)[$f['kind']] ?? $f['kind']) ?></td><td><?= e($f['due_date']) ?></td><td><span class="pill <?= $f['status']==='SENT'?'p-ok':($f['status']==='SKIPPED'?'p-mut':'p-warn') ?>"><?= e($f['status']) ?></span></td></tr><?php endforeach; ?>
     </table>
     <p class="muted" style="margin-top:6px">Scheduled when the quote is marked sent (3 / 6 / 9 days, fortnight, month). Auto-emails with templates come in the next phase.</p>
     <?php else: ?><p class="muted">Follow-ups are scheduled once the quote is marked <b>sent</b>.</p><?php endif; ?>

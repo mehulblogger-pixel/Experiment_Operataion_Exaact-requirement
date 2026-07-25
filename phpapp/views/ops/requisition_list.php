@@ -23,7 +23,7 @@
         <td><?= $r['req_type']==='REPLACEMENT' ? '<span class="pill p-warn">Replacement</span>' : '<span class="pill p-info">New</span>' ?><?= $r['outgoing_name'] ? '<br><span class="muted" style="font-size:12px">↳ '.e($r['outgoing_name']).'</span>' : '' ?></td>
         <td><?= e($r['office_name'] ?: '—') ?></td>
         <td class="num"><?= $r['budgeted_cost']>0 ? fmoney($r['budgeted_cost']) : '<span class="muted">—</span>' ?></td>
-        <td><span class="pill <?= $stCls ?>"><?= e(REQ_STATUS[$r['status']] ?? $r['status']) ?></span><?= $r['hired_name'] ? '<br><span class="muted" style="font-size:12px">'.e($r['hired_name']).'</span>' : '' ?></td>
+        <td><span class="pill <?= $stCls ?>"><?= e(lk_options_or('requisition_status', REQ_STATUS)[$r['status']] ?? $r['status']) ?></span><?= $r['hired_name'] ? '<br><span class="muted" style="font-size:12px">'.e($r['hired_name']).'</span>' : '' ?></td>
         <td><a class="btn small secondary" href="/requisition?id=<?= (int)$r['id'] ?>">Open</a></td>
       </tr>
     <?php endforeach; ?>

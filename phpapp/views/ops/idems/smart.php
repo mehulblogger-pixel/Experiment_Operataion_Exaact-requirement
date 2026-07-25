@@ -20,9 +20,9 @@
       <textarea class="form-control" name="remarks" rows="16"><?= e($text) ?></textarea>
       <div class="form-grid" style="margin-top:10px">
         <div class="ff"><label>Inspection result</label>
-          <select class="form-control" name="result"><?php foreach (IDEMS_RESULTS as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($p['result']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+          <select class="form-control" name="result"><?php foreach (lk_options_or('inspection_result', IDEMS_RESULTS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($p['result']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
         <div class="ff"><label>Release status</label>
-          <select class="form-control" name="release_status"><?php foreach (IDEMS_RELEASE as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($p['release']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+          <select class="form-control" name="release_status"><?php foreach (lk_options_or('release_status', IDEMS_RELEASE) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($p['release']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
       </div>
       <div style="margin-top:12px">
         <?php if (idems_can_edit_doc($doc)): ?><button class="btn" type="submit">Apply to report</button>

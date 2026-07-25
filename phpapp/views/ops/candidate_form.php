@@ -14,7 +14,7 @@
     <label>Against requisition (management approval) *</label>
     <select class="form-control searchable" name="requisition_id" required>
       <option value="">— pick an approved requisition —</option>
-      <?php foreach (($requisitions ?? []) as $rq): ?><option value="<?= (int)$rq['id'] ?>" <?= (string)($preReq ?? '')===(string)$rq['id']?'selected':'' ?>><?= e($rq['req_code']) ?> · <?= e(DESIGNATIONS[$rq['designation']] ?? $rq['designation']) ?> · <?= e(REQ_TYPES[$rq['req_type']] ?? '') ?></option><?php endforeach; ?>
+      <?php foreach (($requisitions ?? []) as $rq): ?><option value="<?= (int)$rq['id'] ?>" <?= (string)($preReq ?? '')===(string)$rq['id']?'selected':'' ?>><?= e($rq['req_code']) ?> · <?= e(DESIGNATIONS[$rq['designation']] ?? $rq['designation']) ?> · <?= e(lk_options_or('requisition_type', REQ_TYPES)[$rq['req_type']] ?? '') ?></option><?php endforeach; ?>
     </select>
     <small class="muted">Every hire must trace to an approved requisition. Not listed? <a href="/requisition-new">Raise one first</a>.</small>
   </div>
@@ -51,7 +51,7 @@
         <?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($cand['sbu'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"><label>Source</label>
-      <select class="form-control" id="cand_source" name="source"><?php foreach (CAND_SOURCES as $k=>$v): ?><option value="<?= $k ?>" <?= (($cand['source'] ?? 'FREELANCER')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+      <select class="form-control" id="cand_source" name="source"><?php foreach (lk_options_or('candidate_source', CAND_SOURCES) as $k=>$v): ?><option value="<?= $k ?>" <?= (($cand['source'] ?? 'FREELANCER')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label id="agency_lbl">Agency (sub-con / HR agency) <a href="#" class="addlink" data-qa="agency">+ Add new</a></label>
       <?php $curAgency = $cand['agency'] ?? ''; $inList = in_array($curAgency, $agencies, true); ?>
       <select class="form-control searchable" id="agency_sel" name="agency">
@@ -66,7 +66,7 @@
 
     <div class="ff"><label>Expected rate (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="expected_rate" value="<?= e($cand['expected_rate'] ?? '') ?>"></div>
     <div class="ff"><label>Rate type</label>
-      <select class="form-control" name="rate_type"><?php foreach (RATE_TYPES as $k=>$v): ?><option value="<?= $k ?>" <?= (($cand['rate_type'] ?? 'MANDAY')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+      <select class="form-control" name="rate_type"><?php foreach (lk_options_or('rate_type', RATE_TYPES) as $k=>$v): ?><option value="<?= $k ?>" <?= (($cand['rate_type'] ?? 'MANDAY')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>CV received date</label><input class="form-control" type="date" name="cv_received_date" value="<?= e($cand['cv_received_date'] ?? '') ?>"></div>
 
     <div class="ff ff-wide"><label>CV link (Drive / SharePoint URL)</label><input class="form-control" name="cv_link" value="<?= e($cand['cv_link'] ?? '') ?>" placeholder="https://…"></div>

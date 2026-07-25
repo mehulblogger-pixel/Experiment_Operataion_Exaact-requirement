@@ -84,11 +84,11 @@
       </select></div>
     <div class="ff"><label>Inspection result</label>
       <select class="form-control" name="result"><option value="">—</option>
-        <?php foreach (IDEMS_RESULTS as $rk=>$rv): ?><option value="<?= e($rk) ?>" <?= ($doc && $doc['result']===$rk)?'selected':'' ?>><?= e($rv) ?></option><?php endforeach; ?>
+        <?php foreach (lk_options_or('inspection_result', IDEMS_RESULTS) as $rk=>$rv): ?><option value="<?= e($rk) ?>" <?= ($doc && $doc['result']===$rk)?'selected':'' ?>><?= e($rv) ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"><label>Release status</label>
       <select class="form-control" name="release_status"><option value="">—</option>
-        <?php foreach (IDEMS_RELEASE as $rk=>$rv): ?><option value="<?= e($rk) ?>" <?= ($doc && $doc['release_status']===$rk)?'selected':'' ?>><?= e($rv) ?></option><?php endforeach; ?>
+        <?php foreach (lk_options_or('release_status', IDEMS_RELEASE) as $rk=>$rv): ?><option value="<?= e($rk) ?>" <?= ($doc && $doc['release_status']===$rk)?'selected':'' ?>><?= e($rv) ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff ff-wide"><label>Remarks</label><textarea class="form-control" name="remarks" rows="3"><?= e($doc['remarks'] ?? '') ?></textarea></div>
   </div>

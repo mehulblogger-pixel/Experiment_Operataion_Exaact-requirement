@@ -43,7 +43,7 @@
       <td><?= e($r['subject'] ?: '—') ?></td>
       <td><?= e(lk_options_or('sbu', OPS_SBUS)[$r['sbu']] ?? $r['sbu'] ?: '—') ?></td>
       <td class="num"><?= (float)$r['total_amount']>0 ? cur_sym().number_format((float)$r['total_amount'],0) : '—' ?></td>
-      <td><span class="pill <?= $stPill[$r['status']] ?? 'p-mut' ?>"><?= e(QUOTE_STATUS[$r['status']] ?? $r['status']) ?></span></td>
+      <td><span class="pill <?= $stPill[$r['status']] ?? 'p-mut' ?>"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$r['status']] ?? $r['status']) ?></span></td>
       <td class="num"><a class="btn small secondary" href="/quote?id=<?= (int)$r['id'] ?>">Open</a></td>
     </tr>
     <?php endforeach; ?>

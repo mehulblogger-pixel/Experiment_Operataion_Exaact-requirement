@@ -257,7 +257,7 @@ function ops_crm_inquiries($route, $method) {
     if ($route === 'inquiries') {
         $q = trim($_GET['q'] ?? ''); $st = $_GET['st'] ?? '';
         $w = ['1=1']; $args = [];
-        if ($st !== '' && isset(INQUIRY_STATUS[$st])) { $w[] = 'i.status=?'; $args[] = $st; }
+        if ($st !== '' && isset(lk_options_or('inquiry_status', INQUIRY_STATUS)[$st])) { $w[] = 'i.status=?'; $args[] = $st; }
         if ($q !== '') { $w[] = '(i.inquiry_no LIKE ? OR i.subject LIKE ? OR i.client_name LIKE ?)'; array_push($args, "%$q%", "%$q%", "%$q%"); }
         $sb = scope_sbus();
         if ($sb !== 'ALL' && is_array($sb) && $sb) { $ph = implode(',', array_fill(0, count($sb), '?')); $w[] = "(i.sbu IN ($ph) OR i.sbu='')"; foreach ($sb as $s) $args[] = $s; }
@@ -381,7 +381,7 @@ function ops_crm_quotes($route, $method) {
     if ($route === 'quote-status' && $method === 'POST') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         $to = $_POST['to'] ?? '';
-        if (!isset(QUOTE_STATUS[$to])) { flash('Unknown status.', 'error'); redirect('/quote?id=' . $q['id']); }
+        if (!isset(lk_options_or('quote_status', QUOTE_STATUS)[$to])) { flash('Unknown status.', 'error'); redirect('/quote?id=' . $q['id']); }
         if ($to === 'APPROVED') ops_require(can('crm.quote.approve') || is_master(), 'You cannot approve quotations.');
         if ($to === 'SENT') ops_require(can('crm.quote.send') || is_master(), 'You cannot send quotations.');
         if ($to === 'PENDING_APPROVAL') {
@@ -406,7 +406,7 @@ function ops_crm_quotes($route, $method) {
         } else {
             $pdo->prepare("UPDATE quotations SET status=? WHERE id=?")->execute([$to, $q['id']]);
         }
-        flash('Quotation moved to ' . (QUOTE_STATUS[$to] ?? $to) . '.');
+        flash('Quotation moved to ' . (lk_options_or('quote_status', QUOTE_STATUS)[$to] ?? $to) . '.');
         redirect('/quote?id=' . $q['id']);
     }
     if ($route === 'quote-revise' && $method === 'POST') {
@@ -580,14 +580,14 @@ function crm_float_ops_packet($q) {
         . "Contract: " . ($q['contract_number'] ?: '(pending)') . "\n"
         . "Contact: " . trim($q['contact_name'] . ' · ' . $q['contact_email'] . ' · ' . $q['contact_mobile'], ' ·') . "\n"
         . "SBU: " . (lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu']) . "\n"
-        . "Location: " . ($q['site_location'] ?: '—') . " (" . (QUOTE_LOCATION_TYPES[$q['location_type']] ?? $q['location_type']) . ")\n"
+        . "Location: " . ($q['site_location'] ?: '—') . " (" . (lk_options_or('quote_location_type', QUOTE_LOCATION_TYPES)[$q['location_type']] ?? $q['location_type']) . ")\n"
         . "Value: ₹" . number_format((float)$q['total_amount'], 0) . "\n"
         . ($q['advance_required'] ? "** ADVANCE REQUIRED before scheduling (" . rtrim(rtrim(number_format((float)$q['advance_pct'], 2), '0'), '.') . "%) **\n" : "")
         . ($q['report_vs_payment'] ? "** Deliverable/report only against payment **\n" : "")
         . "\nService requirement:\n" . $svc . "\n\nOrder lines:\n";
     foreach ($lines as $i => $l) {
-        $b .= ($i + 1) . ". [" . (ORDER_TYPES[$l['order_type']] ?? $l['order_type']) . "] " . $l['description']
-            . " — " . rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.') . " " . (QUOTE_UNITS[$l['unit']] ?? $l['unit'])
+        $b .= ($i + 1) . ". [" . (lk_options_or('order_type', ORDER_TYPES)[$l['order_type']] ?? $l['order_type']) . "] " . $l['description']
+            . " — " . rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.') . " " . (lk_options_or('quote_unit', QUOTE_UNITS)[$l['unit']] ?? $l['unit'])
             . " × ₹" . number_format((float)$l['rate'], 0) . " = ₹" . number_format((float)$l['amount'], 0) . "\n";
     }
     $att = [];
@@ -798,9 +798,9 @@ function docx_line_map($l, $i) {
         'l_no' => $i, 'l_sbu' => lk_options_or('sbu', OPS_SBUS)[$l['sbu']] ?? $l['sbu'],
         'l_service' => lk_options_or('crm_service_type', CRM_SERVICE_TYPES)[$l['service_type']] ?? $l['service_type'],
         'l_subtypes' => $l['subtypes'], 'l_desc' => $l['description'], 'l_location' => $l['location'],
-        'l_order' => ORDER_TYPES[$l['order_type']] ?? $l['order_type'],
+        'l_order' => lk_options_or('order_type', ORDER_TYPES)[$l['order_type']] ?? $l['order_type'],
         'l_qty' => rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.'),
-        'l_unit' => QUOTE_UNITS[$l['unit']] ?? $l['unit'],
+        'l_unit' => lk_options_or('quote_unit', QUOTE_UNITS)[$l['unit']] ?? $l['unit'],
         'l_rate' => number_format((float)$l['rate'], 2), 'l_amount' => number_format((float)$l['amount'], 2),
     ];
 }
@@ -853,7 +853,7 @@ function quote_doc_map($q, $tpl) {
         'client_name' => $q['client_name'], 'contact_name' => $q['contact_name'],
         'contact_email' => $q['contact_email'], 'contact_mobile' => $q['contact_mobile'],
         'sbu' => lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu'], 'subject' => $q['subject'],
-        'site_location' => $q['site_location'], 'location_type' => QUOTE_LOCATION_TYPES[$q['location_type']] ?? $q['location_type'],
+        'site_location' => $q['site_location'], 'location_type' => lk_options_or('quote_location_type', QUOTE_LOCATION_TYPES)[$q['location_type']] ?? $q['location_type'],
         'validity_days' => $q['validity_days'], 'payment_terms' => $q['payment_terms'],
         'advance_pct' => rtrim(rtrim(number_format((float)$q['advance_pct'], 2), '0'), '.'),
         'currency' => $q['currency'], 'office_name' => $off ?: '',
@@ -940,7 +940,7 @@ function ops_crm_templates($route, $method) {
         if ($route === 'crm-template-edit') { $t = ops_one("SELECT * FROM crm_templates WHERE id=?", [(int)($_GET['id'] ?? 0)]); if (!$t) { http_response_code(404); view('notfound'); return; } }
         if ($method === 'POST') {
             $b = $_POST;
-            $kind = isset(CRM_TEMPLATE_KINDS[$b['kind'] ?? '']) ? $b['kind'] : 'QUOTE_DOC';
+            $kind = isset(lk_options_or('template_kind', CRM_TEMPLATE_KINDS)[$b['kind'] ?? '']) ? $b['kind'] : 'QUOTE_DOC';
             $isDef = !empty($b['is_default']) ? 1 : 0;
             $active = !empty($b['active']) ? 1 : 0;
             // optional new file upload (.docx)
@@ -985,7 +985,7 @@ function ops_crm_reports() {
     $totVal = 0; $wonVal = 0; $openVal = 0; $nWon = 0; $nLost = 0;
     foreach ($rows as $r) {
         $st = $r['status']; $v = (float)$r['total_amount'];
-        $byStatus[QUOTE_STATUS[$st] ?? $st] = ($byStatus[QUOTE_STATUS[$st] ?? $st] ?? 0) + 1;
+        $byStatus[lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st] = ($byStatus[lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st] ?? 0) + 1;
         $sk = $sbuLbl[$r['sbu']] ?? ($r['sbu'] ?: '—'); $bySbu[$sk] = ($bySbu[$sk] ?? 0) + $v;
         $ck = $r['client_disp'] ?: ($r['client_name'] ?: '—'); $byClient[$ck] = ($byClient[$ck] ?? 0) + $v;
         $totVal += $v;
@@ -999,7 +999,7 @@ function ops_crm_reports() {
     if (wants_csv()) {
         $csv = [['Quote', 'Client', 'SBU', 'Status', 'Total', 'Created', 'Accepted', 'Lost reason', 'Contract']];
         foreach ($rows as $r) $csv[] = [quote_label($r), $r['client_disp'] ?: $r['client_name'], $sbuLbl[$r['sbu']] ?? $r['sbu'],
-            QUOTE_STATUS[$r['status']] ?? $r['status'], (float)$r['total_amount'], substr((string)$r['created_at'], 0, 10),
+            lk_options_or('quote_status', QUOTE_STATUS)[$r['status']] ?? $r['status'], (float)$r['total_amount'], substr((string)$r['created_at'], 0, 10),
             $r['accepted_date'], ($r['lost_reason'] === 'OTHER' && $r['lost_reason_other']) ? $r['lost_reason_other'] : ($lostLbl[$r['lost_reason']] ?? $r['lost_reason']), $r['contract_number']];
         csv_download('sales-quotes-' . $fy . '.csv', $csv);
     }

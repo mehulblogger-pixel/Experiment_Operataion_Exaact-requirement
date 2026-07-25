@@ -6,13 +6,13 @@
 ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/requisitions"><?= e(TP('requisition')) ?></a> › <?= e($req['req_code']) ?></div>
 <div class="master-head">
-  <div><h1><?= e(T_DETAIL('requisition', $req['req_code'])) ?> <span class="pill <?= $stCls ?>" style="vertical-align:middle;font-size:12px"><?= e(REQ_STATUS[$req['status']] ?? $req['status']) ?></span></h1>
-    <p class="sub" style="margin:2px 0 0"><?= e(DESIGNATIONS[$req['designation']] ?? ($req['designation'] ?: 'Position')) ?> · <?= e(REQ_TYPES[$req['req_type']] ?? '') ?> · <?= e($req['office_name'] ?: '—') ?></p></div>
+  <div><h1><?= e(T_DETAIL('requisition', $req['req_code'])) ?> <span class="pill <?= $stCls ?>" style="vertical-align:middle;font-size:12px"><?= e(lk_options_or('requisition_status', REQ_STATUS)[$req['status']] ?? $req['status']) ?></span></h1>
+    <p class="sub" style="margin:2px 0 0"><?= e(DESIGNATIONS[$req['designation']] ?? ($req['designation'] ?: 'Position')) ?> · <?= e(lk_options_or('requisition_type', REQ_TYPES)[$req['req_type']] ?? '') ?> · <?= e($req['office_name'] ?: '—') ?></p></div>
   <?php if (is_coordinator_level()): ?><a class="btn secondary" href="/requisition-edit?id=<?= (int)$req['id'] ?>">Edit</a><?php endif; ?>
 </div>
 
 <div class="panel"><div class="kv-grid">
-  <div><span class="k">Type</span><?= e(REQ_TYPES[$req['req_type']] ?? '') ?></div>
+  <div><span class="k">Type</span><?= e(lk_options_or('requisition_type', REQ_TYPES)[$req['req_type']] ?? '') ?></div>
   <div><span class="k">Project / site</span><?= e($req['project_site'] ?: '—') ?></div>
   <div><span class="k">SBU</span><?= e(OPS_SBUS[$req['sbu']] ?? ($req['sbu'] ?: '—')) ?></div>
   <div><span class="k">Approval</span><?= e($req['approval_ref'] ?: '—') ?><?= $req['approval_date'] ? ' · '.e($req['approval_date']) : '' ?><?= $req['approved_by'] ? ' · by '.e($req['approved_by']) : '' ?></div>
@@ -35,8 +35,8 @@
   <table class="dt"><thead><tr><th>Candidate</th><th>Source</th><th>Stage</th><th></th></tr></thead><tbody>
     <?php foreach ($cands as $cd): ?><tr>
       <td><b><?= e(candidate_name($cd)) ?></b></td>
-      <td><?= e(CAND_SOURCES[$cd['source']] ?? $cd['source']) ?></td>
-      <td><span class="pill <?= in_array($cd['stage'],['ACCEPTED'],true)?'p-ok':(in_array($cd['stage'],['REJECTED','WITHDRAWN','OFFER_DECLINED'],true)?'p-bad':'p-info') ?>"><?= e(CAND_STAGES[$cd['stage']] ?? $cd['stage']) ?></span></td>
+      <td><?= e(lk_options_or('candidate_source', CAND_SOURCES)[$cd['source']] ?? $cd['source']) ?></td>
+      <td><span class="pill <?= in_array($cd['stage'],['ACCEPTED'],true)?'p-ok':(in_array($cd['stage'],['REJECTED','WITHDRAWN','OFFER_DECLINED'],true)?'p-bad':'p-info') ?>"><?= e(lk_options_or('candidate_stage', CAND_STAGES)[$cd['stage']] ?? $cd['stage']) ?></span></td>
       <td><a class="btn small secondary" href="/candidate?id=<?= (int)$cd['id'] ?>">Open</a></td>
     </tr><?php endforeach; ?>
   </tbody></table>

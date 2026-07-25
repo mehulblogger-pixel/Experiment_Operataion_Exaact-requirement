@@ -14,7 +14,7 @@
       <label class="chk" style="margin-top:6px"><input type="checkbox" name="active" value="1" <?= ($t['active'] ?? 1)?'checked':'' ?>> Active</label>
     </div>
 
-    <div class="ff"><label>Document number <span class="muted">(from this format)</span></label><input class="form-control" name="document_number" value="<?= e($t['document_number'] ?? '') ?>" placeholder="e.g. SGS/QT/DOC-014"></div>
+    <div class="ff"><label>Document number <span class="muted">(from this format)</span></label><input class="form-control" name="document_number" value="<?= e($t['document_number'] ?? '') ?>" placeholder="e.g. QT/DOC-014"></div>
     <div class="ff"><label>Format number</label><input class="form-control" name="format_number" value="<?= e($t['format_number'] ?? '') ?>" placeholder="e.g. F-MKT-07"></div>
     <div class="ff"><label>Format revision</label><input class="form-control" name="doc_revision" value="<?= e($t['doc_revision'] ?? '') ?>" placeholder="e.g. Rev 03"></div>
     <div class="ff"><label>Issue / effective date</label><input class="form-control" type="date" name="issue_date" value="<?= e($t['issue_date'] ?? '') ?>"></div>

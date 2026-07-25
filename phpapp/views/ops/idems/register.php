@@ -21,7 +21,7 @@
     <?php foreach ($types as $t): ?><option value="<?= e($t['code']) ?>" <?= $ft===$t['code']?'selected':'' ?>><?= e($t['code']) ?> — <?= e($t['name']) ?></option><?php endforeach; ?>
   </select>
   <select class="form-control" name="status" onchange="this.form.submit()" style="max-width:170px"><option value="">All statuses</option>
-    <?php foreach (IDEMS_STATUS as $k=>$v): ?><option value="<?= e($k) ?>" <?= $fs===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
+    <?php foreach (lk_options_or('report_status', IDEMS_STATUS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= $fs===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
   </select>
   <input class="form-control" name="q" value="<?= e($q) ?>" placeholder="Search IRN / title / project" style="min-width:200px">
   <button class="btn small" type="submit">Search</button>
@@ -41,7 +41,7 @@
         <td><?= e($r['client_disp'] ?: $r['client_name'] ?: '—') ?></td>
         <td><?= e($r['inspector_name'] ?: '—') ?></td>
         <td><?= e($r['inspection_date'] ?: '—') ?></td>
-        <td><span class="pill <?= idems_status_pill($r['status']) ?>"><?= e(IDEMS_STATUS[$r['status']] ?? $r['status']) ?></span><?= $r['finalized'] ? ' 🔒' : '' ?></td>
+        <td><span class="pill <?= idems_status_pill($r['status']) ?>"><?= e(lk_options_or('report_status', IDEMS_STATUS)[$r['status']] ?? $r['status']) ?></span><?= $r['finalized'] ? ' 🔒' : '' ?></td>
       </tr>
       <?php endforeach; ?>
     </tbody>

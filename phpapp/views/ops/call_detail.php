@@ -91,7 +91,7 @@
     <div><span class="k">Client expected date</span><?= e($call['inspection_required_date'] ?: '—') ?></div>
     <div><span class="k">Forwarded to branch</span><?= e($call['forwarded_at'] ? substr($call['forwarded_at'],0,16) : '—') ?></div>
     <div><span class="k">Inspector allocated</span><?= e($lead['alloc_date'] ?: '—') ?></div>
-    <div><span class="k">Lead time (client → SGS)</span><?= $lead['client_to_sgs']===null?'—':(int)$lead['client_to_sgs'].' day(s)' ?></div>
+    <div><span class="k">Lead time (<?= e(Tl('client')) ?> → us)</span><?= $lead['client_to_sgs']===null?'—':(int)$lead['client_to_sgs'].' day(s)' ?></div>
     <div><span class="k">Lead time (to executing)</span><?= $lead['to_executing']===null?'—':(int)$lead['to_executing'].' day(s)' ?></div>
     <div><span class="k">Scheduling delay</span><?php if ($lead['sched_delay']===null): ?>—<?php else: ?><span class="badge <?= $lead['sched_delay']<=1?'GREEN':($lead['sched_delay']<=3?'AMBER':'RED') ?>"><?= (int)$lead['sched_delay'] ?> day(s)</span><?php endif; ?></div>
   </div>
@@ -99,9 +99,9 @@
 
 <?php
   // Assignment confirmation banner (executing branch has allocated an inspector)
-  $engKind = ['ASSET'=>'SGS asset','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor'];
+  $engKind = ['ASSET'=>'own employee','FREELANCER'=>'freelancer','SUBCON'=>'sub-contractor'];
   foreach ($jobs as $aj) { if ($aj['inspector_name'] && $aj['scheduled_date']): ?>
-    <div class="msg msg-success">✅ Call assigned to <strong><?= e($aj['inspector_name']) ?></strong> for <strong><?= e($aj['scheduled_date']) ?></strong> — engineer is <?= e($engKind[$aj['staff_kind'] ?? 'ASSET'] ?? 'SGS asset') ?><?= $aj['subcon_agency'] ? ' (' . e($aj['subcon_agency']) . ')' : '' ?>. Job <?= e($aj['job_code']) ?>, stage: <?= e(JOB_STAGES[$aj['stage'] ?? 'ALLOCATED'] ?? '') ?>.</div>
+    <div class="msg msg-success">✅ Call assigned to <strong><?= e($aj['inspector_name']) ?></strong> for <strong><?= e($aj['scheduled_date']) ?></strong> — engineer is <?= e($engKind[$aj['staff_kind'] ?? 'ASSET'] ?? 'own employee') ?><?= $aj['subcon_agency'] ? ' (' . e($aj['subcon_agency']) . ')' : '' ?>. Job <?= e($aj['job_code']) ?>, stage: <?= e(lk_options_or('job_stage', JOB_STAGES)[$aj['stage'] ?? 'ALLOCATED'] ?? '') ?>.</div>
   <?php endif; } ?>
 <h3 class="tab-sub">Jobs allocated from this call</h3>
 <table class="grid">
@@ -112,7 +112,7 @@
     <td><?= e($j['inspector_name'] ?: ($j['subcon_agency'] ?: '—')) ?></td>
     <td><?= e($engKind[$j['staff_kind'] ?? 'ASSET'] ?? '—') ?></td>
     <td><?= e($j['scheduled_date'] ?: '—') ?></td>
-    <td><span class="badge <?= ($j['stage']??'')==='CLOSED'?'GREEN':'AMBER' ?>"><?= e(JOB_STAGES[$j['stage'] ?? 'ALLOCATED'] ?? '') ?></span></td>
+    <td><span class="badge <?= ($j['stage']??'')==='CLOSED'?'GREEN':'AMBER' ?>"><?= e(lk_options_or('job_stage', JOB_STAGES)[$j['stage'] ?? 'ALLOCATED'] ?? '') ?></span></td>
     <td><?= fmoney($j['expected_credit']) ?></td>
     <td><?= $j['closed_flag'] ? '<span class="badge GREEN">Closed</span>' : '<span class="badge AMBER">Open</span>' ?></td>
     <td class="row-actions"><a class="btn small secondary" href="/job?id=<?= (int)$j['id'] ?>">Open</a></td>

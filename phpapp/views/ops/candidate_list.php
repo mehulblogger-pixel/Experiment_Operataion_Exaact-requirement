@@ -10,7 +10,7 @@
 
 <div class="filter-bar" style="flex-wrap:wrap;gap:6px;margin-bottom:6px">
   <a class="btn small <?= $stage===''?'':'secondary' ?>" href="/candidates">All</a>
-  <?php foreach (CAND_STAGES as $k=>$v): ?>
+  <?php foreach (lk_options_or('candidate_stage', CAND_STAGES) as $k=>$v): ?>
     <a class="btn small <?= $stage===$k?'':'secondary' ?>" href="/candidates?stage=<?= e($k) ?>"><?= e($v) ?> (<?= (int)($counts[$k] ?? 0) ?>)</a>
   <?php endforeach; ?>
 </div>
@@ -31,8 +31,8 @@
     <td><?= e($c['client_disp'] ?: $c['client_name'] ?: '—') ?></td>
     <td><?= e($c['proposed_site'] ?: '—') ?></td>
     <td><?= e(rtrim(rtrim((string)($c['experience_years'] ?? 0), '0'), '.') ?: '0') ?></td>
-    <td><?= e(CAND_SOURCES[$c['source']] ?? $c['source']) ?></td>
-    <td><span class="badge <?= $stageBadge[$c['stage']] ?? 'AMBER' ?>"><?= e(CAND_STAGES[$c['stage']] ?? $c['stage']) ?></span></td>
+    <td><?= e(lk_options_or('candidate_source', CAND_SOURCES)[$c['source']] ?? $c['source']) ?></td>
+    <td><span class="badge <?= $stageBadge[$c['stage']] ?? 'AMBER' ?>"><?= e(lk_options_or('candidate_stage', CAND_STAGES)[$c['stage']] ?? $c['stage']) ?></span></td>
     <td class="row-actions">
       <a class="btn small secondary" href="/candidate?id=<?= (int)$c['id'] ?>">Open</a>
       <a class="btn small" href="/candidate-edit?id=<?= (int)$c['id'] ?>">Edit</a>

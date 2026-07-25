@@ -1479,7 +1479,7 @@ function ops_dispatch($route, $method) {
             header('Content-Type: application/json');
             $out = [];
             foreach (ops_all("SELECT id, address_type, label, town_village, district, city, state FROM partner_addresses WHERE partner_id=? ORDER BY is_primary DESC, id", [(int)($_GET['id'] ?? 0)]) as $a) {
-                $lbl = trim(($a['label'] ?: (ADDRESS_TYPES[$a['address_type']] ?? $a['address_type'])) . ' — ' . implode(', ', array_filter([$a['town_village'], $a['district'], $a['city'], $a['state']])), ' —');
+                $lbl = trim(($a['label'] ?: (lk_options_or('address_type', ADDRESS_TYPES)[$a['address_type']] ?? $a['address_type'])) . ' — ' . implode(', ', array_filter([$a['town_village'], $a['district'], $a['city'], $a['state']])), ' —');
                 $out[] = ['id' => (int)$a['id'], 'label' => $lbl];
             }
             echo json_encode($out); return true;
@@ -1488,7 +1488,7 @@ function ops_dispatch($route, $method) {
             $out = [];
             foreach (ops_all("SELECT id, po_number, po_type, value FROM partner_purchase_orders WHERE partner_id=? ORDER BY id DESC", [(int)($_GET['id'] ?? 0)]) as $o) {
                 $hasLines = (int)ops_val("SELECT COUNT(*) FROM po_line_items WHERE purchase_order_id=?", [$o['id']]);
-                $out[] = ['id' => (int)$o['id'], 'label' => ($o['po_number'] ?: 'Open order') . ' (' . (PO_TYPES[$o['po_type']] ?? $o['po_type']) . ')', 'lines' => $hasLines];
+                $out[] = ['id' => (int)$o['id'], 'label' => ($o['po_number'] ?: 'Open order') . ' (' . (lk_options_or('po_type', PO_TYPES)[$o['po_type']] ?? $o['po_type']) . ')', 'lines' => $hasLines];
             }
             echo json_encode($out); return true;
         case $route === 'po-lines':
@@ -1496,7 +1496,7 @@ function ops_dispatch($route, $method) {
             $out = [];
             foreach (ops_all("SELECT id, description, quantity, consumed, item_type FROM po_line_items WHERE purchase_order_id=? ORDER BY id", [(int)($_GET['id'] ?? 0)]) as $l) {
                 $bal = (float)$l['quantity'] - (float)$l['consumed'];
-                $out[] = ['id' => (int)$l['id'], 'label' => $l['description'] . ' — bal ' . $bal . ' ' . (PO_ITEM_TYPES[$l['item_type']] ?? '')];
+                $out[] = ['id' => (int)$l['id'], 'label' => $l['description'] . ' — bal ' . $bal . ' ' . (lk_options_or('po_item_type', PO_ITEM_TYPES)[$l['item_type']] ?? '')];
             }
             echo json_encode($out); return true;
     }
@@ -2094,13 +2094,13 @@ function ops_candidates($route, $method) {
         if (!$cand) { http_response_code(404); view('notfound'); return; }
         if ($method === 'POST') {
             $to = $_POST['to_stage'] ?? '';
-            if (!isset(CAND_STAGES[$to])) { flash('Unknown stage.', 'error'); redirect('/candidate?id=' . $id); }
+            if (!isset(lk_options_or('candidate_stage', CAND_STAGES)[$to])) { flash('Unknown stage.', 'error'); redirect('/candidate?id=' . $id); }
             $remark = trim($_POST['remark'] ?? '');
             $decided = in_array($to, ['ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED'], true) ? date('c') : ($cand['decided_at'] ?: '');
             $pdo->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")->execute([$to, $decided, $id]);
             $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
                 ->execute([$id, $cand['stage'], $to, $remark, user_name(current_user()), date('c')]);
-            $msg = 'Candidate moved to ' . CAND_STAGES[$to] . '.';
+            $msg = 'Candidate moved to ' . lk_options_or('candidate_stage', CAND_STAGES)[$to] . '.';
             // Hired: create an inspector/resource record from the accepted candidate.
             if ($to === 'ACCEPTED' && !empty($_POST['make_inspector']) && empty($cand['inspector_id'])) {
                 $name = candidate_name($cand);
@@ -2140,7 +2140,7 @@ function ops_candidates($route, $method) {
         ops_require(is_coordinator_level(), 'Only coordinators and admins can view the hiring pipeline.');
         $q = trim($_GET['q'] ?? ''); $stage = $_GET['stage'] ?? '';
         $where = '1=1'; $args = [];
-        if ($stage !== '' && isset(CAND_STAGES[$stage])) { $where .= ' AND c.stage=?'; $args[] = $stage; }
+        if ($stage !== '' && isset(lk_options_or('candidate_stage', CAND_STAGES)[$stage])) { $where .= ' AND c.stage=?'; $args[] = $stage; }
         if ($q) { $where .= " AND (c.first_name LIKE ? OR c.last_name LIKE ? OR c.cand_code LIKE ? OR c.proposed_site LIKE ? OR c.cv_keywords LIKE ? OR c.cv_text LIKE ?)"; array_push($args, "%$q%","%$q%","%$q%","%$q%","%$q%","%$q%"); }
         $rows = ops_all("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, t.label trade_label
             FROM candidates c LEFT JOIN business_partners bp ON bp.id=c.client_id
@@ -2911,7 +2911,7 @@ function ops_profitability() {
         $csv = [$head];
         $sr = 0;
         foreach ($rows as $r) { $p = $r['p']; $sr++;
-            $line = [$sr, $r['boss_number'], $r['client_disp'] ?: $r['client_name'], BOSS_STATUS[$r['status']] ?? $r['status'],
+            $line = [$sr, $r['boss_number'], $r['client_disp'] ?: $r['client_name'], lk_options_or('boss_status', BOSS_STATUS)[$r['status']] ?? $r['status'],
                 $r['start_date'], $r['end_date'], $r['next_no'] ?: '', (int)$p['jobs'], (float)$p['invoiced'], (float)$p['expenses']];
             if ($seeSal) $line = array_merge($line, [(float)$p['labour'], (float)$p['margin'], $p['pct'] === null ? '' : $p['pct']]);
             $csv[] = $line;

@@ -279,7 +279,7 @@
         <a class="master-card" href="/requisition?id=<?= (int)$rq['id'] ?>">
           <strong><?= e($rq['req_code']) ?> · <?= e(DESIGNATIONS[$rq['designation']] ?? $rq['designation']) ?></strong>
           <span class="muted"><?= $rq['req_type']==='REPLACEMENT'?'Replacement':'New' ?><?= $rq['project_site'] ? ' · '.e($rq['project_site']) : '' ?></span>
-          <span class="muted"><span class="badge AMBER"><?= e(REQ_STATUS[$rq['status']] ?? $rq['status']) ?></span></span>
+          <span class="muted"><span class="badge AMBER"><?= e(lk_options_or('requisition_status', REQ_STATUS)[$rq['status']] ?? $rq['status']) ?></span></span>
         </a>
       <?php endforeach; ?>
     </div>
@@ -291,7 +291,7 @@
       <?php foreach ($agRenew as $a): $dl = (int)$a['days_left']; ?>
         <a class="master-card" href="/m/agencies/edit?id=<?= (int)$a['id'] ?>">
           <strong><?= e($a['name']) ?></strong>
-          <span class="muted"><?= e(AGENCY_TYPES[$a['agency_type']] ?? '') ?><?= $a['contract_number'] ? ' · '.e($a['contract_number']) : '' ?></span>
+          <span class="muted"><?= e(lk_options_or('agency_type', AGENCY_TYPES)[$a['agency_type']] ?? '') ?><?= $a['contract_number'] ? ' · '.e($a['contract_number']) : '' ?></span>
           <span class="muted">Renewal <?= e($a['contract_end']) ?> · <span class="badge <?= $dl<0?'RED':($dl<=15?'AMBER':'GREEN') ?>"><?= $dl<0 ? abs($dl).'d overdue' : $dl.'d left' ?></span></span>
         </a>
       <?php endforeach; ?>

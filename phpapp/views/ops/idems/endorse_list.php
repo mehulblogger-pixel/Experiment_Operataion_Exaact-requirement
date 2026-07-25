@@ -14,9 +14,9 @@
 
 <form method="get" action="/endorsements" class="chip-row" style="margin:10px 0;gap:6px">
   <select class="form-control" name="type" onchange="this.form.submit()" style="max-width:210px"><option value="">All document types</option>
-    <?php foreach (ENDORSE_DOC_TYPES as $k=>$v): ?><option value="<?= e($k) ?>" <?= $ft===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
+    <?php foreach (lk_options_or('endorse_doc_type', ENDORSE_DOC_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= $ft===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
   <select class="form-control" name="status" onchange="this.form.submit()" style="max-width:160px"><option value="">All statuses</option>
-    <?php foreach (ENDORSE_STATUS as $k=>$v): ?><option value="<?= e($k) ?>" <?= $fs===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
+    <?php foreach (lk_options_or('endorse_status', ENDORSE_STATUS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= $fs===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
   <input class="form-control" name="q" value="<?= e($q) ?>" placeholder="Search no. / title / heat no." style="min-width:200px">
   <button class="btn small" type="submit">Search</button>
 </form>
@@ -34,7 +34,7 @@
         <td><?= e($r['title'] ?: '—') ?></td>
         <td><?= e($r['vendor_disp'] ?: $r['vendor_name'] ?: '—') ?></td>
         <td class="muted"><?= e($r['heat_no'] ?: '—') ?></td>
-        <td><span class="pill <?= endorse_status_pill($r['status']) ?>"><?= e(ENDORSE_STATUS[$r['status']] ?? $r['status']) ?></span><?= $r['finalized'] ? ' 🔒' : '' ?></td>
+        <td><span class="pill <?= endorse_status_pill($r['status']) ?>"><?= e(lk_options_or('endorse_status', ENDORSE_STATUS)[$r['status']] ?? $r['status']) ?></span><?= $r['finalized'] ? ' 🔒' : '' ?></td>
       </tr>
       <?php endforeach; ?>
     </tbody>
