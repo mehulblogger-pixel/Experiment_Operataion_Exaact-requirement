@@ -611,7 +611,10 @@ function report_approval_notify($jobId) {
     if (!$job) return;
     $uid = report_approver_user_id($job);
     $to = $uid ? ops_val("SELECT email FROM users WHERE id=?", [$uid]) : '';
-    if (!$to) $to = implode(',', manager_emails());
+    // manager_emails() already returns a comma-separated STRING, not a list.
+    // imploding it crashed the whole job-closure flow the moment an inspector's
+    // approver had no e-mail address on file.
+    if (!$to) $to = (string)manager_emails();
     if (!$to) return;
     $subj = 'Report approval: ' . $job['job_code'];
     $body = "Inspector " . ($job['inspector_name'] ?: '—') . " has closed job " . $job['job_code']
