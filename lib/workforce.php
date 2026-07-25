@@ -112,7 +112,7 @@ function inspector_availability_summary($offices, $day = null) {
 }
 // Can the current user manage the availability board? (coordinator / manager level)
 function can_manage_availability() {
-    return is_master() || is_coordinator_level() || is_admin_level() || can('ops.job.allocate');
+    return is_master() || can('workforce.availability') || is_coordinator_level() || is_admin_level() || can('ops.job.allocate');
 }
 // Offices in the viewer's scope (int[] | 'ALL').
 function availability_scope_offices() {
@@ -246,7 +246,7 @@ function org_hierarchy_tree() {
 //  Handler: organisation hierarchy (view / print the N+1 chart)
 // -------------------------------------------------------------------------
 function ops_hierarchy($method) {
-    ops_require(is_master() || can('users.manage.global') || can('users.manage.branch') || can('settings.manage'), 'You cannot view the organisation hierarchy.');
+    ops_require(is_master() || can('org.hierarchy.view') || can('users.manage.global') || can('users.manage.branch') || can('settings.manage'), 'You cannot view the organisation hierarchy.');
     view('ops/hierarchy', ['tree' => org_hierarchy_tree()]);
     return true;
 }
@@ -281,6 +281,7 @@ function can_approve_report($job) {
     if (($job['report_approval'] ?? '') !== 'PENDING') return false;
     $uid = report_approver_user_id($job);
     if ($uid && (int)$uid === (int)(current_user()['id'] ?? 0)) return true;
+    if (can('workforce.report.approve')) return true;
     // otherwise a manager who can allocate/close jobs in scope may approve
     return can('ops.job.close') && (is_admin_level() || is_coordinator_level());
 }
@@ -295,9 +296,10 @@ function jobs_awaiting_report_approval($limit = 50) {
     if (is_master()) return array_slice($rows, 0, $limit);
     // keep only those I can approve (my direct reports, or manager fallback)
     $out = [];
+    $blanket = can('workforce.report.approve') || (can('ops.job.close') && (is_admin_level() || is_coordinator_level()));
     foreach ($rows as $r) {
         if ((int)($r['reports_to_id'] ?? 0) === $me) { $out[] = $r; continue; }
-        if (can('ops.job.close') && (is_admin_level() || is_coordinator_level())) $out[] = $r;
+        if ($blanket) $out[] = $r;
     }
     return array_slice($out, 0, $limit);
 }

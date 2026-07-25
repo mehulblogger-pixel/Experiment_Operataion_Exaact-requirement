@@ -1235,18 +1235,34 @@ function ops_access($method) {
     if ($method === 'POST') {
         $sel = $_POST['role'] ?? $sel;
         if (!isset($roles[$sel])) $sel = array_key_first($roles);
+        $store = json_decode(setting_get('role_access', ''), true); if (!is_array($store)) $store = [];
+        // One-click preset: apply the built-in recommended set for this role.
+        if (($_POST['_do'] ?? '') === 'preset') {
+            $store[$sel] = role_recommended_perms($sel);
+            setting_set('role_access', json_encode($store));
+            flash('Recommended permissions applied for ' . ORG_ROLES[$sel] . '. Review and Save, or adjust as needed.');
+            redirect('/access?role=' . $sel);
+        }
+        // Restore to built-in default (drop the override).
+        if (($_POST['_do'] ?? '') === 'reset') {
+            unset($store[$sel]);
+            setting_set('role_access', json_encode($store));
+            flash('Access for ' . ORG_ROLES[$sel] . ' reset to the built-in default.');
+            redirect('/access?role=' . $sel);
+        }
         $valid = array_keys(all_permissions());
         $checked = array_values(array_intersect(array_keys($_POST['perms'] ?? []), $valid));
         // edit implies view for every module
         foreach ($checked as $p) if (preg_match('/^mod\.(\w+)\.edit$/', $p, $mm)) $checked[] = "mod.{$mm[1]}.view";
         $checked = array_values(array_unique($checked));
-        $store = json_decode(setting_get('role_access', ''), true); if (!is_array($store)) $store = [];
         $store[$sel] = $checked;
         setting_set('role_access', json_encode($store));
         flash('Access for ' . ORG_ROLES[$sel] . ' saved.');
         redirect('/access?role=' . $sel);
     }
-    view('ops/access', ['roles' => $roles, 'sel' => $sel, 'current' => role_perms($sel)]);
+    view('ops/access', ['roles' => $roles, 'sel' => $sel, 'current' => role_perms($sel),
+        'recommended' => role_recommended_perms($sel), 'permGroups' => permission_groups(),
+        'moduleGroups' => module_groups(), 'scope' => role_defaults_base($sel)]);
 }
 
 function ops_dispatch($route, $method) {
