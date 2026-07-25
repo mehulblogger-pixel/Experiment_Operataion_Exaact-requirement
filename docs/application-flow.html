@@ -175,6 +175,20 @@
   .path .v{white-space:nowrap}
   .path .ar{color:var(--ink-3); font-size:var(--t-sm)}
 
+  /* --- the two entry points --------------------------------------------- */
+  .entries{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; margin:24px 0 4px}
+  .entry{background:var(--surface); border:1px solid var(--line); border-radius:9px; padding:18px 20px; box-shadow:var(--shadow); border-left:4px solid var(--accent)}
+  /* The second route is drawn dashed: it is a legitimate way in, not a lesser
+     one, but it bypasses the commercial gates and should not look identical. */
+  .entry.alt{border-left-style:dashed; border-left-color:var(--ink-3)}
+  .entry .lab{display:block; color:var(--accent); margin-bottom:7px}
+  .entry.alt .lab{color:var(--ink-3)}
+  .entry h4{margin:0 0 8px; font-family:var(--serif); font-size:var(--t-lg); font-weight:600}
+  .entry p{font-size:var(--t-sm); color:var(--ink-2); margin:0 0 9px}
+  .entry .ent-foot{font-family:var(--mono); font-size:var(--t-xs); color:var(--ink-3); margin:12px 0 0;
+    padding-top:10px; border-top:1px solid var(--line)}
+  .entry .ent-foot b{color:var(--ink-2)}
+
   /* --- tables ----------------------------------------------------------- */
   .scroll{overflow-x:auto; margin-top:14px; border:1px solid var(--line); border-radius:8px; background:var(--surface)}
   table{border-collapse:collapse; width:100%; font-size:var(--t-sm)}
@@ -237,13 +251,14 @@
     <h1>From one inquiry to the money — every branch</h1>
     <p class="stand">One quotation followed the whole way through: won outright, won after revision, sent back by the approver,
       lost after follow-ups, expired, or submitted on a client portal. Then the winning path onward through the inspection call,
-      the engineer, the report, and out to either an invoice or an inter-office credit.</p>
+      the engineer, the report, and out to either an invoice or an inter-office credit — plus the shorter second route
+      for work the client simply instructs, with no quotation behind it at all.</p>
     <div class="docref">
       <div><span class="lab">Scope</span><b>19 modules</b></div>
       <div><span class="lab">Stages</span><b>0 → 11</b></div>
+      <div><span class="lab">Ways in</span><b>2</b></div>
       <div><span class="lab">Quote outcomes</span><b>6</b></div>
-      <div><span class="lab">Worked example</span><b>Q-00042</b></div>
-      <div><span class="lab">Values shown</span><b>as stored</b></div>
+      <div><span class="lab">Worked examples</span><b>Q-00042 · CALL-00312</b></div>
     </div>
   </header>
 
@@ -299,6 +314,27 @@
   </div>
 
   <!-- ================================================================== -->
+  <h2>Two ways in</h2>
+  <p class="dek">Not every job is sold. Read the spine below knowing that stages 1 to 6 apply to work you had to win —
+    and that a second, shorter route exists for work that is already contracted.</p>
+
+  <div class="entries">
+    <div class="entry">
+      <span class="lab">Entry 1 · quotation-led</span>
+      <h4>Somebody asked for a price</h4>
+      <p>Runs the full spine, stage 1 through stage 11. The commercial terms are agreed, approved and recorded before any
+        engineer is booked, and the inspection call inherits every one of them.</p>
+      <p class="ent-foot">Enters at <b>stage 1</b> · traced in the first ledger below</p>
+    </div>
+    <div class="entry alt">
+      <span class="lab">Entry 2 · direct call</span>
+      <h4>The client just instructs the work</h4>
+      <p>A running ARC, a standing rate contract, or an urgent inspection phoned in by a client you already have.
+        No inquiry, no quotation, no approval, no follow-ups, no handover packet.</p>
+      <p class="ent-foot">Enters at <b>stage 7</b> · skips stages 1&ndash;6 · <a href="#direct">detailed below</a></p>
+    </div>
+  </div>
+
   <h2>The spine</h2>
   <p class="dek">Twelve stages. Stage 5 is the only one that forks — everything before it is a straight line, and everything
     after it happens only if the quotation was won.</p>
@@ -1016,6 +1052,187 @@
   </div>
 
   <!-- ================================================================== -->
+  <h2 id="direct">The other way in — a call with no quotation</h2>
+  <p class="dek">Everything above assumes the work had to be won. A great deal of inspection work does not: it is instructed
+    under something already agreed. The system expects this — once you choose a client, the quotation box on the call form
+    offers <code>— none / direct call —</code> as a first-class option.</p>
+
+  <div class="phases" style="margin-top:22px">
+    <div class="phase">
+      <span class="lab">When it happens</span>
+      <ul>
+        <li>An <b>ARC or open order</b> already won — every call for the rest of the year draws on it</li>
+        <li>A <b>standing rate contract</b> where prices were agreed once and do not change per job</li>
+        <li>An <b>urgent inspection</b> a known client phones in, to be papered afterwards</li>
+        <li>Work <b>instructed under another office's contract</b></li>
+        <li>A <b>re-inspection</b> after a non-conformance, against the original order</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <span class="lab">What you skip</span>
+      <ul>
+        <li>Stage 1 — no <b>inquiry</b></li>
+        <li>Stages 2–3 — no <b>quotation</b>, no <b>approval chain</b></li>
+        <li>Stage 4 — nothing sent, so <b>no follow-ups</b> are scheduled</li>
+        <li>Stage 5 — <b>no fork</b>: there is nothing to win or lose</li>
+        <li>Stage 6 — no <b>handover packet</b>, because there was no handover</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <span class="lab">What you cannot skip</span>
+      <ul>
+        <li>The <b>client must already exist</b> in the register — the call form will not offer anything until one is chosen</li>
+        <li>An <b>executing office</b>, or nothing can be allocated</li>
+        <li>A <b>value</b>, or the job reaches stage 11 as permanently unbilled</li>
+        <li>The <b>credit direction</b>, if two offices are involved</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <span class="lab">Identical from stage 7 on</span>
+      <ul>
+        <li><b>Allocation</b> and the availability check</li>
+        <li><b>Execution</b>, deliverables and the report lifecycle</li>
+        <li><b>Closure</b>, turnaround and expenses</li>
+        <li><b>Invoice or inter-office credit</b> — both exits work the same</li>
+        <li><b>Profitability</b> against the BOSS number</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="spine" style="margin-top:26px">
+    <section class="stage term" style="padding-bottom:0">
+      <div class="no">07</div>
+      <div class="stage-head">
+        <h3>Where it joins</h3>
+        <span class="who">Coordinator · Operation Manager</span>
+      </div>
+      <p>A direct call is the same record as a quotation-led one — same register, same columns, same lead-time and delay
+        highlighting. The single difference is that nothing fills itself in.</p>
+      <div class="card">
+        <div class="warn">
+          <span class="lab">This is where the risk sits</span>
+          <p>On a quotation-led call, the inspection types, product category, SBU, value, charge basis and payment terms all
+            cascade from what was sold, and cannot silently drift. On a direct call the coordinator types every one of them.
+            It is the one place in the system where a job can be scoped differently from what the client actually agreed —
+            and nobody senior sees it before the engineer is booked.</p>
+        </div>
+        <div class="warn">
+          <span class="lab">Known gap — the contract number</span>
+          <p>The contract-number box is filled only by the cascade from a quotation and cannot be typed. A direct call
+            therefore carries no contract number, even when it is drawing down against a real ARC.
+            <b>Where the ARC exists as a won quotation, pick it rather than choosing “direct call”</b> — the draw-down then
+            stays visible against the contract, which is what you want at year end. Raise a direct call only when there is
+            genuinely no quotation record behind the work.</p>
+        </div>
+        <div class="writes">
+          <span class="lab">What replaces the approval that never happened</span>
+          <p>Three things, all after the fact rather than before it. The value entered on the call, which drives everything
+            downstream. The register's own lead-time and delay columns. And the profitability roll-up per BOSS number, where
+            a direct call priced wrongly shows up as a thin margin against a contract that should have carried a fat one.
+            If direct calls are common in your business, the honest control is a monthly read of the profitability register,
+            not a hope that the coordinator got it right.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <h3 style="margin-top:34px">Worked example — a direct call</h3>
+  <p class="dek"><b>CALL-00312</b> — the same client, <b>Kaveri Power Systems Ltd</b>, phones the Pune coordinator on a
+    Friday afternoon: a shipment is being loaded on Monday and they want it supervised. There is no quotation for it, and
+    there is no time to raise one.</p>
+
+  <div class="scroll">
+    <table class="ledger">
+      <thead>
+        <tr><th>Date</th><th>What happens</th><th>State after</th><th class="num">Value ₹</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="when">10 Apr</td>
+          <td><b>Client calls in.</b> Loading supervision at the forge, Monday, one day. Client confirms it is on their
+            existing rates. No inquiry is raised — nobody is going to quote for it.
+            <span class="actor">Coordinator, Pune</span></td>
+          <td>— <span class="lab">no INQ, no Q</span></td>
+          <td class="num">—</td>
+        </tr>
+        <tr>
+          <td class="when">10 Apr</td>
+          <td><b>Call raised directly.</b> Client picked from the register; quotation box set to
+            <code>— none / direct call —</code>. Type of inspection <code>LOADING</code>, product category, SBU, value and
+            charge basis all typed by hand — nothing cascades. One inspection date, reporting <code>NOREPORT</code>
+            beyond the loading report itself.
+            <span class="actor">Coordinator, Pune</span></td>
+          <td><code>CALL-00312</code></td>
+          <td class="num">12,000</td>
+        </tr>
+        <tr>
+          <td class="when">10 Apr</td>
+          <td><b>Offices set.</b> Pune both holds this instruction and will execute it, so the call says there is no
+            inter-office credit — only the value billable to the client. Contrast the earlier example, where the two differed.
+            <span class="actor">Coordinator, Pune</span></td>
+          <td>no credit leg</td>
+          <td class="num">—</td>
+        </tr>
+        <tr>
+          <td class="when">10 Apr</td>
+          <td><b>Allocated inside the hour.</b> Availability screen filtered to Monday: two engineers free. The one already
+            familiar with the vendor is booked. Assignment e-mail goes out with the site and the folder link.
+            <span class="actor">Coordinator, Pune</span></td>
+          <td><code>JOB-00901</code> <span class="pill act">ALLOCATED</span></td>
+          <td class="num">—</td>
+        </tr>
+        <tr>
+          <td class="when">13 Apr</td>
+          <td><b>Loading supervised.</b> Photographic record and a container supervision report; no non-conformance.
+            <span class="actor">Inspection engineer</span></td>
+          <td><span class="pill act">IN_PROGRESS</span></td>
+          <td class="num">—</td>
+        </tr>
+        <tr>
+          <td class="when">14 Apr</td>
+          <td><b>Report issued and job closed.</b> Report date 13 Apr, turnaround zero days. Local conveyance claimed at
+            closure. From here the path is identical to a quotation-led job.
+            <span class="actor">Engineer → Operation Manager</span></td>
+          <td><span class="pill won">CLOSED</span> · TAT <code>0</code></td>
+          <td class="num">1,150</td>
+        </tr>
+        <tr>
+          <td class="when">15 Apr</td>
+          <td><b>Invoiced by Pune</b> on the client's standing 45-day terms. No credit leg, because one office did both.
+            <span class="actor">Finance, Pune</span></td>
+          <td><code>INV/26-27/0188</code> · due 30 May</td>
+          <td class="num">14,160</td>
+        </tr>
+        <tr>
+          <td class="when">15 Apr</td>
+          <td><b>Papered afterwards.</b> The client's covering PO arrives and is attached to the call, which is the only
+            trace tying this work to their order. This step is manual, and it is the one people forget.
+            <span class="actor">Accounts / back-office</span></td>
+          <td>PO attached</td>
+          <td class="num">—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="scroll" style="margin-top:22px">
+    <table>
+      <thead><tr><th>Side by side</th><th>Quotation-led · Q-00042</th><th>Direct call · CALL-00312</th></tr></thead>
+      <tbody>
+        <tr><td><b>Enters at</b></td><td>Stage 1, inquiry</td><td>Stage 7, the call itself</td></tr>
+        <tr><td><b>Elapsed before an engineer is booked</b></td><td>17 days — quote, approve, revise, chase, accept, hand over</td><td>Under an hour</td></tr>
+        <tr><td><b>Who checked the price</b></td><td>Marketing Manager, then Business Director</td><td>Nobody, before the fact</td></tr>
+        <tr><td><b>Commercial fields</b></td><td>Cascaded from the accepted quotation</td><td>Typed by the coordinator</td></tr>
+        <tr><td><b>Contract number</b></td><td>Carried from the quotation</td><td><span class="pill lost">not recordable</span> — see the gap above</td></tr>
+        <tr><td><b>Follow-ups</b></td><td>Five scheduled, worked, then skipped on acceptance</td><td>None — there is nothing to chase</td></tr>
+        <tr><td><b>Allocation onward</b></td><td colspan="2" style="text-align:center">Identical in every respect</td></tr>
+        <tr><td><b>Money exit</b></td><td>Invoice <em>and</em> an inter-office credit</td><td>Invoice only — one office did both</td></tr>
+        <tr><td><b>Where it is visible</b></td><td>Sales pipeline, win rate, lost analysis, profitability</td><td>Profitability only — it never touched the funnel</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ================================================================== -->
   <h2>Who is allowed to do what</h2>
   <p class="dek">Roles are the default; individual exceptions are granted per person. Anything not listed is visible but
     not editable to that role.</p>
@@ -1127,18 +1344,19 @@
 
   <!-- ================================================================== -->
   <h2>The trail a single job leaves</h2>
-  <p class="dek">Six numbers connect the whole chain. Given any one of them, every other can be reached.</p>
+  <p class="dek">Six numbers connect the whole chain. Given any one of them, every other can be reached — except on a direct
+    call, where the first two links were never made and the trail starts at the call.</p>
 
   <div class="scroll">
     <table>
-      <thead><tr><th>Number</th><th>Issued when</th><th>Links backward to</th><th>Links forward to</th></tr></thead>
+      <thead><tr><th>Number</th><th>Issued when</th><th>Links backward to</th><th>Links forward to</th><th>On a direct call</th></tr></thead>
       <tbody>
-        <tr><td><code>INQ-00117</code></td><td>Someone asks for a price</td><td>—</td><td>The quotation raised from it</td></tr>
-        <tr><td><code>Q-00042</code> <span class="lab">rev 00, 01, 02…</span></td><td>Quotation created</td><td>The inquiry</td><td>Contract, calls, jobs</td></tr>
-        <tr><td><code>AHM-26-KAVER-00031</code></td><td>Client registered on acceptance</td><td>The quotation that won them</td><td>Every future quotation and call</td></tr>
-        <tr><td><code>CALL-00311</code></td><td>Client instructs an inspection</td><td>Quotation and contract number</td><td>One or more jobs</td></tr>
-        <tr><td><code>JOB-00874</code></td><td>An engineer is allocated</td><td>The call</td><td>Report, expenses, invoice or credit</td></tr>
-        <tr><td>BOSS number</td><td>Commercial tracking opens</td><td>Contract</td><td>Profitability, and the renewal that succeeds it</td></tr>
+        <tr><td><code>INQ-00117</code></td><td>Someone asks for a price</td><td>—</td><td>The quotation raised from it</td><td><span class="pill">never issued</span></td></tr>
+        <tr><td><code>Q-00042</code> <span class="lab">rev 00, 01, 02…</span></td><td>Quotation created</td><td>The inquiry</td><td>Contract, calls, jobs</td><td><span class="pill">never issued</span></td></tr>
+        <tr><td><code>AHM-26-KAVER-00031</code></td><td>Client registered on acceptance</td><td>The quotation that won them</td><td>Every future quotation and call</td><td>Must already exist</td></tr>
+        <tr><td><code>CALL-00311</code></td><td>Client instructs an inspection</td><td>Quotation and contract number</td><td>One or more jobs</td><td><b>The trail starts here</b></td></tr>
+        <tr><td><code>JOB-00874</code></td><td>An engineer is allocated</td><td>The call</td><td>Report, expenses, invoice or credit</td><td>Identical</td></tr>
+        <tr><td>BOSS number</td><td>Commercial tracking opens</td><td>Contract</td><td>Profitability, and the renewal that succeeds it</td><td>Identical</td></tr>
       </tbody>
     </table>
   </div>
@@ -1148,7 +1366,7 @@
       exactly as written, so it can be searched, filtered or exported. Wording such as <i>IBO</i>, <i>quotation</i> and
       <i>inspection call</i> follows Settings → Terminology — change it there and the screens follow, though this document
       will not.</p>
-    <p>Exaact Inspection &amp; Operations Management System · operating flow, stages 0–11 · prepared 25 July 2026</p>
+    <p>Exaact Inspection &amp; Operations Management System · operating flow, stages 0–11, two entry points · prepared 25 July 2026</p>
   </footer>
 
 </div>
