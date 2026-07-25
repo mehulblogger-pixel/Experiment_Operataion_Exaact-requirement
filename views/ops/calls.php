@@ -60,7 +60,13 @@
         <td><a href="/call?id=<?= (int)$c['id'] ?>"><b><?= e($c['call_code']) ?></b></a>
             <?php if (!empty($c['folder_link'])): ?><a href="<?= e($c['folder_link']) ?>" target="_blank" rel="noopener" title="Shared folder">🔗</a><?php endif; ?></td>
         <td><?= e($c['client_disp'] ?: $c['client_name'] ?: '—') ?>
-            <?php if (!empty($c['contract_number'])): ?><div class="muted" style="font-size:11px"><?= e($c['contract_number']) ?></div><?php endif; ?></td>
+            <?php if (!empty($c['contract_number'])): ?>
+              <div class="muted" style="font-size:11px"><?= e($c['contract_number']) ?></div>
+            <?php else: ?>
+              <?php // Visible in the register too, so a coordinator scanning the
+                    // list can see which orders still have paperwork outstanding. ?>
+              <div style="font-size:11px"><span class="pill p-warn">contract no. pending</span></div>
+            <?php endif; ?></td>
         <td><?= $c['vendor_name'] ? e($c['vendor_name']) : $dash ?></td>
         <td><?= e(lk_options_or('sbu', OPS_SBUS)[$c['sbu']] ?? '—') ?></td>
         <td><?= !empty($c['activity_id']) ? e(lk_value_path($c['activity_id'])) : $dash ?></td>

@@ -29,6 +29,25 @@
   </div>
 </div>
 
+<?php $cgap = function_exists('call_contract_gap') ? call_contract_gap($call) : null; ?>
+<?php if ($cgap): ?>
+  <?php // Shown on every visit until it is fixed. Scheduling is deliberately NOT
+        // blocked — the work does not wait for the paperwork, it just has to stay
+        // visible that the paperwork is outstanding. ?>
+  <div class="panel" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)">
+    <b style="color:var(--warn)">⚠ Contract number not available</b>
+    <div class="muted" style="margin-top:4px"><?= e($cgap['text']) ?></div>
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+      <?php if (is_coordinator_level()): ?>
+        <a class="btn small secondary" href="/call-edit?id=<?= (int)$call['id'] ?>">Add it on this <?= e(Tl('call')) ?></a>
+      <?php endif; ?>
+      <?php if (!empty($cgap['quote_id'])): ?>
+        <a class="btn small secondary" href="/quote?id=<?= (int)$cgap['quote_id'] ?>">Open <?= e($cgap['quote_no']) ?></a>
+      <?php endif; ?>
+    </div>
+  </div>
+<?php endif; ?>
+
 <div class="panel">
   <div class="kv-grid">
     <div><span class="k">Client</span><?= e($call['client_disp'] ?: $call['client_name'] ?: '—') ?></div>
