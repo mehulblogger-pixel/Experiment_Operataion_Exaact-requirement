@@ -581,6 +581,35 @@ function weekdays_label($csv) {
 //  the contracting office pays the executing office a credit in rupees. This
 //  builds the sentence the screens show, so nobody has to work it out.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//  Where did the time go? (§a.ix)
+//
+//  Four moments matter on a call: the client asked, we forwarded it to the
+//  office that will do it, we put an engineer on it, and the engineer is
+//  scheduled. The gaps between them are where delay hides, so they are computed
+//  once here and shown on the register and in its export.
+// ---------------------------------------------------------------------------
+function call_lead_times($c) {
+    $d = function ($v) { $v = substr((string)$v, 0, 10); return ($v !== '' && strtotime($v)) ? strtotime($v) : null; };
+    $recv  = $d($c['call_received_date'] ?? '');
+    $fwd   = $d($c['forwarded_at'] ?? '');
+    $alloc = $d($c['allocated_at'] ?? '');
+    $sched = $d($c['sched_date'] ?? '');
+    $need  = $d($c['inspection_required_date'] ?? '');
+    $days = fn($a, $b) => ($a && $b) ? (int)round(($b - $a) / 86400) : null;
+    $out = [
+        'to_forward'  => $days($recv, $fwd),
+        'to_allocate' => $days($fwd, $alloc),
+        'to_schedule' => $days($recv, $sched),
+        // Positive = the engineer is scheduled AFTER the date the client wanted.
+        'delay'       => $days($need, $sched),
+        'unallocated_days' => (!$alloc && $recv) ? (int)round((time() - $recv) / 86400) : null,
+    ];
+    $out['late'] = ($out['delay'] !== null && $out['delay'] > 0)
+        || ($need && !$sched && $need < time());   // wanted by now, still nothing scheduled
+    return $out;
+}
+
 function credit_explainer($contractingOfficeId, $executingOfficeId) {
     $c = $contractingOfficeId ? office((int)$contractingOfficeId) : null;
     $e = $executingOfficeId ? office((int)$executingOfficeId) : null;
@@ -637,7 +666,7 @@ function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
     }
     return null;
 }
-function inspectors_list($activeOnly = true) { return ops_all("SELECT id, name, emp_code, sbu, salary_ctc FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name"); }
+function inspectors_list($activeOnly = true) { return ops_all("SELECT id, name, emp_code, sbu, salary_ctc, staff_kind, home_office_id FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name"); }
 // Employee-code prefix per engagement kind. Sub-contractors and freelancers get a
 // visibly DIFFERENT code series from our own staff so payroll/accounts can tell
 // them apart at a glance: SC-#### for sub-cons, FL-#### for freelancers, EMP## for staff.
@@ -1977,17 +2006,43 @@ function ops_calls($route, $method) {
         if ($q) { $where .= " AND (c.call_code LIKE ? OR bp.legal_name LIKE ? OR v.legal_name LIKE ?)"; array_push($args, "%$q%","%$q%","%$q%"); }
         $costExpr = "((SELECT COALESCE(SUM(ve.row_total),0) FROM voucher_entries ve JOIN jobs jv ON jv.id=ve.job_id WHERE jv.call_id=c.id)"
                   . " + (SELECT COALESCE(SUM(ex.travel+ex.local+ex.food+ex.lodging+ex.misc),0) FROM expenses ex JOIN jobs je ON je.id=ex.job_id WHERE je.call_id=c.id))";
+        // §a.ix — the register has to answer "where is this call stuck?" without
+        // opening it: which office is executing, what activity, what credit is
+        // owed, whose desk it is on, who is doing it, when, and how late.
         $rows = ops_all("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name,
-            (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) job_count, $costExpr AS cost_incurred
+            eo.name exec_office_name, eo.coordinator_name exec_coordinator,
+            io2.name ibo_office_name,
+            (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) job_count, $costExpr AS cost_incurred,
+            (SELECT MIN(j2.scheduled_date) FROM jobs j2 WHERE j2.call_id=c.id AND j2.scheduled_date<>'') sched_date,
+            (SELECT i.name FROM jobs j3 LEFT JOIN inspectors i ON i.id=j3.inspector_id
+               WHERE j3.call_id=c.id AND j3.inspector_id IS NOT NULL ORDER BY j3.id LIMIT 1) inspector_name
             FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id
-            LEFT JOIN business_partners v ON v.id=c.vendor_id WHERE $where ORDER BY c.id DESC", $args);
+            LEFT JOIN business_partners v ON v.id=c.vendor_id
+            LEFT JOIN offices eo ON eo.id=c.executing_office_id
+            LEFT JOIN offices io2 ON io2.id=c.ibo_office_id
+            WHERE $where ORDER BY c.id DESC", $args);
+        foreach ($rows as &$r) $r['lead'] = call_lead_times($r);
+        unset($r);
         if ($minCost !== null) $rows = array_values(array_filter($rows, fn($r) => (float)$r['cost_incurred'] >= $minCost));
         if (wants_csv()) {
-            $csv = [['Call','Client','Vendor / Site','SBU','Required by','Jobs','Cost incurred','Status']];
+            $csv = [[TH('call'), T('client'), T('vendor') . ' / site', T('sbu'), 'Activity',
+                'Contracting ' . T('office'), 'Executing ' . T('office'), 'Credit to give', 'Coordinator',
+                T('engineer'), 'Received', 'Forwarded', 'Allocated', 'Required by', 'Scheduled',
+                'Received to forwarded (days)', 'Forwarded to allocated (days)', 'Received to scheduled (days)',
+                'Delay vs required (days)', THP('job') . ' count', 'Cost incurred', 'Status']];
             foreach ($rows as $c) {
                 $st = ($c['status'] ?? '') === 'CLOSED' ? 'Closed' : ((int)$c['job_count'] === 0 ? 'To schedule' : 'In progress');
-                $csv[] = [$c['call_code'], $c['client_disp'] ?: $c['client_name'], $c['vendor_name'], OPS_SBUS[$c['sbu']] ?? $c['sbu'],
-                    $c['inspection_required_date'], (int)$c['job_count'], (float)($c['cost_incurred'] ?? 0), $st];
+                $L = $c['lead'];
+                $csv[] = [$c['call_code'], $c['client_disp'] ?: $c['client_name'], $c['vendor_name'],
+                    lk_options_or('sbu', OPS_SBUS)[$c['sbu']] ?? $c['sbu'],
+                    $c['activity_id'] ? lk_value_path($c['activity_id']) : '',
+                    $c['ibo_office_name'] ?? '', $c['exec_office_name'] ?? '',
+                    (float)($c['expected_credit'] ?? 0), $c['exec_coordinator'] ?? '', $c['inspector_name'] ?? '',
+                    fdate($c['call_received_date'], ''), fdate(substr((string)($c['forwarded_at'] ?? ''), 0, 10), ''),
+                    fdate(substr((string)($c['allocated_at'] ?? ''), 0, 10), ''),
+                    fdate($c['inspection_required_date'], ''), fdate($c['sched_date'] ?? '', ''),
+                    $L['to_forward'] ?? '', $L['to_allocate'] ?? '', $L['to_schedule'] ?? '', $L['delay'] ?? '',
+                    (int)$c['job_count'], (float)($c['cost_incurred'] ?? 0), $st];
             }
             csv_download('calls-' . date('Y-m-d') . '.csv', $csv);
         }
@@ -2725,6 +2780,21 @@ function ops_jobs($route, $method) {
         if ($filter === 'open') $where .= " AND j.closed_flag=0";
         if ($filter === 'closed') $where .= " AND j.closed_flag=1";
         if ($q) { $where .= " AND (j.job_code LIKE ? OR bp.legal_name LIKE ?)"; array_push($args, "%$q%","%$q%"); }
+        // §b.ix — narrow the allocation board by engineer, by month, or by a date
+        // range, which is how a coordinator actually looks for a free slot.
+        $fInsp = (int)($_GET['inspector'] ?? 0);
+        if ($fInsp) { $where .= " AND j.inspector_id=?"; $args[] = $fInsp; }
+        $fMonth = trim($_GET['month'] ?? '');           // YYYY-MM
+        if ($fMonth !== '' && preg_match('/^\d{4}-\d{2}$/', $fMonth)) {
+            $where .= " AND j.scheduled_date LIKE ?"; $args[] = $fMonth . '%';
+        }
+        $fFrom = trim($_GET['from'] ?? ''); $fTo = trim($_GET['to'] ?? '');
+        if ($fFrom !== '') { $where .= " AND j.scheduled_date >= ?"; $args[] = $fFrom; }
+        if ($fTo   !== '') { $where .= " AND j.scheduled_date <= ?"; $args[] = $fTo; }
+        $fOffice = (int)($_GET['office'] ?? 0);
+        if ($fOffice) { $where .= " AND j.executing_office_id=?"; $args[] = $fOffice; }
+        $fUnalloc = ($_GET['unallocated'] ?? '') === '1';
+        if ($fUnalloc) $where .= " AND (j.inspector_id IS NULL AND (j.subcon_id IS NULL))";
         $rows = ops_all("SELECT j.*, c.call_code, bp.legal_name client_name, bp.display_name client_disp,
             i.name inspector_name FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
             LEFT JOIN business_partners bp ON bp.id=c.client_id LEFT JOIN inspectors i ON i.id=j.inspector_id
@@ -2739,7 +2809,10 @@ function ops_jobs($route, $method) {
             }
             csv_download('jobs-' . date('Y-m-d') . '.csv', $csv);
         }
-        view('ops/jobs', ['rows' => $rows, 'q' => $q, 'filter' => $filter]); return;
+        view('ops/jobs', ['rows' => $rows, 'q' => $q, 'filter' => $filter,
+            'inspectors' => inspectors_list(), 'offices' => offices_list(),
+            'fInsp' => $fInsp, 'fMonth' => $fMonth, 'fFrom' => $fFrom, 'fTo' => $fTo,
+            'fOffice' => $fOffice, 'fUnalloc' => $fUnalloc]); return;
     }
     if ($route === 'job-new' || $route === 'job-edit') {
         ops_require(is_coordinator_level(), 'Only coordinators and admins can allocate jobs.');
@@ -2759,6 +2832,16 @@ function ops_jobs($route, $method) {
                 'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost','quotation_id'];
             // deliverables come as a checkbox array -> stored as CSV of codes
             $deliverables = implode(',', array_filter((array)($b['deliverables'] ?? [])));
+            // §b.vi — the visit dates arrive as a list of date boxes. Keep them as one
+            // ordered list, and keep scheduled_date as the first day so every existing
+            // report, reminder and TAT calculation keeps working unchanged.
+            $jdates = call_dates_parse(implode(',', (array)($b['inspection_dates'] ?? [])));
+            $b['inspection_dates'] = implode(',', $jdates);
+            if ($jdates) {
+                if (($b['scheduled_date'] ?? '') === '') $b['scheduled_date'] = $jdates[0];
+                if (($b['inspection_start_date'] ?? '') === '') $b['inspection_start_date'] = $jdates[0];
+                if (($b['inspection_end_date'] ?? '') === '' && count($jdates) > 1) $b['inspection_end_date'] = end($jdates);
+            }
             // validation: expected credit mandatory at allocation
             if (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0) {
                 view('ops/job_form', ['job'=>$job,'call'=>$call,'error'=>'Expected credit is mandatory at allocation.',

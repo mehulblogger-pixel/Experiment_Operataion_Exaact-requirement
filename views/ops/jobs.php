@@ -22,13 +22,32 @@
 </div>
 
 <form method="get" action="/jobs" class="filter-bar">
-  <input class="form-control" type="text" name="q" value="<?= e($q) ?>" placeholder="🔍 Search job code or client…">
+  <input class="form-control" type="text" name="q" value="<?= e($q) ?>" placeholder="🔍 Search <?= e(Tl('job')) ?> code or <?= e(Tl('client')) ?>…">
   <select class="form-control" name="status" onchange="this.form.submit()">
     <option value="">All statuses</option>
     <option value="open" <?= $filter==='open'?'selected':'' ?>>Open only</option>
     <option value="closed" <?= $filter==='closed'?'selected':'' ?>>Closed only</option>
   </select>
+  <select class="form-control searchable" name="inspector" onchange="this.form.submit()">
+    <option value="">Any <?= e(Tl('engineer')) ?></option>
+    <?php foreach (($inspectors ?? []) as $i): ?>
+      <option value="<?= (int)$i['id'] ?>" <?= ((int)($fInsp ?? 0)===(int)$i['id'])?'selected':'' ?>><?= e($i['name']) ?></option>
+    <?php endforeach; ?>
+  </select>
+  <select class="form-control searchable" name="office" onchange="this.form.submit()">
+    <option value="">Any <?= e(T('office')) ?></option>
+    <?php foreach (($offices ?? []) as $o): ?>
+      <option value="<?= (int)$o['id'] ?>" <?= ((int)($fOffice ?? 0)===(int)$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option>
+    <?php endforeach; ?>
+  </select>
+  <input class="form-control" type="month" name="month" value="<?= e($fMonth ?? '') ?>" title="Scheduled in this month" style="max-width:170px">
+  <input class="form-control" type="date" name="from" value="<?= e($fFrom ?? '') ?>" title="Scheduled from" style="max-width:160px">
+  <input class="form-control" type="date" name="to" value="<?= e($fTo ?? '') ?>" title="Scheduled to" style="max-width:160px">
+  <label class="chk" style="align-self:center;white-space:nowrap"><input type="checkbox" name="unallocated" value="1" <?= !empty($fUnalloc)?'checked':'' ?> onchange="this.form.submit()"> Nobody allocated</label>
   <button class="btn secondary" type="submit">Search</button>
+  <?php if ($q || $filter || !empty($fInsp) || !empty($fMonth) || !empty($fFrom) || !empty($fTo) || !empty($fOffice) || !empty($fUnalloc)): ?>
+    <a class="btn secondary" href="/jobs">Clear</a>
+  <?php endif; ?>
 </form>
 
 <div class="panel" style="padding:0;overflow:hidden">

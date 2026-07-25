@@ -8,6 +8,30 @@
   $curDays  = $job['report_custom_days'] ?? '';
   $curDeliv = $job && $job['deliverables'] !== '' ? explode(',', $job['deliverables']) : [];
   $curActRow = $curActId ? lk_value($curActId) : null;
+  // §b.i / §b.iii — everything already settled on the call flows through, so the
+  // coordinator allocates rather than re-types.
+  $curFolder   = $job ? ($job['folder_link'] ?? '')   : ($call['folder_link'] ?? '');
+  $curContract = $job ? ($job['contract_number'] ?? ''): ($call['contract_number'] ?? '');
+  $curQuoteId  = $job ? ($job['quotation_id'] ?? '')  : ($call['quotation_id'] ?? '');
+  // §b.vi — the call's visit dates become the deputation's, and more can be added.
+  $curDates = call_dates_parse($job ? ($job['inspection_dates'] ?? '') : ($call['inspection_dates'] ?? ''));
+  if (!$curDates && $job && !empty($job['scheduled_date'])) $curDates = [$job['scheduled_date']];
+  // Older jobs kept three loose "random" dates — fold them in so nothing is lost.
+  if ($job) $curDates = call_dates_parse(implode(',', array_merge($curDates,
+      array_filter([$job['random_date1'] ?? '', $job['random_date2'] ?? '', $job['random_date3'] ?? '']))));
+  $dateSlots = max(5, min(20, count($curDates) + 3));
+  // §b.iv — cross-office means the contracting office GIVES credit to the executor.
+  $mng  = $call['ibo_office_id'] ?? null; $exe = $call['executing_office_id'] ?? null;
+  $cross = $exe && (!$mng || (int)$mng !== (int)$exe);
+  $curDir = $job ? ($job['credit_direction'] ?? '') : ($cross ? 'GIVEN' : '');
+  $ex = credit_explainer($mng, $exe);
+  // §b.vii — our own employee, or somebody else's.
+  $curKind = '';
+  if ($job && !empty($job['subcon_id'])) $curKind = 'SUBCON';
+  elseif ($job && !empty($job['inspector_id'])) {
+      $ik = ops_val("SELECT staff_kind FROM inspectors WHERE id=?", [(int)$job['inspector_id']]);
+      $curKind = ($ik === 'FREELANCER') ? 'FREELANCER' : (($ik === 'SUBCON') ? 'SUBCON' : 'ASSET');
+  }
   function contact_block($info, $role) {
     if (!$info) { echo '<div class="muted">No ' . e($role) . ' selected on the call.</div>'; return; }
     $p = $info['p'];
@@ -23,8 +47,12 @@
     echo '</div>';
   }
 ?>
-<h1><?= $job ? 'Edit Job ' . e($job['job_code']) : 'Allocate Job' ?></h1>
-<p class="sub">From call <strong><?= e($call['call_code']) ?></strong>. Expected credit is mandatory. The inspector gets an assignment email once a schedule date is set.</p>
+<div class="crumbs"><a href="/">Home</a> › <a href="/calls"><?= e(T_REG('call')) ?></a> › <a href="/call?id=<?= (int)$call['id'] ?>"><?= e($call['call_code']) ?></a> › <?= $job ? e($job['job_code']) : 'Allocate' ?></div>
+<div class="master-head">
+  <div><h1><?= $job ? 'Edit ' . e(Tl('job')) . ' ' . e($job['job_code']) : 'Allocate ' . e(Tl('call')) . ' ' . e($call['call_code']) ?></h1>
+    <p class="sub" style="margin:2px 0 0">Everything agreed on the <?= e(Tl('call')) ?> is already filled in below. Pick who does it and when — the <?= e(Tl('engineer')) ?> is e-mailed once a date is set.</p></div>
+  <a class="btn secondary" href="/call?id=<?= (int)$call['id'] ?>">← Back</a>
+</div>
 <?php if (!empty($error)): ?><div class="msg msg-error"><?= e($error) ?></div><?php endif; ?>
 
 <div class="panel info-panel">
@@ -35,6 +63,17 @@
   </div>
 </div>
 
+<?php if ($curFolder || $curContract || $curQuoteId): ?>
+<div class="panel" style="background:var(--soft)">
+  <b>From the <?= e(Tl('call')) ?></b>
+  <div style="margin-top:6px;display:flex;gap:18px;flex-wrap:wrap">
+    <?php if ($curContract): ?><span>Contract <b><?= e($curContract) ?></b></span><?php endif; ?>
+    <?php if ($curFolder): ?><span>📁 <a href="<?= e($curFolder) ?>" target="_blank" rel="noopener">Shared folder</a></span><?php endif; ?>
+    <?php if (!empty($call['inspection_dates'])): ?><span><?= count(call_dates_parse($call['inspection_dates'])) ?> date(s) requested by the <?= e(Tl('client')) ?></span><?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <form method="post" action="<?= $job ? '/job-edit?id=' . (int)$job['id'] : '/job-new?call=' . (int)$call['id'] ?>" class="panel">
   <div class="form-grid">
     <div class="ff"><label>Executing office</label>
@@ -44,11 +83,11 @@
       </select></div>
     <div class="ff"><label>Stage</label>
       <select class="form-control" name="stage"><?php foreach (lk_options_or('job_stage', JOB_STAGES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($job['stage'] ?? 'ALLOCATED')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Job type</label>
+    <div class="ff"><label>How it is worked</label>
       <select class="form-control" name="job_type"><?php foreach (lk_options_or('job_type', JOB_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($job['job_type'] ?? 'INSPECTION')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
-      <small class="muted">For deputation at site, set the start and completion dates over the deputation period.</small></div>
-    <div class="ff"><label>Type of inspection</label>
-      <select class="form-control searchable" name="inspection_type"><option value="">—</option>
+      <small class="muted">A resident posting runs over a period; set the start and completion dates.</small></div>
+    <div class="ff"><label>Type of inspection <span class="muted">(from the <?= e(Tl('call')) ?>, narrowed to the <?= e(Tl('client')) ?>'s types)</span></label>
+      <select class="form-control searchable" id="insp_sel" name="inspection_type"><option value="">—</option>
         <?php foreach (lk_options_or('inspection_type', INSPECTION_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= $curInsp===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"><label>SBU <span class="muted">(from call)</span></label>
@@ -58,11 +97,22 @@
         <?php if ($curActRow) echo '<option value="'.(int)$curActRow['id'].'" selected>'.e($curActRow['label']).'</option>'; ?>
       </select></div>
 
-    <div class="ff"><label>Inspector</label>
-      <select class="form-control searchable" name="inspector_id"><option value="">—</option>
-        <?php foreach ($inspectors as $i): ?><option value="<?= (int)$i['id'] ?>" <?= ($job && $job['inspector_id']==$i['id'])?'selected':'' ?>><?= e($i['name']) ?><?= $i['emp_code']?' ('.e($i['emp_code']).')':'' ?></option><?php endforeach; ?>
+    <div class="ff"><label>Who does it</label>
+      <select class="form-control" id="kind_sel" name="staff_kind_pick">
+        <option value="ASSET"      <?= $curKind==='ASSET'?'selected':'' ?>>Our own employee</option>
+        <option value="NONASSET"   <?= in_array($curKind,['FREELANCER','SUBCON'],true)?'selected':'' ?>>Not our employee</option>
       </select></div>
-    <div class="ff"><label>Sub-contractor (if used)</label>
+    <div class="ff" id="nonasset_ff" style="<?= in_array($curKind,['FREELANCER','SUBCON'],true)?'':'display:none' ?>"><label>…which kind</label>
+      <select class="form-control" id="nonkind_sel" name="non_asset_kind">
+        <option value="FREELANCER" <?= $curKind==='FREELANCER'?'selected':'' ?>>Freelancer</option>
+        <option value="SUBCON"     <?= $curKind==='SUBCON'?'selected':'' ?>>Sub-contractor</option>
+      </select></div>
+    <div class="ff"><label><?= e(T('engineer')) ?></label>
+      <select class="form-control searchable" id="insp_pick" name="inspector_id"><option value="">—</option>
+        <?php foreach ($inspectors as $i): ?><option value="<?= (int)$i['id'] ?>" data-kind="<?= e($i['staff_kind'] ?? 'ASSET') ?>" <?= ($job && $job['inspector_id']==$i['id'])?'selected':'' ?>><?= e($i['name']) ?><?= $i['emp_code']?' ('.e($i['emp_code']).')':'' ?></option><?php endforeach; ?>
+      </select>
+      <small class="muted" id="insp_hint"></small></div>
+    <div class="ff" id="subcon_ff" style="<?= $curKind==='SUBCON'?'':'display:none' ?>"><label>Sub-contracting agency</label>
       <select class="form-control searchable" name="subcon_id"><option value="">—</option>
         <?php foreach ($subcons as $s): ?><option value="<?= (int)$s['id'] ?>" <?= ($job && $job['subcon_id']==$s['id'])?'selected':'' ?>><?= e($s['agency']) ?><?= $s['inspector_name']?' — '.e($s['inspector_name']):'' ?></option><?php endforeach; ?>
       </select></div>
@@ -73,32 +123,43 @@
       </select>
       <?php if (!$boss): ?><small class="muted">No BOSS numbers for this client yet — add under <a href="/m/boss/new">BOSS numbers</a>.</small><?php endif; ?></div>
 
-    <div class="ff"><label>Against <?= e(Tl('quote')) ?> / contract <span class="muted">(CRM)</span></label>
+    <div class="ff"><label><?= e(T('quote')) ?> <span class="muted">— from the <?= e(Tl('call')) ?></span></label>
       <select class="form-control searchable" name="quotation_id"><option value="">— none —</option>
-        <?php foreach (($quotes ?? []) as $qq): ?><option value="<?= (int)$qq['id'] ?>" <?= ($job && $job['quotation_id']==$qq['id'])?'selected':'' ?>><?= e($qq['quote_no']) ?><?= (int)$qq['rev']>0?' R'.$qq['rev']:'' ?><?= $qq['contract_number']?' · '.e($qq['contract_number']):'' ?> · <?= e(cur_sym()) ?><?= number_format((float)$qq['total_amount'],0) ?></option><?php endforeach; ?>
+        <?php foreach (($quotes ?? []) as $qq): ?><option value="<?= (int)$qq['id'] ?>" <?= ((string)$curQuoteId===(string)$qq['id'])?'selected':'' ?>><?= e($qq['quote_no']) ?><?= (int)$qq['rev']>0?' R'.$qq['rev']:'' ?><?= $qq['contract_number']?' · '.e($qq['contract_number']):'' ?> · <?= e(cur_sym()) ?><?= number_format((float)$qq['total_amount'],0) ?></option><?php endforeach; ?>
       </select>
       <small class="muted">Links this job to the order — advance / payment-hold rules and deliverables carry over, and revenue is tracked against the quote.</small></div>
 
     <div class="ff"><label>Scheduled date</label><input class="form-control" type="date" name="scheduled_date" value="<?= e($job['scheduled_date'] ?? '') ?>"></div>
     <div class="ff"><label>Inspection start</label><input class="form-control" type="date" name="inspection_start_date" value="<?= e($job['inspection_start_date'] ?? '') ?>"></div>
     <div class="ff"><label>Inspection end</label><input class="form-control" type="date" name="inspection_end_date" value="<?= e($job['inspection_end_date'] ?? '') ?>"></div>
-    <div class="ff"><label>Random date 1</label><input class="form-control" type="date" name="random_date1" value="<?= e($job['random_date1'] ?? '') ?>"></div>
-    <div class="ff"><label>Random date 2</label><input class="form-control" type="date" name="random_date2" value="<?= e($job['random_date2'] ?? '') ?>"></div>
-    <div class="ff"><label>Random date 3</label><input class="form-control" type="date" name="random_date3" value="<?= e($job['random_date3'] ?? '') ?>"></div>
     <div class="ff"><label>Man-days (0 = auto from dates)</label><input class="form-control" type="number" step="0.5" name="mandays" value="<?= e($job['mandays'] ?? '0') ?>"></div>
+
+    <div class="ff ff-wide">
+      <label>Inspection dates <span class="muted">— every day the <?= e(Tl('engineer')) ?> attends; up to 20</span></label>
+      <div class="form-grid" id="jdates" style="margin-top:4px">
+        <?php for ($i = 0; $i < $dateSlots; $i++): ?>
+          <div class="ff" style="margin:0"><input class="form-control" type="date" name="inspection_dates[]" value="<?= e($curDates[$i] ?? '') ?>"></div>
+        <?php endfor; ?>
+      </div>
+      <div style="margin-top:6px"><button type="button" class="btn small secondary" id="adddate">+ Add another date</button>
+        <span class="muted" style="margin-left:8px"><?= count($curDates) ?> set. Carried from the <?= e(Tl('call')) ?>; edit freely.</span></div>
+    </div>
 
     <div class="ff"><label>Expected credit (<?= e(cur_sym()) ?>) *</label><input class="form-control" type="number" step="0.01" name="expected_credit" value="<?= e($job['expected_credit'] ?? $call['expected_credit'] ?? '') ?>" required></div>
     <div class="ff"><label>Credit type</label>
       <select class="form-control searchable" name="credit_type"><?php foreach (lk_options_or('credit_type', CREDIT_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($job['credit_type'] ?? $call['credit_type'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Credit direction</label>
-      <select class="form-control searchable" name="credit_direction"><?php foreach (lk_options_or('credit_direction', CREDIT_DIRECTIONS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($job && $job['credit_direction']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+      <select class="form-control searchable" name="credit_direction"><?php foreach (lk_options_or('credit_direction', CREDIT_DIRECTIONS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($curDir===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
+      <small class="muted"><?= e($ex['text']) ?></small></div>
 
     <div class="ff"><label>Reporting frequency</label>
       <select class="form-control" id="freq_sel" name="reporting_frequency"><?php foreach (lk_options_or('reporting_frequency', REPORT_FREQ) as $k=>$v): ?><option value="<?= e($k) ?>" <?= $curFreq===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff" id="custom_days_wrap" style="<?= $curFreq==='CUSTOM'?'':'display:none' ?>"><label>…every how many days?</label>
       <input class="form-control" type="number" min="1" name="report_custom_days" value="<?= e($curDays) ?>" placeholder="e.g. 3"></div>
 
-    <div class="ff ff-wide"><label>Report folder link (SharePoint / Drive)</label><input class="form-control" name="folder_link" value="<?= e($job['folder_link'] ?? '') ?>" placeholder="Paste the folder URL"></div>
+    <div class="ff ff-wide"><label>Shared folder / drive link <span class="muted">— carried from the <?= e(Tl('call')) ?></span></label>
+      <input class="form-control" type="url" name="folder_link" value="<?= e($curFolder) ?>" placeholder="https://…">
+      <input type="hidden" name="contract_number" value="<?= e($curContract) ?>"></div>
 
     <div class="ff ff-wide"><label>Deliverables / reports required after completion</label>
       <div class="checkgrid">
@@ -106,7 +167,7 @@
           <label class="chk"><input type="checkbox" name="deliverables[]" value="<?= e($k) ?>" <?= in_array($k, $curDeliv, true)?'checked':'' ?>> <?= e($v) ?></label>
         <?php endforeach; ?>
       </div>
-      <small class="muted">Tick all report formats the client needs. Manage the list under <a href="/lookup?key=deliverable">Deliverables</a>.</small></div>
+      <small class="muted">Each format ticked here is handed to the <?= e(Tl('engineer')) ?> as a report to produce — they appear on the <?= e(Tl('report')) ?> screen ready to fill, using the <?= e(Tl('client')) ?>'s own format where one is on file. The list is the <a href="/report-types"><?= e(Tl('report')) ?> types</a> register.</small></div>
 
     <?php render_custom_fields('job', $cfvals ?? []); ?>
   </div>
@@ -115,4 +176,35 @@
     <a class="btn secondary" href="/call?id=<?= (int)$call['id'] ?>">Cancel</a>
   </div>
 </form>
-<script>window.ACTIVITY = <?= json_encode($act) ?>;</script>
+<script>
+window.ACTIVITY = <?= json_encode($act) ?>;
+(function(){
+  // §b.vi — up to 20 visit dates.
+  var box=document.getElementById('jdates'), add=document.getElementById('adddate');
+  if (box && add) add.addEventListener('click', function(){
+    if (box.querySelectorAll('input[type=date]').length >= 20) { add.disabled = true; return; }
+    var d=document.createElement('div'); d.className='ff'; d.style.margin='0';
+    d.innerHTML='<input class="form-control" type="date" name="inspection_dates[]">';
+    box.appendChild(d);
+  });
+  // §b.vii — our own employee, or a freelancer / sub-contractor.
+  var kind=document.getElementById('kind_sel'), non=document.getElementById('nonkind_sel'),
+      nonFF=document.getElementById('nonasset_ff'), subFF=document.getElementById('subcon_ff'),
+      pick=document.getElementById('insp_pick'), hint=document.getElementById('insp_hint');
+  function wanted(){ return kind.value === 'ASSET' ? 'ASSET' : non.value; }
+  function syncKind(){
+    nonFF.style.display = kind.value === 'ASSET' ? 'none' : '';
+    subFF.style.display = (kind.value !== 'ASSET' && non.value === 'SUBCON') ? '' : 'none';
+    var want = wanted(), shown = 0;
+    Array.prototype.forEach.call(pick.options, function(o){
+      if (!o.value) return;
+      var ok = (o.dataset.kind || 'ASSET') === want;
+      o.hidden = !ok; o.disabled = !ok;
+      if (ok) shown++;
+    });
+    if (pick.selectedIndex > 0 && pick.options[pick.selectedIndex].disabled) pick.value = '';
+    hint.textContent = shown + ' ' + (want === 'ASSET' ? 'own employee' : (want === 'SUBCON' ? 'sub-contract' : 'freelance')) + ' engineer(s) on file.';
+  }
+  if (kind && non && pick) { kind.addEventListener('change', syncKind); non.addEventListener('change', syncKind); syncKind(); }
+})();
+</script>
