@@ -91,12 +91,24 @@
     <div class="oc-tools">
       <button type="button" class="btn small secondary" id="oc-expand">Expand all</button>
       <button type="button" class="btn small secondary" id="oc-collapse">Collapse all</button>
-      <span class="muted" style="margin-left:6px">Click − on a card to fold that branch. Drag sideways to pan.</span>
+      <span class="oc-sep"></span>
+      <button type="button" class="btn small secondary" id="oc-zout" title="Zoom out">−</button>
+      <span class="oc-zval" id="oc-zval">100%</span>
+      <button type="button" class="btn small secondary" id="oc-zin" title="Zoom in">+</button>
+      <button type="button" class="btn small" id="oc-fit" title="Scale the chart to fit the window">Fit to screen</button>
+      <button type="button" class="btn small secondary" id="oc-100" title="Back to full size">100%</button>
+      <span class="oc-sep"></span>
+      <label class="chk" style="white-space:nowrap"><input type="checkbox" id="oc-compact"> Compact</label>
+      <span class="muted oc-hint">Click − on a card to fold a branch. Drag to pan.</span>
     </div>
     <div class="oc-scroll">
-      <ul class="oc-chart">
-        <?php foreach ($tree as $root) org_node_html($root, $all, $canEdit); ?>
-      </ul>
+      <div class="oc-sizer">
+        <div class="oc-stage">
+          <ul class="oc-chart">
+            <?php foreach ($tree as $root) org_node_html($root, $all, $canEdit); ?>
+          </ul>
+        </div>
+      </div>
     </div>
   </div>
 <?php endif; ?>
@@ -108,10 +120,24 @@
      a chart with lines instead of an indented outline. */
   .oc-wrap{padding:12px}
   .oc-tools{display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
-  .oc-scroll{overflow-x:auto;overflow-y:hidden;padding:10px 4px 18px}
+  .oc-sep{width:1px;height:20px;background:var(--line);margin:0 4px}
+  .oc-zval{font-size:12px;color:var(--muted);min-width:42px;text-align:center;font-variant-numeric:tabular-nums}
+  .oc-hint{margin-left:6px}
+  @media (max-width:900px){ .oc-hint{display:none} }
+  /* The stage is scaled with a transform; the sizer is given the resulting
+     pixel size so the scrollbars stay honest (a transform does not change
+     layout size on its own). */
+  /* Bounded height: the chart scrolls inside the panel instead of pushing the
+     page down, which is what lets "fit" mean one screen. */
+  .oc-scroll{overflow:auto;padding:10px 4px 18px;max-height:calc(100vh - 250px);min-height:280px}
+  /* The scaled stage still occupies its UNSCALED width in layout, which would
+     leave a phantom overflow to the right. The sizer is the true painted box,
+     so clipping to it removes that without hiding anything visible. */
+  .oc-sizer{margin:0 auto;overflow:hidden}
+  .oc-stage{transform-origin:0 0;display:inline-block}
   .oc-chart, .oc-chart ul{display:flex;justify-content:center;list-style:none;margin:0;padding:0}
   .oc-chart ul{padding-top:26px;position:relative}
-  .oc-chart li{position:relative;padding:26px 10px 0;text-align:center;list-style:none}
+  .oc-chart li{position:relative;padding:26px 6px 0;text-align:center;list-style:none}
 
   /* the two half-width lines that join siblings together */
   .oc-chart li::before, .oc-chart li::after{
@@ -133,7 +159,7 @@
   .oc-chart > li::before,.oc-chart > li::after{display:none}
 
   .oc-node{position:relative;display:inline-block}
-  .oc-card{display:inline-flex;flex-direction:column;gap:3px;text-align:left;min-width:190px;max-width:230px;
+  .oc-card{display:inline-flex;flex-direction:column;gap:3px;text-align:left;min-width:170px;max-width:200px;
     background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;
     box-shadow:0 1px 2px rgba(0,0,0,.05)}
   .oc-card.oc-top{border-color:var(--brand);box-shadow:0 0 0 2px color-mix(in srgb,var(--brand) 18%,transparent)}
@@ -158,16 +184,142 @@
   /* a folded branch hides its children and flips the button to + */
   li.oc-folded > ul{display:none}
 
+  /* Compact drops the e-mail line and tightens everything, which is what makes
+     a wide org readable without zooming out so far that names blur. */
+  .oc-compact .oc-card{min-width:132px;max-width:150px;padding:7px 9px;border-radius:9px}
+  .oc-compact .oc-mail{display:none}
+  .oc-compact .oc-av{width:24px;height:24px;flex-basis:24px;font-size:11px}
+  .oc-compact .oc-id b{font-size:12.5px}
+  .oc-compact .oc-role{font-size:10.5px}
+  .oc-compact .oc-chart li{padding-left:3px;padding-right:3px}
+  .oc-compact .oc-act select{max-width:86px}
+  /* Shorter drops between levels — on a deep chain this is most of the height. */
+  .oc-compact .oc-chart ul{padding-top:16px}
+  .oc-compact .oc-chart li{padding-top:16px}
+  .oc-compact .oc-chart li::before,.oc-compact .oc-chart li::after{height:16px}
+  .oc-compact .oc-chart ul::before{height:16px}
+  .oc-compact .oc-chart > li{padding-top:0}
+
   @media print{
     .master-head .btn,.side,.nav-toggle,.oc-tools,.oc-act,.oc-toggle,.crumbs{display:none!important}
     .oc-scroll{overflow:visible}
+    .oc-sizer{width:auto!important;height:auto!important}
+    .oc-stage{transform:none!important}
     .oc-card{box-shadow:none}
   }
 </style>
 <script>
 (function(){
-  var chart = document.querySelector('.oc-chart');
+  var chart  = document.querySelector('.oc-chart');
   if (!chart) return;
+  var scroll = document.querySelector('.oc-scroll');
+  var sizer  = document.querySelector('.oc-sizer');
+  var stage  = document.querySelector('.oc-stage');
+  var wrap   = document.querySelector('.oc-wrap');
+  var zval   = document.getElementById('oc-zval');
+  var MIN = 0.35, MAX = 1.4;
+  var zoom = 1, userSet = false;
+
+  // ---- zoom -------------------------------------------------------------
+  // A transform does not change layout size, so the sizer is given the scaled
+  // pixel dimensions; otherwise the scrollbars would describe the unscaled
+  // chart and the panel would keep its full-size height.
+  function measure(){
+    var prev = stage.style.transform;
+    stage.style.transform = 'none';
+    var w = chart.scrollWidth, h = chart.scrollHeight;
+    stage.style.transform = prev;
+    return {w: w, h: h};
+  }
+  function applyZoom(k, keepCentre){
+    k = Math.min(MAX, Math.max(MIN, k));
+    var before = scroll.scrollLeft + scroll.clientWidth / 2;
+    var ratio  = zoom ? (k / zoom) : 1;
+    zoom = k;
+    var m = measure();
+    stage.style.transform = 'scale(' + k + ')';
+    sizer.style.width  = Math.ceil(m.w * k) + 'px';
+    sizer.style.height = Math.ceil(m.h * k) + 'px';
+    zval.textContent = Math.round(k * 100) + '%';
+    if (keepCentre) scroll.scrollLeft = before * ratio - scroll.clientWidth / 2;
+    else centre();
+  }
+  function centre(){
+    // when the chart is narrower than the window the sizer is centred by its
+    // auto margins; when it is wider, start the view in the middle
+    if (sizer.offsetWidth > scroll.clientWidth)
+      scroll.scrollLeft = (sizer.offsetWidth - scroll.clientWidth) / 2;
+  }
+  // Depth of a node, so the deepest level can be folded first.
+  function depthOf(li){ var d = 0, n = li.parentNode; while (n && n !== chart) { if (n.tagName === 'UL') d++; n = n.parentNode; } return d; }
+  function maxDepth(){
+    var d = 0;
+    chart.querySelectorAll('li').forEach(function(li){ if (!li.closest('.oc-folded') || li.classList.contains('oc-folded')) d = Math.max(d, depthOf(li)); });
+    return d;
+  }
+  function needed(){
+    var m = measure();
+    var cs = getComputedStyle(scroll);
+    // clientWidth/Height include the container's own padding, so take it off or
+    // the fit is a few pixels too generous and still scrolls
+    var aw = scroll.clientWidth  - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2;
+    var ah = scroll.clientHeight - parseFloat(cs.paddingTop)  - parseFloat(cs.paddingBottom) - 2;
+    if (aw <= 0 || ah <= 0) return 1;
+    // fit BOTH dimensions — fitting only the width left a deep chart running
+    // off the bottom of the window
+    return Math.min(1, aw / m.w, ah / m.h);
+  }
+  function fit(){
+    var k = needed();
+    // Shrinking past MIN makes the names unreadable, which is not "fitting".
+    // Fold the deepest level instead and try again — a big org then fits by
+    // showing fewer levels rather than by becoming a blur.
+    var guard = 0;
+    while (k < MIN && guard++ < 12) {
+      var d = maxDepth();
+      if (d < 1) break;
+      var folded = false;
+      chart.querySelectorAll('li').forEach(function(li){
+        if (depthOf(li) === d - 1 && li.querySelector('ul') && !li.classList.contains('oc-folded')) {
+          setFolded(li, true); folded = true;
+        }
+      });
+      if (!folded) break;
+      k = needed();
+    }
+    applyZoom(k);
+  }
+  // Fit on load and whenever the shape changes, unless the user has chosen a
+  // zoom of their own — then leave their choice alone.
+  function autoFit(){ if (!userSet) fit(); else applyZoom(zoom, true); }
+
+  document.getElementById('oc-fit').addEventListener('click', function(){ userSet = false; fit(); });
+  document.getElementById('oc-100').addEventListener('click', function(){ userSet = true; applyZoom(1); });
+  document.getElementById('oc-zin').addEventListener('click', function(){ userSet = true; applyZoom(zoom + 0.1, true); });
+  document.getElementById('oc-zout').addEventListener('click', function(){ userSet = true; applyZoom(zoom - 0.1, true); });
+  // Ctrl/⌘ + wheel zooms, as it does in every other diagram tool.
+  scroll.addEventListener('wheel', function(e){
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault(); userSet = true;
+    applyZoom(zoom + (e.deltaY < 0 ? 0.08 : -0.08), true);
+  }, {passive:false});
+
+  // ---- density ----------------------------------------------------------
+  var compact = document.getElementById('oc-compact');
+  function setCompact(on){
+    wrap.classList.toggle('oc-compact', on);
+    try { localStorage.setItem('ocCompact', on ? '1' : '0'); } catch (err) {}
+    autoFit();
+  }
+  compact.addEventListener('change', function(){ setCompact(this.checked); });
+  try {
+    // Default to compact for a big org — it is what makes it fit and stay legible.
+    var saved = localStorage.getItem('ocCompact');
+    var want = saved === null ? (chart.querySelectorAll('.oc-card').length > 8) : (saved === '1');
+    compact.checked = want; wrap.classList.toggle('oc-compact', want);
+  } catch (err) {}
+
+  // ---- fold / unfold ----------------------------------------------------
   function setFolded(li, folded){
     li.classList.toggle('oc-folded', folded);
     var node = li.firstElementChild;
@@ -179,30 +331,36 @@
     if (!btn) return;
     var li = btn.closest('li');
     setFolded(li, !li.classList.contains('oc-folded'));
+    autoFit();                      // folding changes the width, so refit
   });
   var ex = document.getElementById('oc-expand'), co = document.getElementById('oc-collapse');
   if (ex) ex.addEventListener('click', function(){
     chart.querySelectorAll('li').forEach(function(li){ setFolded(li, false); });
+    autoFit();
   });
-  // Collapse everything that has children — the readable default for a big org.
   if (co) co.addEventListener('click', function(){
-    chart.querySelectorAll('li').forEach(function(li){
-      if (li.querySelector('ul')) setFolded(li, true);
-    });
+    chart.querySelectorAll('li').forEach(function(li){ if (li.querySelector('ul')) setFolded(li, true); });
+    autoFit();
   });
-  // Drag to pan, so a wide chart can be moved without hunting for the scrollbar.
-  var sc = document.querySelector('.oc-scroll'), down = false, x0 = 0, l0 = 0;
-  if (sc) {
-    sc.addEventListener('mousedown', function(e){
-      if (e.target.closest && e.target.closest('.oc-card')) return;   // let card clicks work
-      down = true; x0 = e.pageX; l0 = sc.scrollLeft; sc.style.cursor = 'grabbing';
-    });
-    ['mouseup','mouseleave'].forEach(function(ev){
-      sc.addEventListener(ev, function(){ down = false; sc.style.cursor = ''; });
-    });
-    sc.addEventListener('mousemove', function(e){
-      if (!down) return; e.preventDefault(); sc.scrollLeft = l0 - (e.pageX - x0);
-    });
-  }
+
+  // ---- drag to pan ------------------------------------------------------
+  var down = false, x0 = 0, y0 = 0, l0 = 0, t0 = 0;
+  scroll.addEventListener('mousedown', function(e){
+    if (e.target.closest && e.target.closest('.oc-card')) return;   // let card clicks work
+    down = true; x0 = e.pageX; y0 = e.pageY; l0 = scroll.scrollLeft; t0 = scroll.scrollTop;
+    scroll.style.cursor = 'grabbing';
+  });
+  ['mouseup','mouseleave'].forEach(function(ev){
+    scroll.addEventListener(ev, function(){ down = false; scroll.style.cursor = ''; });
+  });
+  scroll.addEventListener('mousemove', function(e){
+    if (!down) return; e.preventDefault();
+    scroll.scrollLeft = l0 - (e.pageX - x0);
+    scroll.scrollTop  = t0 - (e.pageY - y0);
+  });
+
+  // ---- go ---------------------------------------------------------------
+  fit();
+  window.addEventListener('resize', autoFit);
 })();
 </script>
