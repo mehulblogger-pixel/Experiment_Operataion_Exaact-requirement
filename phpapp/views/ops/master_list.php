@@ -1,7 +1,12 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › <?= e($cfg['label']) ?></div>
 <div class="master-head">
   <div><h1><?= e($cfg['label']) ?></h1><p class="sub"><?= count($rows) ?> record(s)</p></div>
-  <a class="btn" href="/m/<?= e($key) ?>/new">+ Add</a>
+  <div style="display:flex;gap:6px">
+    <?php // Offices are also editable as a nested structure — same table, same
+          // rows, arranged as a tree with heads and head-counts. ?>
+    <?php if ($key === 'offices'): ?><a class="btn secondary" href="/hierarchy?tab=offices">Edit as a structure</a><?php endif; ?>
+    <a class="btn" href="/m/<?= e($key) ?>/new">+ Add</a>
+  </div>
 </div>
 <form method="get" action="/m/<?= e($key) ?>" class="filter-bar">
   <input class="form-control" type="text" name="q" value="<?= e($q) ?>" placeholder="Search…">

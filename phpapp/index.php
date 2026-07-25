@@ -39,6 +39,7 @@ try {
     require __DIR__ . '/lib/pdf.php';
     require __DIR__ . '/lib/ai.php';
     require __DIR__ . '/lib/workforce.php';
+    require __DIR__ . '/lib/orgadmin.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
@@ -105,6 +106,8 @@ try {
     db()->query("SELECT id FROM endorsements LIMIT 1");
     db()->query("SELECT id FROM tech_phrases LIMIT 1");
     db()->query("SELECT id FROM learned_suggestions LIMIT 1");
+    // Organisation structure: offices nested under offices, with a head.
+    db()->query("SELECT parent_office_id FROM offices LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which
     // runs the same idempotent boot() and clears it. Each check is self-cancelling.

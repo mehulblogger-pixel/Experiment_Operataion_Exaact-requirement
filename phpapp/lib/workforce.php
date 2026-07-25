@@ -584,47 +584,10 @@ function org_count_below(&$node) {
     return $total;
 }
 
-function ops_hierarchy($method) {
-    ops_require(is_master() || can('org.hierarchy.view') || can('users.manage.global') || can('users.manage.branch') || can('settings.manage'), 'You cannot view the organisation hierarchy.');
-    $canEdit = is_master() || can('users.manage.global');
-    if ($method === 'POST') {
-        ops_require($canEdit, 'You cannot change reporting lines.');
-        if (($_POST['do'] ?? '') === 'auto') {
-            $n = count(org_auto_arrange(true, true));
-            flash($n ? ($n . ' person(s) placed under a reporting manager. Correct any of them from Users.')
-                     : 'Nothing to place — everyone already reports to somebody, or there is nobody above them.');
-        } elseif (($_POST['do'] ?? '') === 'set') {
-            $uid = (int)($_POST['user_id'] ?? 0); $mid = (int)($_POST['manager_id'] ?? 0);
-            if ($uid && $uid !== $mid) {
-                if ($mid) {
-                    $m = ops_one("SELECT first_name, last_name, username, role FROM users WHERE id=?", [$mid]);
-                    $mn = $m ? (trim(($m['first_name'] ?? '') . ' ' . ($m['last_name'] ?? '')) ?: $m['username']) : '';
-                    db()->prepare("UPDATE users SET reports_to_id=?, reports_to_name=?, reports_to_position=? WHERE id=?")
-                        ->execute([$mid, $mn, $m ? (ORG_ROLES[$m['role']] ?? $m['role']) : '', $uid]);
-                } else {
-                    db()->prepare("UPDATE users SET reports_to_id=NULL, reports_to_name='', reports_to_position='' WHERE id=?")->execute([$uid]);
-                }
-                flash('Reporting line updated.');
-            }
-        }
-        redirect('/hierarchy');
-    }
-    $tree = org_hierarchy_tree();
-    foreach ($tree as &$root) org_count_below($root);
-    unset($root);
-    // Everyone, for the inline "reports to" picker.
-    $all = ops_all("SELECT id, first_name, last_name, username, role FROM users WHERE is_active=1 ORDER BY first_name, username");
-    view('ops/hierarchy', [
-        'tree' => $tree, 'canEdit' => $canEdit,
-        'all' => $all,
-        // When nobody is placed, every person is a root and the chart is a flat
-        // row — say so, and offer the fix, rather than showing a wall of boxes.
-        'unplaced' => count($tree),
-        'totalPeople' => (int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1"),
-        'proposals' => $canEdit ? org_auto_arrange(false, true) : [],
-    ]);
-    return true;
-}
+// The organisation screen itself now lives in lib/orgadmin.php as
+// ops_hierarchy_screen(): the chart, the office tree, the bulk people editor
+// and the spreadsheet round-trip are tabs over one set of data, so what you
+// look at is what you edit. The tree/ladder helpers above are shared by both.
 
 // -------------------------------------------------------------------------
 //  Inspection report approval — routes a closed job's report to the

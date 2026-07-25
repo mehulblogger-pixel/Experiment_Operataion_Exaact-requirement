@@ -1,7 +1,11 @@
 <div class="master-head">
   <div><h1><?= e(T_REG('user')) ?></h1>
     <p class="sub"><?= (int)$active ?> active user(s)<?= $seats!=='' ? ' · seat limit ' . e($seats) : '' ?></p></div>
-  <a class="btn" href="/user-new">+ Add user</a>
+  <div style="display:flex;gap:6px">
+    <a class="btn secondary" href="/hierarchy?tab=import" title="Download the register, edit it in Excel, upload it back">Add / update in bulk (Excel)</a>
+    <a class="btn secondary" href="/hierarchy?tab=people">Roles &amp; reporting grid</a>
+    <a class="btn" href="/user-new">+ Add user</a>
+  </div>
 </div>
 <?php if ($seats!=='' && $active >= (int)$seats): ?>
   <div class="msg msg-error">You have reached your licensed seat limit (<?= e($seats) ?>). Deactivate a user before adding a new one.</div>
