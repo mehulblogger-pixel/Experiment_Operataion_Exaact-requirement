@@ -314,13 +314,26 @@
     var byId = function (id) { return document.getElementById(id); };
     function show(sel) { Array.prototype.forEach.call(document.querySelectorAll(sel), function (n) { n.style.display = 'block'; }); }
     function hideAll() { Array.prototype.forEach.call(document.querySelectorAll('.qa-field'), function (n) { n.style.display = 'none'; }); }
+    // §b — the details a client or site cannot be worked against without. A site
+    // is not invoiced and is rarely e-mailed, so it is asked for less.
+    var CV_FIELDS = ['qa_gstin', 'qa_pan', 'qa_line1', 'qa_qcity', 'qa_state', 'qa_pname', 'qa_pmob', 'qa_pmail'];
     function open(k) {
       kind = k; hideAll(); byId('qa_err').style.display = 'none';
-      byId('qa_name').value = ''; byId('qa_gstin').value = '';
+      byId('qa_name').value = '';
+      CV_FIELDS.forEach(function (id) { if (byId(id)) byId(id).value = ''; });
       var titles = { client: 'Add Client', vendor: 'Add Vendor', office: 'Add Executing office', product: 'Add Product category', activity: 'Add Activity code', agency: 'Add Agency (sub-con / HR)' };
       byId('qa_title').textContent = titles[k] || 'Add';
       targetId = { client: 'client_sel', vendor: 'vendor_sel', office: 'exec_sel', product: 'product_sel', activity: 'activity_sel', agency: 'agency_sel' }[k];
-      if (k === 'client' || k === 'vendor') { show('.qa-cv'); if (byId('qa_both')) byId('qa_both').checked = false; }
+      if (k === 'client' || k === 'vendor') {
+        show('.qa-cv'); if (byId('qa_both')) byId('qa_both').checked = false;
+        var isClient = (k === 'client');
+        ['qa_req_addr', 'qa_req_city', 'qa_req_mail'].forEach(function (id) {
+          if (byId(id)) byId(id).style.display = (id === 'qa_req_mail' && !isClient) ? 'none' : '';
+        });
+        if (byId('qa_cv_note')) byId('qa_cv_note').textContent = isClient
+          ? 'A client is invoiced and visited, so the tax identity, an address and somebody to ring are required now — not later.'
+          : 'The engineer travels to this site and reports to this person, so an address and a contact are required now.';
+      }
       if (k === 'office') show('.qa-office');
       if (k === 'activity') show('.qa-activity');
       back.style.display = 'flex'; byId('qa_name').focus();
@@ -337,7 +350,21 @@
       var k = kind;
       var body = new URLSearchParams(); body.append('name', name);
       if (k === 'client' || k === 'vendor') {
-        body.append('gstin', byId('qa_gstin').value);
+        var val = function (id) { return byId(id) ? byId(id).value.trim() : ''; };
+        var isClient = (k === 'client') || (byId('qa_both') && byId('qa_both').checked);
+        var need = [];
+        if (isClient && !val('qa_gstin') && !val('qa_pan')) need.push('a GSTIN or a PAN');
+        if (!val('qa_line1') && !val('qa_qcity')) need.push('an address');
+        if (!val('qa_pname')) need.push('a contact person');
+        if (!val('qa_pmob')) need.push('a mobile number');
+        if (isClient && !val('qa_pmail')) need.push('an e-mail address');
+        if (need.length) {
+          byId('qa_err').textContent = 'Enter ' + (need.length === 1 ? need[0]
+            : need.slice(0, -1).join(', ') + ' and ' + need[need.length - 1])
+            + '. These are needed before the work can be sent out or billed.';
+          byId('qa_err').style.display = 'block'; return;
+        }
+        CV_FIELDS.forEach(function (id) { body.append(id.replace('qa_', ''), val(id)); });
         if (byId('qa_both') && byId('qa_both').checked) k = 'both';
       }
       if (k === 'office') {
