@@ -2684,7 +2684,9 @@ function ops_jobs($route, $method) {
             WHERE j.id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$job) { http_response_code(404); view('notfound'); return; }
         $expenses = ops_all("SELECT * FROM expenses WHERE job_id=? ORDER BY id", [$job['id']]);
-        view('ops/job_detail', ['job'=>$job,'expenses'=>$expenses,'profit'=>job_profit($job)]);
+        // §xxiv — whatever the client sent with the order reaches the engineer here.
+        view('ops/job_detail', ['job'=>$job,'expenses'=>$expenses,'profit'=>job_profit($job),
+            'quoteDocs'=>function_exists('quote_docs_for_job') ? quote_docs_for_job($job['id']) : []]);
         return;
     }
 }
@@ -3236,6 +3238,8 @@ function ops_settings($method) {
         $wd = (float)($_POST['default_weekly_days'] ?? 6);
         setting_set('default_weekly_days', in_array($wd, [5.0, 5.5, 6.0], true) ? $wd : 6);
         setting_set('emp_code_prefix', strtoupper(trim($_POST['emp_code_prefix'] ?? '')));
+        // Default terms & conditions carried onto every new quote.
+        if (isset($_POST['quote_terms'])) setting_set('quote_terms', (string)$_POST['quote_terms']);
         // Display
         setting_set('currency_symbol', trim($_POST['currency_symbol'] ?? '') ?: '₹');
         $df = trim($_POST['date_format'] ?? ''); setting_set('date_format', in_array($df, array_keys(DATE_FORMATS), true) ? $df : 'd M Y');
