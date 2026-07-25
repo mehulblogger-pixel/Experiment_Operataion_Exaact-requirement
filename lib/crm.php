@@ -623,9 +623,34 @@ function crm_build_approvals($q) {
         $pdo->prepare("INSERT INTO quote_approvals (quote_id,level,approver_role,approver_user_id,status) VALUES (?,1,'',NULL,'PENDING')")->execute([$q['id']]);
         return 1;
     }
+    $ownerId = crm_quote_owner_user_id($q);
     $ins = $pdo->prepare("INSERT INTO quote_approvals (quote_id,level,approver_role,approver_user_id,status) VALUES (?,?,?,?,'PENDING')");
-    foreach ($steps as $s) $ins->execute([$q['id'], (int)$s['level'], $s['approver_role'] ?? '', ($s['approver_user_id'] ?? null) ?: null]);
+    foreach ($steps as $s) {
+        $role = $s['approver_role'] ?? '';
+        $uid  = ($s['approver_user_id'] ?? null) ?: null;
+        // A "REPORTS_TO" rule routes to the sales owner's reporting manager N levels up
+        // (rule level = how far up the chain). Resolves to a concrete user at build time.
+        if ($role === 'REPORTS_TO') {
+            $resolved = $ownerId && function_exists('reporting_manager_at') ? reporting_manager_at($ownerId, (int)$s['level']) : null;
+            $role = ''; $uid = $resolved ?: null;   // unresolved → generic step (any approver)
+        }
+        $ins->execute([$q['id'], (int)$s['level'], $role, $uid]);
+    }
     return count($steps);
+}
+// The system-user id who owns a quote (for reporting-chain approvals): owner_id if
+// set, else the user whose username or full name matches created_by. Matched in PHP
+// so it works identically on MySQL and SQLite (no DB-specific string concat).
+function crm_quote_owner_user_id($q) {
+    if (!empty($q['owner_id'])) return (int)$q['owner_id'];
+    $cb = trim((string)($q['created_by'] ?? ''));
+    if ($cb === '') return null;
+    $u = ops_one("SELECT id FROM users WHERE username=? LIMIT 1", [$cb]);
+    if ($u) return (int)$u['id'];
+    foreach (ops_all("SELECT id, first_name, last_name FROM users WHERE is_active=1") as $r) {
+        if (strcasecmp(trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? '')), $cb) === 0) return (int)$r['id'];
+    }
+    return null;
 }
 // May the current user act on this approval step?
 function crm_can_act_approval($step) {

@@ -41,6 +41,23 @@
   <p class="muted" style="margin:4px 2px 0;">Tip: <code>ALL</code> = everything. For an SBU Head, set Offices=<code>ALL</code> and SBUs=<code>IND</code> (their SBU). For a Branch Manager, leave Offices blank (their home office) and SBUs=<code>ALL</code>.</p>
   <?php endif; ?>
 
+  <h3 class="tab-sub">Reporting &amp; position <span class="muted">— builds the organisation hierarchy (N+1) and drives approvals</span></h3>
+  <div class="form-grid">
+    <div class="ff"><label>Position / designation</label><input class="form-control" name="position_title" value="<?= e($user['position_title'] ?? '') ?>" placeholder="e.g. Sr. Coordinator"></div>
+    <div class="ff"><label>Weekly working days</label>
+      <select class="form-control" name="weekly_working_days"><?php foreach (['6'=>'6 days (Mon–Sat)','5.5'=>'5.5 days (alternate Sat off)','5'=>'5 days (Mon–Fri)'] as $k=>$v): ?><option value="<?= $k ?>" <?= ((string)($user['weekly_working_days'] ?? '6')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Reports to <span class="muted">— pick a system user</span></label>
+      <select class="form-control searchable" name="reports_to_id"><option value="">— none / top of chain —</option>
+        <?php foreach (($managers ?? []) as $m): $nm=trim(($m['first_name']??'').' '.($m['last_name']??'')) ?: $m['username']; ?><option value="<?= (int)$m['id'] ?>" <?= ((int)($user['reports_to_id'] ?? 0)===(int)$m['id'])?'selected':'' ?>><?= e($nm) ?> · <?= e(ORG_ROLES[$m['role']] ?? $m['role']) ?></option><?php endforeach; ?>
+      </select></div>
+  </div>
+  <p class="muted" style="margin:4px 2px 6px;">If the reporting manager has no login, leave "Reports to" blank and fill their details below — they still appear in the hierarchy and receive approval e-mails.</p>
+  <div class="form-grid">
+    <div class="ff"><label>Manager name <span class="muted">(if no login)</span></label><input class="form-control" name="reports_to_name" value="<?= e($user['reports_to_name'] ?? '') ?>"></div>
+    <div class="ff"><label>Manager position</label><input class="form-control" name="reports_to_position" value="<?= e($user['reports_to_position'] ?? '') ?>"></div>
+    <div class="ff"><label>Manager e-mail</label><input class="form-control" type="email" name="reports_to_email" value="<?= e($user['reports_to_email'] ?? '') ?>"></div>
+  </div>
+
   <h3 class="tab-sub">Permissions <span class="muted">— leave all unticked to use the role's defaults</span></h3>
   <div class="checkgrid">
     <?php foreach ($allowPerms as $k=>$v): ?>

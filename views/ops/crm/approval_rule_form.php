@@ -26,6 +26,7 @@
 
     <div class="ff"><label>Approver role</label>
       <select class="form-control searchable" name="approver_role"><option value="">— any approver —</option>
+        <option value="REPORTS_TO" <?= (($r['approver_role'] ?? '')==='REPORTS_TO')?'selected':'' ?>>↑ Reporting manager (up the chain by level)</option>
         <?php foreach ($roles as $k=>$v): if($k==='INSPECTOR')continue; ?><option value="<?= e($k) ?>" <?= (($r['approver_role'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>…or a specific person <span class="muted">(overrides role)</span></label>
       <select class="form-control searchable" name="approver_user_id"><option value="">—</option>
