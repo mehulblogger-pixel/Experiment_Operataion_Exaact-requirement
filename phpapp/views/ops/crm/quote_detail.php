@@ -339,30 +339,55 @@
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0">Follow-ups</h3>
     <?php if ($followups): ?>
+    <?php // Row cards, not a table. This panel is half the page wide and six
+          // editable columns could not fit in it — the table ran outside the
+          // panel and had to be zoomed out to read. These wrap instead. ?>
     <form method="post" action="/quote-followup?id=<?= (int)$q['id'] ?>">
       <input type="hidden" name="do" value="save">
-      <table class="dt">
-        <thead><tr><th>When</th><th>Due</th><th>Status</th><th>Done on</th><th>Note</th><th></th></tr></thead>
-        <tbody>
-        <?php foreach ($followups as $f): ?>
-        <tr>
-          <td><input type="hidden" name="f_id[]" value="<?= (int)$f['id'] ?>"><?= e(lk_options_or('followup_kind', FOLLOWUP_KINDS)[$f['kind']] ?? $f['kind']) ?></td>
-          <td><input class="form-control" type="date" name="f_due[]" value="<?= e($f['due_date']) ?>" style="min-width:140px"></td>
-          <td><select class="form-control" name="f_status[]" style="min-width:110px">
-              <?php foreach (['PENDING'=>'Pending','DONE'=>'Done','SENT'=>'Sent','SKIPPED'=>'Skipped'] as $sk=>$sv): ?>
-                <option value="<?= e($sk) ?>" <?= ($f['status']===$sk)?'selected':'' ?>><?= e($sv) ?></option><?php endforeach; ?>
-              </select></td>
-          <td><input class="form-control" type="date" name="f_done[]" value="<?= e($f['done_date'] ?? '') ?>" style="min-width:140px"></td>
-          <td><input class="form-control" name="f_note[]" value="<?= e($f['note'] ?? '') ?>" placeholder="what was said" style="min-width:160px"></td>
-          <td class="num" style="white-space:nowrap"><?php if (!empty($q['contact_email'])): ?>
-            <a class="btn small secondary" href="/followup-compose?id=<?= (int)$f['id'] ?>"
-               title="Opens the chase in your own mailbox">✉️</a><?php endif; ?></td>
-        </tr>
+      <div class="fu-list">
+        <?php foreach ($followups as $f):
+              $tone = ['DONE'=>'p-ok','SENT'=>'p-info','SKIPPED'=>'p-mut','PENDING'=>'p-warn'][$f['status']] ?? 'p-mut';
+              $overdue = ($f['status'] === 'PENDING' && ($f['due_date'] ?? '') !== '' && $f['due_date'] < date('Y-m-d')); ?>
+        <div class="fu<?= $overdue ? ' fu-late' : '' ?>">
+          <input type="hidden" name="f_id[]" value="<?= (int)$f['id'] ?>">
+          <div class="fu-head">
+            <b><?= e(lk_options_or('followup_kind', FOLLOWUP_KINDS)[$f['kind']] ?? $f['kind']) ?></b>
+            <span class="pill <?= e($tone) ?>"><?= e(['PENDING'=>'Pending','DONE'=>'Done','SENT'=>'Sent','SKIPPED'=>'Skipped'][$f['status']] ?? $f['status']) ?></span>
+            <?php if ($overdue): ?><span class="pill p-bad">overdue</span><?php endif; ?>
+            <?php if (!empty($q['contact_email'])): ?>
+              <a class="btn small secondary fu-mail" href="/followup-compose?id=<?= (int)$f['id'] ?>"
+                 title="Opens the chase in your own mailbox">✉️ Chase</a><?php endif; ?>
+          </div>
+          <div class="fu-grid">
+            <label>Due<input class="form-control" type="date" name="f_due[]" value="<?= e($f['due_date']) ?>"></label>
+            <label>Status<select class="form-control" name="f_status[]">
+                <?php foreach (['PENDING'=>'Pending','DONE'=>'Done','SENT'=>'Sent','SKIPPED'=>'Skipped'] as $sk=>$sv): ?>
+                  <option value="<?= e($sk) ?>" <?= ($f['status']===$sk)?'selected':'' ?>><?= e($sv) ?></option><?php endforeach; ?>
+              </select></label>
+            <label>Done on<input class="form-control" type="date" name="f_done[]" value="<?= e($f['done_date'] ?? '') ?>"></label>
+          </div>
+          <label class="fu-note">What was said
+            <input class="form-control" name="f_note[]" value="<?= e($f['note'] ?? '') ?>" placeholder="e.g. purchase head reviewing, call back Tuesday"></label>
+        </div>
         <?php endforeach; ?>
-        </tbody>
-      </table>
-      <div style="margin-top:8px"><button class="btn small" type="submit">Save follow-ups</button></div>
+      </div>
+      <div style="margin-top:10px"><button class="btn small" type="submit">Save follow-ups</button></div>
     </form>
+    <style>
+      .fu-list{display:flex;flex-direction:column;gap:10px}
+      .fu{border:1px solid var(--line);border-radius:var(--radius-sm,10px);padding:10px 12px;background:var(--soft)}
+      .fu-late{border-color:var(--bad)}
+      .fu-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+      .fu-head b{font-size:13.5px}
+      .fu-mail{margin-left:auto}
+      /* auto-fit means one column in a narrow panel and three in a wide one,
+         with no fixed min-width to push the card past its container */
+      .fu-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
+      .fu label,.fu-note{display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:700;
+        color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+      .fu-note{margin-top:8px}
+      .fu .form-control{width:100%;min-width:0;font-size:13.5px;text-transform:none;letter-spacing:0}
+    </style>
     <p class="muted" style="margin-top:6px">Scheduled automatically when the <?= e(Tl('quote')) ?> is marked sent — day 3, 6, 9, fortnight and month. Edit any date, mark one done with a note, or add your own below.</p>
     <?php else: ?>
       <p class="muted">Follow-ups are scheduled automatically once the <?= e(Tl('quote')) ?> is marked <b>sent</b> — day 3, 6, 9, fortnight and month. You can also add one by hand.</p>

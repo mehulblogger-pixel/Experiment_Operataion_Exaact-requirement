@@ -53,6 +53,85 @@
     input.addEventListener('blur', function () { setTimeout(function () { list.style.display = 'none'; input.value = cur(); }, 150); });
   }
 
+  // ---- Free-text combo (suggestions, but a new value is allowed) ----------
+  // For fields like product category, where the list is a helpful memory of what
+  // the office has used before rather than a closed set. It replaces the native
+  // <input list="..."> datalist, whose popup the browser draws itself: narrow,
+  // dark on some platforms, and impossible to theme. This one is the app's own
+  // panel — full field width, theme colours, and it keeps whatever is typed.
+  function enhanceCombo(input) {
+    if (input.dataset.enh === '1') return;
+    input.dataset.enh = '1';
+    var opts = [];
+    var src = input.getAttribute('list');
+    if (src) {
+      var dl = document.getElementById(src);
+      if (dl) {
+        Array.prototype.forEach.call(dl.querySelectorAll('option'), function (o) {
+          var v = (o.value || o.textContent || '').trim();
+          if (v) opts.push(v);
+        });
+        input.removeAttribute('list');          // stop the native popup entirely
+        dl.parentNode && dl.parentNode.removeChild(dl);
+      }
+    }
+    var wrap = document.createElement('div'); wrap.className = 'ss-wrap';
+    var list = document.createElement('div'); list.className = 'ss-list'; list.style.display = 'none';
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input); wrap.appendChild(list);
+
+    function esc(s) { return s.replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+    function mark(label, f) {
+      if (!f) return esc(label);
+      var i = label.toLowerCase().indexOf(f.toLowerCase());
+      if (i < 0) return esc(label);
+      return esc(label.slice(0, i)) + '<b>' + esc(label.slice(i, i + f.length)) + '</b>' + esc(label.slice(i + f.length));
+    }
+    function pick(v) { input.value = v; list.style.display = 'none'; input.dispatchEvent(new Event('change', {bubbles:true})); }
+    function build() {
+      var f = input.value.trim(), lf = f.toLowerCase(), n = 0;
+      list.innerHTML = '';
+      opts.forEach(function (label) {
+        if (f && label.toLowerCase().indexOf(lf) === -1) return;
+        var it = document.createElement('div');
+        it.className = 'ss-item'; it.innerHTML = mark(label, f);
+        it.addEventListener('mousedown', function (e) { e.preventDefault(); pick(label); });
+        list.appendChild(it); n++;
+      });
+      // Typing something new is a valid answer here, so say so rather than
+      // showing a dead "no matches" and leaving the user unsure it will save.
+      var exact = opts.some(function (o) { return o.toLowerCase() === lf; });
+      if (f && !exact) {
+        var nw = document.createElement('div');
+        nw.className = 'ss-item ss-new'; nw.textContent = 'Use “' + f + '” — new category';
+        nw.addEventListener('mousedown', function (e) { e.preventDefault(); pick(f); });
+        list.appendChild(nw); n++;
+      }
+      if (!n) {
+        var d = document.createElement('div'); d.className = 'ss-item ss-none';
+        d.textContent = 'Start typing to add one'; list.appendChild(d);
+      }
+    }
+    input.addEventListener('focus', function () { build(); list.style.display = 'block'; });
+    input.addEventListener('input', function () { build(); list.style.display = 'block'; });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { list.style.display = 'none'; return; }
+      var items = list.querySelectorAll('.ss-item:not(.ss-none)');
+      if (!items.length || list.style.display === 'none') return;
+      var cur = list.querySelector('.ss-item.ss-on'), i = -1;
+      Array.prototype.forEach.call(items, function (it, k) { if (it === cur) i = k; });
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        i = e.key === 'ArrowDown' ? Math.min(i + 1, items.length - 1) : Math.max(i - 1, 0);
+        if (cur) cur.classList.remove('ss-on');
+        items[i].classList.add('ss-on'); items[i].scrollIntoView({block:'nearest'});
+      } else if (e.key === 'Enter' && cur) {
+        e.preventDefault(); cur.dispatchEvent(new MouseEvent('mousedown'));
+      }
+    });
+    input.addEventListener('blur', function () { setTimeout(function () { list.style.display = 'none'; }, 150); });
+  }
+
   // ---- Cascading (dependent) master-list dropdowns ----
   // A .cascade block holds one <select class="cascade-sel" data-level> per level.
   // When a parent select changes, the next level repopulates with only the
@@ -360,6 +439,8 @@
     initTradeSkills();
     initQuickAdd();
     Array.prototype.forEach.call(document.querySelectorAll('select.searchable'), enhanceSelect);
+    // Any text input wired to a datalist becomes the themed combo instead.
+    Array.prototype.forEach.call(document.querySelectorAll('input.combo, input[list]'), enhanceCombo);
   }
   if (document.readyState !== 'loading') init();
   else document.addEventListener('DOMContentLoaded', init);

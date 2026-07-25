@@ -53,9 +53,24 @@ form.stack label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4
 .tl-item{display:flex;align-items:baseline;gap:10px;padding:8px 0 8px 14px;position:relative;font-size:14px}
 .tl-item::before{content:"";position:absolute;left:-7px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--brand)}
 .tl-date{color:var(--muted);min-width:90px;font-size:13px}.tl-text{flex:1}
+/* Dropdown panel shared by the searchable select and the free-text combo.
+   Colours come from the theme, never hard-coded: a fixed white panel with a
+   pale blue hover ignored the theme builder entirely, and the browser's own
+   <datalist> popup it replaces was worse — narrow, dark, and unstyleable.
+   left:0;right:0 pins the panel to the FULL width of the field above it. */
 .ss-wrap{position:relative}
-.ss-list{position:absolute;z-index:50;left:0;right:0;top:100%;max-height:240px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:8px;margin-top:3px;box-shadow:0 6px 20px rgba(0,0,0,.12)}
-.ss-item{padding:8px 12px;font-size:14px;cursor:pointer}.ss-item:hover{background:#eef2ff}.ss-item.ss-none{color:var(--muted);cursor:default}
+.ss-list{position:absolute;z-index:50;left:0;right:0;top:100%;max-height:264px;overflow-y:auto;
+  background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius-sm,10px);
+  margin-top:4px;box-shadow:0 10px 28px rgba(15,23,42,.16)}
+.ss-item{padding:9px 12px;font-size:14px;cursor:pointer;color:var(--ink);line-height:1.35}
+.ss-item:hover,.ss-item.ss-on{background:color-mix(in srgb,var(--brand) 10%,var(--card))}
+.ss-item.ss-none{color:var(--muted);cursor:default}
+.ss-item.ss-new{color:var(--brand);font-weight:600;border-top:1px solid var(--line)}
+.ss-item b{background:color-mix(in srgb,var(--accent) 26%,transparent);font-weight:700;border-radius:3px}
+/* The caret makes it read as a dropdown rather than a plain text box. */
+.ss-wrap::after{content:"";position:absolute;right:12px;top:50%;width:0;height:0;pointer-events:none;
+  margin-top:-2px;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--muted)}
+.ss-wrap > input.form-control{padding-right:30px}
 .readonly-field{background:var(--soft);color:var(--muted)}
 .row-actions{display:flex;gap:6px}
 
@@ -255,15 +270,38 @@ body.app{background:var(--bg)}
 .scrim{display:none;position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:55}
 .scrim.on{display:block}
 
-/* ---- KPI stat cards ---- */
+/* ---- KPI stat cards ----------------------------------------------------
+   ONE card design for every register and dashboard. Two sets of class names
+   are honoured on purpose: screens were written with both `k/v/d` and the
+   longer `k-lab/k-val/k-sub`, and a screen using the unsupported pair used to
+   render as three lines of plain body text with no hierarchy at all. Both
+   names now resolve to the same rules, so no screen can be left unstyled and
+   either name is safe to write. */
 .kpi-row{display:grid;gap:16px;grid-template-columns:repeat(4,1fr);margin-bottom:16px}
 .kpi{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-  padding:16px 18px;box-shadow:var(--shadow-sm)}
-.kpi .k{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
-.kpi .v{font-size:26px;font-weight:800;letter-spacing:-.5px;line-height:1.1;margin:6px 0 3px;font-variant-numeric:tabular-nums}
-.kpi .v a{color:var(--ink)}
-.kpi .d{font-size:12.5px;font-weight:600;color:var(--muted)}
-.kpi .kic{position:absolute;right:16px;top:14px;font-size:17px;opacity:.55}
+  padding:16px 18px;box-shadow:var(--shadow-sm);overflow:hidden}
+.kpi .k, .kpi .k-lab{display:block;font-size:11.5px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.4px;line-height:1.35;padding-right:26px}
+.kpi .v, .kpi .k-val{display:block;font-size:26px;font-weight:800;letter-spacing:-.5px;line-height:1.1;
+  margin:6px 0 3px;font-variant-numeric:tabular-nums}
+.kpi .v a, .kpi .k-val a{color:var(--ink)}
+.kpi .d, .kpi .k-sub{display:block;font-size:12.5px;font-weight:600;color:var(--muted);line-height:1.35}
+.kpi .kic{position:absolute;right:16px;top:14px;font-size:17px;opacity:.55;line-height:1}
+/* A card that is a link behaves like one. */
+a.kpi{text-decoration:none;color:var(--ink);transition:transform .12s,box-shadow .16s}
+a.kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow);text-decoration:none}
+/* Semantic tone: a 3px rail down the left edge, plus a tinted value. Kept
+   separate from the accent colour so "won" and "lost" read at a glance. */
+.kpi.tone-ok, .kpi.tone-warn, .kpi.tone-bad, .kpi.tone-info{padding-left:21px}
+.kpi.tone-ok::before, .kpi.tone-warn::before, .kpi.tone-bad::before, .kpi.tone-info::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.kpi.tone-ok::before{background:var(--ok)}
+.kpi.tone-warn::before{background:var(--warn)}
+.kpi.tone-bad::before{background:var(--bad)}
+.kpi.tone-info::before{background:var(--info)}
+.kpi.tone-ok .k-val, .kpi.tone-ok .v{color:var(--ok)}
+.kpi.tone-bad .k-val, .kpi.tone-bad .v{color:var(--bad)}
+.kpi.tone-warn .k-val, .kpi.tone-warn .v{color:var(--warn)}
 .up{color:var(--ok)}.down{color:var(--bad)}
 
 /* ---- Action / queue cards (money desk, coordinator queue) ---- */
