@@ -10,11 +10,11 @@
 const OPS_REGIONS = ['WEST'=>'West','NORTH'=>'North','SOUTH'=>'South','EAST'=>'East','CENTRAL'=>'Central','OVERSEAS'=>'Overseas'];
 const OPS_SBUS = ['IND'=>'Industrial','OGC'=>'Oil, Gas & Chemicals','MIN'=>'Minerals','GIS'=>'Governments & Institutions','AGRI'=>'Agriculture & Food','CRS'=>'Consumer & Retail','ENV'=>'Environment','OTHER'=>'Other'];
 const PRODUCT_CATS = ['ELEC'=>'Electrical equipment','MECH'=>'Mechanical equipment','STRUCT'=>'Structural / Fabrication','PIPE'=>'Pipes & Fittings','VALVE'=>'Valves','PUMP'=>'Pumps & Rotating','TRANSFORMER'=>'Transformers','CABLE'=>'Cables','INSTRUMENT'=>'Instrumentation','CIVIL'=>'Civil / Construction','OTHER'=>'Others'];
-const CREDIT_TYPES = ['MANDAY'=>'Man-day','MANMONTH'=>'Man-month','LUMP'=>'Lumpsum','LATER'=>'Decide later','OTHER'=>'Other'];
+const CREDIT_TYPES = ['MANDAY'=>'Man-day','MANMONTH'=>'Man-month','LUMP'=>'Lump sum','LATER'=>'Decide later','OTHER'=>'Other'];
 const CREDIT_DIRECTIONS = ['RECEIVED'=>'Received (IBO → Ahmedabad)','GIVEN'=>'Given (Ahmedabad → IBO)'];
 const REPORT_FREQ = ['DAILY'=>'Daily','ALTERNATE'=>'Alternate day','WEEKLY'=>'Weekly','FORTNIGHTLY'=>'Fortnightly','MONTHLY'=>'Monthly','CUSTOM'=>'Custom (every N days)','NOREPORT'=>'No report'];
 // Types of inspection service (third-party inspection industry).
-const INSPECTION_TYPES = ['INSPECTION'=>'Inspection (third-party / TPI)','EXPEDITING'=>'Expediting','DEPUTATION'=>'Resident / site posting','VENDOR_ASSESS'=>'Vendor assessment','VENDOR_AUDIT'=>'Vendor audit','PRE_PROD'=>'Pre-production inspection','DURING_PROD'=>'During-production inspection','STAGE'=>'Stage / In-process inspection','FINAL'=>'Final inspection','FRI'=>'Final random inspection (FRI)','PSI'=>'Pre-shipment inspection (PSI)','WITNESS'=>'Witness / Test witnessing','FAT'=>'Factory Acceptance Test (FAT)','SAT'=>'Site Acceptance Test (SAT)','SOURCE'=>'Source inspection','SURVEILLANCE'=>'Surveillance','LOADING'=>'Loading / container supervision','SAMPLING'=>'Sampling','DIMENSIONAL'=>'Dimensional inspection','WELDING'=>'Welding inspection','NDT'=>'NDT witnessing','PMI'=>'Material verification (PMI)','COATING'=>'Painting / coating inspection','MECH_TEST'=>'Mechanical testing witness','CALIB'=>'Calibration verification','SAFETY_AUDIT'=>'Safety audit','SYSTEM_AUDIT'=>'Management-system audit','SECOND_PARTY'=>'Second-party audit','DESKTOP'=>'Desktop / Document review','TECH_AUDIT'=>'Technical audit'];
+const INSPECTION_TYPES = ['INSPECTION'=>'Inspection (third-party / TPI)','EXPEDITING'=>'Expediting','DEPUTATION'=>'Resident / site posting','VENDOR_ASSESS'=>'Vendor assessment','VENDOR_AUDIT'=>'Vendor audit','PRE_PROD'=>'Pre-production inspection','DURING_PROD'=>'During-production inspection','STAGE'=>'Stage / In-process inspection','FINAL'=>'Final inspection','FRI'=>'Final random inspection (FRI)','PSI'=>'Pre-shipment inspection (PSI)','WITNESS'=>'Witness / Test witnessing','FAT'=>'Factory Acceptance Test (FAT)','SAT'=>'Site Acceptance Test (SAT)','SOURCE'=>'Source inspection','SURVEILLANCE'=>'Surveillance','LOADING'=>'Loading / container supervision','SAMPLING'=>'Sampling','DIMENSIONAL'=>'Dimensional inspection','WELDING'=>'Welding inspection','NDT'=>'NDT witnessing','PMI'=>'Material verification (PMI)','COATING'=>'Painting / coating inspection','MECH_TEST'=>'Mechanical testing witness','CALIB'=>'Calibration verification','SAFETY_AUDIT'=>'Safety audit','SYSTEM_AUDIT'=>'Management-system audit','SECOND_PARTY'=>'Second-party audit','DESKTOP'=>'Desktop / Document review','TECH_AUDIT'=>'Technical audit','SUPPLY_CHAIN'=>'Supply-chain posting','SITE_SUP'=>'Site supervision','COMMISSIONING'=>'Commissioning & installation','SITE_QAQC'=>'Site QA / QC','TYPE_TEST'=>'Type test','TENDER_REVIEW'=>'Tender review','OTHER'=>'Other'];
 // Deliverables / report formats produced after a job.
 const DELIVERABLES = ['IR'=>'Inspection Report (IR)','IRN'=>'Inspection Release Note (IRN)','NCR'=>'Non-Conformance Report (NCR)','COC'=>'Certificate of Conformity (CoC)','EXP_REP'=>'Expediting Report','VA_REP'=>'Vendor Assessment Report','AUDIT_REP'=>'Audit Report','TC_REVIEW'=>'Test Certificate Review','DPR'=>'Daily Progress Report','FINAL_REP'=>'Final Report','PUNCH'=>'Punch List','PHOTO'=>'Photographic Report','DIM_REP'=>'Dimensional Report','RN'=>'Release Note (RN)'];
 const ATT_STATUS = ['PRESENT_NB'=>'Present (non-billable)','TRAINING'=>'Training','MEETING'=>'Meeting','LEAVE'=>'Leave','WFH'=>'Work from home','COMPOFF'=>'Comp-off taken','HOLIDAY'=>'Holiday'];
@@ -31,7 +31,8 @@ const DEPARTMENTS = ['QUALITY'=>'Quality','PROJECTS'=>'Projects','ENGINEERING'=>
 const DESIGNATIONS = ['INSPECTOR'=>'Inspector','SR_INSPECTOR'=>'Sr. Inspector','LEAD_INSPECTOR'=>'Lead Inspector','EXECUTIVE'=>'Executive','SR_EXECUTIVE'=>'Sr. Executive','ENGINEER'=>'Engineer','SR_ENGINEER'=>'Sr. Engineer','LEAD_ENGINEER'=>'Lead Engineer','COORDINATOR'=>'Coordinator','SR_COORDINATOR'=>'Sr. Coordinator','ASST_MANAGER'=>'Asst. Manager','DY_MANAGER'=>'Deputy Manager','MANAGER'=>'Manager','SR_MANAGER'=>'Sr. Manager','BRANCH_MANAGER'=>'Branch Manager','SBU_HEAD'=>'SBU Head','GM'=>'General Manager','DIRECTOR'=>'Director','OTHER'=>'Other'];
 const JOB_STAGES = ['ALLOCATED'=>'Allocated','TRAVELLING'=>'Travelling','IN_PROGRESS'=>'Inspection in progress','REPORT_PENDING'=>'Report pending','SUBMITTED'=>'Report submitted','CLOSED'=>'Closed','ON_HOLD'=>'On hold','CANCELLED'=>'Cancelled'];
 const EXP_LEVELS = ['JUNIOR'=>'Junior','MID'=>'Mid','SENIOR'=>'Senior','EXPERT'=>'Expert / Lead'];
-const RATE_TYPES = ['MANDAY'=>'Per man-day','MANMONTH'=>'Per man-month'];
+// Sub-contractor rate basis — the same charge units, narrowed to the two that apply.
+const RATE_TYPES = ['MANDAY'=>'Man-day','MANMONTH'=>'Man-month'];
 // Agency types: recruitment = CVs only, one-time placement fee, person on our own roll;
 // manpower = supplies people on the AGENCY's roll, bills us monthly (pass-through to client).
 const AGENCY_TYPES = ['RECRUITMENT'=>'Recruitment agency (CVs only · one-time fee)', 'MANPOWER'=>'Manpower / supply agency (monthly bill)'];
@@ -44,7 +45,6 @@ const FEE_STATUS = ['PROVISIONAL'=>'Provisional (within guarantee)', 'CONFIRMED'
 const REQ_TYPES  = ['NEW'=>'New position (new project / expansion)', 'REPLACEMENT'=>'Replacement (engineer who left)'];
 const REQ_STATUS = ['OPEN'=>'Open (approved, sourcing)', 'PROPOSED'=>'Candidate proposed', 'OFFERED'=>'Offer released', 'HIRED'=>'Hired (filled)', 'CLOSED'=>'Closed', 'CANCELLED'=>'Cancelled'];
 const BOSS_STATUS = ['ACTIVE'=>'Active','CLOSED'=>'Closed','HOLD'=>'On hold'];
-const OPS_ROLES = ['MASTER_ADMIN'=>'Master Admin','ADMIN'=>'Admin','COORDINATOR'=>'Coordinator','INSPECTOR'=>'Inspector'];
 const OVERHEAD_PCT = 8; // salary overhead %
 // Built-in theme presets: primary, accent, page background, surface (cards), text.
 const THEME_PRESETS = [
@@ -1496,7 +1496,7 @@ function ops_dispatch($route, $method) {
             $out = [];
             foreach (ops_all("SELECT id, description, quantity, consumed, item_type FROM po_line_items WHERE purchase_order_id=? ORDER BY id", [(int)($_GET['id'] ?? 0)]) as $l) {
                 $bal = (float)$l['quantity'] - (float)$l['consumed'];
-                $out[] = ['id' => (int)$l['id'], 'label' => $l['description'] . ' — bal ' . $bal . ' ' . (lk_options_or('po_item_type', PO_ITEM_TYPES)[$l['item_type']] ?? '')];
+                $out[] = ['id' => (int)$l['id'], 'label' => $l['description'] . ' — bal ' . $bal . ' ' . (lk_options_or('charge_unit', PO_ITEM_TYPES)[$l['item_type']] ?? '')];
             }
             echo json_encode($out); return true;
     }

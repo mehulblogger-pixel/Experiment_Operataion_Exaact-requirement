@@ -11,7 +11,7 @@
   <tr><th>Description</th><th>Trade / skill</th><th>Site</th><th>Men</th><th>Qty</th><th>Consumed</th><th>Bal</th><th>Rate</th><th>Base</th><th>GST%</th><th>Tax</th><th>Total</th></tr>
   <?php $gt=0; foreach ($items as $li): $bal = (float)$li['quantity'] - (float)$li['consumed']; $gt += (float)$li['total_amount']; ?>
   <tr>
-    <td><?= e($li['description']) ?><br><span class="muted" style="font-size:11px"><?= e(lk_options_or('po_item_type', PO_ITEM_TYPES)[$li['item_type']] ?? $li['item_type']) ?><?= $li['activity_label']?' · '.e($li['activity_label']):'' ?></span></td>
+    <td><?= e($li['description']) ?><br><span class="muted" style="font-size:11px"><?= e(lk_options_or('charge_unit', PO_ITEM_TYPES)[$li['item_type']] ?? $li['item_type']) ?><?= $li['activity_label']?' · '.e($li['activity_label']):'' ?></span></td>
     <td><?= e($li['trade_label'] ?: '—') ?><?= $li['skill_label']?'<br><span class="muted" style="font-size:11px">'.e($li['skill_label']).'</span>':'' ?></td>
     <td><?= e($li['site'] ?: '—') ?></td>
     <td><?= (int)$li['manpower'] ?: '—' ?></td>
@@ -32,7 +32,7 @@
 <form method="post" action="/po?id=<?= (int)$po['id'] ?>" class="panel">
   <div class="form-grid">
     <div class="ff"><label>Description</label><input class="form-control" name="description" required></div>
-    <div class="ff"><label>Type</label><select class="form-control" name="item_type"><?php foreach (lk_options_or('po_item_type', PO_ITEM_TYPES) as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Type</label><select class="form-control" name="item_type"><?php foreach (lk_options_or('charge_unit', PO_ITEM_TYPES) as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Trade</label>
       <select class="form-control searchable" id="trade_sel" name="trade_id"><option value="">—</option>
         <?php foreach ($trades as $t): ?><option value="<?= (int)$t['id'] ?>"><?= e($t['label']) ?></option><?php endforeach; ?></select></div>

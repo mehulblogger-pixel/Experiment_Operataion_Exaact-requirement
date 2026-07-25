@@ -33,22 +33,10 @@ const QUOTE_LOST_REASONS = [
 // CRM service / job type (§18, §25) — a CONFIGURABLE master, kept separate from
 // the operational jobs.job_type so mandays logic is untouched. Multi-select in
 // the quote; each can carry sub-types from the inspection-type / deputation lists.
-const CRM_SERVICE_TYPES = [
-    'INSPECTION'      => 'Inspection',
-    'PROJECT_DEP'     => 'Resident / site posting',
-    'SUPPLY_CHAIN'    => 'Supply-chain posting',
-    'SITE_SUP'        => 'Site supervision',
-    'COMMISSIONING'   => 'Commissioning & installation',
-    'SITE_QAQC'       => 'Site QA / QC',
-    'TECH_AUDIT'      => 'Technical audit',
-    'TYPE_TEST'       => 'Type test',
-    'VENDOR_ASSESS'   => 'Vendor assessment',
-    'VENDOR_AUDIT'    => 'Vendor audit',
-    'DOC_REVIEW'      => 'Document review',
-    'TENDER_REVIEW'   => 'Tender review',
-    'EXPEDITING'      => 'Expediting',
-    'OTHER'           => 'Other',
-];
+// Retired: Sales and Operations share the one "Type of inspection" master
+// (INSPECTION_TYPES in lib/ops.php). Kept only as the fallback label map for
+// rows written before the two lists were merged.
+const CRM_SERVICE_TYPES = INSPECTION_TYPES;
 // Resident-posting sub-categories (multiple selection).
 const CRM_DEPUTATION_SUBTYPES = [
     'SITE_QAQC'     => 'Site QA / QC',
@@ -66,14 +54,70 @@ const QUOTE_LOCATION_TYPES = [
 ];
 
 // Billing unit for a quote/order line (§17).
-const QUOTE_UNITS = [
-    'DAY'       => 'Man-day',
-    'MONTH'     => 'Man-month',
+// One charge unit for the whole app. A quote line, a rate card and a PO line
+// all mean the same thing by "man-day", so they now share one master list and
+// one set of codes. QUOTE_UNITS is kept as the name the CRM code already uses.
+const CHARGE_UNITS = [
+    'MANDAY'    => 'Man-day',
+    'MANMONTH'  => 'Man-month',
     'VISIT'     => 'Per visit',
     'AUDIT_DAY' => 'Audit day',
     'LOT'       => 'Per lot / lump sum',
     'DOC'       => 'Per document',
+    'PER_KM'    => 'Per km',
+    'OTHER'     => 'Other',
 ];
+const QUOTE_UNITS = CHARGE_UNITS;
+// Old per-module codes -> the shared ones. Used by the idempotent migration.
+const CHARGE_UNIT_ALIASES = [
+    'DAY' => 'MANDAY', 'MONTH' => 'MANMONTH', 'MANDAYS' => 'MANDAY',
+    'MONTHS' => 'MANMONTH', 'AUDIT_DAYS' => 'AUDIT_DAY', 'VISITS' => 'VISIT',
+    'LUMP' => 'LOT',
+];
+// Rewrite the old per-module codes to the shared ones, wherever they are stored.
+// Idempotent: once a column holds only shared codes, every UPDATE matches nothing.
+function crm_migrate_charge_units() {
+    $cols = [['quote_lines', 'unit'], ['po_line_items', 'item_type']];
+    foreach ($cols as [$table, $col]) {
+        foreach (CHARGE_UNIT_ALIASES as $old => $new) {
+            try { db()->prepare("UPDATE $table SET $col=? WHERE $col=?")->execute([$new, $old]); }
+            catch (Throwable $e) { /* table not created yet on a partial upgrade */ }
+        }
+    }
+}
+// Sales used to keep its own list of work types. It now shares the one
+// "Type of inspection" master, so a quote, a call and a deputation all say the
+// same thing. Only two codes differed in meaning; the rest were already equal.
+const SERVICE_TYPE_ALIASES = ['PROJECT_DEP' => 'DEPUTATION', 'DOC_REVIEW' => 'DESKTOP'];
+function crm_migrate_service_types() {
+    foreach (SERVICE_TYPE_ALIASES as $old => $new) {
+        try { db()->prepare("UPDATE quote_lines SET service_type=? WHERE service_type=?")->execute([$new, $old]); }
+        catch (Throwable $e) { /* table not created yet on a partial upgrade */ }
+    }
+    // The old Sales-only list is retired; its values now live in inspection_type.
+    if (function_exists('lk_type') && lk_type('crm_service_type')) {
+        try {
+            $t = lk_type('crm_service_type');
+            db()->prepare("DELETE FROM lookup_values WHERE type_id=?")->execute([$t['id']]);
+            db()->prepare("DELETE FROM lookup_types WHERE id=?")->execute([$t['id']]);
+        } catch (Throwable $e) {}
+    }
+}
+function service_types_pending() {
+    $in = "'" . implode("','", array_keys(SERVICE_TYPE_ALIASES)) . "'";
+    try {
+        if ((int)db()->query("SELECT COUNT(*) FROM quote_lines WHERE service_type IN ($in)")->fetchColumn() > 0) return true;
+        return (int)db()->query("SELECT COUNT(*) FROM lookup_types WHERE type_key='crm_service_type'")->fetchColumn() > 0;
+    } catch (Throwable $e) { return false; }
+}
+function charge_units_pending() {
+    $in = "'" . implode("','", array_keys(CHARGE_UNIT_ALIASES)) . "'";
+    foreach ([['quote_lines', 'unit'], ['po_line_items', 'item_type']] as [$t, $c]) {
+        try { if ((int)db()->query("SELECT COUNT(*) FROM $t WHERE $c IN ($in)")->fetchColumn() > 0) return true; }
+        catch (Throwable $e) { return false; }
+    }
+    return false;
+}
 // Order type (§17): OPEN = ARC / call-off with no fixed PO; LINE = fixed line items.
 const ORDER_TYPES = ['OPEN' => 'Open order (ARC / call-off)', 'LINE' => 'Line-item order'];
 
@@ -149,7 +193,7 @@ function crm_ensure_schema() {
             id $pk, quote_id INT, line_no INT DEFAULT 0, sbu VARCHAR(20) DEFAULT '',
             service_type VARCHAR(30) DEFAULT '', subtypes VARCHAR(400) DEFAULT '', description VARCHAR(400) DEFAULT '',
             location VARCHAR(255) DEFAULT '', location_type VARCHAR(20) DEFAULT 'REGISTERED',
-            order_type VARCHAR(10) DEFAULT 'LINE', qty DECIMAL(12,2) DEFAULT 0, unit VARCHAR(20) DEFAULT 'DAY',
+            order_type VARCHAR(10) DEFAULT 'LINE', qty DECIMAL(12,2) DEFAULT 0, unit VARCHAR(20) DEFAULT 'MANDAY',
             rate DECIMAL(14,2) DEFAULT 0, amount DECIMAL(14,2) DEFAULT 0,
             deliverables VARCHAR(500) DEFAULT '', notes VARCHAR(400) DEFAULT '')",
 
@@ -200,8 +244,13 @@ function crm_migrate() {
     }
     // Editable master for lost reasons (§ owner: research a dropdown + "Other").
     if (function_exists('lk_ensure_type_map')) lk_ensure_type_map('quote_lost_reason', 'Quote lost reason', QUOTE_LOST_REASONS);
-    // Editable master for CRM service / job types (§18, §25).
-    if (function_exists('lk_ensure_type_map')) lk_ensure_type_map('crm_service_type', 'CRM service / job type', CRM_SERVICE_TYPES);
+    // Sales and Operations now pick the type of work from ONE list, so what is
+    // quoted is the same thing that later appears on the call and the
+    // deputation. The two Sales-only codes are rewritten to their equivalents.
+    crm_migrate_service_types();
+    // A quote line, a rate card and a PO line all charge in the same units, so
+    // they now share one list — rewrite the old per-module codes.
+    crm_migrate_charge_units();
 }
 
 // ---- Small helpers ---------------------------------------------------------
@@ -357,7 +406,7 @@ function ops_crm_quotes($route, $method) {
         $preInq = (!$q && ($_GET['inquiry'] ?? '') !== '') ? crm_inquiry_get((int)$_GET['inquiry']) : null;
         view('ops/crm/quote_form', ['q' => $q, 'lines' => $q ? crm_quote_lines($q['id']) : [], 'preInq' => $preInq,
             'clients' => clients_list(), 'offices' => offices_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
-            'svcOpts' => lk_options_or('crm_service_type', CRM_SERVICE_TYPES), 'unitOpts' => QUOTE_UNITS,
+            'svcOpts' => lk_options_or('inspection_type', INSPECTION_TYPES), 'unitOpts' => QUOTE_UNITS,
             'orderOpts' => ORDER_TYPES, 'locTypes' => QUOTE_LOCATION_TYPES, 'delivOpts' => lk_options_or('deliverable', DELIVERABLES)]);
         return;
     }
@@ -587,7 +636,7 @@ function crm_float_ops_packet($q) {
         . "\nService requirement:\n" . $svc . "\n\nOrder lines:\n";
     foreach ($lines as $i => $l) {
         $b .= ($i + 1) . ". [" . (lk_options_or('order_type', ORDER_TYPES)[$l['order_type']] ?? $l['order_type']) . "] " . $l['description']
-            . " — " . rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.') . " " . (lk_options_or('quote_unit', QUOTE_UNITS)[$l['unit']] ?? $l['unit'])
+            . " — " . rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.') . " " . (lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit'])
             . " × ₹" . number_format((float)$l['rate'], 0) . " = ₹" . number_format((float)$l['amount'], 0) . "\n";
     }
     $att = [];
@@ -796,11 +845,11 @@ function docx_repair_tokens($xml) {
 function docx_line_map($l, $i) {
     return [
         'l_no' => $i, 'l_sbu' => lk_options_or('sbu', OPS_SBUS)[$l['sbu']] ?? $l['sbu'],
-        'l_service' => lk_options_or('crm_service_type', CRM_SERVICE_TYPES)[$l['service_type']] ?? $l['service_type'],
+        'l_service' => lk_options_or('inspection_type', INSPECTION_TYPES)[$l['service_type']] ?? $l['service_type'],
         'l_subtypes' => $l['subtypes'], 'l_desc' => $l['description'], 'l_location' => $l['location'],
         'l_order' => lk_options_or('order_type', ORDER_TYPES)[$l['order_type']] ?? $l['order_type'],
         'l_qty' => rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.'),
-        'l_unit' => lk_options_or('quote_unit', QUOTE_UNITS)[$l['unit']] ?? $l['unit'],
+        'l_unit' => lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit'],
         'l_rate' => number_format((float)$l['rate'], 2), 'l_amount' => number_format((float)$l['amount'], 2),
     ];
 }

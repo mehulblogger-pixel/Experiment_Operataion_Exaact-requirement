@@ -48,10 +48,10 @@ const IDEMS_REPORT_SEED = [
 ];
 const IDEMS_CATEGORIES = ['TPIA_REPORT'=>'TPIA report','ENDORSEMENT'=>'Manufacturer endorsement','ADMIN'=>'Timesheet / admin','SUMMARY'=>'Summary / periodic'];
 // Report-instance lifecycle.
-const IDEMS_STATUS = ['DRAFT'=>'Draft','SUBMITTED'=>'Submitted','UNDER_REVIEW'=>'Under review','APPROVED'=>'Approved','ISSUED'=>'Issued','REJECTED'=>'Returned','ARCHIVED'=>'Archived'];
+const IDEMS_STATUS = ['DRAFT'=>'Draft','SUBMITTED'=>'Submitted','UNDER_REVIEW'=>'Under review','APPROVED'=>'Approved','ISSUED'=>'Issued','REJECTED'=>'Sent back','ARCHIVED'=>'Archived'];
 const IDEMS_OPEN_STATES = ['DRAFT','SUBMITTED','UNDER_REVIEW','REJECTED'];
-const IDEMS_RESULTS = ['ACCEPTED'=>'Accepted','ACCEPTED_COND'=>'Accepted with conditions','REJECTED'=>'Rejected','HOLD'=>'Hold','NA'=>'Not applicable'];
-const IDEMS_RELEASE = ['RELEASED'=>'Released','RELEASED_COND'=>'Released with conditions','NOT_RELEASED'=>'Not released','PENDING'=>'Pending'];
+const IDEMS_RESULTS = ['ACCEPTED'=>'Accepted','ACCEPTED_COND'=>'Accepted with observations','REJECTED'=>'Rejected','HOLD'=>'Hold','NA'=>'Not applicable'];
+const IDEMS_RELEASE = ['RELEASED'=>'Released','RELEASED_COND'=>'Released with observations','NOT_RELEASED'=>'Not released','PENDING'=>'Pending'];
 
 // ---------------------------------------------------------------------------
 //  Schema
@@ -1659,7 +1659,7 @@ function ops_idems_templates($route, $method) {
 // ===========================================================================
 const ENDORSE_DOC_TYPES = ['MTC'=>'Material Test Certificate (MTC)','NDT'=>'NDT Report','HYDRO'=>'Hydrostatic Test Report','DIM'=>'Dimensional Report','PAINT'=>'Painting Report','PWHT'=>'PWHT Report','HARD'=>'Hardness Report','FAT'=>'FAT Report','CALIB'=>'Calibration Certificate','WELD'=>'Welding Record','HTR'=>'Heat Treatment Report','OTHER'=>'Other quality record'];
 const ENDORSE_STATUS = ['UPLOADED'=>'Uploaded','UNDER_REVIEW'=>'Under review','ENDORSED'=>'Endorsed','REJECTED'=>'Rejected','ARCHIVED'=>'Archived'];
-const ENDORSE_DECISION = ['ENDORSED'=>'Reviewed &amp; Endorsed','ENDORSED_COND'=>'Endorsed with comments','REJECTED'=>'Rejected'];
+const ENDORSE_DECISION = ['ENDORSED'=>'Reviewed &amp; endorsed','ENDORSED_COND'=>'Endorsed with observations','REJECTED'=>'Rejected'];
 function endorse_status_pill($s) { return ['UPLOADED'=>'p-mut','UNDER_REVIEW'=>'p-warn','ENDORSED'=>'p-ok','REJECTED'=>'p-bad','ARCHIVED'=>'p-mut'][$s] ?? 'p-mut'; }
 function endorse_can_edit($e) { return $e && empty($e['finalized']) && (is_master() || can('mod.idems.edit')); }
 function endorsement_files($eid, $kind = null) {

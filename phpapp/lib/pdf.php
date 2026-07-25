@@ -206,7 +206,7 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
     $sr = 0;
     foreach ($lines as $l) {
         $sr++;
-        $desc = trim(($l['description'] ?: (CRM_SERVICE_TYPES[$l['service_type']] ?? $l['service_type'])) . ($l['order_type'] === 'OPEN' ? '  [ARC / open order]' : ''));
+        $desc = trim(($l['description'] ?: (lk_options_or('inspection_type', INSPECTION_TYPES)[$l['service_type']] ?? $l['service_type'])) . ($l['order_type'] === 'OPEN' ? '  [ARC / open order]' : ''));
         $wrapped = $p->wrap($desc, 9, $cols[2] - $cols[1] - 6);
         $rh = max($rowH, count($wrapped) * 12 + 6);
         $p->needSpace($rh);
@@ -215,7 +215,7 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
         $p->y = $top + 3;
         $p->text($cols[0] + 3, (string)$sr, 9);
         $p->text($cols[2] + 3, rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.'), 9, false, null, $cols[3] - 3, 'R');
-        $p->text($cols[3] + 3, lk_options_or('quote_unit', QUOTE_UNITS)[$l['unit']] ?? $l['unit'], 9);
+        $p->text($cols[3] + 3, lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit'], 9);
         $p->text($cols[4] + 3, number_format((float)$l['rate'], 0), 9, false, null, $cols[5] - 3, 'R');
         $p->text($cols[4] + 3, number_format((float)$l['amount'], 0), 9, false, null, $x2 - 3, 'R');
         // wrapped description lines
