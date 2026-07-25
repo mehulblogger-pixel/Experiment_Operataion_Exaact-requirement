@@ -36,6 +36,7 @@ try {
     require __DIR__ . '/lib/crm.php';
     require __DIR__ . '/lib/pdf.php';
     require __DIR__ . '/lib/ai.php';
+    require __DIR__ . '/lib/workforce.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine());
@@ -81,6 +82,10 @@ try {
     db()->query("SELECT document_number FROM crm_templates LIMIT 1");
     db()->query("SELECT quotation_id FROM jobs LIMIT 1");
     db()->query("SELECT cv_keywords FROM candidates LIMIT 1");
+    // Workforce pack — availability board, weekly working days, reporting manager.
+    db()->query("SELECT weekly_working_days FROM inspectors LIMIT 1");
+    db()->query("SELECT id FROM inspector_day_status LIMIT 1");
+    db()->query("SELECT reports_to_name FROM users LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();

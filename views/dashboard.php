@@ -140,6 +140,25 @@
     <?php else: ?><p class="muted">Nothing pending — all calls are scheduled. 🎉</p><?php endif; ?>
     <?php endif; $secSched = ob_get_clean();
 
+    // ---------- section: inspector availability (coordinator / manager / branch) ----------
+    $secAvail = '';
+    if (function_exists('can_manage_availability') && can_manage_availability()) {
+      $avRows = inspector_availability(scope_offices(), $today);
+      if ($avRows) {
+        $av = ['AVAILABLE'=>0,'ON_JOB'=>0,'LEAVE'=>0,'OTHER'=>0];
+        foreach ($avRows as $r) { $s=$r['eff_status']; if($s==='AVAILABLE')$av['AVAILABLE']++; elseif($s==='ON_JOB')$av['ON_JOB']++; elseif($s==='LEAVE')$av['LEAVE']++; else $av['OTHER']++; }
+        ob_start(); ?>
+        <div class="ctitle" style="margin-top:22px"><h3>Inspector availability — today</h3><a href="/availability">Open board →</a></div>
+        <div class="qcards">
+          <a class="qcard tone-ok" href="/availability"><div class="qic">🟢</div><div class="qn"><?= (int)$av['AVAILABLE'] ?></div><div class="ql">Available / free</div></a>
+          <a class="qcard tone-info" href="/availability"><div class="qic">🧭</div><div class="qn"><?= (int)$av['ON_JOB'] ?></div><div class="ql">On job today</div></a>
+          <a class="qcard tone-bad" href="/availability"><div class="qic">🌴</div><div class="qn"><?= (int)$av['LEAVE'] ?></div><div class="ql">On leave</div></a>
+          <a class="qcard tone-warn" href="/availability"><div class="qic">📚</div><div class="qn"><?= (int)$av['OTHER'] ?></div><div class="ql">Training / office / other</div></a>
+        </div>
+        <?php $secAvail = ob_get_clean();
+      }
+    }
+
     // ---------- section: Sales / CRM pipeline ----------
     $crmView = can('mod.quotes.view'); $secCrm = ''; $isExec = in_array($role, ['BUSINESS_DIRECTOR','SBU_HEAD','BRANCH_MANAGER'], true) || is_master();
     if ($crmView) {
@@ -170,12 +189,12 @@
 
     // ---------- role-based ordering ----------
     echo $secKpi;
-    if ($isExec)          { echo $secCrm; echo $secMoney; echo $secCharts; echo $secQuick; echo $secSched; }
+    if ($isExec)          { echo $secCrm; echo $secMoney; echo $secCharts; echo $secAvail; echo $secQuick; echo $secSched; }
     elseif (in_array($role, ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'], true))
                           { echo $secCrm; echo $secQuick; echo $secMoney; echo $secCharts; }
-    elseif ($moneyFirst)  { echo $secMoney; echo $secCharts; echo $secSched; echo $secQuick; echo $secCrm; }
-    elseif ($schedFirst)  { echo $secSched; echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; }
-    else                  { echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; echo $secSched; }
+    elseif ($moneyFirst)  { echo $secMoney; echo $secCharts; echo $secSched; echo $secAvail; echo $secQuick; echo $secCrm; }
+    elseif ($schedFirst)  { echo $secSched; echo $secAvail; echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; }
+    else                  { echo $secAvail; echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; echo $secSched; }
   ?>
   <?php
     $deskAdmin = is_coordinator_level() || is_admin_level();

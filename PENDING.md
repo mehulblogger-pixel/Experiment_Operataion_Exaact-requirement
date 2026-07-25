@@ -2,6 +2,36 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🧭 NEXT BIG BUILD — Workforce, hierarchy & permissions pack (owner request 2026-07, before dashboards)
+
+Five owner requirements, to be built as extensions of existing tables (reuse, don't duplicate):
+
+1. **Daily inspector-availability board** on the dashboard of the *office's* Coordinator,
+   Operation Manager & Branch Manager: how many inspectors are FREE vs ALLOCATED today,
+   with a one-click per-inspector dropdown to set today's status — Available / On job /
+   On leave / Training / In office / Half-day / etc. "Allocated" is auto-derived from jobs
+   scheduled today; the dropdown writes a date-specific override.
+   → new `inspector_day_status` table (inspector_id, day, status, note, set_by), AJAX set
+   endpoint, dashboard panel scoped to the viewer's office(s).
+2. **8.5-hour daily cap** — no inspector may log > 8 h 30 m (= 8.5) of working hours on any
+   single working day. Enforce on the timesheet/voucher `hours` entry (sum per inspector+date),
+   block + warn on exceed.
+3. **Weekly working days = 5 or 5.5 per employee** — configurable field on inspectors (and
+   surfaced on users). Feeds per-person working-day / leave / utilisation maths.
+4. **Reporting-manager chain + auto org hierarchy** — assign each position a reporting manager
+   manually (name, position, email; link a system user when one exists). System then derives the
+   N+1 chain automatically (already have `users.reports_to_id`). Wire the chain into:
+   (a) CRM quote approvals — option to route up the reporting chain in addition to the existing
+   amount/SBU rules; (b) inspection/report approval — report/closure routes to the inspector's
+   reporting manager. Org-hierarchy view under Settings.
+5. **Exhaustive, role-divided permissions with one-click presets** — make the permission catalogue
+   complete & clearly worded, grouped, and give the access admin a "recommended set per role"
+   that applies in a single selection, with a readable per-role explanation so an admin knows
+   at a glance who gets what.
+
+Then: dashboards for all roles.
+
+
 ## 🧭 NEXT BIG BUILD — CRM / Marketing & Sales module (roadmap pending owner approval, 2026-07)
 
 The whole pre-operations sales funnel: **inquiry → quotation → approval → send →

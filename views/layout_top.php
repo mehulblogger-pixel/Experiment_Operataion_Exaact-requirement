@@ -41,6 +41,7 @@
         <div class="s-grp">Operations</div>
         <?php if (can('mod.calls.view')): ?><a class="s-item<?= $navOn(['calls','call']) ?>" href="/calls"><span class="s-ic">☎️</span><span>Calls</span></a><?php endif; ?>
         <?php if (can('mod.jobs.view')): ?><a class="s-item<?= $navOn(['jobs','job']) ?>" href="/jobs"><span class="s-ic">🗂</span><span>Jobs</span></a><?php endif; ?>
+        <?php if (can('mod.jobs.view') && function_exists('can_manage_availability') && can_manage_availability()): ?><a class="s-item<?= $navOn(['availability']) ?>" href="/availability"><span class="s-ic">🟢</span><span>Availability</span></a><?php endif; ?>
         <?php if (can('mod.vouchers.view')): ?><a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span>Vouchers</span></a><?php endif; ?>
         <?php if (can('mod.hiring.view')): ?><a class="s-item<?= $navOn(['candidates','candidate']) ?>" href="/candidates"><span class="s-ic">🧑‍💼</span><span>Hiring</span></a><?php endif; ?>
         <?php if (can('mod.hiring.view')): ?><a class="s-item<?= $navOn(['requisitions','requisition']) ?>" href="/requisitions"><span class="s-ic">📋</span><span>Requisitions</span></a><?php endif; ?>

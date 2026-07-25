@@ -31,6 +31,16 @@
       </select><small class="muted">Manage under <a href="/lookup?key=trade">Trade</a> / <a href="/lookup?key=skill">Skill</a>.</small></div>
     <div class="ff"><label>Status</label>
       <select class="form-control" name="status"><?php foreach (['ACTIVE'=>'Active','INACTIVE'=>'Inactive'] as $k=>$v): ?><option value="<?= $k ?>" <?= (($ins['status'] ?? 'ACTIVE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Posted office <span class="muted">— shows on that office's availability board</span></label>
+      <select class="form-control searchable" name="home_office_id"><option value="">—</option>
+        <?php foreach (($offices ?? []) as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ((int)($ins['home_office_id'] ?? 0)===(int)$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
+      </select></div>
+    <div class="ff"><label>Weekly working days</label>
+      <select class="form-control" name="weekly_working_days"><?php foreach (['6'=>'6 days (Mon–Sat)','5.5'=>'5.5 days (alternate Sat off)','5'=>'5 days (Mon–Fri)'] as $k=>$v): ?><option value="<?= $k ?>" <?= ((string)($ins['weekly_working_days'] ?? '6')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Reporting manager <span class="muted">— for approvals & hierarchy</span></label>
+      <select class="form-control searchable" name="reports_to_id"><option value="">—</option>
+        <?php foreach (($managers ?? []) as $m): $nm=trim(($m['first_name']??'').' '.($m['last_name']??'')) ?: $m['username']; ?><option value="<?= (int)$m['id'] ?>" <?= ((int)($ins['reports_to_id'] ?? 0)===(int)$m['id'])?'selected':'' ?>><?= e($nm) ?> · <?= e(ORG_ROLES[$m['role']] ?? $m['role']) ?></option><?php endforeach; ?>
+      </select></div>
     <?php if (can_see_salary()): ?>
     <div class="ff"><label>Annual CTC (₹) <span class="muted">— cost split across SBUs</span></label><input class="form-control" type="number" step="0.01" name="salary_ctc" value="<?= e($ins['salary_ctc'] ?? '') ?>"></div>
     <div class="ff"><label>Hiring agency <span class="muted">— if engaged via an external agency</span></label><input class="form-control" name="agency_name" value="<?= e($ins['agency_name'] ?? '') ?>" placeholder="e.g. Patel Manpower"></div>
