@@ -2,6 +2,46 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🚀 NEXT BIG BUILD — IDEMS: Intelligent Inspection Documentation, Reporting & Endorsement Engine (TPIA Industry Pack) — owner spec 2026-07, roadmap pending approval
+
+A world-class TPIA documentation ecosystem. 24-part spec. Two core workflows:
+(A) TPIA prepares & issues its OWN reports; (B) TPIA reviews/verifies/endorses/certifies
+manufacturer/vendor/contractor documents. One platform for both. Configurable, mobile-friendly,
+offline-capable, AI-ready, no-code report builder.
+
+REUSE (already built — do NOT duplicate): crm_templates docx engine + doc/format-number stamping,
+lib/pdf.php SimplePDF + signature image + per-company letterhead, custom-fields engine (dynamic
+fields on any entity, cascading lookups), lookup masters, approval-chain (quote_approval_rules +
+REPORTS_TO reporting-manager chain), report-approval + escalation, lib/ai.php provider seam,
+email_log, deliverables master (IR/IRN/NCR/CoC…), FY/office/SBU scope.
+
+Proposed phasing (each phase = its own commit, tested):
+- P1 Foundation: report_types registry (seed full TPIA list, admin adds unlimited) + configurable
+  IRN engine (Company/Branch/Year/Client/Project/ReportType/Serial, no-code rules, zero-duplicate)
+  + report_docs instance model + immutable finalize + idems_audit log + Document Register.
+- P2 No-code Report Builder: sections/sub-sections, dynamic/conditional/calculated/mandatory/hidden
+  fields, repeatable tables, attachments/photos/GPS/QR — reuse & extend custom-fields.
+- P3 Workflow & approvals: configurable multi-level chain (per inspector/common/branch/dept/client/
+  project/type), temp approver on leave, SLA auto-escalation, delegation, reject/send-back w/ remarks.
+- P4 Auto signatures + immutable system timestamps (inspector from profile, approver on approve),
+  Branch-App-Mgr-only timestamp edit w/ tamper-proof audit (old/new/user/reason/time).
+- P5 Client-specific formats: upload DOCX/PDF template, map fields, pixel-match output.
+- P6 Manufacturer document verification & endorsement (upload→review→verify→comment→approve/reject→
+  digitally endorse→archive) without altering the original; full endorsement audit trail.
+- P7 Technical Writing Assistant (no AI): grammar/spelling, engineering phrase library, plain
+  observation → engineering language, standard conclusions/acceptance/rejection statements.
+- P8 Smart Remarks & auto Release Note from finalized report.
+- P9 AI-assisted (uses ai.php): read PO/QAP/drawings/specs/MTCs, missing-doc + revision-mismatch +
+  conflict detection, draft remarks/narratives — inspector always final authority.
+- P10 Smart photo/evidence mgmt (compress, timestamp, GPS, link to checkpoint, annotate, dedupe).
+- P11 Super-Admin audit & compliance dashboard (every critical action, soft-delete only, searchable).
+- P12 Offline-first / mobile field UX (constraint: plain PHP on shared hosting → responsive +
+  localStorage autosave/draft + sync-on-reconnect; true native offline is a later PWA effort).
+- P13 Future self-learning suggestions from approved reports (suggestions only, never auto-alter).
+
+Constraint note: MilesWeb shared PHP hosting — no Node/build; "offline-first" is delivered as a
+responsive PWA-lite (localStorage drafts + autosave + sync), not a native app.
+
 ## 🧭 NEXT BIG BUILD — Workforce, hierarchy & permissions pack (owner request 2026-07, before dashboards)
 
 Five owner requirements, to be built as extensions of existing tables (reuse, don't duplicate):
