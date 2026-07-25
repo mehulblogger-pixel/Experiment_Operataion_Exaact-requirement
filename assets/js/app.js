@@ -267,7 +267,16 @@
   function fillSelect(sel, rows, keep) {
     if (!sel) return;
     sel.innerHTML = '<option value="">—</option>';
-    rows.forEach(function (r) { var o = document.createElement('option'); o.value = r.id; o.textContent = r.label; if (String(r.id) === String(keep)) o.selected = true; sel.appendChild(o); });
+    rows.forEach(function (r) {
+      var o = document.createElement('option'); o.value = r.id; o.textContent = r.label;
+      // Carry the commercial detail on the option itself, so choosing a line can
+      // price the call without another round trip.
+      if (r.rate !== undefined && r.rate !== null) o.dataset.rate = r.rate;
+      if (r.unit) o.dataset.unit = r.unit;
+      if (r.balance !== undefined) o.dataset.balance = r.balance;
+      if (String(r.id) === String(keep)) o.selected = true;
+      sel.appendChild(o);
+    });
   }
   function initCallLinks() {
     var client = document.getElementById('client_sel');
@@ -298,7 +307,12 @@
       if (!po || !po.value) { fillSelect(poLine, [], ''); return; }
       fetch('/po-lines?id=' + encodeURIComponent(po.value))
         .then(function (r) { return r.json(); })
-        .then(function (rows) { fillSelect(poLine, rows, keep || poLine.value); autoPick(poLine, rows); })
+        .then(function (rows) {
+          fillSelect(poLine, rows, keep || poLine.value);
+          // autoPick fires change, which prices it; if a line was already chosen
+          // server-side there is no change event, so price it explicitly.
+          if (!autoPick(poLine, rows) && poLine.value) priceFromPoLine();
+        })
         .catch(function () {});
     }
     function loadClientLinks() {
@@ -313,6 +327,36 @@
           if (!autoPick(po, rows)) loadPoLines();
         }).catch(function () {});
     }
+    // §l — the value billable comes off the purchase order: the line's own rate,
+    // times the units this call uses. Typing it again is how a call ends up
+    // billed at a figure the order never carried.
+    function priceFromPoLine() {
+      if (!poLine) return;
+      var o = poLine.options[poLine.selectedIndex];
+      if (!o || !o.value) return;
+      var rateBox = document.getElementById('billable_rate'),
+          basis = document.getElementById('billable_basis'),
+          qtyBox = document.getElementById('billable_qty'),
+          note = document.getElementById('po_bal_note');
+      if (rateBox && o.dataset.rate) rateBox.value = o.dataset.rate;
+      if (basis && o.dataset.unit) {
+        var has = Array.prototype.some.call(basis.options, function (x) { return x.value === o.dataset.unit; });
+        if (has) { basis.value = o.dataset.unit; basis.dispatchEvent(new Event('change', { bubbles: true })); }
+      }
+      if (window.__recalcBillable) window.__recalcBillable();
+      // Asking for more than the order has left is not refused — the order may be
+      // topped up — but nobody should find out at invoicing.
+      if (note) {
+        var bal = parseFloat(o.dataset.balance || 'NaN'), q = parseFloat(qtyBox ? qtyBox.value : '0');
+        if (!isNaN(bal)) {
+          note.textContent = q > bal
+            ? '⚠ This ' + (window.__callWord || 'call') + ' uses ' + q + ' but only ' + bal + ' is left on that PO line.'
+            : bal + ' left on this PO line after ' + (q || 0) + ' used here.';
+          note.className = q > bal ? 'down' : 'muted';
+        }
+      }
+    }
+    if (poLine) poLine.addEventListener('change', priceFromPoLine);
     if (client) client.addEventListener('change', loadClientLinks);
     if (po && poLine) po.addEventListener('change', function () { loadPoLines(); });
     // On an existing call the selects are already filled server-side; still load

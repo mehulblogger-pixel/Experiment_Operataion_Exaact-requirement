@@ -203,8 +203,10 @@
       </select></div>
     <div class="ff"><label>PO line item <span class="muted">(tracks quantity)</span></label>
       <select class="form-control searchable" id="po_line_sel" name="po_line_item_id"><option value="">—</option>
-        <?php if ($call && ($call['po_line_item_id']??null)) { $li=ops_one("SELECT id,description FROM po_line_items WHERE id=?", [$call['po_line_item_id']]); if ($li) echo '<option value="'.(int)$li['id'].'" selected>'.e($li['description']).'</option>'; } ?>
-      </select></div>
+        <?php if ($call && ($call['po_line_item_id']??null)) { $li=ops_one("SELECT id,description,rate,item_type,quantity,consumed FROM po_line_items WHERE id=?", [$call['po_line_item_id']]); if ($li) echo '<option value="'.(int)$li['id'].'" selected data-rate="'.e((string)$li['rate']).'" data-unit="'.e((string)$li['item_type']).'" data-balance="'.e((string)((float)$li['quantity'] - (float)$li['consumed'])).'">'.e($li['description']).'</option>'; } ?>
+      </select>
+      <?php // §l — what the order has left, against what this call is asking for. ?>
+      <small class="muted" id="po_bal_note"></small></div>
     <div class="ff ff-check"><input type="checkbox" name="notify_manager" <?= ($call && !empty($call['notify_manager']))?'checked':'' ?>><label>Also e-mail the branch manager on forwarding</label></div>
     <div class="ff ff-wide"><label>Notes</label><input class="form-control" name="notes" value="<?= e($call['notes'] ?? '') ?>"></div>
     <?php render_custom_fields('call', $cfvals ?? []); ?>
@@ -633,4 +635,5 @@
   </div>
 </div>
 <script>window.ACTIVITY = <?= json_encode($act) ?>;
+window.__callWord = <?= json_encode(Tl('call')) ?>;
 window.INSPTYPES = <?= json_encode(lk_options_or('inspection_type', INSPECTION_TYPES)) ?>;</script>

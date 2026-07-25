@@ -1767,9 +1767,18 @@ function ops_dispatch($route, $method) {
         case $route === 'po-lines':
             header('Content-Type: application/json');
             $out = [];
-            foreach (ops_all("SELECT id, description, quantity, consumed, item_type FROM po_line_items WHERE purchase_order_id=? ORDER BY id", [(int)($_GET['id'] ?? 0)]) as $l) {
+            foreach (ops_all("SELECT id, description, quantity, consumed, item_type, rate FROM po_line_items WHERE purchase_order_id=? ORDER BY id", [(int)($_GET['id'] ?? 0)]) as $l) {
                 $bal = (float)$l['quantity'] - (float)$l['consumed'];
-                $out[] = ['id' => (int)$l['id'], 'label' => $l['description'] . ' — bal ' . $bal . ' ' . (lk_options_or('charge_unit', PO_ITEM_TYPES)[$l['item_type']] ?? '')];
+                // §l — the rate and the unit come back too, so the call can price
+                // itself off the order rather than off somebody's memory, and the
+                // balance is there to be checked against what is being asked for.
+                $out[] = [
+                    'id'    => (int)$l['id'],
+                    'label' => $l['description'] . ' — bal ' . $bal . ' ' . (lk_options_or('charge_unit', PO_ITEM_TYPES)[$l['item_type']] ?? ''),
+                    'rate'  => $l['rate'] === null ? null : (float)$l['rate'],
+                    'unit'  => (string)$l['item_type'],
+                    'balance' => $bal,
+                ];
             }
             echo json_encode($out); return true;
     }
