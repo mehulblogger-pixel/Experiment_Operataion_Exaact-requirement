@@ -279,6 +279,11 @@ function ops_migrate() {
     ensure_column('calls', 'inspection_type', "VARCHAR(40) DEFAULT ''");
     ensure_column('calls', 'inspection_type_other', "VARCHAR(150) DEFAULT ''");
     ensure_column('calls', 'site_address_id', 'INT NULL');
+    // §i — the reporting rhythm and the reports the client wants are agreed on
+    // the call, not invented at allocation. Both flow onto the job.
+    ensure_column('calls', 'reporting_frequency', "VARCHAR(20) DEFAULT ''");
+    ensure_column('calls', 'report_custom_days', 'INT NULL');
+    ensure_column('calls', 'deliverables', "VARCHAR(255) DEFAULT ''");
     ensure_column('calls', 'po_id', 'INT NULL');
     ensure_column('calls', 'po_line_item_id', 'INT NULL');
     // Contracting-vs-executing credit model
@@ -2105,10 +2110,15 @@ function ops_calls($route, $method) {
                 'product_category','product_other','deputation_type','expected_credit','credit_type',
                 'billable_value','billable_basis','call_received_date','inspection_required_date','notes',
                 'quotation_id','quote_line_id','contract_number','folder_link',
-                'inspection_dates','schedule_end_date','schedule_weekdays'];
+                'inspection_dates','schedule_end_date','schedule_weekdays',
+                'reporting_frequency','report_custom_days','deliverables'];
             $wasForwarded = $call ? ($call['executing_office_id'] ?? null) : null;
             $forwardNow = $execOffice && !$wasForwarded; // first time it gets an executing branch
             $notifyMgr = !empty($b['notify_manager']) ? 1 : 0;
+            // §i — the report types are a multi-select, so they arrive as an array
+            // and are stored as a CSV of report-type codes: the same shape the job
+            // uses, which is what lets them be handed over untouched at allocation.
+            $b['deliverables'] = implode(',', array_filter((array)($b['deliverables'] ?? [])));
             // §11 — the inspection is at the client's own premises: the same
             // partner is both the customer and the site. Flag them as a site
             // partner so they appear in the site list from now on, instead of

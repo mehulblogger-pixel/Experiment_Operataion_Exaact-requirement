@@ -49,7 +49,7 @@
       </div></div>
 
     <div class="ff"><label>Product category <span class="muted">— spelling is unified automatically</span></label>
-      <input class="form-control" name="product_category" list="prodcats" value="<?= e($g('product_category')) ?>" placeholder="e.g. Transformers">
+      <input class="form-control" name="product_category" list="prodcats" value="<?= e(product_cat_label($g('product_category'))) ?>" placeholder="e.g. Transformers">
       <datalist id="prodcats"><?php foreach ($prodCats as $pc): ?><option value="<?= e($pc) ?>"><?php endforeach; ?></datalist></div>
     <div class="ff"><label>Where did this <?= e(Tl('quote')) ?> come from?</label>
       <select class="form-control" name="origin" id="origin">

@@ -97,7 +97,11 @@
       <input class="form-control" type="date" name="inspection_required_date" value="<?= e($call['inspection_required_date'] ?? '') ?>"></div>
   </div>
 
-  <div class="panel" style="background:var(--soft);margin:8px 0">
+  <?php // §h — a single-day call needs one date, which is already captured above
+        // as the client's expected date. The five-date grid and the repeating
+        // pattern only make sense for a multi-day or recurring engagement, so
+        // they stay out of the way until the pattern says otherwise. ?>
+  <div class="panel" id="dates_panel" style="background:var(--soft);margin:8px 0">
     <b>Inspection dates</b> <span class="muted">— add up to 5 here; more can be added on the <?= e(Tl('job')) ?> when it is allocated.</span>
     <div class="form-grid" id="datebox" style="margin-top:8px">
       <?php for ($i = 0; $i < 5; $i++): ?>
@@ -184,6 +188,37 @@
     <?php render_custom_fields('call', $cfvals ?? []); ?>
   </div>
 
+  <?php // §i — what the client is owed in the way of reporting is agreed when the
+        // call is taken, not invented at allocation. Both fields are carried onto
+        // every job raised from this call, so the engineer is asked for exactly
+        // what was promised. ?>
+  <h3 class="tab-sub">6. Reporting owed to the <?= e(Tl('client')) ?> <span class="muted">— carried onto the <?= e(TP('job')) ?></span></h3>
+  <?php
+    $callFreq  = $call['reporting_frequency'] ?? '';
+    $callDays  = $call['report_custom_days'] ?? '';
+    $callDeliv = array_values(array_filter(array_map('trim', explode(',', (string)($call['deliverables'] ?? '')))));
+  ?>
+  <div class="form-grid">
+    <div class="ff"><label>Reporting frequency</label>
+      <select class="form-control" id="call_freq_sel" name="reporting_frequency">
+        <option value="">— decide at allocation —</option>
+        <?php foreach (lk_options_or('reporting_frequency', REPORT_FREQ) as $k=>$v): ?>
+          <option value="<?= e($k) ?>" <?= $callFreq===$k?'selected':'' ?>><?= e($v) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <small class="muted">How often the <?= e(Tl('engineer')) ?> must send progress in — shown on the <?= e(T_REG('call')) ?>.</small></div>
+    <div class="ff" id="call_days_wrap" style="<?= $callFreq==='CUSTOM'?'':'display:none' ?>"><label>…every how many days?</label>
+      <input class="form-control" type="number" min="1" name="report_custom_days" value="<?= e($callDays) ?>" placeholder="e.g. 3"></div>
+
+    <div class="ff ff-wide"><label>Types of <?= e(TP('report')) ?> required</label>
+      <div class="checkgrid">
+        <?php foreach (deliverable_options() as $k=>$v): ?>
+          <label class="chk"><input type="checkbox" name="deliverables[]" value="<?= e($k) ?>" <?= in_array($k, $callDeliv, true)?'checked':'' ?>> <?= e($v) ?></label>
+        <?php endforeach; ?>
+      </div>
+      <small class="muted">Each format ticked is handed to the <?= e(Tl('engineer')) ?> on every <?= e(Tl('job')) ?> raised from this <?= e(Tl('call')) ?>, and is the only list they can report against. Maintained in the <a href="/report-types" target="_blank"><?= e(Tl('report')) ?> types</a> register.</small></div>
+  </div>
+
   <div style="margin-top:16px;">
     <button class="btn" type="submit">Save <?= e(Tl('call')) ?></button>
     <a class="btn secondary" href="/calls">Cancel</a>
@@ -208,6 +243,31 @@
          + ' gives ' + offName(ex) + ' a credit. Enter what ' + offName(ex) + ' is to receive — they can revert with the figure they need.');
   }
   ibo.addEventListener('change', syncMoney); ex.addEventListener('change', syncMoney); syncMoney();
+
+  // ---- §h: show the date grid only when the engagement is multi-day ---------
+  var depSel = document.getElementById('dep_sel'), datesPanel = document.getElementById('dates_panel');
+  function syncDates(){
+    if (!depSel || !datesPanel) return;
+    var v = (depSel.value || '').toLowerCase();
+    var single = v.indexOf('single') >= 0 || v === '';
+    // Never hide dates that are already recorded — an existing call would look
+    // as though its schedule had been wiped.
+    var hasDates = Array.prototype.some.call(
+      datesPanel.querySelectorAll('input[type=date]'), function(i){ return !!i.value; });
+    var hasPattern = Array.prototype.some.call(
+      datesPanel.querySelectorAll('input[type=checkbox]'), function(i){ return i.checked; });
+    datesPanel.style.display = (single && !hasDates && !hasPattern) ? 'none' : '';
+  }
+  if (depSel) depSel.addEventListener('change', syncDates);
+  syncDates();
+
+  // ---- §i: "every N days" only matters when the frequency is Custom ----------
+  var freqSel = document.getElementById('call_freq_sel'), daysWrap = document.getElementById('call_days_wrap');
+  if (freqSel && daysWrap) {
+    freqSel.addEventListener('change', function(){
+      daysWrap.style.display = freqSel.value === 'CUSTOM' ? '' : 'none';
+    });
+  }
 
   // ---- §a.i / §a.ii / §a.iv: the quote drives the commercial fields ---------
   var clientSel=document.getElementById('client_sel'), qSel=document.getElementById('quote_sel'),
@@ -312,6 +372,12 @@
       .then(function(ctx){
         if (!ctx) return;
         if (ctx.contract_number) contractBox.value = ctx.contract_number;
+        // remembered so clearing the line falls back to the quote's own types
+        window.__quoteTypes = ctx.inspection_types || null;
+        // The product category is a header field on the quotation — one order,
+        // one category — so it narrows off the quote rather than off the line.
+        window.__quoteProduct = ctx.product_category || null;
+        narrowToLine(null, window.__quoteTypes);
         // Carry the commercial terms across. On a fresh call fill everything; on
         // an existing one only fill blanks, so a deliberate change is not undone.
         var sbu=document.getElementById('sbu_sel');
@@ -324,9 +390,72 @@
         fillLines(ctx);
       }).catch(function(){});
   }
+  // ---- §e: narrow the call's own dropdowns to what the order actually sold ---
+  // The whole catalogue is the wrong list once a quotation line is chosen: that
+  // line sold one service, at one product category. Offering everything is how
+  // a call gets raised for work nobody quoted. The full list stays one click
+  // away, because a client does occasionally ask for something extra.
+  var INSP_ALL = null, PROD_ALL = null;
+  function snapshot(sel){
+    return Array.prototype.map.call(sel.options, function(o){
+      return {v:o.value, t:o.textContent, s:o.selected};
+    });
+  }
+  function rebuild(sel, all, allow, keep){
+    if (!sel) return;
+    var cur = keep || sel.value;
+    sel.innerHTML = '';
+    all.forEach(function(o){
+      if (allow && o.v && allow.indexOf(o.v) === -1 && o.v !== cur) return;
+      var op = document.createElement('option');
+      op.value = o.v; op.textContent = o.t;
+      if (o.v === cur) op.selected = true;
+      sel.appendChild(op);
+    });
+    // The enhancer wraps the select in its own text input; rebuilding the
+    // options behind it means that input has to be re-synced.
+    var wrap = sel.closest('.ss-wrap');
+    if (wrap) { var inp = wrap.querySelector('input'); if (inp) inp.value = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent.trim() : ''; }
+  }
+  function narrowNote(sel, on, label){
+    var ff = sel ? sel.closest('.ff') : null; if (!ff) return;
+    var note = ff.querySelector('.narrow-note');
+    if (!on) { if (note) note.remove(); return; }
+    if (note) return;
+    note = document.createElement('small');
+    note.className = 'muted narrow-note';
+    note.innerHTML = 'Limited to what the ' + label + ' sold. <a href="#">Show every option</a>';
+    note.querySelector('a').addEventListener('click', function(e){
+      e.preventDefault();
+      if (sel.id === 'insp_sel' && INSP_ALL) rebuild(sel, INSP_ALL, null);
+      if (sel.id === 'product_sel' && PROD_ALL) rebuild(sel, PROD_ALL, null);
+      note.remove();
+    });
+    ff.appendChild(note);
+  }
+  function narrowToLine(o, ctxTypes){
+    var insp = document.getElementById('insp_sel'), prod = document.getElementById('product_sel');
+    if (insp && !INSP_ALL) INSP_ALL = snapshot(insp);
+    if (prod && !PROD_ALL) PROD_ALL = snapshot(prod);
+    // A chosen line pins one service; otherwise allow everything the quote sold.
+    var allow = (o && o.dataset.service) ? [o.dataset.service]
+              : (ctxTypes && ctxTypes.length ? ctxTypes : null);
+    if (insp && allow) { rebuild(insp, INSP_ALL, allow, allow.length === 1 ? allow[0] : insp.value); narrowNote(insp, true, 'quotation'); }
+    else if (insp && INSP_ALL) { rebuild(insp, INSP_ALL, null); narrowNote(insp, false); }
+    // The category the order was priced against, pinned the same way.
+    var pcat = window.__quoteProduct || null;
+    // A category typed freehand on the quote is not in the master list; narrowing
+    // to it would leave the box empty, so leave the full list alone instead.
+    if (pcat && PROD_ALL && !PROD_ALL.some(function(o){ return o.v === pcat; })) pcat = null;
+    if (prod && pcat) { rebuild(prod, PROD_ALL, [pcat], pcat); narrowNote(prod, true, 'quotation'); }
+    else if (prod && PROD_ALL) { rebuild(prod, PROD_ALL, null); narrowNote(prod, false); }
+  }
+
   // Choosing one line narrows the call to that part of the order.
   lineSel.addEventListener('change', function(){
-    var o = lineSel.options[lineSel.selectedIndex]; if (!o || !o.value) return;
+    var o = lineSel.options[lineSel.selectedIndex];
+    if (!o || !o.value) { narrowToLine(null, window.__quoteTypes || null); return; }
+    narrowToLine(o, null);
     var sbu=document.getElementById('sbu_sel');
     if (sbu && o.dataset.sbu) { sbu.value=o.dataset.sbu; sbu.dispatchEvent(new Event('change')); }
     var insp=document.getElementById('insp_sel');
