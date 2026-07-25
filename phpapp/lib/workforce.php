@@ -156,6 +156,97 @@ function inspector_availability($offices, $day = null) {
     return $out;
 }
 // Summary counts for the dashboard chip.
+// ---------------------------------------------------------------------------
+//  Looking ahead, not just at today
+//
+//  A call arrives now and asks for three days next week. The board has to answer
+//  two questions the day view cannot: who is free on that date, and for how long
+//  are they free from there. These read the same two sources as the day view —
+//  allocated deputations, and the coordinator's manual day statuses — so a
+//  person is never shown free on a day the board itself calls busy.
+// ---------------------------------------------------------------------------
+
+// Every day between two dates, capped so a careless range cannot run away.
+function day_span($from, $to, $cap = 120) {
+    $a = strtotime((string)$from); $b = strtotime((string)$to);
+    if (!$a || !$b || $b < $a) return [];
+    $out = []; $t = $a;
+    while ($t <= $b && count($out) < $cap) { $out[] = date('Y-m-d', $t); $t = strtotime('+1 day', $t); }
+    return $out;
+}
+
+// status per inspector per day across a span: [inspectorId][day] => STATUS.
+// One query per source for the whole span rather than one per day.
+function availability_matrix($offices, $from, $to) {
+    $days = day_span($from, $to);
+    if (!$days) return [[], [], [], []];
+    $people = inspector_availability($offices, $from);       // roster + today's detail
+    if (!$people) return [[], $days, [], []];
+    $ids = array_map(fn($p) => (int)$p['id'], $people);
+    $inIds = implode(',', $ids);
+    $first = $days[0]; $last = end($days);
+
+    // Manual statuses the coordinator has set anywhere in the span.
+    $manual = [];
+    foreach (ops_all("SELECT inspector_id, day, status FROM inspector_day_status
+                      WHERE day>=? AND day<=? AND inspector_id IN ($inIds)", [$first, $last]) as $r)
+        $manual[(int)$r['inspector_id']][$r['day']] = $r['status'];
+
+    // Days taken by an open deputation — a single scheduled day, a start/end
+    // period, or any of the visit dates now held on the deputation.
+    $busy = [];
+    foreach (ops_all("SELECT inspector_id, job_code, scheduled_date, inspection_start_date, inspection_end_date, inspection_dates
+                      FROM jobs WHERE inspector_id IS NOT NULL AND closed_flag=0 AND inspector_id IN ($inIds)") as $j) {
+        $iid = (int)$j['inspector_id'];
+        $mark = function ($d) use (&$busy, $iid, $j, $first, $last) {
+            if ($d === '' || $d < $first || $d > $last) return;
+            $busy[$iid][$d] = $j['job_code'];
+        };
+        $mark((string)$j['scheduled_date']);
+        foreach (call_dates_parse($j['inspection_dates'] ?? '') as $d) $mark($d);
+        $s = (string)$j['inspection_start_date']; $e = (string)$j['inspection_end_date'];
+        if ($s !== '') foreach (day_span(max($s, $first), min($e !== '' ? $e : $s, $last)) as $d) $mark($d);
+    }
+
+    $matrix = [];
+    foreach ($people as $p) {
+        $id = (int)$p['id'];
+        foreach ($days as $d) {
+            $matrix[$id][$d] = $manual[$id][$d] ?? (isset($busy[$id][$d]) ? 'ON_JOB' : 'AVAILABLE');
+        }
+    }
+    return [$matrix, $days, $people, $busy];
+}
+
+// From $start, how many consecutive days is this person free, and what stops
+// them? Answers "he is free from the 3rd for four days, then he is on JOB-0142".
+function free_window($matrix, $inspectorId, $start, $days) {
+    $id = (int)$inspectorId;
+    $i = array_search($start, $days, true);
+    if ($i === false) return ['free' => false, 'run' => 0, 'until' => '', 'next_busy' => '', 'next_reason' => ''];
+    if (($matrix[$id][$start] ?? 'AVAILABLE') !== 'AVAILABLE')
+        return ['free' => false, 'run' => 0, 'until' => '', 'next_busy' => $start, 'next_reason' => $matrix[$id][$start] ?? ''];
+    $run = 0; $until = $start; $nextBusy = ''; $reason = '';
+    for ($k = $i; $k < count($days); $k++) {
+        $d = $days[$k];
+        if (($matrix[$id][$d] ?? 'AVAILABLE') === 'AVAILABLE') { $run++; $until = $d; }
+        else { $nextBusy = $d; $reason = $matrix[$id][$d]; break; }
+    }
+    return ['free' => true, 'run' => $run, 'until' => $until, 'next_busy' => $nextBusy, 'next_reason' => $reason];
+}
+
+// Who is free for EVERY day of a span — the question a coordinator asks when a
+// call needs three days from the 10th.
+function free_for_span($matrix, $people, array $span) {
+    $out = [];
+    foreach ($people as $p) {
+        $id = (int)$p['id']; $ok = true;
+        foreach ($span as $d) if (($matrix[$id][$d] ?? 'AVAILABLE') !== 'AVAILABLE') { $ok = false; break; }
+        if ($ok) $out[] = $p;
+    }
+    return $out;
+}
+
 function inspector_availability_summary($offices, $day = null) {
     $rows = inspector_availability($offices, $day);
     $c = ['total' => count($rows), 'AVAILABLE' => 0, 'ON_JOB' => 0, 'LEAVE' => 0, 'OTHER' => 0];
@@ -205,7 +296,82 @@ function ops_inspector_availability($method) {
     }
     $offices = availability_scope_offices();
     $rows = inspector_availability($offices, $day);
-    view('ops/availability', ['rows' => $rows, 'day' => $day, 'offices' => $offices]);
+
+    // §d — narrow the board the way a coordinator looks at it.
+    $fOffice = (int)($_GET['office'] ?? 0);
+    $fSbu    = trim($_GET['sbu'] ?? '');
+    $fStatus = trim($_GET['status'] ?? '');
+    $fq      = trim($_GET['q'] ?? '');
+    $filtered = array_values(array_filter($rows, function ($r) use ($fOffice, $fSbu, $fStatus, $fq) {
+        if ($fOffice && (int)($r['home_office_id'] ?? 0) !== $fOffice) return false;
+        if ($fSbu !== '' && strpos(',' . ($r['sbu'] ?? '') . ',', ',' . $fSbu . ',') === false) return false;
+        if ($fStatus !== '' && ($r['eff_status'] ?? '') !== $fStatus) return false;
+        if ($fq !== '' && stripos(($r['name'] ?? '') . ' ' . ($r['emp_code'] ?? ''), $fq) === false) return false;
+        return true;
+    }));
+
+    // §b — "free to allocate" means free today AND tomorrow, so the coordinator
+    // is not handed somebody who is gone in the morning.
+    $tomorrow = date('Y-m-d', strtotime($day . ' +1 day'));
+    [$m2, $d2] = availability_matrix($offices, $day, $tomorrow);
+    $freeBoth = [];
+    foreach ($filtered as $r) {
+        $id = (int)$r['id'];
+        if (($m2[$id][$day] ?? '') === 'AVAILABLE' && ($m2[$id][$tomorrow] ?? '') === 'AVAILABLE') $freeBoth[] = $r;
+    }
+
+    // §c — check a date, and for how long each person is free from it. Optionally
+    // require a run of N days, which answers "who can take three days from the 10th".
+    $chkFrom = trim($_GET['check_from'] ?? '');
+    $chkDays = max(1, min(30, (int)($_GET['check_days'] ?? 1)));
+    $check = null;
+    if ($chkFrom !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $chkFrom)) {
+        $horizon = date('Y-m-d', strtotime($chkFrom . ' +45 days'));
+        [$mC, $dC, $peopleC] = availability_matrix($offices, $chkFrom, $horizon);
+        $span = array_slice($dC, 0, $chkDays);
+        $peopleC = array_values(array_filter($peopleC, function ($p) use ($fOffice, $fSbu, $fq) {
+            if ($fOffice && (int)($p['home_office_id'] ?? 0) !== $fOffice) return false;
+            if ($fSbu !== '' && strpos(',' . ($p['sbu'] ?? '') . ',', ',' . $fSbu . ',') === false) return false;
+            if ($fq !== '' && stripos(($p['name'] ?? '') . ' ' . ($p['emp_code'] ?? ''), $fq) === false) return false;
+            return true;
+        }));
+        $coverIds = [];
+        foreach (free_for_span($mC, $peopleC, $span) as $c) $coverIds[(int)$c['id']] = true;
+        $rowsC = [];
+        foreach ($peopleC as $p) {
+            $w = free_window($mC, (int)$p['id'], $chkFrom, $dC);
+            $rowsC[] = $p + ['win' => $w, 'covers' => isset($coverIds[(int)$p['id']])];
+        }
+        // longest free run first — the most useful person at the top
+        usort($rowsC, fn($a, $b) => ($b['win']['run'] ?? 0) <=> ($a['win']['run'] ?? 0));
+        $check = ['from' => $chkFrom, 'days' => $chkDays, 'span' => $span, 'rows' => $rowsC,
+                  'fit' => count(array_filter($rowsC, fn($r) => ($r['win']['run'] ?? 0) >= $chkDays))];
+    }
+
+    // §d — a month grid, so a whole month's cover can be seen at once.
+    $month = trim($_GET['month'] ?? '');
+    $grid = null;
+    if ($month !== '' && preg_match('/^\d{4}-\d{2}$/', $month)) {
+        $mFrom = $month . '-01';
+        $mTo   = date('Y-m-t', strtotime($mFrom));
+        [$mG, $dG, $peopleG] = availability_matrix($offices, $mFrom, $mTo);
+        $peopleG = array_values(array_filter($peopleG, function ($p) use ($fOffice, $fSbu, $fq) {
+            if ($fOffice && (int)($p['home_office_id'] ?? 0) !== $fOffice) return false;
+            if ($fSbu !== '' && strpos(',' . ($p['sbu'] ?? '') . ',', ',' . $fSbu . ',') === false) return false;
+            if ($fq !== '' && stripos(($p['name'] ?? '') . ' ' . ($p['emp_code'] ?? ''), $fq) === false) return false;
+            return true;
+        }));
+        $grid = ['month' => $month, 'days' => $dG, 'people' => $peopleG, 'matrix' => $mG];
+    }
+
+    view('ops/availability', [
+        'rows' => $filtered, 'allRows' => $rows, 'day' => $day, 'offices' => $offices,
+        'freeBoth' => $freeBoth, 'tomorrow' => $tomorrow,
+        'check' => $check, 'grid' => $grid, 'month' => $month,
+        'officeList' => offices_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
+        'fOffice' => $fOffice, 'fSbu' => $fSbu, 'fStatus' => $fStatus, 'fq' => $fq,
+        'chkFrom' => $chkFrom, 'chkDays' => $chkDays,
+    ]);
     return true;
 }
 
