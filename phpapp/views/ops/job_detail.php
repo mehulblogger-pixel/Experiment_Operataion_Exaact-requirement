@@ -19,6 +19,29 @@
 <div class="panel" style="border:1px solid var(--ok)"><b style="color:var(--ok)">✓ Payment conditions cleared</b> — advance/payment received; the deliverable may be issued.</div>
 <?php endif; ?>
 
+<?php if (($job['report_approval'] ?? '') !== ''): ?>
+  <?php $ra = $job['report_approval']; $canAppr = function_exists('can_approve_report') && can_approve_report($job); ?>
+  <div class="panel" style="border:1px solid <?= $ra==='APPROVED'?'var(--ok)':($ra==='REJECTED'?'var(--bad)':'var(--warn,#c90)') ?>">
+    <?php if ($ra==='PENDING'): ?>
+      <b>🕓 Report awaiting approval</b> from <?= e($job['inspector_name'] ?: 'the inspector') ?>'s reporting manager.
+      <?php if ($canAppr): ?>
+        <form method="post" action="/report-approve?id=<?= (int)$job['id'] ?>" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <input class="form-control" name="note" placeholder="Optional remark" style="max-width:280px">
+          <button class="btn small" type="submit" name="decision" value="approve">Approve report</button>
+          <button class="btn small secondary" type="submit" name="decision" value="reject">Send back</button>
+        </form>
+      <?php endif; ?>
+    <?php elseif ($ra==='APPROVED'): ?>
+      <b style="color:var(--ok)">✓ Report approved</b> by <?= e($job['report_approved_by'] ?: '—') ?><?= $job['report_approved_at']?' on '.e(date('d M Y', strtotime($job['report_approved_at']))):'' ?>.<?= $job['report_approval_note']?' — '.e($job['report_approval_note']):'' ?>
+    <?php else: ?>
+      <b style="color:var(--bad)">↩ Report sent back</b> by <?= e($job['report_approved_by'] ?: '—') ?><?= $job['report_approval_note']?' — '.e($job['report_approval_note']):'' ?>.
+      <?php if ($canAppr): ?>
+        <form method="post" action="/report-approve?id=<?= (int)$job['id'] ?>" style="margin-top:8px"><input type="hidden" name="decision" value="approve"><button class="btn small" type="submit">Approve now</button></form>
+      <?php endif; ?>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
 <div class="panel">
   <div class="kv-grid">
     <?php if (!empty($job['quotation_id'])): $lq = ops_one("SELECT quote_no, rev, contract_number FROM quotations WHERE id=?", [$job['quotation_id']]); ?>

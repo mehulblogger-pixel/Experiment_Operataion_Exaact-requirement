@@ -86,6 +86,7 @@ try {
     db()->query("SELECT weekly_working_days FROM inspectors LIMIT 1");
     db()->query("SELECT id FROM inspector_day_status LIMIT 1");
     db()->query("SELECT reports_to_name FROM users LIMIT 1");
+    db()->query("SELECT report_approval FROM jobs LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();

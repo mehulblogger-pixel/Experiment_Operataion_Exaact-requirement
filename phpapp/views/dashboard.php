@@ -159,6 +159,24 @@
       }
     }
 
+    // ---------- section: reports awaiting my approval (reporting managers) ----------
+    $secRepAppr = '';
+    if (function_exists('jobs_awaiting_report_approval') && (can('ops.job.close') || is_admin_level() || is_master())) {
+      $ra = jobs_awaiting_report_approval(12);
+      if ($ra) { ob_start(); ?>
+        <h3 class="tab-sub" style="margin-top:26px;">🕓 Reports awaiting your approval <span class="muted">(<?= count($ra) ?>)</span></h3>
+        <div class="card-grid">
+          <?php foreach ($ra as $j): ?>
+            <a class="master-card" href="/job?id=<?= (int)$j['id'] ?>">
+              <strong><?= e($j['job_code']) ?></strong>
+              <span class="muted"><?= e($j['inspector_name'] ?: '—') ?><?= $j['sbu'] ? ' · '.e(lk_options_or('sbu', OPS_SBUS)[$j['sbu']] ?? $j['sbu']) : '' ?></span>
+              <span class="muted">Report <?= e($j['report_upload_date'] ?: '—') ?> · <span class="badge AMBER">Approve</span></span>
+            </a>
+          <?php endforeach; ?>
+        </div>
+      <?php $secRepAppr = ob_get_clean(); }
+    }
+
     // ---------- section: Sales / CRM pipeline ----------
     $crmView = can('mod.quotes.view'); $secCrm = ''; $isExec = in_array($role, ['BUSINESS_DIRECTOR','SBU_HEAD','BRANCH_MANAGER'], true) || is_master();
     if ($crmView) {
@@ -189,12 +207,12 @@
 
     // ---------- role-based ordering ----------
     echo $secKpi;
-    if ($isExec)          { echo $secCrm; echo $secMoney; echo $secCharts; echo $secAvail; echo $secQuick; echo $secSched; }
+    if ($isExec)          { echo $secCrm; echo $secMoney; echo $secCharts; echo $secAvail; echo $secRepAppr; echo $secQuick; echo $secSched; }
     elseif (in_array($role, ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'], true))
                           { echo $secCrm; echo $secQuick; echo $secMoney; echo $secCharts; }
-    elseif ($moneyFirst)  { echo $secMoney; echo $secCharts; echo $secSched; echo $secAvail; echo $secQuick; echo $secCrm; }
-    elseif ($schedFirst)  { echo $secSched; echo $secAvail; echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; }
-    else                  { echo $secAvail; echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; echo $secSched; }
+    elseif ($moneyFirst)  { echo $secMoney; echo $secCharts; echo $secSched; echo $secAvail; echo $secRepAppr; echo $secQuick; echo $secCrm; }
+    elseif ($schedFirst)  { echo $secSched; echo $secAvail; echo $secRepAppr; echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; }
+    else                  { echo $secAvail; echo $secRepAppr; echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; echo $secSched; }
   ?>
   <?php
     $deskAdmin = is_coordinator_level() || is_admin_level();

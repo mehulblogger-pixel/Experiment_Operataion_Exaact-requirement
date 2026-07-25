@@ -367,6 +367,11 @@ function ops_migrate() {
     ensure_column('jobs', 'adv_pct', 'DECIMAL(6,2) DEFAULT 0');
     ensure_column('jobs', 'adv_received', 'INT DEFAULT 0');
     ensure_column('jobs', 'report_hold', 'INT DEFAULT 0');   // deliverable held until payment
+    // Inspection report approval — routes to the inspector's reporting manager (N+1).
+    ensure_column('jobs', 'report_approval', "VARCHAR(20) DEFAULT ''");   // ''=n/a, PENDING, APPROVED, REJECTED
+    ensure_column('jobs', 'report_approved_by', "VARCHAR(150) DEFAULT ''");
+    ensure_column('jobs', 'report_approved_at', "VARCHAR(30) DEFAULT ''");
+    ensure_column('jobs', 'report_approval_note', "VARCHAR(400) DEFAULT ''");
     // extra (configurable) expense headings beyond the fixed 5, stored as JSON {code:amount}
     ensure_column('expenses', 'extra', 'TEXT');
     // voucher supporting-file mime (voucher table itself is created in ensure_schema)
@@ -1200,7 +1205,7 @@ function ops_module_gate($route) {
     $base = (strncmp($route, 'm/', 2) === 0) ? 'masters' : $route;
     static $map = [
         'calls'=>'calls','call'=>'calls','call-new'=>'calls','call-edit'=>'calls','call-delete'=>'calls',
-        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-invoice'=>'invoicing','job-advance'=>'jobs',
+        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-invoice'=>'invoicing','job-advance'=>'jobs','report-approve'=>'jobs',
         'invoicing'=>'invoicing',
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring',
@@ -1212,7 +1217,7 @@ function ops_module_gate($route) {
         'masters'=>'masters',
         'office-finance'=>'overheads',
         'reports'=>'reports',
-        'users'=>'users','user-new'=>'users','user-edit'=>'users',
+        'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings',
     ];
     $mod = $map[$base] ?? null;
@@ -1319,6 +1324,10 @@ function ops_dispatch($route, $method) {
             ops_ai_settings($method); return true;
         case $route === 'availability':
             ops_inspector_availability($method); return true;
+        case $route === 'hierarchy':
+            ops_hierarchy($method); return true;
+        case $route === 'report-approve':
+            ops_report_approve($method); return true;
         case $route === 'office-finance':
             ops_office_finance(); return true;
         case $route === 'masters':
@@ -2509,9 +2518,12 @@ function ops_jobs($route, $method) {
                 num($b['travel']), num($b['local']), num($b['food']), num($b['lodging']), num($b['misc']),
                 $extra ? json_encode($extra) : '', $reportDate ?: date('Y-m-d'), $b['exp_notes'] ?? '', date('c')]);
             $tat = days_between($job['inspection_end_date'], $reportDate);
-            $pdo->prepare("UPDATE jobs SET closed_flag=1, closed_at=?, report_upload_date=?, report_link=?, tat_days=? WHERE id=?")
-                ->execute([date('c'), $reportDate, $b['report_link'] ?? '', $tat, $job['id']]);
+            // If a report was produced, route it to the inspector's reporting manager for sign-off.
+            $needsApproval = ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate !== '') ? 'PENDING' : '';
+            $pdo->prepare("UPDATE jobs SET closed_flag=1, closed_at=?, report_upload_date=?, report_link=?, tat_days=?, report_approval=? WHERE id=?")
+                ->execute([date('c'), $reportDate, $b['report_link'] ?? '', $tat, $needsApproval, $job['id']]);
             send_closure_email($job['id']);
+            if ($needsApproval === 'PENDING') report_approval_notify($job['id']);
             flash("Job {$job['job_code']} closed. TAT " . ($tat === null ? '—' : $tat) . " day(s). Closure email sent.");
             redirect('/job?id=' . $job['id']);
         }
@@ -3033,21 +3045,29 @@ function ops_users($route, $method) {
             $chosen = array_filter((array)($b['permissions'] ?? []));
             if (!$globalMgr) $chosen = array_intersect($chosen, ['dash.operations','dash.utilization','data.credit','ops.call.create','ops.job.allocate','ops.job.close','master.manage']);
             $perms = implode(',', $chosen);
+            // Reporting manager (for the org hierarchy + approvals): a system user when
+            // one exists, else a manual name/position/email for a manager without a login.
+            $reportsTo = ($b['reports_to_id'] ?? '') !== '' ? (int)$b['reports_to_id'] : null;
+            if ($reportsTo && $user && $reportsTo === (int)$user['id']) $reportsTo = null; // no self-report
+            $rtName = trim($b['reports_to_name'] ?? ''); $rtPos = trim($b['reports_to_position'] ?? ''); $rtEmail = trim($b['reports_to_email'] ?? '');
+            $posTitle = trim($b['position_title'] ?? '');
+            $uwwd = in_array((string)($b['weekly_working_days'] ?? ''), ['5','5.5','6'], true) ? (float)$b['weekly_working_days'] : 6;
             if ($user) {
-                $pdo->prepare("UPDATE users SET username=?,first_name=?,last_name=?,email=?,role=?,is_superuser=?,is_active=?,inspector_id=?,home_office_id=?,scope_offices=?,scope_sbus=?,permissions=? WHERE id=?")
-                    ->execute([$b['username'], $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, !empty($b['is_active'])?1:0, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $user['id']]);
+                $pdo->prepare("UPDATE users SET username=?,first_name=?,last_name=?,email=?,role=?,is_superuser=?,is_active=?,inspector_id=?,home_office_id=?,scope_offices=?,scope_sbus=?,permissions=?,reports_to_id=?,reports_to_name=?,reports_to_position=?,reports_to_email=?,position_title=?,weekly_working_days=? WHERE id=?")
+                    ->execute([$b['username'], $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, !empty($b['is_active'])?1:0, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $user['id']]);
                 if (!empty($b['password'])) $pdo->prepare("UPDATE users SET password_hash=? WHERE id=?")->execute([password_hash($b['password'], PASSWORD_DEFAULT), $user['id']]);
                 flash('User saved.');
             } else {
                 $hash = password_hash($b['password'] ?: 'changeme123', PASSWORD_DEFAULT);
-                $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id,home_office_id,scope_offices,scope_sbus,permissions)
-                    VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms]);
+                $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id,home_office_id,scope_offices,scope_sbus,permissions,reports_to_id,reports_to_name,reports_to_position,reports_to_email,position_title,weekly_working_days)
+                    VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd]);
                 flash('User created.');
             }
             redirect('/users');
         }
+        $mgrs = ops_all("SELECT id, first_name, last_name, username, role, position_title FROM users WHERE is_active=1" . ($user ? " AND id<>" . (int)$user['id'] : "") . " ORDER BY first_name, last_name");
         view('ops/user_form', ['user'=>$user,'inspectors'=>inspectors_list(false),'offices'=>offices_list(),
-            'sbuOpts'=>lk_options_or('sbu', OPS_SBUS),'globalMgr'=>$globalMgr,'defaults'=>role_defaults($user['role'] ?? 'COORDINATOR')]); return;
+            'sbuOpts'=>lk_options_or('sbu', OPS_SBUS),'globalMgr'=>$globalMgr,'managers'=>$mgrs,'defaults'=>role_defaults($user['role'] ?? 'COORDINATOR')]); return;
     }
     $where = $globalMgr ? "1=1" : "home_office_id = " . (int)$myOffice;
     $rows = ops_all("SELECT * FROM users WHERE $where ORDER BY username");

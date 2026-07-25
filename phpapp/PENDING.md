@@ -29,6 +29,9 @@ Five owner requirements, to be built as extensions of existing tables (reuse, do
    that applies in a single selection, with a readable per-role explanation so an admin knows
    at a glance who gets what.
 
+Status: 1 ✅ 2 ✅ 3 ✅ 4 ✅ (availability board, 8.5h cap, weekly-days, reporting chain + hierarchy +
+CRM REPORTS_TO approval routing + inspection report sign-off all shipped). 5 (permission presets) next.
+
 Then: dashboards for all roles.
 
 

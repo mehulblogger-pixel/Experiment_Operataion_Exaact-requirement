@@ -70,6 +70,7 @@
           <?php if (can('mod.masters.view')): ?><a class="s-item<?= $navOn(['masters','m/']) ?>" href="/masters"><span class="s-ic">📋</span><span>Masters</span></a><?php endif; ?>
           <?php if (can('mod.overheads.view')): ?><a class="s-item<?= $navOn(['office-finance']) ?>" href="/office-finance"><span class="s-ic">📐</span><span>Overheads</span></a><?php endif; ?>
           <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['users','user-new','user-edit']) ?>" href="/users"><span class="s-ic">👥</span><span>Users</span></a><?php endif; ?>
+          <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['hierarchy']) ?>" href="/hierarchy"><span class="s-ic">🗂️</span><span>Org hierarchy</span></a><?php endif; ?>
           <?php if (can('mod.settings.view')): ?><a class="s-item<?= $navOn(['settings','access']) ?>" href="/settings"><span class="s-ic">⚙️</span><span>Settings</span></a><?php endif; ?>
         <?php endif; ?>
       <?php endif; ?>
