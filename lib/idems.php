@@ -1214,18 +1214,19 @@ function ops_idems_timestamp($method) {
 // ===========================================================================
 // Standard tokens available in every template, plus the report type's designed fields.
 function idems_standard_tokens($doc) {
+    $doc = (array)$doc;
     return [
         'irn'=>$doc['irn'] ?? '', 'report_type'=>$doc['type_name'] ?? ($doc['type_code'] ?? ''), 'type_code'=>$doc['type_code'] ?? '',
-        'title'=>$doc['title'] ?? '', 'client'=>$doc['client_disp'] ?: ($doc['client_name'] ?? ''), 'vendor'=>$doc['vendor_disp'] ?: ($doc['vendor_name'] ?? ''),
+        'title'=>$doc['title'] ?? '', 'client'=>($doc['client_disp'] ?? '') ?: ($doc['client_name'] ?? ''), 'vendor'=>($doc['vendor_disp'] ?? '') ?: ($doc['vendor_name'] ?? ''),
         'project'=>trim(($doc['project_code'] ?? '').' '.($doc['project_name'] ?? '')), 'project_code'=>$doc['project_code'] ?? '', 'project_name'=>$doc['project_name'] ?? '',
-        'po'=>$doc['po_ref'] ?? '', 'drawing'=>trim(($doc['drawing_no'] ?? '').' '.($doc['drawing_rev']?'Rev '.$doc['drawing_rev']:'')),
+        'po'=>$doc['po_ref'] ?? '', 'drawing'=>trim(($doc['drawing_no'] ?? '').' '.(!empty($doc['drawing_rev'])?'Rev '.$doc['drawing_rev']:'')),
         'drawing_no'=>$doc['drawing_no'] ?? '', 'drawing_rev'=>$doc['drawing_rev'] ?? '', 'qap_rev'=>$doc['qap_rev'] ?? '',
         'standards'=>$doc['standards'] ?? '', 'location'=>$doc['location'] ?? '', 'product_category'=>$doc['product_category'] ?? '', 'material_grade'=>$doc['material_grade'] ?? '',
         'inspection_date'=>$doc['inspection_date'] ?? '', 'issue_date'=>$doc['issue_date'] ?? '',
         'inspector'=>$doc['inspector_name'] ?? '', 'approver'=>$doc['approved_by'] ?? '',
-        'result'=>IDEMS_RESULTS[$doc['result']] ?? '', 'release'=>IDEMS_RELEASE[$doc['release_status']] ?? '', 'remarks'=>$doc['remarks'] ?? '',
+        'result'=>IDEMS_RESULTS[$doc['result'] ?? ''] ?? '', 'release'=>IDEMS_RELEASE[$doc['release_status'] ?? ''] ?? '', 'remarks'=>$doc['remarks'] ?? '',
         'company'=>idems_company_code(), 'branch'=>$doc['branch_code'] ?? '', 'today'=>date('d M Y'),
-        'status'=>IDEMS_STATUS[$doc['status']] ?? ($doc['status'] ?? ''),
+        'status'=>IDEMS_STATUS[$doc['status'] ?? ''] ?? ($doc['status'] ?? ''),
     ];
 }
 // Build [scalarMap, tablesMap] for a report from standard tokens + its designed fields.
@@ -1320,6 +1321,139 @@ function ops_idems_docx($method) {
     header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     header('Content-Disposition: attachment; filename="' . preg_replace('/[^A-Za-z0-9._-]/','_',$doc['irn']) . '.docx"');
     echo $bin; return true;
+}
+
+// ---------------------------------------------------------------------------
+//  Build the report FORM from an uploaded client format.
+//  Reads the {{tokens}} the admin placed in the .docx, works out a sensible
+//  label and field type for each, and creates the report type's fields — so the
+//  form the inspector fills matches the client's format exactly.
+// ---------------------------------------------------------------------------
+// Pull the readable text of a .docx (paragraph breaks preserved) for label hints.
+function report_docx_plain($binary) {
+    if (!class_exists('ZipArchive')) return '';
+    $tmp = tempnam(sys_get_temp_dir(), 'tp');
+    if ($tmp === false || file_put_contents($tmp, $binary) === false) return '';
+    $z = new ZipArchive(); $out = '';
+    if ($z->open($tmp) === true) {
+        for ($i = 0; $i < $z->numFiles; $i++) {
+            $n = $z->getNameIndex($i);
+            if (!preg_match('#^word/(document|header\d+|footer\d+)\.xml$#', $n)) continue;
+            $xml = docx_repair_tokens($z->getFromName($n));
+            $xml = preg_replace('/<\/w:(p|tr)>/', "\n", $xml);
+            $xml = preg_replace('/<\/w:tc>/', "\t", $xml);
+            $out .= html_entity_decode(strip_tags($xml), ENT_QUOTES, 'UTF-8') . "\n";
+        }
+        $z->close();
+    }
+    @unlink($tmp);
+    return $out;
+}
+// Turn a token key into a readable label ("material_grade" → "Material grade").
+function idems_label_from_key($k) { return ucfirst(trim(str_replace('_', ' ', (string)$k))); }
+// Guess a field type from the token name and the label around it.
+function idems_guess_type($key, $label) {
+    $s = strtolower($key . ' ' . $label);
+    // reference numbers stay plain text even though they contain "no." / "date of"
+    if (preg_match('/\b(no|number|nos)\b\.?\s*$/', trim($label)) || preg_match('/_(no|number)$/', $key)) return 'text';
+    if (preg_match('/\b(date|dated)\b/', $s)) return 'date';
+    if (preg_match('/\b(time)\b/', $s)) return 'time';
+    if (preg_match('/\b(qty|quantity|count|thickness|dia|diameter|length|width|height|pressure|temp|temperature|hardness|dft|reading|hours)\b/', $s)) return 'number';
+    if (preg_match('/\b(remark|remarks|observation|observations|comment|comments|note|notes|description|scope|summary|conclusion|finding|findings|action|cause|reason|justification|detail|details)\b/', $s)) return 'textarea';
+    if (preg_match('/\b(result|status|acceptable|acceptance|decision|disposition|compliance)\b/', $s)) return 'select';
+    return 'text';
+}
+// Scan a template and produce a plan of what the form needs.
+function idems_template_plan($tplBinary, $typeId) {
+    $text = report_docx_plain($tplBinary);
+    // every token in document order
+    preg_match_all('/\{\{([a-zA-Z0-9_.]+)\}\}/', $text, $m, PREG_OFFSET_CAPTURE);
+    $standard = array_flip(array_keys(idems_standard_tokens([])));
+    foreach (['doc_number','format_number','doc_revision','format_issue_date'] as $s) $standard[$s] = 1;
+    $existing = [];
+    foreach (idems_fields($typeId) as $f) $existing[$f['fkey']] = $f;
+    $plan = []; $tables = [];
+    foreach ($m[1] as $i => $hit) {
+        $tok = $hit[0]; $pos = $m[0][$i][1];
+        if (strpos($tok, '.') !== false) {                       // table column token
+            [$tk, $col] = explode('.', $tok, 2);
+            $tables[$tk][$col] = idems_label_from_key($col);
+            continue;
+        }
+        if (isset($standard[$tok]) || isset($plan[$tok])) continue;
+        // label hint = the text immediately before the token on the same line/cell
+        $before = substr($text, max(0, $pos - 90), min(90, $pos));
+        $before = preg_replace('/\{\{[^}]*\}\}/', '', $before);
+        $lineBits = preg_split('/[\n\t]/', $before);
+        $hint = trim((string)end($lineBits));
+        $hint = trim(preg_replace('/[:\-–>\s]+$/u', '', $hint));
+        if (mb_strlen($hint) > 48 || mb_strlen($hint) < 2) $hint = '';
+        $label = $hint !== '' ? $hint : idems_label_from_key($tok);
+        $plan[$tok] = [
+            'key'    => $tok,
+            'label'  => $label,
+            'type'   => idems_guess_type($tok, $label),
+            'exists' => isset($existing[$tok]),
+            'kind'   => 'field',
+        ];
+    }
+    foreach ($tables as $tk => $cols) {
+        if (isset($standard[$tk])) continue;
+        $plan[$tk] = [
+            'key'    => $tk,
+            'label'  => idems_label_from_key($tk),
+            'type'   => 'table',
+            'cols'   => $cols,
+            'exists' => isset($existing[$tk]),
+            'kind'   => 'table',
+        ];
+    }
+    return array_values($plan);
+}
+// ---- Handler: preview + create the form from a template ----
+function ops_idems_form_from_template($method) {
+    ops_require(is_master() || can('idems.type.manage'), 'You cannot design report forms.');
+    $tpl = ops_one("SELECT * FROM report_templates WHERE id=?", [(int)($_GET['id'] ?? $_POST['tpl_id'] ?? 0)]);
+    if (!$tpl) { flash('Template not found.', 'error'); redirect('/report-templates'); }
+    $typeId = (int)($_POST['report_type_id'] ?? $tpl['report_type_id'] ?? 0);
+    if (!$typeId) { flash('This template is not tied to a report type. Edit it and choose one first — the form is built for that type.', 'error'); redirect('/report-template-edit?id=' . $tpl['id']); }
+    $type = ops_one("SELECT * FROM report_types WHERE id=?", [$typeId]);
+    if (!$type) { flash('Report type not found.', 'error'); redirect('/report-templates'); }
+    if (!$tpl['file_data']) { flash('Upload the Word format on this template first.', 'error'); redirect('/report-template-edit?id=' . $tpl['id']); }
+    $binary = base64_decode($tpl['file_data']);
+    if ($method === 'POST' && ($_POST['_do'] ?? '') === 'create') {
+        $pdo = db();
+        // one section named after the template, so generated fields stay together
+        $secTitle = trim($_POST['section_title'] ?? '') ?: ('Report body — ' . ($tpl['name'] ?: $type['name']));
+        $sectionId = ($_POST['section_id'] ?? '') !== '' ? (int)$_POST['section_id'] : 0;
+        if (!$sectionId) {
+            $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, $secTitle, 'Generated from the uploaded client format.', (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $sectionId = (int)$pdo->lastInsertId();
+        }
+        $made = 0;
+        foreach ((array)($_POST['use'] ?? []) as $key => $on) {
+            $key = idems_clean_key($key);
+            if ($key === '' || ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey=?", [$typeId, $key])) continue;
+            $ftype = isset(IDEMS_FIELD_TYPES[$_POST['ftype'][$key] ?? '']) ? $_POST['ftype'][$key] : 'text';
+            $label = trim($_POST['label'][$key] ?? '') ?: idems_label_from_key($key);
+            $cols  = trim($_POST['cols'][$key] ?? '');
+            $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,col_span,sort_order)
+                VALUES (?,?,?,?,?,?,?,?)")
+                ->execute([$typeId, $sectionId, $key, $label, $ftype, $cols,
+                    in_array($ftype, ['textarea','table'], true) ? 2 : 1,
+                    (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId])]);
+            $made++;
+        }
+        idems_log('report_type', $typeId, 'FORM_FROM_TEMPLATE', ['field'=>$type['code'], 'new'=>$made . ' field(s)']);
+        flash($made . ' field(s) created from the format. Review them in the form builder — you can reorder, mark fields mandatory or add conditions.');
+        redirect('/report-builder?type=' . $typeId);
+    }
+    $plan = idems_template_plan($binary, $typeId);
+    view('ops/idems/form_from_template', ['tpl'=>$tpl, 'type'=>$type, 'plan'=>$plan,
+        'fieldTypes'=>IDEMS_FIELD_TYPES, 'sections'=>idems_sections($typeId),
+        'zipOk'=>class_exists('ZipArchive')]);
+    return true;
 }
 
 // ---- Handler: report template manager (upload / map client formats) ----

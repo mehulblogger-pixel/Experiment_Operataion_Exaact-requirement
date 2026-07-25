@@ -52,7 +52,17 @@
       </div>
     <?php endif; ?>
     <?php if (!$sections && empty($bySection[0])): ?>
-      <div class="panel"><p class="muted">This report type has no form yet. Add a section, then add fields. Reports of this type will show the fields you design here.</p></div>
+      <div class="panel"><p class="muted">This report type has no form yet. Add a section, then add fields — or let the system build it for you.</p>
+        <?php $tplForType = ops_all("SELECT id, name, file_name FROM report_templates WHERE report_type_id=? AND file_data<>'' AND active=1 ORDER BY id DESC", [(int)$type['id']]); ?>
+        <?php if ($tplForType): ?>
+          <p><b>🪄 Build it from your uploaded format:</b></p>
+          <?php foreach ($tplForType as $t): ?>
+            <a class="btn small" href="/report-form-from-template?id=<?= (int)$t['id'] ?>"><?= e($t['name'] ?: $t['file_name']) ?></a>
+          <?php endforeach; ?>
+        <?php else: ?>
+          <p class="muted">Tip: upload this report type's Word format under <a href="/report-templates">Report templates</a> with <code>{{tokens}}</code> in it, and the form can be generated from it automatically.</p>
+        <?php endif; ?>
+      </div>
     <?php endif; ?>
   </div>
 
