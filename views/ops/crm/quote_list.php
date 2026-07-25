@@ -16,11 +16,17 @@
   </div>
 </div>
 
+<?php // Each card filters the register to its own view, so the number is a way in
+      // rather than a read-out. Won and lost carry a tone rail. ?>
 <div class="kpi-row">
-  <div class="kpi"><div class="k-lab">Open</div><div class="k-val"><?= (int)$counts['open'] ?></div><div class="k-sub">in the funnel</div></div>
-  <div class="kpi"><div class="k-lab">Pending</div><div class="k-val"><?= (int)$counts['pending'] ?></div><div class="k-sub">approval / reply awaited</div></div>
-  <div class="kpi"><div class="k-lab">Closed (won)</div><div class="k-val up"><?= (int)$counts['closed'] ?></div><div class="k-sub">accepted</div></div>
-  <div class="kpi"><div class="k-lab">Lost</div><div class="k-val down"><?= (int)$counts['lost'] ?></div><div class="k-sub">regretted / expired</div></div>
+  <a class="kpi tone-info" href="<?= e($qs('open')) ?>"><span class="kic">📝</span>
+    <span class="k-lab">Open</span><span class="k-val"><?= (int)$counts['open'] ?></span><span class="k-sub">in the funnel</span></a>
+  <a class="kpi tone-warn" href="<?= e($qs('pending')) ?>"><span class="kic">◷</span>
+    <span class="k-lab">Pending</span><span class="k-val"><?= (int)$counts['pending'] ?></span><span class="k-sub">approval / reply awaited</span></a>
+  <a class="kpi tone-ok" href="<?= e($qs('closed')) ?>"><span class="kic">🏆</span>
+    <span class="k-lab">Closed (won)</span><span class="k-val"><?= (int)$counts['closed'] ?></span><span class="k-sub">accepted</span></a>
+  <a class="kpi tone-bad" href="<?= e($qs('lost')) ?>"><span class="kic">✕</span>
+    <span class="k-lab">Lost</span><span class="k-val"><?= (int)$counts['lost'] ?></span><span class="k-sub">regretted / expired</span></a>
 </div>
 
 <div class="chip-row" style="margin:10px 0">
