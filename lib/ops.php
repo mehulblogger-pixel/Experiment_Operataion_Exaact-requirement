@@ -3128,6 +3128,8 @@ function ops_settings($method) {
         $m = (int)($_POST['fy_start_month'] ?? 4);
         setting_set('fy_start_month', ($m >= 1 && $m <= 12) ? $m : 4);
         setting_set('tat_threshold_days', (int)($_POST['tat_threshold_days'] ?? 3));
+        setting_set('fy_revenue_target', (float)($_POST['fy_revenue_target'] ?? 0));
+        setting_set('report_escalate_days', max(1, (int)($_POST['report_escalate_days'] ?? 3)));
         setting_set('app_name', trim($_POST['app_name'] ?? ''));
         // Theme builder: preset + 4 colours + text colour + font size
         foreach (['c_primary','c_accent','c_bg','c_surface','c_text'] as $k) {
