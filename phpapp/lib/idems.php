@@ -431,7 +431,17 @@ function ops_idems_documents($route, $method) {
             $ctx = idems_context_for((int)($_GET['call'] ?? 0), (int)($_GET['job'] ?? 0));
             if ($ctx) $pre = $ctx;
         }
-        view('ops/idems/doc_form', ['doc'=>$doc, 'pre'=>$pre, 'types'=>idems_types(),
+        // Narrow the report-type dropdown to the deliverables this inspection was
+        // actually allocated. Offering the whole catalogue is how an engineer files
+        // a Final Inspection Report against a job that only owes a daily one.
+        $allTypes = idems_types();
+        $wantCodes = $pre['deliverables'] ?? [];
+        $types = $allTypes;
+        if ($wantCodes) {
+            $narrow = array_values(array_filter($allTypes, fn($t) => in_array($t['code'], $wantCodes, true)));
+            if ($narrow) $types = $narrow;      // never narrow to nothing
+        }
+        view('ops/idems/doc_form', ['doc'=>$doc, 'pre'=>$pre, 'types'=>$types, 'allTypes'=>$allTypes,
             'clients'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 ORDER BY nm"),
             'vendors'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_vendor=1 ORDER BY nm"),
             'inspectors'=>ops_all("SELECT id, name FROM inspectors WHERE status='ACTIVE' ORDER BY name"),
@@ -1371,7 +1381,14 @@ function idems_context_for($callId, $jobId = 0) {
         $ctx['vendor_name']  = $call['vendor_disp'] ?: $call['vendor_name'];
         $ctx['sbu']          = $call['sbu'];
         $ctx['office_id']    = $call['executing_office_id'] ?: $call['ibo_office_id'];
-        $ctx['product_category'] = lk_options_or('product_category', [])[$call['product_category']] ?? ($call['product_other'] ?: $call['product_category']);
+        // The product list is registered as 'product'. Asking for
+        // 'product_category' always missed, so the report showed the raw code
+        // (or nothing) instead of the same label the call shows.
+        $prodMap = lk_options_or('product', PRODUCT_CATS);
+        $ctx['product_category'] = $prodMap[$call['product_category']] ?? ($call['product_other'] ?: $call['product_category']);
+        $ctx['project_name'] = trim((string)($call['project_name'] ?? '')) ?: trim((string)($call['notes'] ?? ''));
+        $ctx['reporting_frequency'] = $call['reporting_frequency'] ?? '';
+        $ctx['report_custom_days']  = $call['report_custom_days'] ?? null;
         $ctx['inspection_type']  = INSPECTION_TYPES[$call['inspection_type']] ?? ($call['inspection_type_other'] ?: '');
         $ctx['required_date']= $call['inspection_required_date'];
         $ctx['notes']        = $call['notes'];
@@ -1405,6 +1422,12 @@ function idems_context_for($callId, $jobId = 0) {
         if (!empty($job['executing_office_id'])) $ctx['office_id'] = $job['executing_office_id'];
         if (!empty($job['boss_id'])) { $b = ops_one("SELECT boss_number FROM boss_numbers WHERE id=?", [$job['boss_id']]); if ($b) $ctx['boss_number'] = $b['boss_number']; }
         if (!empty($job['quotation_id'])) { $q = ops_one("SELECT quote_no, contract_number FROM quotations WHERE id=?", [$job['quotation_id']]); if ($q) { $ctx['quote_no'] = $q['quote_no']; $ctx['contract_number'] = $q['contract_number']; } }
+        // The deliverables chosen at allocation ARE the reports this inspection
+        // owes. Their codes are the report-type codes, so the type dropdown can
+        // be narrowed to them instead of offering the whole catalogue.
+        $ctx['deliverables'] = array_values(array_filter(array_map('trim', explode(',', (string)($job['deliverables'] ?? '')))));
+        if (!empty($job['reporting_frequency'])) $ctx['reporting_frequency'] = $job['reporting_frequency'];
+        if (($job['report_custom_days'] ?? null) !== null) $ctx['report_custom_days'] = $job['report_custom_days'];
     }
     return array_filter($ctx, fn($v) => $v !== null && $v !== '');
 }

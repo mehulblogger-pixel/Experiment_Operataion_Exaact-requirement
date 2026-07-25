@@ -2998,8 +2998,17 @@ function ops_jobs($route, $method) {
             WHERE j.id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$job) { http_response_code(404); view('notfound'); return; }
         $expenses = ops_all("SELECT * FROM expenses WHERE job_id=? ORDER BY id", [$job['id']]);
+        // The engineer standing at the gate needs to know who to ask for and where
+        // to go. None of it was on this screen, so it lived in the assignment
+        // e-mail or in a phone call to the coordinator.
+        $jcall = $job['call_id'] ? ops_one("SELECT * FROM calls WHERE id=?", [(int)$job['call_id']]) : null;
+        $siteAddr = ($jcall && !empty($jcall['site_address_id']))
+            ? ops_one("SELECT * FROM partner_addresses WHERE id=?", [(int)$jcall['site_address_id']]) : null;
         // §xxiv — whatever the client sent with the order reaches the engineer here.
         view('ops/job_detail', ['job'=>$job,'expenses'=>$expenses,'profit'=>job_profit($job),
+            'jcall'=>$jcall, 'siteAddr'=>$siteAddr,
+            'clientInfo'=>$jcall ? partner_full($jcall['client_id']) : null,
+            'vendorInfo'=>$jcall ? partner_full($jcall['vendor_id']) : null,
             'quoteDocs'=>function_exists('quote_docs_for_job') ? quote_docs_for_job($job['id']) : []]);
         return;
     }
