@@ -72,7 +72,7 @@ function ensure_schema() {
             start_date VARCHAR(20) DEFAULT '', end_date VARCHAR(20) DEFAULT '', is_active INT DEFAULT 1,
             notes VARCHAR(255) DEFAULT '')",
         "CREATE TABLE IF NOT EXISTS po_line_items (
-            id $pk, purchase_order_id INT, description VARCHAR(200), item_type VARCHAR(20) DEFAULT 'MANDAYS',
+            id $pk, purchase_order_id INT, description VARCHAR(200), item_type VARCHAR(20) DEFAULT 'MANDAY',
             quantity DECIMAL(12,2) DEFAULT 0, rate DECIMAL(12,2) NULL, consumed DECIMAL(12,2) DEFAULT 0)",
         "CREATE TABLE IF NOT EXISTS partner_relationships (
             id $pk, partner_id INT, related_id INT, relation_type VARCHAR(20) DEFAULT 'OTHER',

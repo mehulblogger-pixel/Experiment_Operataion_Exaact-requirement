@@ -75,7 +75,8 @@ const STATUSES = ['ACTIVE'=>'Active','INACTIVE'=>'Inactive','ON_HOLD'=>'On hold'
 const ADDRESS_TYPES = ['REGISTERED'=>'Registered Office','CORPORATE'=>'Corporate Office','BRANCH'=>'Branch Office','PURCHASE'=>'Purchase Office','BILLING'=>'Billing Address','PLANT'=>'Plant','FACTORY'=>'Factory','WAREHOUSE'=>'Warehouse','PROJECT_SITE'=>'Project Site','SITE_OFFICE'=>'Site Office'];
 const REG_TYPES = ['GSTIN'=>'GSTIN','PAN'=>'PAN','TAN'=>'TAN','CIN'=>'CIN','MSME'=>'MSME / Udyam','ISO'=>'ISO Certificate','PQ'=>'Pre-Qualification','OTHER'=>'Other'];
 const PO_TYPES = ['REGULAR'=>'Regular (fixed value)','OPEN'=>'Open order (no PO / ARC)','ARC'=>'ARC / Rate contract'];
-const PO_ITEM_TYPES = ['MANDAYS'=>'Man-days','MONTHS'=>'Months (deputation)','AUDIT_DAYS'=>'Technical audit days','VISITS'=>'Visits','LOT'=>'Lot / Lumpsum','OTHER'=>'Other'];
+// A PO line is charged in the same units as everything else — see CHARGE_UNITS.
+const PO_ITEM_TYPES = ['MANDAY'=>'Man-day','MANMONTH'=>'Man-month','AUDIT_DAY'=>'Audit day','VISIT'=>'Per visit','LOT'=>'Per lot / lump sum','DOC'=>'Per document','OTHER'=>'Other'];
 const REL_TYPES = ['SUBSIDIARY'=>'Subsidiary of','JV'=>'Joint Venture with','CONSORTIUM'=>'Consortium with','EPC_FOR'=>'EPC Contractor for','CONSULTANT_FOR'=>'Consultant for','SUPPLIER_TO'=>'Supplier to','OTHER'=>'Other'];
 
 function partner_name($p) { return $p['display_name'] !== '' ? $p['display_name'] : $p['legal_name']; }

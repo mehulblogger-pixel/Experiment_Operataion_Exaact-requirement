@@ -133,7 +133,6 @@ function lk_module_lists() {
         ['inquiry_source',      'Inquiry source',            INQUIRY_SOURCES,        'Sales'],
         ['inquiry_status',      'Inquiry status',            INQUIRY_STATUS,         'Sales'],
         ['quote_status',        'Quote status',              QUOTE_STATUS,           'Sales'],
-        ['quote_unit',          'Charge unit',               QUOTE_UNITS,            'Sales'],
         ['quote_location_type', 'Work location type',        QUOTE_LOCATION_TYPES,   'Sales'],
         ['order_type',          'Order type',                ORDER_TYPES,            'Sales'],
         ['followup_kind',       'Follow-up point',           FOLLOWUP_KINDS,         'Sales'],
@@ -143,6 +142,7 @@ function lk_module_lists() {
         ['job_type',            'Deputation type',           JOB_TYPES,              'Operations'],
         ['job_stage',           'Deputation stage',          JOB_STAGES,             'Operations'],
         ['attendance_status',   'Attendance status',         ATT_STATUS,             'Operations'],
+        ['charge_unit',         'Charge unit',               CHARGE_UNITS,           'Operations'],
         ['rate_type',           'Rate basis',                RATE_TYPES,             'Operations'],
         ['experience_level',    'Experience level',          EXP_LEVELS,             'Operations'],
         ['expense_head_type',   'Expense head type',         EXP_HEAD_TYPES,         'Operations'],
@@ -164,7 +164,6 @@ function lk_module_lists() {
         ['registration_type',   'Registration type',         REG_TYPES,              'Directory'],
         ['relationship_type',   'Relationship type',         REL_TYPES,              'Directory'],
         ['po_type',             'Purchase order type',       PO_TYPES,               'Directory'],
-        ['po_item_type',        'PO line unit',              PO_ITEM_TYPES,          'Directory'],
         ['gst_state',           'GST state',                 GST_STATES,             'Directory'],
         // --- Reporting -------------------------------------------------------
         ['report_category',     'Report category',           IDEMS_CATEGORIES,       'Reporting'],
@@ -192,7 +191,7 @@ function lk_register_module_lists() {
         'expense_heading'=>'Money', 'reporting_frequency'=>'Operations', 'avail_status'=>'Operations',
         'leave_type'=>'People', 'day_code'=>'People', 'department'=>'People', 'designation'=>'People',
         'trade'=>'People', 'skill'=>'People', 'client_type'=>'Directory', 'industry'=>'Directory',
-        'quote_lost_reason'=>'Sales', 'crm_service_type'=>'Sales',
+        'quote_lost_reason'=>'Sales',
     ] as $k => $m) lk_set_module($k, $m);
 }
 // Back-fill all coded values from a [code=>label] map into an existing type.

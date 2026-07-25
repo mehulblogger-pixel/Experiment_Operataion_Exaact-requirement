@@ -111,6 +111,10 @@ try {
         throw new RuntimeException('pending upgrade: engagement-pattern list rename');
     if ((int)db()->query("SELECT COUNT(*) FROM inspectors WHERE roll_type NOT IN ('OWN','AGENCY')")->fetchColumn() > 0)
         throw new RuntimeException('pending upgrade: roll-type normalisation');
+    if (function_exists('charge_units_pending') && charge_units_pending())
+        throw new RuntimeException('pending upgrade: shared charge units');
+    if (function_exists('service_types_pending') && service_types_pending())
+        throw new RuntimeException('pending upgrade: shared work-type list');
 } catch (Throwable $ex) {
     try {
         boot();

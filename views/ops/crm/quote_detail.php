@@ -121,12 +121,12 @@
       <tr>
         <td class="muted"><?= $i+1 ?></td>
         <td><?= e(lk_options_or('sbu', OPS_SBUS)[$l['sbu']] ?? $l['sbu'] ?: '—') ?></td>
-        <td><?= e(lk_options_or('crm_service_type', CRM_SERVICE_TYPES)[$l['service_type']] ?? $l['service_type'] ?: '—') ?><?= $l['subtypes']?'<div class="muted" style="font-size:11px">'.e($l['subtypes']).'</div>':'' ?></td>
+        <td><?= e(lk_options_or('inspection_type', INSPECTION_TYPES)[$l['service_type']] ?? $l['service_type'] ?: '—') ?><?= $l['subtypes']?'<div class="muted" style="font-size:11px">'.e($l['subtypes']).'</div>':'' ?></td>
         <td><?= e($l['description'] ?: '—') ?></td>
         <td><?= e($l['location'] ?: '—') ?></td>
         <td><span class="pill <?= $l['order_type']==='OPEN'?'p-info':'p-mut' ?>"><?= e(lk_options_or('order_type', ORDER_TYPES)[$l['order_type']] ?? $l['order_type']) ?></span></td>
         <td class="num"><?= rtrim(rtrim(number_format((float)$l['qty'],2),'0'),'.') ?></td>
-        <td><?= e(lk_options_or('quote_unit', QUOTE_UNITS)[$l['unit']] ?? $l['unit']) ?></td>
+        <td><?= e(lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit']) ?></td>
         <td class="num"><?= e(cur_sym()) ?><?= number_format((float)$l['rate'],0) ?></td>
         <td class="num"><?= e(cur_sym()) ?><?= number_format((float)$l['amount'],0) ?></td>
       </tr>

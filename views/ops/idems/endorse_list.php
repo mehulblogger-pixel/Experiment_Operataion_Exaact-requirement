@@ -9,7 +9,7 @@
   <div class="kpi"><div class="k-lab">Total</div><div class="k-val"><?= (int)($counts['total'] ?? 0) ?></div><div class="k-sub">in register</div></div>
   <div class="kpi"><div class="k-lab">In progress</div><div class="k-val"><?= (int)($counts['open_n'] ?? 0) ?></div><div class="k-sub">uploaded / under review</div></div>
   <div class="kpi"><div class="k-lab">Endorsed</div><div class="k-val up"><?= (int)($counts['endorsed_n'] ?? 0) ?></div><div class="k-sub">approved</div></div>
-  <div class="kpi"><div class="k-lab">Rejected</div><div class="k-val down"><?= (int)($counts['rejected_n'] ?? 0) ?></div><div class="k-sub">returned</div></div>
+  <div class="kpi"><div class="k-lab">Rejected</div><div class="k-val down"><?= (int)($counts['rejected_n'] ?? 0) ?></div><div class="k-sub">not endorsed</div></div>
 </div>
 
 <form method="get" action="/endorsements" class="chip-row" style="margin:10px 0;gap:6px">
