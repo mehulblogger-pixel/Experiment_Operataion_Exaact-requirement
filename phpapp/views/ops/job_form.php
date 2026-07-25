@@ -68,9 +68,10 @@
   <b style="color:var(--bad)">⛔ This order cannot be allocated against</b>
   <div class="muted" style="margin-top:4px"><?= e($gate['reason']) ?>
     <?php if (!empty($gate['pending'])): ?>
-      An exception is <?= e(strtolower(OVERRIDE_STATUS[$gate['pending']['status']] ?? 'pending')) ?>.
+      An exception is <?= e(strtolower(override_status_text($gate['pending']))) ?>.
     <?php else: ?>
-      Ask for an exception from the <?= e(Tl('call')) ?>, and it goes to a Branch Manager and then the Super Admin.
+      Ask for an exception from the <?= e(Tl('call')) ?>.
+      <?= e(override_flow_text($gate['state'] === 'EXPIRED' ? 'EXPIRED' : 'EXHAUSTED')) ?>
     <?php endif; ?>
   </div>
   <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
@@ -109,7 +110,7 @@
 <form method="post" action="<?= $job ? '/job-edit?id=' . (int)$job['id'] : '/job-new?call=' . (int)$call['id'] ?>" class="panel">
   <div class="form-grid">
     <div class="ff"><label>Executing office</label>
-      <select class="form-control searchable" name="executing_office_id">
+      <select class="form-control searchable" id="jexec_sel" name="executing_office_id" data-contracting="<?= (int)($call['ibo_office_id'] ?? 0) ?>">
         <?php foreach ($offices as $o): $sel = $job ? $job['executing_office_id']==$o['id'] : (($call['executing_office_id']??null)? $call['executing_office_id']==$o['id'] : $o['code']==='AHM'); ?>
           <option value="<?= (int)$o['id'] ?>" <?= $sel?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
       </select></div>
@@ -155,11 +156,16 @@
       </select>
       <?php if (!$boss): ?><small class="muted">No BOSS numbers for this client yet — add under <a href="/m/boss/new">BOSS numbers</a>.</small><?php endif; ?></div>
 
-    <div class="ff"><label><?= e(T('quote')) ?> <span class="muted">— from the <?= e(Tl('call')) ?></span></label>
+    <?php // §viii — one heading, and it is the quotation. The contract number is
+          // a property of the order, not a second thing to choose here: it is
+          // shown beneath, read-only, exactly as it stands on the call. ?>
+    <div class="ff"><label><?= e(T('quote')) ?></label>
       <select class="form-control searchable" name="quotation_id"><option value="">— none —</option>
-        <?php foreach (($quotes ?? []) as $qq): ?><option value="<?= (int)$qq['id'] ?>" <?= ((string)$curQuoteId===(string)$qq['id'])?'selected':'' ?>><?= e($qq['quote_no']) ?><?= (int)$qq['rev']>0?' R'.$qq['rev']:'' ?><?= $qq['contract_number']?' · '.e($qq['contract_number']):'' ?> · <?= e(cur_sym()) ?><?= number_format((float)$qq['total_amount'],0) ?></option><?php endforeach; ?>
+        <?php foreach (($quotes ?? []) as $qq): ?><option value="<?= (int)$qq['id'] ?>" <?= ((string)$curQuoteId===(string)$qq['id'])?'selected':'' ?>><?= e($qq['quote_no']) ?><?= (int)$qq['rev']>0?' R'.$qq['rev']:'' ?> · <?= e(cur_sym()) ?><?= number_format((float)$qq['total_amount'],0) ?></option><?php endforeach; ?>
       </select>
-      <small class="muted">Links this job to the order — advance / payment-hold rules and deliverables carry over, and revenue is tracked against the quote.</small></div>
+      <small class="muted">Carried from the <?= e(Tl('call')) ?>. Links this <?= e(Tl('job')) ?> to the order — advance / payment-hold rules and deliverables carry over, and revenue is tracked against it.
+        <?php if ($curContract !== ''): ?><br>Contract <b><?= e($curContract) ?></b>.
+        <?php else: ?><br><span class="pill p-warn">contract number pending</span><?php endif; ?></small></div>
 
     <div class="ff"><label>Scheduled date</label><input class="form-control" type="date" name="scheduled_date" value="<?= e($job['scheduled_date'] ?? '') ?>"></div>
     <div class="ff"><label>Inspection start</label><input class="form-control" type="date" name="inspection_start_date" value="<?= e($job['inspection_start_date'] ?? '') ?>"></div>
@@ -180,9 +186,18 @@
     <div class="ff"><label>Expected credit (<?= e(cur_sym()) ?>) *</label><input class="form-control" type="number" step="0.01" name="expected_credit" value="<?= e($job['expected_credit'] ?? $call['expected_credit'] ?? '') ?>" required></div>
     <div class="ff"><label>Credit type</label>
       <select class="form-control searchable" name="credit_type"><?php foreach (lk_options_or('credit_type', CREDIT_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($job['credit_type'] ?? $call['credit_type'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <?php // §iv — when the contracting office and the executing office are not the
+          // same, the contracting office GIVES the credit. That is not a choice
+          // to be made afresh on every allocation, so it is selected already and
+          // follows the executing office if that is changed here. ?>
     <div class="ff"><label>Credit direction</label>
-      <select class="form-control searchable" name="credit_direction"><?php foreach (lk_options_or('credit_direction', CREDIT_DIRECTIONS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($curDir===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
-      <small class="muted"><?= e($ex['text']) ?></small></div>
+      <select class="form-control searchable" id="dir_sel" name="credit_direction" data-new="<?= $job ? '0' : '1' ?>">
+        <?php // A same-office job has no inter-office credit at all, and needs to
+              // be able to say so rather than being forced to pick a direction. ?>
+        <option value="" <?= $curDir===''?'selected':'' ?>>— none (one office does both) —</option>
+        <?php foreach (lk_options_or('credit_direction', CREDIT_DIRECTIONS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($curDir===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
+      </select>
+      <small class="muted" id="dir_note"><?= e($ex['text']) ?></small></div>
 
     <div class="ff"><label>Reporting frequency</label>
       <select class="form-control" id="freq_sel" name="reporting_frequency"><?php foreach (lk_options_or('reporting_frequency', REPORT_FREQ) as $k=>$v): ?><option value="<?= e($k) ?>" <?= $curFreq===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
@@ -238,5 +253,27 @@ window.ACTIVITY = <?= json_encode($act) ?>;
     hint.textContent = shown + ' ' + (want === 'ASSET' ? 'own employee' : (want === 'SUBCON' ? 'sub-contract' : 'freelance')) + ' engineer(s) on file.';
   }
   if (kind && non && pick) { kind.addEventListener('change', syncKind); non.addEventListener('change', syncKind); syncKind(); }
+
+  // §iv — change the executing office and the credit direction follows it. A
+  // cross-office job means the contracting office gives; a same-office job has
+  // no inter-office credit at all.
+  var jexec = document.getElementById('jexec_sel'), dir = document.getElementById('dir_sel'),
+      dirNote = document.getElementById('dir_note');
+  if (jexec && dir) {
+    var contracting = jexec.dataset.contracting || '';
+    function has(v){ return Array.prototype.some.call(dir.options, function(o){ return o.value === v; }); }
+    function syncDir(){
+      var crossNow = jexec.value !== '' && contracting !== '' && jexec.value !== contracting;
+      if (crossNow) { if (has('GIVEN')) dir.value = 'GIVEN'; }
+      else if (dir.value === 'GIVEN' && has('')) dir.value = '';
+      if (dirNote) dirNote.textContent = crossNow
+        ? 'The contracting office holds this order and another office does the work, so the contracting office gives the credit. Selected for you.'
+        : 'One office both holds the order and does the work — there is no inter-office credit.';
+    }
+    jexec.addEventListener('change', syncDir);
+    // On a fresh allocation set it from the offices. On a saved job leave what
+    // was recorded alone — but still follow along if the office is changed here.
+    if (dir.dataset.new === '1' || dir.value === '') syncDir();
+  }
 })();
 </script>

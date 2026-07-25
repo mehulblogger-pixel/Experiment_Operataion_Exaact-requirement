@@ -62,7 +62,19 @@
         <?php if (can('mod.hiring.view')): ?><a class="s-item<?= $navOn(['candidates','candidate']) ?>" href="/candidates"><span class="s-ic">🧑‍💼</span><span><?= e(THP('candidate')) ?></span></a><?php endif; ?>
         <?php if (can('mod.hiring.view')): ?><a class="s-item<?= $navOn(['requisitions','requisition']) ?>" href="/requisitions"><span class="s-ic">📋</span><span><?= e(THP('requisition')) ?></span></a><?php endif; ?>
         <?php if (can('mod.reconcile.view')): ?><a class="s-item<?= $navOn(['attendance-recon']) ?>" href="/attendance-recon"><span class="s-ic">✅</span><span>Attendance reconciliation</span></a><?php endif; ?>
-        <?php if (can('mod.calls.view')): $ovN = (int)ops_val("SELECT COUNT(*) FROM contract_overrides WHERE status IN ('PENDING','ENDORSED')"); ?>
+        <?php // The badge counts what is waiting on *you*. An expired contract goes
+              // straight to the Super Admin, so a Branch Manager is not nagged about
+              // a decision they cannot take.
+              if (can('mod.calls.view')):
+                $ovN = 0;
+                foreach (ops_all("SELECT kind, status FROM contract_overrides WHERE status IN ('PENDING','ENDORSED')") as $_o) {
+                    $needsBm = function_exists('override_needs_endorsement') && override_needs_endorsement($_o['kind']);
+                    $mine = ($_o['status'] === 'ENDORSED' || !$needsBm)
+                        ? (function_exists('can_grant_override') && can_grant_override())
+                        : (function_exists('can_endorse_override') && can_endorse_override());
+                    if ($mine) $ovN++;
+                }
+        ?>
           <a class="s-item<?= $navOn(['contract-overrides']) ?>" href="/contract-overrides"><span class="s-ic">🛑</span><span>Contract exceptions<?= $ovN ? ' (' . $ovN . ')' : '' ?></span></a>
         <?php endif; ?>
         <?php endif; ?>

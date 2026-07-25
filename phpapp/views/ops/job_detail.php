@@ -80,6 +80,61 @@
   .ct-site{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
 </style>
 
+<?php // §10 — the same standing notice the call carries. Work is never blocked
+      // for want of a contract number, but it stays visible on the deputation
+      // too, because this is the screen the coordinator and the engineer live
+      // on once the call has been allocated.
+      $jgap = ($jcall && function_exists('call_contract_gap')) ? call_contract_gap($jcall) : null; ?>
+<?php if ($jgap): ?>
+<div class="panel" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)">
+  <b style="color:var(--warn)">⚠ Contract number not available</b>
+  <div class="muted" style="margin-top:4px"><?= e($jgap['text']) ?></div>
+  <?php if (!empty($jgap['quote_id']) && (can('crm.contract.register') || is_master())): ?>
+    <div style="margin-top:8px"><a class="btn small" href="/quote?id=<?= (int)$jgap['quote_id'] ?>#contract">Register the contract number</a></div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php // §v — the formats the order promised are the formats this engineer is
+      // asked for, and each one is one click from being written. A deliverable
+      // with nothing against it is work still owed; the reporting module's own
+      // status is shown for the rest, so nobody has to go and look. ?>
+<?php
+  $dlCodes = trim((string)($job['deliverables'] ?? '')) !== '' ? array_filter(array_map('trim', explode(',', $job['deliverables']))) : [];
+  $dlMap = deliverable_options();
+  $jobDocs = [];
+  if ($dlCodes) foreach (ops_all(
+      "SELECT id, irn, type_code, status, finalized FROM report_docs WHERE job_id=? AND deleted=0 ORDER BY id", [(int)$job['id']]) as $rd)
+      $jobDocs[$rd['type_code']][] = $rd;
+?>
+<?php if ($dlCodes): ?>
+<div class="panel">
+  <div class="ctitle" style="margin-top:0"><h3><?= e(ucfirst(TP('report'))) ?> owed on this <?= e(Tl('job')) ?> <span class="muted">(<?= count($dlCodes) ?>)</span></h3></div>
+  <p class="muted" style="margin:0 0 10px">These are the formats agreed on the <?= e(Tl('call')) ?>. Each one opens in the
+    <?= e(Tl('report')) ?> module already filled in from this <?= e(Tl('job')) ?>, on the <?= e(Tl('client')) ?>'s own
+    format where one is registered.</p>
+  <table class="dt">
+    <thead><tr><th>Format</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($dlCodes as $code): $docs = $jobDocs[$code] ?? []; ?>
+      <tr>
+        <td><b><?= e($dlMap[$code] ?? $code) ?></b> <span class="muted"><?= e($code) ?></span></td>
+        <td><?php if (!$docs): ?><span class="pill p-warn">not started</span>
+            <?php else: foreach ($docs as $d): ?>
+              <a href="/document?id=<?= (int)$d['id'] ?>"><?= e($d['irn']) ?></a>
+              <span class="pill <?= !empty($d['finalized']) ? 'p-ok' : (($d['status'] ?? '') === 'DRAFT' ? 'p-mut' : 'p-info') ?>">
+                <?= e(!empty($d['finalized']) ? 'issued' : strtolower((string)($d['status'] ?: 'draft'))) ?></span>
+            <?php endforeach; endif; ?></td>
+        <td class="num"><?php if (can('mod.idems.edit') || is_master()): ?>
+          <a class="btn small<?= $docs ? ' secondary' : '' ?>" href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call=' . (int)$job['call_id'] : '' ?>&type=<?= e(urlencode($code)) ?>"><?= $docs ? 'Add another' : 'Write it' ?></a>
+        <?php endif; ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
+<?php endif; ?>
+
 <?php $holds = function_exists('job_hold_reasons') ? job_hold_reasons($job) : []; if ($holds): ?>
 <div class="panel" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent)">
   <b style="color:var(--bad)">🚫 HOLD — do not issue the report / deliverable to the client:</b> <?= e(implode('; ', $holds)) ?>.
@@ -142,6 +197,11 @@
       $map = deliverable_options();
       echo $dl ? e(implode(', ', array_map(fn($c) => $map[$c] ?? $c, $dl))) : '—';
     ?></div>
+    <?php if (!empty($job['reporting_frequency']) && $job['reporting_frequency'] !== 'NOREPORT'): ?>
+      <div><span class="k">Reporting frequency</span><?= e(lk_options_or('reporting_frequency', REPORT_FREQ)[$job['reporting_frequency']] ?? $job['reporting_frequency']) ?><?php
+        if ($job['reporting_frequency'] === 'CUSTOM' && !empty($job['report_custom_days'])) echo ' — every ' . (int)$job['report_custom_days'] . ' day(s)';
+      ?></div>
+    <?php endif; ?>
     <?php foreach (custom_display('job', $job['id']) as $cf): ?>
       <div><span class="k"><?= e($cf['label']) ?></span><?= e($cf['value']) ?></div>
     <?php endforeach; ?>
