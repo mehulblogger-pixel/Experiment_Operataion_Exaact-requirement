@@ -1245,6 +1245,7 @@ function ops_module_gate($route) {
         'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems',
         'report-types'=>'idems','report-type-edit'=>'idems','report-builder'=>'idems','report-field-edit'=>'idems','report-file'=>'idems','irn-rules'=>'idems','audit-log'=>'idems',
         'document-approve'=>'idems','approver-map'=>'idems','idems-approval-rules'=>'idems','idems-approval-rule-edit'=>'idems',
+        'document-pdf'=>'idems','document-timestamp'=>'idems',
         'masters'=>'masters','work-norms'=>'masters',
         'office-finance'=>'overheads',
         'reports'=>'reports',
@@ -1391,6 +1392,12 @@ function ops_dispatch($route, $method) {
             return ops_idems_approval_rules($route, $method);
         case $route === 'report-file':
             return ops_idems_file($method);
+        case $route === 'document-pdf':
+            return ops_idems_pdf($method);
+        case $route === 'document-timestamp':
+            return ops_idems_timestamp($method);
+        case $route === 'my-signature':
+            return ops_idems_my_signature($method);
         case $route === 'irn-rules':
             return ops_idems_numbering($method);
         case $route === 'audit-log':
@@ -1596,6 +1603,18 @@ function ops_inspectors($action, $method) {
             if (($b['_do'] ?? '') === 'cert_del' && $ins) {
                 $pdo->prepare("DELETE FROM inspector_certs WHERE id=? AND inspector_id=?")->execute([(int)$b['cert_id'], $ins['id']]);
                 flash('Certification removed.');
+                redirect('/m/inspectors/edit?id=' . $ins['id']);
+            }
+            // Digital signature (drawn or uploaded) — added automatically to this inspector's reports.
+            if (($b['_do'] ?? '') === 'signature' && $ins) {
+                $sig = $b['signature'] ?? '';
+                if (!empty($_FILES['sigfile']['tmp_name']) && is_uploaded_file($_FILES['sigfile']['tmp_name'])) {
+                    $bytes = file_get_contents($_FILES['sigfile']['tmp_name']);
+                    if ($bytes !== false && strlen($bytes) < 2*1024*1024) $sig = 'data:' . ($_FILES['sigfile']['type'] ?: 'image/png') . ';base64,' . base64_encode($bytes);
+                }
+                if ($sig && strpos($sig, 'data:image') === 0) { $pdo->prepare("UPDATE inspectors SET signature=? WHERE id=?")->execute([$sig, $ins['id']]); flash('Signature saved.'); }
+                elseif (($b['_clear'] ?? '') === '1') { $pdo->prepare("UPDATE inspectors SET signature='' WHERE id=?")->execute([$ins['id']]); flash('Signature cleared.'); }
+                else flash('No signature captured.', 'error');
                 redirect('/m/inspectors/edit?id=' . $ins['id']);
             }
             // Allowances & rates grid (Super Admin only)

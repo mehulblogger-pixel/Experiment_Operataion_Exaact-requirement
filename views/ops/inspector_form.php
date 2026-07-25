@@ -66,6 +66,21 @@
 
 <?php if ($ins): ?>
 <div class="panel">
+  <h3 class="tab-sub">✍️ Digital signature <span class="muted">— added automatically to this inspector's reports (IDEMS)</span></h3>
+  <?php if (!empty($ins['signature'])): ?><div style="margin-bottom:8px"><img src="<?= e($ins['signature']) ?>" alt="signature" style="max-width:240px;border:1px solid var(--line);border-radius:8px;background:#fff"></div><?php endif; ?>
+  <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>" enctype="multipart/form-data">
+    <input type="hidden" name="_do" value="signature">
+    <canvas id="inspSig" width="420" height="130" style="border:1px solid var(--line);border-radius:8px;background:#fff;touch-action:none;max-width:100%"></canvas>
+    <input type="hidden" name="signature" id="inspSigV">
+    <div style="margin:6px 0;display:flex;gap:6px;align-items:center"><button type="button" class="btn small secondary" onclick="inspSigClear()">Clear</button>
+      <span class="muted">or upload:</span> <input type="file" name="sigfile" accept="image/*"></div>
+    <button class="btn small" type="submit">Save signature</button>
+    <?php if (!empty($ins['signature'])): ?><button class="btn small secondary" type="submit" name="_clear" value="1">Remove</button><?php endif; ?>
+  </form>
+  <script>(function(){var c=document.getElementById('inspSig'),x=c.getContext('2d'),d=false,dy=false;x.lineWidth=2.2;x.lineCap='round';function p(e){var r=c.getBoundingClientRect();var t=e.touches?e.touches[0]:e;return{x:(t.clientX-r.left)*(c.width/r.width),y:(t.clientY-r.top)*(c.height/r.height)};}function s(e){d=true;var q=p(e);x.beginPath();x.moveTo(q.x,q.y);e.preventDefault();}function m(e){if(!d)return;var q=p(e);x.lineTo(q.x,q.y);x.stroke();dy=true;e.preventDefault();}function en(){d=false;if(dy)document.getElementById('inspSigV').value=c.toDataURL('image/png');}c.addEventListener('mousedown',s);c.addEventListener('mousemove',m);window.addEventListener('mouseup',en);c.addEventListener('touchstart',s);c.addEventListener('touchmove',m);c.addEventListener('touchend',en);window.inspSigClear=function(){x.clearRect(0,0,c.width,c.height);document.getElementById('inspSigV').value='';};})();</script>
+</div>
+
+<div class="panel">
   <h3 class="tab-sub">Certifications &amp; validity</h3>
   <p class="sub">The system e-mails the inspector and the QA/QC nominee when a certificate is within a month of expiry. Once the hard copy is received, update the validity date here.</p>
   <table class="grid">

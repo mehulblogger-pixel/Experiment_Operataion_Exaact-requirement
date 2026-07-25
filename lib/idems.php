@@ -124,6 +124,9 @@ function idems_migrate() {
         approver_user_id INT NULL, resolved_user_id INT NULL, status VARCHAR(20) DEFAULT 'PENDING',
         acted_by VARCHAR(150) DEFAULT '', acted_at VARCHAR(30) DEFAULT '', remarks VARCHAR(600) DEFAULT '',
         delegated_to INT NULL, sla_due VARCHAR(30) DEFAULT '', escalated INT DEFAULT 0, created_at VARCHAR(30) DEFAULT '')");
+    // ---- Phase 4: digital signatures on profiles ----
+    ensure_column('users', 'signature', 'MEDIUMTEXT');          // base64 data-URL of the signature image
+    ensure_column('inspectors', 'signature', 'MEDIUMTEXT');
     idems_seed_report_types();
 }
 // Portable "add a unique index if missing" (ignores errors if it already exists).
@@ -430,8 +433,10 @@ function ops_idems_documents($route, $method) {
             flash('This report must be fully approved through its approval chain before it can be finalized.', 'error');
             redirect('/document?id=' . $doc['id']);
         }
-        $pdo->prepare("UPDATE report_docs SET finalized=1, status='ISSUED', finalized_at=?, finalized_by=?, issue_date=?, approved_at=?, approved_by=?, updated_at=? WHERE id=?")
-            ->execute([date('c'), user_name(current_user()), date('Y-m-d'), date('c'), user_name(current_user()), date('c'), $doc['id']]);
+        $issue = $doc['issue_date'] ?: date('Y-m-d');
+        $pdo->prepare("UPDATE report_docs SET finalized=1, status='ISSUED', finalized_at=?, finalized_by=?, issue_date=?, updated_at=? WHERE id=?")
+            ->execute([date('c'), user_name(current_user()), $issue, date('c'), $doc['id']]);
+        idems_snapshot_signatures($doc);   // freeze inspector + approver signatures onto the report
         idems_log('report_doc', $doc['id'], 'FINALIZE', ['irn'=>$doc['irn'], 'old'=>$doc['status'], 'new'=>'ISSUED']);
         flash('Report ' . $doc['irn'] . ' finalized & issued. It is now locked (immutable).');
         redirect('/document?id=' . $doc['id']);
@@ -880,6 +885,220 @@ function idems_run_sla_escalations() {
         $sent++;
     }
     return $sent;
+}
+
+// ===========================================================================
+//  Phase 4: automatic signatures + report PDF + controlled timestamps
+// ===========================================================================
+// Decode a stored signature (data-URL or raw) to JPEG bytes for the PDF.
+function idems_sig_jpeg($stored) {
+    $stored = (string)$stored;
+    if ($stored === '') return '';
+    $raw = strpos($stored, 'base64,') !== false ? base64_decode(substr($stored, strpos($stored, 'base64,') + 7)) : $stored;
+    [$jpg, ] = signature_to_jpeg($raw);
+    return $jpg;
+}
+function user_signature($userId) { return $userId ? (string)ops_val("SELECT signature FROM users WHERE id=?", [(int)$userId]) : ''; }
+function inspector_signature($inspectorId) { return $inspectorId ? (string)ops_val("SELECT signature FROM inspectors WHERE id=?", [(int)$inspectorId]) : ''; }
+
+// ---- Self-service "My signature" (any logged-in user) ----
+function ops_idems_my_signature($method) {
+    ops_require((bool)current_user(), 'Please log in.');
+    $u = current_user();
+    if ($method === 'POST') {
+        $sig = $_POST['sig'] ?? '';
+        if (($_POST['_do'] ?? '') === 'clear') { db()->prepare("UPDATE users SET signature='' WHERE id=?")->execute([$u['id']]); flash('Signature cleared.'); redirect('/my-signature'); }
+        // uploaded image wins over the canvas
+        if (!empty($_FILES['sigfile']['tmp_name']) && is_uploaded_file($_FILES['sigfile']['tmp_name'])) {
+            $bytes = file_get_contents($_FILES['sigfile']['tmp_name']);
+            if ($bytes !== false && strlen($bytes) < 2*1024*1024) $sig = 'data:' . ($_FILES['sigfile']['type'] ?: 'image/png') . ';base64,' . base64_encode($bytes);
+        }
+        if ($sig && strpos($sig, 'data:image') === 0) {
+            db()->prepare("UPDATE users SET signature=? WHERE id=?")->execute([$sig, $u['id']]);
+            idems_log('user', $u['id'], 'SIGNATURE_SET', ['field'=>'own signature']);
+            flash('Your signature has been saved. It will be added automatically to reports you approve.');
+        } else flash('No signature captured — draw in the box or upload an image.', 'error');
+        redirect('/my-signature');
+    }
+    view('ops/idems/my_signature', ['sig'=>$u['signature'] ?? '']);
+    return true;
+}
+
+// ---- Report PDF (letterhead + body + automatic signature block + timestamps) ----
+function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs) {
+    $p = new SimplePDF(); $ml = $p->ml; $right = $p->right();
+    $band = [30, 64, 175];
+    $p->rectFill(0, 0, $p->pageW(), 6, $band);
+    $p->y = $p->mt; $top = $p->y; $nameX = $ml;
+    if (!empty($lh['logo'])) { $ln = $p->addJpeg($lh['logo']); if ($ln) { [$iw,$ih]=$p->imgDim($ln); $lw=80; $lhh=$ih>0?min(44,$lw*$ih/max(1,$iw)):36; $p->drawImage($ln,$ml,$top,$lw,$lhh); $nameX=$ml+$lw+12; } }
+    $p->text($nameX, ($lh['name'] ?? '') ?: app_name(), 15, true, $band);
+    $ly = $top + 18;
+    foreach (preg_split('/\r?\n/', (string)($lh['address'] ?? '')) as $al) { $al=trim($al); if($al==='')continue; $p->y=$ly; $p->text($nameX,$al,8.5,false,[90,90,90]); $ly+=10; }
+    if (!empty($lh['contact'])) { $p->y=$ly; $p->text($nameX,$lh['contact'],8.5,false,[90,90,90]); $ly+=10; }
+    // IRN + status on the right
+    $p->y=$top; $p->text($ml, 'IRN: '.$doc['irn'], 9, true, [60,60,60], $right, 'R');
+    $p->y=$top+12; $p->text($ml, ($doc['type_code'].' — '.($doc['title'] ?: '')), 8, false, [110,110,110], $right, 'R');
+    if (empty($doc['finalized'])) { $p->y=$top+24; $p->text($ml, 'DRAFT — not yet issued', 8, true, [200,60,60], $right, 'R'); }
+    $p->y = max($ly, $top + 50); $p->hr($band);
+    $p->gap(6);
+    // report title
+    $p->line(strtoupper($doc['type_name'] ?? $doc['type_code'] ?? 'INSPECTION REPORT'), 13, true, 16, $band);
+    // key references grid
+    $kv = [
+        'Client' => $doc['client_disp'] ?: ($doc['client_name'] ?? ''), 'Vendor / Mfr' => $doc['vendor_disp'] ?: ($doc['vendor_name'] ?? ''),
+        'Project' => trim(($doc['project_code'] ?? '').' '.($doc['project_name'] ?? '')), 'PO' => $doc['po_ref'] ?? '',
+        'Drawing' => trim(($doc['drawing_no'] ?? '').' '.($doc['drawing_rev']?'Rev '.$doc['drawing_rev']:'')), 'QAP rev' => $doc['qap_rev'] ?? '',
+        'Standards' => $doc['standards'] ?? '', 'Location' => $doc['location'] ?? '',
+        'Inspection date' => $doc['inspection_date'] ?? '', 'Issue date' => $doc['issue_date'] ?? '',
+        'Result' => IDEMS_RESULTS[$doc['result']] ?? '', 'Release' => IDEMS_RELEASE[$doc['release_status']] ?? '',
+    ];
+    $colW = $p->contentW()/2;
+    foreach (array_chunk(array_filter($kv, fn($v)=>trim((string)$v)!==''), 2, true) as $pair) {
+        $p->needSpace(14); $yrow = $p->y; $i = 0;
+        foreach ($pair as $k=>$v) { $x = $ml + $i*$colW; $p->y=$yrow; $p->text($x, $k.':', 8.5, true, [90,90,90]); $p->text($x+70, $p->wrap((string)$v,9,$colW-74)[0] ?? (string)$v, 9); $i++; }
+        $p->y = $yrow + 13;
+    }
+    $p->gap(4);
+    // body sections
+    $bySec = []; foreach ($fields as $f) $bySec[(int)$f['section_id']][] = $f;
+    $filesBy = []; foreach ($files as $fl) $filesBy[$fl['field_key']][] = $fl;
+    $secList = $sections; $secList[] = ['id'=>0,'title'=>''];
+    foreach ($secList as $s) {
+        $fl = $bySec[(int)$s['id']] ?? []; if (!$fl) continue;
+        $p->needSpace(20); $p->gap(4);
+        if ($s['title']!=='') { $p->line($s['title'], 11, true, 14, $band); }
+        foreach ($fl as $f) {
+            if (in_array($f['ftype'],['heading','note'],true)) { $p->needSpace(12); $p->line($f['label'], 9.5, $f['ftype']==='heading', 12, [80,80,80]); continue; }
+            $k=$f['fkey']; $v=$data[$k] ?? '';
+            if ($f['ftype']==='table') {
+                if (!is_array($v)||!$v) continue; $cols=idems_table_cols($f); $p->needSpace(16);
+                $p->text($ml, $f['label'], 9, true, [70,70,70]); $p->gap(11);
+                $cw = $p->contentW()/max(1,count($cols)); $hy=$p->y;
+                $p->rectFill($ml,$hy,$p->contentW(),12,[235,238,245]); $ci=0;
+                foreach ($cols as $cl){ $p->y=$hy+3; $p->text($ml+$ci*$cw+2,(string)$cl,8,true,[60,60,60]); $ci++; }
+                $p->y=$hy+13;
+                foreach ($v as $r){ $r=(array)$r; $p->needSpace(12); $ry=$p->y; $ci=0; foreach($cols as $ck=>$cl){ $p->text($ml+$ci*$cw+2,(string)($r[$ck]??''),8.5); $ci++; } $p->y=$ry+11; $p->lineAt($ml,$p->y,$right,$p->y,[235,235,235]); }
+                $p->gap(3); continue;
+            }
+            if (in_array($f['ftype'],['photo','file','signature'],true)) {
+                if (empty($filesBy[$k])) continue; $p->needSpace(14);
+                $p->text($ml, $f['label'].':', 9, true, [70,70,70]); $p->gap(11);
+                $imgs = array_filter($filesBy[$k], fn($x)=>strpos($x['mime'],'image/')===0);
+                if ($imgs) { $x=$ml; $p->needSpace(60); $rowY=$p->y;
+                    foreach (array_slice($imgs,0,4) as $im){ $jpg=idems_sig_jpeg($im['data']); if(!$jpg)continue; $nm=$p->addJpeg($jpg); if($nm){ if($x+80>$right){$x=$ml;$rowY+=64;} $p->drawImage($nm,$x,$rowY,72,54); $x+=80; } }
+                    $p->y=$rowY+60;
+                }
+                foreach ($filesBy[$k] as $fl2) if (strpos($fl2['mime'],'image/')!==0) { $p->text($ml,'• '.$fl2['file_name'],8.5,false,[90,90,90]); $p->gap(10); }
+                continue;
+            }
+            $label = $f['label'];
+            if ($f['ftype']==='multiselect' && is_array($v)) { $o=idems_field_options($f); $v=implode(', ', array_map(fn($x)=>$o[$x]??$x,$v)); }
+            elseif (in_array($f['ftype'],['select','radio'],true)) { $o=idems_field_options($f); $v=$o[$v]??$v; }
+            elseif ($f['ftype']==='checkbox') $v=($v==='1'||$v===1)?'Yes':'No';
+            if (is_array($v)) $v='';
+            $p->needSpace(12);
+            $wrapped = $p->wrap((string)$v, 9, $p->contentW()-90);
+            $p->text($ml, $label.':', 8.5, true, [90,90,90]);
+            $p->text($ml+88, $wrapped ? $wrapped[0] : '', 9);
+            $p->gap(11);
+            for ($i=1;$i<count($wrapped);$i++){ $p->needSpace(11); $p->text($ml+88,$wrapped[$i],9); $p->gap(11); }
+        }
+    }
+    // remarks
+    if (!empty($doc['remarks'])) { $p->gap(4); $p->needSpace(16); $p->line('Remarks', 10, true, 13, $band); foreach ($p->wrap($doc['remarks'],9,$p->contentW()) as $ln2){ $p->needSpace(11); $p->line($ln2,9,false,11); } }
+    // ---- signature block ----
+    $p->gap(14); $p->needSpace(90); $p->hr($band); $p->gap(8);
+    $colW2 = $p->contentW()/2; $sy = $p->y;
+    $drawSig = function($x, $y0, $title, $s) use ($p) {
+        $p->y=$y0; $p->text($x, $title, 8.5, true, [90,90,90]);
+        $imgY=$y0+14;
+        if (!empty($s['img'])) { $nm=$p->addJpeg($s['img']); if($nm){ $p->drawImage($nm,$x,$imgY,120,40); } }
+        $lineY=$imgY+42; $p->lineAt($x,$lineY,$x+150,$lineY,[120,120,120]);
+        $ty=$lineY+3;
+        foreach (array_filter([$s['name'] ?? '', $s['desig'] ?? '', $s['meta'] ?? '', $s['time'] ?? '']) as $t){ $p->y=$ty; $p->text($x,$t,8,false,[70,70,70]); $ty+=10; }
+        return $ty;
+    };
+    $y1 = $drawSig($ml, $sy, 'Inspected by', $sigs['inspector'] ?? []);
+    $y2 = $drawSig($ml + $colW2, $sy, 'Approved by', $sigs['approver'] ?? []);
+    $p->y = max($y1, $y2) + 6;
+    // footer note
+    if (!empty($lh['footer'])) { $p->needSpace(14); $p->hr([220,220,220]); $p->gap(3); $p->line($lh['footer'], 7.5, false, 10, [130,130,130]); }
+    $p->needSpace(12); $p->line('System-generated by ' . app_name() . ' · IRN ' . $doc['irn'] . ' · ' . date('d M Y H:i') . ($doc['finalized'] ? ' · Issued/locked' : ' · DRAFT'), 7, false, 9, [150,150,150]);
+    return $p->output();
+}
+// Assemble the signature payload for a report (inspector + final approver), from
+// snapshots taken at finalize where available, else live profile signatures.
+function idems_report_signatures($doc) {
+    $out = ['inspector'=>[], 'approver'=>[]];
+    // inspector
+    $ins = $doc['inspector_id'] ? ops_one("SELECT name, designation, emp_code FROM inspectors WHERE id=?", [$doc['inspector_id']]) : null;
+    $snapI = ops_one("SELECT data, created_at FROM report_files WHERE report_doc_id=? AND kind='sig_inspector' ORDER BY id DESC LIMIT 1", [$doc['id']]);
+    $out['inspector'] = [
+        'img'   => idems_sig_jpeg($snapI['data'] ?? inspector_signature($doc['inspector_id'] ?? 0)),
+        'name'  => $ins['name'] ?? '', 'desig' => $ins ? (DESIGNATIONS[$ins['designation']] ?? $ins['designation']) : '',
+        'meta'  => trim(($ins['emp_code'] ?? '') . ($doc['branch_code'] ? ' · ' . $doc['branch_code'] : '')),
+        'time'  => ($doc['finalized_at'] ?? '') ? 'Signed: ' . date('d M Y H:i', strtotime($doc['finalized_at'])) : '',
+    ];
+    // approver = last APPROVED step's actor (a user), else the finalizer
+    $ap = ops_one("SELECT a.acted_by, a.acted_at, a.resolved_user_id FROM report_approvals a WHERE a.report_doc_id=? AND a.status='APPROVED' ORDER BY a.level DESC, a.id DESC LIMIT 1", [$doc['id']]);
+    $apUser = $ap && $ap['resolved_user_id'] ? ops_one("SELECT first_name, last_name, position_title, role FROM users WHERE id=?", [$ap['resolved_user_id']]) : null;
+    $snapA = ops_one("SELECT data FROM report_files WHERE report_doc_id=? AND kind='sig_approver' ORDER BY id DESC LIMIT 1", [$doc['id']]);
+    if ($ap || $doc['approved_by']) {
+        $out['approver'] = [
+            'img'   => idems_sig_jpeg($snapA['data'] ?? user_signature($ap['resolved_user_id'] ?? 0)),
+            'name'  => $apUser ? (trim(($apUser['first_name'] ?? '') . ' ' . ($apUser['last_name'] ?? '')) ?: '') : ($ap['acted_by'] ?? $doc['approved_by'] ?? ''),
+            'desig' => $apUser ? ($apUser['position_title'] ?: (ORG_ROLES[$apUser['role']] ?? '')) : '',
+            'meta'  => 'Approved',
+            'time'  => ($ap['acted_at'] ?? $doc['approved_at'] ?? '') ? 'Approved: ' . date('d M Y H:i', strtotime($ap['acted_at'] ?? $doc['approved_at'])) : '',
+        ];
+    }
+    return $out;
+}
+// Snapshot the inspector + approver signatures onto the report (called at finalize)
+// so they are frozen even if a profile signature later changes.
+function idems_snapshot_signatures($doc) {
+    $pdo = db();
+    $insSig = inspector_signature($doc['inspector_id'] ?? 0);
+    if ($insSig) { $pdo->prepare("DELETE FROM report_files WHERE report_doc_id=? AND kind='sig_inspector'")->execute([$doc['id']]);
+        $pdo->prepare("INSERT INTO report_files (report_doc_id,field_key,kind,file_name,mime,data,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)")->execute([$doc['id'],'','sig_inspector','inspector_sign.png','image/png',$insSig,user_name(current_user()),date('c')]); }
+    $ap = ops_one("SELECT resolved_user_id FROM report_approvals WHERE report_doc_id=? AND status='APPROVED' ORDER BY level DESC, id DESC LIMIT 1", [$doc['id']]);
+    $apSig = user_signature($ap['resolved_user_id'] ?? 0);
+    if ($apSig) { $pdo->prepare("DELETE FROM report_files WHERE report_doc_id=? AND kind='sig_approver'")->execute([$doc['id']]);
+        $pdo->prepare("INSERT INTO report_files (report_doc_id,field_key,kind,file_name,mime,data,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)")->execute([$doc['id'],'','sig_approver','approver_sign.png','image/png',$apSig,user_name(current_user()),date('c')]); }
+}
+// ---- Report PDF handler ----
+function ops_idems_pdf($method) {
+    $doc = ops_one("SELECT d.*, bp.display_name client_disp, bp.legal_name client_name, v.display_name vendor_disp, v.legal_name vendor_name, rt.name type_name
+        FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
+        WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? 0)]);
+    if (!$doc) { http_response_code(404); echo 'Not found'; return true; }
+    ops_require(is_master() || can('mod.idems.view'), 'You cannot view this report.');
+    $lh = function_exists('quote_letterhead') ? quote_letterhead() : ['name'=>app_name()];
+    $pdf = report_pdf_build($doc, idems_sections($doc['report_type_id']), idems_fields($doc['report_type_id']),
+        json_decode($doc['data'] ?: '[]', true) ?: [], idems_doc_files($doc['id']), $lh, idems_report_signatures($doc));
+    idems_log('report_doc', $doc['id'], 'PDF', ['irn'=>$doc['irn']]);
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/','_',$doc['irn']) . '.pdf"');
+    echo $pdf; return true;
+}
+// ---- Controlled timestamp / date edit (Branch App Manager only, Part 22) ----
+function ops_idems_timestamp($method) {
+    if ($method !== 'POST') redirect('/documents');
+    $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
+    if (!$doc) { http_response_code(404); view('notfound'); return true; }
+    ops_require(is_master() || can('idems.timestamp.edit'), 'Only the Branch Application Manager may adjust locked dates.');
+    $field = $_POST['field'] ?? '';
+    $allowed = ['inspection_date','issue_date'];
+    if (!in_array($field, $allowed, true)) { flash('That field cannot be adjusted.', 'error'); redirect('/document?id=' . $doc['id']); }
+    $reason = trim($_POST['reason'] ?? '');
+    if ($reason === '') { flash('A reason is mandatory to change a date.', 'error'); redirect('/document?id=' . $doc['id']); }
+    $new = trim($_POST['value'] ?? '');
+    $old = $doc[$field] ?? '';
+    db()->prepare("UPDATE report_docs SET $field=?, updated_at=? WHERE id=?")->execute([$new, date('c'), $doc['id']]);
+    idems_log('report_doc', $doc['id'], 'TIMESTAMP_EDIT', ['irn'=>$doc['irn'], 'field'=>$field, 'old'=>$old, 'new'=>$new, 'reason'=>$reason]);
+    flash('Date adjusted and logged in the tamper-proof audit trail.');
+    redirect('/document?id=' . $doc['id']);
+    return true;
 }
 
 // Compliance audit log viewer (basic; full super-admin dashboard is a later phase).

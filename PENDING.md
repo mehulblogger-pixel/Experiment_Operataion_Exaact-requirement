@@ -34,8 +34,12 @@ Proposed phasing (each phase = its own commit, tested):
   send-back/delegate with mandatory remarks, finalize gated on full approval, SLA auto-escalation in
   cron, approval-chain panel + act buttons on the report detail. Routes: /approver-map,
   /idems-approval-rules(-edit), /document-approve.
-- P4 Auto signatures + immutable system timestamps (inspector from profile, approver on approve),
-  Branch-App-Mgr-only timestamp edit w/ tamper-proof audit (old/new/user/reason/time).
+- P4 Auto signatures + immutable timestamps ✅ SHIPPED — signature on users + inspectors; self-service
+  /my-signature (draw or upload) + inspector-master signature panel; report PDF (/document-pdf) with
+  letterhead + key refs + designed body (fields/tables/photos) + auto signature block (inspector +
+  final approver, images + name/designation/emp-code/branch + system timestamps) + DRAFT watermark;
+  signatures snapshotted onto the report at finalize (frozen); Branch-App-Mgr-only date edit
+  (/document-timestamp) with mandatory reason → tamper-proof audit (old/new/user/reason/ip/time).
 - P5 Client-specific formats: upload DOCX/PDF template, map fields, pixel-match output.
 - P6 Manufacturer document verification & endorsement (upload→review→verify→comment→approve/reject→
   digitally endorse→archive) without altering the original; full endorsement audit trail.

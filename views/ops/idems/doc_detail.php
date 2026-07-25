@@ -13,6 +13,7 @@
     <?php if (!$doc['finalized'] && (is_master() || can('idems.finalize'))): ?>
       <form method="post" action="/document-finalize?id=<?= (int)$doc['id'] ?>" style="display:inline" onsubmit="return confirm('Finalize &amp; issue this report? It becomes permanently locked (immutable).')"><button class="btn" type="submit">Finalize &amp; issue</button></form>
     <?php endif; ?>
+    <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>" target="_blank">📄 PDF</a>
   </div>
 </div>
 
@@ -118,6 +119,21 @@
 <style>.ev-th{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}</style>
 <?php else: ?>
 <p class="muted" style="margin:10px 2px">No form is designed for this report type yet<?= (is_master()||can('idems.type.manage')) ? ' — use "Design this form" above to add sections &amp; fields.' : '.' ?></p>
+<?php endif; ?>
+
+<?php if (is_master() || can('idems.timestamp.edit')): ?>
+<div class="panel" style="border:1px dashed var(--line)">
+  <div class="ctitle" style="margin-top:0"><h3>🔧 Adjust dates <span class="muted" style="font-weight:400">— Branch Application Manager only</span></h3></div>
+  <p class="muted" style="margin:0 0 8px">System dates are normally locked. A change here is recorded permanently (old &amp; new value, who, when, reason).</p>
+  <form method="post" action="/document-timestamp" style="display:flex;gap:6px;flex-wrap:wrap;align-items:end">
+    <input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
+    <div class="ff" style="margin:0"><label>Field</label>
+      <select class="form-control" name="field"><option value="inspection_date">Inspection date</option><option value="issue_date">Issue date</option></select></div>
+    <div class="ff" style="margin:0"><label>New value</label><input class="form-control" type="date" name="value"></div>
+    <div class="ff" style="margin:0;flex:1;min-width:180px"><label>Reason (required)</label><input class="form-control" name="reason" required></div>
+    <button class="btn" type="submit">Apply &amp; log</button>
+  </form>
+</div>
 <?php endif; ?>
 
 <div class="panel" style="padding:0;overflow:hidden">
