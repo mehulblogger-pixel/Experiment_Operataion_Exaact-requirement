@@ -40,7 +40,13 @@ Proposed phasing (each phase = its own commit, tested):
   final approver, images + name/designation/emp-code/branch + system timestamps) + DRAFT watermark;
   signatures snapshotted onto the report at finalize (frozen); Branch-App-Mgr-only date edit
   (/document-timestamp) with mandatory reason → tamper-proof audit (old/new/user/reason/ip/time).
-- P5 Client-specific formats: upload DOCX/PDF template, map fields, pixel-match output.
+- P5 Client-specific formats ✅ SHIPPED — report_templates (upload .docx per report type/client/office,
+  with doc/format/revision numbers); generic {{token}} fill reusing the docx engine + a generalised
+  repeatable-table row expander ({{fkey.col}}); token map from standard fields + the type's designed
+  fields; most-specific template auto-selected; /document-docx generates output in the client's exact
+  format (fonts/headers/footers/logo/tables preserved); token-reference UI. NO agency names seeded
+  (owner instruction) — admin uploads their own client templates. Routes: /report-templates(-edit/
+  -download), /document-docx.
 - P6 Manufacturer document verification & endorsement (upload→review→verify→comment→approve/reject→
   digitally endorse→archive) without altering the original; full endorsement audit trail.
 - P7 Technical Writing Assistant (no AI): grammar/spelling, engineering phrase library, plain

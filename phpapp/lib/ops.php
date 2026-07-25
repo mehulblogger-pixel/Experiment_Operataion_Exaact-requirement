@@ -1245,7 +1245,8 @@ function ops_module_gate($route) {
         'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems',
         'report-types'=>'idems','report-type-edit'=>'idems','report-builder'=>'idems','report-field-edit'=>'idems','report-file'=>'idems','irn-rules'=>'idems','audit-log'=>'idems',
         'document-approve'=>'idems','approver-map'=>'idems','idems-approval-rules'=>'idems','idems-approval-rule-edit'=>'idems',
-        'document-pdf'=>'idems','document-timestamp'=>'idems',
+        'document-pdf'=>'idems','document-timestamp'=>'idems','document-docx'=>'idems',
+        'report-templates'=>'idems','report-template-edit'=>'idems','report-template-download'=>'idems',
         'masters'=>'masters','work-norms'=>'masters',
         'office-finance'=>'overheads',
         'reports'=>'reports',
@@ -1398,6 +1399,10 @@ function ops_dispatch($route, $method) {
             return ops_idems_timestamp($method);
         case $route === 'my-signature':
             return ops_idems_my_signature($method);
+        case $route === 'document-docx':
+            return ops_idems_docx($method);
+        case $route === 'report-templates' || $route === 'report-template-edit' || $route === 'report-template-download':
+            return ops_idems_templates($route, $method);
         case $route === 'irn-rules':
             return ops_idems_numbering($method);
         case $route === 'audit-log':
