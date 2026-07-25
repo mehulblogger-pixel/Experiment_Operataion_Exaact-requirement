@@ -1,5 +1,6 @@
 <?php
-  $stPill = ['DRAFT'=>'p-mut','PENDING_APPROVAL'=>'p-warn','APPROVED'=>'p-info','SENT'=>'p-info','ACCEPTED'=>'p-ok','LOST'=>'p-bad','EXPIRED'=>'p-mut'];
+  $stPill = ['DRAFT'=>'p-mut','PENDING_APPROVAL'=>'p-warn','APPROVED'=>'p-info','SENT'=>'p-info',
+             'ACCEPTED'=>'p-ok','LOST'=>'p-bad','REJECTED'=>'p-bad','EXPIRED'=>'p-mut'];
   $st = $q['status'];
   $act = function($to, $label, $cls='btn small') use ($q) {
     return '<form method="post" action="/quote-status?id='.(int)$q['id'].'" style="display:inline"><input type="hidden" name="to" value="'.e($to).'"><button class="'.$cls.'" type="submit">'.e($label).'</button></form>';
@@ -13,10 +14,54 @@
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <a class="btn" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
     <a class="btn secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a>
-    <?php if ($canEdit && in_array($st, ['DRAFT','PENDING_APPROVAL'], true)): ?><a class="btn secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>">Edit</a><?php endif; ?>
+    <?php if ($canEdit && in_array($st, ['DRAFT','PENDING_APPROVAL','REJECTED'], true)): ?><a class="btn secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>">Edit</a><?php endif; ?>
     <a class="btn secondary" href="/quotes">← Back</a>
   </div>
 </div>
+
+<?php if ($st === 'REJECTED'): ?>
+<div class="panel" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 6%,transparent)">
+  <b style="color:var(--bad)">Rejected by <?= e($q['rejected_by'] ?: 'the approver') ?></b>
+  <span class="muted"><?= $q['rejected_at'] ? ' on ' . e(fdate(substr((string)$q['rejected_at'],0,10))) : '' ?></span>
+  <?php if (!empty($q['reject_remarks'])): ?><div style="margin-top:4px"><b>Comment:</b> <?= e($q['reject_remarks']) ?></div><?php endif; ?>
+  <div class="muted" style="margin-top:4px">Edit it and submit again, or revise it as a new revision.</div>
+</div>
+<?php endif; ?>
+
+<?php if (!empty($locked)): ?>
+<div class="panel" style="border:1px solid var(--warn)">
+  <b>🔒 Locked.</b> <span class="muted">This <?= e(Tl('quote')) ?> is
+  <?= e(strtolower(lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st)) ?>, so it can no longer be edited.
+  Only the Super Admin can re-open it, and only against a request raised here.</span>
+  <?php if ($editReq): ?>
+    <div style="margin-top:8px"><span class="pill p-warn">Request pending</span>
+      <span class="muted">raised by <?= e($editReq['requested_by']) ?> — “<?= e($editReq['reason']) ?>”</span></div>
+  <?php else: ?>
+    <form method="post" action="/quote-unlock?id=<?= (int)$q['id'] ?>" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:end">
+      <input type="hidden" name="do" value="request">
+      <div class="ff" style="margin:0;flex:1;min-width:240px"><label>Why does it need re-opening?</label>
+        <input class="form-control" name="reason" required placeholder="e.g. client asked to correct the rate on line 2"></div>
+      <button class="btn small secondary" type="submit">Request re-edit</button>
+    </form>
+  <?php endif; ?>
+</div>
+<?php elseif ($editReq && is_master()): ?>
+<div class="panel" style="border:1px solid var(--warn)">
+  <b>Re-edit requested</b> <span class="muted">by <?= e($editReq['requested_by']) ?> — “<?= e($editReq['reason']) ?>”</span>
+  <form method="post" action="/quote-unlock?id=<?= (int)$q['id'] ?>" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:end">
+    <input type="hidden" name="req" value="<?= (int)$editReq['id'] ?>">
+    <div class="ff" style="margin:0"><label>Unlock for (hours)</label>
+      <input class="form-control" type="number" name="hours" value="24" min="1" max="168" style="width:110px"></div>
+    <div class="ff" style="margin:0;flex:1;min-width:200px"><label>Note</label><input class="form-control" name="note"></div>
+    <button class="btn small" name="do" value="grant" type="submit">Grant</button>
+    <button class="btn small danger" name="do" value="refuse" type="submit">Refuse</button>
+  </form>
+</div>
+<?php elseif (!empty($q['unlocked_until']) && strtotime($q['unlocked_until']) > time()): ?>
+<div class="panel" style="border:1px solid var(--ok)">
+  <b style="color:var(--ok)">Unlocked</b> <span class="muted">until <?= e(date('d M Y H:i', strtotime($q['unlocked_until']))) ?> — it re-locks itself afterwards.</span>
+</div>
+<?php endif; ?>
 
 <!-- Status action bar -->
 <div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -37,21 +82,36 @@
   <?php endif; ?>
 </div>
 
-<?php if ($st==='PENDING_APPROVAL' && $approvals): ?>
+<?php if ($approvals): ?>
 <div class="panel">
   <h3 class="tab-sub" style="margin-top:0">Approval chain</h3>
-  <table class="grid"><tr><th>Level</th><th>Approver</th><th>Status</th><th>Acted</th><th></th></tr>
-    <?php foreach ($approvals as $a): $who = $a['approver_user_id'] ? ('User #'.$a['approver_user_id']) : ($a['approver_role'] ? (ORG_ROLES[$a['approver_role']] ?? $a['approver_role']) : 'Any approver'); ?>
+  <?php if ($st==='PENDING_APPROVAL' && $pendingWith): ?>
+    <div class="panel" style="margin:0 0 10px;background:var(--soft)">
+      <b>⏳ Waiting with <?= e($pendingWith) ?></b>
+      <?php if ($pendingStep): ?><span class="muted"> — level <?= (int)$pendingStep['level'] ?> of <?= count($approvals) ?></span><?php endif; ?>
+    </div>
+  <?php endif; ?>
+  <table class="dt">
+    <thead><tr><th class="num">Level</th><th>With whom</th><th>Status</th><th>Acted</th><th>Comment</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($approvals as $ai => $a):
+      $people = $stepPeople[$ai] ?? [];
+      if ($people) { $names = array_map('crm_person_label', array_slice($people, 0, 4)); $more = count($people) - count($names); $who = implode(', ', $names) . ($more > 0 ? " and $more other(s)" : ''); }
+      elseif (!empty($a['approver_role'])) $who = 'Anyone with the role ' . (ORG_ROLES[$a['approver_role']] ?? $a['approver_role']) . ' (nobody holds it yet)';
+      else $who = 'Any approver';
+    ?>
     <tr>
-      <td><b><?= (int)$a['level'] ?></b></td>
+      <td class="num"><b><?= (int)$a['level'] ?></b></td>
       <td><?= e($who) ?></td>
-      <td><span class="pill <?= $a['status']==='APPROVED'?'p-ok':($a['status']==='REJECTED'?'p-bad':'p-warn') ?>"><?= e($a['status']) ?></span></td>
-      <td class="muted"><?= $a['acted_by'] ? e($a['acted_by']).' · '.e(substr((string)$a['acted_at'],0,10)) : '—' ?><?= $a['remarks']?'<div style="font-size:11px">'.e($a['remarks']).'</div>':'' ?></td>
+      <td><span class="pill <?= $a['status']==='APPROVED'?'p-ok':($a['status']==='REJECTED'?'p-bad':'p-warn') ?>">
+          <?= e($a['status']==='PENDING' ? 'Pending' : ucfirst(strtolower($a['status']))) ?></span></td>
+      <td class="muted"><?= $a['acted_by'] ? e($a['acted_by']).'<br><span style="font-size:11px">'.e(fdate(substr((string)$a['acted_at'],0,10))).'</span>' : '—' ?></td>
+      <td class="muted"><?= $a['remarks'] ? e($a['remarks']) : '—' ?></td>
       <td class="num" style="white-space:nowrap">
         <?php if (crm_can_act_approval($a)): ?>
-        <form method="post" action="/quote-approve?id=<?= (int)$q['id'] ?>" style="display:inline-flex;gap:4px;align-items:center">
+        <form method="post" action="/quote-approve?id=<?= (int)$q['id'] ?>" style="display:flex;gap:4px;align-items:center;justify-content:flex-end">
           <input type="hidden" name="step" value="<?= (int)$a['id'] ?>">
-          <input class="form-control" name="remarks" placeholder="remarks" style="width:130px">
+          <input class="form-control" name="remarks" placeholder="comment (required to reject)" style="width:190px">
           <button class="btn small" name="decision" value="approve" type="submit">Approve</button>
           <button class="btn small danger" name="decision" value="reject" type="submit">Reject</button>
         </form>
@@ -59,8 +119,9 @@
       </td>
     </tr>
     <?php endforeach; ?>
+    </tbody>
   </table>
-  <p class="muted" style="margin-top:6px">The quote becomes <strong>Approved</strong> automatically once every step is approved. Configure the chain under <a href="/quote-approval-rules">Approval rules</a>.</p>
+  <p class="muted" style="margin-top:6px">It becomes <strong>Approved</strong> once every level has approved. A rejection needs a comment and marks the whole <?= e(Tl('quote')) ?> as rejected. Configure the chain under <a href="/approval-rules?module=quote">Approval rules</a>.</p>
 </div>
 <?php endif; ?>
 
@@ -217,10 +278,110 @@
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0">Follow-ups</h3>
     <?php if ($followups): ?>
-    <table class="grid"><tr><th>When</th><th>Due date</th><th>Status</th></tr>
-      <?php foreach ($followups as $f): ?><tr><td><?= e(lk_options_or('followup_kind', FOLLOWUP_KINDS)[$f['kind']] ?? $f['kind']) ?></td><td><?= e($f['due_date']) ?></td><td><span class="pill <?= $f['status']==='SENT'?'p-ok':($f['status']==='SKIPPED'?'p-mut':'p-warn') ?>"><?= e($f['status']) ?></span></td></tr><?php endforeach; ?>
-    </table>
-    <p class="muted" style="margin-top:6px">Scheduled when the quote is marked sent (3 / 6 / 9 days, fortnight, month). Auto-emails with templates come in the next phase.</p>
-    <?php else: ?><p class="muted">Follow-ups are scheduled once the quote is marked <b>sent</b>.</p><?php endif; ?>
+    <form method="post" action="/quote-followup?id=<?= (int)$q['id'] ?>">
+      <input type="hidden" name="do" value="save">
+      <table class="dt">
+        <thead><tr><th>When</th><th>Due</th><th>Status</th><th>Done on</th><th>Note</th></tr></thead>
+        <tbody>
+        <?php foreach ($followups as $f): ?>
+        <tr>
+          <td><input type="hidden" name="f_id[]" value="<?= (int)$f['id'] ?>"><?= e(lk_options_or('followup_kind', FOLLOWUP_KINDS)[$f['kind']] ?? $f['kind']) ?></td>
+          <td><input class="form-control" type="date" name="f_due[]" value="<?= e($f['due_date']) ?>" style="min-width:140px"></td>
+          <td><select class="form-control" name="f_status[]" style="min-width:110px">
+              <?php foreach (['PENDING'=>'Pending','DONE'=>'Done','SENT'=>'Sent','SKIPPED'=>'Skipped'] as $sk=>$sv): ?>
+                <option value="<?= e($sk) ?>" <?= ($f['status']===$sk)?'selected':'' ?>><?= e($sv) ?></option><?php endforeach; ?>
+              </select></td>
+          <td><input class="form-control" type="date" name="f_done[]" value="<?= e($f['done_date'] ?? '') ?>" style="min-width:140px"></td>
+          <td><input class="form-control" name="f_note[]" value="<?= e($f['note'] ?? '') ?>" placeholder="what was said" style="min-width:160px"></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+      <div style="margin-top:8px"><button class="btn small" type="submit">Save follow-ups</button></div>
+    </form>
+    <p class="muted" style="margin-top:6px">Scheduled automatically when the <?= e(Tl('quote')) ?> is marked sent — day 3, 6, 9, fortnight and month. Edit any date, mark one done with a note, or add your own below.</p>
+    <?php else: ?>
+      <p class="muted">Follow-ups are scheduled automatically once the <?= e(Tl('quote')) ?> is marked <b>sent</b> — day 3, 6, 9, fortnight and month. You can also add one by hand.</p>
+    <?php endif; ?>
+    <form method="post" action="/quote-followup?id=<?= (int)$q['id'] ?>" style="display:flex;gap:6px;flex-wrap:wrap;align-items:end;margin-top:8px;border-top:1px solid var(--line);padding-top:10px">
+      <input type="hidden" name="do" value="add">
+      <div class="ff" style="margin:0"><label>Add a follow-up on</label><input class="form-control" type="date" name="due_date" value="<?= e(date('Y-m-d')) ?>"></div>
+      <div class="ff" style="margin:0;flex:1;min-width:160px"><label>Note</label><input class="form-control" name="note" placeholder="e.g. call the purchase head"></div>
+      <button class="btn small secondary" type="submit">+ Add</button>
+    </form>
   </div>
+</div>
+
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Sites <span class="muted">— every location this <?= e(Tl('quote')) ?> covers</span></h3>
+  <?php if ($locs): ?>
+  <table class="dt">
+    <thead><tr><th>Site</th><th>Type</th><th>Address</th><th>Contact</th><th>Nearest <?= e(T('office')) ?></th></tr></thead>
+    <tbody>
+    <?php $offById = []; foreach ($offAll as $o) $offById[(int)$o['id']] = $o['name'];
+          foreach ($locs as $L): ?>
+      <tr>
+        <td><b><?= e($L['label'] ?: '—') ?></b></td>
+        <td><?= e(lk_options_or('site_location_type', SITE_LOCATION_TYPES)[$L['location_type']] ?? $L['location_type']) ?></td>
+        <td><?= e(quote_location_line($L)) ?: '<span class="muted">—</span>' ?></td>
+        <td><?= e(trim(($L['contact_name'] ?? '') . ' ' . ($L['contact_mobile'] ?? ''))) ?: '<span class="muted">—</span>' ?></td>
+        <td><?= e($offById[(int)($L['office_id'] ?? 0)] ?? '—') ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php else: ?><p class="muted">No sites recorded. Add them on the edit screen.</p><?php endif; ?>
+</div>
+
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Documents <span class="muted">— our format, attachments, the <?= e(Tl('client')) ?>'s PO and anything the <?= e(Tl('engineer')) ?> will need</span></h3>
+  <?php if ($files): ?>
+  <table class="dt">
+    <thead><tr><th>File</th><th>Kind</th><th>Note</th><th>Shared with <?= e(Tl('engineer')) ?></th><th>Added</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($files as $f): ?>
+      <tr>
+        <td><a href="/quote-file?id=<?= (int)$f['id'] ?>">⬇ <?= e($f['file_name']) ?></a>
+            <span class="muted" style="font-size:11px">(<?= e(number_format(((int)$f['b64len']) * 3 / 4 / 1024, 0)) ?> KB)</span></td>
+        <td><?= e($fileKinds[$f['kind']] ?? $f['kind']) ?></td>
+        <td class="muted"><?= e($f['note'] ?: '—') ?></td>
+        <td><?= $f['share_with_inspector'] ? '<span class="pill p-ok">yes</span>' : '<span class="pill p-mut">no</span>' ?></td>
+        <td class="muted"><?= e($f['uploaded_by']) ?><br><span style="font-size:11px"><?= e(fdate(substr((string)$f['uploaded_at'],0,10))) ?></span></td>
+        <td class="num">
+          <?php if ($canEdit || is_master()): ?>
+          <form method="post" action="/quote-file-delete?id=<?= (int)$f['id'] ?>" onsubmit="return confirm('Remove this file?')" style="display:inline">
+            <button class="btn small danger" type="submit">✕</button></form>
+          <?php endif; ?>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php else: ?><p class="muted">Nothing attached yet.</p><?php endif; ?>
+
+  <?php if ($canEdit || is_master()): ?>
+  <form method="post" action="/quote-files?id=<?= (int)$q['id'] ?>" enctype="multipart/form-data" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+    <div class="form-grid">
+      <div class="ff"><label>Kind</label>
+        <select class="form-control" name="kind" id="fkind">
+          <?php foreach ($fileKinds as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
+        </select></div>
+      <div class="ff"><label>Files <span class="muted">— several at once, 8 MB each</span></label>
+        <input class="form-control" type="file" name="files[]" multiple></div>
+      <div class="ff"><label>Note</label><input class="form-control" name="note" placeholder="e.g. approved QAP rev 2"></div>
+      <div class="ff po-only" style="display:none"><label>PO number</label><input class="form-control" name="po_number" value="<?= e($q['po_number'] ?? '') ?>"></div>
+      <div class="ff po-only" style="display:none"><label>PO date</label><input class="form-control" type="date" name="po_date" value="<?= e($q['po_date'] ?? '') ?>"></div>
+      <div class="ff" style="align-self:end">
+        <label class="chk"><input type="checkbox" name="share_with_inspector" value="1" checked> Share with the <?= e(Tl('engineer')) ?> on every <?= e(Tl('call')) ?> from this <?= e(Tl('quote')) ?></label></div>
+    </div>
+    <div style="margin-top:10px"><button class="btn small" type="submit">Attach</button></div>
+  </form>
+  <script>
+  (function(){
+    var k = document.getElementById('fkind');
+    function sync(){ document.querySelectorAll('.po-only').forEach(function(el){ el.style.display = k.value === 'PO' ? '' : 'none'; }); }
+    k.addEventListener('change', sync); sync();
+  })();
+  </script>
+  <?php endif; ?>
 </div>

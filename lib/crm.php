@@ -131,12 +131,13 @@ const QUOTE_STATUS = [
     'PENDING_APPROVAL' => 'Pending approval',
     'APPROVED'         => 'Approved (ready to send)',
     'SENT'             => 'Sent — awaiting reply',
+    'REJECTED'         => 'Rejected by approver',
     'ACCEPTED'         => 'Accepted / closed-won',
     'LOST'             => 'Lost / regretted',
     'EXPIRED'          => 'Expired',
 ];
 // Which statuses count as OPEN / PENDING / CLOSED for the §14 views.
-const QUOTE_OPEN_STATES    = ['DRAFT','PENDING_APPROVAL','APPROVED','SENT'];
+const QUOTE_OPEN_STATES    = ['DRAFT','PENDING_APPROVAL','APPROVED','SENT','REJECTED'];
 const QUOTE_PENDING_STATES = ['PENDING_APPROVAL','SENT'];
 const QUOTE_CLOSED_STATES  = ['ACCEPTED'];
 
@@ -687,7 +688,46 @@ function ops_crm_quotes($route, $method) {
             foreach ($set as $s) $sa[] = $s;
             $counts[$k] = (int)ops_val("SELECT COUNT(*) FROM quotations q WHERE $sw AND q.is_current=1 AND q.status IN ($ph)", $sa);
         }
+        // §xxii — the same rows the screen shows, as a spreadsheet.
+        if (($_GET['export'] ?? '') === '1') { csv_download('quotes-' . date('Y-m-d') . '.csv', crm_quotes_export($rows)); return; }
         view('ops/crm/quote_list', ['rows' => $rows, 'view' => $view, 'q' => $qq, 'counts' => $counts]); return;
+    }
+    // §xv — a quote we did not write (client / tender portal) still belongs in the
+    // register. Same record, marked with where it came from, so the win/loss and
+    // follow-up numbers stay honest.
+    if ($route === 'quote-external') {
+        ops_require(can('crm.quote.create') || is_master(), 'You cannot add ' . Tlp('quote') . '.');
+        if ($method === 'POST') {
+            $b = $_POST;
+            $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
+            $no = trim($b['quote_no'] ?? '') ?: crm_next_quote_no();
+            $cols = ['quote_no','rev','is_current','status','origin','origin_portal','origin_ref','client_id','client_name',
+                'contact_name','contact_email','contact_mobile','sbu','office_id','subject','product_category',
+                'inspection_types','total_amount','subtotal','gst_pct','payment_terms','sent_at','owner_id','created_by','created_at'];
+            $sub = (float)($b['total_amount'] ?? 0);
+            $vals = [$no, 0, 1, $b['status'] ?? 'SENT', $b['origin'] ?? 'CLIENT_PORTAL', trim($b['origin_portal'] ?? ''), trim($b['origin_ref'] ?? ''),
+                $cid, $cid ? crm_client_name($cid) : trim($b['client_name'] ?? ''),
+                trim($b['contact_name'] ?? ''), trim($b['contact_email'] ?? ''), trim($b['contact_mobile'] ?? ''),
+                $b['sbu'] ?? '', ($b['office_id'] ?? '') !== '' ? (int)$b['office_id'] : null, trim($b['subject'] ?? ''),
+                product_category_canon($b['product_category'] ?? ''),
+                implode(',', array_filter((array)($b['inspection_types'] ?? []))),
+                $sub, $sub, 0, trim($b['payment_terms'] ?? ''),
+                trim($b['submitted_on'] ?? '') ?: date('c'), current_user()['id'] ?? null, user_name(current_user()), date('c')];
+            $pdo->prepare("INSERT INTO quotations (" . implode(',', $cols) . ") VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")")->execute($vals);
+            $id = (int)$pdo->lastInsertId();
+            crm_log_change($id, 'Registered from ' . (lk_options_or('quote_origin', QUOTE_ORIGINS)[$b['origin'] ?? ''] ?? 'an external portal'));
+            if (($b['status'] ?? '') === 'SENT') crm_schedule_followups($id);
+            flash("$no registered.");
+            redirect('/quote?id=' . $id);
+        }
+        view('ops/crm/quote_external', [
+            'clients' => clients_list(), 'offices' => offices_list(),
+            'sbuOpts' => lk_options_or('sbu', OPS_SBUS), 'origins' => lk_options_or('quote_origin', QUOTE_ORIGINS),
+            'svcOpts' => lk_options_or('inspection_type', INSPECTION_TYPES),
+            'payTerms' => lk_options_or('payment_term', PAYMENT_TERMS),
+            'statuses' => lk_options_or('quote_status', QUOTE_STATUS), 'prodCats' => product_categories_all(),
+        ]);
+        return;
     }
     // §ii — contact + addresses for the client just picked on the quote form.
     if ($route === 'quote-client') {
@@ -786,8 +826,17 @@ function ops_crm_quotes($route, $method) {
             'approvals' => crm_approvals($q['id']),
             'lostReasons' => lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS),
             'canApprove' => can('crm.quote.approve') || is_master(), 'canSend' => can('crm.quote.send') || is_master(),
-            'canEdit' => can('crm.quote.create') || can('mod.quotes.edit') || is_master(),
+            'canEdit' => (can('crm.quote.create') || can('mod.quotes.edit') || is_master()) && !quote_is_locked($q),
+            'locked' => quote_is_locked($q), 'editReq' => quote_edit_request_open($q['id']),
             'canContract' => can('crm.contract.register') || is_master(),
+            // §xii — who the approval is actually sitting with, right now.
+            'pendingWith' => crm_pending_with($q['id']), 'pendingStep' => crm_pending_step($q['id']),
+            'stepPeople' => array_map(fn($s) => crm_step_approvers($s), crm_approvals($q['id'])),
+            'locs' => crm_quote_locations($q['id']),
+            'files' => crm_quote_files($q['id']),
+            'fileKinds' => QUOTE_FILE_KINDS,
+            'payTerms' => lk_options_or('payment_term', PAYMENT_TERMS),
+            'offAll' => offices_list(),
             'clientReg' => !empty($q['client_id']) ? ops_one("SELECT code, legal_name FROM business_partners WHERE id=?", [$q['client_id']]) : null,
             'orderJobs' => ops_all("SELECT j.id, j.job_code, j.stage, j.closed_flag, j.invoice_raised, j.invoice_amount, j.payment_received, j.payment_amount, i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.quotation_id=? ORDER BY j.id", [$q['id']])]);
         return;
@@ -800,8 +849,19 @@ function ops_crm_quotes($route, $method) {
         if ($to === 'SENT') ops_require(can('crm.quote.send') || is_master(), 'You cannot send quotations.');
         if ($to === 'PENDING_APPROVAL') {
             $n = crm_build_approvals($q);   // build the approval chain from the rules
-            $pdo->prepare("UPDATE quotations SET status='PENDING_APPROVAL' WHERE id=?")->execute([$q['id']]);
-            flash('Submitted for approval — ' . $n . ' approval step(s) created.');
+            $pdo->prepare("UPDATE quotations SET status='PENDING_APPROVAL', submitted_at=?, rejected_by='', rejected_at='', reject_remarks='' WHERE id=?")
+                ->execute([date('c'), $q['id']]);
+            crm_log_change($q['id'], 'Submitted for approval');
+            // §xii — say who it is now sitting with, and tell them.
+            $with = crm_pending_with($q['id']);
+            $step = crm_pending_step($q['id']);
+            foreach (crm_step_approvers($step ?: []) as $ap) {
+                if (trim((string)($ap['email'] ?? '')) === '') continue;
+                ops_mail($ap['email'], 'Approval needed: ' . quote_label($q),
+                    "Hello,\n\n" . quote_label($q) . " ({$q['client_name']}, " . fmoney($q['total_amount']) . ") is waiting for your approval.\n\n"
+                    . "Open it in " . app_name() . " to approve or reject it with a comment.\n", '', 'QUOTE_APPROVAL');
+            }
+            flash('Submitted for approval — ' . $n . ' step(s). Now with ' . ($with ?: 'an approver') . '.');
             redirect('/quote?id=' . $q['id']);
         } elseif ($to === 'LOST') {
             $pdo->prepare("UPDATE quotations SET status='LOST', lost_reason=?, lost_reason_other=? WHERE id=?")
@@ -884,17 +944,33 @@ function ops_crm_quotes($route, $method) {
         $q = crm_quote_get($step['quote_id']); if (!$q) { http_response_code(404); view('notfound'); return; }
         ops_require(crm_can_act_approval($step), 'You are not an approver for this step.');
         $remarks = trim($_POST['remarks'] ?? '');
+        $me = user_name(current_user());
         if (($_POST['decision'] ?? '') === 'reject') {
+            // §xiii — a rejection must carry a reason.
+            if ($remarks === '') { flash('Enter a comment saying why you are rejecting it.', 'error'); redirect('/quote?id=' . $q['id']); }
             $pdo->prepare("UPDATE quote_approvals SET status='REJECTED', acted_by=?, acted_at=?, remarks=? WHERE id=?")
-                ->execute([user_name(current_user()), date('c'), $remarks, $step['id']]);
-            $pdo->prepare("UPDATE quotations SET status='DRAFT' WHERE id=?")->execute([$q['id']]);
-            flash('Rejected — quotation sent back to draft.');
+                ->execute([$me, date('c'), $remarks, $step['id']]);
+            // §xvi — the quote itself shows as rejected, by whom and why, rather than
+            // quietly reverting to draft with no trace.
+            $pdo->prepare("UPDATE quotations SET status='REJECTED', rejected_by=?, rejected_at=?, reject_remarks=? WHERE id=?")
+                ->execute([$me, date('c'), $remarks, $q['id']]);
+            crm_log_change($q['id'], 'Rejected by ' . $me . ' — ' . $remarks);
+            crm_notify_owner($q, 'rejected by ' . $me, $remarks);
+            flash('Rejected. The ' . Tl('quote') . ' now shows as rejected by you, with your comment.');
         } else {
             $pdo->prepare("UPDATE quote_approvals SET status='APPROVED', acted_by=?, acted_at=?, remarks=? WHERE id=?")
-                ->execute([user_name(current_user()), date('c'), $remarks, $step['id']]);
+                ->execute([$me, date('c'), $remarks, $step['id']]);
             $pending = (int)ops_val("SELECT COUNT(*) FROM quote_approvals WHERE quote_id=? AND status='PENDING'", [$q['id']]);
-            if ($pending === 0) { $pdo->prepare("UPDATE quotations SET status='APPROVED' WHERE id=?")->execute([$q['id']]); flash('All approvals complete — quotation approved and ready to send.'); }
-            else flash('Your approval is recorded. ' . $pending . ' step(s) still pending.');
+            if ($pending === 0) {
+                $pdo->prepare("UPDATE quotations SET status='APPROVED' WHERE id=?")->execute([$q['id']]);
+                crm_log_change($q['id'], 'Approved by ' . $me . ($remarks !== '' ? ' — ' . $remarks : ''));
+                crm_notify_owner($q, 'approved', $remarks);
+                flash('All approvals complete — ' . Tl('quote') . ' approved and ready to send.');
+            } else {
+                crm_log_change($q['id'], 'Approved at level ' . (int)$step['level'] . ' by ' . $me);
+                $next = crm_pending_with($q['id']);
+                flash('Your approval is recorded. Now with ' . ($next ?: 'the next approver') . '.');
+            }
         }
         redirect('/quote?id=' . $q['id']);
     }
@@ -925,9 +1001,187 @@ function ops_crm_quotes($route, $method) {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         ops_require(can('crm.contract.register') || can('crm.quote.send') || is_master(), 'You cannot float this to operations.');
         $ok = crm_float_ops_packet($q);
-        flash($ok ? 'Operations packet re-sent.' : 'Operations packet logged (configure SMTP to e-mail it).', $ok ? 'success' : 'warning');
+        flash($ok ? 'Handover to operations re-sent.'
+                  : 'Handover to operations saved and logged. It will be e-mailed once SMTP is configured in Settings.', $ok ? 'success' : 'warning');
         redirect('/quote?id=' . $q['id']);
     }
+
+    // ---- §xiv / §xxiv — files against a quote -----------------------------
+    if ($route === 'quote-files' && $method === 'POST') {
+        $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
+        ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master(), 'You cannot attach files to ' . Tlp('quote') . '.');
+        $kind  = in_array($_POST['kind'] ?? '', array_keys(QUOTE_FILE_KINDS), true) ? $_POST['kind'] : 'ATTACHMENT';
+        $note  = trim($_POST['note'] ?? '');
+        $share = !empty($_POST['share_with_inspector']) ? 1 : 0;
+        $n = 0; $skipped = [];
+        $files = $_FILES['files'] ?? null;
+        if ($files && is_array($files['tmp_name'])) {
+            foreach ($files['tmp_name'] as $i => $tmp) {
+                if (!$tmp || !is_uploaded_file($tmp)) continue;
+                $size = (int)($files['size'][$i] ?? 0);
+                if ($size <= 0 || $size > QUOTE_FILE_MAX) { $skipped[] = $files['name'][$i] . ' (over ' . round(QUOTE_FILE_MAX / 1048576) . ' MB)'; continue; }
+                $pdo->prepare("INSERT INTO quote_files (quote_id,kind,file_name,mime,file_data,note,share_with_inspector,uploaded_by,uploaded_at) VALUES (?,?,?,?,?,?,?,?,?)")
+                    ->execute([$q['id'], $kind, substr((string)$files['name'][$i], 0, 200),
+                        (string)($files['type'][$i] ?? ''), base64_encode((string)file_get_contents($tmp)),
+                        $note, $share, user_name(current_user()), date('c')]);
+                $n++;
+            }
+        }
+        // The client's PO number and date live on the quote itself.
+        if ($kind === 'PO') {
+            $po = trim($_POST['po_number'] ?? ''); $pd = trim($_POST['po_date'] ?? '');
+            if ($po !== '' || $pd !== '') $pdo->prepare("UPDATE quotations SET po_number=?, po_date=? WHERE id=?")->execute([$po, $pd, $q['id']]);
+        }
+        if ($n) crm_log_change($q['id'], $n . ' ' . strtolower(QUOTE_FILE_KINDS[$kind]) . ' file(s) attached');
+        flash($n ? ($n . ' file(s) attached.' . ($skipped ? ' Skipped: ' . implode(', ', $skipped) : '')) : ('Nothing uploaded.' . ($skipped ? ' Skipped: ' . implode(', ', $skipped) : '')), $n ? 'success' : 'error');
+        redirect('/quote?id=' . $q['id']);
+    }
+    if ($route === 'quote-file') {
+        $f = ops_one("SELECT * FROM quote_files WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$f) { http_response_code(404); echo 'Not found'; return; }
+        $bin = base64_decode((string)$f['file_data']);
+        header('Content-Type: ' . ($f['mime'] ?: 'application/octet-stream'));
+        header('Content-Disposition: attachment; filename="' . preg_replace('/[^A-Za-z0-9._-]/', '_', $f['file_name']) . '"');
+        header('Content-Length: ' . strlen($bin));
+        echo $bin; return;
+    }
+    if ($route === 'quote-file-delete' && $method === 'POST') {
+        $f = ops_one("SELECT * FROM quote_files WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$f) { flash('File not found.', 'error'); redirect('/quotes'); }
+        ops_require(can('crm.quote.create') || is_master(), 'You cannot remove attachments.');
+        $pdo->prepare("DELETE FROM quote_files WHERE id=?")->execute([(int)$f['id']]);
+        crm_log_change((int)$f['quote_id'], 'Removed attachment ' . $f['file_name']);
+        flash('Attachment removed.');
+        redirect('/quote?id=' . (int)$f['quote_id']);
+    }
+
+    // ---- §xix — ask the Super Admin to re-open a closed quote ---------------
+    if ($route === 'quote-unlock' && $method === 'POST') {
+        $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
+        $do = $_POST['do'] ?? 'request';
+        if ($do === 'request') {
+            $reason = trim($_POST['reason'] ?? '');
+            if ($reason === '') { flash('Say why it needs to be re-opened.', 'error'); redirect('/quote?id=' . $q['id']); }
+            if (quote_edit_request_open($q['id'])) { flash('A request is already pending for this ' . Tl('quote') . '.', 'error'); redirect('/quote?id=' . $q['id']); }
+            $pdo->prepare("INSERT INTO quote_edit_requests (quote_id,requested_by,requested_by_id,reason,status,created_at) VALUES (?,?,?,?, 'PENDING', ?)")
+                ->execute([$q['id'], user_name(current_user()), current_user()['id'] ?? null, $reason, date('c')]);
+            crm_log_change($q['id'], 'Re-edit requested — ' . $reason);
+            foreach (leadership_emails() as $to)
+                ops_mail($to, 'Re-edit requested: ' . quote_label($q),
+                    user_name(current_user()) . " has asked to re-open " . quote_label($q) . " ({$q['client_name']}).\n\nReason: $reason\n\n" . app_name(), '', 'QUOTE_UNLOCK');
+            flash('Request raised. Only the Super Admin can grant it.');
+        } else {
+            ops_require(is_master(), 'Only the Super Admin can decide a re-edit request.');
+            $req = ops_one("SELECT * FROM quote_edit_requests WHERE id=?", [(int)($_POST['req'] ?? 0)]);
+            if (!$req) { flash('Request not found.', 'error'); redirect('/quote?id=' . $q['id']); }
+            $note = trim($_POST['note'] ?? '');
+            if ($do === 'grant') {
+                $hours = max(1, min(168, (int)($_POST['hours'] ?? 24)));
+                $until = date('c', time() + $hours * 3600);
+                $pdo->prepare("UPDATE quote_edit_requests SET status='GRANTED', decided_by=?, decided_at=?, decision_note=?, expires_at=? WHERE id=?")
+                    ->execute([user_name(current_user()), date('c'), $note, $until, $req['id']]);
+                $pdo->prepare("UPDATE quotations SET unlocked_until=? WHERE id=?")->execute([$until, $q['id']]);
+                crm_log_change($q['id'], 'Re-edit granted for ' . $hours . 'h by ' . user_name(current_user()));
+                flash('Unlocked for ' . $hours . ' hour(s). It re-locks itself afterwards.');
+            } else {
+                $pdo->prepare("UPDATE quote_edit_requests SET status='REFUSED', decided_by=?, decided_at=?, decision_note=? WHERE id=?")
+                    ->execute([user_name(current_user()), date('c'), $note, $req['id']]);
+                crm_log_change($q['id'], 'Re-edit refused by ' . user_name(current_user()));
+                flash('Request refused.');
+            }
+        }
+        redirect('/quote?id=' . $q['id']);
+    }
+
+    // ---- §xxvi — follow-ups are editable, one row at a time -----------------
+    if ($route === 'quote-followup' && $method === 'POST') {
+        $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
+        ops_require(can('crm.quote.send') || can('crm.quote.create') || is_master(), 'You cannot change follow-ups.');
+        $do = $_POST['do'] ?? 'save';
+        if ($do === 'add') {
+            $due = trim($_POST['due_date'] ?? '') ?: date('Y-m-d');
+            $pdo->prepare("INSERT INTO quote_followups (quote_id,kind,due_date,status,note,created_at) VALUES (?,?,?, 'PENDING', ?, ?)")
+                ->execute([$q['id'], trim($_POST['kind'] ?? 'MANUAL') ?: 'MANUAL', $due, trim($_POST['note'] ?? ''), date('c')]);
+            flash('Follow-up added.');
+        } elseif ($do === 'delete') {
+            $pdo->prepare("DELETE FROM quote_followups WHERE id=? AND quote_id=?")->execute([(int)($_POST['fid'] ?? 0), $q['id']]);
+            flash('Follow-up removed.');
+        } else {
+            foreach ((array)($_POST['f_id'] ?? []) as $i => $fid) {
+                $pdo->prepare("UPDATE quote_followups SET due_date=?, status=?, done_date=?, note=? WHERE id=? AND quote_id=?")
+                    ->execute([trim((string)($_POST['f_due'][$i] ?? '')), (string)($_POST['f_status'][$i] ?? 'PENDING'),
+                        trim((string)($_POST['f_done'][$i] ?? '')), trim((string)($_POST['f_note'][$i] ?? '')), (int)$fid, $q['id']]);
+            }
+            flash('Follow-ups saved.');
+        }
+        redirect('/quote?id=' . $q['id']);
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  §xxii — the register as a spreadsheet. Everything the sales desk asks for:
+//  when it went out, when it was accepted, who the contact is, and every
+//  follow-up date, so chasing can be audited outside the app.
+// ---------------------------------------------------------------------------
+function crm_quotes_export($rows) {
+    $out = [[
+        ucfirst(Tl('quote')) . ' no', 'Rev', 'Status', 'Origin', ucfirst(Tl('client')), 'Contact', 'Contact e-mail',
+        'Contact mobile', T('sbu'), 'Primary ' . T('office'), 'Executing ' . TP('office'), 'Product category',
+        'Subject', 'Sites', 'Created', 'Submitted for approval', 'Approved', 'Sent', 'Accepted',
+        'Lost / rejected on', 'Lost reason', 'Rejected by', 'Reject comment',
+        'Contract number', 'PO number', 'PO date', 'Payment terms',
+        'Subtotal', 'GST %', 'Total', 'Follow-ups done', 'Follow-up dates', 'Owner',
+    ]];
+    $offAll = []; foreach (offices_list() as $o) $offAll[(int)$o['id']] = $o['name'];
+    foreach ($rows as $q) {
+        $fu = ops_all("SELECT kind, due_date, status, done_date FROM quote_followups WHERE quote_id=? ORDER BY due_date", [(int)$q['id']]);
+        $done = array_filter($fu, fn($f) => ($f['status'] ?? '') === 'DONE' || ($f['done_date'] ?? '') !== '');
+        $fuTxt = implode(' | ', array_map(fn($f) =>
+            ($f['kind'] ?: '?') . ' due ' . fdate($f['due_date'], '—')
+            . (($f['done_date'] ?? '') !== '' ? ' done ' . fdate($f['done_date']) : ' (' . strtolower($f['status'] ?: 'pending') . ')'), $fu));
+        $sites = implode(' | ', array_map(fn($L) => quote_location_label($L) . ': ' . quote_location_line($L), crm_quote_locations((int)$q['id'])));
+        $exec = array_filter(array_map('intval', explode(',', (string)($q['exec_office_ids'] ?? ''))));
+        $approved = ops_val("SELECT MAX(acted_at) FROM quote_approvals WHERE quote_id=? AND status='APPROVED'", [(int)$q['id']]);
+        $out[] = [
+            $q['quote_no'], (int)$q['rev'], lk_options_or('quote_status', QUOTE_STATUS)[$q['status']] ?? $q['status'],
+            lk_options_or('quote_origin', QUOTE_ORIGINS)[$q['origin'] ?? 'OWN'] ?? ($q['origin'] ?? ''),
+            $q['client_name'], $q['contact_name'], $q['contact_email'], $q['contact_mobile'],
+            lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu'],
+            $offAll[(int)($q['office_id'] ?? 0)] ?? '',
+            implode(' + ', array_map(fn($i) => $offAll[$i] ?? $i, $exec)),
+            $q['product_category'] ?? '', $q['subject'], $sites,
+            fdate(substr((string)$q['created_at'], 0, 10), ''),
+            fdate(substr((string)($q['submitted_at'] ?? ''), 0, 10), ''),
+            fdate(substr((string)$approved, 0, 10), ''),
+            fdate(substr((string)$q['sent_at'], 0, 10), ''),
+            fdate($q['accepted_date'], ''),
+            fdate(substr((string)($q['rejected_at'] ?? ''), 0, 10), ''),
+            lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS)[$q['lost_reason'] ?? ''] ?? ($q['lost_reason_other'] ?? ''),
+            $q['rejected_by'] ?? '', $q['reject_remarks'] ?? '',
+            $q['contract_number'] ?? '', $q['po_number'] ?? '', fdate($q['po_date'] ?? '', ''),
+            $q['payment_terms'] ?? '',
+            (float)$q['subtotal'], (float)$q['gst_pct'], (float)$q['total_amount'],
+            count($done) . ' of ' . count($fu), $fuTxt, $q['created_by'] ?? '',
+        ];
+    }
+    return $out;
+}
+
+// What can be filed against a quote (§xiv, §xxiv).
+const QUOTE_FILE_KINDS = [
+    'QUOTE_DOC'  => 'Our quotation (the copy sent)',
+    'ATTACHMENT' => 'General attachment',
+    'CLIENT_DOC' => "Client's document / enquiry",
+    'PO'         => 'Purchase order',
+    'INSP_DOC'   => 'Inspection document (spec, drawing, QAP)',
+];
+const QUOTE_FILE_MAX = 8388608;   // 8 MB per file
+function crm_quote_files($qid, $kind = null) {
+    $sql = "SELECT id, quote_id, kind, file_name, mime, note, share_with_inspector, uploaded_by, uploaded_at,
+                   LENGTH(file_data) AS b64len FROM quote_files WHERE quote_id=?";
+    $args = [(int)$qid];
+    if ($kind) { $sql .= " AND kind=?"; $args[] = $kind; }
+    return ops_all($sql . " ORDER BY id DESC", $args);
 }
 
 // ---------------------------------------------------------------------------
@@ -1067,6 +1321,58 @@ function crm_quote_owner_user_id($q) {
     return null;
 }
 // May the current user act on this approval step?
+// ---- Who is it sitting with? (§xii) ----------------------------------------
+// Turn an approval step into the actual people who can act on it, so the quote
+// screen can say "waiting on <name>" instead of "pending".
+function crm_step_approvers($step) {
+    if (!empty($step['approver_user_id'])) {
+        $u = ops_one("SELECT id, username, first_name, last_name, email, role FROM users WHERE id=?", [(int)$step['approver_user_id']]);
+        return $u ? [$u] : [];
+    }
+    if (($step['approver_role'] ?? '') !== '') {
+        return ops_all("SELECT id, username, first_name, last_name, email, role FROM users WHERE role=? AND is_active=1 ORDER BY first_name, username", [$step['approver_role']]);
+    }
+    // A generic step is open to anyone who may approve quotes.
+    $roles = [];
+    foreach (ORG_ROLES as $rk => $rl) if (role_perms($rk) && in_array('crm.quote.approve', role_perms($rk), true)) $roles[] = $rk;
+    if (!$roles) return [];
+    $ph = implode(',', array_fill(0, count($roles), '?'));
+    return ops_all("SELECT id, username, first_name, last_name, email, role FROM users WHERE role IN ($ph) AND is_active=1 ORDER BY first_name, username", $roles);
+}
+function crm_person_label($u) {
+    $nm = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: ($u['username'] ?? '');
+    $role = ORG_ROLES[$u['role'] ?? ''] ?? ($u['role'] ?? '');
+    return $role !== '' ? "$nm ($role)" : $nm;
+}
+// The lowest still-pending level, and who it is with — as a readable phrase.
+function crm_pending_with($qid) {
+    $step = ops_one("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id LIMIT 1", [(int)$qid]);
+    if (!$step) return '';
+    $people = crm_step_approvers($step);
+    if (!$people) return ($step['approver_role'] ?? '') !== ''
+        ? ('anyone with the role ' . (ORG_ROLES[$step['approver_role']] ?? $step['approver_role']))
+        : 'any approver';
+    $names = array_map('crm_person_label', array_slice($people, 0, 3));
+    $more = count($people) - count($names);
+    return implode(', ', $names) . ($more > 0 ? " and $more other(s)" : '');
+}
+function crm_pending_step($qid) {
+    return ops_one("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id LIMIT 1", [(int)$qid]);
+}
+// Tell the sales owner what the approver decided.
+function crm_notify_owner($q, $what, $remarks = '') {
+    $uid = $q['owner_id'] ?? null;
+    if (!$uid) return;
+    $u = ops_one("SELECT email, first_name, username FROM users WHERE id=?", [(int)$uid]);
+    if (!$u || trim((string)$u['email']) === '') return;
+    $label = quote_label($q);
+    $body = "Hello " . (trim($u['first_name'] ?? '') ?: $u['username']) . ",\n\n"
+          . "$label ({$q['client_name']}) has been $what.\n"
+          . ($remarks !== '' ? "\nComment: $remarks\n" : '')
+          . "\n" . app_name();
+    ops_mail($u["email"], "$label — $what", $body, "", "QUOTE_DECISION");
+}
+
 function crm_can_act_approval($step) {
     if (!can('crm.quote.approve') && !is_master()) return false;
     if (($step['status'] ?? '') !== 'PENDING') return false;
