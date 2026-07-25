@@ -268,17 +268,42 @@
     function toggleSite() { if (siteFf && insp) siteFf.style.display = insp.value === 'DEPUTATION' ? 'block' : 'none'; }
     if (insp) insp.addEventListener('change', function () { toggleOther(); toggleSite(); });
     toggleOther(); toggleSite();
+    // §g — a list the user still has to open is not "automatically selected".
+    // When there is exactly one sensible answer, take it and fire change so the
+    // next cascade runs; otherwise leave the choice alone.
+    function autoPick(sel, rows) {
+      if (!sel || sel.value) return false;
+      var real = rows.filter(function (r) { return r && r.id; });
+      if (real.length !== 1) return false;
+      sel.value = String(real[0].id);
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    }
+    function loadPoLines(keep) {
+      if (!poLine) return;
+      if (!po || !po.value) { fillSelect(poLine, [], ''); return; }
+      fetch('/po-lines?id=' + encodeURIComponent(po.value))
+        .then(function (r) { return r.json(); })
+        .then(function (rows) { fillSelect(poLine, rows, keep || poLine.value); autoPick(poLine, rows); })
+        .catch(function () {});
+    }
     function loadClientLinks() {
       var id = client ? client.value : '';
       if (!id) { fillSelect(site, [], ''); fillSelect(po, [], ''); fillSelect(poLine, [], ''); return; }
-      if (site) fetch('/partner-sites?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (rows) { fillSelect(site, rows, site.value); }).catch(function () {});
-      if (po) fetch('/partner-pos?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (rows) { fillSelect(po, rows, po.value); }).catch(function () {});
+      if (site) fetch('/partner-sites?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (rows) { fillSelect(site, rows, site.value); autoPick(site, rows); }).catch(function () {});
+      if (po) fetch('/partner-pos?id=' + encodeURIComponent(id)).then(function (r) { return r.json(); })
+        .then(function (rows) {
+          fillSelect(po, rows, po.value);
+          // One live order for this client is the normal case for an ARC, and
+          // picking it also pulls its line items in.
+          if (!autoPick(po, rows)) loadPoLines();
+        }).catch(function () {});
     }
     if (client) client.addEventListener('change', loadClientLinks);
-    if (po && poLine) po.addEventListener('change', function () {
-      if (!po.value) { fillSelect(poLine, [], ''); return; }
-      fetch('/po-lines?id=' + encodeURIComponent(po.value)).then(function (r) { return r.json(); }).then(function (rows) { fillSelect(poLine, rows, poLine.value); }).catch(function () {});
-    });
+    if (po && poLine) po.addEventListener('change', function () { loadPoLines(); });
+    // On an existing call the selects are already filled server-side; still load
+    // the dependent lists so the line dropdown is not empty on first open.
+    if (po && po.value) loadPoLines(poLine ? poLine.value : '');
   }
 
   // ---- Quick-add ("+ Add new") modal on the New Call form ----

@@ -39,7 +39,7 @@
   <table class="dt" style="min-width:1650px">
     <thead><tr>
       <th><?= e(ucfirst(Tl('call'))) ?></th><th><?= e(T('client')) ?></th><th><?= e(T('vendor')) ?> / site</th>
-      <th><?= e(T('sbu')) ?></th><th>Activity</th>
+      <th><?= e(T('sbu')) ?></th><th>Activity</th><th>Reporting</th>
       <th>Executing <?= e(T('office')) ?></th><th class="num">Credit to give</th>
       <th>Coordinator</th><th><?= e(T('engineer')) ?></th>
       <th>Received</th><th>Forwarded</th><th>Allocated</th>
@@ -70,6 +70,22 @@
         <td><?= $c['vendor_name'] ? e($c['vendor_name']) : $dash ?></td>
         <td><?= e(lk_options_or('sbu', OPS_SBUS)[$c['sbu']] ?? '—') ?></td>
         <td><?= !empty($c['activity_id']) ? e(lk_value_path($c['activity_id'])) : $dash ?></td>
+        <?php // §i — the reporting rhythm and the reports owed, on the register
+              // itself. Both are carried onto the job at allocation, so what is
+              // shown here is what the engineer will be asked to produce. ?>
+        <td><?php
+          $fq = $c['reporting_frequency'] ?? '';
+          if ($fq === '' || $fq === 'NOREPORT') {
+            echo '<span class="pill p-mut">no report</span>';
+          } else {
+            $lbl = lk_options_or('reporting_frequency', REPORT_FREQ)[$fq] ?? $fq;
+            if ($fq === 'CUSTOM' && !empty($c['report_custom_days'])) $lbl .= ' / ' . (int)$c['report_custom_days'] . 'd';
+            echo '<span class="pill p-info">' . e($lbl) . '</span>';
+          }
+          $dl = array_values(array_filter(array_map('trim', explode(',', (string)($c['deliverables'] ?? '')))));
+          if ($dl) echo '<div class="muted" style="font-size:11px;margin-top:2px">' . e(implode(' · ', array_slice($dl, 0, 4)))
+                      . (count($dl) > 4 ? ' +' . (count($dl) - 4) : '') . '</div>';
+        ?></td>
         <td><?= !empty($c['exec_office_name']) ? e($c['exec_office_name']) : '<span class="muted">same ' . e(T('office')) . '</span>' ?></td>
         <td class="num"><?= ((float)($c['expected_credit'] ?? 0)) > 0 ? fmoney($c['expected_credit']) : $dash ?></td>
         <td><?= !empty($c['exec_coordinator']) ? e($c['exec_coordinator']) : $dash ?></td>

@@ -4,9 +4,14 @@
   $curSbu   = $job ? ($job['sbu'] ?? '')             : ($call['sbu'] ?? '');
   $curActId = $job ? ($job['activity_id'] ?? '')     : ($call['activity_id'] ?? '');
   $curInsp  = $job ? ($job['inspection_type'] ?? '') : ($call['inspection_type'] ?? '');
-  $curFreq  = $job ? ($job['reporting_frequency'] ?? 'NOREPORT') : 'NOREPORT';
-  $curDays  = $job['report_custom_days'] ?? '';
-  $curDeliv = $job && $job['deliverables'] !== '' ? explode(',', $job['deliverables']) : [];
+  // §i — the reporting rhythm and the report formats are agreed on the call, so
+  // they arrive here already answered. The coordinator can still change them for
+  // this one deputation, but nobody has to remember what was promised.
+  $curFreq  = $job ? ($job['reporting_frequency'] ?? 'NOREPORT') : (($call['reporting_frequency'] ?? '') ?: 'NOREPORT');
+  $curDays  = $job ? ($job['report_custom_days'] ?? '') : ($call['report_custom_days'] ?? '');
+  $curDeliv = $job
+      ? (trim((string)($job['deliverables'] ?? '')) !== '' ? explode(',', $job['deliverables']) : [])
+      : array_values(array_filter(array_map('trim', explode(',', (string)($call['deliverables'] ?? '')))));
   $curActRow = $curActId ? lk_value($curActId) : null;
   // §b.i / §b.iii — everything already settled on the call flows through, so the
   // coordinator allocates rather than re-types.

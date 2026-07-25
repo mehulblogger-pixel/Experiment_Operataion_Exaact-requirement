@@ -37,7 +37,7 @@
     <?php
       $narrowed = isset($allTypes) && count($types) < count($allTypes);
       $freq = $pre['reporting_frequency'] ?? '';
-      $freqLbl = $freq !== '' ? (lk_options_or('report_frequency', REPORT_FREQ)[$freq] ?? $freq) : '';
+      $freqLbl = $freq !== '' ? (lk_options_or('reporting_frequency', REPORT_FREQ)[$freq] ?? $freq) : '';
       if ($freq === 'CUSTOM' && !empty($pre['report_custom_days'])) $freqLbl .= ' (every ' . (int)$pre['report_custom_days'] . ' days)';
     ?>
     <div class="ff"><label>Report type *

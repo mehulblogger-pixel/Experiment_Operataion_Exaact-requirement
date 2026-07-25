@@ -320,6 +320,28 @@ function crm_migrate() {
         lk_ensure_type_map('site_location_type', 'Site location type', SITE_LOCATION_TYPES, 'Sales');
     }
     crm_backfill_locations();
+    crm_canon_product_categories();
+}
+
+// Quotations used to store the product category as the words on the master list
+// ("Transformers") while inspection calls stored its code ("TRANSFORMER"), so the
+// two never matched and nothing carried across. Fold the stored words onto the
+// code, once, per quotation.
+function crm_canon_product_categories() {
+    try {
+        $rows = ops_all("SELECT id, product_category FROM quotations WHERE product_category <> ''");
+    } catch (Throwable $e) { return; }
+    if (!$rows) return;
+    $master = lk_options_or('product', PRODUCT_CATS);
+    $byLabel = [];
+    foreach ($master as $code => $label) $byLabel[strtolower(preg_replace('/[^a-z0-9]+/i', '', $label))] = $code;
+    $upd = db()->prepare("UPDATE quotations SET product_category=? WHERE id=?");
+    foreach ($rows as $r) {
+        $v = (string)$r['product_category'];
+        if (isset($master[$v])) continue;                       // already a code
+        $code = $byLabel[strtolower(preg_replace('/[^a-z0-9]+/i', '', $v))] ?? null;
+        if ($code) { try { $upd->execute([$code, (int)$r['id']]); } catch (Throwable $e) {} }
+    }
 }
 
 // Payment terms, elaborated and fully editable under Masters.
@@ -435,46 +457,61 @@ function crm_save_lines($qid, $b) {
 //  distance. Only a close match wins; anything else becomes a new category, so a
 //  genuinely new product is never silently merged into the wrong one.
 // ---------------------------------------------------------------------------
+//  A match against the master list resolves to that list's CODE — the same code
+//  an inspection call stores — so a quotation and the call raised against it name
+//  the product the same way. Anything genuinely new keeps the words typed.
 function product_category_canon($raw) {
     $raw = trim(preg_replace('/\s+/', ' ', (string)$raw));
     if ($raw === '') return '';
-    $known = product_categories_all();
+    $known = product_categories_all();          // code => label
     $norm = fn($s) => strtolower(preg_replace('/[^a-z0-9]+/i', '', $s));
     $n = $norm($raw);
-    foreach ($known as $k) if ($norm($k) === $n) return $k;                       // exact
+    // A code typed (or posted) verbatim is already canonical.
+    foreach ($known as $code => $label) if ($norm($code) === $n || $norm($label) === $n) return $code;
     $sing = fn($s) => preg_replace('/(ies|es|s)$/i', '', $s);
     $ns = $norm($sing($raw));
-    foreach ($known as $k) if ($norm($sing($k)) === $ns) return $k;               // plural
+    foreach ($known as $code => $label) if ($norm($sing($label)) === $ns) return $code;
     $best = null; $bestD = PHP_INT_MAX;
-    foreach ($known as $k) {
-        $d = levenshtein($n, $norm($k));
-        if ($d < $bestD) { $bestD = $d; $best = $k; }
+    foreach ($known as $code => $label) {
+        $d = levenshtein($n, $norm($label));
+        if ($d < $bestD) { $bestD = $d; $best = $code; }
     }
     // Allow roughly one typo per five characters, and never on very short words.
     $tol = (int)floor(max(strlen($n), 1) / 5);
     if ($best !== null && strlen($n) >= 4 && $bestD <= max(1, $tol)) return $best;
     return ucfirst($raw);   // genuinely new — keep what they typed
 }
-// Every category already in use, from the master list and from what people have
-// typed. Office-scoped for the people who work in one office; cumulative for
-// anyone whose access spans offices (SBU heads, directors) — §xxv.
+// Every category already in use, as code => label: the Operations master list
+// first, then anything people have typed on a quotation that is not in it (those
+// stand for themselves). Office-scoped for the people who work in one office;
+// cumulative for anyone whose access spans offices (SBU heads, directors) — §xxv.
 function product_categories_all() {
     static $cache = null;
     if ($cache !== null) return $cache;
-    $out = array_values(lk_options_or('product_category', PRODUCT_CATS));
+    $out = lk_options_or('product', PRODUCT_CATS);
+    $norm = fn($s) => strtolower(preg_replace('/[^a-z0-9]+/i', '', (string)$s));
+    $seen = [];
+    foreach ($out as $code => $label) { $seen[$norm($code)] = 1; $seen[$norm($label)] = 1; }
     try {
         $where = ''; $args = [];
         if (function_exists('scope_clause')) {
             [$w, $a] = scope_clause('office_id', 'sbu');
             if ($w && $w !== '1=1') { $where = " AND ($w)"; $args = $a; }
         }
-        foreach (ops_all("SELECT DISTINCT product_category FROM quotations WHERE product_category <> ''$where", $args) as $r)
-            $out[] = $r['product_category'];
+        foreach (ops_all("SELECT DISTINCT product_category FROM quotations WHERE product_category <> ''$where", $args) as $r) {
+            $v = trim((string)$r['product_category']); $k = $norm($v);
+            if ($v === '' || isset($seen[$k])) continue;
+            $seen[$k] = 1; $out[$v] = $v;
+        }
     } catch (Throwable $e) {}
-    $seen = []; $uniq = [];
-    foreach ($out as $v) { $k = strtolower(preg_replace('/[^a-z0-9]+/i', '', $v)); if ($k === '' || isset($seen[$k])) continue; $seen[$k] = 1; $uniq[] = $v; }
-    sort($uniq);
-    return $cache = $uniq;
+    return $cache = $out;
+}
+// The words to show for a stored category — the master label for a code, and the
+// text itself for a category somebody typed that is not on the list.
+function product_cat_label($v) {
+    $v = (string)$v;
+    if ($v === '') return '';
+    return product_categories_all()[$v] ?? $v;
 }
 
 // ---- Terms & conditions (§xviii) -------------------------------------------
@@ -1277,7 +1314,7 @@ function crm_quotes_export($rows) {
             lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu'],
             $offAll[(int)($q['office_id'] ?? 0)] ?? '',
             implode(' + ', array_map(fn($i) => $offAll[$i] ?? $i, $exec)),
-            $q['product_category'] ?? '', $q['subject'], $sites,
+            product_cat_label($q['product_category'] ?? ''), $q['subject'], $sites,
             fdate(substr((string)$q['created_at'], 0, 10), ''),
             fdate(substr((string)($q['submitted_at'] ?? ''), 0, 10), ''),
             fdate(substr((string)$approved, 0, 10), ''),
