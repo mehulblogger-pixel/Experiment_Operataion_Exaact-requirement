@@ -102,7 +102,7 @@
 
     <div class="ff ff-wide"><label>Deliverables / reports required after completion</label>
       <div class="checkgrid">
-        <?php foreach (lk_options_or('deliverable', DELIVERABLES) as $k=>$v): ?>
+        <?php foreach (deliverable_options() as $k=>$v): ?>
           <label class="chk"><input type="checkbox" name="deliverables[]" value="<?= e($k) ?>" <?= in_array($k, $curDeliv, true)?'checked':'' ?>> <?= e($v) ?></label>
         <?php endforeach; ?>
       </div>

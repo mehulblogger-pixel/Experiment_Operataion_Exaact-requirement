@@ -115,6 +115,8 @@ try {
         throw new RuntimeException('pending upgrade: shared charge units');
     if (function_exists('service_types_pending') && service_types_pending())
         throw new RuntimeException('pending upgrade: shared work-type list');
+    if (function_exists('deliverables_pending') && deliverables_pending())
+        throw new RuntimeException('pending upgrade: deliverables from the report register');
 } catch (Throwable $ex) {
     try {
         boot();
