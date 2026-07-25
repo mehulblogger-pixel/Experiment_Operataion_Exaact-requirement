@@ -117,7 +117,7 @@
         <div class="ff" id="fee_one"><label>One-time placement fee (₹) <span class="muted">recruitment</span></label><input class="form-control" type="number" step="0.01" name="placement_fee" value=""></div>
         <div class="ff" id="fee_month"><label>Monthly agency charge (₹) <span class="muted">manpower</span></label><input class="form-control" type="number" step="0.01" name="agency_cost" value=""></div>
       </div>
-      <p class="muted" style="margin:2px 2px 0;font-size:12px">Recruitment → SGS roll + one-time fee (added to costing, one-time). Manpower → agency roll + monthly charge (their bill; we invoice the client our rate).</p>
+      <p class="muted" style="margin:2px 2px 0;font-size:12px">Recruitment → our roll + one-time fee (added to costing, one-time). Manpower → agency roll + monthly charge (their bill; we invoice the client our rate).</p>
     </div>
     <?php endif; ?>
     <div style="margin-top:8px"><button class="btn" type="submit">Update stage</button></div>
@@ -134,7 +134,7 @@
     function syncHire(){ if (det) det.style.display = (mk && mk.checked && sel.value==='ACCEPTED') ? 'block' : 'none'; }
     function syncAgency(){
       if (!ag) return; var o = ag.options[ag.selectedIndex], t = o.getAttribute('data-type');
-      if (roll) roll.value = (t === 'MANPOWER') ? 'AGENCY' : 'SGS';
+      if (roll) roll.value = (t === 'MANPOWER') ? 'AGENCY' : 'OWN';
       if (feeOne)   feeOne.style.display   = (t === 'RECRUITMENT' || t==='') ? '' : 'none';
       if (feeMonth) feeMonth.style.display = (t === 'MANPOWER') ? '' : 'none';
       var f = feeOne && feeOne.querySelector('input'), m = feeMonth && feeMonth.querySelector('input');

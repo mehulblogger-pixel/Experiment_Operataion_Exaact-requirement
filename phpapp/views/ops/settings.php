@@ -5,7 +5,7 @@
 <form method="post" action="/settings" enctype="multipart/form-data" class="panel" style="max-width:620px;">
   <h3 class="tab-sub" style="margin-top:0;">Branding</h3>
   <div class="form-grid">
-    <div class="ff"><label>Application name</label><input class="form-control" name="app_name" value="<?= e(setting_get('app_name','')) ?>" placeholder="e.g. SGS Ahmedabad Ops"></div>
+    <div class="ff"><label>Application name</label><input class="form-control" name="app_name" value="<?= e(setting_get('app_name','')) ?>" placeholder="e.g. Exaact Inspection Ops"></div>
     <div class="ff"><label>Logo (PNG/JPG/SVG, ≤600 KB)</label><input class="form-control" type="file" name="logo" accept="image/*"></div>
     <div class="ff">
       <?php if (setting_get('logo_data','')): ?>
@@ -69,10 +69,59 @@
       </select><small class="muted">India = April. Current FY = <strong><?= e(current_fy()) ?></strong>.</small></div>
     <div class="ff"><label>On-time TAT threshold (days)</label>
       <input class="form-control" type="number" min="0" name="tat_threshold_days" value="<?= e(setting_get('tat_threshold_days', 3)) ?>"></div>
-    <div class="ff"><label>Annual revenue target (₹) <span class="muted">— shows on the leadership dashboard</span></label>
+    <div class="ff"><label>Annual revenue target (<?= e(cur_sym()) ?>) <span class="muted">— shows on the leadership dashboard</span></label>
       <input class="form-control" type="number" min="0" step="1000" name="fy_revenue_target" value="<?= e(setting_get('fy_revenue_target', '')) ?>" placeholder="e.g. 50000000"></div>
     <div class="ff"><label>Report-overdue escalation (days) <span class="muted">— then e-mail the reporting manager</span></label>
       <input class="form-control" type="number" min="1" name="report_escalate_days" value="<?= e(setting_get('report_escalate_days', 3)) ?>"></div>
+  </div>
+
+  <h3 class="tab-sub">Working norms &amp; limits</h3>
+  <p class="sub" style="margin-bottom:10px">The ceiling and defaults the whole app enforces. Per-designation and per-<?= e(Tl('office')) ?> norms are set separately under <a href="/work-norms">Working norms</a>.</p>
+  <div class="form-grid">
+    <div class="ff"><label>Maximum hours a person may log in one day</label>
+      <input class="form-control" type="number" step="0.25" min="1" max="24" name="daily_hours_cap" value="<?= e(hours_cap()) ?>">
+      <small class="muted">Vouchers and timesheets are rejected above this.</small></div>
+    <div class="ff"><label>Default weekly working days</label>
+      <select class="form-control" name="default_weekly_days">
+        <?php /* pairs, not an array key — PHP would truncate the 5.5 key to 5 */
+              $dw = default_weekly_days(); foreach ([['6','6 days'], ['5.5','5.5 days'], ['5','5 days']] as [$k, $lbl]): ?>
+          <option value="<?= e($k) ?>" <?= ((float)$dw === (float)$k) ? 'selected' : '' ?>><?= e($lbl) ?></option><?php endforeach; ?>
+      </select><small class="muted">Used when a person has no norm of their own.</small></div>
+    <div class="ff"><label>Employee code prefix <span class="muted">(own staff)</span></label>
+      <input class="form-control" name="emp_code_prefix" value="<?= e(setting_get('emp_code_prefix','')) ?>" placeholder="EMP">
+      <small class="muted">Sub-contractors stay <code>SC-</code>, freelancers <code>FL-</code>.</small></div>
+  </div>
+
+  <h3 class="tab-sub">Display</h3>
+  <div class="form-grid">
+    <div class="ff"><label>Currency symbol</label>
+      <input class="form-control" name="currency_symbol" value="<?= e(setting_get('currency_symbol','')) ?>" placeholder="₹" maxlength="4"></div>
+    <div class="ff"><label>Date format</label>
+      <select class="form-control" name="date_format">
+        <?php $cdf = date_fmt(); foreach (DATE_FORMATS as $k=>$sample): ?>
+          <option value="<?= e($k) ?>" <?= $cdf===$k?'selected':'' ?>><?= e($sample) ?></option><?php endforeach; ?>
+      </select></div>
+    <div class="ff"><label>Wording used across the app</label>
+      <a class="btn small secondary" href="/terminology" style="margin-top:2px">Open terminology</a>
+      <small class="muted">Rename <?= e(Tlp('client')) ?>, <?= e(Tlp('call')) ?>, <?= e(Tlp('job')) ?> and every other business word.</small></div>
+  </div>
+
+  <h3 class="tab-sub">Reporting controls</h3>
+  <div class="form-grid">
+    <div class="ff ff-wide"><label>Source documents a complete inspection pack must contain</label>
+      <div class="chip-row">
+        <?php $esd = expected_source_docs(); foreach (SOURCE_DOC_TYPES as $k=>$lbl): ?>
+          <label class="ff-check"><input type="checkbox" name="expected_source_docs[]" value="<?= e($k) ?>" <?= in_array($k,$esd,true)?'checked':'' ?>> <?= e($lbl) ?></label>
+        <?php endforeach; ?>
+      </div>
+      <small class="muted">Missing ones are flagged on the report review screen.</small></div>
+    <div class="ff ff-wide"><label>Actions a compliance reviewer should always see</label>
+      <div class="chip-row">
+        <?php $hr = audit_high_risk(); foreach (AUDIT_ACTIONS_ALL as $a): ?>
+          <label class="ff-check"><input type="checkbox" name="audit_high_risk[]" value="<?= e($a) ?>" <?= in_array($a,$hr,true)?'checked':'' ?>> <?= e(audit_action_label($a)) ?></label>
+        <?php endforeach; ?>
+      </div>
+      <small class="muted">These are highlighted in red on the audit trail and counted as "high-risk".</small></div>
   </div>
 
   <h3 class="tab-sub">Email — automatic sending (Office 365 SMTP)</h3>
@@ -94,6 +143,12 @@
   <h3 class="tab-sub" style="margin-top:0;">Roles &amp; access</h3>
   <p class="sub" style="margin-bottom:10px">Control which <strong>modules and features</strong> each role can view or edit — Calls, Jobs, Vouchers, Invoicing, Profitability, Masters, Users, Settings and more. Set defaults per role; fine-tune per person under Users.</p>
   <a class="btn" href="/access">Open Roles &amp; access</a>
+</div>
+
+<div class="panel" style="max-width:620px;margin-top:18px">
+  <h3 class="tab-sub" style="margin-top:0;">Terminology</h3>
+  <p class="sub" style="margin-bottom:10px">Rename every business word the app uses — <?= e(Tl('client')) ?>, <?= e(Tl('vendor')) ?>, <?= e(Tl('quote')) ?>, <?= e(Tl('call')) ?>, <?= e(Tl('job')) ?>, <?= e(Tl('report')) ?>, <?= e(T('office')) ?>, <?= e(T('boss')) ?> and the rest. Change a word once and every heading, menu, button and e-mail follows.</p>
+  <a class="btn" href="/terminology">Open terminology</a>
 </div>
 
 <div class="panel" style="max-width:620px;margin-top:18px">

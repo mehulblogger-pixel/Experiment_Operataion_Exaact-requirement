@@ -1,6 +1,6 @@
 <?php
 // ============================================================================
-//  Operations & Finance engine for the SGS Ahmedabad Inspection Management System
+//  Operations & Finance engine for the Exaact Inspection & Operations Management System
 //  Phases 1-5: Calls, Jobs, Closure/Expenses, SubCon/Attendance/Holidays,
 //  Credit logic, Dashboards + Reconciliation. Plus roles, email and reminders.
 //  Kept in one file so a non-coder can find everything about "operations" here.
@@ -30,10 +30,10 @@ const DESIGNATIONS = ['INSPECTOR'=>'Inspector','SR_INSPECTOR'=>'Sr. Inspector','
 const JOB_STAGES = ['ALLOCATED'=>'Allocated','TRAVELLING'=>'Travelling','IN_PROGRESS'=>'Inspection in progress','REPORT_PENDING'=>'Report pending','SUBMITTED'=>'Report submitted','CLOSED'=>'Closed','ON_HOLD'=>'On hold','CANCELLED'=>'Cancelled'];
 const EXP_LEVELS = ['JUNIOR'=>'Junior','MID'=>'Mid','SENIOR'=>'Senior','EXPERT'=>'Expert / Lead'];
 const RATE_TYPES = ['MANDAY'=>'Per man-day','MANMONTH'=>'Per man-month'];
-// Agency types: recruitment = CVs only, one-time placement fee, person on SGS roll;
-// manpower = supplies people on the AGENCY's roll, bills SGS monthly (pass-through to client).
+// Agency types: recruitment = CVs only, one-time placement fee, person on our own roll;
+// manpower = supplies people on the AGENCY's roll, bills us monthly (pass-through to client).
 const AGENCY_TYPES = ['RECRUITMENT'=>'Recruitment agency (CVs only · one-time fee)', 'MANPOWER'=>'Manpower / supply agency (monthly bill)'];
-const ROLL_TYPES = ['SGS'=>'On SGS roll (we pay salary)', 'AGENCY'=>'On agency roll (agency bills us monthly)'];
+const ROLL_TYPES = ['OWN'=>'On our roll (we pay salary)', 'AGENCY'=>'On agency roll (agency bills us monthly)'];
 // Recruitment fee is conditional on the agency's free-replacement guarantee:
 // provisional while inside the window, confirmed if the person stays past it,
 // waived (₹0, free replacement) if they leave within it.
@@ -47,7 +47,7 @@ const OVERHEAD_PCT = 8; // salary overhead %
 // Built-in theme presets: primary, accent, page background, surface (cards), text.
 const THEME_PRESETS = [
     'blue'     => ['label'=>'Corporate Blue',  'primary'=>'#1e40af','accent'=>'#0ea5e9','bg'=>'#f4f6f9','surface'=>'#ffffff','text'=>'#1f2937'],
-    'orange'   => ['label'=>'SGS Orange',      'primary'=>'#c2410c','accent'=>'#f59e0b','bg'=>'#fbf7f4','surface'=>'#ffffff','text'=>'#292524'],
+    'orange'   => ['label'=>'Corporate Orange',      'primary'=>'#c2410c','accent'=>'#f59e0b','bg'=>'#fbf7f4','surface'=>'#ffffff','text'=>'#292524'],
     'forest'   => ['label'=>'Forest Green',    'primary'=>'#15803d','accent'=>'#10b981','bg'=>'#f1f7f3','surface'=>'#ffffff','text'=>'#14261c'],
     'purple'   => ['label'=>'Royal Purple',    'primary'=>'#6d28d9','accent'=>'#a78bfa','bg'=>'#f7f5fb','surface'=>'#ffffff','text'=>'#1f1b2e'],
     'teal'     => ['label'=>'Teal',            'primary'=>'#0f766e','accent'=>'#14b8a6','bg'=>'#eff7f6','surface'=>'#ffffff','text'=>'#14312e'],
@@ -71,7 +71,7 @@ const CAND_STAGES = [
     'WITHDRAWN'  => 'Withdrawn',
 ];
 // Where a candidate is sourced from (mirrors inspector engineer-type).
-const CAND_SOURCES = ['ASSET'=>'SGS asset (employee)','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor','HR_AGENCY'=>'HR / Manpower agency'];
+const CAND_SOURCES = ['ASSET'=>'Own employee','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor','HR_AGENCY'=>'HR / Manpower agency'];
 // Sources that draw their Agency from the sub-contractor / agency master.
 const CAND_AGENCY_SOURCES = ['SUBCON','HR_AGENCY'];
 
@@ -327,7 +327,9 @@ function ops_migrate() {
     ensure_column('inspectors', 'agency_cost', 'DECIMAL(14,2) DEFAULT 0');
     // Agency linkage + roll: which agency supplied them, on whose roll, one-time fee
     ensure_column('inspectors', 'agency_id', 'INT NULL');
-    ensure_column('inspectors', 'roll_type', "VARCHAR(20) DEFAULT 'SGS'"); // SGS | AGENCY
+    ensure_column('inspectors', 'roll_type', "VARCHAR(20) DEFAULT 'OWN'"); // OWN or AGENCY
+    // Older installs stored the agency's own name as the roll code — normalise it.
+    try { db()->exec("UPDATE inspectors SET roll_type='OWN' WHERE roll_type NOT IN ('OWN','AGENCY')"); } catch (Throwable $e) {}
     ensure_column('inspectors', 'placement_fee', 'DECIMAL(14,2) DEFAULT 0'); // one-time recruitment fee
     ensure_column('inspectors', 'fee_status', "VARCHAR(20) DEFAULT ''");     // PROVISIONAL | CONFIRMED | WAIVED
     ensure_column('inspectors', 'guarantee_upto', "VARCHAR(20) DEFAULT ''"); // fee is provisional until this date
@@ -435,15 +437,15 @@ function ops_seed() {
     $pdo = db();
     if ((int)$pdo->query("SELECT COUNT(*) FROM offices")->fetchColumn() > 0) return;
     $offices = [
-        ['AHM','SGS Ahmedabad','Ahmedabad',1],
-        ['MUM','SGS Mumbai','Mumbai',0], ['DEL','SGS Delhi','New Delhi',0],
-        ['CHE','SGS Chennai','Chennai',0], ['KOL','SGS Kolkata','Kolkata',0],
-        ['BLR','SGS Bengaluru','Bengaluru',0], ['HYD','SGS Hyderabad','Hyderabad',0],
-        ['PUN','SGS Pune','Pune',0], ['BRD','SGS Vadodara','Vadodara',0],
-        ['VIZ','SGS Visakhapatnam','Visakhapatnam',0], ['KOC','SGS Kochi','Kochi',0],
-        ['JAI','SGS Jaipur','Jaipur',0], ['IND','SGS Indore','Indore',0],
-        ['NAG','SGS Nagpur','Nagpur',0], ['BHU','SGS Bhubaneswar','Bhubaneswar',0],
-        ['LKO','SGS Lucknow','Lucknow',0], ['CHD','SGS Chandigarh','Chandigarh',0],
+        ['AHM','Ahmedabad','Ahmedabad',1],
+        ['MUM','Mumbai','Mumbai',0], ['DEL','Delhi','New Delhi',0],
+        ['CHE','Chennai','Chennai',0], ['KOL','Kolkata','Kolkata',0],
+        ['BLR','Bengaluru','Bengaluru',0], ['HYD','Hyderabad','Hyderabad',0],
+        ['PUN','Pune','Pune',0], ['BRD','Vadodara','Vadodara',0],
+        ['VIZ','Visakhapatnam','Visakhapatnam',0], ['KOC','Kochi','Kochi',0],
+        ['JAI','Jaipur','Jaipur',0], ['IND','Indore','Indore',0],
+        ['NAG','Nagpur','Nagpur',0], ['BHU','Bhubaneswar','Bhubaneswar',0],
+        ['LKO','Lucknow','Lucknow',0], ['CHD','Chandigarh','Chandigarh',0],
     ];
     $ins = $pdo->prepare("INSERT INTO offices (code,name,city,is_ahmedabad) VALUES (?,?,?,?)");
     foreach ($offices as $o) $ins->execute($o);
@@ -526,10 +528,15 @@ function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
 }
 function inspectors_list($activeOnly = true) { return ops_all("SELECT id, name, emp_code, sbu, salary_ctc FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name"); }
 // Employee-code prefix per engagement kind. Sub-contractors and freelancers get a
-// visibly DIFFERENT code series from regular SGS assets so payroll/accounts can tell
+// visibly DIFFERENT code series from our own staff so payroll/accounts can tell
 // them apart at a glance: SC-#### for sub-cons, FL-#### for freelancers, EMP## for staff.
+// The staff prefix is a setting (Settings → Working norms & limits); the two
+// contractor series stay fixed so old codes never change meaning.
 const EMP_CODE_PREFIX = ['ASSET' => 'EMP', 'SUBCON' => 'SC-', 'FREELANCER' => 'FL-'];
-function emp_code_prefix($kind) { return EMP_CODE_PREFIX[$kind] ?? 'EMP'; }
+function emp_code_prefix($kind) {
+    if ($kind === 'ASSET') { $p = setting_get('emp_code_prefix', ''); if ($p !== '' && $p !== null) return $p; }
+    return EMP_CODE_PREFIX[$kind] ?? 'EMP';
+}
 // Next free auto code for a kind. Scans existing codes that share the prefix and
 // bumps the highest trailing number. Regular staff pad to 2 digits (EMP07), the
 // contractor series to 3 (SC-014) — either way the running number never collides.
@@ -573,14 +580,27 @@ function placement_fee_summary($soon = 30) {
 }
 function boss_for_client($cid) { return $cid ? ops_all("SELECT id, boss_number, status FROM boss_numbers WHERE client_id=? ORDER BY boss_number", [$cid]) : []; }
 function pname($p) { return $p ? ($p['display_name'] ?: $p['legal_name']) : '—'; }
-function fmoney($v) { return $v === null || $v === '' ? '—' : '₹' . number_format((float)$v, 0); }
+// Currency symbol and date format are settings, not hard-coded (Settings → Display).
+function cur_sym() { static $s = null; if ($s === null) $s = setting_get('currency_symbol', '') ?: '₹'; return $s; }
+const DATE_FORMATS = ['d M Y'=>'25 Jul 2026', 'd/m/Y'=>'25/07/2026', 'd-m-Y'=>'25-07-2026', 'Y-m-d'=>'2026-07-25', 'M d, Y'=>'Jul 25, 2026'];
+function date_fmt() { static $f = null; if ($f === null) { $f = setting_get('date_format', '') ?: 'd M Y'; if (!isset(DATE_FORMATS[$f])) $f = 'd M Y'; } return $f; }
+// Format a stored Y-m-d (or any parseable) date for display.
+function fdate($d, $fallback = '—') {
+    if (!$d) return $fallback;
+    $ts = strtotime($d); return $ts === false ? $d : date(date_fmt(), $ts);
+}
+function fmoney($v) { return $v === null || $v === '' ? '—' : cur_sym() . number_format((float)$v, 0); }
 // Compact Indian money for KPI tiles: ₹1.84 L / ₹4.82 Cr / ₹6,200.
 function fmoney_short($v) {
-    $n = (float)$v; $s = $n < 0 ? '-' : ''; $n = abs($n);
-    if ($n >= 1e7)  return $s . '₹' . rtrim(rtrim(number_format($n / 1e7, 2, '.', ''), '0'), '.') . ' Cr';
-    if ($n >= 1e5)  return $s . '₹' . rtrim(rtrim(number_format($n / 1e5, 2, '.', ''), '0'), '.') . ' L';
-    return $s . '₹' . number_format($n, 0);
+    $n = (float)$v; $s = $n < 0 ? '-' : ''; $n = abs($n); $c = cur_sym();
+    if ($n >= 1e7)  return $s . $c . rtrim(rtrim(number_format($n / 1e7, 2, '.', ''), '0'), '.') . ' Cr';
+    if ($n >= 1e5)  return $s . $c . rtrim(rtrim(number_format($n / 1e5, 2, '.', ''), '0'), '.') . ' L';
+    return $s . $c . number_format($n, 0);
 }
+// ---- Working norms & limits (Settings, with the shipped defaults as fallback)
+function hours_cap()           { $v = (float)setting_get('daily_hours_cap', 0); return $v > 0 ? $v : DAILY_HOURS_CAP; }
+function hours_cap_disp()      { return rtrim(rtrim(number_format(hours_cap(), 2, '.', ''), '0'), '.'); }
+function default_weekly_days() { $v = (float)setting_get('default_weekly_days', 0); return in_array($v, [5.0,5.5,6.0], true) ? $v : 6.0; }
 
 // ---- CSV export (dependency-free; works on MilesWeb shared hosting) ---------
 // $rows = array of rows (each an array of cells); stream as a downloadable file.
@@ -870,7 +890,7 @@ function send_assignment_email($jobId) {
     if ($vc) $b .= "Contact: {$vc['name']} " . ($vc['designation'] ? "({$vc['designation']})" : '') . "  M: " . ($vc['mobile'] ?: $vc['phone']) . "  E: {$vc['email']}\n";
     if ($product) $b .= "\nProduct: {$product}\n";
     if ($notes) $b .= "\nNotes: {$notes}\n";
-    $b .= "\nReport folder: {$j['folder_link']}\n\nRegards,\nSGS Ahmedabad Coordination";
+    $b .= "\nReport folder: {$j['folder_link']}\n\nRegards,\n" . app_name() . " Coordination";
     ops_mail($j['inspector_email'] ?? '', "Job Assignment: {$j['job_code']} — {$client}", $b, coordinator_emails(), 'assignment');
 }
 function partner_primary_contact($pid) {
@@ -887,7 +907,7 @@ function send_closure_email($jobId) {
     $body = "Inspection job closed.\n\nJob: {$j['job_code']}\nClient: {$client}\nInspector: {$j['inspector_name']}\n"
         . "Inspection end: {$j['inspection_end_date']}\nReport uploaded: {$j['report_upload_date']}\n"
         . "TAT: {$j['tat_days']} day(s)\nExpenses: " . fmoney($exp) . "\nReport folder: {$j['folder_link']}\n\n"
-        . "Regards,\nSGS Ahmedabad";
+        . "Regards,\n" . app_name();
     $to = coordinator_emails() ?: ($j['inspector_email'] ?? '');
     ops_mail($to, "Job Closed: {$j['job_code']} — {$client} (TAT {$j['tat_days']}d)", $body, '', 'closure');
 }
@@ -922,7 +942,7 @@ function ops_run_reminders($today = null) {
             $client = $ctx['client_disp'] ?: $ctx['client_name'];
             $body = "Reminder ({$why}) for job {$ctx['job_code']} — {$client}.\n"
                 . "Inspection dates: {$ctx['inspection_start_date']} to {$ctx['inspection_end_date']}.\n"
-                . "Please upload the report / close the job.\n\nSGS Ahmedabad";
+                . "Please upload the report / close the job.\n\n" . app_name();
             ops_mail($ctx['inspector_email'] ?? '', "Reminder: {$ctx['job_code']} ({$why})", $body, coordinator_emails(), 'reminder');
             db()->prepare("UPDATE jobs SET last_reminder=? WHERE id=?")->execute([$today, $j['id']]);
             $sent++;
@@ -941,7 +961,7 @@ function ops_run_reminders($today = null) {
                     $client = $ctx['client_disp'] ?: $ctx['client_name'];
                     $eb = "ESCALATION — report overdue by {$overdueDays} day(s).\n\nJob: {$ctx['job_code']}\nClient: {$client}\n"
                         . "Inspector: {$ctx['inspector_name']}\nInspection ended: {$ctx['inspection_end_date']}\n{$why}.\n\n"
-                        . "The report is still not uploaded. Please follow up with the inspector.\n\nSGS Ahmedabad";
+                        . "The report is still not uploaded. Please follow up with the inspector.\n\n" . app_name();
                     ops_mail($mgrEmail, "OVERDUE report: {$ctx['job_code']} — {$client} ({$overdueDays}d)", $eb, manager_emails(), 'escalation');
                     db()->prepare("UPDATE jobs SET last_escalation=? WHERE id=?")->execute([$today, $j['id']]);
                     $sent++;
@@ -966,7 +986,7 @@ function ops_run_po_alerts($today = null) {
         $client = $bp ? ($bp['display_name'] ?: $bp['legal_name']) : '';
         $bal = (float)$l['quantity'] - (float)$l['consumed'];
         $body = "PO quantity nearing completion.\n\nClient: {$client}\nPO: {$l['po_number']}\nLine: {$l['description']}\n"
-            . "Consumed: {$l['consumed']} of {$l['quantity']} (balance {$bal}).\nPO valid till: {$l['end_date']}.\n\nPlease arrange a fresh PO / extension.\n\nSGS Ahmedabad";
+            . "Consumed: {$l['consumed']} of {$l['quantity']} (balance {$bal}).\nPO valid till: {$l['end_date']}.\n\nPlease arrange a fresh PO / extension.\n\n" . app_name();
         ops_mail(manager_emails(), "PO nearing completion: {$l['po_number']} — {$client}", $body, '', 'po_alert');
         db()->prepare("UPDATE po_line_items SET last_alert=? WHERE id=?")->execute([$today, $l['id']]);
         $sent++;
@@ -990,7 +1010,7 @@ function ops_run_cert_reminders($today = null) {
         if ($c['last_reminder'] === $today) continue;      // once per day
         $when = $days < 0 ? "expired " . abs($days) . " day(s) ago" : "expires in $days day(s)";
         $body = "Certificate follow-up.\n\nInspector: {$c['inspector_name']}\nCertificate: {$c['name']} ({$c['number']})\n"
-            . "Valid to: {$c['valid_to']} — {$when}.\n\nPlease renew and submit the hard copy so the QA/QC nominee can update the date in the system.\n\nSGS Ahmedabad";
+            . "Valid to: {$c['valid_to']} — {$when}.\n\nPlease renew and submit the hard copy so the QA/QC nominee can update the date in the system.\n\n" . app_name();
         ops_mail($c['inspector_email'] ?? '', "Certificate expiry: {$c['name']} — {$c['inspector_name']} ($when)", $body, $qac, 'cert');
         db()->prepare("UPDATE inspector_certs SET last_reminder=? WHERE id=?")->execute([$today, $c['id']]);
         $sent++;
@@ -1254,7 +1274,7 @@ function ops_module_gate($route) {
         'office-finance'=>'overheads',
         'reports'=>'reports',
         'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users',
-        'settings'=>'settings','access'=>'settings','ai-settings'=>'settings',
+        'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
     ];
     $mod = $map[$base] ?? null;
     if ($mod && !can("mod.$mod.view")) {
@@ -1374,6 +1394,8 @@ function ops_dispatch($route, $method) {
             ops_access($method); return true;
         case $route === 'ai-settings':
             ops_ai_settings($method); return true;
+        case $route === 'terminology':
+            ops_terminology($method); return true;
         case $route === 'availability':
             ops_inspector_availability($method); return true;
         case $route === 'hierarchy':
@@ -1957,7 +1979,7 @@ function send_forward_email($callId) {
         . "Activity: " . ($c['activity_id'] ? lk_value_path($c['activity_id']) : '—') . "\n"
         . "Client required date: {$c['inspection_required_date']}\n"
         . "Credit to executing branch: " . fmoney($c['expected_credit']) . " (" . (CREDIT_TYPES[$c['credit_type']] ?? '') . ")\n"
-        . "Please allocate an inspector.\n\nRegards,\nSGS Ahmedabad (Managing office)";
+        . "Please allocate an inspector.\n\nRegards,\n" . app_name() . " (Managing office)";
     ops_mail($to, "Call forwarded: {$c['call_code']} — {$client}", $body, $cc, 'forward');
 }
 
@@ -2077,11 +2099,11 @@ function ops_candidates($route, $method) {
                 $name = candidate_name($cand);
                 $agId = ($_POST['agency_id'] ?? '') !== '' ? (int)$_POST['agency_id'] : null;
                 $ag = $agId ? agency_get($agId) : null;
-                $roll = ($_POST['roll_type'] ?? '') === 'AGENCY' ? 'AGENCY' : 'SGS';
+                $roll = ($_POST['roll_type'] ?? '') === 'AGENCY' ? 'AGENCY' : 'OWN';
                 $agName = $ag['name'] ?? '';
                 $placement = ($_POST['placement_fee'] ?? '') !== '' ? (float)$_POST['placement_fee'] : 0;
                 $agCost = ($_POST['agency_cost'] ?? '') !== '' ? (float)$_POST['agency_cost'] : 0;
-                // On agency roll → costed as a sub-con (monthly agency charge); on SGS roll → asset (salary).
+                // On agency roll → costed as a sub-con (monthly agency charge); on our own roll → asset (salary).
                 $kind = ($roll === 'AGENCY') ? 'SUBCON' : 'ASSET';
                 // Recruitment placement fee is provisional until the agency's guarantee window passes.
                 $gd = (int)($ag['guarantee_days'] ?? 90) ?: 90;
@@ -2099,7 +2121,7 @@ function ops_candidates($route, $method) {
                     $pdo->prepare("UPDATE requisitions SET hired_inspector_id=?, status='HIRED' WHERE id=?")->execute([$insId, (int)$cand['requisition_id']]);
                     $msg .= ' Requisition filled.';
                 }
-                $msg .= ' Added to Inspectors (' . ($roll === 'AGENCY' ? 'on agency roll' : 'on SGS roll') . ') — you can now allocate deputation jobs to them.';
+                $msg .= ' Added to Inspectors (' . ($roll === 'AGENCY' ? 'on agency roll' : 'on our roll') . ') — you can now allocate deputation jobs to them.';
             }
             flash($msg);
         }
@@ -2425,8 +2447,8 @@ function ops_vouchers($route, $method) {
             $hoursByDate[$e['entry_date']] = ($hoursByDate[$e['entry_date']] ?? 0) + (float)($r['hours'] ?? 0);
         }
         foreach ($hoursByDate as $d => $hrs) {
-            if ($hrs > DAILY_HOURS_CAP + 0.001) {
-                flash('Hours on ' . $d . ' total ' . rtrim(rtrim(number_format($hrs, 2), '0'), '.') . ' h — over the ' . DAILY_HOURS_CAP . ' h daily limit. Please reduce so no day exceeds 8.5 hours.', 'error');
+            if ($hrs > hours_cap() + 0.001) {
+                flash('Hours on ' . fdate($d) . ' total ' . rtrim(rtrim(number_format($hrs, 2), '0'), '.') . ' h — over the ' . hours_cap_disp() . ' h daily limit. Please reduce so no day exceeds ' . hours_cap_disp() . ' hours.', 'error');
                 redirect('/voucher?id=' . $v['id']);
             }
         }
@@ -3201,6 +3223,20 @@ function ops_settings($method) {
         setting_set('fy_revenue_target', (float)($_POST['fy_revenue_target'] ?? 0));
         setting_set('report_escalate_days', max(1, (int)($_POST['report_escalate_days'] ?? 3)));
         setting_set('app_name', trim($_POST['app_name'] ?? ''));
+        // Working norms & limits (were hard-coded before)
+        $cap = (float)($_POST['daily_hours_cap'] ?? 8.5);
+        setting_set('daily_hours_cap', ($cap > 0 && $cap <= 24) ? $cap : 8.5);
+        $wd = (float)($_POST['default_weekly_days'] ?? 6);
+        setting_set('default_weekly_days', in_array($wd, [5.0, 5.5, 6.0], true) ? $wd : 6);
+        setting_set('emp_code_prefix', strtoupper(trim($_POST['emp_code_prefix'] ?? '')));
+        // Display
+        setting_set('currency_symbol', trim($_POST['currency_symbol'] ?? '') ?: '₹');
+        $df = trim($_POST['date_format'] ?? ''); setting_set('date_format', in_array($df, array_keys(DATE_FORMATS), true) ? $df : 'd M Y');
+        // Reporting controls
+        $esd = array_values(array_intersect(array_keys(SOURCE_DOC_TYPES), (array)($_POST['expected_source_docs'] ?? [])));
+        setting_set('expected_source_docs', implode(',', $esd));
+        $hr = array_values(array_intersect(AUDIT_ACTIONS_ALL, (array)($_POST['audit_high_risk'] ?? [])));
+        setting_set('audit_high_risk', implode(',', $hr));
         // Theme builder: preset + 4 colours + text colour + font size
         foreach (['c_primary','c_accent','c_bg','c_surface','c_text'] as $k) {
             $v = trim($_POST[$k] ?? '');

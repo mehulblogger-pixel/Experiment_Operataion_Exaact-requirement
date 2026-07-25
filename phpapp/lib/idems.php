@@ -2287,7 +2287,14 @@ const SOURCE_DOC_TYPES = [
     'CALIB'=>'Calibration Certificate', 'PREV_REPORT'=>'Previous Report', 'CUST_INSTR'=>'Customer Instruction', 'OTHER'=>'Other',
 ];
 // Which source documents a complete inspection pack should contain.
+// Shipped default; overridden in Settings → Reporting controls.
 const EXPECTED_SOURCE_DOCS = ['PO','QAP','DRAWING','SPEC'];
+function expected_source_docs() {
+    $s = (string)setting_get('expected_source_docs', '');
+    if ($s === '') return EXPECTED_SOURCE_DOCS;
+    $v = array_values(array_intersect(array_keys(SOURCE_DOC_TYPES), array_map('trim', explode(',', $s))));
+    return $v ?: EXPECTED_SOURCE_DOCS;
+}
 // Extract readable text from an uploaded source document (best-effort, no libs).
 function idems_source_text($mime, $raw, $limit = 20000) {
     $mime = strtolower((string)$mime);
@@ -2322,7 +2329,7 @@ function idems_rule_checks($doc, $srcDocs) {
     $have = [];
     foreach ($srcDocs as $s) $have[$s['doc_type']] = true;
     // 1. missing documents
-    foreach (EXPECTED_SOURCE_DOCS as $t) {
+    foreach (expected_source_docs() as $t) {
         if (empty($have[$t])) $out[] = ['severity'=>'medium', 'kind'=>'Missing document', 'detail'=>(SOURCE_DOC_TYPES[$t] ?? $t) . ' has not been uploaded against this report.'];
     }
     if (empty($have['MTC']) && empty($have['CALIB'])) $out[] = ['severity'=>'low', 'kind'=>'Missing document', 'detail'=>'No material test certificate or calibration certificate has been attached.'];
@@ -2601,18 +2608,30 @@ function ops_idems_learning($method) {
 }
 
 // ---- Actions that a compliance reviewer should always look at ----
+// Shipped default; the company can change the list in Settings → Reporting controls.
 const AUDIT_HIGH_RISK = ['TIMESTAMP_EDIT','DELETE','EVIDENCE_DELETE','REJECT','SENDBACK','SIGNATURE_SET','LOGIN_FAILED','AI_REVIEW','DELEGATE'];
-// Plain-English labels for the log.
-function audit_action_label($a) {
-    $m = ['CREATE'=>'Report created','EDIT'=>'Edited','IRN_GEN'=>'IRN generated','SUBMIT'=>'Submitted','APPROVE'=>'Approved',
-        'REJECT'=>'Rejected','SENDBACK'=>'Sent back','DELEGATE'=>'Approval delegated','FINALIZE'=>'Finalized / issued',
-        'DELETE'=>'Deleted (soft)','EVIDENCE'=>'Evidence added','EVIDENCE_CAPTION'=>'Evidence caption','EVIDENCE_DELETE'=>'Evidence removed',
-        'PDF'=>'PDF generated','DOCX'=>'Client format generated','CERT_PDF'=>'Endorsement certificate','SOURCE_DOC'=>'Source document added',
-        'AI_REVIEW'=>'AI review run','SMART_REMARKS'=>'Suggested remarks applied','TIMESTAMP_EDIT'=>'Date/timestamp changed',
-        'SIGNATURE_SET'=>'Signature changed','ENDORSE'=>'Document endorsed','RELEASE_NOTE_DRAFT'=>'Release Note drafted',
-        'RELEASE_NOTE_CREATED'=>'Release Note created from report','LOGIN'=>'Login','LOGOUT'=>'Logout','LOGIN_FAILED'=>'Failed login'];
-    return $m[$a] ?? $a;
+function audit_high_risk() {
+    $s = (string)setting_get('audit_high_risk', '');
+    if ($s === '') return AUDIT_HIGH_RISK;
+    $v = array_values(array_intersect(AUDIT_ACTIONS_ALL, array_map('trim', explode(',', $s))));
+    return $v ?: AUDIT_HIGH_RISK;
 }
+// Plain-English labels for the log. This map is also the master list of actions.
+const AUDIT_ACTION_LABELS = [
+    'CREATE'=>'Report created','EDIT'=>'Edited','IRN_GEN'=>'IRN generated','SUBMIT'=>'Submitted','APPROVE'=>'Approved',
+    'REJECT'=>'Rejected','SENDBACK'=>'Sent back','DELEGATE'=>'Approval delegated','FINALIZE'=>'Finalized / issued',
+    'DELETE'=>'Deleted (soft)','EVIDENCE'=>'Evidence added','EVIDENCE_CAPTION'=>'Evidence caption','EVIDENCE_DELETE'=>'Evidence removed',
+    'PDF'=>'PDF generated','DOCX'=>'Client format generated','CERT_PDF'=>'Endorsement certificate','SOURCE_DOC'=>'Source document added',
+    'AI_REVIEW'=>'AI review run','SMART_REMARKS'=>'Suggested remarks applied','TIMESTAMP_EDIT'=>'Date/timestamp changed',
+    'SIGNATURE_SET'=>'Signature changed','ENDORSE'=>'Document endorsed','RELEASE_NOTE_DRAFT'=>'Release Note drafted',
+    'RELEASE_NOTE_CREATED'=>'Release Note created from report','LOGIN'=>'Login','LOGOUT'=>'Logout','LOGIN_FAILED'=>'Failed login',
+];
+const AUDIT_ACTIONS_ALL = [
+    'CREATE','EDIT','IRN_GEN','SUBMIT','APPROVE','REJECT','SENDBACK','DELEGATE','FINALIZE','DELETE','EVIDENCE',
+    'EVIDENCE_CAPTION','EVIDENCE_DELETE','PDF','DOCX','CERT_PDF','SOURCE_DOC','AI_REVIEW','SMART_REMARKS',
+    'TIMESTAMP_EDIT','SIGNATURE_SET','ENDORSE','RELEASE_NOTE_DRAFT','RELEASE_NOTE_CREATED','LOGIN','LOGOUT','LOGIN_FAILED',
+];
+function audit_action_label($a) { return AUDIT_ACTION_LABELS[$a] ?? $a; }
 // Compliance health checks across the whole system (super-admin view).
 function idems_compliance_checks() {
     $out = [];
@@ -2648,7 +2667,7 @@ function ops_idems_audit($method) {
     if ($office !== '') { $where .= " AND office_id=?"; $args[] = (int)$office; }
     if ($from)   { $where .= " AND created_at >= ?"; $args[] = $from; }
     if ($to)     { $where .= " AND created_at <= ?"; $args[] = $to . 'T23:59:59'; }
-    if ($risk)   { $where .= " AND action IN ('" . implode("','", AUDIT_HIGH_RISK) . "')"; }
+    if ($risk)   { $where .= " AND action IN ('" . implode("','", audit_high_risk()) . "')"; }
     $rows = ops_all("SELECT * FROM idems_audit WHERE $where ORDER BY id DESC", $args);
     // CSV export of exactly what is on screen
     if (function_exists('wants_csv') && wants_csv()) {
@@ -2662,7 +2681,7 @@ function ops_idems_audit($method) {
     $stats = [
         'total'    => (int)ops_val("SELECT COUNT(*) FROM idems_audit"),
         'today'    => (int)ops_val("SELECT COUNT(*) FROM idems_audit WHERE created_at >= ?", [date('Y-m-d')]),
-        'risk30'   => (int)ops_val("SELECT COUNT(*) FROM idems_audit WHERE created_at >= ? AND action IN ('" . implode("','", AUDIT_HIGH_RISK) . "')", [$since30]),
+        'risk30'   => (int)ops_val("SELECT COUNT(*) FROM idems_audit WHERE created_at >= ? AND action IN ('" . implode("','", audit_high_risk()) . "')", [$since30]),
         'users30'  => (int)ops_val("SELECT COUNT(DISTINCT username) FROM idems_audit WHERE created_at >= ?", [$since30]),
     ];
     $byAction = ops_all("SELECT action, COUNT(*) n FROM idems_audit WHERE created_at >= ? GROUP BY action ORDER BY n DESC", [$since30]);

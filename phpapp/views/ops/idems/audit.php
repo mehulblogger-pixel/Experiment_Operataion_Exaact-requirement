@@ -1,7 +1,7 @@
 <?php
   // Super-admin audit & compliance dashboard
   $sevPill = ['high'=>'p-bad','medium'=>'p-warn','low'=>'p-mut'];
-  $isRisk = fn($a) => in_array($a, AUDIT_HIGH_RISK, true);
+  $isRisk = fn($a) => in_array($a, audit_high_risk(), true);
   $qs = fn($over) => '/audit-log?' . http_build_query(array_merge(array_diff_key($_GET, ['export'=>1]), $over));
   $maxA = $byAction ? max(array_map(fn($r)=>(int)$r['n'], $byAction)) : 0;
 ?>

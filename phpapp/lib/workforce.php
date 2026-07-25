@@ -226,8 +226,8 @@ function inspector_hours_on($inspectorId, $day, $exceptEntryId = 0) {
 // True if adding $addHours to $day would exceed the cap; returns [ok, existing, cap].
 function hours_within_cap($inspectorId, $day, $addHours, $exceptEntryId = 0) {
     $existing = inspector_hours_on($inspectorId, $day, $exceptEntryId);
-    $total = $existing + (float)$addHours;
-    return [$total <= DAILY_HOURS_CAP + 0.001, $existing, DAILY_HOURS_CAP, $total];
+    $total = $existing + (float)$addHours; $cap = hours_cap();
+    return [$total <= $cap + 0.001, $existing, $cap, $total];
 }
 
 // -------------------------------------------------------------------------
