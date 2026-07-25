@@ -287,6 +287,26 @@ function ops_migrate() {
     ensure_column('calls', 'billable_basis', "VARCHAR(20) DEFAULT ''"); // MANDAY / MANMONTH / …
     ensure_column('calls', 'credit_required', 'DECIMAL(14,2) DEFAULT 0'); // executing office's counter value
     ensure_column('calls', 'credit_status', "VARCHAR(20) DEFAULT ''");  // PROPOSED / COUNTERED / AGREED
+    // A call is raised against a quotation, so the commercial terms are inherited
+    // rather than re-typed: contract number, types of inspection, product, value
+    // and basis all come across (§a.i, §a.iv).
+    ensure_column('calls', 'quotation_id', 'INT NULL');
+    ensure_column('calls', 'quote_line_id', 'INT NULL');
+    ensure_column('calls', 'contract_number', "VARCHAR(80) DEFAULT ''");
+    // Where the client's papers and our working files live — a clickable link.
+    ensure_column('calls', 'folder_link', "VARCHAR(500) DEFAULT ''");
+    // Several visit dates on one call (§a.vi), and a repeating pattern for a call
+    // that runs to an end date on set weekdays (§a.vii).
+    ensure_column('calls', 'inspection_dates', "VARCHAR(400) DEFAULT ''");   // CSV of Y-m-d
+    ensure_column('calls', 'schedule_end_date', "VARCHAR(20) DEFAULT ''");
+    ensure_column('calls', 'schedule_weekdays', "VARCHAR(40) DEFAULT ''");   // CSV of 1..7 (Mon..Sun)
+    // When the inspection engineer was actually put on it — the third leg of the
+    // lead-time picture on the register (§a.ix).
+    ensure_column('calls', 'allocated_at', "VARCHAR(30) DEFAULT ''");
+    // Up to 20 visit dates once it reaches a deputation (§b.vi).
+    ensure_column('jobs', 'inspection_dates', "VARCHAR(600) DEFAULT ''");
+    ensure_column('jobs', 'folder_link', "VARCHAR(500) DEFAULT ''");
+    ensure_column('jobs', 'contract_number', "VARCHAR(80) DEFAULT ''");
     // jobs gain type of inspection (carried from call), custom report frequency,
     // activity and the required deliverables/report formats.
     ensure_column('jobs', 'inspection_type', "VARCHAR(40) DEFAULT ''");
@@ -484,6 +504,95 @@ function ops_next_code($table, $col, $prefix) {
     $seq = $last ? ((int)substr($last, strrpos($last, '-') + 1)) + 1 : 1;
     return sprintf("%s-%05d", $prefix, $seq);
 }
+// ---------------------------------------------------------------------------
+//  A call is raised against a quotation (§a.i, §a.ii, §a.iv)
+//
+//  Everything commercial was already agreed when the quote was won, so the call
+//  inherits it instead of the coordinator re-typing it: contract number, the
+//  types of inspection sold, product category, value and the basis it is
+//  charged on. Re-typing is how a call ends up billed differently from what was
+//  quoted.
+// ---------------------------------------------------------------------------
+function call_quotes_for_client($clientId) {
+    $clientId = (int)$clientId;
+    if (!$clientId) return [];
+    return ops_all("SELECT id, quote_no, rev, contract_number, total_amount, status, subject, payment_terms
+                    FROM quotations
+                    WHERE client_id=? AND is_current=1 AND status IN ('ACCEPTED','APPROVED','SENT')
+                    ORDER BY (status='ACCEPTED') DESC, id DESC", [$clientId]);
+}
+// The header + line items of a quote, shaped for the call form's pickers.
+function call_quote_context($quoteId) {
+    $quoteId = (int)$quoteId;
+    if (!$quoteId) return null;
+    $q = ops_one("SELECT * FROM quotations WHERE id=?", [$quoteId]);
+    if (!$q) return null;
+    $lines = ops_all("SELECT id, line_no, sbu, service_type, description, qty, unit, rate, amount, activity_id, office_id, location_id
+                      FROM quote_lines WHERE quote_id=? ORDER BY line_no, id", [$quoteId]);
+    return ['quote' => $q, 'lines' => $lines];
+}
+
+// ---------------------------------------------------------------------------
+//  Visit dates (§a.vi, §a.vii, §b.vi)
+//
+//  Three ways a client asks for the work, all stored as one list of dates:
+//    - a single day
+//    - a handful of named days
+//    - "every Monday and Thursday until the 30th" — expanded here, and still
+//      fully editable afterwards, because site plans change.
+// ---------------------------------------------------------------------------
+function call_dates_parse($csv) {
+    $out = [];
+    foreach (explode(',', (string)$csv) as $d) {
+        $d = trim($d);
+        if ($d !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) $out[] = $d;
+    }
+    $out = array_values(array_unique($out));
+    sort($out);
+    return $out;
+}
+function call_dates_csv(array $dates) { return implode(',', call_dates_parse(implode(',', $dates))); }
+// Expand "these weekdays, from this start, until this end" into actual dates.
+// $weekdays are ISO numbers 1..7 (Monday..Sunday). Capped so a careless end date
+// cannot generate thousands of rows.
+function call_expand_pattern($startDate, $endDate, array $weekdays, $cap = 60) {
+    $start = strtotime((string)$startDate); $end = strtotime((string)$endDate);
+    if (!$start || !$end || $end < $start || !$weekdays) return [];
+    $want = array_flip(array_map('intval', $weekdays));
+    $out = []; $t = $start;
+    while ($t <= $end && count($out) < $cap) {
+        if (isset($want[(int)date('N', $t)])) $out[] = date('Y-m-d', $t);
+        $t = strtotime('+1 day', $t);
+    }
+    return $out;
+}
+const WEEKDAY_NAMES = [1=>'Monday', 2=>'Tuesday', 3=>'Wednesday', 4=>'Thursday', 5=>'Friday', 6=>'Saturday', 7=>'Sunday'];
+function weekdays_label($csv) {
+    $out = [];
+    foreach (explode(',', (string)$csv) as $d) { $d = (int)trim($d); if (isset(WEEKDAY_NAMES[$d])) $out[] = substr(WEEKDAY_NAMES[$d], 0, 3); }
+    return implode(', ', $out);
+}
+
+// ---------------------------------------------------------------------------
+//  Inter-office credit, stated in plain words (§a.viii)
+//
+//  Every office both contracts and executes, depending on whose client it is.
+//  When the office that holds the contract is not the office doing the work,
+//  the contracting office pays the executing office a credit in rupees. This
+//  builds the sentence the screens show, so nobody has to work it out.
+// ---------------------------------------------------------------------------
+function credit_explainer($contractingOfficeId, $executingOfficeId) {
+    $c = $contractingOfficeId ? office((int)$contractingOfficeId) : null;
+    $e = $executingOfficeId ? office((int)$executingOfficeId) : null;
+    if (!$e || !$c || (int)$c['id'] === (int)$e['id']) {
+        return ['cross' => false, 'text' => 'One office both holds the contract and does the work, so there is no inter-office credit — only the value billable to the client.'];
+    }
+    return ['cross' => true, 'from' => $c['name'], 'to' => $e['name'],
+        'text' => $c['name'] . ' holds this contract and ' . $e['name'] . ' will do the work, so '
+                . $c['name'] . ' gives ' . $e['name'] . ' a credit in ' . cur_sym()
+                . '. Enter what ' . $e['name'] . ' is to receive; they can revert with the figure they need.'];
+}
+
 function clients_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_client=1 ORDER BY legal_name"); }
 function vendors_list() { return ops_all("SELECT id, legal_name, display_name FROM business_partners WHERE is_vendor=1 ORDER BY legal_name"); }
 function offices_list() { return ops_all("SELECT * FROM offices ORDER BY is_ahmedabad DESC, name"); }
@@ -1261,7 +1370,7 @@ function ops_module_gate($route) {
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring',
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring',
         'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries',
-        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes',
+        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes',
         'attendance-recon'=>'reconcile',
         'availability'=>'jobs',
         'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems',
@@ -1474,6 +1583,54 @@ function ops_dispatch($route, $method) {
             header('Content-Type: application/json');
             $r = ops_one("SELECT inspection_types FROM business_partners WHERE id=?", [(int)($_GET['id'] ?? 0)]);
             echo json_encode(['inspection_types' => ($r && $r['inspection_types'] !== '') ? explode(',', $r['inspection_types']) : []]);
+            return true;
+        // §a.i — the quotations this client has that a call may be raised against.
+        case $route === 'client-quotes':
+            header('Content-Type: application/json');
+            $out = [];
+            foreach (call_quotes_for_client((int)($_GET['id'] ?? 0)) as $q) {
+                $out[] = [
+                    'id' => (int)$q['id'],
+                    'label' => $q['quote_no'] . ((int)$q['rev'] > 0 ? ' R' . (int)$q['rev'] : '')
+                             . ' · ' . fmoney($q['total_amount'])
+                             . ' · ' . (lk_options_or('quote_status', QUOTE_STATUS)[$q['status']] ?? $q['status'])
+                             . ($q['subject'] ? ' — ' . mb_substr($q['subject'], 0, 40) : ''),
+                    'contract_number' => (string)$q['contract_number'],
+                ];
+            }
+            echo json_encode($out); return true;
+        // §a.ii, §a.iv — the quote's own terms and its line items, so the call
+        // inherits what was sold instead of the coordinator re-typing it.
+        case $route === 'quote-context':
+            header('Content-Type: application/json');
+            $ctx = call_quote_context((int)($_GET['id'] ?? 0));
+            if (!$ctx) { echo json_encode(null); return true; }
+            $q = $ctx['quote'];
+            $lines = [];
+            foreach ($ctx['lines'] as $l) {
+                $lines[] = [
+                    'id' => (int)$l['id'],
+                    'label' => '#' . ((int)$l['line_no'] + 1) . ' · '
+                        . (lk_options_or('inspection_type', INSPECTION_TYPES)[$l['service_type']] ?? $l['service_type'])
+                        . ($l['description'] ? ' — ' . mb_substr($l['description'], 0, 40) : '')
+                        . ' · ' . rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.') . ' '
+                        . (lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit'])
+                        . ' @ ' . fmoney($l['rate']),
+                    'sbu' => (string)$l['sbu'], 'service_type' => (string)$l['service_type'],
+                    'activity_id' => (int)($l['activity_id'] ?? 0), 'office_id' => (int)($l['office_id'] ?? 0),
+                    'amount' => (float)$l['amount'], 'unit' => (string)$l['unit'],
+                ];
+            }
+            echo json_encode([
+                'contract_number'  => (string)$q['contract_number'],
+                'sbu'              => (string)$q['sbu'],
+                'office_id'        => (int)($q['office_id'] ?? 0),
+                'product_category' => (string)($q['product_category'] ?? ''),
+                'inspection_types' => array_values(array_filter(explode(',', (string)($q['inspection_types'] ?? '')))),
+                'total_amount'     => (float)$q['subtotal'],   // ex-GST: what is billable
+                'payment_terms'    => (string)($q['payment_terms'] ?? ''),
+                'lines'            => $lines,
+            ]);
             return true;
         case $route === 'partner-sites':
             header('Content-Type: application/json');
@@ -1852,17 +2009,35 @@ function ops_calls($route, $method) {
             }
             $mngOffice = ($b['ibo_office_id'] ?? '') !== '' ? (int)$b['ibo_office_id'] : null;
             $crossOffice = $execOffice && (!$mngOffice || $mngOffice !== $execOffice);
-            // Cross-office (managing ≠ executing) → credit to the executing office is mandatory.
+            // §a.viii — when the contracting office is not the executing office, the
+            // contracting office owes the executing office a credit in rupees. Say so
+            // in those words rather than reporting a bare validation failure.
             if ($crossOffice && (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0)) {
-                view('ops/call_form', ['call' => $call, 'clients' => clients_list(), 'vendors' => vendors_list(),
-                    'offices' => offices_list(), 'error' => 'This call is executed by a different office, so enter the credit amount to give the executing branch.',
-                    'cfvals' => $call ? custom_values_map('call', $call['id']) : []]);
+                $ex = credit_explainer($mngOffice, $execOffice);
+                // array_merge, not "+": the union operator keeps the left-hand
+                // value, which would silently drop the message.
+                view('ops/call_form', array_merge(call_form_vars($call),
+                    ['error' => $ex['text'] . ' Enter that amount before saving.']));
                 return;
             }
+            // §a.vi / §a.vii — one date, several dates, or a weekly pattern to an end
+            // date. All three end up as the same editable list of dates.
+            $dates = call_dates_parse(implode(',', (array)($b['inspection_dates'] ?? [])));
+            $wd = array_values(array_filter(array_map('intval', (array)($b['schedule_weekdays'] ?? []))));
+            if ($wd && ($b['schedule_end_date'] ?? '') !== '') {
+                $from = ($b['inspection_required_date'] ?? '') ?: ($dates[0] ?? date('Y-m-d'));
+                $dates = call_dates_parse(implode(',', array_merge($dates, call_expand_pattern($from, $b['schedule_end_date'], $wd))));
+            }
+            $b['inspection_dates']  = implode(',', $dates);
+            $b['schedule_weekdays'] = implode(',', $wd);
+            // The client's expected date is the first visit, so the two never disagree.
+            if ($dates && ($b['inspection_required_date'] ?? '') === '') $b['inspection_required_date'] = $dates[0];
             $fields = ['client_id','vendor_id','ibo_office_id','executing_office_id','region','sbu','activity_id',
                 'inspection_type','inspection_type_other','site_address_id','po_id','po_line_item_id',
                 'product_category','product_other','deputation_type','expected_credit','credit_type',
-                'billable_value','billable_basis','call_received_date','inspection_required_date','notes'];
+                'billable_value','billable_basis','call_received_date','inspection_required_date','notes',
+                'quotation_id','quote_line_id','contract_number','folder_link',
+                'inspection_dates','schedule_end_date','schedule_weekdays'];
             $wasForwarded = $call ? ($call['executing_office_id'] ?? null) : null;
             $forwardNow = $execOffice && !$wasForwarded; // first time it gets an executing branch
             $notifyMgr = !empty($b['notify_manager']) ? 1 : 0;
@@ -1890,8 +2065,7 @@ function ops_calls($route, $method) {
                 redirect('/call?id=' . $id);
             }
         }
-        view('ops/call_form', ['call' => $call, 'clients' => clients_list(), 'vendors' => vendors_list(),
-            'offices' => offices_list(), 'error' => null, 'cfvals' => $call ? custom_values_map('call', $call['id']) : []]);
+        view('ops/call_form', call_form_vars($call));
         return;
     }
     // Executing office reverts with the credit it requires for a cross-office call.
@@ -1946,8 +2120,26 @@ function normalise_city($input) {
     if ($best !== null && $bestD <= 2 && strlen($c) >= 5) return $best;
     return $c;
 }
+// Everything the call form needs, in one place — the error path and the normal
+// path used to build this list separately and drifted apart.
+function call_form_vars($call) {
+    $u = current_user();
+    return [
+        'call' => $call,
+        'clients' => clients_list(), 'vendors' => vendors_list(), 'offices' => offices_list(),
+        'cfvals' => $call ? custom_values_map('call', $call['id']) : [],
+        // §a.i — quotes for the client already on the call, so an edit opens ready.
+        'quotes' => $call ? call_quotes_for_client((int)($call['client_id'] ?? 0)) : [],
+        'qlines' => ($call && !empty($call['quotation_id']))
+            ? (call_quote_context((int)$call['quotation_id'])['lines'] ?? []) : [],
+        // §a.iii — Region is a reporting roll-up for the SBU heads and the
+        // Business Director. It is noise for everyone else, so only they see it.
+        'showRegion' => in_array(user_role(), ['SBU_HEAD','BUSINESS_DIRECTOR','MASTER_ADMIN','ADMIN'], true) || is_master(),
+        'error' => null,
+    ];
+}
 function nzc_call($f, $v) {
-    if (in_array($f, ['client_id','vendor_id','ibo_office_id','executing_office_id','contracting_office_id','activity_id','site_address_id','po_id','po_line_item_id'], true)) return $v === '' ? null : (int)$v;
+    if (in_array($f, ['client_id','vendor_id','ibo_office_id','executing_office_id','contracting_office_id','activity_id','site_address_id','po_id','po_line_item_id','quotation_id','quote_line_id'], true)) return $v === '' ? null : (int)$v;
     if (in_array($f, ['expected_credit','billable_value','credit_required'], true)) return $v === '' ? 0 : $v;
     return $v;
 }
@@ -2563,7 +2755,7 @@ function ops_jobs($route, $method) {
         if ($method === 'POST') {
             $b = $_POST;
             $fields = ['executing_office_id','inspector_id','subcon_id','job_type','stage','scheduled_date','inspection_start_date','inspection_end_date',
-                'random_date1','random_date2','random_date3','folder_link','boss_id','expected_credit','credit_type','credit_direction',
+                'random_date1','random_date2','random_date3','folder_link','contract_number','inspection_dates','boss_id','expected_credit','credit_type','credit_direction',
                 'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost','quotation_id'];
             // deliverables come as a checkbox array -> stored as CSV of codes
             $deliverables = implode(',', array_filter((array)($b['deliverables'] ?? [])));
@@ -2589,8 +2781,10 @@ function ops_jobs($route, $method) {
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO jobs (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $jobId = $pdo->lastInsertId();
-                $pdo->prepare("UPDATE calls SET status='ALLOCATED' WHERE id=?")->execute([$call['id']]);
-                flash("$code allocated. Assignment email sent to inspector.");
+                // §a.ix — stamp when the engineer was put on it, so the register can
+                // show received -> forwarded -> allocated as three real lead times.
+                $pdo->prepare("UPDATE calls SET status='ALLOCATED', allocated_at=? WHERE id=?")->execute([date('c'), $call['id']]);
+                flash("$code allocated. Assignment email sent to the " . Tl('engineer') . ".");
             }
             custom_save('job', $jobId, $b);
             // inherit advance / report-vs-payment conditions from a linked quotation
