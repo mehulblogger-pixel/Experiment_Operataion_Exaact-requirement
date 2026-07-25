@@ -1909,6 +1909,189 @@ function ops_idems_release_note($method) {
     return true;
 }
 
+// ===========================================================================
+//  Phase 9: AI-assisted documentation & conflict detection
+//  Source documents (PO / QAP / drawings / specs / MTCs / calibration certs …)
+//  are uploaded against a report. A rule-based checker ALWAYS runs (no AI needed);
+//  when an AI provider is configured it adds a deeper review. The inspector is
+//  always the final authority — nothing is applied automatically.
+// ===========================================================================
+const SOURCE_DOC_TYPES = [
+    'PO'=>'Purchase Order', 'CALL'=>'Inspection Call', 'QAP'=>'QAP / ITP', 'DRAWING'=>'Approved Drawing',
+    'SPEC'=>'Technical Specification', 'STANDARD'=>'Code / Standard', 'MTC'=>'Material Test Certificate',
+    'CALIB'=>'Calibration Certificate', 'PREV_REPORT'=>'Previous Report', 'CUST_INSTR'=>'Customer Instruction', 'OTHER'=>'Other',
+];
+// Which source documents a complete inspection pack should contain.
+const EXPECTED_SOURCE_DOCS = ['PO','QAP','DRAWING','SPEC'];
+// Extract readable text from an uploaded source document (best-effort, no libs).
+function idems_source_text($mime, $raw, $limit = 20000) {
+    $mime = strtolower((string)$mime);
+    if (strpos($mime, 'text/') === 0 || strpos($mime, 'json') !== false || strpos($mime, 'csv') !== false) return substr($raw, 0, $limit);
+    if (strpos($mime, 'wordprocessingml') !== false && class_exists('ZipArchive')) {
+        $tmp = tempnam(sys_get_temp_dir(), 'sd'); file_put_contents($tmp, $raw);
+        $z = new ZipArchive();
+        if ($z->open($tmp) === true) { $xml = $z->getFromName('word/document.xml'); $z->close(); @unlink($tmp);
+            if ($xml) { $t = preg_replace('/<w:p\b[^>]*>/', "\n", $xml); return substr(trim(html_entity_decode(strip_tags($t), ENT_QUOTES, 'UTF-8')), 0, $limit); } }
+        @unlink($tmp);
+    }
+    if (strpos($mime, 'pdf') !== false) {
+        // pull any uncompressed text operators; scanned PDFs yield nothing (that's fine)
+        $out = '';
+        if (preg_match_all('/\((?:\\\\.|[^\\\\()])*\)/s', $raw, $m)) {
+            foreach ($m[0] as $s) { $s = substr($s, 1, -1); $s = str_replace(['\\(','\\)','\\\\'], ['(',')','\\'], $s); if (preg_match('/[A-Za-z0-9]/', $s)) $out .= $s . ' '; }
+        }
+        return substr(trim(preg_replace('/\s+/', ' ', $out)), 0, $limit);
+    }
+    return '';
+}
+// Source docs attached to a report (stored in report_files with kind='src_<TYPE>').
+function idems_source_docs($docId) {
+    $rows = ops_all("SELECT id, kind, field_key, file_name, mime, note, created_at FROM report_files WHERE report_doc_id=? AND kind LIKE 'src_%' ORDER BY id", [(int)$docId]);
+    foreach ($rows as &$r) { $r['doc_type'] = substr($r['kind'], 4); $r['doc_label'] = SOURCE_DOC_TYPES[$r['doc_type']] ?? $r['doc_type']; }
+    return $rows;
+}
+// ---- Rule-based conflict checks (always available, no AI) ----
+// Returns a list of ['severity'=>high|medium|low, 'kind'=>..., 'detail'=>...].
+function idems_rule_checks($doc, $srcDocs) {
+    $out = [];
+    $have = [];
+    foreach ($srcDocs as $s) $have[$s['doc_type']] = true;
+    // 1. missing documents
+    foreach (EXPECTED_SOURCE_DOCS as $t) {
+        if (empty($have[$t])) $out[] = ['severity'=>'medium', 'kind'=>'Missing document', 'detail'=>(SOURCE_DOC_TYPES[$t] ?? $t) . ' has not been uploaded against this report.'];
+    }
+    if (empty($have['MTC']) && empty($have['CALIB'])) $out[] = ['severity'=>'low', 'kind'=>'Missing document', 'detail'=>'No material test certificate or calibration certificate has been attached.'];
+    // 2. header completeness / traceability
+    if (trim((string)($doc['po_ref'] ?? '')) === '') $out[] = ['severity'=>'medium', 'kind'=>'Traceability', 'detail'=>'No purchase-order reference is recorded on the report.'];
+    if (trim((string)($doc['drawing_no'] ?? '')) === '') $out[] = ['severity'=>'medium', 'kind'=>'Traceability', 'detail'=>'No drawing number is recorded on the report.'];
+    elseif (trim((string)($doc['drawing_rev'] ?? '')) === '') $out[] = ['severity'=>'low', 'kind'=>'Revision', 'detail'=>'A drawing number is recorded but its revision is blank.'];
+    if (trim((string)($doc['qap_rev'] ?? '')) === '') $out[] = ['severity'=>'low', 'kind'=>'Revision', 'detail'=>'No QAP revision is recorded on the report.'];
+    if (trim((string)($doc['standards'] ?? '')) === '') $out[] = ['severity'=>'low', 'kind'=>'Applicable standard', 'detail'=>'No applicable code/standard is recorded on the report.'];
+    // 3. revision mismatch between the report header and the uploaded documents
+    $texts = idems_source_text_bundle($doc['id'], 4000);
+    if ($texts !== '') {
+        $dn = trim((string)($doc['drawing_no'] ?? ''));
+        if ($dn !== '' && stripos($texts, $dn) === false)
+            $out[] = ['severity'=>'medium', 'kind'=>'Revision mismatch', 'detail'=>'Drawing "' . $dn . '" from the report header was not found in the text of the uploaded documents — verify the correct drawing/revision is attached.'];
+        $rev = trim((string)($doc['drawing_rev'] ?? ''));
+        if ($dn !== '' && $rev !== '' && preg_match_all('/\brev\.?\s*([A-Za-z0-9]{1,4})\b/i', $texts, $mm)) {
+            $found = array_unique(array_map('strtoupper', $mm[1]));
+            if ($found && !in_array(strtoupper($rev), $found, true))
+                $out[] = ['severity'=>'high', 'kind'=>'Revision mismatch', 'detail'=>'The report records drawing Rev ' . $rev . ', but the uploaded documents reference Rev ' . implode(' / ', array_slice($found, 0, 4)) . '.'];
+        }
+        // 4. expired calibration mentioned in an attached certificate
+        if (preg_match_all('/valid\s*(?:up\s*to|till|until)\s*[:\-]?\s*(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{4}-\d{2}-\d{2})/i', $texts, $cm)) {
+            foreach ($cm[1] as $d) { $ts = strtotime(str_replace(['/', '.'], '-', $d));
+                if ($ts && $ts < strtotime($doc['inspection_date'] ?: date('Y-m-d')))
+                    $out[] = ['severity'=>'high', 'kind'=>'Expired calibration', 'detail'=>'An attached certificate shows validity up to ' . $d . ', which is before the inspection date.']; }
+        }
+    } elseif ($srcDocs) {
+        $out[] = ['severity'=>'low', 'kind'=>'Not readable', 'detail'=>'The uploaded documents contain no extractable text (they may be scans); automatic cross-checking is limited to the report header.'];
+    }
+    return $out;
+}
+// Concatenate the readable text of a report's source documents (for checks + AI).
+function idems_source_text_bundle($docId, $perDoc = 6000) {
+    $rows = ops_all("SELECT kind, file_name, mime, data FROM report_files WHERE report_doc_id=? AND kind LIKE 'src_%' ORDER BY id", [(int)$docId]);
+    $parts = [];
+    foreach ($rows as $r) {
+        $raw = (string)$r['data'];
+        if (strpos($raw, 'base64,') !== false) $raw = base64_decode(substr($raw, strpos($raw, 'base64,') + 7));
+        $t = idems_source_text($r['mime'], $raw, $perDoc);
+        if (trim($t) !== '') $parts[] = '--- ' . (SOURCE_DOC_TYPES[substr($r['kind'],4)] ?? $r['kind']) . ': ' . $r['file_name'] . " ---\n" . $t;
+    }
+    return implode("\n\n", $parts);
+}
+// ---- AI review (optional layer on top of the rule checks) ----
+function idems_ai_review($doc, $fields, $data, $srcDocs) {
+    if (!function_exists('ai_enabled') || !ai_enabled()) return [null, 'No AI provider is enabled — the rule-based checks above still apply.'];
+    $bundle = idems_source_text_bundle($doc['id'], 6000);
+    $body = [];
+    foreach ($fields as $f) {
+        if (in_array($f['ftype'], ['photo','file','signature','heading','note'], true)) continue;
+        $v = $data[$f['fkey']] ?? ''; if (is_array($v)) $v = json_encode($v);
+        if (trim((string)$v) !== '') $body[] = ($f['label'] ?: $f['fkey']) . ': ' . $v;
+    }
+    $ctx = "INSPECTION REPORT\n"
+        . "IRN: {$doc['irn']}\nType: " . ($doc['type_name'] ?? $doc['type_code']) . "\n"
+        . "Client: " . ($doc['client_disp'] ?: ($doc['client_name'] ?? '')) . "\nVendor: " . ($doc['vendor_disp'] ?: ($doc['vendor_name'] ?? '')) . "\n"
+        . "PO: {$doc['po_ref']}\nDrawing: {$doc['drawing_no']} Rev {$doc['drawing_rev']}\nQAP Rev: {$doc['qap_rev']}\n"
+        . "Standards: {$doc['standards']}\nInspection date: {$doc['inspection_date']}\n\n"
+        . "REPORT FINDINGS\n" . (implode("\n", $body) ?: '(none recorded)') . "\n\n"
+        . "ATTACHED DOCUMENTS (" . count($srcDocs) . ")\n" . ($bundle !== '' ? substr($bundle, 0, 20000) : '(no extractable text)');
+    $system = "You are a senior third-party-inspection (TPIA) quality engineer assisting an inspector. "
+        . "Review the inspection report and its attached documents. Be factual and conservative: only state what the provided text supports. "
+        . "You are an assistant, not the approving authority. Reply in plain text using exactly these headings:\n"
+        . "MISSING DOCUMENTS:\nREVISION / SPEC CONFLICTS:\nTRACEABILITY ISSUES:\nSUGGESTED HOLD POINTS:\nSUGGESTED WITNESS POINTS:\nSUGGESTED REMARKS:\n"
+        . "Under each heading use short '- ' bullets, or write 'None identified'. Do not invent document numbers or results.";
+    [$text, $err] = ai_chat($system, $ctx, 1400);
+    if ($err) return [null, $err];
+    return [$text, null];
+}
+// Split the AI reply into its sections for display.
+function idems_ai_sections($text) {
+    $heads = ['MISSING DOCUMENTS','REVISION / SPEC CONFLICTS','TRACEABILITY ISSUES','SUGGESTED HOLD POINTS','SUGGESTED WITNESS POINTS','SUGGESTED REMARKS'];
+    $out = []; $cur = 'NOTES'; $out[$cur] = '';
+    foreach (preg_split('/\r?\n/', (string)$text) as $line) {
+        $t = trim($line);
+        $matched = null;
+        foreach ($heads as $h) if (stripos($t, $h) === 0) { $matched = $h; break; }
+        if ($matched) { $cur = $matched; $out[$cur] = ''; continue; }
+        if ($t !== '') $out[$cur] = trim(($out[$cur] ?? '') . "\n" . $t);
+    }
+    return array_filter($out, fn($v)=>trim((string)$v) !== '');
+}
+
+// ---- Handler: document review (upload sources, run checks, optional AI) ----
+function ops_idems_review($route, $method) {
+    $doc = ops_one("SELECT d.*, bp.display_name client_disp, bp.legal_name client_name, v.display_name vendor_disp, v.legal_name vendor_name, rt.name type_name
+        FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
+        WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? $_POST['id'] ?? 0)]);
+    if (!$doc) { http_response_code(404); view('notfound'); return true; }
+    $pdo = db();
+    if ($method === 'POST') {
+        $do = $_POST['_do'] ?? '';
+        if ($do === 'upload') {
+            ops_require(idems_can_edit_doc($doc), 'This report is finalized.');
+            $type = isset(SOURCE_DOC_TYPES[$_POST['doc_type'] ?? '']) ? $_POST['doc_type'] : 'OTHER';
+            if (!empty($_FILES['src']['name'])) {
+                $names=(array)$_FILES['src']['name']; $tmp=(array)$_FILES['src']['tmp_name']; $types=(array)$_FILES['src']['type']; $errs=(array)$_FILES['src']['error'];
+                for ($i=0;$i<count($names);$i++) {
+                    if (($errs[$i] ?? 1)!==0 || !is_uploaded_file($tmp[$i])) continue;
+                    $bytes=@file_get_contents($tmp[$i]); if ($bytes===false || strlen($bytes)>12*1024*1024) continue;
+                    $pdo->prepare("INSERT INTO report_files (report_doc_id,field_key,kind,file_name,mime,data,note,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
+                        ->execute([$doc['id'], '', 'src_'.$type, substr($names[$i],0,255), $types[$i] ?: '', 'data:'.($types[$i] ?: 'application/octet-stream').';base64,'.base64_encode($bytes), trim($_POST['note'] ?? ''), user_name(current_user()), date('c')]);
+                }
+                idems_log('report_doc', $doc['id'], 'SOURCE_DOC', ['irn'=>$doc['irn'], 'new'=>$type]);
+                flash('Document(s) uploaded.');
+            }
+            redirect('/document-review?id=' . $doc['id']);
+        }
+        if ($do === 'del') {
+            ops_require(idems_can_edit_doc($doc), 'This report is finalized.');
+            $pdo->prepare("DELETE FROM report_files WHERE id=? AND report_doc_id=? AND kind LIKE 'src_%'")->execute([(int)($_POST['file_id'] ?? 0), $doc['id']]);
+            flash('Document removed.'); redirect('/document-review?id=' . $doc['id']);
+        }
+        if ($do === 'ai') {
+            $fields = idems_fields($doc['report_type_id']);
+            $data = json_decode($doc['data'] ?: '[]', true) ?: [];
+            [$text, $err] = idems_ai_review($doc, $fields, $data, idems_source_docs($doc['id']));
+            if ($err) flash('AI review unavailable: ' . $err, 'warning');
+            else { $_SESSION['idems_ai_' . $doc['id']] = $text; idems_log('report_doc', $doc['id'], 'AI_REVIEW', ['irn'=>$doc['irn']]); flash('AI review completed — suggestions below are for your consideration; you remain the approving authority.'); }
+            redirect('/document-review?id=' . $doc['id']);
+        }
+    }
+    $srcDocs = idems_source_docs($doc['id']);
+    $aiText = $_SESSION['idems_ai_' . $doc['id']] ?? '';
+    view('ops/idems/review', [
+        'doc'=>$doc, 'srcDocs'=>$srcDocs, 'types'=>SOURCE_DOC_TYPES,
+        'checks'=>idems_rule_checks($doc, $srcDocs),
+        'aiText'=>$aiText, 'aiSections'=>$aiText ? idems_ai_sections($aiText) : [],
+        'aiOn'=>function_exists('ai_enabled') && ai_enabled(),
+    ]);
+    return true;
+}
+
 // Compliance audit log viewer (basic; full super-admin dashboard is a later phase).
 function ops_idems_audit($method) {
     ops_require(is_master() || can('idems.audit.view'), 'You cannot view the audit log.');
