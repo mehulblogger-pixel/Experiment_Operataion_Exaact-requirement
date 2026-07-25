@@ -1006,6 +1006,51 @@ function ops_crm_quotes($route, $method) {
         redirect('/quote?id=' . $q['id']);
     }
 
+    // ---- Send it yourself, from your own mailbox ---------------------------
+    // Builds the finished message and hands it to the user's mail client. The
+    // .eml form carries the quotation PDF and opens in Outlook as a draft with
+    // a Send button, so the client receives it from the person, not the robot.
+    if ($route === 'quote-compose') {
+        $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
+        ops_require(can('crm.quote.send') || can('crm.quote.create') || is_master(), 'You cannot send ' . Tlp('quote') . '.');
+        [$subject, $body] = crm_quote_message($q);
+        [$fromEmail, $fromName] = compose_from();
+        $to = (string)($q['contact_email'] ?? '');
+        $mode = $_GET['mode'] ?? 'eml';
+        if ($mode === 'mailto') { redirect(compose_mailto($to, $subject, $body)); }
+        if ($mode === 'owa')    { redirect(compose_owa($to, $subject, $body)); }
+        // Default: a real draft, with the quotation PDF and anything marked to
+        // go out with it already attached.
+        $att = [];
+        $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' ORDER BY is_default DESC, id DESC");
+        $pdf = quote_pdf_build($q, crm_quote_lines($q['id']), $tpl ?: [], quote_signature($q), quote_letterhead());
+        if ($pdf) $att[] = ['name' => 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no'] . ($q['rev'] > 0 ? '-R' . $q['rev'] : '')) . '.pdf',
+                            'data' => $pdf, 'type' => 'application/pdf'];
+        foreach (crm_quote_files($q['id']) as $f) {
+            if ((int)$f['share_with_inspector'] !== 1 && $f['kind'] !== 'ATTACHMENT') continue;
+            if (!in_array($f['kind'], ['ATTACHMENT', 'QUOTE_DOC'], true)) continue;   // only what goes to the client
+            $row = ops_one("SELECT file_data, mime, file_name FROM quote_files WHERE id=?", [(int)$f['id']]);
+            if ($row) $att[] = ['name' => $row['file_name'], 'data' => base64_decode((string)$row['file_data']), 'type' => $row['mime'] ?: 'application/octet-stream'];
+        }
+        crm_log_change($q['id'], 'Opened in ' . ($fromName ?: 'the sender') . "'s mailbox to send by hand");
+        compose_eml_download('Quote-' . $q['quote_no'], compose_eml($to, $subject, $body, '', $att, $fromEmail, $fromName));
+        return;
+    }
+    // The same, for chasing a follow-up that is due.
+    if ($route === 'followup-compose') {
+        $f = ops_one("SELECT * FROM quote_followups WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$f) { http_response_code(404); view('notfound'); return; }
+        $q = crm_quote_get((int)$f['quote_id']); if (!$q) { http_response_code(404); view('notfound'); return; }
+        [$fromEmail, $fromName] = compose_from();
+        $et = ops_one("SELECT * FROM crm_templates WHERE kind='EMAIL_FOLLOWUP' AND active=1 ORDER BY is_default DESC, id DESC");
+        $subject = ($et && $et['subject']) ? crm_fill_email($et['subject'], $q) : ('Following up: ' . quote_label($q));
+        $body    = ($et && $et['body'])    ? crm_fill_email($et['body'], $q)    : crm_default_followup_email($q);
+        if (($_GET['mode'] ?? '') === 'mailto') redirect(compose_mailto((string)$q['contact_email'], $subject, $body));
+        compose_eml_download('Followup-' . $q['quote_no'],
+            compose_eml((string)$q['contact_email'], $subject, $body, '', [], $fromEmail, $fromName));
+        return;
+    }
+
     // ---- §xiv / §xxiv — files against a quote -----------------------------
     if ($route === 'quote-files' && $method === 'POST') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
@@ -1419,12 +1464,33 @@ function crm_default_quote_email($q) {
         . "Total value: " . cur_sym() . number_format((float)$q['total_amount'], 0) . " (valid " . (int)$q['validity_days'] . " days).\n\n"
         . "We look forward to your confirmation.\n\nBest regards,\n" . app_name();
 }
-function crm_default_followup_email($q, $kind) {
+function crm_default_followup_email($q, $kind = '') {
     return "Dear " . ($q['contact_name'] ?: 'Sir/Madam') . ",\n\n"
         . "Gentle follow-up on our quotation " . quote_label($q) . " for " . ($q['subject'] ?: 'your requirement')
         . " (" . cur_sym() . number_format((float)$q['total_amount'], 0) . ").\n"
         . "We would be glad to address any questions or revise as needed.\n\nBest regards,\n" . app_name();
 }
+// Subject + body for a quotation e-mail, from the template if one is set up.
+// Shared by the automatic send and by the "open in my mailbox" draft, so the
+// customer gets the same wording either way. When the person sends it
+// themselves the sign-off is theirs, not the app's.
+function crm_quote_message($q, $personal = true) {
+    $et = ops_one("SELECT * FROM crm_templates WHERE kind='EMAIL_QUOTE' AND active=1 ORDER BY is_default DESC, id DESC");
+    $subject = ($et && $et['subject']) ? crm_fill_email($et['subject'], $q)
+                                       : (ucfirst(Tl('quote')) . ' ' . quote_label($q) . ' — ' . app_name());
+    $body = ($et && $et['body']) ? crm_fill_email($et['body'], $q) : crm_default_quote_email($q);
+    if ($personal) {
+        $u = current_user();
+        $nm = $u ? user_name($u) : '';
+        if ($nm !== '') {
+            // Sign off as the person actually sending it.
+            $body = preg_replace('/Best regards,\s*\n' . preg_quote(app_name(), '/') . '\s*$/u',
+                "Best regards,\n" . $nm . "\n" . app_name(), $body);
+        }
+    }
+    return [$subject, $body];
+}
+
 // §xx — the signature stamped on a quote PDF. If the quote names a signatory,
 // their signature stored in the system is used, so the PDF is signed by the
 // person who actually authorised it. Otherwise the company signature applies.
