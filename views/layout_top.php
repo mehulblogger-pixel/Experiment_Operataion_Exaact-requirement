@@ -48,6 +48,13 @@
         <?php if (can('mod.reconcile.view')): ?><a class="s-item<?= $navOn(['attendance-recon']) ?>" href="/attendance-recon"><span class="s-ic">✅</span><span>Reconcile</span></a><?php endif; ?>
         <?php endif; ?>
 
+        <?php if (can('mod.idems.view')): ?>
+        <div class="s-grp">Inspection Reports</div>
+        <a class="s-item<?= $navOn(['documents','document','document-new','document-edit']) ?>" href="/documents"><span class="s-ic">📑</span><span>Document Register</span></a>
+        <?php if (can('mod.idems.edit') || is_master()): ?><a class="s-item<?= $navOn(['document-new']) ?>" href="/document-new"><span class="s-ic">➕</span><span>New Report</span></a><?php endif; ?>
+        <?php if (can('idems.audit.view') || is_master()): ?><a class="s-item<?= $navOn(['audit-log']) ?>" href="/audit-log"><span class="s-ic">🛡️</span><span>Audit Log</span></a><?php endif; ?>
+        <?php endif; ?>
+
         <?php if (can('mod.invoicing.view') || can('mod.profitability.view')): ?>
         <div class="s-grp">Money</div>
         <?php if (can('mod.invoicing.view')): ?><a class="s-item<?= $navOn(['invoicing']) ?>" href="/invoicing"><span class="s-ic">💳</span><span>Invoicing</span></a><?php endif; ?>

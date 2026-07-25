@@ -1,0 +1,20 @@
+<?php // IRN numbering rules ?>
+<div class="crumbs"><a href="/">Home</a> › <a href="/documents">Documents</a> › IRN rules</div>
+<div class="master-head"><div><h1>IRN numbering rules</h1>
+  <p class="sub" style="margin:2px 0 0">Design the Inspection Reference Number with no coding. The running serial is unique within everything that precedes it, so numbering never duplicates.</p></div></div>
+
+<form method="post" action="/irn-rules" class="panel">
+  <div class="form-grid">
+    <div class="ff ff-wide"><label>IRN format <span class="muted">— must contain {SERIAL}</span></label>
+      <input class="form-control" name="idems_irn_format" value="<?= e($format) ?>" style="font-family:monospace"></div>
+    <div class="ff"><label>Company code</label><input class="form-control" name="idems_company_code" value="<?= e($company) ?>" maxlength="20"></div>
+    <div class="ff"><label>Serial width (digits)</label><input class="form-control" type="number" min="3" max="10" name="idems_serial_width" value="<?= (int)$width ?>"></div>
+  </div>
+  <div style="margin:10px 0">
+    <span class="muted">Available tokens:</span>
+    <?php foreach ($tokens as $t=>$lbl): ?><code style="margin:0 4px" title="<?= e($lbl) ?>"><?= e($t) ?></code><?php endforeach; ?>
+  </div>
+  <div class="panel" style="background:var(--soft);margin:6px 0"><span class="muted">Live sample:</span> <strong style="font-family:monospace;font-size:15px"><?= e($sample) ?></strong></div>
+  <div style="margin-top:12px"><button class="btn" type="submit">Save numbering rules</button></div>
+</form>
+<p class="muted" style="margin-top:10px">Example: <code>{COMPANY}/{BRANCH}/{YEAR}/{CLIENT}/{TYPE}/{SERIAL}</code> → <strong>MGH/AHD/2026/RIL/IR/000458</strong>. Add <code>{PROJECT}</code> to include the project code; an empty token drops out cleanly.</p>

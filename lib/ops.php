@@ -1242,6 +1242,8 @@ function ops_module_gate($route) {
         'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes',
         'attendance-recon'=>'reconcile',
         'availability'=>'jobs',
+        'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems',
+        'report-types'=>'idems','report-type-edit'=>'idems','irn-rules'=>'idems','audit-log'=>'idems',
         'masters'=>'masters','work-norms'=>'masters',
         'office-finance'=>'overheads',
         'reports'=>'reports',
@@ -1372,6 +1374,14 @@ function ops_dispatch($route, $method) {
             ops_hierarchy($method); return true;
         case $route === 'work-norms':
             ops_work_norms($method); return true;
+        case in_array($route, ['documents','document','document-new','document-edit','document-submit','document-finalize','document-delete'], true):
+            return ops_idems_documents($route, $method);
+        case $route === 'report-types' || $route === 'report-type-edit':
+            return ops_idems_report_types($route, $method);
+        case $route === 'irn-rules':
+            return ops_idems_numbering($method);
+        case $route === 'audit-log':
+            return ops_idems_audit($method);
         case $route === 'report-approve':
             ops_report_approve($method); return true;
         case $route === 'office-finance':

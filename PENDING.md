@@ -16,9 +16,11 @@ REPORTS_TO reporting-manager chain), report-approval + escalation, lib/ai.php pr
 email_log, deliverables master (IR/IRN/NCR/CoC…), FY/office/SBU scope.
 
 Proposed phasing (each phase = its own commit, tested):
-- P1 Foundation: report_types registry (seed full TPIA list, admin adds unlimited) + configurable
-  IRN engine (Company/Branch/Year/Client/Project/ReportType/Serial, no-code rules, zero-duplicate)
-  + report_docs instance model + immutable finalize + idems_audit log + Document Register.
+- P1 Foundation ✅ SHIPPED — lib/idems.php: report_types registry (32 TPIA types seeded + admin CRUD,
+  unlimited) + configurable no-code IRN engine (token format, zero-duplicate via unique index +
+  scope counters) + report_docs instance model + DRAFT→SUBMITTED→ISSUED with immutable finalize +
+  idems_audit log + Document Register + IRN-rules + audit-log viewer. Module 'idems' + perms
+  (idems.finalize/type.manage/timestamp.edit/audit.view) wired into roles.
 - P2 No-code Report Builder: sections/sub-sections, dynamic/conditional/calculated/mandatory/hidden
   fields, repeatable tables, attachments/photos/GPS/QR — reuse & extend custom-fields.
 - P3 Workflow & approvals: configurable multi-level chain (per inspector/common/branch/dept/client/
