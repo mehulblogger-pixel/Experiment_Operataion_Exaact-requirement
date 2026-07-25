@@ -93,6 +93,9 @@ try {
     db()->query("SELECT irn FROM report_docs LIMIT 1");
     db()->query("SELECT id FROM report_types LIMIT 1");
     db()->query("SELECT id FROM idems_audit LIMIT 1");
+    db()->query("SELECT id FROM report_sections LIMIT 1");
+    db()->query("SELECT id FROM report_fields LIMIT 1");
+    db()->query("SELECT id FROM report_files LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();

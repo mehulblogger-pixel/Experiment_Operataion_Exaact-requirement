@@ -4,7 +4,9 @@
   <div><h1><?= e($doc['irn']) ?> <?= $doc['finalized'] ? '🔒' : '' ?></h1>
     <p class="sub" style="margin:2px 0 0"><span class="pill p-info"><?= e($doc['type_code']) ?></span> <?= e($doc['type_name'] ?: $doc['title']) ?> · <span class="pill <?= idems_status_pill($doc['status']) ?>"><?= e(IDEMS_STATUS[$doc['status']] ?? $doc['status']) ?></span></p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
-    <?php if (idems_can_edit_doc($doc)): ?><a class="btn secondary" href="/document-edit?id=<?= (int)$doc['id'] ?>">Edit</a><?php endif; ?>
+    <?php if (idems_can_edit_doc($doc)): ?><a class="btn secondary" href="/document-edit?id=<?= (int)$doc['id'] ?>">Edit header</a><?php endif; ?>
+    <?php if (idems_can_edit_doc($doc) && !empty($hasSchema)): ?><a class="btn" href="/document-fill?id=<?= (int)$doc['id'] ?>">Fill report body</a><?php endif; ?>
+    <?php if ((is_master() || can('idems.type.manage')) && empty($hasSchema)): ?><a class="btn secondary" href="/report-builder?type=<?= (int)$doc['report_type_id'] ?>">Design this form</a><?php endif; ?>
     <?php if (idems_can_edit_doc($doc) && in_array($doc['status'],['DRAFT','REJECTED'],true)): ?>
       <form method="post" action="/document-submit?id=<?= (int)$doc['id'] ?>" style="display:inline"><button class="btn" type="submit">Submit for review</button></form>
     <?php endif; ?>
@@ -45,7 +47,42 @@
   <?php if ($doc['remarks']): ?><div class="kv-wide" style="margin-top:8px"><span class="k">Remarks</span><?= nl2br(e($doc['remarks'])) ?></div><?php endif; ?>
 </div>
 
-<p class="muted" style="margin:10px 2px">The full report body (sections &amp; fields), signatures, PDF and client-format output come in the next IDEMS phases. Phase 1 establishes the register, the auto-IRN and the immutable audit trail.</p>
+<?php
+  // ---- Report body (designed form values) ----
+  if (!empty($hasSchema)):
+    $bySec = []; foreach ($fields as $f) $bySec[(int)$f['section_id']][] = $f;
+    $filesBy = []; foreach ($files as $fl) $filesBy[$fl['field_key']][] = $fl;
+    $showVal = function($f) use ($data, $filesBy) {
+      $k=$f['fkey']; $v=$data[$k] ?? '';
+      if (in_array($f['ftype'],['photo','file','signature'],true)) {
+        if (empty($filesBy[$k])) return '<span class="muted">—</span>';
+        $h=''; foreach ($filesBy[$k] as $fl){ if(strpos($fl['mime'],'image/')===0) $h.='<a href="/report-file?id='.(int)$fl['id'].'" target="_blank"><img src="/report-file?id='.(int)$fl['id'].'" class="ev-th"></a> '; else $h.='<a class="pill p-info" href="/report-file?id='.(int)$fl['id'].'" target="_blank">📎 '.e($fl['file_name']).'</a> '; }
+        return $h;
+      }
+      if ($f['ftype']==='table') { if(!is_array($v)||!$v) return '<span class="muted">—</span>'; $cols=idems_table_cols($f); $h='<table class="dt" style="margin-top:4px"><thead><tr>'; foreach($cols as $cl) $h.='<th>'.e($cl).'</th>'; $h.='</tr></thead><tbody>'; foreach($v as $r){ $r=(array)$r; $h.='<tr>'; foreach($cols as $ck=>$cl) $h.='<td>'.e($r[$ck]??'').'</td>'; $h.='</tr>'; } return $h.'</tbody></table>'; }
+      if ($f['ftype']==='multiselect' && is_array($v)) { $o=idems_field_options($f); return e(implode(', ', array_map(fn($x)=>$o[$x]??$x,$v))) ?: '<span class="muted">—</span>'; }
+      if (in_array($f['ftype'],['select','radio'],true)) { $o=idems_field_options($f); return e($o[$v] ?? $v) ?: '<span class="muted">—</span>'; }
+      if ($f['ftype']==='checkbox') return ($v==='1'||$v===1)?'Yes':'No';
+      return $v!=='' ? nl2br(e(is_array($v)?'':$v)) : '<span class="muted">—</span>';
+    };
+?>
+<?php foreach ($sections as $s): if (empty($bySec[(int)$s['id']])) continue; ?>
+  <div class="panel">
+    <div class="ctitle" style="margin-top:0"><h3><?= e($s['title']) ?></h3></div>
+    <div class="kv-grid">
+      <?php foreach ($bySec[(int)$s['id']] as $f): if(in_array($f['ftype'],['heading','note'],true)) continue; ?>
+        <div class="<?= (int)$f['col_span']===2 || in_array($f['ftype'],['table','textarea','photo','file','signature'],true) ? 'kv-wide' : '' ?>"><span class="k"><?= e($f['label']) ?></span><?= $showVal($f) ?></div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+<?php endforeach; ?>
+<?php if (!empty($bySec[0])): ?>
+  <div class="panel"><div class="kv-grid"><?php foreach ($bySec[0] as $f): if(in_array($f['ftype'],['heading','note'],true)) continue; ?><div class="<?= (int)$f['col_span']===2?'kv-wide':'' ?>"><span class="k"><?= e($f['label']) ?></span><?= $showVal($f) ?></div><?php endforeach; ?></div></div>
+<?php endif; ?>
+<style>.ev-th{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}</style>
+<?php else: ?>
+<p class="muted" style="margin:10px 2px">No form is designed for this report type yet<?= (is_master()||can('idems.type.manage')) ? ' — use "Design this form" above to add sections &amp; fields.' : '.' ?></p>
+<?php endif; ?>
 
 <div class="panel" style="padding:0;overflow:hidden">
   <div class="ctitle" style="padding:10px 14px 0"><h3>Audit trail</h3></div>
