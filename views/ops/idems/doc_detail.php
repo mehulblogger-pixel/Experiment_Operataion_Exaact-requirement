@@ -10,8 +10,28 @@
     <?php if (idems_can_edit_doc($doc) && in_array($doc['status'],['DRAFT','REJECTED'],true)): ?>
       <form method="post" action="/document-submit?id=<?= (int)$doc['id'] ?>" style="display:inline"><button class="btn" type="submit">Submit for review</button></form>
     <?php endif; ?>
+    <?php
+      // A report cannot be issued until somebody has approved it. Finalising is
+      // irreversible — the document becomes immutable — so an unapproved report
+      // that slips through cannot be taken back. The button says why it is off
+      // rather than simply not being there.
+      $appr = $approvals ?? [];
+      $anyApproved = false; $anyPending = false;
+      foreach ($appr as $a) {
+        if (($a['status'] ?? '') === 'APPROVED') $anyApproved = true;
+        if (in_array($a['status'] ?? '', ['PENDING', 'SENTBACK'], true)) $anyPending = true;
+      }
+      $canFinalize = $anyApproved && !$anyPending;
+      $whyNot = !$appr ? 'No approver has been asked yet — submit it for approval first.'
+              : ($anyPending ? 'Still waiting on an approver.' : 'Not approved.');
+    ?>
     <?php if (!$doc['finalized'] && (is_master() || can('idems.finalize'))): ?>
+      <?php if ($canFinalize): ?>
       <form method="post" action="/document-finalize?id=<?= (int)$doc['id'] ?>" style="display:inline" onsubmit="return confirm('Finalize &amp; issue this report? It becomes permanently locked (immutable).')"><button class="btn" type="submit">Finalize &amp; issue</button></form>
+      <?php else: ?>
+      <button class="btn" type="button" disabled title="<?= e($whyNot) ?>"
+              style="opacity:.5;cursor:not-allowed">Finalize &amp; issue</button>
+      <?php endif; ?>
     <?php endif; ?>
     <a class="btn secondary" href="/document-evidence?id=<?= (int)$doc['id'] ?>">🖼 Evidence</a>
     <a class="btn secondary" href="/document-review?id=<?= (int)$doc['id'] ?>">🔍 Document review</a>

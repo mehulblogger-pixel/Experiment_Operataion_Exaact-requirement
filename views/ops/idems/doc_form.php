@@ -34,10 +34,28 @@
   <input type="hidden" name="job_id" value="<?= (int)$v('job_id') ?>">
   <h3 class="tab-sub" style="margin-top:0">Report</h3>
   <div class="form-grid">
-    <div class="ff"><label>Report type *</label>
+    <?php
+      $narrowed = isset($allTypes) && count($types) < count($allTypes);
+      $freq = $pre['reporting_frequency'] ?? '';
+      $freqLbl = $freq !== '' ? (lk_options_or('report_frequency', REPORT_FREQ)[$freq] ?? $freq) : '';
+      if ($freq === 'CUSTOM' && !empty($pre['report_custom_days'])) $freqLbl .= ' (every ' . (int)$pre['report_custom_days'] . ' days)';
+    ?>
+    <div class="ff"><label>Report type *
+      <?php if ($narrowed): ?><span class="muted">— limited to what this <?= e(Tl('job')) ?> owes</span><?php endif; ?></label>
       <select class="form-control searchable" name="report_type_id" required><option value="">— select —</option>
         <?php foreach ($types as $t): ?><option value="<?= (int)$t['id'] ?>" <?= ($doc && (int)$doc['report_type_id']===(int)$t['id'])?'selected':'' ?>><?= e($t['code']) ?> — <?= e($t['name']) ?></option><?php endforeach; ?>
-      </select></div>
+      </select>
+      <?php if ($freqLbl !== ''): ?>
+        <small class="muted">Reporting frequency on this <?= e(Tl('job')) ?>: <b><?= e($freqLbl) ?></b></small>
+      <?php endif; ?>
+      <?php if ($narrowed): ?>
+        <small class="muted">Deliverables chosen at allocation: <?= e(implode(', ', $pre['deliverables'] ?? [])) ?>.
+          <a href="#" onclick="var s=this.closest('.ff').querySelector('select');
+             <?php foreach ($allTypes as $t): if (in_array($t['code'], $types === $allTypes ? [] : array_column($types,'code'), true)) continue; ?>
+             s.add(new Option(<?= json_encode($t['code'] . ' — ' . $t['name'] . ' (not allocated)') ?>, '<?= (int)$t['id'] ?>'));
+             <?php endforeach; ?>
+             this.style.display='none';return false;">Need a different one?</a></small>
+      <?php endif; ?></div>
     <div class="ff"><label>Title / subject</label><input class="form-control" name="title" value="<?= e($v('title')) ?>" placeholder="defaults to the report type name"></div>
     <div class="ff"><label>Inspection date</label><input class="form-control" type="date" name="inspection_date" value="<?= e($doc ? ($doc['inspection_date'] ?? '') : ($pre['inspection_date'] ?? date('Y-m-d'))) ?>"></div>
     <div class="ff"><label>Office / branch</label>

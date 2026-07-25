@@ -9,6 +9,77 @@
   </div>
 </div>
 
+<?php
+  // ---- Who to call, and where to go ---------------------------------------
+  // The engineer is standing at a gate. Everything needed to get in and to
+  // reach somebody is here, on the job itself, tap-to-dial and tap-to-mail —
+  // it used to exist only in the assignment e-mail, or not at all.
+  $cRow = function ($info, $kind) {
+    if (!$info) return '';
+    $out = '';
+    $contacts = array_slice($info['contacts'] ?? [], 0, 3);
+    foreach ($contacts as $c) {
+      $nm = trim((string)($c['name'] ?? ''));
+      if ($nm === '') continue;
+      $mob = trim((string)(($c['mobile'] ?? '') ?: ($c['phone'] ?? '')));
+      $em  = trim((string)($c['email'] ?? ''));
+      $out .= '<div class="ct-row"><b>' . e($nm) . '</b>';
+      if (!empty($c['designation'])) $out .= ' <span class="muted">' . e($c['designation']) . '</span>';
+      if (!empty($c['is_primary'])) $out .= ' <span class="pill p-info">primary</span>';
+      $out .= '<div class="ct-links">';
+      $out .= $mob !== '' ? '<a href="tel:' . e(preg_replace('/[^0-9+]/', '', $mob)) . '">📞 ' . e($mob) . '</a>' : '<span class="muted">no number</span>';
+      $out .= $em !== '' ? ' <a href="mailto:' . e($em) . '">✉️ ' . e($em) . '</a>' : '';
+      $out .= '</div></div>';
+    }
+    return $out ?: '<p class="muted" style="margin:0">No contact on file for this ' . e($kind) . '.</p>';
+  };
+  $addrLine = function ($a) {
+    if (!$a) return '';
+    $bits = array_filter([$a['line1'] ?? '', $a['line2'] ?? '', $a['city'] ?? '', $a['state'] ?? '', $a['pincode'] ?? '']);
+    return implode(', ', $bits);
+  };
+  // The site: the address named on the call, else the vendor's primary address,
+  // else the client's — whichever is the best answer we actually have.
+  $site = $siteAddr;
+  if (!$site && !empty($vendorInfo['addresses'])) $site = $vendorInfo['addresses'][0];
+  if (!$site && !empty($clientInfo['addresses'])) $site = $clientInfo['addresses'][0];
+  $siteTxt = $addrLine($site);
+?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Who to contact, and where to go</h3>
+  <div class="panel-split">
+    <div>
+      <span class="lab-sm"><?= e(TH('client')) ?> — <?= e($job['client_disp'] ?: $job['client_name'] ?: '—') ?></span>
+      <?= $cRow($clientInfo, Tl('client')) ?>
+    </div>
+    <div>
+      <span class="lab-sm"><?= e(TH('vendor')) ?> / site — <?= e($job['vendor_name'] ?: '—') ?></span>
+      <?= $cRow($vendorInfo, Tl('vendor')) ?>
+    </div>
+  </div>
+  <div class="ct-site">
+    <span class="lab-sm">Site address</span>
+    <?php if ($siteTxt !== ''): ?>
+      <div><?= e($siteTxt) ?>
+        <a class="btn small secondary" target="_blank" rel="noopener"
+           href="https://www.google.com/maps/search/?api=1&amp;query=<?= rawurlencode($siteTxt) ?>">🗺 Map</a></div>
+    <?php else: ?>
+      <p class="muted" style="margin:0">No site address recorded on the <?= e(Tl('call')) ?> or against the <?= e(Tl('vendor')) ?>.</p>
+    <?php endif; ?>
+    <?php if (!empty($jcall['folder_link'])): ?>
+      <div style="margin-top:6px"><a href="<?= e($jcall['folder_link']) ?>" target="_blank" rel="noopener">🔗 Drawings &amp; client papers</a></div>
+    <?php endif; ?>
+  </div>
+</div>
+<style>
+  .lab-sm{display:block;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.4px;margin-bottom:6px}
+  .ct-row{padding:7px 0;border-bottom:1px solid var(--line)}
+  .ct-row:last-child{border-bottom:0}
+  .ct-links{display:flex;gap:12px;flex-wrap:wrap;margin-top:2px;font-size:13.5px}
+  .ct-site{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+</style>
+
 <?php $holds = function_exists('job_hold_reasons') ? job_hold_reasons($job) : []; if ($holds): ?>
 <div class="panel" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent)">
   <b style="color:var(--bad)">🚫 HOLD — do not issue the report / deliverable to the client:</b> <?= e(implode('; ', $holds)) ?>.
