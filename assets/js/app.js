@@ -37,19 +37,66 @@
     wrap.appendChild(input); wrap.appendChild(list); wrap.appendChild(select);
     function cur() { var o = select.options[select.selectedIndex]; return o ? o.textContent.trim() : ''; }
     input.value = cur();
+
+    // Setting select.value in script does NOT fire a change event. Without this
+    // every cascade hanging off a searchable dropdown was dead: choosing a
+    // client never fetched its quotations, choosing a quotation never pulled the
+    // line items, and the inter-office credit panel kept describing the offices
+    // as they were when the page loaded while the save validated the new ones.
+    function pick(opt, label) {
+      select.value = opt.value;
+      input.value = label;
+      list.style.display = 'none';
+      select.dispatchEvent(new Event('input',  { bubbles: true }));
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function items() { return list.querySelectorAll('.ss-item:not(.ss-none)'); }
+    function highlight(i) {
+      var all = items();
+      Array.prototype.forEach.call(all, function (el) { el.classList.remove('ss-on'); });
+      if (i >= 0 && all[i]) { all[i].classList.add('ss-on'); all[i].scrollIntoView({ block: 'nearest' }); }
+    }
     function build(f) {
       list.innerHTML = ''; f = (f || '').toLowerCase(); var n = 0;
       Array.prototype.forEach.call(select.options, function (opt) {
         var label = opt.textContent.trim();
         if (f && label.toLowerCase().indexOf(f) === -1) return;
         var it = document.createElement('div'); it.className = 'ss-item'; it.textContent = label || '—';
-        it.addEventListener('mousedown', function (e) { e.preventDefault(); select.value = opt.value; input.value = label; list.style.display = 'none'; });
+        if (opt.value === select.value) it.classList.add('ss-on');
+        it.addEventListener('mousedown', function (e) { e.preventDefault(); pick(opt, label); });
         list.appendChild(it); n++;
       });
       if (!n) { var d = document.createElement('div'); d.className = 'ss-item ss-none'; d.textContent = 'No matches'; list.appendChild(d); }
     }
+
+    // Keyboard: arrows move, Enter or Space chooses, Escape closes. A dropdown
+    // that can only be driven with a mouse is unusable for anyone entering a
+    // long form at speed.
+    input.addEventListener('keydown', function (e) {
+      var open = list.style.display !== 'none';
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (!open) { build(''); list.style.display = 'block'; }
+        e.preventDefault();
+        var all = items(); if (!all.length) return;
+        var i = -1;
+        Array.prototype.forEach.call(all, function (el, k) { if (el.classList.contains('ss-on')) i = k; });
+        i = e.key === 'ArrowDown' ? Math.min(i + 1, all.length - 1) : Math.max(i - 1, 0);
+        highlight(i);
+      } else if (e.key === 'Enter' || (e.key === ' ' && input.value === '')) {
+        if (!open) return;
+        var on = list.querySelector('.ss-item.ss-on');
+        if (on) { e.preventDefault(); on.dispatchEvent(new MouseEvent('mousedown')); }
+      } else if (e.key === 'Escape') {
+        list.style.display = 'none'; input.value = cur();
+      } else if (e.key === 'Tab') {
+        // Tabbing away with something highlighted takes it, as a native select would.
+        var sel = list.querySelector('.ss-item.ss-on');
+        if (open && sel && input.value !== cur()) sel.dispatchEvent(new MouseEvent('mousedown'));
+      }
+    });
     input.addEventListener('focus', function () { input.select(); build(''); list.style.display = 'block'; });
-    input.addEventListener('input', function () { build(input.value); list.style.display = 'block'; });
+    input.addEventListener('input', function () { build(input.value); list.style.display = 'block'; highlight(0); });
     input.addEventListener('blur', function () { setTimeout(function () { list.style.display = 'none'; input.value = cur(); }, 150); });
   }
 
