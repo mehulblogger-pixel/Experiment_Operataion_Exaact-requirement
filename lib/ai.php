@@ -85,6 +85,72 @@ function ai_http_get($url, $headers, $timeout = 12) {
     if ($body === false) return [null, $code, $err ?: 'request failed'];
     return [$body, $code, $code >= 400 ? "HTTP $code" : null];
 }
+// ---- POST (chat/completions) — used by the AI-assisted documentation features --
+function ai_http_post($url, $headers, $payload, $timeout = 45) {
+    if (!function_exists('curl_init')) return [null, 0, 'cURL not available on this server'];
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode($payload),
+        CURLOPT_HTTPHEADER => array_merge($headers, ['Content-Type: application/json']),
+        CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $proxy = getenv('HTTPS_PROXY') ?: getenv('https_proxy');
+    if ($proxy) { curl_setopt($ch, CURLOPT_PROXY, $proxy); if (is_file('/root/.ccr/ca-bundle.crt')) curl_setopt($ch, CURLOPT_CAINFO, '/root/.ccr/ca-bundle.crt'); }
+    $body = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+    if ($body === false) return [null, $code, $err ?: 'request failed'];
+    return [$body, $code, $code >= 400 ? "HTTP $code" : null];
+}
+// Send a prompt to the active provider/model. Returns [text, error].
+// Providers differ in endpoint + payload + response shape; all are handled here so
+// features can simply call ai_chat($system, $user).
+function ai_chat($system, $user, $maxTokens = 1200) {
+    $act = ai_active();
+    if (!$act) return [null, 'No AI provider is enabled. Add a key under Settings → AI providers.'];
+    $p = $act['provider']; $model = $act['model'];
+    $cfg = ai_provider_cfg($p); $key = trim((string)$cfg['key']);
+    $reg = ai_providers()[$p] ?? null;
+    if (!$reg || $key === '') return [null, 'The selected AI provider has no API key.'];
+    switch ($p) {
+        case 'anthropic':
+            $url = 'https://api.anthropic.com/v1/messages';
+            $headers = ['x-api-key: ' . $key, 'anthropic-version: 2023-06-01'];
+            $payload = ['model'=>$model, 'max_tokens'=>$maxTokens, 'system'=>$system, 'messages'=>[['role'=>'user','content'=>$user]]];
+            break;
+        case 'gemini':
+            $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent?key=' . urlencode($key);
+            $headers = [];
+            $payload = ['systemInstruction'=>['parts'=>[['text'=>$system]]], 'contents'=>[['role'=>'user','parts'=>[['text'=>$user]]]]];
+            break;
+        case 'perplexity':
+            $url = 'https://api.perplexity.ai/chat/completions';
+            $headers = ['Authorization: Bearer ' . $key];
+            $payload = ['model'=>$model, 'max_tokens'=>$maxTokens, 'messages'=>[['role'=>'system','content'=>$system],['role'=>'user','content'=>$user]]];
+            break;
+        case 'copilot':
+            $url = 'https://models.github.ai/inference/chat/completions';
+            $headers = ['Authorization: Bearer ' . $key];
+            $payload = ['model'=>$model, 'max_tokens'=>$maxTokens, 'messages'=>[['role'=>'system','content'=>$system],['role'=>'user','content'=>$user]]];
+            break;
+        default: // openai + any OpenAI-compatible base URL
+            $base = rtrim($cfg['base'] ?: 'https://api.openai.com/v1', '/');
+            if (substr($base, -7) === '/models') $base = substr($base, 0, -7);
+            $url = $base . '/chat/completions';
+            $headers = ['Authorization: Bearer ' . $key];
+            $payload = ['model'=>$model, 'max_tokens'=>$maxTokens, 'messages'=>[['role'=>'system','content'=>$system],['role'=>'user','content'=>$user]]];
+    }
+    [$body, $code, $err] = ai_http_post($url, $headers, $payload);
+    if ($err) return [null, $err . ($body ? ' — ' . substr(strip_tags((string)$body), 0, 300) : '')];
+    $d = json_decode($body, true);
+    if (!is_array($d)) return [null, 'Unexpected response from the AI provider.'];
+    // normalise the reply text across providers
+    $text = $d['choices'][0]['message']['content']                      // openai-compatible
+        ?? (is_array($d['content'] ?? null) ? implode("\n", array_map(fn($c)=>$c['text'] ?? '', $d['content'])) : null)   // anthropic
+        ?? ($d['candidates'][0]['content']['parts'][0]['text'] ?? null) // gemini
+        ?? null;
+    if ($text === null || trim((string)$text) === '') return [null, 'The AI provider returned no usable text.'];
+    return [trim((string)$text), null];
+}
 function ai_parse_models($mode, $data) {
     $ids = [];
     if ($mode === 'gemini') { foreach (($data['models'] ?? []) as $m) { $n = $m['name'] ?? ''; if ($n) $ids[] = preg_replace('#^models/#', '', $n); } }

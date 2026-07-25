@@ -69,8 +69,15 @@ Proposed phasing (each phase = its own commit, tested):
   /document-release-note auto-drafts an RN report from an APPROVED/ISSUED report — carries all refs
   across, wording follows the findings, links back to the source (shown as a banner), duplicate-guarded
   on source_report_id, left as DRAFT for review before issue.
-- P9 AI-assisted (uses ai.php): read PO/QAP/drawings/specs/MTCs, missing-doc + revision-mismatch +
-  conflict detection, draft remarks/narratives — inspector always final authority.
+- P9 AI-assisted documentation ✅ SHIPPED — ai_chat() POST seam added to lib/ai.php (openai-compatible,
+  anthropic, gemini, perplexity, copilot; normalised reply, graceful errors). Source-document library
+  per report (PO/call/QAP/drawing/spec/standard/MTC/calibration/previous report/customer instruction)
+  stored as report_files kind=src_*; best-effort text extraction (text, docx via zip, uncompressed PDF).
+  Rule-based checks ALWAYS run without AI: missing expected documents, blank PO/drawing/QAP/standard
+  traceability, drawing-not-found-in-attachments, drawing REVISION MISMATCH, expired calibration vs
+  inspection date. Optional AI layer reads the pack + findings and returns missing docs / revision-spec
+  conflicts / traceability issues / suggested hold + witness points / draft remarks, parsed into
+  sections. Inspector is always the approving authority (stated in UI). Route: /document-review.
 - P10 Smart photo/evidence mgmt (compress, timestamp, GPS, link to checkpoint, annotate, dedupe).
 - P11 Super-Admin audit & compliance dashboard (every critical action, soft-delete only, searchable).
 - P12 Offline-first / mobile field UX (constraint: plain PHP on shared hosting → responsive +
