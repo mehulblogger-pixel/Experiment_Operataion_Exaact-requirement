@@ -22,7 +22,9 @@
     $opts = idems_field_options($f);
     switch ($f['ftype']) {
       case 'textarea':
-        echo '<textarea class="form-control" name="f['.e($k).']" data-key="'.e($k).'"'.$reqAttr.' rows="3" placeholder="'.e($f['placeholder']).'">'.e(is_array($val)?'':$val).'</textarea>'; break;
+        echo '<textarea class="form-control ta-improve" id="ta_'.e($k).'" name="f['.e($k).']" data-key="'.e($k).'"'.$reqAttr.' rows="3" placeholder="'.e($f['placeholder']).'">'.e(is_array($val)?'':$val).'</textarea>';
+        echo '<div style="margin-top:4px"><button type="button" class="btn small secondary" onclick="idemsImprove(\''.e($k).'\')">✒️ Improve wording</button> <span class="muted" style="font-size:11px">type shorthand — e.g. “dimension ok”</span></div>';
+        break;
       case 'number': case 'text': case 'date': case 'time': case 'qr':
         $t = $f['ftype']==='number'?'number':($f['ftype']==='date'?'date':($f['ftype']==='time'?'time':'text'));
         echo '<input class="form-control" type="'.$t.'" name="f['.e($k).']" data-key="'.e($k).'"'.$reqAttr.' value="'.e(is_array($val)?'':$val).'" placeholder="'.e($f['placeholder']).'">'; break;
@@ -109,6 +111,14 @@
 </style>
 <script>
 function idemsGps(k){ if(!navigator.geolocation){alert('GPS not available');return;} navigator.geolocation.getCurrentPosition(function(p){ var v=p.coords.latitude.toFixed(6)+', '+p.coords.longitude.toFixed(6); document.getElementById('gps_'+k).value=v; },function(){alert('Could not get location');}); }
+// Technical writing assistant: convert shorthand in this box to engineering language.
+function idemsImprove(k){
+  var ta=document.getElementById('ta_'+k); if(!ta||!ta.value.trim())return;
+  var body=new URLSearchParams({text:ta.value, ajax:'1'});
+  fetch('/writing-assistant',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()})
+    .then(function(r){return r.json();}).then(function(d){ if(d&&d.text) ta.value=d.text; })
+    .catch(function(){ alert('Could not reach the writing assistant.'); });
+}
 function idemsAddRow(btn){ var wrap=btn.closest('.rep-table'); var tpl=wrap.querySelector('template'); var tb=wrap.querySelector('tbody'); tb.insertAdjacentHTML('beforeend', tpl.innerHTML); }
 // signature pads
 document.querySelectorAll('.sig-pad').forEach(function(c){

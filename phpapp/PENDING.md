@@ -55,8 +55,13 @@ Proposed phasing (each phase = its own commit, tested):
   signatures snapshotted at endorse; SEPARATE endorsement-certificate PDF (green band) referencing the
   original; immutable after endorse; full endorsement audit trail; soft-delete archive. Routes:
   /endorsements, /endorsement(-new/-edit/-submit/-approve/-delete/-file), /endorsement-cert.
-- P7 Technical Writing Assistant (no AI): grammar/spelling, engineering phrase library, plain
-  observation → engineering language, standard conclusions/acceptance/rejection statements.
+- P7 Technical Writing Assistant (no AI) ✅ SHIPPED — tech_phrases library (35 standard phrases seeded
+  across observation/acceptance/rejection/conclusion/recommendation/hold/witness/deviation; admin adds
+  unlimited); rule-based tech_expand(): per-line shorthand→library match (exact/contains/word-overlap)
+  else tidy pass (domain spell-check, abbreviation expansion, capitalisation, terminal punctuation);
+  standalone /writing-assistant tool + clickable phrase panel; inline "✒️ Improve wording" button on
+  every report textarea via AJAX; usage counters feed future self-learning (P13). Routes:
+  /writing-assistant, /phrase-library, /phrase-edit.
 - P8 Smart Remarks & auto Release Note from finalized report.
 - P9 AI-assisted (uses ai.php): read PO/QAP/drawings/specs/MTCs, missing-doc + revision-mismatch +
   conflict detection, draft remarks/narratives — inspector always final authority.

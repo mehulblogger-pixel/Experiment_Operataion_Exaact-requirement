@@ -53,6 +53,7 @@
         <a class="s-item<?= $navOn(['documents','document','document-new','document-edit']) ?>" href="/documents"><span class="s-ic">📑</span><span>Document Register</span></a>
         <?php if (can('mod.idems.edit') || is_master()): ?><a class="s-item<?= $navOn(['document-new']) ?>" href="/document-new"><span class="s-ic">➕</span><span>New Report</span></a><?php endif; ?>
         <a class="s-item<?= $navOn(['endorsements','endorsement','endorsement-new','endorsement-edit']) ?>" href="/endorsements"><span class="s-ic">✅</span><span>Doc Endorsements</span></a>
+        <a class="s-item<?= $navOn(['writing-assistant','phrase-library','phrase-edit']) ?>" href="/writing-assistant"><span class="s-ic">✒️</span><span>Writing Assistant</span></a>
         <?php if (can('idems.type.manage') || is_master() || can('users.manage.global')): ?><a class="s-item<?= $navOn(['approver-map']) ?>" href="/approver-map"><span class="s-ic">👤</span><span>Approver Mapping</span></a><?php endif; ?>
         <?php if (can('idems.type.manage') || is_master()): ?><a class="s-item<?= $navOn(['idems-approval-rules','idems-approval-rule-edit']) ?>" href="/idems-approval-rules"><span class="s-ic">🔀</span><span>Approval Rules</span></a><?php endif; ?>
         <?php if (can('idems.type.manage') || is_master() || can('crm.template.manage')): ?><a class="s-item<?= $navOn(['report-templates','report-template-edit']) ?>" href="/report-templates"><span class="s-ic">📝</span><span>Report Templates</span></a><?php endif; ?>
