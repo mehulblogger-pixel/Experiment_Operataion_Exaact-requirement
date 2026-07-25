@@ -1247,6 +1247,7 @@ function ops_module_gate($route) {
         'document-approve'=>'idems','approver-map'=>'idems','idems-approval-rules'=>'idems','idems-approval-rule-edit'=>'idems',
         'document-pdf'=>'idems','document-timestamp'=>'idems','document-docx'=>'idems',
         'report-templates'=>'idems','report-template-edit'=>'idems','report-template-download'=>'idems',
+        'endorsements'=>'idems','endorsement'=>'idems','endorsement-new'=>'idems','endorsement-edit'=>'idems','endorsement-submit'=>'idems','endorsement-approve'=>'idems','endorsement-delete'=>'idems','endorsement-file'=>'idems','endorsement-cert'=>'idems',
         'masters'=>'masters','work-norms'=>'masters',
         'office-finance'=>'overheads',
         'reports'=>'reports',
@@ -1403,6 +1404,10 @@ function ops_dispatch($route, $method) {
             return ops_idems_docx($method);
         case $route === 'report-templates' || $route === 'report-template-edit' || $route === 'report-template-download':
             return ops_idems_templates($route, $method);
+        case in_array($route, ['endorsements','endorsement','endorsement-new','endorsement-edit','endorsement-submit','endorsement-approve','endorsement-delete','endorsement-file'], true):
+            return ops_idems_endorsements($route, $method);
+        case $route === 'endorsement-cert':
+            return ops_idems_endorse_cert($method);
         case $route === 'irn-rules':
             return ops_idems_numbering($method);
         case $route === 'audit-log':
