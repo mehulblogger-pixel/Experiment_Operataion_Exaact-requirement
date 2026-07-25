@@ -1105,3 +1105,28 @@ database as well as a fresh one.
 - Register export with submission / approval / sent / acceptance dates, contact
   details, contract and PO numbers, sites and every follow-up.
 - Follow-ups editable (date, status, done-on, note) and can be added by hand.
+
+## Calls pack (done)
+
+New call
+- Client → quotation → contract number; the quote's line items are listed and
+  the call can be tied to one. SBU, activity, type of inspection, product,
+  billable value and basis all inherit from the quote (blanks only, on edit).
+- Up to 5 visit dates, or a weekday pattern to an end date that expands into
+  real dates — all editable afterwards.
+- Cross-office credit explained in the offices' own names, on the form and in
+  the refusal. Every office both contracts and executes.
+- Clickable shared folder / drive link, carried to the deputation.
+- Region shown only to SBU heads and the Business Director.
+
+Call register
+- Executing office, activity, credit to give, coordinator, engineer, received /
+  forwarded / allocated / required / scheduled dates, three lead times, delay
+  pill, late-row tint, days-waiting when unallocated. Export matches.
+
+Allocate
+- Everything inherits from the call, shown in a "from the call" strip.
+- Inspection dates up to 20 (replaces random date 1/2/3; old values folded in).
+- Own employee vs not-ours → freelancer / sub-contractor, engineer list filtered.
+- Credit direction defaults to Given for cross-office.
+- Filters: engineer, office, month, date range, nobody-allocated.
