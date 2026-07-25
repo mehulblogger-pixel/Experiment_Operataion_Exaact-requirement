@@ -99,6 +99,22 @@
   <div class="kv-grid">
     <div><span class="k">IRN</span><strong><?= e($doc['irn']) ?></strong></div>
     <div><span class="k">Report type</span><?= e($doc['type_code']) ?> — <?= e($doc['type_name'] ?: '—') ?></div>
+    <?php // Which format is actually in play. The questions on this report come
+          // from the report type's designed form; the issued document comes from
+          // whichever registered template best fits this client and office. Both
+          // are stated, so "is our format being used?" is answered on the page
+          // rather than guessed at.
+          $tpl = idems_pick_template($doc); ?>
+    <div><span class="k">Format in use</span>
+      <?php if ($tpl): ?>
+        <?= e($tpl['name'] ?: 'Template #' . (int)$tpl['id']) ?>
+        <span class="pill p-info"><?= e($tpl['client_id'] ? Tl('client') . '’s own' : ($tpl['report_type_id'] ? 'by type' : ($tpl['office_id'] ? 'by ' . Tl('office') : 'default'))) ?></span>
+        <a href="/report-templates" style="font-size:12px">manage</a>
+      <?php else: ?>
+        <span class="muted">Our standard layout</span>
+        <span class="muted" style="font-size:12px">— no <a href="/report-templates">template</a> registered for this <?= e(Tl('client')) ?> or type</span>
+      <?php endif; ?>
+    </div>
     <div><span class="k">Title</span><?= e($doc['title'] ?: '—') ?></div>
     <div><span class="k">Client</span><?= e($doc['client_disp'] ?: $doc['client_name'] ?: '—') ?></div>
     <div><span class="k">Vendor / mfr</span><?= e($doc['vendor_disp'] ?: $doc['vendor_name'] ?: '—') ?></div>
