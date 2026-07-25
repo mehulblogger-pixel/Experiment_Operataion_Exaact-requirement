@@ -1728,6 +1728,187 @@ function ops_idems_phrases($route, $method) {
     return true;
 }
 
+// ===========================================================================
+//  Phase 8: Smart remarks & conclusions + automatic Release Note
+//  Rule-based (no AI needed): reads the report's own findings and the phrase
+//  library to propose a summary, observations, deviations, recommendations,
+//  acceptance status and release decision. The inspector always edits/approves.
+// ===========================================================================
+// Pull a standard phrase by its shorthand (falls back to a supplied default).
+function tech_phrase_by($shorthand, $default = '') {
+    $p = ops_one("SELECT phrase FROM tech_phrases WHERE active=1 AND LOWER(shorthand)=? LIMIT 1", [strtolower($shorthand)]);
+    return $p ? $p['phrase'] : $default;
+}
+// Scan the filled body for signals: negative findings, hold/witness markers, and
+// any free text the inspector already wrote.
+function idems_scan_findings($doc, $fields, $data) {
+    $neg = []; $pos = []; $holds = []; $witness = []; $notes = [];
+    $negWords = ['not ok','not acceptable','reject','fail','failed','deviat','non-conform','nonconform','ncr','defect','crack','dent','leak','short','missing','expired','incomplete','inadequate','rework','out of tolerance','beyond tolerance'];
+    foreach ($fields as $f) {
+        $k = $f['fkey']; $v = $data[$k] ?? '';
+        if ($f['ftype'] === 'table') {
+            if (!is_array($v)) continue;
+            foreach ($v as $row) {
+                $line = strtolower(implode(' ', array_map('strval', (array)$row)));
+                foreach ($negWords as $w) if (strpos($line, $w) !== false) { $neg[] = trim(implode(' · ', array_filter(array_map('strval', (array)$row)))); break; }
+            }
+            continue;
+        }
+        if (in_array($f['ftype'], ['photo','file','signature','heading','note'], true)) continue;
+        if (is_array($v)) $v = implode(', ', $v);
+        $v = trim((string)$v);
+        if ($v === '') continue;
+        $lv = strtolower($v);
+        $isNeg = false;
+        foreach ($negWords as $w) if (strpos($lv, $w) !== false) { $isNeg = true; break; }
+        $label = $f['label'] ?: $k;
+        if ($isNeg) $neg[] = $label . ': ' . $v;
+        elseif ($f['ftype'] === 'textarea') $notes[] = $v;
+        elseif (in_array($lv, ['ok','yes','acceptable','accepted','pass','passed','satisfactory'], true)) $pos[] = $label;
+        if (strpos($lv, 'hold') !== false) $holds[] = $label . ': ' . $v;
+        if (strpos($lv, 'witness') !== false) $witness[] = $label . ': ' . $v;
+    }
+    return ['neg'=>$neg, 'pos'=>$pos, 'holds'=>$holds, 'witness'=>$witness, 'notes'=>$notes];
+}
+// Build the suggested blocks for a report. Returns a keyed array of proposals.
+function idems_smart_remarks($doc, $fields, $data) {
+    $s = idems_scan_findings($doc, $fields, $data);
+    $clean = empty($s['neg']);
+    $client = $doc['client_disp'] ?: ($doc['client_name'] ?? '');
+    $vendor = $doc['vendor_disp'] ?: ($doc['vendor_name'] ?? '');
+    $what = $doc['item_desc'] ?? ($doc['title'] ?: ($doc['type_name'] ?? 'the subject item'));
+    // --- summary ---
+    $sum = 'The ' . strtolower($doc['type_name'] ?: 'inspection') . ' was carried out'
+        . ($vendor ? ' at ' . $vendor : '') . ($doc['location'] ? ', ' . $doc['location'] : '')
+        . ($doc['inspection_date'] ? ' on ' . date('d M Y', strtotime($doc['inspection_date'])) : '')
+        . ($client ? ' on behalf of ' . $client : '') . '.';
+    if ($doc['po_ref'] || $doc['drawing_no'] || $doc['qap_rev']) {
+        $refs = array_filter([$doc['po_ref'] ? 'PO ' . $doc['po_ref'] : '', $doc['drawing_no'] ? 'drawing ' . $doc['drawing_no'] . ($doc['drawing_rev'] ? ' Rev ' . $doc['drawing_rev'] : '') : '', $doc['qap_rev'] ? 'QAP Rev ' . $doc['qap_rev'] : '']);
+        $sum .= ' The inspection was performed against ' . implode(', ', $refs) . ($doc['standards'] ? ' and ' . $doc['standards'] : '') . '.';
+    }
+    // --- observations ---
+    $obs = [];
+    foreach ($s['notes'] as $n) $obs[] = $n;
+    if ($s['pos']) $obs[] = 'The following were verified and found acceptable: ' . implode(', ', array_slice($s['pos'], 0, 10)) . '.';
+    if (!$obs) $obs[] = tech_phrase_by('visual ok', 'Visual examination was carried out and no unacceptable surface defects were observed.');
+    // --- deviations ---
+    $dev = [];
+    foreach ($s['neg'] as $n) $dev[] = $n;
+    // --- conclusion + acceptance ---
+    $concl = $clean
+        ? tech_phrase_by('satisfactory', 'Based on the inspection carried out and the documents reviewed, the workmanship and quality were found to be satisfactory.')
+        : tech_phrase_by('not satisfactory', 'Based on the inspection carried out, the workmanship and quality were not found to be satisfactory; refer to the observations recorded above.');
+    $accept = $clean ? tech_phrase_by('accepted', 'The inspected item is found acceptable and is hereby cleared for despatch, subject to the approved documentation.')
+                     : tech_phrase_by('accepted with conditions', 'The inspected item is accepted subject to satisfactory closure of the observations recorded in this report.');
+    // --- recommendations / follow-ups ---
+    $recs = [];
+    if (!$clean) { $recs[] = tech_phrase_by('close observations', 'It is recommended that the observations recorded in this report be closed prior to despatch.');
+                   $recs[] = tech_phrase_by('re-inspection', 'It is recommended that a re-inspection be arranged after completion of the corrective action.'); }
+    else $recs[] = tech_phrase_by('submit documents', 'It is recommended that the manufacturer submit the pending quality records for review and endorsement.');
+    return [
+        'clean'      => $clean,
+        'summary'    => $sum,
+        'observations' => implode(' ', $obs),
+        'deviations' => $dev ? implode('; ', $dev) . '.' : '',
+        'holds'      => $s['holds'] ? implode('; ', $s['holds']) . '.' : '',
+        'witness'    => $s['witness'] ? implode('; ', $s['witness']) . '.' : '',
+        'conclusion' => $concl,
+        'acceptance' => $accept,
+        'recommendations' => implode(' ', $recs),
+        'result'     => $clean ? 'ACCEPTED' : 'ACCEPTED_COND',
+        'release'    => $clean ? 'RELEASED' : 'RELEASED_COND',
+    ];
+}
+// Assemble the proposed blocks into one remarks text.
+function idems_smart_remarks_text($p) {
+    $parts = array_filter([
+        $p['summary'] ?? '', $p['observations'] ?? '',
+        ($p['deviations'] ?? '') ? 'Deviations / observations: ' . $p['deviations'] : '',
+        ($p['holds'] ?? '') ? 'Hold points: ' . $p['holds'] : '',
+        ($p['witness'] ?? '') ? 'Witness points: ' . $p['witness'] : '',
+        $p['conclusion'] ?? '', $p['acceptance'] ?? '', $p['recommendations'] ?? '',
+    ]);
+    return implode("\n\n", $parts);
+}
+// ---- Handler: preview / apply smart remarks ----
+function ops_idems_smart($method) {
+    $doc = ops_one("SELECT d.*, bp.display_name client_disp, bp.legal_name client_name, v.display_name vendor_disp, v.legal_name vendor_name, rt.name type_name
+        FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
+        WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? $_POST['id'] ?? 0)]);
+    if (!$doc) { http_response_code(404); view('notfound'); return true; }
+    $fields = idems_fields($doc['report_type_id']);
+    $data = json_decode($doc['data'] ?: '[]', true) ?: [];
+    $p = idems_smart_remarks($doc, $fields, $data);
+    if ($method === 'POST' && ($_POST['_do'] ?? '') === 'apply') {
+        ops_require(idems_can_edit_doc($doc), 'This report is finalized and can no longer be edited.');
+        $text = trim($_POST['remarks'] ?? '');
+        $res = $_POST['result'] ?? $p['result']; $rel = $_POST['release_status'] ?? $p['release'];
+        if (!isset(IDEMS_RESULTS[$res])) $res = $p['result'];
+        if (!isset(IDEMS_RELEASE[$rel])) $rel = $p['release'];
+        db()->prepare("UPDATE report_docs SET remarks=?, result=?, release_status=?, updated_at=? WHERE id=?")->execute([$text, $res, $rel, date('c'), $doc['id']]);
+        idems_log('report_doc', $doc['id'], 'SMART_REMARKS', ['irn'=>$doc['irn'], 'field'=>'remarks']);
+        flash('Suggested remarks applied. Review and edit as required.');
+        redirect('/document?id=' . $doc['id']);
+    }
+    view('ops/idems/smart', ['doc'=>$doc, 'p'=>$p, 'text'=>idems_smart_remarks_text($p)]);
+    return true;
+}
+
+// ---- Automatic Release Note drafted from a finalized/approved report ----
+// Creates a new RN report instance, carries the source data across, links them.
+function ops_idems_release_note($method) {
+    if ($method !== 'POST') redirect('/documents');
+    $src = ops_one("SELECT d.*, bp.display_name client_disp, bp.legal_name client_name, v.display_name vendor_disp, v.legal_name vendor_name, rt.name type_name
+        FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
+        WHERE d.id=? AND d.deleted=0", [(int)($_POST['id'] ?? 0)]);
+    if (!$src) { http_response_code(404); view('notfound'); return true; }
+    ops_require(is_master() || can('mod.idems.edit'), 'You cannot create reports.');
+    if (!in_array($src['status'], ['APPROVED','ISSUED'], true) && !is_master()) {
+        flash('A Release Note can only be drafted from an approved or issued report.', 'error');
+        redirect('/document?id=' . $src['id']);
+    }
+    $rnType = ops_one("SELECT * FROM report_types WHERE code='RN' AND active=1");
+    if (!$rnType) { flash('No active "RN — Release Note" report type found. Add one under Report types.', 'error'); redirect('/document?id=' . $src['id']); }
+    // don't duplicate — match on the numeric source id (JSON escapes slashes, so
+    // matching the IRN text is unreliable).
+    $exists = ops_one("SELECT id, irn FROM report_docs WHERE type_code='RN' AND deleted=0 AND data LIKE ?", ['%"source_report_id":' . (int)$src['id'] . '%']);
+    if ($exists) { flash('A Release Note already exists for this report: ' . $exists['irn'] . '.', 'warning'); redirect('/document?id=' . $exists['id']); }
+    $fields = idems_fields($src['report_type_id']);
+    $data = json_decode($src['data'] ?: '[]', true) ?: [];
+    $p = idems_smart_remarks($src, $fields, $data);
+    $rel = $src['release_status'] ?: $p['release'];
+    $body = "Release Note issued against inspection report " . $src['irn'] . ".\n\n"
+        . ($p['summary'] ?? '') . "\n\n"
+        . ($p['deviations'] ? "Observations carried forward: " . $p['deviations'] . "\n\n" : '')
+        . ($rel === 'RELEASED'
+            ? tech_phrase_by('accepted', 'The inspected item is found acceptable and is hereby cleared for despatch, subject to the approved documentation.')
+            : tech_phrase_by('accepted with conditions', 'The inspected item is released subject to satisfactory closure of the observations recorded in the referenced report.'));
+    $fieldsNew = [
+        'report_type_id'=>$rnType['id'], 'type_code'=>'RN', 'title'=>'Release Note — ' . ($src['title'] ?: $src['irn']),
+        'client_id'=>$src['client_id'], 'vendor_id'=>$src['vendor_id'], 'call_id'=>$src['call_id'], 'job_id'=>$src['job_id'],
+        'client_code'=>$src['client_code'], 'project_code'=>$src['project_code'], 'project_name'=>$src['project_name'],
+        'office_id'=>$src['office_id'], 'sbu'=>$src['sbu'], 'po_ref'=>$src['po_ref'], 'drawing_no'=>$src['drawing_no'],
+        'drawing_rev'=>$src['drawing_rev'], 'qap_rev'=>$src['qap_rev'], 'standards'=>$src['standards'], 'location'=>$src['location'],
+        'product_category'=>$src['product_category'], 'material_grade'=>$src['material_grade'],
+        'inspector_id'=>$src['inspector_id'], 'approver_user_id'=>$src['approver_user_id'],
+        'inspection_date'=>$src['inspection_date'], 'result'=>$src['result'] ?: $p['result'], 'release_status'=>$rel,
+        'remarks'=>$body,
+    ];
+    [$irn, $serial] = idems_generate_irn($fieldsNew);
+    $tok = idems_tokens_for($fieldsNew);
+    $rnData = json_encode(['source_irn'=>$src['irn'], 'source_report_id'=>(int)$src['id']]);
+    $cols = array_merge(['irn','company_code','branch_code','fy_label','serial','status','rev','data','created_by','created_at','updated_at'], array_keys($fieldsNew));
+    $vals = array_merge([$irn, $tok['{COMPANY}'], $tok['{BRANCH}'], $tok['{FY}'], $serial, 'DRAFT', 0, $rnData, user_name(current_user()), date('c'), date('c')], array_values($fieldsNew));
+    $ph = implode(',', array_fill(0, count($cols), '?'));
+    db()->prepare("INSERT INTO report_docs (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
+    $id = (int)db()->lastInsertId();
+    idems_log('report_doc', $id, 'RELEASE_NOTE_DRAFT', ['irn'=>$irn, 'new'=>'from ' . $src['irn']]);
+    idems_log('report_doc', $src['id'], 'RELEASE_NOTE_CREATED', ['irn'=>$src['irn'], 'new'=>$irn]);
+    flash('Release Note ' . $irn . ' drafted from ' . $src['irn'] . '. Review the wording, then submit/issue it.');
+    redirect('/document?id=' . $id);
+    return true;
+}
+
 // Compliance audit log viewer (basic; full super-admin dashboard is a later phase).
 function ops_idems_audit($method) {
     ops_require(is_master() || can('idems.audit.view'), 'You cannot view the audit log.');

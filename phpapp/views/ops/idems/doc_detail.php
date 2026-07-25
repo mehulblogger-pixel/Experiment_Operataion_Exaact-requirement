@@ -13,6 +13,10 @@
     <?php if (!$doc['finalized'] && (is_master() || can('idems.finalize'))): ?>
       <form method="post" action="/document-finalize?id=<?= (int)$doc['id'] ?>" style="display:inline" onsubmit="return confirm('Finalize &amp; issue this report? It becomes permanently locked (immutable).')"><button class="btn" type="submit">Finalize &amp; issue</button></form>
     <?php endif; ?>
+    <?php if (!empty($hasSchema)): ?><a class="btn secondary" href="/document-smart?id=<?= (int)$doc['id'] ?>">💡 Suggested remarks</a><?php endif; ?>
+    <?php if (in_array($doc['status'], ['APPROVED','ISSUED'], true) && $doc['type_code'] !== 'RN' && (is_master() || can('mod.idems.edit'))): ?>
+      <form method="post" action="/document-release-note" style="display:inline"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><button class="btn secondary" type="submit">📋 Draft Release Note</button></form>
+    <?php endif; ?>
     <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>" target="_blank">📄 PDF</a>
     <?php if (function_exists('idems_pick_template') && idems_pick_template($doc)): ?><a class="btn secondary" href="/document-docx?id=<?= (int)$doc['id'] ?>">📝 Client format</a><?php endif; ?>
   </div>
@@ -57,6 +61,15 @@
       </div>
     </form>
   <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php $srcRef = json_decode($doc['data'] ?: '[]', true); if (!empty($srcRef['source_irn'])): ?>
+<div class="panel" style="border:1px solid var(--brand)">
+  <b>📋 Drafted from inspection report</b> —
+  <?php $srcId = (int)($srcRef['source_report_id'] ?? 0); ?>
+  <?= $srcId ? '<a href="/document?id='.$srcId.'">'.e($srcRef['source_irn']).'</a>' : e($srcRef['source_irn']) ?>.
+  Wording follows that report's findings; edit before issuing.
 </div>
 <?php endif; ?>
 

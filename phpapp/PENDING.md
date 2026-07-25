@@ -62,7 +62,13 @@ Proposed phasing (each phase = its own commit, tested):
   standalone /writing-assistant tool + clickable phrase panel; inline "✒️ Improve wording" button on
   every report textarea via AJAX; usage counters feed future self-learning (P13). Routes:
   /writing-assistant, /phrase-library, /phrase-edit.
-- P8 Smart Remarks & auto Release Note from finalized report.
+- P8 Smart Remarks & auto Release Note ✅ SHIPPED — rule-based idems_smart_remarks() scans the filled
+  body for adverse signals (not-ok/reject/deviation/defect/expired/…) and drafts summary, observations,
+  deviations, hold/witness points, conclusion, acceptance and recommendations from the phrase library;
+  proposes result + release status; /document-smart preview screen (editable) with one-click apply.
+  /document-release-note auto-drafts an RN report from an APPROVED/ISSUED report — carries all refs
+  across, wording follows the findings, links back to the source (shown as a banner), duplicate-guarded
+  on source_report_id, left as DRAFT for review before issue.
 - P9 AI-assisted (uses ai.php): read PO/QAP/drawings/specs/MTCs, missing-doc + revision-mismatch +
   conflict detection, draft remarks/narratives — inspector always final authority.
 - P10 Smart photo/evidence mgmt (compress, timestamp, GPS, link to checkpoint, annotate, dedupe).
