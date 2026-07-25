@@ -11,13 +11,18 @@
   <div class="msg msg-error">You have reached your licensed seat limit (<?= e($seats) ?>). Deactivate a user before adding a new one.</div>
 <?php endif; ?>
 <table class="grid">
-  <tr><th>Username</th><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th>Actions</th></tr>
+  <tr><th>Username</th><th>Name</th><th>Email</th><th>Role</th><th>Signature</th><th>Active</th><th>Actions</th></tr>
   <?php foreach ($rows as $u): ?>
   <tr>
     <td><?= e($u['username']) ?></td>
     <td><?= e(trim(($u['first_name'] ?? '').' '.($u['last_name'] ?? '')) ?: '—') ?></td>
     <td><?= e($u['email'] ?: '—') ?></td>
     <td><?= e(ORG_ROLES[!empty($u['is_superuser'])?'MASTER_ADMIN':strtoupper($u['role'] ?? 'ADMIN')] ?? $u['role']) ?></td>
+    <?php // A user with no signature on file has their approvals and quotations
+          // printed without one, so it belongs in the register, not hidden. ?>
+    <td><?= trim((string)($u['signature'] ?? '')) !== ''
+            ? '<span class="pill p-ok">on file</span>'
+            : '<span class="pill p-warn">none</span>' ?></td>
     <td><?= $u['is_active'] ? '<span class="badge GREEN">Yes</span>' : '<span class="badge RED">No</span>' ?></td>
     <td class="row-actions"><a class="btn small" href="/user-edit?id=<?= (int)$u['id'] ?>">Edit</a></td>
   </tr>

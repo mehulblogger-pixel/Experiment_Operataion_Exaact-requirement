@@ -265,6 +265,12 @@ body.app{background:var(--bg)}
 .tb-chip{background:var(--soft);border:1px solid var(--line);border-radius:20px;padding:5px 11px;font-size:12px;font-weight:600;color:var(--ink);white-space:nowrap}
 .tb-user{display:flex;align-items:center;gap:12px}
 .tb-user a{font-size:13px;font-weight:600}
+/* The signature link used to be a bare ✍️ with no label, so nobody found it.
+   It now reads as a control; the word drops away on a narrow screen. */
+.tb-sig{display:inline-flex;align-items:center;gap:5px;background:var(--soft);border:1px solid var(--line);
+  border-radius:20px;padding:4px 11px;text-decoration:none;color:var(--ink)}
+.tb-sig:hover{border-color:var(--brand);color:var(--brand);text-decoration:none}
+@media(max-width:900px){.tb-sig span{display:none}}
 .tb-logout{color:var(--muted)}
 .app .container{max-width:1200px;margin:22px auto;padding:0 24px;width:100%}
 .scrim{display:none;position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:55}
