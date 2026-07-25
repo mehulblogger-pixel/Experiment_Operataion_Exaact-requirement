@@ -115,6 +115,16 @@ Proposed phasing (each phase = its own commit, tested):
 
 === IDEMS COMPLETE: all 13 phases shipped ===
 
+- ➕ Form-from-format generator ✅ SHIPPED (owner request) — /report-form-from-template reads an
+  uploaded client .docx, extracts every {{token}} in document order, derives the LABEL from the text
+  immediately before the token ("Description of non-conformance: {{nc_description}}" → that label),
+  guesses the field type from key+label (date/time/number/textarea/select/text; "…No." stays text),
+  groups {{field.col}} tokens into a repeatable table with its columns, skips standard header tokens
+  (irn/client/po/drawing/…) and fields that already exist, then shows an EDITABLE plan (tick, rename,
+  change type, edit table columns, choose/name the section) and creates the fields in one click.
+  Buttons on Report templates ("🪄 Build form") and in an empty form builder. Verified round-trip:
+  NCR format uploaded → form generated → filled → client-format .docx produced with no leftover tokens.
+
 Constraint note: MilesWeb shared PHP hosting — no Node/build; "offline-first" is delivered as a
 responsive PWA-lite (localStorage drafts + autosave + sync), not a native app.
 
