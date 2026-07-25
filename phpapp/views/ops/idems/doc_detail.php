@@ -13,6 +13,7 @@
     <?php if (!$doc['finalized'] && (is_master() || can('idems.finalize'))): ?>
       <form method="post" action="/document-finalize?id=<?= (int)$doc['id'] ?>" style="display:inline" onsubmit="return confirm('Finalize &amp; issue this report? It becomes permanently locked (immutable).')"><button class="btn" type="submit">Finalize &amp; issue</button></form>
     <?php endif; ?>
+    <a class="btn secondary" href="/document-evidence?id=<?= (int)$doc['id'] ?>">🖼 Evidence</a>
     <a class="btn secondary" href="/document-review?id=<?= (int)$doc['id'] ?>">🔍 Document review</a>
     <?php if (!empty($hasSchema)): ?><a class="btn secondary" href="/document-smart?id=<?= (int)$doc['id'] ?>">💡 Suggested remarks</a><?php endif; ?>
     <?php if (in_array($doc['status'], ['APPROVED','ISSUED'], true) && $doc['type_code'] !== 'RN' && (is_master() || can('mod.idems.edit'))): ?>

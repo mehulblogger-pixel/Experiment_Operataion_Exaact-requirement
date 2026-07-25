@@ -150,6 +150,12 @@ function idems_migrate() {
     $pdo->exec("CREATE TABLE IF NOT EXISTS endorsement_files (
         id $pk, endorsement_id INT, kind VARCHAR(20) DEFAULT 'support', file_name VARCHAR(255) DEFAULT '', mime VARCHAR(100) DEFAULT '',
         data MEDIUMTEXT, note VARCHAR(400) DEFAULT '', created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // ---- Phase 10: evidence management (compression, dedupe, captions, GPS) ----
+    ensure_column('report_files', 'sha1', "VARCHAR(40) DEFAULT ''");        // duplicate detection
+    ensure_column('report_files', 'caption', "VARCHAR(400) DEFAULT ''");    // annotation / caption
+    ensure_column('report_files', 'taken_at', "VARCHAR(30) DEFAULT ''");    // capture timestamp
+    ensure_column('report_files', 'bytes', 'INT DEFAULT 0');                // stored size after compression
+    ensure_column('report_files', 'orig_bytes', 'INT DEFAULT 0');           // size before compression
     // ---- Phase 7: technical writing assistant — standard phrase library ----
     $pdo->exec("CREATE TABLE IF NOT EXISTS tech_phrases (
         id $pk, category VARCHAR(30) DEFAULT 'OBSERVATION', shorthand VARCHAR(120) DEFAULT '', phrase TEXT,
@@ -677,9 +683,41 @@ function idems_table_cols($f) {
     if (!$out) $out = ['col1'=>'Column 1'];
     return $out;
 }
+// Smart image compression: scale down oversized photos and re-encode as JPEG,
+// preserving readable clarity. Returns [bytes, mime, note]. Non-images pass through.
+function idems_compress_image($bytes, $mime, $maxDim = 1600, $quality = 82) {
+    if (strpos((string)$mime, 'image/') !== 0) return [$bytes, $mime, ''];
+    if (!function_exists('imagecreatefromstring')) return [$bytes, $mime, ''];
+    $im = @imagecreatefromstring($bytes);
+    if (!$im) return [$bytes, $mime, ''];
+    $w = imagesx($im); $h = imagesy($im);
+    $scale = ($w > $maxDim || $h > $maxDim) ? $maxDim / max($w, $h) : 1;
+    $nw = max(1, (int)round($w * $scale)); $nh = max(1, (int)round($h * $scale));
+    $dst = imagecreatetruecolor($nw, $nh);
+    $white = imagecolorallocate($dst, 255, 255, 255);
+    imagefilledrectangle($dst, 0, 0, $nw, $nh, $white);       // flatten transparency onto white
+    imagecopyresampled($dst, $im, 0, 0, 0, 0, $nw, $nh, $w, $h);
+    ob_start(); imagejpeg($dst, null, $quality); $out = ob_get_clean();
+    imagedestroy($im); imagedestroy($dst);
+    if ($out === false || $out === '') return [$bytes, $mime, ''];
+    // keep the original if compression didn't actually help and no resize happened
+    if ($scale === 1 && strlen($out) >= strlen($bytes)) return [$bytes, $mime, ''];
+    return [$out, 'image/jpeg', $scale < 1 ? "resized to {$nw}×{$nh}" : 'recompressed'];
+}
+// Pull the capture time out of a JPEG's EXIF, if present.
+function idems_exif_taken($bytes) {
+    if (!function_exists('exif_read_data')) return '';
+    $tmp = tempnam(sys_get_temp_dir(), 'ex');
+    if ($tmp === false || file_put_contents($tmp, $bytes) === false) return '';
+    $ex = @exif_read_data($tmp); @unlink($tmp);
+    $d = $ex['DateTimeOriginal'] ?? ($ex['DateTime'] ?? '');
+    if (!$d) return '';
+    $ts = strtotime(preg_replace('/^(\d{4}):(\d{2}):(\d{2})/', '$1-$2-$3', $d));
+    return $ts ? date('c', $ts) : '';
+}
 function idems_handle_uploads($doc, $fields) {
     if (empty($_FILES['upl'])) return;
-    $pdo = db();
+    $pdo = db(); $added = 0; $dupes = 0; $saved = 0;
     foreach ($fields as $f) {
         if (!in_array($f['ftype'], ['photo','file'], true)) continue;
         $k = $f['fkey'];
@@ -689,14 +727,30 @@ function idems_handle_uploads($doc, $fields) {
         $names = (array)$names; $tmp = (array)$tmp; $types = (array)$types; $errs = (array)$errs;
         for ($i = 0; $i < count($names); $i++) {
             if (($errs[$i] ?? 1) !== 0 || !is_uploaded_file($tmp[$i])) continue;
-            $bytes = @file_get_contents($tmp[$i]); if ($bytes === false || strlen($bytes) > 6*1024*1024) continue;   // 6 MB cap
-            $b64 = 'data:' . ($types[$i] ?: 'application/octet-stream') . ';base64,' . base64_encode($bytes);
+            $bytes = @file_get_contents($tmp[$i]); if ($bytes === false || strlen($bytes) > 12*1024*1024) continue;
+            $origLen = strlen($bytes);
+            $mime = $types[$i] ?: 'application/octet-stream';
+            $taken = ($f['ftype'] === 'photo') ? idems_exif_taken($bytes) : '';
+            [$bytes, $mime, ] = idems_compress_image($bytes, $mime);
+            $sha = sha1($bytes);
+            // duplicate guard — same content already on this report
+            if (ops_val("SELECT COUNT(*) FROM report_files WHERE report_doc_id=? AND sha1=?", [$doc['id'], $sha])) { $dupes++; continue; }
+            $b64 = 'data:' . $mime . ';base64,' . base64_encode($bytes);
             $gps = trim($_POST['gps'][$k] ?? '');
-            $pdo->prepare("INSERT INTO report_files (report_doc_id,field_key,kind,file_name,mime,data,gps,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
-                ->execute([$doc['id'], $k, $f['ftype'], substr($names[$i], 0, 255), $types[$i] ?: '', $b64, $gps, user_name(current_user()), date('c')]);
+            $pdo->prepare("INSERT INTO report_files (report_doc_id,field_key,kind,file_name,mime,data,gps,sha1,taken_at,bytes,orig_bytes,created_by,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                ->execute([$doc['id'], $k, $f['ftype'], substr($names[$i], 0, 255), $mime, $b64, $gps, $sha,
+                    $taken ?: date('c'), strlen($bytes), $origLen, user_name(current_user()), date('c')]);
+            $added++; $saved += max(0, $origLen - strlen($bytes));
         }
     }
-    idems_log('report_doc', $doc['id'], 'EVIDENCE', ['irn'=>$doc['irn']]);
+    if ($added || $dupes) {
+        idems_log('report_doc', $doc['id'], 'EVIDENCE', ['irn'=>$doc['irn'], 'new'=>$added . ' file(s)' . ($dupes ? ", $dupes duplicate(s) skipped" : '')]);
+        $msg = $added . ' file(s) attached';
+        if ($saved > 1024) $msg .= ' · ' . round($saved/1024) . ' KB saved by compression';
+        if ($dupes) $msg .= ' · ' . $dupes . ' duplicate(s) skipped';
+        flash($msg . '.');
+    }
 }
 // Stream a stored attachment.
 function ops_idems_file($method) {
@@ -2089,6 +2143,48 @@ function ops_idems_review($route, $method) {
         'aiText'=>$aiText, 'aiSections'=>$aiText ? idems_ai_sections($aiText) : [],
         'aiOn'=>function_exists('ai_enabled') && ai_enabled(),
     ]);
+    return true;
+}
+
+// ===========================================================================
+//  Phase 10: evidence gallery — captions, GPS, timestamps, dedupe, organised
+//  by the report section/field each photo belongs to.
+// ===========================================================================
+function ops_idems_evidence($method) {
+    $doc = ops_one("SELECT d.*, rt.name type_name FROM report_docs d LEFT JOIN report_types rt ON rt.id=d.report_type_id WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? $_POST['id'] ?? 0)]);
+    if (!$doc) { http_response_code(404); view('notfound'); return true; }
+    $pdo = db();
+    if ($method === 'POST') {
+        ops_require(idems_can_edit_doc($doc), 'This report is finalized — its evidence is locked.');
+        $do = $_POST['_do'] ?? '';
+        if ($do === 'caption') {
+            $pdo->prepare("UPDATE report_files SET caption=? WHERE id=? AND report_doc_id=?")
+                ->execute([trim($_POST['caption'] ?? ''), (int)($_POST['file_id'] ?? 0), $doc['id']]);
+            idems_log('report_doc', $doc['id'], 'EVIDENCE_CAPTION', ['irn'=>$doc['irn']]);
+            flash('Caption saved.');
+        } elseif ($do === 'del') {
+            $pdo->prepare("DELETE FROM report_files WHERE id=? AND report_doc_id=? AND kind IN ('photo','file')")->execute([(int)($_POST['file_id'] ?? 0), $doc['id']]);
+            idems_log('report_doc', $doc['id'], 'EVIDENCE_DELETE', ['irn'=>$doc['irn'], 'reason'=>trim($_POST['reason'] ?? '')]);
+            flash('Evidence removed.');
+        } elseif ($do === 'move') {
+            $to = trim($_POST['to_field'] ?? '');
+            $pdo->prepare("UPDATE report_files SET field_key=? WHERE id=? AND report_doc_id=?")->execute([$to, (int)($_POST['file_id'] ?? 0), $doc['id']]);
+            flash('Evidence re-linked.');
+        }
+        redirect('/document-evidence?id=' . $doc['id']);
+    }
+    $fields = idems_fields($doc['report_type_id']);
+    $sections = idems_sections($doc['report_type_id']);
+    // label + section for each evidence field
+    $fieldMeta = [];
+    $secName = []; foreach ($sections as $s) $secName[(int)$s['id']] = $s['title'];
+    foreach ($fields as $f) if (in_array($f['ftype'], ['photo','file'], true))
+        $fieldMeta[$f['fkey']] = ['label'=>$f['label'] ?: $f['fkey'], 'section'=>$secName[(int)$f['section_id']] ?? 'Unsectioned'];
+    $files = ops_all("SELECT id, field_key, kind, file_name, mime, gps, caption, taken_at, bytes, orig_bytes, created_by, created_at
+        FROM report_files WHERE report_doc_id=? AND kind IN ('photo','file') ORDER BY id", [$doc['id']]);
+    $stats = ['n'=>count($files), 'bytes'=>0, 'orig'=>0, 'gps'=>0];
+    foreach ($files as $f) { $stats['bytes'] += (int)$f['bytes']; $stats['orig'] += (int)($f['orig_bytes'] ?: $f['bytes']); if (trim((string)$f['gps']) !== '') $stats['gps']++; }
+    view('ops/idems/evidence', ['doc'=>$doc, 'files'=>$files, 'fieldMeta'=>$fieldMeta, 'stats'=>$stats]);
     return true;
 }
 

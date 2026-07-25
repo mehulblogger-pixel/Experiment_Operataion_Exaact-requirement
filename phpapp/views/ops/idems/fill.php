@@ -49,9 +49,10 @@
         echo '<div style="display:flex;gap:6px"><input class="form-control" name="f['.e($k).']" data-key="'.e($k).'" id="gps_'.e($k).'" value="'.e(is_array($val)?'':$val).'" placeholder="lat, long" readonly>';
         echo '<button type="button" class="btn small secondary" onclick="idemsGps(\''.e($k).'\')">📍 Capture</button></div>'; break;
       case 'photo': case 'file':
-        $acc = $f['ftype']==='photo' ? 'accept="image/*" capture="environment"' : '';
+        $acc = $f['ftype']==='photo' ? 'accept="image/*" capture="environment" data-shrink="1"' : '';
         echo '<input class="form-control" type="file" name="upl['.e($k).'][]" multiple '.$acc.'>';
         echo '<input type="hidden" name="gps['.e($k).']" id="gps_'.e($k).'">';
+        if ($f['ftype']==='photo') echo '<small class="muted">Photos are compressed automatically and tagged with time'.(($f['ftype']==='photo')?' &amp; location':'').'.</small>';
         if (!empty($filesByField[$k])) { echo '<div class="ev-thumbs">'; foreach ($filesByField[$k] as $fl) {
           if (strpos($fl['mime'],'image/')===0) echo '<a href="/report-file?id='.(int)$fl['id'].'" target="_blank"><img src="/report-file?id='.(int)$fl['id'].'" class="ev-th"></a>';
           else echo '<a class="pill p-info" href="/report-file?id='.(int)$fl['id'].'" target="_blank">📎 '.e($fl['file_name']).'</a> ';
@@ -120,6 +121,44 @@ function idemsImprove(k){
     .catch(function(){ alert('Could not reach the writing assistant.'); });
 }
 function idemsAddRow(btn){ var wrap=btn.closest('.rep-table'); var tpl=wrap.querySelector('template'); var tb=wrap.querySelector('tbody'); tb.insertAdjacentHTML('beforeend', tpl.innerHTML); }
+// ---- Smart evidence: shrink big camera photos in the browser before upload, and
+// auto-capture the location once a photo is chosen (saves data on site connections).
+(function(){
+  var MAXD = 1600, Q = 0.82;
+  function shrink(file){
+    return new Promise(function(res){
+      if (!file.type || file.type.indexOf('image/') !== 0 || file.size < 400*1024) return res(file);
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function(){
+        var w = img.width, h = img.height, s = (w > MAXD || h > MAXD) ? MAXD/Math.max(w,h) : 1;
+        if (s === 1 && file.size < 1200*1024) { URL.revokeObjectURL(url); return res(file); }
+        var c = document.createElement('canvas'); c.width = Math.round(w*s); c.height = Math.round(h*s);
+        var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0,0,c.width,c.height); x.drawImage(img,0,0,c.width,c.height);
+        c.toBlob(function(b){ URL.revokeObjectURL(url);
+          if (!b || b.size >= file.size) return res(file);
+          res(new File([b], file.name.replace(/\.(png|heic|heif|webp)$/i,'.jpg'), {type:'image/jpeg', lastModified: file.lastModified}));
+        }, 'image/jpeg', Q);
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); res(file); };
+      img.src = url;
+    });
+  }
+  document.querySelectorAll('input[type=file][data-shrink]').forEach(function(inp){
+    inp.addEventListener('change', function(){
+      if (!inp.files || !inp.files.length) return;
+      // auto-capture location alongside the photo
+      var key = (inp.name.match(/upl\[(.+?)\]/)||[])[1];
+      if (key && navigator.geolocation) {
+        var g = document.getElementById('gps_'+key);
+        if (g && !g.value) navigator.geolocation.getCurrentPosition(function(p){ g.value = p.coords.latitude.toFixed(6)+', '+p.coords.longitude.toFixed(6); }, function(){});
+      }
+      Promise.all(Array.prototype.map.call(inp.files, shrink)).then(function(list){
+        var dt = new DataTransfer(); list.forEach(function(f){ dt.items.add(f); });
+        try { inp.files = dt.files; } catch(e) {}
+      });
+    });
+  });
+})();
 // signature pads
 document.querySelectorAll('.sig-pad').forEach(function(c){
   var ctx=c.getContext('2d'), drawing=false, dirty=false; ctx.lineWidth=2; ctx.lineCap='round'; ctx.strokeStyle='#111';
