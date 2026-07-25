@@ -1078,3 +1078,30 @@ Data-level upgrades (renamed lists, rewritten codes, dropped lists) cannot be
 detected by a missing table or column, so the boot probe asserts them and each
 assertion self-cancels once applied. All were tested against a simulated older
 database as well as a fresh one.
+
+## Quote / CRM pack (done)
+
+- Client picked ⇒ free-text name disabled; contact person / e-mail / mobile
+  auto-filled from the client's primary contact, still editable.
+- Sites are real addresses, many per quote; every line item names its site.
+  The client's addresses on file are offered as one-click additions.
+- Executing office: a primary office plus any others, and a per-line office.
+- Types of inspection = the call's master, narrowed to that client's types.
+- Payment terms, quote origin and site type are masters (17 payment terms).
+- Product category unifies spelling automatically (exact → plural → edit
+  distance), office-scoped, cumulative for cross-office access.
+- Editable grids readable: minimum width, room per cell, full-height controls.
+- Approvals show who they are waiting on by name; reject needs a comment;
+  rejected shows as Rejected by whom, when and why.
+- Accepted / lost quotes lock; re-edit is a request the Super Admin grants for
+  N hours, after which it re-locks itself.
+- Multiple attachments per quote, typed (our quotation, attachment, client doc,
+  PO, inspection doc); PO number and date captured; shared files follow the
+  work to the job so the engineer sees them.
+- External quotes (client / tender portal) get their own registration screen.
+- Terms & conditions default in Settings, editable per quote.
+- Stored signature of the named signatory stamped on the quote PDF.
+- Change log shows field-level differences; accepted quotes offer a final copy.
+- Register export with submission / approval / sent / acceptance dates, contact
+  details, contract and PO numbers, sites and every follow-up.
+- Follow-ups editable (date, status, done-on, note) and can be added by hand.
