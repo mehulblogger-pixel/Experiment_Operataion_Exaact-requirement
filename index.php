@@ -34,6 +34,7 @@ try {
     require __DIR__ . '/lib/lookups.php';
     require __DIR__ . '/lib/access.php';
     require __DIR__ . '/lib/terms.php';
+    require __DIR__ . '/lib/compose.php';
     require __DIR__ . '/lib/crm.php';
     require __DIR__ . '/lib/pdf.php';
     require __DIR__ . '/lib/ai.php';

@@ -19,6 +19,21 @@
   </div>
 </div>
 
+<?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email'])): ?>
+<div class="panel" style="background:var(--soft)">
+  <b>Two ways to send this</b>
+  <div class="muted" style="margin-top:4px">
+    <b>Send to <?= e(Tl('client')) ?></b> sends it automatically from the company mailbox.<br>
+    <b>Send from my mailbox</b> downloads the finished message with the PDF already attached; it opens in your
+    Outlook as a draft from <?= e(compose_can_personalise() ? (current_user()['email'] ?? '') : 'your address') ?>,
+    you press Send, and the <?= e(Tl('client')) ?>'s reply comes back to you — it is in your own Sent Items.
+    <?php if (!compose_can_personalise()): ?>
+      <br><span style="color:var(--warn)">Add your e-mail address to your profile first, or the draft will open from the company address.</span>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <?php if ($st === 'REJECTED'): ?>
 <div class="panel" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 6%,transparent)">
   <b style="color:var(--bad)">Rejected by <?= e($q['rejected_by'] ?: 'the approver') ?></b>
@@ -73,6 +88,13 @@
   <?php elseif ($st==='SENT'): ?>
     <?= $act('ACCEPTED','Mark accepted (won)') ?>
     <a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Re-download Word</a>
+  <?php endif; ?>
+  <?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email'])): ?>
+    <span style="width:1px;height:22px;background:var(--line)"></span>
+    <a class="btn small secondary" href="/quote-compose?id=<?= (int)$q['id'] ?>"
+       title="Downloads a draft that opens in your Outlook with the PDF attached — you press Send">✉️ Send from my mailbox</a>
+    <a class="btn small secondary" href="/quote-compose?id=<?= (int)$q['id'] ?>&amp;mode=mailto"
+       title="Opens your default mail app — no attachment (browsers cannot attach files to a mailto link)">Compose without attachment</a>
   <?php endif; ?>
   <?php if (in_array($st, ['DRAFT','PENDING_APPROVAL','APPROVED','SENT'], true)): ?>
     <button class="btn small danger" type="button" onclick="document.getElementById('lostbox').style.display='block'">Mark lost</button>
@@ -320,7 +342,7 @@
     <form method="post" action="/quote-followup?id=<?= (int)$q['id'] ?>">
       <input type="hidden" name="do" value="save">
       <table class="dt">
-        <thead><tr><th>When</th><th>Due</th><th>Status</th><th>Done on</th><th>Note</th></tr></thead>
+        <thead><tr><th>When</th><th>Due</th><th>Status</th><th>Done on</th><th>Note</th><th></th></tr></thead>
         <tbody>
         <?php foreach ($followups as $f): ?>
         <tr>
@@ -332,6 +354,9 @@
               </select></td>
           <td><input class="form-control" type="date" name="f_done[]" value="<?= e($f['done_date'] ?? '') ?>" style="min-width:140px"></td>
           <td><input class="form-control" name="f_note[]" value="<?= e($f['note'] ?? '') ?>" placeholder="what was said" style="min-width:160px"></td>
+          <td class="num" style="white-space:nowrap"><?php if (!empty($q['contact_email'])): ?>
+            <a class="btn small secondary" href="/followup-compose?id=<?= (int)$f['id'] ?>"
+               title="Opens the chase in your own mailbox">✉️</a><?php endif; ?></td>
         </tr>
         <?php endforeach; ?>
         </tbody>
