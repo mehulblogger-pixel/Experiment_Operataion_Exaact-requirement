@@ -133,6 +133,23 @@ function idems_migrate() {
         file_name VARCHAR(200) DEFAULT '', file_data MEDIUMTEXT,
         document_number VARCHAR(80) DEFAULT '', format_number VARCHAR(80) DEFAULT '', doc_revision VARCHAR(40) DEFAULT '', issue_date VARCHAR(20) DEFAULT '',
         active INT DEFAULT 1, is_default INT DEFAULT 0, created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // ---- Phase 6: manufacturer document verification & endorsement ----
+    $pdo->exec("CREATE TABLE IF NOT EXISTS endorsements (
+        id $pk, endorsement_no VARCHAR(120), doc_type VARCHAR(20) DEFAULT 'MTC', title VARCHAR(255) DEFAULT '',
+        vendor_id INT NULL, client_id INT NULL, report_doc_id INT NULL,
+        project_code VARCHAR(40) DEFAULT '', project_name VARCHAR(200) DEFAULT '', po_ref VARCHAR(80) DEFAULT '',
+        drawing_no VARCHAR(80) DEFAULT '', drawing_rev VARCHAR(30) DEFAULT '', qap_rev VARCHAR(30) DEFAULT '',
+        heat_no VARCHAR(80) DEFAULT '', item_desc VARCHAR(255) DEFAULT '', doc_version VARCHAR(40) DEFAULT '',
+        company_code VARCHAR(20) DEFAULT '', branch_code VARCHAR(20) DEFAULT '', client_code VARCHAR(20) DEFAULT '', fy_label VARCHAR(12) DEFAULT '', serial INT DEFAULT 0,
+        office_id INT NULL, sbu VARCHAR(20) DEFAULT '', inspector_id INT NULL, approver_user_id INT NULL,
+        status VARCHAR(20) DEFAULT 'UPLOADED', decision VARCHAR(20) DEFAULT '', decision_remarks VARCHAR(600) DEFAULT '', review_remarks TEXT,
+        submitted_at VARCHAR(30) DEFAULT '', endorsed_at VARCHAR(30) DEFAULT '', endorsed_by VARCHAR(150) DEFAULT '', finalized INT DEFAULT 0,
+        deleted INT DEFAULT 0, created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')");
+    idems_unique_index('endorsements', 'endorsement_no');
+    // Original + supporting files + signature snapshots for an endorsement (original never altered).
+    $pdo->exec("CREATE TABLE IF NOT EXISTS endorsement_files (
+        id $pk, endorsement_id INT, kind VARCHAR(20) DEFAULT 'support', file_name VARCHAR(255) DEFAULT '', mime VARCHAR(100) DEFAULT '',
+        data MEDIUMTEXT, note VARCHAR(400) DEFAULT '', created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
     idems_seed_report_types();
 }
 // Portable "add a unique index if missing" (ignores errors if it already exists).
@@ -1262,6 +1279,257 @@ function ops_idems_templates($route, $method) {
         'tokRefType'=>$tokRefType, 'tokens'=>$tokRefType ? idems_type_tokens($tokRefType) : null,
         'zipOk'=>class_exists('ZipArchive')]);
     return true;
+}
+
+// ===========================================================================
+//  Phase 6: manufacturer document verification & endorsement
+//  The uploaded original is stored and NEVER altered; the endorsement is a
+//  separate record + certificate that references it, with a full audit trail.
+// ===========================================================================
+const ENDORSE_DOC_TYPES = ['MTC'=>'Material Test Certificate (MTC)','NDT'=>'NDT Report','HYDRO'=>'Hydrostatic Test Report','DIM'=>'Dimensional Report','PAINT'=>'Painting Report','PWHT'=>'PWHT Report','HARD'=>'Hardness Report','FAT'=>'FAT Report','CALIB'=>'Calibration Certificate','WELD'=>'Welding Record','HTR'=>'Heat Treatment Report','OTHER'=>'Other quality record'];
+const ENDORSE_STATUS = ['UPLOADED'=>'Uploaded','UNDER_REVIEW'=>'Under review','ENDORSED'=>'Endorsed','REJECTED'=>'Rejected','ARCHIVED'=>'Archived'];
+const ENDORSE_DECISION = ['ENDORSED'=>'Reviewed &amp; Endorsed','ENDORSED_COND'=>'Endorsed with comments','REJECTED'=>'Rejected'];
+function endorse_status_pill($s) { return ['UPLOADED'=>'p-mut','UNDER_REVIEW'=>'p-warn','ENDORSED'=>'p-ok','REJECTED'=>'p-bad','ARCHIVED'=>'p-mut'][$s] ?? 'p-mut'; }
+function endorse_can_edit($e) { return $e && empty($e['finalized']) && (is_master() || can('mod.idems.edit')); }
+function endorsement_files($eid, $kind = null) {
+    if ($kind === null) return ops_all("SELECT id, kind, file_name, mime, note, created_by, created_at FROM endorsement_files WHERE endorsement_id=? ORDER BY id", [(int)$eid]);
+    return ops_all("SELECT id, kind, file_name, mime, note, created_by, created_at FROM endorsement_files WHERE endorsement_id=? AND kind=? ORDER BY id", [(int)$eid, $kind]);
+}
+function endorse_can_act($e) {
+    if (!$e || $e['status'] !== 'UNDER_REVIEW') return false;
+    if (is_master()) return true;
+    if (!empty($e['approver_user_id']) && (int)$e['approver_user_id'] === (int)(current_user()['id'] ?? 0)) return true;
+    return can('idems.finalize');
+}
+
+function ops_idems_endorsements($route, $method) {
+    $pdo = db();
+    // ---- stream a file (original / supporting) ----
+    if ($route === 'endorsement-file') {
+        $f = ops_one("SELECT ef.*, e.deleted FROM endorsement_files ef JOIN endorsements e ON e.id=ef.endorsement_id WHERE ef.id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$f || $f['deleted']) { http_response_code(404); echo 'Not found'; return true; }
+        ops_require(is_master() || can('mod.idems.view'), 'Access denied.');
+        $data = (string)$f['data']; if (strpos($data,'base64,')!==false) $data = base64_decode(substr($data, strpos($data,'base64,')+7));
+        header('Content-Type: ' . ($f['mime'] ?: 'application/octet-stream'));
+        header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/','_',$f['file_name'] ?: 'file') . '"');
+        echo $data; return true;
+    }
+    // ---- register ----
+    if ($route === 'endorsements') {
+        $q = trim($_GET['q'] ?? ''); $fs = $_GET['status'] ?? ''; $ft = $_GET['type'] ?? '';
+        [$w, $a] = scope_clause('e.office_id', 'e.sbu');
+        $where = "e.deleted=0 AND $w"; $args = $a;
+        if ($q) { $where .= " AND (e.endorsement_no LIKE ? OR e.title LIKE ? OR e.heat_no LIKE ?)"; array_push($args, "%$q%", "%$q%", "%$q%"); }
+        if ($fs) { $where .= " AND e.status=?"; $args[] = $fs; }
+        if ($ft) { $where .= " AND e.doc_type=?"; $args[] = $ft; }
+        $rows = ops_all("SELECT e.*, v.display_name vendor_disp, v.legal_name vendor_name, bp.display_name client_disp, i.name inspector_name
+            FROM endorsements e LEFT JOIN business_partners v ON v.id=e.vendor_id LEFT JOIN business_partners bp ON bp.id=e.client_id LEFT JOIN inspectors i ON i.id=e.inspector_id
+            WHERE $where ORDER BY e.id DESC", $args);
+        $counts = ops_one("SELECT COUNT(*) total, SUM(CASE WHEN status IN ('UPLOADED','UNDER_REVIEW') THEN 1 ELSE 0 END) open_n,
+            SUM(CASE WHEN status='ENDORSED' THEN 1 ELSE 0 END) endorsed_n, SUM(CASE WHEN status='REJECTED' THEN 1 ELSE 0 END) rejected_n
+            FROM endorsements e WHERE e.deleted=0 AND $w", $a) ?: [];
+        view('ops/idems/endorse_list', ['rows'=>$rows, 'q'=>$q, 'fs'=>$fs, 'ft'=>$ft, 'counts'=>$counts]);
+        return true;
+    }
+    // ---- create / edit ----
+    if ($route === 'endorsement-new' || $route === 'endorsement-edit') {
+        $e = null;
+        if ($route === 'endorsement-edit') { $e = ops_one("SELECT * FROM endorsements WHERE id=? AND deleted=0", [(int)($_GET['id'] ?? 0)]); if (!$e) { http_response_code(404); view('notfound'); return true; } ops_require(endorse_can_edit($e), 'This endorsement is locked.'); }
+        else ops_require(is_master() || can('mod.idems.edit'), 'You cannot create endorsements.');
+        if ($method === 'POST') {
+            $b = $_POST;
+            $clientId = ($b['client_id'] ?? '')!==''?(int)$b['client_id']:null;
+            $client = $clientId ? ops_one("SELECT legal_name, display_name, code FROM business_partners WHERE id=?", [$clientId]) : null;
+            $officeId = ($b['office_id'] ?? '')!==''?(int)$b['office_id']:(current_user()['home_office_id'] ?? null);
+            $inspectorId = ($b['inspector_id'] ?? '')!==''?(int)$b['inspector_id']:null;
+            $approver = ($b['approver_user_id'] ?? '')!==''?(int)$b['approver_user_id']:idems_inspector_approver($inspectorId);
+            $fields = [
+                'doc_type'=>isset(ENDORSE_DOC_TYPES[$b['doc_type'] ?? ''])?$b['doc_type']:'MTC', 'title'=>trim($b['title'] ?? ''),
+                'vendor_id'=>($b['vendor_id'] ?? '')!==''?(int)$b['vendor_id']:null, 'client_id'=>$clientId, 'report_doc_id'=>($b['report_doc_id'] ?? '')!==''?(int)$b['report_doc_id']:null,
+                'project_code'=>trim($b['project_code'] ?? ''), 'project_name'=>trim($b['project_name'] ?? ''), 'po_ref'=>trim($b['po_ref'] ?? ''),
+                'drawing_no'=>trim($b['drawing_no'] ?? ''), 'drawing_rev'=>trim($b['drawing_rev'] ?? ''), 'qap_rev'=>trim($b['qap_rev'] ?? ''),
+                'heat_no'=>trim($b['heat_no'] ?? ''), 'item_desc'=>trim($b['item_desc'] ?? ''), 'doc_version'=>trim($b['doc_version'] ?? ''),
+                'office_id'=>$officeId, 'sbu'=>$b['sbu'] ?? '', 'inspector_id'=>$inspectorId, 'approver_user_id'=>$approver ?: null,
+                'client_code'=>$client ? idems_client_code($client) : '', 'review_remarks'=>trim($b['review_remarks'] ?? ''),
+            ];
+            if ($e) {
+                $set = implode('=?, ', array_keys($fields)) . '=?'; $args = array_values($fields); $args[]=date('c'); $args[]=$e['id'];
+                $pdo->prepare("UPDATE endorsements SET $set, updated_at=? WHERE id=?")->execute($args);
+                idems_endorse_uploads($e['id']);
+                idems_log('endorsement', $e['id'], 'EDIT', ['irn'=>$e['endorsement_no']]);
+                flash('Endorsement updated.'); redirect('/endorsement?id=' . $e['id']);
+            } else {
+                [$no, $serial] = idems_generate_irn($fields + ['type_code'=>'END', 'inspection_date'=>date('Y-m-d')]);
+                $tok = idems_tokens_for($fields + ['type_code'=>'END']);
+                $cols = array_merge(['endorsement_no','company_code','branch_code','fy_label','serial','status','created_by','created_at','updated_at'], array_keys($fields));
+                $vals = array_merge([$no, $tok['{COMPANY}'], $tok['{BRANCH}'], $tok['{FY}'], $serial, 'UPLOADED', user_name(current_user()), date('c'), date('c')], array_values($fields));
+                $ph = implode(',', array_fill(0, count($cols), '?'));
+                $pdo->prepare("INSERT INTO endorsements (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
+                $id = (int)$pdo->lastInsertId();
+                idems_endorse_uploads($id);
+                idems_log('endorsement', $id, 'CREATE', ['irn'=>$no]);
+                flash('Endorsement created — ' . $no . '. Upload the manufacturer document and any supporting evidence.');
+                redirect('/endorsement?id=' . $id);
+            }
+        }
+        view('ops/idems/endorse_form', ['e'=>$e, 'docTypes'=>ENDORSE_DOC_TYPES,
+            'vendors'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_vendor=1 ORDER BY nm"),
+            'clients'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 ORDER BY nm"),
+            'inspectors'=>ops_all("SELECT id, name FROM inspectors WHERE status='ACTIVE' ORDER BY name"),
+            'approvers'=>ops_all("SELECT id, first_name, last_name, username, role FROM users WHERE is_active=1 ORDER BY first_name"),
+            'offices'=>ops_all("SELECT id, name FROM offices ORDER BY is_ahmedabad DESC, name"), 'sbuOpts'=>lk_options_or('sbu', OPS_SBUS),
+            'reports'=>ops_all("SELECT id, irn FROM report_docs WHERE deleted=0 ORDER BY id DESC")]);
+        return true;
+    }
+    // ---- detail ----
+    if ($route === 'endorsement') {
+        $e = ops_one("SELECT e.*, v.display_name vendor_disp, v.legal_name vendor_name, bp.display_name client_disp, bp.legal_name client_name,
+                i.name inspector_name, o.name office_name, rd.irn linked_irn
+            FROM endorsements e LEFT JOIN business_partners v ON v.id=e.vendor_id LEFT JOIN business_partners bp ON bp.id=e.client_id
+            LEFT JOIN inspectors i ON i.id=e.inspector_id LEFT JOIN offices o ON o.id=e.office_id LEFT JOIN report_docs rd ON rd.id=e.report_doc_id
+            WHERE e.id=? AND e.deleted=0", [(int)($_GET['id'] ?? 0)]);
+        if (!$e) { http_response_code(404); view('notfound'); return true; }
+        $approver = $e['approver_user_id'] ? ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$e['approver_user_id']]) : null;
+        view('ops/idems/endorse_detail', ['e'=>$e, 'approver'=>$approver,
+            'orig'=>endorsement_files($e['id'], 'original'), 'support'=>endorsement_files($e['id'], 'support'),
+            'canAct'=>endorse_can_act($e), 'audit'=>ops_all("SELECT * FROM idems_audit WHERE entity='endorsement' AND entity_id=? ORDER BY id DESC", [$e['id']])]);
+        return true;
+    }
+    // ---- submit for endorsement ----
+    if ($route === 'endorsement-submit' && $method === 'POST') {
+        $e = ops_one("SELECT * FROM endorsements WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
+        if (!$e) { http_response_code(404); view('notfound'); return true; }
+        ops_require(endorse_can_edit($e), 'This endorsement is locked.');
+        if (!ops_val("SELECT COUNT(*) FROM endorsement_files WHERE endorsement_id=? AND kind='original'", [$e['id']])) { flash('Upload the manufacturer document (the original) before submitting.', 'error'); redirect('/endorsement?id=' . $e['id']); }
+        if (!$e['approver_user_id']) { flash('Assign an approver before submitting (or map one for the inspector).', 'error'); redirect('/endorsement?id=' . $e['id']); }
+        $pdo->prepare("UPDATE endorsements SET status='UNDER_REVIEW', submitted_at=?, updated_at=? WHERE id=?")->execute([date('c'), date('c'), $e['id']]);
+        idems_log('endorsement', $e['id'], 'SUBMIT', ['irn'=>$e['endorsement_no'], 'new'=>'UNDER_REVIEW']);
+        $to = idems_approver_email($e['approver_user_id']);
+        if ($to) ops_mail($to, 'Document endorsement required: ' . $e['endorsement_no'], "A manufacturer document awaits your review & endorsement.\n\n" . $e['endorsement_no'] . " — " . (ENDORSE_DOC_TYPES[$e['doc_type']] ?? $e['doc_type']) . "\n\nOpen it in the system to review the original and endorse or reject.\n\n" . app_name(), '', 'idems_endorse');
+        flash('Submitted to the approver for review & endorsement.');
+        redirect('/endorsement?id=' . $e['id']);
+    }
+    // ---- approve (endorse) / reject ----
+    if ($route === 'endorsement-approve' && $method === 'POST') {
+        $e = ops_one("SELECT * FROM endorsements WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
+        if (!$e) { http_response_code(404); view('notfound'); return true; }
+        ops_require(endorse_can_act($e), 'You are not the assigned approver for this document.');
+        $decision = $_POST['decision'] ?? '';
+        $remarks = trim($_POST['remarks'] ?? '');
+        if ($decision === 'reject') {
+            if ($remarks === '') { flash('A remark is mandatory to reject.', 'error'); redirect('/endorsement?id=' . $e['id']); }
+            $pdo->prepare("UPDATE endorsements SET status='REJECTED', decision='REJECTED', decision_remarks=?, updated_at=? WHERE id=?")->execute([$remarks, date('c'), $e['id']]);
+            idems_log('endorsement', $e['id'], 'REJECT', ['irn'=>$e['endorsement_no'], 'reason'=>$remarks]);
+            flash('Document rejected and returned.');
+        } else {
+            $dec = ($decision === 'endorse_cond') ? 'ENDORSED_COND' : 'ENDORSED';
+            $pdo->prepare("UPDATE endorsements SET status='ENDORSED', decision=?, decision_remarks=?, endorsed_at=?, endorsed_by=?, finalized=1, updated_at=? WHERE id=?")
+                ->execute([$dec, $remarks, date('c'), user_name(current_user()), date('c'), $e['id']]);
+            idems_endorse_snapshot_signatures($e);
+            idems_log('endorsement', $e['id'], 'ENDORSE', ['irn'=>$e['endorsement_no'], 'new'=>$dec, 'reason'=>$remarks]);
+            flash('Document endorsed & locked. The endorsement certificate is ready.');
+        }
+        redirect('/endorsement?id=' . $e['id']);
+    }
+    // ---- archive / soft-delete ----
+    if ($route === 'endorsement-delete' && $method === 'POST') {
+        $e = ops_one("SELECT * FROM endorsements WHERE id=?", [(int)($_POST['id'] ?? 0)]);
+        if (!$e) { http_response_code(404); view('notfound'); return true; }
+        ops_require(is_master() || can('idems.finalize'), 'You cannot remove endorsements.');
+        $pdo->prepare("UPDATE endorsements SET deleted=1, updated_at=? WHERE id=?")->execute([date('c'), $e['id']]);
+        idems_log('endorsement', $e['id'], 'DELETE', ['irn'=>$e['endorsement_no'], 'reason'=>trim($_POST['reason'] ?? '')]);
+        flash('Endorsement archived (soft-deleted; stays in the audit log).');
+        redirect('/endorsements');
+    }
+    return false;
+}
+// Handle original + supporting uploads for an endorsement.
+function idems_endorse_uploads($eid) {
+    $pdo = db();
+    $map = ['original'=>'orig', 'support'=>'support'];
+    foreach ($map as $kind => $field) {
+        if (empty($_FILES[$field]['name'])) continue;
+        $names = (array)$_FILES[$field]['name']; $tmp = (array)$_FILES[$field]['tmp_name']; $types = (array)$_FILES[$field]['type']; $errs = (array)$_FILES[$field]['error'];
+        for ($i = 0; $i < count($names); $i++) {
+            if (($errs[$i] ?? 1) !== 0 || !is_uploaded_file($tmp[$i])) continue;
+            $bytes = @file_get_contents($tmp[$i]); if ($bytes === false || strlen($bytes) > 12*1024*1024) continue;
+            // an endorsement keeps ONE original; replace it
+            if ($kind === 'original') $pdo->prepare("DELETE FROM endorsement_files WHERE endorsement_id=? AND kind='original'")->execute([$eid]);
+            $b64 = 'data:' . ($types[$i] ?: 'application/octet-stream') . ';base64,' . base64_encode($bytes);
+            $pdo->prepare("INSERT INTO endorsement_files (endorsement_id,kind,file_name,mime,data,created_by,created_at) VALUES (?,?,?,?,?,?,?)")
+                ->execute([$eid, $kind, substr($names[$i],0,255), $types[$i] ?: '', $b64, user_name(current_user()), date('c')]);
+        }
+    }
+}
+// Freeze inspector + approver signatures onto the endorsement at endorse time.
+function idems_endorse_snapshot_signatures($e) {
+    $pdo = db();
+    $insSig = inspector_signature($e['inspector_id'] ?? 0);
+    if ($insSig) { $pdo->prepare("DELETE FROM endorsement_files WHERE endorsement_id=? AND kind='sig_inspector'")->execute([$e['id']]); $pdo->prepare("INSERT INTO endorsement_files (endorsement_id,kind,file_name,mime,data,created_by,created_at) VALUES (?,?,?,?,?,?,?)")->execute([$e['id'],'sig_inspector','inspector_sign.png','image/png',$insSig,user_name(current_user()),date('c')]); }
+    $apSig = user_signature($e['approver_user_id'] ?? 0);
+    if ($apSig) { $pdo->prepare("DELETE FROM endorsement_files WHERE endorsement_id=? AND kind='sig_approver'")->execute([$e['id']]); $pdo->prepare("INSERT INTO endorsement_files (endorsement_id,kind,file_name,mime,data,created_by,created_at) VALUES (?,?,?,?,?,?,?)")->execute([$e['id'],'sig_approver','approver_sign.png','image/png',$apSig,user_name(current_user()),date('c')]); }
+}
+// ---- Endorsement certificate PDF (separate document; original untouched) ----
+function ops_idems_endorse_cert($method) {
+    $e = ops_one("SELECT e.*, v.display_name vendor_disp, v.legal_name vendor_name, bp.display_name client_disp, bp.legal_name client_name, i.name inspector_name, i.designation insp_desig, i.emp_code insp_emp, rd.irn linked_irn
+        FROM endorsements e LEFT JOIN business_partners v ON v.id=e.vendor_id LEFT JOIN business_partners bp ON bp.id=e.client_id LEFT JOIN inspectors i ON i.id=e.inspector_id LEFT JOIN report_docs rd ON rd.id=e.report_doc_id
+        WHERE e.id=? AND e.deleted=0", [(int)($_GET['id'] ?? 0)]);
+    if (!$e) { http_response_code(404); echo 'Not found'; return true; }
+    ops_require(is_master() || can('mod.idems.view'), 'Access denied.');
+    $lh = function_exists('quote_letterhead') ? quote_letterhead() : ['name'=>app_name()];
+    // approver identity
+    $ap = $e['approver_user_id'] ? ops_one("SELECT first_name, last_name, position_title, role FROM users WHERE id=?", [$e['approver_user_id']]) : null;
+    $snapI = ops_one("SELECT data FROM endorsement_files WHERE endorsement_id=? AND kind='sig_inspector' ORDER BY id DESC LIMIT 1", [$e['id']]);
+    $snapA = ops_one("SELECT data FROM endorsement_files WHERE endorsement_id=? AND kind='sig_approver' ORDER BY id DESC LIMIT 1", [$e['id']]);
+    $sigs = [
+        'inspector'=>['img'=>idems_sig_jpeg($snapI['data'] ?? inspector_signature($e['inspector_id'] ?? 0)), 'name'=>$e['inspector_name'] ?? '', 'desig'=>DESIGNATIONS[$e['insp_desig']] ?? ($e['insp_desig'] ?? ''), 'meta'=>trim(($e['insp_emp'] ?? '').($e['branch_code']?' · '.$e['branch_code']:'')), 'time'=>$e['endorsed_at']?'Reviewed: '.date('d M Y H:i', strtotime($e['endorsed_at'])):''],
+        'approver'=>['img'=>idems_sig_jpeg($snapA['data'] ?? user_signature($e['approver_user_id'] ?? 0)), 'name'=>$ap?trim(($ap['first_name']??'').' '.($ap['last_name']??'')):($e['endorsed_by'] ?? ''), 'desig'=>$ap?($ap['position_title'] ?: (ORG_ROLES[$ap['role']] ?? '')):'', 'meta'=>'Endorsing authority', 'time'=>$e['endorsed_at']?'Endorsed: '.date('d M Y H:i', strtotime($e['endorsed_at'])):''],
+    ];
+    $pdf = endorsement_pdf_build($e, $lh, $sigs);
+    idems_log('endorsement', $e['id'], 'CERT_PDF', ['irn'=>$e['endorsement_no']]);
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/','_',$e['endorsement_no']) . '_endorsement.pdf"');
+    echo $pdf; return true;
+}
+function endorsement_pdf_build($e, $lh, $sigs) {
+    $p = new SimplePDF(); $ml = $p->ml; $right = $p->right(); $band = [21, 128, 61];   // green endorsement band
+    $p->rectFill(0, 0, $p->pageW(), 6, $band); $p->y = $p->mt; $top = $p->y; $nameX = $ml;
+    if (!empty($lh['logo'])) { $ln=$p->addJpeg($lh['logo']); if($ln){ [$iw,$ih]=$p->imgDim($ln); $lw=80; $lhh=$ih>0?min(44,$lw*$ih/max(1,$iw)):36; $p->drawImage($ln,$ml,$top,$lw,$lhh); $nameX=$ml+$lw+12; } }
+    $p->text($nameX, ($lh['name'] ?? '') ?: app_name(), 15, true, $band);
+    $p->y=$top; $p->text($ml, 'Endorsement No: ' . $e['endorsement_no'], 9, true, [60,60,60], $right, 'R');
+    $p->y = $top + 34; $p->hr($band); $p->gap(6);
+    $p->line('DOCUMENT REVIEW & ENDORSEMENT CERTIFICATE', 14, true, 18, $band);
+    $dec = $e['decision']==='REJECTED' ? 'REJECTED' : (ENDORSE_DECISION[$e['decision']] ?? 'Reviewed & Endorsed');
+    $p->line('Decision: ' . strip_tags($dec), 11, true, 15, $e['decision']==='REJECTED'?[190,50,50]:[21,128,61]);
+    $p->gap(4);
+    $kv = ['Document type'=>ENDORSE_DOC_TYPES[$e['doc_type']] ?? $e['doc_type'], 'Title / description'=>$e['title'] ?: $e['item_desc'],
+        'Manufacturer / vendor'=>$e['vendor_disp'] ?: ($e['vendor_name'] ?? ''), 'Client'=>$e['client_disp'] ?: ($e['client_name'] ?? ''),
+        'Project'=>trim(($e['project_code'] ?? '').' '.($e['project_name'] ?? '')), 'PO'=>$e['po_ref'] ?? '',
+        'Drawing'=>trim(($e['drawing_no'] ?? '').' '.($e['drawing_rev']?'Rev '.$e['drawing_rev']:'')), 'QAP rev'=>$e['qap_rev'] ?? '',
+        'Heat / lot no.'=>$e['heat_no'] ?? '', 'Document version'=>$e['doc_version'] ?? '',
+        'Linked inspection report'=>$e['linked_irn'] ?? '', 'Endorsed on'=>$e['endorsed_at']?date('d M Y H:i', strtotime($e['endorsed_at'])):''];
+    $colW = $p->contentW()/2;
+    foreach (array_chunk(array_filter($kv, fn($v)=>trim((string)$v)!==''), 2, true) as $pair) {
+        $p->needSpace(14); $yrow=$p->y; $i=0; foreach ($pair as $k=>$v){ $x=$ml+$i*$colW; $p->y=$yrow; $p->text($x,$k.':',8.5,true,[90,90,90]); $p->text($x+92,(string)$v,9); $i++; } $p->y=$yrow+13;
+    }
+    if (!empty($e['decision_remarks'])) { $p->gap(4); $p->needSpace(16); $p->line('Endorsement remarks', 10, true, 13, $band); foreach ($p->wrap($e['decision_remarks'],9,$p->contentW()) as $ln2){ $p->needSpace(11); $p->line($ln2,9,false,11); } }
+    if (!empty($e['review_remarks'])) { $p->gap(2); $p->needSpace(16); $p->line('Reviewer notes', 10, true, 13, [90,90,90]); foreach ($p->wrap($e['review_remarks'],9,$p->contentW()) as $ln2){ $p->needSpace(11); $p->line($ln2,9,false,11); } }
+    $p->gap(6); $p->needSpace(20); $p->line('This certificate endorses the manufacturer document identified above. The original record is retained unaltered as supporting evidence.', 8, false, 11, [110,110,110]);
+    // signature block
+    $p->gap(12); $p->needSpace(90); $p->hr($band); $p->gap(8); $sy=$p->y; $colW2=$p->contentW()/2;
+    $drawSig = function($x,$y0,$title,$s) use ($p) {
+        $p->y=$y0; $p->text($x,$title,8.5,true,[90,90,90]); $imgY=$y0+14;
+        if(!empty($s['img'])){ $nm=$p->addJpeg($s['img']); if($nm) $p->drawImage($nm,$x,$imgY,120,40); }
+        $lineY=$imgY+42; $p->lineAt($x,$lineY,$x+150,$lineY,[120,120,120]); $ty=$lineY+3;
+        foreach(array_filter([$s['name']??'',$s['desig']??'',$s['meta']??'',$s['time']??'']) as $t){ $p->y=$ty; $p->text($x,$t,8,false,[70,70,70]); $ty+=10; }
+        return $ty;
+    };
+    $y1=$drawSig($ml,$sy,'Reviewed by (inspector)',$sigs['inspector'] ?? []);
+    $y2=$drawSig($ml+$colW2,$sy,'Endorsed by (approver)',$sigs['approver'] ?? []);
+    $p->y=max($y1,$y2)+6;
+    if (!empty($lh['footer'])) { $p->needSpace(12); $p->hr([220,220,220]); $p->gap(3); $p->line($lh['footer'],7.5,false,10,[130,130,130]); }
+    $p->needSpace(12); $p->line('System-generated by ' . app_name() . ' · ' . $e['endorsement_no'] . ' · ' . date('d M Y H:i'), 7, false, 9, [150,150,150]);
+    return $p->output();
 }
 
 // Compliance audit log viewer (basic; full super-admin dashboard is a later phase).

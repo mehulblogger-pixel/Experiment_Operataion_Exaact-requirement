@@ -47,8 +47,14 @@ Proposed phasing (each phase = its own commit, tested):
   format (fonts/headers/footers/logo/tables preserved); token-reference UI. NO agency names seeded
   (owner instruction) — admin uploads their own client templates. Routes: /report-templates(-edit/
   -download), /document-docx.
-- P6 Manufacturer document verification & endorsement (upload→review→verify→comment→approve/reject→
-  digitally endorse→archive) without altering the original; full endorsement audit trail.
+- P6 Manufacturer document verification & endorsement ✅ SHIPPED — endorsements + endorsement_files
+  tables; upload manufacturer quality records (MTC/NDT/hydro/PWHT/hardness/FAT/calibration/welding/HTR/
+  etc.) — the ORIGINAL is stored & never altered; metadata + supporting evidence + linked inspection
+  report; auto endorsement number (reuses IRN engine, END type); assigned approver (mapped or picked);
+  submit→review→endorse/endorse-with-comments/reject (reject remarks mandatory); auto inspector+approver
+  signatures snapshotted at endorse; SEPARATE endorsement-certificate PDF (green band) referencing the
+  original; immutable after endorse; full endorsement audit trail; soft-delete archive. Routes:
+  /endorsements, /endorsement(-new/-edit/-submit/-approve/-delete/-file), /endorsement-cert.
 - P7 Technical Writing Assistant (no AI): grammar/spelling, engineering phrase library, plain
   observation → engineering language, standard conclusions/acceptance/rejection statements.
 - P8 Smart Remarks & auto Release Note from finalized report.

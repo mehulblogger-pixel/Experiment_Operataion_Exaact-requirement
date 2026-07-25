@@ -100,6 +100,7 @@ try {
     db()->query("SELECT id FROM idems_approval_rules LIMIT 1");
     db()->query("SELECT signature FROM users LIMIT 1");
     db()->query("SELECT id FROM report_templates LIMIT 1");
+    db()->query("SELECT id FROM endorsements LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();
