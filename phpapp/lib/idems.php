@@ -90,6 +90,22 @@ function idems_migrate() {
         action VARCHAR(40) DEFAULT '', field VARCHAR(60) DEFAULT '', old_value TEXT, new_value TEXT, reason VARCHAR(400) DEFAULT '',
         username VARCHAR(150) DEFAULT '', role VARCHAR(40) DEFAULT '', office_id INT NULL,
         ip VARCHAR(60) DEFAULT '', device VARCHAR(200) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // ---- Phase 2: no-code report builder (form schema per report type) ----
+    $pdo->exec("CREATE TABLE IF NOT EXISTS report_sections (
+        id $pk, report_type_id INT, title VARCHAR(200) DEFAULT '', help VARCHAR(400) DEFAULT '',
+        cond_field VARCHAR(60) DEFAULT '', cond_op VARCHAR(10) DEFAULT '', cond_val VARCHAR(200) DEFAULT '',
+        sort_order INT DEFAULT 0)");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS report_fields (
+        id $pk, report_type_id INT, section_id INT NULL, fkey VARCHAR(60), label VARCHAR(200) DEFAULT '',
+        ftype VARCHAR(20) DEFAULT 'text', options TEXT, required INT DEFAULT 0, hidden INT DEFAULT 0,
+        cond_field VARCHAR(60) DEFAULT '', cond_op VARCHAR(10) DEFAULT '', cond_val VARCHAR(200) DEFAULT '',
+        calc_expr VARCHAR(400) DEFAULT '', placeholder VARCHAR(200) DEFAULT '', help VARCHAR(400) DEFAULT '',
+        col_span INT DEFAULT 1, table_cols TEXT, sort_order INT DEFAULT 0)");
+    // Evidence / attachments captured against a report's fields (photos, files, signatures).
+    $pdo->exec("CREATE TABLE IF NOT EXISTS report_files (
+        id $pk, report_doc_id INT, field_key VARCHAR(60) DEFAULT '', kind VARCHAR(20) DEFAULT 'file',
+        file_name VARCHAR(255) DEFAULT '', mime VARCHAR(100) DEFAULT '', data MEDIUMTEXT, gps VARCHAR(60) DEFAULT '',
+        note VARCHAR(400) DEFAULT '', created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
     idems_seed_report_types();
 }
 // Portable "add a unique index if missing" (ignores errors if it already exists).
@@ -103,6 +119,38 @@ function idems_seed_report_types() {
     $ins = $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_at) VALUES (?,?,?,1,1,?,?)");
     $i = 0;
     foreach (IDEMS_REPORT_SEED as $r) { $i += 10; if (!isset($have[strtoupper($r[0])])) $ins->execute([$r[0], $r[1], $r[2], $i, date('c')]); }
+}
+
+// ---- Phase 2: field types for the no-code builder --------------------------
+const IDEMS_FIELD_TYPES = [
+    'text'=>'Short text', 'textarea'=>'Paragraph', 'number'=>'Number', 'date'=>'Date', 'time'=>'Time',
+    'select'=>'Dropdown (single)', 'multiselect'=>'Dropdown (multiple)', 'checkbox'=>'Yes / no', 'radio'=>'Choice buttons',
+    'calc'=>'Calculated', 'heading'=>'Section heading', 'note'=>'Info note',
+    'table'=>'Repeatable table', 'photo'=>'Photo', 'file'=>'Attachment', 'gps'=>'GPS location',
+    'signature'=>'Signature', 'qr'=>'QR / barcode value',
+];
+const IDEMS_COND_OPS = ['' => '(always show)', 'eq'=>'equals', 'ne'=>'not equals', 'in'=>'is one of', 'nonempty'=>'is filled', 'empty'=>'is empty'];
+function idems_sections($typeId) { return ops_all("SELECT * FROM report_sections WHERE report_type_id=? ORDER BY sort_order, id", [(int)$typeId]); }
+function idems_fields($typeId, $sectionId = null) {
+    if ($sectionId === null) return ops_all("SELECT * FROM report_fields WHERE report_type_id=? ORDER BY sort_order, id", [(int)$typeId]);
+    return ops_all("SELECT * FROM report_fields WHERE report_type_id=? AND section_id=? ORDER BY sort_order, id", [(int)$typeId, (int)$sectionId]);
+}
+function idems_has_schema($typeId) { return (int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=?", [(int)$typeId]) > 0; }
+// Parse a field's options ("A|B|C" or lookup:key) into [value=>label].
+function idems_field_options($f) {
+    $o = trim((string)($f['options'] ?? ''));
+    if ($o === '') return [];
+    if (strpos($o, 'lookup:') === 0) return lk_options_or(substr($o, 7), []);
+    $out = [];
+    foreach (preg_split('/\r?\n|\|/', $o) as $line) { $line = trim($line); if ($line === '') continue; $parts = explode('=', $line, 2); $out[trim($parts[0])] = trim($parts[count($parts)>1?1:0]); }
+    return $out;
+}
+// A field's stored value from the report's data JSON.
+function idems_val($data, $fkey, $default = '') { return $data[$fkey] ?? $default; }
+// Attachments for a doc (optionally one field).
+function idems_doc_files($docId, $fieldKey = null) {
+    if ($fieldKey === null) return ops_all("SELECT id, field_key, kind, file_name, mime, gps, note, created_at FROM report_files WHERE report_doc_id=? ORDER BY id", [(int)$docId]);
+    return ops_all("SELECT id, field_key, kind, file_name, mime, gps, note, created_at FROM report_files WHERE report_doc_id=? AND field_key=? ORDER BY id", [(int)$docId, $fieldKey]);
 }
 
 // ---------------------------------------------------------------------------
@@ -324,7 +372,11 @@ function ops_idems_documents($route, $method) {
         if (!$doc) { http_response_code(404); view('notfound'); return true; }
         $approver = $doc['approver_user_id'] ? ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$doc['approver_user_id']]) : null;
         $audit = ops_all("SELECT * FROM idems_audit WHERE entity='report_doc' AND entity_id=? ORDER BY id DESC", [$doc['id']]);
-        view('ops/idems/doc_detail', ['doc'=>$doc, 'approver'=>$approver, 'audit'=>$audit]);
+        $sections = idems_sections($doc['report_type_id']);
+        $fields = idems_fields($doc['report_type_id']);
+        $data = json_decode($doc['data'] ?: '[]', true); if (!is_array($data)) $data = [];
+        view('ops/idems/doc_detail', ['doc'=>$doc, 'approver'=>$approver, 'audit'=>$audit,
+            'sections'=>$sections, 'fields'=>$fields, 'data'=>$data, 'files'=>idems_doc_files($doc['id']), 'hasSchema'=>!empty($fields)]);
         return true;
     }
     if ($route === 'document-submit' && $method === 'POST') {
@@ -408,6 +460,182 @@ function ops_idems_numbering($method) {
     view('ops/idems/numbering', ['format'=>idems_irn_format(), 'company'=>idems_company_code(), 'width'=>idems_serial_width(),
         'tokens'=>idems_available_tokens(), 'sample'=>$sample]);
     return true;
+}
+
+// ---------------------------------------------------------------------------
+//  Phase 2: no-code report builder (design the form for a report type)
+// ---------------------------------------------------------------------------
+function ops_idems_builder($route, $method) {
+    ops_require(is_master() || can('idems.type.manage') || can('master.manage'), 'You cannot design report forms.');
+    $pdo = db();
+    $typeId = (int)($_GET['type'] ?? $_POST['report_type_id'] ?? 0);
+    $type = $typeId ? ops_one("SELECT * FROM report_types WHERE id=?", [$typeId]) : null;
+    if (!$type) { flash('Choose a report type to design.', 'error'); redirect('/report-types'); }
+    if ($method === 'POST') {
+        $do = $_POST['_do'] ?? '';
+        // --- sections ---
+        if ($do === 'section_save') {
+            $sid = (int)($_POST['section_id'] ?? 0); $title = trim($_POST['title'] ?? '');
+            if ($title === '') { flash('Section title required.', 'error'); redirect('/report-builder?type=' . $typeId); }
+            if ($sid) $pdo->prepare("UPDATE report_sections SET title=?, help=? WHERE id=? AND report_type_id=?")->execute([$title, trim($_POST['help'] ?? ''), $sid, $typeId]);
+            else $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, $title, trim($_POST['help'] ?? ''), (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            flash('Section saved.'); redirect('/report-builder?type=' . $typeId);
+        }
+        if ($do === 'section_del') {
+            $sid = (int)($_POST['section_id'] ?? 0);
+            $pdo->prepare("DELETE FROM report_sections WHERE id=? AND report_type_id=?")->execute([$sid, $typeId]);
+            $pdo->prepare("UPDATE report_fields SET section_id=NULL WHERE section_id=? AND report_type_id=?")->execute([$sid, $typeId]);
+            flash('Section removed (its fields moved to “unsectioned”).'); redirect('/report-builder?type=' . $typeId);
+        }
+        if ($do === 'section_move') {
+            idems_reorder('report_sections', (int)$_POST['section_id'], $_POST['dir'] ?? 'up', 'report_type_id', $typeId);
+            redirect('/report-builder?type=' . $typeId);
+        }
+        // --- fields ---
+        if ($do === 'field_save') {
+            $fid = (int)($_POST['field_id'] ?? 0);
+            $fkey = idems_clean_key($_POST['fkey'] ?? $_POST['label'] ?? '');
+            if ($fkey === '') { flash('Field needs a name.', 'error'); redirect('/report-builder?type=' . $typeId); }
+            $ftype = isset(IDEMS_FIELD_TYPES[$_POST['ftype'] ?? '']) ? $_POST['ftype'] : 'text';
+            $vals = [
+                'section_id' => ($_POST['section_id'] ?? '') !== '' ? (int)$_POST['section_id'] : null,
+                'fkey' => $fkey, 'label' => trim($_POST['label'] ?? ''), 'ftype' => $ftype,
+                'options' => trim($_POST['options'] ?? ''), 'required' => !empty($_POST['required']) ? 1 : 0, 'hidden' => !empty($_POST['hidden']) ? 1 : 0,
+                'cond_field' => trim($_POST['cond_field'] ?? ''), 'cond_op' => $_POST['cond_op'] ?? '', 'cond_val' => trim($_POST['cond_val'] ?? ''),
+                'calc_expr' => trim($_POST['calc_expr'] ?? ''), 'placeholder' => trim($_POST['placeholder'] ?? ''), 'help' => trim($_POST['help'] ?? ''),
+                'col_span' => max(1, min(2, (int)($_POST['col_span'] ?? 1))), 'table_cols' => trim($_POST['table_cols'] ?? ''),
+            ];
+            if ($fid) {
+                $set = implode('=?, ', array_keys($vals)) . '=?'; $args = array_values($vals); $args[] = $fid; $args[] = $typeId;
+                $pdo->prepare("UPDATE report_fields SET $set WHERE id=? AND report_type_id=?")->execute($args);
+            } else {
+                $vals2 = ['report_type_id'=>$typeId] + $vals + ['sort_order'=>(int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId])];
+                $cols = array_keys($vals2); $ph = implode(',', array_fill(0, count($cols), '?'));
+                $pdo->prepare("INSERT INTO report_fields (" . implode(',', $cols) . ") VALUES ($ph)")->execute(array_values($vals2));
+            }
+            flash('Field saved.'); redirect('/report-builder?type=' . $typeId);
+        }
+        if ($do === 'field_del') {
+            $pdo->prepare("DELETE FROM report_fields WHERE id=? AND report_type_id=?")->execute([(int)($_POST['field_id'] ?? 0), $typeId]);
+            flash('Field removed.'); redirect('/report-builder?type=' . $typeId);
+        }
+        if ($do === 'field_move') {
+            idems_reorder('report_fields', (int)$_POST['field_id'], $_POST['dir'] ?? 'up', 'report_type_id', $typeId);
+            redirect('/report-builder?type=' . $typeId);
+        }
+        redirect('/report-builder?type=' . $typeId);
+    }
+    view('ops/idems/builder', ['type'=>$type, 'sections'=>idems_sections($typeId), 'fields'=>idems_fields($typeId),
+        'editField'=>($route==='report-field-edit') ? ops_one("SELECT * FROM report_fields WHERE id=?", [(int)($_GET['id'] ?? 0)]) : null,
+        'fieldTypes'=>IDEMS_FIELD_TYPES, 'condOps'=>IDEMS_COND_OPS]);
+    return true;
+}
+// Swap sort_order with the previous/next sibling.
+function idems_reorder($table, $id, $dir, $scopeCol, $scopeVal) {
+    $row = ops_one("SELECT id, sort_order FROM $table WHERE id=?", [$id]);
+    if (!$row) return;
+    $op = $dir === 'down' ? '>' : '<'; $ord = $dir === 'down' ? 'ASC' : 'DESC';
+    $nb = ops_one("SELECT id, sort_order FROM $table WHERE $scopeCol=? AND sort_order $op ? ORDER BY sort_order $ord LIMIT 1", [$scopeVal, $row['sort_order']]);
+    if (!$nb) return;
+    db()->prepare("UPDATE $table SET sort_order=? WHERE id=?")->execute([$nb['sort_order'], $row['id']]);
+    db()->prepare("UPDATE $table SET sort_order=? WHERE id=?")->execute([$row['sort_order'], $nb['id']]);
+}
+function idems_clean_key($s) {
+    $k = strtolower(preg_replace('/[^a-z0-9_]+/i', '_', trim((string)$s)));
+    return trim(preg_replace('/_+/', '_', $k), '_');
+}
+
+// ---------------------------------------------------------------------------
+//  Phase 2: fill the report body (render the designed form on an instance)
+// ---------------------------------------------------------------------------
+function ops_idems_fill($route, $method) {
+    $pdo = db();
+    $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_GET['id'] ?? $_POST['id'] ?? 0)]);
+    if (!$doc) { http_response_code(404); view('notfound'); return true; }
+    ops_require(idems_can_edit_doc($doc), 'This report is finalized and can no longer be edited.');
+    $fields = idems_fields($doc['report_type_id']);
+    if ($method === 'POST') {
+        $data = json_decode($doc['data'] ?: '[]', true); if (!is_array($data)) $data = [];
+        // scalar / array field values
+        foreach ($fields as $f) {
+            $k = $f['fkey'];
+            if (in_array($f['ftype'], ['photo','file','signature'], true)) continue;   // handled below
+            if ($f['ftype'] === 'table') {
+                $rows = [];
+                $cols = idems_table_cols($f);
+                $posted = $_POST['tbl'][$k] ?? [];
+                if (is_array($posted)) foreach ($posted as $r) {
+                    $r = (array)$r; $has = false; $row = [];
+                    foreach ($cols as $ck=>$cl) { $row[$ck] = trim((string)($r[$ck] ?? '')); if ($row[$ck] !== '') $has = true; }
+                    if ($has) $rows[] = $row;
+                }
+                $data[$k] = $rows;
+            } elseif ($f['ftype'] === 'multiselect') {
+                $data[$k] = array_values((array)($_POST['f'][$k] ?? []));
+            } else {
+                $data[$k] = is_array($_POST['f'][$k] ?? '') ? $_POST['f'][$k] : trim((string)($_POST['f'][$k] ?? ''));
+            }
+        }
+        // signatures captured as data-URLs (canvas) or GPS strings arrive in $_POST['sig']/['f']
+        foreach ($fields as $f) {
+            if ($f['ftype'] === 'signature') {
+                $sig = $_POST['sig'][$f['fkey']] ?? '';
+                if ($sig && strpos($sig, 'data:image') === 0) {
+                    $pdo->prepare("DELETE FROM report_files WHERE report_doc_id=? AND field_key=? AND kind='signature'")->execute([$doc['id'], $f['fkey']]);
+                    $pdo->prepare("INSERT INTO report_files (report_doc_id,field_key,kind,file_name,mime,data,created_by,created_at) VALUES (?,?,?,?,?,?,?,?)")
+                        ->execute([$doc['id'], $f['fkey'], 'signature', 'signature.png', 'image/png', $sig, user_name(current_user()), date('c')]);
+                }
+            }
+        }
+        // photo / file uploads
+        idems_handle_uploads($doc, $fields);
+        $pdo->prepare("UPDATE report_docs SET data=?, updated_at=? WHERE id=?")->execute([json_encode($data), date('c'), $doc['id']]);
+        idems_log('report_doc', $doc['id'], 'EDIT', ['irn'=>$doc['irn'], 'field'=>'body']);
+        flash('Report body saved.');
+        redirect('/document?id=' . $doc['id']);
+    }
+    $data = json_decode($doc['data'] ?: '[]', true); if (!is_array($data)) $data = [];
+    view('ops/idems/fill', ['doc'=>$doc, 'sections'=>idems_sections($doc['report_type_id']), 'fields'=>$fields, 'data'=>$data, 'files'=>idems_doc_files($doc['id'])]);
+    return true;
+}
+function idems_table_cols($f) {
+    $raw = trim((string)($f['table_cols'] ?? ''));
+    $out = [];
+    foreach (preg_split('/\r?\n|\|/', $raw) as $c) { $c = trim($c); if ($c === '') continue; $out[idems_clean_key($c)] = $c; }
+    if (!$out) $out = ['col1'=>'Column 1'];
+    return $out;
+}
+function idems_handle_uploads($doc, $fields) {
+    if (empty($_FILES['upl'])) return;
+    $pdo = db();
+    foreach ($fields as $f) {
+        if (!in_array($f['ftype'], ['photo','file'], true)) continue;
+        $k = $f['fkey'];
+        $names = $_FILES['upl']['name'][$k] ?? null;
+        if (!$names) continue;
+        $tmp = $_FILES['upl']['tmp_name'][$k]; $types = $_FILES['upl']['type'][$k]; $errs = $_FILES['upl']['error'][$k];
+        $names = (array)$names; $tmp = (array)$tmp; $types = (array)$types; $errs = (array)$errs;
+        for ($i = 0; $i < count($names); $i++) {
+            if (($errs[$i] ?? 1) !== 0 || !is_uploaded_file($tmp[$i])) continue;
+            $bytes = @file_get_contents($tmp[$i]); if ($bytes === false || strlen($bytes) > 6*1024*1024) continue;   // 6 MB cap
+            $b64 = 'data:' . ($types[$i] ?: 'application/octet-stream') . ';base64,' . base64_encode($bytes);
+            $gps = trim($_POST['gps'][$k] ?? '');
+            $pdo->prepare("INSERT INTO report_files (report_doc_id,field_key,kind,file_name,mime,data,gps,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
+                ->execute([$doc['id'], $k, $f['ftype'], substr($names[$i], 0, 255), $types[$i] ?: '', $b64, $gps, user_name(current_user()), date('c')]);
+        }
+    }
+    idems_log('report_doc', $doc['id'], 'EVIDENCE', ['irn'=>$doc['irn']]);
+}
+// Stream a stored attachment.
+function ops_idems_file($method) {
+    $f = ops_one("SELECT rf.*, d.deleted FROM report_files rf JOIN report_docs d ON d.id=rf.report_doc_id WHERE rf.id=?", [(int)($_GET['id'] ?? 0)]);
+    if (!$f || $f['deleted']) { http_response_code(404); echo 'Not found'; return true; }
+    $data = (string)$f['data'];
+    if (strpos($data, 'base64,') !== false) $data = base64_decode(substr($data, strpos($data, 'base64,') + 7));
+    header('Content-Type: ' . ($f['mime'] ?: 'application/octet-stream'));
+    header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/', '_', $f['file_name'] ?: 'file') . '"');
+    echo $data; return true;
 }
 
 // Compliance audit log viewer (basic; full super-admin dashboard is a later phase).

@@ -21,8 +21,12 @@ Proposed phasing (each phase = its own commit, tested):
   scope counters) + report_docs instance model + DRAFT→SUBMITTED→ISSUED with immutable finalize +
   idems_audit log + Document Register + IRN-rules + audit-log viewer. Module 'idems' + perms
   (idems.finalize/type.manage/timestamp.edit/audit.view) wired into roles.
-- P2 No-code Report Builder: sections/sub-sections, dynamic/conditional/calculated/mandatory/hidden
-  fields, repeatable tables, attachments/photos/GPS/QR — reuse & extend custom-fields.
+- P2 No-code Report Builder ✅ SHIPPED — report_sections/report_fields/report_files schema; builder UI
+  (18 field types incl. conditional show-if, calculated formulas, mandatory/hidden, repeatable tables,
+  photo/file/GPS/signature, options incl. lookup:key); fill renderer with live conditional/calc JS,
+  table add-row, signature canvas, GPS capture, file/photo upload (base64 in report_files, 6 MB cap);
+  values saved to report_docs.data JSON; detail renders filled body + evidence thumbnails; finalize
+  still locks it. Routes: /report-builder, /report-field-edit, /document-fill, /report-file.
 - P3 Workflow & approvals: configurable multi-level chain (per inspector/common/branch/dept/client/
   project/type), temp approver on leave, SLA auto-escalation, delegation, reject/send-back w/ remarks.
 - P4 Auto signatures + immutable system timestamps (inspector from profile, approver on approve),

@@ -1242,8 +1242,8 @@ function ops_module_gate($route) {
         'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes',
         'attendance-recon'=>'reconcile',
         'availability'=>'jobs',
-        'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems',
-        'report-types'=>'idems','report-type-edit'=>'idems','irn-rules'=>'idems','audit-log'=>'idems',
+        'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems',
+        'report-types'=>'idems','report-type-edit'=>'idems','report-builder'=>'idems','report-field-edit'=>'idems','report-file'=>'idems','irn-rules'=>'idems','audit-log'=>'idems',
         'masters'=>'masters','work-norms'=>'masters',
         'office-finance'=>'overheads',
         'reports'=>'reports',
@@ -1378,6 +1378,12 @@ function ops_dispatch($route, $method) {
             return ops_idems_documents($route, $method);
         case $route === 'report-types' || $route === 'report-type-edit':
             return ops_idems_report_types($route, $method);
+        case $route === 'report-builder' || $route === 'report-field-edit':
+            return ops_idems_builder($route, $method);
+        case $route === 'document-fill':
+            return ops_idems_fill($route, $method);
+        case $route === 'report-file':
+            return ops_idems_file($method);
         case $route === 'irn-rules':
             return ops_idems_numbering($method);
         case $route === 'audit-log':

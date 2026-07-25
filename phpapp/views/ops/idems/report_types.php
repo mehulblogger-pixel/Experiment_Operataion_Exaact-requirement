@@ -28,6 +28,7 @@
         <td class="muted"><?= e(IDEMS_CATEGORIES[$r['category']] ?? $r['category']) ?></td>
         <td><?= $r['active'] ? '<span class="pill p-ok">Active</span>' : '<span class="pill p-mut">Inactive</span>' ?></td>
         <td style="white-space:nowrap">
+          <a class="btn small" href="/report-builder?type=<?= (int)$r['id'] ?>">Design form</a>
           <a class="btn small secondary" href="/report-type-edit?id=<?= (int)$r['id'] ?>">Edit</a>
           <form method="post" action="/report-types" style="display:inline" onsubmit="return confirm('<?= $r['is_system']?'Deactivate this built-in type?':'Remove this type?' ?>')"><input type="hidden" name="_do" value="del"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><button class="btn small secondary" type="submit"><?= $r['is_system']?'Deactivate':'Remove' ?></button></form>
         </td>
