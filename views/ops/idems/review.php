@@ -4,9 +4,9 @@
   $byType = [];
   foreach ($srcDocs as $s) $byType[$s['doc_type']][] = $s;
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents">Documents</a> › <a href="/document?id=<?= (int)$doc['id'] ?>"><?= e($doc['irn']) ?></a> › Document review</div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <a href="/document?id=<?= (int)$doc['id'] ?>"><?= e($doc['irn']) ?></a> › Document review</div>
 <div class="master-head">
-  <div><h1>Document review &amp; conflict check</h1>
+  <div><h1><?= e(TH('report')) ?> review</h1>
     <p class="sub" style="margin:2px 0 0">Upload the PO, QAP, drawings, specifications and certificates for this report. The system cross-checks them automatically; AI adds a deeper review when enabled. <strong>You remain the approving authority.</strong></p></div>
   <a class="btn secondary" href="/document?id=<?= (int)$doc['id'] ?>">← Back to report</a>
 </div>

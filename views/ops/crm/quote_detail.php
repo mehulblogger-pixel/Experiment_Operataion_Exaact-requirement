@@ -6,7 +6,7 @@
   };
   $locT = QUOTE_LOCATION_TYPES;
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/quotes">Quotations</a> › <?= e(quote_label($q)) ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/quotes"><?= e(TP('quote')) ?></a> › <?= e(quote_label($q)) ?></div>
 <div class="master-head">
   <div><h1><?= e(quote_label($q)) ?> <span class="pill <?= $stPill[$st] ?? 'p-mut' ?>" style="font-size:13px;vertical-align:middle"><?= e(QUOTE_STATUS[$st] ?? $st) ?></span></h1>
     <p class="sub" style="margin:2px 0 0"><?= e($q['subject'] ?: '—') ?></p></div>
@@ -24,7 +24,7 @@
   <?php if ($st==='DRAFT'): ?>
     <?= $act('PENDING_APPROVAL','Submit for approval') ?>
   <?php elseif ($st==='APPROVED'): ?>
-    <?php if ($canSend): ?><?= $act('SENT','✉ Send to customer') ?><?php endif; ?>
+    <?php if ($canSend): ?><?= $act('SENT','✉ Send to ' . Tl('client')) ?><?php endif; ?>
   <?php elseif ($st==='SENT'): ?>
     <?= $act('ACCEPTED','Mark accepted (won)') ?>
     <a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Re-download Word</a>
@@ -93,7 +93,7 @@
 
 <div class="panel-split">
   <div class="panel">
-    <h3 class="tab-sub" style="margin-top:0">Customer</h3>
+    <h3 class="tab-sub" style="margin-top:0"><?= e(T('client')) ?></h3>
     <table class="kv">
       <tr><td class="muted">Client</td><td><?= e($q['client_name'] ?: '—') ?></td></tr>
       <tr><td class="muted">Contact</td><td><?= e($q['contact_name'] ?: '—') ?><?= $q['contact_email']?' · '.e($q['contact_email']):'' ?><?= $q['contact_mobile']?' · '.e($q['contact_mobile']):'' ?></td></tr>
@@ -127,16 +127,16 @@
         <td><span class="pill <?= $l['order_type']==='OPEN'?'p-info':'p-mut' ?>"><?= e(ORDER_TYPES[$l['order_type']] ?? $l['order_type']) ?></span></td>
         <td class="num"><?= rtrim(rtrim(number_format((float)$l['qty'],2),'0'),'.') ?></td>
         <td><?= e(QUOTE_UNITS[$l['unit']] ?? $l['unit']) ?></td>
-        <td class="num">₹<?= number_format((float)$l['rate'],0) ?></td>
-        <td class="num">₹<?= number_format((float)$l['amount'],0) ?></td>
+        <td class="num"><?= e(cur_sym()) ?><?= number_format((float)$l['rate'],0) ?></td>
+        <td class="num"><?= e(cur_sym()) ?><?= number_format((float)$l['amount'],0) ?></td>
       </tr>
       <?php endforeach; ?>
       <?php if (!$lines): ?><tr><td colspan="10" class="muted" style="text-align:center;padding:16px">No line items.</td></tr><?php endif; ?>
     </tbody>
     <tfoot>
-      <tr><td colspan="9" class="num muted">Subtotal</td><td class="num"><b>₹<?= number_format((float)$q['subtotal'],0) ?></b></td></tr>
-      <tr><td colspan="9" class="num muted">GST (<?= (float)$q['gst_pct'] ?>%)</td><td class="num">₹<?= number_format((float)$q['gst_amount'],0) ?></td></tr>
-      <tr><td colspan="9" class="num"><b>Total</b></td><td class="num"><b>₹<?= number_format((float)$q['total_amount'],0) ?></b></td></tr>
+      <tr><td colspan="9" class="num muted">Subtotal</td><td class="num"><b><?= e(cur_sym()) ?><?= number_format((float)$q['subtotal'],0) ?></b></td></tr>
+      <tr><td colspan="9" class="num muted">GST (<?= (float)$q['gst_pct'] ?>%)</td><td class="num"><?= e(cur_sym()) ?><?= number_format((float)$q['gst_amount'],0) ?></td></tr>
+      <tr><td colspan="9" class="num"><b>Total</b></td><td class="num"><b><?= e(cur_sym()) ?><?= number_format((float)$q['total_amount'],0) ?></b></td></tr>
     </tfoot>
   </table>
   </div>
@@ -147,9 +147,9 @@
 <div class="panel">
   <h3 class="tab-sub" style="margin-top:0">Jobs &amp; revenue against this order</h3>
   <div class="chip-row" style="margin-bottom:8px">
-    <span class="ct">Ordered <b>₹<?= number_format((float)$q['total_amount'],0) ?></b></span>
-    <span class="ct">Invoiced <b>₹<?= number_format($oInv,0) ?></b></span>
-    <span class="ct">Received <b>₹<?= number_format($oPaid,0) ?></b></span>
+    <span class="ct">Ordered <b><?= e(cur_sym()) ?><?= number_format((float)$q['total_amount'],0) ?></b></span>
+    <span class="ct">Invoiced <b><?= e(cur_sym()) ?><?= number_format($oInv,0) ?></b></span>
+    <span class="ct">Received <b><?= e(cur_sym()) ?><?= number_format($oPaid,0) ?></b></span>
     <span class="ct"><?= count($orderJobs) ?> job<?= count($orderJobs)==1?'':'s' ?></span>
   </div>
   <table class="grid"><tr><th>Job</th><th>Inspector</th><th>Stage</th><th class="num">Invoiced</th><th class="num">Received</th></tr>
@@ -157,17 +157,17 @@
     <tr><td><a href="/job?id=<?= (int)$oj['id'] ?>"><?= e($oj['job_code']) ?></a></td>
       <td><?= e($oj['inspector_name'] ?: '—') ?></td>
       <td><?= $oj['closed_flag']?'Closed':'Open' ?></td>
-      <td class="num"><?= (float)$oj['invoice_amount']>0?'₹'.number_format((float)$oj['invoice_amount'],0):'—' ?></td>
-      <td class="num"><?= !empty($oj['payment_received'])?'₹'.number_format((float)$oj['payment_amount'],0):'—' ?></td></tr>
+      <td class="num"><?= (float)$oj['invoice_amount']>0?cur_sym().number_format((float)$oj['invoice_amount'],0):'—' ?></td>
+      <td class="num"><?= !empty($oj['payment_received'])?cur_sym().number_format((float)$oj['payment_amount'],0):'—' ?></td></tr>
     <?php endforeach; ?>
   </table>
-  <p class="muted" style="margin-top:6px">Revenue booked against quote <?= e($q['quote_no']) ?><?= $q['contract_number']?' / contract '.e($q['contract_number']):'' ?>. Link more jobs from the job form ("Against quotation / contract").</p>
+  <p class="muted" style="margin-top:6px">Revenue booked against quote <?= e($q['quote_no']) ?><?= $q['contract_number']?' / contract '.e($q['contract_number']):'' ?>. Link more jobs from the job form ("Against <?= e(Tl('quote')) ?> / contract").</p>
 </div>
 <?php endif; ?>
 
 <?php if ($st==='ACCEPTED'): ?>
 <div class="panel" style="border:1px solid var(--ok)">
-  <h3 class="tab-sub" style="margin-top:0">✅ Won — client &amp; contract registration (Accounts)</h3>
+  <h3 class="tab-sub" style="margin-top:0">Won — client &amp; contract registration (Accounts)</h3>
   <?php if ($q['contract_number']): ?>
     <table class="kv">
       <tr><td class="muted">Registered client</td><td><?= $clientReg ? e($clientReg['legal_name']).' <span class="muted">('.e($clientReg['code']).')</span>' : e($q['client_name']) ?></td></tr>
@@ -204,7 +204,7 @@
       <tr>
         <td><b><?= $rv['rev']>0?'Rev '.str_pad((string)$rv['rev'],2,'0',STR_PAD_LEFT):'Original' ?></b> <?= $rv['is_current']?'<span class="pill p-ok">current</span>':'' ?></td>
         <td><?= e(QUOTE_STATUS[$rv['status']] ?? $rv['status']) ?></td>
-        <td class="num">₹<?= number_format((float)$rv['total_amount'],0) ?></td>
+        <td class="num"><?= e(cur_sym()) ?><?= number_format((float)$rv['total_amount'],0) ?></td>
         <td class="muted"><?= e(substr((string)$rv['created_at'],0,10)) ?></td>
         <td><?= $rv['is_current']?'':'<a class="btn small secondary" href="/quote?id='.(int)$rv['id'].'">view</a>' ?></td>
       </tr>

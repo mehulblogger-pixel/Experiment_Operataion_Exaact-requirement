@@ -1,5 +1,5 @@
 <div class="master-head">
-  <div><h1>Master lists</h1><p class="sub">Every dropdown in the app. Edit values, or add your own list — dependent lists filter by a parent list's value.</p></div>
+  <div><h1>Masters</h1><p class="sub">Every dropdown in the app. Edit values, or add your own list — dependent lists filter by a parent list's value.</p></div>
 </div>
 
 <table class="grid">

@@ -1,5 +1,5 @@
 <?php // Standard engineering phrase library (editable master) ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/writing-assistant">Writing assistant</a> › Phrase library</div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/writing-assistant">Technical writing</a> › Phrase library</div>
 <div class="master-head"><div><h1>Phrase library</h1>
   <p class="sub" style="margin:2px 0 0">The standard engineering sentences used by the writing assistant. The <strong>shorthand</strong> is what an inspector types; the <strong>phrase</strong> is what goes into the report. Add unlimited phrases of your own.</p></div>
   <a class="btn secondary" href="/writing-assistant">← Writing assistant</a>

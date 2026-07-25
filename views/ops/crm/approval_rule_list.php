@@ -1,14 +1,15 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/quotes">Quotations</a> › Approval rules</div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/quotes">Approval rules</a> › <?= e(T('quote')) ?> approvals</div>
 <div class="master-head">
-  <div><h1>Quotation approval rules</h1>
-    <p class="sub" style="margin:2px 0 0">Configure who must approve — by <strong>amount band</strong> and/or <strong>SBU</strong>. When a quote is submitted, matching rules become its approval chain (lower levels first).</p></div>
+  <div><h1>Approval rules</h1>
+    <p class="sub" style="margin:2px 0 0">Who must approve a <?= e(Tl('quote')) ?> — by <strong>amount band</strong> and/or <strong><?= e(T('sbu')) ?></strong>. When a <?= e(Tl('quote')) ?> is submitted, matching rules become its approval chain (lower levels first).</p></div>
   <a class="btn" href="/quote-approval-rule-new">+ Add rule</a>
 </div>
+<?= approval_rule_tabs('/approval-rules?module=quote') ?>
 
 <div class="panel" style="padding:0;overflow:hidden">
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
-    <thead><tr><th class="num">Level</th><th>Rule</th><th>Applies to</th><th class="num">From ₹</th><th class="num">Up to ₹</th><th>Approver</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th class="num">Level</th><th>Rule</th><th>Applies to</th><th class="num">From <?= e(cur_sym()) ?></th><th class="num">Up to <?= e(cur_sym()) ?></th><th>Approver</th><th>Status</th><th></th></tr></thead>
     <tbody>
     <?php foreach ($rows as $r): $nm = trim(($r['first_name'] ?? '').' '.($r['last_name'] ?? '')) ?: ($r['username'] ?? ''); ?>
     <tr>

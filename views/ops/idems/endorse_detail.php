@@ -1,7 +1,7 @@
 <?php // Endorsement detail — original (unaltered) + supporting + review/decision + certificate + audit ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/endorsements">Endorsements</a> › <?= e($e['endorsement_no']) ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/endorsements"><?= e(TP('endorsement')) ?></a> › <?= e($e['endorsement_no']) ?></div>
 <div class="master-head">
-  <div><h1><?= e($e['endorsement_no']) ?> <?= $e['finalized'] ? '🔒' : '' ?></h1>
+  <div><h1><?= e(T_DETAIL('endorsement', $e['endorsement_no'])) ?> <?= $e['finalized'] ? '🔒' : '' ?></h1>
     <p class="sub" style="margin:2px 0 0"><span class="pill p-info"><?= e($e['doc_type']) ?></span> <?= e(ENDORSE_DOC_TYPES[$e['doc_type']] ?? '') ?> · <span class="pill <?= endorse_status_pill($e['status']) ?>"><?= e(ENDORSE_STATUS[$e['status']] ?? $e['status']) ?></span></p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <?php if (endorse_can_edit($e)): ?><a class="btn secondary" href="/endorsement-edit?id=<?= (int)$e['id'] ?>">Edit</a><?php endif; ?>

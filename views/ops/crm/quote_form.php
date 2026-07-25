@@ -9,16 +9,16 @@
   // one blank template row appended for a new quote
   $rows = $lines ?: [[]];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/quotes">Quotations</a> › <?= $isEdit ? e(quote_label($q)) : 'New' ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/quotes"><?= e(TP('quote')) ?></a> › <?= $isEdit ? e(quote_label($q)) : 'New' ?></div>
 <div class="master-head">
-  <div><h1><?= $isEdit ? 'Edit — ' . e(quote_label($q)) : 'New quotation' ?></h1>
+  <div><h1><?= $isEdit ? 'Edit — ' . e(quote_label($q)) : ucfirst(T_NEW('quote')) ?></h1>
     <p class="sub" style="margin:2px 0 0"><?= $preInq ? 'From inquiry ' . e($preInq['inquiry_no']) . '. ' : '' ?>Fill the header, add line items, save. Quote number is generated on save.</p></div>
   <a class="btn secondary" href="/quotes">← Back</a>
 </div>
 
 <form method="post" action="/<?= $isEdit ? 'quote-edit?id=' . (int)$q['id'] : 'quote-new' ?>" class="panel" id="qform">
   <?php if ($inqId !== ''): ?><input type="hidden" name="inquiry_id" value="<?= (int)$inqId ?>"><?php endif; ?>
-  <h3 class="tab-sub" style="margin-top:0">Customer &amp; header</h3>
+  <h3 class="tab-sub" style="margin-top:0"><?= e(T('client')) ?> &amp; header</h3>
   <div class="form-grid">
     <div class="ff"><label>Client</label>
       <select class="form-control searchable" name="client_id"><option value="">— pick or type name —</option>
@@ -59,7 +59,7 @@
   <table class="dt" id="lines">
     <thead><tr>
       <th>SBU</th><th>Service</th><th>Sub-types</th><th>Description</th><th>Location</th><th>Type</th><th>Order</th>
-      <th class="num">Qty</th><th>Unit</th><th class="num">Rate ₹</th><th class="num">Amount ₹</th><th></th>
+      <th class="num">Qty</th><th>Unit</th><th class="num">Rate <?= e(cur_sym()) ?></th><th class="num">Amount <?= e(cur_sym()) ?></th><th></th>
     </tr></thead>
     <tbody>
     <?php foreach ($rows as $ln): ?>
@@ -84,13 +84,13 @@
   <div style="margin:8px 0"><button type="button" class="btn small secondary" id="addrow">+ Add line</button></div>
 
   <div class="panel" style="max-width:340px;margin-left:auto;background:var(--soft)">
-    <div style="display:flex;justify-content:space-between;padding:3px 0"><span class="muted">Subtotal</span><b>₹<span id="t_sub">0</span></b></div>
-    <div style="display:flex;justify-content:space-between;padding:3px 0"><span class="muted">GST (<span id="t_gp">18</span>%)</span><b>₹<span id="t_gst">0</span></b></div>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);font-size:16px"><span>Total</span><b>₹<span id="t_tot">0</span></b></div>
+    <div style="display:flex;justify-content:space-between;padding:3px 0"><span class="muted">Subtotal</span><b><?= e(cur_sym()) ?><span id="t_sub">0</span></b></div>
+    <div style="display:flex;justify-content:space-between;padding:3px 0"><span class="muted">GST (<span id="t_gp">18</span>%)</span><b><?= e(cur_sym()) ?><span id="t_gst">0</span></b></div>
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);font-size:16px"><span>Total</span><b><?= e(cur_sym()) ?><span id="t_tot">0</span></b></div>
   </div>
 
   <div style="margin-top:16px">
-    <button class="btn" type="submit"><?= $isEdit ? 'Save quotation' : 'Create quotation' ?></button>
+    <button class="btn" type="submit"><?= $isEdit ? 'Save ' . Tl('quote') : 'Create ' . Tl('quote') ?></button>
     <a class="btn secondary" href="/quotes">Cancel</a>
   </div>
 </form>

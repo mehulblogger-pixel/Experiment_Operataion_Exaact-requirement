@@ -35,8 +35,8 @@ const QUOTE_LOST_REASONS = [
 // the quote; each can carry sub-types from the inspection-type / deputation lists.
 const CRM_SERVICE_TYPES = [
     'INSPECTION'      => 'Inspection',
-    'PROJECT_DEP'     => 'Project deputation',
-    'SUPPLY_CHAIN'    => 'Supply-chain deputation',
+    'PROJECT_DEP'     => 'Resident / site posting',
+    'SUPPLY_CHAIN'    => 'Supply-chain posting',
     'SITE_SUP'        => 'Site supervision',
     'COMMISSIONING'   => 'Commissioning & installation',
     'SITE_QAQC'       => 'Site QA / QC',
@@ -49,7 +49,7 @@ const CRM_SERVICE_TYPES = [
     'EXPEDITING'      => 'Expediting',
     'OTHER'           => 'Other',
 ];
-// Project-deputation sub-categories (§18, multiple selection).
+// Resident-posting sub-categories (multiple selection).
 const CRM_DEPUTATION_SUBTYPES = [
     'SITE_QAQC'     => 'Site QA / QC',
     'COMMISSIONING' => 'Commissioning',

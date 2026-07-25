@@ -89,6 +89,9 @@ function term_lower($s) {
 }
 function Tl($key)  { return term_lower(T($key)); }
 function Tlp($key) { return term_lower(TP($key)); }
+// Sentence-case, for the start of a heading or a nav label: "Inspection engineer".
+function TH($key)  { return term_head(T($key)); }
+function THP($key) { return term_head(TP($key)); }
 
 // Sentence-case a term for the START of a heading: first character upper,
 // the rest as-is unless the whole word is an acronym.
@@ -130,6 +133,19 @@ function term_save($post) {
     term_overrides($ov);
 }
 
+// ---- Shared screen furniture ----------------------------------------------
+// One tab strip, used wherever two modules share a screen (approval rules,
+// document templates, masters) so the heading stays the same and only the
+// module underneath changes. $tabs = [href => label].
+function module_tabs(array $tabs, $activeHref) {
+    $h = '<div class="tabs">';
+    foreach ($tabs as $href => $label) {
+        $on = ($href === $activeHref) ? ' class="active"' : '';
+        $h .= '<a href="' . e($href) . '"' . $on . '>' . e($label) . '</a>';
+    }
+    return $h . '</div>';
+}
+
 // ---- Screen ---------------------------------------------------------------
 function ops_terminology($method) {
     ops_require(can('settings.manage'), 'Only admins can change terminology.');
@@ -139,4 +155,36 @@ function ops_terminology($method) {
         redirect('/terminology');
     }
     view('ops/terminology', ['groups' => term_groups(), 'ov' => term_overrides()]);
+}
+
+// ---- Merged screens -------------------------------------------------------
+// "Approval rules" used to be two screens with near-identical names, one for
+// quotes and one for reports. It is now one screen with a module tab.
+function approval_rule_tabs($active) {
+    $t = [];
+    if (can('mod.quotes.view')) $t['/approval-rules?module=quote'] = T('quote') . ' approvals';
+    if (can('mod.idems.view'))  $t['/approval-rules?module=report'] = T('report') . ' approvals';
+    return count($t) > 1 ? module_tabs($t, $active) : '';
+}
+function ops_approval_rules($method) {
+    $mod = ($_GET['module'] ?? '') === 'quote' ? 'quote' : 'report';
+    // Land on a tab the person can actually open.
+    if ($mod === 'report' && !can('mod.idems.view') && can('mod.quotes.view')) $mod = 'quote';
+    if ($mod === 'quote' && !can('mod.quotes.view') && can('mod.idems.view')) $mod = 'report';
+    if ($mod === 'quote') { ops_crm_approval_rules('quote-approval-rules', $method); return true; }
+    return ops_idems_approval_rules('idems-approval-rules', $method);
+}
+// Likewise "Document templates" — one screen, one tab per kind of template.
+function template_tabs($active) {
+    $t = [];
+    if (can('mod.idems.view'))  $t['/templates?kind=report'] = T('report') . ' formats';
+    if (can('mod.quotes.view')) $t['/templates?kind=quote']  = T('quote') . ' & e-mail';
+    return count($t) > 1 ? module_tabs($t, $active) : '';
+}
+function ops_templates($method) {
+    $kind = ($_GET['kind'] ?? '') === 'quote' ? 'quote' : 'report';
+    if ($kind === 'report' && !can('mod.idems.view') && can('mod.quotes.view')) $kind = 'quote';
+    if ($kind === 'quote' && !can('mod.quotes.view') && can('mod.idems.view')) $kind = 'report';
+    if ($kind === 'quote') { ops_crm_templates('crm-templates', $method); return true; }
+    return ops_idems_templates('report-templates', $method);
 }

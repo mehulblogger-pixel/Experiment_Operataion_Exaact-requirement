@@ -4,7 +4,7 @@
   $scopePill = ['FIELD'=>'p-info','CLIENT'=>'p-ok','REMARK'=>'p-mut','NCR'=>'p-bad'];
   $canEdit = is_master() || can('idems.type.manage');
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/writing-assistant">Writing assistant</a> › Learning insights</div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/writing-assistant">Technical writing</a> › Learning insights</div>
 <div class="master-head">
   <div><h1>Learning insights</h1>
     <p class="sub" style="margin:2px 0 0">Wording harvested from your <strong>approved and issued</strong> reports, offered back as suggestions next time. Learning only enhances suggestions — it never changes a technical conclusion or an approval.</p></div>

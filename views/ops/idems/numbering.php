@@ -1,5 +1,5 @@
 <?php // IRN numbering rules ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents">Documents</a> › IRN rules</div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › IRN rules</div>
 <div class="master-head"><div><h1>IRN numbering rules</h1>
   <p class="sub" style="margin:2px 0 0">Design the Inspection Reference Number with no coding. The running serial is unique within everything that precedes it, so numbering never duplicates.</p></div></div>
 

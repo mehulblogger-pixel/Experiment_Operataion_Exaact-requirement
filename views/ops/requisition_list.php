@@ -1,5 +1,5 @@
 <div class="master-head">
-  <div><h1>Manpower Requisitions</h1>
+  <div><h1><?= e(T_REG('requisition')) ?></h1>
     <p class="sub" style="margin:2px 0 0">Management-approved positions (new or replacement). Every hire must be raised against one of these.</p></div>
   <?php if (is_coordinator_level()): ?><a class="btn" href="/requisition-new">➕ New requisition</a><?php endif; ?>
 </div>

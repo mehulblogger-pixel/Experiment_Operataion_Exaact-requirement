@@ -1,6 +1,6 @@
 <?php // IDEMS Document Register ?>
 <div class="master-head">
-  <div><h1>Document Register</h1>
+  <div><h1><?= e(T_REG('report')) ?></h1>
     <p class="sub" style="margin:2px 0 0">Every inspection report &amp; certificate, with its IRN and status. <?= (int)($counts['total'] ?? 0) ?> document(s).</p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <?php if (is_master() || can('idems.type.manage') || can('master.manage')): ?><a class="btn secondary" href="/report-types">Report types</a><?php endif; ?>

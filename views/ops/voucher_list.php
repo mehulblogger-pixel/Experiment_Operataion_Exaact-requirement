@@ -25,16 +25,16 @@
 
 <div class="kpi-row">
   <div class="kpi"><div class="k-lab"><?= $mine ? 'Total I have claimed' : 'Total expense claimed' ?></div>
-    <div class="k-val">₹<?= number_format($tClaimed, 0) ?></div>
+    <div class="k-val"><?= e(cur_sym()) ?><?= number_format($tClaimed, 0) ?></div>
     <div class="k-sub"><?= count($rows) ?> voucher<?= count($rows)==1?'':'s' ?><?= $mine?'':' · '.count($insp).' inspector'.(count($insp)==1?'':'s') ?></div></div>
   <div class="kpi"><div class="k-lab">This month (<?= e($curMonth) ?>)</div>
-    <div class="k-val">₹<?= number_format($tThisMonth, 0) ?></div>
+    <div class="k-val"><?= e(cur_sym()) ?><?= number_format($tThisMonth, 0) ?></div>
     <div class="k-sub">current period</div></div>
   <div class="kpi"><div class="k-lab">Awaiting approval</div>
     <div class="k-val"><?= $awaiting ?></div>
     <div class="k-sub"><?= $cDraft ?> draft · <?= $cSubmitted ?> submitted</div></div>
   <div class="kpi"><div class="k-lab"><?= $mine ? 'Paid to me' : 'Paid out' ?></div>
-    <div class="k-val up">₹<?= number_format($sPaid, 0) ?></div>
+    <div class="k-val up"><?= e(cur_sym()) ?><?= number_format($sPaid, 0) ?></div>
     <div class="k-sub"><?= $cPaid ?> paid · <?= $cApproved ?> approved</div></div>
 </div>
 
@@ -65,7 +65,7 @@
       <td><strong><?= e($r['month']) ?></strong></td>
       <?php if (!$mine): ?><td><?= e($r['inspector_name'] ?? '—') ?></td><?php endif; ?>
       <td><span class="pill <?= $statusPill[$r['status']] ?? 'p-mut' ?>"><?= e($r['status']) ?></span></td>
-      <td class="num"><?= (float)($r['total'] ?? 0)>0 ? '₹'.number_format((float)$r['total'],0) : '—' ?></td>
+      <td class="num"><?= (float)($r['total'] ?? 0)>0 ? cur_sym().number_format((float)$r['total'],0) : '—' ?></td>
       <td class="num"><a class="btn small" href="/voucher?id=<?= (int)$r['id'] ?>">Open</a></td>
     </tr>
     <?php endforeach; ?>

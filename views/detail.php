@@ -115,7 +115,7 @@ function addr_name($a) { return (ADDRESS_TYPES[$a['address_type']] ?? $a['addres
 
 <?php elseif ($tab === 'contracts'): ?>
   <table class="grid"><tr><th>Contract No.</th><th>Title</th><th>Value</th><th>Start</th><th>End</th></tr>
-    <?php foreach ($contracts as $c): ?><tr><td><?= e($c['contract_number']) ?></td><td><?= e($c['title'] ?: '—') ?></td><td><?= $c['value']!==null?'₹'.e($c['value']):'—' ?></td><td><?= fdate($c['start_date']) ?></td><td><?= fdate($c['end_date']) ?></td></tr><?php endforeach; ?>
+    <?php foreach ($contracts as $c): ?><tr><td><?= e($c['contract_number']) ?></td><td><?= e($c['title'] ?: '—') ?></td><td><?= $c['value']!==null?cur_sym().e($c['value']):'—' ?></td><td><?= fdate($c['start_date']) ?></td><td><?= fdate($c['end_date']) ?></td></tr><?php endforeach; ?>
     <?php if (!$contracts): ?><tr><td colspan="5">No contracts yet.</td></tr><?php endif; ?></table>
   <h3 class="tab-sub">Add a contract</h3>
   <p class="muted">Contracts are usually recorded after a purchase order is received.</p>
@@ -131,7 +131,7 @@ function addr_name($a) { return (ADDRESS_TYPES[$a['address_type']] ?? $a['addres
 <?php elseif ($tab === 'purchase_orders'): ?>
   <?php $ctById = []; foreach ($contracts as $ct) $ctById[$ct['id']] = $ct; ?>
   <table class="grid"><tr><th>PO No.</th><th>Type</th><th>Title</th><th>Value</th><th>Contract</th></tr>
-    <?php foreach ($pos as $o): ?><tr><td><a href="/po?id=<?= (int)$o['id'] ?>"><?= e($o['po_number'] ?: '(open)') ?></a></td><td><?= e(PO_TYPES[$o['po_type']] ?? $o['po_type']) ?></td><td><?= e($o['title'] ?: '—') ?></td><td><?= $o['value']!==null?'₹'.e($o['value']):'—' ?></td><td><?= isset($ctById[$o['contract_id']]) ? e($ctById[$o['contract_id']]['contract_number']) : '—' ?></td></tr><?php endforeach; ?>
+    <?php foreach ($pos as $o): ?><tr><td><a href="/po?id=<?= (int)$o['id'] ?>"><?= e($o['po_number'] ?: '(open)') ?></a></td><td><?= e(PO_TYPES[$o['po_type']] ?? $o['po_type']) ?></td><td><?= e($o['title'] ?: '—') ?></td><td><?= $o['value']!==null?cur_sym().e($o['value']):'—' ?></td><td><?= isset($ctById[$o['contract_id']]) ? e($ctById[$o['contract_id']]['contract_number']) : '—' ?></td></tr><?php endforeach; ?>
     <?php if (!$pos): ?><tr><td colspan="5">No purchase orders yet.</td></tr><?php endif; ?></table>
   <h3 class="tab-sub">Add a purchase order</h3>
   <p class="muted">For open / ARC orders, save the PO then add line items (days, months, audit days).</p>

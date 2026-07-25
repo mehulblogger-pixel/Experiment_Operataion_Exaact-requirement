@@ -2,7 +2,7 @@
   $curTrade = $cand['trade_id'] ?? '';
   $curSkills = ($curTrade && isset($skillsByTrade[$curTrade])) ? $skillsByTrade[$curTrade] : [];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/candidates">Hiring pipeline</a> › <?= $cand ? 'Edit' : 'Add CV' ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/candidates"><?= e(TP('candidate')) ?></a> › <?= $cand ? 'Edit' : 'Add CV' ?></div>
 <div class="master-head">
   <div><h1><?= $cand ? 'Edit — ' . e(candidate_name($cand)) : 'Add candidate CV' ?></h1>
     <p class="sub">Submit a candidate for project deputation. You can move them through Submitted → Shortlisted → Interview → Accept / Hold / Reject afterwards.</p></div>
@@ -64,7 +64,7 @@
     <div class="ff"><label>Email</label><input class="form-control" name="email" value="<?= e($cand['email'] ?? '') ?>"></div>
     <div class="ff"><label>Mobile</label><input class="form-control" name="mobile" value="<?= e($cand['mobile'] ?? '') ?>"></div>
 
-    <div class="ff"><label>Expected rate (₹)</label><input class="form-control" type="number" step="0.01" name="expected_rate" value="<?= e($cand['expected_rate'] ?? '') ?>"></div>
+    <div class="ff"><label>Expected rate (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="expected_rate" value="<?= e($cand['expected_rate'] ?? '') ?>"></div>
     <div class="ff"><label>Rate type</label>
       <select class="form-control" name="rate_type"><?php foreach (RATE_TYPES as $k=>$v): ?><option value="<?= $k ?>" <?= (($cand['rate_type'] ?? 'MANDAY')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>CV received date</label><input class="form-control" type="date" name="cv_received_date" value="<?= e($cand['cv_received_date'] ?? '') ?>"></div>

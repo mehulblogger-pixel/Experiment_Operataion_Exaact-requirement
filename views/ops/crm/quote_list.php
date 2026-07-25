@@ -4,12 +4,12 @@
   $qs = function($v) { return '/quotes?' . http_build_query(array_merge($_GET, ['v'=>$v])); };
 ?>
 <div class="master-head">
-  <div><h1>Quotations</h1>
+  <div><h1><?= e(T_REG('quote')) ?></h1>
     <p class="sub" style="margin:2px 0 0">Quote → approval → send → follow-up → acceptance. <?= count($rows) ?> shown.</p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <?php if (can('crm.quote.approve') || is_master()): ?><a class="btn secondary" href="/quote-approval-rules">Approval rules</a><?php endif; ?>
     <?php if (can('crm.template.manage') || is_master()): ?><a class="btn secondary" href="/crm-templates">Templates</a><?php endif; ?>
-    <?php if (can('crm.quote.create') || can('mod.quotes.edit')): ?><a class="btn" href="/quote-new">+ New quotation</a><?php endif; ?>
+    <?php if (can('crm.quote.create') || can('mod.quotes.edit')): ?><a class="btn" href="/quote-new">+ New <?= e(Tl('quote')) ?></a><?php endif; ?>
   </div>
 </div>
 
@@ -42,12 +42,12 @@
       <td><?= e($r['client_disp'] ?: $r['client_name'] ?: '—') ?></td>
       <td><?= e($r['subject'] ?: '—') ?></td>
       <td><?= e(lk_options_or('sbu', OPS_SBUS)[$r['sbu']] ?? $r['sbu'] ?: '—') ?></td>
-      <td class="num"><?= (float)$r['total_amount']>0 ? '₹'.number_format((float)$r['total_amount'],0) : '—' ?></td>
+      <td class="num"><?= (float)$r['total_amount']>0 ? cur_sym().number_format((float)$r['total_amount'],0) : '—' ?></td>
       <td><span class="pill <?= $stPill[$r['status']] ?? 'p-mut' ?>"><?= e(QUOTE_STATUS[$r['status']] ?? $r['status']) ?></span></td>
       <td class="num"><a class="btn small secondary" href="/quote?id=<?= (int)$r['id'] ?>">Open</a></td>
     </tr>
     <?php endforeach; ?>
-    <?php if (!$rows): ?><tr><td colspan="7" style="text-align:center;padding:24px" class="muted">No quotations in this view.</td></tr><?php endif; ?>
+    <?php if (!$rows): ?><tr><td colspan="7" style="text-align:center;padding:24px" class="muted">No <?= e(Tlp('quote')) ?> in this view.</td></tr><?php endif; ?>
     </tbody>
   </table>
   </div>

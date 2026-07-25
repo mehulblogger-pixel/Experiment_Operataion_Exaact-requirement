@@ -1,6 +1,6 @@
-<div class="crumbs"><a href="/">Home</a> › Office finance (overheads)</div>
+<div class="crumbs"><a href="/">Home</a> › <?= e(T('office')) ?> overheads</div>
 <div class="master-head">
-  <div><h1>Office overheads &amp; contingency</h1>
+  <div><h1><?= e(TH('office')) ?> overheads &amp; contingency</h1>
     <p class="sub">Each office sets its own <strong>Overhead %</strong> and <strong>Contingency %</strong>, applied to that office's cost so profitability is accurate. Blank = use the global default.</p></div>
 </div>
 

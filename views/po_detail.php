@@ -1,7 +1,7 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/partner?id=<?= (int)$po['partner_id'] ?>&tab=purchase_orders">Purchase Orders</a> › <?= e($po['po_number'] ?: 'Open Order') ?></div>
 <div class="master-head">
-  <div><h1><?= e($po['po_number'] ?: 'Open Order') ?></h1>
-    <p class="sub"><?= e($po['pdn'] ?: $po['pn']) ?> · <?= e(PO_TYPES[$po['po_type']] ?? $po['po_type']) ?><?php if ($po['value']!==null): ?> · <strong>₹<?= number_format((float)$po['value'],0) ?></strong> (from line items)<?php endif; ?>
+  <div><h1><?= e($po['po_number'] ?: 'Open order') ?></h1>
+    <p class="sub"><?= e($po['pdn'] ?: $po['pn']) ?> · <?= e(PO_TYPES[$po['po_type']] ?? $po['po_type']) ?><?php if ($po['value']!==null): ?> · <strong><?= e(cur_sym()) ?><?= number_format((float)$po['value'],0) ?></strong> (from line items)<?php endif; ?>
       <?php $psb = array_filter(explode(',', $po['sbu'] ?? '')); if ($psb): ?> · SBU: <?= e(implode(', ', array_map(fn($s)=>lk_options_or('sbu',OPS_SBUS)[$s]??$s, $psb))) ?><?php endif; ?></p></div>
   <a class="btn secondary" href="/partner?id=<?= (int)$po['partner_id'] ?>&tab=purchase_orders">← Back</a>
 </div>
@@ -16,15 +16,15 @@
     <td><?= e($li['site'] ?: '—') ?></td>
     <td><?= (int)$li['manpower'] ?: '—' ?></td>
     <td><?= e($li['quantity']) ?></td><td><?= e($li['consumed']) ?></td><td><strong class="<?= $bal<=0?'':'' ?>"><?= e($bal) ?></strong></td>
-    <td><?= $li['rate']!==null?'₹'.e($li['rate']):'—' ?></td>
-    <td>₹<?= number_format((float)$li['base_amount'],0) ?></td>
+    <td><?= $li['rate']!==null?cur_sym().e($li['rate']):'—' ?></td>
+    <td><?= e(cur_sym()) ?><?= number_format((float)$li['base_amount'],0) ?></td>
     <td><?= e($li['gst_pct']) ?>%</td>
-    <td>₹<?= number_format((float)$li['tax_amount'],0) ?></td>
-    <td><strong>₹<?= number_format((float)$li['total_amount'],0) ?></strong></td>
+    <td><?= e(cur_sym()) ?><?= number_format((float)$li['tax_amount'],0) ?></td>
+    <td><strong><?= e(cur_sym()) ?><?= number_format((float)$li['total_amount'],0) ?></strong></td>
   </tr>
   <?php endforeach; ?>
   <?php if (!$items): ?><tr><td colspan="12">No line items yet.</td></tr>
-  <?php else: ?><tr><td colspan="11" style="text-align:right"><strong>PO total</strong></td><td><strong>₹<?= number_format($gt,0) ?></strong></td></tr><?php endif; ?>
+  <?php else: ?><tr><td colspan="11" style="text-align:right"><strong>PO total</strong></td><td><strong><?= e(cur_sym()) ?><?= number_format($gt,0) ?></strong></td></tr><?php endif; ?>
 </table>
 </div>
 
@@ -45,7 +45,7 @@
     <div class="ff"><label>Site of deployment</label><input class="form-control" name="site"></div>
     <div class="ff"><label>Manpower required</label><input class="form-control" type="number" name="manpower" value="0"></div>
     <div class="ff"><label>Quantity</label><input class="form-control" type="number" step="0.01" name="quantity"></div>
-    <div class="ff"><label>Rate (₹)</label><input class="form-control" type="number" step="0.01" name="rate"></div>
+    <div class="ff"><label>Rate (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="rate"></div>
     <div class="ff"><label>Consumed</label><input class="form-control" type="number" step="0.01" name="consumed" value="0"></div>
     <div class="ff"><label>GST %</label><input class="form-control" type="number" step="0.01" name="gst_pct" value="18"></div>
   </div>

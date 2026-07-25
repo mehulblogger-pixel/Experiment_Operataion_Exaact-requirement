@@ -104,6 +104,13 @@ try {
     db()->query("SELECT id FROM endorsements LIMIT 1");
     db()->query("SELECT id FROM tech_phrases LIMIT 1");
     db()->query("SELECT id FROM learned_suggestions LIMIT 1");
+    // Data-level upgrades can't be spotted by a missing table or column, so they
+    // are asserted here instead: if the old shape is still present, throw, which
+    // runs the same idempotent boot() and clears it. Each check is self-cancelling.
+    if ((int)db()->query("SELECT COUNT(*) FROM lookup_types WHERE type_key='deputation_type'")->fetchColumn() > 0)
+        throw new RuntimeException('pending upgrade: engagement-pattern list rename');
+    if ((int)db()->query("SELECT COUNT(*) FROM inspectors WHERE roll_type NOT IN ('OWN','AGENCY')")->fetchColumn() > 0)
+        throw new RuntimeException('pending upgrade: roll-type normalisation');
 } catch (Throwable $ex) {
     try {
         boot();
@@ -221,8 +228,10 @@ if ($route === 'clients' || $route === 'vendors') {
     $s->execute($args);
     return view('list', [
         'rows' => $s->fetchAll(), 'total' => $total, 'roleField' => $roleField,
-        'title' => $route === 'clients' ? 'Client Master' : 'Vendor Master',
-        'subtitle' => $route === 'clients' ? 'Customers, contacts, contracts and billing references' : 'Manufacturers, suppliers, plants and their contacts',
+        'title' => $route === 'clients' ? T_REG('client') : T_REG('vendor'),
+        'subtitle' => $route === 'clients'
+            ? Tlp('client') . ', contacts, contracts and billing references'
+            : Tlp('manufacturer') . ', ' . Tlp('supplier') . ', plants and their contacts',
         'q' => $q, 'status' => $status, 'page' => $page, 'pages' => (int)ceil($total / $per),
     ]);
 }

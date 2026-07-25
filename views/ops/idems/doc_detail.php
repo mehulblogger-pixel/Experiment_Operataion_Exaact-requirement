@@ -1,7 +1,7 @@
 <?php // Report instance detail — Phase 1 (header, references, lifecycle actions, audit) ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents">Documents</a> › <?= e($doc['irn']) ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <?= e($doc['irn']) ?></div>
 <div class="master-head">
-  <div><h1><?= e($doc['irn']) ?> <?= $doc['finalized'] ? '🔒' : '' ?></h1>
+  <div><h1><?= e(T_DETAIL('report', $doc['irn'])) ?> <?= $doc['finalized'] ? '🔒' : '' ?></h1>
     <p class="sub" style="margin:2px 0 0"><span class="pill p-info"><?= e($doc['type_code']) ?></span> <?= e($doc['type_name'] ?: $doc['title']) ?> · <span class="pill <?= idems_status_pill($doc['status']) ?>"><?= e(IDEMS_STATUS[$doc['status']] ?? $doc['status']) ?></span></p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <?php if (idems_can_edit_doc($doc)): ?><a class="btn secondary" href="/document-edit?id=<?= (int)$doc['id'] ?>">Edit header</a><?php endif; ?>

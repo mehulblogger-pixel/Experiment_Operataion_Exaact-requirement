@@ -1,5 +1,5 @@
 <?php // Per-inspector approver mapping (individual / common / temp cover) ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents">Documents</a> › Approver mapping</div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › Approver mapping</div>
 <div class="master-head"><div><h1>Approver mapping</h1>
   <p class="sub" style="margin:2px 0 0">Assign each inspector's approver. The same person can approve for many inspectors (common approver). Set a temporary cover during leave. Reports can't be submitted for an inspector with no approver.</p></div>
   <a class="btn secondary" href="/idems-approval-rules">Approval rules →</a>

@@ -5,9 +5,9 @@
   $qs = fn($over) => '/audit-log?' . http_build_query(array_merge(array_diff_key($_GET, ['export'=>1]), $over));
   $maxA = $byAction ? max(array_map(fn($r)=>(int)$r['n'], $byAction)) : 0;
 ?>
-<div class="crumbs"><a href="/">Home</a> › Audit &amp; compliance</div>
+<div class="crumbs"><a href="/">Home</a> › Audit trail</div>
 <div class="master-head">
-  <div><h1>Audit &amp; compliance</h1>
+  <div><h1>Audit trail</h1>
     <p class="sub" style="margin:2px 0 0">Every critical action across all branches. Records are never deleted — deletions are soft and stay logged.</p></div>
   <a class="btn secondary" href="<?= e($qs(['export'=>'csv'])) ?>">⭳ Export CSV</a>
 </div>

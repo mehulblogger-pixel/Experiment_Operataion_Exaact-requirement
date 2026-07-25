@@ -54,9 +54,9 @@
       </select></div>
     <div class="ff"><label>Product (if "Others")</label><input class="form-control" name="product_other" value="<?= e($call['product_other'] ?? '') ?>"></div>
 
-    <div class="ff"><label>Deputation type</label>
+    <div class="ff"><label>Engagement pattern</label>
       <select class="form-control searchable" name="deputation_type"><option value="">—</option>
-        <?php foreach (lk_options_or('deputation_type', ['Daily (single day)'=>'Daily (single day)','Multiple days'=>'Multiple days','Continuous days'=>'Continuous days','Monthly (PM deputation)'=>'Monthly (PM deputation)']) as $k=>$v): ?>
+        <?php foreach (lk_options_or('engagement_pattern', ['Daily (single day)'=>'Daily (single day)','Multiple days'=>'Multiple days','Continuous days'=>'Continuous days','Monthly (resident posting)'=>'Monthly (resident posting)']) as $k=>$v): ?>
           <option value="<?= e($v) ?>" <?= ($call && ($call['deputation_type']??'')===$v)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"></div>
@@ -64,7 +64,7 @@
     <!-- SAME office → billable value only (ex-GST); DIFFERENT office → inter-office credit -->
     <div class="ff ff-wide" id="billbox">
       <div class="form-grid" id="samebox">
-        <div class="ff"><label>Billable value to client — <strong>excluding GST</strong> (₹)</label>
+        <div class="ff"><label>Billable value to client — <strong>excluding GST</strong> (<?= e(cur_sym()) ?>)</label>
           <input class="form-control" type="number" step="0.01" name="billable_value" value="<?= e($call['billable_value'] ?? '') ?>"></div>
         <div class="ff"><label>Basis</label>
           <select class="form-control" name="billable_basis"><option value="">—</option>
@@ -73,7 +73,7 @@
         <p class="muted ff-wide" style="margin:2px 2px 0">Same contracting &amp; executing office — no inter-office credit; this is the client-billable value (ex-GST).</p>
       </div>
       <div class="form-grid" id="crossbox" style="display:none">
-        <div class="ff"><label>Credit to executing office (₹) <span class="muted">— required</span></label>
+        <div class="ff"><label>Credit to executing office (<?= e(cur_sym()) ?>) <span class="muted">— required</span></label>
           <input class="form-control" type="number" step="0.01" name="expected_credit" value="<?= e($call['expected_credit'] ?? '') ?>"></div>
         <div class="ff"><label>Credit type</label>
           <select class="form-control" name="credit_type"><option value="">—</option>
