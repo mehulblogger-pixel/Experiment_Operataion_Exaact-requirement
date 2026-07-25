@@ -30,7 +30,7 @@
       <select class="form-control searchable" name="assigned_to"><option value="">—</option>
         <?php foreach ($users as $u): $nm = trim(($u['first_name'] ?? '').' '.($u['last_name'] ?? '')) ?: $u['username']; ?><option value="<?= (int)$u['id'] ?>" <?= (string)($inq['assigned_to'] ?? '')===(string)$u['id']?'selected':'' ?>><?= e($nm) ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff ff-wide"><label>Subject</label><input class="form-control" name="subject" value="<?= e($inq['subject'] ?? '') ?>" placeholder="e.g. Third-party inspection — Adani Mundra"></div>
+    <div class="ff ff-wide"><label>Subject</label><input class="form-control" name="subject" value="<?= e($inq['subject'] ?? '') ?>" placeholder="e.g. Third-party inspection — Suryavan Mundra"></div>
     <div class="ff ff-wide"><label>Service requirement / details</label><textarea class="form-control" name="service_requirement" rows="3"><?= e($inq['service_requirement'] ?? '') ?></textarea></div>
     <div class="ff ff-wide"><label>Notes</label><input class="form-control" name="notes" value="<?= e($inq['notes'] ?? '') ?>"></div>
   </div>

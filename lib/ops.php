@@ -627,7 +627,7 @@ function vendors_list() { return ops_all("SELECT id, legal_name, display_name FR
 function offices_list() { return ops_all("SELECT * FROM offices ORDER BY is_ahmedabad DESC, name"); }
 function office($id) { return $id ? ops_one("SELECT * FROM offices WHERE id=?", [$id]) : null; }
 
-// ---- Client/Vendor coding: BRANCH-YY-SHORTNAME-SEQ (e.g. AHM-26-ADANI-00042) ----
+// ---- Client/Vendor coding: BRANCH-YY-SHORTNAME-SEQ (e.g. AHM-26-KAVER-00042) ----
 function branch_abbr($branchId) {
     $o = $branchId ? office($branchId) : null;
     if (!$o) $o = ops_one("SELECT * FROM offices WHERE is_ahmedabad=1 LIMIT 1");

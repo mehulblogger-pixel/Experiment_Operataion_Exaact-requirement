@@ -20,6 +20,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <?= theme_style_tag() ?>
 <script src="/assets/js/offline.js" defer></script>
+<script>
+  // Applied before first paint: a rail that flashes open then snaps shut
+  // on every page load is worse than one that never collapsed.
+  try { if (localStorage.getItem("navCollapsed") === "1") document.documentElement.classList.add("nav-collapsed"); } catch (e) {}
+</script>
 </head><body class="<?= $u ? 'app' : '' ?><?= $isInsp ? ' inspector' : '' ?>">
 <?php if ($u): ?>
 <div class="shell">
@@ -27,6 +32,9 @@
     <div class="side-brand">
       <a class="sb-logo" href="/"><?php $lg = logo_html(); echo $lg ?: '<span class="sb-mono">'.e(mb_substr(app_name(),0,1)).'</span><b>'.e(app_name()).'</b>'; ?></a>
       <button class="side-close" aria-label="Close menu" onclick="document.getElementById('side').classList.remove('open');document.getElementById('scrim').classList.remove('on');">✕</button>
+      <?php // Desktop only: shrink the rail to icons so a wide register gets the
+            // screen. The choice is remembered per browser. ?>
+      <button class="side-collapse" id="navCollapse" type="button" aria-label="Collapse the menu" title="Collapse the menu">«</button>
     </div>
     <nav class="side-nav">
       <a class="s-item<?= $navOn(['']) ?>" href="/"><span class="s-ic">🏠</span><span>Dashboard</span></a>
@@ -109,6 +117,30 @@
     </div>
   </aside>
   <div class="scrim" id="scrim" onclick="document.getElementById('side').classList.remove('open');this.classList.remove('on');"></div>
+  <script>
+  (function () {
+    // Copy each item's own label onto the element, so the collapsed rail can
+    // show it as a tooltip without duplicating every string in the markup.
+    document.querySelectorAll(".side-nav .s-item").forEach(function (a) {
+      var lab = a.querySelector("span:not(.s-ic)");
+      if (lab) a.setAttribute("data-label", lab.textContent.trim());
+    });
+    var btn = document.getElementById("navCollapse");
+    if (!btn) return;
+    function sync() {
+      var on = document.documentElement.classList.contains("nav-collapsed");
+      btn.textContent = on ? "»" : "«";
+      btn.title = on ? "Expand the menu" : "Collapse the menu";
+      btn.setAttribute("aria-label", btn.title);
+    }
+    btn.addEventListener("click", function () {
+      var on = document.documentElement.classList.toggle("nav-collapsed");
+      try { localStorage.setItem("navCollapsed", on ? "1" : "0"); } catch (e) {}
+      sync();
+    });
+    sync();
+  })();
+  </script>
 
   <div class="main">
     <header class="topbar-slim">

@@ -233,6 +233,33 @@ body.app{background:var(--bg)}
 .side{width:var(--side-w);flex:0 0 var(--side-w);background:var(--card);border-right:1px solid var(--line);
   display:flex;flex-direction:column;position:sticky;top:0;height:100vh;z-index:60}
 .side-brand{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line)}
+/* ---- Collapsible rail --------------------------------------------------
+   A register with a dozen columns needs the width more than the menu does.
+   Collapsed, the rail keeps its icons so navigation is still one click —
+   hiding it entirely would trade a horizontal scroll for a lost menu. */
+.side-collapse{display:none;background:none;border:1px solid var(--line);border-radius:7px;
+  color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:5px 8px;flex:0 0 auto}
+.side-collapse:hover{border-color:var(--brand);color:var(--brand)}
+@media(min-width:961px){ .side-collapse{display:block} }
+
+:root.nav-collapsed .side{width:60px;flex-basis:60px}
+:root.nav-collapsed .side-brand{padding:14px 8px;justify-content:center}
+:root.nav-collapsed .sb-logo b, :root.nav-collapsed .sb-logo img{display:none}
+:root.nav-collapsed .side-nav{overflow-x:hidden}
+/* Hide the label, keep the icon. :not(.s-ic) so the icon span survives. */
+:root.nav-collapsed .s-item{justify-content:center;padding-left:0;padding-right:0;gap:0}
+:root.nav-collapsed .s-item > span:not(.s-ic){display:none}
+/* Group headings become a rule, so the grouping is still legible at 60px. */
+:root.nav-collapsed .s-grp{font-size:0;padding:8px 0 0;margin:6px 10px 0;border-top:1px solid var(--line);height:1px;overflow:hidden}
+:root.nav-collapsed .side-foot .sf-meta, :root.nav-collapsed .side-foot b{display:none}
+:root.nav-collapsed .side-foot{justify-content:center;padding:10px 6px}
+/* The label reappears as a tooltip on hover. */
+:root.nav-collapsed .s-item{position:relative}
+:root.nav-collapsed .s-item:hover::after{
+  content:attr(data-label);position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);
+  background:var(--ink);color:var(--card);font-size:12px;font-weight:600;white-space:nowrap;
+  padding:5px 9px;border-radius:6px;z-index:80;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+
 .sb-logo{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:800;font-size:16px;text-decoration:none;min-width:0}
 .sb-logo:hover{text-decoration:none}
 .sb-logo b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
