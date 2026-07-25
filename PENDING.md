@@ -94,8 +94,16 @@ Proposed phasing (each phase = its own commit, tested):
   (action / branch / user / date range / free-text over IRN+user+value+reason / high-risk-only),
   plain-English action labels, high-risk rows highlighted, and CSV export of the filtered view.
   Records are immutable and never purged; deletes stay soft.
-- P12 Offline-first / mobile field UX (constraint: plain PHP on shared hosting → responsive +
-  localStorage autosave/draft + sync-on-reconnect; true native offline is a later PWA effort).
+- P12 Offline-first / mobile field UX ✅ SHIPPED (PWA-lite, as scoped for shared hosting) —
+  manifest.php (installable, app name/theme follow Settings, inline SVG icon so no binary assets),
+  sw.js service worker (network-first pages cached for re-open, cache-first assets, offline fallback
+  page, never caches POSTs or auth), assets/js/offline.js: per-form localStorage draft autosave with a
+  "restore this draft?" prompt, offline submit queue replayed automatically on reconnect (forms with
+  photos are held back with a clear message since images need a live upload), and a fixed connection
+  banner showing offline / syncing state. Fill form marked data-autosave + field-mode CSS (single
+  column, 16px inputs to stop iOS zoom, 44px+ touch targets). index.php serves /sw.js, /manifest.php
+  and /assets/* before the auth gate (path-traversal guarded) so it works on any host rewrite;
+  .htaccess sets Service-Worker-Allowed + no-cache for sw.js.
 - P13 Future self-learning suggestions from approved reports (suggestions only, never auto-alter).
 
 Constraint note: MilesWeb shared PHP hosting — no Node/build; "offline-first" is delivered as a

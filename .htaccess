@@ -4,6 +4,15 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [L]
 
+# Service worker: must be served from the root scope and never cached stale,
+# otherwise field devices keep an old copy after an upgrade.
+<FilesMatch "^sw\.js$">
+    <IfModule mod_headers.c>
+        Header set Service-Worker-Allowed "/"
+        Header set Cache-Control "no-cache, max-age=0"
+    </IfModule>
+</FilesMatch>
+
 # Protect config and data
 <FilesMatch "^(config\.php)$">
     Require all denied

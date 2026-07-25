@@ -143,6 +143,24 @@ function children($table, $pid, $order = 'id') {
     return $q->fetchAll();
 }
 
+// --- PWA assets: served before the auth gate so field devices can install the
+//     app and register the service worker. Also covers hosts whose rewrite rules
+//     send every request here instead of serving the real file. ---
+if ($route === 'sw.js' || $route === 'manifest.php' || strpos($route, 'assets/') === 0) {
+    $file = __DIR__ . '/' . $route;
+    if ($route === 'manifest.php') { require $file; exit; }
+    if (is_file($file) && strpos(realpath($file), realpath(__DIR__)) === 0) {
+        $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+        $types = ['js'=>'application/javascript', 'css'=>'text/css', 'png'=>'image/png', 'jpg'=>'image/jpeg',
+                  'jpeg'=>'image/jpeg', 'svg'=>'image/svg+xml', 'woff'=>'font/woff', 'woff2'=>'font/woff2'];
+        header('Content-Type: ' . ($types[$ext] ?? 'application/octet-stream'));
+        if ($route === 'sw.js') { header('Service-Worker-Allowed: /'); header('Cache-Control: no-cache, max-age=0'); }
+        else header('Cache-Control: public, max-age=86400');
+        readfile($file); exit;
+    }
+    http_response_code(404); exit;
+}
+
 // --- Public routes ---
 function render_login($error) {
     require __DIR__ . '/views/login_page.php';
