@@ -10,7 +10,8 @@
     return ' data-cond="'.e($f['cond_field']).'" data-cond-op="'.e($f['cond_op']).'" data-cond-val="'.e($f['cond_val']).'"';
   };
 
-  $renderField = function($f) use ($data, $filesByField, $condAttr) {
+  $sugg = $sugg ?? [];
+  $renderField = function($f) use ($data, $filesByField, $condAttr, $sugg) {
     $k = $f['fkey']; $val = $data[$k] ?? '';
     $span = (int)$f['col_span'] === 2 ? ' ff-wide' : '';
     $req = $f['required'] ? ' <span style="color:var(--bad)">*</span>' : '';
@@ -77,6 +78,15 @@
         echo '<input class="form-control" name="f['.e($k).']" data-key="'.e($k).'" value="'.e(is_array($val)?'':$val).'">';
     }
     if ($f['help']) echo '<small class="muted">'.e($f['help']).'</small>';
+    // ---- learned suggestions: what your team usually writes here (click to use) ----
+    if (!empty($sugg[$k]) && in_array($f['ftype'], ['text','textarea'], true)) {
+      echo '<div class="lrn-row"><span class="lrn-lab">Used before:</span>';
+      foreach ($sugg[$k] as $s) {
+        echo '<button type="button" class="lrn" data-target="'.e($k).'" data-text="'.e($s['text_value']).'" title="'.e($s['text_value']).'">'
+           . e(mb_strimwidth($s['text_value'], 0, 46, '…')) . ' <span class="lrn-n">×'.(int)$s['uses'].'</span></button>';
+      }
+      echo '</div>';
+    }
     echo '</div>';
   };
 ?>
@@ -109,6 +119,12 @@
   .ev-th{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
   .sig-pad{border:1px solid var(--line);border-radius:8px;touch-action:none;background:#fff;max-width:100%}
   .rep-table table{width:100%}
+  /* ---- learned suggestions ---- */
+  .lrn-row{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:5px}
+  .lrn-lab{font-size:11px;color:var(--muted)}
+  .lrn{font-size:11px;padding:3px 8px;border:1px solid var(--line);border-radius:12px;background:var(--soft);cursor:pointer;max-width:100%;text-align:left}
+  .lrn:hover{border-color:var(--brand);color:var(--brand)}
+  .lrn-n{color:var(--muted);font-size:10px}
   /* ---- field mode: large, touch-friendly controls on phones & tablets ---- */
   @media (max-width: 820px) {
     .field-form .form-grid{grid-template-columns:1fr}
@@ -136,6 +152,16 @@ function idemsImprove(k){
     .catch(function(){ alert('Could not reach the writing assistant.'); });
 }
 function idemsAddRow(btn){ var wrap=btn.closest('.rep-table'); var tpl=wrap.querySelector('template'); var tb=wrap.querySelector('tbody'); tb.insertAdjacentHTML('beforeend', tpl.innerHTML); }
+// Learned suggestions: click to insert wording your team has used before.
+document.querySelectorAll('.lrn').forEach(function(b){
+  b.addEventListener('click', function(){
+    var k=b.getAttribute('data-target'), t=b.getAttribute('data-text');
+    var el=document.querySelector('[data-key="'+k+'"]'); if(!el) return;
+    el.value = el.value && el.value.trim() ? (el.value.replace(/\s*$/,'') + ' ' + t) : t;
+    el.dispatchEvent(new Event('input',{bubbles:true}));
+    el.focus();
+  });
+});
 // ---- Smart evidence: shrink big camera photos in the browser before upload, and
 // auto-capture the location once a photo is chosen (saves data on site connections).
 (function(){

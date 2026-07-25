@@ -104,7 +104,16 @@ Proposed phasing (each phase = its own commit, tested):
   column, 16px inputs to stop iOS zoom, 44px+ touch targets). index.php serves /sw.js, /manifest.php
   and /assets/* before the auth gate (path-traversal guarded) so it works on any host rewrite;
   .htaccess sets Service-Worker-Allowed + no-cache for sw.js.
-- P13 Future self-learning suggestions from approved reports (suggestions only, never auto-alter).
+- P13 Self-learning suggestions ✅ SHIPPED — learned_suggestions table; learn_from_report() harvests
+  wording when a report is APPROVED or ISSUED (never from drafts): per report-type field wording,
+  per-client wording, remark sentences, and recurring NCR causes (adverse results). Ranked
+  learn_suggestions() (client-specific first, then type-wide) surfaces as clickable "Used before ×N"
+  chips on text/textarea fields in the fill form — click to insert, nothing auto-applied. /learning
+  insights screen: KPIs (learned entries, times seen, reports learned from, NCR patterns), most-used
+  standard phrases chart, scope filter, and per-entry Standardise (promote into tech_phrases) / Mute /
+  Restore. Suggestions only ever enhance — technical conclusions and approvals are never altered.
+
+=== IDEMS COMPLETE: all 13 phases shipped ===
 
 Constraint note: MilesWeb shared PHP hosting — no Node/build; "offline-first" is delivered as a
 responsive PWA-lite (localStorage drafts + autosave + sync), not a native app.

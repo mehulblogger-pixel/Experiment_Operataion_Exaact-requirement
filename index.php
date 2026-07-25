@@ -102,6 +102,7 @@ try {
     db()->query("SELECT id FROM report_templates LIMIT 1");
     db()->query("SELECT id FROM endorsements LIMIT 1");
     db()->query("SELECT id FROM tech_phrases LIMIT 1");
+    db()->query("SELECT id FROM learned_suggestions LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();

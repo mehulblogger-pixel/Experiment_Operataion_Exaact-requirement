@@ -1248,7 +1248,7 @@ function ops_module_gate($route) {
         'document-pdf'=>'idems','document-timestamp'=>'idems','document-docx'=>'idems',
         'report-templates'=>'idems','report-template-edit'=>'idems','report-template-download'=>'idems',
         'endorsements'=>'idems','endorsement'=>'idems','endorsement-new'=>'idems','endorsement-edit'=>'idems','endorsement-submit'=>'idems','endorsement-approve'=>'idems','endorsement-delete'=>'idems','endorsement-file'=>'idems','endorsement-cert'=>'idems',
-        'phrase-library'=>'idems','phrase-edit'=>'idems',
+        'phrase-library'=>'idems','phrase-edit'=>'idems','learning'=>'idems',
         'document-smart'=>'idems','document-release-note'=>'idems','document-review'=>'idems','document-evidence'=>'idems',
         'masters'=>'masters','work-norms'=>'masters',
         'office-finance'=>'overheads',
@@ -1414,6 +1414,8 @@ function ops_dispatch($route, $method) {
             return ops_idems_writing($method);
         case $route === 'phrase-library' || $route === 'phrase-edit':
             return ops_idems_phrases($route, $method);
+        case $route === 'learning':
+            return ops_idems_learning($method);
         case $route === 'document-smart':
             return ops_idems_smart($method);
         case $route === 'document-release-note':
