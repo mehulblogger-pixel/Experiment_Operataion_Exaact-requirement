@@ -510,6 +510,53 @@ function ops_next_code($table, $col, $prefix) {
     return sprintf("%s-%05d", $prefix, $seq);
 }
 // ---------------------------------------------------------------------------
+//  §b — is this party's master record fit to work against?
+//
+//  A client added in a hurry from a call has a name and nothing else: no address
+//  to travel to, nobody to ring, no tax identity to invoice. The gap is not felt
+//  on the day it is created — it is felt weeks later by the engineer standing at
+//  a gate, or by the accountant who cannot raise the bill. So the details are
+//  asked for while the coordinator still has the client on the phone.
+//
+//  Returns what is missing, in plain words. An empty array means the record is
+//  complete. Sites and manufacturers need less than clients — nobody invoices a
+//  site — so the list depends on the role the party is being used in.
+// ---------------------------------------------------------------------------
+function partner_missing($id, $role = 'client') {
+    $id = (int)$id;
+    if (!$id) return [];
+    $p = ops_one("SELECT * FROM business_partners WHERE id=?", [$id]);
+    if (!$p) return [];
+    $miss = [];
+    if ($role === 'client' && trim((string)($p['gstin'] ?? '')) === '' && trim((string)($p['pan'] ?? '')) === '')
+        $miss[] = 'GSTIN or PAN';
+    $addr = ops_one("SELECT * FROM partner_addresses WHERE partner_id=? ORDER BY is_primary DESC, id", [$id]);
+    if (!$addr) $miss[] = 'an address';
+    elseif (trim((string)$addr['line1']) === '' && trim((string)$addr['city']) === '') $miss[] = 'a usable address';
+    $contacts = ops_all("SELECT * FROM partner_contacts WHERE partner_id=?", [$id]);
+    if (!$contacts) $miss[] = 'a contact person';
+    else {
+        $hasPhone = false; $hasMail = false;
+        foreach ($contacts as $c) {
+            if (trim((string)($c['mobile'] ?: $c['phone'])) !== '') $hasPhone = true;
+            if (trim((string)$c['email']) !== '') $hasMail = true;
+        }
+        if (!$hasPhone) $miss[] = 'a contact mobile number';
+        // A site's paperwork travels by hand; only a client is e-mailed.
+        if (!$hasMail && $role === 'client') $miss[] = 'a contact e-mail address';
+    }
+    return $miss;
+}
+// The same question, phrased for a sentence: "no address, no contact person".
+function partner_missing_text($id, $role = 'client') {
+    $m = partner_missing($id, $role);
+    if (!$m) return '';
+    if (count($m) === 1) return $m[0];
+    $last = array_pop($m);
+    return implode(', ', $m) . ' and ' . $last;
+}
+
+// ---------------------------------------------------------------------------
 //  A call is raised against a quotation (§a.i, §a.ii, §a.iv)
 //
 //  Everything commercial was already agreed when the quote was won, so the call
@@ -1626,6 +1673,19 @@ function ops_dispatch($route, $method) {
             lk_admin($route, $method); return true;
         case $route === 'quick-add':
             ops_quick_add(); return true;
+        // §b — what is still missing from a party's master record, so the call
+        // form can say so while the client is still on the phone.
+        case $route === 'partner-gaps':
+            header('Content-Type: application/json');
+            $pid = (int)($_GET['id'] ?? 0);
+            $role = ($_GET['role'] ?? 'client') === 'site' ? 'site' : 'client';
+            $p = $pid ? ops_one("SELECT COALESCE(NULLIF(display_name,''), legal_name) nm FROM business_partners WHERE id=?", [$pid]) : null;
+            echo json_encode([
+                'name'    => $p ? (string)$p['nm'] : '',
+                'missing' => partner_missing($pid, $role),
+                'url'     => $pid ? '/partner-edit?id=' . $pid : '',
+            ]);
+            return true;
         case $route === 'partner-meta':
             header('Content-Type: application/json');
             $r = ops_one("SELECT inspection_types FROM business_partners WHERE id=?", [(int)($_GET['id'] ?? 0)]);
@@ -1719,15 +1779,37 @@ function ops_quick_add() {
             $isClient = ($kind === 'client' || $kind === 'both') ? 1 : 0;
             $isVendor = ($kind === 'vendor' || $kind === 'both') ? 1 : 0;
             $gstin = clean_gstin($b['gstin'] ?? '');
-            $pan = $gstin ? pan_from_gstin($gstin) : '';
-            $state = $gstin ? state_from_gstin($gstin) : '';
+            $pan = $gstin ? pan_from_gstin($gstin) : strtoupper(trim($b['pan'] ?? ''));
+            $state = $gstin ? state_from_gstin($gstin) : trim($b['state'] ?? '');
+            // §b — the record must be usable the moment it exists: an address to
+            // travel to, somebody to ring, and a tax identity to invoice against.
+            $line1 = trim($b['line1'] ?? ''); $city = trim($b['qcity'] ?? '');
+            $pName = trim($b['pname'] ?? ''); $pMob = trim($b['pmob'] ?? ''); $pMail = trim($b['pmail'] ?? '');
+            $need = [];
+            if ($isClient && $gstin === '' && $pan === '') $need[] = 'a GSTIN or a PAN';
+            if ($line1 === '' && $city === '') $need[] = 'an address';
+            if ($pName === '') $need[] = 'a contact person';
+            if ($pMob === '') $need[] = 'a mobile number';
+            if ($isClient && $pMail === '') $need[] = 'an e-mail address';
+            if ($need) {
+                $last = array_pop($need);
+                echo json_encode(['ok' => false, 'error' => 'Enter '
+                    . ($need ? implode(', ', $need) . ' and ' . $last : $last)
+                    . '. These are needed before the work can be sent out or billed.']);
+                return;
+            }
             $token = short_token($name);
             $last = ops_val("SELECT code FROM business_partners WHERE code LIKE ? ORDER BY code DESC LIMIT 1", ["GEN-$token-%"]);
             $seq = $last ? ((int)substr($last, strrpos($last, '-') + 1)) + 1 : 1;
             $code = sprintf("GEN-%s-%04d", $token, $seq);
             $pdo->prepare("INSERT INTO business_partners (code,legal_name,is_client,is_vendor,status,gstin,pan,state,created_at) VALUES (?,?,?,?, 'ACTIVE', ?,?,?,?)")
                 ->execute([$code, $name, $isClient, $isVendor, $gstin, $pan, $state, date('c')]);
-            echo json_encode(['ok' => true, 'id' => $pdo->lastInsertId(), 'label' => $name, 'roles' => ['client' => $isClient, 'vendor' => $isVendor]]);
+            $pid = (int)$pdo->lastInsertId();
+            $pdo->prepare("INSERT INTO partner_addresses (partner_id,address_type,label,line1,city,state,is_primary) VALUES (?,?,?,?,?,?,1)")
+                ->execute([$pid, $isVendor && !$isClient ? 'FACTORY' : 'REGISTERED', $isVendor && !$isClient ? 'Works' : 'Registered office', $line1, $city, $state]);
+            $pdo->prepare("INSERT INTO partner_contacts (partner_id,name,mobile,email,is_primary) VALUES (?,?,?,?,1)")
+                ->execute([$pid, $pName, $pMob, $pMail]);
+            echo json_encode(['ok' => true, 'id' => $pid, 'label' => $name, 'roles' => ['client' => $isClient, 'vendor' => $isVendor]]);
             return;
         }
         if ($kind === 'office') {
@@ -2089,7 +2171,7 @@ function ops_calls($route, $method) {
                 $ex = credit_explainer($mngOffice, $execOffice);
                 // array_merge, not "+": the union operator keeps the left-hand
                 // value, which would silently drop the message.
-                view('ops/call_form', array_merge(call_form_vars($call),
+                view('ops/call_form', array_merge(call_form_vars($call, $b),
                     ['error' => $ex['text'] . ' Enter that amount before saving.']));
                 return;
             }
@@ -2114,6 +2196,29 @@ function ops_calls($route, $method) {
                 'reporting_frequency','report_custom_days','deliverables'];
             $wasForwarded = $call ? ($call['executing_office_id'] ?? null) : null;
             $forwardNow = $execOffice && !$wasForwarded; // first time it gets an executing branch
+            // §b — forwarding is the moment the work leaves this desk: somebody
+            // will travel to the site, and somebody will be invoiced for it. Neither
+            // is possible against a master record that is only a name, so the gaps
+            // are named and the call is handed back rather than sent on. Only the
+            // first forward is gated — a call already out in the world stays
+            // editable, or a typo would become impossible to correct.
+            if ($forwardNow) {
+                $gaps = [];
+                $cm = partner_missing_text((int)($b['client_id'] ?? 0), 'client');
+                if ($cm) $gaps[] = 'The ' . Tl('client') . ' record is missing ' . $cm . '.';
+                $vm = partner_missing_text((int)($b['vendor_id'] ?? 0), 'site');
+                if ($vm) $gaps[] = 'The site record is missing ' . $vm . '.';
+                if ($gaps) {
+                    view('ops/call_form', array_merge(call_form_vars($call, $b), ['error' =>
+                        implode(' ', $gaps) . ' Complete the master under '
+                        . T('client') . 's & ' . T('vendor') . 's before forwarding this '
+                        . Tl('call') . ' to an executing ' . Tl('office')
+                        . ' — the ' . Tl('engineer') . ' needs somewhere to go and somebody to ask for,'
+                        . ' and the invoice needs a tax identity. Leave the executing '
+                        . Tl('office') . ' blank to save what you have so far.']));
+                    return;
+                }
+            }
             $notifyMgr = !empty($b['notify_manager']) ? 1 : 0;
             // §i — the report types are a multi-select, so they arrive as an array
             // and are stored as a CSV of report-type codes: the same shape the job
@@ -2207,12 +2312,23 @@ function normalise_city($input) {
 }
 // Everything the call form needs, in one place — the error path and the normal
 // path used to build this list separately and drifted apart.
-function call_form_vars($call) {
+// $posted: when a save is refused, re-render with what was typed rather than
+// with what is in the database. Losing twenty fields because one was wrong is
+// the kind of thing that makes people stop using a system.
+function call_form_vars($call, $posted = null) {
     $u = current_user();
+    if ($posted !== null) {
+        $sticky = [];
+        foreach ($posted as $k => $v) $sticky[$k] = is_array($v) ? implode(',', array_filter($v, 'strlen')) : $v;
+        $call = array_merge($call ?: [], $sticky);
+        // A call that does not exist yet must not acquire an id from the post.
+        if (!isset($call['call_code'])) unset($call['id']);
+    }
     return [
         'call' => $call,
+        'isEdit' => !empty($call['call_code']),
         'clients' => clients_list(), 'vendors' => vendors_list(), 'offices' => offices_list(),
-        'cfvals' => $call ? custom_values_map('call', $call['id']) : [],
+        'cfvals' => !empty($call['id']) ? custom_values_map('call', $call['id']) : [],
         // §a.i — quotes for the client already on the call, so an edit opens ready.
         'quotes' => $call ? call_quotes_for_client((int)($call['client_id'] ?? 0)) : [],
         'qlines' => ($call && !empty($call['quotation_id']))

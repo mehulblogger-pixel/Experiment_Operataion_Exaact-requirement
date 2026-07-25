@@ -6,17 +6,21 @@
   $curWd = array_filter(array_map('intval', explode(',', (string)($call['schedule_weekdays'] ?? ''))));
   $ex = credit_explainer($call['ibo_office_id'] ?? (current_user()['home_office_id'] ?? null), $call['executing_office_id'] ?? null);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/calls"><?= e(T_REG('call')) ?></a> › <?= $call ? e($call['call_code']) : 'New' ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/calls"><?= e(T_REG('call')) ?></a> › <?= $isEdit ? e($call['call_code']) : 'New' ?></div>
 <div class="master-head">
-  <div><h1><?= $call ? 'Edit ' . e(Tl('call')) . ' ' . e($call['call_code']) : ucfirst(T_NEW('call')) ?></h1>
+  <div><h1><?= $isEdit ? 'Edit ' . e(Tl('call')) . ' ' . e($call['call_code']) : ucfirst(T_NEW('call')) ?></h1>
     <p class="sub" style="margin:2px 0 0">Pick the <?= e(Tl('client')) ?> and the <?= e(Tl('quote')) ?> it is against — the commercial terms come across by themselves. Not in a list? Use <strong>+ Add new</strong> beside any dropdown.</p></div>
   <a class="btn secondary" href="/calls">← Back</a>
 </div>
 <?php if (!empty($error)): ?><div class="msg msg-error"><?= e($error) ?></div><?php endif; ?>
 
-<form method="post" action="<?= $call ? '/call-edit?id=' . (int)$call['id'] : '/call-new' ?>" class="panel">
+<form method="post" action="<?= $isEdit ? '/call-edit?id=' . (int)$call['id'] : '/call-new' ?>" class="panel">
 
   <h3 class="tab-sub" style="margin-top:0">1. <?= e(T('client')) ?> &amp; <?= e(Tl('quote')) ?></h3>
+  <?php // §b — a party added in a hurry has a name and nothing else. Say so here,
+        // while the client is still on the phone, rather than three weeks later
+        // when the engineer is at the gate with nobody to ring. ?>
+  <div id="party_gaps" style="display:none;margin:0 0 12px"></div>
   <div class="form-grid">
     <div class="ff"><label><?= e(T('client')) ?> <a href="#" class="addlink" data-qa="client">+ Add new</a></label>
       <select class="form-control searchable" id="client_sel" name="client_id"><option value="">—</option>
@@ -469,9 +473,57 @@
       var a=document.getElementById('activity_sel'); if (a) a.value=o.dataset.activity;
     }, 250);
   });
-  clientSel.addEventListener('change', function(){ fillQuotes(false); });
+  // ---- §b: a new client's master must actually be filled in -----------------
+  // The details are not optional — an order cannot be invoiced without a tax
+  // identity, and an inspection cannot be carried out without an address and
+  // somebody to ring. The call is still saved, so nothing typed is lost, but it
+  // cannot be forwarded to an executing office until the master is complete.
+  var gapBox = document.getElementById('party_gaps'), vendorSel = document.getElementById('vendor_sel');
+  function gapsFor(sel, role, label) {
+    if (!sel || !sel.value) return Promise.resolve(null);
+    return fetch('/partner-gaps?role=' + role + '&id=' + encodeURIComponent(sel.value))
+      .then(function(r){ return r.json(); })
+      .then(function(g){ return (g && g.missing && g.missing.length) ? {g:g, label:label} : null; })
+      .catch(function(){ return null; });
+  }
+  function checkGaps() {
+    if (!gapBox) return;
+    Promise.all([
+      gapsFor(clientSel, 'client', '<?= e(Tl('client')) ?>'),
+      gapsFor(vendorSel, 'site',   'site')
+    ]).then(function(res){
+      var bad = res.filter(Boolean);
+      if (!bad.length) { gapBox.style.display = 'none'; gapBox.innerHTML = ''; return; }
+      var html = '<div class="panel" style="margin:0;border:1px solid var(--warn);'
+               + 'background:color-mix(in srgb,var(--warn) 8%,transparent)">'
+               + '<b>⚠ The master record is not complete</b>';
+      bad.forEach(function(b){
+        var m = b.g.missing;
+        var list = m.length === 1 ? m[0] : m.slice(0, -1).join(', ') + ' and ' + m[m.length - 1];
+        html += '<div style="margin-top:6px">' + esc(b.g.name) + ' <span class="muted">(' + b.label + ')</span>'
+             +  ' is missing ' + esc(list) + '. '
+             +  '<a class="btn small secondary" href="' + b.g.url + '" target="_blank" rel="noopener">Complete it</a></div>';
+      });
+      html += '<div class="muted" style="margin-top:8px">Save this ' + '<?= e(Tl('call')) ?>'
+           +  ' by all means — nothing typed is lost. It cannot be forwarded to an executing '
+           +  '<?= e(Tl('office')) ?> until the details are in, because that is the point at which '
+           +  'somebody has to travel there and somebody has to be invoiced.'
+           +  ' <a href="#" id="gaps_recheck">Re-check</a></div></div>';
+      gapBox.innerHTML = html;
+      gapBox.style.display = '';
+      var rc = document.getElementById('gaps_recheck');
+      if (rc) rc.addEventListener('click', function(e){ e.preventDefault(); checkGaps(); });
+    });
+  }
+  function esc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+
+  clientSel.addEventListener('change', function(){ fillQuotes(false); checkGaps(); });
+  if (vendorSel) vendorSel.addEventListener('change', checkGaps);
   qSel.addEventListener('change', function(){ loadQuote(false); });
   fillQuotes(true);
+  checkGaps();
+  // Coming back from the master in the other tab should not need a reload.
+  window.addEventListener('focus', checkGaps);
 })();
 </script>
 
@@ -480,9 +532,21 @@
   <div class="modal">
     <h3 id="qa_title">Add</h3>
     <div class="ff"><label>Name *</label><input class="form-control" id="qa_name" autocomplete="off"></div>
+    <?php // §b — a name on its own is not a master record. Ask for what operations
+          // and accounts cannot work without, here, while the coordinator still
+          // has the client on the phone. Everything else can be filled in later
+          // on the full master screen. ?>
     <div class="qa-field qa-cv">
-      <div class="ff"><label>GSTIN (optional — auto PAN/State)</label><input class="form-control" id="qa_gstin"></div>
+      <div class="ff"><label>GSTIN <span class="muted" id="qa_gstin_hint">— auto PAN / state</span></label><input class="form-control" id="qa_gstin"></div>
+      <div class="ff"><label>PAN <span class="muted">— if there is no GSTIN</span></label><input class="form-control" id="qa_pan"></div>
+      <div class="ff"><label>Address <span id="qa_req_addr">*</span></label><input class="form-control" id="qa_line1" placeholder="works / office address"></div>
+      <div class="ff"><label>City <span id="qa_req_city">*</span></label><input class="form-control" id="qa_qcity"></div>
+      <div class="ff"><label>State</label><input class="form-control" id="qa_state"></div>
+      <div class="ff"><label>Contact person <span>*</span></label><input class="form-control" id="qa_pname"></div>
+      <div class="ff"><label>Mobile <span>*</span></label><input class="form-control" id="qa_pmob"></div>
+      <div class="ff"><label>E-mail <span id="qa_req_mail">*</span></label><input class="form-control" id="qa_pmail"></div>
       <div class="ff ff-check"><input type="checkbox" id="qa_both"><label>Add to <strong>both</strong> <?= e(T('client')) ?> &amp; <?= e(T('vendor')) ?> lists</label></div>
+      <p class="muted ff-wide" id="qa_cv_note" style="margin:2px 0 0"></p>
     </div>
     <div class="qa-field qa-office">
       <div class="ff"><label>Code</label><input class="form-control" id="qa_code"></div>
