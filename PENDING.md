@@ -78,7 +78,14 @@ Proposed phasing (each phase = its own commit, tested):
   inspection date. Optional AI layer reads the pack + findings and returns missing docs / revision-spec
   conflicts / traceability issues / suggested hold + witness points / draft remarks, parsed into
   sections. Inspector is always the approving authority (stated in UI). Route: /document-review.
-- P10 Smart photo/evidence mgmt (compress, timestamp, GPS, link to checkpoint, annotate, dedupe).
+- P10 Smart photo & evidence management ✅ SHIPPED — report_files gains sha1/caption/taken_at/bytes/
+  orig_bytes. Two-stage compression: browser-side canvas shrink before upload (saves mobile data) +
+  server-side GD resize/recompress (max 1600px, q82, transparency flattened) — ~80-90% smaller on real
+  camera photos, deterministic output. EXIF capture-time extraction, auto GPS capture on photo select,
+  sha1 duplicate detection (same content skipped, reported in the flash). New /document-evidence
+  gallery: organised by report section → field, thumbnails, capture time, clickable GPS (maps link),
+  size + saving per item, editable captions, remove; KPI strip (items / stored size / space saved /
+  GPS-tagged). Locked once the report is finalized.
 - P11 Super-Admin audit & compliance dashboard (every critical action, soft-delete only, searchable).
 - P12 Offline-first / mobile field UX (constraint: plain PHP on shared hosting → responsive +
   localStorage autosave/draft + sync-on-reconnect; true native offline is a later PWA effort).
