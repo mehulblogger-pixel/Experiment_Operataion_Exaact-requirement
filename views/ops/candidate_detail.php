@@ -6,8 +6,8 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/candidates"><?= e(TP('candidate')) ?></a> › <?= e($cand['cand_code'] ?: candidate_name($cand)) ?></div>
 <div class="master-head">
   <div><h1><?= e(candidate_name($cand)) ?>
-      <span class="badge <?= $stageBadge[$cur] ?? 'AMBER' ?>" style="vertical-align:middle"><?= e(CAND_STAGES[$cur] ?? $cur) ?></span></h1>
-    <p class="sub"><?= e($cand['cand_code']) ?><?= $cand['trade_label']?' · '.e($cand['trade_label']):'' ?><?= $cand['skill_label']?' / '.e($cand['skill_label']):'' ?> · <?= e(CAND_SOURCES[$cand['source']] ?? $cand['source']) ?></p></div>
+      <span class="badge <?= $stageBadge[$cur] ?? 'AMBER' ?>" style="vertical-align:middle"><?= e(lk_options_or('candidate_stage', CAND_STAGES)[$cur] ?? $cur) ?></span></h1>
+    <p class="sub"><?= e($cand['cand_code']) ?><?= $cand['trade_label']?' · '.e($cand['trade_label']):'' ?><?= $cand['skill_label']?' / '.e($cand['skill_label']):'' ?> · <?= e(lk_options_or('candidate_source', CAND_SOURCES)[$cand['source']] ?? $cand['source']) ?></p></div>
   <div class="row-actions">
     <a class="btn secondary" href="/candidate-edit?id=<?= (int)$cand['id'] ?>">Edit</a>
     <a class="btn secondary" href="/candidates">← Back</a>
@@ -26,7 +26,7 @@
     <div><span class="k">Agency</span><span class="v"><?= e($cand['agency'] ?: '—') ?></span></div>
     <div><span class="k">Email</span><span class="v"><?= e($cand['email'] ?: '—') ?></span></div>
     <div><span class="k">Mobile</span><span class="v"><?= e($cand['mobile'] ?: '—') ?></span></div>
-    <div><span class="k">Expected rate</span><span class="v"><?= $cand['expected_rate']>0 ? cur_sym().number_format((float)$cand['expected_rate'],0).' ('.e(RATE_TYPES[$cand['rate_type']] ?? $cand['rate_type']).')' : '—' ?></span></div>
+    <div><span class="k">Expected rate</span><span class="v"><?= $cand['expected_rate']>0 ? cur_sym().number_format((float)$cand['expected_rate'],0).' ('.e(lk_options_or('rate_type', RATE_TYPES)[$cand['rate_type']] ?? $cand['rate_type']).')' : '—' ?></span></div>
     <div><span class="k">CV received</span><span class="v"><?= e($cand['cv_received_date'] ?: '—') ?></span></div>
     <div><span class="k">CV file</span><span class="v"><?= $cand['cv_link'] ? '<a href="'.e($cand['cv_link']).'" target="_blank" rel="noopener">Open CV ↗</a>' : '—' ?></span></div>
   </div>
@@ -100,7 +100,7 @@
     <div class="form-grid">
       <div class="ff"><label>New stage</label>
         <select class="form-control" name="to_stage" id="cand_stage">
-          <?php foreach (CAND_STAGES as $k=>$v): if ($k===$cur) continue; ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
+          <?php foreach (lk_options_or('candidate_stage', CAND_STAGES) as $k=>$v): if ($k===$cur) continue; ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
         </select></div>
       <div class="ff ff-wide"><label>Remark (decision note, interview feedback…)</label><input class="form-control" name="remark" placeholder="e.g. Client shortlisted; interview on 25th"></div>
     </div>
@@ -110,10 +110,10 @@
       <div class="form-grid">
         <div class="ff"><label>Supplied by agency <span class="muted">(optional)</span></label>
           <select class="form-control" name="agency_id" id="ag_sel"><option value="" data-type="" data-fee="0" data-monthly="0">— none / direct —</option>
-            <?php foreach (agencies_list() as $a): ?><option value="<?= (int)$a['id'] ?>" data-type="<?= e($a['agency_type']) ?>" data-fee="<?= e($a['one_time_fee']) ?>" data-monthly="<?= e($a['monthly_rate']) ?>"><?= e($a['name']) ?> · <?= e(AGENCY_TYPES[$a['agency_type']] ?? $a['agency_type']) ?></option><?php endforeach; ?>
+            <?php foreach (agencies_list() as $a): ?><option value="<?= (int)$a['id'] ?>" data-type="<?= e($a['agency_type']) ?>" data-fee="<?= e($a['one_time_fee']) ?>" data-monthly="<?= e($a['monthly_rate']) ?>"><?= e($a['name']) ?> · <?= e(lk_options_or('agency_type', AGENCY_TYPES)[$a['agency_type']] ?? $a['agency_type']) ?></option><?php endforeach; ?>
           </select></div>
         <div class="ff"><label>On whose roll?</label>
-          <select class="form-control" name="roll_type" id="roll_sel"><?php foreach (ROLL_TYPES as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+          <select class="form-control" name="roll_type" id="roll_sel"><?php foreach (lk_options_or('roll_type', ROLL_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
         <div class="ff" id="fee_one"><label>One-time placement fee (<?= e(cur_sym()) ?>) <span class="muted">recruitment</span></label><input class="form-control" type="number" step="0.01" name="placement_fee" value=""></div>
         <div class="ff" id="fee_month"><label>Monthly agency charge (<?= e(cur_sym()) ?>) <span class="muted">manpower</span></label><input class="form-control" type="number" step="0.01" name="agency_cost" value=""></div>
       </div>
@@ -156,7 +156,7 @@
     <?php foreach ($events as $ev): ?>
     <tr>
       <td><?= e(substr($ev['created_at'],0,16)) ?></td>
-      <td><?= $ev['from_stage'] ? e(CAND_STAGES[$ev['from_stage']] ?? $ev['from_stage']).' → ' : '' ?><strong><?= e(CAND_STAGES[$ev['to_stage']] ?? $ev['to_stage']) ?></strong></td>
+      <td><?= $ev['from_stage'] ? e(lk_options_or('candidate_stage', CAND_STAGES)[$ev['from_stage']] ?? $ev['from_stage']).' → ' : '' ?><strong><?= e(lk_options_or('candidate_stage', CAND_STAGES)[$ev['to_stage']] ?? $ev['to_stage']) ?></strong></td>
       <td><?= e($ev['remark'] ?: '—') ?></td>
       <td><?= e($ev['actor'] ?: '—') ?></td>
     </tr>

@@ -52,7 +52,7 @@ function pan_from_gstin($g) {
     }
     return '';
 }
-function state_from_gstin($g) { $g = clean_gstin($g); return GST_STATES[substr($g, 0, 2)] ?? ''; }
+function state_from_gstin($g) { $g = clean_gstin($g); return lk_options_or('gst_state', GST_STATES)[substr($g, 0, 2)] ?? ''; }
 function is_valid_gstin($g) { return (bool)preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/', clean_gstin($g)); }
 function normalize_name($name) {
     $n = strtolower((string)$name);

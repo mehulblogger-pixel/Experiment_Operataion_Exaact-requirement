@@ -20,7 +20,8 @@ function lk_ensure_schema() {
     $t = [
         "CREATE TABLE IF NOT EXISTS lookup_types (
             id $pk, type_key VARCHAR(60), label VARCHAR(150), parent_type_id INT NULL,
-            is_system INT DEFAULT 0, sort_order INT DEFAULT 0, created_at VARCHAR(30) DEFAULT '')",
+            is_system INT DEFAULT 0, sort_order INT DEFAULT 0, module VARCHAR(30) DEFAULT '',
+            created_at VARCHAR(30) DEFAULT '')",
         "CREATE TABLE IF NOT EXISTS lookup_values (
             id $pk, type_id INT, parent_value_id INT NULL, code VARCHAR(60) DEFAULT '',
             label VARCHAR(200), sort_order INT DEFAULT 0, active INT DEFAULT 1, created_at VARCHAR(30) DEFAULT '')",
@@ -36,6 +37,7 @@ function lk_ensure_schema() {
 }
 function lk_migrate() {
     lk_ensure_schema();
+    ensure_column('lookup_types', 'module', "VARCHAR(30) DEFAULT ''"); // groups the Masters screen
     // Idempotent: seed lists that were added after the first release.
     // The record is now called a Deputation, so the old "Deputation type" list —
     // which describes how the visit is structured — is renamed to avoid a clash.
@@ -62,6 +64,8 @@ function lk_migrate() {
     lk_ensure_value('reporting_frequency', 'CUSTOM', 'Custom (every N days)');
     // trade + skills (skills depend on trade) — seed on upgrade if missing
     if ((int)ops_val("SELECT COUNT(*) FROM lookup_types") > 0 && !lk_type('trade')) lk_seed_trade_skill();
+    // NB: lk_register_module_lists() runs from boot() *after* lk_seed(), because
+    // on a fresh install there are no lookup types yet at this point.
 }
 
 // Discipline / trade → skills. Researched, exhaustive starting set; fully editable.
@@ -101,12 +105,95 @@ function skills_by_trade() {
     return $out;
 }
 // Like lk_ensure_type but seeds coded values from a [code=>label] map.
-function lk_ensure_type_map($key, $label, $map) {
-    if (lk_type($key)) return;
+// $module groups the list on the Masters screen so an admin can find it.
+function lk_ensure_type_map($key, $label, $map, $module = '') {
+    if (lk_type($key)) { if ($module !== '') lk_set_module($key, $module); return; }
     if ((int)ops_val("SELECT COUNT(*) FROM lookup_types") === 0) return;
     $tid = lk_add_type($key, $label, null, 0, 50);
     $so = 0;
     foreach ($map as $code => $lab) lk_add_value($tid, null, $code, $lab, $so++);
+    if ($module !== '') lk_set_module($key, $module);
+}
+function lk_set_module($key, $module) {
+    try { db()->prepare("UPDATE lookup_types SET module=? WHERE type_key=? AND (module IS NULL OR module='')")->execute([$module, $key]); }
+    catch (Throwable $e) {}
+}
+
+// ---------------------------------------------------------------------------
+//  Every dropdown in the app, registered as an editable master list.
+//
+//  Each entry is [key, label, source constant, module]. The constant stays in
+//  the code as the fallback (lk_options_or), so a list an admin has never
+//  touched still shows the shipped values, and deleting a list cannot break a
+//  screen. Adding to this table is all it takes to make a dropdown editable.
+// ---------------------------------------------------------------------------
+function lk_module_lists() {
+    return [
+        // --- Sales -----------------------------------------------------------
+        ['inquiry_source',      'Inquiry source',            INQUIRY_SOURCES,        'Sales'],
+        ['inquiry_status',      'Inquiry status',            INQUIRY_STATUS,         'Sales'],
+        ['quote_status',        'Quote status',              QUOTE_STATUS,           'Sales'],
+        ['quote_unit',          'Charge unit',               QUOTE_UNITS,            'Sales'],
+        ['quote_location_type', 'Work location type',        QUOTE_LOCATION_TYPES,   'Sales'],
+        ['order_type',          'Order type',                ORDER_TYPES,            'Sales'],
+        ['followup_kind',       'Follow-up point',           FOLLOWUP_KINDS,         'Sales'],
+        ['template_kind',       'Template kind',             CRM_TEMPLATE_KINDS,     'Sales'],
+        ['approval_match',      'Approval rule match',       APPROVAL_MATCH,         'Sales'],
+        // --- Operations ------------------------------------------------------
+        ['job_type',            'Deputation type',           JOB_TYPES,              'Operations'],
+        ['job_stage',           'Deputation stage',          JOB_STAGES,             'Operations'],
+        ['attendance_status',   'Attendance status',         ATT_STATUS,             'Operations'],
+        ['rate_type',           'Rate basis',                RATE_TYPES,             'Operations'],
+        ['experience_level',    'Experience level',          EXP_LEVELS,             'Operations'],
+        ['expense_head_type',   'Expense head type',         EXP_HEAD_TYPES,         'Operations'],
+        ['travel_basis',        'Travel basis',              TRAVEL_BASIS,           'Operations'],
+        // --- People / hiring -------------------------------------------------
+        ['candidate_stage',     'Candidate stage',           CAND_STAGES,            'People'],
+        ['candidate_source',    'Candidate source',          CAND_SOURCES,           'People'],
+        ['agency_type',         'Agency type',               AGENCY_TYPES,           'People'],
+        ['roll_type',           'Whose roll',                ROLL_TYPES,             'People'],
+        ['fee_status',          'Placement fee status',      FEE_STATUS,             'People'],
+        ['requisition_type',    'Requisition type',          REQ_TYPES,              'People'],
+        ['requisition_status',  'Requisition status',        REQ_STATUS,             'People'],
+        // --- Money -----------------------------------------------------------
+        ['boss_status',         'BOSS number status',        BOSS_STATUS,            'Money'],
+        // --- Directory -------------------------------------------------------
+        ['partner_status',      'Partner status',            STATUSES,               'Directory'],
+        ['ownership',           'Ownership type',            OWNERSHIP,              'Directory'],
+        ['address_type',        'Address type',              ADDRESS_TYPES,          'Directory'],
+        ['registration_type',   'Registration type',         REG_TYPES,              'Directory'],
+        ['relationship_type',   'Relationship type',         REL_TYPES,              'Directory'],
+        ['po_type',             'Purchase order type',       PO_TYPES,               'Directory'],
+        ['po_item_type',        'PO line unit',              PO_ITEM_TYPES,          'Directory'],
+        ['gst_state',           'GST state',                 GST_STATES,             'Directory'],
+        // --- Reporting -------------------------------------------------------
+        ['report_category',     'Report category',           IDEMS_CATEGORIES,       'Reporting'],
+        ['report_status',       'Report status',             IDEMS_STATUS,           'Reporting'],
+        ['inspection_result',   'Inspection result',         IDEMS_RESULTS,          'Reporting'],
+        ['release_status',      'Release status',            IDEMS_RELEASE,          'Reporting'],
+        ['endorse_doc_type',    'Manufacturer record type',  ENDORSE_DOC_TYPES,      'Reporting'],
+        ['endorse_status',      'Endorsement status',        ENDORSE_STATUS,         'Reporting'],
+        ['endorse_decision',    'Endorsement decision',      ENDORSE_DECISION,       'Reporting'],
+        ['phrase_category',     'Phrase category',           PHRASE_CATEGORIES,      'Reporting'],
+        ['source_doc_type',     'Source document type',      SOURCE_DOC_TYPES,       'Reporting'],
+    ];
+}
+function lk_register_module_lists() {
+    foreach (lk_module_lists() as [$key, $label, $map, $module]) {
+        lk_ensure_type_map($key, $label, $map, $module);
+        // back-fill values added to the shipped list after this install was set up
+        lk_ensure_values_from_map($key, $map);
+    }
+    // Lists that already existed get their module tag too, so nothing is unfiled.
+    foreach ([
+        'sbu'=>'Operations', 'region'=>'Operations', 'product'=>'Operations', 'product_category'=>'Operations',
+        'inspection_type'=>'Operations', 'deliverable'=>'Reporting', 'engagement_pattern'=>'Operations',
+        'activity'=>'Operations', 'credit_type'=>'Money', 'credit_direction'=>'Money',
+        'expense_heading'=>'Money', 'reporting_frequency'=>'Operations', 'avail_status'=>'Operations',
+        'leave_type'=>'People', 'day_code'=>'People', 'department'=>'People', 'designation'=>'People',
+        'trade'=>'People', 'skill'=>'People', 'client_type'=>'Directory', 'industry'=>'Directory',
+        'quote_lost_reason'=>'Sales', 'crm_service_type'=>'Sales',
+    ] as $k => $m) lk_set_module($k, $m);
 }
 // Back-fill all coded values from a [code=>label] map into an existing type.
 function lk_ensure_values_from_map($typeKey, $map) {
@@ -217,14 +304,17 @@ function lk_all_values($typeId) { return ops_all("SELECT * FROM lookup_values WH
 function lk_value($id) { return $id ? ops_one("SELECT * FROM lookup_values WHERE id=?", [$id]) : null; }
 
 // Editable map for the old fixed dropdowns: use lookup values if present, else the constant.
+// Cached per request: this is called inside table loops (one label lookup per
+// row), so without the cache a 200-row list would run 400 queries.
 function lk_options_or($key, $const) {
+    static $cache = [];
+    if (array_key_exists($key, $cache)) return $cache[$key] ?: $const;
     $t = lk_type($key);
-    if (!$t) return $const;
-    $rows = lk_root_values($t['id']);
-    if (!$rows) return $const;
+    if (!$t) { $cache[$key] = null; return $const; }
     $out = [];
-    foreach ($rows as $r) $out[$r['code'] !== '' ? $r['code'] : $r['id']] = $r['label'];
-    return $out;
+    foreach (lk_root_values($t['id']) as $r) $out[$r['code'] !== '' ? $r['code'] : $r['id']] = $r['label'];
+    $cache[$key] = $out ?: null;
+    return $out ?: $const;
 }
 
 // The chain of types from root to this leaf type (for cascading render).

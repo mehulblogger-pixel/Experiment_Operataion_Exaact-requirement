@@ -1,7 +1,7 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/partner?id=<?= (int)$po['partner_id'] ?>&tab=purchase_orders">Purchase Orders</a> › <?= e($po['po_number'] ?: 'Open Order') ?></div>
 <div class="master-head">
   <div><h1><?= e($po['po_number'] ?: 'Open order') ?></h1>
-    <p class="sub"><?= e($po['pdn'] ?: $po['pn']) ?> · <?= e(PO_TYPES[$po['po_type']] ?? $po['po_type']) ?><?php if ($po['value']!==null): ?> · <strong><?= e(cur_sym()) ?><?= number_format((float)$po['value'],0) ?></strong> (from line items)<?php endif; ?>
+    <p class="sub"><?= e($po['pdn'] ?: $po['pn']) ?> · <?= e(lk_options_or('po_type', PO_TYPES)[$po['po_type']] ?? $po['po_type']) ?><?php if ($po['value']!==null): ?> · <strong><?= e(cur_sym()) ?><?= number_format((float)$po['value'],0) ?></strong> (from line items)<?php endif; ?>
       <?php $psb = array_filter(explode(',', $po['sbu'] ?? '')); if ($psb): ?> · SBU: <?= e(implode(', ', array_map(fn($s)=>lk_options_or('sbu',OPS_SBUS)[$s]??$s, $psb))) ?><?php endif; ?></p></div>
   <a class="btn secondary" href="/partner?id=<?= (int)$po['partner_id'] ?>&tab=purchase_orders">← Back</a>
 </div>
@@ -11,7 +11,7 @@
   <tr><th>Description</th><th>Trade / skill</th><th>Site</th><th>Men</th><th>Qty</th><th>Consumed</th><th>Bal</th><th>Rate</th><th>Base</th><th>GST%</th><th>Tax</th><th>Total</th></tr>
   <?php $gt=0; foreach ($items as $li): $bal = (float)$li['quantity'] - (float)$li['consumed']; $gt += (float)$li['total_amount']; ?>
   <tr>
-    <td><?= e($li['description']) ?><br><span class="muted" style="font-size:11px"><?= e(PO_ITEM_TYPES[$li['item_type']] ?? $li['item_type']) ?><?= $li['activity_label']?' · '.e($li['activity_label']):'' ?></span></td>
+    <td><?= e($li['description']) ?><br><span class="muted" style="font-size:11px"><?= e(lk_options_or('po_item_type', PO_ITEM_TYPES)[$li['item_type']] ?? $li['item_type']) ?><?= $li['activity_label']?' · '.e($li['activity_label']):'' ?></span></td>
     <td><?= e($li['trade_label'] ?: '—') ?><?= $li['skill_label']?'<br><span class="muted" style="font-size:11px">'.e($li['skill_label']).'</span>':'' ?></td>
     <td><?= e($li['site'] ?: '—') ?></td>
     <td><?= (int)$li['manpower'] ?: '—' ?></td>
@@ -32,7 +32,7 @@
 <form method="post" action="/po?id=<?= (int)$po['id'] ?>" class="panel">
   <div class="form-grid">
     <div class="ff"><label>Description</label><input class="form-control" name="description" required></div>
-    <div class="ff"><label>Type</label><select class="form-control" name="item_type"><?php foreach (PO_ITEM_TYPES as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Type</label><select class="form-control" name="item_type"><?php foreach (lk_options_or('po_item_type', PO_ITEM_TYPES) as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Trade</label>
       <select class="form-control searchable" id="trade_sel" name="trade_id"><option value="">—</option>
         <?php foreach ($trades as $t): ?><option value="<?= (int)$t['id'] ?>"><?= e($t['label']) ?></option><?php endforeach; ?></select></div>

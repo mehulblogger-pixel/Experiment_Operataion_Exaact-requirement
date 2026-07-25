@@ -9,7 +9,7 @@
   <input class="form-control" type="text" name="q" value="<?= e($q) ?>" placeholder="Search name / code / GSTIN / PAN…">
   <select class="form-control" name="status" onchange="this.form.submit()">
     <option value="">Any status</option>
-    <?php foreach (STATUSES as $k => $v): ?><option value="<?= $k ?>" <?= $status === $k ? 'selected' : '' ?>><?= e($v) ?></option><?php endforeach; ?>
+    <?php foreach (lk_options_or('partner_status', STATUSES) as $k => $v): ?><option value="<?= $k ?>" <?= $status === $k ? 'selected' : '' ?>><?= e($v) ?></option><?php endforeach; ?>
   </select>
   <button class="btn secondary" type="submit">Search</button>
   <?php if ($q || $status): ?><a class="btn secondary" href="/<?= $isClient ? 'clients' : 'vendors' ?>">Clear</a><?php endif; ?>
@@ -25,7 +25,7 @@
     <td><?= e(roles_label($p)) ?></td>
     <td><?= e(INDUSTRIES[$p['industry']] ?? '—') ?></td>
     <td><?= e($p['gstin'] ?: '—') ?></td>
-    <td><span class="badge <?= $p['status']==='ACTIVE'?'GREEN':($p['status']==='BLACKLISTED'?'RED':'AMBER') ?>"><?= e(STATUSES[$p['status']] ?? $p['status']) ?></span></td>
+    <td><span class="badge <?= $p['status']==='ACTIVE'?'GREEN':($p['status']==='BLACKLISTED'?'RED':'AMBER') ?>"><?= e(lk_options_or('partner_status', STATUSES)[$p['status']] ?? $p['status']) ?></span></td>
     <td class="row-actions">
       <a class="btn small secondary" href="/partner?id=<?= (int)$p['id'] ?>">Open</a>
       <a class="btn small" href="/partner-edit?id=<?= (int)$p['id'] ?>">Edit</a>

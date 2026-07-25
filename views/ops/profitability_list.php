@@ -48,7 +48,7 @@
         <?php if (!empty($r['prev_no'])): ?><div class="muted" style="font-size:11px">↳ renews <?= e($r['prev_no']) ?></div><?php endif; ?>
       </td>
       <td><?= e($r['client_disp'] ?: $r['client_name'] ?: '—') ?></td>
-      <td><span class="pill <?= $bstatus[$r['status']] ?? 'p-mut' ?>"><?= e(BOSS_STATUS[$r['status']] ?? $r['status'] ?: '—') ?></span></td>
+      <td><span class="pill <?= $bstatus[$r['status']] ?? 'p-mut' ?>"><?= e(lk_options_or('boss_status', BOSS_STATUS)[$r['status']] ?? $r['status'] ?: '—') ?></span></td>
       <td><?= e($fdate($r['start_date'])) ?></td>
       <td><?= e($fdate($r['end_date'])) ?>
         <?php if ($exp !== null && ($r['status'] ?? '') !== 'CLOSED'): ?>

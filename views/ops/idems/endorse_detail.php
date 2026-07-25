@@ -2,7 +2,7 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/endorsements"><?= e(TP('endorsement')) ?></a> › <?= e($e['endorsement_no']) ?></div>
 <div class="master-head">
   <div><h1><?= e(T_DETAIL('endorsement', $e['endorsement_no'])) ?> <?= $e['finalized'] ? '🔒' : '' ?></h1>
-    <p class="sub" style="margin:2px 0 0"><span class="pill p-info"><?= e($e['doc_type']) ?></span> <?= e(ENDORSE_DOC_TYPES[$e['doc_type']] ?? '') ?> · <span class="pill <?= endorse_status_pill($e['status']) ?>"><?= e(ENDORSE_STATUS[$e['status']] ?? $e['status']) ?></span></p></div>
+    <p class="sub" style="margin:2px 0 0"><span class="pill p-info"><?= e($e['doc_type']) ?></span> <?= e(lk_options_or('endorse_doc_type', ENDORSE_DOC_TYPES)[$e['doc_type']] ?? '') ?> · <span class="pill <?= endorse_status_pill($e['status']) ?>"><?= e(lk_options_or('endorse_status', ENDORSE_STATUS)[$e['status']] ?? $e['status']) ?></span></p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <?php if (endorse_can_edit($e)): ?><a class="btn secondary" href="/endorsement-edit?id=<?= (int)$e['id'] ?>">Edit</a><?php endif; ?>
     <?php if (endorse_can_edit($e) && $e['status']==='UPLOADED'): ?>
@@ -14,7 +14,7 @@
 
 <?php if ($e['status']==='ENDORSED'): ?>
 <div class="panel" style="border:1px solid var(--ok);background:color-mix(in srgb,var(--ok) 7%,transparent)">
-  <b style="color:var(--ok)">✓ Endorsed</b> — <?= e(strip_tags(ENDORSE_DECISION[$e['decision']] ?? 'Reviewed & Endorsed')) ?> by <?= e($e['endorsed_by']) ?><?= $e['endorsed_at']?' on '.e(date('d M Y H:i', strtotime($e['endorsed_at']))):'' ?>. <?= $e['decision_remarks'] ? '— '.e($e['decision_remarks']) : '' ?>
+  <b style="color:var(--ok)">✓ Endorsed</b> — <?= e(strip_tags(lk_options_or('endorse_decision', ENDORSE_DECISION)[$e['decision']] ?? 'Reviewed & Endorsed')) ?> by <?= e($e['endorsed_by']) ?><?= $e['endorsed_at']?' on '.e(date('d M Y H:i', strtotime($e['endorsed_at']))):'' ?>. <?= $e['decision_remarks'] ? '— '.e($e['decision_remarks']) : '' ?>
 </div>
 <?php elseif ($e['status']==='REJECTED'): ?>
 <div class="panel" style="border:1px solid var(--bad)"><b style="color:var(--bad)">✕ Rejected</b> — <?= e($e['decision_remarks']) ?></div>
@@ -39,7 +39,7 @@
 <div class="panel">
   <div class="kv-grid">
     <div><span class="k">Endorsement no.</span><strong><?= e($e['endorsement_no']) ?></strong></div>
-    <div><span class="k">Document type</span><?= e(ENDORSE_DOC_TYPES[$e['doc_type']] ?? $e['doc_type']) ?></div>
+    <div><span class="k">Document type</span><?= e(lk_options_or('endorse_doc_type', ENDORSE_DOC_TYPES)[$e['doc_type']] ?? $e['doc_type']) ?></div>
     <div><span class="k">Title</span><?= e($e['title'] ?: '—') ?></div>
     <div><span class="k">Manufacturer / vendor</span><?= e($e['vendor_disp'] ?: $e['vendor_name'] ?: '—') ?></div>
     <div><span class="k">Client</span><?= e($e['client_disp'] ?: $e['client_name'] ?: '—') ?></div>

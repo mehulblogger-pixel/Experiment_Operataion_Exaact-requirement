@@ -110,7 +110,7 @@
   <div class="form-grid">
     <div class="ff ff-wide"><label>Source documents a complete inspection pack must contain</label>
       <div class="chip-row">
-        <?php $esd = expected_source_docs(); foreach (SOURCE_DOC_TYPES as $k=>$lbl): ?>
+        <?php $esd = expected_source_docs(); foreach (lk_options_or('source_doc_type', SOURCE_DOC_TYPES) as $k=>$lbl): ?>
           <label class="ff-check"><input type="checkbox" name="expected_source_docs[]" value="<?= e($k) ?>" <?= in_array($k,$esd,true)?'checked':'' ?>> <?= e($lbl) ?></label>
         <?php endforeach; ?>
       </div>

@@ -12,7 +12,7 @@
   <form method="post" action="/crm-letterhead" enctype="multipart/form-data">
     <div class="form-grid">
       <div class="ff"><label>Company logo (PNG / JPG) <?= !empty($lhLogo)?'<span class="pill p-ok">on file</span>':'' ?></label><input class="form-control" type="file" name="logo" accept=".png,.jpg,.jpeg"></div>
-      <div class="ff"><label>Company name</label><input class="form-control" name="lh_name" value="<?= e($lhName ?? '') ?>" placeholder="e.g. SGS India Pvt Ltd"></div>
+      <div class="ff"><label>Company name</label><input class="form-control" name="lh_name" value="<?= e($lhName ?? '') ?>" placeholder="e.g. Your Company Pvt Ltd"></div>
       <div class="ff"><label>Contact line <span class="muted">(phone · email · web · GSTIN)</span></label><input class="form-control" name="lh_contact" value="<?= e($lhContact ?? '') ?>" placeholder="+91 … · sales@… · www… · GSTIN …"></div>
     </div>
     <div class="ff ff-wide"><label>Address (one line each)</label><textarea class="form-control" name="lh_address" rows="2" placeholder="Building / street&#10;City, State – PIN"><?= e($lhAddress ?? '') ?></textarea></div>
@@ -48,7 +48,7 @@
     <?php foreach ($rows as $r): ?>
     <tr>
       <td><b><?= e($r['name'] ?: '—') ?></b> <?= $r['is_default']?'<span class="pill p-ok">default</span>':'' ?></td>
-      <td><?= e(CRM_TEMPLATE_KINDS[$r['kind']] ?? $r['kind']) ?></td>
+      <td><?= e(lk_options_or('template_kind', CRM_TEMPLATE_KINDS)[$r['kind']] ?? $r['kind']) ?></td>
       <td><?= e($r['document_number'] ?: '—') ?></td>
       <td><?= e($r['format_number'] ?: '—') ?></td>
       <td><?= e($r['doc_revision'] ?: '—') ?></td>

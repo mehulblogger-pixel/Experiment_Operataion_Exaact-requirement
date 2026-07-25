@@ -520,7 +520,7 @@ function ops_idems_report_types($route, $method) {
         }
         $id = (int)($_POST['id'] ?? 0);
         $code = strtoupper(trim($_POST['code'] ?? '')); $name = trim($_POST['name'] ?? '');
-        $cat = isset(IDEMS_CATEGORIES[$_POST['category'] ?? '']) ? $_POST['category'] : 'TPIA_REPORT';
+        $cat = isset(lk_options_or('report_category', IDEMS_CATEGORIES)[$_POST['category'] ?? '']) ? $_POST['category'] : 'TPIA_REPORT';
         $active = !empty($_POST['active']) ? 1 : 0;
         if ($code === '' || $name === '') { flash('Code and name are required.', 'error'); redirect('/report-types'); }
         if ($id) $pdo->prepare("UPDATE report_types SET code=?, name=?, category=?, active=? WHERE id=?")->execute([$code, $name, $cat, $active, $id]);
@@ -1072,7 +1072,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs) {
         'Drawing' => trim(($doc['drawing_no'] ?? '').' '.($doc['drawing_rev']?'Rev '.$doc['drawing_rev']:'')), 'QAP rev' => $doc['qap_rev'] ?? '',
         'Standards' => $doc['standards'] ?? '', 'Location' => $doc['location'] ?? '',
         'Inspection date' => $doc['inspection_date'] ?? '', 'Issue date' => $doc['issue_date'] ?? '',
-        'Result' => IDEMS_RESULTS[$doc['result']] ?? '', 'Release' => IDEMS_RELEASE[$doc['release_status']] ?? '',
+        'Result' => lk_options_or('inspection_result', IDEMS_RESULTS)[$doc['result']] ?? '', 'Release' => lk_options_or('release_status', IDEMS_RELEASE)[$doc['release_status']] ?? '',
     ];
     $colW = $p->contentW()/2;
     foreach (array_chunk(array_filter($kv, fn($v)=>trim((string)$v)!==''), 2, true) as $pair) {
@@ -1240,9 +1240,9 @@ function idems_standard_tokens($doc) {
         'standards'=>$doc['standards'] ?? '', 'location'=>$doc['location'] ?? '', 'product_category'=>$doc['product_category'] ?? '', 'material_grade'=>$doc['material_grade'] ?? '',
         'inspection_date'=>$doc['inspection_date'] ?? '', 'issue_date'=>$doc['issue_date'] ?? '',
         'inspector'=>$doc['inspector_name'] ?? '', 'approver'=>$doc['approved_by'] ?? '',
-        'result'=>IDEMS_RESULTS[$doc['result'] ?? ''] ?? '', 'release'=>IDEMS_RELEASE[$doc['release_status'] ?? ''] ?? '', 'remarks'=>$doc['remarks'] ?? '',
+        'result'=>lk_options_or('inspection_result', IDEMS_RESULTS)[$doc['result'] ?? ''] ?? '', 'release'=>lk_options_or('release_status', IDEMS_RELEASE)[$doc['release_status'] ?? ''] ?? '', 'remarks'=>$doc['remarks'] ?? '',
         'company'=>idems_company_code(), 'branch'=>$doc['branch_code'] ?? '', 'today'=>date('d M Y'),
-        'status'=>IDEMS_STATUS[$doc['status'] ?? ''] ?? ($doc['status'] ?? ''),
+        'status'=>lk_options_or('report_status', IDEMS_STATUS)[$doc['status'] ?? ''] ?? ($doc['status'] ?? ''),
     ];
 }
 // Build [scalarMap, tablesMap] for a report from standard tokens + its designed fields.
@@ -1715,7 +1715,7 @@ function ops_idems_endorsements($route, $method) {
             $inspectorId = ($b['inspector_id'] ?? '')!==''?(int)$b['inspector_id']:null;
             $approver = ($b['approver_user_id'] ?? '')!==''?(int)$b['approver_user_id']:idems_inspector_approver($inspectorId);
             $fields = [
-                'doc_type'=>isset(ENDORSE_DOC_TYPES[$b['doc_type'] ?? ''])?$b['doc_type']:'MTC', 'title'=>trim($b['title'] ?? ''),
+                'doc_type'=>isset(lk_options_or('endorse_doc_type', ENDORSE_DOC_TYPES)[$b['doc_type'] ?? ''])?$b['doc_type']:'MTC', 'title'=>trim($b['title'] ?? ''),
                 'vendor_id'=>($b['vendor_id'] ?? '')!==''?(int)$b['vendor_id']:null, 'client_id'=>$clientId, 'report_doc_id'=>($b['report_doc_id'] ?? '')!==''?(int)$b['report_doc_id']:null,
                 'project_code'=>trim($b['project_code'] ?? ''), 'project_name'=>trim($b['project_name'] ?? ''), 'po_ref'=>trim($b['po_ref'] ?? ''),
                 'drawing_no'=>trim($b['drawing_no'] ?? ''), 'drawing_rev'=>trim($b['drawing_rev'] ?? ''), 'qap_rev'=>trim($b['qap_rev'] ?? ''),
@@ -1776,7 +1776,7 @@ function ops_idems_endorsements($route, $method) {
         $pdo->prepare("UPDATE endorsements SET status='UNDER_REVIEW', submitted_at=?, updated_at=? WHERE id=?")->execute([date('c'), date('c'), $e['id']]);
         idems_log('endorsement', $e['id'], 'SUBMIT', ['irn'=>$e['endorsement_no'], 'new'=>'UNDER_REVIEW']);
         $to = idems_approver_email($e['approver_user_id']);
-        if ($to) ops_mail($to, 'Document endorsement required: ' . $e['endorsement_no'], "A manufacturer document awaits your review & endorsement.\n\n" . $e['endorsement_no'] . " — " . (ENDORSE_DOC_TYPES[$e['doc_type']] ?? $e['doc_type']) . "\n\nOpen it in the system to review the original and endorse or reject.\n\n" . app_name(), '', 'idems_endorse');
+        if ($to) ops_mail($to, 'Document endorsement required: ' . $e['endorsement_no'], "A manufacturer document awaits your review & endorsement.\n\n" . $e['endorsement_no'] . " — " . (lk_options_or('endorse_doc_type', ENDORSE_DOC_TYPES)[$e['doc_type']] ?? $e['doc_type']) . "\n\nOpen it in the system to review the original and endorse or reject.\n\n" . app_name(), '', 'idems_endorse');
         flash('Submitted to the approver for review & endorsement.');
         redirect('/endorsement?id=' . $e['id']);
     }
@@ -1870,10 +1870,10 @@ function endorsement_pdf_build($e, $lh, $sigs) {
     $p->y=$top; $p->text($ml, 'Endorsement No: ' . $e['endorsement_no'], 9, true, [60,60,60], $right, 'R');
     $p->y = $top + 34; $p->hr($band); $p->gap(6);
     $p->line('DOCUMENT REVIEW & ENDORSEMENT CERTIFICATE', 14, true, 18, $band);
-    $dec = $e['decision']==='REJECTED' ? 'REJECTED' : (ENDORSE_DECISION[$e['decision']] ?? 'Reviewed & Endorsed');
+    $dec = $e['decision']==='REJECTED' ? 'REJECTED' : (lk_options_or('endorse_decision', ENDORSE_DECISION)[$e['decision']] ?? 'Reviewed & Endorsed');
     $p->line('Decision: ' . strip_tags($dec), 11, true, 15, $e['decision']==='REJECTED'?[190,50,50]:[21,128,61]);
     $p->gap(4);
-    $kv = ['Document type'=>ENDORSE_DOC_TYPES[$e['doc_type']] ?? $e['doc_type'], 'Title / description'=>$e['title'] ?: $e['item_desc'],
+    $kv = ['Document type'=>lk_options_or('endorse_doc_type', ENDORSE_DOC_TYPES)[$e['doc_type']] ?? $e['doc_type'], 'Title / description'=>$e['title'] ?: $e['item_desc'],
         'Manufacturer / vendor'=>$e['vendor_disp'] ?: ($e['vendor_name'] ?? ''), 'Client'=>$e['client_disp'] ?: ($e['client_name'] ?? ''),
         'Project'=>trim(($e['project_code'] ?? '').' '.($e['project_name'] ?? '')), 'PO'=>$e['po_ref'] ?? '',
         'Drawing'=>trim(($e['drawing_no'] ?? '').' '.($e['drawing_rev']?'Rev '.$e['drawing_rev']:'')), 'QAP rev'=>$e['qap_rev'] ?? '',
@@ -2077,7 +2077,7 @@ function ops_idems_phrases($route, $method) {
             redirect('/phrase-library');
         }
         $id = (int)($_POST['id'] ?? 0);
-        $cat = isset(PHRASE_CATEGORIES[$_POST['category'] ?? '']) ? $_POST['category'] : 'OBSERVATION';
+        $cat = isset(lk_options_or('phrase_category', PHRASE_CATEGORIES)[$_POST['category'] ?? '']) ? $_POST['category'] : 'OBSERVATION';
         $sh = trim($_POST['shorthand'] ?? ''); $ph = trim($_POST['phrase'] ?? '');
         if ($ph === '') { flash('The phrase text is required.', 'error'); redirect('/phrase-library'); }
         $act = !empty($_POST['active']) ? 1 : 0; $disc = trim($_POST['discipline'] ?? '');
@@ -2208,8 +2208,8 @@ function ops_idems_smart($method) {
         ops_require(idems_can_edit_doc($doc), 'This report is finalized and can no longer be edited.');
         $text = trim($_POST['remarks'] ?? '');
         $res = $_POST['result'] ?? $p['result']; $rel = $_POST['release_status'] ?? $p['release'];
-        if (!isset(IDEMS_RESULTS[$res])) $res = $p['result'];
-        if (!isset(IDEMS_RELEASE[$rel])) $rel = $p['release'];
+        if (!isset(lk_options_or('inspection_result', IDEMS_RESULTS)[$res])) $res = $p['result'];
+        if (!isset(lk_options_or('release_status', IDEMS_RELEASE)[$rel])) $rel = $p['release'];
         db()->prepare("UPDATE report_docs SET remarks=?, result=?, release_status=?, updated_at=? WHERE id=?")->execute([$text, $res, $rel, date('c'), $doc['id']]);
         idems_log('report_doc', $doc['id'], 'SMART_REMARKS', ['irn'=>$doc['irn'], 'field'=>'remarks']);
         flash('Suggested remarks applied. Review and edit as required.');
@@ -2319,7 +2319,7 @@ function idems_source_text($mime, $raw, $limit = 20000) {
 // Source docs attached to a report (stored in report_files with kind='src_<TYPE>').
 function idems_source_docs($docId) {
     $rows = ops_all("SELECT id, kind, field_key, file_name, mime, note, created_at FROM report_files WHERE report_doc_id=? AND kind LIKE 'src_%' ORDER BY id", [(int)$docId]);
-    foreach ($rows as &$r) { $r['doc_type'] = substr($r['kind'], 4); $r['doc_label'] = SOURCE_DOC_TYPES[$r['doc_type']] ?? $r['doc_type']; }
+    foreach ($rows as &$r) { $r['doc_type'] = substr($r['kind'], 4); $r['doc_label'] = lk_options_or('source_doc_type', SOURCE_DOC_TYPES)[$r['doc_type']] ?? $r['doc_type']; }
     return $rows;
 }
 // ---- Rule-based conflict checks (always available, no AI) ----
@@ -2330,7 +2330,7 @@ function idems_rule_checks($doc, $srcDocs) {
     foreach ($srcDocs as $s) $have[$s['doc_type']] = true;
     // 1. missing documents
     foreach (expected_source_docs() as $t) {
-        if (empty($have[$t])) $out[] = ['severity'=>'medium', 'kind'=>'Missing document', 'detail'=>(SOURCE_DOC_TYPES[$t] ?? $t) . ' has not been uploaded against this report.'];
+        if (empty($have[$t])) $out[] = ['severity'=>'medium', 'kind'=>'Missing document', 'detail'=>(lk_options_or('source_doc_type', SOURCE_DOC_TYPES)[$t] ?? $t) . ' has not been uploaded against this report.'];
     }
     if (empty($have['MTC']) && empty($have['CALIB'])) $out[] = ['severity'=>'low', 'kind'=>'Missing document', 'detail'=>'No material test certificate or calibration certificate has been attached.'];
     // 2. header completeness / traceability
@@ -2370,7 +2370,7 @@ function idems_source_text_bundle($docId, $perDoc = 6000) {
         $raw = (string)$r['data'];
         if (strpos($raw, 'base64,') !== false) $raw = base64_decode(substr($raw, strpos($raw, 'base64,') + 7));
         $t = idems_source_text($r['mime'], $raw, $perDoc);
-        if (trim($t) !== '') $parts[] = '--- ' . (SOURCE_DOC_TYPES[substr($r['kind'],4)] ?? $r['kind']) . ': ' . $r['file_name'] . " ---\n" . $t;
+        if (trim($t) !== '') $parts[] = '--- ' . (lk_options_or('source_doc_type', SOURCE_DOC_TYPES)[substr($r['kind'],4)] ?? $r['kind']) . ': ' . $r['file_name'] . " ---\n" . $t;
     }
     return implode("\n\n", $parts);
 }
@@ -2425,7 +2425,7 @@ function ops_idems_review($route, $method) {
         $do = $_POST['_do'] ?? '';
         if ($do === 'upload') {
             ops_require(idems_can_edit_doc($doc), 'This report is finalized.');
-            $type = isset(SOURCE_DOC_TYPES[$_POST['doc_type'] ?? '']) ? $_POST['doc_type'] : 'OTHER';
+            $type = isset(lk_options_or('source_doc_type', SOURCE_DOC_TYPES)[$_POST['doc_type'] ?? '']) ? $_POST['doc_type'] : 'OTHER';
             if (!empty($_FILES['src']['name'])) {
                 $names=(array)$_FILES['src']['name']; $tmp=(array)$_FILES['src']['tmp_name']; $types=(array)$_FILES['src']['type']; $errs=(array)$_FILES['src']['error'];
                 for ($i=0;$i<count($names);$i++) {

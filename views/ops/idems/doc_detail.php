@@ -2,7 +2,7 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <?= e($doc['irn']) ?></div>
 <div class="master-head">
   <div><h1><?= e(T_DETAIL('report', $doc['irn'])) ?> <?= $doc['finalized'] ? '🔒' : '' ?></h1>
-    <p class="sub" style="margin:2px 0 0"><span class="pill p-info"><?= e($doc['type_code']) ?></span> <?= e($doc['type_name'] ?: $doc['title']) ?> · <span class="pill <?= idems_status_pill($doc['status']) ?>"><?= e(IDEMS_STATUS[$doc['status']] ?? $doc['status']) ?></span></p></div>
+    <p class="sub" style="margin:2px 0 0"><span class="pill p-info"><?= e($doc['type_code']) ?></span> <?= e($doc['type_name'] ?: $doc['title']) ?> · <span class="pill <?= idems_status_pill($doc['status']) ?>"><?= e(lk_options_or('report_status', IDEMS_STATUS)[$doc['status']] ?? $doc['status']) ?></span></p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <?php if (idems_can_edit_doc($doc)): ?><a class="btn secondary" href="/document-edit?id=<?= (int)$doc['id'] ?>">Edit header</a><?php endif; ?>
     <?php if (idems_can_edit_doc($doc) && !empty($hasSchema)): ?><a class="btn" href="/document-fill?id=<?= (int)$doc['id'] ?>">Fill report body</a><?php endif; ?>
@@ -94,8 +94,8 @@
     <div><span class="k">Standards</span><?= e($doc['standards'] ?: '—') ?></div>
     <div><span class="k">Material / product</span><?= e(trim(($doc['material_grade'] ?? '').' '.($doc['product_category'] ?? '')) ?: '—') ?></div>
     <div><span class="k">Location</span><?= e($doc['location'] ?: '—') ?></div>
-    <div><span class="k">Result</span><?= e(IDEMS_RESULTS[$doc['result']] ?? '—') ?></div>
-    <div><span class="k">Release</span><?= e(IDEMS_RELEASE[$doc['release_status']] ?? '—') ?></div>
+    <div><span class="k">Result</span><?= e(lk_options_or('inspection_result', IDEMS_RESULTS)[$doc['result']] ?? '—') ?></div>
+    <div><span class="k">Release</span><?= e(lk_options_or('release_status', IDEMS_RELEASE)[$doc['release_status']] ?? '—') ?></div>
   </div>
   <?php if ($doc['remarks']): ?><div class="kv-wide" style="margin-top:8px"><span class="k">Remarks</span><?= nl2br(e($doc['remarks'])) ?></div><?php endif; ?>
 </div>

@@ -186,7 +186,7 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
     $p->line($q['client_name'] ?: '—', 11, true, 15);
     if ($q['contact_name'] || $q['contact_email'] || $q['contact_mobile'])
         $p->line('Kind attn: ' . trim(($q['contact_name'] ?: '') . '   ' . ($q['contact_email'] ?: '') . '   ' . ($q['contact_mobile'] ?: '')), 9, false, 14, [80, 80, 80]);
-    if ($q['site_location']) $p->line('Location: ' . $q['site_location'] . ' (' . (QUOTE_LOCATION_TYPES[$q['location_type']] ?? $q['location_type']) . ')', 9, false, 14, [80, 80, 80]);
+    if ($q['site_location']) $p->line('Location: ' . $q['site_location'] . ' (' . (lk_options_or('quote_location_type', QUOTE_LOCATION_TYPES)[$q['location_type']] ?? $q['location_type']) . ')', 9, false, 14, [80, 80, 80]);
     $p->gap(4);
     if ($q['subject']) { $p->line('Subject: ' . $q['subject'], 10, true, 16); }
     $p->gap(4);
@@ -215,7 +215,7 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
         $p->y = $top + 3;
         $p->text($cols[0] + 3, (string)$sr, 9);
         $p->text($cols[2] + 3, rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.'), 9, false, null, $cols[3] - 3, 'R');
-        $p->text($cols[3] + 3, QUOTE_UNITS[$l['unit']] ?? $l['unit'], 9);
+        $p->text($cols[3] + 3, lk_options_or('quote_unit', QUOTE_UNITS)[$l['unit']] ?? $l['unit'], 9);
         $p->text($cols[4] + 3, number_format((float)$l['rate'], 0), 9, false, null, $cols[5] - 3, 'R');
         $p->text($cols[4] + 3, number_format((float)$l['amount'], 0), 9, false, null, $x2 - 3, 'R');
         // wrapped description lines

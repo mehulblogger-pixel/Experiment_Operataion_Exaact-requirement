@@ -10,7 +10,7 @@
     <div class="ff"><label>Code *</label><input class="form-control" name="code" value="<?= e($edit['code'] ?? '') ?>" placeholder="e.g. IR" maxlength="16" required></div>
     <div class="ff"><label>Name *</label><input class="form-control" name="name" value="<?= e($edit['name'] ?? '') ?>" placeholder="e.g. Inspection Report" required></div>
     <div class="ff"><label>Category</label>
-      <select class="form-control" name="category"><?php foreach (IDEMS_CATEGORIES as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($edit['category'] ?? 'TPIA_REPORT')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+      <select class="form-control" name="category"><?php foreach (lk_options_or('report_category', IDEMS_CATEGORIES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($edit['category'] ?? 'TPIA_REPORT')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff ff-check"><input type="checkbox" name="active" <?= (!$edit || $edit['active'])?'checked':'' ?>><label>Active</label></div>
   </div>
   <div style="margin-top:12px"><button class="btn" type="submit"><?= $edit ? 'Save' : 'Add type' ?></button><?php if ($edit): ?> <a class="btn secondary" href="/report-types">Cancel</a><?php endif; ?></div>
@@ -25,7 +25,7 @@
       <tr>
         <td><strong><?= e($r['code']) ?></strong></td>
         <td><?= e($r['name']) ?><?= $r['is_system'] ? ' <span class="muted" style="font-size:11px">(built-in)</span>' : '' ?></td>
-        <td class="muted"><?= e(IDEMS_CATEGORIES[$r['category']] ?? $r['category']) ?></td>
+        <td class="muted"><?= e(lk_options_or('report_category', IDEMS_CATEGORIES)[$r['category']] ?? $r['category']) ?></td>
         <td><?= $r['active'] ? '<span class="pill p-ok">Active</span>' : '<span class="pill p-mut">Inactive</span>' ?></td>
         <td style="white-space:nowrap">
           <a class="btn small" href="/report-builder?type=<?= (int)$r['id'] ?>">Design form</a>

@@ -24,7 +24,7 @@
         <?php foreach (lk_options_or('designation', DESIGNATIONS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ins['designation'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"><label>Engineer type</label>
-      <select class="form-control" name="staff_kind"><?php foreach (['ASSET'=>'SGS asset (employee)','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor'] as $k=>$v): ?><option value="<?= $k ?>" <?= (($ins['staff_kind'] ?? 'ASSET')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+      <select class="form-control" name="staff_kind"><?php foreach (['ASSET'=>'Own employee','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor'] as $k=>$v): ?><option value="<?= $k ?>" <?= (($ins['staff_kind'] ?? 'ASSET')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Trade / discipline</label>
       <select class="form-control searchable" id="trade_sel" name="trade_id"><option value="">—</option>
         <?php foreach ($trades as $t): ?><option value="<?= (int)$t['id'] ?>" <?= (string)$curTrade===(string)$t['id']?'selected':'' ?>><?= e($t['label']) ?></option><?php endforeach; ?>
@@ -134,7 +134,7 @@
       <tr>
         <td><label class="chk"><input type="checkbox" name="allow_mode[<?= e($m['code']) ?>]" value="1" <?= ($a && $a['allowed'])?'checked':'' ?>></label></td>
         <td><strong><?= e($m['label']) ?></strong> <span class="muted">(<?= e($m['code']) ?>)</span></td>
-        <td><?= e(TRAVEL_BASIS[$m['basis']] ?? $m['basis']) ?></td>
+        <td><?= e(lk_options_or('travel_basis', TRAVEL_BASIS)[$m['basis']] ?? $m['basis']) ?></td>
         <td><?= $m['basis']==='PER_KM' ? cur_sym().e($m['default_rate']).'/km' : '—' ?></td>
         <td><?php if ($m['basis']==='PER_KM'): ?><input class="form-control" style="width:130px" type="number" step="0.01" name="mode_rate[<?= e($m['code']) ?>]" value="<?= e($a['rate'] ?? '') ?>" placeholder="<?= e($m['default_rate']) ?>"><?php else: ?><span class="muted">actual bill</span><?php endif; ?></td>
       </tr>
@@ -148,7 +148,7 @@
       <tr>
         <td><label class="chk"><input type="checkbox" name="allow_head[<?= e($h['code']) ?>]" value="1" <?= ($a && $a['allowed'])?'checked':'' ?>></label></td>
         <td><strong><?= e($h['label']) ?></strong> <span class="muted">(<?= e($h['code']) ?>)</span></td>
-        <td><?= e(EXP_HEAD_TYPES[$h['head_type']] ?? $h['head_type']) ?></td>
+        <td><?= e(lk_options_or('expense_head_type', EXP_HEAD_TYPES)[$h['head_type']] ?? $h['head_type']) ?></td>
         <td><?php if ($h['head_type']!=='BILL'): ?><input class="form-control" style="width:130px" type="number" step="0.01" name="head_rate[<?= e($h['code']) ?>]" value="<?= e($a['rate'] ?? '') ?>" placeholder="<?= e($h['default_rate']) ?>"><?php else: ?><span class="muted">actual bill</span><?php endif; ?></td>
       </tr>
       <?php endforeach; ?>

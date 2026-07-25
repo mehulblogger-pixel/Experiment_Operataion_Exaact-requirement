@@ -168,6 +168,9 @@ function boot() {
     if (function_exists('access_migrate')) access_migrate();
     if (function_exists('crm_migrate')) crm_migrate();   // after lookups exist (masters)
     if (function_exists('idems_migrate')) idems_migrate();   // IDEMS report engine
+    // Register every remaining dropdown as an editable master list. Runs last:
+    // it needs the base lists seeded and the CRM/IDEMS constants loaded.
+    if (function_exists('lk_register_module_lists')) lk_register_module_lists();
     ensure_admin();
     auto_seed();
 }
