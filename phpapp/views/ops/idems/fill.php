@@ -89,7 +89,7 @@
 <?php if (!$fields): ?>
   <div class="panel"><p class="muted">No form has been designed for this report type yet. An administrator can design it under <a href="/report-builder?type=<?= (int)$doc['report_type_id'] ?>">Form builder</a>.</p></div>
 <?php else: ?>
-<form method="post" action="/document-fill?id=<?= (int)$doc['id'] ?>" enctype="multipart/form-data" id="fillform">
+<form method="post" action="/document-fill?id=<?= (int)$doc['id'] ?>" enctype="multipart/form-data" id="fillform" data-autosave="report-<?= (int)$doc['id'] ?>" class="field-form">
   <?php foreach ($sections as $s): if (empty($bySection[(int)$s['id']])) continue; ?>
     <div class="panel" style="margin-bottom:14px"<?= $condAttr($s) ?> data-sectionwrap>
       <div class="ctitle" style="margin-top:0"><h3><?= e($s['title']) ?></h3></div>
@@ -109,6 +109,21 @@
   .ev-th{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
   .sig-pad{border:1px solid var(--line);border-radius:8px;touch-action:none;background:#fff;max-width:100%}
   .rep-table table{width:100%}
+  /* ---- field mode: large, touch-friendly controls on phones & tablets ---- */
+  @media (max-width: 820px) {
+    .field-form .form-grid{grid-template-columns:1fr}
+    .field-form .form-control{font-size:16px;padding:11px 12px;min-height:46px}   /* 16px stops iOS zooming on focus */
+    .field-form textarea.form-control{min-height:104px}
+    .field-form label{font-size:14px}
+    .field-form .chk{display:flex;align-items:center;gap:8px;padding:9px 0;font-size:15px}
+    .field-form .chk input[type=checkbox],.field-form .chk input[type=radio]{width:22px;height:22px}
+    .field-form .btn{min-height:44px;padding:10px 16px}
+    .field-form .btn.small{min-height:38px}
+    .field-form .rep-table{overflow-x:auto}
+    .field-form .rep-table .form-control{min-width:120px}
+    .field-form .ev-th{width:76px;height:76px}
+    body{padding-bottom:44px}                                                     /* room for the connection bar */
+  }
 </style>
 <script>
 function idemsGps(k){ if(!navigator.geolocation){alert('GPS not available');return;} navigator.geolocation.getCurrentPosition(function(p){ var v=p.coords.latitude.toFixed(6)+', '+p.coords.longitude.toFixed(6); document.getElementById('gps_'+k).value=v; },function(){alert('Could not get location');}); }

@@ -13,7 +13,13 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($title ?? app_name()) ?></title>
 <link rel="stylesheet" href="/assets/css/app.css">
+<link rel="manifest" href="/manifest.php">
+<meta name="theme-color" content="<?= e(setting_get('c_primary', '') ?: '#1e40af') ?>">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <?= theme_style_tag() ?>
+<script src="/assets/js/offline.js" defer></script>
 </head><body class="<?= $u ? 'app' : '' ?><?= $isInsp ? ' inspector' : '' ?>">
 <?php if ($u): ?>
 <div class="shell">
