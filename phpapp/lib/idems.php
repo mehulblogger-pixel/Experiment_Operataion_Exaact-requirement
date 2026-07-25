@@ -156,6 +156,13 @@ function idems_migrate() {
     ensure_column('report_files', 'taken_at', "VARCHAR(30) DEFAULT ''");    // capture timestamp
     ensure_column('report_files', 'bytes', 'INT DEFAULT 0');                // stored size after compression
     ensure_column('report_files', 'orig_bytes', 'INT DEFAULT 0');           // size before compression
+    // ---- Phase 13: self-learning — harvested suggestions from approved reports ----
+    $pdo->exec("CREATE TABLE IF NOT EXISTS learned_suggestions (
+        id $pk, scope VARCHAR(20) DEFAULT 'FIELD', report_type_id INT NULL, client_id INT NULL,
+        field_key VARCHAR(60) DEFAULT '', text_value TEXT, norm_key VARCHAR(190) DEFAULT '',
+        uses INT DEFAULT 1, last_seen VARCHAR(30) DEFAULT '', muted INT DEFAULT 0,
+        created_at VARCHAR(30) DEFAULT '')");
+    idems_unique_index('learned_suggestions', 'norm_key');
     // ---- Phase 7: technical writing assistant — standard phrase library ----
     $pdo->exec("CREATE TABLE IF NOT EXISTS tech_phrases (
         id $pk, category VARCHAR(30) DEFAULT 'OBSERVATION', shorthand VARCHAR(120) DEFAULT '', phrase TEXT,
@@ -472,6 +479,8 @@ function ops_idems_documents($route, $method) {
         $pdo->prepare("UPDATE report_docs SET finalized=1, status='ISSUED', finalized_at=?, finalized_by=?, issue_date=?, updated_at=? WHERE id=?")
             ->execute([date('c'), user_name(current_user()), $issue, date('c'), $doc['id']]);
         idems_snapshot_signatures($doc);   // freeze inspector + approver signatures onto the report
+        // an issued report is the best source of "how we actually word things"
+        if (function_exists('learn_from_report')) { try { learn_from_report(ops_one("SELECT * FROM report_docs WHERE id=?", [$doc['id']])); } catch (Throwable $e) {} }
         idems_log('report_doc', $doc['id'], 'FINALIZE', ['irn'=>$doc['irn'], 'old'=>$doc['status'], 'new'=>'ISSUED']);
         flash('Report ' . $doc['irn'] . ' finalized & issued. It is now locked (immutable).');
         redirect('/document?id=' . $doc['id']);
@@ -673,7 +682,16 @@ function ops_idems_fill($route, $method) {
         redirect('/document?id=' . $doc['id']);
     }
     $data = json_decode($doc['data'] ?: '[]', true); if (!is_array($data)) $data = [];
-    view('ops/idems/fill', ['doc'=>$doc, 'sections'=>idems_sections($doc['report_type_id']), 'fields'=>$fields, 'data'=>$data, 'files'=>idems_doc_files($doc['id'])]);
+    // learned suggestions per text field (Phase 13) — offered, never applied automatically
+    $sugg = [];
+    if (function_exists('learn_suggestions')) {
+        foreach ($fields as $f) {
+            if (!in_array($f['ftype'], ['text','textarea'], true)) continue;
+            $s = learn_suggestions($doc['report_type_id'], $doc['client_id'] ?? 0, $f['fkey'], 5);
+            if ($s) $sugg[$f['fkey']] = $s;
+        }
+    }
+    view('ops/idems/fill', ['doc'=>$doc, 'sections'=>idems_sections($doc['report_type_id']), 'fields'=>$fields, 'data'=>$data, 'files'=>idems_doc_files($doc['id']), 'sugg'=>$sugg]);
     return true;
 }
 function idems_table_cols($f) {
@@ -869,7 +887,12 @@ function ops_idems_approve($method) {
         idems_log('report_doc', $doc['id'], 'APPROVE', ['irn'=>$doc['irn'], 'field'=>'level '.$step['level'], 'reason'=>$remarks]);
         $next = idems_current_step($doc['id']);
         if ($next) { db()->prepare("UPDATE report_docs SET updated_at=? WHERE id=?")->execute([date('c'), $doc['id']]); idems_notify_approver($doc, $next); flash('Approved. Routed to the next approver.'); }
-        else { $pdo->prepare("UPDATE report_docs SET status='APPROVED', approved_at=?, approved_by=?, updated_at=? WHERE id=?")->execute([date('c'), user_name(current_user()), date('c'), $doc['id']]); flash('Report fully approved — it can now be finalized & issued.'); }
+        else {
+            $pdo->prepare("UPDATE report_docs SET status='APPROVED', approved_at=?, approved_by=?, updated_at=? WHERE id=?")->execute([date('c'), user_name(current_user()), date('c'), $doc['id']]);
+            // learn from the wording that made it through approval (suggestions only)
+            if (function_exists('learn_from_report')) { try { learn_from_report(ops_one("SELECT * FROM report_docs WHERE id=?", [$doc['id']])); } catch (Throwable $e) {} }
+            flash('Report fully approved — it can now be finalized & issued.');
+        }
     } elseif ($decision === 'reject') {
         if ($remarks === '') { flash('A remark is mandatory when rejecting.', 'error'); redirect('/document?id=' . $doc['id']); }
         $pdo->prepare("UPDATE report_approvals SET status='REJECTED', acted_by=?, acted_at=?, remarks=? WHERE id=?")->execute([user_name(current_user()), date('c'), $remarks, $step['id']]);
@@ -2189,6 +2212,106 @@ function ops_idems_evidence($method) {
 }
 
 // Compliance audit log viewer (basic; full super-admin dashboard is a later phase).
+// ===========================================================================
+//  Phase 13: self-learning suggestions
+//  When a report is approved/issued, the wording your team actually used is
+//  harvested so it can be offered back as a suggestion next time. Learning only
+//  ever ENHANCES suggestions — it never changes a technical conclusion or an
+//  approval on its own.
+// ===========================================================================
+function learn_norm($s) {
+    $s = strtolower(trim(preg_replace('/\s+/', ' ', (string)$s)));
+    return substr(preg_replace('/[^a-z0-9 ]/', '', $s), 0, 120);
+}
+// Record one learned value (per report type + field, and optionally per client).
+function learn_record($scope, $typeId, $clientId, $fieldKey, $text) {
+    $text = trim((string)$text);
+    if ($text === '' || mb_strlen($text) < 8 || mb_strlen($text) > 600) return;
+    $norm = learn_norm($text);
+    if ($norm === '') return;
+    $key = substr($scope . '|' . (int)$typeId . '|' . (int)$clientId . '|' . $fieldKey . '|' . $norm, 0, 190);
+    $ex = ops_one("SELECT id, uses FROM learned_suggestions WHERE norm_key=?", [$key]);
+    if ($ex) db()->prepare("UPDATE learned_suggestions SET uses=uses+1, last_seen=? WHERE id=?")->execute([date('c'), $ex['id']]);
+    else db()->prepare("INSERT INTO learned_suggestions (scope,report_type_id,client_id,field_key,text_value,norm_key,uses,last_seen,created_at) VALUES (?,?,?,?,?,?,1,?,?)")
+        ->execute([$scope, $typeId ?: null, $clientId ?: null, $fieldKey, $text, $key, date('c'), date('c')]);
+}
+// Harvest a report's wording once it is approved/issued.
+function learn_from_report($doc) {
+    $fields = idems_fields($doc['report_type_id']);
+    $data = json_decode($doc['data'] ?: '[]', true) ?: [];
+    foreach ($fields as $f) {
+        if (!in_array($f['ftype'], ['text','textarea'], true)) continue;
+        $v = $data[$f['fkey']] ?? '';
+        if (!is_string($v)) continue;
+        learn_record('FIELD', $doc['report_type_id'], 0, $f['fkey'], $v);                       // by report type
+        if (!empty($doc['client_id'])) learn_record('CLIENT', $doc['report_type_id'], $doc['client_id'], $f['fkey'], $v);  // client wording
+    }
+    // remarks are learned per report type, split into sentences
+    foreach (preg_split('/(?<=[.!?])\s+/', (string)($doc['remarks'] ?? '')) as $sentence)
+        learn_record('REMARK', $doc['report_type_id'], 0, '', $sentence);
+    // an adverse result teaches us a common NCR cause
+    if (in_array($doc['result'] ?? '', ['REJECTED','ACCEPTED_COND','HOLD'], true)) {
+        foreach ($fields as $f) {
+            if (!in_array($f['ftype'], ['text','textarea'], true)) continue;
+            $v = $data[$f['fkey']] ?? ''; if (!is_string($v) || trim($v) === '') continue;
+            $lv = strtolower($v);
+            foreach (['not ok','reject','deviat','defect','crack','dent','leak','missing','expired','out of tolerance','incomplete'] as $w)
+                if (strpos($lv, $w) !== false) { learn_record('NCR', $doc['report_type_id'], 0, $f['fkey'], $v); break; }
+        }
+    }
+    idems_log('report_doc', $doc['id'], 'LEARNED', ['irn'=>$doc['irn']]);
+}
+// Ranked suggestions for one field (client-specific wording first, then type-wide).
+function learn_suggestions($typeId, $clientId, $fieldKey, $limit = 6) {
+    $out = []; $seen = [];
+    $add = function($rows) use (&$out, &$seen, $limit) {
+        foreach ($rows as $r) { $k = learn_norm($r['text_value']); if (isset($seen[$k]) || count($out) >= $limit) continue; $seen[$k] = 1; $out[] = $r; }
+    };
+    if ($clientId) $add(ops_all("SELECT * FROM learned_suggestions WHERE muted=0 AND scope='CLIENT' AND report_type_id=? AND client_id=? AND field_key=? ORDER BY uses DESC, last_seen DESC", [(int)$typeId, (int)$clientId, $fieldKey]));
+    $add(ops_all("SELECT * FROM learned_suggestions WHERE muted=0 AND scope='FIELD' AND report_type_id=? AND field_key=? ORDER BY uses DESC, last_seen DESC", [(int)$typeId, $fieldKey]));
+    return $out;
+}
+// Learned remark sentences for a report type (used by the smart-remarks screen).
+function learn_remarks($typeId, $limit = 8) {
+    return ops_all("SELECT * FROM learned_suggestions WHERE muted=0 AND scope='REMARK' AND report_type_id=? ORDER BY uses DESC, last_seen DESC", [(int)$typeId]);
+}
+// ---- Handler: learning insights (what the system has picked up) ----
+function ops_idems_learning($method) {
+    ops_require(is_master() || can('idems.type.manage') || can('mod.idems.view'), 'You cannot view the learning insights.');
+    $pdo = db();
+    if ($method === 'POST') {
+        ops_require(is_master() || can('idems.type.manage'), 'You cannot change the learned library.');
+        $do = $_POST['_do'] ?? '';
+        $id = (int)($_POST['id'] ?? 0);
+        if ($do === 'mute')      { $pdo->prepare("UPDATE learned_suggestions SET muted=1 WHERE id=?")->execute([$id]); flash('Suggestion muted — it will no longer be offered.'); }
+        elseif ($do === 'unmute'){ $pdo->prepare("UPDATE learned_suggestions SET muted=0 WHERE id=?")->execute([$id]); flash('Suggestion restored.'); }
+        elseif ($do === 'promote') {
+            $s = ops_one("SELECT * FROM learned_suggestions WHERE id=?", [$id]);
+            if ($s) { $pdo->prepare("INSERT INTO tech_phrases (category,shorthand,phrase,active,is_system,sort_order,created_by,created_at) VALUES ('OBSERVATION',?,?,1,0,?,?,?)")
+                ->execute([substr(learn_norm($s['text_value']), 0, 40), $s['text_value'], (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM tech_phrases"), user_name(current_user()), date('c')]);
+                flash('Added to the standard phrase library.'); }
+        } elseif ($do === 'purge') { $pdo->prepare("DELETE FROM learned_suggestions WHERE id=?")->execute([$id]); flash('Learned entry removed.'); }
+        redirect('/learning');
+    }
+    $scope = $_GET['scope'] ?? '';
+    $where = "1=1"; $args = [];
+    if ($scope) { $where .= " AND scope=?"; $args[] = $scope; }
+    $rows = ops_all("SELECT l.*, rt.code type_code, rt.name type_name, bp.display_name client_name
+        FROM learned_suggestions l LEFT JOIN report_types rt ON rt.id=l.report_type_id LEFT JOIN business_partners bp ON bp.id=l.client_id
+        WHERE $where ORDER BY l.uses DESC, l.last_seen DESC", $args);
+    $stats = [
+        'total'  => (int)ops_val("SELECT COUNT(*) FROM learned_suggestions"),
+        'uses'   => (int)ops_val("SELECT COALESCE(SUM(uses),0) FROM learned_suggestions"),
+        'ncr'    => (int)ops_val("SELECT COUNT(*) FROM learned_suggestions WHERE scope='NCR'"),
+        'muted'  => (int)ops_val("SELECT COUNT(*) FROM learned_suggestions WHERE muted=1"),
+        'reports'=> (int)ops_val("SELECT COUNT(*) FROM idems_audit WHERE action='LEARNED'"),
+    ];
+    $topPhrases = ops_all("SELECT category, shorthand, phrase, usage_count FROM tech_phrases WHERE usage_count>0 ORDER BY usage_count DESC");
+    view('ops/idems/learning', ['rows'=>array_slice($rows, 0, 300), 'total'=>count($rows), 'scope'=>$scope,
+        'stats'=>$stats, 'topPhrases'=>array_slice($topPhrases, 0, 10)]);
+    return true;
+}
+
 // ---- Actions that a compliance reviewer should always look at ----
 const AUDIT_HIGH_RISK = ['TIMESTAMP_EDIT','DELETE','EVIDENCE_DELETE','REJECT','SENDBACK','SIGNATURE_SET','LOGIN_FAILED','AI_REVIEW','DELEGATE'];
 // Plain-English labels for the log.
