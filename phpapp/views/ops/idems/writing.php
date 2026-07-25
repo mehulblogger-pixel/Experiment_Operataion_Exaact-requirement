@@ -3,7 +3,7 @@
   $byCat = [];
   foreach ($phrases as $p) $byCat[$p['category']][] = $p;
 ?>
-<div class="crumbs"><a href="/">Home</a> › Writing assistant</div>
+<div class="crumbs"><a href="/">Home</a> › Technical writing</div>
 <div class="master-head">
   <div><h1>Technical writing assistant</h1>
     <p class="sub" style="margin:2px 0 0">Type what you saw in plain shorthand — one point per line. The system converts it into correct, factual engineering language using the standard phrase library. No AI required.</p></div>

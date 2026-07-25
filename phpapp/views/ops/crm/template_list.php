@@ -1,13 +1,14 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/quotes">Quotations</a> › Templates</div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/templates">Document templates</a> › <?= e(T('quote')) ?> &amp; e-mail</div>
 <div class="master-head">
-  <div><h1>Quote &amp; e-mail templates</h1>
-    <p class="sub" style="margin:2px 0 0">Upload your Word quotation format (for editing) and the signature that appears on the <strong>client PDF</strong>. The generated quote stamps the document / format number from the format.</p></div>
+  <div><h1>Document templates</h1>
+    <p class="sub" style="margin:2px 0 0">Upload your Word <?= e(Tl('quote')) ?> format (for editing) and the signature that appears on the <strong><?= e(Tl('client')) ?> PDF</strong>. The generated <?= e(Tl('quote')) ?> stamps the document / format number from the format.</p></div>
   <a class="btn" href="/crm-template-new">+ Add template</a>
 </div>
+<?= template_tabs('/templates?kind=quote') ?>
 
 <div class="panel">
-  <h3 class="tab-sub" style="margin-top:0">🏢 Letterhead for client PDF <span class="muted">— per company</span></h3>
-  <p class="sub">The customer receives the quotation as a PDF on this letterhead. Fully customisable to your company.</p>
+  <h3 class="tab-sub" style="margin-top:0">Letterhead for client PDF <span class="muted">— per company</span></h3>
+  <p class="sub">The <?= e(Tl('client')) ?> receives the <?= e(Tl('quote')) ?> as a PDF on this letterhead. Fully customisable to your company.</p>
   <form method="post" action="/crm-letterhead" enctype="multipart/form-data">
     <div class="form-grid">
       <div class="ff"><label>Company logo (PNG / JPG) <?= !empty($lhLogo)?'<span class="pill p-ok">on file</span>':'' ?></label><input class="form-control" type="file" name="logo" accept=".png,.jpg,.jpeg"></div>
@@ -15,7 +16,7 @@
       <div class="ff"><label>Contact line <span class="muted">(phone · email · web · GSTIN)</span></label><input class="form-control" name="lh_contact" value="<?= e($lhContact ?? '') ?>" placeholder="+91 … · sales@… · www… · GSTIN …"></div>
     </div>
     <div class="ff ff-wide"><label>Address (one line each)</label><textarea class="form-control" name="lh_address" rows="2" placeholder="Building / street&#10;City, State – PIN"><?= e($lhAddress ?? '') ?></textarea></div>
-    <div class="ff ff-wide"><label>Footer note (optional)</label><input class="form-control" name="lh_footer" value="<?= e($lhFooter ?? '') ?>" placeholder="e.g. This is a computer-generated quotation."></div>
+    <div class="ff ff-wide"><label>Footer note (optional)</label><input class="form-control" name="lh_footer" value="<?= e($lhFooter ?? '') ?>" placeholder="e.g. This is a computer-generated <?= e(Tl('quote')) ?>."></div>
     <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
       <button class="btn" type="submit">Save letterhead</button>
       <?php if (!empty($lhLogo)): ?><label class="chk"><input type="checkbox" name="clear_logo" value="1"> Remove current logo</label><?php endif; ?>
@@ -24,8 +25,8 @@
 </div>
 
 <div class="panel">
-  <h3 class="tab-sub" style="margin-top:0">✍ Signature for client PDFs</h3>
-  <p class="sub">The customer receives the quotation as a <strong>PDF</strong>; this signature image + name are stamped on it.</p>
+  <h3 class="tab-sub" style="margin-top:0">Signature for client PDFs</h3>
+  <p class="sub">The <?= e(Tl('client')) ?> receives the <?= e(Tl('quote')) ?> as a <strong>PDF</strong>; this signature image + name are stamped on it.</p>
   <form method="post" action="/crm-signature" enctype="multipart/form-data">
     <div class="form-grid">
       <div class="ff"><label>Signature image (PNG / JPG) <?= !empty($sigSet)?'<span class="pill p-ok">on file</span>':'' ?></label><input class="form-control" type="file" name="sig" accept=".png,.jpg,.jpeg"></div>
@@ -60,7 +61,7 @@
       </td>
     </tr>
     <?php endforeach; ?>
-    <?php if (!$rows): ?><tr><td colspan="9" style="text-align:center;padding:24px" class="muted">No templates yet — click "Add template" and upload your Word quotation format.</td></tr><?php endif; ?>
+    <?php if (!$rows): ?><tr><td colspan="9" style="text-align:center;padding:24px" class="muted">No templates yet — click "Add template" and upload your Word <?= e(Tl('quote')) ?> format.</td></tr><?php endif; ?>
     </tbody>
   </table>
   </div>

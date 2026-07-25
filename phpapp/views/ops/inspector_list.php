@@ -1,6 +1,6 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › Inspectors</div>
 <div class="master-head">
-  <div><h1>Inspectors</h1><p class="sub"><?= count($rows) ?> inspector(s)</p></div>
+  <div><h1><?= e(T_REG('engineer')) ?></h1><p class="sub"><?= count($rows) ?> inspector(s)</p></div>
   <a class="btn" href="/m/inspectors/new">+ Add inspector</a>
 </div>
 <form method="get" action="/m/inspectors" class="filter-bar">

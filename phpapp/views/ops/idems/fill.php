@@ -92,8 +92,8 @@
     echo '</div>';
   };
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents">Documents</a> › <a href="/document?id=<?= (int)$doc['id'] ?>"><?= e($doc['irn']) ?></a> › Fill</div>
-<div class="master-head"><div><h1>Fill report — <?= e($doc['irn']) ?></h1>
+<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <a href="/document?id=<?= (int)$doc['id'] ?>"><?= e($doc['irn']) ?></a> › Fill</div>
+<div class="master-head"><div><h1>Fill <?= e(Tl('report')) ?> <?= e($doc['irn']) ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= e($doc['title'] ?: $doc['type_code']) ?></p></div>
   <a class="btn secondary" href="/document?id=<?= (int)$doc['id'] ?>">← Back</a>
 </div>

@@ -1,7 +1,8 @@
 <?php // Report templates — upload client-specific .docx formats and map fields with tokens. ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents">Documents</a> › Report templates</div>
-<div class="master-head"><div><h1>Report templates (client formats)</h1>
-  <p class="sub" style="margin:2px 0 0">Upload a client's approved Word format and place <code>{{tokens}}</code> where values go. Generated reports come out in exactly that format — fonts, headers, footers, logo and tables preserved. The most specific template (by report type, client, office) is used automatically.</p></div></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/templates">Document templates</a> › <?= e(T('report')) ?> formats</div>
+<div class="master-head"><div><h1>Document templates</h1>
+  <p class="sub" style="margin:2px 0 0">Upload a <?= e(Tl('client')) ?>'s approved Word format and place <code>{{tokens}}</code> where values go. Generated <?= e(Tlp('report')) ?> come out in exactly that format — fonts, headers, footers, logo and tables preserved. The most specific template (by <?= e(Tl('report')) ?> type, <?= e(Tl('client')) ?>, <?= e(T('office')) ?>) is used automatically.</p></div></div>
+<?= template_tabs('/templates?kind=report') ?>
 
 <?php if (empty($zipOk)): ?><div class="panel" style="border:1px solid var(--bad)"><b style="color:var(--bad)">Note:</b> the PHP <code>zip</code> extension isn't enabled here, so .docx generation won't run until it's turned on. You can still upload &amp; manage templates.</div><?php endif; ?>
 

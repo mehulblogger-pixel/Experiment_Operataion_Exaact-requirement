@@ -1,6 +1,6 @@
 <?php $stPill = ['OPEN'=>'p-warn','QUOTED'=>'p-ok','DROPPED'=>'p-mut']; ?>
 <div class="master-head">
-  <div><h1>Customer inquiries</h1>
+  <div><h1><?= e(T_REG('inquiry')) ?></h1>
     <p class="sub" style="margin:2px 0 0">Received via email / phone — the front of the sales funnel. <?= count($rows) ?> shown.</p></div>
   <?php if (can('mod.inquiries.edit')): ?><a class="btn" href="/inquiry-new">+ New inquiry</a><?php endif; ?>
 </div>

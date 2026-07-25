@@ -14,16 +14,16 @@
   $vHoursFmt = rtrim(rtrim(number_format($vHours, 1, '.', ''), '0'), '.') ?: '0';
   $vDays = count($byDate);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/vouchers">Vouchers</a> › <?= e($v['month']) ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/vouchers"><?= e(TP('voucher')) ?></a> › <?= e($v['month']) ?></div>
 <div class="master-head">
-  <div><h1>Statement of Travelling Expenses
+  <div><h1>Statement of travelling expenses
       <span class="pill <?= $vpill[0] ?>" style="vertical-align:middle;font-size:12px"><?= e($vpill[1]) ?></span></h1>
     <p class="sub" style="margin:2px 0 0"><strong><?= e($v['inspector_name']) ?></strong><?= $v['emp_code']?' · '.e($v['emp_code']):'' ?> · Month <?= e($v['month']) ?> · SBU <?= e(lk_options_or('sbu',OPS_SBUS)[$v['sbu']] ?? $v['sbu'] ?: '—') ?></p></div>
   <a class="btn secondary" href="/vouchers">← Back</a>
 </div>
 
 <div class="kpi-row" style="margin:16px 0">
-  <div class="kpi"><span class="kic">₹</span><div class="k">Grand total</div><div class="v"><?= fmoney_short($vGrand) ?></div><div class="d"><?= $vDays ?> day(s) · <?= e($vHoursFmt) ?> hrs</div></div>
+  <div class="kpi"><span class="kic"><?= e(cur_sym()) ?></span><div class="k">Grand total</div><div class="v"><?= fmoney_short($vGrand) ?></div><div class="d"><?= $vDays ?> day(s) · <?= e($vHoursFmt) ?> hrs</div></div>
   <div class="kpi"><span class="kic">💳</span><div class="k">Balance <?= $vBal < 0 ? '(recover)' : 'to pay' ?></div><div class="v"><?= fmoney_short(abs($vBal)) ?></div><div class="d">after advance &amp; office</div></div>
   <div class="kpi"><span class="kic">🧾</span><div class="k">Travel</div><div class="v"><?= fmoney_short($sum['travel']) ?></div><div class="d">km × your rate</div></div>
   <div class="kpi"><span class="kic">📌</span><div class="k">Status</div><div class="v" style="font-size:17px;margin-top:8px"><span class="pill <?= $vpill[0] ?>"><?= e($vpill[1]) ?></span></div><div class="d"><?= $v['approved_by'] ? 'by '.e($v['approved_by']) : 'not yet approved' ?></div></div>
@@ -72,9 +72,9 @@
 <table class="grid" id="vgrid">
   <tr>
     <th>Date</th><th>Attendance / Site</th><th>File No (BOSS)</th><th>Line No</th><th>Hrs</th>
-    <th>Mode</th><th>KM</th><th>Travel ₹</th>
+    <th>Mode</th><th>KM</th><th>Travel <?= e(cur_sym()) ?></th>
     <?php foreach ($heads as $h): ?><th title="<?= e($h['code']) ?>"><?= e($h['label']) ?></th><?php endforeach; ?>
-    <th>Row ₹</th><?php if ($canEdit): ?><th></th><?php endif; ?>
+    <th>Row <?= e(cur_sym()) ?></th><?php if ($canEdit): ?><th></th><?php endif; ?>
   </tr>
   <?php foreach ($byDate as $date => $rows): $dayHours = 0; ?>
     <?php foreach ($rows as $e):
@@ -100,11 +100,11 @@
       <td><select form="vform" class="form-control v-mode" style="width:110px" name="<?= $P ?>[mode]"><option value="">—</option>
         <?php foreach ($modes as $m): ?><option value="<?= e($m['code']) ?>" <?= $modeVal===$m['code']?'selected':'' ?>><?= e($m['label']) ?></option><?php endforeach; ?></select></td>
       <td><input form="vform" class="form-control v-km" style="width:70px" type="number" step="0.1" name="<?= $P ?>[km]" value="<?= e($kmVal!==''?$fmt($kmVal):'') ?>"></td>
-      <td class="v-travel" data-eid="<?= $eid ?>">₹<?= $fmt($e['travel_amount']) ?></td>
+      <td class="v-travel" data-eid="<?= $eid ?>"><?= e(cur_sym()) ?><?= $fmt($e['travel_amount']) ?></td>
       <?php foreach ($heads as $h): ?>
         <td><input form="vform" class="form-control v-amt" data-code="<?= e($h['code']) ?>" style="width:80px" type="number" step="0.01" name="<?= $P ?>[amt][<?= e($h['code']) ?>]" value="<?= e(isset($amt[$h['code']])?$fmt($amt[$h['code']]):'') ?>" <?= $h['head_type']==='BILL'?'title="actual bill"':'' ?>></td>
       <?php endforeach; ?>
-      <td class="v-rowtotal" data-eid="<?= $eid ?>"><strong>₹<?= $fmt($e['row_total']) ?></strong></td>
+      <td class="v-rowtotal" data-eid="<?= $eid ?>"><strong><?= e(cur_sym()) ?><?= $fmt($e['row_total']) ?></strong></td>
       <td class="row-actions"><button form="del_<?= $eid ?>" class="btn small danger" type="submit" onclick="return confirm('Remove this row?')">✕</button></td>
       <?php else: ?>
       <td><?= e($e['file_no'] ?: '—') ?></td>
@@ -112,9 +112,9 @@
       <td><?= e($fmt($e['hours'])) ?></td>
       <td><?= e($e['mode_code'] ?: '—') ?></td>
       <td><?= (float)$e['km']>0 ? e($fmt($e['km'])) : '—' ?></td>
-      <td>₹<?= $fmt($e['travel_amount']) ?></td>
-      <?php foreach ($heads as $h): ?><td><?= isset($amt[$h['code']]) ? '₹'.$fmt($amt[$h['code']]) : '—' ?></td><?php endforeach; ?>
-      <td><strong>₹<?= $fmt($e['row_total']) ?></strong></td>
+      <td><?= e(cur_sym()) ?><?= $fmt($e['travel_amount']) ?></td>
+      <?php foreach ($heads as $h): ?><td><?= isset($amt[$h['code']]) ? cur_sym().$fmt($amt[$h['code']]) : '—' ?></td><?php endforeach; ?>
+      <td><strong><?= e(cur_sym()) ?><?= $fmt($e['row_total']) ?></strong></td>
       <?php endif; ?>
     </tr>
     <?php endforeach; ?>
@@ -126,12 +126,12 @@
     <td colspan="4" style="text-align:right"><strong>TOTAL</strong></td>
     <td><strong class="tot-hours"><?= e($fmt($monthHours)) ?></strong></td>
     <td></td><td></td>
-    <td id="tot-travel"><strong>₹<?= $fmt($tTravel) ?></strong></td>
-    <?php foreach ($heads as $h): ?><td id="tot-amt-<?= e($h['code']) ?>"><strong>₹<?= $fmt($tHead[$h['code']]) ?></strong></td><?php endforeach; ?>
-    <td id="tot-grand"><strong>₹<?= $fmt($grand) ?></strong></td>
+    <td id="tot-travel"><strong><?= e(cur_sym()) ?><?= $fmt($tTravel) ?></strong></td>
+    <?php foreach ($heads as $h): ?><td id="tot-amt-<?= e($h['code']) ?>"><strong><?= e(cur_sym()) ?><?= $fmt($tHead[$h['code']]) ?></strong></td><?php endforeach; ?>
+    <td id="tot-grand"><strong><?= e(cur_sym()) ?><?= $fmt($grand) ?></strong></td>
     <?php if ($canEdit): ?><td></td><?php endif; ?>
   </tr>
-  <tr><td colspan="<?= $ncol - 1 ?>" style="text-align:right"><strong>Grand Total</strong></td><td id="tot-grand2"><strong>₹<?= $fmt($grand) ?></strong></td></tr>
+  <tr><td colspan="<?= $ncol - 1 ?>" style="text-align:right"><strong>Grand Total</strong></td><td id="tot-grand2"><strong><?= e(cur_sym()) ?><?= $fmt($grand) ?></strong></td></tr>
   <?php endif; ?>
 </table>
 </div>
@@ -141,7 +141,7 @@
   <?php foreach ($entries as $e): ?>
     <form id="del_<?= (int)$e['id'] ?>" method="post" action="/voucher-entry?id=<?= (int)$v['id'] ?>"><input type="hidden" name="_do" value="del"><input type="hidden" name="entry_id" value="<?= (int)$e['id'] ?>"></form>
   <?php endforeach; ?>
-  <p class="muted" style="margin-top:8px">KM auto-fills from what you last entered for that vendor (↺) and stays editable. Travel ₹ = KM × your rate; the bottom row totals every column. Only the heads &amp; modes you're entitled to appear.</p>
+  <p class="muted" style="margin-top:8px">KM auto-fills from what you last entered for that vendor (↺) and stays editable. Travel <?= e(cur_sym()) ?> = KM × your rate; the bottom row totals every column. Only the heads &amp; modes you're entitled to appear.</p>
 <?php endif; ?>
 
 <div class="panel-split" style="margin-top:16px">
@@ -149,15 +149,15 @@
     <h3 class="tab-sub">Summary — particulars</h3>
     <table class="grid">
       <tr><th>Particular</th><th style="text-align:right">Amount</th></tr>
-      <tr><td>Travel charges (KM × rate)</td><td style="text-align:right">₹<?= number_format($sum['travel'],0) ?></td></tr>
+      <tr><td>Travel charges (KM × rate)</td><td style="text-align:right"><?= e(cur_sym()) ?><?= number_format($sum['travel'],0) ?></td></tr>
       <?php foreach ($sum['heads'] as $code=>$amt): if ($amt==0) continue; ?>
-        <tr><td><?= e($headLabels[$code] ?? $code) ?></td><td style="text-align:right">₹<?= number_format($amt,0) ?></td></tr>
+        <tr><td><?= e($headLabels[$code] ?? $code) ?></td><td style="text-align:right"><?= e(cur_sym()) ?><?= number_format($amt,0) ?></td></tr>
       <?php endforeach; ?>
-      <tr style="background:var(--soft)"><td><strong>Grand Total</strong></td><td style="text-align:right"><strong>₹<?= number_format($sum['grand'],0) ?></strong></td></tr>
-      <tr><td>Less: Advance</td><td style="text-align:right">₹<?= number_format((float)$v['advance'],0) ?></td></tr>
-      <tr><td>Less: Expenses incurred by Office</td><td style="text-align:right">₹<?= number_format((float)$v['office_incurred'],0) ?></td></tr>
+      <tr style="background:var(--soft)"><td><strong>Grand Total</strong></td><td style="text-align:right"><strong><?= e(cur_sym()) ?><?= number_format($sum['grand'],0) ?></strong></td></tr>
+      <tr><td>Less: Advance</td><td style="text-align:right"><?= e(cur_sym()) ?><?= number_format((float)$v['advance'],0) ?></td></tr>
+      <tr><td>Less: Expenses incurred by Office</td><td style="text-align:right"><?= e(cur_sym()) ?><?= number_format((float)$v['office_incurred'],0) ?></td></tr>
       <?php $bal = $sum['grand'] - (float)$v['advance'] - (float)$v['office_incurred']; ?>
-      <tr style="background:var(--soft)"><td><strong>Balance to be paid / (recovered)</strong></td><td style="text-align:right"><strong>₹<?= number_format($bal,0) ?></strong></td></tr>
+      <tr style="background:var(--soft)"><td><strong>Balance to be paid / (recovered)</strong></td><td style="text-align:right"><strong><?= e(cur_sym()) ?><?= number_format($bal,0) ?></strong></td></tr>
     </table>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
       <a class="btn secondary" href="/voucher-print?id=<?= (int)$v['id'] ?>" target="_blank">🖨 Print / Save PDF</a>
@@ -173,8 +173,8 @@
       <div class="form-grid">
         <div class="ff"><label>Nature of spend</label>
           <select class="form-control" name="nature"><option value="">—</option><?php foreach ($natureOpts as $k=>$vv): ?><option value="<?= e($k) ?>" <?= $v['nature']===$k?'selected':'' ?>><?= e($vv) ?></option><?php endforeach; ?></select></div>
-        <div class="ff"><label>Less Advance (₹)</label><input class="form-control" type="number" step="0.01" name="advance" value="<?= e($v['advance']) ?>"></div>
-        <div class="ff"><label>Less Office-incurred (₹)</label><input class="form-control" type="number" step="0.01" name="office_incurred" value="<?= e($v['office_incurred']) ?>"></div>
+        <div class="ff"><label>Less Advance (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="advance" value="<?= e($v['advance']) ?>"></div>
+        <div class="ff"><label>Less Office-incurred (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="office_incurred" value="<?= e($v['office_incurred']) ?>"></div>
         <div class="ff ff-wide"><label>Supporting file — one file for all bills (PDF/JPG, max 6 MB)</label><input class="form-control" type="file" name="support"></div>
       </div>
       <div style="margin-top:8px"><button class="btn small" type="submit">Save details / upload</button></div>
@@ -182,8 +182,8 @@
     <?php else: ?>
       <div class="kv-grid">
         <div><span class="k">Nature</span><span class="v"><?= e($natureOpts[$v['nature']] ?? $v['nature'] ?: '—') ?></span></div>
-        <div><span class="k">Advance</span><span class="v">₹<?= number_format((float)$v['advance'],0) ?></span></div>
-        <div><span class="k">Office-incurred</span><span class="v">₹<?= number_format((float)$v['office_incurred'],0) ?></span></div>
+        <div><span class="k">Advance</span><span class="v"><?= e(cur_sym()) ?><?= number_format((float)$v['advance'],0) ?></span></div>
+        <div><span class="k">Office-incurred</span><span class="v"><?= e(cur_sym()) ?><?= number_format((float)$v['office_incurred'],0) ?></span></div>
       </div>
     <?php endif; ?>
     <?php if ($v['supporting_file']): ?><p style="margin-top:8px">📎 Supporting: <a href="/voucher-file?id=<?= (int)$v['id'] ?>" target="_blank"><?= e($v['supporting_name'] ?: 'file') ?></a></p><?php endif; ?>
@@ -222,7 +222,7 @@
     var RATES = <?= json_encode($rates) ?>;
     var grid = document.getElementById('vgrid');
     if (!grid) return;
-    function money(n){ return '₹' + (Math.round(n*100)/100).toLocaleString('en-IN'); }
+    function money(n){ return '<?= e(cur_sym()) ?>' + (Math.round(n*100)/100).toLocaleString('en-IN'); }
     function recalc(){
       var totTravel=0, totGrand=0, totHead={};
       grid.querySelectorAll('tr[data-eid]').forEach(function(tr){

@@ -1,9 +1,10 @@
 <?php // IDEMS approval rules (configurable multi-level chain) ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents">Documents</a> › Approval rules</div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <?= e(T('report')) ?> approvals</div>
 <div class="master-head"><div><h1>Approval rules</h1>
-  <p class="sub" style="margin:2px 0 0">Design the approval chain by report type, office, client or SBU. Leave a match blank for "any". Multiple levels run in order. No rule ⇒ the inspector's mapped approver is used (single level).</p></div>
+  <p class="sub" style="margin:2px 0 0">Design the approval chain by <?= e(Tl('report')) ?> type, <?= e(T('office')) ?>, <?= e(Tl('client')) ?> or <?= e(T('sbu')) ?>. Leave a match blank for "any". Multiple levels run in order. No rule ⇒ the <?= e(Tl('engineer')) ?>'s mapped approver is used (single level).</p></div>
   <a class="btn secondary" href="/approver-map">Approver mapping →</a>
 </div>
+<?= approval_rule_tabs('/approval-rules?module=report') ?>
 
 <form method="post" action="/idems-approval-rules" class="panel">
   <?php if ($edit): ?><input type="hidden" name="id" value="<?= (int)$edit['id'] ?>"><?php endif; ?>

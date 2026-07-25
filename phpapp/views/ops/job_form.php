@@ -66,16 +66,16 @@
       <select class="form-control searchable" name="subcon_id"><option value="">—</option>
         <?php foreach ($subcons as $s): ?><option value="<?= (int)$s['id'] ?>" <?= ($job && $job['subcon_id']==$s['id'])?'selected':'' ?>><?= e($s['agency']) ?><?= $s['inspector_name']?' — '.e($s['inspector_name']):'' ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff"><label>Sub-con cost (₹)</label><input class="form-control" type="number" step="0.01" name="subcon_cost" value="<?= e($job['subcon_cost'] ?? '') ?>"></div>
+    <div class="ff"><label>Sub-con cost (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="subcon_cost" value="<?= e($job['subcon_cost'] ?? '') ?>"></div>
     <div class="ff"><label>BOSS number</label>
       <select class="form-control searchable" name="boss_id"><option value="">—</option>
         <?php foreach ($boss as $bn): ?><option value="<?= (int)$bn['id'] ?>" <?= ($job && $job['boss_id']==$bn['id'])?'selected':'' ?>><?= e($bn['boss_number']) ?> (<?= e($bn['status']) ?>)</option><?php endforeach; ?>
       </select>
       <?php if (!$boss): ?><small class="muted">No BOSS numbers for this client yet — add under <a href="/m/boss/new">BOSS numbers</a>.</small><?php endif; ?></div>
 
-    <div class="ff"><label>Against quotation / contract <span class="muted">(CRM)</span></label>
+    <div class="ff"><label>Against <?= e(Tl('quote')) ?> / contract <span class="muted">(CRM)</span></label>
       <select class="form-control searchable" name="quotation_id"><option value="">— none —</option>
-        <?php foreach (($quotes ?? []) as $qq): ?><option value="<?= (int)$qq['id'] ?>" <?= ($job && $job['quotation_id']==$qq['id'])?'selected':'' ?>><?= e($qq['quote_no']) ?><?= (int)$qq['rev']>0?' R'.$qq['rev']:'' ?><?= $qq['contract_number']?' · '.e($qq['contract_number']):'' ?> · ₹<?= number_format((float)$qq['total_amount'],0) ?></option><?php endforeach; ?>
+        <?php foreach (($quotes ?? []) as $qq): ?><option value="<?= (int)$qq['id'] ?>" <?= ($job && $job['quotation_id']==$qq['id'])?'selected':'' ?>><?= e($qq['quote_no']) ?><?= (int)$qq['rev']>0?' R'.$qq['rev']:'' ?><?= $qq['contract_number']?' · '.e($qq['contract_number']):'' ?> · <?= e(cur_sym()) ?><?= number_format((float)$qq['total_amount'],0) ?></option><?php endforeach; ?>
       </select>
       <small class="muted">Links this job to the order — advance / payment-hold rules and deliverables carry over, and revenue is tracked against the quote.</small></div>
 
@@ -87,7 +87,7 @@
     <div class="ff"><label>Random date 3</label><input class="form-control" type="date" name="random_date3" value="<?= e($job['random_date3'] ?? '') ?>"></div>
     <div class="ff"><label>Man-days (0 = auto from dates)</label><input class="form-control" type="number" step="0.5" name="mandays" value="<?= e($job['mandays'] ?? '0') ?>"></div>
 
-    <div class="ff"><label>Expected credit (₹) *</label><input class="form-control" type="number" step="0.01" name="expected_credit" value="<?= e($job['expected_credit'] ?? $call['expected_credit'] ?? '') ?>" required></div>
+    <div class="ff"><label>Expected credit (<?= e(cur_sym()) ?>) *</label><input class="form-control" type="number" step="0.01" name="expected_credit" value="<?= e($job['expected_credit'] ?? $call['expected_credit'] ?? '') ?>" required></div>
     <div class="ff"><label>Credit type</label>
       <select class="form-control searchable" name="credit_type"><?php foreach (lk_options_or('credit_type', CREDIT_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($job['credit_type'] ?? $call['credit_type'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Credit direction</label>

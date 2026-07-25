@@ -31,46 +31,48 @@
     <nav class="side-nav">
       <a class="s-item<?= $navOn(['']) ?>" href="/"><span class="s-ic">🏠</span><span>Dashboard</span></a>
 
+      <?php // Every label below is the first words of the page heading it opens,
+            // and every business noun comes from Settings -> Terminology. ?>
       <?php if ($isInsp): ?>
         <div class="s-grp">My work</div>
-        <a class="s-item<?= $navOn(['my-jobs']) ?>" href="/my-jobs"><span class="s-ic">🗂</span><span>My Jobs</span></a>
-        <a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span>My Voucher</span></a>
+        <a class="s-item<?= $navOn(['my-jobs']) ?>" href="/my-jobs"><span class="s-ic">🗂</span><span>My <?= e(Tlp('job')) ?></span></a>
+        <a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span>My <?= e(Tlp('voucher')) ?></span></a>
       <?php else: ?>
         <?php if (can('mod.inquiries.view')||can('mod.quotes.view')||can('mod.crm_reports.view')): ?>
-        <div class="s-grp">Sales / CRM</div>
-        <?php if (can('mod.inquiries.view')): ?><a class="s-item<?= $navOn(['inquiries','inquiry']) ?>" href="/inquiries"><span class="s-ic">📨</span><span>Inquiries</span></a><?php endif; ?>
-        <?php if (can('mod.quotes.view')): ?><a class="s-item<?= $navOn(['quotes','quote']) ?>" href="/quotes"><span class="s-ic">📝</span><span>Quotations</span></a><?php endif; ?>
+        <div class="s-grp">Sales</div>
+        <?php if (can('mod.inquiries.view')): ?><a class="s-item<?= $navOn(['inquiries','inquiry']) ?>" href="/inquiries"><span class="s-ic">📨</span><span><?= e(THP('inquiry')) ?></span></a><?php endif; ?>
+        <?php if (can('mod.quotes.view')): ?><a class="s-item<?= $navOn(['quotes','quote']) ?>" href="/quotes"><span class="s-ic">📝</span><span><?= e(THP('quote')) ?></span></a><?php endif; ?>
         <?php if (can('mod.crm_reports.view')): ?><a class="s-item<?= $navOn(['crm-reports']) ?>" href="/crm-reports"><span class="s-ic">📈</span><span>Sales dashboard</span></a><?php endif; ?>
         <?php endif; ?>
 
         <?php if (can('mod.calls.view')||can('mod.jobs.view')||can('mod.vouchers.view')||can('mod.hiring.view')||can('mod.reconcile.view')): ?>
         <div class="s-grp">Operations</div>
-        <?php if (can('mod.calls.view')): ?><a class="s-item<?= $navOn(['calls','call']) ?>" href="/calls"><span class="s-ic">☎️</span><span>Calls</span></a><?php endif; ?>
-        <?php if (can('mod.jobs.view')): ?><a class="s-item<?= $navOn(['jobs','job']) ?>" href="/jobs"><span class="s-ic">🗂</span><span>Jobs</span></a><?php endif; ?>
-        <?php if (can('mod.jobs.view') && function_exists('can_manage_availability') && can_manage_availability()): ?><a class="s-item<?= $navOn(['availability']) ?>" href="/availability"><span class="s-ic">🟢</span><span>Availability</span></a><?php endif; ?>
-        <?php if (can('mod.vouchers.view')): ?><a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span>Vouchers</span></a><?php endif; ?>
-        <?php if (can('mod.hiring.view')): ?><a class="s-item<?= $navOn(['candidates','candidate']) ?>" href="/candidates"><span class="s-ic">🧑‍💼</span><span>Hiring</span></a><?php endif; ?>
-        <?php if (can('mod.hiring.view')): ?><a class="s-item<?= $navOn(['requisitions','requisition']) ?>" href="/requisitions"><span class="s-ic">📋</span><span>Requisitions</span></a><?php endif; ?>
-        <?php if (can('mod.reconcile.view')): ?><a class="s-item<?= $navOn(['attendance-recon']) ?>" href="/attendance-recon"><span class="s-ic">✅</span><span>Reconcile</span></a><?php endif; ?>
+        <?php if (can('mod.calls.view')): ?><a class="s-item<?= $navOn(['calls','call']) ?>" href="/calls"><span class="s-ic">☎️</span><span><?= e(THP('call')) ?></span></a><?php endif; ?>
+        <?php if (can('mod.jobs.view')): ?><a class="s-item<?= $navOn(['jobs','job']) ?>" href="/jobs"><span class="s-ic">🗂</span><span><?= e(THP('job')) ?></span></a><?php endif; ?>
+        <?php if (can('mod.jobs.view') && function_exists('can_manage_availability') && can_manage_availability()): ?><a class="s-item<?= $navOn(['availability']) ?>" href="/availability"><span class="s-ic">🟢</span><span><?= e(TH('engineer')) ?> availability</span></a><?php endif; ?>
+        <?php if (can('mod.vouchers.view')): ?><a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span><?= e(THP('voucher')) ?></span></a><?php endif; ?>
+        <?php if (can('mod.hiring.view')): ?><a class="s-item<?= $navOn(['candidates','candidate']) ?>" href="/candidates"><span class="s-ic">🧑‍💼</span><span><?= e(THP('candidate')) ?></span></a><?php endif; ?>
+        <?php if (can('mod.hiring.view')): ?><a class="s-item<?= $navOn(['requisitions','requisition']) ?>" href="/requisitions"><span class="s-ic">📋</span><span><?= e(THP('requisition')) ?></span></a><?php endif; ?>
+        <?php if (can('mod.reconcile.view')): ?><a class="s-item<?= $navOn(['attendance-recon']) ?>" href="/attendance-recon"><span class="s-ic">✅</span><span>Attendance reconciliation</span></a><?php endif; ?>
         <?php endif; ?>
 
         <?php if (can('mod.idems.view')): ?>
-        <div class="s-grp">Inspection Reports</div>
-        <a class="s-item<?= $navOn(['documents','document','document-new','document-edit']) ?>" href="/documents"><span class="s-ic">📑</span><span>Document Register</span></a>
-        <?php if (can('mod.idems.edit') || is_master()): ?><a class="s-item<?= $navOn(['document-new']) ?>" href="/document-new"><span class="s-ic">➕</span><span>New Report</span></a><?php endif; ?>
-        <a class="s-item<?= $navOn(['endorsements','endorsement','endorsement-new','endorsement-edit']) ?>" href="/endorsements"><span class="s-ic">✅</span><span>Doc Endorsements</span></a>
-        <a class="s-item<?= $navOn(['writing-assistant','phrase-library','phrase-edit']) ?>" href="/writing-assistant"><span class="s-ic">✒️</span><span>Writing Assistant</span></a>
-        <a class="s-item<?= $navOn(['learning']) ?>" href="/learning"><span class="s-ic">🧠</span><span>Learning Insights</span></a>
-        <?php if (can('idems.type.manage') || is_master() || can('users.manage.global')): ?><a class="s-item<?= $navOn(['approver-map']) ?>" href="/approver-map"><span class="s-ic">👤</span><span>Approver Mapping</span></a><?php endif; ?>
-        <?php if (can('idems.type.manage') || is_master()): ?><a class="s-item<?= $navOn(['idems-approval-rules','idems-approval-rule-edit']) ?>" href="/idems-approval-rules"><span class="s-ic">🔀</span><span>Approval Rules</span></a><?php endif; ?>
-        <?php if (can('idems.type.manage') || is_master() || can('crm.template.manage')): ?><a class="s-item<?= $navOn(['report-templates','report-template-edit']) ?>" href="/report-templates"><span class="s-ic">📝</span><span>Report Templates</span></a><?php endif; ?>
-        <?php if (can('idems.audit.view') || is_master()): ?><a class="s-item<?= $navOn(['audit-log']) ?>" href="/audit-log"><span class="s-ic">🛡️</span><span>Audit Log</span></a><?php endif; ?>
+        <div class="s-grp">Reporting</div>
+        <a class="s-item<?= $navOn(['documents','document','document-new','document-edit']) ?>" href="/documents"><span class="s-ic">📑</span><span><?= e(T_REG('report')) ?></span></a>
+        <?php if (can('mod.idems.edit') || is_master()): ?><a class="s-item<?= $navOn(['document-new']) ?>" href="/document-new"><span class="s-ic">➕</span><span><?= e(ucfirst(T_NEW('report'))) ?></span></a><?php endif; ?>
+        <a class="s-item<?= $navOn(['endorsements','endorsement','endorsement-new','endorsement-edit']) ?>" href="/endorsements"><span class="s-ic">✅</span><span><?= e(T_REG('endorsement')) ?></span></a>
+        <a class="s-item<?= $navOn(['writing-assistant','phrase-library','phrase-edit']) ?>" href="/writing-assistant"><span class="s-ic">✒️</span><span>Technical writing</span></a>
+        <a class="s-item<?= $navOn(['learning']) ?>" href="/learning"><span class="s-ic">🧠</span><span>Learning insights</span></a>
+        <?php if (can('idems.type.manage') || is_master() || can('users.manage.global')): ?><a class="s-item<?= $navOn(['approver-map']) ?>" href="/approver-map"><span class="s-ic">👤</span><span>Approver mapping</span></a><?php endif; ?>
+        <?php if (can('idems.type.manage') || is_master()): ?><a class="s-item<?= $navOn(['idems-approval-rules','idems-approval-rule-edit','approval-rules']) ?>" href="/approval-rules"><span class="s-ic">🔀</span><span>Approval rules</span></a><?php endif; ?>
+        <?php if (can('idems.type.manage') || is_master() || can('crm.template.manage')): ?><a class="s-item<?= $navOn(['report-templates','report-template-edit','templates']) ?>" href="/templates"><span class="s-ic">📝</span><span>Document templates</span></a><?php endif; ?>
+        <?php if (can('idems.audit.view') || is_master()): ?><a class="s-item<?= $navOn(['audit-log']) ?>" href="/audit-log"><span class="s-ic">🛡️</span><span>Audit trail</span></a><?php endif; ?>
         <?php endif; ?>
 
         <?php if (can('mod.invoicing.view') || can('mod.profitability.view')): ?>
         <div class="s-grp">Money</div>
-        <?php if (can('mod.invoicing.view')): ?><a class="s-item<?= $navOn(['invoicing']) ?>" href="/invoicing"><span class="s-ic">💳</span><span>Invoicing</span></a><?php endif; ?>
-        <?php if (can('mod.profitability.view')): ?><a class="s-item<?= $navOn(['profitability']) ?>" href="/profitability"><span class="s-ic">💹</span><span>Profitability</span></a><?php endif; ?>
+        <?php if (can('mod.invoicing.view')): ?><a class="s-item<?= $navOn(['invoicing']) ?>" href="/invoicing"><span class="s-ic">💳</span><span><?= e(T_REG('invoice')) ?></span></a><?php endif; ?>
+        <?php if (can('mod.profitability.view')): ?><a class="s-item<?= $navOn(['profitability']) ?>" href="/profitability"><span class="s-ic">💹</span><span><?= e(T_REG('boss')) ?></span></a><?php endif; ?>
         <?php endif; ?>
 
         <?php if (can('mod.reports.view')): ?>
@@ -80,17 +82,18 @@
 
         <?php if (can('mod.clients.view') || can('mod.vendors.view')): ?>
         <div class="s-grp">Directory</div>
-        <?php if (can('mod.clients.view')): ?><a class="s-item<?= $navOn(['clients']) ?>" href="/clients"><span class="s-ic">🏢</span><span>Clients</span></a><?php endif; ?>
-        <?php if (can('mod.vendors.view')): ?><a class="s-item<?= $navOn(['vendors']) ?>" href="/vendors"><span class="s-ic">🚚</span><span>Vendors</span></a><?php endif; ?>
+        <?php if (can('mod.clients.view')): ?><a class="s-item<?= $navOn(['clients']) ?>" href="/clients"><span class="s-ic">🏢</span><span><?= e(T_REG('client')) ?></span></a><?php endif; ?>
+        <?php if (can('mod.vendors.view')): ?><a class="s-item<?= $navOn(['vendors']) ?>" href="/vendors"><span class="s-ic">🚚</span><span><?= e(T_REG('vendor')) ?></span></a><?php endif; ?>
         <?php endif; ?>
 
         <?php if (can('mod.masters.view')||can('mod.overheads.view')||can('mod.users.view')||can('mod.settings.view')): ?>
         <div class="s-grp">Admin</div>
-          <?php if (can('mod.masters.view')): ?><a class="s-item<?= $navOn(['masters','m/']) ?>" href="/masters"><span class="s-ic">📋</span><span>Masters</span></a><?php endif; ?>
-          <?php if (can('mod.overheads.view')): ?><a class="s-item<?= $navOn(['office-finance']) ?>" href="/office-finance"><span class="s-ic">📐</span><span>Overheads</span></a><?php endif; ?>
-          <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['users','user-new','user-edit']) ?>" href="/users"><span class="s-ic">👥</span><span>Users</span></a><?php endif; ?>
-          <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['hierarchy']) ?>" href="/hierarchy"><span class="s-ic">🗂️</span><span>Org hierarchy</span></a><?php endif; ?>
-          <?php if (can('mod.settings.view')): ?><a class="s-item<?= $navOn(['settings','access']) ?>" href="/settings"><span class="s-ic">⚙️</span><span>Settings</span></a><?php endif; ?>
+          <?php if (can('mod.masters.view')): ?><a class="s-item<?= $navOn(['masters','m/','lookups']) ?>" href="/masters"><span class="s-ic">📋</span><span>Masters</span></a><?php endif; ?>
+          <?php if (can('mod.overheads.view')): ?><a class="s-item<?= $navOn(['office-finance']) ?>" href="/office-finance"><span class="s-ic">📐</span><span><?= e(TH('office')) ?> overheads</span></a><?php endif; ?>
+          <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['users','user-new','user-edit']) ?>" href="/users"><span class="s-ic">👥</span><span><?= e(T_REG('user')) ?></span></a><?php endif; ?>
+          <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['hierarchy']) ?>" href="/hierarchy"><span class="s-ic">🗂️</span><span>Organisation hierarchy</span></a><?php endif; ?>
+          <?php if (is_master()): ?><a class="s-item<?= $navOn(['access']) ?>" href="/access"><span class="s-ic">🔐</span><span>Roles &amp; permissions</span></a><?php endif; ?>
+          <?php if (can('mod.settings.view')): ?><a class="s-item<?= $navOn(['settings','terminology','ai-settings']) ?>" href="/settings"><span class="s-ic">⚙️</span><span>System settings</span></a><?php endif; ?>
         <?php endif; ?>
       <?php endif; ?>
     </nav>

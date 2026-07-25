@@ -95,7 +95,7 @@
   <h3 class="tab-sub">Display</h3>
   <div class="form-grid">
     <div class="ff"><label>Currency symbol</label>
-      <input class="form-control" name="currency_symbol" value="<?= e(setting_get('currency_symbol','')) ?>" placeholder="₹" maxlength="4"></div>
+      <input class="form-control" name="currency_symbol" value="<?= e(setting_get('currency_symbol','')) ?>" placeholder="<?= e(cur_sym()) ?>" maxlength="4"></div>
     <div class="ff"><label>Date format</label>
       <select class="form-control" name="date_format">
         <?php $cdf = date_fmt(); foreach (DATE_FORMATS as $k=>$sample): ?>
@@ -152,7 +152,7 @@
 </div>
 
 <div class="panel" style="max-width:620px;margin-top:18px">
-  <h3 class="tab-sub" style="margin-top:0;">🤖 AI providers &amp; models</h3>
+  <h3 class="tab-sub" style="margin-top:0;">AI providers &amp; models</h3>
   <p class="sub" style="margin-bottom:10px">Enter API keys for OpenAI, Claude, Gemini, Perplexity or GitHub Copilot / Models, refresh each provider's live model list (retired models drop off), and pick which models to use.</p>
   <a class="btn" href="/ai-settings">Open AI settings</a>
 </div>

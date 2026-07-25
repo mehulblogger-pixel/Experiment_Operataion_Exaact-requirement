@@ -10,7 +10,7 @@
   $fdate = function($d){ return $d ? date('d M Y', strtotime($d)) : '—'; };
 ?>
 <div class="master-head">
-  <div><h1>BOSS numbers &amp; contract profitability</h1>
+  <div><h1><?= e(T_REG('boss')) ?></h1>
     <p class="sub" style="margin:2px 0 0">Every BOSS / contract with its dates, renewal chain, invoicing, expenses<?= $seeSal?', salary cost and profit':'' ?>. Click a BOSS for the line-by-line drill-down.</p></div>
   <a class="btn secondary" href="/profitability?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ Download CSV</a>
 </div>

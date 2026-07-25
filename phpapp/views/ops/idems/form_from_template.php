@@ -3,9 +3,9 @@
   $new = array_values(array_filter($plan, fn($p)=>!$p['exists']));
   $have = array_values(array_filter($plan, fn($p)=>$p['exists']));
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/report-templates">Report templates</a> › Build form</div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/report-templates">Document templates</a> › Build form</div>
 <div class="master-head">
-  <div><h1>Build the form from this format</h1>
+  <div><h1>Form from format</h1>
     <p class="sub" style="margin:2px 0 0">Reading <strong><?= e($tpl['file_name'] ?: $tpl['name']) ?></strong> for <strong><?= e($type['code']) ?> — <?= e($type['name']) ?></strong>. Every <code>{{token}}</code> you placed in the Word file becomes a field the inspector fills, so the report comes out matching the format exactly.</p></div>
   <a class="btn secondary" href="/report-templates">← Templates</a>
 </div>

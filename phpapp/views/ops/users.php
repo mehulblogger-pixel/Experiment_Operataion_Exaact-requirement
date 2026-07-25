@@ -1,5 +1,5 @@
 <div class="master-head">
-  <div><h1>Users &amp; roles</h1>
+  <div><h1><?= e(T_REG('user')) ?></h1>
     <p class="sub"><?= (int)$active ?> active user(s)<?= $seats!=='' ? ' · seat limit ' . e($seats) : '' ?></p></div>
   <a class="btn" href="/user-new">+ Add user</a>
 </div>

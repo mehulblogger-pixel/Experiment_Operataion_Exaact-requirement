@@ -8,7 +8,7 @@
   }
 ?>
 <div class="master-head">
-  <div><h1>Call Register</h1>
+  <div><h1><?= e(T_REG('call')) ?></h1>
   <p class="sub" style="margin:2px 0 0">Inspection calls received — open one to allocate a job, or edit the details.</p></div>
   <div style="display:flex;gap:8px">
     <a class="btn secondary" href="/calls?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ CSV</a>
@@ -25,7 +25,7 @@
 
 <form method="get" action="/calls" class="filter-bar">
   <input class="form-control" type="text" name="q" value="<?= e($q) ?>" placeholder="🔍 Search code, client or vendor…">
-  <input class="form-control" type="number" name="mincost" value="<?= e($minCost ?? '') ?>" placeholder="Min cost ₹" style="max-width:140px">
+  <input class="form-control" type="number" name="mincost" value="<?= e($minCost ?? '') ?>" placeholder="Min cost <?= e(cur_sym()) ?>" style="max-width:140px">
   <button class="btn secondary" type="submit">Search</button>
   <?php if ($q || ($minCost ?? '') !== ''): ?><a class="btn secondary" href="/calls">Clear</a><?php endif; ?>
 </form>

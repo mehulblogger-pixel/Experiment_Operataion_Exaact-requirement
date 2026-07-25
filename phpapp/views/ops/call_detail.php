@@ -1,5 +1,5 @@
 <div class="master-head">
-  <div><h1>Call <?= e($call['call_code']) ?></h1>
+  <div><h1><?= e(T_DETAIL('call', $call['call_code'])) ?></h1>
     <p class="sub"><?= e($call['client_disp'] ?: $call['client_name'] ?: 'No client') ?> · <?= e(OPS_REGIONS[$call['region']] ?? '') ?></p></div>
 <?php
   // "Open in Outlook" — mailto to the executing branch's coordinator (+ manager if ticked).
@@ -43,7 +43,7 @@
     <?php if (($call['po_id']??null)): $po = ops_one("SELECT po_number FROM partner_purchase_orders WHERE id=?", [$call['po_id']]); $liw = ($call['po_line_item_id']??null) ? ops_one("SELECT description FROM po_line_items WHERE id=?", [$call['po_line_item_id']]) : null; ?>
       <div><span class="k">Against PO</span><?= e($po['po_number'] ?? '—') ?><?= $liw ? ' · '.e($liw['description']) : '' ?></div><?php endif; ?>
     <div><span class="k">Product</span><?= e((lk_options_or('product', PRODUCT_CATS)[$call['product_category']] ?? '') ?: ($call['product_other'] ?: '—')) ?></div>
-    <div><span class="k">Deputation</span><?= e($call['deputation_type'] ?: '—') ?></div>
+    <div><span class="k">Engagement</span><?= e($call['deputation_type'] ?: '—') ?></div>
     <?php if (!empty($sameOffice)): ?>
       <div><span class="k">Billable (ex-GST)</span><?= fmoney($call['billable_value']) ?><?= ($call['billable_basis']??'') ? ' <small class="muted">('.e(CREDIT_TYPES[$call['billable_basis']] ?? '').')</small>' : '' ?></div>
     <?php else: ?>
@@ -73,7 +73,7 @@
     </div>
     <?php if (can('mod.calls.edit') || is_coordinator_level()): ?>
     <form method="post" action="/call-credit?id=<?= (int)$call['id'] ?>" class="inline-add" style="align-items:flex-end;margin-top:10px">
-      <div class="ff"><label>Executing office — credit you require (₹)</label><input class="form-control" type="number" step="0.01" name="credit_required" value="<?= e($call['credit_required'] ?: '') ?>"></div>
+      <div class="ff"><label>Executing office — credit you require (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="credit_required" value="<?= e($call['credit_required'] ?: '') ?>"></div>
       <div class="ff"><label>Status</label><select class="form-control" name="credit_status">
         <option value="COUNTERED" <?= ($call['credit_status']??'')==='COUNTERED'?'selected':'' ?>>Counter — revert to contracting</option>
         <option value="AGREED" <?= ($call['credit_status']??'')==='AGREED'?'selected':'' ?>>Agreed</option>

@@ -1,6 +1,6 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/profitability">Profitability</a> › <?= e($boss['boss_number']) ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/profitability"><?= e(TP('boss')) ?></a> › <?= e($boss['boss_number']) ?></div>
 <div class="master-head">
-  <div><h1>BOSS <?= e($boss['boss_number']) ?>
+  <div><h1><?= e(T('boss')) ?> <?= e($boss['boss_number']) ?>
       <?php if (!empty($boss['superseded_by'])): ?><span class="pill p-warn" style="vertical-align:middle;font-size:12px">Renewed</span><?php endif; ?></h1>
     <p class="sub" style="margin:2px 0 0"><?= e($boss['client_disp'] ?: $boss['client_name'] ?: '—') ?> · <?= (int)$p['jobs'] ?> job(s)
       <?php if (!empty($boss['prev_no'])): ?> · <span class="muted">continues from <a href="/profitability?boss=<?= (int)$boss['prev_id'] ?>"><?= e($boss['prev_no']) ?></a></span><?php endif; ?>
@@ -9,7 +9,7 @@
 </div>
 
 <div class="kpi-row">
-  <div class="kpi"><span class="kic">₹</span><div class="k">Revenue</div><div class="v"><?= fmoney_short($p['revenue']) ?></div><div class="d"><?= (int)$p['jobs'] ?> job(s)</div></div>
+  <div class="kpi"><span class="kic"><?= e(cur_sym()) ?></span><div class="k">Revenue</div><div class="v"><?= fmoney_short($p['revenue']) ?></div><div class="d"><?= (int)$p['jobs'] ?> job(s)</div></div>
   <div class="kpi"><span class="kic">🧾</span><div class="k">Expenses</div><div class="v"><?= fmoney_short($p['expenses']) ?></div><div class="d">voucher + closure</div></div>
   <div class="kpi"><span class="kic">🤝</span><div class="k">Sub-con</div><div class="v"><?= fmoney_short($p['subcon']) ?></div><div class="d">agency / outsourced</div></div>
   <?php if ($seeSal): ?>
@@ -28,7 +28,7 @@
   <h3 class="tab-sub" style="padding:14px 18px 0;margin-top:0">Expense lines — who visited which vendor, and the cost</h3>
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
-    <thead><tr><th></th><th>Date</th><th>Inspector</th><th>Vendor / Site</th><th class="num">Hrs</th><th>Line No</th><th class="num">Travel ₹</th><th class="num">Bills ₹</th><th class="num">Line total</th></tr></thead>
+    <thead><tr><th></th><th>Date</th><th>Inspector</th><th>Vendor / Site</th><th class="num">Hrs</th><th>Line No</th><th class="num">Travel <?= e(cur_sym()) ?></th><th class="num">Bills <?= e(cur_sym()) ?></th><th class="num">Line total</th></tr></thead>
     <tbody>
     <?php $tot=0; foreach ($lines as $i=>$l): $amt = expense_extra_decode($l['amounts'] ?? ''); $bills = array_sum($amt); $tot += (float)$l['row_total']; ?>
     <tr>
@@ -61,7 +61,7 @@
 <div class="panel" style="padding:0;overflow:hidden;margin-top:16px">
   <h3 class="tab-sub" style="padding:14px 18px 0;margin-top:0">Invoices / jobs</h3>
   <table class="dt">
-    <thead><tr><th>Job</th><th>Inspector</th><th>Invoice No</th><th class="num">Invoice ₹</th><th>Invoice date</th><th>Payment</th></tr></thead>
+    <thead><tr><th>Job</th><th>Inspector</th><th>Invoice No</th><th class="num">Invoice <?= e(cur_sym()) ?></th><th>Invoice date</th><th>Payment</th></tr></thead>
     <tbody>
     <?php foreach ($invLines as $j): ?>
     <tr>

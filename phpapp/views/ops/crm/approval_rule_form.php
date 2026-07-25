@@ -1,4 +1,4 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/quotes">Quotations</a> › <a href="/quote-approval-rules">Approval rules</a> › <?= $r ? 'Edit' : 'Add' ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/quotes"><?= e(TP('quote')) ?></a> › <a href="/quote-approval-rules">Approval rules</a> › <?= $r ? 'Edit' : 'Add' ?></div>
 <div class="master-head">
   <div><h1><?= $r ? 'Edit approval rule' : 'Add approval rule' ?></h1></div>
   <a class="btn secondary" href="/quote-approval-rules">← Back</a>
@@ -20,8 +20,8 @@
         <?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($r['sbu'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"></div>
 
-    <div class="ff"><label>Amount from (₹)</label><input class="form-control" type="number" step="0.01" name="min_amount" value="<?= e($r['min_amount'] ?? 0) ?>"></div>
-    <div class="ff"><label>Amount up to (₹) <span class="muted">— 0 = no upper limit</span></label><input class="form-control" type="number" step="0.01" name="max_amount" value="<?= e($r['max_amount'] ?? 0) ?>"></div>
+    <div class="ff"><label>Amount from (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="min_amount" value="<?= e($r['min_amount'] ?? 0) ?>"></div>
+    <div class="ff"><label>Amount up to (<?= e(cur_sym()) ?>) <span class="muted">— 0 = no upper limit</span></label><input class="form-control" type="number" step="0.01" name="max_amount" value="<?= e($r['max_amount'] ?? 0) ?>"></div>
     <div class="ff"></div>
 
     <div class="ff"><label>Approver role</label>
@@ -32,7 +32,7 @@
       <select class="form-control searchable" name="approver_user_id"><option value="">—</option>
         <?php foreach ($users as $u): $nm = trim(($u['first_name'] ?? '').' '.($u['last_name'] ?? '')) ?: $u['username']; ?><option value="<?= (int)$u['id'] ?>" <?= (string)($r['approver_user_id'] ?? '')===(string)$u['id']?'selected':'' ?>><?= e($nm) ?></option><?php endforeach; ?></select></div>
   </div>
-  <small class="muted" style="display:block;margin-top:8px">The approver must also hold the "Approve quotations" permission. Leave role &amp; person blank for "any approver".</small>
+  <small class="muted" style="display:block;margin-top:8px">The approver must also hold the "Approve <?= e(Tlp('quote')) ?>" permission. Leave role &amp; person blank for "any approver".</small>
   <div style="margin-top:16px">
     <button class="btn" type="submit"><?= $r ? 'Save rule' : 'Add rule' ?></button>
     <a class="btn secondary" href="/quote-approval-rules">Cancel</a>

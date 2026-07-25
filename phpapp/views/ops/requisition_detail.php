@@ -4,9 +4,9 @@
   $hiredCost = $hired    ? ((float)$hired['salary_ctc']/12 + (float)$hired['agency_cost']) : 0;
   $stCls = ['OPEN'=>'p-warn','PROPOSED'=>'p-info','OFFERED'=>'p-info','HIRED'=>'p-ok','CLOSED'=>'p-ok','CANCELLED'=>'p-mut'][$req['status']] ?? 'p-mut';
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/requisitions">Requisitions</a> › <?= e($req['req_code']) ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/requisitions"><?= e(TP('requisition')) ?></a> › <?= e($req['req_code']) ?></div>
 <div class="master-head">
-  <div><h1>Requisition <?= e($req['req_code']) ?> <span class="pill <?= $stCls ?>" style="vertical-align:middle;font-size:12px"><?= e(REQ_STATUS[$req['status']] ?? $req['status']) ?></span></h1>
+  <div><h1><?= e(T_DETAIL('requisition', $req['req_code'])) ?> <span class="pill <?= $stCls ?>" style="vertical-align:middle;font-size:12px"><?= e(REQ_STATUS[$req['status']] ?? $req['status']) ?></span></h1>
     <p class="sub" style="margin:2px 0 0"><?= e(DESIGNATIONS[$req['designation']] ?? ($req['designation'] ?: 'Position')) ?> · <?= e(REQ_TYPES[$req['req_type']] ?? '') ?> · <?= e($req['office_name'] ?: '—') ?></p></div>
   <?php if (is_coordinator_level()): ?><a class="btn secondary" href="/requisition-edit?id=<?= (int)$req['id'] ?>">Edit</a><?php endif; ?>
 </div>

@@ -1,5 +1,5 @@
 <div class="master-head">
-  <div><h1>Job <?= e($job['job_code']) ?></h1>
+  <div><h1><?= e(T_DETAIL('job', $job['job_code'])) ?></h1>
     <p class="sub"><?= e($job['client_disp'] ?: $job['client_name'] ?: '—') ?> · <?= e($job['inspector_name'] ?: 'Unassigned') ?></p></div>
   <div class="row-actions">
     <?php if (!$job['closed_flag']): ?><a class="btn" href="/job-close?id=<?= (int)$job['id'] ?>">Close job</a><?php endif; ?>
@@ -46,7 +46,7 @@
 <div class="panel">
   <div class="kv-grid">
     <?php if (!empty($job['quotation_id'])): $lq = ops_one("SELECT quote_no, rev, contract_number FROM quotations WHERE id=?", [$job['quotation_id']]); ?>
-    <div><span class="k">Against quotation</span><?= $lq ? e($lq['quote_no'].((int)$lq['rev']>0?' R'.$lq['rev']:'')) : '—' ?><?= ($lq && $lq['contract_number'])?' · '.e($lq['contract_number']):'' ?></div>
+    <div><span class="k">Against <?= e(Tl('quote')) ?></span><?= $lq ? e($lq['quote_no'].((int)$lq['rev']>0?' R'.$lq['rev']:'')) : '—' ?><?= ($lq && $lq['contract_number'])?' · '.e($lq['contract_number']):'' ?></div>
     <?php endif; ?>
     <?php if (!empty($job['adv_required'])): ?><div><span class="k">Advance</span><?= rtrim(rtrim(number_format((float)$job['adv_pct'],2),'0'),'.') ?>% · <?= !empty($job['adv_received'])?'<span style="color:var(--ok)">received</span>':'<span style="color:var(--bad)">pending</span>' ?></div><?php endif; ?>
     <div><span class="k">Call</span><?= e($job['call_code'] ?: '—') ?></div>
@@ -121,10 +121,10 @@
       <div class="ff"><label>Invoice number</label><input class="form-control" name="invoice_number" value="<?= e($job['invoice_number'] ?? '') ?>"></div>
       <div class="ff"><label>Invoice date</label><input class="form-control" type="date" name="invoice_date" value="<?= e($job['invoice_date'] ?? '') ?>"></div>
       <div class="ff"><label>Due date</label><input class="form-control" type="date" name="invoice_due_date" value="<?= e($job['invoice_due_date'] ?? '') ?>"></div>
-      <div class="ff"><label>Invoice amount (₹)</label><input class="form-control" type="number" step="0.01" name="invoice_amount" value="<?= e($job['invoice_amount'] ?? '') ?>"></div>
+      <div class="ff"><label>Invoice amount (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="invoice_amount" value="<?= e($job['invoice_amount'] ?? '') ?>"></div>
       <div class="ff ff-check"><input type="checkbox" name="payment_received" <?= !empty($job['payment_received'])?'checked':'' ?>><label>Payment received</label></div>
       <div class="ff"><label>Payment date</label><input class="form-control" type="date" name="payment_date" value="<?= e($job['payment_date'] ?? '') ?>"></div>
-      <div class="ff"><label>Payment amount (₹)</label><input class="form-control" type="number" step="0.01" name="payment_amount" value="<?= e($job['payment_amount'] ?? '') ?>"></div>
+      <div class="ff"><label>Payment amount (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="payment_amount" value="<?= e($job['payment_amount'] ?? '') ?>"></div>
       <div class="ff ff-check"><input type="checkbox" name="credit_received" <?= !empty($job['credit_received'])?'checked':'' ?>><label>Inter-office credit received<?= $isInter?' (this job is credit-given)':'' ?></label></div>
     </div>
     <p class="muted" style="margin:4px 2px">For a local client (same contracting &amp; executing office) use invoice + payment. When the executing branch is different, use the inter-office credit received flag.</p>

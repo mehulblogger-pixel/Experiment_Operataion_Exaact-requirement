@@ -9,7 +9,7 @@
   $kb = fn($b) => $b >= 1048576 ? round($b/1048576, 1) . ' MB' : max(1, round($b/1024)) . ' KB';
   $editable = idems_can_edit_doc($doc);
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/documents">Documents</a> › <a href="/document?id=<?= (int)$doc['id'] ?>"><?= e($doc['irn']) ?></a> › Evidence</div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <a href="/document?id=<?= (int)$doc['id'] ?>"><?= e($doc['irn']) ?></a> › Evidence</div>
 <div class="master-head">
   <div><h1>Evidence gallery</h1>
     <p class="sub" style="margin:2px 0 0">Photos and attachments for <?= e($doc['irn']) ?>, organised by the section they belong to. Images are compressed on upload and duplicates are skipped automatically.</p></div>

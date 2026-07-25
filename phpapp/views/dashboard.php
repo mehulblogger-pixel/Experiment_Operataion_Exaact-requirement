@@ -27,7 +27,7 @@
     <a class="qcard tone-info" href="/my-jobs?f=open"><div class="qic">🗂</div><div class="qn"><?= $myOpen ?></div><div class="ql">Open jobs to do</div></a>
     <a class="qcard tone-warn" href="/my-jobs?f=reports"><div class="qic">📄</div><div class="qn"><?= $myReports ?></div><div class="ql">Reports pending</div></a>
     <a class="qcard tone-bad" href="/my-jobs?f=overdue"><div class="qic">⏰</div><div class="qn"><?= $myOverdue ?></div><div class="ql">Overdue</div></a>
-    <a class="qcard tone-ok" href="/vouchers"><div class="qic">🧾</div><div class="qn">₹</div><div class="ql">This month's voucher</div></a>
+    <a class="qcard tone-ok" href="/vouchers"><div class="qic">🧾</div><div class="qn"><?= e(cur_sym()) ?></div><div class="ql">This month's voucher</div></a>
   </div>
   <div class="qcards" style="grid-template-columns:repeat(2,1fr)">
     <a class="qcard" href="/my-jobs"><div class="qic">🗂</div><div class="qn" style="font-size:18px">All my jobs</div><div class="ql"><?= $myOpen ?> open · <?= $myDone ?> completed</div></a>
@@ -60,7 +60,7 @@
       <div class="kpi"><span class="kic">🗂</span><div class="k">Open jobs</div><div class="v"><a href="/jobs?status=open"><?= $openJobs ?></a></div><div class="d"><?= $overdue ? '<span class="down">'.$overdue.' overdue</span>' : 'All on time' ?></div></div>
       <?php if ($showMoney): ?>
         <div class="kpi"><span class="kic">💳</span><div class="k">Unbilled</div><div class="v"><a href="/invoicing?f=pending"><?= fmoney_short($mc['unbilled']) ?></a></div><div class="d"><?= (int)$mc['pending'] ?> job(s) to invoice</div></div>
-        <div class="kpi"><span class="kic">₹</span><div class="k">Outstanding</div><div class="v"><a href="/invoicing?f=awaiting"><?= fmoney_short($mc['outstanding']) ?></a></div><div class="d"><?= $mc['overdue'] ? '<span class="down">'.$mc['overdue'].' overdue</span>' : (int)$mc['awaiting'].' awaiting' ?></div></div>
+        <div class="kpi"><span class="kic"><?= e(cur_sym()) ?></span><div class="k">Outstanding</div><div class="v"><a href="/invoicing?f=awaiting"><?= fmoney_short($mc['outstanding']) ?></a></div><div class="d"><?= $mc['overdue'] ? '<span class="down">'.$mc['overdue'].' overdue</span>' : (int)$mc['awaiting'].' awaiting' ?></div></div>
       <?php else: ?>
         <div class="kpi"><span class="kic">✅</span><div class="k">Closed jobs</div><div class="v"><a href="/jobs?status=closed"><?= $closedJobs ?></a></div><div class="d">Completed</div></div>
         <div class="kpi"><span class="kic">🏢</span><div class="k">Clients</div><div class="v"><a href="/clients"><?= (int)($clients ?? 0) ?></a></div><div class="d"><?= (int)($vendors ?? 0) ?> vendors</div></div>
@@ -164,7 +164,7 @@
     if (function_exists('jobs_awaiting_report_approval') && (can('ops.job.close') || is_admin_level() || is_master())) {
       $ra = jobs_awaiting_report_approval(12);
       if ($ra) { ob_start(); ?>
-        <h3 class="tab-sub" style="margin-top:26px;">🕓 Reports awaiting your approval <span class="muted">(<?= count($ra) ?>)</span></h3>
+        <h3 class="tab-sub" style="margin-top:26px;">Reports awaiting your approval <span class="muted">(<?= count($ra) ?>)</span></h3>
         <div class="card-grid">
           <?php foreach ($ra as $j): ?>
             <a class="master-card" href="/job?id=<?= (int)$j['id'] ?>">
@@ -188,12 +188,12 @@
           SUM(CASE WHEN status='ACCEPTED' THEN total_amount ELSE 0 END) won_val,
           SUM(CASE WHEN status='ACCEPTED' THEN 1 ELSE 0 END) won_n,
           SUM(CASE WHEN status IN ('LOST','EXPIRED') THEN 1 ELSE 0 END) lost_n
-          FROM quotations q WHERE is_current=1 AND $qw", $qa) ?: [];
-      $fuDue = (int)ops_val("SELECT COUNT(*) FROM quote_followups f JOIN quotations q ON q.id=f.quote_id WHERE f.status='PENDING' AND f.due_date<=? AND q.status='SENT' AND $qw", array_merge([$today], $qa));
-      $pendApprove = (can('crm.quote.approve') || is_master()) ? (int)ops_val("SELECT COUNT(*) FROM quote_approvals a JOIN quotations q ON q.id=a.quote_id WHERE a.status='PENDING' AND q.status='PENDING_APPROVAL' AND $qw", $qa) : 0;
+          FROM <?= e(Tlp('quote')) ?> q WHERE is_current=1 AND $qw", $qa) ?: [];
+      $fuDue = (int)ops_val("SELECT COUNT(*) FROM quote_followups f JOIN <?= e(Tlp('quote')) ?> q ON q.id=f.quote_id WHERE f.status='PENDING' AND f.due_date<=? AND q.status='SENT' AND $qw", array_merge([$today], $qa));
+      $pendApprove = (can('crm.quote.approve') || is_master()) ? (int)ops_val("SELECT COUNT(*) FROM quote_approvals a JOIN <?= e(Tlp('quote')) ?> q ON q.id=a.quote_id WHERE a.status='PENDING' AND q.status='PENDING_APPROVAL' AND $qw", $qa) : 0;
       $winRate = ((int)$qs['won_n'] + (int)$qs['lost_n']) > 0 ? round((int)$qs['won_n'] / ((int)$qs['won_n'] + (int)$qs['lost_n']) * 100) : 0;
       ob_start(); ?>
-      <div class="ctitle" style="margin-top:22px"><h3>Sales pipeline</h3><a href="/quotes">Quotations →</a><?php if (can('mod.crm_reports.view')): ?> <a href="/crm-reports" style="margin-left:8px">Sales dashboard →</a><?php endif; ?></div>
+      <div class="ctitle" style="margin-top:22px"><h3>Sales pipeline</h3><a href="/quotes"><?= e(THP('quote')) ?> →</a><?php if (can('mod.crm_reports.view')): ?> <a href="/crm-reports" style="margin-left:8px">Sales dashboard →</a><?php endif; ?></div>
       <div class="qcards">
         <a class="qcard tone-info" href="/quotes?v=open"><div class="qic">📝</div><div class="qn"><?= (int)$qs['open_n'] ?></div><div class="ql">Open quotes</div></a>
         <a class="qcard tone-warn" href="/quotes?v=pending"><div class="qic">◷</div><div class="qn"><?= (int)$qs['sent_n'] ?></div><div class="ql">Awaiting reply</div></a>
@@ -240,7 +240,7 @@
       </div>
       <?php if ($topClients): ?>
       <div class="panel" style="margin-top:12px">
-        <div class="ctitle"><h3>Top clients by revenue — FY <?= e($fyCur) ?></h3><a href="/reports">All →</a></div>
+        <div class="ctitle"><h3>Top <?= e(Tlp('client')) ?> by revenue — FY <?= e($fyCur) ?></h3><a href="/reports">All →</a></div>
         <div class="hbars">
           <?php foreach (array_slice($topClients,0,6) as $b): $w = $tcMax ? round((float)$b['v']/$tcMax*100) : 0; ?>
             <div class="hbar"><span><?= e($b['client']) ?></span><span class="track"><span class="fill" style="width:<?= $w ?>%"></span></span><span class="val"><?= fmoney_short($b['v']) ?></span></div>
@@ -265,7 +265,7 @@
     if ($deskAdmin) confirm_lapsed_placement_fees(); // flip provisional→confirmed once guarantees lapse
     $pf = $deskAdmin ? placement_fee_summary(30) : null;
     if ($pf && ($pf['prov_n'] || $pf['conf_n'])): ?>
-    <h3 class="tab-sub" style="margin-top:26px;">🎓 Recruitment placement fees</h3>
+    <h3 class="tab-sub" style="margin-top:26px;">Recruitment placement fees</h3>
     <div class="kpi-row" style="grid-template-columns:repeat(2,1fr)">
       <div class="kpi"><span class="kic">⏳</span><div class="k">Provisional (within guarantee)</div><div class="v"><?= fmoney_short($pf['prov_amt']) ?></div><div class="d"><?= (int)$pf['prov_n'] ?> hire(s)<?= $pf['lapsing'] ? ' · '.(int)$pf['lapsing'].' lapsing ≤30d' : '' ?></div></div>
       <div class="kpi"><span class="kic">✅</span><div class="k">Confirmed (payable)</div><div class="v"><?= fmoney_short($pf['conf_amt']) ?></div><div class="d"><?= (int)$pf['conf_n'] ?> past guarantee</div></div>
@@ -273,7 +273,7 @@
   <?php endif; ?>
   <?php $openReqs = $deskAdmin ? ops_all("SELECT id, req_code, designation, req_type, project_site, status FROM requisitions WHERE status IN ('OPEN','PROPOSED','OFFERED') ORDER BY id DESC") : [];
     if ($openReqs): ?>
-    <h3 class="tab-sub" style="margin-top:26px;">📋 Open manpower requisitions <span class="muted">(<?= count($openReqs) ?>)</span></h3>
+    <h3 class="tab-sub" style="margin-top:26px;">Open manpower requisitions <span class="muted">(<?= count($openReqs) ?>)</span></h3>
     <div class="card-grid">
       <?php foreach (array_slice($openReqs, 0, 9) as $rq): ?>
         <a class="master-card" href="/requisition?id=<?= (int)$rq['id'] ?>">
@@ -286,7 +286,7 @@
   <?php endif; ?>
   <?php $agRenew = $deskAdmin ? agencies_renewing(30) : [];
     if ($agRenew): ?>
-    <h3 class="tab-sub" style="margin-top:26px;">⏰ Agency contracts renewing soon <span class="muted">(<?= count($agRenew) ?>)</span></h3>
+    <h3 class="tab-sub" style="margin-top:26px;">Agency contracts renewing soon <span class="muted">(<?= count($agRenew) ?>)</span></h3>
     <div class="card-grid">
       <?php foreach ($agRenew as $a): $dl = (int)$a['days_left']; ?>
         <a class="master-card" href="/m/agencies/edit?id=<?= (int)$a['id'] ?>">

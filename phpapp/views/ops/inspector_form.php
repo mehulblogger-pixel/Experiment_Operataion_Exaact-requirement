@@ -4,7 +4,7 @@
   $curTrade = $ins['trade_id'] ?? '';
   $trades = lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › <a href="/m/inspectors">Inspectors</a> › <?= $ins ? 'Edit' : 'Add' ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › <a href="/m/inspectors"><?= e(TP('engineer')) ?></a> › <?= $ins ? 'Edit' : 'Add' ?></div>
 <div class="master-head">
   <div><h1><?= $ins ? 'Edit — ' . e($ins['name']) : 'Add inspector' ?></h1></div>
   <a class="btn secondary" href="/m/inspectors">← Back to Inspectors</a>
@@ -42,9 +42,9 @@
         <?php foreach (($managers ?? []) as $m): $nm=trim(($m['first_name']??'').' '.($m['last_name']??'')) ?: $m['username']; ?><option value="<?= (int)$m['id'] ?>" <?= ((int)($ins['reports_to_id'] ?? 0)===(int)$m['id'])?'selected':'' ?>><?= e($nm) ?> · <?= e(ORG_ROLES[$m['role']] ?? $m['role']) ?></option><?php endforeach; ?>
       </select></div>
     <?php if (can_see_salary()): ?>
-    <div class="ff"><label>Annual CTC (₹) <span class="muted">— cost split across SBUs</span></label><input class="form-control" type="number" step="0.01" name="salary_ctc" value="<?= e($ins['salary_ctc'] ?? '') ?>"></div>
+    <div class="ff"><label>Annual CTC (<?= e(cur_sym()) ?>) <span class="muted">— cost split across SBUs</span></label><input class="form-control" type="number" step="0.01" name="salary_ctc" value="<?= e($ins['salary_ctc'] ?? '') ?>"></div>
     <div class="ff"><label>Hiring agency <span class="muted">— if engaged via an external agency</span></label><input class="form-control" name="agency_name" value="<?= e($ins['agency_name'] ?? '') ?>" placeholder="e.g. Patel Manpower"></div>
-    <div class="ff"><label>Agency hiring cost (₹/yr) <span class="muted">— extra cost paid to the agency</span></label><input class="form-control" type="number" step="0.01" name="agency_cost" value="<?= e($ins['agency_cost'] ?? '') ?>"></div>
+    <div class="ff"><label>Agency hiring cost (<?= e(cur_sym()) ?>/yr) <span class="muted">— extra cost paid to the agency</span></label><input class="form-control" type="number" step="0.01" name="agency_cost" value="<?= e($ins['agency_cost'] ?? '') ?>"></div>
     <?php endif; ?>
 
     <div class="ff ff-wide"><label>SBUs (multi — monthly cost is distributed across these)</label>
@@ -66,7 +66,7 @@
 
 <?php if ($ins): ?>
 <div class="panel">
-  <h3 class="tab-sub">✍️ Digital signature <span class="muted">— added automatically to this inspector's reports (IDEMS)</span></h3>
+  <h3 class="tab-sub">Digital signature <span class="muted">— added automatically to this inspector's reports (IDEMS)</span></h3>
   <?php if (!empty($ins['signature'])): ?><div style="margin-bottom:8px"><img src="<?= e($ins['signature']) ?>" alt="signature" style="max-width:240px;border:1px solid var(--line);border-radius:8px;background:#fff"></div><?php endif; ?>
   <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>" enctype="multipart/form-data">
     <input type="hidden" name="_do" value="signature">
@@ -122,20 +122,20 @@
 
 <?php if ($ins && is_master()): ?>
 <div class="panel" style="border:1px solid #d9b38c;background:#fffaf3">
-  <h3 class="tab-sub">🔒 Allowances &amp; rates <span class="muted">— Super Admin only. Not visible to anyone else.</span></h3>
+  <h3 class="tab-sub">Allowances &amp; rates <span class="muted">— Super Admin only. Not visible to anyone else.</span></h3>
   <p class="sub">Tick what this inspector is entitled to claim on the monthly voucher, and set their personal rate where it differs from the default. Blank rate = use the master default.</p>
   <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>">
     <input type="hidden" name="_do" value="allow_save">
 
     <h4 class="tab-sub" style="margin-top:6px">Travel modes (per-km)</h4>
     <table class="grid">
-      <tr><th>Allowed</th><th>Mode</th><th>Basis</th><th>Default</th><th>This inspector's rate (₹/km)</th></tr>
+      <tr><th>Allowed</th><th>Mode</th><th>Basis</th><th>Default</th><th>This inspector's rate (<?= e(cur_sym()) ?>/km)</th></tr>
       <?php foreach ($travelModes as $m): $a = $allowMap['MODE'][$m['code']] ?? null; ?>
       <tr>
         <td><label class="chk"><input type="checkbox" name="allow_mode[<?= e($m['code']) ?>]" value="1" <?= ($a && $a['allowed'])?'checked':'' ?>></label></td>
         <td><strong><?= e($m['label']) ?></strong> <span class="muted">(<?= e($m['code']) ?>)</span></td>
         <td><?= e(TRAVEL_BASIS[$m['basis']] ?? $m['basis']) ?></td>
-        <td><?= $m['basis']==='PER_KM' ? '₹'.e($m['default_rate']).'/km' : '—' ?></td>
+        <td><?= $m['basis']==='PER_KM' ? cur_sym().e($m['default_rate']).'/km' : '—' ?></td>
         <td><?php if ($m['basis']==='PER_KM'): ?><input class="form-control" style="width:130px" type="number" step="0.01" name="mode_rate[<?= e($m['code']) ?>]" value="<?= e($a['rate'] ?? '') ?>" placeholder="<?= e($m['default_rate']) ?>"><?php else: ?><span class="muted">actual bill</span><?php endif; ?></td>
       </tr>
       <?php endforeach; ?>
@@ -143,7 +143,7 @@
 
     <h4 class="tab-sub" style="margin-top:14px">Expense heads</h4>
     <table class="grid">
-      <tr><th>Allowed</th><th>Head</th><th>Type</th><th>Override amount/rate (₹)</th></tr>
+      <tr><th>Allowed</th><th>Head</th><th>Type</th><th>Override amount/rate (<?= e(cur_sym()) ?>)</th></tr>
       <?php foreach ($expHeads as $h): $a = $allowMap['HEAD'][$h['code']] ?? null; ?>
       <tr>
         <td><label class="chk"><input type="checkbox" name="allow_head[<?= e($h['code']) ?>]" value="1" <?= ($a && $a['allowed'])?'checked':'' ?>></label></td>

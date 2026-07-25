@@ -8,7 +8,7 @@
   $isToday = ($day === date('Y-m-d'));
 ?>
 <div class="master-head">
-  <div><h1>Inspector availability</h1>
+  <div><h1><?= e(TH('engineer')) ?> availability</h1>
     <p class="sub" style="margin:2px 0 0"><?= $isToday ? 'Today' : e(date('l, d M Y', strtotime($day))) ?> · <?= (int)$sum['total'] ?> inspector(s) in your scope</p></div>
   <form method="get" action="/availability" style="display:flex;gap:6px;align-items:center">
     <a class="btn small secondary" href="/availability?day=<?= e(date('Y-m-d', strtotime($day.' -1 day'))) ?>">‹</a>

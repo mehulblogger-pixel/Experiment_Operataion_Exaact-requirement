@@ -11,17 +11,17 @@
     'OPERATION_MANAGER' => 'Under the branch manager — allocates & closes jobs, runs the availability board, approves reports.',
     'ASST_MANAGER' => 'Assists operations — creates calls, allocates jobs, manages availability. No money figures.',
     'COORDINATOR' => 'Day-to-day desk — schedules and closes jobs, availability board, sees revenue but not salary/profit.',
-    'BUSINESS_DEV_MANAGER' => 'Sales — creates & sends quotations and runs follow-ups across offices.',
-    'KEY_ACCOUNTS_MANAGER' => 'Sales — owns key accounts; creates & sends quotations and follow-ups.',
-    'MARKETING_MANAGER' => 'Senior sales — everything BDM/KAM can do plus approve quotations and manage templates.',
-    'MARKETING_EXECUTIVE' => 'Junior sales — drafts quotations and manages follow-ups (no send/approve).',
+    'BUSINESS_DEV_MANAGER' => 'Sales — creates & sends <?= e(Tlp('quote')) ?> and runs follow-ups across offices.',
+    'KEY_ACCOUNTS_MANAGER' => 'Sales — owns key accounts; creates & sends <?= e(Tlp('quote')) ?> and follow-ups.',
+    'MARKETING_MANAGER' => 'Senior sales — everything BDM/KAM can do plus approve <?= e(Tlp('quote')) ?> and manage templates.',
+    'MARKETING_EXECUTIVE' => 'Junior sales — drafts <?= e(Tlp('quote')) ?> and manages follow-ups (no send/approve).',
     'FINANCE' => 'Accounts — invoicing, credit reconciliation, register clients/contracts; sees all figures.',
     'INSPECTOR' => 'Field engineer — only their own My Jobs / My Voucher; no admin screens.',
   ];
 ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Roles &amp; access</div>
 <div class="master-head">
-  <div><h1>Roles &amp; access</h1>
+  <div><h1>Roles &amp; permissions</h1>
     <p class="sub" style="margin:2px 0 0">Pick a role, apply the recommended set in one click, then fine-tune. Applies to everyone in that role without a personal override. <strong>Master Admin</strong> always has everything.</p></div>
   <a class="btn secondary" href="/settings">← Settings</a>
 </div>

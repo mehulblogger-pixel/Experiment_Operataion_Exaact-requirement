@@ -3,7 +3,7 @@
                 'HOLD'=>'AMBER','REJECTED'=>'RED','ACCEPTED'=>'GREEN','WITHDRAWN'=>'RED'];
   $cur = $cand['stage'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/candidates">Hiring pipeline</a> › <?= e($cand['cand_code'] ?: candidate_name($cand)) ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/candidates"><?= e(TP('candidate')) ?></a> › <?= e($cand['cand_code'] ?: candidate_name($cand)) ?></div>
 <div class="master-head">
   <div><h1><?= e(candidate_name($cand)) ?>
       <span class="badge <?= $stageBadge[$cur] ?? 'AMBER' ?>" style="vertical-align:middle"><?= e(CAND_STAGES[$cur] ?? $cur) ?></span></h1>
@@ -26,7 +26,7 @@
     <div><span class="k">Agency</span><span class="v"><?= e($cand['agency'] ?: '—') ?></span></div>
     <div><span class="k">Email</span><span class="v"><?= e($cand['email'] ?: '—') ?></span></div>
     <div><span class="k">Mobile</span><span class="v"><?= e($cand['mobile'] ?: '—') ?></span></div>
-    <div><span class="k">Expected rate</span><span class="v"><?= $cand['expected_rate']>0 ? '₹'.number_format((float)$cand['expected_rate'],0).' ('.e(RATE_TYPES[$cand['rate_type']] ?? $cand['rate_type']).')' : '—' ?></span></div>
+    <div><span class="k">Expected rate</span><span class="v"><?= $cand['expected_rate']>0 ? cur_sym().number_format((float)$cand['expected_rate'],0).' ('.e(RATE_TYPES[$cand['rate_type']] ?? $cand['rate_type']).')' : '—' ?></span></div>
     <div><span class="k">CV received</span><span class="v"><?= e($cand['cv_received_date'] ?: '—') ?></span></div>
     <div><span class="k">CV file</span><span class="v"><?= $cand['cv_link'] ? '<a href="'.e($cand['cv_link']).'" target="_blank" rel="noopener">Open CV ↗</a>' : '—' ?></span></div>
   </div>
@@ -114,8 +114,8 @@
           </select></div>
         <div class="ff"><label>On whose roll?</label>
           <select class="form-control" name="roll_type" id="roll_sel"><?php foreach (ROLL_TYPES as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
-        <div class="ff" id="fee_one"><label>One-time placement fee (₹) <span class="muted">recruitment</span></label><input class="form-control" type="number" step="0.01" name="placement_fee" value=""></div>
-        <div class="ff" id="fee_month"><label>Monthly agency charge (₹) <span class="muted">manpower</span></label><input class="form-control" type="number" step="0.01" name="agency_cost" value=""></div>
+        <div class="ff" id="fee_one"><label>One-time placement fee (<?= e(cur_sym()) ?>) <span class="muted">recruitment</span></label><input class="form-control" type="number" step="0.01" name="placement_fee" value=""></div>
+        <div class="ff" id="fee_month"><label>Monthly agency charge (<?= e(cur_sym()) ?>) <span class="muted">manpower</span></label><input class="form-control" type="number" step="0.01" name="agency_cost" value=""></div>
       </div>
       <p class="muted" style="margin:2px 2px 0;font-size:12px">Recruitment → our roll + one-time fee (added to costing, one-time). Manpower → agency roll + monthly charge (their bill; we invoice the client our rate).</p>
     </div>

@@ -1,5 +1,5 @@
 <?php $p = $partner; ?>
-<h1><?= $p ? 'Edit ' . e(partner_name($p)) : 'New Business Partner' ?></h1>
+<h1><?= $p ? 'Edit ' . e(partner_name($p)) : 'New business partner' ?></h1>
 <p class="sub">Client Code is generated automatically. Enter GSTIN once — PAN &amp; State fill in automatically.</p>
 <?php if (!empty($error)): ?><div class="msg msg-error"><?= e($error) ?></div><?php endif; ?>
 

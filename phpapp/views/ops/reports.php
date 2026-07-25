@@ -31,7 +31,7 @@
 </form>
 
 <div class="panel" style="margin-bottom:4px">
-  <h4 class="tab-sub" style="margin-top:0">⬇ Download reports (Excel / CSV)</h4>
+  <h4 class="tab-sub" style="margin-top:0">Download reports (Excel / CSV)</h4>
   <p class="sub" style="margin:0 0 10px">Open in Excel or Google Sheets for your own analysis. Each export respects your access scope.</p>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <?php $of = $F['office'] ? '&office='.(int)$F['office'] : ''; $sb = $F['sbu'] ? '&sbu='.e($F['sbu']) : ''; ?>
@@ -81,7 +81,7 @@
   foreach (($fin['expHeadExtra']??[]) as $code=>$amt) if ($amt>0) $expByHead[$exLbls[$code]??$code] = $amt;
 ?>
 <div class="panel-split">
-  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Top 10 customers by revenue</h4><?= svg_hbars($fin['byClientTop'] ?? [], true) ?></div>
+  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Top 10 <?= e(Tlp('client')) ?> by revenue</h4><?= svg_hbars($fin['byClientTop'] ?? [], true) ?></div>
   <div class="panel"><h4 class="tab-sub" style="margin-top:0">Revenue by project (BOSS)</h4><?= svg_hbars($fin['byProjectTop'] ?? [], true) ?></div>
 </div>
 <div class="panel-split">

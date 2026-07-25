@@ -1,4 +1,4 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › <a href="/lookups">Master lists</a> › <?= e($t['label']) ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › <a href="/lookups">Masters</a> › <?= e($t['label']) ?></div>
 <div class="master-head">
   <div><h1><?= e($t['label']) ?></h1>
     <p class="sub">Values in this master list<?= $parentType ? ' · each belongs under a <strong>' . e($parentType['label']) . '</strong>' : '' ?></p></div>

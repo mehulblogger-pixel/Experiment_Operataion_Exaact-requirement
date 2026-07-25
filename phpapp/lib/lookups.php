@@ -37,8 +37,12 @@ function lk_ensure_schema() {
 function lk_migrate() {
     lk_ensure_schema();
     // Idempotent: seed lists that were added after the first release.
-    lk_ensure_type('deputation_type', 'Deputation type', [
-        'Daily (single day)', 'Multiple days', 'Continuous days', 'Monthly (PM deputation)',
+    // The record is now called a Deputation, so the old "Deputation type" list —
+    // which describes how the visit is structured — is renamed to avoid a clash.
+    // Rename first, so the ensure below doesn't create a second, empty list.
+    lk_rename_type('deputation_type', 'engagement_pattern', 'Engagement pattern');
+    lk_ensure_type('engagement_pattern', 'Engagement pattern', [
+        'Daily (single day)', 'Multiple days', 'Continuous days', 'Monthly (resident posting)',
     ]);
     lk_ensure_type_map('inspection_type', 'Type of inspection', INSPECTION_TYPES);
     lk_ensure_type_map('deliverable', 'Deliverable / report format', DELIVERABLES);
@@ -118,6 +122,12 @@ function lk_ensure_value($typeKey, $code, $label) {
 }
 
 // Create a lookup type + flat values only if it doesn't exist yet (safe on upgrades).
+// Rename a shipped list (and its key) in place, keeping every value and every
+// record that points at it. No-op once done, and never clobbers an existing key.
+function lk_rename_type($oldKey, $newKey, $newLabel) {
+    if (!lk_type($oldKey) || lk_type($newKey)) return;
+    db()->prepare("UPDATE lookup_types SET type_key=?, label=? WHERE type_key=?")->execute([$newKey, $newLabel, $oldKey]);
+}
 function lk_ensure_type($key, $label, $values) {
     if (lk_type($key)) return;
     if ((int)ops_val("SELECT COUNT(*) FROM lookup_types") === 0) return; // fresh install: lk_seed handles it
@@ -168,7 +178,7 @@ function lk_seed() {
     if (isset($sbuVals['OGC'])) { lk_add_value($activity, $sbuVals['OGC'], '', 'Welding Inspection', 0); lk_add_value($activity, $sbuVals['OGC'], '', 'NDT Witness', 1); }
 
     // deputation type (flat list)
-    $dep = lk_add_type('deputation_type', 'Deputation type', null, 0, $so++);
+    $dep = lk_add_type('engagement_pattern', 'Engagement pattern', null, 0, $so++);
     foreach (['Daily (single day)', 'Multiple days', 'Continuous days', 'Monthly (PM deputation)'] as $i => $d) lk_add_value($dep, null, '', $d, $i);
     // inspection types + deliverables (coded flat lists)
     $it = lk_add_type('inspection_type', 'Type of inspection', null, 0, $so++);

@@ -36,9 +36,9 @@
 
 <table class="grid">
   <tr>
-    <th>Date</th><th>Details / Site / Attendance</th><th>File &amp; Line</th><th>Hrs</th><th>KM</th><th>Travel ₹</th>
+    <th>Date</th><th>Details / Site / Attendance</th><th>File &amp; Line</th><th>Hrs</th><th>KM</th><th>Travel <?= e(cur_sym()) ?></th>
     <?php foreach ($cols as $c): ?><th><?= e($headLabels[$c] ?? $c) ?></th><?php endforeach; ?>
-    <th>Row ₹</th>
+    <th>Row <?= e(cur_sym()) ?></th>
   </tr>
   <?php $tKm=0; $tTravel=0; $tHead=array_fill_keys($cols,0);
   foreach ($byDate as $date=>$rows): foreach ($rows as $e):
@@ -52,25 +52,25 @@
       <td><?= e(trim(($e['file_no']?:'').($e['line_no']?' / '.$e['line_no']:''),' /')) ?: '—' ?></td>
       <td><?= e(rtrim(rtrim((string)$e['hours'],'0'),'.') ?: '0') ?></td>
       <td><?= (float)$e['km']>0 ? e(rtrim(rtrim((string)$e['km'],'0'),'.')) : '' ?></td>
-      <td class="r"><?= (float)$e['travel_amount']>0?'₹'.$fmt($e['travel_amount']):'' ?></td>
-      <?php foreach ($cols as $c): ?><td class="r"><?= isset($amt[$c])&&$amt[$c]!=0?'₹'.$fmt($amt[$c]):'' ?></td><?php endforeach; ?>
-      <td class="r"><?= (float)$e['row_total']>0?'₹'.$fmt($e['row_total']):'' ?></td>
+      <td class="r"><?= (float)$e['travel_amount']>0?cur_sym().$fmt($e['travel_amount']):'' ?></td>
+      <?php foreach ($cols as $c): ?><td class="r"><?= isset($amt[$c])&&$amt[$c]!=0?cur_sym().$fmt($amt[$c]):'' ?></td><?php endforeach; ?>
+      <td class="r"><?= (float)$e['row_total']>0?cur_sym().$fmt($e['row_total']):'' ?></td>
     </tr>
   <?php endforeach; endforeach; ?>
   <tr class="tot">
     <td colspan="4">TOTAL</td>
     <td><?= $tKm>0?e(rtrim(rtrim((string)$tKm,'0'),'.')):'' ?></td>
-    <td class="r">₹<?= $fmt($tTravel) ?></td>
-    <?php foreach ($cols as $c): ?><td class="r">₹<?= $fmt($tHead[$c]) ?></td><?php endforeach; ?>
-    <td class="r">₹<?= $fmt($sum['grand']) ?></td>
+    <td class="r"><?= e(cur_sym()) ?><?= $fmt($tTravel) ?></td>
+    <?php foreach ($cols as $c): ?><td class="r"><?= e(cur_sym()) ?><?= $fmt($tHead[$c]) ?></td><?php endforeach; ?>
+    <td class="r"><?= e(cur_sym()) ?><?= $fmt($sum['grand']) ?></td>
   </tr>
 </table>
 
 <table class="sumtbl">
-  <tr><td>Grand Total</td><td style="text-align:right"><strong>₹<?= $fmt($sum['grand']) ?></strong></td></tr>
-  <tr><td>Less Advance</td><td style="text-align:right">₹<?= $fmt($v['advance']) ?></td></tr>
-  <tr><td>Less Expenses incurred by Office</td><td style="text-align:right">₹<?= $fmt($v['office_incurred']) ?></td></tr>
-  <tr><td><strong>Balance to be paid / (recovered)</strong></td><td style="text-align:right"><strong>₹<?= $fmt($bal) ?></strong></td></tr>
+  <tr><td>Grand Total</td><td style="text-align:right"><strong><?= e(cur_sym()) ?><?= $fmt($sum['grand']) ?></strong></td></tr>
+  <tr><td>Less Advance</td><td style="text-align:right"><?= e(cur_sym()) ?><?= $fmt($v['advance']) ?></td></tr>
+  <tr><td>Less Expenses incurred by Office</td><td style="text-align:right"><?= e(cur_sym()) ?><?= $fmt($v['office_incurred']) ?></td></tr>
+  <tr><td><strong>Balance to be paid / (recovered)</strong></td><td style="text-align:right"><strong><?= e(cur_sym()) ?><?= $fmt($bal) ?></strong></td></tr>
 </table>
 
 <p class="muted" style="margin-top:14px">I declare that the details provided above are true and correct.</p>
