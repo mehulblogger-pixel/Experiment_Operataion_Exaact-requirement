@@ -1,6 +1,6 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/inquiries"><?= e(TP('inquiry')) ?></a> › <?= $inq ? 'Edit' : 'New' ?></div>
 <div class="master-head">
-  <div><h1><?= $inq ? 'Edit inquiry — ' . e($inq['inquiry_no']) : 'New <?= e(Tl('client')) ?> <?= e(Tl('inquiry')) ?>' ?></h1>
+  <div><h1><?= $inq ? 'Edit inquiry — ' . e($inq['inquiry_no']) : 'New ' . Tl('client') . ' ' . Tl('inquiry') ?></h1>
     <p class="sub" style="margin:2px 0 0">Capture what the <?= e(Tl('client')) ?> asked for. You can raise a <?= e(Tl('quote')) ?> against it afterwards.</p></div>
   <a class="btn secondary" href="/inquiries">← Back</a>
 </div>
