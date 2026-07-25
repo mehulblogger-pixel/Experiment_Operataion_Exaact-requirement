@@ -34,12 +34,35 @@
 </div>
 <?php endif; ?>
 
+<?php // Won, but nobody has raised the contract number yet. The registration panel
+      // is far down a long page, so the state is called out at the top — worded for
+      // whoever is looking, because Accounts have a job to do and everyone else
+      // needs to know the order can still be scheduled. ?>
+<?php if ($st === 'ACCEPTED' && trim((string)($q['contract_number'] ?? '')) === ''):
+        $waited = function_exists('contract_wait_days') ? contract_wait_days($q) : null; ?>
+<div class="panel" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)">
+  <b style="color:var(--warn)">⚠ Contract number is yet to be created</b>
+  <?php if ($waited !== null): ?><span class="pill <?= $waited > 7 ? 'p-bad' : 'p-warn' ?>" style="margin-left:6px">waiting <?= (int)$waited ?> day<?= $waited == 1 ? '' : 's' ?></span><?php endif; ?>
+  <div class="muted" style="margin-top:4px">
+    <?php if ($canContract): ?>
+      This is yours to do — register the <?= e(Tl('client')) ?> and enter the contract number below, and the order floats
+      to operations automatically.
+    <?php else: ?>
+      Accounts have it. <?= e(THP('call')) ?> can be raised against this order in the meantime — they will simply keep
+      showing the contract number as outstanding until it is registered.
+    <?php endif; ?>
+  </div>
+  <div style="margin-top:8px"><a class="btn small<?= $canContract ? '' : ' secondary' ?>" href="#contract">
+    <?= $canContract ? 'Register it now' : 'See the registration panel' ?></a></div>
+</div>
+<?php endif; ?>
+
 <?php if ($st === 'REJECTED'): ?>
 <div class="panel" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 6%,transparent)">
   <b style="color:var(--bad)">Rejected by <?= e($q['rejected_by'] ?: 'the approver') ?></b>
   <span class="muted"><?= $q['rejected_at'] ? ' on ' . e(fdate(substr((string)$q['rejected_at'],0,10))) : '' ?></span>
   <?php if (!empty($q['reject_remarks'])): ?><div style="margin-top:4px"><b>Comment:</b> <?= e($q['reject_remarks']) ?></div><?php endif; ?>
-  <div class="muted" style="margin-top:4px">Edit it and submit again, or revise it as a new revision.</div>
+  <div class="muted" style="margin-top:4px">Correct it, then use <b>Submit for approval again</b> below — the chain is rebuilt from scratch and this rejection is cleared. For a change the client asked for, raise a new revision instead so both versions stay on the record.</div>
 </div>
 <?php endif; ?>
 
@@ -81,8 +104,14 @@
 <!-- Status action bar -->
 <div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
   <span class="muted">Move this quote:</span>
-  <?php if ($st==='DRAFT'): ?>
-    <?= $act('PENDING_APPROVAL','Submit for approval') ?>
+  <?php // A rejected quote is not an ending — it goes back round. It must offer
+        // the same submit button a draft does, or the only way forward is to
+        // raise a whole new revision for what may be a one-word correction. ?>
+  <?php if ($st==='DRAFT' || $st==='REJECTED'): ?>
+    <?= $act('PENDING_APPROVAL', $st==='REJECTED' ? '↻ Submit for approval again' : 'Submit for approval') ?>
+    <?php if ($st==='REJECTED'): ?>
+      <a class="btn small secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>">Edit first</a>
+    <?php endif; ?>
   <?php elseif ($st==='APPROVED'): ?>
     <?php if ($canSend): ?><?= $act('SENT','✉ Send to ' . Tl('client')) ?><?php endif; ?>
   <?php elseif ($st==='SENT'): ?>
@@ -96,10 +125,10 @@
     <a class="btn small secondary" href="/quote-compose?id=<?= (int)$q['id'] ?>&amp;mode=mailto"
        title="Opens your default mail app — no attachment (browsers cannot attach files to a mailto link)">Compose without attachment</a>
   <?php endif; ?>
-  <?php if (in_array($st, ['DRAFT','PENDING_APPROVAL','APPROVED','SENT'], true)): ?>
+  <?php if (in_array($st, ['DRAFT','REJECTED','PENDING_APPROVAL','APPROVED','SENT'], true)): ?>
     <button class="btn small danger" type="button" onclick="document.getElementById('lostbox').style.display='block'">Mark lost</button>
   <?php endif; ?>
-  <?php if ($canEdit && in_array($st, ['SENT','APPROVED','ACCEPTED','LOST'], true)): ?>
+  <?php if ($canEdit && in_array($st, ['SENT','APPROVED','ACCEPTED','LOST','REJECTED'], true)): ?>
     <button class="btn small secondary" type="button" onclick="document.getElementById('revbox').style.display='block'" style="margin-left:auto">Revise (new rev)</button>
   <?php endif; ?>
 </div>
@@ -249,7 +278,7 @@
 <?php endif; ?>
 
 <?php if ($st==='ACCEPTED'): ?>
-<div class="panel" style="border:1px solid var(--ok)">
+<div class="panel" id="contract" style="border:1px solid var(--ok)">
   <h3 class="tab-sub" style="margin-top:0">Won — client &amp; contract registration (Accounts)</h3>
   <?php if ($q['contract_number']): ?>
     <table class="kv">

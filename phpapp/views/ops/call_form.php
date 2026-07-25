@@ -27,9 +27,14 @@
         <option value="">— pick a <?= e(Tl('client')) ?> first —</option>
       </select>
       <small class="muted">Accepted, approved or sent <?= e(Tlp('quote')) ?> for this <?= e(Tl('client')) ?>.</small></div>
-    <div class="ff"><label>Contract number <span class="muted">— from the <?= e(Tl('quote')) ?></span></label>
-      <input class="form-control" id="contract_no" name="contract_number" value="<?= e($call['contract_number'] ?? '') ?>" readonly
-             style="background:var(--soft)"></div>
+    <?php // Read-only ONLY while a quotation is driving it. On a direct call there
+          // is no cascade to fill it, and a call drawing down against a live ARC
+          // still has a contract number the client will quote back at you — a
+          // locked, permanently blank box made that impossible to record. ?>
+    <div class="ff"><label>Contract number <span class="muted" id="cn_hint">— from the <?= e(Tl('quote')) ?></span></label>
+      <input class="form-control" id="contract_no" name="contract_number" value="<?= e($call['contract_number'] ?? '') ?>"
+             placeholder="pick a <?= e(Tl('quote')) ?>, or type it for a direct <?= e(Tl('call')) ?>">
+      <small class="muted" id="cn_note" style="display:none">Typed by hand — no <?= e(Tl('quote')) ?> is driving this <?= e(Tl('call')) ?>.</small></div>
 
     <div class="ff ff-wide"><label>Line item on the <?= e(Tl('quote')) ?> <span class="muted">— which part of the order this <?= e(Tl('call')) ?> draws on</span></label>
       <select class="form-control searchable" id="qline_sel" name="quote_line_id" data-cur="<?= (int)($call['quote_line_id'] ?? 0) ?>">
@@ -218,6 +223,7 @@
           qSel.appendChild(el);
         });
         if (qSel.value) loadQuote(true);
+        else setContractMode(false);        // direct call — the box is the user's
       }).catch(function(){});
   }
   function fillLines(ctx){
@@ -234,10 +240,29 @@
     });
   }
   function setIfEmpty(el, v){ if (el && v && !el.value) el.value = v; }
+  // The contract box is owned by the quotation when one is chosen, and by the
+  // user when one is not. Switching to "direct call" must NOT wipe a number the
+  // user typed themselves — that was how a direct call against a live ARC ended
+  // up with no contract reference at all.
+  var cnHint = document.getElementById('cn_hint'), cnNote = document.getElementById('cn_note');
+  function setContractMode(fromQuote, value){
+    if (fromQuote) {
+      contractBox.value = value || '';
+      contractBox.readOnly = true;
+      contractBox.style.background = 'var(--soft)';
+      if (cnHint) cnHint.textContent = '— from the quotation';
+      if (cnNote) cnNote.style.display = 'none';
+    } else {
+      contractBox.readOnly = false;
+      contractBox.style.background = '';
+      if (cnHint) cnHint.textContent = '— type it if this draws on an existing contract';
+      if (cnNote) cnNote.style.display = '';
+    }
+  }
   function loadQuote(initial){
     var opt = qSel.options[qSel.selectedIndex];
-    contractBox.value = (opt && opt.dataset.contract) ? opt.dataset.contract : '';
-    if (!qSel.value) { fillLines(null); return; }
+    if (!qSel.value) { setContractMode(false); fillLines(null); return; }
+    setContractMode(true, opt && opt.dataset.contract ? opt.dataset.contract : '');
     fetch('/quote-context?id=' + encodeURIComponent(qSel.value))
       .then(function(r){ return r.json(); })
       .then(function(ctx){

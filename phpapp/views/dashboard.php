@@ -192,7 +192,38 @@
       $fuDue = (int)ops_val("SELECT COUNT(*) FROM quote_followups f JOIN quotations q ON q.id=f.quote_id WHERE f.status='PENDING' AND f.due_date<=? AND q.status='SENT' AND $qw", array_merge([$today], $qa));
       $pendApprove = (can('crm.quote.approve') || is_master()) ? (int)ops_val("SELECT COUNT(*) FROM quote_approvals a JOIN quotations q ON q.id=a.quote_id WHERE a.status='PENDING' AND q.status='PENDING_APPROVAL' AND $qw", $qa) : 0;
       $winRate = ((int)$qs['won_n'] + (int)$qs['lost_n']) > 0 ? round((int)$qs['won_n'] / ((int)$qs['won_n'] + (int)$qs['lost_n']) * 100) : 0;
+      // Won, but the contract number has not been raised yet. Accounts see it as
+      // work to do; everyone else sees it as something outstanding on an order
+      // they may already be scheduling against.
+      $noContract = function_exists('quotes_awaiting_contract') ? quotes_awaiting_contract() : [];
+      $canRegisterContract = can('crm.contract.register') || is_master();
       ob_start(); ?>
+      <?php if ($noContract): ?>
+      <div class="panel" style="border:1px solid var(--warn);margin-top:22px">
+        <b><?= count($noContract) ?> won <?= e(count($noContract) === 1 ? Tl('quote') : Tlp('quote')) ?>
+          <?= count($noContract) === 1 ? 'has' : 'have' ?> no contract number yet</b>
+        <p class="sub" style="margin:6px 0 8px">
+          <?= $canRegisterContract
+              ? 'Register the ' . e(Tl('client')) . ' and the contract number so operations can quote it back to the client.'
+              : 'Accounts have been notified. ' . e(THP('call')) . ' can still be raised — they will keep showing the contract number as outstanding.' ?>
+        </p>
+        <table class="dt">
+          <thead><tr><th><?= e(TH('quote')) ?></th><th><?= e(TH('client')) ?></th><th>Won on</th><th class="num">Waiting</th><th></th></tr></thead>
+          <tbody>
+          <?php foreach (array_slice($noContract, 0, 8) as $nc): $wd = contract_wait_days($nc); ?>
+            <tr>
+              <td><a href="/quote?id=<?= (int)$nc['id'] ?>"><?= e(quote_label($nc)) ?></a></td>
+              <td><?= e($nc['client_name'] ?: '—') ?></td>
+              <td><?= e(fdate($nc['accepted_date'], '—')) ?></td>
+              <td class="num"><?= $wd === null ? '—' : '<span class="pill ' . ($wd > 7 ? 'p-bad' : 'p-warn') . '">' . (int)$wd . 'd</span>' ?></td>
+              <td class="num"><?php if ($canRegisterContract): ?><a class="btn small" href="/quote?id=<?= (int)$nc['id'] ?>#contract">Register</a><?php endif; ?></td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+        <?php if (count($noContract) > 8): ?><p class="muted" style="margin:6px 0 0">+<?= count($noContract) - 8 ?> more.</p><?php endif; ?>
+      </div>
+      <?php endif; ?>
       <div class="ctitle" style="margin-top:22px"><h3>Sales pipeline</h3><a href="/quotes"><?= e(THP('quote')) ?> →</a><?php if (can('mod.crm_reports.view')): ?> <a href="/crm-reports" style="margin-left:8px">Sales dashboard →</a><?php endif; ?></div>
       <div class="qcards">
         <a class="qcard tone-info" href="/quotes?v=open"><div class="qic">📝</div><div class="qn"><?= (int)$qs['open_n'] ?></div><div class="ql">Open quotes</div></a>

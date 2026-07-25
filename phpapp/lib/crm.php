@@ -612,6 +612,32 @@ function crm_save_locations($qid, $b) {
     return $keep;
 }
 // Schedule the §11 follow-up cadence (3/6/9 days, fortnight, month) from the sent date.
+// Save the `l_*[]` line-item rows a form posted. Blank rows are dropped, so a
+// form can offer more rows than anyone fills. Returns how many were written.
+function crm_save_lines_from_post($quoteId, $b) {
+    $desc = (array)($b['l_desc'] ?? []);
+    if (!$desc) return 0;
+    $svc  = (array)($b['l_service'] ?? []);
+    $qty  = (array)($b['l_qty'] ?? []);
+    $unit = (array)($b['l_unit'] ?? []);
+    $rate = (array)($b['l_rate'] ?? []);
+    $amt  = (array)($b['l_amount'] ?? []);
+    $ins = db()->prepare("INSERT INTO quote_lines (quote_id,line_no,sbu,service_type,description,qty,unit,rate,amount)
+                          VALUES (?,?,?,?,?,?,?,?,?)");
+    $n = 0;
+    foreach ($desc as $i => $d) {
+        $d = trim((string)$d);
+        $q = (float)($qty[$i] ?? 0);
+        $r = (float)($rate[$i] ?? 0);
+        if ($d === '' && $q == 0 && $r == 0) continue;      // an untouched row
+        $a = (float)($amt[$i] ?? 0) ?: ($q * $r);
+        $n++;
+        $ins->execute([(int)$quoteId, $n, trim((string)($b['sbu'] ?? '')), trim((string)($svc[$i] ?? '')),
+                       $d, $q, trim((string)($unit[$i] ?? '')), $r, $a]);
+    }
+    return $n;
+}
+
 function crm_schedule_followups($qid) {
     $q = crm_quote_get($qid); if (!$q) return;
     $base = $q['sent_at'] ? substr($q['sent_at'], 0, 10) : date('Y-m-d');
@@ -715,7 +741,12 @@ function ops_crm_quotes($route, $method) {
                 trim($b['submitted_on'] ?? '') ?: date('c'), current_user()['id'] ?? null, user_name(current_user()), date('c')];
             $pdo->prepare("INSERT INTO quotations (" . implode(',', $cols) . ") VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")")->execute($vals);
             $id = (int)$pdo->lastInsertId();
-            crm_log_change($id, 'Registered from ' . (lk_options_or('quote_origin', QUOTE_ORIGINS)[$b['origin'] ?? ''] ?? 'an external portal'));
+            // Line items on an external quote too. Without them the quantities an
+            // open order is drawn down against do not exist, so nothing can tell
+            // that an ARC won through a portal has been served out.
+            $nLines = crm_save_lines_from_post($id, $b);
+            crm_log_change($id, 'Registered from ' . (lk_options_or('quote_origin', QUOTE_ORIGINS)[$b['origin'] ?? ''] ?? 'an external portal')
+                . ($nLines ? ' with ' . $nLines . ' line item(s)' : ''));
             if (($b['status'] ?? '') === 'SENT') crm_schedule_followups($id);
             flash("$no registered.");
             redirect('/quote?id=' . $id);
@@ -726,6 +757,7 @@ function ops_crm_quotes($route, $method) {
             'svcOpts' => lk_options_or('inspection_type', INSPECTION_TYPES),
             'payTerms' => lk_options_or('payment_term', PAYMENT_TERMS),
             'statuses' => lk_options_or('quote_status', QUOTE_STATUS), 'prodCats' => product_categories_all(),
+            'unitOpts' => lk_options_or('charge_unit', CHARGE_UNITS),
         ]);
         return;
     }
@@ -1168,6 +1200,54 @@ function ops_crm_quotes($route, $method) {
 //  when it went out, when it was accepted, who the contact is, and every
 //  follow-up date, so chasing can be audited outside the app.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//  Contract number pending
+//
+//  Winning a quotation and registering the contract are two jobs done by two
+//  people. Accounts creates the contract number; the coordinator raises calls
+//  against it. Neither used to know the other was waiting, so a won order could
+//  sit for a week with nobody realising anything was outstanding — and calls
+//  raised in the meantime carried no contract reference at all.
+//
+//  Scheduling is deliberately NOT blocked. Work does not wait for paperwork;
+//  it just has to be visible that the paperwork is outstanding.
+// ---------------------------------------------------------------------------
+function quotes_awaiting_contract($limit = 100) {
+    [$w, $a] = scope_clause('q.office_id', 'q.sbu');
+    return ops_all("SELECT q.id, q.quote_no, q.rev, q.client_name, q.subject, q.total_amount, q.accepted_date,
+                           q.client_id, q.office_id
+                    FROM quotations q
+                    WHERE q.is_current=1 AND q.status='ACCEPTED'
+                      AND (q.contract_number IS NULL OR q.contract_number='')
+                      AND $w
+                    ORDER BY q.accepted_date, q.id", $a);
+}
+function quotes_awaiting_contract_count() { return count(quotes_awaiting_contract()); }
+// Days since a won quotation has been waiting for its contract number.
+function contract_wait_days($q) {
+    $d = trim((string)($q['accepted_date'] ?? ''));
+    if ($d === '') return null;
+    return days_between($d, date('Y-m-d'));
+}
+// Is this call's commercial paperwork incomplete? Used by the call screens to
+// keep saying so until somebody fixes it.
+function call_contract_gap($call) {
+    if (trim((string)($call['contract_number'] ?? '')) !== '') return null;
+    $qid = (int)($call['quotation_id'] ?? 0);
+    if (!$qid) {
+        return ['kind' => 'DIRECT',
+                'text' => 'No contract number on this ' . Tl('call') . ', and no ' . Tl('quote') . ' behind it. '
+                        . 'If it draws on an existing contract, type the number on the ' . Tl('call') . ' so the '
+                        . 'draw-down stays visible against it.'];
+    }
+    $q = ops_one("SELECT quote_no, rev, status, client_name FROM quotations WHERE id=?", [$qid]);
+    if (!$q) return null;
+    return ['kind' => 'PENDING', 'quote_id' => $qid, 'quote_no' => $q['quote_no'],
+            'text' => 'Contract number not yet created for ' . quote_label($q) . '. '
+                    . 'Accounts have been notified; this ' . Tl('call') . ' can go ahead without it, '
+                    . 'but it will keep showing as outstanding until the number is registered.'];
+}
+
 function crm_quotes_export($rows) {
     $out = [[
         ucfirst(Tl('quote')) . ' no', 'Rev', 'Status', 'Origin', ucfirst(Tl('client')), 'Contact', 'Contact e-mail',
