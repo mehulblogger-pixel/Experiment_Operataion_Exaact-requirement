@@ -289,6 +289,12 @@ function ops_migrate() {
     // Contracting-vs-executing credit model
     ensure_column('calls', 'contracting_office_id', 'INT NULL');       // office that owns the client/PO
     ensure_column('calls', 'billable_value', 'DECIMAL(14,2) DEFAULT 0'); // ex-GST value when same office
+    // §13 — the value billable is not typed, it is worked out: the rate the order
+    // was priced at, times the quantity actually being asked for. Both are kept,
+    // because "6,000" tells you nothing later about whether that was one day at
+    // 6,000 or three days at 2,000.
+    ensure_column('calls', 'billable_rate', 'DECIMAL(14,2) DEFAULT 0');
+    ensure_column('calls', 'billable_qty', 'DECIMAL(10,2) DEFAULT 0');
     ensure_column('calls', 'billable_basis', "VARCHAR(20) DEFAULT ''"); // MANDAY / MANMONTH / …
     ensure_column('calls', 'credit_required', 'DECIMAL(14,2) DEFAULT 0'); // executing office's counter value
     ensure_column('calls', 'credit_status', "VARCHAR(20) DEFAULT ''");  // PROPOSED / COUNTERED / AGREED
@@ -1726,6 +1732,9 @@ function ops_dispatch($route, $method) {
                     'sbu' => (string)$l['sbu'], 'service_type' => (string)$l['service_type'],
                     'activity_id' => (int)($l['activity_id'] ?? 0), 'office_id' => (int)($l['office_id'] ?? 0),
                     'amount' => (float)$l['amount'], 'unit' => (string)$l['unit'],
+                    // §13 / §g — the call prices off the line's RATE and its own
+                    // quantity, not off the line total, which covers the whole order.
+                    'rate' => (float)$l['rate'], 'qty' => (float)$l['qty'],
                 ];
             }
             echo json_encode([
@@ -2185,12 +2194,25 @@ function ops_calls($route, $method) {
             }
             $b['inspection_dates']  = implode(',', $dates);
             $b['schedule_weekdays'] = implode(',', $wd);
+            // §13 — rate x quantity, computed here and not read from the form, so a
+            // stale or hand-edited total can never reach the register. The quantity
+            // defaults to the number of visit dates: one for a single day, the
+            // count for several, and the expanded count for a repeating pattern.
+            $rate = (float)($b['billable_rate'] ?? 0);
+            $qty  = (float)($b['billable_qty'] ?? 0);
+            // A repeating pattern is expanded into real dates HERE, so the browser
+            // could not have known the count when it posted. Unless somebody typed
+            // a quantity, it is the number of visit dates after expansion.
+            $qtyAuto = ($b['billable_qty_auto'] ?? '1') !== '0';
+            if ($qty <= 0 || $qtyAuto) $qty = max(1, count($dates));
+            $b['billable_qty'] = $qty;
+            if ($rate > 0) $b['billable_value'] = round($rate * $qty, 2);
             // The client's expected date is the first visit, so the two never disagree.
             if ($dates && ($b['inspection_required_date'] ?? '') === '') $b['inspection_required_date'] = $dates[0];
             $fields = ['client_id','vendor_id','ibo_office_id','executing_office_id','region','sbu','activity_id',
                 'inspection_type','inspection_type_other','site_address_id','po_id','po_line_item_id',
                 'product_category','product_other','deputation_type','expected_credit','credit_type',
-                'billable_value','billable_basis','call_received_date','inspection_required_date','notes',
+                'billable_value','billable_basis','billable_rate','billable_qty','call_received_date','inspection_required_date','notes',
                 'quotation_id','quote_line_id','contract_number','folder_link',
                 'inspection_dates','schedule_end_date','schedule_weekdays',
                 'reporting_frequency','report_custom_days','deliverables'];

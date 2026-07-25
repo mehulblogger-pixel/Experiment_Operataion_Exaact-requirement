@@ -156,13 +156,31 @@
 
   <div class="panel" id="moneybox" style="background:var(--soft);margin:8px 0">
     <div id="creditnote" class="muted" style="margin-bottom:8px"><?= e($ex['text']) ?></div>
+    <?php // §13 — the rate is what was quoted, per unit. The quantity is how many
+          // of those units this call is asking for, which for a day-priced order
+          // is simply how many visit dates it has: one for a single day, the count
+          // for several, and the expanded count for a repeating pattern. The value
+          // is their product and is never typed, so 5,000 a man-day for two days
+          // can only ever read 10,000. ?>
     <div class="form-grid" id="samebox">
-      <div class="ff"><label>Value billable to the <?= e(Tl('client')) ?> — <strong>excluding GST</strong> (<?= e(cur_sym()) ?>)</label>
-        <input class="form-control" type="number" step="0.01" id="billable_value" name="billable_value" value="<?= e($call['billable_value'] ?? '') ?>"></div>
+      <div class="ff"><label>Unit rate — <strong>excluding GST</strong> (<?= e(cur_sym()) ?>) <span class="muted">— as quoted</span></label>
+        <input class="form-control" type="number" step="0.01" id="billable_rate" name="billable_rate" value="<?= e($call['billable_rate'] ?? '') ?>"></div>
       <div class="ff"><label>Basis <span class="muted">— as quoted</span></label>
         <select class="form-control" id="billable_basis" name="billable_basis"><option value="">—</option>
           <?php foreach (lk_options_or('charge_unit', CHARGE_UNITS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($call && ($call['billable_basis']??'')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
         </select></div>
+      <div class="ff"><label>Quantity <span class="muted" id="qty_hint">— counted from the visit dates</span></label>
+        <input class="form-control" type="number" step="0.5" min="0" id="billable_qty" name="billable_qty" value="<?= e(($call['billable_qty'] ?? '') ?: '') ?>">
+        <?php // Tells the server whether this figure was derived or typed. A repeating
+              // pattern is expanded into dates on the server, so the browser cannot
+              // know the count yet — when this is 1, the server recounts after
+              // expanding and prices against that. ?>
+        <input type="hidden" id="billable_qty_auto" name="billable_qty_auto" value="1">
+        <small class="muted">Change it if this <?= e(Tl('call')) ?> is for a different number of units.</small></div>
+      <div class="ff"><label>Value billable to the <?= e(Tl('client')) ?> (<?= e(cur_sym()) ?>, ex-GST) <span class="muted">— rate × quantity</span></label>
+        <input class="form-control" type="number" step="0.01" id="billable_value" name="billable_value" value="<?= e($call['billable_value'] ?? '') ?>" readonly
+               style="background:var(--soft);font-weight:700">
+        <small class="muted" id="calc_note"></small></div>
     </div>
     <div class="form-grid" id="crossbox" style="display:none">
       <div class="ff"><label>Credit to the executing <?= e(T('office')) ?> (<?= e(cur_sym()) ?>) <span class="muted">— required</span></label>
@@ -265,6 +283,49 @@
   if (depSel) depSel.addEventListener('change', syncDates);
   syncDates();
 
+  // ---- §13: value billable = unit rate × quantity, always ---------------------
+  // The quantity follows the visit dates unless somebody has deliberately typed
+  // one, because that is what "how many days are there in between" means once a
+  // pattern has been expanded into actual dates. A lump-sum order has no
+  // quantity to count, so it stays at one.
+  var rateBox = document.getElementById('billable_rate'), qtyBox = document.getElementById('billable_qty'),
+      valBox  = document.getElementById('billable_value'), basisSel = document.getElementById('billable_basis'),
+      calcNote = document.getElementById('calc_note'), qtyHint = document.getElementById('qty_hint');
+  var qtyTouched = false;
+  var qtyAuto = document.getElementById('billable_qty_auto');
+  function markTouched(v){ qtyTouched = v; if (qtyAuto) qtyAuto.value = v ? '0' : '1'; }
+  if (qtyBox) qtyBox.addEventListener('input', function(){ markTouched(true); recalc(); });
+  function lumpSum(){ var b = basisSel ? basisSel.value : ''; return b === 'LOT' || b === 'DOC' || b === 'OTHER'; }
+  function datesCount(){
+    if (!datesPanel) return 0;
+    var n = 0;
+    Array.prototype.forEach.call(datesPanel.querySelectorAll('input[type=date]'), function(i){ if (i.value) n++; });
+    return n;
+  }
+  function recalc(){
+    if (!rateBox || !qtyBox || !valBox) return;
+    if (!qtyTouched) {
+      var auto = lumpSum() ? 1 : Math.max(1, datesCount());
+      qtyBox.value = auto;
+    }
+    var r = parseFloat(rateBox.value || '0'), q = parseFloat(qtyBox.value || '0');
+    if (!(r > 0)) { valBox.value = ''; if (calcNote) calcNote.textContent = 'Enter the unit rate.'; return; }
+    if (!(q > 0)) q = 1;
+    valBox.value = (Math.round(r * q * 100) / 100).toFixed(2);
+    var unit = (basisSel && basisSel.value && basisSel.options[basisSel.selectedIndex])
+             ? basisSel.options[basisSel.selectedIndex].text.toLowerCase() : 'unit';
+    if (calcNote) calcNote.textContent = r.toLocaleString() + ' per ' + unit + ' × ' + q + ' = ' + valBox.value;
+    if (qtyHint) qtyHint.textContent = qtyTouched ? '— entered by hand'
+                : (lumpSum() ? '— a lump sum is one unit' : '— counted from the visit dates (' + datesCount() + ' set)');
+  }
+  if (rateBox) rateBox.addEventListener('input', recalc);
+  if (basisSel) basisSel.addEventListener('change', recalc);
+  if (datesPanel) datesPanel.addEventListener('change', recalc);
+  // An existing call already has a quantity recorded; leave it alone.
+  if (qtyBox && parseFloat(qtyBox.value || '0') > 0) markTouched(true);
+  recalc();
+  window.__recalcBillable = recalc;
+
   // ---- §i: "every N days" only matters when the frequency is Custom ----------
   var freqSel = document.getElementById('call_freq_sel'), daysWrap = document.getElementById('call_days_wrap');
   if (freqSel && daysWrap) {
@@ -306,6 +367,7 @@
       var el=document.createElement('option'); el.value=l.id; el.textContent=l.label;
       el.dataset.sbu=l.sbu||''; el.dataset.service=l.service_type||'';
       el.dataset.activity=l.activity_id||''; el.dataset.amount=l.amount||''; el.dataset.unit=l.unit||'';
+      el.dataset.rate=l.rate||''; el.dataset.qty=l.qty||'';
       if (String(l.id) === String(want)) el.selected = true;
       lineSel.appendChild(el);
     });
@@ -390,7 +452,9 @@
         if (prod && ctx.product_category) setIfEmpty(prod, ctx.product_category);
         var insp=document.getElementById('insp_sel');
         if (insp && ctx.inspection_types && ctx.inspection_types.length) setIfEmpty(insp, ctx.inspection_types[0]);
-        setIfEmpty(document.getElementById('billable_value'), ctx.total_amount || '');
+        // Deliberately NOT the quote total: that prices the whole order. A call
+        // without a chosen line has no rate to inherit, so it is asked for.
+        if (window.__recalcBillable) window.__recalcBillable();
         fillLines(ctx);
       }).catch(function(){});
   }
@@ -464,10 +528,14 @@
     if (sbu && o.dataset.sbu) { sbu.value=o.dataset.sbu; sbu.dispatchEvent(new Event('change')); }
     var insp=document.getElementById('insp_sel');
     if (insp && o.dataset.service) insp.value=o.dataset.service;
-    var bv=document.getElementById('billable_value');
-    if (bv && o.dataset.amount) bv.value=o.dataset.amount;
+    // §g / §13 — the unit rate and the basis come off the chosen line. The value
+    // is then this call's own quantity times that rate, never the line's total,
+    // which prices the whole order rather than this one visit.
+    var br=document.getElementById('billable_rate');
+    if (br && o.dataset.rate) br.value=o.dataset.rate;
     var bb=document.getElementById('billable_basis');
-    if (bb && o.dataset.unit) bb.value=o.dataset.unit;
+    if (bb && o.dataset.unit) { bb.value=o.dataset.unit; bb.dispatchEvent(new Event('change', {bubbles:true})); }
+    if (window.__recalcBillable) window.__recalcBillable();
     // the activity list is filled by the SBU cascade; select afterwards
     if (o.dataset.activity) setTimeout(function(){
       var a=document.getElementById('activity_sel'); if (a) a.value=o.dataset.activity;

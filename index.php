@@ -113,6 +113,7 @@ try {
     db()->query("SELECT id FROM contract_overrides LIMIT 1");
     db()->query("SELECT id FROM report_doc_review LIMIT 1");
     db()->query("SELECT deliverables FROM calls LIMIT 1");
+    db()->query("SELECT billable_rate FROM calls LIMIT 1");
     db()->query("SELECT qty_total FROM partner_contracts LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which
