@@ -1,5 +1,8 @@
 <?php
-function fdate($d) { if (!$d) return '—'; $t = strtotime($d); return $t ? date('d M Y', $t) : e($d); }
+// fdate() is a shared helper in lib/ops.php. Declaring it again here made this
+// one screen fatal the moment ops.php was loaded — which it always is — so the
+// client and vendor detail pages died with "Cannot redeclare fdate()". A view
+// renders; it does not define functions.
 $badge = $p['status']==='ACTIVE'?'GREEN':($p['status']==='BLACKLISTED'?'RED':'AMBER');
 $id = (int)$p['id'];
 // Contract / PO / Projects apply to clients (companies we receive orders from);
