@@ -25,7 +25,7 @@
 </div>
 
 <div class="panel">
-  <h3 class="tab-sub" style="margin-top:0">Signature for client PDFs</h3>
+  <h3 class="tab-sub" id="signature" style="margin-top:0">Signature for client PDFs</h3>
   <p class="sub">The <?= e(Tl('client')) ?> receives the <?= e(Tl('quote')) ?> as a <strong>PDF</strong>; this signature image + name are stamped on it.</p>
   <form method="post" action="/crm-signature" enctype="multipart/form-data">
     <div class="form-grid">

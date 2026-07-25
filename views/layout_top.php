@@ -115,7 +115,7 @@
       <?php if ($office): ?><span class="tb-chip">📍 <?= e($office) ?></span><?php endif; ?>
       <span class="tb-chip">FY <?= e(current_fy()) ?></span>
       <span class="tb-user">
-        <a href="/my-signature" title="My signature">✍️</a>
+        <a href="/my-signature" class="tb-sig" title="Upload or draw the signature that goes on your approved documents and quotations">✍️ <span>Signature</span></a>
         <a href="/change-password" title="Change password">🔑</a>
         <a class="tb-logout" href="/logout">Logout</a>
       </span>

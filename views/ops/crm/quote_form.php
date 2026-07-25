@@ -135,14 +135,34 @@
       <label class="chk"><input type="checkbox" name="advance_required" value="1" <?= $g('advance_required')?'checked':'' ?>> Advance required <span class="muted">before scheduling</span></label>
       <label class="chk" style="margin-top:6px"><input type="checkbox" name="report_vs_payment" value="1" <?= $g('report_vs_payment')?'checked':'' ?>> Report only against payment</label>
     </div>
+    <?php
+      // Default to whoever is writing the quote, if they have a signature on
+      // file. Leaving it blank fell through to the company signature, which is
+      // right as a fallback but wrong as a default for a named salesperson.
+      $meId  = (int)(current_user()['id'] ?? 0);
+      $mineOnFile = false;
+      foreach ($signatories as $s) if ((int)$s['id'] === $meId) $mineOnFile = true;
+      $sigSel = (string)$g('signatory_user_id');
+      if ($sigSel === '' && !$isEdit && $mineOnFile) $sigSel = (string)$meId;
+    ?>
     <div class="ff"><label>Signed by <span class="muted">— the stored signature goes on the PDF</span></label>
       <select class="form-control searchable" name="signatory_user_id">
-        <option value="">— none —</option>
+        <option value="">— use the company signature —</option>
         <?php foreach ($signatories as $s): $nm = trim(($s['first_name'] ?? '') . ' ' . ($s['last_name'] ?? '')) ?: $s['username']; ?>
-          <option value="<?= (int)$s['id'] ?>" <?= (string)$g('signatory_user_id')===(string)$s['id']?'selected':'' ?>><?= e($nm) ?></option>
+          <option value="<?= (int)$s['id'] ?>" <?= $sigSel===(string)$s['id']?'selected':'' ?>><?= e($nm) ?><?= (int)$s['id']===$meId ? ' (you)' : '' ?></option>
         <?php endforeach; ?>
       </select>
-      <?php if (!$signatories): ?><small class="muted">Nobody has captured a signature yet — do it under My signature.</small><?php endif; ?></div>
+      <small class="muted">
+        <?php if (!$signatories): ?>
+          Nobody has a signature on file yet — the PDF falls back to the company signature.
+        <?php elseif (!$mineOnFile): ?>
+          Yours is not on file yet.
+        <?php endif; ?>
+        <a href="/my-signature" target="_blank" rel="noopener">Upload or draw your signature →</a>
+        <?php if (can('crm.template.manage') || is_master()): ?>
+          · <a href="/crm-templates#signature">company signature</a>
+        <?php endif; ?>
+      </small></div>
   </div>
 
   <h3 class="tab-sub">Line items</h3>
