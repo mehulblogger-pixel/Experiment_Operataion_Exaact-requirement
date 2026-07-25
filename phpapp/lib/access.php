@@ -48,7 +48,34 @@ const PERMISSIONS = [
     'crm.followup.manage' => 'Manage quote follow-ups & reminders',
     'crm.contract.register' => 'Register client & contract (Accounts)',
     'crm.template.manage' => 'Manage quote / e-mail templates',
+    // ---- Workforce & organisation ----
+    'workforce.availability' => 'Manage the inspector availability board',
+    'workforce.report.approve' => 'Approve inspection reports (reporting manager)',
+    'org.hierarchy.view'  => 'View the organisation hierarchy',
 ];
+
+// Human-friendly grouping of every permission, so the access editor reads clearly
+// and an admin can see at a glance which area each permission belongs to.
+function permission_groups() {
+    return [
+        'Dashboards & sensitive figures' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability'],
+        'Operations (calls & jobs)'      => ['ops.call.create','ops.job.allocate','ops.job.close','ops.call.delete','workforce.availability','workforce.report.approve'],
+        'Money'                          => ['finance.reconcile'],
+        'Marketing & Sales (CRM)'        => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage'],
+        'Administration'                 => ['master.manage','users.manage.branch','users.manage.global','org.hierarchy.view','settings.manage'],
+    ];
+}
+// Modules grouped the same way for the view/edit matrix.
+function module_groups() {
+    return [
+        'Marketing & Sales (CRM)' => ['inquiries','quotes','crm_orders','crm_reports'],
+        'Operations'              => ['calls','jobs','vouchers','invoicing','profitability','hiring','reconcile'],
+        'Directory & masters'     => ['clients','vendors','masters','overheads'],
+        'Insights & admin'        => ['reports','users','settings'],
+    ];
+}
+// The recommended permission set for a role (fine-grained + module view/edit).
+function role_recommended_perms($role) { return role_defaults($role)['perms']; }
 
 // ---- Module access catalogue (per-module View + Edit) ----------------------
 // Each module yields two permissions: mod.<key>.view and mod.<key>.edit.
@@ -169,21 +196,21 @@ function role_defaults_base($role) {
         case 'MASTER_ADMIN': case 'ADMIN':
             return ['perms' => $all, 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'BUSINESS_DIRECTOR':
-            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability'], 'offices' => 'ALL', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability','org.hierarchy.view'], 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'SBU_HEAD':
-            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability'], 'offices' => 'ALL', 'sbus' => 'OWN'];
+            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability','workforce.report.approve','org.hierarchy.view'], 'offices' => 'ALL', 'sbus' => 'OWN'];
         case 'BRANCH_MANAGER':
-            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability','ops.call.create','ops.job.allocate','ops.job.close','master.manage','users.manage.branch'], 'offices' => 'OWN', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability','ops.call.create','ops.job.allocate','ops.job.close','workforce.availability','workforce.report.approve','master.manage','users.manage.branch','org.hierarchy.view'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'BRANCH_APP_MANAGER':
-            return ['perms' => ['dash.operations','dash.utilization','users.manage.branch','master.manage','ops.call.delete'], 'offices' => 'OWN', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.operations','dash.utilization','users.manage.branch','master.manage','ops.call.delete','org.hierarchy.view'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'OPERATION_MANAGER':
             // "manager under the branch manager" — may see BOSS/contract profitability
-            return ['perms' => ['dash.operations','dash.utilization','data.profitability','ops.call.create','ops.job.allocate','ops.job.close'], 'offices' => 'OWN', 'sbus' => 'OWN'];
+            return ['perms' => ['dash.operations','dash.utilization','data.profitability','ops.call.create','ops.job.allocate','ops.job.close','workforce.availability','workforce.report.approve'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'ASST_MANAGER':
-            return ['perms' => ['dash.operations','ops.call.create','ops.job.allocate'], 'offices' => 'OWN', 'sbus' => 'OWN'];
+            return ['perms' => ['dash.operations','ops.call.create','ops.job.allocate','workforce.availability'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'COORDINATOR':
             // per decision: Operations + read-only revenue (financial section visible, but no salary/profit)
-            return ['perms' => ['dash.operations','dash.financial','data.credit','ops.call.create','ops.job.allocate','ops.job.close'], 'offices' => 'OWN', 'sbus' => 'OWN'];
+            return ['perms' => ['dash.operations','dash.financial','data.credit','ops.call.create','ops.job.allocate','ops.job.close','workforce.availability'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'BUSINESS_DEV_MANAGER': case 'KEY_ACCOUNTS_MANAGER':
             return ['perms' => ['dash.operations','dash.financial','data.credit','crm.quote.create','crm.quote.send','crm.followup.manage'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'MARKETING_MANAGER':
