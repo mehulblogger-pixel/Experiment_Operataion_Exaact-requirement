@@ -9,6 +9,7 @@
   <?php endforeach; ?>
   <a class="master-card" href="/clients"><strong>Clients</strong><span class="muted">Customer master</span></a>
   <a class="master-card" href="/vendors"><strong>Vendors</strong><span class="muted">Manufacturer / supplier master</span></a>
+  <a class="master-card" href="/work-norms"><strong>🕔 Working norms</strong><span class="muted">Weekly days &amp; hours per designation / office</span></a>
 </div>
 
 <?php if (is_admin_level()): ?>

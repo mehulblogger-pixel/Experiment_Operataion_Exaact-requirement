@@ -34,9 +34,66 @@ function working_days_for($weekly, $year = null, $month = null) {
     $wd = $base - $remove;
     return $wd > 0 ? $wd : $base;
 }
+// The standard working norm (weekly days + hours) for a designation at an office.
+// Resolution is most-specific first: (designation, office) → (designation, any) →
+// (office default, i.e. designation '') → (global '' + any) → hard default 6d/48h.
+function work_norm($designation, $officeId = null) {
+    $designation = (string)$designation; $officeId = $officeId ? (int)$officeId : null;
+    $tries = [];
+    if ($designation !== '' && $officeId) $tries[] = ['designation' => $designation, 'office_id' => $officeId];
+    if ($designation !== '')              $tries[] = ['designation' => $designation, 'office_id' => null];
+    if ($officeId)                        $tries[] = ['designation' => '',           'office_id' => $officeId];
+    $tries[]                                        = ['designation' => '',           'office_id' => null];
+    foreach ($tries as $t) {
+        if ($t['office_id'] === null)
+            $r = ops_one("SELECT weekly_days, weekly_hours FROM work_norms WHERE designation=? AND office_id IS NULL", [$t['designation']]);
+        else
+            $r = ops_one("SELECT weekly_days, weekly_hours FROM work_norms WHERE designation=? AND office_id=?", [$t['designation'], $t['office_id']]);
+        if ($r) return ['weekly_days' => (float)$r['weekly_days'], 'weekly_hours' => (float)$r['weekly_hours']];
+    }
+    return ['weekly_days' => 6.0, 'weekly_hours' => 48.0];
+}
+// Effective weekly working days for an inspector: their own value if explicitly set
+// (non-default), otherwise the designation×office norm.
 function inspector_weekly_days($ins) {
     $w = (float)($ins['weekly_working_days'] ?? 0);
-    return $w > 0 ? $w : 6;
+    if ($w > 0 && abs($w - 6) > 0.001) return $w;   // person explicitly chose 5 or 5.5
+    $norm = work_norm($ins['designation'] ?? '', $ins['home_office_id'] ?? null);
+    return $norm['weekly_days'] ?: ($w > 0 ? $w : 6);
+}
+
+// ---- Work-norms master editor -------------------------------------------
+function ops_work_norms($method) {
+    ops_require(is_master() || can('master.manage'), 'You cannot edit working norms.');
+    $pdo = db();
+    if ($method === 'POST') {
+        $do = $_POST['_do'] ?? 'save';
+        if ($do === 'del') {
+            $pdo->prepare("DELETE FROM work_norms WHERE id=?")->execute([(int)($_POST['id'] ?? 0)]);
+            flash('Working norm removed.');
+            redirect('/work-norms');
+        }
+        $desig = trim($_POST['designation'] ?? '');
+        $office = ($_POST['office_id'] ?? '') !== '' ? (int)$_POST['office_id'] : null;
+        $wd = (float)($_POST['weekly_days'] ?? 6); if ($wd <= 0 || $wd > 7) $wd = 6;
+        $wh = (float)($_POST['weekly_hours'] ?? 48); if ($wh <= 0 || $wh > 84) $wh = 48;
+        // upsert on (designation, office)
+        if ($office === null)
+            $ex = ops_one("SELECT id FROM work_norms WHERE designation=? AND office_id IS NULL", [$desig]);
+        else
+            $ex = ops_one("SELECT id FROM work_norms WHERE designation=? AND office_id=?", [$desig, $office]);
+        if ($ex) $pdo->prepare("UPDATE work_norms SET weekly_days=?, weekly_hours=?, updated_by=?, updated_at=? WHERE id=?")
+            ->execute([$wd, $wh, user_name(current_user()), date('c'), $ex['id']]);
+        else $pdo->prepare("INSERT INTO work_norms (designation,office_id,weekly_days,weekly_hours,updated_by,updated_at) VALUES (?,?,?,?,?,?)")
+            ->execute([$desig, $office, $wd, $wh, user_name(current_user()), date('c')]);
+        flash('Working norm saved.');
+        redirect('/work-norms');
+    }
+    $rows = ops_all("SELECT w.*, o.name office_name FROM work_norms w LEFT JOIN offices o ON o.id=w.office_id ORDER BY w.designation, o.name");
+    view('ops/work_norms', ['rows' => $rows,
+        'offices' => ops_all("SELECT id, name FROM offices ORDER BY is_ahmedabad DESC, name"),
+        'designations' => lk_options_or('designation', DESIGNATIONS)]);
+    return true;
 }
 
 // -------------------------------------------------------------------------
@@ -174,6 +231,53 @@ function hours_within_cap($inspectorId, $day, $addHours, $exceptEntryId = 0) {
 }
 
 // -------------------------------------------------------------------------
+//  Automated MIS digest — a periodic ops + sales summary e-mailed to leadership.
+//  Called from cron.php (weekly on Mondays, monthly on the 1st).
+// -------------------------------------------------------------------------
+function leadership_emails() {
+    $rows = ops_all("SELECT email FROM users WHERE role IN ('BUSINESS_DIRECTOR','SBU_HEAD','BRANCH_MANAGER','MASTER_ADMIN','ADMIN') AND email<>'' AND is_active=1");
+    return implode(',', array_filter(array_column($rows, 'email')));
+}
+function ops_run_mis_digest($period = 'weekly') {
+    $to = leadership_emails();
+    if (!$to) return 0;
+    $today = date('Y-m-d');
+    $since = $period === 'monthly' ? date('Y-m-d', strtotime('-1 month')) : date('Y-m-d', strtotime('-7 days'));
+    $v = fn($sql, $a = []) => (float)ops_val($sql, $a);
+    $openJobs   = (int)$v("SELECT COUNT(*) FROM jobs WHERE closed_flag=0");
+    $overdue    = (int)$v("SELECT COUNT(*) FROM jobs WHERE closed_flag=0 AND ((inspection_end_date<>'' AND inspection_end_date<?) OR (inspection_end_date='' AND scheduled_date<>'' AND scheduled_date<?))", [$today, $today]);
+    $closed     = (int)$v("SELECT COUNT(*) FROM jobs WHERE closed_flag=1 AND closed_at>=?", [$since]);
+    $repPending = (int)$v("SELECT COUNT(*) FROM jobs WHERE report_approval='PENDING'");
+    $newCalls   = (int)$v("SELECT COUNT(*) FROM calls WHERE call_received_date>=?", [$since]);
+    // sales (guard if CRM not present)
+    $hasQuotes  = (int)$v("SELECT COUNT(*) FROM quotations");
+    $qOpen = $qWon = $qLost = 0; $wonVal = 0.0;
+    if ($hasQuotes >= 0) {
+        $qOpen = (int)$v("SELECT COUNT(*) FROM quotations WHERE is_current=1 AND status IN ('DRAFT','PENDING_APPROVAL','APPROVED','SENT')");
+        $qWon  = (int)$v("SELECT COUNT(*) FROM quotations WHERE is_current=1 AND status='ACCEPTED' AND updated_at>=?", [$since]);
+        $qLost = (int)$v("SELECT COUNT(*) FROM quotations WHERE is_current=1 AND status IN ('LOST','EXPIRED') AND updated_at>=?", [$since]);
+        $wonVal= $v("SELECT COALESCE(SUM(total_amount),0) FROM quotations WHERE is_current=1 AND status='ACCEPTED' AND updated_at>=?", [$since]);
+    }
+    $unbilled    = $v("SELECT COALESCE(SUM(expected_credit),0) FROM jobs WHERE closed_flag=1 AND invoice_raised=0");
+    $label = $period === 'monthly' ? 'Monthly' : 'Weekly';
+    $body = "$label management summary — " . app_name() . "\nPeriod: since $since\n\n"
+        . "OPERATIONS\n"
+        . "  Open jobs: $openJobs  (overdue: $overdue)\n"
+        . "  Jobs closed in period: $closed\n"
+        . "  New calls in period: $newCalls\n"
+        . "  Reports awaiting approval: $repPending\n\n"
+        . "SALES / CRM\n"
+        . "  Open quotations: $qOpen\n"
+        . "  Won in period: $qWon  (₹" . number_format($wonVal, 0) . ")\n"
+        . "  Lost/expired in period: $qLost\n\n"
+        . "MONEY\n"
+        . "  Unbilled (closed, not invoiced): ₹" . number_format($unbilled, 0) . "\n\n"
+        . "Open the dashboard for details.\n\n" . app_name();
+    ops_mail($to, "$label MIS summary — " . app_name() . " ($today)", $body, '', 'mis_digest');
+    return 1;
+}
+
+// -------------------------------------------------------------------------
 //  Reporting-manager chain + organisation hierarchy (N+1 automatic)
 // -------------------------------------------------------------------------
 function user_display_name($u) {
@@ -261,6 +365,12 @@ function report_approver_user_id($job) {
     if (!$insId) return null;
     $rt = ops_val("SELECT reports_to_id FROM inspectors WHERE id=?", [$insId]);
     return $rt ? (int)$rt : null;
+}
+// E-mail of an inspector's reporting manager (for overdue-report escalation).
+function inspector_manager_email($inspectorId) {
+    $rt = $inspectorId ? ops_val("SELECT reports_to_id FROM inspectors WHERE id=?", [(int)$inspectorId]) : null;
+    if (!$rt) return '';
+    return (string)ops_val("SELECT email FROM users WHERE id=? AND is_active=1", [(int)$rt]);
 }
 function report_approval_notify($jobId) {
     $job = ops_one("SELECT j.*, i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.id=?", [$jobId]);

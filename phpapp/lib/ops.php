@@ -372,6 +372,7 @@ function ops_migrate() {
     ensure_column('jobs', 'report_approved_by', "VARCHAR(150) DEFAULT ''");
     ensure_column('jobs', 'report_approved_at', "VARCHAR(30) DEFAULT ''");
     ensure_column('jobs', 'report_approval_note', "VARCHAR(400) DEFAULT ''");
+    ensure_column('jobs', 'last_escalation', "VARCHAR(20) DEFAULT ''");   // report-overdue escalation to manager
     // extra (configurable) expense headings beyond the fixed 5, stored as JSON {code:amount}
     ensure_column('expenses', 'extra', 'TEXT');
     // voucher supporting-file mime (voucher table itself is created in ensure_schema)
@@ -404,6 +405,12 @@ function ops_migrate() {
     db()->exec("CREATE TABLE IF NOT EXISTS inspector_day_status (
         id " . pk_clause() . ", inspector_id INT, day VARCHAR(20), status VARCHAR(20) DEFAULT 'AVAILABLE',
         note VARCHAR(255) DEFAULT '', set_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // Standard working norm (weekly days + hours) by designation and office. office_id
+    // NULL = all offices; designation '' = office-wide default. Most-specific wins.
+    db()->exec("CREATE TABLE IF NOT EXISTS work_norms (
+        id " . pk_clause() . ", designation VARCHAR(40) DEFAULT '', office_id INT NULL,
+        weekly_days DECIMAL(3,1) DEFAULT 6, weekly_hours DECIMAL(5,1) DEFAULT 48,
+        updated_by VARCHAR(150) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')");
     ops_seed_expense_masters();
 }
 // Seed the expense-head and travel-mode masters once (idempotent — count-guarded,
@@ -920,6 +927,27 @@ function ops_run_reminders($today = null) {
             db()->prepare("UPDATE jobs SET last_reminder=? WHERE id=?")->execute([$today, $j['id']]);
             $sent++;
         }
+        // Escalation: a report/closure overdue by >= threshold days and still open is
+        // escalated to the inspector's reporting manager. Throttled to once a week.
+        $overdueDays = $pastEnd ? days_between($end, $today) : ($due && $since !== null ? $since : 0);
+        $threshold = (int)(setting_get('report_escalate_days', '') ?: 3);
+        if ($due && $overdueDays >= $threshold && function_exists('inspector_manager_email')) {
+            $lastEsc = $j['last_escalation'] ?? '';
+            $escOk = $lastEsc === '' || (days_between($lastEsc, $today) !== null && days_between($lastEsc, $today) >= 7);
+            if ($escOk) {
+                $mgrEmail = inspector_manager_email($j['inspector_id']);
+                if ($mgrEmail) {
+                    $ctx = $ctx ?? job_email_context($j['id']);
+                    $client = $ctx['client_disp'] ?: $ctx['client_name'];
+                    $eb = "ESCALATION — report overdue by {$overdueDays} day(s).\n\nJob: {$ctx['job_code']}\nClient: {$client}\n"
+                        . "Inspector: {$ctx['inspector_name']}\nInspection ended: {$ctx['inspection_end_date']}\n{$why}.\n\n"
+                        . "The report is still not uploaded. Please follow up with the inspector.\n\nSGS Ahmedabad";
+                    ops_mail($mgrEmail, "OVERDUE report: {$ctx['job_code']} — {$client} ({$overdueDays}d)", $eb, manager_emails(), 'escalation');
+                    db()->prepare("UPDATE jobs SET last_escalation=? WHERE id=?")->execute([$today, $j['id']]);
+                    $sent++;
+                }
+            }
+        }
     }
     $sent += ops_run_cert_reminders($today);
     $sent += ops_run_po_alerts($today);
@@ -1214,7 +1242,7 @@ function ops_module_gate($route) {
         'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes',
         'attendance-recon'=>'reconcile',
         'availability'=>'jobs',
-        'masters'=>'masters',
+        'masters'=>'masters','work-norms'=>'masters',
         'office-finance'=>'overheads',
         'reports'=>'reports',
         'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users',
@@ -1342,6 +1370,8 @@ function ops_dispatch($route, $method) {
             ops_inspector_availability($method); return true;
         case $route === 'hierarchy':
             ops_hierarchy($method); return true;
+        case $route === 'work-norms':
+            ops_work_norms($method); return true;
         case $route === 'report-approve':
             ops_report_approve($method); return true;
         case $route === 'office-finance':
