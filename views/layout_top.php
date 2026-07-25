@@ -54,6 +54,9 @@
         <?php if (can('mod.hiring.view')): ?><a class="s-item<?= $navOn(['candidates','candidate']) ?>" href="/candidates"><span class="s-ic">🧑‍💼</span><span><?= e(THP('candidate')) ?></span></a><?php endif; ?>
         <?php if (can('mod.hiring.view')): ?><a class="s-item<?= $navOn(['requisitions','requisition']) ?>" href="/requisitions"><span class="s-ic">📋</span><span><?= e(THP('requisition')) ?></span></a><?php endif; ?>
         <?php if (can('mod.reconcile.view')): ?><a class="s-item<?= $navOn(['attendance-recon']) ?>" href="/attendance-recon"><span class="s-ic">✅</span><span>Attendance reconciliation</span></a><?php endif; ?>
+        <?php if (can('mod.calls.view')): $ovN = (int)ops_val("SELECT COUNT(*) FROM contract_overrides WHERE status IN ('PENDING','ENDORSED')"); ?>
+          <a class="s-item<?= $navOn(['contract-overrides']) ?>" href="/contract-overrides"><span class="s-ic">🛑</span><span>Contract exceptions<?= $ovN ? ' (' . $ovN . ')' : '' ?></span></a>
+        <?php endif; ?>
         <?php endif; ?>
 
         <?php if (can('mod.idems.view')): ?>

@@ -29,6 +29,65 @@
   </div>
 </div>
 
+<?php
+  // Contract cover behind this call: dates and quantity. Shown before the
+  // coordinator tries to allocate, not after they have filled a form.
+  $cqid  = (int)($call['quotation_id'] ?? 0);
+  $cgate = ($cqid && function_exists('contract_gate')) ? contract_gate($cqid) : null;
+  $cinfo = $cgate['info'] ?? null;
+  $fmtq  = fn($n) => rtrim(rtrim(number_format((float)$n, 2), '0'), '.');
+?>
+<?php if ($cinfo && in_array($cinfo['state'], ['EXPIRING','QTY_LOW','EXPIRED','EXHAUSTED'], true)):
+        $bad = in_array($cinfo['state'], ['EXPIRED','EXHAUSTED'], true); ?>
+<div class="panel" style="border:1px solid var(--<?= $bad ? 'bad' : 'warn' ?>);background:color-mix(in srgb,var(--<?= $bad ? 'bad' : 'warn' ?>) 7%,transparent)">
+  <b style="color:var(--<?= $bad ? 'bad' : 'warn' ?>)">
+    <?= $bad ? '⛔' : '⚠' ?> <?= e(CONTRACT_STATES[$cinfo['state']] ?? $cinfo['state']) ?></b>
+  <div class="muted" style="margin-top:4px">
+    <?php if ($cinfo['end_date'] !== ''): ?>
+      Contract ends <?= e(fdate($cinfo['end_date'])) ?><?php
+        if ($cinfo['days_left'] !== null) echo $cinfo['days_left'] < 0
+          ? ' — <b>' . abs((int)$cinfo['days_left']) . ' day(s) ago</b>'
+          : ' — ' . (int)$cinfo['days_left'] . ' day(s) left'; ?>.
+    <?php endif; ?>
+    <?php if ($cinfo['qty_total'] !== null): ?>
+      Quantity <?= e($fmtq($cinfo['qty_used'])) ?> of <?= e($fmtq($cinfo['qty_total'])) ?> used<?php
+        if ($cinfo['qty_left'] !== null) echo ', ' . e($fmtq(max(0, $cinfo['qty_left']))) . ' left'; ?>.
+    <?php endif; ?>
+    <?php if ($bad): ?>
+      <br><b>No further <?= e(Tlp('job')) ?> can be allocated against this order</b> until an exception is granted.
+    <?php else: ?>
+      <br>Nothing is blocked — this is the time to get it renewed or extended.
+    <?php endif; ?>
+  </div>
+
+  <?php if ($bad): ?>
+    <?php if (!empty($cgate['override'])): ?>
+      <div style="margin-top:8px"><span class="pill p-ok">Exception granted</span>
+        <span class="muted">by <?= e($cgate['override']['decided_by']) ?> —
+          <?= (int)$cgate['override']['uses_taken'] ?> of <?= (int)$cgate['override']['uses_allowed'] ?> allocation(s) used.</span></div>
+    <?php elseif (!empty($cgate['pending'])): ?>
+      <div style="margin-top:8px"><span class="pill p-warn"><?= e(OVERRIDE_STATUS[$cgate['pending']['status']] ?? 'Pending') ?></span>
+        <span class="muted">requested by <?= e($cgate['pending']['requested_by']) ?>.</span>
+        <a class="btn small secondary" href="/contract-overrides" style="margin-left:6px">See the request</a></div>
+    <?php elseif (is_coordinator_level() || is_master()): ?>
+      <form method="post" action="/contract-override" style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:end">
+        <input type="hidden" name="do" value="request">
+        <input type="hidden" name="quotation_id" value="<?= (int)$cqid ?>">
+        <input type="hidden" name="call_id" value="<?= (int)$call['id'] ?>">
+        <input type="hidden" name="kind" value="<?= $cinfo['state'] === 'EXPIRED' ? 'EXPIRED' : 'EXHAUSTED' ?>">
+        <input type="hidden" name="back" value="/call?id=<?= (int)$call['id'] ?>">
+        <div class="ff" style="margin:0;flex:1;min-width:260px"><label>Why must this go ahead anyway?</label>
+          <input class="form-control" name="reason" required placeholder="e.g. renewal signed, paperwork follows next week"></div>
+        <div class="ff" style="margin:0"><label>Allocations needed</label>
+          <input class="form-control" type="number" name="uses_allowed" value="1" min="1" max="99" style="width:120px"></div>
+        <button class="btn small" type="submit">Request an exception</button>
+      </form>
+      <p class="muted" style="margin:6px 0 0">A Branch Manager endorses it, then the Super Admin grants it.</p>
+    <?php endif; ?>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php $cgap = function_exists('call_contract_gap') ? call_contract_gap($call) : null; ?>
 <?php if ($cgap): ?>
   <?php // Shown on every visit until it is fixed. Scheduling is deliberately NOT
