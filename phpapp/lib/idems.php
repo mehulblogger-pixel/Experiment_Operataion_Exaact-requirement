@@ -2189,14 +2189,81 @@ function ops_idems_evidence($method) {
 }
 
 // Compliance audit log viewer (basic; full super-admin dashboard is a later phase).
+// ---- Actions that a compliance reviewer should always look at ----
+const AUDIT_HIGH_RISK = ['TIMESTAMP_EDIT','DELETE','EVIDENCE_DELETE','REJECT','SENDBACK','SIGNATURE_SET','LOGIN_FAILED','AI_REVIEW','DELEGATE'];
+// Plain-English labels for the log.
+function audit_action_label($a) {
+    $m = ['CREATE'=>'Report created','EDIT'=>'Edited','IRN_GEN'=>'IRN generated','SUBMIT'=>'Submitted','APPROVE'=>'Approved',
+        'REJECT'=>'Rejected','SENDBACK'=>'Sent back','DELEGATE'=>'Approval delegated','FINALIZE'=>'Finalized / issued',
+        'DELETE'=>'Deleted (soft)','EVIDENCE'=>'Evidence added','EVIDENCE_CAPTION'=>'Evidence caption','EVIDENCE_DELETE'=>'Evidence removed',
+        'PDF'=>'PDF generated','DOCX'=>'Client format generated','CERT_PDF'=>'Endorsement certificate','SOURCE_DOC'=>'Source document added',
+        'AI_REVIEW'=>'AI review run','SMART_REMARKS'=>'Suggested remarks applied','TIMESTAMP_EDIT'=>'Date/timestamp changed',
+        'SIGNATURE_SET'=>'Signature changed','ENDORSE'=>'Document endorsed','RELEASE_NOTE_DRAFT'=>'Release Note drafted',
+        'RELEASE_NOTE_CREATED'=>'Release Note created from report','LOGIN'=>'Login','LOGOUT'=>'Logout','LOGIN_FAILED'=>'Failed login'];
+    return $m[$a] ?? $a;
+}
+// Compliance health checks across the whole system (super-admin view).
+function idems_compliance_checks() {
+    $out = [];
+    $n = fn($sql, $a = []) => (int)ops_val($sql, $a);
+    $stuck = $n("SELECT COUNT(*) FROM report_docs WHERE deleted=0 AND status='UNDER_REVIEW' AND submitted_at<>'' AND submitted_at < ?", [date('c', strtotime('-7 days'))]);
+    if ($stuck) $out[] = ['sev'=>'medium', 'text'=>$stuck . ' report(s) have been awaiting approval for more than 7 days.', 'link'=>'/documents?status=UNDER_REVIEW'];
+    $noAppr = $n("SELECT COUNT(*) FROM inspectors i WHERE i.status='ACTIVE' AND i.reports_to_id IS NULL AND NOT EXISTS (SELECT 1 FROM idems_approver_map m WHERE m.inspector_id=i.id AND m.approver_user_id IS NOT NULL)");
+    if ($noAppr) $out[] = ['sev'=>'high', 'text'=>$noAppr . ' active inspector(s) have no approver assigned — their reports cannot be submitted.', 'link'=>'/approver-map'];
+    $tsEdits = $n("SELECT COUNT(*) FROM idems_audit WHERE action='TIMESTAMP_EDIT' AND created_at >= ?", [date('c', strtotime('-30 days'))]);
+    if ($tsEdits) $out[] = ['sev'=>'high', 'text'=>$tsEdits . ' date/timestamp change(s) in the last 30 days — review the reasons recorded.', 'link'=>'/audit-log?action=TIMESTAMP_EDIT'];
+    $noSig = $n("SELECT COUNT(*) FROM users WHERE is_active=1 AND (signature IS NULL OR signature='') AND role NOT IN ('INSPECTOR')");
+    if ($noSig) $out[] = ['sev'=>'low', 'text'=>$noSig . ' active user(s) have no signature on file — their approvals will print without one.', 'link'=>'/users'];
+    $fails = $n("SELECT COUNT(*) FROM idems_audit WHERE action='LOGIN_FAILED' AND created_at >= ?", [date('c', strtotime('-7 days'))]);
+    if ($fails >= 5) $out[] = ['sev'=>'medium', 'text'=>$fails . ' failed login attempt(s) in the last 7 days.', 'link'=>'/audit-log?action=LOGIN_FAILED'];
+    $del = $n("SELECT COUNT(*) FROM report_docs WHERE deleted=1");
+    if ($del) $out[] = ['sev'=>'low', 'text'=>$del . ' report(s) are soft-deleted (retained for audit; never removed).', 'link'=>'/audit-log?action=DELETE'];
+    return $out;
+}
 function ops_idems_audit($method) {
     ops_require(is_master() || can('idems.audit.view'), 'You cannot view the audit log.');
-    $q = trim($_GET['q'] ?? ''); $act = $_GET['action'] ?? '';
+    // ---- filters (Part 23) ----
+    $q       = trim($_GET['q'] ?? '');
+    $act     = $_GET['action'] ?? '';
+    $user    = trim($_GET['user'] ?? '');
+    $office  = $_GET['office'] ?? '';
+    $from    = trim($_GET['from'] ?? '');
+    $to      = trim($_GET['to'] ?? '');
+    $risk    = !empty($_GET['risk']);
     $where = "1=1"; $args = [];
-    if ($q)   { $where .= " AND (irn LIKE ? OR username LIKE ?)"; array_push($args, "%$q%", "%$q%"); }
-    if ($act) { $where .= " AND action=?"; $args[] = $act; }
+    if ($q)      { $where .= " AND (irn LIKE ? OR username LIKE ? OR new_value LIKE ? OR reason LIKE ?)"; array_push($args, "%$q%", "%$q%", "%$q%", "%$q%"); }
+    if ($act)    { $where .= " AND action=?"; $args[] = $act; }
+    if ($user)   { $where .= " AND username LIKE ?"; $args[] = "%$user%"; }
+    if ($office !== '') { $where .= " AND office_id=?"; $args[] = (int)$office; }
+    if ($from)   { $where .= " AND created_at >= ?"; $args[] = $from; }
+    if ($to)     { $where .= " AND created_at <= ?"; $args[] = $to . 'T23:59:59'; }
+    if ($risk)   { $where .= " AND action IN ('" . implode("','", AUDIT_HIGH_RISK) . "')"; }
     $rows = ops_all("SELECT * FROM idems_audit WHERE $where ORDER BY id DESC", $args);
-    $actions = ops_all("SELECT DISTINCT action FROM idems_audit ORDER BY action");
-    view('ops/idems/audit', ['rows'=>array_slice($rows, 0, 500), 'q'=>$q, 'act'=>$act, 'actions'=>array_column($actions, 'action')]);
+    // CSV export of exactly what is on screen
+    if (function_exists('wants_csv') && wants_csv()) {
+        $csv = [['When','Entity','IRN','Action','Field','Old value','New value','Reason','User','Role','Office','IP']];
+        foreach ($rows as $r) $csv[] = [$r['created_at'], $r['entity'], $r['irn'], $r['action'], $r['field'], $r['old_value'], $r['new_value'], $r['reason'], $r['username'], $r['role'], $r['office_id'], $r['ip']];
+        csv_download('audit-log-' . date('Ymd-His') . '.csv', $csv);
+        return true;
+    }
+    // ---- summary for the dashboard ----
+    $since30 = date('c', strtotime('-30 days'));
+    $stats = [
+        'total'    => (int)ops_val("SELECT COUNT(*) FROM idems_audit"),
+        'today'    => (int)ops_val("SELECT COUNT(*) FROM idems_audit WHERE created_at >= ?", [date('Y-m-d')]),
+        'risk30'   => (int)ops_val("SELECT COUNT(*) FROM idems_audit WHERE created_at >= ? AND action IN ('" . implode("','", AUDIT_HIGH_RISK) . "')", [$since30]),
+        'users30'  => (int)ops_val("SELECT COUNT(DISTINCT username) FROM idems_audit WHERE created_at >= ?", [$since30]),
+    ];
+    $byAction = ops_all("SELECT action, COUNT(*) n FROM idems_audit WHERE created_at >= ? GROUP BY action ORDER BY n DESC", [$since30]);
+    $byUser   = ops_all("SELECT username, COUNT(*) n FROM idems_audit WHERE created_at >= ? GROUP BY username ORDER BY n DESC", [$since30]);
+    $byOffice = ops_all("SELECT a.office_id, o.name office_name, COUNT(*) n FROM idems_audit a LEFT JOIN offices o ON o.id=a.office_id WHERE a.created_at >= ? GROUP BY a.office_id, o.name ORDER BY n DESC", [$since30]);
+    view('ops/idems/audit', [
+        'rows'=>array_slice($rows, 0, 500), 'total'=>count($rows),
+        'q'=>$q, 'act'=>$act, 'user'=>$user, 'office'=>$office, 'from'=>$from, 'to'=>$to, 'risk'=>$risk,
+        'actions'=>array_column(ops_all("SELECT DISTINCT action FROM idems_audit ORDER BY action"), 'action'),
+        'offices'=>ops_all("SELECT id, name FROM offices ORDER BY name"),
+        'stats'=>$stats, 'byAction'=>$byAction, 'byUser'=>array_slice($byUser, 0, 8), 'byOffice'=>$byOffice,
+        'checks'=>idems_compliance_checks(),
+    ]);
     return true;
 }

@@ -86,7 +86,14 @@ Proposed phasing (each phase = its own commit, tested):
   gallery: organised by report section → field, thumbnails, capture time, clickable GPS (maps link),
   size + saving per item, editable captions, remove; KPI strip (items / stored size / space saved /
   GPS-tagged). Locked once the report is finalized.
-- P11 Super-Admin audit & compliance dashboard (every critical action, soft-delete only, searchable).
+- P11 Super-Admin audit & compliance dashboard ✅ SHIPPED — login/logout/failed-login now audited too.
+  /audit-log rebuilt as a compliance dashboard: KPI strip (total events, today, high-risk 30d, active
+  users), automated compliance checks (inspectors with no approver, reports stuck in review >7d,
+  timestamp changes in 30d, users without a signature, failed-login spikes, soft-deleted reports),
+  activity-by-action bar chart (high-risk flagged), most-active users, by-branch chips, full filter set
+  (action / branch / user / date range / free-text over IRN+user+value+reason / high-risk-only),
+  plain-English action labels, high-risk rows highlighted, and CSV export of the filtered view.
+  Records are immutable and never purged; deletes stay soft.
 - P12 Offline-first / mobile field UX (constraint: plain PHP on shared hosting → responsive +
   localStorage autosave/draft + sync-on-reconnect; true native offline is a later PWA effort).
 - P13 Future self-learning suggestions from approved reports (suggestions only, never auto-alter).
