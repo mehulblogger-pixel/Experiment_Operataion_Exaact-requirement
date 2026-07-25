@@ -52,6 +52,11 @@ const PERMISSIONS = [
     'workforce.availability' => 'Manage the inspector availability board',
     'workforce.report.approve' => 'Approve inspection reports (reporting manager)',
     'org.hierarchy.view'  => 'View the organisation hierarchy',
+    // ---- IDEMS (inspection documentation & endorsement) ----
+    'idems.finalize'      => 'Finalize / issue & lock inspection reports',
+    'idems.type.manage'   => 'Manage report types & IRN numbering rules',
+    'idems.timestamp.edit'=> 'Edit locked timestamps (Branch App Admin only)',
+    'idems.audit.view'    => 'View the compliance audit log',
 ];
 
 // Human-friendly grouping of every permission, so the access editor reads clearly
@@ -60,6 +65,7 @@ function permission_groups() {
     return [
         'Dashboards & sensitive figures' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability'],
         'Operations (calls & jobs)'      => ['ops.call.create','ops.job.allocate','ops.job.close','ops.call.delete','workforce.availability','workforce.report.approve'],
+        'Inspection documentation (IDEMS)' => ['idems.finalize','idems.type.manage','idems.timestamp.edit','idems.audit.view'],
         'Money'                          => ['finance.reconcile'],
         'Marketing & Sales (CRM)'        => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage'],
         'Administration'                 => ['master.manage','users.manage.branch','users.manage.global','org.hierarchy.view','settings.manage'],
@@ -69,6 +75,7 @@ function permission_groups() {
 function module_groups() {
     return [
         'Marketing & Sales (CRM)' => ['inquiries','quotes','crm_orders','crm_reports'],
+        'Inspection documentation' => ['idems'],
         'Operations'              => ['calls','jobs','vouchers','invoicing','profitability','hiring','reconcile'],
         'Directory & masters'     => ['clients','vendors','masters','overheads'],
         'Insights & admin'        => ['reports','users','settings'],
@@ -87,6 +94,8 @@ const ACCESS_MODULES = [
     'quotes'        => 'CRM — Quotations',
     'crm_orders'    => 'CRM — Orders / contracts',
     'crm_reports'   => 'CRM — Sales reports',
+    // IDEMS — inspection documentation & reporting
+    'idems'         => 'Inspection reports (IDEMS)',
     // Operations
     'calls'         => 'Calls',
     'jobs'          => 'Jobs',
@@ -123,21 +132,21 @@ function module_defaults($role) {
         case 'MASTER_ADMIN': case 'ADMIN': $edit = $all; break;
         case 'BUSINESS_DIRECTOR': $view = $all; break;
         case 'SBU_HEAD':
-            $view = ['inquiries','quotes','crm_orders','crm_reports','calls','jobs','vouchers','invoicing','profitability','hiring','reconcile','clients','vendors','masters','reports']; break;
+            $view = ['inquiries','quotes','crm_orders','crm_reports','idems','calls','jobs','vouchers','invoicing','profitability','hiring','reconcile','clients','vendors','masters','reports']; break;
         case 'BRANCH_MANAGER':
-            $edit = ['calls','jobs','vouchers','hiring','reconcile','clients','vendors','masters','reports','users'];
+            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','clients','vendors','masters','reports','users'];
             $view = ['inquiries','quotes','crm_orders','crm_reports','invoicing','profitability','overheads']; break;
         case 'BRANCH_APP_MANAGER':
             $edit = ['masters','overheads','users'];
             $view = ['calls','jobs','reports']; break;
         case 'OPERATION_MANAGER':
-            $edit = ['calls','jobs','vouchers','hiring','reconcile'];
+            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile'];
             $view = ['crm_orders','clients','vendors','masters','profitability','reports']; break;
         case 'ASST_MANAGER':
-            $edit = ['calls','jobs'];
+            $edit = ['calls','jobs','idems'];
             $view = ['clients','vendors','reports']; break;
         case 'COORDINATOR':
-            $edit = ['calls','jobs','vouchers','hiring','reconcile'];
+            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile'];
             $view = ['crm_orders','clients','vendors','masters','reports','invoicing']; break;
         // ---- Marketing & Sales (CRM) ----
         case 'BUSINESS_DEV_MANAGER': case 'KEY_ACCOUNTS_MANAGER':
@@ -151,8 +160,8 @@ function module_defaults($role) {
             $view = ['crm_orders','crm_reports','clients']; break;
         case 'FINANCE':
             $edit = ['invoicing','crm_orders'];
-            $view = ['quotes','crm_reports','profitability','reports','jobs','calls','vouchers']; break;
-        case 'INSPECTOR': break; // inspectors use My Jobs / My Voucher (their own)
+            $view = ['quotes','crm_reports','profitability','reports','jobs','calls','vouchers','idems']; break;
+        case 'INSPECTOR': $edit = ['idems']; break; // inspectors write reports; else My Jobs / My Voucher
     }
     $out = [];
     foreach ($view as $k) $out[] = "mod.$k.view";
@@ -164,7 +173,7 @@ function module_defaults($role) {
 // set from before these existed simply doesn't mention them, so we grant the role's
 // default view/edit for them. Safe because these modules are genuinely new — a saved
 // set could never have "deliberately removed" them, so nothing existing is resurrected.
-const NEW_MODULES = ['inquiries', 'quotes', 'crm_orders', 'crm_reports'];
+const NEW_MODULES = ['inquiries', 'quotes', 'crm_orders', 'crm_reports', 'idems'];
 function merge_new_module_defaults($perms, $role) {
     foreach (module_defaults($role) as $dp) {
         if (preg_match('/^mod\.(\w+)\.(view|edit)$/', $dp, $m) && in_array($m[1], NEW_MODULES, true) && !in_array($dp, $perms, true)) $perms[] = $dp;
@@ -196,16 +205,17 @@ function role_defaults_base($role) {
         case 'MASTER_ADMIN': case 'ADMIN':
             return ['perms' => $all, 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'BUSINESS_DIRECTOR':
-            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability','org.hierarchy.view'], 'offices' => 'ALL', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability','org.hierarchy.view','idems.audit.view'], 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'SBU_HEAD':
-            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability','workforce.report.approve','org.hierarchy.view'], 'offices' => 'ALL', 'sbus' => 'OWN'];
+            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability','workforce.report.approve','org.hierarchy.view','idems.finalize','idems.audit.view'], 'offices' => 'ALL', 'sbus' => 'OWN'];
         case 'BRANCH_MANAGER':
-            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability','ops.call.create','ops.job.allocate','ops.job.close','workforce.availability','workforce.report.approve','master.manage','users.manage.branch','org.hierarchy.view'], 'offices' => 'OWN', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability','ops.call.create','ops.job.allocate','ops.job.close','workforce.availability','workforce.report.approve','master.manage','users.manage.branch','org.hierarchy.view','idems.finalize','idems.audit.view'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'BRANCH_APP_MANAGER':
-            return ['perms' => ['dash.operations','dash.utilization','users.manage.branch','master.manage','ops.call.delete','org.hierarchy.view'], 'offices' => 'OWN', 'sbus' => 'ALL'];
+            // The Branch Application Manager is the only role that may edit locked timestamps.
+            return ['perms' => ['dash.operations','dash.utilization','users.manage.branch','master.manage','ops.call.delete','org.hierarchy.view','idems.type.manage','idems.timestamp.edit','idems.audit.view'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'OPERATION_MANAGER':
             // "manager under the branch manager" — may see BOSS/contract profitability
-            return ['perms' => ['dash.operations','dash.utilization','data.profitability','ops.call.create','ops.job.allocate','ops.job.close','workforce.availability','workforce.report.approve'], 'offices' => 'OWN', 'sbus' => 'OWN'];
+            return ['perms' => ['dash.operations','dash.utilization','data.profitability','ops.call.create','ops.job.allocate','ops.job.close','workforce.availability','workforce.report.approve','idems.finalize'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'ASST_MANAGER':
             return ['perms' => ['dash.operations','ops.call.create','ops.job.allocate','workforce.availability'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'COORDINATOR':

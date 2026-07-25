@@ -37,6 +37,7 @@ try {
     require __DIR__ . '/lib/pdf.php';
     require __DIR__ . '/lib/ai.php';
     require __DIR__ . '/lib/workforce.php';
+    require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine());
@@ -88,6 +89,10 @@ try {
     db()->query("SELECT reports_to_name FROM users LIMIT 1");
     db()->query("SELECT report_approval FROM jobs LIMIT 1");
     db()->query("SELECT id FROM work_norms LIMIT 1");
+    // IDEMS report engine tables
+    db()->query("SELECT irn FROM report_docs LIMIT 1");
+    db()->query("SELECT id FROM report_types LIMIT 1");
+    db()->query("SELECT id FROM idems_audit LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();

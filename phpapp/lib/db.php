@@ -167,6 +167,7 @@ function boot() {
     if (function_exists('lk_migrate')) { lk_migrate(); lk_seed(); }
     if (function_exists('access_migrate')) access_migrate();
     if (function_exists('crm_migrate')) crm_migrate();   // after lookups exist (masters)
+    if (function_exists('idems_migrate')) idems_migrate();   // IDEMS report engine
     ensure_admin();
     auto_seed();
 }
