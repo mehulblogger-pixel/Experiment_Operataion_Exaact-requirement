@@ -11,6 +11,57 @@
   <a class="btn secondary" href="/document?id=<?= (int)$doc['id'] ?>">← Back to report</a>
 </div>
 
+<?php
+  // ---- Where each expected document stands ---------------------------------
+  // Uploading is only one of the answers. "Not applicable to this scope" and
+  // "the vendor has not given it to us" are decisions the reviewer is entitled
+  // to record, and the automatic checks stop nagging about anything marked
+  // either way — which is what keeps the checks worth reading.
+  $tone = ['RECEIVED'=>'p-ok','RECEIVED_OBS'=>'p-warn','NOT_APPLICABLE'=>'p-mut',
+           'NOT_AVAILABLE'=>'p-bad','AWAITED'=>'p-warn','PENDING'=>'p-mut'];
+  $rowTypes = $expected ?: array_keys($types);
+  foreach (array_keys($byType) as $t) if (!in_array($t, $rowTypes, true)) $rowTypes[] = $t;
+  $editable = idems_can_edit_doc($doc);
+?>
+<div class="panel">
+  <div class="ctitle" style="margin-top:0"><h3>Where each document stands</h3></div>
+  <p class="sub" style="margin:0 0 10px">Mark every expected document. Anything set to
+    <b>not applicable</b> or <b>not available</b> is left out of the automatic checks.</p>
+  <form method="post" action="/document-review?id=<?= (int)$doc['id'] ?>">
+    <input type="hidden" name="_do" value="state">
+    <div style="overflow-x:auto">
+    <table class="dt">
+      <thead><tr><th>Document</th><th style="min-width:210px">Status</th><th style="min-width:230px">Note</th><th>Files</th></tr></thead>
+      <tbody>
+      <?php foreach ($rowTypes as $t):
+            $r = $review[$t] ?? null; $st = $r['state'] ?? (isset($byType[$t]) ? 'RECEIVED' : 'PENDING'); ?>
+        <tr>
+          <td><b><?= e(lk_options_or('source_doc_type', SOURCE_DOC_TYPES)[$t] ?? $t) ?></b>
+              <?php if ($r && !empty($r['reviewed_by'])): ?>
+                <div class="muted" style="font-size:11px"><?= e($r['reviewed_by']) ?><?= !empty($r['reviewed_at']) ? ' · ' . e(fdate(substr((string)$r['reviewed_at'],0,10))) : '' ?></div>
+              <?php endif; ?></td>
+          <td><?php if ($editable): ?>
+                <select class="form-control" name="st[<?= e($t) ?>]">
+                  <?php foreach ($reviewStates as $k=>$v): ?>
+                    <option value="<?= e($k) ?>" <?= $st===$k?'selected':'' ?>><?= e($v) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              <?php else: ?>
+                <span class="pill <?= e($tone[$st] ?? 'p-mut') ?>"><?= e($reviewStates[$st] ?? $st) ?></span>
+              <?php endif; ?></td>
+          <td><?php if ($editable): ?>
+                <input class="form-control" name="nt[<?= e($t) ?>]" value="<?= e($r['note'] ?? '') ?>" placeholder="why, or what is awaited">
+              <?php else: ?><?= e($r['note'] ?? '—') ?><?php endif; ?></td>
+          <td class="num"><?= isset($byType[$t]) ? '<span class="pill p-ok">' . count($byType[$t]) . '</span>' : '<span class="muted">—</span>' ?></td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+    </div>
+    <?php if ($editable): ?><div style="margin-top:10px"><button class="btn small" type="submit">Save the review</button></div><?php endif; ?>
+  </form>
+</div>
+
 <div class="dash-2col" style="align-items:start">
   <div>
     <!-- ===== conflict report ===== -->

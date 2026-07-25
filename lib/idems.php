@@ -130,6 +130,11 @@ function idems_migrate() {
         acted_by VARCHAR(150) DEFAULT '', acted_at VARCHAR(30) DEFAULT '', remarks VARCHAR(600) DEFAULT '',
         delegated_to INT NULL, sla_due VARCHAR(30) DEFAULT '', escalated INT DEFAULT 0, created_at VARCHAR(30) DEFAULT '')");
     // ---- Phase 4: digital signatures on profiles ----
+        // Per-document review state: applicable / not applicable / not available.
+    db()->exec("CREATE TABLE IF NOT EXISTS report_doc_review (
+        id " . pk_clause() . ", report_doc_id INT, doc_type VARCHAR(30) DEFAULT '',
+        state VARCHAR(20) DEFAULT 'PENDING', note VARCHAR(400) DEFAULT '',
+        reviewed_by VARCHAR(150) DEFAULT '', reviewed_at VARCHAR(30) DEFAULT '')");
     ensure_column('users', 'signature', 'MEDIUMTEXT');          // base64 data-URL of the signature image
     ensure_column('inspectors', 'signature', 'MEDIUMTEXT');
     // ---- Phase 5: client-specific report templates (uploaded .docx, token-mapped) ----
@@ -2398,6 +2403,32 @@ function idems_source_text($mime, $raw, $limit = 20000) {
     }
     return '';
 }
+// How each expected document stands on this report. Uploading a file is only
+// one of the answers — "not applicable to this scope" and "the vendor has not
+// given it to us" are real, different answers, and a review that can only say
+// "missing" forces the engineer to leave it blank and argue in the remarks.
+const DOC_REVIEW_STATES = [
+    'PENDING'        => 'Not reviewed yet',
+    'RECEIVED'       => 'Received & acceptable',
+    'RECEIVED_OBS'   => 'Received with observations',
+    'NOT_APPLICABLE' => 'Not applicable to this scope',
+    'NOT_AVAILABLE'  => 'Not available from the vendor',
+    'AWAITED'        => 'Awaited',
+];
+function idems_doc_review($docId) {
+    $out = [];
+    foreach (ops_all("SELECT * FROM report_doc_review WHERE report_doc_id=?", [(int)$docId]) as $r)
+        $out[$r['doc_type']] = $r;
+    return $out;
+}
+function idems_doc_review_set($docId, $type, $state, $note) {
+    if (!isset(DOC_REVIEW_STATES[$state])) $state = 'PENDING';
+    $ex = ops_one("SELECT id FROM report_doc_review WHERE report_doc_id=? AND doc_type=?", [(int)$docId, $type]);
+    if ($ex) db()->prepare("UPDATE report_doc_review SET state=?, note=?, reviewed_by=?, reviewed_at=? WHERE id=?")
+        ->execute([$state, $note, user_name(current_user()), date('c'), (int)$ex['id']]);
+    else db()->prepare("INSERT INTO report_doc_review (report_doc_id,doc_type,state,note,reviewed_by,reviewed_at) VALUES (?,?,?,?,?,?)")
+        ->execute([(int)$docId, $type, $state, $note, user_name(current_user()), date('c')]);
+}
 // Source docs attached to a report (stored in report_files with kind='src_<TYPE>').
 function idems_source_docs($docId) {
     $rows = ops_all("SELECT id, kind, field_key, file_name, mime, note, created_at FROM report_files WHERE report_doc_id=? AND kind LIKE 'src_%' ORDER BY id", [(int)$docId]);
@@ -2410,8 +2441,14 @@ function idems_rule_checks($doc, $srcDocs) {
     $out = [];
     $have = [];
     foreach ($srcDocs as $s) $have[$s['doc_type']] = true;
+    // A document the reviewer has marked not applicable, or recorded as not
+    // available from the vendor, is a decision — not an omission. Nagging about
+    // it is what teaches people to ignore the checks.
+    $review = idems_doc_review($doc['id'] ?? 0);
     // 1. missing documents
     foreach (expected_source_docs() as $t) {
+        $st = $review[$t]['state'] ?? '';
+        if (in_array($st, ['NOT_APPLICABLE', 'NOT_AVAILABLE'], true)) continue;
         if (empty($have[$t])) $out[] = ['severity'=>'medium', 'kind'=>'Missing document', 'detail'=>(lk_options_or('source_doc_type', SOURCE_DOC_TYPES)[$t] ?? $t) . ' has not been uploaded against this report.'];
     }
     if (empty($have['MTC']) && empty($have['CALIB'])) $out[] = ['severity'=>'low', 'kind'=>'Missing document', 'detail'=>'No material test certificate or calibration certificate has been attached.'];
@@ -2505,6 +2542,13 @@ function ops_idems_review($route, $method) {
     $pdo = db();
     if ($method === 'POST') {
         $do = $_POST['_do'] ?? '';
+        if ($do === 'state') {
+            ops_require(idems_can_edit_doc($doc), 'This report is finalized.');
+            foreach ((array)($_POST['st'] ?? []) as $t => $v)
+                idems_doc_review_set($doc['id'], $t, (string)$v, trim((string)($_POST['nt'][$t] ?? '')));
+            flash('Document review saved.');
+            redirect('/document-review?id=' . $doc['id']);
+        }
         if ($do === 'upload') {
             ops_require(idems_can_edit_doc($doc), 'This report is finalized.');
             $type = isset(lk_options_or('source_doc_type', SOURCE_DOC_TYPES)[$_POST['doc_type'] ?? '']) ? $_POST['doc_type'] : 'OTHER';
@@ -2539,6 +2583,8 @@ function ops_idems_review($route, $method) {
     $aiText = $_SESSION['idems_ai_' . $doc['id']] ?? '';
     view('ops/idems/review', [
         'doc'=>$doc, 'srcDocs'=>$srcDocs, 'types'=>SOURCE_DOC_TYPES,
+        'review'=>idems_doc_review($doc['id']), 'reviewStates'=>DOC_REVIEW_STATES,
+        'expected'=>expected_source_docs(),
         'checks'=>idems_rule_checks($doc, $srcDocs),
         'aiText'=>$aiText, 'aiSections'=>$aiText ? idems_ai_sections($aiText) : [],
         'aiOn'=>function_exists('ai_enabled') && ai_enabled(),
