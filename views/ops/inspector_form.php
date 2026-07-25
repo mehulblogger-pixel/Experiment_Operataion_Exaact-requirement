@@ -35,8 +35,8 @@
       <select class="form-control searchable" name="home_office_id"><option value="">—</option>
         <?php foreach (($offices ?? []) as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ((int)($ins['home_office_id'] ?? 0)===(int)$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff"><label>Weekly working days</label>
-      <select class="form-control" name="weekly_working_days"><?php foreach (['6'=>'6 days (Mon–Sat)','5.5'=>'5.5 days (alternate Sat off)','5'=>'5 days (Mon–Fri)'] as $k=>$v): ?><option value="<?= $k ?>" <?= ((string)($ins['weekly_working_days'] ?? '6')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Weekly working days <span class="muted">— or leave at 6 to inherit the designation/office norm</span></label>
+      <select class="form-control" name="weekly_working_days"><?php foreach (['6'=>'6 days (Mon–Sat) / inherit norm','5.5'=>'5.5 days (alternate Sat off)','5'=>'5 days (Mon–Fri)'] as $k=>$v): ?><option value="<?= $k ?>" <?= ((string)($ins['weekly_working_days'] ?? '6')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Reporting manager <span class="muted">— for approvals & hierarchy</span></label>
       <select class="form-control searchable" name="reports_to_id"><option value="">—</option>
         <?php foreach (($managers ?? []) as $m): $nm=trim(($m['first_name']??'').' '.($m['last_name']??'')) ?: $m['username']; ?><option value="<?= (int)$m['id'] ?>" <?= ((int)($ins['reports_to_id'] ?? 0)===(int)$m['id'])?'selected':'' ?>><?= e($nm) ?> · <?= e(ORG_ROLES[$m['role']] ?? $m['role']) ?></option><?php endforeach; ?>

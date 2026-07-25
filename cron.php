@@ -18,6 +18,8 @@ require __DIR__ . '/lib/lookups.php';
 require __DIR__ . '/lib/access.php';
 require __DIR__ . '/lib/crm.php';
 require __DIR__ . '/lib/pdf.php';
+require __DIR__ . '/lib/ai.php';
+require __DIR__ . '/lib/workforce.php';
 
 // When invoked over HTTP, require a matching key so strangers can't trigger it.
 if (PHP_SAPI !== 'cli') {
@@ -45,4 +47,17 @@ echo "Placement-fee guarantees checked.\n";
 if (function_exists('crm_run_followups')) {
     $fu = crm_run_followups();
     echo "Quote follow-ups sent: $fu\n";
+}
+
+// Automated MIS digest to leadership — weekly on Monday, monthly on the 1st.
+// A per-day guard prevents duplicates if cron runs more than once a day.
+if (function_exists('ops_run_mis_digest')) {
+    $today = date('Y-m-d');
+    if ((int)date('j') === 1 && setting_get('mis_last_monthly', '') !== $today) {
+        ops_run_mis_digest('monthly'); setting_set('mis_last_monthly', $today);
+        echo "Monthly MIS digest sent.\n";
+    } elseif ((int)date('N') === 1 && setting_get('mis_last_weekly', '') !== $today) {
+        ops_run_mis_digest('weekly'); setting_set('mis_last_weekly', $today);
+        echo "Weekly MIS digest sent.\n";
+    }
 }
