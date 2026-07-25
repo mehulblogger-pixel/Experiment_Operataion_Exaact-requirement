@@ -96,6 +96,9 @@ try {
     db()->query("SELECT id FROM report_sections LIMIT 1");
     db()->query("SELECT id FROM report_fields LIMIT 1");
     db()->query("SELECT id FROM report_files LIMIT 1");
+    db()->query("SELECT id FROM report_approvals LIMIT 1");
+    db()->query("SELECT id FROM idems_approval_rules LIMIT 1");
+    db()->query("SELECT signature FROM users LIMIT 1");
 } catch (Throwable $ex) {
     try {
         boot();
