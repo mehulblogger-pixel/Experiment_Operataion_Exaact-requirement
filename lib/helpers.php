@@ -87,3 +87,47 @@ function roles_label($p) {
     if ($p['is_subcontractor']) $r[] = 'Sub-contractor';
     return $r ? implode(' / ', $r) : '—';
 }
+
+// ---------------------------------------------------------------------------
+//  One submission, one record
+//
+//  A form submitted once was being recorded twice. The POST is replayed for
+//  reasons that have nothing to do with the person: a double-click, a browser
+//  retry when a response is slow, the back button and a refresh, and — the one
+//  that caused this — the offline queue re-sending an entry whose reply never
+//  arrived even though the server had already saved it. An inspector's expenses
+//  appeared as two identical lines.
+//
+//  So each form carries a one-shot ticket. The first POST spends it; any replay
+//  presents a ticket that is already spent and is turned away before the handler
+//  runs. A form with no ticket at all — an older page, or a browser with no
+//  JavaScript — is let through exactly as before, so nothing that worked stops
+//  working.
+// ---------------------------------------------------------------------------
+function form_tokens_migrate() {
+    static $done = false;
+    if ($done) return; $done = true;
+    try {
+        db()->exec("CREATE TABLE IF NOT EXISTS form_tokens (
+            token VARCHAR(64) PRIMARY KEY, used_at VARCHAR(30) DEFAULT '')");
+    } catch (Throwable $e) {}
+}
+// True the first time a ticket is presented, false for every replay of it.
+function form_token_spend($token) {
+    $token = trim((string)$token);
+    if ($token === '' || strlen($token) > 64) return true;   // no ticket: behave as before
+    try {
+        db()->prepare("INSERT INTO form_tokens (token, used_at) VALUES (?, ?)")
+            ->execute([$token, date('c')]);
+    } catch (Throwable $e) {
+        return false;   // primary-key clash: this exact submission has been through already
+    }
+    // Keep the table from growing without bound; a ticket older than a day
+    // cannot be replayed by anything we care about.
+    try {
+        if (random_int(1, 200) === 1)
+            db()->prepare("DELETE FROM form_tokens WHERE used_at < ?")
+                ->execute([date('c', time() - 86400)]);
+    } catch (Throwable $e) {}
+    return true;
+}
