@@ -306,6 +306,27 @@ table.dt th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:va
 table.dt tbody tr:hover{background:var(--soft)}
 table.dt td.num,table.dt th.num{text-align:right;font-variant-numeric:tabular-nums}
 
+/* ---- Editable grids (quote lines, site list, any data-entry table) --------
+   A table of inputs was unreadable: fields collapsed to the column width, so a
+   dropdown showed one character and a text box could not be read while typing.
+   Give the cells room, stop the table squeezing them, and make the controls
+   full height. The wrapper still scrolls sideways, which is what should give. */
+table.dt.qlines{min-width:1500px;table-layout:auto}
+table.dt.qlines th,table.dt.qlines td{padding:8px 8px;vertical-align:top}
+table.dt.qlines .form-control{min-width:100%;height:38px;font-size:13.5px;padding:7px 9px}
+table.dt.qlines textarea.form-control{height:auto}
+table.dt.qlines select.form-control{padding-right:26px;text-overflow:ellipsis}
+table.dt.qlines td.num{vertical-align:middle;font-weight:600}
+/* Row-remove buttons stay put rather than stretching with the row. */
+table.dt.qlines .btn.small{white-space:nowrap}
+/* The pick-many boxes (inspection types, executing offices) scroll rather than
+   pushing the rest of the form off the screen. */
+.pickbox{max-height:190px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius-sm);
+  padding:8px;background:var(--card);margin:4px 0 0}
+.pickbox .ff-check{display:inline-flex;align-items:center;gap:6px;margin:3px 10px 3px 0;font-size:13px;white-space:nowrap}
+/* A disabled field must look disabled, not merely be unresponsive. */
+.form-control:disabled{background:var(--soft);color:var(--muted);cursor:not-allowed}
+
 /* ---- Summary count chips above list tables ---- */
 .chip-row{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 6px}
 .chip-row .ct{display:inline-flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);

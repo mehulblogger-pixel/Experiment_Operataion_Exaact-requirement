@@ -229,6 +229,29 @@ function crm_ensure_schema() {
             fields MEDIUMTEXT, document_number VARCHAR(80) DEFAULT '', format_number VARCHAR(80) DEFAULT '',
             doc_revision VARCHAR(40) DEFAULT '', issue_date VARCHAR(20) DEFAULT '',
             active INT DEFAULT 1, is_default INT DEFAULT 0, created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
+
+        // A quote can cover several sites. Each is a full address, not a text box,
+        // and each line item points at one of them.
+        "CREATE TABLE IF NOT EXISTS quote_locations (
+            id $pk, quote_id INT, label VARCHAR(150) DEFAULT '', location_type VARCHAR(20) DEFAULT 'SITE',
+            line1 VARCHAR(255) DEFAULT '', line2 VARCHAR(255) DEFAULT '', city VARCHAR(120) DEFAULT '',
+            state VARCHAR(120) DEFAULT '', pincode VARCHAR(15) DEFAULT '', country VARCHAR(80) DEFAULT 'India',
+            contact_name VARCHAR(150) DEFAULT '', contact_mobile VARCHAR(40) DEFAULT '',
+            office_id INT NULL, sort_order INT DEFAULT 0)",
+
+        // Everything filed against a quote: our own format, general attachments,
+        // the client's PO and any inspection documents that must reach the engineer.
+        "CREATE TABLE IF NOT EXISTS quote_files (
+            id $pk, quote_id INT, kind VARCHAR(20) DEFAULT 'ATTACHMENT', file_name VARCHAR(200) DEFAULT '',
+            mime VARCHAR(100) DEFAULT '', file_data MEDIUMTEXT, note VARCHAR(255) DEFAULT '',
+            share_with_inspector INT DEFAULT 1, uploaded_by VARCHAR(150) DEFAULT '', uploaded_at VARCHAR(30) DEFAULT '')",
+
+        // A closed quote is locked. Re-opening it is a request the Super Admin grants.
+        "CREATE TABLE IF NOT EXISTS quote_edit_requests (
+            id $pk, quote_id INT, requested_by VARCHAR(150) DEFAULT '', requested_by_id INT NULL,
+            reason VARCHAR(500) DEFAULT '', status VARCHAR(20) DEFAULT 'PENDING',
+            decided_by VARCHAR(150) DEFAULT '', decided_at VARCHAR(30) DEFAULT '', decision_note VARCHAR(400) DEFAULT '',
+            expires_at VARCHAR(30) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
     ];
     foreach ($t as $sql) $pdo->exec($sql);
 }
@@ -251,6 +274,106 @@ function crm_migrate() {
     // A quote line, a rate card and a PO line all charge in the same units, so
     // they now share one list — rewrite the old per-module codes.
     crm_migrate_charge_units();
+
+    if (function_exists('ensure_column')) {
+        // Where the quote came from: our own, or a client / tender portal that we
+        // still want in the register (§xv).
+        ensure_column('quotations', 'origin', "VARCHAR(20) DEFAULT 'OWN'");
+        ensure_column('quotations', 'origin_portal', "VARCHAR(150) DEFAULT ''");
+        ensure_column('quotations', 'origin_ref', "VARCHAR(120) DEFAULT ''");
+        // Types of inspection requested — the same master the call uses.
+        ensure_column('quotations', 'inspection_types', "VARCHAR(600) DEFAULT ''");
+        ensure_column('quotations', 'product_category', "VARCHAR(150) DEFAULT ''");
+        // Terms & conditions: seeded from the company default, editable per quote.
+        ensure_column('quotations', 'terms_conditions', 'TEXT');
+        // Work can be executed by more than one office (CSV of office ids); the
+        // header office stays as the primary/owning one.
+        ensure_column('quotations', 'exec_office_ids', "VARCHAR(200) DEFAULT ''");
+        // Rejection is a first-class outcome, with who and why.
+        ensure_column('quotations', 'rejected_by', "VARCHAR(150) DEFAULT ''");
+        ensure_column('quotations', 'rejected_at', "VARCHAR(30) DEFAULT ''");
+        ensure_column('quotations', 'reject_remarks', "VARCHAR(500) DEFAULT ''");
+        // Closed quotes are locked; a granted edit request unlocks one.
+        ensure_column('quotations', 'locked', 'INT DEFAULT 0');
+        ensure_column('quotations', 'unlocked_until', "VARCHAR(30) DEFAULT ''");
+        // The signatory whose stored signature is stamped on the PDF.
+        ensure_column('quotations', 'signatory_user_id', 'INT NULL');
+        // Client PO captured at acceptance.
+        ensure_column('quotations', 'po_number', "VARCHAR(80) DEFAULT ''");
+        ensure_column('quotations', 'po_date', "VARCHAR(20) DEFAULT ''");
+        ensure_column('quotations', 'submitted_at', "VARCHAR(30) DEFAULT ''");
+        // Per-line: which office executes, which site, and the activity under the SBU.
+        ensure_column('quote_lines', 'office_id', 'INT NULL');
+        ensure_column('quote_lines', 'location_id', 'INT NULL');
+        ensure_column('quote_lines', 'activity_id', 'INT NULL');
+        // Follow-ups become editable and can carry a note of what happened.
+        ensure_column('quote_followups', 'done_date', "VARCHAR(20) DEFAULT ''");
+        ensure_column('quote_followups', 'note', "VARCHAR(500) DEFAULT ''");
+        ensure_column('quote_followups', 'owner_id', 'INT NULL');
+    }
+    // Payment terms are a master, not free text (§vi).
+    if (function_exists('lk_ensure_type_map')) {
+        lk_ensure_type_map('payment_term', 'Payment term', PAYMENT_TERMS, 'Sales');
+        lk_ensure_values_from_map('payment_term', PAYMENT_TERMS);
+        lk_ensure_type_map('quote_origin', 'Quote origin', QUOTE_ORIGINS, 'Sales');
+        lk_ensure_type_map('site_location_type', 'Site location type', SITE_LOCATION_TYPES, 'Sales');
+    }
+    crm_backfill_locations();
+}
+
+// Payment terms, elaborated and fully editable under Masters.
+const PAYMENT_TERMS = [
+    'ADV100'    => '100% advance',
+    'ADV50'     => '50% advance, balance against report',
+    'ADV25'     => '25% advance, balance against report',
+    'AGAINST_REPORT' => 'Against submission of report',
+    'AGAINST_INV'    => 'Against invoice',
+    'NET7'      => '7 days from invoice',
+    'NET10'     => '10 days from invoice',
+    'NET15'     => '15 days from invoice',
+    'NET21'     => '21 days from invoice',
+    'NET30'     => '30 days from invoice',
+    'NET45'     => '45 days from invoice',
+    'NET60'     => '60 days from invoice',
+    'NET90'     => '90 days from invoice',
+    'MILESTONE' => 'Milestone-linked',
+    'PROFORMA'  => 'Against proforma invoice',
+    'LC'        => 'Letter of credit',
+    'OTHER'     => 'Other (see terms)',
+];
+// Where a quote came from. Not every quote is ours — some are submitted straight
+// into a client or tender portal and still belong in the register (§xv).
+const QUOTE_ORIGINS = [
+    'OWN'           => 'Our quotation',
+    'CLIENT_PORTAL' => "Client's portal",
+    'TENDER_PORTAL' => 'Tender / e-procurement portal',
+    'EMAIL_ONLY'    => 'Submitted by e-mail only',
+    'OTHER'         => 'Other',
+];
+const SITE_LOCATION_TYPES = [
+    'SITE'       => 'Project site',
+    'WORKS'      => 'Manufacturer works',
+    'REGISTERED' => 'Registered office',
+    'CORPORATE'  => 'Corporate office',
+    'PLANT'      => 'Plant',
+    'WAREHOUSE'  => 'Warehouse',
+    'PORT'       => 'Port / yard',
+    'LAB'        => 'Laboratory',
+    'OTHER'      => 'Other',
+];
+// Quotes written before the address book existed kept a single text location.
+// Carry it across so nothing is lost, once, per quote.
+function crm_backfill_locations() {
+    try {
+        $rows = ops_all("SELECT id, site_location, location_type FROM quotations
+                         WHERE site_location <> '' AND id NOT IN (SELECT quote_id FROM quote_locations)");
+    } catch (Throwable $e) { return; }
+    foreach ($rows as $r) {
+        try {
+            db()->prepare("INSERT INTO quote_locations (quote_id,label,location_type,line1,sort_order) VALUES (?,?,?,?,0)")
+                ->execute([$r['id'], 'Site', $r['location_type'] ?: 'SITE', $r['site_location']]);
+        } catch (Throwable $e) {}
+    }
 }
 
 // ---- Small helpers ---------------------------------------------------------
@@ -276,18 +399,216 @@ function crm_quote_recalc($qid) {
 function crm_save_lines($qid, $b) {
     db()->prepare("DELETE FROM quote_lines WHERE quote_id=?")->execute([(int)$qid]);
     $desc = (array)($b['l_desc'] ?? []); $svc = (array)($b['l_service'] ?? []); $sbu = (array)($b['l_sbu'] ?? []);
-    $loc = (array)($b['l_loc'] ?? []); $lt = (array)($b['l_loctype'] ?? []); $ot = (array)($b['l_order'] ?? []);
+    $ot = (array)($b['l_order'] ?? []);
     $qty = (array)($b['l_qty'] ?? []); $unit = (array)($b['l_unit'] ?? []); $rate = (array)($b['l_rate'] ?? []);
     $sub = (array)($b['l_subtypes'] ?? []); $del = (array)($b['l_deliv'] ?? []);
-    $ins = db()->prepare("INSERT INTO quote_lines (quote_id,line_no,sbu,service_type,subtypes,description,location,location_type,order_type,qty,unit,rate,amount,deliverables) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $act = (array)($b['l_activity'] ?? []); $off = (array)($b['l_office'] ?? []); $lid = (array)($b['l_location'] ?? []);
+    // Site is chosen from the quote's address book; the text copy is kept so the
+    // Word/PDF output and older reports still have something to print.
+    $locs = crm_quote_locations((int)$qid);
+    $byId = []; foreach ($locs as $L) $byId[(int)$L['id']] = $L;
+    $ins = db()->prepare("INSERT INTO quote_lines (quote_id,line_no,sbu,service_type,subtypes,description,location,location_type,order_type,qty,unit,rate,amount,deliverables,office_id,location_id,activity_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
     $n = 0;
     foreach ($desc as $i => $d) {
         $d = trim((string)$d); $sv = trim((string)($svc[$i] ?? ''));
         if ($d === '' && $sv === '') continue;                         // skip blank rows
         $qv = (float)($qty[$i] ?? 0); $rv = (float)($rate[$i] ?? 0);
+        $locId = (int)($lid[$i] ?? 0) ?: null;
+        $L = $locId && isset($byId[$locId]) ? $byId[$locId] : null;
         $ins->execute([(int)$qid, $n++, $sbu[$i] ?? '', $sv, trim((string)($sub[$i] ?? '')), $d,
-            trim((string)($loc[$i] ?? '')), $lt[$i] ?? 'REGISTERED', $ot[$i] ?? 'LINE', $qv, $unit[$i] ?? 'DAY', $rv, round($qv * $rv, 2), trim((string)($del[$i] ?? ''))]);
+            $L ? quote_location_line($L) : '', $L ? $L['location_type'] : 'SITE',
+            $ot[$i] ?? 'LINE', $qv, $unit[$i] ?? 'MANDAY', $rv, round($qv * $rv, 2), trim((string)($del[$i] ?? '')),
+            (int)($off[$i] ?? 0) ?: null, $locId, (int)($act[$i] ?? 0) ?: null]);
     }
+}
+
+// ---------------------------------------------------------------------------
+//  Product category — typed freely, but unified automatically (§xxv).
+//
+//  People type "transformer", "Transformers", "trasnformer". All three must land
+//  on the same category, or the office-wise analysis is meaningless. Matching is
+//  in three passes: exact (case/space-insensitive), singular/plural, then edit
+//  distance. Only a close match wins; anything else becomes a new category, so a
+//  genuinely new product is never silently merged into the wrong one.
+// ---------------------------------------------------------------------------
+function product_category_canon($raw) {
+    $raw = trim(preg_replace('/\s+/', ' ', (string)$raw));
+    if ($raw === '') return '';
+    $known = product_categories_all();
+    $norm = fn($s) => strtolower(preg_replace('/[^a-z0-9]+/i', '', $s));
+    $n = $norm($raw);
+    foreach ($known as $k) if ($norm($k) === $n) return $k;                       // exact
+    $sing = fn($s) => preg_replace('/(ies|es|s)$/i', '', $s);
+    $ns = $norm($sing($raw));
+    foreach ($known as $k) if ($norm($sing($k)) === $ns) return $k;               // plural
+    $best = null; $bestD = PHP_INT_MAX;
+    foreach ($known as $k) {
+        $d = levenshtein($n, $norm($k));
+        if ($d < $bestD) { $bestD = $d; $best = $k; }
+    }
+    // Allow roughly one typo per five characters, and never on very short words.
+    $tol = (int)floor(max(strlen($n), 1) / 5);
+    if ($best !== null && strlen($n) >= 4 && $bestD <= max(1, $tol)) return $best;
+    return ucfirst($raw);   // genuinely new — keep what they typed
+}
+// Every category already in use, from the master list and from what people have
+// typed. Office-scoped for the people who work in one office; cumulative for
+// anyone whose access spans offices (SBU heads, directors) — §xxv.
+function product_categories_all() {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $out = array_values(lk_options_or('product_category', PRODUCT_CATS));
+    try {
+        $where = ''; $args = [];
+        if (function_exists('scope_clause')) {
+            [$w, $a] = scope_clause('office_id', 'sbu');
+            if ($w && $w !== '1=1') { $where = " AND ($w)"; $args = $a; }
+        }
+        foreach (ops_all("SELECT DISTINCT product_category FROM quotations WHERE product_category <> ''$where", $args) as $r)
+            $out[] = $r['product_category'];
+    } catch (Throwable $e) {}
+    $seen = []; $uniq = [];
+    foreach ($out as $v) { $k = strtolower(preg_replace('/[^a-z0-9]+/i', '', $v)); if ($k === '' || isset($seen[$k])) continue; $seen[$k] = 1; $uniq[] = $v; }
+    sort($uniq);
+    return $cache = $uniq;
+}
+
+// ---- Terms & conditions (§xviii) -------------------------------------------
+// One company default, carried onto every new quote and editable there.
+function crm_default_terms() {
+    $t = setting_get('quote_terms', '');
+    if ($t !== '' && $t !== null) return $t;
+    return "1. This quotation is valid for the period stated above.\n"
+         . "2. Rates are exclusive of taxes; GST is charged as applicable.\n"
+         . "3. Man-day means one inspector for one working day of up to " . (function_exists('hours_cap_disp') ? hours_cap_disp() : '8.5') . " hours.\n"
+         . "4. Travel, boarding and lodging at actuals unless stated otherwise.\n"
+         . "5. Waiting or idle time at the works is chargeable at the quoted man-day rate.\n"
+         . "6. Cancellation within 24 hours of the scheduled visit is chargeable in full.\n"
+         . "7. Reports are issued after receipt of payment where so agreed.\n"
+         . "8. Inspection is carried out to the agreed scope, specification and standard only.\n"
+         . "9. Any statutory approval or third-party endorsement is not included unless stated.\n"
+         . "10. Jurisdiction for any dispute is the location of our registered office.";
+}
+// People whose stored signature may be stamped on a quote PDF (§xx).
+function crm_signatories() {
+    try {
+        return ops_all("SELECT id, username, first_name, last_name, role FROM users
+                        WHERE is_active=1 AND signature <> '' ORDER BY first_name, username");
+    } catch (Throwable $e) { return []; }
+}
+// The types of inspection this client actually buys — used to narrow the picker
+// the same way the call screen does (§v).
+function crm_client_inspection_types() {
+    $out = [];
+    try {
+        foreach (ops_all("SELECT id, inspection_types FROM business_partners WHERE is_client=1 AND inspection_types <> ''") as $r)
+            $out[(int)$r['id']] = array_values(array_filter(explode(',', $r['inspection_types'])));
+    } catch (Throwable $e) {}
+    return $out;
+}
+// Contact details to prefill when a client is chosen (§ii).
+function crm_client_contacts($cid) {
+    if (!$cid) return [];
+    try {
+        return ops_all("SELECT name, designation, email, mobile, phone, is_primary FROM partner_contacts
+                        WHERE partner_id=? ORDER BY is_primary DESC, name", [(int)$cid]);
+    } catch (Throwable $e) { return []; }
+}
+// Addresses on file for a client, offered as a starting point for the site list.
+function crm_client_addresses($cid) {
+    if (!$cid) return [];
+    try {
+        return ops_all("SELECT address_type, label, line1, line2, city, state, pincode, country
+                        FROM partner_addresses WHERE partner_id=? ORDER BY is_primary DESC, id", [(int)$cid]);
+    } catch (Throwable $e) { return []; }
+}
+
+// ---- Change log (§xxi) ------------------------------------------------------
+// Every save appends to the same history the revisions use, so "what changed"
+// and "the final copy" are answered from one place.
+function crm_log_change($qid, $summary, $detail = null) {
+    $q = crm_quote_get((int)$qid); if (!$q) return;
+    $base = (int)($q['parent_id'] ?: $q['id']);
+    $snap = $detail ?? ['header' => $q, 'lines' => crm_quote_lines($q['id']), 'locations' => crm_quote_locations($q['id'])];
+    try {
+        db()->prepare("INSERT INTO quote_revisions (quote_id,rev,changed_by,changed_at,summary,snapshot) VALUES (?,?,?,?,?,?)")
+            ->execute([$base, (int)$q['rev'], user_name(current_user()), date('c'), $summary, json_encode($snap)]);
+    } catch (Throwable $e) {}
+}
+// Field-by-field difference between two snapshots, in plain English.
+function crm_diff_snapshots($oldSnap, $newSnap) {
+    $o = is_array($oldSnap) ? ($oldSnap['header'] ?? []) : [];
+    $n = is_array($newSnap) ? ($newSnap['header'] ?? []) : [];
+    $skip = ['updated_at' => 1, 'created_at' => 1, 'id' => 1, 'subtotal' => 1, 'gst_amount' => 1];
+    $out = [];
+    foreach ($n as $k => $v) {
+        if (isset($skip[$k])) continue;
+        $ov = $o[$k] ?? null;
+        if ((string)$ov === (string)$v) continue;
+        $out[] = ['field' => $k, 'from' => (string)$ov, 'to' => (string)$v];
+    }
+    return $out;
+}
+
+// ---- Locking a closed quote (§xix) -----------------------------------------
+// Accepted or lost quotes are read-only. The Super Admin can grant a time-boxed
+// unlock, and only in answer to a request raised in the system.
+function quote_is_locked($q) {
+    if (!$q) return false;
+    if (is_master()) return false;
+    $closed = in_array($q['status'] ?? '', ['ACCEPTED', 'LOST'], true);
+    if (!$closed) return false;
+    $until = $q['unlocked_until'] ?? '';
+    if ($until !== '' && strtotime($until) > time()) return false;   // an unlock is live
+    return true;
+}
+function quote_edit_request_open($qid) {
+    return ops_one("SELECT * FROM quote_edit_requests WHERE quote_id=? AND status='PENDING' ORDER BY id DESC", [(int)$qid]);
+}
+
+// ---- Sites (§iv, §viii, §xi) ----------------------------------------------
+function crm_quote_locations($qid) {
+    return $qid ? ops_all("SELECT * FROM quote_locations WHERE quote_id=? ORDER BY sort_order, id", [(int)$qid]) : [];
+}
+// One-line rendering of an address, for tables, the PDF and the ops packet.
+function quote_location_line($L) {
+    $parts = array_filter([$L['line1'] ?? '', $L['line2'] ?? '', $L['city'] ?? '',
+        trim(($L['state'] ?? '') . ' ' . ($L['pincode'] ?? '')), $L['country'] ?? ''], fn($x) => trim((string)$x) !== '');
+    return implode(', ', array_map('trim', $parts));
+}
+function quote_location_label($L) {
+    $t = lk_options_or('site_location_type', SITE_LOCATION_TYPES)[$L['location_type'] ?? ''] ?? ($L['location_type'] ?? '');
+    return trim(($L['label'] ?: $t) . ($L['city'] ? ' — ' . $L['city'] : ''));
+}
+function crm_save_locations($qid, $b) {
+    $qid = (int)$qid;
+    $ids = (array)($b['loc_id'] ?? []); $lab = (array)($b['loc_label'] ?? []);
+    $lt = (array)($b['loc_type'] ?? []); $l1 = (array)($b['loc_line1'] ?? []); $l2 = (array)($b['loc_line2'] ?? []);
+    $city = (array)($b['loc_city'] ?? []); $st = (array)($b['loc_state'] ?? []); $pin = (array)($b['loc_pin'] ?? []);
+    $ctry = (array)($b['loc_country'] ?? []); $cn = (array)($b['loc_contact'] ?? []); $cm = (array)($b['loc_mobile'] ?? []);
+    $off = (array)($b['loc_office'] ?? []);
+    $keep = [];
+    $upd = db()->prepare("UPDATE quote_locations SET label=?,location_type=?,line1=?,line2=?,city=?,state=?,pincode=?,country=?,contact_name=?,contact_mobile=?,office_id=?,sort_order=? WHERE id=? AND quote_id=?");
+    $ins = db()->prepare("INSERT INTO quote_locations (quote_id,label,location_type,line1,line2,city,state,pincode,country,contact_name,contact_mobile,office_id,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $n = 0;
+    foreach ($l1 as $i => $line1) {
+        $line1 = trim((string)$line1); $c = trim((string)($city[$i] ?? ''));
+        if ($line1 === '' && $c === '' && trim((string)($lab[$i] ?? '')) === '') continue;  // skip blank rows
+        $args = [trim((string)($lab[$i] ?? '')), $lt[$i] ?? 'SITE', $line1, trim((string)($l2[$i] ?? '')), $c,
+            trim((string)($st[$i] ?? '')), trim((string)($pin[$i] ?? '')), trim((string)($ctry[$i] ?? '')) ?: 'India',
+            trim((string)($cn[$i] ?? '')), trim((string)($cm[$i] ?? '')), (int)($off[$i] ?? 0) ?: null, $n++];
+        $existing = (int)($ids[$i] ?? 0);
+        if ($existing) { $upd->execute(array_merge($args, [$existing, $qid])); $keep[] = $existing; }
+        else { $ins->execute(array_merge([$qid], $args)); $keep[] = (int)db()->lastInsertId(); }
+    }
+    // Anything the user removed from the form goes, and lines pointing at it are freed.
+    $all = ops_all("SELECT id FROM quote_locations WHERE quote_id=?", [$qid]);
+    foreach ($all as $r) {
+        if (in_array((int)$r['id'], $keep, true)) continue;
+        db()->prepare("UPDATE quote_lines SET location_id=NULL WHERE location_id=?")->execute([(int)$r['id']]);
+        db()->prepare("DELETE FROM quote_locations WHERE id=?")->execute([(int)$r['id']]);
+    }
+    return $keep;
 }
 // Schedule the §11 follow-up cadence (3/6/9 days, fortnight, month) from the sent date.
 function crm_schedule_followups($qid) {
@@ -368,17 +689,51 @@ function ops_crm_quotes($route, $method) {
         }
         view('ops/crm/quote_list', ['rows' => $rows, 'view' => $view, 'q' => $qq, 'counts' => $counts]); return;
     }
+    // §ii — contact + addresses for the client just picked on the quote form.
+    if ($route === 'quote-client') {
+        header('Content-Type: application/json');
+        $cid = (int)($_GET['id'] ?? 0);
+        $contacts = crm_client_contacts($cid);
+        $primary = $contacts[0] ?? null;
+        echo json_encode([
+            'contact' => $primary ? [
+                'name'   => $primary['name'] ?? '',
+                'email'  => $primary['email'] ?? '',
+                'mobile' => ($primary['mobile'] ?? '') ?: ($primary['phone'] ?? ''),
+            ] : null,
+            'contacts'  => $contacts,
+            'addresses' => crm_client_addresses($cid),
+        ]);
+        return;
+    }
     if ($route === 'quote-new' || $route === 'quote-edit') {
         ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master(), 'You cannot create or edit quotations.');
         $q = null;
-        if ($route === 'quote-edit') { $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; } }
+        if ($route === 'quote-edit') {
+            $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
+            // §xix — an accepted or lost quote is read-only until an unlock is granted.
+            if (quote_is_locked($q)) {
+                flash('This ' . Tl('quote') . ' is ' . strtolower(lk_options_or('quote_status', QUOTE_STATUS)[$q['status']] ?? $q['status'])
+                    . ' and is locked. Raise a re-edit request from the ' . Tl('quote') . ' page — only the Super Admin can grant it.', 'error');
+                redirect('/quote?id=' . $q['id']);
+            }
+        }
         if ($method === 'POST') {
             $b = $_POST;
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
+            // §i — when a client is picked, the free-text name is ignored entirely.
             $hdr = [
                 'client_id' => $cid, 'client_name' => $cid ? crm_client_name($cid) : trim($b['client_name'] ?? ''),
                 'contact_name' => trim($b['contact_name'] ?? ''), 'contact_email' => trim($b['contact_email'] ?? ''), 'contact_mobile' => trim($b['contact_mobile'] ?? ''),
                 'sbu' => $b['sbu'] ?? '', 'office_id' => ($b['office_id'] ?? '') !== '' ? (int)$b['office_id'] : null, 'subject' => trim($b['subject'] ?? ''),
+                // Executing offices: the header office is primary, plus any others (§iii).
+                'exec_office_ids' => implode(',', array_map('intval', array_filter((array)($b['exec_office_ids'] ?? [])))),
+                'inspection_types' => implode(',', array_filter((array)($b['inspection_types'] ?? []))),
+                'product_category' => product_category_canon($b['product_category'] ?? ''),
+                'origin' => $b['origin'] ?? 'OWN', 'origin_portal' => trim($b['origin_portal'] ?? ''),
+                'origin_ref' => trim($b['origin_ref'] ?? ''),
+                'terms_conditions' => (string)($b['terms_conditions'] ?? ''),
+                'signatory_user_id' => ($b['signatory_user_id'] ?? '') !== '' ? (int)$b['signatory_user_id'] : null,
                 'site_location' => trim($b['site_location'] ?? ''), 'location_type' => $b['location_type'] ?? 'REGISTERED',
                 'currency' => $b['currency'] ?? 'INR', 'validity_days' => (int)($b['validity_days'] ?? 30),
                 'payment_terms' => trim($b['payment_terms'] ?? ''), 'advance_pct' => (float)($b['advance_pct'] ?? 0),
@@ -388,8 +743,11 @@ function ops_crm_quotes($route, $method) {
             if ($q) {
                 $set = implode(',', array_map(fn($k) => "$k=?", array_keys($hdr)));
                 $pdo->prepare("UPDATE quotations SET $set, updated_at=? WHERE id=?")->execute(array_merge(array_values($hdr), [date('c'), $q['id']]));
+                // Sites first — line items point at them by id.
+                crm_save_locations($q['id'], $b);
                 crm_save_lines($q['id'], $b); crm_quote_recalc($q['id']);
-                flash('Quotation saved.'); redirect('/quote?id=' . $q['id']);
+                crm_log_change($q['id'], 'Edited');
+                flash(ucfirst(Tl('quote')) . ' saved.'); redirect('/quote?id=' . $q['id']);
             } else {
                 $no = crm_next_quote_no();
                 $inqId = ($b['inquiry_id'] ?? '') !== '' ? (int)$b['inquiry_id'] : null;
@@ -398,6 +756,7 @@ function ops_crm_quotes($route, $method) {
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO quotations (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
+                crm_save_locations($id, $b);
                 crm_save_lines($id, $b); crm_quote_recalc($id);
                 if ($inqId) $pdo->prepare("UPDATE crm_inquiries SET status='QUOTED' WHERE id=?")->execute([$inqId]);
                 flash("$no created."); redirect('/quote?id=' . $id);
@@ -405,9 +764,15 @@ function ops_crm_quotes($route, $method) {
         }
         $preInq = (!$q && ($_GET['inquiry'] ?? '') !== '') ? crm_inquiry_get((int)$_GET['inquiry']) : null;
         view('ops/crm/quote_form', ['q' => $q, 'lines' => $q ? crm_quote_lines($q['id']) : [], 'preInq' => $preInq,
+            'locations' => $q ? crm_quote_locations($q['id']) : [],
             'clients' => clients_list(), 'offices' => offices_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
-            'svcOpts' => lk_options_or('inspection_type', INSPECTION_TYPES), 'unitOpts' => QUOTE_UNITS,
-            'orderOpts' => ORDER_TYPES, 'locTypes' => QUOTE_LOCATION_TYPES, 'delivOpts' => deliverable_options()]);
+            'svcOpts' => lk_options_or('inspection_type', INSPECTION_TYPES), 'unitOpts' => lk_options_or('charge_unit', CHARGE_UNITS),
+            'orderOpts' => lk_options_or('order_type', ORDER_TYPES), 'locTypes' => lk_options_or('site_location_type', SITE_LOCATION_TYPES),
+            'payTerms' => lk_options_or('payment_term', PAYMENT_TERMS), 'origins' => lk_options_or('quote_origin', QUOTE_ORIGINS),
+            'actBySbu' => activity_options_by_sbu(), 'prodCats' => product_categories_all(),
+            'signatories' => crm_signatories(), 'defaultTerms' => crm_default_terms(),
+            'clientTypes' => crm_client_inspection_types(),
+            'delivOpts' => deliverable_options()]);
         return;
     }
     if ($route === 'quote') {
