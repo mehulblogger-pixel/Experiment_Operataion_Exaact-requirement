@@ -33,7 +33,11 @@ Status: 1 ✅ 2 ✅ 3 ✅ 4 ✅ 5 ✅ — ALL SHIPPED. (availability board, 8.5h
 reporting chain + hierarchy + CRM REPORTS_TO approval routing + inspection report sign-off,
 grouped exhaustive permissions + one-click recommended-per-role presets.)
 
-Then: dashboards for all roles (NEXT).
+Follow-on requests (2026-07) — ALL SHIPPED:
+- Working weekly hours/days per designation per office → work_norms master + inheritance ✅
+- Automate reporting → overdue-report escalation to reporting manager + weekly/monthly MIS digest ✅
+- Dashboards for all roles → executive strategic board (FY revenue + YoY + target + top clients +
+  sales won) added on top of the existing role-based section ordering ✅
 
 
 ## 🧭 NEXT BIG BUILD — CRM / Marketing & Sales module (roadmap pending owner approval, 2026-07)

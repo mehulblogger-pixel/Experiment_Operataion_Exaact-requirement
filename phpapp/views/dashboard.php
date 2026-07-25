@@ -205,9 +205,55 @@
       <?php $secCrm = ob_get_clean();
     }
 
+    // ---------- section: executive strategic board (directors / SBU heads / branch mgr) ----------
+    $secExec = '';
+    if ($isExec && can('data.credit')) {
+      [$ew, $ea] = scope_clause('j.executing_office_id', 'j.sbu');
+      $fyCur = current_fy(); [$cf, $ct] = fy_range($fyCur);
+      $nf = date('Y-m-d', strtotime($cf . ' +1 year'));           // start of next FY (half-open upper bound)
+      $fyPrev = fy_of(date('Y-m-d', strtotime($cf . ' -1 day'))); [$pf, ] = fy_range($fyPrev);
+      // revenue date = inspection end, else scheduled, else creation
+      $rd = "COALESCE(NULLIF(j.inspection_end_date,''), NULLIF(j.scheduled_date,''), j.created_at)";
+      $revCur  = (float)ops_val("SELECT COALESCE(SUM(j.expected_credit),0) FROM jobs j WHERE $rd>=? AND $rd<? AND $ew", array_merge([$cf, $nf], $ea));
+      $revPrev = (float)ops_val("SELECT COALESCE(SUM(j.expected_credit),0) FROM jobs j WHERE $rd>=? AND $rd<? AND $ew", array_merge([$pf, $cf], $ea));
+      $yoy = $revPrev > 0 ? round(($revCur - $revPrev) / $revPrev * 100) : null;
+      $target = (float)(setting_get('fy_revenue_target', '') ?: 0);
+      $closedFy = (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=1 AND $rd>=? AND $rd<? AND $ew", array_merge([$cf, $nf], $ea));
+      $topClients = ops_all("SELECT COALESCE(bp.display_name, bp.legal_name, '—') client, COALESCE(SUM(j.expected_credit),0) v
+          FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
+          WHERE $rd>=? AND $rd<? AND $ew GROUP BY client ORDER BY v DESC", array_merge([$cf, $nf], $ea));
+      $topClients = array_values(array_filter($topClients, fn($r)=>(float)$r['v']>0));
+      $tcMax = $topClients ? max(array_map(fn($r)=>(float)$r['v'], $topClients)) : 0;
+      ob_start(); ?>
+      <div class="ctitle" style="margin-top:20px"><h3>Business overview — FY <?= e($fyCur) ?></h3><a href="/reports">Insights →</a></div>
+      <div class="kpi-row">
+        <div class="kpi"><span class="kic">📈</span><div class="k">Revenue booked (FY)</div><div class="v"><?= fmoney_short($revCur) ?></div><div class="d"><?php if ($yoy!==null): ?><span class="<?= $yoy>=0?'up':'down' ?>"><?= $yoy>=0?'▲':'▼' ?> <?= abs($yoy) ?>% YoY</span><?php else: ?>vs <?= fmoney_short($revPrev) ?> last FY<?php endif; ?></div></div>
+        <?php if ($target>0): $prog = min(100, round($revCur/$target*100)); ?>
+        <div class="kpi"><span class="kic">🎯</span><div class="k">Against target</div><div class="v"><?= $prog ?>%</div><div class="d"><?= fmoney_short($target) ?> target</div></div>
+        <?php else: ?>
+        <div class="kpi"><span class="kic">✅</span><div class="k">Jobs delivered (FY)</div><div class="v"><?= $closedFy ?></div><div class="d">closed this FY</div></div>
+        <?php endif; ?>
+        <?php if ($crmView): ?>
+        <div class="kpi"><span class="kic">🏆</span><div class="k">Sales won (FY)</div><div class="v"><?= fmoney_short($qs['won_val'] ?? 0) ?></div><div class="d"><?= (int)($qs['won_n'] ?? 0) ?> quote(s) · <?= $winRate ?? 0 ?>% win</div></div>
+        <?php endif; ?>
+        <div class="kpi"><span class="kic">🗂</span><div class="k">Open jobs now</div><div class="v"><a href="/jobs?status=open"><?= $openJobs ?></a></div><div class="d"><?= $overdue ? '<span class="down">'.$overdue.' overdue</span>' : 'on track' ?></div></div>
+      </div>
+      <?php if ($topClients): ?>
+      <div class="panel" style="margin-top:12px">
+        <div class="ctitle"><h3>Top clients by revenue — FY <?= e($fyCur) ?></h3><a href="/reports">All →</a></div>
+        <div class="hbars">
+          <?php foreach (array_slice($topClients,0,6) as $b): $w = $tcMax ? round((float)$b['v']/$tcMax*100) : 0; ?>
+            <div class="hbar"><span><?= e($b['client']) ?></span><span class="track"><span class="fill" style="width:<?= $w ?>%"></span></span><span class="val"><?= fmoney_short($b['v']) ?></span></div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+      <?php endif;
+      $secExec = ob_get_clean();
+    }
+
     // ---------- role-based ordering ----------
     echo $secKpi;
-    if ($isExec)          { echo $secCrm; echo $secMoney; echo $secCharts; echo $secAvail; echo $secRepAppr; echo $secQuick; echo $secSched; }
+    if ($isExec)          { echo $secExec; echo $secCrm; echo $secMoney; echo $secCharts; echo $secAvail; echo $secRepAppr; echo $secQuick; echo $secSched; }
     elseif (in_array($role, ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'], true))
                           { echo $secCrm; echo $secQuick; echo $secMoney; echo $secCharts; }
     elseif ($moneyFirst)  { echo $secMoney; echo $secCharts; echo $secSched; echo $secAvail; echo $secRepAppr; echo $secQuick; echo $secCrm; }

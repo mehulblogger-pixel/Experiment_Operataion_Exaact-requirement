@@ -69,6 +69,10 @@
       </select><small class="muted">India = April. Current FY = <strong><?= e(current_fy()) ?></strong>.</small></div>
     <div class="ff"><label>On-time TAT threshold (days)</label>
       <input class="form-control" type="number" min="0" name="tat_threshold_days" value="<?= e(setting_get('tat_threshold_days', 3)) ?>"></div>
+    <div class="ff"><label>Annual revenue target (₹) <span class="muted">— shows on the leadership dashboard</span></label>
+      <input class="form-control" type="number" min="0" step="1000" name="fy_revenue_target" value="<?= e(setting_get('fy_revenue_target', '')) ?>" placeholder="e.g. 50000000"></div>
+    <div class="ff"><label>Report-overdue escalation (days) <span class="muted">— then e-mail the reporting manager</span></label>
+      <input class="form-control" type="number" min="1" name="report_escalate_days" value="<?= e(setting_get('report_escalate_days', 3)) ?>"></div>
   </div>
 
   <h3 class="tab-sub">Email — automatic sending (Office 365 SMTP)</h3>
