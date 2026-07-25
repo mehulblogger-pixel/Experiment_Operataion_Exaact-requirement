@@ -133,6 +133,36 @@ function seed_demo() {
         foreach ($vendors as $p) { $insP->execute($p); $vid[$p[0]] = (int)$pdo->lastInsertId(); }
         $c['partners'] = count($clients) + count($vendors);
 
+        // Contacts and a site address for every demo partner. Without these the
+        // engineer's job screen has nobody to ring and nowhere to go, which is
+        // exactly how the inspector view came to look empty and half-built.
+        $insC = $pdo->prepare("INSERT INTO partner_contacts(partner_id,name,designation,department,email,mobile,is_primary) VALUES(?,?,?,?,?,?,?)");
+        $insA = $pdo->prepare("INSERT INTO partner_addresses(partner_id,address_type,label,line1,line2,city,state,pincode,country,is_primary)
+                               VALUES(?,?,?,?,?,?,?,?, 'India', ?)");
+        $people = [
+            ['Rakesh Menon','Purchase Head','PROCUREMENT','9825011001'],
+            ['Sunita Rao','QA Manager','QUALITY','9825011002'],
+            ['Imran Qureshi','Works Manager','PRODUCTION','9825011003'],
+            ['Deepa Balan','Project Engineer','PROJECTS','9825011004'],
+        ];
+        $sites = [
+            ['Plot 42, GIDC Estate','Phase II','Vapi','Gujarat','396195'],
+            ['Survey 118, Mundra SEZ','Near North Gate','Mundra','Gujarat','370421'],
+            ['B-7, MIDC Industrial Area','Chakan','Pune','Maharashtra','410501'],
+            ['Unit 9, Hosur Road','Bommasandra','Bengaluru','Karnataka','560099'],
+        ];
+        $pk = 0;
+        foreach (array_merge(array_values($cid), array_values($vid)) as $pid) {
+            $a = $people[$pk % count($people)];
+            $b = $people[($pk + 1) % count($people)];
+            $mail = fn($n) => strtolower(str_replace(' ', '.', $n)) . '@example.com';
+            $insC->execute([$pid, $a[0], $a[1], $a[2], $mail($a[0]), $a[3], 1]);
+            $insC->execute([$pid, $b[0], $b[1], $b[2], $mail($b[0]), $b[3], 0]);
+            $st = $sites[$pk % count($sites)];
+            $insA->execute([$pid, 'WORKS', 'Works', $st[0], $st[1], $st[2], $st[3], $st[4], 1]);
+            $pk++;
+        }
+
         // ---------- BOSS / contract numbers ----------
         $insB = $pdo->prepare("INSERT INTO boss_numbers(client_id,boss_number,start_date,end_date,status) VALUES(?,?,?,?, 'ACTIVE')");
         $boss = [
