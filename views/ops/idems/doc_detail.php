@@ -22,6 +22,42 @@
 </div>
 <?php endif; ?>
 
+<?php if (!empty($approvals)): ?>
+<div class="panel">
+  <div class="ctitle" style="margin-top:0"><h3>Approval chain</h3></div>
+  <div class="appr-steps">
+    <?php foreach ($approvals as $a):
+      $nm = trim(($a['first_name']??'').' '.($a['last_name']??'')) ?: ($a['username'] ?? '');
+      $target = $nm ?: ($a['approver_role'] ? (ORG_ROLES[$a['approver_role']] ?? $a['approver_role']) : 'Any approver');
+      $sp = ['PENDING'=>'p-warn','APPROVED'=>'p-ok','REJECTED'=>'p-bad','SENTBACK'=>'p-bad','DELEGATED'=>'p-info'][$a['status']] ?? 'p-mut'; ?>
+      <div class="appr-step">
+        <span class="pill <?= $sp ?>">L<?= (int)$a['level'] ?> · <?= e(IDEMS_APPR_STATUS[$a['status']] ?? $a['status']) ?></span>
+        <strong><?= e($target) ?></strong>
+        <?php if ($a['acted_by']): ?><span class="muted">— <?= e($a['acted_by']) ?><?= $a['acted_at']?' · '.e(date('d M H:i', strtotime($a['acted_at']))):'' ?></span><?php endif; ?>
+        <?php if ($a['remarks']): ?><div class="muted" style="font-size:12px">“<?= e($a['remarks']) ?>”</div><?php endif; ?>
+      </div>
+    <?php endforeach; ?>
+  </div>
+  <?php if (!empty($canAct) && !empty($curStep)): ?>
+    <form method="post" action="/document-approve" class="appr-act" style="margin-top:10px">
+      <input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
+      <input class="form-control" name="remarks" placeholder="Remarks (required to reject / send back)" style="margin-bottom:8px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="btn" type="submit" name="decision" value="approve">✓ Approve</button>
+        <button class="btn secondary" type="submit" name="decision" value="sendback">↩ Send back</button>
+        <button class="btn secondary" type="submit" name="decision" value="reject">✕ Reject</button>
+        <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+          <select class="form-control" name="delegate_to" style="max-width:200px"><option value="">Delegate to…</option>
+            <?php foreach (($delegateUsers ?? []) as $u): $un=trim(($u['first_name']??'').' '.($u['last_name']??'')) ?: $u['username']; ?><option value="<?= (int)$u['id'] ?>"><?= e($un) ?></option><?php endforeach; ?>
+          </select>
+          <button class="btn secondary" type="submit" name="decision" value="delegate">Delegate</button>
+        </span>
+      </div>
+    </form>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <div class="panel">
   <div class="kv-grid">
     <div><span class="k">IRN</span><strong><?= e($doc['irn']) ?></strong></div>
