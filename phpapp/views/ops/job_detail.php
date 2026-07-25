@@ -232,15 +232,27 @@
 <div class="panel-split">
   <div class="panel">
     <h3 class="tab-sub">Expenses</h3>
+    <?php // A line recorded twice can now be removed. New duplicates are refused
+          // at submission, but the ones already on file need a way out.
+          $canDropExp = is_coordinator_level() || can('finance.reconcile') || is_master();
+          $seenExp = []; ?>
     <table class="grid">
-      <tr><th>Date</th><th>SBU</th><th>Travel</th><th>Local</th><th>Food</th><th>Lodging</th><th>Misc</th><th>Total</th></tr>
-      <?php $etot=0; $extraLbls=expense_extra_headings(); foreach ($expenses as $x): $ex=expense_extra_decode($x['extra']??''); $rt=$x['travel']+$x['local']+$x['food']+$x['lodging']+$x['misc']+array_sum($ex); $etot+=$rt; ?>
-      <tr><td><?= e($x['exp_date']) ?></td><td><?= e(OPS_SBUS[$x['sbu']] ?? $x['sbu']) ?></td>
+      <tr><th>Date</th><th>SBU</th><th>Travel</th><th>Local</th><th>Food</th><th>Lodging</th><th>Misc</th><th>Total</th><?php if ($canDropExp): ?><th></th><?php endif; ?></tr>
+      <?php $etot=0; $extraLbls=expense_extra_headings(); foreach ($expenses as $x): $ex=expense_extra_decode($x['extra']??''); $rt=$x['travel']+$x['local']+$x['food']+$x['lodging']+$x['misc']+array_sum($ex); $etot+=$rt;
+        $sig = $x['exp_date'] . '|' . $x['sbu'] . '|' . $rt; $dupe = isset($seenExp[$sig]); $seenExp[$sig] = 1; ?>
+      <tr<?= $dupe ? ' style="background:color-mix(in srgb,var(--warn) 8%,transparent)"' : '' ?>>
+        <td><?= e($x['exp_date']) ?><?php if ($dupe): ?><div><span class="pill p-warn">same as the line above</span></div><?php endif; ?></td>
+        <td><?= e(OPS_SBUS[$x['sbu']] ?? $x['sbu']) ?></td>
         <td><?= fmoney($x['travel']) ?></td><td><?= fmoney($x['local']) ?></td><td><?= fmoney($x['food']) ?></td>
-        <td><?= fmoney($x['lodging']) ?></td><td><?= fmoney($x['misc']) ?></td><td><strong><?= fmoney($rt) ?></strong></td></tr>
-      <?php if ($ex): ?><tr><td colspan="8" class="muted" style="font-size:12px">+ <?= e(implode(', ', array_map(fn($c,$a)=>($extraLbls[$c]??$c).': '.fmoney($a), array_keys($ex), array_values($ex)))) ?></td></tr><?php endif; ?>
+        <td><?= fmoney($x['lodging']) ?></td><td><?= fmoney($x['misc']) ?></td><td><strong><?= fmoney($rt) ?></strong></td>
+        <?php if ($canDropExp): ?>
+        <td><form method="post" action="/expense-delete?id=<?= (int)$x['id'] ?>" onsubmit="return confirm('Remove this expense line?')" style="margin:0">
+          <input type="hidden" name="job_id" value="<?= (int)$job['id'] ?>">
+          <button class="btn small secondary" type="submit" title="Remove this line">Remove</button></form></td>
+        <?php endif; ?></tr>
+      <?php if ($ex): ?><tr><td colspan="<?= $canDropExp ? 9 : 8 ?>" class="muted" style="font-size:12px">+ <?= e(implode(', ', array_map(fn($c,$a)=>($extraLbls[$c]??$c).': '.fmoney($a), array_keys($ex), array_values($ex)))) ?></td></tr><?php endif; ?>
       <?php endforeach; ?>
-      <?php if (!$expenses): ?><tr><td colspan="8">No expenses recorded (entered at closure).</td></tr><?php endif; ?>
+      <?php if (!$expenses): ?><tr><td colspan="<?= $canDropExp ? 9 : 8 ?>">No expenses recorded (entered at closure).</td></tr><?php endif; ?>
     </table>
   </div>
   <div class="panel">

@@ -580,7 +580,58 @@
     });
   }
 
+  // ---- One submission, one record ------------------------------------------
+  // Every POST form gets a one-shot ticket. The server spends it on the first
+  // submission and turns away any replay carrying the same one — a double-click,
+  // a browser retry, a refresh-and-resend, or the offline queue re-sending an
+  // entry whose reply never arrived. Reloading the page mints a new ticket, so
+  // deliberately entering the same thing twice still works.
+  function ftUid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'ft-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+  }
+  function initOnceOnly() {
+    var uid = ftUid;
+    Array.prototype.forEach.call(document.querySelectorAll('form'), function (f) {
+      var method = (f.getAttribute('method') || 'get').toLowerCase();
+      if (method !== 'post') return;
+      if (f.querySelector('input[name=_ft]')) return;
+      var t = document.createElement('input');
+      t.type = 'hidden'; t.name = '_ft'; t.value = uid();
+      f.appendChild(t);
+      f.addEventListener('submit', function () {
+        // Grey the button so the second click has nothing to hit. The form is
+        // already on its way, so this only ever hides a duplicate.
+        Array.prototype.forEach.call(f.querySelectorAll('button[type=submit], input[type=submit]'), function (b) {
+          setTimeout(function () { b.disabled = true; b.dataset.wasLabel = b.textContent; if (b.tagName === 'BUTTON') b.textContent = 'Saving…'; }, 0);
+        });
+        // If the browser comes back to this page (bfcache / back button) the
+        // buttons must work again, and the ticket must be a fresh one.
+        setTimeout(function () {
+          Array.prototype.forEach.call(f.querySelectorAll('button[type=submit], input[type=submit]'), function (b) {
+            if (!b.disabled) return;
+            b.disabled = false; if (b.dataset.wasLabel) b.textContent = b.dataset.wasLabel;
+          });
+          t.value = uid();
+        }, 12000);
+      });
+    });
+  }
+  // Coming back with the back button restores the page from cache with its
+  // spent ticket and its greyed buttons. Both have to be reset or the screen
+  // looks broken and a genuine second entry would be refused.
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return;
+    initOnceOnly();
+    Array.prototype.forEach.call(document.querySelectorAll('form input[name=_ft]'), function (t) { t.value = ftUid(); });
+    Array.prototype.forEach.call(document.querySelectorAll('button[type=submit][disabled], input[type=submit][disabled]'), function (b) {
+      b.disabled = false;
+      if (b.dataset.wasLabel) b.textContent = b.dataset.wasLabel;
+    });
+  });
+
   function init() {
+    initOnceOnly();
     gstAutofill();
     initDisplayName();
     initSkillSelect();

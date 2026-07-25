@@ -114,6 +114,7 @@ try {
     db()->query("SELECT id FROM report_doc_review LIMIT 1");
     db()->query("SELECT deliverables FROM calls LIMIT 1");
     db()->query("SELECT billable_rate FROM calls LIMIT 1");
+    db()->query("SELECT token FROM form_tokens LIMIT 1");
     db()->query("SELECT qty_total FROM partner_contracts LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which
@@ -217,6 +218,20 @@ if ($route === 'logout') {
 
 // --- Everything below requires login ---
 require_login();
+
+// One submission, one record. Every form carries a one-shot ticket; the first
+// POST spends it and any replay of that same POST is turned away here, before a
+// handler can write a second row. This is the guard that stops an inspector's
+// expenses appearing twice when the offline queue re-sends an entry the server
+// had already saved, and it costs nothing on a normal submission.
+if ($method === 'POST' && isset($_POST['_ft'])) {
+    if (!form_token_spend($_POST['_ft'])) {
+        flash('That was already saved — the form was sent twice, so the second copy was ignored.', 'warning');
+        $back = $_SERVER['HTTP_REFERER'] ?? '';
+        // Back to where they were, or to the screen they were posting to.
+        redirect($back && strpos($back, '/') === 0 ? $back : '/' . $route);
+    }
+}
 
 if ($route === '') {
     $clients = (int)$pdo->query("SELECT COUNT(*) FROM business_partners WHERE is_client=1")->fetchColumn();

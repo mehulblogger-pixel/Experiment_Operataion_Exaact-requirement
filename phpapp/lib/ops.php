@@ -261,6 +261,7 @@ function ops_ensure_schema() {
 // Idempotent migration: new tables + columns added over time.
 function ops_migrate() {
     ops_ensure_schema();
+    form_tokens_migrate();
     // users gets role plumbing for the 4-role model + inspector self-service link
     ensure_column('users', 'inspector_id', 'INT NULL');
     // offices carry their branch coordinator + manager (for forwarding & emails)
@@ -1459,7 +1460,7 @@ function ops_module_gate($route) {
     $base = (strncmp($route, 'm/', 2) === 0) ? 'masters' : $route;
     static $map = [
         'calls'=>'calls','call'=>'calls','call-new'=>'calls','call-edit'=>'calls','call-delete'=>'calls',
-        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-invoice'=>'invoicing','job-advance'=>'jobs','report-approve'=>'jobs',
+        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-invoice'=>'invoicing','job-advance'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
         'invoicing'=>'invoicing',
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring',
@@ -1544,7 +1545,7 @@ function ops_dispatch($route, $method) {
     switch (true) {
         case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call' || $route === 'call-delete' || $route === 'call-credit':
             ops_calls($route, $method); return true;
-        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-advance':
+        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-advance' || $route === 'expense-delete':
             ops_jobs($route, $method); return true;
         case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage' || $route === 'candidate-cv' || $route === 'candidate-client' || $route === 'candidate-credential':
             ops_candidates($route, $method); return true;
@@ -3111,12 +3112,35 @@ function ops_jobs($route, $method) {
         }
         redirect('/job?id=' . $job['id']);
     }
+    // A duplicate expense line, removed. New ones cannot be created any more, but
+    // the copies already on file have to be clearable — a claim that reads double
+    // is worse than one with a line missing.
+    if ($route === 'expense-delete') {
+        ops_require(is_coordinator_level() || can('finance.reconcile') || is_master(),
+            'Only a coordinator, accounts or an administrator can remove an expense line.');
+        $row = ops_one("SELECT * FROM expenses WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$row) { flash('That expense line no longer exists.', 'warning'); redirect('/jobs'); }
+        $pdo->prepare("DELETE FROM expenses WHERE id=?")->execute([(int)$row['id']]);
+        flash('Expense line removed.');
+        redirect('/job?id=' . (int)$row['job_id']);
+    }
     if ($route === 'job-close') {
         // Inspector (or coordinator) closes: report + expenses required
         $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$job) { http_response_code(404); view('notfound'); return; }
         if ($method === 'POST') {
             $b = $_POST;
+            // A job closes once. Without this, every re-post of the closure form —
+            // a refresh, a back-and-resend, the offline queue re-sending an entry
+            // the server had already taken — filed another set of expenses against
+            // the same day's work, and the engineer's claim read double.
+            if (!empty($job['closed_flag'])) {
+                flash(ucfirst(Tl('job')) . ' ' . $job['job_code'] . ' was already closed'
+                    . (!empty($job['closed_at']) ? ' on ' . fdate(substr((string)$job['closed_at'], 0, 10)) : '')
+                    . '. Nothing was recorded twice. To correct the expenses, edit them on the '
+                    . Tl('job') . ' below.', 'warning');
+                redirect('/job?id=' . $job['id']);
+            }
             $reportDate = $b['report_upload_date'] ?? '';
             if ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate === '') {
                 view('ops/job_close', ['job'=>$job,'error'=>'A report upload date is required before closing this job.']); return;
