@@ -179,7 +179,7 @@
     <p class="sub">Enter the contract number to register the client (if new) and float the order to operations.</p>
     <form method="post" action="/quote-contract?id=<?= (int)$q['id'] ?>">
       <div class="form-grid">
-        <div class="ff"><label>Contract number *</label><input class="form-control" name="contract_number" required placeholder="e.g. SGS/CON/2026/0142"></div>
+        <div class="ff"><label>Contract number *</label><input class="form-control" name="contract_number" required placeholder="e.g. CON/2026/0142"></div>
         <div class="ff"><label>Contract start</label><input class="form-control" type="date" name="start_date"></div>
         <div class="ff"><label>Contract end</label><input class="form-control" type="date" name="end_date"></div>
       </div>
