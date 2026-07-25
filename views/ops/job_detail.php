@@ -68,7 +68,7 @@
     <div class="kv-wide"><span class="k">Report folder</span><?php if ($job['folder_link']): ?><a href="<?= e($job['folder_link']) ?>" target="_blank" rel="noopener"><?= e($job['folder_link']) ?></a><?php else: ?>—<?php endif; ?></div>
     <div class="kv-wide"><span class="k">Deliverables required</span><?php
       $dl = $job['deliverables'] !== '' ? explode(',', $job['deliverables']) : [];
-      $map = lk_options_or('deliverable', DELIVERABLES);
+      $map = deliverable_options();
       echo $dl ? e(implode(', ', array_map(fn($c) => $map[$c] ?? $c, $dl))) : '—';
     ?></div>
     <?php foreach (custom_display('job', $job['id']) as $cf): ?>

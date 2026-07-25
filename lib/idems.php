@@ -20,6 +20,11 @@ const IDEMS_REPORT_SEED = [
     ['SIR','Stage Inspection Report','TPIA_REPORT'],
     ['FIR','Final Inspection Report','TPIA_REPORT'],
     ['RN','Release Note','TPIA_REPORT'],
+    ['IRN','Inspection Release Note','TPIA_REPORT'],
+    ['COC','Certificate of Conformity','TPIA_REPORT'],
+    ['TCRV','Test Certificate Review','TPIA_REPORT'],
+    ['PHOTO','Photographic Report','TPIA_REPORT'],
+    ['DIM','Dimensional Report','TPIA_REPORT'],
     ['IC','Inspection Certificate','TPIA_REPORT'],
     ['WC','Witness Certificate','TPIA_REPORT'],
     ['HC','Hold Certificate','TPIA_REPORT'],
@@ -170,6 +175,8 @@ function idems_migrate() {
         sort_order INT DEFAULT 0, created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
     idems_seed_report_types();
     idems_seed_phrases();
+    // A deputation's deliverables are report types — rewrite the old codes.
+    idems_migrate_deliverables();
 }
 // Portable "add a unique index if missing" (ignores errors if it already exists).
 function idems_unique_index($table, $col) {
@@ -2286,6 +2293,58 @@ const SOURCE_DOC_TYPES = [
     'SPEC'=>'Technical Specification', 'STANDARD'=>'Code / Standard', 'MTC'=>'Material Test Certificate',
     'CALIB'=>'Calibration Certificate', 'PREV_REPORT'=>'Previous Report', 'CUST_INSTR'=>'Customer Instruction', 'OTHER'=>'Other',
 ];
+// ---------------------------------------------------------------------------
+//  Deliverables = report types.
+//
+//  A deputation promises the client certain documents, and those documents are
+//  exactly the ones in the report-types register. There used to be two lists —
+//  a 14-value DELIVERABLES constant on the deputation and the 37-row register
+//  here — so IR, NCR, CoC and Release Note each existed twice. Deputations now
+//  pick from the register, and the old codes are rewritten to match.
+// ---------------------------------------------------------------------------
+const DELIVERABLE_ALIASES = [
+    'EXP_REP' => 'ER', 'VA_REP' => 'VASR', 'AUDIT_REP' => 'VAR', 'DPR' => 'DIR',
+    'FINAL_REP' => 'FIR', 'PUNCH' => 'PPR', 'TC_REVIEW' => 'TCRV', 'DIM_REP' => 'DIM',
+];
+// code => name, straight from the register, so adding a report type adds a
+// deliverable. Falls back to the shipped list if the register is unreachable.
+function deliverable_options() {
+    static $opts = null;
+    if ($opts !== null) return $opts;
+    try {
+        $out = [];
+        foreach (ops_all("SELECT code, name FROM report_types WHERE active=1 ORDER BY sort_order, code") as $r)
+            $out[$r['code']] = $r['name'];
+        return $opts = ($out ?: DELIVERABLES);
+    } catch (Throwable $e) { return $opts = DELIVERABLES; }
+}
+// Deliverables are a CSV of codes, so the rewrite is done in PHP rather than in
+// SQL — the string functions needed differ between MySQL and SQLite, and these
+// are small tables. Idempotent: a second run finds nothing left to change.
+function idems_migrate_deliverables() {
+    foreach ([['jobs', 'deliverables'], ['quote_lines', 'deliverables']] as [$t, $c]) {
+        try { $rows = ops_all("SELECT id, $c v FROM $t WHERE $c <> ''"); }
+        catch (Throwable $e) { continue; }
+        foreach ($rows as $row) {
+            $codes = array_filter(array_map('trim', explode(',', (string)$row['v'])), fn($x) => $x !== '');
+            $mapped = array_values(array_unique(array_map(
+                fn($x) => DELIVERABLE_ALIASES[$x] ?? $x, $codes)));
+            if ($mapped === array_values($codes)) continue;
+            try { db()->prepare("UPDATE $t SET $c=? WHERE id=?")->execute([implode(',', $mapped), $row['id']]); }
+            catch (Throwable $e) {}
+        }
+    }
+}
+function deliverables_pending() {
+    foreach (array_keys(DELIVERABLE_ALIASES) as $old) {
+        foreach ([['jobs', 'deliverables'], ['quote_lines', 'deliverables']] as [$t, $c]) {
+            try { if ((int)ops_val("SELECT COUNT(*) FROM $t WHERE $c LIKE ?", ["%$old%"]) > 0) return true; }
+            catch (Throwable $e) { return false; }
+        }
+    }
+    return false;
+}
+
 // Which source documents a complete inspection pack should contain.
 // Shipped default; overridden in Settings → Reporting controls.
 const EXPECTED_SOURCE_DOCS = ['PO','QAP','DRAWING','SPEC'];

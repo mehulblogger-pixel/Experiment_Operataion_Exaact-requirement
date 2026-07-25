@@ -43,11 +43,12 @@ function lk_migrate() {
     // which describes how the visit is structured — is renamed to avoid a clash.
     // Rename first, so the ensure below doesn't create a second, empty list.
     lk_rename_type('deputation_type', 'engagement_pattern', 'Engagement pattern');
+    // Deliverables now come from the report-types register — drop the duplicate list.
+    lk_drop_type('deliverable');
     lk_ensure_type('engagement_pattern', 'Engagement pattern', [
         'Daily (single day)', 'Multiple days', 'Continuous days', 'Monthly (resident posting)',
     ]);
     lk_ensure_type_map('inspection_type', 'Type of inspection', INSPECTION_TYPES);
-    lk_ensure_type_map('deliverable', 'Deliverable / report format', DELIVERABLES);
     lk_ensure_type_map('expense_heading', 'Expense heading', EXPENSE_HEADINGS);
     lk_ensure_type_map('industry', 'Industry', INDUSTRIES);
     lk_ensure_type_map('department', 'Department', DEPARTMENTS);
@@ -59,7 +60,6 @@ function lk_migrate() {
     lk_ensure_type_map('avail_status', 'Inspector availability status', AVAIL_STATUS);
     // back-fill any newly-added coded values into existing lists (idempotent)
     lk_ensure_values_from_map('inspection_type', INSPECTION_TYPES);
-    lk_ensure_values_from_map('deliverable', DELIVERABLES);
     // add CUSTOM to reporting frequency on existing installs
     lk_ensure_value('reporting_frequency', 'CUSTOM', 'Custom (every N days)');
     // trade + skills (skills depend on trade) — seed on upgrade if missing
@@ -186,7 +186,7 @@ function lk_register_module_lists() {
     // Lists that already existed get their module tag too, so nothing is unfiled.
     foreach ([
         'sbu'=>'Operations', 'region'=>'Operations', 'product'=>'Operations', 'product_category'=>'Operations',
-        'inspection_type'=>'Operations', 'deliverable'=>'Reporting', 'engagement_pattern'=>'Operations',
+        'inspection_type'=>'Operations', 'engagement_pattern'=>'Operations',
         'activity'=>'Operations', 'credit_type'=>'Money', 'credit_direction'=>'Money',
         'expense_heading'=>'Money', 'reporting_frequency'=>'Operations', 'avail_status'=>'Operations',
         'leave_type'=>'People', 'day_code'=>'People', 'department'=>'People', 'designation'=>'People',
@@ -213,6 +213,13 @@ function lk_ensure_value($typeKey, $code, $label) {
 function lk_rename_type($oldKey, $newKey, $newLabel) {
     if (!lk_type($oldKey) || lk_type($newKey)) return;
     db()->prepare("UPDATE lookup_types SET type_key=?, label=? WHERE type_key=?")->execute([$newKey, $newLabel, $oldKey]);
+}
+// Remove a list that has been superseded by another source of the same values.
+function lk_drop_type($key) {
+    $t = lk_type($key);
+    if (!$t) return;
+    db()->prepare("DELETE FROM lookup_values WHERE type_id=?")->execute([$t['id']]);
+    db()->prepare("DELETE FROM lookup_types WHERE id=?")->execute([$t['id']]);
 }
 function lk_ensure_type($key, $label, $values) {
     if (lk_type($key)) return;
@@ -269,8 +276,6 @@ function lk_seed() {
     // inspection types + deliverables (coded flat lists)
     $it = lk_add_type('inspection_type', 'Type of inspection', null, 0, $so++);
     $i = 0; foreach (INSPECTION_TYPES as $code => $lab) lk_add_value($it, null, $code, $lab, $i++);
-    $dl = lk_add_type('deliverable', 'Deliverable / report format', null, 0, $so++);
-    $i = 0; foreach (DELIVERABLES as $code => $lab) lk_add_value($dl, null, $code, $lab, $i++);
     $eh = lk_add_type('expense_heading', 'Expense heading', null, 0, $so++);
     $i = 0; foreach (EXPENSE_HEADINGS as $code => $lab) lk_add_value($eh, null, $code, $lab, $i++);
     lk_seed_trade_skill();

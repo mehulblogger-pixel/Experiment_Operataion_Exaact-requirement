@@ -407,7 +407,7 @@ function ops_crm_quotes($route, $method) {
         view('ops/crm/quote_form', ['q' => $q, 'lines' => $q ? crm_quote_lines($q['id']) : [], 'preInq' => $preInq,
             'clients' => clients_list(), 'offices' => offices_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
             'svcOpts' => lk_options_or('inspection_type', INSPECTION_TYPES), 'unitOpts' => QUOTE_UNITS,
-            'orderOpts' => ORDER_TYPES, 'locTypes' => QUOTE_LOCATION_TYPES, 'delivOpts' => lk_options_or('deliverable', DELIVERABLES)]);
+            'orderOpts' => ORDER_TYPES, 'locTypes' => QUOTE_LOCATION_TYPES, 'delivOpts' => deliverable_options()]);
         return;
     }
     if ($route === 'quote') {
