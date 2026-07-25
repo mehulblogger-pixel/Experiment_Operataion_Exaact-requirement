@@ -160,14 +160,14 @@
   "AMPO VALVES INDIA PRIVATE LIMITED",
   "ANANTA PROCON",
   "ARHAM RENEWTECH INDIA PRIVATE LIMITED",
-  "ARTSON LIMITED ((A TATA ENTERPRISES)",
+  "ARVIND ENGINEERING LIMITED",
   "Acme Air Equipments Company Private Limited",
   "Acme Solar Holding Private Limited",
   "Acmefil Engineering Systems Private Limited",
-  "Adani Energy Solutions Limited (KHAVDA POWER IV A TRANSMISSION LIMITED)",
-  "Adani Green Energy Limited",
-  "Adani Infra India Limited",
-  "Adani Water Limited",
+  "Suryavan Energy Solutions Ltd (Khavda IV-A Transmission)",
+  "Suryavan Green Energy Ltd",
+  "Suryavan Infra India Ltd",
+  "Suryavan Water Ltd",
   "Adaptive Engineering Private Limited",
   "Aditya Birla",
   "Aditya Birla\nRenewables Limited",
@@ -316,9 +316,9 @@
   "L C Infra Projects Private Limited",
   "LAXMI ORGANIC INDUSTRIES Limited",
   "LCC Engineering Private Limited",
-  "Larsen and Toubro Limited",
-  "Larsen and Toubro Limited  (Energy Products and Systems Engineering)",
-  "Larsen and Toubro Limited (Energy Products and Systems Engineering)",
+  "Girnar Heavy Engineering Ltd",
+  "Girnar Heavy Engineering Ltd (Energy Products & Systems)",
+  "Girnar Heavy Engineering Ltd (Energy Products & Systems)",
   "Laxmi Civil Engineering Services Private Limited",
   "Linde India Limited",
   "Lohum Materials Private Limited",
@@ -385,9 +385,9 @@
   "Ramalingam Construction company Limited",
   "Rashmi Metaliks Limited",
   "Ratnamani Metal And Tube Limited - C S Division",
-  "Reliance Industries Limited",
-  "Reliance Infrastructure Limited",
-  "Reliance OSBL Project I Bechtel India Private Limited",
+  "Narmada Industries Ltd",
+  "Narmada Infrastructure Ltd",
+  "Narmada OSBL Project I Engineering India Pvt Ltd",
   "Renew Power Private Limited",
   "Rhythm Automation Control Private Limited",
   "S A Infracom",
@@ -434,9 +434,9 @@
   "Sun Trading Company",
   "Surya Roshni Limited",
   "TECHNOCRAFT CONSTRUCTION PVT. LTD. - EMS LTD.",
-  "Tata Power Limited",
-  "Tata Project Limited",
-  "Tata project Limited",
+  "Vindhya Power Ltd",
+  "Vindhya Projects Ltd",
+  "Vindhya Projects Ltd",
   "Taurant Projects Limited",
   "Tawi Engineering India Private Limited",
   "Technimont Private Limited",
@@ -993,11 +993,11 @@
    "location": "Ahmedabad"
   },
   {
-   "name": "Adani Infra India Limited",
+   "name": "Suryavan Infra India Ltd",
    "location": "Ahmedabad"
   },
   {
-   "name": "Adani New Industries Limited",
+   "name": "Suryavan New Industries Ltd",
    "location": "Kachchh"
   },
   {
@@ -2241,7 +2241,7 @@
    "location": "Dholera"
   },
   {
-   "name": "Reliance Industries Limited",
+   "name": "Narmada Industries Ltd",
    "location": "Jamnagar"
   },
   {

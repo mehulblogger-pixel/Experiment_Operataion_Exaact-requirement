@@ -87,8 +87,8 @@ function seed_demo() {
 
         // ---------- Manpower requisitions (approvals) ----------
         $insReq = $pdo->prepare("INSERT INTO requisitions(req_code,office_id,sbu,designation,project_site,req_type,outgoing_inspector_id,budgeted_cost,approved_by,approval_ref,approval_date,status,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?, 'demo', ?)");
-        $insReq->execute(['REQ-2607-01',$oid['PUN'],'IND','INSPECTOR','Adani Mundra — new project','NEW',null,75000,'Neha Iyer','HR-APP-2026-014',$d(-20),'OPEN',$now]);
-        $insReq->execute(['REQ-2607-02',$oid['AMD'],'OGC','SR_INSPECTOR','Reliance Jamnagar — replacement','REPLACEMENT',$iid['EMP02'],95000,'Meena Shah','HR-APP-2026-021',$d(-10),'OPEN',$now]);
+        $insReq->execute(['REQ-2607-01',$oid['PUN'],'IND','INSPECTOR','Suryavan Mundra — new project','NEW',null,75000,'Neha Iyer','HR-APP-2026-014',$d(-20),'OPEN',$now]);
+        $insReq->execute(['REQ-2607-02',$oid['AMD'],'OGC','SR_INSPECTOR','Narmada Jamnagar — replacement','REPLACEMENT',$iid['EMP02'],95000,'Meena Shah','HR-APP-2026-021',$d(-10),'OPEN',$now]);
         $c['requisitions'] = 2;
 
         // ---------- Users (one per role; inspectors linked) ----------
@@ -120,9 +120,9 @@ function seed_demo() {
         $insP = $pdo->prepare("INSERT INTO business_partners(code,legal_name,display_name,is_client,is_vendor,status,state)
             VALUES(?,?,?,?,?, 'ACTIVE', ?)");
         $clients = [
-            ['CL-RIL','Reliance Industries Ltd','Reliance',1,0,'Gujarat'],
-            ['CL-ADN','Adani Ports & SEZ Ltd','Adani Ports',1,0,'Gujarat'],
-            ['CL-LNT','L&T Energy Hydrocarbon','L&T Energy',1,0,'Maharashtra'],
+            ['CL-NIL','Narmada Industries Ltd','Narmada',1,0,'Gujarat'],
+            ['CL-SVP','Suryavan Ports & SEZ Ltd','Suryavan Ports',1,0,'Gujarat'],
+            ['CL-GHE','Girnar Energy Hydrocarbon','Girnar Energy',1,0,'Maharashtra'],
         ];
         $vendors = [
             ['VN-VAP','Vapi Chemical Works','Vapi Chem',0,1,'Gujarat'],
@@ -136,9 +136,9 @@ function seed_demo() {
         // ---------- BOSS / contract numbers ----------
         $insB = $pdo->prepare("INSERT INTO boss_numbers(client_id,boss_number,start_date,end_date,status) VALUES(?,?,?,?, 'ACTIVE')");
         $boss = [
-            [$cid['CL-RIL'],'40231',$d(-120),$d(240)],
-            [$cid['CL-ADN'],'40198',$d(-90),$d(270)],
-            [$cid['CL-LNT'],'40155',$d(-60),$d(300)],
+            [$cid['CL-NIL'],'40231',$d(-120),$d(240)],
+            [$cid['CL-SVP'],'40198',$d(-90),$d(270)],
+            [$cid['CL-GHE'],'40155',$d(-60),$d(300)],
         ];
         $bid = [];
         foreach ($boss as $b) { $insB->execute($b); $bid[$b[1]] = (int)$pdo->lastInsertId(); }
@@ -149,12 +149,12 @@ function seed_demo() {
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'demo', ?)");
         // [code, client, vendor, ibo(managing/contracting), region, sbu, prodcat, recd, reqBy, status, exec, credit, credit_type, billable, billable_basis, itype]
         $calls = [
-            ['C-2607-001',$cid['CL-RIL'],$vid['VN-VAP'],$oid['AMD'],'WEST','IND','Pressure vessel',$d(-20),$d(-10),'Same office (Ahmedabad manages & executes) — billable only','CLOSED',$oid['AMD'],0,'',150000,'MANDAY','INSPECTION'],
-            ['C-2607-002',$cid['CL-ADN'],$vid['VN-MUN'],$oid['MUM'],'WEST','OGC','Structural',$d(-18),$d(-8),'Managed by Mumbai, executed by Ahmedabad — credit to AMD','CLOSED',$oid['AMD'],184000,'MANDAY',0,'','INSPECTION'],
-            ['C-2607-003',$cid['CL-LNT'],null,$oid['MUM'],'WEST','IND','Piping',$d(-16),$d(-6),'Managed by Mumbai, executed by Pune','CLOSED',$oid['PUN'],96000,'MANDAY',0,'','INSPECTION'],
-            ['C-2607-004',$cid['CL-RIL'],$vid['VN-VAP'],$oid['AMD'],'WEST','IND','Welding audit',$d(-4),$d(3),'Ahmedabad own job — in progress (billable only)','OPEN',$oid['AMD'],0,'',80000,'MANDAY','INSPECTION'],
-            ['C-2607-005',$cid['CL-ADN'],$vid['VN-MUN'],$oid['PUN'],'WEST','MIN','Crane / lifting',$d(-3),$d(4),'Pune own job — sub-con deployed','OPEN',$oid['PUN'],0,'',60000,'MANDAY','INSPECTION'],
-            ['C-2607-006',$cid['CL-LNT'],null,$oid['MUM'],'WEST','OGC','Coating',$d(-12),$d(-2),'Managed by Mumbai, executed by Ahmedabad — credit to AMD','OPEN',$oid['AMD'],110000,'MANDAY',0,'','INSPECTION'],
+            ['C-2607-001',$cid['CL-NIL'],$vid['VN-VAP'],$oid['AMD'],'WEST','IND','Pressure vessel',$d(-20),$d(-10),'Same office (Ahmedabad manages & executes) — billable only','CLOSED',$oid['AMD'],0,'',150000,'MANDAY','INSPECTION'],
+            ['C-2607-002',$cid['CL-SVP'],$vid['VN-MUN'],$oid['MUM'],'WEST','OGC','Structural',$d(-18),$d(-8),'Managed by Mumbai, executed by Ahmedabad — credit to AMD','CLOSED',$oid['AMD'],184000,'MANDAY',0,'','INSPECTION'],
+            ['C-2607-003',$cid['CL-GHE'],null,$oid['MUM'],'WEST','IND','Piping',$d(-16),$d(-6),'Managed by Mumbai, executed by Pune','CLOSED',$oid['PUN'],96000,'MANDAY',0,'','INSPECTION'],
+            ['C-2607-004',$cid['CL-NIL'],$vid['VN-VAP'],$oid['AMD'],'WEST','IND','Welding audit',$d(-4),$d(3),'Ahmedabad own job — in progress (billable only)','OPEN',$oid['AMD'],0,'',80000,'MANDAY','INSPECTION'],
+            ['C-2607-005',$cid['CL-SVP'],$vid['VN-MUN'],$oid['PUN'],'WEST','MIN','Crane / lifting',$d(-3),$d(4),'Pune own job — sub-con deployed','OPEN',$oid['PUN'],0,'',60000,'MANDAY','INSPECTION'],
+            ['C-2607-006',$cid['CL-GHE'],null,$oid['MUM'],'WEST','OGC','Coating',$d(-12),$d(-2),'Managed by Mumbai, executed by Ahmedabad — credit to AMD','OPEN',$oid['AMD'],110000,'MANDAY',0,'','INSPECTION'],
         ];
         $callid = [];
         foreach ($calls as $r) {
@@ -320,7 +320,7 @@ function seed_demo_remove() {
         $del("DELETE FROM boss_numbers WHERE boss_number IN ('40231','40198','40155') OR boss_number LIKE '5090%'");
         $del("DELETE FROM agencies WHERE name IN ('TalentFirst Recruitment','SiteForce Manpower')");
         $del("DELETE FROM requisitions WHERE created_by='demo'");
-        $del("DELETE FROM business_partners WHERE code IN ('CL-RIL','CL-ADN','CL-LNT','VN-VAP','VN-MUN') OR code LIKE 'EC-%' OR code LIKE 'EV-%'");
+        $del("DELETE FROM business_partners WHERE code IN ('CL-NIL','CL-SVP','CL-GHE','VN-VAP','VN-MUN') OR code LIKE 'EC-%' OR code LIKE 'EV-%'");
         // Demo login accounts
         $unames = array_map(fn($a) => $a[0], demo_accounts());
         $ph = implode(',', array_fill(0, count($unames), '?'));
