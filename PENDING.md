@@ -125,6 +125,19 @@ Proposed phasing (each phase = its own commit, tested):
   Buttons on Report templates ("🪄 Build form") and in an empty form builder. Verified round-trip:
   NCR format uploaded → form generated → filled → client-format .docx produced with no leftover tokens.
 
+- ➕ Prefill from the call / job ✅ SHIPPED (owner request) — idems_context_for() gathers everything
+  already known (call code, client, vendor, SBU, office, product, inspection type, PO number + line
+  item, site address, notes; job code, inspector, inspection dates, BOSS number, quote/contract).
+  "New report" from a call or job (buttons on call_detail + job_detail, plus a call picker on the
+  new-report screen) prefills the whole header. idems_autofill() then ALIGNS THE DESIGNED FORM FIELDS
+  via an alias map (customer/purchaser→client, supplier/manufacturer/works→vendor, dwg_no→drawing,
+  date_of_inspection→date, inspected_by→inspector, works_location/site→location, equipment/item→
+  product, call_no→call code, division→SBU, contract_ref/boss→BOSS no., qty_offered→PO line qty …),
+  so a client-worded format fills itself. Never overwrites what the inspector typed; auto-filled
+  fields are badged "auto" with a summary banner. report_docs.job_id now stored alongside call_id.
+  Verified: customer→Reliance, supplier→Vapi Chem, date_of_inspection→2026-07-13, inspected_by→Ravi
+  Kumar, equipment→Pressure vessel, call_no→C-2607-001, division→Industrial, contract_ref→40231.
+
 Constraint note: MilesWeb shared PHP hosting — no Node/build; "offline-first" is delivered as a
 responsive PWA-lite (localStorage drafts + autosave + sync), not a native app.
 

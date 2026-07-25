@@ -386,6 +386,7 @@ function ops_idems_documents($route, $method) {
                 'report_type_id'=>$typeId, 'type_code'=>$type['code'], 'title'=>trim($b['title'] ?? '') ?: $type['name'],
                 'client_id'=>$clientId, 'vendor_id'=>($b['vendor_id'] ?? '')!==''?(int)$b['vendor_id']:null,
                 'call_id'=>($b['call_id'] ?? '')!==''?(int)$b['call_id']:null,
+                'job_id'=>($b['job_id'] ?? '')!==''?(int)$b['job_id']:null,
                 'client_code'=>$clientCode, 'project_code'=>trim($b['project_code'] ?? ''), 'project_name'=>trim($b['project_name'] ?? ''),
                 'office_id'=>$officeId, 'sbu'=>$b['sbu'] ?? '',
                 'po_ref'=>trim($b['po_ref'] ?? ''), 'drawing_no'=>trim($b['drawing_no'] ?? ''), 'drawing_rev'=>trim($b['drawing_rev'] ?? ''),
@@ -417,13 +418,20 @@ function ops_idems_documents($route, $method) {
                 redirect('/document?id=' . $id);
             }
         }
-        view('ops/idems/doc_form', ['doc'=>$doc, 'types'=>idems_types(),
+        // Creating against a call / job? Pull everything already known into the form.
+        $pre = [];
+        if (!$doc) {
+            $ctx = idems_context_for((int)($_GET['call'] ?? 0), (int)($_GET['job'] ?? 0));
+            if ($ctx) $pre = $ctx;
+        }
+        view('ops/idems/doc_form', ['doc'=>$doc, 'pre'=>$pre, 'types'=>idems_types(),
             'clients'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 ORDER BY nm"),
             'vendors'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_vendor=1 ORDER BY nm"),
             'inspectors'=>ops_all("SELECT id, name FROM inspectors WHERE status='ACTIVE' ORDER BY name"),
             'approvers'=>ops_all("SELECT id, first_name, last_name, username, role FROM users WHERE is_active=1 ORDER BY first_name, last_name"),
             'offices'=>ops_all("SELECT id, name FROM offices ORDER BY is_ahmedabad DESC, name"),
-            'sbuOpts'=>lk_options_or('sbu', OPS_SBUS), 'prefixPreview'=>$doc ? null : null]);
+            'calls'=>ops_all("SELECT c.id, c.call_code, COALESCE(bp.display_name,bp.legal_name) client_nm FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id ORDER BY c.id DESC"),
+            'sbuOpts'=>lk_options_or('sbu', OPS_SBUS)]);
         return true;
     }
     if ($route === 'document') {
@@ -682,6 +690,13 @@ function ops_idems_fill($route, $method) {
         redirect('/document?id=' . $doc['id']);
     }
     $data = json_decode($doc['data'] ?: '[]', true); if (!is_array($data)) $data = [];
+    // Prefill: fields the system already knows from the call / job are filled in,
+    // so the inspector only types what is genuinely new. Never overwrites entries.
+    $ctxDoc = ops_one("SELECT d.*, bp.display_name client_disp, bp.legal_name client_name, v.display_name vendor_disp, v.legal_name vendor_name, i.name inspector_name
+        FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN inspectors i ON i.id=d.inspector_id
+        WHERE d.id=?", [$doc['id']]) ?: $doc;
+    $auto = idems_autofill($ctxDoc, $fields, $data);
+    foreach ($auto as $k => $v) $data[$k] = $v;
     // learned suggestions per text field (Phase 13) — offered, never applied automatically
     $sugg = [];
     if (function_exists('learn_suggestions')) {
@@ -691,7 +706,8 @@ function ops_idems_fill($route, $method) {
             if ($s) $sugg[$f['fkey']] = $s;
         }
     }
-    view('ops/idems/fill', ['doc'=>$doc, 'sections'=>idems_sections($doc['report_type_id']), 'fields'=>$fields, 'data'=>$data, 'files'=>idems_doc_files($doc['id']), 'sugg'=>$sugg]);
+    view('ops/idems/fill', ['doc'=>$doc, 'sections'=>idems_sections($doc['report_type_id']), 'fields'=>$fields, 'data'=>$data,
+        'files'=>idems_doc_files($doc['id']), 'sugg'=>$sugg, 'auto'=>$auto]);
     return true;
 }
 function idems_table_cols($f) {
@@ -1321,6 +1337,144 @@ function ops_idems_docx($method) {
     header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     header('Content-Disposition: attachment; filename="' . preg_replace('/[^A-Za-z0-9._-]/','_',$doc['irn']) . '.docx"');
     echo $bin; return true;
+}
+
+// ===========================================================================
+//  Prefill: everything the system already knows about a call / job flows into
+//  the report — the header AND the designed form fields — so the inspector
+//  only types what is genuinely new.
+// ===========================================================================
+// Gather the known context for a call (and its job, if one is given).
+function idems_context_for($callId, $jobId = 0) {
+    $ctx = [];
+    $call = $callId ? ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, bp.code client_code,
+            v.legal_name vendor_name, v.display_name vendor_disp
+        FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id LEFT JOIN business_partners v ON v.id=c.vendor_id
+        WHERE c.id=?", [(int)$callId]) : null;
+    $job = $jobId ? ops_one("SELECT j.*, i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.id=?", [(int)$jobId]) : null;
+    if (!$call && $job && $job['call_id']) return idems_context_for($job['call_id'], $jobId);
+    if (!$call && !$job) return $ctx;
+    if ($call) {
+        $ctx['call_id']      = (int)$call['id'];
+        $ctx['call_code']    = $call['call_code'];
+        $ctx['client_id']    = $call['client_id'];
+        $ctx['client_name']  = $call['client_disp'] ?: $call['client_name'];
+        $ctx['client_code']  = $call['client_code'] ?? '';
+        $ctx['vendor_id']    = $call['vendor_id'];
+        $ctx['vendor_name']  = $call['vendor_disp'] ?: $call['vendor_name'];
+        $ctx['sbu']          = $call['sbu'];
+        $ctx['office_id']    = $call['executing_office_id'] ?: $call['ibo_office_id'];
+        $ctx['product_category'] = lk_options_or('product_category', [])[$call['product_category']] ?? ($call['product_other'] ?: $call['product_category']);
+        $ctx['inspection_type']  = INSPECTION_TYPES[$call['inspection_type']] ?? ($call['inspection_type_other'] ?: '');
+        $ctx['required_date']= $call['inspection_required_date'];
+        $ctx['notes']        = $call['notes'];
+        // purchase order + line item behind the call
+        if (!empty($call['po_id'])) {
+            $po = ops_one("SELECT po_number, title FROM partner_purchase_orders WHERE id=?", [$call['po_id']]);
+            if ($po) { $ctx['po_ref'] = $po['po_number']; $ctx['po_title'] = $po['title']; }
+        }
+        if (!empty($call['po_line_item_id'])) {
+            $li = ops_one("SELECT description, quantity, site FROM po_line_items WHERE id=?", [$call['po_line_item_id']]);
+            if ($li) { $ctx['item_desc'] = $li['description']; $ctx['quantity'] = $li['quantity']; if (!empty($li['site'])) $ctx['location'] = $li['site']; }
+        }
+        // site address behind the call
+        if (!empty($call['site_address_id'])) {
+            $ad = ops_one("SELECT line1, line2, city, state, town_village, district FROM partner_addresses WHERE id=?", [$call['site_address_id']]);
+            if ($ad) $ctx['location'] = trim(implode(', ', array_filter([$ad['line1'], $ad['line2'], $ad['town_village'], $ad['city'], $ad['state']])));
+        }
+        if (empty($ctx['location'])) {
+            $ad = $call['vendor_id'] ? ops_one("SELECT line1, city, state FROM partner_addresses WHERE partner_id=? ORDER BY is_primary DESC, id LIMIT 1", [$call['vendor_id']]) : null;
+            if ($ad) $ctx['location'] = trim(implode(', ', array_filter([$ad['line1'], $ad['city'], $ad['state']])));
+        }
+    }
+    if ($job) {
+        $ctx['job_id']         = (int)$job['id'];
+        $ctx['job_code']       = $job['job_code'];
+        $ctx['inspector_id']   = $job['inspector_id'];
+        $ctx['inspector_name'] = $job['inspector_name'] ?? '';
+        $ctx['inspection_date']= $job['inspection_start_date'] ?: ($job['scheduled_date'] ?: '');
+        $ctx['inspection_end'] = $job['inspection_end_date'];
+        if (!empty($job['sbu'])) $ctx['sbu'] = $job['sbu'];
+        if (!empty($job['executing_office_id'])) $ctx['office_id'] = $job['executing_office_id'];
+        if (!empty($job['boss_id'])) { $b = ops_one("SELECT boss_number FROM boss_numbers WHERE id=?", [$job['boss_id']]); if ($b) $ctx['boss_number'] = $b['boss_number']; }
+        if (!empty($job['quotation_id'])) { $q = ops_one("SELECT quote_no, contract_number FROM quotations WHERE id=?", [$job['quotation_id']]); if ($q) { $ctx['quote_no'] = $q['quote_no']; $ctx['contract_number'] = $q['contract_number']; } }
+    }
+    return array_filter($ctx, fn($v) => $v !== null && $v !== '');
+}
+// Aliases: which field keys in a designed form mean which piece of known data.
+// Lets a client's own naming ("dwg_no", "supplier", "date_of_inspection") still
+// line up with the system's data automatically.
+function idems_field_aliases() {
+    return [
+        'client_name'   => ['client','client_name','customer','customer_name','purchaser','buyer','client_ref'],
+        'vendor_name'   => ['vendor','vendor_name','manufacturer','supplier','fabricator','maker','mfr','works'],
+        'po_ref'        => ['po','po_no','po_number','po_ref','purchase_order','purchase_order_no','order_no','po_num'],
+        'drawing_no'    => ['drawing','drawing_no','drg_no','dwg_no','drawing_number','dwg'],
+        'drawing_rev'   => ['drawing_rev','drg_rev','dwg_rev','drawing_revision','rev','revision'],
+        'qap_rev'       => ['qap','qap_rev','qap_no','qap_revision','itp','itp_no','itp_rev'],
+        'standards'     => ['standard','standards','code','codes','specification','spec','applicable_standard','applicable_code'],
+        'location'      => ['location','site','place','venue','works_location','site_address','address','inspection_location'],
+        'material_grade'=> ['material','material_grade','grade','material_spec'],
+        'product_category'=>['product','product_category','item','item_category','equipment','component'],
+        'item_desc'     => ['item_desc','item_description','description_of_item','material_description','equipment_description'],
+        'quantity'      => ['quantity','qty','quantity_offered','qty_offered','offered_qty','quantity_inspected'],
+        'inspection_date'=>['inspection_date','date_of_inspection','insp_date','date','visit_date','inspected_on'],
+        'inspector_name'=> ['inspector','inspector_name','inspected_by','surveyor','engineer'],
+        'call_code'     => ['call_no','call_number','inspection_call','call_ref','call_code','ic_no'],
+        'job_code'      => ['job_no','job_code','job_number','work_order'],
+        'project_name'  => ['project','project_name','project_title'],
+        'project_code'  => ['project_code','project_no','project_number'],
+        'sbu'           => ['sbu','division','business_unit'],
+        'boss_number'   => ['boss','boss_no','boss_number','contract_ref'],
+        'contract_number'=>['contract','contract_no','contract_number'],
+        'quote_no'      => ['quote','quote_no','quotation','quotation_no'],
+        'inspection_type'=>['inspection_type','type_of_inspection','stage','inspection_stage'],
+        'irn'           => ['irn','report_no','report_number','ref_no','reference_no','certificate_no'],
+    ];
+}
+// Values available to prefill a form, drawn from the report header + its call/job.
+function idems_prefill_values($doc) {
+    $ctx = idems_context_for($doc['call_id'] ?? 0, $doc['job_id'] ?? 0);
+    $sbuMap = lk_options_or('sbu', OPS_SBUS);
+    // the report's own header always wins over the call/job
+    $vals = array_merge($ctx, array_filter([
+        'irn'             => $doc['irn'] ?? '',
+        'client_name'     => $doc['client_disp'] ?? ($doc['client_name'] ?? ''),
+        'vendor_name'     => $doc['vendor_disp'] ?? ($doc['vendor_name'] ?? ''),
+        'po_ref'          => $doc['po_ref'] ?? '',
+        'drawing_no'      => $doc['drawing_no'] ?? '',
+        'drawing_rev'     => $doc['drawing_rev'] ?? '',
+        'qap_rev'         => $doc['qap_rev'] ?? '',
+        'standards'       => $doc['standards'] ?? '',
+        'location'        => $doc['location'] ?? '',
+        'material_grade'  => $doc['material_grade'] ?? '',
+        'product_category'=> $doc['product_category'] ?? '',
+        'project_name'    => $doc['project_name'] ?? '',
+        'project_code'    => $doc['project_code'] ?? '',
+        'inspection_date' => $doc['inspection_date'] ?? '',
+        'inspector_name'  => $doc['inspector_name'] ?? '',
+    ], fn($v) => $v !== null && $v !== ''));
+    if (!empty($vals['sbu']) && isset($sbuMap[$vals['sbu']])) $vals['sbu'] = $sbuMap[$vals['sbu']];
+    return $vals;
+}
+// For each designed field that is still empty, supply the known value (if any).
+// Returns [fkey => value] — only for fields the inspector has not filled in.
+function idems_autofill($doc, $fields, $data) {
+    $vals = idems_prefill_values($doc);
+    $alias = idems_field_aliases();
+    $out = [];
+    foreach ($fields as $f) {
+        if (!in_array($f['ftype'], ['text','textarea','date','number','select'], true)) continue;
+        $k = strtolower($f['fkey']);
+        $cur = $data[$f['fkey']] ?? '';
+        if (is_array($cur) || trim((string)$cur) !== '') continue;      // never overwrite the inspector
+        foreach ($alias as $src => $keys) {
+            if (!in_array($k, $keys, true)) continue;
+            if (!empty($vals[$src])) { $out[$f['fkey']] = (string)$vals[$src]; }
+            break;
+        }
+    }
+    return $out;
 }
 
 // ---------------------------------------------------------------------------

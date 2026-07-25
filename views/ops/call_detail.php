@@ -20,6 +20,7 @@
     <?php if (is_coordinator_level()): ?>
       <a class="btn secondary" href="/call-edit?id=<?= (int)$call['id'] ?>">Edit call</a>
       <a class="btn" href="/job-new?call=<?= (int)$call['id'] ?>">+ Allocate Job</a>
+      <?php if (can('mod.idems.edit') || is_master()): ?><a class="btn secondary" href="/document-new?call=<?= (int)$call['id'] ?>" title="Create an inspection report — all known details are filled in">📑 New report</a><?php endif; ?>
     <?php endif; ?>
     <?php if (is_master() || can('ops.call.delete')): ?>
       <form method="post" action="/call-delete?id=<?= (int)$call['id'] ?>" style="display:inline" onsubmit="return confirm('Delete this call and its jobs? This cannot be undone.')">
