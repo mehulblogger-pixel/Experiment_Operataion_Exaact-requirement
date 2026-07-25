@@ -18,6 +18,11 @@ const INSPECTION_TYPES = ['INSPECTION'=>'Inspection (third-party / TPI)','EXPEDI
 // Deliverables / report formats produced after a job.
 const DELIVERABLES = ['IR'=>'Inspection Report (IR)','IRN'=>'Inspection Release Note (IRN)','NCR'=>'Non-Conformance Report (NCR)','COC'=>'Certificate of Conformity (CoC)','EXP_REP'=>'Expediting Report','VA_REP'=>'Vendor Assessment Report','AUDIT_REP'=>'Audit Report','TC_REVIEW'=>'Test Certificate Review','DPR'=>'Daily Progress Report','FINAL_REP'=>'Final Report','PUNCH'=>'Punch List','PHOTO'=>'Photographic Report','DIM_REP'=>'Dimensional Report','RN'=>'Release Note (RN)'];
 const ATT_STATUS = ['PRESENT_NB'=>'Present (non-billable)','TRAINING'=>'Training','MEETING'=>'Meeting','LEAVE'=>'Leave','WFH'=>'Work from home','COMPOFF'=>'Comp-off taken','HOLIDAY'=>'Holiday'];
+// Daily availability of an inspector (the coordinator's board). ON_JOB is auto-derived
+// from today's jobs; the others are set with one click. Configurable via the lookup master.
+const AVAIL_STATUS = ['AVAILABLE'=>'Available (free)','ON_JOB'=>'On job / allocated','OFFICE'=>'In office','LEAVE'=>'On leave','TRAINING'=>'Training','WFH'=>'Work from home','HALF_DAY'=>'Half day','TRAVEL'=>'On travel'];
+// Maximum working hours an inspector may log on a single working day (8 h 30 m).
+const DAILY_HOURS_CAP = 8.5;
 const JOB_TYPES = ['INSPECTION'=>'Inspection (day-based)','DEPUTATION'=>'Project deputation (site)'];
 const EXPENSE_HEADINGS = ['TRAVEL'=>'Travel','LOCAL'=>'Local conveyance','FOOD'=>'Food','LODGING'=>'Lodging','MISC'=>'Misc'];
 const DEPARTMENTS = ['QUALITY'=>'Quality','PROJECTS'=>'Projects','ENGINEERING'=>'Engineering','DESIGN'=>'Design','INSPECTION'=>'Inspection','PROCUREMENT'=>'Procurement / Purchase','PRODUCTION'=>'Production','MAINTENANCE'=>'Maintenance','SAFETY'=>'Safety / HSE','COMMERCIAL'=>'Commercial / Finance','STORES'=>'Stores','PLANNING'=>'Planning','OWNER'=>'Owner','PARTNER'=>'Partner','DIRECTOR'=>'Director','MANAGEMENT'=>'Management','OTHER'=>'Other'];
@@ -378,6 +383,22 @@ function ops_migrate() {
         id " . pk_clause() . ", inspector_id INT, name VARCHAR(200), number VARCHAR(80) DEFAULT '',
         issued_date VARCHAR(20) DEFAULT '', valid_to VARCHAR(20) DEFAULT '', status VARCHAR(20) DEFAULT 'VALID',
         last_reminder VARCHAR(20) DEFAULT '', updated_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // ---- Workforce pack: office posting, weekly working days, reporting manager ----
+    ensure_column('inspectors', 'home_office_id', 'INT NULL');                     // which branch this engineer is posted to
+    ensure_column('inspectors', 'weekly_working_days', "DECIMAL(3,1) DEFAULT 6");  // 5 | 5.5 | 6 (Sat pattern)
+    ensure_column('inspectors', 'reports_to_id', 'INT NULL');                      // reporting manager (a system user)
+    // Reporting manager on users: reports_to_id already added in access.php; add the
+    // manual name/position/email so a manager who has no login can still be recorded.
+    ensure_column('users', 'reports_to_name', "VARCHAR(150) DEFAULT ''");
+    ensure_column('users', 'reports_to_position', "VARCHAR(120) DEFAULT ''");
+    ensure_column('users', 'reports_to_email', "VARCHAR(200) DEFAULT ''");
+    ensure_column('users', 'position_title', "VARCHAR(120) DEFAULT ''");           // free-text designation for the hierarchy
+    ensure_column('users', 'weekly_working_days', "DECIMAL(3,1) DEFAULT 6");
+    // Per-day availability override for an inspector (leave / training / office …).
+    // "On job" is auto-derived from jobs; a row here is a manual status for that date.
+    db()->exec("CREATE TABLE IF NOT EXISTS inspector_day_status (
+        id " . pk_clause() . ", inspector_id INT, day VARCHAR(20), status VARCHAR(20) DEFAULT 'AVAILABLE',
+        note VARCHAR(255) DEFAULT '', set_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
     ops_seed_expense_masters();
 }
 // Seed the expense-head and travel-mode masters once (idempotent — count-guarded,
@@ -1187,6 +1208,7 @@ function ops_module_gate($route) {
         'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries',
         'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes',
         'attendance-recon'=>'reconcile',
+        'availability'=>'jobs',
         'masters'=>'masters',
         'office-finance'=>'overheads',
         'reports'=>'reports',
@@ -1295,6 +1317,8 @@ function ops_dispatch($route, $method) {
             ops_access($method); return true;
         case $route === 'ai-settings':
             ops_ai_settings($method); return true;
+        case $route === 'availability':
+            ops_inspector_availability($method); return true;
         case $route === 'office-finance':
             ops_office_finance(); return true;
         case $route === 'masters':
@@ -1514,9 +1538,13 @@ function ops_inspectors($action, $method) {
             $desig = $b['designation'] ?? ''; $kind = in_array($b['staff_kind'] ?? '', ['ASSET','FREELANCER','SUBCON'], true) ? $b['staff_kind'] : 'ASSET';
             $empCode = trim($b['emp_code'] ?? '');
             if ($empCode === '' && !$ins) $empCode = next_emp_code($kind); // auto: SC-/FL- for contractors, EMP for staff
+            // Workforce fields: posted office, weekly working days (5/5.5/6), reporting manager.
+            $homeOff  = ($b['home_office_id'] ?? '') !== '' ? (int)$b['home_office_id'] : null;
+            $wwd      = in_array((string)($b['weekly_working_days'] ?? ''), ['5','5.5','6'], true) ? (float)$b['weekly_working_days'] : 6;
+            $reportTo = ($b['reports_to_id'] ?? '') !== '' ? (int)$b['reports_to_id'] : null;
             if ($ins) {
-                $sql = "UPDATE inspectors SET first_name=?,middle_name=?,last_name=?,name=?,emp_code=?,designation=?,staff_kind=?,trade_id=?,sbus=?,sbu=?,skill_ids=?,email=?,mobile=?,agency_name=?,status=?";
-                $args = [$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $b['status'] ?? 'ACTIVE'];
+                $sql = "UPDATE inspectors SET first_name=?,middle_name=?,last_name=?,name=?,emp_code=?,designation=?,staff_kind=?,trade_id=?,sbus=?,sbu=?,skill_ids=?,email=?,mobile=?,agency_name=?,home_office_id=?,weekly_working_days=?,reports_to_id=?,status=?";
+                $args = [$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $homeOff, $wwd, $reportTo, $b['status'] ?? 'ACTIVE'];
                 if ($salary !== null) { $sql .= ",salary_ctc=?"; $args[] = $salary; }
                 if ($agencyCost !== null) { $sql .= ",agency_cost=?"; $args[] = $agencyCost; }
                 $sql .= " WHERE id=?"; $args[] = $ins['id'];
@@ -1524,9 +1552,9 @@ function ops_inspectors($action, $method) {
                 flash('Inspector saved.');
                 redirect('/m/inspectors/edit?id=' . $ins['id']);
             } else {
-                $pdo->prepare("INSERT INTO inspectors (first_name,middle_name,last_name,name,emp_code,designation,staff_kind,trade_id,sbus,sbu,skill_ids,email,mobile,agency_name,agency_cost,salary_ctc,status,created_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $agencyCost ?: 0, $salary ?: 0, $b['status'] ?? 'ACTIVE', date('c')]);
+                $pdo->prepare("INSERT INTO inspectors (first_name,middle_name,last_name,name,emp_code,designation,staff_kind,trade_id,sbus,sbu,skill_ids,email,mobile,agency_name,home_office_id,weekly_working_days,reports_to_id,agency_cost,salary_ctc,status,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $homeOff, $wwd, $reportTo, $agencyCost ?: 0, $salary ?: 0, $b['status'] ?? 'ACTIVE', date('c')]);
                 $id = $pdo->lastInsertId();
                 flash('Inspector added. You can now add certifications.');
                 redirect('/m/inspectors/edit?id=' . $id);
@@ -1534,6 +1562,8 @@ function ops_inspectors($action, $method) {
         }
         $certs = $ins ? ops_all("SELECT * FROM inspector_certs WHERE inspector_id=? ORDER BY valid_to", [$ins['id']]) : [];
         view('ops/inspector_form', ['ins' => $ins, 'certs' => $certs, 'skillsByTrade' => skills_by_trade(),
+            'offices' => ops_all("SELECT id, name FROM offices ORDER BY is_ahmedabad DESC, name"),
+            'managers' => ops_all("SELECT id, first_name, last_name, username, role FROM users WHERE is_active=1 ORDER BY first_name, last_name"),
             'expHeads' => ops_all("SELECT * FROM expense_heads WHERE active=1 ORDER BY sort_order, id"),
             'travelModes' => ops_all("SELECT * FROM travel_modes WHERE active=1 ORDER BY id"),
             'allowMap' => $ins ? inspector_allow_map($ins['id']) : ['HEAD'=>[], 'MODE'=>[]]]);
@@ -2261,6 +2291,20 @@ function ops_vouchers($route, $method) {
         ops_require(can_edit_voucher($v), 'This voucher can no longer be edited.');
         $heads = voucher_heads_for($v['inspector_id']);
         $rates = voucher_mode_rates($v['inspector_id']);
+        // 8.5-hour daily cap: no inspector may log more than DAILY_HOURS_CAP working
+        // hours on any single date. Validate the whole submission before saving.
+        $hoursByDate = [];
+        foreach (($_POST['rows'] ?? []) as $eid => $r) {
+            $e = ops_one("SELECT entry_date FROM voucher_entries WHERE id=? AND voucher_id=?", [(int)$eid, $v['id']]);
+            if (!$e || !$e['entry_date']) continue;
+            $hoursByDate[$e['entry_date']] = ($hoursByDate[$e['entry_date']] ?? 0) + (float)($r['hours'] ?? 0);
+        }
+        foreach ($hoursByDate as $d => $hrs) {
+            if ($hrs > DAILY_HOURS_CAP + 0.001) {
+                flash('Hours on ' . $d . ' total ' . rtrim(rtrim(number_format($hrs, 2), '0'), '.') . ' h — over the ' . DAILY_HOURS_CAP . ' h daily limit. Please reduce so no day exceeds 8.5 hours.', 'error');
+                redirect('/voucher?id=' . $v['id']);
+            }
+        }
         $grand = 0;
         foreach (($_POST['rows'] ?? []) as $eid => $r) {
             $e = ops_one("SELECT * FROM voucher_entries WHERE id=? AND voucher_id=?", [(int)$eid, $v['id']]);
@@ -2297,10 +2341,20 @@ function ops_vouchers($route, $method) {
         ops_require(can_edit_voucher($v), 'This voucher can no longer be edited.');
         $b = $_POST; $do = $b['_do'] ?? '';
         if ($do === 'update') {
+            $ent = ops_one("SELECT entry_date FROM voucher_entries WHERE id=? AND voucher_id=?", [(int)$b['entry_id'], $v['id']]);
+            if ($ent && $ent['entry_date']) {
+                [$ok, , $cap, $tot] = hours_within_cap($v['inspector_id'], $ent['entry_date'], (float)($b['hours'] ?? 0), (int)$b['entry_id']);
+                if (!$ok) { flash('Hours on ' . $ent['entry_date'] . ' would total ' . rtrim(rtrim(number_format($tot, 2), '0'), '.') . ' h — over the ' . $cap . ' h daily limit.', 'error'); redirect('/voucher?id=' . $v['id']); }
+            }
             $pdo->prepare("UPDATE voucher_entries SET hours=?, line_no=?, file_no=?, notes=? WHERE id=? AND voucher_id=?")
                 ->execute([(float)($b['hours'] ?? 0), $b['line_no'] ?? '', $b['file_no'] ?? '', $b['notes'] ?? '', (int)$b['entry_id'], $v['id']]);
             flash('Row updated.');
         } elseif ($do === 'add') {
+            $ed = $b['entry_date'] ?? '';
+            if ($ed) {
+                [$ok, , $cap, $tot] = hours_within_cap($v['inspector_id'], $ed, (float)($b['hours'] ?? 0));
+                if (!$ok) { flash('Hours on ' . $ed . ' would total ' . rtrim(rtrim(number_format($tot, 2), '0'), '.') . ' h — over the ' . $cap . ' h daily limit.', 'error'); redirect('/voucher?id=' . $v['id']); }
+            }
             $dt = in_array($b['day_type'] ?? '', ['OFFICE','LEAVE','HOLIDAY','WEEKOFF','WORK'], true) ? $b['day_type'] : 'OFFICE';
             $pdo->prepare("INSERT INTO voucher_entries (voucher_id,entry_date,day_type,sbu,site_label,hours,leave_code,office_code,is_auto)
                 VALUES (?,?,?,?,?,?,?,?,0)")
