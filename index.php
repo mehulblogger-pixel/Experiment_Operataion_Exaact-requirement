@@ -343,6 +343,23 @@ if ($route === 'partner-add' && $method === 'POST') {
     if (isset($map[$kind])) {
         [$table, $fields, $tab] = $map[$kind];
         if ($kind === 'address' && !empty($b['city'])) $b['city'] = normalise_city($b['city']); // light spell-normalise
+        // §3 — a contract number identifies one contract. The same number under
+        // this same client is a rate contract being extended; under a different
+        // client it is a duplicate, and every expiry and quantity check
+        // downstream would then be reading somebody else's contract.
+        if ($kind === 'contract' && function_exists('contract_no_clash')) {
+            $cn = trim((string)($b['contract_number'] ?? ''));
+            $clash = contract_no_clash($cn, $p['id']);
+            if ($clash) {
+                flash('Contract number ' . $cn . ' is already registered against '
+                    . ($clash['owner_name'] ?: 'another party') . '. Contract numbers must be unique.', 'error');
+                redirect("/partner?id={$p['id']}&tab=contracts");
+            }
+            if ($cn !== '' && ops_val("SELECT id FROM partner_contracts WHERE partner_id=? AND contract_number=? LIMIT 1", [$p['id'], $cn])) {
+                flash('This ' . Tl('client') . ' already has contract ' . $cn . '. Open it to change its dates or value.', 'error');
+                redirect("/partner?id={$p['id']}&tab=contracts");
+            }
+        }
         $cols = array_merge(['partner_id'], $fields);
         $ph = implode(',', array_fill(0, count($cols), '?'));
         $vals = [$p['id']];

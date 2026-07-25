@@ -95,6 +95,15 @@
         if (open && sel && input.value !== cur()) sel.dispatchEvent(new MouseEvent('mousedown'));
       }
     });
+    // Choosing a value keeps the focus on the box (the option is taken on
+    // mousedown, with the default prevented). That meant `focus` never fired
+    // again, so clicking the box a second time did nothing at all and the list
+    // could not be reopened without tabbing away first. Click now toggles, the
+    // way a real <select> does.
+    input.addEventListener('mousedown', function () {
+      if (list.style.display === 'none') { build(''); list.style.display = 'block'; input.select(); }
+      else { list.style.display = 'none'; }
+    });
     input.addEventListener('focus', function () { input.select(); build(''); list.style.display = 'block'; });
     input.addEventListener('input', function () { build(input.value); list.style.display = 'block'; highlight(0); });
     input.addEventListener('blur', function () { setTimeout(function () { list.style.display = 'none'; input.value = cur(); }, 150); });
@@ -159,6 +168,11 @@
         d.textContent = 'Start typing to add one'; list.appendChild(d);
       }
     }
+    // Same reopening fault as the searchable select above — click toggles.
+    input.addEventListener('mousedown', function () {
+      if (list.style.display === 'none') { build(); list.style.display = 'block'; }
+      else { list.style.display = 'none'; }
+    });
     input.addEventListener('focus', function () { build(); list.style.display = 'block'; });
     input.addEventListener('input', function () { build(); list.style.display = 'block'; });
     input.addEventListener('keydown', function (e) {
