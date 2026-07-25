@@ -1164,18 +1164,26 @@ function ops_masters() {
     return [
         'offices' => [
             'label' => 'Offices / branches (IBO)', 'table' => 'offices', 'access' => 'admin', 'order' => 'is_ahmedabad DESC, name',
+            // Same columns the Organisation screen writes — the two editors are
+            // views on one table, so an office never has two versions of itself.
             'fields' => [
                 ['code','Code','text',['req'=>1]],
                 ['name','Office name','text',['req'=>1]],
+                ['office_type','Type','select',['opts'=>OFFICE_TYPES]],
+                ['parent_office_id','Sits under','ref',['ref'=>'offices','optfn'=>'offices_list','optlabel'=>'name']],
+                ['region','Region / zone','text',[]],
                 ['city','City','text',[]],
+                ['address','Address','text',[]],
+                ['phone','Phone','text',[]],
                 ['coordinator_name','Coordinator name','text',[]],
                 ['coordinator_email','Coordinator email','text',[]],
                 ['manager_name','Manager name','text',[]],
                 ['manager_email','Manager email','text',[]],
                 ['is_ahmedabad','This is the Ahmedabad (managing) office','check',[]],
             ],
-            'list' => ['code'=>'Code','name'=>'Office','city'=>'City','coordinator_name'=>'Coordinator','manager_name'=>'Manager'],
-            'list_labels' => [],
+            'list' => ['code'=>'Code','name'=>'Office','office_type'=>'Type','parent_office_id'=>'Sits under','city'=>'City','manager_name'=>'Manager'],
+            'list_labels' => ['office_type'=>OFFICE_TYPES],
+            'ref_cols' => ['parent_office_id'=>['offices','name']],
         ],
         'back-office' => [
             'label' => 'Back-office staff', 'table' => 'back_office_staff', 'access' => 'admin', 'order' => 'name',
@@ -1413,7 +1421,7 @@ function ops_module_gate($route) {
         'masters'=>'masters','work-norms'=>'masters',
         'office-finance'=>'overheads',
         'reports'=>'reports',
-        'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users',
+        'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users','org-template'=>'users',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
     ];
     $mod = $map[$base] ?? null;
@@ -1544,7 +1552,9 @@ function ops_dispatch($route, $method) {
         case $route === 'availability':
             ops_inspector_availability($method); return true;
         case $route === 'hierarchy':
-            ops_hierarchy($method); return true;
+            return ops_hierarchy_screen($method);
+        case $route === 'org-template':
+            return ops_org_template();
         case $route === 'work-norms':
             ops_work_norms($method); return true;
         case in_array($route, ['documents','document','document-new','document-edit','document-submit','document-finalize','document-delete'], true):
