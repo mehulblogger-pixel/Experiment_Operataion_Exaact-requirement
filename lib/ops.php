@@ -1248,6 +1248,7 @@ function ops_module_gate($route) {
         'document-pdf'=>'idems','document-timestamp'=>'idems','document-docx'=>'idems',
         'report-templates'=>'idems','report-template-edit'=>'idems','report-template-download'=>'idems',
         'endorsements'=>'idems','endorsement'=>'idems','endorsement-new'=>'idems','endorsement-edit'=>'idems','endorsement-submit'=>'idems','endorsement-approve'=>'idems','endorsement-delete'=>'idems','endorsement-file'=>'idems','endorsement-cert'=>'idems',
+        'phrase-library'=>'idems','phrase-edit'=>'idems',
         'masters'=>'masters','work-norms'=>'masters',
         'office-finance'=>'overheads',
         'reports'=>'reports',
@@ -1408,6 +1409,10 @@ function ops_dispatch($route, $method) {
             return ops_idems_endorsements($route, $method);
         case $route === 'endorsement-cert':
             return ops_idems_endorse_cert($method);
+        case $route === 'writing-assistant':
+            return ops_idems_writing($method);
+        case $route === 'phrase-library' || $route === 'phrase-edit':
+            return ops_idems_phrases($route, $method);
         case $route === 'irn-rules':
             return ops_idems_numbering($method);
         case $route === 'audit-log':
