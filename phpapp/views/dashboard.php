@@ -188,9 +188,9 @@
           SUM(CASE WHEN status='ACCEPTED' THEN total_amount ELSE 0 END) won_val,
           SUM(CASE WHEN status='ACCEPTED' THEN 1 ELSE 0 END) won_n,
           SUM(CASE WHEN status IN ('LOST','EXPIRED') THEN 1 ELSE 0 END) lost_n
-          FROM <?= e(Tlp('quote')) ?> q WHERE is_current=1 AND $qw", $qa) ?: [];
-      $fuDue = (int)ops_val("SELECT COUNT(*) FROM quote_followups f JOIN <?= e(Tlp('quote')) ?> q ON q.id=f.quote_id WHERE f.status='PENDING' AND f.due_date<=? AND q.status='SENT' AND $qw", array_merge([$today], $qa));
-      $pendApprove = (can('crm.quote.approve') || is_master()) ? (int)ops_val("SELECT COUNT(*) FROM quote_approvals a JOIN <?= e(Tlp('quote')) ?> q ON q.id=a.quote_id WHERE a.status='PENDING' AND q.status='PENDING_APPROVAL' AND $qw", $qa) : 0;
+          FROM quotations q WHERE is_current=1 AND $qw", $qa) ?: [];
+      $fuDue = (int)ops_val("SELECT COUNT(*) FROM quote_followups f JOIN quotations q ON q.id=f.quote_id WHERE f.status='PENDING' AND f.due_date<=? AND q.status='SENT' AND $qw", array_merge([$today], $qa));
+      $pendApprove = (can('crm.quote.approve') || is_master()) ? (int)ops_val("SELECT COUNT(*) FROM quote_approvals a JOIN quotations q ON q.id=a.quote_id WHERE a.status='PENDING' AND q.status='PENDING_APPROVAL' AND $qw", $qa) : 0;
       $winRate = ((int)$qs['won_n'] + (int)$qs['lost_n']) > 0 ? round((int)$qs['won_n'] / ((int)$qs['won_n'] + (int)$qs['lost_n']) * 100) : 0;
       ob_start(); ?>
       <div class="ctitle" style="margin-top:22px"><h3>Sales pipeline</h3><a href="/quotes"><?= e(THP('quote')) ?> →</a><?php if (can('mod.crm_reports.view')): ?> <a href="/crm-reports" style="margin-left:8px">Sales dashboard →</a><?php endif; ?></div>
