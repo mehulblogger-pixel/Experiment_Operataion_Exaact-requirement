@@ -16,6 +16,30 @@
   </div>
 </div>
 
+<?php // §3 — new duplicates are refused at entry and by a unique index. A database
+      // that already held duplicates before that rule existed cannot build the
+      // index, so the ones already there are named here instead of being hidden.
+      $dupQ = ops_all("SELECT quote_no, rev, COUNT(*) n FROM quotations GROUP BY quote_no, rev HAVING COUNT(*)>1");
+      $dupC = ops_all("SELECT contract_number, COUNT(*) n FROM partner_contracts WHERE contract_number<>'' GROUP BY contract_number HAVING COUNT(*)>1");
+?>
+<?php if ($dupQ || $dupC): ?>
+<div class="panel" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)">
+  <b style="color:var(--warn)">⚠ Numbers used more than once</b>
+  <div class="muted" style="margin-top:4px">
+    New duplicates are now refused, but these were recorded before that rule existed. Until they are merged or
+    renumbered, anything counted against them — revenue, contract expiry, quantity used — is reading more than one record.
+  </div>
+  <div style="margin-top:6px;font-size:13px">
+    <?php foreach ($dupQ as $d): ?>
+      <span class="pill p-warn"><?= e(Tl('quote')) ?> <?= e($d['quote_no']) ?><?= (int)$d['rev'] ? ' R' . (int)$d['rev'] : '' ?> × <?= (int)$d['n'] ?></span>
+    <?php endforeach; ?>
+    <?php foreach ($dupC as $d): ?>
+      <span class="pill p-warn">contract <?= e($d['contract_number']) ?> × <?= (int)$d['n'] ?></span>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <?php // Each card filters the register to its own view, so the number is a way in
       // rather than a read-out. Won and lost carry a tone rail. ?>
 <div class="kpi-row">

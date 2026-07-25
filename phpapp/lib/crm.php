@@ -321,6 +321,22 @@ function crm_migrate() {
     }
     crm_backfill_locations();
     crm_canon_product_categories();
+    crm_unique_number_indexes();
+}
+
+// §3 — the same rule as the screens, enforced by the database, so two people
+// saving in the same second cannot both get through. Best-effort: if the table
+// already holds duplicates the index will not build, and the screen-level checks
+// (which give a readable message anyway) remain the guard.
+function crm_unique_number_indexes() {
+    $idx = [
+        ['uq_quotations_no_rev', 'quotations',        '(quote_no, rev)'],
+        ['uq_contract_number',   'partner_contracts', '(contract_number)'],
+    ];
+    foreach ($idx as [$name, $table, $cols]) {
+        try { db()->exec("CREATE UNIQUE INDEX $name ON $table $cols"); }
+        catch (Throwable $e) { /* already there, or existing duplicates — the app-level check stands */ }
+    }
 }
 
 // Quotations used to store the product category as the words on the master list
@@ -402,7 +418,49 @@ function crm_backfill_locations() {
 // ---- Small helpers ---------------------------------------------------------
 function crm_next_inquiry_no() { return ops_next_code('crm_inquiries', 'inquiry_no', 'INQ'); }
 // Quote number is per base document; revisions keep the same number and bump `rev`.
-function crm_next_quote_no() { return ops_next_code('quotations', 'quote_no', 'Q'); }
+function crm_next_quote_no() {
+    // Two people creating a quotation in the same second would otherwise be
+    // handed the same number. Take the next free one, and if it is already gone
+    // by the time we look again, step past it.
+    $no = ops_next_code('quotations', 'quote_no', 'Q');
+    for ($i = 0; $i < 50 && quote_no_taken($no, 0); $i++) {
+        $n = (int)substr($no, strrpos($no, '-') + 1);
+        $no = sprintf('Q-%05d', $n + 1);
+    }
+    return $no;
+}
+// ---------------------------------------------------------------------------
+//  §3 — a number identifies one thing, or it identifies nothing
+//
+//  Two quotations sharing a number, or two contracts sharing a contract number,
+//  make every downstream figure ambiguous: which order did this call draw on,
+//  which contract expired, whose quantity was used up. Both are refused at the
+//  point of entry, and the database carries the same rule so a race between two
+//  users cannot slip one through.
+// ---------------------------------------------------------------------------
+// Is this quotation number (at this revision) already used by another record?
+function quote_no_taken($quoteNo, $rev = 0, $exceptId = null) {
+    $quoteNo = trim((string)$quoteNo);
+    if ($quoteNo === '') return false;
+    $sql = "SELECT id FROM quotations WHERE quote_no=? AND rev=?";
+    $args = [$quoteNo, (int)$rev];
+    if ($exceptId) { $sql .= " AND id<>?"; $args[] = (int)$exceptId; }
+    return (bool)ops_val($sql . " LIMIT 1", $args);
+}
+// A contract number belongs to exactly one client. Returns the contract row it
+// is already on when that row belongs to somebody else, else null. The same
+// number on the SAME client is not a duplicate — that is a rate contract being
+// drawn down again, which is the normal case.
+function contract_no_clash($contractNo, $clientId, $exceptId = null) {
+    $contractNo = trim((string)$contractNo);
+    if ($contractNo === '') return null;
+    $sql = "SELECT c.*, COALESCE(NULLIF(bp.display_name,''), bp.legal_name) owner_name
+            FROM partner_contracts c LEFT JOIN business_partners bp ON bp.id=c.partner_id
+            WHERE c.contract_number=? AND (c.partner_id IS NULL OR c.partner_id<>?)";
+    $args = [$contractNo, (int)$clientId];
+    if ($exceptId) { $sql .= " AND c.id<>?"; $args[] = (int)$exceptId; }
+    return ops_one($sql . " LIMIT 1", $args);
+}
 // "Q-00042 Rev 01" style label.
 function quote_label($q) { $n = $q['quote_no'] ?? ''; $r = (int)($q['rev'] ?? 0); return $r > 0 ? "$n Rev " . str_pad((string)$r, 2, '0', STR_PAD_LEFT) : $n; }
 function crm_inquiry_get($id) { return ops_one("SELECT * FROM crm_inquiries WHERE id=?", [(int)$id]); }
@@ -767,6 +825,14 @@ function ops_crm_quotes($route, $method) {
             $b = $_POST;
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
             $no = trim($b['quote_no'] ?? '') ?: crm_next_quote_no();
+            // §3 — an external quotation carries the number the client or the
+            // portal gave it, so it is the one place a duplicate can be typed in.
+            if (quote_no_taken($no, 0)) {
+                flash(ucfirst(Tl('quote')) . ' number ' . $no . ' is already on the register. '
+                    . 'Every ' . Tl('quote') . ' number must be unique — check the register, or leave the box empty '
+                    . 'and one will be allotted.', 'error');
+                redirect('/quote-external');
+            }
             $cols = ['quote_no','rev','is_current','status','origin','origin_portal','origin_ref','client_id','client_name',
                 'contact_name','contact_email','contact_mobile','sbu','office_id','subject','product_category',
                 'inspection_types','total_amount','subtotal','gst_pct','payment_terms','sent_at','owner_id','created_by','created_at'];
@@ -1055,6 +1121,20 @@ function ops_crm_quotes($route, $method) {
         $contractNo = trim($_POST['contract_number'] ?? '');
         $start = $_POST['start_date'] ?? ''; $end = $_POST['end_date'] ?? '';
         $contractId = $q['contract_id'] ?: null;
+        // §3 — the same contract number on the same client is a rate contract
+        // being drawn down again, which is normal. The same number on a DIFFERENT
+        // client is a duplicate, and every expiry and quantity figure downstream
+        // would then be reading the wrong contract.
+        if ($contractNo !== '' && $cid) {
+            $clash = contract_no_clash($contractNo, $cid);
+            if ($clash) {
+                flash('Contract number ' . $contractNo . ' is already registered against '
+                    . ($clash['owner_name'] ?: 'another ' . Tl('client'))
+                    . '. A contract number must identify one contract — use a different number, '
+                    . 'or correct the ' . Tl('client') . ' on this ' . Tl('quote') . '.', 'error');
+                redirect('/quote?id=' . $q['id']);
+            }
+        }
         if ($contractNo !== '' && $cid) {
             $ex = ops_one("SELECT id FROM partner_contracts WHERE partner_id=? AND contract_number=?", [$cid, $contractNo]);
             if ($ex) $contractId = (int)$ex['id'];
