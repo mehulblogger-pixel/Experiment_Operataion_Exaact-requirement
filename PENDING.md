@@ -1049,3 +1049,32 @@ the theme builder (no colour hardcoded, no CSS variable renamed).
 - [x] Readable error page instead of blank 500.
 - [x] Full operations system (Calls, Jobs, Closure, Expenses, SubCon, Attendance,
       Holidays, Comp-off, Credit, Dashboards) with 4 roles + salary security.
+
+## Consistency pass — headings, dropdowns, terminology (done)
+
+Audited first (no code), reported, then built to the agreed decisions.
+
+- **Terminology engine** `lib/terms.php` + `/terminology`: 27 business nouns,
+  each renameable once and followed everywhere. Shipped vocabulary: Client,
+  Quote, Inspection Call, Deputation, Report, Inspection Engineer + User, IBO,
+  SBU, BOSS Number, Man-day; Vendor / Manufacturer / Supplier / Sub-vendor all
+  kept as distinct parties.
+- **One heading standard** across all 55 screens; sidebar label = the heading it
+  opens; emoji and trailing spaces removed from card titles.
+- **Screens merged**: Approval rules (was 2), Document templates (was 2),
+  Masters (was 2), Users vs Roles & permissions.
+- **Every dropdown editable**: ~60 lists / ~500 values under Masters, grouped by
+  module with a search box. Constants remain as fallbacks.
+- **One list per concept**: work type (Sales + Ops), charge unit (quote + rate +
+  PO), deliverables (from the report-types register), ISO/IEC 17020 result
+  wording, and only two rejection words (Rejected / Sent back).
+- **Settings** gained: hours cap, default weekly working days, employee-code
+  prefix, currency symbol, date format, required source documents, high-risk
+  audit actions.
+- **De-branded**: no third-party agency name anywhere in code, seeds, themes,
+  e-mails or placeholders.
+
+Data-level upgrades (renamed lists, rewritten codes, dropped lists) cannot be
+detected by a missing table or column, so the boot probe asserts them and each
+assertion self-cancels once applied. All were tested against a simulated older
+database as well as a fresh one.
