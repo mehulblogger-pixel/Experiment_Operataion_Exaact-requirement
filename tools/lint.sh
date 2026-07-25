@@ -31,3 +31,10 @@ echo "OK - $count PHP files parse cleanly."
 # a `<?= ... ?>` inside a quoted string, where it becomes literal text in a SQL
 # query or an e-mail body. php -l cannot see that, so check it separately.
 php tools/check-strings.php || exit 1
+
+# And a file can parse perfectly, contain no stray tags, and still take a screen
+# down: two files declaring the same function name fatal with "Cannot redeclare"
+# the moment both are loaded. php -l never sees it, because each file is fine on
+# its own — which is exactly how views/detail.php shipped with its own fdate()
+# and killed the client and vendor pages while every other screen worked.
+php tools/check-dupes.php || exit 1
