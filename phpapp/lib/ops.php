@@ -2109,6 +2109,13 @@ function ops_calls($route, $method) {
             $wasForwarded = $call ? ($call['executing_office_id'] ?? null) : null;
             $forwardNow = $execOffice && !$wasForwarded; // first time it gets an executing branch
             $notifyMgr = !empty($b['notify_manager']) ? 1 : 0;
+            // §11 — the inspection is at the client's own premises: the same
+            // partner is both the customer and the site. Flag them as a site
+            // partner so they appear in the site list from now on, instead of
+            // making somebody go and edit the partner record first.
+            $vid = (int)($b['vendor_id'] ?? 0);
+            if ($vid && $vid === (int)($b['client_id'] ?? 0))
+                $pdo->prepare("UPDATE business_partners SET is_vendor=1 WHERE id=? AND is_vendor=0")->execute([$vid]);
             if ($call) {
                 $set = implode(',', array_map(fn($f)=>"$f=?", $fields));
                 $vals = array_map(fn($f)=> nzc_call($f, $b[$f] ?? ''), $fields); $vals[] = $call['id'];

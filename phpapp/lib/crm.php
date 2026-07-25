@@ -402,6 +402,9 @@ function crm_save_lines($qid, $b) {
     $desc = (array)($b['l_desc'] ?? []); $svc = (array)($b['l_service'] ?? []); $sbu = (array)($b['l_sbu'] ?? []);
     $ot = (array)($b['l_order'] ?? []);
     $qty = (array)($b['l_qty'] ?? []); $unit = (array)($b['l_unit'] ?? []); $rate = (array)($b['l_rate'] ?? []);
+    // The sub-type free-text box is gone from the form: the Service dropdown is
+    // now restricted to the header's agreed types, which is what it was really
+    // for. The column stays so older rows keep printing.
     $sub = (array)($b['l_subtypes'] ?? []); $del = (array)($b['l_deliv'] ?? []);
     $act = (array)($b['l_activity'] ?? []); $off = (array)($b['l_office'] ?? []); $lid = (array)($b['l_location'] ?? []);
     // Site is chosen from the quote's address book; the text copy is kept so the
