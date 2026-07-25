@@ -1130,3 +1130,15 @@ Allocate
 - Own employee vs not-ours → freelancer / sub-contractor, engineer list filtered.
 - Credit direction defaults to Given for cross-office.
 - Filters: engineer, office, month, date range, nobody-allocated.
+
+## Inspector availability (done)
+
+- Six cards: total, available, on job, on leave, in office, training/other.
+- "Free to allocate" = free today AND tomorrow only.
+- Date check: pick a date + days needed -> who is free, for how long, and what
+  they are on next; whole-period cover highlighted; 45-day horizon.
+- Filters: name, office, SBU, status; plus a month grid (free / on job / leave /
+  other per day, with a free-day count).
+- Look-ahead reads open deputations (scheduled day, start-end period, and the
+  deputation's visit dates) plus manual day statuses - the same sources as the
+  day view, so the two can never disagree.
