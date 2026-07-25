@@ -1,5 +1,6 @@
 <?php
-  $stPill = ['DRAFT'=>'p-mut','PENDING_APPROVAL'=>'p-warn','APPROVED'=>'p-info','SENT'=>'p-info','ACCEPTED'=>'p-ok','LOST'=>'p-bad','EXPIRED'=>'p-mut'];
+  $stPill = ['DRAFT'=>'p-mut','PENDING_APPROVAL'=>'p-warn','APPROVED'=>'p-info','SENT'=>'p-info',
+             'ACCEPTED'=>'p-ok','LOST'=>'p-bad','REJECTED'=>'p-bad','EXPIRED'=>'p-mut'];
   $tabs = ['all'=>'All','open'=>'Open','pending'=>'Pending','closed'=>'Closed (won)','lost'=>'Lost'];
   $qs = function($v) { return '/quotes?' . http_build_query(array_merge($_GET, ['v'=>$v])); };
 ?>
@@ -7,8 +8,10 @@
   <div><h1><?= e(T_REG('quote')) ?></h1>
     <p class="sub" style="margin:2px 0 0">Quote → approval → send → follow-up → acceptance. <?= count($rows) ?> shown.</p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
-    <?php if (can('crm.quote.approve') || is_master()): ?><a class="btn secondary" href="/quote-approval-rules">Approval rules</a><?php endif; ?>
-    <?php if (can('crm.template.manage') || is_master()): ?><a class="btn secondary" href="/crm-templates">Templates</a><?php endif; ?>
+    <a class="btn secondary" href="/quotes?<?= e(http_build_query(array_merge($_GET, ['export'=>'1']))) ?>">⬇ Export</a>
+    <?php if (can('crm.quote.approve') || is_master()): ?><a class="btn secondary" href="/approval-rules?module=quote">Approval rules</a><?php endif; ?>
+    <?php if (can('crm.template.manage') || is_master()): ?><a class="btn secondary" href="/templates?kind=quote">Templates</a><?php endif; ?>
+    <?php if (can('crm.quote.create') || can('mod.quotes.edit')): ?><a class="btn secondary" href="/quote-external">+ External</a><?php endif; ?>
     <?php if (can('crm.quote.create') || can('mod.quotes.edit')): ?><a class="btn" href="/quote-new">+ New <?= e(Tl('quote')) ?></a><?php endif; ?>
   </div>
 </div>
