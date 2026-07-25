@@ -155,15 +155,21 @@ if ($route === 'login') {
         $u = $q->fetch();
         if ($u && $u['is_active'] && password_verify($_POST['password'] ?? '', $u['password_hash'])) {
             $_SESSION['uid'] = $u['id'];
+            if (function_exists('idems_log')) idems_log('user', $u['id'], 'LOGIN', ['field'=>$u['username']]);
             flash('Welcome, ' . user_name($u) . '.');
             redirect('/');
         }
+        // record failed attempts too — they matter for a compliance review
+        if (function_exists('idems_log')) idems_log('user', $u['id'] ?? null, 'LOGIN_FAILED', ['field'=>substr((string)($_POST['username'] ?? ''), 0, 60)]);
         return render_login('Invalid username or password.');
     }
     if (current_user()) redirect('/');
     return render_login(null);
 }
-if ($route === 'logout') { session_destroy(); redirect('/login'); }
+if ($route === 'logout') {
+    if (function_exists('idems_log') && current_user()) idems_log('user', current_user()['id'], 'LOGOUT', []);
+    session_destroy(); redirect('/login');
+}
 
 // --- Everything below requires login ---
 require_login();
