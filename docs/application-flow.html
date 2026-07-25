@@ -1,0 +1,1154 @@
+<title>Exaact — End-to-End Operating Flow</title>
+
+<style>
+  /* ---------------------------------------------------------------------
+     Tokens. Every colour and size below is referenced through a custom
+     property, so the dark theme is a token swap rather than a second set
+     of rules. Neutrals are biased slightly toward the teal accent so they
+     read as chosen rather than inherited.
+     --------------------------------------------------------------------- */
+  :root{
+    --ground:#F6F7F7; --surface:#FFFFFF; --surface-2:#EDF1F1; --surface-3:#E4EAEA;
+    --ink:#14191B; --ink-2:#4A555A; --ink-3:#7B888D;
+    --line:#D7DFE0; --line-strong:#B9C6C8;
+    --accent:#0E5C64; --accent-2:#12747E; --accent-soft:#E1EFF0;
+    --won:#2C6E49; --won-soft:#E4F0E8;
+    --lost:#9E3B2E; --lost-soft:#F8E8E5;
+    --wait:#9A660F; --wait-soft:#FAF0DC;
+    --shadow:0 1px 2px rgba(20,25,27,.05), 0 8px 24px -18px rgba(20,25,27,.35);
+
+    --serif:"Iowan Old Style","Charter","Bitstream Charter","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+    --sans:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","SFMono-Regular","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+
+    --t-xs:.705rem; --t-sm:.815rem; --t-base:.945rem; --t-md:1.02rem;
+    --t-lg:1.16rem; --t-xl:1.42rem; --t-2xl:1.95rem; --t-3xl:2.75rem;
+    --gut:76px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#0E1214; --surface:#151B1D; --surface-2:#1B2325; --surface-3:#222C2F;
+      --ink:#E6EBEC; --ink-2:#A5B2B6; --ink-3:#78878C;
+      --line:#283235; --line-strong:#3A4749;
+      --accent:#54BAC3; --accent-2:#7FD2D9; --accent-soft:#122A2D;
+      --won:#6FC08F; --won-soft:#132620;
+      --lost:#E4897A; --lost-soft:#2B1916;
+      --wait:#DFB264; --wait-soft:#2A2214;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -18px rgba(0,0,0,.8);
+    }
+  }
+  /* The viewer's own toggle must beat the OS preference in both directions. */
+  :root[data-theme="dark"]{
+    --ground:#0E1214; --surface:#151B1D; --surface-2:#1B2325; --surface-3:#222C2F;
+    --ink:#E6EBEC; --ink-2:#A5B2B6; --ink-3:#78878C;
+    --line:#283235; --line-strong:#3A4749;
+    --accent:#54BAC3; --accent-2:#7FD2D9; --accent-soft:#122A2D;
+    --won:#6FC08F; --won-soft:#132620;
+    --lost:#E4897A; --lost-soft:#2B1916;
+    --wait:#DFB264; --wait-soft:#2A2214;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -18px rgba(0,0,0,.8);
+  }
+  :root[data-theme="light"]{
+    --ground:#F6F7F7; --surface:#FFFFFF; --surface-2:#EDF1F1; --surface-3:#E4EAEA;
+    --ink:#14191B; --ink-2:#4A555A; --ink-3:#7B888D;
+    --line:#D7DFE0; --line-strong:#B9C6C8;
+    --accent:#0E5C64; --accent-2:#12747E; --accent-soft:#E1EFF0;
+    --won:#2C6E49; --won-soft:#E4F0E8;
+    --lost:#9E3B2E; --lost-soft:#F8E8E5;
+    --wait:#9A660F; --wait-soft:#FAF0DC;
+    --shadow:0 1px 2px rgba(20,25,27,.05), 0 8px 24px -18px rgba(20,25,27,.35);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:var(--sans); font-size:var(--t-base); line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1120px; margin:0 auto; padding:0 28px 96px}
+  p{margin:0 0 .85em; max-width:70ch}
+  a{color:var(--accent); text-underline-offset:2px}
+  a:focus-visible, summary:focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:3px}
+
+  /* --- shared type roles ------------------------------------------------ */
+  .lab{
+    font-family:var(--mono); font-size:var(--t-xs); letter-spacing:.11em;
+    text-transform:uppercase; color:var(--ink-3); font-weight:600;
+  }
+  code, .v{
+    font-family:var(--mono); font-size:.88em; background:var(--surface-2);
+    border:1px solid var(--line); border-radius:4px; padding:.08em .38em;
+    color:var(--ink); white-space:nowrap;
+  }
+  .v-accent{background:var(--accent-soft); border-color:transparent; color:var(--accent)}
+  .v-won{background:var(--won-soft); border-color:transparent; color:var(--won)}
+  .v-lost{background:var(--lost-soft); border-color:transparent; color:var(--lost)}
+  .v-wait{background:var(--wait-soft); border-color:transparent; color:var(--wait)}
+
+  /* --- masthead: a controlled document, not a landing page -------------- */
+  .mast{border-bottom:2px solid var(--ink); padding:52px 0 22px; margin-bottom:8px}
+  .mast h1{
+    font-family:var(--serif); font-size:var(--t-3xl); line-height:1.06;
+    margin:.18em 0 .28em; font-weight:600; letter-spacing:-.015em; text-wrap:balance;
+  }
+  .mast .stand{font-size:var(--t-lg); color:var(--ink-2); max-width:62ch; margin:0}
+  .docref{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr)); gap:0;
+    border:1px solid var(--line); border-radius:6px; overflow:hidden;
+    margin-top:30px; background:var(--surface);
+  }
+  .docref div{padding:11px 14px; border-right:1px solid var(--line)}
+  .docref div:last-child{border-right:0}
+  .docref b{display:block; font-family:var(--mono); font-size:var(--t-sm); font-weight:600; margin-top:3px}
+
+  /* --- section headings ------------------------------------------------- */
+  h2{
+    font-family:var(--serif); font-size:var(--t-2xl); font-weight:600;
+    letter-spacing:-.012em; margin:64px 0 6px; text-wrap:balance;
+  }
+  h3{font-family:var(--serif); font-size:var(--t-xl); font-weight:600; margin:0 0 4px; letter-spacing:-.008em}
+  h4{font-size:var(--t-md); font-weight:650; margin:20px 0 6px}
+  .dek{color:var(--ink-2); max-width:70ch; margin:0 0 24px}
+
+  /* --- module map ------------------------------------------------------- */
+  .phases{display:grid; grid-template-columns:repeat(auto-fit,minmax(216px,1fr)); gap:14px; margin:26px 0 8px}
+  .phase{background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:16px 17px; box-shadow:var(--shadow)}
+  .phase .lab{color:var(--accent); display:block; margin-bottom:9px}
+  .phase ul{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:5px}
+  /* Block, not flex: the label and its gloss are one sentence and must wrap as
+     one. Flex items would break between them and leave orphaned fragments. */
+  .phase li{font-size:var(--t-sm); color:var(--ink-2); padding-left:13px; position:relative; line-height:1.45}
+  .phase li::before{content:""; position:absolute; left:0; top:.55em; width:5px; height:5px; border-radius:50%; background:var(--line-strong)}
+  .phase li b{color:var(--ink); font-weight:600}
+
+  /* --- the stage spine -------------------------------------------------- */
+  .spine{margin-top:34px}
+  .stage{position:relative; padding-left:var(--gut); padding-bottom:34px}
+  .stage::before{                       /* the continuous rule down the gutter */
+    content:""; position:absolute; left:23px; top:6px; bottom:-6px; width:2px; background:var(--line);
+  }
+  .stage:last-child::before{bottom:auto; height:34px}
+  .stage > .no{
+    position:absolute; left:0; top:0; width:48px; height:48px; border-radius:50%;
+    background:var(--surface); border:2px solid var(--accent); color:var(--accent);
+    font-family:var(--mono); font-size:var(--t-sm); font-weight:700;
+    display:flex; align-items:center; justify-content:center; z-index:1;
+  }
+  .stage.term > .no{border-color:var(--ink-3); color:var(--ink-3)}
+  .stage-head{display:flex; flex-wrap:wrap; gap:10px; align-items:baseline; margin-bottom:3px}
+  .stage-head .who{font-family:var(--mono); font-size:var(--t-xs); letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3)}
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:9px;
+    padding:18px 20px; box-shadow:var(--shadow); margin-top:14px;
+  }
+  .card > :last-child{margin-bottom:0}
+
+  /* two-column field/value listing inside a card */
+  .fields{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:0 30px; margin:0}
+  .fields > div{padding:9px 0; border-bottom:1px solid var(--line)}
+  .fields > div:last-child, .fields > div:nth-last-child(2):nth-child(odd){border-bottom:0}
+  .fields .lab{display:block; margin-bottom:2px}
+  .fields p{margin:0; font-size:var(--t-sm); color:var(--ink-2)}
+
+  .writes{background:var(--surface-2); border-left:3px solid var(--accent); border-radius:0 6px 6px 0; padding:12px 16px; margin-top:14px}
+  .writes .lab{color:var(--accent); display:block; margin-bottom:5px}
+  .writes p{font-size:var(--t-sm); margin:0; color:var(--ink-2); max-width:78ch}
+
+  .warn{background:var(--wait-soft); border-left:3px solid var(--wait); border-radius:0 6px 6px 0; padding:12px 16px; margin-top:12px}
+  .warn .lab{color:var(--wait); display:block; margin-bottom:5px}
+  .warn p{font-size:var(--t-sm); margin:0; color:var(--ink-2); max-width:78ch}
+
+  /* --- the fork: six outcomes, lettered because they're alternatives ---- */
+  .fork{display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; margin-top:16px}
+  .out{background:var(--surface); border:1px solid var(--line); border-top:4px solid var(--line-strong); border-radius:8px; padding:16px 18px; box-shadow:var(--shadow)}
+  .out.won{border-top-color:var(--won)}
+  .out.lost{border-top-color:var(--lost)}
+  .out.wait{border-top-color:var(--wait)}
+  .out-h{display:flex; gap:10px; align-items:baseline; margin-bottom:8px}
+  .out-h .k{font-family:var(--mono); font-weight:700; font-size:var(--t-lg); color:var(--ink-3)}
+  .out.won .out-h .k{color:var(--won)}
+  .out.lost .out-h .k{color:var(--lost)}
+  .out.wait .out-h .k{color:var(--wait)}
+  .out-h h4{margin:0; font-size:var(--t-md)}
+  .out p{font-size:var(--t-sm); color:var(--ink-2); margin:0 0 9px}
+  .path{display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin:10px 0 0}
+  .path .v{white-space:nowrap}
+  .path .ar{color:var(--ink-3); font-size:var(--t-sm)}
+
+  /* --- tables ----------------------------------------------------------- */
+  .scroll{overflow-x:auto; margin-top:14px; border:1px solid var(--line); border-radius:8px; background:var(--surface)}
+  table{border-collapse:collapse; width:100%; font-size:var(--t-sm)}
+  th,td{text-align:left; padding:9px 14px; border-bottom:1px solid var(--line); vertical-align:top}
+  thead th{
+    font-family:var(--mono); font-size:var(--t-xs); letter-spacing:.09em; text-transform:uppercase;
+    color:var(--ink-3); font-weight:600; background:var(--surface-2); white-space:nowrap;
+    position:sticky; top:0;
+  }
+  tbody tr:last-child td{border-bottom:0}
+  td.num, th.num{text-align:right; font-variant-numeric:tabular-nums; font-family:var(--mono); white-space:nowrap}
+  td.when{font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap; color:var(--ink-2)}
+  td b{font-weight:650}
+
+  /* --- ledger for the worked example ------------------------------------ */
+  .ledger td:first-child{width:104px}
+  .ledger .actor{font-size:var(--t-xs); font-family:var(--mono); letter-spacing:.07em; text-transform:uppercase; color:var(--ink-3); display:block; margin-top:2px}
+
+  /* --- pill ------------------------------------------------------------- */
+  .pill{
+    display:inline-block; font-family:var(--mono); font-size:var(--t-xs); font-weight:600;
+    letter-spacing:.06em; text-transform:uppercase; padding:2px 8px; border-radius:20px;
+    background:var(--surface-3); color:var(--ink-2); white-space:nowrap;
+  }
+  .pill.won{background:var(--won-soft); color:var(--won)}
+  .pill.lost{background:var(--lost-soft); color:var(--lost)}
+  .pill.wait{background:var(--wait-soft); color:var(--wait)}
+  .pill.act{background:var(--accent-soft); color:var(--accent)}
+
+  details{border:1px solid var(--line); border-radius:8px; background:var(--surface); margin-top:12px; overflow:hidden}
+  summary{padding:12px 18px; cursor:pointer; font-weight:600; font-size:var(--t-sm); list-style:none; display:flex; justify-content:space-between; gap:12px; align-items:center}
+  summary::after{content:"+"; font-family:var(--mono); color:var(--ink-3); font-size:var(--t-lg); line-height:1}
+  details[open] summary::after{content:"–"}
+  summary::-webkit-details-marker{display:none}
+  details .body{padding:0 18px 16px; border-top:1px solid var(--line)}
+  details .body > :first-child{margin-top:14px}
+
+  .foot{margin-top:70px; padding-top:20px; border-top:2px solid var(--ink); color:var(--ink-3); font-size:var(--t-sm)}
+
+  @media (max-width:640px){
+    :root{--gut:52px; --t-3xl:2.1rem; --t-2xl:1.6rem}
+    .wrap{padding:0 18px 64px}
+    .stage > .no{width:38px; height:38px; font-size:var(--t-xs)}
+    .stage::before{left:18px}
+  }
+  @media print{
+    body{background:#fff}
+    .card,.out,.phase,.scroll,details{box-shadow:none; break-inside:avoid}
+    .stage{break-inside:avoid}
+    details{border:0} details .body{display:block !important}
+    summary::after{content:""}
+  }
+  @media (prefers-reduced-motion:reduce){ *{animation:none !important; transition:none !important} }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <span class="lab">Operating manual · Exaact Inspection &amp; Operations</span>
+    <h1>From one inquiry to the money — every branch</h1>
+    <p class="stand">One quotation followed the whole way through: won outright, won after revision, sent back by the approver,
+      lost after follow-ups, expired, or submitted on a client portal. Then the winning path onward through the inspection call,
+      the engineer, the report, and out to either an invoice or an inter-office credit.</p>
+    <div class="docref">
+      <div><span class="lab">Scope</span><b>19 modules</b></div>
+      <div><span class="lab">Stages</span><b>0 → 11</b></div>
+      <div><span class="lab">Quote outcomes</span><b>6</b></div>
+      <div><span class="lab">Worked example</span><b>Q-00042</b></div>
+      <div><span class="lab">Values shown</span><b>as stored</b></div>
+    </div>
+  </header>
+
+  <p class="dek" style="margin-top:26px">Anything in <code>THIS TYPEFACE</code> is the literal value the system stores —
+    the same string you will find in a dropdown, an export column or a filter. Names of clients, vendors and people below are invented for the example.</p>
+
+  <!-- ================================================================== -->
+  <h2>The nineteen modules, grouped by when you touch them</h2>
+  <p class="dek">Nothing here is optional scenery. Each group hands something to the next, and a gap in an early
+    group is what surfaces later as a call that cannot be allocated or an invoice nobody can raise.</p>
+
+  <div class="phases">
+    <div class="phase">
+      <span class="lab">Set up once</span>
+      <ul>
+        <li><b>Organisation</b> — offices, people, reporting lines</li>
+        <li><b>Users &amp; access</b> — roles and permissions</li>
+        <li><b>Masters</b> — every dropdown in the app</li>
+        <li><b>Settings</b> — financial year, currency, SMTP, terminology</li>
+        <li><b>Overheads</b> — per-office cost loading</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <span class="lab">Win the work</span>
+      <ul>
+        <li><b>Inquiries</b> — the funnel entry</li>
+        <li><b>Quotations</b> — build, approve, send, revise</li>
+        <li><b>Orders / contracts</b> — the handover to operations</li>
+        <li><b>Clients</b> · <b>Vendors</b> — registers, contacts, sites</li>
+        <li><b>Sales reports</b> — pipeline, win rate, ageing</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <span class="lab">Do the work</span>
+      <ul>
+        <li><b>Inspection calls</b> — the client's instruction</li>
+        <li><b>Deputations / jobs</b> — allocation to an engineer</li>
+        <li><b>Engineer availability</b> — who is free, and when</li>
+        <li><b>Hiring / candidates</b> — when nobody is free</li>
+        <li><b>Attendance reconcile</b> — days claimed vs days worked</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <span class="lab">Prove and get paid</span>
+      <ul>
+        <li><b>Inspection reports (IDEMS)</b> — draft to issued</li>
+        <li><b>Vouchers</b> — the engineer's expenses</li>
+        <li><b>Invoicing</b> — raise, chase, receive</li>
+        <li><b>Profitability</b> — per BOSS number</li>
+        <li><b>Dashboards</b> — operations, finance, people, sales</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ================================================================== -->
+  <h2>The spine</h2>
+  <p class="dek">Twelve stages. Stage 5 is the only one that forks — everything before it is a straight line, and everything
+    after it happens only if the quotation was won.</p>
+
+  <div class="spine">
+
+    <!-- STAGE 0 -->
+    <section class="stage">
+      <div class="no">00</div>
+      <div class="stage-head">
+        <h3>Foundations</h3>
+        <span class="who">Super Admin · once, then rarely</span>
+      </div>
+      <p>Before any inquiry can be typed, four things must exist. This is the stage people skip, and it is the reason a
+        call later cannot be allocated or an invoice cannot be raised against an office that was never created.</p>
+      <div class="card">
+        <div class="fields">
+          <div><span class="lab">Organisation</span>
+            <p>Offices nested head office → region → branch → site office, each with a head. Every person carries a home office,
+              a role and a reporting manager. Load the whole team from one spreadsheet if it is a first setup.</p></div>
+          <div><span class="lab">Masters</span>
+            <p>62 lists, including SBU, type of inspection, product category, charge units, payment terms, deliverables,
+              expense headings, travel modes and lost reasons. Rename any of them and every screen follows.</p></div>
+          <div><span class="lab">People who do the work</span>
+            <p>Inspection engineers with skills, trade, certifications, weekly working days
+              (<code>5</code> / <code>5.5</code> / <code>6</code>) and roll type — <code>OWN</code> if we pay the salary,
+              <code>AGENCY</code> if an agency bills us.</p></div>
+          <div><span class="lab">Commercial rules</span>
+            <p>Approval rules by quotation amount band and SBU, the quotation Word template, e-mail templates,
+              default terms &amp; conditions, and per-office overhead and contingency percentages.</p></div>
+        </div>
+        <div class="warn">
+          <span class="lab">What breaks without it</span>
+          <p>No approval rule means a quotation can be sent without anyone senior seeing it. No office head means escalations
+            fall back to whoever the system can find. The Organisation → Gaps tab names every one of these before it bites.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- STAGE 1 -->
+    <section class="stage">
+      <div class="no">01</div>
+      <div class="stage-head">
+        <h3>Inquiry</h3>
+        <span class="who">Marketing Executive · BDM · KAM</span>
+      </div>
+      <p>Somebody asks for a price. Log it before you know whether it is real — the funnel is only honest if the losses
+        are in it too.</p>
+      <div class="card">
+        <div class="fields">
+          <div><span class="lab">Number</span><p><code>INQ-00117</code> — issued automatically.</p></div>
+          <div><span class="lab">Source</span>
+            <p><code>EMAIL</code> <code>PHONE</code> <code>REFERRAL</code> <code>WEBSITE</code>
+               <code>EXISTING</code> <code>TENDER</code> <code>OTHER</code></p></div>
+          <div><span class="lab">Status</span>
+            <p>Opens as <code class="v-accent">OPEN</code>. Becomes <code class="v-won">QUOTED</code> the moment a quotation
+              against it is accepted, or <code class="v-lost">DROPPED</code> if you never quote.</p></div>
+          <div><span class="lab">Also captured</span><p>Client, subject, SBU, the person asking and how to reach them.</p></div>
+        </div>
+        <div class="writes"><span class="lab">Branch here</span>
+          <p>An inquiry can die without a quotation — mark it <code>DROPPED</code>. It stays in the register and in the
+            conversion numbers, which is the point.</p></div>
+      </div>
+    </section>
+
+    <!-- STAGE 2 -->
+    <section class="stage">
+      <div class="no">02</div>
+      <div class="stage-head">
+        <h3>Build the quotation</h3>
+        <span class="who">Marketing Executive · BDM · KAM</span>
+      </div>
+      <p>Created from the inquiry, so the client and contact carry across. Choosing the client locks it and fills the
+        contact — a quotation cannot end up addressed to one company and priced for another.</p>
+      <div class="card">
+        <div class="fields">
+          <div><span class="lab">Number and revision</span>
+            <p><code>Q-00042</code> at revision <code>00</code>. The number never changes; the revision does.</p></div>
+          <div><span class="lab">Where the work happens</span>
+            <p>Any number of sites per quotation, each typed <code>SITE</code> <code>WORKS</code> <code>REGISTERED</code>
+              <code>CORPORATE</code> <code>PLANT</code> <code>WAREHOUSE</code>. The site flows down to the line items.</p></div>
+          <div><span class="lab">Each line item</span>
+            <p>SBU → activity, type of inspection and its sub-types, description, site, order type, quantity,
+              charge unit, rate, amount, deliverables, notes.</p></div>
+          <div><span class="lab">Order type</span>
+            <p><code>OPEN</code> — an ARC or call-off that will produce many calls over a period.
+               <code>LINE</code> — a specific line-item order.</p></div>
+          <div><span class="lab">Commercials</span>
+            <p>One of 17 payment terms, advance %, validity in days, GST %, currency, and the standard terms &amp; conditions
+              pulled from Settings so nobody retypes them.</p></div>
+          <div><span class="lab">Origin</span>
+            <p><code>OWN</code> <code>CLIENT_PORTAL</code> <code>TENDER_PORTAL</code> <code>EMAIL_ONLY</code> <code>OTHER</code> —
+              because not every quotation is one we generate. See outcome <b>F</b>.</p></div>
+          <div><span class="lab">Attachments</span>
+            <p>Up to 8 MB per file — scope documents, drawings, the client's enquiry, an approval mail.</p></div>
+          <div><span class="lab">Executing offices</span>
+            <p>More than one may be named, which is what later decides whether money moves between offices as a credit.</p></div>
+        </div>
+        <div class="writes"><span class="lab">State on save</span>
+          <p><code class="v-accent">DRAFT</code>. Nothing has left the building and anyone with edit rights can still change it.</p></div>
+      </div>
+    </section>
+
+    <!-- STAGE 3 -->
+    <section class="stage">
+      <div class="no">03</div>
+      <div class="stage-head">
+        <h3>Approval</h3>
+        <span class="who">Marketing Manager · SBU Head · Business Director</span>
+      </div>
+      <p>Submitting builds the approval chain from the rules — an amount band, optionally narrowed to one SBU — and mails
+        each approver. The quotation screen says out loud who it is sitting with, so nobody has to ask.</p>
+      <div class="card">
+        <div class="fields">
+          <div><span class="lab">On submit</span>
+            <p><code class="v-wait">PENDING_APPROVAL</code>, submission time-stamped, any previous rejection cleared.</p></div>
+          <div><span class="lab">Approver approves</span>
+            <p><code class="v-accent">APPROVED</code> — ready to send. Requires <code>crm.quote.approve</code>.</p></div>
+          <div><span class="lab">Approver rejects</span>
+            <p><code class="v-lost">REJECTED</code> with a written comment, plus who rejected it and when.
+              This is outcome <b>C</b> — it loops back, it is not an ending.</p></div>
+          <div><span class="lab">Multi-step chains</span>
+            <p>A rule may stack steps — a big value in one SBU can need the Marketing Manager and then the Business Director.
+              Each step is notified in turn.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STAGE 4 -->
+    <section class="stage">
+      <div class="no">04</div>
+      <div class="stage-head">
+        <h3>Send it</h3>
+        <span class="who">BDM · KAM · Marketing Manager</span>
+      </div>
+      <p>Two ways out, and the choice matters to the client's eye.</p>
+      <div class="card">
+        <div class="fields">
+          <div><span class="lab">From the system</span>
+            <p>Sent over the configured mailbox with the covering note from the e-mail template.</p></div>
+          <div><span class="lab">From your own mailbox</span>
+            <p>The system hands you a real draft, already carrying the quotation PDF and any attachment marked to go with it.
+              It opens in Outlook with a working <b>Send</b> button, so the client receives it from
+              <span class="v">vishal.shah@…</span> — not from a robot — and the reply lands in that person's inbox.</p></div>
+        </div>
+        <div class="writes"><span class="lab">What the system does the moment it is marked sent</span>
+          <p>Status <code class="v-wait">SENT</code>, send time stamped, and <b>five follow-ups are scheduled automatically</b>
+            from the send date: <code>D3</code> at +3 days, <code>D6</code> at +6, <code>D9</code> at +9,
+            <code>FORTNIGHT</code> at +15 and <code>MONTH</code> at +30. All five open as <code>PENDING</code>.
+            Editable — a client who asked for two weeks does not get chased on day three.</p></div>
+        <div class="writes"><span class="lab">Then they chase themselves</span>
+          <p>On its due date each follow-up sends the reminder from the follow-up e-mail template and marks itself
+            <code>SENT</code>. If the quotation has meanwhile been won, lost or expired, the follow-up marks itself
+            <code>SKIPPED</code> instead of mailing a client who has already decided. A person who makes the call by phone
+            marks it <code class="v-won">DONE</code> with a note.</p></div>
+      </div>
+    </section>
+
+    <!-- STAGE 5 — THE FORK -->
+    <section class="stage">
+      <div class="no">05</div>
+      <div class="stage-head">
+        <h3>The fork — six things can now happen</h3>
+        <span class="who">The client decides; you record it</span>
+      </div>
+      <p>This is the whole point of the register. A quotation that is sent has exactly six ends, and five of them are not
+        "won". Each one leaves a different trail.</p>
+
+      <div class="fork">
+
+        <div class="out won">
+          <div class="out-h"><span class="k">A</span><h4>Accepted, no revision</h4></div>
+          <p>Client says yes to what you sent. Acceptance date recorded.</p>
+          <p><b>Follow-ups:</b> every remaining <code>PENDING</code> follow-up flips to <code>SKIPPED</code> — nobody chases
+            a client who has already ordered. The originating inquiry moves to <code>QUOTED</code>.</p>
+          <div class="path">
+            <span class="v v-wait">SENT</span><span class="ar">→</span><span class="v v-won">ACCEPTED</span>
+          </div>
+        </div>
+
+        <div class="out won">
+          <div class="out-h"><span class="k">B</span><h4>Accepted after revision</h4></div>
+          <p>Client wants a change — scope, rate, terms. Revising creates <b>revision 01</b> as a fresh
+            <code>DRAFT</code> under the same number, carrying every field and line item across. The old revision is
+            demoted, a dated snapshot of it is kept with your one-line reason, and the register shows only the current one.</p>
+          <p>The new revision goes back through approval if the rules still call for it — and a price increase can push it
+            into a higher band and add an approver.</p>
+          <div class="path">
+            <span class="v">Q-00042 R00</span><span class="ar">→</span><span class="v v-accent">R01 DRAFT</span>
+            <span class="ar">→</span><span class="v v-wait">SENT</span><span class="ar">→</span><span class="v v-won">ACCEPTED</span>
+          </div>
+        </div>
+
+        <div class="out wait">
+          <div class="out-h"><span class="k">C</span><h4>Sent back by the approver</h4></div>
+          <p>Not an ending — a loop. The rejection comment stays on the quotation with the approver's name and the date,
+            so the fix is against something written down rather than remembered.</p>
+          <p>Correct it and resubmit. The chain is rebuilt from scratch and the old rejection is cleared.</p>
+          <div class="path">
+            <span class="v v-wait">PENDING_APPROVAL</span><span class="ar">→</span><span class="v v-lost">REJECTED</span>
+            <span class="ar">→</span><span class="v v-wait">PENDING_APPROVAL</span>
+          </div>
+        </div>
+
+        <div class="out lost">
+          <div class="out-h"><span class="k">D</span><h4>Lost after the follow-ups</h4></div>
+          <p>You chase on day 3, day 6 and day 9. On the third call the client says it went elsewhere. Mark it lost and pick
+            a reason from twelve — awarded to a competitor, price too high, budget withdrawn, project cancelled, no response,
+            scope mismatch, timeline, credit terms, accreditation, handled in-house, duplicate, other.</p>
+          <p>The two follow-ups still ahead of you flip to <code>SKIPPED</code>. The reason is what makes the lost-analysis
+            report worth reading.</p>
+          <div class="path">
+            <span class="v">D3 ✓</span><span class="ar">→</span><span class="v">D6 ✓</span><span class="ar">→</span>
+            <span class="v">D9 ✓</span><span class="ar">→</span><span class="v v-lost">LOST</span>
+          </div>
+        </div>
+
+        <div class="out lost">
+          <div class="out-h"><span class="k">E</span><h4>Expired</h4></div>
+          <p>All five follow-ups ran, the validity period lapsed, and the client never said yes or no. Distinct from
+            <code>LOST</code> on purpose: nobody beat you, the enquiry simply went cold.</p>
+          <p>Keeping the two apart is what stops a quiet market looking like a losing sales team.</p>
+          <div class="path">
+            <span class="v v-wait">SENT</span><span class="ar">→ validity lapses →</span><span class="v v-lost">EXPIRED</span>
+          </div>
+        </div>
+
+        <div class="out">
+          <div class="out-h"><span class="k">F</span><h4>Never left as our document</h4></div>
+          <p>Some work is quoted straight into the client's procurement portal or a tender site. There is no PDF of ours to
+            send, but the value, the client and the outcome still belong in the register.</p>
+          <p>Set the origin to <code>CLIENT_PORTAL</code>, <code>TENDER_PORTAL</code> or <code>EMAIL_ONLY</code>. Follow-ups,
+            approval and every outcome above still apply — only the sending step is different.</p>
+          <div class="path">
+            <span class="v">origin ≠ OWN</span><span class="ar">→</span><span class="v v-won">ACCEPTED</span>
+            <span class="ar">or</span><span class="v v-lost">LOST</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="writes"><span class="lab">Locking</span>
+          <p>Once a quotation reaches <code>ACCEPTED</code> or <code>LOST</code> it locks — the commercial record behind a live
+            job cannot be quietly edited. A Super Admin can unlock it, and the unlock is recorded.</p></div>
+        <div class="writes"><span class="lab">Change log</span>
+          <p>Every status move, every revision and every follow-up is stamped with who and when. The final accepted copy is
+            kept as sent, so an argument about what was agreed is settled by the document, not by memory.</p></div>
+      </div>
+    </section>
+
+    <!-- STAGE 6 -->
+    <section class="stage">
+      <div class="no">06</div>
+      <div class="stage-head">
+        <h3>Handover to operations</h3>
+        <span class="who">Accounts / back-office</span>
+      </div>
+      <p>Only reachable from <code class="v-won">ACCEPTED</code>. This is the seam where sales stops and operations starts,
+        and it is a deliberate stop rather than an automatic slide.</p>
+      <div class="card">
+        <div class="fields">
+          <div><span class="lab">Register the client</span>
+            <p>A prospect becomes a real client record with a code like <code>AHM-26-KAVER-00031</code> —
+              office, year, short name, sequence. An existing client is matched, not duplicated.</p></div>
+          <div><span class="lab">Contract number</span>
+            <p>The client's own reference, held against the client with the value, start and end dates.
+              It is what the inspection call will quote back to them.</p></div>
+          <div><span class="lab">Purchase order</span>
+            <p>Uploaded here and carried forward — the engineer standing at the works can see the PO that authorises the visit.</p></div>
+          <div><span class="lab">Float the packet</span>
+            <p>The operations team is mailed the handover: scope, sites, types of inspection, deliverables, commercials, contacts.
+              Where mail is not configured yet, it is logged instead of silently lost, and can be re-sent.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STAGE 7 -->
+    <section class="stage">
+      <div class="no">07</div>
+      <div class="stage-head">
+        <h3>Inspection call</h3>
+        <span class="who">Coordinator · Operation Manager</span>
+      </div>
+      <p>The client instructs a specific inspection. Raised against the accepted quotation, so the commercial terms are
+        inherited rather than retyped — retyping is exactly how a call ends up billed differently from what was sold.</p>
+      <div class="card">
+        <div class="fields">
+          <div><span class="lab">Cascades from the quotation</span>
+            <p>Contract number, the types of inspection sold, product category, value and the basis it is charged on.</p></div>
+          <div><span class="lab">Who is involved</span>
+            <p>Client → vendor / manufacturer → sub-vendor, each with its own contact and site.</p></div>
+          <div><span class="lab">Which offices</span>
+            <p>The contracting office holds the client relationship; the executing office does the work. They are frequently
+              not the same, and every office is both, depending on the contract.</p></div>
+          <div><span class="lab">When</span>
+            <p>Up to five dates, or a weekly pattern — every Tuesday and Thursday until an end date — expanded into real dates
+              you can then edit.</p></div>
+          <div><span class="lab">Reporting rhythm</span>
+            <p><code>DAILY</code> <code>ALTERNATE</code> <code>WEEKLY</code> <code>FORTNIGHTLY</code> <code>MONTHLY</code>
+              <code>CUSTOM</code> (every N days) <code>NOREPORT</code>.</p></div>
+          <div><span class="lab">Documents</span>
+            <p>A clickable link to the shared drive folder, so the engineer is not hunting for drawings.</p></div>
+          <div><span class="lab">Region</span>
+            <p>Set only by an SBU Head or Business Director — it drives regional reporting and should not drift.</p></div>
+          <div><span class="lab">Lead time</span>
+            <p>Computed from the call date to the first inspection date. The register highlights the ones running late,
+              which is the number a coordinator is actually judged on.</p></div>
+        </div>
+        <div class="writes"><span class="lab">Inter-office credit, stated in words</span>
+          <p>When the contracting and executing offices differ, the call says plainly: <i>Ahmedabad holds this contract and Pune
+            will do the work, so Ahmedabad gives Pune a credit.</i> You enter what the executing office is to receive; they can
+            come back with the figure they need. When one office does both, it says so and there is no credit at all —
+            only the value billable to the client.</p></div>
+      </div>
+    </section>
+
+    <!-- STAGE 8 -->
+    <section class="stage">
+      <div class="no">08</div>
+      <div class="stage-head">
+        <h3>Allocate the engineer</h3>
+        <span class="who">Coordinator · Operation Manager</span>
+      </div>
+      <p>The call becomes a job — a day-based inspection or a resident site posting. Everything set on the call flows
+        through; the only genuinely new decision is <em>who goes</em>.</p>
+      <div class="card">
+        <div class="fields">
+          <div><span class="lab">Job number and type</span>
+            <p><code>JOB-00874</code>, typed <code>INSPECTION</code> (day-based) or <code>DEPUTATION</code> (resident posting).</p></div>
+          <div><span class="lab">Who can go</span>
+            <p>Six cards answer it at a glance — total, available, on job, on leave, in office, training. Unassigned people
+              are only listed if they are free <b>today and tomorrow</b>, because a name free for one day is not an allocation.</p></div>
+          <div><span class="lab">A date you did not plan for</span>
+            <p>Check availability on a specific date and see for how long each person is free from it — the answer to
+              "the client wants someone on the 3rd, for four days".</p></div>
+          <div><span class="lab">Ours, or not ours</span>
+            <p>An own-roll engineer, a freelancer, or a sub-contractor's engineer. The choice changes what it costs us and
+              what we can commit to.</p></div>
+          <div><span class="lab">Limits that hold</span>
+            <p>8.5 chargeable hours a day, and each person's own working week of <code>5</code>, <code>5.5</code> or
+              <code>6</code> days.</p></div>
+          <div><span class="lab">Dates</span>
+            <p>Up to twenty inspection dates on one job — a month of intermittent witness points does not need twenty jobs.</p></div>
+          <div><span class="lab">Deliverables</span>
+            <p>Chosen here and carried to the engineer, so what they are expected to produce is on the job, not in an e-mail.</p></div>
+          <div><span class="lab">Money on the job</span>
+            <p>Expected credit, credit type — <code>MANDAY</code> <code>MANMONTH</code> <code>LUMP</code> <code>LATER</code> —
+              and direction <code>GIVEN</code> or <code>RECEIVED</code>. Linked to a BOSS number for profitability.</p></div>
+        </div>
+        <div class="writes"><span class="lab">On save</span>
+          <p>Stage <code class="v-accent">ALLOCATED</code> and the assignment e-mail goes to the engineer with the site,
+            dates, contacts, deliverables and the folder link. Stages then run
+            <code>TRAVELLING</code> → <code>IN_PROGRESS</code> → <code>REPORT_PENDING</code> → <code>SUBMITTED</code> →
+            <code>CLOSED</code>, with <code>ON_HOLD</code> and <code>CANCELLED</code> available at any point.</p></div>
+        <div class="warn"><span class="lab">Nobody is free</span>
+          <p>The gap becomes a requisition, which runs its own track: <code>OPEN</code> → <code>PROPOSED</code> →
+            <code>OFFERED</code> → <code>HIRED</code>. That is why hiring sits inside this system rather than beside it.</p></div>
+      </div>
+    </section>
+
+    <!-- STAGE 9 -->
+    <section class="stage">
+      <div class="no">09</div>
+      <div class="stage-head">
+        <h3>Execution and the report</h3>
+        <span class="who">Inspection engineer · reviewing manager</span>
+      </div>
+      <p>The engineer attends on the inspection dates and produces documents against the deliverables chosen at allocation.
+        Reports are built from a template for that report type and carry a serialised release number.</p>
+      <div class="card">
+        <div class="fields">
+          <div><span class="lab">Report lifecycle</span>
+            <p><code class="v-accent">DRAFT</code> → <code class="v-wait">SUBMITTED</code> →
+              <code class="v-wait">UNDER_REVIEW</code> → <code class="v-won">APPROVED</code> →
+              <code class="v-won">ISSUED</code>, with <code class="v-lost">REJECTED</code> sending it back to the engineer
+              and <code>ARCHIVED</code> at the end of its life.</p></div>
+          <div><span class="lab">Inspection result</span>
+            <p><code>ACCEPTED</code> <code>ACCEPTED_COND</code> (with observations) <code>REJECTED</code>
+              <code>HOLD</code> <code>NA</code>.</p></div>
+          <div><span class="lab">Release decision</span>
+            <p><code>RELEASED</code> <code>RELEASED_COND</code> <code>NOT_RELEASED</code> <code>PENDING</code> —
+              separate from the result, because material can pass and still not be released.</p></div>
+          <div><span class="lab">What gets produced</span>
+            <p>Inspection Report, Release Note, NCR, Certificate of Conformity, Daily Progress Report, Final Report,
+              Punch List, Photographic Report, Dimensional Report, Test Certificate Review — whichever the job called for.</p></div>
+          <div><span class="lab">Who signs it off</span>
+            <p>The engineer's mapped approver, or their reporting manager, or a named person, or anyone holding a role —
+              whichever the rule says. Signature and time stamp are held with the document.</p></div>
+          <div><span class="lab">Evidence</span>
+            <p>Photographs and files attached to the report, an endorsement track for the manufacturer's own documents,
+              and an audit log of every action taken on the document.</p></div>
+        </div>
+        <div class="warn"><span class="lab">A finding is not a failure of process</span>
+          <p>An NCR raised, tracked and closed is the system working. It attaches to the report, and an unclosed one is
+            visible before the job can be treated as finished.</p></div>
+      </div>
+    </section>
+
+    <!-- STAGE 10 -->
+    <section class="stage">
+      <div class="no">10</div>
+      <div class="stage-head">
+        <h3>Close the job</h3>
+        <span class="who">Inspection engineer · Coordinator</span>
+      </div>
+      <p>Closure is a single form that will not let you through without the report, and it captures the money spent at the
+        same moment — which is the only moment anyone actually remembers it.</p>
+      <div class="card">
+        <div class="fields">
+          <div><span class="lab">Required</span>
+            <p>The report upload date. Refused without one unless the call was set to <code>NOREPORT</code>.</p></div>
+          <div><span class="lab">Expenses, at closure</span>
+            <p>Travel, local conveyance, food, lodging, misc, plus any extra headings you have configured. Per-km or actual bill,
+              depending on the heading.</p></div>
+          <div><span class="lab">Turnaround</span>
+            <p>Computed as the days between the last inspection date and the report date, and reported on every dashboard.
+              This is the number clients judge you by.</p></div>
+          <div><span class="lab">Sign-off</span>
+            <p>The report is routed to the engineer's reporting manager as <code class="v-wait">PENDING</code>, and becomes
+              <code class="v-won">APPROVED</code> or is sent back.</p></div>
+        </div>
+        <div class="writes"><span class="lab">On close</span>
+          <p>Job marked closed and time-stamped, the closure e-mail goes out, and the job appears in the money queues in
+            Stage 11. Vouchers raised by the engineer settle against these expense lines.</p></div>
+      </div>
+    </section>
+
+    <!-- STAGE 11 -->
+    <section class="stage term">
+      <div class="no">11</div>
+      <div class="stage-head">
+        <h3>Money — two different exits</h3>
+        <span class="who">Finance · Branch Manager</span>
+      </div>
+      <p>A closed job leaves by one of two doors, and which door depends on a decision taken all the way back at the call:
+        whether one office both held the contract and did the work.</p>
+
+      <div class="fork" style="margin-top:16px">
+        <div class="out won">
+          <div class="out-h"><span class="k">→</span><h4>Invoice the client</h4></div>
+          <p>Used when the contracting office is also the executing office, or when the credit has already been given away.</p>
+          <p>Raise the invoice with number, date, due date and amount; then record the payment when it lands.</p>
+          <div class="path">
+            <span class="v">closed</span><span class="ar">→</span><span class="v v-wait">unbilled</span>
+            <span class="ar">→</span><span class="v v-wait">awaiting payment</span><span class="ar">→</span>
+            <span class="v v-won">paid</span>
+          </div>
+          <p style="margin-top:10px">Three queues watch it: <b>Pending</b> — closed but never billed. <b>Awaiting payment</b> —
+            billed, not paid. <b>Overdue</b> — past the due date. Nothing has to be remembered.</p>
+        </div>
+
+        <div class="out">
+          <div class="out-h"><span class="k">→</span><h4>Inter-office credit</h4></div>
+          <p>Used when one office held the contract and another did the work. No invoice goes to the client from the executing
+            office — value moves between offices instead.</p>
+          <p>Direction <code>GIVEN</code> means the contracting office passes value out; <code>RECEIVED</code> means the executing
+            office takes it in. Credit is recorded as raised, then as received.</p>
+          <div class="path">
+            <span class="v">contracting ≠ executing</span><span class="ar">→</span><span class="v">expected credit</span>
+            <span class="ar">→</span><span class="v v-won">credit received</span>
+          </div>
+          <p style="margin-top:10px">A fourth queue watches these: closed jobs where a credit is due to an executing office and
+            has not yet been taken in.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="writes"><span class="lab">Where it all lands</span>
+          <p>Everything rolls up against the BOSS number: invoicing done, expenses booked from vouchers and closure,
+            and — for those permitted to see it — the loaded salary cost of the engineers deployed. That is profitability
+            per contract, with renewals chained to the number they continue.</p></div>
+        <div class="fields" style="margin-top:6px">
+          <div><span class="lab">Operations dashboard</span><p>Open calls, unallocated work, turnaround, delays.</p></div>
+          <div><span class="lab">Finance dashboard</span><p>Unbilled, outstanding, overdue, credits pending.</p></div>
+          <div><span class="lab">Utilisation</span><p>Days sold against days available, by person and by office.</p></div>
+          <div><span class="lab">Sales</span><p>Pipeline, win rate, lost reasons, follow-up compliance, ageing.</p></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ================================================================== -->
+  <h2>One quotation, followed all the way</h2>
+  <p class="dek"><b>Q-00042</b> — witness and final inspection of forged valve bodies for <b>Kaveri Power Systems Ltd</b>,
+    manufactured at <b>Sahyadri Forge &amp; Fabrication</b>, Pune. Contracted by the Ahmedabad office, executed by Pune.
+    The main ledger takes outcome <b>B</b>; the five alternate endings follow it.</p>
+
+  <div class="scroll">
+    <table class="ledger">
+      <thead>
+        <tr><th>Date</th><th>What happens</th><th>State after</th><th class="num">Value ₹</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="when">02 Mar</td>
+          <td><b>Inquiry logged.</b> Client's procurement engineer calls about third-party inspection for a valve order.
+            <span class="actor">Marketing Executive</span></td>
+          <td><code>INQ-00117</code> <span class="pill act">OPEN</span></td>
+          <td class="num">—</td>
+        </tr>
+        <tr>
+          <td class="when">03 Mar</td>
+          <td><b>Quotation drafted.</b> Three line items — stage inspection 40 man-days, FAT witness 12, final inspection 18.
+            70 man-days at ₹12,000. Site typed <code>WORKS</code>, order type <code>OPEN</code>. Terms: 45 days from invoice.
+            <span class="actor">Business Development Manager</span></td>
+          <td><code>Q-00042 R00</code> <span class="pill act">DRAFT</span></td>
+          <td class="num">8,40,000</td>
+        </tr>
+        <tr>
+          <td class="when">04 Mar</td>
+          <td><b>Submitted for approval.</b> Rule matched: above ₹5,00,000 in the Industrial SBU → Marketing Manager.
+            Approver e-mailed; the screen shows who it is with.
+            <span class="actor">Business Development Manager</span></td>
+          <td><span class="pill wait">PENDING_APPROVAL</span></td>
+          <td class="num">9,91,200</td>
+        </tr>
+        <tr>
+          <td class="when">04 Mar</td>
+          <td><b>Sent back.</b> "FAT witness rate is below the SBU floor — reprice or note the justification."
+            Comment, name and time stored on the quotation. <i>This is outcome C, mid-flow.</i>
+            <span class="actor">Marketing Manager</span></td>
+          <td><span class="pill lost">REJECTED</span></td>
+          <td class="num">—</td>
+        </tr>
+        <tr>
+          <td class="when">05 Mar</td>
+          <td><b>Corrected and resubmitted</b>, then approved the same day.
+            <span class="actor">BDM, then Marketing Manager</span></td>
+          <td><span class="pill act">APPROVED</span></td>
+          <td class="num">9,91,200</td>
+        </tr>
+        <tr>
+          <td class="when">05 Mar</td>
+          <td><b>Sent from the BDM's own mailbox</b> — draft opened in Outlook with the PDF and the scope document already
+            attached, sent under their own name. Five follow-ups scheduled: 08, 11, 14, 20 Mar and 04 Apr.
+            <span class="actor">Business Development Manager</span></td>
+          <td><span class="pill wait">SENT</span></td>
+          <td class="num">9,91,200</td>
+        </tr>
+        <tr>
+          <td class="when">08 Mar</td>
+          <td><b>Follow-up D3 done.</b> Client wants two extra witness points and confirms 45-day terms.
+            <span class="actor">Business Development Manager</span></td>
+          <td><code>D3</code> <span class="pill won">DONE</span></td>
+          <td class="num">—</td>
+        </tr>
+        <tr>
+          <td class="when">09 Mar</td>
+          <td><b>Revision raised.</b> Every field and line item copied to <code>R01</code>; <code>R00</code> demoted and
+            snapshotted with the note "added 2 witness points at client request". Now 85 man-days.
+            <span class="actor">Business Development Manager</span></td>
+          <td><code>Q-00042 R01</code> <span class="pill act">DRAFT</span></td>
+          <td class="num">10,20,000</td>
+        </tr>
+        <tr>
+          <td class="when">10 Mar</td>
+          <td><b>Re-approved and re-sent.</b> The higher value crossed a band, so the chain added the Business Director —
+            both approved. Follow-ups rescheduled from the new send date.
+            <span class="actor">Marketing Manager → Business Director</span></td>
+          <td><span class="pill wait">SENT</span></td>
+          <td class="num">12,03,600</td>
+        </tr>
+        <tr>
+          <td class="when">16 Mar</td>
+          <td><b>Accepted.</b> Client's PO received and uploaded. The three follow-ups still ahead flip to
+            <code>SKIPPED</code>; the inquiry closes as <code>QUOTED</code>.
+            <span class="actor">Key Accounts Manager</span></td>
+          <td><span class="pill won">ACCEPTED</span></td>
+          <td class="num">12,03,600</td>
+        </tr>
+        <tr>
+          <td class="when">17 Mar</td>
+          <td><b>Client and contract registered.</b> Prospect becomes <code>AHM-26-KAVER-00031</code>; contract
+            <code>KPS/TPI/2026-11</code> recorded against them. Handover packet mailed to operations. Quotation now locked.
+            <span class="actor">Accounts / back-office</span></td>
+          <td><span class="pill">LOCKED</span></td>
+          <td class="num">12,03,600</td>
+        </tr>
+        <tr>
+          <td class="when">18 Mar</td>
+          <td><b>Inspection call raised</b> against <code>R01</code>. Contract number, inspection types, product category and
+            charge basis all inherited. Vendor: Sahyadri Forge. Contracting office Ahmedabad, executing office Pune, region West.
+            Four dates set, weekly reporting, drive folder linked.
+            <span class="actor">Coordinator, Ahmedabad</span></td>
+          <td><code>CALL-00311</code></td>
+          <td class="num">—</td>
+        </tr>
+        <tr>
+          <td class="when">18 Mar</td>
+          <td><b>Credit direction fixed.</b> The call states it plainly: Ahmedabad holds the contract, Pune does the work,
+            so Ahmedabad gives Pune a credit. The two branch managers settle the internal transfer rate at ₹8,500 a man-day
+            against the ₹12,000 billed to the client.
+            <span class="actor">Branch Managers, both offices</span></td>
+          <td><code>GIVEN</code> → Pune</td>
+          <td class="num">8,500 <span class="lab">/ m-d</span></td>
+        </tr>
+        <tr>
+          <td class="when">19 Mar</td>
+          <td><b>Allocated.</b> This call covers only the first stage-inspection window; the other 81 man-days follow on later
+            calls against the same contract. Availability checked for 24 Mar: one own-roll engineer free for six days.
+            Four inspection dates, deliverables IR, IRN and photographic report. Assignment e-mail sent.
+            <span class="actor">Coordinator, Pune</span></td>
+          <td><code>JOB-00874</code> <span class="pill act">ALLOCATED</span> · 4 m-d</td>
+          <td class="num">34,000 <span class="lab">credit</span></td>
+        </tr>
+        <tr>
+          <td class="when">24–27 Mar</td>
+          <td><b>Inspection carried out.</b> Daily progress reports filed. One non-conformance raised on weld undercut at
+            stage inspection, closed on 26 Mar after rework.
+            <span class="actor">Inspection engineer</span></td>
+          <td><span class="pill act">IN_PROGRESS</span></td>
+          <td class="num">—</td>
+        </tr>
+        <tr>
+          <td class="when">28 Mar</td>
+          <td><b>Report submitted, reviewed and issued.</b> Result: accepted with observations. Release: released with
+            observations. Release note serialised and signed.
+            <span class="actor">Engineer → Operation Manager</span></td>
+          <td><span class="pill won">ISSUED</span></td>
+          <td class="num">—</td>
+        </tr>
+        <tr>
+          <td class="when">29 Mar</td>
+          <td><b>Job closed.</b> Report date 28 Mar recorded; turnaround one day. Expenses captured at closure — travel,
+            lodging and local conveyance.
+            <span class="actor">Inspection engineer</span></td>
+          <td><span class="pill won">CLOSED</span> · TAT <code>1</code></td>
+          <td class="num">14,250</td>
+        </tr>
+        <tr>
+          <td class="when">30 Mar</td>
+          <td><b>Report signed off</b> by the engineer's reporting manager. Voucher for the expenses settled.
+            <span class="actor">Reporting manager · Finance</span></td>
+          <td><span class="pill won">APPROVED</span></td>
+          <td class="num">14,250</td>
+        </tr>
+        <tr>
+          <td class="when">31 Mar</td>
+          <td><b>Two money movements, not one.</b> Ahmedabad invoices the client for this call's four man-days on 45-day
+            terms — ₹48,000 plus 18% GST. Separately, Pune takes in the ₹34,000 inter-office credit for executing them.
+            Neither is a substitute for the other.
+            <span class="actor">Finance, both offices</span></td>
+          <td><code>INV/26-27/0142</code> · due 15 May</td>
+          <td class="num">56,640</td>
+        </tr>
+        <tr>
+          <td class="when">12 May</td>
+          <td><b>Payment received</b> in full, three days inside terms. The job leaves the outstanding queue; the credit is
+            marked received and leaves the pending-credit queue.
+            <span class="actor">Finance</span></td>
+          <td><span class="pill won">PAID</span> · <span class="pill won">CREDIT IN</span></td>
+          <td class="num">56,640</td>
+        </tr>
+        <tr>
+          <td class="when">12 May</td>
+          <td><b>Profitability updates</b> against the BOSS number: invoiced value, less the ₹14,250 booked, less the loaded
+            cost of the engineer's four days. The contract stays open — 81 man-days remain to be called off.
+            <span class="actor">Branch Manager · Business Director</span></td>
+          <td><span class="pill act">CONTRACT OPEN</span></td>
+          <td class="num">—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 style="margin-top:38px">The same quotation, ending five other ways</h3>
+  <p class="dek">Each row picks up from <b>05 Mar, status <code>SENT</code></b> and diverges from there.</p>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Ending</th><th>What happened</th><th>Final state</th><th>What the system did with the follow-ups</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>A</b> · Straight win</td>
+          <td>Client accepts the original scope on 09 Mar. No revision, no negotiation.</td>
+          <td><span class="pill won">ACCEPTED</span> at <code>R00</code>, ₹9,91,200</td>
+          <td>D3 marked done; D6, D9, Fortnight and Month all flipped to <code>SKIPPED</code>.</td>
+        </tr>
+        <tr>
+          <td><b>C</b> · Stuck in approval</td>
+          <td>Sent back twice — first on rate, then on missing accreditation wording. Corrected and approved on the third pass.</td>
+          <td>Reaches <span class="pill wait">SENT</span> five days later than planned</td>
+          <td>Not scheduled until it was actually sent, so the cadence starts from the real send date.</td>
+        </tr>
+        <tr>
+          <td><b>D</b> · Lost after three chases</td>
+          <td>08 Mar — "still evaluating". 11 Mar — "comparing three offers". 14 Mar — "awarded to another agency on price".</td>
+          <td><span class="pill lost">LOST</span> · reason <code>COMPETITOR</code></td>
+          <td>D3, D6 and D9 recorded as done with notes; Fortnight and Month flipped to <code>SKIPPED</code>.</td>
+        </tr>
+        <tr>
+          <td><b>E</b> · Went cold</td>
+          <td>All five follow-ups attempted, no answer to any of them. Validity of 30 days lapses on 04 Apr.</td>
+          <td><span class="pill lost">EXPIRED</span></td>
+          <td>All five recorded as attempted. Counted separately from lost, so it does not read as a defeat.</td>
+        </tr>
+        <tr>
+          <td><b>F</b> · Portal submission</td>
+          <td>Same scope, but the client only accepts bids through their procurement portal. Nothing is e-mailed by us.</td>
+          <td><span class="pill won">ACCEPTED</span> · origin <code>CLIENT_PORTAL</code></td>
+          <td>Scheduled and worked exactly as normal — the portal changes the sending step, not the chasing.</td>
+        </tr>
+        <tr>
+          <td><b>B+</b> · The year after</td>
+          <td>Because it was won as an ARC, the remaining 81 man-days come back as further calls — different vendors,
+            different months, sometimes a different executing office.</td>
+          <td><span class="pill won">ACCEPTED</span> · one contract, many calls</td>
+          <td>Closed once at acceptance and never reopened. Chasing is finished; delivery is not.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ================================================================== -->
+  <h2>Who is allowed to do what</h2>
+  <p class="dek">Roles are the default; individual exceptions are granted per person. Anything not listed is visible but
+    not editable to that role.</p>
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Role</th><th>Owns</th><th>Can also</th><th>Cannot</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>Marketing Executive</b></td><td>Inquiries, quotation drafts, follow-ups</td><td>Revise a draft</td><td>Send or approve</td></tr>
+        <tr><td><b>Business Development Manager</b><br><span class="lab">Key Accounts Manager</span></td><td>Quotations end to end, follow-ups, client relationships</td><td>Send from their own mailbox</td><td>Approve their own quotation</td></tr>
+        <tr><td><b>Marketing Manager</b></td><td>Everything sales, plus approval and templates</td><td>Approve within the rule bands</td><td>Register contracts</td></tr>
+        <tr><td><b>Accounts / back-office</b></td><td>Client and contract registration, PO, invoicing, payments</td><td>Float the handover packet</td><td>Change a quotation's price</td></tr>
+        <tr><td><b>Coordinator</b></td><td>Inspection calls, allocation, chasing reports</td><td>Raise calls against won quotations</td><td>See salary or profitability</td></tr>
+        <tr><td><b>Operation Manager</b></td><td>Calls, allocation, closure, report review</td><td>Approve reports in their office</td><td>Change the organisation structure</td></tr>
+        <tr><td><b>Inspection engineer</b></td><td>Their own jobs, reports, expenses, vouchers</td><td>Close a job with the report</td><td>See any other engineer's costs</td></tr>
+        <tr><td><b>Branch Manager</b></td><td>Their office — people, calls, jobs, money</td><td>Manage users in their own office</td><td>Reach another office's data</td></tr>
+        <tr><td><b>SBU Head</b></td><td>Their SBU across every office</td><td>Set region on a call</td><td>Edit another SBU</td></tr>
+        <tr><td><b>Business Director</b></td><td>Everything, read across the whole company</td><td>Approve at the top band; see the organisation as one source of truth</td><td>Edit the organisation structure</td></tr>
+        <tr><td><b>Super Admin</b></td><td>All of it, including masters, access and unlocking</td><td>Unlock a closed quotation, rebuild the org</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ================================================================== -->
+  <h2>The awkward cases</h2>
+  <p class="dek">Every one of these has happened to somebody. Each has a defined place to go rather than an e-mail thread.</p>
+
+  <details>
+    <summary>The engineer falls ill two days into a four-day inspection<span class="pill wait">Operations</span></summary>
+    <div class="body">
+      <p>Put the job <code>ON_HOLD</code> rather than closing it. The days already worked stay on it. Check availability for
+        the remaining dates, allocate a second job to whoever is free, and let both roll up to the same call. Utilisation
+        stays honest for both engineers, and the client sees continuity.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>The client cancels after the engineer has already travelled<span class="pill wait">Operations · Finance</span></summary>
+    <div class="body">
+      <p>The job goes <code>CANCELLED</code>, but the expenses are real and are still captured at closure. The call stays
+        against the quotation with nothing delivered. Whether it is billable is a commercial decision — the numbers to have
+        that conversation are already recorded.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>The report is rejected by the reviewing manager after the job was closed<span class="pill wait">Reporting</span></summary>
+    <div class="body">
+      <p>Closure and report sign-off are deliberately separate. The job can be closed with the report uploaded while approval
+        is still <code>PENDING</code>; a rejection sends the document back without reopening the job. Only the document moves.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>An accepted quotation turns out to have the wrong rate<span class="pill lost">Commercial</span></summary>
+    <div class="body">
+      <p>It is locked, and that is intentional — live work depends on it. A Super Admin can unlock it, and the unlock is
+        recorded. Where the client has agreed a change, the cleaner route is a fresh revision, which keeps both the old and
+        new versions on the record.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Two offices disagree on the credit figure<span class="pill wait">Finance</span></summary>
+    <div class="body">
+      <p>The contracting office enters what it proposes the executing office should receive; the executing office can revert
+        with the figure it needs. Until <code>credit_received</code> is set, the job sits in the pending-credit queue where
+        both branch managers can see it — the disagreement is visible rather than buried.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>An open order produces forty calls across a year<span class="pill act">Commercial</span></summary>
+    <div class="body">
+      <p>That is what order type <code>OPEN</code> is for. One quotation, one contract number, one acceptance — and every
+        subsequent call draws down against it. Profitability rolls up to the BOSS number rather than being scattered across
+        forty small jobs, and a renewal chains to the number it continues.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>Nobody in the company is free for the dates the client wants<span class="pill wait">People</span></summary>
+    <div class="body">
+      <p>Three routes, all inside the system. Allocate a freelancer or a sub-contractor's engineer, with the cost recorded
+        differently from an own-roll engineer. Or raise a requisition and run the hiring track. Or go back to the client with
+        the earliest date the availability screen can actually support — which is a better conversation than a missed date.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>An invoice goes past its due date<span class="pill lost">Finance</span></summary>
+    <div class="body">
+      <p>It moves itself into the overdue queue on the finance dashboard the day it passes the due date. Nothing needs to be
+        remembered, and the queue is scoped — a branch manager sees their own office's overdue invoices, the Business Director
+        sees all of them.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>The same client is quoted twice by two different offices<span class="pill wait">Commercial</span></summary>
+    <div class="body">
+      <p>The client register is company-wide and matched on registration, so the second office finds the existing record rather
+        than creating a duplicate. Both quotations sit against the same client in the register, which is what makes the clash
+        visible before the client points it out.</p>
+    </div>
+  </details>
+
+  <!-- ================================================================== -->
+  <h2>The trail a single job leaves</h2>
+  <p class="dek">Six numbers connect the whole chain. Given any one of them, every other can be reached.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Number</th><th>Issued when</th><th>Links backward to</th><th>Links forward to</th></tr></thead>
+      <tbody>
+        <tr><td><code>INQ-00117</code></td><td>Someone asks for a price</td><td>—</td><td>The quotation raised from it</td></tr>
+        <tr><td><code>Q-00042</code> <span class="lab">rev 00, 01, 02…</span></td><td>Quotation created</td><td>The inquiry</td><td>Contract, calls, jobs</td></tr>
+        <tr><td><code>AHM-26-KAVER-00031</code></td><td>Client registered on acceptance</td><td>The quotation that won them</td><td>Every future quotation and call</td></tr>
+        <tr><td><code>CALL-00311</code></td><td>Client instructs an inspection</td><td>Quotation and contract number</td><td>One or more jobs</td></tr>
+        <tr><td><code>JOB-00874</code></td><td>An engineer is allocated</td><td>The call</td><td>Report, expenses, invoice or credit</td></tr>
+        <tr><td>BOSS number</td><td>Commercial tracking opens</td><td>Contract</td><td>Profitability, and the renewal that succeeds it</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer class="foot">
+    <p style="max-width:70ch"><b>Reading this document alongside the app.</b> Every value in <code>MONO</code> above is stored
+      exactly as written, so it can be searched, filtered or exported. Wording such as <i>IBO</i>, <i>quotation</i> and
+      <i>inspection call</i> follows Settings → Terminology — change it there and the screens follow, though this document
+      will not.</p>
+    <p>Exaact Inspection &amp; Operations Management System · operating flow, stages 0–11 · prepared 25 July 2026</p>
+  </footer>
+
+</div>
