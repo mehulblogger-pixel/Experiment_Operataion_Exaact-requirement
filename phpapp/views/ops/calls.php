@@ -9,10 +9,10 @@
 ?>
 <div class="master-head">
   <div><h1><?= e(T_REG('call')) ?></h1>
-  <p class="sub" style="margin:2px 0 0">Inspection calls received — open one to allocate a job, or edit the details.</p></div>
+  <p class="sub" style="margin:2px 0 0">Received from clients — open one to allocate, or edit the details. Rows tinted red are running late; the lead column reads received→forwarded · forwarded→allocated · received→scheduled.</p></div>
   <div style="display:flex;gap:8px">
     <a class="btn secondary" href="/calls?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ CSV</a>
-    <?php if (is_coordinator_level()): ?><a class="btn" href="/call-new">➕ New Call</a><?php endif; ?>
+    <?php if (is_coordinator_level()): ?><a class="btn" href="/call-new">➕ <?= e(ucfirst(T_NEW('call'))) ?></a><?php endif; ?>
   </div>
 </div>
 
@@ -35,9 +35,17 @@
     <div style="text-align:center;padding:34px"><div style="font-size:32px">☎️</div>
       <p class="muted" style="margin:8px 0 0">No calls yet. <?php if (is_coordinator_level()): ?><a href="/call-new">Create the first call</a>.<?php endif; ?></p></div>
   <?php else: ?>
-  <table class="dt">
+  <div class="tbl-scroll" style="overflow-x:auto">
+  <table class="dt" style="min-width:1650px">
     <thead><tr>
-      <th>Call</th><th>Client</th><th>Vendor / Site</th><th>SBU</th><th>Required by</th><th class="num">Jobs</th><th class="num">Cost incurred</th><th>Status</th><th></th>
+      <th><?= e(ucfirst(Tl('call'))) ?></th><th><?= e(T('client')) ?></th><th><?= e(T('vendor')) ?> / site</th>
+      <th><?= e(T('sbu')) ?></th><th>Activity</th>
+      <th>Executing <?= e(T('office')) ?></th><th class="num">Credit to give</th>
+      <th>Coordinator</th><th><?= e(T('engineer')) ?></th>
+      <th>Received</th><th>Forwarded</th><th>Allocated</th>
+      <th>Required by</th><th>Scheduled</th>
+      <th class="num" title="Received → forwarded · forwarded → allocated · received → scheduled">Lead (days)</th>
+      <th class="num">Delay</th><th class="num"><?= e(TP('job')) ?></th><th class="num">Cost</th><th>Status</th><th></th>
     </tr></thead>
     <tbody>
     <?php foreach ($rows as $c):
@@ -45,15 +53,39 @@
       $needs = !$closed && (int)$c['job_count'] === 0;
       $req = $c['inspection_required_date'] ?? '';
       $reqOverdue = $needs && $req && $req < $today;
+      $L = $c['lead'] ?? [];
+      $dash = '<span class="muted">—</span>';
     ?>
-      <tr>
-        <td><a href="/call?id=<?= (int)$c['id'] ?>"><b><?= e($c['call_code']) ?></b></a></td>
-        <td><?= e($c['client_disp'] ?: $c['client_name'] ?: '—') ?></td>
-        <td><?= $c['vendor_name'] ? e($c['vendor_name']) : '<span class="muted">—</span>' ?></td>
-        <td><?= e(OPS_SBUS[$c['sbu']] ?? '—') ?></td>
-        <td><?= $req ? ($reqOverdue ? '<span class="down" style="font-weight:600">'.e($req).'</span>' : e($req)) : '<span class="muted">—</span>' ?></td>
+      <tr<?= !empty($L['late']) ? ' style="background:color-mix(in srgb,var(--bad) 5%,transparent)"' : '' ?>>
+        <td><a href="/call?id=<?= (int)$c['id'] ?>"><b><?= e($c['call_code']) ?></b></a>
+            <?php if (!empty($c['folder_link'])): ?><a href="<?= e($c['folder_link']) ?>" target="_blank" rel="noopener" title="Shared folder">🔗</a><?php endif; ?></td>
+        <td><?= e($c['client_disp'] ?: $c['client_name'] ?: '—') ?>
+            <?php if (!empty($c['contract_number'])): ?><div class="muted" style="font-size:11px"><?= e($c['contract_number']) ?></div><?php endif; ?></td>
+        <td><?= $c['vendor_name'] ? e($c['vendor_name']) : $dash ?></td>
+        <td><?= e(lk_options_or('sbu', OPS_SBUS)[$c['sbu']] ?? '—') ?></td>
+        <td><?= !empty($c['activity_id']) ? e(lk_value_path($c['activity_id'])) : $dash ?></td>
+        <td><?= !empty($c['exec_office_name']) ? e($c['exec_office_name']) : '<span class="muted">same ' . e(T('office')) . '</span>' ?></td>
+        <td class="num"><?= ((float)($c['expected_credit'] ?? 0)) > 0 ? fmoney($c['expected_credit']) : $dash ?></td>
+        <td><?= !empty($c['exec_coordinator']) ? e($c['exec_coordinator']) : $dash ?></td>
+        <td><?= !empty($c['inspector_name']) ? e($c['inspector_name'])
+                 : '<span class="pill p-warn">not allocated' . (isset($L['unallocated_days']) && $L['unallocated_days'] !== null ? ' · ' . (int)$L['unallocated_days'] . 'd' : '') . '</span>' ?></td>
+        <td><?= $c['call_received_date'] ? e(fdate($c['call_received_date'])) : $dash ?></td>
+        <td><?= !empty($c['forwarded_at']) ? e(fdate(substr((string)$c['forwarded_at'],0,10))) : $dash ?></td>
+        <td><?= !empty($c['allocated_at']) ? e(fdate(substr((string)$c['allocated_at'],0,10))) : $dash ?></td>
+        <td><?= $req ? ($reqOverdue ? '<span class="down" style="font-weight:700">'.e(fdate($req)).'</span>' : e(fdate($req))) : $dash ?></td>
+        <td><?= !empty($c['sched_date']) ? e(fdate($c['sched_date'])) : $dash ?></td>
+        <td class="num" style="white-space:nowrap"><span class="muted" style="font-size:11.5px">
+          <?= $L['to_forward']  !== null ? (int)$L['to_forward']  : '–' ?> ·
+          <?= $L['to_allocate'] !== null ? (int)$L['to_allocate'] : '–' ?> ·
+          <?= $L['to_schedule'] !== null ? (int)$L['to_schedule'] : '–' ?>
+        </span></td>
+        <td class="num">
+          <?php if (($L['delay'] ?? null) === null): ?><?= $dash ?>
+          <?php elseif ((int)$L['delay'] > 0): ?><span class="pill p-bad"><?= (int)$L['delay'] ?>d late</span>
+          <?php else: ?><span class="pill p-ok">on time</span><?php endif; ?>
+        </td>
         <td class="num"><?= (int)$c['job_count'] ?: '<span class="muted">0</span>' ?></td>
-        <td class="num"><?= ((float)($c['cost_incurred'] ?? 0))>0 ? fmoney($c['cost_incurred']) : '<span class="muted">—</span>' ?></td>
+        <td class="num"><?= ((float)($c['cost_incurred'] ?? 0))>0 ? fmoney($c['cost_incurred']) : $dash ?></td>
         <td>
           <?php if ($closed): ?><span class="pill p-ok">Closed</span>
           <?php elseif ($needs): ?><span class="pill p-warn">To schedule</span>
@@ -67,5 +99,6 @@
     <?php endforeach; ?>
     </tbody>
   </table>
+  </div>
   <?php endif; ?>
 </div>
