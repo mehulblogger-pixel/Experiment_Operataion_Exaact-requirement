@@ -13,6 +13,7 @@ extend it.
 | **Operations** | `lib/ops.php` | Calls → jobs → closure, expenses, vouchers, invoicing, credit, hiring |
 | **CRM** | `lib/crm.php` | Inquiry → quotation → approval → contract → revenue tracking |
 | **Workforce** | `lib/workforce.php` | Availability, hours cap, working norms, org hierarchy, escalations |
+| **Vocabulary** | `lib/terms.php` `lookups.php` | One name and one list per concept, both editable on screen |
 | **IDEMS** | `lib/idems.php` | Inspection reports, formats, approvals, endorsement, evidence, audit (**§12a**) |
 | **Platform** | `lib/access.php` `lookups.php` `pdf.php` `ai.php` | Roles & permissions, configurable masters, PDF, AI |
 
@@ -85,7 +86,8 @@ The system now spans the **whole commercial lifecycle**:
 ### C. Workforce & organisation (`lib/workforce.php`)
 - **Daily inspector availability board** per office (free / on job / leave /
   training / office / half-day / WFH), one click to set, on-job auto-derived.
-- **8.5-hour daily cap** on logged working hours (enforced on the timesheet).
+- **Daily cap on logged working hours** (8.5 by default, set in Settings),
+  enforced on the timesheet.
 - **Working norms** — weekly days *and* hours **per designation per office**,
   inherited by each person unless overridden.
 - **Reporting manager** per person → **automatic N+1 org hierarchy** (printable),
@@ -106,7 +108,11 @@ The TPIA industry pack — see **§16** for the full description.
   no key is set.
 - **Installable PWA**: works on a phone, keeps local drafts, syncs on reconnect.
 - **Settings**: app name, logo, theme, financial-year start, TAT threshold,
-  revenue target, escalation days.
+  revenue target, escalation days, hours cap, weekly working days, currency
+  symbol, date format.
+- **Terminology**: rename every business noun the app displays — Client, Quote,
+  Inspection Call, Deputation, Report, Inspection Engineer, IBO, BOSS Number —
+  once, and every heading, menu, button and e-mail follows.
 
 See **`phpapp/PENDING.md`** for the living build log and any parked items.
 
@@ -229,6 +235,9 @@ lib/lookups.php           Configurable lookup lists (types+values, hierarchy), c
                           trade→skill data, admin CRUD, seeding
 lib/access.php            Roles (ORG_ROLES), permissions (PERMISSIONS), ACCESS_MODULES, can(),
                           scope_clause(), ua(), role presets, settings, theme, FY helpers
+lib/terms.php             Terminology: T()/TP()/Tl()/TH() and the T_REG()/T_DETAIL()/T_NEW()
+                          heading builders, the /terminology screen, module_tabs(), and the
+                          merged Approval rules + Document templates hubs
 lib/crm.php               CRM: inquiries, quotations + revisions, approval matrix, Word/PDF
                           quote docs, send + follow-ups, contract registration, ops packet,
                           CV keyword engine, sales reports
@@ -236,7 +245,7 @@ lib/pdf.php               SimplePDF class (A4, text, lines, JPEG embed, xref) + 
                           normalisation + quotation PDF builder
 lib/ai.php                AI provider registry, key storage (masked), model refresh,
                           ai_chat() across OpenAI/Anthropic/Gemini/Perplexity/GitHub Models
-lib/workforce.php         Availability board, 8.5h cap, working norms, reporting-manager
+lib/workforce.php         Availability board, daily hours cap, working norms, reporting-manager
                           chain + org hierarchy, report approval, SLA escalation, MIS digest
 lib/idems.php             IDEMS engine (largest): report types, IRN numbering, report
                           instances, form builder, approvals, signatures, report PDF,
@@ -430,7 +439,10 @@ Single-segment paths; ids & tabs via `?id=` / `?tab=`. Handled in `index.php`
 | `/candidates` `/candidate-new` `/candidate-edit` `/candidate` `/candidate-stage` | **Hiring pipeline** |
 | `/m/<entity>` `/m/<entity>/new|edit|delete` | Generic masters (offices, back-office, inspectors, subcons, subcon-rates, boss, holidays, attendance, credit-recon) |
 | `/masters` | Master data hub |
-| `/lookups` `/lookup` `/custom-fields` | Configure lists & custom fields |
+| `/lookups` `/lookup` `/custom-fields` | Masters — every dropdown, grouped by module + custom fields |
+| `/terminology` | Rename every business noun the app displays |
+| `/approval-rules?module=…` | Approval rules — one screen, a tab per module |
+| `/templates?kind=…` | Document templates — one screen, a tab per kind |
 | `/reports` | Dashboards (4 families, filter bar) |
 | `/users` `/user-new` `/user-edit` `/hierarchy` | User admin + **org hierarchy** |
 | `/settings` `/access` `/ai-settings` | Settings, role presets, **AI providers** |
@@ -467,10 +479,10 @@ Single-segment paths; ids & tabs via `?id=` / `?tab=`. Handled in `index.php`
 | `/document-evidence` `/report-file` | Evidence gallery / file streaming |
 | `/document-timestamp` | Branch-App-Manager-only date change (audited) |
 | `/report-types` `/report-type-edit` `/report-builder` `/report-field-edit` | Report types + **no-code form builder** |
-| `/report-templates` `/report-template-edit` `/report-template-download` | Client Word formats |
+| `/report-templates` `/report-template-edit` `/report-template-download` | Client Word formats (reached via `/templates`) |
 | `/report-form-from-template` | **Build the form from an uploaded format** |
 | `/irn-rules` | Configurable IRN numbering |
-| `/approver-map` `/idems-approval-rules` `/idems-approval-rule-edit` | Approver mapping + chains |
+| `/approver-map` `/idems-approval-rules` `/idems-approval-rule-edit` | Approver mapping + chains (reached via `/approval-rules`) |
 | `/endorsements` `/endorsement*` `/endorsement-cert` | Manufacturer document endorsement |
 | `/writing-assistant` `/phrase-library` `/phrase-edit` | Technical writing assistant |
 | `/learning` | Self-learning insights |
@@ -482,18 +494,56 @@ Single-segment paths; ids & tabs via `?id=` / `?tab=`. Handled in `index.php`
 
 ## 8. Configuration engines (the "agile" part)
 
-**Lookup lists** (`lib/lookups.php`) — every dropdown is data, not code.
+**Lookup lists** (`lib/lookups.php`) — **every** dropdown in the app is data,
+not code. ~60 lists / ~500 values ship seeded.
 - `lookup_types` + `lookup_values`; a type can have a `parent_type_id` and a
   value a `parent_value_id` → **dependent / cascading** lists (e.g. SBU→Activity,
   Trade→Skill, Product→Wax→Tier).
 - `lk_options_or($key, $CONST)` returns the configured values, **falling back to
   a PHP constant** if the list is empty — so the app works before seeding and
-  after a list is emptied.
-- Seeded types: `deputation_type`, `inspection_type`, `deliverable`,
-  `expense_heading`, `industry`, `department`, `client_type`, `designation`,
-  plus `sbu`, `region`, `activity`, `product`, `trade`, `skill`.
+  after a list is emptied. Cached per request (it is called once per table row).
+- `lk_module_lists()` is the registry: `[key, label, constant, module]`. Adding
+  a row there is all it takes to make a new dropdown editable. `lookup_types.module`
+  groups them on `/lookups` (Sales · Operations · Reporting · People · Money ·
+  Directory) with a search box.
+- `lk_rename_type()` / `lk_drop_type()` migrate a shipped list in place, keeping
+  its values and the records pointing at them.
 - Super-admin can add/edit/delete **any** list (including built-ins) from
   `/lookups`.
+
+**One list per concept.** Where two modules used to keep their own list of the
+same thing, they now share one:
+
+| Concept | One list | Was |
+|---|---|---|
+| Type of work | `inspection_type` (37) | Sales' 14-value list + Operations' 30-value list |
+| Charge unit | `charge_unit` (8) | quote unit + rate basis + PO line unit |
+| Deliverable | the `report_types` register (37) | a separate 14-value list |
+| Rejection wording | `Rejected` / `Sent back` | also "Returned" |
+| Result wording | `… with observations` (ISO/IEC 17020) | "with conditions" / "with comments" |
+
+**Terminology** (`lib/terms.php`) — every business noun the app displays comes
+from one place, editable at `/terminology`.
+- `T()` / `TP()` singular & plural, `Tl()` / `Tlp()` lower-case (acronyms such as
+  IBO, SBU, IRN, BOSS are never lower-cased), `TH()` / `THP()` sentence case.
+- `T_REG()` / `T_DETAIL()` / `T_NEW()` / `T_EDIT()` build the standard heading
+  shapes, so no screen invents its own pattern.
+- 27 terms across Parties / Sales / Operations / Reporting / Money / People.
+  Only what differs from the shipped default is stored, so later changes to the
+  defaults still land.
+- Shipped vocabulary: Client · Vendor / Manufacturer / Supplier / Sub-vendor ·
+  Quote · Inspection Call · Deputation · Report · Inspection Engineer · User ·
+  IBO · SBU · BOSS Number · Man-day.
+
+**Heading standard.** List screen = `<Thing> register`; detail = `<Thing> <code>`;
+form = `New <thing>` / `Edit <thing>`; sentence case; `&` not "and"; no `/` or
+emoji in a heading; the sidebar label is the first words of the heading it opens.
+
+**Settings** covers the values that are not lists: financial year, revenue
+target, TAT threshold, report-escalation days, max hours per day, default weekly
+working days, employee-code prefix, currency symbol, date format, required
+source documents, high-risk audit actions, branding / theme / logo, letterhead,
+SMTP and AI providers.
 
 **Custom fields** (`custom_fields` + `custom_values`) — add your own fields to
 any form (`call`, `job`, `partner`, or any master) from `/custom-fields`. Types:
