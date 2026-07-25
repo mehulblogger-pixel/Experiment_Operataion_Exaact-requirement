@@ -73,6 +73,10 @@
       <input class="form-control" type="number" min="0" step="1000" name="fy_revenue_target" value="<?= e(setting_get('fy_revenue_target', '')) ?>" placeholder="e.g. 50000000"></div>
     <div class="ff"><label>Report-overdue escalation (days) <span class="muted">— then e-mail the reporting manager</span></label>
       <input class="form-control" type="number" min="1" name="report_escalate_days" value="<?= e(setting_get('report_escalate_days', 3)) ?>"></div>
+    <div class="ff"><label>Contract expiry warning (days) <span class="muted">— how far ahead to start warning</span></label>
+      <input class="form-control" type="number" min="1" max="365" name="contract_warn_days" value="<?= e(setting_get('contract_warn_days', 30)) ?>">
+      <small class="muted">Everyone on the order is e-mailed once when a contract comes inside this window. Past the end
+        date, scheduling stops until the Super Admin grants an exception.</small></div>
   </div>
 
   <h3 class="tab-sub">Working norms &amp; limits</h3>

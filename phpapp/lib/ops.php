@@ -1422,6 +1422,7 @@ function ops_module_gate($route) {
         'office-finance'=>'overheads',
         'reports'=>'reports',
         'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users','org-template'=>'users',
+        'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
     ];
     $mod = $map[$base] ?? null;
@@ -1555,6 +1556,8 @@ function ops_dispatch($route, $method) {
             return ops_hierarchy_screen($method);
         case $route === 'org-template':
             return ops_org_template();
+        case $route === 'contract-overrides' || $route === 'contract-override':
+            return ops_contract_overrides($route, $method);
         case $route === 'work-norms':
             ops_work_norms($method); return true;
         case in_array($route, ['documents','document','document-new','document-edit','document-submit','document-finalize','document-delete'], true):
@@ -2854,10 +2857,22 @@ function ops_jobs($route, $method) {
             }
             // validation: expected credit mandatory at allocation
             if (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0) {
-                view('ops/job_form', ['job'=>$job,'call'=>$call,'error'=>'Expected credit is mandatory at allocation.',
-                    'offices'=>offices_list(),'inspectors'=>inspectors_list(),'subcons'=>subcons_list(),
-                    'boss'=>boss_for_client($call['client_id']),'clientInfo'=>partner_full($call['client_id']),
-                    'vendorInfo'=>partner_full($call['vendor_id']),'quotes'=>job_linkable_quotes($call['client_id']),'cfvals'=>$job?custom_values_map('job',$job['id']):[]]);
+                view('ops/job_form', array_merge(call_job_form_vars($job, $call),
+                    ['error' => 'Expected credit is mandatory at allocation.']));
+                return;
+            }
+            // Contract cover: putting an engineer on site against an expired
+            // contract, or one whose quantity is used up, is refused here. This is
+            // the last point before it costs money, so it is the right gate — and
+            // an existing job can still be corrected, only new work is stopped.
+            $gateQid = (int)($b['quotation_id'] ?? 0) ?: (int)($call['quotation_id'] ?? 0);
+            $gate = (!$job && $gateQid && function_exists('contract_gate')) ? contract_gate($gateQid) : null;
+            if ($gate && !$gate['allowed']) {
+                view('ops/job_form', array_merge(call_job_form_vars($job, $call), [
+                    'error' => $gate['reason'] . ' ' . ($gate['pending']
+                        ? 'An exception has been requested and is ' . strtolower(OVERRIDE_STATUS[$gate['pending']['status']] ?? 'pending') . '.'
+                        : 'Ask for an exception from the ' . Tl('call') . ' before allocating.'),
+                    'gate' => $gate]));
                 return;
             }
             if ($job) {
@@ -2877,7 +2892,12 @@ function ops_jobs($route, $method) {
                 // §a.ix — stamp when the engineer was put on it, so the register can
                 // show received -> forwarded -> allocated as three real lead times.
                 $pdo->prepare("UPDATE calls SET status='ALLOCATED', allocated_at=? WHERE id=?")->execute([date('c'), $call['id']]);
-                flash("$code allocated. Assignment email sent to the " . Tl('engineer') . ".");
+                // An exception is spent when work is actually booked against it,
+                // not when it is granted — that is what makes "allowed for 2
+                // allocations" mean anything.
+                if ($gate && !empty($gate['override'])) override_consume($gate['override']);
+                flash("$code allocated. Assignment email sent to the " . Tl('engineer') . "."
+                    . ($gate && !empty($gate['override']) ? ' One granted contract exception was used.' : ''));
             }
             custom_save('job', $jobId, $b);
             // inherit advance / report-vs-payment conditions from a linked quotation
@@ -2895,11 +2915,11 @@ function ops_jobs($route, $method) {
             if ($jj['inspector_id'] && $jj['scheduled_date']) send_assignment_email($jobId);
             redirect('/job?id=' . $jobId);
         }
-        view('ops/job_form', ['job'=>$job,'call'=>$call,'error'=>null,'offices'=>offices_list(),
-            'inspectors'=>inspectors_list(),'subcons'=>subcons_list(),'boss'=>boss_for_client($call['client_id']),
-            'clientInfo'=>partner_full($call['client_id']),'vendorInfo'=>partner_full($call['vendor_id']),
-            'quotes'=>job_linkable_quotes($call['client_id']),
-            'cfvals'=>$job ? custom_values_map('job', $job['id']) : []]);
+        // Show the contract position before anything is typed, so a coordinator
+        // is not filling a form that will be refused on submit.
+        $gq = (int)($call['quotation_id'] ?? 0);
+        view('ops/job_form', array_merge(call_job_form_vars($job, $call),
+            ['gate' => (!$job && $gq && function_exists('contract_gate')) ? contract_gate($gq) : null]));
         return;
     }
     if ($route === 'job-advance' && $method === 'POST') {
@@ -2977,6 +2997,21 @@ function ops_jobs($route, $method) {
         return;
     }
 }
+// Everything the allocate-job screen needs. One place, because it is rendered
+// again on each validation failure and a field missed here shows up as an
+// undefined-variable warning on the re-render rather than at the happy path.
+function call_job_form_vars($job, $call) {
+    return [
+        'job' => $job, 'call' => $call, 'error' => null, 'gate' => null,
+        'offices' => offices_list(), 'inspectors' => inspectors_list(), 'subcons' => subcons_list(),
+        'boss' => boss_for_client($call['client_id']),
+        'clientInfo' => partner_full($call['client_id']),
+        'vendorInfo' => partner_full($call['vendor_id']),
+        'quotes' => job_linkable_quotes($call['client_id']),
+        'cfvals' => $job ? custom_values_map('job', $job['id']) : [],
+    ];
+}
+
 function nzc($f, $v) {
     $nullable = ['executing_office_id','inspector_id','subcon_id','boss_id','activity_id','report_custom_days','quotation_id'];
     if (in_array($f, $nullable) && $v === '') return null;
@@ -3518,6 +3553,7 @@ function ops_settings($method) {
         setting_set('tat_threshold_days', (int)($_POST['tat_threshold_days'] ?? 3));
         setting_set('fy_revenue_target', (float)($_POST['fy_revenue_target'] ?? 0));
         setting_set('report_escalate_days', max(1, (int)($_POST['report_escalate_days'] ?? 3)));
+        setting_set('contract_warn_days', min(365, max(1, (int)($_POST['contract_warn_days'] ?? 30))));
         setting_set('app_name', trim($_POST['app_name'] ?? ''));
         // Working norms & limits (were hard-coded before)
         $cap = (float)($_POST['daily_hours_cap'] ?? 8.5);

@@ -23,6 +23,7 @@ require __DIR__ . '/lib/pdf.php';
 require __DIR__ . '/lib/ai.php';
 require __DIR__ . '/lib/workforce.php';
 require __DIR__ . '/lib/orgadmin.php';
+require __DIR__ . '/lib/contracts.php';
 require __DIR__ . '/lib/idems.php';
 
 // When invoked over HTTP, require a matching key so strangers can't trigger it.
@@ -40,6 +41,8 @@ if (PHP_SAPI !== 'cli') {
 try { boot(); } catch (Throwable $e) { echo "Boot error: " . $e->getMessage() . "\n"; exit(1); }
 
 $sent = ops_run_reminders();
+// Contracts running out of time — one warning per contract per end date.
+$expiring = function_exists('contracts_expiry_reminders') ? contracts_expiry_reminders() : 0;
 echo "Reminders processed. Emails queued/sent: $sent\n";
 
 // Flip recruitment placement fees from provisional to confirmed once the

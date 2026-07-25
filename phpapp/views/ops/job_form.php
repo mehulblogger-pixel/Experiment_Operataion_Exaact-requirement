@@ -55,6 +55,33 @@
 </div>
 <?php if (!empty($error)): ?><div class="msg msg-error"><?= e($error) ?></div><?php endif; ?>
 
+<?php // The contract position, stated before the form is filled in. A blocked
+      // allocation is refused on submit as well, but being told up front is the
+      // difference between a warning and a wasted five minutes. ?>
+<?php if (!empty($gate) && !$gate['allowed']): ?>
+<div class="panel" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 7%,transparent)">
+  <b style="color:var(--bad)">⛔ This order cannot be allocated against</b>
+  <div class="muted" style="margin-top:4px"><?= e($gate['reason']) ?>
+    <?php if (!empty($gate['pending'])): ?>
+      An exception is <?= e(strtolower(OVERRIDE_STATUS[$gate['pending']['status']] ?? 'pending')) ?>.
+    <?php else: ?>
+      Ask for an exception from the <?= e(Tl('call')) ?>, and it goes to a Branch Manager and then the Super Admin.
+    <?php endif; ?>
+  </div>
+  <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+    <a class="btn small secondary" href="/call?id=<?= (int)$call['id'] ?>">Back to the <?= e(Tl('call')) ?></a>
+    <a class="btn small secondary" href="/contract-overrides">Contract exceptions</a>
+  </div>
+</div>
+<?php elseif (!empty($gate) && !empty($gate['override'])): ?>
+<div class="panel" style="border:1px solid var(--ok)">
+  <b style="color:var(--ok)">Exception in force</b>
+  <span class="muted">Granted by <?= e($gate['override']['decided_by']) ?> —
+    <?= (int)$gate['override']['uses_taken'] ?> of <?= (int)$gate['override']['uses_allowed'] ?> allocation(s) used.
+    Allocating here uses one of them.</span>
+</div>
+<?php endif; ?>
+
 <div class="panel info-panel">
   <h3 class="tab-sub">Client &amp; vendor details (from the call)</h3>
   <div class="panel-split">
