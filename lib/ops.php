@@ -2670,7 +2670,10 @@ function voucher_generate($v) {
         $stop  = min(strtotime($to), strtotime($e ?: $s));
         for ($d = $start; $d !== false && $d <= $stop; $d = strtotime('+1 day', $d)) {
             $date = date('Y-m-d', $d);
-            if ((int)ops_val("SELECT COUNT(*) FROM voucher_entries WHERE voucher_id=? AND job_id=? AND entry_date=?", [$v['id'], $j['id'], $date])) continue;
+            // Skip the date if ANYTHING is already on it — the same job pulled
+            // before, another job, or a day entered by hand. Two rows on one date
+            // double-count it whichever way they got there.
+            if ((int)ops_val("SELECT COUNT(*) FROM voucher_entries WHERE voucher_id=? AND entry_date=?", [$v['id'], $date])) continue;
             $site = $j['vdisp'] ?: ($j['vleg'] ?: ($j['cdisp'] ?: ($j['cleg'] ?: '')));
             $ins->execute([$v['id'], $date, $j['id'], $j['boss_id'], $j['client_id'], $j['vendor_id'], $j['boss_number'] ?: '', $j['sbu'], $site, 8]);
             $added++;
@@ -2935,6 +2938,20 @@ function ops_vouchers($route, $method) {
                 if (!$ok) { flash('Hours on ' . $ed . ' would total ' . rtrim(rtrim(number_format($tot, 2), '0'), '.') . ' h — over the ' . $cap . ' h daily limit.', 'error'); redirect('/voucher?id=' . $v['id']); }
             }
             $dt = in_array($b['day_type'] ?? '', ['OFFICE','LEAVE','HOLIDAY','WEEKOFF','WORK'], true) ? $b['day_type'] : 'OFFICE';
+            // A day happens once. The same date added twice — a second click, a
+            // resend, or simply not noticing it was already on the sheet — put two
+            // rows against one date, and a month sheet that double-counts a day is
+            // a payroll problem, not a display one. The daily-hours cap caught it
+            // only when the hours were big enough to breach the cap.
+            $clash = ops_one("SELECT id, day_type, hours FROM voucher_entries WHERE voucher_id=? AND entry_date=?",
+                             [$v['id'], $b['entry_date'] ?? '']);
+            if ($clash) {
+                $dayLbl = lk_options_or('day_code', DAY_CODES)[$clash['day_type']] ?? $clash['day_type'];
+                flash(fdate($b['entry_date'] ?? '') . ' is already on this ' . Tl('voucher')
+                    . ' as ' . $dayLbl . ' (' . rtrim(rtrim(number_format((float)$clash['hours'], 2), '0'), '.') . ' h). '
+                    . 'Edit that row rather than adding the day again.', 'warning');
+                redirect('/voucher?id=' . $v['id']);
+            }
             $pdo->prepare("INSERT INTO voucher_entries (voucher_id,entry_date,day_type,sbu,site_label,hours,leave_code,office_code,is_auto)
                 VALUES (?,?,?,?,?,?,?,?,0)")
                 ->execute([$v['id'], $b['entry_date'] ?? '', $dt, $b['sbu'] ?? '',

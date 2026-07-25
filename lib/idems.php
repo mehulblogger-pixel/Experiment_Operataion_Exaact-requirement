@@ -210,6 +210,27 @@ function idems_fields($typeId, $sectionId = null) {
     if ($sectionId === null) return ops_all("SELECT * FROM report_fields WHERE report_type_id=? ORDER BY sort_order, id", [(int)$typeId]);
     return ops_all("SELECT * FROM report_fields WHERE report_type_id=? AND section_id=? ORDER BY sort_order, id", [(int)$typeId, (int)$sectionId]);
 }
+// Is there already a report that this one would merely repeat? Keyed on the
+// inspection it belongs to, its type and the day it covers — the three things
+// that make two reports the same report. With no date to key on, fall back to a
+// short window, which is long enough to catch a resend and short enough never to
+// stand in the way of real work.
+function idems_existing_twin($f) {
+    $typeId = (int)($f['report_type_id'] ?? 0);
+    if (!$typeId) return null;
+    $jobId  = (int)($f['job_id'] ?? 0);
+    $callId = (int)($f['call_id'] ?? 0);
+    $client = (int)($f['client_id'] ?? 0);
+    $date   = trim((string)($f['inspection_date'] ?? ''));
+    $where = "deleted=0 AND report_type_id=?"; $args = [$typeId];
+    if ($jobId)       { $where .= " AND job_id=?";    $args[] = $jobId; }
+    elseif ($callId)  { $where .= " AND call_id=?";   $args[] = $callId; }
+    elseif ($client)  { $where .= " AND client_id=?"; $args[] = $client; }
+    else return null;                       // nothing to anchor it to
+    if ($date !== '') { $where .= " AND inspection_date=?"; $args[] = $date; }
+    else              { $where .= " AND created_at >= ?";   $args[] = date('c', time() - 120); }
+    return ops_one("SELECT id, irn FROM report_docs WHERE $where ORDER BY id DESC LIMIT 1", $args);
+}
 function idems_has_schema($typeId) { return (int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=?", [(int)$typeId]) > 0; }
 // Parse a field's options ("A|B|C" or lookup:key) into [value=>label].
 function idems_field_options($f) {
@@ -416,6 +437,20 @@ function ops_idems_documents($route, $method) {
                 flash('Report updated.');
                 redirect('/document?id=' . $doc['id']);
             } else {
+                // A report of the same type, for the same inspection, on the same
+                // day is the same report. Filing it twice burns two IRNs — and an
+                // IRN is a permanent reference that goes to the client, so the
+                // second one cannot simply be deleted afterwards. This catches the
+                // second click and the resend; a genuine second visit carries a
+                // different date and is unaffected.
+                $twin = idems_existing_twin($fields);
+                if ($twin) {
+                    flash($twin['irn'] . ' already covers this — same ' . Tl('report') . ' type, same '
+                        . ($fields['job_id'] ? Tl('job') : Tl('client'))
+                        . ($fields['inspection_date'] ? ', same inspection date' : ', created moments ago')
+                        . '. Nothing was created twice; open it below to carry on.', 'warning');
+                    redirect('/document?id=' . (int)$twin['id']);
+                }
                 // generate the IRN from the resolved fields
                 [$irn, $serial] = idems_generate_irn($fields + ['inspection_date'=>$fields['inspection_date']]);
                 $tok = idems_tokens_for($fields);
@@ -1801,6 +1836,35 @@ function ops_idems_endorsements($route, $method) {
                 idems_log('endorsement', $e['id'], 'EDIT', ['irn'=>$e['endorsement_no']]);
                 flash('Endorsement updated.'); redirect('/endorsement?id=' . $e['id']);
             } else {
+                // Same document, same vendor, same heat / drawing — endorsing it
+                // twice burns a second endorsement number against one physical
+                // certificate. Same reasoning as a report: the number is permanent.
+                // Narrow in SQL on the things that are reliably typed, then compare
+                // the rest in PHP: an "empty" id reaches the database as NULL on one
+                // engine and as '' on another, and COALESCE(vendor_id,0)=0 quietly
+                // matches neither. A comparison that depends on which engine you are
+                // running is not a comparison.
+                // Two comparators, deliberately. An id may arrive as NULL on one
+                // engine and '' on another, so ids compare as numbers. Text must
+                // NOT: (int)'A1' and (int)'B1' are both 0, which would have called
+                // three different heat numbers the same document.
+                $sameId  = fn($a, $b) => (int)($a ?? 0) === (int)($b ?? 0);
+                $sameTxt = fn($a, $b) => trim((string)($a ?? '')) === trim((string)($b ?? ''));
+                $twin = null;
+                foreach (ops_all("SELECT * FROM endorsements WHERE deleted=0 AND doc_type=? AND title=? AND created_at >= ? ORDER BY id DESC",
+                        [$fields['doc_type'], $fields['title'], date('c', time() - 120)]) as $cand) {
+                    if (!$sameId($cand['vendor_id'], $fields['vendor_id'])) continue;
+                    if (!$sameId($cand['client_id'], $fields['client_id'])) continue;
+                    if (!$sameTxt($cand['heat_no'], $fields['heat_no'])) continue;
+                    if (!$sameTxt($cand['drawing_no'], $fields['drawing_no'])) continue;
+                    if (!$sameTxt($cand['item_desc'], $fields['item_desc'])) continue;
+                    $twin = $cand; break;
+                }
+                if ($twin) {
+                    flash($twin['endorsement_no'] . ' was just created for the same document. '
+                        . 'Nothing was created twice; open it below to carry on.', 'warning');
+                    redirect('/endorsement?id=' . (int)$twin['id']);
+                }
                 [$no, $serial] = idems_generate_irn($fields + ['type_code'=>'END', 'inspection_date'=>date('Y-m-d')]);
                 $tok = idems_tokens_for($fields + ['type_code'=>'END']);
                 $cols = array_merge(['endorsement_no','company_code','branch_code','fy_label','serial','status','created_by','created_at','updated_at'], array_keys($fields));
