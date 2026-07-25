@@ -27,8 +27,13 @@ Proposed phasing (each phase = its own commit, tested):
   table add-row, signature canvas, GPS capture, file/photo upload (base64 in report_files, 6 MB cap);
   values saved to report_docs.data JSON; detail renders filled body + evidence thumbnails; finalize
   still locks it. Routes: /report-builder, /report-field-edit, /document-fill, /report-file.
-- P3 Workflow & approvals: configurable multi-level chain (per inspector/common/branch/dept/client/
-  project/type), temp approver on leave, SLA auto-escalation, delegation, reject/send-back w/ remarks.
+- P3 Workflow & approvals ✅ SHIPPED — idems_approver_map (per-inspector approver, common approver,
+  temp cover during leave), idems_approval_rules (configurable multi-level chain matched by report
+  type/office/client/SBU; approver = inspector-map / reporting-manager / specific user / role; per-level
+  SLA), report_approvals steps built on submit (submit blocked if no approver), approve/reject/
+  send-back/delegate with mandatory remarks, finalize gated on full approval, SLA auto-escalation in
+  cron, approval-chain panel + act buttons on the report detail. Routes: /approver-map,
+  /idems-approval-rules(-edit), /document-approve.
 - P4 Auto signatures + immutable system timestamps (inspector from profile, approver on approve),
   Branch-App-Mgr-only timestamp edit w/ tamper-proof audit (old/new/user/reason/time).
 - P5 Client-specific formats: upload DOCX/PDF template, map fields, pixel-match output.

@@ -1244,6 +1244,7 @@ function ops_module_gate($route) {
         'availability'=>'jobs',
         'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems',
         'report-types'=>'idems','report-type-edit'=>'idems','report-builder'=>'idems','report-field-edit'=>'idems','report-file'=>'idems','irn-rules'=>'idems','audit-log'=>'idems',
+        'document-approve'=>'idems','approver-map'=>'idems','idems-approval-rules'=>'idems','idems-approval-rule-edit'=>'idems',
         'masters'=>'masters','work-norms'=>'masters',
         'office-finance'=>'overheads',
         'reports'=>'reports',
@@ -1382,6 +1383,12 @@ function ops_dispatch($route, $method) {
             return ops_idems_builder($route, $method);
         case $route === 'document-fill':
             return ops_idems_fill($route, $method);
+        case $route === 'document-approve':
+            return ops_idems_approve($method);
+        case $route === 'approver-map':
+            return ops_idems_approver_map($method);
+        case $route === 'idems-approval-rules' || $route === 'idems-approval-rule-edit':
+            return ops_idems_approval_rules($route, $method);
         case $route === 'report-file':
             return ops_idems_file($method);
         case $route === 'irn-rules':

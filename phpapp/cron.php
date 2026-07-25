@@ -20,6 +20,7 @@ require __DIR__ . '/lib/crm.php';
 require __DIR__ . '/lib/pdf.php';
 require __DIR__ . '/lib/ai.php';
 require __DIR__ . '/lib/workforce.php';
+require __DIR__ . '/lib/idems.php';
 
 // When invoked over HTTP, require a matching key so strangers can't trigger it.
 if (PHP_SAPI !== 'cli') {
@@ -47,6 +48,12 @@ echo "Placement-fee guarantees checked.\n";
 if (function_exists('crm_run_followups')) {
     $fu = crm_run_followups();
     echo "Quote follow-ups sent: $fu\n";
+}
+
+// IDEMS — escalate report approvals that have blown their SLA.
+if (function_exists('idems_run_sla_escalations')) {
+    $esc = idems_run_sla_escalations();
+    echo "IDEMS approval SLA escalations: $esc\n";
 }
 
 // Automated MIS digest to leadership — weekly on Monday, monthly on the 1st.
