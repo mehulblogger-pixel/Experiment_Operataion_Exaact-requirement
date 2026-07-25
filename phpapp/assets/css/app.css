@@ -260,6 +260,26 @@ body.app{background:var(--bg)}
   background:var(--ink);color:var(--card);font-size:12px;font-weight:600;white-space:nowrap;
   padding:5px 9px;border-radius:6px;z-index:80;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.2)}
 
+/* §m — peek. The rail stays narrow so a wide register has the whole screen;
+   clicking it opens the full menu OVER the page rather than pushing it aside,
+   and clicking anywhere else puts it back. Nothing reflows, so the table you
+   were reading does not jump while you find the menu item. */
+@media(min-width:961px){
+  :root.nav-collapsed.nav-peek .side{width:250px;position:fixed;top:0;bottom:0;left:0;z-index:90;
+    box-shadow:6px 0 26px rgba(0,0,0,.16)}
+  /* Taking the rail out of the flow would let the page slide 60px to the left.
+     The shell keeps that 60px, so nothing under the cursor moves. */
+  :root.nav-collapsed.nav-peek .shell{padding-left:60px}
+  :root.nav-collapsed.nav-peek .side-brand{padding:14px 16px;justify-content:space-between}
+  :root.nav-collapsed.nav-peek .sb-logo b, :root.nav-collapsed.nav-peek .sb-logo img{display:block}
+  :root.nav-collapsed.nav-peek .s-item{justify-content:flex-start;padding-left:12px;padding-right:12px;gap:10px}
+  :root.nav-collapsed.nav-peek .s-item > span:not(.s-ic){display:inline}
+  :root.nav-collapsed.nav-peek .s-item:hover::after{display:none}
+  :root.nav-collapsed.nav-peek .s-grp{font-size:10.5px;padding:14px 12px 5px;margin:0;border-top:0;height:auto}
+  :root.nav-collapsed.nav-peek .side-foot{justify-content:flex-start;padding:12px 16px}
+  :root.nav-collapsed.nav-peek .side-foot .sf-meta, :root.nav-collapsed.nav-peek .side-foot b{display:block}
+}
+
 .sb-logo{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:800;font-size:16px;text-decoration:none;min-width:0}
 .sb-logo:hover{text-decoration:none}
 .sb-logo b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

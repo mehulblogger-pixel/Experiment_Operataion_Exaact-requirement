@@ -145,12 +145,35 @@
       btn.title = on ? "Expand the menu" : "Collapse the menu";
       btn.setAttribute("aria-label", btn.title);
     }
-    btn.addEventListener("click", function () {
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
       var on = document.documentElement.classList.toggle("nav-collapsed");
-      try { localStorage.setItem("navCollapsed", on ? "1" : "0"); } catch (e) {}
+      document.documentElement.classList.remove("nav-peek");
+      try { localStorage.setItem("navCollapsed", on ? "1" : "0"); } catch (e2) {}
       sync();
     });
     sync();
+
+    // §m — while the rail is collapsed, clicking it opens the full menu over the
+    // page, and clicking anywhere else closes it again. That keeps a wide
+    // register at full width without making the menu two clicks away.
+    var side = document.getElementById("side");
+    if (side) {
+      side.addEventListener("click", function (e) {
+        if (e.target.closest("#navCollapse")) return;
+        if (!document.documentElement.classList.contains("nav-collapsed")) return;
+        // A menu item click is a navigation, not a request to peek.
+        if (e.target.closest(".s-item")) return;
+        document.documentElement.classList.add("nav-peek");
+      });
+    }
+    document.addEventListener("click", function (e) {
+      if (side && side.contains(e.target)) return;
+      document.documentElement.classList.remove("nav-peek");
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") document.documentElement.classList.remove("nav-peek");
+    });
   })();
   </script>
 
