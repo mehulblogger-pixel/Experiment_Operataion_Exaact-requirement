@@ -771,6 +771,42 @@ function idems_exif_taken($bytes) {
     $ts = strtotime(preg_replace('/^(\d{4}):(\d{2}):(\d{2})/', '$1-$2-$3', $d));
     return $ts ? date('c', $ts) : '';
 }
+// Supporting documents attached straight to the evidence gallery, outside any
+// field the report format defines. Same compression, duplicate guard and audit
+// trail as a template upload — they simply file under their own heading.
+const EVIDENCE_SUPPORTING_KEY = '_supporting';
+function idems_evidence_attach($doc, $caption = '') {
+    if (empty($_FILES['doc']['name'])) { flash('Choose a file to attach.', 'error'); return; }
+    $pdo = db();
+    $names = (array)$_FILES['doc']['name']; $tmp = (array)$_FILES['doc']['tmp_name'];
+    $types = (array)$_FILES['doc']['type']; $errs = (array)$_FILES['doc']['error'];
+    $added = 0; $dupes = 0; $big = 0;
+    for ($i = 0; $i < count($names); $i++) {
+        if (($errs[$i] ?? 1) !== 0 || !is_uploaded_file($tmp[$i])) continue;
+        $bytes = @file_get_contents($tmp[$i]);
+        if ($bytes === false) continue;
+        if (strlen($bytes) > 12 * 1024 * 1024) { $big++; continue; }
+        $origLen = strlen($bytes);
+        $mime = $types[$i] ?: 'application/octet-stream';
+        $taken = (strpos($mime, 'image/') === 0) ? idems_exif_taken($bytes) : '';
+        [$bytes, $mime, ] = idems_compress_image($bytes, $mime);
+        $sha = sha1($bytes);
+        if (ops_val("SELECT COUNT(*) FROM report_files WHERE report_doc_id=? AND sha1=?", [$doc['id'], $sha])) { $dupes++; continue; }
+        $pdo->prepare("INSERT INTO report_files (report_doc_id,field_key,kind,file_name,mime,data,gps,sha1,taken_at,bytes,orig_bytes,caption,created_by,created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+            ->execute([$doc['id'], EVIDENCE_SUPPORTING_KEY, strpos($mime, 'image/') === 0 ? 'photo' : 'file',
+                substr($names[$i], 0, 255), $mime, 'data:' . $mime . ';base64,' . base64_encode($bytes),
+                '', $sha, $taken ?: date('c'), strlen($bytes), $origLen, substr($caption, 0, 255),
+                user_name(current_user()), date('c')]);
+        $added++;
+    }
+    if ($added) idems_log('report_doc', $doc['id'], 'EVIDENCE', ['irn'=>$doc['irn'], 'new'=>$added . ' supporting document(s)']);
+    $notes = [];
+    if ($added) $notes[] = $added . ' document(s) attached';
+    if ($dupes) $notes[] = $dupes . ' already on this ' . Tl('report');
+    if ($big)   $notes[] = $big . ' over the 12 MB limit';
+    flash($notes ? ucfirst(implode(', ', $notes)) . '.' : 'Nothing was attached.', $added ? 'success' : 'error');
+}
 function idems_handle_uploads($doc, $fields) {
     if (empty($_FILES['upl'])) return;
     $pdo = db(); $added = 0; $dupes = 0; $saved = 0;
@@ -2616,6 +2652,13 @@ function ops_idems_evidence($method) {
             $to = trim($_POST['to_field'] ?? '');
             $pdo->prepare("UPDATE report_files SET field_key=? WHERE id=? AND report_doc_id=?")->execute([$to, (int)($_POST['file_id'] ?? 0), $doc['id']]);
             flash('Evidence re-linked.');
+        } elseif ($do === 'upload') {
+            // Supporting documents the report format never asked for — a mill
+            // certificate, a signed gate pass, the client's own checklist. The
+            // fill screen can only offer the file boxes the template defines, so
+            // an inspector holding a paper nobody anticipated had nowhere to put
+            // it. Anything can be attached here, under its own heading.
+            idems_evidence_attach($doc, trim($_POST['caption'] ?? ''));
         }
         redirect('/document-evidence?id=' . $doc['id']);
     }
@@ -2626,6 +2669,7 @@ function ops_idems_evidence($method) {
     $secName = []; foreach ($sections as $s) $secName[(int)$s['id']] = $s['title'];
     foreach ($fields as $f) if (in_array($f['ftype'], ['photo','file'], true))
         $fieldMeta[$f['fkey']] = ['label'=>$f['label'] ?: $f['fkey'], 'section'=>$secName[(int)$f['section_id']] ?? 'Unsectioned'];
+    $fieldMeta[EVIDENCE_SUPPORTING_KEY] = ['label'=>'Attached here', 'section'=>'Supporting documents'];
     $files = ops_all("SELECT id, field_key, kind, file_name, mime, gps, caption, taken_at, bytes, orig_bytes, created_by, created_at
         FROM report_files WHERE report_doc_id=? AND kind IN ('photo','file') ORDER BY id", [$doc['id']]);
     $stats = ['n'=>count($files), 'bytes'=>0, 'orig'=>0, 'gps'=>0];

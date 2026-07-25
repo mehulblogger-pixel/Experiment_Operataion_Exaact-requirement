@@ -26,8 +26,27 @@
   <div class="kpi"><div class="k-lab">With GPS</div><div class="k-val"><?= (int)$stats['gps'] ?></div><div class="k-sub">location tagged</div></div>
 </div>
 
+<?php // Supporting documents the report format never asked for. The fill screen
+      // can only offer the boxes the template defines; an inspector holding a
+      // mill certificate, a gate pass or the client's own checklist needs
+      // somewhere to put it without anybody editing the template first. ?>
+<?php if ($editable): ?>
+<div class="panel">
+  <div class="ctitle" style="margin-top:0"><h3>Attach a supporting document</h3></div>
+  <p class="muted" style="margin:0 0 10px">Anything that backs up this <?= e(Tl('report')) ?> — a test or mill certificate, a calibration record, a signed gate pass, the <?= e(Tl('client')) ?>'s own checklist, a scan or a photograph. Up to 12 MB each; pictures are compressed and the same file is never stored twice.</p>
+  <form method="post" action="/document-evidence?id=<?= (int)$doc['id'] ?>" enctype="multipart/form-data" class="form-grid">
+    <input type="hidden" name="_do" value="upload"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
+    <div class="ff"><label>Document(s)</label>
+      <input class="form-control" type="file" name="doc[]" multiple required></div>
+    <div class="ff"><label>What is it? <span class="muted">— appears under the file</span></label>
+      <input class="form-control" name="caption" placeholder="e.g. Mill test certificate, heat no. 4417"></div>
+    <div class="ff ff-check" style="align-items:end"><button class="btn" type="submit">Attach</button></div>
+  </form>
+</div>
+<?php endif; ?>
+
 <?php if (!$files): ?>
-  <div class="panel"><p class="muted">No evidence attached yet. Use <strong>Add evidence</strong> to capture photos while filling the report — the camera, GPS and timestamp are captured together.</p></div>
+  <div class="panel"><p class="muted">No evidence attached yet. Use <strong>Add evidence</strong> to capture photos while filling the <?= e(Tl('report')) ?> — the camera, GPS and timestamp are captured together — or attach a supporting document above.</p></div>
 <?php endif; ?>
 
 <?php foreach ($bySection as $sec => $groups): ?>
