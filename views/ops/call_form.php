@@ -41,10 +41,17 @@
         <option value="">— whole <?= e(Tl('quote')) ?> —</option>
       </select></div>
 
+    <?php // The site is very often the client's own premises — a manufacturer who
+          // buys inspection of their own works. That partner is a client AND the
+          // site, so it is offered here in one tick rather than making somebody
+          // go and flag the client as a vendor first. ?>
     <div class="ff"><label><?= e(T('vendor')) ?> / <?= e(Tl('manufacturer')) ?> (site) <a href="#" class="addlink" data-qa="vendor">+ Add new</a></label>
       <select class="form-control searchable" id="vendor_sel" name="vendor_id"><option value="">—</option>
         <?php foreach ($vendors as $v): ?><option value="<?= (int)$v['id'] ?>" <?= ($call && $call['vendor_id']==$v['id'])?'selected':'' ?>><?= e(pname($v)) ?></option><?php endforeach; ?>
-      </select></div>
+      </select>
+      <label class="chk" style="margin-top:5px"><input type="checkbox" id="site_is_client">
+        Inspection is at the <?= e(Tl('client')) ?>'s own premises</label>
+      <small class="muted" id="sic_note" style="display:none">The <?= e(Tl('client')) ?> is recorded as the site too.</small></div>
     <div class="ff ff-wide"><label>Shared folder / drive link <span class="muted">— the client's papers and our working files</span></label>
       <input class="form-control" type="url" name="folder_link" value="<?= e($call['folder_link'] ?? '') ?>" placeholder="https://…  (SharePoint, Google Drive, OneDrive)">
       <small class="muted">Travels with the <?= e(Tl('job')) ?>, so the <?= e(Tl('engineer')) ?> gets it too.</small></div>
@@ -239,6 +246,43 @@
       lineSel.appendChild(el);
     });
   }
+  // ---- §11: the client's own works is the inspection site -------------------
+  // Ticking this copies the client into the site box, adding the option if the
+  // partner has never been used as a site before. The server flags them as a
+  // site partner on save, so next time they are simply in the list.
+  var sicBox = document.getElementById('site_is_client'), sicNote = document.getElementById('sic_note');
+  function clientOptionLabel(){
+    var o = clientSel.options[clientSel.selectedIndex];
+    return o && o.value ? o.textContent.trim() : '';
+  }
+  function applySameAsClient(){
+    if (!sicBox.checked) { sicNote.style.display = 'none'; return; }
+    var cid = clientSel.value, label = clientOptionLabel();
+    if (!cid) { sicBox.checked = false; alert('Pick the client first.'); return; }
+    var found = false;
+    Array.prototype.forEach.call(vendorSel.options, function(o){ if (o.value === cid) found = true; });
+    if (!found) {
+      var op = document.createElement('option');
+      op.value = cid; op.textContent = label + ' (client)';
+      vendorSel.appendChild(op);
+    }
+    vendorSel.value = cid;
+    vendorSel.dispatchEvent(new Event('change', {bubbles:true}));
+    sicNote.style.display = '';
+  }
+  var vendorSel = document.getElementById('vendor_sel');
+  sicBox.addEventListener('change', applySameAsClient);
+  // Untick it the moment somebody chooses a different site by hand.
+  vendorSel.addEventListener('change', function(){
+    if (sicBox.checked && vendorSel.value !== clientSel.value) {
+      sicBox.checked = false; sicNote.style.display = 'none';
+    }
+  });
+  // Reflect an already-saved call where the two are the same.
+  if (vendorSel.value && vendorSel.value === clientSel.value) {
+    sicBox.checked = true; sicNote.style.display = '';
+  }
+
   function setIfEmpty(el, v){ if (el && v && !el.value) el.value = v; }
   // The contract box is owned by the quotation when one is chosen, and by the
   // user when one is not. Switching to "direct call" must NOT wipe a number the

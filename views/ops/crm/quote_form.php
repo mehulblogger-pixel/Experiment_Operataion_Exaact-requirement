@@ -170,7 +170,7 @@
   <table class="dt qlines" id="lines">
     <thead><tr>
       <th style="min-width:130px"><?= e(T('sbu')) ?></th><th style="min-width:150px">Activity</th>
-      <th style="min-width:170px">Service</th><th style="min-width:140px">Sub-types</th>
+      <th style="min-width:190px">Service <span class="muted" style="font-weight:400">— from the types above</span></th>
       <th style="min-width:220px">Description</th><th style="min-width:170px">Site</th>
       <th style="min-width:150px"><?= e(T('office')) ?></th><th style="min-width:130px">Order</th>
       <th class="num" style="min-width:80px">Qty</th><th style="min-width:130px">Unit</th>
@@ -182,8 +182,13 @@
     <tr class="lrow">
       <td><select class="form-control l_sbu" name="l_sbu[]"><option value="">—</option><?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($ln['sbu'] ?? '')===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
       <td><select class="form-control l_act" name="l_activity[]" data-cur="<?= (int)($ln['activity_id'] ?? 0) ?>"><option value="">— pick an <?= e(T('sbu')) ?> first —</option></select></td>
-      <td><select class="form-control searchable" name="l_service[]"><option value="">—</option><?php foreach ($svcOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($ln['service_type'] ?? '')===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
-      <td><input class="form-control" name="l_subtypes[]" value="<?= e($ln['subtypes'] ?? '') ?>" placeholder="e.g. Site QA/QC"></td>
+      <?php // A plain select on purpose. It was a .searchable select, which the
+            // enhancer replaces with a text box — so it looked like a free-text
+            // field, accepted typing, then silently reverted. The list is short
+            // and closed; a real dropdown is the honest control. Its options are
+            // rebuilt by JS from the "Types of inspection requested" ticked above,
+            // so a line can never quote something outside the agreed scope. ?>
+      <td><select class="form-control l_service" name="l_service[]" data-cur="<?= e($ln['service_type'] ?? '') ?>"></select></td>
       <td><input class="form-control" name="l_desc[]" value="<?= e($ln['description'] ?? '') ?>"></td>
       <td><select class="form-control l_loc" name="l_location[]" data-cur="<?= (int)($ln['location_id'] ?? 0) ?>"><option value="">— add a site above —</option></select></td>
       <td><select class="form-control" name="l_office[]"><option value="">— primary —</option>
@@ -366,9 +371,51 @@
     document.getElementById('t_gst').textContent = nfmt(gst);
     document.getElementById('t_tot').textContent = nfmt(sub + gst);
   }
+  // ---- §10: a line's Service is whatever was ticked in the header ----------
+  // The scope is agreed once, at the top, in "Types of inspection requested".
+  // Every line then picks from exactly that set — so a line item can never quote
+  // a service the client was not offered, and nobody has to remember the codes.
+  var SVC_LABELS = <?= json_encode(array_map(fn($v) => (string)$v, $svcOpts)) ?>;
+  function tickedTypes(){
+    var out = [];
+    document.querySelectorAll('#itypes input[type=checkbox]:checked').forEach(function(cb){ out.push(cb.value); });
+    return out;
+  }
+  function fillService(tr){
+    var sel = tr.querySelector('.l_service');
+    if (!sel) return;
+    var want = sel.value || sel.dataset.cur || '';
+    var types = tickedTypes();
+    sel.innerHTML = '';
+    var o0 = document.createElement('option');
+    o0.value = '';
+    o0.textContent = types.length ? '— pick one —' : '— tick the types of inspection above —';
+    sel.appendChild(o0);
+    types.forEach(function(code){
+      var op = document.createElement('option');
+      op.value = code; op.textContent = SVC_LABELS[code] || code;
+      if (code === want) op.selected = true;
+      sel.appendChild(op);
+    });
+    // A saved line whose type was later un-ticked keeps its value rather than
+    // being silently blanked, and says so, so the mismatch is visible.
+    if (want && types.indexOf(want) === -1) {
+      var op = document.createElement('option');
+      op.value = want; op.textContent = (SVC_LABELS[want] || want) + ' — no longer in the header';
+      op.selected = true;
+      sel.appendChild(op);
+    }
+    sel.disabled = false;
+  }
+  function fillAllServices(){ tbody.querySelectorAll('.lrow').forEach(fillService); }
+  document.querySelectorAll('#itypes input[type=checkbox]').forEach(function(cb){
+    cb.addEventListener('change', fillAllServices);
+  });
+
   function wireLine(tr){
     tr.querySelectorAll('.l_qty,.l_rate').forEach(function(el){ el.addEventListener('input', recalc); });
     tr.querySelector('.l_sbu').addEventListener('change', function(){ fillAct(tr); });
+    fillService(tr);
     var rm = tr.querySelector('.lrm');
     if (rm) rm.addEventListener('click', function(){
       if (tbody.querySelectorAll('.lrow').length > 1) { tr.remove(); }
