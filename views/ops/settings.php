@@ -161,6 +161,49 @@
         <?php endforeach; ?>
       </div>
       <small class="muted">People in these roles are asked to set it up at their next sign-in and cannot turn it off themselves. Start with the roles that can move money or change permissions.</small></div>
+    <div class="ff"><label>Largest attachment allowed (MB)</label>
+      <input class="form-control" type="number" min="1" max="64" name="upload_max_mb" value="<?= (int)upload_max_mb() ?>">
+      <small class="muted">Applies everywhere a file can be attached.</small></div>
+  </div>
+
+  <h3 class="tab-sub">Compliance</h3>
+  <p class="sub" style="margin-bottom:10px">
+    None of this is written by the software, and leaving it blank is itself what
+    <a href="/compliance">Where we stand</a> will report. The DPDP Act requires a named person to complain to and
+    a notice saying what is collected and why; the CERT-In directions require an independent audit once a year.
+  </p>
+  <div class="form-grid">
+    <div class="ff"><label>Grievance officer — name</label>
+      <input class="form-control" name="grievance_name" value="<?= e(setting_get('grievance_name','')) ?>" placeholder="The person a complaint goes to"></div>
+    <div class="ff"><label>Their e-mail</label>
+      <input class="form-control" type="email" name="grievance_email" value="<?= e(setting_get('grievance_email','')) ?>" placeholder="privacy@yourcompany.com">
+      <small class="muted">Use an address that is actually read. It is published on the privacy page.</small></div>
+    <div class="ff"><label>Their phone</label>
+      <input class="form-control" name="grievance_phone" value="<?= e(setting_get('grievance_phone','')) ?>"></div>
+    <div class="ff"><label>Date of the last independent security audit</label>
+      <input class="form-control" type="date" name="last_cert_audit" value="<?= e(setting_get('last_cert_audit','')) ?>">
+      <small class="muted">By a CERT-In empanelled auditor. The list is published on cert-in.org.in.</small></div>
+    <div class="ff ff-wide"><label>Privacy notice <span class="muted">— shown at /privacy</span></label>
+      <?php // A draft rather than a blank box. A notice nobody can start writing
+            // is a notice that never gets written, and the Act does not care why. ?>
+      <textarea class="form-control" name="privacy_notice" rows="10" placeholder="<?= e(
+"What we hold, and why\n\n" .
+"We are an inspection company. To do the work you or your employer asked for, this system holds:\n" .
+"  · the name, designation, e-mail and phone number of the people we deal with at client and vendor companies, so that inspections can be arranged and reports sent;\n" .
+"  · for our own staff, the details needed to employ them and to schedule work;\n" .
+"  · the inspection records themselves — dates, findings, photographs taken on site, and who approved what.\n\n" .
+"Why we are allowed to hold it\n" .
+"Most of it is needed to perform a contract. Inspection records are kept because our clients, and the standards we work to, require them to be kept.\n\n" .
+"How long we keep it\n" .
+"Contact details for as long as we work with that company. Inspection records and the trail of who changed what for the period our clients and the applicable standards require.\n\n" .
+"Who else sees it\n" .
+"Nobody outside this company, except where a client is entitled to the report of their own inspection, or where the law requires it. The system sends nothing to any other service.\n\n" .
+"What you can ask for\n" .
+"A copy of what we hold about you, a correction, deletion, or the withdrawal of consent you gave earlier. Write to the person named below and we will log it and answer.\n\n" .
+"Where it is kept\n" .
+"On our hosting account in India."
+      ) ?>"><?= e(setting_get('privacy_notice','')) ?></textarea>
+      <small class="muted">The grey text is a starting draft written for an inspection business — read it, change what is not true of you, and paste it in.</small></div>
   </div>
 
   <h3 class="tab-sub">Email — automatic sending (Office 365 SMTP)</h3>
