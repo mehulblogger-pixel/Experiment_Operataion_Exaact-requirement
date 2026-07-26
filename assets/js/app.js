@@ -842,7 +842,12 @@
         .catch(function () {});
     }
     function render(d) {
-      if (!d || !d.count) { out.style.display = 'none'; return; }
+      if (!d || !d.count) {
+        out.style.display = 'none';
+        window.__schedCount = 0; window.__schedWord = '';
+        if (window.__recalcBillable) window.__recalcBillable();
+        return;
+      }
       out.style.display = '';
       out.className = 'msg ' + (d.clashes ? 'msg-warning' : 'msg-success');
       var bits = ['<strong>' + d.label + '</strong> — '];
@@ -904,6 +909,21 @@
         bits.push(sk.join(''));
       }
       out.innerHTML = bits.join('');
+      // What this engagement comes to in billable units, published for the
+      // pricing box. A run of six days is six man-days; a posting is however
+      // many man-months are actually claimable, which is not the same as the
+      // number of months deputed.
+      if (d.type === 'MONTHLY' && typeof d.claimable === 'number' && d.claimable > 0) {
+        window.__schedCount = d.claimable;
+        window.__schedWord = 'claimable man-months';
+      } else if (d.count > 0) {
+        window.__schedCount = d.count;
+        window.__schedWord = 'counted from the ' + d.count + ' inspection day(s)';
+      } else {
+        window.__schedCount = 0;
+        window.__schedWord = '';
+      }
+      if (window.__recalcBillable) window.__recalcBillable();
       // Anything already forced stays ticked when the panel is redrawn.
       (d.forced || []).forEach(function (f) {
         var c = out.querySelector('.forceday[value="' + f + '"]');

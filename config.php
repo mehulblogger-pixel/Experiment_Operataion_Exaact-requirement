@@ -21,4 +21,9 @@ foreach (['driver'=>'DB_DRIVER','host'=>'DB_HOST','name'=>'DB_NAME','user'=>'DB_
 }
 if (getenv('ADMIN_PASSWORD')) $ADMIN['pass'] = getenv('ADMIN_PASSWORD');
 
-return ['db' => $DB, 'admin' => $ADMIN, 'sqlite_path' => __DIR__ . '/data.sqlite'];
+// The SQLite file can be pointed elsewhere the same way, so a check can build a
+// throwaway database instead of touching the one in use.
+$SQLITE = getenv('SQLITE_PATH');
+if (!$SQLITE) $SQLITE = __DIR__ . '/data.sqlite';
+
+return ['db' => $DB, 'admin' => $ADMIN, 'sqlite_path' => $SQLITE];

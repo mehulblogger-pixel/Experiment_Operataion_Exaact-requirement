@@ -44,3 +44,10 @@ php tools/check-dupes.php || exit 1
 # literal and says nothing. That is how a second 'expense-heads' master silently
 # saved office running costs into the voucher expense columns.
 php tools/check-keys.php || exit 1
+
+# And every one of those can pass while a save writes to a column that does not
+# exist. That is invisible until somebody presses the button on the live site
+# and gets "Unknown column 'schedule_weekdays' in 'INSERT INTO'" in their face.
+# This builds a throwaway database so every migration runs, then checks each
+# save's field list against the schema it will actually meet.
+php tools/check-columns.php || exit 1

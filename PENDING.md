@@ -2,6 +2,30 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🧨 TWO THINGS THE SHAPE REWRITE BROKE (July 2026)
+
+Both were mine, both were reported from the live site, and both are the same
+kind of mistake — changing one thing and not following the thread to what read
+from it.
+
+**The billable value stopped calculating.** The quantity was worked out by
+counting filled-in date boxes on the page. The moment the form only shows the
+boxes the chosen shape needs, a continuous run of six days has no date boxes at
+all — so the count read zero, the quantity fell back to one, and six days at
+3,000 priced as 3,000. The quantity now comes from the schedule itself, which
+is the only thing that knows: six days is six, a posting is however many
+man-months are claimable, a lump sum is one. A hand-typed quantity still wins.
+
+**Allocate died with "Unknown column 'schedule_weekdays' in 'INSERT INTO'".**
+The pattern columns existed on `calls` and were added to the deputation's save
+list, but never to the `jobs` table. `php -l` cannot see that, and neither can
+any test that does not press the button.
+
+`tools/check-columns.php` now closes that whole class: it builds a throwaway
+database so every migration runs, then checks each save's field list against
+the schema it will actually meet. Wired into `tools/lint.sh`. Verified by
+removing the column again and watching it fail.
+
 ## 📅 FIVE SHAPES OF ENGAGEMENT (July 2026)
 
 The three dates mean three different things and were being typed as though they
