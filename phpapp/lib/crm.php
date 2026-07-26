@@ -1145,6 +1145,10 @@ function ops_crm_quotes($route, $method) {
             }
         }
         $pdo->prepare("UPDATE quotations SET client_id=?, contract_number=?, contract_id=? WHERE id=?")->execute([$cid, $contractNo, $contractId, $q['id']]);
+        // The contract now exists on the client's Contracts tab; make it point back
+        // at the order it came from, so the tab can say which quotation this is,
+        // and so the same link exists whichever end it was created from.
+        if ($contractId && function_exists('contract_link_quotation')) contract_link_quotation($contractId, (int)$q['id']);
         $ok = crm_float_ops_packet(crm_quote_get($q['id']));
         flash($ok ? 'Client & contract registered — the operations packet has been e-mailed to the team.' : 'Client & contract registered. The ops packet was logged (configure SMTP in Settings to e-mail it).', $ok ? 'success' : 'warning');
         redirect('/quote?id=' . $q['id']);

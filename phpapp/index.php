@@ -340,7 +340,7 @@ if ($route === 'partner-add' && $method === 'POST') {
         'contact' => ['partner_contacts', ['name','designation','department','project','email','mobile','phone','address_id'], 'contacts'],
         'address' => ['partner_addresses', ['address_type','label','line1','line2','town_village','district','city','state','pincode','country'], 'addresses'],
         'registration' => ['partner_registrations', ['doc_type','number','valid_to','notes'], 'registration'],
-        'contract' => ['partner_contracts', ['contract_number','title','sbu','value','start_date','end_date','notes'], 'contracts'],
+        'contract' => ['partner_contracts', ['contract_number','title','sbu','value','start_date','end_date','notes','qty_total'], 'contracts'],
         'relationship' => ['partner_relationships', ['relation_type','related_id','notes'], 'relationships'],
     ];
     if ($kind === 'note') {
@@ -381,10 +381,23 @@ if ($route === 'partner-add' && $method === 'POST') {
         $vals = [$p['id']];
         foreach ($fields as $f) {
             $v = $b[$f] ?? '';
-            if (($f === 'address_id' || $f === 'related_id' || $f === 'value') && $v === '') $v = null;
+            if (($f === 'address_id' || $f === 'related_id' || $f === 'value' || $f === 'qty_total') && $v === '') $v = null;
             $vals[] = $v;
         }
         $pdo->prepare("INSERT INTO $table (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
+        $newId = (int)$pdo->lastInsertId();
+        // A contract recorded here against one of our own quotations is the same
+        // agreement seen from the other end: write the number back onto that
+        // quotation so it stops reading "contract number pending", and point the
+        // contract at the order it came from. Same rule the accounts screen uses.
+        if ($kind === 'contract' && function_exists('contract_link_quotation')) {
+            $qid = (int)($b['quotation_id'] ?? 0);
+            if ($qid && contract_link_quotation($newId, $qid)) {
+                $qn = ops_val("SELECT quote_no FROM quotations WHERE id=?", [$qid]);
+                flash('Contract added, and ' . ($qn ?: Tl('quote')) . ' now carries this contract number.');
+                redirect("/partner?id={$p['id']}&tab=contracts");
+            }
+        }
         flash('Added.');
         redirect("/partner?id={$p['id']}&tab=$tab");
     }
