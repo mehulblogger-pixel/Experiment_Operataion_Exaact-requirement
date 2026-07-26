@@ -15,7 +15,13 @@
 <form method="post" action="<?= $user ? '/user-edit?id=' . (int)$user['id'] : '/user-new' ?>" class="panel">
   <div class="form-grid">
     <div class="ff"><label>Username *</label><input class="form-control" name="username" required value="<?= e($user['username'] ?? '') ?>"></div>
-    <div class="ff"><label>Password <?= $user ? '(blank = keep)' : '' ?></label><input class="form-control" type="text" name="password" placeholder="<?= $user ? '••••••' : 'set a password' ?>"></div>
+    <div class="ff"><label>Password <?= $user ? '(blank = keep)' : '' ?></label>
+      <input class="form-control" type="text" name="password" placeholder="<?= $user ? '••••••' : 'set a password' ?>">
+      <span class="muted" style="font-size:11.5px">At least <?= (int)pwd_min_len() ?> characters, with a letter and a number, and not their own name.</span></div>
+    <?php // Whoever types a password here knows it. This makes the person replace
+          // it at their first sign-in, so it stops being a password two people share. ?>
+    <div class="ff ff-check"><label><input type="checkbox" name="must_change_pwd" value="1"
+        <?= !empty($user['must_change_pwd']) ? 'checked' : '' ?>> They must choose their own at the next sign-in</label></div>
     <div class="ff"><label>First name</label><input class="form-control" name="first_name" value="<?= e($user['first_name'] ?? '') ?>"></div>
     <div class="ff"><label>Last name</label><input class="form-control" name="last_name" value="<?= e($user['last_name'] ?? '') ?>"></div>
     <div class="ff"><label>Email</label><input class="form-control" name="email" value="<?= e($user['email'] ?? '') ?>"></div>
