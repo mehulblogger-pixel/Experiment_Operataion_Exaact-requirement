@@ -241,6 +241,77 @@
     details{border:0} details .body{display:block !important}
     summary::after{content:""}
   }
+
+  /* ---------------------------------------------------------------------
+     Parts II–IV. The flow above is read; these are worked through with the
+     app open, so they are built as instruments rather than prose: a rule
+     states one enforced behaviour, an edge case pairs an action with the
+     answer to expect, and a step carries a box to tick.
+     --------------------------------------------------------------------- */
+  .toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+  .toc a{display:inline-flex;align-items:baseline;gap:8px;text-decoration:none;
+    border:1px solid var(--line);border-radius:999px;padding:7px 15px 7px 11px;
+    background:var(--surface);color:var(--ink-2);font:600 var(--t-sm)/1 var(--sans)}
+  .toc a:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .toc a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .toc .k{font:700 var(--t-xs)/1 var(--mono);color:var(--accent);letter-spacing:.06em}
+
+  .part{margin:64px 0 0;padding-top:26px;border-top:2px solid var(--line-strong)}
+  .part-h{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .part-h .rn{font:700 var(--t-sm)/1 var(--mono);color:var(--accent);letter-spacing:.1em}
+
+  .rules{display:grid;gap:12px;margin:22px 0 0}
+  @media(min-width:780px){ .rules{grid-template-columns:repeat(2,1fr)} }
+  .rule{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;
+    padding:15px 17px;background:var(--surface);box-shadow:var(--shadow)}
+  .rule h4{margin:0 0 6px;font:600 var(--t-md)/1.3 var(--sans);color:var(--ink)}
+  .rule p{margin:0;font-size:var(--t-sm);color:var(--ink-2);line-height:1.62}
+  .rule p + p{margin-top:7px}
+  .rule.blocks{border-left-color:var(--lost)}
+  .rule.warns{border-left-color:var(--wait)}
+
+  .edges{display:grid;gap:10px;margin:20px 0 0}
+  .edge{border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
+  .edge-h{display:flex;gap:12px;align-items:baseline;padding:13px 16px;background:var(--surface-2);
+    border-bottom:1px solid var(--line)}
+  .edge-h .id{font:700 var(--t-xs)/1.5 var(--mono);color:var(--accent);white-space:nowrap}
+  .edge-h b{font:600 var(--t-base)/1.4 var(--sans);color:var(--ink)}
+  .edge-b{display:grid;gap:0}
+  @media(min-width:720px){ .edge-b{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} }
+  .edge-b > div{padding:13px 16px}
+  .edge-b > div + div{border-top:1px solid var(--line)}
+  @media(min-width:720px){ .edge-b > div + div{border-top:0;border-left:1px solid var(--line)} }
+  .edge-b p{margin:5px 0 0;font-size:var(--t-sm);color:var(--ink-2);line-height:1.6}
+  .edge-b .expect{background:var(--accent-soft)}
+  :root[data-theme="dark"] .edge-b .expect, @media(prefers-color-scheme:dark){ .edge-b .expect{background:var(--surface-2)} }
+
+  .run{margin:26px 0 0;border:1px solid var(--line);border-radius:12px;background:var(--surface);
+    box-shadow:var(--shadow);overflow:hidden}
+  .run-h{padding:15px 18px;background:var(--surface-2);border-bottom:1px solid var(--line);
+    display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+  .run-h .rid{font:700 var(--t-xs)/1.5 var(--mono);color:var(--accent);letter-spacing:.08em}
+  .run-h h3{margin:0;font:600 var(--t-lg)/1.3 var(--sans);color:var(--ink)}
+  .run-h .as{margin-left:auto;font:600 var(--t-xs)/1.5 var(--sans);color:var(--ink-3);
+    text-transform:uppercase;letter-spacing:.07em}
+  .steps{list-style:none;margin:0;padding:0;counter-reset:st}
+  .steps > li{display:grid;grid-template-columns:22px 26px minmax(0,1fr);gap:12px;
+    padding:13px 18px;border-bottom:1px solid var(--line);align-items:start}
+  .steps > li:last-child{border-bottom:0}
+  .steps > li::before{counter-increment:st;content:counter(st);
+    font:600 var(--t-xs)/1.7 var(--mono);color:var(--ink-3);text-align:right}
+  .steps .box{width:15px;height:15px;margin-top:3px;border:1.5px solid var(--line-strong);border-radius:3.5px}
+  .steps p{margin:0;font-size:var(--t-sm);color:var(--ink);line-height:1.62}
+  .steps .then{display:block;margin-top:5px;font-size:var(--t-sm);color:var(--ink-2);
+    padding-left:11px;border-left:2px solid var(--accent)}
+  .steps .then b{color:var(--accent);font-weight:600}
+  .steps li.fail{background:var(--lost-soft)}
+  .steps li.fail .then{border-left-color:var(--lost)}
+  .steps li.fail .then b{color:var(--lost)}
+
+  .keyline{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0 0}
+  .keyline span{font:600 var(--t-xs)/1.6 var(--mono);border:1px solid var(--line);
+    border-radius:5px;padding:3px 8px;color:var(--ink-2);background:var(--surface-2)}
+
   @media (prefers-reduced-motion:reduce){ *{animation:none !important; transition:none !important} }
 </style>
 
@@ -258,15 +329,25 @@
       <div><span class="lab">Stages</span><b>0 → 11</b></div>
       <div><span class="lab">Ways in</span><b>2</b></div>
       <div><span class="lab">Quote outcomes</span><b>6</b></div>
-      <div><span class="lab">Worked examples</span><b>Q-00042 · CALL-00312</b></div>
+      <div><span class="lab">Rules enforced</span><b>14</b></div>
+      <div><span class="lab">Edge cases</span><b>40</b></div>
+      <div><span class="lab">Test script</span><b>9 runs · 56 checks</b></div>
     </div>
+    <nav class="toc" aria-label="Contents">
+      <a href="#flow"><span class="k">I</span>The flow, stage by stage</a>
+      <a href="#rules"><span class="k">II</span>The rules the system enforces</a>
+      <a href="#edges"><span class="k">III</span>Edge cases worth testing</a>
+      <a href="#script"><span class="k">IV</span>The test script, step by step</a>
+    </nav>
   </header>
 
   <p class="dek" style="margin-top:26px">Anything in <code>THIS TYPEFACE</code> is the literal value the system stores —
     the same string you will find in a dropdown, an export column or a filter. Names of clients, vendors and people below are invented for the example.</p>
 
   <!-- ================================================================== -->
-  <h2>The nineteen modules, grouped by when you touch them</h2>
+  <div class="part" id="flow" style="border-top:0;margin-top:30px;padding-top:0">
+    <div class="part-h"><span class="rn">PART I</span><h2 style="margin:0">The nineteen modules, grouped by when you touch them</h2></div>
+  </div>
   <p class="dek">Nothing here is optional scenery. Each group hands something to the next, and a gap in an early
     group is what surfaces later as a call that cannot be allocated or an invoice nobody can raise.</p>
 
@@ -599,9 +680,13 @@
           <div><span class="lab">Register the client</span>
             <p>A prospect becomes a real client record with a code like <code>AHM-26-KAVER-00031</code> —
               office, year, short name, sequence. An existing client is matched, not duplicated.</p></div>
-          <div><span class="lab">Contract number</span>
-            <p>The client's own reference, held against the client with the value, start and end dates.
-              It is what the inspection call will quote back to them.</p></div>
+          <div><span class="lab">Contract number — settled from either end</span>
+            <p>The client's own reference, held against the client with the value, the start and <b>end</b> dates and
+              optionally the quantity sold. It is what the inspection call quotes back to them.</p>
+            <p>Register it here and the contract appears on the client's <b>Contract Numbers</b> tab naming this quotation.
+              Or record the contract on that tab and pick the order from <b>Against quotation</b> — a list of exactly those
+              quotations for this client that still have no number — and the number is written back onto the quotation.
+              Whichever end you start from, both sides end up saying the same thing.</p></div>
           <div><span class="lab">Purchase order</span>
             <p>Uploaded here and carried forward — the engineer standing at the works can see the PO that authorises the visit.</p></div>
           <div><span class="lab">Float the packet</span>
@@ -1116,13 +1201,12 @@
             It is the one place in the system where a job can be scoped differently from what the client actually agreed —
             and nobody senior sees it before the engineer is booked.</p>
         </div>
-        <div class="warn">
-          <span class="lab">Known gap — the contract number</span>
-          <p>The contract-number box is filled only by the cascade from a quotation and cannot be typed. A direct call
-            therefore carries no contract number, even when it is drawing down against a real ARC.
-            <b>Where the ARC exists as a won quotation, pick it rather than choosing “direct call”</b> — the draw-down then
-            stays visible against the contract, which is what you want at year end. Raise a direct call only when there is
-            genuinely no quotation record behind the work.</p>
+        <div class="writes">
+          <span class="lab">The contract number on a direct call</span>
+          <p>The box is read-only only while a quotation is driving it. On a direct call it can be typed, so a draw-down
+            against a real ARC stays visible against that contract — which is what you want at year end. Where the ARC
+            exists as a won quotation, still pick it rather than typing: the cascade then brings the rate, the basis and
+            the line item across as well.</p>
         </div>
         <div class="writes">
           <span class="lab">What replaces the approval that never happened</span>
@@ -1223,7 +1307,7 @@
         <tr><td><b>Elapsed before an engineer is booked</b></td><td>17 days — quote, approve, revise, chase, accept, hand over</td><td>Under an hour</td></tr>
         <tr><td><b>Who checked the price</b></td><td>Marketing Manager, then Business Director</td><td>Nobody, before the fact</td></tr>
         <tr><td><b>Commercial fields</b></td><td>Cascaded from the accepted quotation</td><td>Typed by the coordinator</td></tr>
-        <tr><td><b>Contract number</b></td><td>Carried from the quotation</td><td><span class="pill lost">not recordable</span> — see the gap above</td></tr>
+        <tr><td><b>Contract number</b></td><td>Carried from the quotation, both ways</td><td>Typed by hand, and shown as pending until it is</td></tr>
         <tr><td><b>Follow-ups</b></td><td>Five scheduled, worked, then skipped on acceptance</td><td>None — there is nothing to chase</td></tr>
         <tr><td><b>Allocation onward</b></td><td colspan="2" style="text-align:center">Identical in every respect</td></tr>
         <tr><td><b>Money exit</b></td><td>Invoice <em>and</em> an inter-office credit</td><td>Invoice only — one office did both</td></tr>
@@ -1359,6 +1443,550 @@
         <tr><td>BOSS number</td><td>Commercial tracking opens</td><td>Contract</td><td>Profitability, and the renewal that succeeds it</td><td>Identical</td></tr>
       </tbody>
     </table>
+  </div>
+
+  <!-- ================================================================== -->
+  <div class="part" id="rules">
+    <div class="part-h"><span class="rn">PART II</span><h2 style="margin:0">The rules the system enforces</h2></div>
+    <p class="dek">14 behaviours that hold whatever anybody types. Each one exists because the alternative was
+      found in real use: a number that meant two things, a day counted twice, an engineer at a gate with nobody to ring.
+      A rule marked <b style="color:var(--lost)">blocks</b> refuses the action outright; one marked
+      <b style="color:var(--wait)">warns</b> lets the work through and keeps saying so.</p>
+
+    <div class="rules">
+
+      <div class="rule blocks">
+        <h4>A quotation number exists once</h4>
+        <p>The number and its revision are unique across the register. The auto-allotted number steps past anything
+          already taken, so two people saving in the same second cannot collide. An external quotation, where the number
+          is typed by hand, is refused if it clashes.</p>
+      </div>
+
+      <div class="rule blocks">
+        <h4>A contract number identifies one contract</h4>
+        <p>The same number on the <b>same</b> client is a rate contract being drawn down again — allowed, and normal.
+          The same number on a <b>different</b> client is refused, on the accounts screen and on the client master alike.</p>
+        <p>Where a database already held duplicates from before this rule, the quotation register names them so they can
+          be cleaned rather than silently miscounted.</p>
+      </div>
+
+      <div class="rule blocks">
+        <h4>One submission, one record</h4>
+        <p>Every form carries a one-shot ticket. A double-click, a browser retry, a refresh-and-resend, or the offline
+          queue re-sending an entry the server had already saved, all present a spent ticket and are turned away with
+          <i>“that was already saved.”</i> Reloading the page mints a new ticket, so entering the same thing twice on
+          purpose still works.</p>
+      </div>
+
+      <div class="rule blocks">
+        <h4>A job closes once</h4>
+        <p>Re-posting the closure form says so instead of filing another set of expenses against the same day's work.
+          A line already recorded twice is flagged <i>same as the line above</i> on the deputation, with a Remove button.</p>
+      </div>
+
+      <div class="rule blocks">
+        <h4>A day appears once on a voucher</h4>
+        <p>Adding a date already on the sheet names what is there and its hours. Pulling job days skips any date that
+          already carries an entry — from another job or typed by hand — so a month sheet cannot double-count a day.</p>
+      </div>
+
+      <div class="rule blocks">
+        <h4>A report is filed once for a day</h4>
+        <p>Same type, same inspection, same date is the same report: the one already filed opens instead of a second IRN
+          being burned. Daily reports on different days, and different report types on one day, are unaffected.
+          Endorsements follow the same rule, keyed on document, vendor, heat and drawing.</p>
+      </div>
+
+      <div class="rule blocks">
+        <h4>An expired contract stops scheduling</h4>
+        <p>From the day the end date passes, no work can be allocated against that order. An exception goes
+          <b>straight to the Super Admin</b> — nobody else can allow it, and a Branch Manager is not even shown the
+          decision. Granted for a stated number of allocations, optionally with an expiry of its own.</p>
+      </div>
+
+      <div class="rule blocks">
+        <h4>An exhausted quantity stops scheduling</h4>
+        <p>Once the quantity sold is used up, allocation stops. Here the <b>Branch Manager endorses</b> that the extra
+          work is genuinely needed, and only then does the <b>Super Admin</b> decide. Two people, because over-serving an
+          order is a commercial decision rather than an operational one.</p>
+      </div>
+
+      <div class="rule blocks">
+        <h4>Work does not leave the desk against an empty client record</h4>
+        <p>A client needs a tax identity, an address and a contact with a mobile and an e-mail; a site needs an address
+          and a contact. Quick-add refuses to create less than that. Forwarding a call to an executing office is refused
+          until the gaps are closed — that is the moment somebody has to travel there and somebody has to be invoiced.
+          Only the first forward is gated, so a call already out in the world stays editable.</p>
+      </div>
+
+      <div class="rule warns">
+        <h4>A contract number is never a reason to stop work</h4>
+        <p>A won order with no number yet shows on the accountant's dashboard as one to raise, and on the coordinator's
+          as outstanding. Calls can still be raised and allocated — the notice simply keeps appearing, on the call
+          register, the call and the deputation, until the number exists.</p>
+      </div>
+
+      <div class="rule warns">
+        <h4>A contract inside its warning window is expiring, not expired</h4>
+        <p>Within the last 30 days (configurable) everyone concerned is e-mailed once, and the screens say so. Nothing is
+          blocked. That window exists to get the renewal done.</p>
+      </div>
+
+      <div class="rule warns">
+        <h4>Drawing more than the purchase order has left</h4>
+        <p>Choosing a PO line prices the call from that line's rate and says how much is open. Asking for more warns
+          rather than refuses — an order can be topped up; the point is that it is seen now and not at the invoice.</p>
+      </div>
+
+      <div class="rule">
+        <h4>The value billable is a calculation</h4>
+        <p>Unit rate × quantity, computed on the server so a stale or hand-edited total cannot reach the register. The
+          quantity is how many visit dates the call has: one for a single day, the count for several, and the expanded
+          count for a repeating pattern. A quantity typed by hand is left alone.</p>
+      </div>
+
+      <div class="rule">
+        <h4>A quotation and its contract name each other</h4>
+        <p>Register the number on the order and the contract appears on the client's Contract Numbers tab naming that
+          quotation. Record it on the tab against a quotation — the list offers only those with no number yet — and the
+          number is written back onto the order and the rest of its revision chain.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================================================================== -->
+  <div class="part" id="edges">
+    <div class="part-h"><span class="rn">PART III</span><h2 style="margin:0">Edge cases worth testing</h2></div>
+    <p class="dek">40 situations that are easy to hit in real use and easy to miss in a demo. Each pairs the thing
+      you do with the answer you should get. Where the expected answer is a refusal, that refusal <em>is</em> the feature —
+      a system that quietly accepts all of these is the one that produces the month-end you cannot reconcile.</p>
+    <h3 style="margin:30px 0 0;font:600 var(--t-lg)/1.3 var(--sans);color:var(--ink)">Quotations and contracts</h3>
+    <div class="edges">
+      <div class="edge">
+        <div class="edge-h"><span class="id">Q1</span><b>A quotation number that already exists</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Add an external quotation and type a number already on the register, for instance <code>Q-00042</code>.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>Refused, naming the number, with an offer to leave the box empty and be allotted one. Nothing is created.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">Q2</span><b>The same contract number on two different clients</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>On client B's Contract Numbers tab, enter a contract number already held by client A.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>Refused: <i>already registered against [client A]. Contract numbers must be unique.</i></p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">Q3</span><b>The same contract number on the same client</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Enter a number that client already holds.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>Refused as a duplicate of their own record, pointing you at the existing one to edit — a rate contract is drawn down through calls, not by re-recording it.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">Q4</span><b>A contract recorded before anyone registers it on the order</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>On the Contract Numbers tab pick the order under <b>Against quotation</b> and save.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The contract is created, the quotation carries the number and contract from that moment, and it disappears from the <i>Against quotation</i> list. The quote register shows the number in the Contract column.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">Q5</span><b>A contract with no end date</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Add a contract leaving End date blank.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>Saved, and flagged <span class="pill wait">no end date</span> on the tab. Nothing expires and no warning can fire until a date exists — which is the point of showing it.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">Q6</span><b>A quotation revised after approval</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Revise an approved quotation upward into a higher approval band.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>A new revision <code>R01</code> in <code>DRAFT</code>, the old one demoted with a dated snapshot and your reason, and approval required again — possibly from a more senior approver.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">Q7</span><b>A quotation rejected by the approver</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Reject with a comment, then edit and resubmit.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The comment is visible to the owner, the quotation is editable, and resubmitting sends it back through the same rules rather than round them.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">Q8</span><b>Acceptance after the follow-ups have run</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Work three follow-ups, then accept.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>Every remaining <code>PENDING</code> follow-up flips to <code>SKIPPED</code>. Nobody chases a client who has already ordered.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">Q9</span><b>A quotation lost after three follow-ups</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Mark it lost with a reason.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>It leaves the open funnel, keeps its follow-up history, and appears in lost analysis under that reason — the reason list is a master you control.</p></div>
+        </div>
+      </div>
+    </div>
+    <h3 style="margin:30px 0 0;font:600 var(--t-lg)/1.3 var(--sans);color:var(--ink)">Inspection calls</h3>
+    <div class="edges">
+      <div class="edge">
+        <div class="edge-h"><span class="id">C1</span><b>A brand-new client typed during a call</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Use <b>+ Add new</b> beside the client dropdown with only a name.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>Refused, naming exactly what is missing: a GSTIN or PAN, an address, a contact person, a mobile, an e-mail. Fill them and it is created complete.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">C2</span><b>An existing client whose record is thin</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Pick a client with no address or contact.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>A banner names the gaps with a link straight to the master and a re-check that needs no reload. The call still saves; forwarding it to an executing office is refused until they are filled.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">C3</span><b>A single-day call</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Leave the engagement pattern on <i>Daily (single day)</i>.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The visit-date grid stays hidden, and the quantity is 1. The value billable is the unit rate.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">C4</span><b>A three-day call</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Choose <i>Multiple days</i> and enter three dates.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The grid appears, the quantity follows the dates to 3, and the value becomes rate × 3 without anybody typing it.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">C5</span><b>A repeating pattern over a month</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Choose a repeating pattern, tick Monday and Wednesday, set an end date a month out.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The server expands the pattern into real dates on save and prices against the count — nine visits at ₹2,000 is ₹18,000, not ₹2,000.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">C6</span><b>A quantity you want to override</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Type a quantity by hand.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>It is kept, the label changes to <i>entered by hand</i>, and the dates no longer drive it.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">C7</span><b>A call drawing on a purchase order</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Pick the client, then the PO line.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>With one order and one line, both select themselves. The unit rate and basis come from that line, and the balance left is stated.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">C8</span><b>Drawing more than the PO has open</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Set a quantity larger than the line's balance.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>A warning naming both figures — not a refusal. An order can be topped up; being told at the invoice is the failure.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">C9</span><b>A line item chosen on the quotation</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Pick a quotation, then one of its lines.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>Type of inspection and product category narrow to what that line sold, with <i>Show every option</i> one click away if the client asks for something extra.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">C10</span><b>The client's own premises are the site</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Tick <i>Inspection is at the client's own premises</i>.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The same party is recorded as client and site, and is flagged as a site partner so it appears in the site list from then on. No duplicate record.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">C11</span><b>Contracting and executing office differ</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Set two different offices.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The credit panel replaces the billable box, names both offices in the sentence, and requires the credit amount. At allocation the direction is already <code>GIVEN</code>.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">C12</span><b>Same office both ends</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Set them the same.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>No inter-office credit at all — the direction can say <i>none</i> rather than being forced to pick one.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">C13</span><b>A dropdown you want to reopen</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Choose a value, then click the box again.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The list opens. Clicking once more closes it, the way a real dropdown behaves.</p></div>
+        </div>
+      </div>
+    </div>
+    <h3 style="margin:30px 0 0;font:600 var(--t-lg)/1.3 var(--sans);color:var(--ink)">Contract validity</h3>
+    <div class="edges">
+      <div class="edge">
+        <div class="edge-h"><span class="id">V1</span><b>Scheduling against an expired contract</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Allocate a call whose contract ended yesterday.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>Blocked before the form is filled, naming the end date. The exception request goes straight to the Super Admin.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">V2</span><b>A Branch Manager looking at that request</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Sign in as a Branch Manager and open Contract exceptions.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The request reads <i>Awaiting Super Admin</i>, there is no Endorse button, and the sidebar badge does not count it — they are not asked for a decision they cannot take.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">V3</span><b>Scheduling against an exhausted quantity</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Allocate against an order whose quantity is used up.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>Blocked, naming used and sold. The request waits for the Branch Manager to endorse, then the Super Admin to grant.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">V4</span><b>A granted exception being used</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Grant for one allocation, then allocate twice.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The first allocation goes through and consumes it; the second is blocked again.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">V5</span><b>A contract three weeks from its end date</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Look at the order and the exceptions screen.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>Marked expiring, everyone concerned e-mailed once, nothing blocked. The reminder does not repeat daily unless the end date changes.</p></div>
+        </div>
+      </div>
+    </div>
+    <h3 style="margin:30px 0 0;font:600 var(--t-lg)/1.3 var(--sans);color:var(--ink)">Allocation, the engineer and reports</h3>
+    <div class="edges">
+      <div class="edge">
+        <div class="edge-h"><span class="id">J1</span><b>Who does the work</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Set <i>Who does it</i> to <i>Not our employee</i>.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>A second dropdown offers Freelancer or Sub-contractor; choosing sub-contractor reveals the agency box, and the engineer list filters to that kind with a count.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">J2</span><b>Twenty visit dates</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Click <i>Add another date</i> repeatedly.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>Boxes grow to twenty and then the button stops. The call's own dates are already carried in.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">J3</span><b>What the engineer is owed</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Open the deputation after allocating.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The formats agreed on the call are listed with live status from the reporting module, and a <i>Write it</i> button that opens a new report already on that format and filled in from the job.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">J4</span><b>Standing at the gate</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Open the deputation as the allocated engineer.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>Client and vendor contacts with tap-to-dial and tap-to-mail, the site address with a map link, and the shared folder — on the job, not only in an e-mail.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">J5</span><b>Finalizing without an approver</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Open a report with no approver set.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The finalize button is unavailable. A report nobody has signed off cannot be issued.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">J6</span><b>A supporting document nobody anticipated</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>On the evidence screen attach a mill certificate.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>Accepted with a caption under <i>Supporting documents</i>, with the same size limit, compression and duplicate guard as a template upload.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">J7</span><b>The same file attached twice</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Attach it again.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p><i>1 already on this report</i> — the content is recognised, not the filename.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">J8</span><b>A document that does not apply</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Mark it Not applicable in the document review.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The state is recorded and the rule checks skip it. Saving again updates in place rather than adding a second row.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">J9</span><b>Closing the job</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Fill the closure form and send the closure e-mail.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The job closes, TAT is computed, the e-mail goes, and the report is routed to the engineer's reporting manager for sign-off.</p></div>
+        </div>
+      </div>
+    </div>
+    <h3 style="margin:30px 0 0;font:600 var(--t-lg)/1.3 var(--sans);color:var(--ink)">Money and the month</h3>
+    <div class="edges">
+      <div class="edge">
+        <div class="edge-h"><span class="id">M1</span><b>An expense entered once</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Close a job with expenses and watch the deputation.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>One line. Double-clicking, refreshing or resending cannot add a second.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">M2</span><b>A day already on the voucher</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Add the same date twice.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The second is refused, naming what is already there and its hours.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">M3</span><b>Pulling job days after typing some by hand</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Add an office day, then pull job days for the month.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>The typed day is left alone and no second row lands on that date.</p></div>
+        </div>
+      </div>
+      <div class="edge">
+        <div class="edge-h"><span class="id">M4</span><b>An invoice past its due date</b></div>
+        <div class="edge-b">
+          <div><span class="lab">Do this</span><p>Leave an invoice unpaid past due.</p></div>
+          <div class="expect"><span class="lab">This should happen</span><p>It moves itself into the overdue queue on the finance dashboard, scoped so a branch manager sees their own office and the Business Director sees all.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================== -->
+  <div class="part" id="script">
+    <div class="part-h"><span class="rn">PART IV</span><h2 style="margin:0">The test script, step by step</h2></div>
+    <p class="dek">Nine runs, in order, following one order from inquiry to money and back through every guard.
+      Work down each list with the app open and tick as you go. A step tinted red is one where the system
+      <b style="color:var(--lost)">must refuse you</b> — if it lets you through, that is the finding.</p>
+    <div class="keyline">
+      <span>admin / admin12345</span><span>director</span><span>bmanager</span><span>nisha.mehta — coordinator</span>
+      <span>account</span><span>insp.ravi — engineer</span><span>demo users: demo12345</span>
+    </div>
+    <p class="dek" style="margin-top:12px">Load the demo data first from <b>Settings → Load demo data</b> so the registers are
+      not empty, and run the whole script on a copy rather than on live records.</p>
+    <div class="run">
+      <div class="run-h"><span class="rid">RUN 1</span><h3>Before you touch anything</h3><span class="as">Super Admin</span></div>
+      <ol class="steps">
+        <li><span class="box"></span><p>Sign in as the administrator and open <b>Organisation</b>.<span class="then"><b>Then</b> — offices nested head office → region → branch, each with a head. The <b>Gaps</b> tab lists anyone without a manager or an office.</span></p></li>
+        <li><span class="box"></span><p>Open <b>Masters</b> and rename one list value — say an SBU.<span class="then"><b>Then</b> — every screen that uses it follows, including dropdowns and exports.</span></p></li>
+        <li><span class="box"></span><p>Open <b>Settings → Terminology</b> and change <i>IBO</i> to your own word.<span class="then"><b>Then</b> — headings and labels across the app change with it. Change it back.</span></p></li>
+        <li><span class="box"></span><p>Confirm at least one approval rule, one engineer with a reporting manager, and one office with a head.<span class="then"><b>Then</b> — without these, a quotation can be sent unseen and escalations fall back to whoever the system can find.</span></p></li>
+      </ol>
+      <div style="padding:13px 18px;border-top:1px solid var(--line);background:var(--surface-2)"><p style="margin:0;font-size:var(--t-sm);color:var(--ink-2);line-height:1.6">Everything after this assumes these four exist. Skipping this run is why a call later cannot be allocated.</p></div>
+    </div>
+    <div class="run">
+      <div class="run-h"><span class="rid">RUN 2</span><h3>A quotation, all the way to won</h3><span class="as">Marketing / Sales</span></div>
+      <ol class="steps">
+        <li><span class="box"></span><p><b>Inquiries → New</b>. Record who asked, for what, at which site.<span class="then"><b>Then</b> — it appears in the inquiry register.</span></p></li>
+        <li><span class="box"></span><p>Raise a quotation from it. Add <b>two line items</b> with different services, quantities and rates.<span class="then"><b>Then</b> — the subtotal, GST and total compute from the lines — you do not type a total.</span></p></li>
+        <li><span class="box"></span><p>Submit for approval.<span class="then"><b>Then</b> — it routes by amount band and SBU to the right approver, and shows as pending.</span></p></li>
+        <li><span class="box"></span><p>Sign in as that approver and <b>reject with a comment</b>.<span class="then"><b>Then</b> — the owner sees the comment and the quotation becomes editable again.</span></p></li>
+        <li><span class="box"></span><p>Edit and resubmit.<span class="then"><b>Then</b> — it goes back through the same rules — approval is not skipped by the round trip.</span></p></li>
+        <li><span class="box"></span><p>Approve, then send it.<span class="then"><b>Then</b> — follow-ups are scheduled. Send from your own mailbox if you have configured it.</span></p></li>
+        <li><span class="box"></span><p>Work two follow-ups, then mark it <b>Accepted</b>.<span class="then"><b>Then</b> — remaining follow-ups flip to <code>SKIPPED</code>.</span></p></li>
+        <li><span class="box"></span><p>Open the register.<span class="then"><b>Then</b> — the <b>Contract</b> column reads <span class="pill wait">pending</span> against this won order.</span></p></li>
+      </ol>
+      <div style="padding:13px 18px;border-top:1px solid var(--line);background:var(--surface-2)"><p style="margin:0;font-size:var(--t-sm);color:var(--ink-2);line-height:1.6">This is the spine. Everything downstream hangs off the order created here.</p></div>
+    </div>
+    <div class="run">
+      <div class="run-h"><span class="rid">RUN 3</span><h3>The contract number, from both ends</h3><span class="as">Accounts, then anyone</span></div>
+      <ol class="steps">
+        <li><span class="box"></span><p>On the won quotation, register a contract number with a start and an <b>end date</b>.<span class="then"><b>Then</b> — the client is registered, and the contract appears on their <b>Contract Numbers</b> tab naming this quotation.</span></p></li>
+        <li><span class="box"></span><p>Open <b>Clients → the client → Contract Numbers</b>.<span class="then"><b>Then</b> — the row shows the contract number, the quotation it came from as a link, the value and both dates.</span></p></li>
+        <li><span class="box"></span><p>Create a second quotation for the same client and accept it, without registering a number.<span class="then"><b>Then</b> — it shows as pending on the register.</span></p></li>
+        <li><span class="box"></span><p>On the Contract Numbers tab, add a contract and pick that order under <b>Against quotation</b>.<span class="then"><b>Then</b> — the value is offered from the quotation, and on save the message names it: <i>“… now carries this contract number.”</i></span></p></li>
+        <li><span class="box"></span><p>Return to the tab and open the <b>Against quotation</b> list again.<span class="then"><b>Then</b> — that order is gone from it, and the quote register now shows its number.</span></p></li>
+        <li class="fail"><span class="box"></span><p>Try to add the same contract number against a <b>different</b> client.<span class="then"><b>Must refuse</b> — named as already registered to the first client.</span></p></li>
+      </ol>
+      <div style="padding:13px 18px;border-top:1px solid var(--line);background:var(--surface-2)"><p style="margin:0;font-size:var(--t-sm);color:var(--ink-2);line-height:1.6">Do both halves. Each proves a different direction of the same link.</p></div>
+    </div>
+    <div class="run">
+      <div class="run-h"><span class="rid">RUN 4</span><h3>An inspection call that prices itself</h3><span class="as">Coordinator</span></div>
+      <ol class="steps">
+        <li class="fail"><span class="box"></span><p><b>Inspection calls → New</b>. Use <b>+ Add new</b> beside the client and enter only a name.<span class="then"><b>Must refuse</b> — the missing details are named — tax identity, address, contact, mobile, e-mail.</span></p></li>
+        <li><span class="box"></span><p>Fill them and save the new client.<span class="then"><b>Then</b> — it is selected on the call and no gap banner appears.</span></p></li>
+        <li><span class="box"></span><p>Now pick an existing client whose record is thin.<span class="then"><b>Then</b> — a banner names the gaps with a link to the master and a re-check.</span></p></li>
+        <li><span class="box"></span><p>Pick the quotation, then one of its <b>line items</b>.<span class="then"><b>Then</b> — unit rate and basis arrive from that line; type of inspection and product category narrow to what it sold.</span></p></li>
+        <li><span class="box"></span><p>Set the pattern to <b>Multiple days</b> and enter three dates.<span class="then"><b>Then</b> — quantity becomes 3 and the value becomes rate × 3, read-only, with the sum spelled out beneath.</span></p></li>
+        <li><span class="box"></span><p>Set contracting and executing offices to <b>different</b> offices.<span class="then"><b>Then</b> — the credit panel replaces the billable box and names both offices; the credit amount is required.</span></p></li>
+        <li><span class="box"></span><p>Choose the reporting frequency and tick two report types.<span class="then"><b>Then</b> — both appear on the call register in the Reporting column.</span></p></li>
+        <li><span class="box"></span><p>Save.<span class="then"><b>Then</b> — the call is created. If the client record was thin, forwarding is refused until it is completed.</span></p></li>
+      </ol>
+      <div style="padding:13px 18px;border-top:1px solid var(--line);background:var(--surface-2)"><p style="margin:0;font-size:var(--t-sm);color:var(--ink-2);line-height:1.6">The commercial figures should arrive; you should be typing almost nothing.</p></div>
+    </div>
+    <div class="run">
+      <div class="run-h"><span class="rid">RUN 5</span><h3>Allocation and the engineer</h3><span class="as">Coordinator, then the engineer</span></div>
+      <ol class="steps">
+        <li><span class="box"></span><p>Open the call and allocate it.<span class="then"><b>Then</b> — dates, deliverables, reporting frequency, offices and credit direction are already filled from the call.</span></p></li>
+        <li><span class="box"></span><p>Set <i>Who does it</i> to <b>Not our employee</b>, then <b>Sub-contractor</b>.<span class="then"><b>Then</b> — the agency box appears and the engineer list filters, with a count.</span></p></li>
+        <li><span class="box"></span><p>Switch back to your own employee, pick one, and allocate.<span class="then"><b>Then</b> — the assignment e-mail goes out.</span></p></li>
+        <li><span class="box"></span><p>Sign in as that engineer and open the deputation.<span class="then"><b>Then</b> — client and vendor contacts with tap-to-dial and tap-to-mail, the site address with a map link, and the reports owed with a <i>Write it</i> button each.</span></p></li>
+        <li><span class="box"></span><p>Click <b>Write it</b> on one deliverable.<span class="then"><b>Then</b> — a new report opens already on that format, filled from the call — client, vendor, project, product category.</span></p></li>
+        <li><span class="box"></span><p>Look at <b>Format in use</b> on the report.<span class="then"><b>Then</b> — it names the client's registered template, or says our standard layout when none is registered.</span></p></li>
+        <li class="fail"><span class="box"></span><p>Try to finalize with no approver set.<span class="then"><b>Must refuse</b> — the finalize button is unavailable.</span></p></li>
+        <li><span class="box"></span><p>On the evidence screen, attach a supporting document with a caption. Attach the same file again.<span class="then"><b>Then</b> — the first is filed under <i>Supporting documents</i>; the second is recognised as already there.</span></p></li>
+        <li><span class="box"></span><p>Mark one document review item <b>Not applicable</b> and save twice.<span class="then"><b>Then</b> — one row, updated in place, and the rule checks skip it.</span></p></li>
+      </ol>
+      <div style="padding:13px 18px;border-top:1px solid var(--line);background:var(--surface-2)"><p style="margin:0;font-size:var(--t-sm);color:var(--ink-2);line-height:1.6">Where the office work ends and the field work begins.</p></div>
+    </div>
+    <div class="run">
+      <div class="run-h"><span class="rid">RUN 6</span><h3>Closing, and the duplicate guards</h3><span class="as">Engineer, then coordinator</span></div>
+      <ol class="steps">
+        <li><span class="box"></span><p>Close the job with expenses and send the closure e-mail.<span class="then"><b>Then</b> — the job closes, TAT is computed, and the report routes to the reporting manager.</span></p></li>
+        <li><span class="box"></span><p>Open the deputation and count the expense lines.<span class="then"><b>Then</b> — exactly one.</span></p></li>
+        <li class="fail"><span class="box"></span><p>Press the browser back button and submit the closure form again.<span class="then"><b>Must refuse</b> — <i>already closed</i> — no second set of expenses.</span></p></li>
+        <li><span class="box"></span><p>Open any form and double-click its save button.<span class="then"><b>Then</b> — the button greys to <i>Saving…</i> and only one record is created.</span></p></li>
+        <li class="fail"><span class="box"></span><p>Open a draft voucher, add a day, then add the <b>same date</b> again.<span class="then"><b>Must refuse</b> — named as already on the sheet, with its hours.</span></p></li>
+        <li><span class="box"></span><p>Press <b>Generate</b> to pull job days, twice.<span class="then"><b>Then</b> — no date gains a second row.</span></p></li>
+        <li class="fail"><span class="box"></span><p>File a report, then file the same type for the same job and date again.<span class="then"><b>Must refuse</b> — the existing IRN opens instead of a second being burned.</span></p></li>
+      </ol>
+      <div style="padding:13px 18px;border-top:1px solid var(--line);background:var(--surface-2)"><p style="margin:0;font-size:var(--t-sm);color:var(--ink-2);line-height:1.6">This is the run that catches the class of bug that produced two identical expense lines.</p></div>
+    </div>
+    <div class="run">
+      <div class="run-h"><span class="rid">RUN 7</span><h3>The contract gates</h3><span class="as">Coordinator, Branch Manager, Super Admin</span></div>
+      <ol class="steps">
+        <li class="fail"><span class="box"></span><p>As coordinator, try to allocate against an order whose contract has <b>expired</b>.<span class="then"><b>Must refuse</b> — blocked, naming the end date.</span></p></li>
+        <li><span class="box"></span><p>Request an exception with a reason.<span class="then"><b>Then</b> — it is raised and the screen says only the Super Admin can allow it.</span></p></li>
+        <li><span class="box"></span><p>Sign in as a <b>Branch Manager</b> and open Contract exceptions.<span class="then"><b>Then</b> — the request reads <i>Awaiting Super Admin</i>, there is no Endorse button, and the badge does not count it.</span></p></li>
+        <li><span class="box"></span><p>Sign in as the <b>Super Admin</b> and grant it for one allocation.<span class="then"><b>Then</b> — allocation goes through once, and is blocked again the second time.</span></p></li>
+        <li class="fail"><span class="box"></span><p>Now try to allocate against an order whose <b>quantity is exhausted</b>.<span class="then"><b>Must refuse</b> — blocked, naming used and sold.</span></p></li>
+        <li><span class="box"></span><p>Request an exception; as Branch Manager, <b>endorse</b> it.<span class="then"><b>Then</b> — it moves to the Super Admin — this one needs two people.</span></p></li>
+        <li><span class="box"></span><p>As Super Admin, grant it.<span class="then"><b>Then</b> — the allocation is allowed, and the exception records who asked, who endorsed and who granted.</span></p></li>
+      </ol>
+      <div style="padding:13px 18px;border-top:1px solid var(--line);background:var(--surface-2)"><p style="margin:0;font-size:var(--t-sm);color:var(--ink-2);line-height:1.6">Three people, deliberately. Run it with three logins or it proves nothing.</p></div>
+    </div>
+    <div class="run">
+      <div class="run-h"><span class="rid">RUN 8</span><h3>The money out</h3><span class="as">Accounts, Business Director</span></div>
+      <ol class="steps">
+        <li><span class="box"></span><p>On a same-office job, raise the invoice.<span class="then"><b>Then</b> — it carries the contract and BOSS number, and appears in the invoice register.</span></p></li>
+        <li><span class="box"></span><p>Leave it past its due date.<span class="then"><b>Then</b> — it moves itself into the overdue queue, scoped by office.</span></p></li>
+        <li><span class="box"></span><p>On a cross-office job, record the inter-office credit received.<span class="then"><b>Then</b> — the credit closes rather than an invoice — the contracting office gave, the executing office received.</span></p></li>
+        <li><span class="box"></span><p>Open <b>Profitability</b>.<span class="then"><b>Then</b> — revenue, expenses, sub-contract cost and credit roll up per BOSS number and per office.</span></p></li>
+      </ol>
+      <div style="padding:13px 18px;border-top:1px solid var(--line);background:var(--surface-2)"><p style="margin:0;font-size:var(--t-sm);color:var(--ink-2);line-height:1.6">Two different exits depending on who did the work.</p></div>
+    </div>
+    <div class="run">
+      <div class="run-h"><span class="rid">RUN 9</span><h3>The sweep that catches what a demo misses</h3><span class="as">Whoever deploys</span></div>
+      <ol class="steps">
+        <li><span class="box"></span><p>From the app folder run <code>sh tools/lint.sh</code>.<span class="then"><b>Then</b> — every PHP file parses, no stray tags inside strings, and no function declared in two files.</span></p></li>
+        <li><span class="box"></span><p>Run <code>node tools/smoke.js</code> against a running copy.<span class="then"><b>Then</b> — every screen in the app is opened — 80 of them — and any fatal, PHP warning or JavaScript error is named with its URL.</span></p></li>
+        <li><span class="box"></span><p>Only upload when both are clean.<span class="then"><b>Then</b> — the failure they catch is the one nobody finds until a person clicks the wrong screen.</span></p></li>
+      </ol>
+      <div style="padding:13px 18px;border-top:1px solid var(--line);background:var(--surface-2)"><p style="margin:0;font-size:var(--t-sm);color:var(--ink-2);line-height:1.6">Two commands. Run them before every upload — they exist because three green checks once shipped a dead screen.</p></div>
+    </div>
+
+    <div class="card" style="margin-top:26px">
+      <span class="lab">When something fails</span>
+      <p>Note the run and step number, the exact wording on screen, and what you expected instead. A refusal that names
+        what is wrong is working as intended; a refusal that says nothing, an action that silently does nothing, or a
+        screen that shows an error page, is not.</p>
+    </div>
   </div>
 
   <footer class="foot">
