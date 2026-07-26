@@ -194,6 +194,65 @@
       })();
     </script>
 
+    <?php // ---- What this person costs, and where that cost belongs -------
+          // Two different kinds of people. An inspection engineer's cost follows
+          // the work they did, day by day, and needs no percentages. Everybody
+          // else has to say where their cost belongs, because no single job
+          // caused it. That is the whole difference, so it is one tick box. ?>
+    <?php if ($canSalary): ?>
+    <div class="ff-wide" style="border-top:1px solid var(--line);padding-top:14px;margin-top:6px">
+      <h3 class="tab-sub" style="margin-top:0">Cost &amp; where it belongs</h3>
+      <p class="sub">Used by the month-end cost run to work out profit by <?= e(Tl('sbu')) ?>, activity code and <?= e(T('boss')) ?> number. Leave the salary blank and this person is simply left out of the calculation.</p>
+    </div>
+    <div class="ff"><label>Cost to the company, per month (₹)</label>
+      <input class="form-control" type="number" step="0.01" min="0" name="monthly_ctc" id="u_ctc"
+             value="<?= e((string)($user['monthly_ctc'] ?? '')) ?>">
+      <small class="muted">Everything the company pays for this person in a month, not just the take-home.</small></div>
+    <div class="ff ff-check">
+      <label><input type="checkbox" name="is_production" id="u_prod" value="1"
+        <?= !empty($user['is_production']) ? 'checked' : '' ?>>
+        This person does inspections (production staff)</label>
+      <small class="muted">Tick it and their cost follows the days they worked. Leave it and you set the split below.</small></div>
+
+    <div class="ff-wide" id="u_split_wrap" style="<?= !empty($user['is_production']) ? 'display:none' : '' ?>">
+      <label><?= e(TP('sbu')) ?> split for <?= e(date('F Y')) ?>
+        <span class="muted">— where this person's cost belongs</span></label>
+      <?php if ($splitCarried && $splitNow): ?>
+        <div class="msg-info" style="margin:6px 0">Carried forward from the last month it was set. Save to make it this month's own figure, or change it first.</div>
+      <?php endif; ?>
+      <div class="checkgrid">
+        <?php foreach ($splitSbus as $code => $label): ?>
+          <div class="ff" style="margin:0">
+            <label style="font-weight:normal"><?= e($label) ?></label>
+            <input class="form-control split-pct" type="number" step="0.01" min="0" max="100"
+                   name="sbu_pct[<?= e($code) ?>]" value="<?= e((string)($splitNow[$code] ?? '')) ?>" placeholder="0">
+          </div>
+        <?php endforeach; ?>
+      </div>
+      <p class="muted" style="margin-top:6px">Total: <strong id="u_split_total">0</strong>% — it has to come to 100.
+        Equal across all of them is fine; so is 40/40/10/10. Set it fresh each month; if you do not, last month's carries forward and past months are never changed.</p>
+    </div>
+    <script>
+      (function () {
+        var prod = document.getElementById('u_prod'), wrap = document.getElementById('u_split_wrap');
+        if (prod && wrap) {
+          var sync = function () { wrap.style.display = prod.checked ? 'none' : ''; };
+          prod.addEventListener('change', sync); sync();
+        }
+        var boxes = document.querySelectorAll('.split-pct'), out = document.getElementById('u_split_total');
+        if (!boxes.length || !out) return;
+        var tot = function () {
+          var t = 0;
+          Array.prototype.forEach.call(boxes, function (b) { t += parseFloat(b.value) || 0; });
+          out.textContent = Math.round(t * 100) / 100;
+          out.style.color = (t === 0 || Math.abs(t - 100) < 0.01) ? '' : '#b91c1c';
+        };
+        Array.prototype.forEach.call(boxes, function (b) { b.addEventListener('input', tot); });
+        tot();
+      })();
+    </script>
+    <?php endif; ?>
+
     <?php // Manager is picked from the people already on file. Their e-mail and
           // position come with them, so the same manager cannot end up recorded
           // three different ways on three different rows. ?>

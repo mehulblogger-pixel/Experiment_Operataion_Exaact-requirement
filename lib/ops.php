@@ -1508,7 +1508,8 @@ function ops_module_gate($route) {
         'phrase-library'=>'idems','phrase-edit'=>'idems','learning'=>'idems',
         'document-smart'=>'idems','document-release-note'=>'idems','document-review'=>'idems','document-evidence'=>'idems',
         'masters'=>'masters','work-norms'=>'masters',
-        'office-finance'=>'overheads',
+        'office-finance'=>'overheads','cost-run'=>'overheads',
+        'sbu-pl'=>'profitability',
         'reports'=>'reports',
         'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users','org-template'=>'users',
         'user-unlock'=>'users','user-2fa-reset'=>'users','user-retire'=>'users',
@@ -1666,6 +1667,10 @@ function ops_dispatch($route, $method) {
             return ops_org_template();
         case $route === 'reset-data':
             ops_reset_data($method); return true;
+        case $route === 'cost-run':
+            ops_cost_run($method); return true;
+        case $route === 'sbu-pl':
+            ops_sbu_pl(); return true;
         case $route === 'partner-import':
             ops_partner_import($method); return true;
         case $route === 'partner-template':
@@ -2280,7 +2285,7 @@ function ops_calls($route, $method) {
                 'billable_value','billable_basis','billable_rate','billable_qty','call_received_date','inspection_required_date','notes',
                 'quotation_id','quote_line_id','contract_number','folder_link',
                 'inspection_dates','schedule_end_date','schedule_weekdays',
-                'reporting_frequency','report_custom_days','deliverables'];
+                'reporting_frequency','report_custom_days','deliverables','is_outstation'];
             $wasForwarded = $call ? ($call['executing_office_id'] ?? null) : null;
             $forwardNow = $execOffice && !$wasForwarded; // first time it gets an executing branch
             // §b — forwarding is the moment the work leaves this desk: somebody
@@ -2427,6 +2432,9 @@ function call_form_vars($call, $posted = null) {
     ];
 }
 function nzc_call($f, $v) {
+    // An unticked checkbox posts nothing at all, so '' has to mean 0 here or
+    // "no longer outstation" could never be saved.
+    if ($f === 'is_outstation') return empty($v) ? 0 : 1;
     if (in_array($f, ['client_id','vendor_id','ibo_office_id','executing_office_id','contracting_office_id','activity_id','site_address_id','po_id','po_line_item_id','quotation_id','quote_line_id'], true)) return $v === '' ? null : (int)$v;
     if (in_array($f, ['expected_credit','billable_value','credit_required'], true)) return $v === '' ? 0 : $v;
     return $v;
@@ -3078,7 +3086,7 @@ function ops_jobs($route, $method) {
             $b = $_POST;
             $fields = ['executing_office_id','inspector_id','subcon_id','job_type','stage','scheduled_date','inspection_start_date','inspection_end_date',
                 'random_date1','random_date2','random_date3','folder_link','contract_number','inspection_dates','boss_id','expected_credit','credit_type','credit_direction',
-                'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost','quotation_id'];
+                'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost','quotation_id','is_outstation'];
             // deliverables come as a checkbox array -> stored as CSV of codes
             $deliverables = implode(',', array_filter((array)($b['deliverables'] ?? [])));
             // §b.vi — the visit dates arrive as a list of date boxes. Keep them as one
@@ -3281,6 +3289,7 @@ function call_job_form_vars($job, $call) {
 }
 
 function nzc($f, $v) {
+    if ($f === 'is_outstation') return empty($v) ? 0 : 1;   // an unticked box posts nothing
     $nullable = ['executing_office_id','inspector_id','subcon_id','boss_id','activity_id','report_custom_days','quotation_id'];
     if (in_array($f, $nullable) && $v === '') return null;
     if (in_array($f, ['expected_credit','mandays','subcon_cost']) && $v === '') return 0;
@@ -3861,6 +3870,9 @@ function user_row_from_post(array $b, $existing = null) {
     $row['daily_hours']    = trim((string)($b['daily_hours'] ?? ''));
     $row['half_day_hours'] = trim((string)($b['half_day_hours'] ?? ''));
     $row['must_change_pwd'] = !empty($b['must_change_pwd']) ? 1 : 0;
+    $row['monthly_ctc']    = trim((string)($b['monthly_ctc'] ?? ''));
+    $row['is_production']  = !empty($b['is_production']) ? 1 : 0;
+    $row['sbu_pct']        = (array)($b['sbu_pct'] ?? []);
     return $row;
 }
 
@@ -3950,16 +3962,31 @@ function ops_users($route, $method) {
                     // converted rather than passed straight through.
                     view('ops/user_form', ['user'=>user_row_from_post($b, $user), 'inspectors'=>inspectors_list(false), 'offices'=>offices_list(),
                         'sbuOpts'=>lk_options_or('sbu', OPS_SBUS), 'globalMgr'=>$globalMgr, 'managers'=>$mgrs,
-                        'defaults'=>role_defaults($role)]);
+                        'defaults'=>role_defaults($role)] + user_cost_vars(user_row_from_post($b, $user)));
                     return;
                 }
             }
+            // What this person costs, and which side of the line they are on.
+            // Only somebody allowed to see salary may change it — otherwise a
+            // form posted without the field would quietly wipe the figure.
+            $canSalary = can_see_salary();
+            $ctcRaw = trim((string)($b['monthly_ctc'] ?? ''));
+            $ctc = ($ctcRaw === '') ? null : (float)str_replace([',', ' '], '', $ctcRaw);
+            $isProd = !empty($b['is_production']) ? 1 : 0;
+
             // Whoever sets somebody else's password knows it. Ticking this means
             // they must replace it the moment they sign in, so it stops being shared.
             $mustChange = !empty($b['must_change_pwd']) ? 1 : 0;
             if ($user) {
                 $pdo->prepare("UPDATE users SET username=?,first_name=?,last_name=?,email=?,role=?,is_superuser=?,is_active=?,inspector_id=?,home_office_id=?,scope_offices=?,scope_sbus=?,permissions=?,reports_to_id=?,reports_to_name=?,reports_to_position=?,reports_to_email=?,position_title=?,weekly_working_days=?,daily_hours=?,half_day_hours=? WHERE id=?")
                     ->execute([$b['username'], $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, !empty($b['is_active'])?1:0, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, $hHours, $user['id']]);
+                if ($canSalary) {
+                    $pdo->prepare("UPDATE users SET monthly_ctc=?, is_production=? WHERE id=?")
+                        ->execute([$ctc, $isProd, $user['id']]);
+                    if (!$isProd)
+                        person_split_save($user['id'], (int)date('Y'), (int)date('n'),
+                                          (array)($b['sbu_pct'] ?? []), (int)$homeOffice);
+                }
                 if ($newPw !== '') {
                     $pdo->prepare("UPDATE users SET password_hash=?, pwd_changed_at=? WHERE id=?")
                         ->execute([password_hash($newPw, PASSWORD_DEFAULT), date('c'), $user['id']]);
@@ -3973,6 +4000,14 @@ function ops_users($route, $method) {
                 $hash = password_hash($newPw !== '' ? $newPw : bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
                 $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id,home_office_id,scope_offices,scope_sbus,permissions,reports_to_id,reports_to_name,reports_to_position,reports_to_email,position_title,weekly_working_days,daily_hours,half_day_hours,pwd_changed_at,must_change_pwd)
                     VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, $hHours, date('c'), $newPw === '' ? 1 : $mustChange]);
+                if ($canSalary) {
+                    $newId = (int)$pdo->lastInsertId();
+                    $pdo->prepare("UPDATE users SET monthly_ctc=?, is_production=? WHERE id=?")
+                        ->execute([$ctc, $isProd, $newId]);
+                    if (!$isProd)
+                        person_split_save($newId, (int)date('Y'), (int)date('n'),
+                                          (array)($b['sbu_pct'] ?? []), (int)$homeOffice);
+                }
                 flash($newPw === ''
                     ? 'User created. No password was set, so use Edit to give them one — the account cannot be signed into until you do.'
                     : 'User created.');
@@ -3981,7 +4016,8 @@ function ops_users($route, $method) {
         }
         $mgrs = ops_all("SELECT id, first_name, last_name, username, role, position_title FROM users WHERE is_active=1" . ($user ? " AND id<>" . (int)$user['id'] : "") . " ORDER BY first_name, last_name");
         view('ops/user_form', ['user'=>$user,'inspectors'=>inspectors_list(false),'offices'=>offices_list(),
-            'sbuOpts'=>lk_options_or('sbu', OPS_SBUS),'globalMgr'=>$globalMgr,'managers'=>$mgrs,'defaults'=>role_defaults($user['role'] ?? 'COORDINATOR')]); return;
+            'sbuOpts'=>lk_options_or('sbu', OPS_SBUS),'globalMgr'=>$globalMgr,'managers'=>$mgrs,
+            'defaults'=>role_defaults($user['role'] ?? 'COORDINATOR')] + user_cost_vars($user)); return;
     }
     $where = $globalMgr ? "1=1" : "home_office_id = " . (int)$myOffice;
     // Deactivated people drop to the bottom rather than sitting among the staff

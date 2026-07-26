@@ -537,3 +537,265 @@ function office_cost_basis_text($officeId) {
         : 'Still on the old overhead percentage — no salaries or office costs have been entered for this '
           . Tl('office') . ' yet.';
 }
+
+// ---------------------------------------------------------------------------
+//  What the person form needs to draw the cost panel
+//
+//  Kept here rather than in the screen so the normal render and the one after
+//  a rejected password show exactly the same thing — the second is where a
+//  half-built form goes wrong, and did once already.
+// ---------------------------------------------------------------------------
+function user_cost_vars($user) {
+    $canSalary = function_exists('can_see_salary') ? can_see_salary() : false;
+    $officeId  = (int)($user['home_office_id'] ?? 0);
+    $uid       = (int)($user['id'] ?? 0);
+    $yr = (int)date('Y'); $mon = (int)date('n');
+    // A person with no office yet still needs boxes, so fall back to every SBU.
+    $sbus = $officeId ? office_sbus($officeId) : lk_options_or('sbu', OPS_SBUS);
+    // A form handed back after a rejected save must show what was typed, not
+    // what is in the database.
+    $typed = (array)($user['sbu_pct'] ?? []);
+    $split = $typed ? array_filter(array_map('trim', array_map('strval', $typed)), function ($v) { return $v !== ''; })
+                    : ($uid ? person_split($uid, $yr, $mon) : []);
+    return [
+        'canSalary'    => $canSalary,
+        'splitSbus'    => $sbus,
+        'splitNow'     => $split,
+        'splitCarried' => (!$typed && $uid) ? person_split_is_carried($uid, $yr, $mon) : false,
+    ];
+}
+
+// Save one person's split for one month. Blank or zero removes the row, so
+// "nothing entered" and "entered as zero" never look the same. A month that has
+// already been calculated and frozen is left exactly as it was.
+function person_split_save($userId, $yr, $mon, array $pcts, $officeId = 0) {
+    $userId = (int)$userId; $yr = (int)$yr; $mon = (int)$mon;
+    if (!$userId) return 0;
+    if ($officeId && cost_month_frozen($yr, $mon, $officeId)) return 0;
+    $valid = array_keys($officeId ? office_sbus($officeId) : lk_options_or('sbu', OPS_SBUS));
+    db()->prepare("DELETE FROM person_sbu_split WHERE user_id=? AND yr=? AND mon=?")->execute([$userId, $yr, $mon]);
+    $who = user_name(current_user()); $now = date('c'); $n = 0;
+    $ins = db()->prepare("INSERT INTO person_sbu_split (user_id,yr,mon,sbu,pct,set_by,set_at) VALUES (?,?,?,?,?,?,?)");
+    foreach ($pcts as $sbu => $raw) {
+        if (!in_array((string)$sbu, $valid, true)) continue;
+        $v = (float)str_replace([',', ' '], '', trim((string)$raw));
+        if ($v <= 0) continue;
+        $ins->execute([$userId, $yr, $mon, (string)$sbu, $v, $who, $now]);
+        $n++;
+    }
+    return $n;
+}
+
+// ===========================================================================
+//  Month-end run, and the profit & loss it feeds
+// ===========================================================================
+
+// Revenue billed per SBU for a month. A job counts in the month its inspection
+// finished — the month the work was done, not the month somebody got round to
+// raising the invoice.
+function costing_sbu_revenue($officeId, $yr, $mon) {
+    $from = sprintf('%04d-%02d-01', $yr, $mon);
+    $to   = date('Y-m-t', strtotime($from));
+    $rows = ops_all("SELECT sbu, COALESCE(SUM(COALESCE(invoice_amount, expected_credit, 0)),0) v
+                     FROM jobs WHERE executing_office_id=?
+                       AND COALESCE(inspection_end_date, inspection_start_date, scheduled_date) >= ?
+                       AND COALESCE(inspection_end_date, inspection_start_date, scheduled_date) <= ?
+                     GROUP BY sbu", [(int)$officeId, $from, $to]);
+    $out = []; foreach ($rows as $r) $out[(string)$r['sbu']] = (float)$r['v'];
+    return $out;
+}
+
+// What was actually stored by the last run, per SBU and per kind.
+function costing_stored_by_sbu($officeId, $yr, $mon) {
+    $rows = ops_all("SELECT sbu, source_kind, COALESCE(SUM(amount),0) v FROM cost_allocations
+                     WHERE office_id=? AND yr=? AND mon=? GROUP BY sbu, source_kind",
+                    [(int)$officeId, (int)$yr, (int)$mon]);
+    $out = [];
+    foreach ($rows as $r) {
+        $s = (string)$r['sbu'];
+        if (!isset($out[$s])) $out[$s] = ['engineers'=>0, 'staff'=>0, 'office'=>0, 'cost'=>0];
+        $v = (float)$r['v'];
+        if (strncmp($r['source_kind'], 'INSPECTOR', 9) === 0) $out[$s]['engineers'] += $v;
+        elseif ($r['source_kind'] === 'STAFF_SALARY')        $out[$s]['staff'] += $v;
+        else                                                 $out[$s]['office'] += $v;
+        $out[$s]['cost'] += $v;
+    }
+    return $out;
+}
+
+// Cost that names an activity code — an engineer's days on that work. Shared
+// costs stop at the SBU line by design, so they are absent here on purpose.
+function costing_stored_by_activity($officeId, $yr, $mon) {
+    $rows = ops_all("SELECT activity, sbu, COALESCE(SUM(amount),0) v FROM cost_allocations
+                     WHERE office_id=? AND yr=? AND mon=? AND activity <> '' GROUP BY activity, sbu",
+                    [(int)$officeId, (int)$yr, (int)$mon]);
+    $out = [];
+    foreach ($rows as $r) {
+        $k = $r['activity'] . '|' . $r['sbu'];
+        $out[$k] = ['activity'=>$r['activity'], 'sbu'=>(string)$r['sbu'], 'cost'=>(float)$r['v'], 'revenue'=>0,
+                    'label'=>lk_value_path($r['activity']) ?: (string)$r['activity']];
+    }
+    // and the revenue the same activity codes earned
+    $from = sprintf('%04d-%02d-01', $yr, $mon);
+    $to   = date('Y-m-t', strtotime($from));
+    $rev = ops_all("SELECT activity_id, sbu, COALESCE(SUM(COALESCE(invoice_amount, expected_credit, 0)),0) v
+                    FROM jobs WHERE executing_office_id=? AND activity_id IS NOT NULL
+                      AND COALESCE(inspection_end_date, inspection_start_date, scheduled_date) >= ?
+                      AND COALESCE(inspection_end_date, inspection_start_date, scheduled_date) <= ?
+                    GROUP BY activity_id, sbu", [(int)$officeId, $from, $to]);
+    foreach ($rev as $r) {
+        $k = $r['activity_id'] . '|' . $r['sbu'];
+        if (!isset($out[$k]))
+            $out[$k] = ['activity'=>(string)$r['activity_id'], 'sbu'=>(string)$r['sbu'], 'cost'=>0, 'revenue'=>0,
+                        'label'=>lk_value_path($r['activity_id']) ?: (string)$r['activity_id']];
+        $out[$k]['revenue'] += (float)$r['v'];
+    }
+    uasort($out, function ($a, $b) { return ($b['revenue'] - $b['cost']) <=> ($a['revenue'] - $a['cost']); });
+    return $out;
+}
+
+// One line per BOSS number worked in the month: what it billed and what it
+// directly caused. Deliberately NOT loaded with a share of the branch — an
+// order is judged on its own costs, and the branch is judged separately.
+function costing_boss_lines($officeId, $yr, $mon) {
+    $from = sprintf('%04d-%02d-01', $yr, $mon);
+    $to   = date('Y-m-t', strtotime($from));
+    $jobs = ops_all("SELECT j.*, b.boss_number, p.legal_name, p.display_name
+                     FROM jobs j
+                     LEFT JOIN boss_numbers b ON b.id = j.boss_id
+                     LEFT JOIN business_partners p ON p.id = b.client_id
+                     WHERE j.executing_office_id = ?
+                       AND COALESCE(j.inspection_end_date, j.inspection_start_date, j.scheduled_date) >= ?
+                       AND COALESCE(j.inspection_end_date, j.inspection_start_date, j.scheduled_date) <= ?",
+                    [(int)$officeId, $from, $to]);
+    $out = [];
+    foreach ($jobs as $j) {
+        $key = (int)($j['boss_id'] ?? 0) ?: 'none';
+        if (!isset($out[$key])) $out[$key] = [
+            'boss_number' => $j['boss_number'] ?: 'Not against a ' . T('boss') . ' number',
+            'client' => trim((string)($j['display_name'] ?: $j['legal_name'])) ?: '—',
+            'sbu' => (string)($j['sbu'] ?? ''), 'revenue'=>0, 'labour'=>0, 'expenses'=>0, 'subcon'=>0];
+        $p = job_profit($j);
+        $out[$key]['revenue']  += (float)$p['credit'];
+        $out[$key]['labour']   += (float)$p['labour'];
+        $out[$key]['expenses'] += (float)$p['expenses'];
+        $out[$key]['subcon']   += (float)$p['subcon'];
+    }
+    uasort($out, function ($a, $b) {
+        return (($b['revenue'] - $b['labour'] - $b['expenses'] - $b['subcon'])
+             <=> ($a['revenue'] - $a['labour'] - $a['expenses'] - $a['subcon']));
+    });
+    return array_values($out);
+}
+
+// Offices this person may look at, newest schema first.
+function costing_offices_for_user() {
+    $global = is_master() || can('users.manage.global') || can('settings.manage') || can('data.profitability');
+    $mine = current_user()['home_office_id'] ?? null;
+    return $global ? ops_all("SELECT * FROM offices WHERE COALESCE(is_active,1)=1 ORDER BY is_ahmedabad DESC, name")
+                   : ($mine ? ops_all("SELECT * FROM offices WHERE id=?", [$mine]) : []);
+}
+function costing_pick_office(array $offices) {
+    $sel = (int)($_GET['office'] ?? 0);
+    foreach ($offices as $o) if ((int)$o['id'] === $sel) return $sel;
+    return (int)($offices[0]['id'] ?? 0);
+}
+
+// ---------------------------------------------------------------------------
+//  Screen: the month-end run
+// ---------------------------------------------------------------------------
+function ops_cost_run($method) {
+    ops_require(can_see_salary() || is_admin_level(), 'You cannot see the cost run — it contains salaries.');
+    $canRun = is_master() || can('settings.manage') || can('users.manage.global');
+    $offices = costing_offices_for_user();
+
+    if ($method === 'POST') {
+        ops_require($canRun, 'Only an administrator can store or close a month.');
+        $oid = (int)($_POST['office_id'] ?? 0);
+        [$yr, $mon] = ym_parse($_POST['m'] ?? '');
+        $back = '/cost-run?office=' . $oid . '&m=' . sprintf('%04d-%02d', $yr, $mon);
+        $mName = date('F Y', mktime(0, 0, 0, $mon, 1, $yr));
+        $do = $_POST['do'] ?? '';
+        if ($do === 'reopen') {
+            db()->prepare("UPDATE cost_runs SET status='OPEN' WHERE yr=? AND mon=? AND office_id=?")
+                ->execute([$yr, $mon, $oid]);
+            idems_log('office', $oid, 'COST_REOPEN', ['field' => sprintf('%04d-%02d', $yr, $mon)]);
+            flash($mName . ' reopened. Correct the figures, then calculate and close it again.');
+            redirect($back);
+        }
+        if (cost_month_frozen($yr, $mon, $oid)) {
+            flash($mName . ' is closed. Reopen it first.', 'error');
+            redirect($back);
+        }
+        if ($do === 'freeze') {
+            if (!cost_run_status($yr, $mon, $oid)) { flash('Calculate the month before closing it.', 'error'); redirect($back); }
+            db()->prepare("UPDATE cost_runs SET status='FROZEN' WHERE yr=? AND mon=? AND office_id=?")
+                ->execute([$yr, $mon, $oid]);
+            idems_log('office', $oid, 'COST_FREEZE', ['field' => sprintf('%04d-%02d', $yr, $mon)]);
+            flash($mName . ' closed. The figures are fixed now — reopen the month if anything has to change.');
+            redirect($back);
+        }
+        $res = costing_run($yr, $mon, $oid, true);
+        flash('₹' . number_format($res['total'], 2) . ' allocated for ' . $mName . '.'
+            . ($res['warnings'] ? ' ' . count($res['warnings']) . ' thing(s) worth a look.' : ''));
+        redirect($back);
+    }
+
+    $sel = costing_pick_office($offices);
+    [$yr, $mon] = ym_parse($_GET['m'] ?? '');
+    $preview = $sel ? costing_run($yr, $mon, $sel, false) : ['rows'=>[], 'total'=>0, 'warnings'=>[]];
+    $status  = $sel ? cost_run_status($yr, $mon, $sel) : null;
+
+    $kinds = ['INSPECTOR_WORKED'=>0, 'INSPECTOR_IDLE'=>0, 'STAFF_SALARY'=>0, 'OFFICE_EXPENSE'=>0];
+    $bySbu = [];
+    foreach ($preview['rows'] as $r) {
+        $kinds[$r['source_kind']] = ($kinds[$r['source_kind']] ?? 0) + $r['amount'];
+        $s = (string)$r['sbu'];
+        if (!isset($bySbu[$s])) $bySbu[$s] = ['INSPECTOR_WORKED'=>0, 'INSPECTOR_IDLE'=>0,
+                                               'STAFF_SALARY'=>0, 'OFFICE_EXPENSE'=>0, 'total'=>0];
+        $bySbu[$s][$r['source_kind']] += $r['amount'];
+        $bySbu[$s]['total'] += $r['amount'];
+    }
+    uasort($bySbu, function ($a, $b) { return $b['total'] <=> $a['total']; });
+    $bossCodes = [];
+    foreach (ops_all("SELECT id, boss_number FROM boss_numbers") as $b) $bossCodes[(int)$b['id']] = $b['boss_number'];
+
+    view('ops/cost_run', [
+        'offices'=>$offices, 'sel'=>$sel, 'yr'=>$yr, 'mon'=>$mon,
+        'preview'=>$preview, 'byKind'=>$kinds, 'bySbu'=>$bySbu,
+        'run'=>['status'=>$status['status'] ?? '', 'run_by'=>$status['run_by'] ?? '', 'run_at'=>$status['run_at'] ?? ''],
+        'sbuLabels'=>lk_options_or('sbu', OPS_SBUS), 'bossCodes'=>$bossCodes, 'canRun'=>$canRun,
+    ]);
+}
+
+// ---------------------------------------------------------------------------
+//  Screen: SBU / activity / BOSS profit & loss
+// ---------------------------------------------------------------------------
+function ops_sbu_pl() {
+    ops_require(can('data.profitability') || can_see_salary() || is_admin_level(),
+                'You cannot see profitability figures.');
+    $offices = costing_offices_for_user();
+    $sel = costing_pick_office($offices);
+    [$yr, $mon] = ym_parse($_GET['m'] ?? '');
+
+    $revenue = $sel ? costing_sbu_revenue($sel, $yr, $mon) : [];
+    $cost    = $sel ? costing_stored_by_sbu($sel, $yr, $mon) : [];
+    $rows = [];
+    foreach (array_unique(array_merge(array_keys($revenue), array_keys($cost))) as $s) {
+        if ($s === '' && !($revenue[$s] ?? 0) && !($cost[$s]['cost'] ?? 0)) continue;
+        $rows[$s] = ['revenue'=>(float)($revenue[$s] ?? 0)] + ($cost[$s] ?? ['engineers'=>0,'staff'=>0,'office'=>0,'cost'=>0]);
+    }
+    uasort($rows, function ($a, $b) { return ($b['revenue'] - $b['cost']) <=> ($a['revenue'] - $a['cost']); });
+    $tot = ['revenue'=>0, 'cost'=>0];
+    foreach ($rows as $r) { $tot['revenue'] += $r['revenue']; $tot['cost'] += $r['cost']; }
+
+    view('ops/sbu_pl', [
+        'offices'=>$offices, 'sel'=>$sel, 'yr'=>$yr, 'mon'=>$mon,
+        'rows'=>$rows, 'tot'=>$tot,
+        'byActivity'=>$sel ? costing_stored_by_activity($sel, $yr, $mon) : [],
+        'byBoss'=>$sel ? costing_boss_lines($sel, $yr, $mon) : [],
+        'stored'=>(bool)($sel ? cost_run_status($yr, $mon, $sel) : false),
+        'sbuLabels'=>lk_options_or('sbu', OPS_SBUS),
+        'basisText'=>$sel ? office_cost_basis_text($sel) : '',
+    ]);
+}

@@ -244,12 +244,15 @@ overheads → *SBUs in this office*:
 | Thing | Where you change it |
 |---|---|
 | Expense heads: add, rename, change basis, retire | Masters → Office expense heads |
+| A person's monthly cost, and whether they do inspections | Their own record, under *Cost & where it belongs* |
+| A person's SBU % split for the month | The same panel — one box per SBU in their branch |
+| Whether a call is outstation | The call, and it carries through to the allocation |
+| Calculating, storing and closing a month | Month-end cost run |
+| Reading the answer | SBU profit & loss |
 | How much was spent on each head, per month | Office costs & overheads → Actual costs |
 | Which SBUs an office runs | Office costs & overheads → SBUs in this office |
 | Rule for an engineer with no chargeable day | Office costs & overheads → SBUs in this office |
 | Overhead % and contingency % | Office costs & overheads → Overhead % (fallback) |
-| A person's monthly cost | Their own record |
-| A person's SBU % split | Their own record, month by month |
 | Working days in a month | Masters → Holidays, and the working-norms settings |
 
 Nothing in that list is fixed in the code. The 8% overhead is a fallback used
@@ -269,3 +272,29 @@ Every screen that shows a cost says which of the two it used:
 An office can move from one to the other simply by entering its figures. Both
 are labelled on screen, because a number calculated two different ways for two
 different branches, with nothing saying which, is worse than either.
+
+
+---
+
+## The order to do it in, month by month
+
+1. **Once, at the start** — Masters → Office expense heads: make the list your
+   own. Office costs & overheads → *SBUs in this office*: tick which SBUs each
+   branch runs.
+2. **Once per person** — open their record, fill in *Cost to the company, per
+   month*, and tick *This person does inspections* if they are an inspection
+   engineer.
+3. **Every month, for the people who are not engineers** — set their SBU
+   percentages on their record. Skip it and last month's carries forward.
+4. **Every month, per branch** — Office costs & overheads → *Actual costs*:
+   type what was spent under each head. *Copy last month* fills it in and you
+   edit what changed.
+5. **At month end** — Month-end cost run: pick the branch and the month, read
+   the preview and the warnings, press **Calculate and store**, then **Close
+   the month** when you are happy.
+6. **Read it** — SBU profit & loss: revenue against cost by SBU, by activity
+   code, and by BOSS number.
+
+A closed month cannot be changed. If a figure turns out to be wrong, reopen the
+month, fix it, calculate again and close it. Reopening is recorded in the audit
+trail, so nobody quietly rewrites a closed month.

@@ -119,6 +119,11 @@
     <div class="ff"><label>How it is worked</label>
       <select class="form-control" name="job_type"><?php foreach (lk_options_or('job_type', JOB_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($job['job_type'] ?? 'INSPECTION')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
       <small class="muted">A resident posting runs over a period; set the start and completion dates.</small></div>
+    <div class="ff ff-check">
+      <label><input type="checkbox" name="is_outstation" value="1"
+        <?= !empty($job['is_outstation'] ?? ($call['is_outstation'] ?? 0)) ? 'checked' : '' ?>>
+        Outstation — the <?= e(Tl('engineer')) ?> travels to reach this site</label>
+      <small class="muted">Carried from the <?= e(Tl('call')) ?>. Travel days either side are costed to this <?= e(Tl('sbu')) ?> and activity code.</small></div>
     <div class="ff"><label>Type of inspection <span class="muted">(from the <?= e(Tl('call')) ?>, narrowed to the <?= e(Tl('client')) ?>'s types)</span></label>
       <select class="form-control searchable" id="insp_sel" name="inspection_type"><option value="">—</option>
         <?php foreach (lk_options_or('inspection_type', INSPECTION_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= $curInsp===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
