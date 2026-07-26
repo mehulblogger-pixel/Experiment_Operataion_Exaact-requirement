@@ -11,7 +11,13 @@
 //
 //    · a job belongs to the month its inspection FINISHED
 //      (falling back to when it started, then to when it was scheduled)
-//    · revenue is the invoice if there is one, otherwise the expected credit
+//    · the INVOICE VALUE is what the client is charged — the bill if one has
+//      been raised, otherwise the figure agreed on the order or quotation
+//    · REVENUE is what a branch keeps out of that: the whole invoice value
+//      where one branch holds the order and does the work, and invoice less
+//      the credit passed over where two branches are involved. Filter to a
+//      branch and you get that branch's share; leave it unfiltered and you get
+//      the company's, which is the invoice value itself
 //    · direct cost is the engineer's time on it, its expenses and its sub-con
 //    · the shared cost of the branch is NOT pushed onto a job — that sits on
 //      the SBU line, from the month-end run
@@ -58,7 +64,11 @@ function mis_jobs(array $F) {
         $w[] = "j.executing_office_id IN (" . implode(',', array_map('intval', $scope)) . ")";
     }
     return ops_all("SELECT j.*, c.client_id, c.call_received_date, c.inspection_required_date,
-                           c.forwarded_at, c.allocated_at, c.ibo_office_id, c.contracting_office_id,
+                           c.forwarded_at, c.allocated_at, c.ibo_office_id,
+                           -- aliased: j.* already carries contracting_office_id, and an
+                           -- unaliased second column of the same name would overwrite it
+                           -- with the call's, which may be blank on an older record.
+                           c.contracting_office_id call_contracting_office_id,
                            i.name inspector_name, o.name office_name, o.code office_code,
                            p.legal_name, p.display_name, b.boss_number
                     FROM jobs j
@@ -112,8 +122,11 @@ function mis_summary(array $F) {
         if ($delay !== null) { $b['delayCounted']++; $b['delayDays'] += $delay; if ($delay > 0) $b['late']++; }
     };
 
+    // Narrowed to one branch, every figure is that branch's share; left wide,
+    // it is the company's, and the two always add up.
+    $scope = (int)($F['office'] ?? 0) ?: null;
     foreach ($jobs as $j) {
-        $p = job_profit($j);
+        $p = job_profit($j, $scope);
         $delay = mis_schedule_delay($j);
         $month = substr((string)($j['inspection_end_date'] ?: $j['inspection_start_date'] ?: $j['scheduled_date']), 0, 7);
 
@@ -199,8 +212,9 @@ function mis_last_year(array $F) {
     $jobs = mis_jobs($P);
     $out = ['jobs' => 0, 'revenue' => 0, 'cost' => 0, 'profit' => 0, 'mandays' => 0,
             'from' => $P['from'], 'to' => $P['to']];
+    $scope = (int)($P['office'] ?? 0) ?: null;
     foreach ($jobs as $j) {
-        $p = job_profit($j);
+        $p = job_profit($j, $scope);
         $out['jobs']++;
         $out['mandays'] += $p['mandays'];
         $out['revenue'] += $p['credit'];

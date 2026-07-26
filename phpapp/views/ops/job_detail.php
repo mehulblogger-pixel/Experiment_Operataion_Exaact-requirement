@@ -295,7 +295,15 @@
       <?php endif; ?>
       <div><span class="k">Expenses</span><?= fmoney($profit['expenses']) ?></div>
       <div><span class="k">Sub-con cost</span><?= fmoney($profit['subcon']) ?></div>
-      <div><span class="k">Expected credit</span><?= fmoney($profit['credit']) ?></div>
+      <?php // The two are not the same number and were treated as though they
+            // were. What the client pays is the invoice value; what this branch
+            // keeps out of it is the revenue, which is less by whatever credit
+            // was passed to the branch that did the work. ?>
+      <div><span class="k">Invoice value<?= $profit['billed'] > 0 ? '' : ' (agreed, not yet billed)' ?></span><?= fmoney($profit['invoice']) ?></div>
+      <?php if (!empty($profit['cross'])): ?>
+        <div><span class="k">Credit to the executing <?= e(Tl('office')) ?></span><?= fmoney($profit['own_credit']) ?></div>
+      <?php endif; ?>
+      <div><span class="k">Revenue<?= empty($profit['cross']) ? '' : ' (after the credit)' ?></span><strong><?= fmoney($profit['revenue']) ?></strong></div>
       <?php if (can_see_salary()): ?>
         <div class="kv-wide"><span class="k">Net profit</span><strong style="color:<?= $profit['profit']>=0?'var(--good,#1f8a4c)':'#c0392b' ?>"><?= fmoney($profit['profit']) ?></strong></div>
       <?php else: ?>

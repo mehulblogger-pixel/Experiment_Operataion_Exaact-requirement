@@ -523,12 +523,16 @@ function person_split_for_inspector($inspectorId, $yr, $mon) {
 function costing_office_revenue($officeId, $yr, $mon) {
     $from = sprintf('%04d-%02d-01', $yr, $mon);
     $to   = date('Y-m-t', strtotime($from));
-    $rows = ops_all("SELECT sbu, COALESCE(SUM(COALESCE(invoice_amount, expected_credit, 0)),0) v
-                     FROM jobs WHERE executing_office_id=? AND sbu <> ''
+    $jobs = ops_all("SELECT * FROM jobs
+                     WHERE executing_office_id=? AND sbu <> ''
                        AND COALESCE(inspection_end_date, inspection_start_date) >= ?
-                       AND COALESCE(inspection_end_date, inspection_start_date) <= ?
-                     GROUP BY sbu", [(int)$officeId, $from, $to]);
-    $out = []; foreach ($rows as $r) if ((float)$r['v'] > 0) $out[$r['sbu']] = (float)$r['v'];
+                       AND COALESCE(inspection_end_date, inspection_start_date) <= ?",
+                    [(int)$officeId, $from, $to]);
+    $out = [];
+    foreach ($jobs as $j) {
+        $v = job_revenue_for($j, (int)$officeId);
+        if ($v > 0) $out[(string)$j['sbu']] = ($out[(string)$j['sbu']] ?? 0) + $v;
+    }
     return $out;
 }
 // People per SBU — for heads allocated by headcount. An inspection engineer
@@ -625,12 +629,20 @@ function person_split_save($userId, $yr, $mon, array $pcts, $officeId = 0) {
 function costing_sbu_revenue($officeId, $yr, $mon) {
     $from = sprintf('%04d-%02d-01', $yr, $mon);
     $to   = date('Y-m-t', strtotime($from));
-    $rows = ops_all("SELECT sbu, COALESCE(SUM(COALESCE(invoice_amount, expected_credit, 0)),0) v
-                     FROM jobs WHERE executing_office_id=?
+    // Revenue is this branch's share, not the whole invoice — the same rule the
+    // dashboard uses, so the two screens can no longer disagree. Adding it up
+    // in PHP rather than in SQL because the rule needs both offices and the
+    // credit together, and a COALESCE cannot say "unless it is the same branch".
+    $jobs = ops_all("SELECT * FROM jobs
+                     WHERE executing_office_id=?
                        AND COALESCE(inspection_end_date, inspection_start_date, scheduled_date) >= ?
-                       AND COALESCE(inspection_end_date, inspection_start_date, scheduled_date) <= ?
-                     GROUP BY sbu", [(int)$officeId, $from, $to]);
-    $out = []; foreach ($rows as $r) $out[(string)$r['sbu']] = (float)$r['v'];
+                       AND COALESCE(inspection_end_date, inspection_start_date, scheduled_date) <= ?",
+                    [(int)$officeId, $from, $to]);
+    $out = [];
+    foreach ($jobs as $j) {
+        $k = (string)($j['sbu'] ?? '');
+        $out[$k] = ($out[$k] ?? 0) + job_revenue_for($j, (int)$officeId);
+    }
     return $out;
 }
 
@@ -668,17 +680,17 @@ function costing_stored_by_activity($officeId, $yr, $mon) {
     // and the revenue the same activity codes earned
     $from = sprintf('%04d-%02d-01', $yr, $mon);
     $to   = date('Y-m-t', strtotime($from));
-    $rev = ops_all("SELECT activity_id, sbu, COALESCE(SUM(COALESCE(invoice_amount, expected_credit, 0)),0) v
-                    FROM jobs WHERE executing_office_id=? AND activity_id IS NOT NULL
+    $rev = ops_all("SELECT * FROM jobs
+                    WHERE executing_office_id=? AND activity_id IS NOT NULL
                       AND COALESCE(inspection_end_date, inspection_start_date, scheduled_date) >= ?
-                      AND COALESCE(inspection_end_date, inspection_start_date, scheduled_date) <= ?
-                    GROUP BY activity_id, sbu", [(int)$officeId, $from, $to]);
+                      AND COALESCE(inspection_end_date, inspection_start_date, scheduled_date) <= ?",
+                   [(int)$officeId, $from, $to]);
     foreach ($rev as $r) {
         $k = $r['activity_id'] . '|' . $r['sbu'];
         if (!isset($out[$k]))
             $out[$k] = ['activity'=>(string)$r['activity_id'], 'sbu'=>(string)$r['sbu'], 'cost'=>0, 'revenue'=>0,
                         'label'=>lk_value_path($r['activity_id']) ?: (string)$r['activity_id']];
-        $out[$k]['revenue'] += (float)$r['v'];
+        $out[$k]['revenue'] += job_revenue_for($r, (int)$officeId);
     }
     uasort($out, function ($a, $b) { return ($b['revenue'] - $b['cost']) <=> ($a['revenue'] - $a['cost']); });
     return $out;
@@ -705,7 +717,7 @@ function costing_boss_lines($officeId, $yr, $mon) {
             'boss_number' => $j['boss_number'] ?: 'Not against a ' . T('boss') . ' number',
             'client' => trim((string)($j['display_name'] ?: $j['legal_name'])) ?: '—',
             'sbu' => (string)($j['sbu'] ?? ''), 'revenue'=>0, 'labour'=>0, 'expenses'=>0, 'subcon'=>0];
-        $p = job_profit($j);
+        $p = job_profit($j, $officeId);
         $out[$key]['revenue']  += (float)$p['credit'];
         $out[$key]['labour']   += (float)$p['labour'];
         $out[$key]['expenses'] += (float)$p['expenses'];

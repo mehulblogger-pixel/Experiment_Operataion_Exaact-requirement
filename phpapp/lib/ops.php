@@ -319,6 +319,14 @@ function ops_migrate() {
     ensure_column('jobs', 'inspection_dates', "VARCHAR(600) DEFAULT ''");
     ensure_column('jobs', 'folder_link', "VARCHAR(500) DEFAULT ''");
     ensure_column('jobs', 'contract_number', "VARCHAR(80) DEFAULT ''");
+    // What the client is charged, and which branch holds the order. Both were
+    // only ever on the call, so every figure downstream had to go back and look
+    // — and a same-office job, which has no inter-office credit, read as worth
+    // nothing at all. They belong on the job because a job outlives edits to
+    // the call it came from.
+    ensure_column('jobs', 'invoice_value', 'DECIMAL(14,2) DEFAULT 0');
+    ensure_column('jobs', 'contracting_office_id', 'INT NULL');
+    jobs_backfill_money();
     // jobs gain type of inspection (carried from call), custom report frequency,
     // activity and the required deliverables/report formats.
     ensure_column('jobs', 'inspection_type', "VARCHAR(40) DEFAULT ''");
@@ -884,7 +892,9 @@ function ops_invoicing_counts() {
         'awaiting'   => $q("j.invoice_raised=1 AND j.payment_received=0"),
         'overdue'    => $q("j.invoice_raised=1 AND j.payment_received=0 AND j.invoice_due_date<>'' AND j.invoice_due_date<?", [$today]),
         'credit'     => $q("j.closed_flag=1 AND j.credit_direction<>'GIVEN' AND j.executing_office_id IS NOT NULL AND j.credit_received=0"),
-        'unbilled'   => (float)ops_val("SELECT COALESCE(SUM(j.expected_credit),0) FROM jobs j WHERE $jw AND j.closed_flag=1 AND j.invoice_raised=0", $ja),
+        // What is waiting to be billed is the invoice value, not the inter-office
+        // credit — on a same-office job there is no credit and this read zero.
+        'unbilled'   => (float)ops_val("SELECT COALESCE(SUM(COALESCE(NULLIF(j.invoice_value,0), j.expected_credit)),0) FROM jobs j WHERE $jw AND j.closed_flag=1 AND j.invoice_raised=0", $ja),
         'outstanding'=> (float)ops_val("SELECT COALESCE(SUM(j.invoice_amount),0) FROM jobs j WHERE $jw AND j.invoice_raised=1 AND j.payment_received=0", $ja),
     ];
 }
@@ -908,7 +918,7 @@ function ops_invoicing() {
     [$fw, $fa] = invoicing_filter_sql($f, $today);
     $rows = ops_all(
         "SELECT j.id, j.job_code, j.invoice_raised, j.invoice_number, j.invoice_amount, j.invoice_date, j.invoice_due_date,
-                j.payment_received, j.payment_amount, j.expected_credit, j.credit_direction, j.credit_received,
+                j.payment_received, j.payment_amount, j.invoice_value, j.expected_credit, j.credit_direction, j.credit_received,
                 bp.display_name, bp.legal_name, bn.boss_number, o.name office_name
          FROM jobs j
          LEFT JOIN calls c ON c.id = j.call_id
@@ -922,7 +932,7 @@ function ops_invoicing() {
         $csv = [['Job', T('boss'), 'Client','Office','Amount','Invoice raised','Invoice no','Invoice date','Due date','Payment received','Payment amount','Credit direction','Credit received']];
         foreach ($rows as $r) {
             $csv[] = [$r['job_code'], $r['boss_number'], $r['display_name'] ?: $r['legal_name'], $r['office_name'],
-                (float)($r['invoice_amount'] ?: $r['expected_credit']), !empty($r['invoice_raised']) ? 'Yes' : 'No', $r['invoice_number'],
+                (float)($r['invoice_amount'] ?: ($r['invoice_value'] ?: $r['expected_credit'])), !empty($r['invoice_raised']) ? 'Yes' : 'No', $r['invoice_number'],
                 $r['invoice_date'], $r['invoice_due_date'], !empty($r['payment_received']) ? 'Yes' : 'No', (float)$r['payment_amount'],
                 $r['credit_direction'], !empty($r['credit_received']) ? 'Yes' : 'No'];
         }
@@ -1005,20 +1015,118 @@ function expense_heading_labels() {
     return $out; // col => label for the 5 base columns
 }
 // Full profitability breakdown for a job (Master Admin sees the salary part).
-function job_profit($job) {
+// ---------------------------------------------------------------------------
+//  Invoice value and revenue are two different numbers
+//
+//  The owner's definition, and the only one used anywhere:
+//
+//    INVOICE VALUE  is what the client is charged, as agreed on the purchase
+//                   order or the quotation. Once a bill is actually raised it
+//                   is the bill; until then it is the agreed figure.
+//
+//    REVENUE        is what a branch keeps. Where the branch holding the order
+//                   and the branch doing the work are the same, that is the
+//                   whole invoice value. Where they differ, the holding branch
+//                   passes a credit to the executing branch: the holder keeps
+//                   invoice − credit, and the executor books the credit.
+//
+//  Two consequences worth stating, because both were wrong before:
+//    · added across every branch, revenue equals the invoice value exactly —
+//      no work is counted twice and none disappears;
+//    · a same-office job is NOT worth nothing. It used to read zero because
+//      only the inter-office credit was looked at, and a same-office job has
+//      none.
+// ---------------------------------------------------------------------------
+// Jobs raised before the two columns existed take their figures from the call
+// they came from, once. Anything already filled in is left alone, so this is
+// safe to run on every boot.
+function jobs_backfill_money() {
+    try {
+        db()->exec("UPDATE jobs SET invoice_value = COALESCE(
+                        (SELECT c.billable_value FROM calls c WHERE c.id = jobs.call_id), 0)
+                    WHERE COALESCE(invoice_value,0) = 0 AND call_id IS NOT NULL");
+        db()->exec("UPDATE jobs SET contracting_office_id =
+                        (SELECT COALESCE(c.contracting_office_id, c.ibo_office_id) FROM calls c WHERE c.id = jobs.call_id)
+                    WHERE contracting_office_id IS NULL AND call_id IS NOT NULL");
+    } catch (Throwable $e) { /* a fresh database has nothing to carry */ }
+}
+
+function job_money($job) {
+    // Billed if it has been billed, agreed if it has not. An invoice for zero
+    // is not an invoice, so it does not displace the agreed figure.
+    $billed  = (float)($job['invoice_amount'] ?? 0);
+    $agreed  = (float)($job['invoice_value'] ?? 0);
+    if ($agreed <= 0 && !empty($job['call_id']))
+        $agreed = (float)ops_val("SELECT billable_value FROM calls WHERE id=?", [(int)$job['call_id']]);
+    $invoice = $billed > 0 ? $billed : $agreed;
+
+    $exe = (int)($job['executing_office_id'] ?? 0);
+    $hold = (int)($job['contracting_office_id'] ?? 0);
+    if (!$hold && !empty($job['call_id']))
+        $hold = (int)ops_val("SELECT COALESCE(contracting_office_id, ibo_office_id) FROM calls WHERE id=?", [(int)$job['call_id']]);
+    $cross = $exe && $hold && $exe !== $hold;
+    // The credit only means anything across offices. On a same-office job any
+    // figure sitting in that column is a leftover, not money moving.
+    $credit = $cross ? (float)($job['expected_credit'] ?? 0) : 0.0;
+    // An older cross-office job may carry the credit and nothing else, because
+    // until now only the credit was ever recorded. Subtracting it from an
+    // invoice value of nothing would show the holding branch a loss it never
+    // made. Where there is no invoice value on record, the credit is the whole
+    // of it: the holding branch keeps nothing, which is the honest reading of a
+    // job whose client charge was never written down.
+    if ($invoice <= 0 && $credit > 0) $invoice = $credit;
+
+    return [
+        'invoice' => $invoice, 'billed' => $billed, 'agreed' => $agreed,
+        'credit' => $credit, 'cross' => $cross,
+        'contracting_office_id' => $hold ?: null, 'executing_office_id' => $exe ?: null,
+        // What each side keeps. On a same-office job the one office keeps it
+        // all, and the two shares must never be added together.
+        'rev_holder'   => $cross ? $invoice - $credit : $invoice,
+        'rev_executor' => $cross ? $credit : $invoice,
+    ];
+}
+
+// What one branch books on this job — or, with no branch named, what the
+// company books, which is the invoice value itself.
+function job_revenue_for($job, $officeId = null) {
+    $m = job_money($job);
+    if (!$officeId) return $m['invoice'];
+    $officeId = (int)$officeId;
+    if (!$m['cross'])
+        return ($officeId === (int)$m['executing_office_id'] || $officeId === (int)$m['contracting_office_id'])
+             ? $m['invoice'] : 0.0;
+    if ($officeId === (int)$m['contracting_office_id']) return $m['rev_holder'];
+    if ($officeId === (int)$m['executing_office_id'])   return $m['rev_executor'];
+    return 0.0;
+}
+
+// Money on one job. With no office named this is the company's view: the whole
+// invoice against every cost the job caused. Named a branch, it is that
+// branch's share of the revenue — and the costs, which sit with whoever did
+// the work.
+function job_profit($job, $officeId = null) {
     $mandays = job_mandays($job);
     $office = $job['executing_office_id'] ?? null;
     $salary_ctc = $job['inspector_id'] ? (float)ops_val("SELECT salary_ctc + COALESCE(agency_cost,0) FROM inspectors WHERE id=?", [$job['inspector_id']]) : 0;
     $daily = $salary_ctc ? inspector_daily_cost($salary_ctc, null, null, $office) : 0;
-    $labour = $daily * $mandays;
-    $expenses = job_expenses_total($job['id']);
-    $subcon = (float)($job['subcon_cost'] ?? 0);
-    $credit = (float)($job['expected_credit'] ?? 0);
+    $m = job_money($job);
+    $bearsCost = !$officeId || (int)$officeId === (int)$office;
+    $labour   = $bearsCost ? $daily * $mandays : 0;
+    $expenses = $bearsCost ? job_expenses_total($job['id']) : 0;
+    $subcon   = $bearsCost ? (float)($job['subcon_cost'] ?? 0) : 0;
+    $revenue = job_revenue_for($job, $officeId);
     $contingency = round(($labour + $expenses + $subcon) * office_contingency_pct($office) / 100, 2);
     return [
         'mandays' => $mandays, 'daily_cost' => $daily, 'labour' => $labour,
-        'expenses' => $expenses, 'subcon' => $subcon, 'credit' => $credit, 'contingency' => $contingency,
-        'profit' => $credit - $labour - $expenses - $subcon - $contingency,
+        'expenses' => $expenses, 'subcon' => $subcon, 'contingency' => $contingency,
+        'revenue' => $revenue,
+        'invoice' => $m['invoice'], 'billed' => $m['billed'], 'own_credit' => $m['credit'],
+        'cross' => $m['cross'],
+        // Kept under its old name so nothing that reads it has to change; it is
+        // the revenue for whoever this view is about.
+        'credit' => $revenue,
+        'profit' => $revenue - $labour - $expenses - $subcon - $contingency,
     ];
 }
 
@@ -3276,7 +3384,8 @@ function ops_jobs($route, $method) {
             // still be uploaded; figures cannot be rewritten weeks later.
             if ($job && ($why = job_lock_block($job)) !== '') { flash($why, 'error'); redirect('/job?id=' . $job['id']); }
             $fields = ['executing_office_id','inspector_id','subcon_id','job_type','stage','scheduled_date','inspection_start_date','inspection_end_date',
-                'random_date1','random_date2','random_date3','folder_link','contract_number','inspection_dates','boss_id','expected_credit','credit_type','credit_direction',
+                'random_date1','random_date2','random_date3','folder_link','contract_number','inspection_dates','boss_id',
+                'invoice_value','contracting_office_id','expected_credit','credit_type','credit_direction',
                 'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost','quotation_id','is_outstation'];
             // deliverables come as a checkbox array -> stored as CSV of codes
             $deliverables = implode(',', array_filter((array)($b['deliverables'] ?? [])));
@@ -3297,9 +3406,14 @@ function ops_jobs($route, $method) {
             // did nothing, because the only thing wrong was a box that should
             // never have been asked for. Revenue for a same-office job is what
             // the client is billed, which the call already carries.
-            $jMng = $call['ibo_office_id'] ?? null;
+            $jMng = ($call['contracting_office_id'] ?? null) ?: ($call['ibo_office_id'] ?? null);
             $jExe = ($b['executing_office_id'] ?? '') !== '' ? (int)$b['executing_office_id'] : ($call['executing_office_id'] ?? null);
-            $jCross = $jExe && (!$jMng || (int)$jMng !== (int)$jExe);
+            $jCross = $jExe && $jMng && (int)$jMng !== (int)$jExe;
+            // What the client is charged comes off the order or the quotation
+            // via the call, and rides on the job from here on.
+            $b['contracting_office_id'] = $jMng ?: null;
+            if (($b['invoice_value'] ?? '') === '')
+                $b['invoice_value'] = (float)($call['billable_value'] ?? 0);
             if ($jCross && (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0)) {
                 view('ops/job_form', array_merge(call_job_form_vars($job, $call),
                     ['error' => 'This ' . Tl('job') . ' is executed by a different ' . Tl('office')
@@ -3307,10 +3421,11 @@ function ops_jobs($route, $method) {
                               . Tl('office') . ' has to be stated before it is allocated.']));
                 return;
             }
-            if (!$jCross && (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0)) {
-                // One office both holds the order and does the work, so the money
-                // on this job is simply what the client is billed for the call.
-                $b['expected_credit'] = (float)($call['billable_value'] ?? 0);
+            if (!$jCross) {
+                // One branch both holds the order and does the work. There is no
+                // credit passing between offices, and a leftover figure in that
+                // column would be counted as though there were.
+                $b['expected_credit'] = 0;
                 $b['credit_direction'] = '';
             }
             // The contract number comes down the chain and the register fills
@@ -3511,9 +3626,9 @@ function call_job_form_vars($job, $call) {
 
 function nzc($f, $v) {
     if ($f === 'is_outstation') return empty($v) ? 0 : 1;   // an unticked box posts nothing
-    $nullable = ['executing_office_id','inspector_id','subcon_id','boss_id','activity_id','report_custom_days','quotation_id'];
+    $nullable = ['executing_office_id','contracting_office_id','inspector_id','subcon_id','boss_id','activity_id','report_custom_days','quotation_id'];
     if (in_array($f, $nullable) && $v === '') return null;
-    if (in_array($f, ['expected_credit','mandays','subcon_cost']) && $v === '') return 0;
+    if (in_array($f, ['expected_credit','invoice_value','mandays','subcon_cost']) && $v === '') return 0;
     return $v;
 }
 // Full partner detail (record + contacts + addresses) for the allocate-job info panel.
@@ -3642,7 +3757,9 @@ function boss_profit($bossId) {
     $revenue = 0; $labour = 0; $subcon = 0; $jobExp = 0; $invoiced = 0; $paid = 0; $contingency = 0;
     foreach ($jobs as $j) {
         $office = $j['executing_office_id'] ?? null;
-        $revenue += (float)(($j['invoice_amount'] ?? 0) ?: ($j['expected_credit'] ?? 0));
+        // The order is judged on what the client is charged for it, whichever
+        // branch of ours did the work.
+        $revenue += job_money($j)['invoice'];
         $invoiced += (float)($j['invoice_amount'] ?? 0);
         $paid += !empty($j['payment_received']) ? (float)($j['payment_amount'] ?? 0) : 0;
         $jSub = (float)($j['subcon_cost'] ?? 0); $subcon += $jSub;

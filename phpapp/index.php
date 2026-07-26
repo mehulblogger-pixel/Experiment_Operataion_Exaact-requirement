@@ -188,6 +188,7 @@ try {
     db()->query("SELECT id FROM office_expense_heads LIMIT 1");
     db()->query("SELECT id FROM cost_allocations LIMIT 1");
     db()->query("SELECT locked_at FROM jobs LIMIT 1");
+    db()->query("SELECT invoice_value, contracting_office_id FROM jobs LIMIT 1");
     db()->query("SELECT quotation_id FROM partner_purchase_orders LIMIT 1");
     db()->query("SELECT contract_number FROM cost_allocations LIMIT 1");
     db()->query("SELECT id FROM security_incidents LIMIT 1");
