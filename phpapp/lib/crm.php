@@ -654,12 +654,51 @@ function crm_diff_snapshots($oldSnap, $newSnap) {
 // unlock, and only in answer to a request raised in the system.
 function quote_is_locked($q) {
     if (!$q) return false;
+    $status = (string)($q['status'] ?? '');
+    // Out of the building. Whatever the customer is holding in their inbox is
+    // what this quotation says, and no amount of seniority makes editing it
+    // afterwards honest. Not even the Master Admin — the way back is a revision,
+    // which is a new attempt with its own number and its own approval.
+    if ($status === 'SENT' || trim((string)($q['sent_at'] ?? '')) !== '') return true;
     if (is_master()) return false;
-    $closed = in_array($q['status'] ?? '', ['ACCEPTED', 'LOST'], true);
+    $closed = in_array($status, ['ACCEPTED', 'LOST'], true);
     if (!$closed) return false;
     $until = $q['unlocked_until'] ?? '';
     if ($until !== '' && strtotime($until) > time()) return false;   // an unlock is live
     return true;
+}
+// Why it is locked, in the words the person needs.
+function quote_lock_reason($q) {
+    if (!quote_is_locked($q)) return '';
+    if (($q['status'] ?? '') === 'SENT' || trim((string)($q['sent_at'] ?? '')) !== '')
+        return 'This ' . Tl('quote') . ' has gone to the ' . Tl('client')
+             . (trim((string)($q['sent_at'] ?? '')) !== '' ? ' on ' . fdate(substr((string)$q['sent_at'], 0, 10)) : '')
+             . ', so nothing on it can be changed. To change the price or the scope, raise a revision: '
+             . 'it takes a new revision number, goes through approval again, and is sent again.';
+    return 'This ' . Tl('quote') . ' is closed (' . ($q['status'] ?? '') . ') and is locked. '
+         . 'Raise a re-edit request — only the Super Admin can grant it.';
+}
+
+// ---- Taking an approval back (§ approver pressed the wrong button) ---------
+// Everybody approves the wrong thing once. While the quotation is still inside
+// the building that is a mistake, not an event: the approver takes it back and
+// it goes to whoever it was waiting for. The moment it has gone to the customer
+// it stops being a mistake and becomes history, and history is not edited.
+function quote_can_retract($q) {
+    if (!$q) return false;
+    if (quote_is_locked($q)) return false;                       // gone out, or closed
+    return in_array((string)($q['status'] ?? ''), ['APPROVED', 'PENDING_APPROVAL'], true);
+}
+// This approver's own approved step, if they have one to take back.
+function quote_my_approved_step($qid) {
+    $u = current_user();
+    $me = user_name($u);
+    foreach (ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='APPROVED' ORDER BY level DESC", [(int)$qid]) as $st) {
+        if (is_master()) return $st;
+        if (!empty($st['approver_user_id']) && (int)$st['approver_user_id'] === (int)($u['id'] ?? 0)) return $st;
+        if (trim((string)($st['acted_by'] ?? '')) !== '' && $st['acted_by'] === $me) return $st;
+    }
+    return null;
 }
 function quote_edit_request_open($qid) {
     return ops_one("SELECT * FROM quote_edit_requests WHERE quote_id=? AND status='PENDING' ORDER BY id DESC", [(int)$qid]);
@@ -965,6 +1004,12 @@ function ops_crm_quotes($route, $method) {
             'lostReasons' => lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS),
             'canApprove' => can('crm.quote.approve') || is_master(), 'canSend' => can('crm.quote.send') || is_master(),
             'canEdit' => (can('crm.quote.create') || can('mod.quotes.edit') || is_master()) && !quote_is_locked($q),
+            // Revising is the way FORWARD from a sent quotation, so it must not
+            // be gated on the lock that sending puts in place — that would leave
+            // the only correct action greyed out.
+            'canRevise' => can('crm.quote.create') || can('mod.quotes.edit') || is_master(),
+            'canRetract' => quote_can_retract($q) && quote_my_approved_step($q['id']) !== null,
+            'lockReason' => quote_lock_reason($q),
             'locked' => quote_is_locked($q), 'editReq' => quote_edit_request_open($q['id']),
             'canContract' => can('crm.contract.register') || is_master(),
             // §xii — who the approval is actually sitting with, right now.
@@ -982,6 +1027,12 @@ function ops_crm_quotes($route, $method) {
     if ($route === 'quote-status' && $method === 'POST') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         $to = $_POST['to'] ?? '';
+        // Once it is with the customer the only honest moves are the customer's
+        // own answer — accepted, or lost. Everything else needs a revision.
+        if (quote_is_locked($q) && !in_array($to, ['ACCEPTED', 'LOST'], true)) {
+            flash(quote_lock_reason($q), 'error');
+            redirect('/quote?id=' . $q['id']);
+        }
         if (!isset(lk_options_or('quote_status', QUOTE_STATUS)[$to])) { flash('Unknown status.', 'error'); redirect('/quote?id=' . $q['id']); }
         if ($to === 'APPROVED') ops_require(can('crm.quote.approve') || is_master(), 'You cannot approve quotations.');
         if ($to === 'SENT') ops_require(can('crm.quote.send') || is_master(), 'You cannot send quotations.');
@@ -1026,7 +1077,6 @@ function ops_crm_quotes($route, $method) {
         ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master(), 'You cannot revise quotations.');
         $base = (int)($q['parent_id'] ?: $q['id']);
         $summary = trim($_POST['summary'] ?? '') ?: 'Revised';
-        $snap = ['header' => $q, 'lines' => crm_quote_lines($q['id'])];
         $newRev = (int)$q['rev'] + 1;
         // Snapshot the source first (fully-drained reads), then INSERT the new revision
         // BEFORE flipping the old ones — doing the same-table UPDATE first was observed
@@ -1034,22 +1084,72 @@ function ops_crm_quotes($route, $method) {
         $srcRows = ops_all("SELECT * FROM quotations WHERE id=?", [$q['id']]);
         $src = $srcRows[0];
         $srcLines = crm_quote_lines($q['id']);
-        $carryCols = ['inquiry_id','client_id','client_name','contact_name','contact_email','contact_mobile','sbu','office_id','subject',
-            'site_location','location_type','currency','validity_days','payment_terms','advance_pct','advance_required',
-            'report_vs_payment','subtotal','gst_pct','gst_amount','total_amount','template_id','owner_id'];
+        $srcLocs  = crm_quote_locations($q['id']);
+        $snap = ['header' => $q, 'lines' => $srcLines, 'locations' => $srcLocs];
+
+        // A revision is the SAME quotation, priced again. So it carries every
+        // column except the handful that identify this attempt and its progress.
+        //
+        // This list used to be written out by hand, and it silently lost whatever
+        // was added to the table afterwards: the sites, the types of inspection,
+        // the product category, the executing offices and the terms all vanished
+        // the moment somebody revised. Working the other way round — everything
+        // except what must be new — means a column added next year is carried
+        // without anybody remembering to come back here.
+        $skip = ['id',                                          // a new row
+                 'quote_no','rev','parent_id','is_current',     // identity of the revision
+                 'status','submitted_at','sent_at','accepted_date',
+                 'lost_reason','lost_reason_other',
+                 'rejected_by','rejected_at','reject_remarks',  // this attempt's history
+                 'locked','unlocked_until',
+                 'created_by','created_at','updated_at'];
+        $carryCols = array_values(array_diff(array_keys($src), $skip));
         $cols = array_merge(['quote_no','rev','parent_id','is_current','status','created_by','created_at','updated_at'], $carryCols);
         $vals = array_merge([$src['quote_no'], $newRev, $base, 1, 'DRAFT', user_name(current_user()), date('c'), date('c')],
-            array_map(fn($c) => $src[$c], $carryCols));
-        $pdo->prepare("INSERT INTO quotations (" . implode(',', $cols) . ") VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")")->execute($vals);
+            array_map(function ($c) use ($src) { return $src[$c]; }, $carryCols));
+        $pdo->prepare("INSERT INTO quotations (" . implode(',', $cols) . ") VALUES ("
+            . implode(',', array_fill(0, count($cols), '?')) . ")")->execute($vals);
         $nid = (int)$pdo->lastInsertId();
-        $lcols = ['line_no','sbu','service_type','subtypes','description','location','location_type','order_type','qty','unit','rate','amount','deliverables','notes'];
-        $lins = $pdo->prepare("INSERT INTO quote_lines (quote_id," . implode(',', $lcols) . ") VALUES (?," . implode(',', array_fill(0, count($lcols), '?')) . ")");
-        foreach ($srcLines as $l) $lins->execute(array_merge([$nid], array_map(fn($c) => $l[$c], $lcols)));
+
+        // The sites. These were not copied at all, so every location typed into a
+        // quotation disappeared on the first revision — the single most annoying
+        // thing about revising, and the hardest to notice until the PDF is out.
+        $locMap = [];   // old location id => new, so the lines keep pointing at the right site
+        if ($srcLocs) {
+            $lcCols = array_values(array_diff(array_keys($srcLocs[0]), ['id', 'quote_id']));
+            $li = $pdo->prepare("INSERT INTO quote_locations (quote_id," . implode(',', $lcCols) . ") VALUES (?,"
+                . implode(',', array_fill(0, count($lcCols), '?')) . ")");
+            foreach ($srcLocs as $L) {
+                $li->execute(array_merge([$nid], array_map(function ($c) use ($L) { return $L[$c]; }, $lcCols)));
+                $locMap[(int)$L['id']] = (int)$pdo->lastInsertId();
+            }
+        }
+
+        // The lines, with every column they have — the office, the site and the
+        // activity code were being dropped as well.
+        if ($srcLines) {
+            $liCols = array_values(array_diff(array_keys($srcLines[0]), ['id', 'quote_id']));
+            $lins = $pdo->prepare("INSERT INTO quote_lines (quote_id," . implode(',', $liCols) . ") VALUES (?,"
+                . implode(',', array_fill(0, count($liCols), '?')) . ")");
+            foreach ($srcLines as $l) {
+                $row = [];
+                foreach ($liCols as $c) {
+                    $v = $l[$c];
+                    // a line pointing at a site must point at the NEW copy of it
+                    if ($c === 'location_id' && $v !== null && isset($locMap[(int)$v])) $v = $locMap[(int)$v];
+                    $row[] = $v;
+                }
+                $lins->execute(array_merge([$nid], $row));
+            }
+        }
+
         // Now demote every other revision of this quote.
         $pdo->prepare("UPDATE quotations SET is_current=0 WHERE quote_no=? AND id<>?")->execute([$q['quote_no'], $nid]);
         $pdo->prepare("INSERT INTO quote_revisions (quote_id,rev,changed_by,changed_at,summary,snapshot) VALUES (?,?,?,?,?,?)")
             ->execute([$base, $newRev, user_name(current_user()), date('c'), $summary, json_encode($snap)]);
-        flash('Created revision ' . str_pad((string)$newRev, 2, '0', STR_PAD_LEFT) . '. Edit it below.');
+        crm_log_change($nid, 'Revision ' . $newRev . ' created from rev ' . (int)$q['rev'] . ' — ' . $summary);
+        flash('Created revision ' . str_pad((string)$newRev, 2, '0', STR_PAD_LEFT) . ' with '
+            . count($srcLines) . ' line(s) and ' . count($srcLocs) . ' site(s) carried over. Edit it below.');
         redirect('/quote-edit?id=' . $nid);
     }
     if ($route === 'quote-doc') {
@@ -1112,6 +1212,39 @@ function ops_crm_quotes($route, $method) {
         }
         redirect('/quote?id=' . $q['id']);
     }
+    // Take an approval back, before it leaves the building.
+    if ($route === 'quote-unapprove' && $method === 'POST') {
+        $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
+        if (!quote_can_retract($q)) {
+            flash(quote_lock_reason($q) ?: 'There is nothing to take back on this ' . Tl('quote') . '.', 'error');
+            redirect('/quote?id=' . $q['id']);
+        }
+        $step = quote_my_approved_step($q['id']);
+        if (!$step) {
+            flash('You have no approval on this ' . Tl('quote') . ' to take back.', 'error');
+            redirect('/quote?id=' . $q['id']);
+        }
+        $why = trim((string)($_POST['reason'] ?? ''));
+        $me = user_name(current_user());
+        $pdo->prepare("UPDATE quote_approvals SET status='PENDING', acted_by='', acted_at='', remarks=? WHERE id=?")
+            ->execute([$why, $step['id']]);
+        // Any level approved AFTER this one is void too — an approval given on
+        // the strength of a withdrawn one cannot stand on its own.
+        $after = ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='APPROVED' AND level > ?",
+                         [$q['id'], (int)$step['level']]);
+        foreach ($after as $a)
+            $pdo->prepare("UPDATE quote_approvals SET status='PENDING', acted_by='', acted_at='', remarks=? WHERE id=?")
+                ->execute(['Reset — level ' . (int)$step['level'] . ' was taken back by ' . $me, $a['id']]);
+        $pdo->prepare("UPDATE quotations SET status='PENDING_APPROVAL' WHERE id=?")->execute([$q['id']]);
+        crm_log_change($q['id'], 'Approval at level ' . (int)$step['level'] . ' taken back by ' . $me
+            . ($why !== '' ? ' — ' . $why : '')
+            . ($after ? ' (' . count($after) . ' later level(s) reset)' : ''));
+        crm_notify_owner($q, 'approval taken back by ' . $me, $why);
+        flash('Your approval has been taken back. The ' . Tl('quote') . ' is waiting for approval again'
+            . ($after ? ', and ' . count($after) . ' later level(s) were reset with it' : '') . '.');
+        redirect('/quote?id=' . $q['id']);
+    }
+
     // §12/§13 — Accounts registers the client + contract number, which floats the
     // Operations packet (client, quote/contract no, contacts, service req, TC proposal).
     if ($route === 'quote-contract' && $method === 'POST') {
