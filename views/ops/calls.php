@@ -43,7 +43,7 @@
       <th>Executing <?= e(T('office')) ?></th><th class="num">Credit to give</th>
       <th>Coordinator</th><th><?= e(T('engineer')) ?></th>
       <th>Received</th><th>Forwarded</th><th>Allocated</th>
-      <th>Required by</th><th>Scheduled</th>
+      <th>Required by</th><th>Engagement</th><th>Ends</th><th>Scheduled</th>
       <th class="num" title="Received → forwarded · forwarded → allocated · received → scheduled">Lead (days)</th>
       <th class="num">Delay</th><th class="num"><?= e(TP('job')) ?></th><th class="num">Cost</th><th>Status</th><th></th>
     </tr></thead>
@@ -95,6 +95,14 @@
         <td><?= !empty($c['forwarded_at']) ? e(fdate(substr((string)$c['forwarded_at'],0,10))) : $dash ?></td>
         <td><?= !empty($c['allocated_at']) ? e(fdate(substr((string)$c['allocated_at'],0,10))) : $dash ?></td>
         <td><?= $req ? ($reqOverdue ? '<span class="down" style="font-weight:700">'.e(fdate($req)).'</span>' : e(fdate($req))) : $dash ?></td>
+        <?php // §when — what was actually asked for, and the day it finishes.
+              // A single-day call says so in one word; a continuous run says how
+              // many days; the end date is worked out over Sundays and this
+              // branch's public holidays rather than guessed. ?>
+        <?php $sr = sched_resolve($c, $c['executing_office_id'] ?? null); ?>
+        <td><span class="pill p-info"><?= e($sr['label']) ?></span>
+            <?php if ($sr['count'] > 1): ?><div class="muted" style="font-size:11px"><?= (int)$sr['count'] ?> day(s)</div><?php endif; ?></td>
+        <td><?= $sr['end'] && $sr['count'] > 1 ? e(fdate($sr['end'])) : $dash ?></td>
         <td><?= !empty($c['sched_date']) ? e(fdate($c['sched_date'])) : $dash ?></td>
         <td class="num" style="white-space:nowrap"><span class="muted" style="font-size:11.5px">
           <?= $L['to_forward']  !== null ? (int)$L['to_forward']  : '–' ?> ·

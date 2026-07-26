@@ -733,6 +733,198 @@
     });
   }
 
+  // ---- The shape of the engagement decides which boxes exist ---------------
+  //
+  //  Five shapes, and each needs different answers. A single-day call needs one
+  //  date; a continuous one needs a number of days; multiple dates need the
+  //  dates themselves. Showing all of it at once is what made this screen
+  //  unreadable, so everything not belonging to the chosen shape is taken off
+  //  the page — not merely greyed, taken off, so it cannot be filled in by
+  //  accident and cannot block the save.
+  //
+  //  The dates, the end date and the working-day arithmetic are NOT worked out
+  //  here. They are asked of the server, because Sundays and each branch's own
+  //  public holidays are its rules, and a second copy of a rule in JavaScript is
+  //  a second rule that will drift.
+  var PAT_N_LABEL = {
+    PER_WEEK: 'Visits each week',
+    EVERY_N: 'Every how many days?',
+    WEEKDAYS: '', FORTNIGHT: '', MONTHLY_1: '',
+  };
+  var ENG_HINT = {
+    SINGLE: 'One visit, on one day.',
+    CONTINUOUS: 'The engineer is there day after day — say how many working days.',
+    MULTIPLE: 'The client names the days. It runs from the earliest to the latest.',
+    PATTERN: 'Worked out from how it repeats and the date it runs until.',
+    MONTHLY: 'A posting at the works, on a man-month basis.',
+  };
+  function initEngagement() {
+    var sel = document.getElementById('eng_sel');
+    if (!sel) return;
+    var out = document.getElementById('sched_out');
+    var hint = document.getElementById('eng_hint');
+    var form = sel.form;
+
+    function applyShape() {
+      var t = sel.value || 'SINGLE';
+      Array.prototype.forEach.call(document.querySelectorAll('.eng-box'), function (b) {
+        var mine = (b.getAttribute('data-for') || '').split(',').indexOf(t) >= 0;
+        b.style.display = mine ? '' : 'none';
+        // Out of sight means out of the form: a box for a shape nobody chose
+        // must not be posted and must never hold up a save.
+        Array.prototype.forEach.call(b.querySelectorAll('input, select'), function (el) {
+          el.disabled = !mine;
+        });
+      });
+      if (hint) hint.textContent = ENG_HINT[t] || '';
+      // Within a pattern, only some kinds need a number.
+      var pk = document.getElementById('pattern_kind');
+      if (pk) {
+        var lab = PAT_N_LABEL[pk.value] || '';
+        var nBox = document.getElementById('pat_n_box');
+        var wdBox = document.getElementById('pat_wd_box');
+        if (nBox) {
+          nBox.style.display = (t === 'PATTERN' && lab) ? '' : 'none';
+          var n = document.getElementById('pattern_n'); if (n) n.disabled = !(t === 'PATTERN' && lab);
+          var nl = document.getElementById('pat_n_label'); if (nl && lab) nl.textContent = lab;
+        }
+        if (wdBox) {
+          var wantWd = (t === 'PATTERN' && pk.value === 'WEEKDAYS');
+          wdBox.style.display = wantWd ? '' : 'none';
+          Array.prototype.forEach.call(wdBox.querySelectorAll('input'), function (el) { el.disabled = !wantWd; });
+        }
+      }
+    }
+
+    var timer = null;
+    function preview() {
+      if (!out) return;
+      var t = sel.value || 'SINGLE';
+      var start = (document.getElementById('req_date') || document.getElementById('sched_date') || {}).value || '';
+      var body = new URLSearchParams();
+      body.set('engagement_type', t);
+      body.set('start', start);
+      body.set('days_count', (document.getElementById('days_count') || {}).value || '');
+      body.set('months_count', (document.getElementById('months_count') || {}).value || '');
+      body.set('pattern_kind', (document.getElementById('pattern_kind') || {}).value || '');
+      body.set('pattern_n', (document.getElementById('pattern_n') || {}).value || '');
+      body.set('schedule_end_date', (document.getElementById('schedule_end_date') || {}).value || '');
+      var off = document.getElementById('exec_sel') || document.querySelector('[name=executing_office_id]');
+      if (off && off.value) body.set('office', off.value);
+      Array.prototype.forEach.call(document.querySelectorAll('[name="schedule_weekdays[]"]:checked'), function (c) {
+        body.append('schedule_weekdays[]', c.value);
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('[name="inspection_dates[]"]'), function (d) {
+        if (d.value) body.append('inspection_dates[]', d.value);
+      });
+      var insp = document.getElementById('insp_pick') || document.querySelector('[name=inspector_id]');
+      if (insp && insp.value) body.set('inspector', insp.value);
+      var jobId = (document.querySelector('[name=_job_id]') || {}).value;
+      if (jobId) body.set('job', jobId);
+      // Every POST carries the one-per-session ticket; without it the request is
+      // turned away as a forgery and the panel simply never appears.
+      var tok = document.querySelector('input[name=_csrf]');
+      if (tok) body.set('_csrf', tok.value);
+
+      fetch('/sched-preview', { method: 'POST', body: body })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { render(d); })
+        .catch(function () {});
+    }
+    function render(d) {
+      if (!d || !d.count) { out.style.display = 'none'; return; }
+      out.style.display = '';
+      out.className = 'msg ' + (d.clashes ? 'msg-warning' : 'msg-success');
+      var bits = ['<strong>' + d.label + '</strong> — '];
+      if (d.count === 1) bits.push(d.startPretty + '.');
+      else bits.push(d.startPretty + ' to <strong>' + d.endPretty + '</strong>, ' + d.count + ' inspection day(s). ');
+      if (d.note) bits.push('<span class="muted">' + d.note + '.</span>');
+      if (d.days && d.days.length && d.count <= 40) {
+        bits.push('<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">');
+        d.days.forEach(function (x) {
+          var cls = !x.free ? 'p-bad' : 'p-ok';
+          var t = x.weekday + ' ' + x.pretty + (x.busy ? ' — ' + x.busy : '');
+          bits.push('<span class="pill ' + cls + '">' + t + '</span>');
+        });
+        bits.push('</div>');
+      }
+      if (d.clashes) {
+        bits.push('<div style="margin-top:6px"><strong>' + d.clashes +
+          ' date(s) clash with what that engineer is already doing.</strong> ');
+        var alts = [];
+        (d.days || []).forEach(function (x) {
+          if (x.free || !x.alternatives || !x.alternatives.length) return;
+          alts.push(x.pretty + ': ' + x.alternatives.map(function (a) { return a.name; }).join(', '));
+        });
+        bits.push(alts.length ? 'Free instead — ' + alts.join('; ') + '.' : 'Nobody else in this branch is free either.');
+        bits.push('</div>');
+      }
+      out.innerHTML = bits.join('');
+      perVisit(d);
+    }
+    // A run of named dates may be covered by more than one engineer — the
+    // client asked for the 1st, 5th and 12th, and whoever is free takes each.
+    // Only on the allocate screen, where there is somebody to choose from.
+    function perVisit(d) {
+      var host = document.getElementById('visit_rows');
+      var pick = document.getElementById('insp_pick');
+      if (!host || !pick) return;
+      var wants = (d.type === 'MULTIPLE' || d.type === 'PATTERN') && d.days && d.days.length && d.days.length <= 40;
+      host.style.display = wants ? '' : 'none';
+      if (!wants) { host.innerHTML = ''; return; }
+      var chosen = {};
+      Array.prototype.forEach.call(host.querySelectorAll('select'), function (s) {
+        chosen[s.getAttribute('data-date')] = s.value;
+      });
+      var rows = ['<div class="ff ff-wide" style="margin:0"><label>Who goes on each day '
+        + '<span class="muted">— leave as is to send the same engineer</span></label></div>'
+        + '<table class="grid"><tr><th>Date</th><th>Engineer</th><th></th></tr>'];
+      d.days.forEach(function (x) {
+        var opts = '';
+        Array.prototype.forEach.call(pick.options, function (o) {
+          var sel = String(chosen[x.date] || pick.value) === String(o.value) ? ' selected' : '';
+          opts += '<option value="' + o.value + '"' + sel + '>' + o.textContent.trim() + '</option>';
+        });
+        var note = !x.working ? '<span class="pill p-mut">' + x.why + '</span>'
+                 : (x.busy ? '<span class="pill p-bad">' + x.busy + '</span>'
+                           : '<span class="pill p-ok">free</span>');
+        rows.push('<tr><td>' + x.weekday + ' ' + x.pretty + '</td>'
+          + '<td><select class="form-control" data-date="' + x.date
+          + '" name="visit_inspector[' + x.date + ']">' + opts + '</select></td>'
+          + '<td>' + note + '</td></tr>');
+      });
+      rows.push('</table>');
+      host.innerHTML = rows.join('');
+    }
+    function later() { clearTimeout(timer); timer = setTimeout(preview, 250); }
+
+    sel.addEventListener('change', function () { applyShape(); later(); });
+    if (form) {
+      form.addEventListener('change', later);
+      form.addEventListener('input', later);
+    }
+    var pk = document.getElementById('pattern_kind');
+    if (pk) pk.addEventListener('change', applyShape);
+
+    // "+ Add another date" — one more line, not a wall of empty boxes.
+    var add = document.getElementById('adddate_call') || document.getElementById('adddate');
+    var boxEl = document.getElementById('datebox');
+    if (add && boxEl) {
+      add.addEventListener('click', function () {
+        var n = boxEl.querySelectorAll('.dateline').length + 1;
+        var wrap = document.createElement('div');
+        wrap.className = 'ff dateline';
+        wrap.style.maxWidth = '280px';
+        wrap.innerHTML = '<label>Date ' + n + '</label>'
+          + '<input class="form-control" type="date" name="inspection_dates[]">';
+        boxEl.appendChild(wrap);
+        wrap.querySelector('input').focus();
+      });
+    }
+    applyShape();
+    later();
+  }
+
   // ---- "Other (add new)…" on a dropdown reveals a text box ----
   function initOtherNew() {
     Array.prototype.forEach.call(document.querySelectorAll('input[data-newfor]'), function (inp) {
@@ -838,6 +1030,7 @@
     initCascades();
     initActivity();
     initCustomFreq();
+    initEngagement();
     initClientInspection();
     initCallLinks();
     initTradeSkills();

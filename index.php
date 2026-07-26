@@ -104,6 +104,7 @@ try {
     require __DIR__ . '/lib/mis.php';
     require __DIR__ . '/lib/dedupe.php';
     require __DIR__ . '/lib/joblock.php';
+    require __DIR__ . '/lib/schedule.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
@@ -189,6 +190,14 @@ try {
     db()->query("SELECT id FROM cost_allocations LIMIT 1");
     db()->query("SELECT locked_at FROM jobs LIMIT 1");
     db()->query("SELECT invoice_value, contracting_office_id FROM jobs LIMIT 1");
+    db()->query("SELECT engagement_type, days_count, months_count, pattern_kind FROM calls LIMIT 1");
+    db()->query("SELECT engagement_type FROM jobs LIMIT 1");
+    db()->query("SELECT office_id FROM holidays LIMIT 1");
+    db()->query("SELECT visit_date FROM job_visits LIMIT 1");
+    db()->query("SELECT engagement_type, days_count, months_count, pattern_kind FROM calls LIMIT 1");
+    db()->query("SELECT engagement_type FROM jobs LIMIT 1");
+    db()->query("SELECT office_id FROM holidays LIMIT 1");
+    db()->query("SELECT visit_date FROM job_visits LIMIT 1");
     db()->query("SELECT quotation_id FROM partner_purchase_orders LIMIT 1");
     db()->query("SELECT contract_number FROM cost_allocations LIMIT 1");
     db()->query("SELECT id FROM security_incidents LIMIT 1");

@@ -189,21 +189,97 @@
         <?php if ($curContract !== ''): ?><br>Contract <b><?= e($curContract) ?></b>.
         <?php else: ?><br><span class="pill p-warn">contract number pending</span><?php endif; ?></small></div>
 
-    <div class="ff"><label>Scheduled date</label><input class="form-control" type="date" name="scheduled_date" value="<?= e($job['scheduled_date'] ?? '') ?>"></div>
-    <div class="ff"><label>Inspection start</label><input class="form-control" type="date" name="inspection_start_date" value="<?= e($job['inspection_start_date'] ?? '') ?>"></div>
-    <div class="ff"><label>Inspection end</label><input class="form-control" type="date" name="inspection_end_date" value="<?= e($job['inspection_end_date'] ?? '') ?>"></div>
-    <div class="ff"><label>Man-days (0 = auto from dates)</label><input class="form-control" type="number" step="0.5" name="mandays" value="<?= e($job['mandays'] ?? '0') ?>"></div>
+    <?php // §when — the three dates mean three different things and were being
+          // typed as though they were interchangeable:
+          //   received  — the day the contracting branch got the call
+          //   required  — the day the client asked for
+          //   scheduled — the day we are actually going
+          // The first two are settled on the call and are shown here, not
+          // re-typed. Only the actual date is chosen here, and everything else
+          // — the end date, the visit count, the working-day arithmetic —
+          // follows from it. ?>
+    <div class="ff"><label><?= e(Tl('call')) ?> received <span class="muted">— from the <?= e(Tl('call')) ?></span></label>
+      <input class="form-control" type="date" value="<?= e($call['call_received_date'] ?? '') ?>" readonly style="background:var(--soft)"></div>
+    <div class="ff"><label><?= e(Tl('client')) ?>'s required date <span class="muted">— from the <?= e(Tl('call')) ?></span></label>
+      <input class="form-control" type="date" value="<?= e($call['inspection_required_date'] ?? '') ?>" readonly style="background:var(--soft)"></div>
+    <div class="ff"><label>Actual scheduled date <span class="muted">— when we are going</span></label>
+      <input class="form-control" type="date" id="req_date" name="scheduled_date"
+             value="<?= e(($job['scheduled_date'] ?? '') ?: ($call['inspection_required_date'] ?? '')) ?>">
+      <small class="muted">Move this and the end date moves with it.</small></div>
 
-    <div class="ff ff-wide">
-      <label>Inspection dates <span class="muted">— every day the <?= e(Tl('engineer')) ?> attends; up to 20</span></label>
-      <div class="form-grid" id="jdates" style="margin-top:4px">
-        <?php for ($i = 0; $i < $dateSlots; $i++): ?>
-          <div class="ff" style="margin:0"><input class="form-control" type="date" name="inspection_dates[]" value="<?= e($curDates[$i] ?? '') ?>"></div>
+    <?php // The shape is settled on the call; it is shown here and can be
+          // corrected, and the boxes that shape needs appear with it. ?>
+    <div class="ff"><label>Shape of the engagement</label>
+      <select class="form-control" id="eng_sel" name="engagement_type">
+        <?php $curEng = ($job['engagement_type'] ?? '') ?: (($call['engagement_type'] ?? '') ?: 'SINGLE');
+              foreach (lk_options_or('engagement_type', ENGAGEMENT_TYPES) as $k => $v): ?>
+          <option value="<?= e($k) ?>" <?= $curEng === $k ? 'selected' : '' ?>><?= e($v) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <small class="muted" id="eng_hint"></small></div>
+
+    <div class="ff eng-box" data-for="CONTINUOUS"><label>How many days, continuously?</label>
+      <input class="form-control" type="number" min="1" max="365" id="days_count" name="days_count"
+             value="<?= e((($job['days_count'] ?? '') ?: ($call['days_count'] ?? '')) ?: '') ?>">
+      <small class="muted">Working days — Sundays and this <?= e(Tl('office')) ?>'s public holidays are stepped over.</small></div>
+
+    <div class="ff eng-box" data-for="MONTHLY"><label>How many months on site?</label>
+      <input class="form-control" type="number" min="1" max="36" id="months_count" name="months_count"
+             value="<?= e((($job['months_count'] ?? '') ?: ($call['months_count'] ?? '')) ?: '') ?>"></div>
+
+    <div class="ff eng-box" data-for="PATTERN"><label>How does it repeat?</label>
+      <select class="form-control" id="pattern_kind" name="pattern_kind">
+        <?php $curPk = (($job['pattern_kind'] ?? '') ?: ($call['pattern_kind'] ?? '')) ?: 'WEEKDAYS';
+              foreach (lk_options_or('pattern_kind', PATTERN_KINDS) as $k => $v): ?>
+          <option value="<?= e($k) ?>" <?= $curPk === $k ? 'selected' : '' ?>><?= e($v) ?></option>
+        <?php endforeach; ?>
+      </select></div>
+    <div class="ff eng-box" data-for="PATTERN" id="pat_n_box"><label id="pat_n_label">How many</label>
+      <input class="form-control" type="number" min="1" max="30" id="pattern_n" name="pattern_n"
+             value="<?= e((($job['pattern_n'] ?? '') ?: ($call['pattern_n'] ?? '')) ?: '') ?>"></div>
+    <div class="ff ff-wide eng-box" data-for="PATTERN" id="pat_wd_box"><label>On these days</label>
+      <div class="chip-row pickbox" style="max-height:none">
+        <?php $jwd = array_filter(array_map('intval', explode(',', (string)(($job['schedule_weekdays'] ?? '') ?: ($call['schedule_weekdays'] ?? '')))));
+              foreach (WEEKDAY_NAMES as $n => $nm): ?>
+          <label class="ff-check"><input type="checkbox" name="schedule_weekdays[]" value="<?= $n ?>" <?= in_array($n, $jwd, true) ? 'checked' : '' ?>> <?= e($nm) ?></label>
+        <?php endforeach; ?>
+      </div></div>
+    <div class="ff eng-box" data-for="PATTERN"><label>Repeat until</label>
+      <input class="form-control" type="date" id="schedule_end_date" name="schedule_end_date"
+             value="<?= e(($job['schedule_end_date'] ?? '') ?: ($call['schedule_end_date'] ?? '')) ?>"></div>
+
+    <div class="ff"><label>Man-days <span class="muted">— 0 counts them from the dates</span></label>
+      <input class="form-control" type="number" step="0.5" name="mandays" value="<?= e($job['mandays'] ?? '0') ?>"></div>
+
+    <?php // The client named these days; they are not ours to invent. Two lines
+          // to begin with and one more on request, rather than twenty empty boxes. ?>
+    <div class="ff ff-wide eng-box" data-for="MULTIPLE">
+      <label>The dates the <?= e(Tl('client')) ?> asked for</label>
+      <div id="datebox" style="margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">
+        <?php $slots = max(2, count($curDates));
+              for ($i = 0; $i < $slots; $i++): ?>
+          <div class="ff dateline" style="margin:0;max-width:200px">
+            <input class="form-control" type="date" name="inspection_dates[]" value="<?= e($curDates[$i] ?? '') ?>"></div>
         <?php endfor; ?>
       </div>
-      <div style="margin-top:6px"><button type="button" class="btn small secondary" id="adddate">+ Add another date</button>
-        <span class="muted" style="margin-left:8px"><?= count($curDates) ?> set. Carried from the <?= e(Tl('call')) ?>; edit freely.</span></div>
+      <div style="margin-top:6px"><button type="button" class="btn small secondary" id="adddate">+ Add another date</button></div>
     </div>
+
+    <?php // Whether the engineer can actually be there. Every date, checked
+          // against what they are already booked on and against days marked off
+          // — and where there is a clash, who else in the branch is free. ?>
+    <div class="ff ff-wide">
+      <div class="msg" id="sched_out" style="display:none;margin:0"></div>
+    </div>
+    <?php // A run of named dates may need more than one engineer. Drawn only
+          // when the shape has several visits, so a single-day allocation is not
+          // handed a table with one row in it. ?>
+    <div class="ff ff-wide" id="visit_rows" style="display:none;margin-top:4px"></div>
+    <input type="hidden" name="_job_id" value="<?= (int)($job['id'] ?? 0) ?>">
+    <input type="hidden" name="inspection_start_date" id="insp_start"
+           value="<?= e($job['inspection_start_date'] ?? '') ?>">
+    <input type="hidden" name="inspection_end_date" id="insp_end"
+           value="<?= e($job['inspection_end_date'] ?? '') ?>">
 
     <?php // Two different numbers, and confusing them is how a branch's profit
           // stops meaning anything. The invoice value is what the client is

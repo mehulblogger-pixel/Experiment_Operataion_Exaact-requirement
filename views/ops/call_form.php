@@ -123,58 +123,87 @@ document.addEventListener('DOMContentLoaded', function () {
       </select></div>
   </div>
 
-  <h3 class="tab-sub">3. When <span class="muted">— one day, several days, or a repeating pattern</span></h3>
+  <?php // §when — five shapes of engagement, and only the boxes that shape needs.
+        // Showing all of them at once meant the coordinator had to know which to
+        // ignore, and the register could not say what had actually been asked
+        // for. The end date, the visit count and the working-day arithmetic are
+        // worked out on the server — Sundays and the branch's own public
+        // holidays are not working days, and nobody should be counting those by
+        // hand against a wall calendar. ?>
+  <h3 class="tab-sub">3. When</h3>
   <div class="form-grid">
-    <div class="ff"><label><?= e(Tl('call')) ?> received from <?= e(Tl('client')) ?></label>
+    <div class="ff"><label><?= e(Tl('call')) ?> received <span class="muted">— the day the contracting <?= e(Tl('office')) ?> got it</span></label>
       <input class="form-control" type="date" name="call_received_date" value="<?= e($call['call_received_date'] ?? date('Y-m-d')) ?>"></div>
-    <div class="ff"><label>Engagement pattern</label>
-      <select class="form-control searchable" id="dep_sel" name="deputation_type"><option value="">—</option>
-        <?php foreach (lk_options_or('engagement_pattern', ['Daily (single day)'=>'Daily (single day)','Multiple days'=>'Multiple days','Continuous days'=>'Continuous days','Monthly (resident posting)'=>'Monthly (resident posting)']) as $k=>$v): ?>
-          <option value="<?= e($v) ?>" <?= ($call && ($call['deputation_type']??'')===$v)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
+    <div class="ff"><label><?= e(Tl('client')) ?>'s required date <span class="muted">— when they want it</span></label>
+      <input class="form-control" type="date" id="req_date" name="inspection_required_date" value="<?= e($call['inspection_required_date'] ?? '') ?>"></div>
+    <div class="ff"><label>Shape of the engagement</label>
+      <select class="form-control" id="eng_sel" name="engagement_type">
+        <?php $curEng = ($call['engagement_type'] ?? '') ?: 'SINGLE';
+              foreach (lk_options_or('engagement_type', ENGAGEMENT_TYPES) as $k => $v): ?>
+          <option value="<?= e($k) ?>" <?= $curEng === $k ? 'selected' : '' ?>><?= e($v) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <small class="muted" id="eng_hint"></small></div>
+
+    <?php // CONTINUOUS — the engineer is there day after day. Type how many. ?>
+    <div class="ff eng-box" data-for="CONTINUOUS"><label>How many days, continuously?</label>
+      <input class="form-control" type="number" min="1" max="365" id="days_count" name="days_count"
+             value="<?= e(($call['days_count'] ?? '') ?: '') ?>" placeholder="e.g. 5, 10, 15">
+      <small class="muted">Sundays and this <?= e(Tl('office')) ?>'s public holidays are stepped over, so the end date is a real one.</small></div>
+
+    <?php // MONTHLY — a posting at the works, on a man-month basis. ?>
+    <div class="ff eng-box" data-for="MONTHLY"><label>How many months on site?</label>
+      <input class="form-control" type="number" min="1" max="36" id="months_count" name="months_count"
+             value="<?= e(($call['months_count'] ?? '') ?: '') ?>" placeholder="e.g. 1, 3, 6">
+      <small class="muted">Man-month basis — the <?= e(Tl('engineer')) ?> is posted at the works for the whole period.</small></div>
+
+    <?php // PATTERN — how it repeats, and until when. ?>
+    <div class="ff eng-box" data-for="PATTERN"><label>How does it repeat?</label>
+      <select class="form-control" id="pattern_kind" name="pattern_kind">
+        <?php $curPk = ($call['pattern_kind'] ?? '') ?: 'WEEKDAYS';
+              foreach (lk_options_or('pattern_kind', PATTERN_KINDS) as $k => $v): ?>
+          <option value="<?= e($k) ?>" <?= $curPk === $k ? 'selected' : '' ?>><?= e($v) ?></option>
+        <?php endforeach; ?>
       </select></div>
-    <div class="ff"><label><?= e(Tl('client')) ?>'s expected date <span class="muted">— the first visit</span></label>
-      <input class="form-control" type="date" name="inspection_required_date" value="<?= e($call['inspection_required_date'] ?? '') ?>"></div>
-    <?php // The site is away from base, so there are travel days either side.
-          // A travel day belongs to the inspection it is travelling for — not to
-          // the pool of non-chargeable days — and this tick is what tells the
-          // cost run to attach them to this job's SBU and activity code. ?>
+    <div class="ff eng-box" data-for="PATTERN" id="pat_n_box"><label id="pat_n_label">How many</label>
+      <input class="form-control" type="number" min="1" max="30" id="pattern_n" name="pattern_n"
+             value="<?= e(($call['pattern_n'] ?? '') ?: '') ?>"></div>
+    <div class="ff ff-wide eng-box" data-for="PATTERN" id="pat_wd_box"><label>On these days</label>
+      <div class="chip-row pickbox" style="max-height:none">
+        <?php foreach (WEEKDAY_NAMES as $n => $nm): ?>
+          <label class="ff-check"><input type="checkbox" name="schedule_weekdays[]" value="<?= $n ?>" <?= in_array($n, $curWd, true) ? 'checked' : '' ?>> <?= e($nm) ?></label>
+        <?php endforeach; ?>
+      </div></div>
+    <div class="ff eng-box" data-for="PATTERN"><label>Repeat until</label>
+      <input class="form-control" type="date" id="schedule_end_date" name="schedule_end_date" value="<?= e($call['schedule_end_date'] ?? '') ?>"></div>
+
+    <?php // Travel days belong to the inspection they are travelling for. ?>
     <div class="ff ff-check">
       <label><input type="checkbox" name="is_outstation" value="1"
         <?= !empty($call['is_outstation']) ? 'checked' : '' ?>> Outstation — the <?= e(Tl('engineer')) ?> travels to reach this site</label>
-      <small class="muted">Travel days either side of the visit are then costed to this <?= e(Tl('sbu')) ?> and activity code rather than counted as non-chargeable.</small></div>
+      <small class="muted">Travel days either side are then costed to this <?= e(Tl('sbu')) ?> and activity code rather than counted as non-chargeable.</small></div>
   </div>
 
-  <?php // §h — a single-day call needs one date, which is already captured above
-        // as the client's expected date. The five-date grid and the repeating
-        // pattern only make sense for a multi-day or recurring engagement, so
-        // they stay out of the way until the pattern says otherwise. ?>
-  <div class="panel" id="dates_panel" style="background:var(--soft);margin:8px 0">
-    <b>Inspection dates</b> <span class="muted">— add up to 5 here; more can be added on the <?= e(Tl('job')) ?> when it is allocated.</span>
-    <div class="form-grid" id="datebox" style="margin-top:8px">
-      <?php for ($i = 0; $i < 5; $i++): ?>
-        <div class="ff"><label>Date <?= $i + 1 ?></label>
+  <?php // MULTIPLE — the client names the days. Two lines to begin with, and a
+        // button that adds one more; a wall of empty date boxes is what made
+        // this screen unreadable. ?>
+  <div class="panel eng-box" data-for="MULTIPLE" style="background:var(--soft);margin:8px 0">
+    <b>The dates the <?= e(Tl('client')) ?> has asked for</b>
+    <span class="muted">— it starts on the earliest and ends on the latest; the days in between are not inspection days.</span>
+    <div id="datebox" style="margin-top:8px">
+      <?php $slots = max(2, count($curDates));
+            for ($i = 0; $i < $slots; $i++): ?>
+        <div class="ff dateline" style="max-width:280px">
+          <label>Date <?= $i + 1 ?></label>
           <input class="form-control" type="date" name="inspection_dates[]" value="<?= e($curDates[$i] ?? '') ?>"></div>
       <?php endfor; ?>
     </div>
-    <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
-      <b>…or a repeating pattern</b>
-      <span class="muted">— e.g. every Monday and Thursday until the end date. The dates are worked out and listed on the <?= e(Tl('call')) ?>, and stay editable afterwards.</span>
-      <div class="form-grid" style="margin-top:8px">
-        <div class="ff ff-wide"><label>On these days</label>
-          <div class="chip-row pickbox" style="max-height:none">
-            <?php foreach (WEEKDAY_NAMES as $n => $nm): ?>
-              <label class="ff-check"><input type="checkbox" name="schedule_weekdays[]" value="<?= $n ?>" <?= in_array($n, $curWd, true)?'checked':'' ?>> <?= e($nm) ?></label>
-            <?php endforeach; ?>
-          </div></div>
-        <div class="ff"><label>Until (end date)</label>
-          <input class="form-control" type="date" name="schedule_end_date" value="<?= e($call['schedule_end_date'] ?? '') ?>"></div>
-      </div>
-    </div>
-    <?php if ($curDates): ?>
-      <p class="muted" style="margin:8px 2px 0"><b><?= count($curDates) ?> date(s) currently on this <?= e(Tl('call')) ?>:</b>
-        <?= e(implode(', ', array_map(fn($d) => fdate($d), array_slice($curDates, 0, 12)))) ?><?= count($curDates) > 12 ? ' …' : '' ?></p>
-    <?php endif; ?>
+    <button type="button" class="btn small secondary" id="adddate_call">+ Add another date</button>
   </div>
+
+  <?php // Whatever shape it is, this is what it comes to. Worked out by the
+        // server as the boxes are filled, so nobody presses Save wondering. ?>
+  <div class="msg" id="sched_out" style="display:none;margin:8px 0"></div>
 
   <h3 class="tab-sub">4. Which <?= e(TP('office')) ?>, and the money between them</h3>
   <div class="form-grid">

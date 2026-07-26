@@ -1565,14 +1565,19 @@ function ops_masters() {
             'money_cols' => ['default_rate'],
         ],
         'holidays' => [
-            'label' => 'Holidays', 'table' => 'holidays', 'access' => 'admin', 'order' => 'hol_date',
+            // A holiday belongs to a branch. Bombay does not shut for a Gujarat
+            // holiday, and an end date worked out as though it did is wrong by a
+            // day for half the company. Leave the office blank for a national one.
+            'label' => 'Public holidays', 'table' => 'holidays', 'access' => 'admin', 'order' => 'hol_date',
             'fields' => [
                 ['hol_date','Date','date',['req'=>1]],
                 ['name','Holiday name','text',['req'=>1]],
+                ['office_id',T('office') . ' — leave blank for every ' . Tl('office'),'ref',['ref'=>'offices','optfn'=>'offices_list','optlabel'=>'name']],
                 ['region','Region','select',['opts'=>OPS_REGIONS]],
             ],
-            'list' => ['hol_date'=>'Date','name'=>'Holiday','region'=>'Region'],
+            'list' => ['hol_date'=>'Date','name'=>'Holiday','office_id'=>T('office'),'region'=>'Region'],
             'list_labels' => ['region'=>OPS_REGIONS],
+            'ref_cols' => ['office_id'=>['offices','name']],
         ],
         'attendance' => [
             'label' => 'Attendance / non-billable', 'table' => 'attendance', 'access' => 'coordinator', 'order' => 'att_date DESC',
@@ -1997,6 +2002,10 @@ function ops_dispatch($route, $method) {
                           'lines' => $hasLines];
             }
             echo json_encode($out); return true;
+        case $route === 'sched-preview':
+            // The dates, the end date and who is free — worked out on the server
+            // so the holiday rules exist in exactly one place.
+            return ops_sched_preview();
         case $route === 'po-lines':
             header('Content-Type: application/json');
             $poId = (int)($_GET['id'] ?? 0);
@@ -2520,16 +2529,25 @@ function ops_calls($route, $method) {
                      'errorFields' => ['expected_credit']]));
                 return;
             }
-            // §a.vi / §a.vii — one date, several dates, or a weekly pattern to an end
-            // date. All three end up as the same editable list of dates.
-            $dates = call_dates_parse(implode(',', (array)($b['inspection_dates'] ?? [])));
+            // §when — the shape of the engagement decides the dates, and the
+            // arithmetic lives in schedule.php so the form, the register and the
+            // allocation all read the same answer. A continuous run of five days
+            // is five WORKING days: Sundays and this branch's public holidays are
+            // stepped over, not counted.
+            $b['engagement_type'] = (string)($b['engagement_type'] ?? 'SINGLE');
+            if (!isset(ENGAGEMENT_TYPES[$b['engagement_type']])) $b['engagement_type'] = 'SINGLE';
             $wd = array_values(array_filter(array_map('intval', (array)($b['schedule_weekdays'] ?? []))));
-            if ($wd && ($b['schedule_end_date'] ?? '') !== '') {
-                $from = ($b['inspection_required_date'] ?? '') ?: ($dates[0] ?? date('Y-m-d'));
-                $dates = call_dates_parse(implode(',', array_merge($dates, call_expand_pattern($from, $b['schedule_end_date'], $wd))));
-            }
-            $b['inspection_dates']  = implode(',', $dates);
             $b['schedule_weekdays'] = implode(',', $wd);
+            $b['inspection_dates']  = implode(',', call_dates_parse(implode(',', (array)($b['inspection_dates'] ?? []))));
+            $sr = sched_resolve($b, $execOffice ?: ($b['ibo_office_id'] ?? null),
+                                ($b['inspection_required_date'] ?? '') ?: null);
+            $dates = $sr['dates'];
+            // The worked-out dates are stored, so nothing downstream has to
+            // recompute them and nothing can disagree about what was booked.
+            $b['inspection_dates']  = implode(',', $dates);
+            $b['schedule_end_date'] = ($b['engagement_type'] === 'PATTERN')
+                ? (string)($b['schedule_end_date'] ?? '')     // the "repeat until" the user typed
+                : (string)$sr['end'];
             // §13 — rate x quantity, computed here and not read from the form, so a
             // stale or hand-edited total can never reach the register. The quantity
             // defaults to the number of visit dates: one for a single day, the
@@ -2551,6 +2569,7 @@ function ops_calls($route, $method) {
                 'billable_value','billable_basis','billable_rate','billable_qty','call_received_date','inspection_required_date','notes',
                 'quotation_id','quote_line_id','contract_number','folder_link',
                 'inspection_dates','schedule_end_date','schedule_weekdays',
+                'engagement_type','days_count','months_count','pattern_kind','pattern_n',
                 'reporting_frequency','report_custom_days','deliverables','is_outstation'];
             $wasForwarded = $call ? ($call['executing_office_id'] ?? null) : null;
             $forwardNow = $execOffice && !$wasForwarded; // first time it gets an executing branch
@@ -2710,6 +2729,9 @@ function nzc_call($f, $v) {
     if ($f === 'is_outstation') return empty($v) ? 0 : 1;
     if (in_array($f, ['client_id','vendor_id','ibo_office_id','executing_office_id','contracting_office_id','activity_id','site_address_id','po_id','po_line_item_id','quotation_id','quote_line_id'], true)) return $v === '' ? null : (int)$v;
     if (in_array($f, ['expected_credit','billable_value','credit_required'], true)) return $v === '' ? 0 : $v;
+    // The counts only exist for the shape that uses them; a box that was never
+    // shown posts nothing, and nothing means none.
+    if (in_array($f, ['days_count','months_count','pattern_n'], true)) return $v === '' ? 0 : (int)$v;
     return $v;
 }
 // True when the managing / contracting office also executes the call (or
@@ -3385,19 +3407,36 @@ function ops_jobs($route, $method) {
             if ($job && ($why = job_lock_block($job)) !== '') { flash($why, 'error'); redirect('/job?id=' . $job['id']); }
             $fields = ['executing_office_id','inspector_id','subcon_id','job_type','stage','scheduled_date','inspection_start_date','inspection_end_date',
                 'random_date1','random_date2','random_date3','folder_link','contract_number','inspection_dates','boss_id',
+                'engagement_type','days_count','months_count','pattern_kind','pattern_n',
+                'schedule_weekdays','schedule_end_date',
                 'invoice_value','contracting_office_id','expected_credit','credit_type','credit_direction',
                 'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost','quotation_id','is_outstation'];
             // deliverables come as a checkbox array -> stored as CSV of codes
             $deliverables = implode(',', array_filter((array)($b['deliverables'] ?? [])));
-            // §b.vi — the visit dates arrive as a list of date boxes. Keep them as one
-            // ordered list, and keep scheduled_date as the first day so every existing
-            // report, reminder and TAT calculation keeps working unchanged.
-            $jdates = call_dates_parse(implode(',', (array)($b['inspection_dates'] ?? [])));
+            // §when — the actual date is the only one chosen here; the end date
+            // and the visit list follow from it and the shape of the engagement.
+            // Move the actual date and the end date moves with it, which is the
+            // whole reason the coordinator is not typing three dates by hand.
+            $b['engagement_type'] = (string)($b['engagement_type'] ?? '')
+                ?: (string)($call['engagement_type'] ?? 'SINGLE');
+            if (!isset(ENGAGEMENT_TYPES[$b['engagement_type']])) $b['engagement_type'] = 'SINGLE';
+            foreach (['days_count', 'months_count', 'pattern_kind', 'pattern_n', 'schedule_end_date'] as $k)
+                if (($b[$k] ?? '') === '') $b[$k] = $call[$k] ?? '';
+            $b['schedule_weekdays'] = implode(',', array_values(array_filter(array_map('intval',
+                (array)($b['schedule_weekdays'] ?? [])))))
+                ?: (string)($call['schedule_weekdays'] ?? '');
+            $b['inspection_dates'] = implode(',', call_dates_parse(implode(',', (array)($b['inspection_dates'] ?? []))));
+            if ($b['inspection_dates'] === '') $b['inspection_dates'] = (string)($call['inspection_dates'] ?? '');
+            $jExecForDates = ($b['executing_office_id'] ?? '') !== ''
+                ? (int)$b['executing_office_id'] : (int)($call['executing_office_id'] ?? 0);
+            $start = ($b['scheduled_date'] ?? '') ?: ($call['inspection_required_date'] ?? '');
+            $jr = sched_resolve($b, $jExecForDates ?: null, $start ?: null);
+            $jdates = $jr['dates'];
             $b['inspection_dates'] = implode(',', $jdates);
             if ($jdates) {
-                if (($b['scheduled_date'] ?? '') === '') $b['scheduled_date'] = $jdates[0];
-                if (($b['inspection_start_date'] ?? '') === '') $b['inspection_start_date'] = $jdates[0];
-                if (($b['inspection_end_date'] ?? '') === '' && count($jdates) > 1) $b['inspection_end_date'] = end($jdates);
+                $b['scheduled_date'] = $jdates[0];
+                $b['inspection_start_date'] = $jdates[0];
+                $b['inspection_end_date'] = count($jdates) > 1 ? end($jdates) : $jdates[0];
             }
             // §b.iv — the inter-office credit only exists when one office holds
             // the order and another does the work. On a job both ends of which
@@ -3475,6 +3514,12 @@ function ops_jobs($route, $method) {
                     . ($gate && !empty($gate['override']) ? ' One granted contract exception was used.' : ''));
             }
             custom_save('job', $jobId, $b);
+            // One row per visit, so a multi-date deputation can carry a different
+            // engineer on different days and the availability board is real.
+            $perDate = [];
+            foreach ((array)($_POST['visit_inspector'] ?? []) as $d => $iid)
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$d) && (int)$iid) $perDate[$d] = (int)$iid;
+            job_visits_sync($jobId, (int)($b['inspector_id'] ?? 0), $perDate);
             // inherit advance / report-vs-payment conditions from a linked quotation
             if (function_exists('crm_apply_quote_to_job')) crm_apply_quote_to_job($jobId);
             // consume the linked PO line item by this job's man-days (new jobs only)
