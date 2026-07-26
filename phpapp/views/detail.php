@@ -5,10 +5,10 @@
 // renders; it does not define functions.
 $badge = $p['status']==='ACTIVE'?'GREEN':($p['status']==='BLACKLISTED'?'RED':'AMBER');
 $id = (int)$p['id'];
-// Contract / PO / Projects apply to clients (companies we receive orders from);
+// Contract / PO / deputations apply to clients (companies we receive orders from);
 // purchase order comes first, contract is selected after the PO is received.
 $tabs = ['overview'=>'Overview','general'=>'General','registration'=>'Registration','addresses'=>'Addresses','contacts'=>'Contacts'];
-if (!empty($p['is_client'])) { $tabs['purchase_orders']='Purchase Orders'; $tabs['contracts']='Contract Numbers'; $tabs['projects']='Projects'; }
+if (!empty($p['is_client'])) { $tabs['purchase_orders']='Purchase Orders'; $tabs['contracts']='Contract Numbers'; $tabs['projects']=TP('job'); }
 $tabs += ['relationships'=>'Relationships','notes'=>'Notes','timeline'=>'Timeline'];
 if (!isset($tabs[$tab])) $tab = 'overview';
 // Cross-tab data flow: primary contact/address and links between them.
@@ -191,17 +191,76 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
     <?php foreach ($pos as $o): ?><tr><td><a href="/po?id=<?= (int)$o['id'] ?>"><?= e($o['po_number'] ?: '(open)') ?></a></td><td><?= e(lk_options_or('po_type', PO_TYPES)[$o['po_type']] ?? $o['po_type']) ?></td><td><?= e($o['title'] ?: '—') ?></td><td><?= $o['value']!==null?cur_sym().e($o['value']):'—' ?></td><td><?= isset($ctById[$o['contract_id']]) ? e($ctById[$o['contract_id']]['contract_number']) : '—' ?></td></tr><?php endforeach; ?>
     <?php if (!$pos): ?><tr><td colspan="5">No purchase orders yet.</td></tr><?php endif; ?></table>
   <h3 class="tab-sub">Add a purchase order</h3>
-  <p class="muted">For open / ARC orders, save the PO then add line items (days, months, audit days).</p>
+  <?php // The order the client sends is the answer to a quotation we sent them.
+        // Name the quotation and everything else is already written down: the
+        // contract number, the SBU, the value and every line item. Typing them
+        // again is how the order and the quotation drift apart. ?>
+  <?php $poQuotes = function_exists('quotations_for_po') ? quotations_for_po($id) : []; ?>
+  <p class="muted">Pick the <?= e(Tl('quote')) ?> this order answers — the contract number, <?= e(Tl('sbu')) ?>,
+    value and all its line items come across with it. For an order that arrived without a
+    <?= e(Tl('quote')) ?>, leave it blank and fill the boxes yourself.</p>
   <form method="post" action="/partner-add?id=<?= $id ?>&kind=po" class="inline-add">
+    <div class="ff ff-wide"><label><?= e(T('quote')) ?> this order answers</label>
+      <select class="form-control searchable" id="po_quote" name="quotation_id">
+        <option value="">— none / arrived directly —</option>
+        <?php foreach ($poQuotes as $pq): ?>
+          <option value="<?= (int)$pq['id'] ?>"
+                  data-contract="<?= (int)($pq['contract_id'] ?? 0) ?>"
+                  data-contractno="<?= e((string)($pq['contract_number'] ?? '')) ?>"
+                  data-sbu="<?= e((string)($pq['sbu'] ?? '')) ?>"
+                  data-value="<?= e((string)$pq['total_amount']) ?>"
+                  data-title="<?= e((string)($pq['subject'] ?? '')) ?>"
+                  data-lines="<?= (int)$pq['line_count'] ?>">
+            <?= e($pq['quote_no']) ?><?= (int)$pq['rev'] ? ' R' . (int)$pq['rev'] : '' ?>
+            · <?= e(cur_sym()) ?><?= number_format((float)$pq['total_amount'], 0) ?>
+            · <?= (int)$pq['line_count'] ?> line(s)
+            <?= ($pq['contract_number'] ?? '') !== '' ? ' · contract ' . e($pq['contract_number']) : ' · no contract yet' ?>
+            <?= $pq['subject'] ? ' — ' . e(mb_strimwidth($pq['subject'], 0, 40, '…')) : '' ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+      <small class="muted" id="po_quote_note"><?= $poQuotes ? '' : 'No open ' . e(Tlp('quote')) . ' for this ' . e(Tl('client')) . ' yet.' ?></small></div>
     <div class="ff"><label>PO number</label><input class="form-control" name="po_number"></div>
     <div class="ff"><label>Type</label><select class="form-control" name="po_type"><?php foreach (lk_options_or('po_type', PO_TYPES) as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Against contract</label><select class="form-control searchable" name="contract_id"><option value="">— none —</option><?php foreach ($contracts as $ct): ?><option value="<?= (int)$ct['id'] ?>"><?= e($ct['contract_number'].' '.$ct['title']) ?></option><?php endforeach; ?></select></div>
-    <div class="ff ff-wide"><label>SBU(s) — revenue (tick one or more)</label>
-      <div class="checkgrid"><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><label class="chk"><input type="checkbox" name="po_sbu[]" value="<?= e($k) ?>"> <?= e($v) ?></label><?php endforeach; ?></div></div>
-    <div class="ff"><label>Title</label><input class="form-control" name="title"></div>
-    <div class="ff"><label>Value (auto from line items)</label><input class="form-control" type="number" name="value"></div>
+    <div class="ff"><label>Against contract</label>
+      <select class="form-control searchable" id="po_contract" name="contract_id"><option value="">— none —</option>
+        <?php foreach ($contracts as $ct): ?><option value="<?= (int)$ct['id'] ?>"><?= e($ct['contract_number'].' '.$ct['title']) ?></option><?php endforeach; ?>
+      </select></div>
+    <div class="ff ff-wide"><label><?= e(TP('sbu')) ?> — revenue (tick one or more)</label>
+      <div class="checkgrid"><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><label class="chk"><input type="checkbox" class="po-sbu" name="po_sbu[]" value="<?= e($k) ?>"> <?= e($v) ?></label><?php endforeach; ?></div></div>
+    <div class="ff"><label>Title</label><input class="form-control" id="po_title" name="title"></div>
+    <div class="ff"><label>Value <span class="muted">— from the <?= e(Tl('quote')) ?> if one is named</span></label><input class="form-control" type="number" step="0.01" id="po_value" name="value"></div>
     <button class="btn small" type="submit">Add PO</button>
   </form>
+  <script>
+  (function () {
+    var q = document.getElementById('po_quote');
+    if (!q) return;
+    q.addEventListener('change', function () {
+      var o = q.options[q.selectedIndex], note = document.getElementById('po_quote_note');
+      if (!o || !o.value) { if (note) note.textContent = ''; return; }
+      var d = o.dataset;
+      // the contract it already belongs to
+      var c = document.getElementById('po_contract');
+      if (c && d.contract && d.contract !== '0') {
+        c.value = d.contract;
+        c.dispatchEvent(new Event('change', { bubbles: true }));
+        var box = c.parentNode && c.parentNode.querySelector('input');
+        if (box) box.value = (c.options[c.selectedIndex] || {}).textContent || '';
+      }
+      // the SBU it was sold under
+      if (d.sbu) Array.prototype.forEach.call(document.querySelectorAll('.po-sbu'), function (cb) {
+        if (d.sbu.split(',').indexOf(cb.value) >= 0) cb.checked = true;
+      });
+      var t = document.getElementById('po_title'), v = document.getElementById('po_value');
+      if (t && !t.value && d.title) t.value = d.title;
+      if (v && !v.value && d.value) v.value = d.value;
+      if (note) note.textContent = d.lines && d.lines !== '0'
+        ? d.lines + ' line item(s) will be copied from this ' + o.textContent.trim().split(' ')[0] + ' when you save.'
+        : 'This quotation has no line items, so none will be copied.';
+    });
+  })();
+  </script>
 
 <?php elseif ($tab === 'projects'): ?>
   <table class="grid"><tr><th>Call</th><th>Type</th><th>Received</th><th>Required by</th><th>Status</th><th></th></tr>

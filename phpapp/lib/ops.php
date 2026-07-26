@@ -1881,6 +1881,34 @@ function ops_quick_add() {
                     . '. These are needed before the work can be sent out or billed.']);
                 return;
             }
+            // The same company twice is worse than a missing one: the calls split
+            // between two records, the profitability splits with them, and nobody
+            // notices until somebody adds up two lots of the same client by hand.
+            // Matched on the name as well as on the tax numbers, because a second
+            // record is usually typed by somebody who did not find the first.
+            $dup = find_duplicate_partner($name, $gstin, $pan, trim($b['tan'] ?? ''), 0);
+            if ($dup) {
+                $r = $dup['row'];
+                $already = ((int)($r['is_client'] ?? 0) && $isClient) || ((int)($r['is_vendor'] ?? 0) && $isVendor);
+                if (!$already) {
+                    // On file, but not yet in this list. Tick the extra role rather
+                    // than making a second copy of the same company.
+                    // Worked out here rather than in SQL: a bound "1" is a string,
+                    // and letting the database decide what that means differs
+                    // between MySQL and SQLite.
+                    db()->prepare("UPDATE business_partners SET is_client=?, is_vendor=? WHERE id=?")
+                        ->execute([((int)($r['is_client'] ?? 0) || $isClient) ? 1 : 0,
+                                   ((int)($r['is_vendor'] ?? 0) || $isVendor) ? 1 : 0, $r['id']]);
+                    echo json_encode(['ok' => true, 'id' => (int)$r['id'], 'label' => $r['legal_name'],
+                        'note' => $r['legal_name'] . ' was already on file as ' . $r['code']
+                                . ' (matched by ' . $dup['by'] . '). It has been added to this list rather than duplicated.',
+                        'roles' => ['client' => $isClient, 'vendor' => $isVendor]]);
+                    return;
+                }
+                echo json_encode(['ok' => false, 'error' => $r['legal_name'] . ' is already on file as '
+                    . $r['code'] . ' (matched by ' . $dup['by'] . '). Pick it from the list instead of adding it twice.']);
+                return;
+            }
             $token = short_token($name);
             $last = ops_val("SELECT code FROM business_partners WHERE code LIKE ? ORDER BY code DESC LIMIT 1", ["GEN-$token-%"]);
             $seq = $last ? ((int)substr($last, strrpos($last, '-') + 1)) + 1 : 1;
@@ -2255,7 +2283,8 @@ function ops_calls($route, $method) {
                 // array_merge, not "+": the union operator keeps the left-hand
                 // value, which would silently drop the message.
                 view('ops/call_form', array_merge(call_form_vars($call, $b),
-                    ['error' => $ex['text'] . ' Enter that amount before saving.']));
+                    ['error' => $ex['text'] . ' Enter that amount before saving.',
+                     'errorFields' => ['expected_credit']]));
                 return;
             }
             // §a.vi / §a.vii — one date, several dates, or a weekly pattern to an end
@@ -2305,7 +2334,13 @@ function ops_calls($route, $method) {
                 $vm = partner_missing_text((int)($b['vendor_id'] ?? 0), 'site');
                 if ($vm) $gaps[] = 'The site record is missing ' . $vm . '.';
                 if ($gaps) {
-                    view('ops/call_form', array_merge(call_form_vars($call, $b), ['error' =>
+                    // Name the boxes as well as the problem. A message at the top
+                    // of a long form, with nothing on the form itself, is what
+                    // made this read as "Save is not working".
+                    $bad = [];
+                    if ($cm) $bad[] = 'client_id';
+                    if ($vm) $bad[] = 'vendor_id';
+                    view('ops/call_form', array_merge(call_form_vars($call, $b), ['errorFields' => $bad, 'error' =>
                         implode(' ', $gaps) . ' Complete the master under '
                         . T('client') . 's & ' . T('vendor') . 's before forwarding this '
                         . Tl('call') . ' to an executing ' . Tl('office')
@@ -2422,6 +2457,7 @@ function call_form_vars($call, $posted = null) {
     }
     return [
         'call' => $call,
+        'errorFields' => [],
         'isEdit' => !empty($call['call_code']),
         'clients' => clients_list(), 'vendors' => vendors_list(), 'offices' => offices_list(),
         'cfvals' => !empty($call['id']) ? custom_values_map('call', $call['id']) : [],

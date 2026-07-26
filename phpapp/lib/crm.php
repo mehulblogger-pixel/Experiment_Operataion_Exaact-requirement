@@ -1620,6 +1620,92 @@ function job_hold_reasons($j) {
 // ---------------------------------------------------------------------------
 //  Acceptance → client/contract registration → Operations hand-off (§12,§13)
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//  What the sales conversation already knew
+//
+//  A client usually starts life as a name typed into an inquiry or a quotation,
+//  with a person's name, an e-mail, a mobile, an SBU and a list of the
+//  inspections they are asking for. When somebody finally opens the master and
+//  completes it, all of that is sitting three screens away and gets typed again
+//  — or, more often, not typed at all.
+//
+//  So the moment a client record exists, it takes what the sales side already
+//  recorded: the types of inspection wanted, the first contact, and the SBU.
+//  Nothing is overwritten — an inspection type already ticked stays ticked, and
+//  a contact of the same name is not added twice.
+// ---------------------------------------------------------------------------
+function partner_carry_from_crm($partnerId, $name = '') {
+    $partnerId = (int)$partnerId;
+    $p = $partnerId ? ops_one("SELECT * FROM business_partners WHERE id=?", [$partnerId]) : null;
+    if (!$p) return ['linked' => 0, 'types' => 0, 'contacts' => 0];
+    $name = trim((string)$name) ?: trim((string)($p['legal_name'] ?? ''));
+    $norm = normalize_name($name);
+    $linked = 0; $types = 0; $contacts = 0;
+
+    // Everything the sales side holds for this company, whether it was linked
+    // to the record or only ever carried the name.
+    $rows = [];
+    foreach ([['crm_inquiries', 'sbu', ''], ['quotations', 'sbu', 'inspection_types']] as [$t, $sbuCol, $typeCol]) {
+        try {
+            foreach (ops_all("SELECT * FROM $t WHERE client_id = ? OR client_id IS NULL OR client_id = 0", [$partnerId]) as $r) {
+                $rn = normalize_name((string)($r['client_name'] ?? ''));
+                if ((int)($r['client_id'] ?? 0) !== $partnerId && ($rn === '' || $rn !== $norm)) continue;
+                $r['_table'] = $t; $r['_types'] = $typeCol;
+                $rows[] = $r;
+                // Same company, so say so — the register stops showing it as a
+                // loose name and every report can count it.
+                if ((int)($r['client_id'] ?? 0) !== $partnerId) {
+                    db()->prepare("UPDATE $t SET client_id=? WHERE id=?")->execute([$partnerId, $r['id']]);
+                    $linked++;
+                }
+            }
+        } catch (Throwable $e) { continue; }
+    }
+    if (!$rows) return ['linked' => 0, 'types' => 0, 'contacts' => 0];
+
+    // The inspections they have been asking for, merged with anything already ticked.
+    $have = array_values(array_filter(array_map('trim', explode(',', (string)($p['inspection_types'] ?? '')))));
+    $before = count($have);
+    foreach ($rows as $r) {
+        if (($r['_types'] ?? '') === '') continue;
+        foreach (array_filter(array_map('trim', explode(',', (string)($r[$r['_types']] ?? '')))) as $t)
+            if ($t !== '' && !in_array($t, $have, true)) $have[] = $t;
+    }
+    if (count($have) > $before) {
+        db()->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
+            ->execute([implode(',', $have), $partnerId]);
+        $types = count($have) - $before;
+    }
+
+    // The person they have been talking to. A contact of the same name is left
+    // alone — the master's version is the one somebody checked.
+    foreach ($rows as $r) {
+        $cn = trim((string)($r['contact_name'] ?? ''));
+        if ($cn === '') continue;
+        $exists = ops_val("SELECT id FROM partner_contacts WHERE partner_id=? AND LOWER(name)=?",
+                          [$partnerId, strtolower($cn)]);
+        if ($exists) continue;
+        $isFirst = !ops_val("SELECT id FROM partner_contacts WHERE partner_id=?", [$partnerId]);
+        db()->prepare("INSERT INTO partner_contacts (partner_id,name,email,mobile,is_primary,department)
+                       VALUES (?,?,?,?,?,?)")
+            ->execute([$partnerId, $cn, trim((string)($r['contact_email'] ?? '')),
+                       trim((string)($r['contact_mobile'] ?? '')), $isFirst ? 1 : 0,
+                       $r['_table'] === 'quotations' ? 'From ' . T('quote') : 'From ' . T('inquiry')]);
+        $contacts++;
+    }
+    return ['linked' => $linked, 'types' => $types, 'contacts' => $contacts];
+}
+// One sentence for the flash message, or '' when nothing came across.
+function partner_carry_text($res) {
+    $bits = [];
+    if ($res['types'])    $bits[] = $res['types'] . ' type(s) of inspection';
+    if ($res['contacts']) $bits[] = $res['contacts'] . ' contact(s)';
+    if ($res['linked'])   $bits[] = $res['linked'] . ' ' . Tl('inquiry') . '/' . Tl('quote') . ' linked to this record';
+    if (!$bits) return '';
+    $last = array_pop($bits);
+    return 'Carried across from the sales side: ' . ($bits ? implode(', ', $bits) . ' and ' . $last : $last) . '.';
+}
+
 // Ensure the quote's customer is a registered client; create one if only a name
 // was typed. Returns the business_partner id (or null if there is nothing to use).
 function crm_register_client_for_quote($q) {
@@ -1633,7 +1719,10 @@ function crm_register_client_for_quote($q) {
     $code = sprintf("GEN-%s-%04d", $token, $seq);
     db()->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,status,created_at) VALUES (?,?,?,1,0,'ACTIVE',?)")
         ->execute([$code, $name, $name, date('c')]);
-    return (int)db()->lastInsertId();
+    $pid = (int)db()->lastInsertId();
+    // Bring the sales conversation with it rather than leaving a bare name.
+    partner_carry_from_crm($pid, $name);
+    return $pid;
 }
 // Build + send the Operations packet: client, quote/contract no, contacts, service
 // requirement, order lines (open vs line-item), advance/payment flags, TC proposal.

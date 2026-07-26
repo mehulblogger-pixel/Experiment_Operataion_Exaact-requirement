@@ -219,6 +219,24 @@ function contract_link_quotation($contractId, $quotationId) {
 // The quotations this client could still have a contract raised against: current,
 // not lost, and with no contract number yet. This is the list the Contracts tab
 // offers, so a contract recorded there can say which order it belongs to.
+// Every current quotation for this client, for the purchase-order form. Unlike
+// the contract list this one does NOT hide the quotations that already carry a
+// contract number — a PO usually arrives against exactly those, and hiding them
+// is what forced people to retype the lines by hand.
+function quotations_for_po($clientId) {
+    $clientId = (int)$clientId;
+    if (!$clientId) return [];
+    $rows = ops_all("SELECT q.id, q.quote_no, q.rev, q.status, q.subject, q.total_amount, q.sbu,
+                            q.contract_id, q.contract_number
+                     FROM quotations q
+                     WHERE q.client_id=? AND q.is_current=1 AND q.status NOT IN ('LOST','REJECTED')
+                     ORDER BY (q.status='ACCEPTED') DESC, q.id DESC", [$clientId]);
+    foreach ($rows as &$r)
+        $r['line_count'] = (int)ops_val("SELECT COUNT(*) FROM quote_lines WHERE quote_id=?", [$r['id']]);
+    unset($r);
+    return $rows;
+}
+
 function quotations_awaiting_contract($clientId) {
     $clientId = (int)$clientId;
     if (!$clientId) return [];
