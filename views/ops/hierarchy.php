@@ -347,6 +347,24 @@
   </div>
 
 <?php elseif ($tab === 'people'): ?>
+  <?php // "Back-office staff" under Masters was a second list of people. Its card
+        // now points here, and anything left in it is offered for moving rather
+        // than being stranded on a screen nobody opens any more. ?>
+  <?php $bosLeft = (int)ops_val("SELECT COUNT(*) FROM back_office_staff"); ?>
+  <?php if ($bosLeft && $canEdit): ?>
+    <div class="panel" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)">
+      <b style="color:var(--warn)">⚠ <?= $bosLeft ?> person(s) are still on the old “Back-office staff” list</b>
+      <div class="muted" style="margin-top:4px;font-size:13.5px">
+        People belong in one register, and that is this one. Bringing them across keeps their name, designation,
+        e-mail and <?= e(Tl('office')) ?>. Anybody already here is skipped, so running it twice changes nothing.
+        They arrive with no password, so nobody can sign in as them until you set one.
+      </div>
+      <form method="post" action="/hierarchy" style="margin-top:8px">
+        <input type="hidden" name="do" value="bos-import"><input type="hidden" name="tab" value="people">
+        <button class="btn" type="submit">Bring them into the people register</button>
+      </form>
+    </div>
+  <?php endif; ?>
   <div class="panel">
     <div class="master-head" style="margin-bottom:8px">
       <div><h3 class="tab-sub" style="margin:0">Everybody, in one grid</h3>
