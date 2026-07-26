@@ -51,7 +51,7 @@
       </td>
     </tr>
     <?php endforeach; ?>
-    <?php if (!$lines): ?><tr><td colspan="9" class="muted" style="padding:16px">No inspector expenses recorded against this BOSS yet.</td></tr><?php endif; ?>
+    <?php if (!$lines): ?><tr><td colspan="9" class="muted" style="padding:16px">No inspector expenses recorded against this <?= e(Tl("boss")) ?> yet.</td></tr><?php endif; ?>
     <?php if ($lines): ?><tr style="background:var(--soft)"><td colspan="8" style="text-align:right"><strong>Total voucher expenses</strong></td><td class="num"><strong><?= fmoney($tot) ?></strong></td></tr><?php endif; ?>
     </tbody>
   </table>
@@ -73,7 +73,7 @@
       <td><?= !empty($j['payment_received'])?'<span class="pill p-ok">Paid '.fmoney($j['payment_amount']).'</span>':'<span class="pill p-warn">Pending</span>' ?></td>
     </tr>
     <?php endforeach; ?>
-    <?php if (!$invLines): ?><tr><td colspan="6" class="muted" style="padding:16px">No jobs linked to this BOSS.</td></tr><?php endif; ?>
+    <?php if (!$invLines): ?><tr><td colspan="6" class="muted" style="padding:16px">No jobs linked to this <?= e(Tl("boss")) ?>.</td></tr><?php endif; ?>
     </tbody>
   </table>
 </div>
@@ -81,10 +81,10 @@
 <?php if (empty($boss['superseded_by'])): ?>
 <div class="panel" style="margin-top:16px">
   <h3 class="tab-sub" style="margin-top:0">Renew / change contract number (ARC / Open order)</h3>
-  <p class="sub">Creates a new BOSS/contract number, carries the <strong>open jobs</strong> forward to it, and keeps this old number visible in the chain.</p>
+  <p class="sub">Creates a new <?= e(Tl("boss")) ?>, carries the <strong>open jobs</strong> forward to it, and keeps this old number visible in the chain.</p>
   <form method="post" action="/boss-renew" class="inline-add" style="align-items:flex-end" onsubmit="return confirm('Renew this contract? Open jobs will move to the new number.')">
     <input type="hidden" name="old_id" value="<?= (int)$boss['id'] ?>">
-    <div class="ff"><label>New BOSS / contract number *</label><input class="form-control" name="new_number" required></div>
+    <div class="ff"><label>New <?= e(T("boss")) ?> *</label><input class="form-control" name="new_number" required></div>
     <div class="ff"><label>Start date</label><input class="form-control" type="date" name="start_date"></div>
     <div class="ff"><label>End date</label><input class="form-control" type="date" name="end_date"></div>
     <button class="btn" type="submit">Renew &amp; carry forward</button>

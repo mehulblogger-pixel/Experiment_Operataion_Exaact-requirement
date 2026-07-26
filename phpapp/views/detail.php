@@ -187,9 +187,14 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
 
 <?php elseif ($tab === 'purchase_orders'): ?>
   <?php $ctById = []; foreach ($contracts as $ct) $ctById[$ct['id']] = $ct; ?>
-  <table class="grid"><tr><th>PO No.</th><th>Type</th><th>Title</th><th>Value</th><th>Contract</th></tr>
-    <?php foreach ($pos as $o): ?><tr><td><a href="/po?id=<?= (int)$o['id'] ?>"><?= e($o['po_number'] ?: '(open)') ?></a></td><td><?= e(lk_options_or('po_type', PO_TYPES)[$o['po_type']] ?? $o['po_type']) ?></td><td><?= e($o['title'] ?: '—') ?></td><td><?= $o['value']!==null?cur_sym().e($o['value']):'—' ?></td><td><?= isset($ctById[$o['contract_id']]) ? e($ctById[$o['contract_id']]['contract_number']) : '—' ?></td></tr><?php endforeach; ?>
-    <?php if (!$pos): ?><tr><td colspan="5">No purchase orders yet.</td></tr><?php endif; ?></table>
+  <?php // Whether an order carries line items decides whether it is usable
+        // downstream at all, so it is a column here rather than something you
+        // find out by opening the order or, worse, by staring at an empty
+        // dropdown on an inspection call. ?>
+  <table class="grid"><tr><th>PO No.</th><th>Type</th><th>Title</th><th>Value</th><th>Contract</th><th>Line items</th></tr>
+    <?php foreach ($pos as $o): $nLines = (int)ops_val("SELECT COUNT(*) FROM po_line_items WHERE purchase_order_id=?", [$o['id']]); ?><tr><td><a href="/po?id=<?= (int)$o['id'] ?>"><?= e($o['po_number'] ?: '(open)') ?></a></td><td><?= e(lk_options_or('po_type', PO_TYPES)[$o['po_type']] ?? $o['po_type']) ?></td><td><?= e($o['title'] ?: '—') ?></td><td><?= $o['value']!==null?cur_sym().e($o['value']):'—' ?></td><td><?= isset($ctById[$o['contract_id']]) ? e($ctById[$o['contract_id']]['contract_number']) : '—' ?></td>
+      <td><?php if ($nLines): ?><?= $nLines ?><?php else: ?><a class="pill p-warn" href="/po?id=<?= (int)$o['id'] ?>">none — add them</a><?php endif; ?></td></tr><?php endforeach; ?>
+    <?php if (!$pos): ?><tr><td colspan="6">No purchase orders yet.</td></tr><?php endif; ?></table>
   <h3 class="tab-sub">Add a purchase order</h3>
   <?php // The order the client sends is the answer to a quotation we sent them.
         // Name the quotation and everything else is already written down: the

@@ -58,7 +58,7 @@
     <div class="pitch">
       <h1>Run every office. <em>See every rupee.</em></h1>
       <p>Calls, jobs, inspector vouchers and profitability — one system for independent inspection offices, each with its own targets and P&amp;L.</p>
-      <div class="chips"><span class="chip">Call &amp; Job register</span><span class="chip">Inspector vouchers</span><span class="chip">BOSS profitability</span><span class="chip">Live dashboards</span></div>
+      <div class="chips"><span class="chip">Call &amp; Job register</span><span class="chip">Inspector vouchers</span><span class="chip">Contract profitability</span><span class="chip">Live dashboards</span></div>
     </div>
     <div class="foot"><b>Peer offices, one platform</b> · your role decides what you see</div>
   </aside>

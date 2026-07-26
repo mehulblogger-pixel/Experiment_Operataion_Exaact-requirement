@@ -302,29 +302,46 @@
       sel.dispatchEvent(new Event('change', { bubbles: true }));
       return true;
     }
-    function poLineNote(txt) {
+    function poLineNote(hint) {
       var n = document.getElementById('po_line_note');
       if (!n) {
         var host = poLine && poLine.closest ? poLine.closest('.ff') : null;
         if (!host) return;
-        n = document.createElement('small'); n.id = 'po_line_note'; n.className = 'muted';
+        n = document.createElement('small'); n.id = 'po_line_note';
         host.appendChild(n);
       }
-      n.textContent = txt || '';
+      n.textContent = '';
+      n.className = hint ? 'down' : 'muted';
+      if (!hint) return;
+      n.appendChild(document.createTextNode(hint.text + ' '));
+      if (hint.url) {
+        var a = document.createElement('a');
+        a.href = hint.url; a.target = '_blank'; a.textContent = hint.link || 'Open';
+        n.appendChild(a);
+      }
     }
     function loadPoLines(keep) {
       if (!poLine) return;
-      if (!po || !po.value) { fillSelect(poLine, [], ''); poLineNote(''); return; }
+      if (!po || !po.value) { fillSelect(poLine, [], ''); poLineNote(null); return; }
       fetch('/po-lines?id=' + encodeURIComponent(po.value))
         .then(function (r) { return r.json(); })
-        .then(function (rows) {
+        .then(function (data) {
+          // The endpoint answers with {lines, hint}; older callers were handed a
+          // bare array, so accept both rather than break on a cached script.
+          var rows = (data && data.lines) ? data.lines : (Array.isArray(data) ? data : []);
+          var hint = (data && data.hint) ? data.hint : null;
           fillSelect(poLine, rows, keep || poLine.value);
-          // An order with no lines on it looks exactly like a broken dropdown.
-          // Say which it is, and where the lines come from.
-          poLineNote(rows && rows.length ? ''
-            : 'This order has no line items on it yet. Add them on the order '
-              + '(Clients → Purchase Orders), or record the order against its quotation '
-              + 'and every quoted line is copied across.');
+          // An order with no lines looks exactly like a broken dropdown, and the
+          // note underneath is hidden by the open list at the moment somebody is
+          // staring at it. So the reason goes INSIDE the list as well, where the
+          // eye already is.
+          if (!rows.length && hint) {
+            var o = document.createElement('option');
+            o.value = ''; o.disabled = true;
+            o.textContent = '— no line items on this order —';
+            poLine.appendChild(o);
+          }
+          poLineNote(rows.length ? null : hint);
           // autoPick fires change, which prices it; if a line was already chosen
           // server-side there is no change event, so price it explicitly.
           if (!autoPick(poLine, rows) && poLine.value) priceFromPoLine();

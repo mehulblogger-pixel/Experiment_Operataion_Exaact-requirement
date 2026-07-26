@@ -11,7 +11,7 @@
 ?>
 <div class="master-head">
   <div><h1><?= e(T_REG('boss')) ?></h1>
-    <p class="sub" style="margin:2px 0 0">Every BOSS / contract with its dates, renewal chain, invoicing, expenses<?= $seeSal?', salary cost and profit':'' ?>. Click a BOSS for the line-by-line drill-down.</p></div>
+    <p class="sub" style="margin:2px 0 0">Every <?= e(Tl("boss")) ?> with its dates, renewal chain, invoicing, expenses<?= $seeSal?', salary cost and profit':'' ?>. Click one for the line-by-line drill-down.</p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <a class="btn secondary" href="/profitability?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ Download CSV</a>
     <a class="btn ghost" href="/mis">Management dashboard</a>
@@ -31,7 +31,7 @@
 <?php endif; ?>
 
 <div class="kpi-row">
-  <div class="kpi"><div class="k-lab">BOSS numbers</div><div class="k-val"><?= count($rows) ?></div><div class="k-sub"><?= $active ?> active</div></div>
+  <div class="kpi"><div class="k-lab"><?= e(TP("boss")) ?></div><div class="k-val"><?= count($rows) ?></div><div class="k-sub"><?= $active ?> active</div></div>
   <div class="kpi"><div class="k-lab">Invoiced</div><div class="k-val"><?= fmoney_short($tInv) ?></div><div class="k-sub">Received <?= fmoney_short($tPaid) ?></div></div>
   <div class="kpi"><div class="k-lab">Expenses booked</div><div class="k-val"><?= fmoney_short($tExp) ?></div><div class="k-sub">travel + closure</div></div>
   <?php if ($seeSal): ?>
@@ -43,12 +43,12 @@
 <div class="panel" style="padding:0;overflow:hidden">
   <?php if (!$rows): ?>
     <div style="text-align:center;padding:34px"><div style="font-size:32px">📄</div>
-      <p class="muted" style="margin:8px 0 0">No BOSS numbers yet. Add them under <a href="/m/boss">BOSS numbers</a>.</p></div>
+      <p class="muted" style="margin:8px 0 0">No <?= e(Tlp("boss")) ?> yet. They are created on their own when a <?= e(Tl("quote")) ?> carrying one is allocated, and can also be added under <a href="/m/boss"><?= e(Tlp("boss")) ?></a>.</p></div>
   <?php else: ?>
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
     <thead><tr>
-      <th class="num">Sr</th><th>BOSS number</th><th>Client</th><th>Status</th>
+      <th class="num">Sr</th><th><?= e(T("boss")) ?></th><th>Client</th><th>Status</th>
       <th>Created on</th><th>Expires on</th><th>Renewed into</th>
       <th class="num">Jobs</th><th class="num">Invoicing done</th><th class="num">Expenses booked</th>
       <?php if ($seeSal): ?><th class="num">Salary costing</th><th class="num">Profit INR</th><th class="num">Profit %</th><?php endif; ?>
@@ -87,4 +87,4 @@
   </div>
   <?php endif; ?>
 </div>
-<p class="muted" style="margin-top:10px">"Renewed into" links a BOSS to the newer number that continues it (renewal hierarchy). "Invoicing done" is the invoiced amount against the BOSS; "Expenses booked" is inspector voucher costs (travel + bills) plus job-closure expenses<?= $seeSal?'; "Salary costing" is the loaded labour cost of the inspectors deployed':'' ?>.</p>
+<p class="muted" style="margin-top:10px">"Renewed into" links a <?= e(Tl("boss")) ?> to the newer number that continues it (renewal hierarchy). "Invoicing done" is the invoiced amount against it; "Expenses booked" is inspector voucher costs (travel + bills) plus job-closure expenses<?= $seeSal?'; "Salary costing" is the loaded labour cost of the inspectors deployed':'' ?>.</p>

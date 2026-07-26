@@ -713,6 +713,9 @@ if ($route === 'po') {
     if (!$poActivities) foreach ($actBySbu as $list) foreach ($list as $a) $poActivities[] = $a; // fallback: all
     return view('po_detail', ['po' => $po, 'items' => $li->fetchAll(), 'skillsByTrade' => skills_by_trade(),
         'quoteState' => function_exists('po_quote_status') ? po_quote_status($po) : null,
+        // Every quotation this client has open, so lines can be taken from one
+        // even when the order was typed in without naming it.
+        'poQuotes' => function_exists('quotations_for_po') ? quotations_for_po($po['partner_id']) : [],
         'trades' => lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [], 'poActivities' => $poActivities]);
 }
 

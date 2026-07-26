@@ -2,6 +2,37 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🔗 WINNING IT PUTS THE COMPANY ON FILE (July 2026)
+
+### Bugs fixed, from the live site
+
+- **The PO line item list was empty even when the order existed.** The chain
+  broke one step earlier than it looked. A quotation raised against a *typed*
+  client name was never bound to the client master, so the Purchase Orders tab
+  had no quotation to offer, the order was typed in by hand, and the lines that
+  already existed on the quotation never came across. Marking a quotation
+  **accepted** now registers the company — deliberately incomplete, tax details
+  and address to follow — links every revision to it, and carries the types of
+  inspection and the contact across. An order that has no lines now says so, on
+  the order itself, on the client master's order list, and inside the call
+  form's own dropdown, and offers to take the lines from the quotation.
+- **"Allocate & send email" did nothing.** The expected inter-office credit was
+  mandatory on *every* deputation, including one where a single office both
+  holds the order and does the work — where there is no such credit to state.
+  The browser refused the submit and the button died silently. The credit is now
+  required only when the deputation really does cross offices; where it does
+  not, the value carried is what the client is billed on the call.
+- **BOSS number is now the contract number.** It is not chosen from a register
+  any more — it comes down from the quotation to the call to the deputation, and
+  the register entry is created on saving. The old register is still there and
+  still holds the renewal chain; it just fills itself.
+
+### Still open
+
+- **Revenue is counted two different ways.** The management dashboard reads the
+  expected credit; the SBU P&L reads the invoice and falls back to the credit.
+  They will disagree. The owner has been asked which single rule to apply.
+
 ## 🧾 QUOTATIONS, MASTERS & THE CALL FORM (July 2026)
 
 ### Bugs fixed, from the live site

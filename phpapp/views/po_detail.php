@@ -28,6 +28,48 @@
   <p class="muted">Taken from <a href="/quote?id=<?= (int)$qs['from']['id'] ?>"><?= e($qs['from']['quote_no']) ?><?= (int)$qs['from']['rev'] ? ' R' . (int)$qs['from']['rev'] : '' ?></a><?= $qs['synced'] !== '' ? ' on ' . e(fdate(substr($qs['synced'], 0, 10))) : '' ?>, which is still the current revision.</p>
   <?php endif; ?>
 <?php endif; ?>
+<?php // An order with no lines on it is a dead dropdown everywhere downstream —
+      // the inspection call cannot pick a line, and nothing tracks how much of
+      // the order is left. Nearly always the lines already exist on the
+      // quotation and nobody realised they had to be brought across, so the
+      // offer to do it sits here rather than being something you must know.
+      $liveQuotes = array_values(array_filter($poQuotes ?? [], function ($q) { return (int)$q['line_count'] > 0; }));
+?>
+<?php if (!$items && $liveQuotes): ?>
+<div class="msg-warning">
+  <strong>This order has no line items yet.</strong>
+  Until it has some, no <?= e(Tl('call')) ?> can be booked against a line of it and nothing tracks how much
+  of the order is left. <?= count($liveQuotes) === 1 ? 'This' : 'One' ?> <?= e(Tl('quote')) ?> for this
+  <?= e(Tl('client')) ?> already carries the lines — take them across rather than typing them again.
+  <form method="post" action="/po?id=<?= (int)$po['id'] ?>" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+    <input type="hidden" name="do" value="pull-quote">
+    <div class="ff" style="margin:0;min-width:280px"><label><?= e(T('quote')) ?> to take the lines from</label>
+      <select class="form-control searchable" name="quotation_id">
+        <?php foreach ($liveQuotes as $pq): ?>
+          <option value="<?= (int)$pq['id'] ?>"<?= (int)$pq['id'] === (int)($po['quotation_id'] ?? 0) ? ' selected' : '' ?>>
+            <?= e($pq['quote_no']) ?><?= (int)$pq['rev'] ? ' R' . (int)$pq['rev'] : '' ?>
+            · <?= (int)$pq['line_count'] ?> line(s)
+            · <?= e(cur_sym()) ?><?= number_format((float)$pq['total_amount'], 0) ?>
+            <?= $pq['subject'] ? ' — ' . e(mb_strimwidth($pq['subject'], 0, 40, '…')) : '' ?>
+          </option>
+        <?php endforeach; ?>
+      </select></div>
+    <button class="btn small" type="submit">Take the lines across</button>
+  </form>
+</div>
+<?php elseif (!$items): ?>
+<div class="msg-warning">
+  <strong>This order has no line items yet.</strong>
+  Until it has some, a <?= e(Tl('call')) ?> raised against this order cannot pick a line, and nothing tracks
+  how much of the order is left. Add them below — or record the order against the <?= e(Tl('quote')) ?> it
+  answers, and every quoted line is copied across on its own.
+  <?php if ((($po['po_type'] ?? '') === 'REGULAR') && (float)($po['value'] ?? 0) > 0): ?>
+    <p class="muted" style="margin:8px 0 0">This is a fixed-value order of <?= e(fmoney((float)$po['value'])) ?>.
+      If it was never meant to be broken into lines, leave it — the <?= e(Tl('call')) ?> is priced on its own
+      rate and quantity, and only the balance tracking is lost.</p>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 <h2>Line items</h2>
 <div class="tbl-scroll" style="overflow-x:auto">
 <table class="grid">

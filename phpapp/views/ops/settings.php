@@ -262,9 +262,9 @@
     <form method="post" action="/seed-demo-remove" onsubmit="return confirm('Remove ALL demo/sample data (offices left in place)? Your own real records are not touched. You can load the demo again later.')">
       <button class="btn danger" type="submit">🗑 Remove demo data</button>
     </form>
-    <p class="muted" style="margin-top:8px;font-size:12px">Deletes only the seeded calls, jobs, vouchers, demo inspectors, clients/vendors, BOSS numbers and demo logins. The three demo offices are left in place (delete them under Masters if you want).</p>
+    <p class="muted" style="margin-top:8px;font-size:12px">Deletes only the seeded calls, jobs, vouchers, demo inspectors, clients/vendors, <?= e(Tlp("boss")) ?> and demo logins. The three demo offices are left in place (delete them under Masters if you want).</p>
   <?php else: ?>
-    <p class="sub" style="margin-bottom:10px">One-click load of a complete example — <strong>offices, users of every role, inspectors, clients, BOSS numbers, calls, jobs, vouchers, invoicing &amp; credit</strong> — so every screen shows live figures. Safe to explore; you can delete records later. It runs only once.</p>
+    <p class="sub" style="margin-bottom:10px">One-click load of a complete example — <strong>offices, users of every role, inspectors, clients, <?= e(Tlp("boss")) ?>, calls, jobs, vouchers, invoicing &amp; credit</strong> — so every screen shows live figures. Safe to explore; you can delete records later. It runs only once.</p>
     <form method="post" action="/seed-demo" onsubmit="return confirm('Load the demo/sample dataset now? This adds example records across the whole app.')">
       <button class="btn" type="submit">Load demo data</button>
     </form>

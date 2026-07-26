@@ -159,7 +159,7 @@ function lk_module_lists() {
         ['requisition_type',    'Requisition type',          REQ_TYPES,              'People'],
         ['requisition_status',  'Requisition status',        REQ_STATUS,             'People'],
         // --- Money -----------------------------------------------------------
-        ['boss_status',         'BOSS number status',        BOSS_STATUS,            'Money'],
+        ['boss_status',         'Contract number status',        BOSS_STATUS,            'Money'],
         // --- Directory -------------------------------------------------------
         ['partner_status',      'Partner status',            STATUSES,               'Directory'],
         ['ownership',           'Ownership type',            OWNERSHIP,              'Directory'],
@@ -255,7 +255,7 @@ function lk_seed() {
         ['credit_type','Credit type', CREDIT_TYPES], ['credit_direction','Credit direction', CREDIT_DIRECTIONS],
         ['reporting_frequency','Reporting frequency', REPORT_FREQ], ['attendance_status','Attendance status', ATT_STATUS],
         ['experience_level','Experience level', EXP_LEVELS], ['rate_type','Rate type', RATE_TYPES],
-        ['boss_status','BOSS status', BOSS_STATUS], ['client_type','Client type', CLIENT_TYPES],
+        ['boss_status','Contract status', BOSS_STATUS], ['client_type','Client type', CLIENT_TYPES],
         ['industry','Industry', INDUSTRIES], ['ownership','Ownership type', OWNERSHIP], ['partner_status','Partner status', STATUSES], ['department','Department', DEPARTMENTS], ['designation','Designation', DESIGNATIONS],
         ['leave_type','Leave type', LEAVE_TYPES], ['day_code','Day / office code', DAY_CODES],
     ];

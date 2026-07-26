@@ -27,7 +27,7 @@ function reset_groups() {
         'work' => [
             'label' => 'Day-to-day work',
             'note'  => 'Inquiries, quotations, ' . Tlp('call') . ', ' . Tlp('job') . ', expenses, '
-                     . Tlp('voucher') . ', attendance, BOSS numbers, credit reconciliation.',
+                     . Tlp('voucher') . ', attendance, " . Tlp("boss") . ", credit reconciliation.',
             'tables' => ['crm_inquiries', 'quotations', 'quote_lines', 'quote_locations', 'quote_revisions',
                 'quote_approvals', 'quote_files', 'quote_followups', 'quote_edit_requests',
                 'calls', 'jobs', 'expenses', 'vouchers', 'voucher_entries', 'attendance',
