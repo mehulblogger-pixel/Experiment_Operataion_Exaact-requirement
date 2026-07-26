@@ -2,6 +2,47 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 📅 FIVE SHAPES OF ENGAGEMENT (July 2026)
+
+The three dates mean three different things and were being typed as though they
+were interchangeable:
+
+| | |
+|---|---|
+| **Call received** | the day the contracting branch got it |
+| **Required** | the day the client asked for |
+| **Scheduled** | the day we are actually going |
+
+Only the third is chosen at allocation; the first two are settled on the call
+and shown read-only. The end date is never typed — it follows.
+
+An engagement is one of five shapes, and only the boxes that shape needs are
+ever shown:
+
+- **Single day** — one date, nothing else.
+- **Continuous** — type the number of days. The end date counts *working* days:
+  Sundays, the branch's Saturday pattern and the branch's own public holidays
+  are stepped over. Five days from Thursday 30 July ends Tuesday 4 August at a
+  six-day branch and Wednesday 5 August at a five-day one.
+- **Multiple dates** — two date lines, and one more each time you ask. It runs
+  from the earliest to the latest; the days between are not inspection days.
+  Each visit can carry a different engineer.
+- **Pattern** — chosen weekdays, N times a week, every N days, fortnightly or
+  once a month, until a date. The dates are worked out, not typed.
+- **Monthly deputation** — a posting at the works on a man-month basis.
+
+Holidays now belong to a branch (blank = national). All the arithmetic lives in
+`lib/schedule.php` and is asked of the server as the form is filled in, so the
+holiday rules exist in exactly one place. Where an engineer is already booked,
+the clash is named and the branch's free engineers are offered instead.
+
+### Still to settle with the owner
+
+- Half-day Saturdays (the 5.5-day pattern) currently count as a full working
+  day for the end-date arithmetic.
+- A pattern visit that falls on a holiday is skipped, not moved to the next day.
+- Monthly deputation counts calendar months from the start date.
+
 ## 🛑 SAVE MUST NEVER FAIL SILENTLY (July 2026)
 
 Reported twice. The first fix was wrong, and this records why so it is not

@@ -158,6 +158,11 @@ function lk_module_lists() {
         ['fee_status',          'Placement fee status',      FEE_STATUS,             'People'],
         ['requisition_type',    'Requisition type',          REQ_TYPES,              'People'],
         ['requisition_status',  'Requisition status',        REQ_STATUS,             'People'],
+        // --- Scheduling ------------------------------------------------------
+        // The wording is yours; the behaviour is keyed on the code behind it, so
+        // renaming "Continuous days" does not stop the working-day arithmetic.
+        ['engagement_type',     'Shape of engagement',       ENGAGEMENT_TYPES,       'Operations'],
+        ['pattern_kind',        'How a pattern repeats',     PATTERN_KINDS,          'Operations'],
         // --- Money -----------------------------------------------------------
         ['boss_status',         'Contract number status',        BOSS_STATUS,            'Money'],
         // --- Directory -------------------------------------------------------
