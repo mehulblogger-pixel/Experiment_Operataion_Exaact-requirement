@@ -2,6 +2,48 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🧾 QUOTATIONS, MASTERS & THE CALL FORM (July 2026)
+
+### Bugs fixed, from the live site
+
+- **"Save inspection call is not working."** The credit box was made required
+  the moment *any* executing office was chosen — including when it was the same
+  office holding the contract, in which case the whole box is hidden. A browser
+  will neither submit a form with a required field it cannot show, nor say why.
+  The button just died. Now the credit is only required when the call really
+  does cross offices, and as a safety net across the whole app no form can be
+  blocked by a field nobody can see.
+- **A revision lost the sites and the types of inspection.** See the previous
+  section — carried-across columns are now derived from the table rather than
+  written out by hand.
+- **PO line items were never fetched.** Because purchase orders were created
+  empty and the lines had to be typed by hand afterwards. A PO recorded against
+  its quotation now copies every quoted line, so the call register finds them.
+
+### What to test
+
+1. **Quotations** — approve, then *Take my approval back*. Mark one sent: it
+   locks for everybody, and offers *Raise a revision* instead.
+2. **Purchase Orders tab** — pick the quotation first: the contract number, SBU,
+   value and every line item come across.
+3. **Clients** — complete a client from a name sales typed into an inquiry: the
+   types of inspection, the contact and the inquiry/quote links come with it.
+4. **Quick-add a vendor from a call** — the GSTIN fills the PAN and the state,
+   the state is a dropdown, and the same company cannot be added twice.
+5. **A refused save** — the box that stopped it is ringed in red and the form
+   scrolls to it.
+
+### Still open
+
+- [ ] **Duplicate detection is name/GSTIN/PAN/TAN only.** Two spellings of the
+      same company with no tax numbers ("Kaveri Pressure" vs "Kaveri Pressure
+      Vessels") are still two records. A fuzzy match would need a review screen.
+- [ ] **Client and vendor lists are already one register across all offices** —
+      no change was needed. If a branch should only see its own, that is a new
+      requirement, not a fix.
+- [ ] **The PO tab copies quoted lines once, at creation.** Revising the
+      quotation afterwards does not update an order already raised against it.
+
 ## 📈 MANAGEMENT DASHBOARD, FINANCIAL YEARS & THE CLOSE-ON-TIME LOCK (July 2026)
 
 ### What to test

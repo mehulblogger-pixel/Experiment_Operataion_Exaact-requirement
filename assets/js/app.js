@@ -302,13 +302,29 @@
       sel.dispatchEvent(new Event('change', { bubbles: true }));
       return true;
     }
+    function poLineNote(txt) {
+      var n = document.getElementById('po_line_note');
+      if (!n) {
+        var host = poLine && poLine.closest ? poLine.closest('.ff') : null;
+        if (!host) return;
+        n = document.createElement('small'); n.id = 'po_line_note'; n.className = 'muted';
+        host.appendChild(n);
+      }
+      n.textContent = txt || '';
+    }
     function loadPoLines(keep) {
       if (!poLine) return;
-      if (!po || !po.value) { fillSelect(poLine, [], ''); return; }
+      if (!po || !po.value) { fillSelect(poLine, [], ''); poLineNote(''); return; }
       fetch('/po-lines?id=' + encodeURIComponent(po.value))
         .then(function (r) { return r.json(); })
         .then(function (rows) {
           fillSelect(poLine, rows, keep || poLine.value);
+          // An order with no lines on it looks exactly like a broken dropdown.
+          // Say which it is, and where the lines come from.
+          poLineNote(rows && rows.length ? ''
+            : 'This order has no line items on it yet. Add them on the order '
+              + '(Clients → Purchase Orders), or record the order against its quotation '
+              + 'and every quoted line is copied across.');
           // autoPick fires change, which prices it; if a line was already chosen
           // server-side there is no change event, so price it explicitly.
           if (!autoPick(poLine, rows) && poLine.value) priceFromPoLine();
@@ -396,6 +412,32 @@
       if (k === 'activity') show('.qa-activity');
       back.style.display = 'flex'; byId('qa_name').focus();
     }
+    // The master screen reads the PAN and the state straight out of the GSTIN
+    // as it is typed. Quick-add asked for the same GSTIN and then made people
+    // work them out themselves, which is how a vendor ends up with no PAN.
+    (function () {
+      var g = byId('qa_gstin');
+      if (!g) return;
+      g.addEventListener('input', function () {
+        var v = (g.value || '').toUpperCase().replace(/\s+/g, '');
+        var pan = byId('qa_pan'), st = byId('qa_state');
+        if (v.length >= 12 && pan) {
+          var p = v.substring(2, 12);
+          if (/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p)) pan.value = p;
+        }
+        if (v.length >= 2 && st) {
+          var name = STATES[v.substring(0, 2)] || '';
+          if (name) {
+            st.value = name;
+            // the searchable widget hides the real select, so tell it
+            st.dispatchEvent(new Event('change', { bubbles: true }));
+            var wrap = st.parentNode, box = wrap && wrap.querySelector('input');
+            if (box) box.value = name;
+          }
+        }
+      });
+      g.addEventListener('blur', function () { g.value = (g.value || '').toUpperCase().replace(/\s+/g, ''); });
+    })();
     function close() { back.style.display = 'none'; }
     Array.prototype.forEach.call(document.querySelectorAll('.addlink'), function (a) {
       a.addEventListener('click', function (e) { e.preventDefault(); open(a.getAttribute('data-qa')); });
@@ -439,6 +481,10 @@
         .then(function (r) { return r.json(); })
         .then(function (res) {
           if (!res.ok) { byId('qa_err').textContent = res.error || 'Could not add.'; byId('qa_err').style.display = 'block'; return; }
+          // It may have found the company already on file and used that one. Say
+          // so — silently picking a different record than the one just typed is
+          // how people end up not trusting the box.
+          if (res.note) { try { alert(res.note); } catch (e) {} }
           if (k === 'both') {
             setSelectValue(byId('client_sel'), res.id, res.label);
             setSelectValue(byId('vendor_sel'), res.id, res.label);
@@ -529,19 +575,58 @@
     legal.addEventListener('input', function () { if (!touched) disp.value = legal.value; });
   }
 
-  // ---- Make credit mandatory (visibly) when a call is forwarded to a branch ----
+  // ---- Make credit mandatory (visibly) when a call crosses offices ----------
+  //
+  //  This used to require the credit whenever ANY executing office was chosen —
+  //  including when it was the same office that holds the contract, in which
+  //  case there is no inter-office credit and the whole box is hidden. A
+  //  required field inside a hidden container is the one thing a browser will
+  //  neither submit nor complain about: the button goes dead, silently, and
+  //  stays dead. That is what "Save inspection call is not working" was.
   function initForwardCredit() {
     var exec = document.getElementById('exec_sel');
+    var ibo = document.getElementById('ibo_sel');
     var credit = document.querySelector('input[name="expected_credit"]');
     if (!exec || !credit) return;
     function sync() {
-      var on = exec.value !== '';
+      var e = exec.value || '', m = ibo ? (ibo.value || '') : '';
+      // exactly the condition that shows the box — one office doing its own
+      // work owes itself nothing
+      var on = e !== '' && e !== m;
       credit.required = on;
-      var lbl = credit.closest('.ff') && credit.closest('.ff').querySelector('label');
-      if (lbl && on && lbl.textContent.indexOf('★') === -1) lbl.innerHTML = lbl.innerHTML + ' <span style="color:#c0392b">★ required</span>';
-      if (on) { credit.style.borderColor = '#F37021'; }
+      var ff = credit.closest ? credit.closest('.ff') : null;
+      var lbl = ff && ff.querySelector('label');
+      if (lbl) {
+        var star = lbl.querySelector('.req-star');
+        if (on && !star) {
+          var sp = document.createElement('span');
+          sp.className = 'req-star'; sp.style.color = '#c0392b'; sp.textContent = ' ★ required';
+          lbl.appendChild(sp);
+        } else if (!on && star) star.remove();
+      }
+      credit.style.borderColor = on ? '#F37021' : '';
     }
-    exec.addEventListener('change', sync); sync();
+    exec.addEventListener('change', sync);
+    if (ibo) ibo.addEventListener('change', sync);
+    sync();
+  }
+
+  // ---- A hidden box can never be filled in, so it can never be required -----
+  //
+  //  Belt and braces for the whole app, not just the call form: whatever else
+  //  is going on, a form must never refuse to submit because of a field nobody
+  //  can see. If it is out of sight when Save is pressed, the requirement comes
+  //  off and the server does the checking — which it does anyway, and which can
+  //  actually explain itself.
+  function initNoHiddenRequired() {
+    Array.prototype.forEach.call(document.querySelectorAll('form'), function (f) {
+      f.addEventListener('submit', function () {
+        Array.prototype.forEach.call(f.querySelectorAll('[required]'), function (el) {
+          var visible = !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+          if (!visible) el.required = false;
+        });
+      }, true);
+    });
   }
 
   // ---- "Other (add new)…" on a dropdown reveals a text box ----
@@ -640,6 +725,7 @@
     initDisplayName();
     initSkillSelect();
     initForwardCredit();
+    initNoHiddenRequired();
     initSubconVendor();
     initRegAutofill();
     initOtherNew();

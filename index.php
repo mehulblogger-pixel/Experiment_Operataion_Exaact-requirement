@@ -484,8 +484,13 @@ if ($route === 'partner-new') {
         $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
             ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $id]);
         custom_save('partner', $id, $b);
-        flash("$code created.");
-        redirect("/partner?id=$id");
+        // Whatever sales already knew about this company: the inspections they
+        // asked for, the person they were talking to, and the inquiries and
+        // quotations that only ever carried the name.
+        $carry = function_exists('partner_carry_from_crm') ? partner_carry_from_crm($id, $b['legal_name']) : null;
+        $note = $carry ? partner_carry_text($carry) : '';
+        flash("$code created." . ($note !== '' ? ' ' . $note : ''));
+        redirect("/partner?id=$id" . ($note !== '' ? '&tab=contacts' : ''));
     }
     return view('form', ['partner' => null, 'defaultRole' => $_GET['role'] ?? 'is_client', 'error' => null, 'offices' => offices_list(), 'pcfvals' => []]);
 }
@@ -536,11 +541,46 @@ if ($route === 'partner-add' && $method === 'POST') {
         redirect("/partner?id={$p['id']}&tab=notes");
     }
     if ($kind === 'po') {
+        // The purchase order the client sends is the answer to a quotation we
+        // sent them. Naming that quotation is what makes the rest of this form
+        // unnecessary: the contract, the SBU, the value and every line item are
+        // already written down, and retyping them is how the two drift apart.
+        $qid = (int)($b['quotation_id'] ?? 0);
+        $quote = $qid ? ops_one("SELECT * FROM quotations WHERE id=?", [$qid]) : null;
+        $qLines = $quote ? ops_all("SELECT * FROM quote_lines WHERE quote_id=? ORDER BY line_no, id", [$qid]) : [];
+
         $poSbu = isset($b['po_sbu']) ? implode(',', array_filter((array)$b['po_sbu'])) : ($b['sbu'] ?? '');
+        if ($poSbu === '' && $quote) $poSbu = (string)($quote['sbu'] ?? '');
+        $contractId = ($b['contract_id'] ?? '') !== '' ? (int)$b['contract_id'] : null;
+        if (!$contractId && $quote && !empty($quote['contract_id'])) $contractId = (int)$quote['contract_id'];
+        $title = trim((string)($b['title'] ?? '')) ?: (string)($quote['subject'] ?? '');
+        $value = ($b['value'] ?? '') !== '' ? $b['value'] : ($quote ? $quote['total_amount'] : null);
+
         $pdo->prepare("INSERT INTO partner_purchase_orders (partner_id,contract_id,sbu,po_number,po_type,title,value,start_date,end_date,notes) VALUES (?,?,?,?,?,?,?,?,?,?)")
-            ->execute([$p['id'], ($b['contract_id'] ?? '') !== '' ? $b['contract_id'] : null, $poSbu, $b['po_number'] ?? '', $b['po_type'] ?? 'REGULAR', $b['title'] ?? '', ($b['value'] ?? '') !== '' ? $b['value'] : null, $b['start_date'] ?? '', $b['end_date'] ?? '', $b['notes'] ?? '']);
-        flash('Purchase order added.');
-        redirect('/po?id=' . $pdo->lastInsertId());
+            ->execute([$p['id'], $contractId, $poSbu, $b['po_number'] ?? '', $b['po_type'] ?? 'REGULAR',
+                       $title, $value, $b['start_date'] ?? '', $b['end_date'] ?? '', $b['notes'] ?? '']);
+        $poId = (int)$pdo->lastInsertId();
+
+        // Every line of the quotation becomes a line of the order, with the
+        // quantity and the rate it was quoted at. Consumption is tracked against
+        // these, so getting them from the quotation rather than from memory is
+        // what makes "how much of this order is left" a real number.
+        $n = 0;
+        if ($qLines) {
+            $ins = $pdo->prepare("INSERT INTO po_line_items (purchase_order_id,description,item_type,quantity,rate,consumed) VALUES (?,?,?,?,?,0)");
+            foreach ($qLines as $l) {
+                $desc = trim((string)($l['description'] ?? ''));
+                if ($desc === '') $desc = trim((string)($l['service_type'] ?? '')) ?: 'Line ' . (int)$l['line_no'];
+                if (trim((string)($l['location'] ?? '')) !== '') $desc .= ' — ' . $l['location'];
+                $ins->execute([$poId, mb_substr($desc, 0, 200), (string)($l['unit'] ?? 'MANDAY'),
+                               (float)($l['qty'] ?? 0), ($l['rate'] === null || $l['rate'] === '') ? null : (float)$l['rate']]);
+                $n++;
+            }
+        }
+        flash('Purchase order added.' . ($quote ? ' Taken from ' . $quote['quote_no']
+            . ((int)$quote['rev'] ? ' R' . (int)$quote['rev'] : '')
+            . ($n ? ' with ' . $n . ' line item(s)' : '') . '.' : ''));
+        redirect('/po?id=' . $poId);
     }
     if (isset($map[$kind])) {
         [$table, $fields, $tab] = $map[$kind];

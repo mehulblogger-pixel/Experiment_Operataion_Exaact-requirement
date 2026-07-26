@@ -460,3 +460,11 @@ table.dt.qlines .btn.small{white-space:nowrap}
   body.inspector .app .container{padding-bottom:78px}
   body.inspector .topbar-slim .nav-toggle{display:none} /* bottom bar replaces the drawer */
 }
+
+/* ---- A field that stopped a save -------------------------------------------
+   A message at the top of a long form, with nothing marked on the form itself,
+   reads as "the button does not work". These ring the boxes that need filling
+   and clear themselves the moment the person types. */
+.field-bad{border-color:var(--bad) !important;box-shadow:0 0 0 3px rgba(185,28,28,.12) !important;background:rgba(185,28,28,.03)}
+.ff-bad > label{color:var(--bad);font-weight:600}
+.ff-bad > label::after{content:" — needed";font-weight:500;opacity:.8}

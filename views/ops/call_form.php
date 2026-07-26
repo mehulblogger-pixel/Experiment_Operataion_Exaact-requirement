@@ -12,7 +12,42 @@
     <p class="sub" style="margin:2px 0 0">Pick the <?= e(Tl('client')) ?> and the <?= e(Tl('quote')) ?> it is against — the commercial terms come across by themselves. Not in a list? Use <strong>+ Add new</strong> beside any dropdown.</p></div>
   <a class="btn secondary" href="/calls">← Back</a>
 </div>
-<?php if (!empty($error)): ?><div class="msg msg-error"><?= e($error) ?></div><?php endif; ?>
+<?php if (!empty($error)): ?><div class="msg msg-error" id="call_err"><?= e($error) ?></div><?php endif; ?>
+<?php // A message at the top of a form this long, with nothing marked on the form
+      // itself, reads as "Save is not working". Ring the boxes that stopped it and
+      // put the person in front of the first one. ?>
+<?php if (!empty($errorFields)): ?>
+<script>
+// Deferred: this block sits at the TOP of the form, so the fields it has to
+// mark do not exist yet when it runs.
+document.addEventListener('DOMContentLoaded', function () {
+  var names = <?= json_encode(array_values((array)$errorFields)) ?>;
+  var first = null;
+  names.forEach(function (n) {
+    var el = document.querySelector('[name="' + n + '"]');
+    if (!el) return;
+    // the searchable dropdowns hide the real select, so mark what is on screen
+    var box = el.parentNode && el.parentNode.querySelector('input.form-control');
+    var mark = box || el;
+    mark.classList.add('field-bad');
+    var ff = mark.closest('.ff');
+    if (ff) ff.classList.add('ff-bad');
+    if (!first) first = mark;
+    // A field inside a section the form keeps collapsed cannot be filled in
+    // while it is hidden — open whatever it lives in.
+    for (var n = mark; n && n !== document.body; n = n.parentNode)
+      if (n.style && n.style.display === 'none') n.style.display = '';
+    var clear = function () { mark.classList.remove('field-bad'); if (ff) ff.classList.remove('ff-bad'); };
+    mark.addEventListener('input', clear);
+    mark.addEventListener('change', clear);
+    el.addEventListener('change', clear);
+  });
+  var msg = document.getElementById('call_err');
+  if (msg) msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (first) setTimeout(function () { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }, 350);
+});
+</script>
+<?php endif; ?>
 
 <form method="post" action="<?= $isEdit ? '/call-edit?id=' . (int)$call['id'] : '/call-new' ?>" class="panel">
 
@@ -619,7 +654,12 @@
       <div class="ff"><label>PAN <span class="muted">— if there is no GSTIN</span></label><input class="form-control" id="qa_pan"></div>
       <div class="ff"><label>Address <span id="qa_req_addr">*</span></label><input class="form-control" id="qa_line1" placeholder="works / office address"></div>
       <div class="ff"><label>City <span id="qa_req_city">*</span></label><input class="form-control" id="qa_qcity"></div>
-      <div class="ff"><label>State</label><input class="form-control" id="qa_state"></div>
+      <?php // The same state list the master screen uses. A typed state does not
+            // match anything downstream, and a GSTIN already knows the answer. ?>
+      <div class="ff"><label>State</label>
+        <select class="form-control searchable" id="qa_state"><option value="">—</option>
+          <?php foreach (lk_options_or('gst_state', GST_STATES) as $sc => $sn): ?><option value="<?= e($sn) ?>"><?= e($sn) ?></option><?php endforeach; ?>
+        </select></div>
       <div class="ff"><label>Contact person <span>*</span></label><input class="form-control" id="qa_pname"></div>
       <div class="ff"><label>Mobile <span>*</span></label><input class="form-control" id="qa_pmob"></div>
       <div class="ff"><label>E-mail <span id="qa_req_mail">*</span></label><input class="form-control" id="qa_pmail"></div>
