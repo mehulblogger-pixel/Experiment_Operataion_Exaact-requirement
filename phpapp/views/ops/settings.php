@@ -73,6 +73,22 @@
       <input class="form-control" type="number" min="0" step="1000" name="fy_revenue_target" value="<?= e(setting_get('fy_revenue_target', '')) ?>" placeholder="e.g. 50000000"></div>
     <div class="ff"><label>Report-overdue escalation (days) <span class="muted">— then e-mail the reporting manager</span></label>
       <input class="form-control" type="number" min="1" name="report_escalate_days" value="<?= e(setting_get('report_escalate_days', 3)) ?>"></div>
+    <?php // A man-month is a commercial term, not a fact about the calendar,
+          // and clients mean different things by it. This is the company
+          // default; a client's record can override it, and a single deputation
+          // can override that. Most specific wins, and the allocate screen says
+          // which of the three it took. ?>
+    <div class="ff"><label>What a man-month means <span class="muted">— company default</span></label>
+      <select class="form-control" name="manmonth_basis">
+        <?php $curMm = setting_get('manmonth_basis', 'CALENDAR');
+              foreach (MANMONTH_BASES as $k => $v): ?>
+          <option value="<?= e($k) ?>" <?= $curMm === $k ? 'selected' : '' ?>><?= e($v) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <small class="muted">Overridden on a <?= e(Tl('client') ) ?>'s record, and on a single deputation, when that client's contract says something different.</small></div>
+    <div class="ff"><label>Minimum working days in a man-month</label>
+      <input class="form-control" type="number" min="1" max="31" name="manmonth_min_days" value="<?= e(setting_get('manmonth_min_days', 26)) ?>">
+      <small class="muted">Only used on the minimum-days basis. A month falling short of this is claimable pro-rata; a month exceeding it is still exactly one man-month.</small></div>
     <div class="ff"><label>Contract expiry warning (days) <span class="muted">— how far ahead to start warning</span></label>
       <input class="form-control" type="number" min="1" max="365" name="contract_warn_days" value="<?= e(setting_get('contract_warn_days', 30)) ?>">
       <small class="muted">Everyone on the order is e-mailed once when a contract comes inside this window. Past the end

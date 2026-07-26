@@ -44,6 +44,23 @@
         <?php endforeach; ?>
       </div>
       <small class="muted">Tick all that apply. In a new call for this client the Type-of-inspection list is narrowed to these. Manage the master under <a href="/lookup?key=inspection_type">Type of inspection</a>.</small></div>
+    <?php // §man-month — what this client's contract means by a man-month. Left
+          // alone it follows the company default in Settings. Set here it applies
+          // to every monthly deputation for this client, and a single deputation
+          // can still override it. ?>
+    <div class="ff"><label>What a man-month means for this <?= e(Tl('client')) ?></label>
+      <select class="form-control" name="manmonth_basis">
+        <option value="">— the company default —</option>
+        <?php $mmb = (string)($p['manmonth_basis'] ?? '');
+              foreach (MANMONTH_BASES as $k => $v): ?>
+          <option value="<?= e($k) ?>" <?= $mmb === $k ? 'selected' : '' ?>><?= e($v) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <small class="muted">Only matters for monthly deputations. The default is under <a href="/settings">Settings</a>.</small></div>
+    <div class="ff"><label>Minimum working days in their man-month</label>
+      <input class="form-control" type="number" min="1" max="31" name="manmonth_min_days"
+             value="<?= e((($p['manmonth_min_days'] ?? 0) ?: '')) ?>" placeholder="e.g. 26">
+      <small class="muted">Below this the month is claimable pro-rata; above it, it is still one man-month.</small></div>
     <?php if (function_exists('render_custom_fields')) render_custom_fields('partner', $pcfvals ?? []); ?>
   </div>
   <div style="margin-top:18px;">

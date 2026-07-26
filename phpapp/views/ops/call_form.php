@@ -155,7 +155,22 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="ff eng-box" data-for="MONTHLY"><label>How many months on site?</label>
       <input class="form-control" type="number" min="1" max="36" id="months_count" name="months_count"
              value="<?= e(($call['months_count'] ?? '') ?: '') ?>" placeholder="e.g. 1, 3, 6">
-      <small class="muted">Man-month basis — the <?= e(Tl('engineer')) ?> is posted at the works for the whole period.</small></div>
+      <small class="muted">The posting runs the 1st to the last day of the month, whatever day it starts.</small></div>
+    <?php // What a man-month means here. Blank follows the client's record, and
+          // that follows the company default in Settings. Only worth setting when
+          // this one order differs from what the client normally agrees. ?>
+    <div class="ff eng-box" data-for="MONTHLY"><label>Man-month basis <span class="muted">— blank follows the <?= e(Tl('client')) ?></span></label>
+      <select class="form-control" name="manmonth_basis">
+        <option value="">— as agreed with the <?= e(Tl('client')) ?> —</option>
+        <?php $curMm = (string)($call['manmonth_basis'] ?? '');
+              foreach (MANMONTH_BASES as $k => $v): ?>
+          <option value="<?= e($k) ?>" <?= $curMm === $k ? 'selected' : '' ?>><?= e($v) ?></option>
+        <?php endforeach; ?>
+      </select></div>
+    <div class="ff eng-box" data-for="MONTHLY"><label>Minimum working days</label>
+      <input class="form-control" type="number" min="1" max="31" name="manmonth_min_days"
+             value="<?= e((($call['manmonth_min_days'] ?? 0) ?: '')) ?>" placeholder="e.g. 26">
+      <small class="muted">Only used on the minimum-days basis.</small></div>
 
     <?php // PATTERN — how it repeats, and until when. ?>
     <div class="ff eng-box" data-for="PATTERN"><label>How does it repeat?</label>

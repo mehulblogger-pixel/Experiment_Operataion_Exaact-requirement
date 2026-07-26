@@ -819,6 +819,16 @@
       });
       var insp = document.getElementById('insp_pick') || document.querySelector('[name=inspector_id]');
       if (insp && insp.value) body.set('inspector', insp.value);
+      var cli = document.getElementById('client_sel') || document.querySelector('[name=client_id]');
+      if (cli && cli.value) body.set('client', cli.value);
+      var mb = document.querySelector('[name=manmonth_basis]');
+      if (mb && mb.value) body.set('manmonth_basis', mb.value);
+      var md = document.querySelector('[name=manmonth_min_days]');
+      if (md && md.value) body.set('manmonth_min_days', md.value);
+      // Days the coordinator has decided to work despite the calendar.
+      Array.prototype.forEach.call(document.querySelectorAll('.forceday:checked'), function (c) {
+        body.append('force_dates[]', c.value);
+      });
       var jobId = (document.querySelector('[name=_job_id]') || {}).value;
       if (jobId) body.set('job', jobId);
       // Every POST carries the one-per-session ticket; without it the request is
@@ -859,7 +869,49 @@
         bits.push(alts.length ? 'Free instead — ' + alts.join('; ') + '.' : 'Nobody else in this branch is free either.');
         bits.push('</div>');
       }
+      // A posting is billed in man-months, and how many are claimable is not
+      // the number of months on the calendar. Show the working.
+      if (d.type === 'MONTHLY' && d.manmonths && d.manmonths.length) {
+        var mm = ['<table class="grid" style="margin-top:8px"><tr><th>Month</th>'
+          + '<th style="text-align:right">Working days</th><th style="text-align:right">Man-months</th></tr>'];
+        d.manmonths.forEach(function (m) {
+          mm.push('<tr><td>' + m.label + '</td><td style="text-align:right">' + m.working_days + '</td>'
+            + '<td style="text-align:right"><strong>' + m.units.toFixed(2) + '</strong>'
+            + (m.short ? ' <span class="pill p-warn">short — pro-rata</span>' : '') + '</td></tr>');
+        });
+        mm.push('<tr><td colspan="2" style="text-align:right"><strong>Claimable</strong></td>'
+          + '<td style="text-align:right"><strong>' + Number(d.claimable).toFixed(2) + '</strong></td></tr></table>');
+        mm.push('<div class="muted" style="margin-top:4px">'
+          + (d.basis === 'MIN_DAYS'
+              ? 'A man-month here is a minimum of ' + d.minDays + ' working days: below that it is pro-rata, above it is still one.'
+              : 'A man-month here is the calendar month, whatever the working days come to.')
+          + ' Taken from ' + (d.basisFrom || 'the default') + '.</div>');
+        bits.push(mm.join(''));
+      }
+      // Sundays and holidays inside the run. The engagement steps over them on
+      // its own; ticking one puts it back, which is the coordinator's call and
+      // nobody else's.
+      if (d.skipped && d.skipped.length) {
+        var sk = ['<div style="margin-top:8px"><strong>Stepped over</strong> '
+          + '<span class="muted">— tick any day the ' + (window.__engineerWord || 'engineer')
+          + ' will work anyway, and the end date moves back.</span>'
+          + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">'];
+        d.skipped.forEach(function (x) {
+          sk.push('<label class="ff-check"><input type="checkbox" class="forceday" name="force_dates[]" value="'
+            + x.date + '"> ' + x.weekday + ' ' + x.pretty + ' <span class="muted">(' + x.why + ')</span></label>');
+        });
+        sk.push('</div></div>');
+        bits.push(sk.join(''));
+      }
       out.innerHTML = bits.join('');
+      // Anything already forced stays ticked when the panel is redrawn.
+      (d.forced || []).forEach(function (f) {
+        var c = out.querySelector('.forceday[value="' + f + '"]');
+        if (c) c.checked = true;
+      });
+      Array.prototype.forEach.call(out.querySelectorAll('.forceday'), function (c) {
+        c.addEventListener('change', later);
+      });
       perVisit(d);
     }
     // A run of named dates may be covered by more than one engineer — the

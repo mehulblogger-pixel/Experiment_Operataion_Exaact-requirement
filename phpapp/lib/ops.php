@@ -2539,8 +2539,13 @@ function ops_calls($route, $method) {
             $wd = array_values(array_filter(array_map('intval', (array)($b['schedule_weekdays'] ?? []))));
             $b['schedule_weekdays'] = implode(',', $wd);
             $b['inspection_dates']  = implode(',', call_dates_parse(implode(',', (array)($b['inspection_dates'] ?? []))));
+            // Days the coordinator has decided will be worked despite falling on
+            // a Sunday or a holiday. Recorded, because it is a decision.
+            $b['force_dates'] = implode(',', call_dates_parse(implode(',', (array)($b['force_dates'] ?? []))));
+            if (!isset(MANMONTH_BASES[(string)($b['manmonth_basis'] ?? '')])) $b['manmonth_basis'] = '';
             $sr = sched_resolve($b, $execOffice ?: ($b['ibo_office_id'] ?? null),
-                                ($b['inspection_required_date'] ?? '') ?: null);
+                                ($b['inspection_required_date'] ?? '') ?: null,
+                                (int)($b['client_id'] ?? 0) ?: null);
             $dates = $sr['dates'];
             // The worked-out dates are stored, so nothing downstream has to
             // recompute them and nothing can disagree about what was booked.
@@ -2559,6 +2564,12 @@ function ops_calls($route, $method) {
             // a quantity, it is the number of visit dates after expansion.
             $qtyAuto = ($b['billable_qty_auto'] ?? '1') !== '0';
             if ($qty <= 0 || $qtyAuto) $qty = max(1, count($dates));
+            // A posting is not billed by the day. What is claimable is the
+            // man-months the months actually came to — pro-rata for a month that
+            // fell short of the agreed minimum, and capped at one for a month
+            // that ran over it.
+            if (($b['engagement_type'] ?? '') === 'MONTHLY' && ($sr['claimable'] ?? 0) > 0)
+                $qty = (float)$sr['claimable'];
             $b['billable_qty'] = $qty;
             if ($rate > 0) $b['billable_value'] = round($rate * $qty, 2);
             // The client's expected date is the first visit, so the two never disagree.
@@ -2570,6 +2581,7 @@ function ops_calls($route, $method) {
                 'quotation_id','quote_line_id','contract_number','folder_link',
                 'inspection_dates','schedule_end_date','schedule_weekdays',
                 'engagement_type','days_count','months_count','pattern_kind','pattern_n',
+                'force_dates','manmonth_basis','manmonth_min_days',
                 'reporting_frequency','report_custom_days','deliverables','is_outstation'];
             $wasForwarded = $call ? ($call['executing_office_id'] ?? null) : null;
             $forwardNow = $execOffice && !$wasForwarded; // first time it gets an executing branch
@@ -2731,7 +2743,7 @@ function nzc_call($f, $v) {
     if (in_array($f, ['expected_credit','billable_value','credit_required'], true)) return $v === '' ? 0 : $v;
     // The counts only exist for the shape that uses them; a box that was never
     // shown posts nothing, and nothing means none.
-    if (in_array($f, ['days_count','months_count','pattern_n'], true)) return $v === '' ? 0 : (int)$v;
+    if (in_array($f, ['days_count','months_count','pattern_n','manmonth_min_days'], true)) return $v === '' ? 0 : (int)$v;
     return $v;
 }
 // True when the managing / contracting office also executes the call (or
@@ -3408,7 +3420,7 @@ function ops_jobs($route, $method) {
             $fields = ['executing_office_id','inspector_id','subcon_id','job_type','stage','scheduled_date','inspection_start_date','inspection_end_date',
                 'random_date1','random_date2','random_date3','folder_link','contract_number','inspection_dates','boss_id',
                 'engagement_type','days_count','months_count','pattern_kind','pattern_n',
-                'schedule_weekdays','schedule_end_date',
+                'schedule_weekdays','schedule_end_date','force_dates','manmonth_basis','manmonth_min_days',
                 'invoice_value','contracting_office_id','expected_credit','credit_type','credit_direction',
                 'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost','quotation_id','is_outstation'];
             // deliverables come as a checkbox array -> stored as CSV of codes
@@ -3427,10 +3439,14 @@ function ops_jobs($route, $method) {
                 ?: (string)($call['schedule_weekdays'] ?? '');
             $b['inspection_dates'] = implode(',', call_dates_parse(implode(',', (array)($b['inspection_dates'] ?? []))));
             if ($b['inspection_dates'] === '') $b['inspection_dates'] = (string)($call['inspection_dates'] ?? '');
+            $b['force_dates'] = implode(',', call_dates_parse(implode(',', (array)($b['force_dates'] ?? []))));
+            if (!isset(MANMONTH_BASES[(string)($b['manmonth_basis'] ?? '')]))
+                $b['manmonth_basis'] = (string)($call['manmonth_basis'] ?? '');
+            if (($b['manmonth_min_days'] ?? '') === '') $b['manmonth_min_days'] = (int)($call['manmonth_min_days'] ?? 0);
             $jExecForDates = ($b['executing_office_id'] ?? '') !== ''
                 ? (int)$b['executing_office_id'] : (int)($call['executing_office_id'] ?? 0);
             $start = ($b['scheduled_date'] ?? '') ?: ($call['inspection_required_date'] ?? '');
-            $jr = sched_resolve($b, $jExecForDates ?: null, $start ?: null);
+            $jr = sched_resolve($b, $jExecForDates ?: null, $start ?: null, (int)($call['client_id'] ?? 0) ?: null);
             $jdates = $jr['dates'];
             $b['inspection_dates'] = implode(',', $jdates);
             if ($jdates) {
@@ -3674,6 +3690,7 @@ function nzc($f, $v) {
     $nullable = ['executing_office_id','contracting_office_id','inspector_id','subcon_id','boss_id','activity_id','report_custom_days','quotation_id'];
     if (in_array($f, $nullable) && $v === '') return null;
     if (in_array($f, ['expected_credit','invoice_value','mandays','subcon_cost']) && $v === '') return 0;
+    if (in_array($f, ['days_count','months_count','pattern_n','manmonth_min_days'], true)) return $v === '' ? 0 : (int)$v;
     return $v;
 }
 // Full partner detail (record + contacts + addresses) for the allocate-job info panel.
@@ -4422,6 +4439,11 @@ function ops_settings($method) {
         setting_set('fy_revenue_target', (float)($_POST['fy_revenue_target'] ?? 0));
         setting_set('report_escalate_days', max(1, (int)($_POST['report_escalate_days'] ?? 3)));
         setting_set('contract_warn_days', min(365, max(1, (int)($_POST['contract_warn_days'] ?? 30))));
+        // What a man-month means, company-wide, unless a client or a single
+        // deputation says otherwise.
+        $mmb = (string)($_POST['manmonth_basis'] ?? 'CALENDAR');
+        setting_set('manmonth_basis', isset(MANMONTH_BASES[$mmb]) ? $mmb : 'CALENDAR');
+        setting_set('manmonth_min_days', min(31, max(1, (int)($_POST['manmonth_min_days'] ?? 26))));
         setting_set('app_name', trim($_POST['app_name'] ?? ''));
         // Working norms & limits (were hard-coded before)
         $cap = (float)($_POST['daily_hours_cap'] ?? 8.5);

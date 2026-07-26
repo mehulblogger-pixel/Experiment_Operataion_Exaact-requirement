@@ -194,10 +194,14 @@ try {
     db()->query("SELECT engagement_type FROM jobs LIMIT 1");
     db()->query("SELECT office_id FROM holidays LIMIT 1");
     db()->query("SELECT visit_date FROM job_visits LIMIT 1");
+    db()->query("SELECT force_dates, manmonth_basis FROM calls LIMIT 1");
+    db()->query("SELECT manmonth_basis FROM business_partners LIMIT 1");
     db()->query("SELECT engagement_type, days_count, months_count, pattern_kind FROM calls LIMIT 1");
     db()->query("SELECT engagement_type FROM jobs LIMIT 1");
     db()->query("SELECT office_id FROM holidays LIMIT 1");
     db()->query("SELECT visit_date FROM job_visits LIMIT 1");
+    db()->query("SELECT force_dates, manmonth_basis FROM calls LIMIT 1");
+    db()->query("SELECT manmonth_basis FROM business_partners LIMIT 1");
     db()->query("SELECT quotation_id FROM partner_purchase_orders LIMIT 1");
     db()->query("SELECT contract_number FROM cost_allocations LIMIT 1");
     db()->query("SELECT id FROM security_incidents LIMIT 1");
@@ -501,6 +505,12 @@ if ($route === 'partner-new') {
         $id = $pdo->lastInsertId();
         $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
             ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $id]);
+        // What a man-month means for this client, when their contract differs
+        // from the company default. Blank falls back, which is the common case.
+        $mmB = (string)($b['manmonth_basis'] ?? '');
+        if (!isset(MANMONTH_BASES[$mmB])) $mmB = '';
+        $pdo->prepare("UPDATE business_partners SET manmonth_basis=?, manmonth_min_days=? WHERE id=?")
+            ->execute([$mmB, (int)($b['manmonth_min_days'] ?? 0), $id]);
         custom_save('partner', $id, $b);
         // Whatever sales already knew about this company: the inspections they
         // asked for, the person they were talking to, and the inquiries and
@@ -533,6 +543,12 @@ if ($route === 'partner-edit') {
             ->execute([$b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $p['id']]);
         $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
             ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $p['id']]);
+        // What a man-month means for this client, when their contract differs
+        // from the company default. Blank falls back, which is the common case.
+        $mmB = (string)($b['manmonth_basis'] ?? '');
+        if (!isset(MANMONTH_BASES[$mmB])) $mmB = '';
+        $pdo->prepare("UPDATE business_partners SET manmonth_basis=?, manmonth_min_days=? WHERE id=?")
+            ->execute([$mmB, (int)($b['manmonth_min_days'] ?? 0), $p['id']]);
         custom_save('partner', $p['id'], $b);
         flash('Updated.');
         redirect("/partner?id={$p['id']}");
