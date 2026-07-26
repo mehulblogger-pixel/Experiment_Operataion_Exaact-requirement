@@ -1,11 +1,23 @@
 <h1>Masters</h1>
 <p class="sub">The reference lists the Calls and Jobs screens draw from. Add or edit these first.</p>
 <div class="card-grid">
-  <?php foreach ($masters as $key => $cfg): if (!master_access_ok($cfg['access'])) continue; ?>
-    <a class="master-card" href="/m/<?= e($key) ?>">
-      <strong><?= e($cfg['label']) ?></strong>
-      <span class="muted"><?= (int)ops_val("SELECT COUNT(*) FROM {$cfg['table']}") ?> record(s)</span>
-    </a>
+  <?php // Some of these are the same records the Organisation module maintains.
+        // Two editors over one table is how the same office ends up with two
+        // versions of itself, so those cards send you to the one place that
+        // owns them instead of opening a second form over the top. ?>
+  <?php foreach ($masters as $key => $cfg): if (!master_access_ok($cfg['access'])) continue;
+        $n = (int)ops_val("SELECT COUNT(*) FROM {$cfg['table']}"); ?>
+    <?php if (!empty($cfg['goto'])): ?>
+      <a class="master-card" href="<?= e($cfg['goto']) ?>">
+        <strong><?= e($cfg['label']) ?></strong>
+        <span class="muted"><?= $n ?> record(s) · <?= e($cfg['goto_note'] ?? 'maintained elsewhere') ?> →</span>
+      </a>
+    <?php else: ?>
+      <a class="master-card" href="/m/<?= e($key) ?>">
+        <strong><?= e($cfg['label']) ?></strong>
+        <span class="muted"><?= $n ?> record(s)</span>
+      </a>
+    <?php endif; ?>
   <?php endforeach; ?>
   <a class="master-card" href="/clients"><strong>Clients</strong><span class="muted"><?= e(T('client')) ?> master</span></a>
   <a class="master-card" href="/vendors"><strong>Vendors</strong><span class="muted">Manufacturer / supplier master</span></a>

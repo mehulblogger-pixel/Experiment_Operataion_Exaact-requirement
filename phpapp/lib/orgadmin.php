@@ -99,6 +99,23 @@ function person_quick_create($name, $email = '', $designation = '', $officeId = 
     return $id;
 }
 
+// Adding an office from wherever one is being asked for. Same table the
+// Organisation screen owns, so it appears there — and in every other dropdown —
+// the moment it is saved. Returns the new id, or 0 if there was nothing to add.
+function office_quick_create($name, $code = '', $city = '', $type = 'BRANCH') {
+    $name = trim((string)$name);
+    if ($name === '') return 0;
+    if (ops_val("SELECT COUNT(*) FROM offices WHERE LOWER(name)=?", [strtolower($name)]) > 0)
+        return (int)ops_val("SELECT id FROM offices WHERE LOWER(name)=?", [strtolower($name)]);
+    $type = isset(OFFICE_TYPES[$type]) ? $type : 'BRANCH';
+    db()->prepare("INSERT INTO offices (code,name,city,region,office_type,parent_office_id,head_user_id,
+                   address,phone,is_active,sort_order,is_ahmedabad) VALUES (?,?,?,'',?,NULL,NULL,'','',1,0,0)")
+        ->execute([strtoupper(trim((string)$code)), $name, trim((string)$city), $type]);
+    $id = (int)db()->lastInsertId();
+    idems_log('office', $id, 'CREATE', ['field' => $name, 'reason' => 'added from a form that needed one']);
+    return $id;
+}
+
 // ---------------------------------------------------------------------------
 //  One shell for the whole module
 //
@@ -1084,6 +1101,31 @@ function ops_hierarchy_screen($method) {
                 db()->prepare("UPDATE offices SET is_active=? WHERE id=?")->execute([$cur ? 0 : 1, $id]);
                 flash(TH('office') . ($cur ? ' marked inactive.' : ' reactivated.'));
             }
+
+        } elseif ($do === 'bos-import') {
+            // Back-office staff was a second list of people. Rather than strand
+            // whatever was typed into it, it is brought across into the one
+            // register — matched on name so running it twice changes nothing.
+            $n = 0; $skip = 0;
+            foreach (ops_all("SELECT * FROM back_office_staff") as $s) {
+                $nm = trim((string)($s['name'] ?? ''));
+                if ($nm === '') { $skip++; continue; }
+                $parts = preg_split('/\s+/', $nm, 2);
+                $exists = ops_val("SELECT COUNT(*) FROM users WHERE LOWER(TRIM(first_name || ' ' || last_name))=?",
+                                  [strtolower($nm)]);
+                if (db_driver() !== 'sqlite')
+                    $exists = ops_val("SELECT COUNT(*) FROM users WHERE LOWER(TRIM(CONCAT(first_name,' ',last_name)))=?",
+                                      [strtolower($nm)]);
+                if ($exists > 0) { $skip++; continue; }
+                person_quick_create($nm, $s['email'] ?? '', $s['designation'] ?? '',
+                                    $s['office_id'] ?? null, 'COORDINATOR');
+                $n++;
+            }
+            flash($n ? $n . ' back-office staff brought into the people register'
+                       . ($skip ? ', ' . $skip . ' skipped (already there, or no name)' : '')
+                       . '. They have no password yet, so nobody can sign in as them until you set one.'
+                     : 'Nothing to bring across — everybody in that list is already here.', $n ? 'success' : 'info');
+            redirect('/hierarchy?tab=people');
 
         } elseif ($do === 'office-delete') {
             // Deleting is offered because an office typed by mistake should not

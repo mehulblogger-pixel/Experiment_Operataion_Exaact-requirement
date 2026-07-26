@@ -1223,6 +1223,10 @@ function ops_masters() {
     return [
         'offices' => [
             'label' => 'Offices / branches', 'table' => 'offices', 'access' => 'admin', 'order' => 'is_ahmedabad DESC, name',
+            // One table, one editor. The Organisation screen owns these: it is
+            // the only one that also maintains the tree and the head of each
+            // office, so a second form here would quietly write half a record.
+            'goto' => '/hierarchy?tab=offices', 'goto_note' => 'in Organisation & people',
             // Same columns the Organisation screen writes — the two editors are
             // views on one table, so an office never has two versions of itself.
             'fields' => [
@@ -1246,6 +1250,10 @@ function ops_masters() {
         ],
         'back-office' => [
             'label' => 'Back-office staff', 'table' => 'back_office_staff', 'access' => 'admin', 'order' => 'name',
+            // These are people, and people live in one register. Kept as a table
+            // so nothing already typed here is lost, but the card sends you to
+            // the People tab and anything still in here is offered for moving.
+            'goto' => '/hierarchy?tab=people', 'goto_note' => 'people live in Organisation & people',
             'fields' => [
                 ['name','Name','text',['req'=>1]],
                 ['emp_code','Employee code','text',[]],
@@ -3737,7 +3745,16 @@ function ops_users($route, $method) {
             $isSuper = $role === 'MASTER_ADMIN' ? 1 : 0;
             $insId = ($b['inspector_id'] ?? '') !== '' ? (int)$b['inspector_id'] : null;
             // scope: global managers set anything; branch managers pin to their office
-            $homeOffice = $globalMgr ? (($b['home_office_id'] ?? '') !== '' ? (int)$b['home_office_id'] : null) : $myOffice;
+            // "+ Add an office" on this form writes into the one office list,
+            // so it is there for everybody the moment this person is saved.
+            $homeRaw = (string)($b['home_office_id'] ?? '');
+            if ($globalMgr && $homeRaw === '__new__') {
+                $homeOffice = office_quick_create($b['new_office_name'] ?? '', $b['new_office_code'] ?? '',
+                                                  $b['new_office_city'] ?? '', $b['new_office_type'] ?? 'BRANCH') ?: null;
+                if (!$homeOffice) flash('The ' . Tl('office') . ' needs a name, so none was added.', 'warning');
+            } else {
+                $homeOffice = $globalMgr ? ($homeRaw !== '' ? (int)$homeRaw : null) : $myOffice;
+            }
             // Both scopes arrive as tick-lists now. "Every…" wins over the
             // individual ticks, and is stored as ALL so an office added next
             // year is included without anybody revisiting this person.

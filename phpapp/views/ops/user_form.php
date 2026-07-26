@@ -34,10 +34,48 @@
     <div class="ff"><label>Email</label><input class="form-control" name="email" value="<?= e($user['email'] ?? '') ?>"></div>
     <div class="ff"><label>Role</label>
       <select class="form-control searchable" name="role"><?php foreach ($roleList as $k=>$v): ?><option value="<?= $k ?>" <?= $curRole===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Home office</label>
-      <select class="form-control searchable" name="home_office_id" <?= $globalMgr?'':'disabled' ?>><option value="">—</option>
+    <?php // The same offices the Organisation screen owns — one table, so one
+          // added here shows up there and in every other dropdown at once. And
+          // it can be added here, because being sent to another screen halfway
+          // through this form loses everything already typed. ?>
+    <div class="ff"><label>Home <?= e(Tl('office')) ?></label>
+      <select class="form-control searchable" name="home_office_id" id="u_home_off" <?= $globalMgr?'':'disabled' ?>><option value="">—</option>
         <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= (($user['home_office_id'] ?? '')==$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
-      </select><?php if (!$globalMgr): ?><small class="muted">Fixed to your office.</small><?php endif; ?></div>
+        <?php if ($globalMgr): ?><option value="__new__">+ Add an <?= e(Tl('office')) ?> not on this list…</option><?php endif; ?>
+      </select><?php if (!$globalMgr): ?><small class="muted">Fixed to your <?= e(Tl('office')) ?>.</small><?php endif; ?></div>
+    <?php if ($globalMgr): ?>
+    <div class="ff ff-wide" id="u_home_off_new" style="display:none">
+      <div class="panel" style="margin:0;padding:12px;background:var(--field)">
+        <b style="font-size:13px">New <?= e(Tl('office')) ?></b>
+        <div class="muted" style="font-size:12.5px;margin:2px 0 8px">Added to the one <?= e(Tl('office')) ?> list, so it appears
+          under <a href="/hierarchy?tab=offices">Organisation &amp; people</a> and in every other dropdown straight away.</div>
+        <div class="form-grid" style="margin:0">
+          <div class="ff"><label>Name *</label><input class="form-control" name="new_office_name" placeholder="e.g. Surat"></div>
+          <div class="ff"><label>Code</label><input class="form-control" name="new_office_code" placeholder="e.g. SUR"></div>
+          <div class="ff"><label>City</label><input class="form-control" name="new_office_city"></div>
+          <div class="ff"><label>Type</label>
+            <select class="form-control" name="new_office_type">
+              <?php foreach (OFFICE_TYPES as $ok => $ol): ?>
+                <option value="<?= e($ok) ?>"<?= $ok === 'BRANCH' ? ' selected' : '' ?>><?= e($ol) ?></option>
+              <?php endforeach; ?>
+            </select></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var s = document.getElementById('u_home_off'), box = document.getElementById('u_home_off_new');
+        if (!s || !box) return;
+        function sync() {
+          var isNew = s.value === '__new__';
+          box.style.display = isNew ? '' : 'none';
+          var n = box.querySelector('input[name=new_office_name]');
+          if (isNew && n) n.focus();
+        }
+        s.addEventListener('change', sync); sync();
+      })();
+    </script>
+    <?php endif; ?>
     <div class="ff"><label>Linked inspector (Inspector role)</label>
       <select class="form-control searchable" name="inspector_id"><option value="">—</option>
         <?php foreach ($inspectors as $i): ?><option value="<?= (int)$i['id'] ?>" <?= ($user && $user['inspector_id']==$i['id'])?'selected':'' ?>><?= e($i['name']) ?></option><?php endforeach; ?>
