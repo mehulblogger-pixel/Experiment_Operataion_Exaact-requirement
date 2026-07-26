@@ -49,8 +49,163 @@ const OFFICE_TYPES = [
     'REGION'      => 'Region / zone',
     'BRANCH'      => 'Branch office',
     'SITE_OFFICE' => 'Site / project office',
-    'IBO'         => 'Affiliate (IBO)',
+    // The key stays IBO so offices already saved with it keep their type; only
+    // the words on screen change.
+    'IBO'         => 'Affiliate office',
 ];
+
+// ---------------------------------------------------------------------------
+//  One shell for the whole module
+//
+//  The reporting tree, the office list, the people grid and the login accounts
+//  were two separate screens that happened to edit the same rows, each with its
+//  own heading and its own words for the same thing. They are one thing, so
+//  they now share one header, one tab bar and one vocabulary — and every tab
+//  carries a Back that goes somewhere sensible rather than relying on the
+//  browser button.
+// ---------------------------------------------------------------------------
+function org_tabs() {
+    return [
+        'chart'   => ['Chart',        '/hierarchy?tab=chart'],
+        'offices' => [THP('office'),  '/hierarchy?tab=offices'],
+        'people'  => ['People',       '/hierarchy?tab=people'],
+        'users'   => ['Login accounts', '/users'],
+        'import'  => ['Excel upload', '/hierarchy?tab=import'],
+        'gaps'    => ['Gaps',         '/hierarchy?tab=gaps'],
+    ];
+}
+// $back is where the Back button goes; pass '' for the module's own front page.
+function org_head($tab, $subtitle = '', $back = '', $backLabel = '', $actions = '') {
+    $tabs = org_tabs();
+    $gaps = function_exists('org_gaps') ? count(org_gaps()) : 0;
+    $back = $back ?: '/hierarchy?tab=' . ($tab === 'users' ? 'people' : 'chart');
+    $backLabel = $backLabel ?: 'Back';
+    ob_start(); ?>
+<div class="crumbs"><a href="/">Home</a> › <a href="/hierarchy">Organisation &amp; people</a>
+  <?= $tab && isset($tabs[$tab]) ? ' › ' . e($tabs[$tab][0]) : '' ?></div>
+<div class="master-head">
+  <div style="display:flex;align-items:flex-start;gap:12px">
+    <?php // Every screen in this module has this. It is the single most-asked-for
+          // thing on any register: a way back that does not lose your place. ?>
+    <a class="btn secondary" href="<?= e($back) ?>" title="Back" style="margin-top:2px">← <?= e($backLabel) ?></a>
+    <div><h1>Organisation &amp; people</h1>
+      <p class="sub" style="margin:2px 0 0"><?= $subtitle ?></p></div>
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap"><?= $actions ?>
+    <button class="btn secondary" onclick="window.print()">Print</button></div>
+</div>
+<div class="tabs">
+  <?php foreach ($tabs as $k => [$label, $href]): ?>
+    <a href="<?= e($href) ?>"<?= $tab === $k ? ' class="active"' : '' ?>><?= e($label) ?><?php
+      if ($k === 'gaps' && $gaps) echo ' (' . (int)$gaps . ')'; ?></a>
+  <?php endforeach; ?>
+</div>
+<?php return ob_get_clean();
+}
+
+// ---------------------------------------------------------------------------
+//  What to do first
+//
+//  Somebody opening this for the first time sees six tabs and no idea which one
+//  starts. The order actually matters — a person cannot be given an office that
+//  does not exist yet, and cannot be given a designation that is not on the
+//  master. So the order is stated, each step knows whether it is done, and the
+//  first one that is not done is the one highlighted.
+// ---------------------------------------------------------------------------
+function org_start_here() {
+    $offices = (int)ops_val("SELECT COUNT(*) FROM offices WHERE is_active=1");
+    $desig   = count(lk_options_or('designation', DESIGNATIONS));
+    $sbus    = count(lk_options_or('sbu', OPS_SBUS));
+    $people  = (int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1");
+    $placed  = (int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1 AND COALESCE(reports_to_id,0)>0");
+    $homed   = (int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1 AND COALESCE(home_office_id,0)>0");
+    return [
+        ['n'=>1, 'title'=>'Set up your ' . Tlp('office'),
+         'why'=>'Everything else hangs off these. A person cannot be given an ' . Tl('office') . ' that does not exist yet.',
+         'done'=>$offices > 0, 'state'=>$offices . ' active', 'href'=>'/hierarchy?tab=offices', 'cta'=>'Open ' . Tlp('office')],
+        ['n'=>2, 'title'=>'Check the designation list',
+         'why'=>'Job titles come from this master, so everybody\'s card reads the same way and reports can group by it.',
+         'done'=>$desig > 0, 'state'=>$desig . ' on the list', 'href'=>'/m/designation', 'cta'=>'Open the master'],
+        ['n'=>3, 'title'=>'Check the ' . Tlp('sbu') . ' list',
+         'why'=>'A person can belong to more than one. The list comes from the master, not typed in by hand.',
+         'done'=>$sbus > 0, 'state'=>$sbus . ' on the list', 'href'=>'/m/sbu', 'cta'=>'Open the master'],
+        ['n'=>4, 'title'=>'Add your people',
+         'why'=>'One row per person. Add them one at a time, or upload the whole register from Excel.',
+         'done'=>$people > 1, 'state'=>$people . ' active', 'href'=>'/user-new', 'cta'=>'Add a person'],
+        ['n'=>5, 'title'=>'Give each person a home ' . Tl('office'),
+         'why'=>'This is what decides which records they see.',
+         'done'=>$people > 0 && $homed >= $people, 'state'=>$homed . ' of ' . $people . ' done',
+         'href'=>'/hierarchy?tab=people', 'cta'=>'Open People'],
+        ['n'=>6, 'title'=>'Say who reports to whom',
+         'why'=>'The reporting line drives approvals, escalation and the chart. "Place everyone automatically" gets you most of the way.',
+         'done'=>$people > 1 && $placed >= $people - 1, 'state'=>$placed . ' of ' . max(0, $people - 1) . ' placed',
+         'href'=>'/hierarchy?tab=chart', 'cta'=>'Open the chart'],
+    ];
+}
+
+// ---------------------------------------------------------------------------
+//  Is anything pointing at this office?
+//
+//  Asked before an office is deleted. Rather than keep a hand-written list of
+//  the tables that reference one — which is exactly the list that goes stale
+//  the next time a column is added — the database is asked what its own
+//  columns are, and every column whose name ends in office_id is counted. A
+//  table added next year is covered without anybody remembering.
+// ---------------------------------------------------------------------------
+function db_tables() {
+    try {
+        if (db_driver() === 'sqlite')
+            return db()->query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+                       ->fetchAll(PDO::FETCH_COLUMN);
+        return db()->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Throwable $e) { return []; }
+}
+function db_columns($table) {
+    try {
+        if (db_driver() === 'sqlite') {
+            $out = [];
+            foreach (db()->query("PRAGMA table_info(`$table`)")->fetchAll() as $c) $out[] = $c['name'];
+            return $out;
+        }
+        return db()->query("SHOW COLUMNS FROM `$table`")->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Throwable $e) { return []; }
+}
+// Returns ['<plain-English place>' => count, …]; empty means nothing points here.
+function office_in_use($officeId) {
+    $officeId = (int)$officeId;
+    if (!$officeId) return [];
+    // Table name → what a person calls the things in it.
+    $friendly = [
+        'calls' => 'inspection calls', 'jobs' => 'deputations', 'users' => 'people',
+        'inspectors' => 'inspection engineers', 'vouchers' => 'vouchers',
+        'quotations' => 'quotations', 'crm_inquiries' => 'inquiries',
+        'business_partners' => 'clients and vendors', 'report_docs' => 'reports',
+        'endorsements' => 'endorsements', 'work_norms' => 'working-hour norms',
+        'offices' => 'other offices sitting under it', 'requisitions' => 'requisitions',
+        'boss_numbers' => 'BOSS numbers', 'idems_audit' => 'audit entries',
+    ];
+    $out = [];
+    foreach (db_tables() as $t) {
+        if ($t === 'idems_audit') continue;                 // the trail is never a reason to keep a row
+        foreach (db_columns($t) as $c) {
+            if (!preg_match('/office_id$/i', $c)) continue;
+            try {
+                $n = (int)ops_val("SELECT COUNT(*) FROM `$t` WHERE `$c` = ?", [$officeId]);
+            } catch (Throwable $e) { continue; }
+            if ($n <= 0) continue;
+            $label = $friendly[$t] ?? str_replace('_', ' ', $t);
+            $out[$label] = ($out[$label] ?? 0) + $n;
+        }
+    }
+    return $out;
+}
+function office_in_use_text(array $uses) {
+    $bits = [];
+    foreach ($uses as $what => $n) $bits[] = $n . ' ' . $what;
+    if (!$bits) return 'nothing points at it.';
+    $last = array_pop($bits);
+    return 'it is still used by ' . ($bits ? implode(', ', $bits) . ' and ' . $last : $last) . '.';
+}
 
 // ---------------------------------------------------------------------------
 //  Office tree
@@ -871,6 +1026,28 @@ function ops_hierarchy_screen($method) {
                 $cur = (int)ops_val("SELECT is_active FROM offices WHERE id=?", [$id]);
                 db()->prepare("UPDATE offices SET is_active=? WHERE id=?")->execute([$cur ? 0 : 1, $id]);
                 flash(TH('office') . ($cur ? ' marked inactive.' : ' reactivated.'));
+            }
+
+        } elseif ($do === 'office-delete') {
+            // Deleting is offered because an office typed by mistake should not
+            // have to sit there for ever marked inactive. But an office that
+            // work has been booked against is not a mistake — removing it would
+            // orphan calls, jobs and vouchers and silently break every figure
+            // computed from them. So it is only removed when nothing points at
+            // it, and when something does, the screen says exactly what.
+            $id = (int)($_POST['office_id'] ?? 0);
+            $o  = $id ? ops_one("SELECT * FROM offices WHERE id=?", [$id]) : null;
+            if (!$o) { flash('That ' . Tl('office') . ' no longer exists.', 'error'); }
+            else {
+                $uses = office_in_use($id);
+                if ($uses) {
+                    flash(TH('office') . ' “' . $o['name'] . '” cannot be deleted — ' . office_in_use_text($uses)
+                        . ' Deactivate it instead: it disappears from every dropdown and nothing already recorded changes.', 'error');
+                } else {
+                    db()->prepare("DELETE FROM offices WHERE id=?")->execute([$id]);
+                    idems_log('office', $id, 'DELETE', ['field' => $o['name'], 'reason' => 'nothing was booked against it']);
+                    flash(TH('office') . ' “' . $o['name'] . '” deleted. Nothing was recorded against it, so nothing else changed.');
+                }
             }
 
         } elseif ($do === 'import-preview') {

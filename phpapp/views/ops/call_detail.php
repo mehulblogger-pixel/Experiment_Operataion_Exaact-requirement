@@ -111,7 +111,7 @@
   <div class="kv-grid">
     <div><span class="k">Client</span><?= e($call['client_disp'] ?: $call['client_name'] ?: '—') ?></div>
     <div><span class="k">Vendor / Site</span><?= e($call['vendor_name'] ?: '—') ?></div>
-    <div><span class="k">Managing / IBO</span><?= e($call['ibo_name'] ?: 'Ahmedabad (own)') ?></div>
+    <div><span class="k">Contracting <?= e(Tl('office')) ?></span><?= e($call['ibo_name'] ?: 'Ahmedabad (own)') ?></div>
     <div><span class="k">Executing branch</span><?= e($call['exec_name'] ?: 'Ahmedabad executes') ?><?= $call['coordinator_name'] ? '<br><small class="muted">Coord: '.e($call['coordinator_name']).'</small>' : '' ?></div>
     <div><span class="k">SBU</span><?= e(lk_options_or('sbu', OPS_SBUS)[$call['sbu']] ?? '—') ?></div>
     <div><span class="k">Activity</span><?= e($call['activity_id'] ? lk_value_path($call['activity_id']) : '—') ?></div>

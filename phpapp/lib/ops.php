@@ -11,7 +11,7 @@ const OPS_REGIONS = ['WEST'=>'West','NORTH'=>'North','SOUTH'=>'South','EAST'=>'E
 const OPS_SBUS = ['IND'=>'Industrial','OGC'=>'Oil, Gas & Chemicals','MIN'=>'Minerals','GIS'=>'Governments & Institutions','AGRI'=>'Agriculture & Food','CRS'=>'Consumer & Retail','ENV'=>'Environment','OTHER'=>'Other'];
 const PRODUCT_CATS = ['ELEC'=>'Electrical equipment','MECH'=>'Mechanical equipment','STRUCT'=>'Structural / Fabrication','PIPE'=>'Pipes & Fittings','VALVE'=>'Valves','PUMP'=>'Pumps & Rotating','TRANSFORMER'=>'Transformers','CABLE'=>'Cables','INSTRUMENT'=>'Instrumentation','CIVIL'=>'Civil / Construction','OTHER'=>'Others'];
 const CREDIT_TYPES = ['MANDAY'=>'Man-day','MANMONTH'=>'Man-month','LUMP'=>'Lump sum','LATER'=>'Decide later','OTHER'=>'Other'];
-const CREDIT_DIRECTIONS = ['RECEIVED'=>'Received (IBO → Ahmedabad)','GIVEN'=>'Given (Ahmedabad → IBO)'];
+const CREDIT_DIRECTIONS = ['RECEIVED'=>'Received (from the other office)','GIVEN'=>'Given (to the other office)'];
 const REPORT_FREQ = ['DAILY'=>'Daily','ALTERNATE'=>'Alternate day','WEEKLY'=>'Weekly','FORTNIGHTLY'=>'Fortnightly','MONTHLY'=>'Monthly','CUSTOM'=>'Custom (every N days)','NOREPORT'=>'No report'];
 // Types of inspection service (third-party inspection industry).
 const INSPECTION_TYPES = ['INSPECTION'=>'Inspection (third-party / TPI)','EXPEDITING'=>'Expediting','DEPUTATION'=>'Resident / site posting','VENDOR_ASSESS'=>'Vendor assessment','VENDOR_AUDIT'=>'Vendor audit','PRE_PROD'=>'Pre-production inspection','DURING_PROD'=>'During-production inspection','STAGE'=>'Stage / In-process inspection','FINAL'=>'Final inspection','FRI'=>'Final random inspection (FRI)','PSI'=>'Pre-shipment inspection (PSI)','WITNESS'=>'Witness / Test witnessing','FAT'=>'Factory Acceptance Test (FAT)','SAT'=>'Site Acceptance Test (SAT)','SOURCE'=>'Source inspection','SURVEILLANCE'=>'Surveillance','LOADING'=>'Loading / container supervision','SAMPLING'=>'Sampling','DIMENSIONAL'=>'Dimensional inspection','WELDING'=>'Welding inspection','NDT'=>'NDT witnessing','PMI'=>'Material verification (PMI)','COATING'=>'Painting / coating inspection','MECH_TEST'=>'Mechanical testing witness','CALIB'=>'Calibration verification','SAFETY_AUDIT'=>'Safety audit','SYSTEM_AUDIT'=>'Management-system audit','SECOND_PARTY'=>'Second-party audit','DESKTOP'=>'Desktop / Document review','TECH_AUDIT'=>'Technical audit','SUPPLY_CHAIN'=>'Supply-chain posting','SITE_SUP'=>'Site supervision','COMMISSIONING'=>'Commissioning & installation','SITE_QAQC'=>'Site QA / QC','TYPE_TEST'=>'Type test','TENDER_REVIEW'=>'Tender review','OTHER'=>'Other'];
@@ -466,7 +466,7 @@ function ops_seed_expense_masters() {
     }
 }
 
-// Seed offices (Ahmedabad + affiliate IBOs) once.
+// Seed offices (head office + branches) once.
 function ops_seed() {
     $pdo = db();
     if ((int)$pdo->query("SELECT COUNT(*) FROM offices")->fetchColumn() > 0) return;
@@ -1222,7 +1222,7 @@ function ops_run_cert_reminders($today = null) {
 function ops_masters() {
     return [
         'offices' => [
-            'label' => 'Offices / branches (IBO)', 'table' => 'offices', 'access' => 'admin', 'order' => 'is_ahmedabad DESC, name',
+            'label' => 'Offices / branches', 'table' => 'offices', 'access' => 'admin', 'order' => 'is_ahmedabad DESC, name',
             // Same columns the Organisation screen writes — the two editors are
             // views on one table, so an office never has two versions of itself.
             'fields' => [
@@ -1400,7 +1400,7 @@ function ops_masters() {
             'label' => 'Credit reconciliation', 'table' => 'credit_recon', 'access' => 'admin', 'order' => 'month DESC',
             'fields' => [
                 ['month','Month (YYYY-MM)','text',['req'=>1]],
-                ['ibo_office_id','IBO / Office','ref',['ref'=>'offices','optfn'=>'offices_list','optlabel'=>'name']],
+                ['ibo_office_id','Contracting office','ref',['ref'=>'offices','optfn'=>'offices_list','optlabel'=>'name']],
                 ['client_id','Client','ref',['ref'=>'clients','optfn'=>'clients_list','optlabel'=>'partner']],
                 ['boss_number','BOSS number','text',[]],
                 ['direction','Direction','select',['opts'=>CREDIT_DIRECTIONS]],
@@ -1481,7 +1481,7 @@ function ops_module_gate($route) {
         'office-finance'=>'overheads',
         'reports'=>'reports',
         'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users','org-template'=>'users',
-        'user-unlock'=>'users','user-2fa-reset'=>'users',
+        'user-unlock'=>'users','user-2fa-reset'=>'users','user-retire'=>'users',
         'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
     ];
@@ -1609,6 +1609,8 @@ function ops_dispatch($route, $method) {
             view('ops/privacy', ['notice'=>privacy_notice_text(), 'g'=>grievance_officer()]); return true;
         case $route === 'user-unlock':
             ops_user_unlock($method); return true;
+        case $route === 'user-retire':
+            ops_user_retire($method); return true;
         case $route === 'user-2fa-reset':
             ops_user_twofa_reset($method); return true;
         case $route === 'settings':
@@ -2129,7 +2131,7 @@ function ops_calls($route, $method) {
         if ($off !== 'ALL' && is_array($off) && $off) {
             $ahm = (int)(ops_val("SELECT id FROM offices WHERE is_ahmedabad=1 LIMIT 1") ?: 0);
             $ids = implode(',', array_map('intval', $off)); // inline ints (COALESCE drops bind affinity)
-            // Visible to BOTH the managing/contracting office (IBO) and the executing office.
+            // Visible to BOTH the managing/contracting office and the executing office.
             $conds[] = "(COALESCE(c.executing_office_id,$ahm) IN ($ids) OR c.ibo_office_id IN ($ids))";
         }
         if ($sbu !== 'ALL' && is_array($sbu) && $sbu) {
@@ -2192,7 +2194,7 @@ function ops_calls($route, $method) {
         if ($method === 'POST') {
             $b = $_POST;
             $execOffice = ($b['executing_office_id'] ?? '') !== '' ? (int)$b['executing_office_id'] : null;
-            // Default the managing / contracting office (IBO) to the creator's home office if blank.
+            // Default the managing / contracting office to the creator's home office if blank.
             if (($b['ibo_office_id'] ?? '') === '') {
                 $b['ibo_office_id'] = ($call['ibo_office_id'] ?? '') ?: (current_user()['home_office_id'] ?? '');
             }
@@ -2391,7 +2393,7 @@ function nzc_call($f, $v) {
     if (in_array($f, ['expected_credit','billable_value','credit_required'], true)) return $v === '' ? 0 : $v;
     return $v;
 }
-// True when the managing / contracting office (IBO) also executes the call (or
+// True when the managing / contracting office also executes the call (or
 // there is no separate executing branch) — then there is no inter-office credit,
 // only a billable value to the client (ex-GST). The managing office = ibo_office_id.
 function call_same_office($call) {
@@ -3793,7 +3795,10 @@ function ops_users($route, $method) {
             'sbuOpts'=>lk_options_or('sbu', OPS_SBUS),'globalMgr'=>$globalMgr,'managers'=>$mgrs,'defaults'=>role_defaults($user['role'] ?? 'COORDINATOR')]); return;
     }
     $where = $globalMgr ? "1=1" : "home_office_id = " . (int)$myOffice;
-    $rows = ops_all("SELECT * FROM users WHERE $where ORDER BY username");
+    // Deactivated people drop to the bottom rather than sitting among the staff
+    // who are actually here. They are never hidden: their work is still on file
+    // and somebody will need to find them.
+    $rows = ops_all("SELECT * FROM users WHERE $where ORDER BY is_active DESC, username");
     $seats = getenv('SEAT_LIMIT') ?: '';
     view('ops/users', ['rows'=>$rows,'seats'=>$seats,'active'=>(int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1"),
         'globalMgr'=>$globalMgr, 'defaults'=>accounts_on_default_password(), 'locked'=>accounts_locked_now()]);

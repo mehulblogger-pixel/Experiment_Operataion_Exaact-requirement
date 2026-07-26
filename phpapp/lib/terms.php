@@ -36,7 +36,10 @@ const TERM_DEFAULTS = [
     'call'         => ['Inspection Call', 'Inspection Calls', 'Operations', 'The client’s request to inspect, with dates and location.'],
     'job'          => ['Deputation', 'Deputations', 'Operations', 'An inspection engineer put on a call.'],
     'engineer'     => ['Inspection Engineer', 'Inspection Engineers', 'Operations', 'The person who performs the inspection.'],
-    'office'       => ['IBO', 'IBOs', 'Operations', 'Inspection branch office.'],
+    // "IBO" was the shipped default and nobody outside the company reads it as
+    // anything. "Office" is what people actually say. Anyone who wants the old
+    // word back can set it under Settings → Terminology; every screen follows.
+    'office'       => ['Office', 'Offices', 'Operations', 'A branch or head office of this company.'],
     'sbu'          => ['SBU', 'SBUs', 'Operations', 'Strategic business unit.'],
     'manday'       => ['Man-day', 'Man-days', 'Operations', 'One engineer for one working day.'],
     // -- reporting -----------------------------------------------------------

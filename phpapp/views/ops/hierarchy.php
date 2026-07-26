@@ -99,6 +99,21 @@
       echo     '<input type="hidden" name="office_id" value="' . $id . '">';
       echo     '<button class="btn small secondary" type="submit">' . ((int)($o['is_active'] ?? 1) ? 'Deactivate' : 'Reactivate') . '</button>';
       echo   '</form>';
+      // Delete is offered only where it is actually possible. An office that
+      // work has been booked against would take calls, deputations and vouchers
+      // with it, so instead of a button that fails, the row says what is holding
+      // it — and Deactivate above already does the safe version of the same job.
+      $uses = office_in_use($id);
+      if (!$uses) {
+        echo '<form method="post" action="/hierarchy" class="ot-inline"'
+           . ' onsubmit="return confirm(\'Delete ' . e(addslashes($o['name'] ?? '')) . '? Nothing has been recorded against it, so nothing else changes. This cannot be undone.\')">';
+        echo   '<input type="hidden" name="do" value="office-delete"><input type="hidden" name="tab" value="offices">';
+        echo   '<input type="hidden" name="office_id" value="' . $id . '">';
+        echo   '<button class="btn small secondary ot-del" type="submit">Delete</button>';
+        echo '</form>';
+      } else {
+        echo '<span class="muted ot-why" title="' . e(office_in_use_text($uses)) . '">in use · cannot delete</span>';
+      }
       echo '</div>';
     }
     echo '</div>';
@@ -124,22 +139,41 @@
     'gaps'    => 'Gaps' . ($gapCount ? ' (' . $gapCount . ')' : ''),
   ];
 ?>
-<div class="crumbs"><a href="/">Home</a> › Organisation</div>
-<div class="master-head">
-  <div><h1>Organisation</h1>
-    <p class="sub" style="margin:2px 0 0">One place for the reporting tree, the <?= e(Tl('office')) ?> structure and every person in them —
-      <?= (int)$totalPeople ?> active people across <?= count($offOpts) ?> <?= e(Tlp('office')) ?>.</p></div>
-  <div style="display:flex;gap:6px">
-    <a class="btn secondary" href="/users">Users</a>
-    <button class="btn secondary" onclick="window.print()">Print</button>
+<?= org_head($tab,
+      'One place for the reporting tree, the ' . e(Tl('office')) . ' structure, every person in them and their login — '
+      . (int)$totalPeople . ' active people across ' . count($offOpts) . ' ' . e(Tlp('office')) . '.',
+      $tab === 'chart' ? '/' : '/hierarchy?tab=chart',
+      $tab === 'chart' ? 'Home' : 'Back') ?>
+
+<?php // First-run guidance. Once every step is done it stops taking up room and
+      // becomes a line you can open if you want it. ?>
+<?php $steps = org_start_here(); $left = array_values(array_filter($steps, function ($s) { return !$s['done']; })); ?>
+<?php if ($left): ?>
+<div class="panel" style="border:1px solid var(--info);background:color-mix(in srgb,var(--info) 6%,transparent)">
+  <div class="ctitle" style="margin-top:0"><h3>Start here — in this order</h3>
+    <span class="pill p-info"><?= count($steps) - count($left) ?> of <?= count($steps) ?> done</span></div>
+  <p class="muted" style="margin:0 0 10px;font-size:13.5px">The order matters: a person cannot be given an
+    <?= e(Tl('office')) ?> or a designation that does not exist yet.</p>
+  <div class="ss-wrap" style="display:grid;gap:8px">
+    <?php foreach ($steps as $i => $s): $isNext = !$s['done'] && $s['n'] === $left[0]['n']; ?>
+      <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 11px;border-radius:10px;
+                  border:1px solid <?= $isNext ? 'var(--brand)' : 'var(--line)' ?>;
+                  background:<?= $isNext ? 'color-mix(in srgb,var(--brand) 7%,transparent)' : 'var(--card)' ?>;
+                  <?= $s['done'] ? 'opacity:.6' : '' ?>">
+        <span style="font-weight:800;min-width:22px;color:<?= $s['done'] ? 'var(--ok)' : 'var(--brand)' ?>">
+          <?= $s['done'] ? '✔' : (int)$s['n'] ?></span>
+        <div style="flex:1">
+          <b><?= e($s['title']) ?></b>
+          <?php if ($isNext): ?><span class="pill p-info" style="margin-left:6px">do this next</span><?php endif; ?>
+          <div class="muted" style="font-size:13px;margin-top:2px"><?= e($s['why']) ?></div>
+        </div>
+        <span class="muted" style="font-size:12.5px;white-space:nowrap"><?= e($s['state']) ?></span>
+        <a class="btn small <?= $isNext ? '' : 'secondary' ?>" href="<?= e($s['href']) ?>"><?= e($s['cta']) ?></a>
+      </div>
+    <?php endforeach; ?>
   </div>
 </div>
-
-<div class="tabs">
-  <?php foreach ($tabs as $k => $label): ?>
-    <a href="/hierarchy?tab=<?= e($k) ?>"<?= $tab === $k ? ' class="active"' : '' ?>><?= e($label) ?></a>
-  <?php endforeach; ?>
-</div>
+<?php endif; ?>
 
 <?php if (!$canEdit): ?>
   <?php // A Business Director sees the whole organisation but does not maintain
