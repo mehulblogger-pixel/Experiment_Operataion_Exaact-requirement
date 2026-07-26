@@ -33,16 +33,19 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
 5. **A refused save** — the box that stopped it is ringed in red and the form
    scrolls to it.
 
-### Still open
+### Closed since
 
-- [ ] **Duplicate detection is name/GSTIN/PAN/TAN only.** Two spellings of the
-      same company with no tax numbers ("Kaveri Pressure" vs "Kaveri Pressure
-      Vessels") are still two records. A fuzzy match would need a review screen.
-- [ ] **Client and vendor lists are already one register across all offices** —
-      no change was needed. If a branch should only see its own, that is a new
+- [x] **Duplicate review** — Clients → *Possible duplicates* finds pairs the add
+      screens cannot: different spellings, M/s, Pvt Ltd, word order. Shows both
+      sides with everything hanging off each, and merges only when a person says
+      so. The dropped record is marked *merged*, never deleted.
+- [x] **An order follows its quotation.** A PO raised against a quotation that is
+      later revised says so and offers to pull the new lines through — refused
+      once any of the order has been consumed, because the balances were measured
+      against the old quantities.
+- [x] **Client and vendor lists are one register across all offices** — verified,
+      no change needed. If a branch should only see its own, that is a new
       requirement, not a fix.
-- [ ] **The PO tab copies quoted lines once, at creation.** Revising the
-      quotation afterwards does not update an order already raised against it.
 
 ## 📈 MANAGEMENT DASHBOARD, FINANCIAL YEARS & THE CLOSE-ON-TIME LOCK (July 2026)
 
@@ -65,20 +68,24 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
 4. **Sub-contractor cost** now lands in the month-end run on the job, its
    contract number, its SBU and its activity code — never spread.
 
+### Closed since
+
+- [x] **The lock sweep no longer waits on cron.** Once a day, the first page
+      somebody opens runs it. Setting the cPanel cron is still worth doing (it
+      is tidier and does not depend on somebody signing in), but the alerts now
+      go out either way.
+- [x] **Year-on-year** — inspections, man-days, revenue and profit each carry
+      the same slice of the calendar a year earlier. A period with nothing a
+      year ago says so rather than inventing a percentage.
+- [x] **Utilisation %** — man-days worked against days available (working days
+      less holidays, across every engineer the filter covers).
+
 ### Still open
 
-- [ ] **The lock sweep needs cron.** `joblock_sweep()` runs from `cron.php`;
-      until the cPanel cron job is set up, jobs lock on screen (the rule is
-      evaluated live) but **nobody is e-mailed**. Setting the daily cron is an
-      owner action.
-- [ ] **No year-on-year comparison** on the dashboard — this year against last
-      is the obvious next column.
-- [ ] **Utilisation is man-days only.** Available days per engineer per month
-      are known (working days minus holidays), but the dashboard does not yet
-      show a utilisation %.
 - [ ] **The dashboard reads jobs, not vouchers.** Where a voucher timesheet
       disagrees with a job's man-days, the job wins here. The reconciliation
-      screen is the place that surfaces the difference.
+      screen is the place that surfaces the difference — this is a deliberate
+      choice, recorded so nobody has to rediscover it.
 
 ## 💰 COSTING & PROFITABILITY — complete, ready to test (July 2026)
 
@@ -106,19 +113,18 @@ figures, and the order to do things in month by month.
 6. **SBU profit & loss** — revenue against cost by SBU, by activity code, and
    by BOSS number.
 
-### Still open on costing
+### Closed since
 
-- [ ] **The Profitability screen still uses the old overhead %** for its
-      per-job figures. That is deliberate — an order is judged on what it
-      directly caused (see `docs/COSTING.md`, Question 1) — but the two screens
-      should cross-link so nobody reads one thinking it is the other.
-- [ ] **No year-to-date view yet.** Everything is one month at a time. A
-      12-month roll-up per SBU is the obvious next report.
-- [ ] **Sub-contractor cost is not in the allocation run.** It is already on the
-      job and in the BOSS-number line; it is not yet spread across SBUs as an
-      office cost, because it belongs to the job that caused it.
-- [ ] **Closing a month does not stop a voucher being edited** for that month.
-      The allocation is frozen; the timesheet behind it is not. Worth a lock.
+- [x] **The Profitability screen and the SBU P&L now cross-link**, each saying
+      what it does and does not include.
+- [x] **Year to date and whole year** on the SBU P&L, alongside one month. It
+      says how many of the months in the span have actually been run, and warns
+      that months not yet run contribute revenue but no cost.
+- [x] **Sub-contractor cost** is in the allocation run, on the job, its contract
+      number, its SBU and its activity code.
+- [x] **Closing a month closes its timesheets.** A frozen month refuses voucher
+      edits with the reason, on every write path including a typed URL. Reopen
+      the month to correct a day.
 
 ## 🔐 SECURITY & COMPLIANCE — shipped 2026-07, with what is still open
 

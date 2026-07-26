@@ -808,8 +808,23 @@ function ops_sbu_pl() {
     $sel = costing_pick_office($offices);
     [$yr, $mon] = ym_parse($_GET['m'] ?? '');
 
-    $revenue = $sel ? costing_sbu_revenue($sel, $yr, $mon) : [];
-    $cost    = $sel ? costing_stored_by_sbu($sel, $yr, $mon) : [];
+    // One month, the whole financial year, or the year so far. A month at a
+    // time was the only view, which is no use for the question people actually
+    // ask — how is the year going.
+    $span = (string)($_GET['span'] ?? 'month');
+    if (!in_array($span, ['month', 'fy', 'ytd'], true)) $span = 'month';
+    $fy = (string)($_GET['fy'] ?? fy_of(sprintf('%04d-%02d-01', $yr, $mon)));
+    $fyOpts = fy_options();
+    if (!in_array($fy, $fyOpts, true)) $fy = current_fy();
+    $months = costing_span_months($span, $fy, $yr, $mon);
+
+    $revenue = []; $cost = [];
+    foreach ($months as [$y, $m]) {
+        if (!$sel) break;
+        foreach (costing_sbu_revenue($sel, $y, $m) as $k => $v) $revenue[$k] = ($revenue[$k] ?? 0) + $v;
+        foreach (costing_stored_by_sbu($sel, $y, $m) as $k => $row)
+            foreach ($row as $f => $v) $cost[$k][$f] = ($cost[$k][$f] ?? 0) + $v;
+    }
     $rows = [];
     foreach (array_unique(array_merge(array_keys($revenue), array_keys($cost))) as $s) {
         if ($s === '' && !($revenue[$s] ?? 0) && !($cost[$s]['cost'] ?? 0)) continue;
@@ -820,13 +835,61 @@ function ops_sbu_pl() {
     $tot = ['revenue'=>0, 'cost'=>0];
     foreach ($rows as $r) { $tot['revenue'] += $r['revenue']; $tot['cost'] += $r['cost']; }
 
+    // The activity and BOSS tables add up the same span.
+    $byActivity = []; $byBoss = []; $storedMonths = 0;
+    foreach ($months as [$y, $m]) {
+        if (!$sel) break;
+        foreach (costing_stored_by_activity($sel, $y, $m) as $k => $a) {
+            if (!isset($byActivity[$k])) $byActivity[$k] = $a;
+            else { $byActivity[$k]['cost'] += $a['cost']; $byActivity[$k]['revenue'] += $a['revenue']; }
+        }
+        foreach (costing_boss_lines($sel, $y, $m) as $b) {
+            $k = $b['boss_number'];
+            if (!isset($byBoss[$k])) $byBoss[$k] = $b;
+            else foreach (['revenue','labour','expenses','subcon'] as $f) $byBoss[$k][$f] += $b[$f];
+        }
+        if (cost_run_status($y, $m, $sel)) $storedMonths++;
+    }
+    uasort($byActivity, function ($a, $b) { return ($b['revenue'] - $b['cost']) <=> ($a['revenue'] - $a['cost']); });
+    uasort($byBoss, function ($a, $b) {
+        return (($b['revenue'] - $b['labour'] - $b['expenses'] - $b['subcon'])
+             <=> ($a['revenue'] - $a['labour'] - $a['expenses'] - $a['subcon']));
+    });
+
     view('ops/sbu_pl', [
         'offices'=>$offices, 'sel'=>$sel, 'yr'=>$yr, 'mon'=>$mon,
+        'span'=>$span, 'fy'=>$fy, 'fyOpts'=>$fyOpts, 'months'=>$months,
+        'spanLabel'=>costing_span_label($span, $fy, $yr, $mon),
         'rows'=>$rows, 'tot'=>$tot,
-        'byActivity'=>$sel ? costing_stored_by_activity($sel, $yr, $mon) : [],
-        'byBoss'=>$sel ? costing_boss_lines($sel, $yr, $mon) : [],
-        'stored'=>(bool)($sel ? cost_run_status($yr, $mon, $sel) : false),
+        'byActivity'=>$byActivity, 'byBoss'=>array_values($byBoss),
+        'stored'=>$storedMonths > 0, 'storedMonths'=>$storedMonths, 'monthCount'=>count($months),
         'sbuLabels'=>lk_options_or('sbu', OPS_SBUS),
         'basisText'=>$sel ? office_cost_basis_text($sel) : '',
     ]);
+}
+
+// The months a P&L span covers, as [year, month] pairs.
+//   month — just the one chosen
+//   fy    — all twelve of the financial year
+//   ytd   — the financial year so far, up to and including the chosen month
+function costing_span_months($span, $fy, $yr, $mon) {
+    if ($span === 'month') return [[(int)$yr, (int)$mon]];
+    $out = [];
+    foreach (array_keys(fy_months($fy)) as $ym) {
+        [$y, $m] = array_map('intval', explode('-', $ym));
+        if ($span === 'ytd') {
+            // stop at the chosen month, or at today when the chosen month is
+            // not in this year at all
+            $stop = (in_array($fy, [fy_of(sprintf('%04d-%02d-01', $yr, $mon))], true))
+                ? sprintf('%04d%02d', $yr, $mon) : date('Ym');
+            if (sprintf('%04d%02d', $y, $m) > $stop) break;
+        }
+        $out[] = [$y, $m];
+    }
+    return $out ?: [[(int)$yr, (int)$mon]];
+}
+function costing_span_label($span, $fy, $yr, $mon) {
+    if ($span === 'fy')  return 'FY ' . $fy;
+    if ($span === 'ytd') return 'FY ' . $fy . ' to date';
+    return date('F Y', mktime(0, 0, 0, (int)$mon, 1, (int)$yr));
 }

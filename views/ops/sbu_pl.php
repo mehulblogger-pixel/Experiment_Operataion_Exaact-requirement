@@ -6,7 +6,7 @@ $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); 
 ?>
 <div class="crumbs"><a href="/">Home</a> › <?= e(T('sbu')) ?> profit &amp; loss</div>
 <div class="master-head">
-  <div><h1><?= e(T('sbu')) ?> profit &amp; loss — <?= e($mName) ?></h1>
+  <div><h1><?= e(T('sbu')) ?> profit &amp; loss — <?= e($spanLabel) ?></h1>
     <p class="sub">Revenue billed against the cost that landed on it. Real money on both sides.</p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <a class="btn ghost" href="/mis?fy=<?= e(fy_of($ym . '-01')) ?>&amp;m=<?= e($ym) ?>&amp;office=<?= (int)$sel ?>">Management dashboard</a>
@@ -16,21 +16,38 @@ $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); 
 </div>
 
 <div class="panel">
-  <form method="get" action="/sbu-pl" class="inline-add" style="align-items:flex-end">
+  <form method="get" action="/sbu-pl" class="inline-add" style="align-items:flex-end;flex-wrap:wrap">
     <div class="ff"><label><?= e(T('office')) ?></label>
       <select class="form-control searchable" name="office" onchange="this.form.submit()">
         <?php foreach ($offices as $o): ?>
           <option value="<?= (int)$o['id'] ?>"<?= (int)$o['id'] === (int)$sel ? ' selected' : '' ?>><?= e($o['name']) ?> (<?= e($o['code']) ?>)</option>
         <?php endforeach; ?>
       </select></div>
+    <?php // A month at a time is no use for the question people actually ask —
+          // how is the year going. All three read the same stored figures. ?>
+    <div class="ff"><label>Show</label>
+      <select class="form-control" name="span" onchange="this.form.submit()">
+        <option value="month"<?= $span === 'month' ? ' selected' : '' ?>>One month</option>
+        <option value="ytd"<?= $span === 'ytd' ? ' selected' : '' ?>>Financial year to date</option>
+        <option value="fy"<?= $span === 'fy' ? ' selected' : '' ?>>Whole financial year</option>
+      </select></div>
     <div class="ff"><label>Month</label>
       <input class="form-control" type="month" name="m" value="<?= e($ym) ?>" onchange="this.form.submit()"></div>
+    <div class="ff"><label>Financial year</label>
+      <select class="form-control" name="fy" onchange="this.form.submit()">
+        <?php foreach ($fyOpts as $o): ?><option value="<?= e($o) ?>"<?= $fy === $o ? ' selected' : '' ?>>FY <?= e($o) ?></option><?php endforeach; ?>
+      </select></div>
     <button class="btn ghost" type="submit">Show</button>
   </form>
+  <?php if ($span !== 'month'): ?>
+    <p class="muted" style="margin-top:6px"><?= (int)$monthCount ?> month(s) added together;
+      <?= (int)$storedMonths ?> of them have been calculated on the month-end run.
+      <?php if ($storedMonths < $monthCount): ?><strong>The months that have not been run contribute revenue but no cost</strong>, so the margin reads high until they are.<?php endif; ?></p>
+  <?php endif; ?>
 </div>
 
 <?php if (!$stored): ?>
-  <div class="msg-warning"><strong><?= e($mName) ?> has not been calculated yet.</strong>
+  <div class="msg-warning"><strong><?= e($spanLabel) ?> has not been calculated yet.</strong>
     Costs are only shared out across <?= e(Tlp('sbu')) ?> when the month-end run has been stored.
     <a href="/cost-run?office=<?= (int)$sel ?>&amp;m=<?= e($ym) ?>">Open the month-end run</a> — you can look at it
     before storing anything. Revenue below is what has been billed; the cost columns stay empty until then.</div>
@@ -67,10 +84,10 @@ $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); 
       <td><span class="pill <?= $pill($p) ?>"><?= $r['revenue'] > 0 ? round($p / $r['revenue'] * 100, 1) . '%' : '—' ?></span></td>
     </tr>
     <?php endforeach; ?>
-    <?php if (!$rows): ?><tr><td colspan="9">Nothing billed and nothing costed for <?= e($mName) ?>.</td></tr><?php endif; ?>
+    <?php if (!$rows): ?><tr><td colspan="9">Nothing billed and nothing costed in <?= e($spanLabel) ?>.</td></tr><?php endif; ?>
   </table>
   </div>
-  <p class="muted" style="margin-top:8px">A <?= e(Tl('sbu')) ?> can show a loss while the branch as a whole is profitable — that is the point of the split. Revenue counts a <?= e(Tl('job')) ?> in the month its inspection finished.</p>
+  <p class="muted" style="margin-top:8px">A <?= e(Tl('sbu')) ?> can show a loss while the branch as a whole is profitable — that is the point of the split. Revenue counts a <?= e(Tl('job')) ?> in the month its inspection finished, and this view adds those months together.</p>
 </div>
 
 <div class="panel">
@@ -88,7 +105,7 @@ $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); 
       <td style="text-align:right"><strong><?= $money($p) ?></strong></td>
     </tr>
     <?php endforeach; ?>
-    <?php if (!$byActivity): ?><tr><td colspan="5">No activity code carried any work in <?= e($mName) ?>.</td></tr><?php endif; ?>
+    <?php if (!$byActivity): ?><tr><td colspan="5">No activity code carried any work in <?= e($spanLabel) ?>.</td></tr><?php endif; ?>
   </table>
   </div>
   <p class="muted" style="margin-top:8px">Only the cost that names an activity code appears here — an engineer's days on that work. Shared costs stop at the <?= e(Tl('sbu')) ?> line and are not pushed down onto activity codes or <?= e(T('boss')) ?> numbers.</p>
@@ -115,7 +132,7 @@ $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); 
       <td><span class="pill <?= $pill($p) ?>"><?= $b['revenue'] > 0 ? round($p / $b['revenue'] * 100, 1) . '%' : '—' ?></span></td>
     </tr>
     <?php endforeach; ?>
-    <?php if (!$byBoss): ?><tr><td colspan="9">No <?= e(T('boss')) ?> number was worked in <?= e($mName) ?>.</td></tr><?php endif; ?>
+    <?php if (!$byBoss): ?><tr><td colspan="9">No <?= e(T('boss')) ?> number was worked in <?= e($spanLabel) ?>.</td></tr><?php endif; ?>
   </table>
   </div>
   <p class="muted" style="margin-top:8px"><?= e($basisText) ?>

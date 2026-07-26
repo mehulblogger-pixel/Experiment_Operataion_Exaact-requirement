@@ -219,6 +219,55 @@ function contract_link_quotation($contractId, $quotationId) {
 // The quotations this client could still have a contract raised against: current,
 // not lost, and with no contract number yet. This is the list the Contracts tab
 // offers, so a contract recorded there can say which order it belongs to.
+// An order remembers the quotation it answers, so a revised quotation can be
+// pulled through again rather than re-keyed. Added here because contracts.php
+// is where the quote/contract/order relationship already lives.
+function po_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    ensure_column('partner_purchase_orders', 'quotation_id', 'INT NULL');
+    ensure_column('partner_purchase_orders', 'lines_synced_at', "VARCHAR(30) DEFAULT ''");
+}
+
+// Copy every line of a quotation onto an order. Replaces what is there, because
+// a revision is the same order re-priced — but refuses when any line has
+// already been consumed, since that consumption was measured against the old
+// quantities and silently moving them would make the balance a lie.
+function po_pull_quote_lines($poId, $quoteId) {
+    $poId = (int)$poId; $quoteId = (int)$quoteId;
+    if (!$poId || !$quoteId) return ['ok' => false, 'error' => 'Nothing to copy from.'];
+    $used = (float)ops_val("SELECT COALESCE(SUM(consumed),0) FROM po_line_items WHERE purchase_order_id=?", [$poId]);
+    if ($used > 0) return ['ok' => false, 'error' =>
+        'Some of this order has already been used (' . rtrim(rtrim(number_format($used, 2, '.', ''), '0'), '.')
+        . ' unit(s) consumed). Replacing the lines now would leave the balances describing quantities that no '
+        . 'longer exist. Add or correct the lines by hand instead.'];
+    $lines = ops_all("SELECT * FROM quote_lines WHERE quote_id=? ORDER BY line_no, id", [$quoteId]);
+    if (!$lines) return ['ok' => false, 'error' => 'That quotation has no line items to copy.'];
+    db()->prepare("DELETE FROM po_line_items WHERE purchase_order_id=?")->execute([$poId]);
+    $ins = db()->prepare("INSERT INTO po_line_items (purchase_order_id,description,item_type,quantity,rate,consumed) VALUES (?,?,?,?,?,0)");
+    foreach ($lines as $l) {
+        $desc = trim((string)($l['description'] ?? '')) ?: (trim((string)($l['service_type'] ?? '')) ?: 'Line ' . (int)$l['line_no']);
+        if (trim((string)($l['location'] ?? '')) !== '') $desc .= ' — ' . $l['location'];
+        $ins->execute([$poId, mb_substr($desc, 0, 200), (string)($l['unit'] ?? 'MANDAY'),
+                       (float)($l['qty'] ?? 0), ($l['rate'] === null || $l['rate'] === '') ? null : (float)$l['rate']]);
+    }
+    db()->prepare("UPDATE partner_purchase_orders SET quotation_id=?, lines_synced_at=? WHERE id=?")
+        ->execute([$quoteId, date('c'), $poId]);
+    return ['ok' => true, 'count' => count($lines)];
+}
+
+// The quotation an order came from, and whether it has moved on since.
+function po_quote_status($po) {
+    $qid = (int)($po['quotation_id'] ?? 0);
+    if (!$qid) return null;
+    $q = ops_one("SELECT id, quote_no, rev, is_current, status FROM quotations WHERE id=?", [$qid]);
+    if (!$q) return null;
+    // The revision that is current now, which may not be the one this came from.
+    $cur = ops_one("SELECT id, quote_no, rev FROM quotations WHERE quote_no=? AND is_current=1", [$q['quote_no']]);
+    return ['from' => $q, 'current' => $cur,
+            'stale' => $cur && (int)$cur['id'] !== $qid,
+            'synced' => (string)($po['lines_synced_at'] ?? '')];
+}
+
 // Every current quotation for this client, for the purchase-order form. Unlike
 // the contract list this one does NOT hide the quotations that already carry a
 // contract number — a PO usually arrives against exactly those, and hiding them

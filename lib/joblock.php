@@ -213,3 +213,26 @@ function ops_job_unlock($method) {
     flash($job['job_code'] . ' reopened until ' . $until . '. Close it before then or it locks again.');
     redirect('/job?id=' . $id);
 }
+
+// ---------------------------------------------------------------------------
+//  Running the sweep without a cron job
+//
+//  The cPanel cron is an owner action, and until it is set up nobody is told
+//  their job has locked. The rule already bites on screen — it is evaluated
+//  live — so the only thing missing is the telling, and that should not wait
+//  on a hosting setting.
+//
+//  So: once a day, the first page load by a signed-in person does the sweep.
+//  Guarded on a setting, so it happens once and not on every request, and
+//  wrapped so a mail failure can never take a screen down. If the real cron IS
+//  set up this simply finds nothing left to do.
+// ---------------------------------------------------------------------------
+function joblock_sweep_daily() {
+    if (!job_lock_enabled()) return;
+    $today = date('Y-m-d');
+    if (setting_get('joblock_last_sweep', '') === $today) return;
+    // Stamp first. If the sweep is slow, two requests must not both run it, and
+    // a sweep that dies half-way is better than one that runs on every load.
+    setting_set('joblock_last_sweep', $today);
+    try { joblock_sweep($today); } catch (Throwable $e) {}
+}

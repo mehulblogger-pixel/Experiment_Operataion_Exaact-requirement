@@ -5,6 +5,29 @@
       <?php $psb = array_filter(explode(',', $po['sbu'] ?? '')); if ($psb): ?> · SBU: <?= e(implode(', ', array_map(fn($s)=>lk_options_or('sbu',OPS_SBUS)[$s]??$s, $psb))) ?><?php endif; ?></p></div>
   <a class="btn secondary" href="/partner?id=<?= (int)$po['partner_id'] ?>&tab=purchase_orders">← Back</a>
 </div>
+
+<?php // An order raised against a quotation that has since been revised is the
+      // quiet way two records drift apart: the customer is working off R02 and
+      // the order still holds R01's quantities. Say so, and offer the fix. ?>
+<?php if (!empty($quoteState)): $qs = $quoteState; ?>
+  <?php if ($qs['stale']): ?>
+  <div class="msg-warning">
+    <strong>The quotation behind this order has been revised.</strong>
+    This order was taken from <?= e($qs['from']['quote_no']) ?><?= (int)$qs['from']['rev'] ? ' R' . (int)$qs['from']['rev'] : '' ?>,
+    and the current revision is now <?= e($qs['current']['quote_no']) ?><?= (int)$qs['current']['rev'] ? ' R' . (int)$qs['current']['rev'] : '' ?>.
+    <form method="post" action="/po?id=<?= (int)$po['id'] ?>" style="margin-top:8px;display:inline">
+      <input type="hidden" name="do" value="pull-quote">
+      <input type="hidden" name="quotation_id" value="<?= (int)$qs['current']['id'] ?>">
+      <button class="btn small" type="submit"
+        onclick="return confirm('Replace the line items on this order with the ones from the current revision?')">Take the lines from the current revision</button>
+    </form>
+    <a class="btn small ghost" href="/quote?id=<?= (int)$qs['current']['id'] ?>">Open the quotation</a>
+    <p class="muted" style="margin:8px 0 0">Refused if any line has already been used — the balances were measured against the old quantities, and moving them silently would make those balances wrong.</p>
+  </div>
+  <?php else: ?>
+  <p class="muted">Taken from <a href="/quote?id=<?= (int)$qs['from']['id'] ?>"><?= e($qs['from']['quote_no']) ?><?= (int)$qs['from']['rev'] ? ' R' . (int)$qs['from']['rev'] : '' ?></a><?= $qs['synced'] !== '' ? ' on ' . e(fdate(substr($qs['synced'], 0, 10))) : '' ?>, which is still the current revision.</p>
+  <?php endif; ?>
+<?php endif; ?>
 <h2>Line items</h2>
 <div class="tbl-scroll" style="overflow-x:auto">
 <table class="grid">

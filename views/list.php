@@ -7,6 +7,7 @@
     <?php if (is_admin_level() || can('mod.clients.edit') || can('mod.vendors.edit')): ?>
       <a class="btn ghost" href="/partner-import">⬆ Import from a spreadsheet</a>
       <a class="btn ghost" href="/partner-template?kind=<?= $isClient ? 'clients' : 'vendors' ?>&amp;fmt=xlsx">⬇ Export</a>
+      <a class="btn ghost" href="/duplicates">🔍 Possible duplicates</a>
     <?php endif; ?>
   </div>
 </div>

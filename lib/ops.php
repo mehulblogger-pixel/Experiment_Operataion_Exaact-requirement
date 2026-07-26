@@ -1516,7 +1516,7 @@ function ops_module_gate($route) {
         'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'reset-data'=>'settings',
-        'partner-import'=>'clients','partner-template'=>'clients',
+        'partner-import'=>'clients','partner-template'=>'clients','duplicates'=>'clients',
     ];
     $mod = $map[$base] ?? null;
     if ($mod && !can("mod.$mod.view")) {
@@ -1675,6 +1675,8 @@ function ops_dispatch($route, $method) {
             ops_cost_run($method); return true;
         case $route === 'sbu-pl':
             ops_sbu_pl(); return true;
+        case $route === 'duplicates':
+            ops_dedupe($method); return true;
         case $route === 'partner-import':
             ops_partner_import($method); return true;
         case $route === 'partner-template':
@@ -2747,7 +2749,30 @@ function inspector_link_msg() {
 }
 function voucher_owner_is_me($v) { return my_inspector_id() && (int)$v['inspector_id'] === (int)my_inspector_id(); }
 function can_view_voucher($v) { return is_coordinator_level() || voucher_owner_is_me($v); }
-function can_edit_voucher($v) { return ($v['status'] === 'DRAFT') && (is_coordinator_level() || voucher_owner_is_me($v)); }
+// A voucher is the timesheet the whole cost run is built on. Once the month has
+// been calculated and closed, changing a day behind it would make the stored
+// allocation describe a month that no longer exists — the figures would still
+// add up, and they would still be wrong. So a closed month closes its vouchers
+// with it. Reopen the month if a day genuinely has to be corrected.
+function voucher_month_frozen($v) {
+    if (!function_exists('cost_month_frozen')) return false;
+    $m = (string)($v['month'] ?? '');
+    if (!preg_match('/^(\d{4})-(\d{2})$/', $m, $mm)) return false;
+    $office = (int)($v['office_id'] ?? 0);
+    if (!$office) $office = (int)ops_val("SELECT home_office_id FROM inspectors WHERE id=?", [(int)($v['inspector_id'] ?? 0)]);
+    return $office ? cost_month_frozen((int)$mm[1], (int)$mm[2], $office) : false;
+}
+function voucher_lock_reason($v) {
+    if (!voucher_month_frozen($v)) return '';
+    return ucfirst(Tl('voucher')) . ' for ' . date('F Y', strtotime(($v['month'] ?? '') . '-01'))
+         . ' cannot be changed: that month has been calculated and closed on the month-end cost run, '
+         . 'and the costs already allocated were worked out from these days. '
+         . 'Reopen the month first if a day really has to be corrected.';
+}
+function can_edit_voucher($v) {
+    if (voucher_month_frozen($v)) return false;
+    return ($v['status'] === 'DRAFT') && (is_coordinator_level() || voucher_owner_is_me($v));
+}
 
 // Build the month's day rows from the inspector's jobs (idempotent — skips days
 // already pulled for the same job). Returns how many rows were added.
@@ -2875,7 +2900,7 @@ function ops_vouchers($route, $method) {
     if ($route === 'voucher-header' && $method === 'POST') {
         $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$v) { http_response_code(404); view('notfound'); return; }
-        ops_require(can_edit_voucher($v), 'This voucher can no longer be edited.');
+        ops_require(can_edit_voucher($v), voucher_lock_reason($v) ?: 'This voucher can no longer be edited.');
         $pdo->prepare("UPDATE vouchers SET nature=?, advance=?, office_incurred=? WHERE id=?")
             ->execute([$_POST['nature'] ?? '', (float)($_POST['advance'] ?? 0), (float)($_POST['office_incurred'] ?? 0), $v['id']]);
         if (!empty($_FILES['support']['tmp_name']) && (int)$_FILES['support']['error'] === 0) {
@@ -2972,7 +2997,7 @@ function ops_vouchers($route, $method) {
     if ($route === 'voucher-save' && $method === 'POST') {
         $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$v) { http_response_code(404); view('notfound'); return; }
-        ops_require(can_edit_voucher($v), 'This voucher can no longer be edited.');
+        ops_require(can_edit_voucher($v), voucher_lock_reason($v) ?: 'This voucher can no longer be edited.');
         $heads = voucher_heads_for($v['inspector_id']);
         $rates = voucher_mode_rates($v['inspector_id']);
         // 8.5-hour daily cap: no inspector may log more than DAILY_HOURS_CAP working
@@ -3013,7 +3038,7 @@ function ops_vouchers($route, $method) {
     if ($route === 'voucher-generate' && $method === 'POST') {
         $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$v) { http_response_code(404); view('notfound'); return; }
-        ops_require(can_edit_voucher($v), 'This voucher can no longer be edited.');
+        ops_require(can_edit_voucher($v), voucher_lock_reason($v) ?: 'This voucher can no longer be edited.');
         $n = voucher_generate($v);
         flash($n ? "$n working day(s) pulled from jobs." : 'No new job days found for this month.');
         redirect('/voucher?id=' . $v['id']);
@@ -3022,7 +3047,7 @@ function ops_vouchers($route, $method) {
     if ($route === 'voucher-entry' && $method === 'POST') {
         $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$v) { http_response_code(404); view('notfound'); return; }
-        ops_require(can_edit_voucher($v), 'This voucher can no longer be edited.');
+        ops_require(can_edit_voucher($v), voucher_lock_reason($v) ?: 'This voucher can no longer be edited.');
         $b = $_POST; $do = $b['_do'] ?? '';
         if ($do === 'update') {
             $ent = ops_one("SELECT entry_date FROM voucher_entries WHERE id=? AND voucher_id=?", [(int)$b['entry_id'], $v['id']]);
