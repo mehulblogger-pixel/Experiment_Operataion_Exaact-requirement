@@ -33,7 +33,7 @@
 <div class="panel" style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
   <form method="post" action="/voucher-generate?id=<?= (int)$v['id'] ?>">
     <button class="btn" type="submit">↻ Pull working days from jobs</button>
-    <p class="muted" style="margin:6px 2px 0;max-width:280px">Auto-fills each inspection day (date, site, File No/BOSS, SBU) from the jobs allotted to this inspector. Safe to click again — it won't duplicate.</p>
+    <p class="muted" style="margin:6px 2px 0;max-width:280px">Auto-fills each inspection day (date, site, File No / <?= e(Tl("boss")) ?>, SBU) from the jobs allotted to this inspector. Safe to click again — it won't duplicate.</p>
   </form>
   <form method="post" action="/voucher-entry?id=<?= (int)$v['id'] ?>" class="inline-add" style="align-items:flex-end">
     <input type="hidden" name="_do" value="add">
@@ -71,7 +71,7 @@
 <div class="tbl-scroll" style="overflow-x:auto">
 <table class="grid" id="vgrid">
   <tr>
-    <th>Date</th><th>Attendance / Site</th><th>File No (BOSS)</th><th>Line No</th><th>Hrs</th>
+    <th>Date</th><th>Attendance / Site</th><th>File No (<?= e(T("boss")) ?>)</th><th>Line No</th><th>Hrs</th>
     <th>Mode</th><th>KM</th><th>Travel <?= e(cur_sym()) ?></th>
     <?php foreach ($heads as $h): ?><th title="<?= e($h['code']) ?>"><?= e($h['label']) ?></th><?php endforeach; ?>
     <th>Row <?= e(cur_sym()) ?></th><?php if ($canEdit): ?><th></th><?php endif; ?>

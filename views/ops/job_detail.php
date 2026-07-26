@@ -211,7 +211,7 @@
     <div><span class="k">Executing office</span><?= e($job['office_name'] ?: '—') ?></div>
     <div><span class="k">Inspector</span><?= e($job['inspector_name'] ?: '—') ?></div>
     <div><span class="k">Sub-con</span><?= e($job['subcon_agency'] ?: '—') ?></div>
-    <div><span class="k">BOSS no.</span><?= e($job['boss_number'] ?: '—') ?></div>
+    <div><span class="k"><?= e(T('boss')) ?></span><?= e($job['boss_number'] ?: '—') ?></div>
     <div><span class="k">Scheduled</span><?= e($job['scheduled_date'] ?: '—') ?></div>
     <div><span class="k">Inspection</span><?= e(($job['inspection_start_date'] ?: '?') . ' → ' . ($job['inspection_end_date'] ?: '?')) ?></div>
     <div><span class="k">Type of inspection</span><?= e(INSPECTION_TYPES[$job['inspection_type']] ?? ($job['inspection_type'] ?: '—')) ?></div>

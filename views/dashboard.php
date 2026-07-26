@@ -112,7 +112,7 @@
       <?php if (can('ops.call.create')): ?><a class="qcard tone-info" href="/call-new"><div class="qic">➕</div><div class="qn" style="font-size:18px">New Call</div><div class="ql">Log an inspection call</div></a><?php endif; ?>
       <a class="qcard" href="/jobs"><div class="qic">🗂</div><div class="qn" style="font-size:18px">Jobs</div><div class="ql">Allocate · schedule · close</div></a>
       <?php if (is_coordinator_level()): ?><a class="qcard" href="/vouchers"><div class="qic">🧾</div><div class="qn" style="font-size:18px">Vouchers</div><div class="ql">Travelling expenses</div></a><?php endif; ?>
-      <?php if ($showProfit): ?><a class="qcard" href="/profitability"><div class="qic">💹</div><div class="qn" style="font-size:18px">Profitability</div><div class="ql">Margin by BOSS / contract</div></a><?php endif; ?>
+      <?php if ($showProfit): ?><a class="qcard" href="/profitability"><div class="qic">💹</div><div class="qn" style="font-size:18px">Profitability</div><div class="ql">Margin by <?= e(Tl("boss")) ?></div></a><?php endif; ?>
     </div>
     <?php $secQuick = ob_get_clean();
 

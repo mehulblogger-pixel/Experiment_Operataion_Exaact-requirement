@@ -33,7 +33,7 @@
     <p class="muted" style="padding:18px">Nothing here — all clear. 🎉</p>
   <?php else: ?>
   <table class="dt" style="margin-top:8px">
-    <thead><tr><th>Job / BOSS</th><th>Client</th><th class="num">Amount</th><th>Invoice</th><th>Payment</th><th>Credit</th><th></th></tr></thead>
+    <thead><tr><th>Job / <?= e(T("boss")) ?></th><th>Client</th><th class="num">Amount</th><th>Invoice</th><th>Payment</th><th>Credit</th><th></th></tr></thead>
     <tbody>
     <?php foreach ($rows as $r):
       $amount = (float)($r['invoice_amount'] ?: $r['expected_credit']);
@@ -44,7 +44,7 @@
       $isGiven = ($r['credit_direction'] ?? '') === 'GIVEN';
     ?>
       <tr>
-        <td><b><?= e($r['job_code']) ?></b><?php if ($r['boss_number']): ?><br><span class="muted">BOSS <?= e($r['boss_number']) ?></span><?php endif; ?></td>
+        <td><b><?= e($r['job_code']) ?></b><?php if ($r['boss_number']): ?><br><span class="muted"><?= e(T('boss')) ?> <?= e($r['boss_number']) ?></span><?php endif; ?></td>
         <td><?= e($r['display_name'] ?: $r['legal_name'] ?: '—') ?><?php if ($r['office_name']): ?><br><span class="muted" style="font-size:12px"><?= e($r['office_name']) ?></span><?php endif; ?></td>
         <td class="num"><?= $amount ? fmoney($amount) : '—' ?></td>
         <td><?php if ($raised): ?><span class="pill p-ok"><?= e($r['invoice_number'] ?: 'Raised') ?></span><?php else: ?><span class="pill p-warn">Not raised</span><?php endif; ?></td>

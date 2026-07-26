@@ -38,7 +38,7 @@
     <a class="btn small secondary" href="/jobs?export=csv">Job register</a>
     <a class="btn small secondary" href="/calls?export=csv">Call register</a>
     <?php if (can('data.credit') || can('finance.reconcile')): ?><a class="btn small secondary" href="/invoicing?f=all&export=csv">Invoicing &amp; payments</a><?php endif; ?>
-    <?php if (can('data.profitability')): ?><a class="btn small secondary" href="/profitability?export=csv">Profitability by BOSS</a><?php endif; ?>
+    <?php if (can('data.profitability')): ?><a class="btn small secondary" href="/profitability?export=csv">Profitability by <?= e(T("boss")) ?></a><?php endif; ?>
   </div>
 </div>
 
@@ -82,7 +82,7 @@
 ?>
 <div class="panel-split">
   <div class="panel"><h4 class="tab-sub" style="margin-top:0">Top 10 <?= e(Tlp('client')) ?> by revenue</h4><?= svg_hbars($fin['byClientTop'] ?? [], true) ?></div>
-  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Revenue by project (BOSS)</h4><?= svg_hbars($fin['byProjectTop'] ?? [], true) ?></div>
+  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Revenue by <?= e(Tl("boss")) ?></h4><?= svg_hbars($fin['byProjectTop'] ?? [], true) ?></div>
 </div>
 <div class="panel-split">
   <div class="panel"><h4 class="tab-sub" style="margin-top:0">Credit by SBU</h4><?= svg_donut(chart_relabel_sbu($fin['bySbu']), true) ?></div>

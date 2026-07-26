@@ -1066,6 +1066,16 @@ function ops_crm_quotes($route, $method) {
             $pdo->prepare("UPDATE quotations SET status='ACCEPTED', accepted_date=? WHERE id=?")->execute([date('Y-m-d'), $q['id']]);
             $pdo->prepare("UPDATE quote_followups SET status='SKIPPED' WHERE quote_id=? AND status='PENDING'")->execute([$q['id']]);
             if ($q['inquiry_id']) $pdo->prepare("UPDATE crm_inquiries SET status='QUOTED' WHERE id=?")->execute([$q['inquiry_id']]);
+            // A won order that exists only as a typed name is the point at which
+            // the sales side and the operations side stop being the same system:
+            // the client master never hears about it, so the order tab has no
+            // quotation to offer, the line items are typed again by hand, and the
+            // two versions drift. Winning it is the moment to put the company on
+            // file — incomplete is fine and expected, because the tax numbers and
+            // the addresses arrive later. What must not wait is the link.
+            $res = quote_land_on_client($q);
+            flash(quote_landed_text($q, $res), 'success');
+            redirect('/quote?id=' . $q['id']);
         } else {
             $pdo->prepare("UPDATE quotations SET status=? WHERE id=?")->execute([$to, $q['id']]);
         }
@@ -1724,6 +1734,83 @@ function crm_register_client_for_quote($q) {
     partner_carry_from_crm($pid, $name);
     return $pid;
 }
+
+// ---------------------------------------------------------------------------
+//  Winning it puts the company on file
+//
+//  Up to acceptance a quotation may name a company that exists nowhere but in
+//  that one box — which is right, because most of them never come to anything
+//  and a master full of hopefuls is worse than useless. The moment it is won
+//  that stops being true: somebody is going to raise an order against it, book
+//  inspections against it and invoice it, and every one of those screens reads
+//  the client master, not the quotation.
+//
+//  So acceptance registers the company whether or not anybody has the GSTIN
+//  yet. Deliberately incomplete: the record exists, the quotation points at it,
+//  the types of inspection and the contact come across, and the missing tax and
+//  address details are filled in when they arrive. A record waiting to be
+//  completed is a job somebody can finish; a name that was never written down
+//  is a job nobody knows about.
+// ---------------------------------------------------------------------------
+function quote_land_on_client($q) {
+    $out = ['client_id' => 0, 'created' => false, 'chain' => 0, 'carry' => null, 'name' => ''];
+    $had = (int)($q['client_id'] ?? 0);
+    $name = trim((string)($q['client_name'] ?? ''));
+    $out['name'] = $name;
+    $cid = crm_register_client_for_quote($q);
+    if (!$cid) return $out;                       // no name at all — nothing to register
+    $out['client_id'] = (int)$cid;
+    $out['created'] = !$had && !ops_val(
+        "SELECT id FROM quotations WHERE client_id=? AND id<>?", [$cid, (int)$q['id']]);
+
+    // Every revision of this quotation is the same conversation with the same
+    // company, so the whole chain points at the record — otherwise R00 shows as
+    // a loose name for ever and the registers double-count.
+    $base = (int)(($q['parent_id'] ?? 0) ?: $q['id']);
+    $st = db()->prepare("UPDATE quotations SET client_id=? WHERE (id=? OR id=? OR parent_id=?)
+                          AND (client_id IS NULL OR client_id=0)");
+    $st->execute([$cid, (int)$q['id'], $base, $base]);
+    $out['chain'] = $st->rowCount();
+
+    // The inquiry it grew out of, and any other loose row carrying the same name.
+    if (!empty($q['inquiry_id']))
+        db()->prepare("UPDATE crm_inquiries SET client_id=? WHERE id=? AND (client_id IS NULL OR client_id=0)")
+            ->execute([$cid, (int)$q['inquiry_id']]);
+
+    // Types of inspection and the person we have been talking to.
+    $out['carry'] = partner_carry_from_crm($cid, $name);
+    idems_log('partner', $cid, 'UPDATE', ['field' => 'from ' . Tl('quote'),
+        'new' => (string)$q['quote_no'] . ' accepted']);
+    return $out;
+}
+
+// What to tell the person who just marked it won — including the part they have
+// to finish, because a master that is missing its tax details will refuse an
+// inspection call later and that is much better said now than then.
+function quote_landed_text($q, $res) {
+    $head = Tl('quote') . ' marked accepted.';
+    if (!$res['client_id'])
+        return $head . ' No ' . Tl('client') . ' name was on it, so nothing could be put on file — '
+             . 'add the name and mark it accepted again.';
+    $link = '/partner?id=' . (int)$res['client_id'];
+    $bits = [];
+    $bits[] = $res['created']
+        ? $res['name'] . ' has been created in the ' . Tl('client') . ' master'
+        : $res['name'] . ' is now linked to the ' . Tl('client') . ' master';
+    if (($res['chain'] ?? 0) > 1) $bits[] = 'all ' . (int)$res['chain'] . ' revisions with it';
+    $c = $res['carry'] ?? null;
+    if ($c && ($c['types'] ?? 0)) $bits[] = (int)$c['types'] . ' type(s) of inspection carried across';
+    if ($c && ($c['contacts'] ?? 0)) $bits[] = (int)$c['contacts'] . ' contact(s) carried across';
+    $msg = $head . ' ' . implode(', ', $bits) . '.';
+    // The order tab can now offer this quotation, which is the whole point.
+    $msg .= ' Its line items can now be pulled straight onto a purchase order from the '
+          . Tl('client') . ' master.';
+    $miss = function_exists('partner_missing_text') ? partner_missing_text($res['client_id'], 'client') : '';
+    if ($miss !== '') $msg .= ' The record is deliberately incomplete — it still needs ' . $miss
+                     . '. Complete it before the first ' . Tl('call') . ' is raised against it.';
+    return $msg;
+}
+
 // Build + send the Operations packet: client, quote/contract no, contacts, service
 // requirement, order lines (open vs line-item), advance/payment flags, TC proposal.
 function crm_float_ops_packet($q) {

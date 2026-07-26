@@ -778,6 +778,58 @@ function placement_fee_summary($soon = 30) {
     return ['prov_n'=>(int)$prov['n'], 'prov_amt'=>(float)$prov['amt'], 'conf_n'=>(int)$conf['n'], 'conf_amt'=>(float)$conf['amt'], 'lapsing'=>$lapsing];
 }
 function boss_for_client($cid) { return $cid ? ops_all("SELECT id, boss_number, status FROM boss_numbers WHERE client_id=? ORDER BY boss_number", [$cid]) : []; }
+
+// ---------------------------------------------------------------------------
+//  The contract number is not a thing you choose
+//
+//  It is agreed once, on the quotation, and from there it is simply carried:
+//  quotation → inspection call → deputation. Asking the coordinator to pick it
+//  again from a register meant two things went wrong. Either the register was
+//  empty, in which case the allocation screen offered an empty dropdown and the
+//  number the client actually quoted never reached the figures at all; or the
+//  coordinator picked the wrong one, and a month's profit was booked against
+//  somebody else's contract.
+//
+//  So the register fills itself. The number comes down the chain, and the row
+//  profitability hangs off is created the first time it is needed, against the
+//  right client, with the contract's own dates on it.
+// ---------------------------------------------------------------------------
+function contract_ref_ensure($clientId, $number, $quotationId = 0) {
+    $clientId = (int)$clientId;
+    $number = trim((string)$number);
+    if (!$clientId || $number === '') return null;
+    $ex = ops_val("SELECT id FROM boss_numbers WHERE client_id=? AND boss_number=?", [$clientId, $number]);
+    if ($ex) return (int)$ex;
+    // The dates come from the contract itself where one is on file, so expiry
+    // checks and the renewal chain work on the real cover, not on guesses.
+    $start = ''; $end = '';
+    $ct = ops_one("SELECT start_date, end_date FROM partner_contracts WHERE partner_id=? AND contract_number=?",
+                  [$clientId, $number]);
+    if ($ct) { $start = (string)($ct['start_date'] ?? ''); $end = (string)($ct['end_date'] ?? ''); }
+    $note = 'Created automatically from ' . Tl('quote') . '/' . Tl('call') . ' ' . date('Y-m-d');
+    if ($quotationId) {
+        $q = ops_one("SELECT quote_no, rev FROM quotations WHERE id=?", [(int)$quotationId]);
+        if ($q) $note = 'Created automatically from ' . $q['quote_no'] . ((int)$q['rev'] ? ' R' . (int)$q['rev'] : '');
+    }
+    db()->prepare("INSERT INTO boss_numbers (client_id,boss_number,start_date,end_date,status,comments)
+                   VALUES (?,?,?,?,?,?)")
+        ->execute([$clientId, $number, $start, $end, 'ACTIVE', $note]);
+    return (int)db()->lastInsertId();
+}
+
+// The contract number for a deputation, taken from the first place that has one:
+// what is already on the job, what the call carried, or the quotation it is
+// linked to. Nothing here is typed by hand.
+function contract_number_for($job, $call, $quotationId = 0) {
+    foreach ([($job['contract_number'] ?? ''), ($call['contract_number'] ?? '')] as $n)
+        if (trim((string)$n) !== '') return trim((string)$n);
+    $qid = (int)($quotationId ?: ($job['quotation_id'] ?? 0) ?: ($call['quotation_id'] ?? 0));
+    if ($qid) {
+        $n = ops_val("SELECT contract_number FROM quotations WHERE id=?", [$qid]);
+        if (trim((string)$n) !== '') return trim((string)$n);
+    }
+    return '';
+}
 function pname($p) { return $p ? ($p['display_name'] ?: $p['legal_name']) : '—'; }
 // Currency symbol and date format are settings, not hard-coded (Settings → Display).
 function cur_sym() { static $s = null; if ($s === null) $s = setting_get('currency_symbol', '') ?: '₹'; return $s; }
@@ -867,7 +919,7 @@ function ops_invoicing() {
          ORDER BY (j.invoice_due_date <> '') DESC, j.invoice_due_date ASC, j.id DESC",
         array_merge($ja, $fa));
     if (wants_csv()) {
-        $csv = [['Job','BOSS','Client','Office','Amount','Invoice raised','Invoice no','Invoice date','Due date','Payment received','Payment amount','Credit direction','Credit received']];
+        $csv = [['Job', T('boss'), 'Client','Office','Amount','Invoice raised','Invoice no','Invoice date','Due date','Payment received','Payment amount','Credit direction','Credit received']];
         foreach ($rows as $r) {
             $csv[] = [$r['job_code'], $r['boss_number'], $r['display_name'] ?: $r['legal_name'], $r['office_name'],
                 (float)($r['invoice_amount'] ?: $r['expected_credit']), !empty($r['invoice_raised']) ? 'Yes' : 'No', $r['invoice_number'],
@@ -1081,7 +1133,7 @@ function send_assignment_email($jobId) {
     $b .= "Type: " . (INSPECTION_TYPES[$call['inspection_type'] ?? ''] ?? '') . "\n";
     $b .= "Scheduled: {$j['scheduled_date']}   Inspection: {$j['inspection_start_date']} to {$j['inspection_end_date']}\n";
     $b .= "Client required date: " . ($call['inspection_required_date'] ?? '') . "\n";
-    $b .= "Reporting: " . (REPORT_FREQ[$j['reporting_frequency']] ?? '') . "   BOSS: {$j['boss_number']}\n\n";
+    $b .= "Reporting: " . (REPORT_FREQ[$j['reporting_frequency']] ?? '') . "   " . T('boss') . ": {$j['boss_number']}\n\n";
     $b .= "-- CLIENT --\n{$client}\n";
     if ($cc) $b .= "Contact: {$cc['name']} " . ($cc['designation'] ? "({$cc['designation']})" : '') . "  M: " . ($cc['mobile'] ?: $cc['phone']) . "  E: {$cc['email']}\n";
     $b .= "\n-- VENDOR / SITE --\n{$j['vendor_name']}\n";
@@ -1363,16 +1415,16 @@ function ops_masters() {
             'money_cols' => ['rate'],
         ],
         'boss' => [
-            'label' => 'BOSS numbers', 'table' => 'boss_numbers', 'access' => 'coordinator', 'order' => 'boss_number',
+            'label' => TP('boss'), 'table' => 'boss_numbers', 'access' => 'coordinator', 'order' => 'boss_number',
             'fields' => [
                 ['client_id','Client','ref',['req'=>1,'ref'=>'clients','optfn'=>'clients_list','optlabel'=>'partner']],
-                ['boss_number','BOSS number','text',['req'=>1]],
+                ['boss_number',T('boss'),'text',['req'=>1]],
                 ['start_date','Start date','date',[]],
                 ['end_date','End date','date',[]],
                 ['status','Status','select',['opts'=>BOSS_STATUS]],
                 ['comments','Comments','text',[]],
             ],
-            'list' => ['boss_number'=>'BOSS number','client_id'=>'Client','start_date'=>'Start','end_date'=>'End','status'=>'Status'],
+            'list' => ['boss_number'=>T('boss'),'client_id'=>'Client','start_date'=>'Start','end_date'=>'End','status'=>'Status'],
             'list_labels' => ['status'=>BOSS_STATUS],
             'ref_cols' => ['client_id'=>['clients','partner']],
         ],
@@ -1432,12 +1484,12 @@ function ops_masters() {
                 ['month','Month (YYYY-MM)','text',['req'=>1]],
                 ['ibo_office_id','Contracting office','ref',['ref'=>'offices','optfn'=>'offices_list','optlabel'=>'name']],
                 ['client_id','Client','ref',['ref'=>'clients','optfn'=>'clients_list','optlabel'=>'partner']],
-                ['boss_number','BOSS number','text',[]],
+                ['boss_number',T('boss'),'text',[]],
                 ['direction','Direction','select',['opts'=>CREDIT_DIRECTIONS]],
                 ['credit_actual','Actual credit (₹)','money',[]],
                 ['notes','Notes','text',[]],
             ],
-            'list' => ['month'=>'Month','client_id'=>'Client','boss_number'=>'BOSS','direction'=>'Direction','credit_actual'=>'Actual'],
+            'list' => ['month'=>'Month','client_id'=>'Client','boss_number'=>T('boss'),'direction'=>'Direction','credit_actual'=>'Actual'],
             'list_labels' => ['direction'=>CREDIT_DIRECTIONS],
             'ref_cols' => ['client_id'=>['clients','partner'],'ibo_office_id'=>['offices','name']],
             'money_cols' => ['credit_actual'],
@@ -1611,7 +1663,7 @@ function ops_dispatch($route, $method) {
                 $res = seed_demo();
                 if (!empty($res['skipped'])) flash('Demo data is already loaded. To refresh it with the latest sample records (e.g. agencies, requisitions), click "Remove demo data" first, then "Load demo data" again.', 'warning');
                 elseif (!empty($res['error'])) flash('Could not load demo data: ' . $res['error'], 'error');
-                else { $x = $res['counts']; flash("Demo data loaded — {$x['offices']} offices, {$x['users']} users, {$x['inspectors']} inspectors, {$x['partners']} clients/vendors, {$x['boss']} BOSS, {$x['calls']} calls, {$x['jobs']} jobs, {$x['vouchers']} vouchers, plus " . ($x['edge_cases'] ?? 0) . " generated edge-case records. Log in as any demo user (e.g. director, account, insp.ravi) with password demo12345."); }
+                else { $x = $res['counts']; flash("Demo data loaded — {$x['offices']} offices, {$x['users']} users, {$x['inspectors']} inspectors, {$x['partners']} clients/vendors, {$x['boss']} " . Tlp('boss') . ", {$x['calls']} calls, {$x['jobs']} jobs, {$x['vouchers']} vouchers, plus " . ($x['edge_cases'] ?? 0) . " generated edge-case records. Log in as any demo user (e.g. director, account, insp.ravi) with password demo12345."); }
             }
             redirect('/settings'); return true;
         case $route === 'seed-demo-remove':
@@ -1828,13 +1880,20 @@ function ops_dispatch($route, $method) {
             $out = [];
             foreach (ops_all("SELECT id, po_number, po_type, value FROM partner_purchase_orders WHERE partner_id=? ORDER BY id DESC", [(int)($_GET['id'] ?? 0)]) as $o) {
                 $hasLines = (int)ops_val("SELECT COUNT(*) FROM po_line_items WHERE purchase_order_id=?", [$o['id']]);
-                $out[] = ['id' => (int)$o['id'], 'label' => ($o['po_number'] ?: 'Open order') . ' (' . (lk_options_or('po_type', PO_TYPES)[$o['po_type']] ?? $o['po_type']) . ')', 'lines' => $hasLines];
+                // How many lines an order carries decides whether the next
+                // dropdown will have anything in it, so it is said here rather
+                // than discovered by picking the order and finding it empty.
+                $out[] = ['id' => (int)$o['id'],
+                          'label' => ($o['po_number'] ?: 'Open order') . ' (' . (lk_options_or('po_type', PO_TYPES)[$o['po_type']] ?? $o['po_type']) . ')'
+                                   . ' · ' . ($hasLines ? $hasLines . ' line(s)' : 'no line items'),
+                          'lines' => $hasLines];
             }
             echo json_encode($out); return true;
         case $route === 'po-lines':
             header('Content-Type: application/json');
+            $poId = (int)($_GET['id'] ?? 0);
             $out = [];
-            foreach (ops_all("SELECT id, description, quantity, consumed, item_type, rate FROM po_line_items WHERE purchase_order_id=? ORDER BY id", [(int)($_GET['id'] ?? 0)]) as $l) {
+            foreach (ops_all("SELECT id, description, quantity, consumed, item_type, rate FROM po_line_items WHERE purchase_order_id=? ORDER BY id", [$poId]) as $l) {
                 $bal = (float)$l['quantity'] - (float)$l['consumed'];
                 // §l — the rate and the unit come back too, so the call can price
                 // itself off the order rather than off somebody's memory, and the
@@ -1847,9 +1906,73 @@ function ops_dispatch($route, $method) {
                     'balance' => $bal,
                 ];
             }
-            echo json_encode($out); return true;
+            // An empty dropdown and a broken dropdown look identical, and the
+            // person in front of it cannot tell which they are looking at. So
+            // when there is nothing to offer, say why and say where the fix is —
+            // usually the quotation this order answers, whose lines have simply
+            // never been taken across.
+            echo json_encode(['lines' => $out, 'hint' => $out ? null : po_empty_hint($poId)]);
+            return true;
     }
     return false;
+}
+
+// ---------------------------------------------------------------------------
+//  Why the line-item list is empty
+//
+//  Three different situations look identical from the call form — the order is
+//  a lump-sum one that was never meant to have lines, the order came from a
+//  quotation whose lines were never taken across, or nobody has typed them yet.
+//  Only the second one is a mistake, and it is the common one. Naming which is
+//  which, with the link to the screen that fixes it, turns a dead dropdown into
+//  a task somebody can finish.
+// ---------------------------------------------------------------------------
+function po_empty_hint($poId) {
+    $poId = (int)$poId;
+    if (!$poId) return null;
+    $po = ops_one("SELECT * FROM partner_purchase_orders WHERE id=?", [$poId]);
+    if (!$po) return null;
+    $url = '/po?id=' . $poId;
+
+    // The quotation this order answers, if it named one and that quotation has
+    // lines waiting. This is the case worth shouting about.
+    $qid = (int)($po['quotation_id'] ?? 0);
+    if ($qid) {
+        $q = ops_one("SELECT quote_no, rev FROM quotations WHERE id=?", [$qid]);
+        $n  = (int)ops_val("SELECT COUNT(*) FROM quote_lines WHERE quote_id=?", [$qid]);
+        if ($q && $n) return [
+            'text' => 'This order came from ' . $q['quote_no'] . ((int)$q['rev'] ? ' R' . (int)$q['rev'] : '')
+                    . ', which has ' . $n . ' line item(s) that have never been taken across. '
+                    . 'Open the order and pull them through — then they appear here.',
+            'url' => $url, 'link' => 'Open the order'];
+    }
+
+    // No quotation named, but the client has one with lines on it — offer that,
+    // because re-typing twelve lines that already exist is how the order and the
+    // quotation end up disagreeing.
+    $cand = ops_one("SELECT q.quote_no, q.rev, COUNT(l.id) n
+                     FROM quotations q JOIN quote_lines l ON l.quote_id=q.id
+                     WHERE q.client_id=? AND q.is_current=1 AND q.status NOT IN ('LOST','REJECTED')
+                     GROUP BY q.id ORDER BY (q.status='ACCEPTED') DESC, q.id DESC",
+                    [(int)$po['partner_id']]);
+    if ($cand) return [
+        'text' => 'This order has no line items yet. ' . $cand['quote_no']
+                . ((int)$cand['rev'] ? ' R' . (int)$cand['rev'] : '') . ' for this ' . Tl('client')
+                . ' has ' . (int)$cand['n'] . ' line(s) that can be copied straight onto it.',
+        'url' => $url, 'link' => 'Open the order'];
+
+    // A lump-sum order genuinely has nothing to track per line, and saying so
+    // stops somebody hunting for a fault that is not there.
+    if (($po['po_type'] ?? '') === 'REGULAR' && (float)($po['value'] ?? 0) > 0) return [
+        'text' => 'This is a fixed-value order of ' . fmoney((float)$po['value'])
+                . ' with no line items on it, so there is nothing to pick here. That is fine — '
+                . 'the ' . Tl('call') . ' is priced on its own rate and quantity. Add line items to '
+                . 'the order if you want the balance tracked.',
+        'url' => $url, 'link' => 'Open the order'];
+
+    return ['text' => 'This order has no line items on it yet. Add them on the order, or record the '
+                    . 'order against its ' . Tl('quote') . ' and every quoted line is copied across.',
+            'url' => $url, 'link' => 'Open the order'];
 }
 
 // Inline "+ Add new" from the New Call form. Returns JSON {ok,id,label}.
@@ -2924,7 +3047,7 @@ function ops_vouchers($route, $method) {
         $rows[] = ['Statement of Travelling Expenses'];
         $rows[] = ['Inspector', $v['inspector_name'], 'Emp code', $v['emp_code'], 'Month', $v['month'], 'Status', $v['status']];
         $rows[] = [];
-        $hdr = ['Date','Attendance / Site','File No (BOSS)','Line No','Hours','Mode','KM','Travel'];
+        $hdr = ['Date','Attendance / Site','File No (' . T('boss') . ')','Line No','Hours','Mode','KM','Travel'];
         foreach ($heads as $h) $hdr[] = $h['label'];
         $hdr[] = 'Row total';
         $rows[] = $hdr;
@@ -3167,11 +3290,36 @@ function ops_jobs($route, $method) {
                 if (($b['inspection_start_date'] ?? '') === '') $b['inspection_start_date'] = $jdates[0];
                 if (($b['inspection_end_date'] ?? '') === '' && count($jdates) > 1) $b['inspection_end_date'] = end($jdates);
             }
-            // validation: expected credit mandatory at allocation
-            if (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0) {
+            // §b.iv — the inter-office credit only exists when one office holds
+            // the order and another does the work. On a job both ends of which
+            // are the same office there is no credit to expect, and demanding a
+            // figure greater than zero stopped the allocation dead: the button
+            // did nothing, because the only thing wrong was a box that should
+            // never have been asked for. Revenue for a same-office job is what
+            // the client is billed, which the call already carries.
+            $jMng = $call['ibo_office_id'] ?? null;
+            $jExe = ($b['executing_office_id'] ?? '') !== '' ? (int)$b['executing_office_id'] : ($call['executing_office_id'] ?? null);
+            $jCross = $jExe && (!$jMng || (int)$jMng !== (int)$jExe);
+            if ($jCross && (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0)) {
                 view('ops/job_form', array_merge(call_job_form_vars($job, $call),
-                    ['error' => 'Expected credit is mandatory at allocation.']));
+                    ['error' => 'This ' . Tl('job') . ' is executed by a different ' . Tl('office')
+                              . ' from the one holding the order, so the credit to the executing '
+                              . Tl('office') . ' has to be stated before it is allocated.']));
                 return;
+            }
+            if (!$jCross && (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0)) {
+                // One office both holds the order and does the work, so the money
+                // on this job is simply what the client is billed for the call.
+                $b['expected_credit'] = (float)($call['billable_value'] ?? 0);
+                $b['credit_direction'] = '';
+            }
+            // The contract number comes down the chain and the register fills
+            // itself, so nothing has to be chosen from a list that may be empty.
+            $cn = contract_number_for($job ?: [], $call, (int)($b['quotation_id'] ?? 0));
+            if ($cn !== '') {
+                $b['contract_number'] = $cn;
+                $ref = contract_ref_ensure($call['client_id'] ?? 0, $cn, (int)($b['quotation_id'] ?? 0));
+                if ($ref) $b['boss_id'] = $ref;
             }
             // Contract cover: putting an engineer on site against an expired
             // contract, or one whose quantity is used up, is refused here. This is
@@ -3639,7 +3787,7 @@ function ops_profitability() {
     }
     $seeSal = can_see_salary();
     if (wants_csv()) {
-        $head = ['Sr No','BOSS number','Client','Status','Created on','Expires on','Renewed into','Jobs','Invoicing done','Expenses booked'];
+        $head = ['Sr No', T('boss'), 'Client','Status','Created on','Expires on','Renewed into','Jobs','Invoicing done','Expenses booked'];
         if ($seeSal) $head = array_merge($head, ['Salary costing','Profit INR','Profit %']);
         $csv = [$head];
         $sr = 0;
@@ -3739,10 +3887,10 @@ function ops_boss_renew() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') { redirect('/profitability'); }
     $pdo = db();
     $old = ops_one("SELECT * FROM boss_numbers WHERE id=?", [(int)($_POST['old_id'] ?? 0)]);
-    if (!$old) { flash('BOSS/contract not found.', 'error'); redirect('/profitability'); }
+    if (!$old) { flash(T('boss') . ' not found.', 'error'); redirect('/profitability'); }
     if (!empty($old['superseded_by'])) { flash('This contract has already been renewed.', 'error'); redirect('/profitability?boss=' . $old['id']); }
     $newNo = trim($_POST['new_number'] ?? '');
-    if ($newNo === '') { flash('Enter the new BOSS / contract number.', 'error'); redirect('/profitability?boss=' . $old['id']); }
+    if ($newNo === '') { flash('Enter the new ' . Tl('boss') . '.', 'error'); redirect('/profitability?boss=' . $old['id']); }
     $pdo->prepare("INSERT INTO boss_numbers (client_id,boss_number,start_date,end_date,status,comments,supersedes,carried_at) VALUES (?,?,?,?, 'ACTIVE', ?, ?, ?)")
         ->execute([$old['client_id'], $newNo, $_POST['start_date'] ?? '', $_POST['end_date'] ?? '', 'Carried forward from ' . $old['boss_number'], $old['id'], date('c')]);
     $newId = $pdo->lastInsertId();
@@ -3826,7 +3974,7 @@ function ops_reports() {
         // customer (top-10 chart) and by project/BOSS (revenue-by-project chart).
         $rev=(float)($j['invoice_amount']??0); if ($rev<=0) $rev=$p['credit'];
         if ($rev!=0){ $ck=$j['client_disp']?:($j['client_name']?:'(no client)'); $fin['byClient'][$ck]=($fin['byClient'][$ck]??0)+$rev;
-            $pk=$j['boss_number']?:'(no BOSS)'; $fin['byProject'][$pk]=($fin['byProject'][$pk]??0)+$rev; }
+            $pk=$j['boss_number']?:('(no ' . Tl('boss') . ')'); $fin['byProject'][$pk]=($fin['byProject'][$pk]??0)+$rev; }
         foreach (ops_all("SELECT * FROM expenses WHERE job_id=?", [$j['id']]) as $x) {
             foreach (['travel','local','food','lodging','misc'] as $h) $fin['expHead'][$h]+=(float)$x[$h];
             foreach (expense_extra_decode($x['extra'] ?? '') as $code=>$amt) $fin['expHeadExtra'][$code]=($fin['expHeadExtra'][$code]??0)+(float)$amt;

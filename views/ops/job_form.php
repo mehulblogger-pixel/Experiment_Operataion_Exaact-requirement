@@ -155,11 +155,28 @@
         <?php foreach ($subcons as $s): ?><option value="<?= (int)$s['id'] ?>" <?= ($job && $job['subcon_id']==$s['id'])?'selected':'' ?>><?= e($s['agency']) ?><?= $s['inspector_name']?' — '.e($s['inspector_name']):'' ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"><label>Sub-con cost (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="subcon_cost" value="<?= e($job['subcon_cost'] ?? '') ?>"></div>
-    <div class="ff"><label>BOSS number</label>
-      <select class="form-control searchable" name="boss_id"><option value="">—</option>
-        <?php foreach ($boss as $bn): ?><option value="<?= (int)$bn['id'] ?>" <?= ($job && $job['boss_id']==$bn['id'])?'selected':'' ?>><?= e($bn['boss_number']) ?> (<?= e($bn['status']) ?>)</option><?php endforeach; ?>
-      </select>
-      <?php if (!$boss): ?><small class="muted">No BOSS numbers for this client yet — add under <a href="/m/boss/new">BOSS numbers</a>.</small><?php endif; ?></div>
+    <?php // The contract number is agreed once, on the quotation, and carried
+          // from there — quotation → inspection call → deputation. It is shown
+          // here rather than chosen, because choosing it again from a register
+          // is how a month's profit ends up booked against somebody else's
+          // contract. The register entry is created on saving if it is not
+          // already there, so the profitability screens have it without anybody
+          // maintaining a second list by hand. ?>
+    <div class="ff"><label><?= e(T('boss')) ?> <span class="muted">— carried from the <?= e(Tl('quote')) ?> / <?= e(Tl('call')) ?></span></label>
+      <?php if ($curContract !== ''): ?>
+        <input class="form-control" value="<?= e($curContract) ?>" readonly style="background:var(--soft);font-weight:700">
+        <small class="muted">Profit on this <?= e(Tl('job')) ?> is booked against this number. It is filed under
+          <a href="/m/boss"><?= e(Tlp('boss')) ?></a> automatically when you save.</small>
+      <?php else: ?>
+        <input class="form-control" value="" readonly placeholder="— none yet —" style="background:var(--soft)">
+        <small class="muted"><span class="pill p-warn">not agreed yet</span>
+          No <?= e(Tl('boss')) ?> has come through on the <?= e(Tl('quote')) ?> or the <?= e(Tl('call')) ?>.
+          The <?= e(Tl('job')) ?> can still be allocated — record the number on the <?= e(Tl('quote')) ?> when the
+          client confirms it, and everything raised against it lines up from then on.</small>
+      <?php endif; ?>
+      <?php // Kept so an existing deputation does not lose the register row it
+            // was already pointing at when the number is still blank. ?>
+      <input type="hidden" name="boss_id" value="<?= e((string)($job['boss_id'] ?? '')) ?>"></div>
 
     <?php // §viii — one heading, and it is the quotation. The contract number is
           // a property of the order, not a second thing to choose here: it is
@@ -188,7 +205,18 @@
         <span class="muted" style="margin-left:8px"><?= count($curDates) ?> set. Carried from the <?= e(Tl('call')) ?>; edit freely.</span></div>
     </div>
 
-    <div class="ff"><label>Expected credit (<?= e(cur_sym()) ?>) *</label><input class="form-control" type="number" step="0.01" name="expected_credit" value="<?= e($job['expected_credit'] ?? $call['expected_credit'] ?? '') ?>" required></div>
+    <?php // Only a cross-office deputation has an inter-office credit. Marking
+          // it required on a same-office one meant the browser refused to submit
+          // a form over a box that should not have been there — the button
+          // simply did nothing. Where there is no credit the figure that matters
+          // is what the client is billed, so that is what is shown. ?>
+    <div class="ff"><label><?= $cross ? 'Expected credit (' . e(cur_sym()) . ') *' : 'Value of this ' . e(Tl('job')) . ' (' . e(cur_sym()) . ')' ?></label>
+      <input class="form-control" type="number" step="0.01" name="expected_credit"
+             value="<?= e($job['expected_credit'] ?? ($cross ? ($call['expected_credit'] ?? '') : ($call['billable_value'] ?? ''))) ?>"
+             <?= $cross ? 'required' : '' ?>>
+      <small class="muted"><?= $cross
+        ? 'One ' . e(Tl('office')) . ' holds the order and another does the work, so the credit between them has to be stated before this is allocated.'
+        : 'Carried from what the ' . e(Tl('client')) . ' is billed on the ' . e(Tl('call')) . '. Leave it and it is taken from there.' ?></small></div>
     <div class="ff"><label>Credit type</label>
       <select class="form-control searchable" name="credit_type"><?php foreach (lk_options_or('credit_type', CREDIT_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($job['credit_type'] ?? $call['credit_type'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <?php // §iv — when the contracting office and the executing office are not the

@@ -47,7 +47,7 @@ const TERM_DEFAULTS = [
     'endorsement'  => ['Endorsement', 'Endorsements', 'Reporting', 'Our review and sign-off of a manufacturer’s record.'],
     'mfr_record'   => ['Manufacturer Record', 'Manufacturer Records', 'Reporting', 'MTC, NDT report, hydro test report and similar.'],
     // -- money ---------------------------------------------------------------
-    'boss'         => ['BOSS Number', 'BOSS Numbers', 'Money', 'The contract / order number profitability is tracked against.'],
+    'boss'         => ['Contract Number', 'Contract Numbers', 'Money', 'The client contract / order number that profitability is tracked against. It is not typed on a deputation — it comes down from the quotation and the inspection call, and the register fills itself.'],
     'invoice'      => ['Invoice', 'Invoices', 'Money', 'A bill raised on the client.'],
     'voucher'      => ['Voucher', 'Vouchers', 'Money', 'The monthly statement of travelling expenses.'],
     // -- people --------------------------------------------------------------
