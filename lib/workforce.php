@@ -62,6 +62,42 @@ function inspector_weekly_days($ins) {
     return $norm['weekly_days'] ?: ($w > 0 ? $w : 6);
 }
 
+// ---------------------------------------------------------------------------
+//  How long a person's week actually is
+//
+//  A 5.5-day week is five full days plus one half day. The half day is a real
+//  half day of its own length — four hours here — not half of a full one, which
+//  would be 4.25. Guessing it wrong is a quarter of an hour a week per person
+//  in every utilisation figure, so it is typed rather than derived.
+// ---------------------------------------------------------------------------
+function company_daily_hours()    { $v = (float)setting_get('daily_hours_cap', 8.5); return $v > 0 ? $v : 8.5; }
+function company_half_day_hours() { $v = (float)setting_get('half_day_hours', 4);    return $v > 0 ? $v : 4; }
+function person_daily_hours($u) {
+    $v = (float)($u['daily_hours'] ?? 0);
+    return $v > 0 ? $v : company_daily_hours();
+}
+function person_half_day_hours($u) {
+    $v = (float)($u['half_day_hours'] ?? 0);
+    return $v > 0 ? $v : company_half_day_hours();
+}
+function person_weekly_hours($u) {
+    $days = (float)($u['weekly_working_days'] ?? 6);
+    if ($days <= 0) $days = 6;
+    $full = floor($days);                                  // 5.5 → five full days
+    $hrs  = $full * person_daily_hours($u);
+    if ($days - $full > 0.001) $hrs += person_half_day_hours($u);   // plus the half day
+    return round($hrs, 2);
+}
+// "5 full days of 8.5 h plus a half day of 4 h — 46.5 h a week"
+function person_week_text($u) {
+    $days = (float)($u['weekly_working_days'] ?? 6);
+    $full = floor($days);
+    $t = $full . ' full day' . ($full == 1 ? '' : 's') . ' of ' . rtrim(rtrim(number_format(person_daily_hours($u), 2), '0'), '.') . ' h';
+    if ($days - $full > 0.001)
+        $t .= ' plus a half day of ' . rtrim(rtrim(number_format(person_half_day_hours($u), 2), '0'), '.') . ' h';
+    return $t . ' — ' . rtrim(rtrim(number_format(person_weekly_hours($u), 2), '0'), '.') . ' h a week';
+}
+
 // ---- Work-norms master editor -------------------------------------------
 function ops_work_norms($method) {
     ops_require(is_master() || can('master.manage'), 'You cannot edit working norms.');
