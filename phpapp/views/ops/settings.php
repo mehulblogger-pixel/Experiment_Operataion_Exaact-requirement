@@ -90,7 +90,11 @@
         <?php /* pairs, not an array key — PHP would truncate the 5.5 key to 5 */
               $dw = default_weekly_days(); foreach ([['6','6 days'], ['5.5','5.5 days'], ['5','5 days']] as [$k, $lbl]): ?>
           <option value="<?= e($k) ?>" <?= ((float)$dw === (float)$k) ? 'selected' : '' ?>><?= e($lbl) ?></option><?php endforeach; ?>
-      </select><small class="muted">Used when a person has no norm of their own.</small></div>
+      </select><small class="muted">Used when a person has no norm of their own. 5.5 means five full days plus one half day.</small></div>
+    <div class="ff"><label>Hours on a half day</label>
+      <input class="form-control" type="number" step="0.25" min="0.5" max="12" name="half_day_hours" value="<?= e(company_half_day_hours()) ?>">
+      <small class="muted">A half day is its own length, not half of a full one — four hours by default, against a full day of
+        <?= e(hours_cap()) ?> h. Anybody whose half day differs has their own figure on their person record.</small></div>
     <div class="ff"><label>Employee code prefix <span class="muted">(own staff)</span></label>
       <input class="form-control" name="emp_code_prefix" value="<?= e(setting_get('emp_code_prefix','')) ?>" placeholder="EMP">
       <small class="muted">Sub-contractors stay <code>SC-</code>, freelancers <code>FL-</code>.</small></div>

@@ -263,12 +263,46 @@
               <option value="<?= (int)$oid ?>"<?= $pre === (int)$oid ? ' selected' : '' ?>><?= e($lbl) ?></option>
             <?php endforeach; ?>
           </select></div>
-          <div class="ff"><label>Head of this <?= e(Tl('office')) ?></label><select name="o_head">
-            <option value="">— not set —</option>
-            <?php foreach ($all as $u): $un = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: $u['username']; ?>
-              <option value="<?= (int)$u['id'] ?>"<?= (int)($o['head_user_id'] ?? 0) === (int)$u['id'] ? ' selected' : '' ?>><?= e($un) ?> — <?= e(ORG_ROLES[$u['role']] ?? $u['role']) ?></option>
-            <?php endforeach; ?>
-          </select></div>
+          <?php // Offices are set up before anybody exists — that is the order this
+                // module's own guidance gives — so this list is usually empty at the
+                // moment the question is asked. Adding the head from right here
+                // creates a real person, who then shows up on the People tab and in
+                // every other dropdown. No password: the account is a record, not a
+                // way in, until somebody deliberately gives them one. ?>
+          <div class="ff"><label>Head of this <?= e(Tl('office')) ?></label>
+            <select name="o_head" id="o_head">
+              <option value="">— not set —</option>
+              <?php foreach ($all as $u): $un = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: $u['username']; ?>
+                <option value="<?= (int)$u['id'] ?>"<?= (int)($o['head_user_id'] ?? 0) === (int)$u['id'] ? ' selected' : '' ?>><?= e($un) ?> — <?= e($u['position_title'] ?: (ORG_ROLES[$u['role']] ?? $u['role'])) ?></option>
+              <?php endforeach; ?>
+              <option value="__new__">+ The head is not on this list — add them…</option>
+            </select>
+            <?php if (!$all): ?><small class="muted">Nobody has been added yet — use the option above.</small><?php endif; ?>
+          </div>
+          <div class="ff ff-wide" id="o_head_new" style="display:none">
+            <div class="panel" style="margin:0;padding:12px;background:var(--field)">
+              <b style="font-size:13px">New head of this <?= e(Tl('office')) ?></b>
+              <div class="muted" style="font-size:12.5px;margin:2px 0 8px">They are added to the people list straight away.
+                They cannot sign in until somebody gives them a password on the Login accounts tab.</div>
+              <div class="form-grid" style="margin:0">
+                <div class="ff"><label>Name *</label><input class="form-control" name="o_head_name" placeholder="e.g. Ravi Kumar"></div>
+                <div class="ff"><label>E-mail</label><input class="form-control" type="email" name="o_head_email"></div>
+                <div class="ff"><label>Designation</label>
+                  <select class="form-control" name="o_head_position">
+                    <option value="">— not set —</option>
+                    <?php foreach (lk_options_or('designation', DESIGNATIONS) as $dc => $dl): ?>
+                      <option value="<?= e($dl) ?>"><?= e($dl) ?></option>
+                    <?php endforeach; ?>
+                  </select></div>
+                <div class="ff"><label>Role</label>
+                  <select class="form-control" name="o_head_role">
+                    <?php foreach (ORG_ROLES as $rk => $rl): ?>
+                      <option value="<?= e($rk) ?>"<?= $rk === 'BRANCH_MANAGER' ? ' selected' : '' ?>><?= e($rl) ?></option>
+                    <?php endforeach; ?>
+                  </select></div>
+              </div>
+            </div>
+          </div>
           <div class="ff"><label>Region / zone</label><input name="o_region" value="<?= e($o['region'] ?? '') ?>"></div>
           <div class="ff"><label>City</label><input name="o_city" value="<?= e($o['city'] ?? '') ?>"></div>
           <div class="ff ff-wide"><label>Address</label><input name="o_address" value="<?= e($o['address'] ?? '') ?>"></div>
@@ -281,6 +315,19 @@
           <a class="btn secondary" href="/hierarchy?tab=offices">Cancel</a>
         </div>
       </form>
+      <script>
+        (function () {
+          var s = document.getElementById('o_head'), box = document.getElementById('o_head_new');
+          if (!s || !box) return;
+          function sync() {
+            var isNew = s.value === '__new__';
+            box.style.display = isNew ? '' : 'none';
+            var n = box.querySelector('input[name=o_head_name]');
+            if (isNew && n) n.focus();
+          }
+          s.addEventListener('change', sync); sync();
+        })();
+      </script>
     </div>
   <?php endif; ?>
 

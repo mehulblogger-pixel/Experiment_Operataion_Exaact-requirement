@@ -55,6 +55,51 @@ const OFFICE_TYPES = [
 ];
 
 // ---------------------------------------------------------------------------
+//  Adding a person from wherever you happen to need one
+//
+//  The office form asks who heads the office, and the honest order of setup —
+//  the one this module's own guidance gives — is offices first. So at the exact
+//  moment that question is asked there is usually nobody to pick, and sending
+//  somebody away to a different screen to create one, then back, loses whatever
+//  they had typed.
+//
+//  This creates a real person, in the one place people live, so they appear on
+//  the People tab, in the manager dropdown and everywhere else immediately. No
+//  password is set: the account cannot be signed into until somebody gives them
+//  one, which is the same rule the Add-a-person screen already follows.
+// ---------------------------------------------------------------------------
+function person_username_from($name, $email = '') {
+    $base = strtolower(trim((string)$name));
+    $base = preg_replace('/[^a-z0-9]+/', '.', $base);
+    $base = trim($base, '.');
+    if ($base === '' && $email !== '') $base = strtolower(preg_replace('/[^a-z0-9]+/', '.', explode('@', $email)[0]));
+    if ($base === '') $base = 'person';
+    $base = substr($base, 0, 40);
+    $try = $base; $n = 1;
+    while (ops_val("SELECT COUNT(*) FROM users WHERE username=?", [$try]) > 0) { $n++; $try = $base . $n; }
+    return $try;
+}
+// Returns the new user's id, or 0 when there was nothing to create.
+function person_quick_create($name, $email = '', $designation = '', $officeId = null, $role = 'COORDINATOR') {
+    $name = trim((string)$name);
+    if ($name === '') return 0;
+    $parts = preg_split('/\s+/', $name, 2);
+    $first = $parts[0]; $last = $parts[1] ?? '';
+    $role  = isset(ORG_ROLES[$role]) ? $role : 'COORDINATOR';
+    $user  = person_username_from($name, $email);
+    // A password nobody knows, and must-change set: the row exists so it can be
+    // pointed at, but it is not a way in until somebody deliberately sets one.
+    db()->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,
+                   home_office_id,position_title,weekly_working_days,pwd_changed_at,must_change_pwd)
+                   VALUES (?,?,?,?,?,?,0,1,?,?,6,?,1)")
+        ->execute([$user, password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT), $first, $last,
+                   trim((string)$email), $role, $officeId ?: null, trim((string)$designation), date('c')]);
+    $id = (int)db()->lastInsertId();
+    idems_log('user', $id, 'CREATE', ['field' => $name, 'reason' => 'added while setting up an ' . Tl('office')]);
+    return $id;
+}
+
+// ---------------------------------------------------------------------------
 //  One shell for the whole module
 //
 //  The reporting tree, the office list, the people grid and the login accounts
@@ -998,8 +1043,20 @@ function ops_hierarchy_screen($method) {
                 redirect($back);
             }
             $type = isset(OFFICE_TYPES[$_POST['o_type'] ?? '']) ? $_POST['o_type'] : 'BRANCH';
+            // "The head is not on this list" — create them here rather than
+            // sending somebody to another screen and losing what they typed.
+            $head = (string)($_POST['o_head'] ?? '');
+            $newHead = 0;
+            if ($head === '__new__') {
+                $newHead = person_quick_create(
+                    $_POST['o_head_name'] ?? '', $_POST['o_head_email'] ?? '',
+                    $_POST['o_head_position'] ?? '', $id ?: null, $_POST['o_head_role'] ?? 'BRANCH_MANAGER');
+                if (!$newHead && trim((string)($_POST['o_head_name'] ?? '')) !== '')
+                    flash('The head could not be added — check the name.', 'error');
+            }
+            $headId = $newHead ?: ((int)$head ?: null);
             $vals = [trim($_POST['o_code'] ?? ''), $name, trim($_POST['o_city'] ?? ''), trim($_POST['o_region'] ?? ''),
-                     $type, $parent, (int)($_POST['o_head'] ?? 0) ?: null, trim($_POST['o_address'] ?? ''),
+                     $type, $parent, $headId, trim($_POST['o_address'] ?? ''),
                      trim($_POST['o_phone'] ?? ''), !empty($_POST['o_active']) ? 1 : 0, (int)($_POST['o_sort'] ?? 0)];
             if ($id) {
                 $vals[] = $id;

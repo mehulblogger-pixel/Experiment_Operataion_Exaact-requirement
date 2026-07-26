@@ -118,20 +118,37 @@
              placeholder="Type the new designation — it is added to the master">
       <small class="muted"><a href="/m/designation">Manage the designation master</a></small></div>
 
-    <?php // The old choice was 6 / 5.5 / 5 days, where 5.5 meant "alternate
-          // Saturday off". There is no alternate Saturday here, so it is gone,
-          // and the hours a day are typed rather than assumed. ?>
+    <?php // 5.5 days is five full days plus one half day. It was mislabelled
+          // "alternate Sat off", which is a different arrangement altogether and
+          // not one used here. The half day is a real half day, and how long it
+          // is gets typed rather than assumed to be half of a full one. ?>
+    <?php $wwdCur = rtrim(rtrim((string)($user['weekly_working_days'] ?? '6'), '0'), '.') ?: '6'; ?>
     <div class="ff"><label>Working days a week</label>
-      <select class="form-control" name="weekly_working_days">
-        <?php foreach (['6'=>'6 days (Mon–Sat)', '5'=>'5 days (Mon–Fri)'] as $k => $v): ?>
-          <option value="<?= $k ?>" <?= ((string)($user['weekly_working_days'] ?? '6') === $k) ? 'selected' : '' ?>><?= e($v) ?></option>
+      <select class="form-control" name="weekly_working_days" id="u_wwd">
+        <?php foreach (['6'=>'6 days (Mon–Sat)', '5.5'=>'5.5 days (5 full + 1 half day)', '5'=>'5 days (Mon–Fri)'] as $k => $v): ?>
+          <option value="<?= $k ?>" <?= $wwdCur === $k ? 'selected' : '' ?>><?= e($v) ?></option>
         <?php endforeach; ?>
       </select></div>
-    <div class="ff"><label>Working hours a day</label>
+    <div class="ff"><label>Working hours a full day</label>
       <input class="form-control" type="number" step="0.25" min="1" max="16" name="daily_hours"
              value="<?= e((string)($user['daily_hours'] ?? '') !== '' ? $user['daily_hours'] : setting_get('daily_hours_cap', '8.5')) ?>">
       <small class="muted">Set per person. Blank falls back to the company figure in Settings
         (<?= e(setting_get('daily_hours_cap', '8.5')) ?> h). This is what utilisation and the daily cap are measured against.</small></div>
+    <div class="ff" id="u_half_wrap" style="<?= $wwdCur === '5.5' ? '' : 'display:none' ?>">
+      <label>Hours on the half day</label>
+      <input class="form-control" type="number" step="0.25" min="0.5" max="12" name="half_day_hours"
+             value="<?= e((string)($user['half_day_hours'] ?? '') !== '' ? $user['half_day_hours'] : setting_get('half_day_hours', '4')) ?>">
+      <small class="muted">Not simply half of a full day — a half day here is
+        <?= e(setting_get('half_day_hours', '4')) ?> hours by default. Change it per person if theirs differs.</small></div>
+    <script>
+      // The half-day box only means anything on a 5.5-day week.
+      (function () {
+        var w = document.getElementById('u_wwd'), h = document.getElementById('u_half_wrap');
+        if (!w || !h) return;
+        function sync() { h.style.display = w.value === '5.5' ? '' : 'none'; }
+        w.addEventListener('change', sync); sync();
+      })();
+    </script>
 
     <?php // Manager is picked from the people already on file. Their e-mail and
           // position come with them, so the same manager cannot end up recorded

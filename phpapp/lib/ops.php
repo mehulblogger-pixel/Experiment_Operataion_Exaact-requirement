@@ -3770,11 +3770,16 @@ function ops_users($route, $method) {
                     if (!in_array($posTitle, lk_options_or('designation', DESIGNATIONS), true))
                         lk_add_value($dt['id'], null, strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $posTitle), 0, 20)), $posTitle);
             }
-            // There is no alternate Saturday here, so 5.5 is gone. Hours a day
-            // are typed per person rather than assumed from the number of days.
-            $uwwd = in_array((string)($b['weekly_working_days'] ?? ''), ['5','6'], true) ? (float)$b['weekly_working_days'] : 6;
+            // 5.5 days means five full days plus one half day — not "alternate
+            // Saturday off", which is what it used to say and is a different
+            // arrangement. How long a full day and a half day are is typed, not
+            // assumed, because a half day here is four hours and not half of 8.5.
+            $uwwd = in_array((string)($b['weekly_working_days'] ?? ''), ['5','5.5','6'], true) ? (float)$b['weekly_working_days'] : 6;
             $dHours = trim((string)($b['daily_hours'] ?? ''));
             $dHours = ($dHours !== '' && (float)$dHours > 0 && (float)$dHours <= 16) ? (float)$dHours : null;
+            $hHours = trim((string)($b['half_day_hours'] ?? ''));
+            $hHours = ($hHours !== '' && (float)$hHours > 0 && (float)$hHours <= 12) ? (float)$hHours : null;
+            if ($uwwd != 5.5) $hHours = null;      // meaningless on any other pattern
             // A password set by an administrator has to clear the same bar as one
             // somebody chooses for themselves; otherwise the rule is decorative.
             $newPw = (string)($b['password'] ?? '');
@@ -3793,8 +3798,8 @@ function ops_users($route, $method) {
             // they must replace it the moment they sign in, so it stops being shared.
             $mustChange = !empty($b['must_change_pwd']) ? 1 : 0;
             if ($user) {
-                $pdo->prepare("UPDATE users SET username=?,first_name=?,last_name=?,email=?,role=?,is_superuser=?,is_active=?,inspector_id=?,home_office_id=?,scope_offices=?,scope_sbus=?,permissions=?,reports_to_id=?,reports_to_name=?,reports_to_position=?,reports_to_email=?,position_title=?,weekly_working_days=?,daily_hours=? WHERE id=?")
-                    ->execute([$b['username'], $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, !empty($b['is_active'])?1:0, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, $user['id']]);
+                $pdo->prepare("UPDATE users SET username=?,first_name=?,last_name=?,email=?,role=?,is_superuser=?,is_active=?,inspector_id=?,home_office_id=?,scope_offices=?,scope_sbus=?,permissions=?,reports_to_id=?,reports_to_name=?,reports_to_position=?,reports_to_email=?,position_title=?,weekly_working_days=?,daily_hours=?,half_day_hours=? WHERE id=?")
+                    ->execute([$b['username'], $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, !empty($b['is_active'])?1:0, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, $hHours, $user['id']]);
                 if ($newPw !== '') {
                     $pdo->prepare("UPDATE users SET password_hash=?, pwd_changed_at=? WHERE id=?")
                         ->execute([password_hash($newPw, PASSWORD_DEFAULT), date('c'), $user['id']]);
@@ -3806,8 +3811,8 @@ function ops_users($route, $method) {
                 // A brand-new account with no password typed gets one nobody knows
                 // and is marked must-change, rather than a shared default.
                 $hash = password_hash($newPw !== '' ? $newPw : bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
-                $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id,home_office_id,scope_offices,scope_sbus,permissions,reports_to_id,reports_to_name,reports_to_position,reports_to_email,position_title,weekly_working_days,daily_hours,pwd_changed_at,must_change_pwd)
-                    VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, date('c'), $newPw === '' ? 1 : $mustChange]);
+                $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id,home_office_id,scope_offices,scope_sbus,permissions,reports_to_id,reports_to_name,reports_to_position,reports_to_email,position_title,weekly_working_days,daily_hours,half_day_hours,pwd_changed_at,must_change_pwd)
+                    VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, $hHours, date('c'), $newPw === '' ? 1 : $mustChange]);
                 flash($newPw === ''
                     ? 'User created. No password was set, so use Edit to give them one — the account cannot be signed into until you do.'
                     : 'User created.');
@@ -3842,6 +3847,11 @@ function ops_settings($method) {
         // Working norms & limits (were hard-coded before)
         $cap = (float)($_POST['daily_hours_cap'] ?? 8.5);
         setting_set('daily_hours_cap', ($cap > 0 && $cap <= 24) ? $cap : 8.5);
+        // A half day is its own length — four hours here — not half of a full
+        // day. Typed once for the company; anybody whose half day differs has
+        // their own figure on their person record.
+        $hh = (float)($_POST['half_day_hours'] ?? 4);
+        setting_set('half_day_hours', ($hh > 0 && $hh <= 12) ? $hh : 4);
         $wd = (float)($_POST['default_weekly_days'] ?? 6);
         setting_set('default_weekly_days', in_array($wd, [5.0, 5.5, 6.0], true) ? $wd : 6);
         setting_set('emp_code_prefix', strtoupper(trim($_POST['emp_code_prefix'] ?? '')));
