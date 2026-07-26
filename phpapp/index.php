@@ -97,6 +97,7 @@ try {
     require __DIR__ . '/lib/orgadmin.php';
     require __DIR__ . '/lib/contracts.php';
     require __DIR__ . '/lib/security.php';
+    require __DIR__ . '/lib/compliance.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
@@ -174,6 +175,9 @@ try {
     db()->query("SELECT token FROM form_tokens LIMIT 1");
     db()->query("SELECT qty_total FROM partner_contracts LIMIT 1");
     db()->query("SELECT totp_enabled FROM users LIMIT 1");
+    db()->query("SELECT id FROM security_incidents LIMIT 1");
+    db()->query("SELECT id FROM data_requests LIMIT 1");
+    db()->query("SELECT id FROM data_consents LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which
     // runs the same idempotent boot() and clears it. Each check is self-cancelling.

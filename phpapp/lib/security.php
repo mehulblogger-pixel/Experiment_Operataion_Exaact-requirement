@@ -72,11 +72,17 @@ function user_on_default_password($u) {
         if (password_verify($d, (string)($u['password_hash'] ?? ''))) return true;
     return false;
 }
+// Only accounts whose password has never been set through this app are worth
+// testing. Checking a password is deliberately slow — that is the whole point of
+// bcrypt — so four checks per account on every page load is seconds of waiting
+// once a company has fifty people. Anything set through the change screen or the
+// user form has already been through the policy, which refuses every one of
+// these, so it cannot be a shipped default and does not need re-testing.
 function accounts_on_default_password() {
     $out = [];
-    foreach (ops_all("SELECT id, username, first_name, last_name, role FROM users WHERE is_active=1") as $u) {
-        $full = ops_one("SELECT password_hash FROM users WHERE id=?", [$u['id']]);
-        $u['password_hash'] = $full['password_hash'] ?? '';
+    $rows = ops_all("SELECT id, username, first_name, last_name, role, password_hash
+                     FROM users WHERE is_active=1 AND COALESCE(pwd_changed_at,'')='' LIMIT 200");
+    foreach ($rows as $u) {
         if (user_on_default_password($u)) { unset($u['password_hash']); $out[] = $u; }
     }
     return $out;

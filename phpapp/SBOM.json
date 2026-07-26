@@ -1,0 +1,687 @@
+{
+    "bomFormat": "CycloneDX",
+    "specVersion": "1.5",
+    "version": 1,
+    "metadata": {
+        "timestamp": "2026-07-26T07:08:45+00:00",
+        "component": {
+            "type": "application",
+            "name": "exaact-inspection-ops",
+            "description": "Inspection and operations management system",
+            "version": "1.0"
+        },
+        "tools": [
+            {
+                "name": "tools/sbom.php",
+                "description": "walks the source and fingerprints every file"
+            }
+        ]
+    },
+    "components": [],
+    "notes": {
+        "third_party_runtime_dependencies": "None. There is no Composer, no npm, no framework and no CDN. The application is plain PHP with PDO, and plain JavaScript in the browser.",
+        "platform_dependencies": "PHP 8 with the PDO, pdo_mysql, json, mbstring, openssl and gd extensions, and MySQL 5.7 or later. These are supplied and patched by the hosting provider, and are the only components for which a vulnerability announcement needs to be watched.",
+        "why_this_matters": "A vulnerability in a library the application does not have cannot affect it. The list of things to watch is therefore PHP itself, the MySQL server, and the web server."
+    },
+    "inventory": {
+        "file_count": 127,
+        "total_bytes": 1951561,
+        "files_by_type": {
+            "gitignore": 1,
+            "htaccess": 1,
+            "md": 3,
+            "css": 1,
+            "js": 4,
+            "php": 116,
+            "sh": 1
+        },
+        "resources_loaded_from_other_sites": [],
+        "links_a_person_can_click_to_other_sites": [
+            {
+                "file": "views/ops/idems/evidence.php",
+                "reference": "<a href=\"https://maps.google.com/?q=<?= e(urlencode($f["
+            },
+            {
+                "file": "views/ops/job_detail.php",
+                "reference": "<a class=\"btn small secondary\" target=\"_blank\" rel=\"noopener\"\n           href=\"https://www.google.com/maps/search/?api=1&amp;query=<?= rawur"
+            }
+        ],
+        "files": [
+            {
+                "path": ".gitignore",
+                "bytes": 18,
+                "sha256": "105f812981193f78be90e5cb087ff260068bf6d7acf4b37d764c0f7a0a875516"
+            },
+            {
+                "path": ".htaccess",
+                "bytes": 2694,
+                "sha256": "b43ae5f8b052224adefe930a93172aa0a7db10852ce63b9f813c0bec60b88ff6"
+            },
+            {
+                "path": "PENDING.md",
+                "bytes": 82017,
+                "sha256": "8430dbd26bd4f9d83be4af7170e368285938afb07ce8101540ae8b6b1022ff7a"
+            },
+            {
+                "path": "README-MilesWeb-PHP.md",
+                "bytes": 5367,
+                "sha256": "94db6f2f413be78424b569e4e10d5dbeea909cf158d7dd33a1d152e30400b522"
+            },
+            {
+                "path": "SEED-DATA-VERIFICATION.md",
+                "bytes": 6172,
+                "sha256": "d0c6a63207775481a0578f70469f4bbe039283fd4461aeef875361c9a80be12c"
+            },
+            {
+                "path": "assets/css/app.css",
+                "bytes": 32179,
+                "sha256": "937966db919889adbfe479720cda6982eced66c9590d3b9aee826791fcce4258"
+            },
+            {
+                "path": "assets/js/app.js",
+                "bytes": 35326,
+                "sha256": "fbc7ef8a16cdceef4e82c7002a596b7bfb2ddc1f8378a099de0a2ced2a8b63d5"
+            },
+            {
+                "path": "assets/js/offline.js",
+                "bytes": 6988,
+                "sha256": "f9d406038e9b861f3092e09ad488d20cb4fe294d469e8dcb8ca6ad012e76325a"
+            },
+            {
+                "path": "cron.php",
+                "bytes": 3177,
+                "sha256": "4da43467a36b309f8ab941bfa2f95bb9b5523fc19f970f3f44dfca65132facf4"
+            },
+            {
+                "path": "index.php",
+                "bytes": 39896,
+                "sha256": "0ffb124a444ef7c68e0a223d410d40f07e7d157147e030a4abf7de0c603f265b"
+            },
+            {
+                "path": "lib/access.php",
+                "bytes": 24641,
+                "sha256": "6316e51658cb69f38cd163c63f930cb6de4188d8ed56db05d29cfe47ba89d41d"
+            },
+            {
+                "path": "lib/ai.php",
+                "bytes": 13537,
+                "sha256": "b259a1ee321085665077d6e2b59504a6ea96cbc66258ce1b71b25eac98c11122"
+            },
+            {
+                "path": "lib/compliance.php",
+                "bytes": 26919,
+                "sha256": "271d70cd147f06fa3ed70c6d81d06c2ae9e1e2da0c95de3294cce0b795c803c5"
+            },
+            {
+                "path": "lib/compose.php",
+                "bytes": 6280,
+                "sha256": "ba51539fdee0ae7f26296c295325f0e41413f42719f534e07f24d0214bb5dec6"
+            },
+            {
+                "path": "lib/contracts.php",
+                "bytes": 24520,
+                "sha256": "aa8911960ffe7dcb1f5a95315dcdb65a5b52cd19f50060cda8b13e63bc45c7e2"
+            },
+            {
+                "path": "lib/crm.php",
+                "bytes": 143997,
+                "sha256": "e72ae623e6d963c73e0388e3975c2e8ec76e5c1e678c4cde80f1d28ef63e1407"
+            },
+            {
+                "path": "lib/db.php",
+                "bytes": 9156,
+                "sha256": "d5801a3894693c86f577a3581baccffd68c4450e8821e9b6ec315743ac155044"
+            },
+            {
+                "path": "lib/helpers.php",
+                "bytes": 14759,
+                "sha256": "41374a2fa566b0258619d47983f8e81306c3995377e0b8b62907964d3de406c6"
+            },
+            {
+                "path": "lib/idems.php",
+                "bytes": 215690,
+                "sha256": "accca755e2cc144886d4d8acfb5592564fd589ecbfb07208b18530d0b555b860"
+            },
+            {
+                "path": "lib/lookups.php",
+                "bytes": 33478,
+                "sha256": "0169421f80bbb039913ec1620c801c042a98b76b764b63ac60c75fbda1275423"
+            },
+            {
+                "path": "lib/ops.php",
+                "bytes": 270582,
+                "sha256": "32c89869b5df3aa86c0292a85645d4b082da9219e705e966901c3e9058b5d4ae"
+            },
+            {
+                "path": "lib/orgadmin.php",
+                "bytes": 53917,
+                "sha256": "903c07ae5472c803ab0004eec02147a4e7ff94f83c8dad7b1d9a2d6b78152097"
+            },
+            {
+                "path": "lib/pdf.php",
+                "bytes": 16189,
+                "sha256": "4caa8ea5f73704427e0f5490f1caa56ed47ea3e7b06115dc9b897a0191acade4"
+            },
+            {
+                "path": "lib/security.php",
+                "bytes": 27856,
+                "sha256": "08c4704587d141072b5c4696cde779d40fa6d621287917bff8ff9ff4fb8cbd37"
+            },
+            {
+                "path": "lib/seed_demo.php",
+                "bytes": 26929,
+                "sha256": "b776b79b3347b918045562701a2e6996bf468871c73e5e54e84391ebc9d0013e"
+            },
+            {
+                "path": "lib/terms.php",
+                "bytes": 10719,
+                "sha256": "9e5ddc21b27e1cbb75fe7e41646dca0e4f1af7482bb359a18dd404f1b739967b"
+            },
+            {
+                "path": "lib/workforce.php",
+                "bytes": 36647,
+                "sha256": "ad3c25d9fd1c79b85b10826dfeafc2d9552392aa3e3f4ce958fa40c468ec9edf"
+            },
+            {
+                "path": "manifest.php",
+                "bytes": 1665,
+                "sha256": "cd62f3f83b1a7969db2e95d98a1e98ec10ddb4f9d490fa97f9ed4e653794a3e3"
+            },
+            {
+                "path": "sw.js",
+                "bytes": 2674,
+                "sha256": "a141a89a532093306172f0a3b019c969ecc39fc7bc57a1c349780da8dba92a5c"
+            },
+            {
+                "path": "tools/check-dupes.php",
+                "bytes": 3511,
+                "sha256": "b29441eab390155a899543b1ac3e5c12c73136eaece669ef0da289c6f53f2378"
+            },
+            {
+                "path": "tools/check-strings.php",
+                "bytes": 2613,
+                "sha256": "45d093de527a4f5970ded54ec32bf9ab5aa3ad9264f333acf2c3490818d7325a"
+            },
+            {
+                "path": "tools/lint.sh",
+                "bytes": 1583,
+                "sha256": "f8db59b5aba1fab70b69fc865afa804eb4b475e8ad72b9185167f7d33736380c"
+            },
+            {
+                "path": "tools/sbom.php",
+                "bytes": 5314,
+                "sha256": "7da7803dd8b6a8164d765dddffff3f83c378ba2d2b8b02c305ec11bed832fd4d"
+            },
+            {
+                "path": "tools/smoke.js",
+                "bytes": 6271,
+                "sha256": "f7dfce566e273c32202664daf40e1532837351e386d6bdc4d50057497d164386"
+            },
+            {
+                "path": "views/dashboard.php",
+                "bytes": 26750,
+                "sha256": "bbba26fc1c5e241ba89ce26fb3ff07ee1ac8bf655ae3a2e98efc959fab320881"
+            },
+            {
+                "path": "views/detail.php",
+                "bytes": 22748,
+                "sha256": "bf9ece9bc0f407767801fb0c04c0a35259a5bad6b87337f8a5126864dd142477"
+            },
+            {
+                "path": "views/form.php",
+                "bytes": 6304,
+                "sha256": "f720239697c3945d2e18dcd51c9b1ebc832056849abaa6983404d1fc9191734e"
+            },
+            {
+                "path": "views/layout_bottom.php",
+                "bytes": 880,
+                "sha256": "e6b33e19b84eb59ffa96456b853b9bac0dfdb7627590549953454ea16342f429"
+            },
+            {
+                "path": "views/layout_top.php",
+                "bytes": 15842,
+                "sha256": "e7ba8fa2b9a5dff102dcf978afbd663eb7cd80344ee527054cfd17982eafc5fd"
+            },
+            {
+                "path": "views/list.php",
+                "bytes": 2741,
+                "sha256": "adeea975cd08b6f58c1a08fe86b4a1c3c566079ee73cb1cb41aa6f66d2d2a279"
+            },
+            {
+                "path": "views/login.php",
+                "bytes": 602,
+                "sha256": "ff266c37dfd19bb03495b15e1c7c87e4eace840954627870feeaa46a9ae5b7b2"
+            },
+            {
+                "path": "views/login_page.php",
+                "bytes": 8350,
+                "sha256": "1b7387acb94dcfb3dcb1090840c14856b98cd24245637277de30d1335254fdcb"
+            },
+            {
+                "path": "views/notfound.php",
+                "bytes": 212,
+                "sha256": "0b4feab07b715eec88a99b6beada179554174716d5070f4e3bf1530fb97cf8f3"
+            },
+            {
+                "path": "views/ops/access.php",
+                "bytes": 6805,
+                "sha256": "c870b36d47ba32d78014352b1d13be7a47d2fc7c464746746819725268cc39d9"
+            },
+            {
+                "path": "views/ops/ai_settings.php",
+                "bytes": 3976,
+                "sha256": "85c7c7702303d4f6312338629b962d42ed8b1e80bdacc389cbe7491c7ea0c9d5"
+            },
+            {
+                "path": "views/ops/attendance_recon.php",
+                "bytes": 3035,
+                "sha256": "ce64ac7059b9bdaed85b2ecdc214f302f3a1f7f80aed65b48956ae406727448c"
+            },
+            {
+                "path": "views/ops/availability.php",
+                "bytes": 14750,
+                "sha256": "171a8c362b852ba995151a2ab77ca7faaca592704d5a7e2163ab2c1e4e7c050a"
+            },
+            {
+                "path": "views/ops/call_detail.php",
+                "bytes": 15761,
+                "sha256": "76bedaba243a0d0065eac00a1c15366c12e86b5a180c0cd48bf25dab611872d7"
+            },
+            {
+                "path": "views/ops/call_form.php",
+                "bytes": 44359,
+                "sha256": "8b1a4e8ad1e36addcdf793ccb0794d24187d823dfad5674f3021981654d0e79c"
+            },
+            {
+                "path": "views/ops/calls.php",
+                "bytes": 8282,
+                "sha256": "1ce29ea772aac28c8fa9843789d20ec9a1b4a529943b7c239d9ee7c9076d32e4"
+            },
+            {
+                "path": "views/ops/candidate_detail.php",
+                "bytes": 13460,
+                "sha256": "e331cf87a79228642ec12cab5ddc7cc29054f1414199dace35b507f44a62e69d"
+            },
+            {
+                "path": "views/ops/candidate_form.php",
+                "bytes": 9099,
+                "sha256": "ef0f4d707bb2e792ee01d3558b7ef28593642a7b66f7a4824d8d5ad75a1d910d"
+            },
+            {
+                "path": "views/ops/candidate_list.php",
+                "bytes": 2674,
+                "sha256": "a6b937e7bce79cb5ec7769040e8a74f9163b627cc35c8195c5ae5306482ade13"
+            },
+            {
+                "path": "views/ops/change_password.php",
+                "bytes": 819,
+                "sha256": "07a7c01d844eed393dc88ede06e37714e6b1c2debcced26267fec7026ce76994"
+            },
+            {
+                "path": "views/ops/compliance.php",
+                "bytes": 5445,
+                "sha256": "cd89208138c187ba1b777997810a061ad4d871eeb6af3e10c838ddaf766330f0"
+            },
+            {
+                "path": "views/ops/contract_overrides.php",
+                "bytes": 8957,
+                "sha256": "6d9de0085c1e6c37068f652a6ef4e1c996603fe0486b5423ef830d6c76be8c5e"
+            },
+            {
+                "path": "views/ops/crm/approval_rule_form.php",
+                "bytes": 3810,
+                "sha256": "705272f4926f68d2b17979d06aed2bff6039eba7a4cea2cf9f2a711e75372310"
+            },
+            {
+                "path": "views/ops/crm/approval_rule_list.php",
+                "bytes": 2487,
+                "sha256": "5921ee036049e0ef50abe647cd7712df02db0e88e1337b2077958f06c5f62745"
+            },
+            {
+                "path": "views/ops/crm/inquiry_form.php",
+                "bytes": 3907,
+                "sha256": "166de9b777efa4320322b46acb5a2957af8706ae9dea8f2e9c3eb78020917b7f"
+            },
+            {
+                "path": "views/ops/crm/inquiry_list.php",
+                "bytes": 2686,
+                "sha256": "b24ea52e8a156d995ff046e257aa6bbef607c55149166b1b1e0e8d8a25f62f93"
+            },
+            {
+                "path": "views/ops/crm/quote_detail.php",
+                "bytes": 34637,
+                "sha256": "861beaa438d0b6b255c017d5091ac651d66af530b3402457d6b5cc3245b83b60"
+            },
+            {
+                "path": "views/ops/crm/quote_external.php",
+                "bytes": 8932,
+                "sha256": "b2bc432b39deb979162105f1e555692f15434ddc44143e4186a9fd5997e29997"
+            },
+            {
+                "path": "views/ops/crm/quote_form.php",
+                "bytes": 28415,
+                "sha256": "4a77bb5030fdd53c0a25db3b65ba6974a05a04234ecfc415cadd143db0e2a59f"
+            },
+            {
+                "path": "views/ops/crm/quote_list.php",
+                "bytes": 6380,
+                "sha256": "cd5b81804d5832447d894a8edaa7f5a5aa0386a1ab348fe0d1c963c46627dd7f"
+            },
+            {
+                "path": "views/ops/crm/reports.php",
+                "bytes": 3314,
+                "sha256": "0f81e4c904ad6f5a91613bb5ca9342c1931e867e7f7a4e1c6ba18abf681fe500"
+            },
+            {
+                "path": "views/ops/crm/template_form.php",
+                "bytes": 4091,
+                "sha256": "d85aff2b06d4b4c61f843e46b1c4ef96b0a34a471bad26f20239cc7366ce9cdb"
+            },
+            {
+                "path": "views/ops/crm/template_list.php",
+                "bytes": 5370,
+                "sha256": "083649e5bf231d9c3987248fc6a803a803adf93b7f0ea4b18486dc56923445c7"
+            },
+            {
+                "path": "views/ops/custom_fields.php",
+                "bytes": 3375,
+                "sha256": "52b8bbb035773349f71c78dd65fcdb1d55407f4b4bd91690363097c8443ef16c"
+            },
+            {
+                "path": "views/ops/data_requests.php",
+                "bytes": 3832,
+                "sha256": "ed9278127f9593f68eaf781518bff4d5f4d4d0ba1db9559924aafb7cc05f0387"
+            },
+            {
+                "path": "views/ops/hierarchy.php",
+                "bytes": 44145,
+                "sha256": "d354ff20dd07a9eedf817b8f7c2374ef4c9304513fd1837a41aeaf76f1516c55"
+            },
+            {
+                "path": "views/ops/idems/approval_rules.php",
+                "bytes": 6572,
+                "sha256": "d3de11bc0c1221720bde9b6874f3546e510cd359fe9f2d1802c021ffa9577f8a"
+            },
+            {
+                "path": "views/ops/idems/approver_map.php",
+                "bytes": 2602,
+                "sha256": "917b43719caa5945ea57a05a63cac2e5bac9abf4eab067d28adb30d4a8d8c953"
+            },
+            {
+                "path": "views/ops/idems/audit.php",
+                "bytes": 7678,
+                "sha256": "806a8c1c4a9bab00e68969dc10b56c63972164bc423d9ce33c0af4f76869ee46"
+            },
+            {
+                "path": "views/ops/idems/builder.php",
+                "bytes": 11602,
+                "sha256": "bbe9ff4132de75fc61638e3f23f32d33c0c1c5ce90946c463ba118ed5aceabed"
+            },
+            {
+                "path": "views/ops/idems/doc_detail.php",
+                "bytes": 15794,
+                "sha256": "ff2e3f07d1226760a8383eb9482b5746dd210587cc8f0cf6a4d17385941631de"
+            },
+            {
+                "path": "views/ops/idems/doc_form.php",
+                "bytes": 10235,
+                "sha256": "b459a3dd2bddab51057a8762eeeda32efa4aefe41dbf9fe0b5cf191714b5d714"
+            },
+            {
+                "path": "views/ops/idems/endorse_detail.php",
+                "bytes": 6984,
+                "sha256": "afea639479d389dc9ae042c0a879890d292d1fe79a0be30bdba1ebf4c3a62d71"
+            },
+            {
+                "path": "views/ops/idems/endorse_form.php",
+                "bytes": 6135,
+                "sha256": "07c1f1636aa06b2283ea73988aeb15ad83341a3acc0bd2dd2c387c1479090941"
+            },
+            {
+                "path": "views/ops/idems/endorse_list.php",
+                "bytes": 3333,
+                "sha256": "71f40f1e2330c4605f04674a549a55c42a4f819f99f5085b900e42791f70b12a"
+            },
+            {
+                "path": "views/ops/idems/evidence.php",
+                "bytes": 7216,
+                "sha256": "edb0c96571aa7438a1e93f65c01e0f8d2f960399f06dab715f246673051413f8"
+            },
+            {
+                "path": "views/ops/idems/fill.php",
+                "bytes": 17675,
+                "sha256": "14091a5b0cb5dd4e16423b362a6c161ba810234616c748f08431d9cd03d9bebf"
+            },
+            {
+                "path": "views/ops/idems/form_from_template.php",
+                "bytes": 5285,
+                "sha256": "d1b3d03d96d70d972ad9e3d7d5ae3cd50dc530c3d2eef5583b20743686b8dca1"
+            },
+            {
+                "path": "views/ops/idems/learning.php",
+                "bytes": 5604,
+                "sha256": "89a8035384e352a9e52782bee9d608cf6603cb0252b7f19fd4764376dec80907"
+            },
+            {
+                "path": "views/ops/idems/my_signature.php",
+                "bytes": 2755,
+                "sha256": "f57e0247a3ff7b585a0b3e8f494aea726aee53a12c8580e4f39d40e04d0e21c2"
+            },
+            {
+                "path": "views/ops/idems/numbering.php",
+                "bytes": 1836,
+                "sha256": "3f240f7905e26dfa945af16d0d33c0768ead9681bac419f9f13529f017fcd09f"
+            },
+            {
+                "path": "views/ops/idems/phrases.php",
+                "bytes": 4110,
+                "sha256": "d77fd023ae96dc6ce3ddf3bf47e7b8497e8667f603e135edb77318447f139c5e"
+            },
+            {
+                "path": "views/ops/idems/register.php",
+                "bytes": 3584,
+                "sha256": "c4c7a1864bed0be9881220ddfab978cd6c1ce1b8012113b2c85412d1247a2cb9"
+            },
+            {
+                "path": "views/ops/idems/report_types.php",
+                "bytes": 3178,
+                "sha256": "2f4a71b39f6199ac3b1069ec43af6906309ba949ca32b8de655daa48e4b05d26"
+            },
+            {
+                "path": "views/ops/idems/review.php",
+                "bytes": 9268,
+                "sha256": "8640950b97ee4c090d1630b6094c1c98aa0b77123875b70daf1636cf20850c29"
+            },
+            {
+                "path": "views/ops/idems/smart.php",
+                "bytes": 3500,
+                "sha256": "0d8cd07c17f568d8f45c47e50f0025dc971d94e80eecab7e583c945d533d12fb"
+            },
+            {
+                "path": "views/ops/idems/templates.php",
+                "bytes": 8201,
+                "sha256": "c40ef902c97d0002d6d87c39099b187b94bd4c739de8497f0200af7373408b1e"
+            },
+            {
+                "path": "views/ops/idems/writing.php",
+                "bytes": 3657,
+                "sha256": "2e0d6d3d7dc9db629f894485663845ea9aad84f5038765bedb01c7708202804e"
+            },
+            {
+                "path": "views/ops/incident_detail.php",
+                "bytes": 3934,
+                "sha256": "48806c4cf6fa8da83c290c8915123907fdadc25a96e963da442374981065893d"
+            },
+            {
+                "path": "views/ops/incident_form.php",
+                "bytes": 5373,
+                "sha256": "4efe80d38180fb148aec683d3136d66d3a480ac8422ac1fc027431385633a769"
+            },
+            {
+                "path": "views/ops/incidents.php",
+                "bytes": 2969,
+                "sha256": "a8f2e53178bd649c711e7bfa26c88fd4248ac9d82e6c84bcd6b754039a6047ff"
+            },
+            {
+                "path": "views/ops/inspector_form.php",
+                "bytes": 15399,
+                "sha256": "32ae33e29b4728b9b3ce81436ddde9c469c06e4cd6e4f3e8dd201e9c365759ec"
+            },
+            {
+                "path": "views/ops/inspector_list.php",
+                "bytes": 1840,
+                "sha256": "6cf63b34fbb864f6f6cd82bcf5d6f633d9d6deffcb204deb8bafd524e9adae65"
+            },
+            {
+                "path": "views/ops/invoicing.php",
+                "bytes": 3923,
+                "sha256": "3f8894fefc6e057367fae5c0dab547a40e0b8a82b2ac20b8cb46fcaf26b451d9"
+            },
+            {
+                "path": "views/ops/job_close.php",
+                "bytes": 2799,
+                "sha256": "0377d9750a89dfb1450ad5f1148867d4c13c4330d1cea6cc66fc5c2f5ff8f7db"
+            },
+            {
+                "path": "views/ops/job_detail.php",
+                "bytes": 21559,
+                "sha256": "73ff8727269176b29c9f3a8c9ed53279eff333b7538ca03d2da14e4e2a1e43c7"
+            },
+            {
+                "path": "views/ops/job_form.php",
+                "bytes": 21938,
+                "sha256": "068d3868e28eef012255542b883ded93d0909aee090243453f5c09bf8ca9d8b9"
+            },
+            {
+                "path": "views/ops/jobs.php",
+                "bytes": 5768,
+                "sha256": "e96f89cc423442e8e5ac2d3733e0e4c431241d2eed3ae36d7f155a2b57968118"
+            },
+            {
+                "path": "views/ops/lookup_values.php",
+                "bytes": 2966,
+                "sha256": "52895a1cabe9befc01344d57a0c50373f5c65eb7b04ad75a7b76a3bacaf91e3e"
+            },
+            {
+                "path": "views/ops/lookups.php",
+                "bytes": 4398,
+                "sha256": "63f13d48f1860f72b81d8b31f2a3f978cc1c02ea11f2c36b943a2367ac711096"
+            },
+            {
+                "path": "views/ops/master_form.php",
+                "bytes": 2642,
+                "sha256": "35e45d9d09cd662b2554ff0462e2aa95d3fbdc02ab69e526c88d9b7ab1eeba2a"
+            },
+            {
+                "path": "views/ops/master_list.php",
+                "bytes": 2136,
+                "sha256": "1d1942663bce97ab040d026f42e6f2f884fad868629cbd0be53ab889eb1dc8e1"
+            },
+            {
+                "path": "views/ops/masters.php",
+                "bytes": 2475,
+                "sha256": "a056c7002d16f57b731c98908bea8d785f78c68062e00dad079d4b47bdd20d16"
+            },
+            {
+                "path": "views/ops/my_jobs.php",
+                "bytes": 4918,
+                "sha256": "7bdf16e6e32304b372f2229e2736eaa382528703827ebaf434eb8912fb516ee6"
+            },
+            {
+                "path": "views/ops/office_finance.php",
+                "bytes": 2705,
+                "sha256": "885adf8508a0c9e72b1c81545e4eb4904faf2b1c9b7284ae7b6ec53455296a25"
+            },
+            {
+                "path": "views/ops/person_erase.php",
+                "bytes": 2880,
+                "sha256": "4421b7a3054d3081fe69856d5e1250d2eb36c91706dca791d11e28de46dfe6a4"
+            },
+            {
+                "path": "views/ops/privacy.php",
+                "bytes": 1537,
+                "sha256": "140a873cc030bd6e6ca080caba71cbd3ecf5bf6ba892120fd3ad2ffff2e1fa67"
+            },
+            {
+                "path": "views/ops/profitability_detail.php",
+                "bytes": 7466,
+                "sha256": "bad1984ed3c78f82561f280476a85cf293352c1f378849ff893f3a058925c93c"
+            },
+            {
+                "path": "views/ops/profitability_list.php",
+                "bytes": 5223,
+                "sha256": "236b59d8e31ff2a16734a59c5e4ee43603f12eed306683177a6f18c4bf7bcf1e"
+            },
+            {
+                "path": "views/ops/reports.php",
+                "bytes": 14816,
+                "sha256": "0edb9951cba3960b3b9d90d76cca527661aa31a0095a12a9a822c974750050be"
+            },
+            {
+                "path": "views/ops/requisition_detail.php",
+                "bytes": 4329,
+                "sha256": "192a16d4a96bade0044ac4b9bdb4eb068df17c0cf13fc957251433437908e48f"
+            },
+            {
+                "path": "views/ops/requisition_form.php",
+                "bytes": 3947,
+                "sha256": "8c29b8f396ab4fc98e24a401372c6a62ad8365418fd1f564bf0e1635a0852012"
+            },
+            {
+                "path": "views/ops/requisition_list.php",
+                "bytes": 2529,
+                "sha256": "ff4379801f023c54e3dc52e55a448b1c8ea4cad4ecdf70e34884f1d3977a86a5"
+            },
+            {
+                "path": "views/ops/settings.php",
+                "bytes": 24175,
+                "sha256": "500fb1500daaef07bd11bf3e62529b06c2da4e74bede7476db64dc2dd9c14a90"
+            },
+            {
+                "path": "views/ops/terminology.php",
+                "bytes": 2444,
+                "sha256": "9caa23b77d71195723f9c43a66e4bbc23afe6ace419aaab57a9afd163a2312ab"
+            },
+            {
+                "path": "views/ops/two_factor.php",
+                "bytes": 6658,
+                "sha256": "c58a41d3ddb6fe2cd290203fcaf37fc76bc1ea9ae2a1e6b3281dfe9b82c5aeb2"
+            },
+            {
+                "path": "views/ops/user_form.php",
+                "bytes": 7501,
+                "sha256": "b9ad702098817b4bcec314a4f44f66c655a95e8c2a75c29fefdd0e040208cc67"
+            },
+            {
+                "path": "views/ops/users.php",
+                "bytes": 5169,
+                "sha256": "677bfaa989db6f7ab64fa9868e673c028765585d931367befabffc49b0ff52fa"
+            },
+            {
+                "path": "views/ops/voucher_detail.php",
+                "bytes": 19503,
+                "sha256": "40e5ee0e55c0f7212c38c3e0892c2eaf6c61fefc71148522071f7fc776d14fa5"
+            },
+            {
+                "path": "views/ops/voucher_list.php",
+                "bytes": 4375,
+                "sha256": "d950e7dc23420d7a09011a3629d6521bf842d2cf4addf70144a2003f7cd6ef50"
+            },
+            {
+                "path": "views/ops/voucher_print.php",
+                "bytes": 5463,
+                "sha256": "d644d00b1f66df459af99b54108b0f5436132158b4d3651cf21c5c915aeb68a3"
+            },
+            {
+                "path": "views/ops/work_norms.php",
+                "bytes": 3390,
+                "sha256": "dd26779f61c4b1eb829ffb00ad6a7b0652579f2d49847ce30e70d83af335760b"
+            },
+            {
+                "path": "views/po_detail.php",
+                "bytes": 5097,
+                "sha256": "5dd3c217cd716e5d26da216bc79488da83fad02f1673e89d91cf049c4b5ea9ea"
+            }
+        ]
+    }
+}

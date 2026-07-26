@@ -1599,6 +1599,14 @@ function ops_dispatch($route, $method) {
             ops_change_password($method); return true;
         case $route === 'two-factor':
             ops_two_factor($method); return true;
+        case $route === 'compliance':
+            ops_compliance($method); return true;
+        case $route === 'incidents' || $route === 'incident' || $route === 'incident-new' || $route === 'incident-edit':
+            ops_incidents($route, $method); return true;
+        case $route === 'data-requests' || $route === 'person-data' || $route === 'person-erase':
+            ops_data_requests($route, $method); return true;
+        case $route === 'privacy':
+            view('ops/privacy', ['notice'=>privacy_notice_text(), 'g'=>grievance_officer()]); return true;
         case $route === 'user-unlock':
             ops_user_unlock($method); return true;
         case $route === 'user-2fa-reset':
@@ -3828,6 +3836,14 @@ function ops_settings($method) {
         $tr = array_values(array_intersect(array_keys(ORG_ROLES), (array)($_POST['twofa_roles'] ?? [])));
         setting_set('twofa_roles', implode(',', $tr));
         setting_set('audit_retain_days', min(3650, max(180, (int)($_POST['audit_retain_days'] ?? 400))));
+        setting_set('upload_max_mb',     min(64, max(1, (int)($_POST['upload_max_mb'] ?? 12))));
+        // --- Compliance. Nothing here is written by the software; leaving it
+        //     blank is itself what the compliance screen reports. ---
+        setting_set('grievance_name',  trim($_POST['grievance_name'] ?? ''));
+        setting_set('grievance_email', trim($_POST['grievance_email'] ?? ''));
+        setting_set('grievance_phone', trim($_POST['grievance_phone'] ?? ''));
+        if (isset($_POST['privacy_notice'])) setting_set('privacy_notice', (string)$_POST['privacy_notice']);
+        setting_set('last_cert_audit', trim($_POST['last_cert_audit'] ?? ''));
         // Theme builder: preset + 4 colours + text colour + font size
         foreach (['c_primary','c_accent','c_bg','c_surface','c_text'] as $k) {
             $v = trim($_POST[$k] ?? '');

@@ -93,6 +93,10 @@
         <?php if (can('idems.type.manage') || is_master()): ?><a class="s-item<?= $navOn(['idems-approval-rules','idems-approval-rule-edit','approval-rules']) ?>" href="/approval-rules"><span class="s-ic">🔀</span><span>Approval rules</span></a><?php endif; ?>
         <?php if (can('idems.type.manage') || is_master() || can('crm.template.manage')): ?><a class="s-item<?= $navOn(['report-templates','report-template-edit','templates']) ?>" href="/templates"><span class="s-ic">📝</span><span>Document templates</span></a><?php endif; ?>
         <?php if (can('idems.audit.view') || is_master()): ?><a class="s-item<?= $navOn(['audit-log']) ?>" href="/audit-log"><span class="s-ic">🛡️</span><span>Audit trail</span></a><?php endif; ?>
+        <?php // One screen that says, measured from the running system, which of the
+              // legal obligations are met and which are not. Kept next to the audit
+              // trail because that is where somebody looks when a client asks. ?>
+        <?php if (is_master() || can('settings.manage')): ?><a class="s-item<?= $navOn(['compliance','incidents','incident','incident-new','incident-edit','data-requests','person-erase']) ?>" href="/compliance"><span class="s-ic">⚖️</span><span>Where we stand</span></a><?php endif; ?>
         <?php endif; ?>
 
         <?php if (can('mod.invoicing.view') || can('mod.profitability.view')): ?>
