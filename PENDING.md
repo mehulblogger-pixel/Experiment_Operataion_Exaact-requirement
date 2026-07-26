@@ -2,6 +2,137 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🔐 SECURITY & COMPLIANCE — shipped 2026-07, with what is still open
+
+Four commits: `220d5cd` (forgery, sessions, login limits, uploaded files), `1dede08`
+(passwords, two-step sign-in, session expiry), `ad44ecb` (attachment checks, host
+lockdown), `2ec3caa` (compliance screen, incident register, data-subject rights, SBOM).
+
+### ⚠️ OWNER ACTIONS — not code, nobody else can do these
+
+In priority order. The first five cost almost nothing and matter more than anything
+in the code.
+
+- [ ] **1. HTTPS on the live site.** THE biggest single gap. Free Let's Encrypt
+      certificate in the MilesWeb cPanel. Once `https://yourdomain` works in a
+      browser, remove the `#` from the four lines at the bottom of `phpapp/.htaccess`.
+      **Do not uncomment before the certificate works** — visitors would be sent to an
+      address that does not answer and the site would look down. Until this is done the
+      session cookie cannot be marked "never send unencrypted" and passwords travel in
+      the clear on any hotel or plant wifi. The compliance screen reports it red.
+- [ ] **2. Change `admin/admin12345`** and the demo passwords (`demo12345` — director,
+      bmanager, nisha.mehta, account, insp.ravi). The Users screen now names every
+      account still on a shipped password, in red. Tick "they must choose their own at
+      the next sign-in" when handing one over.
+- [ ] **3. Grievance officer + privacy notice** — Settings → Compliance. Both are
+      required by the DPDP Act. A complete draft notice written for an inspection
+      business sits in the box as placeholder text: read it, correct what is not true
+      of you, paste it in. An afternoon's work.
+- [ ] **4. Two e-mails to MilesWeb, replies filed:**
+      (a) confirm the account **and its backups** sit in an **Indian data centre**
+      (CERT-In log-localisation); (b) confirm NTP is synchronised to
+      **time.nplindia.org** or an NIST server (CERT-In clock-sync). Software cannot
+      answer either — the compliance screen says "not ours to answer" for both.
+- [ ] **5. Backups, and a restore that has actually been tried.** Every photograph,
+      report and voucher is in one database. Schedule it in the panel, download a copy
+      somewhere else, and **restore it once to prove it works.** Not on any regulatory
+      list and more likely to save the business than everything above it.
+- [ ] **6. Switch on two-step sign-in** for the roles that can move money or change
+      permissions — Settings → Security → "Roles that must use two-step sign-in".
+      Those people get nudged on every screen until they set it up.
+- [ ] **7. Book the CERT-In empanelled audit.** Required annually. List published on
+      cert-in.org.in; roughly ₹75,000–2,50,000 for an app this size. **Do items 1–4
+      first** or you will pay to be told what is already written here. Record the date
+      in Settings and the compliance screen turns green.
+- [ ] **8. ISO/IEC 27001 or SOC 2 — only when a client asks.** These certify the
+      *company*, not this software. Voluntary. Roughly ₹4–10 lakh and 6–12 months.
+      The IT Act names ISO 27001 as *a* benchmark for "reasonable security", not the
+      only one; demonstrable practices plus a CERT-In audit report is defensible for a
+      company this size.
+
+### 🔧 CODE — deliberately not built, or built only part way
+
+- [ ] **Content-Security-Policy still carries `'unsafe-inline'`.** The screens use
+      inline `onclick` handlers and inline `<style>`, so script injected into a page
+      could still run. What it could NOT do is load code from another site or send what
+      it found anywhere — `connect-src 'self'`, `object-src 'none'`, `form-action
+      'self'` all hold. Closing it properly means moving every inline handler and style
+      block out to files and adding a per-request nonce. Sizeable, low urgency while
+      the escaping in the views holds.
+- [ ] **Consent register is built but not wired in.** `data_consents` exists; nothing
+      writes to it yet. For most of what this app holds the lawful basis is
+      contract-performance, not consent, so this matters mainly if marketing e-mails
+      are ever sent. Wire it at the contact-capture points if that changes.
+- [ ] **No encryption at rest, by decision.** On shared hosting the key would sit in
+      `config.php` next to the database password — anyone who can read one can read the
+      other, so it buys almost nothing and risks losing the data if the key is lost.
+      Real disk/database encryption is the hosting provider's to offer. Revisit only if
+      a client contract demands it in writing, and then encrypt named columns (salary,
+      bank details) rather than everything.
+- [ ] **No IP allow-listing.** Would lock the app to the offices' addresses. Not built
+      because inspectors work from client sites on mobile data. Worth adding for the
+      *accounts and settings screens only* if ever wanted.
+- [ ] **Two-step enrolment has no QR code** — the setup key is typed into the
+      authenticator app by hand. A QR needs a pure-PHP encoder (~300 lines with
+      Reed-Solomon) since no library can be installed on the host. Manual entry works
+      with every app; add the QR if enrolment turns out to be a support burden.
+- [ ] **Erasure covers system users and client contact persons only.** Candidates
+      (`candidates`, with CVs) and inspectors-without-a-login are also personal data and
+      have no erase path yet. Add `person_erase_preview()` / `person_erase()` branches
+      for both.
+- [ ] **Data-subject requests have no clock.** Incidents count down from six hours;
+      requests just sit as "Open". The DPDP Act says "without undue delay" rather than
+      naming days, but a visible ageing pill would stop one arriving on a Tuesday and
+      being remembered in December.
+- [ ] **Audit trim is a button, not a schedule.** `audit_trim_old()` runs only when
+      somebody clicks it on the compliance screen. Wire it into `cron.php` so retention
+      is applied whether or not anyone remembers.
+- [ ] **The CERT-In incident report is composed by hand.** The screen states the address
+      and everything they expect, all on one page, but does not send it. Wiring it to
+      the existing `ops_mail` composer would remove a step at exactly the moment
+      somebody is panicking. Worth doing.
+- [ ] **SBOM is regenerated by hand** — `php tools/sbom.php` from the `phpapp` folder.
+      Should run as part of whatever the release routine becomes, so `SBOM.json` cannot
+      quietly go stale. Currently: 127 files, **zero third-party runtime dependencies,
+      zero resources loaded from other sites** — measured, not asserted. This is the
+      strongest compliance card the app has; keep it true.
+- [ ] **Per-source login throttle could lock a whole office.** Counted per IP at 30
+      failures / 15 minutes. A NAT'd office shares one address. Deliberately loose, but
+      watch it once real staff are on it; the admin can release an account from the
+      Users screen.
+
+### 👀 OBSERVED ONCE, NOT REPRODUCED
+
+- [ ] **A session ended unexpectedly straight after sign-in**, once, during testing.
+      Never recurred across many later runs. The likely cause is the standard race when
+      the session id is replaced at sign-in (`session_regenerate_id(true)`) and a second
+      request arrives carrying the old id — every framework has this, and the
+      alternative leaves the pre-login id valid, which is the thing being closed. Left
+      as-is. **If anyone reports being thrown back to the sign-in page immediately after
+      signing in, this is the first place to look.**
+
+### 🐛 TWO REAL BUGS FOUND AND FIXED WHILE TESTING (for the record)
+
+- A submission that was turned away sent the person back to the **wrong screen**. The
+  browser reports where it came from as a full address; the code tested it for a
+  leading `/`, which never matches, so the record id was dropped and they landed on an
+  empty register. It also compared the host *with* the port against the host *without*
+  it. **The same flaw was in the duplicate-submission path and had been doing this
+  silently all along.** Now parsed properly in `redirect_back()`, same-host only.
+- The default-password check ran **four bcrypt comparisons per account on every page
+  load** of two screens. Bcrypt is deliberately slow; at fifty staff that was seconds
+  of waiting. Now tests only accounts whose password has never been set through the
+  app — anything set through it has already been refused by the policy.
+
+### 🧪 TEST-SUITE HOUSEKEEPING (dev only, not shipped)
+
+- [ ] Several scratchpad suites hard-code record ids (`job=315`, `call=326`,
+      `document?id=1`) from whichever database existed when they were written, and fail
+      as "precondition missing" on a fresh one. Worth changing to *find* a suitable
+      record instead. `tools/smoke.js` and `tools/lint.sh` (incl. `check-dupes.php`,
+      `check-strings.php`) are the two that always work and should be run before every
+      upload: `sh tools/lint.sh && node tools/smoke.js`.
+
 ## 🚀 NEXT BIG BUILD — IDEMS: Intelligent Inspection Documentation, Reporting & Endorsement Engine (TPIA Industry Pack) — owner spec 2026-07, roadmap pending approval
 
 A world-class TPIA documentation ecosystem. 24-part spec. Two core workflows:
