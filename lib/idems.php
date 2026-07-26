@@ -2865,6 +2865,7 @@ const AUDIT_ACTION_LABELS = [
     'ACCOUNT_UNLOCKED'=>'Locked account released','PERSON_EXPORT'=>'Personal data exported',
     'PERSON_ERASED'=>'Personal data erased','INCIDENT'=>'Security incident recorded',
     'CONSENT'=>'Consent recorded','CONSENT_WITHDRAWN'=>'Consent withdrawn',
+    'UPLOAD_REFUSED'=>'Attachment refused',
 ];
 const AUDIT_ACTIONS_ALL = [
     'CREATE','EDIT','IRN_GEN','SUBMIT','APPROVE','REJECT','SENDBACK','DELEGATE','FINALIZE','DELETE','EVIDENCE',

@@ -5,6 +5,30 @@ function e($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 function redirect($path) { header("Location: $path"); exit; }
 
+// Back to the screen they were on, when a submission is turned away.
+//
+// The browser sends the referrer as a full address — http://host/page?id=7 —
+// not as a path, so a test for a leading "/" never matches it and the id is
+// dropped, landing the person on an empty register instead of the record they
+// were working on. Only our own host is honoured, so the header cannot be used
+// to bounce somebody off the site.
+function redirect_back($fallbackRoute = '') {
+    $ref = (string)($_SERVER['HTTP_REFERER'] ?? '');
+    $to  = '/' . ltrim($fallbackRoute, '/');
+    if ($ref !== '') {
+        $p = parse_url($ref);
+        // parse_url hands back the host without the port, while HTTP_HOST keeps
+        // it — "127.0.0.1" against "127.0.0.1:8801" — so the port is stripped
+        // from both before they are compared. Getting this wrong silently sends
+        // everybody to the fallback and loses the record they were on.
+        $here = preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? ''));
+        $sameHost = empty($p['host']) || strcasecmp($p['host'], $here) === 0;
+        if ($sameHost && !empty($p['path']))
+            $to = $p['path'] . (isset($p['query']) && $p['query'] !== '' ? '?' . $p['query'] : '');
+    }
+    redirect($to);
+}
+
 // --- Flash messages ---
 function flash($text, $tag = 'success') {
     $_SESSION['flash'][] = ['text' => $text, 'tag' => $tag];

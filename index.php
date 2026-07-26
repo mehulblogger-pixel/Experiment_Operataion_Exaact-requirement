@@ -373,6 +373,20 @@ if ($method === 'POST' && !csrf_ok($_POST['_csrf'] ?? '')) {
     redirect('/' . $route);
 }
 
+// Every file attached anywhere in this app passes through here before a handler
+// sees it. Uploads are held in the database and never written to disk, so one
+// can't be executed; this is the second guard — a file whose contents disagree
+// with what it claims to be, or which is script under any name, is refused at
+// the door rather than stored and served back to a colleague later.
+if ($method === 'POST' && !empty($_FILES)) {
+    $badUpload = uploads_reject_reason();
+    if ($badUpload !== '') {
+        idems_log('user', current_user()['id'] ?? null, 'UPLOAD_REFUSED', ['field'=>substr($badUpload, 0, 200)]);
+        flash($badUpload . ' Nothing else on the form was saved either — please attach a different file and submit again.', 'error');
+        redirect_back($route);
+    }
+}
+
 // One submission, one record. Every form carries a one-shot ticket; the first
 // POST spends it and any replay of that same POST is turned away here, before a
 // handler can write a second row. This is the guard that stops an inspector's
@@ -381,9 +395,10 @@ if ($method === 'POST' && !csrf_ok($_POST['_csrf'] ?? '')) {
 if ($method === 'POST' && isset($_POST['_ft'])) {
     if (!form_token_spend($_POST['_ft'])) {
         flash('That was already saved — the form was sent twice, so the second copy was ignored.', 'warning');
-        $back = $_SERVER['HTTP_REFERER'] ?? '';
-        // Back to where they were, or to the screen they were posting to.
-        redirect($back && strpos($back, '/') === 0 ? $back : '/' . $route);
+        // Back to the record they were on. The referrer arrives as a full
+        // address, so it has to be parsed rather than tested for a leading "/";
+        // done the naive way, the id is dropped and they land on an empty list.
+        redirect_back($route);
     }
 }
 
