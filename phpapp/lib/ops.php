@@ -3738,19 +3738,43 @@ function ops_users($route, $method) {
             $insId = ($b['inspector_id'] ?? '') !== '' ? (int)$b['inspector_id'] : null;
             // scope: global managers set anything; branch managers pin to their office
             $homeOffice = $globalMgr ? (($b['home_office_id'] ?? '') !== '' ? (int)$b['home_office_id'] : null) : $myOffice;
-            $scopeOffices = $globalMgr ? trim($b['scope_offices'] ?? '') : '';   // '' = OWN(home)
-            $scopeSbus = trim($b['scope_sbus'] ?? '');
+            // Both scopes arrive as tick-lists now. "Every…" wins over the
+            // individual ticks, and is stored as ALL so an office added next
+            // year is included without anybody revisiting this person.
+            if ($globalMgr) {
+                $scopeOffices = !empty($b['scope_offices_all']) ? 'ALL'
+                    : implode(',', array_map('intval', array_filter((array)($b['scope_offices'] ?? []))));
+            } else { $scopeOffices = ''; }                                       // '' = OWN(home)
+            $sbuOpts = lk_options_or('sbu', OPS_SBUS);
+            $scopeSbus = !empty($b['scope_sbus_all']) ? 'ALL'
+                : implode(',', array_values(array_intersect(array_keys($sbuOpts), (array)($b['scope_sbus'] ?? []))));
             // permissions: branch mgr can only grant a safe subset (no salary/global/settings)
             $chosen = array_filter((array)($b['permissions'] ?? []));
             if (!$globalMgr) $chosen = array_intersect($chosen, ['dash.operations','dash.utilization','data.credit','ops.call.create','ops.job.allocate','ops.job.close','master.manage']);
             $perms = implode(',', $chosen);
             // Reporting manager (for the org hierarchy + approvals): a system user when
             // one exists, else a manual name/position/email for a manager without a login.
-            $reportsTo = ($b['reports_to_id'] ?? '') !== '' ? (int)$b['reports_to_id'] : null;
+            // "+ add them" is not a person id — it means the manager has no login,
+            // so the typed name/position/e-mail below are what we keep.
+            $rtRaw = (string)($b['reports_to_id'] ?? '');
+            $reportsTo = ($rtRaw !== '' && $rtRaw !== '__new__') ? (int)$rtRaw : null;
             if ($reportsTo && $user && $reportsTo === (int)$user['id']) $reportsTo = null; // no self-report
             $rtName = trim($b['reports_to_name'] ?? ''); $rtPos = trim($b['reports_to_position'] ?? ''); $rtEmail = trim($b['reports_to_email'] ?? '');
+            // Designation comes from the master. "+ Add" writes it into the
+            // master as well, so the next person picks it instead of typing a
+            // second spelling of the same job.
             $posTitle = trim($b['position_title'] ?? '');
-            $uwwd = in_array((string)($b['weekly_working_days'] ?? ''), ['5','5.5','6'], true) ? (float)$b['weekly_working_days'] : 6;
+            if ($posTitle === '__new__') {
+                $posTitle = trim($b['position_title_new'] ?? '');
+                if ($posTitle !== '' && ($dt = lk_type('designation')))
+                    if (!in_array($posTitle, lk_options_or('designation', DESIGNATIONS), true))
+                        lk_add_value($dt['id'], null, strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $posTitle), 0, 20)), $posTitle);
+            }
+            // There is no alternate Saturday here, so 5.5 is gone. Hours a day
+            // are typed per person rather than assumed from the number of days.
+            $uwwd = in_array((string)($b['weekly_working_days'] ?? ''), ['5','6'], true) ? (float)$b['weekly_working_days'] : 6;
+            $dHours = trim((string)($b['daily_hours'] ?? ''));
+            $dHours = ($dHours !== '' && (float)$dHours > 0 && (float)$dHours <= 16) ? (float)$dHours : null;
             // A password set by an administrator has to clear the same bar as one
             // somebody chooses for themselves; otherwise the rule is decorative.
             $newPw = (string)($b['password'] ?? '');
@@ -3769,8 +3793,8 @@ function ops_users($route, $method) {
             // they must replace it the moment they sign in, so it stops being shared.
             $mustChange = !empty($b['must_change_pwd']) ? 1 : 0;
             if ($user) {
-                $pdo->prepare("UPDATE users SET username=?,first_name=?,last_name=?,email=?,role=?,is_superuser=?,is_active=?,inspector_id=?,home_office_id=?,scope_offices=?,scope_sbus=?,permissions=?,reports_to_id=?,reports_to_name=?,reports_to_position=?,reports_to_email=?,position_title=?,weekly_working_days=? WHERE id=?")
-                    ->execute([$b['username'], $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, !empty($b['is_active'])?1:0, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $user['id']]);
+                $pdo->prepare("UPDATE users SET username=?,first_name=?,last_name=?,email=?,role=?,is_superuser=?,is_active=?,inspector_id=?,home_office_id=?,scope_offices=?,scope_sbus=?,permissions=?,reports_to_id=?,reports_to_name=?,reports_to_position=?,reports_to_email=?,position_title=?,weekly_working_days=?,daily_hours=? WHERE id=?")
+                    ->execute([$b['username'], $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, !empty($b['is_active'])?1:0, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, $user['id']]);
                 if ($newPw !== '') {
                     $pdo->prepare("UPDATE users SET password_hash=?, pwd_changed_at=? WHERE id=?")
                         ->execute([password_hash($newPw, PASSWORD_DEFAULT), date('c'), $user['id']]);
@@ -3782,8 +3806,8 @@ function ops_users($route, $method) {
                 // A brand-new account with no password typed gets one nobody knows
                 // and is marked must-change, rather than a shared default.
                 $hash = password_hash($newPw !== '' ? $newPw : bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
-                $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id,home_office_id,scope_offices,scope_sbus,permissions,reports_to_id,reports_to_name,reports_to_position,reports_to_email,position_title,weekly_working_days,pwd_changed_at,must_change_pwd)
-                    VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, date('c'), $newPw === '' ? 1 : $mustChange]);
+                $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id,home_office_id,scope_offices,scope_sbus,permissions,reports_to_id,reports_to_name,reports_to_position,reports_to_email,position_title,weekly_working_days,daily_hours,pwd_changed_at,must_change_pwd)
+                    VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, date('c'), $newPw === '' ? 1 : $mustChange]);
                 flash($newPw === ''
                     ? 'User created. No password was set, so use Edit to give them one — the account cannot be signed into until you do.'
                     : 'User created.');

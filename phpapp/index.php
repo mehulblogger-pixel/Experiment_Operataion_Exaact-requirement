@@ -175,6 +175,7 @@ try {
     db()->query("SELECT token FROM form_tokens LIMIT 1");
     db()->query("SELECT qty_total FROM partner_contracts LIMIT 1");
     db()->query("SELECT totp_enabled FROM users LIMIT 1");
+    db()->query("SELECT daily_hours FROM users LIMIT 1");
     db()->query("SELECT id FROM security_incidents LIMIT 1");
     db()->query("SELECT id FROM data_requests LIMIT 1");
     db()->query("SELECT id FROM data_consents LIMIT 1");

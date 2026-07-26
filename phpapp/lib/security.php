@@ -619,6 +619,7 @@ function user_reactivate($id) {
 function security_migrate() {
     static $done = false; if ($done) return; $done = true;
     ensure_column('users', 'deactivated_at', "VARCHAR(30) DEFAULT ''");
+    ensure_column('users', 'daily_hours',    "DECIMAL(4,2) NULL");
     ensure_column('users', 'pwd_changed_at',  "VARCHAR(30) DEFAULT ''");
     ensure_column('users', 'must_change_pwd', "INT DEFAULT 0");
     ensure_column('users', 'totp_secret',     "VARCHAR(64) DEFAULT ''");
