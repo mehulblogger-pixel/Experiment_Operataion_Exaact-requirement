@@ -383,6 +383,53 @@ function ops_two_factor($method) {
 //  written to the audit trail with the name of whoever did it. Neither reveals
 //  or sets a password.
 // ---------------------------------------------------------------------------
+// Deactivate / reactivate / remove, from the register.
+function ops_user_retire($method) {
+    ops_require(can('users.manage.branch') || can('users.manage.global'), 'You cannot manage users.');
+    if ($method !== 'POST') redirect('/users');
+    $id = (int)($_POST['id'] ?? 0);
+    $u  = ops_one("SELECT * FROM users WHERE id=?", [$id]);
+    if (!$u) { flash('That person no longer exists.', 'error'); redirect('/users'); }
+    $do = $_POST['_do'] ?? '';
+
+    if ($do === 'deactivate') {
+        if ((int)$u['id'] === (int)(current_user()['id'] ?? 0)) {
+            flash('You cannot deactivate your own account — somebody else has to do it.', 'error'); redirect('/users');
+        }
+        if (!empty($u['is_superuser']) && (int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1 AND is_superuser=1") <= 1) {
+            flash('That is the last Master Admin. Give somebody else that role first, or you will lock everybody out.', 'error');
+            redirect('/users');
+        }
+        user_deactivate($id, trim((string)($_POST['reason'] ?? '')));
+        flash($u['username'] . ' can no longer sign in. Everything they did stays exactly as it is. '
+            . 'The account can be removed after ' . user_retire_days() . ' days.', 'warning');
+
+    } elseif ($do === 'reactivate') {
+        user_reactivate($id);
+        flash($u['username'] . ' can sign in again.');
+
+    } elseif ($do === 'delete') {
+        $left = user_delete_wait($u);
+        if ($left === null) { flash('Deactivate the account first.', 'error'); redirect('/users'); }
+        if ($left > 0) {
+            flash('Not yet — ' . $left . ' more day(s). An account is kept for ' . user_retire_days()
+                . ' days after it is switched off, so that anything raised about their work can still be traced to them.', 'error');
+            redirect('/users');
+        }
+        // Only the sign-in goes. The name on the account is replaced, and every
+        // report, voucher and audit line they are named on is left untouched.
+        db()->prepare("UPDATE users SET username=?, password_hash='', first_name='Removed', last_name='account',
+                       email='', signature='', totp_secret='', recovery_codes='', last_login_ip='',
+                       permissions='', is_superuser=0 WHERE id=?")
+            ->execute(['removed-' . $id, $id]);
+        idems_log('user', $id, 'USER_REMOVED', ['field'=>$u['username'],
+            'reason'=>'removed after ' . user_retire_days() . ' days; work records kept']);
+        flash('The sign-in for ' . $u['username'] . ' has been removed. Their reports, vouchers and audit trail are untouched — '
+            . 'those are records this company has to keep.', 'warning');
+    }
+    redirect('/users');
+}
+
 function ops_user_unlock($method) {
     ops_require(can('users.manage.branch') || can('users.manage.global'), 'You cannot manage users.');
     if ($method !== 'POST') redirect('/users');
@@ -529,8 +576,49 @@ function uploads_reject_reason() {
 //  live database on the way in, so an upload-and-go deployment gains them
 //  without anybody running anything.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//  Retiring somebody without losing what they did
+//
+//  A person who leaves must stop being able to sign in immediately. But every
+//  report they approved, every voucher they filed and every line of the audit
+//  trail is written against them, and an inspection record whose author has
+//  been deleted is worthless — to a client, and to an auditor.
+//
+//  So: deactivate is instant and reversible; the row drops to the bottom of the
+//  register; and the account itself can only be removed after a settling period
+//  (180 days by default), by which time any dispute about their work has
+//  surfaced. Even then, only the login goes — their name is replaced on the
+//  account, and nothing they did is touched.
+// ---------------------------------------------------------------------------
+function user_retire_days() { $n = (int)setting_get('user_retire_days', 180); return ($n >= 30 && $n <= 3650) ? $n : 180; }
+// Days still to wait, or 0 when the account may be removed.
+function user_delete_wait($u) {
+    if (!empty($u['is_active'])) return null;                 // still active: not applicable
+    $since = trim((string)($u['deactivated_at'] ?? ''));
+    if ($since === '') return user_retire_days();             // deactivated before this was recorded
+    $days = (int)floor((time() - strtotime($since)) / 86400);
+    $left = user_retire_days() - $days;
+    return $left > 0 ? $left : 0;
+}
+function user_deactivate($id, $reason = '') {
+    $u = ops_one("SELECT * FROM users WHERE id=?", [(int)$id]);
+    if (!$u) return false;
+    db()->prepare("UPDATE users SET is_active=0, deactivated_at=?, totp_enabled=0, recovery_codes=''
+                   WHERE id=?")->execute([date('c'), (int)$id]);
+    idems_log('user', (int)$id, 'USER_DEACTIVATED', ['field'=>$u['username'], 'reason'=>$reason]);
+    return true;
+}
+function user_reactivate($id) {
+    $u = ops_one("SELECT * FROM users WHERE id=?", [(int)$id]);
+    if (!$u) return false;
+    db()->prepare("UPDATE users SET is_active=1, deactivated_at='' WHERE id=?")->execute([(int)$id]);
+    idems_log('user', (int)$id, 'USER_REACTIVATED', ['field'=>$u['username']]);
+    return true;
+}
+
 function security_migrate() {
     static $done = false; if ($done) return; $done = true;
+    ensure_column('users', 'deactivated_at', "VARCHAR(30) DEFAULT ''");
     ensure_column('users', 'pwd_changed_at',  "VARCHAR(30) DEFAULT ''");
     ensure_column('users', 'must_change_pwd', "INT DEFAULT 0");
     ensure_column('users', 'totp_secret',     "VARCHAR(64) DEFAULT ''");

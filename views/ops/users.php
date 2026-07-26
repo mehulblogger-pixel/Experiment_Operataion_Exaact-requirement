@@ -1,12 +1,9 @@
-<div class="master-head">
-  <div><h1><?= e(T_REG('user')) ?></h1>
-    <p class="sub"><?= (int)$active ?> active user(s)<?= $seats!=='' ? ' · seat limit ' . e($seats) : '' ?></p></div>
-  <div style="display:flex;gap:6px">
-    <a class="btn secondary" href="/hierarchy?tab=import" title="Download the register, edit it in Excel, upload it back">Add / update in bulk (Excel)</a>
-    <a class="btn secondary" href="/hierarchy?tab=people">Roles &amp; reporting grid</a>
-    <a class="btn" href="/user-new">+ Add user</a>
-  </div>
-</div>
+<?= org_head('users',
+      (int)$active . ' active login(s)' . ($seats !== '' ? ' · seat limit ' . e($seats) : '')
+      . ' — this is the same register as the People tab, seen from the sign-in side.',
+      '/hierarchy?tab=people', 'Back',
+      '<a class="btn secondary" href="/hierarchy?tab=import" title="Download the register, edit it in Excel, upload it back">Bulk (Excel)</a>'
+      . '<a class="btn" href="/user-new">+ Add a person</a>') ?>
 <?php if ($seats!=='' && $active >= (int)$seats): ?>
   <div class="msg msg-error">You have reached your licensed seat limit (<?= e($seats) ?>). Deactivate a user before adding a new one.</div>
 <?php endif; ?>
@@ -65,8 +62,35 @@
       elseif ($req) echo '<span class="pill p-bad">required, not set up</span>';
       else echo '<span class="pill p-mut">off</span>'; ?></td>
     <td><?= $u['last_login_at'] ? e(fdate($u['last_login_at'])) : '<span class="muted">never</span>' ?></td>
-    <td><?= $u['is_active'] ? '<span class="badge GREEN">Yes</span>' : '<span class="badge RED">No</span>' ?></td>
+    <?php // Active, or switched off and counting down to when the sign-in may go. ?>
+    <td><?php if ($u['is_active']) { echo '<span class="badge GREEN">Yes</span>'; }
+      else { $left = user_delete_wait($u);
+        echo '<span class="badge RED">No</span><br><span class="muted" style="font-size:11.5px">'
+           . ($left > 0 ? 'removable in ' . (int)$left . ' d' : 'may be removed') . '</span>'; } ?></td>
     <td class="row-actions"><a class="btn small" href="/user-edit?id=<?= (int)$u['id'] ?>">Edit</a>
+      <?php // Deactivate is instant and reversible. Removal waits out the settling
+            // period, and even then only takes the sign-in — never the work. ?>
+      <?php if ($u['is_active']): ?>
+        <form method="post" action="/user-retire" style="display:inline"
+              onsubmit="return confirm('Deactivate <?= e($u['username']) ?>?\n\nThey can no longer sign in. Every report, voucher and audit entry in their name stays exactly as it is, and you can switch them back on at any time.')">
+          <input type="hidden" name="_do" value="deactivate"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
+          <button class="btn small secondary" type="submit">Deactivate</button>
+        </form>
+      <?php else: $left = user_delete_wait($u); ?>
+        <form method="post" action="/user-retire" style="display:inline">
+          <input type="hidden" name="_do" value="reactivate"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
+          <button class="btn small secondary" type="submit">Reactivate</button>
+        </form>
+        <?php if ((int)$left === 0): ?>
+          <form method="post" action="/user-retire" style="display:inline"
+                onsubmit="return confirm('Remove the sign-in for <?= e($u['username']) ?>?\n\nOnly the login goes. Their reports, vouchers and audit trail stay — those are records this company has to keep. This cannot be undone.')">
+            <input type="hidden" name="_do" value="delete"><input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
+            <button class="btn small secondary" type="submit">Remove sign-in</button>
+          </form>
+        <?php else: ?>
+          <span class="muted" style="font-size:11.5px" title="An account is kept for <?= (int)user_retire_days() ?> days after it is switched off, so anything raised about their work can still be traced to them.">removable in <?= (int)$left ?> d</span>
+        <?php endif; ?>
+      <?php endif; ?>
       <?php if (!empty($u['totp_enabled']) && (is_master() || can('users.manage.global'))): ?>
         <form method="post" action="/user-2fa-reset" style="display:inline"
               onsubmit="return confirm('Clear two-step sign-in for <?= e($u['username']) ?>? Do this only when you are sure who you are speaking to — it removes a lock on their account.')">

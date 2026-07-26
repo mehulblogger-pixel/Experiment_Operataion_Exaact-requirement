@@ -65,8 +65,8 @@
 <h3 class="tab-sub fam">💰 Financial</h3>
 <div class="stat-row">
   <div class="stat-card"><div class="sc-num"><?= fmoney($fin['credit']) ?></div><div class="sc-lbl">Total credit</div></div>
-  <div class="stat-card"><div class="sc-num"><?= fmoney($fin['recv']) ?></div><div class="sc-lbl">Received (IBO→branch)</div></div>
-  <div class="stat-card"><div class="sc-num"><?= fmoney($fin['given']) ?></div><div class="sc-lbl">Given (branch→IBO)</div></div>
+  <div class="stat-card"><div class="sc-num"><?= fmoney($fin['recv']) ?></div><div class="sc-lbl">Received (from another office)</div></div>
+  <div class="stat-card"><div class="sc-num"><?= fmoney($fin['given']) ?></div><div class="sc-lbl">Given (to another office)</div></div>
   <div class="stat-card"><div class="sc-num"><?= fmoney($fin['exp']) ?></div><div class="sc-lbl">Expenses</div></div>
   <div class="stat-card"><div class="sc-num"><?= fmoney($fin['subcon']) ?></div><div class="sc-lbl">Sub-con cost</div></div>
   <?php if ($seeSalary): ?>
