@@ -225,7 +225,19 @@
 
     <div class="ff eng-box" data-for="MONTHLY"><label>How many months on site?</label>
       <input class="form-control" type="number" min="1" max="36" id="months_count" name="months_count"
-             value="<?= e((($job['months_count'] ?? '') ?: ($call['months_count'] ?? '')) ?: '') ?>"></div>
+             value="<?= e((($job['months_count'] ?? '') ?: ($call['months_count'] ?? '')) ?: '') ?>">
+      <small class="muted">1st to the last day of the month, whatever day it starts.</small></div>
+    <div class="ff eng-box" data-for="MONTHLY"><label>Man-month basis <span class="muted">— blank follows the <?= e(Tl('client')) ?></span></label>
+      <select class="form-control" name="manmonth_basis">
+        <option value="">— as agreed with the <?= e(Tl('client')) ?> —</option>
+        <?php $curMm = (string)(($job['manmonth_basis'] ?? '') ?: ($call['manmonth_basis'] ?? ''));
+              foreach (MANMONTH_BASES as $k => $v): ?>
+          <option value="<?= e($k) ?>" <?= $curMm === $k ? 'selected' : '' ?>><?= e($v) ?></option>
+        <?php endforeach; ?>
+      </select></div>
+    <div class="ff eng-box" data-for="MONTHLY"><label>Minimum working days</label>
+      <input class="form-control" type="number" min="1" max="31" name="manmonth_min_days"
+             value="<?= e(((($job['manmonth_min_days'] ?? 0) ?: ($call['manmonth_min_days'] ?? 0))) ?: '') ?>" placeholder="e.g. 26"></div>
 
     <div class="ff eng-box" data-for="PATTERN"><label>How does it repeat?</label>
       <select class="form-control" id="pattern_kind" name="pattern_kind">

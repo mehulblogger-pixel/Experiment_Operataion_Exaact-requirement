@@ -35,6 +35,20 @@ const ENGAGEMENT_TYPES = [
     'MONTHLY'    => 'Monthly deputation',
 ];
 
+// How a man-month is defined. This is a commercial term, not a fact about the
+// calendar, and different clients mean different things by it.
+//
+//   CALENDAR   the 1st to the last day of the month is one man-month, whether
+//              that month happened to hold 24 working days or 27. No pro-rata.
+//   MIN_DAYS   a minimum number of working days — usually 26 — has to be put
+//              in. Fall short (five Sundays, a run of holidays) and only the
+//              proportion actually worked is claimable. Exceed it and it is
+//              still exactly one man-month; the extra days are not billable.
+const MANMONTH_BASES = [
+    'CALENDAR' => 'Calendar month — one man-month whatever the working days',
+    'MIN_DAYS' => 'Minimum working days — pro-rata below, capped at one above',
+];
+
 // How a repeating pattern repeats. Everything the client actually asks for.
 const PATTERN_KINDS = [
     'WEEKDAYS'   => 'On chosen weekdays',
@@ -52,7 +66,18 @@ function sched_migrate() {
         ensure_column($t, 'months_count', 'INT DEFAULT 0');     // MONTHLY
         ensure_column($t, 'pattern_kind', "VARCHAR(20) DEFAULT ''");
         ensure_column($t, 'pattern_n',    'INT DEFAULT 0');     // PER_WEEK / EVERY_N
+        // Days the coordinator has decided will be worked even though they fall
+        // on a Sunday or a holiday. The client asked, or the works is running a
+        // shutdown — either way it is a decision, not an accident, so it is
+        // recorded rather than inferred.
+        ensure_column($t, 'force_dates', "VARCHAR(600) DEFAULT ''");
+        // What a man-month means on THIS engagement, carried from the client.
+        ensure_column($t, 'manmonth_basis', "VARCHAR(20) DEFAULT ''");
+        ensure_column($t, 'manmonth_min_days', 'INT DEFAULT 0');
     }
+    // The client's own definition, which is where it is usually agreed.
+    ensure_column('business_partners', 'manmonth_basis', "VARCHAR(20) DEFAULT ''");
+    ensure_column('business_partners', 'manmonth_min_days', 'INT DEFAULT 0');
     // A holiday belongs to an office. Bombay does not shut for a Gujarat
     // holiday, and an end date that ignores that is wrong by a day for half the
     // company. A row with no office is a national holiday for everybody.
@@ -86,8 +111,13 @@ function engagement_label($code) {
 
 // The public holidays that apply to an office: its own, plus the ones with no
 // office named, which are everybody's.
-function office_holidays($officeId, $from = null, $to = null) {
+// Adding a holiday has to take effect at once, not on the next page load —
+// somebody adds one BECAUSE a date they are looking at is wrong.
+function office_holidays_flush() { office_holidays(-1, null, null, true); }
+
+function office_holidays($officeId, $from = null, $to = null, $flush = false) {
     static $cache = [];
+    if ($flush) { $cache = []; return []; }
     $officeId = (int)$officeId;
     $key = $officeId . '|' . (string)$from . '|' . (string)$to;
     if (isset($cache[$key])) return $cache[$key];
@@ -103,68 +133,85 @@ function office_holidays($officeId, $from = null, $to = null) {
     return $cache[$key] = $out;
 }
 
-// Saturday is a working day in most of these offices, but not all — the office
-// carries its own weekly pattern and this reads it rather than assuming.
-function office_weekly_days($officeId) {
-    $v = null;
-    try { $v = ops_val("SELECT weekly_working_days FROM offices WHERE id=?", [(int)$officeId]); } catch (Throwable $e) {}
-    $v = (float)($v ?: 0);
-    if (!$v) $v = (float)(function_exists('setting') ? (setting('weekly_working_days') ?: 6) : 6);
-    return in_array($v, [5.0, 5.5, 6.0], true) ? $v : 6.0;
-}
-
-// Sunday is never a working day; Saturday depends on the office; a public
-// holiday for that office is never one. This is the only place that decides.
-function is_working_day($date, $officeId = null) {
+// Saturday is a full working day for an inspection engineer. The 5 / 5.5 / 6
+// pattern on an office is about office staff and their leave arithmetic; it has
+// never applied to a man on a site, and applying it here made every end date a
+// day late.
+//
+// So a day is a working day unless it is a Sunday or a public holiday for that
+// branch — and unless the coordinator has said otherwise, which they can.
+function is_working_day($date, $officeId = null, $forced = []) {
     $ts = strtotime((string)$date);
     if ($ts === false) return false;
-    $dow = (int)date('N', $ts);                       // 1 Mon .. 7 Sun
-    if ($dow === 7) return false;
-    if ($dow === 6 && office_weekly_days($officeId) == 5.0) return false;
-    return !isset(office_holidays($officeId)[date('Y-m-d', $ts)]);
+    $d = date('Y-m-d', $ts);
+    // A day the coordinator has decided will be worked anyway. The client asked
+    // for the Sunday, or the works is on a shutdown run — their call, not ours.
+    if ($forced && in_array($d, (array)$forced, true)) return true;
+    if ((int)date('N', $ts) === 7) return false;
+    return !isset(office_holidays($officeId)[$d]);
 }
 
 // Why a date is not a working day, in words, for the screen.
 function non_working_reason($date, $officeId = null) {
     $ts = strtotime((string)$date);
     if ($ts === false) return 'not a date';
-    $hol = office_holidays($officeId);
     $d = date('Y-m-d', $ts);
+    $hol = office_holidays($officeId);
     if (isset($hol[$d])) return $hol[$d];
-    $dow = (int)date('N', $ts);
-    if ($dow === 7) return 'Sunday';
-    if ($dow === 6 && office_weekly_days($officeId) == 5.0) return 'Saturday';
+    if ((int)date('N', $ts) === 7) return 'Sunday';
     return '';
 }
 
-function next_working_day($date, $officeId = null) {
+function next_working_day($date, $officeId = null, $forced = []) {
     $ts = strtotime((string)$date);
     if ($ts === false) return '';
     for ($i = 0; $i < 400; $i++) {
         $d = date('Y-m-d', $ts + $i * 86400);
-        if (is_working_day($d, $officeId)) return $d;
+        if (is_working_day($d, $officeId, $forced)) return $d;
     }
     return date('Y-m-d', $ts);
+}
+
+// The days inside a span that are NOT being worked, and why. These are what the
+// screen offers to override: a Sunday followed by a Monday holiday pushes the
+// visit to Tuesday on its own, and the coordinator can pull either back in.
+function sched_skipped($from, $to, $officeId = null, $forced = []) {
+    $a = strtotime((string)$from); $b = strtotime((string)$to);
+    if ($a === false || $b === false || $b < $a) return [];
+    if (($b - $a) / 86400 > 400) return [];
+    $out = [];
+    for ($t = $a; $t <= $b; $t += 86400) {
+        $d = date('Y-m-d', $t);
+        if (is_working_day($d, $officeId, $forced)) continue;
+        $out[] = ['date' => $d, 'pretty' => fdate($d), 'weekday' => date('D', $t),
+                  'why' => non_working_reason($d, $officeId)];
+    }
+    return $out;
+}
+
+// The dates a record says are worked regardless.
+function sched_forced($row) {
+    return call_dates_parse((string)($row['force_dates'] ?? ''));
 }
 
 // N working days starting at (or on the first working day after) a date.
 // "Five days from Thursday" is Thu Fri Mon Tue Wed when Saturday is off — the
 // arithmetic nobody should be doing in their head against a holiday list.
-function sched_continuous($start, $days, $officeId = null) {
+function sched_continuous($start, $days, $officeId = null, $forced = []) {
     $days = max(1, (int)$days);
     $ts = strtotime((string)$start);
     if ($ts === false) return [];
     $out = [];
     for ($i = 0; $i < 800 && count($out) < $days; $i++) {
         $d = date('Y-m-d', $ts + $i * 86400);
-        if (is_working_day($d, $officeId)) $out[] = $d;
+        if (is_working_day($d, $officeId, $forced)) $out[] = $d;
     }
     return $out;
 }
 
 // A repeating pattern between two dates. Non-working days are skipped, not
 // moved — a Monday visit that lands on a holiday is simply not that week.
-function sched_pattern($start, $end, $kind, $n, $weekdays, $officeId = null) {
+function sched_pattern($start, $end, $kind, $n, $weekdays, $officeId = null, $forced = []) {
     $s = strtotime((string)$start); $e = strtotime((string)$end);
     if ($s === false || $e === false || $e < $s) return [];
     if (($e - $s) / 86400 > 730) $e = $s + 730 * 86400;      // two years is plenty
@@ -176,7 +223,7 @@ function sched_pattern($start, $end, $kind, $n, $weekdays, $officeId = null) {
             if (!$wd) return [];
             for ($t = $s; $t <= $e; $t += 86400) {
                 $d = date('Y-m-d', $t);
-                if (in_array((int)date('N', $t), $wd, true) && is_working_day($d, $officeId)) $out[] = $d;
+                if (in_array((int)date('N', $t), $wd, true) && is_working_day($d, $officeId, $forced)) $out[] = $d;
             }
             break;
         case 'PER_WEEK':
@@ -187,7 +234,7 @@ function sched_pattern($start, $end, $kind, $n, $weekdays, $officeId = null) {
                 $days = [];
                 for ($x = $t; $x <= $weekEnd; $x += 86400) {
                     $d = date('Y-m-d', $x);
-                    if (is_working_day($d, $officeId)) $days[] = $d;
+                    if (is_working_day($d, $officeId, $forced)) $days[] = $d;
                 }
                 if ($days) {
                     $take = min($n, count($days));
@@ -202,13 +249,13 @@ function sched_pattern($start, $end, $kind, $n, $weekdays, $officeId = null) {
             break;
         case 'EVERY_N':
             for ($t = $s; $t <= $e; $t += $n * 86400) {
-                $d = next_working_day(date('Y-m-d', $t), $officeId);
+                $d = next_working_day(date('Y-m-d', $t), $officeId, $forced);
                 if (strtotime($d) <= $e) $out[] = $d;
             }
             break;
         case 'FORTNIGHT':
             for ($t = $s; $t <= $e; $t += 14 * 86400) {
-                $d = next_working_day(date('Y-m-d', $t), $officeId);
+                $d = next_working_day(date('Y-m-d', $t), $officeId, $forced);
                 if (strtotime($d) <= $e) $out[] = $d;
             }
             break;
@@ -216,7 +263,7 @@ function sched_pattern($start, $end, $kind, $n, $weekdays, $officeId = null) {
             for ($m = 0; $m < 60; $m++) {
                 $t = strtotime("+$m month", $s);
                 if ($t > $e) break;
-                $d = next_working_day(date('Y-m-d', $t), $officeId);
+                $d = next_working_day(date('Y-m-d', $t), $officeId, $forced);
                 if (strtotime($d) <= $e) $out[] = $d;
             }
             break;
@@ -226,18 +273,89 @@ function sched_pattern($start, $end, $kind, $n, $weekdays, $officeId = null) {
     return $out;
 }
 
-// Every working day of a monthly posting: from the start, for N whole months.
-function sched_monthly($start, $months, $officeId = null) {
-    $s = strtotime((string)$start);
-    if ($s === false) return ['dates' => [], 'end' => ''];
-    $months = max(1, (int)$months);
-    $endTs = strtotime('+' . $months . ' month -1 day', $s);
-    $dates = [];
-    for ($t = $s; $t <= $endTs; $t += 86400) {
-        $d = date('Y-m-d', $t);
-        if (is_working_day($d, $officeId)) $dates[] = $d;
+// ---------------------------------------------------------------------------
+//  Man-months
+//
+//  A monthly deputation runs the 1st to the last day of the month — that is
+//  what a month means on these contracts, whatever day the engineer happens to
+//  arrive. What is CLAIMABLE for that month depends on how the client defines a
+//  man-month, and the two common definitions give different answers:
+//
+//    CALENDAR   the month is the month. 24 working days or 27, it is one
+//               man-month and there is nothing to pro-rate.
+//    MIN_DAYS   the contract says a minimum — usually 26 working days. Five
+//               Sundays and a couple of holidays and the month only holds 24,
+//               so 24/26 of a man-month is claimable. A month holding 27 is
+//               still one man-month; the extra day is not billable.
+//
+//  Both are here because both are real, and which applies is a commercial term
+//  agreed with the client, not something the calendar can decide.
+// ---------------------------------------------------------------------------
+
+// Which definition applies: what this engagement says, else what the client's
+// record says, else the company default in Settings. Most specific wins.
+function manmonth_rule($row, $clientId = null) {
+    $basis = trim((string)($row['manmonth_basis'] ?? ''));
+    $min   = (int)($row['manmonth_min_days'] ?? 0);
+    if ($basis === '' && $clientId) {
+        $c = ops_one("SELECT manmonth_basis, manmonth_min_days FROM business_partners WHERE id=?", [(int)$clientId]);
+        if ($c) { $basis = trim((string)($c['manmonth_basis'] ?? '')); $min = $min ?: (int)($c['manmonth_min_days'] ?? 0); }
     }
-    return ['dates' => $dates, 'end' => date('Y-m-d', $endTs)];
+    if ($basis === '' && function_exists('setting_get')) {
+        $basis = (string)(setting_get('manmonth_basis', '') ?: '');
+        $min = $min ?: (int)(setting_get('manmonth_min_days', 0) ?: 0);
+    }
+    if (!isset(MANMONTH_BASES[$basis])) $basis = 'CALENDAR';
+    if ($min <= 0) $min = 26;
+    return ['basis' => $basis, 'min_days' => $min];
+}
+
+// Where that definition came from, so nobody has to guess which of three places
+// is in force.
+function manmonth_source($row, $clientId = null) {
+    if (trim((string)($row['manmonth_basis'] ?? '')) !== '') return 'this ' . Tl('job');
+    if ($clientId) {
+        $c = ops_val("SELECT manmonth_basis FROM business_partners WHERE id=?", [(int)$clientId]);
+        if (trim((string)$c) !== '') return 'the ' . Tl('client') . ' record';
+    }
+    if (function_exists('setting_get') && (string)(setting_get('manmonth_basis', '') ?: '') !== '') return 'the company default';
+    return 'the built-in default';
+}
+
+// A monthly posting, month by month: the working days each month actually
+// holds, and what is claimable for it.
+function sched_monthly($start, $months, $officeId = null, $rule = null, $forced = []) {
+    $s = strtotime((string)$start);
+    if ($s === false) return ['dates' => [], 'end' => '', 'months' => [], 'claimable' => 0];
+    $months = max(1, (int)$months);
+    $rule = $rule ?: ['basis' => 'CALENDAR', 'min_days' => 26];
+    // The 1st to the last day of the month, always.
+    $first = date('Y-m-01', $s);
+    $endTs = strtotime(date('Y-m-t', strtotime('+' . ($months - 1) . ' month', strtotime($first))));
+    $dates = []; $per = []; $claim = 0;
+    for ($m = 0; $m < $months; $m++) {
+        $mStart = strtotime('+' . $m . ' month', strtotime($first));
+        $mFrom = date('Y-m-01', $mStart);
+        $mTo   = date('Y-m-t', $mStart);
+        $work = [];
+        for ($t = strtotime($mFrom); $t <= strtotime($mTo); $t += 86400) {
+            $d = date('Y-m-d', $t);
+            if (is_working_day($d, $officeId, $forced)) $work[] = $d;
+        }
+        $n = count($work);
+        $units = ($rule['basis'] === 'MIN_DAYS')
+            ? min(1.0, $n / max(1, (int)$rule['min_days']))     // short month pro-rata, long month capped
+            : 1.0;
+        $units = round($units, 4);
+        $claim += $units;
+        $per[] = ['month' => date('Y-m', $mStart), 'label' => date('F Y', $mStart),
+                  'from' => $mFrom, 'to' => $mTo, 'working_days' => $n, 'units' => $units,
+                  'short' => ($rule['basis'] === 'MIN_DAYS' && $n < (int)$rule['min_days'])];
+        $dates = array_merge($dates, $work);
+    }
+    return ['dates' => $dates, 'end' => date('Y-m-d', $endTs), 'start' => $first,
+            'months' => $per, 'claimable' => round($claim, 4),
+            'basis' => $rule['basis'], 'min_days' => (int)$rule['min_days']];
 }
 
 // ---------------------------------------------------------------------------
@@ -247,20 +365,22 @@ function sched_monthly($start, $months, $officeId = null) {
 //  shape it is. Every screen, every register column and every reminder reads
 //  this — so they cannot disagree about what was booked.
 // ---------------------------------------------------------------------------
-function sched_resolve($row, $officeId = null, $startOverride = null) {
+function sched_resolve($row, $officeId = null, $startOverride = null, $clientId = null) {
     $type  = (string)($row['engagement_type'] ?? '') ?: 'SINGLE';
     $office = $officeId ?: ($row['executing_office_id'] ?? null);
+    $forced = sched_forced($row);
     $start = trim((string)($startOverride
         ?: ($row['scheduled_date'] ?? '')
         ?: ($row['inspection_start_date'] ?? '')
         ?: ($row['inspection_required_date'] ?? '')));
     $dates = [];
     $note  = '';
+    $extra = [];
 
     switch ($type) {
         case 'CONTINUOUS':
             $n = (int)($row['days_count'] ?? 0);
-            $dates = ($start !== '' && $n > 0) ? sched_continuous($start, $n, $office) : [];
+            $dates = ($start !== '' && $n > 0) ? sched_continuous($start, $n, $office, $forced) : [];
             if ($dates) {
                 $span = (int)round((strtotime(end($dates)) - strtotime($dates[0])) / 86400) + 1;
                 $skipped = $span - count($dates);
@@ -278,30 +398,48 @@ function sched_resolve($row, $officeId = null, $startOverride = null) {
                 ? sched_pattern($start, $end, (string)($row['pattern_kind'] ?? 'WEEKDAYS'),
                                 (int)($row['pattern_n'] ?? 1),
                                 array_filter(array_map('intval', explode(',', (string)($row['schedule_weekdays'] ?? '')))),
-                                $office)
+                                $office, $forced)
                 : [];
             $note = count($dates) . ' visit(s) from the pattern';
             break;
         case 'MONTHLY':
             $m = (int)($row['months_count'] ?? 0) ?: 1;
-            $r = $start !== '' ? sched_monthly($start, $m, $office) : ['dates' => [], 'end' => ''];
+            $rule = manmonth_rule($row, $clientId);
+            $r = $start !== ''
+                ? sched_monthly($start, $m, $office, $rule, $forced)
+                : ['dates' => [], 'end' => '', 'months' => [], 'claimable' => 0];
             $dates = $r['dates'];
-            $note = $m . ' month(s) on site — ' . count($dates) . ' working day(s)';
+            $extra['manmonths'] = $r['months'] ?? [];
+            $extra['claimable'] = $r['claimable'] ?? 0;
+            $extra['basis'] = $rule['basis'];
+            $extra['min_days'] = $rule['min_days'];
+            $note = $m . ' month(s), 1st to the last day — ' . count($dates) . ' working day(s); '
+                  . rtrim(rtrim(number_format((float)($r['claimable'] ?? 0), 2), '0'), '.')
+                  . ' man-month(s) claimable'
+                  . ($rule['basis'] === 'MIN_DAYS' ? ' on a ' . (int)$rule['min_days'] . '-day basis' : ' on a calendar basis');
             break;
         default: // SINGLE
             $dates = $start !== '' ? [$start] : [];
             $note = 'One visit';
     }
 
-    return [
-        'type'   => $type,
-        'label'  => engagement_label($type),
-        'dates'  => $dates,
-        'start'  => $dates ? $dates[0] : $start,
-        'end'    => $dates ? end($dates) : '',
-        'count'  => count($dates),
-        'note'   => $note,
-    ];
+    // A Sunday, or a holiday, sitting inside the span. The run steps over them
+    // by itself; these are offered so the coordinator can pull one back in when
+    // the client has asked for it.
+    $skippable = ($dates && count($dates) > 1)
+        ? sched_skipped($dates[0], end($dates), $office, $forced) : [];
+
+    return array_merge([
+        'type'    => $type,
+        'label'   => engagement_label($type),
+        'dates'   => $dates,
+        'start'   => $dates ? $dates[0] : $start,
+        'end'     => $dates ? end($dates) : '',
+        'count'   => count($dates),
+        'note'    => $note,
+        'forced'  => $forced,
+        'skipped' => $skippable,
+    ], $extra);
 }
 
 // The register line: what was asked for, in one phrase.
@@ -448,9 +586,13 @@ function ops_sched_preview() {
         'inspection_dates'         => implode(',', (array)($b['inspection_dates'] ?? [])),
         'inspection_required_date' => (string)($b['start'] ?? ''),
         'scheduled_date'           => (string)($b['start'] ?? ''),
+        'force_dates'              => implode(',', (array)($b['force_dates'] ?? [])),
+        'manmonth_basis'           => (string)($b['manmonth_basis'] ?? ''),
+        'manmonth_min_days'        => (int)($b['manmonth_min_days'] ?? 0),
     ];
     $office = (int)($b['office'] ?? 0) ?: null;
-    $r = sched_resolve($row, $office);
+    $client = (int)($b['client'] ?? 0) ?: null;
+    $r = sched_resolve($row, $office, null, $client);
     $inspector = (int)($b['inspector'] ?? 0);
     $exceptJob = (int)($b['job'] ?? 0);
     $days = sched_availability($r['dates'], $inspector, $exceptJob, $office);
@@ -468,6 +610,15 @@ function ops_sched_preview() {
         'startPretty' => $r['start'] ? fdate($r['start']) : '',
         'endPretty'   => $r['end'] ? fdate($r['end']) : '',
         'days' => $days, 'clashes' => $clashes,
+        // The Sundays and holidays the run stepped over, so any of them can be
+        // pulled back in, and the man-month working for a posting.
+        'skipped'   => $r['skipped'] ?? [],
+        'forced'    => $r['forced'] ?? [],
+        'manmonths' => $r['manmonths'] ?? [],
+        'claimable' => $r['claimable'] ?? null,
+        'basis'     => $r['basis'] ?? '',
+        'minDays'   => $r['min_days'] ?? 0,
+        'basisFrom' => ($r['type'] === 'MONTHLY') ? manmonth_source($row, $client) : '',
     ]);
     return true;
 }

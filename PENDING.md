@@ -36,12 +36,38 @@ Holidays now belong to a branch (blank = national). All the arithmetic lives in
 holiday rules exist in exactly one place. Where an engineer is already booked,
 the clash is named and the branch's free engineers are offered instead.
 
-### Still to settle with the owner
+### Settled
 
-- Half-day Saturdays (the 5.5-day pattern) currently count as a full working
-  day for the end-date arithmetic.
-- A pattern visit that falls on a holiday is skipped, not moved to the next day.
-- Monthly deputation counts calendar months from the start date.
+- **Saturday is a full working day for an inspection engineer.** The 5 / 5.5 / 6
+  pattern on an office is about office staff; it never applied to a man on a
+  site, and applying it made every end date a day late. Only Sundays and the
+  branch's public holidays are stepped over now.
+- **A Sunday followed by a Monday holiday pushes the visit to Tuesday** — and
+  the coordinator can pull either day back in. Every skipped day inside a run is
+  offered as a tick-box; ticking one records that it will be worked and the end
+  date moves back with it.
+- **A monthly deputation runs the 1st to the last day of the month**, whatever
+  day it starts.
+
+### Man-months — configured in three places, most specific wins
+
+| Where | When to use it |
+|---|---|
+| **Settings → Financial & operations** | the company default |
+| **Client master** | this client's contract says something different |
+| **The call / the allocation** | this one order differs from what that client normally agrees |
+
+Two definitions:
+
+- **Calendar month** — one man-month whatever the working days come to. 24 days
+  or 27, it is one.
+- **Minimum working days** (usually 26) — a month falling short is claimable
+  pro-rata (21 working days = 21/26 = 0.81 man-months); a month running over is
+  still exactly one. The extra day is not billable.
+
+The allocate screen shows the month-by-month working, says which of the three
+places the definition came from, and the claimable total becomes the billable
+quantity.
 
 ## 🛑 SAVE MUST NEVER FAIL SILENTLY (July 2026)
 
