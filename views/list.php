@@ -2,7 +2,13 @@
 <div class="master-head">
   <div><h1><?= e($title) ?></h1>
     <p class="sub"><?= e($subtitle) ?> · <?= (int)$total ?> record<?= $total == 1 ? '' : 's' ?></p></div>
-  <a class="btn" href="/partner-new?role=<?= e($roleField) ?>">+ Add <?= $isClient ? 'Client' : 'Vendor' ?></a>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <a class="btn" href="/partner-new?role=<?= e($roleField) ?>">+ Add <?= $isClient ? 'Client' : 'Vendor' ?></a>
+    <?php if (is_admin_level() || can('mod.clients.edit') || can('mod.vendors.edit')): ?>
+      <a class="btn ghost" href="/partner-import">⬆ Import from a spreadsheet</a>
+      <a class="btn ghost" href="/partner-template?kind=<?= $isClient ? 'clients' : 'vendors' ?>&amp;fmt=xlsx">⬇ Export</a>
+    <?php endif; ?>
+  </div>
 </div>
 
 <form method="get" action="/<?= $isClient ? 'clients' : 'vendors' ?>" class="filter-bar">
