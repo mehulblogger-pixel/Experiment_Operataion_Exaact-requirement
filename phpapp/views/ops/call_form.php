@@ -99,6 +99,14 @@
       </select></div>
     <div class="ff"><label><?= e(Tl('client')) ?>'s expected date <span class="muted">— the first visit</span></label>
       <input class="form-control" type="date" name="inspection_required_date" value="<?= e($call['inspection_required_date'] ?? '') ?>"></div>
+    <?php // The site is away from base, so there are travel days either side.
+          // A travel day belongs to the inspection it is travelling for — not to
+          // the pool of non-chargeable days — and this tick is what tells the
+          // cost run to attach them to this job's SBU and activity code. ?>
+    <div class="ff ff-check">
+      <label><input type="checkbox" name="is_outstation" value="1"
+        <?= !empty($call['is_outstation']) ? 'checked' : '' ?>> Outstation — the <?= e(Tl('engineer')) ?> travels to reach this site</label>
+      <small class="muted">Travel days either side of the visit are then costed to this <?= e(Tl('sbu')) ?> and activity code rather than counted as non-chargeable.</small></div>
   </div>
 
   <?php // §h — a single-day call needs one date, which is already captured above

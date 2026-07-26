@@ -1,6 +1,46 @@
-# Pending / parked items — SGS Ahmedabad Inspection Management System
+# Pending / parked items — Exaact Inspection & Operations Management System
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
+
+## 💰 COSTING & PROFITABILITY — complete, ready to test (July 2026)
+
+Five commits: `9c75b5f` (the allocation engine), `4bc4c97` (expense heads master +
+monthly cost entry), `23068db` (client/vendor import, clear records, the written
+explanation in `docs/COSTING.md`), and this one (person cost & split, outstation
+tick, month-end run, SBU/activity/BOSS P&L).
+
+**Read `docs/COSTING.md` first** — the whole model in plain words with worked
+figures, and the order to do things in month by month.
+
+### What to test, in order
+
+1. **Masters → Office expense heads** — add one of your own, change how it
+   spreads, retire one. Delete the ones you do not use; they stay deleted.
+2. **Each person's record → Cost & where it belongs** — monthly cost, and the
+   tick for whether they do inspections. Non-engineers get one percentage box
+   per SBU in their branch; the running total has to reach 100.
+3. **A call → Outstation** — tick it, allocate the call, check it carried over.
+4. **Office costs & overheads → Actual costs** — a month of real figures, then
+   *Copy last month* into the next one.
+5. **Month-end cost run** — preview, read the warnings, *Calculate and store*,
+   then *Close the month*. Closing locks the entry screens; reopening is
+   recorded in the audit trail.
+6. **SBU profit & loss** — revenue against cost by SBU, by activity code, and
+   by BOSS number.
+
+### Still open on costing
+
+- [ ] **The Profitability screen still uses the old overhead %** for its
+      per-job figures. That is deliberate — an order is judged on what it
+      directly caused (see `docs/COSTING.md`, Question 1) — but the two screens
+      should cross-link so nobody reads one thinking it is the other.
+- [ ] **No year-to-date view yet.** Everything is one month at a time. A
+      12-month roll-up per SBU is the obvious next report.
+- [ ] **Sub-contractor cost is not in the allocation run.** It is already on the
+      job and in the BOSS-number line; it is not yet spread across SBUs as an
+      office cost, because it belongs to the job that caused it.
+- [ ] **Closing a month does not stop a voucher being edited** for that month.
+      The allocation is frozen; the timesheet behind it is not. Worth a lock.
 
 ## 🔐 SECURITY & COMPLIANCE — shipped 2026-07, with what is still open
 
@@ -614,7 +654,7 @@ it can draw on real pipeline data.
 ## ✅ Just shipped (2026-07 — owner's screenshot batch)
 - **Distinct employee-code series for contractors.** A new inspector saved with a
   blank Employee code now auto-gets a code by engagement kind: **SC-###** for
-  sub-contractors, **FL-###** for freelancers, **EMP##** for SGS staff — so
+  sub-contractors, **FL-###** for freelancers, **EMP##** for our own staff — so
   payroll/accounts can tell them apart at a glance. Manually typed codes are kept
   as-is. Demo sub-con Mohan reseeds as **SC-001**. (`next_emp_code()` in ops.php.)
 - **"Food bills (actual)" expense head** added alongside "Food allowance (meals)"
@@ -761,7 +801,7 @@ Two agency types, each with a contract and a different fee model — both feed
 - [x] **DONE** — `agencies` master (type Recruitment/Manpower, contact, contract
       no. + start/end, one-time fee, monthly rate); **renewal reminder card** on
       the dashboard (≤30 days, colour-coded); Candidate **Accept** now picks the
-      supplying agency + roll (SGS vs agency) + fee, and the new inspector stores
+      supplying agency + roll (own payroll vs agency) + fee, and the new inspector stores
       agency_id / roll_type / placement_fee (one-time, tracked separately) /
       agency_cost (monthly, into loaded cost). One-time recruitment fee is
       **recorded, not amortised** (owner: tenure is unpredictable).
@@ -769,7 +809,7 @@ Two agency types, each with a contract and a different fee model — both feed
       **inspector edit form** + inspector costing breakdown; (b) turn the renewal
       reminder into an **email** via `cron.php` (currently a dashboard card only);
       (c) **manpower pass-through invoicing** — we invoice the client our rate
-      while the agency bills SGS their monthly charge (margin = our rate − agency
+      while the agency bills us their monthly charge (margin = our rate − agency
       charge); ties into §1d monthly invoicing.
 
 - [ ] **Agency master with a type**: **Recruitment agency** (CVs only, one-time
@@ -782,14 +822,14 @@ Two agency types, each with a contract and a different fee model — both feed
       pattern in `cron.php` + a dashboard "expiring soon" card). Applies to
       BOTH recruitment and manpower agencies.
 - [ ] **Fee model by type → inspector costing**:
-      • **Recruitment** → person is on **SGS roll** (salary CTC) **plus a
+      • **Recruitment** → person is on **our own payroll** (salary CTC) **plus a
         one-time fixed placement/consulting fee** paid to the agency; that fee is
         **included in the inspector's costing** (decide: one-time in the hire
         month vs amortised over expected tenure — confirm with owner).
       • **Manpower** → agency **bills us monthly**; that monthly charge is the
         inspector's `agency_cost`, and **we invoice the client** for the manpower
         (pass-through — ties to §1d monthly invoicing).
-- [ ] **On Accept, choose the roll + agency + fee**: SGS roll (salary) vs agency
+- [ ] **On Accept, choose the roll + agency + fee**: own payroll (salary) vs agency
       roll (monthly charge); pick the agency (from the master) and its
       contract; capture the one-time fee (recruitment) or monthly charge
       (manpower). Writes `agency_name` + `agency_cost` (+ new one-time-fee field)
@@ -1070,7 +1110,7 @@ the theme builder (no colour hardcoded, no CSS variable renamed).
 ## 💡 Separate product idea (future — not part of this app)
 
 - [ ] **Freelancer ⇄ Agency connect platform** — a standalone application (its own
-      product, separate from the SGS inspection system) where **freelancers and
+      product, separate from this inspection system) where **freelancers and
       agencies can find and connect with each other**: freelancers publish
       profiles/skills/availability/rates, agencies post requirements, and the two
       sides discover, message and engage each other (a two-sided marketplace).
