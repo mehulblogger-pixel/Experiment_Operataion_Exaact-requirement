@@ -2825,9 +2825,8 @@ function ops_vouchers($route, $method) {
         $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$v || !$v['supporting_file']) { http_response_code(404); echo 'No supporting file.'; return; }
         ops_require(can_view_voucher($v), 'You cannot view this file.');
-        header('Content-Type: ' . ($v['supporting_mime'] ?: 'application/octet-stream'));
-        header('Content-Disposition: inline; filename="' . preg_replace('/[^\w.\- ]/', '', $v['supporting_name'] ?: 'support') . '"');
-        echo base64_decode($v['supporting_file']);
+        send_uploaded_file(base64_decode($v['supporting_file']),
+                           $v['supporting_name'] ?: 'support', $v['supporting_mime'] ?? '');
         return;
     }
 

@@ -131,3 +131,127 @@ function form_token_spend($token) {
     } catch (Throwable $e) {}
     return true;
 }
+
+// ---------------------------------------------------------------------------
+//  Cross-site request forgery
+//
+//  Every screen in this app changes something real: approving a quotation,
+//  allotting a contract number, creating a user. Without a token, any page a
+//  signed-in person happens to visit can make their own browser do those things
+//  — the browser sends the session cookie whatever site asked. Nothing on the
+//  screen would look wrong afterwards, because as far as the app is concerned
+//  the right person did it.
+//
+//  The one-shot ticket already on every form is NOT this. That is minted in the
+//  browser to stop a submission being recorded twice; anyone can mint one. This
+//  token is issued by the server, kept in the session and never leaves it.
+//
+//  It is stamped into every POST form as the page is written out, rather than
+//  by hand in 141 places, so a form added tomorrow is covered without anybody
+//  remembering to do anything.
+// ---------------------------------------------------------------------------
+function csrf_token() {
+    if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
+    return $_SESSION['csrf'];
+}
+function csrf_ok($token) {
+    $have = $_SESSION['csrf'] ?? '';
+    return $have !== '' && is_string($token) && hash_equals($have, $token);
+}
+// Add the hidden field to every POST form in a rendered page.
+function csrf_stamp_forms($html) {
+    $field = '<input type="hidden" name="_csrf" value="' . e(csrf_token()) . '">';
+    $out = preg_replace_callback(
+        '/<form\b[^>]*>/i',
+        function ($m) use ($field) {
+            // GET forms (search, filters) change nothing and need no token.
+            if (!preg_match('/method\s*=\s*["\']?post["\']?/i', $m[0])) return $m[0];
+            return $m[0] . $field;
+        },
+        $html
+    );
+    // On a very large page the matcher can give up and return null. A page that
+    // saves nothing is bad; a blank page is worse, so the original is sent.
+    return $out === null ? $html : $out;
+}
+
+// ---------------------------------------------------------------------------
+//  Slowing down password guessing
+//
+//  Failed sign-ins were recorded but never limited, so a password could be
+//  guessed as fast as the server would answer. Five wrong tries and that
+//  username rests for fifteen minutes. Counted per username rather than per
+//  browser, because the browser is the attacker's to change.
+// ---------------------------------------------------------------------------
+const LOGIN_MAX_TRIES = 5;
+const LOGIN_LOCK_MIN  = 15;
+function login_attempts_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    try { db()->exec("CREATE TABLE IF NOT EXISTS login_attempts (
+        username VARCHAR(150) PRIMARY KEY, tries INT DEFAULT 0, last_at VARCHAR(30) DEFAULT '')"); }
+    catch (Throwable $e) {}
+}
+function login_row($username) {
+    login_attempts_migrate();
+    try { return ops_one("SELECT * FROM login_attempts WHERE username=?", [$username]); }
+    catch (Throwable $e) { return null; }
+}
+// Minutes still to wait, or 0 when the account may try again.
+function login_locked_for($username) {
+    $r = login_row($username);
+    if (!$r || (int)$r['tries'] < LOGIN_MAX_TRIES) return 0;
+    $since = (time() - strtotime((string)$r['last_at'])) / 60;
+    $left  = (int)ceil(LOGIN_LOCK_MIN - $since);
+    return $left > 0 ? $left : 0;
+}
+function login_allowed($username) { return login_locked_for($username) === 0; }
+// Record a failure; returns the minutes the account is now resting for, if any.
+function login_fail($username) {
+    $username = substr(trim($username), 0, 150);
+    if ($username === '') return 0;
+    login_attempts_migrate();
+    $r = login_row($username);
+    try {
+        if (!$r) db()->prepare("INSERT INTO login_attempts (username,tries,last_at) VALUES (?,1,?)")
+                     ->execute([$username, date('c')]);
+        else {
+            // A lock that has already run its course starts the count again.
+            $tries = login_locked_for($username) === 0 && (int)$r['tries'] >= LOGIN_MAX_TRIES ? 1 : (int)$r['tries'] + 1;
+            db()->prepare("UPDATE login_attempts SET tries=?, last_at=? WHERE username=?")
+                ->execute([$tries, date('c'), $username]);
+        }
+    } catch (Throwable $e) {}
+    return login_locked_for($username);
+}
+function login_clear($username) {
+    login_attempts_migrate();
+    try { db()->prepare("DELETE FROM login_attempts WHERE username=?")->execute([$username]); }
+    catch (Throwable $e) {}
+}
+
+// ---------------------------------------------------------------------------
+//  Serving a file somebody uploaded
+//
+//  Uploads never touch the disk — they are held in the database — so an uploaded
+//  .php can never be executed. But they were being served back with whatever
+//  content type the uploader's browser claimed, and shown inline. Upload an HTML
+//  page or an SVG and it would render inside this site, able to act as whoever
+//  opened it. So: a short list of types that are safe to display, everything
+//  else downloaded rather than rendered, and never the uploader's word for it.
+// ---------------------------------------------------------------------------
+const SAFE_INLINE_MIME = [
+    'image/jpeg' => 1, 'image/png' => 1, 'image/gif' => 1, 'image/webp' => 1,
+    'image/bmp'  => 1, 'application/pdf' => 1, 'text/plain' => 1,
+];
+function send_uploaded_file($bytes, $name, $mime) {
+    $mime = strtolower(trim((string)$mime));
+    $safe = isset(SAFE_INLINE_MIME[$mime]);
+    $name = preg_replace('/[^A-Za-z0-9._\- ]/', '_', (string)$name) ?: 'file';
+    // nosniff matters most here: without it a browser may decide a "text/plain"
+    // file full of markup is really HTML and run it.
+    header('X-Content-Type-Options: nosniff');
+    header('Content-Type: ' . ($safe ? $mime : 'application/octet-stream'));
+    header('Content-Disposition: ' . ($safe ? 'inline' : 'attachment') . '; filename="' . $name . '"');
+    header('Content-Security-Policy: default-src \'none\'; sandbox');
+    echo $bytes;
+}

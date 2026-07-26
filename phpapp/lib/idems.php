@@ -885,9 +885,8 @@ function ops_idems_file($method) {
     if (!$f || $f['deleted']) { http_response_code(404); echo 'Not found'; return true; }
     $data = (string)$f['data'];
     if (strpos($data, 'base64,') !== false) $data = base64_decode(substr($data, strpos($data, 'base64,') + 7));
-    header('Content-Type: ' . ($f['mime'] ?: 'application/octet-stream'));
-    header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/', '_', $f['file_name'] ?: 'file') . '"');
-    echo $data; return true;
+    send_uploaded_file($data, $f['file_name'] ?: 'file', $f['mime'] ?? '');
+    return true;
 }
 
 // ===========================================================================
@@ -1787,9 +1786,8 @@ function ops_idems_endorsements($route, $method) {
         if (!$f || $f['deleted']) { http_response_code(404); echo 'Not found'; return true; }
         ops_require(is_master() || can('mod.idems.view'), 'Access denied.');
         $data = (string)$f['data']; if (strpos($data,'base64,')!==false) $data = base64_decode(substr($data, strpos($data,'base64,')+7));
-        header('Content-Type: ' . ($f['mime'] ?: 'application/octet-stream'));
-        header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/','_',$f['file_name'] ?: 'file') . '"');
-        echo $data; return true;
+        send_uploaded_file($data, $f['file_name'] ?: 'file', $f['mime'] ?? '');
+        return true;
     }
     // ---- register ----
     if ($route === 'endorsements') {
@@ -2861,11 +2859,13 @@ const AUDIT_ACTION_LABELS = [
     'AI_REVIEW'=>'AI review run','SMART_REMARKS'=>'Suggested remarks applied','TIMESTAMP_EDIT'=>'Date/timestamp changed',
     'SIGNATURE_SET'=>'Signature changed','ENDORSE'=>'Document endorsed','RELEASE_NOTE_DRAFT'=>'Release Note drafted',
     'RELEASE_NOTE_CREATED'=>'Release Note created from report','LOGIN'=>'Login','LOGOUT'=>'Logout','LOGIN_FAILED'=>'Failed login',
+    'CSRF_REJECTED'=>'Save refused — not sent from this site',
 ];
 const AUDIT_ACTIONS_ALL = [
     'CREATE','EDIT','IRN_GEN','SUBMIT','APPROVE','REJECT','SENDBACK','DELEGATE','FINALIZE','DELETE','EVIDENCE',
     'EVIDENCE_CAPTION','EVIDENCE_DELETE','PDF','DOCX','CERT_PDF','SOURCE_DOC','AI_REVIEW','SMART_REMARKS',
     'TIMESTAMP_EDIT','SIGNATURE_SET','ENDORSE','RELEASE_NOTE_DRAFT','RELEASE_NOTE_CREATED','LOGIN','LOGOUT','LOGIN_FAILED',
+    'CSRF_REJECTED',
 ];
 function audit_action_label($a) { return AUDIT_ACTION_LABELS[$a] ?? $a; }
 // Compliance health checks across the whole system (super-admin view).
@@ -2897,7 +2897,9 @@ function ops_idems_audit($method) {
     $to      = trim($_GET['to'] ?? '');
     $risk    = !empty($_GET['risk']);
     $where = "1=1"; $args = [];
-    if ($q)      { $where .= " AND (irn LIKE ? OR username LIKE ? OR new_value LIKE ? OR reason LIKE ?)"; array_push($args, "%$q%", "%$q%", "%$q%", "%$q%"); }
+    // The action is searchable too, so typing "CSRF" or "LOGIN_FAILED" finds
+    // those entries without having to know which dropdown they live in.
+    if ($q)      { $where .= " AND (irn LIKE ? OR username LIKE ? OR new_value LIKE ? OR reason LIKE ? OR action LIKE ?)"; array_push($args, "%$q%", "%$q%", "%$q%", "%$q%", "%$q%"); }
     if ($act)    { $where .= " AND action=?"; $args[] = $act; }
     if ($user)   { $where .= " AND username LIKE ?"; $args[] = "%$user%"; }
     if ($office !== '') { $where .= " AND office_id=?"; $args[] = (int)$office; }
