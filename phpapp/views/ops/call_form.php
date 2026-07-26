@@ -355,22 +355,8 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   ibo.addEventListener('change', syncMoney); ex.addEventListener('change', syncMoney); syncMoney();
 
-  // ---- §h: show the date grid only when the engagement is multi-day ---------
-  var depSel = document.getElementById('dep_sel'), datesPanel = document.getElementById('dates_panel');
-  function syncDates(){
-    if (!depSel || !datesPanel) return;
-    var v = (depSel.value || '').toLowerCase();
-    var single = v.indexOf('single') >= 0 || v === '';
-    // Never hide dates that are already recorded — an existing call would look
-    // as though its schedule had been wiped.
-    var hasDates = Array.prototype.some.call(
-      datesPanel.querySelectorAll('input[type=date]'), function(i){ return !!i.value; });
-    var hasPattern = Array.prototype.some.call(
-      datesPanel.querySelectorAll('input[type=checkbox]'), function(i){ return i.checked; });
-    datesPanel.style.display = (single && !hasDates && !hasPattern) ? 'none' : '';
-  }
-  if (depSel) depSel.addEventListener('change', syncDates);
-  syncDates();
+  // (the old date-grid toggle lived here; the engagement shape now decides
+  //  which boxes exist at all — see initEngagement in app.js)
 
   // ---- §13: value billable = unit rate × quantity, always ---------------------
   // The quantity follows the visit dates unless somebody has deliberately typed
@@ -385,12 +371,22 @@ document.addEventListener('DOMContentLoaded', function () {
   function markTouched(v){ qtyTouched = v; if (qtyAuto) qtyAuto.value = v ? '0' : '1'; }
   if (qtyBox) qtyBox.addEventListener('input', function(){ markTouched(true); recalc(); });
   function lumpSum(){ var b = basisSel ? basisSel.value : ''; return b === 'LOT' || b === 'DOC' || b === 'OTHER'; }
+  // How many units this call is asking for. It used to be counted by looking
+  // for filled-in date boxes on the page — which stopped working the moment the
+  // form only shows the boxes the chosen shape needs: a continuous run of six
+  // days has no date boxes at all, so the count read zero and the value stopped
+  // calculating. The number now comes from the schedule itself, which is the
+  // only thing that actually knows: six days is six, a posting is however many
+  // man-months are claimable, and a lump sum is one.
   function datesCount(){
-    if (!datesPanel) return 0;
+    if (typeof window.__schedCount === 'number' && window.__schedCount > 0) return window.__schedCount;
     var n = 0;
-    Array.prototype.forEach.call(datesPanel.querySelectorAll('input[type=date]'), function(i){ if (i.value) n++; });
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="inspection_dates[]"]'), function(i){ if (i.value) n++; });
     return n;
   }
+  // What to call those units on screen, so the hint is not lying about where
+  // the figure came from.
+  function countWord(){ return window.__schedWord || 'the visit dates'; }
   function recalc(){
     if (!rateBox || !qtyBox || !valBox) return;
     if (!qtyTouched) {
@@ -405,11 +401,13 @@ document.addEventListener('DOMContentLoaded', function () {
              ? basisSel.options[basisSel.selectedIndex].text.toLowerCase() : 'unit';
     if (calcNote) calcNote.textContent = r.toLocaleString() + ' per ' + unit + ' × ' + q + ' = ' + valBox.value;
     if (qtyHint) qtyHint.textContent = qtyTouched ? '— entered by hand'
-                : (lumpSum() ? '— a lump sum is one unit' : '— counted from the visit dates (' + datesCount() + ' set)');
+                : (lumpSum() ? '— a lump sum is one unit' : '— ' + countWord() + ' (' + datesCount() + ')');
   }
   if (rateBox) rateBox.addEventListener('input', recalc);
   if (basisSel) basisSel.addEventListener('change', recalc);
-  if (datesPanel) datesPanel.addEventListener('change', recalc);
+  // The date lines and every other box that shapes the schedule are watched
+  // by initEngagement, which re-prices through __recalcBillable when the
+  // server comes back with the day count.
   // An existing call already has a quantity recorded; leave it alone.
   if (qtyBox && parseFloat(qtyBox.value || '0') > 0) markTouched(true);
   recalc();

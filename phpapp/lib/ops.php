@@ -2574,15 +2574,7 @@ function ops_calls($route, $method) {
             if ($rate > 0) $b['billable_value'] = round($rate * $qty, 2);
             // The client's expected date is the first visit, so the two never disagree.
             if ($dates && ($b['inspection_required_date'] ?? '') === '') $b['inspection_required_date'] = $dates[0];
-            $fields = ['client_id','vendor_id','ibo_office_id','executing_office_id','region','sbu','activity_id',
-                'inspection_type','inspection_type_other','site_address_id','po_id','po_line_item_id',
-                'product_category','product_other','deputation_type','expected_credit','credit_type',
-                'billable_value','billable_basis','billable_rate','billable_qty','call_received_date','inspection_required_date','notes',
-                'quotation_id','quote_line_id','contract_number','folder_link',
-                'inspection_dates','schedule_end_date','schedule_weekdays',
-                'engagement_type','days_count','months_count','pattern_kind','pattern_n',
-                'force_dates','manmonth_basis','manmonth_min_days',
-                'reporting_frequency','report_custom_days','deliverables','is_outstation'];
+            $fields = call_save_fields();
             $wasForwarded = $call ? ($call['executing_office_id'] ?? null) : null;
             $forwardNow = $execOffice && !$wasForwarded; // first time it gets an executing branch
             // §b — forwarding is the moment the work leaves this desk: somebody
@@ -2735,6 +2727,39 @@ function call_form_vars($call, $posted = null) {
         'error' => null,
     ];
 }
+// ---------------------------------------------------------------------------
+//  What a save writes
+//
+//  These lists were written out inline where the INSERT is built. Adding a
+//  column to a form and to the list, and forgetting to add it to the table, put
+//  a name in the INSERT that the database had never heard of — and every
+//  allocation died on it. Naming them here means one place to read, and
+//  tools/check-columns.php checks both lists against the real schema, so the
+//  same mistake cannot reach the site again.
+// ---------------------------------------------------------------------------
+function call_save_fields() {
+    return ['client_id','vendor_id','ibo_office_id','executing_office_id','region','sbu','activity_id',
+        'inspection_type','inspection_type_other','site_address_id','po_id','po_line_item_id',
+        'product_category','product_other','deputation_type','expected_credit','credit_type',
+        'billable_value','billable_basis','billable_rate','billable_qty','call_received_date',
+        'inspection_required_date','notes',
+        'quotation_id','quote_line_id','contract_number','folder_link',
+        'inspection_dates','schedule_end_date','schedule_weekdays',
+        'engagement_type','days_count','months_count','pattern_kind','pattern_n',
+        'force_dates','manmonth_basis','manmonth_min_days',
+        'reporting_frequency','report_custom_days','deliverables','is_outstation'];
+}
+function job_save_fields() {
+    return ['executing_office_id','inspector_id','subcon_id','job_type','stage','scheduled_date',
+        'inspection_start_date','inspection_end_date',
+        'random_date1','random_date2','random_date3','folder_link','contract_number','inspection_dates','boss_id',
+        'engagement_type','days_count','months_count','pattern_kind','pattern_n',
+        'schedule_weekdays','schedule_end_date','force_dates','manmonth_basis','manmonth_min_days',
+        'invoice_value','contracting_office_id','expected_credit','credit_type','credit_direction',
+        'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays',
+        'subcon_cost','quotation_id','is_outstation'];
+}
+
 function nzc_call($f, $v) {
     // An unticked checkbox posts nothing at all, so '' has to mean 0 here or
     // "no longer outstation" could never be saved.
@@ -3417,12 +3442,7 @@ function ops_jobs($route, $method) {
             // A job that ran out of time is fixed as it stands. Documents can
             // still be uploaded; figures cannot be rewritten weeks later.
             if ($job && ($why = job_lock_block($job)) !== '') { flash($why, 'error'); redirect('/job?id=' . $job['id']); }
-            $fields = ['executing_office_id','inspector_id','subcon_id','job_type','stage','scheduled_date','inspection_start_date','inspection_end_date',
-                'random_date1','random_date2','random_date3','folder_link','contract_number','inspection_dates','boss_id',
-                'engagement_type','days_count','months_count','pattern_kind','pattern_n',
-                'schedule_weekdays','schedule_end_date','force_dates','manmonth_basis','manmonth_min_days',
-                'invoice_value','contracting_office_id','expected_credit','credit_type','credit_direction',
-                'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost','quotation_id','is_outstation'];
+            $fields = job_save_fields();
             // deliverables come as a checkbox array -> stored as CSV of codes
             $deliverables = implode(',', array_filter((array)($b['deliverables'] ?? [])));
             // §when — the actual date is the only one chosen here; the end date

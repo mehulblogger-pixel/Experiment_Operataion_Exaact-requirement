@@ -66,6 +66,12 @@ function sched_migrate() {
         ensure_column($t, 'months_count', 'INT DEFAULT 0');     // MONTHLY
         ensure_column($t, 'pattern_kind', "VARCHAR(20) DEFAULT ''");
         ensure_column($t, 'pattern_n',    'INT DEFAULT 0');     // PER_WEEK / EVERY_N
+        // A pattern is chosen on the call and can be corrected at allocation, so
+        // BOTH tables need to hold it. These two existed only on calls, and the
+        // deputation save listed them without them existing — every allocation
+        // of a patterned engagement died on the INSERT.
+        ensure_column($t, 'schedule_weekdays', "VARCHAR(40) DEFAULT ''");   // CSV of 1..7
+        ensure_column($t, 'schedule_end_date', "VARCHAR(20) DEFAULT ''");
         // Days the coordinator has decided will be worked even though they fall
         // on a Sunday or a holiday. The client asked, or the works is running a
         // shutdown — either way it is a decision, not an accident, so it is
