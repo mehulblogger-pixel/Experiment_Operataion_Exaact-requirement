@@ -1270,6 +1270,28 @@ function ops_masters() {
             'list_labels' => ['designation'=>DESIGNATIONS,'department'=>DEPARTMENTS],
             'ref_cols' => ['office_id'=>['offices','name']],
         ],
+        // NOTE: not 'expense-heads' — that key is already taken by the voucher
+        // expense columns (what an engineer claims on a job). These are the
+        // office's own running costs. Two different lists, two different keys.
+        'office-expense-heads' => [
+            // The company's own list of what an office spends money on, and how
+            // each one should be shared across its SBUs. Nothing here is fixed
+            // in code: add a head, rename it, change how it spreads, retire it.
+            // Salary is deliberately not one of these — it comes off the person's
+            // record, and having it in both places would count the same rupee twice.
+            'label' => 'Office expense heads', 'table' => 'office_expense_heads', 'access' => 'admin',
+            'order' => 'is_active DESC, sort_order, label',
+            'fields' => [
+                ['code','Short code','text',['req'=>1]],
+                ['label','Expense head','text',['req'=>1]],
+                ['alloc_basis','How it spreads across ' . TP('sbu'),'select',['opts'=>ALLOC_BASES]],
+                ['notes','Notes','text',[]],
+                ['sort_order','Order on the entry screen','number',[]],
+                ['is_active','In use','check',[]],
+            ],
+            'list' => ['code'=>'Code','label'=>'Expense head','alloc_basis'=>'Spreads by','sort_order'=>'Order','is_active'=>'In use'],
+            'list_labels' => ['alloc_basis'=>ALLOC_BASES],
+        ],
         'agencies' => [
             'label' => 'Recruitment / manpower agencies', 'table' => 'agencies', 'access' => 'admin', 'order' => 'name',
             'fields' => [
@@ -3402,32 +3424,91 @@ function boss_profit($bossId) {
         'vExp' => $vExp, 'jobExp' => $jobExp, 'subcon' => $subcon, 'contingency' => $contingency, 'margin' => $margin,
         'pct' => $revenue ? round($margin / $revenue * 100, 1) : null, 'invoiced' => $invoiced, 'paid' => $paid];
 }
-// Per-office overhead % + contingency % (Branch Application Manager edits their
-// own office; global managers edit any + the global default).
+// Office money. Two tabs, and the difference between them matters:
+//   · Actual costs — what the office really spent this month, head by head.
+//     Real figures, allocated to the SBUs by the rule set on each head.
+//   · Overhead %   — the old single multiplier, still there for an office that
+//     has not entered real figures yet, so no branch is left without a number.
+// The office decides which it is on by whether it has entered anything.
 function ops_office_finance() {
     ops_require(is_admin_level() || can('settings.manage'), 'You cannot edit office finance settings.');
     $pdo = db();
     $global = is_master() || can('users.manage.global') || can('settings.manage');
     $myOffice = current_user()['home_office_id'] ?? null;
+    $offices = $global ? ops_all("SELECT * FROM offices WHERE COALESCE(is_active,1)=1 ORDER BY is_ahmedabad DESC, name")
+                       : ($myOffice ? ops_all("SELECT * FROM offices WHERE id=?", [$myOffice]) : []);
+    $mayEdit = function ($oid) use ($global, $myOffice) { return $global || (int)$oid === (int)$myOffice; };
+
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $do = $_POST['_do'] ?? '';
         if (isset($_POST['global_default'])) {
             ops_require(can('settings.manage') || is_master(), 'Only an admin can set the global default.');
             setting_set('overhead_pct', ($_POST['overhead_pct'] ?? '') === '' ? '' : (string)(float)$_POST['overhead_pct']);
             setting_set('contingency_pct', ($_POST['contingency_pct'] ?? '') === '' ? '' : (string)(float)$_POST['contingency_pct']);
             flash('Global default saved.');
-            redirect('/office-finance');
+            redirect('/office-finance?tab=pct');
         }
         $oid = (int)($_POST['office_id'] ?? 0);
-        if (!$global && $oid !== (int)$myOffice) { flash('You can only edit your own office.', 'error'); redirect('/office-finance'); }
+        if (!$mayEdit($oid)) { flash('You can only edit your own ' . Tl('office') . '.', 'error'); redirect('/office-finance'); }
+
+        if ($do === 'expenses' || $do === 'copy') {
+            $m = trim((string)($_POST['m'] ?? ''));
+            [$yr, $mon] = ym_parse($m);
+            $back = '/office-finance?tab=actual&office=' . $oid . '&m=' . sprintf('%04d-%02d', $yr, $mon);
+            if (cost_month_frozen($yr, $mon, $oid)) {
+                flash('That month is frozen — reopen it on the month-end run before changing figures.', 'error');
+                redirect($back);
+            }
+            if ($do === 'copy') {
+                $p = ($mon > 1) ? [$yr, $mon - 1] : [$yr - 1, 12];
+                $n = office_expenses_copy($oid, $p[0], $p[1], $yr, $mon);
+                flash($n ? "Copied $n figure(s) from " . date('F Y', mktime(0,0,0,$p[1],1,$p[0])) . '. Edit anything that changed, then Save.'
+                         : 'Nothing was entered for ' . date('F Y', mktime(0,0,0,$p[1],1,$p[0])) . ', so there was nothing to copy.',
+                      $n ? 'success' : 'warning');
+                redirect($back);
+            }
+            $n = office_expenses_save($oid, $yr, $mon, (array)($_POST['amt'] ?? []), (array)($_POST['note'] ?? []));
+            flash('Saved ₹' . number_format(office_expense_total($oid, $yr, $mon), 2) . ' of '
+                  . Tl('office') . ' costs for ' . date('F Y', mktime(0,0,0,$mon,1,$yr)) . '.');
+            redirect($back);
+        }
+        if ($do === 'sbus') {
+            $all = lk_options_or('sbu', OPS_SBUS);
+            $sel = array_values(array_intersect((array)($_POST['sbus'] ?? []), array_keys($all)));
+            $idle = trim((string)($_POST['idle_basis'] ?? ''));
+            if (!isset(IDLE_BASES[$idle])) $idle = '';
+            $pdo->prepare("UPDATE offices SET sbus=?, idle_basis=? WHERE id=?")->execute([implode(',', $sel), $idle, $oid]);
+            flash($sel ? count($sel) . ' ' . Tlp('sbu') . ' set for this ' . Tl('office') . '.'
+                       : 'No ' . Tlp('sbu') . ' named, so this ' . Tl('office') . ' is treated as running all of them.');
+            redirect('/office-finance?tab=sbus&office=' . $oid);
+        }
+        // default: the old overhead / contingency percentages
         $oh = ($_POST['overhead_pct'] ?? '') === '' ? null : (float)$_POST['overhead_pct'];
         $cg = ($_POST['contingency_pct'] ?? '') === '' ? null : (float)$_POST['contingency_pct'];
         $pdo->prepare("UPDATE offices SET overhead_pct=?, contingency_pct=? WHERE id=?")->execute([$oh, $cg, $oid]);
         flash('Office finance settings saved.');
-        redirect('/office-finance');
+        redirect('/office-finance?tab=pct');
     }
-    $offices = $global ? ops_all("SELECT * FROM offices ORDER BY is_ahmedabad DESC, name")
-                       : ($myOffice ? ops_all("SELECT * FROM offices WHERE id=?", [$myOffice]) : []);
-    view('ops/office_finance', ['offices' => $offices, 'global' => $global,
+
+    $tab = $_GET['tab'] ?? 'actual';
+    if (!in_array($tab, ['actual', 'sbus', 'pct'], true)) $tab = 'actual';
+    $sel = (int)($_GET['office'] ?? 0);
+    if (!$sel || !array_filter($offices, function ($o) use ($sel) { return (int)$o['id'] === $sel; }))
+        $sel = (int)($offices[0]['id'] ?? 0);
+    [$yr, $mon] = ym_parse($_GET['m'] ?? '');
+
+    view('ops/office_finance', ['offices' => $offices, 'global' => $global, 'tab' => $tab,
+        'sel' => $sel, 'yr' => $yr, 'mon' => $mon,
+        'heads' => $sel ? expense_heads_for_month($sel, $yr, $mon) : expense_heads(true),
+        'entered' => $sel ? office_expense_map($sel, $yr, $mon) : [],
+        'spent' => $sel ? office_expense_total($sel, $yr, $mon) : 0,
+        'frozen' => $sel ? cost_month_frozen($yr, $mon, $sel) : false,
+        'allSbus' => lk_options_or('sbu', OPS_SBUS),
+        'offSbus' => $sel ? array_keys(office_sbus($sel)) : [],
+        'offSbuRaw' => $sel ? trim((string)ops_val("SELECT sbus FROM offices WHERE id=?", [$sel])) : '',
+        'idleBasis' => $sel ? (string)ops_val("SELECT idle_basis FROM offices WHERE id=?", [$sel]) : '',
+        'idleUsed' => $sel ? office_idle_basis($sel) : 'OFFICE_MIX',
+        'basisText' => $sel ? office_cost_basis_text($sel) : '',
         'defOh' => global_overhead_pct(), 'defCg' => global_contingency_pct(),
         'canGlobal' => can('settings.manage') || is_master()]);
 }

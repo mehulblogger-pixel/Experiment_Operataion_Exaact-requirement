@@ -110,6 +110,10 @@ function costing_migrate() {
 // is exactly the double count this design exists to avoid.
 function costing_seed_heads() {
     try {
+        // Once. A company that deletes every head we shipped means it — putting
+        // them back on the next page load would make the list ours, not theirs.
+        if (setting_get('expense_heads_seeded', '') === '1') return;
+        setting_set('expense_heads_seeded', '1');
         if ((int)ops_val("SELECT COUNT(*) FROM office_expense_heads") > 0) return;
         $seed = [
             ['RENT',        'Office rent',                    'EQUAL',     10],
@@ -128,6 +132,98 @@ function costing_seed_heads() {
             db()->prepare("INSERT INTO office_expense_heads (code,label,alloc_basis,sort_order,is_active)
                            VALUES (?,?,?,?,1)")->execute([$c, $l, $b, $o]);
     } catch (Throwable $e) {}
+}
+
+// "2026-07" → [2026, 7]. Anything unreadable falls back to the current month,
+// so a hand-typed URL can never land the screen on year zero.
+function ym_parse($s) {
+    $s = trim((string)$s);
+    if (preg_match('/^(\d{4})-(\d{1,2})$/', $s, $m)) {
+        $yr = (int)$m[1]; $mon = (int)$m[2];
+        if ($yr >= 2000 && $yr <= 2100 && $mon >= 1 && $mon <= 12) return [$yr, $mon];
+    }
+    return [(int)date('Y'), (int)date('n')];
+}
+
+// ---------------------------------------------------------------------------
+//  The expense heads themselves
+//
+//  Every one of them is a row the company owns: it can be renamed, its basis
+//  changed, a new one added or an old one retired, all from Masters → Office
+//  expense heads. The list above is only what a brand-new database starts with
+//  so the entry screen is not blank on day one.
+// ---------------------------------------------------------------------------
+function expense_heads($activeOnly = true) {
+    $w = $activeOnly ? "WHERE COALESCE(is_active,1) = 1" : '';
+    return ops_all("SELECT * FROM office_expense_heads $w ORDER BY sort_order, label");
+}
+
+// The heads to show on one month's entry screen: the ones in use, plus any
+// retired head that still holds money for that month. Retiring a head must not
+// make the rupees already booked under it disappear from the screen while they
+// are still in the total — that is how a month stops adding up.
+function expense_heads_for_month($officeId, $yr, $mon) {
+    $heads = expense_heads(true);
+    $have  = array_column($heads, null, 'id');
+    foreach (office_expense_map($officeId, $yr, $mon) as $hid => $r) {
+        if (isset($have[$hid]) || (float)$r['amount'] <= 0) continue;
+        $h = ops_one("SELECT * FROM office_expense_heads WHERE id=?", [$hid]);
+        if ($h) { $h['retired'] = 1; $heads[] = $h; }
+    }
+    return $heads;
+}
+
+// What one office entered under each head for one month, keyed by head.
+function office_expense_map($officeId, $yr, $mon) {
+    $rows = ops_all("SELECT * FROM office_expenses WHERE office_id=? AND yr=? AND mon=?",
+                    [(int)$officeId, (int)$yr, (int)$mon]);
+    $out = []; foreach ($rows as $r) $out[(int)$r['head_id']] = $r;
+    return $out;
+}
+function office_expense_total($officeId, $yr, $mon) {
+    return (float)ops_val("SELECT COALESCE(SUM(amount),0) FROM office_expenses WHERE office_id=? AND yr=? AND mon=?",
+                          [(int)$officeId, (int)$yr, (int)$mon]);
+}
+
+// Save a whole month in one go: [head_id => amount]. A blank or zero amount
+// removes the row rather than storing a zero, so "nothing spent" and "not yet
+// entered" do not look the same on the screen.
+function office_expenses_save($officeId, $yr, $mon, array $amounts, array $notes = []) {
+    $officeId = (int)$officeId; $yr = (int)$yr; $mon = (int)$mon;
+    $have = office_expense_map($officeId, $yr, $mon);
+    $who  = user_name(current_user()); $now = date('c'); $n = 0;
+    foreach ($amounts as $headId => $raw) {
+        $headId = (int)$headId;
+        $amt = trim((string)$raw);
+        $amt = ($amt === '') ? 0.0 : (float)str_replace([',', ' '], '', $amt);
+        $note = trim((string)($notes[$headId] ?? ''));
+        if ($amt <= 0 && $note === '') {
+            if (isset($have[$headId])) {
+                db()->prepare("DELETE FROM office_expenses WHERE id=?")->execute([$have[$headId]['id']]); $n++;
+            }
+            continue;
+        }
+        if (isset($have[$headId])) {
+            db()->prepare("UPDATE office_expenses SET amount=?, notes=?, set_by=?, set_at=? WHERE id=?")
+                ->execute([$amt, $note, $who, $now, $have[$headId]['id']]);
+        } else {
+            db()->prepare("INSERT INTO office_expenses (office_id,yr,mon,head_id,amount,notes,set_by,set_at)
+                           VALUES (?,?,?,?,?,?,?,?)")
+                ->execute([$officeId, $yr, $mon, $headId, $amt, $note, $who, $now]);
+        }
+        $n++;
+    }
+    return $n;
+}
+
+// Copy a month forward. Rent and the like repeat; retyping twelve numbers a
+// month is how figures stop being entered at all.
+function office_expenses_copy($officeId, $fromYr, $fromMon, $toYr, $toMon) {
+    $src = office_expense_map($officeId, $fromYr, $fromMon);
+    if (!$src) return 0;
+    $amounts = []; $notes = [];
+    foreach ($src as $hid => $r) { $amounts[$hid] = $r['amount']; $notes[$hid] = $r['notes'] ?? ''; }
+    return office_expenses_save($officeId, $toYr, $toMon, $amounts, $notes);
 }
 
 // ---------------------------------------------------------------------------

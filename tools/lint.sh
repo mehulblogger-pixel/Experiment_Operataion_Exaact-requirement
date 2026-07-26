@@ -38,3 +38,9 @@ php tools/check-strings.php || exit 1
 # its own — which is exactly how views/detail.php shipped with its own fdate()
 # and killed the client and vendor pages while every other screen worked.
 php tools/check-dupes.php || exit 1
+
+# And a file can parse, have no stray tags and no duplicate function, and still
+# write to the wrong table: PHP keeps the LAST of two identical keys in an array
+# literal and says nothing. That is how a second 'expense-heads' master silently
+# saved office running costs into the voucher expense columns.
+php tools/check-keys.php || exit 1
