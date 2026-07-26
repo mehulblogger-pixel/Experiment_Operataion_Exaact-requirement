@@ -3725,6 +3725,53 @@ function ops_reports() {
 }
 
 // ---- Users, roles, access --------------------------------------------------
+// ---------------------------------------------------------------------------
+//  Turning what was typed back into a user row
+//
+//  When a save is refused the form has to be redrawn with what the person
+//  typed, or they lose it. But the posted data and the stored row are different
+//  shapes: the tick-lists (permissions, offices, SBUs) arrive as arrays while
+//  the row keeps them comma-separated, and the sentinel values from the
+//  "+ add one" dropdowns are not ids at all. Handing the raw post straight to
+//  the form crashes it on the first field that expects a string.
+//
+//  So the conversion happens here, once, in the direction the form needs.
+// ---------------------------------------------------------------------------
+function user_row_from_post(array $b, $existing = null) {
+    $csv = function ($v) {
+        if (is_array($v)) return implode(',', array_filter(array_map('strval', $v), function ($x) { return $x !== ''; }));
+        return trim((string)$v);
+    };
+    $notSentinel = function ($v) { return ($v === '__new__' || $v === '') ? '' : $v; };
+
+    $row = is_array($existing) ? $existing : [];
+    $row['id']            = $existing['id'] ?? null;
+    $row['username']      = trim((string)($b['username'] ?? ''));
+    $row['first_name']    = trim((string)($b['first_name'] ?? ''));
+    $row['last_name']     = trim((string)($b['last_name'] ?? ''));
+    $row['email']         = trim((string)($b['email'] ?? ''));
+    $row['role']          = (string)($b['role'] ?? ($existing['role'] ?? 'COORDINATOR'));
+    $row['is_superuser']  = ($row['role'] === 'MASTER_ADMIN') ? 1 : 0;
+    $row['is_active']     = !empty($b['is_active']) ? 1 : 0;
+    $row['inspector_id']  = $notSentinel((string)($b['inspector_id'] ?? '')) ?: null;
+    $row['home_office_id'] = $notSentinel((string)($b['home_office_id'] ?? '')) ?: null;
+    // "Every office / every SBU" is stored as ALL; otherwise the ticked ids.
+    $row['scope_offices'] = !empty($b['scope_offices_all']) ? 'ALL' : $csv($b['scope_offices'] ?? '');
+    $row['scope_sbus']    = !empty($b['scope_sbus_all'])    ? 'ALL' : $csv($b['scope_sbus'] ?? '');
+    $row['permissions']   = $csv($b['permissions'] ?? '');
+    $row['reports_to_id'] = $notSentinel((string)($b['reports_to_id'] ?? '')) ?: null;
+    $row['reports_to_name']     = trim((string)($b['reports_to_name'] ?? ''));
+    $row['reports_to_position'] = trim((string)($b['reports_to_position'] ?? ''));
+    $row['reports_to_email']    = trim((string)($b['reports_to_email'] ?? ''));
+    $pt = trim((string)($b['position_title'] ?? ''));
+    $row['position_title'] = ($pt === '__new__') ? trim((string)($b['position_title_new'] ?? '')) : $pt;
+    $row['weekly_working_days'] = (string)($b['weekly_working_days'] ?? '6');
+    $row['daily_hours']    = trim((string)($b['daily_hours'] ?? ''));
+    $row['half_day_hours'] = trim((string)($b['half_day_hours'] ?? ''));
+    $row['must_change_pwd'] = !empty($b['must_change_pwd']) ? 1 : 0;
+    return $row;
+}
+
 function ops_users($route, $method) {
     ops_require(can('users.manage.branch') || can('users.manage.global'), 'You cannot manage users.');
     $pdo = db();
@@ -3805,7 +3852,11 @@ function ops_users($route, $method) {
                 if ($bad !== '') {
                     flash($bad, 'error');
                     $mgrs = ops_all("SELECT id, first_name, last_name, username, role, position_title FROM users WHERE is_active=1" . ($user ? " AND id<>" . (int)$user['id'] : "") . " ORDER BY first_name, last_name");
-                    view('ops/user_form', ['user'=>$user ?: $b, 'inspectors'=>inspectors_list(false), 'offices'=>offices_list(),
+                    // Hand the form what it expects — a user ROW. Posted data is a
+                    // different shape (permissions and the scope lists arrive as
+                    // arrays, the row stores them comma-separated), so it has to be
+                    // converted rather than passed straight through.
+                    view('ops/user_form', ['user'=>user_row_from_post($b, $user), 'inspectors'=>inspectors_list(false), 'offices'=>offices_list(),
                         'sbuOpts'=>lk_options_or('sbu', OPS_SBUS), 'globalMgr'=>$globalMgr, 'managers'=>$mgrs,
                         'defaults'=>role_defaults($role)]);
                     return;
