@@ -12,6 +12,9 @@
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($title ?? app_name()) ?></title>
+<?php // The forms on the page are given this automatically on the way out. The
+      // few places that post without a form — quick-add, for one — read it here. ?>
+<meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <link rel="stylesheet" href="/assets/css/app.css">
 <link rel="manifest" href="/manifest.php">
 <meta name="theme-color" content="<?= e(setting_get('c_primary', '') ?: '#1e40af') ?>">

@@ -407,6 +407,10 @@
       if (!name) { byId('qa_err').textContent = 'Enter a name.'; byId('qa_err').style.display = 'block'; return; }
       var k = kind;
       var body = new URLSearchParams(); body.append('name', name);
+      // Posted without a form, so the token the server stamps into forms is not
+      // here — it is read off the page instead. Without it the save is refused.
+      var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      if (csrfMeta) body.append('_csrf', csrfMeta.getAttribute('content') || '');
       if (k === 'client' || k === 'vendor') {
         var val = function (id) { return byId(id) ? byId(id).value.trim() : ''; };
         var isClient = (k === 'client') || (byId('qa_both') && byId('qa_both').checked);

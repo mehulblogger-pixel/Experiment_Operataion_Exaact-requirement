@@ -1,14 +1,49 @@
 <?php
+// The session cookie is the only thing standing between a stolen browser tab and
+// somebody else's account, so it is locked down before the session is opened:
+// unreadable to JavaScript, not sent to other sites, and — once the site is on
+// HTTPS, which it should be — never sent in the clear.
+$httpsNow = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+         || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
+         || (($_SERVER['SERVER_PORT'] ?? '') == 443);
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'httponly' => true,
+    'secure'   => $httpsNow,
+    'samesite' => 'Lax',
+]);
+ini_set('session.use_strict_mode', '1');   // refuse a session id the server never issued
 session_start();
 
+// Tell the browser not to guess at content types, not to frame us, and not to
+// leak our URLs to other sites.
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: same-origin');
+if ($httpsNow) header('Strict-Transport-Security: max-age=15552000');
+
 // --- Readable error page instead of a blank 500 (so problems are diagnosable) ---
-function ops_fatal($title, $hint, $detail = '') {
+//
+// The technical detail — file paths, table names, the SQL that failed — is a map
+// of the app, and it was being handed to anybody who could make a page break,
+// signed in or not. It is still shown, because "screenshot this and send it
+// over" is how problems get reported here; but only to somebody signed in, or
+// during first-time setup when nobody can be signed in yet. A stranger gets the
+// plain-English half and a reference to quote.
+function ops_fatal($title, $hint, $detail = '', $showDetailToAnyone = false) {
     if (!headers_sent()) http_response_code(500);
+    $signedIn = !empty($_SESSION['uid']);
+    $ref = strtoupper(substr(md5($detail . date('YmdH')), 0, 8));
     echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
     echo '<div style="font-family:Segoe UI,Arial,sans-serif;max-width:660px;margin:50px auto;padding:26px;border:1px solid #e2ddd6;border-radius:12px">';
     echo '<h2 style="color:#b8480f;margin:0 0 10px">' . htmlspecialchars($title) . '</h2>';
     echo '<p style="color:#4d4d4d;font-size:15px">' . $hint . '</p>';
-    if ($detail !== '') echo '<pre style="background:#f7f6f4;border:1px solid #e2ddd6;padding:12px;border-radius:8px;overflow:auto;font-size:13px;white-space:pre-wrap">' . htmlspecialchars($detail) . '</pre>';
+    if ($detail !== '' && ($signedIn || $showDetailToAnyone))
+        echo '<pre style="background:#f7f6f4;border:1px solid #e2ddd6;padding:12px;border-radius:8px;overflow:auto;font-size:13px;white-space:pre-wrap">' . htmlspecialchars($detail) . '</pre>';
+    elseif ($detail !== '')
+        echo '<p style="color:#7a7a7a;font-size:13px">Reference <b>' . $ref . '</b> — quote this when reporting it. '
+           . 'Sign in and open the page again to see the technical detail.</p>';
     echo '</div>';
     exit;
 }
@@ -44,7 +79,8 @@ try {
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
-    ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine());
+    // Setup-time: nobody can be signed in yet, so the detail has to be visible.
+    ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);
 }
 
 // Bootstrap / upgrade: this quick probe fails on a fresh install (no table) or
@@ -139,7 +175,8 @@ try {
         $hint = $isConn
             ? 'Open <code>config.php</code> and enter your MySQL database name, user and password (from MilesWeb → Databases).'
             : 'The database is reachable but a table could not be set up. Send this message over and it will be fixed quickly.';
-        ops_fatal($isConn ? 'Database not connected' : 'Database setup error', $hint, $m . "\n" . $e2->getFile() . ':' . $e2->getLine());
+        ops_fatal($isConn ? 'Database not connected' : 'Database setup error', $hint,
+                  $m . "\n" . $e2->getFile() . ':' . $e2->getLine(), true);
     }
 }
 
@@ -154,9 +191,13 @@ $pdo = db();
 
 function view($name, $vars = []) {
     extract($vars);
+    // Buffered so every POST form on the page can be given its token on the way
+    // out — one place, rather than 141 forms each relying on somebody remembering.
+    ob_start();
     require __DIR__ . '/views/layout_top.php';
     require __DIR__ . "/views/$name.php";
     require __DIR__ . '/views/layout_bottom.php';
+    echo csrf_stamp_forms((string)ob_get_clean());
 }
 
 function find_partner($id) {
@@ -198,7 +239,13 @@ if ($route === 'login') {
         $q = $pdo->prepare("SELECT * FROM users WHERE username = ?");
         $q->execute([$_POST['username'] ?? '']);
         $u = $q->fetch();
-        if ($u && $u['is_active'] && password_verify($_POST['password'] ?? '', $u['password_hash'])) {
+        if ($u && $u['is_active'] && login_allowed($u['username'])
+            && password_verify($_POST['password'] ?? '', $u['password_hash'])) {
+            // A brand-new session id on sign-in, so an id someone else planted in
+            // this browser beforehand cannot become an authenticated one.
+            session_regenerate_id(true);
+            unset($_SESSION['csrf']);          // new session, new token
+            login_clear($u['username']);
             $_SESSION['uid'] = $u['id'];
             if (function_exists('idems_log')) idems_log('user', $u['id'], 'LOGIN', ['field'=>$u['username']]);
             flash('Welcome, ' . user_name($u) . '.');
@@ -206,6 +253,8 @@ if ($route === 'login') {
         }
         // record failed attempts too — they matter for a compliance review
         if (function_exists('idems_log')) idems_log('user', $u['id'] ?? null, 'LOGIN_FAILED', ['field'=>substr((string)($_POST['username'] ?? ''), 0, 60)]);
+        $wait = login_fail((string)($_POST['username'] ?? ''));
+        if ($wait > 0) return render_login('Too many failed attempts. Try again in ' . $wait . ' minute(s).');
         return render_login('Invalid username or password.');
     }
     if (current_user()) redirect('/');
@@ -218,6 +267,18 @@ if ($route === 'logout') {
 
 // --- Everything below requires login ---
 require_login();
+
+// Refuse any state-changing request that did not come from one of our own
+// pages. Without this, a page somebody visits in another tab can make their
+// browser approve, delete or create things here using their own session, and
+// nothing afterwards would look wrong. The one-shot ticket below is a different
+// thing entirely — it is minted in the browser and only stops double-posting.
+if ($method === 'POST' && !csrf_ok($_POST['_csrf'] ?? '')) {
+    idems_log('user', current_user()['id'] ?? null, 'CSRF_REJECTED', ['field' => substr($route, 0, 60)]);
+    flash('That form was not sent from this site, or your session had expired. '
+        . 'Please reload the page and try again — nothing was changed.', 'error');
+    redirect('/' . $route);
+}
 
 // One submission, one record. Every form carries a one-shot ticket; the first
 // POST spends it and any replay of that same POST is turned away here, before a
