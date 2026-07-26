@@ -93,6 +93,7 @@ function costing_migrate() {
         db()->exec("CREATE TABLE IF NOT EXISTS cost_allocations (
             id $pk, yr INT, mon INT, office_id INT, sbu VARCHAR(40),
             activity VARCHAR(60) DEFAULT '', boss_id INT NULL, job_id INT NULL,
+            contract_number VARCHAR(64) DEFAULT '',
             source_kind VARCHAR(30), source_id INT NULL, source_label VARCHAR(200) DEFAULT '',
             basis VARCHAR(30) DEFAULT '', amount DECIMAL(14,2) DEFAULT 0,
             created_at VARCHAR(30) DEFAULT '')");
@@ -101,6 +102,8 @@ function costing_migrate() {
             total DECIMAL(14,2) DEFAULT 0, note VARCHAR(255) DEFAULT '',
             run_by VARCHAR(120) DEFAULT '', run_at VARCHAR(30) DEFAULT '')");
     } catch (Throwable $e) {}
+
+    ensure_column('cost_allocations', 'contract_number', "VARCHAR(64) DEFAULT ''");
 
     costing_seed_heads();
 }
@@ -385,9 +388,10 @@ function costing_run($yr, $mon, $officeId, $commit = false) {
     $yr = (int)$yr; $mon = (int)$mon; $officeId = (int)$officeId;
     $rows = []; $warn = [];
     $sbus = office_sbus($officeId);
-    $add = function ($sbu, $amount, $kind, $id, $label, $basis, $activity = '', $boss = null, $job = null) use (&$rows) {
+    $add = function ($sbu, $amount, $kind, $id, $label, $basis, $activity = '', $boss = null, $job = null, $contract = '') use (&$rows) {
         if (round((float)$amount, 2) == 0) return;
         $rows[] = ['sbu'=>$sbu, 'activity'=>$activity, 'boss_id'=>$boss, 'job_id'=>$job,
+                   'contract_number'=>(string)$contract,
                    'source_kind'=>$kind, 'source_id'=>$id, 'source_label'=>$label,
                    'basis'=>$basis, 'amount'=>round((float)$amount, 2)];
     };
@@ -462,15 +466,40 @@ function costing_run($yr, $mon, $officeId, $commit = false) {
             $add($sbu, $amt, 'OFFICE_EXPENSE', (int)$h['head_id'], $h['label'], $basis);
     }
 
+    // ---- 4. sub-contractors: paid for one job, so it lands on that job -----
+    //
+    //  It sits on the job, on its contract, on its SBU and on its activity
+    //  code — the same four things a worked day lands on. Nothing is spread:
+    //  a sub-contractor is the least ambiguous cost in the business, and
+    //  averaging it across SBUs would only make it harder to see.
+    $from = sprintf('%04d-%02d-01', $yr, $mon);
+    $to   = date('Y-m-t', strtotime($from));
+    $subs = ops_all("SELECT j.id, j.job_code, j.sbu, j.activity_id, j.boss_id, j.contract_number,
+                            COALESCE(j.subcon_cost,0) subcon_cost, s.agency
+                     FROM jobs j LEFT JOIN subcons s ON s.id = j.subcon_id
+                     WHERE j.executing_office_id = ? AND COALESCE(j.subcon_cost,0) > 0
+                       AND COALESCE(j.inspection_end_date, j.inspection_start_date, j.scheduled_date) >= ?
+                       AND COALESCE(j.inspection_end_date, j.inspection_start_date, j.scheduled_date) <= ?",
+                    [$officeId, $from, $to]);
+    foreach ($subs as $sc) {
+        $sbu = trim((string)$sc['sbu']);
+        if ($sbu === '') { $warn[] = $sc['job_code'] . ' has a sub-contractor cost but no ' . Tl('sbu') . '.'; continue; }
+        $add($sbu, (float)$sc['subcon_cost'], 'SUBCON', (int)$sc['id'],
+             trim(($sc['agency'] ?: 'Sub-contractor') . ' — ' . $sc['job_code']), 'THE_JOB_IT_WAS_FOR',
+             (string)($sc['activity_id'] ?? ''), (int)($sc['boss_id'] ?? 0) ?: null, (int)$sc['id'],
+             (string)($sc['contract_number'] ?? ''));
+    }
+
     $total = 0; foreach ($rows as $r) $total += $r['amount'];
     if ($commit) {
         db()->prepare("DELETE FROM cost_allocations WHERE yr=? AND mon=? AND office_id=?")->execute([$yr, $mon, $officeId]);
         $ins = db()->prepare("INSERT INTO cost_allocations
-            (yr,mon,office_id,sbu,activity,boss_id,job_id,source_kind,source_id,source_label,basis,amount,created_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            (yr,mon,office_id,sbu,activity,boss_id,job_id,contract_number,source_kind,source_id,source_label,basis,amount,created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
         foreach ($rows as $r)
             $ins->execute([$yr, $mon, $officeId, $r['sbu'], $r['activity'], $r['boss_id'], $r['job_id'],
-                           $r['source_kind'], $r['source_id'], $r['source_label'], $r['basis'], $r['amount'], date('c')]);
+                           $r['contract_number'] ?? '', $r['source_kind'], $r['source_id'], $r['source_label'],
+                           $r['basis'], $r['amount'], date('c')]);
         db()->prepare("DELETE FROM cost_runs WHERE yr=? AND mon=? AND office_id=?")->execute([$yr, $mon, $officeId]);
         db()->prepare("INSERT INTO cost_runs (yr,mon,office_id,status,total,note,run_by,run_at)
                        VALUES (?,?,?,'OPEN',?,?,?,?)")
@@ -613,10 +642,11 @@ function costing_stored_by_sbu($officeId, $yr, $mon) {
     $out = [];
     foreach ($rows as $r) {
         $s = (string)$r['sbu'];
-        if (!isset($out[$s])) $out[$s] = ['engineers'=>0, 'staff'=>0, 'office'=>0, 'cost'=>0];
+        if (!isset($out[$s])) $out[$s] = ['engineers'=>0, 'staff'=>0, 'subcon'=>0, 'office'=>0, 'cost'=>0];
         $v = (float)$r['v'];
         if (strncmp($r['source_kind'], 'INSPECTOR', 9) === 0) $out[$s]['engineers'] += $v;
         elseif ($r['source_kind'] === 'STAFF_SALARY')        $out[$s]['staff'] += $v;
+        elseif ($r['source_kind'] === 'SUBCON')              $out[$s]['subcon'] += $v;
         else                                                 $out[$s]['office'] += $v;
         $out[$s]['cost'] += $v;
     }
@@ -746,13 +776,13 @@ function ops_cost_run($method) {
     $preview = $sel ? costing_run($yr, $mon, $sel, false) : ['rows'=>[], 'total'=>0, 'warnings'=>[]];
     $status  = $sel ? cost_run_status($yr, $mon, $sel) : null;
 
-    $kinds = ['INSPECTOR_WORKED'=>0, 'INSPECTOR_IDLE'=>0, 'STAFF_SALARY'=>0, 'OFFICE_EXPENSE'=>0];
+    $kinds = ['INSPECTOR_WORKED'=>0, 'INSPECTOR_IDLE'=>0, 'STAFF_SALARY'=>0, 'SUBCON'=>0, 'OFFICE_EXPENSE'=>0];
     $bySbu = [];
     foreach ($preview['rows'] as $r) {
         $kinds[$r['source_kind']] = ($kinds[$r['source_kind']] ?? 0) + $r['amount'];
         $s = (string)$r['sbu'];
         if (!isset($bySbu[$s])) $bySbu[$s] = ['INSPECTOR_WORKED'=>0, 'INSPECTOR_IDLE'=>0,
-                                               'STAFF_SALARY'=>0, 'OFFICE_EXPENSE'=>0, 'total'=>0];
+                                               'STAFF_SALARY'=>0, 'SUBCON'=>0, 'OFFICE_EXPENSE'=>0, 'total'=>0];
         $bySbu[$s][$r['source_kind']] += $r['amount'];
         $bySbu[$s]['total'] += $r['amount'];
     }
@@ -783,7 +813,8 @@ function ops_sbu_pl() {
     $rows = [];
     foreach (array_unique(array_merge(array_keys($revenue), array_keys($cost))) as $s) {
         if ($s === '' && !($revenue[$s] ?? 0) && !($cost[$s]['cost'] ?? 0)) continue;
-        $rows[$s] = ['revenue'=>(float)($revenue[$s] ?? 0)] + ($cost[$s] ?? ['engineers'=>0,'staff'=>0,'office'=>0,'cost'=>0]);
+        $rows[$s] = ['revenue'=>(float)($revenue[$s] ?? 0)]
+                  + ($cost[$s] ?? ['engineers'=>0, 'staff'=>0, 'subcon'=>0, 'office'=>0, 'cost'=>0]);
     }
     uasort($rows, function ($a, $b) { return ($b['revenue'] - $b['cost']) <=> ($a['revenue'] - $a['cost']); });
     $tot = ['revenue'=>0, 'cost'=>0];

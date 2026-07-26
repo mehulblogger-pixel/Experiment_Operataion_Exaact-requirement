@@ -12,8 +12,23 @@
 <div class="master-head">
   <div><h1><?= e(T_REG('boss')) ?></h1>
     <p class="sub" style="margin:2px 0 0">Every BOSS / contract with its dates, renewal chain, invoicing, expenses<?= $seeSal?', salary cost and profit':'' ?>. Click a BOSS for the line-by-line drill-down.</p></div>
-  <a class="btn secondary" href="/profitability?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ Download CSV</a>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <a class="btn secondary" href="/profitability?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ Download CSV</a>
+    <a class="btn ghost" href="/mis">Management dashboard</a>
+    <a class="btn ghost" href="/sbu-pl"><?= e(T('sbu')) ?> P&amp;L</a>
+  </div>
 </div>
+
+<?php if ($seeSal): ?>
+<div class="msg-info">
+  <strong>What this screen shows, and what it does not.</strong>
+  A <?= e(T('boss')) ?> number is judged on what it <em>directly caused</em> — the <?= e(Tl('engineer')) ?>'s time on it,
+  its expenses and its sub-contractor — plus the single overhead % set for the <?= e(Tl('office')) ?>.
+  No share of the branch manager, the coordinator or the rent is pushed onto an order.
+  Those sit on the <a href="/sbu-pl"><?= e(Tl('sbu')) ?> line</a>, from the month-end run.
+  Read this screen when pricing work; read the <?= e(Tl('sbu')) ?> P&amp;L when asking whether the branch is ahead.
+</div>
+<?php endif; ?>
 
 <div class="kpi-row">
   <div class="kpi"><div class="k-lab">BOSS numbers</div><div class="k-val"><?= count($rows) ?></div><div class="k-sub"><?= $active ?> active</div></div>

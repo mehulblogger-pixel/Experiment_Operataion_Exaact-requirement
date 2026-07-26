@@ -7,6 +7,7 @@ $kindLabel = [
     'INSPECTOR_WORKED' => 'Days worked on a job',
     'INSPECTOR_IDLE'   => 'Non-chargeable days',
     'STAFF_SALARY'     => 'Salary, split by percentage',
+    'SUBCON'           => 'Sub-contractor',
     'OFFICE_EXPENSE'   => 'Office costs',
 ];
 $basisLabel = [
@@ -19,6 +20,7 @@ $basisLabel = [
     'MANDAYS'     => 'man-days worked',
     'REVENUE'     => 'revenue earned',
     'HEADCOUNT'   => 'headcount',
+    'THE_JOB_IT_WAS_FOR' => 'the job it was paid for',
 ];
 ?>
 <div class="crumbs"><a href="/">Home</a> › Month-end cost run</div>
@@ -28,6 +30,7 @@ $basisLabel = [
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <a class="btn ghost" href="/office-finance?tab=actual&amp;office=<?= (int)$sel ?>&amp;m=<?= e($ym) ?>">Enter <?= e(Tl('office')) ?> costs</a>
     <a class="btn ghost" href="/sbu-pl?office=<?= (int)$sel ?>&amp;m=<?= e($ym) ?>"><?= e(T('sbu')) ?> P&amp;L</a>
+    <a class="btn ghost" href="/mis?fy=<?= e(fy_of($ym . '-01')) ?>&amp;m=<?= e($ym) ?>&amp;office=<?= (int)$sel ?>">Management dashboard</a>
   </div>
 </div>
 
@@ -62,6 +65,7 @@ $basisLabel = [
   <div class="kpi"><span class="k-lab">Total cost for <?= e($mName) ?></span><span class="k-val">₹<?= number_format($preview['total'], 2) ?></span></div>
   <div class="kpi"><span class="k-lab">Inspection <?= e(Tlp('engineer')) ?></span><span class="k-val">₹<?= number_format($byKind['INSPECTOR_WORKED'] + $byKind['INSPECTOR_IDLE'], 2) ?></span></div>
   <div class="kpi"><span class="k-lab">Everybody else</span><span class="k-val">₹<?= number_format($byKind['STAFF_SALARY'], 2) ?></span></div>
+  <div class="kpi"><span class="k-lab">Sub-contractors</span><span class="k-val">₹<?= number_format($byKind['SUBCON'], 2) ?></span></div>
   <div class="kpi"><span class="k-lab"><?= e(TH('office')) ?> costs</span><span class="k-val">₹<?= number_format($byKind['OFFICE_EXPENSE'], 2) ?></span></div>
 </div>
 
@@ -109,7 +113,7 @@ $basisLabel = [
   <h3 class="tab-sub">Line by line <span class="muted">— where each figure came from</span></h3>
   <div class="tbl-scroll" style="overflow-x:auto;max-height:520px">
   <table class="grid">
-    <tr><th>What</th><th>Who / which head</th><th><?= e(T('sbu')) ?></th><th>Activity</th><th><?= e(T('boss')) ?></th><th>Spread by</th><th style="text-align:right">₹</th></tr>
+    <tr><th>What</th><th>Who / which head</th><th><?= e(T('sbu')) ?></th><th>Activity</th><th><?= e(T('boss')) ?></th><th>Contract</th><th>Spread by</th><th style="text-align:right">₹</th></tr>
     <?php foreach ($preview['rows'] as $r): ?>
     <tr>
       <td><?= e($kindLabel[$r['source_kind']] ?? $r['source_kind']) ?></td>
@@ -117,6 +121,7 @@ $basisLabel = [
       <td><?= e($sbuLabels[$r['sbu']] ?? $r['sbu']) ?></td>
       <td class="muted"><?= $r['activity'] !== '' ? e(lk_value_path($r['activity'])) : '—' ?></td>
       <td class="muted"><?= $r['boss_id'] ? e($bossCodes[(int)$r['boss_id']] ?? ('#' . (int)$r['boss_id'])) : '—' ?></td>
+      <td class="muted"><?= ($r['contract_number'] ?? '') !== '' ? e($r['contract_number']) : '—' ?></td>
       <td class="muted"><?= e($basisLabel[$r['basis']] ?? strtolower(str_replace('_', ' ', $r['basis']))) ?></td>
       <td style="text-align:right">₹<?= number_format($r['amount'], 2) ?></td>
     </tr>

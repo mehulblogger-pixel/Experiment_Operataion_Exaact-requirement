@@ -173,6 +173,7 @@ function boot() {
     if (function_exists('security_migrate')) security_migrate();    // password age, second factor
     if (function_exists('compliance_migrate')) compliance_migrate(); // incident register, consent, data requests
     if (function_exists('costing_migrate')) costing_migrate();       // salary + overhead allocation to SBUs
+    if (function_exists('joblock_migrate')) joblock_migrate();       // close-on-time lock
     // Register every remaining dropdown as an editable master list. Runs last:
     // it needs the base lists seeded and the CRM/IDEMS constants loaded.
     if (function_exists('lk_register_module_lists')) lk_register_module_lists();

@@ -25,6 +25,8 @@ require __DIR__ . '/lib/workforce.php';
 require __DIR__ . '/lib/orgadmin.php';
 require __DIR__ . '/lib/contracts.php';
 require __DIR__ . '/lib/idems.php';
+require __DIR__ . '/lib/costing.php';
+require __DIR__ . '/lib/joblock.php';
 
 // When invoked over HTTP, require a matching key so strangers can't trigger it.
 if (PHP_SAPI !== 'cli') {
@@ -49,6 +51,13 @@ echo "Reminders processed. Emails queued/sent: $sent\n";
 // agency's free-replacement guarantee window has passed.
 confirm_lapsed_placement_fees();
 echo "Placement-fee guarantees checked.\n";
+
+// Jobs that ran out of time: lock them, and tell the engineer, the coordinator,
+// the branch manager and the administrators — once each, not every morning.
+if (function_exists('joblock_sweep')) {
+    $lk = joblock_sweep();
+    echo "Jobs locked for late closure: {$lk['locked']} (alerts sent: {$lk['alerted']})\n";
+}
 
 // Send any due quotation follow-up e-mails (3/6/9-day, fortnight, month).
 if (function_exists('crm_run_followups')) {

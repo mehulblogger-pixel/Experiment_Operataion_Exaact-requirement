@@ -29,7 +29,7 @@ const PLAIN = [
   '/phrase-library', '/learning', '/approver-map', '/idems-approval-rules', '/report-types',
   '/report-templates', '/irn-rules', '/audit-log',
   '/clients', '/vendors', '/partner-new', '/masters', '/lookups', '/custom-fields',
-  '/work-norms', '/office-finance', '/cost-run', '/sbu-pl', '/partner-import',
+  '/work-norms', '/office-finance', '/cost-run', '/sbu-pl', '/mis', '/partner-import',
   '/reset-data', '/m/office-expense-heads', '/reports', '/profitability', '/invoicing',
   '/users', '/user-new', '/hierarchy', '/settings', '/access', '/terminology',
   '/ai-settings', '/templates', '/crm-templates', '/approval-rules', '/my-signature',

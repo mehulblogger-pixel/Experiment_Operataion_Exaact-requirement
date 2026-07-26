@@ -2,6 +2,42 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 📈 MANAGEMENT DASHBOARD, FINANCIAL YEARS & THE CLOSE-ON-TIME LOCK (July 2026)
+
+### What to test
+
+1. **Management dashboard** (new, in the menu). Filter by financial year,
+   month, SBU, activity code, executing office, contracting office, engineer
+   and client. Nine KPI cards, eight breakdown tables, each downloadable as a
+   spreadsheet. Every figure is counted off ONE set of jobs by ONE rule, so no
+   two tables can disagree.
+2. **Financial years follow the data.** Enter work dated next year and next
+   year appears in the list; the year ahead is always offered so work can be
+   entered before April.
+3. **The close-on-time lock.** An engineer has 2 days after the inspection ends
+   (Settings → *Days to close a job*). Miss it and the job locks: nothing can
+   be changed, the engineer/coordinator/branch manager/administrators are
+   e-mailed once, and **documents can still be uploaded**. A manager can reopen
+   it for a few days with a reason, which is written to the audit trail. The
+   register shows a count of locked jobs and marks each row.
+4. **Sub-contractor cost** now lands in the month-end run on the job, its
+   contract number, its SBU and its activity code — never spread.
+
+### Still open
+
+- [ ] **The lock sweep needs cron.** `joblock_sweep()` runs from `cron.php`;
+      until the cPanel cron job is set up, jobs lock on screen (the rule is
+      evaluated live) but **nobody is e-mailed**. Setting the daily cron is an
+      owner action.
+- [ ] **No year-on-year comparison** on the dashboard — this year against last
+      is the obvious next column.
+- [ ] **Utilisation is man-days only.** Available days per engineer per month
+      are known (working days minus holidays), but the dashboard does not yet
+      show a utilisation %.
+- [ ] **The dashboard reads jobs, not vouchers.** Where a voucher timesheet
+      disagrees with a job's man-days, the job wins here. The reconciliation
+      screen is the place that surfaces the difference.
+
 ## 💰 COSTING & PROFITABILITY — complete, ready to test (July 2026)
 
 Five commits: `9c75b5f` (the allocation engine), `4bc4c97` (expense heads master +

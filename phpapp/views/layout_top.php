@@ -122,6 +122,7 @@
           <?php if (can('mod.overheads.view')): ?><a class="s-item<?= $navOn(['office-finance']) ?>" href="/office-finance"><span class="s-ic">📐</span><span><?= e(TH("office")) ?> costs &amp; overheads</span></a><?php endif; ?>
           <?php if (can('mod.overheads.view')): ?><a class="s-item<?= $navOn(['cost-run']) ?>" href="/cost-run"><span class="s-ic">🧮</span><span>Month-end cost run</span></a><?php endif; ?>
           <?php if (can('mod.profitability.view')): ?><a class="s-item<?= $navOn(['sbu-pl']) ?>" href="/sbu-pl"><span class="s-ic">📊</span><span><?= e(T('sbu')) ?> profit &amp; loss</span></a><?php endif; ?>
+          <?php if (can('mod.reports.view')||can('dash.operations')||can('dash.financial')): ?><a class="s-item<?= $navOn(['mis']) ?>" href="/mis"><span class="s-ic">📈</span><span>Management dashboard</span></a><?php endif; ?>
           <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['users','user-new','user-edit']) ?>" href="/users"><span class="s-ic">👥</span><span><?= e(T_REG('user')) ?></span></a><?php endif; ?>
           <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['hierarchy']) ?>" href="/hierarchy"><span class="s-ic">🗂️</span><span>Organisation</span></a><?php endif; ?>
           <?php if (is_master()): ?><a class="s-item<?= $navOn(['access']) ?>" href="/access"><span class="s-ic">🔐</span><span>Roles &amp; permissions</span></a><?php endif; ?>
