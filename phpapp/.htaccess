@@ -20,3 +20,53 @@ RewriteRule ^ index.php [L]
 <IfModule mod_rewrite.c>
     RewriteRule ^data/ - [F]
 </IfModule>
+
+# --- Nothing below changes how the app works. It only closes doors that are
+#     open by default on a shared host. ---
+
+# Never list the contents of a folder that has no index page.
+Options -Indexes
+
+# Dotfiles: .htaccess itself, .git, editor leftovers. None of these should ever
+# be fetchable, and a copy of .git would hand over the whole source history.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+<IfModule mod_rewrite.c>
+    RewriteRule (^|/)\.git(/|$) - [F]
+</IfModule>
+
+# Files that are part of the build, not the site. A database left in the folder
+# during a test, a backup an editor wrote, notes, the seed data.
+<FilesMatch "\.(sqlite|sqlite3|db|sql|bak|old|orig|save|swp|log|ini|md|json|lock|yml|yaml)$">
+    Require all denied
+</FilesMatch>
+
+# The program itself. With the rewrite above these are never requested directly,
+# but if the rewrite is ever switched off this is what stops the source being
+# read line by line — including whatever a future version keeps in it.
+<IfModule mod_rewrite.c>
+    RewriteRule ^(lib|views|tools|docs)/ - [F]
+</IfModule>
+
+# Do not advertise the PHP version in every response.
+<IfModule mod_headers.c>
+    Header unset X-Powered-By
+    Header always unset X-Powered-By
+</IfModule>
+
+# --- HTTPS ---------------------------------------------------------------
+# The session cookie is only marked "never send this in the clear" when the
+# site is actually on HTTPS, so switching the certificate on matters more than
+# anything else in this file. Once the certificate is issued and
+# https://yourdomain works in a browser, remove the # from the four lines below
+# and every visitor is moved to the secure address automatically.
+#
+# Do not uncomment before the certificate works — a browser would be sent to an
+# address that does not answer, and the site would appear to be down.
+#
+# <IfModule mod_rewrite.c>
+#     RewriteCond %{HTTPS} off
+#     RewriteCond %{HTTP:X-Forwarded-Proto} !https
+#     RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>

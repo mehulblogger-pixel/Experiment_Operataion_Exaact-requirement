@@ -411,6 +411,112 @@ function accounts_locked_now() {
 }
 
 // ---------------------------------------------------------------------------
+//  Checking a file before any handler sees it
+//
+//  There are thirteen places in this app where somebody can attach a file —
+//  evidence photos, mill certificates, quotation PDFs, voucher supports, CVs,
+//  letterheads, signatures, report templates, the staff import sheet. Guarding
+//  each one separately means the fourteenth is unguarded, so this runs once,
+//  over everything in the request, before routing.
+//
+//  Files are never written to disk here — they are held in the database — so an
+//  uploaded .php cannot be executed. That is the strong defence and it was
+//  already in place. This adds the second one: a file whose contents disagree
+//  with what it claims to be, or which is script whatever it claims, is turned
+//  away at the door rather than stored and served later.
+// ---------------------------------------------------------------------------
+function upload_max_mb() { $n = (int)setting_get('upload_max_mb', 12); return ($n >= 1 && $n <= 64) ? $n : 12; }
+
+// Names that mean "run me" on almost any web server, whatever is inside.
+const UPLOAD_BANNED_EXT = ['php','php3','php4','php5','php7','phps','phtml','phar','cgi','pl','py',
+                           'sh','bash','exe','com','bat','cmd','scr','msi','dll','jar','htaccess','htpasswd'];
+
+// What the first few bytes actually say this is.
+function file_real_kind($bytes) {
+    if (strlen($bytes) < 4) return 'unknown';
+    if (strncmp($bytes, "\xFF\xD8\xFF", 3) === 0)              return 'image/jpeg';
+    if (strncmp($bytes, "\x89PNG\r\n\x1a\n", 8) === 0)         return 'image/png';
+    if (strncmp($bytes, 'GIF87a', 6) === 0
+        || strncmp($bytes, 'GIF89a', 6) === 0)                 return 'image/gif';
+    if (strncmp($bytes, 'RIFF', 4) === 0
+        && substr($bytes, 8, 4) === 'WEBP')                    return 'image/webp';
+    if (strncmp($bytes, 'BM', 2) === 0)                        return 'image/bmp';
+    if (strncmp($bytes, '%PDF', 4) === 0)                      return 'application/pdf';
+    if (strncmp($bytes, "PK\x03\x04", 4) === 0)                return 'zip';   // docx, xlsx, odt
+    if (strncmp($bytes, "\xD0\xCF\x11\xE0", 4) === 0)          return 'ole';   // old .doc, .xls
+    return 'unknown';
+}
+
+// '' when the file may be stored, otherwise the reason it may not.
+function upload_reject_reason($bytes, $name, $declaredMime) {
+    $name = (string)$name;
+    $len  = strlen($bytes);
+    if ($len === 0) return '';                       // an empty slot, not an upload
+    if ($len > upload_max_mb() * 1024 * 1024)
+        return '"' . $name . '" is larger than the ' . upload_max_mb() . ' MB limit.';
+
+    $ext = strtolower((string)pathinfo($name, PATHINFO_EXTENSION));
+    if (in_array($ext, UPLOAD_BANNED_EXT, true))
+        return '"' . $name . '" is a program file. Attach a document or a picture instead.';
+    // A second extension hidden before the visible one — report.php.jpg.
+    foreach (explode('.', strtolower($name)) as $part)
+        if (in_array($part, UPLOAD_BANNED_EXT, true))
+            return '"' . $name . '" has a program-file extension inside its name. Rename it and try again.';
+
+    $head = substr($bytes, 0, 1024);
+    if (stripos($head, '<' . '?php') !== false || strncmp($head, '#!', 2) === 0)
+        return '"' . $name . '" contains program code, so it was not stored.';
+
+    $real = file_real_kind($bytes);
+    $decl = strtolower(trim((string)$declaredMime));
+
+    // Anything calling itself a picture must actually be one. This is what
+    // stops a page of script arriving with a .jpg name and an image/jpeg label.
+    if (strpos($decl, 'image/') === 0 && strpos($real, 'image/') !== 0)
+        return '"' . $name . '" says it is a picture but its contents are not. It may be damaged, or renamed from something else.';
+
+    // A drawing (SVG) is not a picture as far as a browser is concerned — it is
+    // a document that can carry script. They are never displayed here, so there
+    // is no reason to hold one.
+    if ($decl === 'image/svg+xml' || $ext === 'svg')
+        return 'SVG drawings are not accepted. Save it as a PNG or a JPG and attach that.';
+
+    // Markup, from anywhere, under any name.
+    if (in_array($ext, ['html','htm','xhtml','shtml','svgz'], true)
+        || stripos($head, '<!doctype html') !== false
+        || (stripos($head, '<html') !== false && stripos($head, '<script') !== false))
+        return '"' . $name . '" is a web page. Print it to PDF and attach that instead.';
+
+    return '';
+}
+
+// Walk everything in the request, however deeply the form nested it, and hand
+// back the first reason to refuse — or '' when they are all fine.
+function uploads_reject_reason() {
+    if (empty($_FILES)) return '';
+    $flat = function ($v) use (&$flat) { return is_array($v) ? array_merge(...array_map($flat, array_values($v))) : [$v]; };
+    foreach ($_FILES as $f) {
+        if (!isset($f['tmp_name'])) continue;
+        $tmps  = $flat($f['tmp_name']);
+        $names = $flat($f['name'] ?? '');
+        $types = $flat($f['type'] ?? '');
+        $errs  = $flat($f['error'] ?? 0);
+        foreach ($tmps as $i => $tmp) {
+            if ((int)($errs[$i] ?? 0) !== 0 || $tmp === '' || !is_uploaded_file($tmp)) continue;
+            // Only the head is read for the check; the size is taken from disk,
+            // so a 200 MB file is never pulled into memory to be refused.
+            $size = (int)@filesize($tmp);
+            if ($size > upload_max_mb() * 1024 * 1024)
+                return '"' . ($names[$i] ?? 'that file') . '" is larger than the ' . upload_max_mb() . ' MB limit.';
+            $head = (string)@file_get_contents($tmp, false, null, 0, 4096);
+            $why  = upload_reject_reason($head, $names[$i] ?? 'file', $types[$i] ?? '');
+            if ($why !== '') return $why;
+        }
+    }
+    return '';
+}
+
+// ---------------------------------------------------------------------------
 //  Where new columns are added
 //
 //  Called from the boot migration. Every column here is checked for on the
