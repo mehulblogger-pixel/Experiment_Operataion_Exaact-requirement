@@ -99,6 +99,8 @@ try {
     require __DIR__ . '/lib/security.php';
     require __DIR__ . '/lib/compliance.php';
     require __DIR__ . '/lib/costing.php';
+    require __DIR__ . '/lib/reset.php';
+    require __DIR__ . '/lib/partnerimport.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {

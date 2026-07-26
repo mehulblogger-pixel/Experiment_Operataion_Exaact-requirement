@@ -534,7 +534,9 @@ function xl_sheet($rows, $validations = '', $freezeHeader = true) {
     return $x;
 }
 // $lists = ['A' => ['title', v, v, ...], ...] keyed by the column letter they fill.
-function org_xlsx($dataRows, $lists, $validations) {
+// $sheetName is what the tab is called in Excel — the user register calls it
+// People, the client/vendor template calls itself something else.
+function org_xlsx($dataRows, $lists, $validations, $sheetName = 'People') {
     if (!class_exists('ZipArchive')) return null;
     $tmp = tempnam(sys_get_temp_dir(), 'xlsx');
     $z = new ZipArchive();
@@ -559,7 +561,7 @@ function org_xlsx($dataRows, $lists, $validations) {
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
         . 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'
-        . '<sheet name="People" sheetId="1" r:id="rId1"/>'
+        . '<sheet name="' . xl_esc($sheetName) . '" sheetId="1" r:id="rId1"/>'
         . '<sheet name="Lists" sheetId="2" state="hidden" r:id="rId2"/>'
         . '</sheets></workbook>');
     $z->addFromString('xl/_rels/workbook.xml.rels',

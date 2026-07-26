@@ -1514,6 +1514,8 @@ function ops_module_gate($route) {
         'user-unlock'=>'users','user-2fa-reset'=>'users','user-retire'=>'users',
         'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
+        'reset-data'=>'settings',
+        'partner-import'=>'clients','partner-template'=>'clients',
     ];
     $mod = $map[$base] ?? null;
     if ($mod && !can("mod.$mod.view")) {
@@ -1662,6 +1664,12 @@ function ops_dispatch($route, $method) {
             return ops_hierarchy_screen($method);
         case $route === 'org-template':
             return ops_org_template();
+        case $route === 'reset-data':
+            ops_reset_data($method); return true;
+        case $route === 'partner-import':
+            ops_partner_import($method); return true;
+        case $route === 'partner-template':
+            return ops_partner_template();
         case $route === 'contract-overrides' || $route === 'contract-override':
             return ops_contract_overrides($route, $method);
         case $route === 'work-norms':
@@ -3756,10 +3764,13 @@ function ops_reports() {
     $fin['costBySbu']=[]; $fin['costBySbuTotal']=0;
     if ($seeSalary) {
         $scopeSbuSet = scope_sbus();
-        foreach (ops_all("SELECT id, sbus, sbu, salary_ctc + COALESCE(agency_cost,0) salary_ctc FROM inspectors WHERE status='ACTIVE'") as $ins) {
+        foreach (ops_all("SELECT id, sbus, sbu, home_office_id, salary_ctc + COALESCE(agency_cost,0) salary_ctc FROM inspectors WHERE status='ACTIVE'") as $ins) {
             if ($F['insp']!=='' && (int)$ins['id']!==(int)$F['insp']) continue;
             $ctc=(float)($ins['salary_ctc'] ?? 0); if ($ctc<=0) continue;
-            $loadedMonthly=($ctc/12)*(1+OVERHEAD_PCT/100);
+            // The engineer's own office decides its overhead %, exactly as the
+            // job-level cost does. Reading the constant here made this one panel
+            // disagree with every other figure on the screen.
+            $loadedMonthly=($ctc/12)*(1+office_overhead_pct($ins['home_office_id'] ?? null)/100);
             $sbus=array_values(array_filter(array_map('trim', explode(',', ($ins['sbus'] ?: ($ins['sbu'] ?? ''))))));
             if (!$sbus) $sbus=['—'];
             if ($scopeSbuSet!=='ALL') $sbus=array_values(array_intersect($sbus,$scopeSbuSet));
