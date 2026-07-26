@@ -2,6 +2,33 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🛑 SAVE MUST NEVER FAIL SILENTLY (July 2026)
+
+Reported twice. The first fix was wrong, and this records why so it is not
+attempted that way again.
+
+A browser refuses to submit a form holding an invalid field and tries to point
+at it. If that field is not on screen it cannot point at anything — so it
+refuses, says nothing, and the button looks dead. Every searchable dropdown in
+this app hides its real `<select>` behind a text box, so **any** required
+dropdown was one empty answer away from killing the whole form.
+
+The first attempt listened for the form's `submit` event and took the
+requirement off anything hidden. It could never have worked: the browser blocks
+*before* `submit` fires, so the listener never ran.
+
+The browser's own checking is now switched off (`noValidate`) and done in the
+page instead, where it can be seen:
+
+- on screen and wrong → rung in red, scrolled to, named in a message above the
+  form; nothing is submitted;
+- off screen → let through to the server, which checks it anyway and answers
+  with a message that opens the section it lives in.
+
+Either way something visible happens when Save is pressed. The guard also stops
+the one-shot-ticket handler when it blocks, so the button no longer greys out
+reading "Saving…" over a form that is not going anywhere.
+
 ## 🔗 WINNING IT PUTS THE COMPANY ON FILE (July 2026)
 
 ### Bugs fixed, from the live site

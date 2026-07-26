@@ -628,21 +628,108 @@
     sync();
   }
 
-  // ---- A hidden box can never be filled in, so it can never be required -----
+  // ---- Save must never fail silently ---------------------------------------
   //
-  //  Belt and braces for the whole app, not just the call form: whatever else
-  //  is going on, a form must never refuse to submit because of a field nobody
-  //  can see. If it is out of sight when Save is pressed, the requirement comes
-  //  off and the server does the checking — which it does anyway, and which can
-  //  actually explain itself.
-  function initNoHiddenRequired() {
+  //  A browser refuses to submit a form holding an invalid field, and tries to
+  //  point at it. If that field is not on screen it cannot point at anything —
+  //  so it refuses, says nothing, and the button appears dead. Every searchable
+  //  dropdown in this app hides its real <select> behind a text box, so ANY
+  //  required dropdown was one empty answer away from killing the whole form,
+  //  with nothing on screen and nothing in the log to say why.
+  //
+  //  The previous attempt at this listened for the form's submit event and took
+  //  the requirement off anything hidden. It could never have worked: the
+  //  browser blocks BEFORE submit fires, so the listener never ran. That is the
+  //  bug being fixed here, and it is why "Save is not working" came back.
+  //
+  //  So the browser's own checking is switched off entirely and done here
+  //  instead, where it can be seen:
+  //    · a field that is on screen and wrong  — rung in red, scrolled to, named
+  //      in a message above the form. The form does not submit.
+  //    · a field that is off screen           — let through to the server, which
+  //      checks it anyway and answers with a message that opens the section it
+  //      lives in. Better a clear refusal from the server than a dead button.
+  //  Either way something happens when Save is pressed. That is the whole point.
+  function fieldLabel(el) {
+    var ff = el.closest ? el.closest('.ff') : null;
+    var lab = ff ? ff.querySelector('label') : null;
+    if (!lab) return el.name || 'a field';
+    // Labels carry hints and an "+ Add new" link; naming the box means the words
+    // that name it, not everything printed alongside.
+    var c = lab.cloneNode(true);
+    Array.prototype.forEach.call(c.querySelectorAll('a, button, .muted, small'), function (n) {
+      n.parentNode.removeChild(n);
+    });
+    var t = c.textContent.replace(/\s+/g, ' ').trim().replace(/[\s*:—-]+$/, '');
+    return t || el.name || 'a field';
+  }
+  function onScreen(el) {
+    return !!(el && (el.offsetWidth || el.offsetHeight || (el.getClientRects && el.getClientRects().length)));
+  }
+  // What the person actually sees for this control. A searchable dropdown is a
+  // hidden <select> with a visible text box next to it; marking the select in
+  // red would mark nothing.
+  function shownAs(el) {
+    if (onScreen(el)) return el;
+    var wrap = el.closest ? el.closest('.ss-wrap') : null;
+    var box = wrap ? wrap.querySelector('input') : null;
+    return (box && onScreen(box)) ? box : null;
+  }
+  function clearMarks(f) {
+    Array.prototype.forEach.call(f.querySelectorAll('.field-bad'), function (n) { n.classList.remove('field-bad'); });
+    Array.prototype.forEach.call(f.querySelectorAll('.ff-bad'), function (n) { n.classList.remove('ff-bad'); });
+    var old = f.querySelector('.guard-msg');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+  }
+  function showProblems(f, bad) {
+    var names = bad.map(function (b) { return fieldLabel(b.el); });
+    var box = document.createElement('div');
+    box.className = 'msg msg-error guard-msg';
+    box.textContent = bad.length === 1
+      ? 'Nothing has been saved — ' + names[0] + ' still needs filling in.'
+      : 'Nothing has been saved — ' + bad.length + ' boxes still need filling in: ' + names.join(', ') + '.';
+    f.insertBefore(box, f.firstChild);
+    bad.forEach(function (b) {
+      b.mark.classList.add('field-bad');
+      var ff = b.mark.closest ? b.mark.closest('.ff') : null;
+      if (ff) ff.classList.add('ff-bad');
+      var clear = function () {
+        b.mark.classList.remove('field-bad');
+        if (ff) ff.classList.remove('ff-bad');
+      };
+      b.mark.addEventListener('input', clear);
+      b.mark.addEventListener('change', clear);
+      b.el.addEventListener('change', clear);
+    });
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var first = bad[0].mark;
+    setTimeout(function () { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }, 350);
+  }
+  function initFormGuard() {
     Array.prototype.forEach.call(document.querySelectorAll('form'), function (f) {
-      f.addEventListener('submit', function () {
-        Array.prototype.forEach.call(f.querySelectorAll('[required]'), function (el) {
-          var visible = !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
-          if (!visible) el.required = false;
+      if (f.dataset.guard === '1') return;
+      f.dataset.guard = '1';
+      // The browser must never make this decision, because it cannot always
+      // show its reasons.
+      f.noValidate = true;
+      f.addEventListener('submit', function (e) {
+        clearMarks(f);
+        var bad = [];
+        Array.prototype.forEach.call(f.elements, function (el) {
+          if (el.disabled || el.type === 'hidden' || el.type === 'submit'
+              || el.type === 'button' || el.type === 'reset') return;
+          if (!el.checkValidity || el.checkValidity()) return;
+          var mark = shownAs(el);
+          if (!mark) return;                 // not on screen: the server judges it
+          bad.push({ el: el, mark: mark });
         });
-      }, true);
+        if (!bad.length) return;             // let it save
+        e.preventDefault();
+        // Stop the one-shot-ticket handler too, or it greys the button and
+        // writes "Saving…" over a form that is not going anywhere.
+        e.stopImmediatePropagation();
+        showProblems(f, bad);
+      });
     });
   }
 
@@ -737,12 +824,14 @@
   });
 
   function init() {
+    // First, so its submit listener runs before the one-shot ticket greys the
+    // button: listeners on the same element fire in the order they were added.
+    initFormGuard();
     initOnceOnly();
     gstAutofill();
     initDisplayName();
     initSkillSelect();
     initForwardCredit();
-    initNoHiddenRequired();
     initSubconVendor();
     initRegAutofill();
     initOtherNew();
