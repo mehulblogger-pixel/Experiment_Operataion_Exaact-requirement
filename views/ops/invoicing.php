@@ -36,7 +36,7 @@
     <thead><tr><th>Job / <?= e(T("boss")) ?></th><th>Client</th><th class="num">Amount</th><th>Invoice</th><th>Payment</th><th>Credit</th><th></th></tr></thead>
     <tbody>
     <?php foreach ($rows as $r):
-      $amount = (float)($r['invoice_amount'] ?: $r['expected_credit']);
+      $amount = (float)($r['invoice_amount'] ?: (($r['invoice_value'] ?? 0) ?: $r['expected_credit']));
       $raised = !empty($r['invoice_raised']);
       $paid   = !empty($r['payment_received']);
       $overdue = $raised && !$paid && ($r['invoice_due_date'] ?? '') && $r['invoice_due_date'] < $today;

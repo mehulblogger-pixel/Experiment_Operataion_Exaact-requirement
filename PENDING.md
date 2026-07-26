@@ -27,11 +27,24 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
   the register entry is created on saving. The old register is still there and
   still holds the renewal chain; it just fills itself.
 
-### Still open
+### Revenue and invoice value — the owner's definition, now the only one
 
-- **Revenue is counted two different ways.** The management dashboard reads the
-  expected credit; the SBU P&L reads the invoice and falls back to the credit.
-  They will disagree. The owner has been asked which single rule to apply.
+    INVOICE VALUE  what the client is charged, as agreed on the purchase order
+                   or the quotation. Once a bill is raised it is the bill.
+    REVENUE        what a branch keeps out of it. Same branch holding the order
+                   and doing the work → the whole invoice value. Two branches →
+                   the holder keeps invoice − credit, the executor books the
+                   credit.
+
+Every screen reads this from one function. Two things it guarantees, both of
+which were wrong before: branch revenues added together come back to the
+invoice value exactly, and a same-office job is no longer worth nothing.
+
+Jobs now carry the invoice value and the contracting branch of their own, both
+carried from the call. Older rows were filled in from the call they came from
+on the next boot; a cross-office job that only ever recorded a credit reads the
+credit as the whole of it, so the holding branch shows nil rather than a loss
+it never made.
 
 ## 🧾 QUOTATIONS, MASTERS & THE CALL FORM (July 2026)
 

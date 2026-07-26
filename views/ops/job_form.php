@@ -205,18 +205,26 @@
         <span class="muted" style="margin-left:8px"><?= count($curDates) ?> set. Carried from the <?= e(Tl('call')) ?>; edit freely.</span></div>
     </div>
 
-    <?php // Only a cross-office deputation has an inter-office credit. Marking
-          // it required on a same-office one meant the browser refused to submit
-          // a form over a box that should not have been there — the button
-          // simply did nothing. Where there is no credit the figure that matters
-          // is what the client is billed, so that is what is shown. ?>
-    <div class="ff"><label><?= $cross ? 'Expected credit (' . e(cur_sym()) . ') *' : 'Value of this ' . e(Tl('job')) . ' (' . e(cur_sym()) . ')' ?></label>
+    <?php // Two different numbers, and confusing them is how a branch's profit
+          // stops meaning anything. The invoice value is what the client is
+          // charged. The credit is what one branch passes another for doing the
+          // work, and it exists only when those are two different branches.
+          // Revenue is the invoice less any credit given away — so added across
+          // the branches it comes back to the invoice value exactly. ?>
+    <div class="ff"><label>Invoice value to the <?= e(Tl('client')) ?> (<?= e(cur_sym()) ?>, ex-GST)</label>
+      <input class="form-control" type="number" step="0.01" name="invoice_value"
+             value="<?= e($job['invoice_value'] ?? $call['billable_value'] ?? '') ?>">
+      <small class="muted">What is charged, as agreed on the order or the <?= e(Tl('quote')) ?>. Carried from the <?= e(Tl('call')) ?>.</small></div>
+    <?php // Marking the credit required on a same-office deputation meant the
+          // browser refused to submit a form over a box that should not have
+          // been there at all, and the button simply did nothing. ?>
+    <div class="ff"><label>Credit to the executing <?= e(Tl('office')) ?> (<?= e(cur_sym()) ?>)<?= $cross ? ' *' : '' ?></label>
       <input class="form-control" type="number" step="0.01" name="expected_credit"
-             value="<?= e($job['expected_credit'] ?? ($cross ? ($call['expected_credit'] ?? '') : ($call['billable_value'] ?? ''))) ?>"
-             <?= $cross ? 'required' : '' ?>>
+             value="<?= e($cross ? ($job['expected_credit'] ?? $call['expected_credit'] ?? '') : '') ?>"
+             <?= $cross ? 'required' : 'readonly placeholder="— not applicable —" style="background:var(--soft)"' ?>>
       <small class="muted"><?= $cross
-        ? 'One ' . e(Tl('office')) . ' holds the order and another does the work, so the credit between them has to be stated before this is allocated.'
-        : 'Carried from what the ' . e(Tl('client')) . ' is billed on the ' . e(Tl('call')) . '. Leave it and it is taken from there.' ?></small></div>
+        ? 'One ' . e(Tl('office')) . ' holds the order and another does the work. The holding ' . e(Tl('office')) . ' books the invoice less this figure; the executing one books this figure.'
+        : 'One ' . e(Tl('office')) . ' both holds the order and does the work, so nothing passes between offices and the whole invoice value is its revenue.' ?></small></div>
     <div class="ff"><label>Credit type</label>
       <select class="form-control searchable" name="credit_type"><?php foreach (lk_options_or('credit_type', CREDIT_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($job['credit_type'] ?? $call['credit_type'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <?php // §iv — when the contracting office and the executing office are not the

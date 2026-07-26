@@ -460,7 +460,7 @@ function ops_run_mis_digest($period = 'weekly') {
         $qLost = (int)$v("SELECT COUNT(*) FROM quotations WHERE is_current=1 AND status IN ('LOST','EXPIRED') AND updated_at>=?", [$since]);
         $wonVal= $v("SELECT COALESCE(SUM(total_amount),0) FROM quotations WHERE is_current=1 AND status='ACCEPTED' AND updated_at>=?", [$since]);
     }
-    $unbilled    = $v("SELECT COALESCE(SUM(expected_credit),0) FROM jobs WHERE closed_flag=1 AND invoice_raised=0");
+    $unbilled    = $v("SELECT COALESCE(SUM(COALESCE(NULLIF(invoice_value,0), expected_credit)),0) FROM jobs WHERE closed_flag=1 AND invoice_raised=0");
     $label = $period === 'monthly' ? 'Monthly' : 'Weekly';
     $body = "$label management summary — " . app_name() . "\nPeriod: since $since\n\n"
         . "OPERATIONS\n"
