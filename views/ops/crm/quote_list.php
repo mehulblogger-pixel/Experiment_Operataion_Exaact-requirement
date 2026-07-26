@@ -67,7 +67,7 @@
 <div class="panel" style="padding:0;overflow:hidden">
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
-    <thead><tr><th>Quote</th><th>Client</th><th>Subject</th><th>SBU</th><th class="num">Total</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Quote</th><th>Client</th><th>Subject</th><th>SBU</th><th class="num">Total</th><th>Contract</th><th>Status</th><th></th></tr></thead>
     <tbody>
     <?php foreach ($rows as $r): ?>
     <tr>
@@ -76,11 +76,18 @@
       <td><?= e($r['subject'] ?: '—') ?></td>
       <td><?= e(lk_options_or('sbu', OPS_SBUS)[$r['sbu']] ?? $r['sbu'] ?: '—') ?></td>
       <td class="num"><?= (float)$r['total_amount']>0 ? cur_sym().number_format((float)$r['total_amount'],0) : '—' ?></td>
+      <?php // The contract number, from whichever end it was settled — registered
+            // by accounts on the order, or recorded on the client's Contracts tab.
+            // A won order without one is work nobody can invoice. ?>
+      <td><?php $cn = trim((string)($r['contract_number'] ?? ''));
+        if ($cn !== '') { echo e($cn); }
+        elseif (in_array($r['status'], ['ACCEPTED','APPROVED'], true)) { echo '<span class="pill p-warn">pending</span>'; }
+        else { echo '<span class="muted">—</span>'; } ?></td>
       <td><span class="pill <?= $stPill[$r['status']] ?? 'p-mut' ?>"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$r['status']] ?? $r['status']) ?></span></td>
       <td class="num"><a class="btn small secondary" href="/quote?id=<?= (int)$r['id'] ?>">Open</a></td>
     </tr>
     <?php endforeach; ?>
-    <?php if (!$rows): ?><tr><td colspan="7" style="text-align:center;padding:24px" class="muted">No <?= e(Tlp('quote')) ?> in this view.</td></tr><?php endif; ?>
+    <?php if (!$rows): ?><tr><td colspan="8" style="text-align:center;padding:24px" class="muted">No <?= e(Tlp('quote')) ?> in this view.</td></tr><?php endif; ?>
     </tbody>
   </table>
   </div>

@@ -183,6 +183,54 @@ function contract_state($quoteId, $today = null) {
 function contract_state_blocks($state) { return in_array($state, ['EXPIRED', 'EXHAUSTED'], true); }
 
 // ---------------------------------------------------------------------------
+//  A contract and the quotation it came from are two views of one agreement
+//
+//  The contract number is settled in one of two places, and which one depends on
+//  who happens to get there first. Accounts register it against the won
+//  quotation; or somebody records the contract on the client's Contracts tab
+//  because the paperwork arrived that way. Either way both sides have to end up
+//  saying the same thing — otherwise the quotation shows "contract number
+//  pending" forever while the contract sits on the client, and the expiry and
+//  quantity gates read a contract that nothing is pointing at.
+//
+//  So there is one rule, in one place, and both screens call it.
+// ---------------------------------------------------------------------------
+function contract_link_quotation($contractId, $quotationId) {
+    $contractId = (int)$contractId; $quotationId = (int)$quotationId;
+    if (!$contractId || !$quotationId) return false;
+    $c = ops_one("SELECT * FROM partner_contracts WHERE id=?", [$contractId]);
+    $q = ops_one("SELECT * FROM quotations WHERE id=?", [$quotationId]);
+    if (!$c || !$q) return false;
+    $pdo = db();
+    // The contract points at the quotation it came from…
+    $pdo->prepare("UPDATE partner_contracts SET quotation_id=? WHERE id=?")->execute([$quotationId, $contractId]);
+    // …and the quotation carries the number and the contract it produced, which
+    // is what every downstream screen actually reads.
+    $pdo->prepare("UPDATE quotations SET contract_number=?, contract_id=?, client_id=COALESCE(client_id, ?) WHERE id=?")
+        ->execute([(string)$c['contract_number'], $contractId, (int)$c['partner_id'], $quotationId]);
+    // A revision chain shares one order, so the whole chain shares the number.
+    $base = (int)($q['parent_id'] ?: $q['id']);
+    try {
+        $pdo->prepare("UPDATE quotations SET contract_number=?, contract_id=? WHERE (id=? OR parent_id=?) AND (contract_number='' OR contract_number IS NULL)")
+            ->execute([(string)$c['contract_number'], $contractId, $base, $base]);
+    } catch (Throwable $e) {}
+    return true;
+}
+// The quotations this client could still have a contract raised against: current,
+// not lost, and with no contract number yet. This is the list the Contracts tab
+// offers, so a contract recorded there can say which order it belongs to.
+function quotations_awaiting_contract($clientId) {
+    $clientId = (int)$clientId;
+    if (!$clientId) return [];
+    return ops_all("SELECT id, quote_no, rev, status, subject, total_amount, created_at
+                    FROM quotations
+                    WHERE client_id=? AND is_current=1
+                      AND (contract_number='' OR contract_number IS NULL)
+                      AND status NOT IN ('LOST','REJECTED')
+                    ORDER BY (status='ACCEPTED') DESC, id DESC", [$clientId]);
+}
+
+// ---------------------------------------------------------------------------
 //  Overrides
 // ---------------------------------------------------------------------------
 // A granted, unused, still-valid override for this quotation and reason.

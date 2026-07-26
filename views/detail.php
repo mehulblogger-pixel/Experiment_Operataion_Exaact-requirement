@@ -117,19 +117,73 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
   </form>
 
 <?php elseif ($tab === 'contracts'): ?>
-  <table class="grid"><tr><th>Contract No.</th><th>Title</th><th>Value</th><th>Start</th><th>End</th></tr>
-    <?php foreach ($contracts as $c): ?><tr><td><?= e($c['contract_number']) ?></td><td><?= e($c['title'] ?: '—') ?></td><td><?= $c['value']!==null?cur_sym().e($c['value']):'—' ?></td><td><?= fdate($c['start_date']) ?></td><td><?= fdate($c['end_date']) ?></td></tr><?php endforeach; ?>
-    <?php if (!$contracts): ?><tr><td colspan="5">No contracts yet.</td></tr><?php endif; ?></table>
+  <?php // A contract and the quotation it came from are two views of one
+        // agreement, so each names the other. Registering the number on the
+        // quotation puts the contract here; recording it here puts the number
+        // back on the quotation. Either way nothing is left saying "pending".
+        $awaiting = function_exists('quotations_awaiting_contract') ? quotations_awaiting_contract($id) : []; ?>
+  <table class="grid"><tr><th>Contract No.</th><th>Against <?= e(Tl('quote')) ?></th><th>Title</th><th>Value</th><th>Start</th><th>End</th></tr>
+    <?php foreach ($contracts as $c):
+      $cq = !empty($c['quotation_id']) ? ops_one("SELECT id, quote_no, rev, total_amount FROM quotations WHERE id=?", [(int)$c['quotation_id']]) : null; ?>
+      <tr><td><?= e($c['contract_number']) ?></td>
+        <td><?php if ($cq): ?><a href="/quote?id=<?= (int)$cq['id'] ?>"><?= e($cq['quote_no']) ?><?= (int)$cq['rev'] ? ' R' . (int)$cq['rev'] : '' ?></a>
+            <?php else: ?><span class="muted">— recorded directly —</span><?php endif; ?></td>
+        <td><?= e($c['title'] ?: '—') ?></td><td><?= $c['value']!==null?cur_sym().e($c['value']):'—' ?></td>
+        <td><?= fdate($c['start_date']) ?></td>
+        <td><?php if (trim((string)$c['end_date']) === ''): ?><span class="pill p-warn">no end date</span>
+            <?php else: ?><?= fdate($c['end_date']) ?><?php endif; ?></td></tr>
+    <?php endforeach; ?>
+    <?php if (!$contracts): ?><tr><td colspan="6">No contracts yet.</td></tr><?php endif; ?></table>
+
+  <?php if ($awaiting): ?>
+    <p class="muted" style="margin-top:10px"><b><?= count($awaiting) ?></b>
+      <?= e(count($awaiting) === 1 ? Tl('quote') : Tlp('quote')) ?> for this <?= e(Tl('client')) ?>
+      <?= count($awaiting) === 1 ? 'has' : 'have' ?> no contract number yet — pick one below and it is filled in on both sides.</p>
+  <?php endif; ?>
+
   <h3 class="tab-sub">Add a contract</h3>
-  <p class="muted">Contracts are usually recorded after a purchase order is received.</p>
+  <p class="muted">Contracts are usually recorded after a purchase order is received. If the order came from a
+    <?= e(Tl('quote')) ?> we raised, name it — the number is written back onto that <?= e(Tl('quote')) ?>,
+    and the value and dates are offered from it.</p>
   <form method="post" action="/partner-add?id=<?= $id ?>&kind=contract" class="inline-add">
     <div class="ff"><label>Contract number</label><input class="form-control" name="contract_number" required></div>
-    <div class="ff"><label>Title</label><input class="form-control" name="title"></div>
+    <div class="ff"><label>Against <?= e(Tl('quote')) ?> <span class="muted">— only those with no contract number</span></label>
+      <select class="form-control searchable" id="ct_quote" name="quotation_id">
+        <option value="">— none / recorded directly —</option>
+        <?php foreach ($awaiting as $aq): ?>
+          <option value="<?= (int)$aq['id'] ?>" data-value="<?= e((string)$aq['total_amount']) ?>" data-title="<?= e($aq['subject'] ?? '') ?>">
+            <?= e($aq['quote_no']) ?><?= (int)$aq['rev'] ? ' R' . (int)$aq['rev'] : '' ?>
+            · <?= e(cur_sym()) ?><?= number_format((float)$aq['total_amount'], 0) ?>
+            · <?= e(lk_options_or('quote_status', QUOTE_STATUS)[$aq['status']] ?? $aq['status']) ?>
+            <?= $aq['subject'] ? ' — ' . e(mb_strimwidth($aq['subject'], 0, 40, '…')) : '' ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+      <?php if (!$awaiting): ?><small class="muted">Every <?= e(Tl('quote')) ?> for this <?= e(Tl('client')) ?> already has a contract number.</small><?php endif; ?></div>
+    <div class="ff"><label>Title</label><input class="form-control" id="ct_title" name="title"></div>
     <div class="ff"><label>SBU</label><select class="form-control searchable" name="sbu"><option value="">—</option><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Value</label><input class="form-control" type="number" name="value"></div>
+    <div class="ff"><label>Value</label><input class="form-control" type="number" step="0.01" id="ct_value" name="value"></div>
     <div class="ff"><label>Start date</label><input class="form-control" type="date" name="start_date"></div>
+    <?php // Without an end date a contract never expires, and the expiry warnings
+          // and the scheduling gate have nothing to work from. It was missing here. ?>
+    <div class="ff"><label>End date <span class="muted">— when cover stops</span></label><input class="form-control" type="date" name="end_date"></div>
+    <div class="ff"><label>Quantity sold <span class="muted">— optional; blank means untracked</span></label><input class="form-control" type="number" step="0.01" name="qty_total"></div>
     <button class="btn small" type="submit">Add Contract</button>
   </form>
+  <script>
+  (function () {
+    // Naming the quotation offers its value and subject, so the two records do
+    // not drift apart over a typo.
+    var q = document.getElementById('ct_quote');
+    if (!q) return;
+    q.addEventListener('change', function () {
+      var o = q.options[q.selectedIndex]; if (!o || !o.value) return;
+      var v = document.getElementById('ct_value'), t = document.getElementById('ct_title');
+      if (v && !v.value && o.dataset.value) v.value = o.dataset.value;
+      if (t && !t.value && o.dataset.title) t.value = o.dataset.title;
+    });
+  })();
+  </script>
 
 <?php elseif ($tab === 'purchase_orders'): ?>
   <?php $ctById = []; foreach ($contracts as $ct) $ctById[$ct['id']] = $ct; ?>
