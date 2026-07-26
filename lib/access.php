@@ -386,15 +386,75 @@ function fy_range($fyLabel) {
     $toTs = strtotime($from . ' +1 year -1 day');
     return [$from, date('Y-m-d', $toTs)];
 }
-// A handful of recent FY labels for the filter dropdown.
-function fy_options($n = 5) {
-    $out = []; $cur = current_fy();
-    $startY = (int)substr($cur, 0, 4);
-    for ($i = 0; $i < $n; $i++) {
-        $y = $startY - $i;
-        $out[] = fy_start_month() === 1 ? (string)$y : sprintf('%d-%02d', $y, ($y + 1) % 100);
+// The FY label for a starting calendar year: 2026 -> "2026-27" (or "2026" when
+// the year starts in January).
+function fy_label($startYear) {
+    $startYear = (int)$startYear;
+    return fy_start_month() === 1 ? (string)$startYear : sprintf('%d-%02d', $startYear, ($startYear + 1) % 100);
+}
+
+// Every financial year the data actually touches, newest first, always
+// including the one we are in.
+//
+// The old version counted backwards from today, so a branch that entered next
+// year's work could not select the year it had just typed, and a five-year-old
+// record was unreachable. This looks at the real span of the data instead: put
+// a job in 2028-29 and 2028-29 appears; open the app in April and the new year
+// is simply there.
+function fy_options($n = 6) {
+    $curStart = (int)substr(current_fy(), 0, 4);
+    $lo = $curStart; $hi = $curStart;
+    $spans = [
+        ['jobs',  ['inspection_end_date', 'inspection_start_date', 'scheduled_date', 'created_at']],
+        ['calls', ['inspection_required_date', 'call_received_date', 'created_at']],
+        ['crm_inquiries', ['created_at']],
+        ['quotations', ['created_at']],
+    ];
+    foreach ($spans as [$table, $cols]) {
+        foreach ($cols as $c) {
+            try {
+                $r = db()->query("SELECT MIN($c) a, MAX($c) b FROM $table WHERE $c IS NOT NULL AND $c <> ''")->fetch();
+            } catch (Throwable $e) { continue; }
+            foreach ([$r['a'] ?? '', $r['b'] ?? ''] as $d) {
+                $d = substr((string)$d, 0, 10);
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) continue;
+                $y = (int)substr(fy_of($d), 0, 4);
+                if ($y < 1990 || $y > 2200) continue;
+                $lo = min($lo, $y); $hi = max($hi, $y);
+            }
+        }
+    }
+    // Always offer the year ahead, so next year's work can be entered before it
+    // starts without anybody having to wait for April.
+    $hi = max($hi, $curStart + 1);
+    // A very old stray date must not produce a hundred-entry dropdown.
+    $lo = max($lo, $hi - max(1, (int)$n) - 4);
+    $out = [];
+    for ($y = $hi; $y >= $lo; $y--) $out[] = fy_label($y);
+    return $out;
+}
+
+// The months of one FY, in the order the year runs: April..March for an April
+// start. Returns ['YYYY-MM' => 'April 2026', ...].
+function fy_months($fyLabel) {
+    [$from] = fy_range($fyLabel);
+    $out = [];
+    for ($i = 0; $i < 12; $i++) {
+        $ts = strtotime($from . " +$i month");
+        $out[date('Y-m', $ts)] = date('F Y', $ts);
     }
     return $out;
+}
+
+// One month inside an FY, or the whole FY. Returns [from, to] as YYYY-MM-DD so
+// every screen filters the same way and no two of them disagree by a day.
+function fy_month_range($fyLabel, $ym = '') {
+    $ym = trim((string)$ym);
+    if ($ym !== '' && preg_match('/^(\d{4})-(\d{1,2})$/', $ym, $m)) {
+        $from = sprintf('%04d-%02d-01', (int)$m[1], (int)$m[2]);
+        return [$from, date('Y-m-t', strtotime($from))];
+    }
+    return fy_range($fyLabel);
 }
 
 // ---- Migration -------------------------------------------------------------

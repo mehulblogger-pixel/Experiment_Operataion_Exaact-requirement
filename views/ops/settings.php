@@ -95,6 +95,17 @@
       <input class="form-control" type="number" step="0.25" min="0.5" max="12" name="half_day_hours" value="<?= e(company_half_day_hours()) ?>">
       <small class="muted">A half day is its own length, not half of a full one — four hours by default, against a full day of
         <?= e(hours_cap()) ?> h. Anybody whose half day differs has their own figure on their person record.</small></div>
+    <?php // The deadline for closing a job, and whether it bites at all. Two days
+          // is what was asked for; a business that works differently changes it
+          // here rather than asking for a code change. ?>
+    <div class="ff"><label>Days to close a <?= e(Tl('job')) ?> after the inspection ends</label>
+      <input class="form-control" type="number" step="1" min="0" max="365" name="job_close_grace_days" value="<?= e((string)job_close_grace_days()) ?>">
+      <small class="muted">Miss it and the <?= e(Tl('job')) ?> locks itself: dates, man-days, expenses and credit
+        are fixed as they stand, and the <?= e(Tl('engineer')) ?>, coordinator, branch manager and administrators are told.
+        Reports and photographs can still be uploaded. A manager can reopen it with a reason.</small></div>
+    <div class="ff ff-check"><label><input type="checkbox" name="job_lock_enabled" value="1" <?= job_lock_enabled() ? 'checked' : '' ?>>
+      Lock <?= e(Tlp('job')) ?> that are not closed in time</label>
+      <small class="muted">Untick to turn the deadline off entirely — nothing locks, and no alerts are sent.</small></div>
     <div class="ff"><label>Employee code prefix <span class="muted">(own staff)</span></label>
       <input class="form-control" name="emp_code_prefix" value="<?= e(setting_get('emp_code_prefix','')) ?>" placeholder="EMP">
       <small class="muted">Sub-contractors stay <code>SC-</code>, freelancers <code>FL-</code>.</small></div>

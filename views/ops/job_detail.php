@@ -1,13 +1,43 @@
+<?php $lock = job_lock_state($job); ?>
 <div class="master-head">
   <div><h1><?= e(T_DETAIL('job', $job['job_code'])) ?></h1>
     <p class="sub"><?= e($job['client_disp'] ?: $job['client_name'] ?: '—') ?> · <?= e($job['inspector_name'] ?: 'Unassigned') ?></p></div>
   <div class="row-actions">
-    <?php if (!$job['closed_flag']): ?><a class="btn" href="/job-close?id=<?= (int)$job['id'] ?>">Close job</a><?php endif; ?>
+    <?php if (!$job['closed_flag'] && !$lock['locked']): ?><a class="btn" href="/job-close?id=<?= (int)$job['id'] ?>">Close job</a><?php endif; ?>
     <?php if (can('mod.idems.edit') || is_master()): ?><a class="btn secondary" href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call='.(int)$job['call_id'] : '' ?>" title="Create an inspection report — all known details are filled in">📑 New report</a><?php endif; ?>
-    <?php if (is_coordinator_level() && !$job['closed_flag']): ?><a class="btn secondary" href="/job-edit?id=<?= (int)$job['id'] ?>">Edit</a><?php endif; ?>
+    <?php if (is_coordinator_level() && !$job['closed_flag'] && !$lock['locked']): ?><a class="btn secondary" href="/job-edit?id=<?= (int)$job['id'] ?>">Edit</a><?php endif; ?>
     <?php if ($job['call_id']): ?><a class="btn secondary" href="/call?id=<?= (int)$job['call_id'] ?>">View call</a><?php endif; ?>
   </div>
 </div>
+
+<?php // The deadline, said out loud while there is still time to act on it —
+      // and after, said plainly, with what can still be done. ?>
+<?php if ($lock['locked']): ?>
+  <div class="msg-error">
+    <strong>🔒 Locked.</strong> <?= e(job_lock_text($lock)) ?>
+    Dates, man-days, expenses and credit are fixed as they stand.
+    <strong>Reports and photographs can still be uploaded</strong> — that is not blocked.
+    <?php if (can_unlock_job()): ?>
+      <form method="post" action="/job-unlock?id=<?= (int)$job['id'] ?>" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div class="ff" style="margin:0;min-width:240px"><label>Why is it being reopened?</label>
+          <input class="form-control" type="text" name="reason" required placeholder="e.g. client confirmed the second visit date late"></div>
+        <div class="ff" style="margin:0;width:120px"><label>For how many days</label>
+          <input class="form-control" type="number" name="days" value="3" min="1" max="30"></div>
+        <button class="btn" type="submit">Reopen it</button>
+      </form>
+      <p class="muted" style="margin-top:6px">The reason and your name are kept with the <?= e(Tl('job')) ?> and written to the audit trail.</p>
+    <?php else: ?>
+      <br>Ask a manager to reopen it if a figure genuinely has to be corrected.
+    <?php endif; ?>
+  </div>
+<?php elseif ($lock['unlocked']): ?>
+  <div class="msg-warning"><strong>Reopened until <?= e($job['unlock_until']) ?>.</strong>
+    <?= e($job['unlock_reason']) ?> — reopened by <?= e($job['unlocked_by']) ?>.
+    Close it before then or it locks again.</div>
+<?php elseif (!$job['closed_flag'] && $lock['left'] !== null && $lock['left'] <= 3): ?>
+  <div class="msg-warning"><strong><?= e(job_lock_text($lock)) ?></strong>
+    After that nothing on it can be changed, and your manager is told.</div>
+<?php endif; ?>
 
 <?php
   // ---- Who to call, and where to go ---------------------------------------

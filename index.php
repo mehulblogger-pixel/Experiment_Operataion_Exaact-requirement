@@ -101,6 +101,8 @@ try {
     require __DIR__ . '/lib/costing.php';
     require __DIR__ . '/lib/reset.php';
     require __DIR__ . '/lib/partnerimport.php';
+    require __DIR__ . '/lib/mis.php';
+    require __DIR__ . '/lib/joblock.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
@@ -184,6 +186,8 @@ try {
     db()->query("SELECT is_outstation FROM calls LIMIT 1");
     db()->query("SELECT id FROM office_expense_heads LIMIT 1");
     db()->query("SELECT id FROM cost_allocations LIMIT 1");
+    db()->query("SELECT locked_at FROM jobs LIMIT 1");
+    db()->query("SELECT contract_number FROM cost_allocations LIMIT 1");
     db()->query("SELECT id FROM security_incidents LIMIT 1");
     db()->query("SELECT id FROM data_requests LIMIT 1");
     db()->query("SELECT id FROM data_consents LIMIT 1");

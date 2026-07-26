@@ -2,10 +2,17 @@
   $today = date('Y-m-d');
   $seeCredit = can('data.credit');
   // quick counts over the shown set
-  $nOpen = 0; $nOverdue = 0; $nClosed = 0;
+  $nOpen = 0; $nOverdue = 0; $nClosed = 0; $nLocked = 0; $nDueSoon = 0;
+  $locks = [];
   foreach ($rows as $j) {
     if ($j['closed_flag']) { $nClosed++; }
     else { $nOpen++; $end = $j['inspection_end_date'] ?: $j['scheduled_date']; if ($end && $end < $today) $nOverdue++; }
+    // The deadline is only useful while there is still time to act on it, so
+    // it belongs in the register and not only on the job itself.
+    $st = job_lock_state($j);
+    $locks[(int)$j['id']] = $st;
+    if ($st['locked']) $nLocked++;
+    elseif (!$j['closed_flag'] && $st['left'] !== null && $st['left'] <= 1) $nDueSoon++;
   }
 ?>
 <div class="master-head">
@@ -18,6 +25,8 @@
   <span class="ct">Showing <b><?= count($rows) ?></b></span>
   <span class="ct"><span class="dot dot-warn"></span><?= $nOpen ?> open</span>
   <?php if ($nOverdue): ?><span class="ct"><span class="dot dot-bad"></span><?= $nOverdue ?> overdue</span><?php endif; ?>
+  <?php if ($nLocked): ?><span class="ct"><span class="dot dot-bad"></span><?= $nLocked ?> locked</span><?php endif; ?>
+  <?php if ($nDueSoon): ?><span class="ct"><span class="dot dot-warn"></span><?= $nDueSoon ?> due to be closed</span><?php endif; ?>
   <span class="ct"><span class="dot dot-ok"></span><?= $nClosed ?> closed</span>
 </div>
 
@@ -85,10 +94,18 @@
           <?php elseif ($overdue): ?><span class="pill p-bad">Overdue</span>
           <?php else: ?><span class="pill p-warn">Open</span><?php endif; ?>
           <?php if ($seeCredit && $money): ?><span class="pill <?= $money[1] ?>" style="margin-left:4px"><?= $money[0] ?></span><?php endif; ?>
+          <?php $lk = $locks[(int)$j['id']] ?? null; ?>
+          <?php if ($lk && $lk['locked']): ?>
+            <span class="pill p-bad" style="margin-left:4px" title="<?= e(job_lock_text($lk)) ?>">🔒 Locked</span>
+          <?php elseif ($lk && $lk['unlocked']): ?>
+            <span class="pill p-info" style="margin-left:4px">Reopened</span>
+          <?php elseif ($lk && !$j['closed_flag'] && $lk['left'] !== null && $lk['left'] <= 1): ?>
+            <span class="pill p-warn" style="margin-left:4px" title="<?= e(job_lock_text($lk)) ?>">Closes <?= $lk['left'] === 0 ? 'today' : 'tomorrow' ?></span>
+          <?php endif; ?>
         </td>
         <td style="white-space:nowrap">
           <a class="btn small secondary" href="/job?id=<?= (int)$j['id'] ?>">Open</a>
-          <?php if (!$j['closed_flag']): ?><a class="btn small" href="/job-close?id=<?= (int)$j['id'] ?>">Close</a><?php endif; ?>
+          <?php if (!$j['closed_flag'] && !($lk && $lk['locked'])): ?><a class="btn small" href="/job-close?id=<?= (int)$j['id'] ?>">Close</a><?php endif; ?>
         </td>
       </tr>
     <?php endforeach; ?>

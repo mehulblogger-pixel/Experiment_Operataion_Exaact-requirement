@@ -1490,7 +1490,7 @@ function ops_module_gate($route) {
     $base = (strncmp($route, 'm/', 2) === 0) ? 'masters' : $route;
     static $map = [
         'calls'=>'calls','call'=>'calls','call-new'=>'calls','call-edit'=>'calls','call-delete'=>'calls',
-        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-invoice'=>'invoicing','job-advance'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
+        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-advance'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
         'invoicing'=>'invoicing',
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring',
@@ -1509,7 +1509,7 @@ function ops_module_gate($route) {
         'document-smart'=>'idems','document-release-note'=>'idems','document-review'=>'idems','document-evidence'=>'idems',
         'masters'=>'masters','work-norms'=>'masters',
         'office-finance'=>'overheads','cost-run'=>'overheads',
-        'sbu-pl'=>'profitability',
+        'sbu-pl'=>'profitability','mis'=>'reports',
         'reports'=>'reports',
         'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users','org-template'=>'users',
         'user-unlock'=>'users','user-2fa-reset'=>'users','user-retire'=>'users',
@@ -1667,6 +1667,10 @@ function ops_dispatch($route, $method) {
             return ops_org_template();
         case $route === 'reset-data':
             ops_reset_data($method); return true;
+        case $route === 'job-unlock':
+            ops_job_unlock($method); return true;
+        case $route === 'mis':
+            ops_mis($method); return true;
         case $route === 'cost-run':
             ops_cost_run($method); return true;
         case $route === 'sbu-pl':
@@ -3084,6 +3088,9 @@ function ops_jobs($route, $method) {
         }
         if ($method === 'POST') {
             $b = $_POST;
+            // A job that ran out of time is fixed as it stands. Documents can
+            // still be uploaded; figures cannot be rewritten weeks later.
+            if ($job && ($why = job_lock_block($job)) !== '') { flash($why, 'error'); redirect('/job?id=' . $job['id']); }
             $fields = ['executing_office_id','inspector_id','subcon_id','job_type','stage','scheduled_date','inspection_start_date','inspection_end_date',
                 'random_date1','random_date2','random_date3','folder_link','contract_number','inspection_dates','boss_id','expected_credit','credit_type','credit_direction',
                 'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays','subcon_cost','quotation_id','is_outstation'];
@@ -3170,6 +3177,7 @@ function ops_jobs($route, $method) {
         ops_require(is_coordinator_level() || can('data.credit') || can('finance.reconcile'), 'You cannot update advance status.');
         $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$job) { http_response_code(404); view('notfound'); return; }
+        if (($why = job_lock_block($job)) !== '') { flash($why, 'error'); redirect('/job?id=' . $job['id']); }
         $pdo->prepare("UPDATE jobs SET adv_received=? WHERE id=?")->execute([!empty($_POST['adv_received']) ? 1 : 0, $job['id']]);
         flash(!empty($_POST['adv_received']) ? 'Advance marked received — scheduling can proceed.' : 'Advance marked NOT received.');
         redirect('/job?id=' . $job['id']);
@@ -3209,6 +3217,10 @@ function ops_jobs($route, $method) {
         if (!$job) { http_response_code(404); view('notfound'); return; }
         if ($method === 'POST') {
             $b = $_POST;
+            // Past the deadline the engineer can no longer close it themselves —
+            // the whole point of the lock is that late figures are not simply
+            // typed in later as if nothing happened.
+            if (($why = job_lock_block($job)) !== '') { flash($why, 'error'); redirect('/job?id=' . $job['id']); }
             // A job closes once. Without this, every re-post of the closure form —
             // a refresh, a back-and-resend, the offline queue re-sending an entry
             // the server had already taken — filed another set of expenses against
@@ -4051,6 +4063,10 @@ function ops_settings($method) {
         $wd = (float)($_POST['default_weekly_days'] ?? 6);
         setting_set('default_weekly_days', in_array($wd, [5.0, 5.5, 6.0], true) ? $wd : 6);
         setting_set('emp_code_prefix', strtoupper(trim($_POST['emp_code_prefix'] ?? '')));
+        // How long an engineer has to close a job before it locks itself.
+        $gd = trim((string)($_POST['job_close_grace_days'] ?? ''));
+        if ($gd !== '') setting_set('job_close_grace_days', (string)max(0, min(365, (int)$gd)));
+        setting_set('job_lock_enabled', !empty($_POST['job_lock_enabled']) ? '1' : '0');
         // Default terms & conditions carried onto every new quote.
         if (isset($_POST['quote_terms'])) setting_set('quote_terms', (string)$_POST['quote_terms']);
         // Display

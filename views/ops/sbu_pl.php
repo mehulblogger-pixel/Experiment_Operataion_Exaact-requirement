@@ -9,6 +9,7 @@ $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); 
   <div><h1><?= e(T('sbu')) ?> profit &amp; loss — <?= e($mName) ?></h1>
     <p class="sub">Revenue billed against the cost that landed on it. Real money on both sides.</p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <a class="btn ghost" href="/mis?fy=<?= e(fy_of($ym . '-01')) ?>&amp;m=<?= e($ym) ?>&amp;office=<?= (int)$sel ?>">Management dashboard</a>
     <a class="btn ghost" href="/cost-run?office=<?= (int)$sel ?>&amp;m=<?= e($ym) ?>">Month-end run</a>
     <a class="btn ghost" href="/office-finance?tab=actual&amp;office=<?= (int)$sel ?>&amp;m=<?= e($ym) ?>">Enter <?= e(Tl('office')) ?> costs</a>
   </div>
@@ -50,6 +51,7 @@ $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); 
   <table class="grid">
     <tr><th><?= e(T('sbu')) ?></th><th style="text-align:right">Revenue</th>
         <th style="text-align:right">Engineers</th><th style="text-align:right">Other salary</th>
+        <th style="text-align:right">Sub-contractor</th>
         <th style="text-align:right"><?= e(TH('office')) ?> costs</th>
         <th style="text-align:right">Total cost</th><th style="text-align:right">Profit</th><th style="width:90px">Margin</th></tr>
     <?php foreach ($rows as $sbu => $r): $p = $r['revenue'] - $r['cost']; ?>
@@ -58,13 +60,14 @@ $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); 
       <td style="text-align:right"><?= $money($r['revenue']) ?></td>
       <td style="text-align:right"><?= $money($r['engineers']) ?></td>
       <td style="text-align:right"><?= $money($r['staff']) ?></td>
+      <td style="text-align:right"><?= $money($r['subcon'] ?? 0) ?></td>
       <td style="text-align:right"><?= $money($r['office']) ?></td>
       <td style="text-align:right"><?= $money($r['cost']) ?></td>
       <td style="text-align:right"><strong><?= $money($p) ?></strong></td>
       <td><span class="pill <?= $pill($p) ?>"><?= $r['revenue'] > 0 ? round($p / $r['revenue'] * 100, 1) . '%' : '—' ?></span></td>
     </tr>
     <?php endforeach; ?>
-    <?php if (!$rows): ?><tr><td colspan="8">Nothing billed and nothing costed for <?= e($mName) ?>.</td></tr><?php endif; ?>
+    <?php if (!$rows): ?><tr><td colspan="9">Nothing billed and nothing costed for <?= e($mName) ?>.</td></tr><?php endif; ?>
   </table>
   </div>
   <p class="muted" style="margin-top:8px">A <?= e(Tl('sbu')) ?> can show a loss while the branch as a whole is profitable — that is the point of the split. Revenue counts a <?= e(Tl('job')) ?> in the month its inspection finished.</p>
