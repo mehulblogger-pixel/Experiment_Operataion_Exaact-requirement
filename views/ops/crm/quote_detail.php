@@ -68,10 +68,14 @@
 
 <?php if (!empty($locked)): ?>
 <div class="panel" style="border:1px solid var(--warn)">
-  <b>🔒 Locked.</b> <span class="muted">This <?= e(Tl('quote')) ?> is
-  <?= e(strtolower(lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st)) ?>, so it can no longer be edited.
-  Only the Super Admin can re-open it, and only against a request raised here.</span>
-  <?php if ($editReq): ?>
+  <b>🔒 Locked.</b> <span class="muted"><?= e($lockReason ?? '') ?></span>
+  <?php if ($st === 'SENT' || trim((string)($q['sent_at'] ?? '')) !== ''): ?>
+    <div style="margin-top:8px">
+      <button class="btn small" type="button" onclick="document.getElementById('revbox').style.display='block';document.getElementById('revbox').scrollIntoView({behavior:'smooth'})">Raise a revision</button>
+      <span class="muted" style="margin-left:6px">A revision keeps the same <?= e(Tl('quote')) ?> number, takes the next revision number,
+        carries every line and site across, and goes through approval again before it can be sent.</span>
+    </div>
+  <?php elseif ($editReq): ?>
     <div style="margin-top:8px"><span class="pill p-warn">Request pending</span>
       <span class="muted">raised by <?= e($editReq['requested_by']) ?> — “<?= e($editReq['reason']) ?>”</span></div>
   <?php else: ?>
@@ -128,7 +132,10 @@
   <?php if (in_array($st, ['DRAFT','REJECTED','PENDING_APPROVAL','APPROVED','SENT'], true)): ?>
     <button class="btn small danger" type="button" onclick="document.getElementById('lostbox').style.display='block'">Mark lost</button>
   <?php endif; ?>
-  <?php if ($canEdit && in_array($st, ['SENT','APPROVED','ACCEPTED','LOST','REJECTED'], true)): ?>
+  <?php // Revising is how a sent quotation is changed, so this is deliberately NOT
+        // gated on the edit lock — otherwise the only correct action would be the
+        // one greyed out. ?>
+  <?php if (!empty($canRevise) && in_array($st, ['SENT','APPROVED','ACCEPTED','LOST','REJECTED'], true)): ?>
     <button class="btn small secondary" type="button" onclick="document.getElementById('revbox').style.display='block'" style="margin-left:auto">Revise (new rev)</button>
   <?php endif; ?>
 </div>
@@ -172,6 +179,19 @@
     <?php endforeach; ?>
     </tbody>
   </table>
+  <?php // Everybody approves the wrong thing once. While it is still inside the
+        // building that is a mistake, not an event. ?>
+  <?php if (!empty($canRetract)): ?>
+  <form method="post" action="/quote-unapprove?id=<?= (int)$q['id'] ?>"
+        style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--line);padding-top:10px">
+    <div class="ff" style="margin:0;flex:1;min-width:260px"><label>Approved it by mistake? Take it back</label>
+      <input class="form-control" name="reason" placeholder="why you are taking it back (optional)"></div>
+    <button class="btn small secondary" type="submit"
+      onclick="return confirm('Take your approval back? The quotation goes to waiting-for-approval again, and any level approved after yours is reset with it.')">Take my approval back</button>
+  </form>
+  <p class="muted" style="margin-top:6px">Possible only while the <?= e(Tl('quote')) ?> is still inside the company.
+    Once it has gone to the <?= e(Tl('client')) ?> it cannot be taken back — raise a revision instead.</p>
+  <?php endif; ?>
   <p class="muted" style="margin-top:6px">It becomes <strong>Approved</strong> once every level has approved. A rejection needs a comment and marks the whole <?= e(Tl('quote')) ?> as rejected. Configure the chain under <a href="/approval-rules?module=quote">Approval rules</a>.</p>
 </div>
 <?php endif; ?>
