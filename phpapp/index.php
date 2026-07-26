@@ -102,6 +102,7 @@ try {
     require __DIR__ . '/lib/reset.php';
     require __DIR__ . '/lib/partnerimport.php';
     require __DIR__ . '/lib/mis.php';
+    require __DIR__ . '/lib/dedupe.php';
     require __DIR__ . '/lib/joblock.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
@@ -187,6 +188,7 @@ try {
     db()->query("SELECT id FROM office_expense_heads LIMIT 1");
     db()->query("SELECT id FROM cost_allocations LIMIT 1");
     db()->query("SELECT locked_at FROM jobs LIMIT 1");
+    db()->query("SELECT quotation_id FROM partner_purchase_orders LIMIT 1");
     db()->query("SELECT contract_number FROM cost_allocations LIMIT 1");
     db()->query("SELECT id FROM security_incidents LIMIT 1");
     db()->query("SELECT id FROM data_requests LIMIT 1");
@@ -351,6 +353,12 @@ if ($route === 'logout') {
 
 // --- Everything below requires login ---
 require_login();
+
+// Once a day, on the first page somebody opens: lock the jobs that ran out of
+// time and tell the four people who need to know. The rule bites on screen
+// whether or not this runs; this is what sends the message when the host's cron
+// has not been set up yet.
+if (function_exists('joblock_sweep_daily')) joblock_sweep_daily();
 
 // A laptop left open on a client's site is the realistic risk, not a clever
 // attack. An idle session, and a session that has simply run long enough, both
@@ -556,10 +564,11 @@ if ($route === 'partner-add' && $method === 'POST') {
         $title = trim((string)($b['title'] ?? '')) ?: (string)($quote['subject'] ?? '');
         $value = ($b['value'] ?? '') !== '' ? $b['value'] : ($quote ? $quote['total_amount'] : null);
 
-        $pdo->prepare("INSERT INTO partner_purchase_orders (partner_id,contract_id,sbu,po_number,po_type,title,value,start_date,end_date,notes) VALUES (?,?,?,?,?,?,?,?,?,?)")
-            ->execute([$p['id'], $contractId, $poSbu, $b['po_number'] ?? '', $b['po_type'] ?? 'REGULAR',
+        $pdo->prepare("INSERT INTO partner_purchase_orders (partner_id,contract_id,quotation_id,sbu,po_number,po_type,title,value,start_date,end_date,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+            ->execute([$p['id'], $contractId, $qid ?: null, $poSbu, $b['po_number'] ?? '', $b['po_type'] ?? 'REGULAR',
                        $title, $value, $b['start_date'] ?? '', $b['end_date'] ?? '', $b['notes'] ?? '']);
         $poId = (int)$pdo->lastInsertId();
+        if ($qid) $pdo->prepare("UPDATE partner_purchase_orders SET lines_synced_at=? WHERE id=?")->execute([date('c'), $poId]);
 
         // Every line of the quotation becomes a line of the order, with the
         // quantity and the rate it was quoted at. Consumption is tracked against
@@ -659,6 +668,17 @@ if ($route === 'po') {
     $s->execute([(int)($_GET['id'] ?? 0)]);
     $po = $s->fetch();
     if (!$po) { http_response_code(404); return view('notfound'); }
+    if ($method === 'POST' && ($_POST['do'] ?? '') === 'pull-quote') {
+        // The quotation has been revised since this order was raised. Pull the
+        // lines through again rather than making somebody re-key twelve of them.
+        $qid = (int)($_POST['quotation_id'] ?? 0) ?: (int)($po['quotation_id'] ?? 0);
+        $res = function_exists('po_pull_quote_lines') ? po_pull_quote_lines($po['id'], $qid) : ['ok' => false, 'error' => 'Not available.'];
+        if (!$res['ok']) { flash($res['error'], 'error'); redirect('/po?id=' . $po['id']); }
+        $sum = (float)$pdo->query("SELECT COALESCE(SUM(total_amount),0) FROM po_line_items WHERE purchase_order_id=" . (int)$po['id'])->fetchColumn();
+        $pdo->prepare("UPDATE partner_purchase_orders SET value=? WHERE id=?")->execute([$sum ?: null, $po['id']]);
+        flash($res['count'] . ' line item(s) taken from the quotation. Anything typed here before has been replaced.');
+        redirect('/po?id=' . $po['id']);
+    }
     if ($method === 'POST') {
         $b = $_POST;
         $qty = (float)($b['quantity'] ?? 0); $rate = (float)($b['rate'] ?? 0); $gst = (float)($b['gst_pct'] ?? 0);
@@ -692,6 +712,7 @@ if ($route === 'po') {
     foreach ($poSbus as $sc) foreach (($actBySbu[$sc] ?? []) as $a) $poActivities[] = $a;
     if (!$poActivities) foreach ($actBySbu as $list) foreach ($list as $a) $poActivities[] = $a; // fallback: all
     return view('po_detail', ['po' => $po, 'items' => $li->fetchAll(), 'skillsByTrade' => skills_by_trade(),
+        'quoteState' => function_exists('po_quote_status') ? po_quote_status($po) : null,
         'trades' => lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [], 'poActivities' => $poActivities]);
 }
 

@@ -151,8 +151,12 @@ function mis_summary(array $F) {
     $sortByJobs   = function ($x) { uasort($x, function ($a, $b) { return $b['jobs'] <=> $a['jobs']; }); return $x; };
     ksort($byMonth);
 
+    $avail = mis_available_days($F);
     return [
         'jobs' => $jobs, 'tot' => $tot, 'seeSalary' => $seeSalary,
+        'available' => $avail,
+        'utilisation' => $avail > 0 ? round($tot['mandays'] / $avail * 100, 1) : null,
+        'lastYear' => mis_last_year($F),
         'bySbu' => $sortByProfit($bySbu), 'byActivity' => $sortByProfit($byActivity),
         'byOffice' => $sortByProfit($byOffice), 'byInspector' => $sortByJobs($byInspector),
         'byIbo' => $sortByJobs($byIbo), 'byClient' => $sortByProfit($byClient),
@@ -160,6 +164,56 @@ function mis_summary(array $F) {
         'shared' => $shared,
         'sharedTotal' => array_sum(array_column($shared, 'amount')),
     ];
+}
+
+// How many days the engineers in this period actually had. Utilisation is
+// man-days worked against days available — without the second half it is a
+// count, not a percentage, and a count cannot tell you whether a branch is
+// stretched or idle.
+function mis_available_days(array $F) {
+    // The engineers who appear in the period, or every active one when the
+    // filter does not name a person.
+    $w = ["status='ACTIVE'"]; $a = [];
+    if ($F['inspector']) { $w[] = 'id = ?'; $a[] = $F['inspector']; }
+    if ($F['office'])    { $w[] = 'home_office_id = ?'; $a[] = $F['office']; }
+    $n = (int)ops_val("SELECT COUNT(*) FROM inspectors WHERE " . implode(' AND ', $w), $a);
+    if (!$n) return 0;
+    // Working days across the months the filter covers.
+    $days = 0;
+    $ts = strtotime($F['from']); $end = strtotime($F['to']);
+    while ($ts <= $end) {
+        $days += working_days_in_month((int)date('Y', $ts), (int)date('n', $ts));
+        $ts = strtotime(date('Y-m-01', $ts) . ' +1 month');
+    }
+    return $n * $days;
+}
+
+// The same period, one year earlier. Everything else about the filter is kept,
+// so "up on last year" means up on the same slice of last year and not on some
+// other set of work.
+function mis_last_year(array $F) {
+    $back = function ($d) { return date('Y-m-d', strtotime($d . ' -1 year')); };
+    $P = $F;
+    $P['from'] = $back($F['from']);
+    $P['to']   = $back($F['to']);
+    $jobs = mis_jobs($P);
+    $out = ['jobs' => 0, 'revenue' => 0, 'cost' => 0, 'profit' => 0, 'mandays' => 0,
+            'from' => $P['from'], 'to' => $P['to']];
+    foreach ($jobs as $j) {
+        $p = job_profit($j);
+        $out['jobs']++;
+        $out['mandays'] += $p['mandays'];
+        $out['revenue'] += $p['credit'];
+        $out['cost']    += $p['labour'] + $p['expenses'] + $p['subcon'];
+        $out['profit']  += $p['credit'] - $p['labour'] - $p['expenses'] - $p['subcon'];
+    }
+    return $out;
+}
+// "+18.4%" / "−6%" / '' when there is nothing to compare against.
+function mis_change($now, $then) {
+    $then = (float)$then;
+    if (abs($then) < 0.005) return null;
+    return round((((float)$now - $then) / abs($then)) * 100, 1);
 }
 
 // What the month-end run allocated to each SBU over the filtered period. This

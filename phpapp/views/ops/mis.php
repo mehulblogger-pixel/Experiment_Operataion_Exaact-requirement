@@ -5,6 +5,15 @@ $money = function ($v) { return ($v < 0 ? '−₹' : '₹') . number_format(abs(
 $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); };
 $avg   = function ($r) { return $r['delayCounted'] ? round($r['delayDays'] / $r['delayCounted'], 1) : null; };
 $period = $F['m'] !== '' ? ($F['months'][$F['m']] ?? $F['m']) : 'FY ' . $F['fy'];
+$LY = $S['lastYear'];
+// "up 18% on last year" only means something if there WAS a last year.
+$vs = function ($now, $then, $money = false) use ($LY) {
+    $pct = mis_change($now, $then);
+    if ($pct === null) return '<span class="muted">no figure a year ago</span>';
+    $cls = $pct > 0 ? 'p-ok' : ($pct < 0 ? 'p-bad' : 'p-mut');
+    return '<span class="pill ' . $cls . '">' . ($pct > 0 ? '+' : '') . $pct . '%</span>'
+         . ' <span class="muted">vs ' . ($money ? '₹' . number_format((float)$then, 0) : (float)$then) . ' last year</span>';
+};
 $qs = function ($extra = []) use ($F) {
     $q = ['fy'=>$F['fy'], 'm'=>$F['m'], 'sbu'=>$F['sbu'], 'activity'=>$F['activity'],
           'office'=>$F['office'] ?: '', 'ibo'=>$F['ibo'] ?: '', 'inspector'=>$F['inspector'] ?: '',
@@ -100,16 +109,24 @@ $table = function ($rows, $head, $exportKey) use ($money, $pill, $avg, $sal, $qs
 
 <div class="kpi-row">
   <div class="kpi"><span class="k-lab">Inspections</span><span class="k-val"><?= (int)$tot['jobs'] ?></span>
-    <span class="k-sub"><?= (int)$tot['closed'] ?> closed · <?= (int)$tot['open'] ?> still open</span></div>
+    <span class="k-sub"><?= (int)$tot['closed'] ?> closed · <?= (int)$tot['open'] ?> still open</span>
+    <span class="k-sub"><?= $vs($tot['jobs'], $LY['jobs']) ?></span></div>
   <div class="kpi"><span class="k-lab">Man-days</span><span class="k-val"><?= round($tot['mandays'], 1) ?></span>
-    <span class="k-sub"><?= $tot['jobs'] ? round($tot['mandays'] / $tot['jobs'], 1) : 0 ?> per inspection</span></div>
+    <span class="k-sub"><?= $tot['jobs'] ? round($tot['mandays'] / $tot['jobs'], 1) : 0 ?> per inspection</span>
+    <span class="k-sub"><?= $vs(round($tot['mandays'], 1), round($LY['mandays'], 1)) ?></span></div>
+  <div class="kpi"><span class="k-lab">Utilisation</span>
+    <span class="k-val"><?= $S['utilisation'] === null ? '—' : $S['utilisation'] . '%' ?></span>
+    <span class="k-sub"><?= $S['available'] ? round($tot['mandays'], 1) . ' worked of ' . (int)$S['available'] . ' available' : 'no engineers in this filter' ?></span>
+    <span class="k-sub"><?= e($S['available'] ? 'working days less holidays, across every engineer in the filter' : '') ?></span></div>
   <div class="kpi"><span class="k-lab">Revenue</span><span class="k-val"><?= $money($tot['revenue']) ?></span>
-    <span class="k-sub"><?= $money($tot['invoiced']) ?> invoiced · <?= $money($tot['paid']) ?> received</span></div>
+    <span class="k-sub"><?= $money($tot['invoiced']) ?> invoiced · <?= $money($tot['paid']) ?> received</span>
+    <span class="k-sub"><?= $vs($tot['revenue'], $LY['revenue'], true) ?></span></div>
   <?php if ($sal): ?>
   <div class="kpi"><span class="k-lab">Direct cost</span><span class="k-val"><?= $money($tot['cost']) ?></span>
     <span class="k-sub"><?= $money($tot['labour']) ?> time · <?= $money($tot['expenses']) ?> expenses · <?= $money($tot['subcon']) ?> sub-con</span></div>
   <div class="kpi"><span class="k-lab">Profit before branch costs</span><span class="k-val"><?= $money($tot['profit']) ?></span>
-    <span class="k-sub"><?= $tot['revenue'] > 0 ? round($tot['profit'] / $tot['revenue'] * 100, 1) . '% margin' : 'no revenue' ?></span></div>
+    <span class="k-sub"><?= $tot['revenue'] > 0 ? round($tot['profit'] / $tot['revenue'] * 100, 1) . '% margin' : 'no revenue' ?></span>
+    <span class="k-sub"><?= $vs($tot['profit'], $LY['profit'], true) ?></span></div>
   <div class="kpi"><span class="k-lab">Branch costs allocated</span><span class="k-val"><?= $money($S['sharedTotal']) ?></span>
     <span class="k-sub"><?= $S['sharedTotal'] > 0 ? 'from the month-end run' : 'month-end run not stored yet' ?></span></div>
   <div class="kpi"><span class="k-lab">Profit after branch costs</span>
@@ -203,6 +220,8 @@ $table = function ($rows, $head, $exportKey) use ($money, $pill, $avg, $sal, $qs
     <li><strong>Revenue</strong> is the invoice where one has been raised, otherwise the expected credit on the <?= e(Tl('job')) ?>.</li>
     <li><strong>Delay</strong> is the days between the date the <?= e(Tl('client')) ?> asked for and the date actually scheduled. A <?= e(Tl('job')) ?> missing either date is left out of the average rather than counted as nil.</li>
     <li><strong>Direct cost</strong> is the <?= e(Tl('engineer')) ?>'s time on the <?= e(Tl('job')) ?>, its expenses and its sub-contractor. Branch salaries and overheads are not pushed onto a <?= e(Tl('job')) ?> — see <a href="/sbu-pl"><?= e(T('sbu')) ?> profit &amp; loss</a>.</li>
+    <li><strong>Utilisation</strong> is man-days worked against days available — working days in the period, less holidays, across every <?= e(Tl('engineer')) ?> the filter covers.</li>
+    <li><strong>Against last year</strong> compares the same slice of the calendar a year earlier (<?= e(fdate($LY['from'])) ?> to <?= e(fdate($LY['to'])) ?>), with every other filter unchanged. A period with nothing a year ago says so rather than showing a made-up percentage.</li>
     <li>You only see the <?= e(Tlp('office')) ?> your account is scoped to, exactly as on every register.</li>
   </ul>
 </div>
