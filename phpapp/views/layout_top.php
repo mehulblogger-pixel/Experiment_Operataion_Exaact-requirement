@@ -190,10 +190,18 @@
       <span class="tb-user">
         <a href="/my-signature" class="tb-sig" title="Upload or draw the signature that goes on your approved documents and quotations">✍️ <span>Signature</span></a>
         <a href="/change-password" title="Change password">🔑</a>
+        <a href="/two-factor" title="Two-step sign-in — a code from your phone as well as your password"><?= twofa_on($u) ? '🛡️' : '🛡' ?></a>
         <a class="tb-logout" href="/logout">Logout</a>
       </span>
     </header>
     <main class="container">
+<?php // A role that has been told to use two-step sign-in but has not set it up
+      // is nudged on every screen. Not locked out — an inspector who cannot reach
+      // Monday's jobs because of a security setting will simply stop using the app. ?>
+<?php if (twofa_owed($u)): ?>
+      <div class="msg msg-warning">Your role requires two-step sign-in and it is not set up yet.
+        <a href="/two-factor"><strong>Set it up now</strong></a> — it takes about a minute and needs only your phone.</div>
+<?php endif; ?>
 <?php foreach (take_flash() as $m): ?>
       <div class="msg msg-<?= e($m['tag']) ?>"><?= e($m['text']) ?></div>
 <?php endforeach; ?>

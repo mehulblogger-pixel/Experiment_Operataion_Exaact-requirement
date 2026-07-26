@@ -132,6 +132,37 @@
       <small class="muted">These are highlighted in red on the audit trail and counted as "high-risk".</small></div>
   </div>
 
+  <h3 class="tab-sub">Security</h3>
+  <p class="sub" style="margin-bottom:10px">
+    These choose how strict each guard is. None of them switches a guard off — a password is always
+    scrambled before it is stored, every save is always checked for where it came from, and every
+    sign-in is always recorded, whatever is set here.
+  </p>
+  <div class="form-grid">
+    <div class="ff"><label>Shortest password allowed</label>
+      <input class="form-control" type="number" min="8" max="64" name="pwd_min_len" value="<?= (int)pwd_min_len() ?>">
+      <small class="muted">Applied the moment a password is chosen. A letter and a number are always required.</small></div>
+    <div class="ff"><label>Force a new password after (days)</label>
+      <input class="form-control" type="number" min="0" max="730" name="pwd_max_age_days" value="<?= (int)pwd_max_age_days() ?>" placeholder="0 = never">
+      <small class="muted">0 means never. Set 90 or 180 only if a client contract asks for it — forced rotation tends to push people towards weaker passwords they can remember.</small></div>
+    <div class="ff"><label>Sign out after idle (minutes)</label>
+      <input class="form-control" type="number" min="5" max="1440" name="session_idle_min" value="<?= (int)session_idle_min() ?>">
+      <small class="muted">A laptop left open at a client's plant is the real risk here.</small></div>
+    <div class="ff"><label>Sign out after (hours) regardless</label>
+      <input class="form-control" type="number" min="1" max="168" name="session_max_hours" value="<?= (int)session_max_hours() ?>">
+      <small class="muted">Ends even a session somebody keeps awake.</small></div>
+    <div class="ff"><label>Keep the audit trail for (days)</label>
+      <input class="form-control" type="number" min="180" max="3650" name="audit_retain_days" value="<?= (int)audit_retain_days() ?>">
+      <small class="muted">The CERT-In directions require at least 180 days, so that is the floor. 400 covers a full year plus an audit cycle.</small></div>
+    <div class="ff ff-wide"><label>Roles that must use two-step sign-in</label>
+      <div class="chip-row">
+        <?php $tr = twofa_required_roles(); foreach (ORG_ROLES as $rk=>$rl): ?>
+          <label class="ff-check"><input type="checkbox" name="twofa_roles[]" value="<?= e($rk) ?>" <?= in_array($rk,$tr,true)?'checked':'' ?>> <?= e($rl) ?></label>
+        <?php endforeach; ?>
+      </div>
+      <small class="muted">People in these roles are asked to set it up at their next sign-in and cannot turn it off themselves. Start with the roles that can move money or change permissions.</small></div>
+  </div>
+
   <h3 class="tab-sub">Email — automatic sending (Office 365 SMTP)</h3>
   <p class="sub" style="margin-bottom:10px">Fill these to send assignment / closure / reminder emails <strong>automatically</strong> from your mailbox. Leave blank to keep the current behaviour (emails are logged and opened in Outlook to send by hand).</p>
   <div class="form-grid">

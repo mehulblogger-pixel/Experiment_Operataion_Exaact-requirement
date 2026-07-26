@@ -65,11 +65,30 @@
 
   <main class="auth-side">
     <div class="card">
+      <?php if (($stage ?? 'password') === 'code'): ?>
+      <?php // The password was right. Nobody is signed in yet — the session only
+            // knows who is half-way through, and drops that after five minutes. ?>
+      <div class="hi">One more step</div>
+      <h2>Enter your code</h2>
+      <p class="s">Open your authenticator app and type the six digits showing for
+        <strong><?= e(app_name()) ?></strong>. If your phone is not with you, use one of your recovery codes instead.</p>
+      <?php if (!empty($error)): ?><div class="err"><?= e($error) ?></div><?php endif; ?>
+      <form method="post" action="/login">
+        <input type="hidden" name="stage" value="code">
+        <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+        <div class="fld"><label for="c">Six-digit code</label>
+          <div class="wrap"><input id="c" name="code" type="text" inputmode="numeric" autocomplete="one-time-code"
+            autofocus required placeholder="000000" style="letter-spacing:.34em;font-size:20px;text-align:center"></div></div>
+        <button class="go" type="submit">Verify →</button>
+      </form>
+      <p class="help">Lost the phone and the recovery codes? Your <strong>office administrator</strong> can turn the second step off for your account.</p>
+      <?php else: ?>
       <div class="hi">Welcome back</div>
       <h2>Sign in to continue</h2>
       <p class="s">Enter your credentials to reach your office dashboard.</p>
       <?php if (!empty($error)): ?><div class="err"><?= e($error) ?></div><?php endif; ?>
       <form method="post" action="/login">
+        <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
         <div class="fld"><label for="u">Username</label>
           <div class="wrap"><input id="u" name="username" type="text" autocomplete="username" autofocus required placeholder="e.g. m.prajapati"></div></div>
         <div class="fld"><label for="p">Password</label>
@@ -78,6 +97,7 @@
         <button class="go" type="submit">Sign in →</button>
       </form>
       <p class="help">No account? Ask your <strong>office administrator</strong> to create one.</p>
+      <?php endif; ?>
       <div class="ver"><?= e(app_name()) ?> · v1.0</div>
     </div>
   </main>

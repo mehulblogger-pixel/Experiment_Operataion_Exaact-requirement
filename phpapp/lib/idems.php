@@ -2860,12 +2860,18 @@ const AUDIT_ACTION_LABELS = [
     'SIGNATURE_SET'=>'Signature changed','ENDORSE'=>'Document endorsed','RELEASE_NOTE_DRAFT'=>'Release Note drafted',
     'RELEASE_NOTE_CREATED'=>'Release Note created from report','LOGIN'=>'Login','LOGOUT'=>'Logout','LOGIN_FAILED'=>'Failed login',
     'CSRF_REJECTED'=>'Save refused — not sent from this site',
+    'PASSWORD_CHANGED'=>'Password changed','TWOFA_ON'=>'Two-step sign-in switched on',
+    'TWOFA_OFF'=>'Two-step sign-in switched off','TWOFA_RESET'=>'Two-step sign-in reset by an administrator',
+    'ACCOUNT_UNLOCKED'=>'Locked account released','PERSON_EXPORT'=>'Personal data exported',
+    'PERSON_ERASED'=>'Personal data erased','INCIDENT'=>'Security incident recorded',
+    'CONSENT'=>'Consent recorded','CONSENT_WITHDRAWN'=>'Consent withdrawn',
 ];
 const AUDIT_ACTIONS_ALL = [
     'CREATE','EDIT','IRN_GEN','SUBMIT','APPROVE','REJECT','SENDBACK','DELEGATE','FINALIZE','DELETE','EVIDENCE',
     'EVIDENCE_CAPTION','EVIDENCE_DELETE','PDF','DOCX','CERT_PDF','SOURCE_DOC','AI_REVIEW','SMART_REMARKS',
     'TIMESTAMP_EDIT','SIGNATURE_SET','ENDORSE','RELEASE_NOTE_DRAFT','RELEASE_NOTE_CREATED','LOGIN','LOGOUT','LOGIN_FAILED',
-    'CSRF_REJECTED',
+    'CSRF_REJECTED','PASSWORD_CHANGED','TWOFA_ON','TWOFA_OFF','TWOFA_RESET','ACCOUNT_UNLOCKED',
+    'PERSON_EXPORT','PERSON_ERASED','INCIDENT','CONSENT','CONSENT_WITHDRAWN',
 ];
 function audit_action_label($a) { return AUDIT_ACTION_LABELS[$a] ?? $a; }
 // Compliance health checks across the whole system (super-admin view).

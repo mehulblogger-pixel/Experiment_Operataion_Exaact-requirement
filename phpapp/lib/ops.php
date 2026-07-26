@@ -1481,6 +1481,7 @@ function ops_module_gate($route) {
         'office-finance'=>'overheads',
         'reports'=>'reports',
         'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users','org-template'=>'users',
+        'user-unlock'=>'users','user-2fa-reset'=>'users',
         'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
     ];
@@ -1596,6 +1597,12 @@ function ops_dispatch($route, $method) {
             ops_users($route, $method); return true;
         case $route === 'change-password':
             ops_change_password($method); return true;
+        case $route === 'two-factor':
+            ops_two_factor($method); return true;
+        case $route === 'user-unlock':
+            ops_user_unlock($method); return true;
+        case $route === 'user-2fa-reset':
+            ops_user_twofa_reset($method); return true;
         case $route === 'settings':
             ops_settings($method); return true;
         case $route === 'access':
@@ -3734,16 +3741,42 @@ function ops_users($route, $method) {
             $rtName = trim($b['reports_to_name'] ?? ''); $rtPos = trim($b['reports_to_position'] ?? ''); $rtEmail = trim($b['reports_to_email'] ?? '');
             $posTitle = trim($b['position_title'] ?? '');
             $uwwd = in_array((string)($b['weekly_working_days'] ?? ''), ['5','5.5','6'], true) ? (float)$b['weekly_working_days'] : 6;
+            // A password set by an administrator has to clear the same bar as one
+            // somebody chooses for themselves; otherwise the rule is decorative.
+            $newPw = (string)($b['password'] ?? '');
+            if ($newPw !== '') {
+                $bad = password_problem_text($newPw, $b['username'] ?? '', trim(($b['first_name'] ?? '') . ' ' . ($b['last_name'] ?? '')));
+                if ($bad !== '') {
+                    flash($bad, 'error');
+                    $mgrs = ops_all("SELECT id, first_name, last_name, username, role, position_title FROM users WHERE is_active=1" . ($user ? " AND id<>" . (int)$user['id'] : "") . " ORDER BY first_name, last_name");
+                    view('ops/user_form', ['user'=>$user ?: $b, 'inspectors'=>inspectors_list(false), 'offices'=>offices_list(),
+                        'sbuOpts'=>lk_options_or('sbu', OPS_SBUS), 'globalMgr'=>$globalMgr, 'managers'=>$mgrs,
+                        'defaults'=>role_defaults($role)]);
+                    return;
+                }
+            }
+            // Whoever sets somebody else's password knows it. Ticking this means
+            // they must replace it the moment they sign in, so it stops being shared.
+            $mustChange = !empty($b['must_change_pwd']) ? 1 : 0;
             if ($user) {
                 $pdo->prepare("UPDATE users SET username=?,first_name=?,last_name=?,email=?,role=?,is_superuser=?,is_active=?,inspector_id=?,home_office_id=?,scope_offices=?,scope_sbus=?,permissions=?,reports_to_id=?,reports_to_name=?,reports_to_position=?,reports_to_email=?,position_title=?,weekly_working_days=? WHERE id=?")
                     ->execute([$b['username'], $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, !empty($b['is_active'])?1:0, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $user['id']]);
-                if (!empty($b['password'])) $pdo->prepare("UPDATE users SET password_hash=? WHERE id=?")->execute([password_hash($b['password'], PASSWORD_DEFAULT), $user['id']]);
+                if ($newPw !== '') {
+                    $pdo->prepare("UPDATE users SET password_hash=?, pwd_changed_at=? WHERE id=?")
+                        ->execute([password_hash($newPw, PASSWORD_DEFAULT), date('c'), $user['id']]);
+                    idems_log('user', $user['id'], 'PASSWORD_CHANGED', ['field'=>$user['username'], 'reason'=>'set by ' . user_name(current_user())]);
+                }
+                $pdo->prepare("UPDATE users SET must_change_pwd=? WHERE id=?")->execute([$mustChange, $user['id']]);
                 flash('User saved.');
             } else {
-                $hash = password_hash($b['password'] ?: 'changeme123', PASSWORD_DEFAULT);
-                $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id,home_office_id,scope_offices,scope_sbus,permissions,reports_to_id,reports_to_name,reports_to_position,reports_to_email,position_title,weekly_working_days)
-                    VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd]);
-                flash('User created.');
+                // A brand-new account with no password typed gets one nobody knows
+                // and is marked must-change, rather than a shared default.
+                $hash = password_hash($newPw !== '' ? $newPw : bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
+                $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id,home_office_id,scope_offices,scope_sbus,permissions,reports_to_id,reports_to_name,reports_to_position,reports_to_email,position_title,weekly_working_days,pwd_changed_at,must_change_pwd)
+                    VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, date('c'), $newPw === '' ? 1 : $mustChange]);
+                flash($newPw === ''
+                    ? 'User created. No password was set, so use Edit to give them one — the account cannot be signed into until you do.'
+                    : 'User created.');
             }
             redirect('/users');
         }
@@ -3754,7 +3787,8 @@ function ops_users($route, $method) {
     $where = $globalMgr ? "1=1" : "home_office_id = " . (int)$myOffice;
     $rows = ops_all("SELECT * FROM users WHERE $where ORDER BY username");
     $seats = getenv('SEAT_LIMIT') ?: '';
-    view('ops/users', ['rows'=>$rows,'seats'=>$seats,'active'=>(int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1"),'globalMgr'=>$globalMgr]);
+    view('ops/users', ['rows'=>$rows,'seats'=>$seats,'active'=>(int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1"),
+        'globalMgr'=>$globalMgr, 'defaults'=>accounts_on_default_password(), 'locked'=>accounts_locked_now()]);
 }
 
 // ---- System settings (financial year, etc.) --------------------------------
@@ -3784,6 +3818,16 @@ function ops_settings($method) {
         setting_set('expected_source_docs', implode(',', $esd));
         $hr = array_values(array_intersect(AUDIT_ACTIONS_ALL, (array)($_POST['audit_high_risk'] ?? [])));
         setting_set('audit_high_risk', implode(',', $hr));
+        // --- Security. Each of these only chooses how strict a guard is; none
+        //     of them can switch a guard off. ---
+        setting_set('pwd_min_len',       min(64, max(8, (int)($_POST['pwd_min_len'] ?? 10))));
+        $age = (int)($_POST['pwd_max_age_days'] ?? 0);
+        setting_set('pwd_max_age_days',  ($age >= 30 && $age <= 730) ? $age : 0);
+        setting_set('session_idle_min',  min(1440, max(5, (int)($_POST['session_idle_min'] ?? 60))));
+        setting_set('session_max_hours', min(168, max(1, (int)($_POST['session_max_hours'] ?? 12))));
+        $tr = array_values(array_intersect(array_keys(ORG_ROLES), (array)($_POST['twofa_roles'] ?? [])));
+        setting_set('twofa_roles', implode(',', $tr));
+        setting_set('audit_retain_days', min(3650, max(180, (int)($_POST['audit_retain_days'] ?? 400))));
         // Theme builder: preset + 4 colours + text colour + font size
         foreach (['c_primary','c_accent','c_bg','c_surface','c_text'] as $k) {
             $v = trim($_POST[$k] ?? '');
@@ -3824,9 +3868,15 @@ function ops_change_password($method) {
         if (!password_verify($b['current'] ?? '', $u['password_hash'])) {
             view('ops/change_password', ['error'=>'Current password is incorrect.']); return;
         }
-        if (strlen($b['new'] ?? '') < 8) { view('ops/change_password', ['error'=>'New password must be at least 8 characters.']); return; }
+        // The rule is applied at the moment the password is chosen. Refusing it
+        // a year later, after it has been used on every screen, helps nobody.
+        $bad = password_problem_text($b['new'] ?? '', $u['username'], user_name($u));
+        if ($bad !== '') { view('ops/change_password', ['error'=>$bad]); return; }
         if (($b['new'] ?? '') !== ($b['confirm'] ?? '')) { view('ops/change_password', ['error'=>'New password and confirmation do not match.']); return; }
+        if (password_verify($b['new'], $u['password_hash'])) { view('ops/change_password', ['error'=>'That is the password you are already using. Please choose a different one.']); return; }
         $pdo->prepare("UPDATE users SET password_hash=? WHERE id=?")->execute([password_hash($b['new'], PASSWORD_DEFAULT), $u['id']]);
+        pwd_mark_changed($u['id']);
+        idems_log('user', $u['id'], 'PASSWORD_CHANGED', ['field'=>$u['username']]);
         flash('Password changed.');
         redirect('/');
     }

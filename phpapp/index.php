@@ -22,6 +22,26 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
 header('Referrer-Policy: same-origin');
 if ($httpsNow) header('Strict-Transport-Security: max-age=15552000');
+// Nothing on any screen needs a camera beyond the evidence capture, and nothing
+// needs a microphone, a payment sheet or the accelerometer at all.
+header('Permissions-Policy: geolocation=(self), camera=(self), microphone=(), payment=(), usb=(), interest-cohort=()');
+// A content policy is the net under the escaping in the views: if a script ever
+// did get onto a page, this is what stops it fetching from or reporting to
+// anywhere else. 'unsafe-inline' is stated honestly — the screens carry inline
+// handlers and style, so script injected into a page could still run; what it
+// could NOT do is load code from another site or send what it found there.
+$csp = "default-src 'self'; "
+     . "script-src 'self' 'unsafe-inline'; "
+     . "style-src 'self' 'unsafe-inline'; "
+     . "img-src 'self' data: blob:; "
+     . "font-src 'self' data:; "
+     . "connect-src 'self'; "
+     . "media-src 'self' blob:; "
+     . "object-src 'none'; "
+     . "base-uri 'self'; "
+     . "form-action 'self'; "
+     . "frame-ancestors 'self'";
+header('Content-Security-Policy: ' . $csp);
 
 // --- Readable error page instead of a blank 500 (so problems are diagnosable) ---
 //
@@ -76,6 +96,7 @@ try {
     require __DIR__ . '/lib/workforce.php';
     require __DIR__ . '/lib/orgadmin.php';
     require __DIR__ . '/lib/contracts.php';
+    require __DIR__ . '/lib/security.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
@@ -152,6 +173,7 @@ try {
     db()->query("SELECT billable_rate FROM calls LIMIT 1");
     db()->query("SELECT token FROM form_tokens LIMIT 1");
     db()->query("SELECT qty_total FROM partner_contracts LIMIT 1");
+    db()->query("SELECT totp_enabled FROM users LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which
     // runs the same idempotent boot() and clears it. Each check is self-cancelling.
@@ -230,30 +252,75 @@ if ($route === 'sw.js' || $route === 'manifest.php' || strpos($route, 'assets/')
 }
 
 // --- Public routes ---
-function render_login($error) {
+// $stage is 'password' for the ordinary form and 'code' once the password has
+// been accepted and a second factor is still owed.
+function render_login($error, $stage = 'password', $note = '') {
     require __DIR__ . '/views/login_page.php';
     exit;
 }
 if ($route === 'login') {
     if ($method === 'POST') {
+        // The sign-in form carries a token too, so another site cannot quietly
+        // sign somebody into an account of its choosing and then watch what
+        // they file under it. The token is minted when the page is drawn, so a
+        // missing one means the page is stale rather than that anything is wrong.
+        if (!csrf_ok($_POST['_csrf'] ?? ''))
+            return render_login('This sign-in page has been open a while. Please reload it and try again.');
+        // ---- second stage: the six-digit code, or a recovery code ----------
+        if (($_POST['stage'] ?? '') === 'code') {
+            $pid = (int)($_SESSION['pending_uid'] ?? 0);
+            $age = time() - (int)($_SESSION['pending_at'] ?? 0);
+            $u   = $pid ? ops_one("SELECT * FROM users WHERE id=?", [$pid]) : null;
+            // Five minutes to reach for a phone is generous; after that the
+            // half-finished sign-in is thrown away rather than left lying open.
+            if (!$u || $age > 300) {
+                unset($_SESSION['pending_uid'], $_SESSION['pending_at']);
+                return render_login('That took too long. Please sign in again.');
+            }
+            $code = trim((string)($_POST['code'] ?? ''));
+            if (totp_verify($u['totp_secret'], $code) || recovery_code_spend($u, $code)) {
+                $left = recovery_codes_left($u);
+                complete_login($u);
+                flash('Welcome, ' . user_name($u) . '.');
+                if (strpos($code, '-') !== false)
+                    flash('You signed in with a recovery code. ' . $left . ' left — generate a new set from Two-step sign-in.', 'warning');
+                redirect('/');
+            }
+            idems_log('user', $u['id'], 'LOGIN_FAILED', ['field'=>$u['username'] . ' (wrong code)']);
+            $wait = login_fail($u['username']); login_fail(login_ip_key());
+            if ($wait > 0) { unset($_SESSION['pending_uid']); return render_login('Too many failed attempts. Try again in ' . $wait . ' minute(s).'); }
+            return render_login('That code is not right. Check the app and try the current one.', 'code');
+        }
+
+        // ---- first stage: username and password ----------------------------
+        // The address is counted as well as the username: one machine working
+        // through a list of logins never trips a per-username limit.
+        $ipWait = login_ip_locked_for();
+        if ($ipWait > 0) {
+            idems_log('user', null, 'LOGIN_FAILED', ['field'=>'blocked source ' . client_ip()]);
+            return render_login('Too many failed attempts from this connection. Try again in ' . $ipWait . ' minute(s).');
+        }
         $q = $pdo->prepare("SELECT * FROM users WHERE username = ?");
         $q->execute([$_POST['username'] ?? '']);
         $u = $q->fetch();
         if ($u && $u['is_active'] && login_allowed($u['username'])
             && password_verify($_POST['password'] ?? '', $u['password_hash'])) {
-            // A brand-new session id on sign-in, so an id someone else planted in
-            // this browser beforehand cannot become an authenticated one.
-            session_regenerate_id(true);
-            unset($_SESSION['csrf']);          // new session, new token
-            login_clear($u['username']);
-            $_SESSION['uid'] = $u['id'];
-            if (function_exists('idems_log')) idems_log('user', $u['id'], 'LOGIN', ['field'=>$u['username']]);
+            if (twofa_on($u)) {
+                // Nothing is signed in yet. The session only remembers who is
+                // half-way through, and for how long.
+                session_regenerate_id(true);
+                $_SESSION['pending_uid'] = $u['id'];
+                $_SESSION['pending_at']  = time();
+                return render_login(null, 'code');
+            }
+            complete_login($u);
             flash('Welcome, ' . user_name($u) . '.');
             redirect('/');
         }
         // record failed attempts too — they matter for a compliance review
         if (function_exists('idems_log')) idems_log('user', $u['id'] ?? null, 'LOGIN_FAILED', ['field'=>substr((string)($_POST['username'] ?? ''), 0, 60)]);
         $wait = login_fail((string)($_POST['username'] ?? ''));
+        login_fail(login_ip_key());
         if ($wait > 0) return render_login('Too many failed attempts. Try again in ' . $wait . ' minute(s).');
         return render_login('Invalid username or password.');
     }
@@ -267,6 +334,32 @@ if ($route === 'logout') {
 
 // --- Everything below requires login ---
 require_login();
+
+// A laptop left open on a client's site is the realistic risk, not a clever
+// attack. An idle session, and a session that has simply run long enough, both
+// end here — and the person is told which it was rather than being dumped at a
+// blank sign-in page for no stated reason.
+$expired = session_expiry_reason();
+if ($expired !== '') {
+    idems_log('user', current_user()['id'] ?? null, 'LOGOUT', ['field'=>'session expired']);
+    $_SESSION = []; session_destroy();
+    session_start();
+    flash($expired, 'warning');
+    redirect('/login');
+}
+session_touch();
+
+// Somebody still on the password they were handed, or on one that has aged out
+// of the company's own rule, is sent to change it and can go nowhere else. The
+// sign-out and the change screen itself stay reachable, or they would be stuck.
+if (must_change_password(current_user())
+    && !in_array($route, ['change-password', 'logout'], true)
+    && strpos($route, 'assets/') !== 0) {
+    flash(!empty(current_user()['must_change_pwd'])
+        ? 'Please choose your own password before going any further.'
+        : 'Your password has reached the age limit set for this company. Please choose a new one.', 'warning');
+    redirect('/change-password');
+}
 
 // Refuse any state-changing request that did not come from one of our own
 // pages. Without this, a page somebody visits in another tab can make their

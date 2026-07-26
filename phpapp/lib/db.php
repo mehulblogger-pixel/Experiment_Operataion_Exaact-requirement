@@ -170,6 +170,8 @@ function boot() {
     if (function_exists('idems_migrate')) idems_migrate();   // IDEMS report engine
     if (function_exists('orgadmin_migrate')) orgadmin_migrate();   // office tree + heads
     if (function_exists('contracts_migrate')) contracts_migrate();  // contract validity gates
+    if (function_exists('security_migrate')) security_migrate();    // password age, second factor
+    if (function_exists('compliance_migrate')) compliance_migrate(); // incident register, consent, data requests
     // Register every remaining dropdown as an editable master list. Runs last:
     // it needs the base lists seeded and the CRM/IDEMS constants loaded.
     if (function_exists('lk_register_module_lists')) lk_register_module_lists();
