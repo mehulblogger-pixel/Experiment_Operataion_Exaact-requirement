@@ -52,8 +52,12 @@ function current_user() {
 }
 function require_login() { if (!current_user()) redirect('login'); }
 function user_name($u) {
+    // Nobody is signed in when this runs from cron or a month-end job, so a
+    // null must give a usable word rather than a warning in the middle of a
+    // calculation nobody is watching.
+    if (!is_array($u)) return 'System';
     $n = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? ''));
-    return $n !== '' ? $n : $u['username'];
+    return $n !== '' ? $n : ($u['username'] ?? 'System');
 }
 
 // --- GST helpers ---

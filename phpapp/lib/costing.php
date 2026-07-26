@@ -1,0 +1,443 @@
+<?php
+// ===========================================================================
+//  Where the money actually goes
+//
+//  The old answer was one percentage. Every inspector's salary was multiplied
+//  by it, and that multiplier stood in for the branch manager, the accountant,
+//  the back office, the rent and the laptops — none of which were written down
+//  anywhere. It gave a number, but the number was distributed on the wrong
+//  basis: in proportion to whichever inspector happened to do the work, rather
+//  than to what those costs are actually for.
+//
+//  This replaces it with real figures, allocated on rules the company chooses:
+//
+//    Production staff (inspection engineers)
+//      · days they worked  → that job's SBU and activity code
+//      · days they did not → split by the SBU mix of the work they did do that
+//                            month; if there was none, by a method the admin
+//                            picks
+//      Every rupee of their salary lands on an SBU. That is the test.
+//
+//    Everybody else (branch manager, coordinator, accountant, back office)
+//      · a percentage split across the branch's SBUs, set per month on their
+//        own record. Not entered this month? Last month's carries forward.
+//
+//    Office costs that are not salary (rent, electricity, laptops, contingency)
+//      · entered per office per month against heads the company defines, and
+//        allocated on the basis chosen for each head.
+//
+//  Salary never appears as an expense head, and an expense head never contains
+//  salary. That is what keeps the two from counting the same rupee twice.
+//
+//  Months are frozen once calculated: changing somebody's split in September
+//  must not silently rewrite August.
+// ===========================================================================
+
+// --- how an expense head spreads across the SBUs of an office --------------
+const ALLOC_BASES = [
+    'EQUAL'     => 'Equally across the SBUs in this office',
+    'MANDAYS'   => 'By man-days worked that month',
+    'REVENUE'   => 'By revenue earned that month',
+    'HEADCOUNT' => 'By the number of people in each SBU',
+];
+// --- what to do with an inspector who did no chargeable work at all --------
+const IDLE_BASES = [
+    'OFFICE_MIX' => 'By the office’s overall SBU mix that month',
+    'EQUAL'      => 'Equally across the SBUs in this office',
+    'OWN_SPLIT'  => 'By a fixed percentage set on their own record',
+];
+function office_idle_basis($officeId) {
+    $v = $officeId ? ops_val("SELECT idle_basis FROM offices WHERE id=?", [$officeId]) : '';
+    $v = trim((string)$v);
+    if (isset(IDLE_BASES[$v])) return $v;
+    $g = trim((string)setting_get('idle_basis', 'OFFICE_MIX'));
+    return isset(IDLE_BASES[$g]) ? $g : 'OFFICE_MIX';
+}
+
+function costing_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    $pk = (db_driver() === 'sqlite') ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INT AUTO_INCREMENT PRIMARY KEY';
+
+    // Which SBUs actually operate in this office. Without this there is no
+    // answer to "show me ten boxes, one per SBU in the branch".
+    ensure_column('offices', 'sbus',       "VARCHAR(300) DEFAULT ''");
+    ensure_column('offices', 'idle_basis', "VARCHAR(20) DEFAULT ''");
+
+    // What a person costs, and which side of the line they are on.
+    ensure_column('users', 'monthly_ctc',   'DECIMAL(14,2) NULL');
+    ensure_column('users', 'is_production', 'INT DEFAULT 0');
+
+    // An inspection away from base: the travel day belongs to the job it is
+    // travelling for, not to the pool of idle days.
+    ensure_column('calls', 'is_outstation', 'INT DEFAULT 0');
+    ensure_column('jobs',  'is_outstation', 'INT DEFAULT 0');
+
+    try {
+        // The percentage split for a non-production person, per month. Kept as
+        // rows rather than a CSV so a month can be read back exactly as it was
+        // entered, and so a changed split never reaches a month already closed.
+        db()->exec("CREATE TABLE IF NOT EXISTS person_sbu_split (
+            id $pk, user_id INT, yr INT, mon INT, sbu VARCHAR(40),
+            pct DECIMAL(6,2) DEFAULT 0, set_by VARCHAR(120) DEFAULT '', set_at VARCHAR(30) DEFAULT '')");
+        // The heads the company defines for its own office costs. Never salary.
+        db()->exec("CREATE TABLE IF NOT EXISTS office_expense_heads (
+            id $pk, code VARCHAR(40), label VARCHAR(150),
+            alloc_basis VARCHAR(20) DEFAULT 'EQUAL', notes VARCHAR(255) DEFAULT '',
+            sort_order INT DEFAULT 0, is_active INT DEFAULT 1)");
+        // What each office actually spent under each head, month by month.
+        db()->exec("CREATE TABLE IF NOT EXISTS office_expenses (
+            id $pk, office_id INT, yr INT, mon INT, head_id INT,
+            amount DECIMAL(14,2) DEFAULT 0, notes VARCHAR(255) DEFAULT '',
+            set_by VARCHAR(120) DEFAULT '', set_at VARCHAR(30) DEFAULT '')");
+        // The frozen answer. One row per month per office per SBU per source.
+        db()->exec("CREATE TABLE IF NOT EXISTS cost_allocations (
+            id $pk, yr INT, mon INT, office_id INT, sbu VARCHAR(40),
+            activity VARCHAR(60) DEFAULT '', boss_id INT NULL, job_id INT NULL,
+            source_kind VARCHAR(30), source_id INT NULL, source_label VARCHAR(200) DEFAULT '',
+            basis VARCHAR(30) DEFAULT '', amount DECIMAL(14,2) DEFAULT 0,
+            created_at VARCHAR(30) DEFAULT '')");
+        db()->exec("CREATE TABLE IF NOT EXISTS cost_runs (
+            id $pk, yr INT, mon INT, office_id INT, status VARCHAR(20) DEFAULT 'OPEN',
+            total DECIMAL(14,2) DEFAULT 0, note VARCHAR(255) DEFAULT '',
+            run_by VARCHAR(120) DEFAULT '', run_at VARCHAR(30) DEFAULT '')");
+    } catch (Throwable $e) {}
+
+    costing_seed_heads();
+}
+
+// A starting set, so the screen is not an empty box on day one. Salary is
+// deliberately absent — it comes from the people, and putting it here as well
+// is exactly the double count this design exists to avoid.
+function costing_seed_heads() {
+    try {
+        if ((int)ops_val("SELECT COUNT(*) FROM office_expense_heads") > 0) return;
+        $seed = [
+            ['RENT',        'Office rent',                    'EQUAL',     10],
+            ['ELECTRICITY', 'Electricity & utilities',        'EQUAL',     20],
+            ['INTERNET',    'Internet & telephone',           'HEADCOUNT', 30],
+            ['LAPTOP',      'Laptops & IT equipment',         'HEADCOUNT', 40],
+            ['SOFTWARE',    'Software & subscriptions',       'HEADCOUNT', 50],
+            ['TRAVEL_ADMIN','Administrative travel',          'MANDAYS',   60],
+            ['REPAIRS',     'Repairs & maintenance',          'EQUAL',     70],
+            ['STATIONERY',  'Printing & stationery',          'HEADCOUNT', 80],
+            ['PROF_FEES',   'Professional & audit fees',      'REVENUE',   90],
+            ['OVERHEAD',    'Other overheads',                'EQUAL',    100],
+            ['CONTINGENCY', 'Contingency',                    'REVENUE',  110],
+        ];
+        foreach ($seed as [$c, $l, $b, $o])
+            db()->prepare("INSERT INTO office_expense_heads (code,label,alloc_basis,sort_order,is_active)
+                           VALUES (?,?,?,?,1)")->execute([$c, $l, $b, $o]);
+    } catch (Throwable $e) {}
+}
+
+// ---------------------------------------------------------------------------
+//  The SBUs of an office
+// ---------------------------------------------------------------------------
+function office_sbus($officeId) {
+    $all = lk_options_or('sbu', OPS_SBUS);
+    $csv = $officeId ? trim((string)ops_val("SELECT sbus FROM offices WHERE id=?", [$officeId])) : '';
+    $codes = array_values(array_filter(array_map('trim', explode(',', $csv))));
+    $codes = array_values(array_intersect($codes, array_keys($all)));
+    // An office that has not said which SBUs it runs is treated as running all
+    // of them — otherwise its costs would have nowhere to land.
+    if (!$codes) $codes = array_keys($all);
+    $out = [];
+    foreach ($codes as $c) $out[$c] = $all[$c];
+    return $out;
+}
+
+// ---------------------------------------------------------------------------
+//  A person's percentage split for one month
+//
+//  Not entered this month? The most recent earlier month carries forward. That
+//  is a read-time fallback, not a write — so a month nobody touched still shows
+//  the right answer without filling the table with copies.
+// ---------------------------------------------------------------------------
+function person_split($userId, $yr, $mon) {
+    $userId = (int)$userId;
+    $rows = ops_all("SELECT sbu, pct FROM person_sbu_split WHERE user_id=? AND yr=? AND mon=? AND pct>0",
+                    [$userId, (int)$yr, (int)$mon]);
+    if ($rows) return array_column($rows, 'pct', 'sbu');
+    // carry forward: the newest month before this one
+    $prev = ops_one("SELECT yr, mon FROM person_sbu_split WHERE user_id=? AND (yr < ? OR (yr = ? AND mon < ?))
+                     ORDER BY yr DESC, mon DESC", [$userId, (int)$yr, (int)$yr, (int)$mon]);
+    if (!$prev) return [];
+    $rows = ops_all("SELECT sbu, pct FROM person_sbu_split WHERE user_id=? AND yr=? AND mon=? AND pct>0",
+                    [$userId, (int)$prev['yr'], (int)$prev['mon']]);
+    return array_column($rows, 'pct', 'sbu');
+}
+function person_split_is_carried($userId, $yr, $mon) {
+    return !ops_all("SELECT id FROM person_sbu_split WHERE user_id=? AND yr=? AND mon=?",
+                    [(int)$userId, (int)$yr, (int)$mon]);
+}
+// Splits are only meaningful when they add to 100.
+function split_total(array $split) { return round(array_sum(array_map('floatval', $split)), 2); }
+
+// ---------------------------------------------------------------------------
+//  Is this month already closed?
+// ---------------------------------------------------------------------------
+function cost_run_status($yr, $mon, $officeId) {
+    $r = ops_one("SELECT * FROM cost_runs WHERE yr=? AND mon=? AND office_id=?", [(int)$yr, (int)$mon, (int)$officeId]);
+    return $r ?: null;
+}
+function cost_month_frozen($yr, $mon, $officeId) {
+    $r = cost_run_status($yr, $mon, $officeId);
+    return $r && ($r['status'] ?? '') === 'FROZEN';
+}
+
+// ===========================================================================
+//  The engine
+//
+//  Everything below turns one month for one office into rows in
+//  cost_allocations. It is written so that the total it produces equals the
+//  total the office actually spends — no rupee invented, none lost. The tests
+//  assert exactly that.
+// ===========================================================================
+
+// A day the inspector worked, resolved to the job it belongs to. Travel days on
+// an outstation job carry no job of their own on the voucher; by the owner's
+// rule they belong to the inspection they are travelling for, so a dayless
+// travel row takes the job of the next dated row that has one.
+function costing_inspector_days($inspectorId, $yr, $mon) {
+    $from = sprintf('%04d-%02d-01', $yr, $mon);
+    $to   = date('Y-m-t', strtotime($from));
+    $rows = ops_all("SELECT e.*, j.sbu job_sbu, j.activity_id, j.boss_id job_boss, j.is_outstation
+                     FROM voucher_entries e
+                     LEFT JOIN vouchers v ON v.id = e.voucher_id
+                     LEFT JOIN jobs j ON j.id = e.job_id
+                     WHERE v.inspector_id = ? AND e.entry_date >= ? AND e.entry_date <= ?
+                     ORDER BY e.entry_date, e.id", [(int)$inspectorId, $from, $to]);
+    // forward-fill the job for travel rows that name none
+    for ($i = 0; $i < count($rows); $i++) {
+        if ((int)($rows[$i]['job_id'] ?? 0) > 0) continue;
+        $isTravel = (float)($rows[$i]['km'] ?? 0) > 0 || (float)($rows[$i]['travel_amount'] ?? 0) > 0;
+        if (!$isTravel) continue;
+        for ($k = $i + 1; $k < count($rows); $k++) {
+            if ((int)($rows[$k]['job_id'] ?? 0) > 0) {
+                $rows[$i]['job_id']     = $rows[$k]['job_id'];
+                $rows[$i]['job_sbu']    = $rows[$k]['job_sbu'];
+                $rows[$i]['activity_id']= $rows[$k]['activity_id'];
+                $rows[$i]['job_boss']   = $rows[$k]['job_boss'];
+                $rows[$i]['carried']    = 1;      // for the explain view
+                break;
+            }
+        }
+    }
+    return $rows;
+}
+
+// One inspector, one month → [['sbu'=>..,'activity'=>..,'boss_id'=>..,'job_id'=>..,'days'=>..], …]
+// plus the count of days that were not chargeable to anything.
+function costing_inspector_month($inspectorId, $yr, $mon) {
+    $worked = []; $productive = 0;
+    foreach (costing_inspector_days($inspectorId, $yr, $mon) as $e) {
+        if (($e['day_type'] ?? '') !== 'WORK') continue;
+        $jid = (int)($e['job_id'] ?? 0);
+        if (!$jid) continue;                                  // work with no job names nothing
+        $sbu = trim((string)($e['job_sbu'] ?: $e['sbu'] ?: ''));
+        $key = $jid . '|' . $sbu;
+        if (!isset($worked[$key])) $worked[$key] = ['sbu'=>$sbu, 'activity'=>(string)($e['activity_id'] ?? ''),
+            'boss_id'=>(int)($e['job_boss'] ?? 0) ?: null, 'job_id'=>$jid, 'days'=>0];
+        $worked[$key]['days'] += 1;
+        $productive += 1;
+    }
+    $available = working_days_in_month($yr, $mon);
+    return ['worked' => array_values($worked), 'productive' => $productive,
+            'available' => $available, 'idle' => max(0, $available - $productive)];
+}
+
+// The SBU mix of an office for a month — used when an inspector did nothing
+// chargeable at all, so their salary still lands somewhere rather than vanishing.
+function costing_office_mix($officeId, $yr, $mon) {
+    $from = sprintf('%04d-%02d-01', $yr, $mon);
+    $to   = date('Y-m-t', strtotime($from));
+    $rows = ops_all("SELECT j.sbu, COUNT(*) n FROM voucher_entries e
+                     LEFT JOIN jobs j ON j.id = e.job_id
+                     WHERE e.day_type='WORK' AND e.job_id IS NOT NULL AND j.sbu <> ''
+                       AND j.executing_office_id = ? AND e.entry_date >= ? AND e.entry_date <= ?
+                     GROUP BY j.sbu", [(int)$officeId, $from, $to]);
+    $mix = []; foreach ($rows as $r) $mix[$r['sbu']] = (float)$r['n'];
+    return $mix;
+}
+
+// Turn any set of weights into shares of $amount that add back to $amount
+// exactly — the rounding remainder goes on the largest share, so the total is
+// never a rupee out.
+function costing_spread($amount, array $weights) {
+    $amount = round((float)$amount, 2);
+    $sum = array_sum(array_map('floatval', $weights));
+    if ($sum <= 0 || !$weights) return [];
+    $out = []; $running = 0; $biggest = null; $biggestW = -1;
+    foreach ($weights as $k => $w) {
+        $w = (float)$w; if ($w <= 0) continue;
+        $share = round($amount * $w / $sum, 2);
+        $out[$k] = $share; $running += $share;
+        if ($w > $biggestW) { $biggestW = $w; $biggest = $k; }
+    }
+    if ($biggest !== null && abs($running - $amount) >= 0.01)
+        $out[$biggest] = round($out[$biggest] + ($amount - $running), 2);
+    return $out;
+}
+
+// ---------------------------------------------------------------------------
+//  Run one month for one office
+//
+//  Returns the rows it would write, so the screen can show a preview before
+//  anything is committed. $commit writes them and marks the run.
+// ---------------------------------------------------------------------------
+function costing_run($yr, $mon, $officeId, $commit = false) {
+    $yr = (int)$yr; $mon = (int)$mon; $officeId = (int)$officeId;
+    $rows = []; $warn = [];
+    $sbus = office_sbus($officeId);
+    $add = function ($sbu, $amount, $kind, $id, $label, $basis, $activity = '', $boss = null, $job = null) use (&$rows) {
+        if (round((float)$amount, 2) == 0) return;
+        $rows[] = ['sbu'=>$sbu, 'activity'=>$activity, 'boss_id'=>$boss, 'job_id'=>$job,
+                   'source_kind'=>$kind, 'source_id'=>$id, 'source_label'=>$label,
+                   'basis'=>$basis, 'amount'=>round((float)$amount, 2)];
+    };
+
+    // ---- 1. production staff: the work they did, then what they did not ----
+    $insp = ops_all("SELECT id, name, COALESCE(salary_ctc,0) salary_ctc, COALESCE(agency_cost,0) agency_cost
+                     FROM inspectors WHERE home_office_id = ? AND status='ACTIVE'", [$officeId]);
+    foreach ($insp as $i) {
+        $monthly = ((float)$i['salary_ctc'] / 12) + (float)$i['agency_cost'];
+        if ($monthly <= 0) { $warn[] = $i['name'] . ' has no salary on file, so their time is not costed.'; continue; }
+        $m = costing_inspector_month($i['id'], $yr, $mon);
+        if ($m['available'] <= 0) continue;
+        $daily = $monthly / $m['available'];
+
+        $mix = [];
+        foreach ($m['worked'] as $w) {
+            if ($w['sbu'] === '') { $warn[] = $i['name'] . ' worked days on a job with no ' . Tl('sbu') . '.'; continue; }
+            $add($w['sbu'], $daily * $w['days'], 'INSPECTOR_WORKED', (int)$i['id'],
+                 $i['name'] . ' — ' . $w['days'] . ' day(s) worked', 'DAYS_WORKED',
+                 (string)$w['activity'], $w['boss_id'], $w['job_id']);
+            $mix[$w['sbu']] = ($mix[$w['sbu']] ?? 0) + $w['days'];
+        }
+        if ($m['idle'] > 0) {
+            $idleAmt = $daily * $m['idle'];
+            // by their own month's mix; with no mix at all, by the office rule
+            $weights = $mix;
+            $basis = 'OWN_MIX';
+            if (!$weights) {
+                $basis = office_idle_basis($officeId);
+                if ($basis === 'OFFICE_MIX') $weights = costing_office_mix($officeId, $yr, $mon);
+                if ($basis === 'OWN_SPLIT')  $weights = person_split_for_inspector($i['id'], $yr, $mon);
+                if (!$weights) { $basis = 'EQUAL'; $weights = array_fill_keys(array_keys($sbus), 1); }
+            }
+            foreach (costing_spread($idleAmt, $weights) as $sbu => $amt)
+                $add($sbu, $amt, 'INSPECTOR_IDLE', (int)$i['id'],
+                     $i['name'] . ' — ' . $m['idle'] . ' non-chargeable day(s)', $basis);
+        }
+    }
+
+    // ---- 2. everybody else: their own percentage split ---------------------
+    $people = ops_all("SELECT id, first_name, last_name, username, COALESCE(monthly_ctc,0) monthly_ctc
+                       FROM users WHERE home_office_id = ? AND is_active = 1
+                         AND COALESCE(is_production,0) = 0 AND COALESCE(monthly_ctc,0) > 0", [$officeId]);
+    foreach ($people as $p) {
+        $nm = trim($p['first_name'] . ' ' . $p['last_name']) ?: $p['username'];
+        $split = person_split($p['id'], $yr, $mon);
+        $tot = split_total($split);
+        if (!$split) {
+            $warn[] = $nm . ' has a salary but no ' . Tl('sbu') . ' split, so it was spread equally.';
+            $split = array_fill_keys(array_keys($sbus), 100 / max(1, count($sbus)));
+            $tot = 100;
+        } elseif (abs($tot - 100) > 0.01) {
+            $warn[] = $nm . '’s split adds to ' . $tot . '%, not 100 — it was scaled to fit.';
+        }
+        foreach (costing_spread((float)$p['monthly_ctc'], $split) as $sbu => $amt)
+            $add($sbu, $amt, 'STAFF_SALARY', (int)$p['id'], $nm, 'PERSON_SPLIT');
+    }
+
+    // ---- 3. office costs that are not salary -------------------------------
+    $heads = ops_all("SELECT oe.*, h.code, h.label, h.alloc_basis
+                      FROM office_expenses oe JOIN office_expense_heads h ON h.id = oe.head_id
+                      WHERE oe.office_id=? AND oe.yr=? AND oe.mon=? AND oe.amount > 0", [$officeId, $yr, $mon]);
+    $mixMandays = costing_office_mix($officeId, $yr, $mon);
+    foreach ($heads as $h) {
+        $basis = isset(ALLOC_BASES[$h['alloc_basis']]) ? $h['alloc_basis'] : 'EQUAL';
+        $weights = [];
+        if ($basis === 'MANDAYS')        $weights = $mixMandays;
+        elseif ($basis === 'REVENUE')    $weights = costing_office_revenue($officeId, $yr, $mon);
+        elseif ($basis === 'HEADCOUNT')  $weights = costing_office_headcount($officeId, $yr, $mon);
+        if (!$weights) { $basis = 'EQUAL'; $weights = array_fill_keys(array_keys($sbus), 1); }
+        foreach (costing_spread((float)$h['amount'], $weights) as $sbu => $amt)
+            $add($sbu, $amt, 'OFFICE_EXPENSE', (int)$h['head_id'], $h['label'], $basis);
+    }
+
+    $total = 0; foreach ($rows as $r) $total += $r['amount'];
+    if ($commit) {
+        db()->prepare("DELETE FROM cost_allocations WHERE yr=? AND mon=? AND office_id=?")->execute([$yr, $mon, $officeId]);
+        $ins = db()->prepare("INSERT INTO cost_allocations
+            (yr,mon,office_id,sbu,activity,boss_id,job_id,source_kind,source_id,source_label,basis,amount,created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        foreach ($rows as $r)
+            $ins->execute([$yr, $mon, $officeId, $r['sbu'], $r['activity'], $r['boss_id'], $r['job_id'],
+                           $r['source_kind'], $r['source_id'], $r['source_label'], $r['basis'], $r['amount'], date('c')]);
+        db()->prepare("DELETE FROM cost_runs WHERE yr=? AND mon=? AND office_id=?")->execute([$yr, $mon, $officeId]);
+        db()->prepare("INSERT INTO cost_runs (yr,mon,office_id,status,total,note,run_by,run_at)
+                       VALUES (?,?,?,'OPEN',?,?,?,?)")
+            ->execute([$yr, $mon, $officeId, round($total, 2), implode(' ', array_slice($warn, 0, 5)),
+                       user_name(current_user()), date('c')]);
+        idems_log('office', $officeId, 'COST_RUN', ['field'=>sprintf('%04d-%02d', $yr, $mon),
+                  'new'=>'total ' . round($total, 2)]);
+    }
+    return ['rows' => $rows, 'total' => round($total, 2), 'warnings' => array_values(array_unique($warn))];
+}
+
+// An inspector's own fixed split, for the rare "did nothing chargeable" case
+// where the office rule says to use it. Reads the same table as everybody else,
+// through the linked login if there is one.
+function person_split_for_inspector($inspectorId, $yr, $mon) {
+    $uid = (int)ops_val("SELECT id FROM users WHERE inspector_id=?", [(int)$inspectorId]);
+    return $uid ? person_split($uid, $yr, $mon) : [];
+}
+
+// Revenue earned per SBU in the month — for heads allocated by revenue.
+function costing_office_revenue($officeId, $yr, $mon) {
+    $from = sprintf('%04d-%02d-01', $yr, $mon);
+    $to   = date('Y-m-t', strtotime($from));
+    $rows = ops_all("SELECT sbu, COALESCE(SUM(COALESCE(invoice_amount, expected_credit, 0)),0) v
+                     FROM jobs WHERE executing_office_id=? AND sbu <> ''
+                       AND COALESCE(inspection_end_date, inspection_start_date) >= ?
+                       AND COALESCE(inspection_end_date, inspection_start_date) <= ?
+                     GROUP BY sbu", [(int)$officeId, $from, $to]);
+    $out = []; foreach ($rows as $r) if ((float)$r['v'] > 0) $out[$r['sbu']] = (float)$r['v'];
+    return $out;
+}
+// People per SBU — for heads allocated by headcount. An inspection engineer
+// counts towards the SBUs they actually worked in; everybody else towards the
+// SBUs their split names.
+function costing_office_headcount($officeId, $yr, $mon) {
+    $out = costing_office_mix($officeId, $yr, $mon);   // engineers, by where they worked
+    foreach ($out as $k => $v) $out[$k] = 0;           // want heads, not days
+    foreach (array_keys(costing_office_mix($officeId, $yr, $mon)) as $s) $out[$s] = ($out[$s] ?? 0) + 1;
+    $people = ops_all("SELECT id FROM users WHERE home_office_id=? AND is_active=1
+                       AND COALESCE(is_production,0)=0", [(int)$officeId]);
+    foreach ($people as $p)
+        foreach (person_split($p['id'], $yr, $mon) as $sbu => $pct)
+            if ((float)$pct > 0) $out[$sbu] = ($out[$sbu] ?? 0) + ((float)$pct / 100);
+    return array_filter($out, function ($v) { return $v > 0; });
+}
+
+// ---------------------------------------------------------------------------
+//  Does this office have real figures, or is it still on the old percentage?
+//
+//  Said out loud on every screen that shows a cost, because a number computed
+//  two different ways for two different branches, with nothing saying which,
+//  is worse than either.
+// ---------------------------------------------------------------------------
+function office_uses_real_costs($officeId) {
+    if (!$officeId) return false;
+    $sal = (int)ops_val("SELECT COUNT(*) FROM users WHERE home_office_id=? AND is_active=1
+                         AND COALESCE(monthly_ctc,0) > 0", [(int)$officeId]);
+    $exp = (int)ops_val("SELECT COUNT(*) FROM office_expenses WHERE office_id=? AND amount>0", [(int)$officeId]);
+    return $sal > 0 || $exp > 0;
+}
+function office_cost_basis_text($officeId) {
+    return office_uses_real_costs($officeId)
+        ? 'Real salaries and office costs, allocated to SBUs.'
+        : 'Still on the old overhead percentage — no salaries or office costs have been entered for this '
+          . Tl('office') . ' yet.';
+}

@@ -98,6 +98,7 @@ try {
     require __DIR__ . '/lib/contracts.php';
     require __DIR__ . '/lib/security.php';
     require __DIR__ . '/lib/compliance.php';
+    require __DIR__ . '/lib/costing.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
@@ -176,6 +177,11 @@ try {
     db()->query("SELECT qty_total FROM partner_contracts LIMIT 1");
     db()->query("SELECT totp_enabled FROM users LIMIT 1");
     db()->query("SELECT half_day_hours FROM users LIMIT 1");
+    db()->query("SELECT monthly_ctc FROM users LIMIT 1");
+    db()->query("SELECT sbus FROM offices LIMIT 1");
+    db()->query("SELECT is_outstation FROM calls LIMIT 1");
+    db()->query("SELECT id FROM office_expense_heads LIMIT 1");
+    db()->query("SELECT id FROM cost_allocations LIMIT 1");
     db()->query("SELECT id FROM security_incidents LIMIT 1");
     db()->query("SELECT id FROM data_requests LIMIT 1");
     db()->query("SELECT id FROM data_consents LIMIT 1");
