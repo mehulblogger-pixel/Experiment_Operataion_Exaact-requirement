@@ -260,8 +260,13 @@
       <input class="form-control" type="date" id="schedule_end_date" name="schedule_end_date"
              value="<?= e(($job['schedule_end_date'] ?? '') ?: ($call['schedule_end_date'] ?? '')) ?>"></div>
 
+    <?php // §price — the man-days ARE the quantity. Entering 6 here and watching
+          // the money stay at one day's rate is the commonest way a deputation
+          // gets invoiced short: the value was carried from the call once and
+          // then never followed the days. It follows them now. ?>
     <div class="ff"><label>Man-days <span class="muted">— 0 counts them from the dates</span></label>
-      <input class="form-control" type="number" step="0.5" name="mandays" value="<?= e($job['mandays'] ?? '0') ?>"></div>
+      <input class="form-control" type="number" step="0.5" id="j_mandays" name="mandays" value="<?= e($job['mandays'] ?? '0') ?>">
+      <small class="muted" id="md_note"></small></div>
 
     <?php // The client named these days; they are not ours to invent. Two lines
           // to begin with and one more on request, rather than twenty empty boxes. ?>
@@ -299,10 +304,21 @@
           // work, and it exists only when those are two different branches.
           // Revenue is the invoice less any credit given away — so added across
           // the branches it comes back to the invoice value exactly. ?>
+    <?php $unitRate = (float)($call['billable_rate'] ?? 0);
+          $unitBasis = (string)($call['billable_basis'] ?? '');
+          $unitLabel = $unitBasis ? (lk_options_or('charge_unit', CHARGE_UNITS)[$unitBasis] ?? $unitBasis) : 'unit'; ?>
+    <div class="ff"><label>Unit rate <span class="muted">— as quoted, from the <?= e(Tl('call')) ?></span></label>
+      <input class="form-control" type="number" step="0.01" id="j_rate" name="billable_rate_display"
+             value="<?= e($unitRate ?: '') ?>" readonly style="background:var(--soft)"
+             data-basis="<?= e($unitLabel) ?>">
+      <small class="muted"><?= $unitRate > 0
+        ? 'Per ' . e(strtolower($unitLabel)) . ', taken from the order line on the ' . e(Tl('call')) . '.'
+        : 'No rate came through on the ' . e(Tl('call')) . ' — type the invoice value below by hand.' ?></small></div>
     <div class="ff"><label>Invoice value to the <?= e(Tl('client')) ?> (<?= e(cur_sym()) ?>, ex-GST)</label>
-      <input class="form-control" type="number" step="0.01" name="invoice_value"
+      <input class="form-control" type="number" step="0.01" id="j_invoice" name="invoice_value"
              value="<?= e($job['invoice_value'] ?? $call['billable_value'] ?? '') ?>">
-      <small class="muted">What is charged, as agreed on the order or the <?= e(Tl('quote')) ?>. Carried from the <?= e(Tl('call')) ?>.</small></div>
+      <input type="hidden" id="j_invoice_auto" name="invoice_value_auto" value="<?= ($job && (float)($job['invoice_value'] ?? 0) > 0) ? '0' : '1' ?>">
+      <small class="muted" id="inv_note">Rate × man-days. Type over it if this one is billed differently.</small></div>
     <?php // Marking the credit required on a same-office deputation meant the
           // browser refused to submit a form over a box that should not have
           // been there at all, and the button simply did nothing. ?>

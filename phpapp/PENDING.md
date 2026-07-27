@@ -2,6 +2,25 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 💰 THE MAN-DAYS ARE THE QUANTITY (July 2026)
+
+Six man-days entered on the allocate screen, against an order line at 3,000 a
+man-day, and the value stayed at 3,000.
+
+The invoice value was carried across from the call **once** and then followed
+nothing. If the call was priced as a single visit — which it usually is, because
+the man-days are not known until somebody is allocated — the deputation kept
+that one day's figure however many days were actually worked. Every multi-day
+deputation raised off a single-day call was set up to be invoiced short.
+
+The allocate screen now shows the **unit rate carried from the call** (read-only)
+and works the invoice value out as **rate × man-days**, live. Man-days left at 0
+means "count them from the dates", and the schedule says how many that is. Typing
+over the value stops it being recalculated, and says so.
+
+Recomputed on the server as well as in the browser — a figure that only exists
+if JavaScript ran is a figure that will one day be wrong.
+
 ## 🧨 TWO THINGS THE SHAPE REWRITE BROKE (July 2026)
 
 Both were mine, both were reported from the live site, and both are the same
