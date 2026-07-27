@@ -1738,12 +1738,19 @@ function ops_module_gate($route) {
         'user-unlock'=>'users','user-2fa-reset'=>'users','user-retire'=>'users',
         'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
+        'preflight'=>'settings',
         'reset-data'=>'settings',
         'partner-import'=>'clients','partner-template'=>'clients','duplicates'=>'clients',
     ];
     $mod = $map[$base] ?? null;
     if ($mod && !can("mod.$mod.view")) {
-        ops_require(false, 'You don’t have access to the ' . (ACCESS_MODULES[$mod] ?? $mod) . ' module. Ask your administrator.');
+        // Two different "no"s, and they need two different sentences. Telling
+        // somebody to ask their administrator for a module the company has not
+        // bought sends them on an errand that cannot succeed.
+        $owner = function_exists('licence_owner') ? licence_owner($mod) : null;
+        ops_require(false, ($owner && !licence_enabled($owner))
+            ? 'The ' . PRODUCT_MODULES[$owner][0] . ' module is not switched on for this installation.'
+            : 'You don’t have access to the ' . (ACCESS_MODULES[$mod] ?? $mod) . ' module. Ask your administrator.');
     }
 }
 
@@ -1872,6 +1879,8 @@ function ops_dispatch($route, $method) {
             ops_user_retire($method); return true;
         case $route === 'user-2fa-reset':
             ops_user_twofa_reset($method); return true;
+        case $route === 'preflight':
+            ops_preflight(); return true;
         case $route === 'settings':
             ops_settings($method); return true;
         case $route === 'access':
@@ -4603,6 +4612,17 @@ function ops_users($route, $method) {
 function ops_settings($method) {
     ops_require(can('settings.manage'), 'Only admins can change settings.');
     if ($method === 'POST') {
+        // Which parts of the product this installation runs. Master Admin only —
+        // switching a module off hides it from everybody including the person
+        // doing the switching, so it is not an ordinary admin setting.
+        if (isset($_POST['mod_on']) || ($_POST['modules_form'] ?? '') === '1') {
+            if (!is_master()) { flash('Only the Master Admin can change which modules are licensed.', 'error'); redirect('/settings'); }
+            if (getenv('MODULES_OFF')) { flash('Modules are pinned by this server\'s configuration (MODULES_OFF) and cannot be changed here.', 'warning'); redirect('/settings'); }
+            $off = licence_save($_POST);
+            flash($off ? 'Modules updated. Switched off: ' . implode(', ', array_map(fn($k) => PRODUCT_MODULES[$k][0], $off)) . '.'
+                       : 'Modules updated — every module is switched on.');
+            redirect('/settings');
+        }
         $m = (int)($_POST['fy_start_month'] ?? 4);
         setting_set('fy_start_month', ($m >= 1 && $m <= 12) ? $m : 4);
         setting_set('tat_threshold_days', (int)($_POST['tat_threshold_days'] ?? 3));

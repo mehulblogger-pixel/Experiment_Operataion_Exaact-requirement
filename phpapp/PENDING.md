@@ -2,6 +2,54 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ ROADMAP PHASE 2 — one product, licensed by module (July 2026)
+
+The answer to *"can we separate every module and provide them separately?"*,
+delivered the way that gets the commercial outcome without the refactor.
+
+- [x] **2.1 · Module licensing.** `lib/licence.php`. Six saleable modules —
+      Operations, Administration, Sales & CRM, Inspection reporting, Money,
+      People & hiring. Switch one off and its menu group disappears, its routes
+      refuse, and its dashboard panels drop out.
+      **The whole thing is one hook inside `can()`**, because every screen and
+      every menu item in this app already asks `can('mod.<x>.view')`. That is
+      why this took days instead of the 6–10 weeks a real code split would have
+      cost for nothing a customer can see.
+      Four decisions worth keeping:
+      · the licence is checked **before** the Master Admin bypass — a module the
+        customer has not bought is not a permissions question, and an admin who
+        could still open it would be looking at something unsupported;
+      · only `mod.*` permissions can be licensed away — `data.salary` is a role
+        question, not a contract question, and licensing it here would silently
+        change who sees salaries;
+      · **Operations and Administration cannot be switched off**, and naming
+        them is ignored rather than obeyed — an inspection system without calls,
+        deputations, masters and users is not a smaller product;
+      · an access module nobody has claimed stays **visible**, so a module added
+        next year cannot vanish because somebody forgot to license it.
+      Settable at Settings → Modules (Master Admin only), or pinned from outside
+      the database with `MODULES_OFF` for an on-premise install. 27 rule tests
+      plus 16 browser checks switching Sales and Money off and back on.
+- [x] **2.2 · Pre-flight server check** — Settings → Server check. PHP version,
+      every extension, the PDO driver actually configured, php.ini upload limits
+      against the app's own limit, and HTTPS. Required items are separated from
+      optional ones, and an optional miss says **what feature you lose** rather
+      than showing an error, because the app genuinely keeps working.
+- [x] **2.3 · A version.** `APP_VERSION` (`2026.07.1`, date-based so it means
+      something read aloud on a support call). On the login screen — which used
+      to say a hardcoded "v1.0" — and on the server check.
+- [x] **2.4 · Release packaging** — `tools/release.sh` builds a dated, versioned
+      `.tar.gz` and `.zip` with a `.sha256`, from tracked files only.
+      **It refuses to build from a dirty working tree.** That guard is not
+      theoretical: the first run of this script produced a package that died on
+      its first page load, because three new files were not yet committed and
+      `git ls-files` correctly left them out. A customer would have received a
+      broken product.
+
+*Verified:* lint green (140 files), 83 screens render, t_lic 27, t_comp 22,
+t_bills 31, t_sched 39, t_rev 24, t_profit 22, t_cost 20, t_mis 45, t_hours 7,
+t_session 12, plus 15 + 16 + 13 browser checks.
+
 ## ✅ ROADMAP PHASE 1 — the broken flows are fixed (July 2026)
 
 Six items from the gap review, all verified in a real browser as the role that

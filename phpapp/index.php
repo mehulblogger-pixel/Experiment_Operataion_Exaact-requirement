@@ -87,6 +87,7 @@ try {
     require __DIR__ . '/lib/helpers.php';
     require __DIR__ . '/lib/ops.php';
     require __DIR__ . '/lib/lookups.php';
+    require __DIR__ . '/lib/licence.php';
     require __DIR__ . '/lib/access.php';
     require __DIR__ . '/lib/terms.php';
     require __DIR__ . '/lib/compose.php';
@@ -108,6 +109,7 @@ try {
     require __DIR__ . '/lib/callprofit.php';
     require __DIR__ . '/lib/bills.php';
     require __DIR__ . '/lib/competence.php';
+    require __DIR__ . '/lib/preflight.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {

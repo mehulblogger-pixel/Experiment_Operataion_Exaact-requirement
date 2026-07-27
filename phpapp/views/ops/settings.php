@@ -1,6 +1,38 @@
 <div class="crumbs"><a href="/">Home</a> › Settings</div>
 <h1>System settings</h1>
-<p class="sub">Company-wide options — financial year, branding and dashboards.</p>
+<p class="sub">Company-wide options — financial year, branding and dashboards.
+  <a href="/preflight">Server check &amp; version <?= e(APP_VERSION) ?> →</a></p>
+
+<?php // Which parts of the product this installation runs. Its own form, because
+      // switching a module off changes what everybody can see and should not be
+      // saved by accident alongside a logo upload. ?>
+<?php if (is_master()): $mods = licence_summary(); $pinned = (bool)getenv('MODULES_OFF'); ?>
+<form method="post" action="/settings" class="panel" style="max-width:620px;">
+  <input type="hidden" name="modules_form" value="1">
+  <h3 class="tab-sub" style="margin-top:0;">Modules</h3>
+  <p class="sub" style="margin-top:0">What this installation has. Switching one off hides it from
+    <strong>everybody, including you</strong> — the menu group disappears and its screens refuse.
+    Nothing is deleted; switching it back on restores it exactly as it was.</p>
+  <?php if ($pinned): ?>
+    <div class="msg msg-warning">Modules are pinned by this server's configuration
+      (<code>MODULES_OFF</code>) and cannot be changed from this screen.</div>
+  <?php endif; ?>
+  <div class="checkgrid" style="grid-template-columns:1fr">
+    <?php foreach ($mods as $key => $m): ?>
+      <label class="chk" style="align-items:flex-start;padding:7px 2px">
+        <input type="checkbox" name="mod_on[<?= e($key) ?>]" value="1"
+               <?= $m['on'] ? 'checked' : '' ?> <?= ($m['core'] || $pinned) ? 'disabled' : '' ?>>
+        <span><strong><?= e($m['label']) ?></strong>
+          <?php if ($m['core']): ?><span class="pill p-mut">always on</span><?php endif; ?>
+          <br><span class="muted" style="font-size:12px"><?= e($m['desc']) ?></span></span>
+      </label>
+    <?php endforeach; ?>
+  </div>
+  <p class="muted" style="font-size:12px;margin:8px 2px">Operations and Administration cannot be switched off —
+    an inspection system without calls, deputations, masters and users is not a smaller product.</p>
+  <?php if (!$pinned): ?><button class="btn" type="submit">Save modules</button><?php endif; ?>
+</form>
+<?php endif; ?>
 
 <form method="post" action="/settings" enctype="multipart/form-data" class="panel" style="max-width:620px;">
   <h3 class="tab-sub" style="margin-top:0;">Branding</h3>
