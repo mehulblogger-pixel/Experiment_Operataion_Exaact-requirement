@@ -30,7 +30,7 @@ None of this is code. All of it blocks a sale, an audit, or both.
 
 ---
 
-## Phase 1 — Fix what is broken (4–6 days)
+## Phase 1 — Fix what is broken (4–6 days) — ✅ DONE, commit 5d15879
 
 The app has flow breaks that a demo will expose. These come first, always.
 
@@ -48,7 +48,7 @@ complete that role's day without hitting a dead end.
 
 ---
 
-## Phase 2 — Make it sellable and installable (4–5 days)
+## Phase 2 — Make it sellable and installable (4–5 days) — ✅ DONE, commit 70fae4f
 
 This is the "separate modules" answer, done the cheap way that gets the same
 commercial result.
@@ -250,11 +250,11 @@ with a plausible engine that no accredited body can actually use.
 
 ## The whole thing, in one view
 
-| Phase | What | Est. | Start when |
+| Phase | What | Est. | Status |
 |---|---|---:|---|
-| 0 | Owner actions (HTTPS, passwords, backups) | hours | **now** |
-| 1 | Fix the broken flows | 4–6 d | now |
-| 2 | Module licensing, pre-flight, versioning | 4–5 d | after 1 |
+| 0 | Owner actions (HTTPS, passwords, backups) | hours | **still yours — blocks 7** |
+| 1 | Fix the broken flows | 4–6 d | ✅ done `5d15879` |
+| 2 | Module licensing, pre-flight, versioning | 4–5 d | ✅ done `70fae4f` |
 | 3 | **ISO/IEC 17020:2026 transition pack** | 12–16 d | after 1 |
 | 4 | Trust layer + verifiable reports | 6–8 d | after 3.6 |
 | 5 | Client portal, tax, ageing, feedback | 10–14 d | after 4 |
