@@ -1739,6 +1739,9 @@ function ops_module_gate($route) {
         'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'preflight'=>'settings',
+        'equipment'=>'equipment','equip-new'=>'equipment','equip-edit'=>'equipment',
+        'equip-cal-add'=>'equipment','equip-cal-del'=>'equipment','equip-cert'=>'equipment',
+        'report-equip-add'=>'equipment','report-equip-del'=>'equipment',
         'reset-data'=>'settings',
         'partner-import'=>'clients','partner-template'=>'clients','duplicates'=>'clients',
     ];
@@ -1879,6 +1882,8 @@ function ops_dispatch($route, $method) {
             ops_user_retire($method); return true;
         case $route === 'user-2fa-reset':
             ops_user_twofa_reset($method); return true;
+        case strncmp($route, 'equip', 5) === 0 || $route === 'report-equip-add' || $route === 'report-equip-del':
+            return ops_equipment($route, $method);
         case $route === 'preflight':
             ops_preflight(); return true;
         case $route === 'settings':

@@ -540,6 +540,16 @@ function ops_idems_documents($route, $method) {
             flash('This report must be fully approved through its approval chain before it can be finalized.', 'error');
             redirect('/document?id=' . $doc['id']);
         }
+        // ISO/IEC 17020 §6.2 — a report must not go out claiming an instrument
+        // that was out of calibration on the day the work was done. Checked on
+        // the server, and NOT overridable: unlike a lapsed personnel ticket,
+        // there is no honest reading under which a measurement taken with an
+        // uncalibrated instrument is still valid.
+        if (function_exists('report_equipment_block') && ($why = report_equipment_block($doc)) !== '') {
+            flash($why . ' Correct the calibration record, or take the instrument off this '
+                  . Tl('report') . ', then issue it.', 'error');
+            redirect('/document?id=' . $doc['id']);
+        }
         $issue = $doc['issue_date'] ?: date('Y-m-d');
         $pdo->prepare("UPDATE report_docs SET finalized=1, status='ISSUED', finalized_at=?, finalized_by=?, issue_date=?, updated_at=? WHERE id=?")
             ->execute([date('c'), user_name(current_user()), $issue, date('c'), $doc['id']]);

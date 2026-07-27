@@ -78,7 +78,7 @@ alternative. Nothing else in this document has that.
 
 | # | Item | Est. | Clause |
 |---|---|---:|---|
-| 3.1 | **Equipment & calibration register** — instrument ID, owner, certificate, due date; and the report **refuses to finalise** naming an instrument out of calibration | 3 d | §6.2 |
+| 3.1 | ✅ **DONE** — **Equipment & calibration register** — instrument ID, owner, certificate, due date; and the report **refuses to finalise** naming an instrument out of calibration | 3 d | §6.2 |
 | 3.2 | **Competence & authorisation matrix** — which inspection types / methods / clients each person is authorised for; witnessed-inspection record; periodic monitoring | 3 d | §6.1 (incl. 6.1.8) |
 | 3.3 | **Impartiality & conflict-of-interest** — per-deputation declaration, plus a register of declared threats and how each was resolved. **2026 explicitly adds threats from organisational relationships, outsourcing and financial pressure** | 2 d | §4.1 |
 | 3.4 | **Complaints & appeals register** — logged, acknowledged, investigated, closed; appeals decided by people not involved in the original inspection | 2 d | §7.5, §7.6 |

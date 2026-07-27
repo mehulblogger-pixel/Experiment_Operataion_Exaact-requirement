@@ -91,6 +91,8 @@
         <?php endif; ?>
         <?php endif; ?>
 
+        <?php if (can('mod.equipment.view')): ?><a class="s-item<?= $navOn(['equipment','equip-new','equip-edit']) ?>" href="/equipment"><span class="s-ic">📏</span><span>Equipment &amp; calibration</span></a><?php endif; ?>
+
         <?php if (can('mod.idems.view')): ?>
         <div class="s-grp">Reporting</div>
         <a class="s-item<?= $navOn(['documents','document','document-new','document-edit']) ?>" href="/documents"><span class="s-ic">📑</span><span><?= e(T_REG('report')) ?></span></a>

@@ -2,6 +2,51 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ ROADMAP 3.1 — equipment & calibration (ISO/IEC 17020 §6.2) (July 2026)
+
+`lib/equipment.php`, `equipment` · `equipment_calibrations` · `report_equipment`.
+
+Before this the app had **no equipment at all** — yet a report could print the
+standard sentence *"the measuring and test equipment used was verified to be
+within its valid calibration period"* with nothing behind it. An assessor asks
+for the certificate.
+
+Four things it now makes true:
+
+1. **Every instrument is on a register** with the identity somebody reads off
+   the label: code, serial, make/model, range, accuracy, owning branch, who
+   holds it, ownership (ours / hired / client's), and state.
+2. **Calibration is a HISTORY, not a field.** This is the design decision that
+   matters. "Valid to 12 Aug" says nothing about the instrument's state on
+   3 March. `equipment_calibration_on($id, $date)` returns *the certificate that
+   was in force on that date* — so a report is judged against the certificate
+   live when the work was done, and re-calibrating an instrument next year
+   cannot quietly rewrite what an issued report rested on. The link row also
+   stamps **which certificate** was relied on.
+3. **The instrument is named on the report** that used it. A register nothing
+   links to is paperwork; the link is what makes it evidence.
+4. **A report will not issue** naming an instrument that was out of calibration
+   on the inspection date — checked in `document-finalize` on the server, and
+   **not overridable**. Unlike a lapsed personnel ticket there is no honest
+   reading under which a measurement taken with an uncalibrated instrument is
+   still valid. An out-of-calibration instrument *can* still be recorded, so
+   the record stays truthful about what was actually used.
+
+Also: state beats calibration (quarantined / under repair / retired is unusable
+however good the certificate), a FAIL certificate is not a calibration, and
+30-day reminders run from `cron.php` beside the personnel ones.
+
+**A bug worth remembering.** The register came back permanently empty in
+testing. The cause was `status <> 'RETIRED'` — ambiguous, because `inspectors`
+also has a `status` column and the query joins it. What *hid* it was my own
+`catch (Throwable) { return []; }`, meant to tolerate a pre-migration database.
+A broken query and an empty table are not the same thing. Every such catch in
+this file now re-throws unless the message really is "no such table".
+
+*Verified:* 26 rule tests (including the certificate-on-the-day case both ways),
+9 browser checks adding an instrument, filing a certificate and quarantining it,
+lint green (143 files), 83 screens render.
+
 ## ✅ ROADMAP PHASE 2 — one product, licensed by module (July 2026)
 
 The answer to *"can we separate every module and provide them separately?"*,
