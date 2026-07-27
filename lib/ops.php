@@ -3487,8 +3487,20 @@ function ops_jobs($route, $method) {
             // What the client is charged comes off the order or the quotation
             // via the call, and rides on the job from here on.
             $b['contracting_office_id'] = $jMng ?: null;
-            if (($b['invoice_value'] ?? '') === '')
+            // §price — the man-days are the quantity. A deputation of six days
+            // against a per-day rate is worth six days, not the one the call was
+            // priced at when it was still a single visit. Recomputed here as
+            // well as in the browser, because a figure that only exists if
+            // JavaScript ran is a figure that will one day be wrong.
+            $invAuto = ($b['invoice_value_auto'] ?? '1') !== '0';
+            $unitRate = (float)($call['billable_rate'] ?? 0);
+            if ($invAuto && $unitRate > 0) {
+                $md = (float)($b['mandays'] ?? 0);
+                if ($md <= 0) $md = max(1, count($jdates));
+                $b['invoice_value'] = round($unitRate * $md, 2);
+            } elseif (($b['invoice_value'] ?? '') === '') {
                 $b['invoice_value'] = (float)($call['billable_value'] ?? 0);
+            }
             if ($jCross && (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0)) {
                 view('ops/job_form', array_merge(call_job_form_vars($job, $call),
                     ['error' => 'This ' . Tl('job') . ' is executed by a different ' . Tl('office')

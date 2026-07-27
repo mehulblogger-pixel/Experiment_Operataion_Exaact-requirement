@@ -846,6 +846,7 @@
         out.style.display = 'none';
         window.__schedCount = 0; window.__schedWord = '';
         if (window.__recalcBillable) window.__recalcBillable();
+        if (window.__recalcJobPrice) window.__recalcJobPrice();
         return;
       }
       out.style.display = '';
@@ -924,6 +925,7 @@
         window.__schedWord = '';
       }
       if (window.__recalcBillable) window.__recalcBillable();
+      if (window.__recalcJobPrice) window.__recalcJobPrice();
       // Anything already forced stays ticked when the panel is redrawn.
       (d.forced || []).forEach(function (f) {
         var c = out.querySelector('.forceday[value="' + f + '"]');
@@ -995,6 +997,57 @@
     }
     applyShape();
     later();
+  }
+
+  // ---- The deputation's value follows its man-days ------------------------
+  //
+  //  The man-days ARE the quantity. Entering six of them and watching the money
+  //  sit at one day's rate is how a deputation gets invoiced short — the value
+  //  was carried over from the call once, when the call was still a single day,
+  //  and then never followed anything. Rate × man-days, live, and still typed
+  //  over when this one is billed some other way.
+  function initJobPrice() {
+    var rate = document.getElementById('j_rate'),
+        md   = document.getElementById('j_mandays'),
+        inv  = document.getElementById('j_invoice'),
+        auto = document.getElementById('j_invoice_auto'),
+        note = document.getElementById('inv_note'),
+        mdNote = document.getElementById('md_note');
+    if (!md || !inv) return;
+    var touched = auto ? auto.value === '0' : false;
+    inv.addEventListener('input', function () {
+      touched = true; if (auto) auto.value = '0';
+      if (note) note.textContent = 'Typed by hand — it will be saved exactly as entered.';
+    });
+    // Man-days of 0 means "count them from the dates", and the schedule knows
+    // how many that is.
+    function days() {
+      var typed = parseFloat(md.value || '0');
+      if (typed > 0) return typed;
+      var n = (typeof window.__schedCount === 'number' && window.__schedCount > 0) ? window.__schedCount : 1;
+      return n;
+    }
+    function recalc() {
+      var d = days();
+      if (mdNote) mdNote.textContent = parseFloat(md.value || '0') > 0
+        ? '' : 'Counted from the dates — ' + d + ' day(s).';
+      var r = parseFloat(rate ? rate.value || '0' : '0');
+      if (touched) return;
+      if (!(r > 0)) {
+        if (note) note.textContent = 'No unit rate on the ' + (window.__callWord || 'call') + ' — enter the value by hand.';
+        return;
+      }
+      inv.value = (Math.round(r * d * 100) / 100).toFixed(2);
+      var basis = (rate.getAttribute('data-basis') || 'unit').toLowerCase();
+      if (note) note.textContent = r.toLocaleString() + ' per ' + basis + ' × ' + d + ' = ' + inv.value
+                                 + '. Type over it if this one is billed differently.';
+    }
+    md.addEventListener('input', recalc);
+    md.addEventListener('change', recalc);
+    // The schedule preview changes the day count when man-days is left at 0.
+    document.addEventListener('sched:updated', recalc);
+    window.__recalcJobPrice = recalc;
+    recalc();
   }
 
   // ---- "Other (add new)…" on a dropdown reveals a text box ----
@@ -1103,6 +1156,7 @@
     initActivity();
     initCustomFreq();
     initEngagement();
+    initJobPrice();
     initClientInspection();
     initCallLinks();
     initTradeSkills();
