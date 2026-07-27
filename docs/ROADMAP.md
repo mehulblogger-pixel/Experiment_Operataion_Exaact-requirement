@@ -21,7 +21,7 @@ None of this is code. All of it blocks a sale, an audit, or both.
 
 | # | Item | Why it blocks |
 |---|---|---|
-| 0.1 | **HTTPS on the live site** | Sessions in clear text; **and the phone app silently stops working** — browsers refuse a service worker over HTTP. Free via Let's Encrypt. |
+| 0.1 | ✅ **HTTPS on the live site** — certificate live at MilesWeb (July 2026). The redirect in `.htaccess` was still commented out and is now **on**, because a certificate that exists but is not enforced buys neither the Secure cookie nor the service worker. **Phase 7 is now unblocked.** |
 | 0.2 | **Change `admin/admin12345`** and every `demo12345` account | The credentials are in the repository. |
 | 0.3 | **Backups running, and one restore actually tried** | Every photo, bill and signed report lives in the database. A backup nobody has restored is a hope. |
 | 0.4 | **Grievance officer + privacy notice** (Settings → Compliance) | DPDP Act. Two text fields, legally required. |
@@ -252,7 +252,7 @@ with a plausible engine that no accredited body can actually use.
 
 | Phase | What | Est. | Status |
 |---|---|---:|---|
-| 0 | Owner actions (HTTPS, passwords, backups) | hours | **still yours — blocks 7** |
+| 0 | Owner actions | hours | HTTPS ✅ done — **Phase 7 unblocked**. Passwords, backups, DPDP notice still open |
 | 1 | Fix the broken flows | 4–6 d | ✅ done `5d15879` |
 | 2 | Module licensing, pre-flight, versioning | 4–5 d | ✅ done `70fae4f` |
 | 3 | **ISO/IEC 17020:2026 transition pack** | 12–16 d | after 1 |

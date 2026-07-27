@@ -725,7 +725,13 @@ lockdown), `2ec3caa` (compliance screen, incident register, data-subject rights,
 In priority order. The first five cost almost nothing and matter more than anything
 in the code.
 
-- [ ] **1. HTTPS on the live site.** THE biggest single gap. Free Let's Encrypt
+- [x] **1. HTTPS on the live site — DONE (July 2026).** Certificate live at MilesWeb.
+      The redirect in `.htaccess` was still commented out and has now been switched **on**:
+      until it was, anyone reaching the bare `http://` address still got a session cookie
+      with no `Secure` flag and **no service worker at all**, so the installable phone app
+      did not work. Verified: announced as HTTPS the app sets `Secure` on the cookie and
+      sends `Strict-Transport-Security`; on plain HTTP it correctly does neither.
+      *Was:* THE biggest single gap. Free Let's Encrypt
       certificate in the MilesWeb cPanel. Once `https://yourdomain` works in a
       browser, remove the `#` from the four lines at the bottom of `phpapp/.htaccess`.
       **Do not uncomment before the certificate works** — visitors would be sent to an
