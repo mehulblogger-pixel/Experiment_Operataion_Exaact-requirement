@@ -210,6 +210,12 @@ try {
         throw new RuntimeException('pending upgrade: engagement-pattern list rename');
     if ((int)db()->query("SELECT COUNT(*) FROM inspectors WHERE roll_type NOT IN ('OWN','AGENCY')")->fetchColumn() > 0)
         throw new RuntimeException('pending upgrade: roll-type normalisation');
+    // The acronyms are gone from the app; a live database set up on an older
+    // version still carries them as list headings. Self-cancelling: boot() renames.
+    if ((int)db()->query("SELECT COUNT(*) FROM lookup_types WHERE (type_key='sbu' AND label='SBU') OR (type_key='boss_status' AND label='BOSS status')")->fetchColumn() > 0)
+        throw new RuntimeException('pending upgrade: list headings renamed off the old acronyms');
+    if ((int)db()->query("SELECT COUNT(*) FROM lookup_values WHERE label='SBU Head' AND type_id IN (SELECT id FROM lookup_types WHERE type_key='designation')")->fetchColumn() > 0)
+        throw new RuntimeException('pending upgrade: designation renamed off the old acronym');
     if (function_exists('charge_units_pending') && charge_units_pending())
         throw new RuntimeException('pending upgrade: shared charge units');
     if (function_exists('service_types_pending') && service_types_pending())
@@ -573,7 +579,7 @@ if ($route === 'partner-add' && $method === 'POST') {
     if ($kind === 'po') {
         // The purchase order the client sends is the answer to a quotation we
         // sent them. Naming that quotation is what makes the rest of this form
-        // unnecessary: the contract, the SBU, the value and every line item are
+        // unnecessary: the contract, the business unit, the value and every line item are
         // already written down, and retyping them is how the two drift apart.
         $qid = (int)($b['quotation_id'] ?? 0);
         $quote = $qid ? ops_one("SELECT * FROM quotations WHERE id=?", [$qid]) : null;
@@ -727,7 +733,7 @@ if ($route === 'po') {
         FROM po_line_items l LEFT JOIN lookup_values t ON t.id=l.trade_id LEFT JOIN lookup_values s ON s.id=l.skill_id
         LEFT JOIN lookup_values a ON a.id=l.activity_id WHERE l.purchase_order_id = ?");
     $li->execute([$po['id']]);
-    // activities available for this PO's SBU(s)
+    // activities available for this PO's business unit(s)
     $poSbus = array_filter(explode(',', $po['sbu'] ?? ''));
     $actBySbu = activity_options_by_sbu();
     $poActivities = [];

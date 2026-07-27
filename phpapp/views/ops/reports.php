@@ -17,7 +17,7 @@
     foreach ($mn as $k=>$v): ?><option value="<?= $k ?>" <?= (string)$F['month']===$k?'selected':'' ?>><?= $v ?></option><?php endforeach; ?></select>
   <select class="form-control" name="office" onchange="this.form.submit()"><option value="">All offices</option>
     <?php foreach ($offOpts as $o): ?><option value="<?= (int)$o['id'] ?>" <?= (string)$F['office']===(string)$o['id']?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?></select>
-  <select class="form-control" name="sbu" onchange="this.form.submit()"><option value="">All SBUs</option>
+  <select class="form-control" name="sbu" onchange="this.form.submit()"><option value="">All <?= e(TP('sbu')) ?></option>
     <?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= $F['sbu']===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
   <select class="form-control searchable" name="client" onchange="this.form.submit()"><option value="">All clients</option>
     <?php foreach (($clientOpts ?? []) as $cl): ?><option value="<?= (int)$cl['id'] ?>" <?= (string)$F['client']===(string)$cl['id']?'selected':'' ?>><?= e($cl['name']) ?></option><?php endforeach; ?></select>
@@ -85,23 +85,23 @@
   <div class="panel"><h4 class="tab-sub" style="margin-top:0">Revenue by <?= e(Tl("boss")) ?></h4><?= svg_hbars($fin['byProjectTop'] ?? [], true) ?></div>
 </div>
 <div class="panel-split">
-  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Credit by SBU</h4><?= svg_donut(chart_relabel_sbu($fin['bySbu']), true) ?></div>
+  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Credit by <?= e(Tl("sbu")) ?></h4><?= svg_donut(chart_relabel_sbu($fin['bySbu']), true) ?></div>
   <div class="panel"><h4 class="tab-sub" style="margin-top:0">Credit by office</h4><?= svg_hbars($fin['byOffice'], true) ?></div>
 </div>
 <div class="panel-split">
   <div class="panel"><h4 class="tab-sub" style="margin-top:0">Expenses by heading</h4><?= svg_hbars($expByHead, true) ?></div>
-  <?php if ($seeSalary): ?><div class="panel"><h4 class="tab-sub" style="margin-top:0">Loaded cost by SBU</h4><?= svg_donut(chart_relabel_sbu($fin['costBySbu']??[]), true) ?></div><?php endif; ?>
+  <?php if ($seeSalary): ?><div class="panel"><h4 class="tab-sub" style="margin-top:0">Loaded cost by <?= e(Tl("sbu")) ?></h4><?= svg_donut(chart_relabel_sbu($fin['costBySbu']??[]), true) ?></div><?php endif; ?>
 </div>
 <div class="panel-split">
-  <div class="panel"><h3 class="tab-sub">By SBU<?= $seeSalary?' — credit vs distributed cost':'' ?></h3>
+  <div class="panel"><h3 class="tab-sub">By <?= e(Tl('sbu')) ?><?= $seeSalary?' — credit vs distributed cost':'' ?></h3>
     <?php $sbuKeys = array_unique(array_merge(array_keys($fin['bySbu']), array_keys($fin['costBySbu'] ?? []))); ?>
-    <table class="grid"><tr><th>SBU</th><th>Credit</th><?php if ($seeSalary): ?><th>Loaded cost</th><th>Net</th><?php endif; ?></tr>
+    <table class="grid"><tr><th><?= e(T('sbu')) ?></th><th>Credit</th><?php if ($seeSalary): ?><th>Loaded cost</th><th>Net</th><?php endif; ?></tr>
     <?php foreach ($sbuKeys as $k): $cr=$fin['bySbu'][$k]??0; $co=$fin['costBySbu'][$k]??0; ?>
       <tr><td><?= e(lk_options_or('sbu',OPS_SBUS)[$k]??$k) ?></td><td><?= fmoney($cr) ?></td>
       <?php if ($seeSalary): ?><td><?= fmoney($co) ?></td><td><strong style="color:<?= ($cr-$co)>=0?'var(--ok)':'var(--bad)' ?>"><?= fmoney($cr-$co) ?></strong></td><?php endif; ?></tr>
     <?php endforeach; ?>
     <?php if(!$sbuKeys):?><tr><td colspan="<?= $seeSalary?4:2 ?>">No data.</td></tr><?php endif;?></table>
-    <?php if ($seeSalary): ?><p class="muted" style="margin-top:6px;">Loaded cost is each active engineer's monthly cost (CTC/12 + <?= OVERHEAD_PCT ?>% overhead) split equally across the SBUs they're tagged to.</p><?php endif; ?></div>
+    <?php if ($seeSalary): ?><p class="muted" style="margin-top:6px;">Loaded cost is each active engineer's monthly cost (CTC/12 + <?= OVERHEAD_PCT ?>% overhead) split equally across the <?= e(Tlp('sbu')) ?> they're tagged to.</p><?php endif; ?></div>
   <div class="panel"><h3 class="tab-sub">Expenses by heading</h3><table class="grid"><tr><th>Heading</th><th>Amount</th></tr>
     <?php foreach (expense_heading_labels() as $k=>$v): ?><tr><td><?= e($v) ?></td><td><?= fmoney($fin['expHead'][$k]) ?></td></tr><?php endforeach; ?>
     <?php $extraLbls = expense_extra_headings(); foreach ($fin['expHeadExtra'] as $code=>$amt): ?><tr><td><?= e($extraLbls[$code] ?? $code) ?></td><td><?= fmoney($amt) ?></td></tr><?php endforeach; ?></table>
@@ -135,7 +135,7 @@
     <?php foreach ($util as $r): ?><tr><td><?= e($r['name']) ?></td><td><?= e($r['mandays']) ?></td><td><div class="bar"><div class="bar-fill" style="width:<?= min(100,(int)$r['pct']) ?>%"></div></div><?= (int)$r['pct'] ?>%</td></tr><?php endforeach; ?>
     <?php if(!$util):?><tr><td colspan="3">No inspectors.</td></tr><?php endif;?></table></div>
   <div class="panel">
-    <h3 class="tab-sub" style="margin-top:0;">Man-days by SBU</h3>
+    <h3 class="tab-sub" style="margin-top:0;">Man-days by <?= e(Tl('sbu')) ?></h3>
     <?= svg_hbars(chart_relabel_sbu($mdBySbu)) ?>
     <p class="muted" style="margin-top:8px;">Deputation: <?= e($depMd) ?> md · Day-based: <?= e($inspMd) ?> md · Sub-con: <?= e($subMd) ?> md</p>
   </div>

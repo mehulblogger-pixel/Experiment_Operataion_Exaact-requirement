@@ -9,7 +9,7 @@
   <?php if ($q): ?><a class="btn secondary" href="/m/inspectors">Clear</a><?php endif; ?>
 </form>
 <table class="grid">
-  <tr><th>Name</th><th>Emp code</th><th>Trade</th><th>SBUs</th><th>Skills</th><th>Status</th><th>Actions</th></tr>
+  <tr><th>Name</th><th>Emp code</th><th>Trade</th><th><?= e(TP('sbu')) ?></th><th>Skills</th><th>Status</th><th>Actions</th></tr>
   <?php foreach ($rows as $r): ?>
   <tr>
     <td><a href="/m/inspectors/edit?id=<?= (int)$r['id'] ?>"><strong><?= e($r['name'] ?: '—') ?></strong></a></td>

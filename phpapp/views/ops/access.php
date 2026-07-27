@@ -4,8 +4,8 @@
   $allPerm = all_permissions();
   // short plain-English description of each role (who they are)
   $roleBlurb = [
-    'BUSINESS_DIRECTOR' => 'Top management. Sees everything across all offices and SBUs — all dashboards, revenue, salary and profitability — but does not run day-to-day operations.',
-    'SBU_HEAD' => 'Heads one SBU across all offices. Full dashboards & figures for their SBU; approves inspection reports for their people.',
+    'BUSINESS_DIRECTOR' => 'Top management. Sees everything across all offices and ' . Tlp('sbu') . ' — all dashboards, revenue, salary and profitability — but does not run day-to-day operations.',
+    'SBU_HEAD' => 'Heads one ' . Tl('sbu') . ' across all offices. Full dashboards & figures for their ' . Tl('sbu') . '; approves inspection reports for their people.',
     'BRANCH_MANAGER' => 'Runs one office end-to-end: calls, jobs, availability, report approvals, masters, and users in that office.',
     'BRANCH_APP_MANAGER' => 'Application manager in a branch — masters, overheads and branch users; limited operational view.',
     'OPERATION_MANAGER' => 'Under the branch manager — allocates & closes jobs, runs the availability board, approves reports.',
@@ -37,7 +37,7 @@
     <div style="flex:1;min-width:260px">
       <h3 style="margin:0 0 4px"><?= e($roles[$sel]) ?></h3>
       <p class="muted" style="margin:0"><?= e($roleBlurb[$sel] ?? '') ?></p>
-      <p class="muted" style="margin:6px 0 0">Recommended data scope: <strong>Offices <?= e($scope['offices'] ?? 'OWN') ?></strong> · <strong>SBUs <?= e($scope['sbus'] ?? 'OWN') ?></strong></p>
+      <p class="muted" style="margin:6px 0 0">Recommended data scope: <strong>Offices <?= e($scope['offices'] ?? 'OWN') ?></strong> · <strong><?= e(TP('sbu')) ?> <?= e($scope['sbus'] ?? 'OWN') ?></strong></p>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <form method="post" action="/access" onsubmit="return confirm('Apply the recommended permission set for <?= e($roles[$sel]) ?>? This replaces the current ticks below (you can still adjust before saving).')">

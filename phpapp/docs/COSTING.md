@@ -7,7 +7,7 @@ confusing. Keep them apart and it becomes simple.
 
 | Question | Answer comes from | Who asks it |
 |---|---|---|
-| Did *this order* make money? | The BOSS number's own revenue and its own direct costs | Sales, branch manager, anyone pricing the next job |
+| Did *this order* make money? | The contract number's own revenue and its own direct costs | Sales, branch manager, anyone pricing the next job |
 | Did *this branch* make money? | Total revenue minus every rupee the branch spent | The owner, the accountant |
 
 The first is a **job-level** number. The second is an **office-level** number.
@@ -15,12 +15,12 @@ They are not meant to add up to each other, and they never will.
 
 ---
 
-## Question 1 — did this BOSS number make money?
+## Question 1 — did this contract number make money?
 
 Only what that order actually caused.
 
 ```
-Revenue billed on the BOSS number
+Revenue billed on the contract number
   −  the engineer's time on it   (their monthly cost ÷ working days × days worked)
   −  their travel and site expenses
   −  any sub-contractor paid for it
@@ -32,7 +32,7 @@ Nobody's salary is spread onto it, the rent is not spread onto it, and the
 branch manager is not spread onto it. Every figure here is traceable to
 something that happened on that job.
 
-### Worked example — BOSS-2231
+### Worked example — CN-2231
 
 - Client billed: **₹2,00,000**
 - Engineer: Ravi, cost **₹60,000 a month**, 22 working days in the month →
@@ -47,7 +47,7 @@ Engineer's time (11 days)  − 30,000
 Travel & site expenses     − 18,000
 Sub-contractor             −  9,000
                            ─────────
-Profit on BOSS-2231         1,43,000   (71.5%)
+Profit on CN-2231         1,43,000   (71.5%)
 ```
 
 That is what the Profitability screen shows for the order.
@@ -64,7 +64,7 @@ places, in this order of priority:
 3. If both are blank, 8%
 
 With 8% on, Ravi's 11 days cost `30,000 × 1.08 = ₹32,400` instead of ₹30,000,
-and BOSS-2231 shows ₹1,40,600 instead of ₹1,43,000.
+and CN-2231 shows ₹1,40,600 instead of ₹1,43,000.
 
 There is also a **contingency %** which works the same way — a buffer added on
 top of (labour + expenses + sub-con), also per office, also blank by default.
@@ -95,7 +95,7 @@ This is a straight subtraction. Nothing is allocated, nothing is estimated.
 
 | | ₹ |
 |---|---:|
-| 14 BOSS numbers billed | 24,00,000 |
+| 14 contract numbers billed | 24,00,000 |
 
 **People**
 
@@ -138,16 +138,16 @@ about.
 
 ---
 
-## Question 3 (bonus) — which SBU is carrying which?
+## Question 3 (bonus) — which business unit is carrying which?
 
 Branch profit is one number. It does not tell you whether Oil & Gas is paying
 for Industrial's losses. For that, the ₹3,66,000 of salary and ₹89,000 of
-office cost has to be shared out across the SBUs. That is what the allocation
+office cost has to be shared out across the business units. That is what the allocation
 engine does, and it follows the rules you set:
 
 ### Rule 1 — inspection engineers follow their work
 
-A day worked goes to that job's SBU and activity code. Nothing is estimated.
+A day worked goes to that job's business unit and activity code. Nothing is estimated.
 
 *Ravi, July: 10 days Industrial, 5 days Oil & Gas, 7 days not chargeable
 (office, leave, holidays).*
@@ -164,7 +164,7 @@ somewhere; nothing is lost and nothing is invented.
 
 ### Rule 2 — travel days belong to the inspection they are for
 
-A travel day carries no job of its own. By your rule it takes the SBU and
+A travel day carries no job of its own. By your rule it takes the business unit and
 activity code of the inspection it is travelling for — whether you travel out
 the day before, or travel back the day after.
 
@@ -174,12 +174,12 @@ either side attach to that job automatically.
 ### Rule 3 — everybody else splits by percentage, set monthly
 
 A branch manager looks after the whole branch, so their salary cannot follow
-any single job. Instead each non-engineer gets a **percentage box per SBU on
+any single job. Instead each non-engineer gets a **percentage box per business unit on
 their own record**, set each month.
 
-*Bela the branch manager, ₹1,20,000, four SBUs in the branch:*
+*Bela the branch manager, ₹1,20,000, four business units in the branch:*
 
-| SBU | % | ₹ |
+| Business unit | % | ₹ |
 |---|---:|---:|
 | Industrial | 40 | 48,000 |
 | Oil & Gas | 40 | 48,000 |
@@ -187,7 +187,7 @@ their own record**, set each month.
 | Government | 10 | 12,000 |
 | | **100** | **1,20,000** |
 
-Ten SBUs in the branch means ten boxes. Equal across all of them is fine too
+Ten business units in the branch means ten boxes. Equal across all of them is fine too
 (25/25/25/25); so is 40/40/20.
 
 **If the split is not entered this month, last month's carries forward.**
@@ -200,12 +200,12 @@ Each expense head says how it should spread, and you choose:
 
 | Basis | Used for |
 |---|---|
-| Equally across the SBUs | Rent, electricity, general overheads |
+| Equally across the business units | Rent, electricity, general overheads |
 | By man-days worked | Anything driven by activity |
 | By revenue earned | Professional fees, contingency |
 | By the number of people | Laptops, internet, stationery |
 
-*Rent ₹50,000, spread equally across four SBUs → ₹12,500 each.*
+*Rent ₹50,000, spread equally across four business units → ₹12,500 each.*
 *Laptops ₹12,000 by headcount, where Industrial holds half the people →
 ₹6,000 Industrial, the rest shared.*
 
@@ -215,10 +215,10 @@ rename it, change its basis, retire it. Nothing there is fixed in the code.
 ### Rule 5 — an engineer with no chargeable day at all
 
 Rare, but it has to land somewhere. **You decide**, on Office costs &
-overheads → *SBUs in this office*:
+overheads → *business units in this office*:
 
-- by the office's overall SBU mix that month (the default), or
-- equally across the branch's SBUs, or
+- by the office's overall business unit mix that month (the default), or
+- equally across the branch's business units, or
 - by a fixed percentage set on that person's record
 
 ---
@@ -227,13 +227,13 @@ overheads → *SBUs in this office*:
 
 | Situation | Where the cost goes |
 |---|---|
-| Engineer works a day on a job | That job's SBU + activity code + BOSS number |
-| Engineer in the office / on leave / on a holiday | Split by *his own* SBU mix that month |
-| Engineer travels out the day before an outstation job | The SBU + activity of the job he is travelling to |
+| Engineer works a day on a job | That job's business unit + activity code + contract number |
+| Engineer in the office / on leave / on a holiday | Split by *his own* business unit mix that month |
+| Engineer travels out the day before an outstation job | The business unit + activity of the job he is travelling to |
 | Engineer travels back the day after | The same job he was travelling from |
 | Engineer with no chargeable day that month at all | The rule the admin picked for the office |
 | Assistant manager who inspects sometimes | Days on a job → that job. The rest → their own % split |
-| Branch manager, coordinator, accountant, admin | Their own % split per SBU, set monthly |
+| Branch manager, coordinator, accountant, admin | Their own % split per business unit, set monthly |
 | Rent, electricity, laptops, contingency | Their expense head's basis (equal / man-days / revenue / headcount) |
 | Salary | **Never** an expense head — always from the person's record |
 
@@ -245,13 +245,13 @@ overheads → *SBUs in this office*:
 |---|---|
 | Expense heads: add, rename, change basis, retire | Masters → Office expense heads |
 | A person's monthly cost, and whether they do inspections | Their own record, under *Cost & where it belongs* |
-| A person's SBU % split for the month | The same panel — one box per SBU in their branch |
+| A person's business unit % split for the month | The same panel — one box per business unit in their branch |
 | Whether a call is outstation | The call, and it carries through to the allocation |
 | Calculating, storing and closing a month | Month-end cost run |
-| Reading the answer | SBU profit & loss |
+| Reading the answer | Business Unit profit & loss |
 | How much was spent on each head, per month | Office costs & overheads → Actual costs |
-| Which SBUs an office runs | Office costs & overheads → SBUs in this office |
-| Rule for an engineer with no chargeable day | Office costs & overheads → SBUs in this office |
+| Which business units an office runs | Office costs & overheads → business units in this office |
+| Rule for an engineer with no chargeable day | Office costs & overheads → business units in this office |
 | Overhead % and contingency % | Office costs & overheads → Overhead % (fallback) |
 | Working days in a month | Masters → Holidays, and the working-norms settings |
 
@@ -279,12 +279,12 @@ different branches, with nothing saying which, is worse than either.
 ## The order to do it in, month by month
 
 1. **Once, at the start** — Masters → Office expense heads: make the list your
-   own. Office costs & overheads → *SBUs in this office*: tick which SBUs each
+   own. Office costs & overheads → *business units in this office*: tick which business units each
    branch runs.
 2. **Once per person** — open their record, fill in *Cost to the company, per
    month*, and tick *This person does inspections* if they are an inspection
    engineer.
-3. **Every month, for the people who are not engineers** — set their SBU
+3. **Every month, for the people who are not engineers** — set their business unit
    percentages on their record. Skip it and last month's carries forward.
 4. **Every month, per branch** — Office costs & overheads → *Actual costs*:
    type what was spent under each head. *Copy last month* fills it in and you
@@ -292,8 +292,8 @@ different branches, with nothing saying which, is worse than either.
 5. **At month end** — Month-end cost run: pick the branch and the month, read
    the preview and the warnings, press **Calculate and store**, then **Close
    the month** when you are happy.
-6. **Read it** — SBU profit & loss: revenue against cost by SBU, by activity
-   code, and by BOSS number.
+6. **Read it** — Business Unit profit & loss: revenue against cost by business unit, by activity
+   code, and by contract number.
 
 A closed month cannot be changed. If a figure turns out to be wrong, reopen the
 month, fix it, calculate again and close it. Reopening is recorded in the audit

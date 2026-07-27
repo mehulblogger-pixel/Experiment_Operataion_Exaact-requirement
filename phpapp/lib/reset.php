@@ -130,6 +130,13 @@ function reset_run(array $keys) {
     if (in_array('masters', $keys, true)) {
         try { db()->prepare("DELETE FROM settings WHERE skey = 'expense_heads_seeded'")->execute(); } catch (Throwable $e) {}
     }
+    // Clearing the clients and vendors has to STAY cleared. The starter list is
+    // seeded whenever that table is empty — which is exactly the state this
+    // leaves it in — so without this flag they came straight back on the very
+    // next page load and the delete looked as though it had done nothing.
+    if (in_array('partners', $keys, true)) {
+        try { setting_set('partners_seeded', '1'); } catch (Throwable $e) {}
+    }
     // Put the starter lists, the expense heads and the admin account back, so
     // the next screen is a working system rather than an empty one.
     boot();

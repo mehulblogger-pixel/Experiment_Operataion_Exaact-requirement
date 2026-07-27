@@ -46,7 +46,7 @@
         <?php foreach (lk_options_or('designation', DESIGNATIONS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($cand['designation'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
 
-    <div class="ff"><label>SBU</label>
+    <div class="ff"><label><?= e(T("sbu")) ?></label>
       <select class="form-control searchable" name="sbu"><option value="">—</option>
         <?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($cand['sbu'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select></div>

@@ -338,7 +338,7 @@
     });
   }
 
-  // ---- §x: activity depends on the line's SBU ------------------------------
+  // ---- §x: activity depends on the line's business unit ------------------------------
   function fillAct(tr){
     var sbu = tr.querySelector('.l_sbu').value;
     var act = tr.querySelector('.l_act');

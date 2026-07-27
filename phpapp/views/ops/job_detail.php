@@ -267,7 +267,7 @@
           $canDropExp = is_coordinator_level() || can('finance.reconcile') || is_master();
           $seenExp = []; ?>
     <table class="grid">
-      <tr><th>Date</th><th>SBU</th><th>Travel</th><th>Local</th><th>Food</th><th>Lodging</th><th>Misc</th><th>Total</th><?php if ($canDropExp): ?><th></th><?php endif; ?></tr>
+      <tr><th>Date</th><th><?= e(T("sbu")) ?></th><th>Travel</th><th>Local</th><th>Food</th><th>Lodging</th><th>Misc</th><th>Total</th><?php if ($canDropExp): ?><th></th><?php endif; ?></tr>
       <?php $etot=0; $extraLbls=expense_extra_headings(); foreach ($expenses as $x): $ex=expense_extra_decode($x['extra']??''); $rt=$x['travel']+$x['local']+$x['food']+$x['lodging']+$x['misc']+array_sum($ex); $etot+=$rt;
         $sig = $x['exp_date'] . '|' . $x['sbu'] . '|' . $rt; $dupe = isset($seenExp[$sig]); $seenExp[$sig] = 1; ?>
       <tr<?= $dupe ? ' style="background:color-mix(in srgb,var(--warn) 8%,transparent)"' : '' ?>>

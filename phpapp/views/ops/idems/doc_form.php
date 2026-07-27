@@ -24,7 +24,7 @@
 <?php if ($pre): ?>
 <div class="panel" style="border:1px solid var(--ok);background:color-mix(in srgb,var(--ok) 6%,transparent)">
   <b style="color:var(--ok)">✓ Prefilled from <?= e($pre['call_code'] ?? $pre['job_code'] ?? 'the call') ?></b>
-  <span class="muted">— client, vendor, PO, site, product, SBU, office and dates have been carried across. Change anything below if needed.</span>
+  <span class="muted">— client, vendor, PO, site, product, <?= e(Tl("sbu")) ?>, office and dates have been carried across. Change anything below if needed.</span>
 </div>
 <?php endif; ?>
 <?php endif; ?>
@@ -67,7 +67,7 @@
       <select class="form-control searchable" name="office_id"><option value="">— your office —</option>
         <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ((int)$v('office_id')===(int)$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff"><label>SBU</label>
+    <div class="ff"><label><?= e(T("sbu")) ?></label>
       <select class="form-control searchable" name="sbu"><option value="">—</option>
         <?php foreach ($sbuOpts as $sk=>$sv): ?><option value="<?= e($sk) ?>" <?= ((string)$v('sbu')===(string)$sk)?'selected':'' ?>><?= e($sv) ?></option><?php endforeach; ?>
       </select></div>

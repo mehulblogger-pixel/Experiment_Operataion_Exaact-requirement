@@ -161,7 +161,7 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
       </select>
       <?php if (!$awaiting): ?><small class="muted">Every <?= e(Tl('quote')) ?> for this <?= e(Tl('client')) ?> already has a contract number.</small><?php endif; ?></div>
     <div class="ff"><label>Title</label><input class="form-control" id="ct_title" name="title"></div>
-    <div class="ff"><label>SBU</label><select class="form-control searchable" name="sbu"><option value="">—</option><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label><?= e(T("sbu")) ?></label><select class="form-control searchable" name="sbu"><option value="">—</option><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Value</label><input class="form-control" type="number" step="0.01" id="ct_value" name="value"></div>
     <div class="ff"><label>Start date</label><input class="form-control" type="date" name="start_date"></div>
     <?php // Without an end date a contract never expires, and the expiry warnings
@@ -198,7 +198,7 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
   <h3 class="tab-sub">Add a purchase order</h3>
   <?php // The order the client sends is the answer to a quotation we sent them.
         // Name the quotation and everything else is already written down: the
-        // contract number, the SBU, the value and every line item. Typing them
+        // contract number, the business unit, the value and every line item. Typing them
         // again is how the order and the quotation drift apart. ?>
   <?php $poQuotes = function_exists('quotations_for_po') ? quotations_for_po($id) : []; ?>
   <p class="muted">Pick the <?= e(Tl('quote')) ?> this order answers — the contract number, <?= e(Tl('sbu')) ?>,
@@ -253,7 +253,7 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
         var box = c.parentNode && c.parentNode.querySelector('input');
         if (box) box.value = (c.options[c.selectedIndex] || {}).textContent || '';
       }
-      // the SBU it was sold under
+      // the business unit it was sold under
       if (d.sbu) Array.prototype.forEach.call(document.querySelectorAll('.po-sbu'), function (cb) {
         if (d.sbu.split(',').indexOf(cb.value) >= 0) cb.checked = true;
       });

@@ -67,7 +67,7 @@
 <div class="panel" style="padding:0;overflow:hidden">
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
-    <thead><tr><th>Quote</th><th>Client</th><th>Subject</th><th>SBU</th><th class="num">Total</th><th>Contract</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Quote</th><th>Client</th><th>Subject</th><th><?= e(T('sbu')) ?></th><th class="num">Total</th><th>Contract</th><th>Status</th><th></th></tr></thead>
     <tbody>
     <?php foreach ($rows as $r): ?>
     <tr>

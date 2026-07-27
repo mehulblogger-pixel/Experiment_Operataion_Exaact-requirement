@@ -2,14 +2,14 @@
 // ============================================================================
 //  Organisation structure, configurable access (scope + permissions),
 //  settings (financial year), and financial-year helpers.
-//  Scope = which data you see (offices / SBUs / self).
+//  Scope = which data you see (offices / Business Units / self).
 //  Permissions = which features you may use.
 // ============================================================================
 
 // ---- Roles ----------------------------------------------------------------
 const ORG_ROLES = [
     'MASTER_ADMIN' => 'Master Admin', 'BUSINESS_DIRECTOR' => 'Business Director',
-    'SBU_HEAD' => 'SBU Head', 'BRANCH_MANAGER' => 'Branch Manager',
+    'SBU_HEAD' => 'Business Unit Head', 'BRANCH_MANAGER' => 'Branch Manager',
     'BRANCH_APP_MANAGER' => 'Branch Application Manager', 'OPERATION_MANAGER' => 'Operation Manager',
     'ASST_MANAGER' => 'Asst. Manager', 'COORDINATOR' => 'Coordinator',
     // Marketing & Sales (CRM) roles
@@ -35,7 +35,7 @@ const PERMISSIONS = [
     // do their job, and does not need to see what the branch earns on it.
     'data.revenue'    => 'See the revenue figure on a call / deputation',
     'data.salary'     => 'See salary / loaded cost',
-    'data.profitability' => 'See BOSS / contract profitability',
+    'data.profitability' => 'See profitability by contract number',
     'ops.call.create' => 'Create / edit calls',
     'ops.job.allocate'=> 'Allocate / edit jobs',
     'ops.job.close'   => 'Close jobs',
@@ -218,7 +218,7 @@ function role_defaults_base($role) {
             // The Branch Application Manager is the only role that may edit locked timestamps.
             return ['perms' => ['dash.operations','dash.utilization','users.manage.branch','master.manage','ops.call.delete','org.hierarchy.view','idems.type.manage','idems.timestamp.edit','idems.audit.view'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'OPERATION_MANAGER':
-            // "manager under the branch manager" — may see BOSS/contract profitability
+            // "manager under the branch manager" — may see contract profitability
             return ['perms' => ['dash.operations','dash.utilization','data.revenue','data.profitability','ops.call.create','ops.job.allocate','ops.job.close','workforce.availability','workforce.report.approve','idems.finalize'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'ASST_MANAGER':
             return ['perms' => ['dash.operations','ops.call.create','ops.job.allocate','workforce.availability'], 'offices' => 'OWN', 'sbus' => 'OWN'];
@@ -285,7 +285,7 @@ function can($perm) { $a = ua(); return $a['master'] || in_array($perm, $a['perm
 function scope_offices() { return ua()['offices']; } // 'ALL' or int[]
 function scope_sbus() { return ua()['sbus']; }        // 'ALL' or string[]
 
-// Build a WHERE fragment scoping calls/jobs by office + SBU. $officeCol is the
+// Build a WHERE fragment scoping calls/jobs by office + Business Unit. $officeCol is the
 // column holding the executing office id (nullable → treated as Ahmedabad).
 function scope_clause($officeCol, $sbuCol) {
     $off = scope_offices(); $sbu = scope_sbus();

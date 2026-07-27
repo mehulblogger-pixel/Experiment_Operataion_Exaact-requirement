@@ -236,7 +236,7 @@
       <?php $secCrm = ob_get_clean();
     }
 
-    // ---------- section: executive strategic board (directors / SBU heads / branch mgr) ----------
+    // ---------- section: executive strategic board (directors / business-unit heads / branch mgr) ----------
     $secExec = '';
     if ($isExec && can('data.credit')) {
       [$ew, $ea] = scope_clause('j.executing_office_id', 'j.sbu');

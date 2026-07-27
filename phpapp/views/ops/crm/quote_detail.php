@@ -229,7 +229,7 @@
     <table class="kv">
       <tr><td class="muted">Client</td><td><?= e($q['client_name'] ?: '—') ?></td></tr>
       <tr><td class="muted">Contact</td><td><?= e($q['contact_name'] ?: '—') ?><?= $q['contact_email']?' · '.e($q['contact_email']):'' ?><?= $q['contact_mobile']?' · '.e($q['contact_mobile']):'' ?></td></tr>
-      <tr><td class="muted">SBU</td><td><?= e(lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu'] ?: '—') ?></td></tr>
+      <tr><td class="muted"><?= e(T("sbu")) ?></td><td><?= e(lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu'] ?: '—') ?></td></tr>
       <tr><td class="muted">Location</td><td><?= e($q['site_location'] ?: '—') ?> <span class="pill p-mut"><?= e($locT[$q['location_type']] ?? $q['location_type']) ?></span></td></tr>
     </table>
   </div>
@@ -247,7 +247,7 @@
 <div class="panel" style="padding:0;overflow:hidden">
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
-    <thead><tr><th>#</th><th>SBU</th><th>Service</th><th>Description</th><th>Location</th><th>Order</th><th class="num">Qty</th><th>Unit</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
+    <thead><tr><th>#</th><th><?= e(T('sbu')) ?></th><th>Service</th><th>Description</th><th>Location</th><th>Order</th><th class="num">Qty</th><th>Unit</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
     <tbody>
       <?php foreach ($lines as $i=>$l): ?>
       <tr>

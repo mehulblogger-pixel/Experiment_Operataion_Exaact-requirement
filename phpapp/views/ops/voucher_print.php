@@ -30,7 +30,7 @@
 <div class="loc">Location: <strong>AHMEDABAD</strong></div>
 <h1>STATEMENT OF TRAVELLING EXPENSES</h1>
 <table class="hdr">
-  <tr><td>Name: <strong><?= e($v['inspector_name']) ?></strong></td><td>Employee code: <strong><?= e($v['emp_code'] ?: '—') ?></strong></td><td>SBU: <strong><?= e(lk_options_or('sbu',OPS_SBUS)[$v['sbu']] ?? $v['sbu'] ?: '—') ?></strong></td></tr>
+  <tr><td>Name: <strong><?= e($v['inspector_name']) ?></strong></td><td>Employee code: <strong><?= e($v['emp_code'] ?: '—') ?></strong></td><td><?= e(T("sbu")) ?>: <strong><?= e(lk_options_or('sbu',OPS_SBUS)[$v['sbu']] ?? $v['sbu'] ?: '—') ?></strong></td></tr>
   <tr><td>Month: <strong><?= e($v['month']) ?></strong></td><td>Nature of spend: <strong><?= e($natureMap[$v['nature']] ?? $v['nature'] ?: '—') ?></strong></td><td>Status: <strong><?= e($v['status']) ?></strong></td></tr>
 </table>
 

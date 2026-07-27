@@ -3,7 +3,7 @@
 //  Demo / sample dataset — one-click loader (Master Admin only).
 //  Inserts a complete, coherent lifecycle so every screen shows live figures:
 //    offices → users (all roles) → inspectors (+ entitlements) → clients/
-//    vendors → BOSS numbers → calls → jobs (allocated / closed) → vouchers
+//    vendors → contract numbers → calls → jobs (allocated / closed) → vouchers
 //    (km + bills) → job-closure expenses → invoicing + payment + credit.
 //  Idempotent: guarded by the `demo_seeded` setting so it runs only once.
 // ============================================================================
@@ -14,7 +14,7 @@ function demo_seeded() { return setting_get('demo_seeded', '') === '1'; }
 function demo_accounts() {
     return [
         ['director',  'Business Director', 'Mumbai'],
-        ['sbuhead',   'SBU Head',          'Mumbai'],
+        ['sbuhead',   'Business Unit Head',          'Mumbai'],
         ['bmanager',  'Branch Manager',    'Ahmedabad'],
         ['appmanager','Branch Application Manager', 'Ahmedabad'],
         ['opmanager', 'Operation Manager', 'Ahmedabad'],
@@ -163,7 +163,7 @@ function seed_demo() {
             $pk++;
         }
 
-        // ---------- BOSS / contract numbers ----------
+        // ---------- contract numbers ----------
         $insB = $pdo->prepare("INSERT INTO boss_numbers(client_id,boss_number,start_date,end_date,status) VALUES(?,?,?,?, 'ACTIVE')");
         $boss = [
             [$cid['CL-NIL'],'40231',$d(-120),$d(240)],

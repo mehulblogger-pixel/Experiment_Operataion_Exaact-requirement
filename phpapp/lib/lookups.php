@@ -6,7 +6,7 @@
 //  appear in the forms automatically.
 //
 //  lookup_types  : each master list. parent_type_id makes it depend on another
-//                  list (e.g. Activity depends on SBU; Wax Type depends on
+//                  list (e.g. Activity depends on Business Unit; Wax Type depends on
 //                  Product; Tier depends on Wax Type — any depth).
 //  lookup_values : the values. parent_value_id links a value to its parent
 //                  value, so child lists filter by the chosen parent value.
@@ -64,6 +64,13 @@ function lk_migrate() {
     lk_ensure_value('reporting_frequency', 'CUSTOM', 'Custom (every N days)');
     // trade + skills (skills depend on trade) — seed on upgrade if missing
     if ((int)ops_val("SELECT COUNT(*) FROM lookup_types") > 0 && !lk_type('trade')) lk_seed_trade_skill();
+    // The acronyms are gone from the app. Existing installs still carry the old
+    // list headings in the database, so rename those in place — once. Anyone who
+    // has already renamed a list themselves is left alone, because only the exact
+    // old wording is matched.
+    lk_rename_type_label('sbu', 'SBU', 'Business Unit');
+    lk_rename_type_label('boss_status', 'BOSS status', 'Contract status');
+    lk_rename_value_label('designation', 'SBU Head', 'Business Unit Head');
     // NB: lk_register_module_lists() runs from boot() *after* lk_seed(), because
     // on a fresh install there are no lookup types yet at this point.
 }
@@ -240,7 +247,7 @@ function lk_ensure_type($key, $label, $values) {
     foreach ($values as $v) lk_add_value($tid, null, '', $v, $so++);
 }
 
-// Activity values grouped by their parent SBU code — for the SBU→Activity picker.
+// Activity values grouped by their parent Business Unit code — for the Business Unit→Activity picker.
 function activity_options_by_sbu() {
     $act = lk_type('activity');
     if (!$act) return [];
@@ -254,12 +261,30 @@ function activity_options_by_sbu() {
     return $out;
 }
 
+// Rename a stored list heading, but only when it still reads exactly as it was
+// shipped — so a company that has already chosen its own word keeps it.
+function lk_rename_type_label($key, $from, $to) {
+    try {
+        db()->prepare("UPDATE lookup_types SET label=? WHERE type_key=? AND label=?")
+            ->execute([$to, $key, $from]);
+    } catch (Throwable $e) { /* pre-migration schema — nothing to rename yet */ }
+}
+
+// Same, for one value inside a list. The stored code is left untouched — it is
+// what the rest of the app matches on.
+function lk_rename_value_label($typeKey, $from, $to) {
+    try {
+        db()->prepare("UPDATE lookup_values SET label=? WHERE label=? AND type_id IN (SELECT id FROM lookup_types WHERE type_key=?)")
+            ->execute([$to, $from, $typeKey]);
+    } catch (Throwable $e) { /* pre-migration schema — nothing to rename yet */ }
+}
+
 // ---- Seed system lists (from the old fixed choice lists) + demo hierarchies -
 function lk_seed() {
     if ((int)ops_val("SELECT COUNT(*) FROM lookup_types") > 0) return;
     // system (flat) lists — become editable, keep the same codes so logic still works
     $system = [
-        ['sbu','SBU', OPS_SBUS], ['region','Region', OPS_REGIONS], ['product','Product category', PRODUCT_CATS],
+        ['sbu','Business Unit', OPS_SBUS], ['region','Region', OPS_REGIONS], ['product','Product category', PRODUCT_CATS],
         ['credit_type','Credit type', CREDIT_TYPES], ['credit_direction','Credit direction', CREDIT_DIRECTIONS],
         ['reporting_frequency','Reporting frequency', REPORT_FREQ], ['attendance_status','Attendance status', ATT_STATUS],
         ['experience_level','Experience level', EXP_LEVELS], ['rate_type','Rate type', RATE_TYPES],
@@ -273,7 +298,7 @@ function lk_seed() {
         $vso = 0;
         foreach ($map as $code => $vlabel) lk_add_value($tid, null, $code, $vlabel, $vso++);
     }
-    // demo hierarchy 1: Activity under SBU (the scenario you raised)
+    // demo hierarchy 1: Activity under Business Unit (the scenario you raised)
     $sbu = lk_type('sbu');
     $activity = lk_add_type('activity', 'Activity code', $sbu['id'], 0, $so++);
     $sbuVals = [];

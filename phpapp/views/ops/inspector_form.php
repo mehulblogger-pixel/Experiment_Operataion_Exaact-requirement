@@ -42,12 +42,12 @@
         <?php foreach (($managers ?? []) as $m): $nm=trim(($m['first_name']??'').' '.($m['last_name']??'')) ?: $m['username']; ?><option value="<?= (int)$m['id'] ?>" <?= ((int)($ins['reports_to_id'] ?? 0)===(int)$m['id'])?'selected':'' ?>><?= e($nm) ?> · <?= e(ORG_ROLES[$m['role']] ?? $m['role']) ?></option><?php endforeach; ?>
       </select></div>
     <?php if (can_see_salary()): ?>
-    <div class="ff"><label>Annual CTC (<?= e(cur_sym()) ?>) <span class="muted">— cost split across SBUs</span></label><input class="form-control" type="number" step="0.01" name="salary_ctc" value="<?= e($ins['salary_ctc'] ?? '') ?>"></div>
+    <div class="ff"><label>Annual CTC (<?= e(cur_sym()) ?>) <span class="muted">— cost split across <?= e(Tlp("sbu")) ?></span></label><input class="form-control" type="number" step="0.01" name="salary_ctc" value="<?= e($ins['salary_ctc'] ?? '') ?>"></div>
     <div class="ff"><label>Hiring agency <span class="muted">— if engaged via an external agency</span></label><input class="form-control" name="agency_name" value="<?= e($ins['agency_name'] ?? '') ?>" placeholder="e.g. Patel Manpower"></div>
     <div class="ff"><label>Agency hiring cost (<?= e(cur_sym()) ?>/yr) <span class="muted">— extra cost paid to the agency</span></label><input class="form-control" type="number" step="0.01" name="agency_cost" value="<?= e($ins['agency_cost'] ?? '') ?>"></div>
     <?php endif; ?>
 
-    <div class="ff ff-wide"><label>SBUs (multi — monthly cost is distributed across these)</label>
+    <div class="ff ff-wide"><label><?= e(TP("sbu")) ?> (multi — monthly cost is distributed across these)</label>
       <div class="checkgrid">
         <?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?>
           <label class="chk"><input type="checkbox" name="sbus[]" value="<?= e($k) ?>" <?= in_array($k, $selSbus, true)?'checked':'' ?>> <?= e($v) ?></label>

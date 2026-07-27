@@ -10,7 +10,7 @@
   <?php if ($edit): ?><input type="hidden" name="id" value="<?= (int)$edit['id'] ?>"><?php endif; ?>
   <h3 class="tab-sub" style="margin-top:0"><?= $edit ? 'Edit rule' : 'Add a rule' ?></h3>
   <div class="form-grid">
-    <div class="ff"><label>Rule name</label><input class="form-control" name="name" value="<?= e($edit['name'] ?? '') ?>" placeholder="e.g. NCR needs SBU head"></div>
+    <div class="ff"><label>Rule name</label><input class="form-control" name="name" value="<?= e($edit['name'] ?? '') ?>" placeholder="<?= e('e.g. NCR needs '.Tl('sbu').' head') ?>"></div>
     <div class="ff"><label>Level <span class="muted">(1 = first)</span></label><input class="form-control" type="number" min="1" name="level" value="<?= e($edit['level'] ?? 1) ?>"></div>
     <div class="ff"><label>SLA hours <span class="muted">(escalate after)</span></label><input class="form-control" type="number" min="0" name="sla_hours" value="<?= e($edit['sla_hours'] ?? 24) ?>"></div>
     <div class="ff ff-check"><input type="checkbox" name="active" <?= (!$edit || $edit['active'])?'checked':'' ?>><label>Active</label></div>
@@ -20,7 +20,7 @@
     <div class="ff"><label>Report type</label><select class="form-control searchable" name="report_type_code"><option value="">Any</option><?php foreach ($types as $t): ?><option value="<?= e($t['code']) ?>" <?= (($edit['report_type_code'] ?? '')===$t['code'])?'selected':'' ?>><?= e($t['code']) ?> — <?= e($t['name']) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Office</label><select class="form-control searchable" name="office_id"><option value="">Any</option><?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ((int)($edit['office_id'] ?? 0)===(int)$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Client</label><select class="form-control searchable" name="client_id"><option value="">Any</option><?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>" <?= ((int)($edit['client_id'] ?? 0)===(int)$c['id'])?'selected':'' ?>><?= e($c['nm']) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>SBU</label><select class="form-control searchable" name="sbu"><option value="">Any</option><?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($edit['sbu'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label><?= e(T("sbu")) ?></label><select class="form-control searchable" name="sbu"><option value="">Any</option><?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($edit['sbu'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
   </div>
   <h4 style="margin:8px 0 4px">Approver</h4>
   <div class="form-grid">

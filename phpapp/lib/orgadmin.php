@@ -244,7 +244,7 @@ function office_in_use($officeId) {
         'business_partners' => 'clients and vendors', 'report_docs' => 'reports',
         'endorsements' => 'endorsements', 'work_norms' => 'working-hour norms',
         'offices' => 'other offices sitting under it', 'requisitions' => 'requisitions',
-        'boss_numbers' => 'BOSS numbers', 'idems_audit' => 'audit entries',
+        'boss_numbers' => 'contract numbers', 'idems_audit' => 'audit entries',
     ];
     $out = [];
     foreach (db_tables() as $t) {
