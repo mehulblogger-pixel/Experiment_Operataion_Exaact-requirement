@@ -61,6 +61,19 @@
   <a class="btn secondary" href="/call?id=<?= (int)$call['id'] ?>">← Back</a>
 </div>
 <?php if (!empty($error)): ?><div class="msg msg-error"><?= e($error) ?></div><?php endif; ?>
+<?php // Only appears once the gate has actually stopped somebody, and only for
+      // a manager. A reason is required — an override with no reason is worse
+      // than no override, because it looks like a decision was made. ?>
+<?php if (!empty($certBlock) && competence_can_override()): ?>
+<div class="panel" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent)">
+  <b>Allow it anyway?</b>
+  <p class="muted" style="margin:4px 0 8px">This will be recorded against the <?= e(Tl('job')) ?> with your name, and an
+    assessor will read it. Say what makes this acceptable — for example that the renewal is issued and the hard copy is awaited.</p>
+  <input class="form-control" form="jobform" name="cert_override_note" required
+         value="<?= e($_POST['cert_override_note'] ?? '') ?>"
+         placeholder="e.g. renewal issued 12 Jul, certificate in hand, hard copy awaited">
+</div>
+<?php endif; ?>
 
 <?php // The contract position, stated before the form is filled in. A blocked
       // allocation is refused on submit as well, but being told up front is the
@@ -109,7 +122,7 @@
 </div>
 <?php endif; ?>
 
-<form method="post" action="<?= $job ? '/job-edit?id=' . (int)$job['id'] : '/job-new?call=' . (int)$call['id'] ?>" class="panel">
+<form method="post" id="jobform" action="<?= $job ? '/job-edit?id=' . (int)$job['id'] : '/job-new?call=' . (int)$call['id'] ?>" class="panel">
   <div class="form-grid">
     <div class="ff"><label>Executing office</label>
       <select class="form-control searchable" id="jexec_sel" name="executing_office_id" data-contracting="<?= (int)($call['ibo_office_id'] ?? 0) ?>">
@@ -147,9 +160,16 @@
         <option value="FREELANCER" <?= $curKind==='FREELANCER'?'selected':'' ?>>Freelancer</option>
         <option value="SUBCON"     <?= $curKind==='SUBCON'?'selected':'' ?>>Sub-contractor</option>
       </select></div>
+    <?php // ISO/IEC 17020 §6.1 — anybody with a lapsed REQUIRED certificate is
+          // marked in the list before they are picked, so a coordinator is not
+          // told only after filling the whole form in. The server refuses it
+          // regardless; this is courtesy, not the control. ?>
+    <?php $certDate = competence_job_date($job ?: [], $call); ?>
     <div class="ff"><label><?= e(T('engineer')) ?></label>
       <select class="form-control searchable" id="insp_pick" name="inspector_id"><option value="">—</option>
-        <?php foreach ($inspectors as $i): ?><option value="<?= (int)$i['id'] ?>" data-kind="<?= e($i['staff_kind'] ?? 'ASSET') ?>" <?= ($job && $job['inspector_id']==$i['id'])?'selected':'' ?>><?= e($i['name']) ?><?= $i['emp_code']?' ('.e($i['emp_code']).')':'' ?></option><?php endforeach; ?>
+        <?php foreach ($inspectors as $i): $lapsed = competence_lapsed((int)$i['id'], $certDate); ?>
+          <option value="<?= (int)$i['id'] ?>" data-kind="<?= e($i['staff_kind'] ?? 'ASSET') ?>" <?= ($job && $job['inspector_id']==$i['id'])?'selected':'' ?>><?= e($i['name']) ?><?= $i['emp_code']?' ('.e($i['emp_code']).')':'' ?><?= $lapsed ? ' — certificate lapsed' : '' ?></option>
+        <?php endforeach; ?>
       </select>
       <small class="muted" id="insp_hint"></small></div>
     <div class="ff" id="subcon_ff" style="<?= $curKind==='SUBCON'?'':'display:none' ?>"><label>Sub-contracting agency</label>

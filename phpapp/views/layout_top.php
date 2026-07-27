@@ -45,8 +45,17 @@
       <?php // Every label below is the first words of the page heading it opens,
             // and every business noun comes from Settings -> Terminology. ?>
       <?php if ($isInsp): ?>
+        <?php // The engineer performs the inspection AND writes the report, so the
+              // report register belongs on their menu. They already hold
+              // mod.idems.view/edit — this branch simply never offered it, and the
+              // person who writes every report had a two-item menu. ?>
         <div class="s-grp">My work</div>
         <a class="s-item<?= $navOn(['my-jobs']) ?>" href="/my-jobs"><span class="s-ic">🗂</span><span>My <?= e(Tlp('job')) ?></span></a>
+        <?php if (can('mod.idems.view')): ?>
+          <a class="s-item<?= $navOn(['documents','document','document-edit','document-fill']) ?>" href="/documents"><span class="s-ic">📑</span><span>My <?= e(Tlp('report')) ?></span></a>
+          <?php if (can('mod.idems.edit')): ?><a class="s-item<?= $navOn(['document-new']) ?>" href="/document-new"><span class="s-ic">➕</span><span><?= e(ucfirst(T_NEW('report'))) ?></span></a><?php endif; ?>
+          <a class="s-item<?= $navOn(['endorsements','endorsement','endorsement-new','endorsement-edit']) ?>" href="/endorsements"><span class="s-ic">✅</span><span><?= e(THP('endorsement')) ?></span></a>
+        <?php endif; ?>
         <a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span>My <?= e(Tlp('voucher')) ?></span></a>
       <?php else: ?>
         <?php if (can('mod.inquiries.view')||can('mod.quotes.view')||can('mod.crm_reports.view')): ?>
@@ -116,7 +125,9 @@
         <?php if (can('mod.vendors.view')): ?><a class="s-item<?= $navOn(['vendors']) ?>" href="/vendors"><span class="s-ic">🚚</span><span><?= e(T_REG('vendor')) ?></span></a><?php endif; ?>
         <?php endif; ?>
 
-        <?php if (can('mod.masters.view')||can('mod.overheads.view')||can('mod.users.view')||can('mod.settings.view')): ?>
+        <?php if (can('mod.masters.view')||can('mod.overheads.view')||can('mod.users.view')
+                  ||can('mod.profitability.view')||can('mod.reports.view')||is_master()
+                  ||(can('mod.settings.view') && can('settings.manage'))): ?>
         <div class="s-grp">Admin</div>
           <?php if (can('mod.masters.view')): ?><a class="s-item<?= $navOn(['masters','m/','lookups']) ?>" href="/masters"><span class="s-ic">📋</span><span>Masters</span></a><?php endif; ?>
           <?php if (can('mod.overheads.view')): ?><a class="s-item<?= $navOn(['office-finance']) ?>" href="/office-finance"><span class="s-ic">📐</span><span><?= e(TH("office")) ?> costs &amp; overheads</span></a><?php endif; ?>
@@ -130,7 +141,10 @@
           <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['users','user-new','user-edit']) ?>" href="/users"><span class="s-ic">👥</span><span><?= e(T_REG('user')) ?></span></a><?php endif; ?>
           <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['hierarchy']) ?>" href="/hierarchy"><span class="s-ic">🗂️</span><span>Organisation</span></a><?php endif; ?>
           <?php if (is_master()): ?><a class="s-item<?= $navOn(['access']) ?>" href="/access"><span class="s-ic">🔐</span><span>Roles &amp; permissions</span></a><?php endif; ?>
-          <?php if (can('mod.settings.view')): ?><a class="s-item<?= $navOn(['settings','terminology','ai-settings','reset-data']) ?>" href="/settings"><span class="s-ic">⚙️</span><span>System settings</span></a><?php endif; ?>
+          <?php // The screen itself requires settings.manage. Offering it on
+                // mod.settings.view meant a business director was shown the link
+                // and then refused at the door — which reads as a broken app. ?>
+          <?php if (can('mod.settings.view') && can('settings.manage')): ?><a class="s-item<?= $navOn(['settings','terminology','ai-settings','reset-data']) ?>" href="/settings"><span class="s-ic">⚙️</span><span>System settings</span></a><?php endif; ?>
         <?php endif; ?>
       <?php endif; ?>
     </nav>

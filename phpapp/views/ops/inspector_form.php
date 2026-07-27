@@ -82,9 +82,11 @@
 
 <div class="panel">
   <h3 class="tab-sub">Certifications &amp; validity</h3>
-  <p class="sub">The system e-mails the inspector and the QA/QC nominee when a certificate is within a month of expiry. Once the hard copy is received, update the validity date here.</p>
+  <p class="sub">The system e-mails the inspector and the QA/QC nominee when a certificate is within a month of expiry. Once the hard copy is received, update the validity date here.
+    Tick <strong>Required</strong> on the ones this person may not work without — ISO/IEC 17020 §6.1. A required certificate that has lapsed
+    <strong>stops them being allocated</strong>; a manager can still allow it, but must say why, and the reason is kept on the deputation.</p>
   <table class="grid">
-    <tr><th>Certificate</th><th>Number</th><th>Issued</th><th>Valid to</th><th>Status</th><th>Actions</th></tr>
+    <tr><th>Certificate</th><th>Number</th><th>Issued</th><th>Valid to</th><th>Status</th><th>Required?</th><th>Actions</th></tr>
     <?php foreach ($certs as $c): $days = $c['valid_to'] ? (int)round((strtotime($c['valid_to']) - time())/86400) : null; ?>
     <tr>
       <td><strong><?= e($c['name']) ?></strong></td>
@@ -92,11 +94,15 @@
       <td><?= e($c['issued_date'] ?: '—') ?></td>
       <td><?= e($c['valid_to'] ?: '—') ?></td>
       <td><?php if ($days===null): ?>—<?php elseif ($days<0): ?><span class="badge RED">Expired</span><?php elseif ($days<=30): ?><span class="badge AMBER"><?= $days ?>d left</span><?php else: ?><span class="badge GREEN">Valid</span><?php endif; ?></td>
+      <td><?= !empty($c['is_mandatory'])
+            ? '<span class="pill ' . ($days !== null && $days < 0 ? 'p-bad' : 'p-info') . '">required</span>'
+            : '<span class="muted">optional</span>' ?></td>
       <td class="row-actions">
         <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
           <input type="hidden" name="_do" value="cert_update"><input type="hidden" name="cert_id" value="<?= (int)$c['id'] ?>">
           <input class="form-control" style="width:100px" name="cert_number" value="<?= e($c['number']) ?>" placeholder="No.">
           <input class="form-control" style="width:150px" type="date" name="cert_valid_to" value="<?= e($c['valid_to']) ?>">
+          <label class="chk" style="white-space:nowrap"><input type="checkbox" name="cert_mandatory" value="1" <?= !empty($c['is_mandatory'])?'checked':'' ?>> Required</label>
           <button class="btn small" type="submit">Update</button>
         </form>
         <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>" onsubmit="return confirm('Remove this certificate?')">
@@ -106,7 +112,7 @@
       </td>
     </tr>
     <?php endforeach; ?>
-    <?php if (!$certs): ?><tr><td colspan="6">No certificates recorded.</td></tr><?php endif; ?>
+    <?php if (!$certs): ?><tr><td colspan="7">No certificates recorded.</td></tr><?php endif; ?>
   </table>
   <h3 class="tab-sub">Add a certificate</h3>
   <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>" class="inline-add">
@@ -115,6 +121,8 @@
     <div class="ff"><label>Number</label><input class="form-control" name="cert_number"></div>
     <div class="ff"><label>Issued date</label><input class="form-control" type="date" name="cert_issued"></div>
     <div class="ff"><label>Valid to</label><input class="form-control" type="date" name="cert_valid_to"></div>
+    <div class="ff"><label>Required for work?</label>
+      <label class="chk"><input type="checkbox" name="cert_mandatory" value="1"> They may not be allocated without it</label></div>
     <button class="btn small" type="submit">Add certificate</button>
   </form>
 </div>

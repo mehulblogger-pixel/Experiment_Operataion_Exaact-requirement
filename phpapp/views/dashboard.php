@@ -255,6 +255,12 @@
           WHERE $rd>=? AND $rd<? AND $ew GROUP BY client ORDER BY v DESC", array_merge([$cf, $nf], $ea));
       $topClients = array_values(array_filter($topClients, fn($r)=>(float)$r['v']>0));
       $tcMax = $topClients ? max(array_map(fn($r)=>(float)$r['v'], $topClients)) : 0;
+      // The one number a director asks about an inspection business and which
+      // was not on this screen: what share of the engineer-days available were
+      // actually billable. Same definition as the management dashboard, from
+      // the same function, so the two can never quote different figures.
+      $util = function_exists('mis_utilisation')
+          ? mis_utilisation($cf, date('Y-m-d', strtotime($nf . ' -1 day'))) : null;
       ob_start(); ?>
       <div class="ctitle" style="margin-top:20px"><h3>Business overview — FY <?= e($fyCur) ?></h3><a href="/reports">Insights →</a></div>
       <div class="kpi-row">
@@ -268,6 +274,11 @@
         <div class="kpi"><span class="kic">🏆</span><div class="k">Sales won (FY)</div><div class="v"><?= fmoney_short($qs['won_val'] ?? 0) ?></div><div class="d"><?= (int)($qs['won_n'] ?? 0) ?> quote(s) · <?= $winRate ?? 0 ?>% win</div></div>
         <?php endif; ?>
         <div class="kpi"><span class="kic">🗂</span><div class="k">Open jobs now</div><div class="v"><a href="/jobs?status=open"><?= $openJobs ?></a></div><div class="d"><?= $overdue ? '<span class="down">'.$overdue.' overdue</span>' : 'on track' ?></div></div>
+        <?php if ($util && $util['available'] > 0): ?>
+        <div class="kpi"><span class="kic">⏱</span><div class="k">Engineer utilisation (FY)</div>
+          <div class="v"><a href="/mis"><?= $util['pct'] === null ? '—' : $util['pct'] . '%' ?></a></div>
+          <div class="d"><?= e($util['worked']) ?> of <?= e($util['available']) ?> <?= e(Tlp('manday')) ?> billable</div></div>
+        <?php endif; ?>
       </div>
       <?php if ($topClients): ?>
       <div class="panel" style="margin-top:12px">
