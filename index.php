@@ -220,6 +220,10 @@ try {
         throw new RuntimeException('pending upgrade: list headings renamed off the old acronyms');
     if ((int)db()->query("SELECT COUNT(*) FROM lookup_values WHERE label='SBU Head' AND type_id IN (SELECT id FROM lookup_types WHERE type_key='designation')")->fetchColumn() > 0)
         throw new RuntimeException('pending upgrade: designation renamed off the old acronym');
+    // A column that is merely too narrow is not a *missing* column, so nothing
+    // else would ever notice. MEDIUMTEXT silently truncates a large upload.
+    if (function_exists('file_columns_pending') && file_columns_pending())
+        throw new RuntimeException('pending upgrade: upload columns widened to LONGTEXT');
     if (function_exists('charge_units_pending') && charge_units_pending())
         throw new RuntimeException('pending upgrade: shared charge units');
     if (function_exists('service_types_pending') && service_types_pending())
@@ -234,7 +238,8 @@ try {
         $isConn = stripos($m, 'connect') !== false || stripos($m, 'access denied') !== false
                || stripos($m, 'unknown database') !== false || stripos($m, 'no such file') !== false;
         $hint = $isConn
-            ? 'Open <code>config.php</code> and enter your MySQL database name, user and password (from MilesWeb → Databases).'
+            ? 'Open <code>config.php</code> and enter the MySQL database name, user and password for this server. '
+            . 'On shared hosting these come from the control panel under Databases; on your own server, from whoever set MySQL up.'
             : 'The database is reachable but a table could not be set up. Send this message over and it will be fixed quickly.';
         ops_fatal($isConn ? 'Database not connected' : 'Database setup error', $hint,
                   $m . "\n" . $e2->getFile() . ':' . $e2->getLine(), true);

@@ -226,7 +226,7 @@ function crm_ensure_schema() {
         // for QUOTE_DOC; fields holds a JSON field map for the §6 field designer.
         "CREATE TABLE IF NOT EXISTS crm_templates (
             id $pk, kind VARCHAR(30) DEFAULT 'EMAIL_FOLLOWUP', name VARCHAR(150) DEFAULT '',
-            subject VARCHAR(255) DEFAULT '', body MEDIUMTEXT, file_name VARCHAR(200) DEFAULT '', file_data MEDIUMTEXT,
+            subject VARCHAR(255) DEFAULT '', body MEDIUMTEXT, file_name VARCHAR(200) DEFAULT '', file_data LONGTEXT,
             fields MEDIUMTEXT, document_number VARCHAR(80) DEFAULT '', format_number VARCHAR(80) DEFAULT '',
             doc_revision VARCHAR(40) DEFAULT '', issue_date VARCHAR(20) DEFAULT '',
             active INT DEFAULT 1, is_default INT DEFAULT 0, created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
@@ -244,7 +244,7 @@ function crm_ensure_schema() {
         // the client's PO and any inspection documents that must reach the engineer.
         "CREATE TABLE IF NOT EXISTS quote_files (
             id $pk, quote_id INT, kind VARCHAR(20) DEFAULT 'ATTACHMENT', file_name VARCHAR(200) DEFAULT '',
-            mime VARCHAR(100) DEFAULT '', file_data MEDIUMTEXT, note VARCHAR(255) DEFAULT '',
+            mime VARCHAR(100) DEFAULT '', file_data LONGTEXT, note VARCHAR(255) DEFAULT '',
             share_with_inspector INT DEFAULT 1, uploaded_by VARCHAR(150) DEFAULT '', uploaded_at VARCHAR(30) DEFAULT '')",
 
         // A closed quote is locked. Re-opening it is a request the Super Admin grants.

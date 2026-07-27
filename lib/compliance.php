@@ -287,7 +287,8 @@ function compliance_status() {
 
     $add('CERT-In directions', 'Logs held inside India',
         'unknown', 'Depends on where your hosting account is. The app writes everything to your own database and sends nothing anywhere else.',
-        'Confirm with MilesWeb in writing that the account and its backups sit in an Indian data centre, and keep that confirmation.');
+        'Get written confirmation from whoever hosts this system that the server and its backups sit in an Indian data centre, and keep that confirmation. '
+        . 'On your own server that is your own record; on shared hosting, ask the provider.');
 
     $open = ops_all("SELECT * FROM security_incidents WHERE status='OPEN'");
     $late = 0; foreach ($open as $i) { $h = incident_hours_left($i); if ($h !== null && $h <= 0) $late++; }
@@ -299,7 +300,8 @@ function compliance_status() {
 
     $add('CERT-In directions', 'Clocks synchronised to NPL or NIST',
         'unknown', 'Server time now: ' . date('d M Y H:i:s T') . '. A web application cannot set the machine clock.',
-        'Ask MilesWeb to confirm NTP is synchronised to time.nplindia.org (or an NIST server) and keep the reply.');
+        'Confirm the server clock is synchronised to time.nplindia.org (or an NIST server) and keep the evidence — '
+        . 'ask the hosting provider, or check the NTP service on your own server.');
 
     $sbom = file_exists(__DIR__ . '/../SBOM.json');
     $add('CERT-In directions', 'Software bill of materials',

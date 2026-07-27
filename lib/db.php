@@ -29,6 +29,49 @@ function pk_clause() {
         : 'INT AUTO_INCREMENT PRIMARY KEY';
 }
 
+// ---- Columns that hold an uploaded file ------------------------------------
+//  Uploads are held in the row, base64-encoded, so a move between servers takes
+//  the files with the records. Base64 costs a third more than the raw bytes,
+//  and MySQL's MEDIUMTEXT stops at 16,777,215 — so a file at the 12 MB upload
+//  limit encodes to 16,777,216 characters and misses by a single byte. Worse,
+//  MySQL outside strict mode TRUNCATES rather than complains: the file is
+//  stored broken and nobody finds out until somebody opens it months later.
+//  SQLite has no such ceiling, which is why this never showed up in testing.
+//  LONGTEXT (4 GB) removes the ceiling; the upload limit stays the real cap.
+const FILE_COLUMNS = [
+    ['job_bills',        'file_data'],
+    ['quote_files',      'file_data'],
+    ['crm_templates',    'file_data'],
+    ['report_files',     'data'],
+    ['report_templates', 'file_data'],
+    ['endorsement_files','data'],
+    ['vouchers',         'supporting_file'],
+];
+
+// True while any of them is still the narrow type. Asserted by the boot probe,
+// because a column that merely needs widening is not a *missing* column and
+// nothing else would ever notice.
+function file_columns_pending() {
+    if (db_driver() === 'sqlite') return false;      // TEXT is unbounded there
+    try {
+        foreach (FILE_COLUMNS as [$t, $c]) {
+            $q = db()->prepare("SHOW COLUMNS FROM `$t` LIKE ?");
+            $q->execute([$c]);
+            $row = $q->fetch();
+            if ($row && stripos((string)($row['Type'] ?? ''), 'longtext') === false) return true;
+        }
+    } catch (Throwable $e) { return false; }          // table not built yet
+    return false;
+}
+
+function widen_file_columns() {
+    if (db_driver() === 'sqlite') return;
+    foreach (FILE_COLUMNS as [$t, $c]) {
+        try { db()->exec("ALTER TABLE `$t` MODIFY `$c` LONGTEXT"); }
+        catch (Throwable $e) { /* table not built yet, or already wide */ }
+    }
+}
+
 function ensure_schema() {
     $pdo = db();
     $pk = pk_clause();
@@ -180,6 +223,7 @@ function boot() {
     if (function_exists('costing_migrate')) costing_migrate();       // salary + overhead allocation to Business Units
     if (function_exists('joblock_migrate')) joblock_migrate();       // close-on-time lock
     if (function_exists('po_migrate')) po_migrate();                 // an order remembers its quotation
+    widen_file_columns();                                            // uploads need LONGTEXT, not MEDIUMTEXT
     if (function_exists('bills_migrate')) bills_migrate();             // chargeable expenses + their bills
     if (function_exists('sched_migrate')) sched_migrate();           // engagement shapes, holidays by office, visits
     // Register every remaining dropdown as an editable master list. Runs last:

@@ -218,7 +218,7 @@ function ops_ensure_schema() {
             id $pk, inspector_id INT, office_id INT NULL, month VARCHAR(7),
             status VARCHAR(20) DEFAULT 'DRAFT', nature VARCHAR(30) DEFAULT '',
             advance DECIMAL(12,2) DEFAULT 0, office_incurred DECIMAL(12,2) DEFAULT 0,
-            supporting_file MEDIUMTEXT, supporting_name VARCHAR(200) DEFAULT '',
+            supporting_file LONGTEXT, supporting_name VARCHAR(200) DEFAULT '',
             total DECIMAL(14,2) DEFAULT 0, submitted_at VARCHAR(30) DEFAULT '',
             checked_by VARCHAR(150) DEFAULT '', approved_by VARCHAR(150) DEFAULT '',
             authorized_by VARCHAR(150) DEFAULT '', approved_at VARCHAR(30) DEFAULT '',
@@ -865,7 +865,7 @@ function hours_cap()           { $v = (float)setting_get('daily_hours_cap', 0); 
 function hours_cap_disp()      { return rtrim(rtrim(number_format(hours_cap(), 2, '.', ''), '0'), '.'); }
 function default_weekly_days() { $v = (float)setting_get('default_weekly_days', 0); return in_array($v, [5.0,5.5,6.0], true) ? $v : 6.0; }
 
-// ---- CSV export (dependency-free; works on MilesWeb shared hosting) ---------
+// ---- CSV export (dependency-free; works on the plainest shared hosting) -----
 // $rows = array of rows (each an array of cells); stream as a downloadable file.
 function csv_download($filename, array $rows) {
     if (headers_sent()) return;

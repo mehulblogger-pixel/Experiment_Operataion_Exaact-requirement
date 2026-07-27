@@ -109,7 +109,7 @@ function idems_migrate() {
     // Evidence / attachments captured against a report's fields (photos, files, signatures).
     $pdo->exec("CREATE TABLE IF NOT EXISTS report_files (
         id $pk, report_doc_id INT, field_key VARCHAR(60) DEFAULT '', kind VARCHAR(20) DEFAULT 'file',
-        file_name VARCHAR(255) DEFAULT '', mime VARCHAR(100) DEFAULT '', data MEDIUMTEXT, gps VARCHAR(60) DEFAULT '',
+        file_name VARCHAR(255) DEFAULT '', mime VARCHAR(100) DEFAULT '', data LONGTEXT, gps VARCHAR(60) DEFAULT '',
         note VARCHAR(400) DEFAULT '', created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
     // ---- Phase 3: workflow & approvals ----
     // Per-inspector approver mapping (individual or common; temp cover during leave).
@@ -140,7 +140,7 @@ function idems_migrate() {
     // ---- Phase 5: client-specific report templates (uploaded .docx, token-mapped) ----
     $pdo->exec("CREATE TABLE IF NOT EXISTS report_templates (
         id $pk, name VARCHAR(150) DEFAULT '', report_type_id INT NULL, client_id INT NULL, office_id INT NULL,
-        file_name VARCHAR(200) DEFAULT '', file_data MEDIUMTEXT,
+        file_name VARCHAR(200) DEFAULT '', file_data LONGTEXT,
         document_number VARCHAR(80) DEFAULT '', format_number VARCHAR(80) DEFAULT '', doc_revision VARCHAR(40) DEFAULT '', issue_date VARCHAR(20) DEFAULT '',
         active INT DEFAULT 1, is_default INT DEFAULT 0, created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
     // ---- Phase 6: manufacturer document verification & endorsement ----
@@ -159,7 +159,7 @@ function idems_migrate() {
     // Original + supporting files + signature snapshots for an endorsement (original never altered).
     $pdo->exec("CREATE TABLE IF NOT EXISTS endorsement_files (
         id $pk, endorsement_id INT, kind VARCHAR(20) DEFAULT 'support', file_name VARCHAR(255) DEFAULT '', mime VARCHAR(100) DEFAULT '',
-        data MEDIUMTEXT, note VARCHAR(400) DEFAULT '', created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+        data LONGTEXT, note VARCHAR(400) DEFAULT '', created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
     // ---- Phase 10: evidence management (compression, dedupe, captions, GPS) ----
     ensure_column('report_files', 'sha1', "VARCHAR(40) DEFAULT ''");        // duplicate detection
     ensure_column('report_files', 'caption', "VARCHAR(400) DEFAULT ''");    // annotation / caption
