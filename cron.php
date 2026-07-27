@@ -68,6 +68,13 @@ if (function_exists('equipment_run_cal_reminders')) {
     echo "Calibration reminders sent: $cal\n";
 }
 
+// §6.1 — an authorisation that has run out, or one resting on a certificate
+// that has lapsed, must stop being live without anybody having to notice.
+if (function_exists('auth_run_maintenance')) {
+    $am = auth_run_maintenance();
+    echo "Authorisations expired: {$am['expired']}, suspended: {$am['suspended']}\n";
+}
+
 if (function_exists('crm_run_followups')) {
     $fu = crm_run_followups();
     echo "Quote follow-ups sent: $fu\n";
