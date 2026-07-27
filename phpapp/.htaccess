@@ -56,17 +56,21 @@ Options -Indexes
 </IfModule>
 
 # --- HTTPS ---------------------------------------------------------------
-# The session cookie is only marked "never send this in the clear" when the
-# site is actually on HTTPS, so switching the certificate on matters more than
-# anything else in this file. Once the certificate is issued and
-# https://yourdomain works in a browser, remove the # from the four lines below
-# and every visitor is moved to the secure address automatically.
+# ON, because the certificate is now issued and working.
 #
-# Do not uncomment before the certificate works — a browser would be sent to an
-# address that does not answer, and the site would appear to be down.
+# Why this matters more than anything else in this file: on a plain HTTP
+# request the session cookie is NOT marked Secure, so it travels where it can
+# be read — and the browser refuses to register the service worker, which means
+# the installable phone app and its offline drafts silently do not work at all.
+# A certificate that exists but is not enforced buys neither of those things.
 #
-# <IfModule mod_rewrite.c>
-#     RewriteCond %{HTTPS} off
-#     RewriteCond %{HTTP:X-Forwarded-Proto} !https
-#     RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-# </IfModule>
+# The second condition covers shared hosting that terminates SSL at a proxy and
+# forwards plain HTTP to PHP: without it the rule would loop for ever.
+#
+# IF THE SITE EVER APPEARS DOWN after a hosting change, put a # in front of the
+# four lines below and it is immediately back — nothing else depends on them.
+<IfModule mod_rewrite.c>
+    RewriteCond %{HTTPS} off
+    RewriteCond %{HTTP:X-Forwarded-Proto} !https
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
