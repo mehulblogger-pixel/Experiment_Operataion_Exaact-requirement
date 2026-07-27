@@ -180,6 +180,7 @@ function boot() {
     if (function_exists('costing_migrate')) costing_migrate();       // salary + overhead allocation to Business Units
     if (function_exists('joblock_migrate')) joblock_migrate();       // close-on-time lock
     if (function_exists('po_migrate')) po_migrate();                 // an order remembers its quotation
+    if (function_exists('bills_migrate')) bills_migrate();             // chargeable expenses + their bills
     if (function_exists('sched_migrate')) sched_migrate();           // engagement shapes, holidays by office, visits
     // Register every remaining dropdown as an editable master list. Runs last:
     // it needs the base lists seeded and the CRM/IDEMS constants loaded.

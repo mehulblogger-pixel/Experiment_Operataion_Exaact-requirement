@@ -106,6 +106,7 @@ try {
     require __DIR__ . '/lib/joblock.php';
     require __DIR__ . '/lib/schedule.php';
     require __DIR__ . '/lib/callprofit.php';
+    require __DIR__ . '/lib/bills.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
@@ -203,6 +204,9 @@ try {
     db()->query("SELECT id FROM security_incidents LIMIT 1");
     db()->query("SELECT id FROM data_requests LIMIT 1");
     db()->query("SELECT id FROM data_consents LIMIT 1");
+    db()->query("SELECT chargeable_heads FROM calls LIMIT 1");
+    db()->query("SELECT chargeable_heads FROM jobs LIMIT 1");
+    db()->query("SELECT head_code FROM job_bills LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which
     // runs the same idempotent boot() and clears it. Each check is self-cancelling.

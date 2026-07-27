@@ -1142,7 +1142,18 @@ function job_profit($job, $officeId = null) {
     $subcon   = $bearsCost ? (float)($job['subcon_cost'] ?? 0) : 0;
     $other    = $bearsCost ? (float)($job['other_cost'] ?? 0) : 0;
 
-    $direct = $labour + $overhead + $expenses + $voucher + $subcon + $other;
+    // What the client agreed to pay back on top of the fee — the bills filed
+    // against a ticked heading. It is money the branch laid out and then got
+    // back, so leaving it in the cost would show a loss the branch never made.
+    // Capped at what the job actually cost in expenses, so a mis-keyed bill can
+    // never invent profit out of nothing.
+    // Guarded the same way boot() guards its modules: if bills.php did not
+    // upload, profitability still opens — it simply shows nothing recovered,
+    // rather than taking the whole screen down.
+    $recovered = ($bearsCost && function_exists('job_recovered_total'))
+        ? min(job_recovered_total($job), $expenses + $voucher) : 0;
+
+    $direct = $labour + $overhead + $expenses + $voucher + $subcon + $other - $recovered;
     $contingency = round($direct * office_contingency_pct($office) / 100, 2);
     $cost = round($direct + $contingency, 2);
     $profit = round($revenue - $cost, 2);
@@ -1151,6 +1162,8 @@ function job_profit($job, $officeId = null) {
         'mandays' => $mandays, 'daily_cost' => $daily, 'daily_base' => $dailyBase,
         'labour' => $labour, 'overhead' => $overhead, 'overhead_pct' => $ohPct,
         'expenses' => $expenses, 'voucher' => $voucher, 'subcon' => $subcon, 'other' => $other,
+        'recovered' => $recovered,
+        'chargeable' => function_exists('chargeable_head_labels') ? chargeable_head_labels($job) : [],
         'contingency' => $contingency, 'contingency_pct' => office_contingency_pct($office),
         'cost' => $cost,
         'revenue' => $revenue,
@@ -1700,6 +1713,7 @@ function ops_module_gate($route) {
     static $map = [
         'calls'=>'calls','call'=>'calls','call-new'=>'calls','call-edit'=>'calls','call-delete'=>'calls',
         'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-advance'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
+        'bill-add'=>'jobs','bill-delete'=>'jobs','bill-file'=>'jobs',
         'invoicing'=>'invoicing',
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring',
@@ -1790,6 +1804,9 @@ function ops_dispatch($route, $method) {
             ops_calls($route, $method); return true;
         case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-advance' || $route === 'expense-delete':
             ops_jobs($route, $method); return true;
+        // Bills backing the expenses the client is being charged for.
+        case $route === 'bill-add' || $route === 'bill-delete' || $route === 'bill-file':
+            return ops_job_bill($route, $method);
         case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage' || $route === 'candidate-cv' || $route === 'candidate-client' || $route === 'candidate-credential':
             ops_candidates($route, $method); return true;
         case $route === 'inquiries' || $route === 'inquiry-new' || $route === 'inquiry-edit':
@@ -2666,6 +2683,10 @@ function ops_calls($route, $method) {
             // and are stored as a CSV of report-type codes: the same shape the job
             // uses, which is what lets them be handed over untouched at allocation.
             $b['deliverables'] = implode(',', array_filter((array)($b['deliverables'] ?? [])));
+            // Which expense headings the client has agreed to pay on top of the
+            // fee. A tick here is what later stops the deputation closing until
+            // the bill for it is on file.
+            $b['chargeable_heads'] = chargeable_heads_from_post($b['chargeable_heads'] ?? []);
             // §11 — the inspection is at the client's own premises: the same
             // partner is both the customer and the site. Flag them as a site
             // partner so they appear in the site list from now on, instead of
@@ -2802,7 +2823,7 @@ function call_save_fields() {
         'inspection_dates','schedule_end_date','schedule_weekdays',
         'engagement_type','days_count','months_count','pattern_kind','pattern_n',
         'force_dates','manmonth_basis','manmonth_min_days',
-        'reporting_frequency','report_custom_days','deliverables','is_outstation'];
+        'reporting_frequency','report_custom_days','deliverables','is_outstation','chargeable_heads'];
 }
 function job_save_fields() {
     return ['executing_office_id','inspector_id','subcon_id','job_type','stage','scheduled_date',
@@ -2812,7 +2833,7 @@ function job_save_fields() {
         'schedule_weekdays','schedule_end_date','force_dates','manmonth_basis','manmonth_min_days',
         'invoice_value','contracting_office_id','expected_credit','credit_rate','credit_type','credit_direction',
         'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays',
-        'subcon_cost','other_cost','other_cost_note','quotation_id','is_outstation'];
+        'subcon_cost','other_cost','other_cost_note','quotation_id','is_outstation','chargeable_heads'];
 }
 
 function nzc_call($f, $v) {
@@ -3500,6 +3521,12 @@ function ops_jobs($route, $method) {
             $fields = job_save_fields();
             // deliverables come as a checkbox array -> stored as CSV of codes
             $deliverables = implode(',', array_filter((array)($b['deliverables'] ?? [])));
+            // Same shape for the chargeable headings. If the allocate form did
+            // not post them at all, the call's agreement stands — never blank
+            // them by accident, because blanking removes the bill requirement.
+            $b['chargeable_heads'] = array_key_exists('chargeable_heads', $b)
+                ? chargeable_heads_from_post($b['chargeable_heads'])
+                : (string)($job['chargeable_heads'] ?? $call['chargeable_heads'] ?? '');
             // §when — the actual date is the only one chosen here; the end date
             // and the visit list follow from it and the shape of the engagement.
             // Move the actual date and the end date moves with it, which is the
@@ -3714,6 +3741,12 @@ function ops_jobs($route, $method) {
             $reportDate = $b['report_upload_date'] ?? '';
             if ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate === '') {
                 view('ops/job_close', ['job'=>$job,'error'=>'A report upload date is required before closing this job.']); return;
+            }
+            // The client is being charged for these, so the bill has to exist
+            // before the job is called finished. Checked on the server, not only
+            // in the browser: this is a promise made to a customer.
+            if (($why = job_bills_block($job)) !== '') {
+                view('ops/job_close', ['job'=>$job,'error'=>$why]); return;
             }
             // collect any configurable (extra) headings into JSON {code:amount}
             $extra = [];

@@ -25,11 +25,18 @@ $_SERVER['REQUEST_URI'] = '/';
 $_SERVER['REQUEST_METHOD'] = 'GET';
 if (session_status() === PHP_SESSION_NONE) @session_start();
 
-foreach (['db','helpers','ops','lookups','access','terms','compose','crm','pdf','ai','workforce',
-          'orgadmin','contracts','security','compliance','costing','reset','partnerimport','mis',
-          'dedupe','joblock','schedule','idems','seed_demo'] as $m) {
+// The first few have to load in this order — everything after them only needs
+// db/helpers/ops to already be there. The rest is picked up from the folder, so
+// a module added tomorrow is checked without anybody remembering to list it
+// here. Missing it was exactly how a save could name a column that did not
+// exist and this checker still pass.
+$ordered = ['db', 'helpers', 'ops', 'lookups', 'access', 'terms'];
+foreach ($ordered as $m) {
     $f = "$root/lib/$m.php";
     if (file_exists($f)) require_once $f;
+}
+foreach (glob("$root/lib/*.php") as $f) {
+    if (!in_array(basename($f, '.php'), $ordered, true)) require_once $f;
 }
 
 try {

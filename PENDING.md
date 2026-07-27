@@ -2,6 +2,57 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🧾 EXPENSES THE CLIENT PAYS FOR, AND THE BILLS THAT BACK THEM (July 2026)
+
+Owner: *"There shall also be option to mark if travelling, lodging boarding with
+multiple selection chargeable to client; if tick or selected it is required for
+inspector to upload all related bills."*
+
+**Ticked on the call, corrected at allocation.** A tick-list of expense headings
+sits on the inspection call and again on the allocate screen. Any number can be
+ticked. The list is the company's own **expense-heading master**, not a fixed
+three — travelling, lodging, boarding, local conveyance, misc, and anything
+added under Masters → Expense headings appears there by itself.
+
+**A tick is a promise, so it is enforced.** Every heading ticked must have at
+least one bill uploaded against the deputation. Until it does:
+
+- the deputation screen names exactly which bills are outstanding,
+- the Close screen says so **before** anything is filled in, and greys the
+  Close button,
+- and the server refuses the close even if the button is bypassed. Checked in
+  `job_bills_block()`, called from the `job-close` handler — not only in the
+  browser, because this is a promise made to a customer.
+
+**Who can file one.** The engineer on the deputation, the coordinator, or a
+manager. Once the deputation is closed the bills are part of what was invoiced,
+so only a manager may remove one — an engineer cannot quietly withdraw the
+evidence for something already charged.
+
+**A bill the client pays is not a cost this branch bears.** `job_profit()` now
+carries a `recovered` line: the bills filed under a ticked heading come back out
+of the cost, and the deputation shows *"Less: recovered from the client"*.
+Without it a branch that laid out ₹9,600 and billed all of it back showed a
+₹9,600 loss it never made. Two guards on that figure:
+
+- it is **capped at what the job actually cost** in expenses and voucher claims,
+  so a mis-keyed bill can never invent profit;
+- un-ticking a heading stops its bills counting, but **keeps them on file** —
+  they are shown as *"no longer charged"* rather than vanishing.
+
+**Two foot-guns closed while here.** `tools/check-columns.php` kept a
+hand-written list of modules to load, so a save could name a column in a module
+the checker had never heard of and still pass — it now loads every `lib/*.php`.
+And `job_profit()` calls into the new module through `function_exists()`, the
+same way `boot()` does, so a partial upload cannot take the profitability screen
+down.
+
+*Verified:* 31 rule tests, and a real browser run that ticks the three headings,
+is refused at the Close screen, is refused again when the disabled button is
+bypassed with a valid CSRF token, uploads the three bills, opens one back, and
+then closes — 13 checks, repeatable from a clean reset. Lint green (136 files),
+81 screens render, fresh-install boot creates both columns and the table.
+
 ## 🏷️ THE ACRONYMS ARE GONE (July 2026)
 
 Owner: *"delete SGS, BOSS etc. and replace them with suitable name — for BOSS it

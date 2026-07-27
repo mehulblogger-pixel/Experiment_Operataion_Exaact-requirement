@@ -114,6 +114,8 @@
     <div><span class="k">Contracting <?= e(Tl('office')) ?></span><?= e($call['ibo_name'] ?: 'Ahmedabad (own)') ?></div>
     <div><span class="k">Executing branch</span><?= e($call['exec_name'] ?: 'Ahmedabad executes') ?><?= $call['coordinator_name'] ? '<br><small class="muted">Coord: '.e($call['coordinator_name']).'</small>' : '' ?></div>
     <div><span class="k"><?= e(T("sbu")) ?></span><?= e(lk_options_or('sbu', OPS_SBUS)[$call['sbu']] ?? '—') ?></div>
+    <div><span class="k">Charged to the <?= e(Tl('client')) ?></span><?php $cl = chargeable_head_labels($call);
+      echo $cl ? e(implode(', ', $cl)) . ' <span class="muted">— bills required</span>' : '<span class="muted">nothing beyond the fee</span>'; ?></div>
     <div><span class="k">Activity</span><?= e($call['activity_id'] ? lk_value_path($call['activity_id']) : '—') ?></div>
     <div><span class="k">Type of inspection</span><?= e(($call['inspection_type']??'')==='OTHER' ? ($call['inspection_type_other'] ?: 'Other') : (INSPECTION_TYPES[$call['inspection_type']??''] ?? '—')) ?></div>
     <?php if (($call['site_address_id']??null)): $sa = ops_one("SELECT * FROM partner_addresses WHERE id=?", [$call['site_address_id']]); ?>
