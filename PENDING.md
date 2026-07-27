@@ -2,6 +2,113 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🔍 GAP REVIEW — the app used as every role, July 2026
+
+Method: a demo database was built and the app was driven in a real browser as
+**inspection engineer → coordinator → asst. manager → operation manager →
+branch manager → business unit head → business director → finance → admin**,
+then measured against **ISO/IEC 17020** (the standard a third-party inspection
+body is accredited to) and against what competing inspection-management
+products ship. Nothing below is a guess; each item was reproduced.
+
+**What is genuinely strong** — 191 routes, 74 tables; the sales→call→deputation
+→schedule→close→bills→voucher→profit chain holds end to end; access control is
+sound (an engineer probing 16 management URLs was bounced home from every one);
+the phone experience is real (no horizontal scroll on any screen tested, card
+layouts, bottom tab bar, camera capture, GPS stamping, offline draft queue).
+
+### A. Accreditation-blocking (only if ISO/IEC 17020 matters to you)
+
+- [ ] **A1 · Equipment & calibration register (§6.2).** There is no register of
+      measuring and test equipment — gauges, UT/DFT meters, hardness testers —
+      with ID, owner, calibration certificate and due date. Today a report can
+      print the standard phrase *"equipment was verified to be within its valid
+      calibration period"* with nothing behind it. An assessor will ask for the
+      certificate. **Also needed:** the report should refuse to finalise naming
+      an instrument whose calibration has lapsed.
+- [ ] **A2 · Impartiality / conflict-of-interest declaration (§4.1).** This is
+      the defining clause for a Type A body and there is nothing in the app. A
+      per-deputation declaration by the engineer ("I have no interest in this
+      vendor / have not worked for them"), held with the record, plus a register
+      of declared threats and how they were resolved.
+- [ ] **A3 · Complaints & appeals register (§7.5, §7.6).** Only a DPDP grievance
+      *contact name* exists in Settings. Accreditation needs a logged complaint,
+      acknowledgement, investigation, outcome and closure — and appeals decided
+      by people who were not involved in the original inspection.
+- [ ] **A4 · Competence & authorisation, and enforce it (§6.1).** Certificates
+      are held (`inspector_certs`) and an e-mail goes out 30 days before expiry,
+      but **an engineer whose certificate has expired can still be allocated** —
+      nothing checks it at allocation. Missing entirely: which inspection types
+      / methods / clients each person is *authorised* for, the witnessed-
+      inspection record, and the periodic monitoring §6.1.8 requires.
+- [ ] **A5 · Internal audit, management review, corrective action (§8.5–8.8).**
+      No register for any of the three. `security_incidents` covers security
+      only. A CAPA log with root cause, action, owner, due date and
+      effectiveness check is the usual shape.
+
+### B. Flows that are wrong or dead-ended (found by using it)
+
+- [ ] **B1 · The Business Director is offered "Settings" and then refused it.**
+      The menu item renders; opening it says *"Only admins can change
+      settings."* Either hide it for that role or grant it. A menu item that
+      refuses reads as a broken app. *(Smallest fix on this list.)*
+- [ ] **B2 · Two disconnected reporting worlds.** The Close screen asks for a
+      *"report link"* — a URL to a file kept somewhere else — while a full
+      report engine (templates, sections, approvals, signatures, IRN, evidence)
+      sits alongside it. The bridge is the "Reports owed on this deputation"
+      panel, but that panel **only renders when deliverables were ticked on the
+      call**. Miss that tick and the engineer has no route from the job into the
+      report engine at all. The panel should always show, with a plain "no
+      formats agreed — write one anyway" path.
+- [ ] **B3 · The engineer's menu has two items.** `My deputations` and `My
+      vouchers`. Not the report register, not evidence upload, not their own
+      certificates, not their availability/leave. They *have* permission for
+      `/documents` — it is simply never offered. (The dashboard tiles do link to
+      `/my-jobs?f=reports`, so it is not a dead end, but the person who writes
+      every report has no menu entry for reports.)
+- [ ] **B4 · Sales → operations is pull-only.** A won quotation lands the client
+      in the master and the call form can pick the quote up, but there is no
+      **"Raise an inspection call from this quotation"** button. Somebody has to
+      remember. Every comparable product pushes.
+
+### C. Not in line with the market
+
+- [ ] **C1 · No client portal.** The single biggest differentiator competing
+      products sell on: the client logs in, sees call status, downloads reports,
+      raises the next call. Also removes the daily "where is my report" e-mail.
+- [ ] **C2 · Tax stops at the quotation.** A single `gst_pct` / `gst_amount`
+      exists on the quote. On the invoice side there is **no GST at all** — no
+      HSN/SAC code, no place of supply, no IGST vs CGST+SGST split, no
+      e-invoice/IRN. `/invoicing` is an invoice *tracker* (raised / paid flags),
+      not an invoicing module. Fine if billing is done in Tally — but then the
+      export to Tally is the missing piece, and it should be said out loud.
+- [ ] **C3 · No receivables ageing.** Overdue is a yes/no. Collections work off
+      0–30 / 31–60 / 61–90 / 90+ buckets by client.
+- [ ] **C4 · No customer satisfaction / feedback capture** after a job closes —
+      an ISO 9001 expectation and a normal account-management tool.
+- [ ] **C5 · Director's dashboard has no utilisation.** Pipeline and conversion
+      are there; the one number a director asks about an inspection business —
+      *what percentage of engineer-days were billable* — is not on it, even
+      though the man-day data to compute it exists.
+
+### D. Mobile — already most of the way there
+
+The app is **already a working PWA**: `manifest.php` (standalone display,
+portrait, icons), a registered service worker with field-friendly caching, an
+offline draft queue in `localStorage`, `capture="environment"` for the camera
+and `navigator.geolocation` for GPS-stamped evidence. Every screen tested at
+Pixel-7 size had zero horizontal scroll, and the engineer gets a card layout
+with a bottom tab bar. See the fuller answer in the review notes; the short
+version is that "Add to Home Screen" is available today, and store presence is
+a packaging job (Trusted Web Activity for Play, WKWebView shell for the App
+Store) rather than a rewrite — with **HTTPS being the hard prerequisite**,
+since a service worker will not run over plain HTTP.
+
+**Suggested order** if the list is worked: B1 (minutes) → B3 + B2 (the field
+user's day) → A4 (expired certificates are both a safety and an accreditation
+problem) → A1 → C5 → B4 → A2/A3/A5 → C1 → C2/C3.
+
+
 ## 🧾 EXPENSES THE CLIENT PAYS FOR, AND THE BILLS THAT BACK THEM (July 2026)
 
 Owner: *"There shall also be option to mark if travelling, lodging boarding with
