@@ -281,7 +281,20 @@ function ua() {
         'master' => $role === 'MASTER_ADMIN',
     ];
 }
-function can($perm) { $a = ua(); return $a['master'] || in_array($perm, $a['perms'], true); }
+// The single choke point. Every screen, every menu item and every module gate
+// in this app comes through here, which is why the module licence is applied
+// here and nowhere else: switch a module off and every gate that was already
+// written starts saying no, with nothing else to change.
+//
+// Note the order — the licence is checked BEFORE the master-admin bypass. A
+// module the installation has not bought is not a permissions question, and a
+// Master Admin who could still open it would be looking at a screen the
+// customer has not paid for and cannot be supported on.
+function can($perm) {
+    if (function_exists('licence_blocks') && licence_blocks($perm)) return false;
+    $a = ua();
+    return $a['master'] || in_array($perm, $a['perms'], true);
+}
 function scope_offices() { return ua()['offices']; } // 'ALL' or int[]
 function scope_sbus() { return ua()['sbus']; }        // 'ALL' or string[]
 

@@ -98,7 +98,7 @@
       </form>
       <p class="help">No account? Ask your <strong>office administrator</strong> to create one.</p>
       <?php endif; ?>
-      <div class="ver"><?= e(app_name()) ?> · v1.0</div>
+      <div class="ver"><?= e(app_name()) ?> · v<?= e(defined('APP_VERSION') ? APP_VERSION : '1.0') ?></div>
     </div>
   </main>
 </div>
