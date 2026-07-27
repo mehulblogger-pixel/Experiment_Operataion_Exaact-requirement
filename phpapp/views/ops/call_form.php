@@ -325,6 +325,7 @@ document.addEventListener('DOMContentLoaded', function () {
     $callFreq  = $call['reporting_frequency'] ?? '';
     $callDays  = $call['report_custom_days'] ?? '';
     $callDeliv = array_values(array_filter(array_map('trim', explode(',', (string)($call['deliverables'] ?? '')))));
+    $callChg   = chargeable_heads($call ?: []);
   ?>
   <div class="form-grid">
     <div class="ff"><label>Reporting frequency</label>
@@ -345,6 +346,14 @@ document.addEventListener('DOMContentLoaded', function () {
         <?php endforeach; ?>
       </div>
       <small class="muted">Each format ticked is handed to the <?= e(Tl('engineer')) ?> on every <?= e(Tl('job')) ?> raised from this <?= e(Tl('call')) ?>, and is the only list they can report against. Maintained in the <a href="/report-types" target="_blank"><?= e(Tl('report')) ?> types</a> register.</small></div>
+
+    <div class="ff ff-wide"><label>Expenses the <?= e(Tl('client')) ?> pays for <span class="muted">(tick any number)</span></label>
+      <div class="checkgrid">
+        <?php foreach (chargeable_head_options() as $k=>$v): ?>
+          <label class="chk"><input type="checkbox" name="chargeable_heads[]" value="<?= e($k) ?>" <?= in_array($k, $callChg, true)?'checked':'' ?>> <?= e($v) ?></label>
+        <?php endforeach; ?>
+      </div>
+      <small class="muted">Travelling, lodging, boarding and the rest — tick whatever this <?= e(Tl('client')) ?> has agreed to reimburse on top of the fee. Anything ticked <strong>must have its bill uploaded</strong> before the <?= e(Tl('job')) ?> can be closed, and is then taken out of the cost when the profit is worked out. Headings come from the <a href="/lookup?key=expense_heading" target="_blank">expense headings</a> list.</small></div>
   </div>
 
   <div style="margin-top:16px;">

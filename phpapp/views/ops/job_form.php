@@ -12,6 +12,8 @@
   $curDeliv = $job
       ? (trim((string)($job['deliverables'] ?? '')) !== '' ? explode(',', $job['deliverables']) : [])
       : array_values(array_filter(array_map('trim', explode(',', (string)($call['deliverables'] ?? '')))));
+  $curChg = $job && trim((string)($job['chargeable_heads'] ?? '')) !== ''
+      ? chargeable_heads($job) : chargeable_heads($call ?: []);
   $curActRow = $curActId ? lk_value($curActId) : null;
   // §b.i / §b.iii — everything already settled on the call flows through, so the
   // coordinator allocates rather than re-types.
@@ -391,6 +393,14 @@
         <?php endforeach; ?>
       </div>
       <small class="muted">Each format ticked here is handed to the <?= e(Tl('engineer')) ?> as a report to produce — they appear on the <?= e(Tl('report')) ?> screen ready to fill, using the <?= e(Tl('client')) ?>'s own format where one is on file. The list is the <a href="/report-types"><?= e(Tl('report')) ?> types</a> register.</small></div>
+
+    <div class="ff ff-wide"><label>Expenses the <?= e(Tl('client')) ?> pays for <span class="muted">(from the <?= e(Tl('call')) ?> — correct it here if needed)</span></label>
+      <div class="checkgrid">
+        <?php foreach (chargeable_head_options() as $k=>$v): ?>
+          <label class="chk"><input type="checkbox" name="chargeable_heads[]" value="<?= e($k) ?>" <?= in_array($k, $curChg, true)?'checked':'' ?>> <?= e($v) ?></label>
+        <?php endforeach; ?>
+      </div>
+      <small class="muted">Each one ticked is a bill the <?= e(Tl('engineer')) ?> has to upload against this <?= e(Tl('job')) ?>. Until every one of them has a bill on file, the <?= e(Tl('job')) ?> will not close.</small></div>
 
     <?php render_custom_fields('job', $cfvals ?? []); ?>
   </div>

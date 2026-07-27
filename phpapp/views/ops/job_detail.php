@@ -259,6 +259,81 @@
 </div>
 <?php endif; ?>
 
+<?php // The expenses the client agreed to pay for. Every one ticked needs a
+      // bill on file or the job will not close, so the outstanding ones are
+      // named here rather than only being discovered at the Close screen.
+      $chgHeads = chargeable_heads($job);
+      $chgOpts  = chargeable_head_options();
+      $byHead   = job_bills_by_head($job['id']);
+      $missing  = job_bills_missing($job);
+      $canBill  = job_bill_can_upload($job); ?>
+<?php if ($chgHeads || $byHead): ?>
+<div class="panel" id="bills">
+  <div class="ctitle" style="margin-top:0"><h3>Charged to the <?= e(Tl('client')) ?> — bills required
+    <span class="muted">(<?= count($chgHeads) ?>)</span></h3></div>
+  <?php if ($missing): ?>
+    <div class="msg msg-error" style="margin:8px 0"><?= e(job_bills_block($job)) ?></div>
+  <?php elseif ($chgHeads): ?>
+    <div class="msg msg-ok" style="margin:8px 0">Every chargeable expense on this <?= e(Tl('job')) ?> has its bill on file.</div>
+  <?php endif; ?>
+  <table class="grid">
+    <tr><th>Heading</th><th>Bill no.</th><th>Bill date</th><th class="num">Amount</th><th>File</th><th>Filed by</th><?php if ($canBill): ?><th></th><?php endif; ?></tr>
+    <?php $btot = 0; foreach ($chgHeads as $code): $rows = $byHead[$code] ?? []; ?>
+      <?php if (!$rows): ?>
+        <tr><td><strong><?= e($chgOpts[$code] ?? $code) ?></strong></td>
+            <td colspan="<?= $canBill ? 6 : 5 ?>"><span class="pill p-warn">no bill yet</span></td></tr>
+      <?php else: foreach ($rows as $i => $b): $btot += (float)$b['amount']; ?>
+        <tr><td><?= $i === 0 ? '<strong>' . e($chgOpts[$code] ?? $code) . '</strong>' : '' ?></td>
+          <td><?= e($b['bill_no'] ?: '—') ?></td>
+          <td><?= e($b['bill_date'] ? fdate($b['bill_date']) : '—') ?></td>
+          <td class="num"><?= fmoney($b['amount']) ?></td>
+          <td><a href="/bill-file?id=<?= (int)$b['id'] ?>" target="_blank" rel="noopener"><?= e($b['file_name']) ?></a></td>
+          <td class="muted"><?= e($b['uploaded_by']) ?></td>
+          <?php if ($canBill): ?>
+          <td><form method="post" action="/bill-delete" onsubmit="return confirm('Remove this bill?')" style="margin:0">
+            <input type="hidden" name="job_id" value="<?= (int)$job['id'] ?>">
+            <input type="hidden" name="id" value="<?= (int)$b['id'] ?>">
+            <button class="btn small secondary" type="submit">Remove</button></form></td>
+          <?php endif; ?></tr>
+      <?php endforeach; endif; ?>
+    <?php endforeach; ?>
+    <?php // Bills filed under a heading that has since been un-ticked. Kept, and
+          // shown, but no longer charged on — otherwise they simply vanish. ?>
+    <?php foreach ($byHead as $code => $rows): if (in_array($code, $chgHeads, true)) continue; foreach ($rows as $b): ?>
+      <tr class="muted"><td><?= e($chgOpts[$code] ?? $code) ?> <span class="pill p-mut">no longer charged</span></td>
+        <td><?= e($b['bill_no'] ?: '—') ?></td><td><?= e($b['bill_date'] ? fdate($b['bill_date']) : '—') ?></td>
+        <td class="num"><?= fmoney($b['amount']) ?></td>
+        <td><a href="/bill-file?id=<?= (int)$b['id'] ?>" target="_blank" rel="noopener"><?= e($b['file_name']) ?></a></td>
+        <td><?= e($b['uploaded_by']) ?></td><?php if ($canBill): ?><td></td><?php endif; ?></tr>
+    <?php endforeach; endforeach; ?>
+    <?php if ($btot > 0): ?><tr><td colspan="3"><strong>Recoverable from the <?= e(Tl('client')) ?></strong></td>
+      <td class="num"><strong><?= fmoney($btot) ?></strong></td><td colspan="<?= $canBill ? 3 : 2 ?>"></td></tr><?php endif; ?>
+  </table>
+
+  <?php if ($canBill && $chgHeads): ?>
+  <form method="post" action="/bill-add?job=<?= (int)$job['id'] ?>" enctype="multipart/form-data" style="margin-top:14px">
+    <input type="hidden" name="job_id" value="<?= (int)$job['id'] ?>">
+    <div class="form-grid">
+      <div class="ff"><label>Which expense *</label>
+        <select class="form-control" name="head_code" required>
+          <?php foreach ($chgHeads as $code): ?>
+            <option value="<?= e($code) ?>"><?= e($chgOpts[$code] ?? $code) ?><?= isset($missing[$code]) ? ' — still needed' : '' ?></option>
+          <?php endforeach; ?>
+        </select></div>
+      <div class="ff"><label>Bill number</label><input class="form-control" name="bill_no" placeholder="as printed on the bill"></div>
+      <div class="ff"><label>Bill date</label><input class="form-control" type="date" name="bill_date"></div>
+      <div class="ff"><label>Amount (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="amount" value="0"></div>
+      <div class="ff"><label>The bill itself *</label><input class="form-control" type="file" name="bill_file" required
+             accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx"></div>
+      <div class="ff ff-wide"><label>Note</label><input class="form-control" name="note" placeholder="e.g. return fare Ahmedabad–Vadodara"></div>
+    </div>
+    <button class="btn" type="submit">Upload bill</button>
+    <span class="muted" style="margin-left:8px">A photo of the bill is fine. Up to <?= (int)upload_max_mb() ?> MB.</span>
+  </form>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <div class="panel-split">
   <div class="panel">
     <h3 class="tab-sub">Expenses</h3>
@@ -294,6 +369,9 @@
         <div><span class="k">Labour cost</span><?= fmoney($profit['labour']) ?></div>
       <?php endif; ?>
       <div><span class="k">Expenses</span><?= fmoney($profit['expenses']) ?></div>
+      <?php if (!empty($profit['recovered'])): ?>
+        <div><span class="k">Less: recovered from the <?= e(Tl('client')) ?></span>−<?= fmoney($profit['recovered']) ?></div>
+      <?php endif; ?>
       <div><span class="k">Sub-con cost</span><?= fmoney($profit['subcon']) ?></div>
       <?php // The two are not the same number and were treated as though they
             // were. What the client pays is the invoice value; what this branch
