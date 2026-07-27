@@ -225,6 +225,7 @@ function boot() {
     if (function_exists('po_migrate')) po_migrate();                 // an order remembers its quotation
     widen_file_columns();                                            // uploads need LONGTEXT, not MEDIUMTEXT
     if (function_exists('bills_migrate')) bills_migrate();             // chargeable expenses + their bills
+    if (function_exists('competence_migrate')) competence_migrate();   // required certificates gate allocation
     if (function_exists('sched_migrate')) sched_migrate();           // engagement shapes, holidays by office, visits
     // Register every remaining dropdown as an editable master list. Runs last:
     // it needs the base lists seeded and the CRM/IDEMS constants loaded.

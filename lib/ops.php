@@ -2350,14 +2350,16 @@ function ops_inspectors($action, $method) {
             $b = $_POST;
             // certification sub-actions on the edit page
             if (($b['_do'] ?? '') === 'cert_add' && $ins) {
-                $pdo->prepare("INSERT INTO inspector_certs (inspector_id,name,number,issued_date,valid_to,status,updated_by,created_at) VALUES (?,?,?,?,?,?,?,?)")
-                    ->execute([$ins['id'], $b['cert_name'] ?? '', $b['cert_number'] ?? '', $b['cert_issued'] ?? '', $b['cert_valid_to'] ?? '', 'VALID', user_name(current_user()), date('c')]);
+                $pdo->prepare("INSERT INTO inspector_certs (inspector_id,name,number,issued_date,valid_to,status,is_mandatory,updated_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
+                    ->execute([$ins['id'], $b['cert_name'] ?? '', $b['cert_number'] ?? '', $b['cert_issued'] ?? '', $b['cert_valid_to'] ?? '', 'VALID',
+                               empty($b['cert_mandatory']) ? 0 : 1, user_name(current_user()), date('c')]);
                 flash('Certification added.');
                 redirect('/m/inspectors/edit?id=' . $ins['id']);
             }
             if (($b['_do'] ?? '') === 'cert_update' && $ins) {
-                $pdo->prepare("UPDATE inspector_certs SET valid_to=?, number=?, updated_by=? WHERE id=? AND inspector_id=?")
-                    ->execute([$b['cert_valid_to'] ?? '', $b['cert_number'] ?? '', user_name(current_user()), (int)$b['cert_id'], $ins['id']]);
+                $pdo->prepare("UPDATE inspector_certs SET valid_to=?, number=?, is_mandatory=?, updated_by=? WHERE id=? AND inspector_id=?")
+                    ->execute([$b['cert_valid_to'] ?? '', $b['cert_number'] ?? '', empty($b['cert_mandatory']) ? 0 : 1,
+                               user_name(current_user()), (int)$b['cert_id'], $ins['id']]);
                 flash('Certification validity updated.');
                 redirect('/m/inspectors/edit?id=' . $ins['id']);
             }
@@ -2572,6 +2574,21 @@ function ops_calls($route, $method) {
         if ($route === 'call-edit') {
             $call = ops_one("SELECT * FROM calls WHERE id=?", [(int)($_GET['id'] ?? 0)]);
             if (!$call) { http_response_code(404); view('notfound'); return; }
+        }
+        // Raised straight off a won quotation: the client, the contract number,
+        // the commercials and the business unit come across so nobody has to
+        // remember them. Sales used to hand over by telling somebody.
+        if ($route === 'call-new' && !empty($_GET['quote'])) {
+            $fromQ = ops_one("SELECT * FROM quotations WHERE id=?", [(int)$_GET['quote']]);
+            if ($fromQ) {
+                $call = [
+                    'quotation_id'    => (int)$fromQ['id'],
+                    'client_id'       => $fromQ['client_id'] ?? null,
+                    'contract_number' => $fromQ['contract_number'] ?? '',
+                    'sbu'             => $fromQ['sbu'] ?? '',
+                    'ibo_office_id'   => $fromQ['office_id'] ?? (current_user()['home_office_id'] ?? null),
+                ];
+            }
         }
         if ($method === 'POST') {
             $b = $_POST;
@@ -2833,7 +2850,8 @@ function job_save_fields() {
         'schedule_weekdays','schedule_end_date','force_dates','manmonth_basis','manmonth_min_days',
         'invoice_value','contracting_office_id','expected_credit','credit_rate','credit_type','credit_direction',
         'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays',
-        'subcon_cost','other_cost','other_cost_note','quotation_id','is_outstation','chargeable_heads'];
+        'subcon_cost','other_cost','other_cost_note','quotation_id','is_outstation','chargeable_heads',
+        'cert_override_note','cert_override_by'];
 }
 
 function nzc_call($f, $v) {
@@ -3603,6 +3621,31 @@ function ops_jobs($route, $method) {
                 // column would be counted as though there were.
                 $b['expected_credit'] = 0;
                 $b['credit_direction'] = '';
+            }
+            // ISO/IEC 17020 §6.1 — only somebody competent and authorised does
+            // the work. A required certificate that had already lapsed on the
+            // date the work happens stops the allocation here. A manager may
+            // still let it through, but only by saying why, and that reason is
+            // kept on the deputation because that is the record an assessor
+            // reads. Refusing outright would push people to back-date the
+            // certificate to get past the gate, which destroys the evidence.
+            $b['cert_override_note'] = trim((string)($b['cert_override_note'] ?? ''));
+            if (!empty($b['inspector_id'])) {
+                $onDate = competence_job_date($b, $call);
+                if (($why = competence_block((int)$b['inspector_id'], $onDate)) !== '') {
+                    if ($b['cert_override_note'] === '' || !competence_can_override()) {
+                        view('ops/job_form', array_merge(call_job_form_vars($job, $call),
+                            ['error' => $why . (competence_can_override()
+                                ? ' To go ahead anyway, state the reason in the box that has appeared below.'
+                                : ' A manager can allow it with a recorded reason.'),
+                             'certBlock' => $why]));
+                        return;
+                    }
+                    $b['cert_override_by'] = user_name(current_user());
+                } else {
+                    $b['cert_override_note'] = '';   // nothing to excuse
+                    $b['cert_override_by'] = '';
+                }
             }
             // The contract number comes down the chain and the register fills
             // itself, so nothing has to be chosen from a list that may be empty.

@@ -2,6 +2,46 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ ROADMAP PHASE 1 — the broken flows are fixed (July 2026)
+
+Six items from the gap review, all verified in a real browser as the role that
+suffers from them. See `docs/ROADMAP.md` for the phases that follow.
+
+- [x] **B1 — the director was offered "Settings" and then refused it.** The menu
+      tested `mod.settings.view`; the screen requires `settings.manage`. Two
+      different permissions. The menu now tests both, and the gate on the screen
+      is unchanged — so nothing was loosened to make a link work.
+- [x] **B3 — the engineer's two-item menu.** They already held
+      `mod.idems.view/edit`; the nav simply branched past it. The person who
+      writes every report now has the report register, "write a report" and the
+      endorsement register on their menu.
+- [x] **B2 — the report engine was unreachable from a deputation** whenever
+      deliverables had not been ticked on the call, because the whole "Reports
+      owed" panel was inside that condition. It now always renders, lists
+      reports written under a format nobody agreed, and offers "write one
+      anyway". Checked on 8 of 8 deputations.
+- [x] **C5 — utilisation on the director's dashboard.** Billable engineer-days
+      over available engineer-days, FY to date. Deliberately computed by a new
+      shared `mis_utilisation()` that the management dashboard uses too, so the
+      two screens can never quote different numbers for the same word.
+- [x] **B4 — sales → operations was pull-only.** An accepted quotation now
+      offers **"Raise an inspection call"**, and the call opens with the client,
+      the contract number, the business unit and the quotation link already
+      filled. Only on ACCEPTED, verified both ways.
+- [x] **A4(a) — an engineer with a lapsed certificate could still be deputed.**
+      New `lib/competence.php`. A certificate can be marked **required**; a
+      required one that had already lapsed *on the date the work happens* stops
+      the allocation. Two deliberate design calls, both explained in the file:
+      only *required* certificates gate (a lapsed first-aid card must not stop a
+      welding inspection, or the desk stops trusting the system), and a manager
+      may override **with a reason recorded on the deputation** (refusing
+      outright pushes people to back-date the certificate, which destroys the
+      very record an assessor reads). 22 tests.
+
+*Verified:* lint green (137 files), 81 screens render, 15 browser checks across
+five roles, and t_comp 22, t_bills 31, t_sched 39, t_rev 24, t_profit 22,
+t_cost 20, t_mis 45, t_hours 7, t_session 12 all pass.
+
 ## 🖥️ INSTALLING ON A CLIENT'S OWN SERVER (July 2026)
 
 Question: can the whole app be handed to a client to run on their own server?

@@ -183,6 +183,30 @@ function mis_summary(array $F) {
 // man-days worked against days available — without the second half it is a
 // count, not a percentage, and a count cannot tell you whether a branch is
 // stretched or idle.
+// Utilisation for a date range, using EXACTLY the definition the management
+// dashboard already uses — billable engineer-days over available engineer-days.
+// Written as its own function so the director's home screen and the MIS screen
+// can never drift apart and quote two different numbers for the same thing.
+function mis_utilisation($from, $to, $officeId = 0, $inspectorId = 0) {
+    $F = ['from' => $from, 'to' => $to, 'office' => (int)$officeId, 'inspector' => (int)$inspectorId];
+    $avail = mis_available_days($F);
+    // The days actually worked, over the same window and the same scope. The
+    // revenue date used elsewhere is the inspection end, so it is used here too.
+    [$w, $a] = scope_clause('j.executing_office_id', 'j.sbu');
+    $rd = "COALESCE(NULLIF(j.inspection_end_date,''), NULLIF(j.scheduled_date,''), j.created_at)";
+    $sql = "SELECT * FROM jobs j WHERE $w AND $rd >= ? AND $rd <= ?";
+    $args = array_merge($a, [$from, $to]);
+    if ($officeId)    { $sql .= " AND j.executing_office_id = ?"; $args[] = (int)$officeId; }
+    if ($inspectorId) { $sql .= " AND j.inspector_id = ?";        $args[] = (int)$inspectorId; }
+    $worked = 0.0;
+    foreach (ops_all($sql, $args) as $j) $worked += (float)job_mandays($j);
+    return [
+        'worked'    => round($worked, 1),
+        'available' => $avail,
+        'pct'       => $avail > 0 ? round($worked / $avail * 100, 1) : null,
+    ];
+}
+
 function mis_available_days(array $F) {
     // The engineers who appear in the period, or every active one when the
     // filter does not name a person.

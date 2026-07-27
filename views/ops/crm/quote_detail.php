@@ -12,7 +12,13 @@
   <div><h1><?= e(quote_label($q)) ?> <span class="pill <?= $stPill[$st] ?? 'p-mut' ?>" style="font-size:13px;vertical-align:middle"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st) ?></span></h1>
     <p class="sub" style="margin:2px 0 0"><?= e($q['subject'] ?: '—') ?></p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
-    <a class="btn" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
+    <?php // Sales hands over to operations here. Before this the handover was
+          // pull-only — a coordinator had to know a quote had been won and go
+          // and find it from the call form. ?>
+    <?php if ($st === 'ACCEPTED' && is_coordinator_level()): ?>
+      <a class="btn" href="/call-new?quote=<?= (int)$q['id'] ?>">▶ Raise an <?= e(Tl('call')) ?></a>
+    <?php endif; ?>
+    <a class="btn<?= $st === 'ACCEPTED' ? ' secondary' : '' ?>" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
     <a class="btn secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a>
     <?php if ($canEdit && in_array($st, ['DRAFT','PENDING_APPROVAL','REJECTED'], true)): ?><a class="btn secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>">Edit</a><?php endif; ?>
     <a class="btn secondary" href="/quotes">← Back</a>

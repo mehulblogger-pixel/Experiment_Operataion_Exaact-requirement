@@ -133,16 +133,31 @@
   $dlCodes = trim((string)($job['deliverables'] ?? '')) !== '' ? array_filter(array_map('trim', explode(',', $job['deliverables']))) : [];
   $dlMap = deliverable_options();
   $jobDocs = [];
-  if ($dlCodes) foreach (ops_all(
+  // Loaded whether or not formats were agreed — a report written against a
+  // deputation with no agreed format still has to be findable from it.
+  foreach (ops_all(
       "SELECT id, irn, type_code, status, finalized FROM report_docs WHERE job_id=? AND deleted=0 ORDER BY id", [(int)$job['id']]) as $rd)
       $jobDocs[$rd['type_code']][] = $rd;
+  // Anything already written under a format nobody ticked, so it is still listed.
+  $extraCodes = array_values(array_diff(array_keys($jobDocs), $dlCodes));
+  $canWrite = can('mod.idems.edit') || is_master();
 ?>
-<?php if ($dlCodes): ?>
+<?php // This panel is the ONLY bridge from a deputation into the report engine.
+      // It used to render only when deliverables had been ticked on the call —
+      // so if the coordinator missed that tick, the engineer had no route to the
+      // reporting module at all and fell back to pasting a link to a file kept
+      // somewhere else. It now always renders. ?>
 <div class="panel">
-  <div class="ctitle" style="margin-top:0"><h3><?= e(ucfirst(TP('report'))) ?> owed on this <?= e(Tl('job')) ?> <span class="muted">(<?= count($dlCodes) ?>)</span></h3></div>
+  <div class="ctitle" style="margin-top:0"><h3><?= e(ucfirst(TP('report'))) ?> on this <?= e(Tl('job')) ?> <span class="muted">(<?= count($dlCodes) + count($extraCodes) ?>)</span></h3></div>
+  <?php if ($dlCodes): ?>
   <p class="muted" style="margin:0 0 10px">These are the formats agreed on the <?= e(Tl('call')) ?>. Each one opens in the
     <?= e(Tl('report')) ?> module already filled in from this <?= e(Tl('job')) ?>, on the <?= e(Tl('client')) ?>'s own
     format where one is registered.</p>
+  <?php else: ?>
+  <p class="muted" style="margin:0 0 10px">No <?= e(Tl('report')) ?> format was agreed on the <?= e(Tl('call')) ?>.
+    That does not stop one being written — start it below and it opens already filled in from this <?= e(Tl('job')) ?>.
+    To have formats carried through automatically next time, tick them on the <?= e(Tl('call')) ?>.</p>
+  <?php endif; ?>
   <table class="dt">
     <thead><tr><th>Format</th><th>Status</th><th></th></tr></thead>
     <tbody>
@@ -160,10 +175,30 @@
         <?php endif; ?></td>
       </tr>
     <?php endforeach; ?>
+    <?php // Written under a format that was never agreed — still this job's work. ?>
+    <?php foreach ($extraCodes as $code): ?>
+      <tr>
+        <td><b><?= e($dlMap[$code] ?? $code) ?></b> <span class="pill p-mut">not on the agreed list</span></td>
+        <td><?php foreach ($jobDocs[$code] as $d): ?>
+              <a href="/document?id=<?= (int)$d['id'] ?>"><?= e($d['irn']) ?></a>
+              <span class="pill <?= !empty($d['finalized']) ? 'p-ok' : 'p-info' ?>"><?= e(!empty($d['finalized']) ? 'issued' : strtolower((string)($d['status'] ?: 'draft'))) ?></span>
+            <?php endforeach; ?></td>
+        <td></td>
+      </tr>
+    <?php endforeach; ?>
+    <?php if (!$dlCodes && !$extraCodes): ?>
+      <tr><td colspan="2" class="muted">Nothing written yet.</td>
+          <td class="num"><?php if ($canWrite): ?>
+            <a class="btn small" href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call=' . (int)$job['call_id'] : '' ?>">Write one</a>
+          <?php endif; ?></td></tr>
+    <?php endif; ?>
     </tbody>
   </table>
+  <?php if ($canWrite && ($dlCodes || $extraCodes)): ?>
+    <p class="muted" style="margin:10px 2px 0">Need a format that is not listed?
+      <a href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call=' . (int)$job['call_id'] : '' ?>">Write another <?= e(Tl('report')) ?></a>.</p>
+  <?php endif; ?>
 </div>
-<?php endif; ?>
 
 <?php $holds = function_exists('job_hold_reasons') ? job_hold_reasons($job) : []; if ($holds): ?>
 <div class="panel" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent)">
