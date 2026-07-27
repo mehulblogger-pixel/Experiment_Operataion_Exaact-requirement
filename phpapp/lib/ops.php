@@ -1112,27 +1112,67 @@ function job_revenue_for($job, $officeId = null) {
 function job_profit($job, $officeId = null) {
     $mandays = job_mandays($job);
     $office = $job['executing_office_id'] ?? null;
-    $salary_ctc = $job['inspector_id'] ? (float)ops_val("SELECT salary_ctc + COALESCE(agency_cost,0) FROM inspectors WHERE id=?", [$job['inspector_id']]) : 0;
-    $daily = $salary_ctc ? inspector_daily_cost($salary_ctc, null, null, $office) : 0;
     $m = job_money($job);
-    $bearsCost = !$officeId || (int)$officeId === (int)$office;
-    $labour   = $bearsCost ? $daily * $mandays : 0;
-    $expenses = $bearsCost ? job_expenses_total($job['id']) : 0;
-    $subcon   = $bearsCost ? (float)($job['subcon_cost'] ?? 0) : 0;
     $revenue = job_revenue_for($job, $officeId);
-    $contingency = round(($labour + $expenses + $subcon) * office_contingency_pct($office) / 100, 2);
+    // A branch only bears the cost of the work it actually did.
+    $bearsCost = !$officeId || (int)$officeId === (int)$office;
+
+    // --- the engineer's own time, unloaded ---------------------------------
+    // The daily cost used elsewhere already has the overhead baked into it,
+    // which is right for a rate but wrong for a statement: it hides the
+    // overhead inside "salary" and there is then no line to point at. Here the
+    // salary is the salary and the overhead is its own line, and the two add up
+    // to exactly what the loaded rate would have given.
+    $salary_ctc = $job['inspector_id']
+        ? (float)ops_val("SELECT salary_ctc + COALESCE(agency_cost,0) FROM inspectors WHERE id=?", [$job['inspector_id']])
+        : 0;
+    $wd = working_days_in_month((int)date('Y'), (int)date('n'));
+    $dailyBase = ($salary_ctc && $wd > 0) ? ($salary_ctc / 12) / $wd : 0;
+    $ohPct = office_overhead_pct($office);
+    $labour   = $bearsCost ? round($dailyBase * $mandays, 2) : 0;
+    $overhead = $bearsCost ? round($labour * $ohPct / 100, 2) : 0;
+    $daily    = $dailyBase * (1 + $ohPct / 100);          // the loaded rate, for display
+
+    // --- everything else the job cost -------------------------------------
+    $expenses = $bearsCost ? job_expenses_total($job['id']) : 0;   // booked at closure
+    // What the engineer actually claimed on their monthly voucher against this
+    // job — travel, lodging, food. Real money out of the branch, and it was
+    // missing from this sum entirely.
+    $voucher  = $bearsCost ? job_voucher_total($job['id']) : 0;
+    $subcon   = $bearsCost ? (float)($job['subcon_cost'] ?? 0) : 0;
+    $other    = $bearsCost ? (float)($job['other_cost'] ?? 0) : 0;
+
+    $direct = $labour + $overhead + $expenses + $voucher + $subcon + $other;
+    $contingency = round($direct * office_contingency_pct($office) / 100, 2);
+    $cost = round($direct + $contingency, 2);
+    $profit = round($revenue - $cost, 2);
+
     return [
-        'mandays' => $mandays, 'daily_cost' => $daily, 'labour' => $labour,
-        'expenses' => $expenses, 'subcon' => $subcon, 'contingency' => $contingency,
+        'mandays' => $mandays, 'daily_cost' => $daily, 'daily_base' => $dailyBase,
+        'labour' => $labour, 'overhead' => $overhead, 'overhead_pct' => $ohPct,
+        'expenses' => $expenses, 'voucher' => $voucher, 'subcon' => $subcon, 'other' => $other,
+        'contingency' => $contingency, 'contingency_pct' => office_contingency_pct($office),
+        'cost' => $cost,
         'revenue' => $revenue,
         'invoice' => $m['invoice'], 'billed' => $m['billed'], 'own_credit' => $m['credit'],
         'cross' => $m['cross'],
         // Kept under its old name so nothing that reads it has to change; it is
         // the revenue for whoever this view is about.
         'credit' => $revenue,
-        'profit' => $revenue - $labour - $expenses - $subcon - $contingency,
+        'profit' => $profit,
+        'margin' => $revenue > 0 ? round($profit / $revenue * 100, 1) : null,
     ];
 }
+
+// What the engineer claimed on their monthly voucher against this job. Kept
+// apart from the closure expenses because they are entered by different people
+// at different times, and a manager asking "why is this job thin" needs to see
+// which of the two it was.
+function job_voucher_total($jobId) {
+    try { return (float)ops_val("SELECT COALESCE(SUM(row_total),0) FROM voucher_entries WHERE job_id=?", [(int)$jobId]); }
+    catch (Throwable $e) { return 0.0; }
+}
+
 
 // ---- Email (real send when configured, always logged) ----------------------
 // SMTP settings (e.g. Office 365) come from Settings, or env overrides. Null = not configured.
@@ -1678,7 +1718,7 @@ function ops_module_gate($route) {
         'document-smart'=>'idems','document-release-note'=>'idems','document-review'=>'idems','document-evidence'=>'idems',
         'masters'=>'masters','work-norms'=>'masters',
         'office-finance'=>'overheads','cost-run'=>'overheads',
-        'sbu-pl'=>'profitability','mis'=>'reports',
+        'sbu-pl'=>'profitability','call-profit'=>'profitability','mis'=>'reports',
         'reports'=>'reports',
         'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users','org-template'=>'users',
         'user-unlock'=>'users','user-2fa-reset'=>'users','user-retire'=>'users',
@@ -1842,6 +1882,10 @@ function ops_dispatch($route, $method) {
             ops_mis($method); return true;
         case $route === 'cost-run':
             ops_cost_run($method); return true;
+        case $route === 'call-profit':
+            // What each inspection made, for the branch manager and the managers
+            // under them. Same figures as every other screen — one function.
+            ops_call_profit(); return true;
         case $route === 'sbu-pl':
             ops_sbu_pl(); return true;
         case $route === 'duplicates':
@@ -2768,7 +2812,7 @@ function job_save_fields() {
         'schedule_weekdays','schedule_end_date','force_dates','manmonth_basis','manmonth_min_days',
         'invoice_value','contracting_office_id','expected_credit','credit_rate','credit_type','credit_direction',
         'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays',
-        'subcon_cost','quotation_id','is_outstation'];
+        'subcon_cost','other_cost','other_cost_note','quotation_id','is_outstation'];
 }
 
 function nzc_call($f, $v) {
@@ -3739,7 +3783,7 @@ function nzc($f, $v) {
     if ($f === 'is_outstation') return empty($v) ? 0 : 1;   // an unticked box posts nothing
     $nullable = ['executing_office_id','contracting_office_id','inspector_id','subcon_id','boss_id','activity_id','report_custom_days','quotation_id'];
     if (in_array($f, $nullable) && $v === '') return null;
-    if (in_array($f, ['expected_credit','invoice_value','credit_rate','mandays','subcon_cost']) && $v === '') return 0;
+    if (in_array($f, ['expected_credit','invoice_value','credit_rate','mandays','subcon_cost','other_cost']) && $v === '') return 0;
     if (in_array($f, ['days_count','months_count','pattern_n','manmonth_min_days'], true)) return $v === '' ? 0 : (int)$v;
     return $v;
 }

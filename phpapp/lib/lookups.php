@@ -161,8 +161,11 @@ function lk_module_lists() {
         // --- Scheduling ------------------------------------------------------
         // The wording is yours; the behaviour is keyed on the code behind it, so
         // renaming "Continuous days" does not stop the working-day arithmetic.
-        ['engagement_type',     'Shape of engagement',       ENGAGEMENT_TYPES,       'Operations'],
-        ['pattern_kind',        'How a pattern repeats',     PATTERN_KINDS,          'Operations'],
+        // defined() because these live in schedule.php: a list here naming a
+        // constant from a file that did not load takes the whole app down on a
+        // fatal, and a missing dropdown is a far smaller problem than that.
+        ['engagement_type',     'Shape of engagement',       defined('ENGAGEMENT_TYPES') ? ENGAGEMENT_TYPES : [], 'Operations'],
+        ['pattern_kind',        'How a pattern repeats',     defined('PATTERN_KINDS') ? PATTERN_KINDS : [],       'Operations'],
         // --- Money -----------------------------------------------------------
         ['boss_status',         'Contract number status',        BOSS_STATUS,            'Money'],
         // --- Directory -------------------------------------------------------

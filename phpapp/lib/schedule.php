@@ -84,6 +84,10 @@ function sched_migrate() {
         // charge is. Only the total was ever stored, so a six-day deputation
         // carried one day's credit and nobody could see which figure was wrong.
         ensure_column($t, 'credit_rate', 'DECIMAL(14,2) DEFAULT 0');
+        // Anything else this one cost that is not salary, a claimed expense or a
+        // sub-contractor: a hired instrument, a permit, a courier.
+        ensure_column($t, 'other_cost', 'DECIMAL(14,2) DEFAULT 0');
+        ensure_column($t, 'other_cost_note', "VARCHAR(200) DEFAULT ''");
     }
     // The client's own definition, which is where it is usually agreed.
     ensure_column('business_partners', 'manmonth_basis', "VARCHAR(20) DEFAULT ''");

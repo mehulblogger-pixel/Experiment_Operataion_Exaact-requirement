@@ -2,6 +2,41 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 📉 PROFIT ON ONE INSPECTION (July 2026)
+
+**Profit by call** — a branch manager and the managers under them see what each
+inspection actually made. Scoped to the branches they can already see; no new
+visibility anywhere else.
+
+    Revenue              invoice less any credit passed over
+  − Engineer's salary    unloaded daily cost × days worked
+  − Overhead             the branch percentage on that salary
+  − Expenses at close    booked against the job when it closed
+  − Voucher claims       what the engineer claimed on the monthly voucher
+  − Sub-contractor
+  − Anything else        hired instrument, permit, courier
+  − Contingency          the branch percentage on all of the above
+  ──────────────────────────────────────────────────
+  = Profit, and margin = profit ÷ revenue
+
+### Two things this corrected
+
+- **Voucher claims were never in the per-job sum.** Closure expenses were;
+  what the engineer actually claimed for travel and lodging was not. Every job
+  looked better than it was.
+- **Overhead was hidden inside the salary.** The daily rate had it baked in, so
+  there was no line to point at. Salary and overhead are separate lines now and
+  add to exactly what the loaded rate gave — the total is unchanged, the
+  statement is readable.
+
+Both percentages are per branch (Masters → Offices), falling back to the
+company default in Settings. Nothing is hard-coded.
+
+The branch's own shared costs — rent, the manager's salary, the back office —
+are **not** pushed onto individual jobs. A job is judged on what it directly
+caused; the branch is judged on the SBU P&L, where those are shared out at
+month end.
+
 ## 🧮 RATE × DAYS, ON BOTH SIDES, AND THEN THE REVENUE (July 2026)
 
 The client charge and the inter-office credit are agreed the same way — a rate
