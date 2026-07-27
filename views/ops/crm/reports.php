@@ -17,7 +17,7 @@
 
 <div class="panel-split">
   <div class="panel"><h4 class="tab-sub" style="margin-top:0">Quotes by status</h4><?= svg_donut($byStatus) ?></div>
-  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Quoted value by SBU</h4><?= svg_hbars($bySbu, true) ?></div>
+  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Quoted value by <?= e(Tl('sbu')) ?></h4><?= svg_hbars($bySbu, true) ?></div>
 </div>
 <div class="panel-split">
   <div class="panel"><h4 class="tab-sub" style="margin-top:0">Top <?= e(Tlp('client')) ?> by quoted value</h4><?= svg_hbars($topClients, true) ?></div>

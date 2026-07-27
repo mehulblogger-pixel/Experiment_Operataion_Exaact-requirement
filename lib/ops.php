@@ -28,7 +28,7 @@ const DAILY_HOURS_CAP = 8.5;
 const JOB_TYPES = ['INSPECTION'=>'Day-based inspection','DEPUTATION'=>'Resident / site posting'];
 const EXPENSE_HEADINGS = ['TRAVEL'=>'Travel','LOCAL'=>'Local conveyance','FOOD'=>'Food','LODGING'=>'Lodging','MISC'=>'Misc'];
 const DEPARTMENTS = ['QUALITY'=>'Quality','PROJECTS'=>'Projects','ENGINEERING'=>'Engineering','DESIGN'=>'Design','INSPECTION'=>'Inspection','PROCUREMENT'=>'Procurement / Purchase','PRODUCTION'=>'Production','MAINTENANCE'=>'Maintenance','SAFETY'=>'Safety / HSE','COMMERCIAL'=>'Commercial / Finance','STORES'=>'Stores','PLANNING'=>'Planning','OWNER'=>'Owner','PARTNER'=>'Partner','DIRECTOR'=>'Director','MANAGEMENT'=>'Management','OTHER'=>'Other'];
-const DESIGNATIONS = ['INSPECTOR'=>'Inspector','SR_INSPECTOR'=>'Sr. Inspector','LEAD_INSPECTOR'=>'Lead Inspector','EXECUTIVE'=>'Executive','SR_EXECUTIVE'=>'Sr. Executive','ENGINEER'=>'Engineer','SR_ENGINEER'=>'Sr. Engineer','LEAD_ENGINEER'=>'Lead Engineer','COORDINATOR'=>'Coordinator','SR_COORDINATOR'=>'Sr. Coordinator','ASST_MANAGER'=>'Asst. Manager','DY_MANAGER'=>'Deputy Manager','MANAGER'=>'Manager','SR_MANAGER'=>'Sr. Manager','BRANCH_MANAGER'=>'Branch Manager','SBU_HEAD'=>'SBU Head','GM'=>'General Manager','DIRECTOR'=>'Director','OTHER'=>'Other'];
+const DESIGNATIONS = ['INSPECTOR'=>'Inspector','SR_INSPECTOR'=>'Sr. Inspector','LEAD_INSPECTOR'=>'Lead Inspector','EXECUTIVE'=>'Executive','SR_EXECUTIVE'=>'Sr. Executive','ENGINEER'=>'Engineer','SR_ENGINEER'=>'Sr. Engineer','LEAD_ENGINEER'=>'Lead Engineer','COORDINATOR'=>'Coordinator','SR_COORDINATOR'=>'Sr. Coordinator','ASST_MANAGER'=>'Asst. Manager','DY_MANAGER'=>'Deputy Manager','MANAGER'=>'Manager','SR_MANAGER'=>'Sr. Manager','BRANCH_MANAGER'=>'Branch Manager','SBU_HEAD'=>'Business Unit Head','GM'=>'General Manager','DIRECTOR'=>'Director','OTHER'=>'Other'];
 const JOB_STAGES = ['ALLOCATED'=>'Allocated','TRAVELLING'=>'Travelling','IN_PROGRESS'=>'Inspection in progress','REPORT_PENDING'=>'Report pending','SUBMITTED'=>'Report submitted','CLOSED'=>'Closed','ON_HOLD'=>'On hold','CANCELLED'=>'Cancelled'];
 const EXP_LEVELS = ['JUNIOR'=>'Junior','MID'=>'Mid','SENIOR'=>'Senior','EXPERT'=>'Expert / Lead'];
 // Sub-contractor rate basis — the same charge units, narrowed to the two that apply.
@@ -341,7 +341,7 @@ function ops_migrate() {
     ensure_column('partner_addresses', 'town_village', "VARCHAR(150) DEFAULT ''");
     ensure_column('partner_addresses', 'district', "VARCHAR(150) DEFAULT ''");
     ensure_column('partner_contacts', 'project', "VARCHAR(200) DEFAULT ''");
-    // contracts / purchase orders carry SBU for revenue attribution
+    // contracts / purchase orders carry Business Unit for revenue attribution
     ensure_column('partner_contracts', 'sbu', "VARCHAR(20) DEFAULT ''");
     ensure_column('partner_purchase_orders', 'sbu', "VARCHAR(20) DEFAULT ''");
     // PO line items: manpower / site / trade→subcategory + GST/Tax/Total
@@ -355,7 +355,7 @@ function ops_migrate() {
     ensure_column('po_line_items', 'tax_amount', 'DECIMAL(14,2) DEFAULT 0');
     ensure_column('po_line_items', 'total_amount', 'DECIMAL(14,2) DEFAULT 0');
     ensure_column('po_line_items', 'last_alert', "VARCHAR(20) DEFAULT ''");
-    // inspector master overhaul: names, trade, multi-SBU, multi-skill
+    // inspector master overhaul: names, trade, multi-Business Unit, multi-skill
     ensure_column('inspectors', 'first_name', "VARCHAR(80) DEFAULT ''");
     ensure_column('inspectors', 'middle_name', "VARCHAR(80) DEFAULT ''");
     ensure_column('inspectors', 'last_name', "VARCHAR(80) DEFAULT ''");
@@ -424,9 +424,9 @@ function ops_migrate() {
     // per-office finance params (overhead % + contingency %) for accurate profitability
     ensure_column('offices', 'overhead_pct', 'DECIMAL(6,2) NULL');
     ensure_column('offices', 'contingency_pct', 'DECIMAL(6,2) NULL');
-    // BOSS / contract carry-forward chain (renewal / ARC → new number, old kept visible)
-    ensure_column('boss_numbers', 'supersedes', 'INT NULL');       // this row continues an older BOSS
-    ensure_column('boss_numbers', 'superseded_by', 'INT NULL');    // this row was renewed into a newer BOSS
+    // Contract-number carry-forward chain (renewal / ARC → new number, old kept visible)
+    ensure_column('boss_numbers', 'supersedes', 'INT NULL');       // this row continues an older contract
+    ensure_column('boss_numbers', 'superseded_by', 'INT NULL');    // this row was renewed into a newer contract
     ensure_column('boss_numbers', 'carried_at', "VARCHAR(30) DEFAULT ''");
     // certifications per inspector, with validity + reminder tracking
     db()->exec("CREATE TABLE IF NOT EXISTS inspector_certs (
@@ -884,7 +884,7 @@ function wants_csv() { return ($_GET['export'] ?? '') === 'csv'; }
 
 // ---- Accountant "money desk": counts + worklist of jobs needing action ------
 // Uses the invoice / payment / inter-office-credit fields already on `jobs`.
-// Scoped to the user's offices/SBUs so a branch accountant sees only their own.
+// Scoped to the user's offices/Business Units so a branch accountant sees only their own.
 function ops_invoicing_counts() {
     [$jw, $ja] = scope_clause('j.executing_office_id', 'j.sbu');
     $today = date('Y-m-d');
@@ -1479,7 +1479,7 @@ function ops_masters() {
         // office's own running costs. Two different lists, two different keys.
         'office-expense-heads' => [
             // The company's own list of what an office spends money on, and how
-            // each one should be shared across its SBUs. Nothing here is fixed
+            // each one should be shared across its Business Units. Nothing here is fixed
             // in code: add a head, rename it, change how it spreads, retire it.
             // Salary is deliberately not one of these — it comes off the person's
             // record, and having it in both places would count the same rupee twice.
@@ -1523,7 +1523,7 @@ function ops_masters() {
             'fields' => [
                 ['name','Name','text',['req'=>1]],
                 ['emp_code','Employee code','text',[]],
-                ['sbu','SBU','select',['opts'=>OPS_SBUS]],
+                ['sbu','Business Unit','select',['opts'=>OPS_SBUS]],
                 ['skills','Skills','text',[]],
                 ['email','Email','text',[]],
                 ['mobile','Mobile','text',[]],
@@ -1532,7 +1532,7 @@ function ops_masters() {
                 ['compoff_balance','Comp-off balance (days)','number',[]],
                 ['status','Status','select',['opts'=>['ACTIVE'=>'Active','INACTIVE'=>'Inactive']]],
             ],
-            'list' => ['name'=>'Name','emp_code'=>'Emp code','sbu'=>'SBU','skills'=>'Skills','status'=>'Status'],
+            'list' => ['name'=>'Name','emp_code'=>'Emp code','sbu'=>'Business Unit','skills'=>'Skills','status'=>'Status'],
             'list_labels' => ['sbu'=>OPS_SBUS],
         ],
         'subcons' => [
@@ -2241,7 +2241,7 @@ function ops_quick_add() {
             if (!$t || !$sbu) { echo json_encode(['ok' => false, 'error' => 'No activity list']); return; }
             $sbuCode = $b['sbu'] ?? '';
             $sbuVal = ops_one("SELECT * FROM lookup_values WHERE type_id=? AND (code=? OR id=?)", [$sbu['id'], $sbuCode, (int)$sbuCode]);
-            if (!$sbuVal) { echo json_encode(['ok' => false, 'error' => 'Pick an SBU first.']); return; }
+            if (!$sbuVal) { echo json_encode(['ok' => false, 'error' => 'Pick a ' . Tl('sbu') . ' first.']); return; }
             $id = lk_add_value($t['id'], $sbuVal['id'], '', $name, 99);
             echo json_encode(['ok' => true, 'id' => $id, 'label' => $name, 'sbu' => $sbuCode]);
             return;
@@ -2313,7 +2313,7 @@ function column_exists($table, $col) {
     } catch (Throwable $e) { return false; }
 }
 
-// ---- Inspector master (dedicated: names, trade, multi-SBU, multi-skill, certs) ----
+// ---- Inspector master (dedicated: names, trade, multi-Business Unit, multi-skill, certs) ----
 function ops_inspectors($action, $method) {
     $pdo = db();
     if ($action === 'delete' && $method === 'POST') {
@@ -2460,7 +2460,7 @@ function save_inspector_allowances($insId, $b) {
     }
 }
 
-// Human labels for an inspector's stored SBU codes / skill ids / trade.
+// Human labels for an inspector's stored Business Unit codes / skill ids / trade.
 function sbu_labels($csv) {
     if (!$csv) return '—';
     $map = lk_options_or('sbu', OPS_SBUS);
@@ -2776,7 +2776,7 @@ function call_form_vars($call, $posted = null) {
         'quotes' => $call ? call_quotes_for_client((int)($call['client_id'] ?? 0)) : [],
         'qlines' => ($call && !empty($call['quotation_id']))
             ? (call_quote_context((int)$call['quotation_id'])['lines'] ?? []) : [],
-        // §a.iii — Region is a reporting roll-up for the SBU heads and the
+        // §a.iii — Region is a reporting roll-up for the Business Unit heads and the
         // Business Director. It is noise for everyone else, so only they see it.
         'showRegion' => in_array(user_role(), ['SBU_HEAD','BUSINESS_DIRECTOR','MASTER_ADMIN','ADMIN'], true) || is_master(),
         'error' => null,
@@ -3897,16 +3897,16 @@ function svg_gauge($pct, $label) {
     $svg .= "<text x='60' y='76' text-anchor='middle' font-size='10' fill='var(--muted)'>" . htmlspecialchars($label, ENT_QUOTES) . "</text>";
     return $svg . "</svg>";
 }
-// Map SBU-coded aggregates to their labels for charts.
+// Map Business Unit-coded aggregates to their labels for charts.
 function chart_relabel_sbu($data) {
     $map = lk_options_or('sbu', OPS_SBUS); $out = [];
     foreach ($data as $k => $v) $out[$map[$k] ?? $k] = $v;
     return $out;
 }
 
-// ---- Profitability by BOSS / contract number (P7) --------------------------
+// ---- Profitability by contract number / contract number (P7) --------------------------
 // Revenue − labour − expenses − subcon, rolling voucher expenses + job closure
-// expenses into each BOSS number. Labour is only counted when salary is visible.
+// expenses into each contract number number. Labour is only counted when salary is visible.
 function boss_profit($bossId) {
     $seeSal = can_see_salary();
     $jobs = ops_all("SELECT * FROM jobs WHERE boss_id=?", [$bossId]);
@@ -3937,7 +3937,7 @@ function boss_profit($bossId) {
 }
 // Office money. Two tabs, and the difference between them matters:
 //   · Actual costs — what the office really spent this month, head by head.
-//     Real figures, allocated to the SBUs by the rule set on each head.
+//     Real figures, allocated to the Business Units by the rule set on each head.
 //   · Overhead %   — the old single multiplier, still there for an office that
 //     has not entered real figures yet, so no branch is left without a number.
 // The office decides which it is on by whether it has entered anything.
@@ -4047,7 +4047,7 @@ function ops_profitability() {
             'headLabels' => expense_head_label_map(), 'seeSal' => can_see_salary()]);
         return;
     }
-    // list all BOSS numbers with profitability + renewal hierarchy (prev / next BOSS)
+    // list all contract number numbers with profitability + renewal hierarchy (prev / next contract number)
     $rows = [];
     foreach (ops_all("SELECT bn.*, bp.display_name client_disp, bp.legal_name client_name,
                 nw.boss_number next_no, old.boss_number prev_no
@@ -4153,7 +4153,7 @@ function attendance_parse_csv($tmp) {
     return [$out, ''];
 }
 
-// P8 — renew / carry a BOSS/contract forward (ARC / renewal). Creates a new
+// P8 — renew / carry a contract number/contract forward (ARC / renewal). Creates a new
 // number linked to the old one, carries OPEN jobs forward, keeps the old visible.
 function ops_boss_renew() {
     ops_require(can('data.profitability') || is_coordinator_level(), 'You cannot renew a contract.');
@@ -4244,7 +4244,7 @@ function ops_reports() {
         $sk=$j['sbu']?:'—'; $fin['bySbu'][$sk]=($fin['bySbu'][$sk]??0)+$p['credit'];
         $ok=$j['office_name']?:'Ahmedabad'; $fin['byOffice'][$ok]=($fin['byOffice'][$ok]??0)+$p['credit'];
         // Revenue = invoiced value where raised, else expected credit. Grouped by
-        // customer (top-10 chart) and by project/BOSS (revenue-by-project chart).
+        // customer (top-10 chart) and by project/contract number (revenue-by-project chart).
         $rev=(float)($j['invoice_amount']??0); if ($rev<=0) $rev=$p['credit'];
         if ($rev!=0){ $ck=$j['client_disp']?:($j['client_name']?:'(no client)'); $fin['byClient'][$ck]=($fin['byClient'][$ck]??0)+$rev;
             $pk=$j['boss_number']?:('(no ' . Tl('boss') . ')'); $fin['byProject'][$pk]=($fin['byProject'][$pk]??0)+$rev; }
@@ -4260,10 +4260,10 @@ function ops_reports() {
     $fin['reconRecv']=(float)ops_val("SELECT COALESCE(SUM(credit_actual),0) FROM credit_recon WHERE direction='RECEIVED'");
     $fin['reconGiven']=(float)ops_val("SELECT COALESCE(SUM(credit_actual),0) FROM credit_recon WHERE direction='GIVEN'");
 
-    // ---- Loaded cost distributed across each engineer's tagged SBUs (monthly snapshot) ----
-    // An inspector tagged to multiple SBUs has their monthly loaded cost split
-    // equally across those SBUs, so cost shows where the head-count sits — not
-    // only where jobs happened to land. Respects SBU scope + the SBU/inspector filter.
+    // ---- Loaded cost distributed across each engineer's tagged Business Units (monthly snapshot) ----
+    // An inspector tagged to multiple Business Units has their monthly loaded cost split
+    // equally across those Business Units, so cost shows where the head-count sits — not
+    // only where jobs happened to land. Respects Business Unit scope + the Business Unit/inspector filter.
     $fin['costBySbu']=[]; $fin['costBySbuTotal']=0;
     if ($seeSalary) {
         $scopeSbuSet = scope_sbus();
@@ -4297,7 +4297,7 @@ function ops_reports() {
     $certSoon=[]; foreach ($certExp as $c){ $dleft=days_between($today,$c['valid_to']); if ($dleft!==null && $dleft<=90){ $c['days']=$dleft; $certSoon[]=$c; } }
     $byTrade=[]; foreach (ops_all("SELECT trade_id, COUNT(*) n FROM inspectors WHERE status='ACTIVE' GROUP BY trade_id") as $r){ $byTrade[trade_label($r['trade_id'])]=$r['n']; }
 
-    // ---- top-10 customers by revenue + revenue by project (BOSS) ----
+    // ---- top-10 customers by revenue + revenue by project (contract number) ----
     arsort($fin['byClient']); $fin['byClientTop'] = array_slice($fin['byClient'], 0, 10, true);
     arsort($fin['byProject']); $fin['byProjectTop'] = array_slice($fin['byProject'], 0, 10, true);
 
@@ -4325,7 +4325,7 @@ function ops_reports() {
 //
 //  When a save is refused the form has to be redrawn with what the person
 //  typed, or they lose it. But the posted data and the stored row are different
-//  shapes: the tick-lists (permissions, offices, SBUs) arrive as arrays while
+//  shapes: the tick-lists (permissions, offices, Business Units) arrive as arrays while
 //  the row keeps them comma-separated, and the sentinel values from the
 //  "+ add one" dropdowns are not ids at all. Handing the raw post straight to
 //  the form crashes it on the first field that expects a string.
@@ -4350,7 +4350,7 @@ function user_row_from_post(array $b, $existing = null) {
     $row['is_active']     = !empty($b['is_active']) ? 1 : 0;
     $row['inspector_id']  = $notSentinel((string)($b['inspector_id'] ?? '')) ?: null;
     $row['home_office_id'] = $notSentinel((string)($b['home_office_id'] ?? '')) ?: null;
-    // "Every office / every SBU" is stored as ALL; otherwise the ticked ids.
+    // "Every office / every Business Unit" is stored as ALL; otherwise the ticked ids.
     $row['scope_offices'] = !empty($b['scope_offices_all']) ? 'ALL' : $csv($b['scope_offices'] ?? '');
     $row['scope_sbus']    = !empty($b['scope_sbus_all'])    ? 'ALL' : $csv($b['scope_sbus'] ?? '');
     $row['permissions']   = $csv($b['permissions'] ?? '');

@@ -16,7 +16,7 @@
 //      Tlp('call') → "inspection calls"
 //      T_REG('call') → "Inspection call register"   (the standard list heading)
 //
-//  Acronyms (IBO, SBU, IRN, BOSS…) are never lower-cased by Tl() — see
+//  Acronyms (IBO, IRN, NCR, MTC…) are never lower-cased by Tl() — see
 //  TERM_ACRONYMS. Overrides live in the single `terms` setting as JSON.
 // ============================================================================
 
@@ -40,7 +40,8 @@ const TERM_DEFAULTS = [
     // anything. "Office" is what people actually say. Anyone who wants the old
     // word back can set it under Settings → Terminology; every screen follows.
     'office'       => ['Office', 'Offices', 'Operations', 'A branch or head office of this company.'],
-    'sbu'          => ['SBU', 'SBUs', 'Operations', 'Strategic business unit.'],
+    'sbu'          => ['Business Unit', 'Business Units', 'Operations',
+                       'The line of business a job belongs to — what the branch is judged by.'],
     'manday'       => ['Man-day', 'Man-days', 'Operations', 'One engineer for one working day.'],
     // -- reporting -----------------------------------------------------------
     'report'       => ['Report', 'Reports', 'Reporting', 'An inspection document we issue (IR, NCR, IRN, CoC…).'],
@@ -57,6 +58,9 @@ const TERM_DEFAULTS = [
 ];
 
 // Words that must keep their capitals when used mid-sentence.
+// SBU and BOSS stay listed: they are no longer the shipped defaults, but a
+// company that sets either word back under Settings must still get its
+// capitals kept mid-sentence.
 const TERM_ACRONYMS = ['IBO','IBOs','SBU','SBUs','IRN','NCR','BOSS','MTC','NDT','FAT','SAT','PWHT','CoC','CV','CVs','AI','GST','TPI','QAP','PO','HSE','ARC'];
 
 // Pass $set to replace the cached overrides (used right after saving).
@@ -81,7 +85,7 @@ function TP($key)  { return term_raw($key, 1); }
 
 // Lower-cased for mid-sentence use, but acronyms are left alone. A multi-word
 // term only lower-cases the words that are not acronyms ("Inspection Call" →
-// "inspection call"; "IBO" stays "IBO"; "BOSS Number" → "BOSS number").
+// "inspection call"; "IBO" stays "IBO"; "Contract Number" → "contract number").
 function term_lower($s) {
     $out = [];
     foreach (explode(' ', $s) as $w) {

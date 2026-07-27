@@ -49,15 +49,15 @@ just: upload the changed files. Done.
 
 ## Operations & Finance modules (all 5 phases)
 
-The app now covers the full SGS Ahmedabad blueprint:
+The app now covers the full operations blueprint:
 
-- **Calls** — call register (client, vendor, IBO, region, SBU, product, dates).
-- **Jobs** — allocation, inspector/sub-con assignment, BOSS number, schedule &
+- **Calls** — call register (client, vendor, IBO, region, business unit, product, dates).
+- **Jobs** — allocation, inspector/sub-con assignment, contract number, schedule &
   random dates, expected credit (mandatory), credit direction (received/given),
   reporting frequency, folder link.
-- **Closure** — inspector uploads report + enters SBU-wise expenses; TAT is
+- **Closure** — inspector uploads report + enters business-unit-wise expenses; TAT is
   computed automatically; job locks.
-- **Masters** — Inspectors, Sub-contractors, Sub-con rate matrix, BOSS numbers,
+- **Masters** — Inspectors, Sub-contractors, Sub-con rate matrix, contract numbers,
   Holidays, Attendance, Credit reconciliation.
 - **Comp-off** — earned automatically when a job date falls on a Sunday
   (30-day expiry).
@@ -69,7 +69,7 @@ Set a user's role on the **Users** screen (Admin only):
 
 - **Master Admin** — everything, including salary & profit figures.
 - **Admin** — scheduling, reconciliation, dashboards (no salary).
-- **Coordinator** — create calls & jobs, pick BOSS, enter expected credit.
+- **Coordinator** — create calls & jobs, pick contract numbers, enter expected credit.
 - **Inspector** — sees only *My Jobs*; uploads reports & expenses.
 
 Link an Inspector login to their inspector record (Users → Linked inspector)
@@ -115,7 +115,7 @@ The app adapts to any field-operations company **without code changes**, from
   editable list. Add/remove values, or create a whole new list.
 - **Dependent (cascading) lists** — when you create a list, pick a "Depends on"
   parent to make it filter by the parent's value. Examples that ship built-in:
-  - **SBU → Activity code** (Activity values belong under an SBU)
+  - **Business Unit → Activity code** (Activity values belong under a business unit)
   - **Product family → Wax type → Tier** (e.g. Candles → Soy wax → Premium)
   Any depth is supported.
 - **Custom fields** (`/custom-fields`) — add your own fields to the **Call** or

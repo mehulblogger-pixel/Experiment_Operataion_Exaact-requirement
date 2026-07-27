@@ -702,7 +702,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var bb=document.getElementById('billable_basis');
     if (bb && o.dataset.unit) { bb.value=o.dataset.unit; bb.dispatchEvent(new Event('change', {bubbles:true})); }
     if (window.__recalcBillable) window.__recalcBillable();
-    // the activity list is filled by the SBU cascade; select afterwards
+    // the activity list is filled by the business-unit cascade; select afterwards
     if (o.dataset.activity) setTimeout(function(){
       var a=document.getElementById('activity_sel'); if (a) a.value=o.dataset.activity;
     }, 250);
@@ -804,5 +804,6 @@ document.addEventListener('DOMContentLoaded', function () {
   </div>
 </div>
 <script>window.ACTIVITY = <?= json_encode($act) ?>;
+window.TERM_SBU = <?= json_encode(Tl('sbu')) ?>;
 window.__callWord = <?= json_encode(Tl('call')) ?>;
 window.INSPTYPES = <?= json_encode(lk_options_or('inspection_type', INSPECTION_TYPES)) ?>;</script>

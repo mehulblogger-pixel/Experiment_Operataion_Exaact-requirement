@@ -18,7 +18,7 @@
     <div class="ff"><label>Contact email</label><input class="form-control" name="contact_email" value="<?= e($inq['contact_email'] ?? '') ?>"></div>
     <div class="ff"><label>Contact mobile</label><input class="form-control" name="contact_mobile" value="<?= e($inq['contact_mobile'] ?? '') ?>"></div>
 
-    <div class="ff"><label>SBU</label>
+    <div class="ff"><label><?= e(T('sbu')) ?></label>
       <select class="form-control searchable" name="sbu"><option value="">—</option>
         <?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($inq['sbu'] ?? '')===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Source</label>

@@ -242,7 +242,11 @@
     select.dispatchEvent(new Event('change'));
   }
 
-  // ---- Activity dropdown linked to the chosen SBU (SBU → Activity) ----
+  // ---- Activity dropdown linked to the chosen business unit (parent → Activity) ----
+  // The word itself is whatever Settings → Terminology says; the page publishes
+  // it as window.TERM_SBU so this file never hard-codes a business noun.
+  function SBU_WORD() { return window.TERM_SBU || 'business unit'; }
+
   function initActivity() {
     var sbu = document.getElementById('sbu_sel');
     var act = document.getElementById('activity_sel');
@@ -250,7 +254,7 @@
     function fill(keepId) {
       var code = sbu.value;
       var opts = window.ACTIVITY[code] || [];
-      act.innerHTML = '<option value="">' + (code ? 'Select activity…' : '— pick SBU first —') + '</option>';
+      act.innerHTML = '<option value="">' + (code ? 'Select activity…' : '— pick ' + SBU_WORD() + ' first —') + '</option>';
       opts.forEach(function (o) {
         var op = document.createElement('option'); op.value = o.id; op.textContent = o.label;
         if (String(o.id) === String(keepId)) op.selected = true;
@@ -493,7 +497,7 @@
         body.append('coordinator_name', byId('qa_cname').value); body.append('coordinator_email', byId('qa_cemail').value);
         body.append('manager_name', byId('qa_mname').value); body.append('manager_email', byId('qa_memail').value);
       }
-      if (k === 'activity') { var s = byId('sbu_sel'); if (!s || !s.value) { byId('qa_err').textContent = 'Pick an SBU on the form first.'; byId('qa_err').style.display = 'block'; return; } body.append('sbu', s.value); }
+      if (k === 'activity') { var s = byId('sbu_sel'); if (!s || !s.value) { byId('qa_err').textContent = 'Pick a ' + SBU_WORD() + ' on the form first.'; byId('qa_err').style.display = 'block'; return; } body.append('sbu', s.value); }
       fetch('/quick-add?kind=' + encodeURIComponent(k), { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() })
         .then(function (r) { return r.json(); })
         .then(function (res) {

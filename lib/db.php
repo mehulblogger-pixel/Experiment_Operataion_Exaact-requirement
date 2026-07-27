@@ -128,8 +128,13 @@ function ensure_admin() {
 
 function auto_seed() {
     $pdo = db();
+    // Seeded once, and remembered. Without the flag this ran again the moment
+    // the table was empty — which is exactly the state right after somebody
+    // deliberately cleared the clients and vendors, so they came straight back
+    // and the delete looked as though it had not worked.
+    try { if (ops_val("SELECT svalue FROM settings WHERE skey='partners_seeded'")) return; } catch (Throwable $e) {}
     $n = (int)$pdo->query("SELECT COUNT(*) FROM business_partners")->fetchColumn();
-    if ($n > 0) return;
+    if ($n > 0) { @setting_set('partners_seeded', '1'); return; }
     $file = __DIR__ . '/../data/seed_data.json';
     if (!is_file($file)) return;
     $data = json_decode(file_get_contents($file), true);
@@ -172,7 +177,7 @@ function boot() {
     if (function_exists('contracts_migrate')) contracts_migrate();  // contract validity gates
     if (function_exists('security_migrate')) security_migrate();    // password age, second factor
     if (function_exists('compliance_migrate')) compliance_migrate(); // incident register, consent, data requests
-    if (function_exists('costing_migrate')) costing_migrate();       // salary + overhead allocation to SBUs
+    if (function_exists('costing_migrate')) costing_migrate();       // salary + overhead allocation to Business Units
     if (function_exists('joblock_migrate')) joblock_migrate();       // close-on-time lock
     if (function_exists('po_migrate')) po_migrate();                 // an order remembers its quotation
     if (function_exists('sched_migrate')) sched_migrate();           // engagement shapes, holidays by office, visits

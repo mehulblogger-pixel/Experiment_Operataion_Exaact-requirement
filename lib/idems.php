@@ -117,7 +117,7 @@ function idems_migrate() {
         id $pk, inspector_id INT, approver_user_id INT NULL, temp_user_id INT NULL,
         temp_from VARCHAR(20) DEFAULT '', temp_to VARCHAR(20) DEFAULT '', active INT DEFAULT 1, updated_at VARCHAR(30) DEFAULT '')");
     idems_unique_index('idems_approver_map', 'inspector_id');
-    // Configurable approval chain rules (matched by report type / office / client / SBU).
+    // Configurable approval chain rules (matched by report type / office / client / Business Unit).
     $pdo->exec("CREATE TABLE IF NOT EXISTS idems_approval_rules (
         id $pk, name VARCHAR(150) DEFAULT '', active INT DEFAULT 1,
         report_type_code VARCHAR(16) DEFAULT '', office_id INT NULL, client_id INT NULL, sbu VARCHAR(20) DEFAULT '',

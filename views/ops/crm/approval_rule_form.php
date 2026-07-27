@@ -12,10 +12,10 @@
 
     <div class="ff"><label>Applies to</label>
       <select class="form-control" name="match_type" id="mt" onchange="document.getElementById('sbuwrap').style.display=this.value==='SBU'?'block':'none'">
-        <option value="ANY" <?= (($r['match_type'] ?? 'ANY')==='ANY')?'selected':'' ?>>Any SBU</option>
-        <option value="SBU" <?= (($r['match_type'] ?? '')==='SBU')?'selected':'' ?>>A specific SBU</option>
+        <option value="ANY" <?= (($r['match_type'] ?? 'ANY')==='ANY')?'selected':'' ?>>Any <?= e(Tl('sbu')) ?></option>
+        <option value="SBU" <?= (($r['match_type'] ?? '')==='SBU')?'selected':'' ?>>A specific <?= e(Tl('sbu')) ?></option>
       </select></div>
-    <div class="ff" id="sbuwrap" style="<?= (($r['match_type'] ?? '')==='SBU')?'':'display:none' ?>"><label>SBU</label>
+    <div class="ff" id="sbuwrap" style="<?= (($r['match_type'] ?? '')==='SBU')?'':'display:none' ?>"><label><?= e(T('sbu')) ?></label>
       <select class="form-control searchable" name="sbu"><option value="">—</option>
         <?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($r['sbu'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"></div>

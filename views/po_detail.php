@@ -2,7 +2,7 @@
 <div class="master-head">
   <div><h1><?= e($po['po_number'] ?: 'Open order') ?></h1>
     <p class="sub"><?= e($po['pdn'] ?: $po['pn']) ?> · <?= e(lk_options_or('po_type', PO_TYPES)[$po['po_type']] ?? $po['po_type']) ?><?php if ($po['value']!==null): ?> · <strong><?= e(cur_sym()) ?><?= number_format((float)$po['value'],0) ?></strong> (from line items)<?php endif; ?>
-      <?php $psb = array_filter(explode(',', $po['sbu'] ?? '')); if ($psb): ?> · SBU: <?= e(implode(', ', array_map(fn($s)=>lk_options_or('sbu',OPS_SBUS)[$s]??$s, $psb))) ?><?php endif; ?></p></div>
+      <?php $psb = array_filter(explode(',', $po['sbu'] ?? '')); if ($psb): ?> · <?= e(T("sbu")) ?>: <?= e(implode(', ', array_map(fn($s)=>lk_options_or('sbu',OPS_SBUS)[$s]??$s, $psb))) ?><?php endif; ?></p></div>
   <a class="btn secondary" href="/partner?id=<?= (int)$po['partner_id'] ?>&tab=purchase_orders">← Back</a>
 </div>
 
@@ -104,7 +104,7 @@
     <div class="ff"><label>Sub-category (skill)</label>
       <select class="form-control" id="skill_sel" name="skill_id"><option value="">— pick trade —</option></select>
       <small class="muted">Not listed? Add it under <a href="/lookup?key=skill">Skill</a>.</small></div>
-    <div class="ff"><label>Activity (per PO's SBU)</label>
+    <div class="ff"><label>Activity (per PO's <?= e(Tl("sbu")) ?>)</label>
       <select class="form-control searchable" name="activity_id"><option value="">—</option>
         <?php foreach (($poActivities ?? []) as $a): ?><option value="<?= (int)$a['id'] ?>"><?= e($a['label']) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Site of deployment</label><input class="form-control" name="site"></div>

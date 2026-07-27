@@ -18,7 +18,7 @@
 <div class="master-head">
   <div><h1>Statement of travelling expenses
       <span class="pill <?= $vpill[0] ?>" style="vertical-align:middle;font-size:12px"><?= e($vpill[1]) ?></span></h1>
-    <p class="sub" style="margin:2px 0 0"><strong><?= e($v['inspector_name']) ?></strong><?= $v['emp_code']?' · '.e($v['emp_code']):'' ?> · Month <?= e($v['month']) ?> · SBU <?= e(lk_options_or('sbu',OPS_SBUS)[$v['sbu']] ?? $v['sbu'] ?: '—') ?></p></div>
+    <p class="sub" style="margin:2px 0 0"><strong><?= e($v['inspector_name']) ?></strong><?= $v['emp_code']?' · '.e($v['emp_code']):'' ?> · Month <?= e($v['month']) ?> · <?= e(T("sbu")) ?> <?= e(lk_options_or('sbu',OPS_SBUS)[$v['sbu']] ?? $v['sbu'] ?: '—') ?></p></div>
   <a class="btn secondary" href="/vouchers">← Back</a>
 </div>
 
@@ -33,7 +33,7 @@
 <div class="panel" style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
   <form method="post" action="/voucher-generate?id=<?= (int)$v['id'] ?>">
     <button class="btn" type="submit">↻ Pull working days from jobs</button>
-    <p class="muted" style="margin:6px 2px 0;max-width:280px">Auto-fills each inspection day (date, site, File No / <?= e(Tl("boss")) ?>, SBU) from the jobs allotted to this inspector. Safe to click again — it won't duplicate.</p>
+    <p class="muted" style="margin:6px 2px 0;max-width:280px">Auto-fills each inspection day (date, site, File No / <?= e(Tl("boss")) ?>, <?= e(Tl("sbu")) ?>) from the jobs allotted to this inspector. Safe to click again — it won't duplicate.</p>
   </form>
   <form method="post" action="/voucher-entry?id=<?= (int)$v['id'] ?>" class="inline-add" style="align-items:flex-end">
     <input type="hidden" name="_do" value="add">

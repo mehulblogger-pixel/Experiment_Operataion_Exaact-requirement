@@ -20,7 +20,7 @@
 //      the company's, which is the invoice value itself
 //    · direct cost is the engineer's time on it, its expenses and its sub-con
 //    · the shared cost of the branch is NOT pushed onto a job — that sits on
-//      the SBU line, from the month-end run
+//      the Business Unit line, from the month-end run
 //
 //  Anything that wants a different rule has to say so on the screen.
 // ===========================================================================
@@ -157,7 +157,7 @@ function mis_summary(array $F) {
     }
 
     // The shared cost of the branch, from the month-end run. Not pushed onto a
-    // job — shown alongside, so the SBU line can be read both ways.
+    // job — shown alongside, so the Business Unit line can be read both ways.
     $shared = mis_shared_by_sbu($F);
 
     $sortByProfit = function ($x) { uasort($x, function ($a, $b) { return $b['profit'] <=> $a['profit']; }); return $x; };
@@ -230,9 +230,9 @@ function mis_change($now, $then) {
     return round((((float)$now - $then) / abs($then)) * 100, 1);
 }
 
-// What the month-end run allocated to each SBU over the filtered period. This
+// What the month-end run allocated to each Business Unit over the filtered period. This
 // is the branch manager, the coordinator, the rent — the costs that belong to
-// an SBU but not to any one job.
+// a business unit but not to any one job.
 function mis_shared_by_sbu(array $F) {
     $months = [];
     $ts = strtotime($F['from']); $end = strtotime($F['to']);

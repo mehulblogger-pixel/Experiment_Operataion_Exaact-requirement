@@ -19,7 +19,7 @@ are smaller — that's correct.)
 | Users | 11 demo logins added (see below) |
 | Inspectors | 4 (Ravi EMP01, Anil EMP02, Priya EMP03 + 1 sub-con Mohan **SC-001**) |
 | Clients + Vendors | ~21 demo (5 named + 16 edge) |
-| BOSS / contracts | 15 (3 named: 40231, 40198, 40155 + 12 edge) |
+| Contract numbers | 15 (3 named: 40231, 40198, 40155 + 12 edge) |
 | Calls | 156 (6 named + 150 edge cases) |
 | Jobs | 156 (6 named + 150 edge cases) |
 | Vouchers | 34 (2 named + 32 across inspectors/months) |
@@ -29,7 +29,7 @@ are smaller — that's correct.)
 
 The "Load demo data" confirmation message should read roughly:
 *"Demo data loaded — 3 offices, 11 users, 4 inspectors, ~21 clients/vendors,
-3 BOSS, 6 calls, 6 jobs, 2 vouchers, plus 332 generated edge-case records."*
+3 contract numbers, 6 calls, 6 jobs, 2 vouchers, plus 332 generated edge-case records."*
 
 ---
 
@@ -38,7 +38,7 @@ The "Load demo data" confirmation message should read roughly:
 | Login | Role | Lands on |
 |---|---|---|
 | `director` | Business Director | All-office analytics |
-| `sbuhead` | SBU Head | SBU dashboard |
+| `sbuhead` | Business Unit Head | business unit dashboard |
 | `bmanager` | Branch Manager (Ahmedabad) | Branch dashboard |
 | `appmanager` | Branch Application Manager | Branch + overheads |
 | `opmanager` | Operation Manager | Ops dashboard |
@@ -86,12 +86,12 @@ Jobs / My Voucher).
 - **156** rows; status pills **To schedule / In progress / Closed**; a
   **Cost incurred** column; try the **Min cost ₹** filter.
 
-### Profitability → BOSS numbers list
-- **15** BOSS numbers in one accessible list with **Sr No · BOSS number · Client ·
+### Profitability → contract numbers list
+- **15** contract numbers in one accessible list with **Sr No · contract number · Client ·
   Status · Created on · Expires on · Renewed into · Jobs · Invoicing done ·
   Expenses booked** and (salary-cleared roles only) **Salary costing · Profit INR ·
   Profit %**. The 3 named ones (40231, 40198, 40155) have full job + voucher history.
-  Expiring/expired contracts show an amber/red pill; a renewed BOSS links to the
+  Expiring/expired contracts show an amber/red pill; a renewed contract links to the
   newer number that continues it. **⬇ Download CSV** exports all columns.
 
 ### Vouchers screen (role-scoped cards)
@@ -126,7 +126,7 @@ Jobs / My Voucher).
 - [ ] Requisitions list has **2**; the Replacement one shows the cost comparison.
 - [ ] Each demo login lands on a different, role-appropriate view.
 - [ ] **⬇ Download CSV** on Jobs/Calls/Invoicing/Profitability downloads a file.
-- [ ] BOSS list shows the new columns; sub-con **Mohan** has code **SC-001**.
+- [ ] contract-number list shows the new columns; sub-con **Mohan** has code **SC-001**.
 - [ ] A new inspector saved with a **blank** Employee code auto-gets **SC-###**
       (sub-con), **FL-###** (freelancer) or **EMP##** (staff).
 - [ ] Vouchers screen shows the role-scoped cards (inspector = own only).

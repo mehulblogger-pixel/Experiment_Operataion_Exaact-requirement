@@ -153,9 +153,9 @@ const CRM_TEMPLATE_KINDS = [
     'EMAIL_CREDENTIAL'=> 'Email — candidate credential request',
 ];
 
-// Approval-rule scope: a rule may target an amount band and/or an SBU (§ owner:
-// "by quote amount threshold aligned with respect to SBU … either or both").
-const APPROVAL_MATCH = ['ANY'=>'Any SBU', 'SBU'=>'Specific SBU'];
+// Approval-rule scope: a rule may target an amount band and/or a business unit (§ owner:
+// "by quote amount threshold aligned with respect to Business Unit … either or both").
+const APPROVAL_MATCH = ['ANY'=>'Any Business Unit', 'Business Unit'=>'Specific Business Unit'];
 
 // ---------------------------------------------------------------------------
 //  Schema
@@ -172,7 +172,7 @@ function crm_ensure_schema() {
             status VARCHAR(20) DEFAULT 'OPEN', notes TEXT, created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')",
 
         // Quotation header. Revisions are modelled with parent_id + rev (the newest
-        // rev is is_current=1); the BOSS supersede pattern, reused for §23.
+        // rev is is_current=1); the contract supersede pattern, reused for §23.
         "CREATE TABLE IF NOT EXISTS quotations (
             id $pk, quote_no VARCHAR(40), rev INT DEFAULT 0, parent_id INT NULL, is_current INT DEFAULT 1,
             inquiry_id INT NULL, client_id INT NULL, client_name VARCHAR(200) DEFAULT '',
@@ -189,7 +189,7 @@ function crm_ensure_schema() {
             contract_id INT NULL, contract_number VARCHAR(60) DEFAULT '',
             owner_id INT NULL, created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')",
 
-        // Quote / order line items (§4 SBU per line, §16 revenue, §17 order lines).
+        // Quote / order line items (§4 Business Unit per line, §16 revenue, §17 order lines).
         "CREATE TABLE IF NOT EXISTS quote_lines (
             id $pk, quote_id INT, line_no INT DEFAULT 0, sbu VARCHAR(20) DEFAULT '',
             service_type VARCHAR(30) DEFAULT '', subtypes VARCHAR(400) DEFAULT '', description VARCHAR(400) DEFAULT '',
@@ -209,7 +209,7 @@ function crm_ensure_schema() {
             status VARCHAR(20) DEFAULT 'PENDING', acted_by VARCHAR(150) DEFAULT '', acted_at VARCHAR(30) DEFAULT '',
             remarks VARCHAR(400) DEFAULT '')",
 
-        // Configurable approval matrix (§ owner: amount threshold and/or SBU).
+        // Configurable approval matrix (§ owner: amount threshold and/or Business Unit).
         "CREATE TABLE IF NOT EXISTS quote_approval_rules (
             id $pk, name VARCHAR(120) DEFAULT '', match_type VARCHAR(10) DEFAULT 'ANY', sbu VARCHAR(20) DEFAULT '',
             min_amount DECIMAL(14,2) DEFAULT 0, max_amount DECIMAL(14,2) DEFAULT 0,
@@ -303,7 +303,7 @@ function crm_migrate() {
         ensure_column('quotations', 'po_number', "VARCHAR(80) DEFAULT ''");
         ensure_column('quotations', 'po_date', "VARCHAR(20) DEFAULT ''");
         ensure_column('quotations', 'submitted_at', "VARCHAR(30) DEFAULT ''");
-        // Per-line: which office executes, which site, and the activity under the SBU.
+        // Per-line: which office executes, which site, and the activity under the Business Unit.
         ensure_column('quote_lines', 'office_id', 'INT NULL');
         ensure_column('quote_lines', 'location_id', 'INT NULL');
         ensure_column('quote_lines', 'activity_id', 'INT NULL');
@@ -542,7 +542,7 @@ function product_category_canon($raw) {
 // Every category already in use, as code => label: the Operations master list
 // first, then anything people have typed on a quotation that is not in it (those
 // stand for themselves). Office-scoped for the people who work in one office;
-// cumulative for anyone whose access spans offices (SBU heads, directors) — §xxv.
+// cumulative for anyone whose access spans offices (Business Unit heads, directors) — §xxv.
 function product_categories_all() {
     static $cache = null;
     if ($cache !== null) return $cache;
@@ -1634,13 +1634,13 @@ function job_hold_reasons($j) {
 //  What the sales conversation already knew
 //
 //  A client usually starts life as a name typed into an inquiry or a quotation,
-//  with a person's name, an e-mail, a mobile, an SBU and a list of the
+//  with a person's name, an e-mail, a mobile, a business unit and a list of the
 //  inspections they are asking for. When somebody finally opens the master and
 //  completes it, all of that is sitting three screens away and gets typed again
 //  — or, more often, not typed at all.
 //
 //  So the moment a client record exists, it takes what the sales side already
-//  recorded: the types of inspection wanted, the first contact, and the SBU.
+//  recorded: the types of inspection wanted, the first contact, and the Business Unit.
 //  Nothing is overwritten — an inspection type already ticked stays ticked, and
 //  a contact of the same name is not added twice.
 // ---------------------------------------------------------------------------
@@ -1822,7 +1822,7 @@ function crm_float_ops_packet($q) {
         . "Quotation: " . quote_label($q) . "\n"
         . "Contract: " . ($q['contract_number'] ?: '(pending)') . "\n"
         . "Contact: " . trim($q['contact_name'] . ' · ' . $q['contact_email'] . ' · ' . $q['contact_mobile'], ' ·') . "\n"
-        . "SBU: " . (lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu']) . "\n"
+        . "Business Unit: " . (lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu']) . "\n"
         . "Location: " . ($q['site_location'] ?: '—') . " (" . (lk_options_or('quote_location_type', QUOTE_LOCATION_TYPES)[$q['location_type']] ?? $q['location_type']) . ")\n"
         . "Value: " . cur_sym() . number_format((float)$q['total_amount'], 0) . "\n"
         . ($q['advance_required'] ? "** ADVANCE REQUIRED before scheduling (" . rtrim(rtrim(number_format((float)$q['advance_pct'], 2), '0'), '.') . "%) **\n" : "")
@@ -1845,11 +1845,11 @@ function crm_float_ops_packet($q) {
 }
 
 // ---------------------------------------------------------------------------
-//  Approvals (§9) — configurable matrix by amount band and/or SBU
+//  Approvals (§9) — configurable matrix by amount band and/or Business Unit
 // ---------------------------------------------------------------------------
 function crm_approvals($qid) { return ops_all("SELECT * FROM quote_approvals WHERE quote_id=? ORDER BY level, id", [(int)$qid]); }
 // Build the approval steps for a quote from the active rules. A rule matches when
-// its SBU matches (or it is "any SBU") and the quote total falls in its amount band
+// its Business Unit matches (or it is "any Business Unit") and the quote total falls in its amount band
 // (max 0 = no upper limit). If nothing matches, one generic step (any approver).
 function crm_build_approvals($q) {
     $pdo = db();
@@ -1857,7 +1857,7 @@ function crm_build_approvals($q) {
     $amt = (float)$q['total_amount']; $sbu = $q['sbu'];
     $steps = [];
     foreach (ops_all("SELECT * FROM quote_approval_rules WHERE active=1 ORDER BY level, id") as $r) {
-        if (($r['match_type'] ?? 'ANY') === 'SBU' && ($r['sbu'] ?? '') !== '' && $r['sbu'] !== $sbu) continue;
+        if (($r['match_type'] ?? 'ANY') === 'Business Unit' && ($r['sbu'] ?? '') !== '' && $r['sbu'] !== $sbu) continue;
         if ($amt < (float)$r['min_amount']) continue;
         if ((float)$r['max_amount'] > 0 && $amt > (float)$r['max_amount']) continue;
         $steps[] = $r;
@@ -2089,8 +2089,8 @@ function ops_crm_approval_rules($route, $method) {
         if ($route === 'quote-approval-rule-edit') { $r = ops_one("SELECT * FROM quote_approval_rules WHERE id=?", [(int)($_GET['id'] ?? 0)]); if (!$r) { http_response_code(404); view('notfound'); return; } }
         if ($method === 'POST') {
             $b = $_POST;
-            $mt = ($b['match_type'] ?? 'ANY') === 'SBU' ? 'SBU' : 'ANY';
-            $vals = [trim($b['name'] ?? ''), $mt, $mt === 'SBU' ? ($b['sbu'] ?? '') : '', (float)($b['min_amount'] ?? 0), (float)($b['max_amount'] ?? 0),
+            $mt = ($b['match_type'] ?? 'ANY') === 'Business Unit' ? 'Business Unit' : 'ANY';
+            $vals = [trim($b['name'] ?? ''), $mt, $mt === 'Business Unit' ? ($b['sbu'] ?? '') : '', (float)($b['min_amount'] ?? 0), (float)($b['max_amount'] ?? 0),
                 max(1, (int)($b['level'] ?? 1)), $b['approver_role'] ?? '', ($b['approver_user_id'] ?? '') !== '' ? (int)$b['approver_user_id'] : null, !empty($b['active']) ? 1 : 0];
             if ($r) {
                 $pdo->prepare("UPDATE quote_approval_rules SET name=?,match_type=?,sbu=?,min_amount=?,max_amount=?,level=?,approver_role=?,approver_user_id=?,active=? WHERE id=?")
@@ -2331,7 +2331,7 @@ function ops_crm_reports() {
         elseif (in_array($st, QUOTE_OPEN_STATES, true)) $openVal += $v;
     }
     if (wants_csv()) {
-        $csv = [['Quote', 'Client', 'SBU', 'Status', 'Total', 'Created', 'Accepted', 'Lost reason', 'Contract']];
+        $csv = [['Quote', 'Client', 'Business Unit', 'Status', 'Total', 'Created', 'Accepted', 'Lost reason', 'Contract']];
         foreach ($rows as $r) $csv[] = [quote_label($r), $r['client_disp'] ?: $r['client_name'], $sbuLbl[$r['sbu']] ?? $r['sbu'],
             lk_options_or('quote_status', QUOTE_STATUS)[$r['status']] ?? $r['status'], (float)$r['total_amount'], substr((string)$r['created_at'], 0, 10),
             $r['accepted_date'], ($r['lost_reason'] === 'OTHER' && $r['lost_reason_other']) ? $r['lost_reason_other'] : ($lostLbl[$r['lost_reason']] ?? $r['lost_reason']), $r['contract_number']];

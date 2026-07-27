@@ -8,7 +8,7 @@
   $clientNm = $call['client_disp'] ?: $call['client_name'];
   $subj = rawurlencode("Inspection call {$call['call_code']} — {$clientNm}");
   $bodyLines = "Call: {$call['call_code']}\nClient: {$clientNm}\nVendor/Site: " . ($call['vendor_name'] ?: '-') .
-    "\nSBU: " . (OPS_SBUS[$call['sbu']] ?? $call['sbu']) . "\nActivity: " . ($call['activity_id'] ? lk_value_path($call['activity_id']) : '-') .
+    "\n" . T("sbu") . ": " . (OPS_SBUS[$call['sbu']] ?? $call['sbu']) . "\nActivity: " . ($call['activity_id'] ? lk_value_path($call['activity_id']) : '-') .
     "\nClient required date: " . ($call['inspection_required_date'] ?: '-') .
     "\nCredit to executing branch: " . fmoney($call['expected_credit']) .
     "\n\n(Attach the original client inspection-request email before sending.)";
@@ -113,7 +113,7 @@
     <div><span class="k">Vendor / Site</span><?= e($call['vendor_name'] ?: '—') ?></div>
     <div><span class="k">Contracting <?= e(Tl('office')) ?></span><?= e($call['ibo_name'] ?: 'Ahmedabad (own)') ?></div>
     <div><span class="k">Executing branch</span><?= e($call['exec_name'] ?: 'Ahmedabad executes') ?><?= $call['coordinator_name'] ? '<br><small class="muted">Coord: '.e($call['coordinator_name']).'</small>' : '' ?></div>
-    <div><span class="k">SBU</span><?= e(lk_options_or('sbu', OPS_SBUS)[$call['sbu']] ?? '—') ?></div>
+    <div><span class="k"><?= e(T("sbu")) ?></span><?= e(lk_options_or('sbu', OPS_SBUS)[$call['sbu']] ?? '—') ?></div>
     <div><span class="k">Activity</span><?= e($call['activity_id'] ? lk_value_path($call['activity_id']) : '—') ?></div>
     <div><span class="k">Type of inspection</span><?= e(($call['inspection_type']??'')==='OTHER' ? ($call['inspection_type_other'] ?: 'Other') : (INSPECTION_TYPES[$call['inspection_type']??''] ?? '—')) ?></div>
     <?php if (($call['site_address_id']??null)): $sa = ops_one("SELECT * FROM partner_addresses WHERE id=?", [$call['site_address_id']]); ?>

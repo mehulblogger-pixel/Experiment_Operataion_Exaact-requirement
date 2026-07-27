@@ -31,7 +31,7 @@
     <div class="ff"><label>QAP rev.</label><input class="form-control" name="qap_rev" value="<?= e($e['qap_rev'] ?? '') ?>"></div>
     <div class="ff"><label>Office</label>
       <select class="form-control searchable" name="office_id"><option value="">— your office —</option><?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ($e && (int)$e['office_id']===(int)$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>SBU</label>
+    <div class="ff"><label><?= e(T("sbu")) ?></label>
       <select class="form-control searchable" name="sbu"><option value="">—</option><?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($e && $e['sbu']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
   </div>
 

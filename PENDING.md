@@ -2,6 +2,44 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🏷️ THE ACRONYMS ARE GONE (July 2026)
+
+Owner: *"delete SGS, BOSS etc. and replace them with suitable name — for BOSS it
+is Contract. Rename SBU with Business Unit or something like that."*
+
+**BOSS → Contract Number.** Already the shipped term; this pass finished the job
+by clearing the word out of every remaining comment, screen and document.
+
+**SBU → Business Unit.** The shipped term is now `Business Unit` / `Business
+Units`. Every screen that used to print the acronym now asks the terminology
+engine instead (`T('sbu')` / `Tl('sbu')` / `TP('sbu')`), so a company that wants
+a different word sets it once under **Settings → Terminology** and every screen
+follows. The JavaScript no longer hard-codes it either — the page publishes
+`window.TERM_SBU` and `app.js` reads that.
+
+**The role stays `SBU_HEAD` in the database, and reads "Business Unit Head" on
+screen.** Renaming the stored code would have orphaned every existing user row.
+
+**Live databases are renamed too, not just fresh ones.** A database set up on an
+older version still carried the acronyms as *data* — the list heading `SBU`, the
+list heading `BOSS status`, and the designation value `SBU Head`. Two new
+helpers, `lk_rename_type_label()` and `lk_rename_value_label()`, rename those in
+place from `lk_migrate()`, and the boot probe in `index.php` asserts the old
+wording is gone so an existing install actually runs the upgrade. Both only match
+the *exact* old wording, so a company that has already renamed a list keeps its
+own word.
+
+**"SGS India Pvt. Ltd." on the login screen is not in the code.** It is the
+`app_name` setting — whatever was typed into **Settings → Application name**.
+Changing it there changes the login screen, the sidebar, the browser tab, the
+PDF letterhead and the "From" name on every e-mail. Grep confirms no third-party
+inspection-agency or real client name appears anywhere in the source, the seeds
+or the documents.
+
+*Verified:* lint green (135 files), 81 screens render, and every screen in the
+app was crawled and grepped — no `SBU`, `SBUs`, `BOSS` or `SGS` survives in any
+rendered page. Fresh-install boot produces the new wording directly.
+
 ## 📉 PROFIT ON ONE INSPECTION (July 2026)
 
 **Profit by call** — a branch manager and the managers under them see what each
@@ -34,7 +72,7 @@ company default in Settings. Nothing is hard-coded.
 
 The branch's own shared costs — rent, the manager's salary, the back office —
 are **not** pushed onto individual jobs. A job is judged on what it directly
-caused; the branch is judged on the SBU P&L, where those are shared out at
+caused; the branch is judged on the Business Unit P&L, where those are shared out at
 month end.
 
 ## 🧮 RATE × DAYS, ON BOTH SIDES, AND THEN THE REVENUE (July 2026)
@@ -225,7 +263,7 @@ reading "Saving…" over a form that is not going anywhere.
   The browser refused the submit and the button died silently. The credit is now
   required only when the deputation really does cross offices; where it does
   not, the value carried is what the client is billed on the call.
-- **BOSS number is now the contract number.** It is not chosen from a register
+- **contract number is now the contract number.** It is not chosen from a register
   any more — it comes down from the quotation to the call to the deputation, and
   the register entry is created on saving. The old register is still there and
   still holds the renewal chain; it just fills itself.
@@ -271,7 +309,7 @@ it never made.
 
 1. **Quotations** — approve, then *Take my approval back*. Mark one sent: it
    locks for everybody, and offers *Raise a revision* instead.
-2. **Purchase Orders tab** — pick the quotation first: the contract number, SBU,
+2. **Purchase Orders tab** — pick the quotation first: the contract number, business unit,
    value and every line item come across.
 3. **Clients** — complete a client from a name sales typed into an inquiry: the
    types of inspection, the contact and the inquiry/quote links come with it.
@@ -299,7 +337,7 @@ it never made.
 ### What to test
 
 1. **Management dashboard** (new, in the menu). Filter by financial year,
-   month, SBU, activity code, executing office, contracting office, engineer
+   month, business unit, activity code, executing office, contracting office, engineer
    and client. Nine KPI cards, eight breakdown tables, each downloadable as a
    spreadsheet. Every figure is counted off ONE set of jobs by ONE rule, so no
    two tables can disagree.
@@ -313,7 +351,7 @@ it never made.
    it for a few days with a reason, which is written to the audit trail. The
    register shows a count of locked jobs and marks each row.
 4. **Sub-contractor cost** now lands in the month-end run on the job, its
-   contract number, its SBU and its activity code — never spread.
+   contract number, its business unit and its activity code — never spread.
 
 ### Closed since
 
@@ -339,7 +377,7 @@ it never made.
 Five commits: `9c75b5f` (the allocation engine), `4bc4c97` (expense heads master +
 monthly cost entry), `23068db` (client/vendor import, clear records, the written
 explanation in `docs/COSTING.md`), and this one (person cost & split, outstation
-tick, month-end run, SBU/activity/BOSS P&L).
+tick, month-end run, business unit / activity / contract P&L).
 
 **Read `docs/COSTING.md` first** — the whole model in plain words with worked
 figures, and the order to do things in month by month.
@@ -350,25 +388,25 @@ figures, and the order to do things in month by month.
    spreads, retire one. Delete the ones you do not use; they stay deleted.
 2. **Each person's record → Cost & where it belongs** — monthly cost, and the
    tick for whether they do inspections. Non-engineers get one percentage box
-   per SBU in their branch; the running total has to reach 100.
+   per business unit in their branch; the running total has to reach 100.
 3. **A call → Outstation** — tick it, allocate the call, check it carried over.
 4. **Office costs & overheads → Actual costs** — a month of real figures, then
    *Copy last month* into the next one.
 5. **Month-end cost run** — preview, read the warnings, *Calculate and store*,
    then *Close the month*. Closing locks the entry screens; reopening is
    recorded in the audit trail.
-6. **SBU profit & loss** — revenue against cost by SBU, by activity code, and
-   by BOSS number.
+6. **business unit profit & loss** — revenue against cost by business unit, by activity code, and
+   by contract number.
 
 ### Closed since
 
-- [x] **The Profitability screen and the SBU P&L now cross-link**, each saying
+- [x] **The Profitability screen and the Business Unit P&L now cross-link**, each saying
       what it does and does not include.
-- [x] **Year to date and whole year** on the SBU P&L, alongside one month. It
+- [x] **Year to date and whole year** on the Business Unit P&L, alongside one month. It
       says how many of the months in the span have actually been run, and warns
       that months not yet run contribute revenue but no cost.
 - [x] **Sub-contractor cost** is in the allocation run, on the job, its contract
-      number, its SBU and its activity code.
+      number, its business unit and its activity code.
 - [x] **Closing a month closes its timesheets.** A frozen month refuses voucher
       edits with the reason, on every write path including a typed URL. Reopen
       the month to correct a day.
@@ -515,7 +553,7 @@ REUSE (already built — do NOT duplicate): crm_templates docx engine + doc/form
 lib/pdf.php SimplePDF + signature image + per-company letterhead, custom-fields engine (dynamic
 fields on any entity, cascading lookups), lookup masters, approval-chain (quote_approval_rules +
 REPORTS_TO reporting-manager chain), report-approval + escalation, lib/ai.php provider seam,
-email_log, deliverables master (IR/IRN/NCR/CoC…), FY/office/SBU scope.
+email_log, deliverables master (IR/IRN/NCR/CoC…), FY/office/business unit scope.
 
 Proposed phasing (each phase = its own commit, tested):
 - P1 Foundation ✅ SHIPPED — lib/idems.php: report_types registry (32 TPIA types seeded + admin CRUD,
@@ -531,7 +569,7 @@ Proposed phasing (each phase = its own commit, tested):
   still locks it. Routes: /report-builder, /report-field-edit, /document-fill, /report-file.
 - P3 Workflow & approvals ✅ SHIPPED — idems_approver_map (per-inspector approver, common approver,
   temp cover during leave), idems_approval_rules (configurable multi-level chain matched by report
-  type/office/client/SBU; approver = inspector-map / reporting-manager / specific user / role; per-level
+  type/office/client/business unit; approver = inspector-map / reporting-manager / specific user / role; per-level
   SLA), report_approvals steps built on submit (submit blocked if no approver), approve/reject/
   send-back/delegate with mandatory remarks, finalize gated on full approval, SLA auto-escalation in
   cron, approval-chain panel + act buttons on the report detail. Routes: /approver-map,
@@ -628,16 +666,16 @@ Proposed phasing (each phase = its own commit, tested):
   NCR format uploaded → form generated → filled → client-format .docx produced with no leftover tokens.
 
 - ➕ Prefill from the call / job ✅ SHIPPED (owner request) — idems_context_for() gathers everything
-  already known (call code, client, vendor, SBU, office, product, inspection type, PO number + line
-  item, site address, notes; job code, inspector, inspection dates, BOSS number, quote/contract).
+  already known (call code, client, vendor, business unit, office, product, inspection type, PO number + line
+  item, site address, notes; job code, inspector, inspection dates, contract number, quote/contract).
   "New report" from a call or job (buttons on call_detail + job_detail, plus a call picker on the
   new-report screen) prefills the whole header. idems_autofill() then ALIGNS THE DESIGNED FORM FIELDS
   via an alias map (customer/purchaser→client, supplier/manufacturer/works→vendor, dwg_no→drawing,
   date_of_inspection→date, inspected_by→inspector, works_location/site→location, equipment/item→
-  product, call_no→call code, division→SBU, contract_ref/boss→BOSS no., qty_offered→PO line qty …),
+  product, call_no→call code, division→business unit, contract_ref/boss→contract no., qty_offered→PO line qty …),
   so a client-worded format fills itself. Never overwrites what the inspector typed; auto-filled
   fields are badged "auto" with a summary banner. report_docs.job_id now stored alongside call_id.
-  Verified: customer→Reliance, supplier→Vapi Chem, date_of_inspection→2026-07-13, inspected_by→Ravi
+  Verified: customer→Northern Petrochem, supplier→Vapi Chem, date_of_inspection→2026-07-13, inspected_by→Ravi
   Kumar, equipment→Pressure vessel, call_no→C-2607-001, division→Industrial, contract_ref→40231.
 
 Constraint note: MilesWeb shared PHP hosting — no Node/build; "offline-first" is delivered as a
@@ -663,7 +701,7 @@ Five owner requirements, to be built as extensions of existing tables (reuse, do
    manually (name, position, email; link a system user when one exists). System then derives the
    N+1 chain automatically (already have `users.reports_to_id`). Wire the chain into:
    (a) CRM quote approvals — option to route up the reporting chain in addition to the existing
-   amount/SBU rules; (b) inspection/report approval — report/closure routes to the inspector's
+   amount/business unit rules; (b) inspection/report approval — report/closure routes to the inspector's
    reporting manager. Org-hierarchy view under Settings.
 5. **Exhaustive, role-divided permissions with one-click presets** — make the permission catalogue
    complete & clearly worded, grouped, and give the access admin a "recommended set per role"
@@ -694,7 +732,7 @@ afterwards (current landing dashboard "is not what we're expecting").**
 1. Customer inquiry received via email (capture it).
 2. Quotation number generation (auto).
 3. Quotation generation (the document).
-4. Allocate to different SBU(s) when generating the quote (per line if needed).
+4. Allocate to different business unit(s) when generating the quote (per line if needed).
 5. Upload the quote WORD format; it must adapt to a new/revised format whenever a
    new .docx is uploaded (template-driven, hot-swappable).
 6. Fields designable — create / edit / delete fields to match the new format.
@@ -732,7 +770,7 @@ afterwards (current landing dashboard "is not what we're expecting").**
     inspector a HOLD so they don't issue the deliverable; fetch this rule from the
     quotation / final accepted terms.
 23. Quote revision is compulsory when needed → auto Rev. 01 numbering, with an edit
-    history of what changed (reuse the BOSS supersede/hierarchy pattern).
+    history of what changed (reuse the contract supersede/hierarchy pattern).
 24. Fetch the required deliverable(s) from the quote into Operations.
 25. Job types (full list): Inspection, Project deputation, Supply-chain deputation,
     Site supervision, Commissioning & Installation, Site QA/QC, Technical audit,
@@ -743,9 +781,9 @@ afterwards (current landing dashboard "is not what we're expecting").**
   `partner_contacts` (name/email/mobile), `partner_site_addresses` (locations),
   `partner_contracts` (contract_number/title/sbu/value/dates),
   `partner_purchase_orders` + `po_line_items` (trade/skill/site/manpower/activity/
-  gst/base/tax/total — this is largely the "order line items" of §17), BOSS numbers.
+  gst/base/tax/total — this is largely the "order line items" of §17), contract numbers.
 - Calls→Jobs pipeline with `inspection_type`, `job_type` (INSPECTION/DEPUTATION),
-  `deliverables`, `site_address_id`, `po_id`, `po_line_item_id`, activity, SBU,
+  `deliverables`, `site_address_id`, `po_id`, `po_line_item_id`, activity, business unit,
   mandays; invoicing + payment + credit + profitability.
 - Masters/lookups engine (configurable dropdowns → §8), `INSPECTION_TYPES` (30+),
   `JOB_TYPES`, `DELIVERABLES` constants + lookup overrides (§18/§25).
@@ -765,10 +803,10 @@ afterwards (current landing dashboard "is not what we're expecting").**
   PHP `ZipArchive` and string-replacing in `word/document.xml` — no library, upload-
   and-go, hot-swappable format. Alternative: HTML→print-to-PDF. Needs owner's pick.
 - **Approval chain needs a rule/matrix** — "as required" must become configurable
-  (levels by value threshold and/or SBU, with named approvers). Confirm the rule.
+  (levels by value threshold and/or business unit, with named approvers). Confirm the rule.
 - **Lost/Rejected quote status** — owner listed Open/Pending/Closed(accepted) only;
   need a LOST/REGRETTED state + reason for win/loss analytics.
-- **One quote → multiple SBUs** (§4) implies SBU per quote line (split), not one SBU
+- **One quote → multiple business units** (§4) implies business unit per quote line (split), not one business unit
   per quote — confirm.
 - **Advance %/payment terms & "report-vs-payment" gate** need explicit fields on the
   quote that flow to the job and show the inspector a HOLD (§21/§22).
@@ -778,7 +816,7 @@ afterwards (current landing dashboard "is not what we're expecting").**
 ### Proposed phased roadmap (see chat for the approved-pending version)
 - P0 Foundations: sales roles + access modules; CRM masters (job-type / inspection
   sub-category as multi-select configurable masters); quote/inquiry numbering.
-- P1 Inquiry + Quotation core: inquiry capture, quote header + line items (SBU per
+- P1 Inquiry + Quotation core: inquiry capture, quote header + line items (business unit per
   line), auto quote number, revisions (Rev 01) + history, dropdown-driven entry.
 - P2 Template engine: upload .docx template, map/define fields (add/edit/delete),
   auto-fill via ZipArchive token replacement → downloadable quote.
@@ -808,8 +846,8 @@ afterwards (current landing dashboard "is not what we're expecting").**
   (`crm_service_type`, §18/§25) — both editable lookups.
 - **CRM data model created** (idempotent, SQLite+MySQL): `crm_inquiries`,
   `quotations` (+rev/parent for §23 revisions, advance/report-vs-payment flags),
-  `quote_lines` (SBU per line, order type, units), `quote_revisions`,
-  `quote_approvals`, `quote_approval_rules` (amount band and/or SBU — §owner),
+  `quote_lines` (business unit per line, order type, units), `quote_revisions`,
+  `quote_approvals`, `quote_approval_rules` (amount band and/or business unit — §owner),
   `quote_followups`, `crm_templates` (docx + email, with a JSON field map for §6).
 - Boot probe extended so live MySQL auto-creates the CRM tables on next load.
 - **Next: P1** — Inquiry + Quotation screens (list/form/detail), quote numbering,
@@ -817,11 +855,11 @@ afterwards (current landing dashboard "is not what we're expecting").**
 
 ### ✅ P1 shipped (2026-07) — Inquiry + Quotation core
 - **Inquiry register** (§1): list + new/edit, auto `INQ-#####` number, client/contact/
-  SBU/source/status, "Quote" button that carries an inquiry into a new quotation.
+  business unit/source/status, "Quote" button that carries an inquiry into a new quotation.
 - **Quotation core** (§2,3,4,8,14,23): list with **Open / Pending / Closed(won) / Lost**
-  views + KPI counts; new/edit form with header (client, contacts, SBU, site +
+  views + KPI counts; new/edit form with header (client, contacts, business unit, site +
   location type, validity, payment terms, **advance % + advance-required**,
-  **report-vs-payment** flag, GST) and **dynamic line items** (SBU per line, service
+  **report-vs-payment** flag, GST) and **dynamic line items** (business unit per line, service
   type, order type OPEN/LINE, qty/unit/rate, live totals); auto `Q-#####` number.
 - **Status workflow**: Draft → Submit → Approve → Send → Accepted / Lost, gated by
   the CRM permissions; on **Sent** the 3/6/9-day, fortnight, month **follow-ups are
@@ -844,7 +882,7 @@ afterwards (current landing dashboard "is not what we're expecting").**
   `{{doc_rev}}` / `{{doc_date}}`. Upload a revised format with a new number → new quotes
   show the new number automatically.
 - **Token engine** (no external library — `ZipArchive` + string replace): fills header
-  tokens (quote no, client, contacts, SBU, commercials, totals, **amount in words**),
+  tokens (quote no, client, contacts, business unit, commercials, totals, **amount in words**),
   **repeats a table row per line item** (`{{l_desc}}` etc.), and **repairs tokens Word
   splits across runs** (verified: `{{cli|ent_name}}` rejoined correctly). Tokens are
   documented on the template form.
@@ -853,7 +891,7 @@ afterwards (current landing dashboard "is not what we're expecting").**
   stamped, line rows repeated, totals + words correct, no unreplaced tokens.
 ### ✅ P3 shipped (2026-07) — approval chain + send + follow-up emails
 - **Configurable approval matrix** (Quotations → Approval rules): rules by **amount
-  band** and/or **SBU**, with a **level** (chain order) and an **approver role or a
+  band** and/or **business unit**, with a **level** (chain order) and an **approver role or a
   specific person**. On "Submit for approval" the matching rules become the quote's
   chain; with no rule it needs one approval from any approver.
 - **Approval flow**: each approver sees Approve/Reject (with remarks) for their step
@@ -877,7 +915,7 @@ afterwards (current landing dashboard "is not what we're expecting").**
   value, dates) and linked to the quotation (`contract_id`, `contract_number`).
 - **Operations packet auto-floated** (§13): on contract entry an e-mail goes to the
   coordinators + ops managers with **client, quotation no, contract no, contact
-  person/email/mobile, SBU, location, value, advance/report-vs-payment flags, the
+  person/email/mobile, business unit, location, value, advance/report-vs-payment flags, the
   service requirement, and the order lines** — with the **techno-commercial (.docx)
   attached**. A "Re-send to operations" button re-floats it.
 - **Open (ARC) vs line-item orders** (§17): each order line is labelled
@@ -918,7 +956,7 @@ afterwards (current landing dashboard "is not what we're expecting").**
 ### ✅ P7 shipped (2026-07) — Sales / CRM dashboard + monthly report + win/loss
 - **Sales dashboard** (CRM → Sales dashboard, gated `mod.crm_reports.view`): FY-filtered,
   scope-aware. KPIs — quotations, **open pipeline value**, **won value**, **win rate**.
-- Charts: quotes by status (donut), quoted value by SBU, **top customers by quoted &
+- Charts: quotes by status (donut), quoted value by business unit, **top customers by quoted &
   by won value**, and **"Why we lost" win/loss** breakdown by reason (§ lost-reason master).
 - **Monthly performance table** (§15): per month — raised / won / lost / won value.
 - **CSV export** of all quotes in scope for the FY.
@@ -939,7 +977,7 @@ afterwards (current landing dashboard "is not what we're expecting").**
 
 ### ✅ CRM ROADMAP COMPLETE (P0–P7)
 Inquiry → quotation (+ revisions, Word template w/ doc & format numbers) → approval
-chain (amount/SBU) → send-to-customer (Word attached) → follow-up e-mails → acceptance
+chain (amount/business unit) → send-to-customer (Word attached) → follow-up e-mails → acceptance
 → client + contract registration → Operations hand-off → job link (revenue, HOLD,
 deliverables) → CV analysis + client-submission tracking → sales dashboard/reports.
 Remaining big items: the **AI-keys** master-settings feature, then **dashboards for all
@@ -979,7 +1017,7 @@ and then **select which model(s)** to use under each provider. Requirements:
 ### PARKED (do after CRM): Executive-Director dashboard rebuild
 Current landing dashboard for the Business/Executive Director "is not what we're
 expecting." Rebuild to a strategic C-suite view (pipeline value, win rate, revenue
-by SBU/customer/project, forecast vs actual, top accounts) — AFTER the CRM lands so
+by business unit/customer/project, forecast vs actual, top accounts) — AFTER the CRM lands so
 it can draw on real pipeline data.
 
 ## ✅ Just shipped (2026-07 — owner's screenshot batch)
@@ -992,21 +1030,21 @@ it can draw on real pipeline data.
   (now an ALLOWANCE; the new head is an actual BILL needing a receipt). Expense
   heads are now ensured **by code** on boot, so existing live databases gain the
   new head automatically without wiping custom heads.
-- **BOSS numbers list** (Profitability screen) rebuilt as an accessible table with
-  **Sr No · BOSS number · Client · Status · Created on · Expires on · Renewed into
+- **contract numbers list** (Profitability screen) rebuilt as an accessible table with
+  **Sr No · contract number · Client · Status · Created on · Expires on · Renewed into
   (renewal hierarchy) · Jobs · Invoicing done · Expenses booked** + salary-gated
   **Salary costing · Profit INR · Profit %**, KPI cards, expiry pills, and CSV.
 - **Vouchers screen role-scoped cards** — Total expense claimed · This month ·
   Awaiting approval · Paid, scoped to the role (inspector sees only their own).
 - **Insights dashboard (/reports):** added a **client-name filter** to the filter
-  bar, a **Top 10 customers by revenue** chart and a **Revenue by project (BOSS)**
+  bar, a **Top 10 customers by revenue** chart and a **Revenue by contract**
   chart in the Financial section. The **Certificates-expiring** panel is now hidden
   for the **Business Director** role (strategic view, not an ops-compliance task).
 - **Demo reload guidance:** the "already loaded" message now tells the user to
   Remove + Load again to pick up newer sample records. Root cause of "agencies /
   requisitions look empty" is the one-shot `demo_seeded` flag — the seed itself is
   correct (verified: 2 agencies, 2 requisitions render for admin *and* director).
-- Remaining voucher/BOSS polish parked below (§ Reports Phase 2, deputation).
+- Remaining voucher/contract polish parked below (§ Reports Phase 2, deputation).
 
 ## 🆕 Requested — to build next (noted 2026-07, owner)
 
@@ -1030,7 +1068,7 @@ The one-time recruitment fee is **conditional**, so it is NOT a fixed cost:
   requisition to the next candidate.
 
 ### 1e. Manpower Requisition / Position Approval module — ✅ CORE DONE
-- [x] **DONE** — `requisitions` (New/Replacement, office/SBU/designation/site,
+- [x] **DONE** — `requisitions` (New/Replacement, office/business unit/designation/site,
       budgeted cost, approval ref/date/by, status Open→Proposed→Offer→Hired→
       Closed); Requisitions screen (list/form/detail) under Hiring; REPLACEMENT
       links the outgoing engineer; detail shows **Outgoing vs Budgeted vs Hired**
@@ -1046,7 +1084,7 @@ The one-time recruitment fee is **conditional**, so it is NOT a fixed cost:
 - [ ] *(original design, for reference)* Management approves **every position**
 Management approves **every position** (new or replacement); the whole hiring
 chain hangs off that approval.
-- [ ] **`requisitions` table**: req_code, office, SBU, designation/position,
+- [ ] **`requisitions` table**: req_code, office, business unit, designation/position,
       project/site, **type NEW vs REPLACEMENT**, budgeted monthly cost, approved_by,
       approval ref + date, status (Open → Proposed → Offer released → Hired →
       Closed / Cancelled), notes.
@@ -1075,22 +1113,22 @@ and feeds the agency/roll/fee logic already built.
       button in **Settings** (POST `/seed-demo`, idempotent via `demo_seeded`).
       One click inserts 3 peer offices (Mumbai HO + Ahmedabad + Pune), 11 users
       (every role, password `demo12345`), 4 inspectors (incl. an agency sub-con)
-      with entitlements, 3 clients + 2 vendors, 3 BOSS numbers, 6 calls, 6 jobs
+      with entitlements, 3 clients + 2 vendors, 3 contract numbers, 6 calls, 6 jobs
       across the full lifecycle (paid / awaiting / overdue / unbilled / in-progress
       / sub-con), closure expenses, and 2 vouchers (DRAFT + APPROVED). Every
       screen shows live figures immediately. *Follow-ups when the credit rules
       below land: extend the seed with same-vs-different-office credit examples.*
 - [ ] *(original ask, for reference)* A **ready-made sample dataset** that can be loaded into a fresh install so
       the whole system can be explored end-to-end with realistic values —
-      **from user creation → multiple offices → clients/vendors → BOSS/contract
+      **from user creation → multiple offices → clients/vendors → contract
       numbers → calls → job allocation & scheduling → inspection → voucher
       (km + bills) → closure → invoicing → payment → inter-office credit.**
       Purpose: demos, training, and testing every screen with data already in
       place. Should include: several **offices** (peer offices + Mumbai as the
       commercial HO), **users of every role** (Master Admin, Business Director,
-      SBU Head, Branch/Branch-App Manager, Operation/Asst. Manager, Coordinator,
+      Business Unit Head, Branch/Branch-App Manager, Operation/Asst. Manager, Coordinator,
       Accountant, Inspector), **inspectors** with salary + entitlements, a few
-      **clients/vendors/sites**, **BOSS numbers**, a spread of **calls & jobs**
+      **clients/vendors/sites**, **contract numbers**, a spread of **calls & jobs**
       (some same-office, some cross-office), **completed vouchers**, and
       **invoiced + paid + credit-settled** examples so profitability, dashboards
       and the money desk all show live figures immediately. Delivered as a
@@ -1209,7 +1247,7 @@ Two agency types, each with a contract and a different fee model — both feed
       (contracting sees its calls; executing sees the calls it executed).
 - [ ] **Invoicing filters** — the Invoicing / money desk (`/invoicing`) needs a
       **filter bar** like the Dashboards: **Financial Year, Month**, plus office,
-      SBU, client and status bucket (pending / awaiting / overdue / credit). The
+      business unit, client and status bucket (pending / awaiting / overdue / credit). The
       counts and worklist recompute for the chosen period so an accountant can
       pull, e.g., "unpaid invoices for FY 2026-27, July, Ahmedabad." Filters
       respect the user's scope, and the filtered view should also be exportable
@@ -1221,7 +1259,7 @@ Two agency types, each with a contract and a different fee model — both feed
       (each respects the current scope + filters), a **Download-reports** section
       on the Dashboards page (permission-gated), and **voucher download**
       (`/voucher-csv` → full Statement of Travelling Expenses, plus Print/Save-PDF).
-      *Remaining from the catalogue below (future): TAT report, office/SBU P&L,
+      *Remaining from the catalogue below (future): TAT report, office/Business Unit P&L,
       utilization/productivity, overdue-aging, inter-office credit statement,
       and PDF statements for invoices/credit notes.*
 
@@ -1231,16 +1269,16 @@ analysis, PDF for official statements). Proposed catalogue to build:
 
 **Operations**
 - [ ] Call register (with lead-times, status, pending-scheduling flag)
-- [ ] Job register / allocation report (inspector, dates, BOSS, status)
-- [ ] **TAT report** — on-time vs late, average TAT, by office / SBU / inspector
+- [ ] Job register / allocation report (inspector, dates, contract numbers, status)
+- [ ] **TAT report** — on-time vs late, average TAT, by office / business unit / inspector
 - [ ] Overdue-closure report (jobs past scheduled/required date)
 - [ ] Scheduling / dispatch board export (what's due, who's free)
 - [ ] Inspection volume by client / vendor / site / inspection-type
 
 **Finance**
-- [ ] **Profitability by BOSS / contract** (revenue − labour − exp − subcon − OH − contingency)
+- [ ] **Profitability by contract / contract** (revenue − labour − exp − subcon − OH − contingency)
 - [ ] **Office P&L** (per peer office; own targets vs achieved)
-- [ ] **SBU P&L** (credit vs distributed loaded cost vs net)
+- [ ] **Business Unit P&L** (credit vs distributed loaded cost vs net)
 - [ ] **Voucher / expense register** (per inspector/month, per expense head)
 - [ ] **Invoicing & payment** — raised / received / outstanding / **overdue aging** (30/60/90)
 - [ ] **Inter-office credit statement** — given vs received, expected vs actual, reconciliation
@@ -1258,8 +1296,8 @@ analysis, PDF for official statements). Proposed catalogue to build:
 **Formats & mechanics to decide**: CSV + Excel (`.xls` via HTML table or
 `.csv`, no library needed on MilesWeb) for data; **PDF/print** for official
 statements (voucher, credit note, invoice summary) using the existing
-print-page approach; every report **respects the user's office/SBU scope** and
-the current dashboard **filters** (FY, month, office, SBU, inspector).
+print-page approach; every report **respects the user's office/business unit scope** and
+the current dashboard **filters** (FY, month, office, business unit, inspector).
 
 
 ## 🚧 Expense / Inspector-Voucher module (IN PROGRESS — the profitability engine)
@@ -1286,8 +1324,8 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
 - [x] **P3 · Voucher auto-fill** — DONE. `vouchers` + `voucher_entries` tables;
       new **Vouchers** tab (inspectors see "My Voucher"). Open/create a voucher
       per inspector+month; **"Pull working days from jobs"** auto-fills one row per
-      inspection day (date, **vendor display name** as site, **File No = BOSS**,
-      SBU, 8h, tagged `auto`) — idempotent, never duplicates. **Multiple rows per
+      inspection day (date, **vendor display name** as site, **File No = contract number**,
+      business unit, 8h, tagged `auto`) — idempotent, never duplicates. **Multiple rows per
       date** supported with a per-day **hours subtotal** + month total; hours
       **editable**; **Line No editable** (from Accounts), File No editable on work
       rows. Add non-inspection days (Office / Leave-with-code / Holiday / Week-off).
@@ -1320,10 +1358,10 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
       the app's voucher-derived present/leave** for the month — flagging OK /
       MISMATCH / In-HR-only / In-app-only with the differing cells highlighted.
       Verified: match=OK, HR4-vs-app2=MISMATCH, unknown code=In-HR-only.
-- [x] **P7 · Profitability by BOSS/Contract** — DONE. New **Profitability** tab
+- [x] **P7 · Profitability by contract number/Contract** — DONE. New **Profitability** tab
       (gated by new `data.profitability` perm — granted to Master Admin, Business
-      Director, SBU Head, Branch Manager, **Operation Manager** [manager under the
-      branch manager] and Finance; **not** Coordinator/Inspector). List of BOSS
+      Director, Business Unit Head, Branch Manager, **Operation Manager** [manager under the
+      branch manager] and Finance; **not** Coordinator/Inspector). List of contract number
       numbers with Revenue / Expenses / Sub-con / Labour / **Margin ₹ + %**;
       detail page with stat row + **expense drill-down** (each line shows which
       inspector visited which vendor, hours, travel + bills + line total, with a
@@ -1331,8 +1369,8 @@ total. Auto-fills from Jobs; inspector only enters hours + km + bills.
       voucher `row_total` (by boss_id) + job-closure expenses. Labour counted only
       when salary is visible (else "Contribution"). Verified: revenue 50k, expenses
       668, margin/%, drill-down. Super Admin can grant/revoke the perm per user.
-- [x] **P8 · Contract/BOSS carry-forward** — DONE. On a BOSS profitability page,
-      **Renew / change contract number (ARC/Open)** creates a new BOSS number
+- [x] **P8 · Contract/contract carry-forward** — DONE. On a contract profitability page,
+      **Renew / change contract number (ARC/Open)** creates a new contract number
       linked to the old (`supersedes`/`superseded_by`), carries the **open jobs
       (and their voucher lines) forward** to the new number, closes the old, and
       shows the chain both ways ("continues from…", "renewed as…"). Closed/
@@ -1351,7 +1389,7 @@ the theme builder (no colour hardcoded, no CSS variable renamed).
       Directory / Admin) with active highlighting + per-role visibility; slim
       top bar (office + FY chips, search, user); mobile drawer + scrim.
 - [x] **Role-aware dashboard** — one template filled per role & scope (Director,
-      SBU Head, Branch/Branch-App Manager, Manager/Asst, Coordinator, Accountant,
+      Business Unit Head, Branch/Branch-App Manager, Manager/Asst, Coordinator, Accountant,
       Inspector); KPI tiles, money desk, expected-credit-by-office bars, job
       donut, quick actions, pending-scheduling — sections shown by permission,
       ordered per role.
@@ -1415,24 +1453,24 @@ the theme builder (no colour hardcoded, no CSS variable renamed).
 ### Reports — Phase 2 (advanced, downloadable)
 - [ ] Beyond the Phase-1 CSV exports (Jobs / Calls / Invoicing / Profitability /
       voucher), build the deeper analytics from the catalogue: **TAT report**
-      (on-time vs late, avg, by office/SBU/inspector), **Office P&L** and **SBU
+      (on-time vs late, avg, by office/business unit/inspector), **Office P&L** and **business unit
       P&L**, **inspector utilization & productivity**, **overdue aging (30/60/90)**
       on receivables, **inter-office credit statement** (given/received, expected
       vs actual reconciliation), and **true PDF** documents for invoices / credit
       notes / the signed voucher (currently print-to-PDF). Reuse the same
-      scope + dashboard-filter pattern; add FY/Month/office/SBU pickers to each.
+      scope + dashboard-filter pattern; add FY/Month/office/business unit pickers to each.
 
 ### CRM system (new module — before the Call in the chain)
 - [ ] **CRM / quotation pipeline** — a front-end sales process that feeds the
       existing operations spine: **Lead / Enquiry → Quotation → Follow-up →
-      Won/Lost → (on Won) auto-create a Call/BOSS**. Scope to define with owner,
-      but likely includes: enquiry capture (client, contact, SBU, scope, source),
+      Won/Lost → (on Won) auto-create a Call/contract number**. Scope to define with owner,
+      but likely includes: enquiry capture (client, contact, business unit, scope, source),
       **quotation builder** (line items, rates, GST, validity, revisions,
       PDF/print + email to client), **follow-up reminders & status** (open /
       quoted / negotiating / won / lost with reason), a **sales pipeline board**
       + conversion dashboard, and a hand-off that turns a won quotation into a
-      **BOSS number + Call** (carrying client, SBU, PO, agreed value) so nothing
-      is re-keyed. Reuses clients/contacts, offices, SBUs, access control and the
+      **contract number + Call** (carrying client, business unit, PO, agreed value) so nothing
+      is re-keyed. Reuses clients/contacts, offices, business units, access control and the
       CSV/PDF export already built. Sits *before* Calls in the Enquiry → Quotation
       → Call → Job → Voucher → Profitability chain. **Note:** the git branch is
       already named `…quotation-management-workflow…`, but no CRM/quotation code
@@ -1456,12 +1494,12 @@ the theme builder (no colour hardcoded, no CSS variable renamed).
       provided by the user).
 - [x] **CV / hiring pipeline (deputation resourcing)** — DONE. New "Hiring" tab.
       Add a candidate CV (name, trade→skill, client, against-call, proposed site,
-      SBU, designation, source [asset/freelancer/sub-con], experience, rate, CV
+      business unit, designation, source [asset/freelancer/sub-con], experience, rate, CV
       link, CV-received date). Move through **CV received → Submitted to client →
       Shortlisted → Interview → Hold / Reject / Accept(=Hired) / Withdrawn**, each
       transition logged with a remark + who/when (full history on the candidate).
       On **Accept** you can tick "add to Inspectors" and the person is created as
-      an inspector (carrying trade/skill/SBU/designation and the freelancer/
+      an inspector (carrying trade/skill/business unit/designation and the freelancer/
       sub-con type) ready for deputation-job allocation. Stage filter chips +
       counts on the list. Tables: `candidates`, `candidate_events`.
 
@@ -1479,11 +1517,11 @@ the theme builder (no colour hardcoded, no CSS variable renamed).
       any office) as a managing HQ — the old `is_ahmedabad` "managing office" idea
       is being unwound. This is a role/permission + org redesign for a dedicated
       pass; needs the owner's intended per-office roles before building.
-- [x] **Multi-SBU cost distribution in dashboards** — DONE. The Financial
-      dashboard's "By SBU" panel now shows Credit vs **distributed loaded cost**
-      vs Net per SBU. Each active engineer's monthly loaded cost (CTC/12 + 8%
-      overhead) is split equally across the SBUs they're tagged to, respecting
-      SBU scope + the SBU/inspector filter. Salary-gated (`data.salary`).
+- [x] **Multi-business unit cost distribution in dashboards** — DONE. The Financial
+      dashboard's "By business unit" panel now shows Credit vs **distributed loaded cost**
+      vs Net per business unit. Each active engineer's monthly loaded cost (CTC/12 + 8%
+      overhead) is split equally across the business units they're tagged to, respecting
+      business unit scope + the business unit/inspector filter. Salary-gated (`data.salary`).
 
 
 - [ ] **Reminder cron jobs** — set up the two cPanel Cron entries (07:00 report-due,
@@ -1509,13 +1547,13 @@ the theme builder (no colour hardcoded, no CSS variable renamed).
 - [x] Project deputation → client sites dropdown (shown only for deputation).
 - [x] Executing-branch confirmation status on the call.
 - [x] PO line items: manpower/site/trade→subcategory + GST/Tax/Total + rollup;
-      activity per line respecting the PO's SBU; multi-SBU on the PO.
+      activity per line respecting the PO's business unit; multi-business unit on the PO.
 - [x] Projects tab lists the partner's calls.
 - [x] City light auto-correct; Type-of-inspection 'Other' free text on the call.
 
 ## Modules C / D / E — not yet started
 
-- [ ] C: Logo upload + editable theme (kept legible); per-SBU expense headings.
+- [ ] C: Logo upload + editable theme (kept legible); per-business unit expense headings.
 - [ ] D: inspection lifecycle/status flow; designations master (Inspector,
       Sr. Inspector, Sr. Executive…); back-office staff with costing (CTC,
       allowances).
@@ -1530,13 +1568,13 @@ the theme builder (no colour hardcoded, no CSS variable renamed).
       total/profit, the job-detail expense table, and the Financial dashboard's
       "Expenses by heading" breakdown. Extras are stored per expense row as JSON
       (`expenses.extra`), so nothing about the fixed 5 columns changed — fully
-      backward-compatible. *Remaining refinement:* scope headings **per SBU**
-      (make `expense_heading` a child list under SBU) — small follow-up.
+      backward-compatible. *Remaining refinement:* scope headings **per business unit**
+      (make `expense_heading` a child list under business unit) — small follow-up.
 - [ ] **Persona landing pages** — today all four dashboard families live on one
       /reports page with each section gated by permission (so each person sees
       only their allowed sections). A future refinement gives each role a
-      tailored default landing layout (Director = office comparison, SBU Head =
-      SBU-across-offices, etc.).
+      tailored default landing layout (Director = office comparison, Business Unit Head =
+      business unit-across-offices, etc.).
 
 ## Nice-to-have / minor
 
@@ -1559,7 +1597,7 @@ Audited first (no code), reported, then built to the agreed decisions.
 - **Terminology engine** `lib/terms.php` + `/terminology`: 27 business nouns,
   each renameable once and followed everywhere. Shipped vocabulary: Client,
   Quote, Inspection Call, Deputation, Report, Inspection Engineer + User, IBO,
-  SBU, BOSS Number, Man-day; Vendor / Manufacturer / Supplier / Sub-vendor all
+  business unit, contract Number, Man-day; Vendor / Manufacturer / Supplier / Sub-vendor all
   kept as distinct parties.
 - **One heading standard** across all 55 screens; sidebar label = the heading it
   opens; emoji and trailing spaces removed from card titles.
@@ -1612,14 +1650,14 @@ database as well as a fresh one.
 
 New call
 - Client → quotation → contract number; the quote's line items are listed and
-  the call can be tied to one. SBU, activity, type of inspection, product,
+  the call can be tied to one. business unit, activity, type of inspection, product,
   billable value and basis all inherit from the quote (blanks only, on edit).
 - Up to 5 visit dates, or a weekday pattern to an end date that expands into
   real dates — all editable afterwards.
 - Cross-office credit explained in the offices' own names, on the form and in
   the refusal. Every office both contracts and executes.
 - Clickable shared folder / drive link, carried to the deputation.
-- Region shown only to SBU heads and the Business Director.
+- Region shown only to business unit heads and the Business Director.
 
 Call register
 - Executing office, activity, credit to give, coordinator, engineer, received /
@@ -1639,7 +1677,7 @@ Allocate
 - "Free to allocate" = free today AND tomorrow only.
 - Date check: pick a date + days needed -> who is free, for how long, and what
   they are on next; whole-period cover highlighted; 45-day horizon.
-- Filters: name, office, SBU, status; plus a month grid (free / on job / leave /
+- Filters: name, office, business unit, status; plus a month grid (free / on job / leave /
   other per day, with a free-day count).
 - Look-ahead reads open deputations (scheduled day, start-end period, and the
   deputation's visit dates) plus manual day statuses - the same sources as the

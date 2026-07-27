@@ -128,10 +128,10 @@
       <select class="form-control searchable" id="insp_sel" name="inspection_type"><option value="">—</option>
         <?php foreach (lk_options_or('inspection_type', INSPECTION_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= $curInsp===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff"><label>SBU <span class="muted">(from call)</span></label>
+    <div class="ff"><label><?= e(T("sbu")) ?> <span class="muted">(from call)</span></label>
       <select class="form-control" id="sbu_sel" name="sbu"><option value="">—</option><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= $curSbu===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Activity code <span class="muted">(from call)</span></label>
-      <select class="form-control" id="activity_sel" name="activity_id"><option value="">— pick SBU first —</option>
+      <select class="form-control" id="activity_sel" name="activity_id"><option value="">— pick <?= e(Tl("sbu")) ?> first —</option>
         <?php if ($curActRow) echo '<option value="'.(int)$curActRow['id'].'" selected>'.e($curActRow['label']).'</option>'; ?>
       </select></div>
 
@@ -401,6 +401,7 @@
 </form>
 <script>
 window.ACTIVITY = <?= json_encode($act) ?>;
+window.TERM_SBU = <?= json_encode(Tl('sbu')) ?>;
 (function(){
   // §b.vi — up to 20 visit dates.
   var box=document.getElementById('jdates'), add=document.getElementById('adddate');

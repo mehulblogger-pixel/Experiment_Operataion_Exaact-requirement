@@ -12,14 +12,14 @@
 //  This replaces it with real figures, allocated on rules the company chooses:
 //
 //    Production staff (inspection engineers)
-//      · days they worked  → that job's SBU and activity code
-//      · days they did not → split by the SBU mix of the work they did do that
+//      · days they worked  → that job's Business Unit and activity code
+//      · days they did not → split by the Business Unit mix of the work they did do that
 //                            month; if there was none, by a method the admin
 //                            picks
-//      Every rupee of their salary lands on an SBU. That is the test.
+//      Every rupee of their salary lands on a business unit. That is the test.
 //
 //    Everybody else (branch manager, coordinator, accountant, back office)
-//      · a percentage split across the branch's SBUs, set per month on their
+//      · a percentage split across the branch's Business Units, set per month on their
 //        own record. Not entered this month? Last month's carries forward.
 //
 //    Office costs that are not salary (rent, electricity, laptops, contingency)
@@ -33,17 +33,17 @@
 //  must not silently rewrite August.
 // ===========================================================================
 
-// --- how an expense head spreads across the SBUs of an office --------------
+// --- how an expense head spreads across the Business Units of an office --------------
 const ALLOC_BASES = [
-    'EQUAL'     => 'Equally across the SBUs in this office',
+    'EQUAL'     => 'Equally across the business units in this office',
     'MANDAYS'   => 'By man-days worked that month',
     'REVENUE'   => 'By revenue earned that month',
-    'HEADCOUNT' => 'By the number of people in each SBU',
+    'HEADCOUNT' => 'By the number of people in each business unit',
 ];
 // --- what to do with an inspector who did no chargeable work at all --------
 const IDLE_BASES = [
-    'OFFICE_MIX' => 'By the office’s overall SBU mix that month',
-    'EQUAL'      => 'Equally across the SBUs in this office',
+    'OFFICE_MIX' => 'By the office’s overall business unit mix that month',
+    'EQUAL'      => 'Equally across the business units in this office',
     'OWN_SPLIT'  => 'By a fixed percentage set on their own record',
 ];
 function office_idle_basis($officeId) {
@@ -58,8 +58,8 @@ function costing_migrate() {
     static $done = false; if ($done) return; $done = true;
     $pk = (db_driver() === 'sqlite') ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'INT AUTO_INCREMENT PRIMARY KEY';
 
-    // Which SBUs actually operate in this office. Without this there is no
-    // answer to "show me ten boxes, one per SBU in the branch".
+    // Which Business Units actually operate in this office. Without this there is no
+    // answer to "show me ten boxes, one per Business Unit in the branch".
     ensure_column('offices', 'sbus',       "VARCHAR(300) DEFAULT ''");
     ensure_column('offices', 'idle_basis', "VARCHAR(20) DEFAULT ''");
 
@@ -89,7 +89,7 @@ function costing_migrate() {
             id $pk, office_id INT, yr INT, mon INT, head_id INT,
             amount DECIMAL(14,2) DEFAULT 0, notes VARCHAR(255) DEFAULT '',
             set_by VARCHAR(120) DEFAULT '', set_at VARCHAR(30) DEFAULT '')");
-        // The frozen answer. One row per month per office per SBU per source.
+        // The frozen answer. One row per month per office per Business Unit per source.
         db()->exec("CREATE TABLE IF NOT EXISTS cost_allocations (
             id $pk, yr INT, mon INT, office_id INT, sbu VARCHAR(40),
             activity VARCHAR(60) DEFAULT '', boss_id INT NULL, job_id INT NULL,
@@ -230,14 +230,14 @@ function office_expenses_copy($officeId, $fromYr, $fromMon, $toYr, $toMon) {
 }
 
 // ---------------------------------------------------------------------------
-//  The SBUs of an office
+//  The Business Units of an office
 // ---------------------------------------------------------------------------
 function office_sbus($officeId) {
     $all = lk_options_or('sbu', OPS_SBUS);
     $csv = $officeId ? trim((string)ops_val("SELECT sbus FROM offices WHERE id=?", [$officeId])) : '';
     $codes = array_values(array_filter(array_map('trim', explode(',', $csv))));
     $codes = array_values(array_intersect($codes, array_keys($all)));
-    // An office that has not said which SBUs it runs is treated as running all
+    // An office that has not said which Business Units it runs is treated as running all
     // of them — otherwise its costs would have nowhere to land.
     if (!$codes) $codes = array_keys($all);
     $out = [];
@@ -345,7 +345,7 @@ function costing_inspector_month($inspectorId, $yr, $mon) {
             'available' => $available, 'idle' => max(0, $available - $productive)];
 }
 
-// The SBU mix of an office for a month — used when an inspector did nothing
+// The Business Unit mix of an office for a month — used when an inspector did nothing
 // chargeable at all, so their salary still lands somewhere rather than vanishing.
 function costing_office_mix($officeId, $yr, $mon) {
     $from = sprintf('%04d-%02d-01', $yr, $mon);
@@ -468,10 +468,10 @@ function costing_run($yr, $mon, $officeId, $commit = false) {
 
     // ---- 4. sub-contractors: paid for one job, so it lands on that job -----
     //
-    //  It sits on the job, on its contract, on its SBU and on its activity
+    //  It sits on the job, on its contract, on its Business Unit and on its activity
     //  code — the same four things a worked day lands on. Nothing is spread:
     //  a sub-contractor is the least ambiguous cost in the business, and
-    //  averaging it across SBUs would only make it harder to see.
+    //  averaging it across Business Units would only make it harder to see.
     $from = sprintf('%04d-%02d-01', $yr, $mon);
     $to   = date('Y-m-t', strtotime($from));
     $subs = ops_all("SELECT j.id, j.job_code, j.sbu, j.activity_id, j.boss_id, j.contract_number,
@@ -519,7 +519,7 @@ function person_split_for_inspector($inspectorId, $yr, $mon) {
     return $uid ? person_split($uid, $yr, $mon) : [];
 }
 
-// Revenue earned per SBU in the month — for heads allocated by revenue.
+// Revenue earned per Business Unit in the month — for heads allocated by revenue.
 function costing_office_revenue($officeId, $yr, $mon) {
     $from = sprintf('%04d-%02d-01', $yr, $mon);
     $to   = date('Y-m-t', strtotime($from));
@@ -535,9 +535,9 @@ function costing_office_revenue($officeId, $yr, $mon) {
     }
     return $out;
 }
-// People per SBU — for heads allocated by headcount. An inspection engineer
-// counts towards the SBUs they actually worked in; everybody else towards the
-// SBUs their split names.
+// People per Business Unit — for heads allocated by headcount. An inspection engineer
+// counts towards the Business Units they actually worked in; everybody else towards the
+// Business Units their split names.
 function costing_office_headcount($officeId, $yr, $mon) {
     $out = costing_office_mix($officeId, $yr, $mon);   // engineers, by where they worked
     foreach ($out as $k => $v) $out[$k] = 0;           // want heads, not days
@@ -566,7 +566,7 @@ function office_uses_real_costs($officeId) {
 }
 function office_cost_basis_text($officeId) {
     return office_uses_real_costs($officeId)
-        ? 'Real salaries and office costs, allocated to SBUs.'
+        ? 'Real salaries and office costs, allocated to business units.'
         : 'Still on the old overhead percentage — no salaries or office costs have been entered for this '
           . Tl('office') . ' yet.';
 }
@@ -583,7 +583,7 @@ function user_cost_vars($user) {
     $officeId  = (int)($user['home_office_id'] ?? 0);
     $uid       = (int)($user['id'] ?? 0);
     $yr = (int)date('Y'); $mon = (int)date('n');
-    // A person with no office yet still needs boxes, so fall back to every SBU.
+    // A person with no office yet still needs boxes, so fall back to every Business Unit.
     $sbus = $officeId ? office_sbus($officeId) : lk_options_or('sbu', OPS_SBUS);
     // A form handed back after a rejected save must show what was typed, not
     // what is in the database.
@@ -623,7 +623,7 @@ function person_split_save($userId, $yr, $mon, array $pcts, $officeId = 0) {
 //  Month-end run, and the profit & loss it feeds
 // ===========================================================================
 
-// Revenue billed per SBU for a month. A job counts in the month its inspection
+// Revenue billed per Business Unit for a month. A job counts in the month its inspection
 // finished — the month the work was done, not the month somebody got round to
 // raising the invoice.
 function costing_sbu_revenue($officeId, $yr, $mon) {
@@ -646,7 +646,7 @@ function costing_sbu_revenue($officeId, $yr, $mon) {
     return $out;
 }
 
-// What was actually stored by the last run, per SBU and per kind.
+// What was actually stored by the last run, per Business Unit and per kind.
 function costing_stored_by_sbu($officeId, $yr, $mon) {
     $rows = ops_all("SELECT sbu, source_kind, COALESCE(SUM(amount),0) v FROM cost_allocations
                      WHERE office_id=? AND yr=? AND mon=? GROUP BY sbu, source_kind",
@@ -666,7 +666,7 @@ function costing_stored_by_sbu($officeId, $yr, $mon) {
 }
 
 // Cost that names an activity code — an engineer's days on that work. Shared
-// costs stop at the SBU line by design, so they are absent here on purpose.
+// costs stop at the Business Unit line by design, so they are absent here on purpose.
 function costing_stored_by_activity($officeId, $yr, $mon) {
     $rows = ops_all("SELECT activity, sbu, COALESCE(SUM(amount),0) v FROM cost_allocations
                      WHERE office_id=? AND yr=? AND mon=? AND activity <> '' GROUP BY activity, sbu",
@@ -696,7 +696,7 @@ function costing_stored_by_activity($officeId, $yr, $mon) {
     return $out;
 }
 
-// One line per BOSS number worked in the month: what it billed and what it
+// One line per contract number worked in the month: what it billed and what it
 // directly caused. Deliberately NOT loaded with a share of the branch — an
 // order is judged on its own costs, and the branch is judged separately.
 function costing_boss_lines($officeId, $yr, $mon) {
@@ -811,7 +811,7 @@ function ops_cost_run($method) {
 }
 
 // ---------------------------------------------------------------------------
-//  Screen: SBU / activity / BOSS profit & loss
+//  Screen: business unit / activity / contract profit & loss
 // ---------------------------------------------------------------------------
 function ops_sbu_pl() {
     ops_require(can('data.profitability') || can_see_salary() || is_admin_level(),
@@ -847,7 +847,7 @@ function ops_sbu_pl() {
     $tot = ['revenue'=>0, 'cost'=>0];
     foreach ($rows as $r) { $tot['revenue'] += $r['revenue']; $tot['cost'] += $r['cost']; }
 
-    // The activity and BOSS tables add up the same span.
+    // The activity and contract tables add up the same span.
     $byActivity = []; $byBoss = []; $storedMonths = 0;
     foreach ($months as [$y, $m]) {
         if (!$sel) break;

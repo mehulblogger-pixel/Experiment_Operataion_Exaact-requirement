@@ -14,7 +14,7 @@
 <div class="panel"><div class="kv-grid">
   <div><span class="k">Type</span><?= e(lk_options_or('requisition_type', REQ_TYPES)[$req['req_type']] ?? '') ?></div>
   <div><span class="k">Project / site</span><?= e($req['project_site'] ?: '—') ?></div>
-  <div><span class="k">SBU</span><?= e(OPS_SBUS[$req['sbu']] ?? ($req['sbu'] ?: '—')) ?></div>
+  <div><span class="k"><?= e(T("sbu")) ?></span><?= e(OPS_SBUS[$req['sbu']] ?? ($req['sbu'] ?: '—')) ?></div>
   <div><span class="k">Approval</span><?= e($req['approval_ref'] ?: '—') ?><?= $req['approval_date'] ? ' · '.e($req['approval_date']) : '' ?><?= $req['approved_by'] ? ' · by '.e($req['approved_by']) : '' ?></div>
   <?php if ($seeSal): ?><div><span class="k">Budgeted monthly cost</span><?= fmoney($req['budgeted_cost']) ?></div><?php endif; ?>
   <?php if ($req['notes']): ?><div class="kv-wide"><span class="k">Notes</span><?= e($req['notes']) ?></div><?php endif; ?>
