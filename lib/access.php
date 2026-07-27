@@ -29,7 +29,11 @@ const PERMISSIONS = [
     'dash.financial'  => 'Financial dashboard',
     'dash.utilization'=> 'Utilization dashboard',
     'dash.people'     => 'People & compliance dashboard',
-    'data.credit'     => 'See credit / revenue figures',
+    'data.credit'     => 'See the inter-office credit figures',
+    // What the branch actually keeps — the invoice less any credit passed over.
+    // Held apart from the credit itself: a coordinator has to see the credit to
+    // do their job, and does not need to see what the branch earns on it.
+    'data.revenue'    => 'See the revenue figure on a call / deputation',
     'data.salary'     => 'See salary / loaded cost',
     'data.profitability' => 'See BOSS / contract profitability',
     'ops.call.create' => 'Create / edit calls',
@@ -63,7 +67,7 @@ const PERMISSIONS = [
 // and an admin can see at a glance which area each permission belongs to.
 function permission_groups() {
     return [
-        'Dashboards & sensitive figures' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability'],
+        'Dashboards & sensitive figures' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.revenue','data.salary','data.profitability'],
         'Operations (calls & jobs)'      => ['ops.call.create','ops.job.allocate','ops.job.close','ops.call.delete','workforce.availability','workforce.report.approve'],
         'Inspection documentation (IDEMS)' => ['idems.finalize','idems.type.manage','idems.timestamp.edit','idems.audit.view'],
         'Money'                          => ['finance.reconcile'],
@@ -205,17 +209,17 @@ function role_defaults_base($role) {
         case 'MASTER_ADMIN': case 'ADMIN':
             return ['perms' => $all, 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'BUSINESS_DIRECTOR':
-            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability','org.hierarchy.view','idems.audit.view'], 'offices' => 'ALL', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.revenue','data.salary','data.profitability','org.hierarchy.view','idems.audit.view'], 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'SBU_HEAD':
-            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability','workforce.report.approve','org.hierarchy.view','idems.finalize','idems.audit.view'], 'offices' => 'ALL', 'sbus' => 'OWN'];
+            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.revenue','data.salary','data.profitability','workforce.report.approve','org.hierarchy.view','idems.finalize','idems.audit.view'], 'offices' => 'ALL', 'sbus' => 'OWN'];
         case 'BRANCH_MANAGER':
-            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.salary','data.profitability','ops.call.create','ops.job.allocate','ops.job.close','workforce.availability','workforce.report.approve','master.manage','users.manage.branch','org.hierarchy.view','idems.finalize','idems.audit.view'], 'offices' => 'OWN', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.revenue','data.salary','data.profitability','ops.call.create','ops.job.allocate','ops.job.close','workforce.availability','workforce.report.approve','master.manage','users.manage.branch','org.hierarchy.view','idems.finalize','idems.audit.view'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'BRANCH_APP_MANAGER':
             // The Branch Application Manager is the only role that may edit locked timestamps.
             return ['perms' => ['dash.operations','dash.utilization','users.manage.branch','master.manage','ops.call.delete','org.hierarchy.view','idems.type.manage','idems.timestamp.edit','idems.audit.view'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'OPERATION_MANAGER':
             // "manager under the branch manager" — may see BOSS/contract profitability
-            return ['perms' => ['dash.operations','dash.utilization','data.profitability','ops.call.create','ops.job.allocate','ops.job.close','workforce.availability','workforce.report.approve','idems.finalize'], 'offices' => 'OWN', 'sbus' => 'OWN'];
+            return ['perms' => ['dash.operations','dash.utilization','data.revenue','data.profitability','ops.call.create','ops.job.allocate','ops.job.close','workforce.availability','workforce.report.approve','idems.finalize'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'ASST_MANAGER':
             return ['perms' => ['dash.operations','ops.call.create','ops.job.allocate','workforce.availability'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'COORDINATOR':
@@ -224,11 +228,11 @@ function role_defaults_base($role) {
         case 'BUSINESS_DEV_MANAGER': case 'KEY_ACCOUNTS_MANAGER':
             return ['perms' => ['dash.operations','dash.financial','data.credit','crm.quote.create','crm.quote.send','crm.followup.manage'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'MARKETING_MANAGER':
-            return ['perms' => ['dash.operations','dash.financial','data.credit','data.profitability','crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.template.manage'], 'offices' => 'ALL', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.operations','dash.financial','data.credit','data.revenue','data.profitability','crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.template.manage'], 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'MARKETING_EXECUTIVE':
             return ['perms' => ['crm.quote.create','crm.followup.manage'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'FINANCE':
-            return ['perms' => ['dash.financial','data.credit','data.salary','data.profitability','finance.reconcile','crm.contract.register'], 'offices' => 'ALL', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.financial','data.credit','data.revenue','data.salary','data.profitability','finance.reconcile','crm.contract.register'], 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'INSPECTOR':
             return ['perms' => [], 'offices' => 'OWN', 'sbus' => 'OWN'];
     }

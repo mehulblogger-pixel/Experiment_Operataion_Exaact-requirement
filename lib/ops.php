@@ -506,6 +506,10 @@ function is_admin_level() { return in_array(user_role(), MGMT_ROLES, true); }
 function is_coordinator_level() { return is_admin_level() || in_array(user_role(), ['ASST_MANAGER','COORDINATOR'], true); }
 function is_inspector() { return user_role() === 'INSPECTOR'; }
 function can_see_salary() { return can('data.salary'); } // salary/cost visibility
+// What the branch keeps out of an invoice. Deliberately a separate permission
+// from the credit itself: a coordinator has to see the credit to do the job,
+// and has no business seeing what the branch earns on it.
+function can_see_revenue() { return can('data.revenue') || is_admin_level(); }
 // A convenient guard for handlers.
 function ops_require($ok, $msg = 'You do not have access to that screen.') {
     if (!$ok) { flash($msg, 'error'); redirect('/'); }
@@ -2572,6 +2576,13 @@ function ops_calls($route, $method) {
                 $qty = (float)$sr['claimable'];
             $b['billable_qty'] = $qty;
             if ($rate > 0) $b['billable_value'] = round($rate * $qty, 2);
+            // §credit — the credit is agreed per man-day and totalled off the
+            // same quantity, so a six-day call cannot carry one day's credit.
+            // Done here as well as in the browser: a figure that only exists if
+            // JavaScript ran is a figure that will one day be wrong.
+            $creditAuto = ($b['expected_credit_auto'] ?? '1') !== '0';
+            $creditRate = (float)($b['credit_rate'] ?? 0);
+            if ($creditAuto && $creditRate > 0) $b['expected_credit'] = round($creditRate * $qty, 2);
             // The client's expected date is the first visit, so the two never disagree.
             if ($dates && ($b['inspection_required_date'] ?? '') === '') $b['inspection_required_date'] = $dates[0];
             $fields = call_save_fields();
@@ -2741,7 +2752,7 @@ function call_save_fields() {
     return ['client_id','vendor_id','ibo_office_id','executing_office_id','region','sbu','activity_id',
         'inspection_type','inspection_type_other','site_address_id','po_id','po_line_item_id',
         'product_category','product_other','deputation_type','expected_credit','credit_type',
-        'billable_value','billable_basis','billable_rate','billable_qty','call_received_date',
+        'billable_value','billable_basis','billable_rate','billable_qty','credit_rate','call_received_date',
         'inspection_required_date','notes',
         'quotation_id','quote_line_id','contract_number','folder_link',
         'inspection_dates','schedule_end_date','schedule_weekdays',
@@ -2755,7 +2766,7 @@ function job_save_fields() {
         'random_date1','random_date2','random_date3','folder_link','contract_number','inspection_dates','boss_id',
         'engagement_type','days_count','months_count','pattern_kind','pattern_n',
         'schedule_weekdays','schedule_end_date','force_dates','manmonth_basis','manmonth_min_days',
-        'invoice_value','contracting_office_id','expected_credit','credit_type','credit_direction',
+        'invoice_value','contracting_office_id','expected_credit','credit_rate','credit_type','credit_direction',
         'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays',
         'subcon_cost','quotation_id','is_outstation'];
 }
@@ -2765,7 +2776,7 @@ function nzc_call($f, $v) {
     // "no longer outstation" could never be saved.
     if ($f === 'is_outstation') return empty($v) ? 0 : 1;
     if (in_array($f, ['client_id','vendor_id','ibo_office_id','executing_office_id','contracting_office_id','activity_id','site_address_id','po_id','po_line_item_id','quotation_id','quote_line_id'], true)) return $v === '' ? null : (int)$v;
-    if (in_array($f, ['expected_credit','billable_value','credit_required'], true)) return $v === '' ? 0 : $v;
+    if (in_array($f, ['expected_credit','billable_value','credit_required','credit_rate'], true)) return $v === '' ? 0 : $v;
     // The counts only exist for the shape that uses them; a box that was never
     // shown posts nothing, and nothing means none.
     if (in_array($f, ['days_count','months_count','pattern_n','manmonth_min_days'], true)) return $v === '' ? 0 : (int)$v;
@@ -3494,13 +3505,20 @@ function ops_jobs($route, $method) {
             // JavaScript ran is a figure that will one day be wrong.
             $invAuto = ($b['invoice_value_auto'] ?? '1') !== '0';
             $unitRate = (float)($call['billable_rate'] ?? 0);
+            $mdQty = (float)($b['mandays'] ?? 0);
+            if ($mdQty <= 0) $mdQty = max(1, count($jdates));
             if ($invAuto && $unitRate > 0) {
-                $md = (float)($b['mandays'] ?? 0);
-                if ($md <= 0) $md = max(1, count($jdates));
-                $b['invoice_value'] = round($unitRate * $md, 2);
+                $b['invoice_value'] = round($unitRate * $mdQty, 2);
             } elseif (($b['invoice_value'] ?? '') === '') {
                 $b['invoice_value'] = (float)($call['billable_value'] ?? 0);
             }
+            // The credit is priced per man-day off the same man-days.
+            if (($b['credit_rate'] ?? '') === '') $b['credit_rate'] = (float)($call['credit_rate'] ?? 0);
+            $jCreditAuto = ($b['expected_credit_auto'] ?? '1') !== '0';
+            $jCreditRate = (float)($b['credit_rate'] ?? 0);
+            if ($jCross && $jCreditAuto && $jCreditRate > 0)
+                $b['expected_credit'] = round($jCreditRate * $mdQty, 2);
+            if (!$jCross) $b['credit_rate'] = 0;
             if ($jCross && (($b['expected_credit'] ?? '') === '' || (float)$b['expected_credit'] <= 0)) {
                 view('ops/job_form', array_merge(call_job_form_vars($job, $call),
                     ['error' => 'This ' . Tl('job') . ' is executed by a different ' . Tl('office')
@@ -3721,7 +3739,7 @@ function nzc($f, $v) {
     if ($f === 'is_outstation') return empty($v) ? 0 : 1;   // an unticked box posts nothing
     $nullable = ['executing_office_id','contracting_office_id','inspector_id','subcon_id','boss_id','activity_id','report_custom_days','quotation_id'];
     if (in_array($f, $nullable) && $v === '') return null;
-    if (in_array($f, ['expected_credit','invoice_value','mandays','subcon_cost']) && $v === '') return 0;
+    if (in_array($f, ['expected_credit','invoice_value','credit_rate','mandays','subcon_cost']) && $v === '') return 0;
     if (in_array($f, ['days_count','months_count','pattern_n','manmonth_min_days'], true)) return $v === '' ? 0 : (int)$v;
     return $v;
 }

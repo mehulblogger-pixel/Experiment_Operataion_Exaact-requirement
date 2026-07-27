@@ -1042,6 +1042,57 @@
       if (note) note.textContent = r.toLocaleString() + ' per ' + basis + ' × ' + d + ' = ' + inv.value
                                  + '. Type over it if this one is billed differently.';
     }
+    // ---- the credit, priced the same way, and then the revenue -------------
+    var cRate = document.getElementById('j_credit_rate'),
+        cTot  = document.getElementById('j_credit'),
+        cAuto = document.getElementById('j_credit_auto'),
+        cNote = document.getElementById('j_credit_note'),
+        revBox = document.getElementById('j_rev'),
+        isCross = (document.getElementById('j_is_cross') || {}).value === '1';
+    var cTouched = cAuto ? cAuto.value === '0' : false;
+    if (cTot) cTot.addEventListener('input', function () {
+      cTouched = true; if (cAuto) cAuto.value = '0';
+      if (cNote) cNote.textContent = 'Typed by hand — saved exactly as entered.';
+      revenue();
+    });
+    function creditRecalc() {
+      if (!cTot || !cRate) return;
+      var d = days(), r = parseFloat(cRate.value || '0');
+      if (!cTouched && r > 0) {
+        cTot.value = (Math.round(r * d * 100) / 100).toFixed(2);
+        if (cNote) cNote.textContent = r.toLocaleString() + ' per man-day × ' + d + ' = ' + cTot.value
+          + '. Type over it if this one is credited differently.';
+      }
+      revenue();
+    }
+    // Invoice − credit. The one figure a branch is judged on; the box is only
+    // on the page for somebody allowed to see it.
+    function revenue() {
+      if (!revBox) return;
+      var inv = parseFloat(inv0() || '0');
+      var cred = isCross ? (parseFloat(cTot ? cTot.value || '0' : '0') || 0) : 0;
+      if (!(inv > 0)) { revBox.style.display = 'none'; return; }
+      var rev = Math.round((inv - cred) * 100) / 100;
+      var money = function (v) { return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+      revBox.style.display = '';
+      revBox.className = 'msg ' + (rev < 0 ? 'msg-error' : 'msg-success');
+      revBox.innerHTML = isCross
+        ? '<strong>Revenue to the ' + (window.__officeWord || 'office') + ' holding the order: ' + money(rev) + '</strong>'
+          + ' <span class="muted">— total invoice ' + money(inv) + ' less the ' + money(cred)
+          + ' credited across. The executing ' + (window.__officeWord || 'office') + ' books the '
+          + money(cred) + '; the two add back to the invoice.</span>'
+          + (rev < 0 ? '<div><strong>The credit is more than the invoice.</strong> Check both figures.</div>' : '')
+        : '<strong>Revenue: ' + money(rev) + '</strong>'
+          + ' <span class="muted">— one ' + (window.__officeWord || 'office') + ' holds the order and does the work,'
+          + ' so the whole invoice value is its revenue.</span>';
+    }
+    function inv0() { return inv ? inv.value : '0'; }
+    if (cRate) cRate.addEventListener('input', creditRecalc);
+    if (inv) inv.addEventListener('input', revenue);
+
+    var baseRecalc = recalc;
+    recalc = function () { baseRecalc(); creditRecalc(); };
+
     md.addEventListener('input', recalc);
     md.addEventListener('change', recalc);
     // The schedule preview changes the day count when man-days is left at 0.
