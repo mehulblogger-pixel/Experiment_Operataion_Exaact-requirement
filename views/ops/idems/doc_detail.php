@@ -173,6 +173,60 @@
 <p class="muted" style="margin:10px 2px">No form is designed for this report type yet<?= (is_master()||can('idems.type.manage')) ? ' — use "Design this form" above to add sections &amp; fields.' : '.' ?></p>
 <?php endif; ?>
 
+<?php // ISO/IEC 17020 §6.2 — the instruments this report relied on. Naming them
+      // here is what turns the equipment register from paperwork into evidence,
+      // and it is what the finalise gate reads. ?>
+<?php if (function_exists('report_equipment')): $req = report_equipment($doc['id']);
+        $eqDate = report_equipment_date($doc);
+        $eqBlock = report_equipment_block($doc);
+        $canEq = !$doc['finalized'] && (can('mod.equipment.view') || is_master()); ?>
+<div class="panel" id="equipment">
+  <div class="ctitle" style="margin-top:0"><h3>📏 Measuring &amp; test equipment used <span class="muted">(<?= count($req) ?>)</span></h3>
+    <a href="/equipment">Register →</a></div>
+  <?php if ($eqBlock !== ''): ?>
+    <div class="msg msg-error" style="margin:6px 0"><?= e($eqBlock) ?>
+      This <?= e(Tl('report')) ?> <strong>will not issue</strong> until it is corrected.</div>
+  <?php elseif ($req): ?>
+    <div class="msg msg-ok" style="margin:6px 0">Every instrument named was within calibration on <?= e(fdate($eqDate)) ?>.</div>
+  <?php else: ?>
+    <p class="muted" style="margin:0 0 8px">None recorded. If a measurement was taken, name the instrument —
+      an assessor will ask which one was used and for its certificate.</p>
+  <?php endif; ?>
+  <?php if ($req): ?>
+  <table class="grid">
+    <tr><th>Code</th><th>Instrument</th><th>Serial</th><th>Used on</th><th>Calibration</th><?php if ($canEq): ?><th></th><?php endif; ?></tr>
+    <?php foreach ($req as $r): $why = equipment_block((int)$r['equipment_id'], $r['used_on'] ?: $eqDate); ?>
+      <tr><td><strong><?= e($r['code']) ?></strong></td><td><?= e($r['name']) ?></td>
+        <td><?= e($r['serial_no'] ?: '—') ?></td>
+        <td><?= e($r['used_on'] ? fdate($r['used_on']) : fdate($eqDate)) ?></td>
+        <td><?= $why === '' ? '<span class="pill p-ok">in calibration</span>'
+                            : '<span class="pill p-bad" title="' . e($why) . '">not valid</span>' ?></td>
+        <?php if ($canEq): ?>
+        <td><form method="post" action="/report-equip-del" style="margin:0">
+          <input type="hidden" name="doc_id" value="<?= (int)$doc['id'] ?>">
+          <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+          <button class="btn small secondary" type="submit">Remove</button></form></td>
+        <?php endif; ?></tr>
+    <?php endforeach; ?>
+  </table>
+  <?php endif; ?>
+  <?php if ($canEq): $avail = equipment_all(); ?>
+  <form method="post" action="/report-equip-add" class="inline-add" style="margin-top:10px">
+    <input type="hidden" name="doc_id" value="<?= (int)$doc['id'] ?>">
+    <div class="ff"><label>Instrument</label>
+      <select class="form-control searchable" name="equipment_id" required>
+        <option value="">—</option>
+        <?php foreach ($avail as $a): $bad = equipment_block($a['id'], $eqDate); ?>
+          <option value="<?= (int)$a['id'] ?>"><?= e($a['code'] . ' — ' . $a['name']) ?><?= $bad ? ' (not valid on this date)' : '' ?></option>
+        <?php endforeach; ?>
+      </select></div>
+    <div class="ff"><label>Used on</label><input class="form-control" type="date" name="used_on" value="<?= e($eqDate) ?>"></div>
+    <button class="btn small" type="submit">Add</button>
+  </form>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php if (is_master() || can('idems.timestamp.edit')): ?>
 <div class="panel" style="border:1px dashed var(--line)">
   <div class="ctitle" style="margin-top:0"><h3>🔧 Adjust dates <span class="muted" style="font-weight:400">— Branch Application Manager only</span></h3></div>

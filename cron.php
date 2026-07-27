@@ -61,6 +61,13 @@ if (function_exists('joblock_sweep')) {
 }
 
 // Send any due quotation follow-up e-mails (3/6/9-day, fortnight, month).
+// ISO/IEC 17020 §6.2 — an instrument that falls out of calibration silently is
+// the whole problem. The same 30-day window as the personnel certificates.
+if (function_exists('equipment_run_cal_reminders')) {
+    $cal = equipment_run_cal_reminders();
+    echo "Calibration reminders sent: $cal\n";
+}
+
 if (function_exists('crm_run_followups')) {
     $fu = crm_run_followups();
     echo "Quote follow-ups sent: $fu\n";

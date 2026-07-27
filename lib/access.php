@@ -110,6 +110,7 @@ const ACCESS_MODULES = [
     'reconcile'     => 'Attendance reconcile',
     'clients'       => 'Clients',
     'vendors'       => 'Vendors',
+    'equipment'     => 'Equipment & calibration',
     'masters'       => 'Masters',
     'overheads'     => 'Overheads (office finance)',
     'reports'       => 'Dashboards / reports',
