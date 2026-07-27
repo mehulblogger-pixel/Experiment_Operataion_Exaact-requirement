@@ -28,7 +28,7 @@
 // Saleable module => [label, what it covers, the fine-grained access modules]
 const PRODUCT_MODULES = [
     'operations' => ['Operations', 'Inspection calls, deputations, scheduling, availability',
-                     ['calls', 'jobs', 'reconcile', 'vouchers', 'equipment'], true],
+                     ['calls', 'jobs', 'reconcile', 'vouchers', 'equipment', 'competence'], true],
     'admin'      => ['Administration', 'Masters, users, offices, settings, parties',
                      ['masters', 'users', 'settings', 'clients', 'vendors', 'overheads', 'reports'], true],
     'sales'      => ['Sales & CRM', 'Inquiries, quotations, approvals, sales dashboards',

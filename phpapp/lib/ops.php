@@ -1739,6 +1739,8 @@ function ops_module_gate($route) {
         'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'preflight'=>'settings',
+        'competence'=>'competence','auth-add'=>'competence','auth-status'=>'competence',
+        'auth-enforce'=>'competence','witness-add'=>'competence',
         'equipment'=>'equipment','equip-new'=>'equipment','equip-edit'=>'equipment',
         'equip-cal-add'=>'equipment','equip-cal-del'=>'equipment','equip-cert'=>'equipment',
         'report-equip-add'=>'equipment','report-equip-del'=>'equipment',
@@ -1882,6 +1884,8 @@ function ops_dispatch($route, $method) {
             ops_user_retire($method); return true;
         case $route === 'user-2fa-reset':
             ops_user_twofa_reset($method); return true;
+        case $route === 'competence' || strncmp($route, 'auth-', 5) === 0 || $route === 'witness-add':
+            return ops_competence($route, $method);
         case strncmp($route, 'equip', 5) === 0 || $route === 'report-equip-add' || $route === 'report-equip-del':
             return ops_equipment($route, $method);
         case $route === 'preflight':
@@ -3659,6 +3663,22 @@ function ops_jobs($route, $method) {
                 } else {
                     $b['cert_override_note'] = '';   // nothing to excuse
                     $b['cert_override_by'] = '';
+                }
+                // §6.1 again, the other half: a valid certificate is not the
+                // same as permission to do THIS work. Only checked when the
+                // body has switched enforcement on — see lib/competence.php for
+                // why that is deliberately opt-in.
+                if (function_exists('auth_block')) {
+                    $aWhy = auth_block((int)$b['inspector_id'],
+                                       (string)($b['inspection_type'] ?? $call['inspection_type'] ?? ''),
+                                       (int)($b['activity_id'] ?? $call['activity_id'] ?? 0),
+                                       (int)($call['client_id'] ?? 0), $onDate);
+                    if ($aWhy !== '') {
+                        view('ops/job_form', array_merge(call_job_form_vars($job, $call),
+                            ['error' => $aWhy . ' Grant an authorisation under Competence & authorisation, '
+                                      . 'or switch enforcement off if the matrix is not populated yet.']));
+                        return;
+                    }
                 }
             }
             // The contract number comes down the chain and the register fills

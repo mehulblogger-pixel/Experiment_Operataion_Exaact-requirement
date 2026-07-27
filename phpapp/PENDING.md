@@ -2,6 +2,61 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ ROADMAP 3.2a — the competence & authorisation spine (§6.1) (July 2026)
+
+Built into `lib/competence.php` beside the certificate gate, because "is this
+person allowed" should have one home. Tables `authorisations`,
+`witness_assessments`, `qualifications`.
+
+**The distinction the whole module rests on:**
+
+> a **qualification** is what somebody *has* — CSWIP 3.1, valid to 2027
+> an **authorisation** is what we *permit* — may sign final inspections for this
+> client, to March, at this level
+
+§6.1 asks for the second. The app only had the first.
+
+**Four decisions, all written into the file because they will be argued about:**
+
+1. **Enforcement is opt-in and default OFF.** Switching it on for an existing
+   customer with an empty matrix would make every allocation fail on the same
+   afternoon. The screen **refuses to switch it on** while nobody is authorised,
+   and when it is switched on it says how many people it has just stopped.
+2. **Scope reuses the app's own masters** — type of inspection (37 configurable
+   values already), activity code, client. Inventing parallel industry / asset /
+   activity taxonomies would mean three more lists to keep true and no link to
+   the work actually being scheduled.
+3. **Suspended, never deleted.** A withdrawn permission is evidence of a
+   decision, on a date, by somebody. Changing a status **requires a reason** —
+   refused without one.
+4. **Levels are a list, not an enum** — Trainee through Technical Authority
+   ships as a starting point and is editable.
+
+**It maintains itself.** From cron: an authorisation past its end date becomes
+EXPIRED; one belonging to somebody whose *required* certificate has lapsed is
+SUSPENDED automatically, with the certificate named in the reason. A witnessed
+assessment recorded as anything other than "competent" **suspends that person's
+authorisations** — which is the point of watching somebody work rather than
+filing a form about it.
+
+**Audit-readiness** is the matrix screen itself: people, how many hold a live
+authorisation, how many have a lapsed required certificate, how many are due a
+witnessed check — the four questions in the order an assessor asks them.
+
+*Verified:* 26 rule tests (including that a person with no authorisation is
+**still allocatable while enforcement is off** — the property that stops this
+breaking every existing install), 13 browser checks, lint green (144 files),
+83 screens, and all 12 other suites still pass.
+
+### Still to come — 3.2b, from the owner's fuller specification
+- [ ] Competency scoring, learning management, technical knowledge library.
+- [ ] Deliberately **not** built as "AI": these are rules engines. Calling them
+      AI invites an assessor to ask for the AI validation record that
+      ISO/IEC 17020:2026 now requires for AI tools. Same behaviour, no exposure.
+- [ ] Personal data in the fuller spec (passport, visa, medical fitness, police
+      verification, risk category) needs a lawful basis, a retention limit and a
+      separate permission under the DPDP Act before it is stored at all.
+
 ## ✅ ROADMAP 3.1 — equipment & calibration (ISO/IEC 17020 §6.2) (July 2026)
 
 `lib/equipment.php`, `equipment` · `equipment_calibrations` · `report_equipment`.

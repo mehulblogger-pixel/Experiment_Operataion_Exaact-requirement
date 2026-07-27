@@ -216,6 +216,9 @@ try {
     db()->query("SELECT id FROM equipment LIMIT 1");
     db()->query("SELECT id FROM equipment_calibrations LIMIT 1");
     db()->query("SELECT id FROM report_equipment LIMIT 1");
+    db()->query("SELECT id FROM authorisations LIMIT 1");
+    db()->query("SELECT id FROM witness_assessments LIMIT 1");
+    db()->query("SELECT id FROM qualifications LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which
     // runs the same idempotent boot() and clears it. Each check is self-cancelling.

@@ -111,6 +111,7 @@ const ACCESS_MODULES = [
     'clients'       => 'Clients',
     'vendors'       => 'Vendors',
     'equipment'     => 'Equipment & calibration',
+    'competence'    => 'Competence & authorisation',
     'masters'       => 'Masters',
     'overheads'     => 'Overheads (office finance)',
     'reports'       => 'Dashboards / reports',
