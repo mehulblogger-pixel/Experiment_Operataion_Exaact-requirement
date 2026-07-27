@@ -2,6 +2,37 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🧮 RATE × DAYS, ON BOTH SIDES, AND THEN THE REVENUE (July 2026)
+
+The client charge and the inter-office credit are agreed the same way — a rate
+per man-day — so they are entered and totalled the same way, and the one figure
+that follows from both is stated rather than left to be worked out on paper.
+
+**On the call and on the allocation:**
+
+| | |
+|---|---|
+| Unit rate | per man-day, from the order line |
+| Total invoice value | rate × days |
+| Credit per man-day | what the executing branch is paid for each day |
+| Total credit | credit rate × days |
+| **Revenue** | **total invoice − credit** |
+
+Worked example, verified end to end: 6 days at 3,000 credited at 1,800 a day →
+invoice 18,000, credit 10,800, revenue **7,200**. Change the man-days to 8 at
+allocation and all three move: 24,000, 14,400, **9,600**. Either total can be
+typed over when that one is billed or credited differently, and typing stops it
+being recalculated.
+
+Only the credit total used to be stored. A six-day deputation could carry one
+day's credit with nothing on screen to show which figure was wrong.
+
+**Revenue has its own permission — `data.revenue`.** A coordinator has to see
+the credit to do the job and has no business seeing what the branch earns on it.
+Where it is not granted the screen says so rather than leaving a blank. Granted
+by default to the roles that already had contract profitability; the credit
+boxes are untouched.
+
 ## 💰 THE MAN-DAYS ARE THE QUANTITY (July 2026)
 
 Six man-days entered on the allocate screen, against an order line at 3,000 a

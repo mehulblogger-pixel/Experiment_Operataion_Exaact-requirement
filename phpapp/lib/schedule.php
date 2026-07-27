@@ -80,6 +80,10 @@ function sched_migrate() {
         // What a man-month means on THIS engagement, carried from the client.
         ensure_column($t, 'manmonth_basis', "VARCHAR(20) DEFAULT ''");
         ensure_column($t, 'manmonth_min_days', 'INT DEFAULT 0');
+        // The inter-office credit is agreed per man-day, the same way the client
+        // charge is. Only the total was ever stored, so a six-day deputation
+        // carried one day's credit and nobody could see which figure was wrong.
+        ensure_column($t, 'credit_rate', 'DECIMAL(14,2) DEFAULT 0');
     }
     // The client's own definition, which is where it is usually agreed.
     ensure_column('business_partners', 'manmonth_basis', "VARCHAR(20) DEFAULT ''");

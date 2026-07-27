@@ -319,16 +319,38 @@
              value="<?= e($job['invoice_value'] ?? $call['billable_value'] ?? '') ?>">
       <input type="hidden" id="j_invoice_auto" name="invoice_value_auto" value="<?= ($job && (float)($job['invoice_value'] ?? 0) > 0) ? '0' : '1' ?>">
       <small class="muted" id="inv_note">Rate × man-days. Type over it if this one is billed differently.</small></div>
+    <?php // §revenue — the one figure a branch is actually judged on, behind its
+          // own permission. A coordinator needs the credit to do the job and has
+          // no business seeing what the branch earns on it. ?>
+    <?php if (can_see_revenue()): ?>
+      <div class="ff ff-wide"><div class="msg" id="j_rev" style="display:none;margin:0"></div>
+        <input type="hidden" id="j_is_cross" value="<?= $cross ? '1' : '0' ?>"></div>
+    <?php else: ?>
+      <div class="ff ff-wide"><p class="muted" style="margin:0">The revenue on this <?= e(Tl('job')) ?> is not shown to your role.</p></div>
+    <?php endif; ?>
     <?php // Marking the credit required on a same-office deputation meant the
           // browser refused to submit a form over a box that should not have
           // been there at all, and the button simply did nothing. ?>
-    <div class="ff"><label>Credit to the executing <?= e(Tl('office')) ?> (<?= e(cur_sym()) ?>)<?= $cross ? ' *' : '' ?></label>
-      <input class="form-control" type="number" step="0.01" name="expected_credit"
+    <?php // §credit — priced per man-day, exactly as the client charge is, and
+          // off the same man-days. Only the total used to be entered, so a
+          // six-day deputation could carry one day's credit and the branch on
+          // the other end was short without anybody seeing why. ?>
+    <div class="ff eng-cross"><label>Credit per man-day to the executing <?= e(Tl('office')) ?> (<?= e(cur_sym()) ?>)</label>
+      <input class="form-control" type="number" step="0.01" id="j_credit_rate" name="credit_rate"
+             value="<?= e($cross ? ((($job['credit_rate'] ?? 0) ?: ($call['credit_rate'] ?? 0)) ?: '') : '') ?>"
+             <?= $cross ? '' : 'readonly placeholder="— not applicable —" style="background:var(--soft)"' ?>>
+      <small class="muted"><?= $cross
+        ? 'What the executing ' . e(Tl('office')) . ' is paid for each day.'
+        : 'One ' . e(Tl('office')) . ' both holds the order and does the work, so nothing passes between offices.' ?></small></div>
+    <div class="ff eng-cross"><label>Total credit (<?= e(cur_sym()) ?>)<?= $cross ? ' *' : '' ?> <span class="muted">— rate × man-days</span></label>
+      <input class="form-control" type="number" step="0.01" id="j_credit" name="expected_credit"
              value="<?= e($cross ? ($job['expected_credit'] ?? $call['expected_credit'] ?? '') : '') ?>"
              <?= $cross ? 'required' : 'readonly placeholder="— not applicable —" style="background:var(--soft)"' ?>>
-      <small class="muted"><?= $cross
-        ? 'One ' . e(Tl('office')) . ' holds the order and another does the work. The holding ' . e(Tl('office')) . ' books the invoice less this figure; the executing one books this figure.'
-        : 'One ' . e(Tl('office')) . ' both holds the order and does the work, so nothing passes between offices and the whole invoice value is its revenue.' ?></small></div>
+      <input type="hidden" id="j_credit_auto" name="expected_credit_auto"
+             value="<?= ($job && (float)($job['expected_credit'] ?? 0) > 0 && (float)($job['credit_rate'] ?? 0) <= 0) ? '0' : '1' ?>">
+      <small class="muted" id="j_credit_note"><?= $cross
+        ? 'The holding ' . e(Tl('office')) . ' books the invoice less this figure; the executing one books this figure.'
+        : '' ?></small></div>
     <div class="ff"><label>Credit type</label>
       <select class="form-control searchable" name="credit_type"><?php foreach (lk_options_or('credit_type', CREDIT_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($job['credit_type'] ?? $call['credit_type'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <?php // §iv — when the contracting office and the executing office are not the

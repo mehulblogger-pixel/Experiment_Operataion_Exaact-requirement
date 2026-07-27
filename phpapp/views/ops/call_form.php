@@ -269,17 +269,34 @@ document.addEventListener('DOMContentLoaded', function () {
                style="background:var(--soft);font-weight:700">
         <small class="muted" id="calc_note"></small></div>
     </div>
+    <?php // §credit — the credit is agreed per man-day exactly as the client
+          // charge is, so it is entered the same way and totalled the same way.
+          // Only the total was ever stored, which is why a six-day deputation
+          // could carry one day's credit with nothing on screen to show it. ?>
     <div class="form-grid" id="crossbox" style="display:none">
-      <div class="ff"><label>Credit to the executing <?= e(T('office')) ?> (<?= e(cur_sym()) ?>) <span class="muted">— required</span></label>
-        <input class="form-control" type="number" step="0.01" name="expected_credit" value="<?= e($call['expected_credit'] ?? '') ?>"></div>
+      <div class="ff"><label>Credit per man-day to the executing <?= e(T('office')) ?> (<?= e(cur_sym()) ?>)</label>
+        <input class="form-control" type="number" step="0.01" id="credit_rate" name="credit_rate" value="<?= e(($call['credit_rate'] ?? '') ?: '') ?>">
+        <small class="muted">What the executing branch is paid for each day.</small></div>
+      <div class="ff"><label>Total credit (<?= e(cur_sym()) ?>) <span class="muted">— rate × quantity</span></label>
+        <input class="form-control" type="number" step="0.01" id="credit_total" name="expected_credit" value="<?= e($call['expected_credit'] ?? '') ?>">
+        <input type="hidden" id="credit_total_auto" name="expected_credit_auto" value="<?= ((float)($call['expected_credit'] ?? 0) > 0 && (float)($call['credit_rate'] ?? 0) <= 0) ? '0' : '1' ?>">
+        <small class="muted" id="credit_note">Type over it if this one is credited differently.</small></div>
       <div class="ff"><label>Credit basis</label>
         <select class="form-control" name="credit_type"><option value="">—</option>
           <?php foreach (lk_options_or('credit_type', CREDIT_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($call && ($call['credit_type']??'')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
         </select></div>
-      <div class="ff"><label>Value billable to the <?= e(Tl('client')) ?> (<?= e(cur_sym()) ?>, ex-GST)</label>
-        <input class="form-control" type="number" step="0.01" name="billable_value_x" value="<?= e($call['billable_value'] ?? '') ?>" disabled
-               title="Shown for context — edit it in the same-office box"></div>
+      <div class="ff"><label>Total invoice value to the <?= e(Tl('client')) ?> (<?= e(cur_sym()) ?>, ex-GST)</label>
+        <input class="form-control" type="number" step="0.01" id="billable_value_x" name="billable_value_x" value="<?= e($call['billable_value'] ?? '') ?>" disabled
+               title="Worked out above from the rate and the quantity"></div>
     </div>
+    <?php // §revenue — what this branch actually keeps. Held behind its own
+          // permission: a coordinator has to see the credit to do the job and
+          // has no business seeing what the branch earns on it. ?>
+    <?php if (can_see_revenue()): ?>
+      <div class="msg" id="rev_box" style="margin:8px 0"></div>
+    <?php else: ?>
+      <p class="muted" style="margin:8px 2px">The revenue on this <?= e(Tl('call')) ?> is not shown to your role.</p>
+    <?php endif; ?>
   </div>
 
   <h3 class="tab-sub">5. Against the <?= e(Tl('client')) ?>'s purchase order <span class="muted">(optional)</span></h3>
@@ -353,7 +370,9 @@ document.addEventListener('DOMContentLoaded', function () {
       : (offName(ibo) + ' holds this contract and ' + offName(ex) + ' will do the work, so ' + offName(ibo)
          + ' gives ' + offName(ex) + ' a credit. Enter what ' + offName(ex) + ' is to receive — they can revert with the figure they need.');
   }
-  ibo.addEventListener('change', syncMoney); ex.addEventListener('change', syncMoney); syncMoney();
+  ibo.addEventListener('change', function () { syncMoney(); if (window.__recalcCredit) window.__recalcCredit(); });
+  ex.addEventListener('change', function () { syncMoney(); if (window.__recalcCredit) window.__recalcCredit(); });
+  syncMoney();
 
   // (the old date-grid toggle lived here; the engagement shape now decides
   //  which boxes exist at all — see initEngagement in app.js)
@@ -402,7 +421,67 @@ document.addEventListener('DOMContentLoaded', function () {
     if (calcNote) calcNote.textContent = r.toLocaleString() + ' per ' + unit + ' × ' + q + ' = ' + valBox.value;
     if (qtyHint) qtyHint.textContent = qtyTouched ? '— entered by hand'
                 : (lumpSum() ? '— a lump sum is one unit' : '— ' + countWord() + ' (' + datesCount() + ')');
+    // The credit is priced off the same quantity, and the revenue off both.
+    if (valueX) valueX.value = valBox.value;
+    creditRecalc();
   }
+  // ---- §credit / §revenue -------------------------------------------------
+  //  The credit is agreed per man-day, exactly as the client charge is, and the
+  //  quantity is the same quantity. So the same sum, and then the one figure
+  //  that actually matters to a branch: what it keeps.
+  var creditRate  = document.getElementById('credit_rate'),
+      creditTotal = document.getElementById('credit_total'),
+      creditAuto  = document.getElementById('credit_total_auto'),
+      creditNote  = document.getElementById('credit_note'),
+      valueX      = document.getElementById('billable_value_x'),
+      revBox      = document.getElementById('rev_box');
+  var creditTouched = creditAuto ? creditAuto.value === '0' : false;
+  if (creditTotal) creditTotal.addEventListener('input', function () {
+    creditTouched = true;
+    if (creditAuto) creditAuto.value = '0';
+    if (creditNote) creditNote.textContent = 'Typed by hand — saved exactly as entered.';
+    showRevenue();
+  });
+  function creditRecalc() {
+    if (!creditTotal) return;
+    var q = parseFloat(qtyBox ? qtyBox.value || '0' : '0') || 1;
+    var cr = parseFloat(creditRate ? creditRate.value || '0' : '0');
+    if (!creditTouched) {
+      if (cr > 0) {
+        creditTotal.value = (Math.round(cr * q * 100) / 100).toFixed(2);
+        if (creditNote) creditNote.textContent = cr.toLocaleString() + ' × ' + q + ' = ' + creditTotal.value
+          + '. Type over it if this one is credited differently.';
+      } else if (creditNote) {
+        creditNote.textContent = 'Enter the credit per man-day, or type the total here.';
+      }
+    }
+    showRevenue();
+  }
+  //  Invoice − credit. On a same-office call there is no credit, so the revenue
+  //  is the whole invoice; the box only exists when it crosses offices.
+  function showRevenue() {
+    if (!revBox) return;
+    var crossNow = cross && cross.style.display !== 'none';
+    var inv = parseFloat(valBox ? valBox.value || '0' : '0');
+    var cred = crossNow ? (parseFloat(creditTotal ? creditTotal.value || '0' : '0') || 0) : 0;
+    if (!(inv > 0)) { revBox.style.display = 'none'; return; }
+    var rev = Math.round((inv - cred) * 100) / 100;
+    revBox.style.display = '';
+    revBox.className = 'msg ' + (rev < 0 ? 'msg-error' : 'msg-success');
+    var money = function (v) { return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+    revBox.innerHTML = crossNow
+      ? '<strong>Revenue to this ' + (window.__officeWord || 'office') + ': ' + money(rev) + '</strong>'
+        + ' <span class="muted">— total invoice ' + money(inv) + ' less the ' + money(cred)
+        + ' credited to the executing ' + (window.__officeWord || 'office') + '.'
+        + ' They book the ' + money(cred) + '; the two add back to the invoice.</span>'
+        + (rev < 0 ? '<div><strong>The credit is more than the invoice.</strong> Check both figures.</div>' : '')
+      : '<strong>Revenue to this ' + (window.__officeWord || 'office') + ': ' + money(rev) + '</strong>'
+        + ' <span class="muted">— one ' + (window.__officeWord || 'office') + ' holds the order and does the work,'
+        + ' so the whole invoice value is its revenue.</span>';
+  }
+  if (creditRate) creditRate.addEventListener('input', creditRecalc);
+  window.__recalcCredit = creditRecalc;
+
   if (rateBox) rateBox.addEventListener('input', recalc);
   if (basisSel) basisSel.addEventListener('change', recalc);
   // The date lines and every other box that shapes the schedule are watched

@@ -194,7 +194,8 @@ try {
     db()->query("SELECT engagement_type, schedule_weekdays, schedule_end_date, force_dates FROM jobs LIMIT 1");
     db()->query("SELECT office_id FROM holidays LIMIT 1");
     db()->query("SELECT visit_date FROM job_visits LIMIT 1");
-    db()->query("SELECT force_dates, manmonth_basis FROM calls LIMIT 1");
+    db()->query("SELECT force_dates, manmonth_basis, credit_rate FROM calls LIMIT 1");
+    db()->query("SELECT credit_rate FROM jobs LIMIT 1");
     db()->query("SELECT manmonth_basis FROM business_partners LIMIT 1");
     db()->query("SELECT quotation_id FROM partner_purchase_orders LIMIT 1");
     db()->query("SELECT contract_number FROM cost_allocations LIMIT 1");
