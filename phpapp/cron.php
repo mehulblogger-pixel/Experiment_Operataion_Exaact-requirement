@@ -1,6 +1,7 @@
 <?php
 // ============================================================================
-//  Reminder runner — call this once or twice a day from MilesWeb cPanel → Cron.
+//  Reminder runner — call this once or twice a day from the server's scheduler
+//  (cPanel → Cron Jobs, a systemd timer, or Windows Task Scheduler).
 //
 //  Example cron lines (cPanel → Cron Jobs):
 //     Report-due reminder,   daily 07:00:   php /home/USER/public_html/cron.php

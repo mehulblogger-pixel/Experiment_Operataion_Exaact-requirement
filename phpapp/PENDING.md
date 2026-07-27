@@ -2,6 +2,63 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🖥️ INSTALLING ON A CLIENT'S OWN SERVER (July 2026)
+
+Question: can the whole app be handed to a client to run on their own server?
+**Yes — it already can, and it was proved rather than assumed.** A pristine copy
+of the tracked files (2.8 MB, 149 files, no database) was unpacked and opened:
+the first page load built **81 tables, the admin account and 64 master lists
+with nothing configured**, took 3.7 s, and settled to 3 ms from the second load
+on. All 73 screens then rendered on that empty install. See **`INSTALL.md`**.
+
+Why it is this easy — and these are properties to protect, not accidents:
+
+- **Single-tenant by design.** There is no `tenant_id` anywhere. One database is
+  one company, which is exactly the shape an on-premise install needs.
+- **No build step.** No Composer, no Node, no bundler. PHP files and one CSS.
+- **Self-migrating.** `boot()` is the installer *and* the upgrader.
+- **Optional extensions already degrade.** `zip`, `gd` and `curl` are each
+  checked with `class_exists`/`function_exists` and lose one feature with a
+  plain message instead of taking the app down.
+- **MySQL or SQLite**, both first-class. A pilot needs no database server.
+
+### Two real defects found on the way, and fixed
+
+- [x] **Uploads could not survive on MySQL.** Files are held base64 in the row.
+      Base64 costs a third more, and MEDIUMTEXT stops at 16,777,215 bytes — so a
+      file at the 12 MB upload limit encodes to 16,777,216 characters and misses
+      **by one byte**. Outside strict mode MySQL *truncates* rather than
+      complains: the file is stored broken and nobody finds out until somebody
+      opens it months later. SQLite has no such ceiling, which is exactly why
+      months of testing never showed it — **the bug only existed where
+      production runs.** The setting also allows up to 64 MB, so anyone raising
+      it broke every upload silently. Now: seven upload columns declared
+      `LONGTEXT`, `widen_file_columns()` migrates existing MySQL installs, and
+      `file_columns_pending()` is asserted in the boot probe — a column that is
+      merely too *narrow* is not a *missing* column, so nothing else would ever
+      have noticed. Verified with a 12 MB round-trip, byte-for-byte.
+      *The `ALTER … MODIFY` is untested here — no MySQL in the build box — but
+      it mirrors the identical statement already running in `access.php:313`.*
+- [x] **The failure message named the hosting provider.** A client with a wrong
+      password was told to look in "MilesWeb → Databases", which is meaningless
+      on their own server. All hosting-specific wording is now generic (config
+      hint, the two DPDP compliance checks, the cron header).
+
+### Still to do before this is a sellable on-premise product
+
+- [ ] **A pre-flight page** — "PHP 8.1 ✓, pdo_mysql ✓, zip ✗ (Word export off)"
+      before install rather than after a failure. The single highest-value
+      addition; today the requirements are only in `INSTALL.md`.
+- [ ] **A version number in the app**, and a stated upgrade path. Right now
+      nobody can tell which build a client is running.
+- [ ] **A release artifact** — a versioned, dated zip with a checksum, rather
+      than "copy what git has".
+- [ ] **Licensing.** `SEAT_LIMIT` is read from the environment and displayed,
+      but nothing enforces it. Decide whether on-premise is licensed at all.
+- [ ] **A web setup screen** so `config.php` need not be hand-edited (optional —
+      a client's IT team will not mind, a small client will).
+
+
 ## 🔍 GAP REVIEW — the app used as every role, July 2026
 
 Method: a demo database was built and the app was driven in a real browser as

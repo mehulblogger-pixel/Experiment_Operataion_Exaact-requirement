@@ -44,7 +44,7 @@ function bills_migrate() {
         id $pk, job_id INT, head_code VARCHAR(30) DEFAULT '',
         bill_no VARCHAR(80) DEFAULT '', bill_date VARCHAR(20) DEFAULT '',
         amount DECIMAL(12,2) DEFAULT 0,
-        file_name VARCHAR(255) DEFAULT '', mime VARCHAR(100) DEFAULT '', file_data MEDIUMTEXT,
+        file_name VARCHAR(255) DEFAULT '', mime VARCHAR(100) DEFAULT '', file_data LONGTEXT,
         note VARCHAR(400) DEFAULT '',
         uploaded_by VARCHAR(150) DEFAULT '', uploaded_at VARCHAR(30) DEFAULT '')");
 }
