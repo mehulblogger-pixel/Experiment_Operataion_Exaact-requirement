@@ -155,6 +155,15 @@
         <?php foreach ($subcons as $s): ?><option value="<?= (int)$s['id'] ?>" <?= ($job && $job['subcon_id']==$s['id'])?'selected':'' ?>><?= e($s['agency']) ?><?= $s['inspector_name']?' — '.e($s['inspector_name']):'' ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"><label>Sub-con cost (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="subcon_cost" value="<?= e($job['subcon_cost'] ?? '') ?>"></div>
+    <?php // Anything else this one cost that is not salary, a claimed expense or
+          // a sub-contractor — a hired instrument, a permit, a courier. Without
+          // a box for it, it either goes unrecorded or is pushed into a heading
+          // where it does not belong. ?>
+    <div class="ff"><label>Any other cost (<?= e(cur_sym()) ?>)</label>
+      <input class="form-control" type="number" step="0.01" name="other_cost" value="<?= e(($job['other_cost'] ?? '') ?: '') ?>"></div>
+    <div class="ff"><label>What was it for?</label>
+      <input class="form-control" name="other_cost_note" value="<?= e($job['other_cost_note'] ?? '') ?>"
+             placeholder="e.g. hired UT thickness gauge"></div>
     <?php // The contract number is agreed once, on the quotation, and carried
           // from there — quotation → inspection call → deputation. It is shown
           // here rather than chosen, because choosing it again from a register
