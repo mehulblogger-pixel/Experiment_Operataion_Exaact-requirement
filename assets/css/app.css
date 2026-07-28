@@ -509,3 +509,64 @@ table.dt.qlines .btn.small{white-space:nowrap}
 .field-bad{border-color:var(--bad) !important;box-shadow:0 0 0 3px rgba(185,28,28,.12) !important;background:rgba(185,28,28,.03)}
 .ff-bad > label{color:var(--bad);font-weight:600}
 .ff-bad > label::after{content:" — needed";font-weight:500;opacity:.8}
+
+/* ---- The shared register (lib/datatable.php) --------------------------------
+   One set of rules for forty-two lists. Sorting, paging, choosing columns and
+   acting on several rows at once look the same on every screen, so learning one
+   register teaches all of them.
+
+   .sr-only is here rather than in a screen: a caption naming the table, a label
+   on every checkbox and a name for the search box are what make a register
+   usable without sight, and none of them should be visible to anyone else. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+.dt-wrap{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  box-shadow:var(--shadow-sm)}
+.dt-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;
+  padding:10px 12px;background:var(--soft);border-bottom:1px solid var(--line)}
+.dt-bar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto}
+.dt-bar select{padding:5px 8px;font-size:12.5px;border:1px solid var(--line);border-radius:8px;
+  background:var(--card);color:inherit}
+.dt-search{display:flex;align-items:center;gap:6px}
+.dt-search input[name=q]{padding:6px 10px;font-size:13px;border:1px solid var(--line);
+  border-radius:8px;background:var(--card);color:inherit;min-width:190px}
+
+/* Horizontal scrolling belongs to the table, never to the page. A register with
+   twenty columns must not push the whole layout sideways on a phone. */
+.dt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.dt-wrap table.dt{margin:0}
+.dt-wrap table.dt th a{color:inherit;text-decoration:none;display:inline-block}
+.dt-wrap table.dt th a:hover{color:var(--brand);text-decoration:underline}
+.dt-wrap table.dt th[aria-sort=ascending] a,
+.dt-wrap table.dt th[aria-sort=descending] a{color:var(--brand)}
+.dt-wrap table.dt tbody tr:last-child td{border-bottom:0}
+
+.dt-bulk{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;
+  border-top:1px solid var(--line);background:var(--soft)}
+.dt-pages{display:flex;align-items:center;gap:10px;justify-content:center;padding:10px 12px;
+  border-top:1px solid var(--line)}
+.dt-pages .btn.disabled{opacity:.45;pointer-events:none}
+
+/* Column chooser: a <details> so it works with JavaScript switched off — the
+   list is a plain form that posts and comes back. */
+.dt-cols{position:relative;display:inline-block}
+.dt-cols>summary{list-style:none;cursor:pointer}
+.dt-cols>summary::-webkit-details-marker{display:none}
+.dt-colbox{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:210px;max-height:320px;
+  overflow:auto;display:flex;flex-direction:column;gap:6px;padding:12px;background:var(--card);
+  border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.16)}
+.dt-colbox label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;cursor:pointer}
+.dt-colbox button{margin-top:4px;align-self:flex-start}
+
+@media(max-width:640px){
+  .dt-bar{gap:8px}
+  .dt-search input[name=q]{min-width:0;flex:1}
+  .dt-bar-right{width:100%;margin-left:0}
+}
+/* An older rule turns table.dt into a scrolling block on small screens. Inside
+   the component .dt-scroll already does that, and a table forced to display:block
+   loses its column widths and its <caption> association. Put it back. */
+@media(max-width:560px){
+  .dt-wrap table.dt{display:table;overflow:visible}
+}

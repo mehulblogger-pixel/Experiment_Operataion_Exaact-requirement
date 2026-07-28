@@ -128,6 +128,7 @@ try {
     require __DIR__ . '/lib/activity.php';
     require __DIR__ . '/lib/packs.php';
     require __DIR__ . '/lib/leads.php';
+    require __DIR__ . '/lib/datatable.php';
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';
     require __DIR__ . '/lib/trust.php';
@@ -274,6 +275,7 @@ try {
     db()->query("SELECT id FROM activities LIMIT 1");
     db()->query("SELECT id FROM leads LIMIT 1");
     db()->query("SELECT id FROM pipeline_stages LIMIT 1");
+    db()->query("SELECT id FROM user_prefs LIMIT 1");
     db()->query("SELECT sitedoc_override_note FROM jobs LIMIT 1");
     db()->query("SELECT id FROM internal_audits LIMIT 1");
     db()->query("SELECT id FROM audit_findings LIMIT 1");

@@ -2,7 +2,6 @@
 <div class="master-head">
   <div><h1>Activity</h1>
   <p class="sub" style="margin:2px 0 0">Everything that has happened, in date order. Most of it writes itself — a quote sent, a report issued, a complaint raised. What a person typed is marked apart from what the system recorded, because a timeline where the two look identical teaches you to distrust both.</p></div>
-  <a class="btn secondary" href="/activities?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ CSV</a>
 </div>
 
 <div class="panel" style="margin-top:16px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">
@@ -29,35 +28,14 @@
 </div>
 <?php endif; ?>
 
-<div class="panel" style="padding:0;overflow:hidden;margin-top:16px">
-  <div class="ctitle" style="padding:14px 18px 0"><h3>Timeline <span class="muted">(<?= count($rows) ?>)</span></h3></div>
-  <?php if (!$rows): ?>
-    <p class="muted" style="padding:18px">Nothing recorded yet. It fills itself as work happens.</p>
-  <?php else: ?>
-  <div style="overflow-x:auto">
-  <table class="dt" style="margin-top:8px">
-    <thead><tr><th>When</th><th>What</th><th>Customer</th><th>About</th><th>Who</th><th></th></tr></thead>
-    <tbody>
-    <?php foreach ($rows as $r): $link = act_link($r); ?>
-      <tr>
-        <td style="white-space:nowrap"><?= e(fdate(substr((string)$r['occurred_at'],0,10))) ?>
-          <br><span class="muted" style="font-size:12px"><?= e(substr((string)$r['occurred_at'],11,5)) ?></span></td>
-        <td>
-          <span class="pill <?= $r['auto'] ? 'p-mut' : 'p-ok' ?>" style="font-size:11px"><?= e(ACT_KINDS[$r['kind']] ?? $r['kind']) ?></span>
-          <?= $r['direction'] ? ' <span class="muted" style="font-size:11px">' . e(ACT_DIRECTIONS[$r['direction']]) . '</span>' : '' ?>
-          <br><?= e($r['subject']) ?>
-          <?php if (trim((string)$r['body']) !== ''): ?><br><span class="muted" style="font-size:12px;white-space:pre-wrap"><?= e(mb_substr((string)$r['body'],0,140)) ?></span><?php endif; ?>
-        </td>
-        <td><?= $r['partner_id'] ? e($r['display_name'] ?: $r['legal_name']) : '<span class="muted">—</span>' ?></td>
-        <td><?= e(act_entity_label($r) ?: '—') ?></td>
-        <td><?= e($r['owner'] ?: '—') ?><?php if ($r['with_whom']): ?><br><span class="muted" style="font-size:12px">with <?= e($r['with_whom']) ?></span><?php endif; ?></td>
-        <td><?php if ($link): ?><a class="btn small" href="<?= e($link) ?>">Open →</a><?php endif; ?></td>
-      </tr>
-    <?php endforeach; ?>
-    </tbody>
-  </table>
-  </div>
-  <?php endif; ?>
+<div style="margin-top:16px">
+  <?= dt_render($dt, $rows, $total, [
+        'caption'     => 'Activity timeline',
+        'search'      => true,
+        'search_hint' => 'Search what happened…',
+        'export'      => true,
+        'empty'       => 'Nothing recorded yet. It fills itself as work happens.',
+      ]) ?>
 </div>
 
 <?php if ($canWrite): ?>

@@ -180,8 +180,9 @@ function lead_ref_next() {
     return $ref;
 }
 
-function leads_all($filter = []) {
-    leads_migrate();
+// The filter, built once. Counting rows and fetching a page of them must ask
+// the same question or the pager lies about how many pages there are.
+function leads_where($filter = []) {
     [$sw, $sa] = scope_office_clause('l.office_id');
     $w = [$sw]; $a = $sa;
     if (!empty($filter['status'])) { $w[] = 'l.status = ?'; $a[] = $filter['status']; }
@@ -189,19 +190,34 @@ function leads_all($filter = []) {
     if (!empty($filter['pipeline'])) { $w[] = 'l.pipeline_id = ?'; $a[] = (int)$filter['pipeline']; }
     if (!empty($filter['owner']))  { $w[] = 'l.owner_user_id = ?'; $a[] = (int)$filter['owner']; }
     if (!empty($filter['q'])) {
-        $w[] = '(l.company_name LIKE ? OR l.contact_name LIKE ? OR l.ref LIKE ?)';
-        $like = '%' . $filter['q'] . '%'; $a[] = $like; $a[] = $like; $a[] = $like;
+        $w[] = '(l.company_name LIKE ? OR l.contact_name LIKE ? OR l.ref LIKE ? OR l.contact_email LIKE ?)';
+        $like = '%' . $filter['q'] . '%'; array_push($a, $like, $like, $like, $like);
     }
-    return leads_try(fn() => ops_all(
-        "SELECT l.*, s.name stage_name, s.kind stage_kind, s.probability, s.sla_days, s.seq stage_seq,
-                p.name pipeline_name, o.name office_name, bp.display_name, bp.legal_name
-         FROM leads l
+    return [implode(' AND ', $w), $a];
+}
+
+const LEADS_FROM = "FROM leads l
          LEFT JOIN pipeline_stages s ON s.id = l.stage_id
          LEFT JOIN pipelines p ON p.id = l.pipeline_id
          LEFT JOIN offices o ON o.id = l.office_id
-         LEFT JOIN business_partners bp ON bp.id = l.partner_id
-         WHERE " . implode(' AND ', $w) . "
-         ORDER BY (l.status='OPEN') DESC, s.seq, l.value DESC, l.id DESC", $a));
+         LEFT JOIN business_partners bp ON bp.id = l.partner_id";
+
+const LEADS_SELECT = "SELECT l.*, s.name stage_name, s.kind stage_kind, s.probability, s.sla_days, s.seq stage_seq,
+                p.name pipeline_name, o.name office_name, bp.display_name, bp.legal_name ";
+
+// $tail is an ORDER BY / LIMIT built by the register component from its own
+// whitelist. Nothing from the address bar arrives here as SQL.
+function leads_all($filter = [], $tail = '') {
+    leads_migrate();
+    [$w, $a] = leads_where($filter);
+    $order = $tail ?: " ORDER BY (l.status='OPEN') DESC, s.seq, l.value DESC, l.id DESC";
+    return leads_try(fn() => ops_all(LEADS_SELECT . LEADS_FROM . " WHERE $w" . $order, $a));
+}
+
+function leads_count($filter = []) {
+    leads_migrate();
+    [$w, $a] = leads_where($filter);
+    return (int)leads_try(fn() => ops_val("SELECT COUNT(*) " . LEADS_FROM . " WHERE $w", $a), 0);
 }
 
 function lead_row($id) {
@@ -470,18 +486,111 @@ function leads_counts() {
     ];
 }
 
+// ---- The register's columns -------------------------------------------------
+// Sortable by anything a sales manager sorts by: biggest first, oldest in stage
+// first, nearest expected close first. Each 'sort' is an expression this file
+// wrote, which is why the sort key in the address bar can never be dangerous.
+function leads_dt_columns() {
+    return [
+        'ref' => ['label' => 'Ref', 'sort' => 'l.ref', 'render' => fn($l) =>
+            '<a href="/lead?id=' . (int)$l['id'] . '"><b>' . e($l['ref']) . '</b></a>'],
+        'company' => ['label' => 'Company', 'sort' => 'l.company_name', 'render' => function ($l) {
+            $h = e($l['company_name']);
+            if ($l['contact_name']) $h .= '<br><span class="muted" style="font-size:12px">' . e($l['contact_name']) . '</span>';
+            return $h;
+        }],
+        'stage' => ['label' => 'Stage', 'sort' => 's.seq', 'render' => fn($l) => e($l['stage_name'] ?: '—')],
+        'value' => ['label' => 'Value', 'sort' => 'l.value', 'num' => true,
+            'render' => fn($l) => $l['value'] ? e(fmoney($l['value'])) : '—'],
+        'owner' => ['label' => 'Owner', 'sort' => 'l.owner_name',
+            'render' => fn($l) => e($l['owner_name'] ?: '—')],
+        'branch' => ['label' => 'Branch', 'sort' => 'o.name', 'optional' => true,
+            'render' => fn($l) => e($l['office_name'] ?: '—')],
+        'source' => ['label' => 'Source', 'sort' => 'l.source', 'optional' => true,
+            'render' => fn($l) => e($l['source'] ?: '—')],
+        'close' => ['label' => 'Expected close', 'sort' => 'l.expected_close', 'optional' => true,
+            'render' => fn($l) => $l['expected_close'] ? e(fdate($l['expected_close'])) : '—'],
+        'instage' => ['label' => 'In stage', 'sort' => 'l.stage_since', 'num' => true,
+            'render' => fn($l) => lead_days_in_stage($l) . ' d'
+                . (lead_stalled($l) ? '<br><span class="pill p-bad">late</span>' : '')],
+        // Score is computed in PHP by a rules engine, so it cannot be sorted in
+        // SQL without duplicating the rules there — and two copies of a rule is
+        // how the two drift apart. It stays unsortable rather than half-right.
+        'score' => ['label' => 'Score', 'num' => true, 'render' => function ($l) {
+            $sc = lead_score($l);
+            return '<span class="pill ' . ($sc['score'] >= 60 ? 'p-ok' : ($sc['score'] >= 35 ? 'p-warn' : 'p-mut'))
+                 . '">' . (int)$sc['score'] . '</span>';
+        }],
+        'status' => ['label' => 'Status', 'sort' => 'l.status', 'render' => fn($l) =>
+            '<span class="pill ' . ($l['status'] === 'CONVERTED' ? 'p-ok' : ($l['status'] === 'LOST' ? 'p-bad' : 'p-warn'))
+            . '">' . e(LEAD_STATUS[$l['status']] ?? $l['status']) . '</span>'],
+    ];
+}
+
+// Acting on a handful of leads at once. Both of these are things somebody does
+// after a sales meeting — "these six are mine now", "these four went quiet" —
+// and doing them one screen at a time is why they don't get done at all.
+function leads_bulk($action, array $ids) {
+    $ids = array_values(array_filter(array_map('intval', $ids)));
+    if (!$ids) return 'Nothing was ticked.';
+    // Only leads this person can already see. A row hidden by branch scope must
+    // not become reachable by posting its id.
+    [$w, $a] = leads_where([]);
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    $allowed = array_map('intval', array_column(
+        leads_try(fn() => ops_all("SELECT l.id " . LEADS_FROM . " WHERE ($w) AND l.id IN ($in)",
+                                  array_merge($a, $ids))), 'id'));
+    if (!$allowed) return 'None of those are yours to change.';
+    $u = current_user();
+    $now = date('c');
+    $n = 0;
+    foreach ($allowed as $id) {
+        if ($action === 'mine') {
+            // user_name() is what lead_create() writes, so a lead reassigned in
+            // bulk carries the same name as one created by hand.
+            db()->prepare("UPDATE leads SET owner_user_id=?, owner_name=?, updated_at=? WHERE id=?")
+               ->execute([(int)$u['id'], substr(user_name($u), 0, 150), $now, $id]);
+            $n++;
+        } elseif ($action === 'lost') {
+            // Already closed one way or another — skip rather than overwrite a
+            // conversion with a loss.
+            $st = (string)ops_val("SELECT status FROM leads WHERE id=?", [$id]);
+            if ($st !== 'OPEN') continue;
+            db()->prepare("UPDATE leads SET status='LOST', lost_reason=?, updated_at=? WHERE id=?")
+               ->execute([(string)($_POST['lost_reason'] ?? 'NO_RESPONSE'), $now, $id]);
+            if (function_exists('act_log')) act_log('LEAD', $id, 'STATUS', 'Marked lost in a bulk update');
+            $n++;
+        }
+    }
+    $skipped = count($allowed) - $n;
+    return $n . ' lead' . ($n === 1 ? '' : 's') . ' updated.'
+         . ($skipped > 0 ? ' ' . $skipped . ' left alone because ' . ($skipped === 1 ? 'it was' : 'they were') . ' already closed.' : '');
+}
+
 // ---- Screens ----------------------------------------------------------------
 function ops_leads($route, $method) {
     ops_require(leads_can_view(), 'You cannot open the lead register.');
     leads_migrate();
     $canEdit = leads_can_edit();
 
+    if ($route === 'leads-bulk' && $method === 'POST') {
+        ops_require($canEdit, 'You cannot change a lead.');
+        $msg = leads_bulk((string)($_POST['bulk'] ?? ''), (array)($_POST['ids'] ?? []));
+        // 'ok' is not one of the styled tags — it renders as an unstyled strip.
+        flash($msg, strpos($msg, 'updated') === false ? 'error' : 'success');
+        redirect_back('/leads?v=list');
+    }
+
     if ($route === 'leads') {
         $view = $_GET['v'] ?? 'board';
-        $rows = leads_all(['status' => (string)($_GET['status'] ?? ''), 'q' => (string)($_GET['q'] ?? '')]);
+        $cols = leads_dt_columns();
+        $dt   = dt_state('leads', $cols, ['default_sort' => 'value', 'default_dir' => 'desc', 'per' => 50]);
+        $filter = ['status' => (string)($_GET['status'] ?? ''), 'q' => $dt['q']];
+
         if (wants_csv()) {
+            // Every row the filters match, not the page on screen.
             $csv = [['Ref','Company','Contact','Stage','Status','Value','Owner','Branch','Source','Expected close','Days in stage','Score']];
-            foreach ($rows as $r) {
+            foreach (leads_all($filter) as $r) {
                 $sc = lead_score($r);
                 $csv[] = [$r['ref'], $r['company_name'], $r['contact_name'], $r['stage_name'], $r['status'],
                           (float)$r['value'], $r['owner_name'], $r['office_name'], $r['source'],
@@ -489,10 +598,22 @@ function ops_leads($route, $method) {
             }
             csv_download('leads-' . date('Y-m-d') . '.csv', $csv);
         }
+
+        // The board needs every open lead to draw its columns; the list pages.
+        // Only one of the two is fetched, so opening the board does not pay for
+        // the list and the other way round.
+        $rows = $total = null;
+        if ($view === 'list') {
+            $total = leads_count($filter);
+            $rows  = leads_all($filter, dt_sql_tail($dt, $cols, "(l.status='OPEN') DESC, s.seq, l.value DESC, l.id DESC"));
+        }
         view('ops/leads', [
-            'view' => $view, 'rows' => $rows, 'counts' => leads_counts(),
-            'board' => lead_board((int)($_GET['pipeline'] ?? 0)),
+            'view' => $view, 'rows' => $rows ?: [], 'total' => (int)$total,
+            'dt' => $dt, 'cols' => $cols, 'counts' => leads_counts(),
+            'board' => $view === 'list' ? ['pipeline' => null, 'stages' => [], 'columns' => []]
+                                        : lead_board((int)($_GET['pipeline'] ?? 0)),
             'pipelines' => pipelines_all(), 'canEdit' => $canEdit,
+            'lostReasons' => function_exists('lk_options_or') ? lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS) : [],
         ]);
         return true;
     }

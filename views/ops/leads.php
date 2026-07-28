@@ -5,7 +5,11 @@
   <p class="sub" style="margin:2px 0 0">People we are chasing before they are customers. Winning one <b>converts</b> it — it becomes a customer and an inquiry, and nothing is typed twice.</p></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <?php if ($canEdit): ?><a class="btn" href="/lead-new">+ New lead</a><?php endif; ?>
-    <a class="btn secondary" href="/leads?<?= e(http_build_query(array_merge($_GET,['export'=>'csv']))) ?>">⬇ CSV</a>
+    <?php // The list carries its own export, inside the register, so it can say
+          // it is exporting what the filters match. Only the board needs one here. ?>
+    <?php if ($view !== 'list'): ?>
+      <a class="btn secondary" href="/leads?<?= e(http_build_query(array_merge($_GET,['export'=>'csv']))) ?>">⬇ CSV</a>
+    <?php endif; ?>
   </div>
 </div>
 
@@ -19,18 +23,23 @@
 <div class="panel" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
   <a class="btn small<?= $view==='board'?'':' secondary' ?>" href="/leads?v=board">Board</a>
   <a class="btn small<?= $view==='list'?'':' secondary' ?>" href="/leads?v=list">List</a>
-  <form method="get" action="/leads" style="display:flex;gap:8px;margin-left:auto">
-    <input type="hidden" name="v" value="list">
-    <input name="q" value="<?= e($_GET['q'] ?? '') ?>" placeholder="Find a company or reference">
-    <button class="btn small secondary">Find</button>
-  </form>
+  <?php if ($view !== 'list'): ?>
+    <form method="get" action="/leads" style="display:flex;gap:8px;margin-left:auto">
+      <input type="hidden" name="v" value="list">
+      <label class="sr-only" for="lead-find">Find a lead</label>
+      <input id="lead-find" name="q" value="<?= e($_GET['q'] ?? '') ?>" placeholder="Find a company or reference">
+      <button class="btn small secondary">Find</button>
+    </form>
+  <?php endif; ?>
 </div>
 
 <?php if ($view === 'board'): ?>
-  <?php $cols = $board['columns']; ?>
+  <?php // Named apart from $cols, which is the register's column definitions.
+        // Two different things under one name is how a page 500s a screen later. ?>
+  <?php $boardCols = $board['columns']; ?>
   <div style="overflow-x:auto;margin-top:16px">
     <div style="display:flex;gap:12px;min-width:min-content;align-items:flex-start">
-      <?php foreach ($board['stages'] as $s): $col = $cols[(int)$s['id']] ?? ['leads'=>[],'value'=>0]; ?>
+      <?php foreach ($board['stages'] as $s): $col = $boardCols[(int)$s['id']] ?? ['leads'=>[],'value'=>0]; ?>
         <div class="panel" style="min-width:250px;max-width:250px;padding:12px">
           <div style="display:flex;justify-content:space-between;align-items:baseline">
             <b style="font-size:13.5px"><?= e($s['name']) ?></b>
@@ -58,28 +67,32 @@
   <p class="muted" style="margin-top:10px;font-size:12.5px">A red edge means it has sat in that stage longer than the stage allows. The number is a score with its reasoning on the lead — it is a rules engine, not a guess.</p>
 
 <?php else: ?>
-<div class="panel" style="padding:0;overflow:hidden;margin-top:16px">
-  <div class="ctitle" style="padding:14px 18px 0"><h3>All leads <span class="muted">(<?= count($rows) ?>)</span></h3></div>
-  <?php if (!$rows): ?><p class="muted" style="padding:18px">Nothing yet.</p><?php else: ?>
-  <div style="overflow-x:auto">
-  <table class="dt" style="margin-top:8px">
-    <thead><tr><th>Ref</th><th>Company</th><th>Stage</th><th class="num">Value</th><th>Owner</th><th class="num">In stage</th><th class="num">Score</th><th>Status</th></tr></thead>
-    <tbody>
-    <?php foreach ($rows as $l): $sc = lead_score($l); $st = lead_stalled($l); ?>
-      <tr>
-        <td><a href="/lead?id=<?= (int)$l['id'] ?>"><b><?= e($l['ref']) ?></b></a></td>
-        <td><?= e($l['company_name']) ?><?php if ($l['contact_name']): ?><br><span class="muted" style="font-size:12px"><?= e($l['contact_name']) ?></span><?php endif; ?></td>
-        <td><?= e($l['stage_name'] ?: '—') ?></td>
-        <td class="num"><?= $l['value'] ? fmoney($l['value']) : '—' ?></td>
-        <td><?= e($l['owner_name'] ?: '—') ?></td>
-        <td class="num"><?= lead_days_in_stage($l) ?> d<?php if ($st): ?><br><span class="pill p-bad">late</span><?php endif; ?></td>
-        <td class="num"><span class="pill <?= $sc['score']>=60?'p-ok':($sc['score']>=35?'p-warn':'p-mut') ?>"><?= (int)$sc['score'] ?></span></td>
-        <td><span class="pill <?= $l['status']==='CONVERTED'?'p-ok':($l['status']==='LOST'?'p-bad':'p-warn') ?>"><?= e(LEAD_STATUS[$l['status']] ?? $l['status']) ?></span></td>
-      </tr>
-    <?php endforeach; ?>
-    </tbody>
-  </table>
-  </div>
-  <?php endif; ?>
+<?php
+  // The reason travels with the "mark lost" button, inside the same form.
+  $reasonSelect = '';
+  if ($canEdit) {
+      $reasonSelect = '<label class="sr-only" for="lead-lost-reason">Why they were lost</label>'
+        . '<select id="lead-lost-reason" name="lost_reason" style="padding:5px 8px;font-size:12.5px;'
+        . 'border:1px solid var(--line);border-radius:8px;background:var(--card);color:inherit">';
+      foreach (($lostReasons ?: ['NO_RESPONSE' => 'No response']) as $k => $v)
+          $reasonSelect .= '<option value="' . e($k) . '">' . e($v) . '</option>';
+      $reasonSelect .= '</select>';
+  }
+?>
+<div style="margin-top:16px">
+  <?= dt_render($dt, $rows, $total, [
+        'caption'     => 'Lead register',
+        'search'      => true,
+        'search_hint' => 'Company, contact or reference…',
+        'export'      => true,
+        'empty'       => 'Nothing yet. Leads land here from the website form, a phone call, or by typing one in.',
+        'bulk_action' => '/leads-bulk',
+        'bulk_extra'  => $reasonSelect,
+        'bulk'        => !$canEdit ? [] : [
+          'mine' => ['label' => 'Assign to me', 'confirm' => 'Take ownership of these leads?'],
+          'lost' => ['label' => 'Mark lost', 'danger' => true,
+                     'confirm' => 'Mark these leads lost, with the reason chosen beside this button?'],
+        ],
+      ]) ?>
 </div>
 <?php endif; ?>
