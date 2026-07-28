@@ -117,16 +117,22 @@ function seed_demo() {
         $c['users'] = $made;
 
         // ---------- Clients & vendors ----------
-        $insP = $pdo->prepare("INSERT INTO business_partners(code,legal_name,display_name,is_client,is_vendor,status,state)
-            VALUES(?,?,?,?,?, 'ACTIVE', ?)");
+        // GSTIN is carried on the named clients because the Tally export reads
+        // the state out of its first two digits to decide IGST against
+        // CGST+SGST. Girnar is in Maharashtra against a Gujarat seller, so the
+        // demo has one inter-state invoice and two within-state ones. The ten
+        // Edge Clients below are deliberately left with no GSTIN — that is the
+        // refusal path on the export screen, and it needs rows to refuse.
+        $insP = $pdo->prepare("INSERT INTO business_partners(code,legal_name,display_name,is_client,is_vendor,status,state,gstin)
+            VALUES(?,?,?,?,?, 'ACTIVE', ?,?)");
         $clients = [
-            ['CL-NIL','Narmada Industries Ltd','Narmada',1,0,'Gujarat'],
-            ['CL-SVP','Suryavan Ports & SEZ Ltd','Suryavan Ports',1,0,'Gujarat'],
-            ['CL-GHE','Girnar Energy Hydrocarbon','Girnar Energy',1,0,'Maharashtra'],
+            ['CL-NIL','Narmada Industries Ltd','Narmada',1,0,'Gujarat','24AABCN1234M1Z5'],
+            ['CL-SVP','Suryavan Ports & SEZ Ltd','Suryavan Ports',1,0,'Gujarat','24AACCS5678K1ZP'],
+            ['CL-GHE','Girnar Energy Hydrocarbon','Girnar Energy',1,0,'Maharashtra','27AAECG9012L1Z8'],
         ];
         $vendors = [
-            ['VN-VAP','Vapi Chemical Works','Vapi Chem',0,1,'Gujarat'],
-            ['VN-MUN','Mundra Fabrication Yard','Mundra Fab',0,1,'Gujarat'],
+            ['VN-VAP','Vapi Chemical Works','Vapi Chem',0,1,'Gujarat','24AAFCV3456N1ZQ'],
+            ['VN-MUN','Mundra Fabrication Yard','Mundra Fab',0,1,'Gujarat','24AAGCM7890P1ZR'],
         ];
         $cid = []; $vid = [];
         foreach ($clients as $p) { $insP->execute($p); $cid[$p[0]] = (int)$pdo->lastInsertId(); }
@@ -239,8 +245,8 @@ function seed_demo() {
 
         // ================= 200+ EDGE CASES (deterministic generator) =================
         // Extra masters for spread
-        for ($i = 1; $i <= 10; $i++) { $insP->execute(['EC-'.$i,'Edge Client '.sprintf('%02d',$i),'EdgeCli'.$i,1,0,'Gujarat']); $cid['EC'.$i] = (int)$pdo->lastInsertId(); }
-        for ($i = 1; $i <= 6;  $i++) { $insP->execute(['EV-'.$i,'Edge Vendor '.sprintf('%02d',$i),'EdgeVen'.$i,0,1,'Maharashtra']); $vid['EV'.$i] = (int)$pdo->lastInsertId(); }
+        for ($i = 1; $i <= 10; $i++) { $insP->execute(['EC-'.$i,'Edge Client '.sprintf('%02d',$i),'EdgeCli'.$i,1,0,'Gujarat','']); $cid['EC'.$i] = (int)$pdo->lastInsertId(); }
+        for ($i = 1; $i <= 6;  $i++) { $insP->execute(['EV-'.$i,'Edge Vendor '.sprintf('%02d',$i),'EdgeVen'.$i,0,1,'Maharashtra','']); $vid['EV'.$i] = (int)$pdo->lastInsertId(); }
         $clientPool = array_values($cid); $vendorPool = array_values($vid); $bossPool = array_values($bid);
         for ($i = 1; $i <= 12; $i++) { $cc = $clientPool[$i % count($clientPool)]; $insB->execute([$cc,'5090'.sprintf('%02d',$i),$d(-100),$d(260)]); $bossPool[] = (int)$pdo->lastInsertId(); }
         $offK = ['AMD','PUN','MUM']; $sbus = ['IND','OGC','MIN','GIS','AGRI','CRS','ENV','OTHER'];
@@ -277,7 +283,16 @@ function seed_demo() {
             $invRaised = 0; $invNo = ''; $invDate = ''; $invDue = ''; $invAmt = 0; $payRecv = 0; $payDate = ''; $payAmt = 0;
             if ($closed) {
                 $mod = $i % 3; $amt = $credit ?: ($billable ?: 50000);
-                if ($mod === 1) { $invRaised = 1; $invNo = 'INV-E'.$i; $invDate = $d(-15); $invDue = ($i % 2 === 0) ? $d(-3) : $d(20); $invAmt = $amt; } // awaiting / overdue
+                // Ages spread on purpose, so receivables ageing has something in
+                // every bucket. All of these used to be fifteen days old, which
+                // made the ageing report a single column and proved nothing —
+                // the row that matters is the invoice everybody has forgotten.
+                // Negative = not due yet; 30-day terms throughout.
+                if ($mod === 1) {
+                    $past = [10, 40, 75, 130, -20][$i % 5];              // days past due
+                    $invRaised = 1; $invNo = 'INV-E'.$i; $invAmt = $amt;
+                    $invDue = $d(-$past); $invDate = $d(-$past - 30);
+                }
                 elseif ($mod === 2) { $invRaised = 1; $invNo = 'INV-E'.$i; $invDate = $d(-15); $invDue = $d(15); $invAmt = $amt; $payRecv = 1; $payDate = $d(-2); $payAmt = $amt; } // paid
             }
             $creditRecv = $cross ? ($closed ? ($i % 2) : 0) : 1;         // same-office excluded from "credit pending"

@@ -167,6 +167,10 @@
         <?php if (can('mod.invoicing.view') || can('mod.profitability.view')): ?>
         <?php $grp('Money'); ?>
         <?php if (can('mod.invoicing.view')): ?><a class="s-item<?= $navOn(['invoicing']) ?>" href="/invoicing"><span class="s-ic">💳</span><span><?= e(T_REG('invoice')) ?></span></a><?php endif; ?>
+        <?php if (can('mod.invoicing.view') && (can('finance.reconcile') || can('data.credit') || is_master())): ?>
+          <a class="s-item<?= $navOn(['receivables']) ?>" href="/receivables"><span class="s-ic">⏳</span><span>Receivables ageing</span></a>
+          <a class="s-item<?= $navOn(['tally']) ?>" href="/tally"><span class="s-ic">📤</span><span>Tally export</span></a>
+        <?php endif; ?>
         <?php if (can('mod.profitability.view')): ?><a class="s-item<?= $navOn(['profitability']) ?>" href="/profitability"><span class="s-ic">💹</span><span><?= e(T_REG('boss')) ?></span></a><?php endif; ?>
         <?php $endgrp(); endif; ?>
 

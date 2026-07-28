@@ -121,8 +121,8 @@ capture and a withdrawal path — but I will argue against it first.
 | # | Item | Est. | Notes |
 |---|---|---:|---|
 | 5.1 | ✅ **DONE** — **Client portal** — `/portal`. A named person at the client signs in and sees their own calls and where each has got to, the visits and who is going, the reports we have **issued** (never a draft), their invoices and what is outstanding, and a form to ask for the next inspection. Off by default; on, nobody can reach it until they are invited. Invitations are one-time links that last seven days — **we never choose or e-mail a password**. A client user is a separate table and a separate session key, so `current_user()` can never return one and no staff screen is one careless route away. Every read takes the company from the session and puts it in the WHERE clause; the cost, credit, margin and salary columns are not SELECTed at all | 5 d | Pairs with 4.5: `/verify` proves one report to anybody holding it, the portal shows a named client everything that is theirs. |
-| 5.2 | **GST on the invoice side** *or* **a Tally export** | 3 d | Today tax stops at the quotation. `/invoicing` is a tracker, not an invoicing module. **Decide which** — building a full GST engine (HSN/SAC, place of supply, IGST vs CGST+SGST, e-invoice/IRN) is 3× the work of exporting to Tally, and most Indian firms bill in Tally anyway. My recommendation is the export. |
-| 5.3 | **Receivables ageing** — 0–30 / 31–60 / 61–90 / 90+ by client | 1 d | Overdue is a yes/no today. |
+| 5.2 | ✅ **DONE** — **Tally export** — `/tally`. Raised invoices become Sales vouchers Tally will import: party ledger, `New Ref` bill allocation, and the tax split worked out from the client's GSTIN (IGST against CGST+SGST by comparing state codes). Payments become Receipt vouchers with an `Agst Ref` that clears the bill. **Nothing is guessed** — a client with no GSTIN and no state is refused, by name, with the reason on screen, because the wrong choice is a return that has to be revised. Exports are recorded per invoice so the same voucher cannot go into Tally twice, and a batch can be undone if the import failed at the other end. The recommendation below was taken: HSN/SAC, credit notes and e-invoice/IRN are **not** built | 3 d | Chose the export over the engine — a full GST engine is 3× the work and the firm bills in Tally anyway. |
+| 5.3 | ✅ **DONE** — **Receivables ageing** — `/receivables`. Not-yet-due / 0–30 / 31–60 / 61–90 / 90+ by client, worst first, drill-through to the invoices behind a row, CSV out. Aged **from the due date** by default — an invoice on 60-day terms is not late on day 45 — with a switch to age from the invoice date, and a per-row note where no due date was recorded. The outstanding total is the same figure the money desk quotes | 1 d | Overdue was a yes/no. |
 | 5.4 | **Customer satisfaction capture** after closure | 1 d | ISO 9001 expectation and a normal account tool. |
 | 5.5 | **Consolidated invoicing** — one invoice across many deputations | 2 d | Currently one invoice per job. Already flagged in `PENDING.md`. |
 
@@ -258,7 +258,7 @@ with a plausible engine that no accredited body can actually use.
 | 2 | Module licensing, pre-flight, versioning | 4–5 d | ✅ done `70fae4f` |
 | 3 | **ISO/IEC 17020:2026 transition pack** | 12–16 d | after 1 |
 | 4 | Trust layer + verifiable reports | 6–8 d | after 3.6 |
-| 5 | Client portal, tax, ageing, feedback | 10–14 d | after 4 |
+| 5 | Client portal, tax, ageing, feedback | 10–14 d | 5.1 ✅ · 5.2 ✅ Tally export · 5.3 ✅ ageing · **5.4, 5.5 open** |
 | 6 | ISO/IEC 17021 certification bodies | 15–20 d | after 4, with a design partner |
 | 7 | Play Store / App Store | 5–8 d | after 0.1 |
 | H | Money + Notification carve-out, backlog triage | 3–4 d | any quiet week |
