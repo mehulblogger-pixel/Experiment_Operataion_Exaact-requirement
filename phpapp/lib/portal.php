@@ -583,6 +583,33 @@ function portal_route($route, $method) {
             portal_report_pdf($d);
             exit;
 
+        // ISO/IEC 17020 7.5 and 7.6. The register and the published policy
+        // both existed; the client had no way to actually lodge one.
+        case 'portal/complaints':
+            portal_view('complaints', ['rows' => pcmp_mine()]);
+            exit;
+
+        case 'portal/complaint-new':
+            $err = '';
+            if ($method === 'POST') {
+                $err = pcmp_create($_POST, portal_user());
+                if ($err === '') {
+                    $_SESSION['portal_flash'] = 'Thank you — it is recorded and our office has been told. '
+                        . 'You will be written to when it has been looked into.';
+                    redirect('/portal/complaints');
+                }
+            }
+            portal_view('complaint_new', [
+                'err' => $err,
+                'appealable' => pcmp_appealable(),
+                'jobs' => portal_try(fn() => ops_all(
+                    "SELECT j.id, j.job_code, j.scheduled_date FROM jobs j
+                     LEFT JOIN calls c ON c.id = j.call_id
+                     WHERE c.client_id = ? ORDER BY j.id DESC LIMIT 100", [portal_partner_id()])),
+                'prefill' => $_GET,
+            ]);
+            exit;
+
         case 'portal/invoices':
             portal_view('invoices', ['rows' => portal_invoices()]);
             exit;

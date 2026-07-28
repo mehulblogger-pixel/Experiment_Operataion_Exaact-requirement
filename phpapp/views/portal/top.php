@@ -11,6 +11,7 @@ $links = [
     'portal/reports'  => 'Reports',
     'portal/invoices' => 'Invoices',
     'portal/request'  => 'Request an inspection',
+    'portal/complaints' => 'Complaints &amp; appeals',
 ];
 ?><!doctype html>
 <html lang="en"><head>
