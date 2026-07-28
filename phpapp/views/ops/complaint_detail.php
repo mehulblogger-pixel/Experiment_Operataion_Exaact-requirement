@@ -150,14 +150,29 @@
 
   <?php if (in_array($c['outcome'], CMP_NEEDS_CAPA, true)): ?>
   <h3 class="tab-sub">6 · Corrective action</h3>
-  <p class="sub" style="margin-top:0">We found fault, so something has to change. Record the reference here; the
-    corrective-action register itself is the next thing being built.</p>
-  <form method="post" action="/complaint-capa" class="inline-add">
-    <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
-    <div class="ff"><label>Corrective action reference</label>
-      <input class="form-control" name="capa_ref" value="<?= e($c['capa_ref']) ?>" placeholder="e.g. CAPA-2026-014"></div>
-    <button class="btn small secondary" type="submit">Save</button>
-  </form>
+  <?php $capa = ($c['capa_ref'] !== '' && function_exists('capa_by_ref')) ? capa_by_ref($c['capa_ref']) : null; ?>
+  <?php if ($capa): ?>
+    <p style="margin:0"><a href="/capa-item?id=<?= (int)$capa['id'] ?>"><strong><?= e($capa['ref']) ?></strong></a>
+      — <?= e(strtok(CAPA_STATUS[$capa['status']] ?? $capa['status'], '—')) ?>.
+      <?= $capa['verified_on'] ? 'Checked ' . e(fdate($capa['verified_on'])) . ': it '
+            . ($capa['effective'] === 'YES' ? 'worked.' : 'did not work.')
+          : 'Nobody has checked yet whether it worked.' ?></p>
+  <?php else: ?>
+    <p class="sub" style="margin-top:0">We found fault, so something has to change. Raising it here carries the
+      complaint and the cause across, so the two records cannot end up disagreeing.</p>
+    <?php if (function_exists('capa_create') && can('mod.capa.edit')): ?>
+    <form method="post" action="/capa-from-complaint" style="margin:0 0 8px">
+      <input type="hidden" name="complaint_id" value="<?= (int)$c['id'] ?>">
+      <button class="btn small" type="submit">Raise a corrective action from this</button>
+    </form>
+    <?php endif; ?>
+    <form method="post" action="/complaint-capa" class="inline-add">
+      <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+      <div class="ff"><label>…or record a reference kept elsewhere</label>
+        <input class="form-control" name="capa_ref" value="<?= e($c['capa_ref']) ?>" placeholder="e.g. CAPA-2026-014"></div>
+      <button class="btn small secondary" type="submit">Save</button>
+    </form>
+  <?php endif; ?>
   <?php endif; ?>
 
   <h3 class="tab-sub">7 · Close</h3>

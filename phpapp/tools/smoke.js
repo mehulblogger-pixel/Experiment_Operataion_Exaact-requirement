@@ -19,8 +19,15 @@ const BASE = process.argv[2] || 'http://127.0.0.1:8801';
 const USER = process.argv[3] || 'admin';
 const PASS = process.argv[4] || 'admin12345';
 
-// Screens reached without an id. Anything needing one is discovered from the
-// registers below, so the list stays honest as the app grows.
+// Screens reached without an id. This list is a floor, not the whole crawl:
+// everything on the administrator's sidebar is added to it at run time (see
+// navPaths below). It had to be, because seven modules were shipped between
+// August and now — equipment, competence, impartiality, complaints, corrective
+// actions, internal audits, management review — and not one of them was ever
+// opened by this crawl, because nobody remembered to add it here. A test list
+// that has to be maintained by hand is a test list that quietly stops testing.
+//
+// Anything needing an id is discovered from the registers below.
 const PLAIN = [
   '/', '/calls', '/call-new', '/jobs', '/availability', '/vouchers', '/candidates',
   '/requisitions', '/attendance-recon', '/contract-overrides',
@@ -49,6 +56,11 @@ const REGISTERS = [
   ['/vouchers',      /^\/voucher\?id=(\d+)/,  ['/voucher?id=%s']],
   ['/report-types',  /^\/report-type-edit\?id=(\d+)/, ['/report-type-edit?id=%s', '/report-builder?id=%s']],
   ['/users',         /^\/user-edit\?id=(\d+)/,['/user-edit?id=%s']],
+  ['/complaints',    /^\/complaint\?id=(\d+)/, ['/complaint?id=%s']],
+  ['/capa',          /^\/capa-item\?id=(\d+)/, ['/capa-item?id=%s']],
+  ['/internal-audits', /^\/internal-audit\?id=(\d+)/, ['/internal-audit?id=%s']],
+  ['/management-reviews', /^\/management-review\?id=(\d+)/, ['/management-review?id=%s']],
+  ['/equipment',     /^\/equip-edit\?id=(\d+)/, ['/equip-edit?id=%s']],
 ];
 
 const FATAL = /Cannot redeclare|program file is missing|The app hit an error|Fatal error|Parse error|Uncaught (?:Error|Exception|TypeError)|SQLSTATE|Warning: |Notice: |Deprecated: |Undefined variable|Undefined array key/i;
@@ -64,6 +76,16 @@ const FATAL = /Cannot redeclare|program file is missing|The app hit an error|Fat
   await pg.fill('input[name=password]', PASS);
   await pg.click('button[type=submit]');
   await pg.waitForLoadState('networkidle');
+
+  // Everything the sidebar offers an administrator, plus the hand-written floor
+  // above. A module with a menu entry is now crawled the moment it ships.
+  const navPaths = await pg.evaluate(() =>
+    Array.from(document.querySelectorAll('.side-nav a[href^="/"]'))
+         .map(a => a.getAttribute('href'))
+         .filter(h => h && !h.includes('#')));
+  const TO_VISIT = Array.from(new Set(PLAIN.concat(navPaths)));
+  const added = TO_VISIT.length - PLAIN.length;
+  if (added > 0) console.log(`  (${added} screen(s) picked up from the sidebar that the fixed list did not name)`);
 
   const broken = [];
   let checked = 0;
@@ -91,7 +113,7 @@ const FATAL = /Cannot redeclare|program file is missing|The app hit an error|Fat
     if (jsErrors.length) broken.push([path, 'JS: ' + jsErrors[0]]);
   }
 
-  for (const p of PLAIN) await visit(p);
+  for (const p of TO_VISIT) await visit(p);
 
   for (const [reg, pattern, templates] of REGISTERS) {
     await pg.goto(BASE + reg, { waitUntil: 'domcontentloaded' });

@@ -2,6 +2,75 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ ROADMAP 3.5 — CAPA, internal audit, management review (§8.7–8.9) (July 2026)
+
+`lib/capa.php` and `lib/audits.php`. Six screens. This is the register behind the
+corrective-action reference that complaints (3.4) already demanded.
+
+**§8.7 — corrective actions.** Almost every body has a spreadsheet for this, and
+almost every one loses the same two marks:
+
+1. **The effectiveness review never happens.** Somebody does the action, ticks
+   "closed", and nobody goes back to see whether the problem stopped. Here a
+   corrective action **cannot be closed** until somebody has gone back, on a
+   date, and said whether it worked — and if it did **not** work, closing it as
+   done is refused outright. The honest ending is offered instead: close it as
+   ineffective and raise a successor that carries the history forward. A body
+   that can show that is a body that is actually improving.
+2. **Nobody asks whether it happened elsewhere.** §8.7.2 d). One line in the
+   standard, the most-missed one in practice, because it is the only part that
+   costs real thinking. It is a required answer, with a note. "No" is fine —
+   as long as somebody actually looked.
+
+Also required before closing: the cause, **how the cause was worked out** (an
+assessor asks that next, every time), and the plan.
+
+**§8.8 — internal audits.** Two things:
+
+- **An auditor may not audit their own work.** Named on the plan, checked,
+  refused. It is the commonest way a small body's internal audit becomes
+  worthless, and it takes one line to prevent.
+- **Clause coverage.** The question is not "did you audit" but "did you audit
+  *all* of it". A board shows every clause and when it was last covered; a
+  clause nothing has looked at inside the cycle shows red. An audit older than
+  the cycle stops counting.
+- A **nonconformity with no corrective action blocks the audit's close**, and
+  raising one carries the audit's own words across rather than retyping them.
+
+**§8.9 — management review.** The clause most often written the night before an
+assessment. §8.9.2 lists fifteen required inputs, and **fourteen of them are
+questions this application already knows the answer to**: how many complaints,
+how many upheld, how many corrective actions open, how many carried out and
+never checked, how much equipment is out of calibration, whose ticket lapsed,
+which impartiality threats are undecided, how the work volume moved. Those are
+**measured** and put in front of the chair, who writes what they mean. The one
+that cannot be measured says so rather than inventing a figure.
+
+A review is **not complete** until every input has been addressed and at least
+one decision has come out of it. §8.9.3 asks for outputs; fifteen inputs and no
+decisions is minutes of a meeting.
+
+Deliberately not done: no scoring, no automatic root cause, no "AI-suggested"
+corrective action. A root cause that software guessed is a root cause nobody
+owns, and an assessor finds that out in one question.
+
+*Verified:* 84 rule tests, 48 browser checks, each run twice from a dirty
+database. Lint green (162 files), 98 screens.
+
+### A third hand-maintained list found to have gone stale
+`tools/smoke.js` — the crawl that opens every screen — worked from a fixed list
+of paths. **Seven modules shipped since it was written and not one of them was
+ever opened by it**: equipment, competence, impartiality, identity, complaints,
+corrective actions, internal audits. The crawl was reporting "83 screens, all
+clean" while never touching them. It now unions the fixed list with everything
+on the administrator's sidebar, so a module with a menu entry is crawled the
+moment it ships — 98 screens, and the ten it had been missing all render.
+
+That is the third list of this kind in two days (`module_groups()`,
+`NEW_MODULES`, now this). The pattern is worth naming: **any list that has to be
+extended by hand when a module is added will eventually stop being extended.**
+Each of the three now derives itself from the real catalogue.
+
 ## ✅ ROADMAP 3.4 — complaints & appeals (§7.5, §7.6) (July 2026)
 
 `lib/complaints.php`, `complaints` · `complaint_events`, screens `/complaints`

@@ -59,6 +59,7 @@ function lk_migrate() {
     lk_ensure_type_map('day_code', 'Day / office code', DAY_CODES);
     lk_ensure_type_map('avail_status', 'Inspector availability status', AVAIL_STATUS);
     if (defined('IDDOC_KINDS')) lk_ensure_type_map('identity_doc', 'Identity document', IDDOC_KINDS);
+    if (defined('AUDIT_CLAUSES')) lk_ensure_type_map('audit_clause', 'Standard clause (internal audit)', AUDIT_CLAUSES);
     // back-fill any newly-added coded values into existing lists (idempotent)
     lk_ensure_values_from_map('inspection_type', INSPECTION_TYPES);
     // add CUSTOM to reporting frequency on existing installs

@@ -399,6 +399,45 @@ function compliance_status() {
             $cr['unnotified'] ? 'This is the single most common finding in this clause. Closing refuses until it is done, but the letter still has to be written.' : '');
     }
 
+    // --- ISO/IEC 17020 §8.7 to §8.9 ---------------------------------------
+    if (function_exists('capa_readiness')) {
+        $pr = capa_readiness();
+        $add('ISO/IEC 17020 §8.7', 'Corrective actions are checked for effectiveness',
+            $pr['verify_late'] ? 'bad' : 'ok',
+            $pr['verify_late'] ? $pr['verify_late'] . ' action(s) carried out and never checked afterwards.'
+                               : $pr['open'] . ' open, none waiting to be checked past its date.',
+            $pr['verify_late'] ? 'Open the corrective-action register. §8.7.3 asks for the effectiveness review by name, and this is the figure an assessor computes.' : '');
+        $add('ISO/IEC 17020 §8.7', 'We asked whether it happened anywhere else',
+            $pr['no_similar'] ? 'warn' : 'ok',
+            $pr['no_similar'] ? $pr['no_similar'] . ' open action(s) with that question unanswered.'
+                              : 'Answered on every open action.',
+            $pr['no_similar'] ? '§8.7.2 d). One line in the standard, and the one most often skipped because it is the only part that costs real thinking.' : '');
+    }
+    if (function_exists('audits_readiness')) {
+        $ar = audits_readiness();
+        $add('ISO/IEC 17020 §8.8', 'The whole standard gets audited, not part of it',
+            $ar['uncovered'] ? 'bad' : 'ok',
+            $ar['uncovered'] . ' of ' . $ar['clauses'] . ' clauses not covered in the last ' . $ar['cycle_days'] . ' days.',
+            $ar['uncovered'] ? 'Open Internal audits — the coverage board shows which clauses nothing has looked at.' : '');
+        $add('ISO/IEC 17020 §8.8', 'Nonconformities found were acted on',
+            $ar['nc_without_capa'] ? 'bad' : 'ok',
+            $ar['nc_without_capa'] ? $ar['nc_without_capa'] . ' audit finding(s) with no corrective action against them.'
+                                   : 'Every nonconformity found has a corrective action.',
+            $ar['nc_without_capa'] ? 'A nonconformity recorded and never acted on is worse than one never found — it proves we knew.' : '');
+    }
+    if (function_exists('reviews_readiness')) {
+        $rr = reviews_readiness();
+        $add('ISO/IEC 17020 §8.9', 'A management review was held',
+            $rr['overdue'] ? 'bad' : 'ok',
+            $rr['last'] ? 'Last held ' . fdate($rr['last']['held_on']) . ' (' . (int)$rr['days_since'] . ' days ago).'
+                        : 'None on file.',
+            $rr['overdue'] ? 'Open Management review. The inputs it needs are counted for you from this system; the judgement is what you add.' : '');
+        $add('ISO/IEC 17020 §8.9', 'Decisions from the review were carried out',
+            $rr['open_actions'] ? 'warn' : 'ok',
+            $rr['open_actions'] ? $rr['open_actions'] . ' decision(s) still open.' : 'Nothing outstanding.',
+            $rr['open_actions'] ? 'Decisions nobody did are the first thing an assessor tests at the next review.' : '');
+    }
+
     // --- things software cannot answer ------------------------------------
     $add('Everything else', 'Backups, and a restore that has been tried',
         'unknown', 'Every photograph, report and voucher in this system is in one database.',

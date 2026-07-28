@@ -70,6 +70,9 @@ const PERMISSIONS = [
     // Recording and investigating is ordinary desk work. Deciding the outcome is
     // not, and the standard cares who did it, so it is its own permission.
     'complaints.decide'   => 'Decide complaints and appeals (§7.5.4 — must not have been involved)',
+    // Closing a corrective action means asserting it worked. Held apart from
+    // doing the work, because those are two different responsibilities.
+    'capa.close'          => 'Close corrective actions (§8.7.3 — asserts the action was effective)',
 ];
 
 // Human-friendly grouping of every permission, so the access editor reads clearly
@@ -82,7 +85,7 @@ function permission_groups() {
         'Money'                          => ['finance.reconcile'],
         'Marketing & Sales (CRM)'        => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage'],
         'Identity documents (personal data)' => ['person.iddoc.view','person.iddoc.manage'],
-        'Complaints & appeals'           => ['complaints.decide'],
+        'Complaints & appeals'           => ['complaints.decide','capa.close'],
         'Administration'                 => ['master.manage','users.manage.branch','users.manage.global','org.hierarchy.view','settings.manage'],
     ];
 }
@@ -98,7 +101,7 @@ function module_groups() {
         'Marketing & Sales (CRM)' => ['inquiries','quotes','crm_orders','crm_reports'],
         'Inspection documentation' => ['idems'],
         'Operations'              => ['calls','jobs','vouchers','invoicing','profitability','hiring','reconcile'],
-        'Accreditation & compliance' => ['equipment','competence','impartiality','complaints','identity'],
+        'Accreditation & compliance' => ['equipment','competence','impartiality','complaints','capa','audits','identity'],
         'Directory & masters'     => ['clients','vendors','masters','overheads'],
         'Insights & admin'        => ['reports','users','settings'],
     ];
@@ -137,6 +140,8 @@ const ACCESS_MODULES = [
     'impartiality'  => 'Impartiality & conflicts',
     'identity'      => 'Identity documents (site access)',
     'complaints'    => 'Complaints & appeals',
+    'capa'          => 'Corrective actions',
+    'audits'        => 'Internal audits & management review',
     'masters'       => 'Masters',
     'overheads'     => 'Overheads (office finance)',
     'reports'       => 'Dashboards / reports',
@@ -163,22 +168,22 @@ function module_defaults($role) {
         case 'MASTER_ADMIN': case 'ADMIN': $edit = $all; break;
         case 'BUSINESS_DIRECTOR': $view = $all; break;
         case 'SBU_HEAD':
-            $view = ['inquiries','quotes','crm_orders','crm_reports','idems','calls','jobs','vouchers','invoicing','profitability','hiring','reconcile','clients','vendors','masters','reports','complaints']; break;
+            $view = ['inquiries','quotes','crm_orders','crm_reports','idems','calls','jobs','vouchers','invoicing','profitability','hiring','reconcile','clients','vendors','masters','reports','complaints','capa','audits']; break;
         case 'BRANCH_MANAGER':
-            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','clients','vendors','masters','reports','users','complaints'];
+            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','clients','vendors','masters','reports','users','complaints','capa','audits'];
             $view = ['inquiries','quotes','crm_orders','crm_reports','invoicing','profitability','overheads']; break;
         case 'BRANCH_APP_MANAGER':
             $edit = ['masters','overheads','users'];
             $view = ['calls','jobs','reports']; break;
         case 'OPERATION_MANAGER':
-            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','complaints'];
+            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','complaints','capa'];
             $view = ['crm_orders','clients','vendors','masters','profitability','reports']; break;
         case 'ASST_MANAGER':
             $edit = ['calls','jobs','idems','complaints'];
-            $view = ['clients','vendors','reports']; break;
+            $view = ['clients','vendors','reports','capa']; break;
         case 'COORDINATOR':
             $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','complaints'];
-            $view = ['crm_orders','clients','vendors','masters','reports','invoicing']; break;
+            $view = ['crm_orders','clients','vendors','masters','reports','invoicing','capa']; break;
         // ---- Marketing & Sales (CRM) ----
         case 'BUSINESS_DEV_MANAGER': case 'KEY_ACCOUNTS_MANAGER':
             $edit = ['inquiries','quotes','crm_orders'];
@@ -225,7 +230,8 @@ function module_defaults($role) {
 // first shipped — and it is a one-off catch-up, not a list to keep extending:
 // from now on modules_at_last_save() answers the question by itself.
 const NEW_MODULES = ['inquiries', 'quotes', 'crm_orders', 'crm_reports', 'idems',
-                     'equipment', 'competence', 'impartiality', 'identity', 'complaints'];
+                     'equipment', 'competence', 'impartiality', 'identity', 'complaints',
+                     'capa', 'audits'];
 
 // Snapshot the module catalogue. Called whenever a role's access is saved.
 function stamp_modules_at_save() {
