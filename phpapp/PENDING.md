@@ -2,6 +2,56 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ The eleven gaps from the July review — all closed (July 2026)
+
+Owner: *"they are very very shallow and is not integrated with the data."* Fair.
+The registers satisfied a clause reading and fell over on contact with a
+multi-branch company. Eleven items, all shipped, each verified over HTTP.
+
+**Where I took the decision myself**, because the answer was needed to build and
+waiting would have stopped everything. Any of these can be changed — they are
+settings and lists, not structure:
+
+1. **Client portal roles** — six permissions rather than fixed roles, with five
+   presets (full · quality/technical · commercial/purchasing · accounts ·
+   read-only). **Seeing a report and accepting one are separate**, because
+   accepting binds the company. Optional site restriction. A blank permission
+   list means everything, so nobody invited before this lost access.
+2. **How somebody becomes authorised** — the authorisation records the *basis*
+   (training · witnessed job · examination · documented experience · carried
+   over), a **review cycle in months**, and a **witnessing interval**. Review is
+   counted from the last review or, failing that, from the grant date, so an
+   authorisation nobody ever reviewed still becomes due.
+3. **A rejected report raises a MINOR nonconformity**, not a major one. "Wrong
+   PO number" and "we disagree with the conclusion" are not the same event and
+   grading them by rule would be guessing — a person reads it and decides.
+4. **A confidentiality breach raises a MAJOR one**, automatically. Losing
+   control of a client's information is not a minor lapse.
+5. **A report signed by somebody unauthorised warns and records, not blocks.**
+   Unlike an uncalibrated instrument — where the measurement is void — this is a
+   management failure to put right, not a reason to withhold a report a client
+   is waiting for.
+6. **Site-entry documents block with a manager override that states a reason**,
+   the same shape as the certificate gate. Refusing outright teaches people to
+   back-date documents, which destroys the evidence.
+7. **Nothing is auto-accepted by silence.** A client who does not answer is
+   reported as not having answered, with the age. A rule that reads silence as
+   consent is discovered during a dispute.
+8. **An unassigned record stays visible to every branch.** Scoping hides other
+   branches' work, never orphans.
+
+**Still open, deliberately:**
+
+- [ ] **Part-payments.** A payment is a flag and one amount, so receivables
+      ageing ages the whole invoice or none of it. Doing it honestly needs a
+      payments table.
+- [ ] **Credit notes** are not exported to Tally; a cancelled invoice already
+      imported has to be reversed by hand.
+- [ ] **Nothing is read back from Tally.** One-way on purpose.
+- [ ] **Training records do not yet grant an authorisation automatically** — the
+      basis is recorded, but somebody still types the authorisation.
+- [ ] **The 17021 certification-body engine** (roadmap phase 6) is untouched.
+
 ## ✅ The money goes to Tally, and the ageing says how old it is (July 2026)
 
 Roadmap 5.2 and 5.3, the last two buildable items in Phase 5.
