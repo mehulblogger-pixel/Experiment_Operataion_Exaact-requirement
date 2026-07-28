@@ -259,6 +259,8 @@ try {
     db()->query("SELECT client_decision FROM report_docs LIMIT 1");
     db()->query("SELECT id FROM tally_exports LIMIT 1");
     db()->query("SELECT perms FROM client_users LIMIT 1");
+    db()->query("SELECT id FROM site_doc_requirements LIMIT 1");
+    db()->query("SELECT sitedoc_override_note FROM jobs LIMIT 1");
     db()->query("SELECT id FROM internal_audits LIMIT 1");
     db()->query("SELECT id FROM audit_findings LIMIT 1");
     db()->query("SELECT id FROM mgmt_reviews LIMIT 1");

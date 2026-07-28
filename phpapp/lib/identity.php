@@ -455,3 +455,178 @@ function iddoc_flash_number($number = null, $docId = 0) {
     unset($_SESSION['iddoc_reveal']);
     return $v;
 }
+
+// ============================================================================
+//  What a site demands before it will let our engineer through the gate
+//
+//  The register above holds passports, visas, gate passes and medicals under a
+//  stated purpose, with a retention limit and a log of every look. What it did
+//  NOT do was any work: nothing ever consulted it. An engineer could be deputed
+//  to a refinery that requires a medical fitness certificate and a police
+//  verification, hold neither, and find out at the gate — which is a wasted
+//  day, a missed inspection and an invoice nobody can raise.
+//
+//  So a client — or one particular site of that client — can now say which
+//  documents it demands, and the allocation checks them.
+//
+//  Three decisions:
+//
+//   1. **A mandatory requirement blocks, but a manager may override with a
+//      recorded reason.** Exactly the pattern the certificate gate already
+//      uses, and for the same reason: refusing outright teaches people to
+//      back-date a document to get past the gate, which destroys the evidence
+//      the register exists to hold. A recorded override is a fact an assessor
+//      can read; a forged date is not.
+//   2. **It checks validity on the DAY OF THE VISIT, not today.** A passport
+//      valid this morning and expired by the inspection date is not a document
+//      somebody holds. Some sites also want a margin — "valid for 30 days
+//      beyond the visit" — so the requirement carries its own lead time.
+//   3. **A document nobody has recorded and a document that has expired are
+//      different failures**, and are reported differently, because the fix is
+//      different: one is "get it from them", the other is "it has to be renewed".
+// ============================================================================
+
+function sitedoc_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    $pdo = db(); $pk = pk_clause();
+    $pdo->exec("CREATE TABLE IF NOT EXISTS site_doc_requirements (
+        id $pk, partner_id INT, site_address_id INT NULL,
+        doc_kind VARCHAR(30) DEFAULT 'GATE_PASS',
+        is_mandatory INT DEFAULT 1,
+        valid_days_after INT DEFAULT 0,
+        note VARCHAR(400) DEFAULT '',
+        created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // Why an engineer was sent without one. Kept on the deputation, because
+    // that is the record an assessor reads.
+    ensure_column('jobs', 'sitedoc_override_note', "VARCHAR(400) DEFAULT ''");
+    ensure_column('jobs', 'sitedoc_override_by', "VARCHAR(150) DEFAULT ''");
+}
+
+// What this client, at this site, asks for. A requirement with no site applies
+// to every site of that client, so a company-wide rule is one row.
+function sitedoc_required($partnerId, $siteAddressId = null) {
+    sitedoc_migrate();
+    if (!$partnerId) return [];
+    $w = 'partner_id = ?'; $a = [(int)$partnerId];
+    if ($siteAddressId) { $w .= ' AND (site_address_id IS NULL OR site_address_id = ?)'; $a[] = (int)$siteAddressId; }
+    else                { $w .= ' AND site_address_id IS NULL'; }
+    try { return ops_all("SELECT * FROM site_doc_requirements WHERE $w ORDER BY is_mandatory DESC, doc_kind", $a); }
+    catch (Throwable $e) { if (iddoc_missing_table($e)) return []; throw $e; }
+}
+
+// Everything wrong with sending THIS person to THIS site on THIS date.
+// Returns ['block' => [...], 'warn' => [...]] — sentences, not codes, because
+// they are shown to the coordinator who has to fix them.
+function sitedoc_check($inspectorId, $partnerId, $siteAddressId, $visitDate = null) {
+    $out = ['block' => [], 'warn' => []];
+    if (!$inspectorId || !$partnerId) return $out;
+    $reqs = sitedoc_required($partnerId, $siteAddressId);
+    if (!$reqs) return $out;
+    $visit = $visitDate ?: date('Y-m-d');
+    $kinds = iddoc_kind_options();
+    $held  = [];
+    foreach (iddoc_list((int)$inspectorId) as $d) $held[(string)$d['doc_kind']][] = $d;
+
+    foreach ($reqs as $r) {
+        $kind  = (string)$r['doc_kind'];
+        $label = $kinds[$kind] ?? $kind;
+        $bucket = !empty($r['is_mandatory']) ? 'block' : 'warn';
+        $mine = $held[$kind] ?? [];
+        if (!$mine) {
+            $out[$bucket][] = "no $label is on file for this engineer";
+            continue;
+        }
+        // Valid on the day of the visit, plus any margin the site insists on.
+        $needUntil = (int)$r['valid_days_after'] > 0
+            ? date('Y-m-d', strtotime($visit . ' +' . (int)$r['valid_days_after'] . ' days'))
+            : $visit;
+        $ok = false; $bestExpiry = '';
+        foreach ($mine as $d) {
+            if (!empty($d['redacted_at'])) continue;
+            $exp = (string)($d['expires_on'] ?? '');
+            if ($exp === '' || $exp >= $needUntil) { $ok = true; break; }
+            if ($exp > $bestExpiry) $bestExpiry = $exp;
+        }
+        if (!$ok) {
+            // "Expired" and "missing" are different failures with different fixes.
+            $out[$bucket][] = $bestExpiry !== ''
+                ? "their $label expires " . fdate($bestExpiry) . ', before '
+                  . ((int)$r['valid_days_after'] > 0
+                     ? 'the ' . (int)$r['valid_days_after'] . ' days this site requires beyond the visit'
+                     : 'the inspection date')
+                : "their $label has been withdrawn from the register";
+        }
+    }
+    return $out;
+}
+
+// One sentence for the allocation screen, or '' when there is nothing to say.
+function sitedoc_block_message(array $check) {
+    if (!$check['block']) return '';
+    return 'This site will not admit the engineer: ' . implode('; ', $check['block']) . '.';
+}
+
+// Documents running out, for the nightly chase. Looks ahead far enough that a
+// visa can actually be renewed in time.
+function sitedoc_expiring($days = 45, $today = null) {
+    sitedoc_migrate();
+    $today = $today ?: date('Y-m-d');
+    $until = date('Y-m-d', strtotime($today . " +$days days"));
+    try {
+        return ops_all(
+            "SELECT d.id, d.person_id, d.doc_kind, d.expires_on, i.name inspector_name, i.email
+             FROM person_documents d
+             LEFT JOIN inspectors i ON i.id = d.person_id
+             WHERE d.person_kind='INSPECTOR' AND (d.redacted_at IS NULL OR d.redacted_at='')
+               AND d.expires_on <> '' AND d.expires_on >= ? AND d.expires_on <= ?
+             ORDER BY d.expires_on", [$today, $until]);
+    } catch (Throwable $e) { if (iddoc_missing_table($e)) return []; throw $e; }
+}
+
+// ---- The requirements register ---------------------------------------------
+function ops_sitedocs($route, $method) {
+    ops_require(iddoc_can_view() || can('mod.clients.view') || is_master(),
+                'You cannot open the site-document requirements.');
+    sitedoc_migrate();
+
+    $canEdit = iddoc_can_manage() || can('mod.clients.edit') || is_master();
+
+    if ($route === 'site-docs-add' || $route === 'site-docs-delete') {
+        ops_require($canEdit, 'You cannot change what a site requires.');
+        if ($method === 'POST' && $route === 'site-docs-add') {
+            $pid = (int)($_POST['partner_id'] ?? 0);
+            if (!$pid) { flash('Choose which client the requirement belongs to.', 'error'); redirect('/site-docs'); }
+            db()->prepare("INSERT INTO site_doc_requirements
+                (partner_id,site_address_id,doc_kind,is_mandatory,valid_days_after,note,created_by,created_at)
+                VALUES (?,?,?,?,?,?,?,?)")
+                ->execute([$pid,
+                    ($_POST['site_address_id'] ?? '') !== '' ? (int)$_POST['site_address_id'] : null,
+                    (string)($_POST['doc_kind'] ?? 'GATE_PASS'),
+                    !empty($_POST['is_mandatory']) ? 1 : 0,
+                    max(0, (int)($_POST['valid_days_after'] ?? 0)),
+                    substr(trim((string)($_POST['note'] ?? '')), 0, 400),
+                    user_name(current_user()), date('c')]);
+            flash('Requirement added. It is checked whenever somebody is deputed to that client.');
+        }
+        if ($method === 'POST' && $route === 'site-docs-delete') {
+            db()->prepare("DELETE FROM site_doc_requirements WHERE id=?")->execute([(int)($_POST['id'] ?? 0)]);
+            flash('Requirement removed.');
+        }
+        redirect('/site-docs');
+    }
+
+    $rows = ops_all(
+        "SELECT r.*, bp.display_name, bp.legal_name, a.label site_label, a.city site_city
+         FROM site_doc_requirements r
+         LEFT JOIN business_partners bp ON bp.id = r.partner_id
+         LEFT JOIN partner_addresses a ON a.id = r.site_address_id
+         ORDER BY COALESCE(bp.display_name, bp.legal_name), r.is_mandatory DESC, r.doc_kind");
+    view('ops/site_docs', [
+        'rows' => $rows, 'canEdit' => $canEdit,
+        'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners
+                              WHERE is_client=1 AND status='ACTIVE' ORDER BY COALESCE(display_name, legal_name)"),
+        'kinds' => iddoc_kind_options(),
+        'expiring' => sitedoc_expiring(45),
+    ]);
+    return true;
+}

@@ -75,6 +75,22 @@
 </div>
 <?php endif; ?>
 
+<?php // The same shape for the documents the client's site demands. Kept
+      // separate from the certificate box because they are different failures
+      // with different fixes — one is our competence record, the other is
+      // somebody's passport — and an assessor reads them as different things. ?>
+<?php if (!empty($siteDocBlock) && competence_can_override()): ?>
+<div class="panel" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent)">
+  <b>Send them anyway?</b>
+  <p class="muted" style="margin:4px 0 8px">The site may still turn them away at the gate. This is recorded against
+    the <?= e(Tl('job')) ?> with your name. Say what makes it acceptable — for example that the client has confirmed
+    entry in writing, or the pass is being issued on arrival.</p>
+  <input class="form-control" form="jobform" name="sitedoc_override_note" required
+         value="<?= e($_POST['sitedoc_override_note'] ?? '') ?>"
+         placeholder="e.g. client security confirmed by e-mail that the gate pass will be issued on the day">
+</div>
+<?php endif; ?>
+
 <?php // The contract position, stated before the form is filled in. A blocked
       // allocation is refused on submit as well, but being told up front is the
       // difference between a warning and a wasted five minutes. ?>

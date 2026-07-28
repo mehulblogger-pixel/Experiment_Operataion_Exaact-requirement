@@ -1755,6 +1755,7 @@ function ops_module_gate($route) {
         'failure-add'=>'datacontrol','failure-update'=>'datacontrol','failure-resolve'=>'datacontrol',
         'failure-capa'=>'datacontrol',
         'report-reviews'=>'idems','report-ack'=>'idems',
+        'site-docs'=>'identity','site-docs-add'=>'identity','site-docs-delete'=>'identity',
         'ncr'=>'ncr','ncr-item'=>'ncr','ncr-new'=>'ncr','ncr-contain'=>'ncr','ncr-disposition'=>'ncr',
         'ncr-capa'=>'ncr','ncr-assign'=>'ncr','ncr-close'=>'ncr','ncr-reopen'=>'ncr',
         'capa'=>'capa','capa-item'=>'capa','capa-new'=>'capa','capa-cause'=>'capa','capa-plan'=>'capa',
@@ -1950,6 +1951,8 @@ function ops_dispatch($route, $method) {
             return ops_datacontrol($route, $method);
         case $route === 'report-reviews' || $route === 'report-ack':
             return ops_report_reviews($route, $method);
+        case $route === 'site-docs' || $route === 'site-docs-add' || $route === 'site-docs-delete':
+            return ops_sitedocs($route, $method);
         case $route === 'ncr' || strncmp($route, 'ncr-', 4) === 0:
             return ops_ncr($route, $method);
         case $route === 'capa' || strncmp($route, 'capa-', 5) === 0:
@@ -2955,6 +2958,7 @@ function job_save_fields() {
         'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays',
         'subcon_cost','other_cost','other_cost_note','quotation_id','is_outstation','chargeable_heads',
         'cert_override_note','cert_override_by',
+        'sitedoc_override_note','sitedoc_override_by',
         'impartiality_ok','impartiality_note','impartiality_by','impartiality_at'];
 }
 
@@ -3779,6 +3783,37 @@ function ops_jobs($route, $method) {
                             ['error' => $iWhy . ' Decide it on the Impartiality register, or put somebody else on the work.']));
                         return;
                     }
+                }
+                // Whether the site will actually let them through the gate. The
+                // identity register held passports, visas, medicals and gate
+                // passes and nothing ever read it — so an engineer could be
+                // deputed to a refinery demanding a medical they do not hold
+                // and find out at the barrier. Checked against the INSPECTION
+                // DATE, not today, and overridable with a recorded reason for
+                // the same reason the certificate gate is: refusing outright
+                // teaches people to back-date the document.
+                $b['sitedoc_override_note'] = trim((string)($b['sitedoc_override_note'] ?? ''));
+                if (function_exists('sitedoc_check')) {
+                    $sd = sitedoc_check((int)$b['inspector_id'], (int)($call['client_id'] ?? 0),
+                                        (int)($call['site_address_id'] ?? 0), $onDate);
+                    $sWhy = sitedoc_block_message($sd);
+                    if ($sWhy !== '') {
+                        if ($b['sitedoc_override_note'] === '' || !competence_can_override()) {
+                            view('ops/job_form', array_merge(call_job_form_vars($job, $call),
+                                ['error' => $sWhy . (competence_can_override()
+                                    ? ' Get the document on file, put somebody else on it, or state below why they are being sent anyway.'
+                                    : ' Get the document onto the identity register, or ask a manager.'),
+                                 'siteDocBlock' => $sWhy]));
+                            return;
+                        }
+                        $b['sitedoc_override_by'] = user_name(current_user());
+                    } else {
+                        $b['sitedoc_override_note'] = '';
+                        $b['sitedoc_override_by'] = '';
+                    }
+                    // Advisory requirements never stop the work; they are said
+                    // once, where the person allocating will see them.
+                    if ($sd['warn']) flash('Worth checking before they travel: ' . implode('; ', $sd['warn']) . '.', 'warning');
                 }
             }
             // Who confirmed there was nothing to declare on THIS deputation.
