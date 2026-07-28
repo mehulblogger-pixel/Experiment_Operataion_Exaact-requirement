@@ -8,6 +8,7 @@
   $locT = lk_options_or('quote_location_type', QUOTE_LOCATION_TYPES);
 ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/quotes"><?= e(TP('quote')) ?></a> › <?= e(quote_label($q)) ?></div>
+<?= function_exists('chain_strip') ? chain_strip('QUOTE', (int)$q['id'], 'QUOTE', (int)$q['id']) : '' ?>
 <div class="master-head">
   <div><h1><?= e(quote_label($q)) ?> <span class="pill <?= $stPill[$st] ?? 'p-mut' ?>" style="font-size:13px;vertical-align:middle"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st) ?></span></h1>
     <p class="sub" style="margin:2px 0 0"><?= e($q['subject'] ?: '—') ?></p></div>

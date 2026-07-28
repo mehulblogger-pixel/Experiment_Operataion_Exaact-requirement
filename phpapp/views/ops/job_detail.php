@@ -1,4 +1,5 @@
 <?php $lock = job_lock_state($job); ?>
+<?= function_exists('chain_strip') ? chain_strip('JOB', (int)$job['id'], 'JOB', (int)$job['id']) : '' ?>
 <div class="master-head">
   <div><h1><?= e(T_DETAIL('job', $job['job_code'])) ?></h1>
     <p class="sub"><?= e($job['client_disp'] ?: $job['client_name'] ?: '—') ?> · <?= e($job['inspector_name'] ?: 'Unassigned') ?></p></div>
