@@ -1969,6 +1969,10 @@ function ops_dispatch($route, $method) {
         // on whatever register you were already allowed to open.
         case $route === 'dt-columns':
             return ops_dt_columns($route, $method);
+        // Not gated by a module either: it searches only the registers the
+        // person can already open, and queries nothing else.
+        case $route === 'search':
+            return ops_search($route, $method);
         case $route === 'leads' || strncmp($route, 'lead', 4) === 0:
             return ops_leads($route, $method);
         case $route === 'activities' || $route === 'activity-add':

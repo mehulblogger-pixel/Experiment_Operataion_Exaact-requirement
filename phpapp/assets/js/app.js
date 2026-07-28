@@ -1230,8 +1230,24 @@
     return confirm(message.replace('%d', n) + '\n\n' + n + ' row' + (n === 1 ? '' : 's') + ' selected.');
   };
 
+  // "/" jumps to the record search from anywhere — but never while somebody is
+  // typing into a field, which is the mistake that makes this shortcut hated.
+  function initSearchKey() {
+    var box = document.getElementById('gsearch');
+    if (!box) return;
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key !== '/' || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      var t = ev.target, tag = (t && t.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select' || (t && t.isContentEditable)) return;
+      ev.preventDefault();
+      box.focus();
+      box.select();
+    });
+  }
+
   function init() {
     initDataTables();
+    initSearchKey();
     // First, so its submit listener runs before the one-shot ticket greys the
     // button: listeners on the same element fire in the order they were added.
     initFormGuard();

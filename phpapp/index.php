@@ -129,6 +129,7 @@ try {
     require __DIR__ . '/lib/packs.php';
     require __DIR__ . '/lib/leads.php';
     require __DIR__ . '/lib/datatable.php';
+    require __DIR__ . '/lib/search.php';
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';
     require __DIR__ . '/lib/trust.php';

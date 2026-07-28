@@ -41,6 +41,18 @@ const PLAIN = [
   '/users', '/user-new', '/hierarchy', '/settings', '/access', '/terminology',
   '/ai-settings', '/templates', '/crm-templates', '/approval-rules', '/my-signature',
   '/change-password', '/my-jobs', '/boss-renew',
+  // Global search: the empty box, a term that matches several registers, and a
+  // term narrowed to one. 'lim' hits the many "... LIMITED" customers, so the
+  // crawl stays on the results page instead of being redirected to a lone hit.
+  '/search', '/search?q=lim', '/search?q=lim&in=partners',
+  // The three registers using the shared table component, each exercised with a
+  // sort and a page size — the URL is the whole of the component's input, so a
+  // plain load would miss everything that made it worth building.
+  '/leads?v=list', '/leads?v=list&sort=value&dir=asc&per=25',
+  '/activities', '/activities?sort=what&dir=desc&per=25&page=1',
+  '/ncr', '/ncr?f=all&sort=severity&dir=desc&per=50',
+  // A sort key no screen declares must be ignored, not fatal.
+  '/activities?sort=not-a-column&dir=desc',
 ];
 
 // register path -> [link pattern to follow, extra screens built from that id]
@@ -61,6 +73,8 @@ const REGISTERS = [
   ['/internal-audits', /^\/internal-audit\?id=(\d+)/, ['/internal-audit?id=%s']],
   ['/management-reviews', /^\/management-review\?id=(\d+)/, ['/management-review?id=%s']],
   ['/equipment',     /^\/equip-edit\?id=(\d+)/, ['/equip-edit?id=%s']],
+  ['/leads?v=list',  /^\/lead\?id=(\d+)/,   ['/lead?id=%s']],
+  ['/ncr?f=all',     /^\/ncr-item\?id=(\d+)/, ['/ncr-item?id=%s']],
 ];
 
 const FATAL = /Cannot redeclare|program file is missing|The app hit an error|Fatal error|Parse error|Uncaught (?:Error|Exception|TypeError)|SQLSTATE|Warning: |Notice: |Deprecated: |Undefined variable|Undefined array key/i;
