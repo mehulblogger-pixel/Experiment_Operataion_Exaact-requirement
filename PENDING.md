@@ -137,6 +137,42 @@ corrective actions, branch scoping, portal permissions, site-entry documents,
 confidentiality, and the competence review cycle. Entries about them survive
 below as history; they are not open.
 
+## ▣ Sales & CRM can now be sold on its own (July 2026)
+
+The owner asked whether the whole sales module including the CRM could be
+delivered separately and completely. Measured rather than answered from memory:
+
+**It could not.** `PRODUCT_MODULES` had a 'Sales & CRM' entry, but `operations`
+was flagged **core**, so it could never be switched off — "sold separately" was
+a line in a settings screen, not something that could be delivered.
+
+**It can now, and it is tested.** `MODULES_OFF=operations,reporting,hr` gives a
+working Sales & CRM + Books install: 107 screens crawled, all rendering cleanly,
+every operations screen correctly refused.
+
+**What had to change**
+
+* `operations` is no longer core. Administration stays core — every install
+  needs masters, users and settings. A trading company or a consultancy buying
+  the CRM has no deputations to schedule.
+* **`is_master()` was walking straight past the licence.** `can()` already
+  refused a permission belonging to an unbought module, but 33 screens guarded
+  themselves with `can('mod.x.view') || is_master()`, and the bare `is_master()`
+  ignored it. An administrator on a Sales-only install was being offered the
+  equipment register, the nonconformity register and the report engine. New
+  `is_master_of($modules)`: being the administrator means you can do anything the
+  PRODUCT does, not that you own modules you have not bought. All 33 converted.
+* Nav guards using bare capabilities (`idems.type.manage`, `dash.operations`)
+  are invisible to the licence, which only understands `mod.<x>.<y>`. Those four
+  are gated explicitly.
+* `overheads` moved from admin to operations — the cost run and office overheads
+  exist to cost deputations.
+
+**Coupling, measured:** the whole sales/CRM/books stack calls exactly **three**
+functions that live in operations-only files — `deliverable_options()`,
+`idems_log()` and `ncr_can_view()` — and all three are already behind
+`function_exists()` or a licence check.
+
 ## ▣ CRM → operations → the books, as one flow (July 2026)
 
 The owner's requirement: *"Our system must flow from CRM to operations and

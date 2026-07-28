@@ -27,12 +27,19 @@
 
 // Saleable module => [label, what it covers, the fine-grained access modules]
 const PRODUCT_MODULES = [
+    // CORRECTING AN EARLIER DECISION. 'operations' was marked core, which meant
+    // it could never be switched off — so "Sales & CRM sold on its own" was a
+    // line in a settings screen and not a thing that could actually be
+    // delivered. It is not core: a trading company, a consultancy or an agency
+    // buying the CRM has no deputations to schedule. What IS core is
+    // administration, because every install needs masters, users and settings.
     'operations' => ['Operations', 'Inspection calls, deputations, scheduling, availability',
                      ['calls', 'jobs', 'reconcile', 'vouchers', 'equipment', 'competence', 'impartiality',
-                      'identity', 'complaints', 'ncr', 'capa', 'audits', 'datacontrol', 'confidentiality'], true],
+                      'identity', 'complaints', 'ncr', 'capa', 'audits', 'datacontrol', 'confidentiality',
+                      'overheads'], false],
     'admin'      => ['Administration', 'Masters, users, offices, settings, parties',
-                     ['masters', 'users', 'settings', 'clients', 'vendors', 'overheads', 'reports', 'portal'], true],
-    'sales'      => ['Sales & CRM', 'Inquiries, quotations, approvals, sales dashboards',
+                     ['masters', 'users', 'settings', 'clients', 'vendors', 'reports', 'portal'], true],
+    'sales'      => ['Sales & CRM', 'Leads, pipelines, enquiries, quotations, approvals, activity, sales dashboards',
                      ['leads', 'inquiries', 'quotes', 'crm_orders', 'crm_reports'], false],
     'reporting'  => ['Inspection reporting', 'The report engine, formats, endorsements, evidence',
                      ['idems'], false],
@@ -77,6 +84,29 @@ function licence_disabled($reload = false) {
 }
 
 function licence_enabled($key) { return !in_array($key, licence_disabled(), true); }
+
+// ---- The administrator does not own what was not bought ---------------------
+// can() already refuses a permission belonging to an unlicensed module. But
+// thirty-odd screens guard themselves with `can('mod.x.view') || is_master()`,
+// and that bare is_master() walks straight past the licence. The result was an
+// administrator on a Sales-only install being offered the equipment register,
+// the nonconformity register and the report engine — modules that installation
+// had not bought and whose screens would have been half-empty.
+//
+// Being the administrator means you can do anything the PRODUCT does. It does
+// not mean you own modules that are switched off. So: master, but only for a
+// module this installation actually has.
+//
+// $modules is one access-module key, or several — true if ANY of them is
+// licensed, matching the `A or B` shape of the guards it replaces.
+function is_master_of($modules) {
+    if (!is_master()) return false;
+    foreach ((array)$modules as $m) {
+        $owner = licence_owner($m);
+        if ($owner === null || licence_enabled($owner)) return true;   // unclaimed or bought
+    }
+    return false;
+}
 
 // True when this permission belongs to a module the installation has not
 // bought. Only 'mod.<x>.<y>' permissions can be licensed away — a bare

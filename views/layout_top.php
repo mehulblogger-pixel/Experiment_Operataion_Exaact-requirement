@@ -146,8 +146,8 @@
         <?php if (can('mod.competence.view')): ?><a class="s-item<?= $navOn(['competence']) ?>" href="/competence"><span class="s-ic">🎓</span><span>Competence &amp; authorisation</span></a><?php endif; ?>
         <?php if (can('mod.impartiality.view')): ?><a class="s-item<?= $navOn(['impartiality']) ?>" href="/impartiality"><span class="s-ic">⚖️</span><span>Impartiality</span></a><?php endif; ?>
         <?php if (can('mod.complaints.view')): $cmpN = function_exists('cmp_all') ? count(cmp_all(['status'=>'OPEN'])) : 0; ?><a class="s-item<?= $navOn(['complaints','complaint','complaint-new']) ?>" href="/complaints"><span class="s-ic">📮</span><span>Complaints &amp; appeals<?= $cmpN ? ' (' . $cmpN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if (can('mod.confidentiality.view') || can('mod.identity.view') || is_master()): ?><a class="s-item<?= $navOn(['confidentiality','conf-breach']) ?>" href="/confidentiality"><span class="s-ic">🔒</span><span>Confidentiality</span></a><?php endif; ?>
-        <?php if (function_exists('ops_sitedocs') && (can('mod.identity.view') || can('mod.clients.view') || is_master())): ?><a class="s-item<?= $navOn(['site-docs']) ?>" href="/site-docs"><span class="s-ic">🛂</span><span>Site entry documents</span></a><?php endif; ?>
+        <?php if (can('mod.confidentiality.view') || can('mod.identity.view') || is_master_of(['confidentiality','identity'])): ?><a class="s-item<?= $navOn(['confidentiality','conf-breach']) ?>" href="/confidentiality"><span class="s-ic">🔒</span><span>Confidentiality</span></a><?php endif; ?>
+        <?php if (function_exists('ops_sitedocs') && licence_enabled('operations') && (can('mod.identity.view') || can('mod.clients.view') || is_master_of(['identity','clients']))): ?><a class="s-item<?= $navOn(['site-docs']) ?>" href="/site-docs"><span class="s-ic">🛂</span><span>Site entry documents</span></a><?php endif; ?>
         <?php if (function_exists('rcr_can_view') && rcr_can_view()): $rcrN = function_exists('rcr_counts') ? rcr_counts()['rejected'] : 0; ?><a class="s-item<?= $navOn(['report-reviews']) ?>" href="/report-reviews"><span class="s-ic">📬</span><span>Client acceptance<?= $rcrN ? ' (' . $rcrN . ')' : '' ?></span></a><?php endif; ?>
         <?php if (can('mod.ncr.view') || can('mod.capa.view')): $ncrN = function_exists('ncr_counts') ? ncr_counts()['open'] : 0; ?><a class="s-item<?= $navOn(['ncr','ncr-item','ncr-new']) ?>" href="/ncr"><span class="s-ic">⚠</span><span>Nonconformities<?= $ncrN ? ' (' . $ncrN . ')' : '' ?></span></a><?php endif; ?>
         <?php if (can('mod.capa.view')): $capaN = function_exists('capa_all') ? count(capa_all(['open'=>1])) : 0; ?><a class="s-item<?= $navOn(['capa','capa-item','capa-new']) ?>" href="/capa"><span class="s-ic">🛠</span><span>Corrective actions<?= $capaN ? ' (' . $capaN . ')' : '' ?></span></a><?php endif; ?>
@@ -162,14 +162,14 @@
         <?php if (can('mod.idems.view')): ?>
         <?php $grp('Reporting'); ?>
         <a class="s-item<?= $navOn(['documents','document','document-new','document-edit']) ?>" href="/documents"><span class="s-ic">📑</span><span><?= e(T_REG('report')) ?></span></a>
-        <?php if (can('mod.idems.edit') || is_master()): ?><a class="s-item<?= $navOn(['document-new']) ?>" href="/document-new"><span class="s-ic">➕</span><span><?= e(ucfirst(T_NEW('report'))) ?></span></a><?php endif; ?>
+        <?php if (can('mod.idems.edit') || is_master_of('idems')): ?><a class="s-item<?= $navOn(['document-new']) ?>" href="/document-new"><span class="s-ic">➕</span><span><?= e(ucfirst(T_NEW('report'))) ?></span></a><?php endif; ?>
         <a class="s-item<?= $navOn(['endorsements','endorsement','endorsement-new','endorsement-edit']) ?>" href="/endorsements"><span class="s-ic">✅</span><span><?= e(T_REG('endorsement')) ?></span></a>
         <a class="s-item<?= $navOn(['writing-assistant','phrase-library','phrase-edit']) ?>" href="/writing-assistant"><span class="s-ic">✒️</span><span>Technical writing</span></a>
         <a class="s-item<?= $navOn(['learning']) ?>" href="/learning"><span class="s-ic">🧠</span><span>Learning insights</span></a>
-        <?php if (can('idems.type.manage') || is_master() || can('users.manage.global')): ?><a class="s-item<?= $navOn(['approver-map']) ?>" href="/approver-map"><span class="s-ic">👤</span><span>Approver mapping</span></a><?php endif; ?>
-        <?php if (can('idems.type.manage') || is_master()): ?><a class="s-item<?= $navOn(['idems-approval-rules','idems-approval-rule-edit','approval-rules']) ?>" href="/approval-rules"><span class="s-ic">🔀</span><span>Approval rules</span></a><?php endif; ?>
-        <?php if (can('idems.type.manage') || is_master() || can('crm.template.manage')): ?><a class="s-item<?= $navOn(['report-templates','report-template-edit','templates']) ?>" href="/templates"><span class="s-ic">📝</span><span>Document templates</span></a><?php endif; ?>
-        <?php if (can('idems.audit.view') || is_master()): ?><a class="s-item<?= $navOn(['audit-log']) ?>" href="/audit-log"><span class="s-ic">🛡️</span><span>Audit trail</span></a><?php endif; ?>
+        <?php if (licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('users.manage.global'))): ?><a class="s-item<?= $navOn(['approver-map']) ?>" href="/approver-map"><span class="s-ic">👤</span><span>Approver mapping</span></a><?php endif; ?>
+        <?php if (licence_enabled('reporting') && (can('idems.type.manage') || is_master())): ?><a class="s-item<?= $navOn(['idems-approval-rules','idems-approval-rule-edit','approval-rules']) ?>" href="/approval-rules"><span class="s-ic">🔀</span><span>Approval rules</span></a><?php endif; ?>
+        <?php if (licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('crm.template.manage'))): ?><a class="s-item<?= $navOn(['report-templates','report-template-edit','templates']) ?>" href="/templates"><span class="s-ic">📝</span><span>Document templates</span></a><?php endif; ?>
+        <?php if (licence_enabled('reporting') && (can('idems.audit.view') || is_master())): ?><a class="s-item<?= $navOn(['audit-log']) ?>" href="/audit-log"><span class="s-ic">🛡️</span><span>Audit trail</span></a><?php endif; ?>
         <?php // One screen that says, measured from the running system, which of the
               // legal obligations are met and which are not. Kept next to the audit
               // trail because that is where somebody looks when a client asks. ?>
@@ -216,7 +216,7 @@
                 // monthly total — so the per-inspection figure sits beside the
                 // branch one rather than being buried in it. ?>
           <?php if (can('mod.profitability.view')): ?><a class="s-item<?= $navOn(['call-profit']) ?>" href="/call-profit"><span class="s-ic">🧾</span><span>Profit by <?= e(Tl('call')) ?></span></a><?php endif; ?>
-          <?php if (can('mod.reports.view')||can('dash.operations')||can('dash.financial')): ?><a class="s-item<?= $navOn(['mis']) ?>" href="/mis"><span class="s-ic">📈</span><span>Management dashboard</span></a><?php endif; ?>
+          <?php if (licence_enabled('operations') && (can('mod.reports.view')||can('dash.operations')||can('dash.financial'))): ?><a class="s-item<?= $navOn(['mis']) ?>" href="/mis"><span class="s-ic">📈</span><span>Management dashboard</span></a><?php endif; ?>
           <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['users','user-new','user-edit']) ?>" href="/users"><span class="s-ic">👥</span><span><?= e(T_REG('user')) ?></span></a><?php endif; ?>
           <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['hierarchy']) ?>" href="/hierarchy"><span class="s-ic">🗂️</span><span>Organisation</span></a><?php endif; ?>
           <?php if (is_master()): ?><a class="s-item<?= $navOn(['access']) ?>" href="/access"><span class="s-ic">🔐</span><span>Roles &amp; permissions</span></a><?php endif; ?>

@@ -59,7 +59,7 @@ function search_sources() {
     $like = fn($q) => '%' . str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], (string)$q) . '%';
 
     // ---- Customers and vendors ---------------------------------------------
-    $add('partners', 'Customers & vendors', '🏢', can('mod.clients.view') || is_master(),
+    $add('partners', 'Customers & vendors', '🏢', can('mod.clients.view') || is_master_of('clients'),
         function ($q, $n) use ($like) {
             $l = $like($q);
             return array_map(fn($r) => [
@@ -81,7 +81,7 @@ function search_sources() {
     // ---- People at those customers -----------------------------------------
     // Searched separately because "who is Rakesh" is a real question and the
     // answer is a person, not the company they happen to work for.
-    $add('contacts', 'Contacts', '👤', can('mod.clients.view') || is_master(),
+    $add('contacts', 'Contacts', '👤', can('mod.clients.view') || is_master_of('clients'),
         function ($q, $n) use ($like) {
             $l = $like($q);
             return array_map(fn($r) => [
@@ -119,7 +119,7 @@ function search_sources() {
         });
 
     // ---- Inquiries ----------------------------------------------------------
-    $add('inquiries', THP('inquiry'), '📨', can('mod.inquiries.view') || is_master(),
+    $add('inquiries', THP('inquiry'), '📨', can('mod.inquiries.view') || is_master_of('inquiries'),
         function ($q, $n) use ($like) {
             $l = $like($q);
             return array_map(fn($r) => [
@@ -137,7 +137,7 @@ function search_sources() {
         });
 
     // ---- Quotations ---------------------------------------------------------
-    $add('quotes', THP('quote'), '📝', can('mod.quotes.view') || is_master(),
+    $add('quotes', THP('quote'), '📝', can('mod.quotes.view') || is_master_of('quotes'),
         function ($q, $n) use ($like) {
             $l = $like($q);
             [$sw, $sa] = scope_clause('q.office_id', 'q.sbu');
@@ -159,7 +159,7 @@ function search_sources() {
         });
 
     // ---- Inspection calls ---------------------------------------------------
-    $add('calls', THP('call'), '📞', can('mod.calls.view') || is_master(),
+    $add('calls', THP('call'), '📞', can('mod.calls.view') || is_master_of('calls'),
         function ($q, $n) use ($like) {
             $l = $like($q);
             [$sw, $sa] = scope_clause('c.executing_office_id', 'c.sbu');
@@ -181,7 +181,7 @@ function search_sources() {
     // ---- Deputations ---------------------------------------------------------
     // Invoice number is searched here because that is where it lives, and
     // "which job was invoice INV/26/0112" is the most-asked accounts question.
-    $add('jobs', THP('job'), '🗂', can('mod.jobs.view') || is_master(),
+    $add('jobs', THP('job'), '🗂', can('mod.jobs.view') || is_master_of('jobs'),
         function ($q, $n) use ($like) {
             $l = $like($q);
             [$sw, $sa] = scope_clause('j.executing_office_id', 'j.sbu');
@@ -206,7 +206,7 @@ function search_sources() {
         });
 
     // ---- Reports -------------------------------------------------------------
-    $add('reports', THP('report'), '📑', can('mod.idems.view') || is_master(),
+    $add('reports', THP('report'), '📑', can('mod.idems.view') || is_master_of('idems'),
         function ($q, $n) use ($like) {
             $l = $like($q);
             [$sw, $sa] = scope_clause('d.office_id', 'd.sbu');
@@ -228,7 +228,7 @@ function search_sources() {
         });
 
     // ---- The compliance registers -------------------------------------------
-    $add('complaints', 'Complaints & appeals', '📣', can('mod.complaints.view') || is_master(),
+    $add('complaints', 'Complaints & appeals', '📣', can('mod.complaints.view') || is_master_of('complaints'),
         function ($q, $n) use ($like) {
             $l = $like($q);
             [$sw, $sa] = scope_office_clause('office_id');
@@ -263,7 +263,7 @@ function search_sources() {
                 array_merge($sa, [$l, $l, $l, $l])));
         });
 
-    $add('capa', 'Corrective actions', '🛠', can('mod.capa.view') || is_master(),
+    $add('capa', 'Corrective actions', '🛠', can('mod.capa.view') || is_master_of('capa'),
         function ($q, $n) use ($like) {
             $l = $like($q);
             [$sw, $sa] = scope_office_clause('office_id');
@@ -282,7 +282,7 @@ function search_sources() {
         });
 
     // ---- People and instruments ---------------------------------------------
-    $add('people', 'People', '👷', can('mod.inspectors.view') || is_master(),
+    $add('people', 'People', '👷', can('mod.inspectors.view') || is_master_of('inspectors'),
         function ($q, $n) use ($like) {
             $l = $like($q);
             return array_map(fn($r) => [
@@ -298,7 +298,7 @@ function search_sources() {
                 [$l, $l, $l, $l]));
         });
 
-    $add('equipment', 'Equipment', '📐', can('mod.equipment.view') || is_master(),
+    $add('equipment', 'Equipment', '📐', can('mod.equipment.view') || is_master_of('equipment'),
         function ($q, $n) use ($like) {
             $l = $like($q);
             return array_map(fn($r) => [

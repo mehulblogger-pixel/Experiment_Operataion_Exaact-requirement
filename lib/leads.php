@@ -146,8 +146,8 @@ function leads_try($fn, $fb = []) {
     try { return $fn(); } catch (Throwable $e) { if (!leads_missing($e)) throw $e; return $fb; }
 }
 
-function leads_can_view() { return can('mod.leads.view') || can('mod.inquiries.view') || is_master(); }
-function leads_can_edit() { return can('mod.leads.edit') || can('mod.inquiries.edit') || is_master(); }
+function leads_can_view() { return can('mod.leads.view') || can('mod.inquiries.view') || is_master_of(['leads','inquiries']); }
+function leads_can_edit() { return can('mod.leads.edit') || can('mod.inquiries.edit') || is_master_of(['leads','inquiries']); }
 
 // ---- Pipelines and stages --------------------------------------------------
 function pipelines_all($kind = 'LEAD') {

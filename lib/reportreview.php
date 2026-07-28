@@ -275,14 +275,14 @@ function rcr_counts() {
 }
 
 // ---- The staff screen ------------------------------------------------------
-function rcr_can_view() { return can('mod.idems.view') || can('mod.ncr.view') || is_master(); }
+function rcr_can_view() { return can('mod.idems.view') || can('mod.ncr.view') || is_master_of(['idems','ncr']); }
 
 function ops_report_reviews($route, $method) {
     ops_require(rcr_can_view(), 'You cannot open the client-acceptance register.');
     rcr_migrate();
 
     if ($route === 'report-ack' && $method === 'POST') {
-        ops_require(can('mod.idems.edit') || can('mod.ncr.edit') || is_master(),
+        ops_require(can('mod.idems.edit') || can('mod.ncr.edit') || is_master_of(['idems','ncr']),
                     'You cannot acknowledge a client decision.');
         rcr_acknowledge((int)($_POST['id'] ?? 0), (string)($_POST['note'] ?? ''));
         flash('Acknowledged. The nonconformity, if one was raised, still has to be worked through on its own.');
@@ -310,7 +310,7 @@ function ops_report_reviews($route, $method) {
         csv_download('client-acceptance-' . $f . '-' . date('Y-m-d') . '.csv', $csv);
     }
     view('ops/report_reviews', ['f' => $f, 'pending' => $pending, 'rejected' => $rejected,
-                                'canAck' => can('mod.idems.edit') || can('mod.ncr.edit') || is_master()]);
+                                'canAck' => can('mod.idems.edit') || can('mod.ncr.edit') || is_master_of(['idems','ncr'])]);
     return true;
 }
 
