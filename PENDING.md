@@ -2,6 +2,70 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ ROADMAP 3.4 — complaints & appeals (§7.5, §7.6) (July 2026)
+
+`lib/complaints.php`, `complaints` · `complaint_events`, screens `/complaints`
+and `/complaint`, plus **one page that opens without signing in**.
+
+Every inspection body says it takes complaints seriously. What an assessor asks
+for is a **list**: how many, when each arrived, when each was acknowledged, who
+decided it, whether that person had anything to do with the inspection being
+complained about, and when the complainant was told. A body that cannot produce
+that list has a nonconformity however well it handled the complaint in the room.
+
+**Three rules the software will not let you break:**
+
+1. **§7.5.4 — the decider must not have been involved.** The engineer on the
+   work, whoever prepared the report, whoever finalised it and whoever approved
+   it are all refused, by name, with the clause quoted. The coordinator who
+   allocated the deputation is deliberately **not** counted — allocating work is
+   not carrying out an inspection, and counting it would leave a small branch
+   with nobody left who is allowed to decide anything.
+2. **§7.6 — an appeal is decided by somebody else again.** Whoever decided the
+   original cannot decide the appeal against it. Otherwise it is not an appeal,
+   it is the same person being asked twice. An appeal also *inherits* what the
+   original was about, so rule 1 still bites on it.
+3. **Nothing closes until the complainant has been told.** The most common
+   finding in this clause is a register full of resolved complaints where nobody
+   wrote back. Closing refuses, and says so. The one honest exception —
+   anonymous with no way to reach them — is stated rather than silently skipped.
+
+Plus: an **upheld** complaint cannot close with nothing changed (a corrective
+action reference is required — 3.5 builds the register itself), turning a
+complaint away as "not ours" requires a reason on the record, and a decision
+requires the reasons written out, because that paragraph is what goes to the
+complainant.
+
+**The published description (§7.5.1)** is at **`/complaints-policy`** and opens
+**without signing in** — a page behind a password is not "available to any
+interested party". It ships filled in, because blank is the finding, and the
+register says out loud when the wording is still ours rather than the company's.
+
+**No public complaint form.** An open submission form on the internet needs rate
+limiting, spam handling and abuse review to be worth having, and a half-built
+one is worse than a published address. Deferred deliberately, said plainly.
+
+*Verified:* 69 rule tests, 41 browser checks, each run twice from a dirty
+database. Lint green (152 files), 83 screens.
+
+### Two real bugs found while wiring this up
+
+- **The access editor could not reach five modules.** It renders
+  `module_groups()`, not `ACCESS_MODULES` — and equipment, competence,
+  impartiality, identity and complaints were in the catalogue but in no group.
+  An administrator literally could not grant or deny any of them. Now grouped
+  under *Accreditation & compliance*, **and** the function ends with a catch-all
+  so a module can never go missing from that screen again.
+- **A module added later looked identical to one that was denied.** A saved
+  permission set is a list of what was ticked; a module added afterwards is
+  simply absent, which is indistinguishable from deliberately unticked. The old
+  answer was a hand-maintained `NEW_MODULES` list that nobody remembered to
+  extend — so the last five modules were invisible to any install that had ever
+  saved Roles & access. Saving now **stamps the module catalogue as it stood at
+  that moment**, so "new" is a fact rather than a guess, and unticking a module
+  is no longer silently undone. The old list survives only as the one-off
+  catch-up for installs that saved before the stamp existed.
+
 ## ✅ Identity documents — built, with the guardrails, not after them (July 2026)
 
 `lib/identity.php`, `person_documents` · `person_document_access`, screen

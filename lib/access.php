@@ -66,6 +66,10 @@ const PERMISSIONS = [
     // reason to read a colleague's passport, so somebody has to grant it.
     'person.iddoc.view'   => 'See that an identity document is on file (numbers stay masked)',
     'person.iddoc.manage' => 'Hold identity documents — file, reveal a number, log a copy sent out, redact',
+    // ---- Complaints & appeals (ISO/IEC 17020 §7.5, §7.6) ----
+    // Recording and investigating is ordinary desk work. Deciding the outcome is
+    // not, and the standard cares who did it, so it is its own permission.
+    'complaints.decide'   => 'Decide complaints and appeals (§7.5.4 — must not have been involved)',
 ];
 
 // Human-friendly grouping of every permission, so the access editor reads clearly
@@ -78,18 +82,30 @@ function permission_groups() {
         'Money'                          => ['finance.reconcile'],
         'Marketing & Sales (CRM)'        => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage'],
         'Identity documents (personal data)' => ['person.iddoc.view','person.iddoc.manage'],
+        'Complaints & appeals'           => ['complaints.decide'],
         'Administration'                 => ['master.manage','users.manage.branch','users.manage.global','org.hierarchy.view','settings.manage'],
     ];
 }
 // Modules grouped the same way for the view/edit matrix.
+//
+// The access editor renders THIS, not ACCESS_MODULES — so a module missing from
+// here cannot be granted or denied by an administrator at all. That had already
+// happened to five of them. The catch-all at the end makes it impossible to
+// happen again: anything in the catalogue that no group claims is shown anyway,
+// under a heading that says what it is.
 function module_groups() {
-    return [
+    $g = [
         'Marketing & Sales (CRM)' => ['inquiries','quotes','crm_orders','crm_reports'],
         'Inspection documentation' => ['idems'],
         'Operations'              => ['calls','jobs','vouchers','invoicing','profitability','hiring','reconcile'],
+        'Accreditation & compliance' => ['equipment','competence','impartiality','complaints','identity'],
         'Directory & masters'     => ['clients','vendors','masters','overheads'],
         'Insights & admin'        => ['reports','users','settings'],
     ];
+    $claimed = array_merge(...array_values($g));
+    $orphans = array_values(array_diff(array_keys(ACCESS_MODULES), $claimed));
+    if ($orphans) $g['Not yet grouped'] = $orphans;
+    return $g;
 }
 // The recommended permission set for a role (fine-grained + module view/edit).
 function role_recommended_perms($role) { return role_defaults($role)['perms']; }
@@ -120,6 +136,7 @@ const ACCESS_MODULES = [
     'competence'    => 'Competence & authorisation',
     'impartiality'  => 'Impartiality & conflicts',
     'identity'      => 'Identity documents (site access)',
+    'complaints'    => 'Complaints & appeals',
     'masters'       => 'Masters',
     'overheads'     => 'Overheads (office finance)',
     'reports'       => 'Dashboards / reports',
@@ -146,21 +163,21 @@ function module_defaults($role) {
         case 'MASTER_ADMIN': case 'ADMIN': $edit = $all; break;
         case 'BUSINESS_DIRECTOR': $view = $all; break;
         case 'SBU_HEAD':
-            $view = ['inquiries','quotes','crm_orders','crm_reports','idems','calls','jobs','vouchers','invoicing','profitability','hiring','reconcile','clients','vendors','masters','reports']; break;
+            $view = ['inquiries','quotes','crm_orders','crm_reports','idems','calls','jobs','vouchers','invoicing','profitability','hiring','reconcile','clients','vendors','masters','reports','complaints']; break;
         case 'BRANCH_MANAGER':
-            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','clients','vendors','masters','reports','users'];
+            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','clients','vendors','masters','reports','users','complaints'];
             $view = ['inquiries','quotes','crm_orders','crm_reports','invoicing','profitability','overheads']; break;
         case 'BRANCH_APP_MANAGER':
             $edit = ['masters','overheads','users'];
             $view = ['calls','jobs','reports']; break;
         case 'OPERATION_MANAGER':
-            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile'];
+            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','complaints'];
             $view = ['crm_orders','clients','vendors','masters','profitability','reports']; break;
         case 'ASST_MANAGER':
-            $edit = ['calls','jobs','idems'];
+            $edit = ['calls','jobs','idems','complaints'];
             $view = ['clients','vendors','reports']; break;
         case 'COORDINATOR':
-            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile'];
+            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','complaints'];
             $view = ['crm_orders','clients','vendors','masters','reports','invoicing']; break;
         // ---- Marketing & Sales (CRM) ----
         case 'BUSINESS_DEV_MANAGER': case 'KEY_ACCOUNTS_MANAGER':
@@ -191,14 +208,41 @@ function module_defaults($role) {
     return array_values(array_unique($out));
 }
 
-// Modules added AFTER the access editor first shipped. A saved role/user permission
-// set from before these existed simply doesn't mention them, so we grant the role's
-// default view/edit for them. Safe because these modules are genuinely new — a saved
-// set could never have "deliberately removed" them, so nothing existing is resurrected.
-const NEW_MODULES = ['inquiries', 'quotes', 'crm_orders', 'crm_reports', 'idems'];
+// ---- Modules that did not exist when somebody last saved their access -------
+//
+// A saved role or per-user permission set is a list of what was ticked. A module
+// added later is simply absent from that list — indistinguishable, on the face
+// of it, from a module that was deliberately untieked. Get this wrong in one
+// direction and a new module is invisible for ever; get it wrong in the other
+// and unticking a module silently un-does itself.
+//
+// So the saved set carries a companion: the list of modules that existed at the
+// moment it was saved. Anything not on that list is genuinely new and gets the
+// role's default. Nothing is guessed.
+//
+// The fallback below is for installs that saved their access before this
+// companion list existed. It names every module added after the access editor
+// first shipped — and it is a one-off catch-up, not a list to keep extending:
+// from now on modules_at_last_save() answers the question by itself.
+const NEW_MODULES = ['inquiries', 'quotes', 'crm_orders', 'crm_reports', 'idems',
+                     'equipment', 'competence', 'impartiality', 'identity', 'complaints'];
+
+// Snapshot the module catalogue. Called whenever a role's access is saved.
+function stamp_modules_at_save() {
+    setting_set('role_access_modules', implode(',', array_keys(ACCESS_MODULES)));
+}
+function modules_at_last_save() {
+    $raw = trim((string)setting_get('role_access_modules', ''));
+    if ($raw === '') return null;                     // saved before the stamp existed
+    return array_values(array_filter(array_map('trim', explode(',', $raw))));
+}
+
 function merge_new_module_defaults($perms, $role) {
+    $known = modules_at_last_save();
     foreach (module_defaults($role) as $dp) {
-        if (preg_match('/^mod\.(\w+)\.(view|edit)$/', $dp, $m) && in_array($m[1], NEW_MODULES, true) && !in_array($dp, $perms, true)) $perms[] = $dp;
+        if (!preg_match('/^mod\.(\w+)\.(view|edit)$/', $dp, $m)) continue;
+        $isNew = $known === null ? in_array($m[1], NEW_MODULES, true) : !in_array($m[1], $known, true);
+        if ($isNew && !in_array($dp, $perms, true)) $perms[] = $dp;
     }
     return array_values(array_unique($perms));
 }

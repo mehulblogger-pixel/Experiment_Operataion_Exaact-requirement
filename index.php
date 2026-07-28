@@ -113,6 +113,7 @@ try {
     require __DIR__ . '/lib/equipment.php';
     require __DIR__ . '/lib/impartiality.php';
     require __DIR__ . '/lib/identity.php';
+    require __DIR__ . '/lib/complaints.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
@@ -226,6 +227,8 @@ try {
     db()->query("SELECT impartiality_ok FROM jobs LIMIT 1");
     db()->query("SELECT id FROM person_documents LIMIT 1");
     db()->query("SELECT id FROM person_document_access LIMIT 1");
+    db()->query("SELECT id FROM complaints LIMIT 1");
+    db()->query("SELECT id FROM complaint_events LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which
     // runs the same idempotent boot() and clears it. Each check is self-cancelling.
@@ -393,6 +396,15 @@ if ($route === 'login') {
 if ($route === 'logout') {
     if (function_exists('idems_log') && current_user()) idems_log('user', current_user()['id'], 'LOGOUT', []);
     session_destroy(); redirect('/login');
+}
+
+// How we handle complaints has to be readable by anybody who wants to complain
+// — ISO/IEC 17020 §7.5.1 asks for the description to be available to any
+// interested party, and a page behind a password is not available to them. So
+// this one page sits in front of the gate. It is read-only and takes nothing in.
+if ($route === 'complaints-policy') {
+    require __DIR__ . '/views/ops/complaints_policy.php';
+    exit;
 }
 
 // --- Everything below requires login ---
