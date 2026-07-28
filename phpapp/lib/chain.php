@@ -354,7 +354,7 @@ function chain_gaps() {
 }
 
 function chain_can() {
-    return can('mod.calls.view') || can('mod.jobs.view') || can('mod.quotes.view') || is_master();
+    return can('mod.calls.view') || can('mod.jobs.view') || can('mod.quotes.view') || is_master_of(['calls','jobs','quotes']);
 }
 
 function ops_chain($route, $method) {

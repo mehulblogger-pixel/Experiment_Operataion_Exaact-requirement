@@ -627,7 +627,7 @@ function verify_lookup_inner($code) {
 // ============================================================================
 //  Screens
 // ============================================================================
-function trust_can_review() { return can('mod.idems.edit') || is_admin_level() || is_master(); }
+function trust_can_review() { return can('mod.idems.edit') || (is_admin_level() && licence_enabled('reporting')) || is_master_of('idems'); }
 
 function ops_trust($route, $method) {
     if ($route === 'checkin-photo') {

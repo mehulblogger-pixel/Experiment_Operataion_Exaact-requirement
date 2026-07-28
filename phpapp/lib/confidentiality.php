@@ -110,8 +110,8 @@ function conf_try($fn, $fallback = []) {
     try { return $fn(); } catch (Throwable $e) { if (!conf_missing_table($e)) throw $e; return $fallback; }
 }
 
-function conf_can_view()   { return can('mod.confidentiality.view') || can('mod.identity.view') || is_master(); }
-function conf_can_manage() { return can('mod.confidentiality.edit') || can('mod.identity.edit') || is_master(); }
+function conf_can_view()   { return can('mod.confidentiality.view') || can('mod.identity.view') || is_master_of(['confidentiality','identity']); }
+function conf_can_manage() { return can('mod.confidentiality.edit') || can('mod.identity.edit') || is_master_of(['confidentiality','identity']); }
 
 // ---- Undertakings ----------------------------------------------------------
 // In force on a date: signed on or before it, and not expired by it.

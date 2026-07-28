@@ -166,8 +166,8 @@ function ncr_dt_columns($today) {
 }
 
 // ---- Who ------------------------------------------------------------------
-function ncr_can_view()  { return can('mod.ncr.view') || can('mod.capa.view') || is_master(); }
-function ncr_can_raise() { return can('mod.ncr.edit') || can('mod.capa.edit') || is_master(); }
+function ncr_can_view()  { return can('mod.ncr.view') || can('mod.capa.view') || is_master_of(['ncr','capa']); }
+function ncr_can_raise() { return can('mod.ncr.edit') || can('mod.capa.edit') || is_master_of(['ncr','capa']); }
 // Closing is a separate act from raising, for the same reason approving is
 // separate from creating everywhere else in this application.
 function ncr_can_close() { return can('ncr.close') || can('capa.close') || is_master(); }

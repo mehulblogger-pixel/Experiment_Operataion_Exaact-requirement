@@ -924,7 +924,7 @@ function ops_crm_quotes($route, $method) {
         return;
     }
     if ($route === 'quote-new' || $route === 'quote-edit') {
-        ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master(), 'You cannot create or edit quotations.');
+        ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'), 'You cannot create or edit quotations.');
         $q = null;
         if ($route === 'quote-edit') {
             $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
@@ -1003,11 +1003,11 @@ function ops_crm_quotes($route, $method) {
             'approvals' => crm_approvals($q['id']),
             'lostReasons' => lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS),
             'canApprove' => can('crm.quote.approve') || is_master(), 'canSend' => can('crm.quote.send') || is_master(),
-            'canEdit' => (can('crm.quote.create') || can('mod.quotes.edit') || is_master()) && !quote_is_locked($q),
+            'canEdit' => (can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes')) && !quote_is_locked($q),
             // Revising is the way FORWARD from a sent quotation, so it must not
             // be gated on the lock that sending puts in place — that would leave
             // the only correct action greyed out.
-            'canRevise' => can('crm.quote.create') || can('mod.quotes.edit') || is_master(),
+            'canRevise' => can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'),
             'canRetract' => quote_can_retract($q) && quote_my_approved_step($q['id']) !== null,
             'lockReason' => quote_lock_reason($q),
             'locked' => quote_is_locked($q), 'editReq' => quote_edit_request_open($q['id']),
@@ -1084,7 +1084,7 @@ function ops_crm_quotes($route, $method) {
     }
     if ($route === 'quote-revise' && $method === 'POST') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
-        ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master(), 'You cannot revise quotations.');
+        ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'), 'You cannot revise quotations.');
         $base = (int)($q['parent_id'] ?: $q['id']);
         $summary = trim($_POST['summary'] ?? '') ?: 'Revised';
         $newRev = (int)$q['rev'] + 1;
@@ -1353,7 +1353,7 @@ function ops_crm_quotes($route, $method) {
     // ---- §xiv / §xxiv — files against a quote -----------------------------
     if ($route === 'quote-files' && $method === 'POST') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
-        ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master(), 'You cannot attach files to ' . Tlp('quote') . '.');
+        ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'), 'You cannot attach files to ' . Tlp('quote') . '.');
         $kind  = in_array($_POST['kind'] ?? '', array_keys(QUOTE_FILE_KINDS), true) ? $_POST['kind'] : 'ATTACHMENT';
         $note  = trim($_POST['note'] ?? '');
         $share = !empty($_POST['share_with_inspector']) ? 1 : 0;
@@ -2306,7 +2306,7 @@ function ops_crm_templates($route, $method) {
 //  Sales / CRM dashboard + monthly report + win/loss analytics (§14,§15)
 // ---------------------------------------------------------------------------
 function ops_crm_reports() {
-    ops_require(can('mod.crm_reports.view') || is_master(), 'You do not have access to sales reports.');
+    ops_require(can('mod.crm_reports.view') || is_master_of('crm_reports'), 'You do not have access to sales reports.');
     $fy = $_GET['fy'] ?? current_fy();
     [$from, $to] = fy_range($fy);
     [$sw, $sa] = scope_clause('q.office_id', 'q.sbu');

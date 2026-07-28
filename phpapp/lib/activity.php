@@ -237,8 +237,8 @@ function act_entity_label($a) {
 }
 
 // ---- The screen ------------------------------------------------------------
-function act_can_view()  { return can('mod.clients.view') || can('mod.calls.view') || is_master(); }
-function act_can_write() { return can('mod.clients.edit') || can('mod.calls.edit') || is_master(); }
+function act_can_view()  { return can('mod.clients.view') || can('mod.calls.view') || is_master_of(['clients','calls']); }
+function act_can_write() { return can('mod.clients.edit') || can('mod.calls.edit') || is_master_of(['clients','calls']); }
 
 // The register's columns, declared once. The 'sort' value is a SQL expression
 // the register owns — it is the ONLY thing that can reach ORDER BY, which is

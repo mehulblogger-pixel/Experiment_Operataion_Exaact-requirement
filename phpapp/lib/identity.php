@@ -585,11 +585,11 @@ function sitedoc_expiring($days = 45, $today = null) {
 
 // ---- The requirements register ---------------------------------------------
 function ops_sitedocs($route, $method) {
-    ops_require(iddoc_can_view() || can('mod.clients.view') || is_master(),
+    ops_require(iddoc_can_view() || can('mod.clients.view') || is_master_of(['identity','clients']),
                 'You cannot open the site-document requirements.');
     sitedoc_migrate();
 
-    $canEdit = iddoc_can_manage() || can('mod.clients.edit') || is_master();
+    $canEdit = iddoc_can_manage() || can('mod.clients.edit') || is_master_of(['identity','clients']);
 
     if ($route === 'site-docs-add' || $route === 'site-docs-delete') {
         ops_require($canEdit, 'You cannot change what a site requires.');

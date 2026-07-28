@@ -340,7 +340,7 @@ function competence_readiness() {
 
 // ---- Screens ---------------------------------------------------------------
 function ops_competence($route, $method) {
-    ops_require(can('mod.users.view') || is_admin_level() || is_master(),
+    ops_require(can('mod.users.view') || is_admin_level() || is_master_of('users'),
                 'Only a manager can open the competence register.');
 
     if ($route === 'competence') {

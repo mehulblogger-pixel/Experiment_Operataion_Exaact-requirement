@@ -192,7 +192,7 @@ function imp_can_decide() { return is_admin_level() || is_master(); }
 
 // ---- Screens ---------------------------------------------------------------
 function ops_impartiality($route, $method) {
-    ops_require(can('mod.competence.view') || is_admin_level() || is_master(),
+    ops_require(can('mod.competence.view') || is_master_of('competence') || (is_admin_level() && licence_enabled('operations')),
                 'Only a manager can open the impartiality register.');
 
     if ($route === 'impartiality') {
