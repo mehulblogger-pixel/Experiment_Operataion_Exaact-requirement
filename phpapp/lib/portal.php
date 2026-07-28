@@ -56,6 +56,11 @@ function portal_migrate() {
         invite_token VARCHAR(64) DEFAULT '', invite_expires VARCHAR(30) DEFAULT '',
         last_login_at VARCHAR(30) DEFAULT '', last_login_ip VARCHAR(60) DEFAULT '',
         created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // What this particular person may see and do, and at which sites. Blank
+    // perms means everything, so existing client users keep their access.
+    ensure_column('client_users', 'perms', "VARCHAR(400) DEFAULT ''");
+    ensure_column('client_users', 'site_ids', "VARCHAR(400) DEFAULT ''");
+    ensure_column('client_users', 'role_preset', "VARCHAR(30) DEFAULT ''");
     // What they asked for. Kept apart from the inspection-call register until a
     // coordinator accepts it — a client cannot create work in our system, only
     // ask for it.
@@ -189,7 +194,8 @@ function portal_calls($limit = 200) {
         "SELECT c.id, c.call_code, c.call_received_date, c.inspection_required_date, c.status,
                 c.inspection_type, c.inspection_type_other, c.product_category, c.contract_number,
                 c.allocated_at
-         FROM calls c WHERE c.client_id = ? ORDER BY c.id DESC LIMIT " . max(1, (int)$limit), [$pid]));
+         FROM calls c WHERE c.client_id = ? AND " . portal_site_sql('c') . "
+         ORDER BY c.id DESC LIMIT " . max(1, (int)$limit), [$pid]));
 }
 
 function portal_call($id) {
@@ -232,7 +238,9 @@ function portal_reports($limit = 200) {
                   WHERE r.report_doc_id = d.id AND r.rev = d.rev
                   ORDER BY r.id DESC LIMIT 1) client_decision
          FROM report_docs d
+         LEFT JOIN calls c ON c.id = d.call_id
          WHERE d.client_id = ? AND d.finalized = 1 AND COALESCE(d.deleted,0) = 0
+           AND (d.call_id IS NULL OR " . portal_site_sql('c') . ")
          ORDER BY d.finalized_at DESC, d.id DESC LIMIT " . max(1, (int)$limit), [$pid]));
 }
 
@@ -276,7 +284,7 @@ function portal_invoices() {
                 j.invoice_amount, j.payment_received, j.payment_date, c.call_code
          FROM jobs j JOIN calls c ON c.id = j.call_id
          WHERE c.client_id = ? AND COALESCE(j.invoice_raised,0) = 1
-           AND COALESCE(j.invoice_number,'') <> ''
+           AND COALESCE(j.invoice_number,'') <> '' AND " . portal_site_sql('c') . "
          ORDER BY j.invoice_date DESC, j.id DESC", [$pid]));
 }
 
@@ -543,16 +551,19 @@ function portal_route($route, $method) {
             exit;
 
         case 'portal/calls':
+            portal_need('calls', 'inspection calls');
             portal_view('calls', ['rows' => portal_calls()]);
             exit;
 
         case 'portal/call':
+            portal_need('calls', 'inspection calls');
             $c = portal_call((int)($_GET['id'] ?? 0));
             if (!$c) { http_response_code(404); portal_view('notfound'); exit; }
             portal_view('call', ['c' => $c, 'jobs' => portal_jobs((int)$c['id'])]);
             exit;
 
         case 'portal/reports':
+            portal_need('reports', 'reports');
             portal_view('reports', ['rows' => portal_reports(), 'err' => '']);
             exit;
 
@@ -560,6 +571,7 @@ function portal_route($route, $method) {
         // proves the report belongs to them — rcr_decide() trusts that and does
         // not re-check, so nothing else may call it with an unchecked row.
         case 'portal/report-decision':
+            portal_need('reports.decide', 'accepting or rejecting a report');
             $d = portal_report((int)($_POST['id'] ?? $_GET['id'] ?? 0));
             if (!$d) { http_response_code(404); portal_view('notfound'); exit; }
             $err = '';
@@ -577,6 +589,7 @@ function portal_route($route, $method) {
             exit;
 
         case 'portal/report':
+            portal_need('reports', 'reports');
             $d = portal_report((int)($_GET['id'] ?? 0));
             if (!$d) { http_response_code(404); portal_view('notfound'); exit; }
             portal_log('REPORT_OPENED', $d['irn']);
@@ -586,10 +599,12 @@ function portal_route($route, $method) {
         // ISO/IEC 17020 7.5 and 7.6. The register and the published policy
         // both existed; the client had no way to actually lodge one.
         case 'portal/complaints':
+            portal_need('complaint', 'complaints and appeals');
             portal_view('complaints', ['rows' => pcmp_mine()]);
             exit;
 
         case 'portal/complaint-new':
+            portal_need('complaint', 'raising a complaint');
             $err = '';
             if ($method === 'POST') {
                 $err = pcmp_create($_POST, portal_user());
@@ -611,6 +626,7 @@ function portal_route($route, $method) {
             exit;
 
         case 'portal/invoices':
+            portal_need('invoices', 'invoices');
             portal_view('invoices', ['rows' => portal_invoices()]);
             exit;
 
@@ -688,6 +704,22 @@ function ops_portal_admin($route, $method) {
         return true;
     }
 
+    if ($route === 'portal-user-perms') {
+        $id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
+        $u = portal_try(fn() => ops_one(
+            "SELECT cu.*, p.display_name partner_name, p.legal_name
+             FROM client_users cu JOIN business_partners p ON p.id = cu.partner_id
+             WHERE cu.id = ?", [$id]), null);
+        if (!$u) { http_response_code(404); view('notfound'); return true; }
+        if ($method === 'POST') {
+            portal_perms_save($id, $_POST);
+            flash('Access saved for ' . ($u['name'] ?: $u['email']) . '.');
+            redirect('/portal-users');
+        }
+        view('ops/portal_user_perms', ['u' => $u, 'sites' => portal_sites_for((int)$u['partner_id'])]);
+        return true;
+    }
+
     if ($route === 'portal-user-toggle' && $method === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
         $u = portal_try(fn() => ops_one("SELECT * FROM client_users WHERE id=?", [$id]), null);
@@ -744,4 +776,109 @@ function ops_portal_admin($route, $method) {
 
     redirect('/portal-users');
     return true;
+}
+
+// ============================================================================
+//  What a particular person at the client may see and do
+//
+//  Until now client_users had is_active and nothing else: every named contact
+//  at a company saw the same screens. That is wrong in both directions. The
+//  purchasing clerk who chases invoices has no business accepting an
+//  inspection report on the company's behalf, and the plant QA engineer who
+//  should be accepting reports often must not see what anything cost.
+//
+//  Two axes, because clients ask for two different things:
+//
+//   1. WHAT they can do — a small set of permissions, not a fixed role. Roles
+//      differ too much between a two-person fabricator and a refinery to be
+//      hard-coded, so the presets below just tick boxes and every one of them
+//      can be adjusted afterwards.
+//   2. WHICH SITES it applies to — a plant manager at one works should not see
+//      another plant's inspections. Blank means every site, which is what a
+//      head-office contact needs.
+//
+//  Backwards compatibility matters here: an existing client user has no
+//  permissions stored, and must NOT silently lose access on upgrade. A blank
+//  permission list therefore means "everything", exactly as before, and the
+//  admin screen says so rather than showing a row of empty boxes.
+// ============================================================================
+
+const PORTAL_PERMS = [
+    'calls'          => 'See inspection calls and visits',
+    'reports'        => 'See issued reports and download them',
+    'reports.decide' => 'Accept or reject a report on the company’s behalf',
+    'invoices'       => 'See invoices and what is outstanding',
+    'request'        => 'Ask for an inspection',
+    'complaint'      => 'Raise a complaint or an appeal',
+];
+
+// Starting points, not a cage — every one is editable after it is applied.
+const PORTAL_PRESETS = [
+    'FULL'       => ['label' => 'Full access — a main contact',
+                     'perms' => ['calls','reports','reports.decide','invoices','request','complaint']],
+    'QUALITY'    => ['label' => 'Quality / technical — accepts reports, sees no money',
+                     'perms' => ['calls','reports','reports.decide','request','complaint']],
+    'COMMERCIAL' => ['label' => 'Commercial / purchasing — sees reports and invoices, does not accept reports',
+                     'perms' => ['calls','reports','invoices','request','complaint']],
+    'ACCOUNTS'   => ['label' => 'Accounts — invoices only',
+                     'perms' => ['invoices','complaint']],
+    'READONLY'   => ['label' => 'Read only — sees everything, changes nothing',
+                     'perms' => ['calls','reports','invoices']],
+];
+
+// The permissions this signed-in client user holds. A blank stored value means
+// everything, so nobody invited before this existed loses access on upgrade.
+function portal_perms() {
+    $u = portal_user();
+    if (!$u) return [];
+    $raw = trim((string)($u['perms'] ?? ''));
+    if ($raw === '') return array_keys(PORTAL_PERMS);
+    return array_values(array_intersect(array_map('trim', explode(',', $raw)), array_keys(PORTAL_PERMS)));
+}
+
+function pcan($key) { return in_array($key, portal_perms(), true); }
+
+// Refuse rather than hide: hiding a link but leaving the address reachable is
+// the bug this whole file exists to avoid. (portal_require() above is the
+// sign-in gate; this is the permission gate that runs after it.)
+function portal_need($key, $what = 'that') {
+    if (pcan($key)) return;
+    $_SESSION['portal_flash'] = 'Your access here does not include ' . $what . '. '
+        . 'Ask your main contact at ' . portal_client_name() . ' to have it added.';
+    redirect('/portal');
+}
+
+// Which sites this person is limited to. Empty = all of them.
+function portal_site_ids() {
+    $u = portal_user();
+    if (!$u) return [];
+    $raw = trim((string)($u['site_ids'] ?? ''));
+    if ($raw === '') return [];
+    return array_values(array_filter(array_map('intval', explode(',', $raw))));
+}
+
+// SQL fragment limiting a query on `calls c` to this person's sites. Returns
+// '1=1' when they are not limited, so callers do not need two code paths.
+function portal_site_sql($alias = 'c') {
+    $ids = portal_site_ids();
+    if (!$ids) return '1=1';
+    // A call with no site recorded stays visible: an unlocated call must not
+    // vanish for everybody who has any site restriction at all.
+    return "($alias.site_address_id IS NULL OR $alias.site_address_id IN (" . implode(',', $ids) . '))';
+}
+
+// The sites we could offer, for the admin screen.
+function portal_sites_for($partnerId) {
+    return portal_try(fn() => ops_all(
+        "SELECT id, label, line1, city FROM partner_addresses
+         WHERE partner_id = ? ORDER BY is_primary DESC, id", [(int)$partnerId]));
+}
+
+function portal_perms_save($clientUserId, array $b) {
+    $keys = [];
+    foreach (array_keys(PORTAL_PERMS) as $k) if (!empty($b['p_' . str_replace('.', '_', $k)])) $keys[] = $k;
+    $sites = array_values(array_filter(array_map('intval', (array)($b['site_ids'] ?? []))));
+    db()->prepare("UPDATE client_users SET perms=?, site_ids=?, role_preset=? WHERE id=?")
+        ->execute([implode(',', $keys), implode(',', $sites),
+                   substr(trim((string)($b['role_preset'] ?? '')), 0, 30), (int)$clientUserId]);
 }

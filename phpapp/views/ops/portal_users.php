@@ -72,7 +72,7 @@
   <div style="padding:16px 18px 0"><h2 style="margin:0;font-size:17px">Who can sign in</h2></div>
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
-    <thead><tr><th>Client</th><th>Person</th><th>E-mail</th><th>State</th><th>Last signed in</th><th></th></tr></thead>
+    <thead><tr><th>Client</th><th>Person</th><th>E-mail</th><th>State</th><th>What they can do</th><th>Last signed in</th><th></th></tr></thead>
     <tbody>
     <?php foreach ($rows as $r): ?>
       <tr>
@@ -86,6 +86,22 @@
             <?php else: ?>
               <span class="pill p-ok">active</span>
             <?php endif; ?></td>
+        <?php
+          // Blank means everything, so somebody invited before per-person
+          // access existed does not silently lose it on upgrade. Said in
+          // words, because a row of empty boxes would read as "no access".
+          $held = trim((string)($r['perms'] ?? ''));
+          $heldArr = $held === '' ? array_keys(PORTAL_PERMS) : array_filter(explode(',', $held));
+          $sites = array_filter(explode(',', (string)($r['site_ids'] ?? '')));
+        ?>
+        <td style="max-width:260px">
+          <?php if ($held === ''): ?><span class="pill p-warn">everything</span>
+          <?php else: ?>
+            <span style="font-size:12px"><?= e(implode(', ', array_map(fn($k) => PORTAL_PERMS[$k] ?? $k, $heldArr))) ?></span>
+          <?php endif; ?>
+          <?php if ($sites): ?><br><span class="muted" style="font-size:12px"><?= count($sites) ?> site(s) only</span><?php endif; ?>
+          <br><a href="/portal-user-perms?id=<?= (int)$r['id'] ?>" style="font-size:12px">Change</a>
+        </td>
         <td><?= $r['last_login_at'] ? e(fdate(substr((string)$r['last_login_at'], 0, 10))) : '<span class="muted">never</span>' ?></td>
         <td style="white-space:nowrap">
           <form method="post" action="/portal-user-toggle" style="display:inline">
@@ -101,7 +117,7 @@
       </tr>
     <?php endforeach; ?>
     <?php if (!$rows): ?>
-      <tr><td colspan="6" style="text-align:center;padding:24px" class="muted">Nobody invited yet.</td></tr>
+      <tr><td colspan="7" style="text-align:center;padding:24px" class="muted">Nobody invited yet.</td></tr>
     <?php endif; ?>
     </tbody>
   </table>

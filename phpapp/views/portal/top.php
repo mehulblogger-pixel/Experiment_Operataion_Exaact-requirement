@@ -5,14 +5,14 @@
 // portal has its own, and it can only link to portal addresses.
 $nav = isset($nav) ? (bool)$nav : true;
 $here = trim((string)parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH), '/');
-$links = [
-    'portal'          => 'Overview',
-    'portal/calls'    => TP('call'),
-    'portal/reports'  => 'Reports',
-    'portal/invoices' => 'Invoices',
-    'portal/request'  => 'Request an inspection',
-    'portal/complaints' => 'Complaints &amp; appeals',
-];
+// Only what this person actually holds. The routes refuse independently —
+// hiding a link is presentation, not access control.
+$links = ['portal' => 'Overview'];
+if (pcan('calls'))     $links['portal/calls']      = TP('call');
+if (pcan('reports'))   $links['portal/reports']    = 'Reports';
+if (pcan('invoices'))  $links['portal/invoices']   = 'Invoices';
+if (pcan('request'))   $links['portal/request']    = 'Request an inspection';
+if (pcan('complaint')) $links['portal/complaints'] = 'Complaints &amp; appeals';
 ?><!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
