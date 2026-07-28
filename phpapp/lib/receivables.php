@@ -51,7 +51,59 @@ function ar_bucket_of($days) {
 // Every unpaid raised invoice in scope, aged. $basis 'DUE' ages from the due
 // date (falling back to the invoice date where none was recorded); 'INVOICE'
 // ages everything from the invoice date, which is what a lender asks for.
+// Ageing from the invoice register — real invoices, with part-payments, TDS and
+// credit notes taken off. This is what the ageing SHOULD always have been; the
+// old job-column version below is kept for a database that has no invoices yet,
+// because a company mid-migration must not open this screen and see nothing.
+//
+// The difference matters: the old one aged the WHOLE invoice until the payment
+// flag flipped, so a customer who had paid 80% still appeared for the full
+// amount, and one who settled in full through TDS never cleared at all.
+function ar_rows_from_books($basis = 'DUE', $today = null) {
+    if (!function_exists('books_migrate')) return [];
+    books_migrate();
+    $today = $today ?: date('Y-m-d');
+    [$w, $a] = scope_clause('i.office_id', 'i.sbu');
+    $rows = books_try(fn() => ops_all(
+        "SELECT i.id, i.invoice_no, i.invoice_date, i.due_date, i.total, i.sbu,
+                i.partner_id client_id, i.partner_name, o.name office_name,
+                bp.display_name, bp.legal_name
+         FROM invoices i
+         LEFT JOIN offices o ON o.id = i.office_id
+         LEFT JOIN business_partners bp ON bp.id = i.partner_id
+         WHERE $w AND i.status IN ('ISSUED','PART_PAID')
+         ORDER BY i.due_date ASC, i.invoice_date ASC, i.id ASC", $a));
+    $out = [];
+    foreach ($rows as $r) {
+        $s = books_settled((int)$r['id']);
+        if ($s['outstanding'] <= 1) continue;         // settled; nothing to chase
+        $due = trim((string)$r['due_date']);
+        $inv = trim((string)$r['invoice_date']);
+        $from = ($basis === 'INVOICE') ? $inv : ($due !== '' ? $due : $inv);
+        if ($from === '') continue;
+        $days = (int)floor((strtotime($today) - strtotime($from)) / 86400);
+        $out[] = $r + [
+            'job_code'       => $r['invoice_no'],
+            'invoice_number' => $r['invoice_no'],
+            'invoice_amount' => (float)$r['total'],
+            'amount'         => $s['outstanding'],
+            'age_days'       => $days,
+            'age_from'       => $from,
+            'estimated'      => ($basis !== 'INVOICE' && $due === ''),
+            'bucket'         => ar_bucket_of($days),
+            'from_books'     => true,
+        ];
+    }
+    return $out;
+}
+
 function ar_rows($basis = 'DUE', $today = null) {
+    // Prefer the invoice register the moment there is one.
+    if (function_exists('books_migrate')) {
+        books_migrate();
+        $any = (int)books_try(fn() => ops_val("SELECT COUNT(*) FROM invoices WHERE status IN ('ISSUED','PART_PAID')"), 0);
+        if ($any > 0) return ar_rows_from_books($basis, $today);
+    }
     $today = $today ?: date('Y-m-d');
     [$jw, $ja] = scope_clause('j.executing_office_id', 'j.sbu');
     $rows = ops_all(
