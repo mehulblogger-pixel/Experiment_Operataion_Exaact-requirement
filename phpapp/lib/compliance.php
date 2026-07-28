@@ -373,6 +373,46 @@ function compliance_status() {
             'Review the list under Settings → Roles & access. Fewer is better.');
     }
 
+    // --- ISO/IEC 17020 §4.1, §6.1, §6.2 -----------------------------------
+    // These three modules enforce their own rules on their own screens, which
+    // is where the work happens — but this is the screen a director opens
+    // before an assessment, and until now three of the seven accreditation
+    // modules were simply absent from it. Enforced somewhere is not the same
+    // as visible here.
+    if (function_exists('imp_readiness')) {
+        $ir = imp_readiness();
+        $bad = $ir['open'] + $ir['unacceptable'];
+        $add('ISO/IEC 17020 §4.1', 'Threats to impartiality are declared and decided',
+            $bad ? 'bad' : ($ir['declaration_due'] ? 'warn' : 'ok'),
+            $ir['open'] . ' undecided, ' . $ir['unacceptable'] . ' judged unacceptable, '
+            . $ir['declaration_due'] . ' of ' . $ir['people'] . ' people owing a declaration. This body is '
+            . $ir['type_label'] . '.',
+            $bad ? 'Open the impartiality register. An undecided threat stops the work it touches from being allocated, so this is costing you deputations as well as marks.'
+                 : ($ir['declaration_due'] ? 'Chase the outstanding declarations. A statement made once and never renewed is not a current statement.' : ''));
+    }
+    if (function_exists('competence_readiness')) {
+        $cr = competence_readiness();
+        $add('ISO/IEC 17020 §6.1', 'People are authorised for the work they are given',
+            $cr['lapsed'] ? 'bad' : ($cr['authorised'] < $cr['people'] ? 'warn' : 'ok'),
+            $cr['authorised'] . ' of ' . $cr['people'] . ' authorised for something; '
+            . $cr['lapsed'] . ' with a lapsed required certificate; '
+            . $cr['witness_due'] . ' overdue a witnessed assessment. Enforcement is '
+            . ($cr['enforced'] ? 'ON' : 'OFF') . '.',
+            $cr['lapsed'] ? 'A lapsed required ticket suspends the authorisations resting on it. Open the competence register.'
+                : (!$cr['enforced'] ? 'Enforcement is off, so the matrix is a record rather than a gate. Switch it on once the matrix is populated.' : ''));
+    }
+    if (function_exists('equipment_all') && function_exists('equipment_current_calibration')) {
+        $eq = equipment_all();
+        $out_ = 0;
+        foreach ($eq as $e) if (!equipment_current_calibration((int)$e['id'])) $out_++;
+        $add('ISO/IEC 17020 §6.2', 'Measuring equipment is in calibration',
+            $out_ ? 'bad' : (count($eq) ? 'ok' : 'warn'),
+            count($eq) ? $out_ . ' of ' . count($eq) . ' instruments have no calibration in force today.'
+                       : 'No equipment on the register at all.',
+            $out_ ? 'A report naming an instrument out of calibration is refused at finalisation, so this blocks issue as well as failing the clause.'
+                  : (count($eq) ? '' : 'If your people use gauges, meters or thickness testers, they belong on the register. A report that names an uncalibrated instrument is not defensible.'));
+    }
+
     // --- ISO/IEC 17020 §7.5 / §7.6 ----------------------------------------
     // Measured from the register, not from a policy. The three lines are the
     // three things an assessor checks: is the process published, are we meeting
@@ -436,6 +476,38 @@ function compliance_status() {
             $rr['open_actions'] ? 'warn' : 'ok',
             $rr['open_actions'] ? $rr['open_actions'] . ' decision(s) still open.' : 'Nothing outstanding.',
             $rr['open_actions'] ? 'Decisions nobody did are the first thing an assessor tests at the next review.' : '');
+    }
+
+    // --- ISO/IEC 17020:2026 §7.11 — control of data and information --------
+    // New in the 2026 edition, with no 2012 equivalent. Four lines, because the
+    // clause asks four separate questions and a body can pass three and fail one.
+    if (function_exists('datacontrol_readiness')) {
+        $dr = datacontrol_readiness();
+        $st = $dr['app']['state'];
+        $add('ISO/IEC 17020 §7.11', 'The software version in use has been validated',
+            $st === 'ok' ? 'ok' : 'bad',
+            $st === 'ok' ? 'Version ' . $dr['app']['version'] . ' validated on ' . fdate($dr['app']['row']['validated_on']) . '.'
+            : ($st === 'stale' ? 'The last validation was of version ' . ($dr['app']['row']['version'] ?: 'unrecorded')
+                               . '; you are running ' . $dr['app']['version'] . '.'
+                               : 'No validation record exists for this application.'),
+            $st === 'ok' ? '' : 'Open Data & information control and record one. This is the first thing an assessor asks about under the 2026 edition, and the commonest answer is a validation of a version nobody runs any more.');
+        $add('ISO/IEC 17020 §7.11', 'Data integrity is checked, and the check is on file',
+            $dr['check_failed'] ? 'bad' : ($dr['run_stale'] ? 'warn' : 'ok'),
+            ($dr['check_failed'] ? $dr['check_failed'] . ' of ' . $dr['checks'] . ' checks failing. '
+                                 : 'All ' . ($dr['checks'] - $dr['check_skipped']) . ' checks pass. ')
+            . ($dr['last_run'] ? 'Last run ' . substr($dr['last_run']['ran_on'], 0, 10) . '.' : 'Never run.'),
+            $dr['check_failed'] ? 'Open Data & information control — each failing line says what is wrong and why it matters.'
+                : ($dr['run_stale'] ? 'Press "Run them now". A check that passes but was never recorded is not evidence.' : ''));
+        $add('ISO/IEC 17020 §7.11', 'Access to the data is controlled and reviewed',
+            $dr['access']['dormant'] ? 'warn' : 'ok',
+            $dr['access']['admins'] . ' of ' . $dr['access']['people'] . ' accounts can change access; '
+            . $dr['access']['dormant'] . ' have not signed in for 90 days.',
+            $dr['access']['dormant'] ? 'Retire the dormant accounts. An account nobody uses is an account nobody notices being used.' : '');
+        $add('ISO/IEC 17020 §7.11', 'System failures are logged, and answered for',
+            $dr['failures_unanswered'] ? 'bad' : 'ok',
+            $dr['total_failures'] . ' logged, ' . $dr['failures_open'] . ' open, '
+            . $dr['failures_unanswered'] . ' with no answer yet on what happened to the data.',
+            $dr['failures_unanswered'] ? 'Each entry has to say whether data or results were affected. That is the one an assessor picks out of the log.' : '');
     }
 
     // --- things software cannot answer ------------------------------------
