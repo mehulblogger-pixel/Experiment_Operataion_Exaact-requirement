@@ -2,6 +2,71 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ Identity documents — built, with the guardrails, not after them (July 2026)
+
+`lib/identity.php`, `person_documents` · `person_document_access`, screen
+`/identity`. The owner's instruction was four words: *"That is required for
+identity verification."* That is a **purpose**, and under the DPDP Act 2023 a
+purpose is what makes holding somebody's passport lawful. Everything here
+follows from taking that seriously rather than treating it as a form of words.
+
+**Why build it at all.** An engineer cannot enter a refinery, a port, a shipyard
+or a defence yard without a gate pass, and a gate pass is issued against a
+document. So the coordinator ends up holding a scan whether the software helps
+or not — today it sits in a mailbox and on a laptop, copied to whoever asked
+last. *That* is the real risk, and it is worse than holding it here.
+
+**The four guardrails, all shipped in the same commit:**
+
+1. **The purpose is on the screen**, not in a policy nobody opens — and it is
+   copied onto the row at the moment of filing. Changing the wording later does
+   **not** rewrite what was already agreed with somebody. (Tested.)
+2. **A separate permission.** `person.iddoc.view` and `person.iddoc.manage`, in
+   **no role's defaults**. A Business Director's blanket "every module" grant is
+   explicitly stripped of `identity` — running operations is not a reason to
+   read a colleague's passport. Only the master administrator gets through
+   without being granted it, and every look they take is logged like anyone's.
+3. **A retention limit that actually runs.** Default 730 days past the
+   document's own expiry, counted from the *later* of expiry and filing so a
+   passport good for eight more years is not binned next year. The nightly job
+   sweeps it. Redaction, not deletion: the file and the number go, the row
+   stays — it is the evidence that identity *was* checked.
+4. **A record of who looked.** Every open, download, reveal of a full number,
+   and every copy sent out to a plant's security desk. That last one is the
+   disclosure that normally lives only in somebody's sent items.
+
+**Two deliberate refusals:**
+
+- **The number is masked** (`•••• 4517`) unless somebody gives a reason. The
+  reason is kept, and the number is shown once — via the session, never the
+  URL, so a reload does not show it again.
+- **No allocation is blocked on this.** ISO/IEC 17020 does not ask for it, and a
+  body that cannot depute an engineer because a visa scan is missing has built a
+  compliance problem, not solved one. The deputation screen **tells** the
+  coordinator, which is the useful half.
+
+Joined to the machinery that already existed: the subject-access export carries
+the documents *and the access log* (not the bytes — the person already has their
+own passport, and one more loose copy helps nobody); erasing a person redacts
+every document they hold; and the compliance screen gained three measured lines
+— purpose, retention, and who can look.
+
+*Verified:* 61 rule tests (twice, from a dirty database), 27 browser checks,
+lint green (147 files), 83 screens.
+
+### Also this round
+- **`auth_run_maintenance()` was never called.** Written in 3.2a, wired to
+  nothing — so authorisations would never have expired or auto-suspended on a
+  live system. Now runs nightly beside the retention sweep. Found only because
+  I went looking for somewhere to hang the new sweep.
+- **`b_bills.js` had never actually reset anything.** Its reset script ran
+  against the *default* SQLite path while the server under test ran against
+  another, so eighteen bills had piled up on one deputation and the suite was
+  passing for the wrong reason. Now points at the served database.
+- **`b_imp.js` made idempotent** the same way `b_auth.js` was, via
+  `reset_imp.php`. Third time this class of bug has appeared; each suite is now
+  checked by running it twice in a row before it is believed.
+
 ## ✅ ROADMAP 3.3 + 3.7 — impartiality, and Type A / non-A (§4.1) (July 2026)
 
 `lib/impartiality.php`. **The clause a third-party body exists to satisfy.**
@@ -45,10 +110,9 @@ organisation record, with rubbish falling back to A rather than breaking.
 
 ### Identity documents — purpose now stated
 The owner has confirmed passport / visa / ID holding is for **site-access
-identity verification**, which is a lawful purpose under the DPDP Act. Still to
-build, and it must ship *with* its guardrails rather than after them: a stated
-purpose on the screen, a separate permission, a retention limit, and a record of
-who viewed the document. Not built yet.
+identity verification**, which is a lawful purpose under the DPDP Act.
+**Built** — see the entry at the top of this file. It shipped with its
+guardrails in the same commit, not after them.
 
 ## ✅ ROADMAP 3.2a — the competence & authorisation spine (§6.1) (July 2026)
 
@@ -101,9 +165,13 @@ breaking every existing install), 13 browser checks, lint green (144 files),
 - [ ] Deliberately **not** built as "AI": these are rules engines. Calling them
       AI invites an assessor to ask for the AI validation record that
       ISO/IEC 17020:2026 now requires for AI tools. Same behaviour, no exposure.
-- [ ] Personal data in the fuller spec (passport, visa, medical fitness, police
-      verification, risk category) needs a lawful basis, a retention limit and a
-      separate permission under the DPDP Act before it is stored at all.
+- [x] Personal data in the fuller spec (passport, visa, medical fitness, police
+      verification) — **done**, with the lawful basis stated on the screen, a
+      retention limit that runs nightly, and a separate permission. See the
+      identity-documents entry at the top of this file.
+- [ ] Risk category / grading of a person is still not built, and should not be
+      until somebody can say what it would be *used for*. A label on a colleague
+      with no decision attached to it is data held for no purpose.
 
 ## ✅ ROADMAP 3.1 — equipment & calibration (ISO/IEC 17020 §6.2) (July 2026)
 

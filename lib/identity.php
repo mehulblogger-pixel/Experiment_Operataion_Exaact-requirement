@@ -1,0 +1,457 @@
+<?php
+// ============================================================================
+//  Identity documents — passport, visa, ID — held for one stated reason
+//
+//  Why this exists at all. An engineer cannot walk into a refinery, a port, a
+//  shipyard or a defence yard without a gate pass, and a gate pass is issued
+//  against a document. So the coordinator ends up holding a scan of somebody's
+//  passport whether the software helps or not — today it sits in a mailbox and
+//  on a laptop, copied to whoever asked last. That is the actual risk, and it
+//  is worse than holding it here.
+//
+//  The owner's instruction was short: "That is required for identity
+//  verification." Good — that is a purpose, and under the DPDP Act 2023 a
+//  purpose is the thing that makes the holding lawful. Everything in this file
+//  follows from taking that purpose seriously rather than treating it as a
+//  form of words:
+//
+//   · PURPOSE ON THE SCREEN. Not in a policy document nobody opens. The person
+//     uploading reads what it will be used for, and the purpose is copied onto
+//     the row, so a later change of policy cannot rewrite what was agreed at
+//     the time.
+//   · A SEPARATE PERMISSION. Being a manager does not get you a passport. Two
+//     permissions, granted deliberately: one to look, one to hold.
+//   · A RETENTION LIMIT THAT ACTUALLY RUNS. A date on every document, and a
+//     redaction that empties the file and the number when that date passes.
+//     The row survives — it is the evidence that identity WAS verified — but
+//     the copy of the passport does not.
+//   · A RECORD OF WHO LOOKED. Every open, every download, every reveal of a
+//     full number, and every time a copy is sent to a site. This is the part
+//     people skip, and it is the only part that turns "we are careful" into
+//     something an auditor can check.
+//
+//  Two deliberate refusals:
+//
+//   · The number is masked by default. Seeing that a valid passport is on file
+//     is what a coordinator needs ninety-nine times out of a hundred; reading
+//     the number out is the hundredth, and it costs a click and a reason.
+//   · No allocation is blocked on this. ISO/IEC 17020 does not ask for it, and
+//     a body that cannot depute an engineer because a visa scan is missing has
+//     built a compliance problem, not solved one. What the deputation screen
+//     does is TELL the coordinator, which is the useful half.
+// ============================================================================
+
+// The kinds of document a site actually asks for. Company-editable — this is a
+// seeded lookup, not a fixed list, because the mix differs by country and by
+// industry (offshore wants a medical, defence wants police verification).
+const IDDOC_KINDS = [
+    'PASSPORT'   => 'Passport',
+    'VISA'       => 'Visa / entry permit',
+    'NATIONAL_ID'=> 'National identity card',
+    'DRIVING_LIC'=> 'Driving licence',
+    'WORK_PERMIT'=> 'Work permit',
+    'GATE_PASS'  => 'Site / plant gate pass',
+    'MEDICAL'    => 'Medical fitness certificate',
+    'POLICE_VER' => 'Police verification',
+];
+
+// What every one of these is held for. Shown on the screen, and stamped onto
+// the row at the moment of upload.
+const IDDOC_PURPOSE = 'Identity verification for site access — issuing gate passes and '
+    . 'satisfying a client’s or plant’s entry requirements.';
+
+// Actions worth writing down. UPLOAD and REDACT are here too, so the log reads
+// as the whole life of the document rather than only the looking at it.
+const IDDOC_ACTIONS = [
+    'UPLOAD'   => 'Filed',
+    'VIEW'     => 'Opened the register entry',
+    'DOWNLOAD' => 'Downloaded the file',
+    'REVEAL'   => 'Read the full number',
+    'SHARE'    => 'Sent a copy out',
+    'REDACT'   => 'Redacted',
+    'DELETE'   => 'Deleted',
+];
+
+// How long a document is kept after it stops being needed. Default two years,
+// which is long enough to answer "who did you send to our plant in March" and
+// short enough not to be a standing liability. Company-settable.
+const IDDOC_RETAIN_DEFAULT = 730;
+
+function identity_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    $pdo = db(); $pk = pk_clause();
+    $pdo->exec("CREATE TABLE IF NOT EXISTS person_documents (
+        id $pk, person_kind VARCHAR(20) DEFAULT 'INSPECTOR', person_id INT,
+        doc_kind VARCHAR(30) DEFAULT 'PASSPORT',
+        doc_number VARCHAR(80) DEFAULT '', number_last4 VARCHAR(8) DEFAULT '',
+        issuing_authority VARCHAR(150) DEFAULT '', issuing_country VARCHAR(80) DEFAULT '',
+        issued_on VARCHAR(20) DEFAULT '', expires_on VARCHAR(20) DEFAULT '',
+        file_name VARCHAR(255) DEFAULT '', mime VARCHAR(100) DEFAULT '', file_data LONGTEXT,
+        purpose VARCHAR(400) DEFAULT '',
+        consent_on VARCHAR(20) DEFAULT '', consent_note VARCHAR(400) DEFAULT '',
+        retain_until VARCHAR(20) DEFAULT '',
+        redacted_at VARCHAR(30) DEFAULT '', redacted_by VARCHAR(150) DEFAULT '',
+        note VARCHAR(400) DEFAULT '',
+        uploaded_by VARCHAR(150) DEFAULT '', uploaded_at VARCHAR(30) DEFAULT '')");
+    // Who looked, when, from where, and — where it matters — why.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS person_document_access (
+        id $pk, document_id INT, person_id INT,
+        action VARCHAR(20) DEFAULT 'VIEW', username VARCHAR(150) DEFAULT '',
+        reason VARCHAR(400) DEFAULT '', recipient VARCHAR(200) DEFAULT '',
+        ip VARCHAR(60) DEFAULT '', at VARCHAR(30) DEFAULT '')");
+}
+
+function iddoc_missing_table(Throwable $e) {
+    $m = $e->getMessage();
+    return stripos($m, 'no such table') !== false || stripos($m, "doesn't exist") !== false;
+}
+
+// ---- The company's own answers ---------------------------------------------
+function iddoc_kind_options() { return lk_options_or('identity_doc', IDDOC_KINDS); }
+function iddoc_retain_days() {
+    $d = (int)setting_get('iddoc_retain_days', (string)IDDOC_RETAIN_DEFAULT);
+    return $d > 0 ? $d : IDDOC_RETAIN_DEFAULT;
+}
+// The purpose as this company words it. Ours is the default; a company that
+// writes its own keeps its own, and that is the wording stamped on new rows.
+function iddoc_purpose() {
+    $p = trim((string)setting_get('iddoc_purpose', ''));
+    return $p !== '' ? $p : IDDOC_PURPOSE;
+}
+
+// ---- Permissions ------------------------------------------------------------
+// Deliberately NOT is_admin_level(). A branch manager runs operations; that is
+// not a reason to read a colleague's passport. The master admin still gets
+// through can() — as they do everywhere — and every look is logged, which is
+// the honest treatment of an account that can do anything.
+function iddoc_can_view()   { return can('person.iddoc.view') || can('person.iddoc.manage'); }
+function iddoc_can_manage() { return can('person.iddoc.manage'); }
+
+// Every account that can open a document, apart from the master administrator.
+// Written out because "who in this company can read a passport" is a question
+// somebody will eventually be asked, and counting it by hand across role
+// defaults and per-user overrides is how the wrong answer gets given.
+function iddoc_holders($perm = 'person.iddoc.manage') {
+    $out = [];
+    foreach (ops_all("SELECT id, username, first_name, last_name, role, is_superuser, permissions
+                      FROM users WHERE is_active=1 ORDER BY username") as $u) {
+        if (!empty($u['is_superuser'])) continue;          // counted separately, and always logged
+        $role = strtoupper((string)($u['role'] ?? 'ADMIN'));
+        $csv  = trim((string)($u['permissions'] ?? ''));
+        $perms = $csv !== '' ? array_values(array_filter(explode(',', $csv))) : role_perms($role);
+        if (in_array($perm, $perms, true)) $out[] = $u;
+    }
+    return $out;
+}
+
+// ---- Masking ----------------------------------------------------------------
+// Enough to tell two documents apart, not enough to use one.
+function iddoc_mask($doc) {
+    $l4 = (string)($doc['number_last4'] ?? '');
+    if ($l4 === '') return '—';
+    return '•••• ' . $l4;
+}
+
+// ---- Reading ----------------------------------------------------------------
+// Never selects file_data. The bytes come out through one function, below, and
+// that function writes to the access log. Keeping the two apart is what stops
+// a future screen from quietly rendering somebody's passport in a list.
+function iddoc_list($personId, $kind = 'INSPECTOR') {
+    try {
+        return ops_all("SELECT id, person_kind, person_id, doc_kind, number_last4,
+                               issuing_authority, issuing_country, issued_on, expires_on,
+                               file_name, mime, purpose, consent_on, consent_note, retain_until,
+                               redacted_at, redacted_by, note, uploaded_by, uploaded_at
+                        FROM person_documents
+                        WHERE person_kind=? AND person_id=? ORDER BY doc_kind, id DESC",
+                       [$kind, (int)$personId]);
+    } catch (Throwable $e) { if (iddoc_missing_table($e)) return []; throw $e; }
+}
+
+function iddoc_row($id, $withFile = false) {
+    $cols = $withFile ? '*' : 'id, person_kind, person_id, doc_kind, number_last4, issuing_authority,
+                              issuing_country, issued_on, expires_on, file_name, mime, purpose,
+                              consent_on, consent_note, retain_until, redacted_at, redacted_by,
+                              note, uploaded_by, uploaded_at';
+    try { return ops_one("SELECT $cols FROM person_documents WHERE id=?", [(int)$id]); }
+    catch (Throwable $e) { if (iddoc_missing_table($e)) return null; throw $e; }
+}
+
+// A document that is still usable: not redacted, and not past its own expiry.
+function iddoc_current($doc, $onDate = null) {
+    $onDate = $onDate ?: date('Y-m-d');
+    if (!empty($doc['redacted_at'])) return false;
+    if (($doc['expires_on'] ?? '') !== '' && $doc['expires_on'] < $onDate) return false;
+    return true;
+}
+
+// Does this person have a live identity document on file? This is the whole
+// question a coordinator arranging a gate pass is actually asking.
+function iddoc_verified($personId, $kind = 'INSPECTOR', $onDate = null) {
+    foreach (iddoc_list($personId, $kind) as $d) if (iddoc_current($d, $onDate)) return true;
+    return false;
+}
+
+// The advisory sentence for the deputation screen. Not a block — see the note
+// at the top of this file.
+function iddoc_note_for_person($personId, $kind = 'INSPECTOR') {
+    $all = iddoc_list($personId, $kind);
+    if (!$all) return 'No identity document is on file for site access.';
+    if (!iddoc_verified($personId, $kind))
+        return 'Every identity document on file has expired or been redacted.';
+    return '';
+}
+
+// ---- Writing ----------------------------------------------------------------
+function iddoc_log($documentId, $personId, $action, $reason = '', $recipient = '') {
+    try {
+        db()->prepare("INSERT INTO person_document_access (document_id,person_id,action,username,reason,recipient,ip,at)
+                       VALUES (?,?,?,?,?,?,?,?)")
+            ->execute([(int)$documentId, (int)$personId, $action, user_name(current_user()),
+                       substr((string)$reason, 0, 400), substr((string)$recipient, 0, 200),
+                       function_exists('client_ip') ? client_ip() : ($_SERVER['REMOTE_ADDR'] ?? ''),
+                       date('c')]);
+    } catch (Throwable $e) { /* the log must never be the thing that breaks a screen */ }
+}
+
+function iddoc_access_log($documentId = 0, $personId = 0, $limit = 200) {
+    $w = ['1=1']; $a = [];
+    if ($documentId) { $w[] = 'document_id=?'; $a[] = (int)$documentId; }
+    if ($personId)   { $w[] = 'person_id=?';   $a[] = (int)$personId; }
+    try {
+        return ops_all("SELECT * FROM person_document_access WHERE " . implode(' AND ', $w)
+                     . " ORDER BY id DESC LIMIT " . max(1, (int)$limit), $a);
+    } catch (Throwable $e) { if (iddoc_missing_table($e)) return []; throw $e; }
+}
+
+// When this copy stops being kept. Counted from whichever comes later — the
+// document's own expiry or the day it was filed — so a passport valid for
+// another eight years is not thrown away next year.
+function iddoc_retain_until($expiresOn, $from = null) {
+    $from = $from ?: date('Y-m-d');
+    $base = ($expiresOn !== '' && $expiresOn > $from) ? $expiresOn : $from;
+    return date('Y-m-d', strtotime($base . ' +' . iddoc_retain_days() . ' days'));
+}
+
+function iddoc_add($personId, $post, $file, $kind = 'INSPECTOR') {
+    $docKind = (string)($post['doc_kind'] ?? '');
+    $valid = iddoc_kind_options();
+    if (!isset($valid[$docKind])) return 'Choose which kind of document this is.';
+    $number = trim((string)($post['doc_number'] ?? ''));
+    if ($number === '') return 'The document number is what makes the record useful — enter it.';
+    $bytes = ($file && ($file['tmp_name'] ?? '') !== '' && is_uploaded_file($file['tmp_name']))
+        ? (string)file_get_contents($file['tmp_name']) : '';
+    if ($bytes !== '' && ($why = upload_reject_reason($bytes, $file['name'] ?? '', $file['type'] ?? '')) !== '')
+        return $why;
+    // A scan of a passport with no expiry date is a copy nobody can ever retire
+    // on the document's own terms, so it is asked for.
+    $expires = (string)($post['expires_on'] ?? '');
+    if ($expires === '') return 'Enter the expiry date. Without it this copy can never be retired on time.';
+    db()->prepare("INSERT INTO person_documents
+        (person_kind,person_id,doc_kind,doc_number,number_last4,issuing_authority,issuing_country,
+         issued_on,expires_on,file_name,mime,file_data,purpose,consent_on,consent_note,retain_until,note,uploaded_by,uploaded_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        ->execute([$kind, (int)$personId, $docKind, substr($number, 0, 80), substr($number, -4),
+                   substr(trim((string)($post['issuing_authority'] ?? '')), 0, 150),
+                   substr(trim((string)($post['issuing_country'] ?? '')), 0, 80),
+                   (string)($post['issued_on'] ?? ''), $expires,
+                   $bytes !== '' ? substr((string)($file['name'] ?? 'document'), 0, 255) : '',
+                   $bytes !== '' ? (string)($file['type'] ?? '') : '',
+                   $bytes !== '' ? base64_encode($bytes) : '',
+                   substr(iddoc_purpose(), 0, 400),
+                   (string)($post['consent_on'] ?? date('Y-m-d')),
+                   substr(trim((string)($post['consent_note'] ?? '')), 0, 400),
+                   iddoc_retain_until($expires),
+                   substr(trim((string)($post['note'] ?? '')), 0, 400),
+                   user_name(current_user()), date('c')]);
+    iddoc_log((int)db()->lastInsertId(), (int)$personId, 'UPLOAD', $valid[$docKind]);
+    return '';
+}
+
+// Redaction, not deletion. The file and the number go; the row stays, so the
+// company can still show that identity was verified on a given date without
+// still holding the passport it was verified against.
+function iddoc_redact($id, $why = 'Retention period reached') {
+    $d = iddoc_row($id);
+    if (!$d || !empty($d['redacted_at'])) return false;
+    db()->prepare("UPDATE person_documents SET doc_number='', file_data=NULL, file_name='', mime='',
+                   redacted_at=?, redacted_by=? WHERE id=?")
+        ->execute([date('c'), user_name(current_user()) ?: 'system', (int)$id]);
+    iddoc_log((int)$id, (int)$d['person_id'], 'REDACT', $why);
+    return true;
+}
+
+// Documents whose retention date has passed and which still hold a copy.
+function iddoc_due_redaction($onDate = null) {
+    $onDate = $onDate ?: date('Y-m-d');
+    try {
+        return ops_all("SELECT id, person_id, doc_kind, retain_until FROM person_documents
+                        WHERE (redacted_at IS NULL OR redacted_at='')
+                          AND retain_until <> '' AND retain_until < ?", [$onDate]);
+    } catch (Throwable $e) { if (iddoc_missing_table($e)) return []; throw $e; }
+}
+
+// Run from the nightly job. A retention limit that nobody runs is a sentence in
+// a policy, which is exactly what this module is meant to replace.
+function iddoc_run_retention($onDate = null) {
+    $n = 0;
+    foreach (iddoc_due_redaction($onDate) as $d)
+        if (iddoc_redact((int)$d['id'], 'Retention period reached (' . $d['retain_until'] . ').')) $n++;
+    return $n;
+}
+
+// ---- How this looks across the company -------------------------------------
+function iddoc_readiness() {
+    $people = ops_all("SELECT id, name FROM inspectors WHERE status='ACTIVE'");
+    $with = 0; $expiring = 0; $expired = 0; $held = 0;
+    $soon = date('Y-m-d', strtotime('+60 days'));
+    $today = date('Y-m-d');
+    foreach ($people as $p) {
+        $docs = iddoc_list($p['id']);
+        if (!$docs) continue;
+        if (iddoc_verified($p['id'])) $with++;
+        foreach ($docs as $d) {
+            if (!empty($d['redacted_at'])) continue;
+            if ($d['file_name'] !== '') $held++;
+            if ($d['expires_on'] === '') continue;
+            if ($d['expires_on'] < $today) $expired++;
+            elseif ($d['expires_on'] <= $soon) $expiring++;
+        }
+    }
+    return [
+        'people' => count($people), 'verified' => $with,
+        'without' => count($people) - $with,
+        'expiring' => $expiring, 'expired' => $expired,
+        'copies_held' => $held,
+        'due_redaction' => count(iddoc_due_redaction()),
+        'retain_days' => iddoc_retain_days(),
+    ];
+}
+
+// ---- Screens ----------------------------------------------------------------
+function ops_identity($route, $method) {
+    ops_require(iddoc_can_view(),
+        'Identity documents are held under a separate permission. Ask your administrator for '
+      . '“See identity documents” if your work needs it.');
+
+    if ($route === 'identity') {
+        $pid = (int)($_GET['i'] ?? 0);
+        $people = ops_all("SELECT id, name, emp_code, status FROM inspectors WHERE status='ACTIVE' ORDER BY name");
+        $rows = [];
+        foreach ($people as $p) {
+            $docs = iddoc_list($p['id']);
+            $rows[] = ['p' => $p, 'n' => count($docs), 'ok' => iddoc_verified($p['id'])];
+        }
+        $person = $pid ? ops_one("SELECT * FROM inspectors WHERE id=?", [$pid]) : null;
+        if ($person) iddoc_log(0, $pid, 'VIEW', 'Opened the register for ' . $person['name']);
+        view('ops/identity', [
+            'ready'   => iddoc_readiness(),
+            'people'  => $rows,
+            'person'  => $person,
+            'docs'    => $person ? iddoc_list($pid) : [],
+            'log'     => $person ? iddoc_access_log(0, $pid, 60) : [],
+            'kinds'   => iddoc_kind_options(),
+            'purpose' => iddoc_purpose(),
+            'canManage' => iddoc_can_manage(),
+            'reveal'  => (int)($_GET['reveal'] ?? 0),
+            'revealed'=> iddoc_flash_number(),
+        ]);
+        return true;
+    }
+
+    ops_require(iddoc_can_manage(),
+        'You may see that a document is on file. Adding, revealing or removing one needs '
+      . '“Hold identity documents”.');
+
+    if ($route === 'iddoc-file') {
+        $d = iddoc_row((int)($_GET['id'] ?? 0), true);
+        if (!$d) { http_response_code(404); view('notfound'); return true; }
+        if (empty($d['file_data'])) {
+            flash(!empty($d['redacted_at'])
+                ? 'That copy was redacted on ' . substr((string)$d['redacted_at'], 0, 10) . '. The record of the check remains.'
+                : 'No file was uploaded with that entry.', 'error');
+            redirect('/identity?i=' . (int)$d['person_id']);
+        }
+        iddoc_log((int)$d['id'], (int)$d['person_id'], 'DOWNLOAD',
+                  trim((string)($_GET['why'] ?? '')) ?: 'Not stated');
+        send_uploaded_file(base64_decode((string)$d['file_data']),
+                           $d['file_name'] ?: 'document', $d['mime'] ?: 'application/octet-stream');
+        return true;
+    }
+
+    if ($route === 'iddoc-add' && $method === 'POST') {
+        $pid = (int)($_POST['person_id'] ?? 0);
+        $why = iddoc_add($pid, $_POST, $_FILES['doc_file'] ?? null);
+        flash($why !== '' ? $why : 'Filed, and held for ' . iddoc_retain_days()
+              . ' days past expiry. Everyone who opens it after this is recorded.',
+              $why !== '' ? 'error' : 'success');
+        redirect('/identity?i=' . $pid);
+    }
+
+    // Reading a number out loud. Costs a reason, and the reason is kept.
+    if ($route === 'iddoc-reveal' && $method === 'POST') {
+        $d = iddoc_row((int)($_POST['id'] ?? 0), true);
+        if (!$d) redirect('/identity');
+        $reason = trim((string)($_POST['reason'] ?? ''));
+        if ($reason === '') {
+            flash('Say why the full number is needed. The reason is kept with the record.', 'error');
+            redirect('/identity?i=' . (int)$d['person_id']);
+        }
+        if (!empty($d['redacted_at'])) {
+            flash('That number was redacted on ' . substr((string)$d['redacted_at'], 0, 10) . '.', 'error');
+            redirect('/identity?i=' . (int)$d['person_id']);
+        }
+        iddoc_log((int)$d['id'], (int)$d['person_id'], 'REVEAL', $reason);
+        iddoc_flash_number((string)$d['doc_number'], (int)$d['id']);
+        redirect('/identity?i=' . (int)$d['person_id'] . '&reveal=' . (int)$d['id']);
+    }
+
+    // Sending a copy to a plant's security desk is a disclosure. It is the one
+    // thing that most often goes unrecorded and most often needs answering for,
+    // so it gets its own button rather than living in somebody's sent items.
+    if ($route === 'iddoc-share' && $method === 'POST') {
+        $d = iddoc_row((int)($_POST['id'] ?? 0));
+        if (!$d) redirect('/identity');
+        $to = trim((string)($_POST['recipient'] ?? ''));
+        if ($to === '') {
+            flash('Name who it went to — a company, a site, or a person.', 'error');
+            redirect('/identity?i=' . (int)$d['person_id']);
+        }
+        iddoc_log((int)$d['id'], (int)$d['person_id'], 'SHARE',
+                  trim((string)($_POST['reason'] ?? '')) ?: iddoc_purpose(), $to);
+        flash('Recorded: a copy went to ' . $to . '.');
+        redirect('/identity?i=' . (int)$d['person_id']);
+    }
+
+    if ($route === 'iddoc-redact' && $method === 'POST') {
+        $d = iddoc_row((int)($_POST['id'] ?? 0));
+        if (!$d) redirect('/identity');
+        iddoc_redact((int)$d['id'], trim((string)($_POST['reason'] ?? '')) ?: 'Redacted on request.');
+        flash('The copy and the number are gone. The record that identity was checked remains.');
+        redirect('/identity?i=' . (int)$d['person_id']);
+    }
+
+    if ($route === 'iddoc-retention' && $method === 'POST') {
+        $d = (int)($_POST['iddoc_retain_days'] ?? 0);
+        if ($d > 0) setting_set('iddoc_retain_days', (string)$d);
+        $p = trim((string)($_POST['iddoc_purpose'] ?? ''));
+        setting_set('iddoc_purpose', $p);
+        $n = iddoc_run_retention();
+        flash('Retention set to ' . iddoc_retain_days() . ' days past expiry.'
+            . ($n ? ' ' . $n . ' document(s) past that limit were redacted now.' : ''));
+        redirect('/identity');
+    }
+
+    redirect('/identity');
+    return true;
+}
+
+// A revealed number is shown once, on the next screen, and never stored in the
+// URL or the page history. The session is the only place it lives, and it is
+// taken out the moment it is read.
+function iddoc_flash_number($number = null, $docId = 0) {
+    if ($number !== null) { $_SESSION['iddoc_reveal'] = ['id' => (int)$docId, 'n' => $number]; return ''; }
+    $v = $_SESSION['iddoc_reveal'] ?? null;
+    unset($_SESSION['iddoc_reveal']);
+    return $v;
+}

@@ -40,6 +40,7 @@ function pk_clause() {
 //  LONGTEXT (4 GB) removes the ceiling; the upload limit stays the real cap.
 const FILE_COLUMNS = [
     ['job_bills',        'file_data'],
+    ['person_documents', 'file_data'],
     ['quote_files',      'file_data'],
     ['crm_templates',    'file_data'],
     ['report_files',     'data'],
@@ -229,6 +230,7 @@ function boot() {
     if (function_exists('equipment_migrate')) equipment_migrate();     // measuring & test equipment, §6.2
     if (function_exists('competence_spine_migrate')) competence_spine_migrate();  // authorisation matrix, §6.1
     if (function_exists('impartiality_migrate')) impartiality_migrate();  // §4.1 threats & declarations
+    if (function_exists('identity_migrate')) identity_migrate();       // passports & IDs, held under DPDP guardrails
     if (function_exists('sched_migrate')) sched_migrate();           // engagement shapes, holidays by office, visits
     // Register every remaining dropdown as an editable master list. Runs last:
     // it needs the base lists seeded and the CRM/IDEMS constants loaded.

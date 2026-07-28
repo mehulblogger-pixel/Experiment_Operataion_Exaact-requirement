@@ -85,6 +85,7 @@ alternative. Nothing else in this document has that.
 | 3.5 | **Internal audit · management review · corrective action (CAPA)** — root cause, action, owner, due date, effectiveness check | 3 d | §8.5–8.8 |
 | 3.6 | **Data & information control** — software validation record, data-integrity evidence, access control report, system failure log | 2 d | **new in 2026, no 2012 equivalent** |
 | 3.7 | ✅ **DONE** — **Type A / Type non-A** on the organisation record (was A/B/C) | 0.25 d | 2026 model change |
+| 3.8 | ✅ **DONE** — **Identity documents for site access** — passport / visa / ID held under a stated purpose, a separate permission, a retention limit that runs nightly, masked numbers, and a log of every open, reveal and copy sent out | 1.5 d | DPDP Act 2023, not 17020 |
 
 **Sell it as one thing:** *"17020:2026 transition-ready."* That is a reason to
 buy this year rather than eventually.

@@ -179,6 +179,15 @@ function person_data_export($kind, $id) {
         $out['inspector'] = ops_one("SELECT * FROM inspectors WHERE id=(SELECT inspector_id FROM users WHERE id=?)", [(int)$id]);
         $out['what_they_did'] = ops_all("SELECT created_at, entity, irn, action, field, new_value
                                          FROM idems_audit WHERE username=? ORDER BY id DESC", [$u['username']]);
+        // Identity documents, and — the part people most want to know — every
+        // time somebody in this company opened one of them. The scans are not
+        // put in the export: they are the person's own documents, they already
+        // have them, and a copy in a downloadable file is one more copy loose.
+        if (function_exists('iddoc_list') && !empty($out['inspector']['id'])) {
+            $iid = (int)$out['inspector']['id'];
+            $out['identity_documents'] = iddoc_list($iid);
+            $out['who_looked_at_them'] = iddoc_access_log(0, $iid, 500);
+        }
     } elseif ($kind === 'contact') {
         $c = ops_one("SELECT * FROM partner_contacts WHERE id=?", [(int)$id]);
         if (!$c) return null;
@@ -210,7 +219,8 @@ function person_erase_preview($kind, $id) {
         return [
             'name'    => trim($u['first_name'] . ' ' . $u['last_name']) ?: $u['username'],
             'removed' => ['their name and e-mail address', 'the sign-in itself, which is switched off',
-                          'the stored signature', 'the last-seen address'],
+                          'the stored signature', 'the last-seen address',
+                          'every identity document held for them — the scan and the number both go'],
             'kept'    => ['reports they approved or issued, and the signature already printed on those — a report cannot be unsigned after a client has relied on it',
                           'the audit trail, under the username, which is what an inspection audit examines'],
         ];
@@ -234,6 +244,12 @@ function person_erase($kind, $id, $reason) {
         $pdo->prepare("UPDATE users SET first_name='Removed', last_name='at request', email='',
                        is_active=0, signature='', totp_secret='', totp_enabled=0, recovery_codes='',
                        last_login_ip='' WHERE id=?")->execute([(int)$id]);
+        // An erasure that leaves a passport scan on the server is not an
+        // erasure. Redaction keeps the row — the proof that identity was once
+        // checked — and takes the copy away, which is the whole point.
+        if (function_exists('iddoc_list') && !empty($u['inspector_id']))
+            foreach (iddoc_list((int)$u['inspector_id']) as $d)
+                iddoc_redact((int)$d['id'], 'Erasure requested by the person. ' . $reason);
         idems_log('user', (int)$id, 'PERSON_ERASED', ['field'=>$u['username'], 'reason'=>$reason]);
         return true;
     }
@@ -337,6 +353,25 @@ function compliance_status() {
 
     $add('DPDP Act 2023', 'Breach notified to the Board and to the people affected',
         'ok', 'The incident register holds both dates and shows them as outstanding until they are filled in.');
+
+    // Identity documents are the heaviest personal data this system holds, so
+    // they get their own three lines rather than hiding inside "we have a notice".
+    if (function_exists('iddoc_readiness')) {
+        $idr = iddoc_readiness();
+        $add('DPDP Act 2023', 'Identity documents held for a stated purpose only',
+            'ok', 'Purpose: ' . iddoc_purpose() . ' It is stamped onto every document as it is filed.',
+            'Check the wording matches what you actually tell people, on the Identity documents screen.');
+        $add('DPDP Act 2023', 'Identity documents retired when they are no longer needed',
+            $idr['due_redaction'] ? 'bad' : 'ok',
+            $idr['copies_held'] . ' copy(ies) held; kept ' . $idr['retain_days'] . ' days past expiry. '
+          . ($idr['due_redaction'] ? $idr['due_redaction'] . ' past that limit and not yet wiped.' : 'None past that limit.'),
+            $idr['due_redaction'] ? 'The nightly job wipes these. If it is not running, open the Identity documents screen and press "Save & sweep".' : '');
+        $holders = count(iddoc_holders());
+        $add('DPDP Act 2023', 'Only named people can open an identity document',
+            'ok', $holders . ' account(s) hold the permission, apart from the master administrator. '
+                . 'Every open, download and copy sent out is recorded against a name.',
+            'Review the list under Settings → Roles & access. Fewer is better.');
+    }
 
     // --- things software cannot answer ------------------------------------
     $add('Everything else', 'Backups, and a restore that has been tried',
