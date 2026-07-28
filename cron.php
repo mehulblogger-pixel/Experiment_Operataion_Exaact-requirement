@@ -133,3 +133,21 @@ if (function_exists('cmp_run_reminders')) {
     $n = cmp_run_reminders();
     echo "Complaint chases sent: $n\n";
 }
+
+// Passports, visas, medicals and gate passes running out. Looked at 45 days
+// ahead rather than 30, because a visa takes weeks to renew and a document that
+// expires the week of the inspection is a wasted trip.
+if (function_exists('sitedoc_expiring') && function_exists('ops_mail')) {
+    $n = 0;
+    foreach (sitedoc_expiring(45) as $d) {
+        $to = trim((string)($d['email'] ?? ''));
+        if ($to === '') continue;
+        $kinds = function_exists('iddoc_kind_options') ? iddoc_kind_options() : [];
+        ops_mail($to, 'Your ' . ($kinds[$d['doc_kind']] ?? $d['doc_kind']) . ' expires on ' . $d['expires_on'],
+            "Your " . ($kinds[$d['doc_kind']] ?? $d['doc_kind']) . " expires on {$d['expires_on']}.\n\n"
+            . "Some client sites will not admit you without it, and an allocation to one of those sites "
+            . "will be refused once it has lapsed. Please get it renewed and send the new one to the office.");
+        $n++;
+    }
+    echo "Site-entry document expiry notices sent: $n\n";
+}

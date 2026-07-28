@@ -230,7 +230,8 @@ function boot() {
     if (function_exists('equipment_migrate')) equipment_migrate();     // measuring & test equipment, §6.2
     if (function_exists('competence_spine_migrate')) competence_spine_migrate();  // authorisation matrix, §6.1
     if (function_exists('impartiality_migrate')) impartiality_migrate();  // §4.1 threats & declarations
-    if (function_exists('identity_migrate')) identity_migrate();       // passports & IDs, held under DPDP guardrails
+    if (function_exists('identity_migrate')) identity_migrate();
+    if (function_exists('sitedoc_migrate')) sitedoc_migrate();         // what a site demands before the gate opens       // passports & IDs, held under DPDP guardrails
     if (function_exists('complaints_migrate')) complaints_migrate();   // §7.5 complaints, §7.6 appeals
     if (function_exists('capa_migrate')) capa_migrate();
     if (function_exists('ncr_migrate')) ncr_migrate();                 // the event, before the corrective action               // §8.7 nonconformity & corrective action
