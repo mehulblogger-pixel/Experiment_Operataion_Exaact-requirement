@@ -310,13 +310,48 @@
     <form method="post" action="/seed-demo-remove" onsubmit="return confirm('Remove ALL demo/sample data (offices left in place)? Your own real records are not touched. You can load the demo again later.')">
       <button class="btn danger" type="submit">🗑 Remove demo data</button>
     </form>
-    <p class="muted" style="margin-top:8px;font-size:12px">Deletes only the seeded calls, jobs, vouchers, demo inspectors, clients/vendors, <?= e(Tlp("boss")) ?> and demo logins. The three demo offices are left in place (delete them under Masters if you want).</p>
+    <p class="muted" style="margin-top:8px;font-size:12px">Deletes the seeded records across every module — calls, deputations, vouchers, quotations, reports and their evidence, equipment, authorisations, complaints, corrective actions, audits, reviews, portal logins — plus the demo inspectors, clients/vendors, <?= e(Tlp("boss")) ?> and demo logins, and switches the client portal back off. The three demo offices are left in place (delete them under Masters if you want).</p>
   <?php else: ?>
-    <p class="sub" style="margin-bottom:10px">One-click load of a complete example — <strong>offices, users of every role, inspectors, clients, <?= e(Tlp("boss")) ?>, calls, jobs, vouchers, invoicing &amp; credit</strong> — so every screen shows live figures. Safe to explore; you can delete records later. It runs only once.</p>
+    <p class="sub" style="margin-bottom:10px">One-click load of a complete example across <strong>every module</strong> — offices, users of every role, engineers, clients, <?= e(Tlp("boss")) ?>, calls, deputations, vouchers, invoicing &amp; credit, quotations, inspection reports with evidence, equipment and calibration, authorisations, impartiality, complaints and appeals, corrective actions, internal audit, management review and the client portal. Roughly half the records are deliberately awkward — an expired calibration, a lapsed authorisation, a complaint nobody acknowledged in time, a corrective action that did not work — because a register of tidy rows cannot show you whether a rule is working. See <code>docs/DEMO-TEST-PACK.md</code> for what each one should do on screen.</p>
     <form method="post" action="/seed-demo" onsubmit="return confirm('Load the demo/sample dataset now? This adds example records across the whole app.')">
       <button class="btn" type="submit">Load demo data</button>
     </form>
     <p class="muted" style="margin-top:8px">Creates demo logins (director, sbuhead, bmanager, appmanager, opmanager, asstmgr, coord.amd, coord.pun, account, insp.ravi, insp.anil) — all password <code>demo12345</code>. Use a fresh/test install, not a database that already holds real data.</p>
+  <?php endif; ?>
+
+  <?php
+  // What the demo actually reaches, checked against the database rather than
+  // remembered. This module once fell two years behind — the seed filled
+  // Operations and every register added afterwards loaded empty — and nothing
+  // said so. Now it does, on the screen where somebody would notice.
+  $cov = function_exists('demo_coverage') ? demo_coverage() : [];
+  $gaps = array_filter($cov, fn($c) => $c['state'] !== 'ok');
+  ?>
+  <?php if ($cov): ?>
+  <details style="margin-top:14px">
+    <summary style="cursor:pointer;font-size:13px" class="muted">
+      Module coverage —
+      <?= $gaps
+        ? '<span class="pill p-warn">' . count($gaps) . ' of ' . count($cov) . ' with no demo data</span>'
+        : '<span class="pill p-ok">all ' . count($cov) . ' modules covered</span>' ?>
+    </summary>
+    <div style="margin-top:10px">
+      <?php if ($gaps): ?>
+        <p class="muted" style="font-size:12.5px;line-height:1.6;margin:0 0 8px">
+          These registers hold nothing, so a demonstration shows them empty. If a module was added recently,
+          its rows belong in <code>demo_seed_modules()</code> in <code>lib/seed_demo.php</code>.
+        </p>
+      <?php endif; ?>
+      <div style="display:grid;gap:2px 14px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));font-size:12.5px">
+        <?php foreach ($cov as $label => $c): ?>
+          <div style="display:flex;justify-content:space-between;gap:8px">
+            <span><?= $c['state'] === 'ok' ? '✓' : '·' ?> <?= e($label) ?></span>
+            <span class="muted"><?= $c['state'] === 'missing' ? 'not installed' : (int)$c['rows'] ?></span>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  </details>
   <?php endif; ?>
 </div>
 

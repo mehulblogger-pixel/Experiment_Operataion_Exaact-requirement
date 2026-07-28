@@ -2,6 +2,57 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ The demo dataset now covers every module (July 2026)
+
+Owner: *"demo data is of no use at present due to addition of many other
+features."* Measured, and worse than expected: the seed filled Operations and
+**every one of the 25 registers added since loaded empty** — sales, reporting,
+the whole accreditation pack, the trust layer, the client portal. A demonstration
+showed about a third of the product and two dozen blank screens, including the
+entire ISO/IEC 17020 story that is the actual differentiator.
+
+**Now 32 modules, all seeded**, from one shared cast of clients, engineers and
+deputations so the modules are visibly about each other rather than twenty
+unrelated islands. `docs/DEMO-TEST-PACK.md` lists every scenario with the screen
+to open and what should happen there.
+
+**Roughly half the records are deliberately wrong**, and that is the point. A
+register full of tidy compliant rows cannot tell you whether a rule is working or
+whether the rule was never written. So the seed plants: an instrument whose
+calibration expired and which nobody withdrew; a calibration that FAILED; an
+authorisation lapsed on a sub-contractor; one suspended with its reason; an
+impartiality declaration that lapsed unnoticed; a complaint past its
+acknowledgement deadline; an appeal the original decider must be refused; a
+corrective action verified as **not effective**; an overdue internal audit;
+a management review that cannot be completed; an identity document held past its
+retention date. Every one is a numbered row in the test pack, and `t_demo.php`
+asserts each still exists — because those are exactly the rows a future tidy-up
+would remove, and the test pack would quietly stop being testable while still
+reading as though it worked.
+
+**The demo deliberately ships with one failing integrity check** — the retention
+case. A demo where everything is green cannot show you that the checks run at all.
+
+**It cannot rot quietly again.** `demo_coverage()` checks the real database and
+the result is shown on the screen where the demo is loaded: add a module, add its
+line to `demo_modules_expected()`, and the screen says "no demo data" in plain
+sight until it has some. Same fix as `module_groups()`, the new-module guess and
+the smoke crawl's path list — derive it from the real thing rather than trusting
+somebody to remember.
+
+**Removal is complete and reversible.** Load → remove → load again is a cycle,
+asserted by test. Removal also switches the client portal back **off**: leaving a
+client-facing door open after "remove demo data" is exactly the kind of thing
+nobody checks.
+
+**Still open on the demo:**
+
+- [ ] Evidence photographs are 1-pixel placeholders so the register loads fast.
+      Real EXIF reading and image compression need a real photograph uploaded by
+      hand.
+- [ ] Nothing is e-mailed; the mail log records what would have been sent.
+- [ ] No GST/e-invoice data, because that module does not exist yet (roadmap 5.2).
+
 ## ✅ PHASE 5.1 — the client portal (July 2026)
 
 `lib/portal.php`, client screens under `/portal`, staff screen `/portal-users`.

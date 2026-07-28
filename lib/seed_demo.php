@@ -315,6 +315,18 @@ function seed_demo() {
         $c['edge_cases'] = $edge;
         // ================= end edge cases =================
 
+        // ---------- Everything the original seed never reached ----------
+        // Sales, reporting, the accreditation pack, the trust layer and the
+        // client portal. Seeded from one shared cast of clients, engineers and
+        // deputations so the modules are visibly ABOUT each other rather than
+        // twenty unrelated islands. See demo_seed_modules() for the scenarios
+        // and docs/DEMO-TEST-PACK.md for what each one should do on screen.
+        $c += demo_seed_modules($pdo, [
+            'oid' => $oid, 'iid' => $iid, 'cid' => $cid, 'vid' => $vid,
+            'callid' => $callid, 'jid' => $jid, 'bid' => $bid,
+            'now' => $now, 'today' => $today, 'd' => $d, 'hash' => $hash,
+        ]);
+
         // Place the demo users under a reporting manager, so the organisation
         // chart shows an actual tree rather than a flat row of roots.
         if (function_exists('org_auto_arrange')) $c['reporting_lines'] = count(org_auto_arrange(true, true));
@@ -351,6 +363,56 @@ function seed_demo_remove() {
         $del("DELETE FROM agencies WHERE name IN ('TalentFirst Recruitment','SiteForce Manpower')");
         $del("DELETE FROM requisitions WHERE created_by='demo'");
         $del("DELETE FROM business_partners WHERE code IN ('CL-NIL','CL-SVP','CL-GHE','VN-VAP','VN-MUN') OR code LIKE 'EC-%' OR code LIKE 'EV-%'");
+        // ---- Everything the module seed added -------------------------------
+        // Wrapped one at a time: a table that does not exist on this install
+        // must not abort the removal and strand the rest of the demo data.
+        $try = function ($sql, $args = []) use ($pdo, &$n) {
+            try { $st = $pdo->prepare($sql); $st->execute($args); $n += $st->rowCount(); }
+            catch (Throwable $e) { /* table not built here */ }
+        };
+        // Reports first, then what hangs off them.
+        $try("DELETE FROM evidence_chain WHERE report_doc_id IN (SELECT id FROM report_docs WHERE created_by='demo')");
+        $try("DELETE FROM report_equipment WHERE report_doc_id IN (SELECT id FROM report_docs WHERE created_by='demo')");
+        $try("DELETE FROM report_files WHERE created_by='demo'");
+        $try("DELETE FROM report_docs WHERE created_by='demo'");
+        $try("DELETE FROM endorsements WHERE created_by='demo'");
+        $try("DELETE FROM site_visits WHERE by_user IN ('Ravi Kumar','Anil Sharma','Priya Nair','Mohan Rao')
+              AND ip='127.0.0.1'");
+        // Sales
+        $try("DELETE FROM quote_lines WHERE quote_id IN (SELECT id FROM quotations WHERE created_by='demo')");
+        $try("DELETE FROM quotations WHERE created_by='demo'");
+        $try("DELETE FROM crm_inquiries WHERE created_by='demo'");
+        // Accreditation pack — by the seed's own reference prefixes.
+        $try("DELETE FROM equipment_calibrations WHERE equipment_id IN (SELECT id FROM equipment WHERE created_by='demo')");
+        $try("DELETE FROM equipment WHERE created_by='demo'");
+        $try("DELETE FROM qualifications WHERE code IN ('QW-2','NDT-UT2','CIP-1')");
+        $try("DELETE FROM witness_assessments WHERE assessor='Sunil Verma'");
+        $try("DELETE FROM authorisations WHERE granted_by='Meena Shah'");
+        $try("DELETE FROM impartiality_declarations WHERE signed_name IN ('Ravi Kumar','Anil Sharma','Priya Nair','Mohan Rao')");
+        $try("DELETE FROM impartiality_threats WHERE raised_by IN ('Sunil Verma','Meena Shah','Sana Kapoor')");
+        $try("DELETE FROM person_document_access WHERE document_id IN (SELECT id FROM person_documents WHERE uploaded_by='demo')");
+        $try("DELETE FROM person_documents WHERE uploaded_by='demo'");
+        $try("DELETE FROM complaint_events WHERE complaint_id IN (SELECT id FROM complaints WHERE ref LIKE 'CMP-2026-%' OR ref LIKE 'APL-2026-%')");
+        $try("DELETE FROM complaints WHERE ref LIKE 'CMP-2026-%' OR ref LIKE 'APL-2026-%'");
+        $try("DELETE FROM capa_events WHERE capa_id IN (SELECT id FROM capa WHERE ref LIKE 'CAPA-2026-%')");
+        $try("DELETE FROM capa WHERE ref LIKE 'CAPA-2026-%'");
+        $try("DELETE FROM audit_findings WHERE audit_id IN (SELECT id FROM internal_audits WHERE created_by='demo')");
+        $try("DELETE FROM internal_audits WHERE created_by='demo'");
+        $try("DELETE FROM mr_inputs WHERE review_id IN (SELECT id FROM mgmt_reviews WHERE created_by='demo')");
+        $try("DELETE FROM mr_actions WHERE review_id IN (SELECT id FROM mgmt_reviews WHERE created_by='demo')");
+        $try("DELETE FROM mgmt_reviews WHERE created_by='demo'");
+        $try("DELETE FROM sw_validations WHERE ref LIKE 'SV-2026-%'");
+        $try("DELETE FROM data_check_runs WHERE ran_by='Arjun Patel'");
+        $try("DELETE FROM system_failures WHERE ref LIKE 'SF-2026-%'");
+        // Client portal
+        $try("DELETE FROM portal_audit WHERE client_user_id IN (SELECT id FROM client_users WHERE created_by='demo')");
+        $try("DELETE FROM portal_requests WHERE client_user_id IN (SELECT id FROM client_users WHERE created_by='demo')");
+        $try("DELETE FROM client_users WHERE created_by='demo'");
+        // The portal is switched ON by the demo. Switching it back off on the way
+        // out matters more than it looks: leaving a client-facing door open after
+        // "remove demo data" is exactly the kind of thing nobody checks.
+        setting_set('portal_enabled', '0');
+
         // Demo login accounts
         $unames = array_map(fn($a) => $a[0], demo_accounts());
         $ph = implode(',', array_fill(0, count($unames), '?'));
@@ -362,4 +424,691 @@ function seed_demo_remove() {
         return ['error' => $e->getMessage()];
     }
     return ['deleted' => $n];
+}
+
+// ============================================================================
+//  The modules the original seed never reached
+//
+//  Sales, reporting, the whole accreditation pack, the trust layer and the
+//  client portal. Every scenario below is deliberate: most exist to make a RULE
+//  visible, not to fill a table. A register full of tidy, compliant rows proves
+//  nothing — you cannot tell a working gate from a missing one. So roughly half
+//  of these are the awkward cases: the expired authorisation, the calibration
+//  that ran out, the corrective action that did not work, the complaint nobody
+//  acknowledged in time, the management review that cannot be completed.
+//
+//  docs/DEMO-TEST-PACK.md lists each one with the screen to open and what
+//  should happen there.
+// ============================================================================
+function demo_seed_modules($pdo, $x) {
+    $oid = $x['oid']; $iid = $x['iid']; $cid = $x['cid']; $vid = $x['vid'];
+    $callid = $x['callid']; $jid = $x['jid'];
+    $now = $x['now']; $today = $x['today']; $d = $x['d']; $hash = $x['hash'];
+    $n = [];
+
+    // A table that is not built on this install must not take the whole seed
+    // down with it — the demo has to survive a partial upgrade.
+    $has = function ($t) use ($pdo) {
+        try { $pdo->query("SELECT 1 FROM $t LIMIT 1"); return true; }
+        catch (Throwable $e) { return false; }
+    };
+    $ins = function ($sql, $args) use ($pdo) { $s = $pdo->prepare($sql); $s->execute($args); return (int)$pdo->lastInsertId(); };
+
+    // ------------------------------------------------------------------
+    //  Sales — inquiries and quotations (CRM)
+    // ------------------------------------------------------------------
+    if ($has('crm_inquiries') && $has('quotations')) {
+        $q1 = $ins("INSERT INTO crm_inquiries (inquiry_no,client_id,client_name,contact_name,contact_email,contact_mobile,
+                    subject,service_requirement,sbu,source,received_date,status,created_by,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'demo', ?)",
+            ['INQ-2607-01', $cid['CL-NIL'], 'Narmada Industries Ltd', 'Rakesh Menon', 'rakesh.menon@example.com', '9825011001',
+             'Third-party inspection of 12 pressure vessels', "12 vessels, ASME VIII Div 1. Stage plus final at the fabricator's works. Certification required before despatch.",
+             'IND', 'EMAIL', $d(-40), 'CONVERTED', $now]);
+        // Still sitting there. Deliberately older than the follow-up window, so
+        // the inquiry register has something that should be chased.
+        $ins("INSERT INTO crm_inquiries (inquiry_no,client_id,client_name,contact_name,contact_email,contact_mobile,
+              subject,service_requirement,sbu,source,received_date,status,notes,created_by,created_at)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?, 'demo', ?)",
+            ['INQ-2607-02', $cid['CL-GHE'], 'Girnar Energy Hydrocarbon', 'Deepa Balan', 'deepa.balan@example.com', '9825011004',
+             'Coating inspection — 4 storage tanks', 'Surface preparation and DFT checks through the painting campaign. Roughly six weeks on site.',
+             'OGC', 'PHONE', $d(-26), 'OPEN', 'Chased twice. Waiting on their board approval.', $now]);
+        $n['inquiries'] = 2;
+
+        $qi = "INSERT INTO quotations (quote_no,rev,is_current,inquiry_id,client_id,client_name,contact_name,contact_email,
+               sbu,office_id,subject,site_location,currency,validity_days,payment_terms,advance_pct,advance_required,
+               subtotal,gst_pct,gst_amount,total_amount,status,lost_reason,sent_at,accepted_date,contract_number,
+               created_by,created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'INR', ?,?,?,?,?,18,?,?,?,?,?,?,?, 'demo', ?)";
+        // Won — and it is the quotation the demo's first contract number came from.
+        $qA = $ins($qi, ['Q-2607-001', 0, 1, $q1, $cid['CL-NIL'], 'Narmada Industries Ltd', 'Rakesh Menon', 'rakesh.menon@example.com',
+                         'IND', $oid['AMD'], 'TPI — 12 pressure vessels', 'Vapi, Gujarat', 30, '30 days from invoice', 0, 0,
+                         150000, 27000, 177000, 'ACCEPTED', '', $d(-36), $d(-30), '40231', $now]);
+        // Sent and about to run out of validity — the follow-up screen should care.
+        $ins($qi, ['Q-2607-002', 0, 1, null, $cid['CL-SVP'], 'Suryavan Ports & SEZ Ltd', 'Sunita Rao', 'sunita.rao@example.com',
+                   'OGC', $oid['MUM'], 'Structural inspection — jetty fabrication', 'Mundra SEZ, Gujarat', 15, '45 days from invoice', 20, 1,
+                   240000, 43200, 283200, 'SENT', '', $d(-13), '', '', $now]);
+        // Lost, with the reason recorded — the sales dashboard needs a loss to show.
+        $ins($qi, ['Q-2607-003', 0, 1, null, $cid['CL-GHE'], 'Girnar Energy Hydrocarbon', 'Deepa Balan', 'deepa.balan@example.com',
+                   'OGC', $oid['AMD'], 'Coating inspection — 4 tanks', 'Chakan, Pune', 30, '30 days from invoice', 0, 0,
+                   310000, 55800, 365800, 'LOST', 'PRICE', $d(-22), '', '', $now]);
+        $n['quotations'] = 3;
+        if ($has('quote_lines')) {
+            $ql = "INSERT INTO quote_lines (quote_id,line_no,sbu,service_type,description,location,qty,rate,amount) VALUES (?,?,?,?,?,?,?,?,?)";
+            try {
+                $ins($ql, [$qA, 1, 'IND', 'INSPECTION', 'Stage inspection — 12 vessels', 'Vapi', 10, 9000, 90000]);
+                $ins($ql, [$qA, 2, 'IND', 'INSPECTION', 'Final inspection and certification', 'Vapi', 6, 10000, 60000]);
+                $n['quote_lines'] = 2;
+            } catch (Throwable $e) { /* line schema differs on older installs */ }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    //  Measuring equipment and its calibration (ISO/IEC 17020 §6.2)
+    // ------------------------------------------------------------------
+    if ($has('equipment')) {
+        $ie = "INSERT INTO equipment (code,name,kind,make,model,serial_no,range_spec,accuracy,office_id,inspector_id,
+               status,cal_interval_months,owned_by,notes,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'demo', ?)";
+        $e1 = $ins($ie, ['EQ-UT-001','Ultrasonic thickness gauge','THICKNESS','Fieldtech','TG-110','TG110-4471','0.8–300 mm','±0.1 mm',
+                         $oid['AMD'],$iid['EMP01'],'ACTIVE',12,'OWN','Issued to Ravi Kumar',$now]);
+        $e2 = $ins($ie, ['EQ-VC-002','Vernier caliper 0–200 mm','DIMENSIONAL','Metrix','VC-200','VC200-9912','0–200 mm','±0.02 mm',
+                         $oid['PUN'],$iid['EMP03'],'ACTIVE',12,'OWN','',$now]);
+        $e3 = $ins($ie, ['EQ-DFT-003','Coating thickness gauge','COATING','Layercheck','DFT-9','DFT9-2210','0–1500 µm','±1 µm',
+                         $oid['AMD'],$iid['EMP02'],'ACTIVE',6,'OWN','',$now]);
+        $e4 = $ins($ie, ['EQ-HT-004','Portable hardness tester','HARDNESS','Duromet','PHT-5','PHT5-0088','20–68 HRC','±2 HRC',
+                         $oid['AMD'],null,'ACTIVE',12,'HIRED','Hired for the Mundra campaign',$now]);
+        $n['equipment'] = 4;
+
+        if ($has('equipment_calibrations')) {
+            $ic = "INSERT INTO equipment_calibrations (equipment_id,cert_no,cal_date,valid_to,cal_body,traceable_to,result,remarks,uploaded_by,uploaded_at)
+                   VALUES (?,?,?,?,?,?,?,?, 'demo', ?)";
+            // In date, comfortably.
+            $cal1 = $ins($ic, [$e1,'CAL/2026/1187',$d(-150),$d(215),'Statewide Calibration Laboratory','National standards','PASS','',$now]);
+            // Runs out in twelve days — the register should be warning about it.
+            $ins($ic, [$e2,'CAL/2026/1204',$d(-353),$d(12),'Statewide Calibration Laboratory','National standards','PASS','',$now]);
+            // ALREADY EXPIRED, and the instrument is still marked ACTIVE. This is
+            // the one that matters: an instrument nobody withdrew.
+            $ins($ic, [$e3,'CAL/2026/0990',$d(-200),$d(-18),'Statewide Calibration Laboratory','National standards','PASS','',$now]);
+            // A calibration that FAILED. It stays on the register, because a
+            // failure is the record — the instrument must not be used.
+            $ins($ic, [$e4,'CAL/2026/1310',$d(-30),$d(335),'Statewide Calibration Laboratory','National standards','FAIL',
+                       'Reading 4 HRC low across the range. Returned to the hire company.',$now]);
+            $n['calibrations'] = 4;
+            $x['cal1'] = $cal1;
+        }
+        $x['eq1'] = $e1;
+    }
+
+    // ------------------------------------------------------------------
+    //  Competence and authorisation (§6.1)
+    // ------------------------------------------------------------------
+    if ($has('qualifications')) {
+        $iq = "INSERT INTO qualifications (code,name,scheme,issuing_body,level,renewal_months,active,notes,created_at) VALUES (?,?,?,?,?,?,1,?,?)";
+        $ins($iq, ['QW-2','Welding Inspector Level 2','Welding','National welding institute','2',60,'',$now]);
+        $ins($iq, ['NDT-UT2','NDT Ultrasonic Level II','NDT','National NDT board','II',60,'',$now]);
+        $ins($iq, ['CIP-1','Coating Inspector Level 1','Coating','Coatings institute','1',36,'',$now]);
+        $n['qualifications'] = 3;
+    }
+    if ($has('authorisations')) {
+        $ia = "INSERT INTO authorisations (inspector_id,level,scope_kind,scope_value,valid_from,valid_to,status,status_reason,
+               granted_by,granted_at,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)";
+        $ins($ia, [$iid['EMP01'],'SENIOR_INSPECTOR','ACTIVITY','WELDING',$d(-300),$d(240),'ACTIVE','','Meena Shah',$now,'']);
+        // Expires in nine days. Allocating him after that must be refused when
+        // enforcement is switched on — which is the point of the nine days.
+        $ins($ia, [$iid['EMP02'],'INSPECTOR','ACTIVITY','COATING',$d(-356),$d(9),'ACTIVE','','Meena Shah',$now,'Renewal paperwork with the training provider.']);
+        // Suspended, with the reason on the record.
+        $ins($ia, [$iid['EMP03'],'INSPECTOR','ACTIVITY','NDT',$d(-200),$d(160),'SUSPENDED',
+                   'Withdrawn pending re-assessment after the Mundra observation.','Meena Shah',$now,'']);
+        // Already lapsed — and he is a sub-contractor, which is exactly the
+        // combination that gets missed.
+        $ins($ia, [$iid['SC-001'],'INSPECTOR','ACTIVITY','LIFTING',$d(-400),$d(-5),'ACTIVE','','Meena Shah',$now,'']);
+        $n['authorisations'] = 4;
+    }
+    if ($has('witness_assessments')) {
+        $iw = "INSERT INTO witness_assessments (inspector_id,job_id,assessed_on,assessor,location,scores,outcome,remarks,next_due,created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?)";
+        $ins($iw, [$iid['EMP01'],$jid['J-2607-101'],$d(-11),'Sunil Verma','Vapi Chemical Works',
+                   json_encode(['preparation'=>4,'technique'=>5,'records'=>4,'conduct'=>5]),'PASS','Thorough. Records written up on site.',$d(354),$now]);
+        // A failed witness assessment, which is what should drive the suspension above.
+        $ins($iw, [$iid['EMP03'],$jid['J-2607-103'],$d(-7),'Sunil Verma','Mundra Fabrication Yard',
+                   json_encode(['preparation'=>2,'technique'=>2,'records'=>3,'conduct'=>4]),'FAIL',
+                   'Calibration of the gauge not checked before use; readings not recorded contemporaneously.',$d(83),$now]);
+        $n['witness_assessments'] = 2;
+    }
+
+    // ------------------------------------------------------------------
+    //  Impartiality (§4.1)
+    // ------------------------------------------------------------------
+    if ($has('impartiality_declarations')) {
+        $idl = "INSERT INTO impartiality_declarations (person_kind,person_id,declared_on,valid_to,has_conflicts,statement,signed_name,created_at)
+                VALUES ('INSPECTOR',?,?,?,?,?,?,?)";
+        $ins($idl, [$iid['EMP01'],$d(-120),$d(245),0,'No interest in any client or supplier we inspect for.','Ravi Kumar',$now]);
+        $ins($idl, [$iid['EMP02'],$d(-115),$d(250),0,'No interest to declare.','Anil Sharma',$now]);
+        // Declares a real conflict — the interesting row.
+        $ins($idl, [$iid['EMP03'],$d(-100),$d(265),1,
+                    'My brother is a production supervisor at one of our vendor sites (Mundra Fabrication Yard). I have not worked and will not work on their inspections.',
+                    'Priya Nair',$now]);
+        // Lapsed six days ago. Somebody has to notice.
+        $ins($idl, [$iid['SC-001'],$d(-371),$d(-6),0,'No interest to declare.','Mohan Rao',$now]);
+        $n['impartiality_declarations'] = 4;
+    }
+    if ($has('impartiality_threats')) {
+        $it = "INSERT INTO impartiality_threats (threat_kind,person_kind,person_id,partner_id,office_id,description,raised_by,raised_on,
+               status,safeguards,decided_by,decided_on,review_on,created_at) VALUES (?, 'INSPECTOR',?,?,?,?,?,?,?,?,?,?,?,?)";
+        $ins($it, ['FAMILIARITY',$iid['EMP03'],$vid['VN-MUN'],$oid['PUN'],
+                   'Engineer has a close relative in production at this vendor.','Sunil Verma',$d(-98),'CLOSED',
+                   'Removed from all deputations to this vendor; a second engineer reviews any report naming it.','Meena Shah',$d(-95),$d(85),$now]);
+        // Open, and its review date has already passed.
+        $ins($it, ['SELF_INTEREST',$iid['EMP02'],$cid['CL-GHE'],$oid['AMD'],
+                   'Engineer was employed by this client until two years ago and holds a small shareholding.','Meena Shah',$d(-60),'OPEN',
+                   '','','',$d(-9),$now]);
+        $ins($it, ['INTIMIDATION',null,$cid['CL-NIL'],$oid['AMD'],
+                   'Client asked, on a call, for a rejection to be re-graded to "accepted with observations" before despatch.',
+                   'Sana Kapoor',$d(-15),'OPEN','','','',$d(20),$now]);
+        $n['impartiality_threats'] = 3;
+    }
+
+    // ------------------------------------------------------------------
+    //  Identity documents (DPDP guardrails)
+    //  Deliberately small. It is real personal data even in a demo, so there
+    //  are three rows that show the three states and nothing more.
+    // ------------------------------------------------------------------
+    if ($has('person_documents')) {
+        $ip = "INSERT INTO person_documents (person_kind,person_id,doc_kind,doc_number,number_last4,issuing_authority,issuing_country,
+               issued_on,expires_on,purpose,consent_on,consent_note,retain_until,redacted_at,redacted_by,note,uploaded_by,uploaded_at)
+               VALUES ('INSPECTOR',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'demo', ?)";
+        $ins($ip, [$iid['EMP01'],'PASSPORT','Z1234567','4567','Regional Passport Office','India',$d(-1100),$d(1600),
+                   'Refinery site access pass — the client requires passport details for the gate list.',$d(-90),
+                   'Given in writing by e-mail, and can be withdrawn at any time.',$d(1965),'','','',$now]);
+        // Past its own retention date: the retention run should offer to redact it.
+        $ins($ip, [$iid['EMP02'],'DRIVING_LICENCE','GJ0120099887','9887','Regional Transport Office','India',$d(-2000),$d(-400),
+                   'Hire-car authorisation for the Mundra campaign, which finished last year.',$d(-800),
+                   'Given in writing.', $d(-35),'','','',$now]);
+        // Already redacted — the number is gone, the record of having held it stays.
+        $ins($ip, [$iid['EMP03'],'PASSPORT','','8812','Regional Passport Office','India',$d(-1500),$d(900),
+                   'Site access for a visit that did not go ahead.',$d(-300),'Given in writing.',$d(-60),
+                   $d(-58) . 'T10:00:00+05:30','Arjun Patel','Redacted once the purpose fell away.',$now]);
+        $n['identity_documents'] = 3;
+    }
+
+    return $n + demo_seed_modules_b($pdo, $x, $has, $ins);
+}
+
+// Part two, split only so neither function runs to three hundred lines:
+// reports and their evidence, the trust layer, complaints and appeals,
+// corrective actions, internal audit, management review, data control and the
+// client portal. Same rule as part one — most rows exist to make a gate visible.
+function demo_seed_modules_b($pdo, $x, $has, $ins) {
+    $oid = $x['oid']; $iid = $x['iid']; $cid = $x['cid']; $vid = $x['vid'];
+    $callid = $x['callid']; $jid = $x['jid'];
+    $now = $x['now']; $d = $x['d'];
+    $n = [];
+    $val = function ($sql, $a = []) use ($pdo) { $s = $pdo->prepare($sql); $s->execute($a); $v = $s->fetchColumn(); $s->closeCursor(); return $v; };
+
+    // ------------------------------------------------------------------
+    //  Inspection reports, and the evidence behind them
+    // ------------------------------------------------------------------
+    $docs = [];
+    if ($has('report_docs')) {
+        // Whatever report type this install shipped with — the seed must not
+        // depend on a particular one existing.
+        $rt   = (int)$val("SELECT id FROM report_types WHERE active=1 ORDER BY sort_order, id LIMIT 1");
+        $rtc  = (string)$val("SELECT code FROM report_types WHERE id=?", [$rt]);
+        $ir = "INSERT INTO report_docs (irn,report_type_id,type_code,title,client_id,vendor_id,call_id,job_id,
+               office_id,sbu,po_ref,location,inspector_id,inspection_date,issue_date,result,release_status,status,
+               data,remarks,finalized,finalized_at,finalized_by,submitted_at,approved_at,approved_by,deleted,
+               created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0, 'demo', ?)";
+
+        // 1. Issued, accepted, and the one the client portal and /verify use.
+        $docs['issued'] = $ins($ir, ['MGH/AMD/2026/D-0001',$rt,$rtc,'Final inspection — 12 pressure vessels',
+            $cid['CL-NIL'],$vid['VN-VAP'],$callid['C-2607-001'],$jid['J-2607-101'],$oid['AMD'],'IND','PO-NIL-77120',
+            'Vapi, Gujarat',$iid['EMP01'],$d(-12),$d(-10),'ACCEPTED','RELEASED','ISSUED','[]',
+            'All 12 vessels witnessed. Dimensional and NDT records verified against the approved QAP.',
+            1,$d(-10).'T18:20:00+05:30','Ravi Kumar',$d(-11).'T09:00:00+05:30',$d(-10).'T17:40:00+05:30','Sunil Verma',$now]);
+
+        // 2. Issued but REJECTED — the outcome nobody demos, and the one a
+        //    client argues about. Release status says not released.
+        $docs['rejected'] = $ins($ir, ['MGH/AMD/2026/D-0002','','','Stage inspection — jetty fabrication',
+            $cid['CL-SVP'],$vid['VN-MUN'],$callid['C-2607-002'],$jid['J-2607-102'],$oid['AMD'],'OGC','PO-SVP-40881',
+            'Mundra SEZ, Gujarat',$iid['EMP02'],$d(-10),$d(-8),'REJECTED','NOT_RELEASED','ISSUED','[]',
+            'Weld root penetration outside the specification on 3 of 14 joints. Material not released for despatch.',
+            1,$d(-8).'T19:05:00+05:30','Anil Sharma',$d(-9).'T10:00:00+05:30',$d(-8).'T18:30:00+05:30','Sunil Verma',$now]);
+        $pdo->prepare("UPDATE report_docs SET report_type_id=?, type_code=? WHERE id=?")->execute([$rt,$rtc,$docs['rejected']]);
+
+        // 3. Submitted, sitting with the approver.
+        $docs['submitted'] = $ins($ir, ['MGH/PUN/2026/D-0003',$rt,$rtc,'Piping inspection — line 400 series',
+            $cid['CL-GHE'],null,$callid['C-2607-003'],$jid['J-2607-103'],$oid['PUN'],'IND','PO-GHE-2201',
+            'Chakan, Pune',$iid['EMP03'],$d(-8),'','ACCEPTED_COND','PENDING','SUBMITTED','[]',
+            'Two observations raised; awaiting approval.',0,'','',$d(-6).'T16:10:00+05:30','','',$now]);
+
+        // 4. Still a draft. Must NOT appear on the client portal.
+        $docs['draft'] = $ins($ir, ['MGH/AMD/2026/D-0004',$rt,$rtc,'Welding audit — fabrication shop',
+            $cid['CL-NIL'],$vid['VN-VAP'],$callid['C-2607-004'],$jid['J-2607-104'],$oid['AMD'],'IND','PO-NIL-77120',
+            'Vapi, Gujarat',$iid['EMP01'],$d(-1),'','','PENDING','DRAFT','[]','Being written up.',0,'','','','','',$now]);
+        $n['reports'] = 4;
+
+        // Evidence. A 1x1 JPEG is enough — what is being demonstrated is where
+        // the location came from, not what the picture shows.
+        if ($has('report_files')) {
+            $jpg = 'data:image/jpeg;base64,' . base64_encode(base64_decode(
+                '/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0a'
+              . 'HBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAA'
+              . 'AAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q=='));
+            $ifl = "INSERT INTO report_files (report_doc_id,field_key,kind,file_name,mime,data,gps,note,created_by,created_at)
+                    VALUES (?,?,?,?,?,?,?,?, 'demo', ?)";
+            $f1 = $ins($ifl, [$docs['issued'],'photos','photo','vessel-01-weld-cap.jpg','image/jpeg',$jpg,'','Cap pass, vessel 1 of 12',$now]);
+            $f2 = $ins($ifl, [$docs['issued'],'photos','photo','vessel-01-nameplate.jpg','image/jpeg',$jpg,'','Nameplate and heat number',$now]);
+            $f3 = $ins($ifl, [$docs['rejected'],'photos','photo','joint-07-root.jpg','image/jpeg',$jpg,'','Root run, joint 7 — the rejection',$now]);
+            $n['report_evidence'] = 3;
+
+            // The location facts, kept apart exactly as the trust layer requires:
+            // the camera's fix is the evidence; the upload fix is not.
+            if ((int)$val("SELECT COUNT(*) FROM pragma_table_info('report_files') WHERE name='exif_lat'")
+                || $has('evidence_chain')) {
+                try {
+                    $up = $pdo->prepare("UPDATE report_files SET exif_lat=?, exif_lon=?, up_lat=?, up_lon=?, up_acc=?,
+                                         geo_source=?, taken_at=?, received_at=?, clock_skew=?, flags=? WHERE id=?");
+                    // Taken at the plant (camera), uploaded from home that evening.
+                    // A late upload is normal and is deliberately NOT flagged.
+                    $up->execute([20.3720000,72.9080000,23.0225000,72.5714000,18,'EXIF',$d(-12).'T11:41:00+05:30',$d(-12).'T21:14:00+05:30',0,'',$f1]);
+                    $up->execute([20.3721000,72.9081000,23.0225000,72.5714000,18,'EXIF',$d(-12).'T11:52:00+05:30',$d(-12).'T21:14:00+05:30',0,'',$f2]);
+                    // No location in the photograph at all — a corporate phone
+                    // that strips EXIF. Flagged as upload-only, not as a lie.
+                    $up->execute([null,null,22.8300000,70.1200000,2200,'UPLOAD','',$d(-8).'T20:02:00+05:30',0,'NO_GEO,UPLOAD_ONLY',$f3]);
+                } catch (Throwable $e) { /* pre-Phase-4 install */ }
+            }
+            // Build the hash chain through the real function, so /verify says
+            // "unaltered" rather than "broken" — a demo with a broken chain
+            // teaches the opposite of the lesson.
+            if (function_exists('chain_append')) foreach ([$f1,$f2,$f3] as $fid) chain_append($fid);
+        }
+        // The public verification code on the issued report.
+        if (function_exists('verify_code_for')) {
+            foreach (['issued','rejected'] as $k)
+                verify_code_for(ops_one("SELECT * FROM report_docs WHERE id=?", [$docs[$k]]));
+        }
+        // Which instrument the issued report relied on — the link that turns the
+        // equipment register into evidence.
+        if ($has('report_equipment')) {
+            $eq = (int)$val("SELECT id FROM equipment WHERE code='EQ-UT-001'");
+            $cal = (int)$val("SELECT id FROM equipment_calibrations WHERE equipment_id=? ORDER BY id DESC LIMIT 1", [$eq]);
+            if ($eq) $ins("INSERT INTO report_equipment (report_doc_id,equipment_id,used_on,calibration_id,added_by,added_at)
+                           VALUES (?,?,?,?, 'demo', ?)", [$docs['issued'],$eq,$d(-12),$cal ?: null,$now]);
+        }
+    }
+
+    // Endorsement of a manufacturer's document.
+    if ($has('endorsements')) {
+        $ie = "INSERT INTO endorsements (endorsement_no,doc_type,title,vendor_id,client_id,report_doc_id,po_ref,heat_no,
+               item_desc,office_id,sbu,inspector_id,status,decision,decision_remarks,submitted_at,endorsed_at,endorsed_by,
+               finalized,deleted,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0, 'demo', ?)";
+        $ins($ie, ['MGH/AMD/2026/E-0001','MTC','Mill test certificate — SA516 Gr 70 plate',$vid['VN-VAP'],$cid['CL-NIL'],
+                   $docs['issued'] ?? null,'PO-NIL-77120','HT-88213','12 mm plate, 6 sheets',$oid['AMD'],'IND',$iid['EMP01'],
+                   'ENDORSED','ACCEPTED','Chemistry and mechanicals verified against the specification.',
+                   $d(-13).'T11:00:00+05:30',$d(-12).'T15:20:00+05:30','Sunil Verma',1,$now]);
+        // One refused — an endorsement register with no refusals is not credible.
+        $ins($ie, ['MGH/AMD/2026/E-0002','MTC','Mill test certificate — weld consumable batch',$vid['VN-MUN'],$cid['CL-SVP'],
+                   null,'PO-SVP-40881','HT-91004','E7018, 40 packets',$oid['AMD'],'OGC',$iid['EMP02'],
+                   'REJECTED','REJECTED','Certificate is a photocopy with no mill stamp; original requested and not produced.',
+                   $d(-9).'T09:30:00+05:30','','',0,$now]);
+        $n['endorsements'] = 2;
+    }
+
+    // ------------------------------------------------------------------
+    //  The trust layer — somebody was on site, at a time
+    // ------------------------------------------------------------------
+    if ($has('site_visits')) {
+        $iv = "INSERT INTO site_visits (job_id,inspector_id,kind,lat,lon,accuracy,device_at,at,clock_skew,flags,note,by_user,ip,created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?, '127.0.0.1', ?)";
+        // A clean pair: arrived 09:12, left 14:40. This is the line a client wants.
+        $ins($iv, [$jid['J-2607-101'],$iid['EMP01'],'ENTRY',20.3719000,72.9079000,12,$d(-12).'T09:12:00+05:30',$d(-12).'T09:12:04+05:30',0,'','Arrived at the works gate.','Ravi Kumar',$now]);
+        $ins($iv, [$jid['J-2607-101'],$iid['EMP01'],'EXIT', 20.3720500,72.9080500,14,$d(-12).'T14:40:00+05:30',$d(-12).'T14:40:03+05:30',0,'','Left site.','Ravi Kumar',$now]);
+        // An arrival with no departure — the engineer forgot. Common, and the
+        // close gate should notice.
+        $ins($iv, [$jid['J-2607-106'],$iid['EMP02'],'ENTRY',19.0760000,72.8777000,25,$d(-5).'T10:05:00+05:30',$d(-5).'T10:05:07+05:30',0,'','','Anil Sharma',$now]);
+        // A device clock 47 minutes out. Recorded, compared, never trusted.
+        $ins($iv, [$jid['J-2607-103'],$iid['EMP03'],'ENTRY',18.7500000,73.8600000,9,$d(-8).'T08:13:00+05:30',$d(-8).'T09:00:00+05:30',47,'CLOCK_SKEW','','Priya Nair',$now]);
+        $n['site_visits'] = 4;
+    }
+
+    // ------------------------------------------------------------------
+    //  Complaints and appeals (§7.5, §7.6)
+    // ------------------------------------------------------------------
+    $cmpIds = [];
+    if ($has('complaints')) {
+        $ic = "INSERT INTO complaints (ref,kind,appeal_of_id,source,channel,partner_id,anonymous,complainant_name,
+               complainant_email,complainant_phone,subject,description,received_on,received_by,job_id,report_irn,
+               inspector_id,office_id,validity,validity_note,validity_by,validity_on,acknowledged_on,acknowledged_by,
+               assigned_to,investigation,root_cause,outcome,decision_note,decided_by,decided_on,notified_on,notified_by,
+               notify_note,capa_ref,status,closed_on,closed_by,created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        // 1. The full journey, done properly — and it raised a corrective action.
+        $cmpIds['closed'] = $ins($ic, ['CMP-2026-001','COMPLAINT',null,'CLIENT','EMAIL',$cid['CL-NIL'],0,
+            'Rakesh Menon','rakesh.menon@example.com','9825011001',
+            'Report issued eight days after the inspection',
+            "We were told the report would reach us within two working days of the inspection. It arrived on the eighth day and our despatch was held up.",
+            $d(-28),'Sana Kapoor',$jid['J-2607-101'],'MGH/AMD/2026/D-0001',$iid['EMP01'],$oid['AMD'],
+            'VALID','Our own turnaround commitment was not met.','Meena Shah',$d(-27),$d(-27),'Sana Kapoor','Sunil Verma',
+            "Checked the deputation record and the report register. Inspection finished on the 12th, report finalised on the 20th. The engineer was deputed to two further sites in between with no cover arranged.",
+            'Scheduling did not allow report-writing time between consecutive deputations.',
+            'UPHELD',"Complaint upheld. Our commitment was not met and the cause was ours, not the client's.",
+            'Meena Shah',$d(-21),$d(-20),'Sana Kapoor','Told by e-mail, with the corrective action reference.',
+            'CAPA-2026-001','CLOSED',$d(-20),'Meena Shah',$now]);
+
+        // 2. Open, and PAST the acknowledgement deadline. The register must say so.
+        $cmpIds['late'] = $ins($ic, ['CMP-2026-002','COMPLAINT',null,'CLIENT','PHONE',$cid['CL-SVP'],0,
+            'Sunita Rao','sunita.rao@example.com','9825011002',
+            'Engineer arrived without the calibration certificate for his gauge',
+            "Our gate would not admit the instrument without a current calibration certificate and half a day was lost.",
+            $d(-9),'Vivek Menon',$jid['J-2607-102'],'MGH/AMD/2026/D-0002',$iid['EMP02'],$oid['AMD'],
+            'PENDING','','','','','','','','', 'PENDING','','','','','','','','OPEN','','',$now]);
+
+        // 3. An APPEAL against the decision on the first one. Under §7.6 the
+        //    person who decided the complaint may not decide the appeal.
+        $cmpIds['appeal'] = $ins($ic, ['APL-2026-001','APPEAL',$cmpIds['closed'],'CLIENT','EMAIL',$cid['CL-NIL'],0,
+            'Rakesh Menon','rakesh.menon@example.com','9825011001',
+            'Appeal — we do not accept the compensation offered',
+            "We accept the finding but not the remedy. We are asking for the inspection fee to be waived.",
+            $d(-16),'Sana Kapoor',$jid['J-2607-101'],'MGH/AMD/2026/D-0001',$iid['EMP01'],$oid['AMD'],
+            'VALID','Appeal is against the remedy, not the finding.','Arjun Patel',$d(-15),$d(-15),'Sana Kapoor','Rahul Desai',
+            '','','PENDING','','','','','','','','OPEN','','',$now]);
+
+        // 4. Anonymous, raised internally. Somebody has to be able to complain
+        //    without putting their name to it.
+        $ins($ic, ['CMP-2026-003','COMPLAINT',null,'STAFF','WEB',null,1,'','','',
+            'Pressure to soften a finding before despatch',
+            "A coordinator was asked by a client contact to re-grade a rejection. Raising this anonymously.",
+            $d(-6),'—',null,'',null,$oid['AMD'],
+            'PENDING','','','',$d(-5),'Arjun Patel','Rahul Desai','','','PENDING','','','','','','','','OPEN','','',$now]);
+        $n['complaints'] = 4;
+
+        if ($has('complaint_events')) {
+            $ie = "INSERT INTO complaint_events (complaint_id,at,action,actor,note) VALUES (?,?,?,?,?)";
+            foreach ([['RECEIVED',-28,'Sana Kapoor','Taken by e-mail.'],['ACKNOWLEDGED',-27,'Sana Kapoor','Acknowledged same day.'],
+                      ['VALIDITY',-27,'Meena Shah','Accepted as valid.'],['INVESTIGATED',-23,'Sunil Verma','Records reviewed.'],
+                      ['DECIDED',-21,'Meena Shah','Upheld.'],['NOTIFIED',-20,'Sana Kapoor','Client told.'],
+                      ['CLOSED',-20,'Meena Shah','Closed with a corrective action raised.']] as $ev)
+                $ins($ie, [$cmpIds['closed'], $d($ev[1]).'T10:00:00+05:30', $ev[0], $ev[2], $ev[3]]);
+            $n['complaint_events'] = 7;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    //  Corrective actions (§8.7)
+    // ------------------------------------------------------------------
+    $capaIds = [];
+    if ($has('capa')) {
+        $ic = "INSERT INTO capa (ref,source,source_ref,complaint_id,audit_finding_id,follows_id,title,description,clause,
+               severity,office_id,raised_by,raised_on,immediate_action,root_cause,rc_method,similar_checked,similar_found,
+               similar_note,action_plan,owner,due_on,completed_on,completed_by,verify_due,verified_on,verified_by,
+               effective,effectiveness_note,status,closed_on,closed_by,created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        // 1. The complete one: root cause, method, the §8.7.2 d) similar-work
+        //    answer, a plan, done, and independently verified as effective.
+        $capaIds['closed'] = $ins($ic, ['CAPA-2026-001','COMPLAINT','CMP-2026-001',$cmpIds['closed'] ?? null,null,null,
+            'Report turnaround exceeded on consecutive deputations',
+            'Reports are late whenever an engineer is deputed to a second site before the first report is written.',
+            '7.4','MAJOR',$oid['AMD'],'Meena Shah',$d(-21),
+            'The two outstanding reports were written up the same week and the client was told.',
+            'Scheduling allowed back-to-back deputations with no report-writing day in between. The rule existed on paper and nothing enforced it.',
+            'FIVE_WHYS',1,'YES','Two other engineers had the same pattern in the last quarter; both checked and cleared.',
+            "Report-writing time is now blocked in the availability board and the allocation screen refuses a deputation that leaves no writing day. Coordinators briefed on 12th.",
+            'Sunil Verma',$d(-7),$d(-9),'Sunil Verma',$d(-2),$d(-2),'Arjun Patel',
+            'YES','Checked the last fourteen deputations: no report exceeded two working days. The gate refused two attempts, both re-planned.',
+            'CLOSED',$d(-2),'Arjun Patel',$now]);
+
+        // 2. Open and OVERDUE — its due date has already gone.
+        $capaIds['overdue'] = $ins($ic, ['CAPA-2026-002','AUDIT','IA-2026-001',null,null,null,
+            'Calibration certificates not carried to site',
+            'An engineer attended with an instrument whose certificate was not available at the gate.',
+            '6.2','MINOR',$oid['AMD'],'Arjun Patel',$d(-18),
+            'Certificate e-mailed to the client the same afternoon.',
+            //  root_cause, rc_method, similar_checked, similar_found, similar_note
+            '','',0,'','',
+            //  action_plan, owner, due_on, completed_on, completed_by, verify_due,
+            //  verified_on, verified_by, effective, effectiveness_note, status, closed_on, closed_by
+            '','Sunil Verma',$d(-4),'','','','','','','','OPEN','','',$now]);
+
+        // 3. Done, verified — and it did NOT work. This must not close as
+        //    effective, and it needs a successor action.
+        $capaIds['failed'] = $ins($ic, ['CAPA-2026-003','SELF_IDENTIFIED','',null,null,null,
+            'Evidence photographs arriving without a location',
+            'Photographs from two corporate handsets carry no location, so nothing ties them to the site.',
+            '7.3','MINOR',$oid['PUN'],'Sunil Verma',$d(-40),
+            'Engineers asked to use the site check-in as well.',
+            'Handsets are managed by the client and strip location data on capture.','FIVE_WHYS',1,'YES',
+            'Both Pune handsets affected; Ahmedabad unaffected.',
+            'Asked the engineers to switch location on before photographing.',
+            'Kiran Joshi',$d(-20),$d(-19),'Kiran Joshi',$d(-6),$d(-6),'Arjun Patel',
+            'NO','Checked twenty photographs taken since: eleven still carry no location. Asking people to change a setting the handset resets on reboot was never going to hold.',
+            'OPEN','','',$now]);
+        $n['capa'] = 3;
+
+        if ($has('capa_events')) {
+            $iev = "INSERT INTO capa_events (capa_id,at,action,actor,note) VALUES (?,?,?,?,?)";
+            foreach ([['RAISED',-21,'Meena Shah',''],['ROOT_CAUSE',-16,'Sunil Verma','Five whys with the coordinators.'],
+                      ['PLAN',-14,'Sunil Verma',''],['COMPLETED',-9,'Sunil Verma',''],
+                      ['VERIFIED',-2,'Arjun Patel','Effective.'],['CLOSED',-2,'Arjun Patel','']] as $ev)
+                $ins($iev, [$capaIds['closed'], $d($ev[1]).'T11:00:00+05:30', $ev[0], $ev[2], $ev[3]]);
+            $ins($iev, [$capaIds['failed'], $d(-6).'T11:00:00+05:30','VERIFIED','Arjun Patel','Not effective — see the note.']);
+            $n['capa_events'] = 7;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    //  Internal audit and management review (§8.8, §8.9)
+    // ------------------------------------------------------------------
+    if ($has('internal_audits')) {
+        $ia = "INSERT INTO internal_audits (ref,planned_on,carried_out_on,clauses,scope,office_id,area_owner,auditor,method,
+               summary,status,reported_on,closed_on,closed_by,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'demo', ?)";
+        $a1 = $ins($ia, ['IA-2026-001',$d(-30),$d(-25),'6.2,7.3,7.4',
+            'Equipment control, inspection records and report turnaround at Ahmedabad.',$oid['AMD'],'Meena Shah','Arjun Patel',
+            'Records sampled (12 deputations), two engineers interviewed, equipment register walked.',
+            'Two findings raised. Report turnaround already under corrective action from a client complaint.',
+            'CLOSED',$d(-24),$d(-3),'Rahul Desai',$now]);
+        // Planned, and the date has passed. An audit programme with nothing
+        // overdue on it is not a real audit programme.
+        $ins($ia, ['IA-2026-002',$d(-6),'','4.1,6.1','Impartiality and competence at Pune.',$oid['PUN'],'Kiran Joshi','Arjun Patel',
+            '','','PLANNED','','','',$now]);
+        $n['internal_audits'] = 2;
+
+        if ($has('audit_findings')) {
+            $if = "INSERT INTO audit_findings (audit_id,clause,kind,detail,evidence,capa_ref,capa_id,raised_by,raised_on) VALUES (?,?,?,?,?,?,?,?,?)";
+            $ins($if, [$a1,'6.2','NONCONFORMITY',
+                'An instrument was taken to site without its calibration certificate being available.',
+                'Deputation J-2607-102; client complaint CMP-2026-002.','CAPA-2026-002',$capaIds['overdue'] ?? null,'Arjun Patel',$d(-25)]);
+            $ins($if, [$a1,'7.4','OBSERVATION',
+                'Report turnaround exceeded the stated commitment on three deputations in the sample of twelve.',
+                'Report register, 1st to 20th.','CAPA-2026-001',$capaIds['closed'] ?? null,'Arjun Patel',$d(-25)]);
+            $ins($if, [$a1,'7.3','OBSERVATION',
+                'Two evidence photographs carried no location and no site check-in.','Report MGH/AMD/2026/D-0002.','','','Arjun Patel',$d(-25)]);
+            $n['audit_findings'] = 3;
+        }
+    }
+    if ($has('mgmt_reviews')) {
+        $im = "INSERT INTO mgmt_reviews (ref,held_on,period_from,period_to,chair,attendees,status,completed_on,completed_by,created_by,created_at)
+               VALUES (?,?,?,?,?,?,?,?,?, 'demo', ?)";
+        $r1 = $ins($im, ['MR-2026-01',$d(-14),$d(-195),$d(-15),'Rahul Desai',
+            'Rahul Desai (chair), Neha Iyer, Meena Shah, Arjun Patel, Sunil Verma','COMPLETED',$d(-14),'Rahul Desai',$now]);
+        // A draft with its inputs not yet recorded — completing it must be refused.
+        $r2 = $ins($im, ['MR-2026-02',$d(7),$d(-14),$d(6),'Rahul Desai','','DRAFT','','',$now]);
+        $n['management_reviews'] = 2;
+
+        if ($has('mr_inputs') && defined('MR_INPUTS')) {
+            $ii = "INSERT INTO mr_inputs (review_id,input_key,measured,note,noted_by,noted_at) VALUES (?,?,?,?,?,?)";
+            $notes = [
+                'Complaints and appeals received, and how they were dealt with.',
+                'Results of internal audits and the actions arising.',
+                'Corrective actions: raised, closed, and whether they worked.',
+                'Impartiality: threats identified in the period and the safeguards applied.',
+                'Competence and authorisation status of inspection personnel.',
+            ];
+            $k = 0;
+            foreach (array_keys(MR_INPUTS) as $key) {
+                $ins($ii, [$r1, $key, '', $notes[$k % count($notes)], 'Arjun Patel', $d(-15) . 'T12:00:00+05:30']);
+                $k++;
+            }
+            $n['mr_inputs'] = $k;
+        }
+        if ($has('mr_actions')) {
+            $iact = "INSERT INTO mr_actions (review_id,kind,decision,owner,due_on,status,done_on,done_note,capa_ref,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)";
+            $ins($iact, [$r1,'IMPROVEMENT','Block report-writing time in the availability board before allocating a second deputation.','Sunil Verma',$d(-4),'DONE',$d(-9),'Gate live since the 12th.','CAPA-2026-001',$now]);
+            $ins($iact, [$r1,'RESOURCE','Buy two handsets that do not strip location, for the Pune engineers.','Kiran Joshi',$d(21),'OPEN','','','CAPA-2026-003',$now]);
+            $ins($iact, [$r1,'POLICY','Review the impartiality declaration cycle: one lapsed without anybody noticing.','Meena Shah',$d(-2),'OPEN','','','',$now]);
+            $n['mr_actions'] = 3;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    //  Control of data and information (§7.11)
+    // ------------------------------------------------------------------
+    if ($has('sw_validations')) {
+        $iv = "INSERT INTO sw_validations (ref,kind,component,version,purpose,what_tested,expected,observed,result,limitations,
+               evidence,validated_by,validated_on,next_review,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        $ins($iv, ['SV-2026-001','APP','Inspection Ops application', defined('APP_VERSION') ? APP_VERSION : '2026.07.1',
+            'Recording inspections, producing reports, and the figures the branch is run on.',
+            'Twenty deputations re-checked by hand end to end: credit, invoice value, turnaround and the close gates.',
+            'Figures on screen match the manual calculation; every close gate refuses when its condition is unmet.',
+            'Matched on all twenty. Both close gates refused as expected.','PASS','',
+            'Worksheet held with the quality records.','Arjun Patel',$d(-45),$d(320),$now]);
+        // A spreadsheet whose review date has passed.
+        $ins($iv, ['SV-2026-002','SPREADSHEET','Deputation costing workbook','3.2',
+            'Working out what a deputation costs before it is quoted.',
+            'Twenty rows recalculated by hand against the workbook.',
+            'Workbook total equals the manual total.','Matched on all twenty rows.','PASS','',
+            'Workbook and the check sheet are with the quality records.','Nikhil Jain',$d(-400),$d(-35),$now]);
+        $n['sw_validations'] = 2;
+    }
+    if ($has('data_check_runs') && function_exists('integrity_checks')) {
+        try {
+            $checks = integrity_checks();
+            $failed = 0;
+            foreach ($checks as $ck) if (empty($ck['ok']) && empty($ck['skipped'])) $failed++;
+            $ins("INSERT INTO data_check_runs (ran_on,ran_by,total,failed,app_version,detail) VALUES (?,?,?,?,?,?)",
+                [$d(-5) . 'T09:00:00+05:30','Arjun Patel',count($checks),$failed,
+                 defined('APP_VERSION') ? APP_VERSION : '', json_encode($checks)]);
+            $n['data_check_runs'] = 1;
+        } catch (Throwable $e) { /* checks not available on this install */ }
+    }
+    if ($has('system_failures')) {
+        $isf = "INSERT INTO system_failures (ref,occurred_at,source,fingerprint,summary,detail,data_affected,data_note,
+                immediate_action,capa_ref,reported_by,status,resolved_on,resolved_by,created_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        $ins($isf, ['SF-2026-001',$d(-33).'T14:22:00+05:30','REPORTED','demo-seed-a',
+            'Report PDF would not open for one report type',
+            'Opening the PDF for the coating report type returned a blank page for about two hours.',
+            'NO','No inspection record was changed; only the rendering failed.',
+            'Report type reverted to the previous template; PDF checked on five reports.','','Sana Kapoor',
+            'CLOSED',$d(-32),'Arjun Patel',$now]);
+        // Open, and nobody has said yet whether data was affected — the honest
+        // state of a failure somebody has only just reported.
+        $ins($isf, ['SF-2026-002',$d(-2).'T08:41:00+05:30','REPORTED','demo-seed-b',
+            'Evidence upload failed twice on a large photograph',
+            'Two uploads of a 14 MB photograph failed. Smaller photographs from the same handset uploaded.',
+            'UNKNOWN','','Engineer asked to keep the original until this is settled.','','Vivek Menon',
+            'OPEN','','',$now]);
+        $n['system_failures'] = 2;
+    }
+
+    // ------------------------------------------------------------------
+    //  The client portal
+    // ------------------------------------------------------------------
+    if ($has('client_users')) {
+        // On, because a demo of a portal that is switched off shows nothing.
+        // Any real install starts with it off.
+        setting_set('portal_enabled', '1');
+        $icu = "INSERT INTO client_users (partner_id,email,name,password_hash,is_active,must_change,invite_token,
+                invite_expires,last_login_at,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?, 'demo', ?)";
+        // Accepted, and can be signed in as. Password: demo12345, like the rest.
+        $ins($icu, [$cid['CL-NIL'],'buyer@narmada.example','Rakesh Menon',$x['hash'],1,0,'','',$d(-1).'T09:40:00+05:30',$now]);
+        // Invited and not yet accepted — the state most portals never show.
+        $ins($icu, [$cid['CL-SVP'],'qa@suryavan.example','Sunita Rao','',1,1,
+                    'demoinvite' . str_repeat('0', 38), $d(6) . 'T00:00:00+05:30','',$now]);
+        // Withdrawn: somebody who left the client company.
+        $ins($icu, [$cid['CL-GHE'],'former.buyer@girnar.example','Deepa Balan',$x['hash'],0,0,'','',$d(-60).'T11:00:00+05:30',$now]);
+        $n['portal_users'] = 3;
+
+        if ($has('portal_requests')) {
+            $ipr = "INSERT INTO portal_requests (partner_id,client_user_id,subject,detail,site,wanted_on,contact_name,
+                    contact_phone,status,handled_by,handled_at,reply,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)";
+            $cu = (int)$val("SELECT id FROM client_users WHERE email='buyer@narmada.example'");
+            $ins($ipr, [$cid['CL-NIL'],$cu,'Final inspection — next batch of 8 vessels',
+                "Same specification as the last batch. Ready for final inspection from the 20th.",
+                'Vapi works',$d(12),'Rakesh Menon','9825011001','NEW','','','',$now]);
+            $ins($ipr, [$cid['CL-NIL'],$cu,'Witness of hydro test — vessel 13',
+                'One day. Hydro test is scheduled for the morning.','Vapi works',$d(-3),'Rakesh Menon','9825011001',
+                'ACCEPTED','Sana Kapoor',$d(-8).'T10:00:00+05:30','An engineer is booked for the morning of the 9th.',$now]);
+            $n['portal_requests'] = 2;
+        }
+    }
+
+    return $n;
+}
+
+// ============================================================================
+//  What the demo actually covers — checked, not remembered
+//
+//  This module fell two years behind without anybody noticing: the seed filled
+//  Operations and every register added afterwards loaded empty, so a demo showed
+//  a third of the product and two dozen blank screens. That is the same trap as
+//  every other hand-maintained list in this application — module_groups(), the
+//  "new modules" guess, the smoke crawl's fixed path list. Each one was fixed by
+//  deriving it from the real thing instead of trusting somebody to remember.
+//
+//  So: this is the list, it is checked against the database, and the result is
+//  shown on the screen where the demo is loaded. Add a module tomorrow, add its
+//  line here, and the screen says "no demo data" in plain sight until it has
+//  some. It cannot rot quietly again.
+// ============================================================================
+function demo_modules_expected() {
+    return [
+        'Inspection calls'          => 'calls',
+        'Deputations'               => 'jobs',
+        'Clients & vendors'         => 'business_partners',
+        'Inspection engineers'      => 'inspectors',
+        'Vouchers'                  => 'vouchers',
+        'Hiring / requisitions'     => 'requisitions',
+        'CRM — inquiries'           => 'crm_inquiries',
+        'CRM — quotations'          => 'quotations',
+        'Inspection reports'        => 'report_docs',
+        'Report evidence'           => 'report_files',
+        'Evidence chain'            => 'evidence_chain',
+        'Endorsements'              => 'endorsements',
+        'Site check-ins'            => 'site_visits',
+        'Equipment'                 => 'equipment',
+        'Calibration certificates'  => 'equipment_calibrations',
+        'Qualifications'            => 'qualifications',
+        'Authorisations'            => 'authorisations',
+        'Witness assessments'       => 'witness_assessments',
+        'Impartiality declarations' => 'impartiality_declarations',
+        'Impartiality threats'      => 'impartiality_threats',
+        'Identity documents'        => 'person_documents',
+        'Complaints & appeals'      => 'complaints',
+        'Corrective actions'        => 'capa',
+        'Internal audits'           => 'internal_audits',
+        'Audit findings'            => 'audit_findings',
+        'Management reviews'        => 'mgmt_reviews',
+        'Review actions'            => 'mr_actions',
+        'Software validations'      => 'sw_validations',
+        'Integrity check runs'      => 'data_check_runs',
+        'System failures'           => 'system_failures',
+        'Client portal users'       => 'client_users',
+        'Client portal requests'    => 'portal_requests',
+    ];
+}
+
+// [label => ['rows' => n, 'state' => 'ok'|'empty'|'missing'], …]
+function demo_coverage() {
+    $out = [];
+    foreach (demo_modules_expected() as $label => $table) {
+        try {
+            $n = (int)db()->query("SELECT COUNT(*) FROM $table")->fetchColumn();
+            $out[$label] = ['rows' => $n, 'table' => $table, 'state' => $n > 0 ? 'ok' : 'empty'];
+        } catch (Throwable $e) {
+            $out[$label] = ['rows' => 0, 'table' => $table, 'state' => 'missing'];
+        }
+    }
+    return $out;
+}
+function demo_coverage_gaps() {
+    return array_keys(array_filter(demo_coverage(), fn($c) => $c['state'] !== 'ok'));
 }
