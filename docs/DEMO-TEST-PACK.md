@@ -215,6 +215,19 @@ The portal is switched **on** by the demo. A real install starts with it off, an
 | 12.3 | Sign in as `coord.amd` | Open `/profitability` | **Refused** or figures hidden — a coordinator does not see what the branch earns |
 | 12.4 | Sign in as `account` | Open a deputation | Sees invoice and payment, **not** salary or loaded cost |
 | 12.5 | `/vouchers` | Open one | 34 vouchers across four engineers and eight months, in all four states, including leave-only months at ₹0 |
+| 12.6 | `/receivables` | Open it | 51 unpaid invoices, ~₹36.6 lakh outstanding. **Every ageing bucket has money in it** — not-yet-due through 90+ — because the seed spreads the invoice dates on purpose |
+| 12.7 | `/receivables` | Check the Outstanding figure | It is the **same number** as "Outstanding" on `/invoicing`. Two screens must never quote different figures for the same word |
+| 12.8 | `/receivables` | Switch **Age by** to Invoice date | Everything shifts older and "not yet due" empties — 30-day terms throughout the seed |
+| 12.9 | `/receivables` | Click a client | The invoices behind that client's row, oldest first, each with its bucket |
+| 12.10 | `/tally` | Open it, before setting anything | **Every row refused**, reason: *our own state is not set*. The export will not guess IGST against CGST+SGST |
+| 12.11 | `/tally` | Open **Ledger names & tax defaults**, set Our state = Gujarat, Save | The refusals clear; rows become Ready |
+| 12.12 | `/tally` | Widen the window to the whole year and find **Girnar Energy** | Marked **inter-state** with IGST only — its GSTIN starts `27` (Maharashtra) against a Gujarat seller. Narmada and Suryavan (`24`) are within-state, CGST+SGST |
+| 12.13 | `/tally` | Look at the **Edge Client** rows | Listed with the place of supply taken from the client's state, because they have no GSTIN. That is the fallback working, not a defect |
+| 12.14 | `/tally` | Download the **Tally XML** | A valid XML file. Each voucher's ledger entries sum to zero; the party carries the invoice number as a `New Ref` bill allocation |
+| 12.15 | `/tally` | Re-open the same window | **Nothing ready** — the batch was recorded on download, so the same invoice cannot be imported into Tally twice |
+| 12.16 | `/tally` | Tick "Show what has already gone" | The same rows, marked Exported with their batch reference |
+| 12.17 | `/tally` | Undo the batch at the foot of the screen | The vouchers are offered again. Use this only when the import genuinely failed |
+| 12.18 | `/tally` | Switch to **Receipt vouchers** | Payments received become Receipt vouchers — bank debited, party credited, `Agst Ref` against the invoice number so it clears from the ageing |
 
 ---
 
@@ -263,13 +276,16 @@ Listed here so they are never mistaken for defects:
 
 Stated plainly rather than left to be discovered:
 
-- **GST and e-invoicing.** Tax stops at the quotation. There is no HSN/SAC, no
-  place of supply, no IGST/CGST split and no IRN. That is roadmap item 5.2 and
-  depends on the MGH Books decision.
+- **A GST engine.** Tax is worked out at the point of export (place of supply,
+  IGST against CGST+SGST, from the client's GSTIN) but the invoice itself still
+  carries a single amount. There is no HSN/SAC on the line, no credit notes and
+  no e-invoice/IRN. Roadmap 5.2 chose the Tally export over building all of
+  that here, on the reasoning that the firm keeps its books in Tally anyway.
 - **Outbound e-mail.** Nothing is actually sent; the mail log records what would
   have been. Configure SMTP in Settings to exercise it for real.
-- **Receivables ageing, satisfaction capture, consolidated invoicing** — roadmap
-  5.3–5.5, not built.
+- **Satisfaction capture and consolidated invoicing** — roadmap 5.4–5.5, not built.
+- **Part-payments.** A payment is a flag and one amount, so the ageing cannot
+  show an invoice half settled. Section 12 ages the whole invoice or none of it.
 - **File uploads at realistic size.** Evidence photographs in the demo are
   1-pixel placeholders, so the register is fast to load. Upload a real
   photograph to exercise compression and EXIF reading.

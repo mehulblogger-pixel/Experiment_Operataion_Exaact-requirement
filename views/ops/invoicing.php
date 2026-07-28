@@ -11,7 +11,13 @@
 <div class="master-head">
   <div><h1><?= e(T_REG('invoice')) ?></h1>
   <p class="sub" style="margin:2px 0 0">Confirm invoicing, payment received and inter-office credit. Tick each job — it feeds profitability.</p></div>
-  <a class="btn secondary" href="/invoicing?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ Download CSV</a>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <?php if (can('finance.reconcile') || can('data.credit') || is_master()): ?>
+      <a class="btn secondary" href="/receivables">⏳ Ageing</a>
+      <a class="btn secondary" href="/tally">📤 Tally export</a>
+    <?php endif; ?>
+    <a class="btn secondary" href="/invoicing?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ Download CSV</a>
+  </div>
 </div>
 
 <div class="qcards" style="margin-top:16px">

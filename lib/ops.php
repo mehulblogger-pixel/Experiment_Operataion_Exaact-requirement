@@ -1722,6 +1722,8 @@ function ops_module_gate($route) {
         'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-advance'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
         'bill-add'=>'jobs','bill-delete'=>'jobs','bill-file'=>'jobs',
         'invoicing'=>'invoicing',
+        'tally'=>'invoicing','tally-export'=>'invoicing','tally-settings'=>'invoicing','tally-undo'=>'invoicing',
+        'receivables'=>'invoicing',
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring',
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring',
@@ -1877,6 +1879,10 @@ function ops_dispatch($route, $method) {
             ops_profitability(); return true;
         case $route === 'invoicing':
             ops_invoicing(); return true;
+        case $route === 'receivables':
+            ops_receivables(); return true;
+        case $route === 'tally' || $route === 'tally-export' || $route === 'tally-settings' || $route === 'tally-undo':
+            return ops_tally($route, $method);
         case $route === 'seed-demo':
             ops_require(is_master(), 'Only the Master Admin can load demo data.');
             if ($method === 'POST') {

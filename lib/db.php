@@ -238,6 +238,7 @@ function boot() {
     if (function_exists('trust_migrate')) trust_migrate();             // evidence bound to place and time
     if (function_exists('portal_migrate')) portal_migrate();           // the client's own sign-in, its own table
     if (function_exists('sched_migrate')) sched_migrate();           // engagement shapes, holidays by office, visits
+    if (function_exists('tally_migrate')) tally_migrate();             // what has already been handed to Tally
     // Register every remaining dropdown as an editable master list. Runs last:
     // it needs the base lists seeded and the CRM/IDEMS constants loaded.
     if (function_exists('lk_register_module_lists')) lk_register_module_lists();

@@ -2,6 +2,88 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ The money goes to Tally, and the ageing says how old it is (July 2026)
+
+Roadmap 5.2 and 5.3, the last two buildable items in Phase 5.
+
+**5.2 asked for a decision, not a feature: build GST into the invoice side, or
+export to Tally.** The recommendation on record was the export, and it was
+taken. A full engine is HSN/SAC, place of supply, IGST against CGST+SGST,
+credit notes, e-invoice and IRN — roughly three times the work — and at the end
+of it the firm still keeps its books in Tally. Two systems holding the same
+ledger is not an improvement on one.
+
+**`/tally` does the smaller, truer job.** Raised invoices become Sales vouchers
+Tally will import: the party ledger, a `New Ref` bill allocation carrying the
+invoice number so it lands on the ageing, the sales ledger and the tax ledgers.
+Payments become Receipt vouchers with an `Agst Ref` that knocks the invoice off
+again. Ledger names, voucher types and the default rate are the accountant's,
+set on the screen; the defaults are what Tally ships with, so a first export
+usually works untouched — except our own state, which has no honest default.
+
+**Four decisions worth the argument:**
+
+1. **Nothing is guessed.** The IGST-or-CGST+SGST choice comes from comparing
+   state codes — the client's from the first two digits of their GSTIN, ours
+   from settings. A client with neither GSTIN nor state is **refused by name,
+   with the reason on screen**, and left out of the file. Picking one silently
+   is a return that has to be revised later.
+2. **The invoice amount is the invoice amount.** The money desk falls back to
+   the quoted value or the inter-office credit when nobody has typed a figure
+   yet. That is right for a worklist and wrong for a ledger, so a row without a
+   real invoice amount is refused too.
+3. **Exporting is remembered.** Importing the same sales voucher twice is a real
+   and painful mistake, so each batch is recorded against the job and the same
+   invoice is never offered again — with an **Undo** for the day the import
+   fails at the other end.
+4. **No library.** Tally's import format is XML over a documented envelope,
+   written by hand for the same reason the .docx and PDF writers were: shared
+   hosting has no Composer.
+
+**5.3 — `/receivables`.** Not-yet-due / 0–30 / 31–60 / 61–90 / 90+ by client,
+worst first, drill through a row to the invoices behind it, CSV out. Aged **from
+the due date**, because an invoice on 60-day terms is not late on day 45; a
+switch ages from the invoice date instead, and any row with no due date says so
+rather than quietly mixing two meanings into one column. Not-yet-due is its own
+column so the top bucket keeps its meaning and the total still agrees with the
+money desk — **verified: both say ₹36,64,000 across 51 invoices.**
+
+**Two bugs the testing found, not the reading.**
+
+- The `tally_exports` join placeholder binds *before* everything in the WHERE.
+  Passing the arguments in logical order compared the invoice date against the
+  word "SALES" and returned nothing at all.
+- `GST_STATE_CODES` looked like it had string keys. PHP turns `'24'` into the
+  integer 24 while leaving `'01'` a string, so the strict compare that decides
+  the tax split had `24 !== '24'` — **and called a Gujarat-to-Gujarat sale
+  inter-state.** Every code now goes through one function that returns a
+  two-character string. This is why the demo has an inter-state client: without
+  Girnar in Maharashtra the screen looked right.
+
+**The demo can now demonstrate both.** Every seeded invoice used to be fifteen
+days old, which made an ageing report a single column proving nothing, so the
+ages are spread across all five buckets on purpose. The named clients carry a
+GSTIN (one in Maharashtra against a Gujarat seller, so there is a real IGST
+row); the ten Edge Clients deliberately have none — that is the refusal path,
+and it needs rows to refuse. Eighteen numbered scenarios in
+`docs/DEMO-TEST-PACK.md` §12.
+
+**Still open on the money side:**
+
+- [ ] **Part-payments.** A payment is a flag and one amount, so an invoice
+      cannot be half settled — the ageing ages all of it or none of it. Doing
+      this honestly needs a payments table; inventing one to serve a report
+      would put a second version of the truth next to the first.
+- [ ] **Credit notes and cancellations** are not exported. A cancelled invoice
+      already in Tally has to be reversed by hand.
+- [ ] **Nothing is read back from Tally.** If Accounts marks a payment there, it
+      does not come here. One-way on purpose, but worth stating.
+- [ ] **HSN/SAC is one code for the whole company**, held as a setting for
+      reference only — it is not written per line, because the line does not
+      carry one.
+- [ ] Roadmap **5.4 satisfaction capture** and **5.5 consolidated invoicing**
+      are the remaining Phase 5 items.
+
 ## ✅ The sidebar folds, and you can type to find a screen (July 2026)
 
 Owner, from a phone: *"It feels the side bar navigation is clutter and very
