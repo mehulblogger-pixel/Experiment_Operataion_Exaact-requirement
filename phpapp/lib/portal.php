@@ -227,7 +227,10 @@ function portal_reports($limit = 200) {
     if (!$pid) return [];
     return portal_try(fn() => ops_all(
         "SELECT d.id, d.irn, d.title, d.type_code, d.result, d.release_status,
-                d.inspection_date, d.finalized_at, d.issue_date, d.verify_code
+                d.inspection_date, d.finalized_at, d.issue_date, d.verify_code, d.rev,
+                (SELECT r.decision FROM report_client_reviews r
+                  WHERE r.report_doc_id = d.id AND r.rev = d.rev
+                  ORDER BY r.id DESC LIMIT 1) client_decision
          FROM report_docs d
          WHERE d.client_id = ? AND d.finalized = 1 AND COALESCE(d.deleted,0) = 0
          ORDER BY d.finalized_at DESC, d.id DESC LIMIT " . max(1, (int)$limit), [$pid]));
@@ -550,7 +553,27 @@ function portal_route($route, $method) {
             exit;
 
         case 'portal/reports':
-            portal_view('reports', ['rows' => portal_reports()]);
+            portal_view('reports', ['rows' => portal_reports(), 'err' => '']);
+            exit;
+
+        // The client's answer to a report we issued. portal_report() is what
+        // proves the report belongs to them — rcr_decide() trusts that and does
+        // not re-check, so nothing else may call it with an unchecked row.
+        case 'portal/report-decision':
+            $d = portal_report((int)($_POST['id'] ?? $_GET['id'] ?? 0));
+            if (!$d) { http_response_code(404); portal_view('notfound'); exit; }
+            $err = '';
+            if ($method === 'POST') {
+                $err = rcr_decide($d, $_POST, portal_user());
+                if ($err === '') {
+                    $_SESSION['portal_flash'] = ($_POST['decision'] ?? '') === 'ACCEPTED'
+                        ? 'Thank you — your acceptance of ' . $d['irn'] . ' is recorded.'
+                        : 'Recorded. ' . $d['irn'] . ' is with our team, and they have been told what needs to change.';
+                    redirect('/portal/reports');
+                }
+            }
+            portal_view('report_decide', ['d' => $d, 'err' => $err,
+                                          'current' => rcr_current($d), 'history' => rcr_history((int)$d['id'])]);
             exit;
 
         case 'portal/report':

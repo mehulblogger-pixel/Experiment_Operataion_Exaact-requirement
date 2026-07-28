@@ -8,7 +8,7 @@
 <div class="pscroll"><table class="ptable">
   <thead><tr>
     <th>Report</th><th>Title</th><th>Inspected</th><th>Result</th><th>Release</th>
-    <th>Issued</th><th>Verification code</th><th></th>
+    <th>Issued</th><th>Your decision</th><th>Verification code</th><th></th>
   </tr></thead>
   <tbody>
   <?php foreach ($rows as $r): ?>
@@ -19,6 +19,12 @@
       <td><?= e(lk_options_or('inspection_result', IDEMS_RESULTS)[$r['result']] ?? ($r['result'] ?: '—')) ?></td>
       <td><?= e(lk_options_or('release_status', IDEMS_RELEASE)[$r['release_status']] ?? ($r['release_status'] ?: '—')) ?></td>
       <td><?= e(fdate(substr((string)($r['finalized_at'] ?: $r['issue_date']), 0, 10))) ?></td>
+      <td><?php
+            $dec = $r['client_decision'] ?? '';
+            if ($dec === 'ACCEPTED') echo '<b style="color:var(--ok)">Accepted</b>';
+            elseif ($dec === 'REJECTED') echo '<b style="color:var(--bad)">Rejected</b>';
+            else echo '<a href="/portal/report-decision?id=' . (int)$r['id'] . '">Accept or reject →</a>';
+          ?></td>
       <td><?php if (!empty($r['verify_code'])): ?>
             <code><?= e($r['verify_code']) ?></code>
           <?php else: ?>—<?php endif; ?></td>
