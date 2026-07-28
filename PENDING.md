@@ -2,6 +2,54 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ ROADMAP 3.3 + 3.7 — impartiality, and Type A / non-A (§4.1) (July 2026)
+
+`lib/impartiality.php`. **The clause a third-party body exists to satisfy.**
+Everything else in the standard is about doing the work properly; §4.1 is about
+being *entitled to do it at all*. The app had nothing.
+
+**The 2026 edition made this heavier, not lighter** — threats now explicitly
+include those from **organisational relationships**, **outsourcing** and
+**financial pressure**. The last is the one bodies find hardest to write down
+honestly, because it means *"this client is 40% of the branch's revenue and
+everybody knows it"*. All three are on the list.
+
+Three things it makes true:
+
+1. **A declaration exists, per person, with a date** — not a policy on a wall.
+   One with no end date is treated as running a year, because a statement made
+   once and never renewed is not a current statement, and saying so is cheaper
+   than arguing with an assessor about it.
+2. **A declared threat is a record, not a conversation** — who it involves,
+   which kind, what was decided, by whom, and when it is reviewed again.
+   **Clearing one without saying how is refused**: that is precisely the finding
+   §4.1 exists to prevent.
+3. **An uncleared threat stops the allocation.** A register nobody acts on is
+   worse than none — it proves the body knew. A threat with *no party named*
+   counts against every client, which is the point of raising it that way.
+
+Unlike the competence gates this one is **not opt-in**: a threat only exists on
+the register because somebody deliberately put it there, so the body already
+knows. There is also a **per-deputation confirmation** kept on the job, because
+that is the record an assessor pulls when they pick one inspection at random.
+
+**3.7 · Type A / Type non-A** — the 2026 model change, replacing A/B/C. On the
+organisation record, with rubbish falling back to A rather than breaking.
+
+*Verified:* 34 rule tests, 10 browser checks, lint green (146 files), 83 screens.
+
+### Also this round
+- Made `b_auth.js` reset its own state first. It had been passing only on a
+  clean database — the same lesson the bills suite taught, relearned. A test
+  that cannot run twice proves nothing.
+
+### Identity documents — purpose now stated
+The owner has confirmed passport / visa / ID holding is for **site-access
+identity verification**, which is a lawful purpose under the DPDP Act. Still to
+build, and it must ship *with* its guardrails rather than after them: a stated
+purpose on the screen, a separate permission, a retention limit, and a record of
+who viewed the document. Not built yet.
+
 ## ✅ ROADMAP 3.2a — the competence & authorisation spine (§6.1) (July 2026)
 
 Built into `lib/competence.php` beside the certificate gate, because "is this

@@ -1739,6 +1739,8 @@ function ops_module_gate($route) {
         'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'preflight'=>'settings',
+        'impartiality'=>'impartiality','imp-type'=>'impartiality','imp-declare'=>'impartiality',
+        'imp-threat-add'=>'impartiality','imp-threat-decide'=>'impartiality',
         'competence'=>'competence','auth-add'=>'competence','auth-status'=>'competence',
         'auth-enforce'=>'competence','witness-add'=>'competence',
         'equipment'=>'equipment','equip-new'=>'equipment','equip-edit'=>'equipment',
@@ -1884,6 +1886,8 @@ function ops_dispatch($route, $method) {
             ops_user_retire($method); return true;
         case $route === 'user-2fa-reset':
             ops_user_twofa_reset($method); return true;
+        case $route === 'impartiality' || strncmp($route, 'imp-', 4) === 0:
+            return ops_impartiality($route, $method);
         case $route === 'competence' || strncmp($route, 'auth-', 5) === 0 || $route === 'witness-add':
             return ops_competence($route, $method);
         case strncmp($route, 'equip', 5) === 0 || $route === 'report-equip-add' || $route === 'report-equip-del':
@@ -2869,7 +2873,8 @@ function job_save_fields() {
         'invoice_value','contracting_office_id','expected_credit','credit_rate','credit_type','credit_direction',
         'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays',
         'subcon_cost','other_cost','other_cost_note','quotation_id','is_outstation','chargeable_heads',
-        'cert_override_note','cert_override_by'];
+        'cert_override_note','cert_override_by',
+        'impartiality_ok','impartiality_note','impartiality_by','impartiality_at'];
 }
 
 function nzc_call($f, $v) {
@@ -3680,6 +3685,29 @@ function ops_jobs($route, $method) {
                         return;
                     }
                 }
+                // §4.1 — a declared threat to impartiality that has not been
+                // decided, or has been judged unacceptable, stops the work it
+                // touches. Unlike the competence gates this is NOT opt-in: a
+                // threat only exists here because somebody deliberately put it
+                // on the register, so the body already knows.
+                if (function_exists('imp_block')) {
+                    $iWhy = imp_block((int)$b['inspector_id'],
+                                      [(int)($call['client_id'] ?? 0), (int)($call['vendor_id'] ?? 0)], $onDate);
+                    if ($iWhy !== '') {
+                        view('ops/job_form', array_merge(call_job_form_vars($job, $call),
+                            ['error' => $iWhy . ' Decide it on the Impartiality register, or put somebody else on the work.']));
+                        return;
+                    }
+                }
+            }
+            // Who confirmed there was nothing to declare on THIS deputation.
+            if (!empty($b['impartiality_ok'])) {
+                $b['impartiality_ok'] = 1;
+                $b['impartiality_by'] = user_name(current_user());
+                $b['impartiality_at'] = date('c');
+            } else {
+                $b['impartiality_ok'] = 0;
+                $b['impartiality_by'] = ''; $b['impartiality_at'] = '';
             }
             // The contract number comes down the chain and the register fills
             // itself, so nothing has to be chosen from a list that may be empty.
