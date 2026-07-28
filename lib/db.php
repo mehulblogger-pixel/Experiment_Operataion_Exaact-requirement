@@ -236,7 +236,8 @@ function boot() {
     if (function_exists('complaints_migrate')) complaints_migrate();   // §7.5 complaints, §7.6 appeals
     if (function_exists('capa_migrate')) capa_migrate();
     if (function_exists('ncr_migrate')) ncr_migrate();
-    if (function_exists('conf_migrate')) conf_migrate();                // §4.2 undertakings, client NDAs, breaches                 // the event, before the corrective action               // §8.7 nonconformity & corrective action
+    if (function_exists('conf_migrate')) conf_migrate();
+    if (function_exists('act_migrate')) act_migrate();                   // the activity spine — Customer 360 reads this                // §4.2 undertakings, client NDAs, breaches                 // the event, before the corrective action               // §8.7 nonconformity & corrective action
     if (function_exists('audits_migrate')) audits_migrate();           // §8.8 internal audit, §8.9 management review
     if (function_exists('datacontrol_migrate')) datacontrol_migrate(); // §7.11 control of data & information (2026)
     if (function_exists('trust_migrate')) trust_migrate();             // evidence bound to place and time
