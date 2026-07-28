@@ -1746,6 +1746,9 @@ function ops_module_gate($route) {
         'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'preflight'=>'settings',
+        'data-control'=>'datacontrol','data-check-run'=>'datacontrol','sw-validation-add'=>'datacontrol',
+        'failure-add'=>'datacontrol','failure-update'=>'datacontrol','failure-resolve'=>'datacontrol',
+        'failure-capa'=>'datacontrol',
         'capa'=>'capa','capa-item'=>'capa','capa-new'=>'capa','capa-cause'=>'capa','capa-plan'=>'capa',
         'capa-done'=>'capa','capa-verify'=>'capa','capa-close'=>'capa','capa-escalate'=>'capa',
         'capa-settings'=>'capa','capa-from-complaint'=>'capa',
@@ -1914,6 +1917,9 @@ function ops_dispatch($route, $method) {
             ops_user_twofa_reset($method); return true;
         case $route === 'complaints' || $route === 'complaint' || strncmp($route, 'complaint-', 10) === 0:
             return ops_complaints($route, $method);
+        case $route === 'data-control' || $route === 'data-check-run'
+             || $route === 'sw-validation-add' || strncmp($route, 'failure-', 8) === 0:
+            return ops_datacontrol($route, $method);
         case $route === 'capa' || strncmp($route, 'capa-', 5) === 0:
             return ops_capa($route, $method);
         case $route === 'management-reviews' || $route === 'management-review'

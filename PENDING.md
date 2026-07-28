@@ -2,6 +2,85 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ ROADMAP 3.6 — control of data & information (§7.11) (July 2026)
+## 🏁 The ISO/IEC 17020:2026 transition pack is now complete (3.1 – 3.8)
+
+`lib/datacontrol.php`, screen `/data-control`. **New in the 2026 edition, with
+no 2012 equivalent.** It arrived because inspection bodies stopped keeping
+records on paper and nobody had written down what that means. It asks four
+questions a body running on software cannot answer by pointing at a policy — and
+three of the four this application can genuinely *produce* rather than store.
+
+**1 · Was the software validated — for what you use it for, and again when it
+changed?** This is the one part that cannot be automated, and pretending
+otherwise would be the worst thing the module could do. So instead it says,
+loudly, when the version you are **running** has no record against it. That is
+the finding a body actually collects: it validated version one in 2024 and has
+upgraded four times since. The register covers the spreadsheet somebody built
+and the report template with a formula in it too, because the clause does. A
+record with no stated **purpose** is refused — "fit for purpose" means nothing
+without the purpose. A FAILED validation stays on the register, because a
+failure is the record.
+
+**2 · Can you show the data is intact?** Seventeen checks that **run**, against
+the live database, producing a dated pass/fail: every deputation belongs to a
+real call, every bill to a real deputation, no report is marked issued with
+nobody named, no corrective action is closed as effective without the check
+behind it, no complaint is closed without the complainant being told, no
+identity document is held past its retention date, uploaded files still decode,
+no account carries a permission that no longer exists. You can press the button
+in front of an assessor. Each line says **why** it matters, because that is what
+gets read. A failing run is recorded exactly like a passing one — a check that
+only gets written down when it passes is not a check.
+
+**3 · Who can get at it?** Read from the permission engine, not from an org
+chart: eight powers as columns, dormant accounts, who has two-step on. Nobody
+types it, so nobody can type it wrong.
+
+**4 · When it broke, what happened to the data?** The failure log **writes
+itself** — `ops_fatal()` records an entry before it even renders the error page,
+so a fatal that breaks the rendering still leaves a record. Same fault twice in
+an hour is one entry, and the same fault at a different line number is still the
+same fault. An entry **cannot be resolved** until it says whether data or
+results were affected; answering "yes" then demands a corrective action, which
+can be raised from the entry carrying its own words across.
+
+*Verified:* 77 rule tests, 44 browser checks, each run twice from a dirty
+database. Lint green (165 files), 99 screens.
+
+### Three modules were enforcing rules nobody could see
+Asserting "the whole 2026 pack is on one screen" failed — and it was right to.
+**§4.1 impartiality, §6.1 competence and §6.2 equipment had no line on the
+compliance screen at all.** Each enforces its rules perfectly well on its own
+screen, which is where the work happens; but the compliance screen is what a
+director opens before an assessment, and three of the seven accreditation
+modules simply were not on it. Enforced somewhere is not the same as visible
+here. All three now have measured lines.
+
+### The smoke crawl was calling a working screen broken
+It scans page text for the wording of PHP errors. The failure log's whole job is
+to display the wording of faults the application recorded about itself — so the
+crawl read a page that was working perfectly as broken. Three screens that
+legitimately quote error text (`/data-control`, `/audit-log`, `/incidents`) now
+skip the prose scan only; they are still fetched and still fail on HTTP 500 or a
+JavaScript error.
+
+### Where the transition pack stands
+| Item | Clause | State |
+|---|---|---|
+| 3.1 Equipment & calibration | §6.2 | ✅ |
+| 3.2a Competence & authorisation | §6.1 | ✅ |
+| 3.3 Impartiality & conflicts | §4.1 | ✅ |
+| 3.4 Complaints & appeals | §7.5, §7.6 | ✅ |
+| 3.5 CAPA · internal audit · management review | §8.7–8.9 | ✅ |
+| 3.6 Control of data & information | §7.11 | ✅ |
+| 3.7 Type A / Type non-A | 2026 model change | ✅ |
+| 3.8 Identity documents | DPDP Act 2023 | ✅ |
+
+**"17020:2026 transition-ready" can now be said without an asterisk.** The
+deadline is 27 March 2029 and the edition published 27 March 2026 — the selling
+window is now, not eventually.
+
 ## ✅ ROADMAP 3.5 — CAPA, internal audit, management review (§8.7–8.9) (July 2026)
 
 `lib/capa.php` and `lib/audits.php`. Six screens. This is the register behind the

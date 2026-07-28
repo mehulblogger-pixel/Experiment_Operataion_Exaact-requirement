@@ -52,6 +52,14 @@ header('Content-Security-Policy: ' . $csp);
 // during first-time setup when nobody can be signed in yet. A stranger gets the
 // plain-English half and a reference to quote.
 function ops_fatal($title, $hint, $detail = '', $showDetailToAnyone = false) {
+    // ISO/IEC 17020:2026 §7.11 asks for failures of the information system to be
+    // recorded. A log somebody has to remember to write records only the
+    // failures they were in the mood to admit to, so this one writes itself —
+    // wrapped, because the app is already broken by the time we get here and
+    // the logging must never be what makes it worse.
+    if (function_exists('failure_record_auto')) {
+        try { failure_record_auto($title, $detail); } catch (Throwable $ignored) {}
+    }
     if (!headers_sent()) http_response_code(500);
     $signedIn = !empty($_SESSION['uid']);
     $ref = strtoupper(substr(md5($detail . date('YmdH')), 0, 8));
@@ -116,6 +124,7 @@ try {
     require __DIR__ . '/lib/complaints.php';
     require __DIR__ . '/lib/capa.php';
     require __DIR__ . '/lib/audits.php';
+    require __DIR__ . '/lib/datacontrol.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
@@ -238,6 +247,9 @@ try {
     db()->query("SELECT id FROM mgmt_reviews LIMIT 1");
     db()->query("SELECT id FROM mr_inputs LIMIT 1");
     db()->query("SELECT id FROM mr_actions LIMIT 1");
+    db()->query("SELECT id FROM sw_validations LIMIT 1");
+    db()->query("SELECT id FROM data_check_runs LIMIT 1");
+    db()->query("SELECT id FROM system_failures LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which
     // runs the same idempotent boot() and clears it. Each check is self-cancelling.

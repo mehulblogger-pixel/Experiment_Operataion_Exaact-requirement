@@ -101,7 +101,7 @@ function module_groups() {
         'Marketing & Sales (CRM)' => ['inquiries','quotes','crm_orders','crm_reports'],
         'Inspection documentation' => ['idems'],
         'Operations'              => ['calls','jobs','vouchers','invoicing','profitability','hiring','reconcile'],
-        'Accreditation & compliance' => ['equipment','competence','impartiality','complaints','capa','audits','identity'],
+        'Accreditation & compliance' => ['equipment','competence','impartiality','complaints','capa','audits','datacontrol','identity'],
         'Directory & masters'     => ['clients','vendors','masters','overheads'],
         'Insights & admin'        => ['reports','users','settings'],
     ];
@@ -142,6 +142,7 @@ const ACCESS_MODULES = [
     'complaints'    => 'Complaints & appeals',
     'capa'          => 'Corrective actions',
     'audits'        => 'Internal audits & management review',
+    'datacontrol'   => 'Data & information control',
     'masters'       => 'Masters',
     'overheads'     => 'Overheads (office finance)',
     'reports'       => 'Dashboards / reports',
@@ -170,7 +171,7 @@ function module_defaults($role) {
         case 'SBU_HEAD':
             $view = ['inquiries','quotes','crm_orders','crm_reports','idems','calls','jobs','vouchers','invoicing','profitability','hiring','reconcile','clients','vendors','masters','reports','complaints','capa','audits']; break;
         case 'BRANCH_MANAGER':
-            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','clients','vendors','masters','reports','users','complaints','capa','audits'];
+            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','clients','vendors','masters','reports','users','complaints','capa','audits','datacontrol'];
             $view = ['inquiries','quotes','crm_orders','crm_reports','invoicing','profitability','overheads']; break;
         case 'BRANCH_APP_MANAGER':
             $edit = ['masters','overheads','users'];
@@ -231,7 +232,7 @@ function module_defaults($role) {
 // from now on modules_at_last_save() answers the question by itself.
 const NEW_MODULES = ['inquiries', 'quotes', 'crm_orders', 'crm_reports', 'idems',
                      'equipment', 'competence', 'impartiality', 'identity', 'complaints',
-                     'capa', 'audits'];
+                     'capa', 'audits', 'datacontrol'];
 
 // Snapshot the module catalogue. Called whenever a role's access is saved.
 function stamp_modules_at_save() {

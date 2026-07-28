@@ -65,6 +65,13 @@ const REGISTERS = [
 
 const FATAL = /Cannot redeclare|program file is missing|The app hit an error|Fatal error|Parse error|Uncaught (?:Error|Exception|TypeError)|SQLSTATE|Warning: |Notice: |Deprecated: |Undefined variable|Undefined array key/i;
 
+// Screens whose JOB is to display error text. The failure log under §7.11 shows
+// the wording of faults the application recorded about itself, so scanning its
+// body for that wording says "broken" about a page that is working perfectly.
+// They are still fetched, and still fail on HTTP 500 or a JavaScript error —
+// only the prose scan is skipped, and only here.
+const QUOTES_ERRORS = ['/data-control', '/audit-log', '/incidents'];
+
 (async () => {
   const br = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   const pg = await br.newPage();
@@ -103,7 +110,7 @@ const FATAL = /Cannot redeclare|program file is missing|The app hit an error|Fat
     } catch (e) {
       broken.push([path, 'navigation failed: ' + e.message.split('\n')[0]]); return;
     }
-    const m = body.match(FATAL);
+    const m = QUOTES_ERRORS.some(q => path === q || path.startsWith(q + '?')) ? null : body.match(FATAL);
     if (m) {
       // Show the sentence around the match, not the whole page.
       const at = body.indexOf(m[0]);
