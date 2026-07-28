@@ -258,6 +258,7 @@ try {
     db()->query("SELECT id FROM report_client_reviews LIMIT 1");
     db()->query("SELECT client_decision FROM report_docs LIMIT 1");
     db()->query("SELECT id FROM tally_exports LIMIT 1");
+    db()->query("SELECT perms FROM client_users LIMIT 1");
     db()->query("SELECT id FROM internal_audits LIMIT 1");
     db()->query("SELECT id FROM audit_findings LIMIT 1");
     db()->query("SELECT id FROM mgmt_reviews LIMIT 1");
