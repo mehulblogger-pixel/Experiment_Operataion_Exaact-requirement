@@ -114,6 +114,8 @@ try {
     require __DIR__ . '/lib/impartiality.php';
     require __DIR__ . '/lib/identity.php';
     require __DIR__ . '/lib/complaints.php';
+    require __DIR__ . '/lib/capa.php';
+    require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
@@ -229,6 +231,13 @@ try {
     db()->query("SELECT id FROM person_document_access LIMIT 1");
     db()->query("SELECT id FROM complaints LIMIT 1");
     db()->query("SELECT id FROM complaint_events LIMIT 1");
+    db()->query("SELECT id FROM capa LIMIT 1");
+    db()->query("SELECT id FROM capa_events LIMIT 1");
+    db()->query("SELECT id FROM internal_audits LIMIT 1");
+    db()->query("SELECT id FROM audit_findings LIMIT 1");
+    db()->query("SELECT id FROM mgmt_reviews LIMIT 1");
+    db()->query("SELECT id FROM mr_inputs LIMIT 1");
+    db()->query("SELECT id FROM mr_actions LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which
     // runs the same idempotent boot() and clears it. Each check is self-cancelling.

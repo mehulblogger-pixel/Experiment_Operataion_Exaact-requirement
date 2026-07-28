@@ -1393,6 +1393,7 @@ function ops_run_reminders($today = null) {
     if (function_exists('auth_run_maintenance')) auth_run_maintenance($today);
     if (function_exists('iddoc_run_retention')) iddoc_run_retention($today);
     if (function_exists('cmp_run_reminders')) $sent += cmp_run_reminders($today);
+    if (function_exists('capa_run_reminders')) $sent += capa_run_reminders($today);
     return $sent;
 }
 
@@ -1745,6 +1746,15 @@ function ops_module_gate($route) {
         'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'preflight'=>'settings',
+        'capa'=>'capa','capa-item'=>'capa','capa-new'=>'capa','capa-cause'=>'capa','capa-plan'=>'capa',
+        'capa-done'=>'capa','capa-verify'=>'capa','capa-close'=>'capa','capa-escalate'=>'capa',
+        'capa-settings'=>'capa','capa-from-complaint'=>'capa',
+        'internal-audits'=>'audits','internal-audit'=>'audits','internal-audit-new'=>'audits',
+        'audit-record'=>'audits','audit-finding-add'=>'audits','audit-finding-delete'=>'audits',
+        'audit-finding-capa'=>'audits','audit-close'=>'audits','audit-settings'=>'audits',
+        'management-reviews'=>'audits','management-review'=>'audits','management-review-new'=>'audits',
+        'review-refresh'=>'audits','review-header'=>'audits','review-input'=>'audits',
+        'review-action-add'=>'audits','review-action-done'=>'audits','review-complete'=>'audits',
         'complaints'=>'complaints','complaint'=>'complaints','complaint-new'=>'complaints',
         'complaint-ack'=>'complaints','complaint-validity'=>'complaints','complaint-investigate'=>'complaints',
         'complaint-decide'=>'complaints','complaint-notify'=>'complaints','complaint-capa'=>'complaints',
@@ -1904,6 +1914,19 @@ function ops_dispatch($route, $method) {
             ops_user_twofa_reset($method); return true;
         case $route === 'complaints' || $route === 'complaint' || strncmp($route, 'complaint-', 10) === 0:
             return ops_complaints($route, $method);
+        case $route === 'capa' || strncmp($route, 'capa-', 5) === 0:
+            return ops_capa($route, $method);
+        case $route === 'management-reviews' || $route === 'management-review'
+             || $route === 'management-review-new' || strncmp($route, 'review-', 7) === 0:
+            return ops_reviews($route, $method);
+        // 'audit-log' is IDEMS's compliance trail and predates this module. It
+        // is handled further down, so it has to be let past here — a prefix
+        // match that quietly swallows an existing screen is a nasty way to
+        // break something that was working.
+        case ($route === 'internal-audits' || $route === 'internal-audit'
+              || $route === 'internal-audit-new'
+              || (strncmp($route, 'audit-', 6) === 0 && $route !== 'audit-log')):
+            return ops_audits($route, $method);
         case $route === 'identity' || strncmp($route, 'iddoc-', 6) === 0:
             return ops_identity($route, $method);
         case $route === 'impartiality' || strncmp($route, 'imp-', 4) === 0:
