@@ -236,6 +236,7 @@ function boot() {
     if (function_exists('audits_migrate')) audits_migrate();           // §8.8 internal audit, §8.9 management review
     if (function_exists('datacontrol_migrate')) datacontrol_migrate(); // §7.11 control of data & information (2026)
     if (function_exists('trust_migrate')) trust_migrate();             // evidence bound to place and time
+    if (function_exists('portal_migrate')) portal_migrate();           // the client's own sign-in, its own table
     if (function_exists('sched_migrate')) sched_migrate();           // engagement shapes, holidays by office, visits
     // Register every remaining dropdown as an editable master list. Runs last:
     // it needs the base lists seeded and the CRM/IDEMS constants loaded.
