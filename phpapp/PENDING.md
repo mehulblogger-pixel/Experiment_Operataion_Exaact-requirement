@@ -8,7 +8,7 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
 on top, and a lot of it has since been built — the A1–C5 gap review, the whole
 2026 accreditation pack, the portal, the trust layer. Those entries are kept
 because the reasoning in them is still worth reading, but **this register is the
-authority on what is actually open.** 113 unticked boxes live further down; these 42 are the ones that still
+authority on what is actually open.** 113 unticked boxes live further down; these 48 are the ones that still
 matter, and they are all here.
 
 ### 1 · Yours, not mine — no code, and some of it is legal
@@ -63,6 +63,12 @@ matter, and they are all here.
 | # | What | Note |
 |---|---|---|
 | U1 | **Nothing is pinned in the navigation** | Favourites would be next, but it wants watching real use rather than guessing |
+| U11 | **No global record search** | The search box filters menu items, not records. 101 routes, no cross-entity search — blueprint 002 U2 |
+| U12 | **No notification centre** | Flash messages and e-mail only; nothing persists — blueprint 002 U4 |
+| U13 | **42 list screens, no shared table component** | No sorting, grouping, column choice, bulk actions or inline editing anywhere — blueprint 002 U1 |
+| U14 | **Accessibility is a shell** | 1 `aria-` attribute across 122 operational screens, 4 `:focus` rules in the stylesheet — blueprint 002 U5 |
+| U15 | **No real light/dark mode** | A "Midnight" colour preset exists; no `prefers-color-scheme`, no toggle, and printing assumes light |
+| U16 | **No recently-viewed or favourites** | Blueprint 002 U6 |
 | U2 | **48 destinations is unchanged** | The fold made them findable; it did not decide they all deserve to be there. Your call on what to drop |
 | U3 | **Version number in the app + upgrade note** | Roadmap 2.3. Nobody can tell which build a client is running |
 | U4 | **Release artifact** — versioned zip with a checksum | Roadmap 2.4 |
