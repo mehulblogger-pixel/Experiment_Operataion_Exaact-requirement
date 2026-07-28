@@ -1756,6 +1756,7 @@ function ops_module_gate($route) {
         'failure-capa'=>'datacontrol',
         'report-reviews'=>'idems','report-ack'=>'idems',
         'activities'=>'clients','activity-add'=>'clients',
+        'packs-save'=>'settings',
         'confidentiality'=>'confidentiality','conf-undertaking-add'=>'confidentiality','conf-nda-add'=>'confidentiality',
         'conf-breach'=>'confidentiality','conf-breach-add'=>'confidentiality','conf-breach-close'=>'confidentiality',
         'site-docs'=>'identity','site-docs-add'=>'identity','site-docs-delete'=>'identity',
@@ -1954,6 +1955,15 @@ function ops_dispatch($route, $method) {
             return ops_datacontrol($route, $method);
         case $route === 'report-reviews' || $route === 'report-ack':
             return ops_report_reviews($route, $method);
+        case $route === 'packs-save':
+            ops_require(is_master() || can('settings.manage'), 'Only an administrator can change industry packs.');
+            if ($method === 'POST') {
+                packs_save(implode(',', (array)($_POST['packs'] ?? [])));
+                flash(packs_enabled(true)
+                    ? 'Industry packs saved: ' . implode(', ', packs_enabled()) . '. Their rules are live from the next screen.'
+                    : 'All industry packs are off. The registers stay; no specialist gate will fire.');
+            }
+            redirect('/settings');
         case $route === 'activities' || $route === 'activity-add':
             return ops_activity($route, $method);
         case $route === 'confidentiality' || strncmp($route, 'conf-', 5) === 0:
@@ -3737,91 +3747,63 @@ function ops_jobs($route, $method) {
                 $b['expected_credit'] = 0;
                 $b['credit_direction'] = '';
             }
-            // ISO/IEC 17020 §6.1 — only somebody competent and authorised does
-            // the work. A required certificate that had already lapsed on the
-            // date the work happens stops the allocation here. A manager may
-            // still let it through, but only by saying why, and that reason is
-            // kept on the deputation because that is the record an assessor
-            // reads. Refusing outright would push people to back-date the
-            // certificate to get past the gate, which destroys the evidence.
-            $b['cert_override_note'] = trim((string)($b['cert_override_note'] ?? ''));
-            if (!empty($b['inspector_id'])) {
-                $onDate = competence_job_date($b, $call);
-                if (($why = competence_block((int)$b['inspector_id'], $onDate)) !== '') {
-                    if ($b['cert_override_note'] === '' || !competence_can_override()) {
-                        view('ops/job_form', array_merge(call_job_form_vars($job, $call),
-                            ['error' => $why . (competence_can_override()
-                                ? ' To go ahead anyway, state the reason in the box that has appeared below.'
-                                : ' A manager can allow it with a recorded reason.'),
-                             'certBlock' => $why]));
-                        return;
-                    }
-                    $b['cert_override_by'] = user_name(current_user());
-                } else {
-                    $b['cert_override_note'] = '';   // nothing to excuse
-                    $b['cert_override_by'] = '';
+            // ---- Specialist rules, if a pack is installed --------------------
+            //
+            // These used to be four hard calls into ISO/IEC 17020 modules. That
+            // was right while this served one inspection body and wrong the
+            // moment it became a product: a trading company allocating a
+            // delivery must not meet a competence gate. The rules did not
+            // change and did not soften — they moved behind a hook, and the
+            // inspection pack registers them. No pack, no gate.
+            //
+            // Overrides still work the same way: a manager may proceed by
+            // stating why, and the reason stays on the record, because refusing
+            // outright teaches people to falsify the underlying document.
+            $b['cert_override_note']    = trim((string)($b['cert_override_note'] ?? ''));
+            $b['sitedoc_override_note'] = trim((string)($b['sitedoc_override_note'] ?? ''));
+            if (!empty($b['inspector_id']) && function_exists('pack_fire')) {
+                $onDate = function_exists('competence_job_date') ? competence_job_date($b, $call) : date('Y-m-d');
+                $res = pack_fire('work.assign', [
+                    'person_id'   => (int)$b['inspector_id'],
+                    'partner_id'  => (int)($call['client_id'] ?? 0),
+                    'vendor_id'   => (int)($call['vendor_id'] ?? 0),
+                    'site_id'     => (int)($call['site_address_id'] ?? 0),
+                    'work_type'   => (string)($b['inspection_type'] ?? $call['inspection_type'] ?? ''),
+                    'activity_id' => (int)($b['activity_id'] ?? $call['activity_id'] ?? 0),
+                    'on_date'     => $onDate,
+                ]);
+                $canOverride = function_exists('competence_can_override') && competence_can_override();
+                foreach ($res['block'] as $blk) {
+                    $why      = is_array($blk) ? (string)$blk['why'] : (string)$blk;
+                    $field    = is_array($blk) ? (string)($blk['override'] ?? '') : '';
+                    // The column recording WHO allowed it is cert_override_by,
+                    // not cert_override_note_by — appending to the field name
+                    // silently wrote a column that does not exist, so the
+                    // override was kept with nobody's name against it. Which is
+                    // the one thing an override must never be.
+                    $byField  = preg_replace('/_note$/', '_by', $field);
+                    $excused  = $field !== '' && trim((string)($b[$field] ?? '')) !== '' && $canOverride;
+                    if ($excused) { $b[$byField] = user_name(current_user()); continue; }
+                    $vars = array_merge(call_job_form_vars($job, $call), ['error' => $why
+                        . ($field !== ''
+                            ? ($canOverride
+                                ? ' To go ahead anyway, state the reason in the box below.'
+                                : ' A manager can allow it with a recorded reason.')
+                            : ' Put somebody else on the work, or put the record right first.')]);
+                    // Tell the form which override box to show, if any.
+                    if ($field === 'cert_override_note')    $vars['certBlock']    = $why;
+                    if ($field === 'sitedoc_override_note') $vars['siteDocBlock'] = $why;
+                    view('ops/job_form', $vars);
+                    return;
                 }
-                // §6.1 again, the other half: a valid certificate is not the
-                // same as permission to do THIS work. Only checked when the
-                // body has switched enforcement on — see lib/competence.php for
-                // why that is deliberately opt-in.
-                if (function_exists('auth_block')) {
-                    $aWhy = auth_block((int)$b['inspector_id'],
-                                       (string)($b['inspection_type'] ?? $call['inspection_type'] ?? ''),
-                                       (int)($b['activity_id'] ?? $call['activity_id'] ?? 0),
-                                       (int)($call['client_id'] ?? 0), $onDate);
-                    if ($aWhy !== '') {
-                        view('ops/job_form', array_merge(call_job_form_vars($job, $call),
-                            ['error' => $aWhy . ' Grant an authorisation under Competence & authorisation, '
-                                      . 'or switch enforcement off if the matrix is not populated yet.']));
-                        return;
-                    }
+                // Nothing to excuse — do not keep a reason for a gate that did
+                // not fire, or the record claims a decision nobody made.
+                foreach (['cert_override_note', 'sitedoc_override_note'] as $f) {
+                    $fb = preg_replace('/_note$/', '_by', $f);
+                    if (trim((string)($b[$f] ?? '')) !== '' && empty($b[$fb])) { $b[$f] = ''; $b[$fb] = ''; }
                 }
-                // §4.1 — a declared threat to impartiality that has not been
-                // decided, or has been judged unacceptable, stops the work it
-                // touches. Unlike the competence gates this is NOT opt-in: a
-                // threat only exists here because somebody deliberately put it
-                // on the register, so the body already knows.
-                if (function_exists('imp_block')) {
-                    $iWhy = imp_block((int)$b['inspector_id'],
-                                      [(int)($call['client_id'] ?? 0), (int)($call['vendor_id'] ?? 0)], $onDate);
-                    if ($iWhy !== '') {
-                        view('ops/job_form', array_merge(call_job_form_vars($job, $call),
-                            ['error' => $iWhy . ' Decide it on the Impartiality register, or put somebody else on the work.']));
-                        return;
-                    }
-                }
-                // Whether the site will actually let them through the gate. The
-                // identity register held passports, visas, medicals and gate
-                // passes and nothing ever read it — so an engineer could be
-                // deputed to a refinery demanding a medical they do not hold
-                // and find out at the barrier. Checked against the INSPECTION
-                // DATE, not today, and overridable with a recorded reason for
-                // the same reason the certificate gate is: refusing outright
-                // teaches people to back-date the document.
-                $b['sitedoc_override_note'] = trim((string)($b['sitedoc_override_note'] ?? ''));
-                if (function_exists('sitedoc_check')) {
-                    $sd = sitedoc_check((int)$b['inspector_id'], (int)($call['client_id'] ?? 0),
-                                        (int)($call['site_address_id'] ?? 0), $onDate);
-                    $sWhy = sitedoc_block_message($sd);
-                    if ($sWhy !== '') {
-                        if ($b['sitedoc_override_note'] === '' || !competence_can_override()) {
-                            view('ops/job_form', array_merge(call_job_form_vars($job, $call),
-                                ['error' => $sWhy . (competence_can_override()
-                                    ? ' Get the document on file, put somebody else on it, or state below why they are being sent anyway.'
-                                    : ' Get the document onto the identity register, or ask a manager.'),
-                                 'siteDocBlock' => $sWhy]));
-                            return;
-                        }
-                        $b['sitedoc_override_by'] = user_name(current_user());
-                    } else {
-                        $b['sitedoc_override_note'] = '';
-                        $b['sitedoc_override_by'] = '';
-                    }
-                    // Advisory requirements never stop the work; they are said
-                    // once, where the person allocating will see them.
-                    if ($sd['warn']) flash('Worth checking before they travel: ' . implode('; ', $sd['warn']) . '.', 'warning');
-                }
+                if ($res['warn'])
+                    flash('Worth checking before they travel: ' . implode('; ', $res['warn']) . '.', 'warning');
             }
             // Who confirmed there was nothing to declare on THIS deputation.
             if (!empty($b['impartiality_ok'])) {

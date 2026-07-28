@@ -126,6 +126,7 @@ try {
     require __DIR__ . '/lib/ncr.php';
     require __DIR__ . '/lib/confidentiality.php';
     require __DIR__ . '/lib/activity.php';
+    require __DIR__ . '/lib/packs.php';
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';
     require __DIR__ . '/lib/trust.php';
@@ -139,6 +140,9 @@ try {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);
 }
+
+// Industry packs register their hooks before any route runs.
+if (function_exists('packs_boot')) packs_boot();
 
 // Bootstrap / upgrade: this quick probe fails on a fresh install (no table) or
 // when a new table/column is missing, which triggers the idempotent boot/migrate.
