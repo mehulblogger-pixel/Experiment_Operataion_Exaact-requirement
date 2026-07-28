@@ -304,7 +304,23 @@
 
 <div class="panel" style="max-width:620px;margin-top:18px">
   <h3 class="tab-sub" style="margin-top:0;">Demo / sample data</h3>
-  <?php if (demo_seeded()): ?>
+  <?php if (function_exists('demo_flag_is_stale') && demo_flag_is_stale()): ?>
+    <?php // The flag says loaded and the records are not there — a load that was
+          // cut off part-way, which on a shared host means the page hit its time
+          // limit. This state used to be a dead end: load refused as "already
+          // loaded", and "remove" had nothing to remove. ?>
+    <p class="sub" style="margin:0 0 6px"><span class="pill p-bad">Half loaded</span>
+      The system is marked as having demo data, but the records are not there — the last load was almost
+      certainly cut short by this server's page time limit.</p>
+    <p class="muted" style="margin:0 0 10px">Load it again below. If it stops short a second time, run it from
+      the command line instead, where there is no time limit:
+      <code>php tools/seed-demo.php --force</code> (cPanel → Terminal). <code>php tools/seed-demo.php --status</code>
+      says what is currently there.</p>
+    <form method="post" action="/seed-demo">
+      <input type="hidden" name="force" value="1">
+      <button class="btn" type="submit">Load demo data again</button>
+    </form>
+  <?php elseif (demo_seeded()): ?>
     <p class="sub" style="margin:0 0 6px"><span class="pill p-ok">Loaded</span> The sample dataset is already in the system.</p>
     <p class="muted" style="margin:0 0 10px">Demo logins: <code>director</code>, <code>bmanager</code>, <code>account</code>, <code>coord.amd</code>, <code>insp.ravi</code> … — all with password <code>demo12345</code>.</p>
     <form method="post" action="/seed-demo-remove" onsubmit="return confirm('Remove ALL demo/sample data (offices left in place)? Your own real records are not touched. You can load the demo again later.')">
@@ -317,6 +333,7 @@
       <button class="btn" type="submit">Load demo data</button>
     </form>
     <p class="muted" style="margin-top:8px">Creates demo logins (director, sbuhead, bmanager, appmanager, opmanager, asstmgr, coord.amd, coord.pun, account, insp.ravi, insp.anil) — all password <code>demo12345</code>. Use a fresh/test install, not a database that already holds real data.</p>
+    <p class="muted" style="margin-top:6px;font-size:12px">It writes a few thousand rows. If this server stops the page before it finishes, load it from the command line instead — <code>php tools/seed-demo.php</code> — where there is no time limit.</p>
   <?php endif; ?>
 
   <?php

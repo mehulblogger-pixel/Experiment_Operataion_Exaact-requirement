@@ -1886,10 +1886,18 @@ function ops_dispatch($route, $method) {
         case $route === 'seed-demo':
             ops_require(is_master(), 'Only the Master Admin can load demo data.');
             if ($method === 'POST') {
-                $res = seed_demo();
+                // "Load anyway" is offered when the flag and the data disagree.
+                $res = seed_demo(!empty($_POST['force']));
                 if (!empty($res['skipped'])) flash('Demo data is already loaded. To refresh it with the latest sample records (e.g. agencies, requisitions), click "Remove demo data" first, then "Load demo data" again.', 'warning');
                 elseif (!empty($res['error'])) flash('Could not load demo data: ' . $res['error'], 'error');
-                else { $x = $res['counts']; flash("Demo data loaded — {$x['offices']} offices, {$x['users']} users, {$x['inspectors']} inspectors, {$x['partners']} clients/vendors, {$x['boss']} " . Tlp('boss') . ", {$x['calls']} calls, {$x['jobs']} jobs, {$x['vouchers']} vouchers, plus " . ($x['edge_cases'] ?? 0) . " generated edge-case records. Log in as any demo user (e.g. director, account, insp.ravi) with password demo12345."); }
+                else {
+                    $x = $res['counts'];
+                    flash("Demo data loaded — {$x['offices']} offices, {$x['users']} users, {$x['inspectors']} inspectors, {$x['partners']} clients/vendors, {$x['boss']} " . Tlp('boss') . ", {$x['calls']} calls, {$x['jobs']} jobs, {$x['vouchers']} vouchers, plus " . ($x['edge_cases'] ?? 0) . " generated edge-case records. Log in as any demo user (e.g. director, account, insp.ravi) with password demo12345.");
+                    // The core loaded but a register did not. Say which, rather
+                    // than leaving somebody to notice an empty screen later.
+                    foreach ($res['failed'] ?? [] as $f)
+                        flash('The operations demo loaded, but the extra registers did not: ' . $f, 'error');
+                }
             }
             redirect('/settings'); return true;
         case $route === 'seed-demo-remove':
