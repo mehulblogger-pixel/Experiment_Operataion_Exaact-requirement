@@ -102,7 +102,7 @@ function module_groups() {
         'Inspection documentation' => ['idems'],
         'Operations'              => ['calls','jobs','vouchers','invoicing','profitability','hiring','reconcile'],
         'Accreditation & compliance' => ['equipment','competence','impartiality','complaints','capa','audits','datacontrol','identity'],
-        'Directory & masters'     => ['clients','vendors','masters','overheads'],
+        'Directory & masters'     => ['clients','vendors','masters','overheads','portal'],
         'Insights & admin'        => ['reports','users','settings'],
     ];
     $claimed = array_merge(...array_values($g));
@@ -143,6 +143,7 @@ const ACCESS_MODULES = [
     'capa'          => 'Corrective actions',
     'audits'        => 'Internal audits & management review',
     'datacontrol'   => 'Data & information control',
+    'portal'        => 'Client portal (who at the client can sign in)',
     'masters'       => 'Masters',
     'overheads'     => 'Overheads (office finance)',
     'reports'       => 'Dashboards / reports',
@@ -171,19 +172,19 @@ function module_defaults($role) {
         case 'SBU_HEAD':
             $view = ['inquiries','quotes','crm_orders','crm_reports','idems','calls','jobs','vouchers','invoicing','profitability','hiring','reconcile','clients','vendors','masters','reports','complaints','capa','audits']; break;
         case 'BRANCH_MANAGER':
-            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','clients','vendors','masters','reports','users','complaints','capa','audits','datacontrol'];
+            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','clients','vendors','masters','reports','users','complaints','capa','audits','datacontrol','portal'];
             $view = ['inquiries','quotes','crm_orders','crm_reports','invoicing','profitability','overheads']; break;
         case 'BRANCH_APP_MANAGER':
             $edit = ['masters','overheads','users'];
             $view = ['calls','jobs','reports']; break;
         case 'OPERATION_MANAGER':
-            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','complaints','capa'];
+            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','complaints','capa','portal'];
             $view = ['crm_orders','clients','vendors','masters','profitability','reports']; break;
         case 'ASST_MANAGER':
             $edit = ['calls','jobs','idems','complaints'];
             $view = ['clients','vendors','reports','capa']; break;
         case 'COORDINATOR':
-            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','complaints'];
+            $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','complaints','portal'];
             $view = ['crm_orders','clients','vendors','masters','reports','invoicing','capa']; break;
         // ---- Marketing & Sales (CRM) ----
         case 'BUSINESS_DEV_MANAGER': case 'KEY_ACCOUNTS_MANAGER':

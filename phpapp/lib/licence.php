@@ -31,7 +31,7 @@ const PRODUCT_MODULES = [
                      ['calls', 'jobs', 'reconcile', 'vouchers', 'equipment', 'competence', 'impartiality',
                       'identity', 'complaints', 'capa', 'audits', 'datacontrol'], true],
     'admin'      => ['Administration', 'Masters, users, offices, settings, parties',
-                     ['masters', 'users', 'settings', 'clients', 'vendors', 'overheads', 'reports'], true],
+                     ['masters', 'users', 'settings', 'clients', 'vendors', 'overheads', 'reports', 'portal'], true],
     'sales'      => ['Sales & CRM', 'Inquiries, quotations, approvals, sales dashboards',
                      ['inquiries', 'quotes', 'crm_orders', 'crm_reports'], false],
     'reporting'  => ['Inspection reporting', 'The report engine, formats, endorsements, evidence',

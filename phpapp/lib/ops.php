@@ -1737,6 +1737,8 @@ function ops_module_gate($route) {
         'endorsements'=>'idems','endorsement'=>'idems','endorsement-new'=>'idems','endorsement-edit'=>'idems','endorsement-submit'=>'idems','endorsement-approve'=>'idems','endorsement-delete'=>'idems','endorsement-file'=>'idems','endorsement-cert'=>'idems',
         'phrase-library'=>'idems','phrase-edit'=>'idems','learning'=>'idems',
         'document-smart'=>'idems','document-release-note'=>'idems','document-review'=>'idems','document-evidence'=>'idems',
+        'portal-users'=>'portal','portal-user-toggle'=>'portal','portal-user-reinvite'=>'portal',
+        'portal-settings'=>'portal','portal-request'=>'portal',
         'masters'=>'masters','work-norms'=>'masters',
         'office-finance'=>'overheads','cost-run'=>'overheads',
         'sbu-pl'=>'profitability','call-profit'=>'profitability','mis'=>'reports',
@@ -1921,6 +1923,10 @@ function ops_dispatch($route, $method) {
         case $route === 'evidence-review' || $route === 'evidence-reviewed'
              || $route === 'site-checkin' || $route === 'checkin-photo' || $route === 'checkin-settings':
             return ops_trust($route, $method);
+        case $route === 'portal-users' || $route === 'portal-user-toggle'
+             || $route === 'portal-user-reinvite' || $route === 'portal-settings'
+             || $route === 'portal-request':
+            return ops_portal_admin($route, $method);
         case $route === 'data-control' || $route === 'data-check-run'
              || $route === 'sw-validation-add' || strncmp($route, 'failure-', 8) === 0:
             return ops_datacontrol($route, $method);

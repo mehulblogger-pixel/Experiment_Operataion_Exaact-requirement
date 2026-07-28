@@ -2,6 +2,63 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ PHASE 5.1 — the client portal (July 2026)
+
+`lib/portal.php`, client screens under `/portal`, staff screen `/portal-users`.
+
+**The design rule, and it is not a preference.** A client user is **not** a
+staff user with fewer permissions. That is how client portals leak, every time:
+somebody adds a screen, forgets one gate, and a competitor reads another
+competitor's inspection reports. So:
+
+- Client identity lives in **its own table** (`client_users`) and **its own
+  session key** (`$_SESSION['cuid']`). `current_user()` can never return a
+  client, so no staff screen is reachable by one even if a route is added
+  carelessly a year from now. The browser test drives a signed-in client at
+  `/`, `/calls`, `/documents`, `/portal-users` and `/data-control` and checks
+  each one throws them at the **staff** sign-in.
+- Every read takes the company **from the session** and puts it **in the WHERE
+  clause** — never checked afterwards. Another company's id does not come back
+  at all, so the by-id screens answer **404, not 403**: "it does not exist to
+  you" rather than "it exists and you may not have it."
+- The queries **do not SELECT** the columns a client must not see. No cost, no
+  credit, no margin, no salary, no internal note. What is never loaded cannot
+  leak through a template written in a hurry.
+
+**What a client sees:** their calls and where each has got to; the visits and
+who is coming; the reports we have **issued**, downloadable as the same PDF the
+office sends; their invoices and what is outstanding; a form to ask for the next
+inspection. **A draft is never shown** — a draft is not a report, and showing
+one is how a finding gets quoted back before it is final.
+
+**Passwords.** We never choose one and never e-mail one. An invitation is a
+one-time link that lasts seven days; the invitee sets their own. So there is no
+client password anybody here has ever known, lost, or can be blamed for. The
+link is burnt on use, and a second visit says so on the way *in* rather than
+after somebody has chosen a password and typed it twice.
+
+**Off by default.** Until an administrator switches it on, every portal address
+answers a bare 404 with no shell and no hint that a portal exists. Switched on
+is still not open: nobody can reach it until they are invited.
+
+**A request is a request, not a booking.** A client may ask for an inspection;
+they cannot put work into our register. A coordinator reads it, decides, and
+raises the call — because scope, price and who goes are ours. Declining is
+refused unless a reason is given: a request declined in silence is why clients
+stop using a portal and go back to telephoning.
+
+**Still open on the portal:**
+
+- [ ] Accepting a request does not yet **create the call** for you — it records
+      the decision and a coordinator raises it by hand. One-click conversion is
+      the obvious next step and was left out deliberately until the request
+      form has been used in anger and we know which fields are worth carrying.
+- [ ] No e-mail to the client when a report is issued. They see it on the
+      portal; they are not told to look. Wants the notification work.
+- [ ] Contacts on the client record are not linked to portal accounts
+      (`client_users.contact_id` exists and is unused). Inviting is by typing
+      the address.
+
 ## ✅ PHASE 4 — the trust layer (July 2026)
 
 `lib/trust.php`, screens `/evidence-review` and the public `/verify`.

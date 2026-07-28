@@ -126,6 +126,7 @@ try {
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';
     require __DIR__ . '/lib/trust.php';
+    require __DIR__ . '/lib/portal.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
@@ -257,6 +258,9 @@ try {
     db()->query("SELECT id FROM evidence_chain LIMIT 1");
     db()->query("SELECT geo_source FROM report_files LIMIT 1");
     db()->query("SELECT verify_code FROM report_docs LIMIT 1");
+    db()->query("SELECT id FROM client_users LIMIT 1");
+    db()->query("SELECT id FROM portal_requests LIMIT 1");
+    db()->query("SELECT id FROM portal_audit LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which
     // runs the same idempotent boot() and clears it. Each check is self-cancelling.
@@ -441,6 +445,16 @@ if ($route === 'complaints-policy') {
 // nothing confidential.
 if ($route === 'verify') {
     require __DIR__ . '/views/ops/verify.php';
+    exit;
+}
+
+// The client portal has its own sign-in, its own session key and its own table.
+// It is dispatched HERE, in front of require_login(), because require_login()
+// means a STAFF account — a client has none and must never be pushed towards
+// one. Everything past this point is the staff application; nothing a client
+// does ever reaches it. portal_route() always exits.
+if ($route === 'portal' || strncmp($route, 'portal/', 7) === 0) {
+    portal_route($route, $method);
     exit;
 }
 
