@@ -61,6 +61,11 @@ const PERMISSIONS = [
     'idems.type.manage'   => 'Manage report types & IRN numbering rules',
     'idems.timestamp.edit'=> 'Edit locked timestamps (Branch App Admin only)',
     'idems.audit.view'    => 'View the compliance audit log',
+    // ---- Identity documents (held under the DPDP Act for one stated purpose) ----
+    // Kept out of every role default on purpose. Running operations is not a
+    // reason to read a colleague's passport, so somebody has to grant it.
+    'person.iddoc.view'   => 'See that an identity document is on file (numbers stay masked)',
+    'person.iddoc.manage' => 'Hold identity documents — file, reveal a number, log a copy sent out, redact',
 ];
 
 // Human-friendly grouping of every permission, so the access editor reads clearly
@@ -72,6 +77,7 @@ function permission_groups() {
         'Inspection documentation (IDEMS)' => ['idems.finalize','idems.type.manage','idems.timestamp.edit','idems.audit.view'],
         'Money'                          => ['finance.reconcile'],
         'Marketing & Sales (CRM)'        => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage'],
+        'Identity documents (personal data)' => ['person.iddoc.view','person.iddoc.manage'],
         'Administration'                 => ['master.manage','users.manage.branch','users.manage.global','org.hierarchy.view','settings.manage'],
     ];
 }
@@ -113,6 +119,7 @@ const ACCESS_MODULES = [
     'equipment'     => 'Equipment & calibration',
     'competence'    => 'Competence & authorisation',
     'impartiality'  => 'Impartiality & conflicts',
+    'identity'      => 'Identity documents (site access)',
     'masters'       => 'Masters',
     'overheads'     => 'Overheads (office finance)',
     'reports'       => 'Dashboards / reports',
@@ -169,6 +176,14 @@ function module_defaults($role) {
             $edit = ['invoicing','crm_orders'];
             $view = ['quotes','crm_reports','profitability','reports','jobs','calls','vouchers','idems']; break;
         case 'INSPECTOR': $edit = ['idems']; break; // inspectors write reports; else My Jobs / My Voucher
+    }
+    // Identity documents are never handed out by a blanket "everything" grant.
+    // A Business Director gets every module by default; that is a reasonable
+    // default for revenue figures and a bad one for passports, so it is taken
+    // back out here and has to be granted deliberately.
+    if (!in_array($role, ['MASTER_ADMIN', 'ADMIN'], true)) {
+        $view = array_values(array_diff($view, ['identity']));
+        $edit = array_values(array_diff($edit, ['identity']));
     }
     $out = [];
     foreach ($view as $k) $out[] = "mod.$k.view";

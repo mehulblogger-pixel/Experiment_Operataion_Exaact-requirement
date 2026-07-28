@@ -428,6 +428,18 @@
         <small class="muted">Confirmed by <?= e($job['impartiality_by']) ?><?= !empty($job['impartiality_at']) ? ' on ' . e(fdate(substr($job['impartiality_at'],0,10))) : '' ?>.</small>
       <?php endif; ?></div>
 
+    <?php // Site access. Told, not enforced: a plant gate pass is the client's
+          // requirement, not ISO's, and refusing to depute somebody over a visa
+          // scan would create a compliance problem rather than solve one.
+          $idWhy = (!empty($job['inspector_id']) && function_exists('iddoc_note_for_person'))
+                 ? iddoc_note_for_person((int)$job['inspector_id']) : '';
+          if ($idWhy !== '' && can('mod.identity.view')): ?>
+    <div class="ff ff-wide"><label>Site access</label>
+      <p class="pill p-warn" style="display:inline-block;margin:0"><?= e($idWhy) ?>
+        If this site issues gate passes against a document, arrange it before the deputation
+        — <a href="/identity?i=<?= (int)$job['inspector_id'] ?>">Identity documents</a>.</p></div>
+    <?php endif; ?>
+
     <div class="ff ff-wide"><label>Expenses the <?= e(Tl('client')) ?> pays for <span class="muted">(from the <?= e(Tl('call')) ?> — correct it here if needed)</span></label>
       <div class="checkgrid">
         <?php foreach (chargeable_head_options() as $k=>$v): ?>

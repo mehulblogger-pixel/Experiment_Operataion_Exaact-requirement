@@ -1387,6 +1387,11 @@ function ops_run_reminders($today = null) {
     }
     $sent += ops_run_cert_reminders($today);
     $sent += ops_run_po_alerts($today);
+    // Housekeeping that has to happen on a clock rather than when somebody
+    // opens a screen. Neither sends mail, so neither adds to $sent — they are
+    // here because this is the only thing that runs every night.
+    if (function_exists('auth_run_maintenance')) auth_run_maintenance($today);
+    if (function_exists('iddoc_run_retention')) iddoc_run_retention($today);
     return $sent;
 }
 
@@ -1739,6 +1744,9 @@ function ops_module_gate($route) {
         'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'preflight'=>'settings',
+        'identity'=>'identity','iddoc-add'=>'identity','iddoc-file'=>'identity',
+        'iddoc-reveal'=>'identity','iddoc-share'=>'identity','iddoc-redact'=>'identity',
+        'iddoc-retention'=>'identity',
         'impartiality'=>'impartiality','imp-type'=>'impartiality','imp-declare'=>'impartiality',
         'imp-threat-add'=>'impartiality','imp-threat-decide'=>'impartiality',
         'competence'=>'competence','auth-add'=>'competence','auth-status'=>'competence',
@@ -1886,6 +1894,8 @@ function ops_dispatch($route, $method) {
             ops_user_retire($method); return true;
         case $route === 'user-2fa-reset':
             ops_user_twofa_reset($method); return true;
+        case $route === 'identity' || strncmp($route, 'iddoc-', 6) === 0:
+            return ops_identity($route, $method);
         case $route === 'impartiality' || strncmp($route, 'imp-', 4) === 0:
             return ops_impartiality($route, $method);
         case $route === 'competence' || strncmp($route, 'auth-', 5) === 0 || $route === 'witness-add':
