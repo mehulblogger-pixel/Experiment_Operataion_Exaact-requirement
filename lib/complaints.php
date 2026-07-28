@@ -167,7 +167,12 @@ function cmp_policy_is_default() { return trim((string)setting_get('complaints_p
 
 // ---- Reading ----------------------------------------------------------------
 function cmp_all($filter = []) {
-    $w = ['1=1']; $a = [];
+    // office_id has been on this table since it was written and was never read,
+    // so every branch manager saw every complaint in the company — the opposite
+    // of what a multi-branch body needs. A complaint with no branch stays
+    // visible to everyone, because an unassigned complaint must not vanish.
+    [$sw, $sa] = scope_office_clause('office_id');
+    $w = [$sw]; $a = $sa;
     if (!empty($filter['status']))  { $w[] = 'status = ?';  $a[] = $filter['status']; }
     if (!empty($filter['kind']))    { $w[] = 'kind = ?';    $a[] = $filter['kind']; }
     if (!empty($filter['outcome'])) { $w[] = 'outcome = ?'; $a[] = $filter['outcome']; }

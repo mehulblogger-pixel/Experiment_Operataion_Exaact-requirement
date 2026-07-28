@@ -90,6 +90,79 @@
     <button class="btn small secondary" type="submit">Save plan</button>
   </form>
 
+  <?php
+    // A corrective action is rarely one thing. "Revise the procedure, retrain
+    // four inspectors, add a check to the report form" is three tasks with
+    // three owners and three dates. The summary above stays — it is what every
+    // record written before this existed lives in — and these are the tasks it
+    // breaks into, each chaseable on its own and each blocking the close.
+    $openN = count(array_filter($actions, fn($a) => ($a['status'] ?? 'OPEN') === 'OPEN'));
+    $today = date('Y-m-d');
+  ?>
+  <h4 class="tab-sub" style="margin-top:16px">The actions <span class="muted">(<?= count($actions) ?><?= $openN ? ', ' . $openN . ' still open' : '' ?>)</span></h4>
+  <?php if (!$actions): ?>
+    <p class="muted" style="margin:0 0 10px">None yet. Add one below for each separate thing somebody has to do — one owner and one date each, so each can be chased.</p>
+  <?php else: ?>
+  <table class="dt" style="margin-bottom:12px">
+    <thead><tr><th>#</th><th>What</th><th>Who</th><th>By when</th><th>State</th><?php if ($canEdit): ?><th></th><?php endif; ?></tr></thead>
+    <tbody>
+    <?php foreach ($actions as $a):
+      $st = $a['status'] ?: 'OPEN';
+      $late = $st === 'OPEN' && $a['due_on'] && $a['due_on'] < $today;
+    ?>
+      <tr>
+        <td><?= (int)$a['seq'] ?></td>
+        <td style="white-space:pre-wrap"><?= e($a['description']) ?>
+          <?php if (trim((string)$a['done_note']) !== ''): ?><br><span class="muted" style="font-size:12px"><?= e($a['done_note']) ?></span><?php endif; ?>
+          <?php if (trim((string)$a['cancel_reason']) !== ''): ?><br><span class="muted" style="font-size:12px">Dropped: <?= e($a['cancel_reason']) ?></span><?php endif; ?></td>
+        <td><?= e($a['owner'] ?: '—') ?></td>
+        <td><?= $a['due_on'] ? e(fdate($a['due_on'])) : '—' ?><?php if ($late): ?><br><span class="pill p-bad">late</span><?php endif; ?></td>
+        <td><?php
+          if ($st === 'DONE') echo '<span class="pill p-ok">Done ' . e(fdate($a['done_on'])) . '</span>';
+          elseif ($st === 'CANCELLED') echo '<span class="pill p-mut">Dropped</span>';
+          else echo '<span class="pill p-warn">Open</span>';
+        ?></td>
+        <?php if ($canEdit): ?>
+        <td style="white-space:nowrap">
+          <?php if ($st === 'OPEN'): ?>
+            <form method="post" action="/capa-action-done" style="display:inline">
+              <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+              <input type="hidden" name="action_id" value="<?= (int)$a['id'] ?>">
+              <button class="btn small">Done</button>
+            </form>
+            <form method="post" action="/capa-action-cancel" style="display:inline"
+                  onsubmit="return (this.why.value = prompt('Why is this action being dropped?') || '') !== ''">
+              <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+              <input type="hidden" name="action_id" value="<?= (int)$a['id'] ?>">
+              <input type="hidden" name="why" value="">
+              <button class="btn small secondary">Drop</button>
+            </form>
+          <?php else: ?>
+            <form method="post" action="/capa-action-reopen" style="display:inline">
+              <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+              <input type="hidden" name="action_id" value="<?= (int)$a['id'] ?>">
+              <button class="btn small secondary">Reopen</button>
+            </form>
+          <?php endif; ?>
+        </td>
+        <?php endif; ?>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php endif; ?>
+
+  <?php if ($canEdit): ?>
+  <form method="post" action="/capa-action-add" class="inline-add">
+    <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
+    <div class="ff ff-wide"><label>Add an action</label>
+      <input class="form-control" name="description" placeholder="e.g. Retrain the four inspectors who use the UT gauge"></div>
+    <div class="ff"><label>Whose job</label><input class="form-control" name="owner" placeholder="name or e-mail"></div>
+    <div class="ff"><label>By when</label><input class="form-control" type="date" name="due_on"></div>
+    <button class="btn small secondary" type="submit">Add</button>
+  </form>
+  <?php endif; ?>
+
   <?php if ($c['completed_on'] === ''): ?>
   <h3 class="tab-sub">3 · It was done</h3>
   <form method="post" action="/capa-done" class="inline-add">

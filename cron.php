@@ -108,6 +108,23 @@ if (function_exists('ncr_run_reminders')) {
     $n = ncr_run_reminders();
     echo "Nonconformity chases sent: $n\n";
 }
+// Individual corrective-action tasks past their date. Separate from the
+// corrective action's own chase: the task has its own owner, and that is the
+// person who can actually move it.
+if (function_exists('capa_actions_overdue') && function_exists('ops_mail')) {
+    $n = 0;
+    foreach (capa_actions_overdue() as $a) {
+        $to = trim((string)$a['owner']);
+        if ($to === '') continue;
+        $late = (int)floor((strtotime(date('Y-m-d')) - strtotime($a['due_on'])) / 86400);
+        ops_mail($to, "Corrective action {$a['ref']}: a task is $late day(s) late",
+            "{$a['ref']} — {$a['title']}\n\nYour task: {$a['description']}\n"
+            . "Due: {$a['due_on']} ($late day(s) ago)\n\n"
+            . "Open it in the application to record it as done, or say why it is being dropped.");
+        $n++;
+    }
+    echo "Corrective-action task chases sent: $n\n";
+}
 if (function_exists('capa_run_reminders')) {
     $n = capa_run_reminders();
     echo "Corrective-action chases sent: $n\n";
