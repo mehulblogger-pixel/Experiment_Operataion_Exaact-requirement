@@ -8,6 +8,30 @@
   };
   $office = ($u && ($u['home_office_id'] ?? null)) ? ops_val("SELECT name FROM offices WHERE id=?", [$u['home_office_id']]) : '';
   $isInsp = $u ? is_inspector() : false;
+
+  // ---------------------------------------------------------------------------
+  //  Groups that fold
+  //
+  //  A master admin is offered about forty destinations, and they were all
+  //  expanded, all the time, weighted the same. On a phone that is a wall you
+  //  scroll rather than a menu you read — the owner's words were "cluttered and
+  //  very difficult to find things", and they were right.
+  //
+  //  $grp opens a foldable section, $endgrp closes it. The heading is a real
+  //  <button> so it works by keyboard and reads correctly to a screen reader.
+  //  Which sections are open is remembered per browser, and the section holding
+  //  the page you are on is forced open whatever the memory says — otherwise you
+  //  can be looking at a screen whose menu entry is hidden.
+  // ---------------------------------------------------------------------------
+  $grpN = 0;
+  $grp = function ($label) use (&$grpN) {
+      $grpN++;
+      $id = 'sec' . $grpN;
+      echo '<button type="button" class="s-grp" data-sec="' . e($label) . '" aria-controls="' . $id . '" aria-expanded="true">'
+         . '<span class="s-grp-t">' . e($label) . '</span><span class="s-grp-c" aria-hidden="true">›</span></button>'
+         . '<div class="s-sec" id="' . $id . '">';
+  };
+  $endgrp = function () { echo '</div>'; };
 ?><!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -40,6 +64,15 @@
       <button class="side-collapse" id="navCollapse" type="button" aria-label="Collapse the menu" title="Collapse the menu">«</button>
     </div>
     <nav class="side-nav">
+      <?php // With forty destinations, typing three letters beats any amount of
+            // grouping. It filters what is already on the page — no request, no
+            // index to keep in step with the menu, and it works offline. ?>
+      <div class="s-find">
+        <input type="search" id="navFind" class="s-find-in" placeholder="Find a screen…"
+               autocomplete="off" spellcheck="false" aria-label="Find a screen">
+        <button type="button" class="s-find-x" id="navFindX" aria-label="Clear" hidden>✕</button>
+      </div>
+      <p class="s-find-none" id="navFindNone" hidden>Nothing matches that.</p>
       <a class="s-item<?= $navOn(['']) ?>" href="/"><span class="s-ic">🏠</span><span>Dashboard</span></a>
 
       <?php // Every label below is the first words of the page heading it opens,
@@ -49,7 +82,7 @@
               // report register belongs on their menu. They already hold
               // mod.idems.view/edit — this branch simply never offered it, and the
               // person who writes every report had a two-item menu. ?>
-        <div class="s-grp">My work</div>
+        <?php $grp('My work'); ?>
         <a class="s-item<?= $navOn(['my-jobs']) ?>" href="/my-jobs"><span class="s-ic">🗂</span><span>My <?= e(Tlp('job')) ?></span></a>
         <?php if (can('mod.idems.view')): ?>
           <a class="s-item<?= $navOn(['documents','document','document-edit','document-fill']) ?>" href="/documents"><span class="s-ic">📑</span><span>My <?= e(Tlp('report')) ?></span></a>
@@ -57,16 +90,17 @@
           <a class="s-item<?= $navOn(['endorsements','endorsement','endorsement-new','endorsement-edit']) ?>" href="/endorsements"><span class="s-ic">✅</span><span><?= e(THP('endorsement')) ?></span></a>
         <?php endif; ?>
         <a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span>My <?= e(Tlp('voucher')) ?></span></a>
+        <?php $endgrp(); ?>
       <?php else: ?>
         <?php if (can('mod.inquiries.view')||can('mod.quotes.view')||can('mod.crm_reports.view')): ?>
-        <div class="s-grp">Sales</div>
+        <?php $grp('Sales'); ?>
         <?php if (can('mod.inquiries.view')): ?><a class="s-item<?= $navOn(['inquiries','inquiry']) ?>" href="/inquiries"><span class="s-ic">📨</span><span><?= e(THP('inquiry')) ?></span></a><?php endif; ?>
         <?php if (can('mod.quotes.view')): ?><a class="s-item<?= $navOn(['quotes','quote']) ?>" href="/quotes"><span class="s-ic">📝</span><span><?= e(THP('quote')) ?></span></a><?php endif; ?>
         <?php if (can('mod.crm_reports.view')): ?><a class="s-item<?= $navOn(['crm-reports']) ?>" href="/crm-reports"><span class="s-ic">📈</span><span>Sales dashboard</span></a><?php endif; ?>
-        <?php endif; ?>
+        <?php $endgrp(); endif; ?>
 
         <?php if (can('mod.calls.view')||can('mod.jobs.view')||can('mod.vouchers.view')||can('mod.hiring.view')||can('mod.reconcile.view')): ?>
-        <div class="s-grp">Operations</div>
+        <?php $grp('Operations'); ?>
         <?php if (can('mod.calls.view')): ?><a class="s-item<?= $navOn(['calls','call']) ?>" href="/calls"><span class="s-ic">☎️</span><span><?= e(THP('call')) ?></span></a><?php endif; ?>
         <?php if (can('mod.jobs.view')): ?><a class="s-item<?= $navOn(['jobs','job']) ?>" href="/jobs"><span class="s-ic">🗂</span><span><?= e(THP('job')) ?></span></a><?php endif; ?>
         <?php if (can('mod.jobs.view') && function_exists('can_manage_availability') && can_manage_availability()): ?><a class="s-item<?= $navOn(['availability']) ?>" href="/availability"><span class="s-ic">🟢</span><span><?= e(TH('engineer')) ?> availability</span></a><?php endif; ?>
@@ -89,8 +123,17 @@
         ?>
           <a class="s-item<?= $navOn(['contract-overrides']) ?>" href="/contract-overrides"><span class="s-ic">🛑</span><span>Contract exceptions<?= $ovN ? ' (' . $ovN . ')' : '' ?></span></a>
         <?php endif; ?>
-        <?php endif; ?>
+        <?php $endgrp(); endif; ?>
 
+        <?php // These eleven were rendered loose, with no heading of their own, so
+              // they read as a continuation of Operations and made that group
+              // nineteen items long. They are their own subject — the things an
+              // accreditation assessor asks for — and now they say so.
+              if (can('mod.equipment.view')||can('mod.competence.view')||can('mod.impartiality.view')
+                  ||can('mod.complaints.view')||can('mod.capa.view')||can('mod.audits.view')
+                  ||can('mod.datacontrol.view')||can('mod.portal.view')||can('mod.identity.view')
+                  ||(function_exists('trust_can_review') && trust_can_review())): ?>
+        <?php $grp('Quality & accreditation'); ?>
         <?php if (can('mod.equipment.view')): ?><a class="s-item<?= $navOn(['equipment','equip-new','equip-edit']) ?>" href="/equipment"><span class="s-ic">📏</span><span>Equipment &amp; calibration</span></a><?php endif; ?>
         <?php if (can('mod.competence.view')): ?><a class="s-item<?= $navOn(['competence']) ?>" href="/competence"><span class="s-ic">🎓</span><span>Competence &amp; authorisation</span></a><?php endif; ?>
         <?php if (can('mod.impartiality.view')): ?><a class="s-item<?= $navOn(['impartiality']) ?>" href="/impartiality"><span class="s-ic">⚖️</span><span>Impartiality</span></a><?php endif; ?>
@@ -102,9 +145,10 @@
         <?php if (can('mod.datacontrol.view')): ?><a class="s-item<?= $navOn(['data-control']) ?>" href="/data-control"><span class="s-ic">🗃</span><span>Data &amp; information control</span></a><?php endif; ?>
         <?php if (can('mod.portal.view')): $pqN = function_exists('portal_requests_all') ? count(portal_requests_all('NEW')) : 0; ?><a class="s-item<?= $navOn(['portal-users']) ?>" href="/portal-users"><span class="s-ic">🌐</span><span>Client portal<?= $pqN ? ' (' . $pqN . ')' : '' ?></span></a><?php endif; ?>
         <?php if (can('mod.identity.view') && function_exists('iddoc_can_view') && iddoc_can_view()): ?><a class="s-item<?= $navOn(['identity']) ?>" href="/identity"><span class="s-ic">🪪</span><span>Identity documents</span></a><?php endif; ?>
+        <?php $endgrp(); endif; ?>
 
         <?php if (can('mod.idems.view')): ?>
-        <div class="s-grp">Reporting</div>
+        <?php $grp('Reporting'); ?>
         <a class="s-item<?= $navOn(['documents','document','document-new','document-edit']) ?>" href="/documents"><span class="s-ic">📑</span><span><?= e(T_REG('report')) ?></span></a>
         <?php if (can('mod.idems.edit') || is_master()): ?><a class="s-item<?= $navOn(['document-new']) ?>" href="/document-new"><span class="s-ic">➕</span><span><?= e(ucfirst(T_NEW('report'))) ?></span></a><?php endif; ?>
         <a class="s-item<?= $navOn(['endorsements','endorsement','endorsement-new','endorsement-edit']) ?>" href="/endorsements"><span class="s-ic">✅</span><span><?= e(T_REG('endorsement')) ?></span></a>
@@ -118,29 +162,29 @@
               // legal obligations are met and which are not. Kept next to the audit
               // trail because that is where somebody looks when a client asks. ?>
         <?php if (is_master() || can('settings.manage')): ?><a class="s-item<?= $navOn(['compliance','incidents','incident','incident-new','incident-edit','data-requests','person-erase']) ?>" href="/compliance"><span class="s-ic">⚖️</span><span>Where we stand</span></a><?php endif; ?>
-        <?php endif; ?>
+        <?php $endgrp(); endif; ?>
 
         <?php if (can('mod.invoicing.view') || can('mod.profitability.view')): ?>
-        <div class="s-grp">Money</div>
+        <?php $grp('Money'); ?>
         <?php if (can('mod.invoicing.view')): ?><a class="s-item<?= $navOn(['invoicing']) ?>" href="/invoicing"><span class="s-ic">💳</span><span><?= e(T_REG('invoice')) ?></span></a><?php endif; ?>
         <?php if (can('mod.profitability.view')): ?><a class="s-item<?= $navOn(['profitability']) ?>" href="/profitability"><span class="s-ic">💹</span><span><?= e(T_REG('boss')) ?></span></a><?php endif; ?>
-        <?php endif; ?>
+        <?php $endgrp(); endif; ?>
 
         <?php if (can('mod.reports.view')): ?>
-        <div class="s-grp">Insights</div>
+        <?php $grp('Insights'); ?>
           <a class="s-item<?= $navOn(['reports']) ?>" href="/reports"><span class="s-ic">📊</span><span>Dashboards</span></a>
-        <?php endif; ?>
+        <?php $endgrp(); endif; ?>
 
         <?php if (can('mod.clients.view') || can('mod.vendors.view')): ?>
-        <div class="s-grp">Directory</div>
+        <?php $grp('Directory'); ?>
         <?php if (can('mod.clients.view')): ?><a class="s-item<?= $navOn(['clients']) ?>" href="/clients"><span class="s-ic">🏢</span><span><?= e(T_REG('client')) ?></span></a><?php endif; ?>
         <?php if (can('mod.vendors.view')): ?><a class="s-item<?= $navOn(['vendors']) ?>" href="/vendors"><span class="s-ic">🚚</span><span><?= e(T_REG('vendor')) ?></span></a><?php endif; ?>
-        <?php endif; ?>
+        <?php $endgrp(); endif; ?>
 
         <?php if (can('mod.masters.view')||can('mod.overheads.view')||can('mod.users.view')
                   ||can('mod.profitability.view')||can('mod.reports.view')||is_master()
                   ||(can('mod.settings.view') && can('settings.manage'))): ?>
-        <div class="s-grp">Admin</div>
+        <?php $grp('Admin'); ?>
           <?php if (can('mod.masters.view')): ?><a class="s-item<?= $navOn(['masters','m/','lookups']) ?>" href="/masters"><span class="s-ic">📋</span><span>Masters</span></a><?php endif; ?>
           <?php if (can('mod.overheads.view')): ?><a class="s-item<?= $navOn(['office-finance']) ?>" href="/office-finance"><span class="s-ic">📐</span><span><?= e(TH("office")) ?> costs &amp; overheads</span></a><?php endif; ?>
           <?php if (can('mod.overheads.view')): ?><a class="s-item<?= $navOn(['cost-run']) ?>" href="/cost-run"><span class="s-ic">🧮</span><span>Month-end cost run</span></a><?php endif; ?>
@@ -157,7 +201,7 @@
                 // mod.settings.view meant a business director was shown the link
                 // and then refused at the door — which reads as a broken app. ?>
           <?php if (can('mod.settings.view') && can('settings.manage')): ?><a class="s-item<?= $navOn(['settings','terminology','ai-settings','reset-data']) ?>" href="/settings"><span class="s-ic">⚙️</span><span>System settings</span></a><?php endif; ?>
-        <?php endif; ?>
+        <?php $endgrp(); endif; ?>
       <?php endif; ?>
     </nav>
     <div class="side-foot">
@@ -177,6 +221,77 @@
       var lab = a.querySelector("span:not(.s-ic)");
       if (lab) a.setAttribute("data-label", lab.textContent.trim());
     });
+
+    // ---- Folding groups -------------------------------------------------
+    // Remembered per browser. The section holding the page you are on is
+    // always opened, whatever the memory says — being on a screen whose menu
+    // entry is hidden is worse than any amount of scrolling.
+    var shut = {};
+    try { shut = JSON.parse(localStorage.getItem("navShut") || "{}") || {}; } catch (e3) { shut = {}; }
+    function save() { try { localStorage.setItem("navShut", JSON.stringify(shut)); } catch (e4) {} }
+
+    document.querySelectorAll(".side-nav .s-grp").forEach(function (h) {
+      var sec = h.nextElementSibling;
+      if (!sec || !sec.classList.contains("s-sec")) return;
+      var name = h.getAttribute("data-sec") || "";
+      var here = !!sec.querySelector(".s-item.on");
+      var open = here || !shut[name];
+      function apply(o) {
+        sec.hidden = !o;
+        h.setAttribute("aria-expanded", o ? "true" : "false");
+        h.classList.toggle("shut", !o);
+      }
+      apply(open);
+      if (here) { delete shut[name]; save(); }
+      h.addEventListener("click", function () {
+        var o = sec.hidden;               // about to open
+        apply(o);
+        if (o) delete shut[name]; else shut[name] = 1;
+        save();
+      });
+    });
+
+    // ---- Type to find ---------------------------------------------------
+    var find = document.getElementById("navFind");
+    var findX = document.getElementById("navFindX");
+    var findNone = document.getElementById("navFindNone");
+    if (find) {
+      var nav = document.querySelector(".side-nav");
+      function runFilter() {
+        var q = find.value.trim().toLowerCase();
+        findX.hidden = q === "";
+        nav.classList.toggle("filtering", q !== "");
+        var hits = 0;
+        document.querySelectorAll(".side-nav .s-item").forEach(function (a) {
+          var hit = q === "" || (a.getAttribute("data-label") || "").toLowerCase().indexOf(q) >= 0;
+          a.hidden = !hit;
+          if (hit) hits++;
+        });
+        // While filtering, every section is opened and any that has no match is
+        // taken off screen with its heading — a heading over nothing reads as a
+        // broken page.
+        document.querySelectorAll(".side-nav .s-grp").forEach(function (h) {
+          var sec = h.nextElementSibling;
+          if (!sec || !sec.classList.contains("s-sec")) return;
+          if (q === "") { h.hidden = false; sec.hidden = h.classList.contains("shut"); return; }
+          var any = !!sec.querySelector(".s-item:not([hidden])");
+          h.hidden = !any;
+          sec.hidden = !any;
+        });
+        findNone.hidden = !(q !== "" && hits === 0);
+      }
+      find.addEventListener("input", runFilter);
+      find.addEventListener("keydown", function (e5) {
+        if (e5.key === "Escape") { find.value = ""; runFilter(); find.blur(); }
+        // Enter opens the only thing left, so three letters and a tap is the
+        // whole journey.
+        if (e5.key === "Enter") {
+          var first = document.querySelector(".side-nav .s-item:not([hidden])");
+          if (first) first.click();
+        }
+      });
+      findX.addEventListener("click", function () { find.value = ""; runFilter(); find.focus(); });
+    }
     var btn = document.getElementById("navCollapse");
     if (!btn) return;
     function sync() {

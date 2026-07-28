@@ -251,6 +251,11 @@ body.app{background:var(--bg)}
 :root.nav-collapsed .s-item > span:not(.s-ic){display:none}
 /* Group headings become a rule, so the grouping is still legible at 60px. */
 :root.nav-collapsed .s-grp{font-size:0;padding:8px 0 0;margin:6px 10px 0;border-top:1px solid var(--line);height:1px;overflow:hidden}
+:root.nav-collapsed .s-grp-c{display:none}
+:root.nav-collapsed .s-find, :root.nav-collapsed .s-find-none{display:none}
+/* Folded-away sections must still show at 60px, or the icon rail loses items
+   the user cannot then find — there is no heading to click at that width. */
+:root.nav-collapsed .s-sec[hidden]{display:block}
 :root.nav-collapsed .side-foot .sf-meta, :root.nav-collapsed .side-foot b{display:none}
 :root.nav-collapsed .side-foot{justify-content:center;padding:10px 6px}
 /* The label reappears as a tooltip on hover. */
@@ -287,7 +292,38 @@ body.app{background:var(--bg)}
   color:#fff;display:grid;place-items:center;font-weight:800;font-size:15px}
 .side-close{display:none;background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;line-height:1}
 .side-nav{flex:1;overflow-y:auto;padding:8px 10px 16px}
-.s-grp{font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);padding:14px 12px 5px;font-weight:700}
+/* A group heading is a real button now: the whole rail folds down to eight
+   headings instead of forty items, which was the difference between a menu you
+   read and a wall you scroll. */
+.s-grp{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;
+  font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);
+  padding:14px 12px 5px;font-weight:700;background:none;border:0;cursor:pointer;
+  font-family:inherit;text-align:left}
+.s-grp:hover{color:var(--ink)}
+.s-grp-c{font-size:14px;line-height:1;transform:rotate(90deg);transition:transform .15s ease;opacity:.6}
+.s-grp.shut .s-grp-c{transform:rotate(0deg)}
+.s-grp:focus-visible{outline:2px solid var(--brand);outline-offset:-2px;border-radius:8px}
+.s-sec[hidden]{display:none}
+/* An author display:flex beats the browser's own [hidden] rule, so hiding a
+   heading by setting the attribute did nothing on screen — the filter left
+   headings standing over nothing. Both need saying explicitly. */
+.s-grp[hidden]{display:none}
+
+/* Type-to-find. Forty destinations is past the point where grouping alone
+   helps; three letters gets there faster than any hierarchy. */
+.s-find{position:relative;margin:2px 2px 6px}
+.s-find-in{width:100%;padding:8px 30px 8px 11px;border:1px solid var(--line);border-radius:9px;
+  background:var(--card);color:var(--ink);font-size:13.5px;font-family:inherit}
+.s-find-in:focus{outline:none;border-color:var(--brand)}
+.s-find-in::-webkit-search-cancel-button{display:none}
+.s-find-x{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:0;
+  color:var(--muted);cursor:pointer;font-size:12px;padding:5px 7px;line-height:1}
+.s-find-x:hover{color:var(--ink)}
+.s-find-none{margin:2px 12px;font-size:12.5px;color:var(--muted)}
+.side-nav .s-item[hidden]{display:none}
+/* While filtering, the fold state is set aside — you want every match visible,
+   not matches hidden inside a section you happened to have closed. */
+.side-nav.filtering .s-sec{display:block}
 .s-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;color:var(--ink);
   font-weight:500;text-decoration:none;margin:1px 0;font-size:14px}
 .s-item:hover{background:var(--soft);text-decoration:none}
