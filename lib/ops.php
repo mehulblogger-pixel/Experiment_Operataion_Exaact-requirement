@@ -1724,6 +1724,11 @@ function ops_module_gate($route) {
         'invoicing'=>'invoicing',
         'tally'=>'invoicing','tally-export'=>'invoicing','tally-settings'=>'invoicing','tally-undo'=>'invoicing',
         'receivables'=>'invoicing',
+        'invoices'=>'invoicing','invoice'=>'invoicing','invoice-new'=>'invoicing','invoice-line-add'=>'invoicing',
+        'invoice-line-delete'=>'invoicing','invoice-issue'=>'invoicing','invoice-cancel'=>'invoicing',
+        'to-bill'=>'invoicing','receipts'=>'invoicing','receipt'=>'invoicing','receipt-new'=>'invoicing',
+        'receipt-allocate'=>'invoicing','receipt-unallocate'=>'invoicing','credit-note-new'=>'invoicing',
+        'ledger'=>'invoicing',
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring',
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring',
@@ -1973,6 +1978,11 @@ function ops_dispatch($route, $method) {
         // person can already open, and queries nothing else.
         case $route === 'search':
             return ops_search($route, $method);
+        // The books: invoices, money in, credit notes, the customer ledger.
+        case in_array($route, ['invoices','invoice','invoice-new','invoice-line-add','invoice-line-delete',
+                               'invoice-issue','invoice-cancel','to-bill','receipts','receipt','receipt-new',
+                               'receipt-allocate','receipt-unallocate','credit-note-new','ledger'], true):
+            return ops_books($route, $method);
         case $route === 'leads' || strncmp($route, 'lead', 4) === 0:
             return ops_leads($route, $method);
         case $route === 'activities' || $route === 'activity-add':

@@ -130,6 +130,8 @@ try {
     require __DIR__ . '/lib/leads.php';
     require __DIR__ . '/lib/datatable.php';
     require __DIR__ . '/lib/search.php';
+    require __DIR__ . '/lib/books.php';
+    require __DIR__ . '/lib/booksui.php';
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';
     require __DIR__ . '/lib/trust.php';
@@ -277,6 +279,15 @@ try {
     db()->query("SELECT id FROM leads LIMIT 1");
     db()->query("SELECT id FROM pipeline_stages LIMIT 1");
     db()->query("SELECT id FROM user_prefs LIMIT 1");
+    // The books. A miss here and a live database never gains an invoice table,
+    // so the money screens 500 on a server that upgraded cleanly in every other
+    // respect. Every table and the one column that was added after the fact.
+    db()->query("SELECT id FROM invoices LIMIT 1");
+    db()->query("SELECT id FROM invoice_lines LIMIT 1");
+    db()->query("SELECT id FROM receipts LIMIT 1");
+    db()->query("SELECT id FROM receipt_allocations LIMIT 1");
+    db()->query("SELECT kind FROM receipt_allocations LIMIT 1");
+    db()->query("SELECT id FROM credit_notes LIMIT 1");
     db()->query("SELECT sitedoc_override_note FROM jobs LIMIT 1");
     db()->query("SELECT id FROM internal_audits LIMIT 1");
     db()->query("SELECT id FROM audit_findings LIMIT 1");

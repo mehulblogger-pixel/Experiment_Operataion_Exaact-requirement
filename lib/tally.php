@@ -34,9 +34,18 @@
 //      envelope; it is written here by hand for the same reason the .docx and
 //      PDF writers were — MilesWeb shared hosting has no Composer.
 //
-//  Deliberately NOT done: pulling anything back out of Tally, e-invoice/IRN
-//  generation, credit notes, and TDS. Those need the accountant's ledger
-//  structure, which is theirs, not ours.
+//  CORRECTING THE NOTE THAT USED TO BE HERE. It said credit notes and TDS were
+//  deliberately left out because they need the accountant's ledger structure.
+//  That was true while an "invoice" was six columns on a deputation. Now that
+//  lib/books.php holds real invoices, receipts and credit notes, the export
+//  reads THOSE: the tax comes from the invoice as issued rather than being
+//  worked out a second time, TDS goes over on its own ledger line so the party
+//  balance actually clears, and one receipt against four bills produces four
+//  "Agst Ref" lines. The old job-column source is kept and still used until a
+//  company issues its first invoice, so nobody's screen goes empty mid-change.
+//
+//  Still deliberately NOT done: pulling anything back out of Tally, and
+//  e-invoice/IRN generation.
 // ============================================================================
 
 // GST state codes. The first two digits of a GSTIN are the state, which is the
@@ -90,6 +99,7 @@ const TALLY_DEFAULTS = [
     'tally_sgst_ledger'  => 'SGST',
     'tally_igst_ledger'  => 'IGST',
     'tally_bank_ledger'  => 'Bank Account',
+    'tally_tds_ledger'   => 'TDS Receivable',
     'tally_debtors_group'=> 'Sundry Debtors',
     'tally_voucher_type' => 'Sales',
     'tally_receipt_type' => 'Receipt',
@@ -202,8 +212,110 @@ function tally_compute(array $r, array $cfg) {
 // Raised invoices in the window, scoped to the user's offices exactly as the
 // money desk is. $kind 'SALES' looks at the invoice date, 'RECEIPT' at the
 // payment date — a payment in July against a June invoice belongs in July.
+// ---- From the invoice register ---------------------------------------------
+// Once there are real invoices, THEY are what goes to Tally — not the mirror on
+// the deputation. Two reasons this matters rather than being tidiness:
+//
+//   * An invoice line that bills something other than a deputation (a retainer,
+//     a mobilisation charge, a reimbursement) has no job to mirror onto, so
+//     under the old source it would never have reached the books at all.
+//   * The tax is taken from the invoice as issued rather than recomputed. A
+//     voucher whose tax was worked out a second time, from a rate that may have
+//     changed since, is a reconciliation nobody enjoys.
+//
+// A receipt goes over as the RECEIPT it actually was, including the TDS line,
+// instead of being inferred from a flag on a deputation.
+function tally_rows_from_books($from, $to, $kind = 'SALES', $includeDone = false) {
+    if (!function_exists('books_migrate')) return [];
+    books_migrate();
+    $cfg = tally_settings();
+    $out = [];
+
+    if ($kind === 'SALES') {
+        [$w, $a] = scope_clause('i.office_id', 'i.sbu');
+        $args = [];
+        $sql = "SELECT i.*, o.name office_name, bp.display_name, bp.legal_name, bp.state,
+                       te.batch_ref done_batch
+                FROM invoices i
+                LEFT JOIN offices o ON o.id = i.office_id
+                LEFT JOIN business_partners bp ON bp.id = i.partner_id
+                LEFT JOIN tally_exports te ON te.job_id = i.id AND te.kind = 'INVOICE'
+                WHERE $w AND i.status IN ('ISSUED','PART_PAID','PAID')";
+        foreach ($a as $x) $args[] = $x;
+        if ($from !== '') { $sql .= " AND i.invoice_date >= ?"; $args[] = $from; }
+        if ($to   !== '') { $sql .= " AND i.invoice_date <= ?"; $args[] = $to; }
+        $sql .= " ORDER BY i.invoice_date ASC, i.id ASC";
+        foreach (books_try(fn() => ops_all($sql, $args)) as $r) {
+            if (!$includeDone && $r['done_batch']) continue;
+            $issues = [];
+            if (trim((string)$r['invoice_no']) === '') $issues[] = 'no invoice number';
+            if ((float)$r['total'] <= 0) $issues[] = 'no invoice amount';
+            if (empty($r['partner_id'])) $issues[] = 'the customer is not on the party master';
+            if ((float)($r['cgst'] + $r['sgst'] + $r['igst']) > 0 && trim((string)$r['place_of_supply']) === '')
+                $issues[] = 'no place of supply';
+            $out[] = $r + [
+                'src'             => 'INVOICE',
+                'client_id'       => $r['partner_id'],
+                'job_code'        => $r['invoice_no'],
+                'invoice_number'  => $r['invoice_no'],
+                'invoice_amount'  => (float)$r['total'],
+                'taxable'         => (float)$r['subtotal'],
+                'tax'             => (float)($r['cgst'] + $r['sgst'] + $r['igst']),
+                'total'           => (float)$r['total'],
+                'cgst'            => (float)$r['cgst'], 'sgst' => (float)$r['sgst'], 'igst' => (float)$r['igst'],
+                'interstate'      => (int)$r['is_igst'] === 1,
+                'their_state'     => (string)$r['place_of_supply'],
+                'place_of_supply' => $r['place_of_supply'] !== '' ? (GST_STATE_CODES[$r['place_of_supply']] ?? '') : '',
+                'issues'          => $issues, 'ok' => !$issues,
+            ];
+        }
+        return $out;
+    }
+
+    // RECEIPT: the money that actually arrived, per receipt, not per deputation.
+    [$w, $a] = scope_office_clause('r.office_id');
+    $args = []; foreach ($a as $x) $args[] = $x;
+    $sql = "SELECT r.*, bp.display_name, bp.legal_name, bp.gstin, bp.state, te.batch_ref done_batch
+            FROM receipts r
+            LEFT JOIN business_partners bp ON bp.id = r.partner_id
+            LEFT JOIN tally_exports te ON te.job_id = r.id AND te.kind = 'RCPT'
+            WHERE $w";
+    if ($from !== '') { $sql .= " AND r.receipt_date >= ?"; $args[] = $from; }
+    if ($to   !== '') { $sql .= " AND r.receipt_date <= ?"; $args[] = $to; }
+    $sql .= " ORDER BY r.receipt_date ASC, r.id ASC";
+    foreach (books_try(fn() => ops_all($sql, $args)) as $r) {
+        if (!$includeDone && $r['done_batch']) continue;
+        $issues = [];
+        if ((float)$r['amount'] <= 0 && (float)$r['tds_amount'] <= 0) $issues[] = 'no amount';
+        if (trim((string)$r['receipt_date']) === '') $issues[] = 'no date';
+        if (empty($r['partner_id'])) $issues[] = 'the customer is not on the party master';
+        $out[] = $r + [
+            'src'            => 'RECEIPT',
+            'client_id'      => $r['partner_id'],
+            'job_code'       => $r['receipt_no'],
+            'invoice_number' => $r['receipt_no'],
+            'payment_date'   => $r['receipt_date'],
+            'receipt_amount' => (float)$r['amount'],
+            'tds'            => (float)$r['tds_amount'],
+            'total'          => (float)$r['amount'] + (float)$r['tds_amount'],
+            'taxable'        => 0.0, 'tax' => 0.0, 'cgst' => 0.0, 'sgst' => 0.0, 'igst' => 0.0,
+            'place_of_supply' => '',
+            'issues'         => $issues, 'ok' => !$issues,
+        ];
+    }
+    return $out;
+}
+
 function tally_rows($from, $to, $kind = 'SALES', $includeDone = false) {
     tally_migrate();
+    // Invoices win the moment there are any. A company part-way through the
+    // change keeps the old source until its first invoice is issued, so the
+    // screen never goes empty on them.
+    if (function_exists('books_migrate')) {
+        books_migrate();
+        $any = (int)books_try(fn() => ops_val("SELECT COUNT(*) FROM invoices WHERE status <> 'DRAFT' AND status <> 'CANCELLED'"), 0);
+        if ($any > 0) return tally_rows_from_books($from, $to, $kind, $includeDone);
+    }
     [$jw, $ja] = scope_clause('j.executing_office_id', 'j.sbu');
     $cfg = tally_settings();
     $dateCol = $kind === 'RECEIPT' ? 'j.payment_date' : 'j.invoice_date';
@@ -327,7 +439,8 @@ function tally_sales_voucher(array $r, array $cfg) {
         $x .= "    <PLACEOFSUPPLY>" . tally_x($r['place_of_supply']) . "</PLACEOFSUPPLY>\n";
     $x .= "    <PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW>\n";
     $x .= "    <ISINVOICE>Yes</ISINVOICE>\n";
-    $x .= "    <NARRATION>" . tally_x('Inspection services — job ' . $r['job_code']
+    $x .= "    <NARRATION>" . tally_x(
+            (($r['src'] ?? '') === 'INVOICE' ? 'Invoice ' . $r['invoice_number'] : 'Inspection services — job ' . $r['job_code'])
             . ($r['office_name'] ? ' (' . $r['office_name'] . ')' : '')) . "</NARRATION>\n";
     // Party first: debited with the gross, carrying the bill reference.
     $x .= tally_entry($party, true, $r['total'], $vno, 'New Ref');
@@ -341,18 +454,41 @@ function tally_sales_voucher(array $r, array $cfg) {
 
 function tally_receipt_voucher(array $r, array $cfg) {
     $party  = tally_party($r);
+    $fromBooks = ($r['src'] ?? '') === 'RECEIPT';
     $amount = (float)$r['receipt_amount'];
-    $vno    = 'RCPT-' . $r['job_code'];
+    $tds    = $fromBooks ? (float)($r['tds'] ?? 0) : 0.0;
+    // A receipt from the register already has its own number; prefixing it again
+    // gives Tally "RCPT-RCP/2627/0001", which nobody can match to anything.
+    $vno    = $fromBooks ? (string)$r['job_code'] : 'RCPT-' . $r['job_code'];
     $x  = "  <TALLYMESSAGE xmlns:UDF=\"TallyUDF\">\n";
     $x .= "   <VOUCHER VCHTYPE=\"" . tally_x($cfg['tally_receipt_type']) . "\" ACTION=\"Create\">\n";
     $x .= "    <DATE>" . tally_date($r['payment_date']) . "</DATE>\n";
     $x .= "    <VOUCHERTYPENAME>" . tally_x($cfg['tally_receipt_type']) . "</VOUCHERTYPENAME>\n";
     $x .= "    <VOUCHERNUMBER>" . tally_x($vno) . "</VOUCHERNUMBER>\n";
     $x .= "    <PARTYLEDGERNAME>" . tally_x($party) . "</PARTYLEDGERNAME>\n";
-    $x .= "    <NARRATION>" . tally_x('Payment received against invoice ' . $r['invoice_number']) . "</NARRATION>\n";
+    $x .= "    <NARRATION>" . tally_x($fromBooks
+            ? 'Receipt ' . $vno . ($r['reference'] ?? '' ? ' — ' . $r['reference'] : '')
+            : 'Payment received against invoice ' . $r['invoice_number']) . "</NARRATION>\n";
     $x .= tally_entry($cfg['tally_bank_ledger'], true, $amount);
-    // "Agst Ref" against the invoice number is what clears it from the ageing.
-    $x .= tally_entry($party, false, $amount, (string)$r['invoice_number'], 'Agst Ref');
+    // TDS the customer withheld is money we never saw but which still clears the
+    // bill. Without this line the party ledger in Tally stays short by exactly
+    // the deduction, for ever — which is the whole reason it is captured.
+    if ($tds > 0) $x .= tally_entry($cfg['tally_tds_ledger'], true, $tds);
+    // "Agst Ref" against each invoice this receipt settles is what clears them
+    // from the ageing at the Tally end. One line per invoice, because a single
+    // payment against four bills has to knock off four bills.
+    $allocs = $fromBooks && function_exists('books_receipt_allocations')
+              ? books_receipt_allocations((int)$r['id']) : [];
+    if ($allocs) {
+        foreach ($allocs as $a)
+            $x .= tally_entry($party, false, (float)$a['amount'], (string)$a['invoice_no'], 'Agst Ref');
+        $spare = round($amount + $tds - array_sum(array_map(fn($a) => (float)$a['amount'], $allocs)), 2);
+        // Money received against no invoice yet is a credit on the party, "New
+        // Ref" so it sits there until it is matched rather than vanishing.
+        if ($spare > 0.01) $x .= tally_entry($party, false, $spare, $vno, 'New Ref');
+    } else {
+        $x .= tally_entry($party, false, $amount + $tds, (string)$r['invoice_number'], $fromBooks ? 'New Ref' : 'Agst Ref');
+    }
     $x .= "   </VOUCHER>\n  </TALLYMESSAGE>\n";
     return $x;
 }
@@ -397,8 +533,14 @@ function tally_record(array $rows, $kind, $ref) {
     $st = db()->prepare("INSERT INTO tally_exports (batch_ref,kind,job_id,voucher_no,voucher_date,amount,exported_by,exported_at)
                          VALUES (?,?,?,?,?,?,?,?)");
     foreach ($rows as $r) {
-        $st->execute([$ref, $kind, (int)$r['id'],
-            $kind === 'RECEIPT' ? 'RCPT-' . $r['job_code'] : (string)$r['invoice_number'],
+        // The `kind` recorded says WHERE the voucher came from, so an invoice
+        // exported from the register is not mistaken for the deputation mirror
+        // that happens to share an id. 'SALES'/'RECEIPT' are the old job-keyed
+        // rows; 'INVOICE'/'RCPT' are the invoice register.
+        $src = $r['src'] ?? '';
+        $storedKind = $src === 'INVOICE' ? 'INVOICE' : ($src === 'RECEIPT' ? 'RCPT' : $kind);
+        $st->execute([$ref, $storedKind, (int)$r['id'],
+            $kind === 'RECEIPT' ? ($src === 'RECEIPT' ? (string)$r['job_code'] : 'RCPT-' . $r['job_code']) : (string)$r['invoice_number'],
             $kind === 'RECEIPT' ? (string)$r['payment_date'] : (string)$r['invoice_date'],
             $kind === 'RECEIPT' ? (float)$r['receipt_amount'] : (float)$r['total'],
             $by, $now]);

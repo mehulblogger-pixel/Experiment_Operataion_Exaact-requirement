@@ -176,6 +176,12 @@
         <?php $grp('Money'); ?>
         <?php if (can('mod.invoicing.view')): ?><a class="s-item<?= $navOn(['invoicing']) ?>" href="/invoicing"><span class="s-ic">💳</span><span><?= e(T_REG('invoice')) ?></span></a><?php endif; ?>
         <?php if (can('mod.invoicing.view') && (can('finance.reconcile') || can('data.credit') || is_master())): ?>
+          <?php // Where operations hands over to the books, and then the books
+                // themselves: invoices with lines and tax, money in matched to
+                // them, and one ledger per customer. ?>
+          <a class="s-item<?= $navOn(['to-bill']) ?>" href="/to-bill"><span class="s-ic">⧗</span><span>Waiting to be billed</span></a>
+          <a class="s-item<?= $navOn(['invoices','invoice']) ?>" href="/invoices"><span class="s-ic">🧾</span><span>Invoices</span></a>
+          <a class="s-item<?= $navOn(['receipts','receipt']) ?>" href="/receipts"><span class="s-ic">💰</span><span>Money in</span></a>
           <a class="s-item<?= $navOn(['receivables']) ?>" href="/receivables"><span class="s-ic">⏳</span><span>Receivables ageing</span></a>
           <a class="s-item<?= $navOn(['tally']) ?>" href="/tally"><span class="s-ic">📤</span><span>Tally export</span></a>
         <?php endif; ?>

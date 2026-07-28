@@ -123,6 +123,8 @@
       </select></div>
     <div><label>Sales ledger</label><input name="tally_sales_ledger" value="<?= e($cfg['tally_sales_ledger']) ?>"></div>
     <div><label>Bank / cash ledger <span class="muted">(receipts)</span></label><input name="tally_bank_ledger" value="<?= e($cfg['tally_bank_ledger']) ?>"></div>
+    <div><label>TDS ledger <span class="muted">(tax the customer withheld)</span></label><input name="tally_tds_ledger" value="<?= e($cfg['tally_tds_ledger']) ?>">
+      <span class="muted" style="font-size:12px">Without this, a receipt short by the deduction leaves the party ledger short for ever.</span></div>
     <div><label>CGST ledger</label><input name="tally_cgst_ledger" value="<?= e($cfg['tally_cgst_ledger']) ?>"></div>
     <div><label>SGST ledger</label><input name="tally_sgst_ledger" value="<?= e($cfg['tally_sgst_ledger']) ?>"></div>
     <div><label>IGST ledger</label><input name="tally_igst_ledger" value="<?= e($cfg['tally_igst_ledger']) ?>"></div>

@@ -239,6 +239,7 @@ function boot() {
     if (function_exists('conf_migrate')) conf_migrate();
     if (function_exists('act_migrate')) act_migrate();
     if (function_exists('leads_migrate')) leads_migrate();               // leads, pipelines, configurable stages                   // the activity spine — Customer 360 reads this                // §4.2 undertakings, client NDAs, breaches                 // the event, before the corrective action               // §8.7 nonconformity & corrective action
+    if (function_exists('books_migrate')) books_migrate();             // invoices, receipts, allocations, credit notes
     if (function_exists('dt_migrate')) dt_migrate();                   // per-user register settings (columns, page size)
     if (function_exists('audits_migrate')) audits_migrate();           // §8.8 internal audit, §8.9 management review
     if (function_exists('datacontrol_migrate')) datacontrol_migrate(); // §7.11 control of data & information (2026)
