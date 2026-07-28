@@ -2,6 +2,49 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ The sidebar folds, and you can type to find a screen (July 2026)
+
+Owner, from a phone: *"It feels the side bar navigation is clutter and very
+difficult to find things."* Correct — a master admin was offered **48
+destinations, all expanded, all the time, weighted the same**. On a phone that
+is a wall you scroll, not a menu you read.
+
+**The actual bug underneath it.** Eleven screens — equipment, competence,
+impartiality, complaints, corrective actions, internal audits, management
+review, evidence review, data control, client portal, identity documents — were
+rendered **loose, with no group heading at all**. They read as a continuation of
+Operations, which is why that one group looked nineteen items long. They are
+their own subject and now say so: **Quality & accreditation**. Operations is
+back to 8.
+
+**Three changes, all in the view layer** — no routes, no data, no permissions:
+
+1. **Group headings fold.** Real `<button>`s, so keyboard and screen readers
+   work. Which sections are shut is remembered per browser. The section holding
+   the page you are on is **forced open whatever the memory says** — being on a
+   screen whose menu entry is hidden is worse than any amount of scrolling.
+2. **Type to find.** A box at the top filters what is already on the page: no
+   request, no index to keep in step with the menu, works offline. Enter opens
+   the top match, so three letters and a tap is the whole journey. Headings with
+   no match are taken off screen with their section.
+3. **The 60px icon rail is unaffected** — a folded section still shows every
+   icon there, because at that width there is no heading to click to get it back.
+
+**A CSS bug found by looking at the screenshot rather than the test.** Setting
+`hidden` on a heading did nothing on screen: an author `display:flex` beats the
+browser's own `[hidden]` rule, so the filter left headings standing over
+nothing. The test had asserted the *attribute* and passed. It now measures what
+is actually painted.
+
+**Still open on navigation:**
+
+- [ ] Nothing is pinned. If somebody uses four screens all day they still walk
+      the tree or type. Favourites would be the next step, but it wants watching
+      real use first rather than guessing which four.
+- [ ] The item count is unchanged — this made 48 findable, it did not decide
+      that any of them do not deserve to be there. Trimming is a separate
+      judgement and needs the owner's call on what to drop.
+
 ## ✅ The demo dataset now covers every module (July 2026)
 
 Owner: *"demo data is of no use at present due to addition of many other
