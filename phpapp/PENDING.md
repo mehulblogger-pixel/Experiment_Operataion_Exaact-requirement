@@ -8,7 +8,7 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
 on top, and a lot of it has since been built — the A1–C5 gap review, the whole
 2026 accreditation pack, the portal, the trust layer. Those entries are kept
 because the reasoning in them is still worth reading, but **this register is the
-authority on what is actually open.** 113 unticked boxes live further down; these 48 are the ones that still
+authority on what is actually open.** 113 unticked boxes live further down; these 63 are the ones that still
 matter, and they are all here.
 
 ### 1 · Yours, not mine — no code, and some of it is legal
@@ -69,6 +69,26 @@ matter, and they are all here.
 | U14 | **Accessibility is a shell** | 1 `aria-` attribute across 122 operational screens, 4 `:focus` rules in the stylesheet — blueprint 002 U5 |
 | U15 | **No real light/dark mode** | A "Midnight" colour preset exists; no `prefers-color-scheme`, no toggle, and printing assumes light |
 | U16 | **No recently-viewed or favourites** | Blueprint 002 U6 |
+
+### 8 · From blueprints 003–008 — architecture and platform
+
+| # | What | Note |
+|---|---|---|
+| **B0** | **THE HOSTING DECISION — blocks five items below** | Shared hosting cannot deliver caching, queues, real backups, encryption at rest, or any "millions of records" claim. Stay (A), VPS (B), or managed cloud (C). My recommendation: B, but not until a paying customer's volume demands it |
+| B1 | **No REST API** | Nothing exists. The single biggest item in blueprint 005 and the prerequisite for every external integration |
+| B2 | **No webhooks, API keys or OAuth** | Follows B1 |
+| B3 | **No field-level or record-level permissions** | Permissions stop at module + branch today |
+| B4 | **No password policy** | No minimum, no age, no reuse rule |
+| B5 | **NO BACKUP FEATURE** | Correcting an earlier impression: the compliance screen *tells you to take one*. That is advice, not a feature. Blocked on B0 for anything automatic |
+| B6 | **No caching layer, no job queue** | `cron.php` runs 26 steps once a day. Blocked on B0 |
+| B7 | **No territories** | Blueprint 003 |
+| B8 | **No visual workflow / form / dashboard / report builder** | The rules exist and are configurable; the *designers* do not. Blueprint 008 |
+| B9 | **No configuration export/import, versioning or sandbox** | Blueprint 008 |
+| B10 | **No localisation** beyond English and ₹ | Blueprint 008 |
+| B11 | **No usage analytics or in-app feedback** | Blueprint 007. Also blocks the "reduce manual work by 60%" target in 004, which is unmeasurable today |
+| B12 | **No automated functional tests** | `tools/lint.sh` runs five static checks and there is a smoke crawl; everything else is verified by hand over HTTP — thorough but not repeatable |
+| B13 | **No user manual, admin manual or API documentation** | Blueprint 006 |
+| B14 | **AI that needs history cannot ship** | Lead/opportunity scoring, churn, renewal and payment-delay prediction, forecasting — all learn from outcomes, and there are no leads, opportunities or activities yet to learn from |
 | U2 | **48 destinations is unchanged** | The fold made them findable; it did not decide they all deserve to be there. Your call on what to drop |
 | U3 | **Version number in the app + upgrade note** | Roadmap 2.3. Nobody can tell which build a client is running |
 | U4 | **Release artifact** — versioned zip with a checksum | Roadmap 2.4 |
