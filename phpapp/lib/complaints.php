@@ -567,5 +567,9 @@ function cmp_create($b) {
                    date('c')]);
     $id = (int)db()->lastInsertId();
     cmp_log($id, 'RECEIVED', $ref . ' — ' . $subject);
+    if (function_exists('act_log'))
+        act_log('COMPLAINT', $id, 'SYSTEM', ($kind === 'APPEAL' ? 'Appeal ' : 'Complaint ') . $ref . ' received',
+                ['auto' => 1, 'direction' => 'IN', 'body' => $subject,
+                 'partner_id' => ($b['partner_id'] ?? '') !== '' ? (int)$b['partner_id'] : null]);
     return $id;
 }

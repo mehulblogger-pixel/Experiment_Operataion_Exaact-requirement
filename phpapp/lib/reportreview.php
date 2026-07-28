@@ -155,6 +155,13 @@ function rcr_decide($doc, array $b, $clientUser) {
             ->execute([$decision, date('c'), (int)$doc['id']]);
     } catch (Throwable $e) { if (!rcr_missing_table($e)) throw $e; }
 
+    if (function_exists('act_log'))
+        act_log('REPORT', (int)$doc['id'], 'SYSTEM',
+                'Report ' . $doc['irn'] . ' ' . strtolower(RCR_DECISIONS[$decision]) . ' by the client',
+                ['auto' => 1, 'direction' => 'IN', 'partner_id' => (int)($doc['client_id'] ?? 0) ?: null,
+                 'with_whom' => (string)($clientUser['name'] ?? ''),
+                 'outcome' => strtolower(RCR_DECISIONS[$decision]),
+                 'body' => $decision === 'REJECTED' ? (RCR_REASONS[$reason] ?? '') . "\n\n" . $note : '']);
     if ($decision === 'REJECTED') rcr_raise_ncr($doc, $reviewId, $reason, $note, $clientUser);
     rcr_notify($doc, $decision, $reason, $note, $clientUser);
     if (function_exists('portal_log'))

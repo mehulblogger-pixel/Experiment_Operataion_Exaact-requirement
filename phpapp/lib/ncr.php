@@ -275,6 +275,11 @@ function ncr_create(array $b) {
             (string)($b['containment'] ?? ''),
             user_name(current_user()), date('c')]);
     $id = (int)db()->lastInsertId();
+    if (function_exists('act_log'))
+        act_log('NCR', $id, 'SYSTEM', 'Nonconformity ' . $ref . ' raised',
+                ['auto' => 1, 'body' => (string)($b['title'] ?? ''),
+                 'partner_id' => ($b['partner_id'] ?? '') !== '' ? (int)$b['partner_id'] : null,
+                 'office_id' => $office]);
     ncr_log($id, 'RAISED', $ref . ' — ' . (NCR_SOURCES[$src] ?? $src)
         . ($b['source_note'] ?? '' ? ': ' . $b['source_note'] : ''));
     return $id;

@@ -571,6 +571,9 @@ function ops_idems_documents($route, $method) {
         $pdo->prepare("UPDATE report_docs SET finalized=1, status='ISSUED', finalized_at=?, finalized_by=?, issue_date=?, updated_at=? WHERE id=?")
             ->execute([date('c'), user_name(current_user()), $issue, date('c'), $doc['id']]);
         idems_snapshot_signatures($doc);   // freeze inspector + approver signatures onto the report
+        if (function_exists('act_log'))
+            act_log('REPORT', (int)$doc['id'], 'SYSTEM', 'Report ' . $doc['irn'] . ' issued',
+                    ['auto' => 1, 'direction' => 'OUT', 'partner_id' => (int)($doc['client_id'] ?? 0) ?: null]);
         // an issued report is the best source of "how we actually word things"
         if (function_exists('learn_from_report')) { try { learn_from_report(ops_one("SELECT * FROM report_docs WHERE id=?", [$doc['id']])); } catch (Throwable $e) {} }
         idems_log('report_doc', $doc['id'], 'FINALIZE', ['irn'=>$doc['irn'], 'old'=>$doc['status'], 'new'=>'ISSUED']);

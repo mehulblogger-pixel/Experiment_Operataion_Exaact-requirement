@@ -1755,6 +1755,7 @@ function ops_module_gate($route) {
         'failure-add'=>'datacontrol','failure-update'=>'datacontrol','failure-resolve'=>'datacontrol',
         'failure-capa'=>'datacontrol',
         'report-reviews'=>'idems','report-ack'=>'idems',
+        'activities'=>'clients','activity-add'=>'clients',
         'confidentiality'=>'confidentiality','conf-undertaking-add'=>'confidentiality','conf-nda-add'=>'confidentiality',
         'conf-breach'=>'confidentiality','conf-breach-add'=>'confidentiality','conf-breach-close'=>'confidentiality',
         'site-docs'=>'identity','site-docs-add'=>'identity','site-docs-delete'=>'identity',
@@ -1953,6 +1954,8 @@ function ops_dispatch($route, $method) {
             return ops_datacontrol($route, $method);
         case $route === 'report-reviews' || $route === 'report-ack':
             return ops_report_reviews($route, $method);
+        case $route === 'activities' || $route === 'activity-add':
+            return ops_activity($route, $method);
         case $route === 'confidentiality' || strncmp($route, 'conf-', 5) === 0:
             return ops_confidentiality($route, $method);
         case $route === 'site-docs' || $route === 'site-docs-add' || $route === 'site-docs-delete':

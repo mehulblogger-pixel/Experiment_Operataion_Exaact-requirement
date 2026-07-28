@@ -185,6 +185,7 @@
 
         <?php if (can('mod.clients.view') || can('mod.vendors.view')): ?>
         <?php $grp('Directory'); ?>
+        <?php if (function_exists('act_can_view') && act_can_view()): ?><a class="s-item<?= $navOn(['activities']) ?>" href="/activities"><span class="s-ic">🕘</span><span>Activity</span></a><?php endif; ?>
         <?php if (can('mod.clients.view')): ?><a class="s-item<?= $navOn(['clients']) ?>" href="/clients"><span class="s-ic">🏢</span><span><?= e(T_REG('client')) ?></span></a><?php endif; ?>
         <?php if (can('mod.vendors.view')): ?><a class="s-item<?= $navOn(['vendors']) ?>" href="/vendors"><span class="s-ic">🚚</span><span><?= e(T_REG('vendor')) ?></span></a><?php endif; ?>
         <?php $endgrp(); endif; ?>
