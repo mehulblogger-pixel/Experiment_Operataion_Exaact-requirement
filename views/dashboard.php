@@ -68,6 +68,57 @@
     </div>
     <?php $secKpi = ob_get_clean();
 
+    // ---------- section: what the compliance registers are asking for ----------
+    //
+    // Every one of these registers read operations data and NOTHING flowed
+    // back: they had to be visited to be discovered. A nonconformity nobody
+    // opens the screen for is a nonconformity nobody knows about, so anything
+    // waiting for a person is put in front of that person here. Each tile is
+    // gated on the module, so nobody is shown a count they cannot act on, and
+    // the whole band disappears when there is nothing outstanding.
+    ob_start();
+    $compWait = [];
+    if (function_exists('ncr_counts') && (can('mod.ncr.view') || can('mod.capa.view') || is_master())) {
+        $n = ncr_counts();
+        if ($n['open'])    $compWait[] = ['/ncr?f=open',    '⚠', $n['open'],    'Nonconformities open', $n['major'] ? 'bad' : 'warn'];
+        if ($n['overdue']) $compWait[] = ['/ncr?f=overdue', '⏰', $n['overdue'], 'Past their date',       'bad'];
+    }
+    if (function_exists('rcr_counts') && function_exists('rcr_can_view') && rcr_can_view()) {
+        $r = rcr_counts();
+        if ($r['rejected']) $compWait[] = ['/report-reviews?f=rejected', '📬', $r['rejected'], 'Reports rejected by a client', 'bad'];
+        if ($r['awaiting'] > 0) $compWait[] = ['/report-reviews', '◷', $r['awaiting'], 'Reports awaiting a client answer', 'warn'];
+    }
+    if (function_exists('capa_all') && can('mod.capa.view')) {
+        $co = count(capa_all(['open' => 1]));
+        if ($co) $compWait[] = ['/capa', '🛠', $co, 'Corrective actions open', 'warn'];
+    }
+    if (function_exists('cmp_readiness') && can('mod.complaints.view')) {
+        $cr = cmp_readiness();
+        $cn = (int)($cr['open'] ?? 0);
+        if ($cn) $compWait[] = ['/complaints', '📣', $cn, 'Complaints open', 'warn'];
+    }
+    if (function_exists('conf_readiness') && (can('mod.confidentiality.view') || is_master())) {
+        $cf = conf_readiness();
+        if ($cf['lapsed'] + $cf['none'])
+            $compWait[] = ['/confidentiality', '🔒', $cf['lapsed'] + $cf['none'], 'Without a confidentiality undertaking', 'bad'];
+    }
+    if (function_exists('competence_due_counts') && can('mod.competence.view')) {
+        $cd = competence_due_counts();
+        if ($cd['expired']) $compWait[] = ['/competence', '🎓', $cd['expired'], 'Authorisations expired', 'bad'];
+        if ($cd['review'])  $compWait[] = ['/competence', '🔁', $cd['review'],  'Authorisations due for review', 'warn'];
+        if ($cd['witness']) $compWait[] = ['/competence', '👁', $cd['witness'], 'Witnessing due', 'warn'];
+    }
+    if ($compWait): ?>
+      <h3 class="sec-title" style="margin-top:22px">Waiting on somebody</h3>
+      <div class="qcards">
+        <?php foreach (array_slice($compWait, 0, 8) as [$href, $ic, $n, $label, $tone]): ?>
+          <a class="qcard tone-<?= e($tone) ?>" href="<?= e($href) ?>">
+            <div class="qic"><?= e($ic) ?></div><div class="qn"><?= (int)$n ?></div><div class="ql"><?= e($label) ?></div></a>
+        <?php endforeach; ?>
+      </div>
+    <?php endif;
+    $secCompliance = ob_get_clean();
+
     // ---------- section: money desk ----------
     ob_start();
     if ($showMoney): ?>
@@ -295,6 +346,7 @@
 
     // ---------- role-based ordering ----------
     echo $secKpi;
+    echo $secCompliance;
     if ($isExec)          { echo $secExec; echo $secCrm; echo $secMoney; echo $secCharts; echo $secAvail; echo $secRepAppr; echo $secQuick; echo $secSched; }
     elseif (in_array($role, ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'], true))
                           { echo $secCrm; echo $secQuick; echo $secMoney; echo $secCharts; }

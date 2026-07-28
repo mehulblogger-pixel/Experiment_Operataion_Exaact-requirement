@@ -264,6 +264,7 @@ try {
     db()->query("SELECT id FROM confidentiality_undertakings LIMIT 1");
     db()->query("SELECT id FROM confidentiality_breaches LIMIT 1");
     db()->query("SELECT id FROM client_ndas LIMIT 1");
+    db()->query("SELECT basis FROM authorisations LIMIT 1");
     db()->query("SELECT sitedoc_override_note FROM jobs LIMIT 1");
     db()->query("SELECT id FROM internal_audits LIMIT 1");
     db()->query("SELECT id FROM audit_findings LIMIT 1");
