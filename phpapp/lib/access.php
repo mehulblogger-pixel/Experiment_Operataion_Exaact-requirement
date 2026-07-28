@@ -112,6 +112,7 @@ const ACCESS_MODULES = [
     'vendors'       => 'Vendors',
     'equipment'     => 'Equipment & calibration',
     'competence'    => 'Competence & authorisation',
+    'impartiality'  => 'Impartiality & conflicts',
     'masters'       => 'Masters',
     'overheads'     => 'Overheads (office finance)',
     'reports'       => 'Dashboards / reports',

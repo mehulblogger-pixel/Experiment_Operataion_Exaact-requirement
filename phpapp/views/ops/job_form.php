@@ -414,6 +414,20 @@
       </div>
       <small class="muted">Each format ticked here is handed to the <?= e(Tl('engineer')) ?> as a report to produce — they appear on the <?= e(Tl('report')) ?> screen ready to fill, using the <?= e(Tl('client')) ?>'s own format where one is on file. The list is the <a href="/report-types"><?= e(Tl('report')) ?> types</a> register.</small></div>
 
+    <?php // §4.1 — the per-deputation declaration. Kept on the job because that
+          // is the record an assessor pulls when they pick one inspection at
+          // random and ask "what checked that this person was impartial here?" ?>
+    <div class="ff ff-wide"><label>Impartiality — this <?= e(Tl('job')) ?></label>
+      <label class="chk"><input type="checkbox" name="impartiality_ok" value="1" <?= !empty($job['impartiality_ok'])?'checked':'' ?>>
+        Confirmed: the <?= e(Tl('engineer')) ?> has no interest in the outcome and no relationship with this
+        <?= e(Tl('client')) ?> or <?= e(Tl('vendor')) ?> that could be seen to affect their judgement</label>
+      <input class="form-control" name="impartiality_note" style="margin-top:5px"
+             value="<?= e($job['impartiality_note'] ?? '') ?>"
+             placeholder="anything worth noting — if there IS something, raise it on the Impartiality register instead">
+      <?php if (!empty($job['impartiality_by'])): ?>
+        <small class="muted">Confirmed by <?= e($job['impartiality_by']) ?><?= !empty($job['impartiality_at']) ? ' on ' . e(fdate(substr($job['impartiality_at'],0,10))) : '' ?>.</small>
+      <?php endif; ?></div>
+
     <div class="ff ff-wide"><label>Expenses the <?= e(Tl('client')) ?> pays for <span class="muted">(from the <?= e(Tl('call')) ?> — correct it here if needed)</span></label>
       <div class="checkgrid">
         <?php foreach (chargeable_head_options() as $k=>$v): ?>
