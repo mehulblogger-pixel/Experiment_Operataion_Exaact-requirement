@@ -59,6 +59,9 @@ const PLAIN = [
   '/to-bill', '/receipts', '/receipts?f=unallocated', '/invoice-new', '/receipt-new',
   // The thread, and the report of where it is cut.
   '/flow-gaps',
+  // Opportunities: the deal, kept apart from the quotation.
+  '/opportunities', '/opportunities?v=list',
+  '/opportunities?v=list&sort=weighted&dir=desc', '/opportunity-new',
 ];
 
 // register path -> [link pattern to follow, extra screens built from that id]
@@ -84,6 +87,7 @@ const REGISTERS = [
   ['/invoices?f=all', /^\/invoice\?id=(\d+)/, ['/invoice?id=%s']],
   ['/receipts',      /^\/receipt\?id=(\d+)/, ['/receipt?id=%s', '/trace?kind=RECEIPT&id=%s']],
   ['/flow-gaps',     /^\/job\?id=(\d+)/,     ['/trace?kind=JOB&id=%s']],
+  ['/opportunities?v=list', /^\/opportunity\?id=(\d+)/, ['/opportunity?id=%s', '/trace?kind=OPPORTUNITY&id=%s']],
   ['/invoices?f=all', /^\/ledger\?id=(\d+)/,  ['/ledger?id=%s', '/ledger?id=%s&from=2026-01-01&to=2026-12-31']],
 ];
 

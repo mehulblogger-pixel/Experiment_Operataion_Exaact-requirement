@@ -49,6 +49,7 @@ const ACT_KINDS = [
 const ACT_ENTITIES = [
     'PARTNER'   => ['Customer',        '/client?id='],
     'LEAD'      => ['Lead',            '/lead?id='],
+    'OPPORTUNITY' => ['Opportunity',   '/opportunity?id='],
     'INQUIRY'   => ['Inquiry',         '/inquiry-edit?id='],
     'QUOTE'     => ['Quotation',       '/quote?id='],
     'CALL'      => ['Inspection call', '/call?id='],
@@ -119,6 +120,7 @@ function act_partner_for($entityKind, $entityId) {
     switch ($entityKind) {
         case 'PARTNER':   return $id;
         case 'LEAD':      return $q("SELECT partner_id FROM leads WHERE id=?");
+        case 'OPPORTUNITY': return $q("SELECT partner_id FROM opportunities WHERE id=?");
         case 'INQUIRY':   return $q("SELECT client_id FROM crm_inquiries WHERE id=?");
         case 'QUOTE':     return $q("SELECT client_id FROM quotations WHERE id=?");
         case 'CALL':      return $q("SELECT client_id FROM calls WHERE id=?");

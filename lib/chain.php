@@ -40,14 +40,15 @@
 // The stages, in the order work moves through them. The key is also the entity
 // kind used by the activity timeline, so the two agree about what things are.
 const CHAIN_STAGES = [
-    'LEAD'    => ['Lead',        '🎯', '/lead?id='],
-    'INQUIRY' => ['Enquiry',     '📨', '/inquiry-edit?id='],
-    'QUOTE'   => ['Quotation',   '📝', '/quote?id='],
-    'CALL'    => ['Order',       '📞', '/call?id='],
-    'JOB'     => ['Deputation',  '🗂', '/job?id='],
-    'REPORT'  => ['Report',      '📑', '/document?id='],
-    'INVOICE' => ['Invoice',     '🧾', '/invoice?id='],
-    'RECEIPT' => ['Money in',    '💰', '/receipt?id='],
+    'LEAD'        => ['Lead',        '🎯', '/lead?id='],
+    'OPPORTUNITY' => ['Opportunity', '💡', '/opportunity?id='],
+    'INQUIRY'     => ['Enquiry',     '📨', '/inquiry-edit?id='],
+    'QUOTE'       => ['Quotation',   '📝', '/quote?id='],
+    'CALL'        => ['Order',       '📞', '/call?id='],
+    'JOB'         => ['Deputation',  '🗂', '/job?id='],
+    'REPORT'      => ['Report',      '📑', '/document?id='],
+    'INVOICE'     => ['Invoice',     '🧾', '/invoice?id='],
+    'RECEIPT'     => ['Money in',    '💰', '/receipt?id='],
 ];
 
 function chain_try($fn, $fb = null) {
@@ -92,12 +93,20 @@ function chain_root($kind, $id) {
                 // original show the same thread rather than two half-threads.
                 $q = chain_one("SELECT parent_id, inquiry_id FROM quotations WHERE id=?", [$id]);
                 if ($q && $q['parent_id']) { $id = (int)$q['parent_id']; continue 2; }
+                $oq = chain_one("SELECT opportunity_id FROM opportunity_quotes WHERE quotation_id=? LIMIT 1", [$id]);
+                if ($oq && $oq['opportunity_id']) { $kind = 'OPPORTUNITY'; $id = (int)$oq['opportunity_id']; continue 2; }
                 if ($q && $q['inquiry_id']) { $kind = 'INQUIRY'; $id = (int)$q['inquiry_id']; continue 2; }
                 return ['QUOTE', $id];
             case 'INQUIRY':
+                $o = chain_one("SELECT id FROM opportunities WHERE inquiry_id=? LIMIT 1", [$id]);
+                if ($o) { $kind = 'OPPORTUNITY'; $id = (int)$o['id']; continue 2; }
                 $l = chain_one("SELECT id FROM leads WHERE converted_inquiry_id=? LIMIT 1", [$id]);
                 if ($l) return ['LEAD', (int)$l['id']];
                 return ['INQUIRY', $id];
+            case 'OPPORTUNITY':
+                $o = chain_one("SELECT lead_id FROM opportunities WHERE id=?", [$id]);
+                if ($o && $o['lead_id']) return ['LEAD', (int)$o['lead_id']];
+                return ['OPPORTUNITY', $id];
             default:
                 return ['LEAD', $id];
         }
@@ -114,11 +123,32 @@ function chain_from($kind, $id) {
     $out = [];
     $put = function ($k, array $rows) use (&$out) { $out[$k] = array_values(array_filter($rows)); };
 
-    $leads = $inqs = $quotes = $calls = $jobs = $reports = $invoices = $receipts = [];
+    $leads = $opps = $inqs = $quotes = $calls = $jobs = $reports = $invoices = $receipts = [];
 
     if ($kind === 'LEAD') {
         $l = chain_one("SELECT l.*, s.name stage_name FROM leads l LEFT JOIN pipeline_stages s ON s.id=l.stage_id WHERE l.id=?", [$id]);
-        if ($l) { $leads = [$l]; if ($l['converted_inquiry_id']) { $kind = 'INQUIRY'; $id = (int)$l['converted_inquiry_id']; } }
+        if ($l) {
+            $leads = [$l];
+            $o = chain_one("SELECT o.*, s.name stage_name FROM opportunities o LEFT JOIN pipeline_stages s ON s.id=o.stage_id WHERE o.lead_id=? LIMIT 1", [(int)$l['id']]);
+            if ($o) { $kind = 'OPPORTUNITY'; $id = (int)$o['id']; }
+            elseif ($l['converted_inquiry_id']) { $kind = 'INQUIRY'; $id = (int)$l['converted_inquiry_id']; }
+        }
+    }
+    if ($kind === 'OPPORTUNITY') {
+        $o = chain_one("SELECT o.*, s.name stage_name FROM opportunities o LEFT JOIN pipeline_stages s ON s.id=o.stage_id WHERE o.id=?", [$id]);
+        if ($o) {
+            $opps = [$o];
+            if (!$leads && $o['lead_id']) {
+                $l = chain_one("SELECT l.*, s.name stage_name FROM leads l LEFT JOIN pipeline_stages s ON s.id=l.stage_id WHERE l.id=?", [(int)$o['lead_id']]);
+                if ($l) $leads = [$l];
+            }
+            // A deal's quotations come from the join table; they are the reason
+            // one opportunity must not be counted as three.
+            $quotes = chain_all("SELECT q.* FROM opportunity_quotes oq JOIN quotations q ON q.id=oq.quotation_id
+                                 WHERE oq.opportunity_id=? ORDER BY q.quote_no, q.rev", [(int)$o['id']]);
+            if ($o['inquiry_id']) { $kind = 'INQUIRY'; $id = (int)$o['inquiry_id']; }
+            elseif ($quotes) { $kind = 'QUOTE'; $id = (int)$quotes[0]['id']; }
+        }
     }
     if ($kind === 'INQUIRY') {
         $i = chain_one("SELECT * FROM crm_inquiries WHERE id=?", [$id]);
@@ -195,7 +225,7 @@ function chain_from($kind, $id) {
                                GROUP BY r.id ORDER BY r.receipt_date, r.id", $iIds);
     }
 
-    $put('LEAD', $leads);     $put('INQUIRY', $inqs);   $put('QUOTE', $quotes);
+    $put('LEAD', $leads);     $put('OPPORTUNITY', $opps);  $put('INQUIRY', $inqs);   $put('QUOTE', $quotes);
     $put('CALL', $calls);     $put('JOB', $jobs);       $put('REPORT', $reports);
     $put('INVOICE', $invoices); $put('RECEIPT', $receipts);
     return $out;
@@ -205,6 +235,8 @@ function chain_from($kind, $id) {
 function chain_label($stage, array $r) {
     switch ($stage) {
         case 'LEAD':    return [$r['ref'] ?: 'Lead', $r['company_name'] ?? '', $r['stage_name'] ?? ''];
+        case 'OPPORTUNITY': return [$r['ref'] ?: 'Opportunity', $r['name'] ?? '',
+                                    OPP_STATUS[$r['status']] ?? ($r['stage_name'] ?? '')];
         case 'INQUIRY': return [$r['inquiry_no'] ?: 'Enquiry', $r['subject'] ?? '', $r['status'] ?? ''];
         case 'QUOTE':   return [$r['quote_no'] . ((int)($r['rev'] ?? 0) ? ' r' . (int)$r['rev'] : ''),
                                 $r['subject'] ?? '', $r['status'] ?? ''];

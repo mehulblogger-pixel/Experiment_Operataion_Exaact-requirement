@@ -128,6 +128,7 @@ try {
     require __DIR__ . '/lib/activity.php';
     require __DIR__ . '/lib/packs.php';
     require __DIR__ . '/lib/leads.php';
+    require __DIR__ . '/lib/opportunities.php';
     require __DIR__ . '/lib/datatable.php';
     require __DIR__ . '/lib/search.php';
     require __DIR__ . '/lib/books.php';
@@ -280,6 +281,9 @@ try {
     db()->query("SELECT id FROM leads LIMIT 1");
     db()->query("SELECT id FROM pipeline_stages LIMIT 1");
     db()->query("SELECT id FROM user_prefs LIMIT 1");
+    db()->query("SELECT id FROM opportunities LIMIT 1");
+    db()->query("SELECT id FROM opportunity_quotes LIMIT 1");
+    db()->query("SELECT id FROM opportunity_stage_history LIMIT 1");
     // The books. A miss here and a live database never gains an invoice table,
     // so the money screens 500 on a server that upgraded cleanly in every other
     // respect. Every table and the one column that was added after the fact.
