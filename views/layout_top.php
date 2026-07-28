@@ -227,33 +227,45 @@
     });
 
     // ---- Folding groups -------------------------------------------------
-    // Remembered per browser. The section holding the page you are on is
-    // always opened, whatever the memory says — being on a screen whose menu
-    // entry is hidden is worse than any amount of scrolling.
-    var shut = {};
-    try { shut = JSON.parse(localStorage.getItem("navShut") || "{}") || {}; } catch (e3) { shut = {}; }
-    function save() { try { localStorage.setItem("navShut", JSON.stringify(shut)); } catch (e4) {} }
+    // Closed to start with, and one open at a time — an accordion, not a set of
+    // independent switches. The first version defaulted every group to OPEN,
+    // which meant a master admin still met all 48 destinations at once on a
+    // first visit: the wall this was supposed to remove.
+    //
+    // Two rules survive from that version because they are about not stranding
+    // anybody: the section holding the page you are on is forced open whatever
+    // the memory says, and the 60px icon rail is untouched (at that width there
+    // is no heading to click to get a section back).
+    //
+    // What is remembered is now which ONE section is open, not which are shut.
+    var openSec = "";
+    try { openSec = localStorage.getItem("navOpen") || ""; } catch (e3) { openSec = ""; }
+    function save() { try { localStorage.setItem("navOpen", openSec); } catch (e4) {} }
 
+    var groups = [];
     document.querySelectorAll(".side-nav .s-grp").forEach(function (h) {
       var sec = h.nextElementSibling;
       if (!sec || !sec.classList.contains("s-sec")) return;
       var name = h.getAttribute("data-sec") || "";
       var here = !!sec.querySelector(".s-item.on");
-      var open = here || !shut[name];
       function apply(o) {
         sec.hidden = !o;
         h.setAttribute("aria-expanded", o ? "true" : "false");
         h.classList.toggle("shut", !o);
       }
-      apply(open);
-      if (here) { delete shut[name]; save(); }
+      var g = { h: h, sec: sec, name: name, here: here, apply: apply };
+      groups.push(g);
+      // Where you are wins over what you last opened.
+      if (here) openSec = name;
       h.addEventListener("click", function () {
-        var o = sec.hidden;               // about to open
-        apply(o);
-        if (o) delete shut[name]; else shut[name] = 1;
+        var opening = sec.hidden;
+        openSec = opening ? name : "";
+        groups.forEach(function (x) { x.apply(opening && x.name === name); });
         save();
       });
     });
+    groups.forEach(function (g) { g.apply(g.name === openSec); });
+    save();
 
     // ---- Type to find ---------------------------------------------------
     var find = document.getElementById("navFind");

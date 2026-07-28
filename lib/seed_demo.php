@@ -10,6 +10,22 @@
 
 function demo_seeded() { return setting_get('demo_seeded', '') === '1'; }
 
+// True when the flag says "loaded" but the demo's own records are not there.
+// That happens when a load was cut off part-way — the flag is set inside the
+// core transaction, so a host that kills the page during the module pack can
+// leave the two disagreeing. The flag is the claim; the rows are the evidence.
+function demo_flag_is_stale() {
+    if (!demo_seeded()) return false;
+    try {
+        // Only tables that actually carry the marker — business_partners has no
+        // created_by, and querying it would throw straight into the catch and
+        // quietly answer "not stale" for every install.
+        foreach (['jobs', 'calls'] as $t)
+            if ((int)ops_val("SELECT COUNT(*) FROM $t WHERE created_by='demo'") > 0) return false;
+        return (int)ops_val("SELECT COUNT(*) FROM users WHERE username='insp.ravi'") === 0;
+    } catch (Throwable $e) { return false; }
+}
+
 // The demo login accounts created below (shown to the admin after seeding).
 function demo_accounts() {
     return [
@@ -27,8 +43,31 @@ function demo_accounts() {
     ];
 }
 
-function seed_demo() {
-    if (demo_seeded()) return ['skipped' => true];
+// The seed writes a few thousand rows. Over a network to MySQL that is a few
+// thousand round trips, and shared hosting stops a page at 30 seconds by
+// default — which is why "load demo data" could come back with nothing at all
+// and no explanation. Ask for longer; hosts that forbid it ignore this quietly
+// and demo_explain() then says what happened in words.
+function demo_raise_limits() {
+    @set_time_limit(600);
+    @ini_set('memory_limit', '512M');
+    @ini_set('max_execution_time', '600');
+}
+
+function seed_demo($force = false) {
+    // A flag saying the demo is loaded, over a database with none of it in,
+    // used to be unrecoverable from the screen: load refused as "already
+    // loaded", and there was nothing to remove. Trust the data, not the flag.
+    $recovering = demo_seeded() && ($force || demo_flag_is_stale());
+    if (demo_seeded() && !$recovering) return ['skipped' => true];
+    demo_raise_limits();
+    // Recovering from a load that stopped part-way means there are leftovers —
+    // the quotations or the reports that did get written before the page was
+    // killed. Left alone they collide on the way back in and the pack fails
+    // again for a reason that has nothing to do with the original problem, so
+    // clear the demo's own records first. Real records are never touched:
+    // removal goes by the seed's own markers.
+    if ($recovering) seed_demo_remove();
     $pdo = db();
     $now = date('c'); $today = date('Y-m-d'); $m = date('Y-m');
     $hash = password_hash('demo12345', PASSWORD_DEFAULT);
@@ -330,18 +369,6 @@ function seed_demo() {
         $c['edge_cases'] = $edge;
         // ================= end edge cases =================
 
-        // ---------- Everything the original seed never reached ----------
-        // Sales, reporting, the accreditation pack, the trust layer and the
-        // client portal. Seeded from one shared cast of clients, engineers and
-        // deputations so the modules are visibly ABOUT each other rather than
-        // twenty unrelated islands. See demo_seed_modules() for the scenarios
-        // and docs/DEMO-TEST-PACK.md for what each one should do on screen.
-        $c += demo_seed_modules($pdo, [
-            'oid' => $oid, 'iid' => $iid, 'cid' => $cid, 'vid' => $vid,
-            'callid' => $callid, 'jid' => $jid, 'bid' => $bid,
-            'now' => $now, 'today' => $today, 'd' => $d, 'hash' => $hash,
-        ]);
-
         // Place the demo users under a reporting manager, so the organisation
         // chart shows an actual tree rather than a flat row of roots.
         if (function_exists('org_auto_arrange')) $c['reporting_lines'] = count(org_auto_arrange(true, true));
@@ -350,14 +377,66 @@ function seed_demo() {
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
-        return ['error' => $e->getMessage()];
+        return ['error' => demo_explain($e)];
     }
-    return ['counts' => $c];
+
+    // ---------- Everything the original seed never reached ----------
+    // Sales, reporting, the accreditation pack, the trust layer and the client
+    // portal, seeded from the same cast of clients, engineers and deputations
+    // so the modules are visibly ABOUT each other rather than twenty unrelated
+    // islands. See demo_seed_modules() and docs/DEMO-TEST-PACK.md.
+    //
+    // DELIBERATELY OUTSIDE the core transaction, and its own failure is not
+    // fatal. It used to be one transaction over all of it, which meant a single
+    // module whose table had not been built on a part-upgraded install threw
+    // away the offices, the users, the calls and the deputations too — the
+    // whole demo, because of one register. Now the core is committed first and
+    // the pack is added on top: worst case you get the operations demo and a
+    // named list of which registers did not fill.
+    $failed = [];
+    try {
+        $pdo->beginTransaction();
+        $c += demo_seed_modules($pdo, [
+            'oid' => $oid, 'iid' => $iid, 'cid' => $cid, 'vid' => $vid,
+            'callid' => $callid, 'jid' => $jid, 'bid' => $bid,
+            'now' => $now, 'today' => $today, 'd' => $d, 'hash' => $hash,
+        ]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $failed[] = demo_explain($e);
+    }
+    return ['counts' => $c, 'failed' => $failed];
+}
+
+// Turn a driver message into something the person pressing the button can act
+// on. The raw SQLSTATE is kept on the end because that is what gets sent to me.
+function demo_explain(Throwable $e) {
+    $m = $e->getMessage();
+    if (stripos($m, 'maximum execution time') !== false || stripos($m, 'server has gone away') !== false)
+        return 'The load ran out of time on this server. It writes a few thousand rows, and shared hosting '
+             . 'often stops a page at 30 seconds. Ask the host to raise max_execution_time, or load it from '
+             . 'the command line: php tools/seed-demo.php. (' . $m . ')';
+    if (stripos($m, 'no such table') !== false || stripos($m, "doesn't exist") !== false)
+        return 'A table this build expects is not in the database yet — the upload is probably part-finished. '
+             . 'Re-upload the app so every file is present, load any page once to let it build the schema, '
+             . 'then try again. (' . $m . ')';
+    if (stripos($m, 'unknown column') !== false)
+        return 'The database is from an older build and is missing a column. Load any page once so the '
+             . 'upgrade runs, then try again. (' . $m . ')';
+    if (stripos($m, 'duplicate') !== false)
+        return 'Some of the demo records are already there. Use "Remove demo data" first, then load again. ('
+             . $m . ')';
+    if (stripos($m, 'denied') !== false || stripos($m, 'command') !== false)
+        return 'The database user is not allowed to do this. It needs INSERT, UPDATE, DELETE and CREATE on '
+             . 'the application database. (' . $m . ')';
+    return $m;
 }
 
 // Remove ONLY the records the demo seed created (identified by the seed's own
 // markers), leaving any real data untouched. Lets the demo be loaded again.
 function seed_demo_remove() {
+    demo_raise_limits();
     $pdo = db();
     $n = 0;
     $pdo->beginTransaction();
@@ -436,7 +515,7 @@ function seed_demo_remove() {
         $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
-        return ['error' => $e->getMessage()];
+        return ['error' => demo_explain($e)];
     }
     return ['deleted' => $n];
 }
