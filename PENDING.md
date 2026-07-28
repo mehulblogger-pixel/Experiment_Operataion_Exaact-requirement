@@ -28,11 +28,11 @@ matter, and they are all here.
 
 | # | What | Note |
 |---|---|---|
-| M1 | **Part-payments** | A payment is a flag and one amount, so ageing takes the whole invoice or none. Needs a payments table — the honest fix, not a patch |
-| M2 | **Credit notes and cancellations to Tally** | A cancelled invoice already imported has to be reversed by hand |
+| ~~M1~~ | **Part-payments — BUILT** | `lib/books.php`. Receipts and allocations are separate rows, so one payment lands across four invoices and half a payment reads as half. TDS the customer withheld settles the invoice too, which is the single most common reason an ageing report is not believed |
+| ~~M2~~ | **Credit notes — BUILT** | Real credit notes against an issued invoice, capped at what the invoice was for. Cancelling is refused once anything has settled, and keeps the number so the GST series has no gaps. **Still open:** credit notes are in the books and the ledger but do not yet go over to Tally as their own voucher type |
 | M3 | **Nothing is read back from Tally** | One-way on purpose, but worth stating |
-| M4 | **HSN/SAC is one code for the whole company** | Held as a setting for reference; not written per line, because the line does not carry one |
-| M5 | **Consolidated invoicing** — one invoice across many deputations | Roadmap 5.5. Currently one invoice per job |
+| M4 | **HSN/SAC is now per invoice line**, defaulting to the company setting | Was a setting only. `invoice_lines.hsn_sac` carries it per line; the default still comes from the Tally settings |
+| ~~M5~~ | **Consolidated invoicing — BUILT** | One invoice across many deputations, drafted from /to-bill which lists every closed job nobody has billed, grouped by customer |
 | M6 | **Customer satisfaction capture** after closure | Roadmap 5.4. ISO 9001 expectation and a normal account tool |
 
 ### 3 · The accreditation pack — depth, not breadth
@@ -64,6 +64,9 @@ matter, and they are all here.
 |---|---|---|
 | U1 | **Nothing is pinned in the navigation** | Favourites would be next, but it wants watching real use rather than guessing |
 | U11 | **Global search is built, across 13 registers** | `lib/search.php` — customers, contacts, leads, inquiries, quotations, calls, deputations, reports, complaints, nonconformities, corrective actions, people, equipment. Own box in the top bar, "/" to reach it, a unique reference jumps straight to the record. **It is `LIKE '%term%'`, not a search index** — correct at today's volume, a table scan per source, and the thing to replace when a register passes roughly a million rows. That replacement needs B0 decided first — blueprint 002 U2 |
+| **F1** | **Opportunities are still not built** | Blueprint 001 P6, and the owner confirmed they should be distinct from quotations. Today a lead converts straight to an enquiry, so the stage between "they are interested" and "here is a price" has nowhere to live |
+| **F2** | **Customer 360 is still not built** | Blueprint 001 P3 / 002 U3. The pieces now all exist — activity spine, chain, ledger, search — but there is no one screen per customer that shows them together |
+| **F3** | **The flow is joined but mostly unused** | /flow-gaps measures it: 160 orders with no quotation, 100 closed jobs with no report, 97 closed and never billed. The links and the prompts exist now; the back-data does not. Somebody has to work the list |
 | U12 | **No notification centre** | Flash messages and e-mail only; nothing persists — blueprint 002 U4 |
 | U13 | **The shared table is built, and adopted on 3 of 42 registers** | `lib/datatable.php` — server-side sorting on a whitelist, paging, per-user column choice, bulk actions, filter-aware CSV. Live on **activity, leads and nonconformities**. The other 39 still hand-roll their own `<table>` — blueprint 002 U1. **Inline editing and grouping are not built at all** |
 | U14 | **Accessibility is a shell everywhere the table has not reached** | Was 1 `aria-` attribute across 122 screens. The three adopted registers now carry 34–38 each (`th scope`, live `aria-sort`, an `sr-only` caption, labelled checkboxes) because the component supplies them. The other 119 screens are unchanged, and the 4 `:focus` rules in the stylesheet still stand — blueprint 002 U5 |
@@ -133,6 +136,41 @@ the nonconformity register, client acceptance of reports, multi-action
 corrective actions, branch scoping, portal permissions, site-entry documents,
 confidentiality, and the competence review cycle. Entries about them survive
 below as history; they are not open.
+
+## ▣ CRM → operations → the books, as one flow (July 2026)
+
+The owner's requirement: *"Our system must flow from CRM to operations and
+then to MGH books."* Two structural breaks stood in the way, and both were
+measured before anything was built.
+
+**Break 1 — CRM and operations were not actually joined.** `calls.quotation_id`
+existed and **0 of 160 orders carried one**. The field was saved by the form and
+shown by no screen, so nobody ever noticed it was empty.
+
+**Break 2 — operations had nothing to hand over to.** There was no invoice
+table, no payments table and no ledger. An invoice was six columns typed onto a
+deputation and a payment was a yes/no flag. Part-payment, TDS, credit notes, one
+invoice across several jobs and a customer ledger were all impossible.
+
+**What was built**
+
+* `lib/books.php` / `lib/booksui.php` — invoices with lines and tax, receipts
+  with allocations, credit notes, and a customer ledger with a running balance.
+  Numbering is allocated at issue so a dropped draft leaves no gap; a cancelled
+  invoice keeps its number; reversing value is a credit note.
+* `/to-bill` — every closed deputation nobody has billed, grouped by customer,
+  one click to a draft invoice. This is the operations→books handover, and it
+  did not exist in any form before.
+* Receivables ageing and the Tally export now read the invoice register. The old
+  ageing showed an 80%-paid customer for the full amount and never cleared one
+  who settled through TDS.
+* `lib/chain.php` — the thread from any record to any other, a strip on five
+  detail screens, and `/flow-gaps`, which counts the breaks: 160 orders with no
+  quotation, 100 closed jobs with no report, 97 closed and never billed.
+
+**What is deliberately still open** — F1, F2 and F3 in the register above.
+Opportunities and Customer 360 are not built, and the back-data on 160 existing
+orders is not going to join itself up.
 
 ## ▣ Global search — one box, thirteen registers (July 2026)
 
