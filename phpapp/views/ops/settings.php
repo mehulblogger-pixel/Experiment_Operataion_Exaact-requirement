@@ -303,6 +303,25 @@
 </div>
 
 <div class="panel" style="max-width:620px;margin-top:18px">
+  <h3 class="tab-sub" style="margin-top:0;">Industry packs</h3>
+  <p class="sub" style="margin-bottom:10px">This application is general. A pack adds the rules of one industry —
+    and a business that is not in that industry should not meet them. Switching a pack off leaves every register
+    and every record in place; it only stops the gates firing.</p>
+  <form method="post" action="/packs-save">
+    <?php foreach (packs_available() as $k => $p): ?>
+      <label style="display:flex;gap:9px;align-items:flex-start;margin:8px 0;font-size:14px">
+        <input type="checkbox" name="packs[]" value="<?= e($k) ?>" <?= pack_on($k) ? 'checked' : '' ?>>
+        <span><b><?= $p['label'] ?></b><br><span class="muted" style="font-size:12.5px"><?= $p['desc'] ?></span></span>
+      </label>
+    <?php endforeach; ?>
+    <button class="btn" style="margin-top:10px">Save</button>
+  </form>
+  <p class="muted" style="margin-top:10px;font-size:12.5px">Inside a pack the rules are <b>not</b> negotiable — an
+    inspection body cannot untick §8.7.3. Choosing packs is an installation decision; softening a standard is not
+    a decision anybody gets to make.</p>
+</div>
+
+<div class="panel" style="max-width:620px;margin-top:18px">
   <h3 class="tab-sub" style="margin-top:0;">Demo / sample data</h3>
   <?php if (function_exists('demo_flag_is_stale') && demo_flag_is_stale()): ?>
     <?php // The flag says loaded and the records are not there — a load that was

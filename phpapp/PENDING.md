@@ -8,7 +8,7 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
 on top, and a lot of it has since been built — the A1–C5 gap review, the whole
 2026 accreditation pack, the portal, the trust layer. Those entries are kept
 because the reasoning in them is still worth reading, but **this register is the
-authority on what is actually open.** 113 unticked boxes live further down; these 63 are the ones that still
+authority on what is actually open.** 113 unticked boxes live further down; these 69 are the ones that still
 matter, and they are all here.
 
 ### 1 · Yours, not mine — no code, and some of it is legal
@@ -70,7 +70,18 @@ matter, and they are all here.
 | U15 | **No real light/dark mode** | A "Midnight" colour preset exists; no `prefers-color-scheme`, no toggle, and printing assumes light |
 | U16 | **No recently-viewed or favourites** | Blueprint 002 U6 |
 
-### 8 · From blueprints 003–008 — architecture and platform
+### 8 · Making it universal — the pack boundary
+
+| # | What | Note |
+|---|---|---|
+| **U-P1** | **Six hook points exist; four are unused** | `work.assign` and `document.issue` carry the inspection pack. `record.close`, `customer.create` and `timeline.extra` are declared and empty |
+| U-P2 | **Only two of the six ISO call sites are converted** | Report finalisation still calls `report_equipment_block()` and `report_signatory_warning()` directly in `idems.php`; they should fire `document.issue` |
+| U-P3 | **17 lib files still name ISO/IEC 17020 in prose** | Harmless in comments, wrong in anything user-facing on a non-inspection install |
+| U-P4 | **The inspection registers are always visible** | Equipment, competence, impartiality, NCR and the rest show in the menu whether or not the pack is on. They should follow the pack |
+| U-P5 | **Terminology is not pack-aware** | "Deputation", "inspection call", "engineer" are renameable, but a pack should be able to ship its own defaults |
+| U-P6 | **No second pack exists** | Until a trading or manufacturing pack is written, "universal" is a claim rather than a demonstration |
+
+### 9 · From blueprints 003–008 — architecture and platform
 
 | # | What | Note |
 |---|---|---|
