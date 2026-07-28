@@ -73,6 +73,7 @@ const PERMISSIONS = [
     // Closing a corrective action means asserting it worked. Held apart from
     // doing the work, because those are two different responsibilities.
     'capa.close'          => 'Close corrective actions (§8.7.3 — asserts the action was effective)',
+    'ncr.close'           => 'Close nonconformities (asserts the disposition was carried out)',
 ];
 
 // Human-friendly grouping of every permission, so the access editor reads clearly
@@ -85,7 +86,7 @@ function permission_groups() {
         'Money'                          => ['finance.reconcile'],
         'Marketing & Sales (CRM)'        => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage'],
         'Identity documents (personal data)' => ['person.iddoc.view','person.iddoc.manage'],
-        'Complaints & appeals'           => ['complaints.decide','capa.close'],
+        'Complaints & appeals'           => ['complaints.decide','capa.close','ncr.close'],
         'Administration'                 => ['master.manage','users.manage.branch','users.manage.global','org.hierarchy.view','settings.manage'],
     ];
 }
@@ -101,7 +102,7 @@ function module_groups() {
         'Marketing & Sales (CRM)' => ['inquiries','quotes','crm_orders','crm_reports'],
         'Inspection documentation' => ['idems'],
         'Operations'              => ['calls','jobs','vouchers','invoicing','profitability','hiring','reconcile'],
-        'Accreditation & compliance' => ['equipment','competence','impartiality','complaints','capa','audits','datacontrol','identity'],
+        'Accreditation & compliance' => ['equipment','competence','impartiality','complaints','ncr','capa','audits','datacontrol','identity'],
         'Directory & masters'     => ['clients','vendors','masters','overheads','portal'],
         'Insights & admin'        => ['reports','users','settings'],
     ];
@@ -140,6 +141,7 @@ const ACCESS_MODULES = [
     'impartiality'  => 'Impartiality & conflicts',
     'identity'      => 'Identity documents (site access)',
     'complaints'    => 'Complaints & appeals',
+    'ncr'           => 'Nonconformities',
     'capa'          => 'Corrective actions',
     'audits'        => 'Internal audits & management review',
     'datacontrol'   => 'Data & information control',

@@ -232,7 +232,8 @@ function boot() {
     if (function_exists('impartiality_migrate')) impartiality_migrate();  // §4.1 threats & declarations
     if (function_exists('identity_migrate')) identity_migrate();       // passports & IDs, held under DPDP guardrails
     if (function_exists('complaints_migrate')) complaints_migrate();   // §7.5 complaints, §7.6 appeals
-    if (function_exists('capa_migrate')) capa_migrate();               // §8.7 nonconformity & corrective action
+    if (function_exists('capa_migrate')) capa_migrate();
+    if (function_exists('ncr_migrate')) ncr_migrate();                 // the event, before the corrective action               // §8.7 nonconformity & corrective action
     if (function_exists('audits_migrate')) audits_migrate();           // §8.8 internal audit, §8.9 management review
     if (function_exists('datacontrol_migrate')) datacontrol_migrate(); // §7.11 control of data & information (2026)
     if (function_exists('trust_migrate')) trust_migrate();             // evidence bound to place and time

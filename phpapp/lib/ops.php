@@ -1754,6 +1754,8 @@ function ops_module_gate($route) {
         'data-control'=>'datacontrol','data-check-run'=>'datacontrol','sw-validation-add'=>'datacontrol',
         'failure-add'=>'datacontrol','failure-update'=>'datacontrol','failure-resolve'=>'datacontrol',
         'failure-capa'=>'datacontrol',
+        'ncr'=>'ncr','ncr-item'=>'ncr','ncr-new'=>'ncr','ncr-contain'=>'ncr','ncr-disposition'=>'ncr',
+        'ncr-capa'=>'ncr','ncr-assign'=>'ncr','ncr-close'=>'ncr','ncr-reopen'=>'ncr',
         'capa'=>'capa','capa-item'=>'capa','capa-new'=>'capa','capa-cause'=>'capa','capa-plan'=>'capa',
         'capa-done'=>'capa','capa-verify'=>'capa','capa-close'=>'capa','capa-escalate'=>'capa',
         'capa-settings'=>'capa','capa-from-complaint'=>'capa',
@@ -1944,6 +1946,8 @@ function ops_dispatch($route, $method) {
         case $route === 'data-control' || $route === 'data-check-run'
              || $route === 'sw-validation-add' || strncmp($route, 'failure-', 8) === 0:
             return ops_datacontrol($route, $method);
+        case $route === 'ncr' || strncmp($route, 'ncr-', 4) === 0:
+            return ops_ncr($route, $method);
         case $route === 'capa' || strncmp($route, 'capa-', 5) === 0:
             return ops_capa($route, $method);
         case $route === 'management-reviews' || $route === 'management-review'

@@ -130,7 +130,7 @@
               // nineteen items long. They are their own subject — the things an
               // accreditation assessor asks for — and now they say so.
               if (can('mod.equipment.view')||can('mod.competence.view')||can('mod.impartiality.view')
-                  ||can('mod.complaints.view')||can('mod.capa.view')||can('mod.audits.view')
+                  ||can('mod.complaints.view')||can('mod.ncr.view')||can('mod.capa.view')||can('mod.audits.view')
                   ||can('mod.datacontrol.view')||can('mod.portal.view')||can('mod.identity.view')
                   ||(function_exists('trust_can_review') && trust_can_review())): ?>
         <?php $grp('Quality & accreditation'); ?>
@@ -138,6 +138,7 @@
         <?php if (can('mod.competence.view')): ?><a class="s-item<?= $navOn(['competence']) ?>" href="/competence"><span class="s-ic">🎓</span><span>Competence &amp; authorisation</span></a><?php endif; ?>
         <?php if (can('mod.impartiality.view')): ?><a class="s-item<?= $navOn(['impartiality']) ?>" href="/impartiality"><span class="s-ic">⚖️</span><span>Impartiality</span></a><?php endif; ?>
         <?php if (can('mod.complaints.view')): $cmpN = function_exists('cmp_all') ? count(cmp_all(['status'=>'OPEN'])) : 0; ?><a class="s-item<?= $navOn(['complaints','complaint','complaint-new']) ?>" href="/complaints"><span class="s-ic">📮</span><span>Complaints &amp; appeals<?= $cmpN ? ' (' . $cmpN . ')' : '' ?></span></a><?php endif; ?>
+        <?php if (can('mod.ncr.view') || can('mod.capa.view')): $ncrN = function_exists('ncr_counts') ? ncr_counts()['open'] : 0; ?><a class="s-item<?= $navOn(['ncr','ncr-item','ncr-new']) ?>" href="/ncr"><span class="s-ic">⚠</span><span>Nonconformities<?= $ncrN ? ' (' . $ncrN . ')' : '' ?></span></a><?php endif; ?>
         <?php if (can('mod.capa.view')): $capaN = function_exists('capa_all') ? count(capa_all(['open'=>1])) : 0; ?><a class="s-item<?= $navOn(['capa','capa-item','capa-new']) ?>" href="/capa"><span class="s-ic">🛠</span><span>Corrective actions<?= $capaN ? ' (' . $capaN . ')' : '' ?></span></a><?php endif; ?>
         <?php if (can('mod.audits.view')): ?><a class="s-item<?= $navOn(['internal-audits','internal-audit','internal-audit-new']) ?>" href="/internal-audits"><span class="s-ic">🔍</span><span>Internal audits</span></a>
         <a class="s-item<?= $navOn(['management-reviews','management-review']) ?>" href="/management-reviews"><span class="s-ic">🏛</span><span>Management review</span></a><?php endif; ?>
