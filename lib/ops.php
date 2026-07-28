@@ -1727,6 +1727,7 @@ function ops_module_gate($route) {
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring',
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring',
+        'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads',
         'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries',
         'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes',
         'attendance-recon'=>'reconcile',
@@ -1964,6 +1965,8 @@ function ops_dispatch($route, $method) {
                     : 'All industry packs are off. The registers stay; no specialist gate will fire.');
             }
             redirect('/settings');
+        case $route === 'leads' || strncmp($route, 'lead', 4) === 0:
+            return ops_leads($route, $method);
         case $route === 'activities' || $route === 'activity-add':
             return ops_activity($route, $method);
         case $route === 'confidentiality' || strncmp($route, 'conf-', 5) === 0:

@@ -92,8 +92,9 @@
         <a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span>My <?= e(Tlp('voucher')) ?></span></a>
         <?php $endgrp(); ?>
       <?php else: ?>
-        <?php if (can('mod.inquiries.view')||can('mod.quotes.view')||can('mod.crm_reports.view')): ?>
+        <?php if (can('mod.leads.view')||can('mod.inquiries.view')||can('mod.quotes.view')||can('mod.crm_reports.view')||is_master()): ?>
         <?php $grp('Sales'); ?>
+        <?php if (function_exists('leads_can_view') && leads_can_view()): ?><a class="s-item<?= $navOn(['leads','lead']) ?>" href="/leads"><span class="s-ic">🎯</span><span>Leads</span></a><?php endif; ?>
         <?php if (can('mod.inquiries.view')): ?><a class="s-item<?= $navOn(['inquiries','inquiry']) ?>" href="/inquiries"><span class="s-ic">📨</span><span><?= e(THP('inquiry')) ?></span></a><?php endif; ?>
         <?php if (can('mod.quotes.view')): ?><a class="s-item<?= $navOn(['quotes','quote']) ?>" href="/quotes"><span class="s-ic">📝</span><span><?= e(THP('quote')) ?></span></a><?php endif; ?>
         <?php if (can('mod.crm_reports.view')): ?><a class="s-item<?= $navOn(['crm-reports']) ?>" href="/crm-reports"><span class="s-ic">📈</span><span>Sales dashboard</span></a><?php endif; ?>

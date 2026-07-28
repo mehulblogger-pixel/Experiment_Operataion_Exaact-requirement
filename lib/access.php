@@ -99,7 +99,7 @@ function permission_groups() {
 // under a heading that says what it is.
 function module_groups() {
     $g = [
-        'Marketing & Sales (CRM)' => ['inquiries','quotes','crm_orders','crm_reports'],
+        'Marketing & Sales (CRM)' => ['leads','inquiries','quotes','crm_orders','crm_reports'],
         'Inspection documentation' => ['idems'],
         'Operations'              => ['calls','jobs','vouchers','invoicing','profitability','hiring','reconcile'],
         'Accreditation & compliance' => ['equipment','competence','impartiality','complaints','ncr','capa','audits','datacontrol','identity','confidentiality'],
@@ -141,6 +141,7 @@ const ACCESS_MODULES = [
     'impartiality'  => 'Impartiality & conflicts',
     'identity'      => 'Identity documents (site access)',
     'complaints'    => 'Complaints & appeals',
+    'leads'         => 'Leads &amp; pipeline',
     'ncr'           => 'Nonconformities',
     'confidentiality' => 'Confidentiality (§4.2)',
     'capa'          => 'Corrective actions',

@@ -33,7 +33,7 @@ const PRODUCT_MODULES = [
     'admin'      => ['Administration', 'Masters, users, offices, settings, parties',
                      ['masters', 'users', 'settings', 'clients', 'vendors', 'overheads', 'reports', 'portal'], true],
     'sales'      => ['Sales & CRM', 'Inquiries, quotations, approvals, sales dashboards',
-                     ['inquiries', 'quotes', 'crm_orders', 'crm_reports'], false],
+                     ['leads', 'inquiries', 'quotes', 'crm_orders', 'crm_reports'], false],
     'reporting'  => ['Inspection reporting', 'The report engine, formats, endorsements, evidence',
                      ['idems'], false],
     'money'      => ['Money', 'Invoicing, profitability, credits and the cost run',
