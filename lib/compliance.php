@@ -510,6 +510,30 @@ function compliance_status() {
             $dr['failures_unanswered'] ? 'Each entry has to say whether data or results were affected. That is the one an assessor picks out of the log.' : '');
     }
 
+    // --- The trust layer ---------------------------------------------------
+    // Not a clause of any standard — a commercial differentiator. But it is
+    // measured the same way as everything else here, because "we geotag our
+    // photographs" is worth nothing next to a percentage.
+    if (function_exists('trust_readiness')) {
+        $tr = trust_readiness();
+        $add('Trust layer', 'Evidence is located where it was taken',
+            $tr['photos'] === 0 ? 'unknown' : ($tr['pct'] >= 60 ? 'ok' : 'warn'),
+            $tr['photos'] === 0 ? 'No photographs on file yet.'
+                : $tr['on_site'] . ' of ' . $tr['photos'] . ' photographs (' . $tr['pct'] . '%) carry the location '
+                . 'the camera recorded at the moment they were taken.',
+            $tr['photos'] && $tr['pct'] < 60
+                ? 'Location comes from inside the photograph, so it survives writing the report at home. Where a phone strips it, the site check-in on the deputation carries the fact instead — tell the engineers to use it.' : '');
+        $add('Trust layer', 'The evidence chain is unbroken',
+            $tr['chain']['ok'] ? 'ok' : 'bad',
+            $tr['chain']['ok'] ? $tr['chain']['entries'] . ' entries, each hashing the one before it.'
+                : count($tr['chain']['problems']) . ' problem(s) across ' . $tr['chain']['entries'] . ' entries.',
+            $tr['chain']['ok'] ? '' : 'Open Evidence review. A broken chain means a photograph was altered or removed after it was recorded — find out which before anybody asks.');
+        $add('Trust layer', 'Flagged evidence gets looked at',
+            $tr['pending'] ? 'warn' : 'ok',
+            $tr['pending'] ? $tr['pending'] . ' item(s) waiting for somebody to look.' : 'Nothing waiting.',
+            $tr['pending'] ? 'A queue nobody clears is a queue that trains everybody to ignore the flags.' : '');
+    }
+
     // --- things software cannot answer ------------------------------------
     $add('Everything else', 'Backups, and a restore that has been tried',
         'unknown', 'Every photograph, report and voucher in this system is in one database.',

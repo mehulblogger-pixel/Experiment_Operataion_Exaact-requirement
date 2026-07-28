@@ -2,6 +2,104 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ PHASE 4 — the trust layer (July 2026)
+
+`lib/trust.php`, screens `/evidence-review` and the public `/verify`.
+
+**The owner corrected the design before it was built, and the correction is the
+whole shape of the module:**
+
+> *"Geotagging on the report may not be correct, because practically many
+> inspectors will complete the activity on site and then go to another place or
+> home to prepare the report."*
+
+Exactly so. An engineer photographs a weld at 11:40 at the plant, drives home,
+and writes the report at nine that evening. Any system that takes the location
+of the *report* — or even of the *upload* — and shows it as where the inspection
+happened is not adding trust, it is manufacturing a lie a client can catch.
+
+**So three facts are kept strictly apart, and none may stand in for another:**
+
+1. **Where the camera was when the shutter fired.** Read out of the
+   photograph's own EXIF data — written by the phone at the moment of capture,
+   travelling inside the file, surviving the drive home. **This is the
+   evidence.**
+2. **Where the browser was at upload.** Recorded, but labelled as exactly that
+   everywhere it appears, because it is usually a kitchen table.
+3. **Where the report was written.** Not recorded at all. It has no evidential
+   meaning and collecting it would only tempt somebody to show it.
+
+**And a fourth, deliberate act — the site check-in.** One tap, on site, at the
+time, now with **arrival / departure** and an optional photograph. It is the
+fallback for the many corporate phones that strip EXIF, and it produces the line
+a client actually wants: *"on site 09:12 to 14:40."*
+
+**A late upload is never flagged.** Uploading in the evening is the normal
+working pattern; flagging it would train everybody to ignore the flags, which is
+how a review queue dies. There is a test asserting no such flag exists.
+
+**Flagged, never blocked** — a blocked photograph is a photograph that never
+gets taken, and a fake-GPS app defeats blocking anyway. Seven signals, four of
+them serious enough to want a person: taken far from the check-in, impossible
+travel between two captures, sub-metre "accuracy" (the signature of a fake-GPS
+app), coordinates too round to be a real fix.
+
+**The hash chain (4.4).** Every evidence item is hashed into an append-only
+chain at capture; each entry hashes the one before it, so altering or removing
+anything breaks every hash after it. sha256, no blockchain, no third party —
+a thing that can be explained to an assessor in one sentence.
+
+**The client-verifiable report (4.5).** A code in four readable groups, printed
+on the report, checked at **`/verify` without an account and without asking
+you.** It says: genuine or not, unaltered or not, how much of the evidence was
+located on site, and whether the engineer was authorised. It shows **no client
+name, no findings, no prices** — a verification page that leaked those would
+breach the confidentiality the report is issued under.
+
+*Verified:* 83 rule tests, 34 browser checks, each run twice. Lint green
+(168 files), 104 screens.
+
+### What a browser can and cannot do — the owner asked, and the answer is mixed
+**No Android app is needed.** `capture="environment"` opens the phone's rear
+camera directly from the web page, `navigator.geolocation` gives the fix, and
+the app is already installable to the home screen. The browser test drives a
+real Chromium with a real geolocation permission and a real JPEG, so this is
+demonstrated rather than asserted.
+
+**What a browser genuinely cannot do, said plainly:**
+- **Mobile network time is not available to any web page.** Nor, on a normal
+  Android device, to an app — "network time" in most apps is just an NTP call.
+  This is why the server stamps every check-in and every upload, and why the
+  device clock is recorded only to be *compared*, never trusted.
+- **Mock-location detection.** Native Android has `isFromMockProvider()`; the
+  web has nothing equivalent. Hence heuristics, and hence *flagged not blocked*.
+
+### Four real bugs, all found by the tests rather than by reading
+- **Compression was destroying every location.** `idems_compress_image()`
+  re-encodes through GD, which writes a clean JPEG with **no EXIF** — and the
+  location was being read two lines *after* it. Every photograph would have
+  come out saying "not in the photograph" for ever. Both upload paths now read
+  before compressing, and a test asserts the ordering in each.
+- **Two verification codes for one report.** The report screen calls
+  `verify_code_for()` once for the printed code and again inside `verify_url()`,
+  both with the same in-memory row — so the second call minted a *second* code
+  and overwrote the first. The code on the paper and the code in the link
+  disagreed, and only one worked.
+- **A fatal error on the public verification page.** `auth_live()` judges one
+  authorisation row; it was being called with a person's id. That put a stack
+  trace on the one page in this application that strangers are invited to open.
+  Fixed, and the whole lookup is now wrapped so it can never happen again — a
+  failure reads as "we cannot answer right now", not as a crash.
+- **The boot probe did not know about the new columns.** `site_visits.kind` and
+  the check-in photograph would never have appeared on a live database. This is
+  the standing rule of this codebase and it caught me anyway.
+
+### And one false alarm in last week's work
+The §7.11 integrity check "uploaded files still decode" was reporting **correct**
+evidence as corrupt: `report_files` stores a `data:` URL, not bare base64, and
+the check decoded it as though it were bare. A screen that cries wolf stops
+being read, so this mattered more than it looks.
+
 ## ✅ ROADMAP 3.6 — control of data & information (§7.11) (July 2026)
 ## 🏁 The ISO/IEC 17020:2026 transition pack is now complete (3.1 – 3.8)
 

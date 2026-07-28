@@ -10,6 +10,98 @@
   </div>
 </div>
 
+<?php // ---- Site check-in -------------------------------------------------
+      // The engineer photographs the work at the plant, drives home, and writes
+      // the report that evening. So neither the report nor the upload says
+      // anything about where the inspection happened. This does: one tap, ON
+      // SITE, at the time. It is what the photographs are later compared with,
+      // and it is the fallback for a phone that strips location from its
+      // pictures — which many corporate phones do.
+      $visits = function_exists('site_visits') ? site_visits((int)$job['id']) : [];
+      $canCheckIn = !$job['closed_flag'] && function_exists('site_checkin')
+          && (is_coordinator_level() || (is_inspector()
+              && (int)(current_user()['inspector_id'] ?? 0) === (int)($job['inspector_id'] ?? 0))); ?>
+<div class="panel">
+  <div class="ctitle" style="margin-top:0"><h3>Site check-in <span class="muted">(<?= count($visits) ?>)</span></h3></div>
+  <?php if ($visits): ?>
+    <table class="dt">
+      <thead><tr><th>What / when</th><th>Where</th><th>Accuracy</th><th>Photo</th><th>Who</th><th>Note</th></tr></thead>
+      <tbody>
+      <?php foreach ($visits as $v): ?>
+        <tr><td class="muted"><strong><?= e(VISIT_KINDS[$v['kind'] ?? 'ENTRY'] ?? $v['kind']) ?></strong><br><?= e(substr((string)$v['at'], 0, 16)) ?></td>
+          <td><?php if ($v['lat'] !== null): ?>
+                <a href="<?= e(geo_map_url($v['lat'], $v['lon'])) ?>" target="_blank" rel="noopener"><?= e(geo_pretty($v['lat'], $v['lon'])) ?></a>
+              <?php else: ?>—<?php endif; ?></td>
+          <td class="muted"><?= $v['accuracy'] !== null ? e(round((float)$v['accuracy'])) . ' m' : '—' ?></td>
+          <td><?= !empty($v['photo_name'])
+                ? '<a href="/checkin-photo?id=' . (int)$v['id'] . '" target="_blank" rel="noopener">photo</a>'
+                : '<span class="muted">—</span>' ?></td>
+          <td><?= e($v['by_user']) ?></td>
+          <td class="muted"><?= e($v['note']) ?>
+            <?php foreach (array_filter(explode(',', (string)$v['flags'])) as $fl): ?>
+              <span class="pill p-warn"><?= e(EV_FLAGS[$fl] ?? $fl) ?></span><?php endforeach; ?></td></tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php else: ?>
+    <p class="sub" style="margin-top:0">Nothing recorded on site yet.</p>
+  <?php endif; ?>
+  <?php $win = function_exists('site_visit_window') ? site_visit_window((int)$job['id']) : ['minutes'=>null];
+        if ($win['minutes'] !== null): ?>
+    <p class="pill p-ok" style="display:inline-block;margin:0 0 8px">On site
+      <?= e(substr((string)$win['in']['at'], 11, 5)) ?> to <?= e(substr((string)$win['out']['at'], 11, 5)) ?>
+      — <?= (int)floor($win['minutes'] / 60) ?> h <?= (int)($win['minutes'] % 60) ?> min.</p>
+  <?php endif; ?>
+  <?php $ciMiss = function_exists('site_visit_close_missing') ? site_visit_close_missing($job) : [];
+        if ($ciMiss): ?>
+    <p class="pill p-warn" style="display:inline-block;margin:0 0 8px">Before this
+      <?= e(Tl('job')) ?> can be closed it needs <?= e(implode(' and ', $ciMiss)) ?>.</p>
+  <?php endif; ?>
+  <?php if ($canCheckIn): ?>
+  <form method="post" action="/site-checkin" id="ciForm" enctype="multipart/form-data"
+        style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:8px">
+    <input type="hidden" name="job_id" value="<?= (int)$job['id'] ?>">
+    <input type="hidden" name="gps" id="ciGps">
+    <input type="hidden" name="device_at" id="ciAt">
+    <div class="ff" style="margin:0"><label>What</label>
+      <select class="form-control" name="kind">
+        <?php foreach (VISIT_KINDS as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
+      </select></div>
+    <?php // capture="environment" opens the rear camera straight away on a
+          // phone, and falls back to an ordinary file chooser on a laptop —
+          // which is why this needs no Android app to work in the field. ?>
+    <div class="ff" style="margin:0"><label>Photograph<?= checkin_photo_required() ? ' *' : ' (optional)' ?></label>
+      <input class="form-control" type="file" name="photo" accept="image/*" capture="environment"></div>
+    <div class="ff" style="margin:0;min-width:220px"><label>Note</label>
+      <input class="form-control" name="note" placeholder="gate number, unit, who you met"></div>
+    <button class="btn" type="button" id="ciBtn">📍 Record this</button>
+    <span class="muted" id="ciMsg" style="font-size:13px"></span>
+  </form>
+  <small class="muted">The time is <strong>ours, not the phone's</strong> — a device clock can be changed, and a
+    browser cannot read the mobile network's clock, so the server stamps it. The location is the browser's fix at
+    the moment you press the button, which for a check-in really is where you are standing. Writing the report at
+    home later changes none of this.</small>
+  <script>
+  (function(){
+    var b=document.getElementById('ciBtn'), m=document.getElementById('ciMsg');
+    if(!b) return;
+    b.addEventListener('click', function(){
+      if(!navigator.geolocation){ m.textContent='This browser cannot give a location.'; return; }
+      b.disabled=true; m.textContent='Getting your location…';
+      navigator.geolocation.getCurrentPosition(function(p){
+        document.getElementById('ciGps').value=[p.coords.latitude,p.coords.longitude,p.coords.accuracy].join(',');
+        document.getElementById('ciAt').value=new Date().toISOString();
+        document.getElementById('ciForm').submit();
+      }, function(err){
+        b.disabled=false;
+        m.textContent='No location: '+(err && err.message ? err.message : 'permission refused')+'.';
+      }, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+    });
+  })();
+  </script>
+  <?php endif; ?>
+</div>
+
 <?php // The deadline, said out loud while there is still time to act on it —
       // and after, said plainly, with what can still be done. ?>
 <?php if ($lock['locked']): ?>

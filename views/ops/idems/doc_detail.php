@@ -48,6 +48,30 @@
 <div class="panel" style="border:1px solid var(--ok);background:color-mix(in srgb,var(--ok) 7%,transparent)">
   <b style="color:var(--ok)">🔒 Finalized &amp; issued</b> — locked on <?= e($doc['finalized_at'] ? date('d M Y H:i', strtotime($doc['finalized_at'])) : '—') ?> by <?= e($doc['finalized_by']) ?>. This report is immutable.
 </div>
+
+<?php // "Verify it yourself" wins contracts; "trust us" does not. Print this
+      // code and this address on the report and the client can check it is
+      // genuine and unaltered without an account and without asking you. ?>
+<?php if (function_exists('verify_code_for')): $vc = verify_code_for($doc); $vu = verify_url($doc);
+        $vst = function_exists('chain_verify') ? chain_verify((int)$doc['id']) : ['ok'=>true,'entries'=>0]; ?>
+<div class="panel">
+  <div class="ctitle" style="margin-top:0"><h3>Let the client check this themselves</h3></div>
+  <p class="sub" style="margin-top:0">Put these two lines on the report. Anyone holding it can confirm it is genuine
+    and unaltered — without an account, and without asking you.</p>
+  <table class="dt"><tbody>
+    <tr><th style="width:150px">Verification code</th>
+      <td><code style="font-size:16px;letter-spacing:.06em"><?= e($vc) ?></code></td></tr>
+    <tr><th>Where to check it</th><td><a href="<?= e($vu) ?>" target="_blank" rel="noopener"><?= e($vu) ?></a></td></tr>
+    <tr><th>Evidence chain</th>
+      <td><?= $vst['ok'] ? '<span class="pill p-ok">intact across ' . (int)$vst['entries'] . ' entries</span>'
+            : '<span class="pill p-bad">' . count($vst['problems']) . ' problem(s)</span> — '
+              . '<a href="/evidence-review?doc=' . (int)$doc['id'] . '">look at it</a>' ?></td></tr>
+  </tbody></table>
+  <small class="muted">The page shows the report number, when it was issued, who by, how much of the evidence was
+    located on site, and whether anything has changed since. It shows no client name, no findings and no prices —
+    a verification page that gave those away would breach the confidentiality the report is issued under.</small>
+</div>
+<?php endif; ?>
 <?php endif; ?>
 
 <?php if (!empty($approvals)): ?>

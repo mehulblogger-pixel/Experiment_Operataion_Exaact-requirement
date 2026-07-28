@@ -257,7 +257,15 @@ function integrity_checks() {
         try {
             foreach (ops_all("SELECT $c AS d FROM $t WHERE COALESCE($c,'')<>'' ORDER BY id DESC LIMIT 5") as $r) {
                 $looked++;
-                if (base64_decode((string)$r['d'], true) === false) $bad++;
+                // Two shapes are stored in this application and both are
+                // correct: bare base64, and a full data: URL. Decoding the URL
+                // form as though it were bare base64 fails — and reporting
+                // perfectly good evidence as corrupt is worse than not checking
+                // at all, because a screen that cries wolf stops being read.
+                $d = (string)$r['d'];
+                if (strncmp($d, 'data:', 5) === 0 && ($comma = strpos($d, ',')) !== false)
+                    $d = substr($d, $comma + 1);
+                if (base64_decode($d, true) === false) $bad++;
             }
         } catch (Throwable $e) { /* module not in use */ }
     }

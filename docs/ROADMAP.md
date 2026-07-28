@@ -92,7 +92,7 @@ buy this year rather than eventually.
 
 ---
 
-## Phase 4 — The trust layer (6–8 days)
+## Phase 4 — The trust layer (6–8 days) — ✅ DONE
 
 The differentiator. Bind the **evidence** to place and time — not the **person**
 to a map. See the strategy note for why continuous GPS tracking is the wrong
@@ -100,11 +100,11 @@ answer legally, technically and commercially.
 
 | # | Item | Est. | Notes |
 |---|---|---:|---|
-| 4.1 | **Geotag at the moment of capture** | 1 d | Mostly present in `idems/fill.php`; needs to be enforced and stored as a property of the photo. |
-| 4.2 | **Mock-location detection, flagged not blocked** | 1 d | The standard fraud tool is a fake-GPS app. A flagged photo a supervisor reviews beats a blocked one. |
-| 4.3 | **Server-side timestamps everywhere** | 0.5 d | A phone's clock is attacker-controlled. Never trust it. |
-| 4.4 | **Hash each evidence item at capture, chain the hashes** | 2 d | Makes later alteration detectable. This is what §3.6 above is reaching for. **No blockchain needed** — a hash chain plus an append-only log is easier to explain to an assessor and far cheaper to run. |
-| 4.5 | **Client-verifiable report — QR / public link** | 3 d | The client confirms a report is genuine, unaltered, issued by an authorised inspector, backed by geotagged evidence — **without logging in and without asking you.** *"The inspection body that offers 'verify it yourself' wins contracts; the one that offers 'trust us' cannot."* |
+| 4.1 | ✅ **DONE** — **Geotag at the moment of capture** — read from the photograph's own EXIF, so it survives the drive home and the evening spent writing the report. The upload location is kept separately and never presented as the inspection location. Plus a **site check-in** (arrival / departure, optional photograph) for the many phones that strip EXIF | 1 d | |
+| 4.2 | ✅ **DONE** — **Fake-GPS signals, flagged not blocked** — far from the check-in, impossible travel, sub-metre "accuracy", coordinates too round to be a fix. A late upload is deliberately **never** flagged: it is the normal working day | 1 d | |
+| 4.3 | ✅ **DONE** — **Server-side timestamps everywhere** — the device clock is recorded only to be compared, never trusted. Mobile network time is not available to a web page (nor really to an app), which is exactly why the server stamps it | 0.5 d | |
+| 4.4 | ✅ **DONE** — **Hash chain over the evidence** — append-only, sha256, each entry hashing the one before it; altering or removing anything breaks every hash after it. Verification distinguishes a broken link, a deleted file and changed bytes | 2 d | |
+| 4.5 | ✅ **DONE** — **Client-verifiable report** — a readable code printed on the report, checked at `/verify` with no account. Genuine or not, unaltered or not, how much evidence was located on site, whether the engineer was authorised — and no client name, findings or prices. **QR image still to do**: an unverifiable hand-written encoder on a client-facing certificate is worse than a typed address, so it is deferred rather than guessed | 3 d | |
 
 **Deliberately not building: continuous inspector tracking.** Under DPDP consent
 must be free, informed, specific and withdrawable, and an employee cannot freely
