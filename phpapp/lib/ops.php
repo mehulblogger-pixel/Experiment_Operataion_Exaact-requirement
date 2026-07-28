@@ -1392,6 +1392,7 @@ function ops_run_reminders($today = null) {
     // here because this is the only thing that runs every night.
     if (function_exists('auth_run_maintenance')) auth_run_maintenance($today);
     if (function_exists('iddoc_run_retention')) iddoc_run_retention($today);
+    if (function_exists('cmp_run_reminders')) $sent += cmp_run_reminders($today);
     return $sent;
 }
 
@@ -1744,6 +1745,10 @@ function ops_module_gate($route) {
         'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'preflight'=>'settings',
+        'complaints'=>'complaints','complaint'=>'complaints','complaint-new'=>'complaints',
+        'complaint-ack'=>'complaints','complaint-validity'=>'complaints','complaint-investigate'=>'complaints',
+        'complaint-decide'=>'complaints','complaint-notify'=>'complaints','complaint-capa'=>'complaints',
+        'complaint-close'=>'complaints','complaint-reopen'=>'complaints','complaint-settings'=>'complaints',
         'identity'=>'identity','iddoc-add'=>'identity','iddoc-file'=>'identity',
         'iddoc-reveal'=>'identity','iddoc-share'=>'identity','iddoc-redact'=>'identity',
         'iddoc-retention'=>'identity',
@@ -1800,6 +1805,9 @@ function ops_access($method) {
         $checked = array_values(array_unique($checked));
         $store[$sel] = $checked;
         setting_set('role_access', json_encode($store));
+        // Remember which modules existed at this moment, so a module added in a
+        // later version is known to be new rather than deliberately untieked.
+        stamp_modules_at_save();
         flash('Access for ' . ORG_ROLES[$sel] . ' saved.');
         redirect('/access?role=' . $sel);
     }
@@ -1894,6 +1902,8 @@ function ops_dispatch($route, $method) {
             ops_user_retire($method); return true;
         case $route === 'user-2fa-reset':
             ops_user_twofa_reset($method); return true;
+        case $route === 'complaints' || $route === 'complaint' || strncmp($route, 'complaint-', 10) === 0:
+            return ops_complaints($route, $method);
         case $route === 'identity' || strncmp($route, 'iddoc-', 6) === 0:
             return ops_identity($route, $method);
         case $route === 'impartiality' || strncmp($route, 'imp-', 4) === 0:

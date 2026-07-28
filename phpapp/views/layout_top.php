@@ -94,6 +94,7 @@
         <?php if (can('mod.equipment.view')): ?><a class="s-item<?= $navOn(['equipment','equip-new','equip-edit']) ?>" href="/equipment"><span class="s-ic">📏</span><span>Equipment &amp; calibration</span></a><?php endif; ?>
         <?php if (can('mod.competence.view')): ?><a class="s-item<?= $navOn(['competence']) ?>" href="/competence"><span class="s-ic">🎓</span><span>Competence &amp; authorisation</span></a><?php endif; ?>
         <?php if (can('mod.impartiality.view')): ?><a class="s-item<?= $navOn(['impartiality']) ?>" href="/impartiality"><span class="s-ic">⚖️</span><span>Impartiality</span></a><?php endif; ?>
+        <?php if (can('mod.complaints.view')): $cmpN = function_exists('cmp_all') ? count(cmp_all(['status'=>'OPEN'])) : 0; ?><a class="s-item<?= $navOn(['complaints','complaint','complaint-new']) ?>" href="/complaints"><span class="s-ic">📮</span><span>Complaints &amp; appeals<?= $cmpN ? ' (' . $cmpN . ')' : '' ?></span></a><?php endif; ?>
         <?php if (can('mod.identity.view') && function_exists('iddoc_can_view') && iddoc_can_view()): ?><a class="s-item<?= $navOn(['identity']) ?>" href="/identity"><span class="s-ic">🪪</span><span>Identity documents</span></a><?php endif; ?>
 
         <?php if (can('mod.idems.view')): ?>

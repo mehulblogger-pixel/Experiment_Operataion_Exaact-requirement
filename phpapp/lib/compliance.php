@@ -373,6 +373,32 @@ function compliance_status() {
             'Review the list under Settings → Roles & access. Fewer is better.');
     }
 
+    // --- ISO/IEC 17020 §7.5 / §7.6 ----------------------------------------
+    // Measured from the register, not from a policy. The three lines are the
+    // three things an assessor checks: is the process published, are we meeting
+    // our own deadlines, and did we write back to the people who complained.
+    if (function_exists('cmp_readiness')) {
+        $cr = cmp_readiness();
+        $add('ISO/IEC 17020 §7.5', 'The complaints process is published',
+            $cr['policy_default'] ? 'warn' : 'ok',
+            $cr['policy_default']
+                ? 'Live at /complaints-policy, readable without signing in — but still the wording this app shipped with.'
+                : 'Published at /complaints-policy, in your own words, readable without signing in.',
+            $cr['policy_default'] ? 'Open the complaints register and rewrite the description as your own. An assessor will ask whether it is.' : '');
+        $late = $cr['ack_late'] + $cr['decide_late'];
+        $add('ISO/IEC 17020 §7.5', 'We meet our own deadlines',
+            $late ? 'bad' : 'ok',
+            $late ? $cr['ack_late'] . ' past the ' . $cr['ack_days'] . '-day acknowledgement, '
+                  . $cr['decide_late'] . ' past the ' . $cr['decide_days'] . '-day decision.'
+                  : $cr['open'] . ' open, none past its deadline.',
+            $late ? 'Open the complaints register. The standard does not set these numbers — you did, and they are what you are held to.' : '');
+        $add('ISO/IEC 17020 §7.5', 'Every complainant was told the outcome',
+            $cr['unnotified'] ? 'bad' : 'ok',
+            $cr['unnotified'] ? $cr['unnotified'] . ' decided but not yet written back to.'
+                              : 'Nothing decided is waiting to be sent.',
+            $cr['unnotified'] ? 'This is the single most common finding in this clause. Closing refuses until it is done, but the letter still has to be written.' : '');
+    }
+
     // --- things software cannot answer ------------------------------------
     $add('Everything else', 'Backups, and a restore that has been tried',
         'unknown', 'Every photograph, report and voucher in this system is in one database.',

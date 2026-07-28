@@ -81,7 +81,7 @@ alternative. Nothing else in this document has that.
 | 3.1 | ✅ **DONE** — **Equipment & calibration register** — instrument ID, owner, certificate, due date; and the report **refuses to finalise** naming an instrument out of calibration | 3 d | §6.2 |
 | 3.2 | ✅ **3.2a DONE** (spine) — **Competence & authorisation matrix** — which inspection types / methods / clients each person is authorised for; witnessed-inspection record; periodic monitoring | 3 d | §6.1 (incl. 6.1.8) |
 | 3.3 | ✅ **DONE** — **Impartiality & conflict-of-interest** — per-deputation declaration, plus a register of declared threats and how each was resolved. **2026 explicitly adds threats from organisational relationships, outsourcing and financial pressure** | 2 d | §4.1 |
-| 3.4 | **Complaints & appeals register** — logged, acknowledged, investigated, closed; appeals decided by people not involved in the original inspection | 2 d | §7.5, §7.6 |
+| 3.4 | ✅ **DONE** — **Complaints & appeals register** — logged, acknowledged, investigated, closed; the decider is refused if they were involved (§7.5.4), an appeal cannot be decided by whoever decided the original (§7.6), and nothing closes until the complainant has been written to. The process description is published at `/complaints-policy`, readable without signing in | 2 d | §7.5, §7.6 |
 | 3.5 | **Internal audit · management review · corrective action (CAPA)** — root cause, action, owner, due date, effectiveness check | 3 d | §8.5–8.8 |
 | 3.6 | **Data & information control** — software validation record, data-integrity evidence, access control report, system failure log | 2 d | **new in 2026, no 2012 equivalent** |
 | 3.7 | ✅ **DONE** — **Type A / Type non-A** on the organisation record (was A/B/C) | 0.25 d | 2026 model change |
