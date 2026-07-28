@@ -240,6 +240,47 @@ function act_entity_label($a) {
 function act_can_view()  { return can('mod.clients.view') || can('mod.calls.view') || is_master(); }
 function act_can_write() { return can('mod.clients.edit') || can('mod.calls.edit') || is_master(); }
 
+// The register's columns, declared once. The 'sort' value is a SQL expression
+// the register owns — it is the ONLY thing that can reach ORDER BY, which is
+// what makes ?sort= in the address bar safe. 'optional' means hidden until
+// somebody asks for it, so the default view stays readable.
+function act_dt_columns() {
+    return [
+        'when' => ['label' => 'When', 'sort' => 'a.occurred_at', 'render' => fn($r) =>
+            '<span style="white-space:nowrap">' . e(fdate(substr((string)$r['occurred_at'], 0, 10))) . '</span>'
+            . '<br><span class="muted" style="font-size:12px">' . e(substr((string)$r['occurred_at'], 11, 5)) . '</span>'],
+        'what' => ['label' => 'What happened', 'sort' => 'a.subject', 'render' => function ($r) {
+            $h = '<span class="pill ' . ($r['auto'] ? 'p-mut' : 'p-ok') . '" style="font-size:11px">'
+               . e(ACT_KINDS[$r['kind']] ?? $r['kind']) . '</span>';
+            if ($r['direction']) $h .= ' <span class="muted" style="font-size:11px">'
+                                     . e(ACT_DIRECTIONS[$r['direction']] ?? '') . '</span>';
+            $h .= '<br>' . e($r['subject']);
+            if (trim((string)$r['body']) !== '')
+                $h .= '<br><span class="muted" style="font-size:12px;white-space:pre-wrap">'
+                    . e(mb_substr((string)$r['body'], 0, 140)) . '</span>';
+            return $h;
+        }],
+        'customer' => ['label' => 'Customer', 'sort' => 'COALESCE(bp.display_name, bp.legal_name)',
+            'render' => fn($r) => $r['partner_id']
+                ? '<a href="/activities?partner=' . (int)$r['partner_id'] . '">'
+                  . e($r['display_name'] ?: $r['legal_name']) . '</a>'
+                : '<span class="muted">—</span>'],
+        'about' => ['label' => 'About', 'sort' => 'a.entity_kind',
+            'render' => fn($r) => e(act_entity_label($r) ?: '—')],
+        'who' => ['label' => 'Who', 'sort' => 'a.owner', 'render' => function ($r) {
+            $h = e($r['owner'] ?: '—');
+            if ($r['with_whom']) $h .= '<br><span class="muted" style="font-size:12px">with ' . e($r['with_whom']) . '</span>';
+            return $h;
+        }],
+        'outcome' => ['label' => 'Outcome', 'sort' => 'a.outcome', 'optional' => true,
+            'render' => fn($r) => e($r['outcome'] ?: '—')],
+        'mins' => ['label' => 'Minutes', 'sort' => 'a.duration_mins', 'num' => true, 'optional' => true,
+            'render' => fn($r) => (int)$r['duration_mins'] ?: '<span class="muted">—</span>'],
+        'open' => ['label' => '', 'render' => fn($r) =>
+            ($l = act_link($r)) ? '<a class="btn small" href="' . e($l) . '">Open →</a>' : ''],
+    ];
+}
+
 function ops_activity($route, $method) {
     ops_require(act_can_view(), 'You cannot open the activity timeline.');
     act_migrate();
@@ -264,29 +305,46 @@ function ops_activity($route, $method) {
         redirect_back('/activities');
     }
 
-    // The register: everything, newest first, filterable.
+    // The register. It used to be "newest 300 and no more", which on a busy
+    // installation quietly hid everything older without saying so. It pages now,
+    // so the whole timeline is reachable and the count at the top is the truth.
     $kind = (string)($_GET['kind'] ?? '');
     $pid  = (int)($_GET['partner'] ?? 0);
+    $cols = act_dt_columns();
+    $dt   = dt_state('activities', $cols, ['default_sort' => 'when', 'default_dir' => 'desc', 'per' => 50]);
+
     $w = '1=1'; $a = [];
-    if ($kind !== '' && isset(ACT_KINDS[$kind])) { $w .= ' AND kind=?'; $a[] = $kind; }
-    if ($pid) { $w .= ' AND partner_id=?'; $a[] = $pid; }
-    if (($_GET['manual'] ?? '') === '1') $w .= ' AND auto=0';
-    $rows = act_try(fn() => ops_all(
-        "SELECT a.*, bp.display_name, bp.legal_name FROM activities a
-         LEFT JOIN business_partners bp ON bp.id = a.partner_id
-         WHERE $w ORDER BY a.occurred_at DESC, a.id DESC LIMIT 300", $a));
+    if ($kind !== '' && isset(ACT_KINDS[$kind])) { $w .= ' AND a.kind=?'; $a[] = $kind; }
+    if ($pid) { $w .= ' AND a.partner_id=?'; $a[] = $pid; }
+    if (($_GET['manual'] ?? '') === '1') $w .= ' AND a.auto=0';
+    if ($dt['q'] !== '') {
+        $w .= ' AND (a.subject LIKE ? OR a.body LIKE ? OR a.with_whom LIKE ? OR a.outcome LIKE ?)';
+        $like = '%' . $dt['q'] . '%';
+        array_push($a, $like, $like, $like, $like);
+    }
+    $from = "FROM activities a LEFT JOIN business_partners bp ON bp.id = a.partner_id WHERE $w";
 
     if (wants_csv()) {
-        $csv = [['When','Kind','Subject','Customer','About','Direction','With','Outcome','Owner','Recorded by system']];
-        foreach ($rows as $r)
+        // An export that only carried the page you were looking at would be a
+        // trap. It carries every row the filters match — the same filters, not
+        // the same page.
+        $all = act_try(fn() => ops_all("SELECT a.*, bp.display_name, bp.legal_name $from
+                                        ORDER BY a.occurred_at DESC, a.id DESC LIMIT 20000", $a));
+        $csv = [['When','Kind','Subject','Customer','About','Direction','With','Outcome','Minutes','Owner','Recorded by system']];
+        foreach ($all as $r)
             $csv[] = [substr((string)$r['occurred_at'],0,16), ACT_KINDS[$r['kind']] ?? $r['kind'], $r['subject'],
                       $r['display_name'] ?: $r['legal_name'], act_entity_label($r),
-                      ACT_DIRECTIONS[$r['direction']] ?? '', $r['with_whom'], $r['outcome'], $r['owner'],
-                      $r['auto'] ? 'Yes' : 'No'];
+                      ACT_DIRECTIONS[$r['direction']] ?? '', $r['with_whom'], $r['outcome'],
+                      (int)$r['duration_mins'], $r['owner'], $r['auto'] ? 'Yes' : 'No'];
         csv_download('activities-' . date('Y-m-d') . '.csv', $csv);
     }
 
-    view('ops/activities', ['rows' => $rows, 'kind' => $kind, 'pid' => $pid,
+    $total = (int)act_try(fn() => ops_val("SELECT COUNT(*) $from", $a), 0);
+    $rows  = act_try(fn() => ops_all("SELECT a.*, bp.display_name, bp.legal_name $from"
+                                     . dt_sql_tail($dt, $cols, 'a.occurred_at DESC, a.id DESC'), $a));
+
+    view('ops/activities', ['rows' => $rows, 'total' => $total, 'dt' => $dt, 'cols' => $cols,
+                            'kind' => $kind, 'pid' => $pid,
                             'silent' => act_silent_customers(30, 20),
                             'canWrite' => act_can_write()]);
     return true;

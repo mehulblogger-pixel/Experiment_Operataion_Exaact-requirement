@@ -117,6 +117,54 @@ function ncr_missing_table(Throwable $e) {
     return stripos($m, 'no such table') !== false || stripos($m, "doesn't exist") !== false;
 }
 
+// ---- The register's columns -------------------------------------------------
+// Severity sorts by meaning, not alphabetically: MAJOR before MINOR before
+// OBSERVATION. Sorting a severity column as text puts "Major" after
+// "Concession" and quietly buries the ones that matter.
+function ncr_dt_columns($today) {
+    return [
+        'ref' => ['label' => 'Ref', 'sort' => 'n.ref', 'render' => fn($r) =>
+            '<a href="/ncr-item?id=' . (int)$r['id'] . '"><b>' . e($r['ref']) . '</b></a>'],
+        'severity' => ['label' => 'Severity',
+            'sort' => "CASE n.severity WHEN 'MAJOR' THEN 0 WHEN 'MINOR' THEN 1 ELSE 2 END",
+            'render' => fn($r) => '<span class="pill '
+                . ($r['severity'] === 'MAJOR' ? 'p-bad' : ($r['severity'] === 'MINOR' ? 'p-warn' : 'p-mut'))
+                . '" style="font-size:11px">' . e(ucfirst(strtolower($r['severity']))) . '</span>'],
+        'title' => ['label' => 'What was wrong', 'sort' => 'n.title', 'render' => fn($r) =>
+            '<a href="/ncr-item?id=' . (int)$r['id'] . '">' . e($r['title']) . '</a>'
+            . '<br><span class="muted" style="font-size:12px">raised ' . e(fdate($r['detected_on']))
+            . ' by ' . e($r['detected_by'] ?: '—') . '</span>'],
+        'source' => ['label' => 'Where it came from', 'sort' => 'n.source', 'render' => function ($r) {
+            $h = e(NCR_SOURCES[$r['source']] ?? $r['source']);
+            if ($r['job_code']) $h .= '<br><span class="muted" style="font-size:12px">' . e($r['job_code']) . '</span>';
+            if ($r['display_name'] || $r['legal_name'])
+                $h .= '<br><span class="muted" style="font-size:12px">' . e($r['display_name'] ?: $r['legal_name']) . '</span>';
+            return $h;
+        }],
+        'branch' => ['label' => 'Branch', 'sort' => 'o.name', 'render' => fn($r) => e($r['office_name'] ?: '—')],
+        'owner' => ['label' => 'Owner / due', 'sort' => 'n.due_on', 'render' => function ($r) use ($today) {
+            $od = ($r['status'] !== 'CLOSED') && $r['due_on'] && $r['due_on'] < $today;
+            return e($r['owner'] ?: '—') . '<br><span class="' . ($od ? 'pill p-bad' : 'muted') . '" style="font-size:12px">'
+                 . ($r['due_on'] ? e(fdate($r['due_on'])) . ($od ? ' — late' : '') : 'no date') . '</span>';
+        }],
+        'clause' => ['label' => 'Clause', 'sort' => 'n.clause', 'optional' => true,
+            'render' => fn($r) => e($r['clause'] ?: '—')],
+        'disposition' => ['label' => 'Disposition', 'sort' => 'n.disposition', 'render' => fn($r) =>
+            trim((string)$r['disposition']) === ''
+                ? '<span class="pill p-warn">Not decided</span>'
+                : e(NCR_DISPOSITIONS[$r['disposition']] ?? $r['disposition'])],
+        'capa' => ['label' => 'Corrective action', 'sort' => 'n.capa_ref', 'render' => fn($r) =>
+            $r['capa_ref'] ? '<a href="/capa-item?id=' . (int)$r['capa_id'] . '">' . e($r['capa_ref']) . '</a>'
+                           : ($r['severity'] === 'MAJOR' ? '<span class="pill p-bad">Required</span>'
+                                                         : '<span class="muted">—</span>')],
+        'status' => ['label' => 'Status', 'sort' => 'n.status', 'render' => fn($r) =>
+            '<span class="pill ' . ($r['status'] === 'CLOSED' ? 'p-ok' : ($r['status'] === 'OPEN' ? 'p-warn' : 'p-mut'))
+            . '">' . e(NCR_STATUS[$r['status']] ?? $r['status']) . '</span>'],
+        'closed' => ['label' => 'Closed', 'sort' => 'n.closed_on', 'optional' => true,
+            'render' => fn($r) => $r['closed_on'] ? e(fdate($r['closed_on'])) : '—'],
+    ];
+}
+
 // ---- Who ------------------------------------------------------------------
 function ncr_can_view()  { return can('mod.ncr.view') || can('mod.capa.view') || is_master(); }
 function ncr_can_raise() { return can('mod.ncr.edit') || can('mod.capa.edit') || is_master(); }
@@ -137,33 +185,52 @@ function ncr_ref_next() {
 // Scoped from the first query. The office is taken from the deputation the
 // nonconformity came off when there is one, so it lands with the branch that
 // did the work rather than the branch of whoever happened to type it in.
-function ncr_all($filter = 'open', $extraWhere = '', $extraArgs = []) {
-    ncr_migrate();
+const NCR_FROM = "FROM nonconformities n
+             LEFT JOIN offices o ON o.id = n.office_id
+             LEFT JOIN jobs j ON j.id = n.job_id
+             LEFT JOIN business_partners bp ON bp.id = n.partner_id";
+
+// One filter, used by both the count and the page of rows. They have to agree
+// or the pager promises pages that are not there.
+function ncr_where($filter = 'open', $q = '', $extraWhere = '', $extraArgs = []) {
     [$w, $a] = scope_clause('n.office_id', 'n.sbu');
     $f = '1=1';
-    $today = date('Y-m-d');
     switch ($filter) {
         case 'open':      $f = "n.status <> 'CLOSED'"; break;
         case 'major':     $f = "n.status <> 'CLOSED' AND n.severity='MAJOR'"; break;
-        case 'overdue':   $f = "n.status <> 'CLOSED' AND n.due_on <> '' AND n.due_on < " . db()->quote($today); break;
+        case 'overdue':   $f = "n.status <> 'CLOSED' AND n.due_on <> '' AND n.due_on < ?"; $a[] = date('Y-m-d'); break;
         case 'nodisp':    $f = "n.status <> 'CLOSED' AND (n.disposition IS NULL OR n.disposition='')"; break;
         case 'closed':    $f = "n.status = 'CLOSED'"; break;
         case 'all':       $f = '1=1'; break;
     }
-    if ($extraWhere !== '') { $f .= " AND ($extraWhere)"; }
-    try {
-        return ops_all(
-            "SELECT n.*, o.name office_name, j.job_code, bp.display_name, bp.legal_name
-             FROM nonconformities n
-             LEFT JOIN offices o ON o.id = n.office_id
-             LEFT JOIN jobs j ON j.id = n.job_id
-             LEFT JOIN business_partners bp ON bp.id = n.partner_id
-             WHERE $w AND ($f)
-             ORDER BY (n.status='CLOSED') ASC,
+    if ($extraWhere !== '') { $f .= " AND ($extraWhere)"; $a = array_merge($a, $extraArgs); }
+    if (trim((string)$q) !== '') {
+        $f .= " AND (n.ref LIKE ? OR n.title LIKE ? OR n.description LIKE ? OR n.owner LIKE ?)";
+        $like = '%' . trim((string)$q) . '%';
+        array_push($a, $like, $like, $like, $like);
+    }
+    return ["$w AND ($f)", $a];
+}
+
+const NCR_ORDER = "(n.status='CLOSED') ASC,
                       CASE n.severity WHEN 'MAJOR' THEN 0 WHEN 'MINOR' THEN 1 ELSE 2 END,
-                      n.detected_on DESC, n.id DESC",
-            array_merge($a, $extraArgs));
+                      n.detected_on DESC, n.id DESC";
+
+// $tail is built by the register component from its own column whitelist.
+function ncr_all($filter = 'open', $extraWhere = '', $extraArgs = [], $q = '', $tail = '') {
+    ncr_migrate();
+    [$w, $a] = ncr_where($filter, $q, $extraWhere, $extraArgs);
+    try {
+        return ops_all("SELECT n.*, o.name office_name, j.job_code, bp.display_name, bp.legal_name "
+                       . NCR_FROM . " WHERE $w " . ($tail ?: 'ORDER BY ' . NCR_ORDER), $a);
     } catch (Throwable $e) { if (!ncr_missing_table($e)) throw $e; return []; }
+}
+
+function ncr_count($filter = 'open', $extraWhere = '', $extraArgs = [], $q = '') {
+    ncr_migrate();
+    [$w, $a] = ncr_where($filter, $q, $extraWhere, $extraArgs);
+    try { return (int)ops_val("SELECT COUNT(*) " . NCR_FROM . " WHERE $w", $a); }
+    catch (Throwable $e) { if (!ncr_missing_table($e)) throw $e; return 0; }
 }
 
 function ncr_row($id) {
@@ -369,17 +436,25 @@ function ops_ncr($route, $method) {
 
     if ($route === 'ncr') {
         $f = $_GET['f'] ?? 'open';
-        $rows = ncr_all($f);
+        $cols = ncr_dt_columns(date('Y-m-d'));
+        // Severity first by default: a major nonconformity that scrolled off the
+        // bottom of a date-sorted list is the exact failure this register exists
+        // to prevent.
+        $dt = dt_state('ncr', $cols, ['default_sort' => 'severity', 'default_dir' => 'asc', 'per' => 50]);
+
         if (wants_csv()) {
             $csv = [['Ref','Raised','Severity','Source','Title','Branch','Deputation','Owner','Due','Disposition','Corrective action','Status','Closed']];
-            foreach ($rows as $r)
+            foreach (ncr_all($f, '', [], $dt['q']) as $r)
                 $csv[] = [$r['ref'], $r['detected_on'], $r['severity'], NCR_SOURCES[$r['source']] ?? $r['source'],
                           $r['title'], $r['office_name'], $r['job_code'], $r['owner'], $r['due_on'],
                           NCR_DISPOSITIONS[$r['disposition']] ?? $r['disposition'], $r['capa_ref'],
                           $r['status'], $r['closed_on']];
             csv_download('nonconformities-' . $f . '-' . date('Y-m-d') . '.csv', $csv);
         }
-        view('ops/ncr_list', ['rows' => $rows, 'f' => $f, 'counts' => ncr_counts(),
+        $total = ncr_count($f, '', [], $dt['q']);
+        $rows  = ncr_all($f, '', [], $dt['q'], dt_sql_tail($dt, $cols, NCR_ORDER));
+        view('ops/ncr_list', ['rows' => $rows, 'total' => $total, 'dt' => $dt, 'cols' => $cols,
+                              'f' => $f, 'counts' => ncr_counts(),
                               'canRaise' => ncr_can_raise(), 'today' => date('Y-m-d')]);
         return true;
     }

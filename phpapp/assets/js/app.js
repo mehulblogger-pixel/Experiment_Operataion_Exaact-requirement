@@ -1195,7 +1195,43 @@
     });
   });
 
+  // ---- The shared register (lib/datatable.php) ------------------------------
+  // Deliberately small. Sorting, paging, filtering and choosing columns are all
+  // links and forms that work with JavaScript switched off, so the only things
+  // left here are the two that genuinely need it: a select-all box, and telling
+  // somebody how many rows a destructive button is about to act on.
+  function initDataTables() {
+    Array.prototype.forEach.call(document.querySelectorAll('input[data-dt-all]'), function (all) {
+      var key = all.getAttribute('data-dt-all');
+      var rows = function () {
+        return document.querySelectorAll('input[data-dt-row="' + key + '"]');
+      };
+      all.addEventListener('change', function () {
+        Array.prototype.forEach.call(rows(), function (b) { b.checked = all.checked; });
+      });
+      // Ticking rows by hand has to move the header box too, including the
+      // in-between state — a half-filled box that says "all" is a lie.
+      Array.prototype.forEach.call(rows(), function (b) {
+        b.addEventListener('change', function () {
+          var list = rows(), on = 0;
+          Array.prototype.forEach.call(list, function (x) { if (x.checked) on++; });
+          all.checked = on === list.length && on > 0;
+          all.indeterminate = on > 0 && on < list.length;
+        });
+      });
+    });
+  }
+
+  // Named on the button, so a bulk action states the count before it runs and a
+  // button pressed with nothing ticked says so instead of quietly doing nothing.
+  window.dtConfirm = function (btn, key, message) {
+    var n = document.querySelectorAll('input[data-dt-row="' + key + '"]:checked').length;
+    if (!n) { alert('Tick the rows you want this to apply to first.'); return false; }
+    return confirm(message.replace('%d', n) + '\n\n' + n + ' row' + (n === 1 ? '' : 's') + ' selected.');
+  };
+
   function init() {
+    initDataTables();
     // First, so its submit listener runs before the one-shot ticket greys the
     // button: listeners on the same element fire in the order they were added.
     initFormGuard();

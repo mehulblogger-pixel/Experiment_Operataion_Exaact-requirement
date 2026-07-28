@@ -65,8 +65,8 @@ matter, and they are all here.
 | U1 | **Nothing is pinned in the navigation** | Favourites would be next, but it wants watching real use rather than guessing |
 | U11 | **No global record search** | The search box filters menu items, not records. 101 routes, no cross-entity search — blueprint 002 U2 |
 | U12 | **No notification centre** | Flash messages and e-mail only; nothing persists — blueprint 002 U4 |
-| U13 | **42 list screens, no shared table component** | No sorting, grouping, column choice, bulk actions or inline editing anywhere — blueprint 002 U1 |
-| U14 | **Accessibility is a shell** | 1 `aria-` attribute across 122 operational screens, 4 `:focus` rules in the stylesheet — blueprint 002 U5 |
+| U13 | **The shared table is built, and adopted on 3 of 42 registers** | `lib/datatable.php` — server-side sorting on a whitelist, paging, per-user column choice, bulk actions, filter-aware CSV. Live on **activity, leads and nonconformities**. The other 39 still hand-roll their own `<table>` — blueprint 002 U1. **Inline editing and grouping are not built at all** |
+| U14 | **Accessibility is a shell everywhere the table has not reached** | Was 1 `aria-` attribute across 122 screens. The three adopted registers now carry 34–38 each (`th scope`, live `aria-sort`, an `sr-only` caption, labelled checkboxes) because the component supplies them. The other 119 screens are unchanged, and the 4 `:focus` rules in the stylesheet still stand — blueprint 002 U5 |
 | U15 | **No real light/dark mode** | A "Midnight" colour preset exists; no `prefers-color-scheme`, no toggle, and printing assumes light |
 | U16 | **No recently-viewed or favourites** | Blueprint 002 U6 |
 
@@ -133,6 +133,44 @@ the nonconformity register, client acceptance of reports, multi-action
 corrective actions, branch scoping, portal permissions, site-entry documents,
 confidentiality, and the competence review cycle. Entries about them survive
 below as history; they are not open.
+
+## ▣ One table component, adopted on three registers (July 2026)
+
+Blueprint 002 U1. `lib/datatable.php`, built once and used by the activity
+timeline, the lead register and the nonconformity register.
+
+**What it does, and why each part is the way it is:**
+
+* **Sorting and paging happen in the database, not the browser.** That follows
+  from the hosting answer: sorting client-side means shipping every row first,
+  which is fine at 160 rows and useless at the volume blueprint 005 talks about,
+  and MilesWeb has no cache to hide behind.
+* **Sort columns are whitelisted.** The screen declares a SQL expression per
+  column; `dt_sql_tail()` is the only place an `ORDER BY` is assembled, and a
+  `?sort=` the screen did not declare is ignored rather than rejected. Verified:
+  `?sort=a.id; DROP TABLE activities--` sorts by the default and the table is
+  still there.
+* **Page size is capped at 200.** `?per=99999` falls back to the screen's default.
+* **Column choice is per user, in a new `user_prefs` table** — not a cookie, so
+  a register you arranged at your desk is arranged on your phone.
+* **CSV exports what the filters match, not the page you are looking at.** The
+  old activity export carried a hard `LIMIT 300` and said nothing about it.
+* **Accessibility is in the component**, so one build fixes it on every screen
+  that adopts it: `<th scope>`, `aria-sort` that reflects the real state, an
+  `sr-only` caption naming the register and its row count, and a label on every
+  checkbox. Those three screens went from ~1 `aria-` attribute to 34–38 each.
+
+**Two defects fixed on the way**, both found by paging rather than by reading:
+the activity register silently stopped at 300 rows, and `ncr_all()` interpolated
+today's date with `db()->quote()` instead of binding it.
+
+**Bulk actions** are on leads: assign to me, and mark lost with a reason. Both
+re-check branch scope from the ids that were posted, and "mark lost" skips a
+lead that is already converted or lost rather than overwriting it — tested with
+one of each.
+
+**What is honestly still open:** 39 registers have not adopted it, and neither
+inline editing nor grouping is built at all. U13 in the register above says so.
 
 ## ✅ The eleven gaps from the July review — all closed (July 2026)
 
