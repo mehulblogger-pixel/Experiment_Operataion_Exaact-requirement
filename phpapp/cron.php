@@ -151,3 +151,25 @@ if (function_exists('sitedoc_expiring') && function_exists('ops_mail')) {
     }
     echo "Site-entry document expiry notices sent: $n\n";
 }
+
+// Competence that has fallen out of date: authorisations expired, reviews come
+// round, witnessing due. Sent to the reporting manager rather than the person
+// themselves, because none of these are theirs to fix.
+if (function_exists('competence_due') && function_exists('ops_mail')) {
+    $d = competence_due();
+    $n = count($d['expired']) + count($d['review']) + count($d['witness']);
+    if ($n) {
+        $body = "The competence register has " . $n . " item(s) out of date.\n\n";
+        foreach (['expired' => 'Expired authorisations', 'review' => 'Due for review', 'witness' => 'Witnessing due'] as $k => $lbl) {
+            if (!$d[$k]) continue;
+            $body .= "$lbl:\n";
+            foreach ($d[$k] as $a) $body .= '  - ' . ($a['inspector_name'] ?? '?') . ' — ' . ($a['scope_value'] ?: $a['scope_kind']) . "\n";
+            $body .= "\n";
+        }
+        $body .= "Open Competence & authorisation in the application to put them right.";
+        foreach (ops_all("SELECT email FROM users WHERE is_active=1 AND email <> '' AND role IN ('MASTER_ADMIN','BRANCH_MANAGER','OPERATION_MANAGER','BUSINESS_DIRECTOR')") as $u) {
+            try { ops_mail($u['email'], "Competence register: $n item(s) out of date", $body); } catch (Throwable $e) {}
+        }
+    }
+    echo "Competence items out of date: $n\n";
+}

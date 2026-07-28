@@ -550,6 +550,23 @@ function ops_idems_documents($route, $method) {
                   . Tl('report') . ', then issue it.', 'error');
             redirect('/document?id=' . $doc['id']);
         }
+        // §6.1 — the person who SIGNED it, not just the person who was on the
+        // job. A warning rather than a block on purpose: unlike calibration,
+        // where the measurement is void, this is a management failure to record
+        // and put right, not a reason to withhold a report a client is waiting
+        // for. It is raised as a nonconformity so it cannot be shrugged off.
+        if (function_exists('report_signatory_warning') && ($sw = report_signatory_warning($doc)) !== '') {
+            flash($sw . ' The report has been issued and a nonconformity raised against it.', 'warning');
+            if (function_exists('ncr_create')) {
+                ncr_create([
+                    'source' => 'REPORT', 'source_note' => 'Report ' . $doc['irn'],
+                    'report_doc_id' => (int)$doc['id'], 'job_id' => (int)($doc['job_id'] ?? 0),
+                    'partner_id' => (int)($doc['client_id'] ?? 0), 'office_id' => (int)($doc['office_id'] ?? 0),
+                    'title' => 'Report ' . $doc['irn'] . ' signed by somebody not authorised for the work',
+                    'clause' => '6.1', 'severity' => 'MAJOR', 'description' => $sw,
+                ]);
+            }
+        }
         $issue = $doc['issue_date'] ?: date('Y-m-d');
         $pdo->prepare("UPDATE report_docs SET finalized=1, status='ISSUED', finalized_at=?, finalized_by=?, issue_date=?, updated_at=? WHERE id=?")
             ->execute([date('c'), user_name(current_user()), $issue, date('c'), $doc['id']]);

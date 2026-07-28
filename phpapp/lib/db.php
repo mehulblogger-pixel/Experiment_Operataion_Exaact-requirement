@@ -228,7 +228,8 @@ function boot() {
     if (function_exists('bills_migrate')) bills_migrate();             // chargeable expenses + their bills
     if (function_exists('competence_migrate')) competence_migrate();   // required certificates gate allocation
     if (function_exists('equipment_migrate')) equipment_migrate();     // measuring & test equipment, §6.2
-    if (function_exists('competence_spine_migrate')) competence_spine_migrate();  // authorisation matrix, §6.1
+    if (function_exists('competence_spine_migrate')) competence_spine_migrate();
+    if (function_exists('competence_cycle_migrate')) competence_cycle_migrate();  // basis, review cycle, witnessing interval  // authorisation matrix, §6.1
     if (function_exists('impartiality_migrate')) impartiality_migrate();  // §4.1 threats & declarations
     if (function_exists('identity_migrate')) identity_migrate();
     if (function_exists('sitedoc_migrate')) sitedoc_migrate();         // what a site demands before the gate opens       // passports & IDs, held under DPDP guardrails

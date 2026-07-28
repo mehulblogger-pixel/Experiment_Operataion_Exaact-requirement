@@ -432,3 +432,116 @@ function ops_competence($route, $method) {
 }
 
 function competence_can_authorise() { return is_admin_level() || is_master(); }
+
+// ============================================================================
+//  How somebody BECOMES authorised, and how the authorisation stays true
+//
+//  The matrix already said who may do what, and the allocation gate already
+//  read it. What it could not answer was the two questions an assessor asks
+//  straight afterwards:
+//
+//    "On what basis was this authorisation granted?"  and
+//    "When was it last reviewed?"
+//
+//  An authorisation typed into a screen by whoever had the password, with no
+//  basis and no review date, is an assertion rather than a record — and §6.1.8
+//  asks for the competence of personnel to be MONITORED, which is a verb about
+//  the future, not a box ticked once.
+//
+//  So an authorisation now carries:
+//
+//   - **the basis it rests on** — training, a witnessed job, an examination, or
+//     documented experience — with a reference to the evidence;
+//   - **a review cycle**, so it comes round again rather than standing for ever;
+//   - **a witnessing interval**, because watching somebody work is the only
+//     evidence of competence that is not paperwork about paperwork.
+//
+//  And the report is checked: §6.1 is not satisfied by a competent person being
+//  ON the job if somebody else signed the result. Checked at finalisation, and
+//  DELIBERATELY as a warning rather than a block — unlike calibration, where an
+//  uncalibrated instrument makes the measurement void, a signature by an
+//  unauthorised person is a management failure that must be recorded and put
+//  right, not a reason to withhold a report a client is waiting for.
+// ============================================================================
+
+const AUTH_BASES = [
+    ''            => '— not recorded —',
+    'TRAINING'    => 'Training completed and assessed',
+    'WITNESS'     => 'Witnessed on the job by an assessor',
+    'EXAM'        => 'Examination or formal certification',
+    'EXPERIENCE'  => 'Documented experience, reviewed and accepted',
+    'GRANDFATHER' => 'Carried over when the register was set up',
+];
+
+function competence_cycle_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    ensure_column('authorisations', 'basis', "VARCHAR(20) DEFAULT ''");
+    ensure_column('authorisations', 'basis_ref', "VARCHAR(200) DEFAULT ''");
+    ensure_column('authorisations', 'review_months', 'INT DEFAULT 0');
+    ensure_column('authorisations', 'last_review_on', "VARCHAR(20) DEFAULT ''");
+    ensure_column('authorisations', 'last_review_by', "VARCHAR(150) DEFAULT ''");
+    ensure_column('authorisations', 'witness_every_months', 'INT DEFAULT 0');
+}
+
+// When this authorisation next has to be looked at. Counts from the last
+// review if there has been one, otherwise from the day it was granted —
+// otherwise an authorisation nobody ever reviewed is never due.
+function auth_review_due($a) {
+    $m = (int)($a['review_months'] ?? 0);
+    if ($m <= 0) return '';
+    $from = trim((string)($a['last_review_on'] ?? '')) ?: trim((string)($a['valid_from'] ?? ''));
+    if ($from === '') return '';
+    return date('Y-m-d', strtotime($from . ' +' . $m . ' months'));
+}
+
+function auth_review_overdue($a, $today = null) {
+    $due = auth_review_due($a);
+    return $due !== '' && $due < ($today ?: date('Y-m-d'));
+}
+
+// Everything that has fallen out of date across the whole register: expired
+// authorisations, reviews that have come round, and witnessing that is due.
+function competence_due($today = null) {
+    competence_cycle_migrate();
+    $today = $today ?: date('Y-m-d');
+    $out = ['expired' => [], 'review' => [], 'witness' => [], 'no_basis' => []];
+    try {
+        $rows = ops_all("SELECT a.*, i.name inspector_name, i.email
+                         FROM authorisations a LEFT JOIN inspectors i ON i.id = a.inspector_id
+                         WHERE a.status='ACTIVE'");
+    } catch (Throwable $e) { return $out; }
+    foreach ($rows as $a) {
+        if (trim((string)$a['valid_to']) !== '' && $a['valid_to'] < $today) { $out['expired'][] = $a; continue; }
+        if (auth_review_overdue($a, $today)) $out['review'][] = $a;
+        // An authorisation with no basis is not an emergency, but it is the
+        // question an assessor asks first, so it is counted.
+        if (trim((string)($a['basis'] ?? '')) === '') $out['no_basis'][] = $a;
+        $wm = (int)($a['witness_every_months'] ?? 0);
+        if ($wm > 0 && function_exists('witness_latest')) {
+            $last = witness_latest((int)$a['inspector_id']);
+            $from = $last ? (string)$last['assessed_on'] : (string)$a['valid_from'];
+            if ($from !== '' && date('Y-m-d', strtotime($from . " +$wm months")) < $today) $out['witness'][] = $a;
+        }
+    }
+    return $out;
+}
+
+function competence_due_counts($today = null) {
+    $d = competence_due($today);
+    return ['expired' => count($d['expired']), 'review' => count($d['review']),
+            'witness' => count($d['witness']), 'no_basis' => count($d['no_basis'])];
+}
+
+// ---- The report signatory --------------------------------------------------
+// §6.1: a competent person being on the job is not the same as a competent
+// person signing the result. Returns '' when there is nothing to say.
+function report_signatory_warning($doc) {
+    if (!function_exists('auth_block') || !function_exists('auth_enforced') || !auth_enforced()) return '';
+    $insp = (int)($doc['inspector_id'] ?? 0);
+    if (!$insp) return '';
+    $on = (string)($doc['inspection_date'] ?? '') ?: (string)($doc['issue_date'] ?? '') ?: date('Y-m-d');
+    $why = auth_block($insp, (string)($doc['type_code'] ?? ''), 0, (int)($doc['client_id'] ?? 0), $on);
+    if ($why === '') return '';
+    return 'The engineer named on this ' . (function_exists('Tl') ? Tl('report') : 'report')
+         . ' was not authorised for this work on ' . $on . '. ' . $why;
+}
