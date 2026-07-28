@@ -160,10 +160,26 @@
   <?php else: ?>
     <p class="sub" style="margin-top:0">We found fault, so something has to change. Raising it here carries the
       complaint and the cause across, so the two records cannot end up disagreeing.</p>
+    <?php if (function_exists('ncr_can_raise') && ncr_can_raise()): ?>
+    <?php // Most upheld complaints are a nonconformity first: something was
+          // wrong, and the work already delivered has to be put right. Whether
+          // it also needs a corrective action is a separate judgement, taken on
+          // the nonconformity — which is why this button comes first. ?>
+    <a class="btn small" style="margin:0 0 8px;display:inline-block"
+       href="/ncr-new?<?= e(http_build_query([
+         'source' => 'COMPLAINT', 'complaint_id' => (int)$c['id'],
+         'source_note' => $c['ref'] ?? '',
+         'title' => 'Complaint upheld: ' . ($c['subject'] ?? ''),
+         'description' => (string)($c['description'] ?? ''),
+         'job_id' => (int)($c['job_id'] ?? 0) ?: '',
+         'partner_id' => (int)($c['partner_id'] ?? 0) ?: '',
+         'office_id' => (int)($c['office_id'] ?? 0) ?: '',
+       ])) ?>">Raise a nonconformity from this</a><br>
+    <?php endif; ?>
     <?php if (function_exists('capa_create') && can('mod.capa.edit')): ?>
     <form method="post" action="/capa-from-complaint" style="margin:0 0 8px">
       <input type="hidden" name="complaint_id" value="<?= (int)$c['id'] ?>">
-      <button class="btn small" type="submit">Raise a corrective action from this</button>
+      <button class="btn small secondary" type="submit">…or go straight to a corrective action</button>
     </form>
     <?php endif; ?>
     <form method="post" action="/complaint-capa" class="inline-add">

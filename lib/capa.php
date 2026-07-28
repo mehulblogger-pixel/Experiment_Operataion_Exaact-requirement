@@ -30,6 +30,9 @@
 // Where the nonconformity came from. The first two are wired: a complaint or an
 // audit finding raises one directly and the link is kept both ways.
 const CAPA_SOURCES = [
+    // A corrective action is the response; the nonconformity is the event. Most
+    // corrective actions should now arrive by escalation from one — see lib/ncr.php.
+    'NCR'              => 'A nonconformity',
     'COMPLAINT'        => 'A complaint or appeal',
     'INTERNAL_AUDIT'   => 'An internal audit finding',
     'EXTERNAL_AUDIT'   => 'An assessment by an accreditation or client body',

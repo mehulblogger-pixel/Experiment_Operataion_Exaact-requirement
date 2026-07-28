@@ -28,6 +28,8 @@ require __DIR__ . '/lib/contracts.php';
 require __DIR__ . '/lib/idems.php';
 require __DIR__ . '/lib/costing.php';
 require __DIR__ . '/lib/joblock.php';
+require __DIR__ . '/lib/capa.php';
+require __DIR__ . '/lib/ncr.php';
 
 // When invoked over HTTP, require a matching key so strangers can't trigger it.
 if (PHP_SAPI !== 'cli') {
@@ -97,4 +99,20 @@ if (function_exists('ops_run_mis_digest')) {
         ops_run_mis_digest('weekly'); setting_set('mis_last_weekly', $today);
         echo "Weekly MIS digest sent.\n";
     }
+}
+
+// Nonconformities past their date — chase the owner. Runs alongside the
+// corrective-action and complaint chases so the registers actually reach the
+// person who has to act, rather than waiting to be visited.
+if (function_exists('ncr_run_reminders')) {
+    $n = ncr_run_reminders();
+    echo "Nonconformity chases sent: $n\n";
+}
+if (function_exists('capa_run_reminders')) {
+    $n = capa_run_reminders();
+    echo "Corrective-action chases sent: $n\n";
+}
+if (function_exists('cmp_run_reminders')) {
+    $n = cmp_run_reminders();
+    echo "Complaint chases sent: $n\n";
 }

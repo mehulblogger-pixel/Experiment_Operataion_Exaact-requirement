@@ -123,6 +123,7 @@ try {
     require __DIR__ . '/lib/identity.php';
     require __DIR__ . '/lib/complaints.php';
     require __DIR__ . '/lib/capa.php';
+    require __DIR__ . '/lib/ncr.php';
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';
     require __DIR__ . '/lib/trust.php';
