@@ -63,7 +63,7 @@ matter, and they are all here.
 | # | What | Note |
 |---|---|---|
 | U1 | **Nothing is pinned in the navigation** | Favourites would be next, but it wants watching real use rather than guessing |
-| U11 | **No global record search** | The search box filters menu items, not records. 101 routes, no cross-entity search — blueprint 002 U2 |
+| U11 | **Global search is built, across 13 registers** | `lib/search.php` — customers, contacts, leads, inquiries, quotations, calls, deputations, reports, complaints, nonconformities, corrective actions, people, equipment. Own box in the top bar, "/" to reach it, a unique reference jumps straight to the record. **It is `LIKE '%term%'`, not a search index** — correct at today's volume, a table scan per source, and the thing to replace when a register passes roughly a million rows. That replacement needs B0 decided first — blueprint 002 U2 |
 | U12 | **No notification centre** | Flash messages and e-mail only; nothing persists — blueprint 002 U4 |
 | U13 | **The shared table is built, and adopted on 3 of 42 registers** | `lib/datatable.php` — server-side sorting on a whitelist, paging, per-user column choice, bulk actions, filter-aware CSV. Live on **activity, leads and nonconformities**. The other 39 still hand-roll their own `<table>` — blueprint 002 U1. **Inline editing and grouping are not built at all** |
 | U14 | **Accessibility is a shell everywhere the table has not reached** | Was 1 `aria-` attribute across 122 screens. The three adopted registers now carry 34–38 each (`th scope`, live `aria-sort`, an `sr-only` caption, labelled checkboxes) because the component supplies them. The other 119 screens are unchanged, and the 4 `:focus` rules in the stylesheet still stand — blueprint 002 U5 |
@@ -133,6 +133,46 @@ the nonconformity register, client acceptance of reports, multi-action
 corrective actions, branch scoping, portal permissions, site-entry documents,
 confidentiality, and the competence review cycle. Entries about them survive
 below as history; they are not open.
+
+## ▣ Global search — one box, thirteen registers (July 2026)
+
+Blueprint 002 U2. `lib/search.php`. The box in the navigation filters MENU
+ITEMS: it answers "where is the quotation screen" and never "where is quotation
+Q-2607-001". This one searches records, and it has its own box in the top bar so
+the two are not confusable.
+
+**Thirteen sources:** customers & vendors, contacts, leads, inquiries,
+quotations, inspection calls, deputations, reports, complaints & appeals,
+nonconformities, corrective actions, people, equipment. Searching a customer's
+name returns the company, the person you deal with there, the lead and the
+inquiry — in one page.
+
+**What makes it safe, each one verified:**
+
+* **A source the person cannot see is never queried.** Not queried and then
+  filtered — that is how row counts leak. Checked with a branch manager holding
+  a cut-down permission set: the sources offered matched their menu exactly.
+* **Branch scope applies here as on every register.** Checked with a
+  Mumbai-scoped user: their own job code jumped straight to the record; two job
+  codes from other branches returned an empty page, not a redirect and not a
+  title.
+* **The term is bound and its LIKE metacharacters are escaped**, so typing `%`
+  matches a literal percent sign instead of every row in the system.
+* **A source that throws is named on the page**, so "no results" and "that
+  register is broken" never look the same. Tested by forcing one to throw: the
+  other twelve returned their matches and Equipment was named as unavailable.
+
+**Typing a whole reference goes straight to the record** — but only when there
+is exactly one match and the term contains a digit, so somebody browsing towards
+a company by name is not thrown into a record.
+
+**Stated plainly, because it will matter later:** this is `LIKE '%term%'` with a
+small LIMIT per source, not a search index. A leading wildcard cannot use an
+index, so each source is a table scan — microseconds today, not microseconds at
+a million rows a table. MySQL FULLTEXT and SQLite FTS5 are different enough that
+maintaining both would guarantee they drift, so the right move is one index once
+the hosting decision (B0) is made. The sources are structured so they can be
+re-pointed at one without touching a screen.
 
 ## ▣ One table component, adopted on three registers (July 2026)
 

@@ -74,6 +74,9 @@
       </div>
       <p class="s-find-none" id="navFindNone" hidden>Nothing matches that.</p>
       <a class="s-item<?= $navOn(['']) ?>" href="/"><span class="s-ic">🏠</span><span>Dashboard</span></a>
+      <?php // Also in the top bar, but a destination in the menu is how people
+            // discover that searching records is a thing at all. ?>
+      <a class="s-item<?= $navOn(['search']) ?>" href="/search"><span class="s-ic">🔍</span><span>Search records</span></a>
 
       <?php // Every label below is the first words of the page heading it opens,
             // and every business noun comes from Settings -> Terminology. ?>
@@ -358,6 +361,17 @@
     <header class="topbar-slim">
       <button class="nav-toggle" aria-label="Menu" onclick="document.getElementById('side').classList.add('open');document.getElementById('scrim').classList.add('on');">☰</button>
       <a class="tb-brand" href="/"><?= e(app_name()) ?></a>
+      <?php // Records, not screens. The box in the rail below filters the MENU;
+            // this one searches what is IN the registers. They were confusable
+            // while there was only one of them, which is half of why nobody
+            // could find a record without knowing which register held it. ?>
+      <form class="tb-search" method="get" action="/search" role="search">
+        <label class="sr-only" for="gsearch">Search every register</label>
+        <input id="gsearch" type="search" name="q" autocomplete="off" spellcheck="false"
+               value="<?= e($cur === 'search' ? (string)($_GET['q'] ?? '') : '') ?>"
+               placeholder="Search records…  (/)">
+        <button type="submit" aria-label="Search">🔍</button>
+      </form>
       <div class="tb-spacer"></div>
       <?php if ($office): ?><span class="tb-chip">📍 <?= e($office) ?></span><?php endif; ?>
       <span class="tb-chip">FY <?= e(current_fy()) ?></span>
