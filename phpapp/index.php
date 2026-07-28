@@ -124,6 +124,7 @@ try {
     require __DIR__ . '/lib/complaints.php';
     require __DIR__ . '/lib/capa.php';
     require __DIR__ . '/lib/ncr.php';
+    require __DIR__ . '/lib/confidentiality.php';
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';
     require __DIR__ . '/lib/trust.php';
@@ -260,6 +261,9 @@ try {
     db()->query("SELECT id FROM tally_exports LIMIT 1");
     db()->query("SELECT perms FROM client_users LIMIT 1");
     db()->query("SELECT id FROM site_doc_requirements LIMIT 1");
+    db()->query("SELECT id FROM confidentiality_undertakings LIMIT 1");
+    db()->query("SELECT id FROM confidentiality_breaches LIMIT 1");
+    db()->query("SELECT id FROM client_ndas LIMIT 1");
     db()->query("SELECT sitedoc_override_note FROM jobs LIMIT 1");
     db()->query("SELECT id FROM internal_audits LIMIT 1");
     db()->query("SELECT id FROM audit_findings LIMIT 1");
