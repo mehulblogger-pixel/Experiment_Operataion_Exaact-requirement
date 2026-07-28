@@ -102,7 +102,7 @@ function module_groups() {
         'Marketing & Sales (CRM)' => ['inquiries','quotes','crm_orders','crm_reports'],
         'Inspection documentation' => ['idems'],
         'Operations'              => ['calls','jobs','vouchers','invoicing','profitability','hiring','reconcile'],
-        'Accreditation & compliance' => ['equipment','competence','impartiality','complaints','ncr','capa','audits','datacontrol','identity'],
+        'Accreditation & compliance' => ['equipment','competence','impartiality','complaints','ncr','capa','audits','datacontrol','identity','confidentiality'],
         'Directory & masters'     => ['clients','vendors','masters','overheads','portal'],
         'Insights & admin'        => ['reports','users','settings'],
     ];
@@ -142,6 +142,7 @@ const ACCESS_MODULES = [
     'identity'      => 'Identity documents (site access)',
     'complaints'    => 'Complaints & appeals',
     'ncr'           => 'Nonconformities',
+    'confidentiality' => 'Confidentiality (§4.2)',
     'capa'          => 'Corrective actions',
     'audits'        => 'Internal audits & management review',
     'datacontrol'   => 'Data & information control',

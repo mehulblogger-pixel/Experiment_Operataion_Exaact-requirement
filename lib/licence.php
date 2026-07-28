@@ -29,7 +29,7 @@
 const PRODUCT_MODULES = [
     'operations' => ['Operations', 'Inspection calls, deputations, scheduling, availability',
                      ['calls', 'jobs', 'reconcile', 'vouchers', 'equipment', 'competence', 'impartiality',
-                      'identity', 'complaints', 'ncr', 'capa', 'audits', 'datacontrol'], true],
+                      'identity', 'complaints', 'ncr', 'capa', 'audits', 'datacontrol', 'confidentiality'], true],
     'admin'      => ['Administration', 'Masters, users, offices, settings, parties',
                      ['masters', 'users', 'settings', 'clients', 'vendors', 'overheads', 'reports', 'portal'], true],
     'sales'      => ['Sales & CRM', 'Inquiries, quotations, approvals, sales dashboards',
