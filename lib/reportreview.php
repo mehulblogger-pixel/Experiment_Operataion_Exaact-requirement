@@ -306,3 +306,129 @@ function ops_report_reviews($route, $method) {
                                 'canAck' => can('mod.idems.edit') || can('mod.ncr.edit') || is_master()]);
     return true;
 }
+
+// ============================================================================
+//  A client raises a complaint, or appeals a decision, from the portal
+//
+//  ISO/IEC 17020 §7.5 requires a documented complaints process available to
+//  any interested party, and §7.6 an appeal against a decision. Both existed
+//  as a staff register and a public policy page — but a client had no way to
+//  actually lodge one. They e-mailed somebody, and whether it reached the
+//  register depended on whether that person typed it in. The population most
+//  at risk of going unrecorded was the one the clause is about.
+//
+//  Two things worth knowing:
+//
+//   1. **An appeal is against a decision, not a mood.** §7.6 means appealing
+//      the outcome of something we decided — so the form only offers appeals
+//      against that client's own complaints that have actually been decided.
+//      Anything else is a fresh complaint, which is a different clause.
+//   2. **The client sees status, never the investigation.** Who we assigned it
+//      to, what the engineer said in their defence, and the internal
+//      correspondence are not theirs. What is theirs is: we have it, we
+//      acknowledged it on this date, and here is the outcome we wrote to you
+//      about.
+// ============================================================================
+
+function pcmp_can() { return function_exists('cmp_create') && function_exists('portal_partner_id'); }
+
+// This client's own complaints and appeals, newest first.
+function pcmp_mine($limit = 100) {
+    if (!pcmp_can()) return [];
+    $pid = portal_partner_id();
+    if (!$pid) return [];
+    return rcr_try(fn() => ops_all(
+        "SELECT id, ref, kind, subject, received_on, acknowledged_on, status, outcome,
+                decided_on, notified_on, appeal_of_id
+         FROM complaints WHERE partner_id = ? ORDER BY id DESC LIMIT " . max(1, (int)$limit), [$pid]));
+}
+
+// Only decided complaints of this client can be appealed — §7.6 is an appeal
+// against a decision, and there is nothing to appeal until one has been made.
+function pcmp_appealable() {
+    if (!pcmp_can()) return [];
+    $pid = portal_partner_id();
+    if (!$pid) return [];
+    return rcr_try(fn() => ops_all(
+        "SELECT id, ref, subject, outcome, decided_on FROM complaints
+         WHERE partner_id = ? AND kind = 'COMPLAINT' AND outcome <> 'PENDING' AND decided_on <> ''
+         ORDER BY id DESC LIMIT 50", [$pid]));
+}
+
+function pcmp_create(array $b, $clientUser) {
+    if (!pcmp_can()) return 'Complaints cannot be raised here at the moment.';
+    $subject = trim((string)($b['subject'] ?? ''));
+    $detail  = trim((string)($b['description'] ?? ''));
+    if ($subject === '') return 'Please give it a one-line subject.';
+    if ($detail === '')  return 'Please tell us what happened.';
+
+    $appealOf = (int)($b['appeal_of_id'] ?? 0);
+    if ($appealOf) {
+        // Never trust the id in the form: it must be one of THIS client's own
+        // decided complaints, or an appeal could be attached to somebody else's.
+        $ok = false;
+        foreach (pcmp_appealable() as $c) if ((int)$c['id'] === $appealOf) { $ok = true; break; }
+        if (!$ok) return 'That is not one of your decided complaints, so it cannot be appealed.';
+    }
+
+    // Land it with the branch that did the work, when the client names a job.
+    $office = null; $jobId = null;
+    if (($b['job_id'] ?? '') !== '') {
+        $jobId = (int)$b['job_id'];
+        $j = rcr_try(fn() => ops_one(
+            "SELECT j.id, j.executing_office_id FROM jobs j
+             LEFT JOIN calls c ON c.id = j.call_id
+             WHERE j.id = ? AND c.client_id = ?", [$jobId, portal_partner_id()]), null);
+        if (!$j) { $jobId = null; }                       // not theirs — drop it silently
+        else $office = $j['executing_office_id'] !== null ? (int)$j['executing_office_id'] : null;
+    }
+
+    $id = cmp_create([
+        'kind'         => $appealOf ? 'APPEAL' : 'COMPLAINT',
+        'appeal_of_id' => $appealOf,
+        'source'       => 'CLIENT',
+        'channel'      => 'PORTAL',
+        'partner_id'   => portal_partner_id(),
+        'complainant_name'  => (string)($clientUser['name'] ?? ''),
+        'complainant_email' => (string)($clientUser['email'] ?? ''),
+        'complainant_phone' => substr(trim((string)($b['phone'] ?? '')), 0, 60),
+        'subject'      => $subject,
+        'description'  => $detail,
+        'job_id'       => $jobId,
+        'report_irn'   => substr(trim((string)($b['report_irn'] ?? '')), 0, 120),
+        'office_id'    => $office,
+        'received_by'  => ($clientUser['name'] ?? 'A client') . ' (client portal)',
+    ]);
+    if (!$id) return 'Sorry — that could not be recorded. Please try again.';
+    if (function_exists('portal_log')) portal_log($appealOf ? 'APPEAL_RAISED' : 'COMPLAINT_RAISED', $subject);
+    pcmp_notify($id, $appealOf > 0, $clientUser);
+    return '';
+}
+
+// §7.5.3: a complaint has to be acknowledged. Telling the office at once is
+// what makes that possible, and the deadline is already counted by the
+// complaints register itself.
+function pcmp_notify($complaintId, $isAppeal, $clientUser) {
+    if (!function_exists('ops_mail') || !function_exists('cmp_row')) return;
+    $c = cmp_row($complaintId);
+    if (!$c) return;
+    $to = [];
+    foreach (ops_all("SELECT email FROM users WHERE is_active=1 AND email <> ''") as $u) {
+        // Everyone who can decide one. Deliberately not a single inbox: an
+        // acknowledgement deadline that depends on one person reading their
+        // mail is a deadline that gets missed while they are on leave.
+        $to[] = $u['email'];
+    }
+    $to = array_slice(array_values(array_unique($to)), 0, 25);
+    $what = $isAppeal ? 'An appeal' : 'A complaint';
+    foreach ($to as $t) {
+        try {
+            ops_mail($t, "$what has been raised in the client portal — {$c['ref']}",
+                "$what was raised by " . ($clientUser['name'] ?? '') . " of "
+                . (portal_client_name() ?: 'a client') . ".\n\n"
+                . "Reference: {$c['ref']}\nSubject: {$c['subject']}\n\n{$c['description']}\n\n"
+                . "It must be acknowledged within the period set in the complaints policy. "
+                . "Open the complaints register to record the acknowledgement.");
+        } catch (Throwable $e) { /* the complaint is recorded whether or not the mail goes */ }
+    }
+}

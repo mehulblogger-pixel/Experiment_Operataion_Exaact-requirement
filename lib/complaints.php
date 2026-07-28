@@ -555,7 +555,11 @@ function cmp_create($b) {
                    substr(trim((string)($b['complainant_email'] ?? '')), 0, 200),
                    substr(trim((string)($b['complainant_phone'] ?? '')), 0, 60),
                    substr($subject, 0, 255), $desc,
-                   (string)($b['received_on'] ?? date('Y-m-d')), user_name(current_user()),
+                   (string)($b['received_on'] ?? date('Y-m-d')),
+                   // Who took it. A complaint raised in the client portal has no
+                   // staff user behind it, so the caller says who — otherwise the
+                   // register records the person who happened to load a page.
+                   substr(trim((string)($b['received_by'] ?? user_name(current_user()))), 0, 150),
                    ($b['job_id'] ?? '') !== '' ? (int)$b['job_id'] : ($parent['job_id'] ?? null),
                    substr(trim((string)($b['report_irn'] ?? ($parent['report_irn'] ?? ''))), 0, 120),
                    ($b['inspector_id'] ?? '') !== '' ? (int)$b['inspector_id'] : ($parent['inspector_id'] ?? null),
