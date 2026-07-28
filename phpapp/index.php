@@ -125,6 +125,7 @@ try {
     require __DIR__ . '/lib/capa.php';
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';
+    require __DIR__ . '/lib/trust.php';
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/seed_demo.php';
 } catch (Throwable $e) {
@@ -250,6 +251,12 @@ try {
     db()->query("SELECT id FROM sw_validations LIMIT 1");
     db()->query("SELECT id FROM data_check_runs LIMIT 1");
     db()->query("SELECT id FROM system_failures LIMIT 1");
+    db()->query("SELECT id FROM site_visits LIMIT 1");
+    db()->query("SELECT kind FROM site_visits LIMIT 1");
+    db()->query("SELECT photo_sha1 FROM site_visits LIMIT 1");
+    db()->query("SELECT id FROM evidence_chain LIMIT 1");
+    db()->query("SELECT geo_source FROM report_files LIMIT 1");
+    db()->query("SELECT verify_code FROM report_docs LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which
     // runs the same idempotent boot() and clears it. Each check is self-cancelling.
@@ -425,6 +432,15 @@ if ($route === 'logout') {
 // this one page sits in front of the gate. It is read-only and takes nothing in.
 if ($route === 'complaints-policy') {
     require __DIR__ . '/views/ops/complaints_policy.php';
+    exit;
+}
+
+// "Verify it yourself" is the whole point, so it cannot sit behind a password.
+// A client holding a report checks it here without an account and without
+// asking us. It shows whether the report is genuine and unaltered — and
+// nothing confidential.
+if ($route === 'verify') {
+    require __DIR__ . '/views/ops/verify.php';
     exit;
 }
 

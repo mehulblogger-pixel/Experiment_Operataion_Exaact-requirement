@@ -819,6 +819,24 @@ function idems_exif_taken($bytes) {
 // Supporting documents attached straight to the evidence gallery, outside any
 // field the report format defines. Same compression, duplicate guard and audit
 // trail as a template upload — they simply file under their own heading.
+// Write the trust facts onto a freshly-stored evidence row and add it to the
+// hash chain. Kept here, beside the two upload paths, so neither can gain a
+// third sibling that quietly skips it.
+//
+// The received time is OURS. The device's clock is attacker-controlled and, far
+// more often, simply wrong — so it is recorded for comparison and never used as
+// the time something happened.
+function idems_stamp_trust($fileId, $facts) {
+    if (!$fileId) return;
+    if ($facts && function_exists('chain_append')) {
+        db()->prepare("UPDATE report_files SET exif_lat=?, exif_lon=?, up_lat=?, up_lon=?, up_acc=?,
+                       geo_source=?, received_at=?, clock_skew=?, flags=? WHERE id=?")
+            ->execute([$facts['exif_lat'], $facts['exif_lon'], $facts['up_lat'], $facts['up_lon'], $facts['up_acc'],
+                       $facts['geo_source'], date('c'), (int)$facts['clock_skew'], $facts['flags'], $fileId]);
+    }
+    if (function_exists('chain_append')) chain_append($fileId);
+}
+
 const EVIDENCE_SUPPORTING_KEY = '_supporting';
 function idems_evidence_attach($doc, $caption = '') {
     if (empty($_FILES['doc']['name'])) { flash('Choose a file to attach.', 'error'); return; }
@@ -834,6 +852,18 @@ function idems_evidence_attach($doc, $caption = '') {
         $origLen = strlen($bytes);
         $mime = $types[$i] ?: 'application/octet-stream';
         $taken = (strpos($mime, 'image/') === 0) ? idems_exif_taken($bytes) : '';
+        // Where the CAMERA was, read out of the file itself — which survives the
+        // drive home and the evening spent writing the report. The browser's
+        // location is kept too, separately, and is never mistaken for it.
+        //
+        // READ BEFORE COMPRESSING. idems_compress_image() re-encodes through GD,
+        // and GD writes a clean JPEG — no EXIF, so no GPS. Doing this two lines
+        // later silently threw away the location of every photograph, and the
+        // screens went on saying "not in the photograph" as though the phone had
+        // never recorded one.
+        $gf = function_exists('evidence_geo_facts')
+            ? evidence_geo_facts($bytes, $mime, (string)($_POST['gps_supporting'] ?? ''), (int)($doc['job_id'] ?? 0))
+            : null;
         [$bytes, $mime, ] = idems_compress_image($bytes, $mime);
         $sha = sha1($bytes);
         if (ops_val("SELECT COUNT(*) FROM report_files WHERE report_doc_id=? AND sha1=?", [$doc['id'], $sha])) { $dupes++; continue; }
@@ -841,8 +871,10 @@ function idems_evidence_attach($doc, $caption = '') {
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
             ->execute([$doc['id'], EVIDENCE_SUPPORTING_KEY, strpos($mime, 'image/') === 0 ? 'photo' : 'file',
                 substr($names[$i], 0, 255), $mime, 'data:' . $mime . ';base64,' . base64_encode($bytes),
-                '', $sha, $taken ?: date('c'), strlen($bytes), $origLen, substr($caption, 0, 255),
+                '', $sha, ($gf && $gf['exif_at'] !== '') ? $gf['exif_at'] : ($taken ?: date('c')),
+                strlen($bytes), $origLen, substr($caption, 0, 255),
                 user_name(current_user()), date('c')]);
+        idems_stamp_trust((int)$pdo->lastInsertId(), $gf);
         $added++;
     }
     if ($added) idems_log('report_doc', $doc['id'], 'EVIDENCE', ['irn'=>$doc['irn'], 'new'=>$added . ' supporting document(s)']);
@@ -868,16 +900,23 @@ function idems_handle_uploads($doc, $fields) {
             $origLen = strlen($bytes);
             $mime = $types[$i] ?: 'application/octet-stream';
             $taken = ($f['ftype'] === 'photo') ? idems_exif_taken($bytes) : '';
+            // Same rule as the supporting-evidence path above: read the location
+            // out of the ORIGINAL bytes, because compression strips EXIF.
+            $gfPre = function_exists('evidence_geo_facts')
+                ? evidence_geo_facts($bytes, $mime, trim($_POST['gps'][$k] ?? ''), (int)($doc['job_id'] ?? 0)) : null;
             [$bytes, $mime, ] = idems_compress_image($bytes, $mime);
             $sha = sha1($bytes);
             // duplicate guard — same content already on this report
             if (ops_val("SELECT COUNT(*) FROM report_files WHERE report_doc_id=? AND sha1=?", [$doc['id'], $sha])) { $dupes++; continue; }
             $b64 = 'data:' . $mime . ';base64,' . base64_encode($bytes);
             $gps = trim($_POST['gps'][$k] ?? '');
+            $gf = $gfPre;
             $pdo->prepare("INSERT INTO report_files (report_doc_id,field_key,kind,file_name,mime,data,gps,sha1,taken_at,bytes,orig_bytes,created_by,created_at)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
                 ->execute([$doc['id'], $k, $f['ftype'], substr($names[$i], 0, 255), $mime, $b64, $gps, $sha,
-                    $taken ?: date('c'), strlen($bytes), $origLen, user_name(current_user()), date('c')]);
+                    ($gf && $gf['exif_at'] !== '') ? $gf['exif_at'] : ($taken ?: date('c')),
+                    strlen($bytes), $origLen, user_name(current_user()), date('c')]);
+            idems_stamp_trust((int)$pdo->lastInsertId(), $gf);
             $added++; $saved += max(0, $origLen - strlen($bytes));
         }
     }

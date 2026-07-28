@@ -1746,6 +1746,7 @@ function ops_module_gate($route) {
         'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'preflight'=>'settings',
+        'evidence-review'=>'idems','evidence-reviewed'=>'idems','checkin-photo'=>'jobs','checkin-settings'=>'idems',
         'data-control'=>'datacontrol','data-check-run'=>'datacontrol','sw-validation-add'=>'datacontrol',
         'failure-add'=>'datacontrol','failure-update'=>'datacontrol','failure-resolve'=>'datacontrol',
         'failure-capa'=>'datacontrol',
@@ -1917,6 +1918,9 @@ function ops_dispatch($route, $method) {
             ops_user_twofa_reset($method); return true;
         case $route === 'complaints' || $route === 'complaint' || strncmp($route, 'complaint-', 10) === 0:
             return ops_complaints($route, $method);
+        case $route === 'evidence-review' || $route === 'evidence-reviewed'
+             || $route === 'site-checkin' || $route === 'checkin-photo' || $route === 'checkin-settings':
+            return ops_trust($route, $method);
         case $route === 'data-control' || $route === 'data-check-run'
              || $route === 'sw-validation-add' || strncmp($route, 'failure-', 8) === 0:
             return ops_datacontrol($route, $method);
@@ -3900,6 +3904,13 @@ function ops_jobs($route, $method) {
             // before the job is called finished. Checked on the server, not only
             // in the browser: this is a promise made to a customer.
             if (($why = job_bills_block($job)) !== '') {
+                view('ops/job_close', ['job'=>$job,'error'=>$why]); return;
+            }
+            // Arrival and departure, where the company has asked for them. Off
+            // by default — a body whose engineers hand their phones in at a
+            // refinery gate cannot comply, and shipping it on would make the
+            // software wrong for them from the first day.
+            if (function_exists('site_visit_close_block') && ($why = site_visit_close_block($job)) !== '') {
                 view('ops/job_close', ['job'=>$job,'error'=>$why]); return;
             }
             // collect any configurable (extra) headings into JSON {code:amount}
