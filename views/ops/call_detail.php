@@ -1,3 +1,15 @@
+<?= function_exists('chain_strip') ? chain_strip('CALL', (int)$call['id'], 'CALL', (int)$call['id']) : '' ?>
+<?php // The join between selling and doing. It was empty on all 160 orders,
+      // because the field existed and no screen ever asked about it. Saying so
+      // here is how it stops being empty on the next one. ?>
+<?php if (empty($call['quotation_id'])): ?>
+  <div class="msg msg-warning" style="margin-bottom:12px">
+    <b>No quotation is linked to this order.</b>
+    Nobody can check the rate that was agreed, and the sale never joins up with the work or the invoice.
+    <a href="/call-edit?id=<?= (int)$call['id'] ?>"><b>Set the quotation</b></a>
+    — or type the contract number there if this was a direct order under a running contract.
+  </div>
+<?php endif; ?>
 <div class="master-head">
   <div><h1><?= e(T_DETAIL('call', $call['call_code'])) ?></h1>
     <p class="sub"><?= e($call['client_disp'] ?: $call['client_name'] ?: 'No client') ?> · <?= e(OPS_REGIONS[$call['region']] ?? '') ?></p></div>

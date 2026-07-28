@@ -77,6 +77,10 @@
       <?php // Also in the top bar, but a destination in the menu is how people
             // discover that searching records is a thing at all. ?>
       <a class="s-item<?= $navOn(['search']) ?>" href="/search"><span class="s-ic">🔍</span><span>Search records</span></a>
+      <?php // Where a handover between selling, doing and billing was skipped. ?>
+      <?php if (function_exists('chain_can') && chain_can()): ?>
+        <a class="s-item<?= $navOn(['flow-gaps']) ?>" href="/flow-gaps"><span class="s-ic">🔗</span><span>Where the flow is broken</span></a>
+      <?php endif; ?>
 
       <?php // Every label below is the first words of the page heading it opens,
             // and every business noun comes from Settings -> Terminology. ?>

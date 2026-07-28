@@ -57,6 +57,8 @@ const PLAIN = [
   // invoice and receipt form. The ledger and detail screens come from REGISTERS.
   '/invoices', '/invoices?f=draft', '/invoices?f=paid', '/invoices?f=all',
   '/to-bill', '/receipts', '/receipts?f=unallocated', '/invoice-new', '/receipt-new',
+  // The thread, and the report of where it is cut.
+  '/flow-gaps',
 ];
 
 // register path -> [link pattern to follow, extra screens built from that id]
@@ -80,7 +82,8 @@ const REGISTERS = [
   ['/leads?v=list',  /^\/lead\?id=(\d+)/,   ['/lead?id=%s']],
   ['/ncr?f=all',     /^\/ncr-item\?id=(\d+)/, ['/ncr-item?id=%s']],
   ['/invoices?f=all', /^\/invoice\?id=(\d+)/, ['/invoice?id=%s']],
-  ['/receipts',      /^\/receipt\?id=(\d+)/, ['/receipt?id=%s']],
+  ['/receipts',      /^\/receipt\?id=(\d+)/, ['/receipt?id=%s', '/trace?kind=RECEIPT&id=%s']],
+  ['/flow-gaps',     /^\/job\?id=(\d+)/,     ['/trace?kind=JOB&id=%s']],
   ['/invoices?f=all', /^\/ledger\?id=(\d+)/,  ['/ledger?id=%s', '/ledger?id=%s&from=2026-01-01&to=2026-12-31']],
 ];
 

@@ -1,5 +1,6 @@
 <?php $open = $l['status'] === 'OPEN'; ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/leads">Leads</a> › <?= e($l['ref']) ?></div>
+<?= function_exists('chain_strip') ? chain_strip('LEAD', (int)$l['id'], 'LEAD', (int)$l['id']) : '' ?>
 <div class="master-head"><div>
   <h1><?= e($l['company_name']) ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= e($l['ref']) ?>
