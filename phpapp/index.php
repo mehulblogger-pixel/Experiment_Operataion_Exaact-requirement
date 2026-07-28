@@ -248,6 +248,16 @@ try {
     db()->query("SELECT id FROM complaint_events LIMIT 1");
     db()->query("SELECT id FROM capa LIMIT 1");
     db()->query("SELECT id FROM capa_events LIMIT 1");
+    // Newest: a corrective action broken into its own tasks, the nonconformity
+    // register that feeds it, and the client's answer to an issued report. A
+    // miss on any of these upgrades a live database in one pass.
+    db()->query("SELECT id FROM capa_actions LIMIT 1");
+    db()->query("SELECT id FROM nonconformities LIMIT 1");
+    db()->query("SELECT id FROM ncr_events LIMIT 1");
+    db()->query("SELECT ncr_id FROM capa LIMIT 1");
+    db()->query("SELECT id FROM report_client_reviews LIMIT 1");
+    db()->query("SELECT client_decision FROM report_docs LIMIT 1");
+    db()->query("SELECT id FROM tally_exports LIMIT 1");
     db()->query("SELECT id FROM internal_audits LIMIT 1");
     db()->query("SELECT id FROM audit_findings LIMIT 1");
     db()->query("SELECT id FROM mgmt_reviews LIMIT 1");

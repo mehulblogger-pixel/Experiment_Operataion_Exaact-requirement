@@ -370,6 +370,23 @@ function can($perm) {
 function scope_offices() { return ua()['offices']; } // 'ALL' or int[]
 function scope_sbus() { return ua()['sbus']; }        // 'ALL' or string[]
 
+// Scope by office ALONE, for registers that have a branch but no Business Unit
+// — complaints and corrective actions, which record where something happened
+// rather than which unit sold it. Written separately rather than passing a fake
+// column to scope_clause(): a Business-Unit-scoped user matched against a
+// literal would have every row filtered out, and an empty register reads as
+// "nothing has gone wrong" instead of "you are not being shown it".
+//
+// A row with no office is deliberately visible to everyone. A nonconformity or
+// complaint that nobody assigned to a branch must not become invisible to every
+// branch — that is how things get lost.
+function scope_office_clause($officeCol) {
+    $off = scope_offices();
+    if ($off === 'ALL' || !is_array($off) || !$off) return ['1=1', []];
+    $ids = implode(',', array_map('intval', $off));
+    return ["($officeCol IS NULL OR $officeCol IN ($ids))", []];
+}
+
 // Build a WHERE fragment scoping calls/jobs by office + Business Unit. $officeCol is the
 // column holding the executing office id (nullable → treated as Ahmedabad).
 function scope_clause($officeCol, $sbuCol) {

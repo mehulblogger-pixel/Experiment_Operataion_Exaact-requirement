@@ -93,6 +93,19 @@ function capa_migrate() {
         effectiveness_note TEXT,
         status VARCHAR(20) DEFAULT 'OPEN', closed_on VARCHAR(20) DEFAULT '', closed_by VARCHAR(150) DEFAULT '',
         created_at VARCHAR(30) DEFAULT '')");
+    // A corrective action is rarely one thing. "Revise the procedure, retrain
+    // four inspectors, and add a check to the report form" is three tasks with
+    // three owners and three dates, and holding them in one action_plan text
+    // box meant none of them could be chased, owned or counted. The old single
+    // field is KEPT and still shown: it is the summary, and every record
+    // written before this change lives in it.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS capa_actions (
+        id $pk, capa_id INT, seq INT DEFAULT 0,
+        description TEXT, owner VARCHAR(150) DEFAULT '', due_on VARCHAR(20) DEFAULT '',
+        status VARCHAR(20) DEFAULT 'OPEN',
+        done_on VARCHAR(20) DEFAULT '', done_by VARCHAR(150) DEFAULT '', done_note VARCHAR(1000) DEFAULT '',
+        cancel_reason VARCHAR(500) DEFAULT '',
+        created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
     $pdo->exec("CREATE TABLE IF NOT EXISTS capa_events (
         id $pk, capa_id INT, at VARCHAR(30) DEFAULT '',
         action VARCHAR(40) DEFAULT '', actor VARCHAR(150) DEFAULT '', note VARCHAR(1000) DEFAULT '')");
@@ -109,7 +122,10 @@ function capa_verify_days() { $d = (int)setting_get('capa_verify_days', (string)
 
 // ---- Reading ----------------------------------------------------------------
 function capa_all($filter = []) {
-    $w = ['1=1']; $a = [];
+    // office_id was stored from the first day and never read, so a Pune manager
+    // saw every corrective action in the company. It is read now.
+    [$sw, $sa] = scope_office_clause('office_id');
+    $w = [$sw]; $a = $sa;
     if (!empty($filter['status'])) { $w[] = 'status = ?'; $a[] = $filter['status']; }
     if (!empty($filter['source'])) { $w[] = 'source = ?'; $a[] = $filter['source']; }
     if (!empty($filter['open']))   { $w[] = "status NOT IN ('CLOSED','CLOSED_FAILED')"; }
@@ -169,13 +185,95 @@ function capa_verify_overdue($c, $today = null) {
 
 // ---- Closing ----------------------------------------------------------------
 // The whole of §8.7 in one list, in the order somebody would work through it.
+// ---- The actions --------------------------------------------------------
+// A corrective action is rarely one thing. These are the tasks it breaks into,
+// each with its own owner and date, each chaseable and countable.
+function capa_actions($capaId) {
+    try {
+        return ops_all("SELECT * FROM capa_actions WHERE capa_id=? ORDER BY seq, id", [(int)$capaId]);
+    } catch (Throwable $e) { if (capa_missing_table($e)) return []; throw $e; }
+}
+
+// Still to do. A cancelled action counts as settled — somebody decided against
+// it and said why — but an open one blocks the close.
+function capa_actions_open($capaId) {
+    return array_values(array_filter(capa_actions($capaId), fn($a) => ($a['status'] ?? 'OPEN') === 'OPEN'));
+}
+
+function capa_action_add($capaId, array $b) {
+    $desc = trim((string)($b['description'] ?? ''));
+    if ($desc === '') return 'Say what has to be done.';
+    $seq = 1 + (int)ops_val("SELECT COALESCE(MAX(seq),0) FROM capa_actions WHERE capa_id=?", [(int)$capaId]);
+    $c = capa_row($capaId);
+    // Inherit the corrective action's own date rather than leaving it blank —
+    // an action with no date is an action nobody is late on.
+    $due = trim((string)($b['due_on'] ?? '')) ?: (string)($c['due_on'] ?? '');
+    db()->prepare("INSERT INTO capa_actions (capa_id,seq,description,owner,due_on,status,created_by,created_at)
+                   VALUES (?,?,?,?,?,'OPEN',?,?)")
+        ->execute([(int)$capaId, $seq, $desc,
+                   substr(trim((string)($b['owner'] ?? '')), 0, 150), $due,
+                   user_name(current_user()), date('c')]);
+    capa_log($capaId, 'ACTION_ADDED', $desc . ' — ' . (trim((string)($b['owner'] ?? '')) ?: 'no owner'));
+    return '';
+}
+
+function capa_action_done($actionId, $note = '', $on = null) {
+    $a = ops_one("SELECT * FROM capa_actions WHERE id=?", [(int)$actionId]);
+    if (!$a) return 'That action no longer exists.';
+    db()->prepare("UPDATE capa_actions SET status='DONE', done_on=?, done_by=?, done_note=? WHERE id=?")
+        ->execute([$on ?: date('Y-m-d'), user_name(current_user()),
+                   substr(trim((string)$note), 0, 1000), (int)$actionId]);
+    capa_log((int)$a['capa_id'], 'ACTION_DONE_ONE', $a['description']);
+    return '';
+}
+
+// Dropping an action needs a reason, for the same reason accepting a
+// nonconformity as it stands does: it is the convenient way out.
+function capa_action_cancel($actionId, $why) {
+    $why = trim((string)$why);
+    if ($why === '') return 'Say why this action is being dropped.';
+    $a = ops_one("SELECT * FROM capa_actions WHERE id=?", [(int)$actionId]);
+    if (!$a) return 'That action no longer exists.';
+    db()->prepare("UPDATE capa_actions SET status='CANCELLED', cancel_reason=?, done_on=?, done_by=? WHERE id=?")
+        ->execute([substr($why, 0, 500), date('Y-m-d'), user_name(current_user()), (int)$actionId]);
+    capa_log((int)$a['capa_id'], 'ACTION_CANCELLED', $a['description'] . ' — ' . $why);
+    return '';
+}
+
+function capa_action_reopen($actionId) {
+    $a = ops_one("SELECT * FROM capa_actions WHERE id=?", [(int)$actionId]);
+    if (!$a) return;
+    db()->prepare("UPDATE capa_actions SET status='OPEN', done_on='', done_by='', done_note='', cancel_reason='' WHERE id=?")
+        ->execute([(int)$actionId]);
+    capa_log((int)$a['capa_id'], 'ACTION_REOPENED', $a['description']);
+}
+
+// Every action past its date, across the whole register, for the nightly chase.
+function capa_actions_overdue($today = null) {
+    $today = $today ?: date('Y-m-d');
+    try {
+        return ops_all("SELECT a.*, c.ref, c.title FROM capa_actions a
+                        JOIN capa c ON c.id = a.capa_id
+                        WHERE a.status='OPEN' AND a.due_on <> '' AND a.due_on < ?
+                          AND c.status NOT IN ('CLOSED','CLOSED_FAILED')", [$today]);
+    } catch (Throwable $e) { if (capa_missing_table($e)) return []; throw $e; }
+}
+
 function capa_close_missing($c) {
     $miss = [];
     if (trim((string)($c['root_cause'] ?? '')) === '') $miss[] = 'record the root cause';
     if (trim((string)($c['rc_method'] ?? '')) === '')  $miss[] = 'say how the cause was worked out';
     // §8.7.2 d). One line in the standard, the most-missed line in practice.
     if (empty($c['similar_checked']))                  $miss[] = 'answer whether this happened, or could happen, elsewhere';
-    if (trim((string)($c['action_plan'] ?? '')) === '') $miss[] = 'record what will be done about it';
+    $acts = capa_actions((int)($c['id'] ?? 0));
+    if (!$acts && trim((string)($c['action_plan'] ?? '')) === '')
+        $miss[] = 'record what will be done about it';
+    // Closing the parent while a task under it is still open is how a
+    // corrective action gets marked done on the strength of the easy third of
+    // it. Cancelled counts as settled; somebody decided and said why.
+    $open = array_values(array_filter($acts, fn($a) => ($a['status'] ?? 'OPEN') === 'OPEN'));
+    if ($open) $miss[] = count($open) . ' action(s) still open: '
+        . implode('; ', array_map(fn($a) => trim(mb_substr((string)$a['description'], 0, 60)), $open));
     if (($c['completed_on'] ?? '') === '')             $miss[] = 'record that the action was carried out';
     // §8.7.3. The reason this register exists at all.
     if (($c['verified_on'] ?? '') === '')              $miss[] = 'go back and check whether it worked';
@@ -315,6 +413,7 @@ function ops_capa($route, $method) {
         if (!$c) { http_response_code(404); view('notfound'); return true; }
         view('ops/capa_detail', [
             'c' => $c, 'events' => capa_events($c['id']),
+            'actions' => capa_actions((int)$c['id']),
             'missing' => capa_close_missing($c), 'block' => capa_close_block($c),
             'follows' => !empty($c['follows_id']) ? capa_row((int)$c['follows_id']) : null,
             'followed' => capa_followups((int)$c['id']),
@@ -374,6 +473,29 @@ function ops_capa($route, $method) {
         redirect('/capa-item?id=' . $c['id']);
     }
 
+    if ($route === 'capa-action-add' && $method === 'POST') {
+        if (($err = capa_action_add((int)$c['id'], $_POST)) !== '') flash($err, 'error');
+        else flash('Action added.');
+        redirect('/capa-item?id=' . $c['id']);
+    }
+    if ($route === 'capa-action-done' && $method === 'POST') {
+        if (($err = capa_action_done((int)($_POST['action_id'] ?? 0), (string)($_POST['note'] ?? ''))) !== '')
+            flash($err, 'error');
+        else flash('Action marked done.');
+        redirect('/capa-item?id=' . $c['id']);
+    }
+    if ($route === 'capa-action-cancel' && $method === 'POST') {
+        if (($err = capa_action_cancel((int)($_POST['action_id'] ?? 0), (string)($_POST['why'] ?? ''))) !== '')
+            flash($err, 'error');
+        else flash('Action dropped, with the reason recorded.');
+        redirect('/capa-item?id=' . $c['id']);
+    }
+    if ($route === 'capa-action-reopen' && $method === 'POST') {
+        capa_action_reopen((int)($_POST['action_id'] ?? 0));
+        flash('Action reopened.');
+        redirect('/capa-item?id=' . $c['id']);
+    }
+
     if ($route === 'capa-plan' && $method === 'POST') {
         $due = trim((string)($_POST['due_on'] ?? ''));
         db()->prepare("UPDATE capa SET action_plan=?, owner=?, due_on=?, status=? WHERE id=?")
@@ -387,8 +509,14 @@ function ops_capa($route, $method) {
     }
 
     if ($route === 'capa-done' && $method === 'POST') {
-        if (trim((string)$c['action_plan']) === '') {
+        if (trim((string)$c['action_plan']) === '' && !capa_actions((int)$c['id'])) {
             flash('Record what was going to be done before recording that it was done.', 'error');
+            redirect('/capa-item?id=' . $c['id']);
+        }
+        if ($open = capa_actions_open((int)$c['id'])) {
+            flash('There ' . (count($open) === 1 ? 'is 1 action' : 'are ' . count($open) . ' actions')
+                . ' still open under this corrective action. Finish or drop '
+                . (count($open) === 1 ? 'it' : 'them') . ' first.', 'error');
             redirect('/capa-item?id=' . $c['id']);
         }
         $on = (string)($_POST['completed_on'] ?? date('Y-m-d'));

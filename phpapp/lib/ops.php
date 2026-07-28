@@ -1760,6 +1760,7 @@ function ops_module_gate($route) {
         'capa'=>'capa','capa-item'=>'capa','capa-new'=>'capa','capa-cause'=>'capa','capa-plan'=>'capa',
         'capa-done'=>'capa','capa-verify'=>'capa','capa-close'=>'capa','capa-escalate'=>'capa',
         'capa-settings'=>'capa','capa-from-complaint'=>'capa',
+        'capa-action-add'=>'capa','capa-action-done'=>'capa','capa-action-cancel'=>'capa','capa-action-reopen'=>'capa',
         'internal-audits'=>'audits','internal-audit'=>'audits','internal-audit-new'=>'audits',
         'audit-record'=>'audits','audit-finding-add'=>'audits','audit-finding-delete'=>'audits',
         'audit-finding-capa'=>'audits','audit-close'=>'audits','audit-settings'=>'audits',
