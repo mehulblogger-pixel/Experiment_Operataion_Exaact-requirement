@@ -30,6 +30,7 @@
         <?php
           $hint = [
             'LEAD'    => 'This work was never a lead — it came in as an enquiry or straight as an order.',
+            'OPPORTUNITY' => 'No opportunity. The deal itself was never tracked — only the paperwork it produced.',
             'INQUIRY' => 'No enquiry was recorded, so the quotation has nothing behind it.',
             'QUOTE'   => 'No quotation. The rate that was agreed is not on file anywhere.',
             'CALL'    => 'No order. Work with no order cannot be traced to a customer or a rate.',

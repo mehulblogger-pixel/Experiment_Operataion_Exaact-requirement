@@ -1,6 +1,23 @@
 <?php $open = $l['status'] === 'OPEN'; ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/leads">Leads</a> › <?= e($l['ref']) ?></div>
 <?= function_exists('chain_strip') ? chain_strip('LEAD', (int)$l['id'], 'LEAD', (int)$l['id']) : '' ?>
+<?php // A lead worth pursuing becomes an OPPORTUNITY, not an enquiry. The
+      // enquiry is paperwork; the opportunity is the deal, and it is what the
+      // forecast is built from. ?>
+<?php if ($canEdit && $l['status'] === 'OPEN' && function_exists('opp_can_edit') && opp_can_edit()): ?>
+  <?php $oppId = function_exists('opp_try') ? opp_try(fn() => ops_val("SELECT id FROM opportunities WHERE lead_id=?", [(int)$l['id']]), null) : null; ?>
+  <?php if ($oppId): ?>
+    <div class="msg msg-info" style="margin-bottom:12px">
+      This lead is being worked as <a href="/opportunity?id=<?= (int)$oppId ?>"><b>an opportunity</b></a>.
+    </div>
+  <?php else: ?>
+    <form method="post" action="/opportunity-from-lead" class="msg msg-info" style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <input type="hidden" name="lead_id" value="<?= (int)$l['id'] ?>">
+      <span>Worth pursuing? Open an <b>opportunity</b> — the deal itself, which is what the forecast counts. The lead stays as the record of where it came from.</span>
+      <button class="btn small" style="margin-left:auto">Open an opportunity</button>
+    </form>
+  <?php endif; ?>
+<?php endif; ?>
 <div class="master-head"><div>
   <h1><?= e($l['company_name']) ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= e($l['ref']) ?>
