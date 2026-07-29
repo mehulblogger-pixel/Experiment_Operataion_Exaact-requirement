@@ -32,12 +32,12 @@
 
   <?php if ($billable): ?>
     <h3 style="margin:18px 0 8px">Unbilled work for this customer</h3>
-    <p class="muted" style="font-size:13px;margin:0 0 10px">Tick what this invoice covers. One invoice across several deputations is normal for a monthly account, and each line keeps its link to the work.</p>
+    <p class="muted" style="font-size:13px;margin:0 0 10px">Tick what this invoice covers. One invoice across several <?= e(Tlp('job')) ?> is normal for a monthly account, and each line keeps its link to the work.</p>
     <div class="dt-scroll" style="border:1px solid var(--line);border-radius:10px">
       <table class="dt">
-        <caption class="sr-only">Unbilled deputations</caption>
+        <caption class="sr-only">Unbilled <?= e(Tlp('job')) ?></caption>
         <thead><tr><th scope="col" style="width:34px"><span class="sr-only">Include</span></th>
-          <th scope="col">Deputation</th><th scope="col">Closed</th><th scope="col" class="num">Value</th></tr></thead>
+          <th scope="col"><?= e(TH('job')) ?></th><th scope="col">Closed</th><th scope="col" class="num">Value</th></tr></thead>
         <tbody>
         <?php foreach ($billable as $j): ?>
           <tr><td><label class="sr-only" for="nj-<?= (int)$j['id'] ?>">Include <?= e($j['job_code']) ?></label>
@@ -50,7 +50,7 @@
       </table>
     </div>
   <?php elseif ($partner): ?>
-    <p class="muted" style="margin-top:14px">This customer has no closed, unbilled deputations. You can still add lines by hand once the draft exists.</p>
+    <p class="muted" style="margin-top:14px">This customer has no closed, unbilled <?= e(Tlp('job')) ?>. You can still add lines by hand once the draft exists.</p>
   <?php endif; ?>
 
   <button class="btn" style="margin-top:14px">Start the draft</button>

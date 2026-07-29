@@ -308,7 +308,7 @@
   <?php $ra = $job['report_approval']; $canAppr = function_exists('can_approve_report') && can_approve_report($job); ?>
   <div class="panel" style="border:1px solid <?= $ra==='APPROVED'?'var(--ok)':($ra==='REJECTED'?'var(--bad)':'var(--warn,#c90)') ?>">
     <?php if ($ra==='PENDING'): ?>
-      <b>🕓 Report awaiting approval</b> from <?= e($job['inspector_name'] ?: 'the inspector') ?>'s reporting manager.
+      <b>🕓 Report awaiting approval</b> from <?= e($job['inspector_name'] ?: 'the ' . Tl('engineer')) ?>'s reporting manager.
       <?php if ($canAppr): ?>
         <form method="post" action="/report-approve?id=<?= (int)$job['id'] ?>" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <input class="form-control" name="note" placeholder="Optional remark" style="max-width:280px">

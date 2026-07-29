@@ -112,7 +112,7 @@
   <h3 style="margin-top:0">Add a line</h3>
   <input type="hidden" name="invoice_id" value="<?= (int)$inv['id'] ?>">
   <div class="form-grid" style="gap:12px 16px">
-    <div><label>Bill a finished deputation</label>
+    <div><label>Bill a finished <?= e(Tl('job')) ?></label>
       <select name="job_id">
         <option value="">— or describe it below —</option>
         <?php foreach ($billable as $j): ?>

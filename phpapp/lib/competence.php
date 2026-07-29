@@ -127,10 +127,10 @@ const WITNESS_OUTCOME = ['PASS' => 'Competent — authorisation may stand', 'RET
 const AUTH_LEVELS = [
     'TRAINEE'    => 'Trainee',
     'SUPERVISED' => 'Under supervision',
-    'JUNIOR'     => 'Junior inspector',
+    'JUNIOR'     => 'Junior',
     'INSPECTOR'  => 'Inspector',
-    'SENIOR'     => 'Senior inspector',
-    'LEAD'       => 'Lead inspector',
+    'SENIOR'     => 'Senior',
+    'LEAD'       => 'Lead',
     'SPECIALIST' => 'Technical specialist',
     'AUTHORITY'  => 'Technical authority',
 ];

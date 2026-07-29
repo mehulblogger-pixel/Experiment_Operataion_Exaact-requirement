@@ -551,12 +551,12 @@ function portal_route($route, $method) {
             exit;
 
         case 'portal/calls':
-            portal_need('calls', 'inspection calls');
+            portal_need('calls', Tlp('call'));
             portal_view('calls', ['rows' => portal_calls()]);
             exit;
 
         case 'portal/call':
-            portal_need('calls', 'inspection calls');
+            portal_need('calls', Tlp('call'));
             $c = portal_call((int)($_GET['id'] ?? 0));
             if (!$c) { http_response_code(404); portal_view('notfound'); exit; }
             portal_view('call', ['c' => $c, 'jobs' => portal_jobs((int)$c['id'])]);
@@ -804,13 +804,25 @@ function ops_portal_admin($route, $method) {
 // ============================================================================
 
 const PORTAL_PERMS = [
-    'calls'          => 'See inspection calls and visits',
+    'calls'          => 'See work orders and visits',
     'reports'        => 'See issued reports and download them',
     'reports.decide' => 'Accept or reject a report on the company’s behalf',
     'invoices'       => 'See invoices and what is outstanding',
-    'request'        => 'Ask for an inspection',
+    'request'        => 'Ask for a new job',
     'complaint'      => 'Raise a complaint or an appeal',
 ];
+
+// A constant cannot call T(), so the labels that name a business noun are
+// re-worded here on the way to the screen. What is in the constant is only the
+// fallback, and is kept neutral for that reason.
+function portal_perm_labels() {
+    $m = PORTAL_PERMS;
+    $m['calls']          = 'See ' . Tlp('call') . ' and visits';
+    $m['reports']        = 'See issued ' . Tlp('report') . ' and download them';
+    $m['reports.decide'] = 'Accept or reject a ' . Tl('report') . ' on the company’s behalf';
+    $m['request']        = 'Ask for a new ' . Tl('call');
+    return $m;
+}
 
 // Starting points, not a cage — every one is editable after it is applied.
 const PORTAL_PRESETS = [

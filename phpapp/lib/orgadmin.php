@@ -238,8 +238,8 @@ function office_in_use($officeId) {
     if (!$officeId) return [];
     // Table name → what a person calls the things in it.
     $friendly = [
-        'calls' => 'inspection calls', 'jobs' => 'deputations', 'users' => 'people',
-        'inspectors' => 'inspection engineers', 'vouchers' => 'vouchers',
+        'calls' => Tlp('call'), 'jobs' => Tlp('job'), 'users' => 'people',
+        'inspectors' => Tlp('engineer'), 'vouchers' => 'vouchers',
         'quotations' => 'quotations', 'crm_inquiries' => 'inquiries',
         'business_partners' => 'clients and vendors', 'report_docs' => 'reports',
         'endorsements' => 'endorsements', 'work_norms' => 'working-hour norms',

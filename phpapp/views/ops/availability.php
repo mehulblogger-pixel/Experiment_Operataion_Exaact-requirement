@@ -162,7 +162,7 @@
 <?php endif; ?>
 
 <?php if (!$rows): ?>
-  <div class="panel"><p class="muted">No active inspectors are posted to your office(s) yet. Set an inspector's <strong>posted office</strong> on the Inspector master so they appear here.</p></div>
+  <div class="panel"><p class="muted">No active <?= e(Tlp('engineer')) ?> are posted to your office(s) yet. Set a <?= e(Tl('engineer')) ?>'s <strong>posted office</strong> on the Inspector master so they appear here.</p></div>
 <?php else: ?>
   <?php
     // group by office

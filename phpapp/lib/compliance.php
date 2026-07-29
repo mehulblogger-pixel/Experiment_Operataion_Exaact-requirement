@@ -209,7 +209,7 @@ function person_erase_preview($kind, $id) {
         return [
             'name'    => $c['name'],
             'removed' => ['their name', 'e-mail address', 'mobile and phone number', 'designation and department'],
-            'kept'    => ['the inspection calls and reports this contact appears on, with the name replaced by "Removed at request"',
+            'kept'    => ['the ' . Tlp('call') . ' and ' . Tlp('report') . ' this contact appears on, with the name replaced by "Removed at request"',
                           'the audit trail of who changed what, which this company is required to keep'],
         ];
     }
@@ -387,7 +387,7 @@ function compliance_status() {
             $ir['open'] . ' undecided, ' . $ir['unacceptable'] . ' judged unacceptable, '
             . $ir['declaration_due'] . ' of ' . $ir['people'] . ' people owing a declaration. This body is '
             . $ir['type_label'] . '.',
-            $bad ? 'Open the impartiality register. An undecided threat stops the work it touches from being allocated, so this is costing you deputations as well as marks.'
+            $bad ? 'Open the impartiality register. An undecided threat stops the work it touches from being allocated, so this is costing you ' . Tlp('job') . ' as well as marks.'
                  : ($ir['declaration_due'] ? 'Chase the outstanding declarations. A statement made once and never renewed is not a current statement.' : ''));
     }
     if (function_exists('competence_readiness')) {
@@ -522,7 +522,7 @@ function compliance_status() {
                 : $tr['on_site'] . ' of ' . $tr['photos'] . ' photographs (' . $tr['pct'] . '%) carry the location '
                 . 'the camera recorded at the moment they were taken.',
             $tr['photos'] && $tr['pct'] < 60
-                ? 'Location comes from inside the photograph, so it survives writing the report at home. Where a phone strips it, the site check-in on the deputation carries the fact instead — tell the engineers to use it.' : '');
+                ? 'Location comes from inside the photograph, so it survives writing the ' . Tl('report') . ' at home. Where a phone strips it, the site check-in on the ' . Tl('job') . ' carries the fact instead — tell the ' . Tlp('engineer') . ' to use it.' : '');
         $add('Trust layer', 'The evidence chain is unbroken',
             $tr['chain']['ok'] ? 'ok' : 'bad',
             $tr['chain']['ok'] ? $tr['chain']['entries'] . ' entries, each hashing the one before it.'

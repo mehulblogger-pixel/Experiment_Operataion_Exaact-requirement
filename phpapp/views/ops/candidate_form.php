@@ -5,7 +5,7 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/candidates"><?= e(TP('candidate')) ?></a> › <?= $cand ? 'Edit' : 'Add CV' ?></div>
 <div class="master-head">
   <div><h1><?= $cand ? 'Edit — ' . e(candidate_name($cand)) : 'Add candidate CV' ?></h1>
-    <p class="sub">Submit a candidate for project deputation. You can move them through Submitted → Shortlisted → Interview → Accept / Hold / Reject afterwards.</p></div>
+    <p class="sub">Submit a candidate for project work. You can move them through Submitted → Shortlisted → Interview → Accept / Hold / Reject afterwards.</p></div>
   <a class="btn secondary" href="/candidates">← Back</a>
 </div>
 

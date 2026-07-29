@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="ff"><label>Shape of the engagement</label>
       <select class="form-control" id="eng_sel" name="engagement_type">
         <?php $curEng = ($call['engagement_type'] ?? '') ?: 'SINGLE';
-              foreach (lk_options_or('engagement_type', ENGAGEMENT_TYPES) as $k => $v): ?>
+              foreach (lk_options_or('engagement_type', engagement_types()) as $k => $v): ?>
           <option value="<?= e($k) ?>" <?= $curEng === $k ? 'selected' : '' ?>><?= e($v) ?></option>
         <?php endforeach; ?>
       </select>

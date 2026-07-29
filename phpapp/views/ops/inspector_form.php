@@ -6,8 +6,8 @@
 ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › <a href="/m/inspectors"><?= e(TP('engineer')) ?></a> › <?= $ins ? 'Edit' : 'Add' ?></div>
 <div class="master-head">
-  <div><h1><?= $ins ? 'Edit — ' . e($ins['name']) : 'Add inspector' ?></h1></div>
-  <a class="btn secondary" href="/m/inspectors">← Back to Inspectors</a>
+  <div><h1><?= $ins ? 'Edit — ' . e($ins['name']) : 'Add ' . Tl('engineer') ?></h1></div>
+  <a class="btn secondary" href="/m/inspectors">← Back to <?= e(THP('engineer')) ?></a>
 </div>
 
 <form method="post" action="/m/inspectors/<?= $ins ? 'edit?id=' . (int)$ins['id'] : 'new' ?>" class="panel">
@@ -59,14 +59,14 @@
       <small class="muted">Skills come from the Trade you select. Add more under <a href="/lookup?key=skill">Skill</a>.</small></div>
   </div>
   <div style="margin-top:16px;">
-    <button class="btn" type="submit"><?= $ins ? 'Save inspector' : 'Add inspector' ?></button>
+    <button class="btn" type="submit"><?= $ins ? 'Save ' . Tl('engineer') : 'Add ' . Tl('engineer') ?></button>
     <a class="btn secondary" href="/m/inspectors">Cancel</a>
   </div>
 </form>
 
 <?php if ($ins): ?>
 <div class="panel">
-  <h3 class="tab-sub">Digital signature <span class="muted">— added automatically to this inspector's reports (IDEMS)</span></h3>
+  <h3 class="tab-sub">Digital signature <span class="muted">— added automatically to this <?= e(Tl('engineer')) ?>'s reports (IDEMS)</span></h3>
   <?php if (!empty($ins['signature'])): ?><div style="margin-bottom:8px"><img src="<?= e($ins['signature']) ?>" alt="signature" style="max-width:240px;border:1px solid var(--line);border-radius:8px;background:#fff"></div><?php endif; ?>
   <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>" enctype="multipart/form-data">
     <input type="hidden" name="_do" value="signature">
@@ -82,9 +82,9 @@
 
 <div class="panel">
   <h3 class="tab-sub">Certifications &amp; validity</h3>
-  <p class="sub">The system e-mails the inspector and the QA/QC nominee when a certificate is within a month of expiry. Once the hard copy is received, update the validity date here.
+  <p class="sub">The system e-mails the <?= e(Tl('engineer')) ?> and the QA/QC nominee when a certificate is within a month of expiry. Once the hard copy is received, update the validity date here.
     Tick <strong>Required</strong> on the ones this person may not work without — ISO/IEC 17020 §6.1. A required certificate that has lapsed
-    <strong>stops them being allocated</strong>; a manager can still allow it, but must say why, and the reason is kept on the deputation.</p>
+    <strong>stops them being allocated</strong>; a manager can still allow it, but must say why, and the reason is kept on the <?= e(Tl('job')) ?>.</p>
   <table class="grid">
     <tr><th>Certificate</th><th>Number</th><th>Issued</th><th>Valid to</th><th>Status</th><th>Required?</th><th>Actions</th></tr>
     <?php foreach ($certs as $c): $days = $c['valid_to'] ? (int)round((strtotime($c['valid_to']) - time())/86400) : null; ?>
@@ -131,13 +131,13 @@
 <?php if ($ins && is_master()): ?>
 <div class="panel" style="border:1px solid #d9b38c;background:#fffaf3">
   <h3 class="tab-sub">Allowances &amp; rates <span class="muted">— Super Admin only. Not visible to anyone else.</span></h3>
-  <p class="sub">Tick what this inspector is entitled to claim on the monthly voucher, and set their personal rate where it differs from the default. Blank rate = use the master default.</p>
+  <p class="sub">Tick what this <?= e(Tl('engineer')) ?> is entitled to claim on the monthly voucher, and set their personal rate where it differs from the default. Blank rate = use the master default.</p>
   <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>">
     <input type="hidden" name="_do" value="allow_save">
 
     <h4 class="tab-sub" style="margin-top:6px">Travel modes (per-km)</h4>
     <table class="grid">
-      <tr><th>Allowed</th><th>Mode</th><th>Basis</th><th>Default</th><th>This inspector's rate (<?= e(cur_sym()) ?>/km)</th></tr>
+      <tr><th>Allowed</th><th>Mode</th><th>Basis</th><th>Default</th><th>This <?= e(Tl('engineer')) ?>'s rate (<?= e(cur_sym()) ?>/km)</th></tr>
       <?php foreach ($travelModes as $m): $a = $allowMap['MODE'][$m['code']] ?? null; ?>
       <tr>
         <td><label class="chk"><input type="checkbox" name="allow_mode[<?= e($m['code']) ?>]" value="1" <?= ($a && $a['allowed'])?'checked':'' ?>></label></td>

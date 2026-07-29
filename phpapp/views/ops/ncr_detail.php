@@ -5,7 +5,7 @@
   <p class="sub" style="margin:2px 0 0">
     <span class="pill <?= $n['severity']==='MAJOR'?'p-bad':($n['severity']==='MINOR'?'p-warn':'p-mut') ?>"><?= e(ucfirst(strtolower($n['severity']))) ?></span>
     <span class="pill <?= $closed?'p-ok':'p-warn' ?>"><?= e(NCR_STATUS[$n['status']] ?? $n['status']) ?></span>
-    <?= e(NCR_SOURCES[$n['source']] ?? $n['source']) ?><?= $n['source_note'] ? ' — ' . e($n['source_note']) : '' ?>
+    <?= e(ncr_source_label($n['source'])) ?><?= $n['source_note'] ? ' — ' . e($n['source_note']) : '' ?>
   </p></div>
 </div>
 
@@ -22,7 +22,7 @@
   <table class="grid">
     <tr><th>Raised</th><td><?= e(fdate($n['detected_on'])) ?> by <?= e($n['detected_by'] ?: '—') ?></td>
         <th>Branch</th><td><?= e($n['office_name'] ?: '—') ?></td></tr>
-    <tr><th>Deputation</th><td><?= $n['job_id'] ? '<a href="/job?id=' . (int)$n['job_id'] . '">' . e($n['job_code']) . '</a>' : '—' ?></td>
+    <tr><th><?= e(TH('job')) ?></th><td><?= $n['job_id'] ? '<a href="/job?id=' . (int)$n['job_id'] . '">' . e($n['job_code']) . '</a>' : '—' ?></td>
         <th>Client / party</th><td><?= e($n['display_name'] ?: $n['legal_name'] ?: '—') ?></td></tr>
     <tr><th>Owner</th><td><?= e($n['owner'] ?: '—') ?></td>
         <th>Due</th><td><?= $n['due_on'] ? e(fdate($n['due_on'])) : '—' ?></td></tr>

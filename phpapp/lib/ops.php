@@ -1396,7 +1396,7 @@ function ops_run_reminders($today = null) {
                     $client = $ctx['client_disp'] ?: $ctx['client_name'];
                     $eb = "ESCALATION — report overdue by {$overdueDays} day(s).\n\nJob: {$ctx['job_code']}\nClient: {$client}\n"
                         . "Inspector: {$ctx['inspector_name']}\nInspection ended: {$ctx['inspection_end_date']}\n{$why}.\n\n"
-                        . "The report is still not uploaded. Please follow up with the inspector.\n\n" . app_name();
+                        . "The report is still not uploaded. Please follow up with the " . Tl('engineer') . ".\n\n" . app_name();
                     ops_mail($mgrEmail, "OVERDUE report: {$ctx['job_code']} — {$client} ({$overdueDays}d)", $eb, manager_emails(), 'escalation');
                     db()->prepare("UPDATE jobs SET last_escalation=? WHERE id=?")->execute([$today, $j['id']]);
                     $sent++;
@@ -1578,7 +1578,7 @@ function ops_masters() {
             'label' => 'Sub-contractors', 'table' => 'subcons', 'access' => 'coordinator', 'order' => 'agency',
             'fields' => [
                 ['agency','Agency','text',['req'=>1]],
-                ['inspector_name','Inspector name','text',[]],
+                ['inspector_name',TH('engineer') . ' name','text',[]],
                 ['skill','Skill','text',[]],
                 ['experience_level','Experience','select',['opts'=>EXP_LEVELS]],
                 ['regions','Regions covered','text',[]],
@@ -1850,7 +1850,7 @@ function ops_module_gate($route) {
         $owner = function_exists('licence_owner') ? licence_owner($mod) : null;
         ops_require(false, ($owner && !licence_enabled($owner))
             ? 'The ' . PRODUCT_MODULES[$owner][0] . ' module is not switched on for this installation.'
-            : 'You don’t have access to the ' . (ACCESS_MODULES[$mod] ?? $mod) . ' module. Ask your administrator.');
+            : 'You don’t have access to the ' . access_module_label($mod) . ' module. Ask your administrator.');
     }
 }
 
@@ -3119,13 +3119,13 @@ function send_forward_email($callId) {
     $client = $c['client_disp'] ?: $c['client_name'];
     $to = $c['coordinator_email'];
     $cc = (!empty($c['notify_manager']) && $c['manager_email']) ? $c['manager_email'] : '';
-    $body = "Dear {$c['coordinator_name']},\n\nAn inspection call is forwarded to {$c['office_name']} for execution.\n\n"
+    $body = "Dear {$c['coordinator_name']},\n\nA " . Tl('call') . " is forwarded to {$c['office_name']} for execution.\n\n"
         . "Call: {$c['call_code']}\nClient: {$client}\nVendor/Site: {$c['vendor_name']}\n"
         . "Region: " . (OPS_REGIONS[$c['region']] ?? $c['region']) . "\nSBU: " . (OPS_SBUS[$c['sbu']] ?? $c['sbu']) . "\n"
         . "Activity: " . ($c['activity_id'] ? lk_value_path($c['activity_id']) : '—') . "\n"
         . "Client required date: {$c['inspection_required_date']}\n"
         . "Credit to executing branch: " . fmoney($c['expected_credit']) . " (" . (CREDIT_TYPES[$c['credit_type']] ?? '') . ")\n"
-        . "Please allocate an inspector.\n\nRegards,\n" . app_name() . " (Managing office)";
+        . "Please allocate a " . Tl('engineer') . ".\n\nRegards,\n" . app_name() . " (Managing office)";
     ops_mail($to, "Call forwarded: {$c['call_code']} — {$client}", $body, $cc, 'forward');
 }
 
@@ -3267,7 +3267,7 @@ function ops_candidates($route, $method) {
                     $pdo->prepare("UPDATE requisitions SET hired_inspector_id=?, status='HIRED' WHERE id=?")->execute([$insId, (int)$cand['requisition_id']]);
                     $msg .= ' Requisition filled.';
                 }
-                $msg .= ' Added to Inspectors (' . ($roll === 'AGENCY' ? 'on agency roll' : 'on our roll') . ') — you can now allocate deputation jobs to them.';
+                $msg .= ' Added to ' . THP('engineer') . ' (' . ($roll === 'AGENCY' ? 'on agency roll' : 'on our roll') . ') — you can now allocate ' . Tlp('job') . ' to them.';
             }
             flash($msg);
         }
@@ -3352,9 +3352,9 @@ function ops_candidates($route, $method) {
 function my_inspector_id() { $u = current_user(); return $u['inspector_id'] ?? null; }
 // Friendly, actionable message when an Inspector login has no inspector profile linked.
 function inspector_link_msg() {
-    return 'Your login isn’t linked to an inspector profile yet, so "My Jobs" and "My Voucher" can’t open. '
-         . 'An administrator can fix this in Users → open your name → set "Linked inspector" '
-         . '(if your inspector record doesn’t exist yet, add it under Inspectors first).';
+    return 'Your login isn’t linked to a ' . Tl('engineer') . ' profile yet, so "My Jobs" and "My Voucher" can’t open. '
+         . 'An administrator can fix this in Users → open your name → set "Linked ' . Tl('engineer') . '" '
+         . '(if your ' . Tl('engineer') . ' record doesn’t exist yet, add it under ' . THP('engineer') . ' first).';
 }
 function voucher_owner_is_me($v) { return my_inspector_id() && (int)$v['inspector_id'] === (int)my_inspector_id(); }
 function can_view_voucher($v) { return is_coordinator_level() || voucher_owner_is_me($v); }
@@ -3484,7 +3484,7 @@ function ops_vouchers($route, $method) {
         if (!$id) { // find-or-create for inspector + month
             $insId = is_coordinator_level() ? (int)($_GET['ins'] ?? 0) : (int)my_inspector_id();
             $month = preg_match('/^\d{4}-\d{2}$/', $_GET['month'] ?? '') ? $_GET['month'] : date('Y-m');
-            if (!$insId) { flash('Pick an inspector first.', 'error'); redirect('/vouchers'); }
+            if (!$insId) { flash('Pick a ' . Tl('engineer') . ' first.', 'error'); redirect('/vouchers'); }
             $v = ops_one("SELECT * FROM vouchers WHERE inspector_id=? AND month=?", [$insId, $month]);
             if (!$v) {
                 $pdo->prepare("INSERT INTO vouchers (inspector_id,office_id,month,status,created_by,created_at) VALUES (?,?,?, 'DRAFT', ?,?)")

@@ -33,7 +33,7 @@ const PRODUCT_MODULES = [
     // delivered. It is not core: a trading company, a consultancy or an agency
     // buying the CRM has no deputations to schedule. What IS core is
     // administration, because every install needs masters, users and settings.
-    'operations' => ['Operations', 'Inspection calls, deputations, scheduling, availability',
+    'operations' => ['Operations', 'Work orders, jobs, scheduling, availability',
                      ['calls', 'jobs', 'reconcile', 'vouchers', 'equipment', 'competence', 'impartiality',
                       'identity', 'complaints', 'ncr', 'capa', 'audits', 'datacontrol', 'confidentiality',
                       'overheads'], false],

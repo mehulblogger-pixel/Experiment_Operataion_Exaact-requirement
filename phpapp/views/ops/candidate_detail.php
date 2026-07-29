@@ -32,8 +32,8 @@
   </div>
   <?php if ($cand['remarks']): ?><p class="muted" style="margin-top:8px">Remarks: <?= e($cand['remarks']) ?></p><?php endif; ?>
   <?php if ($cand['inspector_id']): ?>
-    <p class="msg msg-success" style="margin-top:10px">Hired — this candidate is now inspector
-      <a href="/m/inspectors/edit?id=<?= (int)$cand['inspector_id'] ?>">#<?= (int)$cand['inspector_id'] ?></a>. Allocate deputation jobs from the Jobs screen.</p>
+    <p class="msg msg-success" style="margin-top:10px">Hired — this candidate is now <?= e(Tl('engineer')) ?>
+      <a href="/m/inspectors/edit?id=<?= (int)$cand['inspector_id'] ?>">#<?= (int)$cand['inspector_id'] ?></a>. Allocate <?= e(Tlp('job')) ?> from the <?= e(THP('job')) ?> screen.</p>
   <?php endif; ?>
 </div>
 

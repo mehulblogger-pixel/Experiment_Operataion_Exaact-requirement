@@ -14,7 +14,7 @@
 
 <?php if (!$doc): ?>
 <form method="get" action="/document-new" class="panel" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
-  <div class="ff" style="margin:0;flex:1;min-width:240px"><label>Start from an inspection call <span class="muted">— everything known is filled in for you</span></label>
+  <div class="ff" style="margin:0;flex:1;min-width:240px"><label>Start from a <?= e(Tl('call')) ?> <span class="muted">— everything known is filled in for you</span></label>
     <select class="form-control searchable" name="call" onchange="this.form.submit()"><option value="">— select a call —</option>
       <?php foreach (($calls ?? []) as $c): ?><option value="<?= (int)$c['id'] ?>" <?= (string)($_GET['call'] ?? '')===(string)$c['id']?'selected':'' ?>><?= e($c['call_code']) ?><?= $c['client_nm'] ? ' · '.e($c['client_nm']) : '' ?></option><?php endforeach; ?>
     </select></div>

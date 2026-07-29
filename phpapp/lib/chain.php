@@ -45,11 +45,21 @@ const CHAIN_STAGES = [
     'INQUIRY'     => ['Enquiry',     '📨', '/inquiry-edit?id='],
     'QUOTE'       => ['Quotation',   '📝', '/quote?id='],
     'CALL'        => ['Order',       '📞', '/call?id='],
-    'JOB'         => ['Deputation',  '🗂', '/job?id='],
+    'JOB'         => [null,          '🗂', '/job?id='],   // label from T('job') at read time
     'REPORT'      => ['Report',      '📑', '/document?id='],
     'INVOICE'     => ['Invoice',     '🧾', '/invoice?id='],
     'RECEIPT'     => ['Money in',    '💰', '/receipt?id='],
 ];
+
+// Same as elsewhere: the labels that name a business noun are null in the
+// constant and completed here, where the terminology engine is available.
+function chain_stages() {
+    $m = CHAIN_STAGES;
+    $m['CALL'][0] = TH('call');
+    $m['JOB'][0]  = TH('job');
+    return $m;
+}
+
 
 function chain_try($fn, $fb = null) {
     try { return $fn(); } catch (Throwable $e) { return $fb; }
@@ -276,7 +286,7 @@ function chain_strip($kind, $id, $hereKind = '', $hereId = 0) {
     if (!$any) return '';
 
     $h = '<nav class="chain" aria-label="Where this sits, from enquiry to payment">';
-    foreach (CHAIN_STAGES as $key => [$label, $icon, $url]) {
+    foreach (chain_stages() as $key => [$label, $icon, $url]) {
         $rows = $chain[$key] ?? [];
         if (!$rows) {
             $h .= '<span class="chain-step chain-none" title="' . e($label) . ' — nothing at this stage">'
@@ -321,8 +331,8 @@ function chain_gaps() {
     [$jw, $ja] = scope_clause('j.executing_office_id', 'j.sbu');
     $g['job_no_report'] = [
         'label' => 'Work closed with no report on file',
-        'why'   => 'The deputation is closed but no report is linked to it, so what the customer was actually sent is not in the system.',
-        'fix'   => 'Open the deputation and attach or raise the report.',
+        'why'   => 'The ' . Tl('job') . ' is closed but no ' . Tl('report') . ' is linked to it, so what the customer was actually sent is not in the system.',
+        'fix'   => 'Open the ' . Tl('job') . ' and attach or raise the ' . Tl('report') . '.',
         'rows'  => chain_all("SELECT j.id, j.job_code ref, j.closed_at d, i.name who
                               FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id
                               WHERE $jw AND j.closed_flag=1
@@ -349,9 +359,9 @@ function chain_gaps() {
     ];
 
     $g['job_no_call'] = [
-        'label' => 'Deputations under no order',
+        'label' => THP('job') . ' under no ' . Tl('order') . '',
         'why'   => 'Somebody was sent to do work with no order behind it, so it cannot be traced to a customer, a rate or a quotation.',
-        'fix'   => 'Open the deputation and set the order.',
+        'fix'   => 'Open the ' . Tl('job') . ' and set the ' . Tl('order') . '.',
         'rows'  => chain_all("SELECT j.id, j.job_code ref, j.scheduled_date d, i.name who
                               FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id
                               WHERE $jw AND (j.call_id IS NULL OR j.call_id=0)

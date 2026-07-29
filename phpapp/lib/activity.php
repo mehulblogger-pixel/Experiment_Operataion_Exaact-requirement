@@ -52,14 +52,24 @@ const ACT_ENTITIES = [
     'OPPORTUNITY' => ['Opportunity',   '/opportunity?id='],
     'INQUIRY'   => ['Inquiry',         '/inquiry-edit?id='],
     'QUOTE'     => ['Quotation',       '/quote?id='],
-    'CALL'      => ['Inspection call', '/call?id='],
-    'JOB'       => ['Deputation',      '/job?id='],
+    'CALL'      => [null,               '/call?id='],   // labels for these two come from
+    'JOB'       => [null,               '/job?id='],    // act_entities(), where T() can be called
     'REPORT'    => ['Report',          '/document?id='],
     'INVOICE'   => ['Invoice',         '/job?id='],
     'COMPLAINT' => ['Complaint',       '/complaint?id='],
     'NCR'       => ['Nonconformity',   '/ncr-item?id='],
     'CAPA'      => ['Corrective action','/capa-item?id='],
 ];
+
+// A constant cannot call T(), so the two entries that name a business noun are
+// left null above and filled in here.
+function act_entities() {
+    $m = ACT_ENTITIES;
+    $m['CALL'][0] = TH('call');
+    $m['JOB'][0]  = TH('job');
+    return $m;
+}
+
 
 const ACT_DIRECTIONS = ['IN' => 'Incoming', 'OUT' => 'Outgoing', '' => ''];
 
@@ -235,7 +245,8 @@ function act_link($a) {
 }
 function act_entity_label($a) {
     $k = (string)$a['entity_kind'];
-    return isset(ACT_ENTITIES[$k]) ? ACT_ENTITIES[$k][0] : '';
+    $m = act_entities();
+    return isset($m[$k]) ? $m[$k][0] : '';
 }
 
 // ---- The screen ------------------------------------------------------------

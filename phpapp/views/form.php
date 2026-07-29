@@ -56,7 +56,7 @@
           <option value="<?= e($k) ?>" <?= $mmb === $k ? 'selected' : '' ?>><?= e($v) ?></option>
         <?php endforeach; ?>
       </select>
-      <small class="muted">Only matters for monthly deputations. The default is under <a href="/settings">Settings</a>.</small></div>
+      <small class="muted">Only matters for monthly <?= e(Tlp('job')) ?>. The default is under <a href="/settings">Settings</a>.</small></div>
     <div class="ff"><label>Minimum working days in their man-month</label>
       <input class="form-control" type="number" min="1" max="31" name="manmonth_min_days"
              value="<?= e((($p['manmonth_min_days'] ?? 0) ?: '')) ?>" placeholder="e.g. 26">

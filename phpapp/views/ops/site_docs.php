@@ -74,7 +74,7 @@
     <div class="ff-wide">
       <label style="display:flex;gap:8px;align-items:flex-start;font-weight:400">
         <input type="checkbox" name="is_mandatory" value="1" checked>
-        <span>This one <b>blocks</b> the allocation. A manager can still send somebody, but only by stating why — and that reason stays on the deputation. Untick to warn only.</span></label></div>
+        <span>This one <b>blocks</b> the allocation. A manager can still send somebody, but only by stating why — and that reason stays on the <?= e(Tl('job')) ?>. Untick to warn only.</span></label></div>
     <div class="ff-wide"><label>Note <span class="muted">(what the site actually asks for)</span></label>
       <input name="note" maxlength="400" placeholder="e.g. Gate pass must be applied for 7 days ahead through their security office"></div>
   </div>

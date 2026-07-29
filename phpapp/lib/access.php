@@ -33,13 +33,16 @@ const PERMISSIONS = [
     // What the branch actually keeps — the invoice less any credit passed over.
     // Held apart from the credit itself: a coordinator has to see the credit to
     // do their job, and does not need to see what the branch earns on it.
-    'data.revenue'    => 'See the revenue figure on a call / deputation',
+    // The labels below that name a business noun are re-worded by perm_label()
+    // on the way to the screen — a constant cannot call T(). What is written
+    // here is only the fallback, so it stays neutral too.
+    'data.revenue'    => 'See the revenue figure on a work order / job',
     'data.salary'     => 'See salary / loaded cost',
     'data.profitability' => 'See profitability by contract number',
-    'ops.call.create' => 'Create / edit calls',
+    'ops.call.create' => 'Create / edit work orders',
     'ops.job.allocate'=> 'Allocate / edit jobs',
     'ops.job.close'   => 'Close jobs',
-    'ops.call.delete' => 'Delete calls',
+    'ops.call.delete' => 'Delete work orders',
     'master.manage'   => 'Manage master data',
     'finance.reconcile'=> 'Credit reconciliation',
     'users.manage.branch' => 'Manage users in own office',
@@ -53,8 +56,8 @@ const PERMISSIONS = [
     'crm.contract.register' => 'Register client & contract (Accounts)',
     'crm.template.manage' => 'Manage quote / e-mail templates',
     // ---- Workforce & organisation ----
-    'workforce.availability' => 'Manage the inspector availability board',
-    'workforce.report.approve' => 'Approve inspection reports (reporting manager)',
+    'workforce.availability' => 'Manage the availability board',
+    'workforce.report.approve' => 'Approve reports (reporting manager)',
     'org.hierarchy.view'  => 'View the organisation hierarchy',
     // ---- IDEMS (inspection documentation & endorsement) ----
     'idems.finalize'      => 'Finalize / issue & lock inspection reports',
@@ -155,12 +158,45 @@ const ACCESS_MODULES = [
     'settings'      => 'Settings',
 ];
 
+// ---- Labels that follow the company's own wording --------------------------
+//  PERMISSIONS and ACCESS_MODULES are PHP constants, so their labels cannot
+//  call T() where they are declared — a constant expression may not contain a
+//  function call. The words are therefore fixed at the point of declaration and
+//  bent here, on the way to the screen. Only the entries that actually name a
+//  business noun appear below; everything else is already neutral.
+function perm_label($key, $fallback = '') {
+    static $m = null;
+    if ($m === null) $m = [
+        'data.revenue'           => 'See the revenue figure on a ' . Tl('call') . ' / ' . Tl('job'),
+        'ops.call.create'        => 'Create / edit ' . Tlp('call'),
+        'ops.job.allocate'       => 'Allocate / edit ' . Tlp('job'),
+        'ops.job.close'          => 'Close ' . Tlp('job'),
+        'ops.call.delete'        => 'Delete ' . Tlp('call'),
+        'workforce.availability' => 'Manage the ' . Tl('engineer') . ' availability board',
+    ];
+    return $m[$key] ?? ($fallback !== '' ? $fallback : (PERMISSIONS[$key] ?? $key));
+}
+
+function access_module_label($k) {
+    static $m = null;
+    if ($m === null) $m = [
+        'calls'   => TP('call'),
+        'jobs'    => TP('job'),
+        'idems'   => THP('report') . ' (IDEMS)',
+        'clients' => TP('client'),
+        'vendors' => TP('vendor'),
+    ];
+    return $m[$k] ?? (ACCESS_MODULES[$k] ?? $k);
+}
+
 // Full permission map = fine-grained perms + per-module view/edit perms.
 function all_permissions() {
-    $p = PERMISSIONS;
+    $p = [];
+    foreach (PERMISSIONS as $k => $lbl) $p[$k] = perm_label($k, $lbl);
     foreach (ACCESS_MODULES as $k => $lbl) {
-        $p["mod.$k.view"] = "$lbl — view";
-        $p["mod.$k.edit"] = "$lbl — add / edit";
+        $l = access_module_label($k);
+        $p["mod.$k.view"] = "$l — view";
+        $p["mod.$k.edit"] = "$l — add / edit";
     }
     return $p;
 }

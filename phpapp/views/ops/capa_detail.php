@@ -156,7 +156,7 @@
   <form method="post" action="/capa-action-add" class="inline-add">
     <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
     <div class="ff ff-wide"><label>Add an action</label>
-      <input class="form-control" name="description" placeholder="e.g. Retrain the four inspectors who use the UT gauge"></div>
+      <input class="form-control" name="description" placeholder="e.g. Retrain the four people who use the UT gauge"></div>
     <div class="ff"><label>Whose job</label><input class="form-control" name="owner" placeholder="name or e-mail"></div>
     <div class="ff"><label>By when</label><input class="form-control" type="date" name="due_on"></div>
     <button class="btn small secondary" type="submit">Add</button>

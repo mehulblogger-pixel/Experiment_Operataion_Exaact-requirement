@@ -190,14 +190,14 @@ function integrity_checks() {
     };
 
     // ---- Transfers between records: does everything still point somewhere? --
-    $add('job_call', 'Every deputation belongs to a real inspection call',
-        'A deputation whose call has gone is work nobody can trace back to an instruction.',
+    $add('job_call', 'Every ' . Tl('job') . ' belongs to a real ' . Tl('call'),
+        'A ' . Tl('job') . ' whose ' . Tl('call') . ' has gone is work nobody can trace back to an instruction.',
         "SELECT COUNT(*) FROM jobs WHERE call_id IS NOT NULL AND call_id NOT IN (SELECT id FROM calls)");
-    $add('job_inspector', 'Every allocated deputation names a person who exists',
+    $add('job_inspector', 'Every allocated ' . Tl('job') . ' names a person who exists',
         'The name on the report has to resolve to somebody on the register.',
         "SELECT COUNT(*) FROM jobs WHERE inspector_id IS NOT NULL AND inspector_id NOT IN (SELECT id FROM inspectors)");
-    $add('bill_job', 'Every expense bill belongs to a real deputation',
-        'A bill with no deputation cannot be charged to anybody.',
+    $add('bill_job', 'Every expense bill belongs to a real ' . Tl('job'),
+        'A bill with no ' . Tl('job') . ' cannot be charged to anybody.',
         "SELECT COUNT(*) FROM job_bills WHERE job_id NOT IN (SELECT id FROM jobs)");
     $add('cert_person', 'Every certificate belongs to a person who exists',
         'A ticket attached to nobody would still count towards competence.',
@@ -222,7 +222,7 @@ function integrity_checks() {
     $add('complaint_closed', 'No complaint is closed without the complainant being told',
         'The §7.5 gate is enforced on screen; this proves nothing got past it another way.',
         "SELECT COUNT(*) FROM complaints WHERE status='CLOSED' AND notified_on='' AND anonymous=0");
-    $add('job_closed_dates', 'No deputation is closed with an end date before its start',
+    $add('job_closed_dates', 'No ' . Tl('job') . ' is closed with an end date before its start',
         'Dates that run backwards break every duration, cost and turnaround figure downstream.',
         "SELECT COUNT(*) FROM jobs WHERE closed_flag=1 AND inspection_start_date<>'' AND inspection_end_date<>''
                                     AND inspection_end_date < inspection_start_date");

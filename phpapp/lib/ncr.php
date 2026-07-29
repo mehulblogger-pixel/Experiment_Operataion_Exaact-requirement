@@ -46,7 +46,7 @@
 // ============================================================================
 
 const NCR_SOURCES = [
-    'JOB'         => 'A deputation',
+    'JOB'         => '',   // label built by ncr_source_label()
     'REPORT'      => 'An issued report',
     'CLIENT'      => 'Rejected by the client',
     'COMPLAINT'   => 'A complaint',
@@ -56,6 +56,16 @@ const NCR_SOURCES = [
     'DATA'        => 'A data or system failure',
     'INTERNAL'    => 'Noticed by our own staff',
 ];
+
+// NCR_SOURCES is a constant, so the one entry that names a business noun is
+// left blank there and filled in here, where T() can be called.
+function ncr_sources() {
+    $m = NCR_SOURCES;
+    $m['JOB'] = 'A ' . Tl('job');
+    return $m;
+}
+function ncr_source_label($k) { return ncr_sources()[$k] ?? $k; }
+
 
 // Major / minor is not a mood. The definitions are on the form, because two
 // people grading the same event differently makes the register uncountable.
@@ -135,7 +145,7 @@ function ncr_dt_columns($today) {
             . '<br><span class="muted" style="font-size:12px">raised ' . e(fdate($r['detected_on']))
             . ' by ' . e($r['detected_by'] ?: '—') . '</span>'],
         'source' => ['label' => 'Where it came from', 'sort' => 'n.source', 'render' => function ($r) {
-            $h = e(NCR_SOURCES[$r['source']] ?? $r['source']);
+            $h = e(ncr_source_label($r['source']));
             if ($r['job_code']) $h .= '<br><span class="muted" style="font-size:12px">' . e($r['job_code']) . '</span>';
             if ($r['display_name'] || $r['legal_name'])
                 $h .= '<br><span class="muted" style="font-size:12px">' . e($r['display_name'] ?: $r['legal_name']) . '</span>';
@@ -347,7 +357,7 @@ function ncr_create(array $b) {
                 ['auto' => 1, 'body' => (string)($b['title'] ?? ''),
                  'partner_id' => ($b['partner_id'] ?? '') !== '' ? (int)$b['partner_id'] : null,
                  'office_id' => $office]);
-    ncr_log($id, 'RAISED', $ref . ' — ' . (NCR_SOURCES[$src] ?? $src)
+    ncr_log($id, 'RAISED', $ref . ' — ' . ncr_source_label($src)
         . ($b['source_note'] ?? '' ? ': ' . $b['source_note'] : ''));
     return $id;
 }
@@ -443,9 +453,9 @@ function ops_ncr($route, $method) {
         $dt = dt_state('ncr', $cols, ['default_sort' => 'severity', 'default_dir' => 'asc', 'per' => 50]);
 
         if (wants_csv()) {
-            $csv = [['Ref','Raised','Severity','Source','Title','Branch','Deputation','Owner','Due','Disposition','Corrective action','Status','Closed']];
+            $csv = [['Ref','Raised','Severity','Source','Title','Branch',TH('job'),'Owner','Due','Disposition','Corrective action','Status','Closed']];
             foreach (ncr_all($f, '', [], $dt['q']) as $r)
-                $csv[] = [$r['ref'], $r['detected_on'], $r['severity'], NCR_SOURCES[$r['source']] ?? $r['source'],
+                $csv[] = [$r['ref'], $r['detected_on'], $r['severity'], ncr_source_label($r['source']),
                           $r['title'], $r['office_name'], $r['job_code'], $r['owner'], $r['due_on'],
                           NCR_DISPOSITIONS[$r['disposition']] ?? $r['disposition'], $r['capa_ref'],
                           $r['status'], $r['closed_on']];

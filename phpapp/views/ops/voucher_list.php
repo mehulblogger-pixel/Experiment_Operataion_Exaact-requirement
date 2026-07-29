@@ -20,7 +20,7 @@
 ?>
 <div class="master-head">
   <div><h1><?= $mine ? 'My travelling-expense vouchers' : 'Inspector vouchers' ?></h1>
-    <p class="sub" style="margin:2px 0 0">Monthly "Statement of Travelling Expenses"<?= $mine ? ' — only your own claims are shown.' : ' — across the inspectors you supervise.' ?></p></div>
+    <p class="sub" style="margin:2px 0 0">Monthly "Statement of Travelling Expenses"<?= $mine ? ' — only your own claims are shown.' : ' — across the ' . Tlp('engineer') . ' you supervise.' ?></p></div>
 </div>
 
 <div class="kpi-row">

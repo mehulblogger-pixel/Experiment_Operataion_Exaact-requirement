@@ -97,7 +97,7 @@
         <td style="max-width:260px">
           <?php if ($held === ''): ?><span class="pill p-warn">everything</span>
           <?php else: ?>
-            <span style="font-size:12px"><?= e(implode(', ', array_map(fn($k) => PORTAL_PERMS[$k] ?? $k, $heldArr))) ?></span>
+            <span style="font-size:12px"><?= e(implode(', ', array_map(fn($k) => portal_perm_labels()[$k] ?? $k, $heldArr))) ?></span>
           <?php endif; ?>
           <?php if ($sites): ?><br><span class="muted" style="font-size:12px"><?= count($sites) ?> site(s) only</span><?php endif; ?>
           <br><a href="/portal-user-perms?id=<?= (int)$r['id'] ?>" style="font-size:12px">Change</a>

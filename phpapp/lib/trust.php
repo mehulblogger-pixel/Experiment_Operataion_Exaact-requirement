@@ -238,7 +238,7 @@ function site_visit_latest($jobId) {
 
 function site_checkin($jobId, $post, $file = null) {
     $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$jobId]);
-    if (!$job) return 'That deputation could not be found.';
+    if (!$job) return 'That ' . Tl('job') . ' could not be found.';
     $kind = isset(VISIT_KINDS[$post['kind'] ?? '']) ? $post['kind'] : 'ENTRY';
     // A photograph may be required, and when it is, it has to be a real one.
     $bytes = ($file && ($file['tmp_name'] ?? '') !== '' && is_uploaded_file($file['tmp_name']))

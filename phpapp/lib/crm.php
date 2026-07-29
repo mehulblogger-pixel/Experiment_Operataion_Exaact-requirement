@@ -579,7 +579,7 @@ function crm_default_terms() {
     if ($t !== '' && $t !== null) return $t;
     return "1. This quotation is valid for the period stated above.\n"
          . "2. Rates are exclusive of taxes; GST is charged as applicable.\n"
-         . "3. Man-day means one inspector for one working day of up to " . (function_exists('hours_cap_disp') ? hours_cap_disp() : '8.5') . " hours.\n"
+         . "3. " . TH('manday') . " means one " . Tl('engineer') . " for one working day of up to " . (function_exists('hours_cap_disp') ? hours_cap_disp() : '8.5') . " hours.\n"
          . "4. Travel, boarding and lodging at actuals unless stated otherwise.\n"
          . "5. Waiting or idle time at the works is chargeable at the quoted man-day rate.\n"
          . "6. Cancellation within 24 hours of the scheduled visit is chargeable in full.\n"

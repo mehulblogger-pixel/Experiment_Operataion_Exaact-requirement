@@ -259,7 +259,7 @@
     <div class="ff"><label>Shape of the engagement</label>
       <select class="form-control" id="eng_sel" name="engagement_type">
         <?php $curEng = ($job['engagement_type'] ?? '') ?: (($call['engagement_type'] ?? '') ?: 'SINGLE');
-              foreach (lk_options_or('engagement_type', ENGAGEMENT_TYPES) as $k => $v): ?>
+              foreach (lk_options_or('engagement_type', engagement_types()) as $k => $v): ?>
           <option value="<?= e($k) ?>" <?= $curEng === $k ? 'selected' : '' ?>><?= e($v) ?></option>
         <?php endforeach; ?>
       </select>
@@ -452,7 +452,7 @@
           if ($idWhy !== '' && can('mod.identity.view')): ?>
     <div class="ff ff-wide"><label>Site access</label>
       <p class="pill p-warn" style="display:inline-block;margin:0"><?= e($idWhy) ?>
-        If this site issues gate passes against a document, arrange it before the deputation
+        If this site issues gate passes against a document, arrange it before the <?= e(Tl('job')) ?>
         — <a href="/identity?i=<?= (int)$job['inspector_id'] ?>">Identity documents</a>.</p></div>
     <?php endif; ?>
 

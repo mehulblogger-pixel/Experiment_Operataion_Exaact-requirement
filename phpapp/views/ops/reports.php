@@ -21,7 +21,7 @@
     <?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= $F['sbu']===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
   <select class="form-control searchable" name="client" onchange="this.form.submit()"><option value="">All clients</option>
     <?php foreach (($clientOpts ?? []) as $cl): ?><option value="<?= (int)$cl['id'] ?>" <?= (string)$F['client']===(string)$cl['id']?'selected':'' ?>><?= e($cl['name']) ?></option><?php endforeach; ?></select>
-  <select class="form-control" name="insp" onchange="this.form.submit()"><option value="">All inspectors</option>
+  <select class="form-control" name="insp" onchange="this.form.submit()"><option value="">All <?= e(Tlp('engineer')) ?></option>
     <?php foreach ($inspOpts as $i): ?><option value="<?= (int)$i['id'] ?>" <?= (string)$F['insp']===(string)$i['id']?'selected':'' ?>><?= e($i['name']) ?></option><?php endforeach; ?></select>
   <?php if ($actType): ?><select class="form-control" name="act" onchange="this.form.submit()"><option value="">All activities</option>
     <?php foreach (lk_all_values($actType['id']) as $a): ?><option value="<?= (int)$a['id'] ?>" <?= (string)$F['act']===(string)$a['id']?'selected':'' ?>><?= e($a['label']) ?></option><?php endforeach; ?></select><?php endif; ?>
@@ -137,12 +137,12 @@
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0;">Man-days by <?= e(Tl('sbu')) ?></h3>
     <?= svg_hbars(chart_relabel_sbu($mdBySbu)) ?>
-    <p class="muted" style="margin-top:8px;">Deputation: <?= e($depMd) ?> md · Day-based: <?= e($inspMd) ?> md · Sub-con: <?= e($subMd) ?> md</p>
+    <p class="muted" style="margin-top:8px;"><?= e(TH('job')) ?>: <?= e($depMd) ?> md · Day-based: <?= e($inspMd) ?> md · Sub-con: <?= e($subMd) ?> md</p>
   </div>
 </div>
 <div class="panel-split">
   <div class="panel"><h4 class="tab-sub" style="margin-top:0">Man-days: work type</h4>
-    <?= svg_donut(['Day-based'=>$inspMd,'Deputation'=>$depMd,'Sub-con'=>$subMd]) ?></div>
+    <?= svg_donut(['Day-based'=>$inspMd, TH('job')=>$depMd, 'Sub-con'=>$subMd]) ?></div>
   <div class="panel" style="text-align:center"><h4 class="tab-sub" style="margin-top:0">Avg utilization</h4>
     <?php $avgU = $util ? array_sum(array_map(fn($r)=>(float)$r['pct'],$util))/max(1,count($util)) : 0; ?>
     <?= svg_gauge($avgU, 'this month') ?></div>

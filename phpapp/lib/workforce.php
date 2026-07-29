@@ -308,7 +308,7 @@ function availability_scope_offices() {
 //  Handler: set one inspector's status (AJAX / form post) + full board page
 // -------------------------------------------------------------------------
 function ops_inspector_availability($method) {
-    ops_require(can_manage_availability(), 'You cannot manage inspector availability.');
+    ops_require(can_manage_availability(), 'You cannot manage ' . Tl('engineer') . ' availability.');
     $day = $_REQUEST['day'] ?? date('Y-m-d');
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $day)) $day = date('Y-m-d');
     if ($method === 'POST') {

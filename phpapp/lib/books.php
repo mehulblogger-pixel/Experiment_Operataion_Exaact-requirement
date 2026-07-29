@@ -354,7 +354,7 @@ function books_line_add($invoiceId, array $b) {
     if ($inv['status'] !== 'DRAFT') return 'An issued invoice cannot gain a line. Raise a credit note, or cancel it if nothing has happened against it.';
     $desc = trim((string)($b['description'] ?? ''));
     $job  = (int)($b['job_id'] ?? 0) ?: null;
-    if ($desc === '' && !$job) return 'Say what the line is for, or pick the deputation it bills.';
+    if ($desc === '' && !$job) return 'Say what the line is for, or pick the ' . Tl('job') . ' it bills.';
 
     // Billing a deputation: take its figures rather than asking somebody to
     // re-key them, which is where the two versions of a number come from.
@@ -362,8 +362,8 @@ function books_line_add($invoiceId, array $b) {
     if ($job) {
         $j = ops_one("SELECT j.*, c.id call_id, c.billable_value, c.billable_rate, c.billable_qty, c.billable_basis
                       FROM jobs j LEFT JOIN calls c ON c.id = j.call_id WHERE j.id=?", [$job]);
-        if (!$j) return 'That deputation no longer exists.';
-        if (books_job_invoiced($job, (int)$invoiceId)) return 'Deputation ' . $j['job_code'] . ' is already on another invoice.';
+        if (!$j) return 'That ' . Tl('job') . ' no longer exists.';
+        if (books_job_invoiced($job, (int)$invoiceId)) return TH('job') . ' ' . $j['job_code'] . ' is already on another invoice.';
         $callId = $j['call_id'] ? (int)$j['call_id'] : null;
         if ($desc === '') $desc = 'Inspection services — ' . $j['job_code'];
         if (($b['rate'] ?? '') === '') $b['rate'] = (float)($j['billable_rate'] ?: $j['invoice_value'] ?: $j['billable_value'] ?: 0);
