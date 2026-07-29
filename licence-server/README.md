@@ -38,6 +38,31 @@ There is nothing to configure. Three steps, all of them in a browser.
 The public key each application needs (`LICENCE_PUBKEY`) is shown once at the
 end of setup and is always available afterwards at `api.php?action=pubkey`.
 
+### If the address answers 404
+
+The files are there but the address is not reaching them. In order of how
+often it is the cause:
+
+1. **The upload has an extra folder inside it.** Unzipping `licence-server.zip`
+   often makes `licences/licence-server/index.php`. The three files must sit
+   directly in `licences/`.
+2. **The site above is swallowing the address.** MGH ID sends every address to
+   its own front page, and its own "page not found" is what you are seeing.
+   The `.htaccess` shipped in this folder stops that — check it uploaded, since
+   files beginning with a dot are hidden in cPanel File Manager until you turn
+   on **Settings → Show hidden files**.
+3. **Wrong folder.** `licences` has to be inside the folder that serves
+   `id.mghaiapps.com`, not inside `public_html`.
+
+To tell them apart, ask for `https://id.mghaiapps.com/licences/index.php` in
+full. If that opens and the folder address does not, it is cause 2. If neither
+opens, it is cause 1 or 3.
+
+If the address turns from 404 into **500 Internal Server Error** once the
+`.htaccess` is in place, this host does not permit one of its settings. Delete
+that one file — everything works without it, as long as cause 2 is not the
+problem.
+
 ### If the setup page shows a red box
 
 It found nowhere safe to keep the signing key, and it has created nothing at

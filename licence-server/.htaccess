@@ -1,0 +1,51 @@
+# This folder sits INSIDE another site (id.mghaiapps.com, which runs MGH ID),
+# and a site with a front controller usually carries an .htaccess that sends
+# every address to its own index.php. Those rules apply to folders beneath it
+# too — so without this file a perfectly good upload can answer 404: the
+# address never reaches these files at all, and MGH ID simply reports that it
+# has no page by that name.
+#
+# A folder that declares its own rewrite rules replaces the ones above it
+# rather than adding to them, which is exactly what is wanted here. MGH ID is
+# not affected in any way; it keeps its own rules in its own folder.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Nothing is rewritten. The two files in this folder are asked for by name.
+
+    # HTTPS, because this is where an administrator types the password that
+    # protects every customer's subscription, and where Razorpay posts
+    # payments. The second condition covers hosting that terminates SSL at a
+    # proxy and forwards plain HTTP to PHP; without it the rule loops for ever.
+    #
+    # IF THIS FOLDER EVER APPEARS DOWN after a hosting change, put a # in front
+    # of the three lines below and it is immediately back.
+    RewriteCond %{HTTPS} off
+    RewriteCond %{HTTP:X-Forwarded-Proto} !https
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# Open the folder address itself — /licences/ — rather than needing
+# /licences/index.php typed in full.
+DirectoryIndex index.php
+
+# Never list the contents of a folder.
+Options -Indexes
+
+# Nothing private should ever be in here — the signing key, the password and
+# the database all live outside the website. This is the belt to that pair of
+# braces, in case a future hand copies one of them in by mistake.
+<FilesMatch "\.(pem|key|sqlite|sqlite3|db|json|md|log|bak|old|orig|save|swp)$">
+    Require all denied
+</FilesMatch>
+
+# .htaccess itself, .git, editor leftovers.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Do not advertise the PHP version in every response.
+<IfModule mod_headers.c>
+    Header unset X-Powered-By
+    Header always unset X-Powered-By
+</IfModule>
