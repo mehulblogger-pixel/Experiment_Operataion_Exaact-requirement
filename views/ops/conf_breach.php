@@ -18,7 +18,7 @@
   <table class="grid">
     <tr><th>Seen by</th><td><?= e($b['who_saw_it'] ?: '—') ?></td>
         <th>Happened</th><td><?= $b['happened_on'] ? e(fdate($b['happened_on'])) : '—' ?></td></tr>
-    <tr><th>Deputation</th><td><?= $b['job_code'] ? e($b['job_code']) : '—' ?></td>
+    <tr><th><?= e(TH('job')) ?></th><td><?= $b['job_code'] ? e($b['job_code']) : '—' ?></td>
         <th>Branch</th><td><?= e($b['office_name'] ?: '—') ?></td></tr>
     <tr><th>Nonconformity</th><td colspan="3"><?php if ($ncr): ?>
         <a href="/ncr-item?id=<?= (int)$ncr['id'] ?>"><?= e($ncr['ref']) ?></a>

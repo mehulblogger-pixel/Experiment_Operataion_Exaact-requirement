@@ -29,7 +29,7 @@
     <?php endforeach; ?>
   </div>
   <p class="muted" style="font-size:12px;margin:8px 2px">Operations and Administration cannot be switched off —
-    an inspection system without calls, deputations, masters and users is not a smaller product.</p>
+    a system without <?= e(Tlp('call')) ?>, <?= e(Tlp('job')) ?>, masters and users is not a smaller product.</p>
   <?php if (!$pinned): ?><button class="btn" type="submit">Save modules</button><?php endif; ?>
 </form>
 <?php endif; ?>
@@ -117,7 +117,7 @@
           <option value="<?= e($k) ?>" <?= $curMm === $k ? 'selected' : '' ?>><?= e($v) ?></option>
         <?php endforeach; ?>
       </select>
-      <small class="muted">Overridden on a <?= e(Tl('client') ) ?>'s record, and on a single deputation, when that client's contract says something different.</small></div>
+      <small class="muted">Overridden on a <?= e(Tl('client') ) ?>'s record, and on a single <?= e(Tl('job')) ?>, when that client's contract says something different.</small></div>
     <div class="ff"><label>Minimum working days in a man-month</label>
       <input class="form-control" type="number" min="1" max="31" name="manmonth_min_days" value="<?= e(setting_get('manmonth_min_days', 26)) ?>">
       <small class="muted">Only used on the minimum-days basis. A month falling short of this is claimable pro-rata; a month exceeding it is still exactly one man-month.</small></div>
@@ -345,9 +345,9 @@
     <form method="post" action="/seed-demo-remove" onsubmit="return confirm('Remove ALL demo/sample data (offices left in place)? Your own real records are not touched. You can load the demo again later.')">
       <button class="btn danger" type="submit">🗑 Remove demo data</button>
     </form>
-    <p class="muted" style="margin-top:8px;font-size:12px">Deletes the seeded records across every module — calls, deputations, vouchers, quotations, reports and their evidence, equipment, authorisations, complaints, corrective actions, audits, reviews, portal logins — plus the demo inspectors, clients/vendors, <?= e(Tlp("boss")) ?> and demo logins, and switches the client portal back off. The three demo offices are left in place (delete them under Masters if you want).</p>
+    <p class="muted" style="margin-top:8px;font-size:12px">Deletes the seeded records across every module — <?= e(Tlp('call')) ?>, <?= e(Tlp('job')) ?>, vouchers, quotations, <?= e(Tlp('report')) ?> and their evidence, equipment, authorisations, complaints, corrective actions, audits, reviews, portal logins — plus the demo inspectors, clients/vendors, <?= e(Tlp("boss")) ?> and demo logins, and switches the client portal back off. The three demo offices are left in place (delete them under Masters if you want).</p>
   <?php else: ?>
-    <p class="sub" style="margin-bottom:10px">One-click load of a complete example across <strong>every module</strong> — offices, users of every role, engineers, clients, <?= e(Tlp("boss")) ?>, calls, deputations, vouchers, invoicing &amp; credit, quotations, inspection reports with evidence, equipment and calibration, authorisations, impartiality, complaints and appeals, corrective actions, internal audit, management review and the client portal. Roughly half the records are deliberately awkward — an expired calibration, a lapsed authorisation, a complaint nobody acknowledged in time, a corrective action that did not work — because a register of tidy rows cannot show you whether a rule is working. See <code>docs/DEMO-TEST-PACK.md</code> for what each one should do on screen.</p>
+    <p class="sub" style="margin-bottom:10px">One-click load of a complete example across <strong>every module</strong> — offices, users of every role, <?= e(Tlp('engineer')) ?>, clients, <?= e(Tlp("boss")) ?>, <?= e(Tlp('call')) ?>, <?= e(Tlp('job')) ?>, vouchers, invoicing &amp; credit, quotations, <?= e(Tlp('report')) ?> with evidence, equipment and calibration, authorisations, impartiality, complaints and appeals, corrective actions, internal audit, management review and the client portal. Roughly half the records are deliberately awkward — an expired calibration, a lapsed authorisation, a complaint nobody acknowledged in time, a corrective action that did not work — because a register of tidy rows cannot show you whether a rule is working. See <code>docs/DEMO-TEST-PACK.md</code> for what each one should do on screen.</p>
     <form method="post" action="/seed-demo" onsubmit="return confirm('Load the demo/sample dataset now? This adds example records across the whole app.')">
       <button class="btn" type="submit">Load demo data</button>
     </form>

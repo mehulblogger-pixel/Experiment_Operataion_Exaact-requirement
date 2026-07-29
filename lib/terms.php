@@ -8,12 +8,17 @@
 //  no longer hard-code those words. They call T()/TP() and get whatever the
 //  company has decided the word is, from Settings → Terminology.
 //
-//  Vocabulary follows ISO/IEC 17020 and normal third-party-inspection usage.
+//  THE SHIPPED WORDS ARE DELIBERATELY PLAIN. They used to be an inspection
+//  agency's vocabulary — "Inspection Call", "Deputation", "Inspection Engineer"
+//  — which reads as somebody else's software to a manufacturer, a trader, an
+//  EPC contractor, a facilities firm or a manpower supplier. The shipped words
+//  are now ones every trade already uses, and an inspection agency gets its own
+//  back in one click from Settings → Terminology → industry pack.
 //
-//      T('call')   → "Inspection Call"   (singular, as a heading / label)
-//      TP('call')  → "Inspection Calls"  (plural)
-//      Tl('call')  → "inspection call"   (lower-case, mid-sentence)
-//      Tlp('call') → "inspection calls"
+//      T('call')   → "Work Order"   (singular, as a heading / label)
+//      TP('call')  → "Work Orders"  (plural)
+//      Tl('call')  → "work order"   (lower-case, mid-sentence)
+//      Tlp('call') → "work orders"
 //      T_REG('call') → "Inspection call register"   (the standard list heading)
 //
 //  Acronyms (IBO, IRN, NCR, MTC…) are never lower-cased by Tl() — see
@@ -23,30 +28,33 @@
 // key => [singular, plural, group, help]
 const TERM_DEFAULTS = [
     // -- parties -------------------------------------------------------------
-    'client'       => ['Client', 'Clients', 'Parties', 'The party that engages us and receives the report.'],
-    'vendor'       => ['Vendor', 'Vendors', 'Parties', 'The party whose goods or works we inspect.'],
-    'manufacturer' => ['Manufacturer', 'Manufacturers', 'Parties', 'The works that actually fabricates the item.'],
+    'client'       => ['Client', 'Clients', 'Parties', 'The party that engages us and gets what we produce.'],
+    'vendor'       => ['Vendor', 'Vendors', 'Parties', 'The party whose goods or works the job concerns.'],
+    'manufacturer' => ['Manufacturer', 'Manufacturers', 'Parties', 'The works that actually makes the item.'],
     'supplier'     => ['Supplier', 'Suppliers', 'Parties', 'The party that supplies the item to the client.'],
-    'subvendor'    => ['Sub-vendor', 'Sub-vendors', 'Parties', "The manufacturer's own subcontractor."],
+    'subvendor'    => ['Sub-vendor', 'Sub-vendors', 'Parties', "The vendor's own subcontractor."],
     // -- sales ---------------------------------------------------------------
     'inquiry'      => ['Inquiry', 'Inquiries', 'Sales', 'An enquiry received from a client.'],
     'quote'        => ['Quote', 'Quotes', 'Sales', 'Our commercial offer against an inquiry.'],
-    'order'        => ['Order', 'Orders', 'Sales', 'A won quote registered as an order.'],
+    // "Sales Order" rather than "Order", so it can never be read as the work
+    // order below. One is what the customer bought; the other is what we then
+    // have to go and do.
+    'order'        => ['Sales Order', 'Sales Orders', 'Sales', 'A won quote, registered as an order.'],
     // -- operations ----------------------------------------------------------
-    'call'         => ['Inspection Call', 'Inspection Calls', 'Operations', 'The client’s request to inspect, with dates and location.'],
-    'job'          => ['Deputation', 'Deputations', 'Operations', 'An inspection engineer put on a call.'],
-    'engineer'     => ['Inspection Engineer', 'Inspection Engineers', 'Operations', 'The person who performs the inspection.'],
+    'call'         => ['Work Order', 'Work Orders', 'Operations', 'A piece of work the customer has asked for, with its dates and location.'],
+    'job'          => ['Job', 'Jobs', 'Operations', 'One person put on one work order, for particular dates.'],
+    'engineer'     => ['Team Member', 'Team Members', 'Operations', 'The person who carries out the work.'],
     // "IBO" was the shipped default and nobody outside the company reads it as
     // anything. "Office" is what people actually say. Anyone who wants the old
     // word back can set it under Settings → Terminology; every screen follows.
     'office'       => ['Office', 'Offices', 'Operations', 'A branch or head office of this company.'],
     'sbu'          => ['Business Unit', 'Business Units', 'Operations',
                        'The line of business a job belongs to — what the branch is judged by.'],
-    'manday'       => ['Man-day', 'Man-days', 'Operations', 'One engineer for one working day.'],
+    'manday'       => ['Person-day', 'Person-days', 'Operations', 'One person for one working day.'],
     // -- reporting -----------------------------------------------------------
-    'report'       => ['Report', 'Reports', 'Reporting', 'An inspection document we issue (IR, NCR, IRN, CoC…).'],
-    'endorsement'  => ['Endorsement', 'Endorsements', 'Reporting', 'Our review and sign-off of a manufacturer’s record.'],
-    'mfr_record'   => ['Manufacturer Record', 'Manufacturer Records', 'Reporting', 'MTC, NDT report, hydro test report and similar.'],
+    'report'       => ['Report', 'Reports', 'Reporting', 'A document we issue against a job and send to the client.'],
+    'endorsement'  => ['Endorsement', 'Endorsements', 'Reporting', 'Our review and sign-off of somebody else’s record.'],
+    'mfr_record'   => ['Supplier Document', 'Supplier Documents', 'Reporting', 'A document produced by the works rather than by us — test certificate, mill certificate, calibration record.'],
     // -- money ---------------------------------------------------------------
     'boss'         => ['Contract Number', 'Contract Numbers', 'Money', 'The client contract / order number that profitability is tracked against. It is not typed on a deputation — it comes down from the quotation and the inspection call, and the register fills itself.'],
     'invoice'      => ['Invoice', 'Invoices', 'Money', 'A bill raised on the client.'],
@@ -56,6 +64,170 @@ const TERM_DEFAULTS = [
     'candidate'    => ['Candidate', 'Candidates', 'People', 'A person being considered for hiring.'],
     'requisition'  => ['Requisition', 'Requisitions', 'People', 'Approved demand for a new position.'],
 ];
+
+// ---- Industry packs --------------------------------------------------------
+//  A whole vocabulary in one click. The shipped words are plain on purpose, but
+//  plain is not the same as right: a company that says "site visit" every day
+//  should not have to read "work order" on every screen, and the first hour with
+//  new software is where you decide whether it was built for you.
+//
+//  Each pack only lists what it changes. Anything it leaves out keeps the plain
+//  word, so a pack is a nudge and not a straitjacket, and every single word
+//  stays editable underneath — a pack fills the boxes on the Terminology screen,
+//  it does not lock them.
+//
+//  These are the trades this product is being sold into. Adding another is four
+//  lines and no code.
+const TERM_PACKS = [
+    'general' => [
+        'label' => 'General business',
+        'note'  => 'The plain words. A good starting point if none of the others quite fit.',
+        'terms' => [],
+    ],
+    'inspection' => [
+        'label' => 'Inspection & certification',
+        'note'  => 'Third-party inspection, vendor surveillance, expediting, certification bodies.',
+        'terms' => [
+            'call'       => ['Inspection Call', 'Inspection Calls'],
+            'job'        => ['Deputation', 'Deputations'],
+            'engineer'   => ['Inspection Engineer', 'Inspection Engineers'],
+            'report'     => ['Inspection Report', 'Inspection Reports'],
+            'mfr_record' => ['Manufacturer Record', 'Manufacturer Records'],
+            'manday'     => ['Man-day', 'Man-days'],
+        ],
+    ],
+    'manufacturing' => [
+        'label' => 'Manufacturing & fabrication',
+        'note'  => 'Works, job shops, fabricators, process plants.',
+        'terms' => [
+            'call'     => ['Production Order', 'Production Orders'],
+            'job'      => ['Operation', 'Operations'],
+            'engineer' => ['Operator', 'Operators'],
+            'office'   => ['Plant', 'Plants'],
+            'client'   => ['Customer', 'Customers'],
+        ],
+    ],
+    'trading' => [
+        'label' => 'Trading & distribution',
+        'note'  => 'Traders, stockists, distributors, dealers.',
+        'terms' => [
+            'call'     => ['Order', 'Orders'],
+            'job'      => ['Consignment', 'Consignments'],
+            'engineer' => ['Executive', 'Executives'],
+            'client'   => ['Customer', 'Customers'],
+            'office'   => ['Branch', 'Branches'],
+        ],
+    ],
+    'epc' => [
+        'label' => 'EPC & contracting',
+        'note'  => 'Project contractors, erection and commissioning, civil and mechanical works.',
+        'terms' => [
+            'call'     => ['Work Package', 'Work Packages'],
+            'job'      => ['Site Activity', 'Site Activities'],
+            'engineer' => ['Site Engineer', 'Site Engineers'],
+            'office'   => ['Site', 'Sites'],
+            'boss'     => ['Contract Number', 'Contract Numbers'],
+        ],
+    ],
+    'fieldservice' => [
+        'label' => 'Field service & maintenance',
+        'note'  => 'AMC providers, equipment servicing, installation and repair, facilities.',
+        'terms' => [
+            'call'     => ['Service Call', 'Service Calls'],
+            'job'      => ['Visit', 'Visits'],
+            'engineer' => ['Technician', 'Technicians'],
+            'client'   => ['Customer', 'Customers'],
+            'report'   => ['Service Report', 'Service Reports'],
+        ],
+    ],
+    'manpower' => [
+        'label' => 'Manpower supply & staffing',
+        'note'  => 'Contract staffing, skilled and unskilled labour supply, deputation of people.',
+        'terms' => [
+            'call'     => ['Requirement', 'Requirements'],
+            'job'      => ['Deployment', 'Deployments'],
+            'engineer' => ['Worker', 'Workers'],
+            'client'   => ['Principal Employer', 'Principal Employers'],
+            'manday'   => ['Man-day', 'Man-days'],
+        ],
+    ],
+    'exim' => [
+        'label' => 'Export & import',
+        'note'  => 'Exporters, importers, merchant traders, buying houses.',
+        'terms' => [
+            'call'     => ['Shipment', 'Shipments'],
+            'job'      => ['Consignment', 'Consignments'],
+            'engineer' => ['Executive', 'Executives'],
+            'client'   => ['Buyer', 'Buyers'],
+            'vendor'   => ['Supplier', 'Suppliers'],
+        ],
+    ],
+    'logistics' => [
+        'label' => 'Logistics & transport',
+        'note'  => 'Freight forwarders, transporters, CHA, warehousing.',
+        'terms' => [
+            'call'     => ['Booking', 'Bookings'],
+            'job'      => ['Trip', 'Trips'],
+            'engineer' => ['Driver', 'Drivers'],
+            'client'   => ['Consignor', 'Consignors'],
+            'office'   => ['Depot', 'Depots'],
+        ],
+    ],
+    'professional' => [
+        'label' => 'Professional services',
+        'note'  => 'Consultants, auditors, CA and CS firms, design and engineering consultancies.',
+        'terms' => [
+            'call'     => ['Engagement', 'Engagements'],
+            'job'      => ['Assignment', 'Assignments'],
+            'engineer' => ['Consultant', 'Consultants'],
+            'report'   => ['Deliverable', 'Deliverables'],
+            'manday'   => ['Man-day', 'Man-days'],
+        ],
+    ],
+    'labs' => [
+        'label' => 'Testing laboratories',
+        'note'  => 'Materials testing, calibration, NABL laboratories, sample analysis.',
+        'terms' => [
+            'call'       => ['Test Request', 'Test Requests'],
+            'job'        => ['Sample', 'Samples'],
+            'engineer'   => ['Analyst', 'Analysts'],
+            'report'     => ['Test Certificate', 'Test Certificates'],
+            'office'     => ['Laboratory', 'Laboratories'],
+        ],
+    ],
+];
+
+// Apply a pack: fill the overrides with its words, leaving everything it does
+// not mention on the shipped default. Deliberately REPLACES rather than merges
+// with whatever was there before — half of one trade's vocabulary mixed with
+// half of another's is how you get a screen nobody can read.
+function term_apply_pack($packKey) {
+    $pack = TERM_PACKS[$packKey] ?? null;
+    if ($pack === null) return false;
+    $ov = [];
+    foreach ($pack['terms'] as $k => $pair) {
+        if (!isset(TERM_DEFAULTS[$k])) continue;             // a pack cannot invent a term
+        $ov[$k] = [0 => (string)$pair[0], 1 => (string)$pair[1]];
+    }
+    setting_set('terms', $ov ? json_encode($ov) : '');
+    setting_set('terms_pack', $packKey);
+    term_overrides($ov);
+    return true;
+}
+
+// Which pack is in force — for showing the current choice on the screen. A pack
+// stops being "in force" the moment somebody edits a word by hand, and saying so
+// is more honest than showing a tick against a pack that no longer describes
+// what is on screen.
+function term_pack_current() {
+    $k = (string)setting_get('terms_pack', '');
+    if ($k === '' || !isset(TERM_PACKS[$k])) return '';
+    $ov = term_overrides();
+    foreach (TERM_PACKS[$k]['terms'] as $t => $pair) {
+        if (($ov[$t][0] ?? '') !== $pair[0] || ($ov[$t][1] ?? '') !== $pair[1]) return '';
+    }
+    return $k;
+}
 
 // Words that must keep their capitals when used mid-sentence.
 // SBU and BOSS stay listed: they are no longer the shipped defaults, but a
@@ -157,11 +329,28 @@ function module_tabs(array $tabs, $activeHref) {
 function ops_terminology($method) {
     ops_require(can('settings.manage'), 'Only admins can change terminology.');
     if ($method === 'POST') {
-        if (($_POST['reset'] ?? '') === '1') { setting_set('terms', ''); term_overrides([]); flash('Terminology reset to the standard wording.'); }
-        else { term_save($_POST); flash('Terminology saved. Every screen now uses your wording.'); }
+        $pack = trim((string)($_POST['pack'] ?? ''));
+        if (($_POST['reset'] ?? '') === '1') {
+            setting_set('terms', ''); setting_set('terms_pack', ''); term_overrides([]);
+            flash('Terminology reset to the standard wording.');
+        } elseif ($pack !== '') {
+            if (term_apply_pack($pack)) {
+                flash('Wording changed to ' . (TERM_PACKS[$pack]['label'] ?? $pack) . '. Every screen follows — and every word below is still yours to edit.');
+            } else {
+                flash('That is not a wording set this system knows.', 'error');
+            }
+        } else {
+            term_save($_POST);
+            flash('Terminology saved. Every screen now uses your wording.');
+        }
         redirect('/terminology');
     }
-    view('ops/terminology', ['groups' => term_groups(), 'ov' => term_overrides()]);
+    view('ops/terminology', [
+        'groups' => term_groups(),
+        'ov'     => term_overrides(),
+        'packs'  => TERM_PACKS,
+        'pack'   => term_pack_current(),
+    ]);
 }
 
 // ---- Merged screens -------------------------------------------------------

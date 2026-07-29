@@ -6,7 +6,7 @@
 </div>
 
 <div style="margin-top:18px">
-<?php foreach (CHAIN_STAGES as $key => [$label, $icon, $url]): $rows = $chain[$key] ?? []; ?>
+<?php foreach (chain_stages() as $key => [$label, $icon, $url]): $rows = $chain[$key] ?? []; ?>
   <div class="panel" style="margin-bottom:12px;padding:0;overflow:hidden<?= $rows ? '' : ';opacity:.72;border-style:dashed' ?>">
     <div style="padding:11px 16px;background:var(--soft);border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center">
       <span style="font-size:17px"><?= $icon ?></span>

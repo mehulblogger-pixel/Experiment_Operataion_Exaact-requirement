@@ -10,7 +10,7 @@
 
     <div><label>Where it came from</label>
       <select name="source">
-        <?php foreach (NCR_SOURCES as $k=>$v): ?>
+        <?php foreach (ncr_sources() as $k=>$v): ?>
           <option value="<?= e($k) ?>"<?= ($p['source'] ?? 'INTERNAL')===$k?' selected':'' ?>><?= e($v) ?></option>
         <?php endforeach; ?>
       </select></div>
@@ -28,7 +28,7 @@
     <div class="ff-wide"><label>What happened</label>
       <textarea name="description" rows="4" placeholder="What was found, when, and what it affected."><?= e($p['description'] ?? '') ?></textarea></div>
 
-    <div><label>Against a deputation <span class="muted">(optional — sets the branch)</span></label>
+    <div><label>Against a <?= e(Tl('job')) ?> <span class="muted">(optional — sets the branch)</span></label>
       <select name="job_id">
         <option value="">— none —</option>
         <?php foreach ($jobs as $j): ?>
@@ -37,7 +37,7 @@
       </select></div>
     <div><label>Branch</label>
       <select name="office_id">
-        <option value="">— from the deputation, or mine —</option>
+        <option value="">— from the <?= e(Tl('job')) ?>, or mine —</option>
         <?php foreach ($offices as $o): ?>
           <option value="<?= (int)$o['id'] ?>"<?= (string)($p['office_id'] ?? '')===(string)$o['id']?' selected':'' ?>><?= e($o['name']) ?></option>
         <?php endforeach; ?>

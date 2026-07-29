@@ -26,7 +26,7 @@
   <input type="hidden" name="role_preset" id="rolePreset" value="<?= e($u['role_preset'] ?? '') ?>">
 
   <h3>What they can do</h3>
-  <?php foreach (PORTAL_PERMS as $k => $label): $id = 'p_' . str_replace('.', '_', $k); ?>
+  <?php foreach (portal_perm_labels() as $k => $label): $id = 'p_' . str_replace('.', '_', $k); ?>
     <label style="display:flex;gap:9px;align-items:flex-start;margin:6px 0;font-size:14px">
       <input type="checkbox" name="<?= e($id) ?>" id="<?= e($id) ?>" data-perm="<?= e($k) ?>" value="1"
              <?= in_array($k, $heldArr, true) ? 'checked' : '' ?>>

@@ -9,7 +9,7 @@
 <div class="crumbs"><a href="/">Home</a> › Invoices</div>
 <div class="master-head">
   <div><h1>Invoices</h1>
-  <p class="sub" style="margin:2px 0 0">Real invoices with lines and tax, not a number typed onto a deputation. Money received is recorded separately and matched to them, so half a payment reads as half.</p></div>
+  <p class="sub" style="margin:2px 0 0">Real invoices with lines and tax, not a number typed onto a <?= e(Tl('job')) ?>. Money received is recorded separately and matched to them, so half a payment reads as half.</p></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <a class="btn secondary" href="/to-bill">Work waiting to be billed</a>
     <a class="btn secondary" href="/receipts">Money in</a>
@@ -40,6 +40,6 @@
       'search'      => true,
       'search_hint' => 'Invoice number, customer, PO…',
       'export'      => true,
-      'empty'       => 'Nothing here yet. Start from “Work waiting to be billed” — it lists every finished deputation nobody has invoiced.',
+      'empty'       => 'Nothing here yet. Start from “Work waiting to be billed” — it lists every finished ' . Tl('job') . ' nobody has invoiced.',
     ]) ?>
 <style>.qcard.on{outline:2px solid var(--brand);outline-offset:1px}</style>

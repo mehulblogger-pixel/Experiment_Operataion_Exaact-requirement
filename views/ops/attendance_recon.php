@@ -1,6 +1,6 @@
 <div class="master-head">
   <div><h1>Attendance reconciliation</h1>
-    <p class="sub">Cross-check the inspector vouchers against your HR payroll export. The uploaded file is read <strong>in memory only and never stored</strong> — we keep just the comparison result.</p></div>
+    <p class="sub">Cross-check the <?= e(Tl('engineer')) ?> vouchers against your HR payroll export. The uploaded file is read <strong>in memory only and never stored</strong> — we keep just the comparison result.</p></div>
 </div>
 
 <?php if ($error): ?><div class="msg msg-error"><?= e($error) ?></div><?php endif; ?>
@@ -38,6 +38,6 @@
     <?php if (!$result['rows']): ?><tr><td colspan="7">No employees to compare.</td></tr><?php endif; ?>
   </table>
   </div>
-  <p class="muted" style="margin-top:8px">“App present” counts distinct days an inspector logged Work/Office/WFH/Training on their voucher; “App leave” counts distinct Leave days. Red cells show where HR and the voucher disagree.</p>
+  <p class="muted" style="margin-top:8px">“App present” counts distinct days a <?= e(Tl('engineer')) ?> logged Work/Office/WFH/Training on their voucher; “App leave” counts distinct Leave days. Red cells show where HR and the voucher disagree.</p>
 </div>
 <?php endif; ?>

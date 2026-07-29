@@ -48,7 +48,7 @@
         </select>
         <small class="muted">Naming them is what lets the app refuse to let that person decide their own complaint.</small></div>
       <div class="ff"><label><?= e(Tl('job')) ?> number</label>
-        <input class="form-control" name="job_id" value="<?= e($appealOf['job_id'] ?? '') ?>" placeholder="if it concerns one deputation"></div>
+        <input class="form-control" name="job_id" value="<?= e($appealOf['job_id'] ?? '') ?>" placeholder="if it concerns one <?= e(Tl('job')) ?>"></div>
       <div class="ff"><label><?= e(Tl('report')) ?> number (IRN)</label>
         <input class="form-control" name="report_irn" value="<?= e($appealOf['report_irn'] ?? '') ?>"
                placeholder="if it concerns one report">

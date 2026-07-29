@@ -18,7 +18,7 @@
 
 <?php if (!$tot): ?>
   <div class="panel" style="margin-top:16px">
-    <p style="margin:0"><b>Nothing is broken.</b> Every order traces to a quotation, every closed deputation has a report and an invoice, and every invoice is either settled or not yet due.</p>
+    <p style="margin:0"><b>Nothing is broken.</b> Every <?= e(Tl('order')) ?> traces to a quotation, every closed <?= e(Tl('job')) ?> has a <?= e(Tl('report')) ?> and an invoice, and every invoice is either settled or not yet due.</p>
   </div>
 <?php endif; ?>
 

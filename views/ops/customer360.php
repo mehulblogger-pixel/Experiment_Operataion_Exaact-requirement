@@ -174,10 +174,10 @@
           </table>
         <?php endif; ?>
         <?php if ($work['jobs']): ?>
-          <p class="muted" style="font-size:12.5px;margin:12px 0 6px">Deputations</p>
+          <p class="muted" style="font-size:12.5px;margin:12px 0 6px"><?= e(THP('job')) ?></p>
           <table class="dt">
-            <caption class="sr-only">Recent deputations</caption>
-            <thead><tr><th scope="col">Deputation</th><th scope="col">Who</th><th scope="col">State</th></tr></thead>
+            <caption class="sr-only">Recent <?= e(Tlp('job')) ?></caption>
+            <thead><tr><th scope="col"><?= e(TH('job')) ?></th><th scope="col">Who</th><th scope="col">State</th></tr></thead>
             <tbody>
             <?php foreach ($work['jobs'] as $j): ?>
               <tr><td><a href="/job?id=<?= (int)$j['id'] ?>"><?= e($j['job_code']) ?></a></td>

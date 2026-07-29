@@ -104,7 +104,7 @@ foreach ($offices as $o) if ((int)$o['id'] === (int)$sel) $selOff = $o;
       <?php if ($offSbuRaw === ''): ?>
         <p class="muted">Nothing ticked yet, so all <?= count($allSbus) ?> <?= e(Tlp('sbu')) ?> are in play for this <?= e(Tl('office')) ?>.</p>
       <?php endif; ?>
-      <h3 class="tab-sub" style="margin-top:18px">An inspection engineer with no chargeable day at all that month</h3>
+      <h3 class="tab-sub" style="margin-top:18px">A <?= e(Tl('engineer')) ?> with no chargeable day at all that month</h3>
       <p class="sub">Rare, but it has to land somewhere. You choose where.</p>
       <div class="form-grid">
         <div class="ff-wide"><label>Spread their cost</label>

@@ -4,7 +4,7 @@
 ?>
 <div class="master-head">
   <div><h1><?= e(T_REG('candidate')) ?></h1>
-    <p class="sub">Candidate CVs for project deputation / resident engineers · <?= count($rows) ?> shown</p></div>
+    <p class="sub">Candidate CVs for project work / resident staff · <?= count($rows) ?> shown</p></div>
   <a class="btn" href="/candidate-new">+ Add candidate CV</a>
 </div>
 

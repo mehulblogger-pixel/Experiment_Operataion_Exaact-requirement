@@ -101,7 +101,7 @@
 <?php if ($auto): ?>
 <div class="panel" style="border:1px solid var(--ok);background:color-mix(in srgb,var(--ok) 6%,transparent)">
   <b style="color:var(--ok)">✓ <?= count($auto) ?> field(s) filled in for you</b>
-  <span class="muted">— taken from the inspection call, the job and this report's details. They are marked <span class="pill p-ok" style="padding:0 5px;font-size:10px">auto</span>; change any of them if the site differs.</span>
+  <span class="muted">— taken from the <?= e(Tl('call')) ?>, the <?= e(Tl('job')) ?> and this report's details. They are marked <span class="pill p-ok" style="padding:0 5px;font-size:10px">auto</span>; change any of them if the site differs.</span>
 </div>
 <?php endif; ?>
 

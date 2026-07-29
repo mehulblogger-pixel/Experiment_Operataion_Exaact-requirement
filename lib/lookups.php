@@ -57,7 +57,7 @@ function lk_migrate() {
     // voucher attendance codes: leave types + office/WFH/holiday day codes
     lk_ensure_type_map('leave_type', 'Leave type', LEAVE_TYPES);
     lk_ensure_type_map('day_code', 'Day / office code', DAY_CODES);
-    lk_ensure_type_map('avail_status', 'Inspector availability status', AVAIL_STATUS);
+    lk_ensure_type_map('avail_status', TH('engineer') . ' availability status', AVAIL_STATUS);
     if (defined('IDDOC_KINDS')) lk_ensure_type_map('identity_doc', 'Identity document', IDDOC_KINDS);
     if (defined('AUDIT_CLAUSES')) lk_ensure_type_map('audit_clause', 'Standard clause (internal audit)', AUDIT_CLAUSES);
     // back-fill any newly-added coded values into existing lists (idempotent)
@@ -151,8 +151,8 @@ function lk_module_lists() {
         ['template_kind',       'Template kind',             CRM_TEMPLATE_KINDS,     'Sales'],
         ['approval_match',      'Approval rule match',       APPROVAL_MATCH,         'Sales'],
         // --- Operations ------------------------------------------------------
-        ['job_type',            'Deputation type',           JOB_TYPES,              'Operations'],
-        ['job_stage',           'Deputation stage',          JOB_STAGES,             'Operations'],
+        ['job_type',            TH('job') . ' type',         JOB_TYPES,              'Operations'],
+        ['job_stage',           TH('job') . ' stage',        JOB_STAGES,             'Operations'],
         ['attendance_status',   'Attendance status',         ATT_STATUS,             'Operations'],
         ['charge_unit',         'Charge unit',               CHARGE_UNITS,           'Operations'],
         ['rate_type',           'Rate basis',                RATE_TYPES,             'Operations'],
@@ -173,7 +173,7 @@ function lk_module_lists() {
         // defined() because these live in schedule.php: a list here naming a
         // constant from a file that did not load takes the whole app down on a
         // fatal, and a missing dropdown is a far smaller problem than that.
-        ['engagement_type',     'Shape of engagement',       defined('ENGAGEMENT_TYPES') ? ENGAGEMENT_TYPES : [], 'Operations'],
+        ['engagement_type',     'Shape of engagement',       function_exists('engagement_types') ? engagement_types() : [], 'Operations'],
         ['pattern_kind',        'How a pattern repeats',     defined('PATTERN_KINDS') ? PATTERN_KINDS : [],       'Operations'],
         // --- Money -----------------------------------------------------------
         ['boss_status',         'Contract number status',        BOSS_STATUS,            'Money'],
@@ -310,7 +310,7 @@ function lk_seed() {
 
     // deputation type (flat list)
     $dep = lk_add_type('engagement_pattern', 'Engagement pattern', null, 0, $so++);
-    foreach (['Daily (single day)', 'Multiple days', 'Continuous days', 'Monthly (PM deputation)'] as $i => $d) lk_add_value($dep, null, '', $d, $i);
+    foreach (['Daily (single day)', 'Multiple days', 'Continuous days', 'Monthly (planned maintenance)'] as $i => $d) lk_add_value($dep, null, '', $d, $i);
     // inspection types + deliverables (coded flat lists)
     $it = lk_add_type('inspection_type', 'Type of inspection', null, 0, $so++);
     $i = 0; foreach (INSPECTION_TYPES as $code => $lab) lk_add_value($it, null, $code, $lab, $i++);

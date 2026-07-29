@@ -32,8 +32,17 @@ const ENGAGEMENT_TYPES = [
     'CONTINUOUS' => 'Continuous days',
     'MULTIPLE'   => 'Multiple dates',
     'PATTERN'    => 'Repeating pattern',
-    'MONTHLY'    => 'Monthly deputation',
+    'MONTHLY'    => '',   // label built by engagement_label()
 ];
+
+// Same reason as NCR_SOURCES: a constant cannot call T(), so the one entry that
+// names a business noun is completed here.
+function engagement_types() {
+    $m = ENGAGEMENT_TYPES;
+    $m['MONTHLY'] = 'Monthly ' . Tl('job');
+    return $m;
+}
+
 
 // How a man-month is defined. This is a commercial term, not a fact about the
 // calendar, and different clients mean different things by it.
@@ -115,7 +124,7 @@ function sched_migrate() {
 }
 
 function engagement_label($code) {
-    $opts = function_exists('lk_options_or') ? lk_options_or('engagement_type', ENGAGEMENT_TYPES) : ENGAGEMENT_TYPES;
+    $opts = function_exists('lk_options_or') ? lk_options_or('engagement_type', engagement_types()) : engagement_types();
     return $opts[$code] ?? ($code ?: '—');
 }
 

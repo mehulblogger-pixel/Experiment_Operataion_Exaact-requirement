@@ -8,7 +8,7 @@
 <div class="panel" style="border:1px solid var(--info);background:color-mix(in srgb,var(--info) 7%,transparent)">
   <b>What the DPDP Act gives people</b>
   <div class="muted" style="margin-top:4px;font-size:13.5px;line-height:1.65">
-    A person whose data you hold — a client's contact person, one of your own inspection engineers — can ask what
+    A person whose data you hold — a client's contact person, one of your own <?= e(Tlp('engineer')) ?> — can ask what
     you have about them, ask you to correct it, ask you to delete it, or withdraw their consent. Log the request
     here on the day it arrives. A copy of everything held about somebody can be produced as a file from their own
     record, and the same screen shows what deleting them would and would not remove.

@@ -82,7 +82,7 @@
       })();
     </script>
     <?php endif; ?>
-    <div class="ff"><label>Linked inspector (Inspector role)</label>
+    <div class="ff"><label>Linked <?= e(Tl('engineer')) ?> (Inspector role)</label>
       <select class="form-control searchable" name="inspector_id"><option value="">—</option>
         <?php foreach ($inspectors as $i): ?><option value="<?= (int)$i['id'] ?>" <?= ($user && $user['inspector_id']==$i['id'])?'selected':'' ?>><?= e($i['name']) ?></option><?php endforeach; ?>
       </select></div>

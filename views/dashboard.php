@@ -212,7 +212,7 @@
         $av = ['AVAILABLE'=>0,'ON_JOB'=>0,'LEAVE'=>0,'OTHER'=>0];
         foreach ($avRows as $r) { $s=$r['eff_status']; if($s==='AVAILABLE')$av['AVAILABLE']++; elseif($s==='ON_JOB')$av['ON_JOB']++; elseif($s==='LEAVE')$av['LEAVE']++; else $av['OTHER']++; }
         ob_start(); ?>
-        <div class="ctitle" style="margin-top:22px"><h3>Inspector availability — today</h3><a href="/availability">Open board →</a></div>
+        <div class="ctitle" style="margin-top:22px"><h3><?= e(TH('engineer')) ?> availability — today</h3><a href="/availability">Open board →</a></div>
         <div class="qcards">
           <a class="qcard tone-ok" href="/availability"><div class="qic">🟢</div><div class="qn"><?= (int)$av['AVAILABLE'] ?></div><div class="ql">Available / free</div></a>
           <a class="qcard tone-info" href="/availability"><div class="qic">🧭</div><div class="qn"><?= (int)$av['ON_JOB'] ?></div><div class="ql">On job today</div></a>

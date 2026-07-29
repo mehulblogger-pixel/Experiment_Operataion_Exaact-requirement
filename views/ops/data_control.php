@@ -84,7 +84,7 @@
     <div class="ff"><label>Review again by</label><input class="form-control" type="date" name="next_review" value="<?= e(date('Y-m-d', strtotime('+1 year'))) ?>"></div>
     <div class="ff ff-wide"><label>What it is for *</label>
       <input class="form-control" name="purpose" required
-             placeholder="e.g. recording inspection results, issuing reports, and calculating deputation costs"></div>
+             placeholder="e.g. recording results, issuing <?= e(Tlp('report')) ?>, and calculating job costs"></div>
     <div class="ff ff-wide"><label>What was tested *</label>
       <textarea class="form-control" name="what_tested" rows="3" required
                 placeholder="the actual steps somebody carried out — an assessor reads this, not a tick"></textarea></div>

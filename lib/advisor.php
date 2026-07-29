@@ -89,14 +89,14 @@ function adv_unbilled_work() {
         'n' => count($rows), 'value' => $total,
         'cost' => 'About ' . fmoney($total) . ' of work is done, closed, and on no invoice'
                 . ($ageDays !== null ? '. The oldest finished ' . $ageDays . ' days ago' : '') . '.',
-        'why' => 'Closing a deputation and invoicing it are two separate acts, and nothing has ever '
+        'why' => 'Closing a ' . Tl('job') . ' and invoicing it are two separate acts, and nothing has ever '
                . 'connected them. Work got closed by operations; invoicing happened when somebody in '
                . 'accounts remembered. Nobody was ever shown the list of what had been forgotten.',
         'steps' => [
-            'Open <b>Waiting to be billed</b> — it groups every closed, unbilled deputation by customer.',
+            'Open <b>Waiting to be billed</b> — it groups every closed, unbilled ' . Tl('job') . ' by customer.',
             'Start with the customer at the top; the list is ordered by value, so that is the biggest cheque.',
-            'Tick the deputations this invoice should cover — one invoice across several is normal for a monthly account — and press <b>Draft one invoice</b>.',
-            'Check the lines. Each carries the rate from its deputation, so nothing is re-keyed. '
+            'Tick the ' . Tlp('job') . ' this invoice should cover — one invoice across several is normal for a monthly account — and press <b>Draft one invoice</b>.',
+            'Check the lines. Each carries the rate from its ' . Tl('job') . ', so nothing is re-keyed. '
               . ($noValue ? '<b>' . $noValue . ' of these have no value recorded</b> — set the rate on the line before issuing.' : ''),
             'Press <b>Issue</b>. Only then is a number allocated, and the invoice appears in the ledger and the ageing.',
             'Repeat for the next customer. Ten minutes of this is usually the most profitable ten minutes of the week.',
@@ -319,18 +319,18 @@ function adv_closed_no_report() {
         'key' => 'no_report', 'severity' => 'RISK',
         'title' => 'Work closed with no report on file',
         'n' => count($rows), 'value' => 0.0,
-        'cost' => count($rows) . ' closed deputations have no report linked. What the customer was actually sent '
+        'cost' => count($rows) . ' closed ' . Tlp('job') . ' have no ' . Tl('report') . ' linked. What the customer was actually sent '
                 . 'is not in the system, so it cannot be produced in a dispute or an assessment.',
-        'why' => 'Reports were often written outside the system and e-mailed. The deputation was closed on the '
+        'why' => ucfirst(Tlp('report')) . ' were often written outside the system and e-mailed. The ' . Tl('job') . ' was closed on the '
                . 'strength of the work being done, not on the report existing.',
         'steps' => [
             'Sort by most recent — those are the ones whose report still exists somewhere findable.',
-            'Open the deputation. If the report was raised in the system but never linked, link it.',
-            'If it was written outside the system, raise the report against the deputation and attach the file. '
+            'Open the ' . Tl('job') . '. If the ' . Tl('report') . ' was raised in the system but never linked, link it.',
+            'If it was written outside the system, raise the ' . Tl('report') . ' against the ' . Tl('job') . ' and attach the file. '
               . 'That is worth doing for anything in the current financial year.',
             'For older work, decide a cut-off and stop. Reconstructing three years of reports is not a project '
               . 'anybody finishes; being able to produce this year\'s is what an assessor asks for.',
-            'Going forward: a deputation closing without a report should be the exception, and this list is how '
+            'Going forward: a ' . Tl('job') . ' closing without a ' . Tl('report') . ' should be the exception, and this list is how '
               . 'you see whether it is.',
         ],
         'stop' => 'Nothing automatic yet. Making the report a condition of closing is a change I would make only '

@@ -283,7 +283,7 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
       <td><span class="badge <?= ($lc['status']??'')==='CLOSED'?'GREEN':'AMBER' ?>"><?= e($lc['status']) ?></span></td>
       <td class="row-actions"><a class="btn small secondary" href="/call?id=<?= (int)$lc['id'] ?>">Open</a></td>
     </tr><?php endforeach; ?>
-    <?php if (empty($linkedCalls)): ?><tr><td colspan="6">No inspection calls for this partner yet. <a href="/call-new">Create one</a>.</td></tr><?php endif; ?></table>
+    <?php if (empty($linkedCalls)): ?><tr><td colspan="6">No <?= e(Tlp('call')) ?> for this partner yet. <a href="/call-new">Create one</a>.</td></tr><?php endif; ?></table>
 
 <?php elseif ($tab === 'relationships'): ?>
   <table class="grid"><tr><th>This company…</th><th>Related company</th><th>Notes</th></tr>

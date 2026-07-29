@@ -56,7 +56,7 @@ function reset_groups() {
         ],
         'people' => [
             'label' => 'People, ' . Tlp('office') . ' & agencies',
-            'note'  => 'Inspection engineers, back-office staff, sub-contractors, agencies, ' . Tlp('office')
+            'note'  => THP('engineer') . ', back-office staff, sub-contractors, agencies, ' . Tlp('office')
                      . ' and every login except your own.',
             'tables' => ['inspectors', 'inspector_certs', 'inspector_allowances', 'back_office_staff',
                 'subcons', 'subcon_rates', 'agencies', 'work_norms', 'offices', 'users'],

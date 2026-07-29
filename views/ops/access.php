@@ -65,7 +65,7 @@
       <tr><td colspan="3" style="background:var(--soft);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.03em"><?= e($grp) ?></td></tr>
       <?php foreach ($keys as $k): if (!isset(ACCESS_MODULES[$k])) continue; ?>
       <tr>
-        <td><b><?= e(ACCESS_MODULES[$k]) ?></b> <?= $rec("mod.$k.view")?'<span class="pill p-ok" style="padding:0 5px;font-size:10px">recommended</span>':'' ?></td>
+        <td><b><?= e(access_module_label($k)) ?></b> <?= $rec("mod.$k.view")?'<span class="pill p-ok" style="padding:0 5px;font-size:10px">recommended</span>':'' ?></td>
         <td style="text-align:center"><input type="checkbox" name="perms[mod.<?= e($k) ?>.view]" value="1" <?= $has("mod.$k.view")?'checked':'' ?>></td>
         <td style="text-align:center"><input type="checkbox" name="perms[mod.<?= e($k) ?>.edit]" value="1" <?= $has("mod.$k.edit")?'checked':'' ?>></td>
       </tr>

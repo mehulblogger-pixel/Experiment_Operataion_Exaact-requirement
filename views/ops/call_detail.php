@@ -18,7 +18,7 @@
   $mailTo = $call['coordinator_email'] ?? '';
   $mailCc = (!empty($call['notify_manager']) && !empty($call['manager_email'])) ? $call['manager_email'] : '';
   $clientNm = $call['client_disp'] ?: $call['client_name'];
-  $subj = rawurlencode("Inspection call {$call['call_code']} — {$clientNm}");
+  $subj = rawurlencode(TH('call') . " {$call['call_code']} — {$clientNm}");
   $bodyLines = "Call: {$call['call_code']}\nClient: {$clientNm}\nVendor/Site: " . ($call['vendor_name'] ?: '-') .
     "\n" . T("sbu") . ": " . (OPS_SBUS[$call['sbu']] ?? $call['sbu']) . "\nActivity: " . ($call['activity_id'] ? lk_value_path($call['activity_id']) : '-') .
     "\nClient required date: " . ($call['inspection_required_date'] ?: '-') .
@@ -131,7 +131,7 @@
     <div><span class="k">Activity</span><?= e($call['activity_id'] ? lk_value_path($call['activity_id']) : '—') ?></div>
     <div><span class="k">Type of inspection</span><?= e(($call['inspection_type']??'')==='OTHER' ? ($call['inspection_type_other'] ?: 'Other') : (INSPECTION_TYPES[$call['inspection_type']??''] ?? '—')) ?></div>
     <?php if (($call['site_address_id']??null)): $sa = ops_one("SELECT * FROM partner_addresses WHERE id=?", [$call['site_address_id']]); ?>
-      <div><span class="k">Deputation site</span><?= e($sa ? trim(($sa['label']?:'Site').' '.$sa['town_village'].' '.$sa['city'].' '.$sa['state']) : '—') ?></div><?php endif; ?>
+      <div><span class="k"><?= e(TH('job')) ?> site</span><?= e($sa ? trim(($sa['label']?:'Site').' '.$sa['town_village'].' '.$sa['city'].' '.$sa['state']) : '—') ?></div><?php endif; ?>
     <?php if (($call['po_id']??null)): $po = ops_one("SELECT po_number FROM partner_purchase_orders WHERE id=?", [$call['po_id']]); $liw = ($call['po_line_item_id']??null) ? ops_one("SELECT description FROM po_line_items WHERE id=?", [$call['po_line_item_id']]) : null; ?>
       <div><span class="k">Against PO</span><?= e($po['po_number'] ?? '—') ?><?= $liw ? ' · '.e($liw['description']) : '' ?></div><?php endif; ?>
     <div><span class="k">Product</span><?= e((lk_options_or('product', PRODUCT_CATS)[$call['product_category']] ?? '') ?: ($call['product_other'] ?: '—')) ?></div>
