@@ -1770,6 +1770,10 @@ function ops_module_gate($route) {
         // The approval queue and its rules ride with the pipeline they guard.
         'approvals'=>'leads','approval-act'=>'leads',
         // The Ads Pro link rides with leads: it exists to produce them.
+        // 'licence' and 'sso' are deliberately ungated by module. The licence
+        // screen in particular is what somebody reaches when the licence has
+        // lapsed and the modules have gone — gating it behind one of them would
+        // be a lock with the key inside.
         // 'sso' is deliberately ungated by module: it is an identity screen, and an
         // administrator on a Sales-only licence still has to see who signed in.
         'adspro'=>'leads','adspro-save'=>'leads','adspro-test'=>'leads',
@@ -2045,6 +2049,8 @@ function ops_dispatch($route, $method) {
         case $route === 'ads-roi':
             return ops_adsroi($route, $method);
         // Who arrived here from a sibling application, and who was turned away.
+        case $route === 'licence' || $route === 'licence-save':
+            return ops_licence($route, $method);
         case $route === 'sso':
             return ops_sso($route, $method);
         // Deals held at a stage until somebody with the authority agrees.
@@ -4833,6 +4839,15 @@ function ops_users($route, $method) {
                 $pdo->prepare("UPDATE users SET must_change_pwd=? WHERE id=?")->execute([$mustChange, $user['id']]);
                 flash('User saved.');
             } else {
+                // Seats. Checked here, at the one place a NEW active account is
+                // created, rather than in the licence file guessing where that
+                // might be. Editing an existing person is never blocked — that
+                // would strand a customer who is over their seat count with no
+                // way to correct anybody's details.
+                if (function_exists('lk_seat_block') && ($seatErr = lk_seat_block()) !== '') {
+                    flash($seatErr, 'error');
+                    redirect('/users');
+                }
                 // A brand-new account with no password typed gets one nobody knows
                 // and is marked must-change, rather than a shared default.
                 $hash = password_hash($newPw !== '' ? $newPw : bin2hex(random_bytes(16)), PASSWORD_DEFAULT);

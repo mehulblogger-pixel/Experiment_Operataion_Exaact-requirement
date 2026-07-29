@@ -72,6 +72,22 @@ function licence_is_core($key) { return !empty(PRODUCT_MODULES[$key][3]); }
 function licence_disabled($reload = false) {
     static $off = null;
     if ($off !== null && !$reload) return $off;
+
+    // A SIGNED LICENCE OUTRANKS THE SETTINGS SCREEN. When one is present it is
+    // the contract, and what the customer ticked in Settings is irrelevant —
+    // otherwise the switch that sells the product could be flipped by the person
+    // who did not buy it. With no licence in force this returns null and
+    // everything below behaves exactly as it did before licensing existed.
+    if (function_exists('lk_modules')) {
+        $bought = lk_modules();
+        if ($bought !== null) {
+            $off = [];
+            foreach (PRODUCT_MODULES as $k => [$lbl, $desc, $covers, $core])
+                if (!$core && !in_array($k, $bought, true)) $off[] = $k;
+            return $off;
+        }
+    }
+
     $env = getenv('MODULES_OFF');
     $raw = ($env !== false && $env !== '') ? $env : (string)setting_get('modules_off', '');
     $off = [];

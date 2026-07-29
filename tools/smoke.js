@@ -69,6 +69,7 @@ const PLAIN = [
   // The Ads Pro link and the return report. Named here rather than left to the
   // sidebar, because both hide themselves until the link is configured — which
   // is exactly the state a crawl would otherwise never exercise.
+  '/licence',
   '/adspro', '/adspro?q=SENT', '/adspro?q=FAILED', '/adspro?q=SKIPPED',
   '/ads-roi', '/ads-roi?from=2026-01-01&to=2026-12-31', '/sso',
   // Opportunities: the deal, kept apart from the quotation.

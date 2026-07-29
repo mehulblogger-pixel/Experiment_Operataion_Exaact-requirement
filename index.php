@@ -143,6 +143,7 @@ try {
     require __DIR__ . '/lib/mghsso.php';
     require __DIR__ . '/lib/adspro.php';
     require __DIR__ . '/lib/adssync.php';
+    require __DIR__ . '/lib/licencekey.php';
     require __DIR__ . '/lib/adsroi.php';
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';
@@ -583,6 +584,22 @@ if (must_change_password(current_user())
         ? 'Please choose your own password before going any further.'
         : 'Your password has reached the age limit set for this company. Please choose a new one.', 'warning');
     redirect('/change-password');
+}
+
+// An expired subscription makes the system READ-ONLY, never locked. Every
+// screen, export and PDF keeps working; only new records are refused. Locking a
+// business out of its own invoices earns a chargeback and a bad review, and it
+// has never once made anybody renew faster.
+//
+// This sits on the POST path only, so nothing that merely reads is touched, and
+// the licence screen itself is exempt — a rule that blocks the screen you need
+// in order to unlock the system is a support call, not a control.
+if ($method === 'POST' && function_exists('lk_blocks_write') && lk_blocks_write($route)) {
+    $st = lk_state();
+    flash(($st['err'] ?: 'This subscription has ended.')
+        . ' The system is read-only: everything can be opened, printed and exported, but nothing new can be saved. '
+        . 'Paste a current licence key on the Licence screen to carry on.', 'error');
+    redirect('/licence');
 }
 
 // Refuse any state-changing request that did not come from one of our own

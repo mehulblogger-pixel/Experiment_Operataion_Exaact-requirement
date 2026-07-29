@@ -55,14 +55,27 @@
 
     // ---------- section: KPI row ----------
     ob_start(); ?>
+    <?php // A tile is an offer. Offering a count that links to a screen this
+          // installation has not licensed is worse than showing nothing: the
+          // number is real, the link refuses, and the customer reasonably calls
+          // it broken. So each tile asks the same question the menu asks.
+          $hasOps = !function_exists('licence_enabled') || licence_enabled('operations'); ?>
     <div class="kpi-row" style="margin-top:18px">
-      <div class="kpi"><span class="kic">☎️</span><div class="k">Open calls</div><div class="v"><a href="/calls"><?= $openCalls ?></a></div><div class="d">To schedule / in progress</div></div>
-      <div class="kpi"><span class="kic">🗂</span><div class="k">Open jobs</div><div class="v"><a href="/jobs?status=open"><?= $openJobs ?></a></div><div class="d"><?= $overdue ? '<span class="down">'.$overdue.' overdue</span>' : 'All on time' ?></div></div>
+      <?php if ($hasOps): ?>
+      <div class="kpi"><span class="kic">☎️</span><div class="k">Open <?= e(Tlp('call')) ?></div><div class="v"><a href="/calls"><?= $openCalls ?></a></div><div class="d">To schedule / in progress</div></div>
+      <div class="kpi"><span class="kic">🗂</span><div class="k">Open <?= e(Tlp('job')) ?></div><div class="v"><a href="/jobs?status=open"><?= $openJobs ?></a></div><div class="d"><?= $overdue ? '<span class="down">'.$overdue.' overdue</span>' : 'All on time' ?></div></div>
+      <?php else: ?>
+      <?php // Sales-only: the pipeline is what this customer came for. ?>
+      <div class="kpi"><span class="kic">🎯</span><div class="k">Open leads</div><div class="v"><a href="/leads"><?= (int)(function_exists('ops_val') ? (ops_val("SELECT COUNT(*) FROM leads WHERE status='OPEN'") ?: 0) : 0) ?></a></div><div class="d">Being chased</div></div>
+      <div class="kpi"><span class="kic">💡</span><div class="k">Open deals</div><div class="v"><a href="/opportunities"><?= (int)(function_exists('ops_val') ? (ops_val("SELECT COUNT(*) FROM opportunities WHERE status='OPEN'") ?: 0) : 0) ?></a></div><div class="d">In the pipeline</div></div>
+      <?php endif; ?>
       <?php if ($showMoney): ?>
         <div class="kpi"><span class="kic">💳</span><div class="k">Unbilled</div><div class="v"><a href="/invoicing?f=pending"><?= fmoney_short($mc['unbilled']) ?></a></div><div class="d"><?= (int)$mc['pending'] ?> job(s) to invoice</div></div>
         <div class="kpi"><span class="kic"><?= e(cur_sym()) ?></span><div class="k">Outstanding</div><div class="v"><a href="/invoicing?f=awaiting"><?= fmoney_short($mc['outstanding']) ?></a></div><div class="d"><?= $mc['overdue'] ? '<span class="down">'.$mc['overdue'].' overdue</span>' : (int)$mc['awaiting'].' awaiting' ?></div></div>
       <?php else: ?>
-        <div class="kpi"><span class="kic">✅</span><div class="k">Closed jobs</div><div class="v"><a href="/jobs?status=closed"><?= $closedJobs ?></a></div><div class="d">Completed</div></div>
+        <?php if ($hasOps): ?>
+          <div class="kpi"><span class="kic">✅</span><div class="k">Closed <?= e(Tlp('job')) ?></div><div class="v"><a href="/jobs?status=closed"><?= $closedJobs ?></a></div><div class="d">Completed</div></div>
+        <?php endif; ?>
         <div class="kpi"><span class="kic">🏢</span><div class="k">Clients</div><div class="v"><a href="/clients"><?= (int)($clients ?? 0) ?></a></div><div class="d"><?= (int)($vendors ?? 0) ?> vendors</div></div>
       <?php endif; ?>
     </div>
