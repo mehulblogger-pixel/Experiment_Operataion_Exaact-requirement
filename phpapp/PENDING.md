@@ -15,7 +15,7 @@ matter, and they are all here.
 
 | # | What | Why it matters |
 |---|---|---|
-| O1 | **Change `admin/admin12345`** and every `demo12345` account | The credentials are in the repository |
+| ~~O1~~ | **Done — credentials changed** | Confirmed by the owner |
 | O2 | **Backups running, and one restore actually tried** | Every photograph, bill and signed report is in the database. A backup nobody has restored is a hope |
 | O3 | **Grievance officer + privacy notice** (Settings → Compliance) | DPDP Act. Two text fields, legally required |
 | O4 | **Two-step sign-in on** for roles that move money | Built, switched off |
@@ -88,15 +88,15 @@ matter, and they are all here.
 
 | # | What | Note |
 |---|---|---|
-| **B0** | **THE HOSTING DECISION — blocks five items below** | Shared hosting cannot deliver caching, queues, real backups, encryption at rest, or any "millions of records" claim. Stay (A), VPS (B), or managed cloud (C). My recommendation: B, but not until a paying customer's volume demands it |
+| ~~B0~~ | **ANSWERED — it is a VPS on MilesWeb** | Not shared hosting, as I had assumed and built around. That unblocks B1 (REST API), B5 (backups) and B6 (caching and a job queue), and makes encryption at rest possible. Nothing built so far depended on the shared-hosting limits in a way that has to be undone — the choices made under that assumption (no Composer, hand-written XML/PDF, server-side paging) all still hold, they are simply no longer forced |
 | B1 | **No REST API** | Nothing exists. The single biggest item in blueprint 005 and the prerequisite for every external integration |
 | B2 | **No webhooks, API keys or OAuth** | Follows B1 |
 | B3 | **No field-level or record-level permissions** | Permissions stop at module + branch today |
 | B4 | **No password policy** | No minimum, no age, no reuse rule |
-| B5 | **NO BACKUP FEATURE** | Correcting an earlier impression: the compliance screen *tells you to take one*. That is advice, not a feature. Blocked on B0 for anything automatic |
-| B6 | **No caching layer, no job queue** | `cron.php` runs 26 steps once a day. Blocked on B0 |
+| B5 | **NO BACKUP FEATURE** | The compliance screen *tells you to take one*; that is advice, not a feature. **No longer blocked** — a VPS can run a scheduled dump |
+| B6 | **No caching layer, no job queue** | `cron.php` runs 26 steps once a day. **No longer blocked** — the VPS answer makes both possible |
 | B7 | **No territories** | Blueprint 003 |
-| B8 | **No visual workflow / form / dashboard / report builder** | The rules exist and are configurable; the *designers* do not. Blueprint 008 |
+| B8 | **Partly — the FUNNEL builder is built** | `/pipelines` and `/pipeline?id=` — create, clone, rename, reorder, set probability and service level, retire. Guard rails: a pipeline must keep a WON and a LOST stage, a stage holding deals is retired rather than deleted, and a WON stage is forced to 100%. **Still missing:** the workflow, form, dashboard and report designers — blueprint 008 |
 | B9 | **No configuration export/import, versioning or sandbox** | Blueprint 008 |
 | B10 | **No localisation** beyond English and ₹ | Blueprint 008 |
 | B11 | **No usage analytics or in-app feedback** | Blueprint 007. Also blocks the "reduce manual work by 60%" target in 004, which is unmeasurable today |
@@ -136,6 +136,52 @@ the nonconformity register, client acceptance of reports, multi-action
 corrective actions, branch scoping, portal permissions, site-entry documents,
 confidentiality, and the competence review cycle. Entries about them survive
 below as history; they are not open.
+
+## ▣ A CRM that works on the day it is installed (July 2026)
+
+The requirement: *"a complete professional CRM with its individual dashboard,
+pipelines, funnels all prebuilt as per the industry"*, then *"prebuilt in
+multiple number which can be adjusted by the user as per their flow ... or
+create new ones."*
+
+**Twelve industry templates** (`lib/industry.php`) — inspection, manufacturing,
+trading, professional services, construction, IT services, healthcare,
+education, logistics, real estate, staffing, and a plain B2B default. Each ships
+**three** pipelines: a new-business funnel, a second funnel for the business that
+does not behave like new business (renewals, repeat orders, contract extensions,
+variations), and a lead pipeline. Plus the sources deals actually come from in
+that trade and the reasons they are actually lost.
+
+The funnels differ where it matters. A construction bid sits at 5% for months
+and is lost on L1 price; a trading enquiry moves in three days; an IT renewal
+starts at 45% because the customer is already yours.
+
+**Applying a template creates; it never edits.** A live system has deals sitting
+on stages — rewriting those stages would move every deal somewhere it was never
+put. The new pipelines become the default for new work and the old ones keep
+their deals until they close. The screen says so before you press it.
+
+**The funnel builder** (`lib/pipelines.php`) closes a gap worth naming: pipelines
+and stages have always been read from the database rather than hard-coded, but
+there was **no screen to change them**. "Configurable" was true of the data model
+and false of the product. Now: create, clone, rename, reorder, set probability
+and service level, retire. Five guard rails, each because breaking it corrupts
+live data — a pipeline must keep a WON and a LOST stage (every rule reads `kind`,
+not names); a stage holding deals is retired rather than deleted; a WON stage is
+forced to 100% because one left at 80% understates every forecast.
+
+**The CRM's own dashboard** (`lib/crmdash.php`) — kept apart from the main
+dashboard because "what is happening today" and "how is selling going" are
+different questions. The funnel, weighted forecast, win rate, average deal,
+sales cycle, deals that have stopped moving, why we lose, who is selling, and
+the activity behind it.
+
+**On the funnel chart being honest.** The bars are what is sitting in each stage
+now. The conversion beside each is NOT bar B ÷ bar A — that compares two
+snapshots and means nothing when stages move at different speeds. It comes from
+the stage history: of everything that ever reached the previous stage, how much
+ever reached this one. A stage nobody has passed through shows "—", not 0%,
+because zero means "everybody stopped here" and no data means nobody has arrived.
 
 ## ▣ Customer 360, and the flow end to end (July 2026)
 

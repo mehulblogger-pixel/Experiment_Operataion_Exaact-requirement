@@ -129,6 +129,9 @@ try {
     require __DIR__ . '/lib/packs.php';
     require __DIR__ . '/lib/leads.php';
     require __DIR__ . '/lib/opportunities.php';
+    require __DIR__ . '/lib/pipelines.php';
+    require __DIR__ . '/lib/industry.php';
+    require __DIR__ . '/lib/crmdash.php';
     require __DIR__ . '/lib/datatable.php';
     require __DIR__ . '/lib/search.php';
     require __DIR__ . '/lib/books.php';
