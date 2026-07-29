@@ -43,13 +43,19 @@
 //     in order to unlock the system is not a rule, it is a support call.
 // ============================================================================
 
-// The MGH signing key. Public half only — this is meant to be readable, and
-// publishing it costs nothing. Replaced per deployment via LICENCE_PUBKEY when
-// a customer is issued keys from a different signing pair.
+// The MGH signing key — the real one, made on the licence server at
+// id.mghaiapps.com/licences/ and never off that machine in its private half.
+// This is the PUBLIC half only: it can verify a licence and cannot create one,
+// so publishing it costs nothing and every copy of this application ships with
+// it. Replaced per deployment via LICENCE_PUBKEY if a customer is ever issued
+// keys from a different signing pair.
+//
+// If this is ever changed, every licence already issued stops verifying. It is
+// not a setting; it is the anchor the whole scheme hangs from.
 const LICENCE_PUBKEY_DEFAULT = <<<'PEM'
 -----BEGIN PUBLIC KEY-----
-MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEXhowFohyLbUdfzMFAglVBZhL4if+
-V17+PXCQ3l1wIFOqAqRjPziFXuTQNJFAzAexyY6+0yHqh7+we0a005jOhw==
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEqBi7DWZhgXzmGUfhaeXyJUxM0bvr
+VdEeTDu6pl3oAKMciG2CWcOAOzA2dwGz5EyryeqBnM15vBM0g4Bk/h3SHw==
 -----END PUBLIC KEY-----
 PEM;
 
