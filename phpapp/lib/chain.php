@@ -85,6 +85,10 @@ function chain_root($kind, $id) {
                 if ($j && $j['quotation_id']) { $kind = 'QUOTE'; $id = (int)$j['quotation_id']; continue 2; }
                 return ['JOB', $id];
             case 'CALL':
+                // An order raised from a won deal points back at it, which is a
+                // shorter and truer route than going via the quotation.
+                $o = chain_one("SELECT id FROM opportunities WHERE call_id=? LIMIT 1", [$id]);
+                if ($o) { $kind = 'OPPORTUNITY'; $id = (int)$o['id']; continue 2; }
                 $c = chain_one("SELECT quotation_id FROM calls WHERE id=?", [$id]);
                 if ($c && $c['quotation_id']) { $kind = 'QUOTE'; $id = (int)$c['quotation_id']; continue 2; }
                 return ['CALL', $id];
@@ -146,8 +150,17 @@ function chain_from($kind, $id) {
             // one opportunity must not be counted as three.
             $quotes = chain_all("SELECT q.* FROM opportunity_quotes oq JOIN quotations q ON q.id=oq.quotation_id
                                  WHERE oq.opportunity_id=? ORDER BY q.quote_no, q.rev", [(int)$o['id']]);
-            if ($o['inquiry_id']) { $kind = 'INQUIRY'; $id = (int)$o['inquiry_id']; }
-            elseif ($quotes) { $kind = 'QUOTE'; $id = (int)$quotes[0]['id']; }
+            // An order raised straight from the deal is the strongest link
+            // there is; follow it rather than hunting through the paperwork.
+            if (!empty($o['call_id'])) {
+                $c = chain_one("SELECT c.*, COALESCE(bp.display_name,bp.legal_name) client_name FROM calls c
+                                LEFT JOIN business_partners bp ON bp.id=c.client_id WHERE c.id=?", [(int)$o['call_id']]);
+                if ($c) { $calls = [$c]; $kind = 'CALL'; $id = (int)$c['id']; }
+            }
+            if ($kind === 'OPPORTUNITY') {
+                if ($o['inquiry_id']) { $kind = 'INQUIRY'; $id = (int)$o['inquiry_id']; }
+                elseif ($quotes) { $kind = 'QUOTE'; $id = (int)$quotes[0]['id']; }
+            }
         }
     }
     if ($kind === 'INQUIRY') {
@@ -345,6 +358,22 @@ function chain_gaps() {
                               ORDER BY j.id DESC LIMIT 200", $ja),
         'url'   => '/job?id=',
     ];
+
+    if (function_exists('opp_migrate') && function_exists('licence_enabled') && licence_enabled('operations')) {
+        opp_migrate();
+        [$ow, $oa] = scope_office_clause('o.office_id');
+        $g['won_no_order'] = [
+            'label' => 'Deals won and never ordered',
+            'why'   => 'The deal was won and nobody raised the order, so the work has not started and the customer is waiting.',
+            'fix'   => 'Open the deal and raise the order — it carries the quotation and the agreed value across.',
+            'rows'  => chain_all("SELECT o.id, o.ref, o.name who, o.won_at d, o.partner_name
+                                  FROM opportunities o
+                                  WHERE $ow AND o.status='WON' AND (o.call_id IS NULL OR o.call_id=0)
+                                  ORDER BY o.won_at DESC LIMIT 200", $oa),
+            'url'   => '/opportunity?id=',
+            'action'=> ['/opportunities', 'Open the pipeline'],
+        ];
+    }
 
     if (function_exists('books_migrate')) {
         books_migrate();
