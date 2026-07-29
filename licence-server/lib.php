@@ -2,8 +2,10 @@
 // ============================================================================
 //  MGH Licence Server — the thing that turns a payment into a renewal
 //
-//  Deployed to id.mghaiapps.com. It holds the customers, what each has bought,
-//  and until when. Every installation checks in and collects its current key;
+//  Deployed under id.mghaiapps.com — as a FOLDER beneath the MGH ID site,
+//  because MGH ID already occupies that web root. It holds the customers, what
+//  each has bought, and until when. Every installation checks in and collects
+//  its current key;
 //  a payment webhook extends the subscription, and the very next check-in
 //  picks it up. Nobody types anything.
 //
@@ -27,15 +29,55 @@
 //  trust.
 // ============================================================================
 
-const LS_DB      = __DIR__ . '/data/licences.sqlite';
-const LS_KEYFILE = __DIR__ . '/../licence-signing-key.pem';   // outside the web root
 const LS_GRACE   = 14;
+
+// ---- Where the private things live ------------------------------------------
+//  The signing key, the admin password hash and the database must sit somewhere
+//  a browser can never reach. "One level above this folder" is only outside the
+//  web root when this folder IS the web root — and it is not, when the server is
+//  installed as a subfolder of a site that already exists (id.mghaiapps.com
+//  already runs MGH ID, so /licences/ under it is the sane place to put this).
+//  In that arrangement "one level above" is the MGH ID document root, and the
+//  signing key would be downloadable by anyone who guessed the filename.
+//
+//  So the location is a setting, LICENCE_STORE, and the code refuses to write a
+//  signing key into anywhere a browser can reach.
+function ls_store() {
+    static $d = null;
+    if ($d !== null) return $d;
+    $e = trim((string)getenv('LICENCE_STORE'));
+    return $d = rtrim($e !== '' ? $e : __DIR__ . '/..', '/');
+}
+
+// True when the store is inside the document root — i.e. the key would be
+// served. Conservative on purpose: if DOCUMENT_ROOT is not known (the command
+// line), it answers false rather than blocking a legitimate setup.
+function ls_store_is_public() {
+    $doc = realpath((string)($_SERVER['DOCUMENT_ROOT'] ?? ''));
+    $st  = realpath(ls_store());
+    if ($doc === false || $st === false) return false;
+    return $st === $doc || str_starts_with($st . '/', rtrim($doc, '/') . '/');
+}
+
+// Belt and braces for the case where somebody ignores the warning: a deny-all
+// .htaccess costs nothing and Apache is what MilesWeb runs.
+function ls_store_prepare() {
+    $d = ls_store();
+    if (!is_dir($d)) @mkdir($d, 0700, true);
+    if (is_dir($d) && !is_file($d . '/.htaccess'))
+        @file_put_contents($d . '/.htaccess', "Require all denied\n<IfModule !mod_authz_core.c>\nDeny from all\n</IfModule>\n");
+    return $d;
+}
+
+function ls_keyfile()    { return ls_store() . '/licence-signing-key.pem'; }
+function ls_configfile() { return ls_store() . '/licence-server-config.php'; }
+function ls_dbfile()     { return ls_store() . '/licences.sqlite'; }
 
 function ls_db() {
     static $db = null;
     if ($db) return $db;
-    if (!is_dir(dirname(LS_DB))) @mkdir(dirname(LS_DB), 0770, true);
-    $db = new PDO('sqlite:' . LS_DB, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    ls_store_prepare();
+    $db = new PDO('sqlite:' . ls_dbfile(), null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
     $db->exec('PRAGMA journal_mode=WAL');
     ls_migrate($db);
     return $db;
@@ -84,18 +126,28 @@ function ls_uuid() { return bin2hex(random_bytes(16)); }
 // The key is made on this machine, once, and never leaves it. If it is missing
 // the server says so plainly rather than issuing something unverifiable.
 function ls_private_key() {
-    if (!is_file(LS_KEYFILE)) return null;
-    return file_get_contents(LS_KEYFILE);
+    $f = ls_keyfile();
+    if (!is_file($f)) return null;
+    return file_get_contents($f);
 }
 
 function ls_make_keys() {
-    if (is_file(LS_KEYFILE)) return ['err' => 'A signing key already exists. Overwriting it would invalidate every licence ever issued.'];
+    $f = ls_keyfile();
+    if (is_file($f)) return ['err' => 'A signing key already exists. Overwriting it would invalidate every licence ever issued.'];
+    // Refuse rather than warn. A signing key inside the document root is the one
+    // mistake from which there is no recovery: anybody who downloads it can mint
+    // licences for every customer, for ever, and you would not know.
+    if (ls_store_is_public())
+        return ['err' => 'The private folder (' . ls_store() . ') is inside the website and a browser could download the '
+                       . 'signing key from it. Set LICENCE_STORE to a folder outside public_html — for example '
+                       . '/home/YOUR-CPANEL-USER/licence-private — and open this page again.'];
+    ls_store_prepare();
     $k = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
     if (!$k) return ['err' => 'Could not generate a key: ' . openssl_error_string()];
     openssl_pkey_export($k, $priv);
-    if (@file_put_contents(LS_KEYFILE, $priv) === false)
-        return ['err' => 'Could not write ' . LS_KEYFILE . ' — check the folder is writable by the web server.'];
-    @chmod(LS_KEYFILE, 0600);
+    if (@file_put_contents($f, $priv) === false)
+        return ['err' => 'Could not write ' . $f . ' — check the folder is writable by the web server.'];
+    @chmod($f, 0600);
     return ['ok' => true, 'public' => openssl_pkey_get_details($k)['key']];
 }
 
@@ -201,12 +253,11 @@ function ls_state($row) {
 // One password, held as a hash in a config file outside the web root. This
 // server has one operator; anything more elaborate is a system to maintain
 // rather than a control that helps.
-const LS_CONFIG = __DIR__ . '/../licence-server-config.php';
-
 function ls_config() {
     static $c = null;
     if ($c !== null) return $c;
-    return $c = is_file(LS_CONFIG) ? (include LS_CONFIG) : [];
+    $f = ls_configfile();
+    return $c = is_file($f) ? (include $f) : [];
 }
 
 function ls_admin_hash()   { return (string)(ls_config()['admin_hash'] ?? ''); }
