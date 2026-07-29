@@ -63,6 +63,9 @@ const PLAIN = [
   // one screen whose whole job is to be correct about somebody else's data — the
   // open= variant exercises the expanded card, which is where all the rendering is.
   '/advisor', '/advisor?open=unbilled', '/advisor?open=drafts',
+  // The approval queue, its history tabs, and the rule editor.
+  '/approvals', '/approvals?f=APPROVED', '/approvals?f=REJECTED', '/approvals?f=CANCELLED',
+  '/stage-gates', '/stage-gates?new=1', '/stage-gates?edit=1',
   // Opportunities: the deal, kept apart from the quotation.
   '/opportunities', '/opportunities?v=list',
   // The CRM's own dashboard, the funnel builder and the industry templates.

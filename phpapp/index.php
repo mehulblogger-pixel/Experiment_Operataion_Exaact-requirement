@@ -139,6 +139,7 @@ try {
     require __DIR__ . '/lib/chain.php';
     require __DIR__ . '/lib/customer360.php';
     require __DIR__ . '/lib/advisor.php';
+    require __DIR__ . '/lib/stagegate.php';
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';
     require __DIR__ . '/lib/trust.php';
@@ -317,6 +318,8 @@ try {
     db()->query("SELECT id FROM client_users LIMIT 1");
     db()->query("SELECT id FROM portal_requests LIMIT 1");
     db()->query("SELECT id FROM portal_audit LIMIT 1");
+    db()->query("SELECT id FROM stage_gates LIMIT 1");
+    db()->query("SELECT id FROM stage_gate_requests LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which
     // runs the same idempotent boot() and clears it. Each check is self-cancelling.

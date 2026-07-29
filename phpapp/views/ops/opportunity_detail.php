@@ -10,6 +10,40 @@
   </p></div>
 </div>
 
+<?php if (!empty($gate)):
+  // A deal held at a gate says so here, on its own screen. Finding out only by
+  // pressing Move again and being refused is how a control gets described as
+  // "the system is broken".
+  $gTo = function_exists('stage_row') ? stage_row((int)$gate['to_stage_id']) : null; ?>
+  <div class="msg msg-warning" style="margin-top:12px">
+    <b>Held for approval.</b>
+    The move to <b><?= e((string)($gTo['name'] ?? 'the next stage')) ?></b> was requested by
+    <?= e((string)$gate['requested_by'] ?: 'somebody') ?>
+    <?= trim((string)$gate['requested_at']) !== '' ? 'on ' . e(fdate(substr((string)$gate['requested_at'], 0, 10))) : '' ?>
+    and is waiting on <b><?= e((string)$gateWaiting) ?></b>. Until then the deal stays where it is, and it is not in the won figures.
+    <?php if (trim((string)$gate['note']) !== ''): ?><div style="margin-top:4px">“<?= e((string)$gate['note']) ?>”</div><?php endif; ?>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <?php if (!empty($gateCanAct)): ?>
+        <form method="post" action="/approval-act" style="display:inline-flex;gap:6px;align-items:center">
+          <input type="hidden" name="id" value="<?= (int)$gate['id'] ?>">
+          <input type="hidden" name="back" value="/opportunity?id=<?= (int)$o['id'] ?>">
+          <input class="form-control" style="width:220px" name="remarks" placeholder="Remark (required to send back)" maxlength="500">
+          <button class="btn small" name="decision" value="APPROVED">Approve the move</button>
+          <button class="btn small secondary" name="decision" value="REJECTED">Send back</button>
+        </form>
+      <?php else: ?>
+        <form method="post" action="/approval-act" style="display:inline"
+              onsubmit="return confirm('Withdraw this request? The deal stays where it is.')">
+          <input type="hidden" name="id" value="<?= (int)$gate['id'] ?>">
+          <input type="hidden" name="back" value="/opportunity?id=<?= (int)$o['id'] ?>">
+          <button class="btn small secondary" name="decision" value="CANCELLED">Withdraw the request</button>
+        </form>
+      <?php endif; ?>
+      <a class="btn small secondary" href="/approvals">All approvals</a>
+    </div>
+  </div>
+<?php endif; ?>
+
 <?php if ($stalled): ?>
   <div class="msg msg-warning" style="margin-top:12px">
     It has sat in <b><?= e($o['stage_name']) ?></b> for <?= (int)$days ?> days, past the <?= (int)$o['sla_days'] ?> that stage allows. Move it on or record why it is stuck.
