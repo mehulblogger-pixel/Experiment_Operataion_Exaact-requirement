@@ -160,6 +160,10 @@ function ops_books($route, $method) {
             'offices' => ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name"),
             'billable' => $pid ? books_billable_jobs($pid, 200) : [],
             'terms' => function_exists('lk_options') ? lk_options('payment_terms') : [],
+            // Everything the invoice can already know from the customer and from
+            // the work being billed, so nobody re-types a PO number that is
+            // already in the system and gets it wrong.
+            'carry' => $pid ? books_carry_for($pid) : [],
         ]);
         return true;
     }

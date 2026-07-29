@@ -703,8 +703,8 @@ if ($route === 'partner-new') {
         $b['industry'] = resolve_new_lookup('industry', $b['industry'] ?? '', $b['industry_new'] ?? '');
         $branchId = ($b['home_branch_id'] ?? '') !== '' ? (int)$b['home_branch_id'] : null;
         $code = gen_partner_code($branchId, ($b['display_name'] ?? '') ?: ($b['legal_name'] ?? ''));
-        $ins = $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,is_subcontractor,client_type,industry,ownership_type,status,gstin,pan,cin,tan,msme_udyam,state,website,description,home_branch_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-        $ins->execute([$code, $b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $branchId, date('c')]);
+        $ins = $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,is_subcontractor,client_type,industry,ownership_type,status,gstin,pan,cin,tan,msme_udyam,state,website,description,payment_terms,credit_days,home_branch_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        $ins->execute([$code, $b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $b['payment_terms'] ?? '', (int)($b['credit_days'] ?? 0), $branchId, date('c')]);
         $id = $pdo->lastInsertId();
         $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
             ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $id]);
@@ -742,8 +742,8 @@ if ($route === 'partner-edit') {
             return view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'offices' => offices_list(),
                 'error' => "Another company already uses these details: {$dup['row']['code']} — {$dup['row']['legal_name']} (matched by {$dup['by']})."]);
         }
-        $pdo->prepare("UPDATE business_partners SET legal_name=?,display_name=?,is_client=?,is_vendor=?,is_subcontractor=?,client_type=?,industry=?,ownership_type=?,status=?,gstin=?,pan=?,cin=?,tan=?,msme_udyam=?,state=?,website=?,description=? WHERE id=?")
-            ->execute([$b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $p['id']]);
+        $pdo->prepare("UPDATE business_partners SET legal_name=?,display_name=?,is_client=?,is_vendor=?,is_subcontractor=?,client_type=?,industry=?,ownership_type=?,status=?,gstin=?,pan=?,cin=?,tan=?,msme_udyam=?,state=?,website=?,description=?,payment_terms=?,credit_days=? WHERE id=?")
+            ->execute([$b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $b['payment_terms'] ?? '', (int)($b['credit_days'] ?? 0), $p['id']]);
         $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
             ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $p['id']]);
         // What a man-month means for this client, when their contract differs
