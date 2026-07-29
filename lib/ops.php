@@ -1769,6 +1769,11 @@ function ops_module_gate($route) {
         'crm-dashboard'=>'crm_reports',
         // The approval queue and its rules ride with the pipeline they guard.
         'approvals'=>'leads','approval-act'=>'leads',
+        // The Ads Pro link rides with leads: it exists to produce them.
+        // 'sso' is deliberately ungated by module: it is an identity screen, and an
+        // administrator on a Sales-only licence still has to see who signed in.
+        'adspro'=>'leads','adspro-save'=>'leads','adspro-test'=>'leads',
+        'adspro-import'=>'leads','adspro-spend'=>'leads','ads-roi'=>'leads',
         'stage-gates'=>'leads','stage-gate-save'=>'leads','stage-gate-delete'=>'leads',
         'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries',
         'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes',
@@ -2033,6 +2038,14 @@ function ops_dispatch($route, $method) {
             return ops_pipelines($route, $method);
         case $route === 'industry' || $route === 'industry-apply':
             return ops_industry($route, $method);
+        // Advertising: what it cost, and what actually came back.
+        case $route === 'adspro' || strncmp($route, 'adspro-', 7) === 0:
+            return ops_adspro($route, $method);
+        case $route === 'ads-roi':
+            return ops_adsroi($route, $method);
+        // Who arrived here from a sibling application, and who was turned away.
+        case $route === 'sso':
+            return ops_sso($route, $method);
         // Deals held at a stage until somebody with the authority agrees.
         case $route === 'approvals' || $route === 'approval-act':
             return ops_approvals($route, $method);

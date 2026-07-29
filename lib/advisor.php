@@ -471,12 +471,70 @@ function adv_draft_invoices() {
     ];
 }
 
+
+// Advertising money with nothing to show for it. Only exists once Ads Pro is
+// connected — a company that does not advertise must never be told off about
+// campaigns it does not run.
+function adv_ad_spend_dry() {
+    if (!function_exists('ads_on') || !ads_on() || !function_exists('roi_by_campaign')) return null;
+    if (!adv_on('leads')) return null;
+    $rows = []; $wasted = 0.0; $noLead = 0; $uncollected = 0.0;
+    foreach (adv_try(fn() => roi_by_campaign(), []) ?: [] as $c) {
+        if ((float)$c['spend'] <= 0) continue;
+        // Two different failures, and they need different answers. A campaign
+        // producing no leads at all is an advertising problem. A campaign
+        // producing leads nobody followed up is a sales problem, and blaming the
+        // agency for it is how the wrong thing gets cancelled.
+        $dry  = (int)$c['leads'] === 0;
+        $cold = !$dry && (int)$c['won'] === 0 && (float)$c['in_play'] <= 0;
+        if (!$dry && !$cold) { $uncollected += (float)$c['uncollected']; continue; }
+        $wasted += (float)$c['spend'];
+        if ($dry) $noLead++;
+        $rows[] = ['id' => 0, 'ref' => $c['name'], 'd' => '',
+                   'who' => $dry ? 'No leads at all' : (int)$c['leads'] . ' leads, none still alive',
+                   'amount' => (float)$c['spend']];
+    }
+    if (!$rows) return null;
+    usort($rows, fn($a, $b) => $b['amount'] <=> $a['amount']);
+    return [
+        'key' => 'adspend', 'severity' => 'CASH',
+        'title' => 'Advertising you are paying for that has produced nothing',
+        'n' => count($rows), 'value' => $wasted,
+        'cost' => fmoney($wasted) . ' of advertising has produced no live opportunity — '
+                . ($noLead ? $noLead . ' ' . ($noLead === 1 ? 'campaign' : 'campaigns') . ' produced no lead at all'
+                           : 'every one of them produced leads that then went nowhere') . '.',
+        'why' => 'Ad platforms report cost per lead, and by that measure most of these look acceptable. '
+               . 'Nothing has ever joined the spend to what the leads actually became, so a campaign can run for '
+               . 'months on a good cost per lead while producing no business whatsoever.',
+        'steps' => [
+            'Open <b>What the advertising actually earned</b> and sort by what was collected, not by what was spent.',
+            'Split the list in two, because they are different faults with different owners. '
+              . '<b>No leads at all</b> is the agency\'s problem — wrong targeting, wrong creative, wrong offer. '
+              . '<b>Leads that went nowhere</b> is ours — nobody rang them.',
+            'For the second kind, open the leads and check whether anybody ever made contact. If the answer is no, '
+              . 'the campaign is not the thing to cancel.',
+            'Pause the genuinely dry ones in Ads Pro. There is no button here that does it — this system reports, '
+              . 'it does not spend your advertising budget.',
+            'Switch on <b>tell Ads Pro when money is received</b> on the connection screen. Its own optimisation then '
+              . 'steers on cash collected instead of a figure estimated from a tracking pixel, and this list gets '
+              . 'shorter by itself.',
+        ],
+        'stop' => ($uncollected > 0
+            ? 'Separately, ' . fmoney($uncollected) . ' has been invoiced from advertising leads and not yet received. '
+              . 'Collecting it raises the return on this spend without spending anything more.'
+            : 'The return report re-checks every time it is opened, so a campaign turning dry shows up in the same week rather than at the year end.'),
+        'who' => 'Whoever signs off the advertising budget, with sales for the second kind',
+        'link' => '/ads-roi', 'link_label' => 'Open the advertising return',
+        'rows' => array_slice($rows, 0, 12), 'row_url' => '',
+    ];
+}
+
 // ---- Assembly ---------------------------------------------------------------
 function adv_all() {
     $checks = ['adv_unbilled_work', 'adv_overdue_invoices', 'adv_unmatched_receipts',
                'adv_won_not_ordered', 'adv_draft_invoices', 'adv_stalled_deals',
                'adv_silent_customers', 'adv_order_no_quote', 'adv_closed_no_report',
-               'adv_customers_untaxable'];
+               'adv_customers_untaxable', 'adv_ad_spend_dry'];
     $out = [];
     foreach ($checks as $fn) {
         if (!function_exists($fn)) continue;

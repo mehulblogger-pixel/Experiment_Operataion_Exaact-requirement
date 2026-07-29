@@ -66,6 +66,10 @@ const PLAIN = [
   // The approval queue, its history tabs, and the rule editor.
   '/approvals', '/approvals?f=APPROVED', '/approvals?f=REJECTED', '/approvals?f=CANCELLED',
   '/stage-gates', '/stage-gates?new=1', '/stage-gates?edit=1',
+  // The Ads Pro link and the return report. Named here rather than left to the
+  // sidebar, because both hide themselves until the link is configured — which
+  // is exactly the state a crawl would otherwise never exercise.
+  '/adspro', '/ads-roi', '/ads-roi?from=2026-01-01&to=2026-12-31', '/sso',
   // Opportunities: the deal, kept apart from the quotation.
   '/opportunities', '/opportunities?v=list',
   // The CRM's own dashboard, the funnel builder and the industry templates.

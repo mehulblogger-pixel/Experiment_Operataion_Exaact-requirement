@@ -119,6 +119,12 @@
                 $gN = function_exists('gate_pending_count') ? gate_pending_count() : 0; ?>
           <a class="s-item<?= $navOn(['approvals','stage-gates']) ?>" href="/approvals"><span class="s-ic">🛂</span><span>Approvals<?= $gN ? ' (' . (int)$gN . ')' : '' ?></span></a>
         <?php endif; ?>
+        <?php // Both only appear once Ads Pro is actually connected. A company
+              // that does not advertise should never be shown an empty report. ?>
+        <?php if (function_exists('roi_available') && roi_available() && roi_can()): ?>
+          <a class="s-item<?= $navOn(['ads-roi']) ?>" href="/ads-roi"><span class="s-ic">💸</span><span>Advertising return</span></a>
+        <?php endif; ?>
+
         <?php $endgrp(); endif; ?>
 
         <?php if (can('mod.calls.view')||can('mod.jobs.view')||can('mod.vouchers.view')||can('mod.hiring.view')||can('mod.reconcile.view')): ?>
@@ -234,6 +240,12 @@
           <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['users','user-new','user-edit']) ?>" href="/users"><span class="s-ic">👥</span><span><?= e(T_REG('user')) ?></span></a><?php endif; ?>
           <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['hierarchy']) ?>" href="/hierarchy"><span class="s-ic">🗂️</span><span>Organisation</span></a><?php endif; ?>
           <?php if (is_master()): ?><a class="s-item<?= $navOn(['access']) ?>" href="/access"><span class="s-ic">🔐</span><span>Roles &amp; permissions</span></a><?php endif; ?>
+          <?php // The Ads Pro connection lives here rather than under Sales, and
+                // is shown before it is connected — a settings screen that only
+                // appears once the thing is configured cannot be used to
+                // configure it. ?>
+          <?php if (function_exists('ads_can_manage') && ads_can_manage()): ?><a class="s-item<?= $navOn(['adspro']) ?>" href="/adspro"><span class="s-ic">📢</span><span>Ads Pro connection</span></a><?php endif; ?>
+          <?php if (function_exists('sso_on') && (can('users.manage.global') || is_master())): ?><a class="s-item<?= $navOn(['sso']) ?>" href="/sso"><span class="s-ic">🔑</span><span>Single sign-on</span></a><?php endif; ?>
           <?php // The screen itself requires settings.manage. Offering it on
                 // mod.settings.view meant a business director was shown the link
                 // and then refused at the door — which reads as a broken app. ?>

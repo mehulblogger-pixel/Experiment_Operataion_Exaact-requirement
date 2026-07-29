@@ -243,6 +243,8 @@ function boot() {
     if (function_exists('books_migrate')) books_migrate();             // invoices, receipts, allocations, credit notes
     if (function_exists('dt_migrate')) dt_migrate();                   // per-user register settings (columns, page size)
     if (function_exists('gate_migrate')) gate_migrate();               // approval rules standing between a deal and a stage
+    if (function_exists('ads_migrate')) ads_migrate();                 // Ads Pro link: imported leads, cached spend, sync log
+    if (function_exists('sso_migrate')) sso_migrate();                 // single sign-on handoffs, accepted and refused
     if (function_exists('audits_migrate')) audits_migrate();           // §8.8 internal audit, §8.9 management review
     if (function_exists('datacontrol_migrate')) datacontrol_migrate(); // §7.11 control of data & information (2026)
     if (function_exists('trust_migrate')) trust_migrate();             // evidence bound to place and time
