@@ -340,7 +340,11 @@ function opp_record_move($o, $to) {
 // Moving to a WON or LOST stage is not the same as moving between open stages:
 // it closes the deal, and a loss needs a reason. The stage's `kind` decides,
 // which is why stages are configurable and the rule is not.
-function opp_move($oppId, $stageId, array $b = []) {
+// $bypassGate is passed only by the approval itself, replaying a move somebody
+// already asked for and somebody else agreed to. Nothing else may pass it, which
+// is why it is the last parameter and not part of $b — a value in $b comes from
+// $_POST, and a gate a form could switch off is not a gate.
+function opp_move($oppId, $stageId, array $b = [], $bypassGate = false) {
     opp_migrate();
     $o = opp_row($oppId);
     if (!$o) return ['err' => 'That opportunity no longer exists.'];
@@ -352,8 +356,27 @@ function opp_move($oppId, $stageId, array $b = []) {
     if ($kind === 'LOST' && trim((string)($b['lost_reason'] ?? '')) === '')
         return ['err' => 'A deal marked lost needs a reason — it is the only thing that makes the loss useful later.'];
 
+    // The gate. Checked after the reason is demanded, so a request that is going
+    // to need one carries it, rather than the approver being asked to invent why
+    // somebody else's deal was lost.
+    if (!$bypassGate && function_exists('gate_match')) {
+        if ($held = gate_open_request('OPPORTUNITY', (int)$o['id']))
+            return ['err' => 'This deal is already waiting on an approval to move. Withdraw that request first.'];
+        $g = gate_match('OPPORTUNITY', $to, (float)$o['value'], (string)$o['sbu'], (int)$o['pipeline_id']);
+        if ($g) return gate_request('OPPORTUNITY', (int)$o['id'], $g, (int)$o['stage_id'], $to,
+                                    (float)$o['value'], (string)$o['sbu'], $b, (string)($b['gate_note'] ?? ''));
+    }
+
     $status = $kind === 'WON' ? 'WON' : ($kind === 'LOST' ? 'LOST' : 'OPEN');
     $u = current_user();
+    // Who won it. On an ordinary move that is whoever pressed the button. On an
+    // approved move it is the person who ASKED, not the person who agreed — a
+    // manager who approves forty wins a quarter would otherwise appear on the
+    // dashboard to have won all forty, and the sales figures would be nonsense.
+    // Only the approval replay may set this, which is why it is read solely when
+    // $bypassGate is true; $b is $_POST on every other path.
+    $actor = $u ? user_name($u) : '';
+    if ($bypassGate && trim((string)($b['_actor'] ?? '')) !== '') $actor = substr(trim((string)$b['_actor']), 0, 150);
     opp_record_move($o, $to);
     db()->prepare("UPDATE opportunities SET stage_id=?, status=?, probability=?, stage_since=?,
                    lost_reason=?, lost_note=?, lost_to=?, won_at=?, won_by=?, updated_at=? WHERE id=?")
@@ -362,7 +385,7 @@ function opp_move($oppId, $stageId, array $b = []) {
                   $kind === 'LOST' ? (string)($b['lost_note'] ?? '') : (string)$o['lost_note'],
                   $kind === 'LOST' ? (string)($b['lost_to'] ?? '') : (string)$o['lost_to'],
                   $status !== 'OPEN' ? date('c') : (string)$o['won_at'],
-                  $status !== 'OPEN' ? ($u ? user_name($u) : '') : (string)$o['won_by'],
+                  $status !== 'OPEN' ? $actor : (string)$o['won_by'],
                   date('c'), (int)$o['id']]);
     if (function_exists('act_log'))
         act_log('OPPORTUNITY', (int)$o['id'], 'SYSTEM',
@@ -604,6 +627,14 @@ function ops_opportunities($route, $method) {
             'canOrder' => function_exists('licence_enabled') && licence_enabled('operations')
                           && (can('mod.calls.edit') || is_master_of('calls')),
             'days' => opp_days_in_stage($o), 'stalled' => opp_stalled($o),
+            // A deal held at a gate must say so on its own screen. Finding out
+            // only by pressing Move again and being refused is how a control
+            // gets described as "the system is broken".
+            'gate' => function_exists('gate_open_request') ? gate_open_request('OPPORTUNITY', (int)$o['id']) : null,
+            'gateCanAct' => function_exists('gate_can_act') && gate_can_act(
+                                function_exists('gate_open_request') ? gate_open_request('OPPORTUNITY', (int)$o['id']) : null),
+            'gateWaiting' => function_exists('gate_open_request') && ($gq = gate_open_request('OPPORTUNITY', (int)$o['id']))
+                                ? gate_waiting_on($gq) : '',
             'offices' => ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name"),
             'openQuotes' => $o['partner_id'] ? opp_try(fn() => ops_all(
                 "SELECT id, quote_no, rev, status, total_amount FROM quotations
@@ -641,6 +672,11 @@ function ops_opportunities($route, $method) {
         $id = (int)($_POST['id'] ?? 0);
         $r = opp_move($id, (int)($_POST['stage_id'] ?? 0), $_POST);
         if (!empty($r['err'])) flash($r['err'], 'error');
+        elseif (!empty($r['pending']))
+            // The deal has NOT moved, and the message says so rather than
+            // congratulating somebody on a win that has not been agreed.
+            flash('Not moved yet — “' . $r['gate']['name'] . '” applies to a deal this size, so the move to '
+                  . $r['stage']['name'] . ' is waiting on approval.', 'warning');
         else flash($r['status'] === 'WON' ? 'Won. Raise the order when the customer confirms.'
                  : ($r['status'] === 'LOST' ? 'Recorded as lost, with the reason.' : 'Moved.'));
         redirect('/opportunity?id=' . $id);

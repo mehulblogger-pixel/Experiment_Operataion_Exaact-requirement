@@ -113,6 +113,12 @@
         <?php if (can('mod.quotes.view')): ?><a class="s-item<?= $navOn(['quotes','quote']) ?>" href="/quotes"><span class="s-ic">📝</span><span><?= e(THP('quote')) ?></span></a><?php endif; ?>
         <?php if (function_exists('crmdash_can') && crmdash_can()): ?><a class="s-item<?= $navOn(['crm-dashboard']) ?>" href="/crm-dashboard"><span class="s-ic">📈</span><span>Sales dashboard</span></a><?php endif; ?>
         <?php if (function_exists('pipe_can_view') && pipe_can_view()): ?><a class="s-item<?= $navOn(['pipelines','pipeline']) ?>" href="/pipelines"><span class="s-ic">🪜</span><span>Pipelines &amp; funnels</span></a><?php endif; ?>
+        <?php // Deals held at a stage. The count is what makes it a queue rather
+              // than a screen somebody remembers to visit. ?>
+        <?php if (function_exists('gate_can_view') && gate_can_view()):
+                $gN = function_exists('gate_pending_count') ? gate_pending_count() : 0; ?>
+          <a class="s-item<?= $navOn(['approvals','stage-gates']) ?>" href="/approvals"><span class="s-ic">🛂</span><span>Approvals<?= $gN ? ' (' . (int)$gN . ')' : '' ?></span></a>
+        <?php endif; ?>
         <?php $endgrp(); endif; ?>
 
         <?php if (can('mod.calls.view')||can('mod.jobs.view')||can('mod.vouchers.view')||can('mod.hiring.view')||can('mod.reconcile.view')): ?>
