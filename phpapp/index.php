@@ -140,6 +140,9 @@ try {
     require __DIR__ . '/lib/customer360.php';
     require __DIR__ . '/lib/advisor.php';
     require __DIR__ . '/lib/stagegate.php';
+    require __DIR__ . '/lib/mghsso.php';
+    require __DIR__ . '/lib/adspro.php';
+    require __DIR__ . '/lib/adsroi.php';
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';
     require __DIR__ . '/lib/trust.php';
@@ -320,6 +323,10 @@ try {
     db()->query("SELECT id FROM portal_audit LIMIT 1");
     db()->query("SELECT id FROM stage_gates LIMIT 1");
     db()->query("SELECT id FROM stage_gate_requests LIMIT 1");
+    db()->query("SELECT id FROM ads_leads LIMIT 1");
+    db()->query("SELECT id FROM ads_spend LIMIT 1");
+    db()->query("SELECT id FROM ads_sync_log LIMIT 1");
+    db()->query("SELECT id FROM sso_attempts LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which
     // runs the same idempotent boot() and clears it. Each check is self-cancelling.
@@ -482,6 +489,16 @@ if ($route === 'login') {
         return render_login('Invalid username or password.');
     }
     if (current_user()) redirect('/');
+    // A refused single sign-on handoff has a reason, and the person needs it.
+    // "Invalid username or password" on a screen they never typed into is the
+    // most confusing message this application could give them.
+    if (!empty($_SESSION['sso_msg'])) {
+        $ssoMsg = (string)$_SESSION['sso_msg'];
+        unset($_SESSION['sso_msg']);
+        return render_login($ssoMsg);
+    }
+    // Half-way through a handoff and a second factor is still owed.
+    if (!empty($_SESSION['pending_uid'])) return render_login(null, 'code');
     return render_login(null);
 }
 if ($route === 'logout') {
@@ -515,6 +532,19 @@ if ($route === 'verify') {
 if ($route === 'portal' || strncmp($route, 'portal/', 7) === 0) {
     portal_route($route, $method);
     exit;
+}
+
+// A signed handoff from a sibling MGH application (Books, BlogPro, Ads Pro).
+// It sits HERE, in front of require_login(), because its whole job is to satisfy
+// that gate — and behind the portal dispatch, because a client is not a staff
+// member and must never be handed a staff session. Accepted or refused, the
+// token is stripped from the URL by redirecting: a token left in the address bar
+// ends up in a bookmark, a browser history and the next Referer header.
+if (function_exists('sso_accept') && isset($_GET['sso']) && $_GET['sso'] !== '') {
+    $ssoOk = sso_accept((string)$_GET['sso']);
+    $clean = strtok($_SERVER['REQUEST_URI'] ?? '/', '?');
+    if ($ssoOk) { flash('Welcome, ' . user_name(current_user()) . '.'); redirect($clean ?: '/'); }
+    redirect('/login');
 }
 
 // --- Everything below requires login ---
