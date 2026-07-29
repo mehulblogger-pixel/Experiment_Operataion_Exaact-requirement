@@ -132,9 +132,9 @@ document.addEventListener('DOMContentLoaded', function () {
         // hand against a wall calendar. ?>
   <h3 class="tab-sub">3. When</h3>
   <div class="form-grid">
-    <div class="ff"><label><?= e(Tl('call')) ?> received <span class="muted">— the day the contracting <?= e(Tl('office')) ?> got it</span></label>
+    <div class="ff"><label><?= e(TH('call')) ?> received <span class="muted">— the day the contracting <?= e(Tl('office')) ?> got it</span></label>
       <input class="form-control" type="date" name="call_received_date" value="<?= e($call['call_received_date'] ?? date('Y-m-d')) ?>"></div>
-    <div class="ff"><label><?= e(Tl('client')) ?>'s required date <span class="muted">— when they want it</span></label>
+    <div class="ff"><label><?= e(TH('client')) ?>'s required date <span class="muted">— when they want it</span></label>
       <input class="form-control" type="date" id="req_date" name="inspection_required_date" value="<?= e($call['inspection_required_date'] ?? '') ?>"></div>
     <div class="ff"><label>Shape of the engagement</label>
       <select class="form-control" id="eng_sel" name="engagement_type">

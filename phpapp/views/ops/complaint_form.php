@@ -47,9 +47,9 @@
           <?php foreach ($inspectors as $i): ?><option value="<?= (int)$i['id'] ?>" <?= (int)($appealOf['inspector_id'] ?? 0)===(int)$i['id']?'selected':'' ?>><?= e($i['name']) ?></option><?php endforeach; ?>
         </select>
         <small class="muted">Naming them is what lets the app refuse to let that person decide their own complaint.</small></div>
-      <div class="ff"><label><?= e(Tl('job')) ?> number</label>
+      <div class="ff"><label><?= e(TH('job')) ?> number</label>
         <input class="form-control" name="job_id" value="<?= e($appealOf['job_id'] ?? '') ?>" placeholder="if it concerns one <?= e(Tl('job')) ?>"></div>
-      <div class="ff"><label><?= e(Tl('report')) ?> number (IRN)</label>
+      <div class="ff"><label><?= e(TH('report')) ?> number (IRN)</label>
         <input class="form-control" name="report_irn" value="<?= e($appealOf['report_irn'] ?? '') ?>"
                placeholder="if it concerns one report">
         <small class="muted">Whoever prepared or approved that report is then barred from deciding it.</small></div>
