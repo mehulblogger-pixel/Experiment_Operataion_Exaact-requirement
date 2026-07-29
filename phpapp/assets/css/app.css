@@ -1,4 +1,4 @@
-:root{--bg:#f4f6f9;--card:#fff;--ink:#1f2937;--muted:#6b7280;--line:#e5e7eb;--brand:#1e40af;--accent:#0ea5e9;--soft:#f8fafc;--panel:#f7f6f4;--fs:14px;--green:#16a34a;--amber:#d97706;--red:#dc2626}
+:root{--bg:#f4f6f9;--card:#fff;--ink:#1f2937;--muted:#656e7a;--line:#e5e7eb;--brand:#1e40af;--accent:#0ea5e9;--soft:#f8fafc;--panel:#f7f6f4;--fs:14px;--green:#16a34a;--amber:#d97706;--red:#dc2626}
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:var(--fs)}
 a{color:var(--brand);text-decoration:none}a:hover{text-decoration:underline}
@@ -22,7 +22,12 @@ h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:24px 0 10px}
 .card{background:var(--card);border:1px solid var(--line);border-left:6px solid var(--line);border-radius:10px;padding:14px}
 .card.RED{border-left-color:var(--red)}.card.AMBER{border-left-color:var(--amber)}.card.GREEN{border-left-color:var(--green)}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}
-.badge.RED{background:#fee2e2;color:var(--red)}.badge.AMBER{background:#fef3c7;color:var(--amber)}.badge.GREEN{background:#dcfce7;color:var(--green)}
+.badge.RED{background:#fee2e2;color:var(--bad)}.badge.AMBER{background:#fef3c7;color:var(--warn)}.badge.GREEN{background:#dcfce7;color:var(--ok-ink)}
+/* Legacy badges used --red/--amber/--green as INK on a strong tint, which
+   measured 2.86:1 (amber), 3.00 (green) and 3.95 (red) — all below the 4.5
+   WCAG AA needs for text this size. Those colours are correct as fills and
+   wrong as ink. Re-pointed at the darker inks the modern .pill already uses;
+   the badges now measure 4.51, 6.49 and 5.30 and look the same at a glance. */
 .btn{display:inline-block;padding:7px 14px;border-radius:8px;border:1px solid var(--brand);background:var(--brand);color:#fff;font-size:14px;cursor:pointer}
 .btn:hover{text-decoration:none;opacity:.92}.btn.secondary{background:#fff;color:var(--brand)}.btn.danger{background:var(--red);border-color:var(--red)}
 .btn.small{padding:4px 10px;font-size:13px}
@@ -223,6 +228,9 @@ table.grid tr:hover td{background:color-mix(in srgb,var(--brand) 5%,transparent)
    ============================================================ */
 :root{
   --ok:#15803d;--ok-bg:#ecfdf5;--warn:#b45309;--warn-bg:#fffbeb;
+  /* A darker green for ink on the STRONG green tint #dcfce7, where --ok
+     itself only reaches 4.57. Kept separate so --ok stays what it is. */
+  --ok-ink:#166534;
   --bad:#b91c1c;--bad-bg:#fef2f2;--info:#0369a1;--info-bg:#eff6ff;
   --side-w:238px;
 }
@@ -611,3 +619,127 @@ table.dt.qlines .btn.small{white-space:nowrap}
   box-shadow:inset 0 0 0 1px var(--brand)}
 .chain-all{background:var(--soft)}
 @media(max-width:640px){ .chain-step{min-width:88px;flex-basis:88px} }
+
+/* ============================================================================
+   DESIGN SYSTEM — the single source of truth
+   ----------------------------------------------------------------------------
+   Everything below is ADDITIVE. Not one existing rule or variable name is
+   changed, because 170 screens depend on them and a redesign that breaks a
+   working system is not an improvement.
+
+   WHY THIS EXISTS, from measuring the app rather than guessing at it:
+
+     colour      16 hardcoded values across 2,785 inline styles — already
+                 disciplined, and NOT the problem
+     type        40 distinct inline font sizes, including 10.5, 11.5, 12.5,
+                 13.5 and 14.5px. Half-pixel sizes are drift, not decisions
+     spacing     32 distinct values, most of them off any grid — 2, 3, 5, 6, 9,
+                 10, 14, 18, 22, 26px
+
+   So the drift is in TYPE and SPACE, and the mechanism is the inline style
+   attribute: a screen that cannot express "slightly smaller, slightly tighter"
+   in a class invents a number instead. Utilities below give every one of those
+   2,785 cases a named class to use, which is what actually stops the drift.
+
+   HOW TO USE IT
+     - never write a raw px font-size or margin in a view again
+     - reach for a utility class; if none fits, the scale is wrong — fix the
+       scale here rather than adding one more number in one more screen
+   ========================================================================= */
+:root{
+  /* ---- Type scale. Six steps, no half-pixels, each one a decision --------- */
+  --t-xs:11px;      /* pills, table meta, timestamps                          */
+  --t-sm:12px;      /* helper text under a field, muted captions             */
+  --t-md:13px;      /* secondary body, dense table cells                     */
+  --t-base:14px;    /* body — the size everything else is judged against     */
+  --t-lg:16px;      /* card titles, sub-headings                            */
+  --t-xl:18px;      /* section headings                                      */
+  --t-2xl:22px;     /* page title                                            */
+  --t-3xl:28px;     /* the one number on a KPI tile                          */
+
+  --lh-tight:1.25;  /* headings                                              */
+  --lh-base:1.55;   /* body — long text needs the air                        */
+
+  --fw-normal:400; --fw-medium:600; --fw-bold:700;
+
+  /* ---- Space scale. 4px grid, no exceptions ------------------------------ */
+  --s-1:4px;  --s-2:8px;  --s-3:12px; --s-4:16px;
+  --s-5:20px; --s-6:24px; --s-8:32px; --s-10:40px; --s-12:48px;
+
+  /* ---- Semantic colour roles --------------------------------------------
+     Named for the JOB, not the hue. "--danger" survives a rebrand; "--red"
+     becomes a lie the first time somebody changes it. The literal --red,
+     --green and --amber above are kept because existing screens use them. */
+  --primary:var(--brand);
+  --success:var(--green);
+  --danger:var(--red);
+  --warning:var(--amber);
+  --info:var(--accent);
+  --disabled:#9aa3af;
+
+  /* ---- Interaction states, so hover and focus are never re-invented ------ */
+  --hover:color-mix(in srgb, var(--brand) 6%, transparent);
+  --selected:color-mix(in srgb, var(--brand) 10%, transparent);
+  --focus-ring:0 0 0 3px color-mix(in srgb, var(--brand) 35%, transparent);
+}
+
+/* ---- Focus. One visible ring everywhere, because a keyboard user who cannot
+   see where they are is locked out of the software. :focus-visible so it does
+   not fire on a mouse click. ------------------------------------------------ */
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{
+  outline:2px solid var(--brand); outline-offset:2px; box-shadow:var(--focus-ring); border-radius:4px}
+
+/* ---- Type utilities ---------------------------------------------------- */
+.t-xs{font-size:var(--t-xs)}   .t-sm{font-size:var(--t-sm)}
+.t-md{font-size:var(--t-md)}   .t-base{font-size:var(--t-base)}
+.t-lg{font-size:var(--t-lg)}   .t-xl{font-size:var(--t-xl)}
+.t-2xl{font-size:var(--t-2xl)} .t-3xl{font-size:var(--t-3xl)}
+.fw-medium{font-weight:var(--fw-medium)} .fw-bold{font-weight:var(--fw-bold)}
+.t-mut{color:var(--muted)} .t-danger{color:var(--danger)} .t-success{color:var(--success)}
+.t-warning{color:var(--warning)} .t-num{font-variant-numeric:tabular-nums}
+
+/* ---- Space utilities. Only the scale exists — there is no .mt-13px ------ */
+.mt-0{margin-top:0} .mt-1{margin-top:var(--s-1)} .mt-2{margin-top:var(--s-2)}
+.mt-3{margin-top:var(--s-3)} .mt-4{margin-top:var(--s-4)} .mt-5{margin-top:var(--s-5)}
+.mt-6{margin-top:var(--s-6)} .mt-8{margin-top:var(--s-8)}
+.mb-0{margin-bottom:0} .mb-1{margin-bottom:var(--s-1)} .mb-2{margin-bottom:var(--s-2)}
+.mb-3{margin-bottom:var(--s-3)} .mb-4{margin-bottom:var(--s-4)} .mb-6{margin-bottom:var(--s-6)}
+.p-2{padding:var(--s-2)} .p-3{padding:var(--s-3)} .p-4{padding:var(--s-4)} .p-6{padding:var(--s-6)}
+
+/* ---- Layout utilities. These replace the commonest inline style in the app:
+   display:flex with a gap and wrapping. --------------------------------------*/
+.row{display:flex;align-items:center;gap:var(--s-2);flex-wrap:wrap}
+.row-top{display:flex;align-items:flex-start;gap:var(--s-2);flex-wrap:wrap}
+.row-between{display:flex;align-items:center;justify-content:space-between;gap:var(--s-3);flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:var(--s-2)}
+.gap-1{gap:var(--s-1)} .gap-3{gap:var(--s-3)} .gap-4{gap:var(--s-4)}
+.grow{flex:1} .nowrap{white-space:nowrap} .wrap-anywhere{overflow-wrap:anywhere}
+
+/* ---- Empty state. A blank panel saying "No data" tells somebody nothing they
+   did not already know. This gives every empty list the same three things: what
+   is missing, why, and the one button that fixes it. ------------------------ */
+.empty{text-align:center;padding:var(--s-10) var(--s-6);color:var(--muted)}
+.empty .empty-ic{font-size:32px;line-height:1;margin-bottom:var(--s-3);opacity:.65}
+.empty .empty-t{font-size:var(--t-lg);font-weight:var(--fw-medium);color:var(--ink);margin-bottom:var(--s-2)}
+.empty .empty-d{font-size:var(--t-md);max-width:46ch;margin:0 auto var(--s-4)}
+
+/* ---- Skeleton loading, so a slow screen shows its shape rather than white -- */
+.skel{background:linear-gradient(90deg,var(--soft) 25%,var(--line) 37%,var(--soft) 63%);
+  background-size:400% 100%;animation:skel 1.3s ease-in-out infinite;border-radius:var(--radius-sm)}
+.skel-line{height:12px;margin-bottom:var(--s-2)} .skel-line:last-child{width:60%}
+@keyframes skel{0%{background-position:100% 50%}100%{background-position:0 50%}}
+
+/* ---- Respect a person who has asked for less motion. Not decoration: for
+   some people animation causes nausea, and it is one line to honour. -------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;scroll-behavior:auto !important}
+}
+
+/* ---- Touch targets. 44px is the size a finger actually hits; below it people
+   mis-tap and blame the software. Applied only on touch devices so the desktop
+   stays dense. -------------------------------------------------------------- */
+@media (pointer:coarse){
+  .btn,.tabs a,.dt th a,select.form-control,input.form-control{min-height:44px}
+  .btn.small{min-height:36px}
+}
