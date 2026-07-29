@@ -315,31 +315,50 @@ function ads_map_source($s) {
 // ---- Ads Pro → here: spend --------------------------------------------------
 function ads_import_spend($days = 90) {
     ads_migrate();
-    $r = ads_call('cc_attribution', ['days' => (int)$days]);
+    // p6_campaign_breakdown, NOT cc_attribution. The first guess was wrong and
+    // the wrongness was silent: cc_attribution is an attribution-MODEL endpoint
+    // returning weighted channels, with no campaign and no spend in it at all,
+    // so the import reported success and stored nothing. Caught by running it
+    // against the real Ads Pro code instead of a stub built from the same
+    // assumption. The handler for this route existed in Ads Pro and had never
+    // been given an action name; it has one now.
+    $from = date('Y-m-d', strtotime('-' . max(1, (int)$days) . ' days'));
+    $to   = date('Y-m-d');
+    $r = ads_call('p6_campaign_breakdown', ['date_from' => $from, 'date_to' => $to]);
     if (!$r['ok']) return ['err' => $r['error']];
-    $rows = $r['data']['spend'] ?? ($r['data']['campaigns'] ?? ($r['data']['rows'] ?? []));
+    $rows = $r['data']['campaigns'] ?? [];
     if (!is_array($rows)) $rows = [];
     $c = ads_config();
-    $n = 0;
-    $del = db()->prepare("DELETE FROM ads_spend WHERE campaign_id=? AND metric_date=?");
+
+    // What comes back is ALREADY AGGREGATED over the window — there is no
+    // per-day figure to be had, so one row per campaign is stored against the
+    // window's end date. Everything for that campaign inside the window is
+    // deleted first, because re-pulling an overlapping window would otherwise
+    // add the same spend a second time and quietly halve every return figure.
+    $n = 0; $total = 0.0;
+    $del = db()->prepare("DELETE FROM ads_spend WHERE campaign_id=? AND metric_date >= ? AND metric_date <= ?");
     $ins = db()->prepare("INSERT INTO ads_spend
         (workspace_id, campaign_id, campaign_name, platform, metric_date,
          impressions, clicks, spend, conversions, pulled_at) VALUES (?,?,?,?,?,?,?,?,?,?)");
     foreach ($rows as $x) {
-        $cid  = (string)($x['campaign_id'] ?? ($x['id'] ?? ''));
-        $date = substr((string)($x['metric_date'] ?? ($x['date'] ?? '')), 0, 10);
-        if ($cid === '' || $date === '') continue;
-        // Replace the day rather than adding to it: a re-pull of the same date
-        // must not double the spend, and ad platforms restate recent days.
-        ads_try(fn() => $del->execute([$cid, $date]));
+        $cid = (string)($x['campaign_id'] ?? '');
+        if ($cid === '') continue;
+        ads_try(fn() => $del->execute([$cid, $from, $to]));
         ads_try(fn() => $ins->execute([$c['workspace'], $cid,
-            (string)($x['campaign_name'] ?? ($x['name'] ?? '')), (string)($x['platform'] ?? ''), $date,
+            (string)($x['campaign_name'] ?? ''), (string)($x['platform'] ?? ''), $to,
             (int)($x['impressions'] ?? 0), (int)($x['clicks'] ?? 0),
             (float)($x['spend'] ?? 0), (int)($x['conversions'] ?? 0), date('c')]));
+        $total += (float)($x['spend'] ?? 0);
         $n++;
     }
-    ads_log('import_spend', true, 200, $n . ' campaign-days stored');
-    return ['ok' => true, 'rows' => $n];
+    // Ads Pro caps this list at the twenty biggest spenders. A company running
+    // more than twenty campaigns is therefore missing some, and a return report
+    // that quietly under-counts spend flatters every campaign on it. Say so.
+    $capped = $n >= 20;
+    $msg = $n . ' campaigns, ' . fmoney($total) . ' over ' . $from . ' to ' . $to
+         . ($capped ? '. Ads Pro returns only its twenty biggest spenders, so anything smaller is not counted here.' : '.');
+    ads_log('import_spend', true, 200, $msg);
+    return ['ok' => true, 'rows' => $n, 'total' => $total, 'capped' => $capped, 'msg' => $msg];
 }
 
 // ---- here → Ads Pro: outcomes ----------------------------------------------
@@ -455,7 +474,7 @@ function ops_adspro($route, $method) {
         ops_require(ads_can_manage(), 'You cannot refresh the spend figures.');
         $r = ads_import_spend((int)($_POST['days'] ?? 90));
         if (!empty($r['err'])) flash($r['err'], 'error');
-        else flash($r['rows'] . ' campaign-days of spend stored.', 'success');
+        else flash($r['msg'], !empty($r['capped']) ? 'warning' : 'success');
         redirect('/adspro');
     }
 

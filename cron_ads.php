@@ -84,7 +84,7 @@ if ((string)setting_get('adspro_spend_day', '') !== $today) {
     $sp = ads_import_spend(90);
     if (empty($sp['err'])) {
         setting_set('adspro_spend_day', $today);
-        echo "spend: " . (int)$sp['rows'] . " campaign-days\n";
+        echo "spend: " . $sp['msg'] . "\n";
     } else {
         echo "spend: FAILED — " . $sp['err'] . "\n";
     }
