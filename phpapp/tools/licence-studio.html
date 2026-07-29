@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MGH Licence Studio</title>
+<!--
+  ==========================================================================
+   MGH Licence Studio — make the signing keys, and issue licences.
+
+   WHY THIS EXISTS. The command-line tool (tools/licence-issue.php) does the
+   same job and assumes you are comfortable with a terminal. This does not.
+   Open it, click, copy. Nothing to install.
+
+   IT RUNS ON YOUR OWN COMPUTER AND NOTHING LEAVES IT. There is no server
+   here, no internet request, no analytics — open the file from your Downloads
+   folder with your Wi-Fi switched off and it works exactly the same. The
+   signing happens inside your browser using the cryptography built into it.
+
+   That is the whole point: the private signing key must never touch a web
+   server, because anyone who copies it can issue themselves free licences
+   forever.
+
+   The signatures it produces are ECDSA P-256 / SHA-256, converted to DER, so
+   the PHP in the application verifies them exactly as it verifies keys made
+   by the command-line tool. The two are interchangeable.
+  ==========================================================================
+-->
+<style>
+  :root{--ink:#1f2328;--muted:#636c76;--line:#d8dde3;--soft:#f6f8fa;--brand:#0b6bcb;--bad:#b42318;--ok:#0a7a3d}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:#fff}
+  .wrap{max-width:900px;margin:0 auto;padding:24px 18px 60px}
+  h1{font-size:24px;margin:0 0 4px} h2{font-size:17px;margin:0 0 10px}
+  .sub{color:var(--muted);margin:0 0 22px}
+  .card{border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:18px}
+  .card.warn{border-color:#f0c36d;background:#fffbf0}
+  .card.danger{border-color:#f3b0aa;background:#fff5f4}
+  label{display:block;font-weight:600;font-size:13.5px;margin:12px 0 4px}
+  input[type=text],input[type=number],textarea,select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:7px;font:inherit;background:#fff}
+  textarea{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+  .hint{color:var(--muted);font-size:12.5px;margin-top:4px}
+  button{background:var(--brand);color:#fff;border:0;border-radius:7px;padding:10px 16px;font:inherit;font-weight:600;cursor:pointer}
+  button.sec{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .row>div{flex:1;min-width:180px}
+  .tabs{display:flex;gap:6px;margin-bottom:18px;border-bottom:1px solid var(--line)}
+  .tab{padding:10px 16px;cursor:pointer;border:0;background:none;color:var(--muted);font-weight:600;border-bottom:2px solid transparent}
+  .tab.on{color:var(--brand);border-bottom-color:var(--brand)}
+  .out{background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;word-break:break-all;white-space:pre-wrap;margin-top:8px}
+  .msg{padding:10px 12px;border-radius:7px;margin-top:12px;font-size:14px}
+  .msg.bad{background:#fff5f4;border:1px solid #f3b0aa;color:var(--bad)}
+  .msg.ok{background:#f0fbf4;border:1px solid #a9dcbd;color:var(--ok)}
+  .chk{display:flex;gap:8px;align-items:flex-start;margin:8px 0;font-weight:400}
+  .chk input{margin-top:3px}
+  ol{padding-left:22px} ol li{margin-bottom:8px}
+  .hide{display:none}
+  code{background:var(--soft);padding:1px 5px;border-radius:4px;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>MGH Licence Studio</h1>
+<p class="sub">Runs entirely on this computer. Nothing is sent anywhere — you can disconnect from the internet and it still works.</p>
+
+<div class="tabs">
+  <button class="tab on" data-tab="issue">Issue a licence</button>
+  <button class="tab" data-tab="setup">First time — make the signing keys</button>
+</div>
+
+<!-- ===================== SETUP ===================== -->
+<div id="setup" class="hide">
+  <div class="card danger">
+    <h2>Do this once, ever</h2>
+    <p style="margin:0 0 10px">This makes a matched pair of keys:</p>
+    <ol style="margin:0">
+      <li><b>The public key</b> — goes inside the application. Safe for anyone to see. It only <i>checks</i> licences.</li>
+      <li><b>The private key</b> — stays with you and <b>never goes on a server</b>. It is the only thing that can <i>create</i> a licence.</li>
+    </ol>
+    <p style="margin:12px 0 0"><b>If you lose the private key</b>, no existing customer breaks — but you can never issue or renew a licence again without changing the application on every installation. Keep it in your password manager, and keep a second copy somewhere else.</p>
+    <p style="margin:8px 0 0"><b>If somebody steals it</b>, they can give themselves and anybody else free licences forever.</p>
+  </div>
+
+  <div class="card">
+    <button id="gen">Make my signing keys</button>
+    <span class="hint" style="margin-left:10px">Takes about a second.</span>
+
+    <div id="genOut" class="hide">
+      <label>1 · Public key — send this to your developer to put in the application</label>
+      <div class="out" id="pubOut"></div>
+      <div class="row" style="margin-top:8px">
+        <div style="flex:0"><button class="sec" data-copy="pubOut">Copy</button></div>
+        <div style="flex:0"><button class="sec" id="dlPub">Download</button></div>
+      </div>
+
+      <label style="margin-top:22px;color:var(--bad)">2 · Private key — SAVE THIS NOW. It is shown once and never again.</label>
+      <div class="out" id="privOut"></div>
+      <div class="row" style="margin-top:8px">
+        <div style="flex:0"><button class="sec" data-copy="privOut">Copy</button></div>
+        <div style="flex:0"><button id="dlPriv">Download and keep safe</button></div>
+      </div>
+      <div class="hint" style="margin-top:10px">
+        Suggested: paste it into your password manager as a secure note called “MGH licence signing key”, and keep the
+        downloaded file on an encrypted drive or in a private folder you back up. Do <b>not</b> e-mail it to yourself
+        and do <b>not</b> put it on the website server.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== ISSUE ===================== -->
+<div id="issue">
+  <div class="card">
+    <label>Your private signing key</label>
+    <textarea id="priv" rows="5" placeholder="-----BEGIN PRIVATE KEY-----&#10;...paste the key you saved...&#10;-----END PRIVATE KEY-----"></textarea>
+    <div class="hint">Pasted fresh each time and never stored by this page. Close the tab and it is gone.</div>
+  </div>
+
+  <div class="card">
+    <h2>Who is this licence for?</h2>
+    <div class="row">
+      <div>
+        <label>Customer's legal name</label>
+        <input type="text" id="cust" placeholder="Vertex Steel Pvt Ltd">
+      </div>
+      <div>
+        <label>Your reference <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <input type="text" id="ref" placeholder="MGH-2026-0042">
+      </div>
+    </div>
+
+    <label style="margin-top:18px">What have they bought?</label>
+    <div class="chk"><input type="checkbox" id="m_sales" checked><label for="m_sales" style="margin:0;font-weight:400"><b>Sales &amp; CRM</b> — leads, pipelines, enquiries, quotations</label></div>
+    <div class="chk"><input type="checkbox" id="m_money"><label for="m_money" style="margin:0;font-weight:400"><b>Money</b> — invoicing, receipts, profitability</label></div>
+    <div class="chk"><input type="checkbox" id="m_operations"><label for="m_operations" style="margin:0;font-weight:400"><b>Operations</b> — orders, scheduling, work execution</label></div>
+    <div class="chk"><input type="checkbox" id="m_reporting"><label for="m_reporting" style="margin:0;font-weight:400"><b>Inspection reporting</b> — the report engine</label></div>
+    <div class="chk"><input type="checkbox" id="m_hr"><label for="m_hr" style="margin:0;font-weight:400"><b>People &amp; hiring</b> — requisitions, candidates</label></div>
+    <div class="hint">Administration is always included — every installation needs masters, users and settings.</div>
+
+    <div class="row" style="margin-top:18px">
+      <div>
+        <label>How many people may sign in?</label>
+        <input type="number" id="seats" min="0" value="10">
+        <div class="hint">0 means no limit.</div>
+      </div>
+      <div>
+        <label>Subscription length</label>
+        <select id="months">
+          <option value="1">1 month</option>
+          <option value="3">3 months</option>
+          <option value="6">6 months</option>
+          <option value="12" selected>12 months</option>
+          <option value="24">24 months</option>
+        </select>
+      </div>
+      <div>
+        <label>Grace period after expiry</label>
+        <select id="grace">
+          <option value="7">7 days</option>
+          <option value="14" selected>14 days</option>
+          <option value="30">30 days</option>
+        </select>
+        <div class="hint">Everything keeps working during grace.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px"><button id="make">Create the licence key</button></div>
+    <div id="issueMsg"></div>
+
+    <div id="keyBox" class="hide">
+      <label style="margin-top:20px">Send this to the customer — they paste it into <b>Settings → Licence</b></label>
+      <div class="out" id="keyOut"></div>
+      <div class="row" style="margin-top:8px">
+        <div style="flex:0"><button class="sec" data-copy="keyOut">Copy the key</button></div>
+        <div style="flex:0"><button class="sec" id="dlKey">Download as a file</button></div>
+      </div>
+      <div class="out" id="keySummary" style="background:#fff;border-style:dashed;font-family:inherit;font-size:13.5px"></div>
+    </div>
+  </div>
+</div>
+
+<p class="hint" style="text-align:center;margin-top:30px">
+  Nothing on this page is sent anywhere. The signing is done by the cryptography built into your browser.
+</p>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const enc = new TextEncoder();
+
+  // ---- tabs ---------------------------------------------------------------
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === t));
+    $('issue').classList.toggle('hide', t.dataset.tab !== 'issue');
+    $('setup').classList.toggle('hide', t.dataset.tab !== 'setup');
+  }));
+
+  document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', async () => {
+    const txt = $(b.dataset.copy).textContent;
+    try { await navigator.clipboard.writeText(txt); }
+    catch (e) {
+      // Clipboard access is refused on file:// in some browsers. Selecting the
+      // text so Ctrl-C works is a working answer; an error message is not.
+      const r = document.createRange(); r.selectNode($(b.dataset.copy));
+      getSelection().removeAllRanges(); getSelection().addRange(r);
+      b.textContent = 'Selected — press Ctrl+C'; setTimeout(() => b.textContent = 'Copy', 2500);
+      return;
+    }
+    const was = b.textContent; b.textContent = 'Copied'; setTimeout(() => b.textContent = was, 1500);
+  }));
+
+  function download(name, text) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+    a.download = name; a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const b64url = buf => b64(buf).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const pem = (b, t) => '-----BEGIN ' + t + '-----\n' + b.match(/.{1,64}/g).join('\n') + '\n-----END ' + t + '-----';
+
+  // ---- make the signing pair ---------------------------------------------
+  $('gen').addEventListener('click', async () => {
+    const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+    $('pubOut').textContent  = pem(b64(await crypto.subtle.exportKey('spki',  pair.publicKey)),  'PUBLIC KEY');
+    $('privOut').textContent = pem(b64(await crypto.subtle.exportKey('pkcs8', pair.privateKey)), 'PRIVATE KEY');
+    $('genOut').classList.remove('hide');
+    $('gen').disabled = true;
+    $('gen').textContent = 'Keys made — save the private one now';
+  });
+  $('dlPub').addEventListener('click',  () => download('mgh-licence-PUBLIC.pem',  $('pubOut').textContent));
+  $('dlPriv').addEventListener('click', () => download('mgh-licence-PRIVATE.pem', $('privOut').textContent));
+
+  // ---- issue --------------------------------------------------------------
+  // WebCrypto hands back a raw r||s signature. PHP's openssl_verify wants DER.
+  // Getting this wrong produces a key that looks perfect and is rejected by
+  // every installation, so it is done here once and carefully.
+  function rawToDer(raw) {
+    const b = new Uint8Array(raw);
+    const half = b.length / 2;
+    const trim = a => { let i = 0; while (i < a.length - 1 && a[i] === 0) i++; a = a.slice(i);
+                        return (a[0] & 0x80) ? Uint8Array.from([0, ...a]) : a; };
+    const r = trim(b.slice(0, half)), s = trim(b.slice(half));
+    const int = v => Uint8Array.from([0x02, v.length, ...v]);
+    const body = Uint8Array.from([...int(r), ...int(s)]);
+    return Uint8Array.from([0x30, body.length, ...body]);
+  }
+
+  function say(html, bad) { $('issueMsg').innerHTML = '<div class="msg ' + (bad ? 'bad' : 'ok') + '">' + html + '</div>'; }
+
+  $('make').addEventListener('click', async () => {
+    $('keyBox').classList.add('hide');
+    $('issueMsg').innerHTML = '';
+
+    const cust = $('cust').value.trim();
+    if (!cust) return say('Type the customer\'s name first — it is printed on their licence screen.', true);
+
+    const mods = ['sales', 'money', 'operations', 'reporting', 'hr'].filter(m => $('m_' + m).checked);
+    if (!mods.length) return say('Tick at least one module. A licence for nothing would put them straight into read-only.', true);
+    mods.push('admin');
+
+    const privText = $('priv').value.trim();
+    if (!privText) return say('Paste your private signing key at the top of the page.', true);
+
+    let priv;
+    try {
+      const body = privText.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '');
+      const der = Uint8Array.from(atob(body), c => c.charCodeAt(0));
+      priv = await crypto.subtle.importKey('pkcs8', der, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+    } catch (e) {
+      return say('That private key could not be read. Paste the whole thing, including the ' +
+                 '<code>-----BEGIN PRIVATE KEY-----</code> and <code>-----END PRIVATE KEY-----</code> lines.', true);
+    }
+
+    const months = parseInt($('months').value, 10);
+    const exp = new Date(); exp.setMonth(exp.getMonth() + months);
+    const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
+    const claims = { cust: cust, mods: mods, seats: parseInt($('seats').value, 10) || 0,
+                     exp: iso(exp), grace: parseInt($('grace').value, 10), iss: iso(new Date()) };
+    const ref = $('ref').value.trim(); if (ref) claims.ref = ref;
+
+    const payload = b64url(enc.encode(JSON.stringify(claims)));
+    const raw = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, priv, enc.encode(payload));
+    const key = payload + '.' + b64url(rawToDer(raw));
+
+    $('keyOut').textContent = key;
+    $('keySummary').innerHTML =
+      '<b>' + claims.cust + '</b><br>' +
+      'Modules: ' + claims.mods.join(', ') + '<br>' +
+      'People: ' + (claims.seats > 0 ? claims.seats : 'no limit') + '<br>' +
+      'Valid until <b>' + claims.exp + '</b>, then ' + claims.grace + ' days grace, then read-only.';
+    $('keyBox').classList.remove('hide');
+    say('Licence created. Send the key below to the customer.', false);
+  });
+
+  $('dlKey').addEventListener('click', () =>
+    download('licence-' + ($('cust').value.trim().replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'key') + '.txt',
+             $('keyOut').textContent));
+})();
+</script>
+</body>
+</html>
