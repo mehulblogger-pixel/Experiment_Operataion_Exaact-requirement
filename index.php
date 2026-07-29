@@ -284,6 +284,7 @@ try {
     db()->query("SELECT id FROM opportunities LIMIT 1");
     db()->query("SELECT id FROM opportunity_quotes LIMIT 1");
     db()->query("SELECT id FROM opportunity_stage_history LIMIT 1");
+    db()->query("SELECT call_id FROM opportunities LIMIT 1");
     // The books. A miss here and a live database never gains an invoice table,
     // so the money screens 500 on a server that upgraded cleanly in every other
     // respect. Every table and the one column that was added after the fact.

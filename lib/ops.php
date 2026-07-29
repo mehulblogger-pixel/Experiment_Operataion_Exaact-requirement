@@ -524,9 +524,28 @@ function ops_all($sql, $args = []) { $s = db()->prepare($sql); $s->execute($args
 function ops_one($sql, $args = []) { $s = db()->prepare($sql); $s->execute($args); $r = $s->fetch(); $s->closeCursor(); return $r; }
 function ops_val($sql, $args = []) { $s = db()->prepare($sql); $s->execute($args); $v = $s->fetchColumn(); $s->closeCursor(); return $v; }
 function ops_next_code($table, $col, $prefix) {
-    $last = ops_val("SELECT $col FROM $table WHERE $col LIKE ? ORDER BY $col DESC LIMIT 1", ["$prefix-%"]);
-    $seq = $last ? ((int)substr($last, strrpos($last, '-') + 1)) + 1 : 1;
-    return sprintf("%s-%05d", $prefix, $seq);
+    // FIXED, and the failure was live rather than theoretical. This used to take
+    // the string-highest code and cast whatever followed the last '-' to an int.
+    // With CALL-E0149 in the table — a real code from an import — that is
+    // (int)'E0149' = 0, so the "next" code came back as CALL-00001, which
+    // already existed. Every route that raises a call, job or inquiry shared it.
+    //
+    // Two changes. Only codes of the exact shape PREFIX-<digits> are considered,
+    // so a lettered series cannot poison the count; and the result is checked
+    // for existence and stepped past rather than assumed free, because two
+    // people pressing the button at once is not a rare event.
+    $rows = ops_all("SELECT $col FROM $table WHERE $col LIKE ?", ["$prefix-%"]);
+    $max = 0;
+    foreach ($rows as $r) {
+        if (preg_match('/^' . preg_quote($prefix, '/') . '-(\d+)$/', (string)$r[$col], $m))
+            $max = max($max, (int)$m[1]);
+    }
+    for ($try = 1; $try <= 50; $try++) {
+        $code = sprintf("%s-%05d", $prefix, $max + $try);
+        if (!ops_val("SELECT 1 FROM $table WHERE $col=? LIMIT 1", [$code])) return $code;
+    }
+    // Refusing beats handing back a duplicate reference somebody will quote back.
+    throw new RuntimeException("Could not allocate a free $prefix number. Try again.");
 }
 // ---------------------------------------------------------------------------
 //  §b — is this party's master record fit to work against?
@@ -1738,6 +1757,7 @@ function ops_module_gate($route) {
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads',
         'opportunity-move'=>'leads','opportunity-quote'=>'leads','opportunity-from-lead'=>'leads',
+        'opportunity-raise-order'=>'leads',
         'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries',
         'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes',
         'attendance-recon'=>'reconcile',

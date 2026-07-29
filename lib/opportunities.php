@@ -96,7 +96,7 @@ function opp_migrate() {
         lost_reason VARCHAR(40) DEFAULT '', lost_note VARCHAR(500) DEFAULT '',
         lost_to VARCHAR(200) DEFAULT '',
         won_at VARCHAR(30) DEFAULT '', won_by VARCHAR(150) DEFAULT '',
-        won_quotation_id INT NULL,
+        won_quotation_id INT NULL, call_id INT NULL,
         created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '',
         updated_at VARCHAR(30) DEFAULT '')");
     // Which quotations belong to which opportunity. A join table rather than a
@@ -116,6 +116,8 @@ function opp_migrate() {
         act_index('opportunity_quotes', 'idx_oq_opp', '(opportunity_id)');
         act_index('opportunity_quotes', 'idx_oq_quote', '(quotation_id)');
     }
+    // Added after the table shipped, so an existing install gains it.
+    ensure_column('opportunities', 'call_id', 'INT NULL');
     opp_seed_pipeline();
 }
 
@@ -441,6 +443,84 @@ function opp_from_lead($leadId, array $b = []) {
     return $r;
 }
 
+// ---- Winning a deal, and what happens next ---------------------------------
+//  This is the handover the whole flow was missing. `calls.quotation_id` existed
+//  and was empty on all 160 orders, because nothing ever created an order FROM
+//  the sale — somebody keyed a fresh one and the link was never made.
+//
+//  Raising the order from the won deal carries across, in one act:
+//      the customer · the accepted quotation · its contract number ·
+//      the value that was agreed · the branch · the requirement as the notes
+//
+//  MODULE BOUNDARY. Operations may not be installed — the CRM is sold on its
+//  own. So this is offered only when the operations module is licensed AND the
+//  person can create an order. On a Sales-only install a won deal simply
+//  closes, and nothing on screen refers to work that installation cannot do.
+
+// Can this deal become an order at all, and if not, why not.
+function opp_order_block($o) {
+    if (!function_exists('licence_enabled') || !licence_enabled('operations'))
+        return 'not-installed';                       // Sales-only: say nothing about orders
+    if (($o['status'] ?? '') !== 'WON') return 'Only a won opportunity becomes an order.';
+    if (empty($o['partner_id']))
+        return 'It has no customer on the master yet, so an order has nowhere to point. Add them as a customer first.';
+    if (!empty($o['call_id'])) return 'An order has already been raised from this deal.';
+    return '';
+}
+
+// Which quotation the order should carry: the accepted one, else the newest
+// attached. Stated on screen either way, because guessing silently is how the
+// wrong rate ends up on a job.
+function opp_order_quote($oppId) {
+    $qs = opp_quotes($oppId);
+    if (!$qs) return null;
+    foreach ($qs as $q) if (strtoupper((string)$q['status']) === 'ACCEPTED') return $q;
+    return $qs[count($qs) - 1];
+}
+
+function opp_raise_order($oppId, array $b = []) {
+    opp_migrate();
+    $o = opp_row($oppId);
+    if (!$o) return ['err' => 'That opportunity no longer exists.'];
+    $why = opp_order_block($o);
+    if ($why === 'not-installed') return ['err' => 'Operations is not switched on for this installation.'];
+    if ($why !== '') return ['err' => $why];
+
+    $q = opp_order_quote((int)$o['id']);
+    $pdo = db();
+    try {
+        $code = ops_next_code('calls', 'call_code', 'CALL');
+        $pdo->prepare("INSERT INTO calls
+            (call_code, client_id, quotation_id, contract_number, executing_office_id,
+             sbu, billable_value, call_received_date, inspection_required_date,
+             notes, status, created_by, created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?, 'OPEN', ?,?)")
+          ->execute([$code, (int)$o['partner_id'],
+                     $q ? (int)$q['id'] : null,
+                     (string)($b['contract_number'] ?? ''),
+                     (int)($b['executing_office_id'] ?? 0) ?: ($o['office_id'] ?: null),
+                     (string)$o['sbu'],
+                     (float)($q['total_amount'] ?? $o['value']),
+                     date('Y-m-d'),
+                     (string)($b['inspection_required_date'] ?? ''),
+                     trim('Raised from opportunity ' . $o['ref'] . ' — ' . $o['name'] . "\n" . (string)$o['requirement']),
+                     user_name(current_user()), date('c')]);
+        $callId = (int)$pdo->lastInsertId();
+    } catch (Throwable $e) {
+        return ['err' => 'The order could not be raised: ' . $e->getMessage()];
+    }
+
+    $pdo->prepare("UPDATE opportunities SET call_id=?, won_quotation_id=?, updated_at=? WHERE id=?")
+       ->execute([$callId, $q ? (int)$q['id'] : null, date('c'), (int)$o['id']]);
+    if (function_exists('act_log')) {
+        act_log('OPPORTUNITY', (int)$o['id'], 'SYSTEM', 'Order ' . $code . ' raised from this deal',
+                ['auto' => 1, 'partner_id' => $o['partner_id'] ?: null]);
+        act_log('CALL', $callId, 'SYSTEM', 'Raised from opportunity ' . $o['ref'],
+                ['auto' => 1, 'partner_id' => $o['partner_id'] ?: null]);
+    }
+    return ['ok' => true, 'call_id' => $callId, 'code' => $code, 'quote' => $q];
+}
+
 // ---- The register's columns -------------------------------------------------
 function opp_dt_columns() {
     return [
@@ -520,6 +600,9 @@ function ops_opportunities($route, $method) {
             'stages' => pipeline_stages((int)$o['pipeline_id']),
             'timeline' => function_exists('act_for_entity') ? act_for_entity('OPPORTUNITY', (int)$o['id'], 40) : [],
             'lostReasons' => opp_lost_reasons(), 'canEdit' => $canEdit,
+            'orderBlock' => opp_order_block($o), 'orderQuote' => opp_order_quote((int)$o['id']),
+            'canOrder' => function_exists('licence_enabled') && licence_enabled('operations')
+                          && (can('mod.calls.edit') || is_master_of('calls')),
             'days' => opp_days_in_stage($o), 'stalled' => opp_stalled($o),
             'offices' => ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name"),
             'openQuotes' => $o['partner_id'] ? opp_try(fn() => ops_all(
@@ -570,6 +653,16 @@ function ops_opportunities($route, $method) {
              : opp_link_quote($id, (int)($_POST['quotation_id'] ?? 0));
         if ($e !== '') flash($e, 'error');
         redirect('/opportunity?id=' . $id);
+    }
+
+    if ($route === 'opportunity-raise-order' && $method === 'POST') {
+        $id = (int)($_POST['id'] ?? 0);
+        $r = opp_raise_order($id, $_POST);
+        if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id); }
+        flash('Order ' . $r['code'] . ' raised'
+            . ($r['quote'] ? ', carrying quotation ' . $r['quote']['quote_no'] : ', with no quotation attached — set the rate on the order')
+            . '. Now allocate the work.');
+        redirect('/call?id=' . $r['call_id']);
     }
 
     if ($route === 'opportunity-from-lead' && $method === 'POST') {
