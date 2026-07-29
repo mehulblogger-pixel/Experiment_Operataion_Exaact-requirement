@@ -1,0 +1,283 @@
+<?php
+  $name = $p['display_name'] ?: $p['legal_name'];
+  $t = $touch;
+  // How worried to be about silence. Not a guess dressed as science — three
+  // plain bands, and the number of days is always shown beside them.
+  $silence = $t['days'] === null ? ['p-mut', 'never'] :
+             ($t['days'] <= 30 ? ['p-ok', $t['days'] . ' days ago'] :
+             ($t['days'] <= 90 ? ['p-warn', $t['days'] . ' days ago'] : ['p-bad', $t['days'] . ' days ago']));
+?>
+<div class="crumbs"><a href="/">Home</a> › <a href="/clients">Customers</a> › <?= e($name) ?></div>
+<div class="master-head">
+  <div><h1><?= e($name) ?></h1>
+    <p class="sub" style="margin:2px 0 0">
+      <?= e($p['code']) ?>
+      <span class="pill <?= $p['status']==='ACTIVE'?'p-ok':'p-mut' ?>"><?= e($p['status']) ?></span>
+      <?= $p['gstin'] ? ' · GSTIN ' . e($p['gstin']) : '' ?>
+      <?= $p['state'] ? ' · ' . e($p['state']) : '' ?>
+      · last contact <span class="pill <?= $silence[0] ?>"><?= e($silence[1]) ?></span>
+    </p></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btn secondary" href="/partner?id=<?= (int)$p['id'] ?>">Master record</a>
+    <?php if ($money !== null): ?><a class="btn secondary" href="/ledger?id=<?= (int)$p['id'] ?>">Ledger</a><?php endif; ?>
+    <a class="btn secondary" href="/customer?id=<?= (int)$p['id'] ?>&amp;export=csv">⬇ Timeline CSV</a>
+  </div>
+</div>
+
+<?php // ---- The headline row: what you need before you ring them ------------ ?>
+<div class="qcards" style="margin-top:16px">
+  <?php if ($money !== null): ?>
+    <a class="qcard <?= $money['outstanding'] > 0 ? ($money['overdue'] > 0 ? 'tone-bad' : 'tone-info') : 'tone-ok' ?>" href="/ledger?id=<?= (int)$p['id'] ?>">
+      <div class="qic">₹</div><div class="qn" style="font-size:20px"><?= fmoney_short($money['outstanding']) ?></div>
+      <div class="ql">Outstanding<?= $money['overdue'] > 0 ? ' · ' . fmoney_short($money['overdue']) . ' overdue' : '' ?></div>
+    </a>
+    <?php if ($money['on_account'] > 0.01): ?>
+      <div class="qcard tone-warn"><div class="qic">⇄</div><div class="qn" style="font-size:20px"><?= fmoney_short($money['on_account']) ?></div>
+        <div class="ql">Received, not yet matched</div></div>
+    <?php endif; ?>
+  <?php endif; ?>
+  <?php if ($pipeline !== null): ?>
+    <a class="qcard tone-info" href="/opportunities?v=list&amp;q=<?= e(urlencode($name)) ?>">
+      <div class="qic">💡</div><div class="qn"><?= count($pipeline['open']) ?></div>
+      <div class="ql">Open deals<?= $pipeline['weighted'] ? ' · ' . fmoney_short($pipeline['weighted']) . ' weighted' : '' ?></div>
+    </a>
+  <?php endif; ?>
+  <?php if ($work !== null): ?>
+    <div class="qcard <?= $work['open_jobs'] ? 'tone-info' : '' ?>"><div class="qic">🗂</div>
+      <div class="qn"><?= (int)$work['open_jobs'] ?></div><div class="ql">Work in flight</div></div>
+    <?php if ($work['unbilled']): ?>
+      <a class="qcard tone-bad" href="/to-bill?partner=<?= (int)$p['id'] ?>"><div class="qic">⧗</div>
+        <div class="qn"><?= (int)$work['unbilled'] ?></div><div class="ql">Finished, never billed</div></a>
+    <?php endif; ?>
+  <?php endif; ?>
+  <?php if ($quality['any']): ?>
+    <div class="qcard <?= $quality['open'] ? 'tone-bad' : 'tone-warn' ?>"><div class="qic">!</div>
+      <div class="qn"><?= (int)$quality['total'] ?></div>
+      <div class="ql">Complaints, nonconformities, rejections<?= $quality['open'] ? ' · ' . (int)$quality['open'] . ' still open' : ' · all closed' ?></div></div>
+  <?php endif; ?>
+</div>
+
+<div class="panel-split" style="margin-top:16px">
+  <div>
+    <?php // ---- Money ---------------------------------------------------- ?>
+    <?php if ($money !== null): ?>
+      <div class="panel" style="margin-bottom:14px">
+        <div style="display:flex;align-items:baseline;gap:10px">
+          <h3 style="margin:0">Money</h3>
+          <a style="margin-left:auto;font-size:12.5px" href="/ledger?id=<?= (int)$p['id'] ?>">Full ledger →</a>
+        </div>
+        <div class="kv-grid" style="margin-top:10px">
+          <div><span class="k">Billed and open</span><span><?= e(fmoney($money['billed'])) ?></span></div>
+          <div><span class="k">Settled</span><span><?= e(fmoney($money['settled'])) ?></span></div>
+          <div><span class="k">Outstanding</span><span><b><?= e(fmoney($money['outstanding'])) ?></b></span></div>
+          <?php if ($money['oldest_days'] !== null): ?>
+            <div><span class="k">Oldest overdue</span><span><?= (int)$money['oldest_days'] ?> days</span></div>
+          <?php endif; ?>
+        </div>
+        <?php if ($money['buckets']): ?>
+          <?php // The same buckets and the same labels the receivables report
+                // uses. Two ageing screens with two sets of bands is how an
+                // argument about "60 days" starts. ?>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
+            <?php foreach ((defined('AR_BUCKETS') ? AR_BUCKETS : []) as $b): ?>
+              <?php $k = $b['key']; if (empty($money['buckets'][$k])) continue; ?>
+              <span class="pill <?= $k === 'notdue' ? 'p-ok' : ($k === 'b90p' ? 'p-bad' : 'p-warn') ?>">
+                <?= e($b['label']) ?>: <?= e(fmoney($money['buckets'][$k])) ?></span>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+        <?php if ($money['invoices']): ?>
+          <table class="dt" style="margin-top:12px">
+            <caption class="sr-only">Recent invoices</caption>
+            <thead><tr><th scope="col">Invoice</th><th scope="col">Date</th><th scope="col" class="num">Total</th><th scope="col">Status</th></tr></thead>
+            <tbody>
+            <?php foreach ($money['invoices'] as $i): ?>
+              <tr><td><a href="/invoice?id=<?= (int)$i['id'] ?>"><?= e($i['invoice_no'] ?: '#' . (int)$i['id']) ?></a></td>
+                  <td><?= e(fdate($i['invoice_date'])) ?></td>
+                  <td class="num"><?= e(fmoney($i['total'])) ?></td>
+                  <td><span class="pill <?= $i['status']==='PAID'?'p-ok':($i['status']==='CANCELLED'?'p-mut':'p-warn') ?>"><?= e(INV_STATUS[$i['status']] ?? $i['status']) ?></span></td></tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
+
+    <?php // ---- Pipeline ------------------------------------------------- ?>
+    <?php if ($pipeline !== null && ($pipeline['open'] || $pipeline['recent'] || $pipeline['leads'])): ?>
+      <div class="panel" style="margin-bottom:14px">
+        <h3 style="margin-top:0">What we are selling them</h3>
+        <?php if ($pipeline['open']): ?>
+          <table class="dt">
+            <caption class="sr-only">Open opportunities</caption>
+            <thead><tr><th scope="col">Deal</th><th scope="col">Stage</th><th scope="col" class="num">Estimate</th><th scope="col" class="num">Weighted</th></tr></thead>
+            <tbody>
+            <?php foreach ($pipeline['open'] as $o): ?>
+              <tr><td><a href="/opportunity?id=<?= (int)$o['id'] ?>"><?= e($o['name']) ?></a>
+                      <br><span class="muted" style="font-size:12px"><?= e($o['ref']) ?></span></td>
+                  <td><?= e($o['stage_name'] ?: '—') ?></td>
+                  <td class="num"><?= e(fmoney($o['value'])) ?></td>
+                  <td class="num"><?= e(fmoney(opp_weighted($o))) ?></td></tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        <?php else: ?>
+          <p class="muted" style="margin:0 0 10px">Nothing open. <?= $money !== null && $money['billed'] > 0 ? 'They are a paying customer with nothing in the pipeline — worth a call.' : '' ?></p>
+        <?php endif; ?>
+        <?php if ($pipeline['recent']): ?>
+          <p class="muted" style="font-size:12.5px;margin:10px 0 4px">Recently closed</p>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <?php foreach ($pipeline['recent'] as $o): ?>
+              <a class="pill <?= $o['status']==='WON'?'p-ok':'p-bad' ?>" href="/opportunity?id=<?= (int)$o['id'] ?>">
+                <?= e($o['name']) ?> · <?= e(fmoney($o['value'])) ?></a>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
+
+    <?php // ---- Quotations ----------------------------------------------- ?>
+    <?php if ($quotes): ?>
+      <div class="panel" style="margin-bottom:14px">
+        <h3 style="margin-top:0">Quotations</h3>
+        <table class="dt">
+          <caption class="sr-only">Current quotations</caption>
+          <thead><tr><th scope="col">Quotation</th><th scope="col">Subject</th><th scope="col" class="num">Value</th><th scope="col">Status</th></tr></thead>
+          <tbody>
+          <?php foreach ($quotes as $q): ?>
+            <tr><td><a href="/quote?id=<?= (int)$q['id'] ?>"><?= e($q['quote_no']) ?><?= (int)$q['rev'] ? ' r' . (int)$q['rev'] : '' ?></a></td>
+                <td><?= e(mb_substr((string)$q['subject'], 0, 50) ?: '—') ?></td>
+                <td class="num"><?= e(fmoney($q['total_amount'])) ?></td>
+                <td><span class="pill p-mut"><?= e($q['status']) ?></span></td></tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    <?php endif; ?>
+
+    <?php // ---- Work ----------------------------------------------------- ?>
+    <?php if ($work !== null && ($work['calls'] || $work['jobs'])): ?>
+      <div class="panel" style="margin-bottom:14px">
+        <h3 style="margin-top:0">Work</h3>
+        <?php if ($work['calls']): ?>
+          <p class="muted" style="font-size:12.5px;margin:0 0 6px">Orders <span class="muted">(<?= (int)$work['open_calls'] ?> open)</span></p>
+          <table class="dt">
+            <caption class="sr-only">Recent orders</caption>
+            <thead><tr><th scope="col">Order</th><th scope="col">Received</th><th scope="col">Status</th></tr></thead>
+            <tbody>
+            <?php foreach ($work['calls'] as $c): ?>
+              <tr><td><a href="/call?id=<?= (int)$c['id'] ?>"><?= e($c['call_code']) ?></a></td>
+                  <td><?= $c['call_received_date'] ? e(fdate($c['call_received_date'])) : '—' ?></td>
+                  <td><span class="pill p-mut"><?= e($c['status']) ?></span></td></tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        <?php endif; ?>
+        <?php if ($work['jobs']): ?>
+          <p class="muted" style="font-size:12.5px;margin:12px 0 6px">Deputations</p>
+          <table class="dt">
+            <caption class="sr-only">Recent deputations</caption>
+            <thead><tr><th scope="col">Deputation</th><th scope="col">Who</th><th scope="col">State</th></tr></thead>
+            <tbody>
+            <?php foreach ($work['jobs'] as $j): ?>
+              <tr><td><a href="/job?id=<?= (int)$j['id'] ?>"><?= e($j['job_code']) ?></a></td>
+                  <td><?= e($j['inspector_name'] ?: '—') ?></td>
+                  <td><span class="pill <?= $j['closed_flag'] ? 'p-ok' : 'p-warn' ?>"><?= $j['closed_flag'] ? 'Closed' : 'Open' ?></span></td></tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
+
+    <?php // ---- Quality --------------------------------------------------- ?>
+    <?php if ($quality['any']): ?>
+      <div class="panel" style="margin-bottom:14px;border-left:3px solid var(--warn)">
+        <h3 style="margin-top:0">Where we have let them down
+          <span class="muted" style="font-weight:400;font-size:13px">— <?= (int)$quality['total'] ?> in total<?= $quality['total'] > (count($quality['complaints']) + count($quality['ncrs'])) ? ', newest shown' : '' ?></span></h3>
+        <?php if ($quality['rejections']): ?>
+          <p style="margin:0 0 8px"><b><?= (int)$quality['rejections'] ?></b> report<?= $quality['rejections']==1?'':'s' ?> rejected by them.</p>
+        <?php endif; ?>
+        <?php foreach ($quality['complaints'] as $c): ?>
+          <div style="padding:6px 0;border-bottom:1px solid var(--line)">
+            <a href="/complaint?id=<?= (int)$c['id'] ?>"><b><?= e($c['ref']) ?></b></a>
+            <span class="pill p-mut" style="font-size:11px"><?= $c['kind']==='APPEAL'?'Appeal':'Complaint' ?></span>
+            <span class="pill <?= $c['status']==='CLOSED'?'p-ok':'p-warn' ?>" style="font-size:11px"><?= e($c['status']) ?></span>
+            <div class="muted" style="font-size:12.5px"><?= e($c['subject']) ?></div>
+          </div>
+        <?php endforeach; ?>
+        <?php foreach ($quality['ncrs'] as $n): ?>
+          <div style="padding:6px 0;border-bottom:1px solid var(--line)">
+            <a href="/ncr-item?id=<?= (int)$n['id'] ?>"><b><?= e($n['ref']) ?></b></a>
+            <span class="pill <?= $n['severity']==='MAJOR'?'p-bad':'p-warn' ?>" style="font-size:11px"><?= e(ucfirst(strtolower($n['severity']))) ?></span>
+            <div class="muted" style="font-size:12.5px"><?= e($n['title']) ?></div>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+  </div>
+
+  <div>
+    <?php // ---- Who to talk to -------------------------------------------- ?>
+    <div class="panel" style="margin-bottom:14px">
+      <h3 style="margin-top:0">Who to talk to</h3>
+      <?php if (!$contacts): ?>
+        <p class="muted" style="margin:0">Nobody recorded. <a href="/partner?id=<?= (int)$p['id'] ?>&amp;tab=contacts">Add a contact</a> — a customer with no named person is a customer nobody can chase.</p>
+      <?php else: foreach ($contacts as $c): ?>
+        <div style="padding:7px 0;border-bottom:1px solid var(--line)">
+          <b><?= e($c['name']) ?></b><?= !empty($c['is_primary']) ? ' <span class="pill p-ok" style="font-size:10.5px">main</span>' : '' ?>
+          <?php if ($c['designation']): ?><div class="muted" style="font-size:12.5px"><?= e($c['designation']) ?></div><?php endif; ?>
+          <div style="font-size:12.5px">
+            <?php if ($c['email']): ?><a href="mailto:<?= e($c['email']) ?>"><?= e($c['email']) ?></a><?php endif; ?>
+            <?php if ($c['mobile']): ?> · <?= e($c['mobile']) ?><?php endif; ?>
+          </div>
+        </div>
+      <?php endforeach; endif; ?>
+      <?php if ($address): ?>
+        <p class="muted" style="font-size:12.5px;margin:10px 0 0">
+          <?= e(trim(($address['line1'] ?? '') . ' ' . ($address['line2'] ?? ''))) ?><br>
+          <?= e(trim(($address['city'] ?? '') . ' ' . ($address['state'] ?? '') . ' ' . ($address['pincode'] ?? ''))) ?>
+        </p>
+      <?php endif; ?>
+    </div>
+
+    <?php if ($contracts): ?>
+      <div class="panel" style="margin-bottom:14px">
+        <h3 style="margin-top:0">Contracts</h3>
+        <?php foreach ($contracts as $ct): ?>
+          <div style="padding:6px 0;border-bottom:1px solid var(--line);font-size:13px">
+            <b><?= e($ct['contract_number']) ?></b>
+            <?php if ($ct['end_date']): ?><span class="muted"> — to <?= e(fdate($ct['end_date'])) ?></span><?php endif; ?>
+            <?php if ($ct['title']): ?><div class="muted" style="font-size:12.5px"><?= e($ct['title']) ?></div><?php endif; ?>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+
+    <?php // ---- The timeline ---------------------------------------------- ?>
+    <div class="panel">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <h3 style="margin:0">What has happened</h3>
+        <a style="margin-left:auto;font-size:12.5px" href="/activities?partner=<?= (int)$p['id'] ?>">All of it →</a>
+      </div>
+      <?php if (!$timeline): ?>
+        <p class="muted" style="margin:10px 0 0">Nothing recorded against this customer yet. The timeline fills itself as quotations go out, work is done and reports are issued — and anybody can add what was said on the phone.</p>
+      <?php else: ?>
+        <div style="margin-top:10px">
+        <?php foreach ($timeline as $a): ?>
+          <div style="padding:8px 0;border-bottom:1px solid var(--line)">
+            <div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">
+              <span class="muted" style="font-size:12px;min-width:78px"><?= e(fdate(substr((string)$a['occurred_at'],0,10))) ?></span>
+              <span class="pill <?= $a['auto'] ? 'p-mut' : 'p-ok' ?>" style="font-size:10.5px"><?= e(ACT_KINDS[$a['kind']] ?? $a['kind']) ?></span>
+              <span style="font-size:13px;flex:1"><?= e($a['subject']) ?></span>
+            </div>
+            <?php if (trim((string)$a['body']) !== ''): ?>
+              <div class="muted" style="font-size:12.5px;margin:2px 0 0 86px;white-space:pre-wrap"><?= e(mb_substr((string)$a['body'], 0, 160)) ?></div>
+            <?php endif; ?>
+          </div>
+        <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+  </div>
+</div>

@@ -62,10 +62,13 @@ const PLAIN = [
   // Opportunities: the deal, kept apart from the quotation.
   '/opportunities', '/opportunities?v=list',
   '/opportunities?v=list&sort=weighted&dir=desc', '/opportunity-new',
+  // Customer 360 — the assembly. Reached from the customer list below too, but
+  // named here so it is crawled even when the list happens to be empty.
 ];
 
 // register path -> [link pattern to follow, extra screens built from that id]
 const REGISTERS = [
+  ['/clients',       /^\/customer\?id=(\d+)/, ['/customer?id=%s']],
   ['/clients',       /^\/partner\?id=(\d+)/,  ['/partner?id=%s', '/partner?id=%s&tab=contacts', '/partner?id=%s&tab=addresses', '/partner?id=%s&tab=contracts', '/partner?id=%s&tab=purchase_orders', '/partner-edit?id=%s']],
   ['/vendors',       /^\/partner\?id=(\d+)/,  ['/partner?id=%s', '/partner?id=%s&tab=contacts', '/partner-edit?id=%s']],
   ['/calls',         /^\/call\?id=(\d+)/,     ['/call?id=%s', '/call-edit?id=%s', '/job-new?call=%s']],

@@ -65,7 +65,7 @@ matter, and they are all here.
 | U1 | **Nothing is pinned in the navigation** | Favourites would be next, but it wants watching real use rather than guessing |
 | U11 | **Global search is built, across 13 registers** | `lib/search.php` — customers, contacts, leads, inquiries, quotations, calls, deputations, reports, complaints, nonconformities, corrective actions, people, equipment. Own box in the top bar, "/" to reach it, a unique reference jumps straight to the record. **It is `LIKE '%term%'`, not a search index** — correct at today's volume, a table scan per source, and the thing to replace when a register passes roughly a million rows. That replacement needs B0 decided first — blueprint 002 U2 |
 | ~~F1~~ | **Opportunities — BUILT** | `lib/opportunities.php`. The deal, kept distinct from the quotation as confirmed. One deal carries many quotations, so the forecast counts the business once instead of three times. Weighted forecast, win rate and loss reasons all become answerable. Reuses the lead pipeline engine with `entity_kind='OPPORTUNITY'`. A won deal raises the order in one act, carrying the customer, the accepted quotation, its value and the branch — the join that was empty on all 160 existing orders. Offered only where operations is licensed |
-| **F2** | **Customer 360 is still not built** | Blueprint 001 P3 / 002 U3. Every piece now exists — activity spine, chain, ledger, search, opportunities — but nothing assembles them into one screen per customer |
+| ~~F2~~ | **Customer 360 — BUILT** | `lib/customer360.php`, `/customer?id=`. Answers "what do I need to know before I ring them": what they owe and how late, what we are selling them, what work is in flight, where we have let them down, and when anybody last spoke to them. It re-computes nothing — the outstanding figure is `books_outstanding()`, the same function the ledger and the ageing use, so the three cannot disagree. Every section is behind a licence and a permission check, so a Sales-only install shows no trace of deputations rather than an empty panel |
 | **F3** | **The flow is joined but mostly unused** | /flow-gaps measures it: 160 orders with no quotation, 100 closed jobs with no report, 97 closed and never billed. The links and the prompts exist now; the back-data does not. Somebody has to work the list |
 | U12 | **No notification centre** | Flash messages and e-mail only; nothing persists — blueprint 002 U4 |
 | U13 | **The shared table is built, and adopted on 3 of 42 registers** | `lib/datatable.php` — server-side sorting on a whitelist, paging, per-user column choice, bulk actions, filter-aware CSV. Live on **activity, leads and nonconformities**. The other 39 still hand-roll their own `<table>` — blueprint 002 U1. **Inline editing and grouping are not built at all** |
@@ -136,6 +136,39 @@ the nonconformity register, client acceptance of reports, multi-action
 corrective actions, branch scoping, portal permissions, site-entry documents,
 confidentiality, and the competence review cycle. Entries about them survive
 below as history; they are not open.
+
+## ▣ Customer 360, and the flow end to end (July 2026)
+
+`lib/customer360.php` — the last item in the CRM plan, and built last on
+purpose: it is an assembly, not a feature, and it could not be honest until the
+things it assembles existed. Six months ago this screen would have shown a name,
+an address and a list of calls.
+
+It answers the question somebody actually has, which is never "show me the
+customer record" but **"what do I need to know before I ring them?"** — what they
+owe and how overdue, what we are selling them and what it is worth, what work is
+in flight and what is finished-but-unbilled, where we have let them down, and how
+long since anybody spoke to them.
+
+**It re-computes nothing.** The outstanding figure comes from
+`books_outstanding()`, the same function the ledger and the ageing report use;
+the ageing bands are `AR_BUCKETS`, the same bands the receivables screen uses. A
+360 screen with its own arithmetic is one that disagrees with the ledger, and
+then nobody believes either. Verified: 360 says ₹1,53,400 outstanding and the
+ledger closes at ₹1,53,400.
+
+**Counts are true, lists are capped.** The panels show the newest five; the
+headline numbers are real counts. A headline that says 10 because the list stops
+at 5 is the kind of lie somebody repeats in a meeting.
+
+**Nothing is assumed installed.** Every section is behind a licence AND a
+permission check. On a Sales-only install the Work and quality sections are
+absent entirely — not empty panels headed "Deputations".
+
+**The flow now runs end to end**, every hop navigable both ways and every break
+counted:
+
+    Lead → Opportunity → Quotation → Order → Deputation → Report → Invoice → Receipt
 
 ## ▣ Sales & CRM can now be sold on its own (July 2026)
 
