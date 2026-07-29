@@ -18,34 +18,36 @@ as its own subdomain works equally well; nothing in the code cares which.
 
 ## Putting it up
 
+There is nothing to configure. Three steps, all of them in a browser.
+
 1. Upload this folder to `.../id.mghaiapps.com/licences/`.
 
-2. **Make the private folder first, outside the website.** In cPanel → File
-   Manager, at the very top level (the one holding `public_html`), create
-   `licence-private`. Then set the environment variable
+2. Open `https://id.mghaiapps.com/licences/`. It asks for an admin password,
+   once, and makes the signing key at the same time.
 
-       LICENCE_STORE=/home/YOUR-CPANEL-USER/licence-private
+   It also works out for itself where to keep the private things — the signing
+   key, the admin password and the subscriptions database — and creates that
+   folder alongside the website, never inside it. The setup page shows you the
+   path it chose. **Back that folder up; nothing else on this server matters.**
 
-   Three things live there and nothing else: the signing key, this server's
-   password, and the subscriptions database. **Back that folder up.**
-
-   Skipping this step is the one mistake with no recovery. Without it the
-   signing key is written inside the website, where anyone who guesses the
-   filename can download it and mint licences in your name for ever — so the
-   server checks, and refuses to make a key until the folder is somewhere a
-   browser cannot reach.
-
-3. Open `https://id.mghaiapps.com/licences/` in a browser. It asks for an admin
-   password, once, and makes the signing key at the same time.
-
-4. Copy the public key it shows you into each application (`LICENCE_PUBKEY`).
-   It is always available afterwards at `api.php?action=pubkey`.
-
-5. In **Settings**, paste the Razorpay webhook secret.
-
-6. In Razorpay → Settings → Webhooks, add
+3. In **Settings**, paste the Razorpay webhook secret, and in Razorpay →
+   Settings → Webhooks add
    `https://id.mghaiapps.com/licences/api.php?action=razorpay_webhook` for the
    events `payment.captured` and `subscription.charged`.
+
+The public key each application needs (`LICENCE_PUBKEY`) is shown once at the
+end of setup and is always available afterwards at `api.php?action=pubkey`.
+
+### If the setup page shows a red box
+
+It found nowhere safe to keep the signing key, and it has created nothing at
+all. The box says which of the two problems it is and what to do about it. A
+signing key inside the website is the one mistake with no recovery — anybody
+who downloads it can issue licences in your name for ever — so the server
+refuses rather than warns.
+
+On an unusual host, `LICENCE_STORE` can name the folder explicitly. Nobody
+needs to set it on a normal cPanel account.
 
 ## Selling to a customer
 
@@ -63,7 +65,8 @@ needing a human.
 
 ## Two things that must stay true
 
-**Back up the private folder.** Losing the signing key does not break any
+**Back up the private folder** — the one the setup page named, and the one
+Settings shows you at any time. Losing the signing key does not break any
 customer — they keep working on the keys they already hold — but no new licence
 or renewal can ever be issued without changing every installation.
 

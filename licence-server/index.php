@@ -20,19 +20,14 @@ if ($p === 'setup') {
         if (strlen($pw) < 12) { $msg = 'Use at least 12 characters — this password protects every customer subscription.'; $bad = true; }
         else {
             $k = ls_make_keys();
-            $conf = "<?php\nreturn [\n"
-                  . "    'admin_hash' => " . var_export(password_hash($pw, PASSWORD_DEFAULT), true) . ",\n"
-                  . "    'razorpay_secret' => '',\n"
-                  . "];\n";
             // If the key could not be made, stop here and write nothing. Setting
             // the password anyway would lock this screen away and leave a server
             // that can never sign — recoverable only by editing files by hand.
             if (!empty($k['err'])) {
                 $msg = $k['err']; $bad = true;
-            } elseif (@file_put_contents(ls_configfile(), $conf) === false) {
+            } elseif (!ls_config_save(['admin_hash' => password_hash($pw, PASSWORD_DEFAULT), 'razorpay_secret' => ''])) {
                 $msg = 'Could not write ' . ls_configfile() . '. That folder must be writable by the web server.'; $bad = true;
             } else {
-                @chmod(ls_configfile(), 0600);
                 $_SESSION['ls_setup_pub'] = $k['public'] ?? ('Key not created: ' . ($k['err'] ?? ''));
                 header('Location: index.php?p=setupdone'); exit;
             }
@@ -116,9 +111,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ls_logged_in()) {
         if ($do === 'webhook_secret') {
             $c = ls_config();
             $c['razorpay_secret'] = trim((string)($_POST['secret'] ?? ''));
-            $out = "<?php\nreturn " . var_export($c, true) . ";\n";
-            if (@file_put_contents(ls_configfile(), $out) === false) { $msg = 'Could not write the config file.'; $bad = true; }
-            else { @chmod(ls_configfile(), 0600); $msg = 'Webhook secret saved.'; }
+            if (!ls_config_save($c)) { $msg = 'Could not write the config file.'; $bad = true; }
+            else { $msg = 'Webhook secret saved. Razorpay can be pointed at this server now.'; }
         }
     }
 }
@@ -161,18 +155,16 @@ $MODS = ['sales' => 'Sales & CRM', 'money' => 'Money (invoicing)', 'operations' 
     <p>This runs once. It creates your admin password and your signing key.</p>
     <p class="hint">The signing key is written <b>outside the web folder</b> so it can never be downloaded, and it never
       appears in the code repository. It is what proves a licence came from you.</p>
-    <?php if (ls_store_is_public()): ?>
+    <?php $storeProblem = ls_store_problem(); ?>
+    <?php if ($storeProblem !== ''): ?>
       <div class="msg bad">
-        <b>Stop — the private folder is inside the website.</b>
-        <div style="margin-top:4px">Right now the signing key would be written to
-          <span class="mono"><?= ls_h(ls_store()) ?></span>, which a browser can reach. Anybody who downloaded it could
-          issue licences in your name for ever.</div>
-        <div style="margin-top:8px">Fix it before continuing: make a folder outside <span class="mono">public_html</span>
-          — for example <span class="mono">/home/YOUR-CPANEL-USER/licence-private</span> — and set the environment
-          variable <span class="mono">LICENCE_STORE</span> to it. Then reload this page.</div>
+        <b>Stop — nothing has been created yet.</b>
+        <div style="margin-top:4px"><?= ls_h($storeProblem) ?></div>
       </div>
     <?php else: ?>
-      <p class="hint">Private folder: <span class="mono"><?= ls_h(ls_store()) ?></span></p>
+      <p class="hint">Your private folder is ready, outside the website, and this page found it on its own — there is
+        nothing for you to set up:<br><span class="mono"><?= ls_h(ls_store()) ?></span><br>
+        <b>Back that folder up.</b> Everything private lives in it and nowhere else.</p>
     <?php endif; ?>
     <form method="post">
       <label>Choose an admin password (12 characters or more)</label>
@@ -326,12 +318,12 @@ $MODS = ['sales' => 'Sales & CRM', 'money' => 'Money (invoicing)', 'operations' 
   <div class="card">
     <h2>Where the private things are kept</h2>
     <p class="hint">The signing key, this server's password and the subscriptions database all live in one folder,
-      set by the environment variable <code>LICENCE_STORE</code>. Back that folder up.</p>
+      outside the website. <b>This is the folder to back up</b> — there is nothing else worth keeping.</p>
     <pre class="mono" style="background:var(--soft);padding:12px;border-radius:6px;white-space:pre-wrap"><?= ls_h(ls_store()) ?></pre>
     <?php if (ls_store_is_public()): ?>
-      <div class="msg bad"><b>That folder is inside the website</b> — the signing key can be downloaded. Move it outside
-        <span class="mono">public_html</span>, set <code>LICENCE_STORE</code> to the new path, and move the three files
-        across. Until then, treat the signing key as compromised.</div>
+      <div class="msg bad"><b>That folder is inside the website</b> — the signing key can be downloaded, so treat it as
+        compromised. Ask your host to set <code>LICENCE_STORE</code> to a folder outside the website, move the files
+        across, and issue everybody a fresh key from a new signing key.</div>
     <?php endif; ?>
   </div>
 

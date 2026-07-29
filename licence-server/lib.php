@@ -40,13 +40,46 @@ const LS_GRACE   = 14;
 //  In that arrangement "one level above" is the MGH ID document root, and the
 //  signing key would be downloadable by anyone who guessed the filename.
 //
-//  So the location is a setting, LICENCE_STORE, and the code refuses to write a
-//  signing key into anywhere a browser can reach.
+//  SO THIS WORKS IT OUT ITSELF. The person putting this up is not a developer,
+//  and an instruction to "set an environment variable" is a job handed back to
+//  them along with the chance to get it wrong in the one place where being
+//  wrong cannot be undone. Given a document root, the folder that holds it is
+//  by definition outside the website, so licence-private goes there and is
+//  created on first use.
+//
+//  LICENCE_STORE still overrides everything, for a host laid out differently or
+//  for somebody who wants the key on another volume. Nobody has to touch it.
 function ls_store() {
     static $d = null;
     if ($d !== null) return $d;
+
     $e = trim((string)getenv('LICENCE_STORE'));
-    return $d = rtrim($e !== '' ? $e : __DIR__ . '/..', '/');
+    if ($e !== '') return $d = rtrim($e, '/');
+
+    // A key already sitting in the old fixed place keeps being used. Moving it
+    // silently would leave a working server unable to find its own signing key.
+    if (is_file(__DIR__ . '/../licence-signing-key.pem')) return $d = rtrim(__DIR__ . '/..', '/');
+
+    // The normal path: alongside the website, never inside it.
+    $doc = realpath((string)($_SERVER['DOCUMENT_ROOT'] ?? ''));
+    if ($doc !== false && dirname($doc) !== $doc) return $d = dirname($doc) . '/licence-private';
+
+    // No document root — the command line. One level up is right there.
+    return $d = rtrim(__DIR__ . '/..', '/');
+}
+
+// Tidy a path without requiring it to exist — the store folder is usually
+// checked before it has been created, and realpath() answers false for those.
+function ls_norm($p) {
+    $r = realpath($p);
+    if ($r !== false) return $r;
+    $out = [];
+    foreach (explode('/', str_replace('\\', '/', $p)) as $seg) {
+        if ($seg === '' || $seg === '.') continue;
+        if ($seg === '..') { array_pop($out); continue; }
+        $out[] = $seg;
+    }
+    return '/' . implode('/', $out);
 }
 
 // True when the store is inside the document root — i.e. the key would be
@@ -54,9 +87,29 @@ function ls_store() {
 // line), it answers false rather than blocking a legitimate setup.
 function ls_store_is_public() {
     $doc = realpath((string)($_SERVER['DOCUMENT_ROOT'] ?? ''));
-    $st  = realpath(ls_store());
-    if ($doc === false || $st === false) return false;
+    if ($doc === false) return false;
+    $st = ls_norm(ls_store());
     return $st === $doc || str_starts_with($st . '/', rtrim($doc, '/') . '/');
+}
+
+// Everything that could be wrong with the private folder, in the words of
+// somebody who has to fix it from cPanel rather than a terminal. Empty string
+// means it is fine. Both the setup screen and key generation ask this, so the
+// warning a person reads and the rule the code enforces cannot drift apart.
+function ls_store_problem() {
+    $d = ls_store();
+    if (ls_store_is_public())
+        return 'The private folder (' . $d . ') is inside the website, so a browser could download the signing key '
+             . 'from it. Nothing has been created. Tell your host to set LICENCE_STORE to a folder outside the '
+             . 'website — anywhere that is not reachable by a web address will do.';
+    ls_store_prepare();
+    if (!is_dir($d))
+        return 'The folder ' . $d . ' could not be created. Create it in cPanel → File Manager, then open this page '
+             . 'again.';
+    if (!is_writable($d))
+        return 'The folder ' . $d . ' exists but this server cannot write to it. In cPanel → File Manager, right-click '
+             . 'it → Change Permissions → tick the three boxes on the top row (Owner: read, write, execute).';
+    return '';
 }
 
 // Belt and braces for the case where somebody ignores the warning: a deny-all
@@ -70,7 +123,7 @@ function ls_store_prepare() {
 }
 
 function ls_keyfile()    { return ls_store() . '/licence-signing-key.pem'; }
-function ls_configfile() { return ls_store() . '/licence-server-config.php'; }
+function ls_configfile() { return ls_store() . '/licence-server-config.json'; }
 function ls_dbfile()     { return ls_store() . '/licences.sqlite'; }
 
 function ls_db() {
@@ -137,11 +190,8 @@ function ls_make_keys() {
     // Refuse rather than warn. A signing key inside the document root is the one
     // mistake from which there is no recovery: anybody who downloads it can mint
     // licences for every customer, for ever, and you would not know.
-    if (ls_store_is_public())
-        return ['err' => 'The private folder (' . ls_store() . ') is inside the website and a browser could download the '
-                       . 'signing key from it. Set LICENCE_STORE to a folder outside public_html — for example '
-                       . '/home/YOUR-CPANEL-USER/licence-private — and open this page again.'];
-    ls_store_prepare();
+    $problem = ls_store_problem();
+    if ($problem !== '') return ['err' => $problem];
     $k = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
     if (!$k) return ['err' => 'Could not generate a key: ' . openssl_error_string()];
     openssl_pkey_export($k, $priv);
@@ -253,11 +303,44 @@ function ls_state($row) {
 // One password, held as a hash in a config file outside the web root. This
 // server has one operator; anything more elaborate is a system to maintain
 // rather than a control that helps.
+// Held as JSON and read as text, NOT as a PHP file that gets included.
+//
+//  A .php config is compiled, and a compiled file is cached: opcache is on by
+//  default on a cPanel host with opcache.revalidate_freq=2, so for a couple of
+//  seconds after the webhook secret is saved, `include` can hand back the
+//  PREVIOUS contents. The window is small and the consequence is not — a
+//  payment arriving in those seconds is rejected as unsigned, and the customer
+//  is left unrenewed with a successful payment. That is exactly the failure
+//  this whole system exists to prevent, so the file is now read with
+//  file_get_contents, which no cache stands in front of.
+//
+//  JSON has a second benefit: if this file ever ends up somewhere web-reachable
+//  it is inert data rather than executable code.
 function ls_config() {
     static $c = null;
     if ($c !== null) return $c;
     $f = ls_configfile();
-    return $c = is_file($f) ? (include $f) : [];
+    clearstatcache(true, $f);
+    if (is_file($f)) {
+        $j = json_decode((string)file_get_contents($f), true);
+        if (is_array($j)) return $c = $j;
+    }
+    // A config written by an earlier version. Read once so an upgrade in place
+    // does not lock the operator out; the next save writes JSON.
+    $old = ls_store() . '/licence-server-config.php';
+    if (is_file($old)) { $v = include $old; if (is_array($v)) return $c = $v; }
+    return $c = [];
+}
+
+// The one place that writes it, so the two callers cannot disagree about the
+// format. Written tightly (0600) and only ever to the private folder.
+function ls_config_save(array $c) {
+    $f = ls_configfile();
+    ls_store_prepare();
+    if (@file_put_contents($f, json_encode($c, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) === false) return false;
+    @chmod($f, 0600);
+    clearstatcache(true, $f);
+    return true;
 }
 
 function ls_admin_hash()   { return (string)(ls_config()['admin_hash'] ?? ''); }
