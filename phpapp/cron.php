@@ -185,14 +185,23 @@ if (function_exists('competence_due') && function_exists('ops_mail')) {
 //
 //  Silent when the link is not configured, which is most installs.
 // ---------------------------------------------------------------------------
+//  A DAILY CATCH-UP ONLY. The real schedule for this is cron_ads.php, run every
+//  fifteen minutes — a lead that arrives at 09:05 should be workable at 09:20,
+//  not tomorrow. It is a separate file because most jobs in THIS file send
+//  e-mail and have no per-day guard, so running this one every quarter of an
+//  hour would post the same reminders ninety-six times a day.
+//
+//  Harmless if cron_ads.php is already running: every push is guarded by a
+//  payload hash and every pull is matched on the Ads Pro record id, so a second
+//  run finds nothing to do.
 if (function_exists('ads_on') && ads_on() && function_exists('ads_sync_now')) {
     $r = ads_sync_now();
     $out = $r['push'] ?? []; $in = $r['pull'] ?? [];
     echo "Ads Pro out: " . (!empty($out['err']) ? 'FAILED — ' . $out['err'] : ($out['msg'] ?? 'nothing waiting')) . "\n";
     echo "Ads Pro in:  " . (!empty($in['err'])  ? 'FAILED — ' . $in['err']  : ($in['msg']  ?? 'nothing')) . "\n";
-    // Spend moves every day and the return report is only as current as it is.
-    if (function_exists('ads_import_spend')) {
+    if (function_exists('ads_import_spend') && (string)setting_get('adspro_spend_day', '') !== date('Y-m-d')) {
         $sp = ads_import_spend(90);
+        if (empty($sp['err'])) setting_set('adspro_spend_day', date('Y-m-d'));
         echo "Ads Pro spend: " . (!empty($sp['err']) ? 'FAILED — ' . $sp['err'] : ($sp['rows'] . ' campaign-days')) . "\n";
     }
 }
