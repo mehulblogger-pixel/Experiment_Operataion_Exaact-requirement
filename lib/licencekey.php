@@ -220,7 +220,7 @@ function lk_seat_block() {
 // Routes that must keep working even when the licence has run out. Everything
 // here either takes nothing in, or is the thing that fixes the licence.
 const LICENCE_ALWAYS_ALLOW = [
-    'licence', 'licence-save',      // the screen that accepts a new key
+    'licence', 'licence-save', 'licence-check',   // the screen that fixes the licence
     'logout', 'login',
     'change-password', 'my-signature',
     'verify',                        // public report verification
@@ -264,6 +264,16 @@ function lk_summary() {
 function ops_licence($route, $method) {
     ops_require(lk_can_manage(), 'You cannot see the licence.');
 
+    // Somebody who has just paid will press a button rather than wait for the
+    // next scheduled check. Making them wait is the whole complaint this
+    // machinery exists to answer.
+    if ($route === 'licence-check' && $method === 'POST') {
+        if (!function_exists('licsync_checkin')) { flash('Automatic renewal is not available on this installation.', 'error'); redirect('/licence'); }
+        $r = licsync_checkin(true);
+        flash($r['msg'], !empty($r['ok']) ? (!empty($r['changed']) ? 'success' : 'info') : 'error');
+        redirect('/licence');
+    }
+
     if ($route === 'licence-save' && $method === 'POST') {
         $key = trim((string)($_POST['key'] ?? ''));
         // Whitespace is how a pasted key arrives from an e-mail client.
@@ -284,6 +294,7 @@ function ops_licence($route, $method) {
     }
 
     view('ops/licence', ['s' => lk_summary(), 'canManage' => lk_can_manage(),
-                         'states' => LICENCE_STATES]);
+                         'states' => LICENCE_STATES,
+                         'sync' => function_exists('licsync_status') ? licsync_status() : ['on' => false]]);
     return true;
 }

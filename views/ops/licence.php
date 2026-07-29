@@ -37,7 +37,36 @@ $t = $tone[$s['state']] ?? 'info';
   <?php endif; ?>
 </div>
 
-<div class="panel-split" style="margin-top:16px">
+<div class="panel-split" style="margin-top:16px;flex-wrap:wrap">
+  <div class="panel">
+    <h3 style="margin-top:0">Renewal</h3>
+    <?php if (!empty($sync['on'])): ?>
+      <p style="margin:0 0 10px">This installation renews itself. When a payment clears, the subscription is extended
+        and this system collects the new licence on its own — daily normally, and every fifteen minutes once an expiry
+        is close.</p>
+      <?php if ($canManage): ?>
+        <form method="post" action="/licence-check">
+          <button class="btn" type="submit">Just paid? Check now</button>
+        </form>
+      <?php endif; ?>
+      <div class="kv-grid" style="margin-top:12px">
+        <div><span class="k">Last checked</span><span><?= trim((string)$sync['last']) !== ''
+            ? e(fdate(substr((string)$sync['last'], 0, 10))) . ' ' . e(substr((string)$sync['last'], 11, 5))
+            : '<span class="muted">never</span>' ?></span></div>
+      </div>
+      <?php if (trim((string)$sync['error']) !== ''): ?>
+        <div class="msg msg-warning" style="margin-top:10px">
+          Last check did not succeed: <?= e($sync['error']) ?>
+          <div style="margin-top:4px">Nothing has been lost — this system carries on with the licence it already holds
+            until that licence's own expiry.</div>
+        </div>
+      <?php endif; ?>
+    <?php else: ?>
+      <p style="margin:0" class="muted">Automatic renewal is not switched on for this installation, so a key is pasted
+        by hand below. That is the right setting for a system with no route to the internet.</p>
+    <?php endif; ?>
+  </div>
+
   <div class="panel">
     <h3 style="margin-top:0">The key</h3>
     <?php if ($s['from_env']): ?>

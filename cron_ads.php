@@ -50,6 +50,8 @@ require __DIR__ . '/lib/leads.php';
 require __DIR__ . '/lib/books.php';
 require __DIR__ . '/lib/adspro.php';
 require __DIR__ . '/lib/adssync.php';
+require __DIR__ . '/lib/licencekey.php';
+require __DIR__ . '/lib/licencesync.php';
 
 // Same protection as cron.php: over the web it needs the key; from the command
 // line there is no request to protect.
@@ -65,8 +67,24 @@ if (PHP_SAPI !== 'cli') {
 
 try { boot(); } catch (Throwable $e) { echo "Boot error: " . $e->getMessage() . "\n"; exit(1); }
 
+// ---------------------------------------------------------------------------
+//  Licence check-in FIRST, and before the Ads Pro test below, because a
+//  customer who has never heard of Ads Pro still has to renew automatically.
+//  licsync_checkin() decides for itself whether it is due — daily normally,
+//  every quarter of an hour once an expiry is close — so calling it on every
+//  run costs one comparison and no network traffic.
+//
+//  A failure here is a non-event. The installation carries on with the licence
+//  it already holds; an outage at MGH must never stop a customer invoicing.
+// ---------------------------------------------------------------------------
+if (function_exists('licsync_checkin')) {
+    $lr = licsync_checkin(false);
+    if (!empty($lr['changed'])) echo "licence: " . $lr['msg'] . "\n";
+    elseif (empty($lr['ok']))   echo "licence: " . $lr['msg'] . "\n";
+}
+
 if (!function_exists('ads_on') || !ads_on()) {
-    echo "Ads Pro is not connected — nothing to do.\n";
+    echo "Ads Pro is not connected — nothing more to do.\n";
     exit;
 }
 
