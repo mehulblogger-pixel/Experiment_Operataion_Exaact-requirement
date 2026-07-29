@@ -35,6 +35,16 @@
     <div class="ff"><label>TAN</label><input class="form-control" name="tan" value="<?= e($p['tan'] ?? '') ?>"></div>
     <div class="ff"><label>MSME / Udyam</label><input class="form-control" name="msme_udyam" value="<?= e($p['msme_udyam'] ?? '') ?>"></div>
     <div class="ff"><label>Website</label><input class="form-control" name="website" value="<?= e($p['website'] ?? '') ?>"></div>
+    <?php // Agreed once here, then carried onto every invoice for this customer.
+          // Before this existed the invoice form asked for both on every single
+          // bill, which is how one customer ends up on 30 days in March and 45
+          // in April with nobody able to say which was right. ?>
+    <div class="ff"><label>Payment terms <span class="muted">— carried onto their invoices</span></label>
+      <input class="form-control" name="payment_terms" maxlength="120" value="<?= e($p['payment_terms'] ?? '') ?>"
+             placeholder="e.g. 45 days from invoice date"></div>
+    <div class="ff"><label>Credit days <span class="muted">— sets the due date on their invoices</span></label>
+      <input class="form-control" type="number" min="0" name="credit_days" value="<?= e((string)($p['credit_days'] ?? '')) ?>"
+             placeholder="e.g. 45"></div>
     <div class="ff ff-wide"><label>Description</label><input class="form-control" name="description" value="<?= e($p['description'] ?? '') ?>"></div>
     <?php $selInsp = ($p && !empty($p['inspection_types'])) ? explode(',', $p['inspection_types']) : []; ?>
     <div class="ff ff-wide"><label>Types of inspection this client needs <span class="muted">— carried into new calls</span></label>

@@ -1,39 +1,97 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/invoices">Invoices</a> › New</div>
 <div class="master-head"><div><h1>New invoice</h1>
-  <p class="sub" style="margin:2px 0 0">Start a draft. Nothing is numbered until it is issued, so an abandoned draft leaves no gap in the series.</p></div></div>
+  <p class="sub mt-0">Start a draft. Nothing is numbered until it is issued, so an abandoned draft leaves no gap in the series.</p></div></div>
 
-<form method="post" action="/invoice-new" class="panel" style="margin-top:16px">
-  <div class="form-grid" style="gap:12px 16px">
-    <div><label>Customer *</label>
-      <select name="partner_id" required class="searchable" id="inv-partner">
+<?php
+// Everything this invoice can already know. A value only appears when the work
+// agrees on it — see books_carry_for(). $carry is [] when no customer has been
+// chosen yet, which is the ordinary first visit.
+$carry = $carry ?? [];
+$from  = $carry['from'] ?? [];
+$clash = $carry['conflict'] ?? [];
+// "Where did this come from", under a prefilled box. A silent prefill is worse
+// than an empty one: nobody can check a number whose source they cannot see.
+$src = function ($k) use ($from) {
+    return isset($from[$k])
+        ? '<div class="ff-help">Carried from ' . e($from[$k]) . ' — change it if this invoice differs.</div>' : '';
+};
+?>
+
+<form method="post" action="/invoice-new" class="panel mt-4">
+
+  <div class="form-sec"><h3>Who it is for</h3>
+    <p>Pick the customer first — the terms, the contract and the unbilled work all follow from it.</p></div>
+  <div class="form-grid">
+    <div class="ff ff-req"><label>Customer</label>
+      <select name="partner_id" required class="form-control searchable" id="inv-partner"
+              onchange="if(this.value) location.href='/invoice-new?partner='+encodeURIComponent(this.value)">
         <option value="">— choose —</option>
         <?php foreach ($clients as $c): ?>
           <option value="<?= (int)$c['id'] ?>" <?= ($partner && (int)$partner['id']===(int)$c['id'])?'selected':'' ?>><?= e($c['display_name'] ?: $c['legal_name']) ?></option>
         <?php endforeach; ?>
-      </select></div>
-    <div><label>Branch *</label>
-      <select name="office_id" required>
+      </select>
+      <div class="ff-help">Choosing one reloads this form with everything already known about them.</div></div>
+
+    <div class="ff ff-req"><label>Branch</label>
+      <select name="office_id" required class="form-control">
         <option value="">— choose —</option>
         <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>"><?= e($o['name']) ?></option><?php endforeach; ?>
       </select>
-      <span class="muted" style="font-size:12px">Decides the numbering series.</span></div>
-    <div><label>Invoice date</label><input type="date" name="invoice_date" value="<?= e(date('Y-m-d')) ?>"></div>
-    <div><label>Credit days</label><input name="credit_days" type="number" min="0" value="30">
-      <span class="muted" style="font-size:12px">Sets the due date, which is what the ageing report counts from.</span></div>
-    <div><label>Payment terms</label>
+      <div class="ff-help">Decides the numbering series.</div></div>
+
+    <div class="ff"><label>Invoice date</label>
+      <input type="date" class="form-control" name="invoice_date" value="<?= e(date('Y-m-d')) ?>"></div>
+  </div>
+
+  <div class="form-sec"><h3>Terms</h3>
+    <p>Taken from what was agreed with this customer and from the work being billed. Anything here can be
+      overruled for this one invoice.</p></div>
+  <div class="form-grid">
+    <div class="ff"><label>Payment terms</label>
+      <?php $pt = (string)($carry['payment_terms'] ?? ''); ?>
       <?php if ($terms): ?>
-        <select name="payment_terms"><option value="">—</option>
-          <?php foreach ($terms as $k=>$v): ?><option value="<?= e($v) ?>"><?= e($v) ?></option><?php endforeach; ?></select>
-      <?php else: ?><input name="payment_terms" maxlength="120"><?php endif; ?></div>
-    <div><label>PO number</label><input name="po_number" maxlength="80"></div>
-    <div><label>Contract number</label><input name="contract_number" maxlength="80"></div>
-    <div class="ff-wide"><label>Notes on the invoice</label><textarea name="notes" rows="2"></textarea></div>
+        <select name="payment_terms" class="form-control"><option value="">—</option>
+          <?php foreach ($terms as $k=>$v): ?>
+            <option value="<?= e($v) ?>" <?= ($pt !== '' && $pt === $v) ? 'selected' : '' ?>><?= e($v) ?></option>
+          <?php endforeach; ?>
+          <?php if ($pt !== '' && !in_array($pt, array_values($terms), true)): ?>
+            <option value="<?= e($pt) ?>" selected><?= e($pt) ?></option>
+          <?php endif; ?>
+        </select>
+      <?php else: ?>
+        <input name="payment_terms" class="form-control" maxlength="120" value="<?= e($pt) ?>">
+      <?php endif; ?>
+      <?= $src('payment_terms') ?></div>
+
+    <div class="ff"><label>Credit days</label>
+      <?php $cd = ($carry['credit_days'] ?? '') !== '' ? (string)$carry['credit_days'] : '30'; ?>
+      <input name="credit_days" type="number" min="0" class="form-control" value="<?= e($cd) ?>">
+      <?= $src('credit_days') ?: '<div class="ff-help">Sets the due date, which is what the ageing report counts from.</div>' ?></div>
+
+    <div class="ff"><label>PO number</label>
+      <input name="po_number" class="form-control" maxlength="80" value="<?= e((string)($carry['po_number'] ?? '')) ?>">
+      <?php if (isset($clash['po_number'])): ?>
+        <div class="ff-err">The ticked work sits under more than one purchase order. Type the right one, or raise
+          a separate invoice per order.</div>
+      <?php else: ?><?= $src('po_number') ?><?php endif; ?></div>
+
+    <div class="ff"><label>Contract number</label>
+      <input name="contract_number" class="form-control" maxlength="80" value="<?= e((string)($carry['contract_number'] ?? '')) ?>">
+      <?php if (isset($clash['contract_number'])): ?>
+        <div class="ff-err">The ticked work spans <?= (int)count($clash['contract_number']) ?> contracts
+          (<?= e(implode(', ', array_slice($clash['contract_number'], 0, 4))) ?>). Nothing has been filled in —
+          pick one, or untick until a single contract is left.</div>
+      <?php else: ?><?= $src('contract_number') ?><?php endif; ?></div>
+
+    <div class="ff ff-wide"><label>Notes on the invoice</label>
+      <textarea name="notes" class="form-control" rows="2"></textarea></div>
   </div>
 
   <?php if ($billable): ?>
-    <h3 style="margin:18px 0 8px">Unbilled work for this customer</h3>
-    <p class="muted" style="font-size:13px;margin:0 0 10px">Tick what this invoice covers. One invoice across several <?= e(Tlp('job')) ?> is normal for a monthly account, and each line keeps its link to the work.</p>
-    <div class="dt-scroll" style="border:1px solid var(--line);border-radius:10px">
+    <div class="form-sec"><h3>What it covers</h3>
+      <p>Tick what this invoice is for. One invoice across several <?= e(Tlp('job')) ?> is normal on a monthly
+        account, and every line keeps its link back to the work.</p></div>
+    <div class="dt-scroll" style="border:1px solid var(--line);border-radius:var(--radius-sm)">
       <table class="dt">
         <caption class="sr-only">Unbilled <?= e(Tlp('job')) ?></caption>
         <thead><tr><th scope="col" style="width:34px"><span class="sr-only">Include</span></th>
@@ -50,9 +108,18 @@
       </table>
     </div>
   <?php elseif ($partner): ?>
-    <p class="muted" style="margin-top:14px">This customer has no closed, unbilled <?= e(Tlp('job')) ?>. You can still add lines by hand once the draft exists.</p>
+    <div class="form-sec"><h3>What it covers</h3></div>
+    <div class="empty">
+      <div class="empty-ic">📋</div>
+      <div class="empty-t">No closed, unbilled <?= e(Tlp('job')) ?> for this customer</div>
+      <div class="empty-d">Work only appears here once it is closed. You can still start the draft and add lines
+        by hand — or close the work first, so every line keeps its link back to the job.</div>
+      <a class="btn secondary" href="/jobs">Open the <?= e(THP('job')) ?> register</a>
+    </div>
   <?php endif; ?>
 
-  <button class="btn" style="margin-top:14px">Start the draft</button>
-  <a class="btn secondary" href="/invoices" style="margin-left:8px">Cancel</a>
+  <div class="form-actions">
+    <button class="btn" type="submit">Start the draft</button>
+    <a class="btn secondary" href="/invoices">Cancel</a>
+  </div>
 </form>

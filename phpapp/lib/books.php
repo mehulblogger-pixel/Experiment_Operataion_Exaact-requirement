@@ -91,6 +91,14 @@ function books_migrate() {
     static $done = false; if ($done) return; $done = true;
     $pdo = db(); $pk = pk_clause();
 
+    // What was agreed with this customer, held once on the customer instead of
+    // retyped onto every invoice. Without these two the invoice form had to ask
+    // for the terms and the credit period as empty boxes on every single bill,
+    // which is how one customer ends up with 30 days on one invoice and 45 on
+    // the next and an argument at the end of the quarter.
+    ensure_column('business_partners', 'payment_terms', "VARCHAR(120) DEFAULT ''");
+    ensure_column('business_partners', 'credit_days', 'INT DEFAULT 0');
+
     $pdo->exec("CREATE TABLE IF NOT EXISTS invoices (
         id $pk,
         invoice_no VARCHAR(40) DEFAULT '', series VARCHAR(20) DEFAULT '', fy VARCHAR(12) DEFAULT '',
@@ -314,6 +322,87 @@ function books_restatus($invoiceId) {
 }
 
 // ---- Writing ----------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//  What the invoice already knows before anybody types
+//
+//  The complaint that produced this: the invoice form asked for the PO number,
+//  the contract number, the payment terms and the credit days as four empty
+//  boxes — on an invoice raised against work that already carries all four.
+//  Somebody looks them up, types them again, and gets one of them wrong; the
+//  customer's accounts department then disputes the invoice over a PO number
+//  that was correct in the system all along.
+//
+//  So: derive them, show where each came from, and let a person overrule any of
+//  it. Deliberately conservative — a value is only offered when the work AGREES
+//  on it. Three jobs quoting three different contract numbers is a real fact
+//  about the month, and silently picking the first would be a lie.
+// ---------------------------------------------------------------------------
+function books_carry_for($partnerId, array $jobIds = []) {
+    books_migrate();
+    $out = ['contract_number'=>'', 'po_number'=>'', 'payment_terms'=>'', 'credit_days'=>'',
+            'from'=>[], 'conflict'=>[]];
+    $pid = (int)$partnerId;
+    if (!$pid) return $out;
+
+    // Client-level agreement comes first: it is what was negotiated, and it
+    // applies whether or not any work has been done yet.
+    $p = ops_one("SELECT * FROM business_partners WHERE id=?", [$pid]);
+    if ($p) {
+        if (trim((string)($p['payment_terms'] ?? '')) !== '') {
+            $out['payment_terms'] = (string)$p['payment_terms'];
+            $out['from']['payment_terms'] = 'this customer\'s agreed terms';
+        }
+        if ((int)($p['credit_days'] ?? 0) > 0) {
+            $out['credit_days'] = (int)$p['credit_days'];
+            $out['from']['credit_days'] = 'this customer\'s agreed credit period';
+        }
+    }
+
+    // Then the work itself. Restricted to the jobs actually going on the
+    // invoice when the caller knows them, so ticking a different set changes
+    // the answer rather than quietly keeping the old one.
+    $jobs = books_billable_jobs($pid, 300);
+    if ($jobIds) {
+        $want = array_map('intval', $jobIds);
+        $jobs = array_values(array_filter($jobs, fn($j) => in_array((int)$j['id'], $want, true)));
+    }
+    if (!$jobs) return $out;
+
+    $ids = implode(',', array_map(fn($j) => (int)$j['id'], $jobs));
+    $rows = books_try(fn() => ops_all(
+        "SELECT j.contract_number AS j_contract, c.contract_number AS c_contract, c.po_id
+         FROM jobs j LEFT JOIN calls c ON c.id = j.call_id WHERE j.id IN ($ids)"), []);
+
+    $contracts = $pos = [];
+    foreach ($rows as $r) {
+        $cn = trim((string)($r['j_contract'] ?: $r['c_contract']));
+        if ($cn !== '') $contracts[$cn] = true;
+        $po = (int)($r['po_id'] ?? 0);
+        if ($po) $pos[$po] = true;
+    }
+
+    if (count($contracts) === 1) {
+        $out['contract_number'] = array_key_first($contracts);
+        $out['from']['contract_number'] = 'the work on this invoice';
+    } elseif (count($contracts) > 1) {
+        // Say so rather than choose. This usually means the tick list spans two
+        // contracts, which is a decision for a person and often two invoices.
+        $out['conflict']['contract_number'] = array_keys($contracts);
+    }
+
+    if (count($pos) === 1) {
+        $poId = (int)array_key_first($pos);
+        $num = books_try(fn() => ops_val("SELECT po_number FROM partner_purchase_orders WHERE id=?", [$poId]), '');
+        if (trim((string)$num) !== '') {
+            $out['po_number'] = (string)$num;
+            $out['from']['po_number'] = 'the purchase order the work was raised against';
+        }
+    } elseif (count($pos) > 1) {
+        $out['conflict']['po_number'] = ['more than one purchase order'];
+    }
+    return $out;
+}
+
 function books_invoice_create(array $b) {
     books_migrate();
     $pid = (int)($b['partner_id'] ?? 0);
