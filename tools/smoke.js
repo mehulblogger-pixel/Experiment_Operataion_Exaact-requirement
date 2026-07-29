@@ -59,6 +59,10 @@ const PLAIN = [
   '/to-bill', '/receipts', '/receipts?f=unallocated', '/invoice-new', '/receipt-new',
   // The thread, and the report of where it is cut.
   '/flow-gaps',
+  // The advisor. Named here rather than relying on the sidebar, because it is the
+  // one screen whose whole job is to be correct about somebody else's data — the
+  // open= variant exercises the expanded card, which is where all the rendering is.
+  '/advisor', '/advisor?open=unbilled', '/advisor?open=drafts',
   // Opportunities: the deal, kept apart from the quotation.
   '/opportunities', '/opportunities?v=list',
   // The CRM's own dashboard, the funnel builder and the industry templates.

@@ -1752,6 +1752,10 @@ function ops_module_gate($route) {
         // 'trace' and 'flow-gaps' are deliberately ungated: they show only records
         // the person's own scope already returns, and refusing them by module
         // would hide the very handovers this is meant to expose.
+        // 'advisor' likewise: it spans selling, doing and billing, and each of its
+        // checks already asks adv_on() whether that module is licensed and visible
+        // to this person. One module gate here would either hide the whole screen
+        // from someone who owns half of it, or show them findings they cannot act on.
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring',
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring',
@@ -2014,6 +2018,9 @@ function ops_dispatch($route, $method) {
         // The thread from enquiry to payment, and where it is cut.
         case $route === 'trace' || $route === 'flow-gaps':
             return ops_chain($route, $method);
+        // What to fix: the problems, what they cost, and the steps that close them.
+        case $route === 'advisor':
+            return ops_advisor($route, $method);
         // The books: invoices, money in, credit notes, the customer ledger.
         case in_array($route, ['invoices','invoice','invoice-new','invoice-line-add','invoice-line-delete',
                                'invoice-issue','invoice-cancel','to-bill','receipts','receipt','receipt-new',
