@@ -255,6 +255,20 @@ $MODS = ['sales' => 'Sales & CRM', 'money' => 'Money (invoicing)', 'operations' 
   </div>
 
   <div class="card">
+    <h2>Taking payment for this installation</h2>
+    <p class="hint">When you create the Razorpay payment link or subscription, add these two <b>notes</b>. They are how a
+      payment finds this customer without anybody matching it by hand. Everything else about the link — amount,
+      description, expiry — is yours to set.</p>
+    <table>
+      <tr><th style="width:120px">Note name</th><th>Value</th></tr>
+      <tr><td class="mono">install</td><td><span class="mono"><?= ls_h($row['install_id']) ?></span></td></tr>
+      <tr><td class="mono">months</td><td><span class="mono">12</span> <span class="muted">— or 1, 3, 6, 24, whatever they are paying for</span></td></tr>
+    </table>
+    <p class="hint" style="margin-top:10px"><b>If you forget them</b> the payment is not lost — it is recorded on this
+      server marked as needing to be matched by hand, and it appears in the list below with no customer against it.</p>
+  </div>
+
+  <div class="card">
     <h2>Every change, and why</h2>
     <table><tr><th>When</th><th>What</th><th>Amount</th><th>Moved to</th><th>Note</th></tr>
     <?php foreach (ls_ledger($row['install_id']) as $l): ?>
