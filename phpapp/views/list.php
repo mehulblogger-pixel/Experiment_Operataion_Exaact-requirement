@@ -34,6 +34,7 @@
     <td><?= e($p['gstin'] ?: '—') ?></td>
     <td><span class="badge <?= $p['status']==='ACTIVE'?'GREEN':($p['status']==='BLACKLISTED'?'RED':'AMBER') ?>"><?= e(lk_options_or('partner_status', STATUSES)[$p['status']] ?? $p['status']) ?></span></td>
     <td class="row-actions">
+      <a class="btn small" href="/customer?id=<?= (int)$p['id'] ?>">360</a>
       <a class="btn small secondary" href="/partner?id=<?= (int)$p['id'] ?>">Open</a>
       <a class="btn small" href="/partner-edit?id=<?= (int)$p['id'] ?>">Edit</a>
     </td>

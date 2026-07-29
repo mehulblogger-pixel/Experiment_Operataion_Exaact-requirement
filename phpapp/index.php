@@ -134,6 +134,7 @@ try {
     require __DIR__ . '/lib/books.php';
     require __DIR__ . '/lib/booksui.php';
     require __DIR__ . '/lib/chain.php';
+    require __DIR__ . '/lib/customer360.php';
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';
     require __DIR__ . '/lib/trust.php';

@@ -1748,6 +1748,7 @@ function ops_module_gate($route) {
         'to-bill'=>'invoicing','receipts'=>'invoicing','receipt'=>'invoicing','receipt-new'=>'invoicing',
         'receipt-allocate'=>'invoicing','receipt-unallocate'=>'invoicing','credit-note-new'=>'invoicing',
         'ledger'=>'invoicing',
+        'customer'=>'clients',
         // 'trace' and 'flow-gaps' are deliberately ungated: they show only records
         // the person's own scope already returns, and refusing them by module
         // would hide the very handovers this is meant to expose.
@@ -2003,6 +2004,9 @@ function ops_dispatch($route, $method) {
         // person can already open, and queries nothing else.
         case $route === 'search':
             return ops_search($route, $method);
+        // Everything about one customer, on one screen.
+        case $route === 'customer':
+            return ops_customer360($route, $method);
         // The thread from enquiry to payment, and where it is cut.
         case $route === 'trace' || $route === 'flow-gaps':
             return ops_chain($route, $method);

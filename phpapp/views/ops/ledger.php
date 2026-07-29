@@ -3,6 +3,7 @@
   <div><h1>Ledger — <?= e($p['display_name'] ?: $p['legal_name']) ?></h1>
   <p class="sub" style="margin:2px 0 0">Every invoice, receipt, TDS deduction and credit note against this customer, in date order, with a running balance. This is the answer to "what do they actually owe us".</p></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btn secondary" href="/customer?id=<?= (int)$p['id'] ?>">Customer 360</a>
     <a class="btn secondary" href="/receipt-new?partner=<?= (int)$p['id'] ?>">Record money received</a>
     <a class="btn secondary" href="/invoice-new?partner=<?= (int)$p['id'] ?>">New invoice</a>
   </div>
