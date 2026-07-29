@@ -202,6 +202,6 @@ if (function_exists('ads_on') && ads_on() && function_exists('ads_sync_now')) {
     if (function_exists('ads_import_spend') && (string)setting_get('adspro_spend_day', '') !== date('Y-m-d')) {
         $sp = ads_import_spend(90);
         if (empty($sp['err'])) setting_set('adspro_spend_day', date('Y-m-d'));
-        echo "Ads Pro spend: " . (!empty($sp['err']) ? 'FAILED — ' . $sp['err'] : ($sp['rows'] . ' campaign-days')) . "\n";
+        echo "Ads Pro spend: " . (!empty($sp['err']) ? 'FAILED — ' . $sp['err'] : ($sp['msg'] ?? '')) . "\n";
     }
 }
