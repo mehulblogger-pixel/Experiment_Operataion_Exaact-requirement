@@ -340,6 +340,9 @@ function lead_create(array $b) {
         act_log('LEAD', $id, 'SYSTEM', 'Lead ' . $ref . ' created — ' . $company,
                 ['auto' => 1, 'partner_id' => (int)($b['partner_id'] ?? 0) ?: null,
                  'body' => (string)($b['requirement'] ?? '')]);
+    // Tell Ads Pro this exists. Queued, never sent from here — a save must not
+    // wait on another server, and must not fail because that server is down.
+    if (function_exists('ads_queue_lead')) ads_queue_lead($id, 'Lead created');
     return ['id' => $id, 'ref' => $ref];
 }
 
@@ -368,6 +371,7 @@ function lead_move($leadId, $stageId, array $b = []) {
             act_log('LEAD', (int)$l['id'], 'SYSTEM', 'Lead ' . $l['ref'] . ' lost',
                     ['auto' => 1, 'partner_id' => $l['partner_id'], 'outcome' => 'lost',
                      'body' => (string)($b['lost_note'] ?? '')]);
+        if (function_exists('ads_queue_lead')) ads_queue_lead((int)$l['id'], 'Marked lost');
         return ['ok' => true];
     }
 
@@ -378,6 +382,10 @@ function lead_move($leadId, $stageId, array $b = []) {
         act_log('LEAD', (int)$l['id'], 'SYSTEM',
                 'Lead ' . $l['ref'] . ' moved to ' . $to['name'],
                 ['auto' => 1, 'partner_id' => $l['partner_id']]);
+    // A stage move can change what Ads Pro should call this contact — a lead that
+    // reaches a stage with real probability is "qualified" over there, and that is
+    // what stops it being advertised to as a stranger.
+    if (function_exists('ads_queue_lead')) ads_queue_lead((int)$l['id'], 'Moved to ' . $to['name']);
     return ['ok' => true];
 }
 
@@ -443,6 +451,11 @@ function lead_convert($leadId, array $b = []) {
                    converted_inquiry_id=?, converted_at=?, converted_by=?, stage_since=?, updated_at=? WHERE id=?")
         ->execute([$stageId, $partnerId, $partnerId, $inqId, date('c'),
                    user_name(current_user()), date('c'), date('c'), (int)$l['id']]);
+
+    // Converted here means "customer" over there, and a customer must stop being
+    // advertised to as a prospect. Also queue the enquiry the conversion raised.
+    if (function_exists('ads_queue_lead')) ads_queue_lead((int)$l['id'], 'Converted to a customer');
+    if ($inqId && function_exists('ads_queue_inquiry')) ads_queue_inquiry($inqId, 'Raised by a conversion');
 
     $toStage = stage_row($stageId);
     if ($toStage) lead_record_move($l, $toStage);
@@ -559,6 +572,7 @@ function leads_bulk($action, array $ids) {
             db()->prepare("UPDATE leads SET status='LOST', lost_reason=?, updated_at=? WHERE id=?")
                ->execute([(string)($_POST['lost_reason'] ?? 'NO_RESPONSE'), $now, $id]);
             if (function_exists('act_log')) act_log('LEAD', $id, 'STATUS', 'Marked lost in a bulk update');
+            if (function_exists('ads_queue_lead')) ads_queue_lead($id, 'Marked lost in a bulk update');
             $n++;
         }
     }
@@ -696,6 +710,7 @@ function ops_leads($route, $method) {
                 (string)($_POST['next_action_on'] ?? ''),
                 substr(trim((string)($_POST['next_action'] ?? '')), 0, 255),
                 date('c'), $id]);
+        if (function_exists('ads_queue_lead')) ads_queue_lead($id, 'Details edited');
         flash('Saved.');
         redirect('/lead?id=' . $id);
     }

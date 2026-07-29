@@ -142,6 +142,7 @@ try {
     require __DIR__ . '/lib/stagegate.php';
     require __DIR__ . '/lib/mghsso.php';
     require __DIR__ . '/lib/adspro.php';
+    require __DIR__ . '/lib/adssync.php';
     require __DIR__ . '/lib/adsroi.php';
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';
@@ -326,6 +327,8 @@ try {
     db()->query("SELECT id FROM ads_leads LIMIT 1");
     db()->query("SELECT id FROM ads_spend LIMIT 1");
     db()->query("SELECT id FROM ads_sync_log LIMIT 1");
+    db()->query("SELECT id FROM ads_outbox LIMIT 1");
+    db()->query("SELECT local_kind FROM ads_leads LIMIT 1");
     db()->query("SELECT id FROM sso_attempts LIMIT 1");
     // Data-level upgrades can't be spotted by a missing table or column, so they
     // are asserted here instead: if the old shape is still present, throw, which

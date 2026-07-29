@@ -104,6 +104,105 @@ $c = $cfg;
   </div>
 </div>
 
+<div class="panel" style="margin-top:16px">
+  <h3 style="margin-top:0">What travels, and which way</h3>
+  <div class="dt-scroll">
+    <table class="dt">
+      <caption class="sr-only">Sync directions</caption>
+      <thead><tr><th scope="col"></th><th scope="col">Ads Pro → here</th><th scope="col">Here → Ads Pro</th></tr></thead>
+      <tbody>
+        <tr><td><b>Leads</b></td>
+            <td><?= (int)($links['leads_in'] ?? 0) ?> brought across</td>
+            <td><?= (int)($links['leads_out'] ?? 0) ?> sent out</td></tr>
+        <tr><td><b>Enquiries</b></td>
+            <td><?= (int)($links['inq_in'] ?? 0) ?> arrived already qualified</td>
+            <td><?= (int)($links['inq_out'] ?? 0) ?> sent out</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted" style="margin:10px 0 0;font-size:12.5px;max-width:760px">
+    A contact Ads Pro has already marked <b>qualified</b> arrives here as an <b>enquiry</b>, not a lead — it has already
+    asked us for something, and filing it at the top of a funnel would make somebody work back down to where it already is.
+    Going the other way, an enquiry raised here becomes a qualified contact there, so Ads Pro stops advertising to a person
+    who is mid-conversation with us.
+  </p>
+  <p class="muted" style="margin:8px 0 0;font-size:12.5px;max-width:760px">
+    <b>Who owns what.</b> Ads Pro owns the campaign, the platform and the UTM — facts about an advertisement, and we do not
+    run the advertisements, so we never write them back. We own the status, the stage and the value, so its status is
+    recorded but never written over ours. Contact details are shared under the one rule that cannot lose anything:
+    <b>an import fills blanks and never overwrites</b> something a person here has typed.
+  </p>
+  <?php if ($canManage): ?>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:12px">
+      <form method="post" action="/adspro-sync"><button class="btn" type="submit">⇄ Sync now, both ways</button></form>
+      <form method="post" action="/adspro-backfill">
+        <input type="hidden" name="kind" value="LEAD">
+        <button class="btn small secondary" type="submit">Queue every lead we already have</button>
+      </form>
+      <form method="post" action="/adspro-backfill">
+        <input type="hidden" name="kind" value="INQUIRY">
+        <button class="btn small secondary" type="submit">Queue every enquiry we already have</button>
+      </form>
+    </div>
+  <?php endif; ?>
+</div>
+
+<div class="panel" style="margin-top:16px;padding:0;overflow:hidden">
+  <div style="padding:12px 16px;background:var(--soft);border-bottom:1px solid var(--line)">
+    <b style="font-size:13.5px">Waiting to go out</b>
+    <div class="muted" style="font-size:12.5px;margin-top:3px">
+      Saving a lead here writes to this queue and returns. It never waits on Ads Pro, and never fails because Ads Pro is
+      down — a form that saved perfectly well must not show an error about somebody else's server.
+    </div>
+    <?php if (!empty($outbox['WILL_RETRY']) || !empty($outbox['GIVEN_UP'])): ?>
+      <div style="margin-top:6px;font-size:12.5px">
+        <?php if (!empty($outbox['WILL_RETRY'])): ?>
+          <b><?= (int)$outbox['WILL_RETRY'] ?></b> failed and will be tried again on the next sync — that is what a
+          short outage at the other end looks like, and it needs nothing from you.
+        <?php endif; ?>
+        <?php if (!empty($outbox['GIVEN_UP'])): ?>
+          <b><?= (int)$outbox['GIVEN_UP'] ?></b> have been tried <?= (int)ADS_RETRY_MAX ?> times and stopped. Those are
+          not going to fix themselves — read the reason below.
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+      <?php foreach ($qstatus as $k => $lbl): ?>
+        <a class="btn small <?= $qf === $k ? '' : 'secondary' ?>" href="/adspro?q=<?= e($k) ?>">
+          <?= e($lbl) ?><?= !empty($outbox[$k]) ? ' (' . (int)$outbox[$k] . ')' : '' ?>
+        </a>
+      <?php endforeach; ?>
+    </div>
+  </div>
+  <?php if (!$queue): ?>
+    <div style="padding:14px 16px" class="muted">Nothing <?= e(strtolower($qstatus[$qf] ?? $qf)) ?>.</div>
+  <?php else: ?>
+    <div class="dt-scroll">
+      <table class="dt">
+        <caption class="sr-only">Outbound queue</caption>
+        <thead><tr><th scope="col">What</th><th scope="col">Why</th><th scope="col">Queued</th><th scope="col">Result</th></tr></thead>
+        <tbody>
+        <?php foreach ($queue as $q): ?>
+          <tr>
+            <td><b><?= e($kinds[$q['kind']] ?? (string)$q['kind']) ?></b>
+                <span class="muted">#<?= (int)$q['local_id'] ?></span></td>
+            <td><?= e((string)$q['reason'] ?: '—') ?></td>
+            <td style="white-space:nowrap"><?= trim((string)$q['queued_at']) !== '' ? e(fdate(substr((string)$q['queued_at'], 0, 10))) : '—' ?>
+                <div class="muted" style="font-size:12px"><?= e((string)$q['queued_by'] ?: '') ?></div></td>
+            <td>
+              <?= (int)$q['attempts'] ? '<span class="muted" style="font-size:12px">' . (int)$q['attempts'] . ' attempt' . ((int)$q['attempts'] === 1 ? '' : 's') . '</span>' : '' ?>
+              <?php if (trim((string)$q['last_error']) !== ''): ?>
+                <div style="font-size:12px"><?= e((string)$q['last_error']) ?></div>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  <?php endif; ?>
+</div>
+
 <div class="panel" style="margin-top:16px;padding:0;overflow:hidden">
   <div style="padding:12px 16px;background:var(--soft);border-bottom:1px solid var(--line)">
     <b style="font-size:13.5px">Every call made, and what came back</b>
