@@ -812,11 +812,15 @@ function ops_crm_inquiries($route, $method) {
             if ($inq) {
                 $pdo->prepare("UPDATE crm_inquiries SET client_id=?,client_name=?,contact_name=?,contact_email=?,contact_mobile=?,subject=?,service_requirement=?,sbu=?,source=?,received_date=?,assigned_to=?,status=?,notes=? WHERE id=?")
                     ->execute(array_merge($vals, [$inq['id']]));
+                if (function_exists('ads_queue_inquiry')) ads_queue_inquiry((int)$inq['id'], 'Enquiry edited');
                 flash('Inquiry updated.'); redirect('/inquiries');
             } else {
                 $no = crm_next_inquiry_no();
                 $pdo->prepare("INSERT INTO crm_inquiries (inquiry_no,client_id,client_name,contact_name,contact_email,contact_mobile,subject,service_requirement,sbu,source,received_date,assigned_to,status,notes,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
                     ->execute(array_merge([$no], $vals, [user_name(current_user()), date('c')]));
+                // Ads Pro is told an enquiry exists so it can stop advertising to
+                // somebody who has already asked us for a price. Queued, not sent.
+                if (function_exists('ads_queue_inquiry')) ads_queue_inquiry((int)$pdo->lastInsertId(), 'Enquiry raised');
                 flash("$no created. You can now raise a quotation against it.");
                 redirect('/inquiries');
             }

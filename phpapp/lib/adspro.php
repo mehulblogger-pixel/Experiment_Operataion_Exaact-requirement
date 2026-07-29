@@ -419,6 +419,31 @@ function ops_adspro($route, $method) {
         else flash('Connected to Ads Pro as ' . $h['email'] . ', workspace “' . $h['workspace_name'] . '”.', 'success');
         redirect('/adspro');
     }
+    if ($route === 'adspro-sync' && $method === 'POST') {
+        ops_require(can('mod.leads.edit') || is_master_of('leads'), 'You cannot run the sync.');
+        $r = ads_sync_now();
+        $bits = [];
+        if (!empty($r['push']['err'])) $bits[] = 'Sending out failed: ' . $r['push']['err'];
+        elseif (!empty($r['push']['looked_at'])) $bits[] = 'Sent out — ' . $r['push']['msg'] . '.';
+        else $bits[] = 'Nothing was waiting to go out.';
+        if (!empty($r['pull']['err'])) $bits[] = 'Bringing in failed: ' . $r['pull']['err'];
+        else $bits[] = 'Brought in — ' . $r['pull']['msg'] . '.';
+        $bad = !empty($r['push']['err']) || !empty($r['pull']['err'])
+            || !empty($r['push']['failed']) || !empty($r['pull']['failed']);
+        flash(implode(' ', $bits), $bad ? 'warning' : 'success');
+        redirect('/adspro');
+    }
+    if ($route === 'adspro-backfill' && $method === 'POST') {
+        ops_require(ads_can_manage(), 'You cannot queue a backfill.');
+        $k = ((string)($_POST['kind'] ?? '') === 'INQUIRY') ? 'INQUIRY' : 'LEAD';
+        $n = ads_backfill($k);
+        flash($n === 0
+            ? 'Nothing to queue — Ads Pro already has a link for every ' . ($k === 'INQUIRY' ? 'enquiry' : 'lead') . ' here.'
+            : $n . ' ' . ($k === 'INQUIRY' ? 'enquiries' : 'leads') . ' queued. They go out on the next sync, '
+              . 'not now — sending them from this page would hold the screen open for the length of ' . $n . ' HTTP calls.',
+            'success');
+        redirect('/adspro');
+    }
     if ($route === 'adspro-import' && $method === 'POST') {
         ops_require(can('mod.leads.edit') || is_master_of('leads'), 'You cannot create leads.');
         $r = ads_import_leads();
@@ -440,6 +465,11 @@ function ops_adspro($route, $method) {
         'counts'    => ads_counts(),
         'log'       => ads_recent_log(20),
         'canManage' => ads_can_manage(),
+        'outbox'    => function_exists('ads_outbox_counts') ? ads_outbox_counts() : [],
+        'queue'     => function_exists('ads_outbox_rows') ? ads_outbox_rows((string)($_GET['q'] ?? 'PENDING'), 40) : [],
+        'qf'        => isset(ADS_OUT_STATUS[(string)($_GET['q'] ?? '')]) ? (string)$_GET['q'] : 'PENDING',
+        'links'     => function_exists('ads_link_counts') ? ads_link_counts() : [],
+        'kinds'     => ADS_OUT_KINDS, 'qstatus' => ADS_OUT_STATUS,
         'envUrl'    => getenv('ADSPRO_URL') !== false && getenv('ADSPRO_URL') !== '',
         'envTok'    => getenv('ADSPRO_TOKEN') !== false && getenv('ADSPRO_TOKEN') !== '',
     ]);

@@ -30,6 +30,8 @@ require __DIR__ . '/lib/costing.php';
 require __DIR__ . '/lib/joblock.php';
 require __DIR__ . '/lib/capa.php';
 require __DIR__ . '/lib/ncr.php';
+require __DIR__ . '/lib/adspro.php';
+require __DIR__ . '/lib/adssync.php';
 
 // When invoked over HTTP, require a matching key so strangers can't trigger it.
 if (PHP_SAPI !== 'cli') {
@@ -172,4 +174,25 @@ if (function_exists('competence_due') && function_exists('ops_mail')) {
         }
     }
     echo "Competence items out of date: $n\n";
+}
+
+// ---------------------------------------------------------------------------
+//  Ads Pro: drain the outbox, then bring in what is new.
+//
+//  This is where the two-way sync actually happens. Saving a lead only ever
+//  queues it — the web request returns immediately whether Ads Pro is up, slow
+//  or gone. Nothing here can break a page, because nothing here runs on one.
+//
+//  Silent when the link is not configured, which is most installs.
+// ---------------------------------------------------------------------------
+if (function_exists('ads_on') && ads_on() && function_exists('ads_sync_now')) {
+    $r = ads_sync_now();
+    $out = $r['push'] ?? []; $in = $r['pull'] ?? [];
+    echo "Ads Pro out: " . (!empty($out['err']) ? 'FAILED — ' . $out['err'] : ($out['msg'] ?? 'nothing waiting')) . "\n";
+    echo "Ads Pro in:  " . (!empty($in['err'])  ? 'FAILED — ' . $in['err']  : ($in['msg']  ?? 'nothing')) . "\n";
+    // Spend moves every day and the return report is only as current as it is.
+    if (function_exists('ads_import_spend')) {
+        $sp = ads_import_spend(90);
+        echo "Ads Pro spend: " . (!empty($sp['err']) ? 'FAILED — ' . $sp['err'] : ($sp['rows'] . ' campaign-days')) . "\n";
+    }
 }
