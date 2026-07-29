@@ -105,7 +105,8 @@
         <?php if (function_exists('opp_can_view') && opp_can_view()): ?><a class="s-item<?= $navOn(['opportunities','opportunity']) ?>" href="/opportunities"><span class="s-ic">💡</span><span>Opportunities</span></a><?php endif; ?>
         <?php if (can('mod.inquiries.view')): ?><a class="s-item<?= $navOn(['inquiries','inquiry']) ?>" href="/inquiries"><span class="s-ic">📨</span><span><?= e(THP('inquiry')) ?></span></a><?php endif; ?>
         <?php if (can('mod.quotes.view')): ?><a class="s-item<?= $navOn(['quotes','quote']) ?>" href="/quotes"><span class="s-ic">📝</span><span><?= e(THP('quote')) ?></span></a><?php endif; ?>
-        <?php if (can('mod.crm_reports.view')): ?><a class="s-item<?= $navOn(['crm-reports']) ?>" href="/crm-reports"><span class="s-ic">📈</span><span>Sales dashboard</span></a><?php endif; ?>
+        <?php if (function_exists('crmdash_can') && crmdash_can()): ?><a class="s-item<?= $navOn(['crm-dashboard']) ?>" href="/crm-dashboard"><span class="s-ic">📈</span><span>Sales dashboard</span></a><?php endif; ?>
+        <?php if (function_exists('pipe_can_view') && pipe_can_view()): ?><a class="s-item<?= $navOn(['pipelines','pipeline']) ?>" href="/pipelines"><span class="s-ic">🪜</span><span>Pipelines &amp; funnels</span></a><?php endif; ?>
         <?php $endgrp(); endif; ?>
 
         <?php if (can('mod.calls.view')||can('mod.jobs.view')||can('mod.vouchers.view')||can('mod.hiring.view')||can('mod.reconcile.view')): ?>

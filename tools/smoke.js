@@ -61,6 +61,8 @@ const PLAIN = [
   '/flow-gaps',
   // Opportunities: the deal, kept apart from the quotation.
   '/opportunities', '/opportunities?v=list',
+  // The CRM's own dashboard, the funnel builder and the industry templates.
+  '/crm-dashboard', '/crm-dashboard?days=90', '/pipelines', '/industry', '/industry?show=trading',
   '/opportunities?v=list&sort=weighted&dir=desc', '/opportunity-new',
   // Customer 360 — the assembly. Reached from the customer list below too, but
   // named here so it is crawled even when the list happens to be empty.
@@ -91,6 +93,7 @@ const REGISTERS = [
   ['/receipts',      /^\/receipt\?id=(\d+)/, ['/receipt?id=%s', '/trace?kind=RECEIPT&id=%s']],
   ['/flow-gaps',     /^\/job\?id=(\d+)/,     ['/trace?kind=JOB&id=%s']],
   ['/opportunities?v=list', /^\/opportunity\?id=(\d+)/, ['/opportunity?id=%s', '/trace?kind=OPPORTUNITY&id=%s']],
+  ['/pipelines',     /^\/pipeline\?id=(\d+)/,  ['/pipeline?id=%s']],
   ['/invoices?f=all', /^\/ledger\?id=(\d+)/,  ['/ledger?id=%s', '/ledger?id=%s&from=2026-01-01&to=2026-12-31']],
 ];
 

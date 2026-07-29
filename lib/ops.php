@@ -1759,6 +1759,10 @@ function ops_module_gate($route) {
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads',
         'opportunity-move'=>'leads','opportunity-quote'=>'leads','opportunity-from-lead'=>'leads',
         'opportunity-raise-order'=>'leads',
+        'pipelines'=>'leads','pipeline'=>'leads','pipeline-new'=>'leads','pipeline-save'=>'leads',
+        'pipeline-stage-add'=>'leads','pipeline-stage-delete'=>'leads','pipeline-default'=>'leads',
+        'industry'=>'settings','industry-apply'=>'settings',
+        'crm-dashboard'=>'crm_reports',
         'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries',
         'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes',
         'attendance-recon'=>'reconcile',
@@ -2015,6 +2019,12 @@ function ops_dispatch($route, $method) {
                                'invoice-issue','invoice-cancel','to-bill','receipts','receipt','receipt-new',
                                'receipt-allocate','receipt-unallocate','credit-note-new','ledger'], true):
             return ops_books($route, $method);
+        case $route === 'pipelines' || strncmp($route, 'pipeline', 8) === 0:
+            return ops_pipelines($route, $method);
+        case $route === 'industry' || $route === 'industry-apply':
+            return ops_industry($route, $method);
+        case $route === 'crm-dashboard':
+            return ops_crmdash($route, $method);
         case $route === 'opportunities' || strncmp($route, 'opportunity', 11) === 0:
             return ops_opportunities($route, $method);
         case $route === 'leads' || strncmp($route, 'lead', 4) === 0:
