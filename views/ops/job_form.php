@@ -245,9 +245,9 @@
           // re-typed. Only the actual date is chosen here, and everything else
           // — the end date, the visit count, the working-day arithmetic —
           // follows from it. ?>
-    <div class="ff"><label><?= e(Tl('call')) ?> received <span class="muted">— from the <?= e(Tl('call')) ?></span></label>
+    <div class="ff"><label><?= e(TH('call')) ?> received <span class="muted">— from the <?= e(Tl('call')) ?></span></label>
       <input class="form-control" type="date" value="<?= e($call['call_received_date'] ?? '') ?>" readonly style="background:var(--soft)"></div>
-    <div class="ff"><label><?= e(Tl('client')) ?>'s required date <span class="muted">— from the <?= e(Tl('call')) ?></span></label>
+    <div class="ff"><label><?= e(TH('client')) ?>'s required date <span class="muted">— from the <?= e(Tl('call')) ?></span></label>
       <input class="form-control" type="date" value="<?= e($call['inspection_required_date'] ?? '') ?>" readonly style="background:var(--soft)"></div>
     <div class="ff"><label>Actual scheduled date <span class="muted">— when we are going</span></label>
       <input class="form-control" type="date" id="req_date" name="scheduled_date"

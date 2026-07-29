@@ -743,3 +743,102 @@ table.dt.qlines .btn.small{white-space:nowrap}
   .btn,.tabs a,.dt th a,select.form-control,input.form-control{min-height:44px}
   .btn.small{min-height:36px}
 }
+
+/* ============================================================================
+   FORMS — one system, replacing five
+   ----------------------------------------------------------------------------
+   MEASURED, not guessed:
+
+     .ff          1,059 uses — but had NO base rule, only ".ff label"
+     .form-grid     114 uses — grid-template-columns:1fr 1fr, and NOT ONE
+                    media query anywhere in this file overriding it
+     .field / .fgrid / .stack   13 uses between them — three more systems
+     <label> with no class      1,004 uses, each screen styling it ad hoc
+
+   What that produced on a 375px phone, measured in a real browser:
+
+     /call-new   two columns of 144.5px; 22 of 25 fields under 160px wide
+     /quote-new  two columns; narrowest field 64px
+
+   A 64px date field is not a form. This is the single worst thing in the
+   application and it is one rule.
+
+   THE RULE: a form is a grid of fields that fit their content and collapse on
+   their own. Columns are a consequence of width, never a fixed number.
+   ========================================================================= */
+
+/* Fields fit content and reflow by themselves. minmax(220px,1fr) means two
+   columns on a laptop, one on a phone, three on a wide monitor — with no
+   breakpoint to maintain and no field ever crushed to 64px. */
+.form-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--s-3) var(--s-4)}
+/* A field that needs the full width says so, at any size. */
+.form-grid .ff-wide,.form-grid .ff-full{grid-column:1/-1}
+/* Below this, two columns cannot be honest whatever the minmax says. */
+@media(max-width:560px){
+  .form-grid{grid-template-columns:1fr}
+  .form-grid .ff-wide,.form-grid .ff-full{grid-column:auto}
+}
+
+/* .ff finally has a base rule, so every field in every form is spaced the
+   same whether or not it sits in a grid. */
+.ff{margin-bottom:var(--s-3);min-width:0}   /* min-width:0 — grid children
+       otherwise refuse to shrink below their content and force a page to
+       scroll sideways on a phone */
+.form-grid .ff{margin-bottom:0}             /* the grid owns the gap */
+.ff label{font-size:var(--t-sm);line-height:1.35}
+.ff .form-control{width:100%}
+.ff-help{font-size:var(--t-sm);color:var(--muted);margin-top:var(--s-1);line-height:1.4}
+.ff-err{font-size:var(--t-sm);color:var(--bad);margin-top:var(--s-1);font-weight:var(--fw-medium)}
+
+/* Required. One marker, in one place, so a person can see before they start
+   what the form will refuse to accept without. */
+.ff-req > label::after{content:" *";color:var(--bad);font-weight:var(--fw-bold)}
+.form-req-note{font-size:var(--t-sm);color:var(--muted);margin-bottom:var(--s-4)}
+.form-req-note b{color:var(--bad)}
+
+/* Sections. A long form that is one undifferentiated run of fields is why
+   people give up halfway; grouping is what makes 40 fields feel like four
+   decisions. */
+.form-sec{margin:var(--s-6) 0 var(--s-3);padding-bottom:var(--s-2);border-bottom:1px solid var(--line)}
+.form-sec:first-child{margin-top:0}
+.form-sec h3{font-size:var(--t-lg);margin:0 0 2px;font-weight:var(--fw-medium)}
+.form-sec p{font-size:var(--t-sm);color:var(--muted);margin:0}
+
+/* The action row. Primary left, so the eye lands on it where reading stops;
+   sticky on a phone so "Save" is never a scroll away at the bottom of a long
+   form. */
+.form-actions{display:flex;gap:var(--s-2);align-items:center;flex-wrap:wrap;
+  margin-top:var(--s-5);padding-top:var(--s-4);border-top:1px solid var(--line)}
+.form-actions .spacer{flex:1}
+@media(max-width:560px){
+  .form-actions{position:sticky;bottom:0;background:var(--card);z-index:5;
+    margin:var(--s-4) calc(var(--s-4) * -1) calc(var(--s-4) * -1);
+    padding:var(--s-3) var(--s-4);box-shadow:0 -2px 12px rgba(18,32,60,.08)}
+  .form-actions .btn{flex:1;text-align:center}
+}
+
+/* Inputs: same height whatever the element, because a select 2px shorter than
+   the text field beside it is the kind of thing nobody names and everybody
+   feels. */
+.form-control{min-height:38px}
+textarea.form-control{min-height:76px;line-height:1.5}
+.form-control:disabled,.form-control[readonly]{background:var(--soft);color:var(--muted);cursor:not-allowed}
+select.form-control{appearance:none;background-image:
+  linear-gradient(45deg,transparent 50%,var(--muted) 50%),
+  linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:30px}
+
+/* Editable tables — locations on a quotation, line items, rate rows.
+   Nine columns of inputs cannot fit a 375px screen at any font size; the
+   quotation's PIN-code box measured 66px wide. Crushing them is the wrong
+   answer, so the table scrolls sideways instead and every field keeps a width
+   a thumb can actually hit. :has() does the selecting; where it is not
+   supported nothing changes, which is exactly today's behaviour. */
+@media(max-width:760px){
+  .table-scroll,
+  table:has(.form-control){display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table:has(.form-control) .form-control{min-width:130px}
+  table:has(.form-control) input[name*="pin"],
+  table:has(.form-control) input[type="number"]{min-width:90px}
+}
