@@ -246,6 +246,17 @@
                 // configure it. ?>
           <?php if (function_exists('ads_can_manage') && ads_can_manage()): ?><a class="s-item<?= $navOn(['adspro']) ?>" href="/adspro"><span class="s-ic">📢</span><span>Ads Pro connection</span></a><?php endif; ?>
           <?php if (function_exists('sso_on') && (can('users.manage.global') || is_master())): ?><a class="s-item<?= $navOn(['sso']) ?>" href="/sso"><span class="s-ic">🔑</span><span>Single sign-on</span></a><?php endif; ?>
+          <?php // The licence. Shown to anyone who could act on it, and carrying
+                // the state in the label so an expiry is noticed before it bites
+                // rather than on the morning somebody cannot save an invoice. ?>
+          <?php if (function_exists('lk_can_manage') && lk_can_manage()):
+                  $lkS = lk_state(); $lkBad = in_array($lkS['state'], ['GRACE','READONLY','INVALID'], true); ?>
+            <a class="s-item<?= $navOn(['licence']) ?>" href="/licence"><span class="s-ic">📜</span><span>Licence<?php
+              if ($lkBad) echo ' ⚠';
+              elseif ($lkS['state'] === 'TRIAL') echo ' (' . (int)$lkS['days_left'] . 'd)';
+              elseif ($lkS['state'] === 'VALID' && $lkS['days_left'] !== null && $lkS['days_left'] <= 30) echo ' (' . (int)$lkS['days_left'] . 'd)';
+            ?></span></a>
+          <?php endif; ?>
           <?php // The screen itself requires settings.manage. Offering it on
                 // mod.settings.view meant a business director was shown the link
                 // and then refused at the door — which reads as a broken app. ?>

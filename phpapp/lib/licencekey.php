@@ -1,0 +1,289 @@
+<?php
+// ============================================================================
+//  The licence key — what this customer bought, proved rather than asserted
+//
+//  WHAT WAS MISSING. lib/licence.php already knew how to switch a module off,
+//  and enforced it in three places at once. But the switch was set by hand on
+//  the server. That is fine for one customer and impossible for a hundred, and
+//  it had no notion of WHEN the subscription ends or HOW MANY people may sign
+//  in. So there was a product but no way to sell it.
+//
+//  SIGNED, NOT SHARED. The key is signed with a private key that only MGH
+//  holds; every installation ships the matching PUBLIC key, which is safe to
+//  publish. So a customer with root on their own server, their own database and
+//  a copy of the source still cannot mint themselves a licence — the most they
+//  can do is delete ours, which only takes things away from them.
+//
+//  This is why it is not an HMAC. A shared secret has to be present on the
+//  customer's machine to verify, and anything that can verify can also forge.
+//
+//  OFFLINE. Verification is arithmetic, not a web request. An installation on a
+//  factory network behind a corporate proxy works exactly like one on a VPS,
+//  and a MGH outage cannot stop a customer invoicing. There is no phone-home,
+//  and adding one later would be a downgrade.
+//
+//  FOUR RULES, and the first one is the important one:
+//
+//  1. A CUSTOMER IS NEVER LOCKED OUT OF THEIR OWN DATA. An expired licence
+//     makes the system read-only: every screen, every export, every PDF still
+//     works; only new records are refused. Locking a business out of its own
+//     invoices earns a chargeback, a bad review and possibly a legal letter,
+//     and it never once made anybody renew faster.
+//
+//  2. NO ENFORCEMENT UNLESS IT IS TURNED ON. With no LICENCE_ENFORCE the whole
+//     file stands down and the system behaves precisely as it did before it
+//     existed. Every installation running today keeps running.
+//
+//  3. A TRIAL, so a new customer is not stuck. Enforcement on but no key yet
+//     means a full-featured trial from first boot. Without it a fresh install
+//     would be read-only before anybody could paste the key that fixes it.
+//
+//  4. THE KEY CAN ALWAYS BE PASTED. Whatever state the licence is in, the
+//     licence screen accepts a new one. A rule that locks the screen you need
+//     in order to unlock the system is not a rule, it is a support call.
+// ============================================================================
+
+// The MGH signing key. Public half only — this is meant to be readable, and
+// publishing it costs nothing. Replaced per deployment via LICENCE_PUBKEY when
+// a customer is issued keys from a different signing pair.
+const LICENCE_PUBKEY_DEFAULT = <<<'PEM'
+-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEXhowFohyLbUdfzMFAglVBZhL4if+
+V17+PXCQ3l1wIFOqAqRjPziFXuTQNJFAzAexyY6+0yHqh7+we0a005jOhw==
+-----END PUBLIC KEY-----
+PEM;
+
+const LICENCE_TRIAL_DAYS = 14;
+const LICENCE_GRACE_DEFAULT = 14;
+
+// The states, in the words the screen uses. Order matters: this is also the
+// severity ranking used by the banner.
+const LICENCE_STATES = [
+    'OPEN'     => 'Not licensed — everything is switched on',
+    'TRIAL'    => 'Trial',
+    'VALID'    => 'Licensed',
+    'GRACE'    => 'Expired — still working',
+    'READONLY' => 'Expired — read only',
+    'INVALID'  => 'Licence key not accepted',
+    'MISSING'  => 'No licence key',
+];
+
+function lk_try($fn, $fb = null) { try { return $fn(); } catch (Throwable $e) { return $fb; } }
+
+function lk_pubkey() {
+    $env = getenv('LICENCE_PUBKEY');
+    return ($env !== false && trim((string)$env) !== '') ? (string)$env : LICENCE_PUBKEY_DEFAULT;
+}
+
+// Enforcement is off unless the deployment says otherwise. This is the single
+// switch that separates "MGH's own install and every developer copy" from "a
+// customer who has paid for something specific".
+function lk_enforcing() {
+    $v = getenv('LICENCE_ENFORCE');
+    return $v !== false && (string)$v !== '' && (string)$v !== '0';
+}
+
+function lk_raw_key() {
+    $env = getenv('LICENCE_KEY');
+    if ($env !== false && trim((string)$env) !== '') return trim((string)$env);
+    return trim((string)setting_get('licence_key', ''));
+}
+
+function lk_b64d($s) { return base64_decode(strtr((string)$s, '-_', '+/')); }
+
+// ---- Verification -----------------------------------------------------------
+// Returns the claims on success, or ['err' => reason]. Every failure names
+// itself: "not accepted" with no reason is the least useful message software
+// can produce, and it is the one a customer will read out over the telephone.
+function lk_verify($key) {
+    $key = trim((string)$key);
+    if ($key === '') return ['err' => 'No key given.'];
+    $parts = explode('.', $key);
+    if (count($parts) !== 2) return ['err' => 'That does not look like a licence key — it should be two parts separated by a dot.'];
+
+    $payload = lk_b64d($parts[0]);
+    $sig     = lk_b64d($parts[1]);
+    if ($payload === false || $sig === false || $payload === '' || $sig === '')
+        return ['err' => 'The key is damaged — it may have been broken across lines when it was copied.'];
+
+    $ok = lk_try(fn() => openssl_verify($parts[0], $sig, lk_pubkey(), OPENSSL_ALGO_SHA256), -1);
+    if ($ok !== 1)
+        return ['err' => 'The signature does not match. This key was not issued by MGH, or it has been altered.'];
+
+    $c = json_decode($payload, true);
+    if (!is_array($c)) return ['err' => 'The key is signed correctly but its contents are unreadable.'];
+    if (empty($c['exp'])) return ['err' => 'The key carries no expiry date.'];
+    return $c;
+}
+
+// ---- The state machine ------------------------------------------------------
+function lk_state($reload = false) {
+    static $s = null;
+    if ($s !== null && !$reload) return $s;
+
+    $out = ['state' => 'OPEN', 'claims' => [], 'err' => '', 'days_left' => null,
+            'read_only' => false, 'customer' => '', 'seats' => 0];
+
+    if (!lk_enforcing()) return $s = $out;
+
+    $key = lk_raw_key();
+    if ($key === '') {
+        // Trial, counted from the first time this installation ever booted.
+        // Stored, not computed from a file date, because a file date changes on
+        // every deployment and would hand out a fresh trial with each upgrade.
+        $first = (string)setting_get('licence_first_seen', '');
+        if ($first === '') { $first = date('Y-m-d'); lk_try(fn() => setting_set('licence_first_seen', $first)); }
+        $used = (int)floor((strtotime(date('Y-m-d')) - strtotime($first)) / 86400);
+        $left = LICENCE_TRIAL_DAYS - $used;
+        $out['days_left'] = $left;
+        if ($left > 0) { $out['state'] = 'TRIAL'; return $s = $out; }
+        $out['state'] = 'READONLY'; $out['read_only'] = true;
+        $out['err'] = 'The ' . LICENCE_TRIAL_DAYS . '-day trial has ended.';
+        return $s = $out;
+    }
+
+    $c = lk_verify($key);
+    if (!empty($c['err'])) {
+        // A bad key is still read-only, never a lock-out. The customer's data is
+        // theirs whatever went wrong with our paperwork.
+        $out['state'] = 'INVALID'; $out['read_only'] = true; $out['err'] = $c['err'];
+        return $s = $out;
+    }
+
+    $out['claims']   = $c;
+    $out['customer'] = (string)($c['cust'] ?? '');
+    $out['seats']    = (int)($c['seats'] ?? 0);
+
+    $exp   = strtotime((string)$c['exp'] . ' 23:59:59');
+    $grace = (int)($c['grace'] ?? LICENCE_GRACE_DEFAULT);
+    $now   = time();
+    $out['days_left'] = (int)floor(($exp - $now) / 86400);
+
+    if ($now <= $exp)                              $out['state'] = 'VALID';
+    elseif ($now <= $exp + ($grace * 86400))       $out['state'] = 'GRACE';
+    else { $out['state'] = 'READONLY'; $out['read_only'] = true;
+           $out['err'] = 'The subscription ended on ' . fdate((string)$c['exp'])
+                       . ' and the ' . $grace . '-day grace period is over.'; }
+    return $s = $out;
+}
+
+function lk_read_only() { return !empty(lk_state()['read_only']); }
+
+// ---- What was bought --------------------------------------------------------
+// The licensed module list, or null when nothing is being enforced — null means
+// "this file has no opinion", which is what lets licence_disabled() carry on
+// using the settings screen exactly as before.
+function lk_modules() {
+    $st = lk_state();
+    if ($st['state'] === 'OPEN') return null;           // nothing is being enforced
+    if ($st['state'] === 'TRIAL') return null;          // a trial is of everything
+
+    // A key that failed verification grants NOTHING beyond the core. Returning
+    // null here — "this file has no opinion" — was a bug caught by the forgery
+    // test: it fell through to the settings screen, so tampering with a key
+    // revealed every module in the product. Read-only made it harmless in
+    // practice, but rewarding tampering with anything at all is the wrong shape.
+    if ($st['state'] === 'INVALID' || $st['state'] === 'MISSING') return [];
+
+    $m = $st['claims']['mods'] ?? null;
+    // VALID, GRACE and READONLY all read from the key: an expired customer must
+    // keep SEEING exactly what they bought. Taking their screens away as well as
+    // their ability to save would be punishing them twice for one late payment.
+    return is_array($m) ? array_map('strtolower', $m) : [];
+}
+
+// Starter or professional, per module. Unknown means the whole module.
+function lk_tier($module) {
+    $t = lk_state()['claims']['tier'] ?? [];
+    return is_array($t) ? (string)($t[strtolower($module)] ?? 'pro') : 'pro';
+}
+
+// ---- Seats ------------------------------------------------------------------
+function lk_seats_used() {
+    return (int)(lk_try(fn() => ops_val("SELECT COUNT(*) FROM users WHERE is_active = 1"), 0) ?: 0);
+}
+
+// Called before a user is created or re-activated. Returns '' when allowed, or
+// the reason it is refused — in the words of the person who has to fix it.
+function lk_seat_block() {
+    $st = lk_state();
+    if ($st['state'] === 'OPEN' || $st['state'] === 'TRIAL') return '';
+    $seats = (int)$st['seats'];
+    if ($seats <= 0) return '';                            // unlimited
+    $used = lk_seats_used();
+    if ($used < $seats) return '';
+    return 'Your subscription covers ' . $seats . ' ' . ($seats === 1 ? 'person' : 'people')
+         . ' and ' . $used . ' are already active. Deactivate somebody who has left, or ask MGH to add seats.';
+}
+
+// ---- Read-only enforcement --------------------------------------------------
+// Routes that must keep working even when the licence has run out. Everything
+// here either takes nothing in, or is the thing that fixes the licence.
+const LICENCE_ALWAYS_ALLOW = [
+    'licence', 'licence-save',      // the screen that accepts a new key
+    'logout', 'login',
+    'change-password', 'my-signature',
+    'verify',                        // public report verification
+];
+
+function lk_blocks_write($route) {
+    if (!lk_read_only()) return false;
+    if (in_array($route, LICENCE_ALWAYS_ALLOW, true)) return false;
+    // Anything that only reads is unaffected — this is called on POST alone.
+    return true;
+}
+
+// ---- The screen -------------------------------------------------------------
+function lk_can_manage() { return can('settings.manage') || is_master(); }
+
+function lk_summary() {
+    $st = lk_state();
+    $out = [
+        'state'     => $st['state'],
+        'label'     => LICENCE_STATES[$st['state']] ?? $st['state'],
+        'customer'  => $st['customer'],
+        'ref'       => (string)($st['claims']['ref'] ?? ''),
+        'expires'   => (string)($st['claims']['exp'] ?? ''),
+        'days_left' => $st['days_left'],
+        'seats'     => (int)$st['seats'],
+        'used'      => lk_seats_used(),
+        'err'       => $st['err'],
+        'enforcing' => lk_enforcing(),
+        'from_env'  => getenv('LICENCE_KEY') !== false && trim((string)getenv('LICENCE_KEY')) !== '',
+        'modules'   => [],
+    ];
+    $mods = lk_modules();
+    foreach (PRODUCT_MODULES as $key => [$lbl, $desc, $covers, $core]) {
+        $on = $core || $mods === null || in_array($key, $mods, true);
+        $out['modules'][$key] = ['label' => $lbl, 'desc' => $desc, 'on' => $on, 'core' => $core,
+                                 'tier' => $on && $mods !== null ? lk_tier($key) : ''];
+    }
+    return $out;
+}
+
+function ops_licence($route, $method) {
+    ops_require(lk_can_manage(), 'You cannot see the licence.');
+
+    if ($route === 'licence-save' && $method === 'POST') {
+        $key = trim((string)($_POST['key'] ?? ''));
+        // Whitespace is how a pasted key arrives from an e-mail client.
+        $key = preg_replace('/\s+/', '', $key);
+        if ($key === '') {
+            setting_set('licence_key', '');
+            lk_state(true);
+            flash('Licence key removed.', 'warning');
+            redirect('/licence');
+        }
+        $c = lk_verify($key);
+        if (!empty($c['err'])) { flash($c['err'], 'error'); redirect('/licence'); }
+        setting_set('licence_key', $key);
+        lk_state(true);
+        licence_disabled(true);
+        flash('Licence accepted — ' . ($c['cust'] ?? 'this installation') . ', to ' . fdate((string)$c['exp']) . '.', 'success');
+        redirect('/licence');
+    }
+
+    view('ops/licence', ['s' => lk_summary(), 'canManage' => lk_can_manage(),
+                         'states' => LICENCE_STATES]);
+    return true;
+}
