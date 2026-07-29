@@ -81,6 +81,12 @@
       <?php if (function_exists('chain_can') && chain_can()): ?>
         <a class="s-item<?= $navOn(['flow-gaps']) ?>" href="/flow-gaps"><span class="s-ic">🔗</span><span>Where the flow is broken</span></a>
       <?php endif; ?>
+      <?php // The one screen that answers "what should I do today" with money attached.
+            // It sits above the module groups on purpose: it is cross-module, and a
+            // person who only opens one screen a day should open this one. ?>
+      <?php if (function_exists('adv_can') && adv_can()): ?>
+        <a class="s-item<?= $navOn(['advisor']) ?>" href="/advisor"><span class="s-ic">🧭</span><span>What to fix</span></a>
+      <?php endif; ?>
 
       <?php // Every label below is the first words of the page heading it opens,
             // and every business noun comes from Settings -> Terminology. ?>
