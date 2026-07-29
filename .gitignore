@@ -20,3 +20,8 @@ db.sqlite3-journal
 .DS_Store
 .idea/
 .vscode/
+
+# Licence server secrets — generated on the server, never in the repo
+licence-signing-key.pem
+licence-server-config.php
+licence-server/data/

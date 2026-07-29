@@ -144,6 +144,7 @@ try {
     require __DIR__ . '/lib/adspro.php';
     require __DIR__ . '/lib/adssync.php';
     require __DIR__ . '/lib/licencekey.php';
+    require __DIR__ . '/lib/licencesync.php';
     require __DIR__ . '/lib/adsroi.php';
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';

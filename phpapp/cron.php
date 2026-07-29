@@ -32,6 +32,8 @@ require __DIR__ . '/lib/capa.php';
 require __DIR__ . '/lib/ncr.php';
 require __DIR__ . '/lib/adspro.php';
 require __DIR__ . '/lib/adssync.php';
+require __DIR__ . '/lib/licencekey.php';
+require __DIR__ . '/lib/licencesync.php';
 
 // When invoked over HTTP, require a matching key so strangers can't trigger it.
 if (PHP_SAPI !== 'cli') {
@@ -185,6 +187,15 @@ if (function_exists('competence_due') && function_exists('ops_mail')) {
 //
 //  Silent when the link is not configured, which is most installs.
 // ---------------------------------------------------------------------------
+// Licence check-in, as a safety net for an installation where the frequent
+// cron (cron_ads.php) was never set up. Renewal is then within a day rather
+// than within fifteen minutes, which is slower than it should be but is never
+// nothing.
+if (function_exists('licsync_checkin')) {
+    $lr = licsync_checkin(false);
+    if (!empty($lr['changed']) || empty($lr['ok'])) echo "Licence: " . $lr['msg'] . "\n";
+}
+
 //  A DAILY CATCH-UP ONLY. The real schedule for this is cron_ads.php, run every
 //  fifteen minutes — a lead that arrives at 09:05 should be workable at 09:20,
 //  not tomorrow. It is a separate file because most jobs in THIS file send
