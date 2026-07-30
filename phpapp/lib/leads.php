@@ -115,6 +115,11 @@ function leads_migrate() {
         from_name VARCHAR(120) DEFAULT '', to_name VARCHAR(120) DEFAULT '',
         days_in_previous INT DEFAULT 0,
         moved_by VARCHAR(150) DEFAULT '', moved_at VARCHAR(30) DEFAULT '')");
+    // Preferred way to reach them. A lead you keep ringing who only ever answers
+    // on WhatsApp is a lead you are annoying, not chasing. Added on an existing
+    // database, so ensure_column, not a schema change nobody would re-run.
+    if (function_exists('ensure_column'))
+        ensure_column('leads', 'pref_contact', "VARCHAR(20) DEFAULT ''");
     if (function_exists('act_index')) {
         act_index('leads', 'idx_lead_stage', '(stage_id, status)');
         act_index('leads', 'idx_lead_owner', '(owner_user_id, status)');
@@ -371,6 +376,94 @@ function lead_create(array $b) {
     // wait on another server, and must not fail because that server is down.
     if (function_exists('ads_queue_lead')) ads_queue_lead($id, 'Lead created');
     return ['id' => $id, 'ref' => $ref];
+}
+
+// The ways you can reach a prospect, and the sensible default follow-up gap for
+// each. A phone call you say you will "follow up on" usually means in a couple
+// of days; a WhatsApp, sooner. The gap only pre-fills a date the user can change.
+const LEAD_CONTACT_METHODS = [
+    'CALL'     => 'Telephone call',
+    'WHATSAPP' => 'WhatsApp',
+    'EMAIL'    => 'E-mail',
+    'MEETING'  => 'Meeting',
+    'VISIT'    => 'Site visit',
+    'NOTE'     => 'Note to self',
+];
+// How the prospect prefers to be reached — a shorter list, because "meet me"
+// is not a channel you pick up the phone and choose.
+const LEAD_PREF_CONTACT = [
+    'CALL'     => 'Telephone',
+    'WHATSAPP' => 'WhatsApp',
+    'EMAIL'    => 'E-mail',
+];
+
+// Logging a conversation — the thing a CRM is for and the thing this one could
+// not do. It writes to the shared activity timeline (so it also shows on
+// Customer 360) and, when a next step is given, sets the lead's follow-up so
+// nobody has to remember it. Everything is optional except that SOMETHING was
+// said: a blank note on a call is still a useful record that the call happened.
+function lead_log_contact($leadId, array $b = []) {
+    leads_migrate();
+    $l = lead_row($leadId);
+    if (!$l) return ['err' => 'That lead no longer exists.'];
+
+    $method = (string)($b['method'] ?? 'CALL');
+    if (!isset(LEAD_CONTACT_METHODS[$method])) $method = 'NOTE';
+    $dir  = in_array(($b['direction'] ?? ''), ['IN', 'OUT'], true) ? (string)$b['direction'] : '';
+    $note = trim((string)($b['note'] ?? ''));
+    $when = trim((string)($b['occurred_on'] ?? '')) ?: date('Y-m-d');
+    // A typed date is a day; the timeline sorts on a full timestamp, so keep the
+    // time-of-day when the day is today and pin older days to their noon.
+    $occurredAt = (substr($when, 0, 10) === date('Y-m-d')) ? date('c') : ($when . 'T12:00:00');
+
+    // The method and the direction are shown as their own tags on the timeline,
+    // so the subject need not repeat them — it carries who, which they do not.
+    $who = trim((string)($b['with_whom'] ?? ''));
+    $subject = $who !== '' ? $who : LEAD_CONTACT_METHODS[$method];
+
+    if (function_exists('act_log'))
+        act_log('LEAD', (int)$l['id'], $method, $subject, [
+            'direction'  => $dir,
+            'body'       => $note,
+            'occurred_at'=> $occurredAt,
+            'outcome'    => (string)($b['outcome'] ?? ''),
+            'with_whom'  => $who ?? '',
+            'partner_id' => $l['partner_id'] ?: null,
+            'office_id'  => $l['office_id'] ?? '',
+            'sbu'        => $l['sbu'] ?? '',
+        ]);
+
+    // The follow-up. If they told us the next step, record it on the lead so it
+    // drives the "what needs chasing" list — this is the bit people forget.
+    $nextAction = trim((string)($b['next_action'] ?? ''));
+    $nextOn     = trim((string)($b['next_action_on'] ?? ''));
+    $sets = []; $args = [];
+    if ($nextAction !== '' || $nextOn !== '') {
+        $sets[] = 'next_action=?';    $args[] = substr($nextAction, 0, 255);
+        $sets[] = 'next_action_on=?'; $args[] = $nextOn;
+    }
+    // Remember how they like to be reached, if the user set it here.
+    if (isset(LEAD_PREF_CONTACT[$b['pref_contact'] ?? ''])) {
+        $sets[] = 'pref_contact=?';   $args[] = (string)$b['pref_contact'];
+    }
+    if ($sets) {
+        $args[] = date('c'); $args[] = (int)$l['id'];
+        db()->prepare("UPDATE leads SET " . implode(',', $sets) . ", updated_at=? WHERE id=?")->execute($args);
+    }
+    return ['ok' => true];
+}
+
+// Quotations raised from this lead. Tolerant on purpose: a Sales-off install
+// has no quotations table, and a database whose CRM tables have not been
+// touched yet has the table but not the lead_id column (it is added by the CRM
+// migration, which a leads-only page never triggers). Either way the lead
+// screen must render, so any storage error here means "none to show", not 500.
+function lead_quotes($leadId) {
+    if (function_exists('crm_migrate')) { try { crm_migrate(); } catch (Throwable $e) { /* ensure lead_id exists */ } }
+    try {
+        return ops_all("SELECT id, quote_no, rev, status, total_amount, created_at
+                        FROM quotations WHERE lead_id=? ORDER BY id DESC", [(int)$leadId]);
+    } catch (Throwable $e) { return []; }
 }
 
 // Moving a stage is where the rules live.
@@ -715,6 +808,13 @@ function ops_leads($route, $method) {
             'stages' => pipeline_stages((int)$l['pipeline_id']),
             'timeline' => function_exists('act_for_entity') ? act_for_entity('LEAD', (int)$l['id'], 50) : [],
             'lostReasons' => function_exists('lk_options_or') ? lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS) : [],
+            // Quotations raised straight off this lead. Newest first, so the
+            // current offer is at the top.
+            'quotes' => lead_quotes((int)$l['id']),
+            'canQuote' => function_exists('licence_enabled') && licence_enabled('sales')
+                          && (can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes')),
+            'methods' => LEAD_CONTACT_METHODS, 'prefMethods' => LEAD_PREF_CONTACT,
+            'today' => date('Y-m-d'),
             'canEdit' => $canEdit, 'days' => lead_days_in_stage($l), 'stalled' => lead_stalled($l),
             'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 ORDER BY COALESCE(display_name, legal_name) LIMIT 500"),
             // Who a lead can be allocated to. Active logins only — allocating
@@ -800,9 +900,10 @@ function ops_leads($route, $method) {
             if (!$ou) { flash('That person is not an active user.', 'error'); redirect('/lead?id=' . $id); }
             $ownerNm = user_name($ou);
         }
+        $pref = isset(LEAD_PREF_CONTACT[$_POST['pref_contact'] ?? '']) ? (string)$_POST['pref_contact'] : '';
         db()->prepare("UPDATE leads SET company_name=?, contact_name=?, contact_email=?, contact_phone=?,
                        source=?, requirement=?, value=?, expected_close=?, owner_user_id=?, owner_name=?,
-                       next_action_on=?, next_action=?, updated_at=? WHERE id=?")
+                       next_action_on=?, next_action=?, pref_contact=?, updated_at=? WHERE id=?")
             ->execute([substr(trim((string)($_POST['company_name'] ?? '')), 0, 200),
                 substr(trim((string)($_POST['contact_name'] ?? '')), 0, 150),
                 substr(trim((string)($_POST['contact_email'] ?? '')), 0, 200),
@@ -812,10 +913,21 @@ function ops_leads($route, $method) {
                 $ownerId, substr($ownerNm, 0, 150),
                 (string)($_POST['next_action_on'] ?? ''),
                 substr(trim((string)($_POST['next_action'] ?? '')), 0, 255),
-                date('c'), $id]);
+                $pref, date('c'), $id]);
         if (function_exists('ads_queue_lead')) ads_queue_lead($id, 'Details edited');
         flash('Saved.');
         redirect('/lead?id=' . $id);
+    }
+
+    // Logging a conversation and, if given, the next follow-up. The one thing a
+    // CRM must do that this one could not.
+    if ($route === 'lead-contact' && $method === 'POST') {
+        $id = (int)($_POST['id'] ?? 0);
+        $r = lead_log_contact($id, $_POST);
+        if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/lead?id=' . $id); }
+        flash('Logged. ' . (trim((string)($_POST['next_action'] ?? '')) !== ''
+            ? 'The next step is on the lead.' : 'Add the next step whenever you know it.'));
+        redirect('/lead?id=' . $id . '#timeline');
     }
 
     // Deleting a lead. There was no way to do this at all, which is why the

@@ -1,9 +1,11 @@
 <?php
   $isEdit = (bool)$q;
+  $preLead = $preLead ?? null;
   $inqId  = $q['inquiry_id'] ?? ($preInq['id'] ?? '');
-  $g = function($k, $d = '') use ($q, $preInq) {
+  $g = function($k, $d = '') use ($q, $preInq, $preLead) {
     if ($q && isset($q[$k])) return $q[$k];
     if ($preInq && isset($preInq[$k])) return $preInq[$k];
+    if ($preLead && isset($preLead[$k]) && $preLead[$k] !== '') return $preLead[$k];
     return $d;
   };
   $rows    = $lines ?: [[]];
@@ -16,12 +18,13 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/quotes"><?= e(TP('quote')) ?></a> › <?= $isEdit ? e(quote_label($q)) : 'New' ?></div>
 <div class="master-head">
   <div><h1><?= $isEdit ? 'Edit — ' . e(quote_label($q)) : ucfirst(T_NEW('quote')) ?></h1>
-    <p class="sub" style="margin:2px 0 0"><?= $preInq ? 'From ' . e(Tl('inquiry')) . ' ' . e($preInq['inquiry_no']) . '. ' : '' ?>Fill the header, add the sites, then the line items. The <?= e(Tl('quote')) ?> number is generated on save.</p></div>
+    <p class="sub" style="margin:2px 0 0"><?= $preInq ? 'From ' . e(Tl('inquiry')) . ' ' . e($preInq['inquiry_no']) . '. ' : '' ?><?= $preLead ? 'From lead ' . e($preLead['ref']) . ' — company, contact and requirement carried across. ' : '' ?>Fill the header, add the sites, then the line items. The <?= e(Tl('quote')) ?> number is generated on save.</p></div>
   <a class="btn secondary" href="/quotes">← Back</a>
 </div>
 
 <form method="post" action="/<?= $isEdit ? 'quote-edit?id=' . (int)$q['id'] : 'quote-new' ?>" class="panel" id="qform">
   <?php if ($inqId !== ''): ?><input type="hidden" name="inquiry_id" value="<?= (int)$inqId ?>"><?php endif; ?>
+  <?php if ($preLead): ?><input type="hidden" name="lead_id" value="<?= (int)$preLead['id'] ?>"><?php endif; ?>
 
   <h3 class="tab-sub" style="margin-top:0"><?= e(T('client')) ?> &amp; header</h3>
   <div class="form-grid">

@@ -303,6 +303,10 @@ function crm_migrate() {
         ensure_column('quotations', 'po_number', "VARCHAR(80) DEFAULT ''");
         ensure_column('quotations', 'po_date', "VARCHAR(20) DEFAULT ''");
         ensure_column('quotations', 'submitted_at', "VARCHAR(30) DEFAULT ''");
+        // The lead this quotation was raised from, so a salesperson can quote
+        // straight off a lead and see every quotation back on it — without
+        // first converting the lead or hunting through the register.
+        ensure_column('quotations', 'lead_id', 'INT NULL');
         // Per-line: which office executes, which site, and the activity under the Business Unit.
         ensure_column('quote_lines', 'office_id', 'INT NULL');
         ensure_column('quote_lines', 'location_id', 'INT NULL');
@@ -972,8 +976,10 @@ function ops_crm_quotes($route, $method) {
             } else {
                 $no = crm_next_quote_no();
                 $inqId = ($b['inquiry_id'] ?? '') !== '' ? (int)$b['inquiry_id'] : null;
-                $cols = array_merge(['quote_no', 'rev', 'is_current', 'inquiry_id', 'status', 'owner_id', 'created_by', 'created_at'], array_keys($hdr));
-                $vals = array_merge([$no, 0, 1, $inqId, 'DRAFT', current_user()['id'] ?? null, user_name(current_user()), date('c')], array_values($hdr));
+                // The lead this was raised from, so it shows back on that lead.
+                $leadId = ($b['lead_id'] ?? '') !== '' ? (int)$b['lead_id'] : null;
+                $cols = array_merge(['quote_no', 'rev', 'is_current', 'inquiry_id', 'lead_id', 'status', 'owner_id', 'created_by', 'created_at'], array_keys($hdr));
+                $vals = array_merge([$no, 0, 1, $inqId, $leadId, 'DRAFT', current_user()['id'] ?? null, user_name(current_user()), date('c')], array_values($hdr));
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO quotations (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
@@ -984,7 +990,26 @@ function ops_crm_quotes($route, $method) {
             }
         }
         $preInq = (!$q && ($_GET['inquiry'] ?? '') !== '') ? crm_inquiry_get((int)$_GET['inquiry']) : null;
-        view('ops/crm/quote_form', ['q' => $q, 'lines' => $q ? crm_quote_lines($q['id']) : [], 'preInq' => $preInq,
+        // Quoting straight off a lead. The lead carries the company, the contact
+        // and the requirement, so none of it is re-typed; if the lead is linked
+        // to a customer on the master, that customer is pre-selected.
+        $preLead = null;
+        if (!$q && ($_GET['lead'] ?? '') !== '' && function_exists('lead_row')) {
+            $ld = lead_row((int)$_GET['lead']);
+            if ($ld) {
+                $subj = trim(preg_replace('/\s+/', ' ', (string)$ld['requirement']));
+                if (mb_strlen($subj) > 180) $subj = mb_substr($subj, 0, 177) . '...';
+                $preLead = [
+                    'id' => (int)$ld['id'], 'ref' => (string)$ld['ref'],
+                    'client_id' => (int)($ld['partner_id'] ?? 0) ?: '',
+                    'client_name' => (int)($ld['partner_id'] ?? 0) ? '' : (string)$ld['company_name'],
+                    'contact_name' => (string)$ld['contact_name'], 'contact_email' => (string)$ld['contact_email'],
+                    'contact_mobile' => (string)$ld['contact_phone'], 'sbu' => (string)($ld['sbu'] ?? ''),
+                    'subject' => $subj !== '' ? $subj : ('From lead ' . $ld['ref']),
+                ];
+            }
+        }
+        view('ops/crm/quote_form', ['q' => $q, 'lines' => $q ? crm_quote_lines($q['id']) : [], 'preInq' => $preInq, 'preLead' => $preLead,
             'locations' => $q ? crm_quote_locations($q['id']) : [],
             'clients' => clients_list(), 'offices' => offices_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
             'svcOpts' => lk_options_or('inspection_type', INSPECTION_TYPES), 'unitOpts' => lk_options_or('charge_unit', CHARGE_UNITS),
