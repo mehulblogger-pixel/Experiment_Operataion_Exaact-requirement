@@ -165,6 +165,35 @@ if (function_exists('packs_boot')) packs_boot();
 
 // Bootstrap / upgrade: this quick probe fails on a fresh install (no table) or
 // when a new table/column is missing, which triggers the idempotent boot/migrate.
+//
+// ---- but only when the code has actually changed -------------------------
+// The probe below reads ~155 tables and columns to catch a pending upgrade. It
+// is correct, but running it on EVERY request means every page holds the one
+// database connection open through ~155 round-trips before it does any real
+// work — and a connection held that long, request after request, is exactly how
+// a server runs out of connection slots. (A pooled app like the Node ones keeps
+// long-lived connections and stays lean per request; this PHP app opens a fresh
+// connection each time, so the long hold hurts it most.) So the whole probe now
+// runs only when the code fingerprint has changed. That fingerprint is built
+// from the modification time and size of index.php and every lib file, so ANY
+// deploy that could alter the schema changes it automatically — there is
+// nothing to remember to bump. When it matches what was last verified, the
+// probe is skipped entirely and the request touches the database only for the
+// page it came to draw.
+$schemaSig = '';
+try {
+    $parts = [filemtime(__FILE__) . ':' . filesize(__FILE__)];
+    foreach (glob(__DIR__ . '/lib/*.php') ?: [] as $f) $parts[] = basename($f) . ':' . @filemtime($f) . ':' . @filesize($f);
+    $schemaSig = md5(implode('|', $parts));
+} catch (Throwable $e) { $schemaSig = ''; }
+$schemaCurrent = false;
+if ($schemaSig !== '') {
+    // One tiny read instead of 155. A missing settings table (fresh install)
+    // throws and is treated as "not current", so the full probe still runs.
+    try { $schemaCurrent = ((string) db()->query("SELECT svalue FROM settings WHERE skey='schema_sig'")->fetchColumn() === $schemaSig); }
+    catch (Throwable $e) { $schemaCurrent = false; }
+}
+if (!$schemaCurrent) {
 try {
     // Probe the NEWEST additions too — a miss here triggers boot(), whose
     // idempotent migrate() then adds every pending table/column in one pass.
@@ -355,9 +384,15 @@ try {
         throw new RuntimeException('pending upgrade: shared work-type list');
     if (function_exists('deliverables_pending') && deliverables_pending())
         throw new RuntimeException('pending upgrade: deliverables from the report register');
+    // Nothing above threw: the schema matches this build. Remember the
+    // fingerprint so the next request skips the whole probe.
+    if ($schemaSig !== '') { try { setting_set('schema_sig', $schemaSig); } catch (Throwable $e) {} }
 } catch (Throwable $ex) {
     try {
         boot();
+        // The upgrade ran cleanly, so the schema now matches this build — record
+        // the fingerprint so later requests do not probe again until it changes.
+        if ($schemaSig !== '') { try { setting_set('schema_sig', $schemaSig); } catch (Throwable $e) {} }
     } catch (Throwable $e2) {
         $m = $e2->getMessage();
 
@@ -371,12 +406,12 @@ try {
         $hint  = '';
         if (stripos($m, 'too many connections') !== false || strpos($m, '1040') !== false) {
             $title = 'The database server is full, just for a moment';
-            $hint  = '<b>Nothing is wrong with this application and nothing is lost.</b> The MySQL server has run out '
-                   . 'of connection slots, so it refused one more. Wait a few seconds and reload — it usually clears '
-                   . 'on its own.<br><br>If it keeps happening, it is a hosting limit rather than a setting here: ask '
-                   . 'your host to raise <code>max_connections</code>, and check whether another application on the '
-                   . 'same MySQL server is holding connections open. Several apps sharing one small database server '
-                   . 'is the usual cause.';
+            $hint  = '<b>Nothing is wrong with this application and nothing is lost.</b> MySQL had no free connection '
+                   . 'slots when this request arrived, so it refused one — and it stayed full through the automatic '
+                   . 'retries too. Reload in a few seconds; it usually clears at once.<br><br>If it keeps happening, '
+                   . 'the ceiling is simply too low for the number of apps sharing this MySQL server. Raise '
+                   . '<code>max_connections</code> in the server\'s <code>my.cnf</code> (for example from 151 to 400) '
+                   . 'and restart MySQL. If other apps hold large idle connection pools, trimming those frees slots too.';
         } elseif (stripos($m, 'access denied') !== false || strpos($m, '1045') !== false) {
             $hint = 'The database name is right but the <b>user or password</b> is not. Open <code>config.php</code> '
                   . 'and check them against the control panel under Databases.';
@@ -394,6 +429,7 @@ try {
         ops_fatal($title, $hint, $m . "\n" . $e2->getFile() . ':' . $e2->getLine(), true);
     }
 }
+}   // end: the schema probe runs only when the code fingerprint has changed
 
 // --- Router (single-segment routes; ids/tabs via query string) ---
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
