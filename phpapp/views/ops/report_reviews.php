@@ -42,7 +42,7 @@
             <?php elseif ($canAck): ?>
               <form method="post" action="/report-ack">
                 <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
-                <input name="note" placeholder="optional note" style="width:150px">
+                <input class="form-control" name="note" placeholder="optional note" style="width:150px">
                 <button class="btn small">Seen it</button>
               </form>
             <?php else: ?><span class="pill p-warn">Not yet</span><?php endif; ?></td>

@@ -115,14 +115,14 @@
       </p>
       <div class="form-grid" style="gap:12px 16px">
         <div><label>Executing branch</label>
-          <select name="executing_office_id">
+          <select class="form-control" name="executing_office_id">
             <option value="">— <?= e($o['office_name'] ?: 'not set') ?> —</option>
             <?php foreach ($offices as $f): ?>
               <option value="<?= (int)$f['id'] ?>" <?= (int)$f['id']===(int)$o['office_id']?'selected':'' ?>><?= e($f['name']) ?></option>
             <?php endforeach; ?>
           </select></div>
-        <div><label>Contract number</label><input name="contract_number" maxlength="80" placeholder="If they gave one"></div>
-        <div><label>Wanted by</label><input type="date" name="inspection_required_date"></div>
+        <div><label>Contract number</label><input class="form-control" name="contract_number" maxlength="80" placeholder="If they gave one"></div>
+        <div><label>Wanted by</label><input class="form-control" type="date" name="inspection_required_date"></div>
       </div>
       <button class="btn" style="margin-top:12px">Raise the order</button>
     </form>
@@ -173,7 +173,7 @@
   <h3 style="margin-top:0">Move it on</h3>
   <div class="form-grid" style="gap:12px 16px">
     <div><label>To which stage</label>
-      <select name="stage_id" id="opp-stage">
+      <select class="form-control" name="stage_id" id="opp-stage">
         <?php foreach ($stages as $s): ?>
           <option value="<?= (int)$s['id'] ?>" data-kind="<?= e($s['kind']) ?>" <?= (int)$s['id']===(int)$o['stage_id']?'selected':'' ?>>
             <?= e($s['name']) ?><?= (int)$s['probability'] ? ' (' . (int)$s['probability'] . '%)' : '' ?><?= $s['kind']!=='OPEN' ? ' — closes the deal' : '' ?>
@@ -181,12 +181,12 @@
         <?php endforeach; ?>
       </select></div>
     <div><label>If lost, why *</label>
-      <select name="lost_reason"><option value="">—</option>
+      <select class="form-control" name="lost_reason"><option value="">—</option>
         <?php foreach ($lostReasons as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
       </select>
       <span class="muted" style="font-size:12px">Required to move to a losing stage. It is the only thing that makes the loss useful later.</span></div>
-    <div><label>Lost to</label><input name="lost_to" maxlength="200" placeholder="Which competitor, if you know"></div>
-    <div class="ff-wide"><label>Note</label><input name="lost_note" maxlength="500" placeholder="What actually happened"></div>
+    <div><label>Lost to</label><input class="form-control" name="lost_to" maxlength="200" placeholder="Which competitor, if you know"></div>
+    <div class="ff-wide"><label>Note</label><input class="form-control" name="lost_note" maxlength="500" placeholder="What actually happened"></div>
   </div>
   <button class="btn" style="margin-top:12px">Move it</button>
 </form>
@@ -195,21 +195,21 @@
   <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
   <h3 style="margin-top:0">Change the detail</h3>
   <div class="form-grid" style="gap:12px 16px">
-    <div class="ff-wide"><label>Name</label><input name="name" value="<?= e($o['name']) ?>" maxlength="255"></div>
-    <div><label>Estimated value</label><input name="value" type="number" step="0.01" value="<?= e($o['value']) ?>"></div>
-    <div><label>Expected close</label><input type="date" name="expected_close" value="<?= e($o['expected_close']) ?>"></div>
-    <div><label>Owner</label><input name="owner_name" value="<?= e($o['owner_name']) ?>" maxlength="150"></div>
+    <div class="ff-wide"><label>Name</label><input class="form-control" name="name" value="<?= e($o['name']) ?>" maxlength="255"></div>
+    <div><label>Estimated value</label><input class="form-control" name="value" type="number" step="0.01" value="<?= e($o['value']) ?>"></div>
+    <div><label>Expected close</label><input class="form-control" type="date" name="expected_close" value="<?= e($o['expected_close']) ?>"></div>
+    <div><label>Owner</label><input class="form-control" name="owner_name" value="<?= e($o['owner_name']) ?>" maxlength="150"></div>
     <div><label>Branch</label>
-      <select name="office_id"><option value="">—</option>
+      <select class="form-control" name="office_id"><option value="">—</option>
         <?php foreach ($offices as $f): ?><option value="<?= (int)$f['id'] ?>" <?= (int)$f['id']===(int)$o['office_id']?'selected':'' ?>><?= e($f['name']) ?></option><?php endforeach; ?>
       </select></div>
-    <div><label>Against</label><input name="competitor" value="<?= e($o['competitor']) ?>" maxlength="200"></div>
-    <div><label>Contact</label><input name="contact_name" value="<?= e($o['contact_name']) ?>" maxlength="150"></div>
-    <div><label>Contact e-mail</label><input name="contact_email" value="<?= e($o['contact_email']) ?>" maxlength="200"></div>
-    <div><label>Contact phone</label><input name="contact_phone" value="<?= e($o['contact_phone']) ?>" maxlength="60"></div>
-    <div><label>Next action</label><input name="next_action" value="<?= e($o['next_action']) ?>" maxlength="255"></div>
-    <div><label>By when</label><input type="date" name="next_action_on" value="<?= e($o['next_action_on']) ?>"></div>
-    <div class="ff-wide"><label>What they need</label><textarea name="requirement" rows="3"><?= e($o['requirement']) ?></textarea></div>
+    <div><label>Against</label><input class="form-control" name="competitor" value="<?= e($o['competitor']) ?>" maxlength="200"></div>
+    <div><label>Contact</label><input class="form-control" name="contact_name" value="<?= e($o['contact_name']) ?>" maxlength="150"></div>
+    <div><label>Contact e-mail</label><input class="form-control" name="contact_email" value="<?= e($o['contact_email']) ?>" maxlength="200"></div>
+    <div><label>Contact phone</label><input class="form-control" name="contact_phone" value="<?= e($o['contact_phone']) ?>" maxlength="60"></div>
+    <div><label>Next action</label><input class="form-control" name="next_action" value="<?= e($o['next_action']) ?>" maxlength="255"></div>
+    <div><label>By when</label><input class="form-control" type="date" name="next_action_on" value="<?= e($o['next_action_on']) ?>"></div>
+    <div class="ff-wide"><label>What they need</label><textarea class="form-control" name="requirement" rows="3"><?= e($o['requirement']) ?></textarea></div>
   </div>
   <button class="btn" style="margin-top:12px">Save</button>
 </form>

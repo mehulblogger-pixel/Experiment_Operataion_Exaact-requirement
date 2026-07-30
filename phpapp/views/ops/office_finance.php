@@ -142,8 +142,8 @@ foreach ($offices as $o) if ((int)$o['id'] === (int)$sel) $selOff = $o;
       <tr>
         <td><form id="<?= $fid ?>" method="post" action="/office-finance"><input type="hidden" name="office_id" value="<?= (int)$o['id'] ?>"></form>
           <strong><?= e($o['name']) ?></strong> <span class="muted">(<?= e($o['code']) ?>)</span></td>
-        <td><input form="<?= $fid ?>" class="form-control" style="width:110px" type="number" step="0.01" name="overhead_pct" value="<?= $o['overhead_pct'] === null ? '' : e($o['overhead_pct']) ?>" placeholder="<?= e($defOh) ?>"></td>
-        <td><input form="<?= $fid ?>" class="form-control" style="width:110px" type="number" step="0.01" name="contingency_pct" value="<?= $o['contingency_pct'] === null ? '' : e($o['contingency_pct']) ?>" placeholder="<?= e($defCg) ?>"></td>
+        <td><input class="form-control" form="<?= $fid ?>" class="form-control" style="width:110px" type="number" step="0.01" name="overhead_pct" value="<?= $o['overhead_pct'] === null ? '' : e($o['overhead_pct']) ?>" placeholder="<?= e($defOh) ?>"></td>
+        <td><input class="form-control" form="<?= $fid ?>" class="form-control" style="width:110px" type="number" step="0.01" name="contingency_pct" value="<?= $o['contingency_pct'] === null ? '' : e($o['contingency_pct']) ?>" placeholder="<?= e($defCg) ?>"></td>
         <td><span class="pill <?= $real ? 'p-ok' : 'p-mut' ?>"><?= $real ? 'Real costs' : 'Percentage' ?></span></td>
         <td><button form="<?= $fid ?>" class="btn small" type="submit">Save</button></td>
       </tr>

@@ -69,11 +69,11 @@
         <form method="post" action="/lead-move" style="display:flex;gap:6px;align-items:center">
           <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
           <input type="hidden" name="stage_id" value="<?= (int)$s['id'] ?>">
-          <select name="lost_reason" required style="max-width:200px">
+          <select class="form-control" name="lost_reason" required style="max-width:200px">
             <option value="">why was it lost?</option>
             <?php foreach ($lostReasons as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
           </select>
-          <input name="lost_note" placeholder="anything more" style="max-width:180px">
+          <input class="form-control" name="lost_note" placeholder="anything more" style="max-width:180px">
           <button class="btn small secondary"><?= e($s['name']) ?></button>
         </form>
       <?php else: ?>
@@ -89,22 +89,80 @@
 
 <form method="post" action="/lead-edit" class="panel" style="margin-top:16px;max-width:860px">
   <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
-  <h3 style="margin-top:0">Details</h3>
-  <div class="form-grid" style="gap:12px 16px">
-    <div class="ff-wide"><label>Company</label><input name="company_name" value="<?= e($l['company_name']) ?>"></div>
-    <div><label>Contact</label><input name="contact_name" value="<?= e($l['contact_name']) ?>"></div>
-    <div><label>Source</label><input name="source" value="<?= e($l['source']) ?>"></div>
-    <div><label>E-mail</label><input type="email" name="contact_email" value="<?= e($l['contact_email']) ?>"></div>
-    <div><label>Telephone</label><input name="contact_phone" value="<?= e($l['contact_phone']) ?>"></div>
-    <div><label>Value</label><input type="number" step="0.01" name="value" value="<?= e($l['value']) ?>"></div>
-    <div><label>Expected close</label><input type="date" name="expected_close" value="<?= e($l['expected_close']) ?>"></div>
-    <div><label>Owner</label><input name="owner_name" value="<?= e($l['owner_name']) ?>"></div>
-    <div><label>Next by</label><input type="date" name="next_action_on" value="<?= e($l['next_action_on']) ?>"></div>
-    <div class="ff-wide"><label>Next thing to do</label><input name="next_action" value="<?= e($l['next_action']) ?>"></div>
-    <div class="ff-wide"><label>What they want</label><textarea name="requirement" rows="3"><?= e($l['requirement']) ?></textarea></div>
+  <div class="form-sec"><h3>Details</h3>
+    <p>Everything here comes across when the lead is won, so it is worth getting right now rather than typing it again later.</p></div>
+  <div class="form-grid">
+    <div class="ff ff-wide"><label>Company</label>
+      <input class="form-control" name="company_name" value="<?= e($l['company_name']) ?>"></div>
+    <div class="ff"><label>Contact</label>
+      <input class="form-control" name="contact_name" value="<?= e($l['contact_name']) ?>"></div>
+    <div class="ff"><label>Source</label>
+      <input class="form-control" name="source" value="<?= e($l['source']) ?>"></div>
+    <div class="ff"><label>E-mail</label>
+      <input class="form-control" type="email" inputmode="email" name="contact_email" value="<?= e($l['contact_email']) ?>"></div>
+    <div class="ff"><label>Telephone</label>
+      <input class="form-control" type="tel" inputmode="tel" name="contact_phone" value="<?= e($l['contact_phone']) ?>"></div>
+    <div class="ff"><label>Value <span class="muted">(<?= e(cur_sym()) ?>)</span></label>
+      <input class="form-control" type="number" step="0.01" name="value" value="<?= e($l['value']) ?>"></div>
+    <div class="ff"><label>Expected close</label>
+      <input class="form-control" type="date" name="expected_close" value="<?= e($l['expected_close']) ?>"></div>
+
+    <?php // Allocation. This was a free-text box: you could type any name, it
+          // linked to no login, and owner_user_id — which every "my leads"
+          // filter and every reminder reads — stayed empty. A lead nobody is
+          // actually assigned is a lead nobody chases. ?>
+    <div class="ff"><label>Allocated to</label>
+      <select class="form-control searchable" name="owner_user_id">
+        <option value="">— nobody yet —</option>
+        <?php foreach (($users ?? []) as $u): ?>
+          <option value="<?= (int)$u['id'] ?>" <?= (int)($l['owner_user_id'] ?? 0) === (int)$u['id'] ? 'selected' : '' ?>>
+            <?= e(trim($u['first_name'] . ' ' . $u['last_name']) ?: $u['username']) ?><?= $u['role'] ? ' — ' . e(ORG_ROLES[$u['role']] ?? $u['role']) : '' ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+      <?php if (trim((string)($l['owner_name'] ?? '')) !== '' && !(int)($l['owner_user_id'] ?? 0)): ?>
+        <div class="ff-help">Recorded against the typed name “<?= e($l['owner_name']) ?>”, which is not linked to a
+          login. Pick the person here and it becomes a real allocation.</div>
+      <?php endif; ?></div>
+
+    <div class="ff"><label>Next by</label>
+      <input class="form-control" type="date" name="next_action_on" value="<?= e($l['next_action_on']) ?>"></div>
+    <div class="ff ff-wide"><label>Next thing to do</label>
+      <input class="form-control" name="next_action" value="<?= e($l['next_action']) ?>"></div>
+    <div class="ff ff-wide"><label>What they want</label>
+      <textarea class="form-control" name="requirement" rows="3"><?= e($l['requirement']) ?></textarea></div>
   </div>
-  <button class="btn" style="margin-top:12px">Save</button>
+  <div class="form-actions">
+    <button class="btn" type="submit">Save</button>
+    <span class="spacer"></span>
+  </div>
 </form>
+<?php endif;   /* closes: only editable while the lead is open */ ?>
+
+<?php
+// Deleting a lead. There was no way to do this anywhere, which is why a register
+// fills up with test rows nobody can clear. A CONVERTED lead is not offered:
+// something downstream points back at it, and it is the record of where that
+// customer came from.
+$converted = ($l['status'] ?? '') === 'CONVERTED' || !empty($l['converted_partner_id']) || !empty($l['converted_inquiry_id']);
+?>
+<?php if (can('mod.leads.edit') || is_master()): ?>
+<div class="panel mt-4">
+  <div class="form-sec"><h3>Delete this lead</h3></div>
+  <?php if ($converted): ?>
+    <p class="sub mb-0">This lead has been won and converted, so it is the record of where
+      <?= e($l['company_name']) ?> came from and cannot be deleted. If it should not be chased any further, mark it
+      lost above — the history stays either way.</p>
+  <?php else: ?>
+    <p class="sub">Removes <?= e($l['ref']) ?> — <?= e($l['company_name']) ?> for good. Nothing else points at it yet,
+      so nothing downstream breaks. This cannot be undone.</p>
+    <form method="post" action="/lead-delete"
+          onsubmit="return confirm('Delete <?= e(addslashes($l['ref'])) ?> — <?= e(addslashes($l['company_name'])) ?>? This cannot be undone.')">
+      <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
+      <button class="btn danger" type="submit">Delete this lead</button>
+    </form>
+  <?php endif; ?>
+</div>
 <?php endif; ?>
 
 <div class="panel" style="margin-top:16px">

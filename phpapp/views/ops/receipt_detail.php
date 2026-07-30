@@ -63,9 +63,9 @@
           <td><?= $o['due_date'] ? e(fdate($o['due_date'])) : '—' ?></td>
           <td class="num"><?= e(fmoney($o['outstanding'])) ?></td>
           <td class="num"><label class="sr-only" for="c-<?= (int)$o['id'] ?>">Cash against <?= e($o['invoice_no']) ?></label>
-            <input id="c-<?= (int)$o['id'] ?>" name="cash[<?= (int)$o['id'] ?>]" type="number" step="0.01" min="0" style="width:110px;text-align:right" placeholder="0.00"></td>
+            <input class="form-control" id="c-<?= (int)$o['id'] ?>" name="cash[<?= (int)$o['id'] ?>]" type="number" step="0.01" min="0" style="width:110px;text-align:right" placeholder="0.00"></td>
           <td class="num"><label class="sr-only" for="t-<?= (int)$o['id'] ?>">TDS against <?= e($o['invoice_no']) ?></label>
-            <input id="t-<?= (int)$o['id'] ?>" name="tds[<?= (int)$o['id'] ?>]" type="number" step="0.01" min="0" style="width:110px;text-align:right" placeholder="0.00"></td>
+            <input class="form-control" id="t-<?= (int)$o['id'] ?>" name="tds[<?= (int)$o['id'] ?>]" type="number" step="0.01" min="0" style="width:110px;text-align:right" placeholder="0.00"></td>
         </tr>
       <?php endforeach; ?>
       </tbody>

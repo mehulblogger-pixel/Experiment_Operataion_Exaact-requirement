@@ -7,7 +7,7 @@
 
 <form method="get" action="/search" class="panel" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:16px" role="search">
   <label class="sr-only" for="gsq">What are you looking for</label>
-  <input id="gsq" name="q" value="<?= e($q) ?>" autofocus
+  <input class="form-control" id="gsq" name="q" value="<?= e($q) ?>" autofocus
          placeholder="A reference, a company, a person, an invoice number…"
          style="flex:1;min-width:240px;padding:9px 12px;font-size:14px">
   <?php if ($only !== ''): ?><input type="hidden" name="in" value="<?= e($only) ?>"><?php endif; ?>

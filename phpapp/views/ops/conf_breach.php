@@ -31,26 +31,26 @@
   <input type="hidden" name="id" value="<?= (int)$b['id'] ?>">
   <h3 style="margin-top:0">Containment and who was told</h3>
   <label>What was done to contain it</label>
-  <textarea name="containment" rows="3" <?= $canEdit && !$closed ? '' : 'disabled' ?>><?= e($b['containment']) ?></textarea>
+  <textarea class="form-control" name="containment" rows="3" <?= $canEdit && !$closed ? '' : 'disabled' ?>><?= e($b['containment']) ?></textarea>
 
   <div class="form-grid" style="gap:12px 16px;margin-top:12px">
     <div><label>Was the affected party told?</label>
-      <select name="party_told" <?= $canEdit && !$closed ? '' : 'disabled' ?>>
+      <select class="form-control" name="party_told" <?= $canEdit && !$closed ? '' : 'disabled' ?>>
         <option value="">— not decided —</option>
         <option value="YES" <?= $b['party_told']==='YES'?'selected':'' ?>>Yes</option>
         <option value="NO"  <?= $b['party_told']==='NO'?'selected':'' ?>>No</option>
       </select>
       <small class="muted">Deciding not to tell them is a legitimate answer. Not having decided is not.</small></div>
-    <div><label>Told on</label><input type="date" name="party_told_on" value="<?= e($b['party_told_on']) ?>" <?= $canEdit && !$closed ? '' : 'disabled' ?>></div>
+    <div><label>Told on</label><input class="form-control" type="date" name="party_told_on" value="<?= e($b['party_told_on']) ?>" <?= $canEdit && !$closed ? '' : 'disabled' ?>></div>
     <div class="ff-wide"><label>What they were told, or why they were not</label>
-      <textarea name="party_told_note" rows="2" <?= $canEdit && !$closed ? '' : 'disabled' ?>><?= e($b['party_told_note']) ?></textarea></div>
+      <textarea class="form-control" name="party_told_note" rows="2" <?= $canEdit && !$closed ? '' : 'disabled' ?>><?= e($b['party_told_note']) ?></textarea></div>
     <div><label>A regulator told?</label>
-      <select name="regulator_told" <?= $canEdit && !$closed ? '' : 'disabled' ?>>
+      <select class="form-control" name="regulator_told" <?= $canEdit && !$closed ? '' : 'disabled' ?>>
         <option value="">— not applicable —</option>
         <option value="YES" <?= $b['regulator_told']==='YES'?'selected':'' ?>>Yes</option>
         <option value="NO"  <?= $b['regulator_told']==='NO'?'selected':'' ?>>No</option>
       </select></div>
-    <div><label>Note</label><input name="regulator_told_note" value="<?= e($b['regulator_told_note']) ?>" <?= $canEdit && !$closed ? '' : 'disabled' ?>></div>
+    <div><label>Note</label><input class="form-control" name="regulator_told_note" value="<?= e($b['regulator_told_note']) ?>" <?= $canEdit && !$closed ? '' : 'disabled' ?>></div>
   </div>
   <?php if ($canEdit && !$closed): ?><button class="btn" style="margin-top:12px">Save</button><?php endif; ?>
 </form>

@@ -642,6 +642,10 @@ function ops_leads($route, $method) {
             'lostReasons' => function_exists('lk_options_or') ? lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS) : [],
             'canEdit' => $canEdit, 'days' => lead_days_in_stage($l), 'stalled' => lead_stalled($l),
             'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 ORDER BY COALESCE(display_name, legal_name) LIMIT 500"),
+            // Who a lead can be allocated to. Active logins only — allocating
+            // work to somebody who cannot sign in is the same as not allocating it.
+            'users' => ops_all("SELECT id, first_name, last_name, username, role FROM users
+                                WHERE is_active=1 ORDER BY first_name, last_name"),
         ]);
         return true;
     }
@@ -697,8 +701,19 @@ function ops_leads($route, $method) {
 
     if ($route === 'lead-edit' && $method === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
+        // Allocation, properly. Owner used to be a free-text box: you could type
+        // any name at all, nothing linked to a real login, and owner_user_id —
+        // which every "my leads" filter and every reminder reads — stayed empty.
+        // A lead you cannot allocate is a lead nobody is accountable for.
+        $ownerId = ($_POST['owner_user_id'] ?? '') !== '' ? (int)$_POST['owner_user_id'] : null;
+        $ownerNm = '';
+        if ($ownerId) {
+            $ou = ops_one("SELECT * FROM users WHERE id=? AND is_active=1", [$ownerId]);
+            if (!$ou) { flash('That person is not an active user.', 'error'); redirect('/lead?id=' . $id); }
+            $ownerNm = user_name($ou);
+        }
         db()->prepare("UPDATE leads SET company_name=?, contact_name=?, contact_email=?, contact_phone=?,
-                       source=?, requirement=?, value=?, expected_close=?, owner_name=?,
+                       source=?, requirement=?, value=?, expected_close=?, owner_user_id=?, owner_name=?,
                        next_action_on=?, next_action=?, updated_at=? WHERE id=?")
             ->execute([substr(trim((string)($_POST['company_name'] ?? '')), 0, 200),
                 substr(trim((string)($_POST['contact_name'] ?? '')), 0, 150),
@@ -706,13 +721,36 @@ function ops_leads($route, $method) {
                 substr(trim((string)($_POST['contact_phone'] ?? '')), 0, 60),
                 (string)($_POST['source'] ?? ''), (string)($_POST['requirement'] ?? ''),
                 (float)($_POST['value'] ?? 0), (string)($_POST['expected_close'] ?? ''),
-                substr(trim((string)($_POST['owner_name'] ?? '')), 0, 150),
+                $ownerId, substr($ownerNm, 0, 150),
                 (string)($_POST['next_action_on'] ?? ''),
                 substr(trim((string)($_POST['next_action'] ?? '')), 0, 255),
                 date('c'), $id]);
         if (function_exists('ads_queue_lead')) ads_queue_lead($id, 'Details edited');
         flash('Saved.');
         redirect('/lead?id=' . $id);
+    }
+
+    // Deleting a lead. There was no way to do this at all, which is why the
+    // register fills with test rows nobody can clear.
+    //
+    // A lead that has been CONVERTED is not deleted: an opportunity, an inquiry
+    // or a customer downstream points back at it, and removing the row would
+    // orphan real work and destroy the record of where a customer came from.
+    // Those are marked lost instead, which is what the register already models.
+    if ($route === 'lead-delete' && $method === 'POST') {
+        ops_require(can('mod.leads.edit') || is_master(), 'You cannot delete leads.');
+        $id = (int)($_POST['id'] ?? 0);
+        $l  = $id ? ops_one("SELECT * FROM leads WHERE id=?", [$id]) : null;
+        if (!$l) { flash('That lead no longer exists.', 'error'); redirect('/leads'); }
+        if (($l['status'] ?? '') === 'CONVERTED' || !empty($l['converted_partner_id']) || !empty($l['converted_inquiry_id'])) {
+            flash('This lead has already been converted, so it is the record of where that customer came from. '
+                . 'Mark it lost if it should not be chased, but it cannot be deleted.', 'error');
+            redirect('/lead?id=' . $id);
+        }
+        if (function_exists('act_log')) act_log('LEAD', $id, 'DELETED', 'Lead ' . $l['ref'] . ' deleted — ' . $l['company_name']);
+        db()->prepare("DELETE FROM leads WHERE id=?")->execute([$id]);
+        flash('Lead ' . $l['ref'] . ' deleted.');
+        redirect('/leads');
     }
     redirect('/leads');
 }

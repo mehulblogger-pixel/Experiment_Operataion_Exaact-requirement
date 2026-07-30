@@ -842,3 +842,27 @@ select.form-control{appearance:none;background-image:
   table:has(.form-control) input[name*="pin"],
   table:has(.form-control) input[type="number"]{min-width:90px}
 }
+
+/* ============================================================================
+   BOARDS (kanban) — sideways on a desk, stacked on a phone
+   ----------------------------------------------------------------------------
+   A board is columns because a desk is wide. A phone is not, and asking
+   somebody to scroll sideways through seven stages to find one card — on the
+   device they actually carry to site — is how a board stops being used.
+   Same markup, same order; below 820px each stage becomes a section you scroll
+   past normally, with its own heading and count.
+   ========================================================================= */
+.board-wrap{overflow-x:auto}
+.board{display:flex;gap:var(--s-3);min-width:min-content;align-items:flex-start}
+.board-col{min-width:250px;max-width:250px;padding:var(--s-3)}
+
+@media(max-width:820px){
+  .board-wrap{overflow-x:visible}
+  .board{display:block;min-width:0}
+  /* Full width, and a gap between stages rather than beside them. */
+  .board-col{min-width:0;max-width:none;width:100%;margin-bottom:var(--s-3)}
+  /* A stage with nothing in it earns one line, not a whole empty card — with
+     seven stages stacked, the empty ones are what you scroll past to get
+     anywhere. */
+  .board-col:has(.board-empty){padding:var(--s-2) var(--s-3)}
+}

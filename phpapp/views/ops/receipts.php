@@ -11,7 +11,7 @@
   <form method="get" action="/receipts" style="display:flex;gap:8px;margin-left:auto" role="search">
     <?php if ($f !== ''): ?><input type="hidden" name="f" value="<?= e($f) ?>"><?php endif; ?>
     <label class="sr-only" for="rq">Find a receipt</label>
-    <input id="rq" name="q" value="<?= e($_GET['q'] ?? '') ?>" placeholder="Receipt, customer or bank reference">
+    <input class="form-control" id="rq" name="q" value="<?= e($_GET['q'] ?? '') ?>" placeholder="Receipt, customer or bank reference">
     <button class="btn small secondary">Find</button>
   </form>
   <a class="btn small secondary" href="/receipts?<?= e(http_build_query(array_merge($_GET,['export'=>'csv']))) ?>">⬇ CSV</a>

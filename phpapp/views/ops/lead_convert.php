@@ -17,7 +17,7 @@
   <h3 style="margin-top:0">The customer</h3>
   <div class="form-grid" style="gap:12px 16px">
     <div class="ff-wide"><label>Attach to a customer we already have</label>
-      <select name="partner_id">
+      <select class="form-control" name="partner_id">
         <option value="">— create a new one —</option>
         <?php foreach ($clients as $c): ?>
           <option value="<?= (int)$c['id'] ?>"<?= (int)$l['partner_id'] === (int)$c['id'] ? ' selected' : '' ?>>
@@ -25,8 +25,8 @@
         <?php endforeach; ?>
       </select></div>
     <div class="ff-wide"><label>…or the name for the new one</label>
-      <input name="company_name" value="<?= e($l['company_name']) ?>" maxlength="200"></div>
-    <div><label>State <span class="muted">(for tax on the invoice side)</span></label><input name="state" maxlength="60"></div>
+      <input class="form-control" name="company_name" value="<?= e($l['company_name']) ?>" maxlength="200"></div>
+    <div><label>State <span class="muted">(for tax on the invoice side)</span></label><input class="form-control" name="state" maxlength="60"></div>
   </div>
 
   <h3>What comes across</h3>

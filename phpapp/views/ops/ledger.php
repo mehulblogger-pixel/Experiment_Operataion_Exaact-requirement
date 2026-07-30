@@ -20,8 +20,8 @@
 
 <form method="get" action="/ledger" class="panel" style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:end">
   <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
-  <div class="ff"><label for="lf">From</label><input id="lf" type="date" name="from" value="<?= e($from) ?>"></div>
-  <div class="ff"><label for="lt">To</label><input id="lt" type="date" name="to" value="<?= e($to) ?>"></div>
+  <div class="ff"><label for="lf">From</label><input class="form-control" id="lf" type="date" name="from" value="<?= e($from) ?>"></div>
+  <div class="ff"><label for="lt">To</label><input class="form-control" id="lt" type="date" name="to" value="<?= e($to) ?>"></div>
   <button class="btn small">Apply</button>
   <?php if ($from !== '' || $to !== ''): ?><a class="btn small secondary" href="/ledger?id=<?= (int)$p['id'] ?>">Whole history</a><?php endif; ?>
   <a class="btn small secondary" style="margin-left:auto" href="/ledger?<?= e(http_build_query(array_merge($_GET,['id'=>$p['id'],'export'=>'csv']))) ?>">⬇ CSV</a>

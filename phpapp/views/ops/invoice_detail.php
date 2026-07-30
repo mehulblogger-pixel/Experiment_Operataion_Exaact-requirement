@@ -113,19 +113,19 @@
   <input type="hidden" name="invoice_id" value="<?= (int)$inv['id'] ?>">
   <div class="form-grid" style="gap:12px 16px">
     <div><label>Bill a finished <?= e(Tl('job')) ?></label>
-      <select name="job_id">
+      <select class="form-control" name="job_id">
         <option value="">— or describe it below —</option>
         <?php foreach ($billable as $j): ?>
           <option value="<?= (int)$j['id'] ?>"><?= e($j['job_code']) ?><?= (float)($j['billable_value'] ?: 0) ? ' — ' . e(fmoney($j['billable_value'])) : '' ?></option>
         <?php endforeach; ?>
       </select>
       <span class="muted" style="font-size:12px">Picking one takes its rate and quantity, so the figure is not typed twice.</span></div>
-    <div><label>Description</label><input name="description" maxlength="500" placeholder="e.g. Third-party inspection — May 2026"></div>
-    <div><label>SAC</label><input name="hsn_sac" maxlength="20" value="<?= e(books_default_sac()) ?>"></div>
-    <div><label>Unit</label><input name="unit" maxlength="20" placeholder="e.g. manday, visit"></div>
-    <div><label>Quantity</label><input name="qty" type="number" step="0.001" value="1"></div>
-    <div><label>Rate</label><input name="rate" type="number" step="0.01" placeholder="0.00"></div>
-    <div><label>GST %</label><input name="gst_pct" type="number" step="0.01" value="<?= e(books_default_gst()) ?>"></div>
+    <div><label>Description</label><input class="form-control" name="description" maxlength="500" placeholder="e.g. Third-party inspection — May 2026"></div>
+    <div><label>SAC</label><input class="form-control" name="hsn_sac" maxlength="20" value="<?= e(books_default_sac()) ?>"></div>
+    <div><label>Unit</label><input class="form-control" name="unit" maxlength="20" placeholder="e.g. manday, visit"></div>
+    <div><label>Quantity</label><input class="form-control" name="qty" type="number" step="0.001" value="1"></div>
+    <div><label>Rate</label><input class="form-control" name="rate" type="number" step="0.01" placeholder="0.00"></div>
+    <div><label>GST %</label><input class="form-control" name="gst_pct" type="number" step="0.01" value="<?= e(books_default_gst()) ?>"></div>
   </div>
   <button class="btn" style="margin-top:12px">Add the line</button>
 </form>
@@ -176,14 +176,14 @@
     <h3 style="margin-top:0">Raise a credit note</h3>
     <p class="muted" style="font-size:13px;margin:0 0 10px">The way to reduce an issued invoice. Editing it would leave two versions of a document the customer already has, which under GST is not a correction.</p>
     <div class="form-grid" style="gap:12px 16px">
-      <div><label>Why *</label><select name="reason" required>
+      <div><label>Why *</label><select class="form-control" name="reason" required>
         <option value="">— choose —</option>
         <?php foreach ($reasons as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
-      <div><label>Date</label><input type="date" name="cn_date" value="<?= e(date('Y-m-d')) ?>"></div>
-      <div><label>Amount before tax *</label><input name="subtotal" type="number" step="0.01" required placeholder="0.00"></div>
-      <div><label>GST %</label><input name="gst_pct" type="number" step="0.01" value="<?= e(books_default_gst()) ?>"></div>
-      <div class="ff-wide"><label>Note</label><input name="reason_note" maxlength="500" placeholder="What was agreed, and with whom"></div>
+      <div><label>Date</label><input class="form-control" type="date" name="cn_date" value="<?= e(date('Y-m-d')) ?>"></div>
+      <div><label>Amount before tax *</label><input class="form-control" name="subtotal" type="number" step="0.01" required placeholder="0.00"></div>
+      <div><label>GST %</label><input class="form-control" name="gst_pct" type="number" step="0.01" value="<?= e(books_default_gst()) ?>"></div>
+      <div class="ff-wide"><label>Note</label><input class="form-control" name="reason_note" maxlength="500" placeholder="What was agreed, and with whom"></div>
     </div>
     <button class="btn" style="margin-top:12px">Raise the credit note</button>
   </form>
@@ -195,7 +195,7 @@
   <input type="hidden" name="id" value="<?= (int)$inv['id'] ?>">
   <h3 style="margin-top:0">Cancel it</h3>
   <p class="muted" style="font-size:13px;margin:0 0 10px">For an invoice that should never have existed. The row and the number stay; only the status changes. Once anything has settled against it, this is refused and a credit note is the only route.</p>
-  <input name="reason" maxlength="400" required placeholder="Why is it being cancelled? *" style="max-width:520px">
+  <input class="form-control" name="reason" maxlength="400" required placeholder="Why is it being cancelled? *" style="max-width:520px">
   <button class="btn danger" style="margin-top:12px" onclick="return confirm('Cancel this invoice?')">Cancel this invoice</button>
 </form>
 <?php endif; ?>

@@ -12,20 +12,20 @@
         <?php endforeach; ?>
       </select></div>
     <div><label>Branch</label>
-      <select name="office_id"><option value="">—</option>
+      <select class="form-control" name="office_id"><option value="">—</option>
         <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>"><?= e($o['name']) ?></option><?php endforeach; ?>
       </select></div>
-    <div><label>Date received</label><input type="date" name="receipt_date" value="<?= e(date('Y-m-d')) ?>"></div>
+    <div><label>Date received</label><input class="form-control" type="date" name="receipt_date" value="<?= e(date('Y-m-d')) ?>"></div>
     <div><label>How it came</label>
-      <select name="mode"><?php foreach (RECEIPT_MODES as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div><label>Amount in the bank *</label><input name="amount" type="number" step="0.01" required placeholder="0.00">
+      <select class="form-control" name="mode"><?php foreach (RECEIPT_MODES as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div><label>Amount in the bank *</label><input class="form-control" name="amount" type="number" step="0.01" required placeholder="0.00">
       <span class="muted" style="font-size:12px">What actually arrived, after any deduction.</span></div>
-    <div><label>TDS the customer withheld</label><input name="tds_amount" type="number" step="0.01" placeholder="0.00">
+    <div><label>TDS the customer withheld</label><input class="form-control" name="tds_amount" type="number" step="0.01" placeholder="0.00">
       <span class="muted" style="font-size:12px">This settles the invoice too. Leaving it out is why an ageing report chases a customer who paid in full.</span></div>
-    <div><label>Bank charges</label><input name="bank_charges" type="number" step="0.01" placeholder="0.00"></div>
-    <div><label>Bank</label><input name="bank" maxlength="120"></div>
-    <div class="ff-wide"><label>Reference</label><input name="reference" maxlength="120" placeholder="UTR, cheque number, or whatever the statement shows"></div>
-    <div class="ff-wide"><label>Notes</label><input name="notes" maxlength="500"></div>
+    <div><label>Bank charges</label><input class="form-control" name="bank_charges" type="number" step="0.01" placeholder="0.00"></div>
+    <div><label>Bank</label><input class="form-control" name="bank" maxlength="120"></div>
+    <div class="ff-wide"><label>Reference</label><input class="form-control" name="reference" maxlength="120" placeholder="UTR, cheque number, or whatever the statement shows"></div>
+    <div class="ff-wide"><label>Notes</label><input class="form-control" name="notes" maxlength="500"></div>
   </div>
 
   <?php if ($open): ?>
