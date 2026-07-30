@@ -866,3 +866,17 @@ select.form-control{appearance:none;background-image:
      anywhere. */
   .board-col:has(.board-empty){padding:var(--s-2) var(--s-3)}
 }
+
+/* The bulk bar is two rows: the buttons, then whatever control the action being
+   reached for needs. Two rows rather than one because revealing a control on the
+   same row moved the buttons, and a button that moves under a thumb is a mis-tap
+   waiting to happen. */
+.dt-bulk-wrap{border-top:1px solid var(--line);background:var(--soft)}
+.dt-bulk-wrap .dt-bulk{border-top:none;background:transparent}
+.dt-bulk-ctls{display:flex;gap:var(--s-2);flex-wrap:wrap;padding:0 12px 10px}
+.dt-bulk-ctls:empty{display:none}
+.dt-bulk-ctls .bulk-ctl[hidden]{display:none}
+@media(max-width:560px){
+  .dt-bulk-ctls .form-control{width:100%}
+  .dt-bulk-ctls .bulk-ctl{flex:1 1 100%}
+}

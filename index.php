@@ -634,8 +634,12 @@ if ($method === 'POST' && function_exists('lk_blocks_write') && lk_blocks_write(
 // thing entirely — it is minted in the browser and only stops double-posting.
 if ($method === 'POST' && !csrf_ok($_POST['_csrf'] ?? '')) {
     idems_log('user', current_user()['id'] ?? null, 'CSRF_REJECTED', ['field' => substr($route, 0, 60)]);
-    flash('That form was not sent from this site, or your session had expired. '
-        . 'Please reload the page and try again — nothing was changed.', 'error');
+    // Keep what they typed. The old message said "nothing was changed", which was
+    // true about the database and a lie about the twenty fields somebody had just
+    // filled in — they came back to an empty form.
+    form_stash($route, $_POST);
+    flash('Your session had timed out, so that was not saved. '
+        . 'Everything you typed is still here — press the button again.', 'warning');
     redirect('/' . $route);
 }
 

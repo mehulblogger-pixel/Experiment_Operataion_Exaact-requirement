@@ -58,6 +58,23 @@ function lk_migrate() {
     lk_ensure_type_map('leave_type', 'Leave type', LEAVE_TYPES);
     lk_ensure_type_map('day_code', 'Day / office code', DAY_CODES);
     lk_ensure_type_map('avail_status', TH('engineer') . ' availability status', AVAIL_STATUS);
+
+    // What to do next about a lead or a deal. Was a free-text box, so twenty
+    // people wrote twenty versions of "send profile" and no follow-up report
+    // could ever count them. A list makes it countable; the field stays
+    // typeable, so the one action nobody predicted is not blocked.
+    lk_ensure_type_map('next_action', 'Next thing to do', [
+        'CAPABILITY'  => 'Send the capability statement',
+        'QUALIFY'     => 'Call to qualify',
+        'MEETING'     => 'Arrange a meeting',
+        'SITE_VISIT'  => 'Site visit',
+        'SPEC'        => 'Ask for the specification',
+        'QUOTE'       => 'Send a quotation',
+        'QUOTE_CHASE' => 'Follow up on the quotation',
+        'CREDENTIALS' => 'Send credentials and approvals',
+        'RATES'       => 'Agree rates',
+        'PO_CHASE'    => 'Chase the purchase order',
+    ]);
     if (defined('IDDOC_KINDS')) lk_ensure_type_map('identity_doc', 'Identity document', IDDOC_KINDS);
     if (defined('AUDIT_CLAUSES')) lk_ensure_type_map('audit_clause', 'Standard clause (internal audit)', AUDIT_CLAUSES);
     // back-fill any newly-added coded values into existing lists (idempotent)
@@ -211,7 +228,7 @@ function lk_register_module_lists() {
         'expense_heading'=>'Money', 'reporting_frequency'=>'Operations', 'avail_status'=>'Operations',
         'leave_type'=>'People', 'day_code'=>'People', 'department'=>'People', 'designation'=>'People',
         'trade'=>'People', 'skill'=>'People', 'client_type'=>'Directory', 'industry'=>'Directory',
-        'quote_lost_reason'=>'Sales',
+        'quote_lost_reason'=>'Sales', 'next_action'=>'Sales',
     ] as $k => $m) lk_set_module($k, $m);
 }
 // Back-fill all coded values from a [code=>label] map into an existing type.

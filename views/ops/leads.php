@@ -68,15 +68,27 @@
 
 <?php else: ?>
 <?php
-  // The reason travels with the "mark lost" button, inside the same form.
-  $reasonSelect = '';
+  // The two controls the bulk actions need, hidden until the action that uses
+  // them is chosen. Reported from a real test: a lost-reason dropdown sat on the
+  // register permanently, next to a button called "Assign to me", and read as
+  // one confusing control rather than two unrelated ones.
+  $bulkExtra = '';
   if ($canEdit) {
-      $reasonSelect = '<label class="sr-only" for="lead-lost-reason">Why they were lost</label>'
-        . '<select class="form-control" id="lead-lost-reason" name="lost_reason" style="padding:5px 8px;font-size:12.5px;'
-        . 'border:1px solid var(--line);border-radius:8px;background:var(--card);color:inherit">';
+      $bulkExtra = '<span class="bulk-ctl" data-for="assign" hidden>'
+        . '<label class="sr-only" for="lead-assign-to">Allocate to</label>'
+        . '<select class="form-control" id="lead-assign-to" name="assign_to" style="min-width:11rem">'
+        . '<option value="">— choose a person —</option>';
+      foreach (($users ?? []) as $u)
+          $bulkExtra .= '<option value="' . (int)$u['id'] . '">'
+            . e(trim($u['first_name'] . ' ' . $u['last_name']) ?: $u['username']) . '</option>';
+      $bulkExtra .= '</select></span>';
+
+      $bulkExtra .= '<span class="bulk-ctl" data-for="lost" hidden>'
+        . '<label class="sr-only" for="lead-lost-reason">Why they were lost</label>'
+        . '<select class="form-control" id="lead-lost-reason" name="lost_reason" style="min-width:11rem">';
       foreach (($lostReasons ?: ['NO_RESPONSE' => 'No response']) as $k => $v)
-          $reasonSelect .= '<option value="' . e($k) . '">' . e($v) . '</option>';
-      $reasonSelect .= '</select>';
+          $bulkExtra .= '<option value="' . e($k) . '">' . e($v) . '</option>';
+      $bulkExtra .= '</select></span>';
   }
 ?>
 <div style="margin-top:16px">
@@ -87,11 +99,12 @@
         'export'      => true,
         'empty'       => 'Nothing yet. Leads land here from the website form, a phone call, or by typing one in.',
         'bulk_action' => '/leads-bulk',
-        'bulk_extra'  => $reasonSelect,
+        'bulk_extra'  => $bulkExtra,
         'bulk'        => !$canEdit ? [] : [
-          'mine' => ['label' => 'Assign to me', 'confirm' => 'Take ownership of these leads?'],
-          'lost' => ['label' => 'Mark lost', 'danger' => true,
-                     'confirm' => 'Mark these leads lost, with the reason chosen beside this button?'],
+          'assign' => ['label' => 'Allocate to…', 'confirm' => 'Allocate the ticked leads to the person chosen beside this button?'],
+          'mine'   => ['label' => 'Take these myself', 'confirm' => 'Take ownership of these leads?'],
+          'lost'   => ['label' => 'Mark lost', 'danger' => true,
+                       'confirm' => 'Mark these leads lost, with the reason chosen beside this button?'],
         ],
       ]) ?>
 </div>
