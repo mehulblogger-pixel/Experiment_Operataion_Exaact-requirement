@@ -352,6 +352,16 @@ function opp_move($oppId, $stageId, array $b = [], $bypassGate = false) {
     $to = stage_row((int)$stageId);
     if (!$to) return ['err' => 'Choose a stage to move it to.'];
 
+    // Refuse a move to the stage it is already in. The dropdown pre-selects the
+    // current stage, so pressing "Move it" without changing anything used to go
+    // straight through: it flashed "Moved.", wrote a history row reading
+    // "Enquiry received → Enquiry received", and — the real damage — reset
+    // stage_since, so "in this stage: 0 days" and every stalled-deal and
+    // service-level figure that counts from it silently went back to zero.
+    // From the outside it looked like the button did nothing. It did worse.
+    if ((int)$to['id'] === (int)$o['stage_id'])
+        return ['err' => 'This deal is already at "' . $to['name'] . '". Pick a different stage to move it to.'];
+
     $kind = (string)$to['kind'];
     if ($kind === 'LOST' && trim((string)($b['lost_reason'] ?? '')) === '')
         return ['err' => 'A deal marked lost needs a reason — it is the only thing that makes the loss useful later.'];
@@ -399,17 +409,66 @@ function opp_update($oppId, array $b) {
     opp_migrate();
     $o = opp_row($oppId);
     if (!$o) return 'That opportunity no longer exists.';
+
+    // ---- The pipeline, which used to be permanent -------------------------
+    //  Reported: "once the pipeline is selected nothing can be changed". True —
+    //  pipeline_id was never in this UPDATE, so a deal put on the wrong pipeline
+    //  by one wrong click at creation stayed there for ever, and the only way
+    //  out was to abandon it and re-key the whole thing.
+    //
+    //  Changing it cannot be a simple field write: the stage the deal is sitting
+    //  in belongs to the OLD pipeline, and leaving it there would give a deal a
+    //  stage from one pipeline and a pipeline from another — which every board,
+    //  funnel and forecast then disagrees about. So the deal is moved to the
+    //  first open stage of the new pipeline and the change is recorded in the
+    //  history, where somebody can see it happened.
+    $newPipe = (int)($b['pipeline_id'] ?? 0);
+    $pipeMoved = false;
+    if ($newPipe && $newPipe !== (int)$o['pipeline_id']) {
+        if (($o['status'] ?? 'OPEN') !== 'OPEN')
+            return 'This deal is already closed, so its pipeline cannot be changed. Its history has to stay as it was decided.';
+        // Never trust the dropdown for this: a lead pipeline would hand the deal
+        // stages that no funnel or forecast expects to find on an opportunity.
+        $pk = ops_val("SELECT entity_kind FROM pipelines WHERE id=?", [$newPipe]);
+        if ((string)$pk !== 'OPPORTUNITY')
+            return 'That is a lead pipeline, not a deal pipeline. Pick one built for opportunities.';
+        $stages = function_exists('pipeline_stages') ? pipeline_stages($newPipe) : [];
+        $first = null;
+        foreach ($stages as $st) if (($st['kind'] ?? 'OPEN') === 'OPEN') { $first = $st; break; }
+        if (!$first) return 'That pipeline has no open stage to move the deal into. Add one first under Pipelines & funnels.';
+        // Recorded BEFORE the row changes, because opp_record_move() reads the
+        // stage it is moving away from off the row it is given.
+        opp_record_move($o, $first);
+        db()->prepare("UPDATE opportunities SET pipeline_id=?, stage_id=?, probability=?, stage_since=? WHERE id=?")
+           ->execute([$newPipe, (int)$first['id'], (int)($first['probability'] ?? 0), date('c'), (int)$o['id']]);
+        if (function_exists('act_log'))
+            act_log('OPPORTUNITY', (int)$o['id'], 'PIPELINE', 'Moved onto a different pipeline, and to its first open stage.');
+        $pipeMoved = true;
+    }
+
+    // ---- Allocation, not a typed name -------------------------------------
+    //  owner_name was free text here too, so owner_user_id — which "my deals"
+    //  and every reminder read — could say one person while the screen said
+    //  another.
+    $ownerId = ($b['owner_user_id'] ?? '') !== '' ? (int)$b['owner_user_id'] : (int)($o['owner_user_id'] ?? 0);
+    $ownerNm = (string)($o['owner_name'] ?? '');
+    if ($ownerId) {
+        $ou = ops_one("SELECT * FROM users WHERE id=? AND is_active=1", [$ownerId]);
+        if (!$ou) return 'That person is not an active user, so the deal cannot be allocated to them.';
+        $ownerNm = user_name($ou);
+    } else { $ownerNm = ''; }
+
     db()->prepare("UPDATE opportunities SET name=?, value=?, expected_close=?, requirement=?, competitor=?,
-                   contact_name=?, contact_email=?, contact_phone=?, owner_name=?, office_id=?, sbu=?,
+                   contact_name=?, contact_email=?, contact_phone=?, owner_user_id=?, owner_name=?, office_id=?, sbu=?,
                    next_action_on=?, next_action=?, updated_at=? WHERE id=?")
        ->execute([trim((string)($b['name'] ?? $o['name'])), (float)($b['value'] ?? $o['value']),
                   (string)($b['expected_close'] ?? ''), (string)($b['requirement'] ?? ''),
                   (string)($b['competitor'] ?? ''), (string)($b['contact_name'] ?? ''),
                   (string)($b['contact_email'] ?? ''), (string)($b['contact_phone'] ?? ''),
-                  (string)($b['owner_name'] ?? ''), (int)($b['office_id'] ?? 0) ?: null,
+                  $ownerId ?: null, $ownerNm, (int)($b['office_id'] ?? 0) ?: null,
                   (string)($b['sbu'] ?? ''), (string)($b['next_action_on'] ?? ''),
                   (string)($b['next_action'] ?? ''), date('c'), (int)$o['id']]);
-    return '';
+    return $pipeMoved ? '' : '';
 }
 
 // Attaching a quotation is what makes "one deal, three quotations" countable.
@@ -623,6 +682,15 @@ function ops_opportunities($route, $method) {
             'stages' => pipeline_stages((int)$o['pipeline_id']),
             'timeline' => function_exists('act_for_entity') ? act_for_entity('OPPORTUNITY', (int)$o['id'], 40) : [],
             'lostReasons' => opp_lost_reasons(), 'canEdit' => $canEdit,
+            // Who a deal can be allocated to, and which pipeline it can be put on.
+            'users' => ops_all("SELECT id, first_name, last_name, username FROM users
+                                WHERE is_active=1 ORDER BY first_name, last_name"),
+            // OPPORTUNITY pipelines only. pipe_all() returns lead pipelines too, and
+            // putting a deal on a lead pipeline would give it stages that no funnel,
+            // board or forecast expects to find there.
+            'pipelines' => function_exists('pipe_all')
+                ? array_values(array_filter(pipe_all(), fn($pl) => ($pl['entity_kind'] ?? '') === 'OPPORTUNITY'))
+                : [],
             'orderBlock' => opp_order_block($o), 'orderQuote' => opp_order_quote((int)$o['id']),
             'canOrder' => function_exists('licence_enabled') && licence_enabled('operations')
                           && (can('mod.calls.edit') || is_master_of('calls')),
