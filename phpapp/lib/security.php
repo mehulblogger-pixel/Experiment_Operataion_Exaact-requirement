@@ -78,14 +78,49 @@ function user_on_default_password($u) {
 // once a company has fifty people. Anything set through the change screen or the
 // user form has already been through the policy, which refuses every one of
 // these, so it cannot be a shipped default and does not need re-testing.
-function accounts_on_default_password() {
+// MEASURED, not guessed: on a demo install this took 6.4 SECONDS every time the
+// compliance screen or the Users screen was opened — 14 accounts x 4 candidate
+// passwords x ~115ms of bcrypt. The comment above predicted it and the guard on
+// pwd_changed_at was not enough, because the accounts that have never changed a
+// password are exactly the ones this has to test. So it bit hardest on the
+// installs that needed the answer most, and on a fifty-person company it would
+// have been half a minute.
+//
+// bcrypt is slow ON PURPOSE and cannot be made faster. What can change is how
+// often it runs: the answer only moves when somebody changes a password, or an
+// account is added or removed. That is a cheap thing to fingerprint, so the
+// result is cached against it and recomputed only when the fingerprint moves.
+function accounts_default_fingerprint() {
+    $r = ops_one("SELECT COUNT(*) n, COALESCE(MAX(id),0) mx, COALESCE(MAX(pwd_changed_at),'') pc,
+                         COALESCE(SUM(CASE WHEN is_active=1 THEN 1 ELSE 0 END),0) act
+                  FROM users");
+    return md5(($r['n'] ?? 0) . '|' . ($r['mx'] ?? 0) . '|' . ($r['pc'] ?? '') . '|' . ($r['act'] ?? 0));
+}
+
+function accounts_on_default_password($force = false) {
+    static $memo = null;
+    if ($memo !== null && !$force) return $memo;        // once per request, whatever asks
+
+    $fp = accounts_default_fingerprint();
+    if (!$force) {
+        $cached = (string)setting_get('pwd_default_cache', '');
+        if ($cached !== '') {
+            $c = json_decode($cached, true);
+            // Only trusted while the fingerprint matches. A stale answer here
+            // would be the worst kind: a screen saying every password is fine.
+            if (is_array($c) && ($c['fp'] ?? '') === $fp && isset($c['rows']))
+                return $memo = $c['rows'];
+        }
+    }
+
     $out = [];
     $rows = ops_all("SELECT id, username, first_name, last_name, role, password_hash
                      FROM users WHERE is_active=1 AND COALESCE(pwd_changed_at,'')='' LIMIT 200");
     foreach ($rows as $u) {
         if (user_on_default_password($u)) { unset($u['password_hash']); $out[] = $u; }
     }
-    return $out;
+    setting_set('pwd_default_cache', json_encode(['fp' => $fp, 'rows' => $out]));
+    return $memo = $out;
 }
 
 // ---------------------------------------------------------------------------
