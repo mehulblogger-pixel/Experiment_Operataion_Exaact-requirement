@@ -34,9 +34,25 @@ $me  = current_user();
   <div class="form-sec"><h3>Who they are</h3>
     <p>The minimum that makes a lead chaseable. Everything here comes across if they become a customer.</p></div>
   <div class="form-grid">
-    <div class="ff ff-wide ff-req"><label>Company or person</label>
-      <input class="form-control" name="company_name" required maxlength="200"
-             value="<?= e($val('company_name')) ?>" placeholder="Who are we chasing?"></div>
+    <?php // Company from the master, or a person's name typed in. Picking a
+          // company on the master links the lead straight to that customer, so
+          // it is never re-typed or mis-spelled — the same client picker the
+          // quotation screen uses. A person or a company we do not yet know is
+          // typed into the box, and stays a plain lead with no master link. ?>
+    <div class="ff ff-wide ff-req"><label for="lead-partner">Company or person</label>
+      <div class="pair-2">
+        <select class="form-control searchable" name="partner_id" id="lead-partner">
+          <option value="">— pick a company on the master —</option>
+          <?php foreach (($clients ?? []) as $cl): ?>
+            <option value="<?= (int)$cl['id'] ?>" <?= $val('partner_id') === (string)$cl['id'] ? 'selected' : '' ?>>
+              <?= e($cl['display_name'] ?: $cl['legal_name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <input class="form-control" name="company_name" id="lead-company" maxlength="200"
+               value="<?= e($val('company_name')) ?>" placeholder="…or type a new company / person's name">
+      </div>
+      <div class="ff-help">Already a customer? Pick them on the left. Someone new — a company or a person — type the name on the right.</div>
+    </div>
     <div class="ff"><label>Contact name</label>
       <input class="form-control" name="contact_name" maxlength="150" value="<?= e($val('contact_name')) ?>"></div>
     <div class="ff"><label>E-mail</label>
@@ -125,3 +141,33 @@ $me  = current_user();
     <a class="btn secondary" href="/leads">Cancel</a>
   </div>
 </form>
+
+<script>
+// Company from the master, OR a typed name — the two are one decision, so they
+// cannot both be filled. Picking a customer on the master takes over the name
+// box (its own name is what gets saved); clearing the picker hands the box back.
+(function () {
+  var sel  = document.getElementById('lead-partner');
+  var name = document.getElementById('lead-company');
+  if (!sel || !name) return;
+  function sync() {
+    var picked = sel.value !== '';
+    if (picked) {
+      var opt = sel.options[sel.selectedIndex];
+      name.value = opt ? opt.textContent.trim() : name.value;
+      name.readOnly = true;
+      name.classList.add('readonly-field');
+      name.removeAttribute('required');
+      name.placeholder = 'Using the customer picked on the left';
+    } else {
+      if (name.readOnly) name.value = '';   // only clear what WE filled
+      name.readOnly = false;
+      name.classList.remove('readonly-field');
+      name.setAttribute('required', 'required');
+      name.placeholder = '…or type a new company / person’s name';
+    }
+  }
+  sel.addEventListener('change', sync);
+  sync();   // honour a bounced-back partner_id on a retry
+})();
+</script>
