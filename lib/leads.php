@@ -455,11 +455,13 @@ function lead_log_contact($leadId, array $b = []) {
 
 // Quotations raised from this lead. Tolerant on purpose: a Sales-off install
 // has no quotations table, and a database whose CRM tables have not been
-// touched yet has the table but not the lead_id column (it is added by the CRM
-// migration, which a leads-only page never triggers). Either way the lead
-// screen must render, so any storage error here means "none to show", not 500.
+// migrated yet has the table but not the lead_id column. Either way this means
+// "none to show", never a 500 — and it must NEVER run the CRM migration itself.
+// It is called on every lead view, and migrating on a hot read path runs dozens
+// of extra queries and holds the one database connection far longer, which on a
+// shared server is exactly how "too many connections" is provoked. The column
+// is created the ordinary way, the first time any quotation screen is opened.
 function lead_quotes($leadId) {
-    if (function_exists('crm_migrate')) { try { crm_migrate(); } catch (Throwable $e) { /* ensure lead_id exists */ } }
     try {
         return ops_all("SELECT id, quote_no, rev, status, total_amount, created_at
                         FROM quotations WHERE lead_id=? ORDER BY id DESC", [(int)$leadId]);

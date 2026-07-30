@@ -16,7 +16,24 @@ function db() {
         // name is silently replaced with "?" as it is written, and no amount of
         // reading it back correctly will recover it. This makes new tables land
         // as utf8mb4 whatever the database default says.
-        $pdo = new PDO($dsn, $d['user'], $d['pass']);
+        //
+        // A SHARED MySQL SERVER MOMENTARILY OUT OF SLOTS SHOULD NOT BE AN ERROR
+        // PAGE. "Too many connections" (1040) and "can't connect" (2002) on a
+        // crowded host clear within a second, so we wait a beat and try again
+        // rather than turning a half-second spike into a dead screen. Crucially
+        // the wait happens BEFORE we hold any connection, so retrying costs the
+        // shared server nothing. A real fault — wrong password (1045), unknown
+        // database (1049) — is not transient and is thrown at once, unretried.
+        $attempt = 0;
+        while (true) {
+            try { $pdo = new PDO($dsn, $d['user'], $d['pass']); break; }
+            catch (PDOException $e) {
+                $m = $e->getMessage();
+                $transient = strpos($m, '1040') !== false || strpos($m, '2002') !== false || strpos($m, '1203') !== false;
+                if (!$transient || ++$attempt >= 3) throw $e;
+                usleep($attempt * 350000);   // 0.35s, then 0.70s — no DB slot held meanwhile
+            }
+        }
         // Belt to the DSN's braces, and the part that actually fixes new tables:
         // set the session's default charset so CREATE TABLE without an explicit
         // charset inherits utf8mb4 rather than whatever the database was made
