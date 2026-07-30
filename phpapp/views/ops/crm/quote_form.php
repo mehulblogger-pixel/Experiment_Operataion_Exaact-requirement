@@ -44,6 +44,12 @@
 
     <div class="ff ff-wide"><label>Subject / scope title</label><input class="form-control" name="subject" value="<?= e($g('subject')) ?>" placeholder="e.g. Third-party inspection services — pipeline project"></div>
 
+    <?php // What we have already quoted this customer and its group. Filled by
+          // JS from /quote-client when a customer is known, so it also updates
+          // the moment you pick a different customer above. Empty and invisible
+          // until then. ?>
+    <div class="ff ff-wide" id="qhist" style="display:none"></div>
+
     <div class="ff ff-wide"><label>Types of inspection requested <span class="muted">— same list the <?= e(Tl('call')) ?> uses<span id="it_narrow"></span></span></label>
       <div class="chip-row pickbox" id="itypes">
         <?php foreach ($svcOpts as $k=>$v): ?>
@@ -237,6 +243,7 @@
 
   // ---- §i / §ii: picking a client locks the free-text name and fills contacts
   var sel = document.getElementById('client_id'), nameBox = document.getElementById('client_name');
+  var excludeQuote = <?= $isEdit ? (int)$q['id'] : 0 ?>;
   function syncClient(fill){
     var on = sel.value !== '';
     nameBox.disabled = on;
@@ -244,18 +251,52 @@
     document.getElementById('cn_hint').textContent = on ? '— using the selected ' + <?= json_encode(Tl('client')) ?> : '';
     if (on) nameBox.value = sel.options[sel.selectedIndex].text;
     narrowTypes();
-    if (on && fill) {
-      fetch('/quote-client?id=' + encodeURIComponent(sel.value))
-        .then(function(r){ return r.json(); })
-        .then(function(d){
-          // only fill what is empty, so a typed-over value is never clobbered
+    if (!on) { renderHistory([]); return; }
+    // Fetch whenever a customer is known — on load too, not only on change — so
+    // the group's quotation history is there before you price anything. Only
+    // auto-fill the contact fields when the user actually picked (fill), never
+    // on load, where it would clobber an edited quote.
+    fetch('/quote-client?id=' + encodeURIComponent(sel.value) + '&exclude=' + excludeQuote)
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (fill) {
           [['contact_name','name'],['contact_email','email'],['contact_mobile','mobile']].forEach(function(p){
             var el = document.getElementById(p[0]);
             if (el && !el.value && d.contact && d.contact[p[1]]) el.value = d.contact[p[1]];
           });
           if (d.addresses && d.addresses.length) offerAddresses(d.addresses);
-        }).catch(function(){});
-    }
+        }
+        renderHistory(d.history || []);
+      }).catch(function(){});
+  }
+
+  // "What we have already quoted this group." A group company's own name is
+  // shown against its rows so subsidiaries are obvious; the customer you are
+  // quoting shows no name because every unlabelled row is theirs.
+  function renderHistory(list){
+    var box = document.getElementById('qhist');
+    if (!box) return;
+    if (!list || !list.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+    var rows = list.map(function(h){
+      return '<tr>'
+        + '<td><a href="/quote?id=' + h.id + '" target="_blank">' + esc(h.no) + '</a>'
+        + (h.company ? ' <span class="pill p-mut" style="font-size:11px">' + esc(h.company) + '</span>' : '') + '</td>'
+        + '<td>' + esc(h.subject || '—') + '</td>'
+        + '<td class="num">' + esc(h.value) + '</td>'
+        + '<td><span class="pill p-mut" style="font-size:11px">' + esc(h.status) + '</span></td>'
+        + '<td style="white-space:nowrap">' + esc(h.when) + '</td>'
+        + '</tr>';
+    }).join('');
+    box.innerHTML =
+      '<div class="panel" style="margin:0;border-left:3px solid var(--brand)">'
+      + '<h3 style="margin-top:0;font-size:14px">Already quoted to this ' + <?= json_encode(Tl('client')) ?> + ' &amp; its group '
+      + '<span class="muted" style="font-weight:400">(' + list.length + ')</span></h3>'
+      + '<p class="muted" style="font-size:12.5px;margin:0 0 8px">So you price with the full picture. A name against a row means it is a group company, not this one. Opens in a new tab.</p>'
+      + '<div style="overflow-x:auto"><table class="dt"><thead><tr>'
+      + '<th>Quotation</th><th>Subject</th><th class="num">Value</th><th>Status</th><th>Raised</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    box.style.display = '';
   }
   // §v — narrow the inspection-type picker to what this client actually buys
   function narrowTypes(){
