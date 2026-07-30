@@ -315,6 +315,15 @@ function lead_create(array $b) {
 
     $u = current_user();
     $ref = lead_ref_next();
+    // Who it is allocated to. A posted id wins; otherwise it belongs to whoever
+    // is entering it, which is the common case and the right default.
+    $ownerId = ($b['owner_user_id'] ?? '') !== '' ? (int)$b['owner_user_id'] : (int)($u['id'] ?? 0);
+    $ownerNm = '';
+    if ($ownerId) {
+        $ou = ops_one("SELECT * FROM users WHERE id=? AND is_active=1", [$ownerId]);
+        if ($ou) $ownerNm = user_name($ou);
+        else { $ownerId = (int)($u['id'] ?? 0); $ownerNm = $u ? user_name($u) : ''; }
+    }
     db()->prepare("INSERT INTO leads
         (ref,pipeline_id,stage_id,company_name,partner_id,contact_name,contact_email,contact_phone,
          source,source_note,requirement,value,expected_close,owner_user_id,owner_name,office_id,sbu,
@@ -328,8 +337,9 @@ function lead_create(array $b) {
             (string)($b['source'] ?? ''), substr(trim((string)($b['source_note'] ?? '')), 0, 200),
             (string)($b['requirement'] ?? ''),
             (float)($b['value'] ?? 0), (string)($b['expected_close'] ?? ''),
-            ($b['owner_user_id'] ?? '') !== '' ? (int)$b['owner_user_id'] : ($u['id'] ?? null),
-            substr(trim((string)($b['owner_name'] ?? ($u ? user_name($u) : ''))), 0, 150),
+            // The id and the name must come from the SAME place or they drift:
+            // allocate to Nisha and the row could still read "admin".
+            $ownerId, substr($ownerNm, 0, 150),
             ($b['office_id'] ?? '') !== '' ? (int)$b['office_id'] : (($u['home_office_id'] ?? null) ?: null),
             (string)($b['sbu'] ?? ''),
             date('c'),
@@ -564,6 +574,20 @@ function leads_bulk($action, array $ids) {
     $now = date('c');
     $n = 0;
     foreach ($allowed as $id) {
+        // Allocating to a colleague, not only to yourself. "Assign to me" was
+        // the ONLY way to give a lead an owner from the register, which is the
+        // opposite of what a manager standing over a list of new enquiries
+        // actually needs to do.
+        if ($action === 'assign') {
+            $to = (int)($_POST['assign_to'] ?? 0);
+            $ou = $to ? ops_one("SELECT * FROM users WHERE id=? AND is_active=1", [$to]) : null;
+            if (!$ou) return 'Choose an active person to allocate these to.';
+            db()->prepare("UPDATE leads SET owner_user_id=?, owner_name=?, updated_at=? WHERE id=?")
+                ->execute([(int)$ou['id'], user_name($ou), $now, $id]);
+            if (function_exists('act_log')) act_log('LEAD', $id, 'OWNER', 'Allocated to ' . user_name($ou) . ' in a bulk update');
+            $n++;
+            continue;
+        }
         if ($action === 'mine') {
             // user_name() is what lead_create() writes, so a lead reassigned in
             // bulk carries the same name as one created by hand.
@@ -634,6 +658,9 @@ function ops_leads($route, $method) {
                                         : lead_board((int)($_GET['pipeline'] ?? 0)),
             'pipelines' => pipelines_all(), 'canEdit' => $canEdit,
             'lostReasons' => function_exists('lk_options_or') ? lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS) : [],
+            // The people a batch of leads can be allocated to from the register.
+            'users' => ops_all("SELECT id, first_name, last_name, username FROM users
+                                WHERE is_active=1 ORDER BY first_name, last_name"),
         ]);
         return true;
     }
@@ -661,7 +688,7 @@ function ops_leads($route, $method) {
     if ($route === 'lead-new') {
         if ($method === 'POST') {
             $r = lead_create($_POST);
-            if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/lead-new'); }
+            if (!empty($r['err'])) { form_stash('lead-new', $_POST); flash($r['err'], 'error'); redirect('/lead-new'); }
             flash('Lead ' . $r['ref'] . ' created.');
             redirect('/lead?id=' . $r['id']);
         }
@@ -671,6 +698,16 @@ function ops_leads($route, $method) {
             'pipelines' => pipelines_all(), 'dup' => $dup, 'prefill' => $_GET,
             'offices' => ops_all("SELECT id, name FROM offices ORDER BY name"),
             'sources' => function_exists('lk_options_or') ? lk_options_or('lead_source', LEAD_SOURCES) : LEAD_SOURCES,
+            // Allocating at the moment of creation. Reported from a real test:
+            // a lead was added and the only way to give it to somebody was
+            // "Assign to me" on the register afterwards. Whoever takes the
+            // enquiry is very often not the person who will chase it.
+            'users' => ops_all("SELECT id, first_name, last_name, username FROM users
+                                WHERE is_active=1 ORDER BY first_name, last_name"),
+            // "Next thing to do" was a free-text box, so twenty people wrote
+            // twenty versions of "send profile". A master list makes it
+            // countable — and it stays typeable for the one that is not on it.
+            'nextActions' => function_exists('lk_options') ? lk_options('next_action') : [],
         ]);
         return true;
     }

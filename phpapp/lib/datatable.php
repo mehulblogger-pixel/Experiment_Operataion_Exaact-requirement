@@ -228,17 +228,45 @@ function dt_render(array $state, array $rows, $total, array $opt = []) {
       </div>
 
       <?php if ($bulk && $rows): ?>
-        <div class="dt-bulk">
-          <span class="muted" style="font-size:12.5px">With the rows you have ticked:</span>
-          <?php // A bulk action that needs one more answer — a reason, a person —
-                // puts its control here, inside the same form as the buttons. ?>
-          <?= (string)($opt['bulk_extra'] ?? '') ?>
-          <?php foreach ($bulk as $bk => $b): ?>
-            <button class="btn small<?= !empty($b['danger']) ? ' danger' : ' secondary' ?>"
-                    name="bulk" value="<?= e($bk) ?>"
-                    <?= !empty($b['confirm']) ? 'onclick="return dtConfirm(this,\'' . e($key) . '\',\'' . e($b['confirm']) . '\')"' : '' ?>>
-              <?= e($b['label']) ?></button>
-          <?php endforeach; ?>
+        <div class="dt-bulk-wrap">
+          <div class="dt-bulk">
+            <span class="muted" style="font-size:12.5px">With the rows you have ticked:</span>
+            <?php foreach ($bulk as $bk => $b): ?>
+              <button class="btn small<?= !empty($b['danger']) ? ' danger' : ' secondary' ?>"
+                      name="bulk" value="<?= e($bk) ?>" data-bulk="<?= e($bk) ?>"
+                      <?= !empty($b['confirm']) ? 'onclick="return dtConfirm(this,\'' . e($key) . '\',\'' . e($b['confirm']) . '\')"' : '' ?>>
+                <?= e($b['label']) ?></button>
+            <?php endforeach; ?>
+          </div>
+          <?php // Any control an action needs — a person, a reason — lives on its OWN
+                // row, and only appears when that action is reached for.
+                //
+                // Two things were wrong before. All the controls showed at once, so a
+                // lost-reason dropdown sat permanently beside a button about ownership
+                // and read as one baffling control rather than two unrelated ones. And
+                // when they shared a row with the buttons, revealing one REFLOWED the
+                // buttons — measured in a browser, they genuinely moved — so on a phone
+                // a thumb heading for "Mark lost" could land on the button beside it.
+                // Growing downwards moves nothing. ?>
+          <div class="dt-bulk-ctls">
+            <?= (string)($opt['bulk_extra'] ?? '') ?>
+          </div>
+          <script>
+          (function () {
+            var wrap = document.currentScript.closest('.dt-bulk-wrap');
+            if (!wrap) return;
+            var ctls = wrap.querySelectorAll('.bulk-ctl');
+            if (!ctls.length) return;
+            function show(which) {
+              Array.prototype.forEach.call(ctls, function (c) { c.hidden = (c.dataset.for !== which); });
+            }
+            Array.prototype.forEach.call(wrap.querySelectorAll('button[data-bulk]'), function (b) {
+              ['mouseenter', 'focus', 'touchstart'].forEach(function (ev) {
+                b.addEventListener(ev, function () { show(b.dataset.bulk); }, {passive: true});
+              });
+            });
+          })();
+          </script>
         </div>
       <?php endif; ?>
       </form>

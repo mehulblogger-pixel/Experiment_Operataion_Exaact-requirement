@@ -182,6 +182,50 @@ function csrf_token() {
     if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
     return $_SESSION['csrf'];
 }
+// ---------------------------------------------------------------------------
+//  Keeping what somebody typed when a submit is refused
+//
+//  Reported from a real test: a lead form was filled in, the submit was refused
+//  because the session had expired, and the screen came back EMPTY. Everything
+//  typed was gone. The message even said "nothing was changed", which was true
+//  about the database and a lie about the person's afternoon.
+//
+//  Losing somebody's typing is the rudest thing software does. So a refused POST
+//  is stashed for exactly one page load and the form fills itself back in.
+//  One load only, so a later visit to the same form is genuinely blank.
+// ---------------------------------------------------------------------------
+function form_stash($route, array $post) {
+    if (session_status() === PHP_SESSION_NONE) return;
+    unset($post['_csrf'], $post['_ticket'], $post['password'], $post['password2'], $post['new_password']);
+    $_SESSION['form_retry'] = ['route' => trim((string)$route, '/'), 'at' => time(), 'data' => $post];
+}
+
+// Loaded once per page and cleared from the session immediately, so a refresh
+// does not resurrect old typing. Both readers below go through this.
+function form_retry_data() {
+    static $mine = null;
+    if ($mine !== null) return $mine;
+    $mine = [];
+    $r = $_SESSION['form_retry'] ?? null;
+    if (is_array($r) && (time() - (int)($r['at'] ?? 0)) < 900) {
+        $here = trim((string)parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), '/');
+        if ($here === (string)($r['route'] ?? '')) $mine = (array)($r['data'] ?? []);
+    }
+    unset($_SESSION['form_retry']);
+    return $mine;
+}
+
+// What was typed, if this page is the one we were just bounced from.
+function form_old($name, $default = '') {
+    $d = form_retry_data();
+    if (!array_key_exists($name, $d)) return $default;
+    return is_array($d[$name]) ? $d[$name] : (string)$d[$name];
+}
+
+// True when this page is a retry, so the screen can say so rather than leaving
+// somebody wondering why the boxes are already full.
+function form_is_retry() { return form_retry_data() !== []; }
+
 function csrf_ok($token) {
     $have = $_SESSION['csrf'] ?? '';
     return $have !== '' && is_string($token) && hash_equals($have, $token);
