@@ -446,6 +446,17 @@ function lead_convert($leadId, array $b = []) {
     }
 
     // And an inquiry, so the funnel that already exists takes over.
+    //
+    // THE SUBJECT HAS TO SAY WHAT THE WORK IS. It used to read "From lead
+    // L-2026-0011", which tells a reader nothing and — because the quotation
+    // form takes its subject straight off the inquiry — meant the scope was
+    // typed out a second time on the quote, having already been typed on the
+    // lead. Where the lead came from is recorded in the notes below and in the
+    // record links, so the subject is free to carry the work itself.
+    $subject = trim(preg_replace('/\s+/', ' ', (string)$l['requirement']));
+    if ($subject === '') $subject = 'From lead ' . $l['ref'];
+    elseif (mb_strlen($subject) > 180) $subject = mb_substr($subject, 0, 177) . '...';
+
     $inqId = null;
     try {
         $no = 'INQ-' . date('ym') . '-' . str_pad((string)((int)ops_val("SELECT COUNT(*) FROM crm_inquiries") + 1), 3, '0', STR_PAD_LEFT);
@@ -455,7 +466,7 @@ function lead_convert($leadId, array $b = []) {
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'OPEN', ?,?,?)")
             ->execute([$no, $partnerId, $l['company_name'], $l['contact_name'], $l['contact_email'],
                        $l['contact_phone'],
-                       'From lead ' . $l['ref'],
+                       $subject,
                        (string)$l['requirement'], (string)$l['sbu'], (string)$l['source'],
                        date('Y-m-d'), (string)$l['owner_name'],
                        'Converted from lead ' . $l['ref'] . '.', user_name(current_user()), date('c')]);
