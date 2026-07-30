@@ -180,7 +180,7 @@
           </option>
         <?php endforeach; ?>
       </select></div>
-    <div><label>If lost, why *</label>
+    <div class="ff"><label>If lost, why</label>
       <select class="form-control" name="lost_reason"><option value="">—</option>
         <?php foreach ($lostReasons as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
       </select>
@@ -198,7 +198,35 @@
     <div class="ff-wide"><label>Name</label><input class="form-control" name="name" value="<?= e($o['name']) ?>" maxlength="255"></div>
     <div><label>Estimated value</label><input class="form-control" name="value" type="number" step="0.01" value="<?= e($o['value']) ?>"></div>
     <div><label>Expected close</label><input class="form-control" type="date" name="expected_close" value="<?= e($o['expected_close']) ?>"></div>
-    <div><label>Owner</label><input class="form-control" name="owner_name" value="<?= e($o['owner_name']) ?>" maxlength="150"></div>
+    <div class="ff"><label>Allocated to</label>
+      <select class="form-control searchable" name="owner_user_id">
+        <option value="">— nobody yet —</option>
+        <?php foreach (($users ?? []) as $uu): ?>
+          <option value="<?= (int)$uu['id'] ?>" <?= (int)($o['owner_user_id'] ?? 0) === (int)$uu['id'] ? 'selected' : '' ?>>
+            <?= e(trim($uu['first_name'] . ' ' . $uu['last_name']) ?: $uu['username']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <?php if (trim((string)($o['owner_name'] ?? '')) !== '' && !(int)($o['owner_user_id'] ?? 0)): ?>
+        <div class="ff-help">Held against the typed name “<?= e($o['owner_name']) ?>”, which is not linked to a login.
+          Pick the person and it becomes a real allocation.</div>
+      <?php endif; ?></div>
+
+    <?php // The pipeline was fixed at creation and could never be changed, so one
+          // wrong click meant abandoning the deal and re-keying it. Changing it
+          // moves the deal to the first open stage of the new pipeline, because a
+          // stage from one pipeline on a deal in another is what makes every
+          // board and forecast disagree. Only while the deal is open. ?>
+    <?php if (($o['status'] ?? 'OPEN') === 'OPEN' && !empty($pipelines)): ?>
+      <div class="ff"><label>Pipeline</label>
+        <select class="form-control" name="pipeline_id">
+          <?php foreach ($pipelines as $pl): ?>
+            <option value="<?= (int)$pl['id'] ?>" <?= (int)$pl['id'] === (int)$o['pipeline_id'] ? 'selected' : '' ?>>
+              <?= e($pl['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <div class="ff-help">Changing this moves the deal to the first open stage of the pipeline you pick, and the
+          move is written into its history.</div></div>
+    <?php endif; ?>
     <div><label>Branch</label>
       <select class="form-control" name="office_id"><option value="">—</option>
         <?php foreach ($offices as $f): ?><option value="<?= (int)$f['id'] ?>" <?= (int)$f['id']===(int)$o['office_id']?'selected':'' ?>><?= e($f['name']) ?></option><?php endforeach; ?>
@@ -211,7 +239,9 @@
     <div><label>By when</label><input class="form-control" type="date" name="next_action_on" value="<?= e($o['next_action_on']) ?>"></div>
     <div class="ff-wide"><label>What they need</label><textarea class="form-control" name="requirement" rows="3"><?= e($o['requirement']) ?></textarea></div>
   </div>
-  <button class="btn" style="margin-top:12px">Save</button>
+  <div class="form-actions">
+    <button class="btn" type="submit">Save</button>
+  </div>
 </form>
 <?php endif; ?>
 

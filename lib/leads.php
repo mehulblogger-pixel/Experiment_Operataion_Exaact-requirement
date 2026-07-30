@@ -355,6 +355,12 @@ function lead_move($leadId, $stageId, array $b = []) {
     if (!$to || (int)$to['pipeline_id'] !== (int)$l['pipeline_id'])
         return ['err' => 'That stage does not belong to this lead\'s pipeline.'];
 
+    // Same reason as the opportunity board: a move to the stage it already sits
+    // in is not a move, and recording one resets the clock that the stalled-lead
+    // figures count from.
+    if ((int)$to['id'] === (int)$l['stage_id'])
+        return ['err' => 'This lead is already at "' . $to['name'] . '".'];
+
     // Winning means converting. A lead marked won that produced no customer is
     // the disconnection this whole module exists to remove.
     if ($to['kind'] === 'WON') return ['convert' => true, 'stage_id' => (int)$to['id']];
