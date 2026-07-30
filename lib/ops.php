@@ -1776,7 +1776,7 @@ function ops_module_gate($route) {
         // to this person. One module gate here would either hide the whole screen
         // from someone who owns half of it, or show them findings they cannot act on.
         'profitability'=>'profitability','boss-renew'=>'profitability',
-        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring',
+        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring',
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring',
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads',
@@ -2001,9 +2001,11 @@ function ops_dispatch($route, $method) {
             ops_two_factor($method); return true;
         case $route === 'compliance':
             ops_compliance($method); return true;
-        case $route === 'incidents' || $route === 'incident' || $route === 'incident-new' || $route === 'incident-edit':
+        case $route === 'incidents' || $route === 'incident' || $route === 'incident-new' || $route === 'incident-edit'
+             || $route === 'incident-report':
             ops_incidents($route, $method); return true;
-        case $route === 'data-requests' || $route === 'person-data' || $route === 'person-erase':
+        case $route === 'data-requests' || $route === 'person-data' || $route === 'person-erase'
+             || $route === 'candidate-erase':
             ops_data_requests($route, $method); return true;
         case $route === 'privacy':
             view('ops/privacy', ['notice'=>privacy_notice_text(), 'g'=>grievance_officer()]); return true;

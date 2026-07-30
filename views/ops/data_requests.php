@@ -34,11 +34,32 @@
 <div class="panel" style="padding:0;overflow:hidden">
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
-    <thead><tr><th>Received</th><th>Who</th><th>What they want</th><th>Detail</th><th>Status</th><th>Answer</th></tr></thead>
+    <thead><tr><th>Received</th><th>Waiting</th><th>Who</th><th>What they want</th><th>Detail</th><th>Status</th><th>Answer</th></tr></thead>
     <tbody>
     <?php foreach ($rows as $r): ?>
       <tr>
         <td><?= e(fdate($r['received_at'])) ?></td>
+        <?php $ag = dsr_age($r); ?>
+        <td class="nowrap">
+          <?php if ($ag['days'] === null): ?>
+            <span class="muted">—</span>
+          <?php elseif ($ag['state'] === 'overdue'): ?>
+            <span class="pill p-bad"><?= (int)$ag['days'] ?> days</span>
+            <div class="t-xs t-mut">past the <?= (int)$ag['target'] ?>-day target</div>
+          <?php elseif ($ag['state'] === 'due-soon'): ?>
+            <span class="pill p-warn"><?= (int)$ag['days'] ?> days</span>
+            <div class="t-xs t-mut">of <?= (int)$ag['target'] ?></div>
+          <?php elseif ($ag['state'] === 'late-closed'): ?>
+            <span class="pill p-mut"><?= (int)$ag['days'] ?> days</span>
+            <div class="t-xs t-mut">answered late</div>
+          <?php elseif ($ag['state'] === 'answered'): ?>
+            <span class="pill p-ok"><?= (int)$ag['days'] ?> days</span>
+            <div class="t-xs t-mut">to answer</div>
+          <?php else: ?>
+            <span class="pill p-mut"><?= (int)$ag['days'] ?> days</span>
+            <div class="t-xs t-mut">of <?= (int)$ag['target'] ?></div>
+          <?php endif; ?>
+        </td>
         <td><b><?= e($r['requester']) ?></b><?= $r['contact'] ? '<br><span class="muted" style="font-size:12px">' . e($r['contact']) . '</span>' : '' ?></td>
         <td><?= e(DATA_REQUEST_KINDS[$r['kind']] ?? $r['kind']) ?></td>
         <td style="font-size:13px"><?= e($r['detail'] ?: '—') ?></td>
