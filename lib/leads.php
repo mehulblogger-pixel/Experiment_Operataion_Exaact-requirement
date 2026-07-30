@@ -305,8 +305,25 @@ function lead_possible_duplicate($company, $email = '') {
 
 function lead_create(array $b) {
     leads_migrate();
-    $company = trim((string)($b['company_name'] ?? ''));
-    if ($company === '') return ['err' => 'A lead needs a company or person to chase.'];
+
+    // WHO WE ARE CHASING — a company already on the master, or a new name.
+    //  Reported: the company field was a plain box, so an existing customer got
+    //  re-typed (often mis-spelled) as if we had never heard of them, and the
+    //  lead never linked back to the customer it was really for. The form now
+    //  offers the client master as a dropdown. When one is picked its own name
+    //  is authoritative — the free-text box is ignored, exactly as the quotation
+    //  screen already does — so the lead points at the real customer and the
+    //  name cannot drift. Type a name instead and it is a fresh company or a
+    //  person, with no master link, which is the whole point of a lead.
+    $partnerId = (int)($b['partner_id'] ?? 0);
+    $company   = trim((string)($b['company_name'] ?? ''));
+    if ($partnerId) {
+        $bp = ops_one("SELECT id, display_name, legal_name FROM business_partners WHERE id=? AND is_client=1", [$partnerId]);
+        if ($bp) $company = (string)($bp['display_name'] ?: $bp['legal_name']);
+        else     $partnerId = 0;   // a stale id is not a customer; fall back to the typed name
+    }
+    if ($company === '') return ['err' => 'A lead needs a company or person to chase. Pick one from the master, or type a name.'];
+    $b['partner_id'] = $partnerId ?: null;
 
     $pipe = (int)($b['pipeline_id'] ?? 0) ?: (int)(pipeline_default()['id'] ?? 0);
     $stages = pipeline_stages($pipe);
@@ -721,6 +738,9 @@ function ops_leads($route, $method) {
         $dup = ($_GET['company'] ?? '') !== '' ? lead_possible_duplicate((string)$_GET['company']) : null;
         view('ops/lead_form', [
             'pipelines' => pipelines_all(), 'dup' => $dup, 'prefill' => $_GET,
+            // The client master, so a company we already know is picked, not
+            // re-typed. Individuals and brand-new companies are still typed.
+            'clients' => function_exists('clients_list') ? clients_list() : [],
             'offices' => ops_all("SELECT id, name FROM offices ORDER BY name"),
             'sources' => function_exists('lk_options_or') ? lk_options_or('lead_source', LEAD_SOURCES) : LEAD_SOURCES,
             // Allocating at the moment of creation. Reported from a real test:

@@ -790,6 +790,12 @@ table.dt.qlines .btn.small{white-space:nowrap}
 .ff-help{font-size:var(--t-sm);color:var(--muted);margin-top:var(--s-1);line-height:1.4}
 .ff-err{font-size:var(--t-sm);color:var(--bad);margin-top:var(--s-1);font-weight:var(--fw-medium)}
 
+/* Two controls that are one decision — pick from a list on the left OR type on
+   the right (company-from-master vs a new name). Side by side where there is
+   room, stacked on a phone so neither is ever a cramped half-width box. */
+.pair-2{display:grid;grid-template-columns:1fr 1fr;gap:var(--s-2) var(--s-3);align-items:start}
+@media (max-width:560px){.pair-2{grid-template-columns:1fr}}
+
 /* Required. One marker, in one place, so a person can see before they start
    what the form will refuse to accept without. */
 .ff-req > label::after{content:" *";color:var(--bad);font-weight:var(--fw-bold)}
