@@ -187,29 +187,56 @@
   <?php endif; ?>
 <?php endif; ?>
 
-<?php if ($canEdit && $open): ?>
+<?php if ($canEdit && $open):
+  $curStageName = '';
+  foreach ($stages as $s) if ((int)$s['id'] === (int)$o['stage_id']) $curStageName = $s['name'];
+?>
 <form method="post" action="/opportunity-move" class="panel" style="margin-top:16px">
   <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
-  <h3 style="margin-top:0">Move it on</h3>
+  <h3 style="margin-top:0">Where is this deal — and where next?</h3>
+  <?php // Reported: "Move it does nothing / is very confusing." So the panel now
+        // names where the deal sits, says what a move means, and only asks for a
+        // lost reason once a losing stage is actually chosen. ?>
+  <p style="margin:0 0 4px">Right now it is at <b><?= e($curStageName ?: '—') ?></b>.</p>
+  <p class="muted" style="margin:0 0 14px;font-size:13px">Pick the stage this deal has genuinely reached and press <b>Move it</b>.
+    Move <b>forward</b> as it progresses. <b>Won</b> closes it as a sale and lets you raise the order. <b>Lost</b> closes it — and asks why, so the pipeline learns from it.</p>
   <div class="form-grid" style="gap:12px 16px">
-    <div><label>To which stage</label>
+    <div><label for="opp-stage">Move it to</label>
       <select class="form-control" name="stage_id" id="opp-stage">
         <?php foreach ($stages as $s): ?>
           <option value="<?= (int)$s['id'] ?>" data-kind="<?= e($s['kind']) ?>" <?= (int)$s['id']===(int)$o['stage_id']?'selected':'' ?>>
-            <?= e($s['name']) ?><?= (int)$s['probability'] ? ' (' . (int)$s['probability'] . '%)' : '' ?><?= $s['kind']!=='OPEN' ? ' — closes the deal' : '' ?>
+            <?= e($s['name']) ?><?= (int)$s['probability'] ? ' (' . (int)$s['probability'] . '%)' : '' ?><?= $s['kind']==='WON' ? ' — closes it as a sale' : ($s['kind']==='LOST' ? ' — closes it as lost' : '') ?>
           </option>
         <?php endforeach; ?>
-      </select></div>
-    <div class="ff"><label>If lost, why</label>
-      <select class="form-control" name="lost_reason"><option value="">—</option>
-        <?php foreach ($lostReasons as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
       </select>
-      <span class="muted" style="font-size:12px">Required to move to a losing stage. It is the only thing that makes the loss useful later.</span></div>
-    <div><label>Lost to</label><input class="form-control" name="lost_to" maxlength="200" placeholder="Which competitor, if you know"></div>
-    <div class="ff-wide"><label>Note</label><input class="form-control" name="lost_note" maxlength="500" placeholder="What actually happened"></div>
+      <span class="muted" style="font-size:12px">The one it is on now is where it stays if you change nothing.</span></div>
+  </div>
+  <div id="opp-lost" style="display:none;margin-top:10px;border-left:3px solid var(--bad,#dc2626);padding-left:12px">
+    <p class="muted" style="font-size:12.5px;margin:0 0 8px">You are closing this as <b>lost</b>. A reason is required — it is the only thing that makes a lost deal tell you anything later.</p>
+    <div class="form-grid" style="gap:12px 16px">
+      <div class="ff"><label>Why it was lost</label>
+        <select class="form-control" name="lost_reason"><option value="">choose a reason…</option>
+          <?php foreach ($lostReasons as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
+        </select></div>
+      <div><label>Lost to</label><input class="form-control" name="lost_to" maxlength="200" placeholder="Which competitor, if you know"></div>
+      <div class="ff-wide"><label>What actually happened</label><input class="form-control" name="lost_note" maxlength="500" placeholder="Optional, but useful"></div>
+    </div>
   </div>
   <button class="btn" style="margin-top:12px">Move it</button>
 </form>
+<script>
+// Show the "why lost" fields only when a losing stage is picked, so a normal
+// forward move is one dropdown and one button — not a wall of fields about loss.
+(function () {
+  var sel = document.getElementById('opp-stage'), lost = document.getElementById('opp-lost');
+  if (!sel || !lost) return;
+  function sync() {
+    var o = sel.options[sel.selectedIndex];
+    lost.style.display = (o && o.getAttribute('data-kind') === 'LOST') ? 'block' : 'none';
+  }
+  sel.addEventListener('change', sync); sync();
+})();
+</script>
 
 <form method="post" action="/opportunity-edit" class="panel" style="margin-top:16px">
   <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">

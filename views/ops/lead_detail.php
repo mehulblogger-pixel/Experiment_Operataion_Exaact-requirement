@@ -40,6 +40,7 @@
   <table class="grid">
     <tr><th>Contact</th><td><?= e($l['contact_name'] ?: '—') ?></td><th>E-mail</th><td><?= e($l['contact_email'] ?: '—') ?></td></tr>
     <tr><th>Telephone</th><td><?= e($l['contact_phone'] ?: '—') ?></td><th>Source</th><td><?= e($l['source'] ?: '—') ?></td></tr>
+    <tr><th>Preferred contact</th><td><?= e(($l['pref_contact'] ?? '') !== '' ? (LEAD_PREF_CONTACT[$l['pref_contact']] ?? $l['pref_contact']) : '—') ?></td><th>Quotations</th><td><?= count($quotes ?? []) ? count($quotes) : '—' ?></td></tr>
     <tr><th>Value</th><td><?= $l['value'] ? fmoney($l['value']) : '—' ?></td><th>Expected close</th><td><?= $l['expected_close'] ? e(fdate($l['expected_close'])) : '—' ?></td></tr>
     <tr><th>Owner</th><td><?= e($l['owner_name'] ?: '—') ?></td><th>Branch</th><td><?= e($l['office_name'] ?: '—') ?></td></tr>
     <tr><th>Next thing to do</th><td colspan="3"><?= e($l['next_action'] ?: '—') ?><?= $l['next_action_on'] ? ' — by ' . e(fdate($l['next_action_on'])) : '' ?></td></tr>
@@ -59,34 +60,159 @@
   <?php endif; ?>
 </div>
 
+<?php // ---- Log a contact -------------------------------------------------
+      // The thing a CRM is for, and the thing this lead screen could not do:
+      // record that you spoke to them, how, what was said, and when to chase
+      // next. Everything is optional except that it happened. ?>
 <?php if ($canEdit && $open): ?>
 <div class="panel" style="margin-top:16px">
-  <h3 style="margin-top:0">Move it on</h3>
-  <p class="muted" style="margin:0 0 10px">Moving to a <b>won</b> stage converts the lead — it becomes a customer and an inquiry. Moving to <b>lost</b> needs a reason, so win/loss analysis means something.</p>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <?php foreach ($stages as $s): if ((int)$s['id'] === (int)$l['stage_id']) continue; ?>
-      <?php if ($s['kind'] === 'LOST'): ?>
-        <form method="post" action="/lead-move" style="display:flex;gap:6px;align-items:center">
-          <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
-          <input type="hidden" name="stage_id" value="<?= (int)$s['id'] ?>">
-          <select class="form-control" name="lost_reason" required style="max-width:200px">
-            <option value="">why was it lost?</option>
-            <?php foreach ($lostReasons as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
-          </select>
-          <input class="form-control" name="lost_note" placeholder="anything more" style="max-width:180px">
-          <button class="btn small secondary"><?= e($s['name']) ?></button>
-        </form>
-      <?php else: ?>
+  <h3 style="margin-top:0">Log a contact</h3>
+  <p class="muted" style="margin:0 0 12px">Every call, message or meeting — so the next person to pick this up can see the whole story, and nobody forgets the follow-up.</p>
+  <form method="post" action="/lead-contact">
+    <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
+    <div class="form-grid">
+      <div class="ff"><label for="c-method">How</label>
+        <select class="form-control" name="method" id="c-method">
+          <?php foreach ($methods as $k=>$v): ?>
+            <option value="<?= e($k) ?>" <?= ($l['pref_contact'] ?? '')===$k?'selected':'' ?>><?= e($v) ?></option>
+          <?php endforeach; ?>
+        </select></div>
+      <div class="ff"><label for="c-dir">Which way</label>
+        <select class="form-control" name="direction" id="c-dir">
+          <option value="OUT">We contacted them</option>
+          <option value="IN">They contacted us</option>
+        </select></div>
+      <div class="ff"><label for="c-when">When</label>
+        <input class="form-control" type="date" name="occurred_on" id="c-when" value="<?= e($today) ?>" max="<?= e($today) ?>"></div>
+      <div class="ff"><label for="c-who">Who you spoke to</label>
+        <input class="form-control" name="with_whom" id="c-who" maxlength="150" value="<?= e($l['contact_name'] ?: '') ?>" placeholder="Name at their end"></div>
+      <div class="ff ff-wide"><label for="c-note">What was said</label>
+        <textarea class="form-control" name="note" id="c-note" rows="2" placeholder="Briefly — what they asked, what you told them, what they decided"></textarea></div>
+      <div class="ff"><label for="c-outcome">How it went</label>
+        <input class="form-control" name="outcome" id="c-outcome" maxlength="60" list="c-outcomes" placeholder="e.g. Interested, Call back, No answer">
+        <datalist id="c-outcomes">
+          <option>Interested</option><option>Wants a quotation</option><option>Call back later</option>
+          <option>No answer</option><option>Not interested</option><option>Asked us to email</option>
+        </datalist></div>
+      <div class="ff"><label for="c-pref">They prefer to be reached by</label>
+        <select class="form-control" name="pref_contact" id="c-pref">
+          <option value="">— no preference noted —</option>
+          <?php foreach ($prefMethods as $k=>$v): ?>
+            <option value="<?= e($k) ?>" <?= ($l['pref_contact'] ?? '')===$k?'selected':'' ?>><?= e($v) ?></option>
+          <?php endforeach; ?>
+        </select></div>
+    </div>
+    <div class="form-sec" style="margin-top:6px"><h3 style="font-size:14px">And the next step</h3>
+      <p>The one thing people forget. Fill it and it drives your follow-up list; leave it if there is nothing to do yet.</p></div>
+    <div class="form-grid">
+      <div class="ff ff-wide"><label for="c-next">Next thing to do</label>
+        <input class="form-control" name="next_action" id="c-next" maxlength="255" placeholder="e.g. Send the capability statement"></div>
+      <div class="ff"><label for="c-nexton">By when</label>
+        <input class="form-control" type="date" name="next_action_on" id="c-nexton" min="<?= e($today) ?>"></div>
+    </div>
+    <div class="form-actions"><button class="btn" type="submit">Save this contact</button></div>
+  </form>
+</div>
+<?php endif; ?>
+
+<?php // ---- Quotations, straight off the lead ------------------------------
+      // Reported: no way to raise or reach a quotation from the lead. Now the
+      // lead is where it starts and where it stays visible, at any stage. ?>
+<?php if (!empty($canQuote) || $quotes): ?>
+<div class="panel" style="margin-top:16px">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px">
+    <h3 style="margin:0">Quotations <span class="muted" style="font-weight:400;font-size:13px">(<?= count($quotes) ?>)</span></h3>
+    <?php if (!empty($canQuote) && $l['status'] !== 'LOST'): ?>
+      <a class="btn small" href="/quote-new?lead=<?= (int)$l['id'] ?>">+ Create a quotation</a>
+    <?php endif; ?>
+  </div>
+  <p class="muted" style="font-size:13px;margin:8px 0 0">The company, the contact and the requirement are carried across — you will not type them again.</p>
+  <?php if ($quotes): ?>
+    <table class="dt" style="margin-top:10px">
+      <thead><tr><th scope="col">Quotation</th><th scope="col">Status</th><th scope="col" class="num">Value</th><th scope="col">Raised</th></tr></thead>
+      <tbody>
+      <?php foreach ($quotes as $qq): ?>
+        <tr>
+          <td><a href="/quote?id=<?= (int)$qq['id'] ?>"><?= e($qq['quote_no']) ?><?= (int)$qq['rev'] ? ' r' . (int)$qq['rev'] : '' ?></a></td>
+          <td><span class="pill p-mut"><?= e($qq['status']) ?></span></td>
+          <td class="num"><?= e(fmoney($qq['total_amount'])) ?></td>
+          <td><?= e(fdate(substr((string)$qq['created_at'],0,10))) ?></td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php else: ?>
+    <p class="muted" style="margin:10px 0 0">None yet.<?= (!empty($canQuote) && $l['status'] !== 'LOST') ? ' Use <b>Create a quotation</b> above when you are ready to price it.' : '' ?></p>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php // ---- Move it on, made step by step ---------------------------------
+      // Reported: "Move to is very confusing for a first-time user." So the
+      // current position is named, each move says what it MEANS and why you
+      // would choose it, and winning/losing is set apart from just progressing. ?>
+<?php if ($canEdit && $open):
+  $curStage = '';
+  foreach ($stages as $s) if ((int)$s['id'] === (int)$l['stage_id']) $curStage = $s['name'];
+  $fwd = array_values(array_filter($stages, fn($s) => $s['kind']==='OPEN' && (int)$s['id']!==(int)$l['stage_id']));
+  $won = array_values(array_filter($stages, fn($s) => $s['kind']==='WON'));
+  $lost= array_values(array_filter($stages, fn($s) => $s['kind']==='LOST'));
+?>
+<div class="panel" style="margin-top:16px">
+  <h3 style="margin-top:0">Where is this lead now — and where next?</h3>
+  <p style="margin:0 0 4px">Right now it is at <b><?= e($curStage ?: '—') ?></b>. Move it on as the conversation really progresses — the stage is what the pipeline, the forecast and your manager read.</p>
+  <p class="muted" style="margin:0 0 14px;font-size:13px">A rule of thumb: <b>move forward</b> only when something actually changed (you reached them, they showed interest, they asked to be quoted). <b>Won</b> makes them a customer. <b>Lost</b> closes it — and asks why, so next quarter you know what to fix.</p>
+
+  <?php if ($fwd): ?>
+    <div class="form-sec" style="margin-top:0"><h3 style="font-size:14px">Move it forward</h3>
+      <p>It has genuinely progressed to this step.</p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <?php foreach ($fwd as $s): ?>
         <form method="post" action="/lead-move" style="display:inline">
           <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
           <input type="hidden" name="stage_id" value="<?= (int)$s['id'] ?>">
-          <button class="btn small<?= $s['kind']==='WON'?'':' secondary' ?>"><?= e($s['name']) ?><?= $s['kind']==='WON'?' →':'' ?></button>
+          <button class="btn small secondary" title="Move this lead to &quot;<?= e($s['name']) ?>&quot;"><?= e($s['name']) ?></button>
         </form>
-      <?php endif; ?>
-    <?php endforeach; ?>
-  </div>
-</div>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
 
+  <?php if ($won): ?>
+    <div class="form-sec"><h3 style="font-size:14px">They said yes</h3>
+      <p>This makes them a customer on the master and raises the enquiry — you will confirm the details on the next screen.</p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <?php foreach ($won as $s): ?>
+        <form method="post" action="/lead-move" style="display:inline">
+          <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
+          <input type="hidden" name="stage_id" value="<?= (int)$s['id'] ?>">
+          <button class="btn small"><?= e($s['name']) ?> →</button>
+        </form>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($lost): ?>
+    <div class="form-sec"><h3 style="font-size:14px">It did not happen</h3>
+      <p>Pick the closest reason. It is the only thing that makes lost deals tell you anything later.</p></div>
+    <?php foreach ($lost as $s): ?>
+      <form method="post" action="/lead-move" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:8px">
+        <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
+        <input type="hidden" name="stage_id" value="<?= (int)$s['id'] ?>">
+        <div class="ff" style="margin:0"><label style="font-size:12px">Why it was lost</label>
+          <select class="form-control" name="lost_reason" required style="max-width:220px">
+            <option value="">choose a reason…</option>
+            <?php foreach ($lostReasons as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
+          </select></div>
+        <div class="ff" style="margin:0"><label style="font-size:12px">Anything more</label>
+          <input class="form-control" name="lost_note" placeholder="optional" style="max-width:200px"></div>
+        <button class="btn small secondary"><?= e($s['name']) ?></button>
+      </form>
+    <?php endforeach; ?>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($canEdit && $open): ?>
 <form method="post" action="/lead-edit" class="panel" style="margin-top:16px;max-width:860px">
   <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
   <div class="form-sec"><h3>Details</h3>
@@ -125,6 +251,13 @@
           login. Pick the person here and it becomes a real allocation.</div>
       <?php endif; ?></div>
 
+    <div class="ff"><label>Preferred contact</label>
+      <select class="form-control" name="pref_contact">
+        <option value="">— not noted —</option>
+        <?php foreach (($prefMethods ?? []) as $k=>$v): ?>
+          <option value="<?= e($k) ?>" <?= ($l['pref_contact'] ?? '')===$k?'selected':'' ?>><?= e($v) ?></option>
+        <?php endforeach; ?>
+      </select></div>
     <div class="ff"><label>Next by</label>
       <input class="form-control" type="date" name="next_action_on" value="<?= e($l['next_action_on']) ?>"></div>
     <div class="ff ff-wide"><label>Next thing to do</label>
@@ -181,19 +314,24 @@ $converted = ($l['status'] ?? '') === 'CONVERTED' || !empty($l['converted_partne
   <?php endif; ?>
 </div>
 
-<?php if ($timeline): ?>
-<div class="panel" style="margin-top:16px">
+<div class="panel" style="margin-top:16px" id="timeline">
   <h3 style="margin-top:0">Everything that happened</h3>
+  <?php if ($timeline): ?>
   <table class="dt">
-    <thead><tr><th>When</th><th>What</th><th>Who</th></tr></thead>
+    <thead><tr><th>When</th><th>What</th><th>Notes</th><th>Who</th></tr></thead>
     <tbody>
     <?php foreach ($timeline as $a): ?>
-      <tr><td><?= e(fdate(substr((string)$a['occurred_at'],0,10))) ?></td>
+      <tr><td style="white-space:nowrap"><?= e(fdate(substr((string)$a['occurred_at'],0,10))) ?></td>
           <td><span class="pill <?= $a['auto']?'p-mut':'p-ok' ?>" style="font-size:11px"><?= e(ACT_KINDS[$a['kind']] ?? $a['kind']) ?></span>
-              <?= e($a['subject']) ?></td>
-          <td><?= e($a['owner'] ?: '—') ?></td></tr>
+              <?php if (!empty($a['direction'])): ?><span class="muted" style="font-size:11px"><?= $a['direction']==='IN'?'⭠ in':'⭢ out' ?></span><?php endif; ?>
+              <?= e($a['subject']) ?>
+              <?php if (!empty($a['outcome'])): ?> <span class="pill p-warn" style="font-size:11px"><?= e($a['outcome']) ?></span><?php endif; ?></td>
+          <td class="muted" style="font-size:12.5px;max-width:340px"><?= nl2br(e((string)($a['body'] ?? ''))) ?></td>
+          <td style="white-space:nowrap"><?= e($a['owner'] ?: '—') ?></td></tr>
     <?php endforeach; ?>
     </tbody>
   </table>
+  <?php else: ?>
+    <p class="muted" style="margin:0">Nothing logged yet.<?= ($canEdit && $open) ? ' Use <b>Log a contact</b> above the first time you reach them.' : '' ?></p>
+  <?php endif; ?>
 </div>
-<?php endif; ?>
