@@ -39,8 +39,8 @@
   <h3 style="margin-top:0">Owner and date</h3>
   <form method="post" action="/ncr-assign" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
     <input type="hidden" name="id" value="<?= (int)$n['id'] ?>">
-    <div><label>Owner</label><input name="owner" value="<?= e($n['owner']) ?>"></div>
-    <div><label>Due by</label><input type="date" name="due_on" value="<?= e($n['due_on']) ?>"></div>
+    <div><label>Owner</label><input class="form-control" name="owner" value="<?= e($n['owner']) ?>"></div>
+    <div><label>Due by</label><input class="form-control" type="date" name="due_on" value="<?= e($n['due_on']) ?>"></div>
     <button class="btn small">Save</button>
   </form>
 </div>
@@ -56,7 +56,7 @@
   <?php if ($canEdit && !$closed): ?>
   <form method="post" action="/ncr-contain">
     <input type="hidden" name="id" value="<?= (int)$n['id'] ?>">
-    <textarea name="containment" rows="2" placeholder="e.g. the report was recalled from the client the same day"><?= e($n['containment']) ?></textarea>
+    <textarea class="form-control" name="containment" rows="2" placeholder="e.g. the report was recalled from the client the same day"><?= e($n['containment']) ?></textarea>
     <button class="btn small" style="margin-top:8px">Save</button>
   </form>
   <?php endif; ?>
@@ -73,12 +73,12 @@
   <?php if ($canEdit && !$closed): ?>
   <form method="post" action="/ncr-disposition">
     <input type="hidden" name="id" value="<?= (int)$n['id'] ?>">
-    <select name="disposition" style="max-width:360px">
+    <select class="form-control" name="disposition" style="max-width:360px">
       <?php foreach (NCR_DISPOSITIONS as $k=>$v): ?>
         <option value="<?= e($k) ?>"<?= $n['disposition']===$k?' selected':'' ?>><?= e($v) ?></option>
       <?php endforeach; ?>
     </select>
-    <textarea name="disposition_note" rows="2" style="margin-top:8px" placeholder="Required if you are accepting it as it stands"><?= e($n['disposition_note']) ?></textarea>
+    <textarea class="form-control" name="disposition_note" rows="2" style="margin-top:8px" placeholder="Required if you are accepting it as it stands"><?= e($n['disposition_note']) ?></textarea>
     <button class="btn small" style="margin-top:8px">Record it</button>
   </form>
   <?php endif; ?>
@@ -115,7 +115,7 @@
     <?php if ($canClose): ?>
       <form method="post" action="/ncr-reopen" onsubmit="return confirm('Reopen this nonconformity?')">
         <input type="hidden" name="id" value="<?= (int)$n['id'] ?>">
-        <input name="why" placeholder="Why is it being reopened?" style="max-width:420px">
+        <input class="form-control" name="why" placeholder="Why is it being reopened?" style="max-width:420px">
         <button class="btn small secondary">Reopen</button>
       </form>
     <?php endif; ?>
@@ -126,7 +126,7 @@
   <?php else: ?>
     <form method="post" action="/ncr-close">
       <input type="hidden" name="id" value="<?= (int)$n['id'] ?>">
-      <textarea name="close_note" rows="2" placeholder="Anything worth saying on the way out (optional)"></textarea>
+      <textarea class="form-control" name="close_note" rows="2" placeholder="Anything worth saying on the way out (optional)"></textarea>
       <button class="btn" style="margin-top:8px">Close <?= e($n['ref']) ?></button>
     </form>
   <?php endif; ?>

@@ -360,14 +360,38 @@ try {
         boot();
     } catch (Throwable $e2) {
         $m = $e2->getMessage();
-        $isConn = stripos($m, 'connect') !== false || stripos($m, 'access denied') !== false
-               || stripos($m, 'unknown database') !== false || stripos($m, 'no such file') !== false;
-        $hint = $isConn
-            ? 'Open <code>config.php</code> and enter the MySQL database name, user and password for this server. '
-            . 'On shared hosting these come from the control panel under Databases; on your own server, from whoever set MySQL up.'
-            : 'The database is reachable but a table could not be set up. Send this message over and it will be fixed quickly.';
-        ops_fatal($isConn ? 'Database not connected' : 'Database setup error', $hint,
-                  $m . "\n" . $e2->getFile() . ':' . $e2->getLine(), true);
+
+        // Say which of these it is. The old page answered every connection
+        // failure with "open config.php and enter the database name, user and
+        // password" — which is actively wrong for a server that has simply run
+        // out of connection slots, and sends somebody to re-check credentials
+        // that were never the problem. [1040] was reported from the live server
+        // and that is exactly what it did.
+        $title = 'Database not connected';
+        $hint  = '';
+        if (stripos($m, 'too many connections') !== false || strpos($m, '1040') !== false) {
+            $title = 'The database server is full, just for a moment';
+            $hint  = '<b>Nothing is wrong with this application and nothing is lost.</b> The MySQL server has run out '
+                   . 'of connection slots, so it refused one more. Wait a few seconds and reload — it usually clears '
+                   . 'on its own.<br><br>If it keeps happening, it is a hosting limit rather than a setting here: ask '
+                   . 'your host to raise <code>max_connections</code>, and check whether another application on the '
+                   . 'same MySQL server is holding connections open. Several apps sharing one small database server '
+                   . 'is the usual cause.';
+        } elseif (stripos($m, 'access denied') !== false || strpos($m, '1045') !== false) {
+            $hint = 'The database name is right but the <b>user or password</b> is not. Open <code>config.php</code> '
+                  . 'and check them against the control panel under Databases.';
+        } elseif (stripos($m, 'unknown database') !== false || strpos($m, '1049') !== false) {
+            $hint = 'The user and password are accepted but there is <b>no database by that name</b> on this server. '
+                  . 'Check the name in <code>config.php</code> — on shared hosting it usually carries an account prefix.';
+        } elseif (stripos($m, 'connect') !== false || stripos($m, 'no such file') !== false || strpos($m, '2002') !== false) {
+            $hint = 'The database server could not be reached at all. Check the <b>host</b> in <code>config.php</code> — '
+                  . 'on most shared hosting it is <code>localhost</code>.';
+        } else {
+            $title = 'Database setup error';
+            $hint  = 'The database is reachable but a table could not be set up. Send this message over and it will be '
+                   . 'fixed quickly.';
+        }
+        ops_fatal($title, $hint, $m . "\n" . $e2->getFile() . ':' . $e2->getLine(), true);
     }
 }
 

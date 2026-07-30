@@ -27,7 +27,7 @@
     <form method="get" action="/leads" style="display:flex;gap:8px;margin-left:auto">
       <input type="hidden" name="v" value="list">
       <label class="sr-only" for="lead-find">Find a lead</label>
-      <input id="lead-find" name="q" value="<?= e($_GET['q'] ?? '') ?>" placeholder="Find a company or reference">
+      <input class="form-control" id="lead-find" name="q" value="<?= e($_GET['q'] ?? '') ?>" placeholder="Find a company or reference">
       <button class="btn small secondary">Find</button>
     </form>
   <?php endif; ?>
@@ -37,10 +37,10 @@
   <?php // Named apart from $cols, which is the register's column definitions.
         // Two different things under one name is how a page 500s a screen later. ?>
   <?php $boardCols = $board['columns']; ?>
-  <div style="overflow-x:auto;margin-top:16px">
-    <div style="display:flex;gap:12px;min-width:min-content;align-items:flex-start">
+  <div class="board-wrap mt-4">
+    <div class="board">
       <?php foreach ($board['stages'] as $s): $col = $boardCols[(int)$s['id']] ?? ['leads'=>[],'value'=>0]; ?>
-        <div class="panel" style="min-width:250px;max-width:250px;padding:12px">
+        <div class="panel board-col">
           <div style="display:flex;justify-content:space-between;align-items:baseline">
             <b style="font-size:13.5px"><?= e($s['name']) ?></b>
             <span class="muted" style="font-size:12px"><?= count($col['leads']) ?></span>
@@ -72,7 +72,7 @@
   $reasonSelect = '';
   if ($canEdit) {
       $reasonSelect = '<label class="sr-only" for="lead-lost-reason">Why they were lost</label>'
-        . '<select id="lead-lost-reason" name="lost_reason" style="padding:5px 8px;font-size:12.5px;'
+        . '<select class="form-control" id="lead-lost-reason" name="lost_reason" style="padding:5px 8px;font-size:12.5px;'
         . 'border:1px solid var(--line);border-radius:8px;background:var(--card);color:inherit">';
       foreach (($lostReasons ?: ['NO_RESPONSE' => 'No response']) as $k => $v)
           $reasonSelect .= '<option value="' . e($k) . '">' . e($v) . '</option>';

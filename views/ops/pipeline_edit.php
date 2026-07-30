@@ -18,7 +18,7 @@
   <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
   <div style="padding:12px 16px;background:var(--soft);border-bottom:1px solid var(--line);display:flex;gap:14px;flex-wrap:wrap;align-items:end">
     <div class="ff" style="flex:1;min-width:220px"><label for="pname">Name</label>
-      <input id="pname" name="pipeline_name" value="<?= e($p['name']) ?>" maxlength="120" <?= $canEdit?'':'disabled' ?>></div>
+      <input class="form-control" id="pname" name="pipeline_name" value="<?= e($p['name']) ?>" maxlength="120" <?= $canEdit?'':'disabled' ?>></div>
     <div class="ff-check"><input type="checkbox" name="active" id="pactive" value="1" <?= (int)$p['active']?'checked':'' ?> <?= $canEdit?'':'disabled' ?>>
       <label for="pactive">In use</label></div>
   </div>
@@ -43,21 +43,21 @@
         <tr<?= (int)$s['active'] ? '' : ' style="opacity:.55"' ?>>
           <td><?= $i + 1 ?></td>
           <td><label class="sr-only" for="n-<?= $sid ?>">Stage name</label>
-              <input id="n-<?= $sid ?>" name="name[<?= $sid ?>]" value="<?= e($s['name']) ?>" maxlength="120" style="min-width:170px" <?= $canEdit?'':'disabled' ?>></td>
+              <input class="form-control" id="n-<?= $sid ?>" name="name[<?= $sid ?>]" value="<?= e($s['name']) ?>" maxlength="120" style="min-width:170px" <?= $canEdit?'':'disabled' ?>></td>
           <td><label class="sr-only" for="k-<?= $sid ?>">What this stage means</label>
-              <select id="k-<?= $sid ?>" name="kind[<?= $sid ?>]" <?= $canEdit?'':'disabled' ?>>
+              <select class="form-control" id="k-<?= $sid ?>" name="kind[<?= $sid ?>]" <?= $canEdit?'':'disabled' ?>>
                 <?php foreach ($kinds as $k => $lbl): ?>
                   <option value="<?= e($k) ?>" <?= $s['kind']===$k?'selected':'' ?>><?= e($lbl) ?></option>
                 <?php endforeach; ?>
               </select></td>
           <td class="num"><label class="sr-only" for="p-<?= $sid ?>">Probability</label>
-              <input id="p-<?= $sid ?>" name="probability[<?= $sid ?>]" type="number" min="0" max="100"
+              <input class="form-control" id="p-<?= $sid ?>" name="probability[<?= $sid ?>]" type="number" min="0" max="100"
                      value="<?= (int)$s['probability'] ?>" style="width:78px;text-align:right" <?= $canEdit?'':'disabled' ?>>%</td>
           <td class="num"><label class="sr-only" for="s-<?= $sid ?>">Days allowed in this stage</label>
-              <input id="s-<?= $sid ?>" name="sla_days[<?= $sid ?>]" type="number" min="0"
+              <input class="form-control" id="s-<?= $sid ?>" name="sla_days[<?= $sid ?>]" type="number" min="0"
                      value="<?= (int)$s['sla_days'] ?>" style="width:70px;text-align:right" <?= $canEdit?'':'disabled' ?>></td>
           <td><label class="sr-only" for="a-<?= $sid ?>">In use</label>
-              <input id="a-<?= $sid ?>" type="checkbox" name="active[<?= $sid ?>]" value="1" <?= (int)$s['active']?'checked':'' ?> <?= $canEdit?'':'disabled' ?>></td>
+              <input class="form-control" id="a-<?= $sid ?>" type="checkbox" name="active[<?= $sid ?>]" value="1" <?= (int)$s['active']?'checked':'' ?> <?= $canEdit?'':'disabled' ?>></td>
           <td class="num"><?= (int)$s['in_use'] ? '<b>' . (int)$s['in_use'] . '</b>' : '<span class="muted">—</span>' ?></td>
           <?php if ($canEdit): ?>
             <td><?php if (!(int)$s['in_use']): ?>
@@ -96,11 +96,11 @@
   <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
   <h3 style="margin-top:0">Add a stage</h3>
   <div class="form-grid" style="gap:12px 16px">
-    <div><label>Name *</label><input name="name" required maxlength="120" placeholder="e.g. Technical approval, Client site visit"></div>
+    <div><label>Name *</label><input class="form-control" name="name" required maxlength="120" placeholder="e.g. Technical approval, Client site visit"></div>
     <div><label>What it means</label>
-      <select name="kind"><?php foreach ($kinds as $k => $lbl): ?><option value="<?= e($k) ?>"><?= e($lbl) ?></option><?php endforeach; ?></select></div>
-    <div><label>Probability</label><input name="probability" type="number" min="0" max="100" value="50"></div>
-    <div><label>Days allowed</label><input name="sla_days" type="number" min="0" value="14">
+      <select class="form-control" name="kind"><?php foreach ($kinds as $k => $lbl): ?><option value="<?= e($k) ?>"><?= e($lbl) ?></option><?php endforeach; ?></select></div>
+    <div><label>Probability</label><input class="form-control" name="probability" type="number" min="0" max="100" value="50"></div>
+    <div><label>Days allowed</label><input class="form-control" name="sla_days" type="number" min="0" value="14">
       <span class="muted" style="font-size:12px">A deal past this shows as stopped moving. 0 means never chase it.</span></div>
   </div>
   <button class="btn" style="margin-top:12px">Add it</button>

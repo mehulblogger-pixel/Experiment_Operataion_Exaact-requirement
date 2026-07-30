@@ -42,15 +42,15 @@
 <form method="post" action="/conf-undertaking-add" enctype="multipart/form-data" class="panel" style="margin-top:16px;max-width:820px">
   <h3 style="margin-top:0">Record an undertaking</h3>
   <div class="form-grid" style="gap:12px 16px">
-    <div><label>Person</label><select name="person_id" required><option value="">— choose —</option>
+    <div><label>Person</label><select class="form-control" name="person_id" required><option value="">— choose —</option>
       <?php foreach ($inspectors as $i): ?><option value="<?= (int)$i['id'] ?>"><?= e($i['name']) ?></option><?php endforeach; ?></select></div>
-    <div><label>Kind</label><select name="kind">
+    <div><label>Kind</label><select class="form-control" name="kind">
       <?php foreach (CONF_UNDERTAKING_KINDS as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div><label>Signed on</label><input type="date" name="signed_on" value="<?= e(date('Y-m-d')) ?>"></div>
-    <div><label>Valid to <span class="muted">(blank = no end date)</span></label><input type="date" name="valid_to"></div>
-    <div><label>Wording reference</label><input name="wording_ref" placeholder="e.g. CONF-UND Rev 3"></div>
+    <div><label>Signed on</label><input class="form-control" type="date" name="signed_on" value="<?= e(date('Y-m-d')) ?>"></div>
+    <div><label>Valid to <span class="muted">(blank = no end date)</span></label><input class="form-control" type="date" name="valid_to"></div>
+    <div><label>Wording reference</label><input class="form-control" name="wording_ref" placeholder="e.g. CONF-UND Rev 3"></div>
     <div><label>The signed document</label><input type="file" name="file"></div>
-    <div class="ff-wide"><label>Note</label><input name="note" maxlength="500"></div>
+    <div class="ff-wide"><label>Note</label><input class="form-control" name="note" maxlength="500"></div>
   </div>
   <button class="btn" style="margin-top:12px">Record it</button>
   <p class="muted" style="margin-top:8px;font-size:12.5px">A renewal is a new row, never an edit — "what was in force in March" has to stay answerable.</p>
@@ -82,14 +82,14 @@
 <form method="post" action="/conf-nda-add" enctype="multipart/form-data" class="panel" style="margin-top:16px;max-width:820px">
   <h3 style="margin-top:0">Record a client agreement</h3>
   <div class="form-grid" style="gap:12px 16px">
-    <div><label>Client</label><select name="partner_id" required><option value="">— choose —</option>
+    <div><label>Client</label><select class="form-control" name="partner_id" required><option value="">— choose —</option>
       <?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['display_name'] ?: $c['legal_name']) ?></option><?php endforeach; ?></select></div>
-    <div><label>What it is called</label><input name="title" maxlength="200" placeholder="e.g. Mutual NDA, Sept 2026"></div>
-    <div><label>Signed on</label><input type="date" name="signed_on"></div>
-    <div><label>Runs to</label><input type="date" name="valid_to"></div>
-    <div><label>Obligation survives (months past the end)</label><input type="number" min="0" name="survives_months" value="0"></div>
+    <div><label>What it is called</label><input class="form-control" name="title" maxlength="200" placeholder="e.g. Mutual NDA, Sept 2026"></div>
+    <div><label>Signed on</label><input class="form-control" type="date" name="signed_on"></div>
+    <div><label>Runs to</label><input class="form-control" type="date" name="valid_to"></div>
+    <div><label>Obligation survives (months past the end)</label><input class="form-control" type="number" min="0" name="survives_months" value="0"></div>
     <div><label>The signed document</label><input type="file" name="file"></div>
-    <div class="ff-wide"><label>Anything stricter than our standard terms</label><textarea name="terms" rows="3"></textarea></div>
+    <div class="ff-wide"><label>Anything stricter than our standard terms</label><textarea class="form-control" name="terms" rows="3"></textarea></div>
   </div>
   <button class="btn" style="margin-top:12px">Record it</button>
 </form>
@@ -126,16 +126,16 @@
 <form method="post" action="/conf-breach-add" class="panel" style="margin-top:16px;max-width:820px">
   <h3 style="margin-top:0">Record a breach</h3>
   <div class="form-grid" style="gap:12px 16px">
-    <div><label>What happened</label><select name="kind">
+    <div><label>What happened</label><select class="form-control" name="kind">
       <?php foreach (CONF_BREACH_KINDS as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div><label>Whose information</label><select name="partner_id"><option value="">— not a specific client —</option>
+    <div><label>Whose information</label><select class="form-control" name="partner_id"><option value="">— not a specific client —</option>
       <?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['display_name'] ?: $c['legal_name']) ?></option><?php endforeach; ?></select></div>
-    <div><label>Happened on</label><input type="date" name="happened_on"></div>
-    <div><label>Discovered on</label><input type="date" name="discovered_on" value="<?= e(date('Y-m-d')) ?>"></div>
-    <div class="ff-wide"><label>What got out *</label><textarea name="what_got_out" rows="3" required
+    <div><label>Happened on</label><input class="form-control" type="date" name="happened_on"></div>
+    <div><label>Discovered on</label><input class="form-control" type="date" name="discovered_on" value="<?= e(date('Y-m-d')) ?>"></div>
+    <div class="ff-wide"><label>What got out *</label><textarea class="form-control" name="what_got_out" rows="3" required
       placeholder="Be specific — which report, whose data, how much of it."></textarea></div>
-    <div class="ff-wide"><label>Who saw it</label><input name="who_saw_it" maxlength="400"></div>
-    <div class="ff-wide"><label>What was done immediately</label><textarea name="containment" rows="2"></textarea></div>
+    <div class="ff-wide"><label>Who saw it</label><input class="form-control" name="who_saw_it" maxlength="400"></div>
+    <div class="ff-wide"><label>What was done immediately</label><textarea class="form-control" name="containment" rows="2"></textarea></div>
   </div>
   <button class="btn" style="margin-top:12px">Record it</button>
   <p class="muted" style="margin-top:8px;font-size:12.5px">This raises a <b>major</b> nonconformity automatically. Losing control of a client's information is not a minor lapse.</p>

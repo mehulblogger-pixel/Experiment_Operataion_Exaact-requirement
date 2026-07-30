@@ -863,7 +863,26 @@ function contract_number_for($job, $call, $quotationId = 0) {
 }
 function pname($p) { return $p ? ($p['display_name'] ?: $p['legal_name']) : '—'; }
 // Currency symbol and date format are settings, not hard-coded (Settings → Display).
-function cur_sym() { static $s = null; if ($s === null) $s = setting_get('currency_symbol', '') ?: '₹'; return $s; }
+// The currency symbol, defended against its own storage.
+//
+// Reported from the live server: every money figure in the app read "?10,000".
+// The symbol is kept in the settings table, and none of the CREATE TABLE
+// statements name a charset — so on MySQL each table takes the DATABASE
+// default. Where that default is latin1 (still common on cPanel hosts), the
+// three bytes of ₹ cannot be represented, MySQL substitutes "?" on the way IN,
+// and it reads back as "?" for ever afterwards. The connection being utf8mb4
+// does not save you; by then the damage is in the column.
+//
+// So a stored symbol containing "?" or invalid UTF-8 is not a currency symbol,
+// and is ignored in favour of the default. "?10,000" on every screen in the
+// system is far worse than quietly falling back to ₹.
+function cur_sym() {
+    static $s = null;
+    if ($s !== null) return $s;
+    $v = trim((string)setting_get('currency_symbol', ''));
+    if ($v === '' || strpos($v, '?') !== false || !mb_check_encoding($v, 'UTF-8')) $v = '₹';
+    return $s = $v;
+}
 const DATE_FORMATS = ['d M Y'=>'25 Jul 2026', 'd/m/Y'=>'25/07/2026', 'd-m-Y'=>'25-07-2026', 'Y-m-d'=>'2026-07-25', 'M d, Y'=>'Jul 25, 2026'];
 function date_fmt() { static $f = null; if ($f === null) { $f = setting_get('date_format', '') ?: 'd M Y'; if (!isset(DATE_FORMATS[$f])) $f = 'd M Y'; } return $f; }
 // Format a stored Y-m-d (or any parseable) date for display.
@@ -1759,7 +1778,7 @@ function ops_module_gate($route) {
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring',
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring',
-        'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads',
+        'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads',
         'opportunity-move'=>'leads','opportunity-quote'=>'leads','opportunity-from-lead'=>'leads',
         'opportunity-raise-order'=>'leads',

@@ -46,13 +46,13 @@
   <h3 style="margin-top:0">Create one</h3>
   <p class="muted" style="font-size:13px;margin:0 0 12px">Cloning is usually quicker — "the same as the main funnel but with an extra approval step" is the common case, and retyping seven stages from a blank screen is how people give up.</p>
   <div class="form-grid" style="gap:12px 16px">
-    <div><label>Name *</label><input name="name" required maxlength="120" placeholder="e.g. AMC renewals, Government tenders, Export orders"></div>
+    <div><label>Name *</label><input class="form-control" name="name" required maxlength="120" placeholder="e.g. AMC renewals, Government tenders, Export orders"></div>
     <div><label>What is it for</label>
-      <select name="entity_kind">
+      <select class="form-control" name="entity_kind">
         <?php foreach ($entities as $k => $lbl): ?><option value="<?= e($k) ?>"><?= e($lbl) ?></option><?php endforeach; ?>
       </select></div>
     <div><label>Start from</label>
-      <select name="clone_from">
+      <select class="form-control" name="clone_from">
         <option value="">— a plain four-stage starter —</option>
         <?php foreach ($rows as $r): ?>
           <option value="<?= (int)$r['id'] ?>"><?= e($r['name']) ?> (<?= e($entities[$r['entity_kind']] ?? $r['entity_kind']) ?>)</option>

@@ -57,26 +57,26 @@
   <h3 style="margin-top:0">Add a requirement</h3>
   <div class="form-grid" style="gap:12px 16px">
     <div><label>Client</label>
-      <select name="partner_id" required>
+      <select class="form-control" name="partner_id" required>
         <option value="">— choose —</option>
         <?php foreach ($clients as $c): ?>
           <option value="<?= (int)$c['id'] ?>"><?= e($c['display_name'] ?: $c['legal_name']) ?></option>
         <?php endforeach; ?>
       </select></div>
     <div><label>Site <span class="muted">(leave blank for every site of that client)</span></label>
-      <input name="site_address_id" placeholder="address id, or blank"></div>
+      <input class="form-control" name="site_address_id" placeholder="address id, or blank"></div>
     <div><label>Document</label>
-      <select name="doc_kind">
+      <select class="form-control" name="doc_kind">
         <?php foreach ($kinds as $k => $v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
     <div><label>Still valid this many days after the visit</label>
-      <input type="number" name="valid_days_after" min="0" value="0" placeholder="0 = valid on the day is enough"></div>
+      <input class="form-control" type="number" name="valid_days_after" min="0" value="0" placeholder="0 = valid on the day is enough"></div>
     <div class="ff-wide">
       <label style="display:flex;gap:8px;align-items:flex-start;font-weight:400">
         <input type="checkbox" name="is_mandatory" value="1" checked>
         <span>This one <b>blocks</b> the allocation. A manager can still send somebody, but only by stating why — and that reason stays on the <?= e(Tl('job')) ?>. Untick to warn only.</span></label></div>
     <div class="ff-wide"><label>Note <span class="muted">(what the site actually asks for)</span></label>
-      <input name="note" maxlength="400" placeholder="e.g. Gate pass must be applied for 7 days ahead through their security office"></div>
+      <input class="form-control" name="note" maxlength="400" placeholder="e.g. Gate pass must be applied for 7 days ahead through their security office"></div>
   </div>
   <button class="btn" style="margin-top:12px">Add it</button>
 </form>

@@ -33,7 +33,7 @@
       echo   '<form method="post" action="/hierarchy" class="oc-move"><input type="hidden" name="do" value="set">';
       echo     '<input type="hidden" name="tab" value="chart">';
       echo     '<input type="hidden" name="user_id" value="' . (int)$n['id'] . '">';
-      echo     '<select name="manager_id" onchange="this.form.submit()" title="Move under another manager">';
+      echo     '<select class="form-control" name="manager_id" onchange="this.form.submit()" title="Move under another manager">';
       echo       '<option value="">— top level —</option>';
       foreach ($all as $u) {
         if ((int)$u['id'] === (int)$n['id']) continue;
@@ -82,7 +82,7 @@
       echo     '<input type="hidden" name="do" value="office-move"><input type="hidden" name="tab" value="offices">';
       echo     '<input type="hidden" name="office_id" value="' . $id . '">';
       echo     '<span class="ot-lab">under</span>';
-      echo     '<select name="parent_office_id" onchange="this.form.submit()" title="Move this ' . e(Tl('office')) . ' under another">';
+      echo     '<select class="form-control" name="parent_office_id" onchange="this.form.submit()" title="Move this ' . e(Tl('office')) . ' under another">';
       echo       '<option value="">— top level —</option>';
       // Its own sub-offices are left out: choosing one would fold the branch
       // into a loop, and the picker should not offer what it will refuse.
@@ -249,14 +249,14 @@
         <input type="hidden" name="do" value="office-save"><input type="hidden" name="tab" value="offices">
         <input type="hidden" name="office_id" value="<?= (int)($o['id'] ?? 0) ?>">
         <div class="form-grid">
-          <div class="ff"><label>Code</label><input name="o_code" value="<?= e($o['code'] ?? '') ?>" placeholder="e.g. AMD"></div>
-          <div class="ff ff-wide"><label><?= e(TH('office')) ?> name *</label><input name="o_name" required value="<?= e($o['name'] ?? '') ?>"></div>
-          <div class="ff"><label>Type</label><select name="o_type">
+          <div class="ff"><label>Code</label><input class="form-control" name="o_code" value="<?= e($o['code'] ?? '') ?>" placeholder="e.g. AMD"></div>
+          <div class="ff ff-wide"><label><?= e(TH('office')) ?> name *</label><input class="form-control" name="o_name" required value="<?= e($o['name'] ?? '') ?>"></div>
+          <div class="ff"><label>Type</label><select class="form-control" name="o_type">
             <?php foreach (OFFICE_TYPES as $k => $v): ?>
               <option value="<?= e($k) ?>"<?= ($o['office_type'] ?? 'BRANCH') === $k ? ' selected' : '' ?>><?= e($v) ?></option>
             <?php endforeach; ?>
           </select></div>
-          <div class="ff"><label>Sits under</label><select name="o_parent">
+          <div class="ff"><label>Sits under</label><select class="form-control" name="o_parent">
             <option value="">— top level —</option>
             <?php $pre = (int)($o['parent_office_id'] ?? ($_GET['under'] ?? 0));
                   foreach ($offOpts as $oid => $lbl): ?>
@@ -270,7 +270,7 @@
                 // every other dropdown. No password: the account is a record, not a
                 // way in, until somebody deliberately gives them one. ?>
           <div class="ff"><label>Head of this <?= e(Tl('office')) ?></label>
-            <select name="o_head" id="o_head">
+            <select class="form-control" name="o_head" id="o_head">
               <option value="">— not set —</option>
               <?php foreach ($all as $u): $un = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: $u['username']; ?>
                 <option value="<?= (int)$u['id'] ?>"<?= (int)($o['head_user_id'] ?? 0) === (int)$u['id'] ? ' selected' : '' ?>><?= e($un) ?> — <?= e($u['position_title'] ?: (ORG_ROLES[$u['role']] ?? $u['role'])) ?></option>
@@ -303,11 +303,11 @@
               </div>
             </div>
           </div>
-          <div class="ff"><label>Region / zone</label><input name="o_region" value="<?= e($o['region'] ?? '') ?>"></div>
-          <div class="ff"><label>City</label><input name="o_city" value="<?= e($o['city'] ?? '') ?>"></div>
-          <div class="ff ff-wide"><label>Address</label><input name="o_address" value="<?= e($o['address'] ?? '') ?>"></div>
-          <div class="ff"><label>Phone</label><input name="o_phone" value="<?= e($o['phone'] ?? '') ?>"></div>
-          <div class="ff"><label>Order on the chart</label><input name="o_sort" type="number" value="<?= (int)($o['sort_order'] ?? 0) ?>"></div>
+          <div class="ff"><label>Region / zone</label><input class="form-control" name="o_region" value="<?= e($o['region'] ?? '') ?>"></div>
+          <div class="ff"><label>City</label><input class="form-control" name="o_city" value="<?= e($o['city'] ?? '') ?>"></div>
+          <div class="ff ff-wide"><label>Address</label><input class="form-control" name="o_address" value="<?= e($o['address'] ?? '') ?>"></div>
+          <div class="ff"><label>Phone</label><input class="form-control" name="o_phone" value="<?= e($o['phone'] ?? '') ?>"></div>
+          <div class="ff"><label>Order on the chart</label><input class="form-control" name="o_sort" type="number" value="<?= (int)($o['sort_order'] ?? 0) ?>"></div>
           <div class="ff ff-check"><label class="chk"><input type="checkbox" name="o_active" value="1"<?= (int)($o['is_active'] ?? 1) ? ' checked' : '' ?>> Active</label></div>
         </div>
         <div style="margin-top:12px;display:flex;gap:8px">
@@ -382,19 +382,19 @@
           <tr data-find="<?= e(strtolower($nm . ' ' . $p['username'] . ' ' . (ORG_ROLES[$p['role']] ?? '') . ' ' . ($offAll[(int)($p['home_office_id'] ?? 0)] ?? ''))) ?>">
             <td><a href="/user-edit?id=<?= (int)$p['id'] ?>"><b><?= e($nm) ?></b></a>
                 <div class="muted" style="font-size:11.5px"><?= e($p['username']) ?><?= $p['email'] ? ' · ' . e($p['email']) : '' ?></div></td>
-            <td><select name="p_role[<?= (int)$p['id'] ?>]" <?= $canEdit ? '' : 'disabled' ?>>
+            <td><select class="form-control" name="p_role[<?= (int)$p['id'] ?>]" <?= $canEdit ? '' : 'disabled' ?>>
               <?php foreach (ORG_ROLES as $k => $v): ?>
                 <option value="<?= e($k) ?>"<?= $p['role'] === $k ? ' selected' : '' ?>><?= e($v) ?></option>
               <?php endforeach; ?>
             </select></td>
-            <td><input name="p_position[<?= (int)$p['id'] ?>]" value="<?= e($p['position_title'] ?? '') ?>" placeholder="as printed on a card" <?= $canEdit ? '' : 'disabled' ?>></td>
-            <td><select name="p_office[<?= (int)$p['id'] ?>]" <?= $canEdit ? '' : 'disabled' ?>>
+            <td><input class="form-control" name="p_position[<?= (int)$p['id'] ?>]" value="<?= e($p['position_title'] ?? '') ?>" placeholder="as printed on a card" <?= $canEdit ? '' : 'disabled' ?>></td>
+            <td><select class="form-control" name="p_office[<?= (int)$p['id'] ?>]" <?= $canEdit ? '' : 'disabled' ?>>
               <option value="">— none —</option>
               <?php foreach ($offOpts as $oid => $lbl): ?>
                 <option value="<?= (int)$oid ?>"<?= (int)($p['home_office_id'] ?? 0) === (int)$oid ? ' selected' : '' ?>><?= e($lbl) ?></option>
               <?php endforeach; ?>
             </select></td>
-            <td><select name="p_manager[<?= (int)$p['id'] ?>]" <?= $canEdit ? '' : 'disabled' ?>>
+            <td><select class="form-control" name="p_manager[<?= (int)$p['id'] ?>]" <?= $canEdit ? '' : 'disabled' ?>>
               <option value="">— top level —</option>
               <?php foreach ($all as $u): if ((int)$u['id'] === (int)$p['id']) continue;
                     $un = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: $u['username']; ?>
@@ -488,7 +488,7 @@
             <td><b><?= e(trim($r['first_name'] . ' ' . $r['last_name']) ?: $r['username']) ?></b>
                 <div class="muted" style="font-size:11.5px"><?= e($r['username']) ?><?= $r['email'] ? ' · ' . e($r['email']) : '' ?></div>
                 <span class="pill <?= $r['action'] === 'create' ? 'p-ok' : 'p-info' ?>"><?= $r['action'] === 'create' ? 'new' : 'update' ?></span></td>
-            <td><select name="i_role[<?= $i ?>]">
+            <td><select class="form-control" name="i_role[<?= $i ?>]">
               <?php // Never let a blank role look like whichever role happens to
                     // be first in the list — make the gap visible instead. ?>
               <?php if ($r['role'] === ''): ?><option value="" selected>— choose a role —</option><?php endif; ?>
@@ -496,13 +496,13 @@
                 <option value="<?= e($k) ?>"<?= $r['role'] === $k ? ' selected' : '' ?>><?= e($v) ?></option>
               <?php endforeach; ?>
             </select></td>
-            <td><select name="i_office[<?= $i ?>]">
+            <td><select class="form-control" name="i_office[<?= $i ?>]">
               <option value="">— none —</option>
               <?php foreach ($offOpts as $oid => $lbl): ?>
                 <option value="<?= (int)$oid ?>"<?= (int)$r['office_id'] === (int)$oid ? ' selected' : '' ?>><?= e($lbl) ?></option>
               <?php endforeach; ?>
             </select></td>
-            <td><select name="i_manager[<?= $i ?>]">
+            <td><select class="form-control" name="i_manager[<?= $i ?>]">
               <option value="0">— top level —</option>
               <?php // people arriving in this same file, so a forward reference is selectable
               foreach ($importRows as $j => $o): if ($j === $i) continue;

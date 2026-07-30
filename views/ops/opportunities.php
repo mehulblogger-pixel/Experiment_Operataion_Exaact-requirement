@@ -26,7 +26,7 @@
     <form method="get" action="/opportunities" style="display:flex;gap:8px;margin-left:auto" role="search">
       <input type="hidden" name="v" value="list">
       <label class="sr-only" for="opp-find">Find an opportunity</label>
-      <input id="opp-find" name="q" value="<?= e($_GET['q'] ?? '') ?>" placeholder="Find a deal or a customer">
+      <input class="form-control" id="opp-find" name="q" value="<?= e($_GET['q'] ?? '') ?>" placeholder="Find a deal or a customer">
       <button class="btn small secondary">Find</button>
     </form>
   <?php endif; ?>

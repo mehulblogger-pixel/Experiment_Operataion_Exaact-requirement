@@ -10,7 +10,19 @@ function db() {
         $pdo = new PDO('sqlite:' . $cfg['sqlite_path']);
     } else {
         $dsn = "mysql:host={$d['host']};dbname={$d['name']};charset=utf8mb4";
+        // Every CREATE TABLE in this application omits a charset, so each table
+        // takes the DATABASE default. On a host where that default is latin1 —
+        // still common on cPanel — a rupee sign, a curly quote or any non-Latin
+        // name is silently replaced with "?" as it is written, and no amount of
+        // reading it back correctly will recover it. This makes new tables land
+        // as utf8mb4 whatever the database default says.
         $pdo = new PDO($dsn, $d['user'], $d['pass']);
+        // Belt to the DSN's braces, and the part that actually fixes new tables:
+        // set the session's default charset so CREATE TABLE without an explicit
+        // charset inherits utf8mb4 rather than whatever the database was made
+        // with. Wrapped because a locked-down host may refuse SET, and a refused
+        // charset must not stop the application from starting.
+        try { $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"); } catch (Throwable $e) {}
     }
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);

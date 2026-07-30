@@ -13,12 +13,12 @@
 
 <form method="get" action="/tally" class="panel" style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
   <div><label>What</label>
-    <select name="kind">
+    <select class="form-control" name="kind">
       <option value="SALES"<?= !$isRcp?' selected':'' ?>>Sales vouchers (invoices raised)</option>
       <option value="RECEIPT"<?= $isRcp?' selected':'' ?>>Receipt vouchers (payments received)</option>
     </select></div>
-  <div><label><?= $isRcp ? 'Payment from' : 'Invoice from' ?></label><input type="date" name="from" value="<?= e($from) ?>"></div>
-  <div><label>to</label><input type="date" name="to" value="<?= e($to) ?>"></div>
+  <div><label><?= $isRcp ? 'Payment from' : 'Invoice from' ?></label><input class="form-control" type="date" name="from" value="<?= e($from) ?>"></div>
+  <div><label>to</label><input class="form-control" type="date" name="to" value="<?= e($to) ?>"></div>
   <label style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
     <input type="checkbox" name="done" value="1"<?= $showDone?' checked':'' ?>> <span>Show what has already gone</span></label>
   <button class="btn">Show</button>
@@ -113,32 +113,32 @@
   <p class="muted" style="margin:10px 0">These are the names in <em>your</em> Tally company. The defaults are what Tally ships with, so a first export usually works without changing anything — except our own state, which decides IGST against CGST+SGST and has no sensible default.</p>
   <form method="post" action="/tally-settings" class="form-grid" style="gap:12px 16px">
     <div><label>Tally company name <span class="muted">(optional)</span></label>
-      <input name="tally_company" value="<?= e($cfg['tally_company']) ?>" placeholder="leave blank to import into whichever company is open"></div>
+      <input class="form-control" name="tally_company" value="<?= e($cfg['tally_company']) ?>" placeholder="leave blank to import into whichever company is open"></div>
     <div><label>Our state <span class="muted">(place of supply we sell from)</span></label>
-      <select name="tally_state">
+      <select class="form-control" name="tally_state">
         <option value="">— not set —</option>
         <?php foreach ($states as $code => $label): $code = tally_code_str($code); ?>
           <option value="<?= e($label) ?>"<?= $cfg['state_code'] === $code ? ' selected' : '' ?>><?= e($label) ?> (<?= e($code) ?>)</option>
         <?php endforeach; ?>
       </select></div>
-    <div><label>Sales ledger</label><input name="tally_sales_ledger" value="<?= e($cfg['tally_sales_ledger']) ?>"></div>
-    <div><label>Bank / cash ledger <span class="muted">(receipts)</span></label><input name="tally_bank_ledger" value="<?= e($cfg['tally_bank_ledger']) ?>"></div>
-    <div><label>TDS ledger <span class="muted">(tax the customer withheld)</span></label><input name="tally_tds_ledger" value="<?= e($cfg['tally_tds_ledger']) ?>">
+    <div><label>Sales ledger</label><input class="form-control" name="tally_sales_ledger" value="<?= e($cfg['tally_sales_ledger']) ?>"></div>
+    <div><label>Bank / cash ledger <span class="muted">(receipts)</span></label><input class="form-control" name="tally_bank_ledger" value="<?= e($cfg['tally_bank_ledger']) ?>"></div>
+    <div><label>TDS ledger <span class="muted">(tax the customer withheld)</span></label><input class="form-control" name="tally_tds_ledger" value="<?= e($cfg['tally_tds_ledger']) ?>">
       <span class="muted" style="font-size:12px">Without this, a receipt short by the deduction leaves the party ledger short for ever.</span></div>
-    <div><label>CGST ledger</label><input name="tally_cgst_ledger" value="<?= e($cfg['tally_cgst_ledger']) ?>"></div>
-    <div><label>SGST ledger</label><input name="tally_sgst_ledger" value="<?= e($cfg['tally_sgst_ledger']) ?>"></div>
-    <div><label>IGST ledger</label><input name="tally_igst_ledger" value="<?= e($cfg['tally_igst_ledger']) ?>"></div>
-    <div><label>Debtors group <span class="muted">(where new party ledgers go)</span></label><input name="tally_debtors_group" value="<?= e($cfg['tally_debtors_group']) ?>"></div>
-    <div><label>Sales voucher type</label><input name="tally_voucher_type" value="<?= e($cfg['tally_voucher_type']) ?>"></div>
-    <div><label>Receipt voucher type</label><input name="tally_receipt_type" value="<?= e($cfg['tally_receipt_type']) ?>"></div>
+    <div><label>CGST ledger</label><input class="form-control" name="tally_cgst_ledger" value="<?= e($cfg['tally_cgst_ledger']) ?>"></div>
+    <div><label>SGST ledger</label><input class="form-control" name="tally_sgst_ledger" value="<?= e($cfg['tally_sgst_ledger']) ?>"></div>
+    <div><label>IGST ledger</label><input class="form-control" name="tally_igst_ledger" value="<?= e($cfg['tally_igst_ledger']) ?>"></div>
+    <div><label>Debtors group <span class="muted">(where new party ledgers go)</span></label><input class="form-control" name="tally_debtors_group" value="<?= e($cfg['tally_debtors_group']) ?>"></div>
+    <div><label>Sales voucher type</label><input class="form-control" name="tally_voucher_type" value="<?= e($cfg['tally_voucher_type']) ?>"></div>
+    <div><label>Receipt voucher type</label><input class="form-control" name="tally_receipt_type" value="<?= e($cfg['tally_receipt_type']) ?>"></div>
     <div><label>Default GST % <span class="muted">(used when the quotation does not say)</span></label>
-      <input name="tally_gst_pct" type="number" step="0.01" min="0" max="100" value="<?= e($cfg['tally_gst_pct']) ?>"></div>
+      <input class="form-control" name="tally_gst_pct" type="number" step="0.01" min="0" max="100" value="<?= e($cfg['tally_gst_pct']) ?>"></div>
     <div><label>The invoice amount recorded here is…</label>
-      <select name="tally_amount_basis">
+      <select class="form-control" name="tally_amount_basis">
         <option value="EXCL"<?= $cfg['tally_amount_basis']==='EXCL'?' selected':'' ?>>before GST (tax is added)</option>
         <option value="INCL"<?= $cfg['tally_amount_basis']==='INCL'?' selected':'' ?>>after GST (tax is inside it)</option>
       </select></div>
-    <div><label>SAC code <span class="muted">(for your reference)</span></label><input name="tally_sac" value="<?= e($cfg['tally_sac']) ?>"></div>
+    <div><label>SAC code <span class="muted">(for your reference)</span></label><input class="form-control" name="tally_sac" value="<?= e($cfg['tally_sac']) ?>"></div>
     <div style="align-self:end"><button class="btn">Save</button></div>
   </form>
 </details>
