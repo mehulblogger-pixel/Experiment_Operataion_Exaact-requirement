@@ -57,6 +57,51 @@
   <?php endif; ?>
 </div>
 
+<?php // ---- Group / parent company -----------------------------------------
+      // A customer can belong to a group. Setting the parent here is what makes
+      // the quotation screen show the whole group's earlier offers together, so
+      // you price a subsidiary knowing what the parent was quoted. ?>
+<?php $g = $group ?? ['parent'=>null,'subs'=>[],'opts'=>[]]; ?>
+<?php if ($g['parent'] || $g['subs'] || !empty($canWrite)): ?>
+<div class="panel" style="margin-top:16px">
+  <h3 style="margin-top:0">Group</h3>
+  <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start">
+    <div style="min-width:220px">
+      <div class="muted" style="font-size:12.5px">Parent company</div>
+      <?php if ($g['parent']): ?>
+        <a href="/customer?id=<?= (int)$g['parent']['id'] ?>"><b><?= e($g['parent']['display_name'] ?: $g['parent']['legal_name']) ?></b></a>
+      <?php else: ?>
+        <span class="muted">— none; this is a top-level company —</span>
+      <?php endif; ?>
+    </div>
+    <div style="min-width:220px">
+      <div class="muted" style="font-size:12.5px">Companies under it (<?= count($g['subs']) ?>)</div>
+      <?php if ($g['subs']): ?>
+        <?php foreach ($g['subs'] as $s): ?>
+          <div><a href="/customer?id=<?= (int)$s['id'] ?>"><?= e($s['display_name'] ?: $s['legal_name']) ?></a></div>
+        <?php endforeach; ?>
+      <?php else: ?>
+        <span class="muted">— none —</span>
+      <?php endif; ?>
+    </div>
+  </div>
+  <?php if (!empty($canWrite)): ?>
+    <form method="post" action="/customer-parent" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+      <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+      <div class="ff" style="min-width:260px;margin:0"><label for="pp">Parent company</label>
+        <select class="form-control searchable" id="pp" name="parent_id">
+          <option value="">— none (top-level) —</option>
+          <?php foreach ($g['opts'] as $o): ?>
+            <option value="<?= (int)$o['id'] ?>" <?= (int)($p['parent_id'] ?? 0)===(int)$o['id']?'selected':'' ?>><?= e($o['display_name'] ?: $o['legal_name']) ?></option>
+          <?php endforeach; ?>
+        </select></div>
+      <button class="btn small">Save group</button>
+    </form>
+    <div class="ff-help" style="margin-top:6px">Set the parent, and this customer and its group share one quotation history on the quote screen.</div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <div class="panel-split" style="margin-top:16px">
   <div>
     <?php // ---- Money ---------------------------------------------------- ?>
