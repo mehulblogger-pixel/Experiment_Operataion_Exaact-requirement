@@ -186,11 +186,66 @@ function c360_load($pid) {
         'quality'  => c360_quality($pid),
         'timeline' => c360_timeline($pid),
         'touch'    => c360_last_touch($pid),
+        'group'    => c360_group($pid, $p),
     ];
+}
+
+// The customer's place in a group: its parent (if any), the companies under it,
+// and the candidates that could be its parent. This is what makes the group
+// quotation history on the quote screen actually populate — without a parent
+// link set here, a customer is a group of one.
+function c360_group($pid, $p) {
+    $pid = (int)$pid;
+    $parent = !empty($p['parent_id'])
+        ? c360_one("SELECT id, legal_name, display_name FROM business_partners WHERE id=?", [(int)$p['parent_id']])
+        : null;
+    $subs = c360_rows("SELECT id, legal_name, display_name FROM business_partners
+                       WHERE parent_id=? ORDER BY COALESCE(display_name, legal_name)", [$pid]);
+    // Anyone could be the parent EXCEPT this company and its own subsidiaries —
+    // putting a child above its parent is the loop we must not allow.
+    $subIds = array_map(fn($s) => (int)$s['id'], $subs);
+    $opts = c360_rows("SELECT id, legal_name, display_name FROM business_partners
+                       WHERE is_client=1 AND status='ACTIVE' AND id<>?
+                       ORDER BY COALESCE(display_name, legal_name) LIMIT 800", [$pid]);
+    $opts = array_values(array_filter($opts, fn($o) => !in_array((int)$o['id'], $subIds, true)));
+    return ['parent' => $parent, 'subs' => $subs, 'opts' => $opts];
 }
 
 function ops_customer360($route, $method) {
     ops_require(c360_can(), 'You cannot open customer records.');
+
+    // Setting the parent (group) company. Its own screen action, so the group
+    // that drives the quotation history can be built where the customer is read.
+    if ($route === 'customer-parent' && $method === 'POST') {
+        ops_require(can('mod.clients.edit') || is_master_of('clients'), 'You cannot change customer records.');
+        $pid = (int)($_POST['id'] ?? 0);
+        if (!c360_one("SELECT id FROM business_partners WHERE id=?", [$pid])) {
+            flash('That customer no longer exists.', 'error'); redirect('/clients');
+        }
+        $parent = (int)($_POST['parent_id'] ?? 0);
+        if ($parent === $pid) { flash('A company cannot be its own parent.', 'error'); redirect('/customer?id=' . $pid); }
+        if ($parent) {
+            if (!c360_one("SELECT id FROM business_partners WHERE id=?", [$parent])) {
+                flash('That company is not on the master.', 'error'); redirect('/customer?id=' . $pid);
+            }
+            // Walking up from the chosen parent must never arrive back at this
+            // company, or the group would be a loop nothing could read.
+            $cur = $parent; $seen = [];
+            for ($i = 0; $i < 20 && $cur; $i++) {
+                if ($cur === $pid) { flash('That would make a loop — the company you picked is already under this one.', 'error'); redirect('/customer?id=' . $pid); }
+                if (isset($seen[$cur])) break;
+                $seen[$cur] = 1;
+                $row = c360_one("SELECT parent_id FROM business_partners WHERE id=?", [$cur]);
+                $cur = (int)($row['parent_id'] ?? 0);
+            }
+        }
+        db()->prepare("UPDATE business_partners SET parent_id=? WHERE id=?")->execute([$parent ?: null, $pid]);
+        if (function_exists('act_log'))
+            act_log('PARTNER', $pid, 'SYSTEM', $parent ? 'Placed under a parent company.' : 'Removed from its group.', ['auto' => 1]);
+        flash($parent ? 'Group updated — earlier quotations across the group now show together.' : 'Removed from the group.');
+        redirect('/customer?id=' . $pid);
+    }
+
     $pid = (int)($_GET['id'] ?? 0);
     $d = $pid ? c360_load($pid) : null;
     if (!$d) { http_response_code(404); view('notfound'); return true; }
