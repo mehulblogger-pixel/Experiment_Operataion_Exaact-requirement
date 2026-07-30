@@ -458,16 +458,50 @@ function opp_update($oppId, array $b) {
         $ownerNm = user_name($ou);
     } else { $ownerNm = ''; }
 
+    // ---- The customer -----------------------------------------------------
+    //  Only settable at creation until now, so a deal opened from a lead had
+    //  none — and the lead conversion, which is what makes the customer, ran
+    //  afterwards and never came back to say so. That deal reached Won and
+    //  stopped: no customer, no order, and no field anywhere to fix it.
+    //
+    //  Changing it once an order exists would leave the order pointing at one
+    //  customer and the deal at another, so that is refused. Everything before
+    //  the order is still being decided, and may be corrected.
+    if (array_key_exists('partner_id', $b)) {
+        $newPartner = (int)$b['partner_id'];
+        if ($newPartner !== (int)($o['partner_id'] ?? 0)) {
+            if (!empty($o['call_id']))
+                return 'An order has already been raised from this deal, so its customer cannot be changed now.';
+            $pn = '';
+            if ($newPartner) {
+                $bp = ops_one("SELECT id, display_name, legal_name FROM business_partners
+                               WHERE id=? AND is_client=1", [$newPartner]);
+                if (!$bp) return 'That customer is not on the master, so the deal cannot be pointed at them.';
+                $pn = (string)($bp['display_name'] ?: $bp['legal_name']);
+            }
+            db()->prepare("UPDATE opportunities SET partner_id=?, partner_name=? WHERE id=?")
+               ->execute([$newPartner ?: null, $pn, (int)$o['id']]);
+            if (function_exists('act_log'))
+                act_log('OPPORTUNITY', (int)$o['id'], 'CUSTOMER',
+                        $newPartner ? 'Customer set to ' . $pn . '.' : 'Customer cleared.');
+        }
+    }
+
+    // A FIELD THE FORM DID NOT POST IS NOT A FIELD SOMEBODY CLEARED. The values
+    // below read `?? $o[...]` rather than `?? ''`, so a form carrying only part
+    // of the deal leaves the rest alone. `??` falls back only when the key is
+    // ABSENT, so a box the user genuinely emptied still posts '' and is still
+    // cleared — the full form behaves exactly as it did.
     db()->prepare("UPDATE opportunities SET name=?, value=?, expected_close=?, requirement=?, competitor=?,
                    contact_name=?, contact_email=?, contact_phone=?, owner_user_id=?, owner_name=?, office_id=?, sbu=?,
                    next_action_on=?, next_action=?, updated_at=? WHERE id=?")
        ->execute([trim((string)($b['name'] ?? $o['name'])), (float)($b['value'] ?? $o['value']),
-                  (string)($b['expected_close'] ?? ''), (string)($b['requirement'] ?? ''),
-                  (string)($b['competitor'] ?? ''), (string)($b['contact_name'] ?? ''),
-                  (string)($b['contact_email'] ?? ''), (string)($b['contact_phone'] ?? ''),
-                  $ownerId ?: null, $ownerNm, (int)($b['office_id'] ?? 0) ?: null,
-                  (string)($b['sbu'] ?? ''), (string)($b['next_action_on'] ?? ''),
-                  (string)($b['next_action'] ?? ''), date('c'), (int)$o['id']]);
+                  (string)($b['expected_close'] ?? $o['expected_close']), (string)($b['requirement'] ?? $o['requirement']),
+                  (string)($b['competitor'] ?? $o['competitor']), (string)($b['contact_name'] ?? $o['contact_name']),
+                  (string)($b['contact_email'] ?? $o['contact_email']), (string)($b['contact_phone'] ?? $o['contact_phone']),
+                  $ownerId ?: null, $ownerNm, (int)($b['office_id'] ?? $o['office_id']) ?: null,
+                  (string)($b['sbu'] ?? $o['sbu']), (string)($b['next_action_on'] ?? $o['next_action_on']),
+                  (string)($b['next_action'] ?? $o['next_action']), date('c'), (int)$o['id']]);
     return $pipeMoved ? '' : '';
 }
 
@@ -704,6 +738,12 @@ function ops_opportunities($route, $method) {
             'gateWaiting' => function_exists('gate_open_request') && ($gq = gate_open_request('OPPORTUNITY', (int)$o['id']))
                                 ? gate_waiting_on($gq) : '',
             'offices' => ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name"),
+            // The customer, which used to be settable only at creation. A deal
+            // opened from a lead has none until the lead is converted, and
+            // without this there was no screen anywhere that could supply one.
+            'clients' => opp_try(fn() => ops_all(
+                "SELECT id, display_name, legal_name FROM business_partners
+                 WHERE is_client=1 AND status='ACTIVE' ORDER BY display_name, legal_name"), []),
             'openQuotes' => $o['partner_id'] ? opp_try(fn() => ops_all(
                 "SELECT id, quote_no, rev, status, total_amount FROM quotations
                  WHERE client_id=? AND id NOT IN (SELECT quotation_id FROM opportunity_quotes WHERE opportunity_id=?)

@@ -87,49 +87,7 @@
     <?php if ($quotes): ?>
       <table class="dt">
         <caption class="sr-only">Quotations attached to this opportunity</caption>
-        <thead><tr><th scope="col">Quotation</th><th scope="col">Status</th><th scope="col" class="num">Value</th><?php // ---- Won: hand it to operations -------------------------------------
-      // The join between selling and doing. It was empty on all 160 existing
-      // orders because nothing ever made an order FROM a sale. This does.
-      // Hidden entirely when operations is not installed — a Sales-only
-      // customer must never be shown work their installation cannot do. ?>
-<?php if ($o['status'] === 'WON' && $canOrder): ?>
-  <?php if (!empty($o['call_id'])): ?>
-    <div class="msg msg-success" style="margin-top:16px">
-      Order raised from this deal — <a href="/call?id=<?= (int)$o['call_id'] ?>"><b>open it</b></a>.
-    </div>
-  <?php elseif ($orderBlock !== '' && $orderBlock !== 'not-installed'): ?>
-    <div class="msg msg-warning" style="margin-top:16px"><?= e($orderBlock) ?></div>
-  <?php else: ?>
-    <form method="post" action="/opportunity-raise-order" class="panel" style="margin-top:16px;border-left:3px solid var(--brand)">
-      <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
-      <h3 style="margin-top:0">Raise the order</h3>
-      <p class="muted" style="font-size:13px;margin:0 0 10px">
-        Carries the customer, the quotation, the agreed value and the branch straight onto the order, so the sale and the work are joined.
-        <?php if ($orderQuote): ?>
-          It will carry <b><?= e($orderQuote['quote_no']) ?><?= (int)$orderQuote['rev'] ? ' r' . (int)$orderQuote['rev'] : '' ?></b>
-          (<?= e($orderQuote['status']) ?>, <?= e(fmoney($orderQuote['total_amount'])) ?>)<?php
-            if (strtoupper((string)$orderQuote['status']) !== 'ACCEPTED'): ?> — <b>not marked accepted</b>, so check it is the right one<?php endif; ?>.
-        <?php else: ?>
-          <b>No quotation is attached</b>, so the order will carry the estimate and somebody will have to set the rate on it.
-        <?php endif; ?>
-      </p>
-      <div class="form-grid" style="gap:12px 16px">
-        <div><label>Executing branch</label>
-          <select class="form-control" name="executing_office_id">
-            <option value="">— <?= e($o['office_name'] ?: 'not set') ?> —</option>
-            <?php foreach ($offices as $f): ?>
-              <option value="<?= (int)$f['id'] ?>" <?= (int)$f['id']===(int)$o['office_id']?'selected':'' ?>><?= e($f['name']) ?></option>
-            <?php endforeach; ?>
-          </select></div>
-        <div><label>Contract number</label><input class="form-control" name="contract_number" maxlength="80" placeholder="If they gave one"></div>
-        <div><label>Wanted by</label><input class="form-control" type="date" name="inspection_required_date"></div>
-      </div>
-      <button class="btn" style="margin-top:12px">Raise the order</button>
-    </form>
-  <?php endif; ?>
-<?php endif; ?>
-
-<?php if ($canEdit && $open): ?><th scope="col"></th><?php endif; ?></tr></thead>
+        <thead><tr><th scope="col">Quotation</th><th scope="col">Status</th><th scope="col" class="num">Value</th><?php if ($canEdit && $open): ?><th scope="col"></th><?php endif; ?></tr></thead>
         <tbody>
         <?php foreach ($quotes as $q): ?>
           <tr>
@@ -167,6 +125,68 @@
   </div>
 </div>
 
+<?php // ---- Won: hand it to operations -------------------------------------
+      // The join between selling and doing. It was empty on all 160 existing
+      // orders because nothing ever made an order FROM a sale. This does.
+      // Hidden entirely when operations is not installed — a Sales-only
+      // customer must never be shown work their installation cannot do. ?>
+<?php if ($o['status'] === 'WON' && $canOrder): ?>
+  <?php if (!empty($o['call_id'])): ?>
+    <div class="msg msg-success" style="margin-top:16px">
+      Order raised from this deal — <a href="/call?id=<?= (int)$o['call_id'] ?>"><b>open it</b></a>.
+    </div>
+  <?php elseif ($orderBlock !== '' && $orderBlock !== 'not-installed'): ?>
+    <?php // A reason to stop is only useful with a way forward. The commonest
+          // block by far is "no customer yet" on a deal that came from a lead,
+          // and the lead is exactly where the conversion lives. ?>
+    <div class="msg msg-warning" style="margin-top:16px"><?= e($orderBlock) ?>
+      <?php if (empty($o['partner_id']) && !empty($o['lead_id'])): ?>
+        <a href="/lead?id=<?= (int)$o['lead_id'] ?>"><b>Convert the lead</b></a> — it makes the customer and fills this in.
+      <?php endif; ?>
+      <?php if (empty($o['partner_id']) && $canEdit && !empty($clients)): ?>
+        <form method="post" action="/opportunity-edit" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+          <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+          <div class="ff" style="flex:1;min-width:220px"><label for="opp-cust">Or pick one already on the master</label>
+            <select id="opp-cust" name="partner_id" class="searchable">
+              <option value="">—</option>
+              <?php foreach ($clients as $c): ?>
+                <option value="<?= (int)$c['id'] ?>"><?= e($c['display_name'] ?: $c['legal_name']) ?></option>
+              <?php endforeach; ?>
+            </select></div>
+          <button class="btn small">Set the customer</button>
+        </form>
+      <?php endif; ?>
+    </div>
+  <?php else: ?>
+    <form method="post" action="/opportunity-raise-order" class="panel" style="margin-top:16px;border-left:3px solid var(--brand)">
+      <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+      <h3 style="margin-top:0">Raise the order</h3>
+      <p class="muted" style="font-size:13px;margin:0 0 10px">
+        Carries the customer, the quotation, the agreed value and the branch straight onto the order, so the sale and the work are joined.
+        <?php if ($orderQuote): ?>
+          It will carry <b><?= e($orderQuote['quote_no']) ?><?= (int)$orderQuote['rev'] ? ' r' . (int)$orderQuote['rev'] : '' ?></b>
+          (<?= e($orderQuote['status']) ?>, <?= e(fmoney($orderQuote['total_amount'])) ?>)<?php
+            if (strtoupper((string)$orderQuote['status']) !== 'ACCEPTED'): ?> — <b>not marked accepted</b>, so check it is the right one<?php endif; ?>.
+        <?php else: ?>
+          <b>No quotation is attached</b>, so the order will carry the estimate and somebody will have to set the rate on it.
+        <?php endif; ?>
+      </p>
+      <div class="form-grid" style="gap:12px 16px">
+        <div><label>Executing branch</label>
+          <select class="form-control" name="executing_office_id">
+            <option value="">— <?= e($o['office_name'] ?: 'not set') ?> —</option>
+            <?php foreach ($offices as $f): ?>
+              <option value="<?= (int)$f['id'] ?>" <?= (int)$f['id']===(int)$o['office_id']?'selected':'' ?>><?= e($f['name']) ?></option>
+            <?php endforeach; ?>
+          </select></div>
+        <div><label>Contract number</label><input class="form-control" name="contract_number" maxlength="80" placeholder="If they gave one"></div>
+        <div><label>Wanted by</label><input class="form-control" type="date" name="inspection_required_date"></div>
+      </div>
+      <button class="btn" style="margin-top:12px">Raise the order</button>
+    </form>
+  <?php endif; ?>
+<?php endif; ?>
+
 <?php if ($canEdit && $open): ?>
 <form method="post" action="/opportunity-move" class="panel" style="margin-top:16px">
   <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
@@ -196,6 +216,14 @@
   <h3 style="margin-top:0">Change the detail</h3>
   <div class="form-grid" style="gap:12px 16px">
     <div class="ff-wide"><label>Name</label><input class="form-control" name="name" value="<?= e($o['name']) ?>" maxlength="255"></div>
+    <div class="ff"><label for="opp-partner">Customer</label>
+      <select class="form-control searchable" id="opp-partner" name="partner_id">
+        <option value="">— not on the master yet —</option>
+        <?php foreach ($clients as $c): ?>
+          <option value="<?= (int)$c['id'] ?>" <?= (int)$c['id']===(int)$o['partner_id']?'selected':'' ?>><?= e($c['display_name'] ?: $c['legal_name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <span class="muted" style="font-size:12px">A deal from a lead has none until the lead is converted. The order cannot be raised without it.</span></div>
     <div><label>Estimated value</label><input class="form-control" name="value" type="number" step="0.01" value="<?= e($o['value']) ?>"></div>
     <div><label>Expected close</label><input class="form-control" type="date" name="expected_close" value="<?= e($o['expected_close']) ?>"></div>
     <div class="ff"><label>Allocated to</label>

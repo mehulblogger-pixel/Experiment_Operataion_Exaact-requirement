@@ -468,6 +468,20 @@ function lead_convert($leadId, array $b = []) {
         ->execute([$stageId, $partnerId, $partnerId, $inqId, date('c'),
                    user_name(current_user()), date('c'), date('c'), (int)$l['id']]);
 
+    // THE DEAL ALREADY OPENED FROM THIS LEAD NEEDS THE CUSTOMER TOO. Opening an
+    // opportunity happens BEFORE the lead is converted — that is the normal
+    // order, you work the deal and only make them a customer when it is real.
+    // But the opportunity was created with no partner_id and nothing ever went
+    // back to fill it in, so a deal that came from a lead reached Won and
+    // stopped dead: "no customer on the master yet, so an order has nowhere to
+    // point", with no screen anywhere that could set one. The conversion knows
+    // the answer; it just never told the deal.
+    try {
+        $pdo->prepare("UPDATE opportunities SET partner_id=?, partner_name=?, updated_at=?
+                       WHERE lead_id=? AND (partner_id IS NULL OR partner_id=0)")
+            ->execute([$partnerId, (string)$l['company_name'], date('c'), (int)$l['id']]);
+    } catch (Throwable $e) { /* opportunities not built on this install */ }
+
     // Converted here means "customer" over there, and a customer must stop being
     // advertised to as a prospect. Also queue the enquiry the conversion raised.
     if (function_exists('ads_queue_lead')) ads_queue_lead((int)$l['id'], 'Converted to a customer');
