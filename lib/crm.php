@@ -626,6 +626,72 @@ function crm_client_addresses($cid) {
     } catch (Throwable $e) { return []; }
 }
 
+// ---- The customer's group, for "what have we quoted them before" -----------
+// A customer can belong to a group (business_partners.parent_id). When you are
+// about to quote one company, the useful history is the whole group's — the
+// parent's, the sibling divisions', the subsidiaries' — so you price with the
+// full picture and do not undercut or contradict an offer already out there.
+// Walks up to the top of the tree, then collects everything under it, with a
+// hop cap so a bad parent-of-itself loop cannot spin.
+function partner_group_ids($pid) {
+    $pid = (int)$pid; if (!$pid) return [];
+    try {
+        $root = $pid; $seen = [$pid => 1];
+        for ($i = 0; $i < 6; $i++) {
+            $par = (int)ops_val("SELECT parent_id FROM business_partners WHERE id=?", [$root]);
+            if (!$par || isset($seen[$par])) break;
+            $seen[$par] = 1; $root = $par;
+        }
+        $ids = [$root => 1]; $frontier = [$root];
+        for ($d = 0; $d < 6 && $frontier; $d++) {
+            $in = implode(',', array_fill(0, count($frontier), '?'));
+            $kids = ops_all("SELECT id FROM business_partners WHERE parent_id IN ($in)", $frontier);
+            $frontier = [];
+            foreach ($kids as $k) { $k = (int)$k['id']; if (!isset($ids[$k])) { $ids[$k] = 1; $frontier[] = $k; } }
+        }
+        $ids[$pid] = 1;
+        return array_map('intval', array_keys($ids));
+    } catch (Throwable $e) { return [$pid]; }
+}
+
+// Every current quotation across that group. is_current only, so it is one row
+// per quotation and not one per revision. Newest first.
+function quotes_for_group($pid, $excludeQuoteId = 0) {
+    $ids = partner_group_ids($pid);
+    if (!$ids) return [];
+    try {
+        $in = implode(',', array_fill(0, count($ids), '?'));
+        $args = $ids;
+        $sql = "SELECT q.id, q.quote_no, q.rev, q.status, q.total_amount, q.created_at, q.subject, q.client_id,
+                       bp.display_name, bp.legal_name
+                FROM quotations q LEFT JOIN business_partners bp ON bp.id = q.client_id
+                WHERE q.client_id IN ($in) AND q.is_current=1";
+        if ($excludeQuoteId) { $sql .= " AND q.id<>?"; $args[] = (int)$excludeQuoteId; }
+        $sql .= " ORDER BY q.id DESC LIMIT 50";
+        return ops_all($sql, $args);
+    } catch (Throwable $e) { return []; }
+}
+
+// The group history shaped for JSON — what the quote form draws. The company
+// name is blank when the row is the same customer, and named when it is a group
+// company, so a reader sees at a glance which are the subsidiaries'.
+function quote_history_json($cid, $excludeQuoteId = 0) {
+    $cid = (int)$cid;
+    $out = [];
+    foreach (quotes_for_group($cid, $excludeQuoteId) as $h) {
+        $out[] = [
+            'id'      => (int)$h['id'],
+            'no'      => $h['quote_no'] . ((int)$h['rev'] ? ' r' . (int)$h['rev'] : ''),
+            'subject' => (string)$h['subject'],
+            'value'   => function_exists('fmoney') ? fmoney($h['total_amount']) : (string)$h['total_amount'],
+            'status'  => (string)$h['status'],
+            'when'    => function_exists('fdate') ? fdate(substr((string)$h['created_at'], 0, 10)) : substr((string)$h['created_at'], 0, 10),
+            'company' => ((int)$h['client_id'] === $cid) ? '' : (string)($h['display_name'] ?: $h['legal_name']),
+        ];
+    }
+    return $out;
+}
+
 // ---- Change log (§xxi) ------------------------------------------------------
 // Every save appends to the same history the revisions use, so "what changed"
 // and "the final copy" are answered from one place.
@@ -928,6 +994,9 @@ function ops_crm_quotes($route, $method) {
             ] : null,
             'contacts'  => $contacts,
             'addresses' => crm_client_addresses($cid),
+            // What we have already quoted this customer's whole group. The one
+            // being edited, if any, is left out so it does not list itself.
+            'history'   => quote_history_json($cid, (int)($_GET['exclude'] ?? 0)),
         ]);
         return;
     }
