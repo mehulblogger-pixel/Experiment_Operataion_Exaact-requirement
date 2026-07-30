@@ -20,6 +20,15 @@
     <?= ($g['name'] && $g['email']) ? '— <strong>' . e($g['name']) . ', ' . e($g['email']) . '</strong>' : '(no grievance officer is named yet — Settings → Compliance)' ?>.
     Then come back and enter the time and their reference, and this warning goes away.
   </div>
+  <?php // The report, drafted from the facts already on this page. Six hours is
+        // not long enough to compose one from a blank screen. Deliberately NOT
+        // sent for you: a breach notification nobody read is worse than one an
+        // hour late, and the clock is on a human decision, not a mail queue. ?>
+  <div class="row gap-2 mt-3">
+    <a class="btn" href="/incident-report?id=<?= (int)$inc['id'] ?>">Draft the CERT-In e-mail</a>
+    <a class="btn secondary" href="/incident-report?id=<?= (int)$inc['id'] ?>&amp;mode=eml">Download it for Outlook</a>
+    <span class="t-sm t-mut">Opens in your own mail program with everything filled in. Read it before you send it.</span>
+  </div>
 </div>
 <?php endif; ?>
 

@@ -164,3 +164,62 @@
     <?php if (!$events): ?><tr><td colspan="4">No history yet.</td></tr><?php endif; ?>
   </table>
 </div>
+
+<?php
+// ---------------------------------------------------------------------------
+//  Erasing an applicant's details
+//
+//  This is the sharpest personal data in the system and it belongs to somebody
+//  who may never have worked for you: name, mobile, e-mail, the text of their
+//  CV, expected rate. The DPDP Act allows keeping it only while there is a
+//  reason to, and "nobody deleted it" is not one.
+//
+//  Offered on the candidate's own screen rather than buried in a compliance
+//  register, because this is where somebody is standing when the request
+//  arrives.
+// ---------------------------------------------------------------------------
+$erasePv = function_exists('candidate_erase_preview') ? candidate_erase_preview((int)$cand['id']) : null;
+?>
+<?php if ($erasePv && (is_master() || can('settings.manage') || can('person.iddoc.manage'))): ?>
+<div class="panel mt-4">
+  <div class="form-sec"><h3>Erase this person's details</h3>
+    <p>For when an applicant asks you to remove what you hold about them.</p></div>
+
+  <?php if ($erasePv['erased']): ?>
+    <div class="msg msg-info">
+      <b>Already erased</b> on <?= e(fdate(substr((string)$cand['erased_at'], 0, 10))) ?>
+      <?= trim((string)($cand['erased_by'] ?? '')) !== '' ? 'by ' . e($cand['erased_by']) : '' ?>.
+      <?php if (trim((string)($cand['erase_reason'] ?? '')) !== ''): ?>
+        <div class="mt-1">Reason recorded: <?= e($cand['erase_reason']) ?></div>
+      <?php endif; ?>
+      <div class="mt-1">The reference and the hiring decision were kept on purpose, so the register still adds up.</div>
+    </div>
+
+  <?php elseif ($erasePv['hired']): ?>
+    <div class="msg msg-warning">
+      <b>This candidate was hired.</b> Their details are now held as a <?= e(Tl('engineer')) ?> — for employment, not
+      for recruitment — so erasing them here would not remove them from the system and would only make this register
+      disagree with the rest of it. Handle it from their own record instead.
+    </div>
+
+  <?php else: ?>
+    <div class="row-top gap-4" style="align-items:flex-start">
+      <div class="grow" style="min-width:260px">
+        <p class="t-md t-mut mb-2"><b>What goes:</b>
+          <?= $erasePv['holds'] ? e(implode(', ', array_map(fn($f) => str_replace('_', ' ', $f), $erasePv['holds'])))
+                                : 'nothing — no personal details are held on this record' ?>.</p>
+        <p class="t-md t-mut mb-0"><b>What stays:</b> <?= e(implode(', ', $erasePv['keeps'])) ?> — a register that
+          silently loses rows is one nobody can audit, so the shape of the decision is kept and only the person is
+          removed.</p>
+      </div>
+      <form method="post" action="/candidate-erase" class="col" style="min-width:260px"
+            onsubmit="return confirm('Erase the personal details on <?= e(addslashes((string)$cand['cand_code'])) ?>? This cannot be undone.')">
+        <input type="hidden" name="id" value="<?= (int)$cand['id'] ?>">
+        <div class="ff mb-0"><label>Why <span class="muted">(kept on the record)</span></label>
+          <input class="form-control" name="reason" maxlength="255" placeholder="e.g. asked to be removed, 14 Aug 2026"></div>
+        <button class="btn danger" type="submit">Erase the details</button>
+      </form>
+    </div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>

@@ -34,6 +34,12 @@ require __DIR__ . '/lib/adspro.php';
 require __DIR__ . '/lib/adssync.php';
 require __DIR__ . '/lib/licencekey.php';
 require __DIR__ . '/lib/licencesync.php';
+// Retention lives across these two, and BOTH were missing from this list — so
+// the nightly trim below silently did nothing at all: function_exists() returned
+// false and the block skipped without a word. security.php holds the retention
+// period, compliance.php holds the trim itself.
+require __DIR__ . '/lib/security.php';
+require __DIR__ . '/lib/compliance.php';
 
 // When invoked over HTTP, require a matching key so strangers can't trigger it.
 if (PHP_SAPI !== 'cli') {
@@ -214,5 +220,28 @@ if (function_exists('ads_on') && ads_on() && function_exists('ads_sync_now')) {
         $sp = ads_import_spend(90);
         if (empty($sp['err'])) setting_set('adspro_spend_day', date('Y-m-d'));
         echo "Ads Pro spend: " . (!empty($sp['err']) ? 'FAILED — ' . $sp['err'] : ($sp['msg'] ?? '')) . "\n";
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  Retention, once a day
+//
+//  audit_trim_old() existed but was only ever reached by somebody pressing a
+//  button on the compliance screen. Nobody presses it, so the trail grew for
+//  ever — which is the opposite of a retention policy: the screen states a
+//  retention period the system was not keeping to, and holding personal data
+//  longer than you said you would is the finding, not the fix.
+//
+//  Guarded per day so running cron.php more often costs one comparison.
+// ---------------------------------------------------------------------------
+if (function_exists('audit_trim_old') && (string)setting_get('audit_trim_day', '') !== date('Y-m-d')) {
+    try {
+        $n = audit_trim_old();
+        setting_set('audit_trim_day', date('Y-m-d'));
+        echo "Audit trail: " . ($n ? $n . " entries past the " . audit_retain_days() . "-day retention period removed"
+                                   : "nothing older than " . audit_retain_days() . " days") . "\n";
+    } catch (Throwable $e) {
+        // A failed trim must never stop the rest of the nightly run.
+        echo "Audit trail: trim failed — " . $e->getMessage() . "\n";
     }
 }

@@ -614,10 +614,27 @@ function ops_incidents($route, $method) {
         return;
     }
 
+    // The CERT-In report, handed to the operator's own mail program. Two ways out
+    // because one of them always works: mailto opens the default client, and the
+    // .eml download opens in Outlook when mailto is not wired up on the machine.
+    if ($route === 'incident-report') {
+        $inc = ops_one("SELECT * FROM security_incidents WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$inc) { http_response_code(404); view('notfound'); return; }
+        $m = incident_report_email($inc);
+        idems_log('incident', (int)$inc['id'], 'CERTIN_DRAFTED', ['field' => (string)$inc['ref']]);
+        if (($_GET['mode'] ?? '') === 'eml') {
+            compose_eml_download('CERT-In-' . (string)$inc['ref'],
+                                 compose_eml($m['to'], $m['subject'], $m['body']));
+            return;
+        }
+        redirect(compose_mailto($m['to'], $m['subject'], $m['body']));
+    }
+
     if ($route === 'incident') {
         $inc = ops_one("SELECT * FROM security_incidents WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$inc) { http_response_code(404); view('notfound'); return; }
-        view('ops/incident_detail', ['inc'=>$inc, 'g'=>grievance_officer()]);
+        view('ops/incident_detail', ['inc'=>$inc, 'g'=>grievance_officer(),
+                                     'mail'=>incident_report_email($inc)]);
         return;
     }
 
@@ -625,9 +642,209 @@ function ops_incidents($route, $method) {
     view('ops/incidents', ['rows'=>$rows]);
 }
 
+// ---------------------------------------------------------------------------
+//  How long a request has been sitting
+//
+//  The DPDP Act does not give a number of days; it says a person must be
+//  answered without undue delay. That is exactly the kind of duty a register
+//  quietly fails, because nothing on the screen counted. A request logged and
+//  forgotten looked the same as one logged this morning.
+//
+//  So: an age in days on every open request, and a target that the company sets
+//  for itself. Thirty days is the default because it is what the draft privacy
+//  notice in Settings promises, and a promise you made is a better yardstick
+//  than one nobody wrote down.
+// ---------------------------------------------------------------------------
+function dsr_target_days() {
+    $n = (int)setting_get('dsr_target_days', 30);
+    return ($n >= 1 && $n <= 180) ? $n : 30;
+}
+
+// Days since it arrived, and where that stands against the target. Returns null
+// for age when the date is unreadable rather than inventing a number.
+function dsr_age($row) {
+    $at = trim((string)($row['received_at'] ?? ''));
+    $ts = $at !== '' ? strtotime($at) : false;
+    $closed = ($row['status'] ?? '') === 'CLOSED';
+    if ($ts === false) return ['days' => null, 'state' => 'unknown', 'target' => dsr_target_days()];
+    $end = $closed && trim((string)($row['answered_at'] ?? '')) !== ''
+         ? (strtotime((string)$row['answered_at']) ?: time()) : time();
+    $days = (int)floor(($end - $ts) / 86400);
+    $t = dsr_target_days();
+    if ($closed)            $state = $days > $t ? 'late-closed' : 'answered';
+    elseif ($days > $t)     $state = 'overdue';
+    elseif ($days > $t * 0.7) $state = 'due-soon';
+    else                    $state = 'open';
+    return ['days' => $days, 'state' => $state, 'target' => $t];
+}
+
+// The one number the compliance screen and the dashboard care about: is anybody
+// waiting longer than we said they would.
+function dsr_overdue_count() {
+    $n = 0;
+    foreach (ops_all("SELECT * FROM data_requests WHERE status <> 'CLOSED'") as $r)
+        if (dsr_age($r)['state'] === 'overdue') $n++;
+    return $n;
+}
+
+// ---------------------------------------------------------------------------
+//  Erasing a candidate
+//
+//  The sharpest piece of personal data in this system belongs to somebody who
+//  never became a customer, a colleague or a supplier: a person who applied for
+//  work and was not taken on. The candidates table holds their name, mobile,
+//  e-mail, the text of their CV, its file name, expected rate and interview
+//  outcome. Under the DPDP Act that may be kept only while there is a reason,
+//  and "we never got round to deleting it" is not one.
+//
+//  Deleting the ROW is the wrong answer. A candidate who was hired is now a
+//  team member with jobs, vouchers and reports behind them, and a candidate who
+//  was rejected is still the reason a requisition closed the way it did. So this
+//  REDACTS: every field that identifies the person is emptied, the shape of the
+//  hiring decision is kept, and the row says plainly that it was erased and
+//  when. A register that silently loses rows is a register nobody can audit.
+// ---------------------------------------------------------------------------
+function candidate_erase_fields() {
+    // Only what identifies a person. Not the stage, not the dates, not the
+    // outcome — those are facts about a decision, not about them.
+    return ['first_name', 'middle_name', 'last_name', 'email', 'mobile',
+            'cv_link', 'cv_text', 'cv_keywords', 'cv_file_name', 'remarks',
+            'expected_rate', 'client_feedback_note'];
+}
+
+// What erasing would remove, in words, so a person can be told before they press
+// it — and so the answer to the request can quote it.
+function candidate_erase_preview($id) {
+    $c = ops_one("SELECT * FROM candidates WHERE id=?", [(int)$id]);
+    if (!$c) return null;
+    $held = [];
+    foreach (candidate_erase_fields() as $f)
+        if (trim((string)($c[$f] ?? '')) !== '' && (string)($c[$f] ?? '') !== '0') $held[] = $f;
+    return [
+        'row'    => $c,
+        'holds'  => $held,
+        'hired'  => !empty($c['inspector_id']),
+        'keeps'  => ['the reference ' . (string)$c['cand_code'], 'which stage it reached',
+                     'the dates it moved', 'the interview outcome'],
+        'erased' => trim((string)($c['erased_at'] ?? '')) !== '',
+    ];
+}
+
+function candidate_erase($id, $reason = '') {
+    $c = ops_one("SELECT * FROM candidates WHERE id=?", [(int)$id]);
+    if (!$c) return 'That candidate record no longer exists.';
+    if (trim((string)($c['erased_at'] ?? '')) !== '') return 'That record has already been erased.';
+
+    // A candidate who was taken on is a colleague now, and their details are
+    // held for employment rather than for recruitment. Erasing here would not
+    // remove them from the system and would only make this register lie.
+    if (!empty($c['inspector_id']))
+        return 'This candidate was hired, so their details are held as a team member rather than as an applicant. '
+             . 'Erase them from their own record instead — this register would still show them.';
+
+    ensure_column('candidates', 'erased_at', "VARCHAR(30) DEFAULT ''");
+    ensure_column('candidates', 'erased_by', "VARCHAR(150) DEFAULT ''");
+    ensure_column('candidates', 'erase_reason', "VARCHAR(255) DEFAULT ''");
+
+    $sets = []; $args = [];
+    foreach (candidate_erase_fields() as $f) {
+        if (!array_key_exists($f, $c)) continue;          // a column a future version dropped
+        $sets[] = "$f = ?";
+        $args[] = ($f === 'expected_rate') ? 0 : '';
+    }
+    $u = current_user();
+    $sets[] = 'erased_at = ?';   $args[] = date('c');
+    $sets[] = 'erased_by = ?';   $args[] = $u ? user_name($u) : '';
+    $sets[] = 'erase_reason = ?'; $args[] = substr(trim((string)$reason), 0, 255);
+    $args[] = (int)$c['id'];
+
+    db()->prepare("UPDATE candidates SET " . implode(', ', $sets) . " WHERE id = ?")->execute($args);
+
+    // Written to the trail BEFORE anybody can ask whether it happened. Note it
+    // records the reference, never the name — logging what you just erased would
+    // defeat the erasure.
+    if (function_exists('act_log'))
+        act_log('CANDIDATE', (int)$c['id'], 'ERASED',
+                'Personal details erased on request. Reference ' . (string)$c['cand_code'] . ' and the hiring decision kept.');
+    return '';
+}
+
+// ---------------------------------------------------------------------------
+//  The CERT-In report, as an e-mail somebody can actually send
+//
+//  CERT-In allows six hours from noticing an incident to reporting it. Six hours
+//  is not enough time to work out what to write, and the register already holds
+//  every fact the report needs. So it drafts the e-mail: the operator opens it
+//  in their own mail program, reads it, corrects anything wrong and presses send.
+//
+//  Deliberately NOT sent automatically. A breach notification going out on a
+//  cron with nobody having read it is a worse failure than being an hour late,
+//  and the six-hour clock is on a human decision, not on a mail queue.
+// ---------------------------------------------------------------------------
+function incident_report_email($inc) {
+    $sev  = strtoupper((string)($inc['severity'] ?? 'MEDIUM'));
+    $ref  = (string)($inc['ref'] ?? '');
+    $org  = (string)(setting_get('company_name', '') ?: app_name());
+    $subject = 'Cyber security incident report — ' . $org . ' — ' . $ref;
+
+    $when = trim((string)($inc['detected_at'] ?? ''));
+    $fmt  = $when !== '' ? date('d M Y H:i', strtotime($when) ?: time()) : 'not recorded';
+
+    $L = [];
+    $L[] = 'To: The Indian Computer Emergency Response Team (CERT-In)';
+    $L[] = '';
+    $L[] = 'Reported under the CERT-In Directions of 28 April 2022, within six hours of noticing.';
+    $L[] = '';
+    $L[] = 'ORGANISATION';
+    $L[] = '  Name            : ' . $org;
+    $L[] = '  Contact person  : ' . (setting_get('grievance_officer_name', '') ?: '[name — Settings → Compliance]');
+    $L[] = '  Contact e-mail  : ' . (setting_get('grievance_officer_email', '') ?: '[e-mail — Settings → Compliance]');
+    $L[] = '  Telephone       : ' . (setting_get('grievance_officer_phone', '') ?: '[telephone]');
+    $L[] = '';
+    $L[] = 'THE INCIDENT';
+    $L[] = '  Our reference   : ' . $ref;
+    $L[] = '  Noticed at      : ' . $fmt . ' (IST)';
+    $L[] = '  Type            : ' . (string)($inc['kind'] ?? '');
+    $L[] = '  Severity        : ' . $sev;
+    $L[] = '  Systems         : ' . (trim((string)($inc['systems'] ?? '')) ?: 'see below');
+    $L[] = '  People affected : ' . ((int)($inc['people_affected'] ?? 0) ?: 'not yet established');
+    $L[] = '  Kinds of data   : ' . (trim((string)($inc['data_kinds'] ?? '')) ?: 'not yet established');
+    $L[] = '';
+    $L[] = 'WHAT HAPPENED';
+    $L[] = '  ' . (trim((string)($inc['summary'] ?? '')) ?: '[describe what happened]');
+    $L[] = '';
+    $L[] = 'WHAT WE DID IMMEDIATELY';
+    $L[] = '  ' . (trim((string)($inc['immediate_action'] ?? '')) ?: '[what was done to contain it]');
+    $L[] = '';
+    if (trim((string)($inc['root_cause'] ?? '')) !== '') {
+        $L[] = 'CAUSE, SO FAR AS KNOWN';
+        $L[] = '  ' . (string)$inc['root_cause'];
+        $L[] = '';
+    }
+    $L[] = 'Logs are retained and available on request. Our systems clock is synchronised to';
+    $L[] = 'time.nplindia.org.';
+    $L[] = '';
+    $L[] = 'This report is made on the facts known at the time of writing and will be';
+    $L[] = 'supplemented as the investigation continues.';
+
+    return ['to' => (string)(setting_get('certin_email', '') ?: 'incident@cert-in.org.in'),
+            'subject' => $subject, 'body' => implode("\n", $L)];
+}
+
 function ops_data_requests($route, $method) {
     ops_require(is_master() || can('settings.manage'), 'Only an administrator can open this register.');
     $pdo = db();
+
+    // Erasing an applicant's details. POST only, and it says what it kept.
+    if ($route === 'candidate-erase' && $method === 'POST') {
+        $cid = (int)($_POST['id'] ?? 0);
+        $pv  = candidate_erase_preview($cid);
+        if (!$pv) { flash('That candidate record no longer exists.', 'error'); redirect('/candidates'); }
+        if (($e = candidate_erase($cid, (string)($_POST['reason'] ?? ''))) !== '') flash($e, 'error');
+        else flash('Personal details erased. The reference ' . (string)$pv['row']['cand_code']
+                 . ' and the hiring decision are kept, so the register still adds up.');
+        redirect('/candidate?id=' . $cid);
+    }
 
     // A copy of one person's data, as a file they can be sent.
     if ($route === 'person-data') {
