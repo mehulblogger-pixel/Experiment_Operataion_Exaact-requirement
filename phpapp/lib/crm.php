@@ -1172,7 +1172,50 @@ function ops_crm_quotes($route, $method) {
             // file — incomplete is fine and expected, because the tax numbers and
             // the addresses arrive later. What must not wait is the link.
             $res = quote_land_on_client($q);
-            flash(quote_landed_text($q, $res), 'success');
+
+            // SYNC — the quote's answer travels back to the deal. Accepting a
+            // quotation IS the moment the deal is won, so the sales pipeline
+            // should say so on its own, without anyone opening the deal to move
+            // it by hand. That one-way link (the deal knew its quote, but the
+            // quote's answer never came back) was the "to and fro" reported.
+            // Best-effort: a hiccup here must never stop the quotation being
+            // accepted — the acceptance is the fact, the propagation is a
+            // convenience on top of it.
+            $dealWon = false;
+            try {
+                if (function_exists('opp_move') && function_exists('opp_row') && function_exists('pipeline_stages')) {
+                    $qid = (int)$q['id']; $base = (int)(($q['parent_id'] ?? 0) ?: $qid);
+                    // Attached to the deal explicitly, or raised straight off the
+                    // lead the deal came from — either way it is this deal.
+                    $oid = (int)(ops_val("SELECT opportunity_id FROM opportunity_quotes WHERE quotation_id IN (?,?) ORDER BY id DESC LIMIT 1", [$qid, $base]) ?: 0);
+                    if (!$oid && !empty($q['lead_id']))
+                        $oid = (int)(ops_val("SELECT id FROM opportunities WHERE lead_id=? ORDER BY id DESC LIMIT 1", [(int)$q['lead_id']]) ?: 0);
+                    if ($oid) {
+                        $o = opp_row($oid);
+                        if ($o) {
+                            // The acceptance just put the company on the customer
+                            // master. Carry that onto the deal too, or a deal born
+                            // from a lead (which starts with no customer) would be
+                            // won but unable to raise its order — the customer sits
+                            // on the quote and never reaches operations.
+                            if (empty($o['partner_id']) && !empty($res['client_id'])) {
+                                $pn = (string) ops_val("SELECT COALESCE(display_name, legal_name) FROM business_partners WHERE id=?", [(int)$res['client_id']]);
+                                db()->prepare("UPDATE opportunities SET partner_id=?, partner_name=? WHERE id=?")
+                                   ->execute([(int)$res['client_id'], $pn, $oid]);
+                            }
+                            if (($o['status'] ?? '') === 'OPEN') {
+                                $wonStage = 0;
+                                foreach (pipeline_stages((int)$o['pipeline_id']) as $st)
+                                    if (($st['kind'] ?? '') === 'WON') { $wonStage = (int)$st['id']; break; }
+                                if ($wonStage) { $rw = opp_move($oid, $wonStage, [], true); $dealWon = !empty($rw['ok']); }
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable $e) { /* never block the acceptance */ }
+
+            flash(quote_landed_text($q, $res)
+                . ($dealWon ? ' The deal is now won in the sales pipeline.' : ''), 'success');
             redirect('/quote?id=' . $q['id']);
         } else {
             $pdo->prepare("UPDATE quotations SET status=? WHERE id=?")->execute([$to, $q['id']]);
