@@ -619,7 +619,13 @@ function opp_raise_order($oppId, array $b = []) {
                      (string)($b['contract_number'] ?? '') ?: (string)($q['contract_number'] ?? ''),
                      (int)($b['executing_office_id'] ?? 0) ?: ($o['office_id'] ?: null),
                      (string)$o['sbu'],
-                     (float)($q['total_amount'] ?? $o['value']),
+                     // The work-order's billable value is the EX-GST base (the call
+                     // screen labels it "Billable (ex-GST)" and the invoice adds GST
+                     // on top of it). Carrying the quote's GST-inclusive total here
+                     // charged the customer GST twice on every won deal — the invoice
+                     // grossed up a figure that was already gross. Use the quote's
+                     // subtotal; only fall back to the deal estimate if there is no quote.
+                     (float)($q['subtotal'] ?? $o['value']),
                      date('Y-m-d'),
                      (string)($b['inspection_required_date'] ?? ''),
                      trim('Raised from opportunity ' . $o['ref'] . ' — ' . $o['name'] . "\n" . (string)$o['requirement']),

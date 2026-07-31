@@ -1822,6 +1822,7 @@ function ops_module_gate($route) {
         'contract-overrides'=>'calls','contract-override'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'preflight'=>'settings',
+        'trace-thread'=>'settings','trace-thread-remove'=>'settings',
         'evidence-review'=>'idems','evidence-reviewed'=>'idems','checkin-photo'=>'jobs','checkin-settings'=>'idems',
         'data-control'=>'datacontrol','data-check-run'=>'datacontrol','sw-validation-add'=>'datacontrol',
         'failure-add'=>'datacontrol','failure-update'=>'datacontrol','failure-resolve'=>'datacontrol',
@@ -1987,6 +1988,21 @@ function ops_dispatch($route, $method) {
                 $res = seed_demo_remove();
                 if (!empty($res['error'])) flash('Could not remove demo data: ' . $res['error'], 'error');
                 else flash('Demo data removed — ' . (int)($res['deleted'] ?? 0) . ' records deleted. You can load it again anytime.');
+            }
+            redirect('/settings'); return true;
+        case $route === 'trace-thread':
+            ops_require(is_master(), 'Only the Master Admin can build the traceability thread.');
+            if ($method === 'POST' && function_exists('trace_seed')) {
+                $res = trace_seed(true);   // always rebuild fresh, so the run is repeatable
+                if (empty($res['ok'])) flash('The traceability thread stopped: ' . ($res['error'] ?? 'unknown'), 'error');
+                view('ops/trace_thread', ['res' => $res]); return true;
+            }
+            redirect('/settings'); return true;
+        case $route === 'trace-thread-remove':
+            ops_require(is_master(), 'Only the Master Admin can remove the traceability thread.');
+            if ($method === 'POST' && function_exists('trace_seed_remove')) {
+                $r = trace_seed_remove();
+                flash('Traceability thread removed — ' . (int)($r['deleted'] ?? 0) . ' records deleted.');
             }
             redirect('/settings'); return true;
         case $route === 'boss-renew':

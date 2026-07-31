@@ -392,6 +392,16 @@
 </div>
 
 <div class="panel" style="max-width:620px;margin-top:18px">
+  <h3 class="tab-sub" style="margin-top:0;">Traceability check</h3>
+  <p class="sub" style="margin-bottom:8px">Builds <strong>one</strong> record and follows it the whole way through — customer, lead, contact, deal, quotation, accept, contract number, work-order, job, site check-in, report, invoice, money-in — then reads the database back and shows you, place by place, that every link was saved and every figure is right.</p>
+  <p class="muted" style="margin:0 0 10px">Safe to run on a live system: everything it writes is one demo customer (<code><?= e(defined('TRACE_CLIENT_CODE') ? TRACE_CLIENT_CODE : 'GT-CLIENT') ?></code>) and can be removed again in one click on the results page. Use it to prove the flow end-to-end, or after any change to check nothing broke.</p>
+  <form method="post" action="/trace-thread">
+    <button class="btn" type="submit">Build &amp; check the thread</button>
+  </form>
+  <p class="muted" style="margin-top:8px;font-size:12px">Command line, no time limit: <code>php tools/trace-thread.php</code> — add <code>--remove</code> to take it out, <code>--check</code> to re-verify.</p>
+</div>
+
+<div class="panel" style="max-width:620px;margin-top:18px">
   <h3 class="tab-sub" style="margin-top:0;">Clear records</h3>
   <p class="sub" style="margin-bottom:10px">For setting up and testing: empty whole groups of records — day-to-day work, reports, costing figures, <?= e(Tlp('client')) ?> &amp; <?= e(Tlp('vendor')) ?>, people, master lists — and start again with a clean register. You see the count before anything happens, and your own login is never deleted.</p>
   <a class="btn danger" href="/reset-data">Open clear records</a>
