@@ -26,6 +26,28 @@
   </div>
 </div>
 
+<?php
+  // Where this quotation is in its journey, said in one line with the one next
+  // step — so a person knows what to do without reading the whole page. The
+  // detailed panels below still carry the specifics (who is approving, the
+  // contract, and so on).
+  $nbTitle = lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st; $nbNext = '';
+  switch ($st) {
+    case 'DRAFT': $nbTitle = 'Still a draft.'; $nbNext = 'Next: submit it for approval when it is ready.'; break;
+    case 'PENDING_APPROVAL': $nbTitle = 'Waiting for approval' . (!empty($pendingWith) ? ' — with ' . $pendingWith : '') . '.'; $nbNext = 'They approve it, or send it back with a comment.'; break;
+    case 'APPROVED': $nbTitle = 'Approved and ready to go out.'; $nbNext = 'Next: send it to the ' . Tl('client') . '.'; break;
+    case 'SENT': $nbTitle = 'Sent to the ' . Tl('client') . (trim((string)($q['sent_at'] ?? '')) !== '' ? ' on ' . fdate(substr((string)$q['sent_at'], 0, 10)) : '') . '.'; $nbNext = 'Waiting for their answer — mark it accepted, or lost.'; break;
+    case 'ACCEPTED': $nbTitle = 'Accepted 🎉 — they said yes.'; $nbNext = trim((string)($q['contract_number'] ?? '')) === '' ? 'Next: register the contract number, then raise the order.' : 'Raise the order to hand it to operations.'; break;
+    case 'REJECTED': $nbTitle = 'Sent back by ' . ($q['rejected_by'] ?: 'the approver') . '.'; $nbNext = 'Correct it and submit again, or raise a revision.'; break;
+    case 'LOST': $nbTitle = 'Closed — not accepted.'; break;
+    case 'EXPIRED': $nbTitle = 'Expired — its validity has passed.'; $nbNext = 'Raise a revision to re-issue it.'; break;
+  }
+?>
+<div class="nowband">
+  <div class="step"><?= e($nbTitle) ?></div>
+  <?php if ($nbNext !== ''): ?><p class="next"><?= e($nbNext) ?></p><?php endif; ?>
+</div>
+
 <?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email'])): ?>
 <div class="panel" style="background:var(--soft)">
   <b>Two ways to send this</b>
@@ -335,6 +357,9 @@
 <div class="panel" style="border:1px solid var(--bad)"><b>Lost reason:</b> <?= e(lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS)[$q['lost_reason']] ?? $q['lost_reason']) ?><?= $q['lost_reason_other']?' — '.e($q['lost_reason_other']):'' ?></div>
 <?php endif; ?>
 
+<details class="fold">
+  <summary>Revisions &amp; follow-ups <span class="sub"><?= count($revs) ?> version<?= count($revs) === 1 ? '' : 's' ?><?= $followups ? ' · ' . count($followups) . ' follow-up' . (count($followups) === 1 ? '' : 's') : '' ?></span></summary>
+  <div class="fold-body">
 <div class="panel-split">
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0">Revision history</h3>
@@ -456,6 +481,8 @@
     </form>
   </div>
 </div>
+  </div>
+</details>
 
 <div class="panel">
   <h3 class="tab-sub" style="margin-top:0">Sites <span class="muted">— every location this <?= e(Tl('quote')) ?> covers</span></h3>
