@@ -185,6 +185,11 @@ $schemaSig = '';
 try {
     $parts = [filemtime(__FILE__) . ':' . filesize(__FILE__)];
     foreach (glob(__DIR__ . '/lib/*.php') ?: [] as $f) $parts[] = basename($f) . ':' . @filemtime($f) . ':' . @filesize($f);
+    // config.php too — editing the admin credentials there must re-run boot() so
+    // ensure_admin() re-applies them. Without this, a password changed in config
+    // on a running server was silently ignored (the code fingerprint had not
+    // moved), and the old password kept working while the new one was refused.
+    $parts[] = 'config:' . @filemtime(__DIR__ . '/config.php') . ':' . @filesize(__DIR__ . '/config.php');
     $schemaSig = md5(implode('|', $parts));
 } catch (Throwable $e) { $schemaSig = ''; }
 $schemaCurrent = false;
