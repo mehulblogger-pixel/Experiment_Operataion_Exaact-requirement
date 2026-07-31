@@ -428,6 +428,8 @@ function lead_log_contact($leadId, array $b = []) {
             'occurred_at'=> $occurredAt,
             'outcome'    => (string)($b['outcome'] ?? ''),
             'with_whom'  => $who ?? '',
+            // How long it took — the raw material of the "effort to win" figure.
+            'duration_mins' => max(0, (int)($b['time_spent'] ?? 0)),
             'partner_id' => $l['partner_id'] ?: null,
             'office_id'  => $l['office_id'] ?? '',
             'sbu'        => $l['sbu'] ?? '',
@@ -817,6 +819,13 @@ function ops_leads($route, $method) {
                           && (can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes')),
             'methods' => LEAD_CONTACT_METHODS, 'prefMethods' => LEAD_PREF_CONTACT,
             'today' => date('Y-m-d'),
+            // Effort so far — this lead's logged time plus the deal it became.
+            'effort' => function_exists('act_effort') ? act_effort([
+                ['LEAD', (int)$l['id']],
+                ['OPPORTUNITY', (int)(function_exists('opp_try')
+                    ? opp_try(fn() => ops_val("SELECT id FROM opportunities WHERE lead_id=? ORDER BY id DESC LIMIT 1", [(int)$l['id']]), 0)
+                    : 0)],
+            ]) : ['mins' => 0, 'touches' => 0],
             'canEdit' => $canEdit, 'days' => lead_days_in_stage($l), 'stalled' => lead_stalled($l),
             'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 ORDER BY COALESCE(display_name, legal_name) LIMIT 500"),
             // Who a lead can be allocated to. Active logins only — allocating

@@ -41,6 +41,9 @@
     <tr><th>Contact</th><td><?= e($l['contact_name'] ?: '—') ?></td><th>E-mail</th><td><?= e($l['contact_email'] ?: '—') ?></td></tr>
     <tr><th>Telephone</th><td><?= e($l['contact_phone'] ?: '—') ?></td><th>Source</th><td><?= e($l['source'] ?: '—') ?></td></tr>
     <tr><th>Preferred contact</th><td><?= e(($l['pref_contact'] ?? '') !== '' ? (LEAD_PREF_CONTACT[$l['pref_contact']] ?? $l['pref_contact']) : '—') ?></td><th>Quotations</th><td><?= count($quotes ?? []) ? count($quotes) : '—' ?></td></tr>
+    <tr><th><?= $l['status']==='CONVERTED' ? 'Effort to win' : 'Effort so far' ?></th><td colspan="3"><?php
+        $effLbl = function_exists('act_effort_label') ? act_effort_label($effort ?? []) : '';
+        echo $effLbl !== '' ? e($effLbl) : '<span class="muted">— none timed yet; add “Time it took” when you log a contact —</span>'; ?></td></tr>
     <tr><th>Value</th><td><?= $l['value'] ? fmoney($l['value']) : '—' ?></td><th>Expected close</th><td><?= $l['expected_close'] ? e(fdate($l['expected_close'])) : '—' ?></td></tr>
     <tr><th>Owner</th><td><?= e($l['owner_name'] ?: '—') ?></td><th>Branch</th><td><?= e($l['office_name'] ?: '—') ?></td></tr>
     <tr><th>Next thing to do</th><td colspan="3"><?= e($l['next_action'] ?: '—') ?><?= $l['next_action_on'] ? ' — by ' . e(fdate($l['next_action_on'])) : '' ?></td></tr>
@@ -94,6 +97,16 @@
           <option>Interested</option><option>Wants a quotation</option><option>Call back later</option>
           <option>No answer</option><option>Not interested</option><option>Asked us to email</option>
         </datalist></div>
+      <?php // Time spent — adds up into "effort to win" on the lead and the deal,
+            // so you can see what a contract actually cost in man-days. ?>
+      <div class="ff"><label for="c-time">Time it took</label>
+        <select class="form-control" name="time_spent" id="c-time">
+          <option value="0">—</option>
+          <option value="15">15 minutes</option><option value="30">Half an hour</option>
+          <option value="45">45 minutes</option><option value="60">1 hour</option>
+          <option value="90">1½ hours</option><option value="120">2 hours</option>
+          <option value="240">Half a day</option><option value="480">A full day</option>
+        </select></div>
       <div class="ff"><label for="c-pref">They prefer to be reached by</label>
         <select class="form-control" name="pref_contact" id="c-pref">
           <option value="">— no preference noted —</option>

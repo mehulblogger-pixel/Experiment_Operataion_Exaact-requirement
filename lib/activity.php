@@ -183,6 +183,34 @@ function act_log($entityKind, $entityId, $kind, $subject, array $opt = []) {
     }
 }
 
+// ---- Effort ----------------------------------------------------------------
+// How much working time went into something, summed from the minutes logged on
+// its activities. A man-day is a standard eight-hour working day — the yardstick
+// a manager reads "how much did it cost us to win this" in.
+function act_effort(array $refs) {
+    $mins = 0; $n = 0;
+    foreach ($refs as $ref) {
+        $k = $ref[0] ?? ''; $id = (int)($ref[1] ?? 0);
+        if ($k === '' || !$id) continue;
+        try {
+            $r = ops_one("SELECT COALESCE(SUM(duration_mins),0) m, COUNT(*) n
+                          FROM activities WHERE entity_kind=? AND entity_id=? AND duration_mins>0", [$k, $id]);
+            $mins += (int)($r['m'] ?? 0); $n += (int)($r['n'] ?? 0);
+        } catch (Throwable $e) { /* table not built yet */ }
+    }
+    return ['mins' => $mins, 'touches' => $n, 'mandays' => $mins / 480.0];
+}
+// "1.5 man-days (12h over 6 touches)" — empty when nothing has been timed, so a
+// screen shows the line only once there is something honest to put in it.
+function act_effort_label(array $eff) {
+    $mins = (int)($eff['mins'] ?? 0);
+    if ($mins <= 0) return '';
+    $h = intdiv($mins, 60); $m = $mins % 60;
+    $hm = $h ? ($h . 'h' . ($m ? ' ' . $m . 'm' : '')) : ($m . 'm');
+    $n  = (int)($eff['touches'] ?? 0);
+    return number_format($mins / 480.0, 1) . ' man-days (' . $hm . ' over ' . $n . ' touch' . ($n === 1 ? '' : 'es') . ')';
+}
+
 // ---- Reading ---------------------------------------------------------------
 // Everything for one customer — the Customer 360 query. One index, no joins to
 // find the customer, because that was resolved on the way in.
