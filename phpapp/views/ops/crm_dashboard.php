@@ -36,6 +36,10 @@
   <div class="qcard"><div class="qic">%</div><div class="qn"><?= $h['rate'] === null ? '—' : (int)$h['rate'] . '%' ?></div><div class="ql">Win rate</div></div>
   <div class="qcard"><div class="qic">₹</div><div class="qn" style="font-size:20px"><?= $h['avg_deal'] ? fmoney_short($h['avg_deal']) : '—' ?></div><div class="ql">Average won deal</div></div>
   <div class="qcard"><div class="qic">◷</div><div class="qn"><?= $h['cycle_days'] === null ? '—' : (int)$h['cycle_days'] ?></div><div class="ql">Days to win, average</div></div>
+  <?php // Effort, in man-days: what winning costs, and what the losses cost. ?>
+  <?php $ef = $effort ?? []; ?>
+  <div class="qcard"><div class="qic">⏱</div><div class="qn"><?= ($ef['avg_win_md'] ?? null) === null ? '—' : number_format($ef['avg_win_md'], 1) ?></div><div class="ql">Man-days to win, average</div></div>
+  <div class="qcard <?= !empty($ef['lost_timed']) && ($ef['lost_md'] ?? 0) >= 1 ? 'tone-bad' : '' ?>"><div class="qic">⌛</div><div class="qn"><?= empty($ef['lost_timed']) ? '—' : number_format($ef['lost_md'], 1) ?></div><div class="ql">Man-days on deals lost<?= !empty($ef['lost_n']) ? ' · ' . (int)$ef['lost_n'] . ' deal' . ((int)$ef['lost_n'] === 1 ? '' : 's') : '' ?></div></div>
   <div class="qcard <?= $h['stalled'] ? 'tone-bad' : '' ?>"><div class="qic">!</div><div class="qn"><?= (int)$h['stalled'] ?></div><div class="ql">Stopped moving</div></div>
   <div class="qcard <?= $h['closing_soon'] ? 'tone-warn' : '' ?>"><div class="qic">▸</div><div class="qn"><?= (int)$h['closing_soon'] ?></div><div class="ql">Due to close in 30 days</div></div>
 </div>

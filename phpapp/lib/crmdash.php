@@ -141,6 +141,41 @@ function crmdash_headline($days = 365) {
             'won_value' => $win['won_value'], 'avg_deal' => $avg, 'cycle_days' => $cycle];
 }
 
+// Effort — the man-days that went into deals that closed, won or lost. Each
+// closed deal's effort is the time logged on it plus the time logged on the
+// lead it came from. Won gives "what it costs us to win"; lost gives the price
+// of the ones that got away, which is the number nobody usually sees.
+function crmdash_effort($days = 365) {
+    $cut = date('Y-m-d', strtotime("-$days days"));
+    [$sw, $sa] = scope_office_clause('o.office_id');
+    $rows = crmdash_try(fn() => crmdash_rows(
+        "SELECT o.status,
+                (SELECT COALESCE(SUM(a.duration_mins),0) FROM activities a
+                  WHERE (a.entity_kind='OPPORTUNITY' AND a.entity_id=o.id)
+                     OR (a.entity_kind='LEAD' AND a.entity_id=o.lead_id)) AS mins
+         FROM opportunities o
+         WHERE $sw AND o.status IN ('WON','LOST')
+           AND COALESCE(NULLIF(o.won_at,''), o.updated_at) >= ?",
+        array_merge($sa, [$cut])), []) ?: [];
+    $wonN = $wonMins = $lostN = $lostMins = 0;
+    foreach ($rows as $r) {
+        // Only deals where time was actually logged, so a company still adopting
+        // the time-tracking is not shown a fake near-zero average dragged down by
+        // every old deal that was never timed.
+        $m = (int)$r['mins'];
+        if ($m <= 0) continue;
+        if (($r['status'] ?? '') === 'WON') { $wonN++;  $wonMins  += $m; }
+        else                                { $lostN++; $lostMins += $m; }
+    }
+    return [
+        'won_n'      => $wonN,
+        'avg_win_md' => ($wonN && $wonMins) ? ($wonMins / $wonN / 480.0) : null,
+        'lost_n'     => $lostN,
+        'lost_md'    => $lostMins / 480.0,
+        'lost_timed' => $lostMins > 0,
+    ];
+}
+
 // Where the whole thing starts: leads in, and how many became deals.
 function crmdash_topfunnel($days = 365) {
     $cut = date('Y-m-d', strtotime("-$days days"));
@@ -214,6 +249,7 @@ function ops_crmdash($route, $method) {
     view('ops/crm_dashboard', [
         'funnel'   => $funnel,
         'head'     => crmdash_headline($days),
+        'effort'   => crmdash_effort($days),
         'top'      => crmdash_topfunnel($days),
         'owners'   => crmdash_owners($days),
         'stuck'    => crmdash_stuck(10),
