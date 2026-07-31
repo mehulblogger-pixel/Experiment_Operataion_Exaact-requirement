@@ -41,6 +41,36 @@
   </div>
 </div>
 
+<?php // ---- Where this order stands, and the one next thing ------------------ ?>
+<?php
+  $jobsN = count($jobs);
+  $schedN = 0; $closedN = 0;
+  foreach ($jobs as $j) {
+    if (!empty($j['scheduled_date'])) $schedN++;
+    if (!empty($j['closed_flag'])) $closedN++;
+  }
+  $callDone = strtoupper((string)($call['status'] ?? '')) === 'CLOSED'
+              || ($jobsN > 0 && $closedN === $jobsN);
+  $canAlloc = is_coordinator_level();
+?>
+<div class="nowband">
+  <?php if ($callDone): ?>
+    <div class="step">Done — the work is finished.</div>
+    <p class="next">All <?= $jobsN > 1 ? 'jobs on this order have' : 'work on this order has' ?> been carried out and closed. Nothing more to do here.</p>
+  <?php elseif ($jobsN === 0): ?>
+    <div class="step">Nothing has been given out yet.</div>
+    <p class="next">The order is in, but no engineer has the work. <b>Next:</b> allocate a job so someone can be sent.</p>
+    <?php if ($canAlloc): ?><div class="cta"><a class="btn small" href="/job-new?call=<?= (int)$call['id'] ?>">Allocate a job →</a></div><?php endif; ?>
+  <?php elseif ($schedN === 0): ?>
+    <div class="step"><?= (int)$jobsN ?> <?= $jobsN > 1 ? 'jobs' : 'job' ?> given out — no date set yet.</div>
+    <p class="next">The work has gone to a branch but no visit date is fixed. <b>Next:</b> open the job below and set the scheduled date so the engineer knows when to go.</p>
+  <?php else: ?>
+    <div class="step">Work is under way — <?= (int)$schedN ?> of <?= (int)$jobsN ?> <?= $jobsN > 1 ? 'jobs' : 'job' ?> scheduled.</div>
+    <p class="next">Track each visit in the <a href="#jobs">jobs list below</a>. It closes here once every job is done.</p>
+    <?php if ($canAlloc): ?><div class="cta"><a class="btn small secondary" href="/job-new?call=<?= (int)$call['id'] ?>">Allocate another job</a></div><?php endif; ?>
+  <?php endif; ?>
+</div>
+
 <?php
   // Contract cover behind this call: dates and quantity. Shown before the
   // coordinator tries to allocate, not after they have filled a form.
@@ -149,8 +179,9 @@
   </div>
 </div>
 
-<div class="panel" id="credit">
-  <h3 class="tab-sub" style="margin-top:0">Credit / billing &amp; cost</h3>
+<details class="fold" id="credit">
+  <summary>Money — credit, billing &amp; cost so far <span class="sub">who bills whom, and what it has cost</span></summary>
+  <div class="fold-body">
   <div class="kv-grid">
     <div><span class="k">Managing / contracting office</span><?= e($call['ibo_name'] ?: '—') ?></div>
     <div><span class="k">Executing office</span><?= e($call['exec_name'] ?: ($call['ibo_name'] ?: 'Same office')) ?></div>
@@ -174,10 +205,12 @@
     </form>
     <?php endif; ?>
   <?php endif; ?>
-</div>
+  </div>
+</details>
 
-<div class="panel">
-  <h3 class="tab-sub">Timing &amp; lead time</h3>
+<details class="fold">
+  <summary>Timing &amp; lead time <span class="sub">when it came in, and how fast it moved</span></summary>
+  <div class="fold-body">
   <div class="kv-grid">
     <div><span class="k">Call received</span><?= e($call['call_received_date'] ?: '—') ?></div>
     <div><span class="k">Client expected date</span><?= e($call['inspection_required_date'] ?: '—') ?></div>
@@ -187,7 +220,8 @@
     <div><span class="k">Lead time (to executing)</span><?= $lead['to_executing']===null?'—':(int)$lead['to_executing'].' day(s)' ?></div>
     <div><span class="k">Scheduling delay</span><?php if ($lead['sched_delay']===null): ?>—<?php else: ?><span class="badge <?= $lead['sched_delay']<=1?'GREEN':($lead['sched_delay']<=3?'AMBER':'RED') ?>"><?= (int)$lead['sched_delay'] ?> day(s)</span><?php endif; ?></div>
   </div>
-</div>
+  </div>
+</details>
 
 <?php
   // Assignment confirmation banner (executing branch has allocated an inspector)
@@ -195,7 +229,7 @@
   foreach ($jobs as $aj) { if ($aj['inspector_name'] && $aj['scheduled_date']): ?>
     <div class="msg msg-success">✅ Call assigned to <strong><?= e($aj['inspector_name']) ?></strong> for <strong><?= e($aj['scheduled_date']) ?></strong> — engineer is <?= e($engKind[$aj['staff_kind'] ?? 'ASSET'] ?? 'own employee') ?><?= $aj['subcon_agency'] ? ' (' . e($aj['subcon_agency']) . ')' : '' ?>. Job <?= e($aj['job_code']) ?>, stage: <?= e(lk_options_or('job_stage', JOB_STAGES)[$aj['stage'] ?? 'ALLOCATED'] ?? '') ?>.</div>
   <?php endif; } ?>
-<h3 class="tab-sub">Jobs allocated from this call</h3>
+<h3 class="tab-sub" id="jobs">Jobs allocated from this call</h3>
 <table class="grid">
   <tr><th>Job</th><th>Inspector</th><th>Engineer</th><th>Scheduled</th><th>Stage</th><th>Expected credit</th><th>Closed</th><th></th></tr>
   <?php foreach ($jobs as $j): ?>
