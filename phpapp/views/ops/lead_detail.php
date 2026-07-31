@@ -1,60 +1,65 @@
-<?php $open = $l['status'] === 'OPEN'; ?>
+<?php
+  $open = $l['status'] === 'OPEN';
+  $curStage = '';
+  foreach ($stages as $s) if ((int)$s['id'] === (int)$l['stage_id']) $curStage = $s['name'];
+  $oppId = ($canEdit && $open && function_exists('opp_try'))
+      ? opp_try(fn() => ops_val("SELECT id FROM opportunities WHERE lead_id=?", [(int)$l['id']]), null) : null;
+  $converted = ($l['status'] ?? '') === 'CONVERTED' || !empty($l['converted_partner_id']) || !empty($l['converted_inquiry_id']);
+  $effLbl = function_exists('act_effort_label') ? act_effort_label($effort ?? []) : '';
+?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/leads">Leads</a> › <?= e($l['ref']) ?></div>
 <?= function_exists('chain_strip') ? chain_strip('LEAD', (int)$l['id'], 'LEAD', (int)$l['id']) : '' ?>
-<?php // A lead worth pursuing becomes an OPPORTUNITY, not an enquiry. The
-      // enquiry is paperwork; the opportunity is the deal, and it is what the
-      // forecast is built from. ?>
-<?php if ($canEdit && $l['status'] === 'OPEN' && function_exists('opp_can_edit') && opp_can_edit()): ?>
-  <?php $oppId = function_exists('opp_try') ? opp_try(fn() => ops_val("SELECT id FROM opportunities WHERE lead_id=?", [(int)$l['id']]), null) : null; ?>
-  <?php if ($oppId): ?>
-    <div class="msg msg-info" style="margin-bottom:12px">
-      This lead is being worked as <a href="/opportunity?id=<?= (int)$oppId ?>"><b>an opportunity</b></a>.
-    </div>
-  <?php else: ?>
-    <form method="post" action="/opportunity-from-lead" class="msg msg-info" style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <input type="hidden" name="lead_id" value="<?= (int)$l['id'] ?>">
-      <span>Worth pursuing? Open an <b>opportunity</b> — the deal itself, which is what the forecast counts. The lead stays as the record of where it came from.</span>
-      <button class="btn small" style="margin-left:auto">Open an opportunity</button>
-    </form>
-  <?php endif; ?>
-<?php endif; ?>
+
 <div class="master-head"><div>
   <h1><?= e($l['company_name']) ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= e($l['ref']) ?>
     <span class="pill <?= $l['status']==='CONVERTED'?'p-ok':($l['status']==='LOST'?'p-bad':'p-warn') ?>"><?= e(LEAD_STATUS[$l['status']] ?? $l['status']) ?></span>
-    <?php if ($l['stage_name']): ?><span class="pill p-mut"><?= e($l['stage_name']) ?></span><?php endif; ?>
-    <?php if ($stalled): ?><span class="pill p-bad"><?= (int)$days ?> days in this stage — past its <?= (int)$l['sla_days'] ?>-day allowance</span><?php endif; ?>
+    <?php if ($curStage): ?><span class="pill p-mut"><?= e($curStage) ?></span><?php endif; ?>
   </p></div></div>
 
-<div class="panel" style="margin-top:16px">
-  <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px">
-    <h3 style="margin:0">Score <span class="pill <?= $score['score']>=60?'p-ok':($score['score']>=35?'p-warn':'p-mut') ?>"><?= (int)$score['score'] ?></span></h3>
-    <span class="muted" style="font-size:12.5px">A rules engine, not a guess — every rule that fired is listed.</span>
-  </div>
-  <ul style="margin:8px 0 0;padding-left:20px">
-    <?php foreach ($score['why'] as $w): ?><li style="font-size:13.5px"><?= e($w) ?></li><?php endforeach; ?>
-  </ul>
+<?php // ---- Where it is now, and the one next thing ------------------------- ?>
+<div class="nowband">
+  <?php if ($converted): ?>
+    <div class="step">Won — this became a customer.</div>
+    <p class="next">It is now <a href="/client?id=<?= (int)$l['converted_partner_id'] ?>"><b><?= e($l['company_name']) ?> on the customer list</b></a><?php
+      if ($l['converted_inquiry_id']): ?> · <a href="/inquiries">an enquiry was raised</a><?php endif; ?>.
+      Carry on from there.</p>
+  <?php elseif ($l['status'] === 'LOST'): ?>
+    <div class="step">Closed — this one did not happen.</div>
+    <?php if ($l['lost_reason']): ?><p class="next">Reason: <b><?= e($lostReasons[$l['lost_reason']] ?? $l['lost_reason']) ?></b><?= $l['lost_note'] ? ' — ' . e($l['lost_note']) : '' ?>.</p><?php endif; ?>
+  <?php else: ?>
+    <div class="step">This lead is at <b><?= e($curStage ?: '—') ?></b>.<?php if ($stalled): ?> <span class="pill p-bad" style="font-size:11.5px"><?= (int)$days ?> days here — overdue</span><?php endif; ?></div>
+    <p class="next"><?php if (trim((string)$l['next_action']) !== ''): ?>
+        <b>Next:</b> <?= e($l['next_action']) ?><?= $l['next_action_on'] ? ' <span class="muted">by ' . e(fdate($l['next_action_on'])) . '</span>' : '' ?>
+      <?php else: ?>
+        <span class="muted">No next step set yet — log a contact below and say what happens next.</span>
+      <?php endif; ?></p>
+    <?php if ($canEdit): ?>
+      <div class="cta">
+        <?php if ($oppId): ?>
+          <a class="btn small secondary" href="/opportunity?id=<?= (int)$oppId ?>">Open the deal →</a>
+        <?php elseif (function_exists('opp_can_edit') && opp_can_edit()): ?>
+          <form method="post" action="/opportunity-from-lead" style="display:inline">
+            <input type="hidden" name="lead_id" value="<?= (int)$l['id'] ?>">
+            <button class="btn small">Work this as a deal →</button>
+          </form>
+        <?php endif; ?>
+        <a class="btn small secondary" href="#log">Log a contact</a>
+        <?php if (!empty($canQuote)): ?><a class="btn small secondary" href="/quote-new?lead=<?= (int)$l['id'] ?>">Make a quotation</a><?php endif; ?>
+      </div>
+    <?php endif; ?>
+  <?php endif; ?>
 </div>
 
+<?php // ---- The essentials, plainly ---------------------------------------- ?>
 <div class="panel" style="margin-top:16px">
   <table class="grid">
-    <tr><th>Contact</th><td><?= e($l['contact_name'] ?: '—') ?></td><th>E-mail</th><td><?= e($l['contact_email'] ?: '—') ?></td></tr>
-    <tr><th>Telephone</th><td><?= e($l['contact_phone'] ?: '—') ?></td><th>Source</th><td><?= e($l['source'] ?: '—') ?></td></tr>
-    <tr><th>Preferred contact</th><td><?= e(($l['pref_contact'] ?? '') !== '' ? (LEAD_PREF_CONTACT[$l['pref_contact']] ?? $l['pref_contact']) : '—') ?></td><th>Quotations</th><td><?= count($quotes ?? []) ? count($quotes) : '—' ?></td></tr>
-    <tr><th><?= $l['status']==='CONVERTED' ? 'Effort to win' : 'Effort so far' ?></th><td colspan="3"><?php
-        $effLbl = function_exists('act_effort_label') ? act_effort_label($effort ?? []) : '';
-        echo $effLbl !== '' ? e($effLbl) : '<span class="muted">— none timed yet; add “Time it took” when you log a contact —</span>'; ?></td></tr>
-    <tr><th>Value</th><td><?= $l['value'] ? fmoney($l['value']) : '—' ?></td><th>Expected close</th><td><?= $l['expected_close'] ? e(fdate($l['expected_close'])) : '—' ?></td></tr>
-    <tr><th>Owner</th><td><?= e($l['owner_name'] ?: '—') ?></td><th>Branch</th><td><?= e($l['office_name'] ?: '—') ?></td></tr>
-    <tr><th>Next thing to do</th><td colspan="3"><?= e($l['next_action'] ?: '—') ?><?= $l['next_action_on'] ? ' — by ' . e(fdate($l['next_action_on'])) : '' ?></td></tr>
-    <?php if ($l['converted_partner_id']): ?>
-      <tr><th>Became</th><td colspan="3"><a href="/client?id=<?= (int)$l['converted_partner_id'] ?>">the customer record</a>
-        <?php if ($l['converted_inquiry_id']): ?> · <a href="/inquiries">an inquiry</a><?php endif; ?>
-        on <?= e(fdate(substr((string)$l['converted_at'],0,10))) ?> by <?= e($l['converted_by']) ?></td></tr>
-    <?php endif; ?>
-    <?php if ($l['lost_reason']): ?>
-      <tr><th>Lost because</th><td colspan="3"><?= e($lostReasons[$l['lost_reason']] ?? $l['lost_reason']) ?>
-        <?= $l['lost_note'] ? '<br><span class="muted">' . e($l['lost_note']) . '</span>' : '' ?></td></tr>
+    <tr><th>Who to talk to</th><td><?= e($l['contact_name'] ?: '—') ?></td><th>Telephone</th><td><?= e($l['contact_phone'] ?: '—') ?></td></tr>
+    <tr><th>E-mail</th><td><?= e($l['contact_email'] ?: '—') ?></td><th>Best reached by</th><td><?= e(($l['pref_contact'] ?? '') !== '' ? (LEAD_PREF_CONTACT[$l['pref_contact']] ?? $l['pref_contact']) : '—') ?></td></tr>
+    <tr><th>Worth about</th><td><?= $l['value'] ? fmoney($l['value']) : '—' ?></td><th>Hoped to close</th><td><?= $l['expected_close'] ? e(fdate($l['expected_close'])) : '—' ?></td></tr>
+    <tr><th>Handled by</th><td><?= e($l['owner_name'] ?: '—') ?></td><th>Branch</th><td><?= e($l['office_name'] ?: '—') ?></td></tr>
+    <?php if ($effLbl !== ''): ?>
+      <tr><th><?= $converted ? 'Effort to win' : 'Effort so far' ?></th><td colspan="3"><?= e($effLbl) ?></td></tr>
     <?php endif; ?>
   </table>
   <?php if (trim((string)$l['requirement']) !== ''): ?>
@@ -63,14 +68,11 @@
   <?php endif; ?>
 </div>
 
-<?php // ---- Log a contact -------------------------------------------------
-      // The thing a CRM is for, and the thing this lead screen could not do:
-      // record that you spoke to them, how, what was said, and when to chase
-      // next. Everything is optional except that it happened. ?>
+<?php // ---- Log a contact — the main daily action --------------------------- ?>
 <?php if ($canEdit && $open): ?>
-<div class="panel" style="margin-top:16px">
+<div class="panel" style="margin-top:16px" id="log">
   <h3 style="margin-top:0">Log a contact</h3>
-  <p class="muted" style="margin:0 0 12px">Every call, message or meeting — so the next person to pick this up can see the whole story, and nobody forgets the follow-up.</p>
+  <p class="muted" style="margin:0 0 12px">Every call, message or meeting — so the story is never lost and the follow-up is never forgotten.</p>
   <form method="post" action="/lead-contact">
     <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
     <div class="form-grid">
@@ -97,8 +99,6 @@
           <option>Interested</option><option>Wants a quotation</option><option>Call back later</option>
           <option>No answer</option><option>Not interested</option><option>Asked us to email</option>
         </datalist></div>
-      <?php // Time spent — adds up into "effort to win" on the lead and the deal,
-            // so you can see what a contract actually cost in man-days. ?>
       <div class="ff"><label for="c-time">Time it took</label>
         <select class="form-control" name="time_spent" id="c-time">
           <option value="0">—</option>
@@ -128,21 +128,19 @@
 </div>
 <?php endif; ?>
 
-<?php // ---- Quotations, straight off the lead ------------------------------
-      // Reported: no way to raise or reach a quotation from the lead. Now the
-      // lead is where it starts and where it stays visible, at any stage. ?>
+<?php // ---- Quotations, straight off the lead ------------------------------ ?>
 <?php if (!empty($canQuote) || $quotes): ?>
 <div class="panel" style="margin-top:16px">
   <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px">
     <h3 style="margin:0">Quotations <span class="muted" style="font-weight:400;font-size:13px">(<?= count($quotes) ?>)</span></h3>
     <?php if (!empty($canQuote) && $l['status'] !== 'LOST'): ?>
-      <a class="btn small" href="/quote-new?lead=<?= (int)$l['id'] ?>">+ Create a quotation</a>
+      <a class="btn small" href="/quote-new?lead=<?= (int)$l['id'] ?>">+ Make a quotation</a>
     <?php endif; ?>
   </div>
-  <p class="muted" style="font-size:13px;margin:8px 0 0">The company, the contact and the requirement are carried across — you will not type them again.</p>
+  <p class="muted" style="font-size:13px;margin:8px 0 0">The company, the contact and what they want come across — you will not type them again.</p>
   <?php if ($quotes): ?>
     <table class="dt" style="margin-top:10px">
-      <thead><tr><th scope="col">Quotation</th><th scope="col">Status</th><th scope="col" class="num">Value</th><th scope="col">Raised</th></tr></thead>
+      <thead><tr><th scope="col">Quotation</th><th scope="col">Status</th><th scope="col" class="num">Value</th><th scope="col">Made</th></tr></thead>
       <tbody>
       <?php foreach ($quotes as $qq): ?>
         <tr>
@@ -155,36 +153,29 @@
       </tbody>
     </table>
   <?php else: ?>
-    <p class="muted" style="margin:10px 0 0">None yet.<?= (!empty($canQuote) && $l['status'] !== 'LOST') ? ' Use <b>Create a quotation</b> above when you are ready to price it.' : '' ?></p>
+    <p class="muted" style="margin:10px 0 0">None yet.<?= (!empty($canQuote) && $l['status'] !== 'LOST') ? ' Use <b>Make a quotation</b> when you are ready to price it.' : '' ?></p>
   <?php endif; ?>
 </div>
 <?php endif; ?>
 
-<?php // ---- Move it on, made step by step ---------------------------------
-      // Reported: "Move to is very confusing for a first-time user." So the
-      // current position is named, each move says what it MEANS and why you
-      // would choose it, and winning/losing is set apart from just progressing. ?>
+<?php // ---- Move it to the next step ---------------------------------------- ?>
 <?php if ($canEdit && $open):
-  $curStage = '';
-  foreach ($stages as $s) if ((int)$s['id'] === (int)$l['stage_id']) $curStage = $s['name'];
   $fwd = array_values(array_filter($stages, fn($s) => $s['kind']==='OPEN' && (int)$s['id']!==(int)$l['stage_id']));
   $won = array_values(array_filter($stages, fn($s) => $s['kind']==='WON'));
   $lost= array_values(array_filter($stages, fn($s) => $s['kind']==='LOST'));
 ?>
 <div class="panel" style="margin-top:16px">
-  <h3 style="margin-top:0">Where is this lead now — and where next?</h3>
-  <p style="margin:0 0 4px">Right now it is at <b><?= e($curStage ?: '—') ?></b>. Move it on as the conversation really progresses — the stage is what the pipeline, the forecast and your manager read.</p>
-  <p class="muted" style="margin:0 0 14px;font-size:13px">A rule of thumb: <b>move forward</b> only when something actually changed (you reached them, they showed interest, they asked to be quoted). <b>Won</b> makes them a customer. <b>Lost</b> closes it — and asks why, so next quarter you know what to fix.</p>
+  <h3 style="margin-top:0">Move it to the next step</h3>
+  <p class="muted" style="margin:0 0 14px;font-size:13px">Move it <b>forward</b> only when something really changed. <b>They said yes</b> makes them a customer. <b>It did not happen</b> closes it, and asks why.</p>
 
   <?php if ($fwd): ?>
-    <div class="form-sec" style="margin-top:0"><h3 style="font-size:14px">Move it forward</h3>
-      <p>It has genuinely progressed to this step.</p></div>
+    <div class="form-sec" style="margin-top:0"><h3 style="font-size:14px">Move it forward</h3></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <?php foreach ($fwd as $s): ?>
         <form method="post" action="/lead-move" style="display:inline">
           <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
           <input type="hidden" name="stage_id" value="<?= (int)$s['id'] ?>">
-          <button class="btn small secondary" title="Move this lead to &quot;<?= e($s['name']) ?>&quot;"><?= e($s['name']) ?></button>
+          <button class="btn small secondary"><?= e($s['name']) ?></button>
         </form>
       <?php endforeach; ?>
     </div>
@@ -192,7 +183,7 @@
 
   <?php if ($won): ?>
     <div class="form-sec"><h3 style="font-size:14px">They said yes</h3>
-      <p>This makes them a customer on the master and raises the enquiry — you will confirm the details on the next screen.</p></div>
+      <p>Makes them a customer and raises the enquiry — you confirm the details on the next screen.</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <?php foreach ($won as $s): ?>
         <form method="post" action="/lead-move" style="display:inline">
@@ -206,7 +197,7 @@
 
   <?php if ($lost): ?>
     <div class="form-sec"><h3 style="font-size:14px">It did not happen</h3>
-      <p>Pick the closest reason. It is the only thing that makes lost deals tell you anything later.</p></div>
+      <p>Pick the closest reason — it is the only thing that makes a lost lead tell you anything later.</p></div>
     <?php foreach ($lost as $s): ?>
       <form method="post" action="/lead-move" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:8px">
         <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
@@ -225,126 +216,123 @@
 </div>
 <?php endif; ?>
 
+<?php // ---- Folded away: the detail you only need sometimes ----------------- ?>
+<details class="fold">
+  <summary>How promising is it? <span class="sub">score <?= (int)$score['score'] ?>/100</span></summary>
+  <div class="fold-body">
+    <p class="muted" style="margin:0 0 8px;font-size:12.5px">A rules engine, not a guess — every rule that fired is listed.</p>
+    <ul style="margin:0;padding-left:20px">
+      <?php foreach ($score['why'] as $w): ?><li style="font-size:13.5px"><?= e($w) ?></li><?php endforeach; ?>
+    </ul>
+  </div>
+</details>
+
 <?php if ($canEdit && $open): ?>
-<form method="post" action="/lead-edit" class="panel" style="margin-top:16px;max-width:860px">
-  <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
-  <div class="form-sec"><h3>Details</h3>
-    <p>Everything here comes across when the lead is won, so it is worth getting right now rather than typing it again later.</p></div>
-  <div class="form-grid">
-    <div class="ff ff-wide"><label>Company</label>
-      <input class="form-control" name="company_name" value="<?= e($l['company_name']) ?>"></div>
-    <div class="ff"><label>Contact</label>
-      <input class="form-control" name="contact_name" value="<?= e($l['contact_name']) ?>"></div>
-    <div class="ff"><label>Source</label>
-      <input class="form-control" name="source" value="<?= e($l['source']) ?>"></div>
-    <div class="ff"><label>E-mail</label>
-      <input class="form-control" type="email" inputmode="email" name="contact_email" value="<?= e($l['contact_email']) ?>"></div>
-    <div class="ff"><label>Telephone</label>
-      <input class="form-control" type="tel" inputmode="tel" name="contact_phone" value="<?= e($l['contact_phone']) ?>"></div>
-    <div class="ff"><label>Value <span class="muted">(<?= e(cur_sym()) ?>)</span></label>
-      <input class="form-control" type="number" step="0.01" name="value" value="<?= e($l['value']) ?>"></div>
-    <div class="ff"><label>Expected close</label>
-      <input class="form-control" type="date" name="expected_close" value="<?= e($l['expected_close']) ?>"></div>
-
-    <?php // Allocation. This was a free-text box: you could type any name, it
-          // linked to no login, and owner_user_id — which every "my leads"
-          // filter and every reminder reads — stayed empty. A lead nobody is
-          // actually assigned is a lead nobody chases. ?>
-    <div class="ff"><label>Allocated to</label>
-      <select class="form-control searchable" name="owner_user_id">
-        <option value="">— nobody yet —</option>
-        <?php foreach (($users ?? []) as $u): ?>
-          <option value="<?= (int)$u['id'] ?>" <?= (int)($l['owner_user_id'] ?? 0) === (int)$u['id'] ? 'selected' : '' ?>>
-            <?= e(trim($u['first_name'] . ' ' . $u['last_name']) ?: $u['username']) ?><?= $u['role'] ? ' — ' . e(ORG_ROLES[$u['role']] ?? $u['role']) : '' ?>
-          </option>
-        <?php endforeach; ?>
-      </select>
-      <?php if (trim((string)($l['owner_name'] ?? '')) !== '' && !(int)($l['owner_user_id'] ?? 0)): ?>
-        <div class="ff-help">Recorded against the typed name “<?= e($l['owner_name']) ?>”, which is not linked to a
-          login. Pick the person here and it becomes a real allocation.</div>
-      <?php endif; ?></div>
-
-    <div class="ff"><label>Preferred contact</label>
-      <select class="form-control" name="pref_contact">
-        <option value="">— not noted —</option>
-        <?php foreach (($prefMethods ?? []) as $k=>$v): ?>
-          <option value="<?= e($k) ?>" <?= ($l['pref_contact'] ?? '')===$k?'selected':'' ?>><?= e($v) ?></option>
-        <?php endforeach; ?>
-      </select></div>
-    <div class="ff"><label>Next by</label>
-      <input class="form-control" type="date" name="next_action_on" value="<?= e($l['next_action_on']) ?>"></div>
-    <div class="ff ff-wide"><label>Next thing to do</label>
-      <input class="form-control" name="next_action" value="<?= e($l['next_action']) ?>"></div>
-    <div class="ff ff-wide"><label>What they want</label>
-      <textarea class="form-control" name="requirement" rows="3"><?= e($l['requirement']) ?></textarea></div>
-  </div>
-  <div class="form-actions">
-    <button class="btn" type="submit">Save</button>
-    <span class="spacer"></span>
-  </div>
-</form>
-<?php endif;   /* closes: only editable while the lead is open */ ?>
-
-<?php
-// Deleting a lead. There was no way to do this anywhere, which is why a register
-// fills up with test rows nobody can clear. A CONVERTED lead is not offered:
-// something downstream points back at it, and it is the record of where that
-// customer came from.
-$converted = ($l['status'] ?? '') === 'CONVERTED' || !empty($l['converted_partner_id']) || !empty($l['converted_inquiry_id']);
-?>
-<?php if (can('mod.leads.edit') || is_master()): ?>
-<div class="panel mt-4">
-  <div class="form-sec"><h3>Delete this lead</h3></div>
-  <?php if ($converted): ?>
-    <p class="sub mb-0">This lead has been won and converted, so it is the record of where
-      <?= e($l['company_name']) ?> came from and cannot be deleted. If it should not be chased any further, mark it
-      lost above — the history stays either way.</p>
-  <?php else: ?>
-    <p class="sub">Removes <?= e($l['ref']) ?> — <?= e($l['company_name']) ?> for good. Nothing else points at it yet,
-      so nothing downstream breaks. This cannot be undone.</p>
-    <form method="post" action="/lead-delete"
-          onsubmit="return confirm('Delete <?= e(addslashes($l['ref'])) ?> — <?= e(addslashes($l['company_name'])) ?>? This cannot be undone.')">
+<details class="fold">
+  <summary>Edit the details</summary>
+  <div class="fold-body">
+    <form method="post" action="/lead-edit">
       <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
-      <button class="btn danger" type="submit">Delete this lead</button>
+      <div class="form-grid">
+        <div class="ff ff-wide"><label>Company</label>
+          <input class="form-control" name="company_name" value="<?= e($l['company_name']) ?>"></div>
+        <div class="ff"><label>Contact</label>
+          <input class="form-control" name="contact_name" value="<?= e($l['contact_name']) ?>"></div>
+        <div class="ff"><label>Source</label>
+          <input class="form-control" name="source" value="<?= e($l['source']) ?>"></div>
+        <div class="ff"><label>E-mail</label>
+          <input class="form-control" type="email" inputmode="email" name="contact_email" value="<?= e($l['contact_email']) ?>"></div>
+        <div class="ff"><label>Telephone</label>
+          <input class="form-control" type="tel" inputmode="tel" name="contact_phone" value="<?= e($l['contact_phone']) ?>"></div>
+        <div class="ff"><label>Worth about <span class="muted">(<?= e(cur_sym()) ?>)</span></label>
+          <input class="form-control" type="number" step="0.01" name="value" value="<?= e($l['value']) ?>"></div>
+        <div class="ff"><label>Hoped to close</label>
+          <input class="form-control" type="date" name="expected_close" value="<?= e($l['expected_close']) ?>"></div>
+        <div class="ff"><label>Handled by</label>
+          <select class="form-control searchable" name="owner_user_id">
+            <option value="">— nobody yet —</option>
+            <?php foreach (($users ?? []) as $u): ?>
+              <option value="<?= (int)$u['id'] ?>" <?= (int)($l['owner_user_id'] ?? 0) === (int)$u['id'] ? 'selected' : '' ?>>
+                <?= e(trim($u['first_name'] . ' ' . $u['last_name']) ?: $u['username']) ?><?= $u['role'] ? ' — ' . e(ORG_ROLES[$u['role']] ?? $u['role']) : '' ?>
+              </option>
+            <?php endforeach; ?>
+          </select>
+          <?php if (trim((string)($l['owner_name'] ?? '')) !== '' && !(int)($l['owner_user_id'] ?? 0)): ?>
+            <div class="ff-help">Held against the typed name “<?= e($l['owner_name']) ?>”, not linked to a login. Pick the person to make it a real allocation.</div>
+          <?php endif; ?></div>
+        <div class="ff"><label>Best reached by</label>
+          <select class="form-control" name="pref_contact">
+            <option value="">— not noted —</option>
+            <?php foreach (($prefMethods ?? []) as $k=>$v): ?>
+              <option value="<?= e($k) ?>" <?= ($l['pref_contact'] ?? '')===$k?'selected':'' ?>><?= e($v) ?></option>
+            <?php endforeach; ?>
+          </select></div>
+        <div class="ff"><label>Next by</label>
+          <input class="form-control" type="date" name="next_action_on" value="<?= e($l['next_action_on']) ?>"></div>
+        <div class="ff ff-wide"><label>Next thing to do</label>
+          <input class="form-control" name="next_action" value="<?= e($l['next_action']) ?>"></div>
+        <div class="ff ff-wide"><label>What they want</label>
+          <textarea class="form-control" name="requirement" rows="3"><?= e($l['requirement']) ?></textarea></div>
+      </div>
+      <div class="form-actions"><button class="btn" type="submit">Save</button></div>
     </form>
-  <?php endif; ?>
-</div>
+  </div>
+</details>
 <?php endif; ?>
 
-<div class="panel" style="margin-top:16px">
-  <h3 style="margin-top:0">How it moved</h3>
-  <?php if (!$history): ?><p class="muted" style="margin:0">It has not moved yet.</p><?php else: ?>
-  <table class="dt">
-    <thead><tr><th>When</th><th>From</th><th>To</th><th class="num">Days there</th><th>Who</th></tr></thead>
-    <tbody>
-    <?php foreach ($history as $h): ?>
-      <tr><td><?= e(fdate(substr((string)$h['moved_at'],0,10))) ?></td>
-          <td><?= e($h['from_name'] ?: '—') ?></td><td><?= e($h['to_name']) ?></td>
-          <td class="num"><?= (int)$h['days_in_previous'] ?></td><td><?= e($h['moved_by']) ?></td></tr>
-    <?php endforeach; ?>
-    </tbody>
-  </table>
-  <?php endif; ?>
-</div>
+<details class="fold">
+  <summary>Its history <span class="sub"><?= count($timeline ?? []) ?> logged · <?= count($history ?? []) ?> move<?= count($history ?? []) === 1 ? '' : 's' ?></span></summary>
+  <div class="fold-body" id="timeline">
+    <h4 style="margin:0 0 8px">What's happened</h4>
+    <?php if ($timeline): ?>
+    <table class="dt">
+      <thead><tr><th>When</th><th>What</th><th>Notes</th><th>Who</th></tr></thead>
+      <tbody>
+      <?php foreach ($timeline as $a): ?>
+        <tr><td style="white-space:nowrap"><?= e(fdate(substr((string)$a['occurred_at'],0,10))) ?></td>
+            <td><span class="pill <?= $a['auto']?'p-mut':'p-ok' ?>" style="font-size:11px"><?= e(ACT_KINDS[$a['kind']] ?? $a['kind']) ?></span>
+                <?php if (!empty($a['direction'])): ?><span class="muted" style="font-size:11px"><?= $a['direction']==='IN'?'⭠ in':'⭢ out' ?></span><?php endif; ?>
+                <?= e($a['subject']) ?>
+                <?php if (!empty($a['outcome'])): ?> <span class="pill p-warn" style="font-size:11px"><?= e($a['outcome']) ?></span><?php endif; ?></td>
+            <td class="muted" style="font-size:12.5px;max-width:340px"><?= nl2br(e((string)($a['body'] ?? ''))) ?></td>
+            <td style="white-space:nowrap"><?= e($a['owner'] ?: '—') ?></td></tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+    <?php else: ?>
+      <p class="muted" style="margin:0">Nothing logged yet.</p>
+    <?php endif; ?>
 
-<div class="panel" style="margin-top:16px" id="timeline">
-  <h3 style="margin-top:0">Everything that happened</h3>
-  <?php if ($timeline): ?>
-  <table class="dt">
-    <thead><tr><th>When</th><th>What</th><th>Notes</th><th>Who</th></tr></thead>
-    <tbody>
-    <?php foreach ($timeline as $a): ?>
-      <tr><td style="white-space:nowrap"><?= e(fdate(substr((string)$a['occurred_at'],0,10))) ?></td>
-          <td><span class="pill <?= $a['auto']?'p-mut':'p-ok' ?>" style="font-size:11px"><?= e(ACT_KINDS[$a['kind']] ?? $a['kind']) ?></span>
-              <?php if (!empty($a['direction'])): ?><span class="muted" style="font-size:11px"><?= $a['direction']==='IN'?'⭠ in':'⭢ out' ?></span><?php endif; ?>
-              <?= e($a['subject']) ?>
-              <?php if (!empty($a['outcome'])): ?> <span class="pill p-warn" style="font-size:11px"><?= e($a['outcome']) ?></span><?php endif; ?></td>
-          <td class="muted" style="font-size:12.5px;max-width:340px"><?= nl2br(e((string)($a['body'] ?? ''))) ?></td>
-          <td style="white-space:nowrap"><?= e($a['owner'] ?: '—') ?></td></tr>
-    <?php endforeach; ?>
-    </tbody>
-  </table>
-  <?php else: ?>
-    <p class="muted" style="margin:0">Nothing logged yet.<?= ($canEdit && $open) ? ' Use <b>Log a contact</b> above the first time you reach them.' : '' ?></p>
-  <?php endif; ?>
-</div>
+    <h4 style="margin:18px 0 8px">How it moved</h4>
+    <?php if (!$history): ?><p class="muted" style="margin:0">It has not moved yet.</p><?php else: ?>
+    <table class="dt">
+      <thead><tr><th>When</th><th>From</th><th>To</th><th class="num">Days there</th><th>Who</th></tr></thead>
+      <tbody>
+      <?php foreach ($history as $h): ?>
+        <tr><td><?= e(fdate(substr((string)$h['moved_at'],0,10))) ?></td>
+            <td><?= e($h['from_name'] ?: '—') ?></td><td><?= e($h['to_name']) ?></td>
+            <td class="num"><?= (int)$h['days_in_previous'] ?></td><td><?= e($h['moved_by']) ?></td></tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+    <?php endif; ?>
+  </div>
+</details>
+
+<?php if (can('mod.leads.edit') || is_master()): ?>
+<details class="fold">
+  <summary>Remove this lead</summary>
+  <div class="fold-body">
+    <?php if ($converted): ?>
+      <p class="muted" style="margin:0">This lead was won and converted, so it is the record of where <?= e($l['company_name']) ?> came from and cannot be deleted. If it should not be chased any further, mark it lost above — the history stays either way.</p>
+    <?php else: ?>
+      <p class="muted" style="margin:0 0 10px">Removes <?= e($l['ref']) ?> — <?= e($l['company_name']) ?> for good. Nothing else points at it yet, so nothing downstream breaks. This cannot be undone.</p>
+      <form method="post" action="/lead-delete"
+            onsubmit="return confirm('Delete <?= e(addslashes($l['ref'])) ?> — <?= e(addslashes($l['company_name'])) ?>? This cannot be undone.')">
+        <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
+        <button class="btn danger" type="submit">Delete this lead</button>
+      </form>
+    <?php endif; ?>
+  </div>
+</details>
+<?php endif; ?>

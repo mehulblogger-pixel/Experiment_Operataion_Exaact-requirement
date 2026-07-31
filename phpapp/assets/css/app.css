@@ -796,6 +796,28 @@ table.dt.qlines .btn.small{white-space:nowrap}
 .pair-2{display:grid;grid-template-columns:1fr 1fr;gap:var(--s-2) var(--s-3);align-items:start}
 @media (max-width:560px){.pair-2{grid-template-columns:1fr}}
 
+/* Fold-away section — the secondary detail a screen keeps one tap under, so the
+   default view stays about what to do, not everything at once. Styled to read
+   as a panel whose header is the toggle. */
+details.fold{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow-sm);margin-top:var(--s-4);overflow:hidden}
+details.fold>summary{cursor:pointer;list-style:none;padding:var(--s-3) var(--s-4);
+  font-weight:var(--fw-semibold);display:flex;align-items:center;gap:var(--s-2);color:var(--ink)}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::before{content:"›";color:var(--muted);font-weight:700;font-size:1.15em;
+  transition:transform .15s;line-height:1}
+details.fold[open]>summary::before{transform:rotate(90deg)}
+details.fold>summary .sub{font-weight:var(--fw-regular);color:var(--muted);font-size:var(--t-sm)}
+details.fold>.fold-body{padding:0 var(--s-4) var(--s-4)}
+
+/* "Where it is now" band — the one-glance status + next step at the top of a
+   record, so a person is oriented before they read anything else. */
+.nowband{border:1px solid var(--line);border-left:3px solid var(--brand);border-radius:var(--radius);
+  background:var(--card);box-shadow:var(--shadow-sm);padding:var(--s-4);margin-top:var(--s-4)}
+.nowband .step{font-size:var(--t-lg,17px);font-weight:var(--fw-semibold)}
+.nowband .next{margin:var(--s-2) 0 0}
+.nowband .cta{margin-top:var(--s-3);display:flex;gap:var(--s-2);flex-wrap:wrap}
+
 /* Required. One marker, in one place, so a person can see before they start
    what the form will refuse to accept without. */
 .ff-req > label::after{content:" *";color:var(--bad);font-weight:var(--fw-bold)}
