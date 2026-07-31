@@ -437,6 +437,14 @@ try {
 }
 }   // end: the schema probe runs only when the code fingerprint has changed
 
+// Locked out of the admin login? Drop a plain text file named
+// "reset-admin.txt" in this folder (cPanel File Manager → New File) with the
+// new password on the first line, then load any page once. The password is set,
+// and the file deletes itself so it cannot be used twice or left lying around.
+// It is safe because it needs file access to the server — the same trust as
+// config.php — and nothing about it appears in the browser.
+if (function_exists('admin_recovery_from_file')) admin_recovery_from_file();
+
 // --- Router (single-segment routes; ids/tabs via query string) ---
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $route = trim($path, '/');

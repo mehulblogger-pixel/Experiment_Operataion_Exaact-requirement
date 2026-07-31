@@ -25,3 +25,7 @@ db.sqlite3-journal
 licence-signing-key.pem
 licence-server-config.php
 licence-server/data/
+
+# one-shot admin recovery file (never commit a password)
+phpapp/reset-admin.txt
+reset-admin.txt

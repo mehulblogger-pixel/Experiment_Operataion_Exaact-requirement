@@ -199,6 +199,37 @@ function ensure_admin() {
     }
 }
 
+// One-shot admin recovery from a file — for a non-technical admin who is locked
+// out and cannot run a command. They create "reset-admin.txt" in the app folder
+// (cPanel File Manager, point and click) with the new password on the first
+// line; the next page load reads it, sets the password, and DELETES the file.
+// Requires file access to the server, which is the same trust level as holding
+// config.php, so it needs no in-app permission and shows nothing in the browser.
+function admin_recovery_from_file() {
+    $file = __DIR__ . '/../reset-admin.txt';
+    if (!is_file($file)) return;                     // the common case: cheap and silent
+    $new = trim((string) @file_get_contents($file));
+    @unlink($file);                                  // gone whether or not the reset succeeds
+    try {
+        $cfg  = require __DIR__ . '/../config.php';
+        $user = (string) ($cfg['admin']['user'] ?? 'admin');
+        if ($new === '') $new = (string) ($cfg['admin']['pass'] ?? '');   // empty file = reset to config
+        if ($new === '') return;
+        $pdo  = db();
+        $hash = password_hash($new, PASSWORD_DEFAULT);
+        $row  = $pdo->prepare("SELECT id FROM users WHERE username=?");
+        $row->execute([$user]);
+        if ($id = $row->fetchColumn()) {
+            $pdo->prepare("UPDATE users SET password_hash=?, is_superuser=1, is_active=1 WHERE id=?")->execute([$hash, $id]);
+            try { $pdo->prepare("UPDATE users SET must_change_pwd=0, pwd_changed_at=? WHERE id=?")->execute([date('c'), $id]); } catch (Throwable $e) {}
+        } else {
+            $pdo->prepare("INSERT INTO users (username,password_hash,role,is_superuser,is_active,email) VALUES (?,?, 'ADMIN', 1,1,?)")
+                ->execute([$user, $hash, 'admin@example.com']);
+        }
+        if (function_exists('idems_log')) idems_log('user', null, 'ADMIN_RECOVERY_FILE', ['field' => $user]);
+    } catch (Throwable $e) { /* never let recovery break the page */ }
+}
+
 function auto_seed() {
     $pdo = db();
     // Seeded once, and remembered. Without the flag this ran again the moment
