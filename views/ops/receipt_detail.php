@@ -10,6 +10,22 @@
     · <?= e(fdate($r['receipt_date'])) ?> · <?= e(RECEIPT_MODES[$r['mode']] ?? $r['mode']) ?><?= $r['reference'] ? ' · ' . e($r['reference']) : '' ?></p></div>
 </div>
 
+<?php // ---- Where this receipt stands, and the one next thing ------------- ?>
+<div class="nowband" style="margin-top:16px">
+  <?php if (($leftCash + $leftTds) > 0.01): ?>
+    <?php if (empty($open)): ?>
+      <div class="step"><?= e(fmoney($leftCash + $leftTds)) ?> not matched — but nothing to do.</div>
+      <p class="next">This customer has no open invoices. The money already sits in their ledger as a credit, so their balance is right. Match it once the invoice is raised.</p>
+    <?php else: ?>
+      <div class="step"><?= e(fmoney($leftCash + $leftTds)) ?> still to match.</div>
+      <p class="next"><b>Next:</b> tick it against the open invoices below, so each one shows as paid.</p>
+    <?php endif; ?>
+  <?php else: ?>
+    <div class="step">Fully matched — done.</div>
+    <p class="next">Every rupee of this receipt is matched to an invoice. Nothing left to do.</p>
+  <?php endif; ?>
+</div>
+
 <div class="qcards" style="margin-top:16px">
   <div class="qcard tone-ok"><div class="qic">₹</div><div class="qn" style="font-size:20px"><?= fmoney_short($r['amount']) ?></div><div class="ql">In the bank</div></div>
   <div class="qcard tone-info"><div class="qic">%</div><div class="qn" style="font-size:20px"><?= fmoney_short($r['tds_amount']) ?></div><div class="ql">TDS withheld</div></div>

@@ -13,6 +13,27 @@
   </div>
 </div>
 
+<?php // ---- Where this invoice stands, and the one next thing -------------- ?>
+<?php $ivOut = isset($settled['outstanding']) ? (float)$settled['outstanding'] : (float)$inv['total']; ?>
+<div class="nowband" style="margin-top:14px">
+  <?php if ($inv['status'] === 'CANCELLED'): ?>
+    <div class="step">Cancelled.</div>
+    <p class="next">This invoice was cancelled — the number is kept so the GST series has no gaps. Nothing to do here.</p>
+  <?php elseif ($inv['status'] === 'PAID'): ?>
+    <div class="step">Paid in full — done.</div>
+    <p class="next">The whole <?= e(fmoney($inv['total'])) ?> has settled. Nothing outstanding.</p>
+  <?php elseif ($isLive): ?>
+    <div class="step">Issued — waiting on payment.</div>
+    <p class="next"><b><?= e(fmoney($ivOut)) ?></b> is still outstanding. <b>Next:</b> record the money when it comes in, below.</p>
+  <?php elseif ($isDraft && $missing): ?>
+    <div class="step">Draft — not ready to issue yet.</div>
+    <p class="next"><b>Next:</b> fix the points listed just below, add the lines being charged, then issue it.</p>
+  <?php else: /* draft, ready */ ?>
+    <div class="step">Draft — ready to issue.</div>
+    <p class="next"><b>Next:</b> check the lines, then press <b>Issue this invoice</b> below. Issuing takes the next number in the branch's series.</p>
+  <?php endif; ?>
+</div>
+
 <?php if ($inv['status'] === 'CANCELLED'): ?>
   <div class="msg msg-error" style="margin-top:14px">
     Cancelled <?= e(fdate(substr((string)$inv['cancelled_at'],0,10))) ?> by <?= e($inv['cancelled_by']) ?>.

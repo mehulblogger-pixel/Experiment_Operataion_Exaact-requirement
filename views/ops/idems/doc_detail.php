@@ -44,6 +44,34 @@
   </div>
 </div>
 
+<?php // ---- Where this report stands, and the one next thing --------------- ?>
+<?php
+  $rSt   = $doc['status'] ?? 'DRAFT';
+  $rFin  = !empty($doc['finalized']);
+  $rBody = !empty($hasSchema);
+  $rCanEdit = idems_can_edit_doc($doc);
+?>
+<div class="nowband">
+  <?php if ($rFin || $rSt === 'ISSUED'): ?>
+    <div class="step">Issued &amp; locked.</div>
+    <p class="next">This <?= e(Tl('report')) ?> has gone to the <?= e(Tl('client')) ?> and can no longer be changed. You can still download the PDF or the client format above.</p>
+  <?php elseif ($rSt === 'APPROVED'): ?>
+    <div class="step">Approved — ready to issue.</div>
+    <p class="next"><b>Next:</b> press <b>Finalize &amp; issue</b> above to send it and lock it. After that nothing on it can change.</p>
+  <?php elseif ($rSt === 'REJECTED'): ?>
+    <div class="step">Sent back for changes.</div>
+    <p class="next"><b>Next:</b> read the reviewer's remark below, fix the body, and submit it again.</p>
+    <?php if ($rCanEdit && $rBody): ?><div class="cta"><a class="btn small" href="/document-fill?id=<?= (int)$doc['id'] ?>">Fix the report body →</a></div><?php endif; ?>
+  <?php elseif (in_array($rSt, ['SUBMITTED','UNDER_REVIEW'], true)): ?>
+    <div class="step">Waiting for approval.</div>
+    <p class="next">It has gone to the approver named below. Nothing more to do until they approve it or send it back.</p>
+  <?php else: /* DRAFT */ ?>
+    <div class="step">Still a draft.</div>
+    <p class="next"><b>Next:</b> <?= $rBody ? 'fill in the report body, then submit it for review.' : 'this report type has no form designed yet — design it, then fill the body.' ?></p>
+    <?php if ($rCanEdit && $rBody): ?><div class="cta"><a class="btn small" href="/document-fill?id=<?= (int)$doc['id'] ?>">Fill the report body →</a></div><?php endif; ?>
+  <?php endif; ?>
+</div>
+
 <?php if ($doc['finalized']): ?>
 <div class="panel" style="border:1px solid var(--ok);background:color-mix(in srgb,var(--ok) 7%,transparent)">
   <b style="color:var(--ok)">🔒 Finalized &amp; issued</b> — locked on <?= e($doc['finalized_at'] ? date('d M Y H:i', strtotime($doc['finalized_at'])) : '—') ?> by <?= e($doc['finalized_by']) ?>. This report is immutable.
@@ -266,8 +294,9 @@
 </div>
 <?php endif; ?>
 
-<div class="panel" style="padding:0;overflow:hidden">
-  <div class="ctitle" style="padding:10px 14px 0"><h3>Audit trail</h3></div>
+<details class="fold">
+  <summary>Audit trail <span class="sub">every change to this <?= e(Tl('report')) ?>, with who and when (<?= count($audit) ?>)</span></summary>
+  <div class="fold-body" style="padding-left:0;padding-right:0">
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
     <thead><tr><th>When</th><th>Action</th><th>By</th><th>Detail</th></tr></thead>
@@ -283,4 +312,5 @@
     </tbody>
   </table>
   </div>
-</div>
+  </div>
+</details>
