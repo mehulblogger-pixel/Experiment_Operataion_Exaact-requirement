@@ -11,6 +11,37 @@
   </div>
 </div>
 
+<?php // ---- Where this job stands, and the one next thing ------------------- ?>
+<?php
+  $jClosed   = !empty($job['closed_flag']);
+  $jSched    = trim((string)($job['scheduled_date'] ?? '')) !== '';
+  $jReports  = (int) ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND deleted=0", [(int)$job['id']]);
+  $jOnSite   = false;
+  if (function_exists('site_visit_window')) { $jw = site_visit_window((int)$job['id']); $jOnSite = ($jw['minutes'] ?? null) !== null; }
+  $jCanClose = !$jClosed && empty($lock['locked']);
+?>
+<div class="nowband">
+  <?php if ($jClosed): ?>
+    <div class="step">Done — this <?= e(Tl('job')) ?> is closed.</div>
+    <p class="next">The report and photographs can still be uploaded if something was missed. Everything else is fixed.</p>
+  <?php elseif ($jReports > 0): ?>
+    <div class="step">The report is written.</div>
+    <p class="next"><b>Next:</b> issue it to the <?= e(Tl('client')) ?>, then close the <?= e(Tl('job')) ?>.</p>
+    <?php if ($jCanClose): ?><div class="cta"><a class="btn small" href="/job-close?id=<?= (int)$job['id'] ?>">Close the <?= e(Tl('job')) ?> →</a></div><?php endif; ?>
+  <?php elseif ($jOnSite): ?>
+    <div class="step">Inspection done on site.</div>
+    <p class="next"><b>Next:</b> write the report below, then close the <?= e(Tl('job')) ?>.</p>
+    <div class="cta"><a class="btn small secondary" href="#reports">Go to the report</a></div>
+  <?php elseif ($jSched): ?>
+    <div class="step">Scheduled for <?= e($job['scheduled_date']) ?>.</div>
+    <p class="next"><b>Next:</b> the engineer goes to site and taps <b>Record this</b> on arrival (below).</p>
+    <div class="cta"><a class="btn small secondary" href="#checkin">Site check-in</a></div>
+  <?php else: ?>
+    <div class="step">Not scheduled yet.</div>
+    <p class="next"><b>Next:</b> set the visit date so the engineer knows when to go.<?php if (is_coordinator_level() && $jCanClose): ?> Use <b>Edit</b> above.<?php endif; ?></p>
+  <?php endif; ?>
+</div>
+
 <?php // ---- Site check-in -------------------------------------------------
       // The engineer photographs the work at the plant, drives home, and writes
       // the report that evening. So neither the report nor the upload says
@@ -22,7 +53,7 @@
       $canCheckIn = !$job['closed_flag'] && function_exists('site_checkin')
           && (is_coordinator_level() || (is_inspector()
               && (int)(current_user()['inspector_id'] ?? 0) === (int)($job['inspector_id'] ?? 0))); ?>
-<div class="panel">
+<div class="panel" id="checkin">
   <div class="ctitle" style="margin-top:0"><h3>Site check-in <span class="muted">(<?= count($visits) ?>)</span></h3></div>
   <?php if ($visits): ?>
     <table class="dt">
@@ -240,7 +271,7 @@
       // so if the coordinator missed that tick, the engineer had no route to the
       // reporting module at all and fell back to pasting a link to a file kept
       // somewhere else. It now always renders. ?>
-<div class="panel">
+<div class="panel" id="reports">
   <div class="ctitle" style="margin-top:0"><h3><?= e(ucfirst(TP('report'))) ?> on this <?= e(Tl('job')) ?> <span class="muted">(<?= count($dlCodes) + count($extraCodes) ?>)</span></h3></div>
   <?php if ($dlCodes): ?>
   <p class="muted" style="margin:0 0 10px">These are the formats agreed on the <?= e(Tl('call')) ?>. Each one opens in the
@@ -367,8 +398,9 @@
 </div>
 
 <?php if (!empty($quoteDocs)): ?>
-<div class="panel">
-  <h3 class="tab-sub" style="margin-top:0"><?= e(T('client')) ?> documents <span class="muted">— filed with the order, for this <?= e(Tl('job')) ?></span></h3>
+<details class="fold">
+  <summary><?= e(T('client')) ?> documents <span class="sub">the PO, spec, drawing &amp; QAP the <?= e(Tl('client')) ?> sent (<?= count($quoteDocs) ?>)</span></summary>
+  <div class="fold-body">
   <table class="dt">
     <thead><tr><th>Document</th><th>Kind</th><th>Note</th><th>Added</th></tr></thead>
     <tbody>
@@ -384,7 +416,8 @@
     </tbody>
   </table>
   <p class="muted" style="margin-top:6px">The purchase order, specification, drawing and QAP the <?= e(Tl('client')) ?> sent when the <?= e(Tl('quote')) ?> was accepted.</p>
-</div>
+  </div>
+</details>
 <?php endif; ?>
 
 <?php // The expenses the client agreed to pay for. Every one ticked needs a
@@ -462,9 +495,12 @@
 </div>
 <?php endif; ?>
 
-<div class="panel-split">
+<details class="fold">
+  <summary>Expenses &amp; profitability <span class="sub">what it cost, and what the <?= e(Tl('job')) ?> made</span></summary>
+  <div class="fold-body">
+  <div class="panel-split">
   <div class="panel">
-    <h3 class="tab-sub">Expenses</h3>
+    <h3 class="tab-sub" style="margin-top:0">Expenses</h3>
     <?php // A line recorded twice can now be removed. New duplicates are refused
           // at submission, but the ones already on file need a way out.
           $canDropExp = is_coordinator_level() || can('finance.reconcile') || is_master();
@@ -517,7 +553,9 @@
       <?php endif; ?>
     </div>
   </div>
-</div>
+  </div>
+  </div>
+</details>
 
 <?php if (can('data.credit') || can('finance.reconcile')): ?>
 <div class="panel" id="invoice">
