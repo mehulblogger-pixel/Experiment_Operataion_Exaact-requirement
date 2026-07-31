@@ -186,7 +186,7 @@ function opp_row($id) {
 function opp_quotes($oppId) {
     opp_migrate();
     return opp_try(fn() => ops_all(
-        "SELECT q.id, q.quote_no, q.rev, q.status, q.total_amount, q.is_current, q.created_at
+        "SELECT q.id, q.quote_no, q.rev, q.status, q.total_amount, q.is_current, q.created_at, q.contract_number
          FROM opportunity_quotes oq JOIN quotations q ON q.id = oq.quotation_id
          WHERE oq.opportunity_id=? ORDER BY q.quote_no, q.rev", [(int)$oppId]));
 }
@@ -613,7 +613,10 @@ function opp_raise_order($oppId, array $b = []) {
             VALUES (?,?,?,?,?,?,?,?,?,?, 'OPEN', ?,?)")
           ->execute([$code, (int)$o['partner_id'],
                      $q ? (int)$q['id'] : null,
-                     (string)($b['contract_number'] ?? ''),
+                     // The contract number the customer gave: whatever was typed
+                     // on the order, else the one already registered on the quote,
+                     // so it is entered once and reaches operations either way.
+                     (string)($b['contract_number'] ?? '') ?: (string)($q['contract_number'] ?? ''),
                      (int)($b['executing_office_id'] ?? 0) ?: ($o['office_id'] ?: null),
                      (string)$o['sbu'],
                      (float)($q['total_amount'] ?? $o['value']),

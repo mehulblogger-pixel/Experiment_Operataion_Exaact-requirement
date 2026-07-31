@@ -1191,6 +1191,15 @@ function ops_crm_quotes($route, $method) {
                     if (!$oid && !empty($q['lead_id']))
                         $oid = (int)(ops_val("SELECT id FROM opportunities WHERE lead_id=? ORDER BY id DESC LIMIT 1", [(int)$q['lead_id']]) ?: 0);
                     if ($oid) {
+                        // Link the quote to the deal both ways. A quote raised
+                        // off a lead was never attached to the deal, so raising
+                        // the order would carry the old estimate and not THIS
+                        // accepted quotation — its rate, its number. One row fixes
+                        // it, and every existing screen then finds the right quote.
+                        try {
+                            if (!(int) ops_val("SELECT COUNT(*) FROM opportunity_quotes WHERE opportunity_id=? AND quotation_id=?", [$oid, $qid]))
+                                db()->prepare("INSERT INTO opportunity_quotes (opportunity_id, quotation_id) VALUES (?,?)")->execute([$oid, $qid]);
+                        } catch (Throwable $e) {}
                         $o = opp_row($oid);
                         if ($o) {
                             // The acceptance just put the company on the customer

@@ -179,7 +179,7 @@
               <option value="<?= (int)$f['id'] ?>" <?= (int)$f['id']===(int)$o['office_id']?'selected':'' ?>><?= e($f['name']) ?></option>
             <?php endforeach; ?>
           </select></div>
-        <div><label>Contract number</label><input class="form-control" name="contract_number" maxlength="80" placeholder="If they gave one"></div>
+        <div><label>Contract number</label><input class="form-control" name="contract_number" maxlength="80" value="<?= e($orderQuote['contract_number'] ?? '') ?>" placeholder="If they gave one"><?php if (!empty($orderQuote['contract_number'])): ?><span class="muted" style="font-size:12px">Carried from the quotation.</span><?php endif; ?></div>
         <div><label>Wanted by</label><input class="form-control" type="date" name="inspection_required_date"></div>
       </div>
       <button class="btn" style="margin-top:12px">Raise the order</button>
