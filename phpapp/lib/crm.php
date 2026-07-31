@@ -1154,10 +1154,50 @@ function ops_crm_quotes($route, $method) {
             $pdo->prepare("UPDATE quotations SET status='LOST', lost_reason=?, lost_reason_other=? WHERE id=?")
                 ->execute([$_POST['lost_reason'] ?? '', trim($_POST['lost_reason_other'] ?? ''), $q['id']]);
             $pdo->prepare("UPDATE quote_followups SET status='SKIPPED' WHERE quote_id=? AND status='PENDING'")->execute([$q['id']]);
+            // SYNC — a lost quotation closes its deal too, carrying the reason, so
+            // the pipeline does not keep counting a deal that is already gone.
+            try {
+                if (function_exists('opp_move') && function_exists('opp_row') && function_exists('pipeline_stages')) {
+                    $oid = quote_linked_deal_id($q);
+                    if ($oid) {
+                        $o = opp_row($oid);
+                        if ($o && ($o['status'] ?? '') === 'OPEN') {
+                            $lostStage = 0;
+                            foreach (pipeline_stages((int)$o['pipeline_id']) as $st)
+                                if (($st['kind'] ?? '') === 'LOST') { $lostStage = (int)$st['id']; break; }
+                            if ($lostStage) opp_move($oid, $lostStage, [
+                                'lost_reason' => ($_POST['lost_reason'] ?? '') ?: 'Quotation not accepted',
+                                'lost_note'   => trim($_POST['lost_reason_other'] ?? ''),
+                            ], true);
+                        }
+                    }
+                }
+            } catch (Throwable $e) { /* never block marking the quote lost */ }
         } elseif ($to === 'SENT') {
             [$sent, $msg] = crm_send_quote_email($q);
             $pdo->prepare("UPDATE quotations SET status='SENT', sent_at=? WHERE id=?")->execute([date('c'), $q['id']]);
             crm_schedule_followups($q['id']);
+            // SYNC — sending the quotation nudges the deal to its "quotation sent"
+            // step, but only FORWARD: a deal already further along is never dragged
+            // back, and a deal with no such step is left where it is.
+            try {
+                if (function_exists('opp_move') && function_exists('opp_row') && function_exists('pipeline_stages')) {
+                    $oid = quote_linked_deal_id($q);
+                    if ($oid) {
+                        $o = opp_row($oid);
+                        if ($o && ($o['status'] ?? '') === 'OPEN') {
+                            $stages = pipeline_stages((int)$o['pipeline_id']);
+                            $curIdx = -1; $sentId = 0; $sentIdx = -1;
+                            foreach ($stages as $i => $st) {
+                                if ((int)$st['id'] === (int)$o['stage_id']) $curIdx = $i;
+                                if ($sentIdx < 0 && ($st['kind'] ?? '') === 'OPEN'
+                                    && preg_match('/quot|proposal|sent/i', (string)$st['name'])) { $sentIdx = $i; $sentId = (int)$st['id']; }
+                            }
+                            if ($sentId && $sentIdx > $curIdx) opp_move($oid, $sentId, [], true);
+                        }
+                    }
+                }
+            } catch (Throwable $e) { /* never block sending */ }
             flash($sent ? ('Quotation e-mailed to ' . $q['contact_email'] . ' and marked sent — follow-ups scheduled.') : ('Marked sent and follow-ups scheduled; ' . $msg), $sent ? 'success' : 'warning');
             redirect('/quote?id=' . $q['id']);
         } elseif ($to === 'ACCEPTED') {
@@ -1184,12 +1224,8 @@ function ops_crm_quotes($route, $method) {
             $dealWon = false;
             try {
                 if (function_exists('opp_move') && function_exists('opp_row') && function_exists('pipeline_stages')) {
-                    $qid = (int)$q['id']; $base = (int)(($q['parent_id'] ?? 0) ?: $qid);
-                    // Attached to the deal explicitly, or raised straight off the
-                    // lead the deal came from — either way it is this deal.
-                    $oid = (int)(ops_val("SELECT opportunity_id FROM opportunity_quotes WHERE quotation_id IN (?,?) ORDER BY id DESC LIMIT 1", [$qid, $base]) ?: 0);
-                    if (!$oid && !empty($q['lead_id']))
-                        $oid = (int)(ops_val("SELECT id FROM opportunities WHERE lead_id=? ORDER BY id DESC LIMIT 1", [(int)$q['lead_id']]) ?: 0);
+                    $qid = (int)$q['id'];
+                    $oid = quote_linked_deal_id($q);
                     if ($oid) {
                         // Link the quote to the deal both ways. A quote raised
                         // off a lead was never attached to the deal, so raising
@@ -1902,6 +1938,19 @@ function crm_register_client_for_quote($q) {
 //  completed is a job somebody can finish; a name that was never written down
 //  is a job nobody knows about.
 // ---------------------------------------------------------------------------
+// The deal a quotation belongs to — attached to it explicitly, or the deal that
+// grew from the same lead. One place, so a quote's answer (sent, accepted, lost)
+// can move its deal without every branch re-deriving the link.
+function quote_linked_deal_id($q) {
+    try {
+        $qid = (int)$q['id']; $base = (int)(($q['parent_id'] ?? 0) ?: $qid);
+        $oid = (int)(ops_val("SELECT opportunity_id FROM opportunity_quotes WHERE quotation_id IN (?,?) ORDER BY id DESC LIMIT 1", [$qid, $base]) ?: 0);
+        if (!$oid && !empty($q['lead_id']))
+            $oid = (int)(ops_val("SELECT id FROM opportunities WHERE lead_id=? ORDER BY id DESC LIMIT 1", [(int)$q['lead_id']]) ?: 0);
+        return $oid;
+    } catch (Throwable $e) { return 0; }
+}
+
 function quote_land_on_client($q) {
     $out = ['client_id' => 0, 'created' => false, 'chain' => 0, 'carry' => null, 'name' => ''];
     $had = (int)($q['client_id'] ?? 0);

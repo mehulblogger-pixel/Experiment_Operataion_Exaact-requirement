@@ -72,6 +72,10 @@
       <?php if ($o['lead_id']): ?>
         <div><span class="k">Came from</span><span><a href="/lead?id=<?= (int)$o['lead_id'] ?>">the lead</a></span></div>
       <?php endif; ?>
+      <?php $effLbl = function_exists('act_effort_label') ? act_effort_label($effort ?? []) : ''; ?>
+      <?php if ($effLbl !== ''): ?>
+        <div><span class="k"><?= $o['status'] === 'WON' ? 'Effort to win' : 'Effort so far' ?></span><span><?= e($effLbl) ?></span></div>
+      <?php endif; ?>
     </div>
     <?php if (trim((string)$o['requirement']) !== ''): ?>
       <p class="muted" style="font-size:13px;margin:12px 0 0;white-space:pre-wrap"><?= e($o['requirement']) ?></p>

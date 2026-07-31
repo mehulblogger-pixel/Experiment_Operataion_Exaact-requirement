@@ -747,6 +747,10 @@ function ops_opportunities($route, $method) {
             'clients' => opp_try(fn() => ops_all(
                 "SELECT id, display_name, legal_name FROM business_partners
                  WHERE is_client=1 AND status='ACTIVE' ORDER BY display_name, legal_name"), []),
+            // Effort — this deal's logged time plus the lead it came from.
+            'effort' => function_exists('act_effort')
+                ? act_effort([['OPPORTUNITY', (int)$o['id']], ['LEAD', (int)($o['lead_id'] ?? 0)]])
+                : ['mins' => 0, 'touches' => 0],
             'openQuotes' => $o['partner_id'] ? opp_try(fn() => ops_all(
                 "SELECT id, quote_no, rev, status, total_amount FROM quotations
                  WHERE client_id=? AND id NOT IN (SELECT quotation_id FROM opportunity_quotes WHERE opportunity_id=?)
