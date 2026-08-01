@@ -338,6 +338,29 @@ function competence_readiness() {
     ];
 }
 
+// Grant (or refresh) an authorisation from one set of facts — used by the
+// manual grant form AND by a passing witnessed assessment, so a competence is
+// recorded once instead of typed twice: assess the person, and the permission
+// that assessment supports is created from it, carrying its basis and a
+// reference back to the evidence. Returns the new row id.
+function auth_grant(array $a) {
+    $kind = (string)($a['scope_kind'] ?? 'ANY');
+    if (!isset(AUTH_SCOPES[$kind])) $kind = 'ANY';
+    db()->prepare("INSERT INTO authorisations
+        (inspector_id,level,scope_kind,scope_value,valid_from,valid_to,status,granted_by,granted_at,notes,basis,basis_ref,review_months,witness_every_months)
+        VALUES (?,?,?,?,?,?, 'ACTIVE', ?,?,?,?,?,?,?)")
+        ->execute([
+            (int)($a['inspector_id'] ?? 0), (string)($a['level'] ?? 'INSPECTOR'), $kind,
+            $kind === 'ANY' ? '' : (string)($a['scope_value'] ?? ''),
+            (string)($a['valid_from'] ?? date('Y-m-d')), (string)($a['valid_to'] ?? ''),
+            user_name(current_user()), date('c'),
+            substr((string)($a['notes'] ?? ''), 0, 500),
+            (string)($a['basis'] ?? ''), substr((string)($a['basis_ref'] ?? ''), 0, 200),
+            (int)($a['review_months'] ?? 0), (int)($a['witness_every_months'] ?? 0),
+        ]);
+    return (int)db()->lastInsertId();
+}
+
 // ---- Screens ---------------------------------------------------------------
 function ops_competence($route, $method) {
     ops_require(can('mod.users.view') || is_admin_level() || is_master_of('users'),
@@ -375,12 +398,21 @@ function ops_competence($route, $method) {
         $ins = (int)($_POST['inspector_id'] ?? 0);
         $kind = (string)($_POST['scope_kind'] ?? 'ANY');
         if (!isset(AUTH_SCOPES[$kind])) $kind = 'ANY';
-        db()->prepare("INSERT INTO authorisations (inspector_id,level,scope_kind,scope_value,valid_from,valid_to,status,granted_by,granted_at,notes)
-                       VALUES (?,?,?,?,?,?, 'ACTIVE', ?,?,?)")
-            ->execute([$ins, (string)($_POST['level'] ?? 'INSPECTOR'), $kind,
-                       $kind === 'ANY' ? '' : (string)($_POST['scope_value'] ?? ''),
-                       (string)($_POST['valid_from'] ?? date('Y-m-d')), (string)($_POST['valid_to'] ?? ''),
-                       user_name(current_user()), date('c'), substr(trim((string)($_POST['notes'] ?? '')), 0, 500)]);
+        $basis = (string)($_POST['basis'] ?? '');
+        if (!isset(AUTH_BASES[$basis])) $basis = '';
+        auth_grant([
+            'inspector_id' => $ins,
+            'level'        => (string)($_POST['level'] ?? 'INSPECTOR'),
+            'scope_kind'   => $kind,
+            'scope_value'  => $kind === 'ANY' ? '' : (string)($_POST['scope_value'] ?? ''),
+            'valid_from'   => (string)($_POST['valid_from'] ?? date('Y-m-d')),
+            'valid_to'     => (string)($_POST['valid_to'] ?? ''),
+            'notes'        => substr(trim((string)($_POST['notes'] ?? '')), 0, 500),
+            'basis'        => $basis,
+            'basis_ref'    => substr(trim((string)($_POST['basis_ref'] ?? '')), 0, 200),
+            'review_months'        => (int)($_POST['review_months'] ?? 0),
+            'witness_every_months' => (int)($_POST['witness_every_months'] ?? 0),
+        ]);
         flash('Authorisation granted.');
         redirect('/competence?i=' . $ins);
     }
@@ -408,22 +440,43 @@ function ops_competence($route, $method) {
         }
         $outcome = (string)($_POST['outcome'] ?? 'PASS');
         if (!isset(WITNESS_OUTCOME[$outcome])) $outcome = 'PASS';
+        $on = (string)($_POST['assessed_on'] ?? date('Y-m-d'));
         db()->prepare("INSERT INTO witness_assessments (inspector_id,job_id,assessed_on,assessor,location,scores,outcome,remarks,next_due,created_at)
                        VALUES (?,?,?,?,?,?,?,?,?,?)")
             ->execute([$ins, ($_POST['job_id'] ?? '') !== '' ? (int)$_POST['job_id'] : null,
-                       (string)($_POST['assessed_on'] ?? date('Y-m-d')), user_name(current_user()),
+                       $on, user_name(current_user()),
                        substr(trim((string)($_POST['location'] ?? '')), 0, 200),
                        json_encode($scores), $outcome,
                        substr(trim((string)($_POST['remarks'] ?? '')), 0, 1000),
                        (string)($_POST['next_due'] ?? ''), date('c')]);
+        $waId = (int)db()->lastInsertId();
         // A failed assessment suspends what it was testing — that is the point
         // of watching somebody work rather than filing a form about it.
         if ($outcome !== 'PASS') {
             foreach (authorisations_for($ins) as $a)
                 db()->prepare("UPDATE authorisations SET status='SUSPENDED', status_reason=?, changed_by=?, changed_at=? WHERE id=?")
-                    ->execute(['Suspended by witnessed assessment on ' . ($_POST['assessed_on'] ?? date('Y-m-d'))
+                    ->execute(['Suspended by witnessed assessment on ' . $on
                                . ': ' . WITNESS_OUTCOME[$outcome] . '.', user_name(current_user()), date('c'), $a['id']]);
             flash('Assessment recorded. Their authorisations have been suspended — ' . strtolower(WITNESS_OUTCOME[$outcome]) . '.', 'warning');
+        } else if (($_POST['grant_auth'] ?? '') === '1') {
+            // Competent, and asked to authorise from it: grant the permission in
+            // the same step, with its basis set to this assessment. No second
+            // trip to the grant form, and the authorisation points back at the
+            // evidence an assessor will ask for.
+            auth_grant([
+                'inspector_id' => $ins,
+                'level'        => (string)($_POST['level'] ?? 'INSPECTOR'),
+                'scope_kind'   => (string)($_POST['scope_kind'] ?? 'ANY'),
+                'scope_value'  => (string)($_POST['scope_value'] ?? ''),
+                'valid_from'   => $on,
+                'notes'        => 'Granted from a witnessed assessment.',
+                'basis'        => 'WITNESS',
+                'basis_ref'    => 'Witnessed assessment on ' . $on . ' by ' . user_name(current_user())
+                                  . ($waId ? ' (#' . $waId . ')' : ''),
+                'review_months'        => (int)($_POST['review_months'] ?? 12),
+                'witness_every_months' => (int)($_POST['witness_every_months'] ?? 12),
+            ]);
+            flash('Assessment recorded, and an authorisation granted from it.');
         } else flash('Assessment recorded.');
         redirect('/competence?i=' . $ins);
     }
