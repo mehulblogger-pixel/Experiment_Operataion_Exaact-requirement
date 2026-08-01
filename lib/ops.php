@@ -2140,6 +2140,8 @@ function ops_dispatch($route, $method) {
             return ops_licence($route, $method);
         case $route === 'vendor' || $route === 'signing-setup':
             ops_vendor($route, $method); return true;
+        case $route === 'agreement':
+            ops_agreement($route, $method); return true;
         case $route === 'sso':
             return ops_sso($route, $method);
         // Deals held at a stage until somebody with the authority agrees.
