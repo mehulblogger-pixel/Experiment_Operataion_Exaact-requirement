@@ -446,6 +446,12 @@ try {
 // config.php — and nothing about it appears in the browser.
 if (function_exists('admin_recovery_from_file')) admin_recovery_from_file();
 
+// Apply the admin password from config.php whenever it changes — reliably, and
+// independent of the code-fingerprint gate above, so "set the password in
+// config.php, upload it, sign in" always works. Does nothing (one settings
+// read) when the config password has not changed since it was last applied.
+if (function_exists('admin_sync_from_config')) admin_sync_from_config();
+
 // --- Router (single-segment routes; ids/tabs via query string) ---
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $route = trim($path, '/');
