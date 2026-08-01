@@ -2,6 +2,6 @@ data.sqlite
 *.log
 config.local.php
 reset-admin.txt
-tenants.php
+/tenants.php
 tenant-*.sqlite
 licence-private.pem
