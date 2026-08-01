@@ -157,6 +157,7 @@ try {
     require __DIR__ . '/lib/seed_demo.php';
     require __DIR__ . '/lib/trace_seed.php';
     require __DIR__ . '/lib/trace_audit.php';
+    require __DIR__ . '/lib/setup.php';
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);
@@ -164,6 +165,20 @@ try {
 
 // Industry packs register their hooks before any route runs.
 if (function_exists('packs_boot')) packs_boot();
+
+// Web setup wizard, Phase A — the database is not configured yet. Handle the
+// wizard's own POST (it writes config.local.php without needing the database),
+// and show the connect form instead of a dead error when config.php still holds
+// the shipped placeholders. A real, configured server never reaches either
+// branch; a genuine connection FAULT is still caught and explained further down.
+if (function_exists('setup_handle_db_post')
+    && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+    && parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) === '/setup-db') {
+    setup_handle_db_post();   // exits
+}
+if (function_exists('setup_config_placeholder') && setup_config_placeholder()) {
+    setup_render_db_form();   // exits
+}
 
 // Bootstrap / upgrade: this quick probe fails on a fresh install (no table) or
 // when a new table/column is missing, which triggers the idempotent boot/migrate.
@@ -419,12 +434,23 @@ try {
                    . 'the ceiling is simply too low for the number of apps sharing this MySQL server. Raise '
                    . '<code>max_connections</code> in the server\'s <code>my.cnf</code> (for example from 151 to 400) '
                    . 'and restart MySQL. If other apps hold large idle connection pools, trimming those frees slots too.';
-        } elseif (stripos($m, 'access denied') !== false || strpos($m, '1045') !== false) {
-            $hint = 'The database name is right but the <b>user or password</b> is not. Open <code>config.php</code> '
-                  . 'and check them against the control panel under Databases.';
-        } elseif (stripos($m, 'unknown database') !== false || strpos($m, '1049') !== false) {
-            $hint = 'The user and password are accepted but there is <b>no database by that name</b> on this server. '
-                  . 'Check the name in <code>config.php</code> — on shared hosting it usually carries an account prefix.';
+        } elseif (stripos($m, 'access denied') !== false || strpos($m, '1045') !== false
+                  || stripos($m, 'unknown database') !== false || strpos($m, '1049') !== false) {
+            // Wrong user / password / database name is a setup problem, not a
+            // fault to stare at: hand them the wizard, prefilled with the name
+            // and host already tried, so they can correct it and save without
+            // touching a file. (Skipped for the transient 1040 above, which is
+            // not a setup problem at all.)
+            if (function_exists('setup_render_db_form')) {
+                $cfgNow = @require __DIR__ . '/config.php';
+                setup_render_db_form([
+                    'db_host' => $cfgNow['db']['host'] ?? 'localhost',
+                    'db_name' => $cfgNow['db']['name'] ?? '',
+                    'db_user' => $cfgNow['db']['user'] ?? '',
+                ], stripos($m, 'unknown database') !== false || strpos($m, '1049') !== false
+                    ? 'The user and password are accepted, but there is no database by that name on this server. On shared hosting the name usually carries an account prefix.'
+                    : 'The database name is right but the user or password is not. Check them under cPanel → Databases.', true);
+            }
         } elseif (stripos($m, 'connect') !== false || stripos($m, 'no such file') !== false || strpos($m, '2002') !== false) {
             $hint = 'The database server could not be reached at all. Check the <b>host</b> in <code>config.php</code> — '
                   . 'on most shared hosting it is <code>localhost</code>.';
