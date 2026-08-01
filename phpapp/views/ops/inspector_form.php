@@ -83,7 +83,7 @@
 <div class="panel">
   <h3 class="tab-sub">Certifications &amp; validity</h3>
   <p class="sub">The system e-mails the <?= e(Tl('engineer')) ?> and the QA/QC nominee when a certificate is within a month of expiry. Once the hard copy is received, update the validity date here.
-    Tick <strong>Required</strong> on the ones this person may not work without — ISO/IEC 17020 §6.1. A required certificate that has lapsed
+    Tick <strong>Required</strong> on the ones this person may not work without<?php if (function_exists('pack_on') && pack_on('inspection')): ?> — ISO/IEC 17020 §6.1<?php endif; ?>. A required certificate that has lapsed
     <strong>stops them being allocated</strong>; a manager can still allow it, but must say why, and the reason is kept on the <?= e(Tl('job')) ?>.</p>
   <table class="grid">
     <tr><th>Certificate</th><th>Number</th><th>Issued</th><th>Valid to</th><th>Status</th><th>Required?</th><th>Actions</th></tr>
