@@ -4,3 +4,4 @@ config.local.php
 reset-admin.txt
 tenants.php
 tenant-*.sqlite
+licence-private.pem
