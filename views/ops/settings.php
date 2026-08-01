@@ -285,6 +285,14 @@
 
 <?php if (is_master()): ?>
 <div class="settings-cards">
+<?php if (function_exists('lk_console_allowed') && lk_console_allowed()): ?>
+<div class="panel settings-card" style="border-left:3px solid var(--brand)">
+  <h3 class="tab-sub" style="margin-top:0;">Super Admin</h3>
+  <p class="sub" style="margin-bottom:10px">Everything you run as the software provider — cloud workspaces, customer
+    licences, per-user pricing and the one-click signing setup — in one place.</p>
+  <a class="btn" href="/vendor">Open Super Admin</a>
+</div>
+<?php endif; ?>
 <?php $curIndT = function_exists('industry_current') ? (string)industry_current() : ''; ?>
 <div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Your industry</h3>

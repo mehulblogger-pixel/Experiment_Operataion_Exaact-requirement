@@ -95,6 +95,17 @@ $t = $tone[$s['state']] ?? 'info';
     <?php endif; ?>
   </div>
 
+  <details class="panel">
+    <summary style="cursor:pointer;font-weight:600">Provider key <span class="muted" style="font-weight:400">— only if your provider asked you to paste one</span></summary>
+    <p class="sub" style="margin:10px 0">If you run this on your <strong>own</strong> server and your provider gave you a
+      “public key” to paste, put it here — it lets your copy check the licences they issue you. Leave it blank if your
+      copy already came set up.</p>
+    <form method="post" action="/licence-pubkey">
+      <textarea class="form-control" name="pubkey" rows="4" style="font-family:ui-monospace,Menlo,monospace;font-size:12px" placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"><?= e(setting_get('licence_pubkey','')) ?></textarea>
+      <button class="btn small" type="submit" style="margin-top:8px">Save provider key</button>
+    </form>
+  </details>
+
   <div class="panel">
     <h3 style="margin-top:0">This subscription</h3>
     <div class="kv-grid">

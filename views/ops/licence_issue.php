@@ -9,9 +9,13 @@
 <?php if (!$can): ?>
 <div class="panel" style="max-width:720px;margin-top:14px">
   <h3 class="tab-sub" style="margin-top:0">Set up signing first</h3>
-  <p class="sub">This server has no private signing key, so it cannot issue keys yet. Create a key pair <strong>once</strong>,
-    keep the private half here, and ship the public half in the app.</p>
-  <ol class="muted" style="font-size:13px;line-height:1.8">
+  <p class="sub">This server has no signing key yet, so it cannot issue licences. The easiest way is one click — the app
+    makes the key itself and saves it here. No commands, no files.</p>
+  <form method="post" action="/signing-setup" onsubmit="return confirm('Set up the signing key now? It stays on this server.')" style="margin:0 0 14px">
+    <button class="btn" type="submit">Set up signing (one click)</button>
+  </form>
+  <details><summary style="cursor:pointer;font-size:13px" class="muted">Or set it up by hand (if the one click cannot write the file)</summary>
+  <ol class="muted" style="font-size:13px;line-height:1.8;margin-top:8px">
     <li>On a machine with OpenSSL, run:
       <pre style="background:var(--soft);padding:10px;border-radius:8px;overflow:auto;white-space:pre-wrap">openssl ecparam -name prime256v1 -genkey -noout -out licence-private.pem
 openssl ec -in licence-private.pem -pubout -out licence-public.pem</pre></li>
@@ -22,6 +26,7 @@ openssl ec -in licence-private.pem -pubout -out licence-public.pem</pre></li>
   </ol>
   <p class="muted" style="font-size:12.5px">The default build already ships a public key; if you use it, its private
     half is what goes here. Never put the private key on a customer's server.</p>
+  </details>
 </div>
 <?php else: ?>
 
