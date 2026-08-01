@@ -23,6 +23,17 @@ try {
     $install = trim((string)($_GET['install'] ?? ''));
     if ($install === '') { echo json_encode(['error' => 'Missing install id.']); exit; }
 
+    // The install may report its own state alongside the pull (the heartbeat).
+    // Advisory only — recorded so the console can show which copies are alive.
+    if (function_exists('licbeat_record')) {
+        $reported = array_filter([
+            'cust'  => $_GET['cust']  ?? null, 'state' => $_GET['state'] ?? null,
+            'used'  => $_GET['used']  ?? null, 'lic'   => $_GET['lic']   ?? null,
+            'host'  => $_GET['host']  ?? null, 'ver'   => $_GET['ver']   ?? null,
+        ], fn($v) => $v !== null);
+        if ($reported) licbeat_record($install, $reported);
+    }
+
     $key = function_exists('lk_latest_key_for') ? lk_latest_key_for($install) : '';
     if ($key === '') { echo json_encode(['error' => 'No licence has been issued for this install id.']); exit; }
 

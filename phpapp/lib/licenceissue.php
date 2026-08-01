@@ -109,6 +109,76 @@ function licissue_migrate() {
     } catch (Throwable $e) {}
 }
 
+// ---- Heartbeat: what each self-hosted copy last reported about itself ---------
+// Every time a customer install checks in for its key it also tells us its state
+// — the licence it thinks it holds, how many people are signed in, its host and
+// version. We keep the latest report per install so the console can show which
+// copies are alive, which have gone quiet, and which report a state that does
+// not match the key we issued (the early warning that a copy has been tampered
+// with). It is self-reported, so it catches honest drift and copies going dark;
+// it is not a guarantee against a determined attacker, which no self-hosted
+// software can give.
+function licbeat_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    try {
+        db()->exec("CREATE TABLE IF NOT EXISTS install_beats (
+            install_id VARCHAR(80) PRIMARY KEY, customer VARCHAR(200) DEFAULT '',
+            state VARCHAR(20) DEFAULT '', seats_used INT DEFAULT 0, seats_lic INT DEFAULT 0,
+            host VARCHAR(190) DEFAULT '', ver VARCHAR(40) DEFAULT '', ip VARCHAR(64) DEFAULT '',
+            first_seen VARCHAR(30) DEFAULT '', last_seen VARCHAR(30) DEFAULT '', beats INT DEFAULT 0)");
+    } catch (Throwable $e) {}
+}
+
+// Record one report from an install. Called by the public api.php on each pull,
+// so the install id is the only credential — the values are advisory, never a
+// basis for a security decision here.
+function licbeat_record($install, array $r) {
+    $install = substr(trim((string)$install), 0, 80);
+    if ($install === '') return;
+    licbeat_migrate();
+    $now  = date('c');
+    $cust = substr((string)($r['cust'] ?? ''), 0, 200);
+    $state = substr((string)($r['state'] ?? ''), 0, 20);
+    $used = max(0, (int)($r['used'] ?? 0));
+    $lic  = max(0, (int)($r['lic'] ?? 0));
+    $host = substr((string)($r['host'] ?? ''), 0, 190);
+    $ver  = substr((string)($r['ver'] ?? ''), 0, 40);
+    $ip   = substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 64);
+    try {
+        $exists = ops_val("SELECT 1 FROM install_beats WHERE install_id=?", [$install]);
+        if ($exists) {
+            db()->prepare("UPDATE install_beats SET customer=?, state=?, seats_used=?, seats_lic=?, host=?, ver=?, ip=?, last_seen=?, beats=beats+1 WHERE install_id=?")
+                ->execute([$cust, $state, $used, $lic, $host, $ver, $ip, $now, $install]);
+        } else {
+            db()->prepare("INSERT INTO install_beats (install_id,customer,state,seats_used,seats_lic,host,ver,ip,first_seen,last_seen,beats) VALUES (?,?,?,?,?,?,?,?,?,?,1)")
+                ->execute([$install, $cust, $state, $used, $lic, $host, $ver, $ip, $now, $now]);
+        }
+    } catch (Throwable $e) {}
+}
+
+// Every install we have heard from, newest first, each tagged with any concern
+// the console should surface (quiet for too long, over its seats, or reporting
+// an unlicensed state though a key was issued for it).
+function licbeat_all() {
+    licbeat_migrate();
+    $rows = ops_all("SELECT * FROM install_beats ORDER BY last_seen DESC") ?: [];
+    $out = [];
+    foreach ($rows as $b) {
+        $last = strtotime((string)$b['last_seen']) ?: 0;
+        $days = $last ? (int)floor((time() - $last) / 86400) : 999;
+        $flags = [];
+        if ($days >= 10) $flags[] = 'quiet ' . $days . ' days';
+        if ((int)$b['seats_lic'] > 0 && (int)$b['seats_used'] > (int)$b['seats_lic'])
+            $flags[] = 'over seats (' . (int)$b['seats_used'] . '/' . (int)$b['seats_lic'] . ')';
+        $issued = (int)ops_val("SELECT COUNT(*) FROM issued_licences WHERE install_id=?", [$b['install_id']]);
+        if ($issued > 0 && in_array((string)$b['state'], ['OPEN', 'MISSING', 'INVALID'], true))
+            $flags[] = 'reports ' . strtolower((string)$b['state']) . ' despite an issued key';
+        $b['days_ago'] = $days; $b['flags'] = $flags; $b['issued'] = $issued;
+        $out[] = $b;
+    }
+    return $out;
+}
+
 // ---- Self-hosted self-service: the public /buy checkout on the licence server -
 // An external customer (no login here — identified by their install id) pays for
 // seats through Razorpay on THIS server, and on a verified payment we auto-issue
@@ -274,5 +344,6 @@ function ops_licence_issue($route, $method) {
         'can_sign' => lk_can_sign(),
         'modules'  => PRODUCT_MODULES,
         'history'  => ops_all("SELECT * FROM issued_licences ORDER BY id DESC LIMIT 50"),
+        'beats'    => licbeat_all(),
     ]);
 }
