@@ -35,6 +35,57 @@ function lk_console_allowed() {
 }
 function lk_can_sign() { return lk_console_allowed() && lk_privkey() !== ''; }
 
+// One-click signing setup — no terminal, no OpenSSL commands. Generates the key
+// pair in PHP, saves the private half as licence-private.pem (kept on this
+// server, gitignored), and stores the public half in settings so this install
+// signs and verifies with it straight away. Returns ['ok'=>true,'pub'=>...] or
+// ['err'=>...]. Refuses to overwrite an existing key.
+function lk_setup_signing() {
+    if (lk_privkey() !== '') return ['err' => 'A signing key is already set up on this server.'];
+    if (!function_exists('openssl_pkey_new')) return ['err' => 'This server does not have OpenSSL in PHP, so the key must be made by hand.'];
+    $res = @openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
+    if (!$res) return ['err' => 'The server could not generate a key (its OpenSSL lacks the prime256v1 curve). Make the key by hand instead.'];
+    $priv = '';
+    if (!@openssl_pkey_export($res, $priv) || $priv === '') return ['err' => 'The private key could not be exported.'];
+    $det = @openssl_pkey_get_details($res);
+    $pub = (string)($det['key'] ?? '');
+    if ($pub === '') return ['err' => 'The public key could not be read.'];
+    $file = __DIR__ . '/../licence-private.pem';
+    if (@file_put_contents($file, $priv) === false)
+        return ['err' => 'Could not save the key file — the app folder is not writable by the web server. '
+                       . 'In cPanel → File Manager, give this folder write permission and try again.'];
+    @chmod($file, 0600);
+    setting_set('licence_pubkey', $pub);
+    if (function_exists('act_log')) try { act_log('SYSTEM', 0, 'SYSTEM', 'Licence signing key generated', ['auto' => 1]); } catch (Throwable $e) {}
+    return ['ok' => true, 'pub' => $pub];
+}
+
+// The provider's public key — the one thing a customer's copy needs so it can
+// verify the keys you sign for it. Shown on the console, pasted on a customer
+// install's licence screen (or shipped via LICENCE_PUBKEY).
+function lk_current_pubkey() { return function_exists('lk_pubkey') ? lk_pubkey() : ''; }
+
+// The Super Admin hub — one place for everything the VENDOR runs: workspaces,
+// licences, pricing/payment, and signing. Master Admin, control site only.
+function ops_vendor($route, $method) {
+    ops_require(lk_console_allowed(), 'The Super Admin panel is for the Master Admin, on the main site.');
+    if ($route === 'signing-setup' && $method === 'POST') {
+        $r = lk_setup_signing();
+        flash(!empty($r['ok']) ? 'Signing is set up. You can now issue licences.' : ($r['err'] ?? 'Could not set up signing.'),
+              !empty($r['ok']) ? 'success' : 'error');
+        redirect('/vendor');
+    }
+    view('ops/vendor', [
+        'can_sign'  => lk_can_sign(),
+        'has_key'   => lk_privkey() !== '',
+        'pubkey'    => lk_can_sign() ? lk_current_pubkey() : '',
+        'saas'      => function_exists('saas_enabled') && saas_enabled(),
+        'billing'   => function_exists('billing_configured') && billing_configured(),
+        'n_tenants' => (function_exists('tenant_registry') ? count((array)(tenant_registry()['tenants'] ?? [])) : 0),
+        'n_issued'  => (int)(function_exists('ops_val') ? ops_val("SELECT COUNT(*) FROM issued_licences") : 0),
+    ]);
+}
+
 // Sign a claims array into a licence key. Returns ['ok'=>true,'key'=>...] or ['err'=>...].
 function lk_issue(array $claims) {
     $pem = lk_privkey();

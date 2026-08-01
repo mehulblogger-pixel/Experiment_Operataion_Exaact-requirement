@@ -78,7 +78,14 @@ function lk_try($fn, $fb = null) { try { return $fn(); } catch (Throwable $e) { 
 
 function lk_pubkey() {
     $env = getenv('LICENCE_PUBKEY');
-    return ($env !== false && trim((string)$env) !== '') ? (string)$env : LICENCE_PUBKEY_DEFAULT;
+    if ($env !== false && trim((string)$env) !== '') return (string)$env;
+    // A public key set from the one-click "Set up signing" button (or pasted on a
+    // customer install as the provider's key) lives in settings. It wins over the
+    // built-in default so a vendor who generated their own pair — and the
+    // customers verifying against it — all line up without touching any code.
+    $s = function_exists('setting_get') ? trim((string)setting_get('licence_pubkey', '')) : '';
+    if ($s !== '') return $s;
+    return LICENCE_PUBKEY_DEFAULT;
 }
 
 // Enforcement is off unless the deployment says otherwise. This is the single
@@ -297,6 +304,17 @@ function lk_summary() {
 
 function ops_licence($route, $method) {
     ops_require(lk_can_manage(), 'You cannot see the licence.');
+
+    // The provider's public key — pasted once on a customer install so it can
+    // verify the keys the provider signs for it. (Not needed where the provider
+    // ships it as LICENCE_PUBKEY, or on the provider's own licence server.)
+    if ($route === 'licence-pubkey' && $method === 'POST') {
+        $pub = trim((string)($_POST['pubkey'] ?? ''));
+        setting_set('licence_pubkey', $pub);
+        lk_state(true);
+        flash($pub === '' ? 'Provider key cleared.' : 'Provider key saved.');
+        redirect('/licence');
+    }
 
     // Somebody who has just paid will press a button rather than wait for the
     // next scheduled check. Making them wait is the whole complaint this

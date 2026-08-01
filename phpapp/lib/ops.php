@@ -2136,8 +2136,10 @@ function ops_dispatch($route, $method) {
         case $route === 'ads-roi':
             return ops_adsroi($route, $method);
         // Who arrived here from a sibling application, and who was turned away.
-        case $route === 'licence' || $route === 'licence-save' || $route === 'licence-check':
+        case $route === 'licence' || $route === 'licence-save' || $route === 'licence-check' || $route === 'licence-pubkey':
             return ops_licence($route, $method);
+        case $route === 'vendor' || $route === 'signing-setup':
+            ops_vendor($route, $method); return true;
         case $route === 'sso':
             return ops_sso($route, $method);
         // Deals held at a stage until somebody with the authority agrees.
