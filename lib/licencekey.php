@@ -88,12 +88,33 @@ function lk_pubkey() {
     return LICENCE_PUBKEY_DEFAULT;
 }
 
-// Enforcement is off unless the deployment says otherwise. This is the single
-// switch that separates "MGH's own install and every developer copy" from "a
-// customer who has paid for something specific".
+// Whether this copy must honour a signed licence. Designed so that NOBODY — not
+// the provider, not the customer — ever edits a server setting: the state is
+// decided from things the app already knows.
+//
+//  1. An explicit LICENCE_ENFORCE in the environment always wins (managed hosts,
+//     and a hard "0" to force a copy open).
+//  2. The provider's own issuing server is never locked by its own licences: it
+//     is the one machine that holds the private signing key, so it is exempt.
+//  3. Otherwise a copy enforces the moment a licence key is FIRST applied to it.
+//     Pasting that first key sets a sticky flag, so a customer who later removes
+//     the key drops to read-only rather than silently becoming unlimited again.
+//
+// The upshot for selling: a customer installs the files and pastes the key you
+// send — nothing else. Their copy was open (a 14-day trial) until the key
+// arrived, and honours exactly the seats you signed from then on.
 function lk_enforcing() {
     $v = getenv('LICENCE_ENFORCE');
-    return $v !== false && (string)$v !== '' && (string)$v !== '0';
+    if ($v !== false && (string)$v !== '') return (string)$v !== '0';
+    if (function_exists('lk_privkey') && lk_privkey() !== '') return false;
+    return (string)setting_get('licence_enforce', '0') === '1';
+}
+
+// Called the first time a valid key is applied (by hand or by auto-pull). It
+// makes enforcement stick, so this copy can never be freed by deleting the key.
+function lk_mark_enforced() {
+    if (function_exists('lk_privkey') && lk_privkey() !== '') return; // the issuer server stays open
+    if ((string)setting_get('licence_enforce', '0') !== '1') setting_set('licence_enforce', '1');
 }
 
 function lk_raw_key() {
@@ -339,6 +360,7 @@ function ops_licence($route, $method) {
         $c = lk_verify($key);
         if (!empty($c['err'])) { flash($c['err'], 'error'); redirect('/licence'); }
         setting_set('licence_key', $key);
+        lk_mark_enforced();   // first key makes this a licensed copy, for good
         lk_state(true);
         licence_disabled(true);
         flash('Licence accepted — ' . ($c['cust'] ?? 'this installation') . ', to ' . fdate((string)$c['exp']) . '.', 'success');
