@@ -1873,6 +1873,16 @@ function ops_module_gate($route) {
             ? 'The ' . PRODUCT_MODULES[$owner][0] . ' module is not switched on for this installation.'
             : 'You don’t have access to the ' . access_module_label($mod) . ' module. Ask your administrator.');
     }
+    // Registers only an accredited inspection body needs. With the inspection
+    // pack switched off they are hidden from the menu; refuse them here too, so
+    // a bookmarked or typed URL cannot reach a screen the installation has
+    // turned off. Universal registers (complaints, identity, confidentiality,
+    // the client portal) are deliberately NOT in this list.
+    if ($mod && function_exists('pack_on') && !pack_on('inspection')
+        && in_array($mod, ['equipment','competence','impartiality','ncr','capa','audits','datacontrol'], true)) {
+        ops_require(false, 'This register is part of the Inspection & certification pack, which is switched '
+            . 'off for this installation. An administrator can switch it on under Settings → Industry packs.');
+    }
 }
 
 // Settings → Roles & access: edit each role's default permission set.

@@ -157,24 +157,30 @@
               // they read as a continuation of Operations and made that group
               // nineteen items long. They are their own subject — the things an
               // accreditation assessor asks for — and now they say so.
-              if (can('mod.equipment.view')||can('mod.competence.view')||can('mod.impartiality.view')
-                  ||can('mod.complaints.view')||can('mod.ncr.view')||can('mod.capa.view')||can('mod.audits.view')
-                  ||can('mod.datacontrol.view')||can('mod.portal.view')||can('mod.identity.view')
-                  ||(function_exists('trust_can_review') && trust_can_review())): ?>
+              // Which of these registers only an accredited inspection body needs
+              // is decided by the inspection pack. With it off, they are hidden
+              // (and refused at the route). The universal ones — complaints, the
+              // client portal, identity and confidentiality — always show.
+              $inspPack = !function_exists('pack_on') || pack_on('inspection');
+              if (($inspPack && (can('mod.equipment.view')||can('mod.competence.view')||can('mod.impartiality.view')
+                  ||can('mod.ncr.view')||can('mod.capa.view')||can('mod.audits.view')||can('mod.datacontrol.view')
+                  ||(function_exists('trust_can_review') && trust_can_review())))
+                  ||can('mod.complaints.view')||can('mod.confidentiality.view')
+                  ||can('mod.portal.view')||can('mod.identity.view')): ?>
         <?php $grp('Quality & accreditation'); ?>
-        <?php if (can('mod.equipment.view')): ?><a class="s-item<?= $navOn(['equipment','equip-new','equip-edit']) ?>" href="/equipment"><span class="s-ic">📏</span><span>Equipment &amp; calibration</span></a><?php endif; ?>
-        <?php if (can('mod.competence.view')): ?><a class="s-item<?= $navOn(['competence']) ?>" href="/competence"><span class="s-ic">🎓</span><span>Competence &amp; authorisation</span></a><?php endif; ?>
-        <?php if (can('mod.impartiality.view')): ?><a class="s-item<?= $navOn(['impartiality']) ?>" href="/impartiality"><span class="s-ic">⚖️</span><span>Impartiality</span></a><?php endif; ?>
+        <?php if ($inspPack && can('mod.equipment.view')): ?><a class="s-item<?= $navOn(['equipment','equip-new','equip-edit']) ?>" href="/equipment"><span class="s-ic">📏</span><span>Equipment &amp; calibration</span></a><?php endif; ?>
+        <?php if ($inspPack && can('mod.competence.view')): ?><a class="s-item<?= $navOn(['competence']) ?>" href="/competence"><span class="s-ic">🎓</span><span>Competence &amp; authorisation</span></a><?php endif; ?>
+        <?php if ($inspPack && can('mod.impartiality.view')): ?><a class="s-item<?= $navOn(['impartiality']) ?>" href="/impartiality"><span class="s-ic">⚖️</span><span>Impartiality</span></a><?php endif; ?>
         <?php if (can('mod.complaints.view')): $cmpN = function_exists('cmp_all') ? count(cmp_all(['status'=>'OPEN'])) : 0; ?><a class="s-item<?= $navOn(['complaints','complaint','complaint-new']) ?>" href="/complaints"><span class="s-ic">📮</span><span>Complaints &amp; appeals<?= $cmpN ? ' (' . $cmpN . ')' : '' ?></span></a><?php endif; ?>
         <?php if (can('mod.confidentiality.view') || can('mod.identity.view') || is_master_of(['confidentiality','identity'])): ?><a class="s-item<?= $navOn(['confidentiality','conf-breach']) ?>" href="/confidentiality"><span class="s-ic">🔒</span><span>Confidentiality</span></a><?php endif; ?>
         <?php if (function_exists('ops_sitedocs') && licence_enabled('operations') && (can('mod.identity.view') || can('mod.clients.view') || is_master_of(['identity','clients']))): ?><a class="s-item<?= $navOn(['site-docs']) ?>" href="/site-docs"><span class="s-ic">🛂</span><span>Site entry documents</span></a><?php endif; ?>
         <?php if (function_exists('rcr_can_view') && rcr_can_view()): $rcrN = function_exists('rcr_counts') ? rcr_counts()['rejected'] : 0; ?><a class="s-item<?= $navOn(['report-reviews']) ?>" href="/report-reviews"><span class="s-ic">📬</span><span>Client acceptance<?= $rcrN ? ' (' . $rcrN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if (can('mod.ncr.view') || can('mod.capa.view')): $ncrN = function_exists('ncr_counts') ? ncr_counts()['open'] : 0; ?><a class="s-item<?= $navOn(['ncr','ncr-item','ncr-new']) ?>" href="/ncr"><span class="s-ic">⚠</span><span>Nonconformities<?= $ncrN ? ' (' . $ncrN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if (can('mod.capa.view')): $capaN = function_exists('capa_all') ? count(capa_all(['open'=>1])) : 0; ?><a class="s-item<?= $navOn(['capa','capa-item','capa-new']) ?>" href="/capa"><span class="s-ic">🛠</span><span>Corrective actions<?= $capaN ? ' (' . $capaN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if (can('mod.audits.view')): ?><a class="s-item<?= $navOn(['internal-audits','internal-audit','internal-audit-new']) ?>" href="/internal-audits"><span class="s-ic">🔍</span><span>Internal audits</span></a>
+        <?php if ($inspPack && (can('mod.ncr.view') || can('mod.capa.view'))): $ncrN = function_exists('ncr_counts') ? ncr_counts()['open'] : 0; ?><a class="s-item<?= $navOn(['ncr','ncr-item','ncr-new']) ?>" href="/ncr"><span class="s-ic">⚠</span><span>Nonconformities<?= $ncrN ? ' (' . $ncrN . ')' : '' ?></span></a><?php endif; ?>
+        <?php if ($inspPack && can('mod.capa.view')): $capaN = function_exists('capa_all') ? count(capa_all(['open'=>1])) : 0; ?><a class="s-item<?= $navOn(['capa','capa-item','capa-new']) ?>" href="/capa"><span class="s-ic">🛠</span><span>Corrective actions<?= $capaN ? ' (' . $capaN . ')' : '' ?></span></a><?php endif; ?>
+        <?php if ($inspPack && can('mod.audits.view')): ?><a class="s-item<?= $navOn(['internal-audits','internal-audit','internal-audit-new']) ?>" href="/internal-audits"><span class="s-ic">🔍</span><span>Internal audits</span></a>
         <a class="s-item<?= $navOn(['management-reviews','management-review']) ?>" href="/management-reviews"><span class="s-ic">🏛</span><span>Management review</span></a><?php endif; ?>
-        <?php if (function_exists('trust_can_review') && trust_can_review()): $evN = function_exists('trust_readiness') ? trust_readiness()['pending'] : 0; ?><a class="s-item<?= $navOn(['evidence-review']) ?>" href="/evidence-review"><span class="s-ic">📍</span><span>Evidence review<?= $evN ? ' (' . $evN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if (can('mod.datacontrol.view')): ?><a class="s-item<?= $navOn(['data-control']) ?>" href="/data-control"><span class="s-ic">🗃</span><span>Data &amp; information control</span></a><?php endif; ?>
+        <?php if ($inspPack && function_exists('trust_can_review') && trust_can_review()): $evN = function_exists('trust_readiness') ? trust_readiness()['pending'] : 0; ?><a class="s-item<?= $navOn(['evidence-review']) ?>" href="/evidence-review"><span class="s-ic">📍</span><span>Evidence review<?= $evN ? ' (' . $evN . ')' : '' ?></span></a><?php endif; ?>
+        <?php if ($inspPack && can('mod.datacontrol.view')): ?><a class="s-item<?= $navOn(['data-control']) ?>" href="/data-control"><span class="s-ic">🗃</span><span>Data &amp; information control</span></a><?php endif; ?>
         <?php if (can('mod.portal.view')): $pqN = function_exists('portal_requests_all') ? count(portal_requests_all('NEW')) : 0; ?><a class="s-item<?= $navOn(['portal-users']) ?>" href="/portal-users"><span class="s-ic">🌐</span><span>Client portal<?= $pqN ? ' (' . $pqN . ')' : '' ?></span></a><?php endif; ?>
         <?php if (can('mod.identity.view') && function_exists('iddoc_can_view') && iddoc_can_view()): ?><a class="s-item<?= $navOn(['identity']) ?>" href="/identity"><span class="s-ic">🪪</span><span>Identity documents</span></a><?php endif; ?>
         <?php $endgrp(); endif; ?>
