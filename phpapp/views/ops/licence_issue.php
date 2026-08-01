@@ -89,14 +89,29 @@ openssl ec -in licence-private.pem -pubout -out licence-public.pem</pre></li>
 <div class="panel" style="margin-top:16px">
   <h3 class="tab-sub" style="margin-top:0">Keys issued</h3>
   <table class="dt">
-    <thead><tr><th>Ref</th><th>Customer</th><th>Seats</th><th>Expires</th><th>Install id</th><th>When</th></tr></thead>
+    <thead><tr><th>Ref</th><th>Customer</th><th>Seats</th><th>Expires</th><th>Install id</th><th>When</th><?php if ($can): ?><th>Reissue</th><?php endif; ?></tr></thead>
     <tbody>
     <?php foreach ($history as $h): ?>
       <tr><td><code><?= e($h['ref']) ?></code></td><td><?= e($h['customer']) ?></td>
         <td><?= (int)$h['seats'] ?: 'unlimited' ?></td><td class="muted"><?= e(fdate($h['exp'])) ?></td>
-        <td class="muted"><?= e($h['install_id'] ?: '—') ?></td><td class="muted"><?= e(fdate(substr((string)$h['created_at'],0,10))) ?></td></tr>
+        <td class="muted"><?= e($h['install_id'] ?: '—') ?></td><td class="muted"><?= e(fdate(substr((string)$h['created_at'],0,10))) ?></td>
+        <?php if ($can): ?>
+        <td><?php if ((int)$h['seats'] > 0): ?>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <?php foreach ([5 => '+5', 1 => '+1', -1 => '−1', -5 => '−5'] as $d => $lbl): if ((int)$h['seats'] + $d < 1 && $d < 0) continue; ?>
+              <form method="post" action="/issue-licence-reissue" style="margin:0"
+                    onsubmit="return confirm('Reissue <?= e($h['customer']) ?> with <?= (int)$h['seats'] + $d ?> seats?')">
+                <input type="hidden" name="src" value="<?= (int)$h['id'] ?>"><input type="hidden" name="delta" value="<?= $d ?>">
+                <button class="btn small<?= $d < 0 ? ' secondary' : '' ?>" type="submit" style="padding:2px 8px;font-size:12px"><?= $lbl ?></button>
+              </form>
+            <?php endforeach; ?>
+          </div>
+        <?php else: ?><span class="muted" style="font-size:12px">unlimited</span><?php endif; ?></td>
+        <?php endif; ?></tr>
     <?php endforeach; ?>
     </tbody>
   </table>
+  <p class="muted" style="font-size:12px;margin:8px 0 0">Reissue keeps the same expiry and modules and only changes the seat count —
+    hand the customer the new key it produces (or they pick it up automatically if they renew online).</p>
 </div>
 <?php endif; ?>
