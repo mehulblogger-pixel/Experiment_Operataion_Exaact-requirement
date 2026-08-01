@@ -228,7 +228,10 @@
 <?php // ISO/IEC 17020 §6.2 — the instruments this report relied on. Naming them
       // here is what turns the equipment register from paperwork into evidence,
       // and it is what the finalise gate reads. ?>
-<?php if (function_exists('report_equipment')): $req = report_equipment($doc['id']);
+<?php // The measuring-equipment register is an inspection-pack concern; a
+      // business that is not an accredited inspection body does not show it.
+      if (function_exists('report_equipment') && (!function_exists('pack_on') || pack_on('inspection'))):
+        $req = report_equipment($doc['id']);
         $eqDate = report_equipment_date($doc);
         $eqBlock = report_equipment_block($doc);
         $canEq = !$doc['finalized'] && (can('mod.equipment.view') || is_master()); ?>

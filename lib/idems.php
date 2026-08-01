@@ -540,22 +540,24 @@ function ops_idems_documents($route, $method) {
             flash('This report must be fully approved through its approval chain before it can be finalized.', 'error');
             redirect('/document?id=' . $doc['id']);
         }
-        // ISO/IEC 17020 §6.2 — a report must not go out claiming an instrument
-        // that was out of calibration on the day the work was done. Checked on
-        // the server, and NOT overridable: unlike a lapsed personnel ticket,
-        // there is no honest reading under which a measurement taken with an
-        // uncalibrated instrument is still valid.
-        if (function_exists('report_equipment_block') && ($why = report_equipment_block($doc)) !== '') {
-            flash($why . ' Correct the calibration record, or take the instrument off this '
+        // The checks that gate issuing a report belong to the inspection pack —
+        // a report must not go out claiming an instrument that was out of
+        // calibration (a block, never overridable: no honest reading makes a
+        // measurement from an uncalibrated instrument valid), and one signed by
+        // somebody not authorised for the work is a warning that also raises a
+        // nonconformity. They run through the document.issue hook so that a
+        // business which is NOT an accredited inspection body — the pack switched
+        // off — issues its reports without them. When the pack is on, nothing
+        // changes.
+        $issueFire = function_exists('pack_fire') ? pack_fire('document.issue', ['doc' => $doc]) : ['block' => [], 'warn' => []];
+        $issueBlock = trim(implode(' ', $issueFire['block'] ?? []));
+        if ($issueBlock !== '') {
+            flash($issueBlock . ' Correct the calibration record, or take the instrument off this '
                   . Tl('report') . ', then issue it.', 'error');
             redirect('/document?id=' . $doc['id']);
         }
-        // §6.1 — the person who SIGNED it, not just the person who was on the
-        // job. A warning rather than a block on purpose: unlike calibration,
-        // where the measurement is void, this is a management failure to record
-        // and put right, not a reason to withhold a report a client is waiting
-        // for. It is raised as a nonconformity so it cannot be shrugged off.
-        if (function_exists('report_signatory_warning') && ($sw = report_signatory_warning($doc)) !== '') {
+        foreach (($issueFire['warn'] ?? []) as $sw) {
+            if ($sw === '') continue;
             flash($sw . ' The report has been issued and a nonconformity raised against it.', 'warning');
             if (function_exists('ncr_create')) {
                 ncr_create([
