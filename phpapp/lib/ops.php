@@ -2062,6 +2062,8 @@ function ops_dispatch($route, $method) {
         case $route === 'data-requests' || $route === 'person-data' || $route === 'person-erase'
              || $route === 'candidate-erase':
             ops_data_requests($route, $method); return true;
+        case $route === 'consents' || $route === 'consent-add' || $route === 'consent-withdraw':
+            ops_consents($route, $method); return true;
         case $route === 'privacy':
             view('ops/privacy', ['notice'=>privacy_notice_text(), 'g'=>grievance_officer()]); return true;
         case $route === 'user-unlock':

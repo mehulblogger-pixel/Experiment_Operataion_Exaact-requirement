@@ -455,6 +455,22 @@ function portal_accept($token, $password, $confirm) {
         ->execute([password_hash((string)$password, PASSWORD_DEFAULT), (int)$u['id']]);
     portal_start_session((int)$u['id']);
     portal_log('ACCEPTED_INVITE', $u['email']);
+    // The one point where the data principal themselves acts — they set their
+    // own password and take up the invitation. Record it in the consent
+    // register so the DPDP lawful-basis question can be answered from the system
+    // rather than from memory.
+    if (function_exists('consent_record')) {
+        consent_record([
+            'subject_kind' => 'PORTAL',
+            'subject_id'   => (int)$u['id'],
+            'subject_name' => (string)($u['name'] ?: $u['email']),
+            'purpose'      => 'Client portal access to their own ' . (function_exists('Tlp') ? Tlp('report') : 'reports'),
+            'basis'        => 'CONSENT',
+            'given_at'     => date('c'),
+            'note'         => 'Recorded automatically when the invitee accepted the invitation and set their own password.',
+            'recorded_by'  => 'The person themselves (portal invitation accepted)',
+        ]);
+    }
     return '';
 }
 

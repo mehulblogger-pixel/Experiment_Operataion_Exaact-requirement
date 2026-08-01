@@ -11,6 +11,7 @@
     <p class="sub" style="margin:2px 0 0">Measured from this running system, not from a checklist somebody ticked.</p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <a class="btn secondary" href="/incidents">Incident register</a>
+    <a class="btn secondary" href="/consents">Consent register<?php if (function_exists('consent_open_count') && ($cc = consent_open_count())): ?> (<?= (int)$cc ?>)<?php endif; ?></a>
     <a class="btn secondary" href="/data-requests">Requests about personal data</a>
     <a class="btn secondary" href="/audit-log">Audit trail</a>
   </div>
