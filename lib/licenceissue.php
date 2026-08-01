@@ -310,6 +310,34 @@ function ops_licence_issue($route, $method) {
         'The licence console runs only on the licence server, for the Master Admin.');
     licissue_migrate();
 
+    // One-click reissue: take an existing customer's key and hand back a new one
+    // with a few more or fewer seats, keeping their expiry, grace, modules and
+    // install id. This is the "+5 / −5" button on each row — no retyping.
+    if ($route === 'issue-licence-reissue' && $method === 'POST') {
+        ops_require(lk_can_sign(), 'No signing key is set up on this server yet.');
+        $src = ops_one("SELECT * FROM issued_licences WHERE id=?", [(int)($_POST['src'] ?? 0)]);
+        if (!$src) { flash('That licence row could not be found.', 'error'); redirect('/issue-licence'); }
+        $old = (int)$src['seats'];
+        if ($old === 0) { flash('That licence has unlimited seats — use the form to set a fixed number instead.', 'error'); redirect('/issue-licence'); }
+        $seats = max(1, $old + (int)($_POST['delta'] ?? 0));
+        $mods  = array_filter(array_map('trim', explode(',', (string)$src['mods']))) ?: array_keys(PRODUCT_MODULES);
+        $exp   = (string)$src['exp'] ?: date('Y-m-d', strtotime('+1 year'));
+        $grace = (int)$src['grace'] ?: LICENCE_GRACE_DEFAULT;
+        $ref   = 'LIC-' . date('ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
+        $claims = ['cust' => (string)$src['customer'], 'exp' => $exp, 'seats' => $seats, 'grace' => $grace, 'ref' => $ref, 'mods' => $mods];
+        $r = lk_issue($claims);
+        if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/issue-licence'); }
+        try {
+            db()->prepare("INSERT INTO issued_licences (ref,customer,install_id,seats,exp,grace,mods,key_text,by_user,created_at)
+                           VALUES (?,?,?,?,?,?,?,?,?,?)")
+                ->execute([$ref, (string)$src['customer'], (string)$src['install_id'], $seats, $exp, $grace,
+                           implode(',', $mods), $r['key'], user_name(current_user()), date('c')]);
+        } catch (Throwable $e) {}
+        flash('Reissued for ' . ($src['customer'] ?: 'this customer') . ' — now ' . $seats . ' seats. Send the new key below.', 'success');
+        view('ops/licence_issued', ['key' => $r['key'], 'claims' => $claims, 'ref' => $ref, 'install' => (string)$src['install_id']]);
+        return;
+    }
+
     if ($route === 'issue-licence-new' && $method === 'POST') {
         ops_require(lk_can_sign(), 'No signing key is set up on this server yet.');
         $cust  = substr(trim((string) ($_POST['customer'] ?? '')), 0, 200);

@@ -2071,7 +2071,7 @@ function ops_dispatch($route, $method) {
         case $route === 'billing' || $route === 'billing-config' || $route === 'billing-order'
              || $route === 'billing-verify':
             ops_billing($route, $method); return true;
-        case $route === 'issue-licence' || $route === 'issue-licence-new':
+        case $route === 'issue-licence' || $route === 'issue-licence-new' || $route === 'issue-licence-reissue':
             ops_licence_issue($route, $method); return true;
         case $route === 'privacy':
             view('ops/privacy', ['notice'=>privacy_notice_text(), 'g'=>grievance_officer()]); return true;
