@@ -170,6 +170,7 @@ try {
     require __DIR__ . '/lib/setup.php';
     require __DIR__ . '/lib/tenants.php';
     require __DIR__ . '/lib/cpanel.php';
+    require __DIR__ . '/lib/agreement.php';
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);
@@ -187,6 +188,12 @@ if (!empty($__t['error']) && function_exists('tenant_error_page')) {
 
 // Industry packs register their hooks before any route runs.
 if (function_exists('packs_boot')) packs_boot();
+
+// Installation licence agreement — a self-hosted customer must read and accept
+// it before the software will install (before even the database is configured).
+// The provider's own issuing server and dev copies are exempt. Runs first so no
+// step of installation happens without an accepted, recorded contract.
+if (function_exists('agreement_gate')) agreement_gate();   // exits if not yet accepted
 
 // Web setup wizard, Phase A — the database is not configured yet. Handle the
 // wizard's own POST (it writes config.local.php without needing the database),

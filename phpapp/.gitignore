@@ -5,3 +5,4 @@ reset-admin.txt
 /tenants.php
 tenant-*.sqlite
 licence-private.pem
+licence-agreement.json
