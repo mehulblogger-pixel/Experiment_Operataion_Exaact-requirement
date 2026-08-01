@@ -796,7 +796,10 @@ function demo_seed_modules_b($pdo, $x, $has, $ins) {
 
             // The location facts, kept apart exactly as the trust layer requires:
             // the camera's fix is the evidence; the upload fix is not.
-            if ((int)$val("SELECT COUNT(*) FROM pragma_table_info('report_files') WHERE name='exif_lat'")
+            // Driver-agnostic column check. `pragma_table_info(...)` is SQLite-only
+            // syntax and raised a 1064 error on MySQL/MariaDB, which is what stopped
+            // the extra registers loading on a real server.
+            if ((function_exists('column_exists') && column_exists('report_files', 'exif_lat'))
                 || $has('evidence_chain')) {
                 try {
                     $up = $pdo->prepare("UPDATE report_files SET exif_lat=?, exif_lon=?, up_lat=?, up_lon=?, up_acc=?,
