@@ -23,8 +23,8 @@
 // ============================================================================
 
 if (!defined('AGREEMENT_VERSION'))     define('AGREEMENT_VERSION', '1.0');
-if (!defined('AGREEMENT_LICENSOR'))    define('AGREEMENT_LICENSOR', getenv('AGREEMENT_LICENSOR') ?: 'MGH AI Apps');
-if (!defined('AGREEMENT_JURISDICTION'))define('AGREEMENT_JURISDICTION', getenv('AGREEMENT_JURISDICTION') ?: 'Mumbai, Maharashtra, India');
+if (!defined('AGREEMENT_LICENSOR'))    define('AGREEMENT_LICENSOR', getenv('AGREEMENT_LICENSOR') ?: 'Mystical Home Decor Products (owner of the brand “MGH AI Apps”)');
+if (!defined('AGREEMENT_JURISDICTION'))define('AGREEMENT_JURISDICTION', getenv('AGREEMENT_JURISDICTION') ?: 'Gandhinagar, Gujarat, India');
 if (!defined('AGREEMENT_CONTACT'))     define('AGREEMENT_CONTACT', getenv('AGREEMENT_CONTACT') ?: 'legal@mghaiapps.com');
 
 function agreement_file() { return __DIR__ . '/../licence-agreement.json'; }
