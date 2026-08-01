@@ -61,4 +61,62 @@ $SQLITE = getenv('SQLITE_PATH');
 if (!$SQLITE && isset($SQLITE_LOCAL)) $SQLITE = $SQLITE_LOCAL;
 if (!$SQLITE) $SQLITE = __DIR__ . '/data.sqlite';
 
-return ['db' => $DB, 'admin' => $ADMIN, 'sqlite_path' => $SQLITE];
+// =========================================================================
+//  Multi-tenant (cloud / SaaS) resolution.
+//
+//  If a  tenants.php  registry sits next to this file, the app runs in cloud
+//  mode: the subdomain on the incoming request selects that tenant's OWN
+//  database, so one codebase and one app folder serve many isolated workspaces
+//  on subdomains (acme.example.com, globex.example.com, …). The control install
+//  — the base domain itself — keeps the database from config.local.php and is
+//  where workspaces are managed. Without tenants.php nothing here runs, so a
+//  single-business install behaves exactly as before.
+//
+//  A tenant may point at MySQL (production) or a SQLite file (dev/testing). An
+//  unknown or suspended subdomain is flagged, never silently pointed at the
+//  control database — index.php shows it a plain "no such workspace" page before
+//  anything touches a database.
+// =========================================================================
+$TENANT = ['key' => '', 'company' => '', 'error' => '', 'saas' => false, 'base' => ''];
+$tenantsFile = __DIR__ . '/tenants.php';
+if (is_file($tenantsFile)) {
+    $reg = @require $tenantsFile;
+    if (is_array($reg) && !empty($reg['base_domain'])) {
+        $TENANT['saas'] = true;
+        $TENANT['base'] = strtolower((string)$reg['base_domain']);
+        $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+        $host = preg_replace('/:\d+$/', '', $host);                 // drop any :port
+        $base = $TENANT['base'];
+        $aliases = array_map('strtolower', (array)($reg['aliases'] ?? []));
+        $isBase = $host === '' || $host === 'localhost' || $host === '127.0.0.1'
+               || $host === $base || $host === 'www.' . $base || in_array($host, $aliases, true);
+        if (!$isBase) {
+            $sub = '';
+            $suffix = '.' . $base;
+            if (strlen($host) > strlen($suffix) && substr($host, -strlen($suffix)) === $suffix) {
+                $sub = trim(substr($host, 0, -strlen($suffix)), '.');
+                if (strpos($sub, '.') !== false) $sub = '';         // only a single label is a workspace
+            }
+            $tenants = (array)($reg['tenants'] ?? []);
+            if ($sub !== '' && isset($tenants[$sub])) {
+                $t = (array)$tenants[$sub];
+                $TENANT['key'] = $sub;
+                $TENANT['company'] = (string)($t['company'] ?? $sub);
+                if (($t['status'] ?? 'active') === 'suspended') {
+                    $TENANT['error'] = 'suspended';
+                } elseif (!empty($t['sqlite'])) {
+                    $DB['driver'] = 'sqlite';
+                    $SQLITE = (string)$t['sqlite'];
+                } elseif (!empty($t['db']) && is_array($t['db'])) {
+                    $DB = array_merge($DB, $t['db']);
+                    if (empty($DB['driver'])) $DB['driver'] = 'mysql';
+                }
+            } else {
+                $TENANT['error'] = 'unknown';                       // a subdomain with no workspace
+            }
+        }
+    }
+}
+$GLOBALS['__tenant'] = $TENANT;
+
+return ['db' => $DB, 'admin' => $ADMIN, 'sqlite_path' => $SQLITE, 'tenant' => $TENANT];

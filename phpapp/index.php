@@ -158,9 +158,20 @@ try {
     require __DIR__ . '/lib/trace_seed.php';
     require __DIR__ . '/lib/trace_audit.php';
     require __DIR__ . '/lib/setup.php';
+    require __DIR__ . '/lib/tenants.php';
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);
+}
+
+// Cloud mode: an unknown or suspended workspace subdomain must be refused BEFORE
+// anything opens a database — otherwise it would fall through to the control
+// install's data. Read config once (this resolves the workspace but does not
+// connect), then act on its verdict.
+if (function_exists('db_driver')) { try { db_driver(); } catch (Throwable $e) {} }
+$__t = $GLOBALS['__tenant'] ?? [];
+if (!empty($__t['error']) && function_exists('tenant_error_page')) {
+    tenant_error_page((string)$__t['error'], (string)($__t['key'] ?? ''));   // exits
 }
 
 // Industry packs register their hooks before any route runs.
