@@ -2,3 +2,5 @@ data.sqlite
 *.log
 config.local.php
 reset-admin.txt
+tenants.php
+tenant-*.sqlite
