@@ -2,8 +2,8 @@
 <div class="crumbs"><a href="/">Home</a> › Data &amp; information control</div>
 <div class="master-head">
   <div><h1>Control of data &amp; information</h1>
-    <p class="sub" style="margin:2px 0 0">ISO/IEC 17020:2026 — a clause with no equivalent in the 2012 edition.
-      It arrived because bodies stopped keeping records on paper and nobody had written down what that means.</p></div>
+    <p class="sub" style="margin:2px 0 0"><?= e(accreditation_ref('datacontrol')) ?> — controlling the data an accredited body's
+      results rest on. It arrived because bodies stopped keeping records on paper and nobody had written down what that means.</p></div>
   <a class="btn secondary" href="/compliance">Compliance overview</a>
 </div>
 

@@ -382,7 +382,7 @@ function compliance_status() {
     if (function_exists('imp_readiness')) {
         $ir = imp_readiness();
         $bad = $ir['open'] + $ir['unacceptable'];
-        $add('ISO/IEC 17020 §4.1', 'Threats to impartiality are declared and decided',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('impartiality')), 'Threats to impartiality are declared and decided',
             $bad ? 'bad' : ($ir['declaration_due'] ? 'warn' : 'ok'),
             $ir['open'] . ' undecided, ' . $ir['unacceptable'] . ' judged unacceptable, '
             . $ir['declaration_due'] . ' of ' . $ir['people'] . ' people owing a declaration. This body is '
@@ -392,7 +392,7 @@ function compliance_status() {
     }
     if (function_exists('competence_readiness')) {
         $cr = competence_readiness();
-        $add('ISO/IEC 17020 §6.1', 'People are authorised for the work they are given',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('competence')), 'People are authorised for the work they are given',
             $cr['lapsed'] ? 'bad' : ($cr['authorised'] < $cr['people'] ? 'warn' : 'ok'),
             $cr['authorised'] . ' of ' . $cr['people'] . ' authorised for something; '
             . $cr['lapsed'] . ' with a lapsed required certificate; '
@@ -405,7 +405,7 @@ function compliance_status() {
         $eq = equipment_all();
         $out_ = 0;
         foreach ($eq as $e) if (!equipment_current_calibration((int)$e['id'])) $out_++;
-        $add('ISO/IEC 17020 §6.2', 'Measuring equipment is in calibration',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('equipment')), 'Measuring equipment is in calibration',
             $out_ ? 'bad' : (count($eq) ? 'ok' : 'warn'),
             count($eq) ? $out_ . ' of ' . count($eq) . ' instruments have no calibration in force today.'
                        : 'No equipment on the register at all.',
@@ -419,20 +419,20 @@ function compliance_status() {
     // our own deadlines, and did we write back to the people who complained.
     if (function_exists('cmp_readiness')) {
         $cr = cmp_readiness();
-        $add('ISO/IEC 17020 §7.5', 'The complaints process is published',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('complaints')), 'The complaints process is published',
             $cr['policy_default'] ? 'warn' : 'ok',
             $cr['policy_default']
                 ? 'Live at /complaints-policy, readable without signing in — but still the wording this app shipped with.'
                 : 'Published at /complaints-policy, in your own words, readable without signing in.',
             $cr['policy_default'] ? 'Open the complaints register and rewrite the description as your own. An assessor will ask whether it is.' : '');
         $late = $cr['ack_late'] + $cr['decide_late'];
-        $add('ISO/IEC 17020 §7.5', 'We meet our own deadlines',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('complaints')), 'We meet our own deadlines',
             $late ? 'bad' : 'ok',
             $late ? $cr['ack_late'] . ' past the ' . $cr['ack_days'] . '-day acknowledgement, '
                   . $cr['decide_late'] . ' past the ' . $cr['decide_days'] . '-day decision.'
                   : $cr['open'] . ' open, none past its deadline.',
             $late ? 'Open the complaints register. The standard does not set these numbers — you did, and they are what you are held to.' : '');
-        $add('ISO/IEC 17020 §7.5', 'Every complainant was told the outcome',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('complaints')), 'Every complainant was told the outcome',
             $cr['unnotified'] ? 'bad' : 'ok',
             $cr['unnotified'] ? $cr['unnotified'] . ' decided but not yet written back to.'
                               : 'Nothing decided is waiting to be sent.',
@@ -442,12 +442,12 @@ function compliance_status() {
     // --- ISO/IEC 17020 §8.7 to §8.9 ---------------------------------------
     if (function_exists('capa_readiness')) {
         $pr = capa_readiness();
-        $add('ISO/IEC 17020 §8.7', 'Corrective actions are checked for effectiveness',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('correctiveaction')), 'Corrective actions are checked for effectiveness',
             $pr['verify_late'] ? 'bad' : 'ok',
             $pr['verify_late'] ? $pr['verify_late'] . ' action(s) carried out and never checked afterwards.'
                                : $pr['open'] . ' open, none waiting to be checked past its date.',
             $pr['verify_late'] ? 'Open the corrective-action register. §8.7.3 asks for the effectiveness review by name, and this is the figure an assessor computes.' : '');
-        $add('ISO/IEC 17020 §8.7', 'We asked whether it happened anywhere else',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('correctiveaction')), 'We asked whether it happened anywhere else',
             $pr['no_similar'] ? 'warn' : 'ok',
             $pr['no_similar'] ? $pr['no_similar'] . ' open action(s) with that question unanswered.'
                               : 'Answered on every open action.',
@@ -455,11 +455,11 @@ function compliance_status() {
     }
     if (function_exists('audits_readiness')) {
         $ar = audits_readiness();
-        $add('ISO/IEC 17020 §8.8', 'The whole standard gets audited, not part of it',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('audit')), 'The whole standard gets audited, not part of it',
             $ar['uncovered'] ? 'bad' : 'ok',
             $ar['uncovered'] . ' of ' . $ar['clauses'] . ' clauses not covered in the last ' . $ar['cycle_days'] . ' days.',
             $ar['uncovered'] ? 'Open Internal audits — the coverage board shows which clauses nothing has looked at.' : '');
-        $add('ISO/IEC 17020 §8.8', 'Nonconformities found were acted on',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('audit')), 'Nonconformities found were acted on',
             $ar['nc_without_capa'] ? 'bad' : 'ok',
             $ar['nc_without_capa'] ? $ar['nc_without_capa'] . ' audit finding(s) with no corrective action against them.'
                                    : 'Every nonconformity found has a corrective action.',
@@ -467,12 +467,12 @@ function compliance_status() {
     }
     if (function_exists('reviews_readiness')) {
         $rr = reviews_readiness();
-        $add('ISO/IEC 17020 §8.9', 'A management review was held',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('review')), 'A management review was held',
             $rr['overdue'] ? 'bad' : 'ok',
             $rr['last'] ? 'Last held ' . fdate($rr['last']['held_on']) . ' (' . (int)$rr['days_since'] . ' days ago).'
                         : 'None on file.',
             $rr['overdue'] ? 'Open Management review. The inputs it needs are counted for you from this system; the judgement is what you add.' : '');
-        $add('ISO/IEC 17020 §8.9', 'Decisions from the review were carried out',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('review')), 'Decisions from the review were carried out',
             $rr['open_actions'] ? 'warn' : 'ok',
             $rr['open_actions'] ? $rr['open_actions'] . ' decision(s) still open.' : 'Nothing outstanding.',
             $rr['open_actions'] ? 'Decisions nobody did are the first thing an assessor tests at the next review.' : '');
@@ -484,26 +484,26 @@ function compliance_status() {
     if (function_exists('datacontrol_readiness')) {
         $dr = datacontrol_readiness();
         $st = $dr['app']['state'];
-        $add('ISO/IEC 17020 §7.11', 'The software version in use has been validated',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('datacontrol')), 'The software version in use has been validated',
             $st === 'ok' ? 'ok' : 'bad',
             $st === 'ok' ? 'Version ' . $dr['app']['version'] . ' validated on ' . fdate($dr['app']['row']['validated_on']) . '.'
             : ($st === 'stale' ? 'The last validation was of version ' . ($dr['app']['row']['version'] ?: 'unrecorded')
                                . '; you are running ' . $dr['app']['version'] . '.'
                                : 'No validation record exists for this application.'),
             $st === 'ok' ? '' : 'Open Data & information control and record one. This is the first thing an assessor asks about under the 2026 edition, and the commonest answer is a validation of a version nobody runs any more.');
-        $add('ISO/IEC 17020 §7.11', 'Data integrity is checked, and the check is on file',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('datacontrol')), 'Data integrity is checked, and the check is on file',
             $dr['check_failed'] ? 'bad' : ($dr['run_stale'] ? 'warn' : 'ok'),
             ($dr['check_failed'] ? $dr['check_failed'] . ' of ' . $dr['checks'] . ' checks failing. '
                                  : 'All ' . ($dr['checks'] - $dr['check_skipped']) . ' checks pass. ')
             . ($dr['last_run'] ? 'Last run ' . substr($dr['last_run']['ran_on'], 0, 10) . '.' : 'Never run.'),
             $dr['check_failed'] ? 'Open Data & information control — each failing line says what is wrong and why it matters.'
                 : ($dr['run_stale'] ? 'Press "Run them now". A check that passes but was never recorded is not evidence.' : ''));
-        $add('ISO/IEC 17020 §7.11', 'Access to the data is controlled and reviewed',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('datacontrol')), 'Access to the data is controlled and reviewed',
             $dr['access']['dormant'] ? 'warn' : 'ok',
             $dr['access']['admins'] . ' of ' . $dr['access']['people'] . ' accounts can change access; '
             . $dr['access']['dormant'] . ' have not signed in for 90 days.',
             $dr['access']['dormant'] ? 'Retire the dormant accounts. An account nobody uses is an account nobody notices being used.' : '');
-        $add('ISO/IEC 17020 §7.11', 'System failures are logged, and answered for',
+        $add((accreditation_std_name() . ' §' . accreditation_clause_or('datacontrol')), 'System failures are logged, and answered for',
             $dr['failures_unanswered'] ? 'bad' : 'ok',
             $dr['total_failures'] . ' logged, ' . $dr['failures_open'] . ' open, '
             . $dr['failures_unanswered'] . ' with no answer yet on what happened to the data.',

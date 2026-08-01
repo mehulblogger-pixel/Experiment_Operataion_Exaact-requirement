@@ -150,6 +150,7 @@ function accreditation_clause($topic) {
         'complaints'    => ['7.5',  '7.9'],
         'appeals'       => ['7.6',  '7.9'],
         'nonconformity' => ['8.7',  '7.10'],
+        'correctiveaction' => ['8.7', '8.7'],
         'audit'         => ['8.8',  '8.8'],
         'review'        => ['8.9',  '8.9'],
         'datacontrol'   => ['7.11', '7.11'],
@@ -162,6 +163,24 @@ function accreditation_ref($topic) {
     $std = accreditation_standard();
     $cl  = accreditation_clause($topic);
     return $std === '' ? '' : ($cl === '' ? $std : $std . ' §' . $cl);
+}
+
+// The active standard's name, never blank — for server-side messages that may
+// be built outside a live pack context. Falls back to the inspection standard.
+function accreditation_std_name() {
+    $s = accreditation_standard();
+    return $s !== '' ? $s : 'ISO/IEC 17020';
+}
+
+// A clause number for a topic under the active standard, never blank. Falls
+// back to the inspection standard's numbering when no pack is on.
+function accreditation_clause_or($topic) {
+    $cl = accreditation_clause($topic);
+    if ($cl !== '') return $cl;
+    $fallback = ['competence'=>'6.1','impartiality'=>'4.1','equipment'=>'6.2','signatory'=>'6.1',
+        'complaints'=>'7.5','appeals'=>'7.6','nonconformity'=>'8.7','correctiveaction'=>'8.7',
+        'audit'=>'8.8','review'=>'8.9','datacontrol'=>'7.11'];
+    return $fallback[$topic] ?? '';
 }
 
 function packs_save($csv) {

@@ -1,7 +1,7 @@
 <div class="crumbs"><a href="/">Home</a> › Management reviews</div>
 <div class="master-head">
   <div><h1>Management review</h1>
-    <p class="sub" style="margin:2px 0 0">ISO/IEC 17020 §8.9. Fifteen required inputs — and most of them are
+    <p class="sub" style="margin:2px 0 0"><?= e(accreditation_ref('review')) ?>. Fifteen required inputs — and most of them are
       questions this system already knows the answer to, so they are counted for you.</p></div>
   <a class="btn secondary" href="/internal-audits">← Internal audits</a>
 </div>

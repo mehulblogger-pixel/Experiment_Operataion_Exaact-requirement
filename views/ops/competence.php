@@ -6,7 +6,7 @@
 <div class="crumbs"><a href="/">Home</a> › Competence &amp; authorisation</div>
 <div class="master-head">
   <div><h1>Competence &amp; authorisation</h1>
-    <p class="sub" style="margin:2px 0 0">ISO/IEC 17020 §6.1 — what each person is <strong>qualified for</strong>,
+    <p class="sub" style="margin:2px 0 0"><?= e(accreditation_ref('competence')) ?> — what each person is <strong>qualified for</strong>,
       what the body <strong>permits them to do</strong>, and when they were last watched doing it.
       A qualification is what somebody has; an authorisation is what we allow.</p></div>
   <a class="btn secondary" href="/">← Back</a>
