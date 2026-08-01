@@ -33,7 +33,7 @@ header('Permissions-Policy: geolocation=(self), camera=(self), microphone=(), pa
 // Razorpay's checkout runs from its own domain in an iframe, so the payment
 // page (and only that page) has to be allowed to load and talk to it. Every
 // other page keeps the tight policy.
-$onPay = strpos((string)($_SERVER['REQUEST_URI'] ?? ''), '/billing-order') !== false;
+$onPay = (bool)preg_match('#^/(billing-order|buy)(\?|$)#', (string)($_SERVER['REQUEST_URI'] ?? ''));
 $rzpScript = $onPay ? ' https://checkout.razorpay.com' : '';
 $rzpFrame  = $onPay ? ' https://api.razorpay.com https://checkout.razorpay.com' : '';
 $rzpConn   = $onPay ? ' https://api.razorpay.com https://lumberjack.razorpay.com' : '';
@@ -655,6 +655,15 @@ if ($route === 'complaints-policy') {
 // nothing confidential.
 if ($route === 'verify') {
     require __DIR__ . '/views/ops/verify.php';
+    exit;
+}
+
+// Self-hosted self-service: a customer on their own server pays for users on
+// THIS licence server. Public, because the caller has no account here — they are
+// identified by their install id, and the only thing they can walk away with is
+// a signed key for that id, issued only after a Razorpay payment we verify.
+if (($route === 'buy' || $route === 'buy-verify') && function_exists('ops_buy')) {
+    ops_buy($route, $method);   // renders a standalone page and exits
     exit;
 }
 
