@@ -159,6 +159,7 @@ function licsync_checkin($force = false) {
         return ['ok' => true, 'changed' => false, 'msg' => 'Already up to date — valid to ' . fdate((string)$c['exp']) . '.'];
 
     licsync_try(fn() => setting_set('licence_key', $key));
+    if (function_exists('lk_mark_enforced')) licsync_try(fn() => lk_mark_enforced());
     if (function_exists('lk_state')) lk_state(true);
     if (function_exists('licence_disabled')) licence_disabled(true);
     if (function_exists('act_log'))
