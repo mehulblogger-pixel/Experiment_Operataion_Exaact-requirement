@@ -7,7 +7,7 @@
       // switching a module off changes what everybody can see and should not be
       // saved by accident alongside a logo upload. ?>
 <?php if (is_master()): $mods = licence_summary(); $pinned = (bool)getenv('MODULES_OFF'); ?>
-<form method="post" action="/settings" class="panel" style="max-width:620px;">
+<form method="post" action="/settings" class="panel settings-form">
   <input type="hidden" name="modules_form" value="1">
   <h3 class="tab-sub" style="margin-top:0;">Modules</h3>
   <p class="sub" style="margin-top:0">What this installation has. Switching one off hides it from
@@ -34,7 +34,7 @@
 </form>
 <?php endif; ?>
 
-<form method="post" action="/settings" enctype="multipart/form-data" class="panel" style="max-width:620px;">
+<form method="post" action="/settings" enctype="multipart/form-data" class="panel settings-form">
   <h3 class="tab-sub" style="margin-top:0;">Branding</h3>
   <div class="form-grid">
     <div class="ff"><label>Application name</label><input class="form-control" name="app_name" value="<?= e(setting_get('app_name','')) ?>" placeholder="e.g. Exaact Inspection Ops"></div>
@@ -284,25 +284,26 @@
 </form>
 
 <?php if (is_master()): ?>
-<div class="panel" style="max-width:620px;margin-top:18px">
+<div class="settings-cards">
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Roles &amp; access</h3>
   <p class="sub" style="margin-bottom:10px">Control which <strong>modules and features</strong> each role can view or edit — Calls, Jobs, Vouchers, Invoicing, Profitability, Masters, Users, Settings and more. Set defaults per role; fine-tune per person under Users.</p>
   <a class="btn" href="/access">Open Roles &amp; access</a>
 </div>
 
-<div class="panel" style="max-width:620px;margin-top:18px">
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Terminology</h3>
   <p class="sub" style="margin-bottom:10px">Rename every business word the app uses — <?= e(Tl('client')) ?>, <?= e(Tl('vendor')) ?>, <?= e(Tl('quote')) ?>, <?= e(Tl('call')) ?>, <?= e(Tl('job')) ?>, <?= e(Tl('report')) ?>, <?= e(T('office')) ?>, <?= e(T('boss')) ?> and the rest. Change a word once and every heading, menu, button and e-mail follows.</p>
   <a class="btn" href="/terminology">Open terminology</a>
 </div>
 
-<div class="panel" style="max-width:620px;margin-top:18px">
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">AI providers &amp; models</h3>
   <p class="sub" style="margin-bottom:10px">Enter API keys for OpenAI, Claude, Gemini, Perplexity or GitHub Copilot / Models, refresh each provider's live model list (retired models drop off), and pick which models to use.</p>
   <a class="btn" href="/ai-settings">Open AI settings</a>
 </div>
 
-<div class="panel" style="max-width:620px;margin-top:18px">
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Industry packs</h3>
   <p class="sub" style="margin-bottom:10px">This application is general. A pack adds the rules of one industry —
     and a business that is not in that industry should not meet them. Switching a pack off leaves every register
@@ -321,7 +322,7 @@
     a decision anybody gets to make.</p>
 </div>
 
-<div class="panel" style="max-width:620px;margin-top:18px">
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Demo / sample data</h3>
   <?php if (function_exists('demo_flag_is_stale') && demo_flag_is_stale()): ?>
     <?php // The flag says loaded and the records are not there — a load that was
@@ -391,7 +392,7 @@
   <?php endif; ?>
 </div>
 
-<div class="panel" style="max-width:620px;margin-top:18px">
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Traceability check</h3>
   <p class="sub" style="margin-bottom:8px">Builds <strong>one</strong> record and follows it the whole way through — customer, lead, contact, deal, quotation, accept, contract number, work-order, job, site check-in, report, invoice, money-in — then reads the database back and shows you, place by place, that every link was saved and every figure is right.</p>
   <p class="muted" style="margin:0 0 10px">Safe to run on a live system: everything it writes is one demo customer (<code><?= e(defined('TRACE_CLIENT_CODE') ? TRACE_CLIENT_CODE : 'GT-CLIENT') ?></code>) and can be removed again in one click on the results page. Use it to prove the flow end-to-end, or after any change to check nothing broke.</p>
@@ -401,7 +402,7 @@
   <p class="muted" style="margin-top:8px;font-size:12px">Command line, no time limit: <code>php tools/trace-thread.php</code> — add <code>--remove</code> to take it out, <code>--check</code> to re-verify.</p>
 </div>
 
-<div class="panel" style="max-width:620px;margin-top:18px">
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Audit &amp; compliance check</h3>
   <p class="sub" style="margin-bottom:8px">The inspection-pack twin of the check above. Builds one compliance chain — <strong>internal audit → finding → corrective action</strong> (with owner &amp; due date, verified and closed), a nonconformity and a complaint that each raise their own corrective action, and a management review — then <strong>fires the accreditation gates on purpose</strong> (a lapsed certificate, an out-of-calibration instrument, an open impartiality threat, the pack's own assign-hook) and confirms each one blocks.</p>
   <p class="muted" style="margin:0 0 10px">Safe on a live system; removable in one click on the results page. Proves the inspection &amp; audit pack holds together end to end.</p>
@@ -411,14 +412,31 @@
   <p class="muted" style="margin-top:8px;font-size:12px">Command line: <code>php tools/trace-audit.php</code> — add <code>--remove</code> to take it out.</p>
 </div>
 
-<div class="panel" style="max-width:620px;margin-top:18px">
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Clear records</h3>
   <p class="sub" style="margin-bottom:10px">For setting up and testing: empty whole groups of records — day-to-day work, reports, costing figures, <?= e(Tlp('client')) ?> &amp; <?= e(Tlp('vendor')) ?>, people, master lists — and start again with a clean register. You see the count before anything happens, and your own login is never deleted.</p>
   <a class="btn danger" href="/reset-data">Open clear records</a>
 </div>
+</div><?php // .settings-cards ?>
 <?php endif; ?>
 
 <style>
+  /* Settings uses the full working width instead of a narrow left column.
+     The two big forms span the page and let their fields flow into as many
+     columns as fit; the small admin panels tile as cards. */
+  .settings-form{max-width:none}
+  .settings-form .form-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  /* Free-text blocks (terms, privacy notice, live preview) read badly at full
+     width — hold them to a comfortable measure and let them span the row. */
+  .settings-form textarea.form-control{max-width:920px}
+  .settings-form .ff-wide{max-width:none}
+  .settings-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
+    gap:16px;margin-top:18px;align-items:start}
+  .settings-cards .settings-card{margin:0}
+  @media(max-width:720px){
+    .settings-form .form-grid{grid-template-columns:1fr}
+    .settings-cards{grid-template-columns:1fr}
+  }
   .theme-swatches{display:flex;flex-wrap:wrap;gap:10px}
   .theme-sw{cursor:pointer;border:2px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:5px;align-items:center;min-width:90px}
   .theme-sw.sel{border-color:var(--brand);box-shadow:0 0 0 2px rgba(0,0,0,.06)}
