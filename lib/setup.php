@@ -157,3 +157,80 @@ function setup_render_db_form(array $vals = [], $msg = '', $isError = false) {
     echo '</div>';
     exit;
 }
+
+// --- Phase B: first-run configuration --------------------------------------
+
+// True once the Master Admin has been through the wizard. Kept in settings, so
+// it survives everything except a deliberate reset.
+function setup_done() {
+    return function_exists('setting_get') && setting_get('setup_done', '') === '1';
+}
+function setup_mark_done() { if (function_exists('setting_set')) setting_set('setup_done', '1'); }
+
+// Whether to force the wizard. True only on a genuinely fresh system — an
+// install that already has data was set up before this wizard existed and must
+// never be dragged through it. Any real sign of use answers "no".
+function setup_needed() {
+    if (setup_done()) return false;
+    try {
+        // Offices and business partners are auto-seeded on first boot, so they
+        // prove nothing. Real signs of a system in use do: a company name set, a
+        // member of staff added, the demo loaded, or ANY operational record.
+        if (trim((string)setting_get('app_name', '')) !== '') return false;
+        if (function_exists('demo_seeded') && demo_seeded()) return false;
+        if ((int)ops_val("SELECT COUNT(*) FROM users WHERE is_superuser=0") > 0) return false;
+        foreach (['calls', 'jobs', 'report_docs', 'leads', 'quotes'] as $t) {
+            try { if ((int)ops_val("SELECT COUNT(*) FROM $t") > 0) return false; } catch (Throwable $e) {}
+        }
+        return true;
+    } catch (Throwable $e) { return false; }   // any doubt → do not force it
+}
+
+// The one-time wizard: the few things only the owner can decide. Everything it
+// sets is also editable later under Settings — this just gathers them on day one
+// instead of leaving a new install looking half-built.
+function ops_setup($route, $method) {
+    ops_require(is_master(), 'Only the administrator can run first-time setup.');
+    if ($route === 'setup-save' && $method === 'POST') {
+        // 1. Admin password — optional here, but this is the moment to move off
+        //    the one from config.php. Refused if it fails the company rule.
+        $np = (string)($_POST['admin_pass'] ?? '');
+        if ($np !== '') {
+            $u = current_user();
+            $why = function_exists('password_problem_text')
+                 ? password_problem_text($np, (string)($u['username'] ?? ''), (string)($u['name'] ?? '')) : '';
+            if ($why !== '') { flash($why, 'error'); redirect('/setup'); }
+            db()->prepare("UPDATE users SET password_hash=?, must_change_pwd=0, pwd_changed_at=? WHERE id=?")
+                ->execute([password_hash($np, PASSWORD_DEFAULT), date('c'), (int)$u['id']]);
+            // Mark the CONFIG credentials as already applied, so
+            // admin_sync_from_config() sees no change and does not revert this
+            // wizard password back to the one in config on the next request.
+            // (The signature must be of the config password, not the new one.)
+            if (function_exists('setting_set')) {
+                try {
+                    $cfg = require __DIR__ . '/../config.php';
+                    setting_set('admin_cfg_sig', md5(((string)($cfg['admin']['user'] ?? 'admin')) . "\x00" . ((string)($cfg['admin']['pass'] ?? ''))));
+                } catch (Throwable $e) {}
+            }
+        }
+        // 2. Company name (branding).
+        $app = trim((string)($_POST['app_name'] ?? ''));
+        if ($app !== '') setting_set('app_name', substr($app, 0, 120));
+        // 3. Industry — sets the wording everywhere, and switches the inspection
+        //    accreditation pack ON only when the industry really is inspection.
+        $ind = (string)($_POST['industry'] ?? '');
+        if ($ind !== '' && function_exists('term_apply_pack')) term_apply_pack($ind);
+        if (function_exists('packs_save')) packs_save($ind === 'inspection' ? 'inspection' : '');
+        // 4. Money & calendar basics.
+        if (isset($_POST['fy_start_month'])) setting_set('fy_start_month', (string)max(1, min(12, (int)$_POST['fy_start_month'])));
+        if (($cs = trim((string)($_POST['currency_symbol'] ?? ''))) !== '') setting_set('currency_symbol', substr($cs, 0, 4));
+        if (($df = trim((string)($_POST['date_format'] ?? ''))) !== '') setting_set('date_format', $df);
+        // 5. DPDP grievance contact — the person a data complaint goes to.
+        setting_set('grievance_name', substr(trim((string)($_POST['grievance_name'] ?? '')), 0, 150));
+        setting_set('grievance_email', substr(trim((string)($_POST['grievance_email'] ?? '')), 0, 150));
+        setup_mark_done();
+        flash('Setup complete — welcome. You can change any of this later under Settings.');
+        redirect('/');
+    }
+    view('ops/setup', []);
+}

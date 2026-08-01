@@ -726,6 +726,16 @@ if ($method === 'POST' && !csrf_ok($_POST['_csrf'] ?? '')) {
     redirect('/' . $route);
 }
 
+// First-run setup wizard (Phase B). The database is up but the Master Admin has
+// never been through setup: gather the few things only they can decide, then
+// never show it again. Sits after the CSRF gate so its own POST is protected,
+// and lets change-password / logout through so nobody can be trapped.
+if ($route === 'setup' || $route === 'setup-save') { ops_setup($route, $method); return; }
+if (function_exists('setup_needed') && setup_needed() && is_master()
+    && !in_array($route, ['logout', 'change-password'], true) && strpos($route, 'assets/') !== 0) {
+    redirect('/setup');
+}
+
 // Every file attached anywhere in this app passes through here before a handler
 // sees it. Uploads are held in the database and never written to disk, so one
 // can't be executed; this is the second guard — a file whose contents disagree
