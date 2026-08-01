@@ -214,5 +214,7 @@ function ops_billing($route, $method) {
         'history'      => billing_history(),
         'self_managed' => billing_self_managed(),
         'lic'          => function_exists('lk_summary') ? lk_summary() : [],
+        'buy_url'      => (function_exists('licsync_on') && licsync_on())
+                            ? licsync_server() . '/buy?install=' . rawurlencode(licsync_install()) : '',
     ]);
 }

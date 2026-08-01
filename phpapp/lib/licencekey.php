@@ -254,6 +254,7 @@ function lk_seat_block() {
 // here either takes nothing in, or is the thing that fixes the licence.
 const LICENCE_ALWAYS_ALLOW = [
     'licence', 'licence-save', 'licence-check',   // the screen that fixes the licence
+    'billing', 'billing-order', 'billing-verify', // …and paying is how you fix it
     'logout', 'login',
     'change-password', 'my-signature',
     'verify',                        // public report verification

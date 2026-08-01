@@ -34,10 +34,14 @@
   <div class="panel" style="max-width:640px;margin-top:14px">
     <h3 class="tab-sub" style="margin-top:0">Your users are set by your licence</h3>
     <p class="sub" style="margin:0 0 10px">This copy runs on your own server, so the number of people who may sign in is
-      fixed by your <strong>licence key</strong> — a value nobody here can raise, which is what keeps it honest. To add
-      or renew users, contact your provider; a new key with the higher count is applied on the licence screen (and picks
-      up automatically if online renewal is set up).</p>
-    <a class="btn" href="/licence">Open licence</a>
+      fixed by your <strong>licence key</strong> — a value nobody here can raise, which is what keeps it honest.
+      <?= !empty($buy_url) ? 'Buy or renew users online below; the new key is applied automatically.' : 'To add or renew users, contact your provider; the new key is applied on the licence screen (and pulled automatically if online renewal is set up).' ?></p>
+    <?php if (!empty($buy_url)): ?>
+      <a class="btn" href="<?= e($buy_url) ?>" target="_blank" rel="noopener">Buy / renew users online →</a>
+      <a class="btn secondary" href="/licence" style="margin-left:6px">Just paid? Check now</a>
+    <?php else: ?>
+      <a class="btn" href="/licence">Open licence</a>
+    <?php endif; ?>
   </div>
 <?php elseif ($canBuy): ?>
 <div class="panel settings-form" style="max-width:640px">
