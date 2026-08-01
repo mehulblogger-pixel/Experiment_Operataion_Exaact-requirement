@@ -10,7 +10,11 @@ $t = $tone[$s['state']] ?? 'info';
 <div class="master-head"><div>
   <h1>Licence</h1>
   <p class="sub" style="margin:2px 0 0">What this installation is entitled to, and until when.</p>
-</div></div>
+</div>
+<?php if (function_exists('lk_console_allowed') && lk_console_allowed()): ?>
+  <a class="btn secondary" href="/issue-licence">Licence console →</a>
+<?php endif; ?>
+</div>
 
 <div class="msg msg-<?= e($t) ?>" style="margin-top:12px">
   <b><?= e($s['label']) ?><?= $s['customer'] !== '' ? ' — ' . e($s['customer']) : '' ?></b>
