@@ -123,7 +123,14 @@
     <div class="ff"><label>From</label><input class="form-control" type="date" name="valid_from" value="<?= e(date('Y-m-d')) ?>"></div>
     <div class="ff"><label>To</label><input class="form-control" type="date" name="valid_to">
       <small class="muted">Blank = open-ended.</small></div>
-    <div class="ff ff-wide"><label>Notes</label><input class="form-control" name="notes" placeholder="what this rests on — qualification, experience, assessment"></div>
+    <div class="ff"><label>Basis <span class="muted">— what it rests on</span></label>
+      <select class="form-control" name="basis">
+        <?php foreach (AUTH_BASES as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
+      </select></div>
+    <div class="ff"><label>Evidence reference</label><input class="form-control" name="basis_ref" placeholder="certificate no., assessment date, file"></div>
+    <div class="ff"><label>Review every (months)</label><input class="form-control" type="number" min="0" max="120" name="review_months" placeholder="0 = no review cycle"></div>
+    <div class="ff"><label>Re-witness every (months)</label><input class="form-control" type="number" min="0" max="120" name="witness_every_months" placeholder="0 = not scheduled"></div>
+    <div class="ff ff-wide"><label>Notes</label><input class="form-control" name="notes" placeholder="anything else worth recording"></div>
     <button class="btn small" type="submit">Grant</button>
   </form>
   <?php endif; ?>
@@ -165,6 +172,25 @@
       </select></div>
     <div class="ff"><label>Next due</label><input class="form-control" type="date" name="next_due"></div>
     <div class="ff ff-wide"><label>Remarks</label><input class="form-control" name="remarks"></div>
+    <?php // Record once. A competent result can grant the authorisation it
+          // supports in the same step, so competence is not typed twice. ?>
+    <div class="ff ff-wide" style="border-top:1px solid var(--line);padding-top:10px;margin-top:2px">
+      <label class="chk"><input type="checkbox" name="grant_auth" value="1" id="grant_auth" onchange="document.getElementById('grantfields').style.display=this.checked?'contents':'none'">
+        Grant an authorisation from this assessment <span class="muted">— only if the outcome is "competent"</span></label></div>
+    <span id="grantfields" style="display:none">
+      <div class="ff"><label>Authorise as</label>
+        <select class="form-control" name="level">
+          <?php foreach (AUTH_LEVELS as $k=>$v): ?><option value="<?= e($k) ?>" <?= $k==='INSPECTOR'?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
+        </select></div>
+      <div class="ff"><label>Covers</label>
+        <select class="form-control" name="scope_kind" id="wsk" onchange="document.getElementById('wsv').style.display=this.value==='ANY'?'none':'block'">
+          <?php foreach (AUTH_SCOPES as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
+        </select></div>
+      <div class="ff" id="wsv" style="display:none"><label>Which one</label>
+        <input class="form-control" name="scope_value" placeholder="type/activity/client"></div>
+      <div class="ff"><label>Review every (months)</label><input class="form-control" type="number" min="0" max="120" name="review_months" value="12"></div>
+      <div class="ff"><label>Re-witness every (months)</label><input class="form-control" type="number" min="0" max="120" name="witness_every_months" value="12"></div>
+    </span>
     <button class="btn small" type="submit">Record assessment</button>
   </form>
   <?php endif; ?>
