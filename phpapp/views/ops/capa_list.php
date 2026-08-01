@@ -1,7 +1,7 @@
 <div class="crumbs"><a href="/">Home</a> › Corrective actions</div>
 <div class="master-head">
   <div><h1>Nonconformities &amp; corrective actions</h1>
-    <p class="sub" style="margin:2px 0 0">ISO/IEC 17020 §8.7. An action nobody went back to check is not a
+    <p class="sub" style="margin:2px 0 0"><?= e(accreditation_ref('correctiveaction')) ?>. An action nobody went back to check is not a
       corrective action — it is a note. So nothing closes here until somebody has checked whether it worked.</p></div>
   <?php if ($canEdit): ?><a class="btn" href="/capa-new">Raise one</a><?php endif; ?>
 </div>

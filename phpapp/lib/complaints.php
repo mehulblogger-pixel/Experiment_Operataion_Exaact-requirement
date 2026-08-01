@@ -274,13 +274,15 @@ function cmp_decide_block($c, $who = null) {
         $parent = cmp_row((int)$c['appeal_of_id']);
         if ($parent && trim((string)$parent['decided_by']) !== ''
             && strcasecmp(trim((string)$parent['decided_by']), $who) === 0)
-            return 'You decided ' . $parent['ref'] . '. ISO/IEC 17020 §7.6 — an appeal has to be decided by '
+            return 'You decided ' . $parent['ref'] . '. ' . accreditation_std_name() . ' §' . accreditation_clause_or('appeals')
+                 . ' — an appeal has to be decided by '
                  . 'somebody who did not make the decision being appealed against, or it is not an appeal.';
     }
 
     foreach (cmp_involved($c) as $n)
         if (strcasecmp($n, $who) === 0)
-            return 'You took part in the inspection this concerns. ISO/IEC 17020 §7.5.4 — the decision must be '
+            return 'You took part in the inspection this concerns. ' . accreditation_std_name() . ' §' . accreditation_clause_or('complaints')
+                 . ' — the decision must be '
                  . 'made by, or reviewed and approved by, somebody who was not involved. Ask a colleague who '
                  . 'was not on this work to decide it.';
     return '';
@@ -348,7 +350,7 @@ function cmp_run_reminders($today = null) {
     }
     if (!$late) return 0;
     $body = "Complaints and appeals past their own deadline:\n\n  " . implode("\n  ", $late)
-          . "\n\nISO/IEC 17020 §7.5 — an assessor reads these dates.\n\n" . app_name();
+          . "\n\n" . accreditation_std_name() . " §" . accreditation_clause_or('complaints') . " — an assessor reads these dates.\n\n" . app_name();
     ops_mail('', 'Complaints overdue (' . count($late) . ')', $body, manager_emails(), 'complaint');
     return count($late);
 }

@@ -180,7 +180,7 @@ function audit_auditor_block($auditor, $areaOwner) {
     $auditor = trim((string)$auditor); $areaOwner = trim((string)$areaOwner);
     if ($auditor === '') return 'Name the auditor. An audit with no auditor on it is not evidence of anything.';
     if ($areaOwner !== '' && strcasecmp($auditor, $areaOwner) === 0)
-        return $auditor . ' runs this area, so they cannot audit it. ISO/IEC 17020 §8.8.2 — auditors shall not '
+        return $auditor . ' runs this area, so they cannot audit it. ' . accreditation_std_name() . ' §8.8.2 — auditors shall not '
              . 'audit their own work. In a small body this usually means swapping areas with a colleague, or '
              . 'bringing somebody in for the day.';
     return '';
@@ -401,7 +401,7 @@ function review_complete_block($id) {
     $miss = review_complete_missing($id);
     if (!$miss) return '';
     return 'This review is not complete. Still to do: ' . implode('; ', $miss)
-         . '. ISO/IEC 17020 §8.9.2 lists the inputs that must be considered and §8.9.3 the decisions that '
+         . '. ' . accreditation_std_name() . ' §8.9.2 lists the inputs that must be considered and §8.9.3 the decisions that '
          . 'must come out — a review with fifteen inputs and no decisions is minutes of a meeting.';
 }
 

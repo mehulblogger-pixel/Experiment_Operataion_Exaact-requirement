@@ -446,7 +446,7 @@ function failure_close_block($f) {
     $miss = failure_close_missing($f);
     if (!$miss) return '';
     return 'This cannot be marked resolved yet. Still to do: ' . implode('; ', $miss)
-         . '. ISO/IEC 17020 §7.11 asks what a failure did to the data — an entry that does not answer '
+         . '. ' . accreditation_std_name() . ' §7.11 asks what a failure did to the data — an entry that does not answer '
          . 'that is the one an assessor picks out of the log.';
 }
 

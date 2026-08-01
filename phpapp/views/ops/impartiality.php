@@ -2,7 +2,7 @@
 <div class="crumbs"><a href="/">Home</a> › Impartiality</div>
 <div class="master-head">
   <div><h1>Impartiality &amp; conflicts of interest</h1>
-    <p class="sub" style="margin:2px 0 0">ISO/IEC 17020 §4.1 — the clause a third-party body exists to satisfy.
+    <p class="sub" style="margin:2px 0 0"><?= e(accreditation_ref('impartiality')) ?> — the clause a third-party body exists to satisfy.
       Everything else is about doing the work properly; this is about being entitled to do it at all.</p></div>
   <a class="btn secondary" href="/">← Back</a>
 </div>

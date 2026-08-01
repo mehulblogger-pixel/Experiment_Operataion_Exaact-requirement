@@ -284,7 +284,7 @@ function capa_close_block($c) {
     $miss = capa_close_missing($c);
     if ($miss) {
         return 'This corrective action cannot be closed yet. Still to do: ' . implode('; ', $miss)
-             . '. ISO/IEC 17020 §8.7.3 — the body reviews the effectiveness of the action it took, '
+             . '. ' . accreditation_std_name() . ' §8.7.3 — the body reviews the effectiveness of the action it took, '
              . 'and an action nobody went back to check is not a corrective action, it is a note.';
     }
     // Verified as NOT effective. Closing it as done would be a false record.
@@ -386,7 +386,7 @@ function capa_run_reminders($today = null) {
     }
     if (!$late) return 0;
     $body = "Corrective actions past their date:\n\n  " . implode("\n  ", $late)
-          . "\n\nISO/IEC 17020 §8.7.3 — an action nobody went back to check is not a corrective action.\n\n"
+          . "\n\n" . accreditation_std_name() . " §8.7.3 — an action nobody went back to check is not a corrective action.\n\n"
           . app_name();
     ops_mail('', 'Corrective actions overdue (' . count($late) . ')', $body, manager_emails(), 'capa');
     return count($late);

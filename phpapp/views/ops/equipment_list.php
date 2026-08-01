@@ -2,7 +2,7 @@
 <div class="master-head">
   <div><h1>Equipment register</h1>
     <p class="sub" style="margin:2px 0 0">Every measuring and test instrument, and the certificate proving it was
-      calibrated when it was used — ISO/IEC 17020 §6.2. A <?= e(Tl('report')) ?> naming an instrument that was out of
+      calibrated when it was used — <?= e(accreditation_ref('equipment')) ?>. A <?= e(Tl('report')) ?> naming an instrument that was out of
       calibration <strong>will not issue</strong>.</p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <?php if ($canEdit): ?><a class="btn" href="/equip-new">+ Add an instrument</a><?php endif; ?>

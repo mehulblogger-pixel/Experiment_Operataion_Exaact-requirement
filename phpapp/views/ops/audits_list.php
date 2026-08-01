@@ -1,7 +1,7 @@
 <div class="crumbs"><a href="/">Home</a> › Internal audits</div>
 <div class="master-head">
   <div><h1>Internal audits</h1>
-    <p class="sub" style="margin:2px 0 0">ISO/IEC 17020 §8.8. The question an assessor asks is not “did you audit”
+    <p class="sub" style="margin:2px 0 0"><?= e(accreditation_ref('audit')) ?>. The question an assessor asks is not “did you audit”
       — it is “did you audit <em>all</em> of it, and did the auditor audit their own work”.</p></div>
   <div style="display:flex;gap:8px">
     <a class="btn secondary" href="/management-reviews">Management reviews</a>
