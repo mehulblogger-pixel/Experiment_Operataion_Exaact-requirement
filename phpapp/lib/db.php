@@ -190,13 +190,57 @@ function ensure_admin() {
     $u->execute([$cfg['admin']['user']]);
     $hash = password_hash($cfg['admin']['pass'], PASSWORD_DEFAULT);
     if ($row = $u->fetch()) {
-        $pdo->prepare("UPDATE users SET password_hash=?, is_superuser=1, is_active=1, role='ADMIN' WHERE id=?")
-            ->execute([$hash, $row['id']]);
+        // Keep the admin a superuser and active, but do NOT overwrite the
+        // password here. This used to re-hash the config password on every
+        // boot, which meant an unrelated code upload could silently reset a
+        // password the admin had chosen in the app. Applying the config
+        // password is now a deliberate, change-detected step in
+        // admin_sync_from_config(), so it happens when — and only when — the
+        // config password actually changes.
+        $pdo->prepare("UPDATE users SET is_superuser=1, is_active=1, role='ADMIN' WHERE id=?")
+            ->execute([$row['id']]);
     } else {
         $pdo->prepare("INSERT INTO users (username,password_hash,role,is_superuser,is_active,email)
             VALUES (?,?,?,1,1,?)")
             ->execute([$cfg['admin']['user'], $hash, 'ADMIN', 'admin@mghaiapps.com']);
     }
+}
+
+// Apply the admin password from config.php the moment it CHANGES — reliably,
+// and without the heavy schema probe. The recurring "config password won't let
+// me in" came from ensure_admin() running only when the code fingerprint moved:
+// edit the password in config.php and, if no code file's size or timestamp
+// happened to change, nothing applied it and the old password stayed live.
+// This runs on every request but does real work only when the config
+// credentials differ from what was last applied (otherwise a single indexed
+// settings read). It never touches a password changed inside the app, because
+// that leaves the config signature unchanged.
+function admin_sync_from_config() {
+    try {
+        $cfg  = require __DIR__ . '/../config.php';
+        $user = (string) ($cfg['admin']['user'] ?? 'admin');
+        $pass = (string) ($cfg['admin']['pass'] ?? '');
+        if ($user === '' || $pass === '') return;
+        $sig  = md5($user . "\x00" . $pass);
+        $seen = null;
+        try { $seen = ops_val("SELECT svalue FROM settings WHERE skey='admin_cfg_sig'"); }
+        catch (Throwable $e) { return; }             // no settings table yet — boot() will handle it
+        if ($seen === $sig) return;                  // config password unchanged since last applied
+        $pdo  = db();
+        $hash = password_hash($pass, PASSWORD_DEFAULT);
+        $q = $pdo->prepare("SELECT id FROM users WHERE username=?");
+        $q->execute([$user]);
+        $id = $q->fetchColumn();
+        if ($id) {
+            $pdo->prepare("UPDATE users SET password_hash=?, is_superuser=1, is_active=1, role='ADMIN' WHERE id=?")->execute([$hash, $id]);
+            try { $pdo->prepare("UPDATE users SET must_change_pwd=0 WHERE id=?")->execute([$id]); } catch (Throwable $e) {}
+        } else {
+            $pdo->prepare("INSERT INTO users (username,password_hash,role,is_superuser,is_active,email) VALUES (?,?, 'ADMIN', 1,1,?)")
+                ->execute([$user, $hash, 'admin@mghaiapps.com']);
+        }
+        @setting_set('admin_cfg_sig', $sig);
+        if (function_exists('idems_log')) idems_log('user', $id ?: null, 'ADMIN_CONFIG_SYNC', ['field' => $user]);
+    } catch (Throwable $e) { /* never let this break the page */ }
 }
 
 // One-shot admin recovery from a file — for a non-technical admin who is locked
