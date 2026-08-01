@@ -161,8 +161,10 @@ function imp_block($inspectorId, $partnerIds = [], $onDate = null) {
         $kind = IMP_THREATS[$t['threat_kind']] ?? $t['threat_kind'];
         $bits[] = strtok($kind, '—') . '(' . strtolower(IMP_STATUS[$t['status']] ?? $t['status']) . ')';
     }
+    $ref = function_exists('accreditation_ref') ? accreditation_ref('impartiality') : 'ISO/IEC 17020 §4.1';
+    if ($ref === '') $ref = 'The accreditation standard';
     return $who . ' has a declared threat to impartiality that has not been cleared for this work: '
-         . implode('; ', $bits) . '. ISO/IEC 17020 §4.1 — the body must resolve it, and record how, '
+         . implode('; ', $bits) . '. ' . $ref . ' — the body must resolve it, and record how, '
          . 'before the work is done.';
 }
 

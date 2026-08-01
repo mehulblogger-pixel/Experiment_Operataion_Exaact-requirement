@@ -223,8 +223,10 @@ function auth_block($inspectorId, $inspectionType, $activityId, $clientId, $onDa
     $why = !$held
         ? ' — nothing is on their authorisation record at all.'
         : ' — what they hold does not cover this work, or has lapsed or been suspended.';
+    $ref = function_exists('accreditation_ref') ? accreditation_ref('competence') : 'ISO/IEC 17020 §6.1';
+    if ($ref === '') $ref = 'The accreditation standard';
     return $who . ' is not authorised for this work' . $why
-         . ' ISO/IEC 17020 §6.1: only authorised personnel may perform an inspection.';
+         . ' ' . $ref . ': only authorised personnel may carry out the work.';
 }
 
 // ---- Keeping the matrix honest --------------------------------------------

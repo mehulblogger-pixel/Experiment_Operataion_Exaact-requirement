@@ -57,9 +57,9 @@
 <?php // §7.5.4 in the flesh: the names the software will not accept as the decider. ?>
 <div class="panel">
   <div class="ctitle" style="margin-top:0"><h3>Who may not decide this</h3></div>
-  <p class="sub" style="margin-top:0"><?php $insp17020 = function_exists('pack_on') && pack_on('inspection'); ?><?php if ($insp17020): ?>ISO/IEC 17020 §7.5.4 — the<?php else: ?>The<?php endif; ?> decision has to be made by, or reviewed and approved
+  <p class="sub" style="margin-top:0"><?php $accr = function_exists('accredited_pack_on') && accredited_pack_on(); ?><?php if ($accr): ?><?= e(accreditation_ref('complaints')) ?> — the<?php else: ?>The<?php endif; ?> decision has to be made by, or reviewed and approved
     by, somebody who was not involved in the inspection being complained about.
-    <?= ($c['kind'] === 'APPEAL' && $insp17020) ? ' §7.6 adds whoever decided the original.' : ($c['kind'] === 'APPEAL' ? ' For an appeal, that also excludes whoever decided the original.' : '') ?></p>
+    <?= $c['kind'] === 'APPEAL' ? ' For an appeal, that also excludes whoever decided the original.' : '' ?></p>
   <?php if ($involved): ?>
     <p style="margin:0"><?php foreach ($involved as $n): ?><span class="pill p-bad" style="margin-right:6px"><?= e($n) ?></span><?php endforeach; ?></p>
     <small class="muted">Taken from the <?= e(Tl('engineer')) ?> on the work and, where a <?= e(Tl('report')) ?> number is

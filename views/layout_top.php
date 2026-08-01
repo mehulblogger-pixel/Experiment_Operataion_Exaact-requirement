@@ -157,11 +157,12 @@
               // they read as a continuation of Operations and made that group
               // nineteen items long. They are their own subject — the things an
               // accreditation assessor asks for — and now they say so.
-              // Which of these registers only an accredited inspection body needs
-              // is decided by the inspection pack. With it off, they are hidden
-              // (and refused at the route). The universal ones — complaints, the
-              // client portal, identity and confidentiality — always show.
-              $inspPack = !function_exists('pack_on') || pack_on('inspection');
+              // Which of these registers only an accredited body needs is decided
+              // by the accreditation packs (inspection OR laboratory). With none
+              // on, they are hidden (and refused at the route). The universal ones
+              // — complaints, the client portal, identity and confidentiality —
+              // always show.
+              $inspPack = !function_exists('accredited_pack_on') || accredited_pack_on();
               if (($inspPack && (can('mod.equipment.view')||can('mod.competence.view')||can('mod.impartiality.view')
                   ||can('mod.ncr.view')||can('mod.capa.view')||can('mod.audits.view')||can('mod.datacontrol.view')
                   ||(function_exists('trust_can_review') && trust_can_review())))
