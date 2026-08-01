@@ -428,6 +428,16 @@
   <p class="sub" style="margin-bottom:10px">For setting up and testing: empty whole groups of records — day-to-day work, reports, costing figures, <?= e(Tlp('client')) ?> &amp; <?= e(Tlp('vendor')) ?>, people, master lists — and start again with a clean register. You see the count before anything happens, and your own login is never deleted.</p>
   <a class="btn danger" href="/reset-data">Open clear records</a>
 </div>
+
+<?php if (function_exists('can_manage_tenants') && can_manage_tenants()): ?>
+<div class="panel settings-card">
+  <h3 class="tab-sub" style="margin-top:0;">Cloud workspaces</h3>
+  <p class="sub" style="margin-bottom:10px">Run one copy of the app as many separate businesses — each on its own subdomain
+    and its own database, isolated from the rest. <?= saas_enabled()
+      ? 'Cloud mode is <strong>on</strong>.' : 'Turn it on and add workspaces here.' ?></p>
+  <a class="btn" href="/tenants">Manage cloud workspaces</a>
+</div>
+<?php endif; ?>
 </div><?php // .settings-cards ?>
 <?php endif; ?>
 
