@@ -95,11 +95,27 @@ function rzp_verify_signature($orderId, $paymentId, $signature) {
     return hash_equals($expected, (string) $signature);
 }
 
-// The live paid grant: seats and the date they are paid until.
+// Is a locally-stored paid seat grant TRUSTWORTHY on this install?
+//
+// The number of paid seats lives in the database. On our own SaaS servers the
+// customer cannot touch that database, so it is safe. On a customer's OWN server
+// (self-hosted) they could edit it to hand themselves free users — so there the
+// seat count must come only from the cryptographically SIGNED licence key, which
+// they cannot forge. This overlay therefore stands down on a self-hosted,
+// licence-enforced install and lets the signed key govern.
+function billing_self_managed() {
+    if (function_exists('saas_enabled') && saas_enabled()) return true;   // our cloud — we own the DB
+    if (function_exists('lk_enforcing') && lk_enforcing()) return false;  // sold + enforced = self-hosted
+    return true;                                                          // dev / unlicensed — nothing is enforced anyway
+}
+
+// The live paid grant: seats and the date they are paid until. Empty on a
+// self-hosted licensed install, where the signed key is the only authority.
 function billing_grant() {
+    if (!billing_self_managed()) return ['active' => false, 'seats' => 0, 'until' => '', 'managed' => false];
     $until = (string) setting_get('billing_paid_until', '');
     $seats = (int) setting_get('billing_seats', 0);
-    return ['active' => $until !== '' && $until >= date('Y-m-d') && $seats > 0, 'seats' => $seats, 'until' => $until];
+    return ['active' => $until !== '' && $until >= date('Y-m-d') && $seats > 0, 'seats' => $seats, 'until' => $until, 'managed' => true];
 }
 
 // Turn a verified payment into paid seats: set the plan to $seats, and extend
@@ -163,6 +179,7 @@ function ops_billing($route, $method) {
 
     // Step 1 → create the order and hand it to the checkout page.
     if ($route === 'billing-order' && $method === 'POST') {
+        if (!billing_self_managed()) { flash('On this install the user count is set by your licence key — buying seats here would not take effect. Renew or upgrade your licence instead.', 'error'); redirect('/billing'); }
         if (!billing_configured()) { flash('Payment is not set up yet.', 'error'); redirect('/billing'); }
         $a = billing_amount((int) ($_POST['seats'] ?? 1), (string) ($_POST['period'] ?? 'month'));
         if ($a['paise'] <= 0) { flash('Set a price per user first.', 'error'); redirect('/billing'); }
@@ -191,9 +208,11 @@ function ops_billing($route, $method) {
     }
 
     view('ops/billing', [
-        'cfg'     => billing_config(),
-        'grant'   => billing_grant(),
-        'used'    => function_exists('lk_seats_used') ? lk_seats_used() : 0,
-        'history' => billing_history(),
+        'cfg'          => billing_config(),
+        'grant'        => billing_grant(),
+        'used'         => function_exists('lk_seats_used') ? lk_seats_used() : 0,
+        'history'      => billing_history(),
+        'self_managed' => billing_self_managed(),
+        'lic'          => function_exists('lk_summary') ? lk_summary() : [],
     ]);
 }

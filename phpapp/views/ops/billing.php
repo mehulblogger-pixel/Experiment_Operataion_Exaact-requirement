@@ -1,10 +1,12 @@
 <?php
   $cfg = $cfg ?? []; $grant = $grant ?? []; $used = (int)($used ?? 0); $history = $history ?? [];
+  $selfManaged = $self_managed ?? true; $lic = $lic ?? [];
   $cur = $cfg['currency'] ?? 'INR';
   $sym = $cur === 'INR' ? '₹' : ($cur . ' ');
   $pm = (int)($cfg['price_month'] ?? 0); $py = (int)($cfg['price_year'] ?? 0);
-  $canBuy = !empty($cfg['enabled']) && ($pm > 0 || $py > 0);
+  $canBuy = $selfManaged && !empty($cfg['enabled']) && ($pm > 0 || $py > 0);
   $master = function_exists('is_master') && is_master();
+  $licSeats = (int)($lic['seats'] ?? 0);
 ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/settings">Settings</a> › Users &amp; billing</div>
 <div class="master-head">
@@ -16,16 +18,28 @@
 
 <div class="kpi-row" style="margin-top:14px">
   <div class="kpi"><span class="k-lab">People active now</span><span class="k-val"><?= $used ?></span></div>
-  <div class="kpi <?= !empty($grant['active']) ? 'tone-ok' : '' ?>"><span class="k-lab">Seats paid for</span>
-    <span class="k-val"><?= !empty($grant['active']) ? (int)$grant['seats'] : '—' ?></span></div>
-  <div class="kpi"><span class="k-lab">Paid until</span>
-    <span class="k-val" style="font-size:18px"><?= !empty($grant['active']) ? e(fdate($grant['until'])) : '—' ?></span></div>
+<?php $shownSeats = $selfManaged ? (!empty($grant['active']) ? (int)$grant['seats'] : 0) : $licSeats;
+        $shownUntil = $selfManaged ? ($grant['until'] ?? '') : (string)($lic['expires'] ?? ''); ?>
+  <div class="kpi <?= $shownSeats ? 'tone-ok' : '' ?>"><span class="k-lab">Seats <?= $selfManaged ? 'paid for' : 'licensed' ?></span>
+    <span class="k-val"><?= $shownSeats ?: ($shownSeats === 0 && !$selfManaged ? 'unlimited' : '—') ?></span></div>
+  <div class="kpi"><span class="k-lab"><?= $selfManaged ? 'Paid until' : 'Licence to' ?></span>
+    <span class="k-val" style="font-size:18px"><?= $shownUntil ? e(fdate($shownUntil)) : '—' ?></span></div>
 </div>
-<?php if (!empty($grant['active']) && $used > (int)$grant['seats']): ?>
-  <div class="msg msg-warning" style="margin-top:8px"><?= $used ?> people are active but only <?= (int)$grant['seats'] ?> seats are paid for. Add seats below, or deactivate people who have left.</div>
+<?php if ($shownSeats && $used > $shownSeats): ?>
+  <div class="msg msg-warning" style="margin-top:8px"><?= $used ?> people are active but only <?= $shownSeats ?> seats are <?= $selfManaged ? 'paid for' : 'licensed' ?>.
+    <?= $selfManaged ? 'Add seats below, or deactivate people who have left.' : 'Ask your provider to add seats to your licence, or deactivate people who have left.' ?></div>
 <?php endif; ?>
 
-<?php if ($canBuy): ?>
+<?php if (!$selfManaged): ?>
+  <div class="panel" style="max-width:640px;margin-top:14px">
+    <h3 class="tab-sub" style="margin-top:0">Your users are set by your licence</h3>
+    <p class="sub" style="margin:0 0 10px">This copy runs on your own server, so the number of people who may sign in is
+      fixed by your <strong>licence key</strong> — a value nobody here can raise, which is what keeps it honest. To add
+      or renew users, contact your provider; a new key with the higher count is applied on the licence screen (and picks
+      up automatically if online renewal is set up).</p>
+    <a class="btn" href="/licence">Open licence</a>
+  </div>
+<?php elseif ($canBuy): ?>
 <div class="panel settings-form" style="max-width:640px">
   <h3 class="tab-sub" style="margin-top:0">Add or renew seats</h3>
   <form method="post" action="/billing-order" id="buyform">
@@ -57,7 +71,7 @@
   <div class="msg msg-info" style="margin-top:14px">Online payment is not switched on yet. Ask the Master Admin to set it up.</div>
 <?php endif; ?>
 
-<?php if ($master): ?>
+<?php if ($master && $selfManaged): ?>
 <details class="panel" <?= $canBuy ? '' : 'open' ?> style="margin-top:16px">
   <summary style="cursor:pointer;font-weight:600">Pricing &amp; payment keys
     <?= !empty($cfg['enabled']) ? '<span class="pill p-ok">Razorpay connected</span>' : '<span class="pill p-mut">not connected</span>' ?></summary>
