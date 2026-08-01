@@ -88,6 +88,26 @@ function licsync_due() {
 // ---- The check-in -----------------------------------------------------------
 // Returns ['ok'=>bool, 'changed'=>bool, 'msg'=>string]. It NEVER throws and
 // never leaves the caller worse off: a failure writes a note and returns.
+// The heartbeat this install adds to its key pull: what it believes it holds and
+// how many people are signed in, so the provider can spot a copy that has gone
+// quiet or drifted out of licence. Best-effort — never blocks the pull.
+function licsync_report_query() {
+    $q = '';
+    try {
+        $s = function_exists('lk_summary') ? lk_summary() : [];
+        $parts = [
+            'state' => (string)($s['state'] ?? ''),
+            'used'  => (string)(function_exists('lk_seats_used') ? lk_seats_used() : ''),
+            'lic'   => (string)($s['seats'] ?? ''),
+            'cust'  => (string)($s['customer'] ?? ''),
+            'host'  => (string)($_SERVER['HTTP_HOST'] ?? ''),
+            'ver'   => defined('APP_VERSION') ? (string)APP_VERSION : '',
+        ];
+        foreach ($parts as $k => $v) if ($v !== '') $q .= '&' . $k . '=' . rawurlencode($v);
+    } catch (Throwable $e) { return ''; }
+    return $q;
+}
+
 function licsync_checkin($force = false) {
     if (!licsync_on())
         return ['ok' => false, 'changed' => false, 'msg' => 'No licence server is configured for this installation.'];
@@ -100,6 +120,9 @@ function licsync_checkin($force = false) {
                 'msg' => 'Refusing to send the installation id over plain http to ' . $base . '. Use https.'];
 
     $url = $base . '/api.php?action=licence&install=' . rawurlencode(licsync_install());
+    // Attach a small self-report (the heartbeat) so the provider's console can
+    // see this copy is alive and what state it believes it is in.
+    $url .= licsync_report_query();
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,

@@ -1,4 +1,4 @@
-<?php $can = $can_sign ?? false; $modules = $modules ?? []; $history = $history ?? []; ?>
+<?php $can = $can_sign ?? false; $modules = $modules ?? []; $history = $history ?? []; $beats = $beats ?? []; ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/licence">Licence</a> › Issue a licence</div>
 <div class="master-head"><div>
   <h1>Licence console</h1>
@@ -58,6 +58,30 @@ openssl ec -in licence-private.pem -pubout -out licence-public.pem</pre></li>
     </div>
     <button class="btn" type="submit" style="margin-top:12px">Generate signed key</button>
   </form>
+</div>
+<?php endif; ?>
+
+<?php if ($beats): ?>
+<div class="panel" style="margin-top:16px">
+  <h3 class="tab-sub" style="margin-top:0">Installations — what each copy last reported</h3>
+  <p class="sub" style="margin:0 0 10px">Every self-hosted copy that renews itself checks in here. A red note means a copy
+    to look at: one that has gone quiet, is over its seats, or reports it is running unlicensed although you issued it a key.
+    Reports are what the copy tells us, so they flag honest drift and copies going dark — they are not proof against someone
+    who deliberately hacks their own server.</p>
+  <table class="dt">
+    <thead><tr><th>Customer</th><th>State</th><th>Users</th><th>Last heard</th><th>Concern</th></tr></thead>
+    <tbody>
+    <?php foreach ($beats as $b): $bad = !empty($b['flags']); ?>
+      <tr<?= $bad ? ' style="background:rgba(220,38,38,.06)"' : '' ?>>
+        <td><b><?= e($b['customer'] ?: '—') ?></b><br><span class="muted" style="font-size:11px"><?= e($b['host'] ?: $b['install_id']) ?></span></td>
+        <td><?= e($b['state'] ?: '—') ?></td>
+        <td><?= (int)$b['seats_used'] ?><?= (int)$b['seats_lic'] > 0 ? ' / ' . (int)$b['seats_lic'] : '' ?></td>
+        <td class="muted"><?= (int)$b['days_ago'] === 0 ? 'today' : ((int)$b['days_ago'] . ' day' . ((int)$b['days_ago'] === 1 ? '' : 's') . ' ago') ?></td>
+        <td><?php if ($bad): ?><span class="pill bad"><?= e(implode('; ', $b['flags'])) ?></span><?php else: ?><span class="muted">—</span><?php endif; ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
 </div>
 <?php endif; ?>
 
