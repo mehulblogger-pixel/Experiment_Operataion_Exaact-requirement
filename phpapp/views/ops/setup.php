@@ -3,7 +3,8 @@
   $months = ['1'=>'January','2'=>'February','3'=>'March','4'=>'April','5'=>'May','6'=>'June',
              '7'=>'July','8'=>'August','9'=>'September','10'=>'October','11'=>'November','12'=>'December'];
   $curFy = (string)(function_exists('fy_start_month') ? fy_start_month() : 4);
-  $curInd = function_exists('term_pack_current') ? term_pack_current() : '';
+  $curInd = function_exists('industry_current') ? (string)industry_current() : '';
+  $industries = defined('INDUSTRY_TEMPLATES') ? INDUSTRY_TEMPLATES : [];
 ?>
 <div class="crumbs"><a href="/">Home</a> › Set up</div>
 <div class="master-head">
@@ -23,18 +24,19 @@
   </div>
 
   <h3 class="tab-sub">2 · What does your company do?</h3>
-  <p class="sub" style="margin:0 0 8px">This sets the wording across the whole app — what a job, a report and a client
-    are called — and switches on the inspection accreditation rules <strong>only</strong> if you pick inspection.</p>
+  <p class="sub" style="margin:0 0 8px">One choice sets three things: the sales pipeline &amp; funnel built for your trade,
+    the wording across the whole app (what a job, a report and a client are called), and — only if you pick inspection —
+    the accreditation rules.</p>
   <div class="form-grid">
     <div class="ff"><label>Company / brand name</label>
       <input class="form-control" name="app_name" value="<?= e(setting_get('app_name','')) ?>" placeholder="e.g. Exaact Inspection Services"></div>
     <div class="ff"><label>Your industry</label>
       <select class="form-control" name="industry">
-        <?php foreach (TERM_PACKS as $k=>$p): ?>
+        <?php foreach ($industries as $k=>$p): ?>
           <option value="<?= e($k) ?>" <?= $curInd===$k?'selected':'' ?>><?= e($p['label']) ?></option>
         <?php endforeach; ?>
       </select>
-      <small class="muted">Picking “Inspection &amp; certification” turns on equipment, competence, impartiality and the ISO gates. Any other choice keeps them off.</small></div>
+      <small class="muted">Picking “Inspection, testing &amp; certification” turns on equipment, competence, impartiality and the ISO gates. Any other choice keeps them off.</small></div>
   </div>
 
   <h3 class="tab-sub">3 · Money &amp; calendar</h3>
