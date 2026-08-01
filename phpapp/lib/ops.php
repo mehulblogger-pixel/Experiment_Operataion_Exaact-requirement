@@ -1823,6 +1823,7 @@ function ops_module_gate($route) {
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'preflight'=>'settings',
         'trace-thread'=>'settings','trace-thread-remove'=>'settings',
+        'trace-audit'=>'settings','trace-audit-remove'=>'settings',
         'evidence-review'=>'idems','evidence-reviewed'=>'idems','checkin-photo'=>'jobs','checkin-settings'=>'idems',
         'data-control'=>'datacontrol','data-check-run'=>'datacontrol','sw-validation-add'=>'datacontrol',
         'failure-add'=>'datacontrol','failure-update'=>'datacontrol','failure-resolve'=>'datacontrol',
@@ -2003,6 +2004,34 @@ function ops_dispatch($route, $method) {
             if ($method === 'POST' && function_exists('trace_seed_remove')) {
                 $r = trace_seed_remove();
                 flash('Traceability thread removed — ' . (int)($r['deleted'] ?? 0) . ' records deleted.');
+            }
+            redirect('/settings'); return true;
+        case $route === 'trace-audit':
+            ops_require(is_master(), 'Only the Master Admin can build the audit thread.');
+            if ($method === 'POST' && function_exists('trace_audit_seed')) {
+                $res = trace_audit_seed(true);
+                if (empty($res['ok'])) flash('The audit thread stopped: ' . ($res['error'] ?? 'unknown'), 'error');
+                view('ops/trace_thread', ['res' => $res,
+                    'title' => 'Audit & compliance thread',
+                    'intro' => 'One compliance chain, and the accreditation gates — checked link by link and gate by gate.',
+                    'bandText' => 'A corrective action ran from an audit finding, a nonconformity and a complaint; and every accreditation gate below was fired on purpose and blocked as it should.',
+                    'removeNote' => 'Takes out the audit, finding, nonconformity, complaint, corrective actions, review and the test engineer/instrument it created — nothing else.',
+                    'removeAction' => '/trace-audit-remove',
+                    'links' => [
+                        'audit'      => ['/internal-audit?id=',    'Internal audit'],
+                        'ncr'        => ['/nonconformity?id=',     'Nonconformity'],
+                        'complaint'  => ['/complaint?id=',         'Complaint'],
+                        'capa_audit' => ['/capa?id=',              'Corrective action'],
+                        'review'     => ['/management-review?id=', 'Management review'],
+                    ]]);
+                return true;
+            }
+            redirect('/settings'); return true;
+        case $route === 'trace-audit-remove':
+            ops_require(is_master(), 'Only the Master Admin can remove the audit thread.');
+            if ($method === 'POST' && function_exists('trace_audit_remove')) {
+                $r = trace_audit_remove();
+                flash('Audit thread removed — ' . (int)($r['deleted'] ?? 0) . ' records deleted.');
             }
             redirect('/settings'); return true;
         case $route === 'boss-renew':

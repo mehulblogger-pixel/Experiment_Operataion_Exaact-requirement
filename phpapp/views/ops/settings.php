@@ -402,6 +402,16 @@
 </div>
 
 <div class="panel" style="max-width:620px;margin-top:18px">
+  <h3 class="tab-sub" style="margin-top:0;">Audit &amp; compliance check</h3>
+  <p class="sub" style="margin-bottom:8px">The inspection-pack twin of the check above. Builds one compliance chain — <strong>internal audit → finding → corrective action</strong> (with owner &amp; due date, verified and closed), a nonconformity and a complaint that each raise their own corrective action, and a management review — then <strong>fires the accreditation gates on purpose</strong> (a lapsed certificate, an out-of-calibration instrument, an open impartiality threat, the pack's own assign-hook) and confirms each one blocks.</p>
+  <p class="muted" style="margin:0 0 10px">Safe on a live system; removable in one click on the results page. Proves the inspection &amp; audit pack holds together end to end.</p>
+  <form method="post" action="/trace-audit">
+    <button class="btn" type="submit">Build &amp; check the audit thread</button>
+  </form>
+  <p class="muted" style="margin-top:8px;font-size:12px">Command line: <code>php tools/trace-audit.php</code> — add <code>--remove</code> to take it out.</p>
+</div>
+
+<div class="panel" style="max-width:620px;margin-top:18px">
   <h3 class="tab-sub" style="margin-top:0;">Clear records</h3>
   <p class="sub" style="margin-bottom:10px">For setting up and testing: empty whole groups of records — day-to-day work, reports, costing figures, <?= e(Tlp('client')) ?> &amp; <?= e(Tlp('vendor')) ?>, people, master lists — and start again with a clean register. You see the count before anything happens, and your own login is never deleted.</p>
   <a class="btn danger" href="/reset-data">Open clear records</a>
