@@ -901,3 +901,94 @@ function compliance_counts($rows) {
     foreach ($rows as $r) $c[$r['state']] = ($c[$r['state']] ?? 0) + 1;
     return $c;
 }
+
+// ============================================================================
+//  Consent / lawful-basis register (DPDP Act)
+//
+//  The Act turns on being able to say, for each person whose data we hold, what
+//  we told them we would use it for and on what basis. This register records
+//  exactly that. It is written to automatically where a person genuinely acts
+//  — a client contact accepting a portal invitation and setting their own
+//  password — and by hand for anything else.
+// ============================================================================
+const CONSENT_BASES = [
+    'CONSENT'    => 'Consent — they agreed',
+    'CONTRACT'   => 'Contract — needed to do what they asked for',
+    'LEGAL'      => 'Legal obligation',
+    'LEGITIMATE' => 'Legitimate interest',
+];
+const CONSENT_SUBJECTS = [
+    'CONTACT' => 'A contact at a client or vendor',
+    'PORTAL'  => 'A client portal user',
+    'STAFF'   => 'A member of staff',
+    'OTHER'   => 'Someone else',
+];
+
+// Record (or refresh) a consent / lawful-basis entry. De-dupes on a live entry
+// for the same subject and purpose, so wiring it into a flow that can fire more
+// than once — an invitation re-accepted, say — does not pile up rows. Returns
+// the row id (existing or new), or 0 if it could not be written.
+function consent_record(array $d) {
+    try {
+        if (function_exists('compliance_migrate')) compliance_migrate();
+        $kind    = (string)($d['subject_kind'] ?? '');
+        $sid     = (int)($d['subject_id'] ?? 0);
+        $purpose = substr(trim((string)($d['purpose'] ?? '')), 0, 200);
+        $basis   = (string)($d['basis'] ?? 'CONSENT');
+        if (!isset(CONSENT_BASES[$basis])) $basis = 'CONSENT';
+        $dupe = (int)ops_val("SELECT id FROM data_consents WHERE subject_kind=? AND subject_id=? AND purpose=? AND (withdrawn_at IS NULL OR withdrawn_at='')",
+                             [$kind, $sid, $purpose]);
+        if ($dupe) return $dupe;
+        db()->prepare("INSERT INTO data_consents (subject_kind,subject_id,subject_name,purpose,basis,given_at,note,recorded_by)
+                       VALUES (?,?,?,?,?,?,?,?)")
+            ->execute([$kind, $sid, substr(trim((string)($d['subject_name'] ?? '')), 0, 200), $purpose, $basis,
+                       (string)($d['given_at'] ?? date('c')) ?: date('c'),
+                       substr((string)($d['note'] ?? ''), 0, 1000),
+                       (string)($d['recorded_by'] ?? (function_exists('current_user') ? user_name(current_user()) : 'system'))]);
+        return (int)db()->lastInsertId();
+    } catch (Throwable $e) { return 0; }
+}
+
+function consent_withdraw($id) {
+    try {
+        db()->prepare("UPDATE data_consents SET withdrawn_at=? WHERE id=? AND (withdrawn_at IS NULL OR withdrawn_at='')")
+            ->execute([date('c'), (int)$id]);
+    } catch (Throwable $e) {}
+}
+
+function consent_open_count() {
+    try { return (int)ops_val("SELECT COUNT(*) FROM data_consents WHERE withdrawn_at IS NULL OR withdrawn_at=''"); }
+    catch (Throwable $e) { return 0; }
+}
+
+function ops_consents($route, $method) {
+    ops_require(is_master() || can('settings.manage'), 'Only an administrator can open the consent register.');
+    if (function_exists('compliance_migrate')) compliance_migrate();
+    if ($route === 'consent-add' && $method === 'POST') {
+        $kind = (string)($_POST['subject_kind'] ?? 'CONTACT');
+        if (!isset(CONSENT_SUBJECTS[$kind])) $kind = 'OTHER';
+        if (trim((string)($_POST['subject_name'] ?? '')) === '' || trim((string)($_POST['purpose'] ?? '')) === '') {
+            flash('A name and a purpose are both needed — the register has to say whose data, and what for.', 'error');
+            redirect('/consents');
+        }
+        consent_record([
+            'subject_kind' => $kind,
+            'subject_id'   => (int)($_POST['subject_id'] ?? 0),
+            'subject_name' => (string)($_POST['subject_name'] ?? ''),
+            'purpose'      => (string)($_POST['purpose'] ?? ''),
+            'basis'        => (string)($_POST['basis'] ?? 'CONSENT'),
+            'given_at'     => (string)($_POST['given_at'] ?? '') !== '' ? (string)$_POST['given_at'] : date('c'),
+            'note'         => (string)($_POST['note'] ?? ''),
+        ]);
+        flash('Consent recorded.');
+        redirect('/consents');
+    }
+    if ($route === 'consent-withdraw' && $method === 'POST') {
+        consent_withdraw((int)($_POST['id'] ?? 0));
+        flash('Recorded as withdrawn. What was collected under it is untouched until reviewed — withdrawing '
+            . 'consent is the trigger to decide whether the data still needs keeping.', 'warning');
+        redirect('/consents');
+    }
+    view('ops/consents', ['rows'=>ops_all(
+        "SELECT * FROM data_consents ORDER BY (withdrawn_at IS NOT NULL AND withdrawn_at<>''), id DESC")]);
+}
