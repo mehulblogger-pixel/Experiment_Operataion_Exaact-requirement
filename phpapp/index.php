@@ -30,16 +30,24 @@ header('Permissions-Policy: geolocation=(self), camera=(self), microphone=(), pa
 // anywhere else. 'unsafe-inline' is stated honestly — the screens carry inline
 // handlers and style, so script injected into a page could still run; what it
 // could NOT do is load code from another site or send what it found there.
+// Razorpay's checkout runs from its own domain in an iframe, so the payment
+// page (and only that page) has to be allowed to load and talk to it. Every
+// other page keeps the tight policy.
+$onPay = strpos((string)($_SERVER['REQUEST_URI'] ?? ''), '/billing-order') !== false;
+$rzpScript = $onPay ? ' https://checkout.razorpay.com' : '';
+$rzpFrame  = $onPay ? ' https://api.razorpay.com https://checkout.razorpay.com' : '';
+$rzpConn   = $onPay ? ' https://api.razorpay.com https://lumberjack.razorpay.com' : '';
 $csp = "default-src 'self'; "
-     . "script-src 'self' 'unsafe-inline'; "
+     . "script-src 'self' 'unsafe-inline'" . $rzpScript . "; "
      . "style-src 'self' 'unsafe-inline'; "
      . "img-src 'self' data: blob:; "
      . "font-src 'self' data:; "
-     . "connect-src 'self'; "
+     . "connect-src 'self'" . $rzpConn . "; "
      . "media-src 'self' blob:; "
      . "object-src 'none'; "
      . "base-uri 'self'; "
-     . "form-action 'self'; "
+     . "form-action 'self'" . ($onPay ? ' https://api.razorpay.com' : '') . "; "
+     . "frame-src 'self'" . $rzpFrame . "; "
      . "frame-ancestors 'self'";
 header('Content-Security-Policy: ' . $csp);
 
@@ -145,6 +153,7 @@ try {
     require __DIR__ . '/lib/adssync.php';
     require __DIR__ . '/lib/licencekey.php';
     require __DIR__ . '/lib/licencesync.php';
+    require __DIR__ . '/lib/billing.php';
     require __DIR__ . '/lib/adsroi.php';
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';

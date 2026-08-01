@@ -296,6 +296,15 @@
   <a class="btn" href="/industry">Choose your industry</a>
 </div>
 
+<?php if (function_exists('billing_can_manage') && billing_can_manage()): ?>
+<div class="panel settings-card">
+  <h3 class="tab-sub" style="margin-top:0;">Users &amp; billing</h3>
+  <p class="sub" style="margin-bottom:10px">Pay per person, monthly or yearly. Add or renew seats online — the seat count
+    goes live the moment payment clears.<?= (function_exists('billing_configured') && billing_configured()) ? '' : ' <em>Set your price and Razorpay keys to switch it on.</em>' ?></p>
+  <a class="btn" href="/billing">Open users &amp; billing</a>
+</div>
+<?php endif; ?>
+
 <div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Roles &amp; access</h3>
   <p class="sub" style="margin-bottom:10px">Control which <strong>modules and features</strong> each role can view or edit — Calls, Jobs, Vouchers, Invoicing, Profitability, Masters, Users, Settings and more. Set defaults per role; fine-tune per person under Users.</p>

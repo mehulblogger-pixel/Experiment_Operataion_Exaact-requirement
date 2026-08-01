@@ -123,14 +123,41 @@ function lk_verify($key) {
 }
 
 // ---- The state machine ------------------------------------------------------
+// The public entry point: the licence state from the signed key (or trial),
+// with the self-service billing grant laid over it. A paid seat plan bought
+// through Razorpay on this install adds seats and keeps the system live to its
+// paid-until date, on top of — or in place of — a signed key. This is what lets
+// per-user self-service payment work without the vendor re-issuing a key.
 function lk_state($reload = false) {
     static $s = null;
     if ($s !== null && !$reload) return $s;
+    $out = lk_state_base($reload);
+    if (function_exists('billing_grant')) {
+        $g = billing_grant();
+        if (!empty($g['active'])) {
+            if ((int) $g['seats'] > (int) $out['seats']) $out['seats'] = (int) $g['seats'];
+            $untilTs = strtotime((string) $g['until'] . ' 23:59:59');
+            $curEndTs = ($out['days_left'] === null) ? 0 : (time() + (int) $out['days_left'] * 86400);
+            // The paid plan governs whenever the system would otherwise be blocked
+            // or on a bare trial, or when it simply runs longer than the key.
+            if ($untilTs > time()
+                && (!empty($out['read_only']) || in_array($out['state'], ['TRIAL', 'OPEN', 'MISSING', 'INVALID'], true) || $untilTs > $curEndTs)) {
+                $out['state']     = 'VALID';
+                $out['read_only'] = false;
+                $out['err']       = '';
+                $out['days_left'] = (int) floor(($untilTs - time()) / 86400);
+                if ($out['customer'] === '') $out['customer'] = (string) setting_get('billing_customer', '');
+            }
+        }
+    }
+    return $out;
+}
 
+function lk_state_base($reload = false) {
     $out = ['state' => 'OPEN', 'claims' => [], 'err' => '', 'days_left' => null,
             'read_only' => false, 'customer' => '', 'seats' => 0];
 
-    if (!lk_enforcing()) return $s = $out;
+    if (!lk_enforcing()) return $out;
 
     $key = lk_raw_key();
     if ($key === '') {
@@ -142,10 +169,10 @@ function lk_state($reload = false) {
         $used = (int)floor((strtotime(date('Y-m-d')) - strtotime($first)) / 86400);
         $left = LICENCE_TRIAL_DAYS - $used;
         $out['days_left'] = $left;
-        if ($left > 0) { $out['state'] = 'TRIAL'; return $s = $out; }
+        if ($left > 0) { $out['state'] = 'TRIAL'; return $out; }
         $out['state'] = 'READONLY'; $out['read_only'] = true;
         $out['err'] = 'The ' . LICENCE_TRIAL_DAYS . '-day trial has ended.';
-        return $s = $out;
+        return $out;
     }
 
     $c = lk_verify($key);
@@ -153,7 +180,7 @@ function lk_state($reload = false) {
         // A bad key is still read-only, never a lock-out. The customer's data is
         // theirs whatever went wrong with our paperwork.
         $out['state'] = 'INVALID'; $out['read_only'] = true; $out['err'] = $c['err'];
-        return $s = $out;
+        return $out;
     }
 
     $out['claims']   = $c;
@@ -170,7 +197,7 @@ function lk_state($reload = false) {
     else { $out['state'] = 'READONLY'; $out['read_only'] = true;
            $out['err'] = 'The subscription ended on ' . fdate((string)$c['exp'])
                        . ' and the ' . $grace . '-day grace period is over.'; }
-    return $s = $out;
+    return $out;
 }
 
 function lk_read_only() { return !empty(lk_state()['read_only']); }
