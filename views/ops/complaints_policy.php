@@ -32,7 +32,7 @@ $g    = grievance_officer();
 <div class="wrap">
   <div class="hd">
     <h1>Complaints and appeals</h1>
-    <p><?= e(app_name()) ?> · published under ISO/IEC 17020 §7.5</p>
+    <p><?= e(app_name()) ?><?php if (function_exists('pack_on') && pack_on('inspection')): ?> · published under ISO/IEC 17020 §7.5<?php endif; ?></p>
   </div>
 
   <div class="body"><?= e($text) ?></div>

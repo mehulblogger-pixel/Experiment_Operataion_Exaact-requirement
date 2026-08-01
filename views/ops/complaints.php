@@ -1,8 +1,9 @@
 <div class="crumbs"><a href="/">Home</a> › Complaints &amp; appeals</div>
 <div class="master-head">
   <div><h1>Complaints &amp; appeals</h1>
-    <p class="sub" style="margin:2px 0 0">ISO/IEC 17020 §7.5 and §7.6. What an assessor asks for is this list, with
-      dates on it — when it arrived, when it was acknowledged, who decided it, and when the complainant was told.</p></div>
+    <p class="sub" style="margin:2px 0 0"><?php if (function_exists('pack_on') && pack_on('inspection')): ?>ISO/IEC 17020 §7.5 and §7.6. What an assessor asks for is this list, with
+      <?php else: ?>Every complaint and appeal, with
+      <?php endif; ?>dates on it — when it arrived, when it was acknowledged, who decided it, and when the complainant was told.</p></div>
   <div style="display:flex;gap:8px">
     <a class="btn secondary" href="/complaints-policy">Published description</a>
     <?php if ($canRecord): ?><a class="btn" href="/complaint-new">Record one</a><?php endif; ?>
