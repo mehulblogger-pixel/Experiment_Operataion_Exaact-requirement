@@ -107,6 +107,12 @@ function lk_enforcing() {
     $v = getenv('LICENCE_ENFORCE');
     if ($v !== false && (string)$v !== '') return (string)$v !== '0';
     if (function_exists('lk_privkey') && lk_privkey() !== '') return false;
+    // A key that is physically present is always honoured, so simply flipping the
+    // sticky flag in the database does not free the copy — the seats still come
+    // from the signed key, which cannot be forged. Enforcement only falls away if
+    // BOTH the key is wiped AND the flag is cleared, which leaves no licence at
+    // all and is plainly a breach rather than a setting.
+    if (trim((string)setting_get('licence_key', '')) !== '') return true;
     return (string)setting_get('licence_enforce', '0') === '1';
 }
 
