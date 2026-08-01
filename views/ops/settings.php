@@ -285,6 +285,17 @@
 
 <?php if (is_master()): ?>
 <div class="settings-cards">
+<?php $curIndT = function_exists('industry_current') ? (string)industry_current() : ''; ?>
+<div class="panel settings-card">
+  <h3 class="tab-sub" style="margin-top:0;">Your industry</h3>
+  <p class="sub" style="margin-bottom:10px">One choice builds the whole thing for your trade — the sales pipeline &amp; funnel,
+    the wording across the app (<?= e(Tl('call')) ?>, <?= e(Tl('report')) ?>, <?= e(Tl('client')) ?>…), and the
+    inspection accreditation rules when the trade is inspection.</p>
+  <p class="muted" style="margin:0 0 10px">Now: <strong><?= e($curIndT && defined('INDUSTRY_TEMPLATES') && isset(INDUSTRY_TEMPLATES[$curIndT]) ? INDUSTRY_TEMPLATES[$curIndT]['label'] : 'Not set') ?></strong>.
+    Fine-tune individual words under <a href="/terminology">Terminology</a>.</p>
+  <a class="btn" href="/industry">Choose your industry</a>
+</div>
+
 <div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Roles &amp; access</h3>
   <p class="sub" style="margin-bottom:10px">Control which <strong>modules and features</strong> each role can view or edit — Calls, Jobs, Vouchers, Invoicing, Profitability, Masters, Users, Settings and more. Set defaults per role; fine-tune per person under Users.</p>

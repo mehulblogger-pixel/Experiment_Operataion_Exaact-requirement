@@ -503,12 +503,41 @@ function industry_apply($key) {
         $added += industry_seed_list('quote_lost_reason', 'Lost reason', $t['lost']);
     }
 
+    // The same choice also decides the WORDING and which specialist rules run —
+    // so "choose your industry" is one act, not three. Apply the matching
+    // vocabulary pack, and switch the inspection accreditation pack on only when
+    // the industry actually is inspection. Both are no-ops if their libraries
+    // are not loaded, so this stays safe in a cut-down build.
+    $termKey = INDUSTRY_TERM_MAP[$key] ?? 'general';
+    $wording = function_exists('term_apply_pack') ? (bool) term_apply_pack($termKey) : false;
+    if (function_exists('packs_save')) packs_save($key === 'inspection' ? 'inspection' : '');
+
     setting_set('industry_template', $key);
     setting_set('industry_applied_at', date('c'));
     if (function_exists('act_log'))
         act_log('', 0, 'SYSTEM', 'Industry template applied: ' . $t['label'], ['auto' => 1]);
-    return ['ok' => true, 'pipelines' => $made, 'list_values' => $added, 'label' => $t['label']];
+    return ['ok' => true, 'pipelines' => $made, 'list_values' => $added, 'label' => $t['label'],
+            'wording' => $wording, 'inspection_pack' => ($key === 'inspection')];
 }
+
+// Which vocabulary pack (terms.php TERM_PACKS) each industry template lines up
+// with. Not every template has an exact word-pack; the nearest is used, and the
+// general default covers the rest. Only 'inspection' also turns on the
+// accreditation pack — that is decided in industry_apply(), not here.
+const INDUSTRY_TERM_MAP = [
+    'inspection'    => 'inspection',
+    'manufacturing' => 'manufacturing',
+    'trading'       => 'trading',
+    'services'      => 'professional',
+    'construction'  => 'epc',
+    'itservices'    => 'professional',
+    'healthcare'    => 'general',
+    'education'     => 'professional',
+    'logistics'     => 'logistics',
+    'realestate'    => 'general',
+    'staffing'      => 'manpower',
+    'generic'       => 'general',
+];
 
 // Add values to a master list without disturbing what is already there.
 function industry_seed_list($typeKey, $typeLabel, array $values) {
@@ -542,6 +571,8 @@ function ops_industry($route, $method) {
         flash($r['label'] . ' applied. ' . $n . ' pipelines created — a main funnel (now the default), '
             . 'an alternate funnel and a lead pipeline'
             . ($r['list_values'] ? ', with ' . $r['list_values'] . ' list values added' : '')
+            . (!empty($r['wording']) ? '; the wording is set to match' : '')
+            . (!empty($r['inspection_pack']) ? '; the inspection accreditation rules are ON' : '; inspection-only registers are OFF')
             . '. Anything already in flight keeps the pipeline it was on.');
         redirect('/opportunities');
     }

@@ -219,8 +219,7 @@ function ops_setup($route, $method) {
         // 3. Industry — sets the wording everywhere, and switches the inspection
         //    accreditation pack ON only when the industry really is inspection.
         $ind = (string)($_POST['industry'] ?? '');
-        if ($ind !== '' && function_exists('term_apply_pack')) term_apply_pack($ind);
-        if (function_exists('packs_save')) packs_save($ind === 'inspection' ? 'inspection' : '');
+        if ($ind !== '') industry_apply($ind);
         // 4. Money & calendar basics.
         if (isset($_POST['fy_start_month'])) setting_set('fy_start_month', (string)max(1, min(12, (int)$_POST['fy_start_month'])));
         if (($cs = trim((string)($_POST['currency_symbol'] ?? ''))) !== '') setting_set('currency_symbol', substr($cs, 0, 4));
