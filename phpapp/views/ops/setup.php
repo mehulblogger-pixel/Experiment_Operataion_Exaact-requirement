@@ -25,8 +25,8 @@
 
   <h3 class="tab-sub">2 · What does your company do?</h3>
   <p class="sub" style="margin:0 0 8px">One choice sets three things: the sales pipeline &amp; funnel built for your trade,
-    the wording across the whole app (what a job, a report and a client are called), and — only if you pick inspection —
-    the accreditation rules.</p>
+    the wording across the whole app (what a job, a report and a client are called), and — if you pick an accredited
+    trade (inspection or a testing laboratory) — the matching accreditation rules.</p>
   <div class="form-grid">
     <div class="ff"><label>Company / brand name</label>
       <input class="form-control" name="app_name" value="<?= e(setting_get('app_name','')) ?>" placeholder="e.g. Exaact Inspection Services"></div>
@@ -36,7 +36,7 @@
           <option value="<?= e($k) ?>" <?= $curInd===$k?'selected':'' ?>><?= e($p['label']) ?></option>
         <?php endforeach; ?>
       </select>
-      <small class="muted">Picking “Inspection, testing &amp; certification” turns on equipment, competence, impartiality and the ISO gates. Any other choice keeps them off.</small></div>
+      <small class="muted">An accredited trade — inspection (ISO/IEC 17020) or a testing &amp; calibration laboratory (ISO/IEC 17025) — turns on equipment, competence, impartiality and the matching ISO gates. Any other choice keeps them off.</small></div>
   </div>
 
   <h3 class="tab-sub">3 · Money &amp; calendar</h3>

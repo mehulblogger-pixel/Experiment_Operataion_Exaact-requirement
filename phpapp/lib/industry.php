@@ -77,6 +77,38 @@ const INDUSTRY_TEMPLATES = [
                       'No accreditation for that scope', 'No response', 'Awarded in-house'],
     ],
 
+    'labs' => [
+        'label' => 'Testing & calibration laboratory',
+        'blurb' => 'Materials testing, calibration, NABL / ISO 17025 laboratories, sample analysis.',
+        'funnel' => [
+            ['Enquiry received',    'OPEN',  10, 5],
+            ['Scope & methods',     'OPEN',  30, 7],
+            ['Quotation sent',      'OPEN',  50, 10],
+            ['Rate negotiation',    'OPEN',  70, 7],
+            ['PO / work order',     'OPEN',  90, 5],
+            ['Won',                 'WON',  100, 0],
+            ['Lost',                'LOST',   0, 0],
+        ],
+        'alt' => ['Annual testing contracts' => [
+                ['Contract due',    'OPEN', 30, 30],
+                ['Renewal proposed','OPEN', 55, 21],
+                ['Rates agreed',    'OPEN', 80, 14],
+                ['Renewed',         'WON', 100, 0],
+                ['Not renewed',     'LOST', 0, 0],
+        ]],
+        'leads' => [
+            ['New enquiry',    'OPEN', 0,  3],
+            ['Contact made',   'OPEN', 0,  7],
+            ['Qualified',      'OPEN', 0, 14],
+            ['Converted',      'WON',  0,  0],
+            ['Not pursued',    'LOST', 0,  0],
+        ],
+        'sources' => ['Existing client', 'Client referral', 'Tender portal', 'NABL directory',
+                      'Website enquiry', 'Trade exhibition', 'Walk-in sample', 'Repeat testing'],
+        'lost'    => ['Rate too high', 'Turnaround too long', 'Scope not in our accreditation',
+                      'Client used in-house lab', 'No response', 'Sample withdrawn'],
+    ],
+
     'manufacturing' => [
         'label' => 'Manufacturing & engineering',
         'blurb' => 'Fabrication, machining, capital equipment, industrial supply.',
@@ -510,14 +542,19 @@ function industry_apply($key) {
     // are not loaded, so this stays safe in a cut-down build.
     $termKey = INDUSTRY_TERM_MAP[$key] ?? 'general';
     $wording = function_exists('term_apply_pack') ? (bool) term_apply_pack($termKey) : false;
-    if (function_exists('packs_save')) packs_save($key === 'inspection' ? 'inspection' : '');
+    // Which accreditation pack (if any) this industry turns on. Only inspection
+    // and laboratory carry one; every other trade turns them all off.
+    $packMap = ['inspection' => 'inspection', 'labs' => 'labs'];
+    $accrPack = $packMap[$key] ?? '';
+    if (function_exists('packs_save')) packs_save($accrPack);
 
     setting_set('industry_template', $key);
     setting_set('industry_applied_at', date('c'));
     if (function_exists('act_log'))
         act_log('', 0, 'SYSTEM', 'Industry template applied: ' . $t['label'], ['auto' => 1]);
     return ['ok' => true, 'pipelines' => $made, 'list_values' => $added, 'label' => $t['label'],
-            'wording' => $wording, 'inspection_pack' => ($key === 'inspection')];
+            'wording' => $wording, 'inspection_pack' => ($key === 'inspection'),
+            'accreditation_pack' => $accrPack];
 }
 
 // Which vocabulary pack (terms.php TERM_PACKS) each industry template lines up
@@ -526,6 +563,7 @@ function industry_apply($key) {
 // accreditation pack — that is decided in industry_apply(), not here.
 const INDUSTRY_TERM_MAP = [
     'inspection'    => 'inspection',
+    'labs'          => 'labs',
     'manufacturing' => 'manufacturing',
     'trading'       => 'trading',
     'services'      => 'professional',
@@ -572,7 +610,9 @@ function ops_industry($route, $method) {
             . 'an alternate funnel and a lead pipeline'
             . ($r['list_values'] ? ', with ' . $r['list_values'] . ' list values added' : '')
             . (!empty($r['wording']) ? '; the wording is set to match' : '')
-            . (!empty($r['inspection_pack']) ? '; the inspection accreditation rules are ON' : '; inspection-only registers are OFF')
+            . (!empty($r['accreditation_pack'])
+                ? '; the ' . ($r['accreditation_pack'] === 'labs' ? 'laboratory (ISO/IEC 17025)' : 'inspection (ISO/IEC 17020)') . ' accreditation rules are ON'
+                : '; the accreditation registers are OFF')
             . '. Anything already in flight keeps the pipeline it was on.');
         redirect('/opportunities');
     }

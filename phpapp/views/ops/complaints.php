@@ -1,7 +1,7 @@
 <div class="crumbs"><a href="/">Home</a> › Complaints &amp; appeals</div>
 <div class="master-head">
   <div><h1>Complaints &amp; appeals</h1>
-    <p class="sub" style="margin:2px 0 0"><?php if (function_exists('pack_on') && pack_on('inspection')): ?>ISO/IEC 17020 §7.5 and §7.6. What an assessor asks for is this list, with
+    <p class="sub" style="margin:2px 0 0"><?php if (function_exists('accredited_pack_on') && accredited_pack_on()): ?><?= e(accreditation_standard()) ?> §<?= e(accreditation_clause('complaints')) ?> and §<?= e(accreditation_clause('appeals')) ?>. What an assessor asks for is this list, with
       <?php else: ?>Every complaint and appeal, with
       <?php endif; ?>dates on it — when it arrived, when it was acknowledged, who decided it, and when the complainant was told.</p></div>
   <div style="display:flex;gap:8px">

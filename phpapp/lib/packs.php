@@ -103,7 +103,65 @@ function packs_available() {
                      . 'signatory check. Switch this OFF for a business that is not an '
                      . 'accredited inspection body — the registers stay, the gates stop firing.',
         ],
+        'labs' => [
+            'label' => 'Testing &amp; calibration laboratory (ISO/IEC 17025)',
+            'desc'  => 'The same accreditation registers, tuned for a laboratory: competence and '
+                     . 'authorisation gates on who may run a test, an impartiality check, and — on '
+                     . 'issuing a test certificate — that every measuring instrument was in '
+                     . 'calibration and the signatory was authorised. No site-entry gate, because '
+                     . 'the sample comes to the laboratory. Switch OFF for a business that is not an '
+                     . 'accredited laboratory.',
+        ],
     ];
+}
+
+// The packs that carry an ISO conformity-assessment standard and therefore
+// share the same registers — equipment, competence, impartiality, nonconformity,
+// corrective action, internal audit, management review, data control. The menu,
+// the routes and the on-screen wording key off "any of these is on", not off
+// one named pack, so a laboratory sees the same apparatus as an inspection body.
+const ACCREDITATION_PACKS = ['inspection', 'labs'];
+
+function accredited_pack_on() {
+    foreach (ACCREDITATION_PACKS as $p) if (pack_on($p)) return true;
+    return false;
+}
+
+// The standard whose name and clause numbers the shared screens should show.
+// If a body somehow runs both, inspection is named — the screens can only carry
+// one, and 17020 is the one with the site work these screens grew up around.
+function accreditation_standard() {
+    if (pack_on('inspection')) return 'ISO/IEC 17020';
+    if (pack_on('labs'))       return 'ISO/IEC 17025';
+    return '';
+}
+
+// The clause a shared obligation carries under the active standard. The two
+// standards number the same duties differently, so a laboratory must not be
+// shown a 17020 clause. Returns '' when no accreditation pack is on.
+function accreditation_clause($topic) {
+    if (!accredited_pack_on()) return '';
+    $labs = pack_on('labs') && !pack_on('inspection');
+    $map = [
+        'competence'    => ['6.1',  '6.2'],
+        'impartiality'  => ['4.1',  '4.1'],
+        'equipment'     => ['6.2',  '6.4'],
+        'signatory'     => ['6.1',  '6.2'],
+        'complaints'    => ['7.5',  '7.9'],
+        'appeals'       => ['7.6',  '7.9'],
+        'nonconformity' => ['8.7',  '7.10'],
+        'audit'         => ['8.8',  '8.8'],
+        'review'        => ['8.9',  '8.9'],
+        'datacontrol'   => ['7.11', '7.11'],
+    ];
+    return isset($map[$topic]) ? $map[$topic][$labs ? 1 : 0] : '';
+}
+
+// Convenience: "ISO/IEC 17025 §6.2" for a topic, or '' when no pack is on.
+function accreditation_ref($topic) {
+    $std = accreditation_standard();
+    $cl  = accreditation_clause($topic);
+    return $std === '' ? '' : ($cl === '' ? $std : $std . ' §' . $cl);
 }
 
 function packs_save($csv) {
@@ -161,6 +219,49 @@ function packs_boot() {
         if (function_exists('report_equipment_block') && ($w = report_equipment_block($doc)) !== '')
             $out['block'][] = $w;
         // §6.1 — warns and records, because the report is still valid work.
+        if (function_exists('report_signatory_warning') && ($w = report_signatory_warning($doc)) !== '')
+            $out['warn'][] = $w;
+        return $out;
+    });
+
+    // ---- The testing & calibration laboratory pack (ISO/IEC 17025) ----------
+    // The same real obligations as inspection — competent people, calibrated
+    // equipment, declared impartiality — because the shared functions enforce
+    // them the same way whichever standard is in force. What differs: no
+    // site-entry gate (the sample comes to the laboratory), and the clause
+    // numbers on the messages, which come from the active standard.
+    pack_register('work.assign', 'labs', function (array $c) {
+        $out = ['block' => [], 'warn' => []];
+        $who = (int)($c['person_id'] ?? 0);
+        if (!$who) return $out;
+        $on = (string)($c['on_date'] ?? date('Y-m-d'));
+        // §6.2 — a required qualification that had lapsed on the day of the test.
+        if (function_exists('competence_block') && ($w = competence_block($who, $on)) !== '')
+            $out['block'][] = ['why' => $w, 'override' => 'cert_override_note'];
+        // §6.2 — authorised for THIS test method, not merely qualified.
+        if (function_exists('auth_block')) {
+            $w = auth_block($who, (string)($c['work_type'] ?? ''), (int)($c['activity_id'] ?? 0),
+                            (int)($c['partner_id'] ?? 0), $on);
+            if ($w !== '') $out['block'][] = ['why' => $w, 'override' => ''];
+        }
+        // §4.1 — a declared threat to impartiality that has not been decided.
+        if (function_exists('imp_block')) {
+            $w = imp_block($who, [(int)($c['partner_id'] ?? 0), (int)($c['vendor_id'] ?? 0)], $on);
+            if ($w !== '') $out['block'][] = ['why' => $w, 'override' => ''];
+        }
+        return $out;
+    });
+
+    pack_register('document.issue', 'labs', function (array $c) {
+        $out = ['block' => [], 'warn' => []];
+        $doc = $c['doc'] ?? null;
+        if (!$doc) return $out;
+        // §6.4 / §6.5 — metrological traceability: a result from an instrument
+        // out of calibration is void, and cannot be overridden.
+        if (function_exists('report_equipment_block') && ($w = report_equipment_block($doc)) !== '')
+            $out['block'][] = $w;
+        // §6.2 / §7.8 — the person who authorised the result must be competent
+        // to. A warning plus a nonconformity, not a block on a client's result.
         if (function_exists('report_signatory_warning') && ($w = report_signatory_warning($doc)) !== '')
             $out['warn'][] = $w;
         return $out;
