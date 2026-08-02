@@ -293,6 +293,12 @@
   <a class="btn" href="/vendor">Open Super Admin</a>
 </div>
 <?php endif; ?>
+<div class="panel settings-card">
+  <h3 class="tab-sub" style="margin-top:0;">Your company</h3>
+  <p class="sub" style="margin-bottom:10px">Your legal name, address, GSTIN and logo — entered once, shown on your quotations,
+    invoices and records.</p>
+  <a class="btn" href="/company-profile">Edit company profile</a>
+</div>
 <?php $curIndT = function_exists('industry_current') ? (string)industry_current() : ''; ?>
 <div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Your industry</h3>
