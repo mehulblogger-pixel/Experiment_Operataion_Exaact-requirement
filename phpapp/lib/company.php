@@ -25,6 +25,7 @@ function company_profile() {
         'email'      => $g('company_email'),
         'phone'      => $g('company_phone'),
         'website'    => $g('company_website'),
+        'footer'     => $g('quote_lh_footer'), // one footer line for every PDF
         'logo'       => $g('quote_lh_logo'),   // shared with the quote letterhead
     ];
 }
@@ -58,6 +59,7 @@ function ops_company_profile($route, $method) {
         $email = substr(trim((string)($_POST['email'] ?? '')), 0, 150);
         $phone = substr(trim((string)($_POST['phone'] ?? '')), 0, 60);
         $web   = substr(trim((string)($_POST['website'] ?? '')), 0, 150);
+        $foot  = substr(trim((string)($_POST['footer'] ?? '')), 0, 300);
 
         if ($gstin !== '' && function_exists('is_valid_gstin') && !is_valid_gstin($gstin)) {
             flash('That GSTIN does not look valid (it should be 15 characters). Saved the rest; please check it.', 'warning');
@@ -78,6 +80,7 @@ function ops_company_profile($route, $method) {
         setting_set('quote_lh_name', $legal !== '' ? $legal : $brand);
         setting_set('quote_lh_address', $addr);
         setting_set('quote_lh_contact', company_contact_line());
+        setting_set('quote_lh_footer', $foot);
 
         flash('Company profile saved — it now appears on your quotations, invoices and records.');
         redirect('/company-profile');
