@@ -171,6 +171,7 @@ try {
     require __DIR__ . '/lib/tenants.php';
     require __DIR__ . '/lib/cpanel.php';
     require __DIR__ . '/lib/agreement.php';
+    require __DIR__ . '/lib/company.php';
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);

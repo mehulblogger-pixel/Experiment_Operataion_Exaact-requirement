@@ -1,6 +1,18 @@
 <?php $isDraft = $inv['status'] === 'DRAFT'; $isLive = in_array($inv['status'], ['ISSUED','PART_PAID','PAID'], true); ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/invoices">Invoices</a> › <?= e($inv['invoice_no'] ?: 'Draft') ?></div>
 <?= function_exists('chain_strip') ? chain_strip('INVOICE', (int)$inv['id'], 'INVOICE', (int)$inv['id']) : '' ?>
+<?php $co = function_exists('company_profile') ? company_profile() : []; ?>
+<?php if (!empty($co['legal_name']) || !empty($co['brand'])): ?>
+<div class="panel" style="margin-top:12px;padding:12px 16px">
+  <b style="font-size:14px"><?= e($co['legal_name'] ?: $co['brand']) ?></b>
+  <?php if (!empty($co['address'])): ?><div class="muted" style="font-size:12.5px;white-space:pre-line"><?= e($co['address']) ?></div><?php endif; ?>
+  <div class="muted" style="font-size:12.5px">
+    <?php if (!empty($co['gstin'])): ?>GSTIN: <?= e($co['gstin']) ?><?php endif; ?>
+    <?php if (!empty($co['state'])): ?> · <?= e($co['state']) ?><?php endif; ?>
+    <?php $cl = function_exists('company_contact_line') ? company_contact_line() : ''; if ($cl !== ''): ?> · <?= e($cl) ?><?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
 <div class="master-head">
   <div>
     <h1><?= e($inv['invoice_no'] ?: 'Draft invoice') ?>

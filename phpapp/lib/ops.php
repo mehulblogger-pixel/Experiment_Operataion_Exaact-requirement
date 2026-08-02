@@ -2142,6 +2142,8 @@ function ops_dispatch($route, $method) {
             ops_vendor($route, $method); return true;
         case $route === 'agreement':
             ops_agreement($route, $method); return true;
+        case $route === 'company-profile':
+            ops_company_profile($route, $method); return true;
         case $route === 'sso':
             return ops_sso($route, $method);
         // Deals held at a stage until somebody with the authority agrees.
