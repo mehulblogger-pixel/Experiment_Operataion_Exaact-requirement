@@ -1220,6 +1220,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs) {
     $ly = $top + 18;
     foreach (preg_split('/\r?\n/', (string)($lh['address'] ?? '')) as $al) { $al=trim($al); if($al==='')continue; $p->y=$ly; $p->text($nameX,$al,8.5,false,[90,90,90]); $ly+=10; }
     if (!empty($lh['contact'])) { $p->y=$ly; $p->text($nameX,$lh['contact'],8.5,false,[90,90,90]); $ly+=10; }
+    if (!empty($lh['gstin'])) { $p->y=$ly; $p->text($nameX,$lh['gstin'],8.5,false,[90,90,90]); $ly+=10; }
     // IRN + status on the right
     $p->y=$top; $p->text($ml, 'IRN: '.$doc['irn'], 9, true, [60,60,60], $right, 'R');
     $p->y=$top+12; $p->text($ml, ($doc['type_code'].' — '.($doc['title'] ?: '')), 8, false, [110,110,110], $right, 'R');

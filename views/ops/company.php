@@ -20,7 +20,9 @@
       <div class="ff"><label>E-mail</label><input class="form-control" type="email" name="email" value="<?= e($p['email'] ?? '') ?>"></div>
       <div class="ff"><label>Phone</label><input class="form-control" name="phone" value="<?= e($p['phone'] ?? '') ?>"></div>
       <div class="ff"><label>Website</label><input class="form-control" name="website" value="<?= e($p['website'] ?? '') ?>" placeholder="www.example.com"></div>
-      <div class="ff ff-wide"><label>Logo <span class="muted">— shown on the quotation PDF</span></label>
+      <div class="ff ff-wide"><label>Footer line for PDFs <span class="muted">— optional, e.g. CIN / bank / tagline</span></label>
+        <input class="form-control" name="footer" value="<?= e($p['footer'] ?? '') ?>" placeholder="Appears at the bottom of quotations, reports and endorsements"></div>
+      <div class="ff ff-wide"><label>Logo <span class="muted">— shown on quotations and reports</span></label>
         <input class="form-control" type="file" name="logo" accept="image/*">
         <?php if (!empty($p['logo'])): ?>
           <label class="chk" style="margin-top:6px"><input type="checkbox" name="clear_logo" value="1"> Remove the current logo</label>

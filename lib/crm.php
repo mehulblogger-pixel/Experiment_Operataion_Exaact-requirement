@@ -2229,11 +2229,15 @@ function quote_signature($q = null) {
 // Customisable letterhead for the client PDF (company logo / name / address / contact).
 function quote_letterhead() {
     $logo = setting_get('quote_lh_logo', '');
+    // GSTIN comes from the single "Your company" profile so it prints on every
+    // document without being typed here as well.
+    $gstin = setting_get('company_gstin', '');
     return [
         'logo' => $logo ? base64_decode($logo) : '',
         'name' => setting_get('quote_lh_name', '') ?: app_name(),
         'address' => setting_get('quote_lh_address', ''),
         'contact' => setting_get('quote_lh_contact', ''),
+        'gstin' => $gstin ? ('GSTIN: ' . $gstin) : '',
         'footer' => setting_get('quote_lh_footer', ''),
     ];
 }
