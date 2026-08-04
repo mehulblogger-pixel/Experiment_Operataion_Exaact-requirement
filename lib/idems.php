@@ -1798,6 +1798,41 @@ function ops_idems_form_from_template($method) {
     return true;
 }
 
+// ---- Handler: auto-build a form from a PLAIN Word file (no {{tokens}}) -------
+// Upload an ordinary report format; the app detects the fields, writes a
+// tokenised copy as this type's client format, and hands off to the existing
+// review-and-create screen. The person never inserts a placeholder.
+function ops_idems_autoform($method) {
+    ops_require(is_master() || can('idems.type.manage'), 'You cannot design report forms.');
+    $typeId = (int)($_GET['type'] ?? $_POST['report_type_id'] ?? 0);
+    $type = $typeId ? ops_one("SELECT * FROM report_types WHERE id=?", [$typeId]) : null;
+    if (!$type) { flash('Choose a report type first, then build its form.', 'error'); redirect('/report-types'); }
+
+    if ($method === 'POST' && !empty($_FILES['tpl']['tmp_name']) && (int)$_FILES['tpl']['error'] === 0) {
+        $name = (string)($_FILES['tpl']['name'] ?? 'format.docx');
+        if (!preg_match('/\.docx$/i', $name)) { flash('Please upload a Word .docx file. (Old .doc must be saved as .docx first.)', 'error'); redirect('/report-autoform?type=' . $typeId); }
+        $bin = (string)file_get_contents($_FILES['tpl']['tmp_name']);
+        $res = autoform_analyze_docx($bin);
+        if (!empty($res['err'])) { flash($res['err'], 'error'); redirect('/report-autoform?type=' . $typeId); }
+        if (empty($res['plan'])) {
+            flash('No fields were detected. The app looks for "Label:" lines and blank table cells — make sure your form has those, or use the {{token}} method instead.', 'warning');
+            redirect('/report-autoform?type=' . $typeId);
+        }
+        // Save the tokenised copy as this type's client format, then reuse the
+        // normal review-and-create screen (it re-scans the tokens).
+        db()->prepare("INSERT INTO report_templates (name, report_type_id, file_name, file_data, active, is_default, created_by, created_at)
+                       VALUES (?,?,?,?,?,?,?,?)")
+            ->execute(['Auto: ' . substr($name, 0, 60), $typeId, $name, base64_encode($res['tokenised']), 1, 0, user_name(current_user()), date('c')]);
+        $tplId = (int)db()->lastInsertId();
+        idems_log('report_type', $typeId, 'AUTOFORM', ['file' => $name, 'detected' => count($res['plan']) . ' field(s)']);
+        flash(count($res['plan']) . ' field(s) detected from your file — review them below, then create the form.');
+        redirect('/report-form-from-template?id=' . $tplId);
+    }
+
+    view('ops/idems/autoform', ['type' => $type, 'zipOk' => autoform_supported()]);
+    return true;
+}
+
 // ---- Handler: report template manager (upload / map client formats) ----
 function ops_idems_templates($route, $method) {
     ops_require(is_master() || can('idems.type.manage') || can('crm.template.manage'), 'You cannot manage report templates.');

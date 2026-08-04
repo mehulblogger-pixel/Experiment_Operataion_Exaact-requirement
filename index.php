@@ -164,6 +164,7 @@ try {
     require __DIR__ . '/lib/tally.php';
     require __DIR__ . '/lib/receivables.php';
     require __DIR__ . '/lib/idems.php';
+    require __DIR__ . '/lib/idems_autoform.php';
     require __DIR__ . '/lib/seed_demo.php';
     require __DIR__ . '/lib/trace_seed.php';
     require __DIR__ . '/lib/trace_audit.php';
