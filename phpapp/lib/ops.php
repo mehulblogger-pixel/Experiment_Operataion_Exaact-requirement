@@ -3252,6 +3252,7 @@ function ops_requisitions($route, $method) {
             if ($req) {
                 $set = implode(',', array_map(fn($f)=>"$f=?", $fields)); $vals = array_map(fn($f)=>$norm($f, $b[$f] ?? ''), $fields); $vals[] = $req['id'];
                 $pdo->prepare("UPDATE requisitions SET $set WHERE id=?")->execute($vals);
+                if (function_exists('custom_save')) custom_save('requisition', (int)$req['id'], $b);
                 flash("Requisition {$req['req_code']} updated."); redirect('/requisition?id=' . $req['id']);
             } else {
                 $code = ops_next_code('requisitions', 'req_code', 'REQ');
@@ -3259,10 +3260,13 @@ function ops_requisitions($route, $method) {
                 $vals = array_merge([$code], array_map(fn($f)=>$norm($f, $b[$f] ?? ''), $fields), [user_name(current_user()), date('c')]);
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO requisitions (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
-                $id = $pdo->lastInsertId(); flash("$code created — now add candidates against it."); redirect('/requisition?id=' . $id);
+                $id = $pdo->lastInsertId();
+                if (function_exists('custom_save')) custom_save('requisition', (int)$id, $b);
+                flash("$code created — now add candidates against it."); redirect('/requisition?id=' . $id);
             }
         }
-        view('ops/requisition_form', ['req' => $req, 'offices' => offices_list(), 'inspectors' => inspectors_list(false)]); return;
+        view('ops/requisition_form', ['req' => $req, 'offices' => offices_list(), 'inspectors' => inspectors_list(false),
+            'cfvals' => $req ? custom_values_map('requisition', $req['id']) : []]); return;
     }
     if ($route === 'requisition') {
         $req = ops_one("SELECT r.*, o.name office_name FROM requisitions r LEFT JOIN offices o ON o.id=r.office_id WHERE r.id=?", [(int)($_GET['id'] ?? 0)]);
@@ -3402,6 +3406,7 @@ function ops_candidates($route, $method) {
                 $set = implode(',', array_map(fn($f) => "$f=?", $fields));
                 $vals = array_map(fn($f) => nzc_cand($f, $b[$f] ?? ''), $fields); $vals[] = $cand['id'];
                 $pdo->prepare("UPDATE candidates SET $set WHERE id=?")->execute($vals);
+                if (function_exists('custom_save')) custom_save('candidate', (int)$cand['id'], $b);
                 flash('Candidate updated.');
                 redirect('/candidate?id=' . $cand['id']);
             } else {
@@ -3412,6 +3417,7 @@ function ops_candidates($route, $method) {
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO candidates (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
+                if (function_exists('custom_save')) custom_save('candidate', (int)$id, $b);
                 $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
                     ->execute([$id, '', 'RECEIVED', 'CV received', user_name(current_user()), date('c')]);
                 flash("$code added to the hiring pipeline.");
@@ -3424,6 +3430,7 @@ function ops_candidates($route, $method) {
         $preReq = $cand ? ($cand['requisition_id'] ?? null) : (($_GET['req'] ?? '') !== '' ? (int)$_GET['req'] : null);
         view('ops/candidate_form', ['cand' => $cand, 'clients' => clients_list(), 'depCalls' => $depCalls, 'agencies' => $agencies,
             'requisitions' => requisitions_list(true), 'preReq' => $preReq,
+            'cfvals' => $cand ? custom_values_map('candidate', $cand['id']) : [],
             'trades' => lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [], 'skillsByTrade' => skills_by_trade()]);
         return;
     }

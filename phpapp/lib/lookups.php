@@ -492,7 +492,7 @@ function lk_admin($route, $method) {
     }
 
     if ($route === 'custom-fields') {
-        $allowedEntities = array_merge(['call', 'job', 'partner'], array_keys(ops_masters()));
+        $allowedEntities = array_merge(['call', 'job', 'partner', 'requisition', 'candidate'], array_keys(ops_masters()));
         $entity = in_array($_GET['entity'] ?? 'call', $allowedEntities, true) ? $_GET['entity'] : 'call';
         if ($method === 'POST') {
             $label = trim($_POST['label'] ?? '');
@@ -504,7 +504,7 @@ function lk_admin($route, $method) {
             $fkey = strtolower(trim(preg_replace('/[^a-zA-Z0-9_]+/', '_', $label)));
             $pdo->prepare("INSERT INTO custom_fields (entity,field_key,label,field_type,lookup_type_id,required,sort_order,active,created_at)
                 VALUES (?,?,?,?,?,?,?,1,?)")->execute([$entity, $fkey, $label, $type, $lt, $req, 99, date('c')]);
-            flash("Field \"$label\" added to the " . ($entity === 'call' ? 'Call' : 'Job') . " form.");
+            flash("Field \"$label\" added to the " . ucfirst($entity) . " form.");
             redirect('/custom-fields?entity=' . $entity);
         }
         if (($_GET['del'] ?? '') !== '') {
