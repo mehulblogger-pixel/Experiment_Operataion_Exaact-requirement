@@ -37,6 +37,9 @@
 // ============================================================================
 
 const OPP_STATUS = ['OPEN' => 'Open', 'WON' => 'Won', 'LOST' => 'Lost'];
+// How many days of closed (Won/Lost) deals the board keeps in view before
+// folding the rest behind a "show all" link into the list.
+const OPP_BOARD_DAYS = 90;
 
 // A default pipeline so a new installation is usable without reading anything.
 // Deliberately different from the lead stages: a lead is about whether they are
@@ -275,17 +278,28 @@ function opp_board($pipelineId = 0) {
     // Lost columns (whose deals are, by definition, NOT open) always render empty
     // while the list view shows them, which reads as a bug. Each deal buckets into
     // its own stage column below, so won deals land under the Won stage.
+    //
+    // A closing stage (Won / Lost) keeps only the last OPP_BOARD_DAYS of history
+    // on the board — older wins pile up forever otherwise — and reports how many
+    // it hid so the column can offer a "show all" link into the full list.
     $rows = opp_all(['pipeline' => $pipe]);
+    $cutoff = date('c', strtotime('-' . OPP_BOARD_DAYS . ' days'));
     $by = [];
-    foreach ($stages as $s) $by[(int)$s['id']] = ['stage' => $s, 'rows' => [], 'value' => 0.0, 'weighted' => 0.0];
+    foreach ($stages as $s) $by[(int)$s['id']] = ['stage' => $s, 'rows' => [], 'value' => 0.0, 'weighted' => 0.0, 'total' => 0, 'hidden' => 0];
     foreach ($rows as $r) {
         $sid = (int)$r['stage_id'];
         if (!isset($by[$sid])) continue;
+        $by[$sid]['total']++;
+        // Only Won/Lost columns are windowed; open stages always show everything.
+        if (in_array($by[$sid]['stage']['kind'], ['WON', 'LOST'], true)) {
+            $when = (string)($r['won_at'] ?: ($r['updated_at'] ?: $r['created_at']));
+            if ($when !== '' && $when < $cutoff) { $by[$sid]['hidden']++; continue; }
+        }
         $by[$sid]['rows'][] = $r;
         $by[$sid]['value'] += (float)$r['value'];
         $by[$sid]['weighted'] += opp_weighted($r);
     }
-    return ['pipeline' => $pipe, 'stages' => $stages, 'columns' => $by];
+    return ['pipeline' => $pipe, 'stages' => $stages, 'columns' => $by, 'window_days' => OPP_BOARD_DAYS];
 }
 
 // ---- Writing ----------------------------------------------------------------
