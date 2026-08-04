@@ -1210,9 +1210,14 @@ function ops_idems_my_signature($method) {
 }
 
 // ---- Report PDF (letterhead + body + automatic signature block + timestamps) ----
-function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs) {
+function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $copy = '') {
     $p = new SimplePDF(); $ml = $p->ml; $right = $p->right();
     $band = [30, 64, 175];
+    // A draft carries a DRAFT watermark until it is approved and locked. Once
+    // finalized, an Original / Duplicate / Triplicate copy carries that word.
+    $copy = strtoupper(trim((string)$copy));
+    if (empty($doc['finalized'])) { $p->watermark = 'DRAFT'; }
+    elseif (in_array($copy, ['DUPLICATE', 'TRIPLICATE'], true)) { $p->watermark = $copy; }
     $p->rectFill(0, 0, $p->pageW(), 6, $band);
     $p->y = $p->mt; $top = $p->y; $nameX = $ml;
     if (!empty($lh['logo'])) { $ln = $p->addJpeg($lh['logo']); if ($ln) { [$iw,$ih]=$p->imgDim($ln); $lw=80; $lhh=$ih>0?min(44,$lw*$ih/max(1,$iw)):36; $p->drawImage($ln,$ml,$top,$lw,$lhh); $nameX=$ml+$lw+12; } }
@@ -1225,6 +1230,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs) {
     $p->y=$top; $p->text($ml, 'IRN: '.$doc['irn'], 9, true, [60,60,60], $right, 'R');
     $p->y=$top+12; $p->text($ml, ($doc['type_code'].' — '.($doc['title'] ?: '')), 8, false, [110,110,110], $right, 'R');
     if (empty($doc['finalized'])) { $p->y=$top+24; $p->text($ml, 'DRAFT — not yet issued', 8, true, [200,60,60], $right, 'R'); }
+    elseif ($copy !== '') { $p->y=$top+24; $p->text($ml, $copy . ' COPY', 8.5, true, [30,64,175], $right, 'R'); }
     $p->y = max($ly, $top + 50); $p->hr($band);
     $p->gap(6);
     // report title
@@ -1359,12 +1365,17 @@ function ops_idems_pdf($method) {
         WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? 0)]);
     if (!$doc) { http_response_code(404); echo 'Not found'; return true; }
     ops_require(is_master() || can('mod.idems.view'), 'You cannot view this report.');
+    // Original / Duplicate / Triplicate — only meaningful once the report is
+    // finalized; a draft always prints as DRAFT regardless.
+    $copyMap = ['original' => 'ORIGINAL', 'duplicate' => 'DUPLICATE', 'triplicate' => 'TRIPLICATE'];
+    $copy = !empty($doc['finalized']) ? ($copyMap[strtolower((string)($_GET['copy'] ?? ''))] ?? '') : '';
     $lh = function_exists('quote_letterhead') ? quote_letterhead() : ['name'=>app_name()];
     $pdf = report_pdf_build($doc, idems_sections($doc['report_type_id']), idems_fields($doc['report_type_id']),
-        json_decode($doc['data'] ?: '[]', true) ?: [], idems_doc_files($doc['id']), $lh, idems_report_signatures($doc));
-    idems_log('report_doc', $doc['id'], 'PDF', ['irn'=>$doc['irn']]);
+        json_decode($doc['data'] ?: '[]', true) ?: [], idems_doc_files($doc['id']), $lh, idems_report_signatures($doc), $copy);
+    idems_log('report_doc', $doc['id'], 'PDF', ['irn'=>$doc['irn'], 'copy'=>$copy ?: 'draft']);
+    $suffix = $copy !== '' ? '_' . $copy : (empty($doc['finalized']) ? '_DRAFT' : '');
     header('Content-Type: application/pdf');
-    header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/','_',$doc['irn']) . '.pdf"');
+    header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/','_',$doc['irn']) . $suffix . '.pdf"');
     echo $pdf; return true;
 }
 // ---- Controlled timestamp / date edit (Branch App Manager only, Part 22) ----

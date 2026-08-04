@@ -39,7 +39,13 @@
     <?php if (in_array($doc['status'], ['APPROVED','ISSUED'], true) && $doc['type_code'] !== 'RN' && (is_master() || can('mod.idems.edit'))): ?>
       <form method="post" action="/document-release-note" style="display:inline"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><button class="btn secondary" type="submit">📋 Draft Release Note</button></form>
     <?php endif; ?>
-    <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>" target="_blank">📄 PDF</a>
+    <?php if (empty($doc['finalized'])): ?>
+      <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>" target="_blank">📄 Draft PDF (watermarked)</a>
+    <?php else: ?>
+      <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=original" target="_blank">📄 Original</a>
+      <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=duplicate" target="_blank">📄 Duplicate</a>
+      <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=triplicate" target="_blank">📄 Triplicate</a>
+    <?php endif; ?>
     <?php if (function_exists('idems_pick_template') && idems_pick_template($doc)): ?><a class="btn secondary" href="/document-docx?id=<?= (int)$doc['id'] ?>">📝 Client format</a><?php endif; ?>
   </div>
 </div>
