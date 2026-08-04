@@ -72,6 +72,10 @@
     <div class="ff ff-wide"><label>CV link (Drive / SharePoint URL)</label><input class="form-control" name="cv_link" value="<?= e($cand['cv_link'] ?? '') ?>" placeholder="https://…"></div>
     <div class="ff ff-wide"><label>Remarks</label><input class="form-control" name="remarks" value="<?= e($cand['remarks'] ?? '') ?>"></div>
   </div>
+  <?php if (function_exists('custom_fields_for') && custom_fields_for('candidate')): ?>
+    <h3 class="tab-sub">More details</h3>
+    <div class="form-grid"><?php render_custom_fields('candidate', $cfvals ?? []); ?></div>
+  <?php endif; ?>
   <div style="margin-top:16px;">
     <button class="btn" type="submit"><?= $cand ? 'Save candidate' : 'Add candidate' ?></button>
     <a class="btn secondary" href="/candidates">Cancel</a>

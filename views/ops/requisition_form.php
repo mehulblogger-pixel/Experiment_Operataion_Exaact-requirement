@@ -17,6 +17,10 @@
     <div class="ff"><label>Approval date</label><input class="form-control" type="date" name="approval_date" value="<?= e($req['approval_date'] ?? '') ?>"></div>
     <div class="ff ff-wide"><label>Notes</label><input class="form-control" name="notes" value="<?= e($req['notes'] ?? '') ?>"></div>
   </div>
+  <?php if (function_exists('custom_fields_for') && custom_fields_for('requisition')): ?>
+    <h3 class="tab-sub">More details</h3>
+    <div class="form-grid"><?php render_custom_fields('requisition', $cfvals ?? []); ?></div>
+  <?php endif; ?>
   <div style="margin-top:16px"><button class="btn" type="submit">Save requisition</button> <a class="btn secondary" href="/requisitions">Cancel</a></div>
 </form>
 <script>(function(){var t=document.getElementById('rq_type'),o=document.getElementById('rq_out');if(t&&o){function s(){o.style.display=(t.value==='REPLACEMENT')?'':'none';}t.addEventListener('change',s);s();}})();</script>

@@ -18,6 +18,9 @@
   <div><span class="k">Approval</span><?= e($req['approval_ref'] ?: '—') ?><?= $req['approval_date'] ? ' · '.e($req['approval_date']) : '' ?><?= $req['approved_by'] ? ' · by '.e($req['approved_by']) : '' ?></div>
   <?php if ($seeSal): ?><div><span class="k">Budgeted monthly cost</span><?= fmoney($req['budgeted_cost']) ?></div><?php endif; ?>
   <?php if ($req['notes']): ?><div class="kv-wide"><span class="k">Notes</span><?= e($req['notes']) ?></div><?php endif; ?>
+  <?php if (function_exists('custom_display')) foreach (custom_display('requisition', $req['id']) as $cf): ?>
+    <div><span class="k"><?= e($cf['label']) ?></span><?= e($cf['value'] ?: '—') ?></div>
+  <?php endforeach; ?>
 </div></div>
 
 <?php if ($seeSal && ($outgoing || $hired)): ?>

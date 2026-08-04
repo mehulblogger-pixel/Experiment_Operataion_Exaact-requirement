@@ -29,6 +29,9 @@
     <div><span class="k">Expected rate</span><span class="v"><?= $cand['expected_rate']>0 ? cur_sym().number_format((float)$cand['expected_rate'],0).' ('.e(lk_options_or('rate_type', RATE_TYPES)[$cand['rate_type']] ?? $cand['rate_type']).')' : '—' ?></span></div>
     <div><span class="k">CV received</span><span class="v"><?= e($cand['cv_received_date'] ?: '—') ?></span></div>
     <div><span class="k">CV file</span><span class="v"><?= $cand['cv_link'] ? '<a href="'.e($cand['cv_link']).'" target="_blank" rel="noopener">Open CV ↗</a>' : '—' ?></span></div>
+    <?php if (function_exists('custom_display')) foreach (custom_display('candidate', $cand['id']) as $cf): ?>
+      <div><span class="k"><?= e($cf['label']) ?></span><span class="v"><?= e($cf['value'] ?: '—') ?></span></div>
+    <?php endforeach; ?>
   </div>
   <?php if ($cand['remarks']): ?><p class="muted" style="margin-top:8px">Remarks: <?= e($cand['remarks']) ?></p><?php endif; ?>
   <?php if ($cand['inspector_id']): ?>
