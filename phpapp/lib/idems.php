@@ -1788,7 +1788,7 @@ function ops_idems_form_from_template($method) {
             $made++;
         }
         idems_log('report_type', $typeId, 'FORM_FROM_TEMPLATE', ['field'=>$type['code'], 'new'=>$made . ' field(s)']);
-        flash($made . ' field(s) created from the format. Review them in the form builder — you can reorder, mark fields mandatory or add conditions.');
+        flash($made . ' field(s) created. Your form is ready — press “Create a report with this form” to use it, or fine-tune the fields first.');
         redirect('/report-builder?type=' . $typeId);
     }
     $plan = idems_template_plan($binary, $typeId);

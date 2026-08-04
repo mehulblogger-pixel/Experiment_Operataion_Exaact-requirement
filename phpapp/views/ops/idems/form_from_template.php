@@ -32,7 +32,12 @@
 <?php endif; ?>
 
 <?php if (!$new): ?>
-  <div class="panel"><p>Every token in this format already has a field. Nothing to create — open the <a href="/report-builder?type=<?= (int)$type['id'] ?>">form builder</a> to fine-tune.</p></div>
+  <div class="panel" style="border-left:3px solid var(--ok)">
+    <p style="margin:0 0 10px"><b>✓ This form is ready.</b> All <?= count($have) ?> fields already exist for <?= e($type['code']) ?> — nothing more to create.</p>
+    <p class="sub" style="margin:0 0 12px"><b>To use it now:</b> create a report of this type, then open it and press <b>“Fill report body”</b> — your fields appear there to fill in.</p>
+    <a class="btn" href="/document-new?type=<?= e($type['code']) ?>">Create a report with this form →</a>
+    <a class="btn secondary" href="/report-builder?type=<?= (int)$type['id'] ?>" style="margin-left:6px">Fine-tune the fields</a>
+  </div>
 <?php else: ?>
 <form method="post" action="/report-form-from-template?id=<?= (int)$tpl['id'] ?>" class="panel">
   <input type="hidden" name="_do" value="create">
