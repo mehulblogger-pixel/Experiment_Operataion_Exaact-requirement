@@ -55,7 +55,12 @@
               <?php if ($st): ?><div style="margin-top:4px"><span class="pill p-bad" style="font-size:10.5px"><?= opp_days_in_stage($o) ?>d</span></div><?php endif; ?>
             </a>
           <?php endforeach; ?>
-          <?php if (!$col['rows']): ?><p class="muted" style="font-size:12px;margin:0">—</p><?php endif; ?>
+          <?php if (!empty($col['hidden'])): ?>
+            <a class="btn small secondary" style="width:100%;text-align:center"
+               href="/opportunities?v=list&amp;status=<?= e($s['kind']) ?><?= $board['pipeline'] ? '&amp;pipeline=' . (int)$board['pipeline'] : '' ?>">
+              +<?= (int)$col['hidden'] ?> older — show all <?= (int)$col['total'] ?>
+            </a>
+          <?php elseif (!$col['rows']): ?><p class="muted" style="font-size:12px;margin:0">—</p><?php endif; ?>
         </div>
       <?php endforeach; ?>
     </div>
