@@ -14,8 +14,21 @@ class SimplePDF {
     private $images = [];                             // name => ['data','w','h','cs']
     private $imgSeq = 0;
 
+    public $watermark = '';                          // e.g. 'DRAFT' — drawn on every page, behind content
     public function __construct() { $this->y = $this->mt; }
     public function pageW() { return $this->W; }
+    // A large, light, 45° watermark laid behind the page content. Returns the
+    // content-stream operators; output() prepends them to each page so the text
+    // sits under everything.
+    private function watermarkOps() {
+        if ($this->watermark === '') return '';
+        $t = $this->esc(strtoupper($this->watermark));
+        $size = 74; $c = 0.7071;
+        $x = $this->W * 0.5 - 175; $y = $this->H * 0.5 - 120;   // roughly centred, bottom-origin
+        return "q 0.90 0.90 0.90 rg BT /F2 $size Tf "
+             . sprintf('%.4f %.4f %.4f %.4f %.2f %.2f', $c, $c, -$c, $c, $x, $y)
+             . " Tm ($t) Tj ET Q\n";
+    }
     public function contentW() { return $this->W - $this->ml - $this->mr; }
     public function right() { return $this->W - $this->mr; }
 
@@ -115,7 +128,9 @@ class SimplePDF {
         foreach ($imgRefs as $name => $id) $xobj .= "/$name $id 0 R ";
         $res = "<< /Font << /F1 $fRegular 0 R /F2 $fBold 0 R >>" . ($xobj ? " /XObject << $xobj>>" : '') . " >>";
         $kids = [];
+        $wm = $this->watermarkOps();
         foreach ($this->pages as $content) {
+            if ($wm !== '') $content = $wm . $content;   // watermark behind the page content
             $cid = $add("<< /Length " . strlen($content) . " >>\nstream\n$content\nendstream");
             $pid = $add("<< /Type /Page /Parent $pagesObj 0 R /MediaBox [0 0 " . sprintf('%.2f %.2f', $this->W, $this->H) . "] /Resources $res /Contents $cid 0 R >>");
             $kids[] = "$pid 0 R";
