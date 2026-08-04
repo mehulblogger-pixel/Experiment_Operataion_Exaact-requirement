@@ -9,7 +9,8 @@
 <div class="master-head"><div><h1>Form builder <?= e($type['code']) ?></h1>
   <p class="sub" style="margin:2px 0 0">Design the report form with no coding: sections, fields, conditional &amp; calculated fields, repeatable tables, photos, GPS and signatures.</p></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <a class="btn" href="/report-autoform?type=<?= (int)$type['id'] ?>">🪄 Build from my Word file (no codes)</a>
+    <?php if (!empty($fields)): ?><a class="btn" href="/document-new?type=<?= e($type['code']) ?>">Create a report with this form →</a><?php endif; ?>
+    <a class="btn<?= empty($fields) ? '' : ' secondary' ?>" href="/report-autoform?type=<?= (int)$type['id'] ?>">🪄 Build from my Word file (no codes)</a>
     <a class="btn secondary" href="/report-types">← Report types</a>
   </div>
 </div>
