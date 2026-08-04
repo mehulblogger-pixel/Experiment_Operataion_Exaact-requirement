@@ -271,7 +271,11 @@ function opp_board($pipelineId = 0) {
     opp_migrate();
     $pipe = $pipelineId ?: (int)(pipeline_default('OPPORTUNITY')['id'] ?? 0);
     $stages = pipeline_stages($pipe);
-    $rows = opp_all(['pipeline' => $pipe, 'open' => 1]);
+    // Every deal on the pipeline, not only the open ones — otherwise the Won and
+    // Lost columns (whose deals are, by definition, NOT open) always render empty
+    // while the list view shows them, which reads as a bug. Each deal buckets into
+    // its own stage column below, so won deals land under the Won stage.
+    $rows = opp_all(['pipeline' => $pipe]);
     $by = [];
     foreach ($stages as $s) $by[(int)$s['id']] = ['stage' => $s, 'rows' => [], 'value' => 0.0, 'weighted' => 0.0];
     foreach ($rows as $r) {
