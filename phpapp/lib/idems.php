@@ -1794,6 +1794,7 @@ function ops_idems_form_from_template($method) {
     $plan = idems_template_plan($binary, $typeId);
     view('ops/idems/form_from_template', ['tpl'=>$tpl, 'type'=>$type, 'plan'=>$plan,
         'fieldTypes'=>IDEMS_FIELD_TYPES, 'sections'=>idems_sections($typeId),
+        'auto'=>!empty($_GET['auto']),
         'zipOk'=>class_exists('ZipArchive')]);
     return true;
 }
@@ -1826,7 +1827,7 @@ function ops_idems_autoform($method) {
         $tplId = (int)db()->lastInsertId();
         idems_log('report_type', $typeId, 'AUTOFORM', ['file' => $name, 'detected' => count($res['plan']) . ' field(s)']);
         flash(count($res['plan']) . ' field(s) detected from your file — review them below, then create the form.');
-        redirect('/report-form-from-template?id=' . $tplId);
+        redirect('/report-form-from-template?id=' . $tplId . '&auto=1');
     }
 
     view('ops/idems/autoform', ['type' => $type, 'zipOk' => autoform_supported()]);

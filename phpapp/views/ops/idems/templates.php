@@ -6,6 +6,24 @@
 
 <?php if (empty($zipOk)): ?><div class="panel" style="border:1px solid var(--bad)"><b style="color:var(--bad)">Note:</b> the PHP <code>zip</code> extension isn't enabled here, so .docx generation won't run until it's turned on. You can still upload &amp; manage templates.</div><?php endif; ?>
 
+<div class="panel" style="border-left:3px solid var(--brand);background:var(--soft)">
+  <h3 class="tab-sub" style="margin-top:0">🪄 Easiest — build a form from your plain Word file <span class="pill p-ok">no codes</span></h3>
+  <p class="sub" style="margin:0 0 10px">Don't want to insert <code>{{tokens}}</code>? Just upload your ordinary report format and the app finds the
+    fields for you — every “Label:” line and blank table cell. You review them, then it's ready. The <code>{{token}}</code>
+    method below is only for when you'd rather place fields by hand.</p>
+  <?php if (!empty($types)): ?>
+    <form method="get" action="/report-autoform" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <select class="form-control" name="type" required style="max-width:340px">
+        <option value="">Which report is this format for?…</option>
+        <?php foreach ($types as $t): ?><option value="<?= (int)$t['id'] ?>"><?= e($t['code']) ?> — <?= e($t['name']) ?></option><?php endforeach; ?>
+      </select>
+      <button class="btn" type="submit">Upload my Word file &amp; build the form →</button>
+    </form>
+  <?php else: ?>
+    <p class="muted" style="margin:0">Add a report type first (under <a href="/report-types">Report types</a>), then come back to build its form from a file.</p>
+  <?php endif; ?>
+</div>
+
 <div class="dash-2col" style="align-items:start">
   <div>
     <form method="post" action="/report-templates" enctype="multipart/form-data" class="panel">

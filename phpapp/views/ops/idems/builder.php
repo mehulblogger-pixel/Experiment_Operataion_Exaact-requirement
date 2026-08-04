@@ -8,7 +8,10 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/report-types">Report types</a> › Builder</div>
 <div class="master-head"><div><h1>Form builder <?= e($type['code']) ?></h1>
   <p class="sub" style="margin:2px 0 0">Design the report form with no coding: sections, fields, conditional &amp; calculated fields, repeatable tables, photos, GPS and signatures.</p></div>
-  <a class="btn secondary" href="/report-types">← Report types</a>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btn" href="/report-autoform?type=<?= (int)$type['id'] ?>">🪄 Build from my Word file (no codes)</a>
+    <a class="btn secondary" href="/report-types">← Report types</a>
+  </div>
 </div>
 
 <div class="dash-2col" style="align-items:start">
