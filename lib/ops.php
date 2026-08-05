@@ -2153,6 +2153,8 @@ function ops_dispatch($route, $method) {
             return geofence_save_party($route, $method);
         case $route === 'job-geo' && $method === 'POST':
             return geofence_save_job($route, $method);
+        case $route === 'timesheet':
+            return ops_timesheet($route, $method);
         case $route === 'sso':
             return ops_sso($route, $method);
         // Deals held at a stage until somebody with the authority agrees.
