@@ -245,13 +245,18 @@ function site_checkin($jobId, $post, $file = null) {
         ? (string)file_get_contents($file['tmp_name']) : '';
     if ($bytes !== '' && function_exists('upload_reject_reason')
         && ($why = upload_reject_reason($bytes, $file['name'] ?? '', $file['type'] ?? '')) !== '') return $why;
-    if ($bytes === '' && checkin_photo_required())
+    if ($bytes === '' && (function_exists('geofence_photo_required') ? geofence_photo_required() : checkin_photo_required()))
         return 'A photograph is required when you check in. On a phone the button opens the camera; '
              . 'on a laptop choose a file. If the site does not allow cameras, ask a manager to turn the '
              . 'requirement off for this kind of work rather than photographing the car park.';
     $g = geo_parse((string)($post['gps'] ?? ''));
     if (!$g) return 'Your device did not give a location. Allow location for this site in the browser and try again — '
                   . 'or, if there is no signal, say so in the note and record it when you are back in coverage.';
+    // Geofence: outside the site's fence, the punch is refused (when enforced).
+    if (function_exists('geofence_check')) {
+        $gf = geofence_check($job, $g['lat'], $g['lon'], $dist);
+        if (empty($gf['ok'])) return $gf['msg'];
+    }
     // The device's own clock is attacker-controlled and, far more often, simply
     // wrong. It is recorded for comparison and never used as the time.
     $deviceAt = trim((string)($post['device_at'] ?? ''));
@@ -667,6 +672,9 @@ function ops_trust($route, $method) {
         ops_require(is_admin_level() || is_master(), 'Only an administrator can change these.');
         setting_set('checkin_entry_exit_required', !empty($_POST['entry_exit']) ? '1' : '0');
         setting_set('checkin_photo_required', !empty($_POST['photo']) ? '1' : '0');
+        // Geofence: only punch in/out within range of the site, photo forced on.
+        setting_set('geofence_on', !empty($_POST['geofence_on']) ? '1' : '0');
+        if (isset($_POST['geofence_radius_m'])) setting_set('geofence_radius_m', (string)max(20, min(20000, (int)$_POST['geofence_radius_m'])));
         flash(checkin_entry_exit_required()
             ? 'Arrival and departure are now required before a ' . Tl('job') . ' can be closed.'
             : 'Arrival and departure are no longer required.');

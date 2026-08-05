@@ -2149,6 +2149,10 @@ function ops_dispatch($route, $method) {
         case $route === 'cform' || $route === 'cform-new' || $route === 'cform-edit' || $route === 'cform-view'
              || $route === 'cform-save' || $route === 'cform-del':
             return ops_cform_records($route, $method);
+        case $route === 'partner-geo' && $method === 'POST':
+            return geofence_save_party($route, $method);
+        case $route === 'job-geo' && $method === 'POST':
+            return geofence_save_job($route, $method);
         case $route === 'sso':
             return ops_sso($route, $method);
         // Deals held at a stage until somebody with the authority agrees.

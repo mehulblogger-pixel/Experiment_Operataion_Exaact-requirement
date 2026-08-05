@@ -345,6 +345,7 @@ function boot() {
     if (function_exists('leads_migrate')) leads_migrate();               // leads, pipelines, configurable stages                   // the activity spine — Customer 360 reads this                // §4.2 undertakings, client NDAs, breaches                 // the event, before the corrective action               // §8.7 nonconformity & corrective action
     if (function_exists('opp_migrate')) opp_migrate();                 // opportunities — the deal, distinct from the quotation
     if (function_exists('books_migrate')) books_migrate();             // invoices, receipts, allocations, credit notes
+    if (function_exists('geofence_migrate')) geofence_migrate();       // site coordinates on party + job, geofenced attendance
     if (function_exists('dt_migrate')) dt_migrate();                   // per-user register settings (columns, page size)
     if (function_exists('gate_migrate')) gate_migrate();               // approval rules standing between a deal and a stage
     if (function_exists('ads_migrate')) ads_migrate();                 // Ads Pro link: imported leads, cached spend, sync log
