@@ -19,6 +19,7 @@
     <td class="muted" style="font-size:13px;"><?= e(skill_labels($r['skill_ids'] ?? '')) ?></td>
     <td><span class="badge <?= ($r['status']??'')==='ACTIVE'?'GREEN':'AMBER' ?>"><?= e($r['status'] ?: '—') ?></span></td>
     <td class="row-actions">
+      <a class="btn small secondary" href="/inspector-profile?id=<?= (int)$r['id'] ?>">Profile</a>
       <a class="btn small" href="/m/inspectors/edit?id=<?= (int)$r['id'] ?>">Edit</a>
       <form method="post" action="/m/inspectors/delete?id=<?= (int)$r['id'] ?>" style="display:inline" onsubmit="return confirm('Delete this <?= e(Tl('engineer')) ?>?')">
         <button class="btn small danger" type="submit">Delete</button>
