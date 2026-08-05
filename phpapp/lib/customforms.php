@@ -36,12 +36,14 @@ function cforms_migrate() {
 }
 
 function cforms_all($activeOnly = true) {
-    cforms_migrate();
-    return ops_all("SELECT * FROM custom_forms " . ($activeOnly ? "WHERE active=1 " : "") . "ORDER BY nav_group, sort_order, name") ?: [];
+    try {
+        cforms_migrate();
+        return ops_all("SELECT * FROM custom_forms " . ($activeOnly ? "WHERE active=1 " : "") . "ORDER BY nav_group, sort_order, name") ?: [];
+    } catch (Throwable $e) { return []; }   // never let the registry break a page
 }
 function cform_by_id($id) { cforms_migrate(); return ops_one("SELECT * FROM custom_forms WHERE id=?", [(int)$id]); }
 function cform_by_slug($slug) { cforms_migrate(); return ops_one("SELECT * FROM custom_forms WHERE slug=?", [(string)$slug]); }
-function cform_slugs() { return array_column(cforms_all(false), 'slug'); }
+function cform_slugs() { try { return array_column(cforms_all(false), 'slug'); } catch (Throwable $e) { return []; } }
 
 // A URL/entity-safe slug from a name, unique against existing forms.
 function cform_make_slug($name) {
