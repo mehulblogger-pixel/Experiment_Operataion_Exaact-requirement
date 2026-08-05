@@ -2144,6 +2144,11 @@ function ops_dispatch($route, $method) {
             ops_agreement($route, $method); return true;
         case $route === 'company-profile':
             ops_company_profile($route, $method); return true;
+        case $route === 'cforms' || $route === 'cform-def-save' || $route === 'cform-def-del':
+            return ops_customforms($route, $method);
+        case $route === 'cform' || $route === 'cform-new' || $route === 'cform-edit' || $route === 'cform-view'
+             || $route === 'cform-save' || $route === 'cform-del':
+            return ops_cform_records($route, $method);
         case $route === 'sso':
             return ops_sso($route, $method);
         // Deals held at a stage until somebody with the authority agrees.
