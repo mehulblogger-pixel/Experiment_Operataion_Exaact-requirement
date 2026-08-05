@@ -492,7 +492,8 @@ function lk_admin($route, $method) {
     }
 
     if ($route === 'custom-fields') {
-        $allowedEntities = array_merge(['call', 'job', 'partner', 'requisition', 'candidate'], array_keys(ops_masters()));
+        $allowedEntities = array_merge(['call', 'job', 'partner', 'requisition', 'candidate'],
+            function_exists('cform_slugs') ? cform_slugs() : [], array_keys(ops_masters()));
         $entity = in_array($_GET['entity'] ?? 'call', $allowedEntities, true) ? $_GET['entity'] : 'call';
         if ($method === 'POST') {
             $label = trim($_POST['label'] ?? '');

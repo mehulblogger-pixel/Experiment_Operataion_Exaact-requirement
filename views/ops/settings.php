@@ -294,6 +294,12 @@
 </div>
 <?php endif; ?>
 <div class="panel settings-card">
+  <h3 class="tab-sub" style="margin-top:0;">Custom forms</h3>
+  <p class="sub" style="margin-bottom:10px">Build a whole new register with no coding — its own fields and dropdowns — and it appears in the
+    menu under the module you choose.</p>
+  <a class="btn" href="/cforms">Build a form</a>
+</div>
+<div class="panel settings-card">
   <h3 class="tab-sub" style="margin-top:0;">Your company</h3>
   <p class="sub" style="margin-bottom:10px">Your legal name, address, GSTIN and logo — entered once, shown on your quotations,
     invoices and records.</p>

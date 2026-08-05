@@ -24,14 +24,21 @@
   //  can be looking at a screen whose menu entry is hidden.
   // ---------------------------------------------------------------------------
   $grpN = 0;
-  $grp = function ($label) use (&$grpN) {
+  $curGrp = '';
+  $grp = function ($label) use (&$grpN, &$curGrp) {
       $grpN++;
       $id = 'sec' . $grpN;
+      $curGrp = $label;
       echo '<button type="button" class="s-grp" data-sec="' . e($label) . '" aria-controls="' . $id . '" aria-expanded="true">'
          . '<span class="s-grp-t">' . e($label) . '</span><span class="s-grp-c" aria-hidden="true">›</span></button>'
          . '<div class="s-sec" id="' . $id . '">';
   };
-  $endgrp = function () { echo '</div>'; };
+  // Before closing each group, drop in any no-code custom forms filed under it,
+  // so a new form appears in the menu under its module with no code change.
+  $endgrp = function () use (&$curGrp) {
+      if (function_exists('custom_forms_nav')) custom_forms_nav($curGrp);
+      echo '</div>';
+  };
 ?><!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
