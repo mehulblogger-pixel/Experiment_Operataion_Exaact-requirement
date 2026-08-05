@@ -361,6 +361,8 @@ function boot() {
     // Register every remaining dropdown as an editable master list. Runs last:
     // it needs the base lists seeded and the CRM/IDEMS constants loaded.
     if (function_exists('lk_register_module_lists')) lk_register_module_lists();
+    // Secondary indexes, last of all: every table it references now exists.
+    if (function_exists('indexes_migrate')) indexes_migrate();
     ensure_admin();
     auto_seed();
 }

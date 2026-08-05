@@ -100,6 +100,7 @@ set_exception_handler(function ($ex) {
 
 try {
     require __DIR__ . '/lib/db.php';
+    require __DIR__ . '/lib/indexes.php';
     require __DIR__ . '/lib/helpers.php';
     require __DIR__ . '/lib/ops.php';
     require __DIR__ . '/lib/lookups.php';
