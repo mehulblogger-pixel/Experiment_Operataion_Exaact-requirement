@@ -16,15 +16,17 @@
 function geofence_migrate() {
     static $done = false; if ($done) return; $done = true;
     if (!function_exists('ensure_column')) return;
-    // On the party — its default site location.
-    ensure_column('business_partners', 'site_lat', "DECIMAL(10,7) NULL");
-    ensure_column('business_partners', 'site_lon', "DECIMAL(10,7) NULL");
-    ensure_column('business_partners', 'geofence_m', "INT DEFAULT 0");
-    // On the job — the exact site for THIS inspection (defaults from the party).
-    ensure_column('jobs', 'site_lat', "DECIMAL(10,7) NULL");
-    ensure_column('jobs', 'site_lon', "DECIMAL(10,7) NULL");
-    ensure_column('jobs', 'site_geofence_m', "INT DEFAULT 0");
-    ensure_column('jobs', 'site_label', "VARCHAR(160) DEFAULT ''");
+    try {
+        // On the party — its default site location.
+        ensure_column('business_partners', 'site_lat', "DECIMAL(10,7) NULL");
+        ensure_column('business_partners', 'site_lon', "DECIMAL(10,7) NULL");
+        ensure_column('business_partners', 'geofence_m', "INT DEFAULT 0");
+        // On the job — the exact site for THIS inspection (defaults from the party).
+        ensure_column('jobs', 'site_lat', "DECIMAL(10,7) NULL");
+        ensure_column('jobs', 'site_lon', "DECIMAL(10,7) NULL");
+        ensure_column('jobs', 'site_geofence_m', "INT DEFAULT 0");
+        ensure_column('jobs', 'site_label', "VARCHAR(160) DEFAULT ''");
+    } catch (Throwable $e) { /* never let a column add break boot */ }
 }
 
 // Whether the fence is switched on for this installation, and the default radius.
