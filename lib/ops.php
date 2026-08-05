@@ -2157,6 +2157,8 @@ function ops_dispatch($route, $method) {
             return ops_timesheet($route, $method);
         case $route === 'ratings' || $route === 'ratings-config':
             return ops_ratings($route, $method);
+        case $route === 'inspector-profile':
+            return ops_inspector_profile($route, $method);
         case $route === 'sso':
             return ops_sso($route, $method);
         // Deals held at a stage until somebody with the authority agrees.

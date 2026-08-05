@@ -14,7 +14,7 @@
     <tbody>
     <?php foreach ($list as $row): $i=$row['inspector']; $r=$row['r']; ?>
       <tr>
-        <td><a href="/timesheet?ins=<?= (int)$i['id'] ?>"><strong><?= e($i['name']) ?></strong></a><?php if ($i['emp_code']): ?> <span class="muted" style="font-size:11px"><?= e($i['emp_code']) ?></span><?php endif; ?></td>
+        <td><a href="/inspector-profile?id=<?= (int)$i['id'] ?>"><strong><?= e($i['name']) ?></strong></a><?php if ($i['emp_code']): ?> <span class="muted" style="font-size:11px"><?= e($i['emp_code']) ?></span><?php endif; ?></td>
         <td><span style="color:#e6a700;font-size:15px" title="<?= (int)$r['overall'] ?>/100"><?= $stars($r['stars']) ?></span>
             <span class="pill <?= $tone($r['overall']) ?>"><?= (int)$r['overall'] ?></span></td>
         <td><?php if ($r['report_score']===null): ?><span class="muted">no reports yet</span><?php else: ?>
