@@ -61,6 +61,15 @@
       // A customer can belong to a group. Setting the parent here is what makes
       // the quotation screen show the whole group's earlier offers together, so
       // you price a subsidiary knowing what the parent was quoted. ?>
+<?php if (!empty($canWrite) && function_exists('geofence_editor')): ?>
+<details class="panel" style="margin-top:16px">
+  <summary style="cursor:pointer;font-weight:600">📍 Site location <span class="muted" style="font-weight:400">— for geofenced attendance</span>
+    <?= ($p['site_lat'] ?? null) !== null && $p['site_lat'] !== '' ? '<span class="pill p-ok">set</span>' : '<span class="pill p-mut">not set</span>' ?></summary>
+  <p class="sub" style="margin:10px 0">Where this party's site is. When geofencing is on, an inspector allocated here can only punch
+    in/out within range of this point. Each job can override it with its exact site.</p>
+  <?= geofence_editor('partner-geo', (int)$p['id'], ['lat'=>$p['site_lat'] ?? null, 'lon'=>$p['site_lon'] ?? null, 'rad'=>(int)($p['geofence_m'] ?? 0)]) ?>
+</details>
+<?php endif; ?>
 <?php $g = $group ?? ['parent'=>null,'subs'=>[],'opts'=>[]]; ?>
 <?php if ($g['parent'] || $g['subs'] || !empty($canWrite)): ?>
 <div class="panel" style="margin-top:16px">

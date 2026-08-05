@@ -55,6 +55,21 @@
               && (int)(current_user()['inspector_id'] ?? 0) === (int)($job['inspector_id'] ?? 0))); ?>
 <div class="panel" id="checkin">
   <div class="ctitle" style="margin-top:0"><h3>Site check-in <span class="muted">(<?= count($visits) ?>)</span></h3></div>
+  <?php if (function_exists('geofence_on') && geofence_on()): $gt = geofence_target($job); ?>
+    <?php if ($gt): ?>
+      <div class="msg msg-info" style="margin-top:0;margin-bottom:10px">📍 Punch-in is fenced to <b><?= e($gt['label']) ?></b> —
+        only works within <b><?= (int)$gt['radius'] ?> m</b> of the site, and a photo is required.
+        <?php if ($gt['source'] === 'party'): ?><span class="muted">(using the party's location)</span><?php endif; ?></div>
+    <?php else: ?>
+      <div class="msg msg-warning" style="margin-top:0;margin-bottom:10px">Geofencing is on but this job has no site location set, so punch-in is not fenced. Set one below.</div>
+    <?php endif; ?>
+    <?php if (is_coordinator_level() || is_master()): ?>
+      <details style="margin-bottom:12px"><summary style="cursor:pointer;font-size:13px" class="muted">Set / adjust this job's exact site location</summary>
+        <div style="margin-top:8px;max-width:520px"><?= geofence_editor('job-geo', (int)$job['id'],
+            ['lat'=>$job['site_lat'] ?? null, 'lon'=>$job['site_lon'] ?? null, 'rad'=>(int)($job['site_geofence_m'] ?? 0), 'label'=>$job['site_label'] ?? ''], true) ?></div>
+      </details>
+    <?php endif; ?>
+  <?php endif; ?>
   <?php if ($visits): ?>
     <table class="dt">
       <thead><tr><th>What / when</th><th>Where</th><th>Accuracy</th><th>Photo</th><th>Who</th><th>Note</th></tr></thead>

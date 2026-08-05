@@ -56,7 +56,14 @@
       <label class="chk"><input type="checkbox" name="entry_exit" value="1" <?= checkin_entry_exit_required()?'checked':'' ?>>
         An arrival <strong>and</strong> a departure check-in before a <?= e(Tl('job')) ?> can be closed</label>
       <label class="chk"><input type="checkbox" name="photo" value="1" <?= checkin_photo_required()?'checked':'' ?>>
-        A photograph with every check-in</label></div>
+        A photograph with every check-in</label>
+      <?php if (function_exists('geofence_on')): ?>
+      <label class="chk"><input type="checkbox" name="geofence_on" value="1" <?= geofence_on()?'checked':'' ?>>
+        <strong>Geofence</strong> — punch in/out only within range of the site (photo is then always required)</label>
+      <label style="font-size:12.5px" class="muted">Default allowed distance
+        <input class="form-control" type="number" name="geofence_radius_m" value="<?= (int)geofence_radius() ?>" min="20" max="20000" style="width:90px;display:inline-block"> m
+        <span>— set a tighter or wider distance per party or per job.</span></label>
+      <?php endif; ?></div>
     <button class="btn small" type="submit">Save</button>
   </form>
   <small class="muted">On a phone the photograph button opens the camera directly — no app to install. On a laptop
