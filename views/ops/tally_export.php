@@ -1,6 +1,7 @@
 <?php
   $kind = $kind ?? 'SALES';
   $isRcp = $kind === 'RECEIPT';
+  $isCn  = $kind === 'CREDITNOTE';
   $qs = fn($over = []) => http_build_query(array_merge(['kind'=>$kind,'from'=>$from,'to'=>$to] + ($showDone?['done'=>1]:[]), $over));
   $readyTotal = 0.0;
   foreach ($ready as $r) $readyTotal += $isRcp ? $r['receipt_amount'] : $r['total'];
@@ -14,10 +15,11 @@
 <form method="get" action="/tally" class="panel" style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
   <div><label>What</label>
     <select class="form-control" name="kind">
-      <option value="SALES"<?= !$isRcp?' selected':'' ?>>Sales vouchers (invoices raised)</option>
+      <option value="SALES"<?= (!$isRcp && !$isCn)?' selected':'' ?>>Sales vouchers (invoices raised)</option>
       <option value="RECEIPT"<?= $isRcp?' selected':'' ?>>Receipt vouchers (payments received)</option>
+      <option value="CREDITNOTE"<?= $isCn?' selected':'' ?>>Credit notes (invoices reduced)</option>
     </select></div>
-  <div><label><?= $isRcp ? 'Payment from' : 'Invoice from' ?></label><input class="form-control" type="date" name="from" value="<?= e($from) ?>"></div>
+  <div><label><?= $isRcp ? 'Payment from' : ($isCn ? 'Credit note from' : 'Invoice from') ?></label><input class="form-control" type="date" name="from" value="<?= e($from) ?>"></div>
   <div><label>to</label><input class="form-control" type="date" name="to" value="<?= e($to) ?>"></div>
   <label style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
     <input type="checkbox" name="done" value="1"<?= $showDone?' checked':'' ?>> <span>Show what has already gone</span></label>
@@ -26,7 +28,7 @@
 
 <div class="qcards" style="margin-top:16px">
   <div class="qcard tone-ok"><div class="qic">✓</div><div class="qn"><?= count($ready) ?></div><div class="ql">Ready to export</div></div>
-  <div class="qcard tone-info"><div class="qic">₹</div><div class="qn" style="font-size:20px"><?= fmoney($readyTotal) ?></div><div class="ql"><?= $isRcp ? 'Receipts' : 'Invoice value' ?></div></div>
+  <div class="qcard tone-info"><div class="qic">₹</div><div class="qn" style="font-size:20px"><?= fmoney($readyTotal) ?></div><div class="ql"><?= $isRcp ? 'Receipts' : ($isCn ? 'Credited value' : 'Invoice value') ?></div></div>
   <div class="qcard <?= $blocked ? 'tone-bad' : '' ?>"><div class="qic">!</div><div class="qn"><?= count($blocked) ?></div><div class="ql">Cannot go yet</div></div>
 </div>
 
@@ -48,15 +50,15 @@
 
 <div class="panel" style="padding:0;overflow:hidden;margin-top:16px">
   <div class="ctitle" style="padding:14px 18px 0">
-    <h3><?= $isRcp ? 'Receipts' : 'Invoices' ?> in this window <span class="muted">(<?= count($rows) ?>)</span></h3>
+    <h3><?= $isRcp ? 'Receipts' : ($isCn ? 'Credit notes' : 'Invoices') ?> in this window <span class="muted">(<?= count($rows) ?>)</span></h3>
   </div>
   <?php if (!$rows): ?>
-    <p class="muted" style="padding:18px">Nothing <?= $isRcp ? 'was paid' : 'was invoiced' ?> in that window<?= $showDone ? '' : ', or everything in it has already been exported' ?>.</p>
+    <p class="muted" style="padding:18px">Nothing <?= $isRcp ? 'was paid' : ($isCn ? 'was credited' : 'was invoiced') ?> in that window<?= $showDone ? '' : ', or everything in it has already been exported' ?>.</p>
   <?php else: ?>
   <div style="overflow-x:auto">
   <table class="dt" style="margin-top:8px">
     <thead><tr>
-      <th>Date</th><th><?= $isRcp ? 'Against invoice' : 'Invoice' ?></th><th>Party</th><th>GSTIN / place of supply</th>
+      <th>Date</th><th><?= $isRcp ? 'Against invoice' : ($isCn ? 'Credit note' : 'Invoice') ?></th><th>Party</th><th>GSTIN / place of supply</th>
       <?php if (!$isRcp): ?><th class="num">Taxable</th><th class="num">CGST</th><th class="num">SGST</th><th class="num">IGST</th><?php endif; ?>
       <th class="num"><?= $isRcp ? 'Received' : 'Total' ?></th><th>Status</th>
     </tr></thead>
@@ -64,7 +66,7 @@
     <?php foreach ($rows as $r): ?>
       <tr<?= $r['ok'] ? '' : ' style="background:rgba(220,60,60,.06)"' ?>>
         <td><?= e($isRcp ? $r['payment_date'] : $r['invoice_date']) ?: '—' ?><br><span class="muted" style="font-size:12px"><?= e($r['job_code']) ?></span></td>
-        <td><b><?= e($r['invoice_number'] ?: '—') ?></b></td>
+        <td><b><?= e($r['invoice_number'] ?: '—') ?></b><?php if ($isCn && !empty($r['against_invoice'])): ?><br><span class="muted" style="font-size:12px">vs <?= e($r['against_invoice']) ?></span><?php endif; ?></td>
         <td><?= e(tally_party($r)) ?><?php if ($r['office_name']): ?><br><span class="muted" style="font-size:12px"><?= e($r['office_name']) ?></span><?php endif; ?></td>
         <td><?= e($r['gstin'] ?: '—') ?><br><span class="muted" style="font-size:12px"><?= e($r['place_of_supply'] ?: 'state unknown') ?><?= $r['ok'] && !$isRcp ? ($r['interstate'] ? ' · inter-state' : ' · within state') : '' ?></span></td>
         <?php if (!$isRcp): ?>
@@ -131,6 +133,7 @@
     <div><label>Debtors group <span class="muted">(where new party ledgers go)</span></label><input class="form-control" name="tally_debtors_group" value="<?= e($cfg['tally_debtors_group']) ?>"></div>
     <div><label>Sales voucher type</label><input class="form-control" name="tally_voucher_type" value="<?= e($cfg['tally_voucher_type']) ?>"></div>
     <div><label>Receipt voucher type</label><input class="form-control" name="tally_receipt_type" value="<?= e($cfg['tally_receipt_type']) ?>"></div>
+    <div><label>Credit note voucher type</label><input class="form-control" name="tally_creditnote_type" value="<?= e($cfg['tally_creditnote_type']) ?>"></div>
     <div><label>Default GST % <span class="muted">(used when the quotation does not say)</span></label>
       <input class="form-control" name="tally_gst_pct" type="number" step="0.01" min="0" max="100" value="<?= e($cfg['tally_gst_pct']) ?>"></div>
     <div><label>The invoice amount recorded here is…</label>
@@ -153,7 +156,7 @@
     <?php foreach ($batches as $b): ?>
       <tr>
         <td><b><?= e($b['batch_ref']) ?></b></td>
-        <td><?= $b['kind'] === 'RECEIPT' ? 'Receipts' : 'Sales' ?></td>
+        <td><?= ['RECEIPT'=>'Receipts','RCPT'=>'Receipts','CN'=>'Credit notes','INVOICE'=>'Sales','SALES'=>'Sales'][$b['kind']] ?? e($b['kind']) ?></td>
         <td class="num"><?= (int)$b['n'] ?></td>
         <td class="num"><?= fmoney($b['total']) ?></td>
         <td><?= e($b['exported_by'] ?: '—') ?></td>
