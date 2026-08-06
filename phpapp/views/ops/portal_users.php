@@ -158,12 +158,21 @@
           <form method="post" action="/portal-request">
             <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
             <input class="form-control" name="reply" placeholder="What shall we tell them?" style="margin-bottom:6px">
-            <button class="btn btn-sm" type="submit" name="status" value="ACCEPTED">Accept</button>
-            <button class="btn btn-sm" type="submit" name="status" value="CONVERTED">Arranged</button>
-            <button class="btn btn-sm" type="submit" name="status" value="DECLINED">Decline</button>
-            <div class="muted" style="font-size:12px;margin-top:4px">Declining needs a reason — silence is why
-              clients stop using a portal.</div>
+            <button class="btn btn-sm" type="submit" name="status" value="CONVERTED">Accept &amp; raise the call</button>
+            <button class="btn btn-sm secondary" type="submit" name="status" value="ACCEPTED">Just acknowledge</button>
+            <button class="btn btn-sm secondary" type="submit" name="status" value="DECLINED">Decline</button>
+            <div class="muted" style="font-size:12px;margin-top:4px">Raising the call creates it and drops you on it to
+              set scope and who goes. Declining needs a reason — silence is why clients stop using a portal.</div>
           </form>
+          <?php elseif ($r['status'] === 'ACCEPTED'): ?>
+            <?php if (!empty($r['reply'])): ?><div class="muted" style="font-size:12px;margin-bottom:6px"><?= e($r['reply']) ?></div><?php endif; ?>
+            <form method="post" action="/portal-request">
+              <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+              <button class="btn btn-sm" type="submit" name="status" value="CONVERTED">Raise the call now</button>
+            </form>
+          <?php elseif ($r['status'] === 'CONVERTED' && !empty($r['call_id'])): ?>
+            <a class="btn btn-sm secondary" href="/call?id=<?= (int)$r['call_id'] ?>">Open the call →</a>
+            <?php if (!empty($r['reply'])): ?><div class="muted" style="font-size:12px;margin-top:4px"><?= e($r['reply']) ?></div><?php endif; ?>
           <?php else: ?>
             <span class="muted" style="font-size:13px"><?= e($r['reply'] ?: '—') ?></span>
           <?php endif; ?>
