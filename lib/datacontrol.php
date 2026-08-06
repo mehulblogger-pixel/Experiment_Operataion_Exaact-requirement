@@ -235,6 +235,18 @@ function integrity_checks() {
     $add('audit_orphan', 'The compliance trail has no entry with no author',
         'An audit entry with no username cannot answer "who did this".',
         "SELECT COUNT(*) FROM idems_audit WHERE COALESCE(username,'')=''");
+    // Present is not enough — the trail must be unaltered. Each entry is sealed
+    // to the one before it; this walks the seals rather than counting rows, so
+    // it runs its own check instead of the COUNT helper above.
+    if (function_exists('idems_audit_verify')) {
+        try {
+            $v = idems_audit_verify();
+            $out[] = ['key' => 'audit_chain',
+                'what' => 'The compliance trail has not been altered or trimmed',
+                'why'  => 'Every entry is sealed to the previous one; a broken seal means a row was changed or a row was removed.',
+                'ok' => !empty($v['ok']), 'found' => (int)($v['broken'] ?? 0), 'skipped' => !empty($v['skipped'])];
+        } catch (Throwable $e) { /* the integrity screen must never break itself */ }
+    }
 
     // ---- Permissions that no longer mean anything --------------------------
     // Not a SQL count — worked out against the live permission catalogue.
