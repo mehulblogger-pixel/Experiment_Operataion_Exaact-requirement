@@ -89,6 +89,12 @@ function idems_migrate() {
         submitted_at VARCHAR(30) DEFAULT '', approved_at VARCHAR(30) DEFAULT '', approved_by VARCHAR(150) DEFAULT '',
         deleted INT DEFAULT 0, created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')");
     idems_unique_index('report_docs', 'irn');
+    // Revision lineage: a reissued report links back to the one it revises, and
+    // the older one points forward to its successor. Added by upgrade.
+    if (function_exists('ensure_column')) {
+        ensure_column('report_docs', 'revises_id', "INT NULL");
+        ensure_column('report_docs', 'revised_by_id', "INT NULL");
+    }
     // Immutable compliance audit log (Parts 21/23/24). Never hard-deleted.
     $pdo->exec("CREATE TABLE IF NOT EXISTS idems_audit (
         id $pk, entity VARCHAR(30) DEFAULT 'report_doc', entity_id INT NULL, irn VARCHAR(120) DEFAULT '',
@@ -659,6 +665,17 @@ function ops_idems_documents($route, $method) {
         idems_log('report_doc', $doc['id'], 'FINALIZE', ['irn'=>$doc['irn'], 'old'=>$doc['status'], 'new'=>'ISSUED']);
         flash('Report ' . $doc['irn'] . ' finalized & issued. It is now locked (immutable).');
         redirect('/document?id=' . $doc['id']);
+    }
+    if ($route === 'document-revise' && $method === 'POST') {
+        $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
+        if (!$doc) { http_response_code(404); view('notfound'); return true; }
+        ops_require(is_master() || can('mod.idems.edit'), 'You cannot create reports.');
+        [$newId, $err] = idems_revise_doc($doc);
+        if ($err === 'EXISTS') { flash('A revision of this report already exists.', 'warning'); redirect('/document?id=' . $newId); }
+        if ($err) { flash($err, 'error'); redirect('/document?id=' . $doc['id']); }
+        flash('Revision drafted as ' . ops_val("SELECT irn FROM report_docs WHERE id=?", [$newId])
+            . '. Amend it, then submit and issue it — the original stays on file, unchanged.');
+        redirect('/document?id=' . $newId);
     }
     if ($route === 'document-delete' && $method === 'POST') {
         $doc = ops_one("SELECT * FROM report_docs WHERE id=?", [(int)($_POST['id'] ?? 0)]);
@@ -2547,6 +2564,51 @@ function ops_idems_smart($method) {
     }
     view('ops/idems/smart', ['doc'=>$doc, 'p'=>$p, 'text'=>idems_smart_remarks_text($p)]);
     return true;
+}
+
+// ---- Reissue: amend a finalized report as a new revision --------------------
+// Clones an issued report's full content into a fresh DRAFT at rev+1, keeping the
+// same report number marked "/R<rev>", and links the two so the lineage is
+// intact. The original stays immutable; the revision runs the normal
+// submit -> approve -> issue workflow again, so it is issued as a real Rev n.
+// Returns [newId, error]; error 'EXISTS' means a revision already exists (newId
+// points at it) so the caller can redirect rather than make a second one.
+function idems_revise_doc($src) {
+    if (!$src) return [0, 'Report not found.'];
+    if ((int)($src['finalized'] ?? 0) !== 1 && !in_array($src['status'] ?? '', ['ISSUED', 'REJECTED'], true))
+        return [0, 'Only an issued report can be reissued as a revision.'];
+    if (!empty($src['revised_by_id'])) {
+        $ex = ops_one("SELECT id FROM report_docs WHERE id=? AND deleted=0", [(int)$src['revised_by_id']]);
+        if ($ex) return [(int)$ex['id'], 'EXISTS'];
+    }
+    $newRev = (int)($src['rev'] ?? 0) + 1;
+    $base = (string)$src['irn'];
+    $irn = $base . '/R' . $newRev; $i = $newRev;
+    while (ops_val("SELECT COUNT(*) FROM report_docs WHERE irn=?", [$irn]) > 0) { $i++; $irn = $base . '/R' . $i; }
+    // Copy the content; the whole lifecycle (approval, finalize, verify, client
+    // decision) is reset so the revision earns its own issue.
+    $copy = [
+        'irn' => $irn, 'report_type_id' => $src['report_type_id'], 'type_code' => $src['type_code'],
+        'title' => $src['title'], 'client_id' => $src['client_id'], 'vendor_id' => $src['vendor_id'],
+        'call_id' => $src['call_id'], 'job_id' => $src['job_id'], 'company_code' => $src['company_code'],
+        'branch_code' => $src['branch_code'], 'client_code' => $src['client_code'], 'project_code' => $src['project_code'],
+        'project_name' => $src['project_name'], 'fy_label' => $src['fy_label'], 'serial' => $src['serial'],
+        'office_id' => $src['office_id'], 'sbu' => $src['sbu'], 'po_ref' => $src['po_ref'], 'drawing_no' => $src['drawing_no'],
+        'drawing_rev' => $src['drawing_rev'], 'qap_rev' => $src['qap_rev'], 'standards' => $src['standards'],
+        'location' => $src['location'], 'product_category' => $src['product_category'], 'material_grade' => $src['material_grade'],
+        'inspector_id' => $src['inspector_id'], 'approver_user_id' => $src['approver_user_id'],
+        'inspection_date' => $src['inspection_date'], 'result' => $src['result'], 'release_status' => $src['release_status'],
+        'data' => $src['data'], 'remarks' => $src['remarks'], 'status' => 'DRAFT', 'finalized' => 0, 'rev' => $newRev,
+        'revises_id' => (int)$src['id'], 'created_by' => user_name(current_user()), 'created_at' => date('c'), 'updated_at' => date('c'),
+    ];
+    $keys = array_keys($copy);
+    db()->prepare("INSERT INTO report_docs (" . implode(',', $keys) . ") VALUES (" . implode(',', array_fill(0, count($keys), '?')) . ")")
+        ->execute(array_values($copy));
+    $newId = (int)db()->lastInsertId();
+    db()->prepare("UPDATE report_docs SET revised_by_id=?, updated_at=? WHERE id=?")->execute([$newId, date('c'), (int)$src['id']]);
+    idems_log('report_doc', $newId, 'REVISION_DRAFT', ['irn' => $irn, 'new' => 'Rev ' . $newRev . ' of ' . $base]);
+    idems_log('report_doc', (int)$src['id'], 'REVISED', ['irn' => $base, 'new' => $irn]);
+    return [$newId, ''];
 }
 
 // ---- Automatic Release Note drafted from a finalized/approved report ----
