@@ -614,6 +614,8 @@ function verify_lookup_inner($code) {
         $authorised = $live > 0;
     }
 
+    $content = function_exists('idems_content_check') ? idems_content_check($doc) : ['sealed' => false, 'ok' => true];
+
     return [
         'state' => 'issued',
         'irn' => $doc['irn'],
@@ -624,6 +626,7 @@ function verify_lookup_inner($code) {
         'result' => $doc['result'],
         'evidence' => $photos, 'on_site' => $onSite, 'flagged' => $flagged,
         'chain' => $chain,
+        'content' => $content,
         'body' => app_name(),
         'ib_type' => function_exists('ib_type_label') ? ib_type_label() : '',
     ];
