@@ -78,6 +78,47 @@ function portal_migrate() {
         id $pk, client_user_id INT NULL, partner_id INT NULL,
         action VARCHAR(40) DEFAULT '', detail VARCHAR(300) DEFAULT '',
         ip VARCHAR(60) DEFAULT '', at VARCHAR(30) DEFAULT '')");
+    portal_backfill_contact_links();
+}
+
+// Link portal accounts back to the contacts on the client record wherever the
+// e-mail already matches one, so the two lists of the same people stop drifting
+// apart. Only touches accounts not yet linked, so it is a cheap no-op once
+// everything is linked; runs in both SQLite and MySQL.
+function portal_backfill_contact_links() {
+    try {
+        db()->exec("UPDATE client_users SET contact_id = (
+                SELECT pc.id FROM partner_contacts pc
+                WHERE pc.partner_id = client_users.partner_id
+                  AND LOWER(pc.email) = LOWER(client_users.email) AND pc.email <> ''
+                ORDER BY pc.is_primary DESC, pc.id LIMIT 1)
+            WHERE (contact_id IS NULL OR contact_id = 0)
+              AND EXISTS (SELECT 1 FROM partner_contacts pc
+                WHERE pc.partner_id = client_users.partner_id
+                  AND LOWER(pc.email) = LOWER(client_users.email) AND pc.email <> '')");
+    } catch (Throwable $e) { /* contacts table may not exist yet on a bare install */ }
+}
+
+// Saved contacts for a client, for the invite picker — only those with an
+// e-mail, since a portal account needs one.
+function portal_contacts_for($partnerId) {
+    return portal_try(fn() => ops_all(
+        "SELECT id, name, email, designation FROM partner_contacts
+         WHERE partner_id=? AND email <> '' ORDER BY is_primary DESC, name", [(int)$partnerId]), []);
+}
+// All client contacts with an e-mail, grouped by partner id, for the JS picker.
+function portal_contacts_by_partner() {
+    $out = [];
+    foreach (portal_try(fn() => ops_all(
+        "SELECT pc.id, pc.partner_id, pc.name, pc.email, pc.designation
+         FROM partner_contacts pc JOIN business_partners p ON p.id = pc.partner_id
+         WHERE p.is_client=1 AND pc.email <> '' ORDER BY pc.is_primary DESC, pc.name"), []) as $c) {
+        $out[(int)$c['partner_id']][] = [
+            'id' => (int)$c['id'], 'name' => (string)$c['name'],
+            'email' => (string)$c['email'], 'desig' => (string)($c['designation'] ?? ''),
+        ];
+    }
+    return $out;
 }
 
 function portal_missing(Throwable $e) {
@@ -433,24 +474,46 @@ function portal_users_for($partnerId) {
 }
 function portal_users_all() {
     return portal_try(fn() => ops_all(
-        "SELECT cu.*, COALESCE(p.display_name, p.legal_name) partner_name
-         FROM client_users cu LEFT JOIN business_partners p ON p.id = cu.partner_id
+        "SELECT cu.*, COALESCE(p.display_name, p.legal_name) partner_name,
+                pc.name contact_name, pc.designation contact_desig
+         FROM client_users cu
+         LEFT JOIN business_partners p ON p.id = cu.partner_id
+         LEFT JOIN partner_contacts pc ON pc.id = cu.contact_id
          ORDER BY partner_name, cu.name"));
 }
 
 // Creates the account and returns the one-time link. The password is never
 // chosen by us and never e-mailed — the invitee sets their own, so nobody here
 // has ever known it.
-function portal_invite($partnerId, $email, $name) {
-    $email = strtolower(trim((string)$email));
+function portal_invite($partnerId, $email, $name, $contactId = 0) {
+    $partnerId = (int)$partnerId; $contactId = (int)$contactId;
+    // If a saved contact was chosen, it is the source of truth for who this is —
+    // its company, name and address win, so the portal account and the contact
+    // on the client record are the same person, not two versions of them.
+    if ($contactId > 0) {
+        $c = portal_try(fn() => ops_one("SELECT * FROM partner_contacts WHERE id=?", [$contactId]), null);
+        if (!$c) return ['err' => 'That contact no longer exists.'];
+        $partnerId = (int)$c['partner_id'];
+        if (trim((string)($c['email'] ?? '')) === '') return ['err' => 'That contact has no e-mail on the client record — add one first, or type the address.'];
+        $email = strtolower(trim((string)$c['email']));
+        if (trim((string)$name) === '') $name = (string)$c['name'];
+    } else {
+        $email = strtolower(trim((string)$email));
+    }
     if (!$partnerId) return ['err' => 'Choose the client company.'];
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) return ['err' => 'A valid e-mail address is needed.'];
     $exists = portal_try(fn() => ops_val("SELECT COUNT(*) FROM client_users WHERE LOWER(email)=?", [$email]), 0);
     if ((int)$exists > 0) return ['err' => 'That address already has portal access.'];
+    // Even a typed address is linked back to the client record when it matches a
+    // saved contact, so the two lists never drift apart.
+    if ($contactId === 0) {
+        $match = portal_try(fn() => ops_one("SELECT id FROM partner_contacts WHERE partner_id=? AND LOWER(email)=? ORDER BY is_primary DESC, id LIMIT 1", [$partnerId, $email]), null);
+        if ($match) $contactId = (int)$match['id'];
+    }
     $token = bin2hex(random_bytes(24));
-    db()->prepare("INSERT INTO client_users (partner_id,email,name,password_hash,is_active,must_change,
-                   invite_token,invite_expires,created_by,created_at) VALUES (?,?,?,'',1,1,?,?,?,?)")
-        ->execute([(int)$partnerId, $email, substr(trim((string)$name), 0, 150), $token,
+    db()->prepare("INSERT INTO client_users (partner_id,contact_id,email,name,password_hash,is_active,must_change,
+                   invite_token,invite_expires,created_by,created_at) VALUES (?,?,?,?,'',1,1,?,?,?,?)")
+        ->execute([$partnerId, $contactId ?: null, $email, substr(trim((string)$name), 0, 150), $token,
                    date('c', time() + 7 * 86400), user_name(current_user()), date('c')]);
     return ['id' => (int)db()->lastInsertId(), 'token' => $token,
             'link' => portal_base_url() . '/portal/accept?t=' . $token];
@@ -739,7 +802,7 @@ function ops_portal_admin($route, $method) {
     if ($route === 'portal-users') {
         $invite = null;
         if ($method === 'POST') {
-            $r = portal_invite((int)($_POST['partner_id'] ?? 0), $_POST['email'] ?? '', $_POST['name'] ?? '');
+            $r = portal_invite((int)($_POST['partner_id'] ?? 0), $_POST['email'] ?? '', $_POST['name'] ?? '', (int)($_POST['contact_id'] ?? 0));
             if (!empty($r['err'])) flash($r['err'], 'error');
             else {
                 $invite = $r;
@@ -750,6 +813,7 @@ function ops_portal_admin($route, $method) {
             'rows' => portal_users_all(), 'clients' => clients_list(),
             'invite' => $invite, 'enabled' => portal_enabled(),
             'requests' => portal_requests_all(), 'base' => portal_base_url(),
+            'contactsByPartner' => portal_contacts_by_partner(),
         ]);
         return true;
     }
