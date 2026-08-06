@@ -45,10 +45,27 @@
       <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=original" target="_blank">📄 Original</a>
       <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=duplicate" target="_blank">📄 Duplicate</a>
       <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=triplicate" target="_blank">📄 Triplicate</a>
+      <?php // Amend-and-reissue: an issued report cannot be edited, but it can be
+            // revised — a new draft at Rev n+1, carrying this report's content, is
+            // created and this one is kept unchanged as the history. ?>
+      <?php if (empty($doc['revised_by_id']) && (is_master() || can('mod.idems.edit'))): ?>
+        <form method="post" action="/document-revise" style="display:inline" onsubmit="return confirm('Create Rev <?= (int)($doc['rev'] ?? 0) + 1 ?> of this report? The original stays on file, unchanged.')"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><button class="btn secondary" type="submit">♻️ Reissue as new revision</button></form>
+      <?php endif; ?>
     <?php endif; ?>
     <?php if (function_exists('idems_pick_template') && idems_pick_template($doc)): ?><a class="btn secondary" href="/document-docx?id=<?= (int)$doc['id'] ?>">📝 Client format</a><?php endif; ?>
   </div>
 </div>
+
+<?php // ---- Revision lineage ------------------------------------------------ ?>
+<?php if (!empty($doc['revises_id']) || !empty($doc['revised_by_id']) || (int)($doc['rev'] ?? 0) > 0): ?>
+<div class="panel" style="padding:10px 14px;margin:0 0 12px;font-size:13.5px">
+  <?php if ((int)($doc['rev'] ?? 0) > 0): ?><b>Revision <?= (int)$doc['rev'] ?></b><?php endif; ?>
+  <?php if (!empty($doc['revises_id'])): $pv = ops_one("SELECT id, irn FROM report_docs WHERE id=?", [(int)$doc['revises_id']]); if ($pv): ?>
+    · revises <a href="/document?id=<?= (int)$pv['id'] ?>"><?= e($pv['irn']) ?></a><?php endif; endif; ?>
+  <?php if (!empty($doc['revised_by_id'])): $nx = ops_one("SELECT id, irn FROM report_docs WHERE id=?", [(int)$doc['revised_by_id']]); if ($nx): ?>
+    · superseded by <a href="/document?id=<?= (int)$nx['id'] ?>"><?= e($nx['irn']) ?></a> — this is no longer the current revision<?php endif; endif; ?>
+</div>
+<?php endif; ?>
 
 <?php // ---- Where this report stands, and the one next thing --------------- ?>
 <?php
