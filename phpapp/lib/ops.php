@@ -5057,6 +5057,10 @@ function ops_settings($method) {
         $gd = trim((string)($_POST['job_close_grace_days'] ?? ''));
         if ($gd !== '') setting_set('job_close_grace_days', (string)max(0, min(365, (int)$gd)));
         setting_set('job_lock_enabled', !empty($_POST['job_lock_enabled']) ? '1' : '0');
+        // P2 — e-mail the client when their report is issued (portal link + verify
+        // code only, never the report itself). On by default; a customer can switch
+        // it off here.
+        setting_set('notify_client_on_issue', !empty($_POST['notify_client_on_issue']) ? '1' : '0');
         // Default terms & conditions carried onto every new quote.
         if (isset($_POST['quote_terms'])) setting_set('quote_terms', (string)$_POST['quote_terms']);
         // Display

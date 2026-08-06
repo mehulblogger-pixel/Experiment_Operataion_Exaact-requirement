@@ -667,7 +667,12 @@ function ops_idems_documents($route, $method) {
         // an issued report is the best source of "how we actually word things"
         if (function_exists('learn_from_report')) { try { learn_from_report(ops_one("SELECT * FROM report_docs WHERE id=?", [$doc['id']])); } catch (Throwable $e) {} }
         idems_log('report_doc', $doc['id'], 'FINALIZE', ['irn'=>$doc['irn'], 'old'=>$doc['status'], 'new'=>'ISSUED']);
-        flash('Report ' . $doc['irn'] . ' finalized & issued. It is now locked (immutable).');
+        // P2 — tell the client it is ready. A report they can see on the portal
+        // but are never told about might as well not be there. Never blocks issue.
+        $notified = 0;
+        try { $notified = idems_notify_client_issued(ops_one("SELECT * FROM report_docs WHERE id=?", [$doc['id']])); } catch (Throwable $e) {}
+        flash('Report ' . $doc['irn'] . ' finalized & issued. It is now locked (immutable).'
+            . ($notified ? ' The ' . Tl('client') . ' has been notified (' . $notified . ' recipient' . ($notified === 1 ? '' : 's') . ').' : ''));
         redirect('/document?id=' . $doc['id']);
     }
     if ($route === 'document-revise' && $method === 'POST') {
@@ -2669,6 +2674,84 @@ function idems_content_check($doc) {
     $seal = (string)($doc['content_seal'] ?? '');
     if ($seal === '') return ['sealed' => false, 'ok' => true];
     return ['sealed' => true, 'ok' => hash_equals($seal, idems_content_seal_compute($doc))];
+}
+
+// Who at the client should be told a report is ready. Portal users the client
+// company invited come first (they have somewhere to sign in and read it);
+// failing that, the primary contact on the partner record. Only people entitled
+// to see reports — a portal user restricted to invoices is not told about a
+// report they cannot open. Returns a de-duplicated list of e-mail addresses.
+function idems_client_notify_emails($clientId) {
+    $clientId = (int)$clientId;
+    if ($clientId <= 0) return [];
+    $emails = [];
+    try {
+        foreach (ops_all("SELECT email, perms FROM client_users WHERE partner_id=? AND is_active=1 AND email <> ''", [$clientId]) ?: [] as $u) {
+            $perms = trim((string)($u['perms'] ?? ''));
+            // Blank perms means everything (the original portal grant); otherwise
+            // the person must actually be allowed to see reports.
+            if ($perms === '' || strpos($perms, 'reports') !== false) $emails[] = strtolower(trim((string)$u['email']));
+        }
+    } catch (Throwable $e) { /* portal not installed — fall through to contacts */ }
+    if (!$emails) {
+        try {
+            $c = ops_one("SELECT email FROM partner_contacts WHERE partner_id=? AND email <> '' ORDER BY is_primary DESC, id ASC LIMIT 1", [$clientId]);
+            if ($c && trim((string)$c['email']) !== '') $emails[] = strtolower(trim((string)$c['email']));
+        } catch (Throwable $e) { /* contacts not present */ }
+    }
+    return array_values(array_unique(array_filter($emails)));
+}
+
+// P2 — tell the client a report has been issued. It never carries the report
+// itself or any finding: confidentiality is the whole point of the report, and
+// the portal is where a client reads one behind their own sign-in. The e-mail
+// says "it is ready, here is how to see it" and nothing more — the reference,
+// the public verification code (safe by design), and, if the portal is on, a
+// link to sign in. Gated by a setting so a customer can switch it off, and
+// wrapped so a mail failure never blocks issuing. Returns the number notified.
+function idems_notify_client_issued($doc) {
+    if (!function_exists('setting_get') || (string)setting_get('notify_client_on_issue', '1') === '0') return 0;
+    $clientId = (int)($doc['client_id'] ?? 0);
+    if ($clientId <= 0) return 0;
+    $to = idems_client_notify_emails($clientId);
+    if (!$to) return 0;
+
+    $irn = (string)($doc['irn'] ?? '');
+    $rword = function_exists('Tl') ? Tl('report') : 'report';
+    $lines = [
+        'Your ' . $rword . ' ' . $irn . ' has been issued and is ready for you.',
+        '',
+    ];
+    if (function_exists('portal_enabled') && portal_enabled() && function_exists('portal_base_url')) {
+        $lines[] = 'Sign in to your portal to view and download it:';
+        $lines[] = rtrim(portal_base_url(), '/') . '/portal';
+        $lines[] = '';
+    } else {
+        $lines[] = 'Contact us for your copy, quoting the reference above.';
+        $lines[] = '';
+    }
+    if (function_exists('verify_code_for')) {
+        $code = verify_code_for($doc);
+        if ($code) {
+            $lines[] = 'To confirm it is genuine and unaltered, you can verify it — no account needed —';
+            if (function_exists('verify_url')) $lines[] = 'at ' . verify_url($doc);
+            $lines[] = 'using the code: ' . $code;
+            $lines[] = '';
+        }
+    }
+    $lines[] = function_exists('app_name') ? app_name() : '';
+    $body = implode("\n", $lines);
+    $subject = 'Your ' . $rword . ' ' . $irn . ' is ready';
+
+    $sent = 0;
+    foreach ($to as $addr) {
+        try { if (ops_mail($addr, $subject, $body, '', 'report_issued')) $sent++; }
+        catch (Throwable $e) { /* logged inside ops_mail; never block issue */ }
+    }
+    if (function_exists('idems_log')) try {
+        idems_log('report_doc', (int)$doc['id'], 'CLIENT_NOTIFIED', ['irn' => $irn, 'to' => implode(',', $to)]);
+    } catch (Throwable $e) {}
+    return count($to);
 }
 
 // ---- Automatic Release Note drafted from a finalized/approved report ----

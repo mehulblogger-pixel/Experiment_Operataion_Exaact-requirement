@@ -193,7 +193,7 @@ matter, and they are all here.
 | # | What | Note |
 |---|---|---|
 | ~~P1~~ | **Accepting a portal request now raises the call — BUILT** | `portal_request_to_call()` in `lib/portal.php`. The "Accept &amp; raise the call" action creates the inspection call from the request, links the two (`portal_requests.call_id`), and drops the coordinator on the call ready to set scope, price, the executing office and who goes — which stay ours to decide, so the call is left OPEN. It carries across only what the client gave us (who, what, where, when-wanted), folded into the call notes. Idempotent — a request already linked is never converted twice. Raising work needs the calls permission; without it, it falls back to Accepted so nothing is lost |
-| P2 | **No e-mail to the client when a report is issued** | They see it on the portal, but are not told |
+| ~~P2~~ | **Client is e-mailed when a report is issued — BUILT** | `idems_notify_client_issued()` in `lib/idems.php`, fired from the finalize/issue handler. A short note that the report is ready, with a link to sign in to the portal and the public verification code — **never the report itself or any finding**, because confidentiality is the whole point and the portal is where a client reads one. Recipients are the active portal users allowed to see reports (blank perms = everything), or the primary partner contact if there are none. Gated by a Settings toggle (on by default, config-first); wrapped so a mail failure never blocks issuing. On a box with no SMTP the mail log still records what would have gone, matching the rest of the system |
 | P3 | **Contacts on the client record are not linked to portal accounts** | Two lists of the same people |
 
 ### 5 · Interface and platform

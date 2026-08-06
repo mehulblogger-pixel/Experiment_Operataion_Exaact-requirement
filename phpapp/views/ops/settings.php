@@ -193,6 +193,11 @@
         <?php endforeach; ?>
       </div>
       <small class="muted">These are highlighted in red on the audit trail and counted as "high-risk".</small></div>
+    <div class="ff ff-check"><label><input type="checkbox" name="notify_client_on_issue" value="1" <?= setting_get('notify_client_on_issue','1') !== '0' ? 'checked' : '' ?>>
+      E-mail the <?= e(Tl('client')) ?> when a <?= e(Tl('report')) ?> is issued</label>
+      <small class="muted">A short note that it is ready, with a link to sign in to the portal and the public
+        verification code — never the <?= e(Tl('report')) ?> itself or any finding. Sent to the portal users who
+        can see reports, or the primary contact if none.</small></div>
   </div>
 
   <h3 class="tab-sub">Security</h3>
