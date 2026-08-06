@@ -335,6 +335,7 @@ function boot() {
     if (function_exists('samples_migrate')) samples_migrate();         // §7.2 inspection items & samples
     if (function_exists('methods_migrate')) methods_migrate();         // §7.1 controlled method & standard library
     if (function_exists('drules_migrate')) drules_migrate();           // §7.4 decision rules & acceptance criteria
+    if (function_exists('cdocs_migrate')) cdocs_migrate();             // §8.3 controlled documents
     if (function_exists('competence_spine_migrate')) competence_spine_migrate();
     if (function_exists('competence_cycle_migrate')) competence_cycle_migrate();  // basis, review cycle, witnessing interval  // authorisation matrix, §6.1
     if (function_exists('impartiality_migrate')) impartiality_migrate();  // §4.1 threats & declarations
