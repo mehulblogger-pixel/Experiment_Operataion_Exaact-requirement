@@ -10,7 +10,8 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/quotes"><?= e(TP('quote')) ?></a> › <?= e(quote_label($q)) ?></div>
 <?= function_exists('chain_strip') ? chain_strip('QUOTE', (int)$q['id'], 'QUOTE', (int)$q['id']) : '' ?>
 <div class="master-head">
-  <div><h1><?= e(quote_label($q)) ?> <span class="pill <?= $stPill[$st] ?? 'p-mut' ?>" style="font-size:13px;vertical-align:middle"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st) ?></span></h1>
+  <div><h1><?= e(quote_label($q)) ?> <span class="pill <?= $stPill[$st] ?? 'p-mut' ?>" style="font-size:13px;vertical-align:middle"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st) ?></span>
+    <?php $verN = count($revs); ?><a href="#revisions" class="pill p-info" style="font-size:12px;vertical-align:middle;text-decoration:none" title="See the revision list and the full change history">🕑 Rev <?= str_pad((string)(int)$q['rev'],2,'0',STR_PAD_LEFT) ?> · <?= $verN ?> version<?= $verN === 1 ? '' : 's' ?></a></h1>
     <p class="sub" style="margin:2px 0 0"><?= e($q['subject'] ?: '—') ?></p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <?php // Sales hands over to operations here. Before this the handover was
@@ -357,8 +358,11 @@
 <div class="panel" style="border:1px solid var(--bad)"><b>Lost reason:</b> <?= e(lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS)[$q['lost_reason']] ?? $q['lost_reason']) ?><?= $q['lost_reason_other']?' — '.e($q['lost_reason_other']):'' ?></div>
 <?php endif; ?>
 
-<details class="fold">
-  <summary>Revisions &amp; follow-ups <span class="sub"><?= count($revs) ?> version<?= count($revs) === 1 ? '' : 's' ?><?= $followups ? ' · ' . count($followups) . ' follow-up' . (count($followups) === 1 ? '' : 's') : '' ?></span></summary>
+<?php // Open by default once there is more than one version or any recorded change,
+      // so the revision trail is visible without a click — a quotation's history is
+      // part of the record, not a detail to hunt for. ?>
+<details class="fold" id="revisions"<?= (count($revs) > 1 || !empty($hist)) ? ' open' : '' ?>>
+  <summary>Revisions &amp; change history <span class="sub"><?= count($revs) ?> version<?= count($revs) === 1 ? '' : 's' ?><?= $hist ? ' · ' . count($hist) . ' logged change' . (count($hist) === 1 ? '' : 's') : '' ?><?= $followups ? ' · ' . count($followups) . ' follow-up' . (count($followups) === 1 ? '' : 's') : '' ?></span></summary>
   <div class="fold-body">
 <div class="panel-split">
   <div class="panel">
