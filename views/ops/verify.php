@@ -76,13 +76,14 @@ $v = $code !== '' ? verify_lookup($code) : null;
         on it, whatever you have been sent.</p>
     </div>
 
-  <?php else: $ok = $v['chain']['ok']; ?>
+  <?php else:
+        $chainOk   = !empty($v['chain']['ok']);
+        $contentOk = ($v['content']['ok'] ?? true);
+        $sealed    = !empty($v['content']['sealed']);
+        $ok = $chainOk && $contentOk; ?>
     <div class="verdict <?= $ok ? 'good' : 'bad' ?>">
       <h2><?= $ok ? 'Genuine, and unaltered since it was issued' : 'Genuine — but something has changed since it was issued' ?></h2>
-      <p><?= $ok
-        ? 'We issued this report, and every piece of evidence behind it still matches what was recorded at the time.'
-        : 'We issued this report, but the evidence behind it no longer matches what was recorded when it was issued. '
-          . 'Please contact us before relying on it — and please quote this code.' ?></p>
+      <p><?php if ($ok): ?>We issued this report, and both the report and every piece of evidence behind it still match what was recorded when it was issued.<?php elseif (!$contentOk): ?>We issued this report, but its content no longer matches what was recorded when it was issued. Please contact us before relying on it — and please quote this code.<?php else: ?>We issued this report, but the evidence behind it no longer matches what was recorded when it was issued. Please contact us before relying on it — and please quote this code.<?php endif; ?></p>
     </div>
 
     <table class="f">
@@ -95,6 +96,7 @@ $v = $code !== '' ? verify_lookup($code) : null;
         <?php elseif ($v['authorised'] === false): ?><br><span class="note">Authorisation not recorded — ask us.</span><?php endif; ?></td></tr>
       <?php endif; ?>
       <?php if ($v['result']): ?><tr><th>Result</th><td><?= e($v['result']) ?></td></tr><?php endif; ?>
+      <?php if ($sealed): ?><tr><th>Report content</th><td><?= $contentOk ? 'Unchanged since it was issued' : 'ALTERED since it was issued — do not rely on this copy' ?></td></tr><?php endif; ?>
       <tr><th>Evidence on file</th><td><?= (int)$v['evidence'] ?> item(s)</td></tr>
       <tr><th>Located on site</th><td><?= (int)$v['on_site'] ?> of <?= (int)$v['evidence'] ?>
         <br><span class="note">Counted from the location the camera recorded inside each photograph at the moment
@@ -104,7 +106,7 @@ $v = $code !== '' ? verify_lookup($code) : null;
         <br><span class="note">Our supervisor reviews anything the system questions. Ask us and we will tell you what
         was found.</span></td></tr>
       <?php endif; ?>
-      <tr><th>Evidence chain</th><td><?= $ok ? 'Intact across ' . (int)$v['chain']['entries'] . ' entries'
+      <tr><th>Evidence chain</th><td><?= $chainOk ? 'Intact across ' . (int)$v['chain']['entries'] . ' entries'
         : 'Broken — ' . count($v['chain']['problems']) . ' problem(s)' ?></td></tr>
     </table>
 

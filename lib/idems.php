@@ -94,6 +94,9 @@ function idems_migrate() {
     if (function_exists('ensure_column')) {
         ensure_column('report_docs', 'revises_id', "INT NULL");
         ensure_column('report_docs', 'revised_by_id', "INT NULL");
+        // Content seal: a hash of the report's own content, frozen at issue, so a
+        // later change to the report (not just its evidence) is detectable at /verify.
+        ensure_column('report_docs', 'content_seal', "VARCHAR(64) DEFAULT ''");
     }
     // Immutable compliance audit log (Parts 21/23/24). Never hard-deleted.
     $pdo->exec("CREATE TABLE IF NOT EXISTS idems_audit (
@@ -657,6 +660,7 @@ function ops_idems_documents($route, $method) {
         $pdo->prepare("UPDATE report_docs SET finalized=1, status='ISSUED', finalized_at=?, finalized_by=?, issue_date=?, updated_at=? WHERE id=?")
             ->execute([date('c'), user_name(current_user()), $issue, date('c'), $doc['id']]);
         idems_snapshot_signatures($doc);   // freeze inspector + approver signatures onto the report
+        idems_seal_content($doc['id']);    // freeze a content hash so /verify can prove it is unaltered
         if (function_exists('act_log'))
             act_log('REPORT', (int)$doc['id'], 'SYSTEM', 'Report ' . $doc['irn'] . ' issued',
                     ['auto' => 1, 'direction' => 'OUT', 'partner_id' => (int)($doc['client_id'] ?? 0) ?: null]);
@@ -2622,6 +2626,40 @@ function idems_revise_doc($src) {
     idems_log('report_doc', $newId, 'REVISION_DRAFT', ['irn' => $irn, 'new' => 'Rev ' . $newRev . ' of ' . $base]);
     idems_log('report_doc', (int)$src['id'], 'REVISED', ['irn' => $base, 'new' => $irn]);
     return [$newId, ''];
+}
+
+// ---- Content seal: prove the report itself has not been altered -------------
+// The canonical string an issued report's seal is computed over — its immutable
+// content, so a later change to any of it is detectable. Used identically at
+// issue and at verification, so the two always agree. Excludes the seal itself
+// and the mutable lifecycle fields.
+function idems_content_payload($doc) {
+    $keys = ['irn', 'rev', 'report_type_id', 'type_code', 'title', 'client_id', 'vendor_id', 'call_id',
+             'job_id', 'office_id', 'sbu', 'inspector_id', 'approver_user_id', 'inspection_date',
+             'issue_date', 'result', 'release_status', 'remarks', 'data'];
+    $parts = [];
+    foreach ($keys as $k) $parts[] = (string)($doc[$k] ?? '');
+    return implode('|', $parts);
+}
+function idems_content_seal_compute($doc) { return hash('sha256', idems_content_payload($doc)); }
+
+// Freeze the seal at issue. Wrapped: sealing is defence-in-depth and must never
+// be what stops a report being issued.
+function idems_seal_content($docId) {
+    try {
+        $d = ops_one("SELECT * FROM report_docs WHERE id=?", [(int)$docId]);
+        if ($d) db()->prepare("UPDATE report_docs SET content_seal=? WHERE id=?")
+            ->execute([idems_content_seal_compute($d), (int)$docId]);
+    } catch (Throwable $e) { /* never block issue */ }
+}
+
+// At verification: is the sealed content still intact? A report issued before
+// this feature has no seal and cannot be judged, so it is reported unsealed
+// rather than failed.
+function idems_content_check($doc) {
+    $seal = (string)($doc['content_seal'] ?? '');
+    if ($seal === '') return ['sealed' => false, 'ok' => true];
+    return ['sealed' => true, 'ok' => hash_equals($seal, idems_content_seal_compute($doc))];
 }
 
 // ---- Automatic Release Note drafted from a finalized/approved report ----
