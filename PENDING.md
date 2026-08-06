@@ -171,7 +171,7 @@ matter, and they are all here.
 | M3 | **Nothing is read back from Tally** | One-way on purpose, but worth stating |
 | M4 | **HSN/SAC is now per invoice line**, defaulting to the company setting | Was a setting only. `invoice_lines.hsn_sac` carries it per line; the default still comes from the Tally settings |
 | ~~M5~~ | **Consolidated invoicing — BUILT** | One invoice across many deputations, drafted from /to-bill which lists every closed job nobody has billed, grouped by customer |
-| M6 | **Customer satisfaction capture** after closure | Roadmap 5.4. ISO 9001 expectation and a normal account tool |
+| ~~M6~~ | **Customer satisfaction — BUILT** | `lib/satisfaction.php`, `/satisfaction`. A survey is a small lifecycle: REQUESTED when we ask, RECEIVED with an overall score + per-aspect ratings + would-recommend + comments, or DECLINED. A response at or below a configurable threshold raises a follow-up flag that is surfaced, never auto-graded into a complaint — whether a 2/5 is a grievance or a grumble is a person's call. The average is over answered surveys only, so an unanswered request never drags it down, and the response rate counts answered-of-asked. Aspects are an editable Master; the scale and threshold are Settings; extra data via custom fields; the whole feature is toggle-able per customer and off closes the register. Roadmap 5.4 / ISO 9001 §9.1.2 |
 
 ### 3 · The accreditation pack — depth, not breadth
 

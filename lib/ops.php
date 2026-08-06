@@ -2215,6 +2215,8 @@ function ops_dispatch($route, $method) {
             return ops_retention($route, $method);
         case strncmp($route, 'disclosure', 10) === 0:
             return ops_disclosure($route, $method);
+        case strncmp($route, 'satisfaction', 12) === 0:
+            return ops_satisfaction($route, $method);
         case $route === 'preflight':
             ops_preflight(); return true;
         case $route === 'settings':

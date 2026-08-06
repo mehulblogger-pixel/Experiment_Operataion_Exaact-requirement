@@ -339,6 +339,7 @@ function boot() {
     if (function_exists('risks_migrate')) risks_migrate();             // §8.5 risks & opportunities
     if (function_exists('retention_migrate')) retention_migrate();     // §8.4 record-retention schedule
     if (function_exists('disclosure_migrate')) disclosure_migrate();   // §4.2 public-disclosure consent
+    if (function_exists('sat_migrate')) sat_migrate();                 // ISO 9001 §9.1.2 customer satisfaction
     if (function_exists('competence_spine_migrate')) competence_spine_migrate();
     if (function_exists('competence_cycle_migrate')) competence_cycle_migrate();  // basis, review cycle, witnessing interval  // authorisation matrix, §6.1
     if (function_exists('impartiality_migrate')) impartiality_migrate();  // §4.1 threats & declarations

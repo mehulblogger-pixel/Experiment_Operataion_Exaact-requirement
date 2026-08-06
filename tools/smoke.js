@@ -84,6 +84,7 @@ const PLAIN = [
   // only when the sidebar happens to offer them.
   '/samples', '/sample-new', '/methods', '/method-new', '/drules', '/drule-new',
   '/cdocs', '/cdoc-new', '/risks', '/risk-new', '/retention', '/disclosure',
+  '/satisfaction', '/satisfaction-new',
 ];
 
 // register path -> [link pattern to follow, extra screens built from that id]

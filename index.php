@@ -136,6 +136,7 @@ try {
     require __DIR__ . '/lib/risks.php';
     require __DIR__ . '/lib/retention.php';
     require __DIR__ . '/lib/disclosure.php';
+    require __DIR__ . '/lib/satisfaction.php';
     require __DIR__ . '/lib/impartiality.php';
     require __DIR__ . '/lib/identity.php';
     require __DIR__ . '/lib/complaints.php';
