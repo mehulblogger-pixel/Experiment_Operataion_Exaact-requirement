@@ -79,6 +79,11 @@ const PLAIN = [
   '/opportunities?v=list&sort=weighted&dir=desc', '/opportunity-new',
   // Customer 360 — the assembly. Reached from the customer list below too, but
   // named here so it is crawled even when the list happens to be empty.
+  // ISO Clause-7 & management-system registers (Aug 2026): the list AND the
+  // create form for each, so the new screens are crawled explicitly rather than
+  // only when the sidebar happens to offer them.
+  '/samples', '/sample-new', '/methods', '/method-new', '/drules', '/drule-new',
+  '/cdocs', '/cdoc-new', '/risks', '/risk-new', '/retention', '/disclosure',
 ];
 
 // register path -> [link pattern to follow, extra screens built from that id]
@@ -108,6 +113,12 @@ const REGISTERS = [
   ['/opportunities?v=list', /^\/opportunity\?id=(\d+)/, ['/opportunity?id=%s', '/trace?kind=OPPORTUNITY&id=%s']],
   ['/pipelines',     /^\/pipeline\?id=(\d+)/,  ['/pipeline?id=%s']],
   ['/invoices?f=all', /^\/ledger\?id=(\d+)/,  ['/ledger?id=%s', '/ledger?id=%s&from=2026-01-01&to=2026-12-31']],
+  // ISO Clause-7 & management registers: follow the first row into detail + edit.
+  ['/samples',  /^\/sample\?id=(\d+)/, ['/sample?id=%s', '/sample-edit?id=%s']],
+  ['/methods',  /^\/method\?id=(\d+)/, ['/method?id=%s', '/method-edit?id=%s']],
+  ['/drules',   /^\/drule\?id=(\d+)/,  ['/drule?id=%s', '/drule-edit?id=%s']],
+  ['/cdocs',    /^\/cdoc\?id=(\d+)/,   ['/cdoc?id=%s', '/cdoc-edit?id=%s']],
+  ['/risks',    /^\/risk\?id=(\d+)/,   ['/risk?id=%s', '/risk-edit?id=%s']],
 ];
 
 const FATAL = /Cannot redeclare|program file is missing|The app hit an error|Fatal error|Parse error|Uncaught (?:Error|Exception|TypeError)|SQLSTATE|Warning: |Notice: |Deprecated: |Undefined variable|Undefined array key/i;

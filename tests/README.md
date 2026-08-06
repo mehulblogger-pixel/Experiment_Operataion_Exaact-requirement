@@ -30,3 +30,24 @@ it can call any application function and use `db()`, `ops_all()`, `ops_one()`,
 `t_nothrow($msg, fn)`, grouped with `t_section('name')`.
 
 **Rule going forward:** when a roadmap step is built, add a test here for it.
+
+## Full browser end-to-end (every screen renders)
+
+`php tests/run.php` is fast but does not render pages. For a true end-to-end
+pass — log in and open **every** screen in the app, following the first row of
+each register into its detail/edit screens, failing on any fatal, PHP warning or
+JS error — use the Playwright crawl in `tools/smoke.js` against a throwaway copy
+of the database:
+
+```
+cp data.sqlite /tmp/smoke.sqlite                       # throwaway — never the real DB
+SQLITE_PATH=/tmp/smoke.sqlite DB_DRIVER=sqlite \
+  php -S 127.0.0.1:8801 tools/smoke-router.php &        # dev server
+node tools/smoke.js http://127.0.0.1:8801 admin admin12345
+```
+
+It discovers the whole sidebar at run time, so new modules are picked up
+automatically; the fixed lists in `smoke.js` additionally name each register's
+list, create form, detail and edit screens so they are always crawled. Last run:
+**195 screens, all clean.**
+
