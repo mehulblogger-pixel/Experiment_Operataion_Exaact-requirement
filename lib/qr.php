@@ -376,6 +376,33 @@ function qr_matrix(string $text, string $ecl = 'M', ?int $forceMask = null): ?ar
     return $out;
 }
 
+// Render a payload as a self-contained inline SVG QR — crisp at any size, no
+// external request, works offline. Ideal for an on-screen code (e.g. a 2FA
+// enrolment link a phone scans). $px is the target pixel side; $quiet is the
+// quiet-zone width in modules (4 is the spec minimum for reliable scanning).
+// Returns '' if the payload is too long to encode. The caller is responsible
+// for any surrounding markup; the SVG itself is safe to echo directly.
+function qr_svg(string $text, int $px = 200, string $ecl = 'M', int $quiet = 4): string {
+    $m = qr_matrix($text, $ecl);
+    if ($m === null) return '';
+    $n = count($m);
+    $total = $n + 2 * $quiet;
+    // One black path over a white background; every dark module is a unit rect,
+    // so the whole code is a single fill with no per-module colour switching.
+    $rects = '';
+    for ($r = 0; $r < $n; $r++) {
+        for ($c = 0; $c < $n; $c++) {
+            if (empty($m[$r][$c])) continue;
+            $rects .= 'M' . ($c + $quiet) . ',' . ($r + $quiet) . 'h1v1h-1z';
+        }
+    }
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' . $px . '" height="' . $px . '" '
+        . 'viewBox="0 0 ' . $total . ' ' . $total . '" shape-rendering="crispEdges" role="img" '
+        . 'aria-label="QR code">'
+        . '<rect width="' . $total . '" height="' . $total . '" fill="#fff"/>'
+        . '<path d="' . $rects . '" fill="#000"/></svg>';
+}
+
 // Stamp format + version information into a masked candidate.
 function qr_apply_format(array &$m, int $size, string $ecl, int $mask, int $ver): void {
     $f = qr_format_bits($ecl, $mask);
