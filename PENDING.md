@@ -2,6 +2,34 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ⭐ STANDING RULE — configuration-first, flexible per customer (Aug 2026)
+
+**Owner principle (Aug 2026):** the system must be **highly flexible and
+configurable to each customer's requirements.** This is already the product's
+strongest area (no-code masters, custom fields, custom forms, terminology &
+industry packs, per-module licensing) and it must stay that way. Every roadmap
+step from here on is built **configuration-first:**
+
+1. **No hardcoded lists.** Any dropdown / category / status / type a customer
+   might want to change goes through the **Masters (lookup) engine**, never a
+   literal list in code.
+2. **Extensible, not fixed.** New entities carry **custom fields** so a customer
+   can add their own data points without code; new registers use the **no-code
+   custom-forms** path where it fits.
+3. **Toggle-able per customer.** New modules/features hang off the existing
+   **licence-by-module + settings** switches, so each customer gets only what
+   they bought / need — nothing is force-on for everyone.
+4. **Renamable.** User-facing labels route through the **terminology engine** so
+   a customer can call things by their own words.
+5. **Sensible defaults, full override.** Ship a good default configuration so it
+   works on day one, but let an admin change it from Settings/Masters — never
+   require a code change to reconfigure.
+6. **Enforce, don't assume.** Where a rule is configurable (e.g. ISO gates, work
+   norms, approval matrices), the setting drives the behaviour and the screen
+   says which state it is in.
+
+When a step below is built, check it against this rule before it ships.
+
 ## 🔗 PARKED FOR LAST — MGH Books integration (single finance platform) (Aug 2026)
 
 **Owner decision (Aug 2026):** build out the *whole* Inspection ERP first —
