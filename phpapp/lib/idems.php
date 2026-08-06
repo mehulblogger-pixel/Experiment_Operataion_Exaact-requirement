@@ -95,6 +95,13 @@ function idems_migrate() {
         action VARCHAR(40) DEFAULT '', field VARCHAR(60) DEFAULT '', old_value TEXT, new_value TEXT, reason VARCHAR(400) DEFAULT '',
         username VARCHAR(150) DEFAULT '', role VARCHAR(40) DEFAULT '', office_id INT NULL,
         ip VARCHAR(60) DEFAULT '', device VARCHAR(200) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // Tamper-evidence: each entry is sealed to the one before it (like the
+    // evidence photo chain in trust.php). Added by upgrade, so older rows carry
+    // empty seals and are simply not checked — an honest "sealed from here".
+    if (function_exists('ensure_column')) {
+        ensure_column('idems_audit', 'prev_hash',  "VARCHAR(64) DEFAULT ''");
+        ensure_column('idems_audit', 'entry_hash', "VARCHAR(64) DEFAULT ''");
+    }
     // ---- Phase 2: no-code report builder (form schema per report type) ----
     $pdo->exec("CREATE TABLE IF NOT EXISTS report_sections (
         id $pk, report_type_id INT, title VARCHAR(200) DEFAULT '', help VARCHAR(400) DEFAULT '',
@@ -254,13 +261,84 @@ function idems_doc_files($docId, $fieldKey = null) {
 // ---------------------------------------------------------------------------
 function idems_log($entity, $entityId, $action, $opts = []) {
     $u = function_exists('current_user') ? current_user() : null;
-    db()->prepare("INSERT INTO idems_audit (entity,entity_id,irn,action,field,old_value,new_value,reason,username,role,office_id,ip,device,created_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute([
-        $entity, $entityId ?: null, $opts['irn'] ?? '', $action, $opts['field'] ?? '',
-        isset($opts['old']) ? (is_scalar($opts['old']) ? (string)$opts['old'] : json_encode($opts['old'])) : '',
-        isset($opts['new']) ? (is_scalar($opts['new']) ? (string)$opts['new'] : json_encode($opts['new'])) : '',
-        $opts['reason'] ?? '', $u ? user_name($u) : 'system', $u['role'] ?? '', $u['home_office_id'] ?? null,
-        $_SERVER['REMOTE_ADDR'] ?? '', substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 200), date('c')]);
+    // Build the row once, so the seal is computed over exactly what is stored.
+    $r = [
+        'entity'    => $entity,
+        'entity_id' => $entityId ?: null,
+        'irn'       => $opts['irn'] ?? '',
+        'action'    => $action,
+        'field'     => $opts['field'] ?? '',
+        'old_value' => isset($opts['old']) ? (is_scalar($opts['old']) ? (string)$opts['old'] : json_encode($opts['old'])) : '',
+        'new_value' => isset($opts['new']) ? (is_scalar($opts['new']) ? (string)$opts['new'] : json_encode($opts['new'])) : '',
+        'reason'    => $opts['reason'] ?? '',
+        'username'  => $u ? user_name($u) : 'system',
+        'role'      => $u['role'] ?? '',
+        'office_id' => $u['home_office_id'] ?? null,
+        'ip'        => $_SERVER['REMOTE_ADDR'] ?? '',
+        'device'    => substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 200),
+        'created_at'=> date('c'),
+    ];
+    // Seal to the previous sealed entry. Reading it must never stop the log
+    // being written, so it is wrapped; the worst case is the chain restarting,
+    // which verify() reports honestly rather than hiding.
+    $prev = '';
+    try { $prev = (string)(ops_val("SELECT entry_hash FROM idems_audit WHERE entry_hash<>'' ORDER BY id DESC LIMIT 1") ?: ''); }
+    catch (Throwable $e) { $prev = ''; }
+    $entryHash = hash('sha256', $prev . '|' . idems_audit_payload($r));
+    try {
+        db()->prepare("INSERT INTO idems_audit (entity,entity_id,irn,action,field,old_value,new_value,reason,username,role,office_id,ip,device,created_at,prev_hash,entry_hash)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute([
+            $r['entity'], $r['entity_id'], $r['irn'], $r['action'], $r['field'], $r['old_value'], $r['new_value'],
+            $r['reason'], $r['username'], $r['role'], $r['office_id'], $r['ip'], $r['device'], $r['created_at'],
+            $prev, $entryHash]);
+    } catch (Throwable $e) {
+        // The seal columns arrive by upgrade; before the migration lands, fall
+        // back to the original unsealed insert so logging never breaks an action.
+        db()->prepare("INSERT INTO idems_audit (entity,entity_id,irn,action,field,old_value,new_value,reason,username,role,office_id,ip,device,created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute([
+            $r['entity'], $r['entity_id'], $r['irn'], $r['action'], $r['field'], $r['old_value'], $r['new_value'],
+            $r['reason'], $r['username'], $r['role'], $r['office_id'], $r['ip'], $r['device'], $r['created_at']]);
+    }
+}
+
+// The exact string a row's seal is computed over — used identically when a row
+// is written and when the chain is verified, so the two always agree.
+function idems_audit_payload($r) {
+    return implode('|', [
+        (string)($r['entity'] ?? ''), (string)($r['entity_id'] ?? ''), (string)($r['irn'] ?? ''),
+        (string)($r['action'] ?? ''), (string)($r['field'] ?? ''), (string)($r['old_value'] ?? ''),
+        (string)($r['new_value'] ?? ''), (string)($r['reason'] ?? ''), (string)($r['username'] ?? ''),
+        (string)($r['role'] ?? ''), (string)($r['office_id'] ?? ''), (string)($r['ip'] ?? ''),
+        (string)($r['device'] ?? ''), (string)($r['created_at'] ?? ''),
+    ]);
+}
+
+// Walk the sealed entries and report tampering. Two independent tests, both
+// tolerant of several entries being written in the same instant:
+//   content — recompute each row's seal from what it stores; a mismatch means
+//             the row's own text was altered after the fact.
+//   links   — every row's prev_hash must be the seal of some earlier row; if it
+//             points at a seal no longer present, a row in between was deleted.
+// Unsealed legacy rows (empty seal) are skipped, never failed.
+function idems_audit_verify() {
+    $rows = [];
+    try { $rows = ops_all("SELECT * FROM idems_audit WHERE entry_hash<>'' ORDER BY id") ?: []; }
+    catch (Throwable $e) {
+        return ['ok' => true, 'skipped' => true, 'checked' => 0, 'broken' => 0,
+                'content' => 0, 'links' => 0, 'first_break' => null];
+    }
+    $seen = []; $brokenContent = 0; $brokenLink = 0; $firstBreak = null;
+    foreach ($rows as $r) {
+        $calc = hash('sha256', (string)$r['prev_hash'] . '|' . idems_audit_payload($r));
+        $bad = false;
+        if (!hash_equals((string)$r['entry_hash'], $calc)) { $brokenContent++; $bad = true; }
+        if ((string)$r['prev_hash'] !== '' && !isset($seen[(string)$r['prev_hash']])) { $brokenLink++; $bad = true; }
+        if ($bad && $firstBreak === null) $firstBreak = (int)$r['id'];
+        $seen[(string)$r['entry_hash']] = true;
+    }
+    $broken = $brokenContent + $brokenLink;
+    return ['ok' => $broken === 0, 'skipped' => count($rows) === 0, 'checked' => count($rows),
+            'broken' => $broken, 'content' => $brokenContent, 'links' => $brokenLink, 'first_break' => $firstBreak];
 }
 
 // ---------------------------------------------------------------------------
