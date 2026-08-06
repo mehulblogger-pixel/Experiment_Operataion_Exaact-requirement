@@ -192,7 +192,7 @@ matter, and they are all here.
 
 | # | What | Note |
 |---|---|---|
-| P1 | **Accepting a portal request does not create the call** | It records the decision; a coordinator still keys it |
+| ~~P1~~ | **Accepting a portal request now raises the call — BUILT** | `portal_request_to_call()` in `lib/portal.php`. The "Accept &amp; raise the call" action creates the inspection call from the request, links the two (`portal_requests.call_id`), and drops the coordinator on the call ready to set scope, price, the executing office and who goes — which stay ours to decide, so the call is left OPEN. It carries across only what the client gave us (who, what, where, when-wanted), folded into the call notes. Idempotent — a request already linked is never converted twice. Raising work needs the calls permission; without it, it falls back to Accepted so nothing is lost |
 | P2 | **No e-mail to the client when a report is issued** | They see it on the portal, but are not told |
 | P3 | **Contacts on the client record are not linked to portal accounts** | Two lists of the same people |
 

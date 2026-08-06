@@ -390,6 +390,40 @@ function portal_request_create($post) {
     return '';
 }
 
+// Turn an accepted request into an actual inspection call, and link the two so
+// the client's ask and the resulting work are the same thread. Deliberately
+// minimal: it carries across only what the client gave us — who they are, what
+// and where, and when they wanted it — folded into the call's notes, and leaves
+// it OPEN so a coordinator sets scope, price, the executing office and who goes,
+// which are ours to decide. Idempotent: a request already linked to a call is
+// never converted twice. Returns [call_id, error].
+function portal_request_to_call($r) {
+    if (!$r) return [0, 'That request no longer exists.'];
+    if (!empty($r['call_id'])) return [(int)$r['call_id'], '']; // already raised — reuse it
+    if (!function_exists('ops_next_code')) return [0, 'The call register is not available on this install.'];
+
+    // Fold everything the client told us into a readable brief on the call.
+    $lines = [];
+    if (trim((string)($r['subject'] ?? '')) !== '') $lines[] = trim((string)$r['subject']);
+    if (trim((string)($r['detail'] ?? '')) !== '')  $lines[] = trim((string)$r['detail']);
+    if (trim((string)($r['site'] ?? '')) !== '')    $lines[] = 'Site: ' . trim((string)$r['site']);
+    $contact = trim(($r['contact_name'] ?? '') . ' ' . ($r['contact_phone'] ?? ''));
+    if ($contact !== '') $lines[] = 'Client contact: ' . $contact;
+    $note = "Raised from a portal request.\n" . implode("\n", $lines);
+
+    $code = ops_next_code('calls', 'call_code', 'CALL');
+    try {
+        db()->prepare("INSERT INTO calls (call_code, client_id, call_received_date, inspection_required_date,
+                       notes, status, created_by, created_at) VALUES (?,?,?,?,?,'OPEN',?,?)")
+            ->execute([$code, (int)$r['partner_id'], date('Y-m-d'),
+                       (string)($r['wanted_on'] ?? ''), $note,
+                       function_exists('user_name') ? user_name(current_user()) : 'Portal', date('c')]);
+    } catch (Throwable $e) { return [0, 'The call could not be created: ' . $e->getMessage()]; }
+    $callId = (int)db()->lastInsertId();
+    if (function_exists('idems_log')) try { idems_log('call', $callId, 'FROM_PORTAL', ['reason' => 'request #' . $r['id']]); } catch (Throwable $e) {}
+    return [$callId, ''];
+}
+
 // ============================================================================
 //  Staff side — inviting a client, and answering requests
 // ============================================================================
@@ -782,6 +816,25 @@ function ops_portal_admin($route, $method) {
             if ($to === 'DECLINED' && $reply === '') {
                 flash('Say why. A request declined in silence is why clients stop using a portal.', 'error');
                 redirect('/portal-users');
+            }
+            // "Arranged" now raises the actual call instead of merely recording a
+            // status — the coordinator lands on the call ready to complete scope,
+            // price and who goes. Raising work needs the calls permission; without
+            // it, fall back to Accepted so nothing is lost.
+            if ($to === 'CONVERTED') {
+                $mayRaise = is_master() || (function_exists('can') && can('mod.calls.view'));
+                if (!$mayRaise) {
+                    flash('Recorded as accepted — ask a coordinator to raise the ' . Tl('call') . '.', 'error');
+                    db()->prepare("UPDATE portal_requests SET status='ACCEPTED', reply=?, handled_by=?, handled_at=? WHERE id=?")
+                        ->execute([substr($reply, 0, 1000), user_name(current_user()), date('c'), (int)$r['id']]);
+                    redirect('/portal-users');
+                }
+                [$callId, $err] = portal_request_to_call($r);
+                if ($err) { flash($err, 'error'); redirect('/portal-users'); }
+                db()->prepare("UPDATE portal_requests SET status='CONVERTED', call_id=?, reply=?, handled_by=?, handled_at=? WHERE id=?")
+                    ->execute([$callId, substr($reply, 0, 1000), user_name(current_user()), date('c'), (int)$r['id']]);
+                flash('Request accepted and ' . Tl('call') . ' raised — complete the scheduling below.');
+                redirect('/call-edit?id=' . $callId);
             }
             db()->prepare("UPDATE portal_requests SET status=?, reply=?, handled_by=?, handled_at=? WHERE id=?")
                 ->execute([$to, substr($reply, 0, 1000), user_name(current_user()), date('c'), (int)$r['id']]);
