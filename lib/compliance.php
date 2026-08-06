@@ -379,6 +379,20 @@ function compliance_status() {
     // before an assessment, and until now three of the seven accreditation
     // modules were simply absent from it. Enforced somewhere is not the same
     // as visible here.
+    // Guardrail: before anything else in this section, say whether the gates are
+    // even switched on. Every 17020 control fires only when an accreditation pack
+    // is enabled, and the authorisation gate is separately opt-in — so a director
+    // could read a page of green registers below while none of them is actually
+    // enforcing. Make that impossible to miss.
+    if (function_exists('accredited_pack_on')) {
+        $packOn = accredited_pack_on();
+        $authOn = function_exists('auth_enforced') && auth_enforced();
+        $add(accreditation_std_name() . ' — enforcement', 'The accreditation controls are switched on',
+            !$packOn ? 'bad' : ($authOn ? 'ok' : 'warn'),
+            'Accreditation pack: ' . ($packOn ? 'ON' : 'OFF') . '. Authorisation gate: ' . ($authOn ? 'ON' : 'OFF') . '.',
+            !$packOn ? 'The accreditation pack is OFF, so none of the gates below fire — every register is a record, not a control. Turn it on under Settings once you are accredited or preparing to be.'
+                : (!$authOn ? 'The authorisation gate is off, so an unauthorised person can still be allocated work. Switch it on under Settings once the competence matrix is populated.' : ''));
+    }
     if (function_exists('imp_readiness')) {
         $ir = imp_readiness();
         $bad = $ir['open'] + $ir['unacceptable'];
