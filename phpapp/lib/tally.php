@@ -103,6 +103,7 @@ const TALLY_DEFAULTS = [
     'tally_debtors_group'=> 'Sundry Debtors',
     'tally_voucher_type' => 'Sales',
     'tally_receipt_type' => 'Receipt',
+    'tally_creditnote_type' => 'Credit Note',
     'tally_gst_pct'      => '18',
     'tally_amount_basis' => 'EXCL',   // is jobs.invoice_amount before or after tax?
     'tally_sac'          => '998346', // technical testing and analysis services
@@ -272,6 +273,56 @@ function tally_rows_from_books($from, $to, $kind = 'SALES', $includeDone = false
         return $out;
     }
 
+    if ($kind === 'CREDITNOTE') {
+        // A credit note reverses part or all of an issued invoice. It carries its
+        // own tax split; the tax nature (IGST vs CGST+SGST) and the place of
+        // supply come from the invoice it reduces, so the return lands in the
+        // same GST bucket the sale did. It knocks the original invoice down on
+        // the ageing via an "Agst Ref" against that invoice number.
+        [$w, $a] = scope_clause('c.office_id', '');
+        $args = []; foreach ($a as $x) $args[] = $x;
+        $sql = "SELECT c.*, o.name office_name, bp.display_name, bp.legal_name, bp.gstin, bp.state,
+                       i.invoice_no orig_invoice_no, i.place_of_supply, i.is_igst,
+                       te.batch_ref done_batch
+                FROM credit_notes c
+                LEFT JOIN offices o ON o.id = c.office_id
+                LEFT JOIN business_partners bp ON bp.id = c.partner_id
+                LEFT JOIN invoices i ON i.id = c.invoice_id
+                LEFT JOIN tally_exports te ON te.job_id = c.id AND te.kind = 'CN'
+                WHERE $w AND c.status = 'ISSUED'";
+        if ($from !== '') { $sql .= " AND c.cn_date >= ?"; $args[] = $from; }
+        if ($to   !== '') { $sql .= " AND c.cn_date <= ?"; $args[] = $to; }
+        $sql .= " ORDER BY c.cn_date ASC, c.id ASC";
+        foreach (books_try(fn() => ops_all($sql, $args)) as $r) {
+            if (!$includeDone && $r['done_batch']) continue;
+            $issues = [];
+            if (trim((string)$r['cn_no']) === '') $issues[] = 'no credit-note number';
+            if (trim((string)$r['cn_date']) === '') $issues[] = 'no credit-note date';
+            if ((float)$r['total'] <= 0) $issues[] = 'no amount';
+            if (empty($r['partner_id'])) $issues[] = 'the customer is not on the party master';
+            if (trim((string)($r['orig_invoice_no'] ?? '')) === '') $issues[] = 'the original invoice is missing';
+            $out[] = $r + [
+                'src'             => 'CREDITNOTE',
+                'client_id'       => $r['partner_id'],
+                'job_code'        => $r['cn_no'],
+                'invoice_number'  => $r['cn_no'],
+                'against_invoice' => (string)($r['orig_invoice_no'] ?? ''),
+                'invoice_date'    => $r['cn_date'],
+                'invoice_amount'  => (float)$r['total'],
+                'taxable'         => (float)$r['subtotal'],
+                'tax'             => (float)($r['cgst'] + $r['sgst'] + $r['igst']),
+                'total'           => (float)$r['total'],
+                'cgst'            => (float)$r['cgst'], 'sgst' => (float)$r['sgst'], 'igst' => (float)$r['igst'],
+                'gst_pct'         => (float)$r['subtotal'] > 0 ? round(($r['cgst'] + $r['sgst'] + $r['igst']) / $r['subtotal'] * 100, 2) : 0,
+                'interstate'      => (int)$r['is_igst'] === 1,
+                'their_state'     => (string)$r['place_of_supply'],
+                'place_of_supply' => $r['place_of_supply'] !== '' ? (GST_STATE_CODES[$r['place_of_supply']] ?? '') : '',
+                'issues'          => $issues, 'ok' => !$issues,
+            ];
+        }
+        return $out;
+    }
+
     // RECEIPT: the money that actually arrived, per receipt, not per deputation.
     [$w, $a] = scope_office_clause('r.office_id');
     $args = []; foreach ($a as $x) $args[] = $x;
@@ -308,6 +359,11 @@ function tally_rows_from_books($from, $to, $kind = 'SALES', $includeDone = false
 
 function tally_rows($from, $to, $kind = 'SALES', $includeDone = false) {
     tally_migrate();
+    // Credit notes exist only in the invoice register — there is no job-keyed
+    // fallback for them, so they always come from books (empty if it is absent).
+    if ($kind === 'CREDITNOTE') {
+        return function_exists('books_migrate') ? tally_rows_from_books($from, $to, $kind, $includeDone) : [];
+    }
     // Invoices win the moment there are any. A company part-way through the
     // change keeps the old source until its first invoice is issued, so the
     // screen never goes empty on them.
@@ -493,6 +549,46 @@ function tally_receipt_voucher(array $r, array $cfg) {
     return $x;
 }
 
+// A Credit Note is a Sales voucher run in reverse: the party is CREDITED with
+// the gross (reducing what they owe), the sales ledger and the tax ledgers are
+// DEBITED. The bill allocation is "Agst Ref" against the ORIGINAL invoice, which
+// is what actually knocks that invoice down on the ageing — the whole reason a
+// cancelled-then-credited invoice no longer has to be reversed by hand in Tally.
+function tally_credit_note_voucher(array $r, array $cfg) {
+    $party = tally_party($r);
+    $vno   = (string)$r['invoice_number'];                 // the CN number
+    $vtype = $cfg['tally_creditnote_type'];
+    $against = (string)($r['against_invoice'] ?? '');
+    $x  = "  <TALLYMESSAGE xmlns:UDF=\"TallyUDF\">\n";
+    $x .= "   <VOUCHER VCHTYPE=\"" . tally_x($vtype) . "\" ACTION=\"Create\" OBJVIEW=\"Invoice Voucher View\">\n";
+    $x .= "    <DATE>" . tally_date($r['invoice_date']) . "</DATE>\n";
+    $x .= "    <EFFECTIVEDATE>" . tally_date($r['invoice_date']) . "</EFFECTIVEDATE>\n";
+    $x .= "    <VOUCHERTYPENAME>" . tally_x($vtype) . "</VOUCHERTYPENAME>\n";
+    $x .= "    <VOUCHERNUMBER>" . tally_x($vno) . "</VOUCHERNUMBER>\n";
+    $x .= "    <REFERENCE>" . tally_x($vno) . "</REFERENCE>\n";
+    $x .= "    <REFERENCEDATE>" . tally_date($r['invoice_date']) . "</REFERENCEDATE>\n";
+    $x .= "    <PARTYLEDGERNAME>" . tally_x($party) . "</PARTYLEDGERNAME>\n";
+    $x .= "    <PARTYNAME>" . tally_x($party) . "</PARTYNAME>\n";
+    if (trim((string)$r['gstin']) !== '')
+        $x .= "    <PARTYGSTIN>" . tally_x(strtoupper(trim((string)$r['gstin']))) . "</PARTYGSTIN>\n";
+    if ($r['place_of_supply'] !== '')
+        $x .= "    <PLACEOFSUPPLY>" . tally_x($r['place_of_supply']) . "</PLACEOFSUPPLY>\n";
+    $x .= "    <PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW>\n";
+    $x .= "    <ISINVOICE>Yes</ISINVOICE>\n";
+    $x .= "    <NARRATION>" . tally_x('Credit note ' . $vno
+            . ($against !== '' ? ' against invoice ' . $against : '')
+            . ($r['office_name'] ? ' (' . $r['office_name'] . ')' : '')) . "</NARRATION>\n";
+    // Party credited with the gross — "Agst Ref" to the original invoice so it
+    // reduces that bill, not a floating new one.
+    $x .= tally_entry($party, false, $r['total'], $against !== '' ? $against : $vno, $against !== '' ? 'Agst Ref' : 'New Ref');
+    $x .= tally_entry($cfg['tally_sales_ledger'], true, $r['taxable']);
+    if ($r['igst'] > 0) $x .= tally_entry($cfg['tally_igst_ledger'], true, $r['igst']);
+    if ($r['cgst'] > 0) $x .= tally_entry($cfg['tally_cgst_ledger'], true, $r['cgst']);
+    if ($r['sgst'] > 0) $x .= tally_entry($cfg['tally_sgst_ledger'], true, $r['sgst']);
+    $x .= "   </VOUCHER>\n  </TALLYMESSAGE>\n";
+    return $x;
+}
+
 function tally_xml(array $rows, array $cfg, $kind = 'SALES', $withMasters = false) {
     $x  = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
     $x .= "<ENVELOPE>\n <HEADER>\n  <TALLYREQUEST>Import Data</TALLYREQUEST>\n </HEADER>\n";
@@ -502,7 +598,8 @@ function tally_xml(array $rows, array $cfg, $kind = 'SALES', $withMasters = fals
     $x .= "   </REQUESTDESC>\n   <REQUESTDATA>\n";
     if ($withMasters) $x .= tally_ledger_masters($rows, $cfg);
     foreach ($rows as $r)
-        $x .= $kind === 'RECEIPT' ? tally_receipt_voucher($r, $cfg) : tally_sales_voucher($r, $cfg);
+        $x .= $kind === 'RECEIPT' ? tally_receipt_voucher($r, $cfg)
+            : ($kind === 'CREDITNOTE' ? tally_credit_note_voucher($r, $cfg) : tally_sales_voucher($r, $cfg));
     $x .= "   </REQUESTDATA>\n  </IMPORTDATA>\n </BODY>\n</ENVELOPE>\n";
     return $x;
 }
@@ -510,6 +607,14 @@ function tally_xml(array $rows, array $cfg, $kind = 'SALES', $withMasters = fals
 // The same figures as a spreadsheet, for the accountant who wants to look
 // before importing, or whose Tally is on somebody else's desk.
 function tally_csv_rows(array $rows, $kind = 'SALES') {
+    if ($kind === 'CREDITNOTE') {
+        $csv = [['CN date','CN no','Against invoice','Party','GSTIN','Place of supply','Taxable','CGST','SGST','IGST','Total','Office']];
+        foreach ($rows as $r)
+            $csv[] = [$r['invoice_date'], $r['invoice_number'], $r['against_invoice'] ?? '', tally_party($r), $r['gstin'],
+                      $r['place_of_supply'], tally_amt($r['taxable']), tally_amt($r['cgst']), tally_amt($r['sgst']),
+                      tally_amt($r['igst']), tally_amt($r['total']), $r['office_name'] ?? ''];
+        return $csv;
+    }
     if ($kind === 'RECEIPT') {
         $csv = [['Date','Voucher','Party','GSTIN','Against invoice','Amount','Job']];
         foreach ($rows as $r)
@@ -538,12 +643,19 @@ function tally_record(array $rows, $kind, $ref) {
         // that happens to share an id. 'SALES'/'RECEIPT' are the old job-keyed
         // rows; 'INVOICE'/'RCPT' are the invoice register.
         $src = $r['src'] ?? '';
-        $storedKind = $src === 'INVOICE' ? 'INVOICE' : ($src === 'RECEIPT' ? 'RCPT' : $kind);
+        $storedKind = $src === 'INVOICE' ? 'INVOICE'
+            : ($src === 'RECEIPT' ? 'RCPT'
+            : ($src === 'CREDITNOTE' ? 'CN' : $kind));
         $st->execute([$ref, $storedKind, (int)$r['id'],
             $kind === 'RECEIPT' ? ($src === 'RECEIPT' ? (string)$r['job_code'] : 'RCPT-' . $r['job_code']) : (string)$r['invoice_number'],
             $kind === 'RECEIPT' ? (string)$r['payment_date'] : (string)$r['invoice_date'],
             $kind === 'RECEIPT' ? (float)$r['receipt_amount'] : (float)$r['total'],
             $by, $now]);
+        // A credit note carries a tally_ref of its own so the money desk can see
+        // at a glance it has already gone over. Best-effort; the tally_exports
+        // row above is the authority for double-import prevention.
+        if ($src === 'CREDITNOTE')
+            try { db()->prepare("UPDATE credit_notes SET tally_ref=? WHERE id=?")->execute([$ref, (int)$r['id']]); } catch (Throwable $e) {}
     }
 }
 
@@ -561,6 +673,9 @@ function tally_batches($limit = 12) {
 function tally_undo($ref) {
     tally_migrate();
     $n = (int)ops_val("SELECT COUNT(*) FROM tally_exports WHERE batch_ref=?", [$ref]);
+    // Clear the tally_ref stamp on any credit notes in this batch, so they read
+    // as not-yet-exported again alongside the tally_exports rows being removed.
+    try { db()->prepare("UPDATE credit_notes SET tally_ref='' WHERE tally_ref=?")->execute([$ref]); } catch (Throwable $e) {}
     db()->prepare("DELETE FROM tally_exports WHERE batch_ref=?")->execute([$ref]);
     return $n;
 }
@@ -568,7 +683,8 @@ function tally_undo($ref) {
 // A reference somebody can read out over the phone, and which cannot collide
 // with the one made a second earlier by the person at the next desk.
 function tally_new_ref($kind) {
-    return ($kind === 'RECEIPT' ? 'RCP' : 'SAL') . '-' . date('Ymd-His') . '-' . strtoupper(substr(bin2hex(random_bytes(2)), 0, 4));
+    $pfx = ['RECEIPT' => 'RCP', 'CREDITNOTE' => 'CRN'][$kind] ?? 'SAL';
+    return $pfx . '-' . date('Ymd-His') . '-' . strtoupper(substr(bin2hex(random_bytes(2)), 0, 4));
 }
 
 // ---- The screen ------------------------------------------------------------
@@ -592,7 +708,8 @@ function ops_tally($route, $method) {
         redirect('/tally');
     }
 
-    $kind = ($_GET['kind'] ?? $_POST['kind'] ?? 'SALES') === 'RECEIPT' ? 'RECEIPT' : 'SALES';
+    $kind = (string)($_GET['kind'] ?? $_POST['kind'] ?? 'SALES');
+    $kind = in_array($kind, ['SALES', 'RECEIPT', 'CREDITNOTE'], true) ? $kind : 'SALES';
     $from = trim((string)($_GET['from'] ?? $_POST['from'] ?? ''));
     $to   = trim((string)($_GET['to']   ?? $_POST['to']   ?? ''));
     if ($from === '' && $to === '') {          // default to the month just gone
