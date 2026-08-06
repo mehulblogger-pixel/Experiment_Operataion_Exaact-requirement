@@ -2211,6 +2211,10 @@ function ops_dispatch($route, $method) {
             return ops_cdocs($route, $method);
         case strncmp($route, 'risk', 4) === 0:
             return ops_risks($route, $method);
+        case strncmp($route, 'retention', 9) === 0:
+            return ops_retention($route, $method);
+        case strncmp($route, 'disclosure', 10) === 0:
+            return ops_disclosure($route, $method);
         case $route === 'preflight':
             ops_preflight(); return true;
         case $route === 'settings':
