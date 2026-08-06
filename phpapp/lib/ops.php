@@ -2201,6 +2201,8 @@ function ops_dispatch($route, $method) {
             return ops_competence($route, $method);
         case strncmp($route, 'equip', 5) === 0 || $route === 'report-equip-add' || $route === 'report-equip-del':
             return ops_equipment($route, $method);
+        case strncmp($route, 'sample', 6) === 0:
+            return ops_samples($route, $method);
         case $route === 'preflight':
             ops_preflight(); return true;
         case $route === 'settings':
