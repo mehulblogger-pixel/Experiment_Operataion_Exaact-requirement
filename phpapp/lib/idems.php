@@ -1419,11 +1419,20 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     if (!empty($doc['finalized']) && function_exists('verify_code_for')) {
         $vc = verify_code_for($doc);
         $vu = function_exists('verify_url') ? verify_url($doc) : '';
-        $p->needSpace(30); $p->gap(4); $p->hr([200,200,200]); $p->gap(3);
+        // A scannable QR pointing straight at the verification page, so a
+        // recipient confirms the report with a phone camera instead of typing a
+        // twenty-character code. Encoded by our own lib/qr.php (no dependencies).
+        $qr = null;
+        if ($vu !== '' && function_exists('qr_matrix')) $qr = qr_matrix($vu, 'M');
+        $qrBox = 34;                          // points (~12mm) — comfortably scannable
+        $p->needSpace($qr ? max(30, $qrBox + 6) : 30); $p->gap(4); $p->hr([200,200,200]); $p->gap(3);
+        $textY = $p->y;
+        if ($qr) $p->qr($qr, $p->right() - $qrBox, $textY, $qrBox);   // top-right, in the margin whitespace
         $p->line('Verify this ' . Tl('report') . ' is genuine and unaltered', 8.5, true, 11, [40, 95, 65]);
         if ($vu !== '') $p->line('Visit: ' . $vu, 8, false, 10, [70, 70, 70]);
         $p->line('Verification code:  ' . $vc, 9.5, true, 12, [30, 30, 30]);
         $p->line('Anyone can check this report exists, was issued, and its evidence is untampered — no account needed.', 7.5, false, 10, [125, 125, 125]);
+        if ($qr) { $p->y = max($p->y, $textY + $qrBox + 3); $p->line('Scan the code to verify.', 7, false, 9, [150, 150, 150]); }
     }
     // footer note
     if (!empty($lh['footer'])) { $p->needSpace(14); $p->hr([220,220,220]); $p->gap(3); $p->line($lh['footer'], 7.5, false, 10, [130,130,130]); }

@@ -63,6 +63,26 @@ class SimplePDF {
     public function rectFill($x, $y, $w, $h, $rgb) {
         $this->cur .= sprintf("%.3f %.3f %.3f rg %.2f %.2f %.2f %.2f re f 0 0 0 rg\n", $rgb[0] / 255, $rgb[1] / 255, $rgb[2] / 255, $x, $this->yy($y + $h), $w, $h);
     }
+    // Draw a QR matrix (bool[][], true = dark) as crisp vector squares. $x/$y are
+    // the top-left corner in points; $box is the full side length. A quiet zone is
+    // NOT added here — callers place the code in whitespace. Every dark module is
+    // one rectangle in a single black fill path, so it stays sharp at any zoom and
+    // costs nothing in file size beyond the rects themselves.
+    public function qr($matrix, $x, $y, $box) {
+        if (!is_array($matrix) || !$matrix) return;
+        $n = count($matrix);
+        $m = $box / $n;                       // module side in points
+        $path = "0 0 0 rg\n";
+        for ($r = 0; $r < $n; $r++) {
+            for ($c = 0; $c < $n; $c++) {
+                if (empty($matrix[$r][$c])) continue;
+                $px = $x + $c * $m;
+                $py = $this->yy($y + ($r + 1) * $m);   // top-origin -> PDF bottom-origin
+                $path .= sprintf("%.2f %.2f %.2f %.2f re\n", $px, $py, $m, $m);
+            }
+        }
+        $this->cur .= $path . "f\n";
+    }
     public function lineAt($x1, $y1, $x2, $y2, $rgb = [210, 210, 210], $w = 0.5) {
         $this->cur .= sprintf("%.3f %.3f %.3f RG %.2f w %.2f %.2f m %.2f %.2f l S 0 0 0 RG\n", $rgb[0] / 255, $rgb[1] / 255, $rgb[2] / 255, $w, $x1, $this->yy($y1), $x2, $this->yy($y2));
     }
