@@ -52,7 +52,18 @@ $big   = qr_matrix(str_repeat('X', 150), 'L');
 t_ok(count($big) > count($small), 'a longer payload selects a larger version');
 t_ok(qr_matrix(str_repeat('X', 5000), 'H') === null, 'an over-long payload is refused, not mis-encoded');
 
-// 5. The issued report PDF renders with the QR block without error.
+// 5. The inline-SVG renderer (used for on-screen codes like 2FA enrolment)
+//    produces a well-formed, self-contained SVG for a real otpauth:// URI. Its
+//    scannability was proven separately by rendering it in a browser and
+//    decoding it back; here we guard the markup and the empty-on-overflow rule.
+$uri = 'otpauth://totp/Exaact:me@example.com?secret=JBSWY3DPEHPK3PXP&issuer=Exaact&digits=6&period=30';
+$svg = qr_svg($uri, 190, 'M');
+t_ok(strncmp($svg, '<svg', 4) === 0 && str_contains($svg, '</svg>'), 'qr_svg returns a well-formed SVG element');
+t_ok(str_contains($svg, 'viewBox') && str_contains($svg, '<path'), 'the SVG carries a viewBox and a module path');
+t_ok(!str_contains($svg, '<image') && !str_contains($svg, 'href=') && !str_contains($svg, 'url('), 'the SVG is self-contained (no external references)');
+t_eq(qr_svg(str_repeat('X', 5000), 190, 'M'), '', 'an over-long payload yields an empty string, not broken markup');
+
+// 6. The issued report PDF renders with the QR block without error.
 if (function_exists('report_pdf_build')) {
     db()->prepare("INSERT INTO report_docs (irn, status, finalized, created_at, updated_at) VALUES (?,?,?,?,?)")
         ->execute(['TIR/26/0950', 'ISSUED', 1, date('c'), date('c')]);

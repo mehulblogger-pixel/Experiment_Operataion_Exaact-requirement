@@ -53,19 +53,33 @@
 
     <?php elseif ($pending): ?>
       <div class="ctitle" style="margin-top:0"><h3>Step 1 — add this to your app</h3></div>
-      <p class="muted" style="font-size:13.5px">
-        In your authenticator app choose <strong>Add account → Enter a setup key</strong>, then type the key below.
-        Give it any name you like — <?= e(app_name()) ?> is the obvious one.
-      </p>
-      <div style="margin:10px 0;padding:12px;border:1px dashed var(--line);border-radius:10px;background:var(--field)">
-        <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Setup key</div>
-        <code style="font-size:17px;letter-spacing:.14em;word-break:break-all"><?= e(chunk_split($pending, 4, ' ')) ?></code>
-        <div class="muted" style="font-size:11.5px;margin-top:6px">Account: <?= e($u['username']) ?> · Type: time-based · 6 digits · 30 seconds</div>
-      </div>
-      <details style="margin-bottom:12px">
-        <summary class="muted" style="cursor:pointer;font-size:12.5px">If your app can scan a link instead</summary>
-        <code style="font-size:11.5px;word-break:break-all;display:block;margin-top:6px"><?= e($uri) ?></code>
-      </details>
+      <?php $qrSvg = ($uri !== '' && function_exists('qr_svg')) ? qr_svg($uri, 190, 'M') : ''; ?>
+      <?php if ($qrSvg !== ''): ?>
+        <p class="muted" style="font-size:13.5px">
+          In your authenticator app choose <strong>Add account → Scan a QR code</strong> and point your
+          camera at this. That is the whole of Step 1.
+        </p>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;margin:10px 0">
+          <div style="padding:10px;border:1px solid var(--line);border-radius:12px;background:#fff;line-height:0">
+            <?= $qrSvg ?>
+          </div>
+          <div style="flex:1;min-width:200px">
+            <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Can't scan? Type this setup key instead</div>
+            <code style="font-size:16px;letter-spacing:.12em;word-break:break-all"><?= e(chunk_split($pending, 4, ' ')) ?></code>
+            <div class="muted" style="font-size:11.5px;margin-top:6px">Account: <?= e($u['username']) ?> · Type: time-based · 6 digits · 30 seconds</div>
+          </div>
+        </div>
+      <?php else: ?>
+        <p class="muted" style="font-size:13.5px">
+          In your authenticator app choose <strong>Add account → Enter a setup key</strong>, then type the key below.
+          Give it any name you like — <?= e(app_name()) ?> is the obvious one.
+        </p>
+        <div style="margin:10px 0;padding:12px;border:1px dashed var(--line);border-radius:10px;background:var(--field)">
+          <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em">Setup key</div>
+          <code style="font-size:17px;letter-spacing:.14em;word-break:break-all"><?= e(chunk_split($pending, 4, ' ')) ?></code>
+          <div class="muted" style="font-size:11.5px;margin-top:6px">Account: <?= e($u['username']) ?> · Type: time-based · 6 digits · 30 seconds</div>
+        </div>
+      <?php endif; ?>
 
       <div class="ctitle"><h3>Step 2 — prove it works</h3></div>
       <p class="muted" style="font-size:13.5px">Type the six digits your app is showing right now. Nothing is switched on until this matches.</p>
