@@ -45,11 +45,12 @@
     One person, one address. Give each person at the client their own sign-in rather than sharing one — a shared
     login cannot be withdrawn from the one who leaves.
   </p>
-  <form method="post" action="/portal-users" class="form-grid" style="display:grid;gap:12px;
+  <form method="post" action="/portal-users" class="form-grid" id="inviteForm" style="display:grid;gap:12px;
         grid-template-columns:repeat(auto-fit,minmax(200px,1fr));align-items:end">
+    <input type="hidden" name="contact_id" id="inv_contact_id" value="">
     <div>
       <label class="muted" style="display:block;font-size:12.5px;margin-bottom:4px">Client company</label>
-      <select class="form-control" name="partner_id" required>
+      <select class="form-control" name="partner_id" id="inv_partner" required>
         <option value="">Choose…</option>
         <?php foreach ($clients as $c): ?>
           <option value="<?= (int)$c['id'] ?>"><?= e($c['display_name'] ?: $c['legal_name']) ?></option>
@@ -57,16 +58,56 @@
       </select>
     </div>
     <div>
+      <label class="muted" style="display:block;font-size:12.5px;margin-bottom:4px">Pick a saved contact <span style="opacity:.7">(optional)</span></label>
+      <select class="form-control" id="inv_contact"><option value="">— type below instead —</option></select>
+    </div>
+    <div>
       <label class="muted" style="display:block;font-size:12.5px;margin-bottom:4px">Their name</label>
-      <input class="form-control" name="name" maxlength="150">
+      <input class="form-control" name="name" id="inv_name" maxlength="150">
     </div>
     <div>
       <label class="muted" style="display:block;font-size:12.5px;margin-bottom:4px">Their e-mail</label>
-      <input class="form-control" name="email" type="email" required>
+      <input class="form-control" name="email" id="inv_email" type="email" required>
     </div>
     <div><button class="btn" type="submit">Create the invitation</button></div>
   </form>
+  <p class="muted" style="margin:8px 0 0;font-size:12.5px">Picking a saved contact links the portal account to that
+    person on the client record, so you keep one list of who they are — not two. A typed address that matches a
+    saved contact is linked automatically.</p>
 </div>
+
+<script>
+(function () {
+  var byPartner = <?= json_encode($contactsByPartner ?? [], JSON_UNESCAPED_UNICODE) ?>;
+  var partner = document.getElementById('inv_partner');
+  var pick    = document.getElementById('inv_contact');
+  var name    = document.getElementById('inv_name');
+  var email   = document.getElementById('inv_email');
+  var cid     = document.getElementById('inv_contact_id');
+  if (!partner || !pick) return;
+  function fill() {
+    pick.innerHTML = '<option value="">— type below instead —</option>';
+    cid.value = '';
+    var list = byPartner[partner.value] || [];
+    list.forEach(function (c) {
+      var o = document.createElement('option');
+      o.value = c.id; o.textContent = c.name + (c.desig ? ' · ' + c.desig : '') + ' — ' + c.email;
+      o.dataset.name = c.name; o.dataset.email = c.email;
+      pick.appendChild(o);
+    });
+    pick.disabled = list.length === 0;
+  }
+  partner.addEventListener('change', fill);
+  pick.addEventListener('change', function () {
+    var o = pick.options[pick.selectedIndex];
+    if (pick.value) { cid.value = pick.value; name.value = o.dataset.name || ''; email.value = o.dataset.email || ''; }
+    else { cid.value = ''; }
+  });
+  // Typing an address by hand means this is not the saved contact any more.
+  email.addEventListener('input', function () { cid.value = ''; pick.value = ''; });
+  fill();
+})();
+</script>
 
 <div class="panel" style="padding:0;overflow:hidden">
   <div style="padding:16px 18px 0"><h2 style="margin:0;font-size:17px">Who can sign in</h2></div>
@@ -77,7 +118,10 @@
     <?php foreach ($rows as $r): ?>
       <tr>
         <td><?= e($r['partner_name'] ?: '—') ?></td>
-        <td><?= e($r['name'] ?: '—') ?></td>
+        <td><?= e($r['name'] ?: '—') ?>
+          <?php if (!empty($r['contact_id']) && !empty($r['contact_name'])): ?>
+            <br><span class="muted" style="font-size:11.5px" title="Linked to the contact on the client record">🔗 <?= e($r['contact_name']) ?><?= !empty($r['contact_desig']) ? ' · ' . e($r['contact_desig']) : '' ?></span>
+          <?php endif; ?></td>
         <td><?= e($r['email']) ?></td>
         <td><?php if (empty($r['is_active'])): ?>
               <span class="pill p-bad">withdrawn</span>
