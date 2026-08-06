@@ -2,6 +2,88 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🔗 PARKED FOR LAST — MGH Books integration (single finance platform) (Aug 2026)
+
+**Owner decision (Aug 2026):** build out the *whole* Inspection ERP first —
+every missing / partial / redesign item on the roadmap — and do the MGH Books
+integration **as the final phase**, once the product itself is complete. This
+section records the agreed design so nothing is lost. **Do not start this until
+the rest of the roadmap is built.**
+
+### The one rule that governs everything: Books is OPTIONAL, never required
+A customer who does **not** subscribe to MGH Books must lose nothing. The
+Inspection ERP therefore **keeps its own invoicing built in as the default**, and
+Books is an **add-on that takes over only when a customer has subscribed.** Two
+modes, one product, both fully working on their own:
+
+| | **Standalone mode** (no Books subscription) | **Connected mode** (Books subscribed) |
+|---|---|---|
+| Who issues the invoice | The Inspection ERP itself (its existing invoicing) | MGH Books |
+| Document format | Same canonical template | Same canonical template |
+| What the customer gets | Raise & track GST invoices, receipts, ageing, Tally export | The above **+ general ledger, GSTR returns, payroll, CA reports** |
+| Customer effort | Nothing — works out of the box | Nothing — just links their Books |
+
+**Non-breaking guarantee:** flip the switch off and the ERP falls straight back
+to its own invoicing. Neither app is ever gutted; the bridge is additive.
+
+### The switch — rides the existing licence system (no code for the owner)
+Add one per-customer flag, **"MGH Books connected: yes/no,"** set from Super
+Admin (it sits alongside the existing per-module licensing, e.g. the "Money"
+module). Off → ERP invoices internally (default for everyone). On → the ERP's
+"Raise invoice" becomes **"Send to Books,"** Books becomes the system of record,
+and every billable event is stamped **"sent to Books #INV-123"** so nothing is
+ever billed twice.
+
+### Same-format documents
+Make **one canonical invoice / financial-document template shared by both
+sides**, so the customer sees the *identical* document whether it came from the
+ERP (standalone) or from Books (connected). Recommendation: adopt **Books'
+format as canonical** (Books is the dedicated finance product) and align the
+ERP's built-in invoice to match, so a customer who later subscribes sees no
+change in their paperwork — it just gains real books behind it.
+
+### Single sign-on — already ~95% in place
+Both apps are already two consumers of the **same MGH identity hub**
+(`id.mghaiapps.com`): same signed-token format (`payload.sig`, HMAC-SHA256), same
+`{email, name, exp}` payload, same `MGH_SSO_SECRET`, **email as the shared
+identity**. Inspection ERP consumes it in `lib/mghsso.php`; Books consumes it in
+`sso.php`. To finish: set the *same real production secret* on both and provision
+matching accounts (same email). Then add an **app-switcher** so from the ERP a
+"📗 Accounts & GST" link opens Books already logged in, and back.
+
+### Data flow — one way, ERP → Books
+- **Parties** (clients/vendors, with GSTIN / address / state) → Books customer/supplier accounts.
+- **Accepted quotation** → Books estimate/proforma (optional).
+- **Billable event** (closed job / "to-bill" line — amount, HSN/SAC, man-days, reimbursable expenses) → Books draft invoice; Books issues the GST invoice + IRN and records the receipt.
+- **Status back** (invoice no. / IRN / issued date / paid vs outstanding) → shown on the ERP job & receivables so operations still sees the truth without recomputing it.
+
+### Hosting & mechanism (facts captured Aug 2026)
+- Owner runs a **MilesWeb VPS** → both apps can be **co-hosted on the same
+  server**, and the bridge is a **private, fast server-to-server link** (no
+  customer sees the plumbing).
+- Books must run in **server / multi-user mode** (its `api.php` + database backend
+  enabled) to receive pushed data. Confirm on the live box at build time.
+- The ERP authenticates its push into Books either via a **dedicated service
+  token** or by **piggybacking the shared SSO session** — decide at build time
+  once server mode is confirmed. Books' `api.php` already exposes `import` / `set`
+  / `create_user` actions and a documented import-JSON format.
+
+### What this replaces on the roadmap
+This integration **satisfies the two hardest finance items** with an app the
+owner already owns, instead of building them from scratch:
+- Roadmap **Step 78 — general ledger / double-entry** → provided by Books.
+- Roadmap **Step 79 — payroll & leave** → provided by Books (PF/ESI/PT/TDS/Form 16).
+It also strengthens the later multi-currency / global story, since Books owns the
+tax engine.
+
+### Security note
+The MGH Books copy shared for review was a **"super-admin test" ZIP that contains
+a live-looking `MGH_SSO_SECRET` and admin tooling** — treat it as sensitive, do
+**not** circulate it, and wire SSO with the **real production secret**, not the
+one in that zip.
+
+---
+
 ## 📋 THE OPEN LIST — everything still outstanding, in one place (July 2026)
 
 **Read this first.** Everything below this section is a running history, newest
