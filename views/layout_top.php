@@ -285,6 +285,7 @@
                 // mod.settings.view meant a business director was shown the link
                 // and then refused at the door — which reads as a broken app. ?>
           <?php if (can('mod.settings.view') && can('settings.manage')): ?><a class="s-item<?= $navOn(['settings','terminology','ai-settings','reset-data']) ?>" href="/settings"><span class="s-ic">⚙️</span><span>System settings</span></a><?php endif; ?>
+          <?php if (can('settings.manage') || is_master()): ?><a class="s-item<?= $navOn(['company-profile']) ?>" href="/company-profile"><span class="s-ic">🏢</span><span>Company profile</span></a><?php endif; ?>
         <?php $endgrp(); endif; ?>
       <?php endif; ?>
     </nav>
