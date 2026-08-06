@@ -132,6 +132,7 @@ try {
     require __DIR__ . '/lib/methods.php';
     require __DIR__ . '/lib/decisionrules.php';
     require __DIR__ . '/lib/controldocs.php';
+    require __DIR__ . '/lib/risks.php';
     require __DIR__ . '/lib/impartiality.php';
     require __DIR__ . '/lib/identity.php';
     require __DIR__ . '/lib/complaints.php';

@@ -2209,6 +2209,8 @@ function ops_dispatch($route, $method) {
             return ops_drules($route, $method);
         case strncmp($route, 'cdoc', 4) === 0:
             return ops_cdocs($route, $method);
+        case strncmp($route, 'risk', 4) === 0:
+            return ops_risks($route, $method);
         case $route === 'preflight':
             ops_preflight(); return true;
         case $route === 'settings':
