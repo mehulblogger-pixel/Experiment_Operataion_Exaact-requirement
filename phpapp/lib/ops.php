@@ -2203,6 +2203,8 @@ function ops_dispatch($route, $method) {
             return ops_equipment($route, $method);
         case strncmp($route, 'sample', 6) === 0:
             return ops_samples($route, $method);
+        case strncmp($route, 'method', 6) === 0:
+            return ops_methods($route, $method);
         case $route === 'preflight':
             ops_preflight(); return true;
         case $route === 'settings':

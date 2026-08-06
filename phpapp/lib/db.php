@@ -333,6 +333,7 @@ function boot() {
     if (function_exists('competence_migrate')) competence_migrate();   // required certificates gate allocation
     if (function_exists('equipment_migrate')) equipment_migrate();     // measuring & test equipment, §6.2
     if (function_exists('samples_migrate')) samples_migrate();         // §7.2 inspection items & samples
+    if (function_exists('methods_migrate')) methods_migrate();         // §7.1 controlled method & standard library
     if (function_exists('competence_spine_migrate')) competence_spine_migrate();
     if (function_exists('competence_cycle_migrate')) competence_cycle_migrate();  // basis, review cycle, witnessing interval  // authorisation matrix, §6.1
     if (function_exists('impartiality_migrate')) impartiality_migrate();  // §4.1 threats & declarations
