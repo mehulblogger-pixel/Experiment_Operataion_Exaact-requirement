@@ -267,6 +267,18 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
     $terms[] = 'Taxes as applicable. Prices in ' . $cur . '.';
     $i = 0;
     foreach ($terms as $t) { $i++; foreach ($p->wrap("$i. $t", 9, $p->contentW()) as $wl) $p->line($wl, 9, false, 12, [70, 70, 70]); }
+    // The free-text terms the author typed on the quote form. These were saved but
+    // never printed on the PDF — so a clause someone deliberately added silently
+    // vanished from the customer's copy. Printed here, keeping the author's own
+    // line breaks; their own numbering (if any) is preserved, so no "1." is forced.
+    $free = trim((string)($q['terms_conditions'] ?? ''));
+    if ($free !== '') {
+        $p->gap(4);
+        foreach (preg_split('/\r\n|\r|\n/', $free) as $tl) {
+            if (rtrim($tl) === '') { $p->gap(3); continue; }
+            foreach ($p->wrap(rtrim($tl), 9, $p->contentW()) as $wl) $p->line($wl, 9, false, 12, [70, 70, 70]);
+        }
+    }
     // ---- signature ----
     $p->gap(18); $p->needSpace(90);
     $sy = $p->y;
