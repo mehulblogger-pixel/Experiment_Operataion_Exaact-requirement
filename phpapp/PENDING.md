@@ -2,6 +2,34 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🎨 PARKED — UI / UX optimization pass (Aug 2026)
+
+**Owner note (Aug 2026):** after the functional build is well along, do a
+dedicated **UI/UX optimization pass** across the whole app. This is Stage J of
+the master roadmap (steps 96–100) plus the audit's UI/UX findings. Keep it on
+the list so it happens deliberately, not piecemeal. Scope to cover:
+
+- **Navigation & findability** — breadcrumb consistency, a global command
+  palette (type-to-jump beyond the search box).
+- **Dense registers** — saved views / column pickers so each user tailors the
+  big tables (respecting the configuration-first rule — a user's view is theirs).
+- **Accessibility (WCAG)** — visible keyboard focus, ARIA on interactive
+  controls, keyboard navigation, contrast checked in BOTH light and dark themes.
+- **Forms** — richer inline client-side validation to complement the strong
+  server-side gates; consistent required-field and error styling.
+- **Dashboards** — summary-before-detail, state encoded in form as well as
+  number (pills / severity stripes) so what needs attention reads at a glance.
+- **Consistency sweep** — every new screen built since the last design pass
+  (custom forms, timesheet, ratings, inspector profile, items & samples, and
+  whatever else lands) re-checked against the design-token / theme layer.
+- **Mobile/field polish** — the field-user screens get a final touch-target and
+  offline-affordance review.
+
+Do this as one coherent pass (or a few grouped batches) so the product reads as
+one system, rather than tweaking screens in isolation. New screens built before
+this pass should still follow the existing design tokens so the later pass is
+polish, not rework.
+
 ## ⭐ STANDING RULE — configuration-first, flexible per customer (Aug 2026)
 
 **Owner principle (Aug 2026):** the system must be **highly flexible and
