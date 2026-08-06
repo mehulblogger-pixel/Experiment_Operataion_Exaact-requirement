@@ -110,6 +110,7 @@ try {
     require __DIR__ . '/lib/compose.php';
     require __DIR__ . '/lib/crm.php';
     require __DIR__ . '/lib/pdf.php';
+    require __DIR__ . '/lib/qr.php';
     require __DIR__ . '/lib/ai.php';
     require __DIR__ . '/lib/workforce.php';
     require __DIR__ . '/lib/orgadmin.php';
