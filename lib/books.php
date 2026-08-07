@@ -616,6 +616,9 @@ function books_receipt_create(array $b) {
                   $u ? user_name($u) : '', date('c')]);
     $id = (int)db()->lastInsertId();
     if (function_exists('act_log')) act_log('RECEIPT', $id, 'CREATED', 'Receipt ' . $no . ' — ' . fmoney($amt + $tds));
+    // Flow the receipt to MGH Books when connected, so it matches the payment
+    // against the invoice there. No-op when Books is off.
+    if (function_exists('books_bridge_on_receipt')) { try { books_bridge_on_receipt($id); } catch (Throwable $e) {} }
     return ['id' => $id, 'no' => $no];
 }
 
@@ -714,6 +717,9 @@ function books_credit_note(array $b) {
     $id = (int)db()->lastInsertId();
     books_restatus($invId);
     if (function_exists('act_log')) act_log('INVOICE', $invId, 'CREDIT', 'Credit note ' . $no . ' for ' . fmoney($total));
+    // Flow the credit note to MGH Books when connected, so it reverses the invoice
+    // there too. No-op when Books is off.
+    if (function_exists('books_bridge_on_creditnote')) { try { books_bridge_on_creditnote($id); } catch (Throwable $e) {} }
     return ['id' => $id, 'no' => $no];
 }
 

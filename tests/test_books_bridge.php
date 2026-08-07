@@ -95,6 +95,65 @@ t_eq(books_bridge_pull_status(), 0, 'the status pull is a no-op in dry run');
 setting_set('books_connected', '0');
 t_eq(books_bridge_pull_status(), 0, 'the status pull is a no-op when disconnected');
 
+// ---- Quote / receipt / credit-note push ----
+t_section('MGH Books — quote, receipt & credit note');
+setting_set('books_connected', '1');
+setting_set('books_dryrun', '1');
+db()->exec("DELETE FROM books_outbox");
+
+// An accepted quotation with two lines maps to the Books quote shape.
+db()->prepare("INSERT INTO quotations (quote_no, rev, client_id, client_name, subject, currency,
+    subtotal, gst_pct, gst_amount, total_amount, status, accepted_date, created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+    ->execute(['Q/2627/0007', 0, $pid, 'Nayara Energy', 'Third-party inspection', 'INR',
+               20000, 18, 3600, 23600, 'ACCEPTED', '2026-07-12', date('c')]);
+$qid = (int)db()->lastInsertId();
+db()->prepare("INSERT INTO quote_lines (quote_id, line_no, description, qty, unit, rate, amount)
+    VALUES (?,?,?,?,?,?,?)")->execute([$qid, 1, 'Stage inspection', 10, 'MD', 2000, 20000]);
+$mq = books_map_quote($qid);
+t_ok($mq['quote_no'] === 'Q/2627/0007' && (float)$mq['total'] === 23600.0, 'the quote maps to the Books shape');
+t_eq($mq['party_ext'], 'ERP-BP-' . $pid, 'the quote references its client by the stable external id');
+t_eq(count($mq['lines']), 1, 'the quote lines carry across');
+t_ok(array_key_exists('pdf_b64', $mq), 'the quote carries the rendered PDF field (exact accepted document)');
+
+// Accepting the quote queues the party and the quote together.
+books_bridge_on_quote_accepted($qid);
+t_ok((int)ops_val("SELECT COUNT(*) FROM books_outbox WHERE kind='QUOTE' AND local_id=?", [$qid]) === 1
+   && (int)ops_val("SELECT COUNT(*) FROM books_outbox WHERE kind='PARTY' AND local_id=?", [$pid]) === 1,
+   'accepting a quote queues both the client and the quote');
+
+// A receipt maps and queues.
+db()->prepare("INSERT INTO receipts (receipt_no, partner_id, partner_name, receipt_date, mode, reference, amount, created_at)
+    VALUES (?,?,?,?,?,?,?,?)")->execute(['RCP/2627/0003', $pid, 'Nayara Energy', '2026-07-15', 'NEFT', 'UTR99', 11800, date('c')]);
+$rid = (int)db()->lastInsertId();
+$mr = books_map_receipt($rid);
+t_ok($mr['ext_id'] === 'ERP-RCP-' . $rid && (float)$mr['amount'] === 11800.0, 'the receipt maps to the Books shape');
+books_bridge_on_receipt($rid);
+t_eq((int)ops_val("SELECT COUNT(*) FROM books_outbox WHERE kind='RECEIPT' AND local_id=?", [$rid]), 1, 'a receipt queues');
+
+// A credit note maps against its invoice and queues.
+db()->prepare("INSERT INTO credit_notes (cn_no, invoice_id, partner_id, partner_name, cn_date, reason, total, status, created_at)
+    VALUES (?,?,?,?,?,?,?,?,?)")->execute(['CN/2627/0001', $invId, $pid, 'Nayara Energy', '2026-07-16', 'RATE_CORRECTION', 1180, 'ISSUED', date('c')]);
+$cnId = (int)db()->lastInsertId();
+$mc = books_map_creditnote($cnId);
+t_eq($mc['against_inv'], 'ERP-INV-' . $invId, 'the credit note references the invoice it reverses');
+books_bridge_on_creditnote($cnId);
+t_eq((int)ops_val("SELECT COUNT(*) FROM books_outbox WHERE kind='CREDITNOTE' AND local_id=?", [$cnId]), 1, 'a credit note queues');
+
+// Draining stamps each record type back with its Books ref.
+books_bridge_drain();
+t_ok((string)ops_val("SELECT books_ref FROM quotations WHERE id=?", [$qid]) !== '', 'the quote is stamped with its Books ref');
+t_ok((string)ops_val("SELECT books_ref FROM receipts WHERE id=?", [$rid]) !== '', 'the receipt is stamped with its Books ref');
+t_ok((string)ops_val("SELECT books_ref FROM credit_notes WHERE id=?", [$cnId]) !== '', 'the credit note is stamped with its Books ref');
+
+// When Books is off, none of the new triggers queue anything.
+setting_set('books_connected', '0');
+db()->exec("DELETE FROM books_outbox");
+books_bridge_on_quote_accepted($qid);
+books_bridge_on_receipt($rid);
+books_bridge_on_creditnote($cnId);
+t_eq((int)ops_val("SELECT COUNT(*) FROM books_outbox"), 0, 'with Books off, quote/receipt/credit-note triggers are clean no-ops');
+
 // ---- App switcher (SSO shortcut to Books) ----
 t_section('MGH Books — app switcher');
 
