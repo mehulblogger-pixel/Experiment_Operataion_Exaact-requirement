@@ -29,3 +29,4 @@ licence-server/data/
 # one-shot admin recovery file (never commit a password)
 phpapp/reset-admin.txt
 reset-admin.txt
+handoff_docs/
