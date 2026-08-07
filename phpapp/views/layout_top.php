@@ -286,6 +286,7 @@
                 // and then refused at the door — which reads as a broken app. ?>
           <?php if (can('mod.settings.view') && can('settings.manage')): ?><a class="s-item<?= $navOn(['settings','terminology','ai-settings','reset-data']) ?>" href="/settings"><span class="s-ic">⚙️</span><span>System settings</span></a><?php endif; ?>
           <?php if (can('settings.manage') || is_master()): ?><a class="s-item<?= $navOn(['company-profile']) ?>" href="/company-profile"><span class="s-ic">🏢</span><span>Company profile</span></a><?php endif; ?>
+          <?php if ((can('settings.manage') || is_master()) && function_exists('books_licensed') && books_licensed()): $bxc = function_exists('books_outbox_counts') ? books_outbox_counts() : []; ?><a class="s-item<?= $navOn(['books-bridge']) ?>" href="/books-bridge"><span class="s-ic">📗</span><span>MGH Books<?= !empty($bxc['stuck']) ? ' (' . (int)$bxc['stuck'] . ')' : '' ?></span></a><?php endif; ?>
         <?php $endgrp(); endif; ?>
       <?php endif; ?>
     </nav>
