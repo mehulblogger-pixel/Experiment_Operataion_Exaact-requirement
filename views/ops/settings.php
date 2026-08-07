@@ -177,6 +177,53 @@
   <p class="sub" style="margin-bottom:10px">Carried onto every new <?= e(Tl('quote')) ?>, where it can still be edited for that one <?= e(Tl('quote')) ?>. Changing it here does not alter <?= e(Tlp('quote')) ?> already written.</p>
   <textarea class="form-control" name="quote_terms" rows="10" style="font-family:inherit"><?= e(setting_get('quote_terms','') !== '' ? setting_get('quote_terms') : crm_default_terms()) ?></textarea>
 
+  <?php if (function_exists('numbering_types')): ?>
+  <h3 class="tab-sub">Document numbering</h3>
+  <p class="sub" style="margin-bottom:10px">Set how each reference is built — the prefix, the separator, how many digits,
+    whether the financial year is in it, and the number to start from. The example updates as you change it. Numbers already
+    issued are never renumbered; new ones follow the scheme from the next one on.</p>
+  <input type="hidden" name="numbering_form" value="1">
+  <div class="tbl-scroll" style="overflow-x:auto">
+  <table class="grid" style="min-width:720px">
+    <tr><th>Document</th><th>Prefix</th><th>Separator</th><th>Digits</th><th>Financial year</th><th>Start&nbsp;from</th><th>Example</th></tr>
+    <?php foreach (numbering_types() as $nk => $nt): $sc = numbering_scheme($nk); ?>
+    <tr data-num="<?= e($nk) ?>">
+      <td><b><?= e($nt['label']) ?></b></td>
+      <td><input class="form-control num-in" data-f="prefix" style="width:90px" name="num_<?= e($nk) ?>_prefix" value="<?= e($sc['prefix']) ?>" maxlength="20"></td>
+      <td><input class="form-control num-in" data-f="sep" style="width:56px;text-align:center" name="num_<?= e($nk) ?>_sep" value="<?= e($sc['sep']) ?>" maxlength="3"></td>
+      <td><input class="form-control num-in" data-f="pad" type="number" min="1" max="12" style="width:64px" name="num_<?= e($nk) ?>_pad" value="<?= (int)$sc['pad'] ?>"></td>
+      <td style="white-space:nowrap">
+        <label class="ff-check" style="display:inline-flex;gap:5px"><input type="checkbox" class="num-in" data-f="fy" name="num_<?= e($nk) ?>_fy" value="1" <?= $sc['fy'] ? 'checked' : '' ?>> in number</label>
+        <select class="form-control num-in" data-f="fy_style" name="num_<?= e($nk) ?>_fy_style" style="width:110px;margin-top:4px">
+          <?php foreach (numbering_fy_styles() as $sv => $sample): ?>
+            <option value="<?= e($sv) ?>" <?= $sc['fy_style'] === $sv ? 'selected' : '' ?>><?= e($sample) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </td>
+      <td><input class="form-control num-in" data-f="start" type="number" min="0" style="width:80px" name="num_<?= e($nk) ?>_start" value="<?= (int)$sc['start'] ?>" placeholder="auto"></td>
+      <td><code class="num-eg" style="font-size:14px"><?= e(numbering_preview($nk)) ?></code></td>
+    </tr>
+    <?php endforeach; ?>
+  </table>
+  </div>
+  <script>
+  (function(){
+    var fyNow = <?= json_encode(array_map(fn($s)=>numbering_fy_string($s), array_combine(array_keys(numbering_fy_styles()), array_keys(numbering_fy_styles())))) ?>;
+    document.querySelectorAll('tr[data-num]').forEach(function(row){
+      function redraw(){
+        var g=function(f){return row.querySelector('[data-f="'+f+'"]');};
+        var prefix=(g('prefix').value||'').trim(), sep=g('sep').value||'', pad=Math.max(1,Math.min(12,parseInt(g('pad').value)||5));
+        var fy=g('fy').checked, style=g('fy_style').value, start=parseInt(g('start').value)||42;
+        var stem=prefix + (fy ? sep + (fyNow[style]||'') : '') + sep;
+        var num=String(Math.max(1,start)).padStart(pad,'0');
+        row.querySelector('.num-eg').textContent = stem + num;
+      }
+      row.querySelectorAll('.num-in').forEach(function(el){ el.addEventListener('input',redraw); el.addEventListener('change',redraw); });
+    });
+  })();
+  </script>
+  <?php endif; ?>
+
   <h3 class="tab-sub">Reporting controls</h3>
   <div class="form-grid">
     <div class="ff ff-wide"><label>Source documents a complete inspection pack must contain</label>

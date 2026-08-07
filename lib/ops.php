@@ -550,6 +550,13 @@ function ops_all($sql, $args = []) { $s = db()->prepare($sql); $s->execute($args
 function ops_one($sql, $args = []) { $s = db()->prepare($sql); $s->execute($args); $r = $s->fetch(); $s->closeCursor(); return $r; }
 function ops_val($sql, $args = []) { $s = db()->prepare($sql); $s->execute($args); $v = $s->fetchColumn(); $s->closeCursor(); return $v; }
 function ops_next_code($table, $col, $prefix) {
+    // Configurable numbering: when the prefix is a known document type, the
+    // admin-controlled scheme (prefix, separator, digits, financial year, start)
+    // drives the format. Defaults reproduce the old PREFIX-00001 exactly, so an
+    // installation that changes nothing is unaffected.
+    if (function_exists('numbering_next') && numbering_has($prefix)) {
+        return numbering_next($prefix, $table, $col);
+    }
     // FIXED, and the failure was live rather than theoretical. This used to take
     // the string-highest code and cast whatever followed the last '-' to an int.
     // With CALL-E0149 in the table — a real code from an import — that is
@@ -5098,6 +5105,9 @@ function ops_settings($method) {
         // code only, never the report itself). On by default; a customer can switch
         // it off here.
         setting_set('notify_client_on_issue', !empty($_POST['notify_client_on_issue']) ? '1' : '0');
+        // Configurable document numbering (prefix, separator, digits, FY, start).
+        if (function_exists('numbering_types') && ($_POST['numbering_form'] ?? '') === '1')
+            foreach (array_keys(numbering_types()) as $nk) numbering_save($nk, $_POST);
         // Default terms & conditions carried onto every new quote.
         if (isset($_POST['quote_terms'])) setting_set('quote_terms', (string)$_POST['quote_terms']);
         // Display
