@@ -69,11 +69,43 @@ button. Gated twice — the Money module must be licensed AND the per-customer
 An **issued invoice** triggers a push of the party + invoice; a **dry-run** mode
 delivers without a live Books server (for testing the wiring), and the Books
 reference is stamped back onto the ERP invoice so nothing is billed twice.
-16 unit checks. **Remaining Books increments:** the live HTTP transport verified
-against Books' real `api.php`; parties/quotes/receipts/credit-notes push;
-**status-back** (Books invoice no. / IRN / paid vs outstanding → shown on the ERP
-job &amp; receivables); the **app-switcher** (SSO one-click to Books and back);
-and the canonical shared invoice template.
+16 unit checks.
+
+**UPDATE (Aug 2026) — the connector is now COMPLETE end-to-end on both sides.**
+Everything on the "remaining" list below has been built and tested (suite
+354/354; the receiver also live HTTP-smoke-tested over a real socket):
+
+- ✅ **Parties / quotes / receipts / credit-notes push** — the whole billable
+  trail flows ERP→Books, not just the invoice. An **accepted quotation** carries
+  the **exact ERP-rendered PDF** (base64) so Books holds the identical accepted
+  document. All idempotent, loop-broken, no-ops when Books is off. Triggers wired
+  in `crm.php` (quote accept), `books.php` (receipt, credit note).
+- ✅ **Status-back** — Books' invoice no. / IRN / paid vs outstanding written onto
+  the ERP invoice (`books_apply_status`), shown on the invoice screen; the ERP
+  never recomputes it, so the two cannot disagree. `cron.php` pulls it.
+- ✅ **App-switcher** — a "📗 Accounts &amp; GST ↗" link in the Money nav opens
+  Books already signed in via the shared SSO, gated on `books_switch_ready()`
+  (connected + web address set). No token minted — the ERP stays consumer-only.
+- ✅ **The Books-side receiver** — `mgh_books_receiver/` (NEW, separate folder for
+  the Books app): `api.php` + `lib/receiver.php`. Implements the three verbs the
+  connector calls (`set` / `import` / `status`), owns the money truth (a receipt
+  pays invoices oldest-first, a credit note reduces the one it names), replies in
+  the exact shape the ERP expects. Storage + login are behind a **13-method
+  adapter seam** (`Bkrecv_Store` + `bkrecv_auth_handler`) so the Books team points
+  it at Books' own tables/login WITHOUT touching the calculation engine — proven
+  by running the same money scenario through two different backends to identical
+  figures (`tests/test_books_receiver_adapter.php`).
+
+**Still genuinely open (needs the Books team / the live box, not ERP code):**
+- ⬜ **Bind the receiver to Books' real tables & login** — implement one
+  `Bkrecv_Store` against Books' schema + register Books' auth. Walked through in
+  `mgh_books_receiver/README.md`. (Cannot be done from the ERP repo — needs the
+  Books codebase.)
+- ⬜ **Canonical shared invoice template** — align the ERP's own standalone invoice
+  PDF to Books' invoice format so a customer who later subscribes sees identical
+  paperwork. (Deferred: needs Books' final template.)
+- ⬜ **Set the same production `MGH_SSO_SECRET` on both boxes** + matching accounts
+  (owner/ops task on the live VPS).
 
 ## 🔗 DESIGN — MGH Books integration (single finance platform) (Aug 2026)
 
