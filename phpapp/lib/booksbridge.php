@@ -71,6 +71,18 @@ function books_api_url() { return rtrim((string)setting_get('books_api_url', '')
 function books_api_token(){ return (string)setting_get('books_api_token', ''); }
 function books_configured() { return books_dryrun() || (books_api_url() !== '' && books_api_token() !== ''); }
 
+// The Books WEB address a person opens (may differ from the server-to-server API
+// address). The app-switcher link uses it. Falls back to the API host.
+function books_app_url() {
+    $u = rtrim((string)setting_get('books_app_url', ''), '/');
+    return $u !== '' ? $u : books_api_url();
+}
+// Show the "Accounts & GST" switcher only when connected and there is somewhere
+// to send people. No token is minted here — both apps consume the same MGH ID
+// hub, so a person already signed in reaches Books already signed in; the ERP
+// stays a consumer only, never an asserter of identity.
+function books_switch_ready() { return books_connected() && books_app_url() !== ''; }
+
 // ---- The outbox ----------------------------------------------------------
 // Queue a record for Books. Idempotent per (kind, local_id): an identical payload
 // to the one already delivered is dropped (loop-breaker); a still-pending item is
@@ -300,6 +312,7 @@ function ops_books_bridge($route, $method) {
         setting_set('books_connected', !empty($_POST['books_connected']) ? '1' : '0');
         setting_set('books_dryrun',    !empty($_POST['books_dryrun']) ? '1' : '0');
         setting_set('books_api_url',   trim((string)($_POST['books_api_url'] ?? '')));
+        setting_set('books_app_url',   trim((string)($_POST['books_app_url'] ?? '')));
         if (($_POST['books_api_token'] ?? '') !== '') setting_set('books_api_token', trim((string)$_POST['books_api_token']));
         flash('Books connection settings saved.' . (books_connected() ? '' : ' (Connection is off — the ' . Tl('report') . ' app keeps its own invoicing.)'));
         redirect('/books-bridge');
@@ -312,6 +325,7 @@ function ops_books_bridge($route, $method) {
     view('ops/books_bridge', [
         'connected' => books_connected(), 'licensed' => books_licensed(),
         'dryrun' => books_dryrun(), 'url' => books_api_url(), 'hasToken' => books_api_token() !== '',
+        'appUrl' => rtrim((string)setting_get('books_app_url', ''), '/'), 'switchReady' => books_switch_ready(),
         'configured' => books_configured(), 'counts' => books_outbox_counts(),
         'pending' => books_outbox_rows('PENDING', 30), 'failed' => books_outbox_rows('FAILED', 30),
     ]);

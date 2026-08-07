@@ -33,10 +33,16 @@
     <form method="post" action="/books-bridge-save" class="form-grid">
       <div class="ff ff-check"><label><input type="checkbox" name="books_connected" value="1" <?= $connected ? 'checked' : '' ?> <?= $licensed ? '' : 'disabled' ?>>
         Books is connected (it becomes the system of record for invoices)</label></div>
-      <div class="ff"><label>Books API address</label>
-        <input class="form-control" name="books_api_url" value="<?= e($url) ?>" placeholder="https://books.yourcompany.com"></div>
+      <div class="ff"><label>Books API address <span class="muted">— server-to-server (where invoices are pushed)</span></label>
+        <input class="form-control" name="books_api_url" value="<?= e($url) ?>" placeholder="https://books.yourcompany.com/api.php"></div>
       <div class="ff"><label>API token <?php if ($hasToken): ?><span class="muted">— saved; leave blank to keep</span><?php endif; ?></label>
         <input class="form-control" type="password" name="books_api_token" placeholder="<?= $hasToken ? '••••••••' : 'paste the token from Books' ?>"></div>
+      <div class="ff"><label>Books web address <span class="muted">— what a person opens; leave blank to reuse the API address</span></label>
+        <input class="form-control" name="books_app_url" value="<?= e($appUrl) ?>" placeholder="https://books.yourcompany.com">
+        <span class="muted" style="font-size:12px;margin-top:4px;display:block">
+          <?php if ($switchReady): ?>✓ The <b>📗 Accounts &amp; GST</b> link is live in the top nav — it opens Books already signed in via the shared login.
+          <?php else: ?>Set this and connect to show an <b>Accounts &amp; GST</b> shortcut in the top nav that opens Books with the same login.<?php endif; ?>
+        </span></div>
       <div class="ff ff-check"><label><input type="checkbox" name="books_dryrun" value="1" <?= $dryrun ? 'checked' : '' ?>>
         Dry run — queue and mark items delivered <em>without</em> contacting Books (for testing the wiring)</label></div>
       <div class="ff ff-check" style="align-items:end"><button class="btn" type="submit">Save connection</button></div>

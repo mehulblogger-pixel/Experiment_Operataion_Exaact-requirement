@@ -233,6 +233,11 @@
           <a class="s-item<?= $navOn(['receivables']) ?>" href="/receivables"><span class="s-ic">⏳</span><span>Receivables ageing</span></a>
           <a class="s-item<?= $navOn(['tally']) ?>" href="/tally"><span class="s-ic">📤</span><span>Tally export</span></a>
         <?php endif; ?>
+        <?php // The app-switcher: opens MGH Books in a new tab, already signed in
+              // through the shared login. Shown only once Books is connected and its
+              // web address is set. No token is minted here — the shared session
+              // carries the identity, so this is just an outbound link. ?>
+        <?php if (function_exists('books_switch_ready') && books_switch_ready()): ?><a class="s-item" href="<?= e(books_app_url()) ?>" target="_blank" rel="noopener"><span class="s-ic">📗</span><span>Accounts &amp; GST ↗</span></a><?php endif; ?>
         <?php if (can('mod.profitability.view')): ?><a class="s-item<?= $navOn(['profitability']) ?>" href="/profitability"><span class="s-ic">💹</span><span><?= e(T_REG('boss')) ?></span></a><?php endif; ?>
         <?php $endgrp(); endif; ?>
 

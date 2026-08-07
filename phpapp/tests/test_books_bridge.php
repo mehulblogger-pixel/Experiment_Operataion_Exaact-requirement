@@ -95,5 +95,28 @@ t_eq(books_bridge_pull_status(), 0, 'the status pull is a no-op in dry run');
 setting_set('books_connected', '0');
 t_eq(books_bridge_pull_status(), 0, 'the status pull is a no-op when disconnected');
 
+// ---- App switcher (SSO shortcut to Books) ----
+t_section('MGH Books — app switcher');
+
+// The web address falls back to the API address when unset.
+setting_set('books_connected', '1');
+setting_set('books_app_url', '');
+setting_set('books_api_url', 'https://books.example.com/api.php');
+t_eq(books_app_url(), 'https://books.example.com/api.php', 'the web address falls back to the API address when blank');
+
+// A distinct web address is used verbatim (trailing slash trimmed).
+setting_set('books_app_url', 'https://books.example.com/');
+t_eq(books_app_url(), 'https://books.example.com', 'a set web address wins over the API address, trailing slash trimmed');
+
+// The switcher is ready only when connected AND a web address resolves.
+t_ok(books_switch_ready(), 'the switcher is ready when connected with a web address');
+setting_set('books_connected', '0');
+t_ok(!books_switch_ready(), 'the switcher is not shown when Books is disconnected');
+setting_set('books_connected', '1');
+setting_set('books_app_url', '');
+setting_set('books_api_url', '');
+t_ok(!books_switch_ready(), 'the switcher is not shown when no address is configured');
+
 // tidy
+setting_set('books_connected', '0');
 setting_set('books_dryrun', '0');
