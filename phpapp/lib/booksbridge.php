@@ -39,6 +39,13 @@ function booksbridge_migrate() {
     if (function_exists('ensure_column')) {
         ensure_column('invoices', 'books_ref', "VARCHAR(80) DEFAULT ''");
         ensure_column('business_partners', 'books_ref', "VARCHAR(80) DEFAULT ''");
+        // Status flowing back FROM Books: its invoice number / IRN, and the paid
+        // vs outstanding truth, so operations sees it without recomputing.
+        ensure_column('invoices', 'books_irn', "VARCHAR(80) DEFAULT ''");
+        ensure_column('invoices', 'books_status', "VARCHAR(20) DEFAULT ''");
+        ensure_column('invoices', 'books_paid', "DECIMAL(16,2) DEFAULT 0");
+        ensure_column('invoices', 'books_outstanding', "DECIMAL(16,2) DEFAULT 0");
+        ensure_column('invoices', 'books_synced_at', "VARCHAR(30) DEFAULT ''");
     }
     if (function_exists('act_index')) { try { act_index('books_outbox', 'idx_bxo_go', '(status, id)'); } catch (Throwable $e) {} }
 }
@@ -209,6 +216,66 @@ function books_bridge_stamp($kind, $localId, $ref) {
         if ($kind === 'INVOICE') db()->prepare("UPDATE invoices SET books_ref=? WHERE id=?")->execute([$ref, (int)$localId]);
         elseif ($kind === 'PARTY') db()->prepare("UPDATE business_partners SET books_ref=? WHERE id=?")->execute([$ref, (int)$localId]);
     } catch (Throwable $e) { /* stamp is a convenience */ }
+}
+
+// ---- Status back (Books -> ERP) ------------------------------------------
+// Books owns the paid/outstanding truth once connected. This writes the status
+// Books reports back onto the ERP invoice — the ERP never recomputes it, so the
+// two can never disagree. Pure and directly testable.
+function books_apply_status($invId, array $st) {
+    booksbridge_migrate();
+    $invId = (int)$invId;
+    if (!$invId || !ops_val("SELECT 1 FROM invoices WHERE id=? LIMIT 1", [$invId])) return false;
+    db()->prepare("UPDATE invoices SET books_irn=?, books_status=?, books_paid=?, books_outstanding=?, books_synced_at=? WHERE id=?")
+        ->execute([
+            substr((string)($st['irn'] ?? ''), 0, 80),
+            substr((string)($st['status'] ?? ''), 0, 20),
+            (float)($st['paid'] ?? 0),
+            (float)($st['outstanding'] ?? 0),
+            date('c'), $invId,
+        ]);
+    return true;
+}
+
+// The Books view of one ERP invoice, for the detail screen. Null when the invoice
+// has not been sent to Books.
+function books_invoice_status($invId) {
+    $r = booksbridge_try(fn() => ops_one(
+        "SELECT books_ref, books_irn, books_status, books_paid, books_outstanding, books_synced_at
+         FROM invoices WHERE id=?", [(int)$invId]));
+    if (!$r || trim((string)$r['books_ref']) === '') return null;
+    return $r;
+}
+
+// Pull the current status for invoices already sent to Books. Dry run and the
+// disconnected state are clean no-ops. Live: asks Books for the status of the
+// external ids it holds and applies each. Returns a count.
+function books_bridge_pull_status($limit = 200) {
+    booksbridge_migrate();
+    if (!books_connected() || !books_configured() || books_dryrun()) return 0;
+    $rows = booksbridge_try(fn() => ops_all(
+        "SELECT id FROM invoices WHERE books_ref <> '' ORDER BY id DESC LIMIT " . (int)$limit), []) ?: [];
+    $n = 0;
+    foreach ($rows as $r) {
+        $st = books_fetch_status('ERP-INV-' . (int)$r['id']);
+        if (is_array($st) && $st) { books_apply_status((int)$r['id'], $st); $n++; }
+    }
+    return $n;
+}
+
+// Ask Books for the status of one external id. Live only.
+function books_fetch_status($extId) {
+    $url = books_api_url();
+    if ($url === '' || books_api_token() === '' || !function_exists('curl_init')) return null;
+    try {
+        $ch = curl_init($url . '/api.php?action=status&ext_id=' . rawurlencode($extId));
+        curl_setopt_array($ch, [CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . books_api_token()],
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_CONNECTTIMEOUT => 8]);
+        $res = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+        if ($res === false || $code < 200 || $code >= 300) return null;
+        $j = json_decode((string)$res, true);
+        return (is_array($j) && !empty($j['ok'])) ? ($j['status'] ?? null) : null;
+    } catch (Throwable $e) { return null; }
 }
 
 // ---- Admin view helpers --------------------------------------------------

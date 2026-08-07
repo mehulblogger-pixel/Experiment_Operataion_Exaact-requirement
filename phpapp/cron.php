@@ -230,6 +230,10 @@ if (function_exists('ads_on') && ads_on() && function_exists('ads_sync_now')) {
 if (function_exists('books_bridge_drain') && function_exists('books_connected') && books_connected()) {
     $bx = books_bridge_drain();
     echo "MGH Books queue: {$bx['sent']} sent, {$bx['failed']} failed\n";
+    if (function_exists('books_bridge_pull_status')) {
+        $pulled = books_bridge_pull_status();
+        echo "MGH Books status pulled: $pulled invoice(s)\n";
+    }
 }
 
 // ---------------------------------------------------------------------------

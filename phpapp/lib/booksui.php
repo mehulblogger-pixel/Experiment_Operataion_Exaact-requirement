@@ -122,6 +122,9 @@ function ops_books($route, $method) {
             'billable' => $inv['status'] === 'DRAFT' ? books_billable_jobs((int)$inv['partner_id'], 60) : [],
             'canIssue' => $canIssue, 'canCancel' => books_can_cancel(),
             'reasons' => CN_REASONS, 'today' => date('Y-m-d'),
+            // The Books view, when this invoice has been sent there.
+            'booksConnected' => function_exists('books_connected') && books_connected(),
+            'booksStatus' => function_exists('books_invoice_status') ? books_invoice_status((int)$inv['id']) : null,
         ]);
         return true;
     }

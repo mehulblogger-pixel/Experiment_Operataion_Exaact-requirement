@@ -66,5 +66,34 @@ db()->exec("DELETE FROM books_outbox");
 books_bridge_on_invoice_issued($invId);
 t_eq((int)ops_val("SELECT COUNT(*) FROM books_outbox"), 0, 'with Books disconnected, issuing queues nothing');
 
+// ---- Status back (Books -> ERP) ----
+t_section('MGH Books — status back');
+
+// Before Books reports anything, there is no Books status on the invoice.
+t_ok(books_invoice_status($invId) === null || trim((string)books_invoice_status($invId)['books_ref']) !== '',
+    'no Books status until it has been sent');
+
+// Stamp a Books ref (as the drain does), then apply the status Books reports.
+db()->prepare("UPDATE invoices SET books_ref=? WHERE id=?")->execute(['BK-INV-778', $invId]);
+$ok = books_apply_status($invId, ['irn' => 'IRN-77XYZ', 'status' => 'PART_PAID', 'paid' => 5000, 'outstanding' => 6800]);
+t_ok($ok, 'the Books status applies to the ERP invoice');
+
+$bs = books_invoice_status($invId);
+t_eq($bs['books_ref'], 'BK-INV-778', 'the Books reference is shown');
+t_eq($bs['books_irn'], 'IRN-77XYZ', 'the Books IRN is stored');
+t_eq($bs['books_status'], 'PART_PAID', 'the paid status comes from Books');
+t_eq((float)$bs['books_paid'], 5000.0, 'the paid figure comes from Books');
+t_eq((float)$bs['books_outstanding'], 6800.0, 'the outstanding figure comes from Books — the ERP does not recompute it');
+t_ok(trim((string)$bs['books_synced_at']) !== '', 'the sync time is recorded');
+
+// Applying to a non-existent invoice is refused, not fatal.
+t_ok(!books_apply_status(999999, ['status' => 'PAID']), 'a status for an unknown invoice is refused');
+
+// The pull is a clean no-op in dry run / when disconnected.
+setting_set('books_dryrun', '1');
+t_eq(books_bridge_pull_status(), 0, 'the status pull is a no-op in dry run');
+setting_set('books_connected', '0');
+t_eq(books_bridge_pull_status(), 0, 'the status pull is a no-op when disconnected');
+
 // tidy
 setting_set('books_dryrun', '0');

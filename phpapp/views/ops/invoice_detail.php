@@ -25,6 +25,25 @@
   </div>
 </div>
 
+<?php // ---- In MGH Books (when this invoice has been sent there) ----------- ?>
+<?php if (!empty($booksConnected) && !empty($booksStatus)): $bs = $booksStatus; ?>
+<div class="panel" style="margin-top:12px;border:1px solid var(--ok);background:color-mix(in srgb,var(--ok) 6%,transparent)">
+  <b style="font-size:14px">📗 In MGH Books</b>
+  <div class="muted" style="font-size:13px;margin-top:4px;line-height:1.7">
+    Sent to Books as <code><?= e($bs['books_ref']) ?></code><?php if (!empty($bs['books_irn'])): ?> · IRN <code><?= e($bs['books_irn']) ?></code><?php endif; ?>.
+    <?php if (trim((string)$bs['books_synced_at']) !== ''): ?>
+      Books reports
+      <?php if ($bs['books_status'] !== ''): ?><span class="pill <?= $bs['books_status']==='PAID'?'p-ok':'p-warn' ?>"><?= e($bs['books_status']) ?></span><?php endif; ?>
+      — paid <?= e(fmoney((float)$bs['books_paid'])) ?>, outstanding <?= e(fmoney((float)$bs['books_outstanding'])) ?>
+      <span style="font-size:11.5px">(as of <?= e(substr((string)$bs['books_synced_at'],0,10)) ?>)</span>.
+      Books is the system of record for this figure.
+    <?php else: ?>
+      Waiting for Books to report its status back.
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <?php // ---- Where this invoice stands, and the one next thing -------------- ?>
 <?php $ivOut = isset($settled['outstanding']) ? (float)$settled['outstanding'] : (float)$inv['total']; ?>
 <div class="nowband" style="margin-top:14px">
