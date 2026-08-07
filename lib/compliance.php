@@ -811,9 +811,10 @@ function incident_report_email($inc) {
     $L[] = '';
     $L[] = 'ORGANISATION';
     $L[] = '  Name            : ' . $org;
-    $L[] = '  Contact person  : ' . (setting_get('grievance_officer_name', '') ?: '[name — Settings → Compliance]');
-    $L[] = '  Contact e-mail  : ' . (setting_get('grievance_officer_email', '') ?: '[e-mail — Settings → Compliance]');
-    $L[] = '  Telephone       : ' . (setting_get('grievance_officer_phone', '') ?: '[telephone]');
+    $gvo = grievance_officer();   // the SAME officer set in Settings → Compliance
+    $L[] = '  Contact person  : ' . ($gvo['name']  ?: '[name — Settings → Compliance]');
+    $L[] = '  Contact e-mail  : ' . ($gvo['email'] ?: '[e-mail — Settings → Compliance]');
+    $L[] = '  Telephone       : ' . ($gvo['phone'] ?: '[telephone]');
     $L[] = '';
     $L[] = 'THE INCIDENT';
     $L[] = '  Our reference   : ' . $ref;

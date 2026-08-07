@@ -278,12 +278,26 @@
       <input class="form-control" type="number" min="180" max="3650" name="audit_retain_days" value="<?= (int)audit_retain_days() ?>">
       <small class="muted">The CERT-In directions require at least 180 days, so that is the floor. 400 covers a full year plus an audit cycle.</small></div>
     <div class="ff ff-wide"><label>Roles that must use two-step sign-in</label>
-      <div class="chip-row">
+      <div class="chip-row" id="twofaRoles">
         <?php $tr = twofa_required_roles(); foreach (ORG_ROLES as $rk=>$rl): ?>
           <label class="ff-check"><input type="checkbox" name="twofa_roles[]" value="<?= e($rk) ?>" <?= in_array($rk,$tr,true)?'checked':'' ?>> <?= e($rl) ?></label>
         <?php endforeach; ?>
       </div>
-      <small class="muted">People in these roles are asked to set it up at their next sign-in and cannot turn it off themselves. Start with the roles that can move money or change permissions.</small></div>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <?php $money = twofa_money_roles(); ?>
+        <button type="button" class="btn secondary" style="font-size:12.5px;padding:5px 11px"
+          onclick="twofaPick(<?= e(json_encode($money)) ?>)">🔒 Require it for the money roles</button>
+        <button type="button" class="btn secondary" style="font-size:12.5px;padding:5px 11px"
+          onclick="twofaPick([])">Clear all</button>
+      </div>
+      <script>
+      function twofaPick(list){
+        document.querySelectorAll('#twofaRoles input[name="twofa_roles[]"]').forEach(function(cb){
+          cb.checked = list.indexOf(cb.value) !== -1;
+        });
+      }
+      </script>
+      <small class="muted">People in these roles are asked to set it up at their next sign-in and cannot turn it off themselves. The <b>money roles</b> button ticks the accounts that move money, change permissions or issue a report in the company's name — then press <b>Save</b>.</small></div>
     <div class="ff"><label>Largest attachment allowed (MB)</label>
       <input class="form-control" type="number" min="1" max="64" name="upload_max_mb" value="<?= (int)upload_max_mb() ?>">
       <small class="muted">Applies everywhere a file can be attached.</small></div>
