@@ -356,6 +356,10 @@ function boot() {
     if (function_exists('booksbridge_migrate')) booksbridge_migrate(); // MGH Books connector: outbox + link columns
     if (function_exists('licissue_migrate')) licissue_migrate();       // Super Admin licence console: issued_licences
     if (function_exists('licbeat_migrate')) licbeat_migrate();         // self-hosted install heartbeats
+    if (function_exists('cforms_migrate')) cforms_migrate();           // no-code custom forms + custom_records
+    if (function_exists('billing_migrate')) billing_migrate();         // SaaS billing/subscriptions
+    if (function_exists('form_tokens_migrate')) form_tokens_migrate(); // CSRF form tokens
+    if (function_exists('login_attempts_migrate')) login_attempts_migrate(); // brute-force throttle
     if (function_exists('geofence_migrate')) geofence_migrate();       // site coordinates on party + job, geofenced attendance
     if (function_exists('dt_migrate')) dt_migrate();                   // per-user register settings (columns, page size)
     if (function_exists('gate_migrate')) gate_migrate();               // approval rules standing between a deal and a stage
