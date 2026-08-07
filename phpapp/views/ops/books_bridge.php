@@ -18,10 +18,11 @@
   <div class="panel">
     <div class="ctitle" style="margin-top:0"><h3>How it works</h3></div>
     <p class="muted" style="font-size:13.5px;line-height:1.65">
-      When connected, an <b>issued invoice</b> is queued and pushed to Books as the billable event — the client, the line
-      items and the tax split — and Books becomes the system of record. The push uses an <b>outbox</b>, so Books being
-      unreachable never blocks you here: the queue drains on the next scheduled run, retries a failure a few times, then
-      shows it plainly. Nothing is sent twice.
+      When connected, the billable trail flows to Books: an <b>accepted quotation</b> (carrying the exact PDF the customer
+      accepted), the <b>client</b>, the <b>issued invoice</b> with its line items and tax split, <b>money received</b> and any
+      <b>credit note</b> — and Books becomes the system of record. The push uses an <b>outbox</b>, so Books being unreachable
+      never blocks you here: the queue drains on the next scheduled run, retries a failure a few times, then shows it plainly.
+      Nothing is sent twice.
     </p>
     <p class="muted" style="font-size:13.5px;line-height:1.65">
       Turn it off and everything falls straight back to this app's own invoicing — no data is lost either way.

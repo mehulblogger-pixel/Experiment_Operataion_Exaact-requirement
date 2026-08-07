@@ -39,6 +39,11 @@ function booksbridge_migrate() {
     if (function_exists('ensure_column')) {
         ensure_column('invoices', 'books_ref', "VARCHAR(80) DEFAULT ''");
         ensure_column('business_partners', 'books_ref', "VARCHAR(80) DEFAULT ''");
+        // The other record types that flow to Books once connected: the accepted
+        // quotation (so Books can convert it), money received, and credit notes.
+        booksbridge_try(fn() => ensure_column('quotations', 'books_ref', "VARCHAR(80) DEFAULT ''"));
+        booksbridge_try(fn() => ensure_column('receipts', 'books_ref', "VARCHAR(80) DEFAULT ''"));
+        booksbridge_try(fn() => ensure_column('credit_notes', 'books_ref', "VARCHAR(80) DEFAULT ''"));
         // Status flowing back FROM Books: its invoice number / IRN, and the paid
         // vs outstanding truth, so operations sees it without recomputing.
         ensure_column('invoices', 'books_irn', "VARCHAR(80) DEFAULT ''");
@@ -157,6 +162,84 @@ function books_map_invoice($invId) {
     ];
 }
 
+// An accepted quotation, mapped to the Books quote/estimate shape so Books can
+// convert it to its own invoice. The ERP-rendered PDF is carried along as base64
+// so Books holds the EXACT document the customer accepted — same layout, same
+// numbers — without having to replicate the ERP's template engine.
+function books_map_quote($quoteId) {
+    $q = booksbridge_try(fn() => ops_one("SELECT * FROM quotations WHERE id=?", [(int)$quoteId]));
+    if (!$q) return null;
+    $lines = booksbridge_try(fn() => ops_all("SELECT * FROM quote_lines WHERE quote_id=? ORDER BY line_no, id", [(int)$quoteId]), []) ?: [];
+    $mapLine = fn($l) => [
+        'description' => trim((string)($l['description'] ?? '') ?: (string)($l['service_type'] ?? '')),
+        'qty'         => (float)($l['qty'] ?? 0),
+        'unit'        => (string)($l['unit'] ?? ''),
+        'rate'        => (float)($l['rate'] ?? 0),
+        'amount'      => (float)($l['amount'] ?? 0),
+    ];
+    $rev = (int)($q['rev'] ?? 0);
+    return [
+        'ext_id'      => 'ERP-QT-' . (int)$q['id'],
+        'quote_no'    => (string)($q['quote_no'] ?? '') . ($rev > 0 ? ' Rev ' . str_pad((string)$rev, 2, '0', STR_PAD_LEFT) : ''),
+        'date'        => (string)($q['accepted_date'] ?? '') ?: (string)($q['created_at'] ?? ''),
+        'party_ext'   => 'ERP-BP-' . (int)($q['client_id'] ?? 0),
+        'party_name'  => (string)($q['client_name'] ?? ''),
+        'subject'     => (string)($q['subject'] ?? ''),
+        'currency'    => (string)($q['currency'] ?? 'INR'),
+        'subtotal'    => (float)($q['subtotal'] ?? 0),
+        'gst_pct'     => (float)($q['gst_pct'] ?? 0),
+        'gst_amount'  => (float)($q['gst_amount'] ?? 0),
+        'total'       => (float)($q['total_amount'] ?? 0),
+        'lines'       => array_map($mapLine, $lines),
+        'pdf_b64'     => books_quote_pdf_b64($q),   // the exact accepted document, or '' if it cannot be built
+    ];
+}
+
+// Best-effort render of the quote's own PDF, base64-encoded, mirroring the
+// quote-pdf route so Books receives the identical format. Never fatal.
+function books_quote_pdf_b64($q) {
+    if (!function_exists('quote_pdf_build')) return '';
+    return (string)booksbridge_try(function () use ($q) {
+        $tpl = booksbridge_try(fn() => ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' ORDER BY is_default DESC, id DESC"), null);
+        $sig = function_exists('quote_signature') ? quote_signature($q) : [];
+        $lh  = function_exists('quote_letterhead') ? quote_letterhead() : [];
+        $pdf = quote_pdf_build($q, crm_quote_lines((int)$q['id']), $tpl ?: [], $sig, $lh);
+        return ($pdf && strlen($pdf) < 4_000_000) ? base64_encode($pdf) : '';
+    }, '');
+}
+
+// Money received, mapped so Books can match it to the invoice it pays.
+function books_map_receipt($rid) {
+    $r = booksbridge_try(fn() => ops_one("SELECT * FROM receipts WHERE id=?", [(int)$rid]));
+    if (!$r) return null;
+    return [
+        'ext_id'     => 'ERP-RCP-' . (int)$r['id'],
+        'receipt_no' => (string)($r['receipt_no'] ?? ''),
+        'date'       => (string)($r['receipt_date'] ?? '') ?: (string)($r['created_at'] ?? ''),
+        'party_ext'  => 'ERP-BP-' . (int)($r['partner_id'] ?? 0),
+        'party_name' => (string)($r['partner_name'] ?? ''),
+        'mode'       => (string)($r['mode'] ?? ''),
+        'reference'  => (string)($r['reference'] ?? ''),
+        'amount'     => (float)($r['amount'] ?? 0),
+    ];
+}
+
+// A credit note, mapped so Books can knock down the invoice it reverses.
+function books_map_creditnote($cnId) {
+    $c = booksbridge_try(fn() => ops_one("SELECT * FROM credit_notes WHERE id=?", [(int)$cnId]));
+    if (!$c) return null;
+    return [
+        'ext_id'      => 'ERP-CN-' . (int)$c['id'],
+        'cn_no'       => (string)($c['cn_no'] ?? '') ?: (string)($c['credit_note_no'] ?? ''),
+        'date'        => (string)($c['cn_date'] ?? '') ?: (string)($c['created_at'] ?? ''),
+        'party_ext'   => 'ERP-BP-' . (int)($c['partner_id'] ?? 0),
+        'party_name'  => (string)($c['partner_name'] ?? ''),
+        'against_inv' => 'ERP-INV-' . (int)($c['invoice_id'] ?? 0),
+        'reason'      => (string)($c['reason'] ?? ''),
+        'amount'      => (float)($c['total'] ?? ($c['amount'] ?? 0)),
+    ];
+}
+
 // ---- Triggers (called from the ERP when connected) -----------------------
 // An issued invoice is the billable event that goes to Books. Called from
 // books_issue(); a no-op unless connected, so the standalone path is untouched.
@@ -168,6 +251,29 @@ function books_bridge_on_invoice_issued($invId) {
     if ($mi) books_bridge_queue('INVOICE', (int)$invId, $mi);
 }
 
+// An accepted quotation flows to Books (with its party). No-op unless connected.
+function books_bridge_on_quote_accepted($quoteId) {
+    if (!books_connected()) return;
+    $party = (int)booksbridge_try(fn() => ops_val("SELECT client_id FROM quotations WHERE id=?", [(int)$quoteId]), 0);
+    if ($party) { $mp = books_map_party($party); if ($mp) books_bridge_queue('PARTY', $party, $mp); }
+    $mq = books_map_quote($quoteId);
+    if ($mq) books_bridge_queue('QUOTE', (int)$quoteId, $mq);
+}
+
+// Money received flows to Books so it matches the payment against the invoice.
+function books_bridge_on_receipt($receiptId) {
+    if (!books_connected()) return;
+    $mr = books_map_receipt($receiptId);
+    if ($mr) books_bridge_queue('RECEIPT', (int)$receiptId, $mr);
+}
+
+// A credit note flows to Books so it reverses the invoice there too.
+function books_bridge_on_creditnote($cnId) {
+    if (!books_connected()) return;
+    $mc = books_map_creditnote($cnId);
+    if ($mc) books_bridge_queue('CREDITNOTE', (int)$cnId, $mc);
+}
+
 // ---- Delivery ------------------------------------------------------------
 // POST one payload to Books. In a dry run it succeeds without contacting Books.
 // Returns [ok(bool), ext_ref(string), error(string)].
@@ -175,7 +281,12 @@ function books_bridge_deliver($kind, array $payload) {
     if (books_dryrun()) return [true, 'DRYRUN-' . substr(md5(json_encode($payload)), 0, 8), ''];
     $url = books_api_url();
     if ($url === '' || books_api_token() === '') return [false, '', 'Books connection is not configured'];
-    $action = $kind === 'INVOICE' ? 'import' : 'set';
+    // Books' api.php verb per record type: import creates a document, set upserts
+    // a master. Unknown kinds fall back to set.
+    $action = [
+        'INVOICE' => 'import', 'QUOTE' => 'import', 'CREDITNOTE' => 'import',
+        'RECEIPT' => 'import', 'PARTY' => 'set',
+    ][$kind] ?? 'set';
     $body = json_encode(['action' => $action, 'kind' => $kind, 'token' => books_api_token(), 'data' => $payload]);
     try {
         if (function_exists('curl_init')) {
@@ -224,10 +335,13 @@ function books_bridge_drain($limit = 100) {
 // Stamp the Books reference back onto the ERP record, so the desk sees it went.
 function books_bridge_stamp($kind, $localId, $ref) {
     if ($ref === '') return;
-    try {
-        if ($kind === 'INVOICE') db()->prepare("UPDATE invoices SET books_ref=? WHERE id=?")->execute([$ref, (int)$localId]);
-        elseif ($kind === 'PARTY') db()->prepare("UPDATE business_partners SET books_ref=? WHERE id=?")->execute([$ref, (int)$localId]);
-    } catch (Throwable $e) { /* stamp is a convenience */ }
+    $table = [
+        'INVOICE' => 'invoices', 'PARTY' => 'business_partners',
+        'QUOTE' => 'quotations', 'RECEIPT' => 'receipts', 'CREDITNOTE' => 'credit_notes',
+    ][$kind] ?? '';
+    if ($table === '') return;
+    try { db()->prepare("UPDATE $table SET books_ref=? WHERE id=?")->execute([$ref, (int)$localId]); }
+    catch (Throwable $e) { /* stamp is a convenience */ }
 }
 
 // ---- Status back (Books -> ERP) ------------------------------------------

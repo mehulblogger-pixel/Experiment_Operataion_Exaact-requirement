@@ -1262,6 +1262,13 @@ function ops_crm_quotes($route, $method) {
                 }
             } catch (Throwable $e) { /* never block the acceptance */ }
 
+            // If MGH Books is connected, the accepted quotation (and its client)
+            // flow across so Books can convert it — best-effort, never blocking the
+            // acceptance, a clean no-op when Books is not connected.
+            if (function_exists('books_bridge_on_quote_accepted')) {
+                try { books_bridge_on_quote_accepted((int)$q['id']); } catch (Throwable $e) {}
+            }
+
             flash(quote_landed_text($q, $res)
                 . ($dealWon ? ' The deal is now won in the sales pipeline.' : ''), 'success');
             redirect('/quote?id=' . $q['id']);
