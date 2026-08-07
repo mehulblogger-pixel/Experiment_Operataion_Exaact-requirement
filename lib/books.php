@@ -187,6 +187,18 @@ function books_series($officeId = null) {
 }
 
 function books_next_number($table, $col, $series, $fy) {
+    // Configurable format: invoices, receipts and credit notes route through the
+    // shared numbering engine (separator, digits, financial-year style), keeping
+    // the office-specific invoice series as the prefix and resetting each FY.
+    // Defaults reproduce the old SERIES/2627/0001 exactly.
+    if (function_exists('numbering_next')) {
+        $key = ['invoices' => 'INV', 'receipts' => 'RCP', 'credit_notes' => 'CN'][$table] ?? '';
+        if ($key !== '' && numbering_has($key)) {
+            $startYear = (int)substr((string)$fy, 0, 4) ?: null;
+            $prefixOverride = $table === 'invoices' ? $series : null;   // keep the office series
+            return numbering_next($key, $table, $col, $startYear, $prefixOverride);
+        }
+    }
     $fyShort = str_replace('-', '', substr((string)$fy, 2)); // 2026-27 -> 2627
     $prefix  = $series . '/' . $fyShort . '/';
     for ($try = 0; $try < 30; $try++) {
