@@ -296,6 +296,16 @@ function twofa_required_roles() {
     $s = trim((string)setting_get('twofa_roles', ''));
     return $s === '' ? [] : array_values(array_filter(array_map('trim', explode(',', $s))));
 }
+// The roles worth insisting on two-step for: the ones that move money, change
+// permissions, or issue a report in the company's name. Offered as a one-click
+// preset on the Settings screen so the owner does not have to guess which — the
+// single most common reason this control is left off. Filtered to roles that
+// actually exist, so it survives the role list changing.
+function twofa_money_roles() {
+    $candidates = ['MASTER_ADMIN', 'ADMIN', 'BUSINESS_DIRECTOR', 'FINANCE',
+                   'BRANCH_MANAGER', 'OPERATION_MANAGER', 'KEY_ACCOUNTS_MANAGER'];
+    return array_values(array_filter($candidates, fn($r) => isset(ORG_ROLES[$r])));
+}
 function twofa_required_for($u) {
     if (!$u) return false;
     $roles = twofa_required_roles();
