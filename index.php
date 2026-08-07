@@ -155,6 +155,7 @@ try {
     require __DIR__ . '/lib/search.php';
     require __DIR__ . '/lib/books.php';
     require __DIR__ . '/lib/booksui.php';
+    require __DIR__ . '/lib/booksbridge.php';
     require __DIR__ . '/lib/chain.php';
     require __DIR__ . '/lib/customer360.php';
     require __DIR__ . '/lib/advisor.php';

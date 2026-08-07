@@ -58,7 +58,24 @@ step from here on is built **configuration-first:**
 
 When a step below is built, check it against this rule before it ships.
 
-## 🔗 PARKED FOR LAST — MGH Books integration (single finance platform) (Aug 2026)
+## 🔗 IN PROGRESS — MGH Books integration (single finance platform) (Aug 2026)
+
+**Spine BUILT (Aug 2026):** `lib/booksbridge.php` + `/books-bridge`. The ERP→Books
+connector foundation is in, following the live Ads Pro contract: an **outbox**
+(the local save never fails if Books is down), **idempotency + a payload-hash
+loop-breaker**, **bounded retry with visible failure**, drained by cron or a
+button. Gated twice — the Money module must be licensed AND the per-customer
+"Books connected" switch on (off by default → the ERP keeps its own invoicing).
+An **issued invoice** triggers a push of the party + invoice; a **dry-run** mode
+delivers without a live Books server (for testing the wiring), and the Books
+reference is stamped back onto the ERP invoice so nothing is billed twice.
+16 unit checks. **Remaining Books increments:** the live HTTP transport verified
+against Books' real `api.php`; parties/quotes/receipts/credit-notes push;
+**status-back** (Books invoice no. / IRN / paid vs outstanding → shown on the ERP
+job &amp; receivables); the **app-switcher** (SSO one-click to Books and back);
+and the canonical shared invoice template.
+
+## 🔗 DESIGN — MGH Books integration (single finance platform) (Aug 2026)
 
 **Owner decision (Aug 2026):** build out the *whole* Inspection ERP first —
 every missing / partial / redesign item on the roadmap — and do the MGH Books

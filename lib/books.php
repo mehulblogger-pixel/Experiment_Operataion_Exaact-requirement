@@ -529,6 +529,9 @@ function books_issue($invoiceId) {
     db()->prepare("UPDATE invoices SET invoice_no=?, status='ISSUED', issued_at=?, issued_by=?, updated_at=? WHERE id=?")
        ->execute([$no, date('c'), $u ? user_name($u) : '', date('c'), (int)$invoiceId]);
     books_mirror_to_jobs($invoiceId);
+    // If the customer has connected MGH Books, the issued invoice is the billable
+    // event that flows across. A no-op when not connected — the ERP keeps its own.
+    if (function_exists('books_bridge_on_invoice_issued')) try { books_bridge_on_invoice_issued((int)$invoiceId); } catch (Throwable $e) {}
     if (function_exists('act_log')) act_log('INVOICE', (int)$invoiceId, 'ISSUED', 'Invoice ' . $no . ' issued for ' . fmoney($inv['total']));
     return '';
 }

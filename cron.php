@@ -40,6 +40,8 @@ require __DIR__ . '/lib/licencesync.php';
 // period, compliance.php holds the trim itself.
 require __DIR__ . '/lib/security.php';
 require __DIR__ . '/lib/compliance.php';
+require __DIR__ . '/lib/books.php';
+require __DIR__ . '/lib/booksbridge.php';
 
 // When invoked over HTTP, require a matching key so strangers can't trigger it.
 if (PHP_SAPI !== 'cli') {
@@ -221,6 +223,13 @@ if (function_exists('ads_on') && ads_on() && function_exists('ads_sync_now')) {
         if (empty($sp['err'])) setting_set('adspro_spend_day', date('Y-m-d'));
         echo "Ads Pro spend: " . (!empty($sp['err']) ? 'FAILED — ' . $sp['err'] : ($sp['msg'] ?? '')) . "\n";
     }
+}
+
+// ---------------------------------------------------------------------------
+//  MGH Books: drain the outbox (ERP -> Books). A no-op unless connected.
+if (function_exists('books_bridge_drain') && function_exists('books_connected') && books_connected()) {
+    $bx = books_bridge_drain();
+    echo "MGH Books queue: {$bx['sent']} sent, {$bx['failed']} failed\n";
 }
 
 // ---------------------------------------------------------------------------

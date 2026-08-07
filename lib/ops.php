@@ -2177,6 +2177,8 @@ function ops_dispatch($route, $method) {
             ops_agreement($route, $method); return true;
         case $route === 'company-profile':
             ops_company_profile($route, $method); return true;
+        case $route === 'books-bridge' || $route === 'books-bridge-save' || $route === 'books-bridge-drain':
+            return ops_books_bridge($route, $method);
         case $route === 'cforms' || $route === 'cform-def-save' || $route === 'cform-def-del':
             return ops_customforms($route, $method);
         case $route === 'cform' || $route === 'cform-new' || $route === 'cform-edit' || $route === 'cform-view'
