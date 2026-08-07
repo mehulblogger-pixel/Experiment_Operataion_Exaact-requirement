@@ -52,7 +52,59 @@ recomputes any of it, so the two can never disagree.
 3. In the ERP, turn **Books connected** on and clear **Dry run**. Issue a test
    invoice; it appears here, and its paid/outstanding flows back.
 
-> This reference receiver is deliberately small — it proves and documents the
-> wire format. In a full Books deployment you would point `receiver.php`'s
-> storage and auth at Books' own tables and login instead; `api.php` stays as
-> is because the contract does not change.
+## Wiring it to Books' own tables and login (the seam)
+
+The reference stores into its own `bk_parties` / `bk_documents` tables and checks
+a shared token. A real Books deployment points both at its own tables and its own
+login — and it does so **without any risk to the numbers**, because the money
+maths does not live in the storage layer.
+
+Two seams, nothing else to touch:
+
+**1. Storage.** Implement the `Bkrecv_Store` interface (13 small methods, each a
+plain row read or write — *no arithmetic*) against Books' real tables, then
+register it once at the top of `api.php`:
+
+```php
+require __DIR__ . '/lib/receiver.php';
+require __DIR__ . '/lib/books_store.php';      // your class BooksStore implements Bkrecv_Store
+bkrecv_store(new BooksStore($booksPdo));
+```
+
+**2. Login.** Hand the receiver Books' own check:
+
+```php
+bkrecv_auth_handler(fn($token) => books_verify_api_key($token));   // your function
+```
+
+That is the whole change. `api.php` and the entire calculation engine in
+`receiver.php` stay untouched.
+
+### Why this is safe
+
+The arithmetic — a receipt paying invoices oldest-first, a credit note reducing
+one, the paid/part/unpaid label, the outstanding figure — is written exactly once
+in `receiver.php` and only ever calls the store to read and write rows. An adapter
+cannot compute a figure, so a wrong adapter can misfile or lose a record, but it
+**cannot make Books disagree with the ERP**. The test suite proves this: the same
+money scenario is run through the SQL store *and* a completely different in-memory
+store, and both return the identical figures to the paisa
+(`tests/test_books_receiver_adapter.php`). If any maths ever leaked into a store,
+those two backends would diverge and the test would fail.
+
+### The 13 methods
+
+| Method | Does |
+|--------|------|
+| `partyByExt` / `partyUpsert` | find / create-or-update a customer by ERP ext id |
+| `docByExt` | find any document by ERP ext id (the idempotency check) |
+| `invoiceInsert` / `invoiceHeaderUpdate` | create / refresh an invoice header |
+| `invoiceGet` / `invoiceByExt` | read an invoice's figures by id / by ext id |
+| `openInvoicesByParty` | a party's unpaid invoices, oldest first |
+| `invoicePay` | add a payment to one invoice |
+| `invoiceSetOutstanding` / `invoiceSetStatus` | set the two derived fields |
+| `simpleUpsert` | store a quote / receipt / credit note and reference it |
+| `ensureSchema` | create/verify tables once (a no-op if Books already has them) |
+
+> The reference `Bkrecv_PdoStore` at the bottom of `receiver.php` is a complete
+> worked example of all 13 — copy its shape, point the SQL at Books' tables.
