@@ -55,3 +55,37 @@ t_eq($c, 'ZZZ-00001', 'a prefix with no configured scheme falls back to the defa
 
 // tidy the setting so other tests see defaults
 setting_set('numbering_CALL', '');
+
+// ---- Money documents (invoice / receipt / credit note) via books_next_number ----
+// Uses the REAL invoices/credit_notes tables, because books_next_number keys the
+// scheme off the table name.
+t_section('configurable numbering — money documents');
+books_migrate();
+$mintInv = function ($series, $fy) { $c = books_next_number('invoices', 'invoice_no', $series, $fy);
+    db()->prepare("INSERT INTO invoices (invoice_no, created_at) VALUES (?,?)")->execute([$c, date('c')]); return $c; };
+
+// 1. Default reproduces the old SERIES/2627/0001 format exactly (backward compatible).
+setting_set('numbering_INV', '');
+db()->exec("DELETE FROM invoices");
+t_eq($mintInv('INV', '2026-27'), 'INV/2627/0001', 'the default invoice format is unchanged');
+t_eq($mintInv('INV', '2026-27'), 'INV/2627/0002', 'and increments within the year');
+
+// 2. The series resets each financial year (a GST requirement).
+t_eq($mintInv('INV', '2027-28'), 'INV/2728/0001', 'the number resets to 0001 in a new financial year');
+t_eq($mintInv('INV', '2026-27'), 'INV/2627/0003', 'the previous year continues from where it was');
+
+// 3. The office-specific invoice series is kept as the prefix.
+t_eq($mintInv('AMD', '2026-27'), 'AMD/2627/0001', 'an office-specific series is honoured');
+
+// 4. A configured format (separator, width, FY style) takes effect.
+setting_set('numbering_INV', json_encode(['sep' => '-', 'pad' => 5, 'fy' => 1, 'fy_style' => 'YYYY-YY']));
+db()->exec("DELETE FROM invoices");
+t_eq($mintInv('INV', '2026-27'), 'INV-2026-27-00001', 'a custom separator, width and FY style are honoured on invoices');
+
+// 5. Credit notes follow their own configurable scheme.
+setting_set('numbering_CN', '');
+db()->exec("DELETE FROM credit_notes");
+$cn = books_next_number('credit_notes', 'cn_no', 'CN', '2026-27');
+t_eq($cn, 'CN/2627/0001', 'credit notes number in their own FY series by default');
+
+setting_set('numbering_INV', '');

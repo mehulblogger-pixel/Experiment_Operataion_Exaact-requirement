@@ -186,10 +186,15 @@
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="grid" style="min-width:720px">
     <tr><th>Document</th><th>Prefix</th><th>Separator</th><th>Digits</th><th>Financial year</th><th>Start&nbsp;from</th><th>Example</th></tr>
-    <?php foreach (numbering_types() as $nk => $nt): $sc = numbering_scheme($nk); ?>
+    <?php foreach (numbering_types() as $nk => $nt): $sc = numbering_scheme($nk); $fromOffice = !empty($sc['prefix_from']); ?>
     <tr data-num="<?= e($nk) ?>">
-      <td><b><?= e($nt['label']) ?></b></td>
-      <td><input class="form-control num-in" data-f="prefix" style="width:90px" name="num_<?= e($nk) ?>_prefix" value="<?= e($sc['prefix']) ?>" maxlength="20"></td>
+      <td><b><?= e($nt['label']) ?></b><?php if (!empty($sc['money'])): ?><br><span class="muted" style="font-size:11px">resets each financial year</span><?php endif; ?></td>
+      <td><?php if ($fromOffice): ?>
+            <span class="muted" style="font-size:12px">from office code</span>
+            <input type="hidden" data-f="prefix" name="num_<?= e($nk) ?>_prefix" value="<?= e($sc['prefix']) ?>">
+          <?php else: ?>
+            <input class="form-control num-in" data-f="prefix" style="width:90px" name="num_<?= e($nk) ?>_prefix" value="<?= e($sc['prefix']) ?>" maxlength="20">
+          <?php endif; ?></td>
       <td><input class="form-control num-in" data-f="sep" style="width:56px;text-align:center" name="num_<?= e($nk) ?>_sep" value="<?= e($sc['sep']) ?>" maxlength="3"></td>
       <td><input class="form-control num-in" data-f="pad" type="number" min="1" max="12" style="width:64px" name="num_<?= e($nk) ?>_pad" value="<?= (int)$sc['pad'] ?>"></td>
       <td style="white-space:nowrap">
@@ -206,6 +211,9 @@
     <?php endforeach; ?>
   </table>
   </div>
+  <p class="muted" style="font-size:12.5px;margin-top:8px"><b><?= e(Tl('report')) ?> numbers (IRN)</b> use a richer token
+    template (company, branch, year, client, type, serial) configured under
+    <a href="/irn-rules">Reports → IRN numbering rules</a>. Contract numbers are entered by hand from the client's PO.</p>
   <script>
   (function(){
     var fyNow = <?= json_encode(array_map(fn($s)=>numbering_fy_string($s), array_combine(array_keys(numbering_fy_styles()), array_keys(numbering_fy_styles())))) ?>;
