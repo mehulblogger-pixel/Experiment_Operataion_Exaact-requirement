@@ -428,8 +428,11 @@ function crm_next_quote_no() {
     // by the time we look again, step past it.
     $no = ops_next_code('quotations', 'quote_no', 'Q');
     for ($i = 0; $i < 50 && quote_no_taken($no, 0); $i++) {
-        $n = (int)substr($no, strrpos($no, '-') + 1);
-        $no = sprintf('Q-%05d', $n + 1);
+        // Step to the next sequence number in whatever numbering scheme is
+        // configured for quotations, rather than assuming the Q-00001 default.
+        if (preg_match('/(\d+)$/', $no, $m) && function_exists('numbering_format_seq'))
+            $no = numbering_format_seq('Q', (int)$m[1] + 1);
+        else { $n = (int)substr($no, strrpos($no, '-') + 1); $no = sprintf('Q-%05d', $n + 1); }
     }
     return $no;
 }

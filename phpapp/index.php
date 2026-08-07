@@ -106,6 +106,7 @@ try {
     require __DIR__ . '/lib/lookups.php';
     require __DIR__ . '/lib/licence.php';
     require __DIR__ . '/lib/access.php';
+    require __DIR__ . '/lib/numbering.php';
     require __DIR__ . '/lib/terms.php';
     require __DIR__ . '/lib/compose.php';
     require __DIR__ . '/lib/crm.php';
