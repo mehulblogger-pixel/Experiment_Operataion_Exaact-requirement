@@ -29,9 +29,10 @@
 ?>
   <div class="row-actions">
     <?php if ($mailTo): ?><a class="btn secondary" href="<?= e($mailtoHref) ?>">✉️ Open in Outlook</a><?php endif; ?>
+    <?php $canAllocTop = function_exists('call_can_allocate') ? call_can_allocate($call) : is_coordinator_level(); ?>
     <?php if (is_coordinator_level()): ?>
       <a class="btn secondary" href="/call-edit?id=<?= (int)$call['id'] ?>">Edit call</a>
-      <a class="btn" href="/job-new?call=<?= (int)$call['id'] ?>">+ Allocate Job</a>
+      <?php if ($canAllocTop): ?><a class="btn" href="/job-new?call=<?= (int)$call['id'] ?>">+ Allocate Job</a><?php endif; ?>
       <?php if (can('mod.idems.edit') || is_master()): ?><a class="btn secondary" href="/document-new?call=<?= (int)$call['id'] ?>" title="Create an inspection report — all known details are filled in">📑 New report</a><?php endif; ?>
     <?php endif; ?>
     <?php if (is_master() || can('ops.call.delete')): ?>
@@ -51,8 +52,20 @@
   }
   $callDone = strtoupper((string)($call['status'] ?? '')) === 'CLOSED'
               || ($jobsN > 0 && $closedN === $jobsN);
-  $canAlloc = is_coordinator_level();
+  $canAlloc = function_exists('call_can_allocate') ? call_can_allocate($call) : is_coordinator_level();
+  // A contracting-office coordinator sees the call but cannot allocate it — the
+  // executing office does that. Say so, rather than silently hiding the button.
+  $contractOnly = is_coordinator_level() && !$canAlloc;
+  $execName = $contractOnly ? ops_val("SELECT name FROM offices WHERE id=?", [call_exec_office($call)]) : '';
 ?>
+<?php if ($contractOnly): ?>
+<div class="nowband" style="border-left:4px solid var(--info,#1c5a86)">
+  <div class="step">Carried out by <?= e($execName ?: 'another ' . Tlp('office')) ?>.</div>
+  <p class="next">Your <?= e(Tl('office')) ?> contracts this <?= e(Tl('call')) ?> and will invoice it, so you can
+    see and track it here — but allocating the <?= e(Tl('engineer')) ?> is the executing <?= e(Tl('office')) ?>'s
+    responsibility, and so is the <?= e(Tl('report')) ?>.</p>
+</div>
+<?php endif; ?>
 <div class="nowband">
   <?php if ($callDone): ?>
     <div class="step">Done — the work is finished.</div>

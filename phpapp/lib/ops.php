@@ -505,6 +505,32 @@ function is_master() { return ua()['master']; }
 function is_admin_level() { return in_array(user_role(), MGMT_ROLES, true); }
 function is_coordinator_level() { return is_admin_level() || in_array(user_role(), ['ASST_MANAGER','COORDINATOR'], true); }
 function is_inspector() { return user_role() === 'INSPECTOR'; }
+
+// Which office actually executes a call (does the field work). Falls back to the
+// inter-branch order office; 0 means it was never set.
+function call_exec_office($call) {
+    $e = (int)($call['executing_office_id'] ?? 0);
+    return $e > 0 ? $e : (int)($call['ibo_office_id'] ?? 0);
+}
+// Allocating a call — assigning the engineer / raising the job — is the EXECUTING
+// office's responsibility. When the contracting and executing offices differ, the
+// contracting office can SEE the call (it owns the client and will invoice it) but
+// must not allocate it: the office doing the work decides who goes. Head office /
+// all-office scope may always allocate, and a call with no executing office set is
+// not blocked (nothing to enforce against).
+// The pure decision, split out so it can be tested without a live sign-in:
+// a coordinator may allocate when they have all-office scope, when the executing
+// office is unset, or when their office scope includes the executing office.
+function call_alloc_allowed($execOffice, $scopeOffices, $isCoord) {
+    if (!$isCoord) return false;
+    if ($scopeOffices === 'ALL' || !is_array($scopeOffices) || !$scopeOffices) return true;
+    $exec = (int)$execOffice;
+    if ($exec <= 0) return true;
+    return in_array($exec, array_map('intval', $scopeOffices), true);
+}
+function call_can_allocate($call) {
+    return call_alloc_allowed(call_exec_office($call), scope_offices(), is_coordinator_level());
+}
 function can_see_salary() { return can('data.salary'); } // salary/cost visibility
 // What the branch keeps out of an invoice. Deliberately a separate permission
 // from the credit itself: a coordinator has to see the credit to do the job,
@@ -3888,6 +3914,17 @@ function ops_jobs($route, $method) {
         } else {
             $call = ops_one("SELECT * FROM calls WHERE id=?", [(int)($_GET['call'] ?? 0)]);
             if (!$call) { flash('Pick a call to allocate first.', 'error'); redirect('/calls'); }
+        }
+        // Only the executing office allocates. A contracting-office coordinator can
+        // open and read the call but not raise work on it — that is the executing
+        // office's responsibility.
+        if ($call && !call_can_allocate($call)) {
+            $eo = ops_val("SELECT name FROM offices WHERE id=?", [call_exec_office($call)]);
+            $msg = 'This ' . Tl('call') . ' is carried out by ' . ($eo ?: 'another ' . Tl('office'))
+                . '. Only that ' . Tl('office') . ' can allocate it — you can see it because your '
+                . Tl('office') . ' contracts it and will invoice it.';
+            flash($msg, 'error');
+            redirect('/call?id=' . (int)$call['id']);
         }
         if ($method === 'POST') {
             $b = $_POST;
