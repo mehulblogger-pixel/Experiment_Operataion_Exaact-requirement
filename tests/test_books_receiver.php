@@ -7,7 +7,7 @@
 // renamed on either side, this test fails.
 t_section('MGH Books receiver — round trip');
 
-require __DIR__ . '/../../mgh_books_receiver/lib/receiver.php';
+require_once __DIR__ . '/../../mgh_books_receiver/lib/receiver.php';
 
 // Give the receiver its own throwaway database (separate from the ERP's) and a
 // shared token, so auth and storage are exercised for real.
