@@ -69,6 +69,8 @@ function lk_current_pubkey() { return function_exists('lk_pubkey') ? lk_pubkey()
 // licences, pricing/payment, and signing. Master Admin, control site only.
 function ops_vendor($route, $method) {
     ops_require(lk_console_allowed(), 'The Super Admin panel is for the Master Admin, on the main site.');
+    licissue_migrate();   // the panel counts issued licences; make sure the table exists first
+    licbeat_migrate();
     if ($route === 'signing-setup' && $method === 'POST') {
         $r = lk_setup_signing();
         flash(!empty($r['ok']) ? 'Signing is set up. You can now issue licences.' : ($r['err'] ?? 'Could not set up signing.'),

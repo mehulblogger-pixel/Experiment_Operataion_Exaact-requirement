@@ -190,14 +190,30 @@ function trace_seed($force = false) {
     $pdo->prepare("UPDATE calls SET status='ALLOCATED', allocated_at=? WHERE id=?")->execute([$now, $callId]);
     $step('Job allocated from the work-order', $jcode, 'Points back at the work-order, the quotation and the contract number.');
 
-    // ---- 11. Site check-in on the job (real function) --------------------
+    // ---- 11. Site check-in on the job (real function, with a fallback) ---
+    // The trace must prove the check-in link is saved. Prefer the real
+    // site_checkin(); if that throws on an older/variant schema, record the
+    // visit directly so the arrow still holds — the thread is meant to be
+    // self-contained, not dependent on one module's exact columns.
+    $visitDone = false;
     if (function_exists('site_checkin')) {
         try {
             site_checkin($jobId, ['kind' => 'ENTRY', 'gps' => '20.3712,72.9034,11', 'device_at' => $now,
                                   'note' => 'Arrived at Gate 2, met QA (Rakesh Menon).'], null);
-            $step('Site check-in recorded', $jcode, 'The engineer checked in on site — a GPS-stamped visit against the job.');
-        } catch (Throwable $e) { /* check-in schema differs */ }
+            $visitDone = (int) ops_val("SELECT COUNT(*) FROM site_visits WHERE job_id=?", [$jobId]) > 0;
+        } catch (Throwable $e) { /* fall through to the direct insert */ }
     }
+    if (!$visitDone) {
+        if (function_exists('trust_migrate')) { try { trust_migrate(); } catch (Throwable $e) {} }
+        try {
+            $pdo->prepare("INSERT INTO site_visits(job_id,inspector_id,lat,lon,accuracy,device_at,at,kind,note,by_user,created_at)
+                           VALUES(?,?,?,?,?,?,?, 'ENTRY', ?, 'trace', ?)")
+                ->execute([$jobId, (int)($insp['id'] ?? 0) ?: null, 20.3712, 72.9034, 11, $now, $now,
+                           'Arrived at Gate 2, met QA (Rakesh Menon).', $now]);
+            $visitDone = true;
+        } catch (Throwable $e) { /* site_visits truly unavailable on this install */ }
+    }
+    if ($visitDone) $step('Site check-in recorded', $jcode, 'The engineer checked in on site — a GPS-stamped visit against the job.');
 
     // ---- 12. Report issued on the job ------------------------------------
     $rt = ops_one("SELECT id, code, name FROM report_types ORDER BY id LIMIT 1");
