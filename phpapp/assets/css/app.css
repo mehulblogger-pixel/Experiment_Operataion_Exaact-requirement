@@ -216,8 +216,15 @@ table.grid tr:hover td{background:color-mix(in srgb,var(--brand) 5%,transparent)
 .tabs a.active{box-shadow:inset 0 3px 0 var(--brand)}
 .tab-body{border-radius:0 var(--radius) var(--radius) var(--radius);box-shadow:var(--shadow)}
 .master-head h1{margin-bottom:2px}
-/* keep wide tables from pushing the page sideways on small screens */
-@media (max-width:640px){table.grid{display:block;overflow-x:auto;white-space:nowrap}}
+/* keep wide tables from pushing the page sideways on small screens: each
+   scrolls inside its own box instead of stretching (or freezing) the page */
+@media (max-width:640px){
+  table.grid,table.dt{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;max-width:100%}
+  .tbl-scroll{-webkit-overflow-scrolling:touch}
+  /* the widest register (quote lines) must not force a 1500px page — let it scroll */
+  table.dt.qlines{min-width:0;width:max-content}
+  .crumbs{flex-wrap:wrap}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
 /* ============================================================
