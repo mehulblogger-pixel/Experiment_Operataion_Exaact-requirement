@@ -39,9 +39,20 @@
           // Before this existed the invoice form asked for both on every single
           // bill, which is how one customer ends up on 30 days in March and 45
           // in April with nobody able to say which was right. ?>
+    <?php // A dropdown from the Payment terms master (Masters → Payment term),
+          // with the current value kept even if it is a custom one not in the list,
+          // and a blank "— none —" so it is optional. Add new terms under Masters. ?>
     <div class="ff"><label>Payment terms <span class="muted">— carried onto their invoices</span></label>
-      <input class="form-control" name="payment_terms" maxlength="120" value="<?= e($p['payment_terms'] ?? '') ?>"
-             placeholder="e.g. 45 days from invoice date"></div>
+      <?php $ptOpts = function_exists('lk_options_or') ? lk_options_or('payment_term', defined('PAYMENT_TERMS') ? PAYMENT_TERMS : []) : [];
+            $ptCur = (string)($p['payment_terms'] ?? ''); ?>
+      <select class="form-control searchable" name="payment_terms">
+        <option value="">— none —</option>
+        <?php $ptSeen = false; foreach ($ptOpts as $k => $lab): $val = (string)$lab; if ($val === $ptCur) $ptSeen = true; ?>
+          <option value="<?= e($val) ?>" <?= $val === $ptCur ? 'selected' : '' ?>><?= e($val) ?></option>
+        <?php endforeach; ?>
+        <?php if ($ptCur !== '' && !$ptSeen): ?><option value="<?= e($ptCur) ?>" selected><?= e($ptCur) ?> (current)</option><?php endif; ?>
+      </select>
+      <small class="muted">Add or edit options under <a href="/lookup?key=payment_term">Masters → Payment terms</a>.</small></div>
     <div class="ff"><label>Credit days <span class="muted">— sets the due date on their invoices</span></label>
       <input class="form-control" type="number" min="0" name="credit_days" value="<?= e((string)($p['credit_days'] ?? '')) ?>"
              placeholder="e.g. 45"></div>
