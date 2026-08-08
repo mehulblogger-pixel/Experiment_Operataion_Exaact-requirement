@@ -512,15 +512,32 @@ function lk_admin($route, $method) {
             function_exists('cform_slugs') ? cform_slugs() : [], array_keys(ops_masters()));
         $entity = in_array($_GET['entity'] ?? 'call', $allowedEntities, true) ? $_GET['entity'] : 'call';
         if ($method === 'POST') {
+            $editId = (int)($_POST['edit_id'] ?? 0);
             $label = trim($_POST['label'] ?? '');
             $type = in_array($_POST['field_type'] ?? '', ['text', 'number', 'date', 'select', 'dependent'], true) ? $_POST['field_type'] : 'text';
             $lt = ($_POST['lookup_type_id'] ?? '') !== '' ? (int)$_POST['lookup_type_id'] : null;
             $req = !empty($_POST['required']) ? 1 : 0;
+            $sort = ($_POST['sort_order'] ?? '') !== '' ? (int)$_POST['sort_order'] : 99;
             if ($label === '') { flash('Enter a field label.', 'error'); redirect('/custom-fields?entity=' . $entity); }
+            if ($editId) {
+                // Edit an existing field. The field_key and field_type are kept
+                // as-is so data already saved under this field is not orphaned;
+                // the label, order, required flag and (for dropdowns) the master
+                // list can all be changed. Changing the list is only meaningful
+                // for select/dependent fields.
+                $cur = ops_one("SELECT * FROM custom_fields WHERE id=? AND entity=?", [$editId, $entity]);
+                if (!$cur) { flash('That field no longer exists.', 'error'); redirect('/custom-fields?entity=' . $entity); }
+                $isDrop = in_array($cur['field_type'], ['select', 'dependent'], true);
+                if ($isDrop && !$lt) { flash('Pick which master list this dropdown uses.', 'error'); redirect('/custom-fields?entity=' . $entity); }
+                $pdo->prepare("UPDATE custom_fields SET label=?, lookup_type_id=?, required=?, sort_order=? WHERE id=? AND entity=?")
+                    ->execute([$label, $isDrop ? $lt : $cur['lookup_type_id'], $req, $sort, $editId, $entity]);
+                flash("Field \"$label\" updated.");
+                redirect('/custom-fields?entity=' . $entity);
+            }
             if (in_array($type, ['select', 'dependent'], true) && !$lt) { flash('Pick which master list this dropdown uses.', 'error'); redirect('/custom-fields?entity=' . $entity); }
             $fkey = strtolower(trim(preg_replace('/[^a-zA-Z0-9_]+/', '_', $label)));
             $pdo->prepare("INSERT INTO custom_fields (entity,field_key,label,field_type,lookup_type_id,required,sort_order,active,created_at)
-                VALUES (?,?,?,?,?,?,?,1,?)")->execute([$entity, $fkey, $label, $type, $lt, $req, 99, date('c')]);
+                VALUES (?,?,?,?,?,?,?,1,?)")->execute([$entity, $fkey, $label, $type, $lt, $req, $sort === 99 ? 99 : $sort, date('c')]);
             flash("Field \"$label\" added to the " . ucfirst($entity) . " form.");
             redirect('/custom-fields?entity=' . $entity);
         }
@@ -529,7 +546,8 @@ function lk_admin($route, $method) {
             flash('Field removed.');
             redirect('/custom-fields?entity=' . $entity);
         }
-        view('ops/custom_fields', ['entity' => $entity, 'fields' => custom_fields_for($entity, false), 'types' => lk_types(), 'entities' => $allowedEntities]);
+        $editField = ($_GET['edit'] ?? '') !== '' ? ops_one("SELECT * FROM custom_fields WHERE id=? AND entity=?", [(int)$_GET['edit'], $entity]) : null;
+        view('ops/custom_fields', ['entity' => $entity, 'fields' => custom_fields_for($entity, false), 'types' => lk_types(), 'entities' => $allowedEntities, 'editField' => $editField]);
         return;
     }
 }
