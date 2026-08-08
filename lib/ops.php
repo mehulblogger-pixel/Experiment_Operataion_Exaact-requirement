@@ -3070,6 +3070,9 @@ function ops_calls($route, $method) {
             // The client's expected date is the first visit, so the two never disagree.
             if ($dates && ($b['inspection_required_date'] ?? '') === '') $b['inspection_required_date'] = $dates[0];
             $fields = call_save_fields();
+            // Drop any field whose column is missing (partial upload) so the whole
+            // save cannot crash on one unknown column — it is added on next boot.
+            if (function_exists('existing_columns_only')) $fields = existing_columns_only('calls', $fields);
             $wasForwarded = $call ? ($call['executing_office_id'] ?? null) : null;
             $forwardNow = $execOffice && !$wasForwarded; // first time it gets an executing branch
             // §b — forwarding is the moment the work leaves this desk: somebody
@@ -3979,6 +3982,9 @@ function ops_jobs($route, $method) {
                 return;
             }
             $fields = job_save_fields();
+            // As with calls: keep only columns that exist, so a partially-uploaded
+            // jobs table degrades gracefully instead of crashing the allocation.
+            if (function_exists('existing_columns_only')) $fields = existing_columns_only('jobs', $fields);
             // deliverables come as a checkbox array -> stored as CSV of codes
             $deliverables = implode(',', array_filter((array)($b['deliverables'] ?? [])));
             // Same shape for the chargeable headings. If the allocate form did

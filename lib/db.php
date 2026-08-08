@@ -154,6 +154,34 @@ function ensure_schema() {
     foreach ($tables as $sql) $pdo->exec($sql);
 }
 
+// The existing columns of a table, as a name => true map. Lets a dynamic
+// INSERT/UPDATE skip a column that is missing on a partially-uploaded install
+// (some files new, some old) instead of crashing the whole save with "Unknown
+// column". The column is added on the next boot() migrate, so this is only a
+// safety net for the brief window of a piecemeal upload.
+function table_columns($table) {
+    static $cache = [];
+    if (isset($cache[$table])) return $cache[$table];
+    $pdo = db(); $out = [];
+    try {
+        if (db_driver() === 'sqlite') {
+            foreach ($pdo->query("PRAGMA table_info(`$table`)")->fetchAll() as $c) $out[(string)$c['name']] = true;
+        } else {
+            foreach ($pdo->query("SHOW COLUMNS FROM `$table`")->fetchAll() as $c) $out[(string)$c['Field']] = true;
+        }
+    } catch (Throwable $e) { /* unknown table → empty map, caller falls back */ }
+    return $cache[$table] = $out;
+}
+
+// Keep only the field names that really exist as columns on $table. Returns the
+// list unchanged when introspection finds nothing (so a mis-detected table never
+// blanks a save). Use for dynamic column lists on partially-upgraded installs.
+function existing_columns_only($table, array $fields) {
+    $have = table_columns($table);
+    if (!$have) return $fields;
+    return array_values(array_filter($fields, fn($f) => isset($have[$f])));
+}
+
 // Add a column to an existing table if it's missing (safe on upgrades).
 function ensure_column($table, $col, $def) {
     $pdo = db();
