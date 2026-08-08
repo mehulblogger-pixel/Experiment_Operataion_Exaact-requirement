@@ -491,7 +491,16 @@ function logo_html() {
     $d = setting_get('logo_data', '');
     return $d ? '<img src="' . e($d) . '" alt="logo" style="height:30px;vertical-align:middle;background:#fff;border-radius:4px;padding:2px 6px">' : '';
 }
-function app_name() { return setting_get('app_name', '') ?: 'Inspection Ops'; }
+// The name shown in the header/title. An explicit app_name still wins, but when
+// it is blank we fall back to the company brand/legal name set in Company profile
+// — so filling that screen updates the header, which is what a user expects
+// (previously the two were separate settings and the header never changed).
+function app_name() {
+    return setting_get('app_name', '')
+        ?: (setting_get('company_name', '')
+        ?: (setting_get('company_legal_name', '')
+        ?: 'Inspection Ops'));
+}
 function &settings_cache() {
     static $cache = null;
     if ($cache === null) {

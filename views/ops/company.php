@@ -14,9 +14,9 @@
         <input class="form-control" name="brand" value="<?= e($p['brand'] ?? '') ?>" placeholder="e.g. MGH AI Apps"></div>
       <div class="ff ff-wide"><label>Address</label>
         <textarea class="form-control" name="address" rows="3" placeholder="Street, city, state, PIN"><?= e($p['address'] ?? '') ?></textarea></div>
-      <div class="ff"><label>GSTIN</label><input class="form-control" name="gstin" value="<?= e($p['gstin'] ?? '') ?>" placeholder="15-character GSTIN"></div>
-      <div class="ff"><label>PAN <span class="muted">— filled from GSTIN if blank</span></label><input class="form-control" name="pan" value="<?= e($p['pan'] ?? '') ?>"></div>
-      <div class="ff"><label>State <span class="muted">— for GST</span></label><input class="form-control" name="state" value="<?= e($p['state'] ?? '') ?>" placeholder="e.g. Gujarat"></div>
+      <div class="ff"><label>GSTIN <span class="muted">— fills PAN &amp; State automatically</span></label><input class="form-control" id="cp_gstin" name="gstin" value="<?= e($p['gstin'] ?? '') ?>" placeholder="15-character GSTIN" maxlength="15" style="text-transform:uppercase"></div>
+      <div class="ff"><label>PAN <span class="muted">— from GSTIN</span></label><input class="form-control" id="cp_pan" name="pan" value="<?= e($p['pan'] ?? '') ?>" style="text-transform:uppercase"></div>
+      <div class="ff"><label>State <span class="muted">— from GSTIN</span></label><input class="form-control" id="cp_state" name="state" value="<?= e($p['state'] ?? '') ?>" placeholder="e.g. Gujarat"></div>
       <div class="ff"><label>E-mail</label><input class="form-control" type="email" name="email" value="<?= e($p['email'] ?? '') ?>"></div>
       <div class="ff"><label>Phone</label><input class="form-control" name="phone" value="<?= e($p['phone'] ?? '') ?>"></div>
       <div class="ff"><label>Website</label><input class="form-control" name="website" value="<?= e($p['website'] ?? '') ?>" placeholder="www.example.com"></div>
@@ -34,3 +34,23 @@
   <p class="muted" style="font-size:12px;margin-top:10px">This feeds the quotation letterhead and invoice header. Leaving it blank
     is fine on a fresh install — fill it when you are ready.</p>
 </div>
+
+<?php // A GSTIN encodes both the PAN (characters 3–12) and the state (first two
+      // digits), so typing the GSTIN fills both — the same map the rest of the app
+      // uses for tax, so nothing can drift. The user can still override either. ?>
+<script>
+(function(){
+  var STATES = <?= json_encode(function_exists('lk_options_or') ? lk_options_or('gst_state', GST_STATES) : GST_STATES, JSON_UNESCAPED_UNICODE) ?>;
+  var g = document.getElementById('cp_gstin'),
+      pan = document.getElementById('cp_pan'),
+      st = document.getElementById('cp_state');
+  if (!g) return;
+  function fill(){
+    var v = (g.value || '').toUpperCase().replace(/\s+/g,'');
+    if (v.length >= 12) pan.value = v.substring(2, 12);
+    if (v.length >= 2 && STATES[v.substring(0,2)]) st.value = STATES[v.substring(0,2)];
+  }
+  g.addEventListener('input', fill);
+  g.addEventListener('blur', fill);
+})();
+</script>

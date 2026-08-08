@@ -70,7 +70,10 @@ function ops_company_profile($route, $method) {
         setting_set('company_address', $addr);
         setting_set('company_gstin', $gstin);
         setting_set('company_pan', $pan !== '' ? $pan : ($gstin !== '' && function_exists('pan_from_gstin') ? pan_from_gstin($gstin) : ''));
-        setting_set('company_state', $state);
+        // State, like PAN, is derivable from the GSTIN (its first two digits), so
+        // fill it from there when the field was left blank — the same map used for
+        // tax, so the header and the GST split can never disagree.
+        setting_set('company_state', $state !== '' ? $state : ($gstin !== '' && function_exists('state_from_gstin') ? state_from_gstin($gstin) : ''));
         setting_set('company_email', $email);
         setting_set('company_phone', $phone);
         setting_set('company_website', $web);
