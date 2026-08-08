@@ -1790,7 +1790,7 @@ function ops_module_gate($route) {
     $base = (strncmp($route, 'm/', 2) === 0) ? 'masters' : $route;
     static $map = [
         'calls'=>'calls','call'=>'calls','call-new'=>'calls','call-edit'=>'calls','call-delete'=>'calls',
-        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-advance'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
+        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-bill'=>'invoicing','job-advance'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
         'bill-add'=>'jobs','bill-delete'=>'jobs','bill-file'=>'jobs',
         'invoicing'=>'invoicing',
         'tally'=>'invoicing','tally-export'=>'invoicing','tally-settings'=>'invoicing','tally-undo'=>'invoicing',
@@ -1976,7 +1976,7 @@ function ops_dispatch($route, $method) {
     switch (true) {
         case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call' || $route === 'call-delete' || $route === 'call-credit':
             ops_calls($route, $method); return true;
-        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-advance' || $route === 'expense-delete':
+        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-bill' || $route === 'job-advance' || $route === 'expense-delete':
             ops_jobs($route, $method); return true;
         // Bills backing the expenses the client is being charged for.
         case $route === 'bill-add' || $route === 'bill-delete' || $route === 'bill-file':
@@ -4237,6 +4237,31 @@ function ops_jobs($route, $method) {
             redirect('/job?id=' . $job['id']);
         }
         redirect('/job?id=' . $job['id']);
+    }
+    // One click from a closed job to a real GST invoice in the Money module — the
+    // amount comes straight off the job's quote/call figures (books_line_add reads
+    // billable_rate/qty/value), so nobody re-keys it (#4 / #5).
+    if ($route === 'job-bill' && $method === 'POST') {
+        ops_require(is_master() || can('finance.reconcile') || can('mod.invoicing.view'), 'You cannot raise invoices.');
+        $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$job) { http_response_code(404); view('notfound'); return; }
+        if (!function_exists('books_invoice_create')) { flash('The Money module is not enabled on this installation.', 'error'); redirect('/job?id=' . $job['id']); }
+        if (empty($job['closed_flag'])) { flash('Close the ' . Tl('job') . ' before raising its invoice.', 'error'); redirect('/job?id=' . $job['id']); }
+        $call = ops_one("SELECT * FROM calls WHERE id=?", [$job['call_id']]);
+        $inv = books_invoice_create([
+            'partner_id'      => (int)($call['client_id'] ?? 0),
+            'office_id'       => (int)($job['executing_office_id'] ?? ($call['executing_office_id'] ?? 0)) ?: null,
+            'sbu'             => (string)($job['sbu'] ?? ($call['sbu'] ?? '')),
+            'contract_number' => (string)($job['contract_number'] ?? ($call['contract_number'] ?? '')),
+            'po_number'       => (string)($call['po_number'] ?? ''),
+            'quotation_id'    => (int)($job['quotation_id'] ?? ($call['quotation_id'] ?? 0)),
+        ]);
+        if (!empty($inv['err'])) { flash($inv['err'], 'error'); redirect('/job?id=' . $job['id']); }
+        $invId = (int)$inv['id'];
+        $addErr = books_line_add($invId, ['job_id' => $job['id']]);   // amount auto-derived from the quote/call
+        if ($addErr !== '') flash($addErr, 'warning');
+        flash('Draft invoice raised from ' . TH('job') . ' ' . $job['job_code'] . ' — the amount is filled from the ' . Tl('quote') . '. Review the line and issue it.');
+        redirect('/invoice?id=' . $invId);
     }
     // A duplicate expense line, removed. New ones cannot be created any more, but
     // the copies already on file have to be clearable — a claim that reads double
