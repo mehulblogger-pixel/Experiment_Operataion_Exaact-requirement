@@ -3940,6 +3940,15 @@ function ops_jobs($route, $method) {
             // A job that ran out of time is fixed as it stands. Documents can
             // still be uploaded; figures cannot be rewritten weeks later.
             if ($job && ($why = job_lock_block($job)) !== '') { flash($why, 'error'); redirect('/job?id=' . $job['id']); }
+            // Allocation must name WHO does the work — an internal inspector /
+            // engineer (any staff kind) or a sub-contracting agency. Allowing a
+            // job to be raised with nobody on it left calls "allocated" to no one.
+            if (empty($b['inspector_id']) && empty($b['subcon_id'])) {
+                view('ops/job_form', array_merge(call_job_form_vars($job, $call),
+                    ['error' => 'Choose who will carry out this ' . Tl('job') . ' — an inspector / engineer, or a '
+                              . 'sub-contracting agency — before it can be allocated.']));
+                return;
+            }
             $fields = job_save_fields();
             // deliverables come as a checkbox array -> stored as CSV of codes
             $deliverables = implode(',', array_filter((array)($b['deliverables'] ?? [])));
@@ -4231,9 +4240,21 @@ function ops_jobs($route, $method) {
             if ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate === '') {
                 view('ops/job_close', ['job'=>$job,'error'=>'A report upload date is required before closing this job.']); return;
             }
+            // Heads the coordinator declares were not incurred on this job (e.g.
+            // travel on a job done locally). Recorded so the requirement is met
+            // without a bill that will never exist — only heads actually agreed on
+            // the job survive the clean.
+            if (array_key_exists('nil_heads', $_POST)) {
+                $agreed  = chargeable_heads($job);
+                $postedNil = chargeable_heads(['chargeable_heads' => chargeable_heads_from_post($_POST['nil_heads'])]);
+                $nil = implode(',', array_values(array_intersect($agreed, $postedNil)));
+                $pdo->prepare("UPDATE jobs SET nil_chargeable_heads=? WHERE id=?")->execute([$nil, $job['id']]);
+                $job['nil_chargeable_heads'] = $nil;
+            }
             // The client is being charged for these, so the bill has to exist
             // before the job is called finished. Checked on the server, not only
-            // in the browser: this is a promise made to a customer.
+            // in the browser: this is a promise made to a customer. A head marked
+            // "not incurred" above is satisfied without one.
             if (($why = job_bills_block($job)) !== '') {
                 view('ops/job_close', ['job'=>$job,'error'=>$why]); return;
             }

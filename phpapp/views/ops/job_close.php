@@ -1,18 +1,30 @@
 <h1>Close <?= e(Tl('job')) ?> <?= e($job['job_code']) ?></h1>
 <p class="sub">Upload the report, enter the day's expenses (<?= e(Tl("sbu")) ?>-wise) and close. Expenses lock to this job automatically.</p>
 <?php if (!empty($error)): ?><div class="msg msg-error"><?= e($error) ?></div><?php endif; ?>
-<?php // Stated before the form, not after a rejected submit: the bills are what
-      // the client is being charged on, so there is nothing to be gained from
-      // letting somebody fill this in and then refusing it.
-      $billBlock = job_bills_block($job); ?>
-<?php if ($billBlock !== ''): ?>
-<div class="panel" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 7%,transparent)">
-  <b style="color:var(--bad)">⛔ Bills outstanding</b>
-  <div class="muted" style="margin-top:4px"><?= e($billBlock) ?></div>
-  <div style="margin-top:8px"><a class="btn small" href="/job?id=<?= (int)$job['id'] ?>#bills">Upload the bills</a></div>
+<?php // Stated before the form: the bills are what the client is charged on.
+      // Each outstanding head can be resolved two ways — upload its bill, or, if
+      // that expense simply did not happen on this job, mark it "not incurred".
+      $missing = function_exists('job_bills_missing') ? job_bills_missing($job) : []; ?>
+<?php if ($missing): ?>
+<div class="panel" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)">
+  <b style="color:var(--warn)">◷ Chargeable expenses to settle</b>
+  <div class="muted" style="margin-top:4px">The client agreed to be charged for the items below. For each, either
+    <a href="/job?id=<?= (int)$job['id'] ?>#bills">upload its bill</a>, or tick it as <b>not incurred on this job</b> in the
+    form below — then close.</div>
 </div>
 <?php endif; ?>
 <form method="post" action="/job-close?id=<?= (int)$job['id'] ?>" class="panel">
+  <?php if ($missing): ?>
+  <div class="ff ff-wide" style="margin-bottom:12px">
+    <label>Not incurred on this job <span class="muted">— tick any the client agreed to pay but that did not happen here</span></label>
+    <div class="chip-row" style="margin-top:6px">
+      <?php foreach ($missing as $code => $label): ?>
+        <label class="ff-check"><input type="checkbox" name="nil_heads[]" value="<?= e($code) ?>"> <?= e($label) ?> — none this job</label>
+      <?php endforeach; ?>
+    </div>
+    <small class="muted">A ticked item needs no bill; the decision is recorded on the job. An unticked item still needs its bill uploaded before closing.</small>
+  </div>
+  <?php endif; ?>
   <div class="form-grid">
     <div class="ff"><label>Report upload date<?= $job['reporting_frequency']!=='NOREPORT'?' *':'' ?></label>
       <input class="form-control" type="date" name="report_upload_date" value="<?= e(date('Y-m-d')) ?>" <?= $job['reporting_frequency']!=='NOREPORT'?'required':'' ?>></div>
@@ -32,7 +44,7 @@
   </div>
   <p class="muted" style="margin:2px;">Add or rename headings under <a href="/lookup?key=expense_heading">Expense headings</a> — new ones appear here automatically.</p>
   <div style="margin-top:16px;">
-    <button class="btn" type="submit"<?= $billBlock !== '' ? ' disabled' : '' ?>>Close job &amp; send closure email</button>
+    <button class="btn" type="submit">Close job &amp; send closure email</button>
     <a class="btn secondary" href="/job?id=<?= (int)$job['id'] ?>">Cancel</a>
   </div>
 </form>
