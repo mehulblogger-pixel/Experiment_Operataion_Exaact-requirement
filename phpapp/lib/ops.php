@@ -790,6 +790,82 @@ function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
     return null;
 }
 function inspectors_list($activeOnly = true) { return ops_all("SELECT id, name, emp_code, sbu, salary_ctc, staff_kind, home_office_id FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name"); }
+
+// ---- Smart inspector suggestion for allocation (#2) ------------------------
+// The dates an inspector is already committed to (their open jobs), as a
+// {YYYY-MM-DD => true} set, so a clash on the required date is visible.
+function inspector_busy_dates($inspectorId, $exceptJobId = 0) {
+    $out = [];
+    foreach (ops_all("SELECT scheduled_date, inspection_dates FROM jobs
+                      WHERE inspector_id=? AND id<>? AND COALESCE(closed_flag,0)=0",
+                     [(int)$inspectorId, (int)$exceptJobId]) as $r) {
+        if (!empty($r['scheduled_date'])) $out[substr((string)$r['scheduled_date'], 0, 10)] = true;
+        foreach (explode(',', (string)($r['inspection_dates'] ?? '')) as $d) {
+            $d = trim($d); if ($d !== '') $out[substr($d, 0, 10)] = true;
+        }
+    }
+    return $out;
+}
+
+// Rank inspectors for a call by the priority ladder:
+//   4  the inspector who did the LAST inspection for the same client + vendor
+//      (+ contract, + executing office) — continuity is the top preference;
+//   2  anyone who has worked for this client before;
+//   0  every other active inspector (the full fallback list).
+// Availability (a clash with the required dates) is attached but never removes
+// anyone from the list — the coordinator always sees everybody and decides.
+function inspector_suggestions($call, array $dates = [], $exceptJobId = 0) {
+    $clientId = (int)($call['client_id'] ?? 0);
+    $vendorId = (int)($call['vendor_id'] ?? 0);
+    $contract = trim((string)($call['contract_number'] ?? ''));
+    $names = []; foreach (inspectors_list(true) as $i) $names[(int)$i['id']] = $i;
+
+    $score = []; $reason = [];
+    $bump = function ($id, $s, $why) use (&$score, &$reason, $names) {
+        $id = (int)$id; if ($id <= 0 || !isset($names[$id])) return;
+        if (($score[$id] ?? -1) < $s) { $score[$id] = $s; $reason[$id] = $why; }
+    };
+    foreach ($names as $id => $i) $bump($id, 0, 'Available');
+    if ($clientId)
+        foreach (ops_all("SELECT DISTINCT j.inspector_id FROM jobs j JOIN calls c ON c.id=j.call_id
+                          WHERE c.client_id=? AND j.inspector_id IS NOT NULL", [$clientId]) as $r)
+            $bump($r['inspector_id'], 2, 'Has worked for this ' . Tl('client'));
+    if ($clientId && $vendorId) {
+        $args = [$clientId, $vendorId]; $cn = '';
+        if ($contract !== '') { $cn = " AND (c.contract_number=? OR c.contract_number='')"; $args[] = $contract; }
+        $last = ops_one("SELECT j.inspector_id FROM jobs j JOIN calls c ON c.id=j.call_id
+                         WHERE c.client_id=? AND c.vendor_id=? AND j.inspector_id IS NOT NULL$cn
+                         ORDER BY COALESCE(j.scheduled_date,'') DESC, j.id DESC LIMIT 1", $args);
+        if ($last && $last['inspector_id']) $bump($last['inspector_id'], 4, 'Did the last inspection for this ' . Tl('client') . ' & ' . Tl('vendor'));
+    }
+    $dates = array_values(array_filter(array_map(fn($d) => substr(trim((string)$d), 0, 10), $dates)));
+    $out = [];
+    foreach ($score as $id => $s) {
+        $busy = $dates ? inspector_busy_dates($id, $exceptJobId) : [];
+        $clash = array_values(array_filter($dates, fn($d) => isset($busy[$d])));
+        $out[] = ['id' => $id, 'name' => (string)$names[$id]['name'], 'emp_code' => (string)($names[$id]['emp_code'] ?? ''),
+                  'score' => $s, 'reason' => $reason[$id], 'clash' => $clash, 'available' => empty($clash)];
+    }
+    usort($out, fn($a, $b) => ($b['score'] <=> $a['score'])
+        ?: (($b['available'] ? 1 : 0) <=> ($a['available'] ? 1 : 0))
+        ?: strcasecmp($a['name'], $b['name']));
+    return $out;
+}
+
+// Other calls for the same client + vendor (+ contract) still waiting to be
+// allocated — surfaced so the coordinator can plan them together (#2).
+function pending_allocation_siblings($call) {
+    $clientId = (int)($call['client_id'] ?? 0);
+    $vendorId = (int)($call['vendor_id'] ?? 0);
+    $selfId   = (int)($call['id'] ?? 0);
+    if (!$clientId) return [];
+    return ops_all("SELECT c.id, c.call_code, c.inspection_required_date, c.contract_number
+                    FROM calls c
+                    WHERE c.client_id=? AND (? = 0 OR c.vendor_id=?) AND c.id<>?
+                      AND UPPER(COALESCE(c.status,'')) <> 'CLOSED'
+                      AND (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) = 0
+                    ORDER BY c.inspection_required_date", [$clientId, $vendorId, $vendorId, $selfId]);
+}
 // Employee-code prefix per engagement kind. Sub-contractors and freelancers get a
 // visibly DIFFERENT code series from our own staff so payroll/accounts can tell
 // them apart at a glance: SC-#### for sub-cons, FL-#### for freelancers, EMP## for staff.
@@ -4381,6 +4457,10 @@ function ops_jobs($route, $method) {
 // again on each validation failure and a field missed here shows up as an
 // undefined-variable warning on the re-render rather than at the happy path.
 function call_job_form_vars($job, $call) {
+    // The dates this deputation needs cover, so an inspector already booked on
+    // one of them shows a clash. Take the job's own dates if it has them, else
+    // fall back to what the call asked for.
+    $jobDates = job_call_required_dates($job, $call);
     return [
         'job' => $job, 'call' => $call, 'error' => null, 'gate' => null,
         'offices' => offices_list(), 'inspectors' => inspectors_list(), 'subcons' => subcons_list(),
@@ -4389,7 +4469,26 @@ function call_job_form_vars($job, $call) {
         'vendorInfo' => partner_full($call['vendor_id']),
         'quotes' => job_linkable_quotes($call['client_id']),
         'cfvals' => $job ? custom_values_map('job', $job['id']) : [],
+        'suggestions' => inspector_suggestions($call, $jobDates, (int)($job['id'] ?? 0)),
+        'jobDates' => $jobDates,
+        'pendingSiblings' => pending_allocation_siblings($call),
     ];
+}
+
+// The dates a deputation needs to cover, as a de-duplicated list of Y-m-d.
+// Prefers the job's own schedule; if the job is new (or has none yet) it uses
+// the dates the inspection call asked for so a clash is caught before saving.
+function job_call_required_dates($job, $call) {
+    $out = [];
+    $add = function ($v) use (&$out) {
+        foreach (explode(',', (string)$v) as $d) { $d = substr(trim($d), 0, 10); if ($d !== '') $out[$d] = true; }
+    };
+    if (is_array($job)) { $add($job['scheduled_date'] ?? ''); $add($job['inspection_dates'] ?? ''); }
+    if (!$out && is_array($call)) {
+        $add($call['inspection_required_date'] ?? '');
+        $add($call['inspection_dates'] ?? '');
+    }
+    return array_keys($out);
 }
 
 function nzc($f, $v) {

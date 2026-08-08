@@ -181,6 +181,51 @@
           // told only after filling the whole form in. The server refuses it
           // regardless; this is courtesy, not the control. ?>
     <?php $certDate = competence_job_date($job ?: [], $call); ?>
+    <?php // #2 — the smart pick. The system ranks who is the best fit for THIS
+          //   call by the agreed ladder: whoever did the last inspection for the
+          //   same client & vendor (continuity) first, then anyone who has worked
+          //   for this client, then everyone else — and flags a date clash for
+          //   anyone already booked on one of the required dates. It is a
+          //   recommendation, not a lock: click a chip to pick that person, or
+          //   choose freely from the full list below.
+          $sugg = $suggestions ?? []; $topSugg = array_slice($sugg, 0, 6);
+          $clashCount = count(array_filter($sugg, fn($s) => !$s['available'])); ?>
+    <?php if ($topSugg): ?>
+    <div class="ff ff-wide" id="best_insp_panel">
+      <label>Suggested <?= e(Tlp('engineer')) ?> <span class="muted">— best fit for this <?= e(Tl('call')) ?> first. Click to pick.</span></label>
+      <?php if (!empty($jobDates)): ?><small class="muted">Checked against these dates: <?= e(implode(', ', $jobDates)) ?>.</small><?php endif; ?>
+      <div class="sugg-row" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+        <?php foreach ($topSugg as $s):
+              $cls = $s['score'] >= 4 ? 'p-ok' : ($s['score'] >= 2 ? 'p-info' : '');
+              $lapsedS = competence_lapsed((int)$s['id'], $certDate); ?>
+          <button type="button" class="sugg-chip" data-insp="<?= (int)$s['id'] ?>"
+                  title="<?= e($s['reason']) ?><?= $s['available'] ? '' : ' — busy on ' . e(implode(', ', $s['clash'])) ?>"
+                  style="text-align:left;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--card);cursor:pointer;<?= $s['available'] ? '' : 'opacity:.7;' ?>">
+            <span style="font-weight:700;"><?= e($s['name']) ?></span>
+            <?php if ($s['emp_code']): ?><span class="muted"> (<?= e($s['emp_code']) ?>)</span><?php endif; ?>
+            <?php if ($s['score'] >= 2): ?><span class="pill <?= $cls ?>" style="margin-left:6px;"><?= $s['score'] >= 4 ? '★ last on this client & vendor' : 'worked for client' ?></span><?php endif; ?>
+            <?php if (!$s['available']): ?><span class="pill p-warn" style="margin-left:6px;">busy <?= e(implode(', ', $s['clash'])) ?></span>
+            <?php else: ?><span class="pill p-ok" style="margin-left:6px;">free</span><?php endif; ?>
+            <?php if ($lapsedS): ?><span class="pill p-warn" style="margin-left:6px;">cert lapsed</span><?php endif; ?>
+          </button>
+        <?php endforeach; ?>
+      </div>
+      <?php if ($clashCount): ?><small class="muted"><?= (int)$clashCount ?> of the suggested <?= e(Tlp('engineer')) ?> are already booked on one of these dates — pick a free one where you can.</small><?php endif; ?>
+    </div>
+    <?php endif; ?>
+    <?php if (!empty($pendingSiblings)): ?>
+    <div class="ff ff-wide">
+      <div class="msg" style="background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px;">
+        <strong>Plan these together.</strong>
+        <?= count($pendingSiblings) ?> other <?= count($pendingSiblings) === 1 ? e(Tl('call')) : e(Tlp('call')) ?>
+        for this <?= e(Tl('client')) ?> &amp; <?= e(Tl('vendor')) ?> <?= count($pendingSiblings) === 1 ? 'is' : 'are' ?> still waiting to be allocated:
+        <?php foreach ($pendingSiblings as $ps): ?>
+          <a href="/call?id=<?= (int)$ps['id'] ?>" style="margin-right:8px;"><?= e($ps['call_code']) ?><?= !empty($ps['inspection_required_date']) ? ' (' . e(substr($ps['inspection_required_date'], 0, 10)) . ')' : '' ?></a>
+        <?php endforeach; ?>
+        <br><small class="muted">Assigning the same <?= e(Tl('engineer')) ?> across them keeps one person on the client's site instead of shuttling several.</small>
+      </div>
+    </div>
+    <?php endif; ?>
     <div class="ff"><label><?= e(T('engineer')) ?></label>
       <select class="form-control searchable" id="insp_pick" name="inspector_id"><option value="">—</option>
         <?php foreach ($inspectors as $i): $lapsed = competence_lapsed((int)$i['id'], $certDate); ?>
@@ -502,6 +547,29 @@ window.TERM_SBU = <?= json_encode(Tl('sbu')) ?>;
     hint.textContent = shown + ' ' + (want === 'ASSET' ? 'own employee' : (want === 'SUBCON' ? 'sub-contract' : 'freelance')) + ' engineer(s) on file.';
   }
   if (kind && non && pick) { kind.addEventListener('change', syncKind); non.addEventListener('change', syncKind); syncKind(); }
+
+  // #2 — clicking a suggested engineer chip picks that person in the dropdown.
+  // If the chip's engineer is a freelancer / sub-contractor, flip the staff-kind
+  // selector to match so the option is not hidden by the kind filter.
+  Array.prototype.forEach.call(document.querySelectorAll('.sugg-chip'), function(chip){
+    chip.addEventListener('click', function(){
+      if (!pick) return;
+      var id = chip.dataset.insp, opt = null;
+      Array.prototype.forEach.call(pick.options, function(o){ if (o.value === id) opt = o; });
+      if (!opt) return;
+      var k = opt.dataset.kind || 'ASSET';
+      if (kind && non && k !== wanted()) {
+        if (k === 'ASSET') { kind.value = 'ASSET'; }
+        else { kind.value = 'NONASSET'; non.value = k; }
+        syncKind();
+      }
+      pick.value = id;
+      pick.dispatchEvent(new Event('change', {bubbles:true}));
+      Array.prototype.forEach.call(document.querySelectorAll('.sugg-chip'), function(c){ c.style.outline=''; });
+      chip.style.outline = '2px solid var(--accent, #4f8)';
+      pick.scrollIntoView({behavior:'smooth', block:'center'});
+    });
+  });
 
   // §iv — change the executing office and the credit direction follows it. A
   // cross-office job means the contracting office gives; a same-office job has
