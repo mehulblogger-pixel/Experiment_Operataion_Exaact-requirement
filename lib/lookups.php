@@ -212,8 +212,24 @@ function lk_module_lists() {
         ['endorse_decision',    'Endorsement decision',      ENDORSE_DECISION,       'Reporting'],
         ['phrase_category',     'Phrase category',           PHRASE_CATEGORIES,      'Reporting'],
         ['source_doc_type',     'Source document type',      SOURCE_DOC_TYPES,       'Reporting'],
+        // T12 — where each document stands. An editable list, so a company adds
+        // its own states (e.g. "under client review") without code.
+        ['document_status',     'Document status',           DOCUMENT_STATUSES,      'Reporting'],
     ];
 }
+// Defaults for the document-status list — received from either side, awaited,
+// not available, issued, and the review states. All editable under Masters.
+const DOCUMENT_STATUSES = [
+    'AWAITED_CLIENT'  => 'Awaited from client',
+    'RECEIVED_CLIENT' => 'Received from client',
+    'AWAITED_VENDOR'  => 'Awaited from vendor',
+    'RECEIVED_VENDOR' => 'Received from vendor',
+    'NOT_AVAILABLE'   => 'Not available',
+    'UNDER_REVIEW'    => 'Under review',
+    'APPROVED'        => 'Approved',
+    'ISSUED'          => 'Issued',
+    'SUPERSEDED'      => 'Superseded',
+];
 function lk_register_module_lists() {
     foreach (lk_module_lists() as [$key, $label, $map, $module]) {
         lk_ensure_type_map($key, $label, $map, $module);
