@@ -804,6 +804,16 @@ function inspector_busy_dates($inspectorId, $exceptJobId = 0) {
             $d = trim($d); if ($d !== '') $out[substr($d, 0, 10)] = true;
         }
     }
+    // A per-visit booking (job_visits) can commit this engineer to a specific
+    // date even when they are not the job's main inspector — count those too, or
+    // two jobs could be booked on the same person for the same day.
+    try {
+        foreach (ops_all("SELECT v.visit_date FROM job_visits v JOIN jobs j ON j.id=v.job_id
+                          WHERE v.inspector_id=? AND v.job_id<>? AND COALESCE(j.closed_flag,0)=0",
+                         [(int)$inspectorId, (int)$exceptJobId]) as $r) {
+            $d = substr(trim((string)$r['visit_date']), 0, 10); if ($d !== '') $out[$d] = true;
+        }
+    } catch (Throwable $e) { /* job_visits not present on a partial upload */ }
     return $out;
 }
 
@@ -1866,7 +1876,7 @@ function ops_module_gate($route) {
     $base = (strncmp($route, 'm/', 2) === 0) ? 'masters' : $route;
     static $map = [
         'calls'=>'calls','call'=>'calls','call-new'=>'calls','call-edit'=>'calls','call-delete'=>'calls',
-        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-bill'=>'invoicing','job-advance'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
+        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-bill'=>'invoicing','job-advance'=>'jobs','job-reassign'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
         'bill-add'=>'jobs','bill-delete'=>'jobs','bill-file'=>'jobs',
         'invoicing'=>'invoicing',
         'tally'=>'invoicing','tally-export'=>'invoicing','tally-settings'=>'invoicing','tally-undo'=>'invoicing',
@@ -2052,7 +2062,7 @@ function ops_dispatch($route, $method) {
     switch (true) {
         case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call' || $route === 'call-delete' || $route === 'call-credit':
             ops_calls($route, $method); return true;
-        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-bill' || $route === 'job-advance' || $route === 'expense-delete':
+        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-bill' || $route === 'job-advance' || $route === 'job-reassign' || $route === 'expense-delete':
             ops_jobs($route, $method); return true;
         // Bills backing the expenses the client is being charged for.
         case $route === 'bill-add' || $route === 'bill-delete' || $route === 'bill-file':
@@ -4428,6 +4438,22 @@ function ops_jobs($route, $method) {
         }
         view('ops/job_close', ['job'=>$job,'error'=>null]); return;
     }
+    // Reshuffle: change who goes on which day AFTER a multi-day job is allocated,
+    // without re-opening the whole allocation form. A coordinator does this the
+    // morning an engineer calls in sick. It rewrites only the visit rows, never
+    // the job's main inspector, so everything else the job carries is untouched.
+    if ($route === 'job-reassign' && $method === 'POST') {
+        ops_require(is_coordinator_level(), 'You cannot reassign ' . Tlp('job') . '.');
+        $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$job) { http_response_code(404); view('notfound'); return; }
+        if (($why = job_lock_block($job)) !== '') { flash($why, 'error'); redirect('/job?id=' . $job['id']); }
+        $perDate = [];
+        foreach ((array)($_POST['visit_inspector'] ?? []) as $d => $iid)
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$d)) $perDate[$d] = (int)$iid;
+        if (function_exists('job_visits_sync')) job_visits_sync($job['id'], (int)($job['inspector_id'] ?? 0), $perDate);
+        flash('Day-by-day assignment updated for ' . $job['job_code'] . '.');
+        redirect('/job?id=' . $job['id'] . '#visits');
+    }
     if ($route === 'job') {
         $job = ops_one("SELECT j.*, c.call_code, c.region, c.product_category, bp.legal_name client_name, bp.display_name client_disp,
             v.legal_name vendor_name, i.name inspector_name, i.salary_ctc, s.agency subcon_agency, bn.boss_number, o.name office_name
@@ -4445,10 +4471,34 @@ function ops_jobs($route, $method) {
         $siteAddr = ($jcall && !empty($jcall['site_address_id']))
             ? ops_one("SELECT * FROM partner_addresses WHERE id=?", [(int)$jcall['site_address_id']]) : null;
         // §xxiv — whatever the client sent with the order reaches the engineer here.
+        // The per-day plan for a multi-day deputation, with a busy flag on each
+        // date, so a coordinator can reshuffle who goes when without re-opening
+        // the whole allocation form.
+        $visits = function_exists('job_visits') ? job_visits($job['id']) : [];
+        // A job allocated before per-visit rows existed (or a fresh multi-day job)
+        // has no job_visits yet — synthesise the plan from its own dates so the
+        // panel still shows, every day on the main inspector until reshuffled.
+        if (!$visits) {
+            $mainInsp = (int)($job['inspector_id'] ?? 0);
+            $mainName = (string)($job['inspector_name'] ?? '');
+            foreach (job_call_required_dates($job, $jcall ?: []) as $d)
+                $visits[] = ['visit_date' => $d, 'inspector_id' => $mainInsp ?: null, 'inspector_name' => $mainName];
+        }
+        $visitPlan = [];
+        foreach ($visits as $v) {
+            $d = substr((string)$v['visit_date'], 0, 10);
+            $insp = (int)($v['inspector_id'] ?? 0);
+            $visitPlan[] = ['date' => $d, 'pretty' => function_exists('fdate') ? fdate($d) : $d,
+                'weekday' => $d ? date('D', strtotime($d)) : '',
+                'inspector_id' => $insp, 'inspector_name' => (string)($v['inspector_name'] ?? ''),
+                'busy' => $insp && function_exists('inspector_busy_on') ? inspector_busy_on($insp, $d, $job['id']) : '',
+                'working' => function_exists('is_working_day') ? is_working_day($d, $job['executing_office_id'] ?? null) : true];
+        }
         view('ops/job_detail', ['job'=>$job,'expenses'=>$expenses,'profit'=>job_profit($job),
             'jcall'=>$jcall, 'siteAddr'=>$siteAddr,
             'clientInfo'=>$jcall ? partner_full($jcall['client_id']) : null,
             'vendorInfo'=>$jcall ? partner_full($jcall['vendor_id']) : null,
+            'visitPlan'=>$visitPlan, 'inspectors'=>inspectors_list(),
             'quoteDocs'=>function_exists('quote_docs_for_job') ? quote_docs_for_job($job['id']) : []]);
         return;
     }

@@ -947,7 +947,8 @@
       var host = document.getElementById('visit_rows');
       var pick = document.getElementById('insp_pick');
       if (!host || !pick) return;
-      var wants = (d.type === 'MULTIPLE' || d.type === 'PATTERN') && d.days && d.days.length && d.days.length <= 40;
+      var wants = (d.type === 'MULTIPLE' || d.type === 'PATTERN' || d.type === 'CONTINUOUS')
+                  && d.days && d.days.length > 1 && d.days.length <= 40;
       host.style.display = wants ? '' : 'none';
       if (!wants) { host.innerHTML = ''; return; }
       var chosen = {};
