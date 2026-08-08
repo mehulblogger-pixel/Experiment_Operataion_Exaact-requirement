@@ -42,6 +42,54 @@
   <?php endif; ?>
 </div>
 
+<?php // ---- Day-by-day plan & reshuffle -----------------------------------
+      // A multi-day deputation can carry a different engineer on different days.
+      // This shows the plan and lets a coordinator swap who goes on any one day
+      // — the morning somebody calls in sick — without touching the rest of the
+      // job. Only shown when there is genuinely more than one visit day.
+      $vp = $visitPlan ?? [];
+      $canReshuffle = !$job['closed_flag'] && is_coordinator_level();
+      if (count($vp) > 1): ?>
+<div class="panel" id="visits">
+  <div class="ctitle" style="margin-top:0"><h3>Who goes on each day
+    <span class="muted">(<?= count($vp) ?> <?= count($vp) === 1 ? 'day' : 'days' ?>)</span></h3></div>
+  <?php $vpClash = count(array_filter($vp, fn($x) => $x['busy'] !== '')); ?>
+  <?php if ($vpClash): ?>
+    <div class="msg msg-warning" style="margin-top:0"><?= (int)$vpClash ?>
+      day(s) have the assigned <?= e(Tlp('engineer')) ?> booked elsewhere — reassign below.</div>
+  <?php endif; ?>
+  <form method="post" action="/job-reassign?id=<?= (int)$job['id'] ?>">
+    <table class="grid">
+      <tr><th>Date</th><th><?= e(ucfirst(Tl('engineer'))) ?></th><th>Status</th></tr>
+      <?php foreach ($vp as $x): ?>
+        <tr>
+          <td><?= e($x['weekday']) ?> <?= e($x['pretty']) ?></td>
+          <td>
+            <?php if ($canReshuffle): ?>
+              <select class="form-control" name="visit_inspector[<?= e($x['date']) ?>]">
+                <?php foreach (($inspectors ?? []) as $i): ?>
+                  <option value="<?= (int)$i['id'] ?>" <?= (int)$i['id'] === (int)$x['inspector_id'] ? 'selected' : '' ?>>
+                    <?= e($i['name']) ?><?= !empty($i['emp_code']) ? ' (' . e($i['emp_code']) . ')' : '' ?></option>
+                <?php endforeach; ?>
+              </select>
+            <?php else: ?><?= e($x['inspector_name'] ?: '—') ?><?php endif; ?>
+          </td>
+          <td>
+            <?php if (!$x['working']): ?><span class="pill p-mut">non-working day</span>
+            <?php elseif ($x['busy'] !== ''): ?><span class="pill p-bad"><?= e($x['busy']) ?></span>
+            <?php else: ?><span class="pill p-ok">free</span><?php endif; ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+    </table>
+    <?php if ($canReshuffle): ?>
+      <div style="margin-top:12px"><button class="btn" type="submit">Update day-by-day plan</button>
+        <span class="muted" style="margin-left:8px">Changing a day here does not change the job's main <?= e(Tl('engineer')) ?>.</span></div>
+    <?php endif; ?>
+  </form>
+</div>
+<?php endif; ?>
+
 <?php // ---- Site check-in -------------------------------------------------
       // The engineer photographs the work at the plant, drives home, and writes
       // the report that evening. So neither the report nor the upload says
