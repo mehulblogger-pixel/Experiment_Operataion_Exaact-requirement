@@ -235,6 +235,28 @@ function chain_from($kind, $id) {
         $inv = chain_one("SELECT * FROM invoices WHERE id=?", [$id]);
         if ($inv) $invoices = [$inv];
     }
+    // A deputation billed / paid on its OWN quick fields (invoice number, amount,
+    // payment) rather than through a full GST invoice must still light up the
+    // Invoice and Payment steps on the thread — otherwise what the coordinator
+    // recorded on the job never shows here (#6). Synthetic nodes, only for jobs a
+    // real books invoice does not already cover, linking back to the job.
+    if ($jIds) {
+        $in = implode(',', array_fill(0, count($jIds), '?'));
+        $covered = [];
+        foreach ($invoices as $inv)
+            foreach (chain_all("SELECT DISTINCT job_id FROM invoice_lines WHERE invoice_id=? AND job_id IS NOT NULL", [(int)$inv['id']]) as $c)
+                $covered[(int)$c['job_id']] = true;
+        foreach (chain_all("SELECT id, job_code, invoice_number, invoice_amount, invoice_date, payment_received, payment_amount, payment_date
+                            FROM jobs WHERE id IN ($in) AND COALESCE(invoice_raised,0)=1", $jIds) as $j) {
+            if (isset($covered[(int)$j['id']])) continue;   // a real invoice already represents it
+            $invoices[] = ['id' => (int)$j['id'], '_href' => '/job?id=' . (int)$j['id'] . '#invoice',
+                'invoice_no' => ($j['invoice_number'] ?: 'Recorded on ' . TH('job')), 'total' => (float)$j['invoice_amount'],
+                'status' => '', 'invoice_date' => $j['invoice_date']];
+            if (!empty($j['payment_received']))
+                $receipts[] = ['id' => (int)$j['id'], '_href' => '/job?id=' . (int)$j['id'] . '#invoice',
+                    'receipt_no' => 'Received', 'amount' => (float)$j['payment_amount'], 'alloc_amount' => (float)$j['payment_amount']];
+        }
+    }
     $iIds = array_map(fn($i) => (int)$i['id'], $invoices);
     if ($iIds) {
         $in = implode(',', array_fill(0, count($iIds), '?'));
@@ -298,7 +320,8 @@ function chain_strip($kind, $id, $hereKind = '', $hereId = 0) {
         [$ref, , $state] = chain_label($key, $first);
         $isHere = ($key === $hereKind) && (int)($first['id'] ?? 0) === $hereId;
         $more = count($rows) > 1 ? ' +' . (count($rows) - 1) : '';
-        $h .= '<a class="chain-step' . ($isHere ? ' chain-here' : '') . '" href="' . e($url . (int)$first['id']) . '"'
+        $href = !empty($first['_href']) ? (string)$first['_href'] : ($url . (int)$first['id']);
+        $h .= '<a class="chain-step' . ($isHere ? ' chain-here' : '') . '" href="' . e($href) . '"'
            . ' title="' . e($label . ' — ' . $state) . '">'
            . '<span class="chain-ic">' . $icon . '</span><span class="chain-lb">' . e($label) . '</span>'
            . '<span class="chain-v">' . e($ref) . e($more) . '</span></a>';
