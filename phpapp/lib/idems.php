@@ -609,6 +609,19 @@ function ops_idems_documents($route, $method) {
             flash('No approver is assigned for this report. Set the inspector’s approver under Inspection Reports → Approver mapping (or add an approval rule) before submitting.', 'error');
             redirect('/document?id=' . $doc['id']);
         }
+        // T10 — a submitted report should carry no blank entries: every text-like
+        // field left empty is recorded as "NA" (not applicable) automatically, so
+        // nobody types it by hand and no field reads as simply forgotten. Drafts
+        // are left untouched; this only stamps the version that goes for approval.
+        $naText = function_exists('setting_get') ? (setting_get('report_blank_fill', '') ?: 'NA') : 'NA';
+        $bodyData = json_decode($doc['data'] ?: '[]', true); if (!is_array($bodyData)) $bodyData = [];
+        $naChanged = false;
+        foreach (idems_fields($doc['report_type_id']) as $f) {
+            if (!in_array($f['ftype'], ['text', 'textarea', 'select'], true)) continue;  // leave numbers, dates, tables, media
+            $k = $f['fkey'];
+            if (trim((string)($bodyData[$k] ?? '')) === '') { $bodyData[$k] = $naText; $naChanged = true; }
+        }
+        if ($naChanged) $pdo->prepare("UPDATE report_docs SET data=? WHERE id=?")->execute([json_encode($bodyData), $doc['id']]);
         $pdo->prepare("UPDATE report_docs SET status='UNDER_REVIEW', submitted_at=?, updated_at=? WHERE id=?")->execute([date('c'), date('c'), $doc['id']]);
         idems_log('report_doc', $doc['id'], 'SUBMIT', ['irn'=>$doc['irn'], 'old'=>$doc['status'], 'new'=>'UNDER_REVIEW']);
         $cur = idems_current_step($doc['id']);
