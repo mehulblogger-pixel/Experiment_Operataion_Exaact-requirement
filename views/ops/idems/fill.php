@@ -31,6 +31,18 @@
       case 'number': case 'text': case 'date': case 'time': case 'qr':
         $t = $f['ftype']==='number'?'number':($f['ftype']==='date'?'date':($f['ftype']==='time'?'time':'text'));
         echo '<input class="form-control" type="'.$t.'" name="f['.e($k).']" data-key="'.e($k).'"'.$reqAttr.' value="'.e(is_array($val)?'':$val).'" placeholder="'.e($f['placeholder']).'">'; break;
+      case 'instrument':
+        // Master instruments as suggestions AND free typing (datalist): lab / NDT /
+        // calibration pick a calibrated instrument; site inspectors type their own.
+        $dl = 'instlist_'.preg_replace('/[^A-Za-z0-9_]/','',$k);
+        echo '<input class="form-control" list="'.$dl.'" name="f['.e($k).']" data-key="'.e($k).'"'.$reqAttr.' value="'.e(is_array($val)?'':$val).'" placeholder="'.e($f['placeholder'] ?: 'Pick a calibrated instrument, or type one used on site').'">';
+        echo '<datalist id="'.$dl.'">';
+        if (function_exists('equipment_all')) foreach (equipment_all() as $eq) {
+            $lbl = trim(($eq['name'] ?? '').($eq['serial_no'] ? ' — '.$eq['serial_no'] : '').($eq['code'] ? ' ['.$eq['code'].']' : ''));
+            if ($lbl !== '') echo '<option value="'.e($lbl).'">';
+        }
+        echo '</datalist>';
+        echo '<small class="muted">From the equipment master (calibrated), or type an instrument used at site.</small>'; break;
       case 'calc':
         echo '<input class="form-control" type="text" name="f['.e($k).']" data-key="'.e($k).'" data-calc="'.e($f['calc_expr']).'" value="'.e(is_array($val)?'':$val).'" readonly style="background:var(--soft)">'; break;
       case 'checkbox':

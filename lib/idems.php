@@ -219,6 +219,11 @@ const IDEMS_FIELD_TYPES = [
     'calc'=>'Calculated', 'heading'=>'Section heading', 'note'=>'Info note',
     'table'=>'Repeatable table', 'photo'=>'Photo', 'file'=>'Attachment', 'gps'=>'GPS location',
     'signature'=>'Signature', 'qr'=>'QR / barcode value',
+    // An inspection instrument. Offers the calibrated instruments from the
+    // equipment master as a dropdown AND allows free typing — so a lab / NDT /
+    // calibration report picks a registered, in-calibration instrument, while a
+    // site inspector (who uses whatever is at the works) can just type it.
+    'instrument'=>'Instrument (master + free-text)',
 ];
 const IDEMS_COND_OPS = ['' => '(always show)', 'eq'=>'equals', 'ne'=>'not equals', 'in'=>'is one of', 'nonempty'=>'is filled', 'empty'=>'is empty'];
 function idems_sections($typeId) { return ops_all("SELECT * FROM report_sections WHERE report_type_id=? ORDER BY sort_order, id", [(int)$typeId]); }
