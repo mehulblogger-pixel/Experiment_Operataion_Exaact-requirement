@@ -37,6 +37,11 @@ function bills_migrate() {
     // and a coordinator may correct it at allocation without touching the call.
     foreach (['calls', 'jobs'] as $t)
         ensure_column($t, 'chargeable_heads', "VARCHAR(255) DEFAULT ''");
+    // Heads the client agreed to pay but which were NOT incurred on this job —
+    // e.g. travel on a job the engineer did locally. Declared nil at closure so
+    // the job can close without a bill that will never exist, while keeping the
+    // fact on record instead of silently dropping the requirement.
+    ensure_column('jobs', 'nil_chargeable_heads', "VARCHAR(255) DEFAULT ''");
     // One row per bill. The file is held in the row like every other upload in
     // this app, so a shared-hosting move never leaves the records pointing at
     // files that did not travel with them.
@@ -106,9 +111,13 @@ function job_bills_missing($job) {
     $ticked = chargeable_heads($job);
     if (!$ticked) return [];
     $have = job_bills_by_head((int)($job['id'] ?? 0));
+    // A head declared "not incurred" at closure counts as satisfied — nothing to
+    // bill, but the decision is recorded.
+    $nil  = array_flip(chargeable_heads([
+        'chargeable_heads' => (string)($job['nil_chargeable_heads'] ?? '')]));
     $opt  = chargeable_head_options();
     $miss = [];
-    foreach ($ticked as $c) if (empty($have[$c])) $miss[$c] = $opt[$c] ?? $c;
+    foreach ($ticked as $c) if (empty($have[$c]) && !isset($nil[$c])) $miss[$c] = $opt[$c] ?? $c;
     return $miss;
 }
 
