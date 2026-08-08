@@ -575,6 +575,17 @@
 <?php if (can('data.credit') || can('finance.reconcile')): ?>
 <div class="panel" id="invoice">
   <h3 class="tab-sub">Invoice &amp; payment / credit</h3>
+  <?php // One click raises a real GST invoice in the Money module from this closed
+        // job, with the amount already filled from the quote/call — no re-keying,
+        // no separate screen to start it (#4 / #5). Shown once the job is closed
+        // and only when the Money module is licensed. ?>
+  <?php if (!empty($job['closed_flag']) && function_exists('books_invoice_create') && (function_exists('licence_enabled') ? (licence_enabled('money') || licence_enabled('invoicing')) : true)): ?>
+    <form method="post" action="/job-bill?id=<?= (int)$job['id'] ?>" style="margin-bottom:12px"
+          onsubmit="return confirm('Raise a draft GST invoice for this <?= e(Tl('job')) ?>? The amount is filled from the <?= e(Tl('quote')) ?>.');">
+      <button class="btn" type="submit">🧾 Raise GST invoice from this <?= e(Tl('job')) ?> →</button>
+      <span class="muted" style="font-size:12.5px;margin-left:6px">Creates the invoice with the amount pre-filled; you review &amp; issue it.</span>
+    </form>
+  <?php endif; ?>
   <?php $isInter = ($job['credit_direction'] ?? '') === 'GIVEN'; ?>
   <form method="post" action="/job-invoice?id=<?= (int)$job['id'] ?>">
     <div class="form-grid">
