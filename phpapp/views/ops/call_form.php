@@ -301,6 +301,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
   <h3 class="tab-sub">5. Against the <?= e(Tl('client')) ?>'s purchase order <span class="muted">(optional)</span></h3>
   <div class="form-grid">
+    <?php // When the client has not sent a formal PO, the work is still against a
+          // line of OUR accepted quotation — offer those lines here so the call is
+          // tied to what was quoted (quantity, rate) instead of being left loose. ?>
+    <?php $qid = (int)($call['quotation_id'] ?? 0);
+          $qLines = $qid ? ops_all("SELECT id, line_no, description, service_type, qty, unit, rate FROM quote_lines WHERE quote_id=? ORDER BY line_no, id", [$qid]) : []; ?>
+    <?php if ($qLines): ?>
+    <div class="ff"><label>Quotation line <span class="muted">— use when there is no client PO</span></label>
+      <select class="form-control searchable" name="quote_line_id"><option value="">— none / whole quotation —</option>
+        <?php foreach ($qLines as $ql):
+          $lbl = ($ql['description'] ?: $ql['service_type']) . ' — ' . rtrim(rtrim(number_format((float)$ql['qty'], 2), '0'), '.') . ' ' . $ql['unit'] . ' @ ' . number_format((float)$ql['rate'], 2); ?>
+          <option value="<?= (int)$ql['id'] ?>" <?= ((int)($call['quote_line_id'] ?? 0) === (int)$ql['id']) ? 'selected' : '' ?>><?= e($lbl) ?></option>
+        <?php endforeach; ?>
+      </select></div>
+    <?php endif; ?>
     <div class="ff"><label>Purchase order</label>
       <select class="form-control searchable" id="po_sel" name="po_id"><option value="">— open / none —</option>
         <?php if ($call && ($call['po_id']??null)) { $po=ops_one("SELECT id,po_number FROM partner_purchase_orders WHERE id=?", [$call['po_id']]); if ($po) echo '<option value="'.(int)$po['id'].'" selected>'.e($po['po_number']?:'Open order').'</option>'; } ?>
