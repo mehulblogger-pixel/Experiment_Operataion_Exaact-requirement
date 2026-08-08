@@ -29,10 +29,19 @@
 ?>
   <div class="row-actions">
     <?php if ($mailTo): ?><a class="btn secondary" href="<?= e($mailtoHref) ?>">✉️ Open in Outlook</a><?php endif; ?>
-    <?php $canAllocTop = function_exists('call_can_allocate') ? call_can_allocate($call) : is_coordinator_level(); ?>
+    <?php $canAllocTop = function_exists('call_can_allocate') ? call_can_allocate($call) : is_coordinator_level();
+          $topHasJobs = !empty($jobs);
+          $topClosed  = strtoupper((string)($call['status'] ?? '')) === 'CLOSED'; ?>
     <?php if (is_coordinator_level()): ?>
       <a class="btn secondary" href="/call-edit?id=<?= (int)$call['id'] ?>">Edit call</a>
-      <?php if ($canAllocTop): ?><a class="btn" href="/job-new?call=<?= (int)$call['id'] ?>">+ Allocate Job</a><?php endif; ?>
+      <?php // Once the call has been allocated it is not offered for allocation as
+            // if it were new — the prominent button is replaced by a quiet
+            // "allocate another" for genuine extra visits, and nothing at all once
+            // the call is closed. ?>
+      <?php if ($canAllocTop && !$topClosed): ?>
+        <?php if (!$topHasJobs): ?><a class="btn" href="/job-new?call=<?= (int)$call['id'] ?>">+ Allocate Job</a>
+        <?php else: ?><a class="btn secondary" href="/job-new?call=<?= (int)$call['id'] ?>">+ Allocate another job</a><?php endif; ?>
+      <?php endif; ?>
       <?php if (can('mod.idems.edit') || is_master()): ?><a class="btn secondary" href="/document-new?call=<?= (int)$call['id'] ?>" title="Create an inspection report — all known details are filled in">📑 New report</a><?php endif; ?>
     <?php endif; ?>
     <?php if (is_master() || can('ops.call.delete')): ?>

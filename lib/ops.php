@@ -3945,6 +3945,13 @@ function ops_jobs($route, $method) {
         } else {
             $call = ops_one("SELECT * FROM calls WHERE id=?", [(int)($_GET['call'] ?? 0)]);
             if (!$call) { flash('Pick a call to allocate first.', 'error'); redirect('/calls'); }
+            // A closed call is finished — it is not offered for a fresh allocation,
+            // even by a stale link or a direct URL. (New work on the same customer
+            // is a new call.)
+            if (strtoupper((string)($call['status'] ?? '')) === 'CLOSED') {
+                flash('This ' . Tl('call') . ' is closed — it cannot be allocated again. Raise a new ' . Tl('call') . ' for further work.', 'warning');
+                redirect('/call?id=' . (int)$call['id']);
+            }
         }
         // Only the executing office allocates. A contracting-office coordinator can
         // open and read the call but not raise work on it — that is the executing
@@ -4267,6 +4274,9 @@ function ops_jobs($route, $method) {
             // without a bill that will never exist — only heads actually agreed on
             // the job survive the clean.
             if (array_key_exists('nil_heads', $_POST)) {
+                // Make sure the column exists before writing it — this handler must
+                // not depend on another file's migration having been uploaded.
+                if (function_exists('ensure_column')) ensure_column('jobs', 'nil_chargeable_heads', "VARCHAR(255) DEFAULT ''");
                 $agreed  = chargeable_heads($job);
                 $postedNil = chargeable_heads(['chargeable_heads' => chargeable_heads_from_post($_POST['nil_heads'])]);
                 $nil = implode(',', array_values(array_intersect($agreed, $postedNil)));
