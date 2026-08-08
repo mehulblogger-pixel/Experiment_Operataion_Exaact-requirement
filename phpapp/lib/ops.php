@@ -2977,6 +2977,25 @@ function ops_calls($route, $method) {
                 ];
             }
         }
+        // T9 — carry the allocation "format" forward across a contract. Once a call
+        // has been set up on a contract (its deliverables, chargeable heads,
+        // reporting frequency and inspection type), a new call under the SAME
+        // contract number inherits that format so it is not re-entered each time.
+        // Only fills blanks — anything already carried from the quote wins, and
+        // the coordinator can still change every field before saving.
+        if ($route === 'call-new') {
+            $cn = trim((string)((is_array($call) ? ($call['contract_number'] ?? '') : '') ?: ($_GET['contract'] ?? '')));
+            if ($cn !== '') {
+                $prev = ops_one("SELECT inspection_type, activity_id, deliverables, chargeable_heads,
+                                        reporting_frequency, report_custom_days, executing_office_id
+                                 FROM calls WHERE contract_number=? ORDER BY id DESC LIMIT 1", [$cn]);
+                if ($prev) {
+                    if (!is_array($call)) $call = [];
+                    foreach ($prev as $k => $v)
+                        if ($v !== null && $v !== '' && ($call[$k] ?? '') === '') $call[$k] = $v;
+                }
+            }
+        }
         if ($method === 'POST') {
             $b = $_POST;
             $execOffice = ($b['executing_office_id'] ?? '') !== '' ? (int)$b['executing_office_id'] : null;
