@@ -787,6 +787,26 @@ function ops_idems_builder($route, $method) {
                 ->execute([$typeId, $title, trim($_POST['help'] ?? ''), (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
             flash('Section saved.'); redirect('/report-builder?type=' . $typeId);
         }
+        // One click adds a ready-made "Scope of activities" section — a repeatable
+        // table (Activity / Status / Remark) — so a report can record each activity
+        // in scope and what happened to it without designing it by hand (T13). The
+        // Status column's suggested values are the editable document_status master.
+        if ($do === 'add_scope') {
+            $exists = (int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=? AND title=?", [$typeId, 'Scope of activities']);
+            if ($exists) { flash('This report type already has a Scope of activities section.', 'warning'); redirect('/report-builder?type=' . $typeId); }
+            $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, 'Scope of activities', 'Each activity in the scope, its status and a remark.',
+                    (int)ops_val("SELECT COALESCE(MIN(sort_order),10)-5 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $secId = (int)$pdo->lastInsertId();
+            $statuses = implode(', ', array_values(function_exists('lk_options_or') ? lk_options_or('document_status', defined('DOCUMENT_STATUSES') ? DOCUMENT_STATUSES : []) : ['Completed','Partial','Not applicable','Not done','Pending client input']));
+            $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span)
+                           VALUES (?,?,?,?,?,?,?,?,2)")
+                ->execute([$typeId, $secId, 'scope_activities', 'Activities', 'table',
+                    "Activity | Status | Remark", 'Status values: ' . $statuses,
+                    (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId])]);
+            flash('Added a “Scope of activities” section — add rows on the report, each with a status and remark.');
+            redirect('/report-builder?type=' . $typeId);
+        }
         if ($do === 'section_del') {
             $sid = (int)($_POST['section_id'] ?? 0);
             $pdo->prepare("DELETE FROM report_sections WHERE id=? AND report_type_id=?")->execute([$sid, $typeId]);

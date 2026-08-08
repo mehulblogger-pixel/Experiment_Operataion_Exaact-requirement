@@ -11,6 +11,10 @@
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <?php if (!empty($fields)): ?><a class="btn" href="/document-new?type=<?= e($type['code']) ?>">Create a report with this form →</a><?php endif; ?>
     <a class="btn<?= empty($fields) ? '' : ' secondary' ?>" href="/report-autoform?type=<?= (int)$type['id'] ?>">🪄 Build from my Word file (no codes)</a>
+    <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline">
+      <input type="hidden" name="_do" value="add_scope">
+      <button class="btn secondary" type="submit" title="Adds a repeatable Activity / Status / Remark table">➕ Scope of activities</button>
+    </form>
     <a class="btn secondary" href="/report-types">← Report types</a>
   </div>
 </div>
