@@ -110,6 +110,46 @@
   <a class="btn secondary" href="/document?id=<?= (int)$doc['id'] ?>">← Back</a>
 </div>
 
+<?php // Where the report stands + the approval trail + Submit — all on this screen,
+      // so the inspector no longer bounces to another page to see or move it (T13).
+  $st = (string)($doc['status'] ?? 'DRAFT');
+  $stLabel = lk_options_or('report_status', IDEMS_STATUS)[$st] ?? $st;
+  $canSubmit = in_array($st, ['DRAFT', 'REJECTED'], true) && (function_exists('idems_can_edit_doc') ? idems_can_edit_doc($doc) : true);
+  $approvals = $approvals ?? []; $curStep = $curStep ?? null;
+  $stepPill = fn($a) => ($a['status'] ?? '') === 'APPROVED' ? 'p-ok'
+      : (($a['status'] ?? '') === 'REJECTED' ? 'p-bad'
+      : (($curStep && (int)$curStep['id'] === (int)$a['id']) ? 'p-info' : 'p-mut')); ?>
+<div class="panel" style="margin-bottom:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span class="pill <?= idems_status_pill($st) ?>"><?= e($stLabel) ?></span>
+    <?php if (!empty($doc['submitted_at'])): ?><span class="muted" style="font-size:12px">Submitted <?= e(substr((string)$doc['submitted_at'], 0, 10)) ?></span><?php endif; ?>
+    <?php if ($curStep): $cn = trim(((string)($curStep['first_name'] ?? '')).' '.((string)($curStep['last_name'] ?? ''))) ?: ($curStep['username'] ?? ''); ?>
+      <span class="muted" style="font-size:12px">· with <b><?= e($cn ?: 'the approver') ?></b> now</span><?php endif; ?>
+  </div>
+  <?php if ($canSubmit): ?>
+    <form method="post" action="/document-submit?id=<?= (int)$doc['id'] ?>" onsubmit="return confirm('Submit this <?= e(Tl('report')) ?> for approval? Any empty fields are recorded as NA.');" style="margin:0">
+      <button class="btn" type="submit">Submit for approval →</button>
+    </form>
+  <?php endif; ?>
+</div>
+<?php if ($approvals): ?>
+<div class="panel" style="margin-bottom:14px">
+  <div class="ctitle" style="margin-top:0"><h3>Approval trail</h3></div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    <?php foreach ($approvals as $a):
+      $nm = trim(((string)($a['first_name'] ?? '')).' '.((string)($a['last_name'] ?? ''))) ?: ((string)($a['username'] ?? '') ?: ('Level '.(int)($a['level'] ?? 0)));
+      $when = trim((string)($a['acted_at'] ?? '')); ?>
+      <div style="border:1px solid var(--line);border-radius:9px;padding:8px 12px;min-width:150px">
+        <div class="muted" style="font-size:10.5px;text-transform:uppercase;letter-spacing:.04em">Level <?= (int)($a['level'] ?? 0) ?><?= $a['approver_role'] ? ' · '.e($a['approver_role']) : '' ?></div>
+        <div style="font-weight:650;font-size:13.5px"><?= e($nm) ?></div>
+        <span class="pill <?= $stepPill($a) ?>" style="font-size:10.5px"><?= e(ucfirst(strtolower((string)($a['status'] ?? 'pending')))) ?></span>
+        <?php if ($when): ?><span class="muted" style="font-size:11px"> · <?= e(substr($when, 0, 10)) ?></span><?php endif; ?>
+      </div>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <?php if ($auto): ?>
 <div class="panel" style="border:1px solid var(--ok);background:color-mix(in srgb,var(--ok) 6%,transparent)">
   <b style="color:var(--ok)">✓ <?= count($auto) ?> field(s) filled in for you</b>

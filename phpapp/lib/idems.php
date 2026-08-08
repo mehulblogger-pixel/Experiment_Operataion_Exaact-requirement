@@ -917,8 +917,13 @@ function ops_idems_fill($route, $method) {
             if ($s) $sugg[$f['fkey']] = $s;
         }
     }
+    // Submit + approval, shown ON this screen so the inspector does not bounce
+    // between pages to see where the report stands (T13).
+    $approvals = function_exists('idems_report_approvals') ? idems_report_approvals($doc['id']) : [];
+    $curStep   = function_exists('idems_current_step') ? idems_current_step($doc['id']) : null;
     view('ops/idems/fill', ['doc'=>$doc, 'sections'=>idems_sections($doc['report_type_id']), 'fields'=>$fields, 'data'=>$data,
-        'files'=>idems_doc_files($doc['id']), 'sugg'=>$sugg, 'auto'=>$auto]);
+        'files'=>idems_doc_files($doc['id']), 'sugg'=>$sugg, 'auto'=>$auto,
+        'approvals'=>$approvals, 'curStep'=>$curStep]);
     return true;
 }
 function idems_table_cols($f) {
