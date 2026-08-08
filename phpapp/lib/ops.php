@@ -2968,6 +2968,9 @@ function ops_calls($route, $method) {
                 $call = [
                     'quotation_id'    => (int)$fromQ['id'],
                     'client_id'       => $fromQ['client_id'] ?? null,
+                    // The manufacturer / vendor site chosen on the quote comes across
+                    // so the work-order's site dropdown is already set to it.
+                    'vendor_id'       => $fromQ['vendor_id'] ?? null,
                     'contract_number' => $fromQ['contract_number'] ?? '',
                     'sbu'             => $fromQ['sbu'] ?? '',
                     'ibo_office_id'   => $fromQ['office_id'] ?? (current_user()['home_office_id'] ?? null),

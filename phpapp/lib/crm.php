@@ -290,6 +290,7 @@ function crm_migrate() {
         // Work can be executed by more than one office (CSV of office ids); the
         // header office stays as the primary/owning one.
         ensure_column('quotations', 'exec_office_ids', "VARCHAR(200) DEFAULT ''");
+        ensure_column('quotations', 'vendor_id', 'INT NULL');   // manufacturer / inspection site, carried to the work-order
         // Rejection is a first-class outcome, with who and why.
         ensure_column('quotations', 'rejected_by', "VARCHAR(150) DEFAULT ''");
         ensure_column('quotations', 'rejected_at', "VARCHAR(30) DEFAULT ''");
@@ -1032,6 +1033,10 @@ function ops_crm_quotes($route, $method) {
                 'terms_conditions' => (string)($b['terms_conditions'] ?? ''),
                 'signatory_user_id' => ($b['signatory_user_id'] ?? '') !== '' ? (int)$b['signatory_user_id'] : null,
                 'site_location' => trim($b['site_location'] ?? ''), 'location_type' => $b['location_type'] ?? 'REGISTERED',
+                // The manufacturer / vendor site the inspection is at. Captured on
+                // the quote so raising the work-order carries it straight through,
+                // instead of the site being re-chosen (or lost) at the call.
+                'vendor_id' => ($b['vendor_id'] ?? '') !== '' ? (int)$b['vendor_id'] : null,
                 'currency' => $b['currency'] ?? 'INR', 'validity_days' => (int)($b['validity_days'] ?? 30),
                 'payment_terms' => trim($b['payment_terms'] ?? ''), 'advance_pct' => (float)($b['advance_pct'] ?? 0),
                 'advance_required' => !empty($b['advance_required']) ? 1 : 0, 'report_vs_payment' => !empty($b['report_vs_payment']) ? 1 : 0,
@@ -1083,7 +1088,7 @@ function ops_crm_quotes($route, $method) {
         }
         view('ops/crm/quote_form', ['q' => $q, 'lines' => $q ? crm_quote_lines($q['id']) : [], 'preInq' => $preInq, 'preLead' => $preLead,
             'locations' => $q ? crm_quote_locations($q['id']) : [],
-            'clients' => clients_list(), 'offices' => offices_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
+            'clients' => clients_list(), 'vendors' => vendors_list(), 'offices' => offices_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
             'svcOpts' => lk_options_or('inspection_type', INSPECTION_TYPES), 'unitOpts' => lk_options_or('charge_unit', CHARGE_UNITS),
             'orderOpts' => lk_options_or('order_type', ORDER_TYPES), 'locTypes' => lk_options_or('site_location_type', SITE_LOCATION_TYPES),
             'payTerms' => lk_options_or('payment_term', PAYMENT_TERMS), 'origins' => lk_options_or('quote_origin', QUOTE_ORIGINS),

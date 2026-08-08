@@ -84,6 +84,17 @@
       <small class="muted">Each line item can then be assigned to one of these, so revenue and inter-<?= e(T('office')) ?> credit split correctly.</small></div>
   </div>
 
+  <?php // The manufacturer / vendor whose works are inspected. Chosen here so it
+        // carries straight onto the work-order's site dropdown when the quote is won. ?>
+  <div class="form-grid">
+    <div class="ff"><label><?= e(T('vendor')) ?> / <?= e(Tl('manufacturer')) ?> site <span class="muted">— carried to the <?= e(Tl('call')) ?></span></label>
+      <select class="form-control searchable" name="vendor_id"><option value="">— none / decide later —</option>
+        <?php foreach (($vendors ?? []) as $vd): ?>
+          <option value="<?= (int)$vd['id'] ?>" <?= (string)$g('vendor_id')===(string)$vd['id']?'selected':'' ?>><?= e($vd['display_name'] ?: $vd['legal_name']) ?></option>
+        <?php endforeach; ?>
+      </select></div>
+  </div>
+
   <h3 class="tab-sub">Sites <span class="muted">— add every location the work covers</span></h3>
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt" id="locs">
