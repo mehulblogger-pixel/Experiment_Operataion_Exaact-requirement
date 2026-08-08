@@ -1149,7 +1149,12 @@ function idems_build_approval_chain($doc) {
         AND (sbu='' OR sbu=?)
         ORDER BY level, sort_order, id", [$doc['type_code'], $doc['office_id'] ?: 0, $doc['client_id'] ?: 0, $doc['sbu'] ?: '']);
     $steps = [];
-    if ($rules) {
+    // An approver chosen directly on the report wins — it is an explicit, per-report
+    // decision, so honouring it stops the "no approver, map it" refusal when one was
+    // in fact picked on the form. Rules / the inspector map remain the fallback.
+    if (!empty($doc['approver_user_id'])) {
+        $steps[] = ['level'=>1, 'kind'=>'REPORT_PICK', 'role'=>'', 'user'=>(int)$doc['approver_user_id'], 'sla'=>24];
+    } elseif ($rules) {
         foreach ($rules as $r) {
             $uid = idems_resolve_approver($r['approver_kind'], $r['approver_user_id'], $doc);
             $steps[] = ['level'=>(int)$r['level'], 'kind'=>$r['approver_kind'], 'role'=>$r['approver_role'] ?? '', 'user'=>$uid, 'sla'=>(int)$r['sla_hours']];
