@@ -836,6 +836,43 @@ function ops_idems_builder($route, $method) {
             flash('Added a “Scope of activities” section — add rows on the report, each with a status and remark.');
             redirect('/report-builder?type=' . $typeId);
         }
+        // One click adds the identification & traceability fields every inspection
+        // report must carry under ISO/IEC 17020 clause 7.4 — so a report type is
+        // "17020-ready" without designing each field by hand. Things the system
+        // already stamps (issuing body, unique report number, dates, inspector &
+        // authorised signatory) are noted, not re-asked; only the fields an
+        // inspector actually fills are added.
+        if ($do === 'add_iso17020') {
+            $title = 'Identification & traceability (ISO 17020)';
+            $exists = (int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=? AND title=?", [$typeId, $title]);
+            if ($exists) { flash('This report type already has the ISO 17020 identification section.', 'warning'); redirect('/report-builder?type=' . $typeId); }
+            $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, $title,
+                    'Mandatory identification & traceability required by ISO/IEC 17020 (7.4). The issuing body, unique report number, dates, inspector and authorised signatory are added automatically by the system — fill the rest.',
+                    (int)ops_val("SELECT COALESCE(MIN(sort_order),10)-3 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $secId = (int)$pdo->lastInsertId();
+            // fkey, label, ftype, options, required, help
+            $isoFields = [
+                ['iso_object',        'Item / object inspected',                'text',     '', 1, 'What was inspected — equipment, material or item description.'],
+                ['iso_object_id',     'Item identification (tag / serial / heat no.)', 'text', '', 0, 'Unique identification of the inspected item so it is traceable.'],
+                ['iso_location',      'Place of inspection',                     'text',     '', 0, 'Where the inspection was carried out (works / site / address).'],
+                ['iso_method',        'Inspection method / standard applied',    'textarea', '', 1, 'The method, standard or specification used (e.g. IS/ASME/EN clause).'],
+                ['iso_criteria',      'Acceptance criteria',                     'textarea', '', 1, 'The criteria the result is judged against.'],
+                ['iso_extent',        'Extent of inspection / sampling',         'text',     '', 0, 'How much was inspected — 100%, sample size, sampling plan.'],
+                ['iso_conformity',    'Statement of conformity',                 'select',   "Conforms\nDoes not conform\nConforms with observations\nNot applicable", 1, 'The overall judgement — required by ISO 17020 when a conformity statement is given.'],
+                ['iso_limitations',   'Limitations, deviations & exclusions',    'textarea', '', 0, 'Anything outside scope, any deviation from the method, or points not covered.'],
+            ];
+            $ins = $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,required,help,sort_order,col_span)
+                                  VALUES (?,?,?,?,?,?,?,?,?,?)");
+            $base = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId]);
+            foreach ($isoFields as $ix => $f) {
+                if ((int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey=?", [$typeId, $f[0]])) continue;
+                $span = in_array($f[2], ['textarea']) ? 2 : 1;
+                $ins->execute([$typeId, $secId, $f[0], $f[1], $f[2], $f[3], $f[4], $f[5], $base + ($ix * 10), $span]);
+            }
+            flash('Added the ISO 17020 identification & traceability section — every mandatory field is now on this report.');
+            redirect('/report-builder?type=' . $typeId);
+        }
         if ($do === 'section_del') {
             $sid = (int)($_POST['section_id'] ?? 0);
             $pdo->prepare("DELETE FROM report_sections WHERE id=? AND report_type_id=?")->execute([$sid, $typeId]);
