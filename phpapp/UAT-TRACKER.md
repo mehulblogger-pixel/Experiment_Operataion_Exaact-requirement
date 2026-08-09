@@ -13,6 +13,36 @@ Legend: ✅ works · 🐞 bug · 🧹 clutter/UX · 👯 duplicate · ⟢ needs 
 
 ---
 
+## 🐞 Bugs found & fixed
+
+### B1 — Add-user screen crashed: "Unknown column 'team_role'" (FIXED)
+
+**Reported live:** Organisation & people → Login accounts → **Add user** →
+`SQLSTATE[42S22]: Unknown column 'team_role' in 'SELECT'` at `lib/ops.php`.
+
+**Root cause (two-part):**
+1. `inspectors_list()` selected `COALESCE(team_role,'FIELD')`. A comment claimed
+   this protected a database missing the column — it does not. `COALESCE`
+   substitutes a NULL *value*; the column must still exist or the SELECT throws.
+2. The boot **schema-probe** in `index.php` (which is what triggers the
+   idempotent migration) probes many `inspectors` columns but **never `team_role`**.
+   So on a live DB updated after that column shipped, the fingerprint matched,
+   the probe passed, migration was skipped, and the column was never added.
+
+**Fix:**
+- `lib/ops.php` — `inspectors_list()` now calls `ensure_column('inspectors',
+  'team_role', …)` before the read (idempotent self-heal, same pattern
+  `team_member_create()` already used), and the misleading comment is corrected.
+- `index.php` — added `SELECT team_role FROM inspectors` to the boot probe so any
+  install missing it triggers the full migration.
+
+**Verified:** reproduced the crash on a DB with the column dropped; after the fix
+the Add-a-person screen renders fully and the column self-heals back. Full suite
+459/459 still passes. On the live server the fix applies on the next page load
+(the code change moves the fingerprint, so the probe re-runs and migrates).
+
+---
+
 ## Environment baseline (09 Aug 2026)
 
 | Check | Result |
