@@ -39,12 +39,22 @@
     <?php if (in_array($doc['status'], ['APPROVED','ISSUED'], true) && $doc['type_code'] !== 'RN' && (is_master() || can('mod.idems.edit'))): ?>
       <form method="post" action="/document-release-note" style="display:inline"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><button class="btn secondary" type="submit">📋 Draft Release Note</button></form>
     <?php endif; ?>
+    <?php // §R1 — when a format (your company's, or this client's) is on file, that
+          // IS the report: it prints in your exact layout. Make it the primary output
+          // and drop the generic PDF to a plain fallback. ?>
+    <?php $yourFmt = function_exists('idems_pick_template') ? idems_pick_template($doc) : null;
+          $fmtLabel = $yourFmt ? ((int)($yourFmt['client_id'] ?? 0) ? 'client format' : 'company format') : ''; ?>
+    <?php if ($yourFmt): ?>
+      <a class="btn" href="/document-docx?id=<?= (int)$doc['id'] ?>">📄 Report — your format <span class="muted" style="font-weight:400">(<?= e($fmtLabel) ?>)</span></a>
+    <?php endif; ?>
     <?php if (empty($doc['finalized'])): ?>
-      <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>" target="_blank">📄 Draft PDF (watermarked)</a>
+      <a class="btn <?= $yourFmt ? 'secondary' : '' ?>" href="/document-pdf?id=<?= (int)$doc['id'] ?>" target="_blank">📄 <?= $yourFmt ? 'Plain PDF' : 'Draft PDF (watermarked)' ?></a>
     <?php else: ?>
-      <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=original" target="_blank">📄 Original</a>
+      <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=original" target="_blank">📄 <?= $yourFmt ? 'Plain PDF' : 'Original' ?></a>
+      <?php if (!$yourFmt): ?>
       <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=duplicate" target="_blank">📄 Duplicate</a>
       <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=triplicate" target="_blank">📄 Triplicate</a>
+      <?php endif; ?>
       <?php // Amend-and-reissue: an issued report cannot be edited, but it can be
             // revised — a new draft at Rev n+1, carrying this report's content, is
             // created and this one is kept unchanged as the history. ?>
@@ -52,7 +62,6 @@
         <form method="post" action="/document-revise" style="display:inline" onsubmit="return confirm('Create Rev <?= (int)($doc['rev'] ?? 0) + 1 ?> of this report? The original stays on file, unchanged.')"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><button class="btn secondary" type="submit">♻️ Reissue as new revision</button></form>
       <?php endif; ?>
     <?php endif; ?>
-    <?php if (function_exists('idems_pick_template') && idems_pick_template($doc)): ?><a class="btn secondary" href="/document-docx?id=<?= (int)$doc['id'] ?>">📝 Client format</a><?php endif; ?>
   </div>
 </div>
 
