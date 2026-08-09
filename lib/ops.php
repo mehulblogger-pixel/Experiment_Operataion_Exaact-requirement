@@ -4707,6 +4707,17 @@ function ops_jobs($route, $method) {
                     return;
                 }
             }
+            // §WO-6 — the last day of an inspection needs the Final Inspection
+            // Report and the Release Note before the job is closed.
+            if (function_exists('job_final_docs_missing')) {
+                $fd = job_final_docs_missing($job);
+                if ($fd) {
+                    view('ops/job_close', ['job'=>$job, 'error'=>'The final day of an inspection needs '
+                        . implode(' and ', $fd) . ' on file before this ' . Tl('job') . ' can be closed. '
+                        . 'Create them with "New report" on the ' . Tl('job') . ' (Final Inspection Report and Release Note).']);
+                    return;
+                }
+            }
             // collect any configurable (extra) headings into JSON {code:amount}
             $extra = [];
             foreach (expense_extra_headings() as $code=>$label) {

@@ -58,6 +58,29 @@ const IDEMS_OPEN_STATES = ['DRAFT','SUBMITTED','UNDER_REVIEW','REJECTED'];
 const IDEMS_RESULTS = ['ACCEPTED'=>'Accepted','ACCEPTED_COND'=>'Accepted with observations','REJECTED'=>'Rejected','HOLD'=>'Hold','NA'=>'Not applicable'];
 const IDEMS_RELEASE = ['RELEASED'=>'Released','RELEASED_COND'=>'Released with observations','NOT_RELEASED'=>'Not released','PENDING'=>'Pending'];
 
+// §WO-6 — the completion deliverables. On the last day of an inspection the job
+// needs a Final Inspection Report (FIR) and a Release Note (RN / IRN) before it
+// can be closed. The daily reports during the run are handled per visit day
+// (WO-8). Owner can turn this gate off if a job type does not conclude with a
+// release note (Settings → Check-in / reporting).
+function require_final_docs_on_close() {
+    return (function_exists('setting_get') ? setting_get('require_final_docs_on_close', '1') : '1') === '1';
+}
+function job_final_docs_missing($job) {
+    if (!require_final_docs_on_close()) return [];
+    if (($job['reporting_frequency'] ?? 'NOREPORT') === 'NOREPORT') return [];
+    $jobId = (int)($job['id'] ?? 0); if (!$jobId) return [];
+    $fir = 0; $rn = 0;
+    try {
+        $fir = (int)ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND type_code='FIR'", [$jobId]);
+        $rn  = (int)ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND type_code IN ('RN','IRN')", [$jobId]);
+    } catch (Throwable $e) { return []; }   // reports not in use on this install
+    $miss = [];
+    if (!$fir) $miss[] = 'a Final Inspection Report';
+    if (!$rn)  $miss[] = 'a Release Note';
+    return $miss;
+}
+
 // ---------------------------------------------------------------------------
 //  Schema
 // ---------------------------------------------------------------------------
