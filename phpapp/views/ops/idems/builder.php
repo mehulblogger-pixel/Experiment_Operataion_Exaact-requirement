@@ -15,6 +15,10 @@
       <input type="hidden" name="_do" value="add_scope">
       <button class="btn secondary" type="submit" title="Adds a repeatable Activity / Status / Remark table">➕ Scope of activities</button>
     </form>
+    <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline">
+      <input type="hidden" name="_do" value="add_iso17020">
+      <button class="btn secondary" type="submit" title="Adds every identification &amp; traceability field ISO/IEC 17020 requires — item, method, acceptance criteria, statement of conformity, limitations">🛡️ ISO 17020 fields</button>
+    </form>
     <a class="btn secondary" href="/report-types">← Report types</a>
   </div>
 </div>
