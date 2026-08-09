@@ -60,7 +60,10 @@ try { boot(); } catch (Throwable $e) { echo "Boot error: " . $e->getMessage() . 
 $sent = ops_run_reminders();
 // Contracts running out of time — one warning per contract per end date.
 $expiring = function_exists('contracts_expiry_reminders') ? contracts_expiry_reminders() : 0;
-echo "Reminders processed. Emails queued/sent: $sent\n";
+// A contract with no activity for two months is closed automatically; anything
+// still pending at close is flagged to the owner, branch manager and accounts.
+$idleClosed = function_exists('contracts_idle_autoclose') ? contracts_idle_autoclose() : 0;
+echo "Reminders processed. Emails queued/sent: $sent. Contracts auto-closed: $idleClosed\n";
 
 // Flip recruitment placement fees from provisional to confirmed once the
 // agency's free-replacement guarantee window has passed.
