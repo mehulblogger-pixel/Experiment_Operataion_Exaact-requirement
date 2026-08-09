@@ -1989,7 +1989,7 @@ function ops_module_gate($route) {
     $base = (strncmp($route, 'm/', 2) === 0) ? 'masters' : $route;
     static $map = [
         'calls'=>'calls','call'=>'calls','call-new'=>'calls','call-edit'=>'calls','call-delete'=>'calls',
-        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-bill'=>'invoicing','job-advance'=>'jobs','job-reassign'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
+        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-bill'=>'invoicing','job-advance'=>'jobs','job-reassign'=>'jobs','job-visit-close'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
         'bill-add'=>'jobs','bill-delete'=>'jobs','bill-file'=>'jobs',
         'invoicing'=>'invoicing',
         'tally'=>'invoicing','tally-export'=>'invoicing','tally-settings'=>'invoicing','tally-undo'=>'invoicing',
@@ -2175,7 +2175,7 @@ function ops_dispatch($route, $method) {
     switch (true) {
         case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call' || $route === 'call-delete' || $route === 'call-credit':
             ops_calls($route, $method); return true;
-        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-bill' || $route === 'job-advance' || $route === 'job-reassign' || $route === 'expense-delete':
+        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-bill' || $route === 'job-advance' || $route === 'job-reassign' || $route === 'job-visit-close' || $route === 'expense-delete':
             ops_jobs($route, $method); return true;
         // Bills backing the expenses the client is being charged for.
         case $route === 'bill-add' || $route === 'bill-delete' || $route === 'bill-file':
@@ -4696,6 +4696,17 @@ function ops_jobs($route, $method) {
                     ->execute([user_name(current_user()), $attReason, date('c'), $job['id']]);
                 $job['attendance_missing'] = 1;
             }
+            // §WO-8 — a multi-day job cannot be closed while any of its visit days
+            // is still open (each day is closed with its own report first).
+            if (function_exists('job_visits_open_days')) {
+                $openDays = job_visits_open_days($job);
+                if ($openDays) {
+                    view('ops/job_close', ['job'=>$job, 'error'=>'This ' . Tl('job') . ' still has ' . count($openDays)
+                        . ' visit day(s) open: ' . implode(', ', array_map('fdate', array_slice($openDays, 0, 6)))
+                        . (count($openDays) > 6 ? ' …' : '') . '. Close each day with its report first (below the day-by-day plan).']);
+                    return;
+                }
+            }
             // collect any configurable (extra) headings into JSON {code:amount}
             $extra = [];
             foreach (expense_extra_headings() as $code=>$label) {
@@ -4724,6 +4735,16 @@ function ops_jobs($route, $method) {
     // without re-opening the whole allocation form. A coordinator does this the
     // morning an engineer calls in sick. It rewrites only the visit rows, never
     // the job's main inspector, so everything else the job carries is untouched.
+    if ($route === 'job-visit-close' && $method === 'POST') {
+        // §WO-8 — close one day of a multi-day job, with its report.
+        ops_require(is_coordinator_level() || is_master(), 'You cannot close a visit day.');
+        $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$job) { http_response_code(404); view('notfound'); return; }
+        if (!empty($job['closed_flag'])) { flash('This ' . Tl('job') . ' is already closed.', 'warning'); redirect('/job?id=' . $job['id'] . '#visits'); }
+        $err = function_exists('job_visit_close') ? job_visit_close($job['id'], $_POST['date'] ?? '', $_POST['report_link'] ?? '', 0) : 'Per-day close is unavailable.';
+        flash($err !== '' ? $err : ('Visit of ' . fdate($_POST['date'] ?? '') . ' closed.'), $err !== '' ? 'error' : 'success');
+        redirect('/job?id=' . $job['id'] . '#visits');
+    }
     if ($route === 'job-reassign' && $method === 'POST') {
         ops_require(is_coordinator_level(), 'You cannot reassign ' . Tlp('job') . '.');
         $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
@@ -4774,7 +4795,12 @@ function ops_jobs($route, $method) {
                 'weekday' => $d ? date('D', strtotime($d)) : '',
                 'inspector_id' => $insp, 'inspector_name' => (string)($v['inspector_name'] ?? ''),
                 'busy' => $insp && function_exists('inspector_busy_on') ? inspector_busy_on($insp, $d, $job['id']) : '',
-                'working' => function_exists('is_working_day') ? is_working_day($d, $job['executing_office_id'] ?? null) : true];
+                'working' => function_exists('is_working_day') ? is_working_day($d, $job['executing_office_id'] ?? null) : true,
+                // §WO-8 per-day completion
+                'status' => (string)($v['status'] ?? 'PLANNED'),
+                'done' => (($v['status'] ?? '') === 'DONE'),
+                'report_link' => (string)($v['report_link'] ?? ''),
+                'closed_by' => (string)($v['closed_by'] ?? '')];
         }
         view('ops/job_detail', ['job'=>$job,'expenses'=>$expenses,'profit'=>job_profit($job),
             'jcall'=>$jcall, 'siteAddr'=>$siteAddr,

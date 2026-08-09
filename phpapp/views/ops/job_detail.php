@@ -90,6 +90,37 @@
 </div>
 <?php endif; ?>
 
+<?php // ---- §WO-8: day-by-day completion — close each visit with its report
+      if (count($vp) > 1 && empty($job['closed_flag'])): ?>
+<div class="panel" id="visit-close">
+  <div class="ctitle" style="margin-top:0"><h3>Day-by-day completion
+    <span class="muted">— close each visit with its report; the <?= e(Tl('job')) ?> closes once every working day is done</span></h3></div>
+  <table class="grid">
+    <tr><th>Date</th><th><?= e(ucfirst(Tl('engineer'))) ?></th><th>Status</th><th>Report &amp; close</th></tr>
+    <?php foreach ($vp as $x): ?>
+      <tr>
+        <td><?= e($x['weekday']) ?> <?= e($x['pretty']) ?></td>
+        <td><?= e($x['inspector_name'] ?: '—') ?></td>
+        <td><?php if (!$x['working']): ?><span class="pill p-mut">non-working</span>
+            <?php elseif (!empty($x['done'])): ?><span class="pill p-ok">closed</span>
+            <?php else: ?><span class="pill" style="background:#b45309;color:#fff">open</span><?php endif; ?></td>
+        <td><?php if (!empty($x['done'])): ?>
+              <?php if (!empty($x['report_link'])): ?><a href="<?= e($x['report_link']) ?>" target="_blank" rel="noopener">report</a>
+              <?php else: ?><span class="muted">report on file</span><?php endif; ?>
+              <?php if (!empty($x['closed_by'] ?? '')): ?> <span class="muted" style="font-size:11px">by <?= e($x['closed_by']) ?></span><?php endif; ?>
+            <?php elseif ($x['working'] && is_coordinator_level()): ?>
+              <form method="post" action="/job-visit-close?id=<?= (int)$job['id'] ?>" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                <input type="hidden" name="date" value="<?= e($x['date']) ?>">
+                <input class="form-control" name="report_link" placeholder="report link — or leave blank to use a report already on this <?= e(Tl('job')) ?>" style="width:300px">
+                <button class="btn small" type="submit">Close day</button>
+              </form>
+            <?php else: ?><span class="muted">—</span><?php endif; ?></td>
+      </tr>
+    <?php endforeach; ?>
+  </table>
+</div>
+<?php endif; ?>
+
 <?php // ---- Site check-in -------------------------------------------------
       // The engineer photographs the work at the plant, drives home, and writes
       // the report that evening. So neither the report nor the upload says
