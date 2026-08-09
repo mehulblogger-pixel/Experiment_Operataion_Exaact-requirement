@@ -342,10 +342,23 @@ function auto_seed() {
     $pdo->commit();
 }
 
-function boot() {
+// The whole schema build/upgrade, in one ordered pass. $withSeeds distinguishes
+// the two callers that share this exact sequence:
+//   boot()        — fresh install / full run: schema DDL *and* the seed data
+//                   (master lists, expense heads, module dropdowns, demo rows).
+//   migrate_all() — a code upgrade on an existing database: run every schema
+//                   migration so any newly added table/column is created, but
+//                   NEVER re-seed (re-seeding could resurrect master data an
+//                   admin has deliberately cleared). The migrations are all
+//                   idempotent DDL (ensure_column / ensure_table), so this is
+//                   safe to run on every deploy.
+// Keeping ONE sequence means a migration added in future is picked up by both
+// paths automatically — the blind spot that left `team_role` unmigrated cannot
+// recur.
+function run_schema($withSeeds = true) {
     migrate();
-    if (function_exists('ops_migrate')) { ops_migrate(); ops_seed(); }
-    if (function_exists('lk_migrate')) { lk_migrate(); lk_seed(); }
+    if (function_exists('ops_migrate')) { ops_migrate(); if ($withSeeds) ops_seed(); }
+    if (function_exists('lk_migrate')) { lk_migrate(); if ($withSeeds) lk_seed(); }
     if (function_exists('access_migrate')) access_migrate();
     if (function_exists('crm_migrate')) crm_migrate();   // after lookups exist (masters)
     if (function_exists('idems_migrate')) idems_migrate();   // IDEMS report engine
@@ -403,9 +416,15 @@ function boot() {
     if (function_exists('tally_migrate')) tally_migrate();             // what has already been handed to Tally
     // Register every remaining dropdown as an editable master list. Runs last:
     // it needs the base lists seeded and the CRM/IDEMS constants loaded.
-    if (function_exists('lk_register_module_lists')) lk_register_module_lists();
+    if ($withSeeds && function_exists('lk_register_module_lists')) lk_register_module_lists();
     // Secondary indexes, last of all: every table it references now exists.
     if (function_exists('indexes_migrate')) indexes_migrate();
     ensure_admin();
-    auto_seed();
+    if ($withSeeds) auto_seed();
 }
+
+// Fresh install / full run — schema + seed data.
+function boot() { run_schema(true); }
+
+// Code upgrade on an existing database — schema DDL only, never re-seed.
+function migrate_all() { run_schema(false); }

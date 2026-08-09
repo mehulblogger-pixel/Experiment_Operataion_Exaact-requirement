@@ -41,6 +41,34 @@ the Add-a-person screen renders fully and the column self-heals back. Full suite
 459/459 still passes. On the live server the fix applies on the next page load
 (the code change moves the fingerprint, so the probe re-runs and migrates).
 
+### B2 — Missing-column sweep: the root class, fixed for good (FIXED)
+
+`team_role` was not unique. Measuring the whole app: the code adds **~290
+columns** via `ensure_column`, but the boot-probe only names **148** of them.
+So **~140 columns sat in the same blind spot** — any of them could be missing on
+a live database and crash a screen the day someone opened it. Hand-adding 140
+probes would be endless whack-a-mole.
+
+**Systemic fix (one change, closes all 140):**
+- `lib/db.php` — the schema build/upgrade is now one ordered sequence,
+  `run_schema($withSeeds)`. `boot()` = `run_schema(true)` (fresh install: schema
+  **and** seed data — behaviour byte-for-byte unchanged). New `migrate_all()` =
+  `run_schema(false)` — every schema migration, **no seeds**.
+- `index.php` — when the code fingerprint has moved (a deploy) but the probe
+  otherwise passes, it now calls `migrate_all()`. So **every** pending
+  table/column is created on the first request after any upgrade, whether or not
+  a probe names it.
+
+**Why it's safe (verified, not asserted):** the migrations are idempotent DDL;
+`migrate_all()` never calls the seeds, so master data an admin cleared stays
+cleared. Test: on a running server, dropped 5 un-probed columns from 5 different
+modules **and** cleared the offices master, marked the fingerprint stale, made
+one request →
+- all 5 columns **healed** ✓
+- cleared offices **stayed cleared** ✓ (the guarantee from commit 5aa95aa)
+- fingerprint rewritten, so later requests skip the probe (no slowdown) ✓
+- Add-user screen renders; suite 459/459.
+
 ---
 
 ## Environment baseline (09 Aug 2026)

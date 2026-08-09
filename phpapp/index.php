@@ -455,6 +455,15 @@ try {
         throw new RuntimeException('pending upgrade: shared work-type list');
     if (function_exists('deliverables_pending') && deliverables_pending())
         throw new RuntimeException('pending upgrade: deliverables from the report register');
+    // Every probe above passed, but the code fingerprint moved — a deploy has
+    // happened. Run the schema migrations directly (idempotent DDL, and NEVER
+    // re-seeds) so ANY table or column added in this build is created, even one
+    // no probe above happens to name. This is what closes the gap that left
+    // inspectors.team_role unmigrated: schema coverage no longer depends on
+    // every column being individually listed in the probe (only ~148 of ~290
+    // columns ever were). Cheap: runs once per deploy, then the fingerprint
+    // matches and the whole block is skipped.
+    if (function_exists('migrate_all')) migrate_all();
     // Nothing above threw: the schema matches this build. Remember the
     // fingerprint so the next request skips the whole probe.
     if ($schemaSig !== '') { try { setting_set('schema_sig', $schemaSig); } catch (Throwable $e) {} }
