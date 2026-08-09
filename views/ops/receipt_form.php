@@ -4,7 +4,7 @@
 
 <form method="post" action="/receipt-new" class="panel" style="margin-top:16px;max-width:820px">
   <div class="form-grid" style="gap:12px 16px">
-    <div><label>Customer *</label>
+    <div><label>Customer * <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
       <select name="partner_id" required class="searchable">
         <option value="">— choose —</option>
         <?php foreach ($clients as $c): ?>

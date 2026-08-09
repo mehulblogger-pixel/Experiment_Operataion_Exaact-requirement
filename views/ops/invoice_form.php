@@ -22,7 +22,7 @@ $src = function ($k) use ($from) {
   <div class="form-sec"><h3>Who it is for</h3>
     <p>Pick the customer first — the terms, the contract and the unbilled work all follow from it.</p></div>
   <div class="form-grid">
-    <div class="ff ff-req"><label>Customer</label>
+    <div class="ff ff-req"><label>Customer <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
       <select name="partner_id" required class="form-control searchable" id="inv-partner"
               onchange="if(this.value) location.href='/invoice-new?partner='+encodeURIComponent(this.value)">
         <option value="">— choose —</option>

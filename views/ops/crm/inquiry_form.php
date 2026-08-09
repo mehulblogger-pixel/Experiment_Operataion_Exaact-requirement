@@ -7,7 +7,7 @@
 
 <form method="post" action="/<?= $inq ? 'inquiry-edit?id=' . (int)$inq['id'] : 'inquiry-new' ?>" class="panel">
   <div class="form-grid">
-    <div class="ff"><label>Client</label>
+    <div class="ff"><label>Client <a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a></label>
       <select class="form-control searchable" name="client_id"><option value="">— pick or type below —</option>
         <?php foreach ($clients as $cl): ?><option value="<?= (int)$cl['id'] ?>" <?= (string)($inq['client_id'] ?? '')===(string)$cl['id']?'selected':'' ?>><?= e($cl['display_name'] ?: $cl['legal_name']) ?></option><?php endforeach; ?>
       </select></div>

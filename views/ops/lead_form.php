@@ -39,7 +39,7 @@ $me  = current_user();
           // it is never re-typed or mis-spelled — the same client picker the
           // quotation screen uses. A person or a company we do not yet know is
           // typed into the box, and stays a plain lead with no master link. ?>
-    <div class="ff ff-wide ff-req"><label for="lead-partner">Company or person</label>
+    <div class="ff ff-wide ff-req"><label for="lead-partner">Company or person <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
       <div class="pair-2">
         <select class="form-control searchable" name="partner_id" id="lead-partner">
           <option value="">— pick a company on the master —</option>

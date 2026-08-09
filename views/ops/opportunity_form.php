@@ -8,7 +8,7 @@
       <input class="form-control" name="name" required maxlength="255" value="<?= e($prefill['name'] ?? '') ?>"
              placeholder="e.g. Annual vessel inspection contract — 2027 renewal">
       <span class="muted" style="font-size:12px">Name it the way you would say it out loud in a review.</span></div>
-    <div><label>Customer</label>
+    <div><label>Customer <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
       <select name="partner_id" class="searchable">
         <option value="">— not on the master yet —</option>
         <?php foreach ($clients as $c): ?>
