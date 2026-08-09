@@ -33,6 +33,36 @@ bucket)**, no errors. Suite 459/459.
 
 ---
 
+## Module 11 — Licensing & Seats (deep test — the whole selling model works)
+
+This is the module the business depends on. Tested end-to-end with a **genuine
+signed key** (real RSA-SHA256, minted and installed the way a customer's key is).
+
+**✅ Signed licence recognised:** installed a 2-seat key → the Licence screen read
+*"Licensed — UAT Test Co, valid to 31 Dec 2027, 1 of 2 in use."* The signature is
+verified by arithmetic on the server (nothing phones home), so it works offline
+and **cannot be forged**.
+
+**✅ Seat cap enforces:**
+- Added user #2 → 2 of 2 seats filled.
+- Added user #3 → **blocked**: *"Your subscription covers 2 people and 2 are
+  already active. Deactivate somebody who has left, or ask MGH to add seats."*
+- The DB confirmed user #3 was **not** created.
+
+**✅ "Add more seats" works:** re-issued a **3-seat** key and swapped it in → the
+same user #3 was **created immediately**, 3 of 3 active. This is exactly the
+"customer asks for more users, you send a new key" flow — verified.
+
+**✅ Per-module licensing enforces too (bonus):** the 2/3-seat keys bought no
+modules, so only *Administration* was on — and the **Operations, Reporting and
+Money groups disappeared from the menu entirely**. A module that isn't bought is
+not just hidden; its screens refuse to open and its permissions are withdrawn.
+
+Everything a paying customer leans on — seat limits, seat top-ups, module
+entitlement — holds. No defects.
+
+---
+
 ## Module 9 — Money / Finance (deep test — settlement reconciles)
 
 Continued the same order into the money side, checking figures against the DB.
@@ -248,6 +278,6 @@ Each will get the same treatment (walk with real values → log → fix → re-t
 | 8 | Quality & Compliance (NCR/CAPA/audits) | ✅ walked — see Module 8 below |
 | 9 | Money / Finance | ✅ loads clean (health sweep) |
 | 10 | Dashboards & MIS | ✅ loads clean (health sweep) |
-| 11 | Licensing & Tenants | ✅ loads clean (health sweep) |
+| 11 | Licensing & Tenants | ✅ deep-tested — see Module 11 below |
 | 12 | Client Portal | ✅ loads clean (health sweep) |
 | 13 | Admin & Security | ✅ loads clean (health sweep) |
