@@ -1022,6 +1022,33 @@ function ops_crm_quotes($route, $method) {
         ]);
         return;
     }
+    if ($route === 'partner-address') {
+        // The registered address and a contact for a single partner (a vendor
+        // picked on a quote site row, a manufacturer, etc.), so its site details
+        // fill in by themselves instead of being copied by hand.
+        header('Content-Type: application/json');
+        $pid = (int)($_GET['id'] ?? 0);
+        $addrs = crm_client_addresses($pid);
+        $primary = $addrs[0] ?? null;
+        $contacts = function_exists('crm_client_contacts') ? crm_client_contacts($pid) : [];
+        $c = $contacts[0] ?? null;
+        echo json_encode([
+            'address' => $primary ? [
+                'label'   => (string)($primary['label'] ?? ''),
+                'line1'   => (string)($primary['line1'] ?? ''),
+                'line2'   => (string)($primary['line2'] ?? ''),
+                'city'    => (string)($primary['city'] ?? ''),
+                'state'   => (string)($primary['state'] ?? ''),
+                'pincode' => (string)($primary['pincode'] ?? ''),
+                'country' => (string)($primary['country'] ?? 'India'),
+            ] : null,
+            'contact' => $c ? [
+                'name'   => (string)($c['name'] ?? ''),
+                'mobile' => (string)(($c['mobile'] ?? '') ?: ($c['phone'] ?? '')),
+            ] : null,
+        ]);
+        return;
+    }
     if ($route === 'quote-new' || $route === 'quote-edit') {
         ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'), 'You cannot create or edit quotations.');
         $q = null;
