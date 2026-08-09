@@ -3214,7 +3214,15 @@ function ops_calls($route, $method) {
                 if ($forwardNow) $pdo->prepare("UPDATE calls SET forwarded_at=?, status='FORWARDED' WHERE id=?")->execute([date('c'), $call['id']]);
                 custom_save('call', $call['id'], $b);
                 if ($forwardNow) send_forward_email($call['id']);
-                flash("Call {$call['call_code']} updated." . ($forwardNow ? ' Forwarded — email sent to the branch.' : ''));
+                // Carry the edit forward onto any open deputation already raised
+                // from this call — dates, days, reporting, formats, contract — so
+                // a change made here does not silently leave the field out of date.
+                $newCall = ops_one("SELECT * FROM calls WHERE id=?", [$call['id']]);
+                [$cfJobs, $cfKept] = call_carry_forward_to_jobs($call, $newCall ?: []);
+                $cfMsg = '';
+                if ($cfJobs > 0) $cfMsg = " Carried forward to $cfJobs open " . ($cfJobs === 1 ? Tl('job') : Tlp('job')) . '.';
+                if ($cfKept > 0) $cfMsg .= " $cfKept field(s) left as they were changed on the " . Tl('job') . '.';
+                flash("Call {$call['call_code']} updated." . ($forwardNow ? ' Forwarded — email sent to the branch.' : '') . $cfMsg);
                 redirect('/call?id=' . $call['id']);
             } else {
                 $code = ops_next_code('calls', 'call_code', 'CALL');
@@ -3349,6 +3357,93 @@ function job_save_fields() {
         'cert_override_note','cert_override_by',
         'sitedoc_override_note','sitedoc_override_by',
         'impartiality_ok','impartiality_note','impartiality_by','impartiality_at'];
+}
+
+// ---- Carry an edited call forward onto its open jobs ----------------------
+// Editing an inspection call AFTER it is allocated used to change nothing on
+// the work already handed out — the dates, the reporting rhythm, the report
+// formats, the contract number all moved on the call and the deputation kept
+// the old ones. Now the change flows through: every OPEN (not closed) job of
+// the call is brought back into line.
+//
+// The one rule that keeps this safe: a field is only overwritten on the job if
+// the job still holds the call's OLD value — i.e. nobody has deliberately
+// changed it on the deputation itself. A per-day reshuffle, a hand-picked date,
+// a one-off reporting change stays put; everything the coordinator never
+// touched follows the call. Returns [jobsChanged, fieldsKept] for the message.
+function cf_eq($a, $b) {
+    $a = trim((string)$a); $b = trim((string)$b);
+    if ($a === $b) return true;
+    if (is_numeric($a) && is_numeric($b)) return (float)$a === (float)$b;
+    return false;
+}
+function call_carry_forward_to_jobs($oldCall, $newCall) {
+    if (!is_array($oldCall) || !is_array($newCall)) return [0, 0];
+    $callId = (int)($newCall['id'] ?? 0); if (!$callId) return [0, 0];
+    // Plain fields that mean the same thing on a job as on the call.
+    $plain = ['executing_office_id','sbu','activity_id','inspection_type',
+              'contract_number','folder_link','engagement_type','days_count',
+              'months_count','pattern_kind','pattern_n','schedule_weekdays',
+              'schedule_end_date','force_dates','manmonth_basis','manmonth_min_days',
+              'reporting_frequency','report_custom_days','deliverables',
+              'is_outstation','chargeable_heads','quotation_id'];
+    if (function_exists('existing_columns_only')) $plain = existing_columns_only('jobs', $plain);
+    // Did anything that shapes the visit dates move on the call?
+    $schedKeys = ['inspection_dates','engagement_type','days_count','months_count',
+                  'pattern_kind','pattern_n','schedule_weekdays','schedule_end_date',
+                  'force_dates','inspection_required_date','manmonth_basis','manmonth_min_days'];
+    $schedMoved = false;
+    foreach ($schedKeys as $k) if (!cf_eq($oldCall[$k] ?? '', $newCall[$k] ?? '')) { $schedMoved = true; break; }
+
+    $jobs = ops_all("SELECT * FROM jobs WHERE call_id=? AND COALESCE(closed_flag,0)=0", [$callId]);
+    $jobsChanged = 0; $fieldsKept = 0;
+    foreach ($jobs as $job) {
+        $set = [];
+        foreach ($plain as $f) {
+            if (!array_key_exists($f, $job)) continue;
+            if (cf_eq($oldCall[$f] ?? '', $newCall[$f] ?? '')) continue;   // call value didn't move
+            if (cf_eq($job[$f] ?? '', $oldCall[$f] ?? '')) $set[$f] = $newCall[$f] ?? '';  // job was in sync → follow
+            else $fieldsKept++;                                            // job was overridden → leave it
+        }
+        // Dates: only re-plan the deputation when the call's schedule moved AND
+        // the deputation is still on the call's old dates (not hand-scheduled).
+        $replan = false;
+        if ($schedMoved) {
+            $oldDates = sched_resolve($oldCall, $oldCall['executing_office_id'] ?? null, ($oldCall['inspection_required_date'] ?? '') ?: null, (int)($oldCall['client_id'] ?? 0) ?: null)['dates'];
+            $jobDates = job_call_required_dates($job, []);
+            sort($oldDates); sort($jobDates);
+            if ($jobDates === $oldDates || (!$jobDates && !$oldDates)) {
+                // Build a row that carries the call's new shape, then resolve it.
+                $shape = $job;
+                foreach ($schedKeys as $k) if (array_key_exists($k, $newCall)) $shape[$k] = $newCall[$k];
+                $start = ($newCall['inspection_required_date'] ?? '') ?: ($job['scheduled_date'] ?? '');
+                $nd = sched_resolve($shape, $job['executing_office_id'] ?? ($newCall['executing_office_id'] ?? null), $start ?: null, (int)($newCall['client_id'] ?? 0) ?: null)['dates'];
+                if ($nd) {
+                    $set['inspection_dates'] = implode(',', $nd);
+                    $set['scheduled_date'] = $nd[0];
+                    $set['inspection_start_date'] = $nd[0];
+                    $set['inspection_end_date'] = count($nd) > 1 ? end($nd) : $nd[0];
+                    $replan = true;
+                }
+            } else {
+                $fieldsKept++;   // deputation has its own dates — untouched
+            }
+        }
+        if (!$set) continue;
+        // Keep only columns that exist, so a partial upload cannot crash the save.
+        if (function_exists('existing_columns_only'))
+            $set = array_intersect_key($set, array_flip(existing_columns_only('jobs', array_keys($set))));
+        if (!$set) continue;
+        $cols = array_keys($set);
+        $sql = 'UPDATE jobs SET ' . implode(',', array_map(fn($c) => "$c=?", $cols)) . ' WHERE id=?';
+        $vals = array_map(fn($c) => nzc($c, $set[$c]), $cols); $vals[] = (int)$job['id'];
+        db()->prepare($sql)->execute($vals);
+        // If the dates were re-planned, redraw the per-visit rows to match.
+        if ($replan && function_exists('job_visits_sync'))
+            job_visits_sync((int)$job['id'], (int)($job['inspector_id'] ?? 0));
+        $jobsChanged++;
+    }
+    return [$jobsChanged, $fieldsKept];
 }
 
 function nzc_call($f, $v) {
