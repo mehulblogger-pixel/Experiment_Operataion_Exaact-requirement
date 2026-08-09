@@ -13,6 +13,28 @@ Legend: ✅ works · 🐞 bug · 🧹 clutter/UX · 👯 duplicate · ⟢ needs 
 
 ---
 
+## 📋 Owner requests (Aug 2026 — Quotation & Reporting)
+
+| # | Request | Status |
+|---|---|---|
+| 1 | Client commercials should flow into the quote | ✅ **built** — payment terms now auto-fill from the client master on client-select |
+| 2 | Site dropdown of vendor sites + handle "sites not finalized" | ⏳ **needs one decision** (see below) |
+| 3 | Geo-fence location on client/vendor creation (anti fake-GPS) | ✅ **built** — site lat/lon + radius on the form; punch-in already checks it |
+| 4 | Report builder 14a/14b "not working" | ✅ **works in current code** — verified live; the live site is running **older files** (same deployment gap as the `team_role` crash). Deploy the latest and it appears. |
+
+**14a/14b proof:** in the current code, the builder's "➕ Scope of activities"
+button adds the section (real click, section persisted), the "Instrument (master
++ free-text)" field type is selectable and saves, and a new report renders both
+the Scope table and the Instrument field. So it is a **deploy**, not a build.
+
+**Item 2 — open decision:** how to model an inspection whose vendor site is not
+yet fixed. Proposed: a **"Site to be confirmed"** option on each location so a
+quote/call can be raised now (multiple vendors, each optionally TBD) and the
+unconfirmed ones are flagged on the register until a real site + geo-fence is
+set. Awaiting owner confirmation before building.
+
+---
+
 ## 🧹 Declutter done
 
 ### D1 — Add/Edit-user permissions grouped like the menu (DONE)
