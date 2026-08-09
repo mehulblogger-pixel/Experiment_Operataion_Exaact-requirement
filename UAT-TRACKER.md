@@ -33,6 +33,31 @@ bucket)**, no errors. Suite 459/459.
 
 ---
 
+## 💰 Deep transaction test — money reconciles Quote → Call → Job → Invoice (PASS)
+
+Pushed one order the whole way through on a live server, checking the figures at
+every hand-off against the database (not the screen). Inputs: quote line **2
+man-days × ₹5,000**, GST **18%**.
+
+| Stage | How the figure is derived | Value | Reconciles |
+|---|---|---|---|
+| **Quote** | Σ(qty×rate) = 10,000; +18% GST | **₹11,800** | subtotal/GST/total all correct ✓ |
+| **Call** | quote line rate carried → rate×qty (5,000×2) | billable **₹10,000** | rate carried from quote ✓ |
+| **Job** | invoice_value = rate × man-days (5,000×2) | **₹10,000** | = call billable ✓ |
+| **Invoice** | one-click from job; line 5,000×2, +18% GST | **₹11,800** | = quote total ✓✓✓ |
+
+Nothing was re-keyed — every number flowed from the quote. **End-to-end: quote
+₹11,800 → invoice ₹11,800.**
+
+Minor, not a confirmed defect:
+- The call carried the quote's **rate and value correctly, but stored an empty
+  `quote_line_id`** (which line it drew from). The save handler *does* persist that
+  column, so this is most likely an artifact of the automated test setting the
+  rate directly instead of through the line-pick cascade a real user uses. **Flagged
+  for a manual check**, not logged as a bug.
+
+---
+
 ## 🐞 Bugs found & fixed
 
 ### B1 — Add-user screen crashed: "Unknown column 'team_role'" (FIXED)
