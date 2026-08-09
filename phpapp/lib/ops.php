@@ -438,6 +438,13 @@ function ops_migrate() {
         id " . pk_clause() . ", inspector_id INT, name VARCHAR(200), number VARCHAR(80) DEFAULT '',
         issued_date VARCHAR(20) DEFAULT '', valid_to VARCHAR(20) DEFAULT '', status VARCHAR(20) DEFAULT 'VALID',
         last_reminder VARCHAR(20) DEFAULT '', updated_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // §WO-7 — a certificate carries its validity window and the scanned copy, so
+    // the hard copy lives with the record and expiry can be watched from both dates.
+    ensure_column('inspector_certs', 'is_mandatory', 'INT DEFAULT 0');
+    ensure_column('inspector_certs', 'valid_from', "VARCHAR(20) DEFAULT ''");
+    ensure_column('inspector_certs', 'file_name',  "VARCHAR(255) DEFAULT ''");
+    ensure_column('inspector_certs', 'file_mime',  "VARCHAR(100) DEFAULT ''");
+    ensure_column('inspector_certs', 'file_data',  'TEXT NULL');
     // ---- Workforce pack: office posting, weekly working days, reporting manager ----
     ensure_column('inspectors', 'home_office_id', 'INT NULL');                     // which branch this engineer is posted to
     ensure_column('inspectors', 'weekly_working_days', "DECIMAL(3,1) DEFAULT 6");  // 5 | 5.5 | 6 (Sat pattern)
@@ -2149,7 +2156,7 @@ function ops_access($method) {
 function ops_dispatch($route, $method) {
     ops_module_gate($route);
     // ----- Generic masters: /m/<entity>, /m/<entity>/new, /m/<entity>/edit
-    if (preg_match('#^m/([a-z-]+)(?:/(new|edit|delete))?$#', $route, $mm)) {
+    if (preg_match('#^m/([a-z-]+)(?:/(new|edit|delete|cert-file))?$#', $route, $mm)) {
         $key = $mm[1]; $action = $mm[2] ?? 'list';
         $masters = ops_masters();
         if (!isset($masters[$key])) return false;
@@ -2904,8 +2911,37 @@ function column_exists($table, $col) {
 }
 
 // ---- Inspector master (dedicated: names, trade, multi-Business Unit, multi-skill, certs) ----
+// A single uploaded certificate scan, stored as a base64 data URI (same as the
+// rest of the app, so it works on hosting with no writable uploads folder).
+function cert_file_from_upload($key) {
+    if (empty($_FILES[$key]) || ($_FILES[$key]['error'] ?? 4) !== 0 || !is_uploaded_file($_FILES[$key]['tmp_name'])) return null;
+    $bytes = @file_get_contents($_FILES[$key]['tmp_name']);
+    if ($bytes === false || strlen($bytes) === 0 || strlen($bytes) > 12 * 1024 * 1024) return null;
+    $mime = $_FILES[$key]['type'] ?: 'application/octet-stream';
+    return ['name' => substr((string)$_FILES[$key]['name'], 0, 255), 'mime' => $mime,
+            'data' => 'data:' . $mime . ';base64,' . base64_encode($bytes)];
+}
+function inspector_cert_add($inspectorId, $b, $fileKey = 'cert_file') {
+    if ($inspectorId <= 0 || trim((string)($b['cert_name'] ?? '')) === '') return;
+    $f = cert_file_from_upload($fileKey);
+    db()->prepare("INSERT INTO inspector_certs (inspector_id,name,number,issued_date,valid_from,valid_to,status,is_mandatory,file_name,file_mime,file_data,updated_by,created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        ->execute([(int)$inspectorId, $b['cert_name'], $b['cert_number'] ?? '', $b['cert_issued'] ?? '',
+                   $b['cert_valid_from'] ?? '', $b['cert_valid_to'] ?? '', 'VALID', empty($b['cert_mandatory']) ? 0 : 1,
+                   $f['name'] ?? '', $f['mime'] ?? '', $f['data'] ?? null, user_name(current_user()), date('c')]);
+}
+
 function ops_inspectors($action, $method) {
     $pdo = db();
+    // Serve a stored certificate scan.
+    if ($action === 'cert-file') {
+        $c = ops_one("SELECT file_name, file_mime, file_data FROM inspector_certs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$c || trim((string)$c['file_data']) === '') { http_response_code(404); echo 'No file.'; return; }
+        $data = (string)$c['file_data'];
+        $bytes = (strpos($data, 'base64,') !== false) ? base64_decode(substr($data, strpos($data, 'base64,') + 7)) : $data;
+        send_uploaded_file($bytes, $c['file_name'] ?: 'certificate', $c['file_mime'] ?: 'application/octet-stream');
+        return;
+    }
     if ($action === 'delete' && $method === 'POST') {
         $id = (int)($_GET['id'] ?? 0);
         $pdo->prepare("DELETE FROM inspector_certs WHERE inspector_id=?")->execute([$id]);
@@ -2923,18 +2959,23 @@ function ops_inspectors($action, $method) {
             $b = $_POST;
             // certification sub-actions on the edit page
             if (($b['_do'] ?? '') === 'cert_add' && $ins) {
-                $pdo->prepare("INSERT INTO inspector_certs (inspector_id,name,number,issued_date,valid_to,status,is_mandatory,updated_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
-                    ->execute([$ins['id'], $b['cert_name'] ?? '', $b['cert_number'] ?? '', $b['cert_issued'] ?? '', $b['cert_valid_to'] ?? '', 'VALID',
-                               empty($b['cert_mandatory']) ? 0 : 1, user_name(current_user()), date('c')]);
+                inspector_cert_add((int)$ins['id'], $b, 'cert_file');
                 flash('Certification added.');
-                redirect('/m/inspectors/edit?id=' . $ins['id']);
+                redirect('/m/inspectors/edit?id=' . $ins['id'] . '#certs');
             }
             if (($b['_do'] ?? '') === 'cert_update' && $ins) {
-                $pdo->prepare("UPDATE inspector_certs SET valid_to=?, number=?, is_mandatory=?, updated_by=? WHERE id=? AND inspector_id=?")
-                    ->execute([$b['cert_valid_to'] ?? '', $b['cert_number'] ?? '', empty($b['cert_mandatory']) ? 0 : 1,
-                               user_name(current_user()), (int)$b['cert_id'], $ins['id']]);
-                flash('Certification validity updated.');
-                redirect('/m/inspectors/edit?id=' . $ins['id']);
+                $f = cert_file_from_upload('cert_file');
+                if ($f) {
+                    $pdo->prepare("UPDATE inspector_certs SET valid_from=?, valid_to=?, number=?, is_mandatory=?, file_name=?, file_mime=?, file_data=?, updated_by=? WHERE id=? AND inspector_id=?")
+                        ->execute([$b['cert_valid_from'] ?? '', $b['cert_valid_to'] ?? '', $b['cert_number'] ?? '', empty($b['cert_mandatory']) ? 0 : 1,
+                                   $f['name'], $f['mime'], $f['data'], user_name(current_user()), (int)$b['cert_id'], $ins['id']]);
+                } else {
+                    $pdo->prepare("UPDATE inspector_certs SET valid_from=?, valid_to=?, number=?, is_mandatory=?, updated_by=? WHERE id=? AND inspector_id=?")
+                        ->execute([$b['cert_valid_from'] ?? '', $b['cert_valid_to'] ?? '', $b['cert_number'] ?? '', empty($b['cert_mandatory']) ? 0 : 1,
+                                   user_name(current_user()), (int)$b['cert_id'], $ins['id']]);
+                }
+                flash('Certification updated.');
+                redirect('/m/inspectors/edit?id=' . $ins['id'] . '#certs');
             }
             if (($b['_do'] ?? '') === 'cert_del' && $ins) {
                 $pdo->prepare("DELETE FROM inspector_certs WHERE id=? AND inspector_id=?")->execute([(int)$b['cert_id'], $ins['id']]);
@@ -2992,8 +3033,11 @@ function ops_inspectors($action, $method) {
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
                     ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $homeOff, $wwd, $reportTo, $teamRole, $agencyCost ?: 0, $salary ?: 0, $b['status'] ?? 'ACTIVE', date('c')]);
                 $id = $pdo->lastInsertId();
-                flash('Inspector added. You can now add certifications.');
-                redirect('/m/inspectors/edit?id=' . $id);
+                // §WO-7 — a first certificate (with its scan and validity) can be
+                // attached right here while adding the team member.
+                inspector_cert_add((int)$id, $b, 'cert_file');
+                flash('Inspector added.' . (trim((string)($b['cert_name'] ?? '')) !== '' ? ' First certificate saved.' : ' You can now add certifications and upload the scans.'));
+                redirect('/m/inspectors/edit?id=' . $id . '#certs');
             }
         }
         $certs = $ins ? ops_all("SELECT * FROM inspector_certs WHERE inspector_id=? ORDER BY valid_to", [$ins['id']]) : [];

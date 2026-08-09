@@ -10,7 +10,7 @@
   <a class="btn secondary" href="/m/inspectors">← Back to <?= e(THP('engineer')) ?></a>
 </div>
 
-<form method="post" action="/m/inspectors/<?= $ins ? 'edit?id=' . (int)$ins['id'] : 'new' ?>" class="panel">
+<form method="post" action="/m/inspectors/<?= $ins ? 'edit?id=' . (int)$ins['id'] : 'new' ?>" class="panel" enctype="multipart/form-data">
   <div class="form-grid">
     <div class="ff"><label>First name *</label><input class="form-control" name="first_name" required value="<?= e($ins['first_name'] ?? '') ?>"></div>
     <div class="ff"><label>Middle name</label><input class="form-control" name="middle_name" value="<?= e($ins['middle_name'] ?? '') ?>"></div>
@@ -67,6 +67,22 @@
       <div class="skill-box" id="skills_box"><span class="muted">Pick a trade to see its skills.</span></div>
       <small class="muted">Skills come from the Trade you select. Add more under <a href="/lookup?key=skill">Skill</a>.</small></div>
   </div>
+
+  <?php if (!$ins): // §WO-7 — attach a first certificate (with its scan) right while adding ?>
+  <fieldset style="margin-top:16px;border:1px solid var(--line);border-radius:8px;padding:12px">
+    <legend style="padding:0 6px;font-weight:600">First certificate <span class="muted" style="font-weight:400">— optional; add more after saving</span></legend>
+    <div class="form-grid">
+      <div class="ff"><label>Certificate name</label><input class="form-control" name="cert_name" placeholder="e.g. CSWIP 3.1"></div>
+      <div class="ff"><label>Number</label><input class="form-control" name="cert_number"></div>
+      <div class="ff"><label>Valid from</label><input class="form-control" type="date" name="cert_valid_from"></div>
+      <div class="ff"><label>Valid to</label><input class="form-control" type="date" name="cert_valid_to"></div>
+      <div class="ff"><label>Certificate file <span class="muted">(PDF / image)</span></label><input class="form-control" type="file" name="cert_file" accept="application/pdf,image/*"></div>
+      <div class="ff" style="align-self:end"><label class="chk"><input type="checkbox" name="cert_mandatory" value="1"> Required for work</label></div>
+    </div>
+    <small class="muted">The system warns the <?= e(Tl('engineer')) ?> and the QA/QC nominee a month before the "valid to" date.</small>
+  </fieldset>
+  <?php endif; ?>
+
   <div style="margin-top:16px;">
     <button class="btn" type="submit"><?= $ins ? 'Save ' . Tl('engineer') : 'Add ' . Tl('engineer') ?></button>
     <a class="btn secondary" href="/m/inspectors">Cancel</a>
@@ -89,28 +105,32 @@
   <script>(function(){var c=document.getElementById('inspSig'),x=c.getContext('2d'),d=false,dy=false;x.lineWidth=2.2;x.lineCap='round';function p(e){var r=c.getBoundingClientRect();var t=e.touches?e.touches[0]:e;return{x:(t.clientX-r.left)*(c.width/r.width),y:(t.clientY-r.top)*(c.height/r.height)};}function s(e){d=true;var q=p(e);x.beginPath();x.moveTo(q.x,q.y);e.preventDefault();}function m(e){if(!d)return;var q=p(e);x.lineTo(q.x,q.y);x.stroke();dy=true;e.preventDefault();}function en(){d=false;if(dy)document.getElementById('inspSigV').value=c.toDataURL('image/png');}c.addEventListener('mousedown',s);c.addEventListener('mousemove',m);window.addEventListener('mouseup',en);c.addEventListener('touchstart',s);c.addEventListener('touchmove',m);c.addEventListener('touchend',en);window.inspSigClear=function(){x.clearRect(0,0,c.width,c.height);document.getElementById('inspSigV').value='';};})();</script>
 </div>
 
-<div class="panel">
+<?php if ($ins): ?>
+<div class="panel" id="certs">
   <h3 class="tab-sub">Certifications &amp; validity</h3>
   <p class="sub">The system e-mails the <?= e(Tl('engineer')) ?> and the QA/QC nominee when a certificate is within a month of expiry. Once the hard copy is received, update the validity date here.
     Tick <strong>Required</strong> on the ones this person may not work without<?php if (function_exists('accredited_pack_on') && accredited_pack_on()): ?> — <?= e(accreditation_ref('competence')) ?><?php endif; ?>. A required certificate that has lapsed
     <strong>stops them being allocated</strong>; a manager can still allow it, but must say why, and the reason is kept on the <?= e(Tl('job')) ?>.</p>
   <table class="grid">
-    <tr><th>Certificate</th><th>Number</th><th>Issued</th><th>Valid to</th><th>Status</th><th>Required?</th><th>Actions</th></tr>
+    <tr><th>Certificate</th><th>Number</th><th>Valid from</th><th>Valid to</th><th>File</th><th>Status</th><th>Required?</th><th>Actions</th></tr>
     <?php foreach ($certs as $c): $days = $c['valid_to'] ? (int)round((strtotime($c['valid_to']) - time())/86400) : null; ?>
     <tr>
       <td><strong><?= e($c['name']) ?></strong></td>
       <td><?= e($c['number'] ?: '—') ?></td>
-      <td><?= e($c['issued_date'] ?: '—') ?></td>
+      <td><?= e(($c['valid_from'] ?? '') ?: ($c['issued_date'] ?: '—')) ?></td>
       <td><?= e($c['valid_to'] ?: '—') ?></td>
+      <td><?= trim((string)($c['file_name'] ?? '')) !== '' ? '<a href="/m/inspectors/cert-file?id=' . (int)$c['id'] . '" target="_blank" rel="noopener">view</a>' : '<span class="muted">—</span>' ?></td>
       <td><?php if ($days===null): ?>—<?php elseif ($days<0): ?><span class="badge RED">Expired</span><?php elseif ($days<=30): ?><span class="badge AMBER"><?= $days ?>d left</span><?php else: ?><span class="badge GREEN">Valid</span><?php endif; ?></td>
       <td><?= !empty($c['is_mandatory'])
             ? '<span class="pill ' . ($days !== null && $days < 0 ? 'p-bad' : 'p-info') . '">required</span>'
             : '<span class="muted">optional</span>' ?></td>
       <td class="row-actions">
-        <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+        <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>" enctype="multipart/form-data" style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
           <input type="hidden" name="_do" value="cert_update"><input type="hidden" name="cert_id" value="<?= (int)$c['id'] ?>">
           <input class="form-control" style="width:100px" name="cert_number" value="<?= e($c['number']) ?>" placeholder="No.">
-          <input class="form-control" style="width:150px" type="date" name="cert_valid_to" value="<?= e($c['valid_to']) ?>">
+          <input class="form-control" style="width:140px" type="date" name="cert_valid_from" value="<?= e($c['valid_from'] ?? '') ?>" title="Valid from">
+          <input class="form-control" style="width:140px" type="date" name="cert_valid_to" value="<?= e($c['valid_to']) ?>" title="Valid to">
+          <input class="form-control" style="width:150px" type="file" name="cert_file" accept="application/pdf,image/*" title="Replace file">
           <label class="chk" style="white-space:nowrap"><input type="checkbox" name="cert_mandatory" value="1" <?= !empty($c['is_mandatory'])?'checked':'' ?>> Required</label>
           <button class="btn small" type="submit">Update</button>
         </form>
@@ -121,20 +141,22 @@
       </td>
     </tr>
     <?php endforeach; ?>
-    <?php if (!$certs): ?><tr><td colspan="7">No certificates recorded.</td></tr><?php endif; ?>
+    <?php if (!$certs): ?><tr><td colspan="8">No certificates recorded.</td></tr><?php endif; ?>
   </table>
   <h3 class="tab-sub">Add a certificate</h3>
-  <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>" class="inline-add">
+  <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>" class="inline-add" enctype="multipart/form-data">
     <input type="hidden" name="_do" value="cert_add">
     <div class="ff"><label>Certificate name *</label><input class="form-control" name="cert_name" required placeholder="e.g. CSWIP 3.1"></div>
     <div class="ff"><label>Number</label><input class="form-control" name="cert_number"></div>
-    <div class="ff"><label>Issued date</label><input class="form-control" type="date" name="cert_issued"></div>
+    <div class="ff"><label>Valid from</label><input class="form-control" type="date" name="cert_valid_from"></div>
     <div class="ff"><label>Valid to</label><input class="form-control" type="date" name="cert_valid_to"></div>
+    <div class="ff"><label>Certificate file <span class="muted">(PDF / image)</span></label><input class="form-control" type="file" name="cert_file" accept="application/pdf,image/*"></div>
     <div class="ff"><label>Required for work?</label>
       <label class="chk"><input type="checkbox" name="cert_mandatory" value="1"> They may not be allocated without it</label></div>
     <button class="btn small" type="submit">Add certificate</button>
   </form>
 </div>
+<?php endif; ?>
 <?php endif; ?>
 
 <?php if ($ins && is_master()): ?>
