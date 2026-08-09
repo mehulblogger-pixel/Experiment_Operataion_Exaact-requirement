@@ -1,9 +1,10 @@
-<?php $p = $partner; ?>
+<?php $p = $partner; $picker = $picker ?? false; ?>
 <h1><?= $p ? 'Edit ' . e(partner_name($p)) : 'New business partner' ?></h1>
-<p class="sub">Client Code is generated automatically. Enter GSTIN once — PAN &amp; State fill in automatically.</p>
+<p class="sub">Client Code is generated automatically. Enter GSTIN once — PAN &amp; State fill in automatically.<?php if ($picker): ?> <span class="muted">Save and this window closes, selecting the new record on the form you came from.</span><?php endif; ?></p>
 <?php if (!empty($error)): ?><div class="msg msg-error"><?= e($error) ?></div><?php endif; ?>
 
 <form method="post" action="<?= $p ? '/partner-edit?id=' . (int)$p['id'] : '/partner-new' ?>" class="panel">
+  <?php if ($picker): ?><input type="hidden" name="picker" value="1"><?php endif; ?>
   <div class="form-grid">
     <div class="ff"><label>Legal name *</label><input class="form-control" name="legal_name" required value="<?= e($p['legal_name'] ?? '') ?>"></div>
     <div class="ff"><label>Display name <span class="muted">(auto from legal, editable)</span></label><input class="form-control" name="display_name" value="<?= e($p['display_name'] ?? '') ?>"></div>

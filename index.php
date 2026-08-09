@@ -868,9 +868,13 @@ if ($route === 'clients' || $route === 'vendors') {
 }
 
 if ($route === 'partner-new') {
+    // Picker mode: the form was opened in a small window from a "+ Add new" link
+    // beside a dropdown (quote, call, candidate…). On save we hand the new record
+    // back to that window instead of redirecting, so it is selected there.
+    $picker = !empty($_POST['picker']) || !empty($_GET['picker']);
     if ($method === 'POST') {
         $b = $_POST;
-        $formVars = ['partner' => null, 'defaultRole' => 'is_client', 'offices' => offices_list()];
+        $formVars = ['partner' => null, 'defaultRole' => 'is_client', 'offices' => offices_list(), 'picker' => $picker];
         if (!empty($b['gstin']) && !is_valid_gstin($b['gstin'])) {
             return view('form', $formVars + ['error' => 'GSTIN should be 15 characters, e.g. 24ADUPL3517E2ZJ.']);
         }
@@ -909,10 +913,33 @@ if ($route === 'partner-new') {
         // quotations that only ever carried the name.
         $carry = function_exists('partner_carry_from_crm') ? partner_carry_from_crm($id, $b['legal_name']) : null;
         $note = $carry ? partner_carry_text($carry) : '';
+        if ($picker) {
+            // Hand the new partner back to the window that opened this form, so the
+            // dropdown it was launched from selects it — no minimal duplicate record.
+            $nm = ($b['display_name'] ?? '') !== '' ? $b['display_name'] : ($b['legal_name'] ?? $code);
+            $payload = json_encode([
+                'type'  => 'exaact:partner-added',
+                'id'    => (int)$id,
+                'name'  => $nm,
+                'code'  => $code,
+                'roles' => [
+                    'client' => !empty($b['is_client']),
+                    'vendor' => !empty($b['is_vendor']) || !empty($b['is_subcontractor']),
+                ],
+            ], JSON_UNESCAPED_UNICODE);
+            header('Content-Type: text/html; charset=utf-8');
+            echo '<!doctype html><meta charset="utf-8"><title>Saved</title>'
+               . '<body style="font:15px/1.5 system-ui,Segoe UI,Arial;padding:2rem;color:#1e293b">'
+               . '<p><strong>' . htmlspecialchars($code . ' — ' . $nm, ENT_QUOTES) . '</strong> created and selected on the form.</p>'
+               . '<p style="color:#64748b">You can close this tab if it does not close by itself.</p>'
+               . '<script>try{(window.opener||window.parent).postMessage(' . $payload . ',location.origin);}catch(e){}'
+               . 'setTimeout(function(){try{window.close();}catch(e){}},200);</script>';
+            exit;
+        }
         flash("$code created." . ($note !== '' ? ' ' . $note : ''));
         redirect("/partner?id=$id" . ($note !== '' ? '&tab=contacts' : ''));
     }
-    return view('form', ['partner' => null, 'defaultRole' => $_GET['role'] ?? 'is_client', 'error' => null, 'offices' => offices_list(), 'pcfvals' => []]);
+    return view('form', ['partner' => null, 'defaultRole' => $_GET['role'] ?? 'is_client', 'error' => null, 'offices' => offices_list(), 'pcfvals' => [], 'picker' => $picker]);
 }
 
 if ($route === 'partner-edit') {

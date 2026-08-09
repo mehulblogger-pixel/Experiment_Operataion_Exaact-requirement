@@ -401,6 +401,64 @@
     if (po && po.value) loadPoLines(poLine ? poLine.value : '');
   }
 
+  // ---- "+ Add new" client / vendor / sub-con / agency ----------------------
+  // Opens the REAL Directory partner form (the same one under Directory →
+  // Client/Vendor master) in a small window, then selects the new record on the
+  // form you came from. Works on any page with a "+ Add new" link, whether or
+  // not the lightweight quick-add modal is present (the quote form has no modal).
+  var PARTNER_KIND_ROLE = { client: 'is_client', vendor: 'is_vendor', subcon: 'is_vendor', agency: 'is_vendor' };
+  function initPartnerPicker() {
+    var FALLBACK_ID = { client: 'client_sel', vendor: 'vendor_sel', agency: 'agency_sel' };
+    var pending = null, win = null;
+
+    function targetsFor(link, kind) {
+      var sel = link.getAttribute('data-target');
+      if (sel) return Array.prototype.slice.call(document.querySelectorAll(sel));
+      // inside a repeating site row → that row's own vendor select
+      var row = link.closest ? link.closest('.locrow') : null;
+      if (row) { var s = row.querySelector('select.loc-vendor'); if (s) return [s]; }
+      var id = FALLBACK_ID[kind], el = id && document.getElementById(id);
+      return el ? [el] : [];
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll('.addlink[data-qa]'), function (link) {
+      var kind = link.getAttribute('data-qa');
+      if (!PARTNER_KIND_ROLE[kind]) return;      // office/product/activity stay on the modal
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        pending = { targets: targetsFor(link, kind) };
+        var url = '/partner-new?role=' + encodeURIComponent(PARTNER_KIND_ROLE[kind]) + '&picker=1';
+        win = window.open(url, 'exaactPartnerPicker', 'width=900,height=920,menubar=no,toolbar=no,scrollbars=yes');
+        if (win) win.focus();
+        else window.location.href = url;         // popups blocked → just navigate
+      });
+    });
+
+    window.addEventListener('message', function (ev) {
+      if (ev.origin !== window.location.origin) return;
+      var d = ev.data;
+      if (!d || d.type !== 'exaact:partner-added') return;
+      var id = d.id, name = d.name || ('#' + id);
+      var aimed = (pending && pending.targets) ? pending.targets : [];
+      aimed.forEach(function (s) { setSelectValue(s, id, name); });
+      // Keep every other matching dropdown in sync, so the new record is also
+      // pickable elsewhere (e.g. per-site vendor lists after adding at the top).
+      var groups = [];
+      if (d.roles && d.roles.vendor) groups.push('select[name="vendor_id"]', 'select.loc-vendor', 'select[name="loc_vendor[]"]');
+      if (d.roles && d.roles.client) groups.push('#client_id', 'select[name="client_id"]', '#client_sel');
+      groups.forEach(function (gsel) {
+        Array.prototype.forEach.call(document.querySelectorAll(gsel), function (s) {
+          if (aimed.indexOf(s) >= 0) return;
+          var has = false;
+          Array.prototype.forEach.call(s.options, function (o) { if (o.value == id) has = true; });
+          if (!has) { var op = document.createElement('option'); op.value = id; op.textContent = name; s.appendChild(op); }
+        });
+      });
+      pending = null;
+      try { if (win && !win.closed) win.close(); } catch (e2) {}
+    });
+  }
+
   // ---- Quick-add ("+ Add new") modal on the New Call form ----
   function initQuickAdd() {
     var back = document.getElementById('qa_back');
@@ -461,6 +519,9 @@
     })();
     function close() { back.style.display = 'none'; }
     Array.prototype.forEach.call(document.querySelectorAll('.addlink'), function (a) {
+      // Client / vendor / sub-con / agency now open the real Directory form
+      // (initPartnerPicker) instead of this cut-down modal.
+      if (PARTNER_KIND_ROLE[a.getAttribute('data-qa')]) return;
       a.addEventListener('click', function (e) { e.preventDefault(); open(a.getAttribute('data-qa')); });
     });
     byId('qa_cancel').addEventListener('click', close);
@@ -1269,6 +1330,7 @@
     initCallLinks();
     initTradeSkills();
     initQuickAdd();
+    initPartnerPicker();
     Array.prototype.forEach.call(document.querySelectorAll('select.searchable'), enhanceSelect);
     // Any text input wired to a datalist becomes the themed combo instead.
     Array.prototype.forEach.call(document.querySelectorAll('input.combo, input[list]'), enhanceCombo);
