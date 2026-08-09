@@ -802,8 +802,15 @@ function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
 function inspectors_list($activeOnly = true) {
     // Field inspectors first (they go to site), then coordinators, then office
     // staff — everyone is deputable, but the person most likely to be sent sits
-    // at the top of every allocate list. Ordered in-code as a fallback so a
-    // database that has not yet gained the team_role column does not crash.
+    // at the top of every allocate list. Ordered in-code as a fallback too.
+    //
+    // Self-heal the column before reading it. COALESCE(team_role,…) does NOT
+    // protect a database that never gained the column — COALESCE substitutes a
+    // NULL value, but the column must still exist or the SELECT throws
+    // "Unknown column 'team_role'". A live install whose boot() probe never
+    // triggered the migration hits exactly that, so add the column here (cheap
+    // and idempotent) before it is selected.
+    if (function_exists('ensure_column')) ensure_column('inspectors', 'team_role', "VARCHAR(10) DEFAULT 'FIELD'");
     $rows = ops_all("SELECT id, name, emp_code, sbu, salary_ctc, staff_kind, home_office_id,
                             COALESCE(team_role,'FIELD') team_role
                      FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name");

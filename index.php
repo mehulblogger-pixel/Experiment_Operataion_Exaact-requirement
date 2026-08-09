@@ -304,6 +304,7 @@ try {
     db()->query("SELECT cv_keywords FROM candidates LIMIT 1");
     // Workforce pack — availability board, weekly working days, reporting manager.
     db()->query("SELECT weekly_working_days FROM inspectors LIMIT 1");
+    db()->query("SELECT team_role FROM inspectors LIMIT 1");
     db()->query("SELECT id FROM inspector_day_status LIMIT 1");
     db()->query("SELECT reports_to_name FROM users LIMIT 1");
     db()->query("SELECT report_approval FROM jobs LIMIT 1");
