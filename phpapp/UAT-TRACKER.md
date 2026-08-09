@@ -33,6 +33,31 @@ bucket)**, no errors. Suite 459/459.
 
 ---
 
+## Module 8 — Quality & Accreditation (walked)
+
+Walked all 20 compliance registers and tested the linked-record flow.
+
+**✅ Loads clean:** all 20 screens render with **no PHP errors** — equipment,
+competence, impartiality, complaints, satisfaction, confidentiality, site-docs,
+NCR, CAPA, internal audits, management review, evidence review, data control,
+identity, risks, retention, disclosure, methods, decision rules, controlled docs.
+
+**✅ Linked-record flow (NCR → CAPA):** created a nonconformity ("weld undercut
+exceeds acceptance criteria"), raised a corrective action from it → the CAPA
+stored `ncr_id` pointing back to the NCR and carried its title/description across.
+The chain that ISO 17020 cares about (a finding must drive a corrective action)
+works end-to-end.
+
+**Design:** registers are consistent and uncluttered — KPI header cards, Open/
+Closed/All tabs, column picker, CSV export, clear empty states ("Nothing here.").
+No declutter work needed here.
+
+*(Test-harness note: the automated error-scan first flagged `data-control` — a
+false positive, it matched the phrase "fatal error" in that screen's own help
+text, not a real error. Detector tightened.)*
+
+---
+
 ## 💰 Deep transaction test — money reconciles Quote → Call → Job → Invoice (PASS)
 
 Pushed one order the whole way through on a live server, checking the figures at
@@ -185,7 +210,7 @@ Each will get the same treatment (walk with real values → log → fix → re-t
 | 5 | Calls & Jobs (Operations) | ◑ forms verified, transactions pending |
 | 6 | Inspectors & People | ⏳ queued |
 | 7 | Reports (IDEMS) | ⏳ queued |
-| 8 | Quality & Compliance (NCR/CAPA/audits) | ⏳ queued |
+| 8 | Quality & Compliance (NCR/CAPA/audits) | ✅ walked — see Module 8 below |
 | 9 | Money / Finance | ⏳ queued |
 | 10 | Dashboards & MIS | ⏳ queued |
 | 11 | Licensing & Tenants | ⏳ queued |
