@@ -1579,6 +1579,40 @@ function send_assignment_email($jobId) {
     $b .= "\nReport folder: {$j['folder_link']}\n\nRegards,\n" . app_name() . " Coordination";
     ops_mail($j['inspector_email'] ?? '', "Job Assignment: {$j['job_code']} — {$client}", $b, coordinator_emails(), 'assignment');
 }
+// §WO-4 — when several engineers cover different days of one job, e-mail each of
+// them only THEIR dates, so nobody is told to travel on a day that is not theirs.
+// $onlyInspectorIds limits the mail to those just (re)assigned; null mails all.
+function send_per_date_assignment_emails($jobId, $onlyInspectorIds = null) {
+    $jobId = (int)$jobId;
+    $j = job_email_context($jobId);
+    if (!$j) return 0;
+    $client = $j['client_disp'] ?: $j['client_name'];
+    $rows = ops_all("SELECT v.inspector_id, v.visit_date, i.name, i.email
+                     FROM job_visits v LEFT JOIN inspectors i ON i.id=v.inspector_id
+                     WHERE v.job_id=? AND v.inspector_id IS NOT NULL AND COALESCE(v.status,'')<>'DONE'
+                     ORDER BY v.inspector_id, v.visit_date", [$jobId]);
+    $byInsp = [];
+    foreach ($rows as $r) {
+        $iid = (int)$r['inspector_id'];
+        if ($onlyInspectorIds !== null && !in_array($iid, $onlyInspectorIds, true)) continue;
+        if (!isset($byInsp[$iid])) $byInsp[$iid] = ['name' => $r['name'], 'email' => $r['email'], 'dates' => []];
+        $byInsp[$iid]['dates'][] = substr((string)$r['visit_date'], 0, 10);
+    }
+    $sent = 0;
+    foreach ($byInsp as $iid => $info) {
+        if (trim((string)($info['email'] ?? '')) === '') continue;
+        $dl = implode(', ', array_map(fn($d) => fdate($d), $info['dates']));
+        $b  = "Dear {$info['name']},\n\nYou are assigned to this inspection on the following date(s):\n\n";
+        $b .= "JOB: {$j['job_code']}" . ($j['call_code'] ? "   (Call {$j['call_code']})" : '') . "\n";
+        $b .= "Client: {$client}\nSite / vendor: " . ($j['vendor_name'] ?: '—') . "\n";
+        $b .= "Your date(s): {$dl}\n";
+        if (!empty($j['folder_link'])) $b .= "Report folder: {$j['folder_link']}\n";
+        $b .= "\nRegards,\n" . app_name() . " Coordination";
+        ops_mail($info['email'], "Your inspection date(s): {$j['job_code']} — {$client}", $b, coordinator_emails(), 'assignment_dates');
+        $sent++;
+    }
+    return $sent;
+}
 function partner_primary_contact($pid) {
     return $pid ? ops_one("SELECT * FROM partner_contacts WHERE partner_id=? ORDER BY is_primary DESC, id LIMIT 1", [$pid]) : null;
 }
@@ -4553,6 +4587,13 @@ function ops_jobs($route, $method) {
             // assignment email when an inspector + schedule exist
             $jj = ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]);
             if ($jj['inspector_id'] && $jj['scheduled_date']) send_assignment_email($jobId);
+            // §WO-4 — days split across engineers: e-mail each the dates that are
+            // theirs (the main inspector already got the full assignment above).
+            if (!empty($perDate) && function_exists('send_per_date_assignment_emails')) {
+                $others = array_values(array_unique(array_filter(array_map('intval', $perDate),
+                    fn($iid) => $iid && $iid !== (int)$jj['inspector_id'])));
+                if ($others) send_per_date_assignment_emails($jobId, $others);
+            }
             redirect('/job?id=' . $jobId);
         }
         // Show the contract position before anything is typed, so a coordinator
@@ -4765,7 +4806,12 @@ function ops_jobs($route, $method) {
         foreach ((array)($_POST['visit_inspector'] ?? []) as $d => $iid)
             if (preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$d)) $perDate[$d] = (int)$iid;
         if (function_exists('job_visits_sync')) job_visits_sync($job['id'], (int)($job['inspector_id'] ?? 0), $perDate);
-        flash('Day-by-day assignment updated for ' . $job['job_code'] . '.');
+        // §WO-4 — e-mail each engineer just (re)assigned, with only their dates.
+        $changed = array_values(array_unique(array_filter(array_map('intval', $perDate))));
+        $sent = $changed && function_exists('send_per_date_assignment_emails')
+            ? send_per_date_assignment_emails($job['id'], $changed) : 0;
+        flash('Day-by-day assignment updated for ' . $job['job_code'] . '.'
+            . ($sent ? ' ' . $sent . ' ' . Tl('engineer') . '(s) e-mailed their dates.' : ''));
         redirect('/job?id=' . $job['id'] . '#visits');
     }
     if ($route === 'job') {
