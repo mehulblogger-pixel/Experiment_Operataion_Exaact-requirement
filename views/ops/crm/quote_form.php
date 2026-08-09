@@ -100,6 +100,7 @@
   <table class="dt" id="locs">
     <thead><tr>
       <th style="min-width:130px">Name / label</th><th style="min-width:130px">Type</th>
+      <th style="min-width:150px">Vendor (site) <span class="muted">— optional</span></th>
       <th style="min-width:200px">Address line 1</th><th style="min-width:160px">Line 2</th>
       <th style="min-width:130px">City</th><th style="min-width:130px">State</th><th style="min-width:90px">PIN</th>
       <th style="min-width:140px">Site contact</th><th style="min-width:130px">Mobile</th>
@@ -112,6 +113,10 @@
           <input class="form-control" name="loc_label[]" value="<?= e($L['label'] ?? '') ?>" placeholder="e.g. Vapi works"></td>
       <td><select class="form-control" name="loc_type[]">
             <?php foreach ($locTypes as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($L['location_type'] ?? 'SITE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
+          </select></td>
+      <td><select class="form-control loc-vendor" name="loc_vendor[]">
+            <option value="">— not a vendor site / decide later —</option>
+            <?php foreach (($vendors ?? []) as $vd): ?><option value="<?= (int)$vd['id'] ?>" <?= ((string)($L['vendor_id'] ?? '')===(string)$vd['id'])?'selected':'' ?>><?= e($vd['display_name'] ?: $vd['legal_name']) ?></option><?php endforeach; ?>
           </select></td>
       <td><input class="form-control" name="loc_line1[]" value="<?= e($L['line1'] ?? '') ?>" placeholder="Plot / building / street"></td>
       <td><input class="form-control" name="loc_line2[]" value="<?= e($L['line2'] ?? '') ?>" placeholder="Area / landmark"></td>
@@ -374,6 +379,19 @@
     if (rm) rm.addEventListener('click', function(){
       if (lbody.querySelectorAll('.locrow').length > 1) tr.remove();
       else { tr.querySelectorAll('input').forEach(function(i){ if(i.name!=='loc_id[]') i.value=''; }); }
+      refreshLocPickers();
+    });
+    // Pick a vendor as the site → name the row after that vendor and mark it as
+    // manufacturer works, so several sites at different vendors read clearly even
+    // before their addresses are known ("site to be confirmed").
+    var vsel = tr.querySelector('.loc-vendor');
+    if (vsel) vsel.addEventListener('change', function(){
+      var lab = tr.querySelector('[name="loc_label[]"]'), ty = tr.querySelector('[name="loc_type[]"]');
+      if (vsel.value) {
+        var nm = vsel.options[vsel.selectedIndex].text;
+        if (lab && !lab.value) lab.value = nm;
+        if (ty && (ty.value === 'SITE' || ty.value === '')) ty.value = 'WORKS';
+      }
       refreshLocPickers();
     });
     tr.querySelectorAll('input,select').forEach(function(el){ el.addEventListener('change', refreshLocPickers); });
