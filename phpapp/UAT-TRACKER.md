@@ -33,6 +33,33 @@ bucket)**, no errors. Suite 459/459.
 
 ---
 
+## Module 3 — CRM / Sales (lead → conversion)
+
+**✅ Lead conversion works:** created a lead ("Bright Future Manufacturing",
+₹2.5L requirement) and converted it → the customer was **created on the master as
+a client** (business partner #667), the lead was marked **CONVERTED** (not
+deleted — the trail stays), and an **inquiry was raised** to carry on from. The
+funnel entry (lead → client + inquiry) is intact.
+
+---
+
+## Module 5 — Inspectors & People (the 8.5h daily cap)
+
+**✅ Daily-hours cap enforces, with the boundary correct:**
+| Hours logged in a day | Result |
+|---|---|
+| 6.0 h | allowed |
+| **8.5 h** (exactly the cap) | allowed |
+| 9.0 h | **blocked** |
+| 12.0 h | **blocked** |
+
+The cap is **cumulative per day** — it sums hours already on that date plus the
+new entry, so two 5-hour entries (10 h) trip it. It is also enforced a second
+time at the voucher-save handler (it totals hours per date before saving and
+refuses the whole submission with a plain message). Belt and braces.
+
+---
+
 ## Module 11 — Licensing & Seats (deep test — the whole selling model works)
 
 This is the module the business depends on. Tested end-to-end with a **genuine
