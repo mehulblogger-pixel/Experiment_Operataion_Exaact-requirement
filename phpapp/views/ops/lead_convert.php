@@ -16,7 +16,7 @@
 
   <h3 style="margin-top:0">The customer</h3>
   <div class="form-grid" style="gap:12px 16px">
-    <div class="ff-wide"><label>Attach to a customer we already have</label>
+    <div class="ff-wide"><label>Attach to a customer we already have <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
       <select class="form-control" name="partner_id">
         <option value="">— create a new one —</option>
         <?php foreach ($clients as $c): ?>

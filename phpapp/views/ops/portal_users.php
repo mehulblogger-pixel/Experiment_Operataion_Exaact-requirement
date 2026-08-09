@@ -49,7 +49,7 @@
         grid-template-columns:repeat(auto-fit,minmax(200px,1fr));align-items:end">
     <input type="hidden" name="contact_id" id="inv_contact_id" value="">
     <div>
-      <label class="muted" style="display:block;font-size:12.5px;margin-bottom:4px">Client company</label>
+      <label class="muted" style="display:block;font-size:12.5px;margin-bottom:4px">Client company <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
       <select class="form-control" name="partner_id" id="inv_partner" required>
         <option value="">Choose…</option>
         <?php foreach ($clients as $c): ?>

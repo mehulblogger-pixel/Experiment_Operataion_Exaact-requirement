@@ -445,7 +445,7 @@
       // pickable elsewhere (e.g. per-site vendor lists after adding at the top).
       var groups = [];
       if (d.roles && d.roles.vendor) groups.push('select[name="vendor_id"]', 'select.loc-vendor', 'select[name="loc_vendor[]"]');
-      if (d.roles && d.roles.client) groups.push('#client_id', 'select[name="client_id"]', '#client_sel');
+      if (d.roles && d.roles.client) groups.push('#client_id', 'select[name="client_id"]', 'select[name="partner_id"]', '#client_sel');
       groups.forEach(function (gsel) {
         Array.prototype.forEach.call(document.querySelectorAll(gsel), function (s) {
           if (aimed.indexOf(s) >= 0) return;
