@@ -571,8 +571,19 @@
             setSelectValue(byId('client_sel'), res.id, res.label);
             setSelectValue(byId('vendor_sel'), res.id, res.label);
           } else if (k === 'activity') {
-            var act = byId('activity_sel');
-            var op = document.createElement('option'); op.value = res.id; op.textContent = res.label; op.selected = true; act.appendChild(op);
+            // Register the new code into the business-unit → activity map, so it
+            // survives a re-fill of the cascade (changing the unit and back). A
+            // bare appended <option> was dropped the next time the list rebuilt,
+            // which read as "pick a business unit first".
+            var sbuSel = byId('sbu_sel');
+            var code = sbuSel ? sbuSel.value : '';
+            if (code && window.ACTIVITY) {
+              if (!window.ACTIVITY[code]) window.ACTIVITY[code] = [];
+              var dup = window.ACTIVITY[code].some(function (o) { return String(o.id) === String(res.id); });
+              if (!dup) window.ACTIVITY[code].push({ id: res.id, label: res.label });
+            }
+            if (typeof window._activityFill === 'function') { window._activityFill(res.id); }
+            else { var act = byId('activity_sel'); var op = document.createElement('option'); op.value = res.id; op.textContent = res.label; op.selected = true; act.appendChild(op); }
           } else {
             setSelectValue(byId(targetId), res.id, res.label);
           }
