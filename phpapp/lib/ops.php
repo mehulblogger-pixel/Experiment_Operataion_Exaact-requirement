@@ -1035,6 +1035,51 @@ function contract_number_for($job, $call, $quotationId = 0) {
     }
     return '';
 }
+// ---- §WO-3: a schedule cannot exceed what was ordered, nor run past the
+//              contract's validity date. Both are hard stops on save. ----------
+// Days the order sold for the line this call draws against. Only day-based units
+// (man-day / day) cap the number of visit dates; anything else returns null (no
+// day cap). Uses the linked quote line's quantity.
+function call_ordered_days($b) {
+    $lineId = (int)($b['quote_line_id'] ?? 0);
+    if (!$lineId) return null;
+    $ln = ops_one("SELECT qty, unit FROM quote_lines WHERE id=?", [$lineId]);
+    if (!$ln) return null;
+    $unit = strtoupper(trim((string)($ln['unit'] ?? '')));
+    if (!in_array($unit, ['MANDAY', 'DAY', 'MANDAYS'], true)) return null;   // not day-bound
+    $qty = (float)($ln['qty'] ?? 0);
+    return $qty > 0 ? (int)ceil($qty) : null;
+}
+// The validity (end) date of the contract this call is booked under, '' if none.
+function call_contract_end($b) {
+    $no  = trim((string)($b['contract_number'] ?? ''));
+    $cid = (int)($b['client_id'] ?? 0);
+    if ($no === '') return '';
+    $end = $cid
+        ? ops_val("SELECT end_date FROM partner_contracts WHERE partner_id=? AND contract_number=?", [$cid, $no])
+        : ops_val("SELECT end_date FROM partner_contracts WHERE contract_number=? ORDER BY id DESC LIMIT 1", [$no]);
+    return trim((string)$end);
+}
+// Returns an error message if the scheduled dates break either limit, else ''.
+function call_schedule_limit_error($b, array $dates) {
+    if (!$dates) return '';
+    $ordered = call_ordered_days($b);
+    if ($ordered !== null && count($dates) > $ordered) {
+        return 'This ' . Tl('quote') . ' / order is for ' . $ordered . ' day(s), but ' . count($dates)
+             . ' inspection date(s) are scheduled. Reduce the schedule to ' . $ordered . ' day(s) or fewer.';
+    }
+    $end = call_contract_end($b);
+    if ($end !== '') {
+        $over = array_values(array_filter($dates, fn($d) => $d > $end));
+        if ($over) {
+            $show = array_map('fdate', array_slice($over, 0, 5));
+            return 'The contract is valid only up to ' . fdate($end) . '. ' . count($over)
+                 . ' scheduled date(s) fall after it: ' . implode(', ', $show)
+                 . (count($over) > 5 ? ' …' : '') . '. Remove those dates or extend the contract first.';
+        }
+    }
+    return '';
+}
 function pname($p) { return $p ? ($p['display_name'] ?: $p['legal_name']) : '—'; }
 // Currency symbol and date format are settings, not hard-coded (Settings → Display).
 // The currency symbol, defended against its own storage.
@@ -3182,6 +3227,15 @@ function ops_calls($route, $method) {
                                 ($b['inspection_required_date'] ?? '') ?: null,
                                 (int)($b['client_id'] ?? 0) ?: null);
             $dates = $sr['dates'];
+            // §WO-3 — hard stops before anything is saved: the schedule cannot
+            // book more days than the order sold, and no visit may fall after the
+            // contract's validity date.
+            $limitErr = call_schedule_limit_error($b, $dates);
+            if ($limitErr !== '') {
+                view('ops/call_form', array_merge(call_form_vars($call, $b),
+                    ['error' => $limitErr, 'errorFields' => ['inspection_dates']]));
+                return;
+            }
             // The worked-out dates are stored, so nothing downstream has to
             // recompute them and nothing can disagree about what was booked.
             $b['inspection_dates']  = implode(',', $dates);
