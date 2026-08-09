@@ -25,6 +25,15 @@
       </select></div>
     <div class="ff"><label>Engineer type</label>
       <select class="form-control" name="staff_kind"><?php foreach (['ASSET'=>'Own employee','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor'] as $k=>$v): ?><option value="<?= $k ?>" <?= (($ins['staff_kind'] ?? 'ASSET')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <?php // Where this person sits for deputation. A FIELD inspector goes to site
+          // and is ranked to the top of every allocate list; a coordinator or
+          // office person can still be deputed but sits below the field inspectors. ?>
+    <div class="ff"><label>Team <span class="muted">— where they sit for site work</span></label>
+      <select class="form-control" name="team_role">
+        <?php foreach (['FIELD'=>'Field '.Tl('engineer').' — goes to site (top of the allocate list)','COORD'=>'Coordinator / office-based — deputable, listed below field '.Tlp('engineer'),'OFFICE'=>'Back office — deputable, listed last'] as $k=>$v): ?>
+          <option value="<?= $k ?>" <?= ((string)($ins['team_role'] ?? 'FIELD')===$k)?'selected':'' ?>><?= e($v) ?></option>
+        <?php endforeach; ?>
+      </select></div>
     <div class="ff"><label>Trade / discipline</label>
       <select class="form-control searchable" id="trade_sel" name="trade_id"><option value="">—</option>
         <?php foreach ($trades as $t): ?><option value="<?= (int)$t['id'] ?>" <?= (string)$curTrade===(string)$t['id']?'selected':'' ?>><?= e($t['label']) ?></option><?php endforeach; ?>

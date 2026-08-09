@@ -37,6 +37,14 @@ try {
     $rank = []; foreach ($sugg as $ix => $s) $rank[(int)$s['id']] = $ix;
     t_ok(isset($rank[$fieldId]) && isset($rank[$officeId]) && $rank[$fieldId] < $rank[$officeId],
         'with no history, the field inspector is suggested above the office person');
+
+    // The Inspectors screen (Masters) can change the team role directly: a plain
+    // UPDATE round-trips the value, and it re-ranks in the list.
+    db()->prepare("UPDATE inspectors SET team_role=? WHERE id=?")->execute(['OFFICE', $fieldId]);
+    t_eq(ops_val("SELECT team_role FROM inspectors WHERE id=?", [$fieldId]), 'OFFICE', 'the Inspectors screen can change a team role');
+    $list2 = inspectors_list(true);
+    $pos2 = []; foreach ($list2 as $ix => $r) { if ((int)$r['id'] === $fieldId || (int)$r['id'] === $coordId) $pos2[(int)$r['id']] = $ix; }
+    t_ok($pos2[$coordId] < $pos2[$fieldId], 'after being moved to back-office, the former field inspector drops below the coordinator');
 } finally {
     if ($own && db()->inTransaction()) db()->rollBack();
 }

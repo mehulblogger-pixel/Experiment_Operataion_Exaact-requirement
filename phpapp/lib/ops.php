@@ -2921,9 +2921,12 @@ function ops_inspectors($action, $method) {
             $homeOff  = ($b['home_office_id'] ?? '') !== '' ? (int)$b['home_office_id'] : null;
             $wwd      = in_array((string)($b['weekly_working_days'] ?? ''), ['5','5.5','6'], true) ? (float)$b['weekly_working_days'] : 6;
             $reportTo = ($b['reports_to_id'] ?? '') !== '' ? (int)$b['reports_to_id'] : null;
+            // Which team they are in for deputation: FIELD (goes to site, top of
+            // the allocate list), COORD, or OFFICE. All three are deputable.
+            $teamRole = in_array($b['team_role'] ?? '', ['FIELD','COORD','OFFICE'], true) ? $b['team_role'] : 'FIELD';
             if ($ins) {
-                $sql = "UPDATE inspectors SET first_name=?,middle_name=?,last_name=?,name=?,emp_code=?,designation=?,staff_kind=?,trade_id=?,sbus=?,sbu=?,skill_ids=?,email=?,mobile=?,agency_name=?,home_office_id=?,weekly_working_days=?,reports_to_id=?,status=?";
-                $args = [$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $homeOff, $wwd, $reportTo, $b['status'] ?? 'ACTIVE'];
+                $sql = "UPDATE inspectors SET first_name=?,middle_name=?,last_name=?,name=?,emp_code=?,designation=?,staff_kind=?,trade_id=?,sbus=?,sbu=?,skill_ids=?,email=?,mobile=?,agency_name=?,home_office_id=?,weekly_working_days=?,reports_to_id=?,team_role=?,status=?";
+                $args = [$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $homeOff, $wwd, $reportTo, $teamRole, $b['status'] ?? 'ACTIVE'];
                 if ($salary !== null) { $sql .= ",salary_ctc=?"; $args[] = $salary; }
                 if ($agencyCost !== null) { $sql .= ",agency_cost=?"; $args[] = $agencyCost; }
                 $sql .= " WHERE id=?"; $args[] = $ins['id'];
@@ -2931,9 +2934,9 @@ function ops_inspectors($action, $method) {
                 flash('Inspector saved.');
                 redirect('/m/inspectors/edit?id=' . $ins['id']);
             } else {
-                $pdo->prepare("INSERT INTO inspectors (first_name,middle_name,last_name,name,emp_code,designation,staff_kind,trade_id,sbus,sbu,skill_ids,email,mobile,agency_name,home_office_id,weekly_working_days,reports_to_id,agency_cost,salary_ctc,status,created_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $homeOff, $wwd, $reportTo, $agencyCost ?: 0, $salary ?: 0, $b['status'] ?? 'ACTIVE', date('c')]);
+                $pdo->prepare("INSERT INTO inspectors (first_name,middle_name,last_name,name,emp_code,designation,staff_kind,trade_id,sbus,sbu,skill_ids,email,mobile,agency_name,home_office_id,weekly_working_days,reports_to_id,team_role,agency_cost,salary_ctc,status,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyName, $homeOff, $wwd, $reportTo, $teamRole, $agencyCost ?: 0, $salary ?: 0, $b['status'] ?? 'ACTIVE', date('c')]);
                 $id = $pdo->lastInsertId();
                 flash('Inspector added. You can now add certifications.');
                 redirect('/m/inspectors/edit?id=' . $id);

@@ -9,11 +9,13 @@
   <?php if ($q): ?><a class="btn secondary" href="/m/inspectors">Clear</a><?php endif; ?>
 </form>
 <table class="grid">
-  <tr><th>Name</th><th>Emp code</th><th>Trade</th><th><?= e(TP('sbu')) ?></th><th>Skills</th><th>Status</th><th>Actions</th></tr>
-  <?php foreach ($rows as $r): ?>
+  <tr><th>Name</th><th>Emp code</th><th>Team</th><th>Trade</th><th><?= e(TP('sbu')) ?></th><th>Skills</th><th>Status</th><th>Actions</th></tr>
+  <?php $teamLabels = ['FIELD'=>'Field', 'COORD'=>'Coordinator', 'OFFICE'=>'Back office'];
+        foreach ($rows as $r): ?>
   <tr>
     <td><a href="/m/inspectors/edit?id=<?= (int)$r['id'] ?>"><strong><?= e($r['name'] ?: '—') ?></strong></a></td>
     <td><?= e($r['emp_code'] ?: '—') ?></td>
+    <td><?= e($teamLabels[$r['team_role'] ?? 'FIELD'] ?? 'Field') ?></td>
     <td><?= e(trade_label($r['trade_id'] ?? null)) ?></td>
     <td><?= e(sbu_labels($r['sbus'] ?? '')) ?></td>
     <td class="muted" style="font-size:13px;"><?= e(skill_labels($r['skill_ids'] ?? '')) ?></td>
@@ -27,5 +29,5 @@
     </td>
   </tr>
   <?php endforeach; ?>
-  <?php if (!$rows): ?><tr><td colspan="7">No inspectors yet. <a href="/m/inspectors/new">Add one</a>.</td></tr><?php endif; ?>
+  <?php if (!$rows): ?><tr><td colspan="8">No inspectors yet. <a href="/m/inspectors/new">Add one</a>.</td></tr><?php endif; ?>
 </table>
