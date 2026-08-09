@@ -990,6 +990,9 @@ function ops_crm_quotes($route, $method) {
         $cid = (int)($_GET['id'] ?? 0);
         $contacts = crm_client_contacts($cid);
         $primary = $contacts[0] ?? null;
+        // The commercial terms agreed with this customer on the master, so the
+        // quote starts from what was already settled instead of being re-typed.
+        $cli = ops_one("SELECT payment_terms, credit_days, gstin, state FROM business_partners WHERE id=?", [$cid]);
         echo json_encode([
             'contact' => $primary ? [
                 'name'   => $primary['name'] ?? '',
@@ -997,6 +1000,12 @@ function ops_crm_quotes($route, $method) {
                 'mobile' => ($primary['mobile'] ?? '') ?: ($primary['phone'] ?? ''),
             ] : null,
             'contacts'  => $contacts,
+            'commercials' => $cli ? [
+                'payment_terms' => (string)($cli['payment_terms'] ?? ''),
+                'credit_days'   => (string)($cli['credit_days'] ?? ''),
+                'gstin'         => (string)($cli['gstin'] ?? ''),
+                'state'         => (string)($cli['state'] ?? ''),
+            ] : null,
             'addresses' => crm_client_addresses($cid),
             // What we have already quoted this customer's whole group. The one
             // being edited, if any, is left out so it does not list itself.
