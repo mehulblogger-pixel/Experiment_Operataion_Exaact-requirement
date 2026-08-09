@@ -82,10 +82,34 @@
       })();
     </script>
     <?php endif; ?>
-    <div class="ff"><label>Linked <?= e(Tl('engineer')) ?> (Inspector role)</label>
-      <select class="form-control searchable" name="inspector_id"><option value="">—</option>
-        <?php foreach ($inspectors as $i): ?><option value="<?= (int)$i['id'] ?>" <?= ($user && $user['inspector_id']==$i['id'])?'selected':'' ?>><?= e($i['name']) ?></option><?php endforeach; ?>
+    <?php // Every login must belong to a team member (person). Pick an existing
+          // one, or add this person to the team right here — one screen adds them
+          // and creates their login together. A new team member defaults to the
+          // person's own name (typed above). The Master-Admin owner account is the
+          // only one the server lets through without a team member.
+          $curLink = $user ? (int)($user['inspector_id'] ?? 0) : 0; ?>
+    <div class="ff"><label>Team member * <span class="muted">— every login must belong to one</span></label>
+      <select class="form-control searchable" name="inspector_id" id="u_team">
+        <option value="__new__" <?= $curLink ? '' : 'selected' ?>>➕ Add this person to the team (use the name above)</option>
+        <?php foreach ($inspectors as $i): ?>
+          <option value="<?= (int)$i['id'] ?>" <?= $curLink === (int)$i['id'] ? 'selected' : '' ?>><?= e($i['name']) ?><?= !empty($i['team_role']) && $i['team_role'] !== 'FIELD' ? ' (' . e($i['team_role'] === 'COORD' ? 'coordinator' : 'office') . ')' : '' ?></option>
+        <?php endforeach; ?>
+      </select>
+      <small class="muted">Choose the person from the team, or leave “Add this person…” to create their team record from the name above.</small></div>
+    <div class="ff" id="u_team_role" style="<?= $curLink ? 'display:none' : '' ?>"><label>Which team <span class="muted">— sets where they sit for site work</span></label>
+      <select class="form-control" name="team_member_role">
+        <option value="FIELD">Field <?= e(Tl('engineer')) ?> — goes to site (top of the allocate list)</option>
+        <option value="COORD">Coordinator / office-based — can still be deputed, listed below field <?= e(Tlp('engineer')) ?></option>
+        <option value="OFFICE">Back office — can still be deputed, listed last</option>
       </select></div>
+    <script>
+      (function () {
+        var t = document.getElementById('u_team'), box = document.getElementById('u_team_role');
+        if (!t || !box) return;
+        function sync() { box.style.display = t.value === '__new__' ? '' : 'none'; }
+        t.addEventListener('change', sync); sync();
+      })();
+    </script>
     <div class="ff ff-check"><input type="checkbox" name="is_active" <?= (!$user || $user['is_active'])?'checked':'' ?>><label>Active</label></div>
   </div>
 
