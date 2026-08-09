@@ -1001,7 +1001,7 @@ function ops_crm_quotes($route, $method) {
         $primary = $contacts[0] ?? null;
         // The commercial terms agreed with this customer on the master, so the
         // quote starts from what was already settled instead of being re-typed.
-        $cli = ops_one("SELECT payment_terms, credit_days, gstin, state FROM business_partners WHERE id=?", [$cid]);
+        $cli = ops_one("SELECT payment_terms, credit_days, gstin, state, home_branch_id FROM business_partners WHERE id=?", [$cid]);
         echo json_encode([
             'contact' => $primary ? [
                 'name'   => $primary['name'] ?? '',
@@ -1009,6 +1009,8 @@ function ops_crm_quotes($route, $method) {
                 'mobile' => ($primary['mobile'] ?? '') ?: ($primary['phone'] ?? ''),
             ] : null,
             'contacts'  => $contacts,
+            // The client's base/home office — line items default to it.
+            'home_office' => $cli && $cli['home_branch_id'] !== null ? (string)$cli['home_branch_id'] : '',
             'commercials' => $cli ? [
                 'payment_terms' => (string)($cli['payment_terms'] ?? ''),
                 'credit_days'   => (string)($cli['credit_days'] ?? ''),

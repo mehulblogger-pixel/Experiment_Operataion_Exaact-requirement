@@ -299,8 +299,26 @@
           }
           if (d.addresses && d.addresses.length) offerAddresses(d.addresses);
         }
+        // Item 5 — line items default to the client's base office. Applied on
+        // load too (not only on an interactive pick), but only to lines whose
+        // office is still unset, so a saved or hand-picked office is never lost.
+        clientHomeOffice = d.home_office || '';
+        applyLineOffices();
         renderHistory(d.history || []);
       }).catch(function(){});
+  }
+  // The client's base office, used as the default executing office on each line.
+  var clientHomeOffice = '';
+  function officeHasOption(sel, val){
+    var ok = false;
+    Array.prototype.forEach.call(sel.options, function(o){ if (o.value === val) ok = true; });
+    return ok;
+  }
+  function applyLineOffices(){
+    if (!clientHomeOffice) return;
+    tbody.querySelectorAll('.lrow select[name="l_office[]"]').forEach(function(s){
+      if (s.value === '' && officeHasOption(s, clientHomeOffice)) s.value = clientHomeOffice;
+    });
   }
 
   // "What we have already quoted this group." A group company's own name is
@@ -594,7 +612,7 @@
     tr.querySelectorAll('input').forEach(function(i){ i.value=''; });
     tr.querySelectorAll('select').forEach(function(s){ s.selectedIndex=0; s.dataset.cur=''; });
     tr.querySelector('.l_amt').textContent = '0';
-    tbody.appendChild(tr); wireLine(tr); refreshLocPickers();
+    tbody.appendChild(tr); wireLine(tr); refreshLocPickers(); applyLineOffices();
   });
   document.getElementById('gst_pct').addEventListener('input', recalc);
   refreshLocPickers(); recalc();
