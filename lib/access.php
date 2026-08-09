@@ -114,6 +114,43 @@ function module_groups() {
     if ($orphans) $g['Not yet grouped'] = $orphans;
     return $g;
 }
+// Every permission — fine-grained AND per-module view/edit — arranged under the
+// SAME headings as the app's main navigation (Sales, Operations, … Admin), so
+// the Add/Edit-user screen reads like the menu the person will actually use
+// instead of one long undivided wall of tick-boxes. Returns an ordered map of
+// heading => [permission keys]. A key the view holds but no group here claims
+// is shown under "Other" by the view, so nothing is ever hidden.
+function permission_nav_groups() {
+    // fine-grained action permissions, by nav area
+    $fine = [
+        'Sales'                   => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage'],
+        'Operations'              => ['ops.call.create','ops.job.allocate','ops.job.close','ops.call.delete','workforce.availability','workforce.report.approve'],
+        'Reporting'               => ['idems.finalize','idems.type.manage','idems.timestamp.edit'],
+        'Money'                   => ['data.credit','data.revenue','data.salary','data.profitability','finance.reconcile'],
+        'Quality & Accreditation' => ['idems.audit.view','person.iddoc.view','person.iddoc.manage','complaints.decide','capa.close','ncr.close'],
+        'Insights'                => ['dash.operations','dash.financial','dash.utilization','dash.people'],
+        'Directory'               => ['master.manage'],
+        'Admin'                   => ['users.manage.branch','users.manage.global','settings.manage','org.hierarchy.view'],
+    ];
+    // module view/edit access, by nav area — each key expands to .view + .edit
+    $mods = [
+        'Sales'                   => ['leads','inquiries','quotes','crm_orders','crm_reports'],
+        'Operations'              => ['calls','jobs','vouchers','hiring','reconcile'],
+        'Reporting'               => ['idems'],
+        'Money'                   => ['invoicing','profitability','overheads'],
+        'Quality & Accreditation' => ['equipment','competence','impartiality','identity','complaints','ncr','confidentiality','capa','audits','datacontrol'],
+        'Insights'                => ['reports'],
+        'Directory'               => ['clients','vendors','masters','portal'],
+        'Admin'                   => ['users','settings'],
+    ];
+    $groups = [];
+    foreach ($fine as $g => $keys) $groups[$g] = $keys;
+    foreach ($mods as $g => $keys) {
+        foreach ($keys as $k) { $groups[$g][] = "mod.$k.view"; $groups[$g][] = "mod.$k.edit"; }
+    }
+    return $groups;
+}
+
 // The recommended permission set for a role (fine-grained + module view/edit).
 function role_recommended_perms($role) { return role_defaults($role)['perms']; }
 
