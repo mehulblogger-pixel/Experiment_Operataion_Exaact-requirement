@@ -498,6 +498,16 @@ function lk_admin($route, $method) {
                     ->execute([$label, $code, $parentVal, $editId, $t['id']]);
                 flash('Value updated.');
             } else {
+                // No duplicate values within a list — two identical dropdown
+                // options only confuse. Scoped to the parent for a dependent list,
+                // so the same label under a DIFFERENT parent is still allowed.
+                $dupWhere = "type_id=? AND LOWER(label)=LOWER(?) AND "
+                          . ($parentVal ? "parent_value_id=?" : "(parent_value_id IS NULL OR parent_value_id=0)");
+                $dupArgs = $parentVal ? [$t['id'], $label, $parentVal] : [$t['id'], $label];
+                if ((int)ops_val("SELECT COUNT(*) FROM lookup_values WHERE $dupWhere", $dupArgs) > 0) {
+                    flash('“' . $label . '” is already on this list.', 'warning');
+                    redirect('/lookup?key=' . $t['type_key']);
+                }
                 lk_add_value($t['id'], $parentVal, $code, $label, 99);
                 flash('Value added.');
             }
