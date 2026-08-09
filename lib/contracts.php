@@ -35,6 +35,27 @@ function contracts_migrate() {
     ensure_column('partner_contracts', 'qty_unit', "VARCHAR(30) DEFAULT ''");
     ensure_column('partner_contracts', 'expiry_notified', "VARCHAR(20) DEFAULT ''");
     ensure_column('partner_contracts', 'quotation_id', 'INT NULL');
+    // Opening a new contract number is a two-signature act (a manager endorses,
+    // the branch manager approves), and an idle contract is closed automatically.
+    // These columns carry that lifecycle. Legacy rows default to OPEN so nothing
+    // that already exists is suddenly treated as un-approved.
+    ensure_column('partner_contracts', 'open_status',       "VARCHAR(20) DEFAULT 'OPEN'");   // PENDING · OPEN · REJECTED · CLOSED
+    ensure_column('partner_contracts', 'branch_id',         'INT NULL');
+    ensure_column('partner_contracts', 'requested_by',      "VARCHAR(150) DEFAULT ''");
+    ensure_column('partner_contracts', 'requested_by_id',   'INT NULL');
+    ensure_column('partner_contracts', 'requested_at',      "VARCHAR(30) DEFAULT ''");
+    ensure_column('partner_contracts', 'mgr_endorsed_by',   "VARCHAR(150) DEFAULT ''");
+    ensure_column('partner_contracts', 'mgr_endorsed_by_id','INT NULL');
+    ensure_column('partner_contracts', 'mgr_endorsed_at',   "VARCHAR(30) DEFAULT ''");
+    ensure_column('partner_contracts', 'bm_approved_by',    "VARCHAR(150) DEFAULT ''");
+    ensure_column('partner_contracts', 'bm_approved_by_id', 'INT NULL');
+    ensure_column('partner_contracts', 'bm_approved_at',    "VARCHAR(30) DEFAULT ''");
+    ensure_column('partner_contracts', 'opened_at',         "VARCHAR(30) DEFAULT ''");
+    ensure_column('partner_contracts', 'closed_at',         "VARCHAR(30) DEFAULT ''");
+    ensure_column('partner_contracts', 'close_reason',      "VARCHAR(300) DEFAULT ''");
+    ensure_column('partner_contracts', 'auto_closed',       'INT DEFAULT 0');
+    ensure_column('partner_contracts', 'last_activity_at',  "VARCHAR(30) DEFAULT ''");
+    ensure_column('partner_contracts', 'idle_notified',     "VARCHAR(20) DEFAULT ''");
     // An override is a written request to schedule anyway. It carries its own
     // two-step approval, so the same row records who asked, who endorsed and
     // who finally granted it.
@@ -414,6 +435,227 @@ function can_endorse_override() {
         || can('users.manage.branch');
 }
 function can_grant_override() { return is_master(); }
+
+// ===========================================================================
+//  Contract number — automatic generation, opening approval, idle auto-close
+// ===========================================================================
+
+// A structured, unique contract number: BRANCH / C / FY / 00001, e.g.
+// AHM/C/25-26/00042. The branch and financial year make it readable and keep
+// it unique across the company; the running number is the next free one.
+function gen_contract_number($branchId = null) {
+    $code = 'GEN';
+    if ($branchId) {
+        $o = ops_one("SELECT code, name FROM offices WHERE id=?", [(int)$branchId]);
+        if ($o && trim((string)$o['code']) !== '') $code = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $o['code']));
+    }
+    $fy = function_exists('fy_label') && function_exists('current_fy') ? fy_label(current_fy()) : date('y');
+    $prefix = $code . '/C/' . $fy . '/';
+    for ($n = 1; $n < 100000; $n++) {
+        $no = $prefix . str_pad((string)$n, 5, '0', STR_PAD_LEFT);
+        if (!ops_one("SELECT id FROM partner_contracts WHERE contract_number=?", [$no])) return $no;
+    }
+    return $prefix . date('YmdHis');
+}
+
+const CONTRACT_OPEN_STATES = [
+    'PENDING'  => 'Pending approval',
+    'OPEN'     => 'Open / in force',
+    'REJECTED' => 'Opening rejected',
+    'CLOSED'   => 'Closed',
+];
+
+// The two signatures that open a contract number. A manager (operations / SBU
+// head / admin) endorses that it is genuinely needed; the branch manager
+// approves that the branch will carry it. The same person cannot do both,
+// unless they are the Master Admin standing in for a one-person branch.
+function can_endorse_contract_open() {
+    return is_master()
+        || in_array(current_user()['role'] ?? '', ['OPERATION_MANAGER','SBU_HEAD','ADMIN','BUSINESS_DIRECTOR'], true)
+        || can('users.manage.branch');
+}
+function can_approve_contract_open() {
+    return is_master()
+        || in_array(current_user()['role'] ?? '', ['BRANCH_MANAGER','BRANCH_APP_MANAGER'], true);
+}
+
+// Latest date anything happened against a contract: the quotation itself, any
+// call or job raised under its number, or an invoice against it. Used to decide
+// when a contract has gone quiet.
+function contract_last_activity_date($c) {
+    $dates = [];
+    $push = function ($d) use (&$dates) { $d = trim((string)$d); if ($d !== '') $dates[] = substr($d, 0, 10); };
+    $push($c['opened_at'] ?: ($c['start_date'] ?: $c['created_at'] ?? ''));
+    $no = (string)$c['contract_number']; $cid = (int)$c['id'];
+    try { $push(ops_val("SELECT MAX(updated_at) FROM quotations WHERE contract_id=? OR (contract_number<>'' AND contract_number=?)", [$cid, $no])); } catch (Throwable $e) {}
+    try { $push(ops_val("SELECT MAX(created_at) FROM calls WHERE contract_number<>'' AND contract_number=?", [$no])); } catch (Throwable $e) {}
+    try { $push(ops_val("SELECT MAX(created_at) FROM jobs  WHERE contract_number<>'' AND contract_number=?", [$no])); } catch (Throwable $e) {}
+    try { $push(ops_val("SELECT MAX(inspection_required_date) FROM calls WHERE contract_number<>'' AND contract_number=?", [$no])); } catch (Throwable $e) {}
+    if (!$dates) return '';
+    sort($dates);
+    return end($dates);
+}
+
+// Pending money / work still hanging off a contract, so an auto-close cannot
+// quietly bury an unbilled or unpaid job. Returns a short human summary, or ''.
+function contract_pending_summary($c) {
+    $no = (string)$c['contract_number']; if ($no === '') return ''; $bits = [];
+    try {
+        $openCalls = (int)ops_val("SELECT COUNT(*) FROM calls WHERE contract_number=? AND COALESCE(status,'') NOT IN ('CLOSED','CANCELLED','COMPLETED')", [$no]);
+        if ($openCalls) $bits[] = $openCalls . ' open ' . Tlp('call');
+    } catch (Throwable $e) {}
+    try {
+        $openJobs = (int)ops_val("SELECT COUNT(*) FROM jobs WHERE contract_number=? AND COALESCE(closed_flag,0)=0", [$no]);
+        if ($openJobs) $bits[] = $openJobs . ' open job(s)';
+    } catch (Throwable $e) {}
+    try {
+        $inv = (int)ops_val("SELECT COUNT(*) FROM invoices WHERE contract_number=? AND COALESCE(status,'') <> 'CANCELLED'", [$no]);
+        if ($inv) $bits[] = $inv . ' invoice(s) raised';
+    } catch (Throwable $e) {}
+    return $bits ? implode(', ', $bits) : '';
+}
+
+// ---------------------------------------------------------------------------
+//  Daily sweep — a contract with no activity for two months is closed
+//
+//  A file that has gone quiet for two months is finished in practice; leaving
+//  it "open" hides real exposure. It is closed automatically and, if it still
+//  carries pending invoices or work, that is flagged to the people responsible
+//  — the owner, the branch manager and back-office — rather than closed silently.
+// ---------------------------------------------------------------------------
+function contract_idle_days() { $d = (int)setting_get('contract_idle_close_days', 60); return $d > 0 ? $d : 60; }
+
+function contracts_idle_autoclose($today = null) {
+    $today = $today ?: date('Y-m-d');
+    $cut = date('Y-m-d', strtotime($today . ' -' . contract_idle_days() . ' days'));
+    $rows = ops_all("SELECT c.*, q.id qid, q.quote_no, q.client_name
+                     FROM partner_contracts c
+                     LEFT JOIN quotations q ON q.contract_id = c.id AND q.is_current=1
+                     WHERE COALESCE(c.open_status,'OPEN')='OPEN' AND COALESCE(c.is_active,1)=1");
+    $closed = 0;
+    foreach ($rows as $c) {
+        $last = contract_last_activity_date($c);
+        if ($last === '' || $last > $cut) continue;          // still active, or unknown → leave it
+        $pending = contract_pending_summary($c);
+        $reason = 'No activity since ' . fdate($last) . ' (' . contract_idle_days() . '+ days idle).'
+                . ($pending !== '' ? ' Pending at close: ' . $pending . '.' : '');
+        db()->prepare("UPDATE partner_contracts
+                       SET open_status='CLOSED', is_active=0, auto_closed=1, closed_at=?, close_reason=?, last_activity_at=?
+                       WHERE id=?")
+           ->execute([date('c'), $reason, $last, (int)$c['id']]);
+        if (function_exists('crm_log_change') && $c['qid']) {
+            crm_log_change((int)$c['qid'], 'Contract ' . $c['contract_number'] . ' auto-closed — ' . $reason);
+        }
+        // Highlight to the responsible people only when something is still pending.
+        if ($pending !== '') {
+            $to = contract_responsible_emails($c);
+            if ($to !== '') {
+                $subj = 'Contract auto-closed with items still pending: ' . $c['contract_number'];
+                $body = "Contract " . $c['contract_number'] . ($c['title'] ? ' — ' . $c['title'] : '')
+                    . "\nClient: " . ($c['client_name'] ?: '—')
+                    . "\n\n" . $reason
+                    . "\n\nIt has been closed automatically after being idle. The pending items above still need to be\n"
+                    . "settled or formally written off. Re-open the contract from the quotation if work continues.\n\n" . app_name();
+                ops_mail($to, $subj, $body, '', 'contract_idle_close');
+            }
+        }
+        db()->prepare("UPDATE partner_contracts SET idle_notified=? WHERE id=?")->execute([$today, (int)$c['id']]);
+        $closed++;
+    }
+    return $closed;
+}
+
+// Owner + branch manager + accounts/back-office, deduplicated.
+function contract_responsible_emails($c) {
+    $emails = [];
+    if (!empty($c['qid'])) foreach (contract_notify_emails((int)$c['qid']) as $e) $emails[] = $e;
+    $mgr = (string)manager_emails();
+    foreach (preg_split('/[,;]+/', $mgr) as $e) { $e = trim($e); if ($e !== '') $emails[] = $e; }
+    try {
+        $acc = ops_all("SELECT email FROM users WHERE role IN ('ACCOUNTANT','ACCOUNTS','ADMIN','MASTER_ADMIN','BRANCH_MANAGER') AND COALESCE(email,'')<>'' AND is_active=1");
+        foreach ($acc as $r) $emails[] = $r['email'];
+    } catch (Throwable $e) {}
+    return implode(',', array_values(array_unique(array_filter($emails))));
+}
+
+// Find the current quotation a contract hangs off, for the thread + redirect.
+function contract_quote_id($c) {
+    $qid = 0;
+    if (!empty($c['quotation_id'])) $qid = (int)$c['quotation_id'];
+    if (!$qid) $qid = (int)ops_val("SELECT id FROM quotations WHERE contract_id=? AND is_current=1 ORDER BY id DESC LIMIT 1", [(int)$c['id']]);
+    return $qid;
+}
+
+// ---------------------------------------------------------------------------
+//  Handler: open a contract number under a two-signature approval
+//
+//  Registered by an accountant / coordinator as PENDING, endorsed by a manager,
+//  approved by the branch manager — then it is OPEN and the order floats to
+//  operations. Every step is written into the quotation thread with who and
+//  when, so the full trail lives with the file.
+// ---------------------------------------------------------------------------
+function ops_contract_open($route, $method) {
+    if ($route !== 'contract-open' || $method !== 'POST') return false;
+    $pdo = db();
+    $c = ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)($_POST['id'] ?? 0)]);
+    if (!$c) { flash('That contract no longer exists.', 'error'); redirect('/quotes'); }
+    $qid = contract_quote_id($c);
+    $back = $qid ? ('/quote?id=' . $qid) : ('/partner?id=' . (int)$c['partner_id'] . '&tab=contracts');
+    $do = $_POST['do'] ?? '';
+    $note = trim($_POST['note'] ?? '');
+    $me = user_name(current_user());
+    $meId = (int)(current_user()['id'] ?? 0);
+    $status = $c['open_status'] ?: 'OPEN';
+
+    if ($do === 'endorse') {
+        ops_require(can_endorse_contract_open(), 'Only a manager can endorse opening a contract.');
+        if ($status !== 'PENDING') { flash('This contract is not awaiting endorsement.', 'warning'); redirect($back); }
+        if (trim((string)$c['mgr_endorsed_at']) !== '') { flash('Already endorsed.', 'warning'); redirect($back); }
+        $pdo->prepare("UPDATE partner_contracts SET mgr_endorsed_by=?, mgr_endorsed_by_id=?, mgr_endorsed_at=? WHERE id=?")
+            ->execute([$me, $meId, date('c'), (int)$c['id']]);
+        if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' opening endorsed by ' . $me . ($note !== '' ? ' — ' . $note : '') . '. Awaiting branch-manager approval.');
+        flash('Endorsed — it is now with the branch manager for approval.');
+        redirect($back);
+    }
+    if ($do === 'approve') {
+        ops_require(can_approve_contract_open(), 'Only the branch manager can approve opening a contract.');
+        if ($status !== 'PENDING') { flash('This contract is not awaiting approval.', 'warning'); redirect($back); }
+        if (trim((string)$c['mgr_endorsed_at']) === '' && !is_master()) {
+            flash('It needs a manager to endorse it first.', 'error'); redirect($back);
+        }
+        // Two people on purpose: the approver must not be the endorser (the Master
+        // Admin standing in for a one-person branch is the only exception).
+        if (!is_master() && (int)$c['mgr_endorsed_by_id'] === $meId && $meId !== 0) {
+            flash('The branch-manager approval must come from someone other than the endorser.', 'error'); redirect($back);
+        }
+        $pdo->prepare("UPDATE partner_contracts SET bm_approved_by=?, bm_approved_by_id=?, bm_approved_at=?, open_status='OPEN', is_active=1, opened_at=? WHERE id=?")
+            ->execute([$me, $meId, date('c'), date('c'), (int)$c['id']]);
+        if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' OPENED — approved by ' . $me . ($note !== '' ? ' — ' . $note : '') . '. Order floated to operations.');
+        // Now that it is open, hand the order to operations.
+        if ($qid) { $q = crm_quote_get($qid); if ($q) crm_float_ops_packet($q); }
+        flash('Contract ' . $c['contract_number'] . ' opened and floated to operations.');
+        redirect($back);
+    }
+    if ($do === 'reject') {
+        ops_require(can_endorse_contract_open() || can_approve_contract_open(), 'You cannot decide this request.');
+        if ($status !== 'PENDING') { flash('This contract is not awaiting a decision.', 'warning'); redirect($back); }
+        $pdo->prepare("UPDATE partner_contracts SET open_status='REJECTED', close_reason=?, closed_at=? WHERE id=?")
+            ->execute(['Opening rejected by ' . $me . ($note !== '' ? ' — ' . $note : ''), date('c'), (int)$c['id']]);
+        if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' opening REJECTED by ' . $me . ($note !== '' ? ' — ' . $note : '') . '.');
+        flash('Opening rejected.', 'warning');
+        redirect($back);
+    }
+    // Re-open a closed / auto-closed contract → back to the PENDING approval path.
+    if ($do === 'reopen') {
+        ops_require(can('crm.contract.register') || is_master(), 'You cannot re-open a contract.');
+        $pdo->prepare("UPDATE partner_contracts SET open_status='PENDING', is_active=1, auto_closed=0, closed_at='', close_reason='', mgr_endorsed_by='', mgr_endorsed_by_id=NULL, mgr_endorsed_at='', bm_approved_by='', bm_approved_by_id=NULL, bm_approved_at='', requested_by=?, requested_by_id=?, requested_at=? WHERE id=?")
+            ->execute([$me, $meId, date('c'), (int)$c['id']]);
+        if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' re-opening requested by ' . $me . ($note !== '' ? ' — ' . $note : '') . '. Pending manager & branch-manager approval.');
+        flash('Re-opening requested — pending manager & branch-manager approval.');
+        redirect($back);
+    }
+    redirect($back);
+}
 
 function ops_contract_overrides($route, $method) {
     $pdo = db();

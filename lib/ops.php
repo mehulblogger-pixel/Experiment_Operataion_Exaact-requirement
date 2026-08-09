@@ -1993,7 +1993,7 @@ function ops_module_gate($route) {
         'reports'=>'reports',
         'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users','org-template'=>'users',
         'user-unlock'=>'users','user-2fa-reset'=>'users','user-retire'=>'users',
-        'contract-overrides'=>'calls','contract-override'=>'calls',
+        'contract-overrides'=>'calls','contract-override'=>'calls','contract-open'=>'quotes',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'preflight'=>'settings',
         'trace-thread'=>'settings','trace-thread-remove'=>'settings',
@@ -2437,6 +2437,8 @@ function ops_dispatch($route, $method) {
             return ops_partner_template();
         case $route === 'contract-overrides' || $route === 'contract-override':
             return ops_contract_overrides($route, $method);
+        case $route === 'contract-open':
+            return ops_contract_open($route, $method);
         case $route === 'work-norms':
             ops_work_norms($method); return true;
         case in_array($route, ['documents','document','document-new','document-edit','document-submit','document-finalize','document-delete'], true):

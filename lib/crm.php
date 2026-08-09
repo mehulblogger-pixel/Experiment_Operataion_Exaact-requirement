@@ -1174,6 +1174,10 @@ function ops_crm_quotes($route, $method) {
             'payTerms' => lk_options_or('payment_term', PAYMENT_TERMS),
             'offAll' => offices_list(),
             'clientReg' => !empty($q['client_id']) ? ops_one("SELECT code, legal_name FROM business_partners WHERE id=?", [$q['client_id']]) : null,
+            // §6 — the contract row and who may act on its opening approval.
+            'contractRow'  => !empty($q['contract_id']) ? ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$q['contract_id']]) : null,
+            'canEndorseContract' => function_exists('can_endorse_contract_open') && can_endorse_contract_open(),
+            'canApproveContract' => function_exists('can_approve_contract_open') && can_approve_contract_open(),
             'orderJobs' => ops_all("SELECT j.id, j.job_code, j.stage, j.closed_flag, j.invoice_raised, j.invoice_amount, j.payment_received, j.payment_amount, i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.quotation_id=? ORDER BY j.id", [$q['id']])]);
         return;
     }
@@ -1509,7 +1513,12 @@ function ops_crm_quotes($route, $method) {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office can register the contract.');
         $cid = crm_register_client_for_quote($q);
+        $branchId = (int)($q['office_id'] ?? 0) ?: null;
+        // §6b — a structured number can be generated instead of typed: BRANCH/C/FY/NNNNN.
         $contractNo = trim($_POST['contract_number'] ?? '');
+        if (!empty($_POST['auto_contract']) || $contractNo === '') {
+            $contractNo = gen_contract_number($branchId);
+        }
         $start = $_POST['start_date'] ?? ''; $end = $_POST['end_date'] ?? '';
         $contractId = $q['contract_id'] ?: null;
         // §3 — the same contract number on the same client is a rate contract
@@ -1526,22 +1535,38 @@ function ops_crm_quotes($route, $method) {
                 redirect('/quote?id=' . $q['id']);
             }
         }
+        // §6d — opening a NEW contract number needs two signatures (a manager
+        // endorses, the branch manager approves). It is registered as PENDING and
+        // the order is held back until it is OPEN. Re-using an existing OPEN
+        // contract for the same client (rate-contract draw-down) floats at once.
+        $isNew = false; $openStatus = 'OPEN';
         if ($contractNo !== '' && $cid) {
-            $ex = ops_one("SELECT id FROM partner_contracts WHERE partner_id=? AND contract_number=?", [$cid, $contractNo]);
-            if ($ex) $contractId = (int)$ex['id'];
+            $ex = ops_one("SELECT id, open_status FROM partner_contracts WHERE partner_id=? AND contract_number=?", [$cid, $contractNo]);
+            if ($ex) { $contractId = (int)$ex['id']; $openStatus = $ex['open_status'] ?: 'OPEN'; }
             else {
-                $pdo->prepare("INSERT INTO partner_contracts (partner_id,contract_number,title,value,start_date,end_date,notes) VALUES (?,?,?,?,?,?,?)")
-                    ->execute([$cid, $contractNo, $q['subject'], (float)$q['total_amount'], $start, $end, 'From quotation ' . $q['quote_no']]);
+                $me = user_name(current_user()); $meId = (int)(current_user()['id'] ?? 0);
+                $pdo->prepare("INSERT INTO partner_contracts (partner_id,contract_number,title,value,start_date,end_date,notes,branch_id,open_status,requested_by,requested_by_id,requested_at,is_active) VALUES (?,?,?,?,?,?,?,?, 'PENDING', ?,?,?, 0)")
+                    ->execute([$cid, $contractNo, $q['subject'], (float)$q['total_amount'], $start, $end, 'From quotation ' . $q['quote_no'], $branchId, $me, $meId, date('c')]);
                 $contractId = (int)$pdo->lastInsertId();
+                $isNew = true; $openStatus = 'PENDING';
             }
         }
         $pdo->prepare("UPDATE quotations SET client_id=?, contract_number=?, contract_id=? WHERE id=?")->execute([$cid, $contractNo, $contractId, $q['id']]);
-        // The contract now exists on the client's Contracts tab; make it point back
-        // at the order it came from, so the tab can say which quotation this is,
-        // and so the same link exists whichever end it was created from.
         if ($contractId && function_exists('contract_link_quotation')) contract_link_quotation($contractId, (int)$q['id']);
-        $ok = crm_float_ops_packet(crm_quote_get($q['id']));
-        flash($ok ? 'Client & contract registered — the operations packet has been e-mailed to the team.' : 'Client & contract registered. The ops packet was logged (configure SMTP in Settings to e-mail it).', $ok ? 'success' : 'warning');
+        if ($isNew) {
+            // Held for approval — record it in the quotation thread, do not float yet.
+            crm_log_change($q['id'], 'Contract ' . $contractNo . ' requested by ' . user_name(current_user())
+                . ' — pending manager & branch-manager approval before the order floats to operations.');
+            flash('Contract ' . $contractNo . ' registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.', 'warning');
+            redirect('/quote?id=' . $q['id']);
+        }
+        // Existing OPEN contract (rate-contract draw-down) — float straight away.
+        $ok = $openStatus === 'OPEN' ? crm_float_ops_packet(crm_quote_get($q['id'])) : false;
+        if ($openStatus === 'OPEN') {
+            flash($ok ? 'Client & contract registered — the operations packet has been e-mailed to the team.' : 'Client & contract registered. The ops packet was logged (configure SMTP in Settings to e-mail it).', $ok ? 'success' : 'warning');
+        } else {
+            flash('Registered against contract ' . $contractNo . ', which is still ' . strtolower(CONTRACT_OPEN_STATES[$openStatus] ?? $openStatus) . '.', 'warning');
+        }
         redirect('/quote?id=' . $q['id']);
     }
     if ($route === 'quote-float' && $method === 'POST') {

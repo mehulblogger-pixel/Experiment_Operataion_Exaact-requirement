@@ -330,24 +330,79 @@
 <?php if ($st==='ACCEPTED'): ?>
 <div class="panel" id="contract" style="border:1px solid var(--ok)">
   <h3 class="tab-sub" style="margin-top:0">Won — client &amp; contract registration (Accounts)</h3>
+  <?php
+    $cr = $contractRow ?? null;
+    $os = $cr ? ($cr['open_status'] ?: 'OPEN') : '';
+    $osColors = ['PENDING'=>'#b45309','OPEN'=>'#15803d','REJECTED'=>'#b91c1c','CLOSED'=>'#64748b'];
+    $osLabel  = defined('CONTRACT_OPEN_STATES') ? (CONTRACT_OPEN_STATES[$os] ?? $os) : $os;
+  ?>
   <?php if ($q['contract_number']): ?>
     <table class="kv">
       <tr><td class="muted">Registered client</td><td><?= $clientReg ? e($clientReg['legal_name']).' <span class="muted">('.e($clientReg['code']).')</span>' : e($q['client_name']) ?></td></tr>
-      <tr><td class="muted">Contract number</td><td><b><?= e($q['contract_number']) ?></b></td></tr>
+      <tr><td class="muted">Contract number</td><td><b><?= e($q['contract_number']) ?></b>
+        <?php if ($cr): ?> <span class="pill" style="background:<?= $osColors[$os] ?? '#64748b' ?>;color:#fff"><?= e($osLabel) ?></span><?php endif; ?></td></tr>
+      <?php if ($cr && trim((string)$cr['requested_by'])!==''): ?><tr><td class="muted">Requested</td><td><?= e($cr['requested_by']) ?><?= $cr['requested_at']?' · '.e(substr($cr['requested_at'],0,10)):'' ?></td></tr><?php endif; ?>
+      <?php if ($cr && trim((string)$cr['mgr_endorsed_at'])!==''): ?><tr><td class="muted">Endorsed (manager)</td><td><?= e($cr['mgr_endorsed_by']) ?> · <?= e(substr($cr['mgr_endorsed_at'],0,10)) ?></td></tr><?php endif; ?>
+      <?php if ($cr && trim((string)$cr['bm_approved_at'])!==''): ?><tr><td class="muted">Approved (branch mgr)</td><td><?= e($cr['bm_approved_by']) ?> · <?= e(substr($cr['bm_approved_at'],0,10)) ?></td></tr><?php endif; ?>
+      <?php if ($cr && trim((string)$cr['close_reason'])!==''): ?><tr><td class="muted">Note</td><td><?= e($cr['close_reason']) ?></td></tr><?php endif; ?>
     </table>
-    <p class="sub" style="margin:8px 0 0">The <strong>handover to operations</strong> — <?= e(Tl('client')) ?>, <?= e(Tl('quote')) ?> and contract number, contacts, what was sold, the order lines and the commercial conditions — has gone to the delivery team, so they can raise <?= e(Tlp('call')) ?> against it without asking Sales for anything. It is saved in the system either way; it is also e-mailed once SMTP is set up in Settings.</p>
-    <form method="post" action="/quote-float?id=<?= (int)$q['id'] ?>" style="margin-top:8px"><button class="btn small secondary" type="submit">Re-send to operations</button></form>
+
+    <?php if ($os === 'PENDING'): ?>
+      <div class="panel" style="margin-top:8px;border-left:3px solid #b45309">
+        <b>Opening approval</b> — a manager endorses, then the branch manager approves. Both steps are written into the history below with who and when.
+        <?php $endorsed = trim((string)$cr['mgr_endorsed_at'])!==''; ?>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <?php if ($canEndorseContract && !$endorsed): ?>
+            <form method="post" action="/contract-open" style="display:flex;gap:6px;align-items:center">
+              <input type="hidden" name="id" value="<?= (int)$cr['id'] ?>"><input type="hidden" name="do" value="endorse">
+              <input class="form-control" name="note" placeholder="note (optional)" style="width:180px">
+              <button class="btn small" type="submit">Endorse (manager)</button>
+            </form>
+          <?php elseif ($endorsed): ?>
+            <span class="pill" style="background:#15803d;color:#fff">Manager endorsed</span>
+          <?php endif; ?>
+          <?php if ($canApproveContract): ?>
+            <form method="post" action="/contract-open" style="display:inline">
+              <input type="hidden" name="id" value="<?= (int)$cr['id'] ?>"><input type="hidden" name="do" value="approve">
+              <button class="btn small" type="submit"<?= (!$endorsed && !is_master())?' disabled title="A manager must endorse it first"':'' ?>>Approve &amp; open (branch manager)</button>
+            </form>
+          <?php endif; ?>
+          <?php if ($canEndorseContract || $canApproveContract): ?>
+            <form method="post" action="/contract-open" style="display:inline" onsubmit="return confirm('Reject opening this contract number?')">
+              <input type="hidden" name="id" value="<?= (int)$cr['id'] ?>"><input type="hidden" name="do" value="reject">
+              <button class="btn small danger" type="submit">Reject</button>
+            </form>
+          <?php endif; ?>
+        </div>
+        <p class="sub" style="margin:8px 0 0">The order is <strong>held from operations</strong> until this is approved.<?php if (!$canEndorseContract && !$canApproveContract): ?> You do not have rights to approve — it is with a manager and the branch manager.<?php endif; ?></p>
+      </div>
+    <?php elseif ($os === 'OPEN'): ?>
+      <p class="sub" style="margin:8px 0 0">The <strong>handover to operations</strong> — <?= e(Tl('client')) ?>, <?= e(Tl('quote')) ?> and contract number, contacts, what was sold, the order lines and the commercial conditions — has gone to the delivery team, so they can raise <?= e(Tlp('call')) ?> against it without asking Sales for anything. It is saved in the system either way; it is also e-mailed once SMTP is set up in Settings.</p>
+      <form method="post" action="/quote-float?id=<?= (int)$q['id'] ?>" style="margin-top:8px"><button class="btn small secondary" type="submit">Re-send to operations</button></form>
+    <?php elseif ($os === 'CLOSED' || $os === 'REJECTED'): ?>
+      <p class="sub" style="margin:8px 0 0">This contract is <?= $os==='CLOSED' ? ('closed'.($cr['auto_closed']?' automatically after being idle':'')) : 'not opened (opening was rejected)' ?>. <?= e($cr['close_reason']) ?></p>
+      <?php if ($canContract): ?>
+        <form method="post" action="/contract-open" style="margin-top:8px" onsubmit="return confirm('Request re-opening this contract? It will need manager and branch-manager approval again.')">
+          <input type="hidden" name="id" value="<?= (int)$cr['id'] ?>"><input type="hidden" name="do" value="reopen">
+          <button class="btn small secondary" type="submit"><?= $os==='CLOSED'?'Request re-opening':'Request opening again' ?></button>
+        </form>
+      <?php endif; ?>
+    <?php endif; ?>
+
   <?php elseif ($canContract): ?>
-    <p class="sub">Enter the contract number to register the client (if new) and float the order to operations.</p>
+    <p class="sub">Register the contract number to open it. A new number is registered as <b>pending</b> — a manager endorses and the branch manager approves before the order floats to operations.</p>
     <form method="post" action="/quote-contract?id=<?= (int)$q['id'] ?>">
       <div class="form-grid">
-        <div class="ff"><label>Contract number *</label><input class="form-control" name="contract_number" required placeholder="e.g. CON/2026/0142"><small class="muted">Entered by Accounts or the administrator once the order is confirmed.</small></div>
+        <div class="ff"><label>Contract number</label>
+          <input class="form-control" name="contract_number" id="contract_number" placeholder="e.g. CON/2026/0142">
+          <label class="chk" style="margin-top:6px"><input type="checkbox" name="auto_contract" value="1" id="auto_contract"> Generate automatically <span class="muted">(BRANCH/C/FY/00001)</span></label></div>
         <div class="ff"><label>Contract start</label><input class="form-control" type="date" name="start_date"></div>
         <div class="ff"><label>Contract end</label><input class="form-control" type="date" name="end_date"></div>
       </div>
       <?php if (empty($q['client_id']) && $q['client_name']): ?><p class="muted" style="margin:6px 2px">"<?= e($q['client_name']) ?>" will be registered as a client automatically.</p><?php endif; ?>
-      <div style="margin-top:10px"><button class="btn" type="submit">Register &amp; float to operations</button></div>
+      <div style="margin-top:10px"><button class="btn" type="submit">Register &amp; request opening</button></div>
     </form>
+    <script>(function(){var a=document.getElementById('auto_contract'),n=document.getElementById('contract_number');if(a&&n)a.addEventListener('change',function(){n.disabled=a.checked;n.style.background=a.checked?'var(--soft)':'';if(a.checked)n.value='';});})();</script>
   <?php else: ?>
     <p class="sub">Awaiting Accounts to register the client &amp; contract number.</p>
   <?php endif; ?>
