@@ -62,19 +62,26 @@ function setup_test_db(array $db) {
 
 // Write config.local.php next to config.php. Returns '' on success, or a reason
 // (the usual one being that the folder is not writable by the web server).
-function setup_write_local_config(array $db, ?array $admin = null) {
-    $file = __DIR__ . '/../config.local.php';
+function setup_write_local_config(array $db, ?array $admin = null, $file = null) {
+    $file = $file ?: __DIR__ . '/../config.local.php';
     $q = function ($s) { return "'" . str_replace(['\\', "'"], ['\\\\', "\\'"], (string)$s) . "'"; };
+    $sqlite = ($db['driver'] ?? '') === 'sqlite';
     $lines = [];
     $lines[] = '<' . '?php';   // split so no literal PHP tag sits inside a string
     $lines[] = '// Written by the web setup wizard. Your real settings — kept out of every';
     $lines[] = '// upload, so they are never overwritten. You can also edit it by hand.';
     $lines[] = 'return [';
     $lines[] = '    \'db\' => [';
-    $lines[] = '        \'host\' => ' . $q($db['host'] ?? 'localhost') . ',';
-    $lines[] = '        \'name\' => ' . $q($db['name'] ?? '') . ',';
-    $lines[] = '        \'user\' => ' . $q($db['user'] ?? '') . ',';
-    $lines[] = '        \'pass\' => ' . $q($db['pass'] ?? '') . ',';
+    if ($sqlite) {
+        // The built-in, no-server database. One file in this folder, created on
+        // first load — nothing to set up in cPanel.
+        $lines[] = '        \'driver\' => \'sqlite\',';
+    } else {
+        $lines[] = '        \'host\' => ' . $q($db['host'] ?? 'localhost') . ',';
+        $lines[] = '        \'name\' => ' . $q($db['name'] ?? '') . ',';
+        $lines[] = '        \'user\' => ' . $q($db['user'] ?? '') . ',';
+        $lines[] = '        \'pass\' => ' . $q($db['pass'] ?? '') . ',';
+    }
     $lines[] = '    ],';
     if ($admin && ($admin['user'] ?? '') !== '') {
         $lines[] = '    \'admin\' => [';
@@ -89,7 +96,7 @@ function setup_write_local_config(array $db, ?array $admin = null) {
         try {
             $cur = require $file;
             if (is_array($cur) && !empty($cur['admin']['user'])) {
-                return setup_write_local_config($db, $cur['admin']);
+                return setup_write_local_config($db, $cur['admin'], $file);
             }
         } catch (Throwable $e) { /* fall through and write db-only */ }
     }
@@ -108,6 +115,14 @@ function setup_write_local_config(array $db, ?array $admin = null) {
 function setup_handle_db_post() {
     if (($_POST['_csrf'] ?? '') !== ($_SESSION['csrf'] ?? "\0"))
         setup_render_db_form($_POST, 'This form expired. It has been reloaded — please submit it again.', true);
+    // One-click: the built-in database. No MySQL, nothing to create in cPanel —
+    // write a sqlite config and the app builds its own database on the next load.
+    if (($_POST['mode'] ?? '') === 'sqlite') {
+        $err = setup_write_local_config(['driver' => 'sqlite']);
+        if ($err !== '') setup_render_db_form($_POST, $err, true);
+        header('Location: /');
+        exit;
+    }
     $db = [
         'host' => trim((string)($_POST['db_host'] ?? 'localhost')) ?: 'localhost',
         'name' => trim((string)($_POST['db_name'] ?? '')),
@@ -132,27 +147,43 @@ function setup_render_db_form(array $vals = [], $msg = '', $isError = false) {
     $host = $vals['db_host'] ?? 'localhost';
     $name = $vals['db_name'] ?? '';
     $user = $vals['db_user'] ?? '';
-    echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Set up the database</title>';
+    echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Set up the system</title>';
     echo '<div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:44px auto;padding:26px;border:1px solid #e2ddd6;border-radius:12px;color:#333">';
-    echo '<h2 style="margin:0 0 6px;color:#1e40af">Connect your database</h2>';
-    echo '<p style="color:#555;font-size:14px;margin:0 0 16px">Enter the database details from '
-       . '<b>cPanel → Databases → MySQL Databases</b>. The app will test them and save them into '
-       . '<code>config.local.php</code>, which no future upload can overwrite.</p>';
+    echo '<h2 style="margin:0 0 6px;color:#1e40af">Set up the system</h2>';
+    echo '<p style="color:#555;font-size:14px;margin:0 0 18px">This runs once. Pick how the system should store its data — '
+       . 'you can be up and running in a single click.</p>';
     if ($msg !== '') {
         $bg = $isError ? '#fdecea' : '#eafaf1'; $bd = $isError ? '#e6b0aa' : '#a9dfbf'; $fg = $isError ? '#922b21' : '#1e6b3a';
         echo '<div style="background:' . $bg . ';border:1px solid ' . $bd . ';color:' . $fg . ';padding:10px 12px;border-radius:8px;font-size:14px;margin-bottom:14px">' . $e($msg) . '</div>';
     }
     $inp = 'width:100%;padding:9px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;box-sizing:border-box';
     $lab = 'display:block;font-size:12px;color:#555;font-weight:600;margin:12px 0 4px';
+    // ---- One click: the built-in database -----------------------------------
+    echo '<div style="border:2px solid #1e40af;border-radius:12px;padding:16px;margin-bottom:8px;background:#f5f8ff">';
+    echo '<div style="font-weight:700;color:#1e40af;font-size:15px;margin-bottom:4px">⚡ One-click start — recommended</div>';
+    echo '<p style="color:#555;font-size:13.5px;margin:0 0 12px">Use the <b>built-in database</b>. Nothing to create in cPanel, '
+       . 'no database name or password to find. The system builds its own storage in this folder and takes you straight in. '
+       . 'Perfect for a laptop or a single office; you can move to MySQL later for many simultaneous users.</p>';
     echo '<form method="post" action="/setup-db">';
+    echo '<input type="hidden" name="_csrf" value="' . $e($token) . '"><input type="hidden" name="mode" value="sqlite">';
+    echo '<button type="submit" style="width:100%;padding:12px;background:#1e40af;color:#fff;border:0;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer">Start now — one click</button>';
+    echo '</form></div>';
+    // ---- Divider ------------------------------------------------------------
+    echo '<div style="text-align:center;color:#aaa;font-size:12px;margin:16px 0 10px">— or connect a MySQL database (for a busy multi-user server) —</div>';
+    // ---- MySQL --------------------------------------------------------------
+    echo '<details style="border:1px solid #e2ddd6;border-radius:10px;padding:0 14px">';
+    echo '<summary style="cursor:pointer;padding:12px 0;font-weight:600;color:#333;font-size:14px">Connect MySQL instead</summary>';
+    echo '<p style="color:#555;font-size:13px;margin:0 0 10px">Enter the details from <b>cPanel → Databases → MySQL Databases</b>. '
+       . 'They are tested and saved into <code>config.local.php</code>, which no future upload overwrites.</p>';
+    echo '<form method="post" action="/setup-db" style="padding-bottom:14px">';
     echo '<input type="hidden" name="_csrf" value="' . $e($token) . '">';
-    echo '<label style="' . $lab . '">Database name</label><input style="' . $inp . '" name="db_name" value="' . $e($name) . '" placeholder="e.g. mghai_operations" autofocus>';
+    echo '<label style="' . $lab . '">Database name</label><input style="' . $inp . '" name="db_name" value="' . $e($name) . '" placeholder="e.g. mghai_operations">';
     echo '<label style="' . $lab . '">Database user</label><input style="' . $inp . '" name="db_user" value="' . $e($user) . '" placeholder="e.g. mghai_admin">';
     echo '<label style="' . $lab . '">Password</label><input style="' . $inp . '" type="password" name="db_pass" placeholder="the database user’s password">';
     echo '<label style="' . $lab . '">Host</label><input style="' . $inp . '" name="db_host" value="' . $e($host) . '" placeholder="localhost">';
-    echo '<button type="submit" style="margin-top:18px;width:100%;padding:11px;background:#1e40af;color:#fff;border:0;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer">Test &amp; save</button>';
-    echo '</form>';
-    echo '<p style="color:#888;font-size:12px;margin-top:14px">Nothing is saved until the test passes. If the folder is not writable, you can still create '
+    echo '<button type="submit" style="margin-top:16px;width:100%;padding:11px;background:#334155;color:#fff;border:0;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer">Test &amp; save</button>';
+    echo '</form></details>';
+    echo '<p style="color:#888;font-size:12px;margin-top:14px">If this folder is not writable by the web server, create '
        . '<code>config.local.php</code> by hand — copy <code>config.local.sample.php</code>.</p>';
     echo '</div>';
     exit;
