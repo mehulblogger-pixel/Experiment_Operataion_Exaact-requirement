@@ -27,7 +27,7 @@ function reset_groups() {
         'work' => [
             'label' => 'Day-to-day work',
             'note'  => 'Inquiries, quotations, ' . Tlp('call') . ', ' . Tlp('job') . ', expenses, '
-                     . Tlp('voucher') . ', attendance, " . Tlp("boss") . ", credit reconciliation.',
+                     . Tlp('voucher') . ', attendance, ' . Tlp('boss') . ', credit reconciliation.',
             'tables' => ['crm_inquiries', 'quotations', 'quote_lines', 'quote_locations', 'quote_revisions',
                 'quote_approvals', 'quote_files', 'quote_followups', 'quote_edit_requests',
                 'calls', 'jobs', 'expenses', 'vouchers', 'voucher_entries', 'attendance',
@@ -124,11 +124,13 @@ function reset_run(array $keys) {
             } catch (Throwable $e) { continue; }   // a table this install never made
         }
     }
-    // The expense heads are seeded once and remembered, so that deleting them
-    // deliberately keeps them deleted. Clearing the master lists is a different
-    // intention — start again — so forget that we ever seeded.
+    // Clearing the master lists is a deliberate "start again", so they must STAY
+    // cleared. Every master table is otherwise re-seeded on the very next boot
+    // (lk_seed for the dropdown lists, ops_seed for the offices), which is why
+    // the delete used to look as though it had done nothing. These flags stop
+    // that; forms fall back to their built-in defaults, so the app still works.
     if (in_array('masters', $keys, true)) {
-        try { db()->prepare("DELETE FROM settings WHERE skey = 'expense_heads_seeded'")->execute(); } catch (Throwable $e) {}
+        try { setting_set('masters_seeded', '1'); } catch (Throwable $e) {}
     }
     // Clearing the clients and vendors has to STAY cleared. The starter list is
     // seeded whenever that table is empty — which is exactly the state this
@@ -136,6 +138,11 @@ function reset_run(array $keys) {
     // next page load and the delete looked as though it had done nothing.
     if (in_array('partners', $keys, true)) {
         try { setting_set('partners_seeded', '1'); } catch (Throwable $e) {}
+    }
+    // Same for the offices, agencies and people — the 17 starter branches are
+    // re-seeded whenever that table is empty, so mark it cleared on purpose.
+    if (in_array('people', $keys, true)) {
+        try { setting_set('offices_seeded', '1'); } catch (Throwable $e) {}
     }
     // Put the starter lists, the expense heads and the admin account back, so
     // the next screen is a working system rather than an empty one.
