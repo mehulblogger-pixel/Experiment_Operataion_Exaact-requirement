@@ -3732,9 +3732,13 @@ function ops_candidates($route, $method) {
 function my_inspector_id() { $u = current_user(); return $u['inspector_id'] ?? null; }
 // Friendly, actionable message when an Inspector login has no inspector profile linked.
 function inspector_link_msg() {
-    return 'Your login isn’t linked to a ' . Tl('engineer') . ' profile yet, so "My Jobs" and "My Voucher" can’t open. '
-         . 'An administrator can fix this in Users → open your name → set "Linked ' . Tl('engineer') . '" '
-         . '(if your ' . Tl('engineer') . ' record doesn’t exist yet, add it under ' . THP('engineer') . ' first).';
+    return 'Your login is on the ' . Tl('engineer') . ' role but is not linked to a ' . Tl('engineer')
+         . ' record yet, so "My ' . Tlp('job') . '" and "My ' . Tlp('voucher') . '" — the personal screens for field '
+         . Tlp('engineer') . ' — cannot open. An administrator fixes this in two steps: '
+         . '(1) if the ' . Tl('engineer') . ' record does not exist yet, add it under Masters → ' . THP('engineer') . '; '
+         . '(2) open Users → your name → set "Linked ' . Tl('engineer') . '" to that record → Save. '
+         . 'If this login is actually an owner / office user rather than a field ' . Tl('engineer') . ', change its Role away from '
+         . Tl('engineer') . ' instead — then use the full ' . THP('job') . ' and ' . THP('voucher') . ' registers under Operations.';
 }
 function voucher_owner_is_me($v) { return my_inspector_id() && (int)$v['inspector_id'] === (int)my_inspector_id(); }
 function can_view_voucher($v) { return is_coordinator_level() || voucher_owner_is_me($v); }
