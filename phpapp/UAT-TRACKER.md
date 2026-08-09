@@ -18,7 +18,7 @@ Legend: ✅ works · 🐞 bug · 🧹 clutter/UX · 👯 duplicate · ⟢ needs 
 | # | Request | Status |
 |---|---|---|
 | 1 | Client commercials should flow into the quote | ✅ **built** — payment terms now auto-fill from the client master on client-select |
-| 2 | Site dropdown of vendor sites + handle "sites not finalized" | ⏳ **needs one decision** (see below) |
+| 2 | Site dropdown of vendor sites + handle "sites not finalized" | ✅ **built** — each quote site can be picked from the vendor master; a "Site to be confirmed" type covers sites not yet fixed |
 | 3 | Geo-fence location on client/vendor creation (anti fake-GPS) | ✅ **built** — site lat/lon + radius on the form; punch-in already checks it |
 | 4 | Report builder 14a/14b "not working" | ✅ **works in current code** — verified live; the live site is running **older files** (same deployment gap as the `team_role` crash). Deploy the latest and it appears. |
 
@@ -27,11 +27,14 @@ button adds the section (real click, section persisted), the "Instrument (master
 + free-text)" field type is selectable and saves, and a new report renders both
 the Scope table and the Instrument field. So it is a **deploy**, not a build.
 
-**Item 2 — open decision:** how to model an inspection whose vendor site is not
-yet fixed. Proposed: a **"Site to be confirmed"** option on each location so a
-quote/call can be raised now (multiple vendors, each optionally TBD) and the
-unconfirmed ones are flagged on the register until a real site + geo-fence is
-set. Awaiting owner confirmation before building.
+**Item 2 — built.** Each site row on the quotation now carries its own **vendor**
+picker (from the vendor master, 450+ vendors), so one quote can cover several
+sites at **different vendors**. Picking a vendor names the row after it and marks
+it *manufacturer works*. For sites not yet fixed, a new **"Site to be confirmed"**
+type lets the row be saved on the strength of the vendor alone — so every vendor
+can be listed before addresses are known. Verified: a quote saved a location with
+`vendor_id` set and type `TBD`. (`quote_locations.vendor_id` added; the save and
+the add-row clone both carry it.)
 
 ---
 

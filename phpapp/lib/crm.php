@@ -291,6 +291,9 @@ function crm_migrate() {
         // header office stays as the primary/owning one.
         ensure_column('quotations', 'exec_office_ids', "VARCHAR(200) DEFAULT ''");
         ensure_column('quotations', 'vendor_id', 'INT NULL');   // manufacturer / inspection site, carried to the work-order
+        // A quote may cover several sites at DIFFERENT vendors, so each location
+        // can name its own vendor (from the master) — or be left "to be confirmed".
+        ensure_column('quote_locations', 'vendor_id', 'INT NULL');
         // Rejection is a first-class outcome, with who and why.
         ensure_column('quotations', 'rejected_by', "VARCHAR(150) DEFAULT ''");
         ensure_column('quotations', 'rejected_at', "VARCHAR(30) DEFAULT ''");
@@ -395,6 +398,7 @@ const QUOTE_ORIGINS = [
     'OTHER'         => 'Other',
 ];
 const SITE_LOCATION_TYPES = [
+    'TBD'        => 'Site to be confirmed',
     'SITE'       => 'Project site',
     'WORKS'      => 'Manufacturer works',
     'REGISTERED' => 'Registered office',
@@ -799,16 +803,21 @@ function crm_save_locations($qid, $b) {
     $city = (array)($b['loc_city'] ?? []); $st = (array)($b['loc_state'] ?? []); $pin = (array)($b['loc_pin'] ?? []);
     $ctry = (array)($b['loc_country'] ?? []); $cn = (array)($b['loc_contact'] ?? []); $cm = (array)($b['loc_mobile'] ?? []);
     $off = (array)($b['loc_office'] ?? []);
+    $ven = (array)($b['loc_vendor'] ?? []);   // the vendor whose site this is (optional)
     $keep = [];
-    $upd = db()->prepare("UPDATE quote_locations SET label=?,location_type=?,line1=?,line2=?,city=?,state=?,pincode=?,country=?,contact_name=?,contact_mobile=?,office_id=?,sort_order=? WHERE id=? AND quote_id=?");
-    $ins = db()->prepare("INSERT INTO quote_locations (quote_id,label,location_type,line1,line2,city,state,pincode,country,contact_name,contact_mobile,office_id,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $upd = db()->prepare("UPDATE quote_locations SET label=?,location_type=?,line1=?,line2=?,city=?,state=?,pincode=?,country=?,contact_name=?,contact_mobile=?,office_id=?,vendor_id=?,sort_order=? WHERE id=? AND quote_id=?");
+    $ins = db()->prepare("INSERT INTO quote_locations (quote_id,label,location_type,line1,line2,city,state,pincode,country,contact_name,contact_mobile,office_id,vendor_id,sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
     $n = 0;
     foreach ($l1 as $i => $line1) {
         $line1 = trim((string)$line1); $c = trim((string)($city[$i] ?? ''));
-        if ($line1 === '' && $c === '' && trim((string)($lab[$i] ?? '')) === '') continue;  // skip blank rows
+        $vid = (int)($ven[$i] ?? 0) ?: null;
+        // Keep a row that has an address, a label, OR a chosen vendor — the last
+        // lets a "site to be confirmed" row (a known vendor, address still open)
+        // be saved so the quote can list every vendor even before sites are fixed.
+        if ($line1 === '' && $c === '' && trim((string)($lab[$i] ?? '')) === '' && !$vid) continue;
         $args = [trim((string)($lab[$i] ?? '')), $lt[$i] ?? 'SITE', $line1, trim((string)($l2[$i] ?? '')), $c,
             trim((string)($st[$i] ?? '')), trim((string)($pin[$i] ?? '')), trim((string)($ctry[$i] ?? '')) ?: 'India',
-            trim((string)($cn[$i] ?? '')), trim((string)($cm[$i] ?? '')), (int)($off[$i] ?? 0) ?: null, $n++];
+            trim((string)($cn[$i] ?? '')), trim((string)($cm[$i] ?? '')), (int)($off[$i] ?? 0) ?: null, $vid, $n++];
         $existing = (int)($ids[$i] ?? 0);
         if ($existing) { $upd->execute(array_merge($args, [$existing, $qid])); $keep[] = $existing; }
         else { $ins->execute(array_merge([$qid], $args)); $keep[] = (int)db()->lastInsertId(); }
