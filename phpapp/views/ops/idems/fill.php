@@ -171,7 +171,13 @@
   <?php if (!empty($bySection[0])): ?>
     <div class="panel" style="margin-bottom:14px"><div class="form-grid"><?php foreach ($bySection[0] as $f) $renderField($f); ?></div></div>
   <?php endif; ?>
-  <div style="margin-top:8px"><button class="btn" type="submit">Save report body</button> <a class="btn secondary" href="/document?id=<?= (int)$doc['id'] ?>">Cancel</a></div>
+  <div style="margin-top:8px"><button class="btn" type="submit">Save report body</button>
+    <?php // §R1 — see the report in your uploaded format at any point while writing
+          // (save first; it fills your layout with what you've entered so far). ?>
+    <?php if (function_exists('idems_pick_template') && idems_pick_template($doc)): ?>
+      <a class="btn secondary" href="/document-docx?id=<?= (int)$doc['id'] ?>" target="_blank" title="Save first, then this opens the report in your uploaded format">📄 See in your format</a>
+    <?php endif; ?>
+    <a class="btn secondary" href="/document?id=<?= (int)$doc['id'] ?>">Cancel</a></div>
 </form>
 <?php endif; ?>
 
