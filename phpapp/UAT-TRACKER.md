@@ -33,6 +33,28 @@ bucket)**, no errors. Suite 459/459.
 
 ---
 
+## Module 9 — Money / Finance (deep test — settlement reconciles)
+
+Continued the same order into the money side, checking figures against the DB.
+
+**✅ Settlement reconciles:** issued the ₹11,800 invoice, then paid it in two
+receipts (₹5,000 part, then ₹6,800 balance), allocating each:
+- outstanding went **11,800 → 6,800 → 0**
+- **status auto-followed the money** — DRAFT → ISSUED → PART_PAID → **PAID** (nobody
+  types the status; it is `total − cash − TDS − credit notes`).
+
+**✅ GST guard works (good behaviour, not a bug):** the invoice **refused to issue**
+while the customer had no GSTIN or state — because place-of-supply is then unknown
+and CGST/SGST-vs-IGST would be a guess. Set the client's state → it issued. This
+is correct GST compliance.
+
+**❎ Checked and cleared:** the issue guard reads `$inv['client_gstin']`, and there
+is no such **column** — looked like a bug, but `books_invoice()` aliases the
+partner's GSTIN *as* `client_gstin` in its SELECT join, so it is correct. Not a
+defect.
+
+---
+
 ## Whole-app health baseline (09 Aug 2026)
 
 Walked **every GET-safe screen in the app — 83 screens across all modules** —
