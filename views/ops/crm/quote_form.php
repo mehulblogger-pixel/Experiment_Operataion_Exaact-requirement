@@ -343,16 +343,47 @@
   syncClient(false);
 
   // offer the client's addresses as ready-made sites
+  function norm(s){ return String(s == null ? '' : s).trim().toLowerCase(); }
+  // Does a site row already hold this address? Matched on line 1 + city (or the
+  // label when there is no street line) so the same address is not added twice.
+  function addressAlreadyASite(a){
+    var found = null;
+    lbody.querySelectorAll('.locrow').forEach(function(tr){
+      var l1 = norm(tr.querySelector('[name="loc_line1[]"]').value);
+      var ct = norm(tr.querySelector('[name="loc_city[]"]').value);
+      var lb = norm(tr.querySelector('[name="loc_label[]"]').value);
+      var aL1 = norm(a.line1), aCt = norm(a.city), aLb = norm(a.label || a.address_type);
+      var match = (aL1 && aL1 === l1 && aCt === ct) || (!aL1 && aLb && aLb === lb);
+      if (match) found = tr;
+    });
+    return found;
+  }
+  function markChipAdded(b, on){
+    if (on) { b.dataset.added = '1'; b.style.opacity = '0.5'; b.style.pointerEvents = 'none';
+              b.textContent = b.textContent.replace(/^\+ /, '✓ '); }
+    else    { delete b.dataset.added; b.style.opacity = ''; b.style.pointerEvents = '';
+              b.textContent = b.textContent.replace(/^✓ /, '+ '); }
+  }
   function offerAddresses(list){
     if (document.getElementById('addrhint')) return;
     var d = document.createElement('div');
     d.id = 'addrhint'; d.className = 'panel'; d.style.margin = '8px 0';
-    d.innerHTML = '<b>' + list.length + ' address(es) on file for this ' + <?= json_encode(Tl('client')) ?> + '.</b> ';
+    d.innerHTML = '<b>' + list.length + ' address(es) on file for this ' + <?= json_encode(Tl('client')) ?> + '.</b> '
+                + '<span class="muted" style="font-size:12px">Click one to add it as a site — each is added once.</span><br>';
     list.forEach(function(a, i){
       var b = document.createElement('button');
       b.type='button'; b.className='btn small secondary'; b.style.margin='2px';
       b.textContent = '+ ' + (a.label || a.address_type || 'Address') + (a.city ? ' — ' + a.city : '');
-      b.addEventListener('click', function(){ addLoc(a); });
+      b.addEventListener('click', function(){
+        if (b.dataset.added) return;               // already a site — do nothing
+        var existing = addressAlreadyASite(a);
+        var tr = existing || addLoc(a);
+        if (tr) { tr._srcChip = b; markChipAdded(b, true); }
+      });
+      // If this address is already on the form (e.g. editing a saved quote), show
+      // it as added from the start rather than letting it be added again.
+      var pre = addressAlreadyASite(a);
+      if (pre) { pre._srcChip = b; markChipAdded(b, true); }
       d.appendChild(b);
     });
     document.getElementById('locs').parentNode.parentNode.insertBefore(d, document.getElementById('locs').parentNode);
@@ -373,6 +404,7 @@
       set('loc_city[]', a.city); set('loc_state[]', a.state); set('loc_pin[]', a.pincode);
     }
     lbody.appendChild(tr); wireLoc(tr); refreshLocPickers();
+    return tr;
   }
   // Fill a site row's address from a picked vendor/address. A field is only
   // overwritten when it is empty or still holds what a previous auto-fill put
@@ -399,8 +431,11 @@
   function wireLoc(tr){
     var rm = tr.querySelector('.locrm');
     if (rm) rm.addEventListener('click', function(){
+      // If this row came from a client-address chip, re-enable that chip so the
+      // address can be added again after it was removed.
+      if (tr._srcChip) { markChipAdded(tr._srcChip, false); tr._srcChip = null; }
       if (lbody.querySelectorAll('.locrow').length > 1) tr.remove();
-      else { tr.querySelectorAll('input').forEach(function(i){ if(i.name!=='loc_id[]') i.value=''; }); }
+      else { tr.querySelectorAll('input').forEach(function(i){ if(i.name!=='loc_id[]') i.value=''; }); tr._autofill = null; }
       refreshLocPickers();
     });
     // Pick a vendor as the site → name the row after that vendor and mark it as
