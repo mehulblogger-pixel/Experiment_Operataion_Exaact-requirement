@@ -316,6 +316,13 @@ function lk_rename_value_label($typeKey, $from, $to) {
 
 // ---- Seed system lists (from the old fixed choice lists) + demo hierarchies -
 function lk_seed() {
+    // Once the master lists have been cleared ON PURPOSE (Settings → Clear
+    // records), they stay cleared. Without this the very next page load re-seeds
+    // every starter + demo list, so the delete looked as though it had done
+    // nothing. Forms fall back to their built-in defaults via lk_options_or(),
+    // so the app is still usable with the lists empty.
+    $cleared = ''; try { $cleared = (string)setting_get('masters_seeded', ''); } catch (Throwable $e) {}
+    if ($cleared === '1') return;
     if ((int)ops_val("SELECT COUNT(*) FROM lookup_types") > 0) return;
     // system (flat) lists — become editable, keep the same codes so logic still works
     $system = [

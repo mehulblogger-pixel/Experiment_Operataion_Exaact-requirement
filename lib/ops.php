@@ -477,6 +477,11 @@ function ops_seed_expense_masters() {
 // Seed offices (head office + branches) once.
 function ops_seed() {
     $pdo = db();
+    // Once the offices have been cleared ON PURPOSE (Settings → Clear records →
+    // People, offices & agencies), they stay cleared instead of the 17 starter
+    // branches flooding straight back on the next page load.
+    $cleared = ''; try { $cleared = (string)setting_get('offices_seeded', ''); } catch (Throwable $e) {}
+    if ($cleared === '1') return;
     if ((int)$pdo->query("SELECT COUNT(*) FROM offices")->fetchColumn() > 0) return;
     $offices = [
         ['AHM','Ahmedabad','Ahmedabad',1],
