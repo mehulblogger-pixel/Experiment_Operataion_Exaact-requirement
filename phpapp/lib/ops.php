@@ -364,6 +364,11 @@ function ops_migrate() {
     ensure_column('inspectors', 'skill_ids', "VARCHAR(600) DEFAULT ''");
     ensure_column('inspectors', 'designation', "VARCHAR(40) DEFAULT ''");
     ensure_column('inspectors', 'staff_kind', "VARCHAR(20) DEFAULT 'ASSET'"); // asset / freelancer / subcon
+    // Where this team member sits for deputation: a FIELD inspector goes to site
+    // and is ranked to the TOP of the allocate list; a COORDinator or OFFICE
+    // person can still be deputed but sits below the field inspectors. Every
+    // login is tied to one of these records (a login must belong to the team).
+    ensure_column('inspectors', 'team_role', "VARCHAR(10) DEFAULT 'FIELD'");
     // extra annual cost paid to an external agency when this engineer is hired via one
     ensure_column('inspectors', 'agency_name', "VARCHAR(150) DEFAULT ''");
     ensure_column('inspectors', 'agency_cost', 'DECIMAL(14,2) DEFAULT 0');
@@ -794,7 +799,40 @@ function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
     }
     return null;
 }
-function inspectors_list($activeOnly = true) { return ops_all("SELECT id, name, emp_code, sbu, salary_ctc, staff_kind, home_office_id FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name"); }
+function inspectors_list($activeOnly = true) {
+    // Field inspectors first (they go to site), then coordinators, then office
+    // staff — everyone is deputable, but the person most likely to be sent sits
+    // at the top of every allocate list. Ordered in-code as a fallback so a
+    // database that has not yet gained the team_role column does not crash.
+    $rows = ops_all("SELECT id, name, emp_code, sbu, salary_ctc, staff_kind, home_office_id,
+                            COALESCE(team_role,'FIELD') team_role
+                     FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name");
+    $rank = ['FIELD' => 0, 'COORD' => 1, 'OFFICE' => 2];
+    usort($rows, fn($a, $b) => ($rank[$a['team_role']] ?? 0) <=> ($rank[$b['team_role']] ?? 0)
+        ?: strcasecmp((string)$a['name'], (string)$b['name']));
+    return $rows;
+}
+
+// Create a team-member (person) record and return its id. Every login must
+// belong to one of these — the user form creates one inline when a new person
+// is added rather than picked. FIELD / COORD / OFFICE drives where they sit in
+// the allocate list; all three are deputable.
+function team_member_create($name, $teamRole = 'FIELD', $officeId = null, $email = '') {
+    $name = trim((string)$name);
+    if ($name === '') return 0;
+    if (function_exists('ensure_column')) ensure_column('inspectors', 'team_role', "VARCHAR(10) DEFAULT 'FIELD'");
+    $tr = in_array($teamRole, ['FIELD', 'COORD', 'OFFICE'], true) ? $teamRole : 'FIELD';
+    $data = ['name' => $name, 'staff_kind' => 'ASSET', 'status' => 'ACTIVE',
+             'home_office_id' => $officeId ?: null, 'team_role' => $tr,
+             'email' => $email, 'created_at' => date('c')];
+    if (function_exists('next_emp_code')) $data['emp_code'] = next_emp_code('ASSET');
+    $cols = function_exists('existing_columns_only') ? existing_columns_only('inspectors', array_keys($data)) : array_keys($data);
+    if (!$cols) return 0;
+    $ph = implode(',', array_fill(0, count($cols), '?'));
+    db()->prepare("INSERT INTO inspectors (" . implode(',', $cols) . ") VALUES ($ph)")
+        ->execute(array_map(fn($c) => $data[$c], $cols));
+    return (int)db()->lastInsertId();
+}
 
 // ---- Smart inspector suggestion for allocation (#2) ------------------------
 // The dates an inspector is already committed to (their open jobs), as a
@@ -859,10 +897,15 @@ function inspector_suggestions($call, array $dates = [], $exceptJobId = 0) {
         $busy = $dates ? inspector_busy_dates($id, $exceptJobId) : [];
         $clash = array_values(array_filter($dates, fn($d) => isset($busy[$d])));
         $out[] = ['id' => $id, 'name' => (string)$names[$id]['name'], 'emp_code' => (string)($names[$id]['emp_code'] ?? ''),
-                  'score' => $s, 'reason' => $reason[$id], 'clash' => $clash, 'available' => empty($clash)];
+                  'score' => $s, 'reason' => $reason[$id], 'clash' => $clash, 'available' => empty($clash),
+                  'team_role' => (string)($names[$id]['team_role'] ?? 'FIELD')];
     }
+    // Rank: history score, then who is free, then a FIELD inspector over a
+    // coordinator / office person (they go to site), then name.
+    $trRank = ['FIELD' => 0, 'COORD' => 1, 'OFFICE' => 2];
     usort($out, fn($a, $b) => ($b['score'] <=> $a['score'])
         ?: (($b['available'] ? 1 : 0) <=> ($a['available'] ? 1 : 0))
+        ?: (($trRank[$a['team_role']] ?? 0) <=> ($trRank[$b['team_role']] ?? 0))
         ?: strcasecmp($a['name'], $b['name']));
     return $out;
 }
@@ -5255,7 +5298,12 @@ function ops_users($route, $method) {
             $allowedRoles = $globalMgr ? array_keys(ORG_ROLES) : ['OPERATION_MANAGER','ASST_MANAGER','COORDINATOR','INSPECTOR'];
             $role = in_array($b['role'] ?? '', $allowedRoles, true) ? $b['role'] : 'COORDINATOR';
             $isSuper = $role === 'MASTER_ADMIN' ? 1 : 0;
-            $insId = ($b['inspector_id'] ?? '') !== '' ? (int)$b['inspector_id'] : null;
+            // An existing team member picked from the list; '__new__' or blank is
+            // resolved below, once the home office is known, into either a newly
+            // created team member or a blocking error (a login must belong to
+            // the team).
+            $insRaw = (string)($b['inspector_id'] ?? '');
+            $insId = ($insRaw !== '' && $insRaw !== '__new__') ? (int)$insRaw : null;
             // scope: global managers set anything; branch managers pin to their office
             // "+ Add an office" on this form writes into the one office list,
             // so it is there for everybody the moment this person is saved.
@@ -5266,6 +5314,31 @@ function ops_users($route, $method) {
                 if (!$homeOffice) flash('The ' . Tl('office') . ' needs a name, so none was added.', 'warning');
             } else {
                 $homeOffice = $globalMgr ? ($homeRaw !== '' ? (int)$homeRaw : null) : $myOffice;
+            }
+            // ---- Every login must belong to a team member (person) -----------
+            // The rule the owner asked for: you cannot create a login for
+            // somebody who is not in the team. Pick an existing team member, or
+            // add them inline (their name + which team they are in). The only
+            // exception is the system-owner (Master Admin) account, which is the
+            // installation's root login rather than a deputable person.
+            $requireTeam = !$isSuper;
+            if ($insId === null) {                          // nothing picked from the list
+                if ($user && !empty($user['inspector_id'])) $insId = (int)$user['inspector_id']; // keep the edit's link
+                if ($insRaw === '__new__' || ($requireTeam && !$insId)) {
+                    $pname = trim(($b['first_name'] ?? '') . ' ' . ($b['last_name'] ?? ''));
+                    if ($pname === '') $pname = trim((string)($b['username'] ?? ''));
+                    $teamRole = in_array($b['team_member_role'] ?? '', ['FIELD', 'COORD', 'OFFICE'], true)
+                              ? $b['team_member_role'] : 'FIELD';
+                    if ($pname !== '') $insId = team_member_create($pname, $teamRole, $homeOffice ?: null, $b['email'] ?? '') ?: null;
+                }
+            }
+            if ($requireTeam && !$insId) {
+                flash('A login must belong to a team member. Pick the person from the team, or enter their name (first / last) so they are added to the team.', 'error');
+                $mgrsE = ops_all("SELECT id, first_name, last_name, username, role, position_title FROM users WHERE is_active=1" . ($user ? " AND id<>" . (int)$user['id'] : "") . " ORDER BY first_name, last_name");
+                view('ops/user_form', ['user' => user_row_from_post($b, $user), 'inspectors' => inspectors_list(false), 'offices' => offices_list(),
+                    'sbuOpts' => lk_options_or('sbu', OPS_SBUS), 'globalMgr' => $globalMgr, 'managers' => $mgrsE,
+                    'defaults' => role_defaults($role)] + user_cost_vars(user_row_from_post($b, $user)));
+                return;
             }
             // Both scopes arrive as tick-lists now. "Every…" wins over the
             // individual ticks, and is stored as ALL so an office added next
