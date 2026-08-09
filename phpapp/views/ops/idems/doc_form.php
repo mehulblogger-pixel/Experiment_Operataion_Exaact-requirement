@@ -98,13 +98,36 @@
   <h3 class="tab-sub">People &amp; outcome</h3>
   <div class="form-grid">
     <div class="ff"><label>Inspector</label>
-      <select class="form-control searchable" name="inspector_id"><option value="">—</option>
+      <select class="form-control searchable" id="idr_inspector" name="inspector_id"><option value="">—</option>
         <?php foreach ($inspectors as $i): ?><option value="<?= (int)$i['id'] ?>" <?= ((int)$v('inspector_id')===(int)$i['id'])?'selected':'' ?>><?= e($i['name']) ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff"><label>Approver</label>
-      <select class="form-control searchable" name="approver_user_id"><option value="">—</option>
+    <div class="ff"><label>Approver <span class="muted" id="idr_appr_hint"></span></label>
+      <select class="form-control searchable" id="idr_approver" name="approver_user_id"><option value="">—</option>
         <?php foreach ($approvers as $u): $nm=trim(($u['first_name']??'').' '.($u['last_name']??'')) ?: $u['username']; ?><option value="<?= (int)$u['id'] ?>" <?= ($doc && (int)$doc['approver_user_id']===(int)$u['id'])?'selected':'' ?>><?= e($nm) ?> · <?= e(ORG_ROLES[$u['role']] ?? $u['role']) ?></option><?php endforeach; ?>
       </select></div>
+    <?php // §R5 — fill the Approver box from the inspector→approver mapping the moment
+          // an inspector is picked, so a configured approver is visible on the form
+          // (and the submit never dead-ends on "no approver"). Manual pick still wins. ?>
+    <script>(function(){
+      var MAP = <?= json_encode($approverMap ?? []) ?>;
+      var ins = document.getElementById('idr_inspector'), ap = document.getElementById('idr_approver'), hint = document.getElementById('idr_appr_hint');
+      if (!ins || !ap) return;
+      function setApprover(id){
+        ap.value = String(id);
+        if (ap.dataset.enh === '1' && ap.parentNode && ap.parentNode.className === 'ss-wrap'){
+          var box = ap.parentNode.querySelector('input.form-control'), o = ap.options[ap.selectedIndex];
+          if (box && o) box.value = o.textContent;
+        }
+        ap.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      function sync(force){
+        var mapped = MAP[ins.value];
+        if (!mapped) { if (hint) hint.textContent = ins.value ? '— no approver mapped for this inspector' : ''; return; }
+        if (force || !ap.value) { setApprover(mapped); if (hint) hint.textContent = '— from the approver mapping'; }
+      }
+      ins.addEventListener('change', function(){ sync(true); });
+      sync(false);   // on load, fill only if the approver is still blank
+    })();</script>
     <div class="ff"><label>Inspection result</label>
       <select class="form-control" name="result"><option value="">—</option>
         <?php foreach (lk_options_or('inspection_result', IDEMS_RESULTS) as $rk=>$rv): ?><option value="<?= e($rk) ?>" <?= ($doc && $doc['result']===$rk)?'selected':'' ?>><?= e($rv) ?></option><?php endforeach; ?>
