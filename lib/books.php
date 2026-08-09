@@ -464,6 +464,14 @@ function books_line_add($invoiceId, array $b) {
         $j = ops_one("SELECT j.*, c.id call_id, c.billable_value, c.billable_rate, c.billable_qty, c.billable_basis
                       FROM jobs j LEFT JOIN calls c ON c.id = j.call_id WHERE j.id=?", [$job]);
         if (!$j) return 'That ' . Tl('job') . ' no longer exists.';
+        // §INV-2 — a job can be billed only once it is closed on its last day (a
+        // multi-day job cannot close before then). A master or finance user may
+        // override to raise the invoice mid-inspection.
+        $canBillOpen = (function_exists('is_master') && is_master()) || (function_exists('can') && can('finance.reconcile'));
+        if (empty($j['closed_flag']) && !$canBillOpen) {
+            return TH('job') . ' ' . $j['job_code'] . ' is not closed yet — bill it once the inspection is completed on its last day. '
+                 . '(A finance user or admin can override to bill in between.)';
+        }
         if (books_job_invoiced($job, (int)$invoiceId)) return TH('job') . ' ' . $j['job_code'] . ' is already on another invoice.';
         $callId = $j['call_id'] ? (int)$j['call_id'] : null;
         if ($desc === '') $desc = 'Inspection services — ' . $j['job_code'];
