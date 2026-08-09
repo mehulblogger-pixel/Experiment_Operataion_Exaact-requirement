@@ -38,7 +38,7 @@
         <label class="chk"><input type="checkbox" name="anonymous" value="1"> They asked not to be named</label>
         <small class="muted">We still investigate. Without a way to reach them we cannot tell them the outcome, and the register says so.</small></div>
 
-      <div class="ff"><label>Which <?= e(Tl('client')) ?> or party</label>
+      <div class="ff"><label>Which <?= e(Tl('client')) ?> or party <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
         <select class="form-control searchable" name="partner_id"><option value="">— none / not applicable —</option>
           <?php foreach ($clients as $cl): ?><option value="<?= (int)$cl['id'] ?>" <?= (int)($appealOf['partner_id'] ?? 0)===(int)$cl['id']?'selected':'' ?>><?= e(pname($cl)) ?></option><?php endforeach; ?>
         </select></div>

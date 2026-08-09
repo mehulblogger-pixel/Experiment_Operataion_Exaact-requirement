@@ -82,7 +82,7 @@
 <form method="post" action="/conf-nda-add" enctype="multipart/form-data" class="panel" style="margin-top:16px;max-width:820px">
   <h3 style="margin-top:0">Record a client agreement</h3>
   <div class="form-grid" style="gap:12px 16px">
-    <div><label>Client</label><select class="form-control" name="partner_id" required><option value="">— choose —</option>
+    <div><label>Client <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label><select class="form-control" name="partner_id" required><option value="">— choose —</option>
       <?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['display_name'] ?: $c['legal_name']) ?></option><?php endforeach; ?></select></div>
     <div><label>What it is called</label><input class="form-control" name="title" maxlength="200" placeholder="e.g. Mutual NDA, Sept 2026"></div>
     <div><label>Signed on</label><input class="form-control" type="date" name="signed_on"></div>

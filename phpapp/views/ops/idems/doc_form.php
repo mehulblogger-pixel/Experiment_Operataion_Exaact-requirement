@@ -75,7 +75,7 @@
 
   <h3 class="tab-sub">Parties &amp; references <span class="muted">— structured entry (Part 18)</span></h3>
   <div class="form-grid">
-    <div class="ff"><label>Client</label>
+    <div class="ff"><label>Client <a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a></label>
       <select class="form-control searchable" name="client_id"><option value="">—</option>
         <?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>" <?= ((int)$v('client_id')===(int)$c['id'])?'selected':'' ?>><?= e($c['nm']) ?></option><?php endforeach; ?>
       </select></div>

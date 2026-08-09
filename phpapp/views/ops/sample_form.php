@@ -39,7 +39,7 @@ $clients = ops_all("SELECT id, COALESCE(display_name, legal_name) nm FROM busine
 
     <div class="ff"><label>Storage location</label><select class="form-control" name="storage_code">
       <option value="">— select —</option><?php $sel($storages, $s['storage_code'] ?? ''); ?></select></div>
-    <div class="ff"><label>Client / owner (optional)</label><select class="form-control" name="partner_id">
+    <div class="ff"><label>Client / owner (optional) <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label><select class="form-control" name="partner_id">
       <option value="">— none —</option>
       <?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>"<?= (int)($s['partner_id'] ?? 0) === (int)$c['id'] ? ' selected' : '' ?>><?= e($c['nm']) ?></option><?php endforeach; ?>
     </select></div>

@@ -37,7 +37,7 @@ $sbadge = ['REQUESTED' => 'AMBER', 'CONSENTED' => 'GREEN', 'DECLINED' => 'RED', 
   <h3 style="margin-top:0"><?= $ed ? 'Edit entry' : 'Record a disclosure &amp; its consent' ?></h3>
   <form method="post" action="<?= $ed ? '/disclosure-edit?id=' . (int)$ed['id'] : '/disclosure-new' ?>" class="settings-form">
     <div class="form-grid">
-      <div class="ff"><label>Client</label><select class="form-control" name="partner_id">
+      <div class="ff"><label>Client <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label><select class="form-control" name="partner_id">
         <option value="">— select —</option>
         <?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>"<?= (int)($ed['partner_id'] ?? 0) === (int)$c['id'] ? ' selected' : '' ?>><?= e($c['nm']) ?></option><?php endforeach; ?>
       </select></div>
