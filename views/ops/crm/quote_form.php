@@ -374,6 +374,28 @@
     }
     lbody.appendChild(tr); wireLoc(tr); refreshLocPickers();
   }
+  // Fill a site row's address from a picked vendor/address. A field is only
+  // overwritten when it is empty or still holds what a previous auto-fill put
+  // there — so switching the vendor updates the address, but anything typed by
+  // hand is kept.
+  function fillRowAddress(tr, addr, contact){
+    var af = tr._autofill || {};
+    function put(name, val){
+      var el = tr.querySelector('[name="'+name+'"]'); if (!el) return;
+      val = val || '';
+      if (el.value === '' || el.value === (af[name] || '')) el.value = val;
+      af[name] = val;
+    }
+    if (addr){
+      put('loc_line1[]', addr.line1); put('loc_line2[]', addr.line2);
+      put('loc_city[]', addr.city);   put('loc_state[]', addr.state);
+      put('loc_pin[]', addr.pincode);
+      var cty = tr.querySelector('[name="loc_country[]"]'); if (cty && addr.country) cty.value = addr.country;
+    }
+    if (contact){ put('loc_contact[]', contact.name); put('loc_mobile[]', contact.mobile); }
+    tr._autofill = af;
+    refreshLocPickers();
+  }
   function wireLoc(tr){
     var rm = tr.querySelector('.locrm');
     if (rm) rm.addEventListener('click', function(){
@@ -390,7 +412,13 @@
       if (vsel.value) {
         var nm = vsel.options[vsel.selectedIndex].text;
         if (lab && !lab.value) lab.value = nm;
-        if (ty && (ty.value === 'SITE' || ty.value === '')) ty.value = 'WORKS';
+        if (ty && (ty.value === 'SITE' || ty.value === 'TBD' || ty.value === '')) ty.value = 'WORKS';
+        // items 1 & 3 — pull the vendor's registered address so the site details
+        // fill themselves instead of being copied by hand.
+        fetch('/partner-address?id=' + encodeURIComponent(vsel.value))
+          .then(function(r){ return r.json(); })
+          .then(function(d){ fillRowAddress(tr, d.address, d.contact); })
+          .catch(function(){});
       }
       refreshLocPickers();
     });
