@@ -57,6 +57,54 @@
       <input class="form-control" type="number" min="0" name="credit_days" value="<?= e((string)($p['credit_days'] ?? '')) ?>"
              placeholder="e.g. 45"></div>
     <div class="ff ff-wide"><label>Description</label><input class="form-control" name="description" value="<?= e($p['description'] ?? '') ?>"></div>
+
+    <?php // Site location for geofenced attendance — so an inspection engineer's
+          // punch-in can be checked against the real site and a spoofed / fake-GPS
+          // location is rejected. Optional: leave blank to keep the geofence off.
+    ?>
+    <div class="ff ff-wide" style="border-top:1px solid var(--line,#e5e7eb);padding-top:10px;margin-top:4px">
+      <label>📍 Site location <span class="muted">— for geofenced attendance; stops an inspector punching in on a fake GPS. Leave blank to switch it off.</span></label>
+      <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px">
+        <div><span class="lab">Latitude</span><input class="form-control" type="number" step="any" id="site_lat" name="site_lat" placeholder="e.g. 23.0225" value="<?= e((string)($p['site_lat'] ?? '')) ?>"></div>
+        <div><span class="lab">Longitude</span><input class="form-control" type="number" step="any" id="site_lon" name="site_lon" placeholder="e.g. 72.5714" value="<?= e((string)($p['site_lon'] ?? '')) ?>"></div>
+        <div><span class="lab">Allowed radius (metres)</span><input class="form-control" type="number" min="0" id="geofence_m" name="geofence_m" placeholder="e.g. 150" value="<?= e((string)($p['geofence_m'] ?? '') ?: '') ?>"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">
+        <button type="button" class="btn secondary" id="geo_here">Use this device's current location</button>
+        <input class="form-control" id="geo_paste" placeholder="…or paste a Google Maps link or “23.0225, 72.5714”" style="flex:1;min-width:220px">
+        <button type="button" class="btn secondary" id="geo_paste_btn">Read coordinates</button>
+        <span class="muted" id="geo_msg"></span>
+      </div>
+    </div>
+    <script>
+    (function(){
+      var lat=document.getElementById('site_lat'), lon=document.getElementById('site_lon'),
+          msg=document.getElementById('geo_msg');
+      function say(t){ if(msg) msg.textContent=t||''; }
+      var here=document.getElementById('geo_here');
+      if(here) here.addEventListener('click',function(){
+        if(!navigator.geolocation){ say('This browser has no location support.'); return; }
+        say('Locating…');
+        navigator.geolocation.getCurrentPosition(function(pos){
+          lat.value=pos.coords.latitude.toFixed(7); lon.value=pos.coords.longitude.toFixed(7);
+          say('Set from this device (±'+Math.round(pos.coords.accuracy)+' m). Stand at the site for the best fix.');
+        }, function(){ say('Could not read location — allow it in the browser, and use HTTPS.'); }, {enableHighAccuracy:true, timeout:10000});
+      });
+      var pb=document.getElementById('geo_paste_btn'), pbox=document.getElementById('geo_paste');
+      function parse(s){
+        if(!s) return null;
+        var m=s.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || s.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/)
+            || s.match(/(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/);
+        return m ? {la:parseFloat(m[1]), lo:parseFloat(m[2])} : null;
+      }
+      if(pb) pb.addEventListener('click',function(){
+        var c=parse(pbox.value||'');
+        if(!c){ say('Could not find coordinates in that text.'); return; }
+        lat.value=c.la.toFixed(7); lon.value=c.lo.toFixed(7); say('Coordinates read.');
+      });
+    })();
+    </script>
+
     <?php $selInsp = ($p && !empty($p['inspection_types'])) ? explode(',', $p['inspection_types']) : []; ?>
     <div class="ff ff-wide"><label>Types of inspection this client needs <span class="muted">— carried into new calls</span></label>
       <div class="checkgrid">
