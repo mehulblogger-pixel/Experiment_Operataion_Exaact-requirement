@@ -115,7 +115,7 @@
       <select class="form-control searchable" name="person_id"><option value="">— the body as a whole —</option>
         <?php foreach ($inspectors as $i): ?><option value="<?= (int)$i['id'] ?>" <?= $sel===(int)$i['id']?'selected':'' ?>><?= e($i['name']) ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff"><label>Which party</label>
+    <div class="ff"><label>Which party <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
       <select class="form-control searchable" name="partner_id"><option value="">— any client —</option>
         <?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e(pname($c)) ?></option><?php endforeach; ?>
       </select>

@@ -19,7 +19,7 @@
   <div class="form-grid">
     <div class="ff"><label>Manufacturer / vendor</label>
       <select class="form-control searchable" name="vendor_id"><option value="">—</option><?php foreach ($vendors as $c): ?><option value="<?= (int)$c['id'] ?>" <?= ($e && (int)$e['vendor_id']===(int)$c['id'])?'selected':'' ?>><?= e($c['nm']) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Client</label>
+    <div class="ff"><label>Client <a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a></label>
       <select class="form-control searchable" name="client_id"><option value="">—</option><?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>" <?= ($e && (int)$e['client_id']===(int)$c['id'])?'selected':'' ?>><?= e($c['nm']) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Linked inspection report</label>
       <select class="form-control searchable" name="report_doc_id"><option value="">—</option><?php foreach ($reports as $r): ?><option value="<?= (int)$r['id'] ?>" <?= ($e && (int)$e['report_doc_id']===(int)$r['id'])?'selected':'' ?>><?= e($r['irn']) ?></option><?php endforeach; ?></select></div>

@@ -5,7 +5,7 @@
 
 <form method="post" action="/satisfaction-new" class="settings-form">
   <div class="form-grid">
-    <div class="ff" style="grid-column:1/-1"><label><?= e(T('client')) ?> *</label>
+    <div class="ff" style="grid-column:1/-1"><label><?= e(T('client')) ?> * <a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a></label>
       <select class="form-control" name="client_id" required>
         <option value="">— choose —</option>
         <?php foreach ($clients as $c): $nm = trim((string)($c['display_name'] ?? '')) ?: (string)($c['legal_name'] ?? ''); ?>

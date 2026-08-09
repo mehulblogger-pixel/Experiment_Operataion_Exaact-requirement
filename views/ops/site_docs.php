@@ -56,7 +56,7 @@
 <form method="post" action="/site-docs-add" class="panel" style="margin-top:16px;max-width:820px">
   <h3 style="margin-top:0">Add a requirement</h3>
   <div class="form-grid" style="gap:12px 16px">
-    <div><label>Client</label>
+    <div><label>Client <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
       <select class="form-control" name="partner_id" required>
         <option value="">— choose —</option>
         <?php foreach ($clients as $c): ?>
