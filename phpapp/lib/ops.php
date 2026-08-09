@@ -2203,7 +2203,8 @@ function ops_dispatch($route, $method) {
         case $route === 'complaints' || $route === 'complaint' || strncmp($route, 'complaint-', 10) === 0:
             return ops_complaints($route, $method);
         case $route === 'evidence-review' || $route === 'evidence-reviewed'
-             || $route === 'site-checkin' || $route === 'checkin-photo' || $route === 'checkin-settings':
+             || $route === 'site-checkin' || $route === 'checkin-photo' || $route === 'checkin-settings'
+             || $route === 'punch':
             return ops_trust($route, $method);
         case $route === 'portal-users' || $route === 'portal-user-toggle'
              || $route === 'portal-user-reinvite' || $route === 'portal-settings'

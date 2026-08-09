@@ -460,6 +460,10 @@
         <a class="tb-logout" href="/logout">Logout</a>
       </span>
     </header>
+    <?php // Web-first punch bar: a field engineer punches in/out for today from
+          // the very top of the app on any device — no Android app, no job screen.
+          // Renders to nothing for anyone who is not a field engineer. ?>
+    <?php if (function_exists('punch_bar')) echo punch_bar(); ?>
     <main class="container">
 <?php // A role that has been told to use two-step sign-in but has not set it up
       // is nudged on every screen. Not locked out — an inspector who cannot reach

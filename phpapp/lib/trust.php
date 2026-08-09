@@ -236,10 +236,28 @@ function site_visit_latest($jobId) {
     return $v ? end($v) : null;
 }
 
-function site_checkin($jobId, $post, $file = null) {
+function site_checkin($jobId, $post, $file = null, $actorInspectorId = 0) {
     $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$jobId]);
     if (!$job) return 'That ' . Tl('job') . ' could not be found.';
     $kind = isset(VISIT_KINDS[$post['kind'] ?? '']) ? $post['kind'] : 'ENTRY';
+    // Who is actually punching. On a job with different engineers on different
+    // days, the person tapping the button — not the job's main inspector — is
+    // the one stamped, so the day's attendance is against the right name.
+    $actor = (int)$actorInspectorId ?: (int)($job['inspector_id'] ?? 0);
+    // One arrival and one departure PER CALENDAR DAY: once punched out, that day
+    // is closed for this person. "While on site" stays repeatable. This is what
+    // makes the punch final for that particular day.
+    if (($kind === 'ENTRY' || $kind === 'EXIT') && $actor) {
+        $st = punch_state((int)$jobId, $actor, date('Y-m-d'));
+        if ($kind === 'ENTRY' && $st['in'])
+            return 'You already punched in for this ' . Tl('job') . ' today at '
+                 . substr((string)$st['in']['at'], 11, 5) . '. A day has one arrival.';
+        if ($kind === 'EXIT' && !$st['in'])
+            return 'Punch in first — no arrival is recorded for this ' . Tl('job') . ' today.';
+        if ($kind === 'EXIT' && $st['out'])
+            return 'You already punched out for this ' . Tl('job') . ' today at '
+                 . substr((string)$st['out']['at'], 11, 5) . '. The day is closed.';
+    }
     // A photograph may be required, and when it is, it has to be a real one.
     $bytes = ($file && ($file['tmp_name'] ?? '') !== '' && is_uploaded_file($file['tmp_name']))
         ? (string)file_get_contents($file['tmp_name']) : '';
@@ -276,7 +294,7 @@ function site_checkin($jobId, $post, $file = null) {
     db()->prepare("INSERT INTO site_visits (job_id,inspector_id,kind,lat,lon,accuracy,device_at,at,clock_skew,flags,note,
                    photo_name,photo_mime,photo_data,photo_sha1,by_user,ip,created_at)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-        ->execute([(int)$jobId, $job['inspector_id'] ?: null, $kind, $g['lat'], $g['lon'], $g['acc'],
+        ->execute([(int)$jobId, $actor ?: ($job['inspector_id'] ?: null), $kind, $g['lat'], $g['lon'], $g['acc'],
                    $deviceAt, date('c'), $skew, implode(',', $flags),
                    substr(trim((string)($post['note'] ?? '')), 0, 400),
                    $bytes !== '' ? substr((string)($file['name'] ?? 'checkin.jpg'), 0, 255) : '',
@@ -329,6 +347,174 @@ function site_visit_window($jobId) {
     $mins = ($in && $out && $in['at'] && $out['at'])
         ? (int)round((strtotime($out['at']) - strtotime($in['at'])) / 60) : null;
     return ['in' => $in, 'out' => $out, 'minutes' => $mins];
+}
+
+// ============================================================================
+//  Today's punch — a web-first, one-tap check-in/out on the dashboard
+//
+//  The field engineer opens the app on any phone or laptop and punches in when
+//  they reach the site and out when they leave — from a bar at the top of the
+//  application, without opening a job screen. No Android app needed: the camera
+//  and the GPS come from the browser. The geofence (Settings → Evidence &
+//  check-in) applies to BOTH the in and the out. One arrival + one departure
+//  per day, so a day, once punched out, is closed.
+// ============================================================================
+
+// The inspector identity of the signed-in user, or 0 if they are not one.
+function punch_user_inspector_id() {
+    $u = function_exists('current_user') ? current_user() : null;
+    return $u ? (int)($u['inspector_id'] ?? 0) : 0;
+}
+
+// This person's arrival / departure for a job on a given day (default today).
+function punch_state($jobId, $inspectorId, $day = null) {
+    $day = $day ?: date('Y-m-d');
+    $in = null; $out = null;
+    foreach (site_visits($jobId) as $v) {
+        if ((int)($v['inspector_id'] ?? 0) !== (int)$inspectorId) continue;
+        if (substr((string)$v['at'], 0, 10) !== $day) continue;
+        $k = $v['kind'] ?? 'ENTRY';
+        if ($k === 'ENTRY') $in = $v;
+        elseif ($k === 'EXIT') $out = $v;
+    }
+    return ['in' => $in, 'out' => $out,
+            'status' => $out ? 'DONE' : ($in ? 'ON_SITE' : 'OUT'),
+            'next'   => $out ? '' : ($in ? 'EXIT' : 'ENTRY')];
+}
+
+// The open deputations this inspector is due on a given day — whether they are
+// the job's main engineer, or assigned that day through the per-day plan.
+function punch_today_jobs($inspectorId = 0, $day = null) {
+    $inspectorId = $inspectorId ?: punch_user_inspector_id();
+    if (!$inspectorId) return [];
+    $day = $day ?: date('Y-m-d');
+    $seen = []; $out = [];
+    $add = function ($j) use (&$seen, &$out) { if (empty($seen[$j['id']])) { $seen[$j['id']] = true; $out[] = $j; } };
+    $sel = "j.*, c.call_code, bp.legal_name client_name, bp.display_name client_disp";
+    try {
+        foreach (ops_all("SELECT $sel FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
+                          LEFT JOIN business_partners bp ON bp.id=c.client_id
+                          WHERE j.inspector_id=? AND COALESCE(j.closed_flag,0)=0", [$inspectorId]) as $j) {
+            $dates = function_exists('job_call_required_dates') ? job_call_required_dates($j, []) : [];
+            if (in_array($day, $dates, true)) $add($j);
+        }
+    } catch (Throwable $e) {}
+    // Days handed to me through the per-day plan on a job somebody else leads.
+    try {
+        foreach (ops_all("SELECT $sel FROM job_visits v JOIN jobs j ON j.id=v.job_id
+                          LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
+                          WHERE v.inspector_id=? AND v.visit_date=? AND COALESCE(j.closed_flag,0)=0",
+                         [$inspectorId, $day]) as $j) $add($j);
+    } catch (Throwable $e) {}
+    return $out;
+}
+
+// The bar rendered at the top of every page for a field engineer. Self-contained
+// (its own form, styles inline, and script), so it can be dropped into the
+// layout without touching anything else.
+function punch_bar() {
+    if (!function_exists('site_checkin')) return '';
+    $insp = punch_user_inspector_id();
+    if (!$insp) return '';
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $today = date('Y-m-d');
+    $jobs = punch_today_jobs($insp, $today);
+    $photoReq = function_exists('geofence_photo_required') ? geofence_photo_required()
+              : (function_exists('checkin_photo_required') && checkin_photo_required());
+    $fenceOn = function_exists('geofence_on') && geofence_on();
+    $back = (string)($_SERVER['REQUEST_URI'] ?? '/');
+    if ($back === '' || $back[0] !== '/') $back = '/';
+    $csrf = function_exists('csrf_token') ? csrf_token() : '';
+
+    ob_start();
+    if (!$jobs) {
+        echo '<div class="punchbar pb-none">🟢 <span>No site visit scheduled for you today.'
+           . ' When you are due on site, punch-in appears here.</span></div>';
+        return ob_get_clean();
+    }
+    // Options carry each job's today-state, so the status line and the buttons
+    // update the instant a different job is picked, with no round-trip.
+    $opts = '';
+    $first = null;
+    foreach ($jobs as $j) {
+        $st = punch_state((int)$j['id'], $insp, $today);
+        $nm = ($j['client_disp'] ?: $j['client_name'] ?: $j['job_code']);
+        $label = $j['job_code'] . ' · ' . $nm;
+        if ($first === null) $first = $st;
+        $opts .= '<option value="' . (int)$j['id'] . '"'
+              . ' data-status="' . $e($st['status']) . '"'
+              . ' data-in="' . $e($st['in']['at'] ?? '') . '"'
+              . ' data-out="' . $e($st['out']['at'] ?? '') . '">' . $e($label) . '</option>';
+    }
+    ?>
+    <div class="punchbar" id="punchBar">
+      <form method="post" action="/punch" enctype="multipart/form-data" id="punchForm" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;width:100%">
+        <input type="hidden" name="_csrf" value="<?= $e($csrf) ?>">
+        <input type="hidden" name="return" value="<?= $e($back) ?>">
+        <input type="hidden" name="kind" id="pbKind" value="ENTRY">
+        <input type="hidden" name="gps" id="pbGps">
+        <input type="hidden" name="device_at" id="pbAt">
+        <span class="pb-badge" id="pbBadge">●</span>
+        <span class="pb-label">On site today:</span>
+        <?php if (count($jobs) > 1): ?>
+          <select class="form-control" name="job_id" id="pbJob" style="max-width:280px"><?= $opts ?></select>
+        <?php else: ?>
+          <input type="hidden" name="job_id" id="pbJob" value="<?= (int)$jobs[0]['id'] ?>">
+          <span class="pb-job"><?= $e($jobs[0]['job_code'] . ' · ' . ($jobs[0]['client_disp'] ?: $jobs[0]['client_name'])) ?></span>
+        <?php endif; ?>
+        <span class="pb-status" id="pbStatus"></span>
+        <?php if ($photoReq): ?>
+          <label class="pb-photo">📷 <input type="file" name="photo" accept="image/*" capture="environment" style="max-width:150px"></label>
+        <?php endif; ?>
+        <button class="btn small" type="button" id="pbIn">📍 Punch in</button>
+        <button class="btn small secondary" type="button" id="pbOut">🏁 Punch out</button>
+        <span class="pb-msg muted" id="pbMsg"></span>
+      </form>
+    </div>
+    <?php // Data for the JS: the single-job state when there is no picker. ?>
+    <script>
+    (function(){
+      var bar=document.getElementById('punchBar'); if(!bar) return;
+      var job=document.getElementById('pbJob'), status=document.getElementById('pbStatus'),
+          badge=document.getElementById('pbBadge'), bIn=document.getElementById('pbIn'),
+          bOut=document.getElementById('pbOut'), msg=document.getElementById('pbMsg'),
+          kind=document.getElementById('pbKind'), form=document.getElementById('pbForm')||document.getElementById('punchForm');
+      var single = <?= count($jobs) > 1 ? 'null' : json_encode(['status'=>$first['status'] ?? 'OUT','in'=>$first['in']['at'] ?? '','out'=>$first['out']['at'] ?? '']) ?>;
+      function state(){
+        if (job && job.tagName === 'SELECT') {
+          var o=job.options[job.selectedIndex];
+          return {status:o.getAttribute('data-status'), in:o.getAttribute('data-in'), out:o.getAttribute('data-out')};
+        }
+        return single || {status:'OUT', in:'', out:''};
+      }
+      function hm(s){ return s ? s.substr(11,5) : ''; }
+      function render(){
+        var s=state();
+        if (s.status==='DONE'){ badge.style.color='#8a8f98'; status.innerHTML='<b>Done for today</b> — in '+hm(s.in)+', out '+hm(s.out);
+          bIn.disabled=true; bOut.disabled=true; bIn.style.opacity=bOut.style.opacity=.5; }
+        else if (s.status==='ON_SITE'){ badge.style.color='#2ecc71'; status.innerHTML='<b>On site</b> since '+hm(s.in);
+          bIn.disabled=true; bIn.style.opacity=.5; bOut.disabled=false; bOut.style.opacity=1; }
+        else { badge.style.color='#e0a800'; status.innerHTML='Not punched in yet';
+          bOut.disabled=true; bOut.style.opacity=.5; bIn.disabled=false; bIn.style.opacity=1; }
+      }
+      if (job && job.tagName==='SELECT') job.addEventListener('change', render);
+      render();
+      function punch(k){
+        if(!navigator.geolocation){ msg.textContent='This browser cannot give a location.'; return; }
+        kind.value=k; bIn.disabled=bOut.disabled=true; msg.textContent='Getting your location…';
+        navigator.geolocation.getCurrentPosition(function(p){
+          document.getElementById('pbGps').value=[p.coords.latitude,p.coords.longitude,p.coords.accuracy].join(',');
+          document.getElementById('pbAt').value=new Date().toISOString();
+          form.submit();
+        }, function(err){ render(); msg.textContent='No location: '+((err&&err.message)||'permission refused')+'.'; },
+        {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+      }
+      bIn.addEventListener('click', function(){ punch('ENTRY'); });
+      bOut.addEventListener('click', function(){ punch('EXIT'); });
+    })();
+    </script>
+    <?php
+    return ob_get_clean();
 }
 
 // Coordinates a real fix never produces: whole degrees, or two decimals, which
@@ -651,6 +837,23 @@ function ops_trust($route, $method) {
         flash($why !== '' ? $why : 'Checked in. That is a fact recorded on site, at the time — which is what the '
             . 'photographs are later compared against.', $why !== '' ? 'error' : 'success');
         redirect('/job?id=' . $jobId);
+    }
+    // The top-of-app quick punch: the signed-in engineer punches in/out for one
+    // of TODAY'S deputations, then lands back where they were.
+    if ($route === 'punch' && $method === 'POST') {
+        $back = (string)($_POST['return'] ?? '/');
+        if ($back === '' || $back[0] !== '/') $back = '/';
+        $insp = punch_user_inspector_id();
+        if (!$insp) { flash('Only a field ' . Tl('engineer') . ' can punch in or out.', 'error'); redirect($back); }
+        $jobId = (int)($_POST['job_id'] ?? 0);
+        $mine = false;
+        foreach (punch_today_jobs($insp) as $j) if ((int)$j['id'] === $jobId) { $mine = true; break; }
+        if (!$mine) { flash('That is not one of your site visits for today.', 'error'); redirect($back); }
+        $why = site_checkin($jobId, $_POST, $_FILES['photo'] ?? null, $insp);
+        if ($why !== '') { flash($why, 'error'); redirect($back); }
+        $lab = ($_POST['kind'] ?? '') === 'EXIT' ? 'Punched out' : (($_POST['kind'] ?? '') === 'ENTRY' ? 'Punched in' : 'Recorded');
+        flash($lab . ' — recorded on site, at the time. The time is the server\'s; the location is your device fix at the tap.', 'success');
+        redirect($back);
     }
 
     ops_require(trust_can_review(), 'Only somebody who works on reports can open the evidence review.');
