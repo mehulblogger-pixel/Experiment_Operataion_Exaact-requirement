@@ -10,7 +10,7 @@
 
 <div class="panel" style="padding:0;overflow:hidden;margin-top:14px">
   <div class="dt-scroll"><table class="dt">
-    <thead><tr><th>Inspector</th><th>Rating</th><th>Timely reporting</th><th>Inspections done</th><th>Complaints</th></tr></thead>
+    <thead><tr><th>Inspector</th><th>Rating</th><th>Timely reporting</th><th>Inspections done</th><th>Complaints</th><th>Site attendance</th></tr></thead>
     <tbody>
     <?php foreach ($list as $row): $i=$row['inspector']; $r=$row['r']; ?>
       <tr>
@@ -24,9 +24,11 @@
             <span class="muted" style="font-size:12px"><?= (int)$r['done'] ?> of <?= (int)$r['target'] ?> target</span></td>
         <td><?php if ((int)$r['complaints']===0): ?><span class="pill p-ok">none</span>
             <?php else: ?><span class="pill p-bad"><?= (int)$r['complaints'] ?></span> <span class="muted" style="font-size:12px">→ <?= (int)$r['comp_score'] ?>/100</span><?php endif; ?></td>
+        <td><?php if ((int)($r['attend_missing'] ?? 0)===0): ?><span class="pill p-ok">clean</span>
+            <?php else: ?><span class="pill p-bad"><?= (int)$r['attend_missing'] ?> lapse<?= (int)$r['attend_missing']===1?'':'s' ?></span> <span class="muted" style="font-size:12px">→ <?= (int)($r['attend_score'] ?? 100) ?>/100</span><?php endif; ?></td>
       </tr>
     <?php endforeach; ?>
-    <?php if (!$list): ?><tr><td colspan="5" class="muted" style="padding:16px">No active inspectors.</td></tr><?php endif; ?>
+    <?php if (!$list): ?><tr><td colspan="6" class="muted" style="padding:16px">No active inspectors.</td></tr><?php endif; ?>
     </tbody>
   </table></div>
 </div>

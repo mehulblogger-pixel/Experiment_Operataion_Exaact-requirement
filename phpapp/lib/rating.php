@@ -18,6 +18,8 @@ function rating_config() {
         'w_report'    => max(0, $g('rating_w_report', 34)),
         'w_volume'    => max(0, $g('rating_w_volume', 33)),
         'w_complaint' => max(0, $g('rating_w_complaint', 33)),
+        'w_attend'    => max(0, $g('rating_w_attendance', 20)),          // §WO-9 site check-in discipline
+        'att_penalty' => max(1, $g('rating_attendance_penalty', 15)),    // points off per lapse
         'tat_days'    => max(0, $g('rating_tat_days', 3)),        // grace to upload a report after the inspection
         'target_mo'   => max(1, $g('rating_target_month', 8)),    // inspections/month that scores 100 on volume
         'penalty'     => max(1, $g('rating_complaint_penalty', 20)),
@@ -70,6 +72,16 @@ function rating_for($inspectorId, $cfg = null) {
     } catch (Throwable $e) { $complaints = 0; }
     $compScore = max(0, 100 - $complaints * $cfg['penalty']);
 
+    // --- 4. Site attendance — closed jobs where a check-in was missing at close
+    // (a manager had to approve the close). Each lapse costs points.
+    $attMiss = 0;
+    try {
+        $attMiss = (int)ops_val("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND COALESCE(closed_flag,0)=1
+                                 AND COALESCE(attendance_missing,0)=1
+                                 AND substr(COALESCE(closed_at, inspection_end_date, ''),1,10) >= ?", [$inspectorId, $since]);
+    } catch (Throwable $e) { $attMiss = 0; }
+    $attScore = max(0, 100 - $attMiss * $cfg['att_penalty']);
+
     // --- Weighted overall ----------------------------------------------------
     // A component with no data (only reporting can be null) drops out of the
     // average so a new inspector is not punished for silence.
@@ -77,6 +89,7 @@ function rating_for($inspectorId, $cfg = null) {
     if ($reportScore !== null) $parts[] = [$cfg['w_report'], $reportScore];
     $parts[] = [$cfg['w_volume'], $volScore];
     $parts[] = [$cfg['w_complaint'], $compScore];
+    $parts[] = [$cfg['w_attend'], $attScore];
     $wsum = array_sum(array_column($parts, 0)) ?: 1;
     $overall = (int)round(array_sum(array_map(fn($p) => $p[0] * $p[1], $parts)) / $wsum);
 
@@ -86,6 +99,7 @@ function rating_for($inspectorId, $cfg = null) {
         'report_score' => $reportScore, 'reportable' => $reportable, 'on_time' => $onTime,
         'volume_score' => $volScore, 'done' => $done, 'target' => $target,
         'comp_score'   => $compScore, 'complaints' => $complaints,
+        'attend_score' => $attScore, 'attend_missing' => $attMiss,
         'months'       => $cfg['months'],
     ];
 }

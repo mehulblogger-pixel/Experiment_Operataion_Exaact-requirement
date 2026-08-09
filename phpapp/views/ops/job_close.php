@@ -14,6 +14,13 @@
 </div>
 <?php endif; ?>
 <form method="post" action="/job-close?id=<?= (int)$job['id'] ?>" class="panel">
+  <?php if (!empty($needAttendanceReason)): // §WO-9 — manager approving a close with a missing site check-in ?>
+  <div class="ff ff-wide" style="margin-bottom:12px;border:1px solid var(--bad);border-radius:8px;padding:12px;background:var(--soft)">
+    <label style="color:var(--bad)">Manager approval — missing <?= e(implode(' and ', $attMiss ?? [])) ?></label>
+    <textarea class="form-control" name="attendance_override_reason" rows="2" required placeholder="Why is the site check-in missing? (e.g. phones not allowed inside the plant)"></textarea>
+    <small class="muted">Recorded on the <?= e(Tl('job')) ?> and counted against the <?= e(Tl('engineer')) ?>'s site-attendance rating.</small>
+  </div>
+  <?php endif; ?>
   <?php if ($missing): ?>
   <div class="ff ff-wide" style="margin-bottom:12px">
     <label>Not incurred on this job <span class="muted">— tick any the client agreed to pay but that did not happen here</span></label>
