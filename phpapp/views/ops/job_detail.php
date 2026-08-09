@@ -360,6 +360,42 @@
   $extraCodes = array_values(array_diff(array_keys($jobDocs), $dlCodes));
   $canWrite = can('mod.idems.edit') || is_master();
 ?>
+<?php // §R1-D — Quality Assurance Plans for this job. A PO may bring one QAP or
+      // many (one per line item). They are attached as-is (usually PDF), never
+      // parsed, and the inspector reads them while writing the report. ?>
+<?php $qaps = $qaps ?? []; $canQap = can('ops.job.edit') || can('mod.idems.edit') || is_master(); ?>
+<div class="panel" id="qaps">
+  <div class="ctitle" style="margin-top:0"><h3>QAP / reference documents <span class="muted">(<?= count($qaps) ?>)</span></h3></div>
+  <p class="muted" style="margin:0 0 10px">The Quality Assurance Plan(s) for this <?= e(Tl('job')) ?> — one or several, per PO line item.
+    The inspector opens them while writing the <?= e(Tl('report')) ?>, and they are kept on record for traceability.</p>
+  <?php if ($qaps): ?>
+  <table class="dt">
+    <thead><tr><th>File</th><th>PO line / item</th><th>Note</th><th>Added</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($qaps as $q): ?>
+      <tr>
+        <td>📄 <a href="/job-qap?id=<?= (int)$q['id'] ?>" target="_blank" rel="noopener"><?= e($q['file_name'] ?: 'QAP') ?></a></td>
+        <td><?= $q['po_line'] ? e($q['po_line']) : '<span class="muted">—</span>' ?></td>
+        <td><?= $q['note'] ? e($q['note']) : '<span class="muted">—</span>' ?></td>
+        <td class="muted" style="white-space:nowrap"><?= e($q['uploaded_at'] ? substr($q['uploaded_at'],0,10) : '') ?><?= $q['uploaded_by'] ? '<br><span class="muted">'.e($q['uploaded_by']).'</span>' : '' ?></td>
+        <td class="num"><?php if ($canQap): ?><form method="post" action="/job-qap-del" style="display:inline" onsubmit="return confirm('Remove this QAP?')"><input type="hidden" name="id" value="<?= (int)$q['id'] ?>"><button class="btn small secondary">✕</button></form><?php endif; ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php else: ?>
+  <p class="muted" style="margin:0 0 10px">No QAP attached yet.</p>
+  <?php endif; ?>
+  <?php if ($canQap): ?>
+  <form method="post" action="/job-qap-upload" enctype="multipart/form-data" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:6px">
+    <input type="hidden" name="job_id" value="<?= (int)$job['id'] ?>">
+    <div class="ff" style="margin:0"><label>QAP file(s) <span class="muted">(PDF or any file)</span></label><input class="form-control" type="file" name="qap[]" multiple required></div>
+    <div class="ff" style="margin:0"><label>PO line / item <span class="muted">(optional)</span></label><input class="form-control" name="po_line" placeholder="e.g. Line 1 — Valves" style="width:200px"></div>
+    <div class="ff" style="margin:0"><label>Note <span class="muted">(optional)</span></label><input class="form-control" name="note" placeholder="e.g. Rev 2" style="width:160px"></div>
+    <button class="btn" type="submit">Attach QAP</button>
+  </form>
+  <?php endif; ?>
+</div>
 <?php // This panel is the ONLY bridge from a deputation into the report engine.
       // It used to render only when deliverables had been ticked on the call —
       // so if the coordinator missed that tick, the engineer had no route to the

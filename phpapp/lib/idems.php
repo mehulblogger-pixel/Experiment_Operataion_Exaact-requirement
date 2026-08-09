@@ -145,6 +145,14 @@ function idems_migrate() {
         cond_field VARCHAR(60) DEFAULT '', cond_op VARCHAR(10) DEFAULT '', cond_val VARCHAR(200) DEFAULT '',
         calc_expr VARCHAR(400) DEFAULT '', placeholder VARCHAR(200) DEFAULT '', help VARCHAR(400) DEFAULT '',
         col_span INT DEFAULT 1, table_cols TEXT, sort_order INT DEFAULT 0)");
+    // §R1-D — Quality Assurance Plans filed against a job/call. One PO can carry
+    // several QAPs (one per line item), so this is many-per-job. Stored as-is
+    // (usually a PDF) — NEVER parsed. The inspector sees them while writing the
+    // report and they travel with the report for traceability.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS job_qaps (
+        id $pk, job_id INT, po_line VARCHAR(200) DEFAULT '', file_name VARCHAR(255) DEFAULT '',
+        mime VARCHAR(100) DEFAULT '', data LONGTEXT, note VARCHAR(400) DEFAULT '',
+        uploaded_by VARCHAR(150) DEFAULT '', uploaded_at VARCHAR(30) DEFAULT '')");
     // Evidence / attachments captured against a report's fields (photos, files, signatures).
     $pdo->exec("CREATE TABLE IF NOT EXISTS report_files (
         id $pk, report_doc_id INT, field_key VARCHAR(60) DEFAULT '', kind VARCHAR(20) DEFAULT 'file',
@@ -1009,6 +1017,7 @@ function ops_idems_fill($route, $method) {
     $curStep   = function_exists('idems_current_step') ? idems_current_step($doc['id']) : null;
     view('ops/idems/fill', ['doc'=>$doc, 'sections'=>idems_sections($doc['report_type_id']), 'fields'=>$fields, 'data'=>$data,
         'files'=>idems_doc_files($doc['id']), 'sugg'=>$sugg, 'auto'=>$auto,
+        'qaps'=>(!empty($doc['job_id']) && function_exists('job_qaps')) ? job_qaps($doc['job_id']) : [],
         'approvals'=>$approvals, 'curStep'=>$curStep]);
     return true;
 }
@@ -1171,6 +1180,65 @@ function ops_idems_file($method) {
     if (strpos($data, 'base64,') !== false) $data = base64_decode(substr($data, strpos($data, 'base64,') + 7));
     send_uploaded_file($data, $f['file_name'] ?: 'file', $f['mime'] ?? '');
     return true;
+}
+
+// ===========================================================================
+//  §R1-D  QAP (Quality Assurance Plan) documents attached to a job/call
+//  One or many per PO line item. Attach only — never parsed. Visible to the
+//  inspector while writing, and carried for traceability.
+// ===========================================================================
+// QAPs on a job (metadata only — no file bytes).
+function job_qaps($jobId) {
+    return ops_all("SELECT id, job_id, po_line, file_name, mime, note, uploaded_by, uploaded_at
+                    FROM job_qaps WHERE job_id=? ORDER BY id", [(int)$jobId]);
+}
+// Upload one or more QAP files against a job.
+function ops_job_qap_upload($method) {
+    $jobId = (int)($_POST['job_id'] ?? $_GET['job_id'] ?? 0);
+    $j = $jobId ? ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]) : null;
+    if (!$j) { flash('Job not found.', 'error'); redirect('/jobs'); }
+    ops_require((function_exists('can') && (can('ops.job.edit') || can('idems.report.write'))) || (function_exists('is_master') && is_master()),
+        'You cannot attach QAP documents.');
+    if ($method !== 'POST') redirect('/job?id=' . $jobId);
+    $poLine = trim($_POST['po_line'] ?? '');
+    $note   = trim($_POST['note'] ?? '');
+    $names = $_FILES['qap']['name'] ?? [];
+    if (!is_array($names)) { $names = [$names]; $_FILES['qap']['tmp_name'] = [$_FILES['qap']['tmp_name']]; $_FILES['qap']['type'] = [$_FILES['qap']['type'] ?? '']; }
+    $n = 0; $skipped = [];
+    $ins = db()->prepare("INSERT INTO job_qaps (job_id,po_line,file_name,mime,data,note,uploaded_by,uploaded_at) VALUES (?,?,?,?,?,?,?,?)");
+    foreach ($names as $i => $nm) {
+        if ($nm === '' || empty($_FILES['qap']['tmp_name'][$i])) continue;
+        $bytes = file_get_contents($_FILES['qap']['tmp_name'][$i]);
+        if ($bytes === false) { $skipped[] = $nm . ' (unreadable)'; continue; }
+        if (strlen($bytes) > 16 * 1024 * 1024) { $skipped[] = $nm . ' (over 16 MB)'; continue; }
+        $mime = $_FILES['qap']['type'][$i] ?: 'application/octet-stream';
+        $ins->execute([$jobId, $poLine, substr($nm, 0, 255), $mime,
+            'data:' . $mime . ';base64,' . base64_encode($bytes), $note,
+            function_exists('user_name') ? user_name(current_user()) : '', date('c')]);
+        $n++;
+    }
+    flash($n ? ($n . ' QAP file(s) attached.' . ($skipped ? ' Skipped: ' . implode(', ', $skipped) : ''))
+             : ('Nothing uploaded.' . ($skipped ? ' Skipped: ' . implode(', ', $skipped) : '')), $n ? 'success' : 'error');
+    redirect('/job?id=' . $jobId);
+}
+// Stream a QAP file (inline so the inspector can read it while writing).
+function ops_job_qap_download() {
+    $f = ops_one("SELECT * FROM job_qaps WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+    if (!$f) { http_response_code(404); echo 'Not found'; return true; }
+    $data = (string)$f['data'];
+    if (strpos($data, 'base64,') !== false) $data = base64_decode(substr($data, strpos($data, 'base64,') + 7));
+    send_uploaded_file($data, $f['file_name'] ?: 'qap', $f['mime'] ?? '');
+    return true;
+}
+// Remove a QAP file from a job.
+function ops_job_qap_del($method) {
+    $f = ops_one("SELECT * FROM job_qaps WHERE id=?", [(int)($_POST['id'] ?? 0)]);
+    if (!$f) { flash('QAP not found.', 'error'); redirect('/jobs'); }
+    ops_require((function_exists('can') && can('ops.job.edit')) || (function_exists('is_master') && is_master()),
+        'You cannot remove QAP documents.');
+    db()->prepare("DELETE FROM job_qaps WHERE id=?")->execute([(int)$f['id']]);
+    flash('QAP removed.');
+    redirect('/job?id=' . (int)$f['job_id']);
 }
 
 // ===========================================================================

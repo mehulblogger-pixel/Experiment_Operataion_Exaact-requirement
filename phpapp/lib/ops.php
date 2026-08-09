@@ -2023,7 +2023,7 @@ function ops_module_gate($route) {
     $base = (strncmp($route, 'm/', 2) === 0) ? 'masters' : $route;
     static $map = [
         'calls'=>'calls','call'=>'calls','call-new'=>'calls','call-edit'=>'calls','call-delete'=>'calls',
-        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-bill'=>'invoicing','job-advance'=>'jobs','job-reassign'=>'jobs','job-visit-close'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
+        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-bill'=>'invoicing','job-advance'=>'jobs','job-reassign'=>'jobs','job-visit-close'=>'jobs','job-qap-upload'=>'jobs','job-qap'=>'jobs','job-qap-del'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
         'bill-add'=>'jobs','bill-delete'=>'jobs','bill-file'=>'jobs',
         'invoicing'=>'invoicing',
         'tally'=>'invoicing','tally-export'=>'invoicing','tally-settings'=>'invoicing','tally-undo'=>'invoicing',
@@ -2211,6 +2211,10 @@ function ops_dispatch($route, $method) {
             ops_calls($route, $method); return true;
         case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-bill' || $route === 'job-advance' || $route === 'job-reassign' || $route === 'job-visit-close' || $route === 'expense-delete':
             ops_jobs($route, $method); return true;
+        // §R1-D — QAP documents on a job (attach only, never parsed).
+        case $route === 'job-qap-upload':   return ops_job_qap_upload($method);
+        case $route === 'job-qap':          return ops_job_qap_download();
+        case $route === 'job-qap-del':      return ops_job_qap_del($method);
         // Bills backing the expenses the client is being charged for.
         case $route === 'bill-add' || $route === 'bill-delete' || $route === 'bill-file':
             return ops_job_bill($route, $method);
@@ -4865,6 +4869,7 @@ function ops_jobs($route, $method) {
             'vendorInfo'=>$jcall ? partner_full($jcall['vendor_id']) : null,
             'visitPlan'=>$visitPlan, 'inspectors'=>inspectors_list(),
             'booksInvoices'=>function_exists('books_invoices_for_job') ? books_invoices_for_job($job['id']) : [],
+            'qaps'=>function_exists('job_qaps') ? job_qaps($job['id']) : [],
             'quoteDocs'=>function_exists('quote_docs_for_job') ? quote_docs_for_job($job['id']) : []]);
         return;
     }

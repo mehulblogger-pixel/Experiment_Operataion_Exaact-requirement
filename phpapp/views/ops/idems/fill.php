@@ -157,6 +157,20 @@
 </div>
 <?php endif; ?>
 
+<?php // §R1-D — the QAP(s) for this job, so the inspector can read them while
+      // writing the report without leaving the screen. Read-only here. ?>
+<?php $qaps = $qaps ?? []; if ($qaps): ?>
+<div class="panel" style="border-left:3px solid var(--brand);background:var(--soft);margin-bottom:14px">
+  <div class="ctitle" style="margin-top:0"><h3 style="margin:0">📋 QAP for this <?= e(Tl('job')) ?> <span class="muted">(<?= count($qaps) ?>)</span></h3></div>
+  <p class="sub" style="margin:2px 0 8px">Open the Quality Assurance Plan while you write — the method, acceptance criteria and hold points to inspect against.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <?php foreach ($qaps as $q): ?>
+      <a class="btn small secondary" href="/job-qap?id=<?= (int)$q['id'] ?>" target="_blank" rel="noopener" title="<?= e($q['note'] ?: '') ?>">📄 <?= e($q['po_line'] ? $q['po_line'].' — ' : '') ?><?= e($q['file_name'] ?: 'QAP') ?></a>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <?php if (!$fields): ?>
   <div class="panel"><p class="muted">No form has been designed for this report type yet. An administrator can design it under <a href="/report-builder?type=<?= (int)$doc['report_type_id'] ?>">Form builder</a>.</p></div>
 <?php else: ?>
