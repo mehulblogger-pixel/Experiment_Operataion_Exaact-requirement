@@ -33,6 +33,29 @@ bucket)**, no errors. Suite 459/459.
 
 ---
 
+## Module 6 — IDEMS report engine (tamper-evidence — proven cryptographically)
+
+The inspection-report engine's headline promise is that an issued report and its
+history **can't be quietly altered**. Tested the mechanism itself.
+
+**✅ Hash-chained audit trail holds:** every logged action is sealed with
+`sha256(previous_seal | this_row's_content)`, so the entries form a chain. Wrote
+sealed entries through a report lifecycle (CREATE → SUBMIT → FINALIZE); the app's
+own `idems_audit_verify()` reported **16 checked, 0 broken — chain intact**.
+
+**✅ Tampering is detected:** silently edited one sealed row's value (as an
+attacker with database access would) → verify immediately flagged it
+(**content mismatch, 1 broken**). Restoring the value made the chain whole again.
+
+So altering or deleting any past audit record is detectable after the fact —
+the legal-defensibility guarantee behind ISO/IEC 17020 reporting actually works.
+
+*(Test-harness note: an early "0 checked" reading was my own fault — the verifier
+calls `ops_all()` and I hadn't loaded that lib into the standalone harness. With
+it loaded, the check runs correctly. No app issue.)*
+
+---
+
 ## Module 3 — CRM / Sales (lead → conversion)
 
 **✅ Lead conversion works:** created a lead ("Bright Future Manufacturing",
