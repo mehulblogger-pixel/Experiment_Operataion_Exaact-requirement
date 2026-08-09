@@ -158,6 +158,43 @@
 </div>
 <?php endif; ?>
 
+<?php // ---- Documents on this lead ------------------------------------------
+      // Any number of files kept against the lead for future reference — the
+      // customer's RFQ, a spec, an e-mail thread. They travel onto the quote
+      // when one is raised from this lead. ?>
+<?php $files = $files ?? []; $fileKinds = $fileKinds ?? []; ?>
+<div class="panel" style="margin-top:16px" id="files">
+  <h3 style="margin-top:0">Documents <span class="muted" style="font-weight:400;font-size:13px">(<?= count($files) ?>)</span></h3>
+  <p class="muted" style="font-size:13px;margin:8px 0 0">Attach the customer's enquiry, specifications, drawings or e-mails — as many as you like, up to 8&nbsp;MB each. They stay on record and are carried onto the quotation raised from this lead.</p>
+  <?php if ($files): ?>
+    <table class="dt" style="margin-top:10px">
+      <thead><tr><th scope="col">File</th><th scope="col">Kind</th><th scope="col">Note</th><th scope="col">Added</th><?php if ($canEdit): ?><th scope="col"></th><?php endif; ?></tr></thead>
+      <tbody>
+      <?php foreach ($files as $f): ?>
+        <tr>
+          <td>📄 <a href="/lead-file?id=<?= (int)$f['id'] ?>"><?= e($f['file_name'] ?: 'file') ?></a></td>
+          <td><span class="pill p-mut"><?= e($fileKinds[$f['kind']] ?? $f['kind']) ?></span></td>
+          <td><?= $f['note'] ? e($f['note']) : '<span class="muted">—</span>' ?></td>
+          <td class="muted" style="white-space:nowrap"><?= e($f['uploaded_at'] ? fdate(substr((string)$f['uploaded_at'],0,10)) : '') ?><?= $f['uploaded_by'] ? '<br><span class="muted" style="font-size:12px">'.e($f['uploaded_by']).'</span>' : '' ?></td>
+          <?php if ($canEdit): ?><td class="num"><form method="post" action="/lead-file-delete?id=<?= (int)$f['id'] ?>" style="display:inline" onsubmit="return confirm('Remove this file?')"><button class="btn small secondary">✕</button></form></td><?php endif; ?>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php else: ?>
+    <p class="muted" style="margin:10px 0 0">No documents yet.</p>
+  <?php endif; ?>
+  <?php if ($canEdit): ?>
+  <form method="post" action="/lead-files?id=<?= (int)$l['id'] ?>" enctype="multipart/form-data" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:12px">
+    <div class="form-sec" style="margin:0"><label style="display:block;font-size:12px" for="lf-file">File(s)</label><input id="lf-file" type="file" name="files[]" multiple required></div>
+    <div class="form-sec" style="margin:0"><label style="display:block;font-size:12px" for="lf-kind">What is it?</label>
+      <select id="lf-kind" name="kind" class="form-control" style="min-width:220px"><?php foreach ($fileKinds as $k=>$lbl): ?><option value="<?= e($k) ?>"<?= $k==='REQUIREMENT'?' selected':'' ?>><?= e($lbl) ?></option><?php endforeach; ?></select></div>
+    <div class="form-sec" style="margin:0"><label style="display:block;font-size:12px" for="lf-note">Note (optional)</label><input id="lf-note" class="form-control" name="note" placeholder="e.g. Rev 2" style="width:180px"></div>
+    <button class="btn" type="submit">Attach</button>
+  </form>
+  <?php endif; ?>
+</div>
+
 <?php // ---- Move it to the next step ---------------------------------------- ?>
 <?php if ($canEdit && $open):
   $fwd = array_values(array_filter($stages, fn($s) => $s['kind']==='OPEN' && (int)$s['id']!==(int)$l['stage_id']));

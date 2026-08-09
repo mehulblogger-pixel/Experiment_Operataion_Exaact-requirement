@@ -76,6 +76,18 @@ const LEAD_SOURCES = [
     'OTHER'      => 'Other',
 ];
 
+// What a file attached to a lead can be. The kinds mirror the quote's, so a
+// document filed against a lead carries the same meaning once the lead becomes
+// a quote and the file travels with it.
+const LEAD_FILE_KINDS = [
+    'REQUIREMENT' => 'Requirement / RFQ from the customer',
+    'ATTACHMENT'  => 'General attachment',
+    'SPEC'        => 'Specification / drawing / QAP',
+    'EMAIL'       => 'E-mail / correspondence',
+    'OTHER'       => 'Other',
+];
+const LEAD_FILE_MAX = 8388608; // 8 MB per file, same ceiling as a quote's files.
+
 function leads_migrate() {
     static $done = false; if ($done) return; $done = true;
     $pdo = db(); $pk = pk_clause();
@@ -115,6 +127,17 @@ function leads_migrate() {
         from_name VARCHAR(120) DEFAULT '', to_name VARCHAR(120) DEFAULT '',
         days_in_previous INT DEFAULT 0,
         moved_by VARCHAR(150) DEFAULT '', moved_at VARCHAR(30) DEFAULT '')");
+    // Documents filed against a lead — the customer's RFQ, a spec, an e-mail
+    // thread. Any number, each up to 8 MB, stored in-row as base64 exactly like
+    // a quote's files. They stay for future reference and travel onto the quote
+    // when one is raised from the lead. `carried_to_quote` stops a file being
+    // copied onto the same quote twice.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS lead_files (
+        id $pk, lead_id INT, kind VARCHAR(20) DEFAULT 'ATTACHMENT',
+        file_name VARCHAR(200) DEFAULT '', mime VARCHAR(100) DEFAULT '', file_data LONGTEXT,
+        note VARCHAR(255) DEFAULT '', carried_to_quote INT DEFAULT 0,
+        uploaded_by VARCHAR(150) DEFAULT '', uploaded_at VARCHAR(30) DEFAULT '')");
+    if (function_exists('act_index')) act_index('lead_files', 'idx_lead_files', '(lead_id)');
     // Preferred way to reach them. A lead you keep ringing who only ever answers
     // on WhatsApp is a lead you are annoying, not chasing. Added on an existing
     // database, so ensure_column, not a schema change nobody would re-run.
@@ -470,6 +493,36 @@ function lead_quotes($leadId) {
     } catch (Throwable $e) { return []; }
 }
 
+// Files on a lead (metadata only — the base64 bytes are never loaded into a list).
+function lead_files($leadId) {
+    try {
+        return ops_all("SELECT id, lead_id, kind, file_name, mime, note, uploaded_by, uploaded_at
+                        FROM lead_files WHERE lead_id=? ORDER BY id", [(int)$leadId]);
+    } catch (Throwable $e) { return []; }
+}
+// Copy a lead's attachments onto a quote raised from it, once each. Called when
+// a quote is created/prefilled from a lead, so the papers stay with the quote
+// for future reference. `carried_to_quote` guards against copying on a revision.
+function lead_files_carry_to_quote($leadId, $quoteId) {
+    if (!$leadId || !$quoteId) return 0;
+    try {
+        $rows = ops_all("SELECT * FROM lead_files WHERE lead_id=? AND carried_to_quote=0", [(int)$leadId]);
+        if (!$rows) return 0;
+        $ins = db()->prepare("INSERT INTO quote_files (quote_id,kind,file_name,mime,file_data,note,share_with_inspector,uploaded_by,uploaded_at) VALUES (?,?,?,?,?,?,?,?,?)");
+        $mk  = db()->prepare("UPDATE lead_files SET carried_to_quote=1 WHERE id=?");
+        $n = 0;
+        foreach ($rows as $f) {
+            // A lead's REQUIREMENT/SPEC map to the quote's CLIENT_DOC/INSP_DOC; the rest stay a general attachment.
+            $qk = $f['kind'] === 'SPEC' ? 'INSP_DOC' : ($f['kind'] === 'REQUIREMENT' ? 'CLIENT_DOC' : 'ATTACHMENT');
+            $note = trim('From lead — ' . ($f['note'] ?: LEAD_FILE_KINDS[$f['kind']] ?? ''));
+            $ins->execute([(int)$quoteId, $qk, $f['file_name'], $f['mime'], $f['file_data'], substr($note, 0, 255), 1, $f['uploaded_by'], date('c')]);
+            $mk->execute([(int)$f['id']]);
+            $n++;
+        }
+        return $n;
+    } catch (Throwable $e) { return 0; }
+}
+
 // Moving a stage is where the rules live.
 function lead_move($leadId, $stageId, array $b = []) {
     $l = lead_row($leadId);
@@ -815,6 +868,8 @@ function ops_leads($route, $method) {
             // Quotations raised straight off this lead. Newest first, so the
             // current offer is at the top.
             'quotes' => lead_quotes((int)$l['id']),
+            // Documents filed against this lead, and the kinds one can be.
+            'files' => lead_files((int)$l['id']), 'fileKinds' => LEAD_FILE_KINDS,
             'canQuote' => function_exists('licence_enabled') && licence_enabled('sales')
                           && (can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes')),
             'methods' => LEAD_CONTACT_METHODS, 'prefMethods' => LEAD_PREF_CONTACT,
@@ -836,7 +891,50 @@ function ops_leads($route, $method) {
         return true;
     }
 
+    // Downloading a lead's file needs only view rights (already checked above).
+    if ($route === 'lead-file') {
+        $f = ops_one("SELECT * FROM lead_files WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$f) { http_response_code(404); echo 'Not found'; return true; }
+        $bin = base64_decode((string)$f['file_data']);
+        header('Content-Type: ' . ($f['mime'] ?: 'application/octet-stream'));
+        header('Content-Disposition: attachment; filename="' . preg_replace('/[^A-Za-z0-9._-]/', '_', $f['file_name']) . '"');
+        header('Content-Length: ' . strlen($bin));
+        echo $bin; return true;
+    }
+
     ops_require($canEdit, 'You cannot change a lead.');
+
+    // ---- Files attached to a lead — the customer's RFQ, specs, correspondence.
+    if ($route === 'lead-files' && $method === 'POST') {
+        $l = lead_row($_GET['id'] ?? 0);
+        if (!$l) { http_response_code(404); view('notfound'); return true; }
+        $kind = in_array($_POST['kind'] ?? '', array_keys(LEAD_FILE_KINDS), true) ? $_POST['kind'] : 'ATTACHMENT';
+        $note = trim($_POST['note'] ?? '');
+        $n = 0; $skipped = [];
+        $files = $_FILES['files'] ?? null;
+        if ($files && is_array($files['tmp_name'])) {
+            foreach ($files['tmp_name'] as $i => $tmp) {
+                if (!$tmp || !is_uploaded_file($tmp)) continue;
+                $size = (int)($files['size'][$i] ?? 0);
+                if ($size <= 0 || $size > LEAD_FILE_MAX) { $skipped[] = $files['name'][$i] . ' (over ' . round(LEAD_FILE_MAX / 1048576) . ' MB)'; continue; }
+                db()->prepare("INSERT INTO lead_files (lead_id,kind,file_name,mime,file_data,note,uploaded_by,uploaded_at) VALUES (?,?,?,?,?,?,?,?)")
+                    ->execute([(int)$l['id'], $kind, substr((string)$files['name'][$i], 0, 200),
+                        (string)($files['type'][$i] ?? ''), base64_encode((string)file_get_contents($tmp)),
+                        $note, user_name(current_user()), date('c')]);
+                $n++;
+            }
+        }
+        if ($n && function_exists('act_log')) act_log('LEAD', (int)$l['id'], 'FILE', $n . ' ' . strtolower(LEAD_FILE_KINDS[$kind]) . ' file(s) attached');
+        flash($n ? ($n . ' file(s) attached.' . ($skipped ? ' Skipped: ' . implode(', ', $skipped) : '')) : ('Nothing uploaded.' . ($skipped ? ' Skipped: ' . implode(', ', $skipped) : '')), $n ? 'success' : 'error');
+        redirect('/lead?id=' . (int)$l['id']);
+    }
+    if ($route === 'lead-file-delete' && $method === 'POST') {
+        $f = ops_one("SELECT * FROM lead_files WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$f) { flash('File not found.', 'error'); redirect('/leads'); }
+        db()->prepare("DELETE FROM lead_files WHERE id=?")->execute([(int)$f['id']]);
+        flash('Attachment removed.');
+        redirect('/lead?id=' . (int)$f['lead_id']);
+    }
 
     if ($route === 'lead-new') {
         if ($method === 'POST') {
