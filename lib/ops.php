@@ -4864,6 +4864,7 @@ function ops_jobs($route, $method) {
             'clientInfo'=>$jcall ? partner_full($jcall['client_id']) : null,
             'vendorInfo'=>$jcall ? partner_full($jcall['vendor_id']) : null,
             'visitPlan'=>$visitPlan, 'inspectors'=>inspectors_list(),
+            'booksInvoices'=>function_exists('books_invoices_for_job') ? books_invoices_for_job($job['id']) : [],
             'quoteDocs'=>function_exists('quote_docs_for_job') ? quote_docs_for_job($job['id']) : []]);
         return;
     }

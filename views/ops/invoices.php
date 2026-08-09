@@ -26,6 +26,12 @@
   <div class="qcard tone-ok"><div class="qic">Σ</div><div class="qn" style="font-size:20px"><?= fmoney_short($c['open_value']) ?></div><div class="ql">Open invoice value</div></div>
 </div>
 
+<?php // §INV-1 — a freshly created invoice is a draft; the default "Open" view hides
+      // drafts, so nudge the user to them instead of it looking like it vanished. ?>
+<?php if ($f === 'open' && (int)($counts['draft'] ?? 0) > 0): ?>
+  <div class="msg msg-warning" style="margin-bottom:10px">You have <b><?= (int)$counts['draft'] ?></b> draft invoice(s) not yet issued —
+    <a href="/invoices?f=draft">review &amp; issue them →</a></div>
+<?php endif; ?>
 <div class="panel" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
   <b style="font-size:13.5px"><?= e($cards[$f]['l'] ?? ucfirst($f)) ?></b>
   <span style="margin-left:auto">
