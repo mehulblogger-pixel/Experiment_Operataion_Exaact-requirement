@@ -665,8 +665,32 @@
       <span class="muted" style="font-size:12.5px;margin-left:6px">Creates the invoice with the amount pre-filled; you review &amp; issue it.</span>
     </form>
   <?php endif; ?>
+  <?php // §INV-1 — the real GST invoices raised against this job, drafts included,
+        // so a raised invoice is visible here at once (not "nothing reflected").
+        $bInv = $booksInvoices ?? [];
+        if ($bInv): ?>
+    <table class="kv" style="margin-bottom:12px">
+      <tr><th>Invoice</th><th>Date</th><th class="num">Total</th><th>Status</th></tr>
+      <?php foreach ($bInv as $bi):
+        $st = (string)$bi['status'];
+        $tone = $st==='PAID'?'p-ok':($st==='DRAFT'?'p-warn':'p-info');
+        $stLbl = defined('INV_STATUS') ? (INV_STATUS[$st] ?? $st) : $st; ?>
+      <tr>
+        <td><a href="/invoice?id=<?= (int)$bi['id'] ?>"><b><?= e($bi['invoice_no'] ?: '(draft)') ?></b></a></td>
+        <td><?= e($bi['invoice_date'] ?: '—') ?></td>
+        <td class="num"><?= e(cur_sym()) ?><?= number_format((float)$bi['total'], 0) ?></td>
+        <td><span class="pill <?= $tone ?>"><?= e($stLbl) ?></span><?php if ($st==='DRAFT'): ?> <a href="/invoice?id=<?= (int)$bi['id'] ?>" class="muted" style="font-size:12px">review &amp; issue →</a><?php endif; ?></td>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+  <?php endif; ?>
   <?php $isInter = ($job['credit_direction'] ?? '') === 'GIVEN'; ?>
-  <form method="post" action="/job-invoice?id=<?= (int)$job['id'] ?>">
+  <?php // The old manual checkbox/number entry, kept for corrections and installs
+        // not using the Money module — tucked away so the real invoice above is the
+        // one thing people look at (§INV-1 "one invoice truth"). ?>
+  <details<?= $bInv ? '' : ' open' ?> style="margin-top:4px">
+    <summary class="muted" style="cursor:pointer;font-size:13px">Manual invoice / payment entry<?= $bInv ? ' (the real invoice is shown above)' : '' ?></summary>
+  <form method="post" action="/job-invoice?id=<?= (int)$job['id'] ?>" style="margin-top:10px">
     <div class="form-grid">
       <div class="ff ff-check"><input type="checkbox" name="invoice_raised" <?= !empty($job['invoice_raised'])?'checked':'' ?>><label>Invoice raised</label></div>
       <div class="ff"><label>Invoice number</label><input class="form-control" name="invoice_number" value="<?= e($job['invoice_number'] ?? '') ?>"></div>
@@ -681,5 +705,6 @@
     <p class="muted" style="margin:4px 2px">For a local client (same contracting &amp; executing office) use invoice + payment. When the executing branch is different, use the inter-office credit received flag.</p>
     <div style="margin-top:8px"><button class="btn small" type="submit">Save invoice / payment</button></div>
   </form>
+  </details>
 </div>
 <?php endif; ?>

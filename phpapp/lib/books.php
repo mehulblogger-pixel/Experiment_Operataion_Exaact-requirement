@@ -501,6 +501,16 @@ function books_job_invoiced($jobId, $exceptInvoice = 0) {
          WHERE l.job_id=? AND i.status <> 'CANCELLED' AND i.id <> ?",
         [(int)$jobId, (int)$exceptInvoice]), 0) > 0;
 }
+// §INV-1 — the real (books) invoices raised against a job, drafts included, so a
+// raised invoice shows on the job at once instead of looking like nothing happened.
+function books_invoices_for_job($jobId) {
+    books_migrate();
+    return books_try(fn() => ops_all(
+        "SELECT DISTINCT i.id, i.invoice_no, i.status, i.total, i.invoice_date
+         FROM invoices i JOIN invoice_lines l ON l.invoice_id=i.id
+         WHERE l.job_id=? AND COALESCE(i.status,'')<>'CANCELLED' ORDER BY i.id DESC",
+        [(int)$jobId]), []);
+}
 
 // What stops an invoice being issued. A list, because telling somebody one
 // problem at a time is how a five-minute job takes half an hour.
