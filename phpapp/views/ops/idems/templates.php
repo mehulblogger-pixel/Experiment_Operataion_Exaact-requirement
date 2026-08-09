@@ -33,7 +33,7 @@
       <div class="form-grid">
         <div class="ff"><label>Report type <span class="muted">(blank = any)</span></label>
           <select class="form-control searchable" name="report_type_id"><option value="">Any</option><?php foreach ($types as $t): ?><option value="<?= (int)$t['id'] ?>" <?= ($edit && (int)$edit['report_type_id']===(int)$t['id'])?'selected':'' ?>><?= e($t['code']) ?> — <?= e($t['name']) ?></option><?php endforeach; ?></select></div>
-        <div class="ff"><label>Client <span class="muted">(blank = any)</span></label>
+        <div class="ff"><label>Client <span class="muted">(blank = any)</span> <a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a></label>
           <select class="form-control searchable" name="client_id"><option value="">Any</option><?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>" <?= ($edit && (int)$edit['client_id']===(int)$c['id'])?'selected':'' ?>><?= e($c['nm']) ?></option><?php endforeach; ?></select></div>
         <div class="ff"><label>Office <span class="muted">(blank = any)</span></label>
           <select class="form-control searchable" name="office_id"><option value="">Any</option><?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ($edit && (int)$edit['office_id']===(int)$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?></select></div>
