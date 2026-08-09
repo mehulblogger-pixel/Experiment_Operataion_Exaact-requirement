@@ -915,3 +915,17 @@ select.form-control{appearance:none;background-image:
   .dt-bulk-ctls .form-control{width:100%}
   .dt-bulk-ctls .bulk-ctl{flex:1 1 100%}
 }
+
+/* ---- Top-of-app punch bar (web-first check-in/out) --------------------- */
+.punchbar{position:sticky;top:0;z-index:25;display:flex;align-items:center;gap:10px;
+  flex-wrap:wrap;padding:8px 16px;background:var(--soft);border-bottom:1px solid var(--line);
+  font-size:14px}
+.punchbar.pb-none{color:var(--muted);font-size:13px}
+.punchbar .pb-badge{font-size:15px;line-height:1}
+.punchbar .pb-label{font-weight:600}
+.punchbar .pb-job,.punchbar .pb-status{font-size:13px}
+.punchbar .pb-status b{color:var(--ink)}
+.punchbar .pb-photo{font-size:13px;display:inline-flex;align-items:center;gap:4px}
+.punchbar .pb-msg{font-size:12.5px}
+.punchbar .btn.small{padding:5px 12px}
+@media(max-width:560px){.punchbar{padding:8px 12px}.punchbar .pb-label{display:none}}
