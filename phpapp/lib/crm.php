@@ -1110,6 +1110,12 @@ function ops_crm_quotes($route, $method) {
                 crm_save_locations($id, $b);
                 crm_save_lines($id, $b); crm_quote_recalc($id);
                 if ($inqId) $pdo->prepare("UPDATE crm_inquiries SET status='QUOTED' WHERE id=?")->execute([$inqId]);
+                // Carry the lead's attachments onto the quote, so the customer's
+                // RFQ, specs and correspondence stay for future reference.
+                if ($leadId && function_exists('lead_files_carry_to_quote')) {
+                    $moved = lead_files_carry_to_quote($leadId, (int)$id);
+                    if ($moved) crm_log_change((int)$id, $moved . ' file(s) carried over from the lead');
+                }
                 flash("$no created."); redirect('/quote?id=' . $id);
             }
         }
