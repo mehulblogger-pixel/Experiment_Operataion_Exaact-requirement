@@ -13,6 +13,26 @@ Legend: ✅ works · 🐞 bug · 🧹 clutter/UX · 👯 duplicate · ⟢ needs 
 
 ---
 
+## 🧹 Declutter done
+
+### D1 — Add/Edit-user permissions grouped like the menu (DONE)
+
+The permissions section was one undivided wall of ~97 tick-boxes (fine-grained
+actions and per-module view/edit all mixed together). It now renders under the
+**same headings as the main navigation** — Sales · Operations · Reporting ·
+Money · Quality & Accreditation · Insights · Directory · Admin — so granting
+access reads like the menu the person will use.
+
+- `lib/access.php` — new `permission_nav_groups()`: every permission (fine-grained
+  **and** each module's view/edit) mapped to its nav area, ordered.
+- `views/ops/user_form.php` — renders a labelled block per group, with an "Other"
+  catch-all so a permission no group claims is still shown, never hidden.
+
+Verified in-browser: all 8 groups render, **all 97 permissions placed (no "Other"
+bucket)**, no errors. Suite 459/459.
+
+---
+
 ## 🐞 Bugs found & fixed
 
 ### B1 — Add-user screen crashed: "Unknown column 'team_role'" (FIXED)

@@ -325,12 +325,35 @@
     })();
   </script>
 
-  <h3 class="tab-sub">Permissions <span class="muted">— leave all unticked to use the role's defaults</span></h3>
-  <div class="checkgrid">
-    <?php foreach ($allowPerms as $k=>$v): ?>
-      <label class="chk"><input type="checkbox" name="permissions[]" value="<?= e($k) ?>" <?= in_array($k, $curPerms, true)?'checked':'' ?>> <?= e($v) ?></label>
-    <?php endforeach; ?>
-  </div>
+  <h3 class="tab-sub">Permissions <span class="muted">— grouped like the menu; leave all unticked to use the role's defaults</span></h3>
+  <?php
+    // Render the permissions under the same headings as the main navigation, so
+    // this reads like the menu instead of one long list. Only permissions this
+    // manager is allowed to grant ($allowPerms) are shown; anything a group does
+    // not claim still appears, under "Other", so nothing is ever hidden.
+    $navGroups = function_exists('permission_nav_groups') ? permission_nav_groups() : [];
+    $shown = [];
+    $hStyle = 'margin:16px 0 6px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#64748b);border-bottom:1px solid var(--line,#e5e7eb);padding-bottom:4px';
+    foreach ($navGroups as $gname => $keys):
+        $inThis = array_values(array_filter($keys, fn($k) => isset($allowPerms[$k])));
+        if (!$inThis) continue;
+        foreach ($inThis as $k) $shown[$k] = true;
+  ?>
+    <div style="<?= $hStyle ?>"><?= e($gname) ?></div>
+    <div class="checkgrid">
+      <?php foreach ($inThis as $k): ?>
+        <label class="chk"><input type="checkbox" name="permissions[]" value="<?= e($k) ?>" <?= in_array($k, $curPerms, true)?'checked':'' ?>> <?= e($allowPerms[$k]) ?></label>
+      <?php endforeach; ?>
+    </div>
+  <?php endforeach; ?>
+  <?php $orphans = array_diff_key($allowPerms, $shown); if ($orphans): ?>
+    <div style="<?= $hStyle ?>">Other</div>
+    <div class="checkgrid">
+      <?php foreach ($orphans as $k=>$v): ?>
+        <label class="chk"><input type="checkbox" name="permissions[]" value="<?= e($k) ?>" <?= in_array($k, $curPerms, true)?'checked':'' ?>> <?= e($v) ?></label>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
 
   <div style="margin-top:16px;">
     <button class="btn" type="submit">Save user</button>
