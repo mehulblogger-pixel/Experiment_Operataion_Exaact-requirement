@@ -144,8 +144,12 @@
     <div class="ff"><label>Currency</label><input class="form-control" name="currency" value="<?= e($g('currency','INR')) ?>"></div>
     <div class="ff"><label>GST %</label><input class="form-control" type="number" step="0.01" id="gst_pct" name="gst_pct" value="<?= e($g('gst_pct','18')) ?>"></div>
 
+    <?php // A plain select on purpose. As a .searchable select the enhancer
+          // replaced it with a text box and hid the real control, so the terms
+          // fetched from the client master were set on the hidden select but the
+          // visible box still read "— select —". The list is short and closed. ?>
     <div class="ff"><label>Payment terms</label>
-      <select class="form-control searchable" name="payment_terms">
+      <select class="form-control" name="payment_terms">
         <option value="">— select —</option>
         <?php $pt = (string)$g('payment_terms'); $known = false;
               foreach ($payTerms as $k=>$v) { if ($pt === $v || $pt === $k) $known = true; } ?>
