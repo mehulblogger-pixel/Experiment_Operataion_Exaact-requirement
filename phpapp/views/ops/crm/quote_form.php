@@ -275,6 +275,19 @@
             var el = document.getElementById(p[0]);
             if (el && !el.value && d.contact && d.contact[p[1]]) el.value = d.contact[p[1]];
           });
+          // Commercials agreed with this customer flow through from the master —
+          // payment terms first — filled only when the field is still empty, so a
+          // one-off change on this quote is never overwritten.
+          if (d.commercials) {
+            var pt = document.querySelector('select[name="payment_terms"]');
+            if (pt && !pt.value && d.commercials.payment_terms) {
+              var want = d.commercials.payment_terms, has = false, i;
+              for (i = 0; i < pt.options.length; i++) { if (pt.options[i].value === want) { has = true; break; } }
+              if (!has) { var o = document.createElement('option'); o.value = want; o.textContent = want + ' (from client)'; pt.appendChild(o); }
+              pt.value = want;
+              pt.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
           if (d.addresses && d.addresses.length) offerAddresses(d.addresses);
         }
         renderHistory(d.history || []);
