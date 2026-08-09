@@ -17,7 +17,7 @@
 
   <h3 class="tab-sub">Parties &amp; references</h3>
   <div class="form-grid">
-    <div class="ff"><label>Manufacturer / vendor</label>
+    <div class="ff"><label>Manufacturer / vendor <a href="#" class="addlink" data-qa="vendor" data-target="select[name='vendor_id']">+ Add new</a></label>
       <select class="form-control searchable" name="vendor_id"><option value="">—</option><?php foreach ($vendors as $c): ?><option value="<?= (int)$c['id'] ?>" <?= ($e && (int)$e['vendor_id']===(int)$c['id'])?'selected':'' ?>><?= e($c['nm']) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Client <a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a></label>
       <select class="form-control searchable" name="client_id"><option value="">—</option><?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>" <?= ($e && (int)$e['client_id']===(int)$c['id'])?'selected':'' ?>><?= e($c['nm']) ?></option><?php endforeach; ?></select></div>
