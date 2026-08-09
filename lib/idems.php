@@ -603,6 +603,9 @@ function ops_idems_documents($route, $method) {
             'approvers'=>ops_all("SELECT id, first_name, last_name, username, role FROM users WHERE is_active=1 ORDER BY first_name, last_name"),
             'offices'=>ops_all("SELECT id, name FROM offices ORDER BY is_ahmedabad DESC, name"),
             'calls'=>ops_all("SELECT c.id, c.call_code, COALESCE(bp.display_name,bp.legal_name) client_nm FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id ORDER BY c.id DESC"),
+            // §R5 — inspector → approver, so the form fills the Approver box the moment
+            // an inspector is chosen (map wins; reporting manager is the fallback).
+            'approverMap'=>idems_approver_map_json(),
             'sbuOpts'=>lk_options_or('sbu', OPS_SBUS)]);
         return true;
     }
@@ -634,7 +637,10 @@ function ops_idems_documents($route, $method) {
         $n = idems_build_approval_chain($doc);
         if ($n === 0) {
             $pdo->prepare("DELETE FROM report_approvals WHERE report_doc_id=?")->execute([$doc['id']]);
-            flash('No approver is assigned for this report. Set the inspector’s approver under Inspection Reports → Approver mapping (or add an approval rule) before submitting.', 'error');
+            $msg = empty($doc['inspector_id'])
+                ? 'This report has no inspector selected, so its approver cannot be worked out. Pick the inspector (and, if needed, the approver) on the report, then submit.'
+                : 'No approver could be resolved for this report. Set this inspector’s approver under Inspection Reports → Approver mapping, or pick an approver directly on the report, then submit.';
+            flash($msg, 'error');
             redirect('/document?id=' . $doc['id']);
         }
         // T10 — a submitted report should carry no blank entries: every text-like
@@ -1149,6 +1155,18 @@ function idems_inspector_approver($inspectorId, $onDate = null) {
     if (!empty($m['temp_user_id']) && $m['temp_from'] && $m['temp_to'] && $onDate >= $m['temp_from'] && $onDate <= $m['temp_to']) return (int)$m['temp_user_id'];
     return !empty($m['approver_user_id']) ? (int)$m['approver_user_id'] : null;
 }
+// §R5 — inspector_id => effective approver user id, for pre-filling the report's
+// Approver box on the form (mapped approver first, reporting manager as fallback).
+function idems_approver_map_json() {
+    $out = [];
+    try {
+        foreach (ops_all("SELECT id FROM inspectors WHERE status='ACTIVE'") as $i) {
+            $a = idems_inspector_approver((int)$i['id']);
+            if ($a) $out[(int)$i['id']] = (int)$a;
+        }
+    } catch (Throwable $e) {}
+    return $out;
+}
 // Resolve a rule/step to a concrete approver user id (null for ROLE / unresolved).
 function idems_resolve_approver($kind, $ruleUserId, $doc) {
     switch ($kind) {
@@ -1186,6 +1204,16 @@ function idems_build_approval_chain($doc) {
         // default: single-level to the inspector's mapped approver (or reporting manager)
         $uid = idems_inspector_approver($doc['inspector_id'] ?? 0, $doc['inspection_date'] ?? null);
         $steps[] = ['level'=>1, 'kind'=>'INSPECTOR_MAP', 'role'=>'', 'user'=>$uid, 'sla'=>24];
+    }
+    // §R5 — if no step resolved to a real person (a rule matched but pointed at
+    // nobody, or the inspector had no map row yet), fall back to the inspector's
+    // mapped approver, then their reporting manager, so a configured approver
+    // always drives the chain instead of the "no approver" refusal.
+    $hasUser = false;
+    foreach ($steps as $s) { if ($s['user'] || $s['role']) { $hasUser = true; break; } }
+    if (!$hasUser) {
+        $fb = idems_inspector_approver($doc['inspector_id'] ?? 0, $doc['inspection_date'] ?? null);
+        if ($fb) $steps = [['level'=>1, 'kind'=>'INSPECTOR_MAP', 'role'=>'', 'user'=>(int)$fb, 'sla'=>24]];
     }
     $actionable = 0;
     $ins = $pdo->prepare("INSERT INTO report_approvals (report_doc_id,level,approver_kind,approver_role,approver_user_id,resolved_user_id,status,sla_due,created_at) VALUES (?,?,?,?,?,?,'PENDING',?,?)");
