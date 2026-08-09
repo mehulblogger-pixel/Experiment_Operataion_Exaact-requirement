@@ -112,6 +112,12 @@ function sched_migrate() {
         id " . pk_clause() . ", job_id INT, visit_date VARCHAR(20),
         inspector_id INT NULL, status VARCHAR(20) DEFAULT 'PLANNED',
         note VARCHAR(255) DEFAULT '')");
+    // §WO-8 — each day of a multi-day job can be closed on its own, and no day is
+    // closed without its report. The completion is recorded per visit.
+    ensure_column('job_visits', 'report_link', "VARCHAR(500) DEFAULT ''");
+    ensure_column('job_visits', 'report_doc_id', 'INT NULL');
+    ensure_column('job_visits', 'closed_by', "VARCHAR(150) DEFAULT ''");
+    ensure_column('job_visits', 'closed_at', "VARCHAR(30) DEFAULT ''");
     // Older records predate the type. Work out what they were from what they
     // carry, so no register row is left blank.
     try {
@@ -587,6 +593,45 @@ function job_visits($jobId) {
                           LEFT JOIN inspectors i ON i.id=v.inspector_id
                           WHERE v.job_id=? ORDER BY v.visit_date", [(int)$jobId]); }
     catch (Throwable $e) { return []; }
+}
+
+// §WO-8 — close one day of a multi-day job. A report (a link or an IDEMS report
+// on the job) is required; without it the day cannot be marked done. Creates the
+// visit row lazily if the schedule was never synced.
+function job_visit_close($jobId, $date, $reportLink = '', $reportDocId = 0) {
+    $jobId = (int)$jobId; $date = substr((string)$date, 0, 10);
+    if (!$jobId || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) return 'That is not a valid visit date.';
+    $reportLink = trim((string)$reportLink);
+    if ($reportLink === '' && !$reportDocId) {
+        // accept an IDEMS report already filed against this job as the evidence
+        try { $reportDocId = (int)ops_val("SELECT id FROM report_docs WHERE job_id=? AND deleted=0 ORDER BY id DESC LIMIT 1", [$jobId]); } catch (Throwable $e) {}
+    }
+    if ($reportLink === '' && !$reportDocId) return 'A report (a link, or an inspection report on this ' . Tl('job') . ') is required before a day can be closed.';
+    $row = ops_one("SELECT * FROM job_visits WHERE job_id=? AND substr(visit_date,1,10)=?", [$jobId, $date]);
+    $me = function_exists('user_name') ? user_name(current_user()) : '';
+    if ($row) {
+        db()->prepare("UPDATE job_visits SET status='DONE', report_link=?, report_doc_id=?, closed_by=?, closed_at=? WHERE id=?")
+            ->execute([$reportLink, $reportDocId ?: null, $me, date('c'), (int)$row['id']]);
+    } else {
+        $insp = (int)ops_val("SELECT inspector_id FROM jobs WHERE id=?", [$jobId]);
+        db()->prepare("INSERT INTO job_visits (job_id,visit_date,inspector_id,status,report_link,report_doc_id,closed_by,closed_at,note) VALUES (?,?,?, 'DONE', ?,?,?,?, '')")
+            ->execute([$jobId, $date, $insp ?: null, $reportLink, $reportDocId ?: null, $me, date('c')]);
+    }
+    return '';
+}
+
+// Working visit days still open — a multi-day job cannot close while any remain.
+function job_visits_open_days($job) {
+    $jobId = (int)($job['id'] ?? 0);
+    $visits = job_visits($jobId);
+    if (count($visits) < 2) return [];                     // single-day handled by the normal close gate
+    $open = [];
+    foreach ($visits as $v) {
+        $d = substr((string)$v['visit_date'], 0, 10);
+        $working = function_exists('is_working_day') ? is_working_day($d, $job['executing_office_id'] ?? null) : true;
+        if ($working && ($v['status'] ?? 'PLANNED') !== 'DONE') $open[] = $d;
+    }
+    return $open;
 }
 
 // ---------------------------------------------------------------------------
