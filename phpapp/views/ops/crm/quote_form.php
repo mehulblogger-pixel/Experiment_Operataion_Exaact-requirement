@@ -28,7 +28,7 @@
 
   <h3 class="tab-sub" style="margin-top:0"><?= e(T('client')) ?> &amp; header</h3>
   <div class="form-grid">
-    <div class="ff"><label><?= e(T('client')) ?></label>
+    <div class="ff"><label><?= e(T('client')) ?> <a href="#" class="addlink" data-qa="client" data-target="#client_id">+ Add new</a></label>
       <select class="form-control searchable" name="client_id" id="client_id"><option value="">— not on file, type the name —</option>
         <?php foreach ($clients as $cl): ?><option value="<?= (int)$cl['id'] ?>" <?= (string)$g('client_id')===(string)$cl['id']?'selected':'' ?>><?= e($cl['display_name'] ?: $cl['legal_name']) ?></option><?php endforeach; ?>
       </select></div>
@@ -87,7 +87,7 @@
   <?php // The manufacturer / vendor whose works are inspected. Chosen here so it
         // carries straight onto the work-order's site dropdown when the quote is won. ?>
   <div class="form-grid">
-    <div class="ff"><label><?= e(T('vendor')) ?> / <?= e(Tl('manufacturer')) ?> site <span class="muted">— carried to the <?= e(Tl('call')) ?></span></label>
+    <div class="ff"><label><?= e(T('vendor')) ?> / <?= e(Tl('manufacturer')) ?> site <a href="#" class="addlink" data-qa="vendor" data-target="select[name=&quot;vendor_id&quot;]">+ Add new</a> <span class="muted">— carried to the <?= e(Tl('call')) ?></span></label>
       <select class="form-control searchable" name="vendor_id"><option value="">— none / decide later —</option>
         <?php foreach (($vendors ?? []) as $vd): ?>
           <option value="<?= (int)$vd['id'] ?>" <?= (string)$g('vendor_id')===(string)$vd['id']?'selected':'' ?>><?= e($vd['display_name'] ?: $vd['legal_name']) ?></option>
