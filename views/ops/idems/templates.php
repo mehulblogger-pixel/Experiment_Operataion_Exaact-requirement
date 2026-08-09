@@ -33,7 +33,7 @@
       <div class="form-grid">
         <div class="ff"><label>Report type <span class="muted">(blank = any)</span></label>
           <select class="form-control searchable" name="report_type_id"><option value="">Any</option><?php foreach ($types as $t): ?><option value="<?= (int)$t['id'] ?>" <?= ($edit && (int)$edit['report_type_id']===(int)$t['id'])?'selected':'' ?>><?= e($t['code']) ?> — <?= e($t['name']) ?></option><?php endforeach; ?></select></div>
-        <div class="ff"><label>Client <span class="muted">(blank = any)</span> <a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a></label>
+        <div class="ff"><label>Client <span class="muted">(blank = company‑wide — every inspector, every client)</span> <a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a></label>
           <select class="form-control searchable" name="client_id"><option value="">Any</option><?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>" <?= ($edit && (int)$edit['client_id']===(int)$c['id'])?'selected':'' ?>><?= e($c['nm']) ?></option><?php endforeach; ?></select></div>
         <div class="ff"><label>Office <span class="muted">(blank = any)</span></label>
           <select class="form-control searchable" name="office_id"><option value="">Any</option><?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ($edit && (int)$edit['office_id']===(int)$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?></select></div>
@@ -48,7 +48,7 @@
       </div>
       <div class="ff"><label>Word template (.docx) <?= $edit && $edit['file_name'] ? '<span class="muted">— current: '.e($edit['file_name']).'</span>' : '' ?></label>
         <input class="form-control" type="file" name="tpl" accept=".docx"></div>
-      <div class="ff ff-check"><input type="checkbox" name="is_default" <?= ($edit && $edit['is_default'])?'checked':'' ?>><label>Prefer this when several match</label></div>
+      <div class="ff ff-check"><input type="checkbox" name="is_default" <?= ($edit && $edit['is_default'])?'checked':'' ?>><label>Company default for this <?= e(Tl('report')) ?> type <span class="muted" style="font-weight:400">— used when no client‑specific format matches</span></label></div>
       <div style="margin-top:10px"><button class="btn" type="submit"><?= $edit ? 'Save template' : 'Add template' ?></button><?php if ($edit): ?> <a class="btn secondary" href="/report-templates">Cancel</a><?php endif; ?></div>
     </form>
   </div>
@@ -73,9 +73,11 @@
       <?php if (!$rows): ?><tr><td colspan="7" class="muted" style="padding:14px">No templates yet. Reports fall back to the built-in PDF.</td></tr><?php endif; ?>
       <?php foreach ($rows as $r): ?>
       <tr>
-        <td><strong><?= e($r['name'] ?: '—') ?></strong><?= $r['is_default'] ? ' <span class="pill p-info" style="padding:0 5px">preferred</span>' : '' ?></td>
+        <td><strong><?= e($r['name'] ?: '—') ?></strong>
+          <?php if (!$r['client_id']): ?> <span class="pill p-ok" style="padding:0 5px" title="Blank client — this format is used for every inspector and every client">Company‑wide</span><?php else: ?> <span class="pill p-info" style="padding:0 5px" title="Only used for this client">Client format</span><?php endif; ?>
+          <?= $r['is_default'] ? ' <span class="pill p-info" style="padding:0 5px" title="Chosen first when several formats match">default</span>' : '' ?></td>
         <td><?= $r['type_code'] ? e($r['type_code']) : '<span class="muted">Any</span>' ?></td>
-        <td><?= $r['client_name'] ? e($r['client_name']) : '<span class="muted">Any</span>' ?></td>
+        <td><?= $r['client_name'] ? e($r['client_name']) : '<span class="muted">Company‑wide</span>' ?></td>
         <td><?= $r['office_name'] ? e($r['office_name']) : '<span class="muted">Any</span>' ?></td>
         <td><?= $r['file_name'] ? '<a href="/report-template-download?id='.(int)$r['id'].'">'.e($r['file_name']).'</a>' : '<span class="muted">none</span>' ?></td>
         <td><?= $r['active'] ? '<span class="pill p-ok">Active</span>' : '<span class="pill p-mut">Off</span>' ?></td>
