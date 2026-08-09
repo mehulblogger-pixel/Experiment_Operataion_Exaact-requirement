@@ -13,6 +13,24 @@
 //  "use my location" button. Distance uses the existing haversine helper.
 // ============================================================================
 
+// Save a client/vendor's site location from the create/edit form. Blank
+// coordinates leave the geofence off for this site (attendance is then not
+// pinned to a spot). A radius with no coordinates is meaningless, so it is only
+// kept when both coordinates are present.
+function partner_save_geofence($pdo, $id, $b) {
+    geofence_migrate();
+    $lat = isset($b['site_lat']) && trim((string)$b['site_lat']) !== '' ? (float)$b['site_lat'] : null;
+    $lon = isset($b['site_lon']) && trim((string)$b['site_lon']) !== '' ? (float)$b['site_lon'] : null;
+    // Out-of-range coordinates are a typo, not a location — drop them rather than
+    // pin attendance to the middle of the ocean.
+    if ($lat === null || $lon === null || $lat < -90 || $lat > 90 || $lon < -180 || $lon > 180) {
+        $lat = null; $lon = null;
+    }
+    $rad = ($lat !== null) ? max(0, (int)($b['geofence_m'] ?? 0)) : 0;
+    $pdo->prepare("UPDATE business_partners SET site_lat=?, site_lon=?, geofence_m=? WHERE id=?")
+        ->execute([$lat, $lon, $rad, (int)$id]);
+}
+
 function geofence_migrate() {
     static $done = false; if ($done) return; $done = true;
     if (!function_exists('ensure_column')) return;

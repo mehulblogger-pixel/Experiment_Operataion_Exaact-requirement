@@ -902,6 +902,7 @@ if ($route === 'partner-new') {
         if (!isset(MANMONTH_BASES[$mmB])) $mmB = '';
         $pdo->prepare("UPDATE business_partners SET manmonth_basis=?, manmonth_min_days=? WHERE id=?")
             ->execute([$mmB, (int)($b['manmonth_min_days'] ?? 0), $id]);
+        partner_save_geofence($pdo, $id, $b);
         custom_save('partner', $id, $b);
         // Whatever sales already knew about this company: the inspections they
         // asked for, the person they were talking to, and the inquiries and
@@ -940,6 +941,7 @@ if ($route === 'partner-edit') {
         if (!isset(MANMONTH_BASES[$mmB])) $mmB = '';
         $pdo->prepare("UPDATE business_partners SET manmonth_basis=?, manmonth_min_days=? WHERE id=?")
             ->execute([$mmB, (int)($b['manmonth_min_days'] ?? 0), $p['id']]);
+        partner_save_geofence($pdo, $p['id'], $b);
         custom_save('partner', $p['id'], $b);
         flash('Updated.');
         redirect("/partner?id={$p['id']}");
