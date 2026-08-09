@@ -883,6 +883,12 @@ if ($route === 'partner-new') {
         if (empty($b['is_client']) && empty($b['is_vendor']) && empty($b['is_subcontractor'])) {
             return view('form', $formVars + ['error' => 'Select at least one role (Client / Vendor / Both).']);
         }
+        // §WO-1 — commercial terms are required for a client (or a client+vendor),
+        // because their invoices carry agreed terms. A vendor-only record needs
+        // none, so adding a vendor while raising a call stays quick.
+        if (!empty($b['is_client']) && trim((string)($b['payment_terms'] ?? '')) === '') {
+            return view('form', $formVars + ['error' => 'Payment terms are required for a ' . Tl('client') . ' (used on their invoices). A vendor-only record does not need them.']);
+        }
         $gstin = clean_gstin($b['gstin'] ?? '');
         $pan = $gstin ? pan_from_gstin($gstin) : '';
         $state = $gstin ? state_from_gstin($gstin) : '';

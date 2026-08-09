@@ -43,17 +43,26 @@
     <?php // A dropdown from the Payment terms master (Masters → Payment term),
           // with the current value kept even if it is a custom one not in the list,
           // and a blank "— none —" so it is optional. Add new terms under Masters. ?>
-    <div class="ff"><label>Payment terms <span class="muted">— carried onto their invoices</span></label>
+    <div class="ff"><label>Payment terms <span id="pt_req" style="color:var(--bad);display:none">*</span><span class="muted">— carried onto their invoices</span></label>
       <?php $ptOpts = function_exists('lk_options_or') ? lk_options_or('payment_term', defined('PAYMENT_TERMS') ? PAYMENT_TERMS : []) : [];
             $ptCur = (string)($p['payment_terms'] ?? ''); ?>
-      <select class="form-control searchable" name="payment_terms">
+      <select class="form-control searchable" name="payment_terms" id="pt_select">
         <option value="">— none —</option>
         <?php $ptSeen = false; foreach ($ptOpts as $k => $lab): $val = (string)$lab; if ($val === $ptCur) $ptSeen = true; ?>
           <option value="<?= e($val) ?>" <?= $val === $ptCur ? 'selected' : '' ?>><?= e($val) ?></option>
         <?php endforeach; ?>
         <?php if ($ptCur !== '' && !$ptSeen): ?><option value="<?= e($ptCur) ?>" selected><?= e($ptCur) ?> (current)</option><?php endif; ?>
       </select>
-      <small class="muted">Add or edit options under <a href="/lookup?key=payment_term">Masters → Payment terms</a>.</small></div>
+      <small class="muted" id="pt_hint">Add or edit options under <a href="/lookup?key=payment_term">Masters → Payment terms</a>.</small></div>
+    <?php // §WO-1 — payment terms are required for a client, optional for a
+          // vendor-only record. Reflect that as the roles are ticked. ?>
+    <script>(function(){
+      var cl=document.querySelector('input[name="is_client"]'), star=document.getElementById('pt_req'), hint=document.getElementById('pt_hint');
+      if(!cl||!star) return;
+      function sync(){ var on=cl.checked; star.style.display=on?'':'none';
+        if(hint) hint.innerHTML = on ? '<b>Required for a '+<?= json_encode(strtolower(function_exists('Tl')?Tl('client'):'client')) ?>+'.</b> ' + 'Add or edit options under <a href="/lookup?key=payment_term">Masters → Payment terms</a>.' : 'Add or edit options under <a href="/lookup?key=payment_term">Masters → Payment terms</a>. Not needed for a vendor-only record.'; }
+      cl.addEventListener('change', sync); sync();
+    })();</script>
     <div class="ff"><label>Credit days <span class="muted">— sets the due date on their invoices</span></label>
       <input class="form-control" type="number" min="0" name="credit_days" value="<?= e((string)($p['credit_days'] ?? '')) ?>"
              placeholder="e.g. 45"></div>
