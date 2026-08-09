@@ -319,9 +319,16 @@ function site_visit_kinds_done($jobId) {
 // confiscated at the gate cannot comply with it, and switching it on for
 // everybody by default would make the software wrong for them on day one.
 function site_visit_close_missing($job) {
-    if (!checkin_entry_exit_required()) return [];
     if (empty($job['inspector_id'])) return [];
     $done = site_visit_kinds_done((int)($job['id'] ?? 0));
+    // Attendance is "expected" for this job when the company requires it, the
+    // site is geofenced, or at least one check-in already exists — i.e. they
+    // started marking attendance, so the pair (arrival AND departure) must be
+    // completed. A job with no attendance in use at all is left alone.
+    $expected = checkin_entry_exit_required()
+        || (float)($job['site_geofence_m'] ?? 0) > 0
+        || !empty($done);
+    if (!$expected) return [];
     $miss = [];
     if (!in_array('ENTRY', $done, true)) $miss[] = 'an arrival check-in';
     if (!in_array('EXIT', $done, true))  $miss[] = 'a departure check-in';
@@ -331,8 +338,17 @@ function site_visit_close_block($job) {
     $miss = site_visit_close_missing($job);
     if (!$miss) return '';
     return 'This ' . Tl('job') . ' is missing ' . implode(' and ', $miss)
-         . '. Your company has asked for both, so a client can be shown that somebody was on site and for how long. '
-         . 'If the plant would not allow it, record why in the note and ask a manager.';
+         . ', so a client cannot be shown that somebody was on site and for how long.';
+}
+// §WO-9 — only a manager may close a job when a site check-in is missing:
+// the operations manager, the branch manager, or this inspector's own reporting
+// manager. The Master Admin always can.
+function can_close_attendance_missing($job) {
+    if (function_exists('is_master') && is_master()) return true;
+    $u = current_user();
+    if (in_array($u['role'] ?? '', ['OPERATION_MANAGER', 'BRANCH_MANAGER', 'ADMIN', 'MASTER_ADMIN'], true)) return true;
+    $rm = (int)ops_val("SELECT reports_to_id FROM inspectors WHERE id=?", [(int)($job['inspector_id'] ?? 0)]);
+    return $rm && $rm === (int)($u['id'] ?? 0);
 }
 
 // Arrival, departure, and how long between them — the pair a client actually

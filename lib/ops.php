@@ -319,6 +319,12 @@ function ops_migrate() {
     ensure_column('jobs', 'inspection_dates', "VARCHAR(600) DEFAULT ''");
     ensure_column('jobs', 'folder_link', "VARCHAR(500) DEFAULT ''");
     ensure_column('jobs', 'contract_number', "VARCHAR(80) DEFAULT ''");
+    // §WO-9 — a job closed without both site check-ins carries the manager's
+    // override on the record, and the lapse feeds the inspector's rating.
+    ensure_column('jobs', 'attendance_missing', 'INT DEFAULT 0');
+    ensure_column('jobs', 'attendance_override_by', "VARCHAR(150) DEFAULT ''");
+    ensure_column('jobs', 'attendance_override_reason', "VARCHAR(400) DEFAULT ''");
+    ensure_column('jobs', 'attendance_override_at', "VARCHAR(30) DEFAULT ''");
     // What the client is charged, and which branch holds the order. Both were
     // only ever on the call, so every figure downstream had to go back and look
     // — and a same-office job, which has no inter-office credit, read as worth
@@ -4669,8 +4675,26 @@ function ops_jobs($route, $method) {
             // by default — a body whose engineers hand their phones in at a
             // refinery gate cannot comply, and shipping it on would make the
             // software wrong for them from the first day.
-            if (function_exists('site_visit_close_block') && ($why = site_visit_close_block($job)) !== '') {
-                view('ops/job_close', ['job'=>$job,'error'=>$why]); return;
+            // §WO-9 — a job cannot be closed if either site check-in (arrival OR
+            // departure) is missing. The inspector/coordinator is stopped; only a
+            // manager may approve the close, must say why, and the lapse dents the
+            // inspector's rating.
+            $attMiss = function_exists('site_visit_close_missing') ? site_visit_close_missing($job) : [];
+            if ($attMiss) {
+                if (!can_close_attendance_missing($job)) {
+                    view('ops/job_close', ['job'=>$job,
+                        'error'=>site_visit_close_block($job) . ' Only a manager (operations, branch, or this ' . Tl('engineer') . '\'s reporting manager) can approve closing it without the check-in.']);
+                    return;
+                }
+                $attReason = trim((string)($b['attendance_override_reason'] ?? ''));
+                if ($attReason === '') {
+                    view('ops/job_close', ['job'=>$job, 'needAttendanceReason'=>true, 'attMiss'=>$attMiss,
+                        'error'=>'Missing ' . implode(' and ', $attMiss) . '. As a manager you may approve this close — enter the reason to proceed. It will be recorded and will affect the ' . Tl('engineer') . '\'s rating.']);
+                    return;
+                }
+                $pdo->prepare("UPDATE jobs SET attendance_missing=1, attendance_override_by=?, attendance_override_reason=?, attendance_override_at=? WHERE id=?")
+                    ->execute([user_name(current_user()), $attReason, date('c'), $job['id']]);
+                $job['attendance_missing'] = 1;
             }
             // collect any configurable (extra) headings into JSON {code:amount}
             $extra = [];
