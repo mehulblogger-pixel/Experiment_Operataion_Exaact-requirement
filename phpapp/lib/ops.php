@@ -4947,6 +4947,48 @@ function ops_check_compoff($jobId) {
 }
 
 // ---- Inspector self-service: my jobs ---------------------------------------
+// §WO-5 — an engineer's day-by-day schedule between two dates, drawn from the
+// per-visit rows (a multi-day job may put them on some days and not others) and,
+// for jobs with no per-visit rows, from the job's own dates. Keyed by date.
+function inspector_date_schedule($insId, $from, $to) {
+    $insId = (int)$insId; $out = []; $covered = [];
+    $add = function ($d, $e) use (&$out) { $d = substr((string)$d, 0, 10); if ($d === '') return; $out[$d][] = $e; };
+    try {
+        foreach (ops_all("SELECT v.visit_date, v.status, j.id job_id, j.job_code, j.closed_flag,
+                          bp.legal_name cl, bp.display_name cld, vp.legal_name site
+                          FROM job_visits v JOIN jobs j ON j.id=v.job_id
+                          LEFT JOIN calls c ON c.id=j.call_id
+                          LEFT JOIN business_partners bp ON bp.id=c.client_id
+                          LEFT JOIN business_partners vp ON vp.id=c.vendor_id
+                          WHERE v.inspector_id=? AND substr(v.visit_date,1,10) BETWEEN ? AND ?
+                          ORDER BY v.visit_date", [$insId, $from, $to]) as $r) {
+            $covered[(int)$r['job_id']] = true;
+            $add($r['visit_date'], ['job_id'=>(int)$r['job_id'], 'code'=>$r['job_code'], 'client'=>$r['cld'] ?: $r['cl'],
+                'site'=>$r['site'], 'done'=>(($r['status'] ?? '') === 'DONE'), 'closed'=>(bool)$r['closed_flag']]);
+        }
+    } catch (Throwable $e) {}
+    try {
+        foreach (ops_all("SELECT j.id, j.job_code, j.scheduled_date, j.inspection_dates, j.closed_flag,
+                          bp.legal_name cl, bp.display_name cld, vp.legal_name site
+                          FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
+                          LEFT JOIN business_partners bp ON bp.id=c.client_id
+                          LEFT JOIN business_partners vp ON vp.id=c.vendor_id
+                          WHERE j.inspector_id=?", [$insId]) as $j) {
+            if (isset($covered[(int)$j['id']])) continue;
+            $dates = array_filter(array_map('trim', explode(',', (string)($j['inspection_dates'] ?? ''))));
+            if (!$dates && trim((string)($j['scheduled_date'] ?? '')) !== '') $dates = [substr((string)$j['scheduled_date'], 0, 10)];
+            foreach ($dates as $d) {
+                $d = substr($d, 0, 10);
+                if ($d < $from || $d > $to) continue;
+                $add($d, ['job_id'=>(int)$j['id'], 'code'=>$j['job_code'], 'client'=>$j['cld'] ?: $j['cl'],
+                    'site'=>$j['site'], 'done'=>false, 'closed'=>(bool)$j['closed_flag']]);
+            }
+        }
+    } catch (Throwable $e) {}
+    ksort($out);
+    return $out;
+}
+
 function ops_my_jobs() {
     $u = current_user();
     $insId = $u['inspector_id'] ?? null;
@@ -4960,7 +5002,14 @@ function ops_my_jobs() {
             FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
             WHERE j.closed_flag=0 ORDER BY j.scheduled_date DESC");
     }
-    view('ops/my_jobs', ['rows' => $rows, 'f' => $_GET['f'] ?? '']);
+    // §WO-5 — month schedule (navigable) for the week/month calendar views.
+    $sched = null; $ym = '';
+    if ($insId) {
+        $ym = preg_match('/^\d{4}-\d{2}$/', (string)($_GET['ym'] ?? '')) ? $_GET['ym'] : date('Y-m');
+        $first = $ym . '-01'; $last = date('Y-m-t', strtotime($first));
+        $sched = inspector_date_schedule($insId, $first, $last);
+    }
+    view('ops/my_jobs', ['rows' => $rows, 'f' => $_GET['f'] ?? '', 'sched' => $sched, 'ym' => $ym]);
 }
 
 // ---- Dashboards / reports (scoped + filtered) ------------------------------
