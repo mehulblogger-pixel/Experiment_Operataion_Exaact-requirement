@@ -835,6 +835,9 @@ function ops_idems_documents($route, $method) {
         idems_snapshot_signatures($doc);   // freeze inspector + approver signatures onto the report
         idems_seal_content($doc['id']);    // freeze a content hash so /verify can prove it is unaltered
         idems_freeze_presentation($doc['id']); // §33 freeze the form schema + company template used, so later edits never change this issued report
+        // Raise hold / witness / review / clearance points from any activity the
+        // inspector dispositioned as such. Never blocks issue.
+        if (function_exists('hwp_derive_from_doc')) { try { hwp_derive_from_doc(ops_one("SELECT * FROM report_docs WHERE id=?", [$doc['id']])); } catch (Throwable $e) {} }
         if (function_exists('act_log'))
             act_log('REPORT', (int)$doc['id'], 'SYSTEM', 'Report ' . $doc['irn'] . ' issued',
                     ['auto' => 1, 'direction' => 'OUT', 'partner_id' => (int)($doc['client_id'] ?? 0) ?: null]);

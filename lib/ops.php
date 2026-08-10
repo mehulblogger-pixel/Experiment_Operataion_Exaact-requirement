@@ -2100,6 +2100,8 @@ function ops_module_gate($route) {
         'confidentiality'=>'confidentiality','conf-undertaking-add'=>'confidentiality','conf-nda-add'=>'confidentiality',
         'conf-breach'=>'confidentiality','conf-breach-add'=>'confidentiality','conf-breach-close'=>'confidentiality',
         'site-docs'=>'identity','site-docs-add'=>'identity','site-docs-delete'=>'identity',
+        'hold-points'=>'hold-points','hw-point-new'=>'hold-points','hw-point-clear'=>'hold-points',
+        'hw-point-waive'=>'hold-points','hw-point-cancel'=>'hold-points','hw-point-reopen'=>'hold-points','hw-point-derive'=>'hold-points',
         'ncr'=>'ncr','ncr-item'=>'ncr','ncr-new'=>'ncr','ncr-contain'=>'ncr','ncr-disposition'=>'ncr',
         'ncr-capa'=>'ncr','ncr-assign'=>'ncr','ncr-close'=>'ncr','ncr-reopen'=>'ncr',
         'capa'=>'capa','capa-item'=>'capa','capa-new'=>'capa','capa-cause'=>'capa','capa-plan'=>'capa',
@@ -2453,6 +2455,8 @@ function ops_dispatch($route, $method) {
             return ops_sitedocs($route, $method);
         case $route === 'ncr' || strncmp($route, 'ncr-', 4) === 0:
             return ops_ncr($route, $method);
+        case $route === 'hold-points' || strncmp($route, 'hw-point', 8) === 0:
+            return ops_hwpoints($route, $method);
         case $route === 'capa' || strncmp($route, 'capa-', 5) === 0:
             return ops_capa($route, $method);
         case $route === 'management-reviews' || $route === 'management-review'
