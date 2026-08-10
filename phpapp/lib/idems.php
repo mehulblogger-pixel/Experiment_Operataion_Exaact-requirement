@@ -1768,13 +1768,31 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
             $k=$f['fkey']; $v=$data[$k] ?? '';
             if ($f['ftype']==='table') {
                 $flushGrid();
-                if (!is_array($v)||!$v) continue; $cols=idems_table_cols($f); $p->needSpace(16);
+                if (!is_array($v)||!$v) continue; $cols=idems_table_cols($f);
+                $cw = $p->contentW()/max(1,count($cols));
+                // The header band is a closure so it can be RE-DRAWN at the top of
+                // every page a long table spills onto (§38 — no headerless
+                // continuation, no cut-off rows).
+                $drawHead = function() use ($p,$ml,$cols,$cw) {
+                    $hy=$p->y; $p->rectFill($ml,$hy,$p->contentW(),12,[235,238,245]); $ci=0;
+                    foreach ($cols as $cl){ $p->y=$hy+3; $p->text($ml+$ci*$cw+2,(string)$cl,8,true,[60,60,60]); $ci++; }
+                    $p->y=$hy+13;
+                };
+                $p->needSpace(34);   // keep the label with its header + a first row
                 $p->text($ml, $f['label'], 9, true, [70,70,70]); $p->gap(11);
-                $cw = $p->contentW()/max(1,count($cols)); $hy=$p->y;
-                $p->rectFill($ml,$hy,$p->contentW(),12,[235,238,245]); $ci=0;
-                foreach ($cols as $cl){ $p->y=$hy+3; $p->text($ml+$ci*$cw+2,(string)$cl,8,true,[60,60,60]); $ci++; }
-                $p->y=$hy+13;
-                foreach ($v as $r){ $r=(array)$r; $p->needSpace(12); $ry=$p->y; $ci=0; foreach($cols as $ck=>$cl){ $p->text($ml+$ci*$cw+2,(string)($r[$ck]??''),8.5); $ci++; } $p->y=$ry+11; $p->lineAt($ml,$p->y,$right,$p->y,[235,235,235]); }
+                $drawHead();
+                foreach ($v as $r){
+                    $r=(array)$r;
+                    // wrap each cell (cap 4 lines) so long text neither overlaps
+                    // the next column nor is silently cut off.
+                    $cells=[]; $lines=1;
+                    foreach ($cols as $ck=>$cl){ $w=$p->wrap((string)($r[$ck]??''),8.5,$cw-4); if(count($w)>4)$w=array_slice($w,0,4); if(!$w)$w=['']; $cells[]=$w; $lines=max($lines,count($w)); }
+                    $rowH=$lines*10+2;
+                    if ($p->needSpace($rowH)) $drawHead();   // spilled to a new page → repeat the header
+                    $ry=$p->y; $ci=0;
+                    foreach ($cells as $w){ for($j=0;$j<count($w);$j++){ $p->y=$ry+$j*10; $p->text($ml+$ci*$cw+2,$w[$j],8.5); } $ci++; }
+                    $p->y=$ry+$rowH; $p->lineAt($ml,$p->y,$right,$p->y,[235,235,235]);
+                }
                 $p->gap(3); continue;
             }
             if (in_array($f['ftype'],['photo','file','signature'],true)) {
