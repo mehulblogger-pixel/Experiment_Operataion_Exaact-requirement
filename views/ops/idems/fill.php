@@ -12,7 +12,7 @@
 
   $sugg = $sugg ?? [];
   $auto = $auto ?? [];
-  $renderField = function($f) use ($data, $filesByField, $condAttr, $sugg, $auto) {
+  $renderField = function($f) use ($data, $filesByField, $condAttr, $sugg, $auto, $doc) {
     $k = $f['fkey']; $val = $data[$k] ?? '';
     $span = (int)$f['col_span'] === 2 ? ' ff-wide' : '';
     $req = $f['required'] ? ' <span style="color:var(--bad)">*</span>' : '';
@@ -22,7 +22,7 @@
     if ($f['ftype'] === 'note')    { echo '<p class="muted" style="grid-column:1/-1"'.$condAttr($f).'>'.e($f['label'] ?: $f['help']).'</p>'; return; }
     echo '<div class="ff'.$span.'" data-fieldwrap="'.e($k).'"'.$condAttr($f).'>';
     echo '<label>'.e($f['label']).$req.$autoTag.'</label>';
-    $opts = idems_field_options($f);
+    $opts = idems_field_options($f, $doc);
     switch ($f['ftype']) {
       case 'textarea':
         echo '<textarea class="form-control ta-improve" id="ta_'.e($k).'" name="f['.e($k).']" data-key="'.e($k).'"'.$reqAttr.' rows="3" placeholder="'.e($f['placeholder']).'">'.e(is_array($val)?'':$val).'</textarea>';
@@ -86,11 +86,14 @@
         $cdefs = idems_table_col_defs($f); $rows = is_array($val)?$val:[];
         echo '<div class="rep-table" data-key="'.e($k).'"><table class="dt"><thead><tr>';
         foreach ($cdefs as $ck=>$d) echo '<th>'.e($d['label']).'</th>'; echo '<th></th></tr></thead><tbody>';
-        $cellInput = function($ck,$d,$cur) use ($k){
+        $cellInput = function($ck,$d,$cur) use ($k,$doc){
             $name = 'tbl['.e($k).'][]['.e($ck).']';
             if ($d['type']==='select') {
+                // A column's options can be a live call source, e.g. call:po_items.
+                $opts = $d['options'];
+                if (count($opts)===1 && strpos((string)$opts[0],'call:')===0) { $opts = array_keys(idems_call_options($doc, substr($opts[0],5))); }
                 $h = '<select class="form-control" name="'.$name.'"><option value=""></option>';
-                foreach ($d['options'] as $o) $h .= '<option value="'.e($o).'" '.((string)$cur===(string)$o?'selected':'').'>'.e($o).'</option>';
+                foreach ($opts as $o) $h .= '<option value="'.e($o).'" '.((string)$cur===(string)$o?'selected':'').'>'.e($o).'</option>';
                 return $h.'</select>';
             }
             if ($d['type']==='textarea') return '<textarea class="form-control" rows="1" name="'.$name.'">'.e($cur).'</textarea>';
