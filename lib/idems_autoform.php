@@ -75,44 +75,83 @@ function autoform_analyze_docx($binary) {
     };
 
     // ---- 1. Tables --------------------------------------------------------
-    // A row of [label][empty] cells becomes label fields; a table whose first
-    // row is all-filled headers and whose remaining rows are empty becomes a
-    // repeatable table.
+    // Real inspection forms mix, inside ONE Word table, a labelled header grid
+    // ("File No:" | "Report No:"), multi-column DATA tables (an 8-column
+    // quantity table, a 6-column instrument-calibration table) and single-line
+    // "Label:" rows. So each table is walked ROW BY ROW rather than classified
+    // as a whole — the old all-or-nothing rule flattened every real table into
+    // stray text fields and lost every column.
+    //
+    //  · A column-title header row (≥2 non-empty cells, none ending in a colon)
+    //    directly followed by one or more fully-empty rows → a repeatable
+    //    {{table.column}} field spanning those columns.
+    //  · A "Label:" cell → an inline field ({{token}} placed after the label).
+    //  · A Label cell whose right-hand neighbour is blank → a field in that
+    //    neighbour cell.
+    $isColonLabel = fn($t) => (bool)preg_match('/[:：]\s*$/u', (string)$t);   // "File No:"
     foreach (iterator_to_array($dom->getElementsByTagNameNS(AF_NS, 'tbl')) as $tbl) {
         $rows = [];
         foreach ($tbl->childNodes as $ch) if ($ch->localName === 'tr') $rows[] = $ch;
         if (!$rows) continue;
         $grid = [];
         foreach ($rows as $ri => $tr) { $grid[$ri] = []; foreach ($tr->childNodes as $c) if ($c->localName === 'tc') $grid[$ri][] = $c; }
-        $ncols = max(array_map('count', $grid));
+        $nrows = count($grid);
+        $txtOf = fn($cells) => array_map('autoform_text', $cells);
+        $nonEmptyCount = fn($vals) => count(array_filter($vals, fn($v) => $v !== ''));
 
-        // Heuristic B: header + empty body → repeatable table
-        $headerFull = count($grid[0]) >= 2;
-        foreach ($grid[0] as $c) if (autoform_text($c) === '') $headerFull = false;
-        $bodyEmpty = count($rows) >= 2;
-        for ($ri = 1; $ri < count($rows); $ri++) foreach ($grid[$ri] as $c) if (autoform_text($c) !== '') $bodyEmpty = false;
-        if ($headerFull && $bodyEmpty && $ncols >= 2) {
-            $tkey = $mkkey(autoform_text($grid[0][0]) . ' table');
-            $cols = [];
-            foreach ($grid[0] as $c) { $lbl = autoform_text($c) ?: 'Column'; $ck = idems_clean_key($lbl) ?: ('c' . (count($cols) + 1)); $cols[$ck] = $lbl; }
-            // tokenise the FIRST body row: {{tkey.colkey}} in each cell (engine repeats it)
-            $ci = 0;
-            foreach ($cols as $ck => $lbl) { if (isset($grid[1][$ci])) autoform_put_token($dom, $grid[1][$ci], $tkey . '.' . $ck); $ci++; }
-            $plan[] = ['key' => $tkey, 'label' => idems_label_from_key($tkey), 'type' => 'table', 'kind' => 'table', 'cols' => $cols];
-            continue;
-        }
+        $ri = 0;
+        while ($ri < $nrows) {
+            $cells = $grid[$ri];
+            $vals  = $txtOf($cells);
 
-        // Heuristic A: label|value (and label|value|label|value) pairs
-        foreach ($grid as $cells) {
-            for ($i = 0; $i + 1 < count($cells); $i += 2) {
-                $lbl = autoform_label(autoform_text($cells[$i]));
-                $valEmpty = autoform_text($cells[$i + 1]) === '';
-                if ($lbl !== '' && $valEmpty) {
-                    $key = $mkkey($lbl);
-                    autoform_put_token($dom, $cells[$i + 1], $key);
-                    $addField($lbl, $key);
+            // -- Data table: a column-title header (≥2 titles, no trailing colon)
+            //    followed by ≥1 fully-empty row → repeatable multi-column table.
+            $isHeader = count($cells) >= 2 && $nonEmptyCount($vals) >= 2;
+            if ($isHeader) foreach ($vals as $v) if ($v !== '' && $isColonLabel($v)) { $isHeader = false; break; }
+            $emptyRun = 0;
+            if ($isHeader) {
+                for ($rj = $ri + 1; $rj < $nrows; $rj++) {
+                    if ($nonEmptyCount($txtOf($grid[$rj])) === 0) $emptyRun++; else break;
                 }
             }
+            if ($isHeader && $emptyRun >= 1) {
+                $tkey = $mkkey(autoform_text($cells[0]) . ' table');
+                $cols = []; $seen = [];
+                foreach ($cells as $c) {
+                    $lbl = autoform_text($c) ?: 'Column';
+                    $ck = idems_clean_key($lbl) ?: ('c' . (count($cols) + 1));
+                    $b = $ck; $x = 2; while (isset($seen[$ck])) { $ck = $b . '_' . $x; $x++; }
+                    $seen[$ck] = 1; $cols[$ck] = $lbl;
+                }
+                // tokenise the FIRST empty row: {{tkey.colkey}} per cell; the fill
+                // engine repeats that row once per data row entered.
+                $bodyRow = $grid[$ri + 1]; $ci = 0;
+                foreach ($cols as $ck => $lbl) { if (isset($bodyRow[$ci])) autoform_put_token($dom, $bodyRow[$ci], $tkey . '.' . $ck); $ci++; }
+                $plan[] = ['key' => $tkey, 'label' => idems_label_from_key($tkey), 'type' => 'table', 'kind' => 'table', 'cols' => $cols];
+                $ri += 1 + $emptyRun;
+                continue;
+            }
+
+            // -- Otherwise: label cells (inline "Label:" or Label|blank pairs). --
+            $handled = [];
+            for ($i = 0; $i < count($cells); $i++) {
+                if (isset($handled[$i]) || $vals[$i] === '') continue;
+                if ($isColonLabel($vals[$i])) {                       // "File No:" → inline token
+                    $lbl = autoform_label($vals[$i]); if ($lbl === '') continue;
+                    $key = $mkkey($lbl);
+                    autoform_put_token($dom, $cells[$i], $key);
+                    $addField($lbl, $key);
+                } else {                                             // Label | (blank value cell)
+                    $lbl = autoform_label($vals[$i]);
+                    if ($lbl !== '' && isset($cells[$i + 1]) && $vals[$i + 1] === '') {
+                        $key = $mkkey($lbl);
+                        autoform_put_token($dom, $cells[$i + 1], $key);
+                        $addField($lbl, $key);
+                        $handled[$i + 1] = 1;
+                    }
+                }
+            }
+            $ri++;
         }
     }
 
