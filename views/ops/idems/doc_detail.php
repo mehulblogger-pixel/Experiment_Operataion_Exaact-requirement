@@ -46,6 +46,8 @@
           $fmtLabel = $yourFmt ? ((int)($yourFmt['client_id'] ?? 0) ? 'client format' : 'company format') : ''; ?>
     <?php if ($yourFmt): ?>
       <a class="btn" href="/document-docx?id=<?= (int)$doc['id'] ?>">📄 Report — your format <span class="muted" style="font-weight:400">(<?= e($fmtLabel) ?>)</span></a>
+    <?php else: ?>
+      <a class="btn secondary" href="/document-docx?id=<?= (int)$doc['id'] ?>" title="Editable Word document built from this report's layout">📝 Word (.docx)</a>
     <?php endif; ?>
     <?php if (empty($doc['finalized'])): ?>
       <a class="btn <?= $yourFmt ? 'secondary' : '' ?>" href="/document-pdf?id=<?= (int)$doc['id'] ?>" target="_blank">📄 <?= $yourFmt ? 'Plain PDF' : 'Draft PDF (watermarked)' ?></a>
