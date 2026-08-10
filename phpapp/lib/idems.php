@@ -196,6 +196,16 @@ function idems_migrate() {
         file_name VARCHAR(200) DEFAULT '', file_data LONGTEXT,
         document_number VARCHAR(80) DEFAULT '', format_number VARCHAR(80) DEFAULT '', doc_revision VARCHAR(40) DEFAULT '', issue_date VARCHAR(20) DEFAULT '',
         active INT DEFAULT 1, is_default INT DEFAULT 0, created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // §32 — template version & lifecycle (draft → published → superseded/archived).
+    // Existing templates default to PUBLISHED so nothing that worked stops working.
+    if (function_exists('ensure_column')) {
+        ensure_column('report_templates', 'status', "VARCHAR(20) DEFAULT 'PUBLISHED'");
+        ensure_column('report_templates', 'version', 'INT DEFAULT 1');
+        ensure_column('report_templates', 'effective_date', "VARCHAR(20) DEFAULT ''");
+        ensure_column('report_templates', 'superseded_by', 'INT NULL');
+        ensure_column('report_templates', 'published_at', "VARCHAR(30) DEFAULT ''");
+        ensure_column('report_templates', 'published_by', "VARCHAR(150) DEFAULT ''");
+    }
     // ---- Phase 6: manufacturer document verification & endorsement ----
     $pdo->exec("CREATE TABLE IF NOT EXISTS endorsements (
         id $pk, endorsement_no VARCHAR(120), doc_type VARCHAR(20) DEFAULT 'MTC', title VARCHAR(255) DEFAULT '',
@@ -2121,6 +2131,68 @@ function idems_render_template($doc) {
     }
     return idems_pick_template($doc);
 }
+
+// §32 — template lifecycle.
+const TEMPLATE_STATUS = ['DRAFT'=>'Draft','PUBLISHED'=>'Published','SUPERSEDED'=>'Superseded','ARCHIVED'=>'Archived'];
+function template_status_pill($s) { return ['DRAFT'=>'p-warn','PUBLISHED'=>'p-ok','SUPERSEDED'=>'p-mut','ARCHIVED'=>'p-mut'][$s] ?? 'p-mut'; }
+
+// §59 — validate a template before it is published/relied upon. Returns
+// ['level'=>'PASS'|'WARNING'|'ERROR', 'issues'=>[['level'=>..,'msg'=>..],…]].
+function idems_template_validate($tpl) {
+    $issues = []; $hardErr = false;
+    $add = function($lvl, $msg) use (&$issues, &$hardErr) { $issues[] = ['level'=>$lvl,'msg'=>$msg]; if ($lvl==='ERROR') $hardErr = true; };
+    $data = (string)($tpl['file_data'] ?? '');
+    if ($data === '') $add('ERROR', 'No Word (.docx) file has been uploaded.');
+    else {
+        $bin = base64_decode($data); $ok = false;
+        if (class_exists('ZipArchive')) {
+            $tmp = tempnam(sys_get_temp_dir(), 'tv'); file_put_contents($tmp, $bin);
+            $z = new ZipArchive(); if ($z->open($tmp) === true) { $ok = $z->getFromName('word/document.xml') !== false; $z->close(); }
+            @unlink($tmp);
+        } else { $ok = strncmp($bin, 'PK', 2) === 0; }
+        if (!$ok) $add('ERROR', 'The uploaded file is not a valid .docx (an old .doc or a corrupt file).');
+    }
+    $typeId = (int)($tpl['report_type_id'] ?? 0);
+    if (!$typeId) $add('WARNING', 'No report type is set — tokens cannot be checked and auto-selection is weaker.');
+    if ($typeId && $data !== '' && !$hardErr) {
+        try {
+            $text = report_docx_plain(base64_decode($data));
+            preg_match_all('/\{\{([a-zA-Z0-9_.]+)\}\}/', $text, $m);
+            $std = idems_type_tokens($typeId);
+            $known = array_flip(array_merge($std['standard'], $std['fields']));
+            $tableKeys = []; foreach ($std['tables'] as $t) { $tableKeys[explode('.', $t)[0]] = 1; }
+            $used = []; $orphans = [];
+            foreach (array_unique($m[1] ?? []) as $tk) {
+                if (strpos($tk, '.') !== false) { [$b,] = explode('.', $tk, 2); $used[$b] = 1; if (!isset($tableKeys[$b])) $orphans[] = $tk; }
+                elseif (isset($known[$tk])) $used[$tk] = 1;
+                else $orphans[] = $tk;
+            }
+            if ($orphans) $add('WARNING', 'Placeholder(s) with no matching field — will stay blank: ' . implode(', ', array_slice(array_unique($orphans), 0, 8)) . (count($orphans) > 8 ? '…' : ''));
+            foreach (idems_fields($typeId) as $f) {
+                if (in_array($f['ftype'], ['heading','note'], true) || empty($f['required'])) continue;
+                if (!isset($used[$f['fkey']])) $add('WARNING', 'Required field “' . $f['label'] . '” has no {{' . $f['fkey'] . '}} in the format.');
+            }
+        } catch (Throwable $e) { $add('WARNING', 'Placeholders could not be read: ' . $e->getMessage()); }
+    }
+    if (trim((string)($tpl['document_number'] ?? '')) === '') $add('WARNING', 'No document-control number is set for this format.');
+    $level = 'PASS'; foreach ($issues as $i) { if ($i['level']==='ERROR') { $level='ERROR'; break; } if ($i['level']==='WARNING') $level='WARNING'; }
+    return ['level'=>$level, 'issues'=>$issues];
+}
+// Publishing a template retires any other active template of the SAME scope
+// (report type + client + office) — that is what "supersede" means (§32).
+function idems_template_supersede_siblings($tpl) {
+    $id = (int)$tpl['id']; $rt = (int)($tpl['report_type_id'] ?? 0); $cl = (int)($tpl['client_id'] ?? 0); $of = (int)($tpl['office_id'] ?? 0);
+    // Filter scope in PHP — a NULL/blank column reads as 0, and this sidesteps
+    // SQLite's affinity mismatch when a COALESCE() expression meets a bound param.
+    $n = 0;
+    foreach (ops_all("SELECT id, report_type_id, client_id, office_id FROM report_templates WHERE active=1 AND id<>?", [$id]) as $s) {
+        if ((int)$s['report_type_id'] === $rt && (int)$s['client_id'] === $cl && (int)$s['office_id'] === $of) {
+            db()->prepare("UPDATE report_templates SET status='SUPERSEDED', active=0, superseded_by=? WHERE id=?")->execute([$id, (int)$s['id']]);
+            $n++;
+        }
+    }
+    return $n;
+}
 // Available token names for a report type (for the reference panel).
 function idems_type_tokens($typeId) {
     $std = ['irn','report_type','title','client','vendor','project','po','drawing','qap_rev','standards','location','inspection_date','issue_date','inspector','approver','result','release','remarks','company','branch','today','doc_number','format_number','doc_revision'];
@@ -2486,6 +2558,20 @@ function ops_idems_templates($route, $method) {
     }
     if ($method === 'POST') {
         if (($_POST['_do'] ?? '') === 'del') { $pdo->prepare("DELETE FROM report_templates WHERE id=?")->execute([(int)($_POST['id'] ?? 0)]); flash('Template removed.'); redirect('/report-templates'); }
+        // §32 — "New version": clone an existing format into a fresh editable DRAFT
+        // with the next version number, so the live one keeps working untouched.
+        if (($_POST['_do'] ?? '') === 'newversion') {
+            $src = ops_one("SELECT * FROM report_templates WHERE id=?", [(int)($_POST['id'] ?? 0)]);
+            if (!$src) { flash('Format not found.', 'error'); redirect('/report-templates'); }
+            $ver = (int)($src['version'] ?? 1) + 1;
+            $pdo->prepare("INSERT INTO report_templates (name,report_type_id,client_id,office_id,file_name,file_data,document_number,format_number,doc_revision,issue_date,is_default,active,status,version,created_by,created_at)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,0,'DRAFT',?,?,?)")
+                ->execute([trim(($src['name'] ?: 'Format').' v'.$ver), $src['report_type_id'], $src['client_id'], $src['office_id'],
+                    $src['file_name'], $src['file_data'], $src['document_number'], $src['format_number'], $src['doc_revision'], $src['issue_date'],
+                    $src['is_default'], $ver, user_name(current_user()), date('c')]);
+            flash('Created version ' . $ver . ' as a draft — edit it, then tick Active to publish (the live version keeps working until you do).');
+            redirect('/report-template-edit?id=' . (int)$pdo->lastInsertId());
+        }
         $id = (int)($_POST['id'] ?? 0);
         $vals = [
             'name'=>trim($_POST['name'] ?? ''), 'report_type_id'=>($_POST['report_type_id'] ?? '')!==''?(int)$_POST['report_type_id']:null,
@@ -2500,14 +2586,35 @@ function ops_idems_templates($route, $method) {
             if ($bytes !== false && strlen($bytes) < 8*1024*1024) { $vals['file_name'] = substr($_FILES['tpl']['name'], 0, 200); $vals['file_data'] = base64_encode($bytes); }
         }
         if ($id) { $set=implode('=?, ',array_keys($vals)).'=?'; $args=array_values($vals); $args[]=$id; $pdo->prepare("UPDATE report_templates SET $set WHERE id=?")->execute($args); }
-        else { $vals2=$vals+['created_by'=>user_name(current_user()),'created_at'=>date('c')]; $cols=array_keys($vals2); $ph=implode(',',array_fill(0,count($cols),'?')); $pdo->prepare("INSERT INTO report_templates (".implode(',',$cols).") VALUES ($ph)")->execute(array_values($vals2)); }
-        flash('Report template saved.'); redirect('/report-templates');
+        else { $vals2=$vals+['created_by'=>user_name(current_user()),'created_at'=>date('c')]; $cols=array_keys($vals2); $ph=implode(',',array_fill(0,count($cols),'?')); $pdo->prepare("INSERT INTO report_templates (".implode(',',$cols).") VALUES ($ph)")->execute(array_values($vals2)); $id=(int)$pdo->lastInsertId(); }
+        // §59 + §32 — validate before it goes live, and record the lifecycle status.
+        $saved = ops_one("SELECT * FROM report_templates WHERE id=?", [$id]);
+        $val = idems_template_validate($saved);
+        $wantActive = !empty($_POST['active']);
+        $extra = []; $note = 'Report template saved.';
+        if ($wantActive && $val['level'] === 'ERROR') {
+            // publish blocked — keep it a draft and tell them what to fix
+            $extra = ['active'=>0, 'status'=>'DRAFT'];
+            $msgs = array_map(fn($i)=>$i['msg'], array_filter($val['issues'], fn($i)=>$i['level']==='ERROR'));
+            flash('Saved as a draft — it cannot be published yet: ' . implode(' ', $msgs), 'error');
+        } else {
+            $status = $wantActive ? 'PUBLISHED' : 'DRAFT';
+            $extra = ['status'=>$status];
+            if ($status === 'PUBLISHED') { $extra['published_at']=date('c'); $extra['published_by']=user_name(current_user()); if (empty($saved['effective_date'])) $extra['effective_date']=date('Y-m-d'); }
+            $warn = array_filter($val['issues'], fn($i)=>$i['level']==='WARNING');
+            $note = ($status==='PUBLISHED'?'Format published.':'Saved as a draft.') . ($warn ? ' ' . count($warn) . ' warning(s) — review under Edit.' : '');
+            flash($note, $warn ? 'warning' : 'success');
+        }
+        if ($extra) { $set=implode('=?, ',array_keys($extra)).'=?'; $a=array_values($extra); $a[]=$id; $pdo->prepare("UPDATE report_templates SET $set WHERE id=?")->execute($a); }
+        // supersede same-scope siblings once this one is live
+        if (($extra['status'] ?? '') === 'PUBLISHED') { $n = idems_template_supersede_siblings(ops_one("SELECT * FROM report_templates WHERE id=?", [$id])); if ($n) flash($n . ' older format(s) of the same scope were superseded.', 'warning'); }
+        redirect('/report-templates');
     }
     $edit = ($route === 'report-template-edit') ? ops_one("SELECT * FROM report_templates WHERE id=?", [(int)($_GET['id'] ?? 0)]) : null;
     $tokRefType = (int)($_GET['tokens'] ?? ($edit['report_type_id'] ?? 0));
     view('ops/idems/templates', [
         'rows'=>ops_all("SELECT t.*, rt.name type_name, rt.code type_code, bp.display_name client_name, o.name office_name FROM report_templates t LEFT JOIN report_types rt ON rt.id=t.report_type_id LEFT JOIN business_partners bp ON bp.id=t.client_id LEFT JOIN offices o ON o.id=t.office_id ORDER BY t.id DESC"),
-        'edit'=>$edit, 'types'=>idems_types(false),
+        'edit'=>$edit, 'validation'=>$edit ? idems_template_validate($edit) : null, 'statusMap'=>TEMPLATE_STATUS, 'types'=>idems_types(false),
         'clients'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 ORDER BY nm"),
         'offices'=>ops_all("SELECT id, name FROM offices ORDER BY name"),
         'tokRefType'=>$tokRefType, 'tokens'=>$tokRefType ? idems_type_tokens($tokRefType) : null,

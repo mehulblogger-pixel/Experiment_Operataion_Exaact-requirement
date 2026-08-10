@@ -28,7 +28,18 @@
   <div>
     <form method="post" action="/report-templates" enctype="multipart/form-data" class="panel">
       <?php if ($edit): ?><input type="hidden" name="id" value="<?= (int)$edit['id'] ?>"><?php endif; ?>
-      <h3 class="tab-sub" style="margin-top:0"><?= $edit ? 'Edit template' : 'Add a template' ?></h3>
+      <h3 class="tab-sub" style="margin-top:0"><?= $edit ? 'Edit template' : 'Add a template' ?>
+        <?php if ($edit): $st=$edit['status'] ?? 'PUBLISHED'; ?><span class="pill <?= e(template_status_pill($st)) ?>" style="padding:0 6px;font-size:11px"><?= e(($statusMap[$st] ?? $st)) ?> · v<?= (int)($edit['version'] ?? 1) ?></span><?php endif; ?></h3>
+      <?php // §59 — validation panel: what will (or won't) work before it goes live.
+        if (!empty($validation)): $lv=$validation['level'];
+          $box=['PASS'=>['var(--ok)','✓ Ready to publish — no problems found.'],'WARNING'=>['var(--warn,#c90)','⚠ Publishable, with warnings:'],'ERROR'=>['var(--bad)','✕ Cannot be published until fixed:']][$lv]; ?>
+        <div class="panel" style="border:1px solid <?= $box[0] ?>;background:color-mix(in srgb,<?= $box[0] ?> 8%,transparent);margin:0 0 12px">
+          <b style="color:<?= $box[0] ?>"><?= e($box[1]) ?></b>
+          <?php if (!empty($validation['issues'])): ?><ul style="margin:6px 0 0;padding-left:18px;font-size:12.5px">
+            <?php foreach ($validation['issues'] as $is): ?><li style="color:<?= $is['level']==='ERROR'?'var(--bad)':'var(--muted)' ?>"><?= e($is['msg']) ?></li><?php endforeach; ?>
+          </ul><?php endif; ?>
+        </div>
+      <?php endif; ?>
       <div class="ff"><label>Name</label><input class="form-control" name="name" value="<?= e($edit['name'] ?? '') ?>" placeholder="e.g. Client A — Inspection Report format"></div>
       <div class="form-grid">
         <div class="ff"><label>Report type <span class="muted">(blank = any)</span></label>
@@ -80,11 +91,12 @@
         <td><?= $r['client_name'] ? e($r['client_name']) : '<span class="muted">Company‑wide</span>' ?></td>
         <td><?= $r['office_name'] ? e($r['office_name']) : '<span class="muted">Any</span>' ?></td>
         <td><?= $r['file_name'] ? '<a href="/report-template-download?id='.(int)$r['id'].'">'.e($r['file_name']).'</a>' : '<span class="muted">none</span>' ?></td>
-        <td><?= $r['active'] ? '<span class="pill p-ok">Active</span>' : '<span class="pill p-mut">Off</span>' ?></td>
+        <td><?php $st=$r['status'] ?? 'PUBLISHED'; ?><span class="pill <?= e(template_status_pill($st)) ?>"><?= e($statusMap[$st] ?? $st) ?></span> <span class="muted" style="font-size:11px">v<?= (int)($r['version'] ?? 1) ?></span></td>
         <td style="white-space:nowrap">
           <?php if ($r['file_data']): ?><a class="btn small secondary" href="/report-template-preview?id=<?= (int)$r['id'] ?>" target="_blank" title="See this format filled with dummy data">👁 Preview</a><?php endif; ?>
           <?php if ($r['file_data'] && $r['report_type_id']): ?><a class="btn small" href="/report-form-from-template?id=<?= (int)$r['id'] ?>" title="Create the form fields from the tokens in this format">🪄 Build form</a><?php endif; ?>
           <a class="btn small secondary" href="/report-template-edit?id=<?= (int)$r['id'] ?>">Edit</a>
+          <?php if ($r['file_data']): ?><form method="post" action="/report-templates" style="display:inline"><input type="hidden" name="_do" value="newversion"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><button class="btn small secondary" title="Clone to a new draft version — the live one keeps working until you publish the new one">＋ New version</button></form><?php endif; ?>
           <form method="post" action="/report-templates" style="display:inline" onsubmit="return confirm('Remove template?')"><input type="hidden" name="_do" value="del"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><button class="btn small secondary">✕</button></form></td>
       </tr>
       <?php endforeach; ?>
