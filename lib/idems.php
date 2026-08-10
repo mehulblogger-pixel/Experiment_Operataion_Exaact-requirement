@@ -942,6 +942,30 @@ function ops_idems_builder($route, $method) {
             flash('Added the “Instruments & calibration” section — a ready table (type, ID, calibrated-on & due dates, NABL traceable Yes/No) with the ISO 17020 disclaimer. Add or reorder more sections around it as you like.');
             redirect('/report-builder?type=' . $typeId);
         }
+        // One click adds the PO items & inspection-quantities section — a
+        // repeatable table the engineer adds one row per PO line item to.
+        // Every quantity column is present so Passed / Failed / Both all work in
+        // one flat table (a table cannot hide columns per row): for Passed fill
+        // Passed Qty, for Failed fill Failed Qty, for Both fill both.
+        if ($do === 'add_po_items') {
+            $title = 'PO items & inspection';
+            $exists = (int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=? AND title=?", [$typeId, $title]);
+            if ($exists) { flash('This report type already has the PO items & inspection section.', 'warning'); redirect('/report-builder?type=' . $typeId); }
+            $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, $title, 'One row per PO line item — ordered vs offered vs passed/failed quantities, with heat and serial numbers for traceability.',
+                    (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $secId = (int)$pdo->lastInsertId();
+            $base = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId]);
+            $cols = "PO / Line Item\nDescription as per PO\nPO Qty|number\nOffered Qty|number\nResult|select|Passed; Failed; Both\nPassed Qty|number\nFailed Qty|number\nBalance Qty|number\nHeat No.\nProduct Sr. No.";
+            if (!(int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey=?", [$typeId, 'po_items'])) {
+                $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span)
+                               VALUES (?,?,?,?,?,?,?,?,2)")
+                    ->execute([$typeId, $secId, 'po_items', 'PO items inspected', 'table', $cols,
+                        'One row per line item. Result = Passed / Failed / Both; for Both fill both Passed Qty and Failed Qty. Balance Qty = ordered − passed to date.', $base]);
+            }
+            flash('Added the “PO items & inspection” section — a ready multi-row table (PO line, description, ordered/offered/passed/failed/balance quantities, heat & serial no.). Tip: change the “Description as per PO” column to a dropdown of the order’s items with call:po_items.');
+            redirect('/report-builder?type=' . $typeId);
+        }
         if ($do === 'section_del') {
             $sid = (int)($_POST['section_id'] ?? 0);
             $pdo->prepare("DELETE FROM report_sections WHERE id=? AND report_type_id=?")->execute([$sid, $typeId]);
@@ -1666,10 +1690,45 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         $fl = $bySec[(int)$s['id']] ?? []; if (!$fl) continue;
         $p->needSpace(20); $p->gap(4);
         if ($s['title']!=='') { $p->line($s['title'], 11, true, 14, $band); }
+        // Short header-style fields (File No, Client, Dates…) render as a clean
+        // TWO-COLUMN grid, like a real inspection form. Paragraphs, tables and
+        // attachments span the full width. §PDF-header-grid
+        $pending = [];
+        $valOf = function($f) use ($data) {
+            $k=$f['fkey']; $v=$data[$k] ?? '';
+            if ($f['ftype']==='multiselect' && is_array($v)) { $o=idems_field_options($f); return implode(', ', array_map(fn($x)=>$o[$x]??$x,$v)); }
+            if (in_array($f['ftype'],['select','radio'],true)) { $o=idems_field_options($f); return (string)($o[$v]??$v); }
+            if ($f['ftype']==='checkbox') return ($v==='1'||$v===1)?'Yes':'No';
+            return is_array($v)?'':(string)$v;
+        };
+        $flushGrid = function() use (&$pending,$p,$ml,$valOf) {
+            if (!$pending) return;
+            $colW=$p->contentW()/2; $lblW=76; $vw=max(40,$colW-$lblW-6);
+            for ($i=0;$i<count($pending);$i+=2) {
+                $L=$pending[$i]; $R=$pending[$i+1]??null;
+                $lv=$p->wrap($valOf($L),8.5,$vw); if(!$lv)$lv=[''];
+                $rv=$R?$p->wrap($valOf($R),8.5,$vw):[]; if($R&&!$rv)$rv=[''];
+                $lines=max(count($lv),count($rv)); $p->needSpace($lines*11+3); $y0=$p->y;
+                $p->y=$y0; $p->text($ml,$L['label'].':',8.5,true,[90,90,90]);
+                for($j=0;$j<count($lv);$j++){ $p->y=$y0+$j*11; $p->text($ml+$lblW,$lv[$j],8.5); }
+                if($R){ $p->y=$y0; $p->text($ml+$colW,$R['label'].':',8.5,true,[90,90,90]);
+                    for($j=0;$j<count($rv);$j++){ $p->y=$y0+$j*11; $p->text($ml+$colW+$lblW,$rv[$j],8.5); } }
+                $p->y=$y0+$lines*11+2;
+            }
+            $pending=[];
+        };
+        $shortTypes=['text','number','date','time','select','radio','checkbox','multiselect','instrument','calc','qr','gps'];
+        $fullLbl = function($f,$v) use ($p,$ml) {
+            $vv=is_array($v)?'':(string)$v; $p->needSpace(12);
+            $p->text($ml,$f['label'].':',8.5,true,[90,90,90]);
+            $wr=$p->wrap($vv,9,$p->contentW()-90); $p->text($ml+88,$wr?$wr[0]:'',9); $p->gap(11);
+            for($i=1;$i<count($wr);$i++){ $p->needSpace(11); $p->text($ml+88,$wr[$i],9); $p->gap(11); }
+        };
         foreach ($fl as $f) {
-            if (in_array($f['ftype'],['heading','note'],true)) { $p->needSpace(12); $p->line($f['label'], 9.5, $f['ftype']==='heading', 12, [80,80,80]); continue; }
+            if (in_array($f['ftype'],['heading','note'],true)) { $flushGrid(); $p->needSpace(12); $p->line($f['label'], 9.5, $f['ftype']==='heading', 12, [80,80,80]); continue; }
             $k=$f['fkey']; $v=$data[$k] ?? '';
             if ($f['ftype']==='table') {
+                $flushGrid();
                 if (!is_array($v)||!$v) continue; $cols=idems_table_cols($f); $p->needSpace(16);
                 $p->text($ml, $f['label'], 9, true, [70,70,70]); $p->gap(11);
                 $cw = $p->contentW()/max(1,count($cols)); $hy=$p->y;
@@ -1680,6 +1739,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                 $p->gap(3); continue;
             }
             if (in_array($f['ftype'],['photo','file','signature'],true)) {
+                $flushGrid();
                 if (empty($filesBy[$k])) continue; $p->needSpace(14);
                 $p->text($ml, $f['label'].':', 9, true, [70,70,70]); $p->gap(11);
                 $imgs = array_filter($filesBy[$k], fn($x)=>strpos($x['mime'],'image/')===0);
@@ -1690,18 +1750,11 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                 foreach ($filesBy[$k] as $fl2) if (strpos($fl2['mime'],'image/')!==0) { $p->text($ml,'• '.$fl2['file_name'],8.5,false,[90,90,90]); $p->gap(10); }
                 continue;
             }
-            $label = $f['label'];
-            if ($f['ftype']==='multiselect' && is_array($v)) { $o=idems_field_options($f); $v=implode(', ', array_map(fn($x)=>$o[$x]??$x,$v)); }
-            elseif (in_array($f['ftype'],['select','radio'],true)) { $o=idems_field_options($f); $v=$o[$v]??$v; }
-            elseif ($f['ftype']==='checkbox') $v=($v==='1'||$v===1)?'Yes':'No';
-            if (is_array($v)) $v='';
-            $p->needSpace(12);
-            $wrapped = $p->wrap((string)$v, 9, $p->contentW()-90);
-            $p->text($ml, $label.':', 8.5, true, [90,90,90]);
-            $p->text($ml+88, $wrapped ? $wrapped[0] : '', 9);
-            $p->gap(11);
-            for ($i=1;$i<count($wrapped);$i++){ $p->needSpace(11); $p->text($ml+88,$wrapped[$i],9); $p->gap(11); }
+            if ($f['ftype']==='textarea') { $flushGrid(); $fullLbl($f,$v); continue; }
+            if (in_array($f['ftype'],$shortTypes,true)) { $pending[]=$f; continue; }
+            $flushGrid(); $fullLbl($f,$v);
         }
+        $flushGrid();
     }
     // remarks
     if (!empty($doc['remarks'])) { $p->gap(4); $p->needSpace(16); $p->line('Remarks', 10, true, 13, $band); foreach ($p->wrap($doc['remarks'],9,$p->contentW()) as $ln2){ $p->needSpace(11); $p->line($ln2,9,false,11); } }
