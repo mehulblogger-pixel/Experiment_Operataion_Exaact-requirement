@@ -1976,10 +1976,10 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     $kv = [
         'Client' => $doc['client_disp'] ?: ($doc['client_name'] ?? ''), 'Vendor / Mfr' => $doc['vendor_disp'] ?: ($doc['vendor_name'] ?? ''),
         'Project' => trim(($doc['project_code'] ?? '').' '.($doc['project_name'] ?? '')), 'PO' => $doc['po_ref'] ?? '',
-        'Drawing' => trim(($doc['drawing_no'] ?? '').' '.($doc['drawing_rev']?'Rev '.$doc['drawing_rev']:'')), 'QAP rev' => $doc['qap_rev'] ?? '',
+        'Drawing' => trim(($doc['drawing_no'] ?? '').' '.(($doc['drawing_rev'] ?? '')?'Rev '.$doc['drawing_rev']:'')), 'QAP rev' => $doc['qap_rev'] ?? '',
         'Standards' => $doc['standards'] ?? '', 'Location' => $doc['location'] ?? '',
         'Inspection date' => $doc['inspection_date'] ?? '', 'Issue date' => $doc['issue_date'] ?? '',
-        'Result' => lk_options_or('inspection_result', IDEMS_RESULTS)[$doc['result']] ?? '', 'Release' => lk_options_or('release_status', IDEMS_RELEASE)[$doc['release_status']] ?? '',
+        'Result' => lk_options_or('inspection_result', IDEMS_RESULTS)[$doc['result'] ?? ''] ?? '', 'Release' => lk_options_or('release_status', IDEMS_RELEASE)[$doc['release_status'] ?? ''] ?? '',
     ];
     $colW = $p->contentW()/2;
     foreach (array_chunk(array_filter($kv, fn($v)=>trim((string)$v)!==''), 2, true) as $pair) {
