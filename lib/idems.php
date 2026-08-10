@@ -911,6 +911,37 @@ function ops_idems_builder($route, $method) {
             flash('Added the ISO 17020 identification & traceability section — every mandatory field is now on this report.');
             redirect('/report-builder?type=' . $typeId);
         }
+        // One click adds the "Instruments & calibration" section the engineer
+        // fills on site — a ready table (Instrument type, ID/serial, calibrated-on
+        // and due dates as date pickers, NABL-traceable Yes/No dropdown) plus the
+        // ISO 17020 traceability disclaimer inline. No hand-building.
+        if ($do === 'add_instruments') {
+            $title = 'Instruments & calibration';
+            $exists = (int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=? AND title=?", [$typeId, $title]);
+            if ($exists) { flash('This report type already has the Instruments & calibration section.', 'warning'); redirect('/report-builder?type=' . $typeId); }
+            $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, $title, 'Instruments used, with calibration validity and traceability — add one row per instrument.',
+                    (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $secId = (int)$pdo->lastInsertId();
+            $base = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId]);
+            // repeatable instrument table — typed columns: two date pickers + a Yes/No dropdown
+            $cols = "Instrument Type\nSr. No. / Identification number\nCalibrated on|date\nCalibrated due date|date\nNABL Traceable|select|Yes; No";
+            if (!(int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey=?", [$typeId, 'instruments'])) {
+                $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span)
+                               VALUES (?,?,?,?,?,?,?,?,2)")
+                    ->execute([$typeId, $secId, 'instruments', 'Instruments used', 'table', $cols,
+                        'Add one row per instrument used during the inspection.', $base]);
+            }
+            // ISO 17020 traceability disclaimer, shown inline under the table (label ≤200 chars).
+            $disc = "All instruments used were within calibration validity. NABL Traceable = Yes means traceable to national / international standards per ISO/IEC 17020. Results apply only to the items inspected.";
+            if (!(int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey=?", [$typeId, 'instruments_disclaimer'])) {
+                $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,sort_order,col_span)
+                               VALUES (?,?,?,?,?,?,2)")
+                    ->execute([$typeId, $secId, 'instruments_disclaimer', $disc, 'note', $base + 10]);
+            }
+            flash('Added the “Instruments & calibration” section — a ready table (type, ID, calibrated-on & due dates, NABL traceable Yes/No) with the ISO 17020 disclaimer. Add or reorder more sections around it as you like.');
+            redirect('/report-builder?type=' . $typeId);
+        }
         if ($do === 'section_del') {
             $sid = (int)($_POST['section_id'] ?? 0);
             $pdo->prepare("DELETE FROM report_sections WHERE id=? AND report_type_id=?")->execute([$sid, $typeId]);
