@@ -23,6 +23,10 @@
       <input type="hidden" name="_do" value="add_instruments">
       <button class="btn secondary" type="submit" title="Adds a ready instrument table — type, ID/serial, calibrated-on &amp; due dates (date pickers), NABL traceable Yes/No — plus the ISO 17020 disclaimer">🔧 Instruments &amp; calibration</button>
     </form>
+    <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline">
+      <input type="hidden" name="_do" value="add_po_items">
+      <button class="btn secondary" type="submit" title="Adds a ready multi-row table: PO line, description, ordered / offered / passed / failed / balance quantities, Result dropdown, heat &amp; serial no.">📦 PO items &amp; quantities</button>
+    </form>
     <a class="btn secondary" href="/report-types">← Report types</a>
   </div>
 </div>
