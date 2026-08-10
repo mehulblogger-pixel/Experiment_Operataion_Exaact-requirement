@@ -63,6 +63,7 @@ const PERMISSIONS = [
     'idems.finalize'      => 'Finalize / issue & lock inspection reports',
     'idems.type.manage'   => 'Manage report types & IRN numbering rules',
     'idems.timestamp.edit'=> 'Edit locked timestamps (Branch App Admin only)',
+    'idems.template.approve'=> 'Document controller — review & approve report formats before they go live',
     'idems.audit.view'    => 'View the compliance audit log',
     // ---- Identity documents (held under the DPDP Act for one stated purpose) ----
     // Kept out of every role default on purpose. Running operations is not a
@@ -125,7 +126,7 @@ function permission_nav_groups() {
     $fine = [
         'Sales'                   => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage'],
         'Operations'              => ['ops.call.create','ops.job.allocate','ops.job.close','ops.call.delete','workforce.availability','workforce.report.approve'],
-        'Reporting'               => ['idems.finalize','idems.type.manage','idems.timestamp.edit'],
+        'Reporting'               => ['idems.finalize','idems.type.manage','idems.timestamp.edit','idems.template.approve'],
         'Money'                   => ['data.credit','data.revenue','data.salary','data.profitability','finance.reconcile'],
         'Quality & Accreditation' => ['idems.audit.view','person.iddoc.view','person.iddoc.manage','complaints.decide','capa.close','ncr.close'],
         'Insights'                => ['dash.operations','dash.financial','dash.utilization','dash.people'],

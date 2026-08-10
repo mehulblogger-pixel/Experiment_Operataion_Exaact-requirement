@@ -205,6 +205,14 @@ function idems_migrate() {
         ensure_column('report_templates', 'superseded_by', 'INT NULL');
         ensure_column('report_templates', 'published_at', "VARCHAR(30) DEFAULT ''");
         ensure_column('report_templates', 'published_by', "VARCHAR(150) DEFAULT ''");
+        // §44 — document-controller review trail (submit → approve/reject).
+        ensure_column('report_templates', 'submitted_at', "VARCHAR(30) DEFAULT ''");
+        ensure_column('report_templates', 'submitted_by', "VARCHAR(150) DEFAULT ''");
+        ensure_column('report_templates', 'reviewed_at', "VARCHAR(30) DEFAULT ''");
+        ensure_column('report_templates', 'reviewed_by', "VARCHAR(150) DEFAULT ''");
+        ensure_column('report_templates', 'review_note', "TEXT");
+        // Per-office / per-branch IRN numbering-pattern override (blank = global).
+        ensure_column('offices', 'irn_format', "VARCHAR(200) DEFAULT ''");
     }
     // ---- Phase 6: manufacturer document verification & endorsement ----
     $pdo->exec("CREATE TABLE IF NOT EXISTS endorsements (
@@ -523,7 +531,17 @@ function idems_audit_verify() {
 //  The running serial is scoped by everything that precedes it, so each
 //  company/branch/year/client/type combination keeps its own sequence.
 // ---------------------------------------------------------------------------
-function idems_irn_format() { return setting_get('idems_irn_format', '') ?: '{COMPANY}/{BRANCH}/{YEAR}/{CLIENT}/{TYPE}/{SERIAL}'; }
+// The IRN numbering pattern. An executing office/branch may carry its own
+// pattern (offices.irn_format) — its clients often demand a specific style — and
+// that overrides the global default. Blank office pattern → the global one.
+function idems_irn_format($doc = null) {
+    if (is_array($doc) && !empty($doc['office_id'])) {
+        $of = ops_one("SELECT irn_format FROM offices WHERE id=?", [(int)$doc['office_id']]);
+        $p = trim((string)($of['irn_format'] ?? ''));
+        if ($p !== '') return $p;
+    }
+    return setting_get('idems_irn_format', '') ?: '{COMPANY}/{BRANCH}/{YEAR}/{CLIENT}/{TYPE}/{SERIAL}';
+}
 function idems_company_code() { return strtoupper(setting_get('idems_company_code', '') ?: 'MGH'); }
 function idems_serial_width() { $w = (int)setting_get('idems_serial_width', 6); return $w >= 3 && $w <= 10 ? $w : 6; }
 function idems_available_tokens() {
@@ -566,7 +584,7 @@ function idems_collapse($s) { return trim(preg_replace('#/{2,}#', '/', $s), '/')
 // Preview the IRN prefix (everything before the serial) for a doc.
 function idems_prefix_for($doc) {
     $tok = idems_tokens_for($doc);
-    $fmt = idems_irn_format();
+    $fmt = idems_irn_format($doc);
     $s = strtr(str_replace('{SERIAL}', '', $fmt), $tok);
     return idems_collapse($s);
 }
@@ -574,7 +592,7 @@ function idems_prefix_for($doc) {
 // index on report_docs.irn is the final guarantee against duplicates.
 function idems_generate_irn($doc, $maxTries = 5) {
     $tok = idems_tokens_for($doc);
-    $fmt = idems_irn_format();
+    $fmt = idems_irn_format($doc);
     $prefix = idems_prefix_for($doc);
     $width = idems_serial_width();
     for ($try = 0; $try < $maxTries; $try++) {
@@ -921,6 +939,15 @@ function ops_idems_report_types($route, $method) {
 function ops_idems_numbering($method) {
     ops_require(is_master() || can('idems.type.manage'), 'You cannot change numbering rules.');
     if ($method === 'POST') {
+        // Per-office pattern override — an office/branch that must number the way
+        // its own clients demand keeps its own pattern (blank = use the global).
+        if (($_POST['_do'] ?? '') === 'office_pattern') {
+            $oid = (int)($_POST['office_id'] ?? 0);
+            $pat = trim((string)($_POST['irn_format'] ?? ''));
+            if ($pat !== '' && strpos($pat, '{SERIAL}') === false) { flash('An office pattern must also include {SERIAL} (or clear it to use the global one).', 'error'); redirect('/irn-rules'); }
+            if ($oid) { db()->prepare("UPDATE offices SET irn_format=? WHERE id=?")->execute([$pat, $oid]); flash($pat !== '' ? 'Office numbering pattern saved.' : 'Office pattern cleared — it now uses the global format.'); }
+            redirect('/irn-rules');
+        }
         $fmt = trim($_POST['idems_irn_format'] ?? '');
         if ($fmt === '' || strpos($fmt, '{SERIAL}') === false) { flash('The format must include {SERIAL}.', 'error'); redirect('/irn-rules'); }
         setting_set('idems_irn_format', $fmt);
@@ -935,7 +962,8 @@ function ops_idems_numbering($method) {
         'type_code'=>'IR', 'project_code'=>'P001', 'inspection_date'=>date('Y-m-d')];
     $sample = idems_collapse(strtr(str_replace('{SERIAL}', str_pad('458', idems_serial_width(), '0', STR_PAD_LEFT), idems_irn_format()), idems_tokens_for($sampleDoc)));
     view('ops/idems/numbering', ['format'=>idems_irn_format(), 'company'=>idems_company_code(), 'width'=>idems_serial_width(),
-        'tokens'=>idems_available_tokens(), 'sample'=>$sample]);
+        'tokens'=>idems_available_tokens(), 'sample'=>$sample,
+        'offices'=>ops_all("SELECT id, name, code, COALESCE(irn_format,'') irn_format FROM offices WHERE COALESCE(is_active,1)=1 ORDER BY name")]);
     return true;
 }
 
@@ -2573,8 +2601,12 @@ function idems_render_template($doc) {
 }
 
 // §32 — template lifecycle.
-const TEMPLATE_STATUS = ['DRAFT'=>'Draft','PUBLISHED'=>'Published','SUPERSEDED'=>'Superseded','ARCHIVED'=>'Archived'];
-function template_status_pill($s) { return ['DRAFT'=>'p-warn','PUBLISHED'=>'p-ok','SUPERSEDED'=>'p-mut','ARCHIVED'=>'p-mut'][$s] ?? 'p-mut'; }
+const TEMPLATE_STATUS = ['DRAFT'=>'Draft','IN_REVIEW'=>'In review','PUBLISHED'=>'Published','SUPERSEDED'=>'Superseded','ARCHIVED'=>'Archived'];
+function template_status_pill($s) { return ['DRAFT'=>'p-warn','IN_REVIEW'=>'p-info','PUBLISHED'=>'p-ok','SUPERSEDED'=>'p-mut','ARCHIVED'=>'p-mut'][$s] ?? 'p-mut'; }
+// A document controller reviews and approves a report format before it goes
+// live (ISO 17020 §documented-information control). Anyone may draft & submit;
+// only a controller (this permission, or a master) may approve/reject/publish.
+function idems_can_approve_template() { return is_master() || (function_exists('can') && can('idems.template.approve')); }
 
 // §59 — validate a template before it is published/relied upon. Returns
 // ['level'=>'PASS'|'WARNING'|'ERROR', 'issues'=>[['level'=>..,'msg'=>..],…]].
@@ -3029,6 +3061,45 @@ function ops_idems_templates($route, $method) {
             flash('Created version ' . $ver . ' as a draft — edit it, then tick Active to publish (the live version keeps working until you do).');
             redirect('/report-template-edit?id=' . (int)$pdo->lastInsertId());
         }
+        // §44 — document-controller review gate ------------------------------
+        if (in_array(($_POST['_do'] ?? ''), ['submit_review','approve','reject','withdraw'], true)) {
+            $tid = (int)($_POST['id'] ?? 0);
+            $t = ops_one("SELECT * FROM report_templates WHERE id=?", [$tid]);
+            if (!$t) { flash('Format not found.', 'error'); redirect('/report-templates'); }
+            $do = $_POST['_do'];
+            if ($do === 'submit_review') {
+                $val = idems_template_validate($t);
+                if ($val['level'] === 'ERROR') { flash('Cannot submit — fix the errors first: ' . implode(' ', array_map(fn($i)=>$i['msg'], array_filter($val['issues'], fn($i)=>$i['level']==='ERROR'))), 'error'); redirect('/report-template-edit?id=' . $tid); }
+                $pdo->prepare("UPDATE report_templates SET status='IN_REVIEW', submitted_at=?, submitted_by=?, review_note='' WHERE id=?")->execute([date('c'), user_name(current_user()), $tid]);
+                idems_log('report_template', $tid, 'SUBMIT_REVIEW', ['field'=>$t['name']]);
+                flash('Format submitted to the document controller for review.');
+                redirect('/report-templates');
+            }
+            if ($do === 'withdraw') {   // author pulls it back to draft
+                $pdo->prepare("UPDATE report_templates SET status='DRAFT' WHERE id=? AND status='IN_REVIEW'")->execute([$tid]);
+                flash('Withdrawn back to draft.'); redirect('/report-template-edit?id=' . $tid);
+            }
+            // approve / reject need the controller permission
+            ops_require(idems_can_approve_template(), 'Only a document controller can approve or reject a report format.');
+            if ($t['status'] !== 'IN_REVIEW' && !is_master()) { flash('This format is not awaiting review.', 'error'); redirect('/report-templates'); }
+            if ($do === 'reject') {
+                $note = trim((string)($_POST['review_note'] ?? ''));
+                if ($note === '') { flash('Say why it is sent back, so the author can fix it.', 'error'); redirect('/report-templates'); }
+                $pdo->prepare("UPDATE report_templates SET status='DRAFT', active=0, reviewed_at=?, reviewed_by=?, review_note=? WHERE id=?")->execute([date('c'), user_name(current_user()), $note, $tid]);
+                idems_log('report_template', $tid, 'REVIEW_REJECT', ['field'=>$t['name'], 'reason'=>$note]);
+                flash('Sent back to the author as a draft with your comment.');
+                redirect('/report-templates');
+            }
+            // approve → publish
+            $val = idems_template_validate($t);
+            if ($val['level'] === 'ERROR') { flash('Cannot approve — the format still has errors.', 'error'); redirect('/report-templates'); }
+            $pdo->prepare("UPDATE report_templates SET status='PUBLISHED', active=1, reviewed_at=?, reviewed_by=?, published_at=?, published_by=?, effective_date=COALESCE(NULLIF(effective_date,''),?) WHERE id=?")
+                ->execute([date('c'), user_name(current_user()), date('c'), user_name(current_user()), date('Y-m-d'), $tid]);
+            $n = idems_template_supersede_siblings(ops_one("SELECT * FROM report_templates WHERE id=?", [$tid]));
+            idems_log('report_template', $tid, 'REVIEW_APPROVE', ['field'=>$t['name']]);
+            flash('Format approved & published' . ($n ? " — $n older format(s) of the same scope superseded." : '') . '.');
+            redirect('/report-templates');
+        }
         $id = (int)($_POST['id'] ?? 0);
         $vals = [
             'name'=>trim($_POST['name'] ?? ''), 'report_type_id'=>($_POST['report_type_id'] ?? '')!==''?(int)$_POST['report_type_id']:null,
@@ -3054,10 +3125,16 @@ function ops_idems_templates($route, $method) {
             $extra = ['active'=>0, 'status'=>'DRAFT'];
             $msgs = array_map(fn($i)=>$i['msg'], array_filter($val['issues'], fn($i)=>$i['level']==='ERROR'));
             flash('Saved as a draft — it cannot be published yet: ' . implode(' ', $msgs), 'error');
+        } elseif ($wantActive && !idems_can_approve_template()) {
+            // Author asked to publish but isn't a document controller — route it
+            // into review instead of going live, and keep it inactive until approved.
+            $extra = ['status'=>'IN_REVIEW', 'active'=>0, 'submitted_at'=>date('c'), 'submitted_by'=>user_name(current_user())];
+            idems_log('report_template', $id, 'SUBMIT_REVIEW', ['field'=>$saved['name']]);
+            flash('Saved and submitted to the document controller for review — it goes live once approved.');
         } else {
             $status = $wantActive ? 'PUBLISHED' : 'DRAFT';
             $extra = ['status'=>$status];
-            if ($status === 'PUBLISHED') { $extra['published_at']=date('c'); $extra['published_by']=user_name(current_user()); if (empty($saved['effective_date'])) $extra['effective_date']=date('Y-m-d'); }
+            if ($status === 'PUBLISHED') { $extra['published_at']=date('c'); $extra['published_by']=user_name(current_user()); $extra['reviewed_at']=date('c'); $extra['reviewed_by']=user_name(current_user()); if (empty($saved['effective_date'])) $extra['effective_date']=date('Y-m-d'); }
             $warn = array_filter($val['issues'], fn($i)=>$i['level']==='WARNING');
             $note = ($status==='PUBLISHED'?'Format published.':'Saved as a draft.') . ($warn ? ' ' . count($warn) . ' warning(s) — review under Edit.' : '');
             flash($note, $warn ? 'warning' : 'success');
