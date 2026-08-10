@@ -1321,29 +1321,34 @@ function idems_table_col_defs($f) {
     $looksNew = false;
     foreach (preg_split('/\r?\n/', $raw) as $ln) {
         $p = explode('|', $ln);
-        if (count($p) >= 2) { $t = strtolower(trim($p[1])); if ($t === 'dropdown') $t = 'select'; if (in_array($t, $types, true)) { $looksNew = true; break; } }
+        if (count($p) >= 2) { foreach (array_slice($p, 1) as $seg) { $t = strtolower(trim($seg)); if ($t === 'dropdown') $t = 'select'; if (in_array($t, $types, true) || $t === 'merge') { $looksNew = true; break 2; } } }
     }
     $out = []; $seen = [];
-    $add = function ($label, $type, $opts) use (&$out, &$seen) {
+    $add = function ($label, $type, $opts, $merge = false) use (&$out, &$seen) {
         $label = trim($label); if ($label === '') return;
         $ck = idems_clean_key($label) ?: ('c' . (count($out) + 1));
         $b = $ck; $x = 2; while (isset($seen[$ck])) { $ck = $b . '_' . $x; $x++; }
-        $seen[$ck] = 1; $out[$ck] = ['label' => $label, 'type' => $type, 'options' => $opts];
+        $seen[$ck] = 1; $out[$ck] = ['label' => $label, 'type' => $type, 'options' => $opts, 'merge' => (bool)$merge];
     };
     if ($looksNew) {
         foreach (preg_split('/\r?\n/', $raw) as $ln) {
             $ln = trim($ln); if ($ln === '') continue;
-            $p = array_map('trim', explode('|', $ln));
-            $type = isset($p[1]) ? strtolower($p[1]) : 'text'; if ($type === 'dropdown') $type = 'select';
+            $segs = array_map('trim', explode('|', $ln));
+            $label = array_shift($segs);
+            // "merge" is a column modifier (vertical merge of identical values) —
+            // pull it out so it isn't mistaken for the type/options segment.
+            $merge = false;
+            $segs = array_values(array_filter($segs, function ($s) use (&$merge) { if (strtolower($s) === 'merge') { $merge = true; return false; } return true; }));
+            $type = isset($segs[0]) && $segs[0] !== '' ? strtolower($segs[0]) : 'text'; if ($type === 'dropdown') $type = 'select';
             if (!in_array($type, $types, true)) $type = 'text';
-            $opts = ($type === 'select' && isset($p[2]) && $p[2] !== '')
-                ? array_values(array_filter(array_map('trim', preg_split('/[;,]/', $p[2])), fn($x) => $x !== '')) : [];
-            $add($p[0], $type, $opts);
+            $opts = ($type === 'select' && isset($segs[1]) && $segs[1] !== '')
+                ? array_values(array_filter(array_map('trim', preg_split('/[;,]/', $segs[1])), fn($x) => $x !== '')) : [];
+            $add($label, $type, $opts, $merge);
         }
     } else {
-        foreach (preg_split('/\r?\n|\|/', $raw) as $c) { $add($c, 'text', []); }
+        foreach (preg_split('/\r?\n|\|/', $raw) as $c) { $add($c, 'text', [], false); }
     }
-    if (!$out) $out = ['col1' => ['label' => 'Column 1', 'type' => 'text', 'options' => []]];
+    if (!$out) $out = ['col1' => ['label' => 'Column 1', 'type' => 'text', 'options' => [], 'merge' => false]];
     return $out;
 }
 // Backward-compatible: key => label (used by the PDF and Word-fill paths).
@@ -1974,7 +1979,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     $p->line(strtoupper($doc['type_name'] ?? $doc['type_code'] ?? 'INSPECTION REPORT'), 13, true, 16, $band);
     // key references grid
     $kv = [
-        'Client' => $doc['client_disp'] ?: ($doc['client_name'] ?? ''), 'Vendor / Mfr' => $doc['vendor_disp'] ?: ($doc['vendor_name'] ?? ''),
+        'Client' => ($doc['client_disp'] ?? '') ?: ($doc['client_name'] ?? ''), 'Vendor / Mfr' => ($doc['vendor_disp'] ?? '') ?: ($doc['vendor_name'] ?? ''),
         'Project' => trim(($doc['project_code'] ?? '').' '.($doc['project_name'] ?? '')), 'PO' => $doc['po_ref'] ?? '',
         'Drawing' => trim(($doc['drawing_no'] ?? '').' '.(($doc['drawing_rev'] ?? '')?'Rev '.$doc['drawing_rev']:'')), 'QAP rev' => $doc['qap_rev'] ?? '',
         'Standards' => $doc['standards'] ?? '', 'Location' => $doc['location'] ?? '',
@@ -2039,6 +2044,10 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
             if ($f['ftype']==='table') {
                 $flushGrid();
                 if (!is_array($v)||!$v) continue; $cols=idems_table_cols($f);
+                // §38 — columns flagged "merge" show a repeated value once and blank
+                // it on the rows below (a vertical cell merge / rowspan look).
+                $mergeCols=[]; foreach (idems_table_col_defs($f) as $mck=>$md) if (!empty($md['merge'])) $mergeCols[$mck]=true;
+                $prevVal=[];
                 $cw = $p->contentW()/max(1,count($cols));
                 // The header band is a closure so it can be RE-DRAWN at the top of
                 // every page a long table spills onto (§38 — no headerless
@@ -2056,9 +2065,14 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                     // wrap each cell (cap 4 lines) so long text neither overlaps
                     // the next column nor is silently cut off.
                     $cells=[]; $lines=1;
-                    foreach ($cols as $ck=>$cl){ $w=$p->wrap((string)($r[$ck]??''),8.5,$cw-4); if(count($w)>4)$w=array_slice($w,0,4); if(!$w)$w=['']; $cells[]=$w; $lines=max($lines,count($w)); }
+                    foreach ($cols as $ck=>$cl){
+                        $cellTxt=(string)($r[$ck]??'');
+                        // vertical merge: same value as the row above → render blank
+                        if (isset($mergeCols[$ck]) && $cellTxt!=='' && ($prevVal[$ck]??null)===$cellTxt) $cellTxt='';
+                        elseif (isset($mergeCols[$ck])) $prevVal[$ck]=(string)($r[$ck]??'');
+                        $w=$p->wrap($cellTxt,8.5,$cw-4); if(count($w)>4)$w=array_slice($w,0,4); if(!$w)$w=['']; $cells[]=$w; $lines=max($lines,count($w)); }
                     $rowH=$lines*10+2;
-                    if ($p->needSpace($rowH)) $drawHead();   // spilled to a new page → repeat the header
+                    if ($p->needSpace($rowH)) { $drawHead(); $prevVal=[]; }   // spilled to a new page → repeat the header (and re-show merged values)
                     $ry=$p->y; $ci=0;
                     foreach ($cells as $w){ for($j=0;$j<count($w);$j++){ $p->y=$ry+$j*10; $p->text($ml+$ci*$cw+2,$w[$j],8.5); } $ci++; }
                     $p->y=$ry+$rowH; $p->lineAt($ml,$p->y,$right,$p->y,[235,235,235]);
@@ -2167,23 +2181,36 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
         return is_array($v) ? '' : (string)$v;
     };
     // A bordered table from a header row (labels) + body rows (arrays of text).
-    $mkTable = function($headers, $rows) use ($run, $esc) {
+    // $mergeFlags[i]===true makes column i a true vertical-merge (rowspan) column:
+    // consecutive identical values collapse into one merged Word cell.
+    $mkTable = function($headers, $rows, $mergeFlags = []) use ($run, $esc) {
         $nc = max(1, count($headers));
         $borders = '<w:tblBorders>'
             . '<w:top w:val="single" w:sz="4" w:color="BBBBBB"/><w:left w:val="single" w:sz="4" w:color="BBBBBB"/>'
             . '<w:bottom w:val="single" w:sz="4" w:color="BBBBBB"/><w:right w:val="single" w:sz="4" w:color="BBBBBB"/>'
             . '<w:insideH w:val="single" w:sz="4" w:color="CCCCCC"/><w:insideV w:val="single" w:sz="4" w:color="CCCCCC"/></w:tblBorders>';
         $xml = '<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>' . $borders . '</w:tblPr>';
-        $cell = function($text, $bold, $shade) use ($run) {
-            $tcpr = '<w:tcPr>' . ($shade ? '<w:shd w:val="clear" w:fill="' . $shade . '"/>' : '') . '</w:tcPr>';
-            return '<w:tc>' . $tcpr . '<w:p><w:pPr><w:spacing w:after="20"/></w:pPr>' . $run($text, $bold, 17) . '</w:p></w:tc>';
+        $cell = function($text, $bold, $shade, $vmerge = '') use ($run) {
+            $tcpr = '<w:tcPr>' . ($shade ? '<w:shd w:val="clear" w:fill="' . $shade . '"/>' : '')
+                  . ($vmerge === 'restart' ? '<w:vMerge w:val="restart"/>' : ($vmerge === 'cont' ? '<w:vMerge/>' : '')) . '</w:tcPr>';
+            $content = $vmerge === 'cont' ? '' : $run($text, $bold, 17);
+            return '<w:tc>' . $tcpr . '<w:p><w:pPr><w:spacing w:after="20"/></w:pPr>' . $content . '</w:p></w:tc>';
         };
         // header
         $xml .= '<w:tr>'; foreach ($headers as $h) $xml .= $cell((string)$h, true, 'EBEEF5'); $xml .= '</w:tr>';
+        $prev = [];
         foreach ($rows as $r) {
             $r = array_values((array)$r);
             $xml .= '<w:tr>';
-            for ($i = 0; $i < $nc; $i++) $xml .= $cell((string)($r[$i] ?? ''), false, null);
+            for ($i = 0; $i < $nc; $i++) {
+                $val = (string)($r[$i] ?? '');
+                if (!empty($mergeFlags[$i])) {
+                    if ($val !== '' && ($prev[$i] ?? null) === $val) { $xml .= $cell('', false, null, 'cont'); }
+                    else { $prev[$i] = $val; $xml .= $cell($val, false, null, 'restart'); }
+                } else {
+                    $xml .= $cell($val, false, null);
+                }
+            }
             $xml .= '</w:tr>';
         }
         return $xml . '</w:tbl>' . '<w:p><w:pPr><w:spacing w:after="40"/></w:pPr></w:p>';
@@ -2225,11 +2252,12 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
             if (in_array($f['ftype'], ['photo','file','signature'], true)) continue;   // images not embedded in the plain Word export
             if ($f['ftype'] === 'table') {
                 $v = $data[$f['fkey']] ?? null; if (!is_array($v) || !$v) continue;
-                $cols = idems_table_cols($f);
+                $defs = idems_table_col_defs($f); $cols = []; $mergeFlags = [];
+                foreach ($defs as $ck => $d) { $cols[$ck] = $d['label']; $mergeFlags[] = !empty($d['merge']); }
                 $body .= $para($run($f['label'], true, 18, '464646'), ['after' => 20]);
                 $rows = [];
                 foreach ($v as $r) { $r = (array)$r; $line = []; foreach ($cols as $ck => $cl) $line[] = (string)($r[$ck] ?? ''); $rows[] = $line; }
-                $body .= $mkTable(array_values($cols), $rows);
+                $body .= $mkTable(array_values($cols), $rows, $mergeFlags);
                 continue;
             }
             $val = $valOf($f);

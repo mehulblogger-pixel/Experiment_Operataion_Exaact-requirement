@@ -188,9 +188,12 @@ function colbSerialize(){
   document.querySelectorAll('#colb .colrow').forEach(function(row){
     var name=row.querySelector('.c-name').value.trim(); if(!name) return;
     var type=row.querySelector('.c-type').value;
-    if(type==='text') lines.push(name);
-    else if(type==='select'){ var o=row.querySelector('.c-opts').value.trim(); lines.push(name+'|select'+(o?('|'+o):'')); }
-    else lines.push(name+'|'+type);
+    var line;
+    if(type==='text') line=name;
+    else if(type==='select'){ var o=row.querySelector('.c-opts').value.trim(); line=name+'|select'+(o?('|'+o):''); }
+    else line=name+'|'+type;
+    var mg=row.querySelector('.c-merge'); if(mg&&mg.checked) line+='|merge';
+    lines.push(line);
   });
   var raw=document.getElementById('table_cols_raw'); if(raw) raw.value=lines.join('\n');
 }
@@ -200,30 +203,36 @@ function colbParse(raw){
   raw.split(/\r?\n/).forEach(function(ln){ var p=ln.split('|'); if(p.length>=2){ var t=p[1].trim().toLowerCase(); if(t==='dropdown')t='select'; if(COLB_TYPES.indexOf(t)>=0) looksNew=true; } });
   var rows=[];
   if(looksNew){
-    raw.split(/\r?\n/).forEach(function(ln){ ln=ln.trim(); if(!ln)return; var p=ln.split('|');
-      var t=(p[1]||'text').trim().toLowerCase(); if(t==='dropdown')t='select'; if(COLB_TYPES.indexOf(t)<0)t='text';
-      rows.push({name:(p[0]||'').trim(),type:t,opts:(t==='select'&&p[2])?p[2].trim():''}); });
+    raw.split(/\r?\n/).forEach(function(ln){ ln=ln.trim(); if(!ln)return;
+      var segs=ln.split('|').map(function(s){return s.trim();});
+      var name=segs.shift()||'';
+      var merge=false; segs=segs.filter(function(s){ if(s.toLowerCase()==='merge'){merge=true;return false;} return true; });
+      var t=(segs[0]||'text').toLowerCase(); if(t==='dropdown')t='select'; if(COLB_TYPES.indexOf(t)<0)t='text';
+      rows.push({name:name,type:t,opts:(t==='select'&&segs[1])?segs[1]:'',merge:merge}); });
   } else {
-    raw.split(/\r?\n|\|/).forEach(function(c){ c=c.trim(); if(!c)return; rows.push({name:c,type:'text',opts:''}); });
+    raw.split(/\r?\n|\|/).forEach(function(c){ c=c.trim(); if(!c)return; rows.push({name:c,type:'text',opts:'',merge:false}); });
   }
   return rows;
 }
 function colbRow(col){
-  col=col||{name:'',type:'text',opts:''};
+  col=col||{name:'',type:'text',opts:'',merge:false};
   var div=document.createElement('div'); div.className='colrow';
   div.style.cssText='display:flex;gap:6px;margin:0 0 5px;align-items:center';
   div.innerHTML='<input class="form-control c-name" placeholder="Column name" style="flex:2">'+
     '<select class="form-control c-type" style="flex:1"><option value="text">Text</option><option value="number">Number</option><option value="date">Date</option><option value="select">Dropdown</option><option value="textarea">Long text</option></select>'+
     '<input class="form-control c-opts" placeholder="Accepted; Rejected; Hold" style="flex:2">'+
+    '<label class="c-merge-lbl" title="Merge identical values down this column (rowspan) in the PDF/Word output" style="display:flex;align-items:center;gap:3px;font-size:11px;white-space:nowrap;color:var(--muted)"><input type="checkbox" class="c-merge">merge</label>'+
     '<button type="button" class="btn small secondary c-del" title="Remove column">✕</button>';
   div.querySelector('.c-name').value=col.name;
   div.querySelector('.c-type').value=col.type;
   div.querySelector('.c-opts').value=col.opts;
+  div.querySelector('.c-merge').checked=!!col.merge;
   function tog(){ div.querySelector('.c-opts').style.display = div.querySelector('.c-type').value==='select'?'':'none'; }
   tog();
   div.querySelector('.c-type').addEventListener('change',function(){tog();colbSerialize();});
   div.querySelector('.c-name').addEventListener('input',colbSerialize);
   div.querySelector('.c-opts').addEventListener('input',colbSerialize);
+  div.querySelector('.c-merge').addEventListener('change',colbSerialize);
   div.querySelector('.c-del').addEventListener('click',function(){div.remove();colbSerialize();});
   return div;
 }
