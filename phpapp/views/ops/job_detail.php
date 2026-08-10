@@ -454,6 +454,82 @@
   <?php endif; ?>
 </div>
 
+<?php
+// --- Hold / witness points --------------------------------------------------
+// First-class intervention points: raised automatically when an inspector
+// issues a report with an activity dispositioned Hold / Witnessed / Reviewed /
+// Client clearance required, or added by hand here. Open points gate despatch.
+$hwPts = function_exists('hwp_for_job') ? hwp_for_job((int)$job['id']) : [];
+$hwOpen = 0; foreach ($hwPts as $p) { if (($p['status'] ?? '') === 'OPEN') $hwOpen++; }
+$hwCanEdit = function_exists('hwp_can_edit') && hwp_can_edit();
+$hwTypePill = function($t) {
+    $m = ['HOLD'=>'p-bad','WITNESS'=>'p-info','REVIEW'=>'p-mut','CLEARANCE'=>'p-warn'];
+    return '<span class="pill '.($m[$t]??'p-mut').'">'.e(function_exists('hwp_type_label')?hwp_type_label($t):$t).'</span>';
+};
+if (function_exists('hwp_for_job')):
+?>
+<div class="panel" id="holdpoints">
+  <div class="ctitle" style="margin-top:0"><h3>Hold &amp; witness points
+    <span class="muted">(<?= count($hwPts) ?><?= $hwOpen ? ', ' . $hwOpen . ' open' : '' ?>)</span></h3></div>
+  <?php if ($hwOpen): ?>
+    <div class="msg-warning" style="margin:0 0 10px"><strong>🚫 <?= (int)$hwOpen ?> open point<?= $hwOpen===1?'':'s' ?></strong>
+      — the manufacturer should not proceed / despatch until these are cleared or waived.</div>
+  <?php endif; ?>
+  <p class="muted" style="margin:0 0 10px">These are raised automatically when a report is issued with an activity marked
+    <b>Hold</b>, <b>Witnessed</b>, <b>Reviewed</b> or <b>Client clearance required</b> — or add one by hand below.</p>
+  <?php if ($hwPts): ?>
+  <table class="dt">
+    <thead><tr><th>Type</th><th>QAP clause</th><th>Activity / description</th><th>Status</th><th>From</th><?php if ($hwCanEdit): ?><th></th><?php endif; ?></tr></thead>
+    <tbody>
+    <?php foreach ($hwPts as $p): $isOpen = ($p['status'] ?? '')==='OPEN'; ?>
+      <tr<?= $isOpen ? '' : ' style="opacity:.6"' ?>>
+        <td><?= $hwTypePill($p['point_type']) ?></td>
+        <td><?= e($p['qap_clause'] ?: '—') ?><?= $p['sub_clause'] ? ' <span class="muted">('.e($p['sub_clause']).')</span>' : '' ?></td>
+        <td><?= e($p['activity'] ?: '') ?><?php if ($p['description']): ?><div class="muted" style="font-size:.9em"><?= e(mb_strimwidth((string)$p['description'],0,140,'…')) ?></div><?php endif; ?></td>
+        <td><span class="pill <?= $isOpen?'p-warn':(($p['status']==='CLEARED')?'p-ok':'p-mut') ?>"><?= e(function_exists('hwp_status_label')?hwp_status_label($p['status']):$p['status']) ?></span>
+            <?php if (!$isOpen && $p['cleared_by']): ?><div class="muted" style="font-size:.82em"><?= e($p['cleared_by']) ?><?= $p['clearance_ref']?' · '.e($p['clearance_ref']):'' ?></div><?php endif; ?></td>
+        <td><?php if (!empty($p['report_doc_id'])): ?><a href="/document?id=<?= (int)$p['report_doc_id'] ?>" title="<?= e($p['irn']) ?>"><?= e($p['irn'] ?: 'report') ?></a><?php else: ?><span class="pill p-mut">manual</span><?php endif; ?></td>
+        <?php if ($hwCanEdit): ?>
+        <td class="num"><?php if ($isOpen): ?>
+          <details><summary class="btn small">Clear / waive</summary>
+            <form method="post" style="display:flex;flex-direction:column;gap:5px;margin-top:6px;min-width:220px">
+              <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+              <input class="form-control" name="clearance_ref" placeholder="Clearance ref (NCR / mail / doc)">
+              <input class="form-control" name="remark" placeholder="Remark">
+              <div style="display:flex;gap:5px">
+                <button class="btn small" formaction="/hw-point-clear">Clear</button>
+                <button class="btn small secondary" formaction="/hw-point-waive">Waive</button>
+              </div>
+            </form>
+          </details>
+        <?php else: ?>
+          <form method="post" action="/hw-point-reopen" style="display:inline"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>"><button class="btn small secondary">Reopen</button></form>
+        <?php endif; ?></td>
+        <?php endif; ?>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php endif; ?>
+  <?php if ($hwCanEdit): ?>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-top:10px">
+    <form method="post" action="/hw-point-new" style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
+      <input type="hidden" name="job_id" value="<?= (int)$job['id'] ?>">
+      <div class="ff" style="margin:0"><label>Type</label>
+        <select class="form-control" name="point_type"><?php foreach (HW_POINT_TYPES as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+      <div class="ff" style="margin:0"><label>QAP clause</label><input class="form-control" name="qap_clause" style="width:90px"></div>
+      <div class="ff" style="margin:0"><label>Description</label><input class="form-control" name="description" placeholder="What must be held / witnessed" style="min-width:220px"></div>
+      <button class="btn small" type="submit">Add point</button>
+    </form>
+    <form method="post" action="/hw-point-derive" title="Re-scan issued reports for hold / witness dispositions">
+      <input type="hidden" name="job_id" value="<?= (int)$job['id'] ?>">
+      <button class="btn small secondary" type="submit">↻ Re-scan issued reports</button>
+    </form>
+  </div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php $holds = function_exists('job_hold_reasons') ? job_hold_reasons($job) : []; if ($holds): ?>
 <div class="panel" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent)">
   <b style="color:var(--bad)">🚫 HOLD — do not issue the report / deliverable to the client:</b> <?= e(implode('; ', $holds)) ?>.

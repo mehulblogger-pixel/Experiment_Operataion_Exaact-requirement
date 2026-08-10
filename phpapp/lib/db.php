@@ -389,6 +389,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('complaints_migrate')) complaints_migrate();   // §7.5 complaints, §7.6 appeals
     if (function_exists('capa_migrate')) capa_migrate();
     if (function_exists('ncr_migrate')) ncr_migrate();
+    if (function_exists('hwp_migrate')) hwp_migrate();                 // hold / witness points — first-class intervention points
     if (function_exists('conf_migrate')) conf_migrate();
     if (function_exists('act_migrate')) act_migrate();
     if (function_exists('leads_migrate')) leads_migrate();               // leads, pipelines, configurable stages                   // the activity spine — Customer 360 reads this                // §4.2 undertakings, client NDAs, breaches                 // the event, before the corrective action               // §8.7 nonconformity & corrective action
