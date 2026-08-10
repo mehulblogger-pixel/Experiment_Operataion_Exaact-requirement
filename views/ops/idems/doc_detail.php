@@ -3,12 +3,16 @@
 <div class="master-head">
   <div><h1><?= e(T_DETAIL('report', $doc['irn'])) ?> <?= $doc['finalized'] ? '🔒' : '' ?></h1>
     <p class="sub" style="margin:2px 0 0"><span class="pill p-info"><?= e($doc['type_code']) ?></span> <?= e($doc['type_name'] ?: $doc['title']) ?> · <span class="pill <?= idems_status_pill($doc['status']) ?>"><?= e(lk_options_or('report_status', IDEMS_STATUS)[$doc['status']] ?? $doc['status']) ?></span></p></div>
+  <?php $canSubmit = idems_can_edit_doc($doc) && in_array($doc['status'],['DRAFT','REJECTED'],true);
+        $comp = $canSubmit ? idems_completeness_check($doc) : null; ?>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <?php if (idems_can_edit_doc($doc)): ?><a class="btn secondary" href="/document-edit?id=<?= (int)$doc['id'] ?>">Edit header</a><?php endif; ?>
     <?php if (idems_can_edit_doc($doc) && !empty($hasSchema)): ?><a class="btn" href="/document-fill?id=<?= (int)$doc['id'] ?>">Fill report body</a><?php endif; ?>
     <?php if ((is_master() || can('idems.type.manage')) && empty($hasSchema)): ?><a class="btn secondary" href="/report-builder?type=<?= (int)$doc['report_type_id'] ?>">Design this form</a><?php endif; ?>
-    <?php if (idems_can_edit_doc($doc) && in_array($doc['status'],['DRAFT','REJECTED'],true)): ?>
-      <form method="post" action="/document-submit?id=<?= (int)$doc['id'] ?>" style="display:inline"><button class="btn" type="submit">Submit for review</button></form>
+    <?php if ($canSubmit && $comp['ok']): ?>
+      <form method="post" action="/document-submit?id=<?= (int)$doc['id'] ?>" style="display:inline"><button class="btn" type="submit">✓ Submit for review (<?= (int)$comp['passed'] ?>/<?= (int)$comp['applicable'] ?>)</button></form>
+    <?php elseif ($canSubmit): ?>
+      <a class="btn secondary" href="#completeness" title="Some completeness checks are failing" style="border-color:var(--bad);color:var(--bad)">⚠ Completeness: <?= (int)$comp['passed'] ?>/<?= (int)$comp['applicable'] ?></a>
     <?php endif; ?>
     <?php
       // A report cannot be issued until somebody has approved it. Finalising is
@@ -75,6 +79,42 @@
     · revises <a href="/document?id=<?= (int)$pv['id'] ?>"><?= e($pv['irn']) ?></a><?php endif; endif; ?>
   <?php if (!empty($doc['revised_by_id'])): $nx = ops_one("SELECT id, irn FROM report_docs WHERE id=?", [(int)$doc['revised_by_id']]); if ($nx): ?>
     · superseded by <a href="/document?id=<?= (int)$nx['id'] ?>"><?= e($nx['irn']) ?></a> — this is no longer the current revision<?php endif; endif; ?>
+</div>
+<?php endif; ?>
+
+<?php // ---- Inspection Completeness Check (pre-submission gate) ------------- ?>
+<?php if ($comp !== null): ?>
+<div class="panel" id="completeness" style="margin:0 0 12px;border:1px solid <?= $comp['ok']?'var(--ok)':'var(--bad)' ?>">
+  <div class="ctitle" style="margin-top:0"><h3>Inspection completeness check
+    <span class="pill <?= $comp['ok']?'p-ok':'p-bad' ?>" style="margin-left:6px"><?= (int)$comp['passed'] ?>/<?= (int)$comp['applicable'] ?> passed</span>
+    <?php if ($comp['na']): ?><span class="muted" style="font-size:12px">· <?= (int)$comp['na'] ?> n/a</span><?php endif; ?></h3></div>
+  <p class="muted" style="margin:0 0 10px">Every applicable check must pass before the report can be submitted for review. Identity, PO, location and specification flow in from the <?= e(Tl('call')) ?> &amp; <?= e(Tl('job')) ?> — fill only what is genuinely new.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 16px">
+    <?php foreach ($comp['checks'] as $c):
+      $pill = $c['status']==='PASS' ? '✓' : ($c['status']==='FAIL' ? '✕' : '–');
+      $col  = $c['status']==='PASS' ? 'var(--ok)' : ($c['status']==='FAIL' ? 'var(--bad)' : 'var(--muted)'); ?>
+      <div style="display:flex;align-items:baseline;gap:7px;padding:3px 0;font-size:13.5px">
+        <span style="color:<?= $col ?>;font-weight:800;width:12px;flex:none"><?= $pill ?></span>
+        <span><?= e($c['label']) ?><?php if ($c['status']!=='PASS' && $c['detail']): ?> <span class="muted" style="font-size:11.5px">— <?= e($c['detail']) ?></span><?php endif; ?></span>
+      </div>
+    <?php endforeach; ?>
+  </div>
+  <?php if ($comp['ok']): ?>
+    <form method="post" action="/document-submit?id=<?= (int)$doc['id'] ?>" style="margin-top:12px">
+      <button class="btn" type="submit">✓ <?= (int)$comp['passed'] ?>/<?= (int)$comp['applicable'] ?> checks passed — SUBMIT REPORT</button>
+    </form>
+  <?php else: ?>
+    <div class="msg-warning" style="margin-top:12px"><strong><?= (int)$comp['failed'] ?> check(s) failing.</strong> Resolve them in <a href="/document-fill?id=<?= (int)$doc['id'] ?>">the report body</a> or <a href="/document-edit?id=<?= (int)$doc['id'] ?>">the header</a>, then this gate opens.</div>
+    <?php if (is_master()): ?>
+      <details style="margin-top:8px"><summary class="btn small secondary">Super-admin: override the gate</summary>
+        <form method="post" action="/document-submit?id=<?= (int)$doc['id'] ?>" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center" onsubmit="return confirm('Override the completeness gate and submit anyway?')">
+          <input type="hidden" name="_force_submit" value="1">
+          <input class="form-control" name="override_reason" placeholder="Reason (recorded in the audit trail)" required style="min-width:280px">
+          <button class="btn small" type="submit">Override &amp; submit</button>
+        </form>
+      </details>
+    <?php endif; ?>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 
