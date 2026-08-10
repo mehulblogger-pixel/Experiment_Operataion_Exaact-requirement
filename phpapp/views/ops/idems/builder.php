@@ -9,7 +9,8 @@
 <div class="master-head"><div><h1>Form builder <?= e($type['code']) ?></h1>
   <p class="sub" style="margin:2px 0 0">Design the report form with no coding: sections, fields, conditional &amp; calculated fields, repeatable tables, photos, GPS and signatures.</p></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <?php if (!empty($fields)): ?><a class="btn" href="/document-new?type=<?= e($type['code']) ?>">Create a report with this form →</a><?php endif; ?>
+    <?php if (!empty($fields)): ?><a class="btn" href="/document-new?type=<?= e($type['code']) ?>">Create a report with this form →</a>
+    <a class="btn secondary" href="/report-type-preview?type=<?= (int)$type['id'] ?>" target="_blank" title="See the finished report filled with dummy data — no real inspection needed">👁 Preview with sample data</a><?php endif; ?>
     <a class="btn<?= empty($fields) ? '' : ' secondary' ?>" href="/report-autoform?type=<?= (int)$type['id'] ?>">🪄 Build from my Word file (no codes)</a>
     <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline">
       <input type="hidden" name="_do" value="add_scope">
