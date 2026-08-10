@@ -248,6 +248,7 @@ function idems_migrate() {
     if (function_exists('lk_ensure_type_map')) {
         lk_ensure_type_map('inspection_disposition', 'Inspection result / disposition', INSPECTION_DISPOSITIONS, 'idems');
         lk_ensure_type_map('activity_progress', 'Activity progress', ACTIVITY_PROGRESS, 'idems');
+        lk_ensure_type_map('measurement_units', 'Measurement units', MEASUREMENT_UNITS, 'idems');
     }
     // A deputation's deliverables are report types — rewrite the old codes.
     idems_migrate_deliverables();
@@ -272,6 +273,15 @@ const ACTIVITY_PROGRESS = [
     'Pending'    => 'Pending',
     'Not done'   => 'Not done',
 ];
+// Units offered by the "unit picker" field type. value === label so it prints
+// as typed. Editable in Masters once seeded.
+const MEASUREMENT_UNITS = [
+    'mm'=>'mm', 'cm'=>'cm', 'm'=>'m', 'inch'=>'inch', 'ft'=>'ft',
+    'kg'=>'kg', 'g'=>'g', 'ton'=>'ton', 'lb'=>'lb',
+    'nos'=>'nos', 'set'=>'set', 'lot'=>'lot', 'mtr'=>'mtr', 'sq.m'=>'sq.m',
+    '%'=>'%', '°C'=>'°C', 'bar'=>'bar', 'MPa'=>'MPa', 'psi'=>'psi',
+    'micron'=>'micron', 'HRC'=>'HRC', 'HB'=>'HB', 'J'=>'J',
+];
 // Portable "add a unique index if missing" (ignores errors if it already exists).
 function idems_unique_index($table, $col) {
     try { db()->exec("CREATE UNIQUE INDEX IF NOT EXISTS ux_{$table}_{$col} ON {$table}($col)"); } catch (Throwable $e) {}
@@ -291,7 +301,7 @@ const IDEMS_FIELD_TYPES = [
     'select'=>'Dropdown (single)', 'multiselect'=>'Dropdown (multiple)', 'checkbox'=>'Yes / no', 'radio'=>'Choice buttons',
     'calc'=>'Calculated', 'heading'=>'Section heading', 'note'=>'Info note',
     'table'=>'Repeatable table', 'photo'=>'Photo', 'file'=>'Attachment', 'gps'=>'GPS location',
-    'signature'=>'Signature', 'qr'=>'QR / barcode value',
+    'signature'=>'Signature', 'qr'=>'QR / barcode value', 'unit'=>'Unit picker',
     // An inspection instrument. Offers the calibrated instruments from the
     // equipment master as a dropdown AND allows free typing — so a lab / NDT /
     // calibration report picks a registered, in-calibration instrument, while a
@@ -329,6 +339,9 @@ function idems_has_schema($typeId) { return (int)ops_val("SELECT COUNT(*) FROM r
 // Parse a field's options ("A|B|C" or lookup:key) into [value=>label].
 function idems_field_options($f, $doc = null) {
     $o = trim((string)($f['options'] ?? ''));
+    // A unit picker: choices come from the field's own list if given, else the
+    // editable "measurement units" master (mm, kg, nos, %, °C …).
+    if (($f['ftype'] ?? '') === 'unit' && $o === '') return lk_options_or('measurement_units', defined('MEASUREMENT_UNITS') ? MEASUREMENT_UNITS : []);
     if ($o === '') return [];
     if (strpos($o, 'lookup:') === 0) return lk_options_or(substr($o, 7), []);
     // A dropdown whose choices come from THIS report's inspection call/job, e.g.
@@ -1147,12 +1160,13 @@ function idems_ensure_default_form($typeId) {
         $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,table_cols,col_span,sort_order) VALUES (?,?,?,?,?,?,?,?,?)")
             ->execute([$typeId, $sid, $fkey, $label, $ftype, $opts, $cols, $span, $fo]);
     };
-    $s1 = $mkSec('Inspection activities', 'Add one row per activity carried out — the QAP clause it maps to, what you did, your observation/finding, the disposition and its progress. Use “+ Add row”.', 10);
+    $s1 = $mkSec('Inspection activities', 'Add one row per activity carried out — the QAP clause it maps to, what you did, your observation/finding, the disposition, whether it is a hold/deviation point, and its progress. Use “+ Add row”.', 10);
     $mkF($s1, 'activities', 'Activities carried out', 'table', '',
-        "QAP Clause No.\nSub-clause\nInspection Activity\nObservation / Finding\nDisposition|select|lookup:inspection_disposition\nStatus|select|lookup:activity_progress", 2);
+        "QAP Clause No.\nSub-clause\nInspection Activity\nObservation / Finding\nDisposition|select|lookup:inspection_disposition\nHold / Deviation Point|select|—; Hold Point; Deviation Point; Witness Point\nStatus|select|lookup:activity_progress", 2);
     $s2 = $mkSec('Observations & conclusion', '', 20);
     $mkF($s2, 'observations', 'Details of inspection carried out / observations', 'textarea', '', '', 2);
     $mkF($s2, 'conclusion', 'Conclusion', 'textarea', '', '', 2);
+    $mkF($s2, 'general_remarks', 'General remarks', 'textarea', '', '', 2);
     $s3 = $mkSec('Photographs', '', 30);
     $mkF($s3, 'photos', 'Photographs', 'photo');
     if (function_exists('idems_log')) idems_log('report_type', $typeId, 'DEFAULT_FORM', ['field' => 'seeded starter form (activities + observations + photos)']);
@@ -1768,6 +1782,111 @@ function ops_idems_my_signature($method) {
     return true;
 }
 
+// ---------------------------------------------------------------------------
+//  Release Note footer — the structured block a Release / Discrepancy Note
+//  carries below the body: what kind of report it is, the despatch disposition,
+//  any accepted deviation, the source inspection-report number(s), an
+//  identification / location / inspected-by / signature grid, and the standing
+//  liability disclaimer. The disclaimer and the note label are settings, so a
+//  company words them its own way (the default mirrors the common TPI wording).
+// ---------------------------------------------------------------------------
+function idems_release_note_defaults() {
+    $disc = function_exists('setting_get') ? setting_get('release_note_disclaimer', '') : '';
+    if (!$disc) $disc = 'This inspection has been carried out to the best of our knowledge & our responsibility is limited to the exercise of reasonable care. This Release / Discrepancy Note reflects our findings at the time & place of inspection and is not intended to relieve the seller from their contractual obligations.';
+    $label = function_exists('setting_get') ? setting_get('release_note_label', '') : '';
+    if (!$label) $label = 'Release / Discrepancy Note';
+    return ['disclaimer' => $disc, 'label' => $label];
+}
+// Pull the "items / products offered" table out of a source report's data, so a
+// Release Note can carry the very same table. Prefers a table whose label/key
+// looks like items/products/PO; otherwise the first table on the report.
+function idems_rn_items_from_source($fields, $data) {
+    $first = null;
+    foreach ($fields as $f) {
+        if (($f['ftype'] ?? '') !== 'table') continue;
+        $rows = $data[$f['fkey']] ?? null; if (!is_array($rows) || !$rows) continue;
+        $defs = function_exists('idems_table_col_defs') ? idems_table_col_defs($f) : [];
+        $cols = []; foreach ($defs as $ck => $d) $cols[$ck] = $d['label'] ?? $ck;
+        $out = ['cols' => array_values($cols), 'rows' => []];
+        foreach ($rows as $r) { $r = (array)$r; $line = []; foreach ($cols as $ck => $lbl) $line[] = (string)($r[$ck] ?? ''); $out['rows'][] = $line; }
+        if ($first === null) $first = $out;
+        $lbl = strtolower(($f['label'] ?? '') . ' ' . ($f['fkey'] ?? ''));
+        if (strpos($lbl, 'item') !== false || strpos($lbl, 'product') !== false || strpos($lbl, 'offered') !== false || strpos($lbl, 'po') !== false) return $out;
+    }
+    return $first;
+}
+// Render the Release Note block onto an open PDF. Fired for RN / IRN documents.
+function idems_release_block($p, $doc, $lh, $band) {
+    $data = json_decode($doc['data'] ?? '[]', true); if (!is_array($data)) $data = [];
+    $ml = $p->ml; $right = $p->right(); $cw = $p->contentW();
+    $def = idems_release_note_defaults();
+
+    // --- Products / items offered (carried from the inspection report) ---
+    $items = $data['rn_items'] ?? null;
+    if (is_array($items) && !empty($items['rows']) && !empty($items['cols'])) {
+        $cols = array_map('strval', $items['cols']); $nc = max(1, count($cols)); $colw = $cw / $nc;
+        $p->gap(6); $p->needSpace(30);
+        $p->line('Products / items offered', 10, true, 13, $band);
+        $drawHead = function() use ($p, $ml, $cols, $colw) {
+            $hy = $p->y; $p->rectFill($ml, $hy, $p->contentW(), 12, [235,238,245]); $ci = 0;
+            foreach ($cols as $cl) { $p->y = $hy + 3; $p->text($ml + $ci*$colw + 2, $cl, 7.5, true, [60,60,60]); $ci++; }
+            $p->y = $hy + 13;
+        };
+        $drawHead();
+        foreach ($items['rows'] as $r) {
+            $r = array_values((array)$r); $cells = []; $lines = 1;
+            for ($i = 0; $i < $nc; $i++) { $w = $p->wrap((string)($r[$i] ?? ''), 8, $colw - 4); if (count($w) > 4) $w = array_slice($w, 0, 4); if (!$w) $w = ['']; $cells[] = $w; $lines = max($lines, count($w)); }
+            $rowH = $lines*10 + 2;
+            if ($p->needSpace($rowH)) $drawHead();
+            $ry = $p->y; $ci = 0;
+            foreach ($cells as $w) { for ($j = 0; $j < count($w); $j++) { $p->y = $ry + $j*10; $p->text($ml + $ci*$colw + 2, $w[$j], 8); } $ci++; }
+            $p->y = $ry + $rowH; $p->lineAt($ml, $p->y, $right, $p->y, [235,235,235]);
+        }
+        $p->gap(4);
+    }
+
+    // --- Remarks / disposition lines ---
+    $p->gap(4); $p->needSpace(60); $p->hr($band); $p->gap(4);
+    $p->line('Remarks', 10.5, true, 13, $band);
+    $kind = trim((string)($data['rn_kind'] ?? '')) ?: 'Stage / Final';
+    $p->line('This is a ' . $kind . ' Inspection Report.', 9, false, 12);
+    $disp = trim((string)($data['rn_disposition'] ?? '')) ?: 'Inspected Quantity is Rejected / Passed Quantity is Cleared for dispatch.';
+    foreach ($p->wrap($disp, 9, $cw) as $ln) { $p->needSpace(11); $p->line($ln, 9, false, 12); }
+    $dev = trim((string)($data['rn_deviation'] ?? ''));
+    $p->line('Deviation accepted (if any): ' . ($dev !== '' ? $dev : '—'), 9, false, 12);
+    $irns = trim((string)($data['rn_ir_numbers'] ?? ($data['source_irn'] ?? '')));
+    $p->line('Inspection Report Number(s): ' . ($irns !== '' ? $irns : '—'), 9, false, 12);
+
+    // --- Identification grid ---
+    $repName = trim((string)($lh['name'] ?? '')) ?: 'Representative';
+    $gcols = ['Inspection Identification', 'Location of Identification', 'Inspected By', 'Signature of ' . $repName];
+    $gw = $cw / 4;
+    $p->gap(4); $p->needSpace(40);
+    $hy = $p->y; $p->rectFill($ml, $hy, $cw, 13, [235,238,245]); $ci = 0;
+    foreach ($gcols as $cl) { foreach ($p->wrap($cl, 7.5, $gw - 4) as $j => $t) { $p->y = $hy + 2 + $j*8; $p->text($ml + $ci*$gw + 2, $t, 7.5, true, [60,60,60]); } $ci++; }
+    $p->y = $hy + 20;
+    $idrows = $data['rn_identification'] ?? [];
+    if (!is_array($idrows) || !$idrows) $idrows = [['ident'=>'', 'location'=>'', 'inspected_by'=>'']];
+    foreach ($idrows as $r) {
+        $r = (array)$r;
+        $vals = [(string)($r['ident'] ?? ''), (string)($r['location'] ?? ''), (string)($r['inspected_by'] ?? ''), ''];
+        $cells = []; $lines = 1;
+        foreach ($vals as $v) { $w = $p->wrap($v, 8, $gw - 4); if (!$w) $w = ['']; $cells[] = $w; $lines = max($lines, count($w)); }
+        $rowH = max(24, $lines*10 + 8);   // keep room for a wet signature
+        if ($p->needSpace($rowH)) { $p->y += 2; }
+        $ry = $p->y; $ci = 0;
+        foreach ($cells as $w) { for ($j = 0; $j < count($w); $j++) { $p->y = $ry + $j*10; $p->text($ml + $ci*$gw + 2, $w[$j], 8); } $ci++; }
+        $p->y = $ry + $rowH; $p->lineAt($ml, $p->y, $right, $p->y, [220,220,220]);
+    }
+    // column separators for the grid look
+    for ($i = 1; $i < 4; $i++) { $x = $ml + $i*$gw; }
+
+    // --- Disclaimer ---
+    $p->gap(6); $p->needSpace(24);
+    foreach ($p->wrap($def['disclaimer'], 8, $cw) as $ln) { $p->needSpace(10); $p->line($ln, 8, false, 10, [90,90,90]); }
+    $p->gap(2);
+}
+
 // ---- Report PDF (letterhead + body + automatic signature block + timestamps) ----
 function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $copy = '') {
     $p = new SimplePDF(); $ml = $p->ml; $right = $p->right();
@@ -1828,7 +1947,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         $valOf = function($f) use ($data) {
             $k=$f['fkey']; $v=$data[$k] ?? '';
             if ($f['ftype']==='multiselect' && is_array($v)) { $o=idems_field_options($f); return implode(', ', array_map(fn($x)=>$o[$x]??$x,$v)); }
-            if (in_array($f['ftype'],['select','radio'],true)) { $o=idems_field_options($f); return (string)($o[$v]??$v); }
+            if (in_array($f['ftype'],['select','radio','unit'],true)) { $o=idems_field_options($f); return (string)($o[$v]??$v); }
             if ($f['ftype']==='checkbox') return ($v==='1'||$v===1)?'Yes':'No';
             return is_array($v)?'':(string)$v;
         };
@@ -1848,7 +1967,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
             }
             $pending=[];
         };
-        $shortTypes=['text','number','date','time','select','radio','checkbox','multiselect','instrument','calc','qr','gps'];
+        $shortTypes=['text','number','date','time','select','unit','radio','checkbox','multiselect','instrument','calc','qr','gps'];
         $fullLbl = function($f,$v) use ($p,$ml) {
             $vv=is_array($v)?'':(string)$v; $p->needSpace(12);
             $p->text($ml,$f['label'].':',8.5,true,[90,90,90]);
@@ -1907,6 +2026,8 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     }
     // remarks
     if (!empty($doc['remarks'])) { $p->gap(4); $p->needSpace(16); $p->line('Remarks', 10, true, 13, $band); foreach ($p->wrap($doc['remarks'],9,$p->contentW()) as $ln2){ $p->needSpace(11); $p->line($ln2,9,false,11); } }
+    // ---- Release Note block (RN / IRN documents only) ----
+    if (in_array(strtoupper((string)($doc['type_code'] ?? '')), ['RN','IRN'], true)) { idems_release_block($p, $doc, $lh, $band); }
     // ---- signature block ----
     $p->gap(14); $p->needSpace(90); $p->hr($band); $p->gap(8);
     $colW2 = $p->contentW()/2; $sy = $p->y;
@@ -3540,7 +3661,25 @@ function ops_idems_release_note($method) {
     ];
     [$irn, $serial] = idems_generate_irn($fieldsNew);
     $tok = idems_tokens_for($fieldsNew);
-    $rnData = json_encode(['source_irn'=>$src['irn'], 'source_report_id'=>(int)$src['id']]);
+    // Carry the very same items/products table and identification across, and
+    // infer the report kind, so the Release Note stands on its own with the
+    // source report's content and its own number.
+    $srcCode = strtoupper((string)($src['type_code'] ?? ''));
+    $kind = (strpos($srcCode, 'FIR') !== false || strpos($srcCode, 'FINAL') !== false) ? 'Final'
+          : ((strpos($srcCode, 'STAGE') !== false || $srcCode === 'IR') ? 'Stage' : 'Stage / Final');
+    $inspName = $src['inspector_id'] ? (string)ops_val("SELECT name FROM inspectors WHERE id=?", [(int)$src['inspector_id']]) : '';
+    $rnData = json_encode([
+        'source_irn'       => $src['irn'],
+        'source_report_id' => (int)$src['id'],
+        'rn_items'         => idems_rn_items_from_source($fields, $data),
+        'rn_kind'          => $kind,
+        'rn_ir_numbers'    => $src['irn'],
+        'rn_identification'=> [[
+            'ident'        => trim(($src['product_category'] ?? '') . ' ' . ($src['material_grade'] ?? '')),
+            'location'     => (string)($src['location'] ?? ''),
+            'inspected_by' => $inspName,
+        ]],
+    ]);
     $cols = array_merge(['irn','company_code','branch_code','fy_label','serial','status','rev','data','created_by','created_at','updated_at'], array_keys($fieldsNew));
     $vals = array_merge([$irn, $tok['{COMPANY}'], $tok['{BRANCH}'], $tok['{FY}'], $serial, 'DRAFT', 0, $rnData, user_name(current_user()), date('c'), date('c')], array_values($fieldsNew));
     $ph = implode(',', array_fill(0, count($cols), '?'));

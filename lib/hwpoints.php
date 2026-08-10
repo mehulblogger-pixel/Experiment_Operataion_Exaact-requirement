@@ -21,10 +21,14 @@ const HW_POINT_TYPES = [
 // Which activity dispositions raise which point type when a report is issued.
 const HW_DISPOSITION_MAP = [
     'hold'                      => 'HOLD',
+    'hold point'                => 'HOLD',
     'witnessed'                 => 'WITNESS',
     'witness'                   => 'WITNESS',
+    'witness point'             => 'WITNESS',
     'reviewed'                  => 'REVIEW',
     'review'                    => 'REVIEW',
+    'deviation'                 => 'REVIEW',
+    'deviation point'           => 'REVIEW',
     'client clearance required' => 'CLEARANCE',
     'client clearance'          => 'CLEARANCE',
 ];
