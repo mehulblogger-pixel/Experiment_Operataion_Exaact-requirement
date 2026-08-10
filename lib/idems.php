@@ -120,6 +120,12 @@ function idems_migrate() {
         // Content seal: a hash of the report's own content, frozen at issue, so a
         // later change to the report (not just its evidence) is detectable at /verify.
         ensure_column('report_docs', 'content_seal', "VARCHAR(64) DEFAULT ''");
+        // §33 — presentation frozen at issue. So editing a form or a company Word
+        // template later can NEVER change how an already-issued report looks. We
+        // keep the exact form schema (sections+fields) and the exact template used.
+        ensure_column('report_docs', 'frozen_schema', 'LONGTEXT');          // JSON {sections, fields}
+        ensure_column('report_docs', 'frozen_template_json', 'LONGTEXT');   // the picked template row incl its .docx bytes
+        ensure_column('report_docs', 'frozen_at', "VARCHAR(30) DEFAULT ''");
     }
     // Immutable compliance audit log (Parts 21/23/24). Never hard-deleted.
     $pdo->exec("CREATE TABLE IF NOT EXISTS idems_audit (
@@ -765,6 +771,7 @@ function ops_idems_documents($route, $method) {
             ->execute([date('c'), user_name(current_user()), $issue, date('c'), $doc['id']]);
         idems_snapshot_signatures($doc);   // freeze inspector + approver signatures onto the report
         idems_seal_content($doc['id']);    // freeze a content hash so /verify can prove it is unaltered
+        idems_freeze_presentation($doc['id']); // §33 freeze the form schema + company template used, so later edits never change this issued report
         if (function_exists('act_log'))
             act_log('REPORT', (int)$doc['id'], 'SYSTEM', 'Report ' . $doc['irn'] . ' issued',
                     ['auto' => 1, 'direction' => 'OUT', 'partner_id' => (int)($doc['client_id'] ?? 0) ?: null]);
@@ -1874,7 +1881,8 @@ function ops_idems_pdf($method) {
     $copyMap = ['original' => 'ORIGINAL', 'duplicate' => 'DUPLICATE', 'triplicate' => 'TRIPLICATE'];
     $copy = !empty($doc['finalized']) ? ($copyMap[strtolower((string)($_GET['copy'] ?? ''))] ?? '') : '';
     $lh = function_exists('quote_letterhead') ? quote_letterhead() : ['name'=>app_name()];
-    $pdf = report_pdf_build($doc, idems_sections($doc['report_type_id']), idems_fields($doc['report_type_id']),
+    [$secs, $flds] = idems_render_schema($doc);   // §33 — frozen schema for an issued report, live for a draft
+    $pdf = report_pdf_build($doc, $secs, $flds,
         json_decode($doc['data'] ?: '[]', true) ?: [], idems_doc_files($doc['id']), $lh, idems_report_signatures($doc), $copy);
     idems_log('report_doc', $doc['id'], 'PDF', ['irn'=>$doc['irn'], 'copy'=>$copy ?: 'draft']);
     $suffix = $copy !== '' ? '_' . $copy : (empty($doc['finalized']) ? '_DRAFT' : '');
@@ -2081,6 +2089,38 @@ function idems_pick_template($doc) {
     usort($cands, fn($a,$b)=>$score($b)<=>$score($a));
     return $cands[0];
 }
+// §33 — freeze the presentation of a report at issue: the exact form schema and
+// the exact company template (bytes included). Called once at finalize. After
+// this, editing the form or the template can never change THIS issued report.
+function idems_freeze_presentation($docId) {
+    $doc = ops_one("SELECT * FROM report_docs WHERE id=?", [(int)$docId]);
+    if (!$doc || !empty($doc['frozen_at'])) return;   // once only
+    $schema = ['sections' => idems_sections($doc['report_type_id']), 'fields' => idems_fields($doc['report_type_id'])];
+    $tpl = idems_pick_template($doc);
+    db()->prepare("UPDATE report_docs SET frozen_schema=?, frozen_template_json=?, frozen_at=? WHERE id=?")
+        ->execute([json_encode($schema), $tpl ? json_encode($tpl) : '', date('c'), (int)$docId]);
+    if (function_exists('idems_log')) idems_log('report_doc', (int)$docId, 'FREEZE_PRESENTATION',
+        ['irn'=>$doc['irn'], 'field'=>$tpl ? ('template ' . ($tpl['name'] ?: $tpl['file_name'])) : 'system format']);
+}
+// The sections+fields to RENDER a report with: its frozen snapshot once issued,
+// otherwise the live schema (drafts, and reports issued before this existed).
+function idems_render_schema($doc) {
+    if (!empty($doc['finalized']) && !empty($doc['frozen_schema'])) {
+        $fs = json_decode($doc['frozen_schema'], true);
+        if (is_array($fs) && (isset($fs['sections']) || isset($fs['fields'])))
+            return [$fs['sections'] ?? [], $fs['fields'] ?? []];
+    }
+    return [idems_sections($doc['report_type_id']), idems_fields($doc['report_type_id'])];
+}
+// The company template to RENDER a report with: its frozen copy once issued,
+// otherwise the current best pick.
+function idems_render_template($doc) {
+    if (!empty($doc['finalized']) && !empty($doc['frozen_template_json'])) {
+        $t = json_decode($doc['frozen_template_json'], true);
+        if (is_array($t) && !empty($t['file_data'])) return $t;
+    }
+    return idems_pick_template($doc);
+}
 // Available token names for a report type (for the reference panel).
 function idems_type_tokens($typeId) {
     $std = ['irn','report_type','title','client','vendor','project','po','drawing','qap_rev','standards','location','inspection_date','issue_date','inspector','approver','result','release','remarks','company','branch','today','doc_number','format_number','doc_revision'];
@@ -2100,9 +2140,9 @@ function ops_idems_docx($method) {
         WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? 0)]);
     if (!$doc) { http_response_code(404); echo 'Not found'; return true; }
     ops_require(is_master() || can('mod.idems.view'), 'You cannot generate this report.');
-    $tpl = idems_pick_template($doc);
+    $tpl = idems_render_template($doc);   // §33 — the frozen template for an issued report, else the current pick
     if (!$tpl) { flash('No client-format template is set for this report type/client. Add one under Report templates, or use the PDF.', 'error'); redirect('/document?id=' . $doc['id']); }
-    $fields = idems_fields($doc['report_type_id']);
+    [, $fields] = idems_render_schema($doc);   // frozen fields once issued, live for a draft
     $data = json_decode($doc['data'] ?: '[]', true) ?: [];
     [$map, $tables] = idems_doc_token_map($doc, $fields, $data, $tpl);
     [$bin, $err] = report_docx_fill(base64_decode($tpl['file_data']), $map, $tables);
