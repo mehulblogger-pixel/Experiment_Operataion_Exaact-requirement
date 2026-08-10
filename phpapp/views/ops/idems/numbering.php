@@ -18,3 +18,28 @@
   <div style="margin-top:12px"><button class="btn" type="submit">Save numbering rules</button></div>
 </form>
 <p class="muted" style="margin-top:10px">Example: <code>{COMPANY}/{BRANCH}/{YEAR}/{CLIENT}/{TYPE}/{SERIAL}</code> → <strong>MGH/AHD/2026/RIL/IR/000458</strong>. Add <code>{PROJECT}</code> to include the project code; an empty token drops out cleanly.</p>
+
+<?php // §27 — per-office / per-branch numbering pattern override ?>
+<div class="panel" style="margin-top:14px">
+  <div class="ctitle" style="margin-top:0"><h3>Per-office numbering patterns <span class="muted">(optional)</span></h3></div>
+  <p class="muted" style="margin:0 0 10px">Some branches must number the way their own clients demand. Give an office its own
+    pattern here and its reports use it; leave it blank and the office follows the global format above. Each pattern must include <code>{SERIAL}</code>.</p>
+  <table class="dt">
+    <thead><tr><th>Office</th><th>Code</th><th>Pattern (blank = global)</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach (($offices ?? []) as $o): ?>
+      <tr>
+        <form method="post" action="/irn-rules">
+        <input type="hidden" name="_do" value="office_pattern">
+        <input type="hidden" name="office_id" value="<?= (int)$o['id'] ?>">
+        <td><strong><?= e($o['name']) ?></strong></td>
+        <td class="muted"><?= e($o['code'] ?: '—') ?></td>
+        <td><input class="form-control" name="irn_format" value="<?= e($o['irn_format']) ?>" placeholder="<?= e($format) ?>" style="font-family:monospace;min-width:280px"></td>
+        <td class="num"><button class="btn small secondary" type="submit">Save</button></td>
+        </form>
+      </tr>
+    <?php endforeach; ?>
+    <?php if (empty($offices)): ?><tr><td colspan="4" class="muted">No offices yet.</td></tr><?php endif; ?>
+    </tbody>
+  </table>
+</div>

@@ -91,8 +91,23 @@
         <td><?= $r['client_name'] ? e($r['client_name']) : '<span class="muted">Company‑wide</span>' ?></td>
         <td><?= $r['office_name'] ? e($r['office_name']) : '<span class="muted">Any</span>' ?></td>
         <td><?= $r['file_name'] ? '<a href="/report-template-download?id='.(int)$r['id'].'">'.e($r['file_name']).'</a>' : '<span class="muted">none</span>' ?></td>
-        <td><?php $st=$r['status'] ?? 'PUBLISHED'; ?><span class="pill <?= e(template_status_pill($st)) ?>"><?= e($statusMap[$st] ?? $st) ?></span> <span class="muted" style="font-size:11px">v<?= (int)($r['version'] ?? 1) ?></span></td>
+        <td><?php $st=$r['status'] ?? 'PUBLISHED'; ?><span class="pill <?= e(template_status_pill($st)) ?>"><?= e($statusMap[$st] ?? $st) ?></span> <span class="muted" style="font-size:11px">v<?= (int)($r['version'] ?? 1) ?></span>
+          <?php if ($st==='IN_REVIEW' && !empty($r['submitted_by'])): ?><div class="muted" style="font-size:11px">submitted by <?= e($r['submitted_by']) ?></div><?php endif; ?>
+          <?php if ($st==='PUBLISHED' && !empty($r['reviewed_by'])): ?><div class="muted" style="font-size:11px">approved by <?= e($r['reviewed_by']) ?></div><?php endif; ?>
+          <?php if ($st==='DRAFT' && !empty($r['review_note'])): ?><div class="muted" style="font-size:11px;color:var(--bad)">sent back: <?= e($r['review_note']) ?></div><?php endif; ?></td>
         <td style="white-space:nowrap">
+          <?php $canApprove = function_exists('idems_can_approve_template') && idems_can_approve_template(); ?>
+          <?php if ($st==='DRAFT'): ?>
+            <form method="post" action="/report-templates" style="display:inline"><input type="hidden" name="_do" value="submit_review"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><button class="btn small" title="Send to the document controller for review">📤 Submit for review</button></form>
+          <?php elseif ($st==='IN_REVIEW'): ?>
+            <?php if ($canApprove): ?>
+              <form method="post" action="/report-templates" style="display:inline"><input type="hidden" name="_do" value="approve"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><button class="btn small" title="Approve &amp; publish this format">✓ Approve</button></form>
+              <form method="post" action="/report-templates" style="display:inline" onsubmit="var n=prompt('Reason for sending it back:');if(!n)return false;this.review_note.value=n;"><input type="hidden" name="_do" value="reject"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input type="hidden" name="review_note" value=""><button class="btn small secondary">✕ Send back</button></form>
+            <?php else: ?>
+              <span class="pill p-info" style="font-size:11px">awaiting controller</span>
+              <form method="post" action="/report-templates" style="display:inline"><input type="hidden" name="_do" value="withdraw"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><button class="btn small secondary" title="Pull it back to draft">↩ Withdraw</button></form>
+            <?php endif; ?>
+          <?php endif; ?>
           <?php if ($r['file_data']): ?><a class="btn small secondary" href="/report-template-preview?id=<?= (int)$r['id'] ?>" target="_blank" title="See this format filled with dummy data">👁 Preview</a><?php endif; ?>
           <?php if ($r['file_data'] && $r['report_type_id']): ?><a class="btn small" href="/report-form-from-template?id=<?= (int)$r['id'] ?>" title="Create the form fields from the tokens in this format">🪄 Build form</a><?php endif; ?>
           <a class="btn small secondary" href="/report-template-edit?id=<?= (int)$r['id'] ?>">Edit</a>
