@@ -296,6 +296,25 @@ function idems_field_options($f, $doc = null) {
     foreach (preg_split('/\r?\n|\|/', $o) as $line) { $line = trim($line); if ($line === '') continue; $parts = explode('=', $line, 2); $out[trim($parts[0])] = trim($parts[count($parts)>1?1:0]); }
     return $out;
 }
+// Should a conditional field/section be shown, given the report's data? Mirrors
+// the show-when rule the builder stores (cond_field / cond_op / cond_val) and the
+// live JS on the fill screen — but evaluated in PHP so the FINAL report (PDF)
+// honours conditions too, not only the data-entry form. Empty rule = always show.
+function idems_cond_visible($row, $data) {
+    $cf = trim((string)($row['cond_field'] ?? '')); $op = (string)($row['cond_op'] ?? '');
+    if ($cf === '' || $op === '') return true;
+    $cur = $data[$cf] ?? '';
+    if (is_array($cur)) $cur = implode(',', $cur);
+    $cur = trim((string)$cur); $val = trim((string)($row['cond_val'] ?? ''));
+    switch ($op) {
+        case 'eq':       return $cur === $val;
+        case 'ne':       return $cur !== $val;
+        case 'in':       return in_array($cur, array_map('trim', preg_split('/[|,]/', $val)), true);
+        case 'nonempty': return $cur !== '';
+        case 'empty':    return $cur === '';
+    }
+    return true;
+}
 // Options pulled live from the inspection call/job this report belongs to.
 // value === label (the stored value is the text itself), so the PDF and Word
 // output simply print what was chosen without needing the call at print time.
@@ -1687,7 +1706,10 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     $filesBy = []; foreach ($files as $fl) $filesBy[$fl['field_key']][] = $fl;
     $secList = $sections; $secList[] = ['id'=>0,'title'=>''];
     foreach ($secList as $s) {
-        $fl = $bySec[(int)$s['id']] ?? []; if (!$fl) continue;
+        if (!idems_cond_visible($s, $data)) continue;   // §cond — honour a section's show-when rule in the output
+        $fl = $bySec[(int)$s['id']] ?? [];
+        $fl = array_values(array_filter($fl, fn($f) => idems_cond_visible($f, $data)));  // §cond — and each field's
+        if (!$fl) continue;
         $p->needSpace(20); $p->gap(4);
         if ($s['title']!=='') { $p->line($s['title'], 11, true, 14, $band); }
         // Short header-style fields (File No, Client, Dates…) render as a clean
@@ -1859,6 +1881,101 @@ function ops_idems_pdf($method) {
     header('Content-Type: application/pdf');
     header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/','_',$doc['irn']) . $suffix . '.pdf"');
     echo $pdf; return true;
+}
+
+// ===========================================================================
+//  Template / form PREVIEW with sample data  (§spec-60)
+//  A designer sees, in one click, how the finished report looks — filled with
+//  realistic dummy data — before any real inspection exists. Two flavours:
+//  the system PDF (report type), and the company .docx (a template).
+// ===========================================================================
+// Plausible sample value for one field, by its type.
+function idems_sample_value($f) {
+    $lbl = trim((string)($f['label'] ?? $f['fkey'] ?? 'Sample'));
+    switch ($f['ftype']) {
+        case 'number': return '10';
+        case 'date':   return date('Y-m-d');
+        case 'time':   return '10:30';
+        case 'checkbox': return '1';
+        case 'select': case 'radio': { $o = idems_field_options($f); return $o ? (string)array_key_first($o) : 'Yes'; }
+        case 'multiselect': { $o = idems_field_options($f); return $o ? [(string)array_key_first($o)] : ['Sample']; }
+        case 'textarea': return 'Sample ' . $lbl . ' — inspection carried out as per the applicable standard; results were within the acceptance criteria.';
+        case 'instrument': return 'Vernier Caliper (VC-114)';
+        case 'calc': return '';
+        case 'table': {
+            $defs = idems_table_col_defs($f); $rows = [];
+            for ($r = 1; $r <= 2; $r++) {
+                $row = [];
+                foreach ($defs as $ck => $d) {
+                    if ($d['type'] === 'number') $row[$ck] = (string)($r * 5);
+                    elseif ($d['type'] === 'date') $row[$ck] = date('Y-m-d');
+                    elseif ($d['type'] === 'select') $row[$ck] = $d['options'][0] ?? 'Yes';
+                    else $row[$ck] = $d['label'] . ' ' . $r;
+                }
+                $rows[] = $row;
+            }
+            return $rows;
+        }
+        default: return 'Sample ' . $lbl;
+    }
+}
+// Sample data map for every non-decorative field of a report type.
+function idems_sample_data($fields) {
+    $data = [];
+    foreach ($fields as $f) {
+        if (in_array($f['ftype'], ['heading','note','photo','file','signature','gps','qr'], true)) continue;
+        $data[$f['fkey']] = idems_sample_value($f);
+    }
+    return $data;
+}
+// A throwaway doc row for a preview render (never saved).
+function idems_sample_doc($extra = []) {
+    return array_merge([
+        'id' => 0, 'irn' => 'SAMPLE / PREVIEW', 'report_type_id' => 0, 'type_code' => 'SAMPLE',
+        'title' => 'Sample preview', 'client_name' => 'ABC Engineering Ltd', 'client_disp' => 'ABC Engineering Ltd',
+        'vendor_name' => 'XYZ Manufacturing Pvt Ltd', 'vendor_disp' => 'XYZ Manufacturing Pvt Ltd',
+        'inspection_date' => date('Y-m-d'), 'issue_date' => date('Y-m-d'), 'result' => 'ACCEPTED',
+        'finalized' => 0, 'data' => '[]', 'remarks' => 'Sample remarks — this is a preview with dummy data, not a real inspection report.',
+    ], $extra);
+}
+// GET /report-type-preview?type=ID — system-format PDF filled with sample data.
+function ops_idems_type_preview() {
+    ops_require(is_master() || can('idems.type.manage') || can('mod.idems.view'), 'You cannot preview report forms.');
+    $typeId = (int)($_GET['type'] ?? 0);
+    $type = $typeId ? ops_one("SELECT * FROM report_types WHERE id=?", [$typeId]) : null;
+    if (!$type) { http_response_code(404); echo 'Report type not found'; return true; }
+    $fields = idems_fields($typeId);
+    $data = idems_sample_data($fields);
+    $doc = idems_sample_doc(['report_type_id' => $typeId, 'type_code' => $type['code'], 'title' => $type['name'], 'data' => json_encode($data)]);
+    $lh = function_exists('quote_letterhead') ? quote_letterhead() : ['name' => app_name()];
+    $sigs = ['inspector' => ['name' => 'A. Inspector', 'desig' => 'Sr. Inspector', 'meta' => 'SAMPLE', 'time' => date('d M Y')],
+             'approver'  => ['name' => 'B. Approver',  'desig' => 'Reviewer',      'meta' => 'SAMPLE', 'time' => date('d M Y')]];
+    $pdf = report_pdf_build($doc, idems_sections($typeId), $fields, $data, [], $lh, $sigs, '');
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="SAMPLE_' . preg_replace('/[^A-Za-z0-9._-]/','_',$type['code']) . '.pdf"');
+    echo $pdf; return true;
+}
+// GET /report-template-preview?id=ID — the company .docx filled with sample data.
+function ops_idems_template_preview() {
+    ops_require(is_master() || can('idems.type.manage'), 'You cannot preview templates.');
+    $tpl = ops_one("SELECT * FROM report_templates WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+    if (!$tpl) { flash('Template not found.', 'error'); redirect('/report-templates'); }
+    if (empty($tpl['file_data'])) { flash('This template has no Word file to preview. Upload a .docx first.', 'error'); redirect('/report-template-edit?id=' . $tpl['id']); }
+    if (!class_exists('ZipArchive')) { flash('The zip PHP extension is off here, so .docx preview cannot run.', 'error'); redirect('/report-templates'); }
+    $typeId = (int)($tpl['report_type_id'] ?? 0);
+    $fields = $typeId ? idems_fields($typeId) : [];
+    $data = idems_sample_data($fields);
+    $doc = idems_sample_doc(['report_type_id' => $typeId, 'data' => json_encode($data)]);
+    [$map, $tables] = idems_doc_token_map($doc, $fields, $data, $tpl);
+    // fill a few standard header tokens with sample values too
+    $map = array_merge(['client' => 'ABC Engineering Ltd', 'project' => 'Sample Project', 'inspector' => 'A. Inspector',
+        'approver' => 'B. Approver', 'irn' => 'SAMPLE/PREVIEW', 'result' => 'Accepted', 'inspection_date' => date('d-m-Y'),
+        'issue_date' => date('d-m-Y')], $map);
+    [$bin, $err] = report_docx_fill(base64_decode($tpl['file_data']), $map, $tables);
+    if ($err) { flash('Preview could not be generated: ' . $err, 'error'); redirect('/report-templates'); }
+    header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    header('Content-Disposition: inline; filename="SAMPLE_' . preg_replace('/[^A-Za-z0-9._-]/','_', $tpl['name'] ?: 'template') . '.docx"');
+    echo $bin; return true;
 }
 // ---- Controlled timestamp / date edit (Branch App Manager only, Part 22) ----
 function ops_idems_timestamp($method) {

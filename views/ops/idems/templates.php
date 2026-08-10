@@ -82,6 +82,7 @@
         <td><?= $r['file_name'] ? '<a href="/report-template-download?id='.(int)$r['id'].'">'.e($r['file_name']).'</a>' : '<span class="muted">none</span>' ?></td>
         <td><?= $r['active'] ? '<span class="pill p-ok">Active</span>' : '<span class="pill p-mut">Off</span>' ?></td>
         <td style="white-space:nowrap">
+          <?php if ($r['file_data']): ?><a class="btn small secondary" href="/report-template-preview?id=<?= (int)$r['id'] ?>" target="_blank" title="See this format filled with dummy data">👁 Preview</a><?php endif; ?>
           <?php if ($r['file_data'] && $r['report_type_id']): ?><a class="btn small" href="/report-form-from-template?id=<?= (int)$r['id'] ?>" title="Create the form fields from the tokens in this format">🪄 Build form</a><?php endif; ?>
           <a class="btn small secondary" href="/report-template-edit?id=<?= (int)$r['id'] ?>">Edit</a>
           <form method="post" action="/report-templates" style="display:inline" onsubmit="return confirm('Remove template?')"><input type="hidden" name="_do" value="del"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><button class="btn small secondary">✕</button></form></td>
