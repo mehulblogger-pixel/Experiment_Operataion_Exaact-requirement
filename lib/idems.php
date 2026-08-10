@@ -1115,6 +1115,37 @@ function ops_idems_builder($route, $method) {
             idems_reorder('report_fields', (int)$_POST['field_id'], $_POST['dir'] ?? 'up', 'report_type_id', $typeId);
             redirect('/report-builder?type=' . $typeId);
         }
+        // --- drag-and-drop layout designer (AJAX) -------------------------
+        // The visual designer posts the whole new order in one shot: fields carry
+        // their (possibly new) section and position; sections carry their order.
+        $ajax = !empty($_POST['_ajax']);
+        $ajaxOk = function($extra = []) use ($ajax) {
+            if ($ajax) { header('Content-Type: application/json'); echo json_encode(['ok' => true] + $extra); exit; }
+        };
+        if ($do === 'field_reorder') {
+            // items = [{id, section}] in the exact visual order across all sections.
+            $items = json_decode((string)($_POST['items'] ?? '[]'), true);
+            if (is_array($items)) {
+                $ord = 0;
+                foreach ($items as $it) {
+                    $fid = (int)($it['id'] ?? 0); if (!$fid) continue;
+                    $sec = (int)($it['section'] ?? 0); $ord += 10;
+                    $pdo->prepare("UPDATE report_fields SET section_id=?, sort_order=? WHERE id=? AND report_type_id=?")
+                        ->execute([$sec ?: null, $ord, $fid, $typeId]);
+                }
+            }
+            $ajaxOk(); redirect('/report-builder?type=' . $typeId);
+        }
+        if ($do === 'section_reorder') {
+            $ids = json_decode((string)($_POST['ids'] ?? '[]'), true);
+            if (is_array($ids)) { $ord = 0; foreach ($ids as $sid) { $ord += 10; $pdo->prepare("UPDATE report_sections SET sort_order=? WHERE id=? AND report_type_id=?")->execute([$ord, (int)$sid, $typeId]); } }
+            $ajaxOk(); redirect('/report-builder?type=' . $typeId);
+        }
+        if ($do === 'field_width') {
+            $span = (int)($_POST['col_span'] ?? 1) === 2 ? 2 : 1;
+            $pdo->prepare("UPDATE report_fields SET col_span=? WHERE id=? AND report_type_id=?")->execute([$span, (int)($_POST['field_id'] ?? 0), $typeId]);
+            $ajaxOk(['col_span' => $span]); redirect('/report-builder?type=' . $typeId);
+        }
         redirect('/report-builder?type=' . $typeId);
     }
     view('ops/idems/builder', ['type'=>$type, 'sections'=>idems_sections($typeId), 'fields'=>idems_fields($typeId),
