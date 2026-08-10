@@ -89,9 +89,12 @@
         $cellInput = function($ck,$d,$cur) use ($k,$doc){
             $name = 'tbl['.e($k).'][]['.e($ck).']';
             if ($d['type']==='select') {
-                // A column's options can be a live call source, e.g. call:po_items.
+                // A column's options can be a single token pointing at a live
+                // source (call:po_items) or an editable master (lookup:inspection_disposition).
                 $opts = $d['options'];
-                if (count($opts)===1 && strpos((string)$opts[0],'call:')===0) { $opts = array_keys(idems_call_options($doc, substr($opts[0],5))); }
+                if (count($opts)===1 && (strpos((string)$opts[0],'call:')===0 || strpos((string)$opts[0],'lookup:')===0)) {
+                    $opts = idems_col_options($doc, (string)$opts[0]);
+                }
                 $h = '<select class="form-control" name="'.$name.'"><option value=""></option>';
                 foreach ($opts as $o) $h .= '<option value="'.e($o).'" '.((string)$cur===(string)$o?'selected':'').'>'.e($o).'</option>';
                 return $h.'</select>';

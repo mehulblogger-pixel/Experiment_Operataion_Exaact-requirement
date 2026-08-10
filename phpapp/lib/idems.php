@@ -243,9 +243,35 @@ function idems_migrate() {
         sort_order INT DEFAULT 0, created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
     idems_seed_report_types();
     idems_seed_phrases();
+    // §activity — editable master lists for an inspection activity's disposition
+    // and progress, so a company can tune the exact words it uses on reports.
+    if (function_exists('lk_ensure_type_map')) {
+        lk_ensure_type_map('inspection_disposition', 'Inspection result / disposition', INSPECTION_DISPOSITIONS, 'idems');
+        lk_ensure_type_map('activity_progress', 'Activity progress', ACTIVITY_PROGRESS, 'idems');
+    }
     // A deputation's deliverables are report types — rewrite the old codes.
     idems_migrate_deliverables();
 }
+// How an inspection activity / line item is dispositioned. value === label so it
+// prints straight onto the report. Editable in Masters once seeded.
+const INSPECTION_DISPOSITIONS = [
+    'Acceptable'                => 'Acceptable',
+    'Acceptable with comment'   => 'Acceptable with comment',
+    'Rejected'                  => 'Rejected',
+    'Client clearance required' => 'Client clearance required',
+    'Hold'                      => 'Hold',
+    'Balance'                   => 'Balance',
+    'Witnessed'                 => 'Witnessed',
+    'Reviewed'                  => 'Reviewed',
+    'Not applicable'            => 'Not applicable',
+];
+const ACTIVITY_PROGRESS = [
+    'Completed'  => 'Completed',
+    'Partial'    => 'Partial',
+    'In progress'=> 'In progress',
+    'Pending'    => 'Pending',
+    'Not done'   => 'Not done',
+];
 // Portable "add a unique index if missing" (ignores errors if it already exists).
 function idems_unique_index($table, $col) {
     try { db()->exec("CREATE UNIQUE INDEX IF NOT EXISTS ux_{$table}_{$col} ON {$table}($col)"); } catch (Throwable $e) {}
@@ -357,6 +383,33 @@ function idems_call_options($doc, $key) {
         }
     } catch (Throwable $e) { return []; }
     return $out;
+}
+// Resolve a single column-option token to a flat list of choice strings.
+// Understands three forms:
+//   call:<key>      -> live, call-linked options (e.g. call:po_items)
+//   lookup:<key>    -> an editable lookup master (e.g. lookup:inspection_disposition)
+//   plain a;b;c     -> the literal choices, already split by the caller
+// Returns a numerically-indexed array of labels ready for a <select>.
+function idems_col_options($doc, $token) {
+    $token = trim((string)$token);
+    if ($token === '') return [];
+    if (stripos($token, 'call:') === 0) {
+        return array_values(idems_call_options($doc, substr($token, 5)));
+    }
+    if (stripos($token, 'lookup:') === 0) {
+        $key = strtolower(trim(substr($token, 7)));
+        // Fall back to the shipped constants so options exist even before the
+        // lookup master has been seeded/edited.
+        $fallback = [];
+        if ($key === 'inspection_disposition' && defined('INSPECTION_DISPOSITIONS')) $fallback = array_values(INSPECTION_DISPOSITIONS);
+        elseif ($key === 'activity_progress' && defined('ACTIVITY_PROGRESS'))       $fallback = array_values(ACTIVITY_PROGRESS);
+        if (function_exists('lk_options_or')) {
+            $opts = lk_options_or($key, $fallback);
+            return array_values($opts);
+        }
+        return $fallback;
+    }
+    return [$token];
 }
 // A field's stored value from the report's data JSON.
 function idems_val($data, $fkey, $default = '') { return $data[$fkey] ?? $default; }
@@ -901,13 +954,15 @@ function ops_idems_builder($route, $method) {
                 ->execute([$typeId, 'Scope of activities', 'Each activity in the scope, its status and a remark.',
                     (int)ops_val("SELECT COALESCE(MIN(sort_order),10)-5 FROM report_sections WHERE report_type_id=?", [$typeId])]);
             $secId = (int)$pdo->lastInsertId();
-            $statuses = implode(', ', array_values(function_exists('lk_options_or') ? lk_options_or('document_status', defined('DOCUMENT_STATUSES') ? DOCUMENT_STATUSES : []) : ['Completed','Partial','Not applicable','Not done','Pending client input']));
+            $dispo = implode(', ', array_values(function_exists('lk_options_or') ? lk_options_or('inspection_disposition', defined('INSPECTION_DISPOSITIONS') ? INSPECTION_DISPOSITIONS : []) : ['Acceptable','Rejected','Hold']));
+            $prog  = implode(', ', array_values(function_exists('lk_options_or') ? lk_options_or('activity_progress', defined('ACTIVITY_PROGRESS') ? ACTIVITY_PROGRESS : []) : ['Completed','Partial','Pending']));
             $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span)
                            VALUES (?,?,?,?,?,?,?,?,2)")
                 ->execute([$typeId, $secId, 'scope_activities', 'Activities', 'table',
-                    "Activity | Status | Remark", 'Status values: ' . $statuses,
+                    "QAP Clause No.\nSub-clause\nInspection Activity\nObservation / Finding\nDisposition|select|lookup:inspection_disposition\nStatus|select|lookup:activity_progress",
+                    'Disposition: ' . $dispo . '. Status: ' . $prog . '. (Both are editable in Masters.)',
                     (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId])]);
-            flash('Added a “Scope of activities” section — add rows on the report, each with a status and remark.');
+            flash('Added a “Scope of activities” section — each row maps to a QAP clause, with a disposition and progress status.');
             redirect('/report-builder?type=' . $typeId);
         }
         // One click adds the identification & traceability fields every inspection
@@ -1089,8 +1144,9 @@ function idems_ensure_default_form($typeId) {
         $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,table_cols,col_span,sort_order) VALUES (?,?,?,?,?,?,?,?,?)")
             ->execute([$typeId, $sid, $fkey, $label, $ftype, $opts, $cols, $span, $fo]);
     };
-    $s1 = $mkSec('Inspection activities', 'Add one row per activity carried out — what you did, the method/standard, the result and your finding. Use “+ Add row”.', 10);
-    $mkF($s1, 'activities', 'Activities carried out', 'table', '', "Activity\nMethod / Standard\nResult|select|Accepted; Rejected; Observation; Not applicable\nFinding / Remark", 2);
+    $s1 = $mkSec('Inspection activities', 'Add one row per activity carried out — the QAP clause it maps to, what you did, your observation/finding, the disposition and its progress. Use “+ Add row”.', 10);
+    $mkF($s1, 'activities', 'Activities carried out', 'table', '',
+        "QAP Clause No.\nSub-clause\nInspection Activity\nObservation / Finding\nDisposition|select|lookup:inspection_disposition\nStatus|select|lookup:activity_progress", 2);
     $s2 = $mkSec('Observations & conclusion', '', 20);
     $mkF($s2, 'observations', 'Details of inspection carried out / observations', 'textarea', '', '', 2);
     $mkF($s2, 'conclusion', 'Conclusion', 'textarea', '', '', 2);
@@ -1978,7 +2034,12 @@ function idems_sample_value($f) {
                 foreach ($defs as $ck => $d) {
                     if ($d['type'] === 'number') $row[$ck] = (string)($r * 5);
                     elseif ($d['type'] === 'date') $row[$ck] = date('Y-m-d');
-                    elseif ($d['type'] === 'select') $row[$ck] = $d['options'][0] ?? 'Yes';
+                    elseif ($d['type'] === 'select') {
+                        $o0 = (string)($d['options'][0] ?? '');
+                        if (stripos($o0, 'lookup:') === 0) { $opts = idems_col_options(null, $o0); $row[$ck] = $opts[0] ?? 'Acceptable'; }
+                        elseif (stripos($o0, 'call:') === 0) { $row[$ck] = 'Sample ' . $d['label']; }
+                        else $row[$ck] = $o0 !== '' ? $o0 : 'Yes';
+                    }
                     else $row[$ck] = $d['label'] . ' ' . $r;
                 }
                 $rows[] = $row;
