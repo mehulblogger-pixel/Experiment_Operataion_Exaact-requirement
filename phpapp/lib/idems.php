@@ -285,12 +285,42 @@ function idems_existing_twin($f) {
 }
 function idems_has_schema($typeId) { return (int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=?", [(int)$typeId]) > 0; }
 // Parse a field's options ("A|B|C" or lookup:key) into [value=>label].
-function idems_field_options($f) {
+function idems_field_options($f, $doc = null) {
     $o = trim((string)($f['options'] ?? ''));
     if ($o === '') return [];
     if (strpos($o, 'lookup:') === 0) return lk_options_or(substr($o, 7), []);
+    // A dropdown whose choices come from THIS report's inspection call/job, e.g.
+    // call:po_items lists every line item on the order behind the call.
+    if (strpos($o, 'call:') === 0) return $doc ? idems_call_options($doc, substr($o, 5)) : [];
     $out = [];
     foreach (preg_split('/\r?\n|\|/', $o) as $line) { $line = trim($line); if ($line === '') continue; $parts = explode('=', $line, 2); $out[trim($parts[0])] = trim($parts[count($parts)>1?1:0]); }
+    return $out;
+}
+// Options pulled live from the inspection call/job this report belongs to.
+// value === label (the stored value is the text itself), so the PDF and Word
+// output simply print what was chosen without needing the call at print time.
+function idems_call_options($doc, $key) {
+    $key = strtolower(trim((string)$key));
+    $callId = (int)($doc['call_id'] ?? 0);
+    $jobId  = (int)($doc['job_id'] ?? 0);
+    if (!$callId && $jobId) $callId = (int)ops_val("SELECT call_id FROM jobs WHERE id=?", [$jobId]);
+    $out = [];
+    try {
+        if ($key === 'po_items') {
+            // every line item on the same purchase order as the call's item. The
+            // call's own line item pins the PO exactly, so prefer it; fall back to
+            // the call's po_id.
+            $call = $callId ? ops_one("SELECT po_id, po_line_item_id FROM calls WHERE id=?", [$callId]) : null;
+            $poId = null;
+            if (!empty($call['po_line_item_id'])) $poId = ops_val("SELECT purchase_order_id FROM po_line_items WHERE id=?", [(int)$call['po_line_item_id']]);
+            if (!$poId && !empty($call['po_id'])) $poId = (int)$call['po_id'];
+            if ($poId) foreach (ops_all("SELECT description FROM po_line_items WHERE purchase_order_id=? ORDER BY id", [(int)$poId]) as $r) {
+                $d = trim((string)$r['description']); if ($d !== '') $out[$d] = $d;
+            }
+        } elseif ($key === 'inspection_types') {
+            foreach ((defined('INSPECTION_TYPES') ? INSPECTION_TYPES : []) as $v) { $out[$v] = $v; }
+        }
+    } catch (Throwable $e) { return []; }
     return $out;
 }
 // A field's stored value from the report's data JSON.

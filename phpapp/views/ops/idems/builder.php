@@ -101,7 +101,7 @@
         </select></div>
       <div class="ff"><label>Field type</label>
         <select class="form-control" name="ftype" id="ftype"><?php foreach ($fieldTypes as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ef['ftype'] ?? 'text')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-      <div class="ff" data-when="select,multiselect,radio"><label>Options <span class="muted">— one per line, or <code>lookup:sbu</code></span></label><textarea class="form-control" name="options" rows="3" placeholder="A&#10;B&#10;C"><?= e($ef['options'] ?? '') ?></textarea></div>
+      <div class="ff" data-when="select,multiselect,radio"><label>Options <span class="muted">— one per line, a master with <code>lookup:sbu</code>, or the call's order items with <code>call:po_items</code></span></label><textarea class="form-control" name="options" rows="3" placeholder="A&#10;B&#10;C"><?= e($ef['options'] ?? '') ?></textarea></div>
       <div class="ff" data-when="table"><label>Table columns <span class="muted">— each column can be text, a number, a date or a dropdown</span></label>
         <div id="colb"></div>
         <button type="button" class="btn small secondary" onclick="colbAdd()">+ Add column</button>
