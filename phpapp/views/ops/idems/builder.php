@@ -10,7 +10,8 @@
   <p class="sub" style="margin:2px 0 0">Design the report form with no coding: sections, fields, conditional &amp; calculated fields, repeatable tables, photos, GPS and signatures.</p></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <?php if (!empty($fields)): ?><a class="btn" href="/document-new?type=<?= e($type['code']) ?>">Create a report with this form →</a>
-    <a class="btn secondary" href="/report-type-preview?type=<?= (int)$type['id'] ?>" target="_blank" title="See the finished report filled with dummy data — no real inspection needed">👁 Preview with sample data</a><?php endif; ?>
+    <button type="button" class="btn secondary" id="bld-preview-toggle" title="Show the finished report next to the designer — it refreshes as you arrange fields">🔍 Live preview</button>
+    <a class="btn secondary" href="/report-type-preview?type=<?= (int)$type['id'] ?>" target="_blank" title="Open the finished report filled with dummy data in a new tab">👁 Open preview</a><?php endif; ?>
     <a class="btn<?= empty($fields) ? '' : ' secondary' ?>" href="/report-autoform?type=<?= (int)$type['id'] ?>">🪄 Build from my Word file (no codes)</a>
     <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline">
       <input type="hidden" name="_do" value="add_scope">
@@ -31,6 +32,17 @@
     <a class="btn secondary" href="/report-types">← Report types</a>
   </div>
 </div>
+
+<?php if (!empty($fields)): ?>
+<div class="panel" id="bld-preview-panel" style="display:none;margin-bottom:14px">
+  <div class="ctitle" style="margin-top:0"><h3>Live preview <span class="muted" style="font-weight:400">— the finished report with sample data, refreshed as you arrange fields</span></h3>
+    <span><button type="button" class="btn small secondary" id="bld-preview-reload">↻ Refresh</button>
+      <button type="button" class="btn small secondary" id="bld-preview-close">Hide</button></span></div>
+  <div style="border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#f5f5f5">
+    <iframe id="bld-preview-frame" title="Report preview" style="width:100%;height:660px;border:0;display:block"></iframe>
+  </div>
+</div>
+<?php endif; ?>
 
 <div class="dash-2col" style="align-items:start">
   <div>
@@ -232,7 +244,8 @@ function colbAdd(){ var h=document.getElementById('colb'); if(h){ h.appendChild(
     var body=new URLSearchParams(); body.set('_do',doName); body.set('report_type_id',TYPE); body.set('_ajax','1');
     body.set('_csrf', (document.querySelector('input[name=_csrf]')||{}).value || '');
     Object.keys(extra||{}).forEach(function(k){ body.set(k, extra[k]); });
-    return fetch('/report-builder?type='+TYPE, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:body.toString(), credentials:'same-origin'});
+    return fetch('/report-builder?type='+TYPE, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:body.toString(), credentials:'same-origin'})
+      .then(function(r){ if(window.bldPreviewRefresh) window.bldPreviewRefresh(); return r; });
   }
   // --- field drag ---
   var dragEl=null;
@@ -289,5 +302,29 @@ function colbAdd(){ var h=document.getElementById('colb'); if(h){ h.appendChild(
       post('field_width', {field_id:btn.getAttribute('data-fid'), col_span:next});
     });
   });
+})();
+
+// ---- live preview pane ----------------------------------------------------
+(function(){
+  var TYPE=<?= json_encode((int)$type['id']) ?>;
+  var toggle=document.getElementById('bld-preview-toggle');
+  var panel=document.getElementById('bld-preview-panel');
+  var frame=document.getElementById('bld-preview-frame');
+  if(!toggle||!panel||!frame) return;
+  var pending=null;
+  function load(){ frame.src='/report-type-preview?type='+TYPE+'&_t='+(new Date().getTime()%100000); }
+  // debounced refresh, exposed to the drag-drop code via window.bldPreviewRefresh
+  window.bldPreviewRefresh=function(){
+    if(panel.style.display==='none') return;    // only refresh when visible
+    if(pending) clearTimeout(pending);
+    pending=setTimeout(load, 500);
+  };
+  function open(){ panel.style.display=''; toggle.classList.add('active'); load(); panel.scrollIntoView({behavior:'smooth',block:'nearest'}); }
+  function close(){ panel.style.display='none'; toggle.classList.remove('active'); }
+  toggle.addEventListener('click',function(){ panel.style.display==='none'?open():close(); });
+  var rl=document.getElementById('bld-preview-reload'); if(rl) rl.addEventListener('click',load);
+  var cl=document.getElementById('bld-preview-close'); if(cl) cl.addEventListener('click',close);
+  // also refresh after any add/edit/delete form submits leave & reload the page
+  // (those are full navigations, so the panel simply reopens on demand).
 })();
 </script>
