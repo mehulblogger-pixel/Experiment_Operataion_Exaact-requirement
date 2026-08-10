@@ -644,6 +644,127 @@ function idems_status_pill($s) {
     return ['DRAFT'=>'p-mut','SUBMITTED'=>'p-info','UNDER_REVIEW'=>'p-warn','APPROVED'=>'p-ok','ISSUED'=>'p-ok','REJECTED'=>'p-bad','ARCHIVED'=>'p-mut'][$s] ?? 'p-mut';
 }
 
+// ===========================================================================
+//  Inspection Completeness Check — the pre-submission gate.
+//  Distinct from template validation (which checks the FORMAT). This checks the
+//  filled REPORT is complete before it can be submitted for approval: identity,
+//  scope, activities, evidence, dispositions, signature. Each check is PASS /
+//  FAIL / NA; a check becomes NA when it doesn't apply to this report's form
+//  (e.g. no photo field → "Required photographs" is N/A). The gate opens only
+//  when every applicable mandatory check passes. Identity/PO/location/spec flow
+//  in from the call & job, so the inspector rarely re-types them.
+// ===========================================================================
+function idems_completeness_check($doc) {
+    $docId = (int)($doc['id'] ?? 0);
+    $data  = json_decode($doc['data'] ?? '[]', true); if (!is_array($data)) $data = [];
+    $fields = $docId ? idems_fields((int)$doc['report_type_id']) : [];
+    // Linked call/job so values FLOW IN rather than being re-typed.
+    $job  = !empty($doc['job_id'])  ? ops_one("SELECT * FROM jobs WHERE id=?",  [(int)$doc['job_id']])  : null;
+    $call = !empty($doc['call_id']) ? ops_one("SELECT * FROM calls WHERE id=?", [(int)$doc['call_id']]) : ($job && !empty($job['call_id']) ? ops_one("SELECT * FROM calls WHERE id=?", [(int)$job['call_id']]) : null);
+    // effective value: prefer the report, fall back to job then call
+    $eff = function($keys) use ($doc, $job, $call) {
+        foreach ((array)$keys as $src => $k) {
+            $row = is_int($src) ? $doc : ($src === 'job' ? $job : ($src === 'call' ? $call : $doc));
+            if ($row && trim((string)($row[$k] ?? '')) !== '') return trim((string)$row[$k]);
+        }
+        return '';
+    };
+    $files = $docId ? idems_doc_files($docId) : [];
+    $filesByKind = []; foreach ($files as $fl) $filesByKind[$fl['kind']][] = $fl;
+    $hasField = function($pred) use ($fields) { foreach ($fields as $f) if ($pred($f)) return $f; return null; };
+    $tableFields = array_values(array_filter($fields, fn($f) => ($f['ftype'] ?? '') === 'table'));
+
+    $checks = [];
+    $add = function($key, $label, $status, $detail = '') use (&$checks) { $checks[] = ['key'=>$key,'label'=>$label,'status'=>$status,'detail'=>$detail]; };
+    $yn = fn($ok, $okMsg='', $bad='Missing') => $ok ? ['PASS', $okMsg] : ['FAIL', $bad];
+
+    // --- Identity & context (flows from the call / job) ---
+    [$s,$d] = $yn(!empty($doc['inspector_id']), 'Assigned', 'Pick the inspector on the report'); $add('inspector','Inspector identified',$s,$d);
+    [$s,$d] = $yn(!empty($doc['client_id']), '', 'No client — set it on the call'); $add('client','Client identified',$s,$d);
+    $isVendorType = trim((string)$eff([0=>'vendor_id'])) !== '' || !empty($doc['vendor_id']);
+    [$s,$d] = $yn(!empty($doc['vendor_id']), '', 'No vendor / manufacturer'); $add('vendor','Vendor / manufacturer identified',$s,$d);
+    $po = $eff([0=>'po_ref', 'job'=>'po_ref', 'call'=>'po_ref']);
+    [$s,$d] = $yn($po !== '', $po, 'No PO reference'); $add('po','PO identified',$s,$d);
+    $loc = $eff([0=>'location', 'job'=>'site_label', 'call'=>'location']);
+    [$s,$d] = $yn($loc !== '', $loc, 'No inspection location'); $add('location','Inspection location',$s,$d);
+    [$s,$d] = $yn(trim((string)($doc['inspection_date'] ?? '')) !== '', $doc['inspection_date'] ?? '', 'No inspection date'); $add('date','Inspection date',$s,$d);
+
+    // --- Scope, spec, QAP ---
+    $scopeOk = false;
+    foreach ($tableFields as $tf) { $rows = $data[$tf['fkey']] ?? null; if (is_array($rows) && $rows) { $scopeOk = true; break; } }
+    if (!$scopeOk) foreach ($fields as $f) { $lbl = strtolower(($f['label'] ?? '').' '.($f['fkey'] ?? '')); if (strpos($lbl,'scope')!==false && trim((string)($data[$f['fkey']] ?? ''))!=='') { $scopeOk = true; break; } }
+    [$s,$d] = $yn($scopeOk, '', 'No scope / activities recorded'); $add('scope','Scope of inspection',$s,$d);
+    $spec = $eff([0=>'standards']);
+    [$s,$d] = $yn($spec !== '', $spec, 'No applicable specification / standard'); $add('spec','Applicable specification',$s,$d);
+    $qapRev = trim((string)($doc['qap_rev'] ?? ''));
+    $qapFiles = (!empty($doc['job_id']) && function_exists('job_qaps')) ? count(job_qaps((int)$doc['job_id'])) : 0;
+    [$s,$d] = ($qapRev !== '' || $qapFiles > 0) ? ['PASS', $qapRev !== '' ? 'Rev '.$qapRev : $qapFiles.' file(s)'] : ['FAIL','No QAP/ITP rev or attachment']; $add('qap','QAP / ITP identified',$s,$d);
+
+    // --- Activities & measurements (form-driven) ---
+    // All activities completed: any table with a status/progress column must have no incomplete rows.
+    $incomplete = 0; $hasProgress = false;
+    foreach ($tableFields as $tf) {
+        $defs = idems_table_col_defs($tf); $progKey = null;
+        foreach ($defs as $ck=>$dd) { $l = strtolower($dd['label'] ?? ''); if (strpos($l,'status')!==false || strpos($l,'progress')!==false) { $progKey=$ck; break; } }
+        if (!$progKey) continue; $hasProgress = true;
+        foreach (($data[$tf['fkey']] ?? []) as $r) { $v = strtolower(trim((string)((array)$r)[$progKey] ?? '')); if (in_array($v, ['pending','not done','in progress','partial'], true)) $incomplete++; }
+    }
+    if (!$hasProgress) $add('activities','All activities completed','NA','No activity-status column');
+    else { [$s,$d] = $yn($incomplete===0, 'All done', $incomplete.' activity(ies) not completed'); $add('activities','All activities completed',$s,$d); }
+    // Required measurements: required number fields must be filled.
+    $reqNum = array_values(array_filter($fields, fn($f) => ($f['ftype']==='number') && !empty($f['required'])));
+    if (!$reqNum) $add('measurements','All required measurements','NA','No mandatory measurement fields');
+    else { $miss=0; foreach ($reqNum as $f) if (trim((string)($data[$f['fkey']] ?? ''))==='') $miss++; [$s,$d]=$yn($miss===0,'',"$miss measurement(s) missing"); $add('measurements','All required measurements',$s,$d); }
+
+    // --- Evidence ---
+    $photoField = $hasField(fn($f) => ($f['ftype'] ?? '')==='photo');
+    if (!$photoField) $add('photos','Required photographs','NA','No photo field on this form');
+    else { $n = count($filesByKind['photo'] ?? []); [$s,$d]=$yn($n>0, "$n photo(s)", 'No photographs attached'); $add('photos','Required photographs',$s,$d); }
+    // Instrument details + calibration validity
+    $instField = $hasField(fn($f) => ($f['ftype'] ?? '')==='instrument');
+    $instTable = null; foreach ($tableFields as $tf) { $l=strtolower(($tf['label']??'').' '.($tf['fkey']??'')); if (strpos($l,'instrument')!==false) { $instTable=$tf; break; } }
+    if (!$instField && !$instTable) { $add('instruments','Instrument details','NA','No instrument field'); $add('calibration','Calibration validity','NA','No instrument field'); }
+    else {
+        $instFilled = $instField ? (trim((string)($data[$instField['fkey']] ?? ''))!=='') : (is_array($data[$instTable['fkey']] ?? null) && $data[$instTable['fkey']]);
+        [$s,$d] = $yn($instFilled, '', 'Instrument not recorded'); $add('instruments','Instrument details',$s,$d);
+        // calibration: any 'due' date column must be on/after the inspection date
+        if ($instTable) {
+            $defs = idems_table_col_defs($instTable); $dueKey=null;
+            foreach ($defs as $ck=>$dd) { $l=strtolower($dd['label']??''); if (strpos($l,'due')!==false && strpos($l,'calib')!==false || (strpos($l,'due')!==false && $dd['type']==='date')) { $dueKey=$ck; break; } }
+            $refDate = $doc['inspection_date'] ?: date('Y-m-d'); $expired=0; $checked=0;
+            if ($dueKey) foreach (($data[$instTable['fkey']] ?? []) as $r) { $dv=trim((string)((array)$r)[$dueKey] ?? ''); if ($dv==='') continue; $checked++; if (strtotime($dv) < strtotime($refDate)) $expired++; }
+            if (!$dueKey || $checked===0) $add('calibration','Calibration validity','NA','No calibration-due column filled');
+            else { [$s,$d]=$yn($expired===0,'In calibration',"$expired instrument(s) out of calibration"); $add('calibration','Calibration validity',$s,$d); }
+        } else $add('calibration','Calibration validity','NA','No instrument table');
+    }
+
+    // --- Dispositions & points ---
+    $ncrs = $docId ? ops_all("SELECT id, disposition, status FROM nonconformities WHERE report_doc_id=?", [$docId]) : [];
+    if (!$ncrs) $add('ncr','NCR disposition','NA','No NCR raised on this report');
+    else { $noDisp=0; foreach ($ncrs as $n) if (trim((string)($n['disposition'] ?? ''))==='') $noDisp++; [$s,$d]=$yn($noDisp===0,count($ncrs).' NCR(s) dispositioned',"$noDisp NCR(s) without disposition"); $add('ncr','NCR disposition',$s,$d); }
+    $hwAll = (!empty($doc['job_id']) && function_exists('hwp_for_job')) ? hwp_for_job((int)$doc['job_id']) : [];
+    if (!$hwAll) $add('holdwitness','Hold / Witness status','NA','No hold / witness points');
+    else { $open=0; foreach ($hwAll as $p) if (($p['status'] ?? '')==='OPEN') $open++; [$s,$d]=$yn($open===0,'All cleared/waived',"$open point(s) still open"); $add('holdwitness','Hold / Witness status',$s,$d); }
+
+    // --- Declaration, signature, attachments ---
+    $declField = $hasField(function($f){ $l=strtolower(($f['label']??'').' '.($f['fkey']??'')); return ($f['ftype']==='checkbox') && strpos($l,'declar')!==false; });
+    if (!$declField) $add('declaration','Inspector declaration','NA','No declaration field on form');
+    else { $v=(string)($data[$declField['fkey']] ?? ''); [$s,$d]=$yn($v==='1'||$v==='Yes','Confirmed','Declaration not confirmed'); $add('declaration','Inspector declaration',$s,$d); }
+    $sigFieldFile = !empty($filesByKind['signature']) || !empty($filesByKind['sig_inspector']);
+    $insSig = function_exists('inspector_signature') ? trim((string)inspector_signature((int)($doc['inspector_id'] ?? 0))) : '';
+    [$s,$d] = ($sigFieldFile || $insSig!=='') ? ['PASS', $sigFieldFile ? 'Signed on report' : 'Inspector signature on file'] : ['FAIL','No inspector signature']; $add('signature','Signature',$s,$d);
+    $reqFileFields = array_values(array_filter($fields, fn($f) => in_array($f['ftype'] ?? '', ['file','signature'], true) && !empty($f['required'])));
+    if (!$reqFileFields) $add('attachments','Attachments','NA','No mandatory attachment fields');
+    else { $miss=0; foreach ($reqFileFields as $f){ $has=false; foreach ($files as $fl) if (($fl['field_key']??'')===$f['fkey']) { $has=true; break; } if (!$has) $miss++; } [$s,$d]=$yn($miss===0,'',"$miss required attachment(s) missing"); $add('attachments','Attachments',$s,$d); }
+
+    // Summary — the gate opens when no applicable check has failed.
+    $applicable = array_values(array_filter($checks, fn($c) => $c['status'] !== 'NA'));
+    $passed = count(array_filter($applicable, fn($c) => $c['status'] === 'PASS'));
+    $failed = count(array_filter($applicable, fn($c) => $c['status'] === 'FAIL'));
+    return ['checks'=>$checks, 'passed'=>$passed, 'applicable'=>count($applicable), 'total'=>count($checks),
+            'na'=>count($checks)-count($applicable), 'failed'=>$failed, 'ok'=>($failed===0)];
+}
+
 // ---------------------------------------------------------------------------
 //  Handlers
 // ---------------------------------------------------------------------------
@@ -790,6 +911,20 @@ function ops_idems_documents($route, $method) {
         $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_GET['id'] ?? $_POST['id'] ?? 0)]);
         if (!$doc) { http_response_code(404); view('notfound'); return true; }
         ops_require(idems_can_edit_doc($doc), 'This report can no longer be changed.');
+        // §gate — Inspection Completeness Check. A report must pass every applicable
+        // mandatory check before it goes for approval. A super-admin may override a
+        // failing gate, but only with a recorded reason (kept in the audit trail).
+        $comp = idems_completeness_check($doc);
+        if (!$comp['ok']) {
+            $override = (!empty($_POST['_force_submit']) && is_master() && trim((string)($_POST['override_reason'] ?? '')) !== '');
+            if (!$override) {
+                $fails = array_values(array_filter($comp['checks'], fn($c)=>$c['status']==='FAIL'));
+                $names = implode(', ', array_map(fn($c)=>$c['label'], array_slice($fails, 0, 6)));
+                flash('Completeness check failed (' . $comp['passed'] . '/' . $comp['applicable'] . ' passed). Resolve: ' . $names . '.', 'error');
+                redirect('/document?id=' . $doc['id']);
+            }
+            idems_log('report_doc', $doc['id'], 'GATE_OVERRIDE', ['irn'=>$doc['irn'], 'reason'=>trim((string)$_POST['override_reason']), 'field'=>$comp['failed'].' check(s) overridden']);
+        }
         // Build the approval chain. Every inspector must have at least one approver.
         $n = idems_build_approval_chain($doc);
         if ($n === 0) {
