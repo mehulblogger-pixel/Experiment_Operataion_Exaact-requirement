@@ -81,10 +81,23 @@
         if ($sig) echo '<span class="muted">saved — sign again to replace</span>';
         echo '</div></div>'; break;
       case 'table':
-        $cols = idems_table_cols($f); $rows = is_array($val)?$val:[];
+        // Each column carries its own data type — a dropdown, number, date or
+        // free text — so a "Result" column can be a Accepted/Rejected/Hold pick.
+        $cdefs = idems_table_col_defs($f); $rows = is_array($val)?$val:[];
         echo '<div class="rep-table" data-key="'.e($k).'"><table class="dt"><thead><tr>';
-        foreach ($cols as $ck=>$cl) echo '<th>'.e($cl).'</th>'; echo '<th></th></tr></thead><tbody>';
-        $render_row = function($r) use ($cols,$k){ echo '<tr>'; foreach ($cols as $ck=>$cl) echo '<td><input class="form-control" name="tbl['.e($k).'][][' .e($ck).']" value="'.e($r[$ck]??'').'"></td>'; echo '<td><button type="button" class="btn small secondary" onclick="this.closest(\'tr\').remove()">✕</button></td></tr>'; };
+        foreach ($cdefs as $ck=>$d) echo '<th>'.e($d['label']).'</th>'; echo '<th></th></tr></thead><tbody>';
+        $cellInput = function($ck,$d,$cur) use ($k){
+            $name = 'tbl['.e($k).'][]['.e($ck).']';
+            if ($d['type']==='select') {
+                $h = '<select class="form-control" name="'.$name.'"><option value=""></option>';
+                foreach ($d['options'] as $o) $h .= '<option value="'.e($o).'" '.((string)$cur===(string)$o?'selected':'').'>'.e($o).'</option>';
+                return $h.'</select>';
+            }
+            if ($d['type']==='textarea') return '<textarea class="form-control" rows="1" name="'.$name.'">'.e($cur).'</textarea>';
+            $t = in_array($d['type'],['number','date'],true) ? $d['type'] : 'text';
+            return '<input class="form-control" type="'.$t.'" name="'.$name.'" value="'.e($cur).'">';
+        };
+        $render_row = function($r) use ($cdefs,$cellInput){ echo '<tr>'; foreach ($cdefs as $ck=>$d) echo '<td>'.$cellInput($ck,$d,$r[$ck]??'').'</td>'; echo '<td><button type="button" class="btn small secondary" onclick="this.closest(\'tr\').remove()">✕</button></td></tr>'; };
         if ($rows) foreach ($rows as $r) $render_row((array)$r); else $render_row([]);
         echo '</tbody></table><button type="button" class="btn small secondary" onclick="idemsAddRow(this)">+ Add row</button>';
         echo '<template>'; $render_row([]); echo '</template></div>'; break;

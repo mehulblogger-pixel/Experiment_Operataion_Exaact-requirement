@@ -1021,11 +1021,49 @@ function ops_idems_fill($route, $method) {
         'approvals'=>$approvals, 'curStep'=>$curStep]);
     return true;
 }
-function idems_table_cols($f) {
+// A table field's columns, each with a data type and (for dropdowns) options.
+// Returns key => ['label','type','options'=>[...]]. Two storage forms are read:
+//   · NEW  — one column per line: "Label | type | opt1;opt2;opt3"
+//            (type ∈ text/number/date/select/textarea; dropdown = select)
+//   · LEGACY — plain column names split on newline OR pipe, all text.
+// A line is only read as the new form when its second piece is a known type,
+// so every table designed before this stays exactly as it was.
+function idems_table_col_defs($f) {
     $raw = trim((string)($f['table_cols'] ?? ''));
+    if ($raw === '') return ['col1' => ['label' => 'Column 1', 'type' => 'text', 'options' => []]];
+    $types = ['text','number','date','select','textarea'];
+    $looksNew = false;
+    foreach (preg_split('/\r?\n/', $raw) as $ln) {
+        $p = explode('|', $ln);
+        if (count($p) >= 2) { $t = strtolower(trim($p[1])); if ($t === 'dropdown') $t = 'select'; if (in_array($t, $types, true)) { $looksNew = true; break; } }
+    }
+    $out = []; $seen = [];
+    $add = function ($label, $type, $opts) use (&$out, &$seen) {
+        $label = trim($label); if ($label === '') return;
+        $ck = idems_clean_key($label) ?: ('c' . (count($out) + 1));
+        $b = $ck; $x = 2; while (isset($seen[$ck])) { $ck = $b . '_' . $x; $x++; }
+        $seen[$ck] = 1; $out[$ck] = ['label' => $label, 'type' => $type, 'options' => $opts];
+    };
+    if ($looksNew) {
+        foreach (preg_split('/\r?\n/', $raw) as $ln) {
+            $ln = trim($ln); if ($ln === '') continue;
+            $p = array_map('trim', explode('|', $ln));
+            $type = isset($p[1]) ? strtolower($p[1]) : 'text'; if ($type === 'dropdown') $type = 'select';
+            if (!in_array($type, $types, true)) $type = 'text';
+            $opts = ($type === 'select' && isset($p[2]) && $p[2] !== '')
+                ? array_values(array_filter(array_map('trim', preg_split('/[;,]/', $p[2])), fn($x) => $x !== '')) : [];
+            $add($p[0], $type, $opts);
+        }
+    } else {
+        foreach (preg_split('/\r?\n|\|/', $raw) as $c) { $add($c, 'text', []); }
+    }
+    if (!$out) $out = ['col1' => ['label' => 'Column 1', 'type' => 'text', 'options' => []]];
+    return $out;
+}
+// Backward-compatible: key => label (used by the PDF and Word-fill paths).
+function idems_table_cols($f) {
     $out = [];
-    foreach (preg_split('/\r?\n|\|/', $raw) as $c) { $c = trim($c); if ($c === '') continue; $out[idems_clean_key($c)] = $c; }
-    if (!$out) $out = ['col1'=>'Column 1'];
+    foreach (idems_table_col_defs($f) as $ck => $d) $out[$ck] = $d['label'];
     return $out;
 }
 // Smart image compression: scale down oversized photos and re-encode as JPEG,

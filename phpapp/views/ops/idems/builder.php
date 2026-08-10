@@ -102,7 +102,11 @@
       <div class="ff"><label>Field type</label>
         <select class="form-control" name="ftype" id="ftype"><?php foreach ($fieldTypes as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ef['ftype'] ?? 'text')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
       <div class="ff" data-when="select,multiselect,radio"><label>Options <span class="muted">— one per line, or <code>lookup:sbu</code></span></label><textarea class="form-control" name="options" rows="3" placeholder="A&#10;B&#10;C"><?= e($ef['options'] ?? '') ?></textarea></div>
-      <div class="ff" data-when="table"><label>Table columns <span class="muted">— one per line</span></label><textarea class="form-control" name="table_cols" rows="3" placeholder="Parameter&#10;Specified&#10;Actual&#10;Result"><?= e($ef['table_cols'] ?? '') ?></textarea></div>
+      <div class="ff" data-when="table"><label>Table columns <span class="muted">— each column can be text, a number, a date or a dropdown</span></label>
+        <div id="colb"></div>
+        <button type="button" class="btn small secondary" onclick="colbAdd()">+ Add column</button>
+        <textarea name="table_cols" id="table_cols_raw" style="display:none"><?= e($ef['table_cols'] ?? '') ?></textarea>
+        <small class="muted">Pick <b>Dropdown</b> to make a column a pick-list (e.g. a Result column of Accepted / Rejected / Hold); separate the choices with a semicolon.</small></div>
       <div class="ff" data-when="calc"><label>Formula <span class="muted">— e.g. <code>qty * rate</code> (use field keys)</span></label><input class="form-control" name="calc_expr" value="<?= e($ef['calc_expr'] ?? '') ?>"></div>
       <div class="ff"><label>Placeholder / hint</label><input class="form-control" name="placeholder" value="<?= e($ef['placeholder'] ?? '') ?>"></div>
       <div class="ff"><label>Help text</label><input class="form-control" name="help" value="<?= e($ef['help'] ?? '') ?>"></div>
@@ -137,5 +141,60 @@
   var sel=document.getElementById('ftype');
   function upd(){ var v=sel.value; document.querySelectorAll('[data-when]').forEach(function(el){ el.style.display = el.getAttribute('data-when').split(',').indexOf(v)>=0 ? '' : 'none'; }); }
   sel.addEventListener('change',upd); upd();
+})();
+
+// ---- visual table-column editor (name + type + dropdown options) ----------
+var COLB_TYPES = ['text','number','date','select','textarea'];
+function colbSerialize(){
+  var lines=[];
+  document.querySelectorAll('#colb .colrow').forEach(function(row){
+    var name=row.querySelector('.c-name').value.trim(); if(!name) return;
+    var type=row.querySelector('.c-type').value;
+    if(type==='text') lines.push(name);
+    else if(type==='select'){ var o=row.querySelector('.c-opts').value.trim(); lines.push(name+'|select'+(o?('|'+o):'')); }
+    else lines.push(name+'|'+type);
+  });
+  var raw=document.getElementById('table_cols_raw'); if(raw) raw.value=lines.join('\n');
+}
+function colbParse(raw){
+  raw=(raw||'').trim(); if(!raw) return [];
+  var looksNew=false;
+  raw.split(/\r?\n/).forEach(function(ln){ var p=ln.split('|'); if(p.length>=2){ var t=p[1].trim().toLowerCase(); if(t==='dropdown')t='select'; if(COLB_TYPES.indexOf(t)>=0) looksNew=true; } });
+  var rows=[];
+  if(looksNew){
+    raw.split(/\r?\n/).forEach(function(ln){ ln=ln.trim(); if(!ln)return; var p=ln.split('|');
+      var t=(p[1]||'text').trim().toLowerCase(); if(t==='dropdown')t='select'; if(COLB_TYPES.indexOf(t)<0)t='text';
+      rows.push({name:(p[0]||'').trim(),type:t,opts:(t==='select'&&p[2])?p[2].trim():''}); });
+  } else {
+    raw.split(/\r?\n|\|/).forEach(function(c){ c=c.trim(); if(!c)return; rows.push({name:c,type:'text',opts:''}); });
+  }
+  return rows;
+}
+function colbRow(col){
+  col=col||{name:'',type:'text',opts:''};
+  var div=document.createElement('div'); div.className='colrow';
+  div.style.cssText='display:flex;gap:6px;margin:0 0 5px;align-items:center';
+  div.innerHTML='<input class="form-control c-name" placeholder="Column name" style="flex:2">'+
+    '<select class="form-control c-type" style="flex:1"><option value="text">Text</option><option value="number">Number</option><option value="date">Date</option><option value="select">Dropdown</option><option value="textarea">Long text</option></select>'+
+    '<input class="form-control c-opts" placeholder="Accepted; Rejected; Hold" style="flex:2">'+
+    '<button type="button" class="btn small secondary c-del" title="Remove column">✕</button>';
+  div.querySelector('.c-name').value=col.name;
+  div.querySelector('.c-type').value=col.type;
+  div.querySelector('.c-opts').value=col.opts;
+  function tog(){ div.querySelector('.c-opts').style.display = div.querySelector('.c-type').value==='select'?'':'none'; }
+  tog();
+  div.querySelector('.c-type').addEventListener('change',function(){tog();colbSerialize();});
+  div.querySelector('.c-name').addEventListener('input',colbSerialize);
+  div.querySelector('.c-opts').addEventListener('input',colbSerialize);
+  div.querySelector('.c-del').addEventListener('click',function(){div.remove();colbSerialize();});
+  return div;
+}
+function colbAdd(){ var h=document.getElementById('colb'); if(h){ h.appendChild(colbRow()); colbSerialize(); } }
+(function colbInit(){
+  var host=document.getElementById('colb'), raw=document.getElementById('table_cols_raw');
+  if(!host||!raw) return;
+  var cols=colbParse(raw.value); if(!cols.length) cols=[{name:'',type:'text',opts:''}];
+  host.innerHTML=''; cols.forEach(function(c){ host.appendChild(colbRow(c)); });
+  colbSerialize();
 })();
 </script>
