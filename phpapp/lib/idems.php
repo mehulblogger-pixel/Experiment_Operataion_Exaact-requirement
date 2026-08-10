@@ -1069,11 +1069,44 @@ function idems_clean_key($s) {
 // ---------------------------------------------------------------------------
 //  Phase 2: fill the report body (render the designed form on an instance)
 // ---------------------------------------------------------------------------
+// Every report must be writable by hand, even if nobody designed a form for its
+// type yet. This seeds a practical STARTER form the first time one is needed —
+// a manual "Inspection activities" table (Activity / Method / Result / Finding),
+// an observations + conclusion narrative, and a photographs block. The admin can
+// edit or replace it later; it only ever fires when the type has zero fields.
+function idems_ensure_default_form($typeId) {
+    $typeId = (int)$typeId;
+    if (!$typeId) return false;
+    if ((int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=?", [$typeId]) > 0) return false;
+    $pdo = db();
+    $mkSec = function($title, $help, $ord) use ($pdo, $typeId) {
+        $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")->execute([$typeId, $title, $help, $ord]);
+        return (int)$pdo->lastInsertId();
+    };
+    $fo = 0;
+    $mkF = function($sid, $fkey, $label, $ftype, $opts = '', $cols = '', $span = 1) use ($pdo, $typeId, &$fo) {
+        $fo += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,table_cols,col_span,sort_order) VALUES (?,?,?,?,?,?,?,?,?)")
+            ->execute([$typeId, $sid, $fkey, $label, $ftype, $opts, $cols, $span, $fo]);
+    };
+    $s1 = $mkSec('Inspection activities', 'Add one row per activity carried out — what you did, the method/standard, the result and your finding. Use “+ Add row”.', 10);
+    $mkF($s1, 'activities', 'Activities carried out', 'table', '', "Activity\nMethod / Standard\nResult|select|Accepted; Rejected; Observation; Not applicable\nFinding / Remark", 2);
+    $s2 = $mkSec('Observations & conclusion', '', 20);
+    $mkF($s2, 'observations', 'Details of inspection carried out / observations', 'textarea', '', '', 2);
+    $mkF($s2, 'conclusion', 'Conclusion', 'textarea', '', '', 2);
+    $s3 = $mkSec('Photographs', '', 30);
+    $mkF($s3, 'photos', 'Photographs', 'photo');
+    if (function_exists('idems_log')) idems_log('report_type', $typeId, 'DEFAULT_FORM', ['field' => 'seeded starter form (activities + observations + photos)']);
+    return true;
+}
 function ops_idems_fill($route, $method) {
     $pdo = db();
     $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_GET['id'] ?? $_POST['id'] ?? 0)]);
     if (!$doc) { http_response_code(404); view('notfound'); return true; }
     ops_require(idems_can_edit_doc($doc), 'This report is finalized and can no longer be edited.');
+    // Nobody designed a form yet? Give a usable one so the inspector can always
+    // write the report by hand (manual activities, observations, photos).
+    if (empty($doc['finalized'])) idems_ensure_default_form($doc['report_type_id']);
     $fields = idems_fields($doc['report_type_id']);
     if ($method === 'POST') {
         $data = json_decode($doc['data'] ?: '[]', true); if (!is_array($data)) $data = [];
@@ -2545,8 +2578,17 @@ function ops_idems_autoform($method) {
         $res = autoform_analyze_docx($bin);
         if (!empty($res['err'])) { flash($res['err'], 'error'); redirect('/report-autoform?type=' . $typeId); }
         if (empty($res['plan'])) {
-            flash('No fields were detected. The app looks for "Label:" lines and blank table cells — make sure your form has those, or use the {{token}} method instead.', 'warning');
-            redirect('/report-autoform?type=' . $typeId);
+            // We couldn't read fields from their file — but don't dead-end. Keep
+            // the format as a template so it can still be filled "in your format",
+            // and set up a usable starter form so a report can be written now.
+            db()->prepare("INSERT INTO report_templates (name, report_type_id, file_name, file_data, active, is_default, status, version, created_by, created_at)
+                           VALUES (?,?,?,?,?,?, 'PUBLISHED', 1, ?, ?)")
+                ->execute(['Uploaded: ' . substr($name, 0, 55), $typeId, $name, base64_encode($bin), 1, 0, user_name(current_user()), date('c')]);
+            $seeded = idems_ensure_default_form($typeId);
+            idems_log('report_type', $typeId, 'AUTOFORM_EMPTY', ['file' => $name]);
+            flash('We could not auto-detect fields in “' . $name . '”, so it is saved as a format you can fill by hand.'
+                . ($seeded ? ' A standard inspection form (activities, observations, photos) has been set up — edit it in the Form builder, or place {{tokens}} in your file for exact placement.' : ''), 'warning');
+            redirect('/report-builder?type=' . $typeId);
         }
         // Save the tokenised copy as this type's client format, then reuse the
         // normal review-and-create screen (it re-scans the tokens).
