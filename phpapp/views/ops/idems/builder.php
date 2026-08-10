@@ -37,40 +37,50 @@
     <!-- ============ existing sections & fields ============ -->
     <?php
       $renderFieldRow = function($f) use ($condOps) {
-        echo '<div class="bld-field">';
-        echo '<div><strong>'.e($f['label'] ?: $f['fkey']).'</strong> <span class="muted">'.e(IDEMS_FIELD_TYPES[$f['ftype']] ?? $f['ftype']).'</span>';
+        $full = (int)$f['col_span'] === 2;
+        echo '<div class="bld-field" draggable="true" data-fid="'.(int)$f['id'].'">';
+        echo '<span class="bld-grip" title="Drag to reorder or move between sections">⠿</span>';
+        echo '<div class="bld-fmain"><strong>'.e($f['label'] ?: $f['fkey']).'</strong> <span class="muted">'.e(IDEMS_FIELD_TYPES[$f['ftype']] ?? $f['ftype']).'</span>';
         if ($f['required']) echo ' <span class="pill p-bad" style="padding:0 5px">required</span>';
         if ($f['hidden']) echo ' <span class="pill p-mut" style="padding:0 5px">hidden</span>';
         if ($f['cond_field']) echo ' <span class="pill p-warn" style="padding:0 5px">if '.e($f['cond_field']).' '.e($condOps[$f['cond_op']] ?? $f['cond_op']).' '.e($f['cond_val']).'</span>';
         if ($f['ftype']==='calc' && $f['calc_expr']) echo ' <span class="pill p-info" style="padding:0 5px">= '.e($f['calc_expr']).'</span>';
         echo ' <span class="muted" style="font-size:11px">['.e($f['fkey']).']</span></div>';
         echo '<div class="bld-act">';
-        echo '<form method="post" action="/report-builder?type='.(int)$f['report_type_id'].'" style="display:inline"><input type="hidden" name="_do" value="field_move"><input type="hidden" name="field_id" value="'.(int)$f['id'].'"><input type="hidden" name="dir" value="up"><button class="btn small secondary" title="Move up">↑</button></form> ';
-        echo '<form method="post" action="/report-builder?type='.(int)$f['report_type_id'].'" style="display:inline"><input type="hidden" name="_do" value="field_move"><input type="hidden" name="field_id" value="'.(int)$f['id'].'"><input type="hidden" name="dir" value="down"><button class="btn small secondary" title="Move down">↓</button></form> ';
+        echo '<button type="button" class="btn small secondary bld-width" data-fid="'.(int)$f['id'].'" data-span="'.($full?2:1).'" title="Toggle field width">'.($full?'▭ Full':'▯ Half').'</button> ';
         echo '<a class="btn small secondary" href="/report-field-edit?type='.(int)$f['report_type_id'].'&id='.(int)$f['id'].'">Edit</a> ';
         echo '<form method="post" action="/report-builder?type='.(int)$f['report_type_id'].'" style="display:inline" onsubmit="return confirm(\'Remove this field?\')"><input type="hidden" name="_do" value="field_del"><input type="hidden" name="field_id" value="'.(int)$f['id'].'"><button class="btn small secondary">✕</button></form>';
         echo '</div></div>';
       };
     ?>
+    <?php if ($sections || !empty($bySection[0])): ?>
+      <p class="muted" style="margin:0 0 8px;font-size:12.5px">💡 Drag the <span style="font-family:monospace">⠿</span> handle to reorder fields or move them between sections; drag a section header to reorder sections. Changes save as you drop.</p>
+    <?php endif; ?>
+    <?php if ($sections || !empty($bySection[0])): ?>
+    <div id="bld-canvas">
     <?php foreach ($sections as $s): ?>
-      <div class="panel" style="margin-bottom:12px">
-        <div class="ctitle" style="margin-top:0"><h3><?= e($s['title']) ?></h3>
+      <div class="panel bld-section" style="margin-bottom:12px" data-sid="<?= (int)$s['id'] ?>">
+        <div class="ctitle bld-shead" draggable="true" style="margin-top:0;cursor:grab"><h3><span class="bld-grip">⠿</span> <?= e($s['title']) ?></h3>
           <span>
-            <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline"><input type="hidden" name="_do" value="section_move"><input type="hidden" name="section_id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="dir" value="up"><button class="btn small secondary">↑</button></form>
-            <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline"><input type="hidden" name="_do" value="section_move"><input type="hidden" name="section_id" value="<?= (int)$s['id'] ?>"><input type="hidden" name="dir" value="down"><button class="btn small secondary">↓</button></form>
+            <a class="btn small secondary" href="/report-field-edit?type=<?= (int)$type['id'] ?>&section=<?= (int)$s['id'] ?>" style="display:none"></a>
             <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline" onsubmit="return confirm('Delete section? Its fields move to Unsectioned.')"><input type="hidden" name="_do" value="section_del"><input type="hidden" name="section_id" value="<?= (int)$s['id'] ?>"><button class="btn small secondary">Delete</button></form>
           </span>
         </div>
         <?php if ($s['help']): ?><p class="muted" style="margin:0 0 6px"><?= e($s['help']) ?></p><?php endif; ?>
-        <?php foreach ($bySection[(int)$s['id']] ?? [] as $f) $renderFieldRow($f); ?>
-        <?php if (empty($bySection[(int)$s['id']])): ?><p class="muted" style="margin:4px 0">No fields yet — add one on the right.</p><?php endif; ?>
+        <div class="bld-drop" data-sec="<?= (int)$s['id'] ?>">
+          <?php foreach ($bySection[(int)$s['id']] ?? [] as $f) $renderFieldRow($f); ?>
+        </div>
+        <?php if (empty($bySection[(int)$s['id']])): ?><p class="muted bld-empty" style="margin:4px 0"><?= 'Drop fields here — or add one on the right.' ?></p><?php endif; ?>
       </div>
     <?php endforeach; ?>
-    <?php if (!empty($bySection[0])): ?>
-      <div class="panel" style="margin-bottom:12px">
+      <div class="panel bld-section" style="margin-bottom:12px" data-sid="0">
         <div class="ctitle" style="margin-top:0"><h3>Unsectioned</h3></div>
-        <?php foreach ($bySection[0] as $f) $renderFieldRow($f); ?>
+        <div class="bld-drop" data-sec="0">
+          <?php foreach ($bySection[0] ?? [] as $f) $renderFieldRow($f); ?>
+        </div>
+        <?php if (empty($bySection[0])): ?><p class="muted bld-empty" style="margin:4px 0">Drop fields here to leave them unsectioned.</p><?php endif; ?>
       </div>
+    </div><!-- /bld-canvas -->
     <?php endif; ?>
     <?php if (!$sections && empty($bySection[0])): ?>
       <div class="panel"><p class="muted">This report type has no form yet. Add a section and fields by hand — or let the system build it for you from your own report format.</p>
@@ -140,10 +150,17 @@
 </div>
 
 <style>
-  .bld-field{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
+  .bld-field{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 6px;border-bottom:1px solid var(--line);background:var(--card,transparent);border-radius:6px}
   .bld-field:last-child{border-bottom:0}
+  .bld-fmain{flex:1;min-width:0}
   .bld-act{white-space:nowrap;display:flex;gap:3px;align-items:center}
   .bld-act form{margin:0}
+  .bld-grip{cursor:grab;color:var(--muted,#999);font-size:15px;user-select:none;padding:0 2px}
+  .bld-field.dragging{opacity:.45}
+  .bld-drop{min-height:14px;border-radius:8px;transition:background .12s,box-shadow .12s}
+  .bld-drop.drop-hot{background:color-mix(in srgb,var(--accent,#2b6cff) 10%,transparent);box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent,#2b6cff) 45%,transparent)}
+  .bld-section.sec-dragging{opacity:.5}
+  .bld-shead h3{display:flex;align-items:center;gap:6px}
 </style>
 <script>
 (function(){
@@ -205,5 +222,72 @@ function colbAdd(){ var h=document.getElementById('colb'); if(h){ h.appendChild(
   var cols=colbParse(raw.value); if(!cols.length) cols=[{name:'',type:'text',opts:''}];
   host.innerHTML=''; cols.forEach(function(c){ host.appendChild(colbRow(c)); });
   colbSerialize();
+})();
+
+// ---- drag-and-drop layout designer ----------------------------------------
+(function(){
+  var canvas=document.getElementById('bld-canvas'); if(!canvas) return;
+  var TYPE=<?= json_encode((int)$type['id']) ?>;
+  function post(doName, extra){
+    var body=new URLSearchParams(); body.set('_do',doName); body.set('report_type_id',TYPE); body.set('_ajax','1');
+    body.set('_csrf', (document.querySelector('input[name=_csrf]')||{}).value || '');
+    Object.keys(extra||{}).forEach(function(k){ body.set(k, extra[k]); });
+    return fetch('/report-builder?type='+TYPE, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:body.toString(), credentials:'same-origin'});
+  }
+  // --- field drag ---
+  var dragEl=null;
+  function afterEl(container, y){
+    var els=[].slice.call(container.querySelectorAll('.bld-field:not(.dragging)'));
+    var closest={offset:-Infinity, el:null};
+    els.forEach(function(c){ var b=c.getBoundingClientRect(); var off=y-b.top-b.height/2; if(off<0&&off>closest.offset){ closest={offset:off, el:c}; } });
+    return closest.el;
+  }
+  canvas.querySelectorAll('.bld-field').forEach(function(f){
+    f.addEventListener('dragstart',function(e){ if(f.closest('.bld-shead')) return; dragEl=f; f.classList.add('dragging'); e.dataTransfer.effectAllowed='move'; });
+    f.addEventListener('dragend',function(){ if(!dragEl)return; dragEl.classList.remove('dragging'); dragEl=null; canvas.querySelectorAll('.drop-hot').forEach(function(d){d.classList.remove('drop-hot');}); saveFieldOrder(); });
+  });
+  canvas.querySelectorAll('.bld-drop').forEach(function(drop){
+    drop.addEventListener('dragover',function(e){ if(!dragEl)return; e.preventDefault(); drop.classList.add('drop-hot');
+      var after=afterEl(drop, e.clientY); if(after==null) drop.appendChild(dragEl); else drop.insertBefore(dragEl, after); });
+    drop.addEventListener('dragleave',function(e){ if(e.target===drop) drop.classList.remove('drop-hot'); });
+    drop.addEventListener('drop',function(e){ e.preventDefault(); drop.classList.remove('drop-hot'); });
+  });
+  function saveFieldOrder(){
+    var items=[];
+    canvas.querySelectorAll('.bld-drop').forEach(function(drop){
+      var sec=drop.getAttribute('data-sec');
+      drop.querySelectorAll('.bld-field').forEach(function(f){ items.push({id:parseInt(f.getAttribute('data-fid'),10), section:parseInt(sec,10)}); });
+    });
+    post('field_reorder', {items:JSON.stringify(items)});
+  }
+  // --- section drag ---
+  var secDrag=null;
+  canvas.querySelectorAll('.bld-shead').forEach(function(head){
+    var sec=head.closest('.bld-section');
+    head.addEventListener('dragstart',function(e){ secDrag=sec; sec.classList.add('sec-dragging'); e.dataTransfer.effectAllowed='move'; });
+    head.addEventListener('dragend',function(){ if(!secDrag)return; secDrag.classList.remove('sec-dragging'); secDrag=null; saveSectionOrder(); });
+  });
+  canvas.addEventListener('dragover',function(e){
+    if(!secDrag)return; e.preventDefault();
+    var secs=[].slice.call(canvas.querySelectorAll('.bld-section:not(.sec-dragging)'));
+    var after=null;
+    for(var i=0;i<secs.length;i++){ var b=secs[i].getBoundingClientRect(); if(e.clientY < b.top+b.height/2){ after=secs[i]; break; } }
+    // keep Unsectioned (data-sid=0) pinned last
+    if(after && after.getAttribute('data-sid')==='0') { canvas.insertBefore(secDrag, after); }
+    else if(after) canvas.insertBefore(secDrag, after);
+  });
+  function saveSectionOrder(){
+    var ids=[];
+    canvas.querySelectorAll('.bld-section').forEach(function(s){ var id=s.getAttribute('data-sid'); if(id&&id!=='0') ids.push(parseInt(id,10)); });
+    post('section_reorder', {ids:JSON.stringify(ids)});
+  }
+  // --- inline width toggle ---
+  canvas.querySelectorAll('.bld-width').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var cur=parseInt(btn.getAttribute('data-span'),10)||1; var next=cur===2?1:2;
+      btn.setAttribute('data-span',next); btn.innerHTML = next===2?'▭ Full':'▯ Half';
+      post('field_width', {field_id:btn.getAttribute('data-fid'), col_span:next});
+    });
+  });
 })();
 </script>
