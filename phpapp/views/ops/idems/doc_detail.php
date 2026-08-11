@@ -176,6 +176,44 @@
 <?php endif; ?>
 <?php endif; ?>
 
+<?php
+  // ---- Vetting & debriefing (a distinct review action before approval) ----
+  $vetting = $vetting ?? []; $canVet = $canVet ?? false;
+  $vetPill = ['VETTED'=>'p-ok','RETURNED'=>'p-bad','DEBRIEFED'=>'p-info'];
+  if (($vetting || $canVet) && empty($doc['finalized'])):
+?>
+<div class="panel">
+  <div class="ctitle" style="margin-top:0"><h3>Vetting &amp; debriefing</h3>
+    <?php if (!empty($doc['vet_status']) && isset(IDEMS_VET_STATUS[$doc['vet_status']])): ?>
+      <span class="pill <?= $vetPill[$doc['vet_status']] ?? 'p-mut' ?>"><?= e(IDEMS_VET_STATUS[$doc['vet_status']]) ?></span>
+    <?php endif; ?>
+  </div>
+  <p class="muted" style="margin:0 0 8px;font-size:12px">A senior reviewer vets the report (technical check) or records a debrief before it goes for approval. Returning a report sends it back to the inspector as a draft.</p>
+  <?php if ($vetting): ?>
+    <div class="appr-steps" style="margin-bottom:10px">
+      <?php foreach ($vetting as $v): ?>
+        <div class="appr-step">
+          <span class="pill <?= $vetPill[$v['action']] ?? 'p-mut' ?>"><?= e(($v['stage']==='DEBRIEF'?'Debrief · ':'') . (IDEMS_VET_STATUS[$v['action']] ?? $v['action'])) ?></span>
+          <span class="muted">— <?= e($v['acted_by']) ?><?= $v['acted_at']?' · '.e(date('d M H:i', strtotime($v['acted_at']))):'' ?></span>
+          <?php if ($v['note']): ?><div class="muted" style="font-size:12px">“<?= e($v['note']) ?>”</div><?php endif; ?>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+  <?php if ($canVet): ?>
+    <form method="post" action="/document-vet">
+      <input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
+      <input class="form-control" name="note" placeholder="Note (required to return for correction)" style="margin-bottom:8px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn" type="submit" name="vet_action" value="VETTED">✓ Vet (cleared)</button>
+        <button class="btn secondary" type="submit" name="vet_action" value="RETURNED">↩ Return for correction</button>
+        <button class="btn secondary" type="submit" name="vet_action" value="DEBRIEFED">🗣 Record debrief</button>
+      </div>
+    </form>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php if (!empty($approvals)): ?>
 <div class="panel">
   <div class="ctitle" style="margin-top:0"><h3>Approval chain</h3></div>
