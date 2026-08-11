@@ -289,6 +289,28 @@ function idems_migrate() {
         try { idems_build_mgh_report(); } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('mgh_report_seeded', '1');
     }
+    // ONE-TIME rescue: an "IR" inspection report whose form was auto-imported from
+    // a Word file ended up with garbled labels ("Client s p o no date", "Item as
+    // percontract order table"…). Replace that garbled form with the clean layout,
+    // and retire the duplicate prebuilt type so there is ONE inspection report.
+    // Guarded so it fires at most once and NEVER touches a form built by hand.
+    if (function_exists('setting_get') && !setting_get('ir_form_cleaned', '')) {
+        try {
+            $ir = ops_one("SELECT id FROM report_types WHERE code='IR'");
+            if ($ir) {
+                $irId = (int)$ir['id'];
+                $alreadyClean = (int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=? AND title='Inspection details'", [$irId]);
+                $garbled = (int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND (label LIKE '% s p o %' OR label LIKE '%percontract%' OR label LIKE '%actual impression%' OR label LIKE '%no revision%' OR label LIKE '%edition version year%' OR label LIKE '%seller manufacturer%')", [$irId]);
+                $anyFields = (int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=?", [$irId]);
+                if (!$alreadyClean && ($garbled > 0 || $anyFields === 0)) {
+                    idems_reset_inspection_form($irId);
+                }
+                // one clean inspection report — hide the auto-seeded duplicate
+                db()->prepare("UPDATE report_types SET active=0 WHERE code='MGHIR'")->execute();
+            }
+        } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('ir_form_cleaned', '1');
+    }
 }
 // ITP inspection type for a scope activity — how the point is covered.
 const INSPECTION_TYPES_ITP = [
