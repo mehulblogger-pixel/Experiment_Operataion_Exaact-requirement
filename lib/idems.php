@@ -2706,9 +2706,35 @@ function idems_status_palette($text) {
     return [[237,238,240], [80,80,80]];
 }
 
+// Given a measured build (page count + where each section started/ended), decide
+// the section index to force a page break before so a sparse final page is filled
+// more evenly. Returns -1 to leave the natural pagination alone. Only a two-page
+// report with a notably short second page is rebalanced; anything else is left as
+// is (and the driver rejects a rebuild that would spill to a third page). §paginate
+function idems_balance_break($r) {
+    if (($r['pages'] ?? 1) !== 2) return -1;
+    $secs = $r['secStarts'] ?? []; if (count($secs) < 2) return -1;
+    $top = $r['top']; $usable = max(1, $r['usable']);
+    $p1bottom = $top;
+    foreach ($secs as $s) { if ((int)($s['endPage'] ?? ($s['startPage'] ?? 0)) === 0) $p1bottom = max($p1bottom, $s['end'] ?? $s['start']); }
+    $h1 = $p1bottom - $top;
+    $h2 = (($r['finalPage'] ?? 0) >= 1) ? ($r['finalY'] - $top) : 0;
+    if ($h1 <= 0 || $h2 <= 0) return -1;
+    if ($h2 >= 0.60 * $h1) return -1;                       // already reasonably balanced
+    $target = $top + ($h1 + $h2) / 2;                       // page 1 should end near here
+    $bestK = -1; $bestD = PHP_FLOAT_MAX;
+    foreach ($secs as $i => $s) {
+        if ($i === 0) continue;                             // never orphan the first section
+        if ((int)($s['startPage'] ?? 0) !== 0) continue;    // only sections that begin on page 1
+        if (($s['start'] - $top) < 0.30 * $usable) continue; // keep page 1 from becoming too empty
+        $d = abs($s['start'] - $target);
+        if ($d < $bestD) { $bestD = $d; $bestK = $i; }
+    }
+    return $bestK;
+}
+
 // ---- Report PDF (letterhead + body + automatic signature block + timestamps) ----
 function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $copy = '') {
-    $p = new SimplePDF(); $ml = $p->ml; $right = $p->right();
     // Company brand colour for the header band (from the letterhead), else default.
     $band = (!empty($lh['band']) && is_array($lh['band'])) ? $lh['band'] : [30, 64, 175];
     // Document-control identity (format no. / doc no. / revision) printed on the
@@ -2719,9 +2745,16 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         $rt = ops_one("SELECT format_number, doc_control_no, revision FROM report_types WHERE id=?", [(int)$doc['report_type_id']]);
         if ($rt) { $fmtNo = trim((string)($rt['format_number'] ?? '')); $docCtl = trim((string)($rt['doc_control_no'] ?? '')); $rev = trim((string)($rt['revision'] ?? '')); }
     }
+    $copy = strtoupper(trim((string)$copy));
+    // §paginate — the whole document is produced by this closure so it can be built
+    // TWICE: once to measure how the sections fall, then again forcing a page break
+    // before a chosen section so a short final page is not left mostly empty. It
+    // returns the page object, where each section began/ended, and the final cursor.
+    $build = function($forceBreakBefore) use ($doc, $sections, $fields, $data, $files, $lh, $sigs, $copy, $band, $fmtNo, $docCtl, $rev) {
+    $p = new SimplePDF(); $ml = $p->ml; $right = $p->right();
+    $secStarts = [];
     // A draft carries a DRAFT watermark until it is approved and locked. Once
     // finalized, an Original / Duplicate / Triplicate copy carries that word.
-    $copy = strtoupper(trim((string)$copy));
     if (empty($doc['finalized'])) { $p->watermark = 'DRAFT'; }
     elseif (in_array($copy, ['DUPLICATE', 'TRIPLICATE'], true)) { $p->watermark = $copy; }
     // Running header on continuation pages + footer with "Page X of Y" on every
@@ -2831,6 +2864,10 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         $fl = array_values(array_filter($fl, fn($f) => idems_cond_visible($f, $data)));  // §cond — and each field's
         $fl = array_values(array_filter($fl, $hasContent));                             // §empty — drop empty fields
         if (!$fl) continue;                                                              // §empty — and empty sections
+        // §paginate — force the balancing break before this section when asked, then
+        // record where it begins so the driver can measure section heights.
+        if (count($secStarts) === $forceBreakBefore && $p->y > $p->mt + 2) $p->addPage();
+        $secStarts[] = ['start'=>$p->y, 'startPage'=>$p->curPageIndex()];
         // Per-section print layout. "Start on new page" forces a page break unless
         // we're already at the top; "Keep together" pushes a section that would be
         // orphaned near the bottom onto the next page.
@@ -3055,6 +3092,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
             $flushGrid(); $fullLbl($f,$v);
         }
         $flushGrid();
+        $__si = count($secStarts) - 1; if ($__si >= 0) { $secStarts[$__si]['end'] = $p->y; $secStarts[$__si]['endPage'] = $p->curPageIndex(); }
     }
     // remarks
     if (!empty($doc['remarks'])) { $p->gap(4); $p->needSpace(16); $p->line('Remarks', 10, true, 13, $band); foreach ($p->wrap($doc['remarks'],9,$p->contentW()) as $ln2){ $p->needSpace(11); $p->line($ln2,9,false,11); } }
@@ -3111,6 +3149,15 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     // footer note
     if (!empty($lh['footer'])) { $p->needSpace(14); $p->hr([220,220,220]); $p->gap(3); $p->line($lh['footer'], 7.5, false, 10, [130,130,130]); }
     $p->needSpace(12); $p->line('System-generated by ' . ((($lh['name'] ?? '') ?: app_name())) . ' · IRN ' . $doc['irn'] . ' · ' . date('d M Y H:i') . ($doc['finalized'] ? ' · Issued/locked' : ' · DRAFT'), 7, false, 9, [150,150,150]);
+        return ['p'=>$p, 'secStarts'=>$secStarts, 'pages'=>$p->pageCount(), 'usable'=>($p->usableBottom()-$p->usableTop()), 'top'=>$p->usableTop(), 'finalY'=>$p->y, 'finalPage'=>$p->curPageIndex()];
+    };
+
+    // Build once to measure, then rebalance if the final page is left mostly empty.
+    // A rebuilt layout is accepted only if it did not spill onto an extra page. §paginate
+    $r = $build(-1);
+    $p = $r['p'];
+    $K = idems_balance_break($r);
+    if ($K >= 0) { $r2 = $build($K); if (($r2['pages'] ?? 99) === ($r['pages'] ?? 0)) $p = $r2['p']; }
     return $p->output();
 }
 

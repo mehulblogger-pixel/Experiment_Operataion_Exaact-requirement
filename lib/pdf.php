@@ -37,6 +37,12 @@ class SimplePDF {
     }
     public function contentW() { return $this->W - $this->ml - $this->mr; }
     public function right() { return $this->W - $this->mr; }
+    // Pagination helpers used by a measure-then-place builder: how many pages so
+    // far, the 0-based index of the page being drawn, and the usable top/bottom.
+    public function pageCount() { return count($this->pages) + 1; }
+    public function curPageIndex() { return count($this->pages); }
+    public function usableTop() { return $this->mt; }
+    public function usableBottom() { return $this->H - $this->mb; }
 
     // One text-drawing op at absolute x / top-origin y (no cursor movement) — used
     // by the running header/footer which are painted outside the normal flow.
