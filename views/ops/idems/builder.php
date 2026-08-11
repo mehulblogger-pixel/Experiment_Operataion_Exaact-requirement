@@ -109,6 +109,7 @@
           ['add_holdstatus','⏸️ Order &amp; hold-point status','P.O. status (Completed/Balance/Hold) + previous &amp; current hold points'],
           ['add_photos','📷 Photographs','Take/upload photos (auto-compressed), caption each, or mark denied'],
           ['add_conclusion','📝 Conclusion &amp; remarks','Observations, conclusion and general remarks'],
+          ['add_disclaimer','📄 Static text / disclaimer','A fixed paragraph printed on the report — disclaimer, standing instruction'],
           ['add_sigblock','🖋️ Sign-off block (per role)','Prepared / Reviewed / Approved — name, designation &amp; date, auto-filled'],
           ['add_signatures','✍️ Signatures (sign pads)','Manufacturer/vendor &amp; client representative signature pads'],
         ];
@@ -163,7 +164,7 @@
         </select></div>
       <div class="ff"><label>Field type</label>
         <select class="form-control" name="ftype" id="ftype"><?php foreach ($fieldTypes as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ef['ftype'] ?? 'text')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-      <div class="ff" data-when="select,multiselect,radio"><label>Options <span class="muted">— one per line, a master with <code>lookup:sbu</code>, or the call's order items with <code>call:po_items</code></span></label><textarea class="form-control" name="options" rows="3" placeholder="A&#10;B&#10;C"><?= e($ef['options'] ?? '') ?></textarea></div>
+      <div class="ff" data-when="select,multiselect,radio,richtext,sigblock"><label><span data-optlabel>Options</span> <span class="muted"><span data-opthint>— one per line, a master with <code>lookup:sbu</code>, or the call's order items with <code>call:po_items</code></span></span></label><textarea class="form-control" name="options" rows="4" placeholder="A&#10;B&#10;C"><?= e($ef['options'] ?? '') ?></textarea></div>
       <div class="ff" data-when="table"><label>Table columns <span class="muted">— each column can be text, a number, a date or a dropdown</span></label>
         <div id="colb"></div>
         <button type="button" class="btn small secondary" onclick="colbAdd()">+ Add column</button>
@@ -213,7 +214,11 @@
 <script>
 (function(){
   var sel=document.getElementById('ftype');
-  function upd(){ var v=sel.value; document.querySelectorAll('[data-when]').forEach(function(el){ el.style.display = el.getAttribute('data-when').split(',').indexOf(v)>=0 ? '' : 'none'; }); }
+  var oL=document.querySelector('[data-optlabel]'), oH=document.querySelector('[data-opthint]');
+  function upd(){ var v=sel.value; document.querySelectorAll('[data-when]').forEach(function(el){ el.style.display = el.getAttribute('data-when').split(',').indexOf(v)>=0 ? '' : 'none'; });
+    if(oL&&oH){ if(v==='richtext'){ oL.textContent='Content'; oH.innerHTML='— the fixed text / disclaimer to print. Blank line = new paragraph.'; }
+      else if(v==='sigblock'){ oL.textContent='Roles'; oH.innerHTML='— one sign-off role per line (e.g. Prepared by / Reviewed by / Approved by). Name &amp; designation auto-fill.'; }
+      else { oL.textContent='Options'; oH.innerHTML='— one per line, a master with <code>lookup:sbu</code>, or the call’s order items with <code>call:po_items</code>'; } } }
   sel.addEventListener('change',upd); upd();
 })();
 

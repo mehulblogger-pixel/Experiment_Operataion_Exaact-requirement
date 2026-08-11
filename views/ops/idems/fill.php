@@ -20,6 +20,17 @@
     $reqAttr = $f['required'] ? ' data-req="1"' : '';
     if ($f['ftype'] === 'heading') { echo '<h3 class="tab-sub" style="grid-column:1/-1"'.$condAttr($f).'>'.e($f['label']).'</h3>'; return; }
     if ($f['ftype'] === 'note')    { echo '<p class="muted" style="grid-column:1/-1"'.$condAttr($f).'>'.e($f['label'] ?: $f['help']).'</p>'; return; }
+    if ($f['ftype'] === 'richtext') {
+      // A fixed disclaimer / standing instruction — printed on the report, shown
+      // read-only here so the inspector reads it in context (no field to fill).
+      echo '<div class="rt-static" style="grid-column:1/-1;border-left:3px solid var(--line,#ccd);padding:4px 0 4px 10px;margin:2px 0"'.$condAttr($f).'>';
+      if (trim((string)$f['label']) !== '') echo '<div style="font-weight:600;font-size:12.5px;margin-bottom:2px">'.e($f['label']).'</div>';
+      foreach (preg_split('/\r?\n/', (string)($f['field_options'] ?? '')) as $ln) {
+        if (trim($ln)==='') { echo '<div style="height:6px"></div>'; continue; }
+        echo '<p class="muted" style="margin:0 0 3px;font-size:12px;line-height:1.4">'.e($ln).'</p>';
+      }
+      echo '</div>'; return;
+    }
     echo '<div class="ff'.$span.'" data-fieldwrap="'.e($k).'"'.$condAttr($f).'>';
     echo '<label>'.e($f['label']).$req.$autoTag.'</label>';
     $opts = idems_field_options($f, $doc);
