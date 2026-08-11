@@ -2948,21 +2948,28 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                 $rows = idems_sigblock_rows($f, $data, $sigs);
                 $n = count($rows); if ($n === 0) { continue; }
                 $perRow = min(3, $n); $boxW = $p->contentW()/$perRow;
-                $p->needSpace(22);
-                if (!$solo && trim((string)($f['label'] ?? '')) !== '') { $p->text($ml, $f['label'], 9, true, [70,70,70]); $p->gap(13); }
+                $p->needSpace(26);
+                if (!$solo && trim((string)($f['label'] ?? '')) !== '') { $p->text($ml, $f['label'], 9, true, [70,70,70]); $p->gap(14); }
                 for ($i=0;$i<$n;$i+=$perRow) {
                     $slice = array_slice($rows,$i,$perRow);
-                    $p->needSpace(76); $rowY=$p->y; $x=$ml;
+                    $p->needSpace(92); $rowY=$p->y; $x=$ml;
                     foreach ($slice as $r) {
-                        $p->y=$rowY; $p->text($x, $r['role'], 8.5, true, [90,90,90]);
-                        $imgY=$rowY+13;
-                        if (!empty($r['img'])) { $nm=$p->addJpeg($r['img']); if($nm) $p->drawImage($nm,$x,$imgY,110,34); }
+                        // §sign — uppercase role header, signature line, then labelled
+                        // Name / Designation / Date and a subtle "digitally signed" mark.
+                        $p->y=$rowY; $p->text($x, strtoupper((string)$r['role']), 8, true, [110,110,110]);
+                        $imgY=$rowY+15;
+                        $signed = !empty($r['img']);
+                        if ($signed) { $nm=$p->addJpeg($r['img']); if($nm) $p->drawImage($nm,$x,$imgY,110,34); }
                         $lineY=$imgY+36; $p->lineAt($x,$lineY,$x+$boxW-14,$lineY,[120,120,120]);
-                        $ty=$lineY+3;
-                        foreach (array_filter([$r['name'],$r['desig'],$r['date']?('Date: '.$r['date']):'']) as $t){ $p->y=$ty; $p->text($x,$t,8,false,[70,70,70]); $ty+=10; }
+                        $ty=$lineY+5;
+                        $put = function($lbl,$val) use (&$ty,$p,$x) { $val=trim((string)$val); if($val==='')return; $p->y=$ty; $p->text($x,$lbl,7,true,[145,145,145]); $p->text($x+38,$val,8,false,[60,60,60]); $ty+=10; };
+                        $put('Name', $r['name']);
+                        $put('Desig.', $r['desig']);
+                        $put('Date', $r['date']);
+                        if ($signed) { $p->y=$ty; $p->text($x, 'Digitally signed', 7, true, [21,101,52]); $ty+=10; }
                         $x+=$boxW;
                     }
-                    $p->y=$rowY+76;
+                    $p->y=$rowY+96;
                 }
                 $p->gap(3); continue;
             }
@@ -3047,17 +3054,23 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         // A scannable QR pointing straight at the verification page, so a
         // recipient confirms the report with a phone camera instead of typing a
         // twenty-character code. Encoded by our own lib/qr.php (no dependencies).
-        $qr = null;
-        if ($vu !== '' && function_exists('qr_matrix')) $qr = qr_matrix($vu, 'M');
-        $qrBox = 34;                          // points (~12mm) — comfortably scannable
-        $p->needSpace($qr ? max(30, $qrBox + 6) : 30); $p->gap(4); $p->hr([200,200,200]); $p->gap(3);
-        $textY = $p->y;
-        if ($qr) $p->qr($qr, $p->right() - $qrBox, $textY, $qrBox);   // top-right, in the margin whitespace
-        $p->line('Verify this ' . Tl('report') . ' is genuine and unaltered', 8.5, true, 11, [40, 95, 65]);
-        if ($vu !== '') $p->line('Visit: ' . $vu, 8, false, 10, [70, 70, 70]);
-        $p->line('Verification code:  ' . $vc, 9.5, true, 12, [30, 30, 30]);
-        $p->line('Anyone can check this report exists, was issued, and its evidence is untampered — no account needed.', 7.5, false, 10, [125, 125, 125]);
-        if ($qr) { $p->y = max($p->y, $textY + $qrBox + 3); $p->line('Scan the code to verify.', 7, false, 9, [150, 150, 150]); }
+        $qr = ($vu !== '' && function_exists('qr_matrix')) ? qr_matrix($vu, 'M') : null;
+        // §verify — a self-contained verification panel: a subtle tinted box with a
+        // left accent stripe, the report's identity and code on the left, and the QR
+        // on the right, so the "this document is genuine" block reads as deliberate.
+        $qrBox = 48; $boxH = 66;
+        $p->needSpace($boxH + 8); $p->gap(6);
+        $bx = $ml; $by = $p->y; $bw = $p->contentW();
+        $p->rectFill($bx, $by, $bw, $boxH, [244, 248, 246]);
+        $p->rectFill($bx, $by, 3, $boxH, [40, 120, 80]);        // accent stripe
+        $tx = $bx + 12; $ty = $by + 9;
+        $p->y = $ty;      $p->text($tx, 'DOCUMENT VERIFICATION', 9, true, [30, 92, 60]);
+        $p->y = $ty + 14; $p->text($tx, 'Digitally verified ' . Tl('report') . ' — evidence untampered, no account needed.', 7.5, false, [95, 95, 95]);
+        $p->y = $ty + 27; $p->text($tx, 'IRN:', 7.5, true, [125, 125, 125]);  $p->text($tx + 30, (string)$doc['irn'], 8, true, [45, 45, 45]);
+        $p->y = $ty + 38; $p->text($tx, 'Code:', 7.5, true, [125, 125, 125]); $p->text($tx + 30, $vc, 9, true, [25, 25, 25]);
+        if ($vu !== '') { $p->y = $ty + 49; $p->text($tx, 'Scan the QR or visit ' . $vu, 7, false, [140, 140, 140]); }
+        if ($qr) $p->qr($qr, $bx + $bw - $qrBox - 10, $by + ($boxH - $qrBox) / 2, $qrBox);
+        $p->y = $by + $boxH + 4;
     }
     // footer note
     if (!empty($lh['footer'])) { $p->needSpace(14); $p->hr([220,220,220]); $p->gap(3); $p->line($lh['footer'], 7.5, false, 10, [130,130,130]); }
