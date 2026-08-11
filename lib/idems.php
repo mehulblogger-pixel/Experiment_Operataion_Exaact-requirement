@@ -1344,7 +1344,7 @@ function ops_idems_builder($route, $method) {
             }
             $default = "This report is issued on the basis of the inspection carried out at the time and place stated. It reflects the condition of the items inspected and does not relieve the manufacturer / supplier of their contractual obligations. Our liability is limited to the fee charged for this inspection.";
             $o = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId]);
-            $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,field_options,sort_order,col_span) VALUES (?,?,?,?,'richtext',?,?,2)")
+            $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,sort_order,col_span) VALUES (?,?,?,?,'richtext',?,?,2)")
                 ->execute([$typeId, $secId, 'disclaimer_'.substr(md5((string)$o),0,4), 'Disclaimer', $default, $o]);
             flash('Added a static “Disclaimer” block — edit the wording in the field’s Content box, or add another for standing instructions.'); redirect('/report-builder?type=' . $typeId);
         }
@@ -1357,7 +1357,7 @@ function ops_idems_builder($route, $method) {
                 ->execute([$typeId, 'Sign-off', 'Prepared / Reviewed / Approved — name, designation and date auto-fill from the workflow; edit the roles in the field options.', (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
             $secId = (int)$pdo->lastInsertId();
             $o = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId]);
-            $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,field_options,sort_order,col_span) VALUES (?,?,?,?,'sigblock',?,?,2)")
+            $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,sort_order,col_span) VALUES (?,?,?,?,'sigblock',?,?,2)")
                 ->execute([$typeId, $secId, 'signoff', 'For '.app_name(), "Prepared by\nReviewed by\nApproved by", $o]);
             flash('Added a “Sign-off” block — Prepared / Reviewed / Approved, auto-filled from the workflow. Edit the roles under the field to add or rename.'); redirect('/report-builder?type=' . $typeId);
         }
@@ -1753,7 +1753,7 @@ function idems_table_cols($f) {
 // designation and date. The role list lives in field_options (one per line); the
 // filled-in name/designation/date live in the doc data as data[fkey][role].
 function idems_sigblock_roles($f) {
-    $raw = trim((string)($f['field_options'] ?? ''));
+    $raw = trim((string)($f['options'] ?? ''));
     $roles = [];
     foreach (preg_split('/\r?\n/', $raw) as $ln) { $ln = trim($ln); if ($ln !== '' && stripos($ln, '=') !== 0) $roles[] = $ln; }
     // strip an "opt=" style prefix if the author reused options syntax; keep plain labels
@@ -2508,7 +2508,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
             if ($f['ftype']==='richtext') {
                 $flushGrid();
                 if (trim((string)($f['label'] ?? '')) !== '') { $p->needSpace(12); $p->line($f['label'], 9.5, true, 12, [70,70,70]); }
-                foreach (preg_split('/\r?\n/', (string)($f['field_options'] ?? '')) as $ln) {
+                foreach (preg_split('/\r?\n/', (string)($f['options'] ?? '')) as $ln) {
                     if (trim($ln) === '') { $p->gap(4); continue; }
                     foreach ($p->wrap($ln, 8.5, $p->contentW()) as $wl) { $p->needSpace(11); $p->line($wl, 8.5, false, 11, [90,90,90]); }
                 }
@@ -2780,7 +2780,7 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
             if (in_array($f['ftype'], ['heading','note'], true)) { $body .= $para($run($f['label'], $f['ftype'] === 'heading', 19, '505050')); continue; }
             if (($f['ftype'] ?? '') === 'richtext') {
                 if (trim((string)($f['label'] ?? '')) !== '') $body .= $para($run($f['label'], true, 18, '464646'), ['after' => 20]);
-                foreach (preg_split('/\r?\n/', (string)($f['field_options'] ?? '')) as $ln) {
+                foreach (preg_split('/\r?\n/', (string)($f['options'] ?? '')) as $ln) {
                     if (trim($ln) === '') { $body .= $para($run('', false, 8), ['after' => 20]); continue; }
                     $body .= $para($run($ln, false, 17, '5A5A5A'), ['after' => 20]);
                 }
