@@ -33,6 +33,7 @@
   <div class="doc-actions">
     <?php // ---- PRIMARY: the single next step ---- ?>
     <?php if (idems_can_edit_doc($doc) && !empty($hasSchema)): ?><a class="btn" href="/document-fill?id=<?= (int)$doc['id'] ?>">✍ Fill report</a><?php endif; ?>
+    <?php if (idems_can_edit_doc($doc)): ?><a class="btn secondary" href="/document-edit?id=<?= (int)$doc['id'] ?>" title="Client, vendor, PO, applicable standards, result & release status">✎ Edit details</a><?php endif; ?>
     <?php if ((is_master() || can('idems.type.manage')) && empty($hasSchema)): ?><a class="btn secondary" href="/report-builder?type=<?= (int)$doc['report_type_id'] ?>">Design this form</a><?php endif; ?>
     <?php if ($canSubmit && $comp['ok']): ?>
       <form method="post" action="/document-submit?id=<?= (int)$doc['id'] ?>" style="display:inline"><button class="btn" type="submit">✓ Submit for review</button></form>
@@ -54,7 +55,6 @@
     <details class="more-menu">
       <summary class="btn secondary">More ▾</summary>
       <div class="more-pop">
-        <?php if (idems_can_edit_doc($doc)): ?><a href="/document-edit?id=<?= (int)$doc['id'] ?>">✎ Edit header</a><?php endif; ?>
         <?php if (!$doc['finalized'] && (is_master() || can('idems.finalize')) && !$canFinalize): ?>
           <span class="mp-head" title="<?= e($whyNot) ?>">Finalize: <?= e($whyNot) ?></span>
         <?php endif; ?>

@@ -109,8 +109,11 @@
         $sig = $filesByField[$k][0] ?? null;
         echo '<div class="sig-wrap"><canvas class="sig-pad" id="sig_'.e($k).'" width="380" height="120" data-key="'.e($k).'"></canvas>';
         echo '<input type="hidden" name="sig['.e($k).']" id="sigv_'.e($k).'">';
-        echo '<div><button type="button" class="btn small secondary" onclick="idemsSigClear(\''.e($k).'\')">Clear</button> ';
-        if ($sig) echo '<span class="muted">saved — sign again to replace</span>';
+        echo '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px">';
+        echo '<button type="button" class="btn small secondary" onclick="idemsSigClear(\''.e($k).'\')">Clear</button>';
+        echo '<label class="btn small secondary" style="cursor:pointer;margin:0">⬆ Upload image<input type="file" accept="image/*" style="display:none" onchange="idemsSigUpload(this,\''.e($k).'\')"></label>';
+        echo '<span class="muted" style="font-size:11px">Draw above, or upload a PNG/JPG of the signature.</span>';
+        if ($sig) echo '<span class="muted">· saved — sign/upload again to replace</span>';
         echo '</div></div>'; break;
       case 'sigblock':
         // Per-role sign-off (Prepared / Reviewed / Approved). Name & designation
@@ -196,7 +199,14 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/documents"><?= e(T_REG('report')) ?></a> › <a href="/document?id=<?= (int)$doc['id'] ?>"><?= e($doc['irn']) ?></a> › Fill</div>
 <div class="master-head"><div><h1>Fill <?= e(Tl('report')) ?> <?= e($doc['irn']) ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= e($doc['title'] ?: $doc['type_code']) ?></p></div>
-  <a class="btn secondary" href="/document?id=<?= (int)$doc['id'] ?>">← Back</a>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <a class="btn secondary" href="/document-edit?id=<?= (int)$doc['id'] ?>" title="Client, vendor, PO, applicable standards, result &amp; release status">✎ Edit details</a>
+    <a class="btn secondary" href="/my-signature" target="_blank" title="Draw or upload your signature — it is added to reports you sign automatically">✍️ My signature</a>
+    <a class="btn secondary" href="/document?id=<?= (int)$doc['id'] ?>">← Back</a>
+  </div>
+</div>
+<div class="panel" style="margin-bottom:12px;border-left:3px solid var(--brand);background:var(--soft);font-size:12.5px;padding:8px 12px">
+  Header details — <b>Client, Vendor, PO, Applicable standards, Result &amp; Release status</b> — are on <a href="/document-edit?id=<?= (int)$doc['id'] ?>">✎ Edit details</a>. Your signature (draw or upload) is set once on <a href="/my-signature" target="_blank">My signature</a> and applied automatically.
 </div>
 
 <?php // Where the report stands + the approval trail + Submit — all on this screen,
@@ -410,6 +420,25 @@ document.querySelectorAll('.sig-pad').forEach(function(c){
   c.addEventListener('touchstart',start); c.addEventListener('touchmove',move); c.addEventListener('touchend',end);
 });
 function idemsSigClear(k){ var c=document.getElementById('sig_'+k); c.getContext('2d').clearRect(0,0,c.width,c.height); document.getElementById('sigv_'+k).value=''; }
+// Upload a signature image: draw it onto the pad (fit) and store it as the value,
+// so it saves through the same path as a drawn signature.
+function idemsSigUpload(input,k){
+  var f=input.files&&input.files[0]; if(!f) return;
+  var r=new FileReader();
+  r.onload=function(ev){
+    var img=new Image();
+    img.onload=function(){
+      var c=document.getElementById('sig_'+k), ctx=c.getContext('2d');
+      ctx.clearRect(0,0,c.width,c.height);
+      var s=Math.min(c.width/img.width, c.height/img.height);
+      var w=img.width*s, h=img.height*s;
+      ctx.drawImage(img,(c.width-w)/2,(c.height-h)/2,w,h);
+      document.getElementById('sigv_'+k).value=c.toDataURL('image/png');
+    };
+    img.src=ev.target.result;
+  };
+  r.readAsDataURL(f);
+}
 // conditional visibility + calculated fields
 (function(){
   var form=document.getElementById('fillform'); if(!form) return;
