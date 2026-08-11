@@ -311,6 +311,18 @@ function idems_migrate() {
         } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('ir_form_cleaned', '1');
     }
+    // The uploaded company template's {{tokens}} were built for the OLD garbled
+    // field keys; after cleaning the form they no longer match, so the "your
+    // format" Word download came out full of raw {{tokens}}. Detach the IR-type
+    // template so the download uses the clean system layout instead. Re-uploading
+    // a company format later maps its tokens to the clean fields.
+    if (function_exists('setting_get') && !setting_get('ir_tpl_detached', '')) {
+        try {
+            $ir = ops_one("SELECT id FROM report_types WHERE code='IR'");
+            if ($ir) db()->prepare("UPDATE report_templates SET active=0 WHERE report_type_id=?")->execute([(int)$ir['id']]);
+        } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('ir_tpl_detached', '1');
+    }
 }
 // ITP inspection type for a scope activity — how the point is covered.
 const INSPECTION_TYPES_ITP = [
