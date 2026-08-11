@@ -63,6 +63,18 @@
           </span>
         </div>
         <?php if ($s['help']): ?><p class="muted" style="margin:0 0 6px"><?= e($s['help']) ?></p><?php endif; ?>
+        <details class="sec-layout" style="margin:0 0 6px">
+          <summary style="cursor:pointer;font-size:11.5px;color:var(--muted)">⚙ Layout<?php if (!empty($s['page_break_before']) || !empty($s['keep_together'])): ?> <span class="pill p-ok" style="font-size:9px;padding:0 4px"><?= (!empty($s['page_break_before'])?'new page':'') . ((!empty($s['page_break_before'])&&!empty($s['keep_together']))?' · ':'') . (!empty($s['keep_together'])?'keep together':'') ?></span><?php endif; ?></summary>
+          <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="margin:6px 0 0;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+            <input type="hidden" name="_do" value="section_save">
+            <input type="hidden" name="section_id" value="<?= (int)$s['id'] ?>">
+            <input type="hidden" name="title" value="<?= e($s['title']) ?>">
+            <input type="hidden" name="help" value="<?= e($s['help']) ?>">
+            <label style="font-size:12px"><input type="checkbox" name="page_break_before" value="1" <?= !empty($s['page_break_before'])?'checked':'' ?>> Start on a new page</label>
+            <label style="font-size:12px"><input type="checkbox" name="keep_together" value="1" <?= !empty($s['keep_together'])?'checked':'' ?>> Keep together (don’t split)</label>
+            <button class="btn small secondary" type="submit">Save layout</button>
+          </form>
+        </details>
         <div class="bld-drop" data-sec="<?= (int)$s['id'] ?>">
           <?php foreach ($bySection[(int)$s['id']] ?? [] as $f) $renderFieldRow($f); ?>
         </div>
@@ -147,6 +159,10 @@
         <input type="hidden" name="_do" value="section_save">
         <div class="ff"><label>Section title</label><input class="form-control" name="title" placeholder="e.g. Inspection details" required></div>
         <div class="ff"><label>Help note (optional)</label><input class="form-control" name="help"></div>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr">
+          <div class="ff ff-check"><input type="checkbox" name="page_break_before" value="1"><label>Start on a new page</label></div>
+          <div class="ff ff-check"><input type="checkbox" name="keep_together" value="1"><label>Keep together (don’t split)</label></div>
+        </div>
         <div style="margin-top:10px"><button class="btn" type="submit">Add section</button></div>
       </form>
     </details>
