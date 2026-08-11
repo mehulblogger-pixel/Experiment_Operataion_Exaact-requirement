@@ -3013,19 +3013,31 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                 if (!$solo) { $p->text($ml, $f['label'].':', 9, true, [70,70,70]); $p->gap(11); }
                 $imgs = array_values(array_filter($filesBy[$k], fn($x)=>strpos($x['mime'],'image/')===0));
                 if ($imgs) {
-                    // Grid of photos, each with its caption printed beneath.
-                    $cw2=88; $ch2=66; $gap2=8; $perRow=max(1,(int)floor(($p->contentW()+$gap2)/($cw2+$gap2)));
+                    // §photos — a 2-across evidence grid: each photo in a bordered
+                    // cell, aspect-fitted (never stretched), with a "Photo NN" label
+                    // and its caption beneath. Reads as deliberate photographic
+                    // evidence, not a strip of thumbnails.
+                    $box = function($x,$y,$w,$h,$rgb=[205,208,214]) use ($p){ $p->lineAt($x,$y,$x+$w,$y,$rgb); $p->lineAt($x,$y+$h,$x+$w,$y+$h,$rgb); $p->lineAt($x,$y,$x,$y+$h,$rgb); $p->lineAt($x+$w,$y,$x+$w,$y+$h,$rgb); };
+                    $perRow=2; $gap2=14; $cellW=($p->contentW()-$gap2)/2; $imgH=120; $capH=24; $cellH=$imgH+$capH;
                     $i2=0;
                     while ($i2 < count($imgs)) {
                         $rowImgs = array_slice($imgs, $i2, $perRow);
-                        $p->needSpace($ch2+18); $rowY=$p->y; $x=$ml;
-                        foreach ($rowImgs as $im){
-                            $jpg=idems_sig_jpeg($im['data']); if($jpg){ $nm=$p->addJpeg($jpg); if($nm) $p->drawImage($nm,$x,$rowY,$cw2-6,$ch2-14); }
+                        $p->needSpace($cellH+10); $rowY=$p->y; $x=$ml;
+                        foreach ($rowImgs as $n=>$im){
+                            $photoNo = $i2 + $n + 1;
+                            $p->rectFill($x,$rowY,$cellW,$imgH,[248,249,251]);
+                            $jpg=idems_sig_jpeg($im['data']);
+                            if($jpg){ $nm=$p->addJpeg($jpg); if($nm){ [$iw,$ih]=$p->imgDim($nm);
+                                $availW=$cellW-8; $availH=$imgH-8; $r=min($availW/max(1,$iw),$availH/max(1,$ih));
+                                $dw=$iw*$r; $dh=$ih*$r; $ix=$x+($cellW-$dw)/2; $iy=$rowY+($imgH-$dh)/2; $p->drawImage($nm,$ix,$iy,$dw,$dh); } }
+                            $box($x,$rowY,$cellW,$imgH);
+                            $cy=$rowY+$imgH+5;
+                            $p->y=$cy; $p->text($x, 'Photo '.sprintf('%02d',$photoNo), 7.5, true, [90,90,90]);
                             $cap=trim((string)($im['caption'] ?? '')); if($cap==='') $cap=(string)($im['file_name'] ?? '');
-                            $cy=$rowY+$ch2-12; foreach (array_slice($p->wrap($cap,7,$cw2-6),0,2) as $cl){ $p->y=$cy; $p->text($x,$cl,7,false,[90,90,90]); $cy+=8; }
-                            $x+=$cw2+$gap2;
+                            if ($cap!==''){ $cy2=$cy+9; foreach (array_slice($p->wrap($cap,7.5,$cellW),0,2) as $cl){ $p->y=$cy2; $p->text($x,$cl,7.5,false,[115,115,115]); $cy2+=9; } }
+                            $x+=$cellW+$gap2;
                         }
-                        $p->y=$rowY+$ch2+8; $i2+=$perRow;
+                        $p->y=$rowY+$cellH+10; $i2+=$perRow;
                     }
                 }
                 foreach ($filesBy[$k] as $fl2) if (strpos($fl2['mime'],'image/')!==0) { $p->text($ml,'• '.$fl2['file_name'].(trim((string)($fl2['caption']??''))!==''?' — '.$fl2['caption']:''),8.5,false,[90,90,90]); $p->gap(10); }
