@@ -380,6 +380,21 @@ function idems_build_mgh_report($code = 'MGHIR', $name = 'MGH Inspection Report'
     $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_at) VALUES (?,?, 'TPIA_REPORT',1,0,?,?)")
         ->execute([$code, $name, $sort, date('c')]);
     $typeId = (int)$pdo->lastInsertId();
+    idems_install_inspection_sections($typeId);
+    return $typeId;
+}
+// Wipe a report type's current form and install the clean inspection layout —
+// used to rescue a type whose form was auto-imported into garbled fields.
+function idems_reset_inspection_form($typeId) {
+    $typeId = (int)$typeId; if (!$typeId) return;
+    $pdo = db();
+    $pdo->prepare("DELETE FROM report_fields WHERE report_type_id=?")->execute([$typeId]);
+    $pdo->prepare("DELETE FROM report_sections WHERE report_type_id=?")->execute([$typeId]);
+    idems_install_inspection_sections($typeId);
+}
+// Install the clean inspection-report sections/fields into an (empty) type.
+function idems_install_inspection_sections($typeId) {
+    $pdo = db();
     $so = 0; // running section sort
     $addSection = function($title, $help = '', $pgb = 0, $keep = 0) use ($pdo, $typeId, &$so) {
         $so += 10;
@@ -1300,6 +1315,12 @@ function ops_idems_builder($route, $method) {
     if ($method === 'POST') {
         $do = $_POST['_do'] ?? '';
         // --- sections ---
+        // Replace a garbled / auto-imported form with the clean inspection layout.
+        if ($do === 'clean_form') {
+            idems_reset_inspection_form($typeId);
+            flash('Replaced with the clean inspection layout — plain labels, no cryptic tables. Fine-tune below if you like.');
+            redirect('/report-builder?type=' . $typeId);
+        }
         if ($do === 'section_save') {
             $sid = (int)($_POST['section_id'] ?? 0); $title = trim($_POST['title'] ?? '');
             if ($title === '') { flash('Section title required.', 'error'); redirect('/report-builder?type=' . $typeId); }
