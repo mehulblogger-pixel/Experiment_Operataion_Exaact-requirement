@@ -2767,12 +2767,26 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     // body sections
     $bySec = []; foreach ($fields as $f) $bySec[(int)$f['section_id']][] = $f;
     $filesBy = []; foreach ($files as $fl) $filesBy[$fl['field_key']][] = $fl;
+    // Does a field carry anything worth printing on the ISSUED report? Static and
+    // structural fields always do; a photo field always does (it prints either the
+    // photos or a "no photographs" note); everything else must have a value. Empty
+    // fields — and sections left entirely empty — are dropped so the report never
+    // shows bare "Label:" lines or a heading with nothing under it. §empty
+    $hasContent = function($f) use ($data, $filesBy) {
+        $t = $f['ftype'] ?? ''; $k = $f['fkey'] ?? '';
+        if (in_array($t, ['richtext','sigblock','heading','note','photo'], true)) return true;
+        if ($t === 'table') { $v = $data[$k] ?? null; return is_array($v) && count($v) > 0; }
+        if (in_array($t, ['file','signature'], true)) return !empty($filesBy[$k]);
+        $v = $data[$k] ?? '';
+        return is_array($v) ? count($v) > 0 : trim((string)$v) !== '';
+    };
     $secList = $sections; $secList[] = ['id'=>0,'title'=>''];
     foreach ($secList as $s) {
         if (!idems_cond_visible($s, $data)) continue;   // §cond — honour a section's show-when rule in the output
         $fl = $bySec[(int)$s['id']] ?? [];
         $fl = array_values(array_filter($fl, fn($f) => idems_cond_visible($f, $data)));  // §cond — and each field's
-        if (!$fl) continue;
+        $fl = array_values(array_filter($fl, $hasContent));                             // §empty — drop empty fields
+        if (!$fl) continue;                                                              // §empty — and empty sections
         // Per-section print layout. "Start on new page" forces a page break unless
         // we're already at the top; "Keep together" pushes a section that would be
         // orphaned near the bottom onto the next page.
@@ -2828,7 +2842,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         // author's own line breaks. This avoids the long label / value collision the
         // old fixed 88pt offset caused, and reads like a proper report paragraph. §layout
         $fullLbl = function($f,$v) use ($p,$ml) {
-            $vv=is_array($v)?'':(string)$v; $p->needSpace(12);
+            $vv=is_array($v)?'':(string)$v; $p->needSpace(24);   // keep the label with its first value line (no orphan "Nil" atop the next page) §empty
             $p->text($ml,$f['label'].':',8.5,true,[90,90,90]); $p->gap(12);
             foreach (preg_split('/\r?\n/', $vv) as $para) {
                 if (trim($para)==='') { $p->gap(4); continue; }
@@ -2927,7 +2941,14 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                     foreach ($p->wrap($stmt, 9, $p->contentW()) as $ln){ $p->needSpace(11); $p->line($ln, 9, false, 11, [150,60,60]); }
                     $p->gap(3); continue;
                 }
-                if (empty($filesBy[$k])) continue; $p->needSpace(14);
+                // No photographs and not marked denied → state it explicitly rather
+                // than leaving a bare heading, so the section still reads as complete. §empty
+                if (empty($filesBy[$k])) {
+                    $p->needSpace(13);
+                    foreach ($p->wrap('No photographs are attached to this report.', 9, $p->contentW()) as $ln){ $p->needSpace(11); $p->line($ln, 9, false, 11, [120,120,120]); }
+                    $p->gap(3); continue;
+                }
+                $p->needSpace(14);
                 if (!$solo) { $p->text($ml, $f['label'].':', 9, true, [70,70,70]); $p->gap(11); }
                 $imgs = array_values(array_filter($filesBy[$k], fn($x)=>strpos($x['mime'],'image/')===0));
                 if ($imgs) {
@@ -3130,11 +3151,22 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
 
     // --- Body sections ------------------------------------------------------
     $bySec = []; foreach ($fields as $f) $bySec[(int)$f['section_id']][] = $f;
+    // Empty fields — and sections left entirely empty — are dropped from the
+    // issued Word document too, so it matches the PDF (no bare labels / headings). §empty
+    $hasContent = function($f) use ($data) {
+        $t = $f['ftype'] ?? ''; $k = $f['fkey'] ?? '';
+        if (in_array($t, ['richtext','sigblock','heading','note'], true)) return true;
+        if ($t === 'photo') return ($data[$k.'__photo_denied'] ?? '') === '1';   // the Word export can't embed images; keep only a "denied" statement
+        if ($t === 'table') { $v = $data[$k] ?? null; return is_array($v) && count($v) > 0; }
+        $v = $data[$k] ?? '';
+        return is_array($v) ? count($v) > 0 : trim((string)$v) !== '';
+    };
     $secList = $sections; $secList[] = ['id' => 0, 'title' => ''];
     $sg = null;   // workflow signatures, resolved lazily if a sigblock needs them
     foreach ($secList as $s) {
         if (!idems_cond_visible($s, $data)) continue;
         $fl = array_values(array_filter($bySec[(int)$s['id']] ?? [], fn($f) => idems_cond_visible($f, $data)));
+        $fl = array_values(array_filter($fl, $hasContent));
         if (!$fl) continue;
         // Per-section print layout: start-on-new-page and keep-with-next (the
         // section heading won't orphan at the bottom of a page).
