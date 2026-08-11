@@ -24,6 +24,14 @@
     <button class="btn" type="submit">Set up the ready inspection report</button>
   </form>
 </div>
+
+<div class="panel" style="margin-top:12px">
+  <h3 class="tab-sub" style="margin-top:0">🔧 Repair split table rows</h3>
+  <p class="muted" style="margin:0 0 10px;font-size:12.5px">If a report saved earlier shows each table value on its own line (a “staircase”), this stitches those split rows back into whole rows. Safe — it only touches tables where every row has a single value, and never changes an issued report.</p>
+  <form method="post" action="/report-types" style="margin:0" onsubmit="return confirm('Repair split table rows across all draft reports now?')"><input type="hidden" name="_do" value="repair_tables">
+    <button class="btn secondary" type="submit">Repair split table rows</button>
+  </form>
+</div>
 <?php endif; ?>
 
 <div class="panel" style="padding:0;overflow:hidden;margin-top:14px">
