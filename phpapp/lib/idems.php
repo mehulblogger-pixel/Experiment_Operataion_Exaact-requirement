@@ -352,6 +352,25 @@ function idems_migrate() {
         } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('sig_synced_v1', '1');
     }
+    // ONE-TIME: drop the item-level fields from any existing "Inspection details"
+    // section — item description, material, drawing no./rev., QAP, heat no. and
+    // quantity. They duplicated what the PO-items and Reference-documents tables
+    // already capture per line, so they are removed from the form and the report.
+    // Scoped to that section title + those exact keys so nothing else is touched;
+    // any data already entered stays in the report record, just no longer printed.
+    if (function_exists('setting_get') && !setting_get('ir_header_dedup_v1', '')) {
+        try {
+            $keys = ['item_description','material','drawing_no','drawing_rev','qap','heat_no','quantity_offered'];
+            $secIds = array_map(fn($r) => (int)$r['id'], ops_all("SELECT id FROM report_sections WHERE LOWER(title)='inspection details'"));
+            if ($secIds) {
+                $inSec = implode(',', array_fill(0, count($secIds), '?'));
+                $inKey = implode(',', array_fill(0, count($keys), '?'));
+                db()->prepare("DELETE FROM report_fields WHERE section_id IN ($inSec) AND LOWER(fkey) IN ($inKey)")
+                    ->execute(array_merge($secIds, array_map('strtolower', $keys)));
+            }
+        } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('ir_header_dedup_v1', '1');
+    }
 }
 // ITP inspection type for a scope activity — how the point is covered.
 const INSPECTION_TYPES_ITP = [
@@ -522,19 +541,16 @@ function idems_install_inspection_sections($typeId) {
     };
 
     // 1) Inspection details — autofills from the job/call (client, vendor, PO…).
+    // Item-level particulars (item description, material, drawing, QAP, heat no.,
+    // quantity) are NOT repeated here — they are captured per line in the PO items
+    // and Reference documents tables below, so this section stays to the identifying
+    // context only. §dedup
     $s = $addSection('Inspection details', 'Most of this carries forward from the job — Client, End user, Manufacturer, PO, Project and dates fill in automatically.', 0, 1);
     $addField($s, 'client', 'Client', 'text');
     $addField($s, 'end_user', 'End user', 'text');
     $addField($s, 'vendor', 'Manufacturer / Vendor', 'text');
     $addField($s, 'po_number', 'P.O. No.', 'text');
     $addField($s, 'project', 'Project', 'text');
-    $addField($s, 'item_description', 'Item / equipment description', 'textarea', '', '', 2);
-    $addField($s, 'material', 'Material / Specification', 'text');
-    $addField($s, 'drawing_no', 'Drawing No.', 'text');
-    $addField($s, 'drawing_rev', 'Drawing Rev.', 'text');
-    $addField($s, 'qap', 'QAP / ITP No. & Rev.', 'text');
-    $addField($s, 'heat_no', 'Heat / Lot No.', 'text');
-    $addField($s, 'quantity_offered', 'Quantity offered', 'text');
     $addField($s, 'inspection_stage', 'Stage of inspection', 'select', "Stage inspection\nIn-process\nFinal\nPre-dispatch\nWitness\nReview");
     $addField($s, 'inspection_date', 'Date of inspection', 'date');
     $addField($s, 'location', 'Place of inspection', 'text');
