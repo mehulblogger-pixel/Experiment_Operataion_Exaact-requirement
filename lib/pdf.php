@@ -15,6 +15,12 @@ class SimplePDF {
     private $imgSeq = 0;
 
     public $watermark = '';                          // e.g. 'DRAFT' — drawn on every page, behind content
+    // Running header / footer — drawn on EVERY page in the margin area by output().
+    //   runHead = ['name'=>.., 'sub'=>.., 'band'=>[r,g,b], 'skipFirst'=>bool]
+    //   runFoot = ['left'=>.., 'pageNumbers'=>bool, 'band'=>[r,g,b]]
+    // Page X of Y is resolved in output() once the total page count is known.
+    public $runHead = null;
+    public $runFoot = null;
     public function __construct() { $this->y = $this->mt; }
     public function pageW() { return $this->W; }
     // A large, light, 45° watermark laid behind the page content. Returns the
@@ -31,6 +37,45 @@ class SimplePDF {
     }
     public function contentW() { return $this->W - $this->ml - $this->mr; }
     public function right() { return $this->W - $this->mr; }
+
+    // One text-drawing op at absolute x / top-origin y (no cursor movement) — used
+    // by the running header/footer which are painted outside the normal flow.
+    private function textOp($x, $yTop, $str, $size, $bold, $rgb) {
+        $f = $bold ? '/F2' : '/F1';
+        $col = $rgb ? sprintf('%.3f %.3f %.3f rg ', $rgb[0] / 255, $rgb[1] / 255, $rgb[2] / 255) : '';
+        return "BT $col$f $size Tf " . sprintf('%.2f %.2f', $x, $this->yy($yTop + $size)) . " Td (" . $this->esc((string)$str) . ") Tj ET 0 0 0 rg\n";
+    }
+    // Build the running-header + running-footer ops for one page. $pageNo is
+    // 1-based; $total is the final page count (known only at output() time, so
+    // "Page X of Y" is correct). Everything is drawn in the top/bottom margins so
+    // it never collides with the page body.
+    private function headFootOps($pageNo, $total) {
+        $ops = '';
+        if (is_array($this->runHead)) {
+            $h = $this->runHead; $band = $h['band'] ?? [30, 64, 175];
+            $skipFirst = !empty($h['skipFirst']);   // page 1 usually already has the full letterhead
+            if (!($skipFirst && $pageNo === 1)) {
+                $y = 15;
+                $name = trim((string)($h['name'] ?? ''));
+                $sub  = trim((string)($h['sub'] ?? ''));
+                if ($name !== '') $ops .= $this->textOp($this->ml, $y, $name, 9, true, $band);
+                if ($sub !== '')  { $w = $this->strWidth($sub, 7.5, false); $ops .= $this->textOp($this->right() - $w, $y + 1, $sub, 7.5, false, [120, 120, 120]); }
+                $ly = $y + 12;
+                $ops .= sprintf("%.3f %.3f %.3f RG 0.5 w %.2f %.2f m %.2f %.2f l S 0 0 0 RG\n", $band[0] / 255, $band[1] / 255, $band[2] / 255, $this->ml, $this->yy($ly), $this->right(), $this->yy($ly));
+            }
+        }
+        if (is_array($this->runFoot)) {
+            $f = $this->runFoot; $fy = $this->H - 30;
+            $ops .= sprintf("0.82 0.82 0.82 RG 0.5 w %.2f %.2f m %.2f %.2f l S 0 0 0 RG\n", $this->ml, $this->yy($fy), $this->right(), $this->yy($fy));
+            $left = trim((string)($f['left'] ?? ''));
+            if ($left !== '') { if ($this->strWidth($left, 7.5, false) > $this->contentW() * 0.6) $left = mb_substr($left, 0, 90); $ops .= $this->textOp($this->ml, $fy + 3, $left, 7.5, false, [125, 125, 125]); }
+            if (!empty($f['pageNumbers'])) {
+                $pn = "Page $pageNo of $total"; $w = $this->strWidth($pn, 7.5, false);
+                $ops .= $this->textOp($this->right() - $w, $fy + 3, $pn, 7.5, false, [125, 125, 125]);
+            }
+        }
+        return $ops;
+    }
 
     private function esc($s) { return strtr($s, ['\\' => '\\\\', '(' => '\\(', ')' => '\\)', "\r" => '']); }
     private function yy($y) { return $this->H - $y; }  // top-origin -> PDF bottom-origin
@@ -149,7 +194,11 @@ class SimplePDF {
         $res = "<< /Font << /F1 $fRegular 0 R /F2 $fBold 0 R >>" . ($xobj ? " /XObject << $xobj>>" : '') . " >>";
         $kids = [];
         $wm = $this->watermarkOps();
+        $pageNo = 0;
         foreach ($this->pages as $content) {
+            $pageNo++;
+            $hf = $this->headFootOps($pageNo, $nPages);   // running header/footer + Page X of Y
+            if ($hf !== '') $content = $content . $hf;     // drawn on top, in the margins
             if ($wm !== '') $content = $wm . $content;   // watermark behind the page content
             $cid = $add("<< /Length " . strlen($content) . " >>\nstream\n$content\nendstream");
             $pid = $add("<< /Type /Page /Parent $pagesObj 0 R /MediaBox [0 0 " . sprintf('%.2f %.2f', $this->W, $this->H) . "] /Resources $res /Contents $cid 0 R >>");
