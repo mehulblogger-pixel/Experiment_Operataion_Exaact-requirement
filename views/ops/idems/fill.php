@@ -149,7 +149,17 @@
                     $isEquip = strpos((string)$opts[0],'equip:')===0;
                     $opts = idems_col_options($doc, (string)$opts[0]);
                 }
-                $h = '<select class="form-control'.($isEquip?' equip-pick':'').'" name="'.$name.'"'.$lblAttr.($isEquip?' data-equip="1"':'').'><option value=""></option>';
+                if ($isEquip) {
+                    // Instruments: BOTH options available — pick a registered
+                    // instrument from the master (which auto-fills its calibration)
+                    // OR just type one in. A free-text box with the register as
+                    // suggestions (works even when the register is empty).
+                    static $eqDlDone = false;
+                    $h = '<input class="form-control equip-pick" list="equip_dl" name="'.$name.'"'.$lblAttr.' data-equip="1" value="'.e((string)$cur).'" placeholder="Pick from register or type…">';
+                    if (!$eqDlDone) { $eqDlDone = true; $h .= '<datalist id="equip_dl">'; foreach ($opts as $o) $h .= '<option value="'.e($o).'">'; $h .= '</datalist>'; }
+                    return $h;
+                }
+                $h = '<select class="form-control" name="'.$name.'"'.$lblAttr.'><option value=""></option>';
                 foreach ($opts as $o) $h .= '<option value="'.e($o).'" '.((string)$cur===(string)$o?'selected':'').'>'.e($o).'</option>';
                 return $h.'</select>';
             }
@@ -272,7 +282,14 @@
   .ev-thumbs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
   .ev-th{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
   .sig-pad{border:1px solid var(--line);border-radius:8px;touch-action:none;background:#fff;max-width:100%}
-  .rep-table table{width:100%}
+  /* Repeatable tables: scroll sideways instead of breaking the page; each column
+     stays wide enough to read. A hint shows on phones that it scrolls. */
+  .rep-table{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:10px}
+  .rep-table table{width:auto;min-width:max-content;margin:0}
+  .rep-table th,.rep-table td{white-space:nowrap;padding:6px 8px;vertical-align:top}
+  .rep-table td .form-control{min-width:110px}
+  .rep-table td textarea.form-control{min-width:160px}
+  .rep-table + button{margin-top:8px}
   /* ---- learned suggestions ---- */
   .lrn-row{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:5px}
   .lrn-lab{font-size:11px;color:var(--muted)}
@@ -300,7 +317,7 @@
 // instrument in a master-linked table auto-fills the serial / calibration columns.
 window.__equipReg = <?= json_encode(function_exists('idems_equipment_active') ? idems_equipment_active() : (object)[], JSON_UNESCAPED_UNICODE) ?>;
 document.addEventListener('change', function(ev){
-  var sel = ev.target; if(!sel.matches || !sel.matches('select[data-equip]')) return;
+  var sel = ev.target; if(!sel.matches || !sel.matches('[data-equip]')) return;
   var reg = window.__equipReg || {}; var rec = reg[sel.value]; if(!rec) return;
   var tr = sel.closest('tr'); if(!tr) return;
   tr.querySelectorAll('[data-collabel]').forEach(function(cell){
