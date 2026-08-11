@@ -2709,7 +2709,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     // IRN + document-control identity + status on the right
     $yr=$top;
     $p->y=$yr; $p->text($ml, 'IRN: '.$doc['irn'], 9, true, [60,60,60], $right, 'R'); $yr+=12;
-    $p->y=$yr; $p->text($ml, ($doc['type_code'].' — '.($doc['title'] ?: '')), 8, false, [110,110,110], $right, 'R'); $yr+=11;
+    $p->y=$yr; $p->text($ml, (($doc['type_code'] ?? '').' — '.($doc['title'] ?? '')), 8, false, [110,110,110], $right, 'R'); $yr+=11;
     if ($fmtNo !== '') { $p->y=$yr; $p->text($ml,'Format No.: '.$fmtNo,7.5,false,[110,110,110],$right,'R'); $yr+=10; }
     if ($docCtl !== '') { $p->y=$yr; $p->text($ml,'Doc. No.: '.$docCtl,7.5,false,[110,110,110],$right,'R'); $yr+=10; }
     if ($rev !== '') { $p->y=$yr; $p->text($ml,'Rev.: '.$rev,7.5,false,[110,110,110],$right,'R'); $yr+=10; }
@@ -2719,15 +2719,28 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     $p->gap(6);
     // report title
     $p->line(strtoupper($doc['type_name'] ?? $doc['type_code'] ?? 'INSPECTION REPORT'), 13, true, 16, $band);
-    // key references grid
-    $kv = [
-        'Client' => ($doc['client_disp'] ?? '') ?: ($doc['client_name'] ?? ''), 'Vendor / Mfr' => ($doc['vendor_disp'] ?? '') ?: ($doc['vendor_name'] ?? ''),
-        'Project' => trim(($doc['project_code'] ?? '').' '.($doc['project_name'] ?? '')), 'PO' => $doc['po_ref'] ?? '',
-        'Drawing' => trim(($doc['drawing_no'] ?? '').' '.(($doc['drawing_rev'] ?? '')?'Rev '.$doc['drawing_rev']:'')), 'QAP rev' => $doc['qap_rev'] ?? '',
-        'Standards' => $doc['standards'] ?? '', 'Location' => $doc['location'] ?? '',
-        'Inspection date' => $doc['inspection_date'] ?? '', 'Issue date' => $doc['issue_date'] ?? '',
-        'Result' => lk_options_or('inspection_result', IDEMS_RESULTS)[$doc['result'] ?? ''] ?? '', 'Release' => lk_options_or('release_status', IDEMS_RELEASE)[$doc['release_status'] ?? ''] ?? '',
-    ];
+    // If the form already carries the header fields (client, vendor, PO, drawing,
+    // QAP, date, location — e.g. an "Inspection details" section), DON'T repeat
+    // them in this auto grid. Show only the outcome fields the form doesn't hold
+    // (Standards / Issue date / Result / Release), so nothing prints twice. §dedup
+    $hdrKeys = ['client','vendor','manufacturer','po','po_number','project','drawing','drawing_no','qap','qap_rev','standards','location','inspection_date','material','material_grade'];
+    $formCovers = 0; foreach ($fields as $ff) if (in_array(strtolower((string)$ff['fkey']), $hdrKeys, true)) $formCovers++;
+    $formHasHeader = $formCovers >= 3;
+    if ($formHasHeader) {
+        $kv = [
+            'Standards' => $doc['standards'] ?? '', 'Issue date' => $doc['issue_date'] ?? '',
+            'Result' => lk_options_or('inspection_result', IDEMS_RESULTS)[$doc['result'] ?? ''] ?? '', 'Release' => lk_options_or('release_status', IDEMS_RELEASE)[$doc['release_status'] ?? ''] ?? '',
+        ];
+    } else {
+        $kv = [
+            'Client' => ($doc['client_disp'] ?? '') ?: ($doc['client_name'] ?? ''), 'Vendor / Mfr' => ($doc['vendor_disp'] ?? '') ?: ($doc['vendor_name'] ?? ''),
+            'Project' => trim(($doc['project_code'] ?? '').' '.($doc['project_name'] ?? '')), 'PO' => $doc['po_ref'] ?? '',
+            'Drawing' => trim(($doc['drawing_no'] ?? '').' '.(($doc['drawing_rev'] ?? '')?'Rev '.$doc['drawing_rev']:'')), 'QAP rev' => $doc['qap_rev'] ?? '',
+            'Standards' => $doc['standards'] ?? '', 'Location' => $doc['location'] ?? '',
+            'Inspection date' => $doc['inspection_date'] ?? '', 'Issue date' => $doc['issue_date'] ?? '',
+            'Result' => lk_options_or('inspection_result', IDEMS_RESULTS)[$doc['result'] ?? ''] ?? '', 'Release' => lk_options_or('release_status', IDEMS_RELEASE)[$doc['release_status'] ?? ''] ?? '',
+        ];
+    }
     $colW = $p->contentW()/2;
     foreach (array_chunk(array_filter($kv, fn($v)=>trim((string)$v)!==''), 2, true) as $pair) {
         $p->needSpace(14); $yrow = $p->y; $i = 0;
@@ -2751,6 +2764,10 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         elseif (!empty($s['keep_together']) && ($p->y > 620)) $p->addPage();
         $p->needSpace(20); $p->gap(4);
         if ($s['title']!=='') { $p->line($s['title'], 11, true, 14, $band); }
+        // When a section holds a SINGLE table/photo/sign-off field, the section
+        // title already names it — so don't print the field's own label too
+        // ("Reference documents / Reference documents"). §dedup
+        $solo = (count($fl) === 1 && trim((string)$s['title']) !== '');
         // Short header-style fields (File No, Client, Dates…) render as a clean
         // TWO-COLUMN grid, like a real inspection form. Paragraphs, tables and
         // attachments span the full width. §PDF-header-grid
@@ -2814,7 +2831,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                     $p->y=$hy+13;
                 };
                 $p->needSpace(34);   // keep the label with its header + a first row
-                $p->text($ml, $f['label'], 9, true, [70,70,70]); $p->gap(11);
+                if (!$solo) { $p->text($ml, $f['label'], 9, true, [70,70,70]); $p->gap(11); }
                 $drawHead();
                 foreach ($v as $r){
                     $r=(array)$r;
@@ -2841,7 +2858,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                 $n = count($rows); if ($n === 0) { continue; }
                 $perRow = min(3, $n); $boxW = $p->contentW()/$perRow;
                 $p->needSpace(22);
-                if (trim((string)($f['label'] ?? '')) !== '') { $p->text($ml, $f['label'], 9, true, [70,70,70]); $p->gap(13); }
+                if (!$solo && trim((string)($f['label'] ?? '')) !== '') { $p->text($ml, $f['label'], 9, true, [70,70,70]); $p->gap(13); }
                 for ($i=0;$i<$n;$i+=$perRow) {
                     $slice = array_slice($rows,$i,$perRow);
                     $p->needSpace(76); $rowY=$p->y; $x=$ml;
@@ -2871,7 +2888,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                     $p->gap(3); continue;
                 }
                 if (empty($filesBy[$k])) continue; $p->needSpace(14);
-                $p->text($ml, $f['label'].':', 9, true, [70,70,70]); $p->gap(11);
+                if (!$solo) { $p->text($ml, $f['label'].':', 9, true, [70,70,70]); $p->gap(11); }
                 $imgs = array_values(array_filter($filesBy[$k], fn($x)=>strpos($x['mime'],'image/')===0));
                 if ($imgs) {
                     // Grid of photos, each with its caption printed beneath.
@@ -2903,20 +2920,25 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     // ---- Release Note block (RN / IRN documents only) ----
     if (in_array(strtoupper((string)($doc['type_code'] ?? '')), ['RN','IRN'], true)) { idems_release_block($p, $doc, $lh, $band); }
     // ---- signature block ----
-    $p->gap(14); $p->needSpace(90); $p->hr($band); $p->gap(8);
-    $colW2 = $p->contentW()/2; $sy = $p->y;
-    $drawSig = function($x, $y0, $title, $s) use ($p) {
-        $p->y=$y0; $p->text($x, $title, 8.5, true, [90,90,90]);
-        $imgY=$y0+14;
-        if (!empty($s['img'])) { $nm=$p->addJpeg($s['img']); if($nm){ $p->drawImage($nm,$x,$imgY,120,40); } }
-        $lineY=$imgY+42; $p->lineAt($x,$lineY,$x+150,$lineY,[120,120,120]);
-        $ty=$lineY+3;
-        foreach (array_filter([$s['name'] ?? '', $s['desig'] ?? '', $s['meta'] ?? '', $s['time'] ?? '']) as $t){ $p->y=$ty; $p->text($x,$t,8,false,[70,70,70]); $ty+=10; }
-        return $ty;
-    };
-    $y1 = $drawSig($ml, $sy, 'Inspected by', $sigs['inspector'] ?? []);
-    $y2 = $drawSig($ml + $colW2, $sy, 'Approved by', $sigs['approver'] ?? []);
-    $p->y = max($y1, $y2) + 6;
+    // Skip this built-in Inspected-by / Approved-by block if the FORM already has
+    // a Sign-off (sigblock) section — otherwise the signatures print twice. §dedup
+    $hasSigblock = false; foreach ($fields as $ff) if (($ff['ftype'] ?? '') === 'sigblock') { $hasSigblock = true; break; }
+    if (!$hasSigblock) {
+        $p->gap(14); $p->needSpace(90); $p->hr($band); $p->gap(8);
+        $colW2 = $p->contentW()/2; $sy = $p->y;
+        $drawSig = function($x, $y0, $title, $s) use ($p) {
+            $p->y=$y0; $p->text($x, $title, 8.5, true, [90,90,90]);
+            $imgY=$y0+14;
+            if (!empty($s['img'])) { $nm=$p->addJpeg($s['img']); if($nm){ $p->drawImage($nm,$x,$imgY,120,40); } }
+            $lineY=$imgY+42; $p->lineAt($x,$lineY,$x+150,$lineY,[120,120,120]);
+            $ty=$lineY+3;
+            foreach (array_filter([$s['name'] ?? '', $s['desig'] ?? '', $s['meta'] ?? '', $s['time'] ?? '']) as $t){ $p->y=$ty; $p->text($x,$t,8,false,[70,70,70]); $ty+=10; }
+            return $ty;
+        };
+        $y1 = $drawSig($ml, $sy, 'Inspected by', $sigs['inspector'] ?? []);
+        $y2 = $drawSig($ml + $colW2, $sy, 'Approved by', $sigs['approver'] ?? []);
+        $p->y = max($y1, $y2) + 6;
+    }
     // Verification block on an issued report: the recipient can confirm it is
     // genuine and unaltered at the public /verify page using the code below, with
     // no account. Backed by verify_lookup() and the evidence hash chain. Printed
@@ -2941,7 +2963,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     }
     // footer note
     if (!empty($lh['footer'])) { $p->needSpace(14); $p->hr([220,220,220]); $p->gap(3); $p->line($lh['footer'], 7.5, false, 10, [130,130,130]); }
-    $p->needSpace(12); $p->line('System-generated by ' . app_name() . ' · IRN ' . $doc['irn'] . ' · ' . date('d M Y H:i') . ($doc['finalized'] ? ' · Issued/locked' : ' · DRAFT'), 7, false, 9, [150,150,150]);
+    $p->needSpace(12); $p->line('System-generated by ' . ((($lh['name'] ?? '') ?: app_name())) . ' · IRN ' . $doc['irn'] . ' · ' . date('d M Y H:i') . ($doc['finalized'] ? ' · Issued/locked' : ' · DRAFT'), 7, false, 9, [150,150,150]);
     return $p->output();
 }
 
@@ -3036,13 +3058,28 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
     if ($dcBits) $body .= $para($run(implode('     ', $dcBits), false, 15, '5A5A5A'), ['after' => 40]);
 
     // --- Key references grid (2-col table) ---------------------------------
-    $kv = [
-        'Client' => $doc['client_disp'] ?? ($doc['client_name'] ?? ''), 'Vendor / Mfr' => $doc['vendor_disp'] ?? ($doc['vendor_name'] ?? ''),
-        'Project' => trim(($doc['project_code'] ?? '') . ' ' . ($doc['project_name'] ?? '')), 'PO' => $doc['po_ref'] ?? '',
-        'Drawing' => trim(($doc['drawing_no'] ?? '') . ' ' . (($doc['drawing_rev'] ?? '') ? 'Rev ' . $doc['drawing_rev'] : '')), 'QAP rev' => $doc['qap_rev'] ?? '',
-        'Standards' => $doc['standards'] ?? '', 'Location' => $doc['location'] ?? '',
-        'Inspection date' => $doc['inspection_date'] ?? '', 'Issue date' => $doc['issue_date'] ?? '',
-    ];
+    // If the form itself carries the header fields (an "Inspection details"
+    // section with client, vendor, PO, drawing, QAP, date, location…), DON'T
+    // repeat them here — show only the outcome fields the form doesn't hold, so
+    // nothing prints twice (mirrors the PDF de-dup). §dedup
+    $hdrKeys = ['client','vendor','manufacturer','po','po_number','project','drawing','drawing_no','qap','qap_rev','standards','location','inspection_date','material','material_grade'];
+    $formCovers = 0; foreach ($fields as $ff) if (in_array(strtolower((string)$ff['fkey']), $hdrKeys, true)) $formCovers++;
+    $formHasHeader = $formCovers >= 3;
+    if ($formHasHeader) {
+        $kv = [
+            'Standards' => $doc['standards'] ?? '', 'Issue date' => $doc['issue_date'] ?? '',
+            'Result' => lk_options_or('inspection_result', IDEMS_RESULTS)[$doc['result'] ?? ''] ?? '',
+            'Release' => lk_options_or('release_status', IDEMS_RELEASE)[$doc['release_status'] ?? ''] ?? '',
+        ];
+    } else {
+        $kv = [
+            'Client' => $doc['client_disp'] ?? ($doc['client_name'] ?? ''), 'Vendor / Mfr' => $doc['vendor_disp'] ?? ($doc['vendor_name'] ?? ''),
+            'Project' => trim(($doc['project_code'] ?? '') . ' ' . ($doc['project_name'] ?? '')), 'PO' => $doc['po_ref'] ?? '',
+            'Drawing' => trim(($doc['drawing_no'] ?? '') . ' ' . (($doc['drawing_rev'] ?? '') ? 'Rev ' . $doc['drawing_rev'] : '')), 'QAP rev' => $doc['qap_rev'] ?? '',
+            'Standards' => $doc['standards'] ?? '', 'Location' => $doc['location'] ?? '',
+            'Inspection date' => $doc['inspection_date'] ?? '', 'Issue date' => $doc['issue_date'] ?? '',
+        ];
+    }
     $kvRows = [];
     $pairKeys = array_keys(array_filter($kv, fn($v) => trim((string)$v) !== ''));
     for ($i = 0; $i < count($pairKeys); $i += 2) {
@@ -3068,6 +3105,9 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
         } elseif ($secPb !== '') {
             $body .= '<w:p><w:pPr>' . $secPb . '</w:pPr></w:p>';
         }
+        // When a section holds a SINGLE table/photo/sign-off field, its title
+        // already names it — don't print the field's own label too. §dedup
+        $solo = (count($fl) === 1 && trim((string)($s['title'] ?? '')) !== '');
         foreach ($fl as $f) {
             if (in_array($f['ftype'], ['heading','note'], true)) { $body .= $para($run($f['label'], $f['ftype'] === 'heading', 19, '505050')); continue; }
             if (($f['ftype'] ?? '') === 'richtext') {
@@ -3081,7 +3121,7 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
             if (($f['ftype'] ?? '') === 'sigblock') {
                 if ($sg === null) $sg = function_exists('idems_report_signatures') ? idems_report_signatures($doc) : [];
                 $rows = idems_sigblock_rows($f, $data, $sg);
-                if (trim((string)($f['label'] ?? '')) !== '') $body .= $para($run($f['label'], true, 18, '464646'), ['after' => 20]);
+                if (!$solo && trim((string)($f['label'] ?? '')) !== '') $body .= $para($run($f['label'], true, 18, '464646'), ['after' => 20]);
                 $tr = [];
                 foreach ($rows as $r) $tr[] = [$r['role'], $r['name'], $r['desig'], $r['date'], !empty($r['img']) ? 'Signed (on file)' : ''];
                 $body .= $mkTable(['Role', 'Name', 'Designation', 'Date', 'Signature'], $tr);
@@ -3090,14 +3130,14 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
             if (($f['ftype'] ?? '') === 'photo' && ($data[$f['fkey'].'__photo_denied'] ?? '') === '1') {
                 $note = trim((string)($data[$f['fkey'].'__photo_denied_note'] ?? ''));
                 $stmt = 'Photographs were not permitted / were denied by the client / vendor at the time of inspection.' . ($note !== '' ? ' ' . $note : '');
-                $body .= $para($run($f['label'] . ': ', true, 18, '5A5A5A') . $run($stmt, false, 18, '963C3C')); continue;
+                $body .= $para(($solo ? '' : $run($f['label'] . ': ', true, 18, '5A5A5A')) . $run($stmt, false, 18, '963C3C')); continue;
             }
             if (in_array($f['ftype'], ['photo','file','signature'], true)) continue;   // images not embedded in the plain Word export
             if ($f['ftype'] === 'table') {
                 $v = $data[$f['fkey']] ?? null; if (!is_array($v) || !$v) continue;
                 $defs = idems_table_col_defs($f); $cols = []; $mergeFlags = [];
                 foreach ($defs as $ck => $d) { $cols[$ck] = $d['label']; $mergeFlags[] = !empty($d['merge']); }
-                $body .= $para($run($f['label'], true, 18, '464646'), ['after' => 20]);
+                if (!$solo) $body .= $para($run($f['label'], true, 18, '464646'), ['after' => 20]);
                 $rows = [];
                 foreach ($v as $r) { $r = (array)$r; $line = []; foreach ($cols as $ck => $cl) $line[] = (string)($r[$ck] ?? ''); $rows[] = $line; }
                 $body .= $mkTable(array_values($cols), $rows, $mergeFlags);
@@ -3141,7 +3181,7 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
         $body .= $mkTable(['Inspection Identification', 'Location of Identification', 'Inspected By', 'Signature of ' . $repName], $irows);
         $body .= $para($run($def['disclaimer'], false, 16, '5A5A5A', true), ['before' => 40]);
     }
-    $body .= $para($run('System-generated by ' . app_name() . ' · IRN ' . ($doc['irn'] ?? '') . ' · ' . date('d M Y H:i') . ($doc['finalized'] ? ' · Issued/locked' : ' · DRAFT'), false, 14, '969696'), ['before' => 120]);
+    $body .= $para($run('System-generated by ' . ((($lh['name'] ?? '') ?: app_name())) . ' · IRN ' . ($doc['irn'] ?? '') . ' · ' . date('d M Y H:i') . ($doc['finalized'] ? ' · Issued/locked' : ' · DRAFT'), false, 14, '969696'), ['before' => 120]);
 
     // --- Running header + footer (auto page numbers) -----------------------
     // A real Word footer part with "Company · IRN" on the left and an automatic
