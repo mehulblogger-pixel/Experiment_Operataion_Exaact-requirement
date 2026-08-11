@@ -2692,6 +2692,20 @@ function idems_release_block($p, $doc, $lh, $band) {
     $p->gap(2);
 }
 
+// Subtle status colour for a badge/pill: returns [background rgb, foreground rgb]
+// for a status word. Restrained industrial tints — green for a good outcome,
+// amber for a pending/hold one, red for a failed/rejected one, neutral grey for
+// anything else. Not a bright dashboard palette. §status
+function idems_status_palette($text) {
+    $t = strtolower(trim((string)$text));
+    $has = function($needles) use ($t) { foreach ($needles as $n) if (strpos($t, $n) !== false) return true; return false; };
+    if ($t === 'n/a' || $t === 'na' || $t === 'not applicable') return [[237,238,240], [90,90,90]];
+    if ($has(['not conform','does not conform','non-conform','nonconform','not released','reject','fail','denied','withheld','not ok','defect'])) return [[254,226,226], [153,27,27]];
+    if ($has(['accept','released','release','clear','complete','conform','pass','satisfactory','approved','closed','ok','yes','done'])) return [[226,242,231], [21,101,52]];
+    if ($has(['hold','pending','partial','balance','in-process','in process','open','await','offered','wip','review','progress','draft'])) return [[254,243,199], [146,64,14]];
+    return [[237,238,240], [80,80,80]];
+}
+
 // ---- Report PDF (letterhead + body + automatic signature block + timestamps) ----
 function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $copy = '') {
     $p = new SimplePDF(); $ml = $p->ml; $right = $p->right();
@@ -2735,33 +2749,56 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     $p->gap(6);
     // report title
     $p->line(strtoupper($doc['type_name'] ?? $doc['type_code'] ?? 'INSPECTION REPORT'), 13, true, 16, $band);
-    // If the form already carries the header fields (client, vendor, PO, drawing,
-    // QAP, date, location — e.g. an "Inspection details" section), DON'T repeat
-    // them in this auto grid. Show only the outcome fields the form doesn't hold
-    // (Standards / Issue date / Result / Release), so nothing prints twice. §dedup
+
+    // §status — a small pill: coloured background + darker text, sized to the word.
+    $badge = function($x, $y, $text, $size = 9.5) use ($p) {
+        $text = trim((string)$text); if ($text === '') return 0;
+        [$bg, $fg] = idems_status_palette($text);
+        $up = strtoupper($text); $tw = $p->strWidth($up, $size, true); $padX = 7; $h = $size + 8; $w = $tw + 2*$padX;
+        $p->rectFill($x, $y, $w, $h, $bg);
+        $p->y = $y + 4; $p->text($x + $padX, $up, $size, true, $fg);
+        return $w;
+    };
+    $fmtDate = function($d) { $d = trim((string)$d); if ($d === '') return ''; $t = strtotime($d); return $t ? date('d-M-Y', $t) : $d; };
+
+    // Outcome status card — Result & Release shown as badges so the report's
+    // disposition reads at a glance, with standards and issue date on a muted line.
+    $result  = lk_options_or('inspection_result', IDEMS_RESULTS)[$doc['result'] ?? ''] ?? '';
+    $release = lk_options_or('release_status', IDEMS_RELEASE)[$doc['release_status'] ?? ''] ?? '';
+    $colW = $p->contentW()/2;
+    if (trim($result) !== '' || trim($release) !== '') {
+        $p->gap(3); $p->needSpace(30); $cardY = $p->y;
+        $p->text($ml, 'RESULT', 7.5, true, [130,130,130]);
+        if (trim($release) !== '') $p->text($ml + $colW, 'RELEASE STATUS', 7.5, true, [130,130,130]);
+        $bY = $cardY + 10;
+        if (trim($result) !== '')  $badge($ml, $bY, $result);
+        if (trim($release) !== '') $badge($ml + $colW, $bY, $release);
+        $p->y = $bY + 20;
+    }
+    $metaBits = array_filter([
+        trim((string)($doc['standards'] ?? '')) !== '' ? 'Standards: ' . $doc['standards'] : '',
+        trim((string)($doc['issue_date'] ?? '')) !== '' ? 'Issue date: ' . $fmtDate($doc['issue_date']) : '',
+    ]);
+    if ($metaBits) { $p->needSpace(13); $p->text($ml, implode('      ·      ', $metaBits), 8.5, false, [90,90,90]); $p->y += 14; }
+
+    // If the form does NOT itself carry the header fields (no "Inspection details"
+    // section), show the client/vendor reference grid here — the outcome fields are
+    // already in the status card above, so nothing prints twice. §dedup
     $hdrKeys = ['client','vendor','manufacturer','po','po_number','project','drawing','drawing_no','qap','qap_rev','standards','location','inspection_date','material','material_grade'];
     $formCovers = 0; foreach ($fields as $ff) if (in_array(strtolower((string)$ff['fkey']), $hdrKeys, true)) $formCovers++;
     $formHasHeader = $formCovers >= 3;
-    if ($formHasHeader) {
-        $kv = [
-            'Standards' => $doc['standards'] ?? '', 'Issue date' => $doc['issue_date'] ?? '',
-            'Result' => lk_options_or('inspection_result', IDEMS_RESULTS)[$doc['result'] ?? ''] ?? '', 'Release' => lk_options_or('release_status', IDEMS_RELEASE)[$doc['release_status'] ?? ''] ?? '',
-        ];
-    } else {
+    if (!$formHasHeader) {
         $kv = [
             'Client' => ($doc['client_disp'] ?? '') ?: ($doc['client_name'] ?? ''), 'Vendor / Mfr' => ($doc['vendor_disp'] ?? '') ?: ($doc['vendor_name'] ?? ''),
             'Project' => trim(($doc['project_code'] ?? '').' '.($doc['project_name'] ?? '')), 'PO' => $doc['po_ref'] ?? '',
             'Drawing' => trim(($doc['drawing_no'] ?? '').' '.(($doc['drawing_rev'] ?? '')?'Rev '.$doc['drawing_rev']:'')), 'QAP rev' => $doc['qap_rev'] ?? '',
-            'Standards' => $doc['standards'] ?? '', 'Location' => $doc['location'] ?? '',
-            'Inspection date' => $doc['inspection_date'] ?? '', 'Issue date' => $doc['issue_date'] ?? '',
-            'Result' => lk_options_or('inspection_result', IDEMS_RESULTS)[$doc['result'] ?? ''] ?? '', 'Release' => lk_options_or('release_status', IDEMS_RELEASE)[$doc['release_status'] ?? ''] ?? '',
+            'Location' => $doc['location'] ?? '', 'Inspection date' => $fmtDate($doc['inspection_date'] ?? ''),
         ];
-    }
-    $colW = $p->contentW()/2;
-    foreach (array_chunk(array_filter($kv, fn($v)=>trim((string)$v)!==''), 2, true) as $pair) {
-        $p->needSpace(14); $yrow = $p->y; $i = 0;
-        foreach ($pair as $k=>$v) { $x = $ml + $i*$colW; $p->y=$yrow; $p->text($x, $k.':', 8.5, true, [90,90,90]); $p->text($x+70, $p->wrap((string)$v,9,$colW-74)[0] ?? (string)$v, 9); $i++; }
-        $p->y = $yrow + 13;
+        foreach (array_chunk(array_filter($kv, fn($v)=>trim((string)$v)!==''), 2, true) as $pair) {
+            $p->needSpace(14); $yrow = $p->y; $i = 0;
+            foreach ($pair as $k=>$v) { $x = $ml + $i*$colW; $p->y=$yrow; $p->text($x, $k.':', 8.5, true, [90,90,90]); $p->text($x+70, $p->wrap((string)$v,9,$colW-74)[0] ?? (string)$v, 9); $i++; }
+            $p->y = $yrow + 13;
+        }
     }
     $p->gap(4);
     // body sections
