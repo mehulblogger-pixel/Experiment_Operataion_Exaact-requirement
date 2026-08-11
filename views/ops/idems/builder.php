@@ -27,7 +27,15 @@
     </form>
     <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline">
       <input type="hidden" name="_do" value="add_po_items">
-      <button class="btn secondary" type="submit" title="Adds a ready multi-row table: PO line, description, ordered / offered / passed / failed / balance quantities, Result dropdown, heat &amp; serial no.">📦 PO items &amp; quantities</button>
+      <button class="btn secondary" type="submit" title="Adds a ready multi-row table: PO Sr.No, description, size, unit, and ordered / offered / passed / rejected / hold / balance quantities, with heat &amp; serial no.">📦 PO items &amp; quantities</button>
+    </form>
+    <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline">
+      <input type="hidden" name="_do" value="add_refdocs">
+      <button class="btn secondary" type="submit" title="Adds a repeatable table: Document Name, Number, Revision, Approval code and Date of approval (date picker)">📑 Reference documents</button>
+    </form>
+    <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline">
+      <input type="hidden" name="_do" value="add_holdstatus">
+      <button class="btn secondary" type="submit" title="Adds the P.O. status dropdown (Completed / Balance / Hold) and previous &amp; current hold-point status fields">⏸️ Order &amp; hold-point status</button>
     </form>
     <a class="btn secondary" href="/report-types">← Report types</a>
   </div>
@@ -182,7 +190,7 @@
 })();
 
 // ---- visual table-column editor (name + type + dropdown options) ----------
-var COLB_TYPES = ['text','number','date','select','textarea'];
+var COLB_TYPES = ['text','number','date','select','textarea','unit'];
 function colbSerialize(){
   var lines=[];
   document.querySelectorAll('#colb .colrow').forEach(function(row){
@@ -219,7 +227,7 @@ function colbRow(col){
   var div=document.createElement('div'); div.className='colrow';
   div.style.cssText='display:flex;gap:6px;margin:0 0 5px;align-items:center';
   div.innerHTML='<input class="form-control c-name" placeholder="Column name" style="flex:2">'+
-    '<select class="form-control c-type" style="flex:1"><option value="text">Text</option><option value="number">Number</option><option value="date">Date</option><option value="select">Dropdown</option><option value="textarea">Long text</option></select>'+
+    '<select class="form-control c-type" style="flex:1"><option value="text">Text</option><option value="number">Number</option><option value="date">Date</option><option value="select">Dropdown</option><option value="unit">Unit picker</option><option value="textarea">Long text</option></select>'+
     '<input class="form-control c-opts" placeholder="Accepted; Rejected; Hold" style="flex:2">'+
     '<label class="c-merge-lbl" title="Merge identical values down this column (rowspan) in the PDF/Word output" style="display:flex;align-items:center;gap:3px;font-size:11px;white-space:nowrap;color:var(--muted)"><input type="checkbox" class="c-merge">merge</label>'+
     '<button type="button" class="btn small secondary c-del" title="Remove column">✕</button>';
