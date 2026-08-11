@@ -2726,7 +2726,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     elseif (in_array($copy, ['DUPLICATE', 'TRIPLICATE'], true)) { $p->watermark = $copy; }
     // Running header on continuation pages + footer with "Page X of Y" on every
     // page — so a multi-page report is identifiable and paginated end to end.
-    $p->runHead = ['name'=>(($lh['name'] ?? '') ?: app_name()), 'sub'=>trim(($doc['type_code'] ?? '').'   IRN '.($doc['irn'] ?? '')), 'band'=>$band, 'skipFirst'=>true];
+    $p->runHead = ['name'=>(($lh['name'] ?? '') ?: app_name()), 'sub'=>trim('IRN '.($doc['irn'] ?? '').($rev!==''?'  ·  Rev '.$rev:'')), 'band'=>$band, 'skipFirst'=>true];
     $p->runFoot = ['left'=>(($lh['name'] ?? '') ?: app_name()).($doc['irn'] ? '  ·  '.$doc['irn'] : ''), 'pageNumbers'=>true, 'band'=>$band];
     $p->rectFill(0, 0, $p->pageW(), 6, $band);
     $p->y = $p->mt; $top = $p->y; $nameX = $ml;
@@ -2736,13 +2736,20 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     foreach (preg_split('/\r?\n/', (string)($lh['address'] ?? '')) as $al) { $al=trim($al); if($al==='')continue; $p->y=$ly; $p->text($nameX,$al,8.5,false,[90,90,90]); $ly+=10; }
     if (!empty($lh['contact'])) { $p->y=$ly; $p->text($nameX,$lh['contact'],8.5,false,[90,90,90]); $ly+=10; }
     if (!empty($lh['gstin'])) { $p->y=$ly; $p->text($nameX,$lh['gstin'],8.5,false,[90,90,90]); $ly+=10; }
-    // IRN + document-control identity + status on the right
+    // §header — document-control block on the right: the report type reads as a
+    // clear title, then the IRN and the controlled-document identity (revision,
+    // issue date, format & doc numbers), so the corner feels intentional.
     $yr=$top;
-    $p->y=$yr; $p->text($ml, 'IRN: '.$doc['irn'], 9, true, [60,60,60], $right, 'R'); $yr+=12;
-    $p->y=$yr; $p->text($ml, (($doc['type_code'] ?? '').' — '.($doc['title'] ?? '')), 8, false, [110,110,110], $right, 'R'); $yr+=11;
-    if ($fmtNo !== '') { $p->y=$yr; $p->text($ml,'Format No.: '.$fmtNo,7.5,false,[110,110,110],$right,'R'); $yr+=10; }
-    if ($docCtl !== '') { $p->y=$yr; $p->text($ml,'Doc. No.: '.$docCtl,7.5,false,[110,110,110],$right,'R'); $yr+=10; }
-    if ($rev !== '') { $p->y=$yr; $p->text($ml,'Rev.: '.$rev,7.5,false,[110,110,110],$right,'R'); $yr+=10; }
+    $typeName = trim((string)($doc['type_name'] ?? $doc['type_code'] ?? 'Inspection Report'));
+    $issueF = trim((string)($doc['issue_date'] ?? '')); if ($issueF!==''){ $tt=strtotime($issueF); if($tt) $issueF=date('d-M-Y',$tt); }
+    $p->y=$yr; $p->text($ml, strtoupper($typeName), 11, true, $band, $right, 'R'); $yr+=15;
+    $p->y=$yr; $p->text($ml, 'IRN: '.$doc['irn'], 8.5, true, [70,70,70], $right, 'R'); $yr+=12;
+    $ctl = [];
+    if ($rev !== '')    $ctl[] = 'Rev. '.$rev;
+    if ($issueF !== '') $ctl[] = 'Issue '.$issueF;
+    if ($ctl) { $p->y=$yr; $p->text($ml, implode('   ·   ', $ctl), 8, false, [110,110,110], $right, 'R'); $yr+=11; }
+    if ($fmtNo !== '') { $p->y=$yr; $p->text($ml,'Format No.: '.$fmtNo,7.5,false,[120,120,120],$right,'R'); $yr+=10; }
+    if ($docCtl !== '') { $p->y=$yr; $p->text($ml,'Doc. No.: '.$docCtl,7.5,false,[120,120,120],$right,'R'); $yr+=10; }
     if (empty($doc['finalized'])) { $p->y=$yr; $p->text($ml, 'DRAFT — not yet issued', 8, true, [200,60,60], $right, 'R'); $yr+=11; }
     elseif ($copy !== '') { $p->y=$yr; $p->text($ml, $copy . ' COPY', 8.5, true, $band, $right, 'R'); $yr+=11; }
     $p->y = max($ly, $yr, $top + 50); $p->hr($band);
