@@ -329,7 +329,7 @@ const IDEMS_FIELD_TYPES = [
     'select'=>'Dropdown (single)', 'multiselect'=>'Dropdown (multiple)', 'checkbox'=>'Tick box', 'yesno'=>'Yes / No', 'radio'=>'Choice buttons',
     'calc'=>'Calculated', 'heading'=>'Section heading', 'note'=>'Info note',
     'table'=>'Repeatable table', 'photo'=>'Photo', 'file'=>'Attachment', 'gps'=>'GPS location',
-    'signature'=>'Signature', 'qr'=>'QR / barcode value', 'unit'=>'Unit picker',
+    'signature'=>'Signature', 'sigblock'=>'Sign-off block (per role)', 'qr'=>'QR / barcode value', 'unit'=>'Unit picker',
     // An inspection instrument. Offers the calibrated instruments from the
     // equipment master as a dropdown AND allows free typing — so a lab / NDT /
     // calibration report picks a registered, in-calibration instrument, while a
@@ -1276,6 +1276,19 @@ function ops_idems_builder($route, $method) {
             }
             flash('Added a “Signatures” section — manufacturer/vendor and client representative sign-offs. (The inspector & approver signatures are applied automatically at issue.)'); redirect('/report-builder?type=' . $typeId);
         }
+        // One-click "Sign-off block" — a per-role signature panel (Prepared /
+        // Reviewed / Approved). Name, designation and date auto-fill from the
+        // workflow actors; the on-file signature image is stamped for the inspector
+        // and approver. The author can rename or add roles in the field options.
+        if ($do === 'add_sigblock') {
+            $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, 'Sign-off', 'Prepared / Reviewed / Approved — name, designation and date auto-fill from the workflow; edit the roles in the field options.', (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $secId = (int)$pdo->lastInsertId();
+            $o = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId]);
+            $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,field_options,sort_order,col_span) VALUES (?,?,?,?,'sigblock',?,?,2)")
+                ->execute([$typeId, $secId, 'signoff', 'For '.app_name(), "Prepared by\nReviewed by\nApproved by", $o]);
+            flash('Added a “Sign-off” block — Prepared / Reviewed / Approved, auto-filled from the workflow. Edit the roles under the field to add or rename.'); redirect('/report-builder?type=' . $typeId);
+        }
         // One click adds the identification & traceability fields every inspection
         // report must carry under ISO/IEC 17020 clause 7.4 — so a report type is
         // "17020-ready" without designing each field by hand. Things the system
@@ -1526,6 +1539,19 @@ function ops_idems_fill($route, $method) {
                     if ($has) $rows[] = $row;
                 }
                 $data[$k] = $rows;
+            } elseif ($f['ftype'] === 'sigblock') {
+                // Per-role sign-off: name / designation / date typed by the author.
+                $posted = $_POST['sb'][$k] ?? [];
+                $out = [];
+                if (is_array($posted)) foreach ($posted as $role => $vals) {
+                    $vals = (array)$vals;
+                    $out[(string)$role] = [
+                        'name'  => trim((string)($vals['name']  ?? '')),
+                        'desig' => trim((string)($vals['desig'] ?? '')),
+                        'date'  => trim((string)($vals['date']  ?? '')),
+                    ];
+                }
+                $data[$k] = $out;
             } elseif ($f['ftype'] === 'multiselect') {
                 $data[$k] = array_values((array)($_POST['f'][$k] ?? []));
             } else {
@@ -1646,6 +1672,40 @@ function idems_table_cols($f) {
     $out = [];
     foreach (idems_table_col_defs($f) as $ck => $d) $out[$ck] = $d['label'];
     return $out;
+}
+// ---- Sign-off block (per-role signature component) -------------------------
+// A "sigblock" field carries one or more sign-off roles (Prepared by / Reviewed
+// by / Approved by …), each printed as a labelled signature box with name,
+// designation and date. The role list lives in field_options (one per line); the
+// filled-in name/designation/date live in the doc data as data[fkey][role].
+function idems_sigblock_roles($f) {
+    $raw = trim((string)($f['field_options'] ?? ''));
+    $roles = [];
+    foreach (preg_split('/\r?\n/', $raw) as $ln) { $ln = trim($ln); if ($ln !== '' && stripos($ln, '=') !== 0) $roles[] = $ln; }
+    // strip an "opt=" style prefix if the author reused options syntax; keep plain labels
+    $roles = array_values(array_filter(array_map(fn($r) => trim(preg_replace('/^[a-z_]+\s*=\s*/i', '', $r)), $roles)));
+    return $roles ?: ['Prepared by', 'Reviewed by', 'Approved by'];
+}
+// Merge the stored per-role values with what the workflow already knows (the
+// inspector for prepared/reviewed-type roles, the approver for approved-type
+// roles) and the on-file signature image — so a sign-off block auto-fills.
+function idems_sigblock_rows($f, $data, $sigs = []) {
+    $stored = $data[$f['fkey']] ?? [];
+    if (!is_array($stored)) $stored = [];
+    $ins = $sigs['inspector'] ?? []; $ap = $sigs['approver'] ?? [];
+    $rows = [];
+    foreach (idems_sigblock_roles($f) as $role) {
+        $s = is_array($stored[$role] ?? null) ? $stored[$role] : [];
+        $lc = strtolower($role);
+        $sys = null;
+        if (strpos($lc, 'approv') !== false || strpos($lc, 'author') !== false || strpos($lc, 'endors') !== false) $sys = $ap;
+        elseif (preg_match('/prepar|review|inspect|witness|carried|verif/', $lc)) $sys = $ins;
+        $name  = trim((string)($s['name']  ?? '')) ?: trim((string)($sys['name']  ?? ''));
+        $desig = trim((string)($s['desig'] ?? '')) ?: trim((string)($sys['desig'] ?? ''));
+        $date  = trim((string)($s['date']  ?? ''));
+        $rows[] = ['role'=>$role, 'name'=>$name, 'desig'=>$desig, 'date'=>$date, 'img'=>$sys['img'] ?? ''];
+    }
+    return $rows;
 }
 // Smart image compression: scale down oversized photos and re-encode as JPEG,
 // preserving readable clarity. Returns [bytes, mime, note]. Non-images pass through.
@@ -2373,6 +2433,29 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                 }
                 $p->gap(3); continue;
             }
+            if ($f['ftype']==='sigblock') {
+                $flushGrid();
+                $rows = idems_sigblock_rows($f, $data, $sigs);
+                $n = count($rows); if ($n === 0) { continue; }
+                $perRow = min(3, $n); $boxW = $p->contentW()/$perRow;
+                $p->needSpace(22);
+                if (trim((string)($f['label'] ?? '')) !== '') { $p->text($ml, $f['label'], 9, true, [70,70,70]); $p->gap(13); }
+                for ($i=0;$i<$n;$i+=$perRow) {
+                    $slice = array_slice($rows,$i,$perRow);
+                    $p->needSpace(76); $rowY=$p->y; $x=$ml;
+                    foreach ($slice as $r) {
+                        $p->y=$rowY; $p->text($x, $r['role'], 8.5, true, [90,90,90]);
+                        $imgY=$rowY+13;
+                        if (!empty($r['img'])) { $nm=$p->addJpeg($r['img']); if($nm) $p->drawImage($nm,$x,$imgY,110,34); }
+                        $lineY=$imgY+36; $p->lineAt($x,$lineY,$x+$boxW-14,$lineY,[120,120,120]);
+                        $ty=$lineY+3;
+                        foreach (array_filter([$r['name'],$r['desig'],$r['date']?('Date: '.$r['date']):'']) as $t){ $p->y=$ty; $p->text($x,$t,8,false,[70,70,70]); $ty+=10; }
+                        $x+=$boxW;
+                    }
+                    $p->y=$rowY+76;
+                }
+                $p->gap(3); continue;
+            }
             if (in_array($f['ftype'],['photo','file','signature'],true)) {
                 $flushGrid();
                 // Photography denied by the client/vendor → print the statement in
@@ -2558,6 +2641,7 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
     // --- Body sections ------------------------------------------------------
     $bySec = []; foreach ($fields as $f) $bySec[(int)$f['section_id']][] = $f;
     $secList = $sections; $secList[] = ['id' => 0, 'title' => ''];
+    $sg = null;   // workflow signatures, resolved lazily if a sigblock needs them
     foreach ($secList as $s) {
         if (!idems_cond_visible($s, $data)) continue;
         $fl = array_values(array_filter($bySec[(int)$s['id']] ?? [], fn($f) => idems_cond_visible($f, $data)));
@@ -2565,6 +2649,15 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
         if (($s['title'] ?? '') !== '') $body .= $para($run($s['title'], true, 22, '1E40AF'), ['before' => 120, 'after' => 40]);
         foreach ($fl as $f) {
             if (in_array($f['ftype'], ['heading','note'], true)) { $body .= $para($run($f['label'], $f['ftype'] === 'heading', 19, '505050')); continue; }
+            if (($f['ftype'] ?? '') === 'sigblock') {
+                if ($sg === null) $sg = function_exists('idems_report_signatures') ? idems_report_signatures($doc) : [];
+                $rows = idems_sigblock_rows($f, $data, $sg);
+                if (trim((string)($f['label'] ?? '')) !== '') $body .= $para($run($f['label'], true, 18, '464646'), ['after' => 20]);
+                $tr = [];
+                foreach ($rows as $r) $tr[] = [$r['role'], $r['name'], $r['desig'], $r['date'], !empty($r['img']) ? 'Signed (on file)' : ''];
+                $body .= $mkTable(['Role', 'Name', 'Designation', 'Date', 'Signature'], $tr);
+                continue;
+            }
             if (($f['ftype'] ?? '') === 'photo' && ($data[$f['fkey'].'__photo_denied'] ?? '') === '1') {
                 $note = trim((string)($data[$f['fkey'].'__photo_denied_note'] ?? ''));
                 $stmt = 'Photographs were not permitted / were denied by the client / vendor at the time of inspection.' . ($note !== '' ? ' ' . $note : '');
@@ -2796,7 +2889,7 @@ function idems_sample_value($f) {
 function idems_sample_data($fields) {
     $data = [];
     foreach ($fields as $f) {
-        if (in_array($f['ftype'], ['heading','note','photo','file','signature','gps','qr'], true)) continue;
+        if (in_array($f['ftype'], ['heading','note','photo','file','signature','sigblock','gps','qr'], true)) continue;
         $data[$f['fkey']] = idems_sample_value($f);
     }
     return $data;
@@ -2900,7 +2993,7 @@ function idems_doc_token_map($doc, $fields, $data, $tpl = null) {
     foreach ($fields as $f) {
         $k = $f['fkey']; $v = $data[$k] ?? '';
         if ($f['ftype'] === 'table') { $tables[$k] = is_array($v) ? array_map(fn($r)=>(array)$r, $v) : []; continue; }
-        if (in_array($f['ftype'], ['photo','file','signature'], true)) continue;
+        if (in_array($f['ftype'], ['photo','file','signature','sigblock'], true)) continue;
         if ($f['ftype'] === 'multiselect' && is_array($v)) { $o=idems_field_options($f); $v=implode(', ', array_map(fn($x)=>$o[$x]??$x,$v)); }
         elseif (in_array($f['ftype'], ['select','radio'], true)) { $o=idems_field_options($f); $v=$o[$v]??$v; }
         elseif ($f['ftype'] === 'checkbox') $v = ($v==='1'||$v===1)?'Yes':'No';
@@ -3057,7 +3150,7 @@ function idems_type_tokens($typeId) {
     $std = ['irn','report_type','title','client','vendor','project','po','drawing','qap_rev','standards','location','inspection_date','issue_date','inspector','approver','result','release','remarks','company','branch','today','doc_number','format_number','doc_revision'];
     $fieldTokens = []; $tableTokens = [];
     foreach (idems_fields($typeId) as $f) {
-        if (in_array($f['ftype'], ['heading','note','photo','file','signature'], true)) continue;
+        if (in_array($f['ftype'], ['heading','note','photo','file','signature','sigblock'], true)) continue;
         if ($f['ftype'] === 'table') { foreach (idems_table_cols($f) as $ck=>$cl) $tableTokens[] = $f['fkey'].'.'.$ck; }
         else $fieldTokens[] = $f['fkey'];
     }
@@ -4040,7 +4133,7 @@ function idems_scan_findings($doc, $fields, $data) {
             }
             continue;
         }
-        if (in_array($f['ftype'], ['photo','file','signature','heading','note'], true)) continue;
+        if (in_array($f['ftype'], ['photo','file','signature','sigblock','heading','note'], true)) continue;
         if (is_array($v)) $v = implode(', ', $v);
         $v = trim((string)$v);
         if ($v === '') continue;
@@ -4560,7 +4653,7 @@ function idems_ai_review($doc, $fields, $data, $srcDocs) {
     $bundle = idems_source_text_bundle($doc['id'], 6000);
     $body = [];
     foreach ($fields as $f) {
-        if (in_array($f['ftype'], ['photo','file','signature','heading','note'], true)) continue;
+        if (in_array($f['ftype'], ['photo','file','signature','sigblock','heading','note'], true)) continue;
         $v = $data[$f['fkey']] ?? ''; if (is_array($v)) $v = json_encode($v);
         if (trim((string)$v) !== '') $body[] = ($f['label'] ?: $f['fkey']) . ': ' . $v;
     }

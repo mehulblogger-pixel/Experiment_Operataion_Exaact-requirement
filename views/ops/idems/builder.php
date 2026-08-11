@@ -109,7 +109,8 @@
           ['add_holdstatus','⏸️ Order &amp; hold-point status','P.O. status (Completed/Balance/Hold) + previous &amp; current hold points'],
           ['add_photos','📷 Photographs','Take/upload photos (auto-compressed), caption each, or mark denied'],
           ['add_conclusion','📝 Conclusion &amp; remarks','Observations, conclusion and general remarks'],
-          ['add_signatures','✍️ Signatures','Manufacturer/vendor &amp; client representative sign-offs'],
+          ['add_sigblock','🖋️ Sign-off block (per role)','Prepared / Reviewed / Approved — name, designation &amp; date, auto-filled'],
+          ['add_signatures','✍️ Signatures (sign pads)','Manufacturer/vendor &amp; client representative signature pads'],
         ];
       ?>
       <div style="display:grid;grid-template-columns:1fr;gap:6px">
