@@ -77,7 +77,19 @@ class SimplePDF {
         return $ops;
     }
 
-    private function esc($s) { return strtr($s, ['\\' => '\\\\', '(' => '\\(', ')' => '\\)', "\r" => '']); }
+    // The built-in Helvetica font is declared with WinAnsiEncoding, so the bytes
+    // in the content stream must be Windows-1252 — NOT raw UTF-8. Writing UTF-8
+    // straight through made "·" show as "Â·" and "—" as "â€"". Convert first, so
+    // middots, en/em dashes, curly quotes, ×, °, etc. all render correctly.
+    private function toWinAnsi($s) {
+        if ($s === '' || preg_match('//u', $s) !== 1) return $s;   // empty or already single-byte
+        // Fast path: pure ASCII needs no conversion.
+        if (!preg_match('/[\x80-\xFF]/', $s) && mb_check_encoding($s, 'ASCII')) return $s;
+        if (function_exists('iconv')) { $r = @iconv('UTF-8', 'Windows-1252//TRANSLIT//IGNORE', $s); if ($r !== false) return $r; }
+        if (function_exists('mb_convert_encoding')) return mb_convert_encoding($s, 'Windows-1252', 'UTF-8');
+        return $s;
+    }
+    private function esc($s) { $s = $this->toWinAnsi((string)$s); return strtr($s, ['\\' => '\\\\', '(' => '\\(', ')' => '\\)', "\r" => '']); }
     private function yy($y) { return $this->H - $y; }  // top-origin -> PDF bottom-origin
 
     public function addPage() { $this->pages[] = $this->cur; $this->cur = ''; $this->y = $this->mt; }

@@ -2781,26 +2781,43 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         };
         $flushGrid = function() use (&$pending,$p,$ml,$valOf) {
             if (!$pending) return;
-            $colW=$p->contentW()/2; $lblW=76; $vw=max(40,$colW-$lblW-6);
+            $colW=$p->contentW()/2;
+            // Lay out one field inside its half-column. The value is placed after the
+            // MEASURED label width (not a fixed offset), so a long label such as
+            // "Item / equipment description:" can never be overprinted by its value.
+            // If the label leaves too little room beside it, the value drops to the
+            // line below the label instead. §layout
+            $plan = function($f,$x) use ($p,$colW,$valOf) {
+                $lbl=$f['label'].':'; $lw=$p->strWidth($lbl,8.5,true)+6;
+                $val=$valOf($f); $avail=$colW-$lw-4;
+                if ($avail>=70) { $vl=$p->wrap($val,8.5,$avail); if(!$vl)$vl=['']; return ['x'=>$x,'lbl'=>$lbl,'vx'=>$x+$lw,'vy'=>0,'vl'=>$vl,'n'=>count($vl)]; }
+                $vl=$p->wrap($val,8.5,$colW-4); if(!$vl)$vl=['']; return ['x'=>$x,'lbl'=>$lbl,'vx'=>$x,'vy'=>11,'vl'=>$vl,'n'=>1+count($vl)];
+            };
             for ($i=0;$i<count($pending);$i+=2) {
-                $L=$pending[$i]; $R=$pending[$i+1]??null;
-                $lv=$p->wrap($valOf($L),8.5,$vw); if(!$lv)$lv=[''];
-                $rv=$R?$p->wrap($valOf($R),8.5,$vw):[]; if($R&&!$rv)$rv=[''];
-                $lines=max(count($lv),count($rv)); $p->needSpace($lines*11+3); $y0=$p->y;
-                $p->y=$y0; $p->text($ml,$L['label'].':',8.5,true,[90,90,90]);
-                for($j=0;$j<count($lv);$j++){ $p->y=$y0+$j*11; $p->text($ml+$lblW,$lv[$j],8.5); }
-                if($R){ $p->y=$y0; $p->text($ml+$colW,$R['label'].':',8.5,true,[90,90,90]);
-                    for($j=0;$j<count($rv);$j++){ $p->y=$y0+$j*11; $p->text($ml+$colW+$lblW,$rv[$j],8.5); } }
+                $cells=[$plan($pending[$i],$ml)];
+                if (isset($pending[$i+1])) $cells[]=$plan($pending[$i+1],$ml+$colW);
+                $lines=1; foreach ($cells as $c) $lines=max($lines,$c['n']);
+                $p->needSpace($lines*11+3); $y0=$p->y;
+                foreach ($cells as $c) {
+                    $p->y=$y0; $p->text($c['x'],$c['lbl'],8.5,true,[90,90,90]);
+                    for($j=0;$j<count($c['vl']);$j++){ $p->y=$y0+$c['vy']+$j*11; $p->text($c['vx'],$c['vl'][$j],8.5); }
+                }
                 $p->y=$y0+$lines*11+2;
             }
             $pending=[];
         };
         $shortTypes=['text','number','date','time','select','unit','yesno','radio','checkbox','multiselect','instrument','calc','qr','gps'];
+        // Long-form fields (observations, conclusion…): print the label on its own
+        // line, then the value wrapped to the FULL width just below it — honouring the
+        // author's own line breaks. This avoids the long label / value collision the
+        // old fixed 88pt offset caused, and reads like a proper report paragraph. §layout
         $fullLbl = function($f,$v) use ($p,$ml) {
             $vv=is_array($v)?'':(string)$v; $p->needSpace(12);
-            $p->text($ml,$f['label'].':',8.5,true,[90,90,90]);
-            $wr=$p->wrap($vv,9,$p->contentW()-90); $p->text($ml+88,$wr?$wr[0]:'',9); $p->gap(11);
-            for($i=1;$i<count($wr);$i++){ $p->needSpace(11); $p->text($ml+88,$wr[$i],9); $p->gap(11); }
+            $p->text($ml,$f['label'].':',8.5,true,[90,90,90]); $p->gap(12);
+            foreach (preg_split('/\r?\n/', $vv) as $para) {
+                if (trim($para)==='') { $p->gap(4); continue; }
+                foreach ($p->wrap($para,9,$p->contentW()-10) as $wl){ $p->needSpace(12); $p->text($ml+10,$wl,9); $p->gap(12); }
+            }
         };
         foreach ($fl as $f) {
             if ($f['ftype']==='richtext') {
@@ -2822,13 +2839,20 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                 $mergeCols=[]; foreach (idems_table_col_defs($f) as $mck=>$md) if (!empty($md['merge'])) $mergeCols[$mck]=true;
                 $prevVal=[];
                 $cw = $p->contentW()/max(1,count($cols));
+                $cellFont = count($cols) > 7 ? 7.5 : 8.5;   // shrink the type when a table has many columns, so cells don't cram
                 // The header band is a closure so it can be RE-DRAWN at the top of
                 // every page a long table spills onto (§38 — no headerless
                 // continuation, no cut-off rows).
+                // Header cells are WRAPPED (like the data cells) so a long column
+                // name — "Description as per PO", "Rejected Qty" — stacks within its
+                // column instead of overprinting the next header. The band grows to
+                // fit the tallest header. §layout
                 $drawHead = function() use ($p,$ml,$cols,$cw) {
-                    $hy=$p->y; $p->rectFill($ml,$hy,$p->contentW(),12,[235,238,245]); $ci=0;
-                    foreach ($cols as $cl){ $p->y=$hy+3; $p->text($ml+$ci*$cw+2,(string)$cl,8,true,[60,60,60]); $ci++; }
-                    $p->y=$hy+13;
+                    $wrapped=[]; $maxL=1;
+                    foreach ($cols as $cl){ $w=$p->wrap((string)$cl,7.5,$cw-3,true); if(count($w)>3)$w=array_slice($w,0,3); if(!$w)$w=['']; $wrapped[]=$w; $maxL=max($maxL,count($w)); }
+                    $hh=$maxL*9+4; $hy=$p->y; $p->rectFill($ml,$hy,$p->contentW(),$hh,[235,238,245]); $ci=0;
+                    foreach ($wrapped as $w){ for($j=0;$j<count($w);$j++){ $p->y=$hy+3+$j*9; $p->text($ml+$ci*$cw+2,$w[$j],7.5,true,[60,60,60]); } $ci++; }
+                    $p->y=$hy+$hh+1;
                 };
                 $p->needSpace(34);   // keep the label with its header + a first row
                 if (!$solo) { $p->text($ml, $f['label'], 9, true, [70,70,70]); $p->gap(11); }
@@ -2843,11 +2867,11 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                         // vertical merge: same value as the row above → render blank
                         if (isset($mergeCols[$ck]) && $cellTxt!=='' && ($prevVal[$ck]??null)===$cellTxt) $cellTxt='';
                         elseif (isset($mergeCols[$ck])) $prevVal[$ck]=(string)($r[$ck]??'');
-                        $w=$p->wrap($cellTxt,8.5,$cw-4); if(count($w)>4)$w=array_slice($w,0,4); if(!$w)$w=['']; $cells[]=$w; $lines=max($lines,count($w)); }
+                        $w=$p->wrap($cellTxt,$cellFont,$cw-4); if(count($w)>4)$w=array_slice($w,0,4); if(!$w)$w=['']; $cells[]=$w; $lines=max($lines,count($w)); }
                     $rowH=$lines*10+2;
                     if ($p->needSpace($rowH)) { $drawHead(); $prevVal=[]; }   // spilled to a new page → repeat the header (and re-show merged values)
                     $ry=$p->y; $ci=0;
-                    foreach ($cells as $w){ for($j=0;$j<count($w);$j++){ $p->y=$ry+$j*10; $p->text($ml+$ci*$cw+2,$w[$j],8.5); } $ci++; }
+                    foreach ($cells as $w){ for($j=0;$j<count($w);$j++){ $p->y=$ry+$j*10; $p->text($ml+$ci*$cw+2,$w[$j],$cellFont); } $ci++; }
                     $p->y=$ry+$rowH; $p->lineAt($ml,$p->y,$right,$p->y,[235,235,235]);
                 }
                 $p->gap(3); continue;
