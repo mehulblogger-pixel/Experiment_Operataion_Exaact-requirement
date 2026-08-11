@@ -214,6 +214,10 @@ function idems_migrate() {
         ensure_column('report_templates', 'review_note', "TEXT");
         // Per-office / per-branch IRN numbering-pattern override (blank = global).
         ensure_column('offices', 'irn_format', "VARCHAR(200) DEFAULT ''");
+        // Per-section print layout: start on a new page / keep the whole section
+        // together (don't split across a page break) — for clean PDF & Word output.
+        ensure_column('report_sections', 'page_break_before', 'INT DEFAULT 0');
+        ensure_column('report_sections', 'keep_together', 'INT DEFAULT 0');
     }
     // ---- Phase 6: manufacturer document verification & endorsement ----
     $pdo->exec("CREATE TABLE IF NOT EXISTS endorsements (
@@ -1173,9 +1177,10 @@ function ops_idems_builder($route, $method) {
         if ($do === 'section_save') {
             $sid = (int)($_POST['section_id'] ?? 0); $title = trim($_POST['title'] ?? '');
             if ($title === '') { flash('Section title required.', 'error'); redirect('/report-builder?type=' . $typeId); }
-            if ($sid) $pdo->prepare("UPDATE report_sections SET title=?, help=? WHERE id=? AND report_type_id=?")->execute([$title, trim($_POST['help'] ?? ''), $sid, $typeId]);
-            else $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
-                ->execute([$typeId, $title, trim($_POST['help'] ?? ''), (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $pgb = !empty($_POST['page_break_before']) ? 1 : 0; $keep = !empty($_POST['keep_together']) ? 1 : 0;
+            if ($sid) $pdo->prepare("UPDATE report_sections SET title=?, help=?, page_break_before=?, keep_together=? WHERE id=? AND report_type_id=?")->execute([$title, trim($_POST['help'] ?? ''), $pgb, $keep, $sid, $typeId]);
+            else $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,page_break_before,keep_together,sort_order) VALUES (?,?,?,?,?,?)")
+                ->execute([$typeId, $title, trim($_POST['help'] ?? ''), $pgb, $keep, (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
             flash('Section saved.'); redirect('/report-builder?type=' . $typeId);
         }
         // One click adds a ready-made "Scope of activities" section — a repeatable
@@ -2409,6 +2414,11 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         $fl = $bySec[(int)$s['id']] ?? [];
         $fl = array_values(array_filter($fl, fn($f) => idems_cond_visible($f, $data)));  // §cond — and each field's
         if (!$fl) continue;
+        // Per-section print layout. "Start on new page" forces a page break unless
+        // we're already at the top; "Keep together" pushes a section that would be
+        // orphaned near the bottom onto the next page.
+        if (!empty($s['page_break_before']) && $p->y > $p->mt + 2) $p->addPage();
+        elseif (!empty($s['keep_together']) && ($p->y > 620)) $p->addPage();
         $p->needSpace(20); $p->gap(4);
         if ($s['title']!=='') { $p->line($s['title'], 11, true, 14, $band); }
         // Short header-style fields (File No, Client, Dates…) render as a clean
@@ -2708,7 +2718,15 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
         if (!idems_cond_visible($s, $data)) continue;
         $fl = array_values(array_filter($bySec[(int)$s['id']] ?? [], fn($f) => idems_cond_visible($f, $data)));
         if (!$fl) continue;
-        if (($s['title'] ?? '') !== '') $body .= $para($run($s['title'], true, 22, '1E40AF'), ['before' => 120, 'after' => 40]);
+        // Per-section print layout: start-on-new-page and keep-with-next (the
+        // section heading won't orphan at the bottom of a page).
+        $secPb = !empty($s['page_break_before']) ? '<w:pageBreakBefore/>' : '';
+        $secKt = !empty($s['keep_together']) ? '<w:keepNext/><w:keepLines/>' : '';
+        if (($s['title'] ?? '') !== '') {
+            $body .= '<w:p><w:pPr>' . $secPb . $secKt . '<w:spacing w:before="120" w:after="40"/></w:pPr>' . $run($s['title'], true, 22, '1E40AF') . '</w:p>';
+        } elseif ($secPb !== '') {
+            $body .= '<w:p><w:pPr>' . $secPb . '</w:pPr></w:p>';
+        }
         foreach ($fl as $f) {
             if (in_array($f['ftype'], ['heading','note'], true)) { $body .= $para($run($f['label'], $f['ftype'] === 'heading', 19, '505050')); continue; }
             if (($f['ftype'] ?? '') === 'richtext') {
