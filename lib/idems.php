@@ -450,7 +450,42 @@ function idems_col_options($doc, $token) {
         }
         return $fallback;
     }
+    // The active instruments from the equipment register — used by the master-
+    // linked instrument table so an inspector picks a real, calibrated device.
+    if (stripos($token, 'equip:') === 0) {
+        return array_keys(idems_equipment_active());
+    }
     return [$token];
+}
+// The active equipment register, keyed by a display label, each carrying its
+// latest calibration (serial, cal date, due date, cert, body, traceable). Drives
+// the master-linked instrument table's dropdown and its client-side auto-fill.
+function idems_equipment_active() {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $cache = [];
+    try {
+        $rows = db()->query("SELECT * FROM equipment WHERE COALESCE(status,'ACTIVE') NOT IN ('RETIRED','INACTIVE') ORDER BY name, code")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) { return $cache; }
+    foreach ($rows as $r) {
+        $cal = null;
+        try { $st = db()->prepare("SELECT * FROM equipment_calibrations WHERE equipment_id=? ORDER BY cal_date DESC, id DESC LIMIT 1"); $st->execute([$r['id']]); $cal = $st->fetch(PDO::FETCH_ASSOC) ?: null; } catch (Throwable $e) {}
+        $label = trim((string)($r['name'] ?: $r['kind'] ?: 'Instrument'));
+        $sn = trim((string)($r['serial_no'] ?? ''));
+        if ($sn !== '') $label .= ' — SN ' . $sn;
+        elseif (trim((string)($r['code'] ?? '')) !== '') $label .= ' (' . $r['code'] . ')';
+        // avoid collisions
+        $base = $label; $i = 2; while (isset($cache[$label])) { $label = $base . ' #' . $i; $i++; }
+        $cache[$label] = [
+            'serial'    => $sn ?: trim((string)($r['code'] ?? '')),
+            'cal_on'    => $cal['cal_date'] ?? '',
+            'cal_due'   => $cal['valid_to'] ?? '',
+            'cert'      => $cal['cert_no'] ?? '',
+            'body'      => $cal['cal_body'] ?? '',
+            'traceable' => (trim((string)($cal['traceable_to'] ?? '')) !== '' ? 'Yes' : ''),
+        ];
+    }
+    return $cache;
 }
 // A field's stored value from the report's data JSON.
 function idems_val($data, $fkey, $default = '') { return $data[$fkey] ?? $default; }
@@ -1351,12 +1386,14 @@ function ops_idems_builder($route, $method) {
             $exists = (int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=? AND title=?", [$typeId, $title]);
             if ($exists) { flash('This report type already has the Instruments & calibration section.', 'warning'); redirect('/report-builder?type=' . $typeId); }
             $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
-                ->execute([$typeId, $title, 'Instruments used, with calibration validity and traceability — add one row per instrument.',
+                ->execute([$typeId, $title, 'Pick an instrument from the equipment register — its serial, calibration dates and traceability fill in automatically. Add one row per instrument.',
                     (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
             $secId = (int)$pdo->lastInsertId();
             $base = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId]);
-            // repeatable instrument table — typed columns: two date pickers + a Yes/No dropdown
-            $cols = "Instrument Type\nSr. No. / Identification number\nCalibrated on|date\nCalibrated due date|date\nNABL Traceable|select|Yes; No";
+            // repeatable instrument table. The first column is master-linked to the
+            // equipment register (equip:instruments) — picking an instrument auto-
+            // fills its serial, calibration dates and traceability from the register.
+            $cols = "Instrument|select|equip:instruments\nSr. No. / Identification number\nCalibrated on|date\nCalibrated due date|date\nNABL Traceable|select|Yes; No";
             if (!(int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey=?", [$typeId, 'instruments'])) {
                 $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span)
                                VALUES (?,?,?,?,?,?,?,?,2)")

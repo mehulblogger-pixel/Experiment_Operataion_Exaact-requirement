@@ -138,20 +138,24 @@
         foreach ($cdefs as $ck=>$d) echo '<th>'.e($d['label']).'</th>'; echo '<th></th></tr></thead><tbody>';
         $cellInput = function($ck,$d,$cur) use ($k,$doc){
             $name = 'tbl['.e($k).'][]['.e($ck).']';
+            $lblAttr = ' data-collabel="'.e(strtolower((string)$d['label'])).'"';
             if ($d['type']==='select') {
                 // A column's options can be a single token pointing at a live
-                // source (call:po_items) or an editable master (lookup:inspection_disposition).
-                $opts = $d['options'];
-                if (count($opts)===1 && (strpos((string)$opts[0],'call:')===0 || strpos((string)$opts[0],'lookup:')===0)) {
+                // source (call:po_items), an editable master (lookup:inspection_disposition),
+                // or the equipment register (equip:instruments) — which also auto-fills
+                // the calibration columns in the same row.
+                $opts = $d['options']; $isEquip = false;
+                if (count($opts)===1 && (strpos((string)$opts[0],'call:')===0 || strpos((string)$opts[0],'lookup:')===0 || strpos((string)$opts[0],'equip:')===0)) {
+                    $isEquip = strpos((string)$opts[0],'equip:')===0;
                     $opts = idems_col_options($doc, (string)$opts[0]);
                 }
-                $h = '<select class="form-control" name="'.$name.'"><option value=""></option>';
+                $h = '<select class="form-control'.($isEquip?' equip-pick':'').'" name="'.$name.'"'.$lblAttr.($isEquip?' data-equip="1"':'').'><option value=""></option>';
                 foreach ($opts as $o) $h .= '<option value="'.e($o).'" '.((string)$cur===(string)$o?'selected':'').'>'.e($o).'</option>';
                 return $h.'</select>';
             }
-            if ($d['type']==='textarea') return '<textarea class="form-control" rows="1" name="'.$name.'">'.e($cur).'</textarea>';
+            if ($d['type']==='textarea') return '<textarea class="form-control" rows="1" name="'.$name.'"'.$lblAttr.'>'.e($cur).'</textarea>';
             $t = in_array($d['type'],['number','date'],true) ? $d['type'] : 'text';
-            return '<input class="form-control" type="'.$t.'" name="'.$name.'" value="'.e($cur).'">';
+            return '<input class="form-control" type="'.$t.'" name="'.$name.'"'.$lblAttr.' value="'.e($cur).'">';
         };
         $render_row = function($r) use ($cdefs,$cellInput){ echo '<tr>'; foreach ($cdefs as $ck=>$d) echo '<td>'.$cellInput($ck,$d,$r[$ck]??'').'</td>'; echo '<td><button type="button" class="btn small secondary" onclick="this.closest(\'tr\').remove()">✕</button></td></tr>'; };
         if ($rows) foreach ($rows as $r) $render_row((array)$r); else $render_row([]);
@@ -292,6 +296,25 @@
   }
 </style>
 <script>
+// Equipment register (active instruments + their latest calibration) — picking an
+// instrument in a master-linked table auto-fills the serial / calibration columns.
+window.__equipReg = <?= json_encode(function_exists('idems_equipment_active') ? idems_equipment_active() : (object)[], JSON_UNESCAPED_UNICODE) ?>;
+document.addEventListener('change', function(ev){
+  var sel = ev.target; if(!sel.matches || !sel.matches('select[data-equip]')) return;
+  var reg = window.__equipReg || {}; var rec = reg[sel.value]; if(!rec) return;
+  var tr = sel.closest('tr'); if(!tr) return;
+  tr.querySelectorAll('[data-collabel]').forEach(function(cell){
+    if(cell===sel) return;
+    var L = cell.getAttribute('data-collabel')||''; var v = null;
+    if(/traceab/.test(L)) v = rec.traceable;
+    else if(/due/.test(L)) v = rec.cal_due;
+    else if(/calibrat/.test(L) && /(on|date)/.test(L)) v = rec.cal_on;
+    else if(/(serial|sr\.?\s*no|identif)/.test(L)) v = rec.serial;
+    else if(/cert/.test(L)) v = rec.cert;
+    else if(/(lab|agency|body)/.test(L)) v = rec.body;
+    if(v!=null && v!=='' && (cell.value===''||cell.dataset.autofilled==='1')){ cell.value=v; cell.dataset.autofilled='1'; }
+  });
+});
 function idemsGps(k){ if(!navigator.geolocation){alert('GPS not available');return;} navigator.geolocation.getCurrentPosition(function(p){ var v=p.coords.latitude.toFixed(6)+', '+p.coords.longitude.toFixed(6); document.getElementById('gps_'+k).value=v; },function(){alert('Could not get location');}); }
 // Technical writing assistant: convert shorthand in this box to engineering language.
 function idemsImprove(k){

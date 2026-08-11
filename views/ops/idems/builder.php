@@ -104,7 +104,7 @@
           ['add_scope','📋 Inspection scope (ITP)','ITP/clause, activity, quantum of check, inspection type, observation, disposition'],
           ['add_po_items','📦 PO items &amp; quantities','Sr.No, description, size, unit, PO/offered/passed/rejected/hold/balance qty'],
           ['add_refdocs','📑 Reference documents','Document name, number, revision, approval code, date of approval'],
-          ['add_instruments','🔧 Instruments &amp; calibration','Instrument, ID/serial, calibrated-on &amp; due dates, NABL traceable'],
+          ['add_instruments','🔧 Instruments &amp; calibration','Pick from the equipment register — serial &amp; calibration dates auto-fill'],
           ['add_iso17020','🛡️ ISO 17020 identification','Item, method, acceptance criteria, statement of conformity, limitations'],
           ['add_holdstatus','⏸️ Order &amp; hold-point status','P.O. status (Completed/Balance/Hold) + previous &amp; current hold points'],
           ['add_photos','📷 Photographs','Take/upload photos (auto-compressed), caption each, or mark denied'],
