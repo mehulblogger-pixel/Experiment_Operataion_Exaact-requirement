@@ -282,6 +282,13 @@ function idems_migrate() {
     }
     // A deputation's deliverables are report types — rewrite the old codes.
     idems_migrate_deliverables();
+    // Prebuild the ready-to-use company inspection report ONCE — a complete type
+    // with every section wired. Guarded by a flag so a user who deletes it does
+    // not get it back, and wrapped so a failure can never break login/migrate.
+    if (function_exists('setting_get') && !setting_get('mgh_report_seeded', '')) {
+        try { idems_build_mgh_report(); } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('mgh_report_seeded', '1');
+    }
 }
 // ITP inspection type for a scope activity — how the point is covered.
 const INSPECTION_TYPES_ITP = [
@@ -356,6 +363,102 @@ const IDEMS_FIELD_TYPES = [
     'instrument'=>'Instrument (master + free-text)',
 ];
 const IDEMS_COND_OPS = ['' => '(always show)', 'eq'=>'equals', 'ne'=>'not equals', 'in'=>'is one of', 'nonempty'=>'is filled', 'empty'=>'is empty'];
+
+// ---------------------------------------------------------------------------
+//  Prebuilt company inspection report — a complete, ready-to-use report type
+//  wired with every section a real TPI inspection report carries: an autofilled
+//  header, reference documents, PO line items, the ITP scope, master-linked
+//  instruments, hold-point status, observations/conclusion, photographs, a
+//  disclaimer and a per-role sign-off. Idempotent: returns the existing type if
+//  it is already built. No third-party agency name is used anywhere.
+// ---------------------------------------------------------------------------
+function idems_build_mgh_report($code = 'MGHIR', $name = 'MGH Inspection Report') {
+    $pdo = db();
+    $existing = ops_one("SELECT id FROM report_types WHERE code=?", [$code]);
+    if ($existing) return (int)$existing['id'];
+    $sort = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_types");
+    $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_at) VALUES (?,?, 'TPIA_REPORT',1,0,?,?)")
+        ->execute([$code, $name, $sort, date('c')]);
+    $typeId = (int)$pdo->lastInsertId();
+    $so = 0; // running section sort
+    $addSection = function($title, $help = '', $pgb = 0, $keep = 0) use ($pdo, $typeId, &$so) {
+        $so += 10;
+        $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,page_break_before,keep_together,sort_order) VALUES (?,?,?,?,?,?)")
+            ->execute([$typeId, $title, $help, $pgb, $keep, $so]);
+        return (int)$pdo->lastInsertId();
+    };
+    $fo = 0; // running field sort
+    $addField = function($secId, $fkey, $label, $ftype, $opts = '', $tableCols = '', $span = 1) use ($pdo, $typeId, &$fo) {
+        $fo += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,table_cols,sort_order,col_span) VALUES (?,?,?,?,?,?,?,?,?)")
+            ->execute([$typeId, $secId, $fkey, $label, $ftype, $opts, $tableCols, $fo, $span]);
+    };
+
+    // 1) Inspection details — autofills from the job/call (client, vendor, PO…).
+    $s = $addSection('Inspection details', 'Most of this carries forward from the job — Client, End user, Manufacturer, PO, Project and dates fill in automatically.', 0, 1);
+    $addField($s, 'client', 'Client', 'text');
+    $addField($s, 'end_user', 'End user', 'text');
+    $addField($s, 'vendor', 'Manufacturer / Vendor', 'text');
+    $addField($s, 'po_number', 'P.O. No.', 'text');
+    $addField($s, 'project', 'Project', 'text');
+    $addField($s, 'item_description', 'Item / equipment description', 'textarea', '', '', 2);
+    $addField($s, 'material', 'Material / Specification', 'text');
+    $addField($s, 'drawing_no', 'Drawing No.', 'text');
+    $addField($s, 'drawing_rev', 'Drawing Rev.', 'text');
+    $addField($s, 'qap', 'QAP / ITP No. & Rev.', 'text');
+    $addField($s, 'heat_no', 'Heat / Lot No.', 'text');
+    $addField($s, 'quantity_offered', 'Quantity offered', 'text');
+    $addField($s, 'inspection_stage', 'Stage of inspection', 'select', "Stage inspection\nIn-process\nFinal\nPre-dispatch\nWitness\nReview");
+    $addField($s, 'inspection_date', 'Date of inspection', 'date');
+    $addField($s, 'location', 'Place of inspection', 'text');
+    $addField($s, 'inspector', 'Inspector', 'text');
+
+    // 2) Reference documents.
+    $s = $addSection('Reference documents', 'The QAP/ITP, drawings, specifications and standards inspected against — one row per document.');
+    $addField($s, 'reference_documents', 'Reference documents', 'table', '', "Document Name\nDocument Number\nRevision No.\nApproval Code\nDate of Approval|date", 2);
+
+    // 3) PO line items & quantities (unit chosen once per line).
+    $s = $addSection('PO items & quantities', 'One row per PO line item — quantities and the unit chosen once per line.');
+    $addField($s, 'po_items', 'PO line items', 'table', '',
+        "PO Sr. No.|merge\nDescription as per PO\nSize\nUnit|unit\nPO Qty|number\nOffered Qty|number\nPassed Qty|number\nRejected Qty|number\nHold Qty|number\nBalance Qty|number\nHeat No.\nProduct Sr. No.", 2);
+
+    // 4) ITP / Inspection scope.
+    $s = $addSection('ITP / Inspection scope', 'Each activity in the ITP — clause, quantum of check, inspection type, observation and disposition.');
+    $addField($s, 'scope_activities', 'Scope of activities', 'table', '',
+        "ITP / Clause No.|merge\nSub-clause\nDescription of activity\nQuantum of check\nInspection type|select|lookup:itp_inspection_type\nObservation\nRemarks\nDisposition|select|lookup:inspection_disposition\nStatus|select|lookup:activity_progress", 2);
+
+    // 5) Instruments & calibration — linked to the equipment register.
+    $s = $addSection('Instruments & calibration', 'Pick an instrument from the equipment register — serial and calibration dates fill in automatically.');
+    $addField($s, 'instruments', 'Instruments used', 'table', '',
+        "Instrument|select|equip:instruments\nSr. No. / Identification number\nCalibrated on|date\nCalibrated due date|date\nNABL Traceable|select|Yes; No", 2);
+
+    // 6) Order & hold-point status.
+    $s = $addSection('Order & hold-point status', 'Status of the order and of any hold / deviation points from the previous visit.');
+    $addField($s, 'po_status', 'P.O. status', 'select', 'lookup:po_status');
+    $addField($s, 'prev_holdpoint_status', 'Status of previous hold points / deviations', 'textarea', '', '', 2);
+    $addField($s, 'current_holdpoints', 'Current hold points / deviations', 'textarea', '', '', 2);
+
+    // 7) Observations & conclusion.
+    $s = $addSection('Observations & conclusion');
+    $addField($s, 'observations', 'Details of inspection carried out / observations', 'textarea', '', '', 2);
+    $addField($s, 'conclusion', 'Conclusion', 'textarea', '', '', 2);
+    $addField($s, 'general_remarks', 'General remarks', 'textarea', '', '', 2);
+
+    // 8) Photographs.
+    $s = $addSection('Photographs', 'Take or upload photos — each auto-compressed and captioned; or mark photography denied.');
+    $addField($s, 'photos', 'Photographs', 'photo', '', '', 2);
+
+    // 9) Disclaimer (kept together, not split across a page).
+    $s = $addSection('', '', 0, 1);
+    $disc = "This report is issued on the basis of the inspection carried out at the time and place stated. It reflects the condition of the items inspected and does not relieve the manufacturer / supplier of their contractual obligations. Our liability is limited to the fee charged for this inspection.";
+    $addField($s, 'disclaimer', 'Disclaimer', 'richtext', $disc, '', 2);
+
+    // 10) Sign-off (Prepared / Reviewed / Approved), kept together.
+    $s = $addSection('Sign-off', 'Prepared / Reviewed / Approved — name, designation and date auto-fill from the workflow.', 0, 1);
+    $addField($s, 'signoff', 'For ' . app_name(), 'sigblock', "Prepared by\nReviewed by\nApproved by", '', 2);
+
+    return $typeId;
+}
 function idems_sections($typeId) { return ops_all("SELECT * FROM report_sections WHERE report_type_id=? ORDER BY sort_order, id", [(int)$typeId]); }
 function idems_fields($typeId, $sectionId = null) {
     if ($sectionId === null) return ops_all("SELECT * FROM report_fields WHERE report_type_id=? ORDER BY sort_order, id", [(int)$typeId]);
@@ -1124,6 +1227,13 @@ function ops_idems_report_types($route, $method) {
     $pdo = db();
     if ($method === 'POST') {
         $do = $_POST['_do'] ?? 'save';
+        // One click builds the complete, ready-to-use company inspection report
+        // (all sections wired). If it already exists, jump straight to its builder.
+        if ($do === 'build_mgh') {
+            $tid = idems_build_mgh_report();
+            flash('Ready inspection report is set up — every section is wired. Review or fine-tune it here.');
+            redirect('/report-builder?type=' . $tid);
+        }
         if ($do === 'del') {
             $t = ops_one("SELECT * FROM report_types WHERE id=?", [(int)($_POST['id'] ?? 0)]);
             if ($t && !$t['is_system']) { $pdo->prepare("DELETE FROM report_types WHERE id=?")->execute([$t['id']]); flash('Report type removed.'); }

@@ -16,6 +16,16 @@
   <div style="margin-top:12px"><button class="btn" type="submit"><?= $edit ? 'Save' : 'Add type' ?></button><?php if ($edit): ?> <a class="btn secondary" href="/report-types">Cancel</a><?php endif; ?></div>
 </form>
 
+<?php if (!$edit): ?>
+<div class="panel" style="margin-top:14px;border:1px solid var(--brand)">
+  <h3 class="tab-sub" style="margin-top:0">⭐ Ready-made inspection report</h3>
+  <p class="muted" style="margin:0 0 10px;font-size:12.5px">A complete inspection report with every section already wired — autofilled header, reference documents, PO items, ITP scope, master-linked instruments, hold-point status, observations &amp; conclusion, photographs, disclaimer and a Prepared / Reviewed / Approved sign-off. Nothing to design; just start writing reports (or fine-tune it).</p>
+  <form method="post" action="/report-types" style="margin:0"><input type="hidden" name="_do" value="build_mgh">
+    <button class="btn" type="submit">Set up the ready inspection report</button>
+  </form>
+</div>
+<?php endif; ?>
+
 <div class="panel" style="padding:0;overflow:hidden;margin-top:14px">
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
