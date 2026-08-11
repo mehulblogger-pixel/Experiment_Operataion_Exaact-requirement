@@ -41,8 +41,9 @@ const HW_POINT_STATUS = [
 
 function hwp_migrate() {
     $pdo = db();
+    $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     $pdo->exec("CREATE TABLE IF NOT EXISTS hw_points (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id $pk,
         job_id INT NULL, call_id INT NULL, report_doc_id INT NULL, office_id INT NULL,
         irn VARCHAR(60) DEFAULT '',
         point_type VARCHAR(16) DEFAULT 'HOLD',
