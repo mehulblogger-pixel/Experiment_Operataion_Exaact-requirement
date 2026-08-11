@@ -47,6 +47,7 @@ const IDEMS_REPORT_SEED = [
     ['TVR','Travel Report','ADMIN'],
     ['EXP','Expense Statement','ADMIN'],
     ['WS','Weekly Summary','SUMMARY'],
+    ['FNR','Fortnightly Progress Report','SUMMARY'],
     ['MPGR','Monthly Progress Report','SUMMARY'],
     ['CSR','Client Summary Report','SUMMARY'],
     ['PCR','Project Closure Report','SUMMARY'],
@@ -325,7 +326,7 @@ function idems_seed_report_types() {
 // ---- Phase 2: field types for the no-code builder --------------------------
 const IDEMS_FIELD_TYPES = [
     'text'=>'Short text', 'textarea'=>'Paragraph', 'number'=>'Number', 'date'=>'Date', 'time'=>'Time',
-    'select'=>'Dropdown (single)', 'multiselect'=>'Dropdown (multiple)', 'checkbox'=>'Yes / no', 'radio'=>'Choice buttons',
+    'select'=>'Dropdown (single)', 'multiselect'=>'Dropdown (multiple)', 'checkbox'=>'Tick box', 'yesno'=>'Yes / No', 'radio'=>'Choice buttons',
     'calc'=>'Calculated', 'heading'=>'Section heading', 'note'=>'Info note',
     'table'=>'Repeatable table', 'photo'=>'Photo', 'file'=>'Attachment', 'gps'=>'GPS location',
     'signature'=>'Signature', 'qr'=>'QR / barcode value', 'unit'=>'Unit picker',
@@ -1206,6 +1207,74 @@ function ops_idems_builder($route, $method) {
             $mk('current_holdpoints','Current hold points / deviations','textarea','',2);
             flash('Added an “Order & hold-point status” section — P.O. status dropdown (Completed / Balance / Hold) plus previous &amp; current hold-point status.');
             redirect('/report-builder?type=' . $typeId);
+        }
+        // "Add a section → Custom table": the user names the section and defines the
+        // columns — how many, each with its own field type — then a repeatable
+        // table is built. This is the from-scratch path when no ready section fits.
+        if ($do === 'add_custom_table') {
+            $secTitle = trim((string)($_POST['sec_title'] ?? '')) ?: 'Table';
+            $names = (array)($_POST['col_name'] ?? []);
+            $ctypes = (array)($_POST['col_type'] ?? []);
+            $copts  = (array)($_POST['col_opts'] ?? []);
+            $lines = [];
+            foreach ($names as $i => $nm) {
+                $nm = trim((string)$nm); if ($nm === '') continue;
+                $t = strtolower(trim((string)($ctypes[$i] ?? 'text'))); if ($t === 'dropdown') $t = 'select';
+                if (!in_array($t, ['text','number','date','select','textarea','unit'], true)) $t = 'text';
+                if ($t === 'text') { $lines[] = $nm; }
+                elseif ($t === 'select') { $o = trim((string)($copts[$i] ?? '')); $lines[] = $nm . '|select' . ($o !== '' ? '|' . $o : ''); }
+                else { $lines[] = $nm . '|' . $t; }
+            }
+            if (!$lines) { flash('Add at least one column (a name and a type) for the table.', 'error'); redirect('/report-builder?type=' . $typeId); }
+            $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, $secTitle, 'Custom table.', (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $secId = (int)$pdo->lastInsertId();
+            $fkey = idems_clean_key($secTitle) ?: ('table_' . $secId);
+            if ((int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey=?", [$typeId, $fkey])) $fkey .= '_' . $secId;
+            $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,sort_order,col_span)
+                           VALUES (?,?,?,?,?,?,?,2)")
+                ->execute([$typeId, $secId, $fkey, $secTitle, 'table', implode("\n", $lines),
+                    (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId])]);
+            flash('Added the “' . $secTitle . '” table with ' . count($lines) . ' column(s). Add rows on the report, or open the table to fine-tune a column.');
+            redirect('/report-builder?type=' . $typeId);
+        }
+        // One-click "Conclusion & remarks" narrative section.
+        if ($do === 'add_conclusion') {
+            if ((int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=? AND title=?", [$typeId, 'Conclusion & remarks'])) {
+                flash('This report type already has a Conclusion & remarks section.', 'warning'); redirect('/report-builder?type=' . $typeId);
+            }
+            $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, 'Conclusion & remarks', '', (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $secId = (int)$pdo->lastInsertId(); $o = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId]);
+            foreach ([['observations','Details of inspection carried out / observations'],['conclusion','Conclusion'],['general_remarks','General remarks']] as $ff) {
+                $o += 10; $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,sort_order,col_span) VALUES (?,?,?,?,'textarea',?,2)")->execute([$typeId,$secId,$ff[0],$ff[1],$o]);
+            }
+            flash('Added a “Conclusion & remarks” section (observations, conclusion, general remarks).'); redirect('/report-builder?type=' . $typeId);
+        }
+        // One-click "Photographs" evidence section.
+        if ($do === 'add_photos') {
+            if ((int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey='photos'", [$typeId])) {
+                flash('This report type already has a Photographs field.', 'warning'); redirect('/report-builder?type=' . $typeId);
+            }
+            $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, 'Photographs', 'Take or upload photos — each auto-compressed and captioned; or mark photography denied.', (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $secId = (int)$pdo->lastInsertId();
+            $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,sort_order,col_span) VALUES (?,?,?,?,'photo',?,2)")
+                ->execute([$typeId,$secId,'photos','Photographs',(int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId])]);
+            flash('Added a “Photographs” section — take/upload (auto-compressed), name each photo, or mark photography denied.'); redirect('/report-builder?type=' . $typeId);
+        }
+        // One-click "Signatures" — inspector + vendor/client representative sign-off.
+        if ($do === 'add_signatures') {
+            if ((int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=? AND title=?", [$typeId, 'Signatures'])) {
+                flash('This report type already has a Signatures section.', 'warning'); redirect('/report-builder?type=' . $typeId);
+            }
+            $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, 'Signatures', 'The inspector signature is applied automatically at issue; add representative sign-offs here.', (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $secId = (int)$pdo->lastInsertId(); $o = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId]);
+            foreach ([['sign_vendor','Signature — Manufacturer / Vendor representative'],['sign_client','Signature — Client / Witness representative']] as $ff) {
+                $o += 10; $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,sort_order,col_span) VALUES (?,?,?,?,'signature',?,1)")->execute([$typeId,$secId,$ff[0],$ff[1],$o]);
+            }
+            flash('Added a “Signatures” section — manufacturer/vendor and client representative sign-offs. (The inspector & approver signatures are applied automatically at issue.)'); redirect('/report-builder?type=' . $typeId);
         }
         // One click adds the identification & traceability fields every inspection
         // report must carry under ISO/IEC 17020 clause 7.4 — so a report type is
@@ -2252,7 +2321,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
             }
             $pending=[];
         };
-        $shortTypes=['text','number','date','time','select','unit','radio','checkbox','multiselect','instrument','calc','qr','gps'];
+        $shortTypes=['text','number','date','time','select','unit','yesno','radio','checkbox','multiselect','instrument','calc','qr','gps'];
         $fullLbl = function($f,$v) use ($p,$ml) {
             $vv=is_array($v)?'':(string)$v; $p->needSpace(12);
             $p->text($ml,$f['label'].':',8.5,true,[90,90,90]);

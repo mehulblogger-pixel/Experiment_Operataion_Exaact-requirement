@@ -13,30 +13,6 @@
     <button type="button" class="btn secondary" id="bld-preview-toggle" title="Show the finished report next to the designer — it refreshes as you arrange fields">🔍 Live preview</button>
     <a class="btn secondary" href="/report-type-preview?type=<?= (int)$type['id'] ?>" target="_blank" title="Open the finished report filled with dummy data in a new tab">👁 Open preview</a><?php endif; ?>
     <a class="btn<?= empty($fields) ? '' : ' secondary' ?>" href="/report-autoform?type=<?= (int)$type['id'] ?>">🪄 Build from my Word file (no codes)</a>
-    <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline">
-      <input type="hidden" name="_do" value="add_scope">
-      <button class="btn secondary" type="submit" title="Adds a repeatable Activity / Status / Remark table">➕ Scope of activities</button>
-    </form>
-    <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline">
-      <input type="hidden" name="_do" value="add_iso17020">
-      <button class="btn secondary" type="submit" title="Adds every identification &amp; traceability field ISO/IEC 17020 requires — item, method, acceptance criteria, statement of conformity, limitations">🛡️ ISO 17020 fields</button>
-    </form>
-    <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline">
-      <input type="hidden" name="_do" value="add_instruments">
-      <button class="btn secondary" type="submit" title="Adds a ready instrument table — type, ID/serial, calibrated-on &amp; due dates (date pickers), NABL traceable Yes/No — plus the ISO 17020 disclaimer">🔧 Instruments &amp; calibration</button>
-    </form>
-    <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline">
-      <input type="hidden" name="_do" value="add_po_items">
-      <button class="btn secondary" type="submit" title="Adds a ready multi-row table: PO Sr.No, description, size, unit, and ordered / offered / passed / rejected / hold / balance quantities, with heat &amp; serial no.">📦 PO items &amp; quantities</button>
-    </form>
-    <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline">
-      <input type="hidden" name="_do" value="add_refdocs">
-      <button class="btn secondary" type="submit" title="Adds a repeatable table: Document Name, Number, Revision, Approval code and Date of approval (date picker)">📑 Reference documents</button>
-    </form>
-    <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="display:inline">
-      <input type="hidden" name="_do" value="add_holdstatus">
-      <button class="btn secondary" type="submit" title="Adds the P.O. status dropdown (Completed / Balance / Hold) and previous &amp; current hold-point status fields">⏸️ Order &amp; hold-point status</button>
-    </form>
     <a class="btn secondary" href="/report-types">← Report types</a>
   </div>
 </div>
@@ -118,14 +94,60 @@
   </div>
 
   <div>
-    <!-- ============ add section ============ -->
-    <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" class="panel" style="margin-bottom:12px">
-      <input type="hidden" name="_do" value="section_save">
-      <h3 class="tab-sub" style="margin-top:0">Add a section</h3>
-      <div class="ff"><label>Section title</label><input class="form-control" name="title" placeholder="e.g. Inspection details" required></div>
-      <div class="ff"><label>Help note (optional)</label><input class="form-control" name="help"></div>
-      <div style="margin-top:10px"><button class="btn" type="submit">Add section</button></div>
-    </form>
+    <!-- ============ ADD A SECTION — pick a type ============ -->
+    <div class="panel" style="margin-bottom:12px">
+      <h3 class="tab-sub" style="margin-top:0">➕ Add a section — pick a type</h3>
+      <p class="muted" style="margin:0 0 10px;font-size:12.5px">Choose a ready-made section (tables and fields already set up), build a custom table, or start blank. You can rename, reorder and fine-tune everything afterwards.</p>
+      <?php
+        $rt = (int)$type['id'];
+        $ready = [
+          ['add_scope','📋 Inspection scope (ITP)','ITP/clause, activity, quantum of check, inspection type, observation, disposition'],
+          ['add_po_items','📦 PO items &amp; quantities','Sr.No, description, size, unit, PO/offered/passed/rejected/hold/balance qty'],
+          ['add_refdocs','📑 Reference documents','Document name, number, revision, approval code, date of approval'],
+          ['add_instruments','🔧 Instruments &amp; calibration','Instrument, ID/serial, calibrated-on &amp; due dates, NABL traceable'],
+          ['add_iso17020','🛡️ ISO 17020 identification','Item, method, acceptance criteria, statement of conformity, limitations'],
+          ['add_holdstatus','⏸️ Order &amp; hold-point status','P.O. status (Completed/Balance/Hold) + previous &amp; current hold points'],
+          ['add_photos','📷 Photographs','Take/upload photos (auto-compressed), caption each, or mark denied'],
+          ['add_conclusion','📝 Conclusion &amp; remarks','Observations, conclusion and general remarks'],
+          ['add_signatures','✍️ Signatures','Manufacturer/vendor &amp; client representative sign-offs'],
+        ];
+      ?>
+      <div style="display:grid;grid-template-columns:1fr;gap:6px">
+        <?php foreach ($ready as $r): ?>
+          <form method="post" action="/report-builder?type=<?= $rt ?>" style="margin:0">
+            <input type="hidden" name="_do" value="<?= e($r[0]) ?>">
+            <button class="bld-sec-card" type="submit" title="<?= $r[2] ?>">
+              <span class="t"><?= $r[1] ?></span><span class="d"><?= $r[2] ?></span>
+            </button>
+          </form>
+        <?php endforeach; ?>
+      </div>
+    </div>
+
+    <!-- ============ CUSTOM TABLE — define columns ============ -->
+    <details class="panel" style="margin-bottom:12px">
+      <summary style="cursor:pointer;font-weight:700">🧱 Custom table — define columns &amp; types</summary>
+      <form method="post" action="/report-builder?type=<?= $rt ?>" style="margin-top:10px" onsubmit="ctSerialize()">
+        <input type="hidden" name="_do" value="add_custom_table">
+        <div class="ff"><label>Table / section title</label><input class="form-control" name="sec_title" placeholder="e.g. Material details" required></div>
+        <label style="font-size:12.5px;color:var(--muted)">Columns — add up to ~10, each with its own type</label>
+        <div id="ctcols" style="margin-top:4px"></div>
+        <button type="button" class="btn small secondary" onclick="ctAdd()">+ Add column</button>
+        <div id="ctfields"></div>
+        <div style="margin-top:10px"><button class="btn" type="submit">Create table</button></div>
+      </form>
+    </details>
+
+    <!-- ============ blank section ============ -->
+    <details class="panel" style="margin-bottom:12px">
+      <summary style="cursor:pointer;font-weight:700">➕ Blank section (add fields by hand)</summary>
+      <form method="post" action="/report-builder?type=<?= $rt ?>" style="margin-top:10px">
+        <input type="hidden" name="_do" value="section_save">
+        <div class="ff"><label>Section title</label><input class="form-control" name="title" placeholder="e.g. Inspection details" required></div>
+        <div class="ff"><label>Help note (optional)</label><input class="form-control" name="help"></div>
+        <div style="margin-top:10px"><button class="btn" type="submit">Add section</button></div>
+      </form>
+    </details>
 
     <!-- ============ add / edit field ============ -->
     <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" class="panel">
@@ -181,6 +203,11 @@
   .bld-drop.drop-hot{background:color-mix(in srgb,var(--accent,#2b6cff) 10%,transparent);box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--accent,#2b6cff) 45%,transparent)}
   .bld-section.sec-dragging{opacity:.5}
   .bld-shead h3{display:flex;align-items:center;gap:6px}
+  .bld-sec-card{width:100%;text-align:left;display:flex;flex-direction:column;gap:2px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--card,var(--panel2));cursor:pointer;transition:border-color .12s,background .12s}
+  .bld-sec-card:hover{border-color:var(--accent,#2b6cff);background:color-mix(in srgb,var(--accent,#2b6cff) 7%,transparent)}
+  .bld-sec-card .t{font-weight:700;font-size:13.5px;color:var(--ink)}
+  .bld-sec-card .d{font-size:11.5px;color:var(--muted);line-height:1.35}
+  .ctrow{display:flex;gap:6px;margin:0 0 5px;align-items:center}
 </style>
 <script>
 (function(){
@@ -245,6 +272,24 @@ function colbRow(col){
   return div;
 }
 function colbAdd(){ var h=document.getElementById('colb'); if(h){ h.appendChild(colbRow()); colbSerialize(); } }
+
+// ---- custom-table column editor (Add a section → Custom table) -------------
+function ctSerialize(){ return true; }   // rows carry named inputs directly
+function ctRow(){
+  var div=document.createElement('div'); div.className='ctrow';
+  div.innerHTML='<input class="form-control" name="col_name[]" placeholder="Column name" style="flex:2">'+
+    '<select class="form-control ct-type" name="col_type[]" style="flex:1">'+
+    '<option value="text">Text</option><option value="number">Number</option><option value="date">Date</option>'+
+    '<option value="select">Dropdown</option><option value="unit">Unit</option><option value="textarea">Long text</option></select>'+
+    '<input class="form-control ct-opts" name="col_opts[]" placeholder="A; B; C" style="flex:2;display:none">'+
+    '<button type="button" class="btn small secondary" title="Remove">✕</button>';
+  function tog(){ div.querySelector('.ct-opts').style.display = div.querySelector('.ct-type').value==='select'?'':'none'; }
+  div.querySelector('.ct-type').addEventListener('change',tog); tog();
+  div.querySelector('button').addEventListener('click',function(){ div.remove(); });
+  return div;
+}
+function ctAdd(){ var h=document.getElementById('ctcols'); if(h) h.appendChild(ctRow()); }
+(function ctInit(){ var h=document.getElementById('ctcols'); if(h && !h.children.length){ h.appendChild(ctRow()); h.appendChild(ctRow()); h.appendChild(ctRow()); } })();
 (function colbInit(){
   var host=document.getElementById('colb'), raw=document.getElementById('table_cols_raw');
   if(!host||!raw) return;
