@@ -321,17 +321,36 @@
   if (!empty($hasSchema)):
     $bySec = []; foreach ($fields as $f) $bySec[(int)$f['section_id']][] = $f;
     $filesBy = []; foreach ($files as $fl) $filesBy[$fl['field_key']][] = $fl;
-    $showVal = function($f) use ($data, $filesBy) {
+    $showVal = function($f) use ($data, $filesBy, $doc) {
       $k=$f['fkey']; $v=$data[$k] ?? '';
       if (in_array($f['ftype'],['photo','file','signature'],true)) {
         if (empty($filesBy[$k])) return '<span class="muted">—</span>';
         $h=''; foreach ($filesBy[$k] as $fl){ if(strpos($fl['mime'],'image/')===0) $h.='<a href="/report-file?id='.(int)$fl['id'].'" target="_blank"><img src="/report-file?id='.(int)$fl['id'].'" class="ev-th"></a> '; else $h.='<a class="pill p-info" href="/report-file?id='.(int)$fl['id'].'" target="_blank">📎 '.e($fl['file_name']).'</a> '; }
         return $h;
       }
-      if ($f['ftype']==='table') { if(!is_array($v)||!$v) return '<span class="muted">—</span>'; $cols=idems_table_cols($f); $h='<table class="dt" style="margin-top:4px"><thead><tr>'; foreach($cols as $cl) $h.='<th>'.e($cl).'</th>'; $h.='</tr></thead><tbody>'; foreach($v as $r){ $r=(array)$r; $h.='<tr>'; foreach($cols as $ck=>$cl) $h.='<td>'.e($r[$ck]??'').'</td>'; $h.='</tr>'; } return $h.'</tbody></table>'; }
+      if ($f['ftype']==='table') {
+        if(!is_array($v)||!$v) return '<span class="muted">—</span>';
+        $cols=idems_table_cols($f);
+        // wide tables (PO items has 12 columns) scroll inside their own box
+        // instead of overflowing the card / page.
+        $h='<div class="rt-scroll"><table class="dt rt-tbl"><thead><tr>';
+        foreach($cols as $cl) $h.='<th>'.e($cl).'</th>'; $h.='</tr></thead><tbody>';
+        foreach($v as $r){ $r=(array)$r; $h.='<tr>'; foreach($cols as $ck=>$cl) $h.='<td>'.nl2br(e((string)($r[$ck]??''))).'</td>'; $h.='</tr>'; }
+        return $h.'</tbody></table></div>';
+      }
+      if ($f['ftype']==='richtext') { $t=trim((string)($f['options']??'')); return $t!=='' ? '<span class="muted" style="font-size:12.5px">'.nl2br(e($t)).'</span>' : '<span class="muted">—</span>'; }
+      if ($f['ftype']==='sigblock') {
+        $sg = function_exists('idems_report_signatures') ? idems_report_signatures($doc) : [];
+        $rows = function_exists('idems_sigblock_rows') ? idems_sigblock_rows($f,$data,$sg) : [];
+        if(!$rows) return '<span class="muted">—</span>';
+        $h='<div class="rt-scroll"><table class="dt rt-tbl"><thead><tr><th>Role</th><th>Name</th><th>Designation</th><th>Date</th></tr></thead><tbody>';
+        foreach($rows as $r){ $h.='<tr><td>'.e($r['role']).'</td><td>'.e($r['name']?:'—').'</td><td>'.e($r['desig']?:'—').'</td><td>'.e($r['date']?:'—').'</td></tr>'; }
+        return $h.'</tbody></table></div>';
+      }
       if ($f['ftype']==='multiselect' && is_array($v)) { $o=idems_field_options($f); return e(implode(', ', array_map(fn($x)=>$o[$x]??$x,$v))) ?: '<span class="muted">—</span>'; }
-      if (in_array($f['ftype'],['select','radio'],true)) { $o=idems_field_options($f); return e($o[$v] ?? $v) ?: '<span class="muted">—</span>'; }
+      if (in_array($f['ftype'],['select','radio','unit'],true)) { $o=idems_field_options($f); return e($o[$v] ?? $v) ?: '<span class="muted">—</span>'; }
       if ($f['ftype']==='checkbox') return ($v==='1'||$v===1)?'Yes':'No';
+      if ($f['ftype']==='yesno') return $v!=='' ? e($v) : '<span class="muted">—</span>';
       return $v!=='' ? nl2br(e(is_array($v)?'':$v)) : '<span class="muted">—</span>';
     };
 ?>
@@ -348,7 +367,14 @@
 <?php if (!empty($bySec[0])): ?>
   <div class="panel"><div class="kv-grid"><?php foreach ($bySec[0] as $f): if(in_array($f['ftype'],['heading','note'],true)) continue; ?><div class="<?= (int)$f['col_span']===2?'kv-wide':'' ?>"><span class="k"><?= e($f['label']) ?></span><?= $showVal($f) ?></div><?php endforeach; ?></div></div>
 <?php endif; ?>
-<style>.ev-th{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}</style>
+<style>
+  .ev-th{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+  /* Report-body tables: scroll sideways in their own box, never overflow the card. */
+  .rt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:8px;margin-top:4px}
+  .rt-tbl{width:auto;min-width:max-content;margin:0}
+  .rt-tbl th,.rt-tbl td{white-space:nowrap;padding:5px 9px;font-size:12.5px;vertical-align:top}
+  .rt-tbl th{background:var(--soft)}
+</style>
 <?php else: ?>
 <p class="muted" style="margin:10px 2px">No form is designed for this report type yet<?= (is_master()||can('idems.type.manage')) ? ' — use "Design this form" above to add sections &amp; fields.' : '.' ?></p>
 <?php endif; ?>
