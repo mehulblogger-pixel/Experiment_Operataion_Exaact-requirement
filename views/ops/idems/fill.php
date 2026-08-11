@@ -47,6 +47,10 @@
         echo '<input class="form-control" type="text" name="f['.e($k).']" data-key="'.e($k).'" data-calc="'.e($f['calc_expr']).'" value="'.e(is_array($val)?'':$val).'" readonly style="background:var(--soft)">'; break;
       case 'checkbox':
         echo '<label class="chk"><input type="checkbox" name="f['.e($k).']" data-key="'.e($k).'" value="1" '.(($val==='1'||$val===1||$val==='Yes')?'checked':'').'> Yes</label>'; break;
+      case 'yesno':
+        echo '<div class="chip-row" data-key="'.e($k).'">';
+        foreach (['Yes','No','N/A'] as $yn) echo '<label class="chk" style="margin-right:12px"><input type="radio" name="f['.e($k).']" value="'.$yn.'" '.($val===$yn?'checked':'').'> '.$yn.'</label>';
+        echo '</div>'; break;
       case 'select': case 'unit':
         echo '<select class="form-control searchable" name="f['.e($k).']" data-key="'.e($k).'"'.$reqAttr.'><option value="">—</option>';
         foreach ($opts as $ok=>$ol) echo '<option value="'.e($ok).'" '.($val===$ok?'selected':'').'>'.e($ol).'</option>';
