@@ -55,6 +55,8 @@ const IDEMS_REPORT_SEED = [
 const IDEMS_CATEGORIES = ['TPIA_REPORT'=>'TPIA report','ENDORSEMENT'=>'Manufacturer endorsement','ADMIN'=>'Timesheet / admin','SUMMARY'=>'Summary / periodic'];
 // Report-instance lifecycle.
 const IDEMS_STATUS = ['DRAFT'=>'Draft','SUBMITTED'=>'Submitted','UNDER_REVIEW'=>'Under review','APPROVED'=>'Approved','ISSUED'=>'Issued','REJECTED'=>'Sent back','ARCHIVED'=>'Archived'];
+// Technical vetting / debriefing states (distinct from the approval chain).
+const IDEMS_VET_STATUS = ['VETTED'=>'Vetted','RETURNED'=>'Returned for correction','DEBRIEFED'=>'Debriefed'];
 const IDEMS_OPEN_STATES = ['DRAFT','SUBMITTED','UNDER_REVIEW','REJECTED'];
 const IDEMS_RESULTS = ['ACCEPTED'=>'Accepted','ACCEPTED_COND'=>'Accepted with observations','REJECTED'=>'Rejected','HOLD'=>'Hold','NA'=>'Not applicable'];
 const IDEMS_RELEASE = ['RELEASED'=>'Released','RELEASED_COND'=>'Released with observations','NOT_RELEASED'=>'Not released','PENDING'=>'Pending'];
@@ -189,6 +191,19 @@ function idems_migrate() {
         id " . pk_clause() . ", report_doc_id INT, doc_type VARCHAR(30) DEFAULT '',
         state VARCHAR(20) DEFAULT 'PENDING', note VARCHAR(400) DEFAULT '',
         reviewed_by VARCHAR(150) DEFAULT '', reviewed_at VARCHAR(30) DEFAULT '')");
+    // Technical vetting & debriefing — a distinct review action a senior reviewer
+    // performs on a report before it goes for approval: vet (cleared), return
+    // (send back for correction) or record a debrief. One row per action; the
+    // report carries the latest vetting status for a quick read.
+    db()->exec("CREATE TABLE IF NOT EXISTS report_vetting (
+        id " . pk_clause() . ", report_doc_id INT, stage VARCHAR(20) DEFAULT 'VET',
+        action VARCHAR(20) DEFAULT '', note VARCHAR(600) DEFAULT '',
+        acted_by VARCHAR(150) DEFAULT '', acted_at VARCHAR(30) DEFAULT '')");
+    if (function_exists('ensure_column')) {
+        ensure_column('report_docs', 'vet_status', "VARCHAR(20) DEFAULT ''");
+        ensure_column('report_docs', 'vet_at', "VARCHAR(30) DEFAULT ''");
+        ensure_column('report_docs', 'vet_by', "VARCHAR(150) DEFAULT ''");
+    }
     ensure_column('users', 'signature', 'MEDIUMTEXT');          // base64 data-URL of the signature image
     ensure_column('inspectors', 'signature', 'MEDIUMTEXT');
     // ---- Phase 5: client-specific report templates (uploaded .docx, token-mapped) ----
@@ -964,6 +979,7 @@ function ops_idems_documents($route, $method) {
         view('ops/idems/doc_detail', ['doc'=>$doc, 'approver'=>$approver, 'audit'=>$audit,
             'sections'=>$sections, 'fields'=>$fields, 'data'=>$data, 'files'=>idems_doc_files($doc['id']), 'hasSchema'=>!empty($fields),
             'approvals'=>$approvals, 'curStep'=>$curStep, 'canAct'=>idems_can_act_step($curStep),
+            'vetting'=>idems_vetting_log($doc['id']), 'canVet'=>idems_can_vet(),
             'delegateUsers'=>($curStep && idems_can_act_step($curStep)) ? ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name") : []]);
         return true;
     }
@@ -2137,6 +2153,39 @@ function ops_idems_approve($method) {
         idems_notify_approver($doc, ['resolved_user_id'=>$to, 'irn'=>$doc['irn']] + $doc);
         flash('Approval delegated.');
     }
+    redirect('/document?id=' . $doc['id']);
+    return true;
+}
+
+// The vetting / debriefing log for a report (newest first).
+function idems_vetting_log($docId) {
+    return ops_all("SELECT * FROM report_vetting WHERE report_doc_id=? ORDER BY id DESC", [(int)$docId]);
+}
+// Who may vet / debrief a report — a senior reviewer (finalizer) or a master.
+function idems_can_vet() { return is_master() || can('idems.finalize'); }
+// ---- Handler: technical vetting / debriefing (distinct from approval) ----
+function ops_idems_vet($method) {
+    if ($method !== 'POST') redirect('/documents');
+    $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
+    if (!$doc) { http_response_code(404); view('notfound'); return true; }
+    ops_require(idems_can_vet(), 'You are not permitted to vet or debrief reports.');
+    if (!empty($doc['finalized'])) { flash('This report is already issued — vetting is closed.', 'warning'); redirect('/document?id=' . $doc['id']); }
+    $action = strtoupper(trim((string)($_POST['vet_action'] ?? '')));
+    if (!isset(IDEMS_VET_STATUS[$action])) { flash('Choose a vetting action.', 'error'); redirect('/document?id=' . $doc['id']); }
+    $note = trim((string)($_POST['note'] ?? ''));
+    if ($action === 'RETURNED' && $note === '') { flash('A note is mandatory when returning a report for correction.', 'error'); redirect('/document?id=' . $doc['id']); }
+    $pdo = db();
+    $stage = ($action === 'DEBRIEFED') ? 'DEBRIEF' : 'VET';
+    $pdo->prepare("INSERT INTO report_vetting (report_doc_id,stage,action,note,acted_by,acted_at) VALUES (?,?,?,?,?,?)")
+        ->execute([$doc['id'], $stage, $action, $note, user_name(current_user()), date('c')]);
+    $pdo->prepare("UPDATE report_docs SET vet_status=?, vet_at=?, vet_by=?, updated_at=? WHERE id=?")
+        ->execute([$action, date('c'), user_name(current_user()), date('c'), $doc['id']]);
+    // Returning for correction routes the report back to the inspector as a draft.
+    if ($action === 'RETURNED' && in_array($doc['status'], IDEMS_OPEN_STATES, true)) {
+        $pdo->prepare("UPDATE report_docs SET status='DRAFT' WHERE id=?")->execute([$doc['id']]);
+    }
+    idems_log('report_doc', $doc['id'], 'VET_' . $action, ['irn'=>$doc['irn'], 'reason'=>$note]);
+    flash(['VETTED'=>'Report vetted — cleared for approval.', 'RETURNED'=>'Report returned to the inspector for correction.', 'DEBRIEFED'=>'Debrief recorded.'][$action] ?? 'Vetting recorded.');
     redirect('/document?id=' . $doc['id']);
     return true;
 }

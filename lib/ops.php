@@ -2071,7 +2071,7 @@ function ops_module_gate($route) {
         'availability'=>'jobs',
         'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems',
         'report-types'=>'idems','report-type-edit'=>'idems','report-builder'=>'idems','report-field-edit'=>'idems','report-file'=>'idems','irn-rules'=>'idems','audit-log'=>'idems',
-        'document-approve'=>'idems','approver-map'=>'idems','idems-approval-rules'=>'idems','idems-approval-rule-edit'=>'idems',
+        'document-approve'=>'idems','document-vet'=>'idems','approver-map'=>'idems','idems-approval-rules'=>'idems','idems-approval-rule-edit'=>'idems',
         'document-pdf'=>'idems','document-timestamp'=>'idems','document-docx'=>'idems','report-type-preview'=>'idems','report-template-preview'=>'idems',
         'report-templates'=>'idems','report-template-edit'=>'idems','report-template-download'=>'idems','report-form-from-template'=>'idems','report-autoform'=>'idems',
         'endorsements'=>'idems','endorsement'=>'idems','endorsement-new'=>'idems','endorsement-edit'=>'idems','endorsement-submit'=>'idems','endorsement-approve'=>'idems','endorsement-delete'=>'idems','endorsement-file'=>'idems','endorsement-cert'=>'idems',
@@ -2551,6 +2551,8 @@ function ops_dispatch($route, $method) {
             return ops_idems_fill($route, $method);
         case $route === 'document-approve':
             return ops_idems_approve($method);
+        case $route === 'document-vet':
+            return ops_idems_vet($method);
         case $route === 'approver-map':
             return ops_idems_approver_map($method);
         case $route === 'idems-approval-rules' || $route === 'idems-approval-rule-edit':
