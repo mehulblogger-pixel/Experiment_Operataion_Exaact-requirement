@@ -5,69 +5,85 @@
     <p class="sub" style="margin:2px 0 0"><span class="pill p-info"><?= e($doc['type_code']) ?></span> <?= e($doc['type_name'] ?: $doc['title']) ?> · <span class="pill <?= idems_status_pill($doc['status']) ?>"><?= e(lk_options_or('report_status', IDEMS_STATUS)[$doc['status']] ?? $doc['status']) ?></span></p></div>
   <?php $canSubmit = idems_can_edit_doc($doc) && in_array($doc['status'],['DRAFT','REJECTED'],true);
         $comp = $canSubmit ? idems_completeness_check($doc) : null; ?>
-  <div style="display:flex;gap:6px;flex-wrap:wrap">
-    <?php if (idems_can_edit_doc($doc)): ?><a class="btn secondary" href="/document-edit?id=<?= (int)$doc['id'] ?>">Edit header</a><?php endif; ?>
-    <?php if (idems_can_edit_doc($doc) && !empty($hasSchema)): ?><a class="btn" href="/document-fill?id=<?= (int)$doc['id'] ?>">Fill report body</a><?php endif; ?>
+  <?php
+    // Work out the workflow state up front so the bar can show ONE clear next step.
+    $appr = $approvals ?? [];
+    $anyApproved = false; $anyPending = false;
+    foreach ($appr as $a) {
+      if (($a['status'] ?? '') === 'APPROVED') $anyApproved = true;
+      if (in_array($a['status'] ?? '', ['PENDING', 'SENTBACK'], true)) $anyPending = true;
+    }
+    $canFinalize = $anyApproved && !$anyPending;
+    $whyNot = !$appr ? 'No approver has been asked yet — submit it for approval first.'
+            : ($anyPending ? 'Still waiting on an approver.' : 'Not approved.');
+    $yourFmt = function_exists('idems_pick_template') ? idems_pick_template($doc) : null;
+    $fmtLabel = $yourFmt ? ((int)($yourFmt['client_id'] ?? 0) ? 'client format' : 'company format') : '';
+  ?>
+  <style>
+    .doc-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .more-menu{position:relative}
+    .more-menu>summary{list-style:none;cursor:pointer}
+    .more-menu>summary::-webkit-details-marker{display:none}
+    .more-pop{position:absolute;right:0;top:calc(100% + 4px);z-index:30;background:var(--card,#fff);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:6px;min-width:210px;display:flex;flex-direction:column;gap:2px}
+    .more-pop a,.more-pop button{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:7px;font:inherit;color:var(--ink);cursor:pointer;text-decoration:none}
+    .more-pop a:hover,.more-pop button:hover{background:color-mix(in srgb,var(--accent,#2b6cff) 8%,transparent)}
+    .more-pop hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+    .more-pop .mp-head{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;padding:6px 10px 2px}
+  </style>
+  <div class="doc-actions">
+    <?php // ---- PRIMARY: the single next step ---- ?>
+    <?php if (idems_can_edit_doc($doc) && !empty($hasSchema)): ?><a class="btn" href="/document-fill?id=<?= (int)$doc['id'] ?>">✍ Fill report</a><?php endif; ?>
     <?php if ((is_master() || can('idems.type.manage')) && empty($hasSchema)): ?><a class="btn secondary" href="/report-builder?type=<?= (int)$doc['report_type_id'] ?>">Design this form</a><?php endif; ?>
     <?php if ($canSubmit && $comp['ok']): ?>
-      <form method="post" action="/document-submit?id=<?= (int)$doc['id'] ?>" style="display:inline"><button class="btn" type="submit">✓ Submit for review (<?= (int)$comp['passed'] ?>/<?= (int)$comp['applicable'] ?>)</button></form>
+      <form method="post" action="/document-submit?id=<?= (int)$doc['id'] ?>" style="display:inline"><button class="btn" type="submit">✓ Submit for review</button></form>
     <?php elseif ($canSubmit): ?>
-      <a class="btn secondary" href="#completeness" title="Some completeness checks are failing" style="border-color:var(--bad);color:var(--bad)">⚠ Completeness: <?= (int)$comp['passed'] ?>/<?= (int)$comp['applicable'] ?></a>
+      <a class="btn secondary" href="#completeness" title="Some completeness checks are failing" style="border-color:var(--bad);color:var(--bad)">⚠ Completeness <?= (int)$comp['passed'] ?>/<?= (int)$comp['applicable'] ?></a>
     <?php endif; ?>
-    <?php
-      // A report cannot be issued until somebody has approved it. Finalising is
-      // irreversible — the document becomes immutable — so an unapproved report
-      // that slips through cannot be taken back. The button says why it is off
-      // rather than simply not being there.
-      $appr = $approvals ?? [];
-      $anyApproved = false; $anyPending = false;
-      foreach ($appr as $a) {
-        if (($a['status'] ?? '') === 'APPROVED') $anyApproved = true;
-        if (in_array($a['status'] ?? '', ['PENDING', 'SENTBACK'], true)) $anyPending = true;
-      }
-      $canFinalize = $anyApproved && !$anyPending;
-      $whyNot = !$appr ? 'No approver has been asked yet — submit it for approval first.'
-              : ($anyPending ? 'Still waiting on an approver.' : 'Not approved.');
-    ?>
     <?php if (!$doc['finalized'] && (is_master() || can('idems.finalize'))): ?>
       <?php if ($canFinalize): ?>
       <form method="post" action="/document-finalize?id=<?= (int)$doc['id'] ?>" style="display:inline" onsubmit="return confirm('Finalize &amp; issue this report? It becomes permanently locked (immutable).')"><button class="btn" type="submit">Finalize &amp; issue</button></form>
-      <?php else: ?>
-      <button class="btn" type="button" disabled title="<?= e($whyNot) ?>"
-              style="opacity:.5;cursor:not-allowed">Finalize &amp; issue</button>
       <?php endif; ?>
     <?php endif; ?>
-    <a class="btn secondary" href="/document-evidence?id=<?= (int)$doc['id'] ?>">🖼 Evidence</a>
-    <a class="btn secondary" href="/document-review?id=<?= (int)$doc['id'] ?>">🔍 Document review</a>
-    <?php if (!empty($hasSchema)): ?><a class="btn secondary" href="/document-smart?id=<?= (int)$doc['id'] ?>">💡 Suggested remarks</a><?php endif; ?>
-    <?php if (in_array($doc['status'], ['APPROVED','ISSUED'], true) && $doc['type_code'] !== 'RN' && (is_master() || can('mod.idems.edit'))): ?>
-      <form method="post" action="/document-release-note" style="display:inline"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><button class="btn secondary" type="submit">📋 Draft Release Note</button></form>
-    <?php endif; ?>
-    <?php // §R1 — when a format (your company's, or this client's) is on file, that
-          // IS the report: it prints in your exact layout. Make it the primary output
-          // and drop the generic PDF to a plain fallback. ?>
-    <?php $yourFmt = function_exists('idems_pick_template') ? idems_pick_template($doc) : null;
-          $fmtLabel = $yourFmt ? ((int)($yourFmt['client_id'] ?? 0) ? 'client format' : 'company format') : ''; ?>
+    <?php // ---- ONE download button ---- ?>
     <?php if ($yourFmt): ?>
-      <a class="btn" href="/document-docx?id=<?= (int)$doc['id'] ?>">📄 Report — your format <span class="muted" style="font-weight:400">(<?= e($fmtLabel) ?>)</span></a>
+      <a class="btn secondary" href="/document-docx?id=<?= (int)$doc['id'] ?>">📄 Download report</a>
     <?php else: ?>
-      <a class="btn secondary" href="/document-docx?id=<?= (int)$doc['id'] ?>" title="Editable Word document built from this report's layout">📝 Word (.docx)</a>
+      <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>" target="_blank">📄 Download PDF</a>
     <?php endif; ?>
-    <?php if (empty($doc['finalized'])): ?>
-      <a class="btn <?= $yourFmt ? 'secondary' : '' ?>" href="/document-pdf?id=<?= (int)$doc['id'] ?>" target="_blank">📄 <?= $yourFmt ? 'Plain PDF' : 'Draft PDF (watermarked)' ?></a>
-    <?php else: ?>
-      <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=original" target="_blank">📄 <?= $yourFmt ? 'Plain PDF' : 'Original' ?></a>
-      <?php if (!$yourFmt): ?>
-      <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=duplicate" target="_blank">📄 Duplicate</a>
-      <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=triplicate" target="_blank">📄 Triplicate</a>
-      <?php endif; ?>
-      <?php // Amend-and-reissue: an issued report cannot be edited, but it can be
-            // revised — a new draft at Rev n+1, carrying this report's content, is
-            // created and this one is kept unchanged as the history. ?>
-      <?php if (empty($doc['revised_by_id']) && (is_master() || can('mod.idems.edit'))): ?>
-        <form method="post" action="/document-revise" style="display:inline" onsubmit="return confirm('Create Rev <?= (int)($doc['rev'] ?? 0) + 1 ?> of this report? The original stays on file, unchanged.')"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><button class="btn secondary" type="submit">♻️ Reissue as new revision</button></form>
-      <?php endif; ?>
-    <?php endif; ?>
+    <?php // ---- Everything else lives here ---- ?>
+    <details class="more-menu">
+      <summary class="btn secondary">More ▾</summary>
+      <div class="more-pop">
+        <?php if (idems_can_edit_doc($doc)): ?><a href="/document-edit?id=<?= (int)$doc['id'] ?>">✎ Edit header</a><?php endif; ?>
+        <?php if (!$doc['finalized'] && (is_master() || can('idems.finalize')) && !$canFinalize): ?>
+          <span class="mp-head" title="<?= e($whyNot) ?>">Finalize: <?= e($whyNot) ?></span>
+        <?php endif; ?>
+        <div class="mp-head">Downloads</div>
+        <?php if ($yourFmt): ?>
+          <a href="/document-docx?id=<?= (int)$doc['id'] ?>">📄 Your format (<?= e($fmtLabel) ?>)</a>
+          <a href="/document-pdf?id=<?= (int)$doc['id'] ?>" target="_blank">📄 Plain PDF</a>
+        <?php else: ?>
+          <a href="/document-docx?id=<?= (int)$doc['id'] ?>">📝 Word (.docx)</a>
+          <a href="/document-pdf?id=<?= (int)$doc['id'] ?>" target="_blank">📄 PDF<?= empty($doc['finalized']) ? ' (draft)' : '' ?></a>
+        <?php endif; ?>
+        <?php if (!empty($doc['finalized']) && !$yourFmt): ?>
+          <a href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=duplicate" target="_blank">📄 Duplicate copy</a>
+          <a href="/document-pdf?id=<?= (int)$doc['id'] ?>&copy=triplicate" target="_blank">📄 Triplicate copy</a>
+        <?php endif; ?>
+        <hr>
+        <div class="mp-head">Tools</div>
+        <a href="/document-evidence?id=<?= (int)$doc['id'] ?>">🖼 Evidence &amp; photos</a>
+        <a href="/document-review?id=<?= (int)$doc['id'] ?>">🔍 Document review</a>
+        <?php if (!empty($hasSchema)): ?><a href="/document-smart?id=<?= (int)$doc['id'] ?>">💡 Suggested remarks</a><?php endif; ?>
+        <?php if (in_array($doc['status'], ['APPROVED','ISSUED'], true) && $doc['type_code'] !== 'RN' && (is_master() || can('mod.idems.edit'))): ?>
+          <form method="post" action="/document-release-note"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><button type="submit">📋 Draft Release Note</button></form>
+        <?php endif; ?>
+        <?php if (!empty($doc['finalized']) && empty($doc['revised_by_id']) && (is_master() || can('mod.idems.edit'))): ?>
+          <hr>
+          <form method="post" action="/document-revise" onsubmit="return confirm('Create Rev <?= (int)($doc['rev'] ?? 0) + 1 ?> of this report? The original stays on file, unchanged.')"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><button type="submit">♻️ Reissue as new revision</button></form>
+        <?php endif; ?>
+      </div>
+    </details>
   </div>
 </div>
 
@@ -156,9 +172,9 @@
       // genuine and unaltered without an account and without asking you. ?>
 <?php if (function_exists('verify_code_for')): $vc = verify_code_for($doc); $vu = verify_url($doc);
         $vst = function_exists('chain_verify') ? chain_verify((int)$doc['id']) : ['ok'=>true,'entries'=>0]; ?>
-<div class="panel">
-  <div class="ctitle" style="margin-top:0"><h3>Let the client check this themselves</h3></div>
-  <p class="sub" style="margin-top:0">Put these two lines on the report. Anyone holding it can confirm it is genuine
+<details class="panel">
+  <summary style="cursor:pointer;font-weight:700">Let the client check this themselves</summary>
+  <p class="sub" style="margin-top:8px">Put these two lines on the report. Anyone holding it can confirm it is genuine
     and unaltered — without an account, and without asking you.</p>
   <table class="dt"><tbody>
     <tr><th style="width:150px">Verification code</th>
@@ -172,7 +188,7 @@
   <small class="muted">The page shows the report number, when it was issued, who by, how much of the evidence was
     located on site, and whether anything has changed since. It shows no client name, no findings and no prices —
     a verification page that gave those away would breach the confidentiality the report is issued under.</small>
-</div>
+</details>
 <?php endif; ?>
 <?php endif; ?>
 
@@ -347,9 +363,9 @@
         $eqDate = report_equipment_date($doc);
         $eqBlock = report_equipment_block($doc);
         $canEq = !$doc['finalized'] && (can('mod.equipment.view') || is_master()); ?>
-<div class="panel" id="equipment">
-  <div class="ctitle" style="margin-top:0"><h3>📏 Measuring &amp; test equipment used <span class="muted">(<?= count($req) ?>)</span></h3>
-    <a href="/equipment">Register →</a></div>
+<details class="panel" id="equipment" <?= ($eqBlock !== '' || $req) ? 'open' : '' ?>>
+  <summary style="cursor:pointer;font-weight:700">📏 Measuring &amp; test equipment used (<?= count($req) ?>)</summary>
+  <div style="margin-top:8px"><a href="/equipment">Register →</a></div>
   <?php if ($eqBlock !== ''): ?>
     <div class="msg msg-error" style="margin:6px 0"><?= e($eqBlock) ?>
       This <?= e(Tl('report')) ?> <strong>will not issue</strong> until it is corrected.</div>
@@ -391,13 +407,13 @@
     <button class="btn small" type="submit">Add</button>
   </form>
   <?php endif; ?>
-</div>
+</details>
 <?php endif; ?>
 
 <?php if (is_master() || can('idems.timestamp.edit')): ?>
-<div class="panel" style="border:1px dashed var(--line)">
-  <div class="ctitle" style="margin-top:0"><h3>🔧 Adjust dates <span class="muted" style="font-weight:400">— Branch Application Manager only</span></h3></div>
-  <p class="muted" style="margin:0 0 8px">System dates are normally locked. A change here is recorded permanently (old &amp; new value, who, when, reason).</p>
+<details class="panel" style="border:1px dashed var(--line)">
+  <summary style="cursor:pointer;font-weight:700">🔧 Adjust dates <span class="muted" style="font-weight:400">— Branch Application Manager only</span></summary>
+  <p class="muted" style="margin:8px 0 8px">System dates are normally locked. A change here is recorded permanently (old &amp; new value, who, when, reason).</p>
   <form method="post" action="/document-timestamp" style="display:flex;gap:6px;flex-wrap:wrap;align-items:end">
     <input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
     <div class="ff" style="margin:0"><label>Field</label>
@@ -406,7 +422,7 @@
     <div class="ff" style="margin:0;flex:1;min-width:180px"><label>Reason (required)</label><input class="form-control" name="reason" required></div>
     <button class="btn" type="submit">Apply &amp; log</button>
   </form>
-</div>
+</details>
 <?php endif; ?>
 
 <details class="fold">

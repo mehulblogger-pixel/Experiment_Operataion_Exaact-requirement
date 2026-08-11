@@ -17,6 +17,19 @@
   </div>
 </div>
 
+<div class="panel" style="margin-bottom:14px;border:1px solid var(--brand);background:color-mix(in srgb,var(--brand) 6%,transparent)">
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+    <div>
+      <b>✨ Start clean</b>
+      <p class="muted" style="margin:2px 0 0;font-size:12.5px;max-width:640px">Replace this form with the tidy inspection layout — plain labels, disclaimer as fixed text, PO items, ITP scope, instruments, sign-off. Best if the current form has cryptic auto-imported field names.</p>
+    </div>
+    <form method="post" action="/report-builder?type=<?= (int)$type['id'] ?>" style="margin:0" onsubmit="return confirm('Replace the whole form with the clean inspection layout? Existing fields on this type are removed (issued reports keep their own frozen copy).')">
+      <input type="hidden" name="_do" value="clean_form">
+      <button class="btn" type="submit">Use the clean inspection layout</button>
+    </form>
+  </div>
+</div>
+
 <?php if (!empty($fields)): ?>
 <div class="panel" id="bld-preview-panel" style="display:none;margin-bottom:14px">
   <div class="ctitle" style="margin-top:0"><h3>Live preview <span class="muted" style="font-weight:400">— the finished report with sample data, refreshed as you arrange fields</span></h3>
