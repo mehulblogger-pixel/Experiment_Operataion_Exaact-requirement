@@ -136,8 +136,11 @@
         $cdefs = idems_table_col_defs($f); $rows = is_array($val)?$val:[];
         echo '<div class="rep-table" data-key="'.e($k).'"><table class="dt"><thead><tr>';
         foreach ($cdefs as $ck=>$d) echo '<th>'.e($d['label']).'</th>'; echo '<th></th></tr></thead><tbody>';
-        $cellInput = function($ck,$d,$cur) use ($k,$doc){
-            $name = 'tbl['.e($k).'][]['.e($ck).']';
+        $cellInput = function($ck,$d,$cur,$ri) use ($k,$doc){
+            // CRITICAL: every cell in one visual row must share ONE row index, else
+            // PHP's bare tbl[key][] makes each cell its own row (a 12-column line
+            // ends up as 12 one-cell rows). So the index is explicit per row.
+            $name = 'tbl['.e($k).']['.e((string)$ri).']['.e($ck).']';
             $lblAttr = ' data-collabel="'.e(strtolower((string)$d['label'])).'"';
             if ($d['type']==='select') {
                 // A column's options can be a single token pointing at a live
@@ -167,10 +170,13 @@
             $t = in_array($d['type'],['number','date'],true) ? $d['type'] : 'text';
             return '<input class="form-control" type="'.$t.'" name="'.$name.'"'.$lblAttr.' value="'.e($cur).'">';
         };
-        $render_row = function($r) use ($cdefs,$cellInput){ echo '<tr>'; foreach ($cdefs as $ck=>$d) echo '<td>'.$cellInput($ck,$d,$r[$ck]??'').'</td>'; echo '<td><button type="button" class="btn small secondary" onclick="this.closest(\'tr\').remove()">✕</button></td></tr>'; };
-        if ($rows) foreach ($rows as $r) $render_row((array)$r); else $render_row([]);
+        $render_row = function($r,$ri) use ($cdefs,$cellInput){ echo '<tr>'; foreach ($cdefs as $ck=>$d) echo '<td>'.$cellInput($ck,$d,$r[$ck]??'',$ri).'</td>'; echo '<td><button type="button" class="btn small secondary" onclick="this.closest(\'tr\').remove()">✕</button></td></tr>'; };
+        $ri = 0;
+        if ($rows) { foreach ($rows as $r) { $render_row((array)$r, $ri); $ri++; } } else $render_row([], 0);
         echo '</tbody></table><button type="button" class="btn small secondary" onclick="idemsAddRow(this)">+ Add row</button>';
-        echo '<template>'; $render_row([]); echo '</template></div>'; break;
+        // template row uses a placeholder index that idemsAddRow() replaces with a
+        // fresh unique one, so each added row groups its own cells together.
+        echo '<template>'; $render_row([], '__ROW__'); echo '</template></div>'; break;
       default:
         echo '<input class="form-control" name="f['.e($k).']" data-key="'.e($k).'" value="'.e(is_array($val)?'':$val).'">';
     }
@@ -341,7 +347,10 @@ function idemsImprove(k){
     .then(function(r){return r.json();}).then(function(d){ if(d&&d.text) ta.value=d.text; })
     .catch(function(){ alert('Could not reach the writing assistant.'); });
 }
-function idemsAddRow(btn){ var wrap=btn.closest('.rep-table'); var tpl=wrap.querySelector('template'); var tb=wrap.querySelector('tbody'); tb.insertAdjacentHTML('beforeend', tpl.innerHTML); }
+function idemsAddRow(btn){ var wrap=btn.closest('.rep-table'); var tpl=wrap.querySelector('template'); var tb=wrap.querySelector('tbody');
+  // give the new row a unique index so all its cells POST together as ONE row.
+  window.__rowSeq=(window.__rowSeq||1000)+1;
+  tb.insertAdjacentHTML('beforeend', tpl.innerHTML.replace(/__ROW__/g, 'r'+window.__rowSeq)); }
 // Learned suggestions: click to insert wording your team has used before.
 document.querySelectorAll('.lrn').forEach(function(b){
   b.addEventListener('click', function(){
