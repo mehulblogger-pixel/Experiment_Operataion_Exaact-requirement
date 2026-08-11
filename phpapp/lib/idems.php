@@ -257,10 +257,29 @@ function idems_migrate() {
         lk_ensure_type_map('inspection_disposition', 'Inspection result / disposition', INSPECTION_DISPOSITIONS, 'idems');
         lk_ensure_type_map('activity_progress', 'Activity progress', ACTIVITY_PROGRESS, 'idems');
         lk_ensure_type_map('measurement_units', 'Measurement units', MEASUREMENT_UNITS, 'idems');
+        lk_ensure_type_map('itp_inspection_type', 'ITP inspection type (Witness/Review/Verify)', INSPECTION_TYPES_ITP, 'idems');
+        lk_ensure_type_map('po_status', 'PO status', PO_STATUS_OPTS, 'idems');
     }
     // A deputation's deliverables are report types — rewrite the old codes.
     idems_migrate_deliverables();
 }
+// ITP inspection type for a scope activity — how the point is covered.
+const INSPECTION_TYPES_ITP = [
+    'Witness'        => 'Witness',
+    'Review'         => 'Review',
+    'Verify'         => 'Verify',
+    'Monitor'        => 'Monitor',
+    'Hold'           => 'Hold',
+    'Surveillance'   => 'Surveillance',
+    'Record review'  => 'Record review',
+    'Perform'        => 'Perform',
+];
+// PO status shown against the order on the report header.
+const PO_STATUS_OPTS = [
+    'Completed' => 'Completed',
+    'Balance'   => 'Balance',
+    'Hold'      => 'Hold',
+];
 // How an inspection activity / line item is dispositioned. value === label so it
 // prints straight onto the report. Editable in Masters once seeded.
 const INSPECTION_DISPOSITIONS = [
@@ -1136,13 +1155,56 @@ function ops_idems_builder($route, $method) {
             $secId = (int)$pdo->lastInsertId();
             $dispo = implode(', ', array_values(function_exists('lk_options_or') ? lk_options_or('inspection_disposition', defined('INSPECTION_DISPOSITIONS') ? INSPECTION_DISPOSITIONS : []) : ['Acceptable','Rejected','Hold']));
             $prog  = implode(', ', array_values(function_exists('lk_options_or') ? lk_options_or('activity_progress', defined('ACTIVITY_PROGRESS') ? ACTIVITY_PROGRESS : []) : ['Completed','Partial','Pending']));
+            // Full ITP scope row: ITP/clause ref, sub-clause, activity, quantum of
+            // check, inspection type (Witness/Review/Verify…), observation, remark,
+            // disposition and progress — matching a real ITP-driven report.
             $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span)
                            VALUES (?,?,?,?,?,?,?,?,2)")
                 ->execute([$typeId, $secId, 'scope_activities', 'Activities', 'table',
-                    "QAP Clause No.\nSub-clause\nInspection Activity\nObservation / Finding\nDisposition|select|lookup:inspection_disposition\nStatus|select|lookup:activity_progress",
-                    'Disposition: ' . $dispo . '. Status: ' . $prog . '. (Both are editable in Masters.)',
+                    "ITP / Clause No.|merge\nSub-clause\nDescription of activity\nQuantum of check\nInspection type|select|lookup:itp_inspection_type\nObservation\nRemarks\nDisposition|select|lookup:inspection_disposition\nStatus|select|lookup:activity_progress",
+                    'Inspection type: Witness / Review / Verify… Disposition: ' . $dispo . '. Status: ' . $prog . '. (All editable in Masters.)',
                     (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId])]);
-            flash('Added a “Scope of activities” section — each row maps to a QAP clause, with a disposition and progress status.');
+            flash('Added a “Scope of activities (ITP)” section — ITP clause, sub-clause, description, quantum of check, inspection type (Witness/Review/Verify), observation, remarks and disposition.');
+            redirect('/report-builder?type=' . $typeId);
+        }
+        // One click adds a "Reference documents" table — Document Name / Number /
+        // Revision / Approval code / Date of approval — repeatable for many docs.
+        if ($do === 'add_refdocs') {
+            $title = 'Reference documents';
+            if ((int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=? AND title=?", [$typeId, $title])) {
+                flash('This report type already has a Reference documents section.', 'warning'); redirect('/report-builder?type=' . $typeId);
+            }
+            $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, $title, 'The QAP/ITP, drawings, specifications and standards the inspection was carried out against — one row per document.',
+                    (int)ops_val("SELECT COALESCE(MIN(sort_order),10)-3 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $secId = (int)$pdo->lastInsertId();
+            $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span)
+                           VALUES (?,?,?,?,?,?,?,?,2)")
+                ->execute([$typeId, $secId, 'reference_documents', 'Reference documents', 'table',
+                    "Document Name\nDocument Number\nRevision No.\nApproval Code\nDate of Approval|date",
+                    'Add one row per controlling document — QAP/ITP, drawing, specification, standard, customer instruction.',
+                    (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId])]);
+            flash('Added a “Reference documents” section — a repeatable table: Document Name, Number, Revision, Approval code and Date of approval (date picker).');
+            redirect('/report-builder?type=' . $typeId);
+        }
+        // One click adds the header fields for previous / current hold-point status
+        // and the PO status dropdown that the company formats carry.
+        if ($do === 'add_holdstatus') {
+            $title = 'Order & hold-point status';
+            if ((int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=? AND title=?", [$typeId, $title])) {
+                flash('This report type already has the Order & hold-point status section.', 'warning'); redirect('/report-builder?type=' . $typeId);
+            }
+            $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, $title, 'Status of the order and of any hold / deviation points from the previous visit.',
+                    (int)ops_val("SELECT COALESCE(MIN(sort_order),10)-2 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $secId = (int)$pdo->lastInsertId(); $ord = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId]);
+            $mk = function($fkey,$label,$ftype,$opts='',$span=1) use ($pdo,$typeId,$secId,&$ord){ $ord+=10;
+                $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,sort_order,col_span) VALUES (?,?,?,?,?,?,?,?)")
+                    ->execute([$typeId,$secId,$fkey,$label,$ftype,$opts,$ord,$span]); };
+            $mk('po_status','P.O. status','select','lookup:po_status',1);
+            $mk('prev_holdpoint_status','Status of previous hold points / deviations','textarea','',2);
+            $mk('current_holdpoints','Current hold points / deviations','textarea','',2);
+            flash('Added an “Order & hold-point status” section — P.O. status dropdown (Completed / Balance / Hold) plus previous &amp; current hold-point status.');
             redirect('/report-builder?type=' . $typeId);
         }
         // One click adds the identification & traceability fields every inspection
@@ -1227,14 +1289,17 @@ function ops_idems_builder($route, $method) {
                     (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
             $secId = (int)$pdo->lastInsertId();
             $base = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId]);
-            $cols = "PO / Line Item\nDescription as per PO\nPO Qty|number\nOffered Qty|number\nResult|select|Passed; Failed; Both\nPassed Qty|number\nFailed Qty|number\nBalance Qty|number\nHeat No.\nProduct Sr. No.";
+            // Full PO line item: Sr.No / Description / Size / Unit (picked once per
+            // line) / PO / Offered / Passed / Rejected / Hold / Balance qty, plus
+            // heat & serial for traceability.
+            $cols = "PO Sr. No.|merge\nDescription as per PO\nSize\nUnit|unit\nPO Qty|number\nOffered Qty|number\nPassed Qty|number\nRejected Qty|number\nHold Qty|number\nBalance Qty|number\nHeat No.\nProduct Sr. No.";
             if (!(int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey=?", [$typeId, 'po_items'])) {
                 $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span)
                                VALUES (?,?,?,?,?,?,?,?,2)")
                     ->execute([$typeId, $secId, 'po_items', 'PO items inspected', 'table', $cols,
-                        'One row per line item. Result = Passed / Failed / Both; for Both fill both Passed Qty and Failed Qty. Balance Qty = ordered − passed to date.', $base]);
+                        'One row per PO line item. Pick the Unit once against the line (nos, mtr, kg…). Balance Qty = ordered − passed to date. Heat & serial give traceability.', $base]);
             }
-            flash('Added the “PO items & inspection” section — a ready multi-row table (PO line, description, ordered/offered/passed/failed/balance quantities, heat & serial no.). Tip: change the “Description as per PO” column to a dropdown of the order’s items with call:po_items.');
+            flash('Added the “PO items & inspection” section — a ready multi-row table: PO Sr.No, description, size, unit, and ordered / offered / passed / rejected / hold / balance quantities, with heat &amp; serial no. Tip: change “Description as per PO” to a dropdown of the order’s items with call:po_items.');
             redirect('/report-builder?type=' . $typeId);
         }
         if ($do === 'section_del') {
@@ -1466,7 +1531,7 @@ function ops_idems_fill($route, $method) {
 function idems_table_col_defs($f) {
     $raw = trim((string)($f['table_cols'] ?? ''));
     if ($raw === '') return ['col1' => ['label' => 'Column 1', 'type' => 'text', 'options' => []]];
-    $types = ['text','number','date','select','textarea'];
+    $types = ['text','number','date','select','textarea','unit'];
     $looksNew = false;
     foreach (preg_split('/\r?\n/', $raw) as $ln) {
         $p = explode('|', $ln);
@@ -1492,6 +1557,13 @@ function idems_table_col_defs($f) {
             if (!in_array($type, $types, true)) $type = 'text';
             $opts = ($type === 'select' && isset($segs[1]) && $segs[1] !== '')
                 ? array_values(array_filter(array_map('trim', preg_split('/[;,]/', $segs[1])), fn($x) => $x !== '')) : [];
+            // A "unit" column is a dropdown fed from the editable measurement-units
+            // master — resolve it to a select so every renderer treats it uniformly.
+            if ($type === 'unit') {
+                $type = 'select';
+                $opts = function_exists('lk_options_or') ? array_values(lk_options_or('measurement_units', defined('MEASUREMENT_UNITS') ? MEASUREMENT_UNITS : []))
+                                                          : (defined('MEASUREMENT_UNITS') ? array_values(MEASUREMENT_UNITS) : []);
+            }
             $add($label, $type, $opts, $merge);
         }
     } else {
