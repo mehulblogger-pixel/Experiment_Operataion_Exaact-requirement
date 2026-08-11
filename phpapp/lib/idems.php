@@ -215,6 +215,12 @@ function idems_migrate() {
     // §32 — template version & lifecycle (draft → published → superseded/archived).
     // Existing templates default to PUBLISHED so nothing that worked stops working.
     if (function_exists('ensure_column')) {
+        // Per-report-type document-control identity that prints on the header of
+        // the clean system layout (no uploaded Word file needed): the format
+        // number (e.g. RE-IN-I&E-INS-011), a document-control number and revision.
+        ensure_column('report_types', 'format_number', "VARCHAR(80) DEFAULT ''");
+        ensure_column('report_types', 'doc_control_no', "VARCHAR(80) DEFAULT ''");
+        ensure_column('report_types', 'revision', "VARCHAR(40) DEFAULT ''");
         ensure_column('report_templates', 'status', "VARCHAR(20) DEFAULT 'PUBLISHED'");
         ensure_column('report_templates', 'version', 'INT DEFAULT 1');
         ensure_column('report_templates', 'effective_date', "VARCHAR(20) DEFAULT ''");
@@ -1372,10 +1378,11 @@ function ops_idems_report_types($route, $method) {
         $code = strtoupper(trim($_POST['code'] ?? '')); $name = trim($_POST['name'] ?? '');
         $cat = isset(lk_options_or('report_category', IDEMS_CATEGORIES)[$_POST['category'] ?? '']) ? $_POST['category'] : 'TPIA_REPORT';
         $active = !empty($_POST['active']) ? 1 : 0;
+        $fmtNo = trim((string)($_POST['format_number'] ?? '')); $docCtl = trim((string)($_POST['doc_control_no'] ?? '')); $rev = trim((string)($_POST['revision'] ?? ''));
         if ($code === '' || $name === '') { flash('Code and name are required.', 'error'); redirect('/report-types'); }
-        if ($id) $pdo->prepare("UPDATE report_types SET code=?, name=?, category=?, active=? WHERE id=?")->execute([$code, $name, $cat, $active, $id]);
-        else $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_by,created_at) VALUES (?,?,?,?,0,?,?,?)")
-            ->execute([$code, $name, $cat, $active, (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_types"), user_name(current_user()), date('c')]);
+        if ($id) $pdo->prepare("UPDATE report_types SET code=?, name=?, category=?, active=?, format_number=?, doc_control_no=?, revision=? WHERE id=?")->execute([$code, $name, $cat, $active, $fmtNo, $docCtl, $rev, $id]);
+        else $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,format_number,doc_control_no,revision,created_by,created_at) VALUES (?,?,?,?,0,?,?,?,?,?,?)")
+            ->execute([$code, $name, $cat, $active, (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_types"), $fmtNo, $docCtl, $rev, user_name(current_user()), date('c')]);
         flash('Report type saved.');
         redirect('/report-types');
     }
@@ -2672,7 +2679,16 @@ function idems_release_block($p, $doc, $lh, $band) {
 // ---- Report PDF (letterhead + body + automatic signature block + timestamps) ----
 function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $copy = '') {
     $p = new SimplePDF(); $ml = $p->ml; $right = $p->right();
-    $band = [30, 64, 175];
+    // Company brand colour for the header band (from the letterhead), else default.
+    $band = (!empty($lh['band']) && is_array($lh['band'])) ? $lh['band'] : [30, 64, 175];
+    // Document-control identity (format no. / doc no. / revision) printed on the
+    // header — from the report type, so a company's own format prints without any
+    // uploaded Word file.
+    $fmtNo = trim((string)($doc['format_number'] ?? '')); $docCtl = trim((string)($doc['doc_control_no'] ?? '')); $rev = trim((string)($doc['revision'] ?? ''));
+    if ($fmtNo === '' && $docCtl === '' && $rev === '' && !empty($doc['report_type_id'])) {
+        $rt = ops_one("SELECT format_number, doc_control_no, revision FROM report_types WHERE id=?", [(int)$doc['report_type_id']]);
+        if ($rt) { $fmtNo = trim((string)($rt['format_number'] ?? '')); $docCtl = trim((string)($rt['doc_control_no'] ?? '')); $rev = trim((string)($rt['revision'] ?? '')); }
+    }
     // A draft carries a DRAFT watermark until it is approved and locked. Once
     // finalized, an Original / Duplicate / Triplicate copy carries that word.
     $copy = strtoupper(trim((string)$copy));
@@ -2690,12 +2706,16 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     foreach (preg_split('/\r?\n/', (string)($lh['address'] ?? '')) as $al) { $al=trim($al); if($al==='')continue; $p->y=$ly; $p->text($nameX,$al,8.5,false,[90,90,90]); $ly+=10; }
     if (!empty($lh['contact'])) { $p->y=$ly; $p->text($nameX,$lh['contact'],8.5,false,[90,90,90]); $ly+=10; }
     if (!empty($lh['gstin'])) { $p->y=$ly; $p->text($nameX,$lh['gstin'],8.5,false,[90,90,90]); $ly+=10; }
-    // IRN + status on the right
-    $p->y=$top; $p->text($ml, 'IRN: '.$doc['irn'], 9, true, [60,60,60], $right, 'R');
-    $p->y=$top+12; $p->text($ml, ($doc['type_code'].' — '.($doc['title'] ?: '')), 8, false, [110,110,110], $right, 'R');
-    if (empty($doc['finalized'])) { $p->y=$top+24; $p->text($ml, 'DRAFT — not yet issued', 8, true, [200,60,60], $right, 'R'); }
-    elseif ($copy !== '') { $p->y=$top+24; $p->text($ml, $copy . ' COPY', 8.5, true, [30,64,175], $right, 'R'); }
-    $p->y = max($ly, $top + 50); $p->hr($band);
+    // IRN + document-control identity + status on the right
+    $yr=$top;
+    $p->y=$yr; $p->text($ml, 'IRN: '.$doc['irn'], 9, true, [60,60,60], $right, 'R'); $yr+=12;
+    $p->y=$yr; $p->text($ml, ($doc['type_code'].' — '.($doc['title'] ?: '')), 8, false, [110,110,110], $right, 'R'); $yr+=11;
+    if ($fmtNo !== '') { $p->y=$yr; $p->text($ml,'Format No.: '.$fmtNo,7.5,false,[110,110,110],$right,'R'); $yr+=10; }
+    if ($docCtl !== '') { $p->y=$yr; $p->text($ml,'Doc. No.: '.$docCtl,7.5,false,[110,110,110],$right,'R'); $yr+=10; }
+    if ($rev !== '') { $p->y=$yr; $p->text($ml,'Rev.: '.$rev,7.5,false,[110,110,110],$right,'R'); $yr+=10; }
+    if (empty($doc['finalized'])) { $p->y=$yr; $p->text($ml, 'DRAFT — not yet issued', 8, true, [200,60,60], $right, 'R'); $yr+=11; }
+    elseif ($copy !== '') { $p->y=$yr; $p->text($ml, $copy . ' COPY', 8.5, true, $band, $right, 'R'); $yr+=11; }
+    $p->y = max($ly, $yr, $top + 50); $p->hr($band);
     $p->gap(6);
     // report title
     $p->line(strtoupper($doc['type_name'] ?? $doc['type_code'] ?? 'INSPECTION REPORT'), 13, true, 16, $band);
@@ -2936,6 +2956,14 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
 function report_docx_build($doc, $sections, $fields, $data, $lh) {
     if (!class_exists('ZipArchive')) return [null, 'The "zip" PHP extension is not enabled on this server.'];
     $esc = function($s) { return function_exists('docx_escape') ? docx_escape((string)$s) : htmlspecialchars((string)$s, ENT_QUOTES | ENT_XML1, 'UTF-8'); };
+    // Company brand colour (hex, no #) for the Word accents, else default blue.
+    $BRAND = (!empty($lh['band']) && is_array($lh['band'])) ? sprintf('%02X%02X%02X', (int)$lh['band'][0], (int)$lh['band'][1], (int)$lh['band'][2]) : '1E40AF';
+    // Document-control identity from the report type, for the header.
+    $fmtNo = trim((string)($doc['format_number'] ?? '')); $docCtl = trim((string)($doc['doc_control_no'] ?? '')); $rev = trim((string)($doc['revision'] ?? ''));
+    if ($fmtNo === '' && $docCtl === '' && $rev === '' && !empty($doc['report_type_id'])) {
+        $rt = ops_one("SELECT format_number, doc_control_no, revision FROM report_types WHERE id=?", [(int)$doc['report_type_id']]);
+        if ($rt) { $fmtNo = trim((string)($rt['format_number'] ?? '')); $docCtl = trim((string)($rt['doc_control_no'] ?? '')); $rev = trim((string)($rt['revision'] ?? '')); }
+    }
     // --- OOXML building blocks ---------------------------------------------
     $run = function($t, $bold = false, $sz = 20, $color = null, $italic = false) use ($esc) {
         $rpr = '';
@@ -2998,11 +3026,14 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
     };
 
     // --- Header block -------------------------------------------------------
-    $body .= $para($run(($lh['name'] ?? '') ?: app_name(), true, 30, '1E40AF'));
+    $body .= $para($run(($lh['name'] ?? '') ?: app_name(), true, 30, $BRAND));
     foreach (preg_split('/\r?\n/', (string)($lh['address'] ?? '')) as $al) { $al = trim($al); if ($al !== '') $body .= $para($run($al, false, 16, '5A5A5A'), ['after' => 20]); }
     if (!empty($lh['contact'])) $body .= $para($run($lh['contact'], false, 16, '5A5A5A'), ['after' => 20]);
-    $body .= $para($run(strtoupper((string)($doc['type_name'] ?? $doc['type_code'] ?? 'INSPECTION REPORT')), true, 26, '1E40AF'), ['before' => 120]);
+    $body .= $para($run(strtoupper((string)($doc['type_name'] ?? $doc['type_code'] ?? 'INSPECTION REPORT')), true, 26, $BRAND), ['before' => 120]);
     $body .= $para($run('IRN: ' . ($doc['irn'] ?? ''), true, 18) . $run('    ' . ($doc['finalized'] ? '' : '(DRAFT — not yet issued)'), false, 16, 'C83C3C'));
+    // Document-control identity (format / doc / revision), if set on the type.
+    $dcBits = array_filter([$fmtNo!==''?'Format No.: '.$fmtNo:'', $docCtl!==''?'Doc. No.: '.$docCtl:'', $rev!==''?'Rev.: '.$rev:'']);
+    if ($dcBits) $body .= $para($run(implode('     ', $dcBits), false, 15, '5A5A5A'), ['after' => 40]);
 
     // --- Key references grid (2-col table) ---------------------------------
     $kv = [
@@ -3033,7 +3064,7 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
         $secPb = !empty($s['page_break_before']) ? '<w:pageBreakBefore/>' : '';
         $secKt = !empty($s['keep_together']) ? '<w:keepNext/><w:keepLines/>' : '';
         if (($s['title'] ?? '') !== '') {
-            $body .= '<w:p><w:pPr>' . $secPb . $secKt . '<w:spacing w:before="120" w:after="40"/></w:pPr>' . $run($s['title'], true, 22, '1E40AF') . '</w:p>';
+            $body .= '<w:p><w:pPr>' . $secPb . $secKt . '<w:spacing w:before="120" w:after="40"/></w:pPr>' . $run($s['title'], true, 22, $BRAND) . '</w:p>';
         } elseif ($secPb !== '') {
             $body .= '<w:p><w:pPr>' . $secPb . '</w:pPr></w:p>';
         }
@@ -3083,18 +3114,18 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
     }
     // --- Remarks + Release Note block (RN/IRN) ------------------------------
     if (!empty($doc['remarks'])) {
-        $body .= $para($run('Remarks', true, 20, '1E40AF'), ['before' => 100, 'after' => 30]);
+        $body .= $para($run('Remarks', true, 20, $BRAND), ['before' => 100, 'after' => 30]);
         foreach (preg_split('/\r?\n/', (string)$doc['remarks']) as $ln) $body .= $para($run($ln, false, 18), ['after' => 20]);
     }
     if (in_array(strtoupper((string)($doc['type_code'] ?? '')), ['RN','IRN'], true)) {
         $rd = is_array($data) ? $data : [];
         $items = $rd['rn_items'] ?? null;
         if (is_array($items) && !empty($items['rows']) && !empty($items['cols'])) {
-            $body .= $para($run('Products / items offered', true, 20, '1E40AF'), ['before' => 100, 'after' => 30]);
+            $body .= $para($run('Products / items offered', true, 20, $BRAND), ['before' => 100, 'after' => 30]);
             $body .= $mkTable(array_map('strval', $items['cols']), $items['rows']);
         }
         $def = idems_release_note_defaults();
-        $body .= $para($run('Remarks', true, 20, '1E40AF'), ['before' => 80, 'after' => 30]);
+        $body .= $para($run('Remarks', true, 20, $BRAND), ['before' => 80, 'after' => 30]);
         $kind = trim((string)($rd['rn_kind'] ?? '')) ?: 'Stage / Final';
         $body .= $para($run('This is a ' . $kind . ' Inspection Report.', false, 18));
         $disp = trim((string)($rd['rn_disposition'] ?? '')) ?: 'Inspected Quantity is Rejected / Passed Quantity is Cleared for dispatch.';
@@ -3138,7 +3169,7 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
         . '<w:hdr ' . $wpml . '>'
         . '<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="CCCCCC"/></w:pBdr>'
         . '<w:tabs><w:tab w:val="right" w:pos="9638"/></w:tabs><w:spacing w:after="0"/></w:pPr>'
-        . '<w:r><w:rPr><w:b/><w:sz w:val="16"/><w:color w:val="1E40AF"/></w:rPr><w:t xml:space="preserve">' . $esc($coName) . '</w:t></w:r>'
+        . '<w:r><w:rPr><w:b/><w:sz w:val="16"/><w:color w:val="' . $BRAND . '"/></w:rPr><w:t xml:space="preserve">' . $esc($coName) . '</w:t></w:r>'
         . '<w:r><w:rPr><w:sz w:val="15"/><w:color w:val="7D7D7D"/></w:rPr><w:tab/><w:t xml:space="preserve">' . $esc($hdTitle) . '</w:t></w:r>'
         . '</w:p></w:hdr>';
 
