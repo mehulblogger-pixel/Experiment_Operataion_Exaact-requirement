@@ -329,6 +329,23 @@ function idems_migrate() {
         try { idems_repair_staircase_tables(); } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('tables_repaired_v1', '1');
     }
+    // ONE-TIME: push each user's saved signature onto their inspector record (by
+    // inspector_id link, else by matching email) so reports where they are the
+    // inspector show the signature they set under "My signature".
+    if (function_exists('setting_get') && !setting_get('sig_synced_v1', '')) {
+        try {
+            foreach (ops_all("SELECT inspector_id, email, signature FROM users WHERE COALESCE(signature,'')<>''") as $u) {
+                $iid = (int)($u['inspector_id'] ?? 0);
+                if (!$iid && trim((string)($u['email'] ?? '')) !== '') {
+                    $iid = (int)ops_val("SELECT id FROM inspectors WHERE LOWER(email)=LOWER(?) LIMIT 1", [trim($u['email'])]);
+                }
+                if ($iid && trim((string)ops_val("SELECT signature FROM inspectors WHERE id=?", [$iid])) === '') {
+                    db()->prepare("UPDATE inspectors SET signature=? WHERE id=?")->execute([$u['signature'], $iid]);
+                }
+            }
+        } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('sig_synced_v1', '1');
+    }
 }
 // ITP inspection type for a scope activity — how the point is covered.
 const INSPECTION_TYPES_ITP = [
@@ -2505,7 +2522,21 @@ function idems_sig_jpeg($stored) {
     return $jpg;
 }
 function user_signature($userId) { return $userId ? (string)ops_val("SELECT signature FROM users WHERE id=?", [(int)$userId]) : ''; }
-function inspector_signature($inspectorId) { return $inspectorId ? (string)ops_val("SELECT signature FROM inspectors WHERE id=?", [(int)$inspectorId]) : ''; }
+function inspector_signature($inspectorId) {
+    if (!$inspectorId) return '';
+    $sig = (string)ops_val("SELECT signature FROM inspectors WHERE id=?", [(int)$inspectorId]);
+    // The inspector record's signature is often blank because a person sets their
+    // signature under "My signature", which saves to their USER profile. Bridge it:
+    // fall back to the user linked to this inspector (by inspector_id, then email).
+    if (trim($sig) === '') {
+        $sig = (string)ops_val("SELECT signature FROM users WHERE inspector_id=? AND COALESCE(signature,'')<>'' ORDER BY id LIMIT 1", [(int)$inspectorId]);
+    }
+    if (trim($sig) === '') {
+        $email = trim((string)ops_val("SELECT email FROM inspectors WHERE id=?", [(int)$inspectorId]));
+        if ($email !== '') $sig = (string)ops_val("SELECT signature FROM users WHERE LOWER(email)=LOWER(?) AND COALESCE(signature,'')<>'' LIMIT 1", [$email]);
+    }
+    return $sig;
+}
 
 // ---- Self-service "My signature" (any logged-in user) ----
 function ops_idems_my_signature($method) {
@@ -2521,8 +2552,11 @@ function ops_idems_my_signature($method) {
         }
         if ($sig && strpos($sig, 'data:image') === 0) {
             db()->prepare("UPDATE users SET signature=? WHERE id=?")->execute([$sig, $u['id']]);
+            // If this user is linked to an inspector record, save it there too so it
+            // appears on reports where they are the inspector (not just approver).
+            if (!empty($u['inspector_id'])) db()->prepare("UPDATE inspectors SET signature=? WHERE id=?")->execute([$sig, (int)$u['inspector_id']]);
             idems_log('user', $u['id'], 'SIGNATURE_SET', ['field'=>'own signature']);
-            flash('Your signature has been saved. It will be added automatically to reports you approve.');
+            flash('Your signature has been saved. It will be added automatically to reports you sign or approve.');
         } else flash('No signature captured — draw in the box or upload an image.', 'error');
         redirect('/my-signature');
     }
