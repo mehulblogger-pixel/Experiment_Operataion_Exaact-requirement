@@ -101,6 +101,24 @@
         echo '<div><button type="button" class="btn small secondary" onclick="idemsSigClear(\''.e($k).'\')">Clear</button> ';
         if ($sig) echo '<span class="muted">saved — sign again to replace</span>';
         echo '</div></div>'; break;
+      case 'sigblock':
+        // Per-role sign-off (Prepared / Reviewed / Approved). Name & designation
+        // auto-fill from the workflow actors; the author can override, and set the
+        // date. The on-file signature image is applied automatically at print.
+        static $__sbSigs = null;
+        if ($__sbSigs === null) $__sbSigs = function_exists('idems_report_signatures') ? idems_report_signatures($doc) : [];
+        $rows = idems_sigblock_rows($f, $data, $__sbSigs);
+        echo '<div class="sigblock" style="grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">';
+        foreach ($rows as $r) {
+          $role = $r['role']; $b = 'sb['.e($k).']['.e($role).']';
+          echo '<div style="border:1px solid var(--line,#ddd);border-radius:8px;padding:10px">';
+          echo '<div style="font-weight:600;font-size:12px;margin-bottom:6px">'.e($role).($r['img']?' <span class="pill p-ok" style="font-size:9px;padding:0 4px" title="Signature on file — stamped automatically">signed</span>':'').'</div>';
+          echo '<input class="form-control" style="margin-bottom:5px" name="'.$b.'[name]" placeholder="Name" value="'.e($r['name']).'">';
+          echo '<input class="form-control" style="margin-bottom:5px" name="'.$b.'[desig]" placeholder="Designation" value="'.e($r['desig']).'">';
+          echo '<input class="form-control" type="date" name="'.$b.'[date]" value="'.e($r['date']).'">';
+          echo '</div>';
+        }
+        echo '</div>'; break;
       case 'table':
         // Each column carries its own data type — a dropdown, number, date or
         // free text — so a "Result" column can be a Accepted/Rejected/Hold pick.
