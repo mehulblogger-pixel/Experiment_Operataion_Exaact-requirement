@@ -719,6 +719,7 @@ function idems_completeness_check($doc) {
     // --- Evidence ---
     $photoField = $hasField(fn($f) => ($f['ftype'] ?? '')==='photo');
     if (!$photoField) $add('photos','Required photographs','NA','No photo field on this form');
+    elseif (($data[$photoField['fkey'].'__photo_denied'] ?? '')==='1') $add('photos','Required photographs','PASS','Photography denied by client/vendor');
     else { $n = count($filesByKind['photo'] ?? []); [$s,$d]=$yn($n>0, "$n photo(s)", 'No photographs attached'); $add('photos','Required photographs',$s,$d); }
     // Instrument details + calibration validity
     $instField = $hasField(fn($f) => ($f['ftype'] ?? '')==='instrument');
@@ -1410,6 +1411,19 @@ function ops_idems_fill($route, $method) {
         }
         // photo / file uploads
         idems_handle_uploads($doc, $fields);
+        // Per-photo captions (name below each photo) — only for files on THIS report.
+        if (!empty($_POST['cap']) && is_array($_POST['cap'])) {
+            foreach ($_POST['cap'] as $fid => $cap) {
+                $pdo->prepare("UPDATE report_files SET caption=? WHERE id=? AND report_doc_id=?")
+                    ->execute([substr(trim((string)$cap), 0, 400), (int)$fid, $doc['id']]);
+            }
+        }
+        // "Photography denied" flag + note, per photo field.
+        foreach ($fields as $f) {
+            if (($f['ftype'] ?? '') !== 'photo') continue; $k = $f['fkey'];
+            $data[$k.'__photo_denied'] = !empty($_POST['pdenied'][$k]) ? '1' : '';
+            $data[$k.'__photo_denied_note'] = substr(trim((string)($_POST['pdenied_note'][$k] ?? '')), 0, 300);
+        }
         $pdo->prepare("UPDATE report_docs SET data=?, updated_at=? WHERE id=?")->execute([json_encode($data), date('c'), $doc['id']]);
         idems_log('report_doc', $doc['id'], 'EDIT', ['irn'=>$doc['irn'], 'field'=>'body']);
         flash('Report body saved.');
@@ -2216,14 +2230,36 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
             }
             if (in_array($f['ftype'],['photo','file','signature'],true)) {
                 $flushGrid();
+                // Photography denied by the client/vendor → print the statement in
+                // place of the photo block, so the report says so explicitly.
+                $denied = ($f['ftype']==='photo') && (($data[$k.'__photo_denied'] ?? '') === '1' || ($data[$k.'__photo_denied'] ?? '') === 1);
+                if ($denied) {
+                    $p->needSpace(16); $p->text($ml, $f['label'].':', 9, true, [70,70,70]); $p->gap(11);
+                    $note = trim((string)($data[$k.'__photo_denied_note'] ?? ''));
+                    $stmt = 'Photographs were not permitted / were denied by the ' . (Tl('client')) . ' / ' . (Tl('vendor')) . ' at the time of inspection.' . ($note !== '' ? ' ' . $note : '');
+                    foreach ($p->wrap($stmt, 9, $p->contentW()) as $ln){ $p->needSpace(11); $p->line($ln, 9, false, 11, [150,60,60]); }
+                    $p->gap(3); continue;
+                }
                 if (empty($filesBy[$k])) continue; $p->needSpace(14);
                 $p->text($ml, $f['label'].':', 9, true, [70,70,70]); $p->gap(11);
-                $imgs = array_filter($filesBy[$k], fn($x)=>strpos($x['mime'],'image/')===0);
-                if ($imgs) { $x=$ml; $p->needSpace(60); $rowY=$p->y;
-                    foreach (array_slice($imgs,0,4) as $im){ $jpg=idems_sig_jpeg($im['data']); if(!$jpg)continue; $nm=$p->addJpeg($jpg); if($nm){ if($x+80>$right){$x=$ml;$rowY+=64;} $p->drawImage($nm,$x,$rowY,72,54); $x+=80; } }
-                    $p->y=$rowY+60;
+                $imgs = array_values(array_filter($filesBy[$k], fn($x)=>strpos($x['mime'],'image/')===0));
+                if ($imgs) {
+                    // Grid of photos, each with its caption printed beneath.
+                    $cw2=88; $ch2=66; $gap2=8; $perRow=max(1,(int)floor(($p->contentW()+$gap2)/($cw2+$gap2)));
+                    $i2=0;
+                    while ($i2 < count($imgs)) {
+                        $rowImgs = array_slice($imgs, $i2, $perRow);
+                        $p->needSpace($ch2+18); $rowY=$p->y; $x=$ml;
+                        foreach ($rowImgs as $im){
+                            $jpg=idems_sig_jpeg($im['data']); if($jpg){ $nm=$p->addJpeg($jpg); if($nm) $p->drawImage($nm,$x,$rowY,$cw2-6,$ch2-14); }
+                            $cap=trim((string)($im['caption'] ?? '')); if($cap==='') $cap=(string)($im['file_name'] ?? '');
+                            $cy=$rowY+$ch2-12; foreach (array_slice($p->wrap($cap,7,$cw2-6),0,2) as $cl){ $p->y=$cy; $p->text($x,$cl,7,false,[90,90,90]); $cy+=8; }
+                            $x+=$cw2+$gap2;
+                        }
+                        $p->y=$rowY+$ch2+8; $i2+=$perRow;
+                    }
                 }
-                foreach ($filesBy[$k] as $fl2) if (strpos($fl2['mime'],'image/')!==0) { $p->text($ml,'• '.$fl2['file_name'],8.5,false,[90,90,90]); $p->gap(10); }
+                foreach ($filesBy[$k] as $fl2) if (strpos($fl2['mime'],'image/')!==0) { $p->text($ml,'• '.$fl2['file_name'].(trim((string)($fl2['caption']??''))!==''?' — '.$fl2['caption']:''),8.5,false,[90,90,90]); $p->gap(10); }
                 continue;
             }
             if ($f['ftype']==='textarea') { $flushGrid(); $fullLbl($f,$v); continue; }
@@ -2384,6 +2420,11 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
         if (($s['title'] ?? '') !== '') $body .= $para($run($s['title'], true, 22, '1E40AF'), ['before' => 120, 'after' => 40]);
         foreach ($fl as $f) {
             if (in_array($f['ftype'], ['heading','note'], true)) { $body .= $para($run($f['label'], $f['ftype'] === 'heading', 19, '505050')); continue; }
+            if (($f['ftype'] ?? '') === 'photo' && ($data[$f['fkey'].'__photo_denied'] ?? '') === '1') {
+                $note = trim((string)($data[$f['fkey'].'__photo_denied_note'] ?? ''));
+                $stmt = 'Photographs were not permitted / were denied by the client / vendor at the time of inspection.' . ($note !== '' ? ' ' . $note : '');
+                $body .= $para($run($f['label'] . ': ', true, 18, '5A5A5A') . $run($stmt, false, 18, '963C3C')); continue;
+            }
             if (in_array($f['ftype'], ['photo','file','signature'], true)) continue;   // images not embedded in the plain Word export
             if ($f['ftype'] === 'table') {
                 $v = $data[$f['fkey']] ?? null; if (!is_array($v) || !$v) continue;

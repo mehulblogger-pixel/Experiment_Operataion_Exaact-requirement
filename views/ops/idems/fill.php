@@ -64,14 +64,31 @@
         echo '<div style="display:flex;gap:6px"><input class="form-control" name="f['.e($k).']" data-key="'.e($k).'" id="gps_'.e($k).'" value="'.e(is_array($val)?'':$val).'" placeholder="lat, long" readonly>';
         echo '<button type="button" class="btn small secondary" onclick="idemsGps(\''.e($k).'\')">📍 Capture</button></div>'; break;
       case 'photo': case 'file':
-        $acc = $f['ftype']==='photo' ? 'accept="image/*" capture="environment" data-shrink="1"' : '';
-        echo '<input class="form-control" type="file" name="upl['.e($k).'][]" multiple '.$acc.'>';
+        if ($f['ftype']==='photo') {
+          // Two ways in: take a photo (camera) OR upload from files — both are
+          // auto-compressed (browser shrink + server re-encode) without visible
+          // quality loss.
+          echo '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+          echo '<label class="btn small secondary" style="cursor:pointer">📷 Take photo<input type="file" name="upl['.e($k).'][]" multiple accept="image/*" capture="environment" data-shrink="1" style="display:none"></label>';
+          echo '<label class="btn small secondary" style="cursor:pointer">⬆ Upload photo(s)<input type="file" name="upl['.e($k).'][]" multiple accept="image/*" data-shrink="1" style="display:none"></label>';
+          echo '</div>';
+          echo '<small class="muted">Automatically compressed to a smaller size without losing clarity; tagged with time &amp; location.</small>';
+        } else {
+          echo '<input class="form-control" type="file" name="upl['.e($k).'][]" multiple>';
+        }
         echo '<input type="hidden" name="gps['.e($k).']" id="gps_'.e($k).'">';
-        if ($f['ftype']==='photo') echo '<small class="muted">Photos are compressed automatically and tagged with time'.(($f['ftype']==='photo')?' &amp; location':'').'.</small>';
-        if (!empty($filesByField[$k])) { echo '<div class="ev-thumbs">'; foreach ($filesByField[$k] as $fl) {
-          if (strpos($fl['mime'],'image/')===0) echo '<a href="/report-file?id='.(int)$fl['id'].'" target="_blank"><img src="/report-file?id='.(int)$fl['id'].'" class="ev-th"></a>';
-          else echo '<a class="pill p-info" href="/report-file?id='.(int)$fl['id'].'" target="_blank">📎 '.e($fl['file_name']).'</a> ';
-        } echo '</div>'; }
+        if (!empty($filesByField[$k])) { echo '<div class="ev-thumbs" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px">'; foreach ($filesByField[$k] as $fl) {
+          if (strpos($fl['mime'],'image/')===0) {
+            echo '<div style="width:120px"><a href="/report-file?id='.(int)$fl['id'].'" target="_blank"><img src="/report-file?id='.(int)$fl['id'].'" class="ev-th" style="width:120px;height:90px;object-fit:cover;border-radius:6px"></a>';
+            echo '<input class="form-control" name="cap['.(int)$fl['id'].']" value="'.e($fl['caption'] ?? '').'" placeholder="Name / caption" style="font-size:12px;margin-top:3px;padding:3px 6px"></div>';
+          } else echo '<a class="pill p-info" href="/report-file?id='.(int)$fl['id'].'" target="_blank">📎 '.e($fl['file_name']).'</a> ';
+        } echo '</div><small class="muted">Type a name under each photo — it prints below the photo on the report. Saved when you save the body.</small>'; }
+        if ($f['ftype']==='photo') {
+          // Photography denied by the client / vendor → statement instead of photos.
+          $den = ($data[$k.'__photo_denied'] ?? '')==='1';
+          echo '<label class="chk" style="margin-top:8px;display:flex;align-items:center;gap:6px"><input type="checkbox" name="pdenied['.e($k).']" value="1" '.($den?'checked':'').'> Photography was <b>not permitted / denied</b> by the client or vendor</label>';
+          echo '<input class="form-control" name="pdenied_note['.e($k).']" value="'.e($data[$k.'__photo_denied_note'] ?? '').'" placeholder="Optional note (who denied, reason)" style="font-size:12px;margin-top:4px">';
+        }
         break;
       case 'signature':
         $sig = $filesByField[$k][0] ?? null;
