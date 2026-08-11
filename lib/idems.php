@@ -323,6 +323,12 @@ function idems_migrate() {
         } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('ir_tpl_detached', '1');
     }
+    // ONE-TIME repair of the staircase table bug on existing draft reports (see
+    // idems_repair_staircase_tables). Guarded + failure-safe.
+    if (function_exists('setting_get') && !setting_get('tables_repaired_v1', '')) {
+        try { idems_repair_staircase_tables(); } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('tables_repaired_v1', '1');
+    }
 }
 // ITP inspection type for a scope activity — how the point is covered.
 const INSPECTION_TYPES_ITP = [
@@ -381,6 +387,55 @@ function idems_seed_report_types() {
     $ins = $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_at) VALUES (?,?,?,1,1,?,?)");
     $i = 0;
     foreach (IDEMS_REPORT_SEED as $r) { $i += 10; if (!isset($have[strtoupper($r[0])])) $ins->execute([$r[0], $r[1], $r[2], $i, date('c')]); }
+}
+// One-time repair for the "staircase" table bug: a table saved before the row-
+// grouping fix stored each cell as its own one-cell row. This stitches those
+// split rows back into whole rows. SAFE BY DESIGN — it only acts on a table where
+// EVERY row has at most one filled cell (the staircase signature), so a table
+// saved correctly (any row with 2+ filled cells) is left untouched, and a genuine
+// single-column list (same column repeated) merges to itself (no change). Skips
+// finalized/issued reports, whose data is immutable. Returns [docsFixed, tablesFixed].
+function idems_repair_staircase_tables() {
+    $pdo = db();
+    $docs = ops_all("SELECT id, report_type_id, data FROM report_docs WHERE deleted=0 AND COALESCE(finalized,0)=0 AND data IS NOT NULL AND data<>'' AND data<>'[]'");
+    $docsFixed = 0; $tablesFixed = 0;
+    foreach ($docs as $d) {
+        $data = json_decode($d['data'] ?: '[]', true); if (!is_array($data)) continue;
+        $fields = idems_fields($d['report_type_id']);
+        $changed = false;
+        foreach ($fields as $f) {
+            if (($f['ftype'] ?? '') !== 'table') continue;
+            $k = $f['fkey'];
+            if (empty($data[$k]) || !is_array($data[$k])) continue;
+            $cols = array_keys(idems_table_cols($f));
+            if (count($cols) < 2) continue;                 // single-column tables can't staircase
+            $rows = array_values($data[$k]);
+            if (count($rows) < 2) continue;
+            // Guard: only repair when EVERY row has at most one filled cell.
+            $maxFilled = 0;
+            foreach ($rows as $r) { $r=(array)$r; $n=0; foreach ($cols as $c) if (trim((string)($r[$c] ?? '')) !== '') $n++; if ($n>$maxFilled) $maxFilled=$n; }
+            if ($maxFilled > 1) continue;                   // already correct / not a staircase
+            // Stitch: a new logical row begins when an incoming column is already
+            // filled in the row being accumulated.
+            $merged = []; $cur = [];
+            foreach ($rows as $r) {
+                $r = (array)$r;
+                foreach ($cols as $c) {
+                    $v = trim((string)($r[$c] ?? '')); if ($v === '') continue;
+                    if (isset($cur[$c]) && $cur[$c] !== '') { $merged[] = $cur; $cur = []; }
+                    $cur[$c] = $v;
+                }
+            }
+            if ($cur) $merged[] = $cur;
+            if (count($merged) < count($rows) && $merged) {  // only if it genuinely collapsed rows
+                foreach ($merged as &$mr) { foreach ($cols as $c) if (!isset($mr[$c])) $mr[$c] = ''; } unset($mr);
+                $data[$k] = array_values($merged);
+                $changed = true; $tablesFixed++;
+            }
+        }
+        if ($changed) { $pdo->prepare("UPDATE report_docs SET data=?, updated_at=? WHERE id=?")->execute([json_encode($data), date('c'), $d['id']]); $docsFixed++; }
+    }
+    return [$docsFixed, $tablesFixed];
 }
 
 // ---- Phase 2: field types for the no-code builder --------------------------
@@ -1282,6 +1337,13 @@ function ops_idems_report_types($route, $method) {
             $tid = idems_build_mgh_report();
             flash('Ready inspection report is set up — every section is wired. Review or fine-tune it here.');
             redirect('/report-builder?type=' . $tid);
+        }
+        // Re-run the staircase-table repair on demand (safe; only merges tables
+        // whose every row has a single filled cell; skips issued reports).
+        if ($do === 'repair_tables') {
+            [$dc, $tc] = idems_repair_staircase_tables();
+            flash($dc ? "Repaired split table rows in $dc report(s) ($tc table(s))." : 'No split table rows found — everything is already whole.');
+            redirect('/report-types');
         }
         if ($do === 'del') {
             $t = ops_one("SELECT * FROM report_types WHERE id=?", [(int)($_POST['id'] ?? 0)]);
