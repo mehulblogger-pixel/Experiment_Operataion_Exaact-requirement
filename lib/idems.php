@@ -2918,17 +2918,29 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
             $pending=[];
         };
         $shortTypes=['text','number','date','time','select','unit','yesno','radio','checkbox','multiselect','instrument','calc','qr','gps'];
-        // Long-form fields (observations, conclusion…): print the label on its own
-        // line, then the value wrapped to the FULL width just below it — honouring the
-        // author's own line breaks. This avoids the long label / value collision the
-        // old fixed 88pt offset caused, and reads like a proper report paragraph. §layout
+        // Does this section mix a full-width field (a paragraph / table / photo) in
+        // with short fields? If so the short fields are laid out in the SAME aligned
+        // label|value columns as the paragraphs (not the compact 2-up grid), so a
+        // section like "Order & hold-point status" reads as one tidy column. §align
+        $allShort = true; foreach ($fl as $ff) if (!in_array($ff['ftype'] ?? '', $shortTypes, true)) { $allShort = false; break; }
+        // A single value printed as an aligned two-column row: the label wraps in a
+        // fixed left column, the value wraps in the right column, both top-aligned —
+        // so every value down the section lines up at the same left edge. §align
         $fullLbl = function($f,$v) use ($p,$ml) {
-            $vv=is_array($v)?'':(string)$v; $p->needSpace(24);   // keep the label with its first value line (no orphan "Nil" atop the next page) §empty
-            $p->text($ml,$f['label'].':',8.5,true,[90,90,90]); $p->gap(12);
+            $vv = is_array($v) ? '' : (string)$v;
+            $lblW = 165; $gap = 10; $valX = $ml + $lblW + $gap; $valW = $p->contentW() - $lblW - $gap;
+            $lblLines = $p->wrap($f['label'], 8.5, $lblW, true); if (!$lblLines) $lblLines = [''];
+            $valLines = [];
             foreach (preg_split('/\r?\n/', $vv) as $para) {
-                if (trim($para)==='') { $p->gap(4); continue; }
-                foreach ($p->wrap($para,9,$p->contentW()-10) as $wl){ $p->needSpace(12); $p->text($ml+10,$wl,9); $p->gap(12); }
+                if (trim($para) === '') { $valLines[] = ''; continue; }
+                foreach ($p->wrap($para, 9, $valW) as $wl) $valLines[] = $wl;
             }
+            if (!$valLines) $valLines = [''];
+            $rows = max(count($lblLines), count($valLines));
+            $p->needSpace($rows * 11 + 4); $y0 = $p->y;
+            foreach ($lblLines as $i => $ln) { $p->y = $y0 + $i*11; $p->text($ml, $ln, 8.5, true, [80,80,80]); }
+            foreach ($valLines as $i => $ln) { if ($ln !== '') { $p->y = $y0 + $i*11; $p->text($valX, $ln, 9, false, [40,40,40]); } }
+            $p->y = $y0 + $rows*11 + 4;
         };
         foreach ($fl as $f) {
             if ($f['ftype']==='richtext') {
@@ -3088,7 +3100,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                 continue;
             }
             if ($f['ftype']==='textarea') { $flushGrid(); $fullLbl($f,$v); continue; }
-            if (in_array($f['ftype'],$shortTypes,true)) { $pending[]=$f; continue; }
+            if (in_array($f['ftype'],$shortTypes,true)) { if ($allShort) { $pending[]=$f; } else { $flushGrid(); $fullLbl($f,$v); } continue; }
             $flushGrid(); $fullLbl($f,$v);
         }
         $flushGrid();
