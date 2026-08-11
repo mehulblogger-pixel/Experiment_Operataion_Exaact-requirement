@@ -13,6 +13,12 @@
       <select class="form-control" name="category"><?php foreach (lk_options_or('report_category', IDEMS_CATEGORIES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($edit['category'] ?? 'TPIA_REPORT')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff ff-check"><input type="checkbox" name="active" <?= (!$edit || $edit['active'])?'checked':'' ?>><label>Active</label></div>
   </div>
+  <p class="muted" style="margin:10px 0 4px;font-size:12px">Document control — printed on the report header (your own format, no Word file needed):</p>
+  <div class="form-grid">
+    <div class="ff"><label>Format No.</label><input class="form-control" name="format_number" value="<?= e($edit['format_number'] ?? '') ?>" placeholder="e.g. RE-IN-I&amp;E-INS-011"></div>
+    <div class="ff"><label>Document No.</label><input class="form-control" name="doc_control_no" value="<?= e($edit['doc_control_no'] ?? '') ?>" placeholder="e.g. QF-07"></div>
+    <div class="ff"><label>Revision</label><input class="form-control" name="revision" value="<?= e($edit['revision'] ?? '') ?>" placeholder="e.g. 0"></div>
+  </div>
   <div style="margin-top:12px"><button class="btn" type="submit"><?= $edit ? 'Save' : 'Add type' ?></button><?php if ($edit): ?> <a class="btn secondary" href="/report-types">Cancel</a><?php endif; ?></div>
 </form>
 

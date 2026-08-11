@@ -27,6 +27,7 @@ function company_profile() {
         'website'    => $g('company_website'),
         'footer'     => $g('quote_lh_footer'), // one footer line for every PDF
         'logo'       => $g('quote_lh_logo'),   // shared with the quote letterhead
+        'report_brand_color' => $g('report_brand_color', '#1E40AF'), // header band colour
     ];
 }
 
@@ -60,6 +61,9 @@ function ops_company_profile($route, $method) {
         $phone = substr(trim((string)($_POST['phone'] ?? '')), 0, 60);
         $web   = substr(trim((string)($_POST['website'] ?? '')), 0, 150);
         $foot  = substr(trim((string)($_POST['footer'] ?? '')), 0, 300);
+        // Brand colour for the report/quotation header band (validated to #RRGGBB).
+        $bcol  = trim((string)($_POST['report_brand_color'] ?? ''));
+        if (preg_match('/^#?[0-9a-fA-F]{6}$/', $bcol)) setting_set('report_brand_color', (strpos($bcol,'#')===0?$bcol:'#'.$bcol));
 
         if ($gstin !== '' && function_exists('is_valid_gstin') && !is_valid_gstin($gstin)) {
             flash('That GSTIN does not look valid (it should be 15 characters). Saved the rest; please check it.', 'warning');

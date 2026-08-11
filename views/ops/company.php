@@ -22,6 +22,12 @@
       <div class="ff"><label>Website</label><input class="form-control" name="website" value="<?= e($p['website'] ?? '') ?>" placeholder="www.example.com"></div>
       <div class="ff ff-wide"><label>Footer line for PDFs <span class="muted">— optional, e.g. CIN / bank / tagline</span></label>
         <input class="form-control" name="footer" value="<?= e($p['footer'] ?? '') ?>" placeholder="Appears at the bottom of quotations, reports and endorsements"></div>
+      <div class="ff"><label>Report header colour <span class="muted">— your brand colour</span></label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="color" name="report_brand_color" value="<?= e($p['report_brand_color'] ?? '#1E40AF') ?>" style="width:48px;height:38px;border:1px solid var(--line);border-radius:8px;padding:2px;background:#fff">
+          <span class="muted" style="font-size:12px">Header band, title &amp; footer on reports/quotations</span>
+        </div>
+      </div>
       <div class="ff ff-wide"><label>Logo <span class="muted">— shown on quotations and reports</span></label>
         <input class="form-control" type="file" name="logo" accept="image/*">
         <?php if (!empty($p['logo'])): ?>

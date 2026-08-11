@@ -2325,6 +2325,8 @@ function quote_letterhead() {
     // GSTIN comes from the single "Your company" profile so it prints on every
     // document without being typed here as well.
     $gstin = setting_get('company_gstin', '');
+    // The company brand colour for the header band / accents (hex, e.g. #1E40AF).
+    $band = brand_color_rgb(setting_get('report_brand_color', ''));
     return [
         'logo' => $logo ? base64_decode($logo) : '',
         'name' => setting_get('quote_lh_name', '') ?: app_name(),
@@ -2332,7 +2334,16 @@ function quote_letterhead() {
         'contact' => setting_get('quote_lh_contact', ''),
         'gstin' => $gstin ? ('GSTIN: ' . $gstin) : '',
         'footer' => setting_get('quote_lh_footer', ''),
+        'band' => $band,   // [r,g,b] or null → renderer uses its default
     ];
+}
+// Parse a #RRGGBB (or RRGGBB) brand colour to [r,g,b], or null if blank/invalid.
+function brand_color_rgb($hex) {
+    $hex = trim((string)$hex);
+    if (preg_match('/^#?([0-9a-fA-F]{6})$/', $hex, $m)) {
+        return [hexdec(substr($m[1], 0, 2)), hexdec(substr($m[1], 2, 2)), hexdec(substr($m[1], 4, 2))];
+    }
+    return null;
 }
 // Generate the signed PDF and e-mail it to the customer. Returns [sentBool, message].
 function crm_send_quote_email($q) {
