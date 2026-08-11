@@ -327,7 +327,7 @@ function idems_seed_report_types() {
 const IDEMS_FIELD_TYPES = [
     'text'=>'Short text', 'textarea'=>'Paragraph', 'number'=>'Number', 'date'=>'Date', 'time'=>'Time',
     'select'=>'Dropdown (single)', 'multiselect'=>'Dropdown (multiple)', 'checkbox'=>'Tick box', 'yesno'=>'Yes / No', 'radio'=>'Choice buttons',
-    'calc'=>'Calculated', 'heading'=>'Section heading', 'note'=>'Info note',
+    'calc'=>'Calculated', 'heading'=>'Section heading', 'note'=>'Info note', 'richtext'=>'Static text / disclaimer',
     'table'=>'Repeatable table', 'photo'=>'Photo', 'file'=>'Attachment', 'gps'=>'GPS location',
     'signature'=>'Signature', 'sigblock'=>'Sign-off block (per role)', 'qr'=>'QR / barcode value', 'unit'=>'Unit picker',
     // An inspection instrument. Offers the calibrated instruments from the
@@ -1275,6 +1275,22 @@ function ops_idems_builder($route, $method) {
                 $o += 10; $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,sort_order,col_span) VALUES (?,?,?,?,'signature',?,1)")->execute([$typeId,$secId,$ff[0],$ff[1],$o]);
             }
             flash('Added a “Signatures” section — manufacturer/vendor and client representative sign-offs. (The inspector & approver signatures are applied automatically at issue.)'); redirect('/report-builder?type=' . $typeId);
+        }
+        // One-click "Static text / disclaimer" — a fixed paragraph that prints on
+        // the report (disclaimer, standing instruction). No field to fill; the
+        // author edits the wording in the field's Content box.
+        if ($do === 'add_disclaimer') {
+            $secId = (int)ops_val("SELECT id FROM report_sections WHERE report_type_id=? ORDER BY sort_order DESC, id DESC LIMIT 1", [$typeId]);
+            if (!$secId) {
+                $pdo->prepare("INSERT INTO report_sections (report_type_id,title,sort_order) VALUES (?,?,?)")
+                    ->execute([$typeId, '', (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+                $secId = (int)$pdo->lastInsertId();
+            }
+            $default = "This report is issued on the basis of the inspection carried out at the time and place stated. It reflects the condition of the items inspected and does not relieve the manufacturer / supplier of their contractual obligations. Our liability is limited to the fee charged for this inspection.";
+            $o = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId]);
+            $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,field_options,sort_order,col_span) VALUES (?,?,?,?,'richtext',?,?,2)")
+                ->execute([$typeId, $secId, 'disclaimer_'.substr(md5((string)$o),0,4), 'Disclaimer', $default, $o]);
+            flash('Added a static “Disclaimer” block — edit the wording in the field’s Content box, or add another for standing instructions.'); redirect('/report-builder?type=' . $typeId);
         }
         // One-click "Sign-off block" — a per-role signature panel (Prepared /
         // Reviewed / Approved). Name, designation and date auto-fill from the
@@ -2393,6 +2409,15 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
             for($i=1;$i<count($wr);$i++){ $p->needSpace(11); $p->text($ml+88,$wr[$i],9); $p->gap(11); }
         };
         foreach ($fl as $f) {
+            if ($f['ftype']==='richtext') {
+                $flushGrid();
+                if (trim((string)($f['label'] ?? '')) !== '') { $p->needSpace(12); $p->line($f['label'], 9.5, true, 12, [70,70,70]); }
+                foreach (preg_split('/\r?\n/', (string)($f['field_options'] ?? '')) as $ln) {
+                    if (trim($ln) === '') { $p->gap(4); continue; }
+                    foreach ($p->wrap($ln, 8.5, $p->contentW()) as $wl) { $p->needSpace(11); $p->line($wl, 8.5, false, 11, [90,90,90]); }
+                }
+                $p->gap(2); continue;
+            }
             if (in_array($f['ftype'],['heading','note'],true)) { $flushGrid(); $p->needSpace(12); $p->line($f['label'], 9.5, $f['ftype']==='heading', 12, [80,80,80]); continue; }
             $k=$f['fkey']; $v=$data[$k] ?? '';
             if ($f['ftype']==='table') {
@@ -2649,6 +2674,14 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
         if (($s['title'] ?? '') !== '') $body .= $para($run($s['title'], true, 22, '1E40AF'), ['before' => 120, 'after' => 40]);
         foreach ($fl as $f) {
             if (in_array($f['ftype'], ['heading','note'], true)) { $body .= $para($run($f['label'], $f['ftype'] === 'heading', 19, '505050')); continue; }
+            if (($f['ftype'] ?? '') === 'richtext') {
+                if (trim((string)($f['label'] ?? '')) !== '') $body .= $para($run($f['label'], true, 18, '464646'), ['after' => 20]);
+                foreach (preg_split('/\r?\n/', (string)($f['field_options'] ?? '')) as $ln) {
+                    if (trim($ln) === '') { $body .= $para($run('', false, 8), ['after' => 20]); continue; }
+                    $body .= $para($run($ln, false, 17, '5A5A5A'), ['after' => 20]);
+                }
+                continue;
+            }
             if (($f['ftype'] ?? '') === 'sigblock') {
                 if ($sg === null) $sg = function_exists('idems_report_signatures') ? idems_report_signatures($doc) : [];
                 $rows = idems_sigblock_rows($f, $data, $sg);
@@ -2889,7 +2922,7 @@ function idems_sample_value($f) {
 function idems_sample_data($fields) {
     $data = [];
     foreach ($fields as $f) {
-        if (in_array($f['ftype'], ['heading','note','photo','file','signature','sigblock','gps','qr'], true)) continue;
+        if (in_array($f['ftype'], ['heading','note','richtext','photo','file','signature','sigblock','gps','qr'], true)) continue;
         $data[$f['fkey']] = idems_sample_value($f);
     }
     return $data;
@@ -3150,7 +3183,7 @@ function idems_type_tokens($typeId) {
     $std = ['irn','report_type','title','client','vendor','project','po','drawing','qap_rev','standards','location','inspection_date','issue_date','inspector','approver','result','release','remarks','company','branch','today','doc_number','format_number','doc_revision'];
     $fieldTokens = []; $tableTokens = [];
     foreach (idems_fields($typeId) as $f) {
-        if (in_array($f['ftype'], ['heading','note','photo','file','signature','sigblock'], true)) continue;
+        if (in_array($f['ftype'], ['heading','note','richtext','photo','file','signature','sigblock'], true)) continue;
         if ($f['ftype'] === 'table') { foreach (idems_table_cols($f) as $ck=>$cl) $tableTokens[] = $f['fkey'].'.'.$ck; }
         else $fieldTokens[] = $f['fkey'];
     }
@@ -4133,7 +4166,7 @@ function idems_scan_findings($doc, $fields, $data) {
             }
             continue;
         }
-        if (in_array($f['ftype'], ['photo','file','signature','sigblock','heading','note'], true)) continue;
+        if (in_array($f['ftype'], ['photo','file','signature','sigblock','heading','note','richtext'], true)) continue;
         if (is_array($v)) $v = implode(', ', $v);
         $v = trim((string)$v);
         if ($v === '') continue;
@@ -4653,7 +4686,7 @@ function idems_ai_review($doc, $fields, $data, $srcDocs) {
     $bundle = idems_source_text_bundle($doc['id'], 6000);
     $body = [];
     foreach ($fields as $f) {
-        if (in_array($f['ftype'], ['photo','file','signature','sigblock','heading','note'], true)) continue;
+        if (in_array($f['ftype'], ['photo','file','signature','sigblock','heading','note','richtext'], true)) continue;
         $v = $data[$f['fkey']] ?? ''; if (is_array($v)) $v = json_encode($v);
         if (trim((string)$v) !== '') $body[] = ($f['label'] ?: $f['fkey']) . ': ' . $v;
     }
