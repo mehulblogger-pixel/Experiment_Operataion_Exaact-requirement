@@ -2900,25 +2900,43 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
             $k=$f['fkey']; $v=$data[$k] ?? '';
             if ($f['ftype']==='table') {
                 $flushGrid();
-                if (!is_array($v)||!$v) continue; $cols=idems_table_cols($f);
-                // §38 — columns flagged "merge" show a repeated value once and blank
-                // it on the rows below (a vertical cell merge / rowspan look).
-                $mergeCols=[]; foreach (idems_table_col_defs($f) as $mck=>$md) if (!empty($md['merge'])) $mergeCols[$mck]=true;
+                if (!is_array($v)||!$v) continue;
+                $defs = idems_table_col_defs($f);                 // ck => [label,type,options,merge]
+                $cols = []; foreach ($defs as $ck=>$d) $cols[$ck]=$d['label'];
+                $mergeCols=[]; foreach ($defs as $ck=>$d) if (!empty($d['merge'])) $mergeCols[$ck]=true;
                 $prevVal=[];
-                $cw = $p->contentW()/max(1,count($cols));
-                $cellFont = count($cols) > 7 ? 7.5 : 8.5;   // shrink the type when a table has many columns, so cells don't cram
-                // The header band is a closure so it can be RE-DRAWN at the top of
-                // every page a long table spills onto (§38 — no headerless
-                // continuation, no cut-off rows).
-                // Header cells are WRAPPED (like the data cells) so a long column
-                // name — "Description as per PO", "Rejected Qty" — stacks within its
-                // column instead of overprinting the next header. The band grows to
-                // fit the tallest header. §layout
-                $drawHead = function() use ($p,$ml,$cols,$cw) {
+                $ncol = max(1,count($cols));
+                $cellFont = $ncol > 7 ? 7.5 : 8.5;   // shrink the type when a table has many columns
+                // §tables — proportional column widths: a description / observation
+                // column earns more room; a number / date / short one gets less (with a
+                // sensible minimum), so wide tables read far better than equal columns.
+                $statusLabels = ['disposition','status','result','conformity','conclusion','acceptance'];
+                $weights=[];
+                foreach ($defs as $ck=>$d) {
+                    $l=strtolower(trim((string)$d['label'])); $t=$d['type'];
+                    if (in_array($l,$statusLabels,true)) $weights[$ck]=1.55;   // room for the status badge
+                    elseif (preg_match('/desc|observ|remark|activit|scope|detail|particular|nature/', $l)) $weights[$ck]=2.2;
+                    elseif (in_array($t,['number','date'],true)) $weights[$ck]=0.85;
+                    elseif ($t==='select') $weights[$ck]=1.05;
+                    else $weights[$ck]=1.3;
+                }
+                $sumW=array_sum($weights) ?: 1; $contentW=$p->contentW(); $minW=26;
+                $wpx=[]; foreach ($weights as $ck=>$wt) $wpx[$ck]=max($minW,$contentW*$wt/$sumW);
+                $scale=$contentW/max(1,array_sum($wpx)); foreach ($wpx as $ck=>$px) $wpx[$ck]=$px*$scale;
+                $xpos=[]; $acc=$ml; foreach ($wpx as $ck=>$px){ $xpos[$ck]=$acc; $acc+=$px; }
+                // A "status" column is rendered as a subtle badge instead of plain text.
+                $isStatusCol = function($lbl) { $l=strtolower(trim((string)$lbl)); return in_array($l, ['disposition','status','result','conformity','conclusion','acceptance'], true); };
+                $cellBadge = function($x,$y,$text) use ($p) {
+                    $text=trim((string)$text); if($text==='') return;
+                    [$bg,$fg]=idems_status_palette($text); $up=strtoupper($text); $size=6.5; $tw=$p->strWidth($up,$size,true);
+                    $padX=4; $w=$tw+2*$padX; $h=$size+5; $p->rectFill($x,$y,$w,$h,$bg); $p->y=$y+2.5; $p->text($x+$padX,$up,$size,true,$fg);
+                };
+                // Header cells are WRAPPED and sit at each column's own x/width. §layout
+                $drawHead = function() use ($p,$ml,$cols,$wpx,$xpos) {
                     $wrapped=[]; $maxL=1;
-                    foreach ($cols as $cl){ $w=$p->wrap((string)$cl,7.5,$cw-3,true); if(count($w)>3)$w=array_slice($w,0,3); if(!$w)$w=['']; $wrapped[]=$w; $maxL=max($maxL,count($w)); }
-                    $hh=$maxL*9+4; $hy=$p->y; $p->rectFill($ml,$hy,$p->contentW(),$hh,[235,238,245]); $ci=0;
-                    foreach ($wrapped as $w){ for($j=0;$j<count($w);$j++){ $p->y=$hy+3+$j*9; $p->text($ml+$ci*$cw+2,$w[$j],7.5,true,[60,60,60]); } $ci++; }
+                    foreach ($cols as $ck=>$cl){ $w=$p->wrap((string)$cl,7.5,$wpx[$ck]-4,true); if(count($w)>3)$w=array_slice($w,0,3); if(!$w)$w=['']; $wrapped[$ck]=$w; $maxL=max($maxL,count($w)); }
+                    $hh=$maxL*9+4; $hy=$p->y; $p->rectFill($ml,$hy,$p->contentW(),$hh,[235,238,245]);
+                    foreach ($wrapped as $ck=>$w){ for($j=0;$j<count($w);$j++){ $p->y=$hy+3+$j*9; $p->text($xpos[$ck]+3,$w[$j],7.5,true,[60,60,60]); } }
                     $p->y=$hy+$hh+1;
                 };
                 $p->needSpace(34);   // keep the label with its header + a first row
@@ -2926,19 +2944,18 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                 $drawHead();
                 foreach ($v as $r){
                     $r=(array)$r;
-                    // wrap each cell (cap 4 lines) so long text neither overlaps
-                    // the next column nor is silently cut off.
-                    $cells=[]; $lines=1;
-                    foreach ($cols as $ck=>$cl){
+                    $cells=[]; $badges=[]; $lines=1;
+                    foreach ($defs as $ck=>$d){
                         $cellTxt=(string)($r[$ck]??'');
-                        // vertical merge: same value as the row above → render blank
                         if (isset($mergeCols[$ck]) && $cellTxt!=='' && ($prevVal[$ck]??null)===$cellTxt) $cellTxt='';
                         elseif (isset($mergeCols[$ck])) $prevVal[$ck]=(string)($r[$ck]??'');
-                        $w=$p->wrap($cellTxt,$cellFont,$cw-4); if(count($w)>4)$w=array_slice($w,0,4); if(!$w)$w=['']; $cells[]=$w; $lines=max($lines,count($w)); }
+                        if ($isStatusCol($d['label']) && trim($cellTxt)!=='') { $badges[$ck]=$cellTxt; $cells[$ck]=['']; continue; }
+                        $w=$p->wrap($cellTxt,$cellFont,$wpx[$ck]-4); if(count($w)>4)$w=array_slice($w,0,4); if(!$w)$w=['']; $cells[$ck]=$w; $lines=max($lines,count($w)); }
                     $rowH=$lines*10+2;
-                    if ($p->needSpace($rowH)) { $drawHead(); $prevVal=[]; }   // spilled to a new page → repeat the header (and re-show merged values)
-                    $ry=$p->y; $ci=0;
-                    foreach ($cells as $w){ for($j=0;$j<count($w);$j++){ $p->y=$ry+$j*10; $p->text($ml+$ci*$cw+2,$w[$j],$cellFont); } $ci++; }
+                    if ($p->needSpace($rowH)) { $drawHead(); $prevVal=[]; }   // spilled to a new page → repeat the header
+                    $ry=$p->y;
+                    foreach ($cells as $ck=>$w){ for($j=0;$j<count($w);$j++){ $p->y=$ry+$j*10; $p->text($xpos[$ck]+3,$w[$j],$cellFont); } }
+                    foreach ($badges as $ck=>$txt){ $cellBadge($xpos[$ck]+2,$ry-1,$txt); }
                     $p->y=$ry+$rowH; $p->lineAt($ml,$p->y,$right,$p->y,[235,235,235]);
                 }
                 $p->gap(3); continue;
