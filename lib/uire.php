@@ -146,6 +146,11 @@ function uire_migrate() {
         discipline VARCHAR(60) DEFAULT '', is_system INT DEFAULT 0, active INT DEFAULT 1, sort_order INT DEFAULT 0)");
     idems_unique_index('inspection_criteria_packs', 'code');
 
+    // Re-inspection linkage (§53) — a NEW inspection that verifies a prior one
+    // (distinct from a report revision, which report_docs.revises_id already
+    // covers). Additive, nullable — nothing existing is affected.
+    if (function_exists('ensure_column')) ensure_column('report_docs', 'reinspects_id', 'INT NULL');
+
     if (function_exists('setting_get') && !setting_get('uire_criteria_seeded_v1', '')) {
         try { uire_seed_criteria(); } catch (Throwable $e) { /* never break login/migrate */ }
         if (function_exists('setting_set')) setting_set('uire_criteria_seeded_v1', '1');
@@ -155,6 +160,41 @@ function uire_migrate() {
     if (function_exists('setting_get') && !setting_get('uire_library_seeded_v1', '')) {
         try { uire_seed_inspection_library(); } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('uire_library_seeded_v1', '1');
+    }
+    // Seed the sample inspection report configurations (§98) — ready, removable
+    // types assembled from the Library. Guarded, so deleting them keeps them gone.
+    if (function_exists('setting_get') && !setting_get('uire_samples_seeded_v1', '')) {
+        try { uire_seed_sample_inspection_types(); } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('uire_samples_seeded_v1', '1');
+    }
+}
+
+// The §98 sample inspection report configurations — each a configuration of the
+// SAME engine (proof of §107). Sections differ by applicability, so a Site
+// inspection carries no dimensional/quantity sections while Manufacturing does.
+// [code, name, [library section codes]]. Removable by the admin.
+const UIRE_SAMPLE_TYPES = [
+    ['UIR_GEN',  'General Inspection Report',
+        ['DOC_CONTROL','CLIENT_INFO','VENDOR_INFO','PROJECT_INFO','INSP_DETAILS','INSP_OBJECTIVES','SCOPE','DOCS_REVIEWED','INSP_ITEMS','INSP_CHECKLIST','FINDINGS','INSP_RESULT','CONCLUSION','INSP_OUTSTANDING','APPROVAL']],
+    ['UIR_MATL', 'Material Inspection Report',
+        ['DOC_CONTROL','VENDOR_INFO','PROJECT_INFO','INSP_DETAILS','DOCS_REVIEWED','INSP_ITEMS','INSP_QTY','INSP_CHECKLIST','INSP_MEASURE','FINDINGS','INSP_RESULT','CONCLUSION','APPROVAL']],
+    ['UIR_MFG',  'Manufacturing Inspection Report',
+        ['DOC_CONTROL','VENDOR_INFO','PROJECT_INFO','INSP_DETAILS','INSP_OBJECTIVES','STANDARDS','DOCS_REVIEWED','INSP_ITEMS','INSP_QTY','INSP_CHECKLIST','INSP_MEASURE','INSP_TESTS','INSP_HOLDWITNESS','FINDINGS','INSP_RESULT','CONCLUSION','INSP_OUTSTANDING','APPROVAL']],
+    ['UIR_SITE', 'Site Inspection Report',
+        ['DOC_CONTROL','CLIENT_INFO','PROJECT_INFO','INSP_DETAILS','INSP_OBJECTIVES','SCOPE','INSP_CHECKLIST','FINDINGS','INSP_RESULT','INSP_OUTSTANDING','CONCLUSION','APPROVAL']],
+    ['UIR_FINAL','Final Inspection Report',
+        ['DOC_CONTROL','CLIENT_INFO','VENDOR_INFO','PROJECT_INFO','INSP_DETAILS','SCOPE','STANDARDS','DOCS_REVIEWED','INSP_ITEMS','INSP_QTY','INSP_CHECKLIST','INSP_MEASURE','INSP_TESTS','FINDINGS','INSP_RESULT','CONCLUSION','INSP_OUTSTANDING','APPROVAL']],
+    ['UIR_TW',   'Test Witness Report',
+        ['DOC_CONTROL','VENDOR_INFO','PROJECT_INFO','INSP_DETAILS','STANDARDS','INSP_TESTS','FINDINGS','INSP_RESULT','CONCLUSION','APPROVAL']],
+    ['UIR_PDI',  'Pre-Dispatch Inspection Report',
+        ['DOC_CONTROL','VENDOR_INFO','PROJECT_INFO','INSP_DETAILS','INSP_ITEMS','INSP_QTY','INSP_CHECKLIST','FINDINGS','INSP_RESULT','CONCLUSION','APPROVAL']],
+    ['UIR_SURV', 'Surveillance Report',
+        ['DOC_CONTROL','VENDOR_INFO','PROJECT_INFO','INSP_DETAILS','SCOPE','INSP_CHECKLIST','FINDINGS','INSP_OUTSTANDING','CONCLUSION','APPROVAL']],
+];
+function uire_seed_sample_inspection_types() {
+    foreach (UIRE_SAMPLE_TYPES as $s) {
+        if (ops_one("SELECT id FROM report_types WHERE code=?", [$s[0]])) continue;
+        uire_assemble_inspection_report($s[0], $s[1], $s[2], ['category' => 'INSPECTION', 'subcategory' => 'UIRE', 'description' => 'Sample inspection configuration (URFE/UIRE) — editable & removable.']);
     }
 }
 
@@ -289,6 +329,202 @@ function uire_criteria_prefill_rows($checklistField, $pack = 'GENERAL', $inspTyp
 function uire_assemble_inspection_report($code, $name, $sectionCodes, $opts = []) {
     $opts = array_merge(['category' => 'TPIA_REPORT', 'finding_enabled' => 1, 'evidence_enabled' => 1], $opts);
     return urfe_assemble_report_type($code, $name, $sectionCodes, $opts);
+}
+
+// ---------------------------------------------------------------------------
+//  Inspection data-integrity checks (§57-62). DETERMINISTIC and ADVISORY — every
+//  issue is a flag for a human; nothing here ever changes a measurement, a
+//  result, an acceptance criterion or a finding. Called from idems_qa_run.
+//  Returns [ ['sev','cat','title','loc','why','fix'], … ].
+// ---------------------------------------------------------------------------
+function uire_qa_checks($doc, $fields = null, $data = null) {
+    if ($fields === null) $fields = idems_fields((int)($doc['report_type_id'] ?? 0));
+    if ($data === null) { $data = json_decode($doc['data'] ?? '[]', true); if (!is_array($data)) $data = []; }
+    $out = [];
+    $numOf = function($v){ $v = preg_replace('/[^0-9.\-]/','',(string)$v); return ($v===''||$v==='-') ? null : (float)$v; };
+    $passish = function($v){ $v = strtolower(trim((string)$v)); return in_array($v, ['pass','passed','ok','accept','accepted','conform','yes','satisfactory'], true); };
+    $failish = function($v){ $v = strtolower(trim((string)$v)); return $v!=='' && (strpos($v,'fail')!==false || strpos($v,'reject')!==false || strpos($v,'not conform')!==false || strpos($v,'nonconform')!==false); };
+
+    // (a) Measurement vs stated result (§62): Actual outside Min/Max but marked
+    // pass — flag, DO NOT flip the result.
+    foreach ($fields as $f) {
+        if (($f['ftype'] ?? '') !== 'table') continue;
+        $rows = $data[$f['fkey']] ?? null; if (!is_array($rows) || !$rows) continue;
+        $defs = idems_table_col_defs($f); $labels = array_map(fn($d)=>strtolower((string)$d['label']), $defs);
+        $col = function($needle) use ($defs) { foreach ($defs as $k=>$d) if (stripos((string)$d['label'],$needle)!==false) return $k; return null; };
+        $kMin=$col('min'); $kMax=$col('max'); $kAct=$col('actual'); $kRes=$col('result'); $kParam=$col('parameter')??$col('dimension')??$col('test');
+        if ($kAct===null || ($kMin===null && $kMax===null)) continue;   // not a measurement-style table
+        foreach ($rows as $i => $r) {
+            $rr = (array)$r; $act = $numOf($rr[$kAct] ?? ''); if ($act === null) continue;
+            $min = $kMin!==null ? $numOf($rr[$kMin] ?? '') : null; $max = $kMax!==null ? $numOf($rr[$kMax] ?? '') : null;
+            $oor = ($min !== null && $act < $min) || ($max !== null && $act > $max);
+            if (!$oor) continue;
+            $res = $kRes!==null ? (string)($rr[$kRes] ?? '') : '';
+            $param = $kParam!==null ? trim((string)($rr[$kParam] ?? '')) : ''; $where = ($f['label'] ?? 'Measurement') . ' — row ' . ($i+1) . ($param!==''?' ('.$param.')':'');
+            $range = trim(($min!==null?('min '.$min):'').(($min!==null&&$max!==null)?' / ':'').($max!==null?('max '.$max):''));
+            if ($passish($res))
+                $out[] = ['sev'=>'high','cat'=>'measurement','title'=>'Measurement appears outside the acceptance range but is marked pass',
+                    'loc'=>$where, 'why'=>'Recorded value '.$act.' is outside the stated range ('.$range.'), yet the result reads "'.$res.'". Please verify the measurement or the result.',
+                    'fix'=>'Re-check the reading and the acceptance range; correct whichever is wrong. The system will not change it for you.'];
+            elseif ($res === '')
+                $out[] = ['sev'=>'medium','cat'=>'measurement','title'=>'Out-of-range measurement has no result recorded',
+                    'loc'=>$where, 'why'=>'Recorded value '.$act.' is outside the stated range ('.$range.') and no result is entered.',
+                    'fix'=>'Record the result (and a finding if it is a nonconformity).'];
+        }
+    }
+
+    // (b) Field-level quantity reconciliation (§20/§57) — inspection library qty.
+    $q = function($k) use ($data,$numOf){ return array_key_exists($k,$data) ? $numOf($data[$k]) : null; };
+    $pres=$q('presented_qty'); $insp=$q('inspected_qty'); $acc=$q('accepted_qty'); $rej=$q('rejected_qty'); $bal=$q('balance_qty');
+    $base = $insp !== null ? $insp : $pres;
+    if ($acc !== null && $rej !== null && $base !== null && ($acc + $rej) > $base + 0.001)
+        $out[] = ['sev'=>'high','cat'=>'quantity','title'=>'Accepted + rejected exceeds the inspected quantity','loc'=>'Quantity verification',
+            'why'=>'Accepted ('.$acc.') + rejected ('.$rej.') = '.($acc+$rej).' exceeds the '.($insp!==null?'inspected':'presented').' quantity ('.$base.').',
+            'fix'=>'Correct the quantities so they reconcile.'];
+    if ($acc !== null && $pres !== null && $acc > $pres + 0.001)
+        $out[] = ['sev'=>'high','cat'=>'quantity','title'=>'Accepted quantity exceeds the presented quantity','loc'=>'Quantity verification',
+            'why'=>'Accepted ('.$acc.') is greater than presented ('.$pres.').','fix'=>'Correct the quantities.'];
+    if ($bal !== null && $pres !== null && $acc !== null && $rej !== null && abs($bal - ($pres - $acc - $rej)) > 0.001)
+        $out[] = ['sev'=>'medium','cat'=>'quantity','title'=>'Balance quantity does not reconcile','loc'=>'Quantity verification',
+            'why'=>'Balance ('.$bal.') ≠ presented − accepted − rejected ('.($pres-$acc-$rej).').','fix'=>'Recompute the balance (presented − accepted − rejected).'];
+
+    // (c) Overall result vs the checklist (§57 last bullet): a positive inspection
+    // result while a checklist criterion is failed — contradiction to reconcile.
+    $ir = strtolower(trim((string)($data['inspection_result'] ?? '')));
+    $resultPositive = $ir !== '' && (strpos($ir,'accept')!==false || strpos($ir,'pass')!==false) && strpos($ir,'not')===false && strpos($ir,'reject')===false;
+    if ($resultPositive) {
+        foreach ($fields as $f) {
+            if (($f['ftype'] ?? '') !== 'table' || ($f['fkey'] ?? '') !== 'checklist') continue;
+            $rows = $data[$f['fkey']] ?? null; if (!is_array($rows)) continue;
+            $defs = idems_table_col_defs($f); $kRes=null; foreach ($defs as $k=>$d){ $l=strtolower((string)$d['label']); if ($l==='result'||strpos($l,'result')!==false){$kRes=$k;break;} }
+            if ($kRes===null) continue;
+            $failed = 0; foreach ($rows as $r){ if ($failish((string)((array)$r)[$kRes] ?? '')) $failed++; }
+            if ($failed > 0)
+                $out[] = ['sev'=>'high','cat'=>'contradiction','title'=>'Overall result is positive while a checklist item is failed','loc'=>'Inspection checklist',
+                    'why'=>'The inspection result is "'.$data['inspection_result'].'" but '.$failed.' checklist item(s) are marked fail/reject.',
+                    'fix'=>'Reconcile the overall result with the failed item(s), or raise a finding/NCR and set the result accordingly.'];
+        }
+    }
+    return $out;
+}
+
+// ---------------------------------------------------------------------------
+//  Inspection history, comparison, re-inspection & consolidation (§51-56).
+//  All reuse the existing report_docs — no new report store. An "inspection
+//  report type" is one that carries an inspection Library section (lib_code
+//  INSP_*) or an inspection_result field, or the built-in IR family.
+// ---------------------------------------------------------------------------
+function uire_is_inspection_type($typeId) {
+    $typeId = (int)$typeId; if (!$typeId) return false;
+    if ((int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=? AND lib_code LIKE 'INSP\\_%' ESCAPE '\\'", [$typeId]) > 0) return true;
+    if ((int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey='inspection_result'", [$typeId]) > 0) return true;
+    $code = (string)ops_val("SELECT code FROM report_types WHERE id=?", [$typeId]);
+    return in_array($code, ['IR','MGHIR'], true);
+}
+// The set of inspection report_type ids (cached per request).
+function uire_inspection_type_ids() {
+    static $ids = null; if ($ids !== null) return $ids;
+    $ids = [];
+    foreach (ops_all("SELECT id FROM report_types") as $t) if (uire_is_inspection_type((int)$t['id'])) $ids[] = (int)$t['id'];
+    return $ids;
+}
+// Prior inspection reports for the same vendor + PO (optionally item / serial),
+// most recent first, excluding this document (§52/§92). Snapshot-safe: reads the
+// stored data. Returns rows with a compact result/qty summary.
+function uire_inspection_history($doc, $limit = 12) {
+    $ids = uire_inspection_type_ids(); if (!$ids) return [];
+    $data = is_array($doc['data'] ?? null) ? $doc['data'] : (json_decode($doc['data'] ?? '[]', true) ?: []);
+    $vid = (int)($doc['vendor_id'] ?? 0);
+    $po = strtolower(trim((string)($data['po_number'] ?? ($doc['po_ref'] ?? ''))));
+    $item = strtolower(trim((string)($data['item_desc'] ?? ''))); $serial = strtolower(trim((string)($data['serial_no'] ?? '')));
+    if (!$vid && $po === '' && $serial === '') return [];
+    $selfId = (int)($doc['id'] ?? 0);
+    $in = implode(',', array_map('intval', $ids));
+    $rows = ops_all("SELECT * FROM report_docs WHERE report_type_id IN ($in) AND deleted=0 AND (id<>? OR ?=0)
+                     ORDER BY COALESCE(issue_date,created_at) DESC, id DESC LIMIT 200", [$selfId, $selfId]);
+    $out = [];
+    foreach ($rows as $r) {
+        if ($selfId && (int)$r['id'] === $selfId) continue;
+        $rd = json_decode($r['data'] ?? '[]', true); if (!is_array($rd)) $rd = [];
+        $rpo = strtolower(trim((string)($rd['po_number'] ?? ($r['po_ref'] ?? ''))));
+        $sameVendor = $vid && (int)($r['vendor_id'] ?? 0) === $vid;
+        $samePo = $po !== '' && $rpo === $po;
+        $sameSerial = $serial !== '' && strtolower(trim((string)($rd['serial_no'] ?? ''))) === $serial;
+        if (!($sameVendor || $samePo || $sameSerial)) continue;
+        $out[] = [
+            'id' => (int)$r['id'], 'irn' => $r['irn'], 'date' => ($r['issue_date'] ?: $r['created_at']),
+            'type_code' => $r['type_code'], 'result' => trim((string)($rd['inspection_result'] ?? ($r['result'] ?? ''))),
+            'item' => trim((string)($rd['item_desc'] ?? '')), 'serial' => trim((string)($rd['serial_no'] ?? '')),
+            'accepted' => ($rd['accepted_qty'] ?? ''), 'rejected' => ($rd['rejected_qty'] ?? ''),
+            'status' => $r['status'], 'finalized' => (int)$r['finalized'],
+        ];
+        if (count($out) >= $limit) break;
+    }
+    return $out;
+}
+// Compare this inspection to a prior one (§54) — result / accepted / rejected
+// deltas, in plain terms, for a follow-up or re-inspection.
+function uire_inspection_compare($doc, $prev) {
+    $d = is_array($doc['data'] ?? null) ? $doc['data'] : (json_decode($doc['data'] ?? '[]', true) ?: []);
+    $pd = is_array($prev['data'] ?? null) ? $prev['data'] : (json_decode($prev['data'] ?? '[]', true) ?: []);
+    $n = fn($x)=>($x===''||$x===null)?null:(float)preg_replace('/[^0-9.\-]/','',(string)$x);
+    $lines = [];
+    $r0 = trim((string)($pd['inspection_result'] ?? ($prev['result'] ?? ''))); $r1 = trim((string)($d['inspection_result'] ?? ($doc['result'] ?? '')));
+    if ($r0 !== '' || $r1 !== '') $lines[] = 'Result: ' . ($r0 ?: '—') . ' → ' . ($r1 ?: '—') . (($r0 && $r1 && $r0 !== $r1) ? ' (changed)' : '');
+    foreach (['accepted_qty'=>'Accepted','rejected_qty'=>'Rejected'] as $k=>$lab) {
+        $a=$n($pd[$k] ?? ''); $b=$n($d[$k] ?? '');
+        if ($a !== null || $b !== null) { $delta = ($a!==null&&$b!==null)?($b-$a):null; $lines[] = "$lab: ".($a??'—')." → ".($b??'—').($delta!==null&&$delta!=0?' ('.($delta>0?'+':'').rtrim(rtrim(number_format($delta,2),'0'),'.').')':''); }
+    }
+    return ['prev_irn'=>$prev['irn'] ?? '', 'prev_date'=>($prev['issue_date'] ?? ''), 'lines'=>$lines];
+}
+// Consolidated inspection view (§51) — aggregate the linked inspection reports
+// for a project into totals + a per-report list, without re-entering data.
+function uire_consolidated_inspection($projectName, $vendorId = null) {
+    $ids = uire_inspection_type_ids(); if (!$ids) return ['reports'=>[], 'totals'=>[]];
+    $in = implode(',', array_map('intval', $ids));
+    $args = ["%$projectName%"]; $w = "report_type_id IN ($in) AND deleted=0 AND project_name LIKE ?";
+    if ($vendorId) { $w .= " AND vendor_id=?"; $args[] = (int)$vendorId; }
+    $rows = ops_all("SELECT * FROM report_docs WHERE $w ORDER BY COALESCE(issue_date,created_at), id", $args);
+    $reports = []; $tot = ['reports'=>0,'inspected'=>0,'accepted'=>0,'rejected'=>0,'rejected_reports'=>0];
+    $n = fn($x)=>(float)preg_replace('/[^0-9.\-]/','',(string)$x);
+    foreach ($rows as $r) {
+        $rd = json_decode($r['data'] ?? '[]', true); if (!is_array($rd)) $rd = [];
+        $res = strtolower(trim((string)($rd['inspection_result'] ?? ($r['result'] ?? ''))));
+        $tot['reports']++; $tot['inspected'] += $n($rd['inspected_qty'] ?? 0); $tot['accepted'] += $n($rd['accepted_qty'] ?? 0); $tot['rejected'] += $n($rd['rejected_qty'] ?? 0);
+        if (strpos($res,'reject')!==false) $tot['rejected_reports']++;
+        $reports[] = ['id'=>(int)$r['id'],'irn'=>$r['irn'],'date'=>($r['issue_date']?:$r['created_at']),'vendor_id'=>(int)$r['vendor_id'],'result'=>$res,'item'=>trim((string)($rd['item_desc']??''))];
+    }
+    return ['reports'=>$reports, 'totals'=>$tot];
+}
+
+// ---------------------------------------------------------------------------
+//  AI metadata exposure (§60-64, §85). Phase 2 does NOT implement the AI engine;
+//  it exposes a CONSERVATIVE per-field policy the future AI layer must obey. The
+//  hard safety rule (§61): AI may analyze and suggest, but NEVER auto-modifies a
+//  factual/technical field (measurement, result, quantity, date, severity). It
+//  may draft wording for narrative fields — a human still commits it. This is the
+//  metadata contract; the existing three-layer QA already enforces "advisory
+//  only" at runtime, and uire_qa_checks() flags without ever changing a value.
+// ---------------------------------------------------------------------------
+function uire_ai_field_policy($field) {
+    $ft = strtolower((string)($field['ftype'] ?? 'text'));
+    $key = strtolower((string)($field['fkey'] ?? ''));
+    $narrative = in_array($ft, ['textarea','richtext','text'], true);
+    // Factual / technical fields the AI must never rewrite (§61).
+    $factual = in_array($ft, ['number','date','time','calc','select','radio','yesno','checkbox','multiselect','unit','table','instrument','qr','gps','signature','sigblock'], true)
+        || in_array($key, ['inspection_result','accepted_qty','rejected_qty','presented_qty','inspected_qty','balance_qty'], true);
+    return [
+        'analyze' => true,                         // AI may always read & analyze
+        'suggest' => $narrative,                    // may suggest wording for narrative fields
+        'modify'  => false,                          // NEVER auto-modifies — always human-committed
+        'class'   => $factual ? 'factual' : ($narrative ? 'narrative' : 'other'),
+    ];
+}
+// Per-field AI policy map for a report type (for the future AI layer / API §84).
+function uire_ai_report_metadata($fields) {
+    $out = [];
+    foreach ($fields as $f) $out[(string)$f['fkey']] = uire_ai_field_policy($f);
+    return $out;
 }
 
 // ---------------------------------------------------------------------------
