@@ -152,9 +152,18 @@ class SimplePDF {
     // Approx Helvetica width in points (avg per-char factor — good enough for layout).
     public function strWidth($s, $size, $bold = false) { return mb_strlen($s) * $size * ($bold ? 0.56 : 0.52); }
     // Wrap text to a width; returns array of lines.
-    public function wrap($s, $size, $w, $bold = false) {
+    public function wrap($s, $size, $w, $bold = false, $hard = false) {
         $out = []; $cur = '';
         foreach (preg_split('/\s+/', trim((string)$s)) as $word) {
+            // $hard: a single word wider than the column is split character-by-
+            // character so it can never overflow into the neighbouring cell.
+            if ($hard && $w > 0 && $this->strWidth($word, $size, $bold) > $w) {
+                if ($cur !== '') { $out[] = $cur; $cur = ''; }
+                $piece = ''; $n = mb_strlen($word);
+                for ($i = 0; $i < $n; $i++) { $ch = mb_substr($word, $i, 1);
+                    if ($piece !== '' && $this->strWidth($piece . $ch, $size, $bold) > $w) { $out[] = $piece; $piece = $ch; } else $piece .= $ch; }
+                $cur = $piece; continue;
+            }
             $try = $cur === '' ? $word : "$cur $word";
             if ($this->strWidth($try, $size, $bold) > $w && $cur !== '') { $out[] = $cur; $cur = $word; } else $cur = $try;
         }

@@ -35,8 +35,17 @@ Vendor-360 are all reused.
   inspection results. The auditor gained an "open major NCR may affect delivery"
   check. Migration er_p2_v1. (Manufacturing-stage detail beyond the weighted
   progress fields deferred to P3.)
-- **Phase 3** — capacity/resource/manpower, sub-supplier monitoring & chain
-  traceability, packing/preservation, dispatch-readiness checklist, logistics.
+- **Phase 3 — ✅ DONE (Aug 2026).** Added to the ER: capacity & resources
+  (+ manpower table), sub-supplier status, packing & preservation, **dispatch-
+  readiness checklist** (prefilled with the standard go/no-go items;
+  `idems_expediting_dispatch_readiness` computes readiness % + the mandatory
+  blockers — a report can read 80% ready and still be blocked) and logistics &
+  delivery. The auditor gained a high-severity "dispatch blocked on N mandatory
+  item(s)" check. Migration er_p3_v1. **Wide-table fix:** `SimplePDF::wrap()`
+  now hard-breaks over-long words (opt-in), and the table renderer uses it for
+  headers & cells, so 9-11 column tables (delay register, logistics) never
+  collide — a universal fix for every wide table, done without a landscape
+  rewrite of the PDF core.
 - **Phase 4** — project-wide consolidation + three outputs from one engine:
   Register (working data) · Dashboard (management) · Report (formal deliverable);
   vendor commitment-reliability & forecast-reliability trends → Vendor-360.
