@@ -73,8 +73,23 @@ Phased build (per spec §56):
 
   **P1 is COMPLETE.** Next: P2 Audit (vendor-scoped VAR audit form; findings →
   NCR/CAPA reuse), then P3 Qualification workflow (approval chain, requal cycle).
-- **P2 Audit** — vendor-scoped VAR audit form; findings → NCR/CAPA (reuse);
-  audit report.
+- **P2 Audit — ✅ COMPLETE (Aug 2026).**
+  - ✅ **VAR audit form** — `idems_build_vendor_audit()` +
+    `idems_install_vendor_audit_sections()` seed the "VAR — Vendor Audit Report"
+    type (guarded migration `var_form_seeded_v1`): audit identification, scope &
+    criteria, an **Audit findings** table (clause · finding · Major/Minor/
+    Observation · evidence · action · target), a lightly-weighted conformance
+    summary (reuses the scoring engine → conformance score), conclusion +
+    recommendation, sign-off. Renders through the shared PDF engine.
+  - ✅ **Findings → NCR/CAPA** — on issue, `idems_raise_ncrs_from_audit()` reads
+    the findings table and raises a nonconformity (via the existing
+    `ncr_create`, source AUDIT) for each Major/Minor finding, linked to the
+    report and the vendor, carrying clause · severity · target date · action.
+    Observations are not raised. Idempotent (never double-raises for a report).
+    From there the existing NCR→CAPA escalation applies unchanged.
+  - ✅ **Vendor write-back** — an issued VAR also updates the vendor profile
+    (score + approval status from its recommendation); the vendor detail page's
+    history now lists both Assessments and Audits.
 - **P3 Qualification** — approved-vendor register; approval status; validity /
   reassessment dates; multi-level approval (reuse chain); requalification.
 - **P4 Performance** — vendor scorecard fed from NCR/complaints/delivery; Vendor

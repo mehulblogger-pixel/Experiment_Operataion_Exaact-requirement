@@ -84,12 +84,13 @@
   <div style="padding:10px 14px;border-bottom:1px solid var(--line)"><h3 style="margin:0">Assessment history</h3></div>
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
-    <thead><tr><th>Report No.</th><th>Date</th><th>Score</th><th>Recommendation</th><th>Status</th></tr></thead>
+    <thead><tr><th>Report No.</th><th>Type</th><th>Date</th><th>Score</th><th>Recommendation</th><th>Status</th></tr></thead>
     <tbody>
-      <?php if (!$history): ?><tr><td colspan="5" class="muted" style="padding:14px">No Vendor Assessment reports raised against this vendor yet.</td></tr><?php endif; ?>
+      <?php if (!$history): ?><tr><td colspan="6" class="muted" style="padding:14px">No Vendor Assessment or Audit reports raised against this vendor yet.</td></tr><?php endif; ?>
       <?php foreach ($history as $h): ?>
       <tr onclick="location.href='/document?id=<?= (int)$h['id'] ?>'" style="cursor:pointer">
         <td><strong><?= e($h['irn']) ?></strong></td>
+        <td><span class="pill p-mut"><?= e($h['kind'] ?? 'Assessment') ?></span></td>
         <td><?= e($h['issue_date'] ?: '—') ?></td>
         <td><?php if ($h['score']!==null): $c=$scoreCol($h['score']); ?><span style="font-weight:700;color:<?= $c ?>"><?= e(rtrim(rtrim(number_format((float)$h['score'],1),'0'),'.')) ?></span><span class="muted" style="font-size:11px">/100 <?= e($h['band']) ?></span><?php else: ?>—<?php endif; ?></td>
         <td><?= e($h['recommendation'] ?: '—') ?></td>
