@@ -150,6 +150,12 @@ function uire_migrate() {
         try { uire_seed_criteria(); } catch (Throwable $e) { /* never break login/migrate */ }
         if (function_exists('setting_set')) setting_set('uire_criteria_seeded_v1', '1');
     }
+    // Extend the URFE Library with inspection sections/fields (needs urfe_migrate
+    // to have created the library tables first — it runs before us in run_schema).
+    if (function_exists('setting_get') && !setting_get('uire_library_seeded_v1', '')) {
+        try { uire_seed_inspection_library(); } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('uire_library_seeded_v1', '1');
+    }
 }
 
 // Seed the GENERAL criteria pack (industry-neutral). Idempotent per criterion code.
@@ -166,6 +172,123 @@ function uire_seed_criteria() {
         if ((int)ops_val("SELECT COUNT(*) FROM inspection_criteria WHERE code=?", [$c[0]]) > 0) continue;
         $ins->execute([$c[0], 'GENERAL', $c[1], $c[2], $c[3], $c[4], (int)$c[5], (int)$c[6], (int)$c[7], 0, $so, $now]);
     }
+}
+
+// ---------------------------------------------------------------------------
+//  Inspection additions to the URFE LIBRARY (reuse/extend the locked foundation,
+//  never redesign it). Inspection-specific fields, tables and sections become
+//  ordinary Library entries — so inspection report types are ASSEMBLED from the
+//  same Library that every other report uses. Select fields reference the real
+//  masters via `lookup:<key>` (reuse), never a copied list.
+//  Field row: [code,label,ftype,options,grp]. Table row: [code,label,grp,cols].
+// ---------------------------------------------------------------------------
+const UIRE_LIB_FIELDS = [
+    ['inspection_type',   'Inspection type',      'select', 'lookup:inspection_type',   'Inspection'],
+    ['inspection_date',   'Inspection date',      'date',   '',                          'Inspection'],
+    ['inspector',         'Inspector',            'text',   '',                          'Inspection'],
+    ['inspection_stage',  'Inspection stage',     'text',   '',                          'Inspection'],
+    ['item_desc',         'Item / description',   'text',   '',                          'Inspection'],
+    ['tag_no',            'Tag no.',              'text',   '',                          'Inspection'],
+    ['serial_no',         'Serial no.',           'text',   '',                          'Inspection'],
+    ['heat_no',           'Heat no.',             'text',   '',                          'Inspection'],
+    ['batch_no',          'Batch / lot no.',      'text',   '',                          'Inspection'],
+    ['inspection_objectives','Objectives',        'multiselect','lookup:inspection_objective','Inspection'],
+    ['inspection_result', 'Inspection result',    'select', 'lookup:inspection_result',  'Outcome'],
+    // Quantity verification (§20). Balance is a calculated field (configurable).
+    ['ordered_qty',       'Ordered qty',          'number', '',                          'Quantity'],
+    ['presented_qty',     'Presented qty',        'number', '',                          'Quantity'],
+    ['inspected_qty',     'Inspected qty',        'number', '',                          'Quantity'],
+    ['accepted_qty',      'Accepted qty',         'number', '',                          'Quantity'],
+    ['rejected_qty',      'Rejected qty',         'number', '',                          'Quantity'],
+];
+const UIRE_LIB_CALCS = [
+    // code => [label, calc_expr, grp]
+    ['balance_qty', 'Balance qty', 'presented_qty - accepted_qty - rejected_qty', 'Quantity'],
+];
+const UIRE_LIB_TABLES = [
+    ['inspection_items', 'Inspection items', 'Inspection',
+        "Item / description\nTag no.\nSerial no.\nBatch / lot\nQuantity\nResult|select|lookup:inspection_result\nRemarks"],
+    ['checklist',        'Inspection checklist', 'Inspection',
+        "Criterion|merge\nRequirement\nReference\nAcceptance criterion\nResponse|select|lookup:inspection_response\nObservation\nEvidence referred\nAttached|select|Yes,No,N/A\nResult|select|lookup:inspection_result\nRemarks"],
+    ['measurements',     'Measurements', 'Measurement',
+        "Parameter\nRequirement\nNominal\nMin\nMax\nActual\nUnit|unit\nInstrument\nResult|select|lookup:inspection_response\nRemarks"],
+    ['test_results',     'Test results', 'Testing',
+        "Test\nProcedure\nRequirement\nExpected\nActual\nResult|select|lookup:inspection_response\nEquipment\nWitness\nRemarks"],
+    ['hold_witness',     'Hold / witness points', 'Inspection',
+        "Point type|select|Hold,Witness,Review,Surveillance\nRequirement\nNotified|date\nScheduled|date\nActual|date\nWitnessed by\nStatus|select|lookup:inspection_point_status\nResult|select|lookup:inspection_result\nRelease"],
+    ['outstanding_items','Outstanding items', 'Outcome',
+        "Item\nDescription\nReason\nResponsible\nDue|date\nStatus\nAction"],
+];
+// Inspection sections added to the Library. [code,title,type,component,help,[field codes],flags]
+const UIRE_LIB_SECTIONS = [
+    ['INSP_DETAILS',   'Inspection details',    'FIELDS', '', 'Type, date, inspector, item identification',
+        ['inspection_type','inspection_date','inspector','inspection_stage','item_desc','tag_no','serial_no'], []],
+    ['INSP_OBJECTIVES','Inspection objectives', 'FIELDS', '', 'What the inspection set out to verify',
+        ['inspection_objectives'], []],
+    ['INSP_ITEMS',     'Inspection items',      'TABLE',  '', 'The items covered by this inspection',
+        ['inspection_items'], []],
+    ['INSP_QTY',       'Quantity verification', 'FIELDS', '', 'Ordered / presented / inspected / accepted / rejected / balance',
+        ['ordered_qty','presented_qty','inspected_qty','accepted_qty','rejected_qty','balance_qty'], []],
+    ['INSP_CHECKLIST', 'Inspection checklist',  'TABLE',  '', 'Criteria checked, with response, evidence and result',
+        ['checklist'], []],
+    ['INSP_MEASURE',   'Measurements',          'TABLE',  '', 'Dimensional / parameter measurements vs tolerance',
+        ['measurements'], []],
+    ['INSP_TESTS',     'Test results',          'TABLE',  '', 'Witnessed / reviewed test results',
+        ['test_results'], []],
+    ['INSP_HOLDWITNESS','Hold / witness points','TABLE',  '', 'Hold, witness, review and surveillance points',
+        ['hold_witness'], []],
+    ['INSP_RESULT',    'Inspection result',     'FIELDS', '', 'Overall inspection disposition',
+        ['inspection_result'], []],
+    ['INSP_OUTSTANDING','Outstanding items',    'TABLE',  '', 'Items still open after the inspection',
+        ['outstanding_items'], []],
+];
+
+// Add the inspection fields/tables/sections into the URFE Library (idempotent).
+function uire_seed_inspection_library() {
+    $pdo = db(); $now = date('c');
+    $hasF = fn($c) => (int)ops_val("SELECT COUNT(*) FROM report_lib_fields WHERE code=?", [$c]) > 0;
+    $insF = $pdo->prepare("INSERT INTO report_lib_fields (code,label,ftype,options,grp,table_cols,calc_expr,is_system,status,version,created_at) VALUES (?,?,?,?,?,?,?,1,'PUBLISHED',1,?)");
+    foreach (UIRE_LIB_FIELDS as $f) { if ($hasF($f[0])) continue; $insF->execute([$f[0],$f[1],$f[2],$f[3]??'',$f[4]??'','','',$now]); }
+    foreach (UIRE_LIB_CALCS as $c)  { if ($hasF($c[0])) continue; $insF->execute([$c[0],$c[1],'calc','',$c[3]??'','',$c[2]??'',$now]); }
+    foreach (UIRE_LIB_TABLES as $t) { if ($hasF($t[0])) continue; $insF->execute([$t[0],$t[1],'table','',$t[2]??'',$t[3]??'','',$now]); }
+    $hasS = fn($c) => (int)ops_val("SELECT COUNT(*) FROM report_lib_sections WHERE code=?", [$c]) > 0;
+    $insS = $pdo->prepare("INSERT INTO report_lib_sections (code,title,help,section_type,component,is_system,status,version,category,sort_order,created_at) VALUES (?,?,?,?,?,1,'PUBLISHED',1,'Inspection',?,?)");
+    $insSF = $pdo->prepare("INSERT INTO report_lib_section_fields (section_code,field_code,sort_order) VALUES (?,?,?)");
+    $ord = 200;
+    foreach (UIRE_LIB_SECTIONS as $s) {
+        $ord += 10; if ($hasS($s[0])) continue;
+        $insS->execute([$s[0],$s[1],$s[4]??'',$s[2]??'FIELDS',$s[3]??'',$ord,$now]);
+        $fo=0; foreach (($s[5]??[]) as $fc) { $fo+=10; $insSF->execute([$s[0],$fc,$fo]); }
+    }
+}
+
+// Turn a criteria pack (filtered by inspection type) into checklist rows keyed to
+// the given checklist field's actual column keys — so a report created from a type
+// with an INSP_CHECKLIST section can be PRE-FILLED with the applicable criteria.
+function uire_criteria_prefill_rows($checklistField, $pack = 'GENERAL', $inspType = null) {
+    if (!$checklistField || !function_exists('idems_table_col_defs')) return [];
+    $defs = idems_table_col_defs($checklistField); $keys = array_keys($defs);
+    // Map by label so column reordering never breaks the prefill.
+    $col = function($needle) use ($defs) { foreach ($defs as $k=>$d) if (stripos((string)$d['label'],$needle)!==false) return $k; return null; };
+    $kCrit=$col('criterion'); $kReq=$col('requirement'); $kRef=$col('reference'); $kAcc=$col('acceptance');
+    $rows = [];
+    foreach (uire_criteria($pack, $inspType) as $c) {
+        $r = array_fill_keys($keys, '');
+        if ($kCrit) $r[$kCrit] = trim(($c['category']?$c['category'].' — ':'').$c['requirement']) ?: $c['code'];
+        if ($kReq)  $r[$kReq]  = (string)$c['requirement'];
+        if ($kRef)  $r[$kRef]  = trim((string)($c['reference'] ?: ($c['standard'].($c['clause']?' '.$c['clause']:''))));
+        if ($kAcc)  $r[$kAcc]  = (string)$c['acceptance'];
+        $rows[] = $r;
+    }
+    return $rows;
+}
+
+// Assemble a complete inspection report TYPE from the Library (URFE + inspection
+// sections). This is the §107 proof: many inspection report types, one engine,
+// zero report-specific code. Returns the report type id.
+function uire_assemble_inspection_report($code, $name, $sectionCodes, $opts = []) {
+    $opts = array_merge(['category' => 'TPIA_REPORT', 'finding_enabled' => 1, 'evidence_enabled' => 1], $opts);
+    return urfe_assemble_report_type($code, $name, $sectionCodes, $opts);
 }
 
 // ---------------------------------------------------------------------------
