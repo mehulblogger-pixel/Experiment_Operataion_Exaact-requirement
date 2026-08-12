@@ -3,6 +3,7 @@
   <div><h1><?= e(T_REG('report')) ?></h1>
     <p class="sub" style="margin:2px 0 0">Every inspection report &amp; certificate, with its IRN and status. <?= (int)($counts['total'] ?? 0) ?> document(s).</p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <a class="btn secondary" href="/release-notes">Release Notes</a>
     <?php if (is_master() || can('idems.type.manage') || can('master.manage')): ?><a class="btn secondary" href="/report-types">Report types</a><?php endif; ?>
     <?php if (is_master() || can('idems.type.manage')): ?><a class="btn secondary" href="/irn-rules">IRN rules</a><?php endif; ?>
     <?php if (is_master() || can('idems.audit.view')): ?><a class="btn secondary" href="/audit-log">Audit log</a><?php endif; ?>
