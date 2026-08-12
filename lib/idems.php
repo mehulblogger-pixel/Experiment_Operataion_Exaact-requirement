@@ -1566,6 +1566,24 @@ function ops_idems_documents($route, $method) {
             flash('This report must be fully approved through its approval chain before it can be finalized.', 'error');
             redirect('/document?id=' . $doc['id']);
         }
+        // AI Report Auditor — a CRITICAL deterministic finding blocks issue. An
+        // administrator may override, but only by supplying a reason, which is
+        // written to the tamper-evident audit trail. §qa-gate
+        if (function_exists('idems_qa_run')) {
+            try { $qa = idems_qa_run($doc); } catch (Throwable $e) { $qa = null; }   // fail-open: a QA engine error must never block a legitimate issue
+            $crit = $qa ? array_values(array_filter($qa['issues'] ?? [], fn($i) => ($i['severity'] ?? '') === 'critical')) : [];
+            if ($crit) {
+                $reason = trim((string)($_POST['qa_override_reason'] ?? ''));
+                if (!is_master() || $reason === '') {
+                    $m = 'The quality check found ' . count($crit) . ' critical issue' . (count($crit) === 1 ? '' : 's') . ' that block issuing this ' . Tl('report') . ' — e.g. “' . $crit[0]['title'] . '”.';
+                    $m .= is_master() ? ' To issue anyway, an administrator must supply an override reason.' : ' It must be resolved before this report can be issued.';
+                    flash($m, 'error');
+                    redirect('/document?id=' . $doc['id']);
+                }
+                idems_log('report_doc', (int)$doc['id'], 'QA_CRITICAL_OVERRIDE', ['reason' => $reason, 'issues' => implode(' | ', array_map(fn($i) => (string)$i['title'], $crit))]);
+                flash('Issued with an administrator override of ' . count($crit) . ' critical quality issue' . (count($crit) === 1 ? '' : 's') . ' — recorded in the audit trail.', 'warning');
+            }
+        }
         // The checks that gate issuing a report belong to the inspection pack —
         // a report must not go out claiming an instrument that was out of
         // calibration (a block, never overridable: no honest reading makes a
