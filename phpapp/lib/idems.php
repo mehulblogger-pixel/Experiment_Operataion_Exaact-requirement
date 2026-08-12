@@ -1433,6 +1433,199 @@ function idems_expediting_status($doc, $fields = null, $data = null) {
     return ['status'=>$status, 'milestones'=>$mt, 'forecast'=>['required'=>$req?date('Y-m-d',$req):'','vendor'=>$vend?date('Y-m-d',$vend):'','expeditor'=>$exp?date('Y-m-d',$exp):'',
             'expeditor_variance_days'=>$expVar, 'vendor_vs_expeditor_days'=>$vendVsExp]];
 }
+
+// The immediately-preceding Expediting Report for the SAME vendor + PO, so the
+// advisory layer can describe the trend (progress movement, forecast slip). Reads
+// report_docs; matches on report type ER, same vendor and PO (from the data JSON
+// or the linked columns), issued before this one, most recent first. Returns the
+// row (with decoded data) or null. §expediting-trend
+function idems_expediting_previous($doc) {
+    $typeId = (int)($doc['report_type_id'] ?? 0);
+    if (!$typeId) { $t = idems_type_id_by_code('ER'); $typeId = (int)$t; }
+    if (!$typeId) return null;
+    $data = is_array($doc['data'] ?? null) ? $doc['data'] : (json_decode($doc['data'] ?? '[]', true) ?: []);
+    $vendor = strtolower(trim((string)($data['vendor'] ?? '')));
+    $po     = strtolower(trim((string)($data['po_number'] ?? '')));
+    if ($vendor === '' && $po === '' && empty($doc['vendor_id'])) return null;
+    $selfId = (int)($doc['id'] ?? 0);
+    $ord = ($doc['issue_date'] ?? '') !== '' ? $doc['issue_date'] : ($doc['created_at'] ?? '');
+    // Pull recent ERs and pick the best earlier match in PHP (data lives in JSON).
+    $rows = ops_all("SELECT * FROM report_docs WHERE report_type_id=? AND (id<>? OR ?=0) ORDER BY COALESCE(issue_date, created_at) DESC, id DESC LIMIT 60",
+                    [$typeId, $selfId, $selfId]);
+    foreach ($rows as $r) {
+        if ($selfId && (int)$r['id'] === $selfId) continue;
+        $ro = ($r['issue_date'] ?? '') !== '' ? $r['issue_date'] : ($r['created_at'] ?? '');
+        if ($ord !== '' && $ro !== '' && strtotime($ro) >= strtotime($ord)) continue; // must be earlier
+        $rd = json_decode($r['data'] ?? '[]', true); if (!is_array($rd)) $rd = [];
+        $rv = strtolower(trim((string)($rd['vendor'] ?? '')));
+        $rp = strtolower(trim((string)($rd['po_number'] ?? '')));
+        $sameVendor = ($vendor !== '' && $rv === $vendor) || (!empty($doc['vendor_id']) && (int)($r['vendor_id'] ?? 0) === (int)$doc['vendor_id']);
+        $samePo = ($po === '' || $rp === '' || $rp === $po);
+        if ($sameVendor && $samePo) { $r['data'] = $rd; return $r; }
+    }
+    return null;
+}
+
+// Join a list into readable prose: "a", "a and b", "a, b and c".
+function idems_list_join($items) {
+    $items = array_values(array_filter(array_map(fn($x)=>trim((string)$x), (array)$items), fn($x)=>$x!==''));
+    $n = count($items);
+    if ($n === 0) return '';
+    if ($n === 1) return $items[0];
+    if ($n === 2) return $items[0].' and '.$items[1];
+    return implode(', ', array_slice($items,0,-1)).' and '.end($items);
+}
+
+// §expediting-advisory (Phase 5) — a DETERMINISTIC advisory narrative for an
+// Expediting Report: a draft executive summary, delay explanations, a forecast-
+// plausibility read, progress anomalies and the trend vs the previous report.
+// It is ADVISORY ONLY — it never changes stored values or gates issue; the
+// expeditor reads it and may adopt the wording. No LLM: every line is a
+// reproducible function of the report's own data (an optional AI provider can
+// still add its separate suggestions elsewhere). Returns
+// ['summary'=>string, 'items'=>[['kind','title','text','tone'], ...]].
+function idems_expediting_advisory($doc, $fields = null, $data = null, $prev = null) {
+    if ($fields === null) $fields = idems_fields((int)($doc['report_type_id'] ?? 0));
+    if ($data === null) { $data = json_decode($doc['data'] ?? '[]', true); if (!is_array($data)) $data = []; }
+    $sections = idems_sections((int)($doc['report_type_id'] ?? 0));
+    $num = function($v){ return rtrim(rtrim(number_format((float)$v,1),'0'),'.'); };
+    $fmtD = function($s){ $s=trim((string)$s); if($s==='')return ''; $t=strtotime($s); return $t?date('d-M-Y',$t):$s; };
+    // Locate a table field's rows + a label→column-key map for the columns we need.
+    $tableRows = function($fkey) use ($fields,$data){
+        foreach ($fields as $f) if (($f['fkey']??'')===$fkey && ($f['ftype']??'')==='table') {
+            $rows = $data[$fkey] ?? null; if(!is_array($rows)) return [null,[]];
+            $defs = idems_table_col_defs($f); $map=[];
+            foreach ($defs as $ck=>$d) $map[strtolower((string)$d['label'])]=$ck;
+            return [$rows,$map];
+        }
+        return [null,[]];
+    };
+    $col = function($map,$needles){ foreach($map as $lbl=>$ck){ foreach((array)$needles as $n){ if(strpos($lbl,$n)!==false) return $ck; } } return null; };
+
+    $sc = function_exists('idems_score_doc') ? idems_score_doc($sections,$fields,$data) : null;
+    $st = idems_expediting_status($doc,$fields,$data);
+    $dr = function_exists('idems_expediting_dispatch_readiness') ? idems_expediting_dispatch_readiness($fields,$data) : null;
+    $pct = ($sc && $sc['overall']!==null) ? (float)$sc['overall'] : null;
+    $ms  = $st['milestones']; $fc = $st['forecast'];
+    $items = [];
+
+    // ---- NCR read (open majors + delivery impact) from the NCR register ----
+    [$ncrRows,$ncrMap] = $tableRows('ncr_register');
+    $ncrOpenMajor = 0; $ncrImpact = 0;
+    if (is_array($ncrRows)) {
+        $sevK=$col($ncrMap,['sever']); $stK=$col($ncrMap,['status']); $impK=$col($ncrMap,['impact','delivery']);
+        foreach ($ncrRows as $r){ $rr=(array)$r;
+            $sev=strtolower(trim((string)($rr[$sevK]??''))); $stt=strtolower(trim((string)($rr[$stK]??'')));
+            $open = $stt!=='' && strpos($stt,'clos')===false;
+            if ($open && strpos($sev,'major')!==false){ $ncrOpenMajor++;
+                $imp=strtolower(trim((string)($rr[$impK]??''))); if(in_array($imp,['yes','y','1','true'],true)) $ncrImpact++; }
+        }
+    }
+
+    // ---- Draft executive summary ---------------------------------------------
+    $asOf = trim((string)($data['period_to'] ?? '')) ?: trim((string)($doc['issue_date'] ?? ''));
+    $parts = [];
+    if ($pct !== null) $parts[] = 'As at '.($asOf?$fmtD($asOf):'this report').', overall weighted progress is '.$num($pct).'% ('.strtolower(idems_progress_band($pct)).')';
+    if ($ms['total']>0) {
+        $seg=[]; if($ms['complete'])$seg[]=$ms['complete'].' complete'; if($ms['at_risk'])$seg[]=$ms['at_risk'].' at risk'; if($ms['delayed'])$seg[]=$ms['delayed'].' delayed';
+        $parts[] = 'of '.$ms['total'].' tracked milestone'.($ms['total']==1?'':'s').($seg?', '.idems_list_join($seg):'');
+    }
+    $s1 = $parts ? (idems_list_join($parts).'.') : '';
+    $s2 = '';
+    if ($fc['expeditor']!=='' || $fc['vendor']!=='') {
+        $bits=[];
+        if ($fc['vendor']!=='')    $bits[]='the vendor forecasts delivery on '.$fmtD($fc['vendor']);
+        if ($fc['expeditor']!=='') $bits[]='the expeditor independently forecasts '.$fmtD($fc['expeditor']);
+        $s2 = ucfirst(idems_list_join($bits));
+        if ($fc['required']!=='' && $fc['expeditor_variance_days']!==null) {
+            $v=$fc['expeditor_variance_days'];
+            $s2 .= ' against a required date of '.$fmtD($fc['required']).' — a variance of '.abs($v).' day'.(abs($v)==1?'':'s').' '.($v>0?'late':($v<0?'early':'(on time)'));
+        }
+        $s2 .= '.';
+    }
+    $s3 = '';
+    if ($ncrOpenMajor>0) $s3 = $ncrOpenMajor.' open major NCR'.($ncrOpenMajor==1?'':'s').($ncrImpact>0?' ('.$ncrImpact.' flagged as delivery-impacting)':'').' remain'.($ncrOpenMajor==1?'s':'').' on the quality picture.';
+    $s4 = '';
+    if ($dr && $dr['pct']!==null) { $b=count($dr['blockers']); $s4='Dispatch readiness stands at '.$num($dr['pct']).'%'.($b>0?', with '.$b.' mandatory item'.($b==1?'':'s').' still open ('.idems_list_join(array_slice($dr['blockers'],0,3)).')':' with no mandatory blockers').'.'; }
+    $summary = trim(implode(' ', array_filter([$s1,$s2,$s3,$s4])));
+
+    // ---- Delay explanations ---------------------------------------------------
+    [$dRows,$dMap] = $tableRows('delays');
+    if (is_array($dRows) && $dRows) {
+        $stgK=$col($dMap,['stage','activity','area']); $dayK=$col($dMap,['day','slip']); $causeK=$col($dMap,['cause','reason']);
+        $respK=$col($dMap,['respons','owner','fault']); $impK=$col($dMap,['impact','effect']); $actK=$col($dMap,['action','recovery','mitig']); $stK2=$col($dMap,['status']);
+        $lines=[];
+        foreach ($dRows as $r){ $rr=(array)$r;
+            $stg=trim((string)($rr[$stgK]??'')); if($stg==='') continue;
+            $day=trim((string)($rr[$dayK]??'')); $cause=trim((string)($rr[$causeK]??''));
+            $resp=trim((string)($rr[$respK]??'')); $imp=trim((string)($rr[$impK]??'')); $act=trim((string)($rr[$actK]??'')); $stt=trim((string)($rr[$stK2]??''));
+            $t='The '.$stg.' activity'.($day!==''?' is delayed by ~'.$day.' day(s)':' is delayed');
+            if($cause!=='') $t.=', attributed to '.rtrim($cause,'.').($resp!==''?' ('.$resp.')':'');
+            $t.='.'; if($imp!=='') $t.=' Impact: '.rtrim($imp,'.').'.'; if($act!=='') $t.=' Agreed action: '.rtrim($act,'.').($stt!==''?' ('.strtolower($stt).')':'').'.';
+            $lines[]=$t;
+        }
+        if ($lines) $items[]=['kind'=>'delay','title'=>'Delay explanation','tone'=>'warn','text'=>implode(' ', $lines)];
+    }
+
+    // ---- Forecast plausibility ------------------------------------------------
+    $fp=''; $fpTone='neutral';
+    $ve=$fc['vendor_vs_expeditor_days']; $ev=$fc['expeditor_variance_days'];
+    if ($fc['vendor']!=='' && $fc['expeditor']!=='' && $ve!==null) {
+        if ($ve>0) { $fp='The expeditor\'s forecast is '.$ve.' day'.($ve==1?'':'s').' later than the vendor\'s, indicating the vendor\'s '.$fmtD($fc['vendor']).' commitment is optimistic relative to the evidence on the ground'; $fpTone='warn'; }
+        elseif ($ve<0) { $fp='The expeditor\'s forecast is '.abs($ve).' day'.(abs($ve)==1?'':'s').' earlier than the vendor\'s — an unusually conservative vendor position worth confirming'; }
+        else $fp='The vendor and expeditor forecasts coincide';
+    } elseif ($fc['expeditor']!=='') { $fp='Only the expeditor\'s forecast ('.$fmtD($fc['expeditor']).') is available for comparison'; }
+    if ($fp!=='') {
+        // Evidence backing: milestone completion + open majors + delayed count.
+        $ev_bits=[];
+        if ($ms['total']>0) $ev_bits[]=$num($ms['total']?round($ms['complete']/$ms['total']*100,0):0).'% of milestones complete';
+        if ($ms['delayed']>0) $ev_bits[]=$ms['delayed'].' delayed';
+        if ($ncrOpenMajor>0) $ev_bits[]=$ncrOpenMajor.' open major NCR'.($ncrOpenMajor==1?'':'s');
+        if ($ev_bits) $fp.='. Evidence: '.idems_list_join($ev_bits);
+        $fp=rtrim($fp,'.').'.';
+        if ($ev!==null && $ev>0) { $fp.=' The expeditor forecast falls '.$ev.' day'.($ev==1?'':'s').' beyond the required date — recovery action is needed to protect the schedule.'; $fpTone='bad'; }
+        elseif ($ev!==null && $ev<=0) { $fp.=' The expeditor forecast is within the required date; schedule risk is currently contained.'; }
+        $items[]=['kind'=>'forecast','title'=>'Forecast plausibility','tone'=>$fpTone,'text'=>$fp];
+    }
+
+    // ---- Progress anomalies ---------------------------------------------------
+    $an=[];
+    if ($pct!==null && $pct>=80 && $ms['delayed']>0) $an[]='Headline progress reads '.$num($pct).'% yet '.$ms['delayed'].' milestone'.($ms['delayed']==1?' is':'s are').' delayed — the single percentage understates the schedule risk; read it against the milestone table, not on its own.';
+    if ($pct!==null && $pct>=80 && $ev!==null && $ev>0) $an[]='Progress is high ('.$num($pct).'%) but the forecast still lands after the required date — the remaining scope is on the critical path.';
+    if ($pct!==null && $pct>=80 && $dr && $dr['pct']!==null && count($dr['blockers'])>0) $an[]='Progress is high yet dispatch is blocked on '.count($dr['blockers']).' mandatory item(s) — completion percentage does not equal ready-to-ship.';
+    if ($ncrImpact>0) $an[]=$ncrImpact.' open major NCR(s) are flagged delivery-impacting — these gate final inspection/dispatch regardless of the progress figure.';
+    if ($an) $items[]=['kind'=>'anomaly','title'=>'Progress anomalies','tone'=>'warn','text'=>implode(' ', $an)];
+
+    // ---- Trend vs the previous report -----------------------------------------
+    if ($prev === null) $prev = idems_expediting_previous($doc);
+    if ($prev) {
+        $pd = is_array($prev['data']??null) ? $prev['data'] : (json_decode($prev['data']??'[]',true)?:[]);
+        $pFields = idems_fields((int)$prev['report_type_id']); $pSec = idems_sections((int)$prev['report_type_id']);
+        $pSc = function_exists('idems_score_doc') ? idems_score_doc($pSec,$pFields,$pd) : null;
+        $pPct = ($pSc && $pSc['overall']!==null) ? (float)$pSc['overall'] : null;
+        $pSt = idems_expediting_status($prev,$pFields,$pd);
+        $tl=[]; $prevIRN=trim((string)($prev['irn']??'')); $prevDate=$fmtD($prev['issue_date']??($prev['created_at']??''));
+        $ref = 'the last report'.($prevIRN!==''?' ('.$prevIRN.($prevDate!==''?', '.$prevDate:'').')':'');
+        if ($pPct!==null && $pct!==null) {
+            $d=$pct-$pPct;
+            if (abs($d)<0.05) $tl[]='Progress is unchanged at '.$num($pct).'% since '.$ref.'.';
+            else $tl[]='Progress moved from '.$num($pPct).'% to '.$num($pct).'% ('.($d>0?'+':'').$num($d).' pt) since '.$ref.'.';
+        }
+        $pExp=$pSt['forecast']['expeditor']; $cExp=$fc['expeditor'];
+        if ($pExp!=='' && $cExp!=='') {
+            $slip=(int)floor((strtotime($cExp)-strtotime($pExp))/86400);
+            if ($slip>0) $tl[]='The expeditor delivery forecast has slipped '.$slip.' day'.($slip==1?'':'s').' (now '.$fmtD($cExp).').';
+            elseif ($slip<0) $tl[]='The expeditor delivery forecast improved by '.abs($slip).' day'.(abs($slip)==1?'':'s').' (now '.$fmtD($cExp).').';
+            else $tl[]='The expeditor delivery forecast is held at '.$fmtD($cExp).'.';
+        }
+        if (($pSt['status']??'')!=='' && $pSt['status']!==$st['status']) $tl[]='Status changed from '.ucwords(strtolower($pSt['status'])).' to '.ucwords(strtolower($st['status'])).'.';
+        if ($tl) { $worse = ($pPct!==null && $pct!==null && $pct<$pPct-0.05) || (isset($slip) && $slip>0);
+            $items[]=['kind'=>'trend','title'=>'Trend vs previous report','tone'=>($worse?'warn':'neutral'),'text'=>implode(' ', $tl)]; }
+    }
+
+    return ['summary'=>$summary, 'items'=>$items];
+}
+
 // Keep only the RELEASED line items for a Release Note — rows that have a
 // passed / cleared / released / accepted quantity greater than zero. Rows that
 // were fully rejected or held are dropped. If no such column can be identified,
@@ -3052,8 +3245,12 @@ function ops_idems_documents($route, $method) {
         $aiText = $_SESSION['idems_ai_' . $doc['id']] ?? '';
         $aiSections = ($aiText && function_exists('idems_ai_sections')) ? idems_ai_sections($aiText) : [];
         $aiOn = function_exists('ai_enabled') && ai_enabled();
+        // Expediting advisory (Phase 5) — deterministic draft summary, delay/
+        // forecast reads, anomalies and trend vs the previous report. Advisory only.
+        $expAdvisory = (($doc['type_code'] ?? '') === 'ER' && function_exists('idems_expediting_advisory'))
+            ? idems_expediting_advisory($doc, $fields, $data) : null;
         view('ops/idems/doc_detail', ['doc'=>$doc, 'approver'=>$approver, 'audit'=>$audit, 'qa'=>$qa,
-            'scorecard'=>$scorecard, 'aiSections'=>$aiSections, 'aiOn'=>$aiOn,
+            'scorecard'=>$scorecard, 'aiSections'=>$aiSections, 'aiOn'=>$aiOn, 'expAdvisory'=>$expAdvisory,
             'sections'=>$sections, 'fields'=>$fields, 'data'=>$data, 'files'=>idems_doc_files($doc['id']), 'hasSchema'=>!empty($fields),
             'approvals'=>$approvals, 'curStep'=>$curStep, 'canAct'=>idems_can_act_step($curStep),
             'vetting'=>idems_vetting_log($doc['id']), 'canVet'=>idems_can_vet(),
