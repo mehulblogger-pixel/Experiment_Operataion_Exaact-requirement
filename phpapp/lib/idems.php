@@ -414,6 +414,39 @@ function idems_migrate() {
         } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('var_checklist_v1', '1');
     }
+    // ONE-TIME: add the "Customer complaints & resolution" section to VASR and VAR
+    // forms seeded before it existed. Reseeds only when the field is absent
+    // (issued reports keep their frozen schema; drafts keep data by fkey).
+    if (function_exists('setting_get') && !setting_get('vendor_complaints_v1', '')) {
+        try {
+            foreach (['VASR' => 'idems_install_vendor_assessment_sections', 'VAR' => 'idems_install_vendor_audit_sections'] as $code => $installer) {
+                $tid = idems_type_id_by_code($code);
+                if ($tid && !(int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey='complaints_review'", [$tid])) {
+                    $pdo->prepare("DELETE FROM report_fields WHERE report_type_id=?")->execute([$tid]);
+                    $pdo->prepare("DELETE FROM report_sections WHERE report_type_id=?")->execute([$tid]);
+                    $installer($tid);
+                }
+            }
+        } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('vendor_complaints_v1', '1');
+    }
+    // ONE-TIME: add the "Evidence referred" + "Attached" (tick) columns to a VAR
+    // checklist/findings seeded before they existed. Reseeds only when the
+    // checklist lacks the Attached column.
+    if (function_exists('setting_get') && !setting_get('var_evidence_v1', '')) {
+        try {
+            $tid = idems_type_id_by_code('VAR');
+            if ($tid) {
+                $cols = (string)ops_val("SELECT table_cols FROM report_fields WHERE report_type_id=? AND fkey='audit_checklist'", [$tid]);
+                if (stripos($cols, 'Attached') === false) {
+                    $pdo->prepare("DELETE FROM report_fields WHERE report_type_id=?")->execute([$tid]);
+                    $pdo->prepare("DELETE FROM report_sections WHERE report_type_id=?")->execute([$tid]);
+                    idems_install_vendor_audit_sections($tid);
+                }
+            }
+        } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('var_evidence_v1', '1');
+    }
     // ---- Vendor qualification profile — one row per vendor partner, updated by
     // assessments. Kept separate from business_partners so the core directory CRUD
     // is untouched; joined by partner_id when a vendor is viewed or listed.
@@ -872,6 +905,14 @@ function idems_install_vendor_assessment_sections($typeId) {
     $addTable($s, 'findings', 'Findings / observations',
         "Sr. No.|merge\nArea\nObservation\nSeverity|select|lookup:severity\nAction required\nTarget date|date");
 
+    // Customer complaints & resolution — the vendor's complaint history and how
+    // each was resolved. Auto-prefilled from the complaint register when the
+    // report is created against a vendor (idems_vendor_prefill_complaints).
+    $s = $addSection('Customer complaints & resolution', 'Complaints raised against this vendor and how they were resolved. Prefilled from the complaint register; add older or external complaints as needed.', 0, 1);
+    $addField($s, 'complaints_summary', 'Complaint history & trend', 'textarea', '', 2);
+    $addTable($s, 'complaints_review', 'Complaints & resolution',
+        "Ref / date|merge\nNature of complaint\nRoot cause\nCorrective action / resolution\nStatus|select|Open,Closed\nEffectiveness verified|select|Yes,No,N/A");
+
     $s = $addSection('Recommendation', 'The overall recommendation, informed by the score.', 0, 1);
     $addField($s, 'recommendation', 'Recommendation', 'select',
         "Approved\nApproved with conditions\nConditional — re-assess after actions\nNot approved", 2);
@@ -947,14 +988,14 @@ function idems_install_vendor_audit_sections($typeId) {
     // the exceptions are also captured in the findings table below.
     $s = $addSection('Audit checklist', 'Every check point examined during the audit, with its result. Non-conformities are also listed in the findings table.');
     $addTable($s, 'audit_checklist', 'Checklist',
-        "Ref|merge\nCheck item\nRequirement / standard\nResult|select|Conforms,Minor NC,Major NC,Observation,N/A\nEvidence / remarks",
-        2, 'Result options: Conforms · Minor NC · Major NC · Observation · N/A. Only Major/Minor findings become nonconformities (from the findings table below).');
+        "Ref|merge\nCheck item\nRequirement / standard\nResult|select|Conforms,Minor NC,Major NC,Observation,N/A\nEvidence referred\nAttached|select|Yes,No,N/A",
+        2, 'Result: Conforms · Minor NC · Major NC · Observation · N/A. "Evidence referred" lists the record(s) seen; "Attached" ticks whether that evidence is attached to this report. Only Major/Minor findings become nonconformities (from the findings table below).');
 
     // Section IV — audit findings. THIS is the table the NCR engine reads.
     $s = $addSection('Audit findings', 'Each finding graded Major / Minor / Observation. On issue, Major and Minor findings are raised as nonconformities against this vendor.');
     $addTable($s, 'audit_findings', 'Findings',
-        "Sr. No.|merge\nClause / requirement\nFinding / observation\nCategory|select|Major,Minor,Observation\nObjective evidence\nCorrective action required\nTarget date|date",
-        2, 'Grade each finding. Major = a requirement not met / system gap; Minor = partial lapse; Observation = improvement opportunity (not raised as an NCR).');
+        "Sr. No.|merge\nClause / requirement\nFinding / observation\nCategory|select|Major,Minor,Observation\nObjective evidence\nAttached|select|Yes,No,N/A\nCorrective action required\nTarget date|date",
+        2, 'Grade each finding. Major = a requirement not met / system gap; Minor = partial lapse; Observation = improvement opportunity (not raised as an NCR). "Attached" ticks whether the objective evidence is attached to this report.');
 
     // Section IV — conformance summary (lightly scored, reuses the scoring engine).
     $s = $addSection('Conformance summary', 'A quick rating per audited area — feeds an overall conformance score.');
@@ -971,6 +1012,13 @@ function idems_install_vendor_audit_sections($typeId) {
     $addScored($s, 'c_measure', 'Inspection, test & calibration', 2);
     $addScored($s, 'c_docs', 'Documentation & traceability', 2);
     $addScored($s, 'c_capa', 'Corrective-action effectiveness', 1);
+
+    // Customer complaints & resolution reviewed during the audit. Auto-prefilled
+    // from the complaint register when the audit is raised against a vendor.
+    $s = $addSection('Customer complaints & resolution', 'Complaints raised against this vendor and how they were resolved, reviewed during the audit. Prefilled from the complaint register.');
+    $addField($s, 'complaints_summary', 'Complaint history & effectiveness of resolution', 'textarea', '', 2);
+    $addTable($s, 'complaints_review', 'Complaints & resolution',
+        "Ref / date|merge\nNature of complaint\nRoot cause\nCorrective action / resolution\nStatus|select|Open,Closed\nEffectiveness verified|select|Yes,No,N/A");
 
     // Section V — conclusion.
     $s = $addSection('Conclusion', 'Overall audit outcome and the recommendation for this vendor.', 0, 1);
@@ -1417,6 +1465,30 @@ function idems_vendor_performance($partnerId) {
     ];
 }
 
+// Build "Customer complaints & resolution" table rows from the vendor's actual
+// complaint register, mapped to the given complaints_review table field. Used to
+// prefill a Vendor Assessment / Audit so complaints & their resolution are part
+// of the evaluation rather than retyped. Returns [] if there are none.
+function idems_vendor_prefill_complaints($partnerId, $field) {
+    $partnerId = (int)$partnerId; if (!$partnerId || !$field) return [];
+    try { $cs = ops_all("SELECT ref, subject, received_on, root_cause, decision_note, outcome, capa_ref, status FROM complaints WHERE partner_id=? ORDER BY id DESC LIMIT 30", [$partnerId]); }
+    catch (Throwable $e) { return []; }
+    if (!$cs) return [];
+    $keys = array_keys(idems_table_col_defs($field));
+    $rows = [];
+    foreach ($cs as $c) {
+        $refDate = trim((string)($c['ref'] ?? '') . (($c['received_on'] ?? '') !== '' ? ' · ' . $c['received_on'] : ''));
+        $reso = trim((string)($c['decision_note'] ?? ''));
+        if ($reso === '') { $o = strtoupper((string)($c['outcome'] ?? '')); if ($o !== '' && $o !== 'PENDING') $reso = ucfirst(strtolower($o)); }
+        if (trim((string)($c['capa_ref'] ?? '')) !== '') $reso = trim($reso . ' (CAPA ' . $c['capa_ref'] . ')');
+        $closed = strtoupper((string)($c['status'] ?? '')) === 'CLOSED';
+        $vals = [$refDate, (string)($c['subject'] ?? ''), (string)($c['root_cause'] ?? ''), $reso,
+                 $closed ? 'Closed' : 'Open', $closed ? ($reso !== '' ? 'Yes' : 'No') : 'N/A'];
+        $r = []; foreach ($keys as $i => $k) $r[$k] = $vals[$i] ?? '';
+        $rows[] = $r;
+    }
+    return $rows;
+}
 // The recent operational records behind the Vendor 360 view (each list capped).
 function idems_vendor_360($partnerId) {
     $partnerId = (int)$partnerId; if (!$partnerId) return ['reports'=>[], 'ncrs'=>[], 'complaints'=>[]];
@@ -1575,6 +1647,24 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
                  $mention['where'] . ' mentions “' . $mention['term'] . '”, but no photograph or supporting document is attached.', $mention['where'],
                  'Attach a photograph or document for this finding, or mark photography as not permitted.');
     }
+    // 7b) Evidence-attached tick — a checklist/finding graded as a nonconformity
+    // but marked with its evidence not attached to the report.
+    foreach ($fields as $f) {
+        if (($f['ftype'] ?? '') !== 'table') continue;
+        $rows = $data[$f['fkey']] ?? null; if (!is_array($rows) || !$rows) continue;
+        $defs = idems_table_col_defs($f); $attK = null; $resK = null;
+        foreach ($defs as $ck => $d) { $l = strtolower((string)$d['label']); if (strpos($l,'attach') !== false) $attK = $ck; elseif (in_array($l, ['result','category','severity'], true)) $resK = $ck; }
+        if ($attK === null || $resK === null) continue;
+        $miss = 0;
+        foreach ($rows as $r) { $rr = (array)$r; $att = strtolower(trim((string)($rr[$attK] ?? ''))); $res = strtolower(trim((string)($rr[$resK] ?? '')));
+            $isFinding = strpos($res,'major') !== false || strpos($res,'minor') !== false;
+            if ($isFinding && !in_array($att, ['yes','y','1','true','n/a','na'], true)) $miss++;
+        }
+        if ($miss > 0)
+            $add('medium', 'evidence', 'Evidence not attached for ' . $miss . ' nonconformity finding(s)', $f['label'] ?? '',
+                 $miss . ' finding(s) graded as a nonconformity are marked with evidence not attached to this report.', $f['label'] ?? '',
+                 'Attach the referenced evidence for these findings, or mark it N/A with a note.');
+    }
     // 8) Date sanity — issue before inspection, and out-of-range dates.
     $pd = function($s) { $s = trim((string)$s); if ($s === '') return null; $t = strtotime($s); return $t ?: null; };
     $insp = $pd($doc['inspection_date'] ?? ''); $iss = $pd($doc['issue_date'] ?? '');
@@ -1652,6 +1742,12 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
                     $add('medium', 'vendor', 'Approval recommended while nonconformities are overdue', 'Vendor record',
                          'The vendor has ' . $overdue . ' overdue nonconformity(ies) still open.', 'Vendor record',
                          'Progress the overdue NCR(s) before confirming approval.');
+                // Open customer complaints against the vendor.
+                $openCmp = (int)ops_val("SELECT COUNT(*) FROM complaints WHERE partner_id=? AND status <> 'CLOSED'", [$vidP]);
+                if ($openCmp > 0)
+                    $add('medium', 'vendor', 'Approval recommended while customer complaints are open', 'Customer complaints',
+                         'The vendor has ' . $openCmp . ' open customer complaint(s) that are not yet resolved.', 'Customer complaints',
+                         'Review the complaints & their resolution before approving; record them in the report.');
             } catch (Throwable $e) {}
             // b) Live performance well below the assessment.
             if (function_exists('idems_vendor_performance')) {
@@ -2381,6 +2477,17 @@ function ops_idems_documents($route, $method) {
                 $id = (int)$pdo->lastInsertId();
                 idems_log('report_doc', $id, 'CREATE', ['irn'=>$irn]);
                 idems_log('report_doc', $id, 'IRN_GEN', ['irn'=>$irn, 'new'=>$irn]);
+                // For a Vendor Assessment / Audit raised against a vendor, prefill
+                // the "Customer complaints & resolution" table from the complaint
+                // register, so complaints & their resolutions are part of the report.
+                try {
+                    $vpid = (int)($fields['vendor_id'] ?? 0);
+                    $tcode = (string)ops_val("SELECT code FROM report_types WHERE id=?", [(int)($fields['report_type_id'] ?? 0)]);
+                    if ($vpid && in_array($tcode, ['VASR','VAR'], true) && function_exists('idems_vendor_prefill_complaints')) {
+                        $cf = null; foreach (idems_fields((int)$fields['report_type_id']) as $ff) if (($ff['fkey'] ?? '') === 'complaints_review') { $cf = $ff; break; }
+                        if ($cf) { $pre = idems_vendor_prefill_complaints($vpid, $cf); if ($pre) $pdo->prepare("UPDATE report_docs SET data=? WHERE id=?")->execute([json_encode(['complaints_review' => $pre]), $id]); }
+                    }
+                } catch (Throwable $e) {}
                 flash('Report created — IRN ' . $irn . '.');
                 redirect('/document?id=' . $id);
             }
@@ -4279,9 +4386,13 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                 // sensible minimum), so wide tables read far better than equal columns.
                 $statusLabels = ['disposition','status','result','conformity','conclusion','acceptance'];
                 $weights=[];
+                // A tick column (evidence attached?) is rendered as a checkbox, so it
+                // needs only a narrow slot.
+                $isTickCol = function($lbl) { $l=strtolower(trim((string)$lbl)); return strpos($l,'attach')!==false || $l==='evidence?' || $l==='attached'; };
                 foreach ($defs as $ck=>$d) {
                     $l=strtolower(trim((string)$d['label'])); $t=$d['type'];
-                    if (in_array($l,$statusLabels,true)) $weights[$ck]=1.55;   // room for the status badge
+                    if ($isTickCol($d['label'])) $weights[$ck]=0.7;             // narrow — just a checkbox
+                    elseif (in_array($l,$statusLabels,true)) $weights[$ck]=1.55;   // room for the status badge
                     elseif (preg_match('/desc|observ|remark|activit|scope|detail|particular|nature/', $l)) $weights[$ck]=2.2;
                     elseif (in_array($t,['number','date'],true)) $weights[$ck]=0.85;
                     elseif ($t==='select') $weights[$ck]=1.05;
@@ -4298,6 +4409,20 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                     [$bg,$fg]=idems_status_palette($text); $up=strtoupper($text); $size=6.5; $tw=$p->strWidth($up,$size,true);
                     $padX=4; $w=$tw+2*$padX; $h=$size+5; $p->rectFill($x,$y,$w,$h,$bg); $p->y=$y+2.5; $p->text($x+$padX,$up,$size,true,$fg);
                 };
+                // A checkbox with a green tick (attached), an empty box (not attached)
+                // or a dash (N/A) — for an "Evidence attached?" style column. Drawn as
+                // vectors so it prints reliably (the report font has no tick glyph).
+                $cellTick = function($x,$y,$val) use ($p) {
+                    $v=strtolower(trim((string)$val));
+                    $bs=7.5; $bx=$x+1; $by=$y+1.5;
+                    if (in_array($v,['n/a','na','-','',' '],true)) { $p->y=$by; $p->text($bx,'—',8,false,[150,150,150]); return; }
+                    $on = in_array($v,['yes','y','1','true','attached','ok','tick','done'],true);
+                    $box=[120,120,120];
+                    $p->lineAt($bx,$by,$bx+$bs,$by,$box,0.6); $p->lineAt($bx,$by+$bs,$bx+$bs,$by+$bs,$box,0.6);
+                    $p->lineAt($bx,$by,$bx,$by+$bs,$box,0.6); $p->lineAt($bx+$bs,$by,$bx+$bs,$by+$bs,$box,0.6);
+                    if ($on) { $g=[21,128,61]; $p->lineAt($bx+1.4,$by+3.8,$bx+3,$by+5.6,$g,1.3); $p->lineAt($bx+3,$by+5.6,$bx+6.1,$by+1.7,$g,1.3); }
+                    else { $rr=[200,60,60]; $p->lineAt($bx+1.6,$by+1.6,$bx+5.9,$by+5.9,$rr,1.1); $p->lineAt($bx+5.9,$by+1.6,$bx+1.6,$by+5.9,$rr,1.1); }
+                };
                 // Header cells are WRAPPED and sit at each column's own x/width. §layout
                 $drawHead = function() use ($p,$ml,$cols,$wpx,$xpos) {
                     $wrapped=[]; $maxL=1;
@@ -4311,11 +4436,12 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                 $drawHead();
                 foreach ($v as $r){
                     $r=(array)$r;
-                    $cells=[]; $badges=[]; $lines=1;
+                    $cells=[]; $badges=[]; $ticks=[]; $lines=1;
                     foreach ($defs as $ck=>$d){
                         $cellTxt=(string)($r[$ck]??'');
                         if (isset($mergeCols[$ck]) && $cellTxt!=='' && ($prevVal[$ck]??null)===$cellTxt) $cellTxt='';
                         elseif (isset($mergeCols[$ck])) $prevVal[$ck]=(string)($r[$ck]??'');
+                        if ($isTickCol($d['label'])) { $ticks[$ck]=$cellTxt; $cells[$ck]=['']; continue; }
                         if ($isStatusCol($d['label']) && trim($cellTxt)!=='') { $badges[$ck]=$cellTxt; $cells[$ck]=['']; continue; }
                         $w=$p->wrap($cellTxt,$cellFont,$wpx[$ck]-4); if(count($w)>4)$w=array_slice($w,0,4); if(!$w)$w=['']; $cells[$ck]=$w; $lines=max($lines,count($w)); }
                     $rowH=$lines*10+2;
@@ -4323,6 +4449,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                     $ry=$p->y;
                     foreach ($cells as $ck=>$w){ for($j=0;$j<count($w);$j++){ $p->y=$ry+$j*10; $p->text($xpos[$ck]+3,$w[$j],$cellFont); } }
                     foreach ($badges as $ck=>$txt){ $cellBadge($xpos[$ck]+2,$ry-1,$txt); }
+                    foreach ($ticks as $ck=>$tv){ $cellTick($xpos[$ck]+2,$ry-1,$tv); }
                     $p->y=$ry+$rowH; $p->lineAt($ml,$p->y,$right,$p->y,[235,235,235]);
                 }
                 $p->gap(3); continue;
