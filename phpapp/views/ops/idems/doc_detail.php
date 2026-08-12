@@ -87,6 +87,35 @@
   </div>
 </div>
 
+<?php // ---- Scorecard — only for scored report types (vendor assessment, audit) ---- ?>
+<?php if (!empty($scorecard) && $scorecard['overall'] !== null):
+  $ov = (float)$scorecard['overall'];
+  $bandCol = function($s){ $s=(float)$s; if($s>=90) return '#15803d'; if($s>=75) return '#2563eb'; if($s>=60) return '#b45309'; if($s>=40) return '#c2410c'; return 'var(--bad)'; };
+  $oc = $bandCol($ov);
+?>
+<div class="panel" style="margin:0 0 12px;border:1px solid <?= $oc ?>;background:color-mix(in srgb,<?= $oc ?> 5%,transparent)">
+  <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;align-items:center;min-width:96px">
+      <div style="font-size:34px;font-weight:800;line-height:1;color:<?= $oc ?>;font-variant-numeric:tabular-nums"><?= rtrim(rtrim(number_format($ov,1),'0'),'.') ?><span style="font-size:15px;font-weight:600;color:var(--muted)">/100</span></div>
+      <div style="font-size:12px;font-weight:700;letter-spacing:.03em;color:<?= $oc ?>;margin-top:3px"><?= e(strtoupper($scorecard['band'])) ?></div>
+    </div>
+    <div style="flex:1;min-width:240px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:13.5px">Assessment scorecard</b><span class="muted" style="font-size:11.5px"><?= (int)$scorecard['answered'] ?>/<?= (int)$scorecard['total'] ?> criteria scored</span></div>
+      <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+        <?php foreach ($scorecard['sections'] as $s): if ($s['score']===null) continue; $c=$bandCol($s['score']); ?>
+          <div style="display:flex;align-items:center;gap:9px;font-size:12px">
+            <span style="flex:0 0 200px;color:var(--ink)"><?= e($s['title']) ?></span>
+            <span style="flex:1;height:8px;background:color-mix(in srgb,var(--line) 60%,transparent);border-radius:5px;overflow:hidden"><span style="display:block;height:100%;width:<?= max(2,(int)round($s['score'])) ?>%;background:<?= $c ?>"></span></span>
+            <span style="flex:0 0 42px;text-align:right;font-variant-numeric:tabular-nums;color:<?= $c ?>;font-weight:600"><?= rtrim(rtrim(number_format($s['score'],1),'0'),'.') ?></span>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  </div>
+  <p class="muted" style="font-size:11px;margin:10px 0 0">Weighted score computed from the rated criteria. Unrated or "not applicable" criteria are excluded. It informs — it does not replace — the assessor's recommendation.</p>
+</div>
+<?php endif; ?>
+
 <?php // ---- AI Report Auditor — automatic deterministic QA (traffic light) ---- ?>
 <?php if (!empty($qa)):
   $st = $qa['status']; $sc = (int)$qa['score']; $cn = $qa['counts'];

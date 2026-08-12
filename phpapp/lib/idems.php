@@ -154,6 +154,17 @@ function idems_migrate() {
         cond_field VARCHAR(60) DEFAULT '', cond_op VARCHAR(10) DEFAULT '', cond_val VARCHAR(200) DEFAULT '',
         calc_expr VARCHAR(400) DEFAULT '', placeholder VARCHAR(200) DEFAULT '', help VARCHAR(400) DEFAULT '',
         col_span INT DEFAULT 1, table_cols TEXT, sort_order INT DEFAULT 0)");
+    // ---- Scoring layer (vendor assessments, audits, scored checklists) ----
+    // A field can carry a weight (its share of its section's score) and either a
+    // max_score (for number/rating inputs, normalised 0-100 against this ceiling)
+    // or a score_map (JSON {option: points 0-100} for select/radio/yesno). Fields
+    // with weight 0 are informational and never contribute to a score — so plain
+    // report types are completely unaffected. Added by upgrade; old rows read 0.
+    if (function_exists('ensure_column')) {
+        ensure_column('report_fields', 'weight',    "REAL DEFAULT 0");
+        ensure_column('report_fields', 'max_score', "REAL DEFAULT 0");
+        ensure_column('report_fields', 'score_map', "TEXT");
+    }
     // §R1-D — Quality Assurance Plans filed against a job/call. One PO can carry
     // several QAPs (one per line item), so this is many-per-job. Stored as-is
     // (usually a PDF) — NEVER parsed. The inspector sees them while writing the
@@ -376,6 +387,12 @@ function idems_migrate() {
     if (function_exists('setting_get') && !setting_get('rn_form_seeded_v1', '')) {
         try { idems_build_release_note(); } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('rn_form_seeded_v1', '1');
+    }
+    // ONE-TIME: give the "VASR — Vendor Assessment Report" type its scored form,
+    // proving the weighted-scoring engine end to end.
+    if (function_exists('setting_get') && !setting_get('vasr_form_seeded_v1', '')) {
+        try { idems_build_vendor_assessment(); } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('vasr_form_seeded_v1', '1');
     }
 }
 // ITP inspection type for a scope activity — how the point is covered.
@@ -696,6 +713,124 @@ function idems_build_release_note() {
     if (!$has) idems_install_release_note_sections($typeId);
     return $typeId;
 }
+
+// Resolve (creating/seeding once) the scored "VASR — Vendor Assessment Report"
+// report type. It is an ordinary form-driven report that additionally carries
+// weighted, scored category sections, so it renders through the same engine and
+// produces a scorecard. Industry-neutral: the categories fit any supplier.
+function idems_build_vendor_assessment() {
+    $pdo = db();
+    $t = ops_one("SELECT id FROM report_types WHERE code='VASR'");
+    if ($t) { $typeId = (int)$t['id']; }
+    else {
+        $sort = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_types");
+        $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_at) VALUES (?,?, 'TPIA_REPORT',1,0,?,?)")
+            ->execute(['VASR', 'Vendor Assessment Report', $sort, date('c')]);
+        $typeId = (int)$pdo->lastInsertId();
+    }
+    $has = (int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=?", [$typeId]);
+    if (!$has) idems_install_vendor_assessment_sections($typeId);
+    return $typeId;
+}
+
+// Seed the Vendor Assessment form. Category sections carry weighted, scored
+// fields on a shared 4-point rating scale; "Not applicable" is a valid answer
+// that is simply excluded from the score (not counted as zero).
+function idems_install_vendor_assessment_sections($typeId) {
+    $pdo = db();
+    $so = 0; $fo = 0;
+    $addSection = function($title, $help = '', $pgb = 0, $keep = 0) use ($pdo, $typeId, &$so) {
+        $so += 10;
+        $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,page_break_before,keep_together,sort_order) VALUES (?,?,?,?,?,?)")
+            ->execute([$typeId, $title, $help, $pgb, $keep, $so]);
+        return (int)$pdo->lastInsertId();
+    };
+    // Plain (unscored) field.
+    $addField = function($secId, $fkey, $label, $ftype, $opts = '', $span = 1, $help = '') use ($pdo, $typeId, &$fo) {
+        $fo += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,help,sort_order,col_span) VALUES (?,?,?,?,?,?,?,?,?)")
+            ->execute([$typeId, $secId, $fkey, $label, $ftype, $opts, $help, $fo, $span]);
+    };
+    // Table field — columns go in table_cols, not options.
+    $addTable = function($secId, $fkey, $label, $cols, $span = 2) use ($pdo, $typeId, &$fo) {
+        $fo += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,sort_order,col_span) VALUES (?,?,?,?, 'table',?,?,?)")
+            ->execute([$typeId, $secId, $fkey, $label, $cols, $fo, $span]);
+    };
+    // Shared 4-point rating scale + its score map. "Not applicable" is offered
+    // but deliberately absent from the map, so it scores null (excluded).
+    $scale = "Excellent\nGood\nFair\nPoor\nNot applicable";
+    $map = json_encode(['Excellent' => 100, 'Good' => 75, 'Fair' => 50, 'Poor' => 25]);
+    // Scored rating field (weighted).
+    $addScored = function($secId, $fkey, $label, $weight, $help = '') use ($pdo, $typeId, &$fo, $scale, $map) {
+        $fo += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,score_map,weight,help,sort_order,col_span) VALUES (?,?,?,?, 'select',?,?,?,?,?,1)")
+            ->execute([$typeId, $secId, $fkey, $label, $scale, $map, $weight, $help, $fo]);
+    };
+
+    // Section I — vendor identification (informational; not scored).
+    $s = $addSection('Vendor identification', 'Who is being assessed, where and why.', 0, 1);
+    $addField($s, 'vendor', 'Vendor / supplier name', 'text');
+    $addField($s, 'vendor_code', 'Vendor code', 'text');
+    $addField($s, 'location', 'Location / address', 'text', '', 2);
+    $addField($s, 'category', 'Supply category / commodity', 'text');
+    $addField($s, 'contact', 'Contact person', 'text');
+    $addField($s, 'assessment_type', 'Assessment type', 'select', "New qualification\nRe-qualification\nPeriodic\nFor cause\nDesk review");
+    $addField($s, 'assessment_date', 'Assessment date', 'date');
+    $addField($s, 'assessor', 'Assessed by', 'text');
+
+    // Scored categories. Weights are the category's share of the overall score.
+    $s = $addSection('Quality management system', 'Documented system, certification, control of records and processes.');
+    $addScored($s, 'q_qms_cert', 'Certified / documented QMS in place', 3, 'ISO 9001 or equivalent, current and appropriate to scope.');
+    $addScored($s, 'q_qms_control', 'Document & record control', 2);
+    $addScored($s, 'q_qms_ncr', 'Nonconformity & corrective-action handling', 2);
+    $addScored($s, 'q_qms_calib', 'Calibration & measurement control', 2);
+
+    $s = $addSection('Manufacturing / operational capability', 'Plant, equipment, capacity and process control.');
+    $addScored($s, 'q_cap_equip', 'Adequacy of plant & equipment', 3);
+    $addScored($s, 'q_cap_capacity', 'Capacity vs anticipated demand', 2);
+    $addScored($s, 'q_cap_process', 'Process control & work instructions', 2);
+    $addScored($s, 'q_cap_maint', 'Maintenance & housekeeping', 1);
+
+    $s = $addSection('Technical competence & resources', 'People, skills and engineering capability.');
+    $addScored($s, 'q_tech_people', 'Competence of key personnel', 3);
+    $addScored($s, 'q_tech_eng', 'Engineering / design capability', 2);
+    $addScored($s, 'q_tech_test', 'In-house testing / inspection ability', 2);
+
+    $s = $addSection('Delivery & commercial performance', 'Track record on time, quantity and responsiveness.');
+    $addScored($s, 'q_del_ontime', 'On-time delivery track record', 3);
+    $addScored($s, 'q_del_quality', 'Delivered quality / rejection history', 3);
+    $addScored($s, 'q_del_response', 'Responsiveness & communication', 1);
+
+    $s = $addSection('HSE & compliance', 'Safety, environment, and legal / statutory compliance.');
+    $addScored($s, 'q_hse_safety', 'Occupational health & safety', 2);
+    $addScored($s, 'q_hse_env', 'Environmental controls', 1);
+    $addScored($s, 'q_hse_legal', 'Statutory & regulatory compliance', 2);
+
+    $s = $addSection('Financial & business stability', 'Ability to sustain supply.');
+    $addScored($s, 'q_fin_stability', 'Financial stability', 2);
+    $addScored($s, 'q_fin_continuity', 'Business continuity / single-source risk', 1);
+
+    // Findings & outcome (informational; the scorecard drives the recommendation).
+    $s = $addSection('Findings', 'Observations, strengths, gaps and any nonconformities raised.', 0, 1);
+    $addField($s, 'strengths', 'Strengths', 'textarea', '', 2);
+    $addField($s, 'gaps', 'Gaps / concerns', 'textarea', '', 2);
+    $addTable($s, 'findings', 'Findings / observations',
+        "Sr. No.|merge\nArea\nObservation\nSeverity|select|lookup:severity\nAction required\nTarget date|date");
+
+    $s = $addSection('Recommendation', 'The overall recommendation, informed by the score.', 0, 1);
+    $addField($s, 'recommendation', 'Recommendation', 'select',
+        "Approved\nApproved with conditions\nConditional — re-assess after actions\nNot approved", 2);
+    $addField($s, 'valid_until', 'Approval valid until', 'date');
+    $addField($s, 'reassess_on', 'Next re-assessment due', 'date');
+    $addField($s, 'conclusion', 'Conclusion / remarks', 'textarea', '', 2);
+
+    // Sign-off, matching the other reports.
+    $s = $addSection('Sign-off', 'Prepared / Reviewed / Approved — name, designation and date auto-fill from the workflow.', 0, 1);
+    $addField($s, 'signoff', 'For ' . app_name(), 'sigblock', "Assessed by\nReviewed by\nApproved by", 2);
+
+    return $typeId;
+}
 // Keep only the RELEASED line items for a Release Note — rows that have a
 // passed / cleared / released / accepted quantity greater than zero. Rows that
 // were fully rejected or held are dropped. If no such column can be identified,
@@ -711,6 +846,107 @@ function idems_released_line_items($rows) {
         return $v !== '' && (float)$v > 0;
     }));
     return $out ?: $rows;
+}
+// ===========================================================================
+//  Scoring engine — weighted per-field scores rolled up by section & overall
+//  Any report type can carry scores: give a field a weight (>0) and a scale.
+//  Fields with weight 0 never contribute, so ordinary reports are untouched.
+//  Used by Vendor Assessment / Audit / scored-checklist report types.
+// ===========================================================================
+
+// Normalise one field's answer to 0-100 on its own scale, or null when the
+// field is unanswered / not a scored input. Scales, in priority order:
+//   score_map  JSON {answer: points} — points 0-100 (best for select/radio/yesno)
+//   max_score  a numeric ceiling — the raw number is scaled value/max*100
+//   ftype defaults — yesno/checkbox => 100 for yes/checked else 0; rating (1-5) => /5
+function idems_field_score($f, $v) {
+    $ft = $f['ftype'] ?? 'text';
+    // A score_map maps the stored answer to points, case-insensitively.
+    $mapRaw = trim((string)($f['score_map'] ?? ''));
+    if ($mapRaw !== '') {
+        $map = json_decode($mapRaw, true);
+        if (is_array($map)) {
+            $sv = is_array($v) ? implode(',', $v) : (string)$v;
+            if (trim($sv) === '') return null;
+            $lc = strtolower(trim($sv));
+            foreach ($map as $key => $pts) {
+                if (strtolower(trim((string)$key)) === $lc) { $p = (float)$pts; return max(0.0, min(100.0, $p)); }
+            }
+            return null; // answered but not a recognised option — don't guess
+        }
+    }
+    $max = (float)($f['max_score'] ?? 0);
+    if ($max > 0) {
+        if (is_array($v) || trim((string)$v) === '') return null;
+        $n = preg_replace('/[^0-9.\-]/', '', (string)$v);
+        if ($n === '' || $n === '-') return null;
+        return max(0.0, min(100.0, ((float)$n / $max) * 100));
+    }
+    if ($ft === 'yesno' || $ft === 'checkbox') {
+        $sv = strtolower(trim(is_array($v) ? implode(',', $v) : (string)$v));
+        if ($sv === '') return null;
+        return in_array($sv, ['yes','y','1','true','ok','pass','conform','on','checked'], true) ? 100.0 : 0.0;
+    }
+    if ($ft === 'rating') {
+        if (trim((string)$v) === '') return null;
+        $n = (float)preg_replace('/[^0-9.\-]/', '', (string)$v);
+        return $n <= 0 ? null : max(0.0, min(100.0, ($n / 5.0) * 100));
+    }
+    return null; // not a scored field
+}
+
+// Roll every weighted field up into per-section scores and one overall score.
+// Returns null when the report carries no weighted fields at all (so callers
+// can simply skip the scorecard for ordinary report types). Otherwise:
+//   ['overall'=>0-100, 'answered'=>n, 'total'=>n, 'band'=>label,
+//    'sections'=>[ ['id','title','score','weight','answered','total','fields'=>[...] ] ] ]
+// A section's score is the weighted average of its answered fields; the overall
+// score is the section scores weighted by each section's summed field weight.
+function idems_score_doc($sections, $fields, $data) {
+    $byId = []; $anyWeight = false;
+    foreach ($fields as $f) {
+        if ((float)($f['weight'] ?? 0) > 0) $anyWeight = true;
+        $sid = (int)($f['section_id'] ?? 0);
+        $byId[$sid][] = $f;
+    }
+    if (!$anyWeight) return null;
+    $secOut = []; $ovNum = 0.0; $ovDen = 0.0; $ansTot = 0; $fldTot = 0;
+    // Preserve section order; include an "id 0" bucket for section-less fields.
+    $order = [];
+    foreach ($sections as $s) $order[] = ['id' => (int)$s['id'], 'title' => (string)($s['title'] ?? '')];
+    if (isset($byId[0])) $order[] = ['id' => 0, 'title' => 'Other'];
+    foreach ($order as $so) {
+        $sid = $so['id']; $fs = $byId[$sid] ?? []; if (!$fs) continue;
+        $num = 0.0; $den = 0.0; $ans = 0; $cnt = 0; $frows = [];
+        foreach ($fs as $f) {
+            $w = (float)($f['weight'] ?? 0); if ($w <= 0) continue;
+            $cnt++; $fldTot++;
+            $sc = idems_field_score($f, $data[$f['fkey'] ?? ''] ?? null);
+            if ($sc === null) { $frows[] = ['label' => $f['label'] ?? $f['fkey'], 'weight' => $w, 'score' => null]; continue; }
+            $ans++; $ansTot++; $num += $sc * $w; $den += $w;
+            $frows[] = ['label' => $f['label'] ?? $f['fkey'], 'weight' => $w, 'score' => round($sc, 1)];
+        }
+        if ($cnt === 0) continue;
+        $secScore = $den > 0 ? $num / $den : null;
+        $secWeight = 0.0; foreach ($fs as $f) $secWeight += (float)($f['weight'] ?? 0);
+        if ($secScore !== null) { $ovNum += $secScore * $secWeight; $ovDen += $secWeight; }
+        $secOut[] = ['id' => $sid, 'title' => $so['title'] ?: 'Section', 'score' => $secScore === null ? null : round($secScore, 1),
+                     'weight' => $secWeight, 'answered' => $ans, 'total' => $cnt, 'fields' => $frows];
+    }
+    $overall = $ovDen > 0 ? round($ovNum / $ovDen, 1) : null;
+    return ['overall' => $overall, 'answered' => $ansTot, 'total' => $fldTot,
+            'band' => $overall === null ? '' : idems_score_band($overall), 'sections' => $secOut];
+}
+
+// A plain-English band for a 0-100 score. Kept simple and stable so a buyer can
+// relabel via a setting later without touching the maths.
+function idems_score_band($score) {
+    $score = (float)$score;
+    if ($score >= 90) return 'Excellent';
+    if ($score >= 75) return 'Approved';
+    if ($score >= 60) return 'Conditional';
+    if ($score >= 40) return 'Marginal';
+    return 'Not approved';
 }
 // ===========================================================================
 //  AI Report Auditor — deterministic QA pass (Phase 1)
@@ -889,6 +1125,27 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
                 }
             }
         } catch (Throwable $e) {}
+    }
+
+    // 10) Scorecard vs recommendation — only for scored report types. If the
+    // assessment recommends approval but the computed score is poor (or rejects a
+    // strong vendor), that contradiction is surfaced for review (deterministic).
+    if (function_exists('idems_score_doc')) {
+        $sc = null; try { $secs = function_exists('idems_sections') ? idems_sections((int)($doc['report_type_id'] ?? 0)) : []; $sc = idems_score_doc($secs, $fields, $data); } catch (Throwable $e) {}
+        if ($sc && $sc['overall'] !== null) {
+            $ov = (float)$sc['overall'];
+            $recRaw = ''; foreach ($fields as $f) { if (($f['fkey'] ?? '') === 'recommendation') { $recRaw = strtolower(trim((string)($data[$f['fkey']] ?? ''))); break; } }
+            $approves = $recRaw !== '' && strpos($recRaw, 'not approved') === false && (strpos($recRaw, 'approv') !== false);
+            $rejects  = $recRaw !== '' && strpos($recRaw, 'not approved') !== false;
+            if ($approves && $ov < 50)
+                $add('high', 'scorecard', 'Recommendation approves the vendor despite a low score', 'Recommendation',
+                     'The assessment score is ' . rtrim(rtrim(number_format($ov,1),'0'),'.') . '/100 (' . $sc['band'] . '), but the recommendation is "' . $recRaw . '".',
+                     'Recommendation', 'Reconcile the recommendation with the score, or record the justification.');
+            if ($rejects && $ov >= 75)
+                $add('medium', 'scorecard', 'Recommendation rejects a vendor with a strong score', 'Recommendation',
+                     'The assessment score is ' . rtrim(rtrim(number_format($ov,1),'0'),'.') . '/100 (' . $sc['band'] . '), but the vendor is not approved.',
+                     'Recommendation', 'Confirm the reason for not approving despite the score.');
+        }
     }
 
     $counts = ['critical'=>0,'high'=>0,'medium'=>0,'low'=>0,'info'=>0];
@@ -1551,6 +1808,9 @@ function ops_idems_documents($route, $method) {
         // AI Report Auditor — a deterministic QA pass, run automatically so the
         // reviewer sees a traffic light and plain-English issues without any action.
         $qa = function_exists('idems_qa_run') ? idems_qa_run($doc, $fields, $data, []) : null;
+        // Scorecard — non-null only for report types that carry weighted fields
+        // (vendor assessments, audits, scored checklists); ordinary reports skip it.
+        $scorecard = function_exists('idems_score_doc') ? idems_score_doc($sections, $fields, $data) : null;
         // Optional AI advisory (LLM) suggestions — shown only when a provider is
         // configured and the reviewer has run one; cached in the session so it does
         // not re-call the model on every page view.
@@ -1558,7 +1818,7 @@ function ops_idems_documents($route, $method) {
         $aiSections = ($aiText && function_exists('idems_ai_sections')) ? idems_ai_sections($aiText) : [];
         $aiOn = function_exists('ai_enabled') && ai_enabled();
         view('ops/idems/doc_detail', ['doc'=>$doc, 'approver'=>$approver, 'audit'=>$audit, 'qa'=>$qa,
-            'aiSections'=>$aiSections, 'aiOn'=>$aiOn,
+            'scorecard'=>$scorecard, 'aiSections'=>$aiSections, 'aiOn'=>$aiOn,
             'sections'=>$sections, 'fields'=>$fields, 'data'=>$data, 'files'=>idems_doc_files($doc['id']), 'hasSchema'=>!empty($fields),
             'approvals'=>$approvals, 'curStep'=>$curStep, 'canAct'=>idems_can_act_step($curStep),
             'vetting'=>idems_vetting_log($doc['id']), 'canVet'=>idems_can_vet(),
@@ -3190,6 +3450,37 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         trim((string)($doc['issue_date'] ?? '')) !== '' ? 'Issue date: ' . $fmtDate($doc['issue_date']) : '',
     ]);
     if ($metaBits) { $p->needSpace(13); $p->text($ml, implode('      ·      ', $metaBits), 8.5, false, [90,90,90]); $p->y += 14; }
+
+    // §scorecard — for scored report types (vendor assessment, audit, scored
+    // checklist) print a compact weighted scorecard: overall score + band and a
+    // bar per category. Non-scored report types return null here and skip it.
+    $scard = function_exists('idems_score_doc') ? idems_score_doc($sections, $fields, $data) : null;
+    if ($scard && $scard['overall'] !== null) {
+        $scoreCol = function($s) { $s=(float)$s; if($s>=90) return [21,128,61]; if($s>=75) return [37,99,235]; if($s>=60) return [180,83,9]; if($s>=40) return [194,65,12]; return [200,60,60]; };
+        $bars = array_values(array_filter($scard['sections'], fn($x)=>$x['score']!==null));
+        $need = 34 + count($bars)*12 + 12; $p->needSpace($need);
+        $oc = $scoreCol($scard['overall']); $cardY = $p->y; $cardX = $ml;
+        $p->rectFill($cardX, $cardY, $p->contentW(), $need-6, [248,249,251]);
+        $p->rectFill($cardX, $cardY, 3, $need-6, $oc);
+        $tx = $cardX + 12; $p->y = $cardY + 9;
+        $p->text($tx, 'ASSESSMENT SCORE', 8, true, [110,110,110]);
+        $ovTxt = rtrim(rtrim(number_format((float)$scard['overall'],1),'0'),'.');
+        $p->y = $cardY + 9; $p->text($tx + 120, $ovTxt.' / 100', 13, true, $oc);
+        $p->y = $cardY + 9; $p->text($ml, strtoupper((string)$scard['band']), 9, true, $oc, $right, 'R');
+        // Category bars.
+        $barX = $tx + 175; $barW = ($ml + $p->contentW() - 40) - $barX;
+        $by = $cardY + 28;
+        foreach ($bars as $b) {
+            $c = $scoreCol($b['score']);
+            $p->y = $by; $p->text($tx, $p->wrap((string)$b['title'], 8, 168)[0] ?? (string)$b['title'], 8, false, [70,70,70]);
+            $p->rectFill($barX, $by + 1, $barW, 5, [225,227,230]);
+            $frac = max(0.02, min(1, ((float)$b['score'])/100));
+            $p->rectFill($barX, $by + 1, $barW*$frac, 5, $c);
+            $p->y = $by; $p->text($ml, rtrim(rtrim(number_format((float)$b['score'],1),'0'),'.'), 8, true, $c, $right, 'R');
+            $by += 12;
+        }
+        $p->y = $cardY + $need - 6; $p->gap(6);
+    }
 
     // If the form does NOT itself carry the header fields (no "Inspection details"
     // section), show the client/vendor reference grid here — the outcome fields are

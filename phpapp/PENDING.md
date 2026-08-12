@@ -30,10 +30,33 @@ register + qualification/validity/requalification workflow; (7) vendor scorecard
 self-assessment + document upload.
 
 Phased build (per spec §56):
-- **P1 Assessment foundation** — add scoring to the form engine (weight/score +
-  category rollup); build the VASR assessment form; vendor attributes + seeded
-  lookups; bind assessment to a vendor; assessment-score → audit-recommendation
-  rule. (Keystone = scoring.)
+- **P1 Assessment foundation** — *scoring keystone DONE + VASR form DONE (Aug
+  2026)*; remaining: vendor attributes + seeded lookups; bind assessment to a
+  vendor.
+  - ✅ **Scoring in the form engine** — `report_fields` gained `weight`,
+    `max_score`, `score_map` (ensure_column, guarded). `idems_field_score()`
+    normalises any answer to 0–100 (score_map JSON / max_score ceiling / ftype
+    defaults for yesno·rating); `idems_score_doc()` rolls fields up to weighted
+    per-section + overall scores with a plain-English band
+    (`idems_score_band()`); returns null when a type carries no weighted fields,
+    so ordinary reports are completely untouched (regression-verified on IR).
+    20 unit tests + integration test pass.
+  - ✅ **VASR assessment form** — `idems_build_vendor_assessment()` +
+    `idems_install_vendor_assessment_sections()` seed the "VASR — Vendor
+    Assessment Report" type (guarded migration `vasr_form_seeded_v1`):
+    identification + 6 weighted category sections (QMS, capability, competence,
+    delivery, HSE, financial) on a shared 4-point scale ("Not applicable"
+    excluded from scoring) + findings table + scored recommendation + sign-off.
+    Renders through the shared PDF engine.
+  - ✅ **Scorecard display** — traffic-light scorecard on the report detail page
+    (overall gauge + per-category bars) AND printed in the PDF (weighted
+    scorecard block: overall score, band, colour-coded category bars).
+  - ✅ **Score → QA** — deterministic QA now flags recommendation-vs-score
+    contradictions (approves despite low score / rejects a strong vendor).
+  - ⬜ Remaining P1: vendor attributes on the partner (type, category, risk
+    class, approval status, rating, reassessment dates); seeded vendor-type /
+    product-category / risk-class lookups; assessment↔vendor linkage;
+    admin UI to set per-field weights/scales in the report builder.
 - **P2 Audit** — vendor-scoped VAR audit form; findings → NCR/CAPA (reuse);
   audit report.
 - **P3 Qualification** — approved-vendor register; approval status; validity /
