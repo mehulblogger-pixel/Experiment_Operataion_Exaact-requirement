@@ -87,6 +87,58 @@
   </div>
 </div>
 
+<?php // ---- AI Report Auditor — automatic deterministic QA (traffic light) ---- ?>
+<?php if (!empty($qa)):
+  $st = $qa['status']; $sc = (int)$qa['score']; $cn = $qa['counts'];
+  $tone  = $st==='BLOCKED' ? 'var(--bad)' : ($st==='REVIEW' ? '#b45309' : 'var(--ok)');
+  $light = $st==='BLOCKED' ? '🔴' : ($st==='REVIEW' ? '🟡' : '🟢');
+  $lab   = $st==='BLOCKED' ? 'Blocked' : ($st==='REVIEW' ? 'Review needed' : 'Ready');
+  $sevColor = ['critical'=>'var(--bad)','high'=>'#c2410c','medium'=>'#b45309','low'=>'#6b7280','info'=>'#2563eb'];
+  $sevLab   = ['critical'=>'CRITICAL','high'=>'HIGH','medium'=>'MEDIUM','low'=>'LOW','info'=>'INFO'];
+  $openByDefault = ($cn['critical']>0 || $cn['high']>0 || $cn['medium']>0);
+  $card = function($it) use ($sevColor,$sevLab) {
+    $sv = $it['severity']; $c = $sevColor[$sv] ?? '#6b7280';
+    echo '<div style="border-left:3px solid '.$c.';background:color-mix(in srgb,'.$c.' 6%,transparent);padding:8px 11px;border-radius:8px">';
+    echo '<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><span style="font-size:10px;font-weight:700;letter-spacing:.04em;color:'.$c.'">'.($sevLab[$sv]??'').'</span><b style="font-size:13.5px">'.e($it['title']).'</b></div>';
+    if (trim((string)$it['why'])!=='') echo '<div class="muted" style="font-size:12.5px;margin-top:3px">'.e($it['why']).'</div>';
+    if (trim((string)$it['location'])!=='') echo '<div class="muted" style="font-size:11.5px;margin-top:2px">Where: '.e($it['location']).'</div>';
+    if (trim((string)($it['suggestion']??''))!=='') echo '<div style="font-size:12px;margin-top:3px;color:var(--ink)">→ '.e($it['suggestion']).'</div>';
+    echo '</div>';
+  };
+  $major = array_values(array_filter($qa['issues'], fn($i)=>in_array($i['severity'],['critical','high','medium'],true)));
+  $minor = array_values(array_filter($qa['issues'], fn($i)=>in_array($i['severity'],['low','info'],true)));
+?>
+<details class="panel" style="margin:0 0 12px;border:1px solid <?= $tone ?>" <?= $openByDefault?'open':'' ?>>
+  <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font-size:18px"><?= $light ?></span>
+    <b style="color:<?= $tone ?>">Report QA — <?= $lab ?></b>
+    <span class="muted" style="font-size:12.5px">Score <?= $sc ?>/100 · runs automatically</span>
+    <span style="flex:1"></span>
+    <?php foreach (['critical','high','medium','low'] as $s): if (($cn[$s]??0)>0): ?>
+      <span class="pill" style="background:color-mix(in srgb,<?= $sevColor[$s] ?> 15%,transparent);color:<?= $sevColor[$s] ?>"><?= (int)$cn[$s] ?> <?= ucfirst($s) ?></span>
+    <?php endif; endforeach; ?>
+  </summary>
+  <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+    <?php if (!$qa['issues']): ?>
+      <p class="muted" style="margin:0">✓ No issues found — this report passed the automatic checks.</p>
+    <?php endif; ?>
+    <?php if ($st==='BLOCKED'): ?>
+      <p style="margin:0;font-size:12.5px;color:var(--bad)"><b>This report cannot be issued</b> until the critical issue(s) below are resolved or explained by an authorised user.</p>
+    <?php endif; ?>
+    <?php foreach ($major as $it) $card($it); ?>
+    <?php if ($minor): ?>
+      <details style="margin-top:2px"><summary style="cursor:pointer;font-size:12.5px" class="muted"><?= count($minor) ?> minor suggestion<?= count($minor)===1?'':'s' ?> (language &amp; style)</summary>
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px"><?php foreach ($minor as $it) $card($it); ?></div>
+      </details>
+    <?php endif; ?>
+    <?php if (idems_can_edit_doc($doc) && !empty($hasSchema)): ?>
+      <div style="margin-top:4px"><a class="btn small" href="/document-fill?id=<?= (int)$doc['id'] ?>">✍ Open report to fix</a> <a class="btn small secondary" href="/document-edit?id=<?= (int)$doc['id'] ?>">✎ Edit details</a></div>
+    <?php endif; ?>
+    <p class="muted" style="font-size:11px;margin:2px 0 0">Automatic quality check. It flags possible issues for your review — it never changes the report or its technical findings.</p>
+  </div>
+</details>
+<?php endif; ?>
+
 <?php // ---- Revision lineage ------------------------------------------------ ?>
 <?php if (!empty($doc['revises_id']) || !empty($doc['revised_by_id']) || (int)($doc['rev'] ?? 0) > 0): ?>
 <div class="panel" style="padding:10px 14px;margin:0 0 12px;font-size:13.5px">

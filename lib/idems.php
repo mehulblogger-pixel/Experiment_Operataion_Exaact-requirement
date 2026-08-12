@@ -1497,7 +1497,10 @@ function ops_idems_documents($route, $method) {
         $data = json_decode($doc['data'] ?: '[]', true); if (!is_array($data)) $data = [];
         $approvals = idems_report_approvals($doc['id']);
         $curStep = idems_current_step($doc['id']);
-        view('ops/idems/doc_detail', ['doc'=>$doc, 'approver'=>$approver, 'audit'=>$audit,
+        // AI Report Auditor — a deterministic QA pass, run automatically so the
+        // reviewer sees a traffic light and plain-English issues without any action.
+        $qa = function_exists('idems_qa_run') ? idems_qa_run($doc, $fields, $data, []) : null;
+        view('ops/idems/doc_detail', ['doc'=>$doc, 'approver'=>$approver, 'audit'=>$audit, 'qa'=>$qa,
             'sections'=>$sections, 'fields'=>$fields, 'data'=>$data, 'files'=>idems_doc_files($doc['id']), 'hasSchema'=>!empty($fields),
             'approvals'=>$approvals, 'curStep'=>$curStep, 'canAct'=>idems_can_act_step($curStep),
             'vetting'=>idems_vetting_log($doc['id']), 'canVet'=>idems_can_vet(),
