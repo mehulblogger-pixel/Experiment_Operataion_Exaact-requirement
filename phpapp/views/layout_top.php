@@ -210,6 +210,7 @@
         <?php if (can('mod.idems.edit') || is_master_of('idems')): ?><a class="s-item<?= $navOn(['document-new']) ?>" href="/document-new"><span class="s-ic">➕</span><span><?= e(ucfirst(T_NEW('report'))) ?></span></a><?php endif; ?>
         <a class="s-item<?= $navOn(['endorsements','endorsement','endorsement-new','endorsement-edit']) ?>" href="/endorsements"><span class="s-ic">✅</span><span><?= e(T_REG('endorsement')) ?></span></a>
         <a class="s-item<?= $navOn(['vendors','vendor-profile']) ?>" href="/vendors"><span class="s-ic">🏭</span><span>Vendor register</span></a>
+        <a class="s-item<?= $navOn(['expediting']) ?>" href="/expediting"><span class="s-ic">🚚</span><span>Expediting register</span></a>
         <a class="s-item<?= $navOn(['writing-assistant','phrase-library','phrase-edit']) ?>" href="/writing-assistant"><span class="s-ic">✒️</span><span>Technical writing</span></a>
         <a class="s-item<?= $navOn(['learning']) ?>" href="/learning"><span class="s-ic">🧠</span><span>Learning insights</span></a>
         <?php if (licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('users.manage.global'))): ?><a class="s-item<?= $navOn(['approver-map']) ?>" href="/approver-map"><span class="s-ic">👤</span><span>Approver mapping</span></a><?php endif; ?>

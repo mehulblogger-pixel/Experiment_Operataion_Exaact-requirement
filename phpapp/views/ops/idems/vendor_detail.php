@@ -139,6 +139,23 @@
 </div>
 <?php endif; // perf ?>
 
+<?php // ---- Expediting performance (commitment & forecast reliability) ---- ?>
+<?php if (!empty($xperf) && ($xperf['commitments']['total'] > 0 || $xperf['forecast']['compared'] > 0)):
+  $rel = $xperf['commitments']['reliability_pct']; $relCol = $rel===null?'var(--muted)':($rel>=85?'#15803d':($rel>=60?'#b45309':'var(--bad)'));
+  $opt = $xperf['forecast']['optimism_pct'];
+?>
+<div class="panel" style="margin-top:14px">
+  <div style="display:flex;justify-content:space-between;align-items:baseline"><h3 style="margin:0">Expediting performance</h3><span class="muted" style="font-size:11.5px">across <?= (int)$xperf['reports'] ?> expediting report(s)</span></div>
+  <div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+    <div><div class="muted" style="font-size:11px">Commitment reliability</div><div style="font-size:20px;font-weight:800;color:<?= $relCol ?>"><?= $rel===null?'—':e(rtrim(rtrim(number_format((float)$rel,1),'0'),'.')).'%' ?></div><div class="muted" style="font-size:11px"><?= (int)$xperf['commitments']['on_time'] ?> on time · <?= (int)$xperf['commitments']['late'] ?> late</div></div>
+    <div><div class="muted" style="font-size:11px">Commitments tracked</div><div style="font-size:20px;font-weight:800"><?= (int)$xperf['commitments']['total'] ?></div><div class="muted" style="font-size:11px"><?= (int)$xperf['commitments']['open'] ?> open · <?= (int)$xperf['commitments']['revised'] ?> revised</div></div>
+    <div><div class="muted" style="font-size:11px">Forecast optimism</div><div style="font-size:20px;font-weight:800;color:<?= ($opt!==null && $opt>=50)?'var(--bad)':'inherit' ?>"><?= $opt===null?'—':e(rtrim(rtrim(number_format((float)$opt,1),'0'),'.')).'%' ?></div><div class="muted" style="font-size:11px">of <?= (int)$xperf['forecast']['compared'] ?> forecasts ran late vs the expeditor</div></div>
+    <div><div class="muted" style="font-size:11px">Avg optimism</div><div style="font-size:20px;font-weight:800"><?= (float)$xperf['forecast']['avg_optimism_days']>0 ? e(rtrim(rtrim(number_format((float)$xperf['forecast']['avg_optimism_days'],1),'0'),'.')).' d' : '—' ?></div><div class="muted" style="font-size:11px">expeditor later than vendor</div></div>
+  </div>
+  <p class="muted" style="font-size:11px;margin:10px 0 0">Commitment reliability = commitments met on time ÷ commitments completed. Forecast optimism = how often the vendor's forecast ran ahead of the expeditor's evidence-based forecast. Computed from this vendor's expediting reports.</p>
+</div>
+<?php endif; ?>
+
 <?php // ---- Assessment history ---- ?>
 <div class="panel" style="margin-top:14px;padding:0;overflow:hidden">
   <div style="padding:10px 14px;border-bottom:1px solid var(--line)"><h3 style="margin:0">Assessment history</h3></div>

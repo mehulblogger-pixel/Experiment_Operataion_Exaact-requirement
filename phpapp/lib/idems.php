@@ -1875,6 +1875,48 @@ function idems_vendor_360($partnerId) {
                                WHERE partner_id=? ORDER BY id DESC LIMIT 6", [$partnerId]),
     ];
 }
+
+// ===========================================================================
+//  Vendor expediting performance — commitment reliability & forecast reliability
+//  computed across all Expediting Reports raised against a vendor. Feeds the
+//  Vendor-360, so schedule behaviour joins quality in the vendor picture.
+// ===========================================================================
+function idems_vendor_expediting_perf($partnerId) {
+    $partnerId = (int)$partnerId; if (!$partnerId) return null;
+    try { $docs = ops_all("SELECT id, data FROM report_docs WHERE vendor_id=? AND deleted=0 AND type_code='ER' ORDER BY id DESC LIMIT 60", [$partnerId]); }
+    catch (Throwable $e) { return null; }
+    if (!$docs) return null;
+    $pd = function($s) { $s = trim((string)$s); if ($s === '') return null; $t = strtotime($s); return $t ?: null; };
+    $cTotal=0;$cOnTime=0;$cLate=0;$cOpen=0;$cRevised=0;
+    $fBoth=0;$fOptim=0;$fSlipSum=0;
+    foreach ($docs as $d) {
+        $data = json_decode($d['data'] ?? '[]', true); if (!is_array($data)) continue;
+        // Commitment reliability — from each report's commitment register.
+        foreach ((array)($data['commitments'] ?? []) as $r) {
+            $rr = (array)$r; $vals = array_values($rr);
+            // columns: commitment, original due, revised due, forecast, actual, status, ...
+            $orig = $pd($vals[1] ?? ''); $revised = $pd($vals[2] ?? ''); $actual = $pd($vals[4] ?? '');
+            $status = strtolower(trim((string)($vals[5] ?? '')));
+            if ($orig === null && $actual === null && $status === '') continue;
+            $cTotal++;
+            if ($revised !== null && $orig !== null && $revised !== $orig) $cRevised++;
+            if ($actual !== null) { if ($orig !== null && $actual <= $orig) $cOnTime++; else $cLate++; }
+            elseif (strpos($status,'complete') !== false) $cOnTime++;    // completed, no date → count as met
+            else $cOpen++;
+        }
+        // Forecast reliability — vendor's latest forecast vs the expeditor's.
+        $vend = $pd($data['f_vendor_forecast'] ?? ''); $exp = $pd($data['f_expeditor'] ?? '');
+        if ($vend !== null && $exp !== null) { $fBoth++; $slip = (int)floor(($exp - $vend) / 86400); if ($slip > 0) { $fOptim++; $fSlipSum += $slip; } }
+    }
+    $done = $cOnTime + $cLate;
+    return [
+        'reports' => count($docs),
+        'commitments' => ['total'=>$cTotal, 'on_time'=>$cOnTime, 'late'=>$cLate, 'open'=>$cOpen, 'revised'=>$cRevised,
+                          'reliability_pct' => $done > 0 ? round($cOnTime / $done * 100, 1) : null],
+        'forecast' => ['compared'=>$fBoth, 'optimistic'=>$fOptim, 'optimism_pct' => $fBoth > 0 ? round($fOptim / $fBoth * 100, 1) : null,
+                       'avg_optimism_days' => $fOptim > 0 ? round($fSlipSum / $fOptim, 1) : 0],
+    ];
+}
 // ===========================================================================
 //  AI Report Auditor — deterministic QA pass (Phase 1)
 //  Runs the existing completeness + rule checks and adds a few high-value
@@ -2698,6 +2740,43 @@ function idems_completeness_check($doc) {
 // Vendor qualification register + per-vendor profile (view / edit attributes /
 // assessment history). The scored Vendor Assessment writes the score & status
 // here on issue; this is where a buyer sees their approved-vendor list.
+// Expediting register + management KPIs — the "Register" and "Dashboard" views of
+// the expediting engine (the formal "Report" is the PDF). One row per Expediting
+// Report, with its live progress, status and forecast computed deterministically.
+function ops_idems_expediting($route, $method) {
+    ops_require(is_master() || can('mod.idems.view') || can('mod.idems.edit'), 'You cannot view the expediting register.');
+    $q = trim($_GET['q'] ?? ''); $fs = $_GET['status'] ?? '';
+    [$w, $a] = scope_clause('d.office_id', 'd.sbu');
+    $where = "d.deleted=0 AND d.type_code='ER' AND $w"; $args = $a;
+    if ($q) { $where .= " AND (d.irn LIKE ? OR d.title LIKE ? OR d.project_name LIKE ?)"; array_push($args, "%$q%", "%$q%", "%$q%"); }
+    $docs = ops_all("SELECT d.*, bp.display_name vendor_disp, bp.legal_name vendor_name
+        FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.vendor_id
+        WHERE $where ORDER BY d.id DESC", $args);
+    $secs = idems_sections_by_code('ER'); $flds = idems_fields_by_code('ER');
+    $today = date('Y-m-d');
+    $rows = []; $k = ['total'=>0,'on_track'=>0,'at_risk'=>0,'delayed'=>0,'late_forecast'=>0];
+    foreach ($docs as $d) {
+        $data = json_decode($d['data'] ?: '[]', true); if (!is_array($data)) $data = [];
+        $es = idems_expediting_status($d, $flds, $data);
+        $sc = idems_score_doc($secs, $flds, $data);
+        $st = $es['status']; if ($fs && $st !== $fs) continue;
+        $k['total']++;
+        if ($st === 'ON TRACK' || $st === 'COMPLETED') $k['on_track']++;
+        elseif ($st === 'AT RISK') $k['at_risk']++;
+        else $k['delayed']++;
+        $ev = $es['forecast']['expeditor_variance_days'];
+        if ($ev !== null && $ev > 0) $k['late_forecast']++;
+        $rows[] = ['id'=>(int)$d['id'], 'irn'=>$d['irn'], 'vendor'=>($d['vendor_disp'] ?: $d['vendor_name'] ?: ($data['vendor'] ?? '')),
+                   'project'=>($d['project_name'] ?: ($data['project'] ?? '')), 'po'=>($data['po_number'] ?? $d['po_ref'] ?? ''),
+                   'progress'=>$sc['overall'] ?? null, 'status'=>$st,
+                   'required'=>$es['forecast']['required'], 'forecast'=>$es['forecast']['expeditor'], 'variance'=>$ev,
+                   'date'=>$d['issue_date'] ?: '', 'finalized'=>(int)$d['finalized']];
+    }
+    view('ops/idems/expediting_register', ['rows'=>$rows, 'q'=>$q, 'fs'=>$fs, 'counts'=>$k, 'today'=>$today,
+        'statusOpts'=>['ON TRACK'=>'On track','AT RISK'=>'At risk','DELAYED'=>'Delayed','CRITICAL'=>'Critical','COMPLETED'=>'Completed']]);
+    return true;
+}
+
 function ops_idems_vendors($route, $method) {
     $pdo = db();
     $canView = is_master() || can('mod.idems.view') || can('mod.idems.edit') || can('mod.partners.view');
@@ -2747,8 +2826,9 @@ function ops_idems_vendors($route, $method) {
         $events = function_exists('idems_vendor_status_events') ? idems_vendor_status_events($pid) : [];
         $perf = function_exists('idems_vendor_performance') ? idems_vendor_performance($pid) : null;
         $v360 = function_exists('idems_vendor_360') ? idems_vendor_360($pid) : ['reports'=>[],'ncrs'=>[],'complaints'=>[]];
+        $xperf = function_exists('idems_vendor_expediting_perf') ? idems_vendor_expediting_perf($pid) : null;
         view('ops/idems/vendor_detail', ['partner'=>$partner, 'profile'=>$profile, 'history'=>$history, 'events'=>$events,
-            'perf'=>$perf, 'v360'=>$v360, 'canEdit'=>$canEdit,
+            'perf'=>$perf, 'v360'=>$v360, 'xperf'=>$xperf, 'canEdit'=>$canEdit,
             'typeOpts'=>lk_options_or('vendor_type', []), 'catOpts'=>lk_options_or('vendor_product_category', []),
             'riskOpts'=>lk_options_or('vendor_risk_class', []), 'statusOpts'=>lk_options_or('vendor_approval_status', [])]);
         return true;
