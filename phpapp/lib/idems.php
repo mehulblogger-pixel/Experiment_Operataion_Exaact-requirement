@@ -840,6 +840,37 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
         }
     }
 
+    // 7) Evidence — an adverse finding with no photo / document attached.
+    $adverse = '/\b(defect|crack|dent|leak|corros|pitt?ing|damage|scratch|gouge|porosit|undercut|non[\s\-]?conform|not acceptable|rejected|deviation|out of tolerance|blow ?hole)\b/i';
+    $mention = null;
+    foreach ($fields as $f) {
+        if (!in_array($f['ftype'] ?? '', ['textarea','text'], true)) continue;
+        $v = (string)($data[$f['fkey']] ?? ''); if (trim($v) === '') continue;
+        if (preg_match($adverse, $v, $mm)) { $mention = ['where' => $f['label'] ?? '', 'term' => $mm[0]]; break; }
+    }
+    if ($mention) {
+        $files = function_exists('idems_doc_files') ? idems_doc_files((int)($doc['id'] ?? 0)) : [];
+        $hasImg = false; foreach ((array)$files as $fl) if (strpos((string)($fl['mime'] ?? ''), 'image/') === 0) { $hasImg = true; break; }
+        $denied = false; foreach ($data as $dk => $dv) if (substr((string)$dk, -14) === '__photo_denied' && (string)$dv === '1') { $denied = true; break; }
+        if (!$hasImg && !$denied)
+            $add('medium', 'evidence', 'A finding mentions a possible defect but no evidence is attached', $mention['where'],
+                 $mention['where'] . ' mentions “' . $mention['term'] . '”, but no photograph or supporting document is attached.', $mention['where'],
+                 'Attach a photograph or document for this finding, or mark photography as not permitted.');
+    }
+    // 8) Date sanity — issue before inspection, and out-of-range dates.
+    $pd = function($s) { $s = trim((string)$s); if ($s === '') return null; $t = strtotime($s); return $t ?: null; };
+    $insp = $pd($doc['inspection_date'] ?? ''); $iss = $pd($doc['issue_date'] ?? '');
+    if ($insp && $iss && $iss < $insp - 86400)
+        $add('medium', 'date', 'Issue date is before the inspection date', 'Dates', 'Issue date ' . date('d-M-Y', $iss) . ' is earlier than the inspection date ' . date('d-M-Y', $insp) . '.', 'Dates', 'Check the inspection and issue dates.');
+    $yNow = (int)date('Y');
+    foreach ($fields as $f) {
+        if (($f['ftype'] ?? '') !== 'date') continue;
+        $t = $pd($data[$f['fkey']] ?? ''); if (!$t) continue;
+        $y = (int)date('Y', $t);
+        if ($y < 2000 || $y > $yNow + 5)
+            $add('low', 'date', ($f['label'] ?? 'A date') . ' looks out of range', $f['label'] ?? '', 'The date ' . date('d-M-Y', $t) . ' is outside the expected range — please confirm.', $f['label'] ?? '', 'Check this date.');
+    }
+
     $counts = ['critical'=>0,'high'=>0,'medium'=>0,'low'=>0,'info'=>0];
     foreach ($issues as $it) { $s = $it['severity']; if (isset($counts[$s])) $counts[$s]++; }
     $score = 100 - ($counts['critical']*40 + $counts['high']*12 + $counts['medium']*5 + $counts['low']*1 + $counts['info']*0);
