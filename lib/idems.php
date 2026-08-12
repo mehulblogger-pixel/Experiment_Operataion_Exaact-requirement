@@ -424,8 +424,16 @@ function idems_migrate() {
             'CRITICAL'=>'Critical','HIGH'=>'High','MEDIUM'=>'Medium','LOW'=>'Low'], 'Vendor');
         lk_ensure_type_map('vendor_approval_status', 'Vendor approval status', [
             'PROSPECT'=>'Prospect','UNDER_ASSESSMENT'=>'Under assessment','APPROVED'=>'Approved',
-            'CONDITIONAL'=>'Approved with conditions','SUSPENDED'=>'Suspended','BLACKLISTED'=>'Blacklisted'], 'Vendor');
+            'CONDITIONAL'=>'Approved with conditions','EXPIRED'=>'Approval expired','SUSPENDED'=>'Suspended','BLACKLISTED'=>'Blacklisted'], 'Vendor');
+        // Ensure EXPIRED exists even where the type was seeded before it was added.
+        if (function_exists('lk_ensure_value')) lk_ensure_value('vendor_approval_status', 'EXPIRED', 'Approval expired');
     }
+    // Vendor status timeline — every qualification change (by assessment, audit,
+    // expiry or a manual edit) recorded with who, when, why and the score.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS vendor_status_events (
+        id $pk, partner_id INT, old_status VARCHAR(30) DEFAULT '', new_status VARCHAR(30) DEFAULT '',
+        source VARCHAR(20) DEFAULT 'MANUAL', report_doc_id INT NULL, score REAL NULL,
+        reason VARCHAR(500) DEFAULT '', actor VARCHAR(150) DEFAULT '', at VARCHAR(30) DEFAULT '')");
 }
 // ITP inspection type for a scope activity — how the point is covered.
 const INSPECTION_TYPES_ITP = [
@@ -1238,6 +1246,8 @@ function idems_vendor_apply_assessment($doc, $score = null) {
         $band    = is_array($score) ? (string)($score['band'] ?? '') : (($overall !== null) ? idems_score_band($overall) : '');
         $rec = (string)($data['recommendation'] ?? '');
         $status = idems_vendor_status_from($rec, $overall);
+        $prev = idems_vendor_profile($partnerId);
+        $oldStatus = $prev['approval_status'] ?? 'PROSPECT';
         idems_vendor_profile_ensure($partnerId);
         $today = date('Y-m-d');
         $months = idems_vendor_requal_months();
@@ -1251,8 +1261,76 @@ function idems_vendor_apply_assessment($doc, $score = null) {
                 $approvedOn, $approvedOn, $validUntil, $reassess, date('c'),
                 (string)(current_user()['username'] ?? ''), $partnerId,
             ]);
+        $src = ($doc['type_code'] ?? '') === 'VAR' ? 'AUDIT' : 'ASSESSMENT';
+        idems_vendor_log_status($partnerId, $oldStatus, $status, $src, [
+            'report_doc_id' => (int)($doc['id'] ?? 0) ?: null, 'score' => $overall,
+            'reason' => trim(($rec !== '' ? $rec : 'Assessment issued') . ($doc['irn'] ?? '' ? ' — ' . $doc['irn'] : '')),
+        ]);
         return $status;
     } catch (Throwable $e) { return ''; }
+}
+
+// Record a vendor status change on the timeline. Logs even when the status is
+// unchanged only if a reason is supplied (e.g. a manual note); assessments that
+// keep the same status still leave a dated trace.
+function idems_vendor_log_status($partnerId, $oldStatus, $newStatus, $source = 'MANUAL', $opts = []) {
+    $partnerId = (int)$partnerId; if (!$partnerId) return;
+    try {
+        db()->prepare("INSERT INTO vendor_status_events (partner_id, old_status, new_status, source, report_doc_id, score, reason, actor, at) VALUES (?,?,?,?,?,?,?,?,?)")
+            ->execute([$partnerId, (string)$oldStatus, (string)$newStatus, (string)$source,
+                isset($opts['report_doc_id']) ? (int)$opts['report_doc_id'] ?: null : null,
+                isset($opts['score']) && $opts['score'] !== null ? (float)$opts['score'] : null,
+                substr((string)($opts['reason'] ?? ''), 0, 500),
+                (string)(current_user()['username'] ?? 'system'), date('c')]);
+    } catch (Throwable $e) {}
+}
+// The vendor's status timeline (newest first).
+function idems_vendor_status_events($partnerId) {
+    return ops_all("SELECT * FROM vendor_status_events WHERE partner_id=? ORDER BY id DESC", [(int)$partnerId]);
+}
+// How many days before re-assessment is due to start reminding (setting).
+function idems_vendor_reminder_days() {
+    $d = function_exists('setting_get') ? (int)setting_get('vendor_reminder_days', '') : 0;
+    return $d > 0 ? $d : 30;
+}
+// Daily maintenance for vendor qualification:
+//   1. Expire — an APPROVED/CONDITIONAL vendor whose validity has passed is moved
+//      to EXPIRED (logged), so a lapsed approval never silently reads as current.
+//   2. Remind — a vendor whose re-assessment falls due within the reminder window
+//      gets a notification to the configured address (vendor_reminder_email).
+// Returns ['expired'=>n, 'reminded'=>m]. Safe to run daily from cron.
+function idems_vendor_run_reminders($today = null) {
+    $today = $today ?: date('Y-m-d');
+    $expired = 0; $reminded = 0;
+    try {
+        // 1) Expire lapsed approvals.
+        $lapsed = ops_all("SELECT * FROM vendor_profiles WHERE approval_status IN ('APPROVED','CONDITIONAL') AND valid_until <> '' AND valid_until < ?", [$today]);
+        foreach ($lapsed as $vp) {
+            db()->prepare("UPDATE vendor_profiles SET approval_status='EXPIRED', updated_at=?, updated_by='system' WHERE partner_id=?")
+                ->execute([date('c'), (int)$vp['partner_id']]);
+            idems_vendor_log_status((int)$vp['partner_id'], $vp['approval_status'], 'EXPIRED', 'EXPIRY', [
+                'reason' => 'Approval validity lapsed on ' . $vp['valid_until'] . ' — re-assessment required.']);
+            $expired++;
+        }
+        // 2) Remind on approaching re-assessment.
+        $to = function_exists('setting_get') ? trim((string)setting_get('vendor_reminder_email', '')) : '';
+        if ($to !== '' && function_exists('ops_mail')) {
+            $win = date('Y-m-d', strtotime($today . ' +' . idems_vendor_reminder_days() . ' days'));
+            $due = ops_all("SELECT vp.*, bp.display_name, bp.legal_name FROM vendor_profiles vp
+                JOIN business_partners bp ON bp.id=vp.partner_id
+                WHERE vp.approval_status IN ('APPROVED','CONDITIONAL') AND vp.reassess_on <> '' AND vp.reassess_on >= ? AND vp.reassess_on <= ?", [$today, $win]);
+            foreach ($due as $vp) {
+                $nm = $vp['display_name'] ?: $vp['legal_name'];
+                ops_mail($to, "Vendor re-assessment due: $nm ({$vp['reassess_on']})",
+                    "$nm is due for re-assessment on {$vp['reassess_on']}.\n\n"
+                    . "Current status: " . (lk_options_or('vendor_approval_status', [])[$vp['approval_status']] ?? $vp['approval_status'])
+                    . "\nLast score: " . ($vp['last_score'] !== null ? rtrim(rtrim(number_format((float)$vp['last_score'],1),'0'),'.') . '/100' : '—')
+                    . "\n\nRaise a Vendor Assessment to re-qualify this vendor.");
+                $reminded++;
+            }
+        }
+    } catch (Throwable $e) {}
+    return ['expired' => $expired, 'reminded' => $reminded];
 }
 // ===========================================================================
 //  AI Report Auditor — deterministic QA pass (Phase 1)
@@ -1974,12 +2052,20 @@ function ops_idems_vendors($route, $method) {
         ops_require($canEdit, 'You cannot edit vendor profiles.');
         $pid = (int)($_POST['partner_id'] ?? 0);
         if ($pid) {
+            $before = idems_vendor_profile($pid);
+            $oldStatus = $before['approval_status'] ?? 'PROSPECT';
+            $newStatus = $_POST['approval_status'] ?? $oldStatus;
             idems_vendor_profile_save($pid, [
                 'vendor_type' => $_POST['vendor_type'] ?? '', 'product_category' => $_POST['product_category'] ?? '',
-                'risk_class' => $_POST['risk_class'] ?? '', 'approval_status' => $_POST['approval_status'] ?? '',
+                'risk_class' => $_POST['risk_class'] ?? '', 'approval_status' => $newStatus,
                 'notes' => $_POST['notes'] ?? '',
             ]);
-            if (function_exists('idems_log')) idems_log('vendor_profile', $pid, 'EDIT', ['status'=>$_POST['approval_status'] ?? '']);
+            // Record a status change (or any manual action carrying a reason) on
+            // the qualification timeline.
+            $reason = trim((string)($_POST['status_reason'] ?? ''));
+            if ($newStatus !== $oldStatus || $reason !== '')
+                idems_vendor_log_status($pid, $oldStatus, $newStatus, 'MANUAL', ['reason' => $reason ?: 'Manual update']);
+            if (function_exists('idems_log')) idems_log('vendor_profile', $pid, 'EDIT', ['status'=>$newStatus]);
             flash('Vendor profile saved.');
         }
         redirect('/vendor-profile?id=' . $pid);
@@ -2002,7 +2088,8 @@ function ops_idems_vendors($route, $method) {
             $h['kind'] = $tc === 'VAR' ? 'Audit' : 'Assessment';
         }
         unset($h);
-        view('ops/idems/vendor_detail', ['partner'=>$partner, 'profile'=>$profile, 'history'=>$history,
+        $events = function_exists('idems_vendor_status_events') ? idems_vendor_status_events($pid) : [];
+        view('ops/idems/vendor_detail', ['partner'=>$partner, 'profile'=>$profile, 'history'=>$history, 'events'=>$events,
             'canEdit'=>$canEdit,
             'typeOpts'=>lk_options_or('vendor_type', []), 'catOpts'=>lk_options_or('vendor_product_category', []),
             'riskOpts'=>lk_options_or('vendor_risk_class', []), 'statusOpts'=>lk_options_or('vendor_approval_status', [])]);
