@@ -471,6 +471,19 @@ function idems_migrate() {
         try { idems_build_expediting(); } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('er_form_seeded_v1', '1');
     }
+    // ONE-TIME (P2): add the engineering/material/inspection/NCR sections to an ER
+    // seeded before they existed. Reseeds only when the inspection table is absent.
+    if (function_exists('setting_get') && !setting_get('er_p2_v1', '')) {
+        try {
+            $eid = idems_type_id_by_code('ER');
+            if ($eid && !(int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey='inspection_status'", [$eid])) {
+                $pdo->prepare("DELETE FROM report_fields WHERE report_type_id=?")->execute([$eid]);
+                $pdo->prepare("DELETE FROM report_sections WHERE report_type_id=?")->execute([$eid]);
+                idems_install_expediting_sections($eid);
+            }
+        } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('er_p2_v1', '1');
+    }
     // ---- Vendor qualification profile — one row per vendor partner, updated by
     // assessments. Kept separate from business_partners so the core directory CRUD
     // is untouched; joined by partner_id when a vendor is viewed or listed.
@@ -1235,6 +1248,28 @@ function idems_install_expediting_sections($typeId) {
         "Milestone|merge\nBaseline|date\nVendor commitment|date\nLatest forecast|date\nActual|date\nStatus|select|Complete,On track,At risk,Delayed,Not started\nRemarks",
         2, 'Status is the traffic light: Complete (green) · On track (green) · At risk (amber) · Delayed (red) · Not started (grey).');
 
+    // Part 11 — engineering / documentation expediting.
+    $s = $addSection('Engineering & documentation', 'Deliverable documents — submission and approval are tracked separately (submission is not approval).');
+    $addTable($s, 'doc_register', 'Documents',
+        "Document|merge\nRev\nPlanned submission|date\nActual submission|date\nReview status|select|Not due,Submitted,Under review,Approved,Approved with comments,Rejected,Revise & resubmit,Overdue\nForecast approval|date\nDelay (days)|number");
+
+    // Part 12-13 — procurement / raw material monitoring.
+    $s = $addSection('Procurement & material', 'Long-lead and raw-material status — ordered vs expected vs received.');
+    $addTable($s, 'material_register', 'Materials',
+        "Material|merge\nSpec / grade\nQty\nRequired|date\nOrdered|date\nExpected|date\nReceived|date\nStatus|select|To order,Ordered,In transit,Received,Shortage,Rejected\nSupplier");
+
+    // Part 14 — inspection / test status. Auto-prefilled from the Inspection
+    // engine (reports raised against this vendor). Expediting never edits results.
+    $s = $addSection('Inspection & test status', 'Inspection / test activity against this vendor — prefilled from the inspection reports. Expediting reflects, it does not change, inspection results.');
+    $addTable($s, 'inspection_status', 'Inspection & tests',
+        "Report / IRN|merge\nType\nDate|date\nResult|select|Accepted,Accepted (obs.),Rejected,Hold,Pending\nStatus\nRelease");
+
+    // Part 15, 31 — quality / NCR summary. Auto-prefilled from the NCR register.
+    $s = $addSection('Quality / NCR summary', 'Nonconformities against this vendor and whether they may affect delivery — prefilled from the NCR register.');
+    $addField($s, 'ncr_summary', 'Quality / NCR narrative', 'textarea', '', 2);
+    $addTable($s, 'ncr_register', 'Nonconformities',
+        "NCR ref|merge\nDescription\nSeverity|select|Major,Minor,Observation\nStatus\nDue|date\nDelivery impact|select|Yes,No,Unknown");
+
     // Part 25 — commitment register (never overwrite the original; every revision
     // kept). Carries an evidence tick.
     $s = $addSection('Commitment register', 'Every material vendor commitment — the original due date is preserved; revisions and their reasons are recorded.');
@@ -1707,6 +1742,46 @@ function idems_vendor_prefill_complaints($partnerId, $field) {
     }
     return $rows;
 }
+// Build "Inspection & test status" rows from the inspection reports raised
+// against this vendor, mapped to the given table field. Used to prefill an
+// Expediting Report so inspection status is reflected, never retyped.
+function idems_vendor_prefill_inspections($partnerId, $field) {
+    $partnerId = (int)$partnerId; if (!$partnerId || !$field) return [];
+    try { $rs = ops_all("SELECT irn, type_code, issue_date, result, status, release_status FROM report_docs
+        WHERE vendor_id=? AND deleted=0 AND type_code NOT IN ('ER','VASR','VAR','RN') ORDER BY id DESC LIMIT 20", [$partnerId]); }
+    catch (Throwable $e) { return []; }
+    if (!$rs) return [];
+    $keys = array_keys(idems_table_col_defs($field));
+    $resMap = ['ACCEPTED'=>'Accepted','ACCEPTED_COND'=>'Accepted (obs.)','REJECTED'=>'Rejected','HOLD'=>'Hold','NA'=>'Pending'];
+    $rows = [];
+    foreach ($rs as $r) {
+        $rel = trim((string)($r['release_status'] ?? '')); $rel = $rel !== '' ? (lk_options_or('release_status', defined('IDEMS_RELEASE')?IDEMS_RELEASE:[])[$rel] ?? $rel) : '';
+        $vals = [(string)$r['irn'], (string)$r['type_code'], (string)($r['issue_date'] ?? ''),
+                 $resMap[strtoupper((string)($r['result'] ?? ''))] ?? '', (string)($r['status'] ?? ''), $rel];
+        $row = []; foreach ($keys as $i => $k) $row[$k] = $vals[$i] ?? ''; $rows[] = $row;
+    }
+    return $rows;
+}
+// Build "Nonconformities" rows from the NCR register for this vendor, mapped to
+// the given table field. Delivery impact defaults to Yes for open majors.
+function idems_vendor_prefill_ncrs($partnerId, $field) {
+    $partnerId = (int)$partnerId; if (!$partnerId || !$field) return [];
+    try { $ns = ops_all("SELECT ref, title, severity, status, due_on FROM nonconformities WHERE partner_id=? ORDER BY id DESC LIMIT 20", [$partnerId]); }
+    catch (Throwable $e) { return []; }
+    if (!$ns) return [];
+    $keys = array_keys(idems_table_col_defs($field));
+    $sevMap = ['MAJOR'=>'Major','MINOR'=>'Minor','OBSERVATION'=>'Observation'];
+    $rows = [];
+    foreach ($ns as $n) {
+        $open = strtoupper((string)($n['status'] ?? '')) !== 'CLOSED';
+        $major = strtoupper((string)($n['severity'] ?? '')) === 'MAJOR';
+        $impact = ($open && $major) ? 'Yes' : 'Unknown';
+        $vals = [(string)$n['ref'], (string)($n['title'] ?? ''), $sevMap[strtoupper((string)($n['severity'] ?? ''))] ?? '',
+                 (string)($n['status'] ?? ''), (string)($n['due_on'] ?? ''), $impact];
+        $row = []; foreach ($keys as $i => $k) $row[$k] = $vals[$i] ?? ''; $rows[] = $row;
+    }
+    return $rows;
+}
 // The recent operational records behind the Vendor 360 view (each list capped).
 function idems_vendor_360($partnerId) {
     $partnerId = (int)$partnerId; if (!$partnerId) return ['reports'=>[], 'ncrs'=>[], 'complaints'=>[]];
@@ -2012,6 +2087,15 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
                 $add('medium', 'expediting', 'High overall progress despite a delayed milestone', 'Milestone status',
                      'Overall progress reads ' . rtrim(rtrim(number_format((float)$sc['overall'],1),'0'),'.') . '% but ' . $es['milestones']['delayed'] . ' milestone(s) are marked delayed.', 'Milestone status',
                      'Check that the stage weights and the milestone status are consistent.');
+            // d) Open quality issues against the vendor that may affect delivery.
+            $vp = (int)($doc['vendor_id'] ?? 0);
+            if ($vp > 0) {
+                $openMaj = (int)ops_val("SELECT COUNT(*) FROM nonconformities WHERE partner_id=? AND status <> 'CLOSED' AND severity='MAJOR'", [$vp]);
+                if ($openMaj > 0)
+                    $add('medium', 'expediting', 'Open major nonconformities may affect delivery', 'Quality / NCR',
+                         'The vendor has ' . $openMaj . ' open major nonconformity(ies); confirm whether they impact this delivery.', 'Quality / NCR',
+                         'Assess the delivery impact of the open NCR(s) and reflect it in the forecast.');
+            }
         } catch (Throwable $e) {}
     }
 
@@ -2727,9 +2811,16 @@ function ops_idems_documents($route, $method) {
                 try {
                     $vpid = (int)($fields['vendor_id'] ?? 0);
                     $tcode = (string)ops_val("SELECT code FROM report_types WHERE id=?", [(int)($fields['report_type_id'] ?? 0)]);
-                    if ($vpid && in_array($tcode, ['VASR','VAR'], true) && function_exists('idems_vendor_prefill_complaints')) {
-                        $cf = null; foreach (idems_fields((int)$fields['report_type_id']) as $ff) if (($ff['fkey'] ?? '') === 'complaints_review') { $cf = $ff; break; }
-                        if ($cf) { $pre = idems_vendor_prefill_complaints($vpid, $cf); if ($pre) $pdo->prepare("UPDATE report_docs SET data=? WHERE id=?")->execute([json_encode(['complaints_review' => $pre]), $id]); }
+                    if ($vpid && in_array($tcode, ['VASR','VAR','ER'], true)) {
+                        $flds = idems_fields((int)$fields['report_type_id']);
+                        $findF = function($k) use ($flds) { foreach ($flds as $ff) if (($ff['fkey'] ?? '') === $k) return $ff; return null; };
+                        // Prefill whichever live-data tables this report type carries,
+                        // so complaints / inspections / NCRs are reflected, not retyped.
+                        $pre = [];
+                        if (($cf = $findF('complaints_review')) && function_exists('idems_vendor_prefill_complaints')) { $r = idems_vendor_prefill_complaints($vpid, $cf); if ($r) $pre['complaints_review'] = $r; }
+                        if (($cf = $findF('inspection_status')) && function_exists('idems_vendor_prefill_inspections')) { $r = idems_vendor_prefill_inspections($vpid, $cf); if ($r) $pre['inspection_status'] = $r; }
+                        if (($cf = $findF('ncr_register')) && function_exists('idems_vendor_prefill_ncrs')) { $r = idems_vendor_prefill_ncrs($vpid, $cf); if ($r) $pre['ncr_register'] = $r; }
+                        if ($pre) $pdo->prepare("UPDATE report_docs SET data=? WHERE id=?")->execute([json_encode($pre), $id]);
                     }
                 } catch (Throwable $e) {}
                 flash('Report created — IRN ' . $irn . '.');
