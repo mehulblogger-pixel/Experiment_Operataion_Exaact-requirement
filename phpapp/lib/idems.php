@@ -712,6 +712,145 @@ function idems_released_line_items($rows) {
     }));
     return $out ?: $rows;
 }
+// ===========================================================================
+//  AI Report Auditor — deterministic QA pass (Phase 1)
+//  Runs the existing completeness + rule checks and adds a few high-value
+//  deterministic checks (quantity reconciliation, result/release vs pending
+//  contradiction, required-field enforcement), returning one severity-scored
+//  result the UI can show as a traffic light with plain-English issue cards.
+//  No LLM is involved — every finding is reproducible. AI advisory suggestions
+//  are a later, separate layer. Facts are never changed; issues are only raised.
+// ===========================================================================
+
+// Signals that mandatory work still appears to be pending — an activity-table
+// status column in a pending/partial state, or a narrative field that says so.
+function idems_qa_pending_signals($fields, $data) {
+    $out = [];
+    $pend = '/\b(pending|in[\s\-]?process|in[\s\-]?progress|partial|not[\s\-]?done|to be offered|to be carried out|balance activit|remain(?:s|ing)?[^.]{0,20}pending|yet to be)\b/i';
+    foreach ($fields as $f) {
+        $ft = $f['ftype'] ?? ''; $k = $f['fkey'] ?? '';
+        if ($ft === 'table') {
+            $rows = $data[$k] ?? null; if (!is_array($rows) || !$rows) continue;
+            $defs = idems_table_col_defs($f); $statusKey = null;
+            foreach ($defs as $ck => $d) { $l = strtolower((string)$d['label']); if (strpos($l,'status')!==false || strpos($l,'progress')!==false || strpos($l,'disposition')!==false) { $statusKey = $ck; break; } }
+            if ($statusKey === null) continue;
+            foreach ($rows as $i => $r) { $rr = (array)$r; $v = trim((string)($rr[$statusKey] ?? '')); if ($v !== '' && preg_match('/\b(pending|in[\s\-]?process|in[\s\-]?progress|partial|not[\s\-]?done|open|hold|await)\b/i', $v)) $out[] = ['where' => ($f['label'] ?? 'Table') . ' — row ' . ($i+1), 'text' => 'status is "' . $v . '"']; }
+        } elseif (in_array($ft, ['textarea','text'], true)) {
+            $v = trim((string)($data[$k] ?? '')); if ($v !== '' && preg_match($pend, $v)) $out[] = ['where' => ($f['label'] ?? $k), 'text' => '"' . $v . '"'];
+        }
+    }
+    return $out;
+}
+
+// Reconcile quantity columns in a table. Prefers the near-universal identity
+// Offered = Passed + Rejected + Hold; falls back to PO = Passed + Rejected +
+// Hold + Balance. Returns issue rows (arithmetic shown so a human can judge).
+function idems_qa_quantity_checks($f, $rows) {
+    $issues = [];
+    if (!is_array($rows) || !$rows) return $issues;
+    $defs = idems_table_col_defs($f);
+    $find = function($needles) use ($defs) { foreach ($defs as $ck => $d) { $l = strtolower((string)$d['label']); foreach ($needles as $n) if (strpos($l, $n) !== false) return $ck; } return null; };
+    $num = function($v) { $v = preg_replace('/[^0-9.\-]/', '', (string)$v); return $v === '' || $v === '-' ? null : (float)$v; };
+    $poK = $find(['po qty','po quantity','ordered','order qty']);
+    $offK = $find(['offered']);
+    $passK = $find(['passed','accepted','cleared']);
+    $rejK = $find(['rejected','reject']);
+    $holdK = $find(['hold']);
+    $balK = $find(['balance']);
+    if ($passK === null || $rejK === null) return $issues;   // nothing to reconcile against
+    foreach ($rows as $i => $r) {
+        $rr = (array)$r;
+        $pass = $num($rr[$passK] ?? '') ?? 0; $rej = $num($rr[$rejK] ?? '') ?? 0; $hold = $holdK !== null ? ($num($rr[$holdK] ?? '') ?? 0) : 0;
+        $where = ($f['label'] ?? 'Table') . ' — row ' . ($i+1);
+        if ($offK !== null && ($off = $num($rr[$offK] ?? '')) !== null) {
+            $sum = $pass + $rej + $hold;
+            if (abs($sum - $off) > 0.001) $issues[] = ['where' => $where, 'why' => 'Offered ' . rtrim(rtrim(number_format($off,2),'0'),'.') . ' ≠ Passed ' . rtrim(rtrim(number_format($pass,2),'0'),'.') . ' + Rejected ' . rtrim(rtrim(number_format($rej,2),'0'),'.') . ($holdK!==null?' + Hold ' . rtrim(rtrim(number_format($hold,2),'0'),'.'):'') . ' = ' . rtrim(rtrim(number_format($sum,2),'0'),'.') . ' (difference ' . rtrim(rtrim(number_format($sum-$off,2),'0'),'.') . ')'];
+        } elseif ($poK !== null && ($po = $num($rr[$poK] ?? '')) !== null && $balK !== null) {
+            $bal = $num($rr[$balK] ?? '') ?? 0; $sum = $pass + $rej + $hold + $bal;
+            if (abs($sum - $po) > 0.001) $issues[] = ['where' => $where, 'why' => 'PO Qty ' . rtrim(rtrim(number_format($po,2),'0'),'.') . ' ≠ Passed + Rejected + Hold + Balance = ' . rtrim(rtrim(number_format($sum,2),'0'),'.') . ' (difference ' . rtrim(rtrim(number_format($sum-$po,2),'0'),'.') . ')'];
+        }
+    }
+    return $issues;
+}
+
+// The unified deterministic QA pass. Returns
+//   ['score'=>0-100, 'counts'=>[critical,high,medium,low,info], 'status'=>BLOCKED|REVIEW|READY, 'issues'=>[...]]
+// Each issue: severity, category, title, location, why, source, suggestion, fixable.
+function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
+    if ($fields === null) $fields = function_exists('idems_fields') ? idems_fields((int)($doc['report_type_id'] ?? 0)) : [];
+    if ($data === null)   $data = json_decode($doc['data'] ?? '[]', true); if (!is_array($data)) $data = [];
+    $issues = [];
+    $add = function($sev, $cat, $title, $loc, $why, $source = '', $suggestion = '') use (&$issues) {
+        $issues[] = ['severity' => $sev, 'category' => $cat, 'title' => $title, 'location' => $loc, 'why' => $why, 'source' => $source ?: $loc, 'suggestion' => $suggestion];
+    };
+
+    // 1) Completeness — reuse the existing submission gate; FAILs become issues.
+    if (function_exists('idems_completeness_check')) {
+        try { $c = idems_completeness_check($doc);
+            foreach (($c['checks'] ?? []) as $chk) if (($chk['status'] ?? '') === 'FAIL')
+                $add('high', 'completeness', ($chk['label'] ?? 'A required detail') . ' is missing or incomplete', $chk['label'] ?? '', (string)($chk['detail'] ?? ''), $chk['label'] ?? '', 'Complete this before the report is issued.');
+        } catch (Throwable $e) {}
+    }
+    // 2) Rule / conflict engine — reuse (traceability, revision, calibration…).
+    if (function_exists('idems_rule_checks')) {
+        try { foreach (idems_rule_checks($doc, is_array($srcDocs) ? $srcDocs : []) as $r) {
+            $sev = ($r['severity'] ?? 'low') === 'high' ? 'high' : (($r['severity'] ?? '') === 'medium' ? 'medium' : 'low');
+            $add($sev, strtolower(str_replace(' ', '-', (string)($r['kind'] ?? 'rule'))), (string)($r['kind'] ?? 'Check'), (string)($r['kind'] ?? ''), (string)($r['detail'] ?? ''));
+        } } catch (Throwable $e) {}
+    }
+    // 3) Quantity reconciliation on every table.
+    foreach ($fields as $f) {
+        if (($f['ftype'] ?? '') !== 'table') continue;
+        $rows = $data[$f['fkey']] ?? null; if (!is_array($rows) || !$rows) continue;
+        foreach (idems_qa_quantity_checks($f, $rows) as $qi)
+            $add('high', 'quantity', 'Quantity reconciliation error', $qi['where'], $qi['why'], $qi['where'], 'Check the quantities on this line.');
+    }
+    // 4) CRITICAL contradiction: a positive result/release while work is pending.
+    $result  = strtoupper(trim((string)($doc['result'] ?? '')));
+    $release = strtoupper(trim((string)($doc['release_status'] ?? '')));
+    $positive = in_array($result, ['ACCEPTED','ACCEPTED_COND','PASS','PASSED'], true) || in_array($release, ['RELEASED','RELEASED_COND'], true);
+    if ($positive) {
+        $pend = idems_qa_pending_signals($fields, $data);
+        foreach ($pend as $pg)
+            $add('critical', 'contradiction', 'Result/Release is positive while activities appear pending', $pg['where'],
+                 'The report result is "' . ($result ?: '—') . '" / release "' . ($release ?: '—') . '", but ' . $pg['where'] . ': ' . $pg['text'] . '.',
+                 $pg['where'], 'Confirm whether acceptance/release applies only to the completed activities, or revise the report status.');
+    }
+    // 5) Required-field enforcement (text/select/textarea/number/date too).
+    foreach ($fields as $f) {
+        if (empty($f['required'])) continue;
+        $ft = $f['ftype'] ?? ''; if (!in_array($ft, ['text','textarea','select','number','date','radio'], true)) continue;
+        $v = $data[$f['fkey']] ?? ''; if (is_array($v)) continue;
+        if (trim((string)$v) === '' || strtoupper(trim((string)$v)) === 'NA')
+            $add('medium', 'completeness', ($f['label'] ?? 'A required field') . ' is required but blank', $f['label'] ?? '', 'This field is marked mandatory on the form.', $f['label'] ?? '', 'Enter a value for this field.');
+    }
+    // 6) Known domain spelling slips (deterministic — full grammar is the AI layer).
+    if (function_exists('tech_spell_map')) {
+        $map = tech_spell_map();
+        if (is_array($map) && $map) {
+            foreach ($fields as $f) {
+                if (!in_array($f['ftype'] ?? '', ['textarea','text'], true)) continue;
+                $v = (string)($data[$f['fkey']] ?? ''); if (trim($v) === '') continue;
+                foreach ($map as $wrong => $right) {
+                    if ($wrong === '' || strcasecmp($wrong, $right) === 0) continue;
+                    if (preg_match('/\b' . preg_quote($wrong, '/') . '\b/i', $v))
+                        $add('low', 'language', 'Possible spelling: "' . $wrong . '" → "' . $right . '"', $f['label'] ?? '', 'A known domain-term spelling was detected.', $f['label'] ?? '', 'Correct "' . $wrong . '" to "' . $right . '".');
+                }
+            }
+        }
+    }
+
+    $counts = ['critical'=>0,'high'=>0,'medium'=>0,'low'=>0,'info'=>0];
+    foreach ($issues as $it) { $s = $it['severity']; if (isset($counts[$s])) $counts[$s]++; }
+    $score = 100 - ($counts['critical']*40 + $counts['high']*12 + $counts['medium']*5 + $counts['low']*1 + $counts['info']*0);
+    $score = max(0, min(100, $score));
+    $status = $counts['critical'] > 0 ? 'BLOCKED' : (($counts['high'] > 0 || $counts['medium'] > 0) ? 'REVIEW' : 'READY');
+    // Order most-severe first for display.
+    $rank = ['critical'=>0,'high'=>1,'medium'=>2,'low'=>3,'info'=>4];
+    usort($issues, fn($a,$b) => ($rank[$a['severity']] ?? 9) <=> ($rank[$b['severity']] ?? 9));
+    return ['score'=>$score, 'counts'=>$counts, 'status'=>$status, 'issues'=>$issues];
+}
+
 function idems_sections($typeId) { return ops_all("SELECT * FROM report_sections WHERE report_type_id=? ORDER BY sort_order, id", [(int)$typeId]); }
 function idems_fields($typeId, $sectionId = null) {
     if ($sectionId === null) return ops_all("SELECT * FROM report_fields WHERE report_type_id=? ORDER BY sort_order, id", [(int)$typeId]);
