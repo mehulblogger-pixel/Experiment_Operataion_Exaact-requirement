@@ -134,6 +134,17 @@
     <?php if (idems_can_edit_doc($doc) && !empty($hasSchema)): ?>
       <div style="margin-top:4px"><a class="btn small" href="/document-fill?id=<?= (int)$doc['id'] ?>">✍ Open report to fix</a> <a class="btn small secondary" href="/document-edit?id=<?= (int)$doc['id'] ?>">✎ Edit details</a></div>
     <?php endif; ?>
+    <?php if ($st === 'BLOCKED' && empty($doc['finalized']) && (is_master() || can('idems.finalize'))): ?>
+      <?php if (is_master()): ?>
+        <form method="post" action="/document-finalize?id=<?= (int)$doc['id'] ?>" style="margin-top:6px;border-top:1px dashed var(--line);padding-top:8px" onsubmit="return confirm('Override the critical issue(s) and issue this report? This is recorded in the audit trail.')">
+          <label style="font-size:12px;font-weight:600;color:var(--bad)">Administrator override — reason required to issue despite the critical issue</label>
+          <textarea name="qa_override_reason" class="form-control" rows="2" required placeholder="Explain why this report may be issued despite the critical issue" style="margin-top:4px;width:100%"></textarea>
+          <button class="btn small" type="submit" style="margin-top:6px;background:var(--bad);border-color:var(--bad)">Issue anyway (override &amp; log)</button>
+        </form>
+      <?php else: ?>
+        <p style="font-size:12px;color:var(--bad);margin:6px 0 0">This report is blocked from issue until the critical issue is resolved. An administrator can override it with a recorded reason.</p>
+      <?php endif; ?>
+    <?php endif; ?>
     <p class="muted" style="font-size:11px;margin:2px 0 0">Automatic quality check. It flags possible issues for your review — it never changes the report or its technical findings.</p>
   </div>
 </details>
