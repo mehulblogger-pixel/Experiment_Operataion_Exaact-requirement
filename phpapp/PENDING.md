@@ -26,19 +26,33 @@ adds only genuinely-new inspection pieces.
   Site-service / Test-Witness assembled from ONE engine, applicability holds (Site
   drops material/dimensional; Material keeps them), checklist prefilled from
   criteria, rendered through the existing PDF engine.
-- **Slice 3 — TODO.** Data-integrity validation as configurable checks in
-  idems_qa_run: measurement out-of-range flag (advisory, never auto-changes
-  Pass/Fail — §61/§62), quantity reconciliation (accepted+rejected+balance vs
-  presented — already partly present), result-vs-open-mandatory-criteria conflict.
-- **Slice 4 — TODO.** Re-inspection & consolidated linking (reuse
-  report_docs.revises_id + related links; §51/§53/§54 comparison), inspection
-  history for vendor/PO/item/serial.
-- **Slice 5 — TODO.** The remaining sample inspection configs (General/
-  Manufacturing/Site/Pre-Dispatch/Surveillance) seeded as ready types (§98);
-  register/dashboard reusing the existing documents register; reviewer flow.
-- **Slice 6 — TODO.** AI-QA metadata exposure per §60-64 (advisory only; AI never
-  changes measurements/results/severity — the existing three-layer QA already
-  enforces this) + regression lock.
+- **Slice 3 — ✅ DONE.** `uire_qa_checks()` in the single QA result (idems_qa_run
+  item 13), ADVISORY only: measurement out-of-range vs a pass result (§62),
+  field-level quantity reconciliation (accepted+rejected>inspected, accepted>
+  presented, balance mismatch — §57), and positive-result-vs-failed-checklist
+  contradiction. **§61 verified: it flags, it never changes a measurement, a
+  result or a finding.** Self-gates on inspection fields, so inert elsewhere.
+- **Slice 4 — ✅ DONE.** Inspection history / comparison / re-inspection /
+  consolidation, all reusing report_docs (no new store): uire_inspection_history()
+  (prior inspections by vendor/PO/item/serial), uire_inspection_compare()
+  (result/qty deltas), additive report_docs.reinspects_id link (§53), and
+  uire_consolidated_inspection() aggregating a project's linked inspections (§51).
+- **Slice 5 — ✅ DONE.** 8 sample inspection report configs seeded (§98) — General,
+  Material, Manufacturing, Site, Final, Test Witness, Pre-Dispatch, Surveillance —
+  each a Library assembly of the SAME engine; applicability varies (Site has no
+  dimensional/quantity; Manufacturing carries tests + hold/witness). Removable by
+  the admin; all render through the existing engine.
+- **Slice 6 — ✅ DONE.** AI metadata contract (§60-64/§85): uire_ai_field_policy()
+  — analyze=yes, suggest=narrative-only, **modify=NO for every field** (factual
+  fields never rewritten by AI). Regression LOCK: all 13 report engines (IR/MGHIR/
+  VASR/VAR/ER + 8 UIR samples) build & render clean; URFE+UIRE library (26
+  sections) and criteria library intact.
+
+**UIRE Phase 2 acceptance (§106/§107/§100/§57-62/§98) demonstrated; Phase 1
+regression clean. Deferred (reuse-heavy, not blockers): a dedicated inspection
+register/dashboard view and the mobile execution flow — the existing documents
+register, fill screen, autosave, offline UX and reviewer/approval workflow
+already serve these; a bespoke inspection UI is polish, not new capability.**
 
 ## 🧱 URFE — Universal Report Foundation Engine (Aug 2026) — IN PROGRESS
 

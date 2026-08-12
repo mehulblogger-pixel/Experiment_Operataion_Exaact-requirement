@@ -2647,6 +2647,16 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
         } catch (Throwable $e) {}
     }
 
+    // 13) Inspection data-integrity (UIRE) — measurement-vs-result, quantity
+    // reconciliation and result-vs-checklist contradictions. ADVISORY: it flags,
+    // it NEVER changes a measurement, a result or a finding (§61/§62). Self-gates
+    // on the inspection library fields, so it is inert on non-inspection reports.
+    if (function_exists('uire_qa_checks')) {
+        try { foreach (uire_qa_checks($doc, $fields, $data) as $qi)
+            $add($qi['sev'], $qi['cat'], $qi['title'], $qi['loc'], $qi['why'], $qi['loc'], $qi['fix'] ?? ''); }
+        catch (Throwable $e) {}
+    }
+
     $counts = ['critical'=>0,'high'=>0,'medium'=>0,'low'=>0,'info'=>0];
     foreach ($issues as $it) { $s = $it['severity']; if (isset($counts[$s])) $counts[$s]++; }
     $score = 100 - ($counts['critical']*40 + $counts['high']*12 + $counts['medium']*5 + $counts['low']*1 + $counts['info']*0);
