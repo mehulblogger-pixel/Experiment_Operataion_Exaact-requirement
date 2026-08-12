@@ -4625,6 +4625,88 @@ function idems_balance_break($r) {
     return $bestK;
 }
 
+// §snapshot — a small set of at-a-glance KPI cards for the top of a report, so a
+// reviewer reads the headline status without scanning the body. Each card is
+// ['label','value','sub','tone'] with tone in ok/warn/bad/neutral/muted. The set
+// is chosen by report type: an expediting report shows progress/status/forecast/
+// dispatch; a scored report shows score/band/coverage/recommendation; an
+// inspection report shows result/release. Returns [] when there is nothing
+// worth snapshotting (so the row simply doesn't print). Deterministic — no LLM.
+function idems_report_kpis($doc, $sections, $fields, $data) {
+    $code = strtoupper((string)($doc['type_code'] ?? ''));
+    $num  = function($v){ return rtrim(rtrim(number_format((float)$v,1),'0'),'.'); };
+    // Pull the first non-empty value for any of the given field keys, mapped
+    // through its options so a stored code reads as its label.
+    $fieldVal = function($keys) use ($fields,$data) {
+        foreach ($fields as $f) {
+            if (!in_array(strtolower((string)$f['fkey']), $keys, true)) continue;
+            $v = $data[$f['fkey']] ?? ''; if (is_array($v)) $v = implode(', ', $v);
+            $v = trim((string)$v); if ($v === '') continue;
+            if (in_array($f['ftype'] ?? '', ['select','radio','unit'], true)) { $o = idems_field_options($f); $v = (string)($o[$v] ?? $v); }
+            return $v;
+        }
+        return '';
+    };
+    $recTone = function($t){ $t=strtolower(trim((string)$t));
+        if (strpos($t,'not')!==false || strpos($t,'reject')!==false || strpos($t,'disqual')!==false || strpos($t,'fail')!==false) return 'bad';
+        if (strpos($t,'condition')!==false || strpos($t,'hold')!==false || strpos($t,'provisional')!==false || strpos($t,'re-')!==false || strpos($t,'requal')!==false) return 'warn';
+        if (strpos($t,'approv')!==false || strpos($t,'qualif')!==false || strpos($t,'accept')!==false || strpos($t,'recommend')!==false) return 'ok';
+        return 'neutral';
+    };
+    $cards = [];
+
+    // Expediting report — progress / status / forecast / dispatch snapshot.
+    if ($code === 'ER') {
+        $sc = function_exists('idems_score_doc') ? idems_score_doc($sections,$fields,$data) : null;
+        $st = function_exists('idems_expediting_status') ? idems_expediting_status($doc,$fields,$data) : null;
+        $dr = function_exists('idems_expediting_dispatch_readiness') ? idems_expediting_dispatch_readiness($fields,$data) : null;
+        if ($sc && $sc['overall'] !== null) {
+            $pct = (float)$sc['overall'];
+            $cards[] = ['label'=>'Overall progress','value'=>$num($pct).'%','sub'=>idems_progress_band($pct),
+                'tone'=>($pct>=90?'ok':($pct>=50?'neutral':($pct>0?'warn':'muted')))];
+        }
+        if ($st) {
+            $stt = (string)$st['status']; $ms = $st['milestones'];
+            $tone = in_array($stt,['ON TRACK','COMPLETED'],true) ? 'ok' : ($stt==='AT RISK' ? 'warn' : 'bad');
+            $cards[] = ['label'=>'Status','value'=>ucwords(strtolower($stt)),
+                'sub'=>($ms['total']>0 ? $ms['complete'].'/'.$ms['total'].' milestones' : ''),'tone'=>$tone];
+            $ev = $st['forecast']['expeditor_variance_days'] ?? null;
+            if ($ev !== null) {
+                $cards[] = ['label'=>'Forecast vs need','value'=>($ev>0?'+'.$ev.' d':($ev<0?$ev.' d':'On time')),
+                    'sub'=>($ev>0?'late':($ev<0?'early':'to plan')),'tone'=>($ev>0?'bad':'ok')];
+            }
+        }
+        if ($dr && $dr['pct'] !== null) {
+            $b = count($dr['blockers']);
+            $cards[] = ['label'=>'Dispatch ready','value'=>$num($dr['pct']).'%','sub'=>$dr['yes'].'/'.$dr['applicable'].' cleared',
+                'tone'=>($dr['pct']>=100?'ok':($b>0?'bad':'warn'))];
+            if ($b>0) $cards[] = ['label'=>'Blockers','value'=>(string)$b,'sub'=>'mandatory open','tone'=>'bad'];
+        }
+        return $cards;
+    }
+
+    // Scored report (vendor assessment / audit / any scored checklist).
+    $sc = function_exists('idems_score_doc') ? idems_score_doc($sections,$fields,$data) : null;
+    if ($sc && $sc['overall'] !== null) {
+        $ov = (float)$sc['overall'];
+        $tone = $ov>=75 ? 'ok' : ($ov>=60 ? 'warn' : 'bad');
+        $scoreLbl = ($code === 'VAR') ? 'Conformance' : 'Assessment score';
+        $cards[] = ['label'=>$scoreLbl,'value'=>$num($ov),'sub'=>'out of 100','tone'=>$tone];
+        if (trim((string)$sc['band']) !== '') $cards[] = ['label'=>'Rating band','value'=>(string)$sc['band'],'sub'=>'','tone'=>$tone];
+        if ((int)($sc['total'] ?? 0) > 0) $cards[] = ['label'=>'Clauses scored','value'=>$sc['answered'].'/'.$sc['total'],'sub'=>'coverage','tone'=>'neutral'];
+        $rec = $fieldVal(['recommendation','decision','overall_recommendation']);
+        if ($rec !== '') $cards[] = ['label'=>'Recommendation','value'=>$rec,'sub'=>'','tone'=>$recTone($rec)];
+        return $cards;
+    }
+
+    // Inspection-type report — result / release headline.
+    $result  = lk_options_or('inspection_result', IDEMS_RESULTS)[$doc['result'] ?? ''] ?? '';
+    $release = lk_options_or('release_status', IDEMS_RELEASE)[$doc['release_status'] ?? ''] ?? '';
+    if (trim($result) !== '') $cards[] = ['label'=>'Result','value'=>$result,'sub'=>'','tone'=>$recTone($result)];
+    if (trim($release) !== '') $cards[] = ['label'=>'Release status','value'=>$release,'sub'=>'','tone'=>$recTone($release)];
+    return $cards;
+}
+
 // ---- Report PDF (letterhead + body + automatic signature block + timestamps) ----
 function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $copy = '') {
     // Company brand colour for the header band (from the letterhead), else default.
@@ -4645,6 +4727,17 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     $build = function($forceBreakBefore) use ($doc, $sections, $fields, $data, $files, $lh, $sigs, $copy, $band, $fmtNo, $docCtl, $rev) {
     $p = new SimplePDF(); $ml = $p->ml; $right = $p->right();
     $secStarts = [];
+    // A friendly report title — never a bare code. Uses the type's own name when
+    // set, else maps a known code to a readable title, else the code itself.
+    $friendlyType = function($doc) {
+        $n = trim((string)($doc['type_name'] ?? ''));
+        if ($n !== '' && strtoupper($n) !== strtoupper(trim((string)($doc['type_code'] ?? '')))) return $n;
+        $map = ['ER'=>'Expediting Report','VASR'=>'Vendor Assessment','VAR'=>'Vendor Audit',
+                'IR'=>'Inspection Report','RN'=>'Release Note','NCR'=>'Nonconformity Report'];
+        $code = strtoupper(trim((string)($doc['type_code'] ?? '')));
+        return $map[$code] ?? ($n !== '' ? $n : ($code !== '' ? $code : 'Inspection Report'));
+    };
+    $docTitle = $friendlyType($doc);
     // A draft carries a DRAFT watermark until it is approved and locked. Once
     // finalized, an Original / Duplicate / Triplicate copy carries that word.
     if (empty($doc['finalized'])) { $p->watermark = 'DRAFT'; }
@@ -4665,7 +4758,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     // clear title, then the IRN and the controlled-document identity (revision,
     // issue date, format & doc numbers), so the corner feels intentional.
     $yr=$top;
-    $typeName = trim((string)($doc['type_name'] ?? $doc['type_code'] ?? 'Inspection Report'));
+    $typeName = $docTitle;
     $issueF = trim((string)($doc['issue_date'] ?? '')); if ($issueF!==''){ $tt=strtotime($issueF); if($tt) $issueF=date('d-M-Y',$tt); }
     $p->y=$yr; $p->text($ml, strtoupper($typeName), 11, true, $band, $right, 'R'); $yr+=15;
     $p->y=$yr; $p->text($ml, 'IRN: '.$doc['irn'], 8.5, true, [70,70,70], $right, 'R'); $yr+=12;
@@ -4680,7 +4773,48 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     $p->y = max($ly, $yr, $top + 50); $p->hr($band);
     $p->gap(6);
     // report title
-    $p->line(strtoupper($doc['type_name'] ?? $doc['type_code'] ?? 'INSPECTION REPORT'), 13, true, 16, $band);
+    $p->line(strtoupper($docTitle), 13, true, 16, $band);
+
+    // §snapshot — at-a-glance KPI cards so a reviewer reads the headline status in
+    // one glance without scanning the body. Rendered as a tidy row of tinted cards
+    // just under the title. When these cards already carry Result/Release (an
+    // inspection report), the separate outcome badges below are suppressed. §dedup
+    $kpiTone = function($t){ switch($t){
+        case 'ok':   return [[236,253,245],[21,128,61]];
+        case 'warn': return [[255,251,235],[180,83,9]];
+        case 'bad':  return [[254,242,242],[185,45,45]];
+        case 'muted':return [[248,249,251],[110,110,110]];
+        default:     return [[239,246,255],[37,99,235]]; // neutral
+    }; };
+    $kpis = function_exists('idems_report_kpis') ? idems_report_kpis($doc, $sections, $fields, $data) : [];
+    $kpiShown = false; $kpiHadOutcome = false;
+    if ($kpis) {
+        $kpis = array_slice($kpis, 0, 5); $n = count($kpis);
+        // Divide the row evenly, but cap each card so one or two cards stay compact
+        // and left-aligned instead of stretching across the whole page. §snapshot
+        $gap = 6; $cardH = 46; $cw = min(($p->contentW() - $gap*($n-1)) / $n, 175);
+        $p->gap(4); $p->needSpace($cardH + 6); $y0 = $p->y;
+        foreach ($kpis as $i => $c) {
+            [$bg,$fg] = $kpiTone($c['tone'] ?? 'neutral');
+            $cx = $ml + $i*($cw+$gap);
+            $p->rectFill($cx, $y0, $cw, $cardH, $bg);
+            $p->rectFill($cx, $y0, 2.5, $cardH, $fg);
+            $tx = $cx + 8; $iw = $cw - 12;
+            // Label (uppercase, muted) at the top.
+            $p->y = $y0 + 7; $p->text($tx, strtoupper($p->wrap((string)($c['label']??''),6.5,$iw,true)[0] ?? ''), 6.5, true, [120,120,120]);
+            // Value — the headline. Shrink to fit the card width; wrap to two lines.
+            $val = trim((string)($c['value']??'')); $vSize = 14;
+            while ($vSize > 8 && $p->strWidth($val, $vSize, true) > $iw) $vSize -= 0.5;
+            $vLines = $p->wrap($val, $vSize, $iw, true, true); $vLines = array_slice($vLines, 0, 2);
+            $vy = $y0 + 18;
+            foreach ($vLines as $vl) { $p->y = $vy; $p->text($tx, $vl, $vSize, true, $fg); $vy += $vSize + 1.5; }
+            // Sub-caption at the foot.
+            $sub = trim((string)($c['sub']??''));
+            if ($sub !== '') { $p->y = $y0 + $cardH - 9; $p->text($tx, $p->wrap($sub,6.5,$iw)[0] ?? '', 6.5, false, [130,130,130]); }
+            $l = strtolower((string)($c['label']??'')); if (strpos($l,'result')!==false || strpos($l,'release')!==false) $kpiHadOutcome = true;
+        }
+        $p->y = $y0 + $cardH; $p->gap(6); $kpiShown = true;
+    }
 
     // §status — a small pill: coloured background + darker text, sized to the word.
     $badge = function($x, $y, $text, $size = 9.5) use ($p) {
@@ -4698,7 +4832,9 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     $result  = lk_options_or('inspection_result', IDEMS_RESULTS)[$doc['result'] ?? ''] ?? '';
     $release = lk_options_or('release_status', IDEMS_RELEASE)[$doc['release_status'] ?? ''] ?? '';
     $colW = $p->contentW()/2;
-    if (trim($result) !== '' || trim($release) !== '') {
+    // Skip these badges when the KPI snapshot above already carries the outcome —
+    // otherwise Result/Release would print twice. §dedup
+    if (!$kpiHadOutcome && (trim($result) !== '' || trim($release) !== '')) {
         $p->gap(3); $p->needSpace(30); $cardY = $p->y;
         $p->text($ml, 'RESULT', 7.5, true, [130,130,130]);
         if (trim($release) !== '') $p->text($ml + $colW, 'RELEASE STATUS', 7.5, true, [130,130,130]);
@@ -4720,19 +4856,32 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     if ($scard && $scard['overall'] !== null) {
         $scoreCol = function($s) { $s=(float)$s; if($s>=90) return [21,128,61]; if($s>=75) return [37,99,235]; if($s>=60) return [180,83,9]; if($s>=40) return [194,65,12]; return [200,60,60]; };
         $bars = array_values(array_filter($scard['sections'], fn($x)=>$x['score']!==null));
+        // When the KPI snapshot already showed the headline score/progress and there
+        // is no per-category breakdown to add (0-1 bars), the scorecard block would
+        // just repeat the number — skip it. Multi-category scorecards still print,
+        // because their category bars are real added detail. §dedup
+        if ($kpiShown && count($bars) <= 1) $bars = null;
+        if ($bars !== null) {
         $need = 34 + count($bars)*12 + 12; $p->needSpace($need);
         $oc = $scoreCol($scard['overall']); $cardY = $p->y; $cardX = $ml;
         $p->rectFill($cardX, $cardY, $p->contentW(), $need-6, [248,249,251]);
         $p->rectFill($cardX, $cardY, 3, $need-6, $oc);
         $tx = $cardX + 12; $p->y = $cardY + 9;
         // An expediting report reads "OVERALL PROGRESS", others "ASSESSMENT SCORE".
+        // But when the KPI snapshot already printed the headline number above, this
+        // block is only the per-category breakdown — so it reads "SCORE BY CATEGORY"
+        // and omits the repeated big number/band. §dedup
         $isER = ($doc['type_code'] ?? '') === 'ER';
-        $cardLbl = $isER ? 'OVERALL PROGRESS' : 'ASSESSMENT SCORE';
         $cardBand = $isER && function_exists('idems_progress_band') ? idems_progress_band($scard['overall']) : (string)$scard['band'];
-        $p->text($tx, $cardLbl, 8, true, [110,110,110]);
-        $ovTxt = rtrim(rtrim(number_format((float)$scard['overall'],1),'0'),'.');
-        $p->y = $cardY + 9; $p->text($tx + 120, $ovTxt . ($isER ? '%' : ' / 100'), 13, true, $oc);
-        $p->y = $cardY + 9; $p->text($ml, strtoupper($cardBand), 9, true, $oc, $right, 'R');
+        if ($kpiShown) {
+            $p->text($tx, 'SCORE BY CATEGORY', 8, true, [110,110,110]);
+        } else {
+            $cardLbl = $isER ? 'OVERALL PROGRESS' : 'ASSESSMENT SCORE';
+            $p->text($tx, $cardLbl, 8, true, [110,110,110]);
+            $ovTxt = rtrim(rtrim(number_format((float)$scard['overall'],1),'0'),'.');
+            $p->y = $cardY + 9; $p->text($tx + 120, $ovTxt . ($isER ? '%' : ' / 100'), 13, true, $oc);
+            $p->y = $cardY + 9; $p->text($ml, strtoupper($cardBand), 9, true, $oc, $right, 'R');
+        }
         // Category bars.
         $barX = $tx + 175; $barW = ($ml + $p->contentW() - 40) - $barX;
         $by = $cardY + 28;
@@ -4746,6 +4895,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
             $by += 12;
         }
         $p->y = $cardY + $need - 6; $p->gap(6);
+        } // §dedup — end scorecard body
     }
 
     // If the form does NOT itself carry the header fields (no "Inspection details"
@@ -4820,16 +4970,16 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         $flushGrid = function() use (&$pending,$p,$ml,$valOf) {
             if (!$pending) return;
             $colW=$p->contentW()/2;
-            // Lay out one field inside its half-column. The value is placed after the
-            // MEASURED label width (not a fixed offset), so a long label such as
-            // "Item / equipment description:" can never be overprinted by its value.
-            // If the label leaves too little room beside it, the value drops to the
-            // line below the label instead. §layout
-            $plan = function($f,$x) use ($p,$colW,$valOf) {
-                $lbl=$f['label'].':'; $lw=$p->strWidth($lbl,8.5,true)+6;
-                $val=$valOf($f); $avail=$colW-$lw-4;
-                if ($avail>=70) { $vl=$p->wrap($val,8.5,$avail); if(!$vl)$vl=['']; return ['x'=>$x,'lbl'=>$lbl,'vx'=>$x+$lw,'vy'=>0,'vl'=>$vl,'n'=>count($vl)]; }
-                $vl=$p->wrap($val,8.5,$colW-4); if(!$vl)$vl=['']; return ['x'=>$x,'lbl'=>$lbl,'vx'=>$x,'vy'=>11,'vl'=>$vl,'n'=>1+count($vl)];
+            // Lay out one field inside its half-column with a FIXED label column, so
+            // every value down a half aligns at the same left edge (professional
+            // two-column look). Long labels wrap within the label column; the value
+            // wraps in the remaining width. Both top-aligned. §align
+            $lblW = 116; $gap = 8;
+            $plan = function($f,$x) use ($p,$colW,$valOf,$lblW,$gap) {
+                $lblLines = $p->wrap($f['label'].':',8.5,$lblW,true,true); if(!$lblLines)$lblLines=[''];
+                $vx = $x + $lblW + $gap; $valW = $colW - $lblW - $gap - 4;
+                $vl = $p->wrap($valOf($f),8.5,max(36,$valW),false,true); if(!$vl)$vl=[''];
+                return ['x'=>$x,'lblLines'=>$lblLines,'vx'=>$vx,'vl'=>$vl,'n'=>max(count($lblLines),count($vl))];
             };
             for ($i=0;$i<count($pending);$i+=2) {
                 $cells=[$plan($pending[$i],$ml)];
@@ -4837,8 +4987,8 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                 $lines=1; foreach ($cells as $c) $lines=max($lines,$c['n']);
                 $p->needSpace($lines*11+3); $y0=$p->y;
                 foreach ($cells as $c) {
-                    $p->y=$y0; $p->text($c['x'],$c['lbl'],8.5,true,[90,90,90]);
-                    for($j=0;$j<count($c['vl']);$j++){ $p->y=$y0+$c['vy']+$j*11; $p->text($c['vx'],$c['vl'][$j],8.5); }
+                    foreach ($c['lblLines'] as $j=>$ln) { $p->y=$y0+$j*11; $p->text($c['x'],$ln,8.5,true,[90,90,90]); }
+                    for($j=0;$j<count($c['vl']);$j++){ $p->y=$y0+$j*11; $p->text($c['vx'],$c['vl'][$j],8.5,false,[40,40,40]); }
                 }
                 $p->y=$y0+$lines*11+2;
             }
