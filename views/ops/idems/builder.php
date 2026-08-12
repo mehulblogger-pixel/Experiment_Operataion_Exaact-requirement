@@ -54,6 +54,7 @@
         if ($f['hidden']) echo ' <span class="pill p-mut" style="padding:0 5px">hidden</span>';
         if ($f['cond_field']) echo ' <span class="pill p-warn" style="padding:0 5px">if '.e($f['cond_field']).' '.e($condOps[$f['cond_op']] ?? $f['cond_op']).' '.e($f['cond_val']).'</span>';
         if ($f['ftype']==='calc' && $f['calc_expr']) echo ' <span class="pill p-info" style="padding:0 5px">= '.e($f['calc_expr']).'</span>';
+        if ((float)($f['weight'] ?? 0) > 0) echo ' <span class="pill p-info" style="padding:0 5px" title="This field is scored">weight '.e(rtrim(rtrim(number_format((float)$f['weight'],2,'.',''),'0'),'.')).'</span>';
         echo ' <span class="muted" style="font-size:11px">['.e($f['fkey']).']</span></div>';
         echo '<div class="bld-act">';
         echo '<button type="button" class="btn small secondary bld-width" data-fid="'.(int)$f['id'].'" data-span="'.($full?2:1).'" title="Toggle field width">'.($full?'▭ Full':'▯ Half').'</button> ';
@@ -217,6 +218,15 @@
           <select class="form-control" name="cond_op"><?php foreach ($condOps as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($ef && $ef['cond_op']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
         <div class="ff ff-wide"><label>Value</label><input class="form-control" name="cond_val" value="<?= e($ef['cond_val'] ?? '') ?>"></div>
       </div>
+      <h4 style="margin:8px 0 4px">Scoring <span class="muted" style="font-weight:400">(for assessments / audits / scored checklists — leave weight 0 for ordinary fields)</span></h4>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr">
+        <div class="ff"><label>Weight <span class="muted">— this field's share of its section's score (0 = not scored)</span></label>
+          <input class="form-control" type="number" step="0.1" min="0" name="weight" value="<?= e(rtrim(rtrim(number_format((float)($ef['weight'] ?? 0),2,'.',''),'0'),'.') ?: '0') ?>"></div>
+        <div class="ff"><label>Max score <span class="muted">— for number / rating inputs; the value is scaled value ÷ max × 100</span></label>
+          <input class="form-control" type="number" step="0.1" min="0" name="max_score" value="<?= e(rtrim(rtrim(number_format((float)($ef['max_score'] ?? 0),2,'.',''),'0'),'.') ?: '0') ?>"></div>
+      </div>
+      <div class="ff ff-wide"><label>Score map <span class="muted">— for dropdown / choice answers: one <code>Option = points</code> per line (points 0–100). Unlisted answers (e.g. “Not applicable”) are excluded from the score.</span></label>
+        <textarea class="form-control" name="score_map" rows="4" placeholder="Excellent = 100&#10;Good = 75&#10;Fair = 50&#10;Poor = 25"><?= e(function_exists('idems_score_map_to_text') ? idems_score_map_to_text($ef['score_map'] ?? '') : '') ?></textarea></div>
       <div style="margin-top:10px"><button class="btn" type="submit"><?= $ef ? 'Save field' : 'Add field' ?></button><?php if ($ef): ?> <a class="btn secondary" href="/report-builder?type=<?= (int)$type['id'] ?>">Cancel</a><?php endif; ?></div>
     </form>
   </div>

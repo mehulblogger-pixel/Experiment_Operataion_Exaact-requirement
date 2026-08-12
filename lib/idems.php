@@ -938,6 +938,35 @@ function idems_score_doc($sections, $fields, $data) {
             'band' => $overall === null ? '' : idems_score_band($overall), 'sections' => $secOut];
 }
 
+// Parse the builder's friendly score-map input into the stored JSON string.
+// Accepts either raw JSON ({"Good":75}) or one "Option = points" per line
+// (also tolerates "Option: points" and "Option, points"). Blank => '' (no map).
+function idems_score_map_to_json($text) {
+    $text = trim((string)$text);
+    if ($text === '') return '';
+    // Already JSON? keep it if it decodes to an object of numbers.
+    if ($text[0] === '{') {
+        $j = json_decode($text, true);
+        if (is_array($j)) { $out = []; foreach ($j as $k => $v) { $k = trim((string)$k); if ($k !== '') $out[$k] = max(0.0, min(100.0, (float)$v)); } return $out ? json_encode($out) : ''; }
+        return '';
+    }
+    $out = [];
+    foreach (preg_split('/\r?\n/', $text) as $line) {
+        $line = trim($line); if ($line === '') continue;
+        if (!preg_match('/^(.*?)\s*[=:,]\s*(-?\d+(?:\.\d+)?)\s*$/', $line, $m)) continue;
+        $k = trim($m[1]); if ($k === '') continue;
+        $out[$k] = max(0.0, min(100.0, (float)$m[2]));
+    }
+    return $out ? json_encode($out) : '';
+}
+// Render a stored score-map JSON back as friendly "Option = points" lines for
+// the builder's edit form.
+function idems_score_map_to_text($json) {
+    $json = trim((string)$json); if ($json === '') return '';
+    $j = json_decode($json, true); if (!is_array($j)) return '';
+    $lines = []; foreach ($j as $k => $v) $lines[] = $k . ' = ' . rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.');
+    return implode("\n", $lines);
+}
 // A plain-English band for a 0-100 score. Kept simple and stable so a buyer can
 // relabel via a setting later without touching the maths.
 function idems_score_band($score) {
@@ -2378,6 +2407,10 @@ function ops_idems_builder($route, $method) {
                 'cond_field' => trim($_POST['cond_field'] ?? ''), 'cond_op' => $_POST['cond_op'] ?? '', 'cond_val' => trim($_POST['cond_val'] ?? ''),
                 'calc_expr' => trim($_POST['calc_expr'] ?? ''), 'placeholder' => trim($_POST['placeholder'] ?? ''), 'help' => trim($_POST['help'] ?? ''),
                 'col_span' => max(1, min(2, (int)($_POST['col_span'] ?? 1))), 'table_cols' => trim($_POST['table_cols'] ?? ''),
+                // Scoring — a field with weight 0 never contributes to a score.
+                'weight' => max(0, (float)($_POST['weight'] ?? 0)),
+                'max_score' => max(0, (float)($_POST['max_score'] ?? 0)),
+                'score_map' => idems_score_map_to_json($_POST['score_map'] ?? ''),
             ];
             if ($fid) {
                 $set = implode('=?, ', array_keys($vals)) . '=?'; $args = array_values($vals); $args[] = $fid; $args[] = $typeId;
