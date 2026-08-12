@@ -90,8 +90,23 @@ Phased build (per spec §56):
   - ✅ **Vendor write-back** — an issued VAR also updates the vendor profile
     (score + approval status from its recommendation); the vendor detail page's
     history now lists both Assessments and Audits.
-- **P3 Qualification** — approved-vendor register; approval status; validity /
-  reassessment dates; multi-level approval (reuse chain); requalification.
+- **P3 Qualification — ✅ COMPLETE (Aug 2026).** Multi-level approval was already
+  in place (a VASR/VAR routes through the report approval chain before issue, and
+  only an *issued* report qualifies the vendor), so P3 added the lifecycle around
+  it:
+  - ✅ **Status timeline** — `vendor_status_events` records every qualification
+    change (assessment, audit, auto-expiry, manual) with old→new status, source,
+    score, reason and actor; shown as a "Qualification history" timeline on the
+    vendor page. Assessments and audits log automatically; manual edits take a
+    reason.
+  - ✅ **Approval expiry** — a daily cron (`idems_vendor_run_reminders`) moves an
+    APPROVED/CONDITIONAL vendor whose validity has lapsed to **EXPIRED** (new
+    status, logged), so a stale approval never reads as current.
+  - ✅ **Re-assessment reminders** — the same cron e-mails the configured address
+    (`vendor_reminder_email`) for vendors whose re-assessment falls due within the
+    reminder window (`vendor_reminder_days`, default 30). Wired into `cron.php`.
+  - Re-qualification = raise a new assessment/audit; the write-back re-approves
+    and resets validity, all captured on the timeline.
 - **P4 Performance** — vendor scorecard fed from NCR/complaints/delivery; Vendor
   360 (reuse the customer-360 assembly pattern); periodic reassessment cycle.
 - **P5 AI** — vendor-specific checks into the existing AI Auditor (score-vs-

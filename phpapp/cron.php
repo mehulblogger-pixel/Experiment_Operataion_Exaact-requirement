@@ -148,6 +148,12 @@ if (function_exists('cmp_run_reminders')) {
     $n = cmp_run_reminders();
     echo "Complaint chases sent: $n\n";
 }
+// Vendor qualification lifecycle — expire lapsed approvals and remind on
+// re-assessments falling due.
+if (function_exists('idems_vendor_run_reminders')) {
+    $vr = idems_vendor_run_reminders();
+    echo "Vendor approvals expired: {$vr['expired']}; re-assessment reminders sent: {$vr['reminded']}\n";
+}
 
 // Passports, visas, medicals and gate passes running out. Looked at 45 days
 // ahead rather than 30, because a visa takes weeks to renew and a document that

@@ -6,6 +6,7 @@
     switch($st){
       case 'APPROVED': return ['p-ok','Approved'];
       case 'CONDITIONAL': return ['p-warn','Approved with conditions'];
+      case 'EXPIRED': return ['p-bad','Approval expired'];
       case 'SUSPENDED': return ['p-bad','Suspended'];
       case 'BLACKLISTED': return ['p-bad','Blacklisted'];
       case 'UNDER_ASSESSMENT': return ['p-info','Under assessment'];
@@ -65,6 +66,7 @@
           <select class="form-control" name="approval_status">
             <?php foreach ($statusOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= $st===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
       </div>
+      <div class="ff" style="margin-top:8px"><label>Reason for status change <span class="muted">(recorded on the timeline)</span></label><input class="form-control" name="status_reason" placeholder="e.g. Suspended pending CAPA closure"></div>
       <div class="ff" style="margin-top:8px"><label>Notes</label><textarea class="form-control" name="notes" rows="2"><?= e($p['notes'] ?? '') ?></textarea></div>
       <div style="margin-top:8px"><button class="btn" type="submit">Save profile</button></div>
     </form>
@@ -101,3 +103,30 @@
   </table>
   </div>
 </div>
+
+<?php // ---- Qualification status timeline ---- ?>
+<?php if (!empty($events)):
+  $srcLab = ['ASSESSMENT'=>'Assessment','AUDIT'=>'Audit','EXPIRY'=>'Auto-expiry','MANUAL'=>'Manual'];
+?>
+<div class="panel" style="margin-top:14px">
+  <h3 style="margin:0 0 8px">Qualification history</h3>
+  <div style="display:flex;flex-direction:column;gap:0">
+    <?php foreach ($events as $ev): [$nc,$nl] = $statusPill($ev['new_status']); $when = $ev['at'] ? date('d M Y H:i', strtotime($ev['at'])) : ''; ?>
+      <div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
+        <div style="flex:0 0 130px;font-size:11.5px;color:var(--muted)"><?= e($when) ?></div>
+        <div style="flex:1">
+          <div style="font-size:13px">
+            <?php if (($ev['old_status'] ?? '') !== '' && $ev['old_status'] !== $ev['new_status']): ?>
+              <span class="muted"><?= e($statusOpts[$ev['old_status']] ?? $ev['old_status']) ?></span> → <?php endif; ?>
+            <span class="pill <?= $nc ?>"><?= e($nl) ?></span>
+            <span class="muted" style="font-size:11px">· <?= e($srcLab[$ev['source']] ?? $ev['source']) ?></span>
+            <?php if ($ev['score'] !== null && $ev['score'] !== ''): ?><span class="muted" style="font-size:11px">· score <?= e(rtrim(rtrim(number_format((float)$ev['score'],1),'0'),'.')) ?></span><?php endif; ?>
+          </div>
+          <?php if (trim((string)($ev['reason'] ?? '')) !== ''): ?><div class="muted" style="font-size:12px;margin-top:2px"><?= e($ev['reason']) ?></div><?php endif; ?>
+          <?php if (trim((string)($ev['actor'] ?? '')) !== ''): ?><div class="muted" style="font-size:11px">by <?= e($ev['actor']) ?></div><?php endif; ?>
+        </div>
+      </div>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php endif; ?>

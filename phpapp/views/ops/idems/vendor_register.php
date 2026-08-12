@@ -4,6 +4,7 @@
     switch($st){
       case 'APPROVED': return ['p-ok','Approved'];
       case 'CONDITIONAL': return ['p-warn','Approved w/ conditions'];
+      case 'EXPIRED': return ['p-bad','Approval expired'];
       case 'SUSPENDED': return ['p-bad','Suspended'];
       case 'BLACKLISTED': return ['p-bad','Blacklisted'];
       case 'UNDER_ASSESSMENT': return ['p-info','Under assessment'];
