@@ -2,6 +2,44 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🔎 UIRE — Universal Inspection Reporting Engine (Phase 2, Aug 2026) — IN PROGRESS
+
+Built on the LOCKED Phase 1 (URFE). `lib/uire.php`, wired into run_schema after
+urfe_migrate. Reuses existing modules (calls=request, jobs=assignment,
+hw_points=hold/witness, methods/decision_rules=acceptance, sample_items=sampling,
+equipment=instruments, nonconformities=finding, capa=action, risk_items=risk) —
+adds only genuinely-new inspection pieces.
+
+- **Slice 1 — ✅ DONE.** Reuses the existing `inspection_type` master (no
+  competing list, no pollution). New **Inspection Criteria Library**
+  (`inspection_criteria` + `inspection_criteria_packs`) — industry-neutral,
+  applicability-driven (applies_types/vendor_type/product, evidence/measurement/
+  mandatory/weight); seeded a 12-item GENERAL pack (the seed of future
+  Welding/NDT/Coating/Civil packs). New masters via the lookup engine:
+  inspection_response, inspection_objective, inspection_point_status.
+- **Slice 2 — ✅ DONE.** Extended the URFE Library with inspection sections/fields
+  (INSP_DETAILS/OBJECTIVES/ITEMS/QTY/CHECKLIST/MEASURE/TESTS/HOLDWITNESS/RESULT/
+  OUTSTANDING; select fields reference real masters via lookup:<key>; balance_qty
+  is a calculated field). `uire_criteria_prefill_rows()` fills a report's checklist
+  from a criteria pack; `uire_assemble_inspection_report()` builds any inspection
+  type from the Library. **Acceptance §107 + §100 PASS:** Final / Material /
+  Site-service / Test-Witness assembled from ONE engine, applicability holds (Site
+  drops material/dimensional; Material keeps them), checklist prefilled from
+  criteria, rendered through the existing PDF engine.
+- **Slice 3 — TODO.** Data-integrity validation as configurable checks in
+  idems_qa_run: measurement out-of-range flag (advisory, never auto-changes
+  Pass/Fail — §61/§62), quantity reconciliation (accepted+rejected+balance vs
+  presented — already partly present), result-vs-open-mandatory-criteria conflict.
+- **Slice 4 — TODO.** Re-inspection & consolidated linking (reuse
+  report_docs.revises_id + related links; §51/§53/§54 comparison), inspection
+  history for vendor/PO/item/serial.
+- **Slice 5 — TODO.** The remaining sample inspection configs (General/
+  Manufacturing/Site/Pre-Dispatch/Surveillance) seeded as ready types (§98);
+  register/dashboard reusing the existing documents register; reviewer flow.
+- **Slice 6 — TODO.** AI-QA metadata exposure per §60-64 (advisory only; AI never
+  changes measurements/results/severity — the existing three-layer QA already
+  enforces this) + regression lock.
+
 ## 🧱 URFE — Universal Report Foundation Engine (Aug 2026) — IN PROGRESS
 
 Phase 1 foundation the whole reporting ecosystem consumes. Strictly ADDITIVE on
