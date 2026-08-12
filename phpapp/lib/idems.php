@@ -400,6 +400,20 @@ function idems_migrate() {
         try { idems_build_vendor_audit(); } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('var_form_seeded_v1', '1');
     }
+    // ONE-TIME: add the Audit checklist table to a VAR form seeded before it
+    // existed. Safe — issued reports keep their frozen schema; drafts keep their
+    // data (fkeys unchanged, one field added).
+    if (function_exists('setting_get') && !setting_get('var_checklist_v1', '')) {
+        try {
+            $vid = idems_type_id_by_code('VAR');
+            if ($vid && !(int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey='audit_checklist'", [$vid])) {
+                $pdo->prepare("DELETE FROM report_fields WHERE report_type_id=?")->execute([$vid]);
+                $pdo->prepare("DELETE FROM report_sections WHERE report_type_id=?")->execute([$vid]);
+                idems_install_vendor_audit_sections($vid);
+            }
+        } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('var_checklist_v1', '1');
+    }
     // ---- Vendor qualification profile — one row per vendor partner, updated by
     // assessments. Kept separate from business_partners so the core directory CRUD
     // is untouched; joined by partner_id when a vendor is viewed or listed.
@@ -929,7 +943,14 @@ function idems_install_vendor_audit_sections($typeId) {
     $addField($s, 'scope', 'Audit scope', 'textarea', '', 2);
     $addField($s, 'criteria', 'Criteria / clauses audited', 'textarea', '', 2);
 
-    // Section III — audit findings. THIS is the table the NCR engine reads.
+    // Section III — the full audit checklist. Every check point with its result;
+    // the exceptions are also captured in the findings table below.
+    $s = $addSection('Audit checklist', 'Every check point examined during the audit, with its result. Non-conformities are also listed in the findings table.');
+    $addTable($s, 'audit_checklist', 'Checklist',
+        "Ref|merge\nCheck item\nRequirement / standard\nResult|select|Conforms,Minor NC,Major NC,Observation,N/A\nEvidence / remarks",
+        2, 'Result options: Conforms · Minor NC · Major NC · Observation · N/A. Only Major/Minor findings become nonconformities (from the findings table below).');
+
+    // Section IV — audit findings. THIS is the table the NCR engine reads.
     $s = $addSection('Audit findings', 'Each finding graded Major / Minor / Observation. On issue, Major and Minor findings are raised as nonconformities against this vendor.');
     $addTable($s, 'audit_findings', 'Findings',
         "Sr. No.|merge\nClause / requirement\nFinding / observation\nCategory|select|Major,Minor,Observation\nObjective evidence\nCorrective action required\nTarget date|date",
