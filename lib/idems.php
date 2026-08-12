@@ -484,6 +484,20 @@ function idems_migrate() {
         } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('er_p2_v1', '1');
     }
+    // ONE-TIME (P3): add capacity / sub-supplier / packing / dispatch-readiness /
+    // logistics sections to an ER seeded before them. Reseeds only when the
+    // dispatch-readiness table is absent.
+    if (function_exists('setting_get') && !setting_get('er_p3_v1', '')) {
+        try {
+            $eid = idems_type_id_by_code('ER');
+            if ($eid && !(int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey='dispatch_readiness'", [$eid])) {
+                $pdo->prepare("DELETE FROM report_fields WHERE report_type_id=?")->execute([$eid]);
+                $pdo->prepare("DELETE FROM report_sections WHERE report_type_id=?")->execute([$eid]);
+                idems_install_expediting_sections($eid);
+            }
+        } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('er_p3_v1', '1');
+    }
     // ---- Vendor qualification profile — one row per vendor partner, updated by
     // assessments. Kept separate from business_partners so the core directory CRUD
     // is untouched; joined by partner_id when a vendor is viewed or listed.
@@ -1281,6 +1295,33 @@ function idems_install_expediting_sections($typeId) {
     $addTable($s, 'delays', 'Delays',
         "Ref|merge\nActivity\nOriginal due|date\nForecast|date\nDelay (days)|number\nCause\nCategory|select|lookup:expediting_delay_category\nResponsible|select|Vendor,Client,Sub-supplier,Third party,Internal,Shared,External,Unknown\nImpact\nRecovery action\nStatus|select|Open,In progress,Recovered,Closed", 2);
 
+    // Part 16, 25-27 — capacity, resources & manpower.
+    $s = $addSection('Capacity & resources', 'Whether the vendor has the capacity, manpower and equipment to meet the plan.');
+    $addField($s, 'capacity_note', 'Capacity assessment', 'textarea', '', 2);
+    $addTable($s, 'resources', 'Resources / manpower',
+        "Resource / manpower|merge\nRequired\nAvailable\nShortage\nImpact");
+
+    // Part 28-29 — sub-supplier monitoring (expediting goes beyond the vendor).
+    $s = $addSection('Sub-supplier status', 'Sub-vendors, material suppliers, special processes, test labs and transporters — often the real constraint.');
+    $addTable($s, 'subsuppliers', 'Sub-suppliers',
+        "Sub-supplier|merge\nScope\nCommitment|date\nStatus|select|On track,At risk,Delayed,Complete\nProgress\nDelay (days)|number\nImpact");
+
+    // Part 18, 33 — packing & preservation.
+    $s = $addSection('Packing & preservation', 'Packaging, preservation, marking and protection readiness.');
+    $addTable($s, 'packing', 'Packing & preservation',
+        "Item|merge\nSpecification\nStatus|select|Not started,In progress,Complete,Pending approval,Rejected\nRemarks");
+
+    // Part 34 — dispatch readiness checklist. Prefilled with the standard items on
+    // creation; the deterministic readiness % + mandatory blockers drive QA.
+    $s = $addSection('Dispatch readiness', 'The formal go/no-go checklist. Mandatory items that are not "Yes" are blockers, whatever the overall readiness %.', 0, 1);
+    $addTable($s, 'dispatch_readiness', 'Dispatch readiness',
+        "Readiness item|merge\nStatus|select|Yes,No,Pending,N/A\nMandatory|select|Yes,No\nRemarks");
+
+    // Part 20, 35 — logistics & delivery.
+    $s = $addSection('Logistics & delivery', 'Shipment mode, carrier, route and transit status through to arrival.');
+    $addTable($s, 'logistics', 'Logistics',
+        "Mode|select|Road,Rail,Sea,Air,Courier,Multimodal\nCarrier\nOrigin\nDestination\nDispatch|date\nExpected arrival|date\nActual arrival|date\nTracking no.\nStatus|select|Planned,Dispatched,In transit,Arrived,Delayed");
+
     // Part 28, 36-37, 73 — delivery forecast: the THREE dates that make a TPIA
     // expediting report worth more than the vendor's own statement.
     $s = $addSection('Delivery forecast', 'The required date, what the vendor commits/forecasts, and the expeditor\'s own evidence-based forecast — kept distinct on purpose.', 0, 1);
@@ -1305,6 +1346,45 @@ function idems_install_expediting_sections($typeId) {
     return $typeId;
 }
 
+// The standard dispatch-readiness checklist (item => mandatory). Editable in the
+// report like any table; prefilled on a new ER so it is ready to complete.
+function idems_dispatch_checklist_items() {
+    return [
+        ['Product / scope complete', 'Yes'], ['Inspection complete', 'Yes'], ['Testing complete', 'Yes'],
+        ['NCRs resolved / dispositioned', 'Yes'], ['Documentation / dossier complete', 'Yes'],
+        ['Packing complete', 'Yes'], ['Preservation complete', 'No'], ['Marking complete', 'Yes'],
+        ['Client release / clearance available', 'Yes'], ['Transport arranged', 'No'], ['Dispatch documents ready', 'Yes'],
+    ];
+}
+// Prefill rows for the dispatch-readiness table (status Pending, mandatory set).
+function idems_dispatch_prefill($field) {
+    if (!$field) return [];
+    $keys = array_keys(idems_table_col_defs($field)); $rows = [];
+    foreach (idems_dispatch_checklist_items() as $it) {
+        $vals = [$it[0], 'Pending', $it[1], '']; $row = [];
+        foreach ($keys as $i => $k) $row[$k] = $vals[$i] ?? ''; $rows[] = $row;
+    }
+    return $rows;
+}
+// Deterministic dispatch readiness: % of applicable items that are "Yes", plus
+// the mandatory items that are NOT yet met (the blockers — a report can be 90%
+// ready and still blocked). Returns null when there is no checklist.
+function idems_expediting_dispatch_readiness($fields, $data) {
+    foreach ($fields as $f) {
+        if (($f['ftype'] ?? '') !== 'table' || ($f['fkey'] ?? '') !== 'dispatch_readiness') continue;
+        $rows = $data[$f['fkey']] ?? null; if (!is_array($rows) || !$rows) return null;
+        $defs = idems_table_col_defs($f); $itemK=null;$stK=null;$mandK=null;
+        foreach ($defs as $ck=>$d){ $l=strtolower((string)$d['label']); if(strpos($l,'item')!==false)$itemK=$ck; elseif($l==='status')$stK=$ck; elseif(strpos($l,'mandator')!==false)$mandK=$ck; }
+        if ($stK===null) return null;
+        $applic=0;$yes=0;$blockers=[];
+        foreach ($rows as $r){ $rr=(array)$r; $st=strtolower(trim((string)($rr[$stK]??''))); if($st===''||$st==='n/a'||$st==='na') continue;
+            $applic++; if($st==='yes'){$yes++;} else { $mand=strtolower(trim((string)($rr[$mandK]??''))); if(in_array($mand,['yes','y','1','true'],true)) $blockers[]=trim((string)($rr[$itemK]??'Item')); }
+        }
+        $pct = $applic>0 ? round($yes/$applic*100,1) : null;
+        return ['pct'=>$pct,'applicable'=>$applic,'yes'=>$yes,'blockers'=>$blockers];
+    }
+    return null;
+}
 // A plain-English band for a 0-100 progress figure (distinct from the assessment
 // bands, which speak of approval rather than completion).
 function idems_progress_band($p) {
@@ -2096,6 +2176,15 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
                          'The vendor has ' . $openMaj . ' open major nonconformity(ies); confirm whether they impact this delivery.', 'Quality / NCR',
                          'Assess the delivery impact of the open NCR(s) and reflect it in the forecast.');
             }
+            // e) Dispatch-readiness mandatory blockers — a report can read mostly
+            // ready and still be blocked on a mandatory item.
+            if (function_exists('idems_expediting_dispatch_readiness')) {
+                $dr = idems_expediting_dispatch_readiness($fields, $data);
+                if ($dr && !empty($dr['blockers']))
+                    $add('high', 'expediting', 'Dispatch is blocked on ' . count($dr['blockers']) . ' mandatory item(s)', 'Dispatch readiness',
+                         'Dispatch readiness is ' . ($dr['pct'] === null ? '—' : rtrim(rtrim(number_format((float)$dr['pct'],1),'0'),'.') . '%') . ', but mandatory item(s) are not met: ' . implode('; ', array_slice($dr['blockers'], 0, 6)) . '.', 'Dispatch readiness',
+                         'Close the mandatory blocker(s) before dispatch, regardless of the overall %.');
+            }
         } catch (Throwable $e) {}
     }
 
@@ -2820,6 +2909,7 @@ function ops_idems_documents($route, $method) {
                         if (($cf = $findF('complaints_review')) && function_exists('idems_vendor_prefill_complaints')) { $r = idems_vendor_prefill_complaints($vpid, $cf); if ($r) $pre['complaints_review'] = $r; }
                         if (($cf = $findF('inspection_status')) && function_exists('idems_vendor_prefill_inspections')) { $r = idems_vendor_prefill_inspections($vpid, $cf); if ($r) $pre['inspection_status'] = $r; }
                         if (($cf = $findF('ncr_register')) && function_exists('idems_vendor_prefill_ncrs')) { $r = idems_vendor_prefill_ncrs($vpid, $cf); if ($r) $pre['ncr_register'] = $r; }
+                        if (($cf = $findF('dispatch_readiness')) && function_exists('idems_dispatch_prefill')) { $r = idems_dispatch_prefill($cf); if ($r) $pre['dispatch_readiness'] = $r; }
                         if ($pre) $pdo->prepare("UPDATE report_docs SET data=? WHERE id=?")->execute([json_encode($pre), $id]);
                     }
                 } catch (Throwable $e) {}
@@ -4768,7 +4858,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                 $hFont = $ncol > 8 ? 6.5 : 7.5; $hLh = $ncol > 8 ? 8 : 9;
                 $drawHead = function() use ($p,$ml,$cols,$wpx,$xpos,$hFont,$hLh) {
                     $wrapped=[]; $maxL=1;
-                    foreach ($cols as $ck=>$cl){ $w=$p->wrap((string)$cl,$hFont,$wpx[$ck]-4,true); if(count($w)>3)$w=array_slice($w,0,3); if(!$w)$w=['']; $wrapped[$ck]=$w; $maxL=max($maxL,count($w)); }
+                    foreach ($cols as $ck=>$cl){ $w=$p->wrap((string)$cl,$hFont,$wpx[$ck]-4,true,true); if(count($w)>3)$w=array_slice($w,0,3); if(!$w)$w=['']; $wrapped[$ck]=$w; $maxL=max($maxL,count($w)); }
                     $hh=$maxL*$hLh+4; $hy=$p->y; $p->rectFill($ml,$hy,$p->contentW(),$hh,[235,238,245]);
                     foreach ($wrapped as $ck=>$w){ for($j=0;$j<count($w);$j++){ $p->y=$hy+3+$j*$hLh; $p->text($xpos[$ck]+3,$w[$j],$hFont,true,[60,60,60]); } }
                     $p->y=$hy+$hh+1;
@@ -4785,7 +4875,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                         elseif (isset($mergeCols[$ck])) $prevVal[$ck]=(string)($r[$ck]??'');
                         if ($isTickCol($d['label'])) { $ticks[$ck]=$cellTxt; $cells[$ck]=['']; continue; }
                         if ($isStatusCol($d['label']) && trim($cellTxt)!=='') { $badges[$ck]=$cellTxt; $cells[$ck]=['']; continue; }
-                        $w=$p->wrap($cellTxt,$cellFont,$wpx[$ck]-4); if(count($w)>4)$w=array_slice($w,0,4); if(!$w)$w=['']; $cells[$ck]=$w; $lines=max($lines,count($w)); }
+                        $w=$p->wrap($cellTxt,$cellFont,$wpx[$ck]-4,false,true); if(count($w)>4)$w=array_slice($w,0,4); if(!$w)$w=['']; $cells[$ck]=$w; $lines=max($lines,count($w)); }
                     $rowH=$lines*10+2;
                     if ($p->needSpace($rowH)) { $drawHead(); $prevVal=[]; }   // spilled to a new page → repeat the header
                     $ry=$p->y;
