@@ -371,6 +371,12 @@ function idems_migrate() {
         } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('ir_header_dedup_v1', '1');
     }
+    // ONE-TIME: give the "RN — Release Note" type its form so a Release Note is
+    // designed like the inspection report and renders through the same engine.
+    if (function_exists('setting_get') && !setting_get('rn_form_seeded_v1', '')) {
+        try { idems_build_release_note(); } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('rn_form_seeded_v1', '1');
+    }
 }
 // ITP inspection type for a scope activity — how the point is covered.
 const INSPECTION_TYPES_ITP = [
@@ -600,6 +606,94 @@ function idems_install_inspection_sections($typeId) {
     $s = $addSection('Sign-off', 'Prepared / Reviewed / Approved — name, designation and date auto-fill from the workflow.', 0, 1);
     $addField($s, 'signoff', 'For ' . app_name(), 'sigblock', "Prepared by\nReviewed by\nApproved by", '', 2);
 
+    return $typeId;
+}
+
+// The Release Note is auto-generated from an Inspection Report and carries the
+// SAME identifying details, the item table and the activity list forward, plus a
+// release statement that refers to the inspection report number(s). It shares the
+// IR's field keys so those values copy across directly, and it is form-driven so
+// it renders through the same polished report engine (header, aligned sections,
+// proportional tables, balanced pagination) — not the legacy plain block.
+function idems_install_release_note_sections($typeId) {
+    $pdo = db();
+    $so = 0; $fo = 0;
+    $addSection = function($title, $help = '', $pgb = 0, $keep = 0) use ($pdo, $typeId, &$so) {
+        $so += 10;
+        $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,page_break_before,keep_together,sort_order) VALUES (?,?,?,?,?,?)")
+            ->execute([$typeId, $title, $help, $pgb, $keep, $so]);
+        return (int)$pdo->lastInsertId();
+    };
+    $addField = function($secId, $fkey, $label, $ftype, $opts = '', $tableCols = '', $span = 1) use ($pdo, $typeId, &$fo) {
+        $fo += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,table_cols,sort_order,col_span) VALUES (?,?,?,?,?,?,?,?,?)")
+            ->execute([$typeId, $secId, $fkey, $label, $ftype, $opts, $tableCols, $fo, $span]);
+    };
+
+    // Section I — reference details (carried from the inspection report).
+    $s = $addSection('Reference', 'Client, end user, manufacturer, PO and project — carried from the inspection report.', 0, 1);
+    $addField($s, 'client', 'Client', 'text');
+    $addField($s, 'end_user', 'End user', 'text');
+    $addField($s, 'vendor', 'Manufacturer / Vendor', 'text');
+    $addField($s, 'po_number', 'P.O. No.', 'text');
+    $addField($s, 'project', 'Project', 'text');
+
+    // Section II — inspection details (carried from the inspection report).
+    $s = $addSection('Inspection details', 'Stage, date, place and inspector — carried from the inspection report.', 0, 1);
+    $addField($s, 'inspection_stage', 'Stage of inspection', 'select', "Stage inspection\nIn-process\nFinal\nPre-dispatch\nWitness\nReview");
+    $addField($s, 'inspection_date', 'Date of inspection', 'date');
+    $addField($s, 'location', 'Place of inspection', 'text');
+    $addField($s, 'inspector', 'Inspector', 'text');
+
+    // Items offered — the same PO item table carried from the report.
+    $s = $addSection('Items offered / released', 'The PO line items released — carried from the inspection report.');
+    $addField($s, 'po_items', 'PO line items', 'table', '',
+        "PO Sr. No.|merge\nDescription as per PO\nSize\nUnit|unit\nPO Qty|number\nOffered Qty|number\nPassed Qty|number\nRejected Qty|number\nHold Qty|number\nBalance Qty|number\nHeat No.\nProduct Sr. No.", 2);
+
+    // Activities carried out — the ITP scope carried from the report.
+    $s = $addSection('Activities carried out', 'The ITP / inspection scope activities carried out — carried from the inspection report.');
+    $addField($s, 'scope_activities', 'Scope of activities', 'table', '',
+        "ITP / Clause No.|merge\nSub-clause\nDescription of activity\nQuantum of check\nInspection type|select|lookup:itp_inspection_type\nObservation\nRemarks\nDisposition|select|lookup:inspection_disposition\nStatus|select|lookup:activity_progress", 2);
+
+    // Release statement — the conclusion, with a field for the inspection report
+    // number(s) entered by hand (kept together, not split across a page).
+    $s = $addSection('Release statement', '', 0, 1);
+    $addField($s, 'release_statement', 'Statement', 'textarea', '', '', 2);
+    $addField($s, 'ir_numbers', 'Inspection Report No(s).', 'text', '', '', 2);
+
+    // Disclaimer + Sign-off, matching the inspection report.
+    $s = $addSection('', '', 0, 1);
+    $disc = "This Release Note is issued on the basis of the inspection carried out and reported under the inspection report number(s) referred above. It does not relieve the manufacturer / supplier of their contractual obligations. Our liability is limited to the fee charged for this inspection.";
+    $addField($s, 'disclaimer', 'Disclaimer', 'richtext', $disc, '', 2);
+    $s = $addSection('Sign-off', 'Prepared / Reviewed / Approved — name, designation and date auto-fill from the workflow.', 0, 1);
+    $addField($s, 'signoff', 'For ' . app_name(), 'sigblock', "Prepared by\nReviewed by\nApproved by", '', 2);
+
+    return $typeId;
+}
+
+// The default release-statement wording (editable per Release Note). The report
+// number(s) are entered by hand into the "Inspection Report No(s)." field, so the
+// statement itself carries a placeholder rather than an auto-inserted number.
+function idems_release_statement_default() {
+    $t = function_exists('setting_get') ? trim((string)setting_get('release_statement_default', '')) : '';
+    if ($t !== '') return $t;
+    return "The subject inspection was carried out with respect to the approved documents and found meeting requirements. For further details please refer Inspection Report Number(s) noted below.";
+}
+
+// Resolve (creating/seeding once) the form-driven "RN — Release Note" report type
+// so a Release Note is designed like the inspection report and renders the same.
+function idems_build_release_note() {
+    $pdo = db();
+    $t = ops_one("SELECT id FROM report_types WHERE code='RN'");
+    if ($t) { $typeId = (int)$t['id']; }
+    else {
+        $sort = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_types");
+        $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_at) VALUES (?,?, 'TPIA_REPORT',1,0,?,?)")
+            ->execute(['RN', 'Release Note', $sort, date('c')]);
+        $typeId = (int)$pdo->lastInsertId();
+    }
+    $has = (int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=?", [$typeId]);
+    if (!$has) idems_install_release_note_sections($typeId);
     return $typeId;
 }
 function idems_sections($typeId) { return ops_all("SELECT * FROM report_sections WHERE report_type_id=? ORDER BY sort_order, id", [(int)$typeId]); }
@@ -3109,7 +3203,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
     // remarks
     if (!empty($doc['remarks'])) { $p->gap(4); $p->needSpace(16); $p->line('Remarks', 10, true, 13, $band); foreach ($p->wrap($doc['remarks'],9,$p->contentW()) as $ln2){ $p->needSpace(11); $p->line($ln2,9,false,11); } }
     // ---- Release Note block (RN / IRN documents only) ----
-    if (in_array(strtoupper((string)($doc['type_code'] ?? '')), ['RN','IRN'], true)) { idems_release_block($p, $doc, $lh, $band); }
+    if (in_array(strtoupper((string)($doc['type_code'] ?? '')), ['RN','IRN'], true) && empty($fields)) { idems_release_block($p, $doc, $lh, $band); }   // legacy form-less RN only; a form-driven RN renders through the normal engine
     // ---- signature block ----
     // Skip this built-in Inspected-by / Approved-by block if the FORM already has
     // a Sign-off (sigblock) section — otherwise the signatures print twice. §dedup
@@ -3374,7 +3468,7 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
         $body .= $para($run('Remarks', true, 20, $BRAND), ['before' => 100, 'after' => 30]);
         foreach (preg_split('/\r?\n/', (string)$doc['remarks']) as $ln) $body .= $para($run($ln, false, 18), ['after' => 20]);
     }
-    if (in_array(strtoupper((string)($doc['type_code'] ?? '')), ['RN','IRN'], true)) {
+    if (in_array(strtoupper((string)($doc['type_code'] ?? '')), ['RN','IRN'], true) && empty($fields)) {
         $rd = is_array($data) ? $data : [];
         $items = $rd['rn_items'] ?? null;
         if (is_array($items) && !empty($items['rows']) && !empty($items['cols'])) {
@@ -5089,8 +5183,7 @@ function ops_idems_release_note($method) {
         flash('A Release Note can only be drafted from an approved or issued report.', 'error');
         redirect('/document?id=' . $src['id']);
     }
-    $rnType = ops_one("SELECT * FROM report_types WHERE code='RN' AND active=1");
-    if (!$rnType) { flash('No active "RN — Release Note" report type found. Add one under Report types.', 'error'); redirect('/document?id=' . $src['id']); }
+    $rnTypeId = idems_build_release_note();   // form-driven RN type, seeded once
     // don't duplicate — match on the numeric source id (JSON escapes slashes, so
     // matching the IRN text is unreliable).
     $exists = ops_one("SELECT id, irn FROM report_docs WHERE type_code='RN' AND deleted=0 AND data LIKE ?", ['%"source_report_id":' . (int)$src['id'] . '%']);
@@ -5106,7 +5199,7 @@ function ops_idems_release_note($method) {
             ? tech_phrase_by('accepted', 'The inspected item is found acceptable and is hereby cleared for despatch, subject to the approved documentation.')
             : tech_phrase_by('accepted with conditions', 'The inspected item is released subject to satisfactory closure of the observations recorded in the referenced report.'));
     $fieldsNew = [
-        'report_type_id'=>$rnType['id'], 'type_code'=>'RN', 'title'=>'Release Note — ' . ($src['title'] ?: $src['irn']),
+        'report_type_id'=>$rnTypeId, 'type_code'=>'RN', 'title'=>'Release Note — ' . ($src['title'] ?: $src['irn']),
         'client_id'=>$src['client_id'], 'vendor_id'=>$src['vendor_id'], 'call_id'=>$src['call_id'], 'job_id'=>$src['job_id'],
         'client_code'=>$src['client_code'], 'project_code'=>$src['project_code'], 'project_name'=>$src['project_name'],
         'office_id'=>$src['office_id'], 'sbu'=>$src['sbu'], 'po_ref'=>$src['po_ref'], 'drawing_no'=>$src['drawing_no'],
@@ -5114,29 +5207,21 @@ function ops_idems_release_note($method) {
         'product_category'=>$src['product_category'], 'material_grade'=>$src['material_grade'],
         'inspector_id'=>$src['inspector_id'], 'approver_user_id'=>$src['approver_user_id'],
         'inspection_date'=>$src['inspection_date'], 'result'=>$src['result'] ?: $p['result'], 'release_status'=>$rel,
-        'remarks'=>$body,
+        'remarks'=>'',
     ];
     [$irn, $serial] = idems_generate_irn($fieldsNew);
     $tok = idems_tokens_for($fieldsNew);
-    // Carry the very same items/products table and identification across, and
-    // infer the report kind, so the Release Note stands on its own with the
-    // source report's content and its own number.
-    $srcCode = strtoupper((string)($src['type_code'] ?? ''));
-    $kind = (strpos($srcCode, 'FIR') !== false || strpos($srcCode, 'FINAL') !== false) ? 'Final'
-          : ((strpos($srcCode, 'STAGE') !== false || $srcCode === 'IR') ? 'Stage' : 'Stage / Final');
-    $inspName = $src['inspector_id'] ? (string)ops_val("SELECT name FROM inspectors WHERE id=?", [(int)$src['inspector_id']]) : '';
-    $rnData = json_encode([
-        'source_irn'       => $src['irn'],
-        'source_report_id' => (int)$src['id'],
-        'rn_items'         => idems_rn_items_from_source($fields, $data),
-        'rn_kind'          => $kind,
-        'rn_ir_numbers'    => $src['irn'],
-        'rn_identification'=> [[
-            'ident'        => trim(($src['product_category'] ?? '') . ' ' . ($src['material_grade'] ?? '')),
-            'location'     => (string)($src['location'] ?? ''),
-            'inspected_by' => $inspName,
-        ]],
-    ]);
+    // Carry the inspection report's own field values across — the identifying
+    // details, the PO item table and the ITP activity list — so the Release Note
+    // renders through the same form engine with the same content, under its own
+    // number. The release statement is prefilled with the default wording; the
+    // inspection report number(s) are left blank for manual entry. §releasenote
+    $carry = ['client','end_user','vendor','po_number','project','inspection_stage','inspection_date','location','inspector','po_items','scope_activities'];
+    $rnArr = ['source_irn' => $src['irn'], 'source_report_id' => (int)$src['id']];
+    foreach ($carry as $ck) if (isset($data[$ck]) && $data[$ck] !== '' && $data[$ck] !== 'NA') $rnArr[$ck] = $data[$ck];
+    $rnArr['release_statement'] = idems_release_statement_default();
+    $rnArr['ir_numbers']        = '';
+    $rnData = json_encode($rnArr);
     $cols = array_merge(['irn','company_code','branch_code','fy_label','serial','status','rev','data','created_by','created_at','updated_at'], array_keys($fieldsNew));
     $vals = array_merge([$irn, $tok['{COMPANY}'], $tok['{BRANCH}'], $tok['{FY}'], $serial, 'DRAFT', 0, $rnData, user_name(current_user()), date('c'), date('c')], array_values($fieldsNew));
     $ph = implode(',', array_fill(0, count($cols), '?'));
