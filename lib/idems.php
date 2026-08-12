@@ -1630,6 +1630,51 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
         }
     }
 
+    // 11) Vendor intelligence — for a Vendor Assessment / Audit that recommends
+    // approval, cross-check the vendor's live record. Deterministic and
+    // reproducible (the AI-advisory layer never gates; this is a real check).
+    $tc = strtoupper((string)($doc['type_code'] ?? ''));
+    $vidP = (int)($doc['vendor_id'] ?? 0);
+    if ($vidP > 0 && in_array($tc, ['VASR','VAR'], true)) {
+        $recRaw = strtolower(trim((string)($data['recommendation'] ?? '')));
+        $approves = $recRaw !== '' && strpos($recRaw, 'not approved') === false && strpos($recRaw, 'suspend') === false && strpos($recRaw, 'approv') !== false;
+        if ($approves) {
+            // a) Open major / overdue nonconformities against the vendor.
+            try {
+                $today = date('Y-m-d');
+                $openMajor = (int)ops_val("SELECT COUNT(*) FROM nonconformities WHERE partner_id=? AND status <> 'CLOSED' AND severity='MAJOR' AND (report_doc_id IS NULL OR report_doc_id <> ?)", [$vidP, (int)($doc['id'] ?? 0)]);
+                $overdue   = (int)ops_val("SELECT COUNT(*) FROM nonconformities WHERE partner_id=? AND status <> 'CLOSED' AND due_on <> '' AND due_on < ?", [$vidP, $today]);
+                if ($openMajor > 0)
+                    $add('high', 'vendor', 'Approval recommended while open major nonconformities exist', 'Vendor record',
+                         'This report recommends approval, but the vendor has ' . $openMajor . ' open major nonconformity(ies) in the register.', 'Vendor record',
+                         'Close or disposition the major NCR(s), or record why approval stands regardless.');
+                if ($overdue > 0)
+                    $add('medium', 'vendor', 'Approval recommended while nonconformities are overdue', 'Vendor record',
+                         'The vendor has ' . $overdue . ' overdue nonconformity(ies) still open.', 'Vendor record',
+                         'Progress the overdue NCR(s) before confirming approval.');
+            } catch (Throwable $e) {}
+            // b) Live performance well below the assessment.
+            if (function_exists('idems_vendor_performance')) {
+                try {
+                    $pf = idems_vendor_performance($vidP);
+                    if ($pf && $pf['score'] !== null && (float)$pf['score'] < 50)
+                        $add('medium', 'vendor', 'Live performance is poor despite the approval recommendation', 'Vendor 360',
+                             'The vendor\'s live performance score is ' . rtrim(rtrim(number_format((float)$pf['score'],1),'0'),'.') . '/100 (' . $pf['band'] . '), driven by open quality issues.', 'Vendor 360',
+                             'Review the open reports, NCRs and complaints on the vendor page before approving.');
+                } catch (Throwable $e) {}
+            }
+            // c) A vendor registration / certification appears expired.
+            try {
+                $today = date('Y-m-d');
+                $expCert = ops_one("SELECT doc_type, number, valid_to FROM partner_registrations WHERE partner_id=? AND valid_to <> '' AND valid_to < ? ORDER BY valid_to DESC LIMIT 1", [$vidP, $today]);
+                if ($expCert)
+                    $add('medium', 'vendor', 'A vendor certification appears expired', 'Vendor registrations',
+                         trim((string)($expCert['doc_type'] ?? 'A registration')) . ' ' . trim((string)($expCert['number'] ?? '')) . ' expired on ' . $expCert['valid_to'] . '.', 'Vendor registrations',
+                         'Obtain the current certificate before approving, or note the exception.');
+            } catch (Throwable $e) {}
+        }
+    }
+
     $counts = ['critical'=>0,'high'=>0,'medium'=>0,'low'=>0,'info'=>0];
     foreach ($issues as $it) { $s = $it['severity']; if (isset($counts[$s])) $counts[$s]++; }
     $score = 100 - ($counts['critical']*40 + $counts['high']*12 + $counts['medium']*5 + $counts['low']*1 + $counts['info']*0);

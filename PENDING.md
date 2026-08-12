@@ -121,8 +121,17 @@ Phased build (per spec §56):
     performance*.
   - Reassessment cycle already delivered in P3 (validity dates + expiry +
     reminders).
-- **P5 AI** — vendor-specific checks into the existing AI Auditor (score-vs-
-  finding conflict, capacity inconsistency, cert-expiry-overrides-score).
+- **P5 AI / vendor-specific checks — ✅ COMPLETE (Aug 2026).** Added as
+  *deterministic, reproducible* checks in the AI Auditor's rule layer (the AI
+  layer stays advisory-only, per the three-layer design). When a Vendor
+  Assessment/Audit recommends approval, `idems_qa_run` now cross-checks the
+  vendor's live record and flags: (a) open **major** nonconformities (HIGH) and
+  **overdue** NCRs (medium); (b) a **live performance score < 50** despite the
+  approval (medium) — the score-vs-finding conflict; (c) an **expired vendor
+  certification** from partner_registrations (medium). Gated to VASR/VAR with a
+  vendor; a clean vendor raises nothing. Verified by a 6-check test.
+
+  **The Universal Vendor platform (P1–P5) is COMPLETE.**
 - **P6 Advanced** — vendor portal self-assessment; predictive risk; automatic
   reassessment triggers; vendor comparison / trend.
 
