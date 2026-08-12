@@ -2,6 +2,47 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🚚 Universal Expediting & Supplier Progress Intelligence Engine (Aug 2026)
+
+Industry-neutral expediting engine built on the report engine — NOT an
+oil-&-gas form. Guiding principle (per the spec): the heart is **milestone +
+commitment + evidence + three-date forecast**, not a single "% complete".
+Reuses everything: report_docs already carries PO/project/vendor linkage; the
+scoring engine powers weighted progress; evidence-tick, QA auditor, NCR and
+Vendor-360 are all reused.
+
+- **Phase 1 keystone — ✅ DONE (Aug 2026).** Seeded "ER — Expediting Report":
+  PO/project baseline · scope & method · executive summary · **weighted overall
+  progress** (reuses the scoring engine → the header reads "OVERALL PROGRESS
+  %", not "assessment score") · **Milestone status** table (Baseline · Vendor
+  commitment · Latest forecast · Actual · traffic-light Status) · Commitment
+  register (with evidence tick) · Delay register · **Delivery forecast — the
+  three distinct dates** (Required · Vendor commitment · Latest vendor forecast ·
+  Expeditor's independent forecast · confidence) · Expeditor's assessment &
+  recommendation · sign-off. `idems_expediting_status()` computes overall
+  status + schedule/forecast variance deterministically; the AI Auditor gained
+  expediting checks (forecast after required = high; vendor forecast optimism vs
+  expeditor; high progress despite a delayed milestone). Seeded lookups:
+  expediting_type / _method / _status / _delay_category. Renders through the
+  shared PDF engine. Migration er_form_seeded_v1.
+- **Phase 2** — engineering/document expediting register, procurement/material
+  monitoring, manufacturing/service progress stages, inspection/test status
+  (link the Inspection engine), quality/NCR summary (link NCR).
+- **Phase 3** — capacity/resource/manpower, sub-supplier monitoring & chain
+  traceability, packing/preservation, dispatch-readiness checklist, logistics.
+- **Phase 4** — project-wide consolidation + three outputs from one engine:
+  Register (working data) · Dashboard (management) · Report (formal deliverable);
+  vendor commitment-reliability & forecast-reliability trends → Vendor-360.
+- **Phase 5** — AI advisory: exec-summary drafting, delay explanation, forecast
+  plausibility, cross-report comparison, progress-anomaly detection (advisory
+  only, never replaces values).
+- **Phase 6** — predictive delay/vendor risk, recovery intelligence, analytics.
+
+Design rule (per spec §79): never hard-code an industry; applicability is driven
+by vendor type / product / process / criteria pack via lookups + the criteria
+library. Register/Dashboard/Report are three views of one engine.
+
+
 ## 🏭 PLANNED — Universal Vendor Assessment / Audit / Qualification / Performance platform (Aug 2026)
 
 Industry-neutral, configurable vendor-evaluation platform (assessment, audit,

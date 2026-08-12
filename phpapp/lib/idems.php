@@ -466,6 +466,11 @@ function idems_migrate() {
         } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('ir_evidence_v1', '1');
     }
+    // ONE-TIME: give the "ER — Expediting Report" type its universal form.
+    if (function_exists('setting_get') && !setting_get('er_form_seeded_v1', '')) {
+        try { idems_build_expediting(); } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('er_form_seeded_v1', '1');
+    }
     // ---- Vendor qualification profile — one row per vendor partner, updated by
     // assessments. Kept separate from business_partners so the core directory CRUD
     // is untouched; joined by partner_id when a vendor is viewed or listed.
@@ -493,6 +498,21 @@ function idems_migrate() {
             'CONDITIONAL'=>'Approved with conditions','EXPIRED'=>'Approval expired','SUSPENDED'=>'Suspended','BLACKLISTED'=>'Blacklisted'], 'Vendor');
         // Ensure EXPIRED exists even where the type was seeded before it was added.
         if (function_exists('lk_ensure_value')) lk_ensure_value('vendor_approval_status', 'EXPIRED', 'Approval expired');
+        // Expediting master lists (all editable; never hard-coded downstream).
+        lk_ensure_type_map('expediting_type', 'Expediting type', [
+            'PRE_AWARD'=>'Pre-award assessment','KICKOFF'=>'Post-PO kickoff','DESK'=>'Desk expediting','REMOTE'=>'Remote expediting',
+            'SITE'=>'Site / factory expediting','ROUTINE'=>'Routine visit','WEEKLY'=>'Weekly','FORTNIGHTLY'=>'Fortnightly','MONTHLY'=>'Monthly',
+            'CRITICAL'=>'Critical-item','RECOVERY'=>'Recovery / delay','PRE_DISPATCH'=>'Pre-dispatch','FINAL'=>'Final expediting'], 'Expediting');
+        lk_ensure_type_map('expediting_method', 'Expediting method', [
+            'DESK'=>'Desk','EMAIL'=>'Email','PHONE'=>'Phone','VIDEO'=>'Video conference','DOC_REVIEW'=>'Document review',
+            'MEETING'=>'Supplier meeting','SITE'=>'Site visit','FACTORY'=>'Factory visit','TPI'=>'Third-party verification','HYBRID'=>'Hybrid'], 'Expediting');
+        lk_ensure_type_map('expediting_status', 'Expediting overall status', [
+            'ON_TRACK'=>'On track','ON_WATCH'=>'On watch','AT_RISK'=>'At risk','DELAYED'=>'Delayed','CRITICAL'=>'Critical','COMPLETED'=>'Completed','CLOSED'=>'Closed'], 'Expediting');
+        lk_ensure_type_map('expediting_delay_category', 'Delay category', [
+            'ENGINEERING'=>'Engineering','CLIENT_APPROVAL'=>'Client approval','VENDOR'=>'Vendor','PROCUREMENT'=>'Procurement','MATERIAL'=>'Material',
+            'PRODUCTION'=>'Production','CAPACITY'=>'Capacity','MANPOWER'=>'Manpower','EQUIPMENT'=>'Equipment','QUALITY'=>'Quality','INSPECTION'=>'Inspection',
+            'TESTING'=>'Testing','DOCUMENTATION'=>'Documentation','LOGISTICS'=>'Logistics','TRANSPORT'=>'Transport','CUSTOMS'=>'Customs','REGULATORY'=>'Regulatory',
+            'WEATHER'=>'Weather','FORCE_MAJEURE'=>'Force majeure','COMMERCIAL'=>'Commercial','PAYMENT'=>'Payment','CHANGE_ORDER'=>'Change order','DESIGN_CHANGE'=>'Design change','OTHER'=>'Other'], 'Expediting');
     }
     // Vendor status timeline — every qualification change (by assessment, audit,
     // expiry or a manual edit) recorded with who, when, why and the score.
@@ -1118,6 +1138,185 @@ function idems_raise_ncrs_from_audit($doc) {
     }
     if ($n > 0 && function_exists('idems_log')) idems_log('report_doc', $docId, 'NCRS_RAISED', ['irn'=>$doc['irn'] ?? '', 'count'=>$n]);
     return $n;
+}
+// ===========================================================================
+//  Universal Expediting Report (ER) — supplier progress / schedule intelligence.
+//  Industry-neutral: milestones + commitments + evidence + a three-date forecast
+//  (required vs vendor vs expeditor) are the heart, NOT a single "% complete".
+//  Weighted progress reuses the scoring engine; evidence ticks, the delay/NCR
+//  links and the deterministic auditor are all reused.
+// ===========================================================================
+function idems_build_expediting() {
+    $pdo = db();
+    $t = ops_one("SELECT id FROM report_types WHERE code='ER'");
+    if ($t) { $typeId = (int)$t['id']; }
+    else {
+        $sort = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_types");
+        $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_at) VALUES (?,?, 'TPIA_REPORT',1,0,?,?)")
+            ->execute(['ER', 'Expediting Report', $sort, date('c')]);
+        $typeId = (int)$pdo->lastInsertId();
+    }
+    $has = (int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=?", [$typeId]);
+    if (!$has) idems_install_expediting_sections($typeId);
+    return $typeId;
+}
+
+function idems_install_expediting_sections($typeId) {
+    $pdo = db();
+    $so = 0; $fo = 0;
+    $addSection = function($title, $help = '', $pgb = 0, $keep = 0) use ($pdo, $typeId, &$so) {
+        $so += 10;
+        $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,page_break_before,keep_together,sort_order) VALUES (?,?,?,?,?,?)")
+            ->execute([$typeId, $title, $help, $pgb, $keep, $so]);
+        return (int)$pdo->lastInsertId();
+    };
+    $addField = function($secId, $fkey, $label, $ftype, $opts = '', $span = 1, $help = '') use ($pdo, $typeId, &$fo) {
+        $fo += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,help,sort_order,col_span) VALUES (?,?,?,?,?,?,?,?,?)")
+            ->execute([$typeId, $secId, $fkey, $label, $ftype, $opts, $help, $fo, $span]);
+    };
+    $addTable = function($secId, $fkey, $label, $cols, $span = 2, $help = '') use ($pdo, $typeId, &$fo) {
+        $fo += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span) VALUES (?,?,?,?, 'table',?,?,?,?)")
+            ->execute([$typeId, $secId, $fkey, $label, $cols, $help, $fo, $span]);
+    };
+    // Weighted progress stage — a number 0-100 with a configurable weight; the
+    // scoring engine rolls these up into one weighted overall progress %.
+    $addProgress = function($secId, $fkey, $label, $weight) use ($pdo, $typeId, &$fo) {
+        $fo += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,max_score,weight,placeholder,sort_order,col_span) VALUES (?,?,?,?, 'number',100,?, '0-100',?,1)")
+            ->execute([$typeId, $secId, $fkey, $label, $weight, $fo]);
+    };
+
+    // Part 3-6 — PO / project / vendor / scope (baseline & identity).
+    $s = $addSection('Project & purchase order', 'What is being expedited, for whom, against which order and by when.', 0, 1);
+    $addField($s, 'vendor', 'Vendor / supplier', 'text');
+    $addField($s, 'vendor_code', 'Vendor code', 'text');
+    $addField($s, 'client', 'Client', 'text');
+    $addField($s, 'project', 'Project', 'text');
+    $addField($s, 'po_number', 'Purchase order no.', 'text');
+    $addField($s, 'po_date', 'PO date', 'date');
+    $addField($s, 'product', 'Product / equipment / service', 'text', '', 2);
+    $addField($s, 'package', 'Package / tag / item', 'text');
+    $addField($s, 'quantity', 'Quantity', 'text');
+    $addField($s, 'location', 'Vendor location', 'text', '', 2);
+    $addField($s, 'criticality', 'Criticality', 'select', "Critical\nHigh\nMedium\nLow");
+    $addField($s, 'required_date', 'Required delivery date', 'date');
+
+    // Part 5-6 — expediting scope, method, period.
+    $s = $addSection('Expediting scope & method', 'How this is being expedited and for what reporting period.', 0, 1);
+    $addField($s, 'expediting_type', 'Expediting type', 'select', "lookup:expediting_type");
+    $addField($s, 'expediting_method', 'Method', 'select', "lookup:expediting_method");
+    $addField($s, 'period_from', 'Reporting period from', 'date');
+    $addField($s, 'period_to', 'Reporting period to', 'date');
+    $addField($s, 'expeditor', 'Expeditor', 'text');
+    $addField($s, 'prev_report', 'Previous report ref', 'text');
+
+    // Part 7 — executive summary.
+    $s = $addSection('Executive summary', 'The management-level headline: overall status and the story of this period.', 0, 1);
+    $addField($s, 'overall_status', 'Overall status', 'select', "lookup:expediting_status", 1);
+    $addField($s, 'summary', 'Summary', 'textarea', '', 2);
+
+    // Part 8 — weighted progress (reuses the scoring engine). Weights are the
+    // stage's share of overall progress and are fully editable in the builder.
+    $s = $addSection('Overall progress (weighted)', 'Percent complete per stage; the overall figure is the weighted roll-up. Edit the weights to suit the scope — a service or software supplier weights different stages than a fabricator.');
+    $addProgress($s, 'p_engineering', 'Engineering / design', 10);
+    $addProgress($s, 'p_documents', 'Documentation / drawings', 10);
+    $addProgress($s, 'p_procurement', 'Procurement / sub-orders', 15);
+    $addProgress($s, 'p_material', 'Raw material received', 10);
+    $addProgress($s, 'p_manufacture', 'Manufacturing / service', 35);
+    $addProgress($s, 'p_inspection', 'Inspection / testing', 10);
+    $addProgress($s, 'p_dispatch', 'Packing / dispatch readiness', 10);
+
+    // Part 10 — MILESTONE STATUS — the heart. Baseline vs vendor commitment vs
+    // latest forecast vs actual, with a traffic-light status.
+    $s = $addSection('Milestone status', 'The heart of the report: what was planned, committed, forecast and actually achieved for each milestone.');
+    $addTable($s, 'milestones', 'Milestones',
+        "Milestone|merge\nBaseline|date\nVendor commitment|date\nLatest forecast|date\nActual|date\nStatus|select|Complete,On track,At risk,Delayed,Not started\nRemarks",
+        2, 'Status is the traffic light: Complete (green) · On track (green) · At risk (amber) · Delayed (red) · Not started (grey).');
+
+    // Part 25 — commitment register (never overwrite the original; every revision
+    // kept). Carries an evidence tick.
+    $s = $addSection('Commitment register', 'Every material vendor commitment — the original due date is preserved; revisions and their reasons are recorded.');
+    $addTable($s, 'commitments', 'Commitments',
+        "Commitment|merge\nOriginal due|date\nRevised due|date\nForecast|date\nActual|date\nStatus|select|Not started,In progress,Completed,Delayed,At risk\nReason for change\nEvidence referred\nAttached|select|Yes,No,N/A", 2);
+
+    // Part 21 — delay register.
+    $s = $addSection('Delay register', 'Each delay with its cause, responsible party, impact and recovery action. Cause is not assumed to be the vendor.');
+    $addTable($s, 'delays', 'Delays',
+        "Ref|merge\nActivity\nOriginal due|date\nForecast|date\nDelay (days)|number\nCause\nCategory|select|lookup:expediting_delay_category\nResponsible|select|Vendor,Client,Sub-supplier,Third party,Internal,Shared,External,Unknown\nImpact\nRecovery action\nStatus|select|Open,In progress,Recovered,Closed", 2);
+
+    // Part 28, 36-37, 73 — delivery forecast: the THREE dates that make a TPIA
+    // expediting report worth more than the vendor's own statement.
+    $s = $addSection('Delivery forecast', 'The required date, what the vendor commits/forecasts, and the expeditor\'s own evidence-based forecast — kept distinct on purpose.', 0, 1);
+    $addField($s, 'f_required', 'Required date (contract)', 'date');
+    $addField($s, 'f_vendor_commit', 'Original vendor commitment', 'date');
+    $addField($s, 'f_vendor_forecast', 'Latest vendor forecast', 'date');
+    $addField($s, 'f_expeditor', "Expeditor's forecast", 'date');
+    $addField($s, 'f_confidence', 'Forecast confidence', 'select', "High\nMedium\nLow");
+    $addField($s, 'f_basis', 'Basis of expeditor forecast', 'textarea', '', 2);
+
+    // Part 29-31 — expeditor's independent assessment & recommendation.
+    $s = $addSection("Expeditor's assessment & recommendation", 'The expeditor\'s independent professional view, not a restatement of the vendor\'s.', 0, 1);
+    $addField($s, 'assessment', 'Independent assessment', 'textarea', '', 2);
+    $addField($s, 'recommendation', 'Recommendation', 'select',
+        "Continue monitoring\nIncrease frequency\nVendor meeting required\nManagement escalation\nRecovery plan required\nClient decision required\nPartial shipment recommended\nInspection priority required\nRe-baseline required\nNo action required", 2);
+    $addField($s, 'next_followup', 'Next planned follow-up', 'date');
+
+    // Sign-off.
+    $s = $addSection('Sign-off', 'Prepared / Reviewed / Approved — name, designation and date auto-fill from the workflow.', 0, 1);
+    $addField($s, 'signoff', 'For ' . app_name(), 'sigblock', "Prepared by\nReviewed by\nApproved by", 2);
+
+    return $typeId;
+}
+
+// A plain-English band for a 0-100 progress figure (distinct from the assessment
+// bands, which speak of approval rather than completion).
+function idems_progress_band($p) {
+    $p = (float)$p;
+    if ($p >= 100) return 'Complete';
+    if ($p >= 90)  return 'Near complete';
+    if ($p >= 50)  return 'In progress';
+    if ($p > 0)    return 'Early stage';
+    return 'Not started';
+}
+
+// Deterministic expediting/schedule intelligence for an Expediting Report:
+// the overall status, schedule variance and forecast picture, computed from the
+// milestone table and the three forecast dates. No LLM — every value reproducible.
+function idems_expediting_status($doc, $fields = null, $data = null) {
+    if ($fields === null) $fields = idems_fields((int)($doc['report_type_id'] ?? 0));
+    if ($data === null) { $data = json_decode($doc['data'] ?? '[]', true); if (!is_array($data)) $data = []; }
+    $pd = function($s) { $s = trim((string)$s); if ($s === '') return null; $t = strtotime($s); return $t ?: null; };
+    // Milestone tallies from the milestone table.
+    $mt = ['total'=>0,'complete'=>0,'delayed'=>0,'at_risk'=>0]; $worst = 0;
+    foreach ($fields as $f) {
+        if (($f['ftype'] ?? '') !== 'table') continue;
+        $defs = idems_table_col_defs($f); $stK = null;
+        foreach ($defs as $ck => $d) if (strtolower((string)$d['label']) === 'status') { $stK = $ck; break; }
+        if ($stK === null || ($f['fkey'] ?? '') !== 'milestones') continue;
+        foreach (($data[$f['fkey']] ?? []) as $r) {
+            $rr = (array)$r; $st = strtolower(trim((string)($rr[$stK] ?? ''))); if ($st === '') continue;
+            $mt['total']++;
+            if (strpos($st,'complete') !== false) $mt['complete']++;
+            elseif (strpos($st,'delay') !== false) { $mt['delayed']++; $worst = max($worst, 3); }
+            elseif (strpos($st,'risk') !== false) { $mt['at_risk']++; $worst = max($worst, 2); }
+        }
+    }
+    // Forecast picture — expeditor forecast vs the required date.
+    $req = $pd($data['f_required'] ?? '') ?: $pd($data['required_date'] ?? '');
+    $vend = $pd($data['f_vendor_forecast'] ?? '');
+    $exp = $pd($data['f_expeditor'] ?? '');
+    $expVar = ($req && $exp) ? (int)floor(($exp - $req) / 86400) : null;             // +ve = late
+    $vendVsExp = ($vend && $exp) ? (int)floor(($exp - $vend) / 86400) : null;         // +ve = expeditor later than vendor
+    if ($expVar !== null) { if ($expVar > 0) $worst = max($worst, 3); }
+    // Overall status.
+    if ($mt['total'] > 0 && $mt['complete'] === $mt['total'] && ($expVar === null || $expVar <= 0)) $status = 'COMPLETED';
+    elseif ($worst >= 3) $status = ($expVar !== null && $expVar > 14) ? 'CRITICAL' : 'DELAYED';
+    elseif ($worst >= 2) $status = 'AT RISK';
+    else $status = 'ON TRACK';
+    return ['status'=>$status, 'milestones'=>$mt, 'forecast'=>['required'=>$req?date('Y-m-d',$req):'','vendor'=>$vend?date('Y-m-d',$vend):'','expeditor'=>$exp?date('Y-m-d',$exp):'',
+            'expeditor_variance_days'=>$expVar, 'vendor_vs_expeditor_days'=>$vendVsExp]];
 }
 // Keep only the RELEASED line items for a Release Note — rows that have a
 // passed / cleared / released / accepted quantity greater than zero. Rows that
@@ -1788,6 +1987,32 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
                          'Obtain the current certificate before approving, or note the exception.');
             } catch (Throwable $e) {}
         }
+    }
+
+    // 12) Expediting intelligence — forecast plausibility & schedule contradictions
+    // for an Expediting Report. Deterministic; surfaces what a management reader
+    // needs to question. (AI plausibility analysis is a later, advisory layer.)
+    if ($tc === 'ER' && function_exists('idems_expediting_status')) {
+        try {
+            $es = idems_expediting_status($doc, $fields, $data);
+            $fc = $es['forecast'];
+            // a) Expeditor's forecast is after the required date — delivery at risk.
+            if ($fc['expeditor_variance_days'] !== null && $fc['expeditor_variance_days'] > 0)
+                $add('high', 'expediting', "Forecast delivery is after the required date", 'Delivery forecast',
+                     "The expeditor's forecast (" . $fc['expeditor'] . ") is " . $fc['expeditor_variance_days'] . " day(s) after the required date (" . $fc['required'] . ").", 'Delivery forecast',
+                     'Confirm the recovery plan, or escalate the delivery risk to the client.');
+            // b) Vendor forecast materially earlier than the expeditor's — optimism.
+            if ($fc['vendor_vs_expeditor_days'] !== null && $fc['vendor_vs_expeditor_days'] >= 7)
+                $add('medium', 'expediting', "Vendor forecast looks optimistic vs the expeditor's", 'Delivery forecast',
+                     "The vendor's latest forecast is " . $fc['vendor_vs_expeditor_days'] . " day(s) earlier than the expeditor's evidence-based forecast.", 'Delivery forecast',
+                     'Record the basis; treat the vendor forecast with the noted confidence.');
+            // c) Overall progress high while a milestone is delayed — contradiction.
+            $sc = function_exists('idems_score_doc') ? idems_score_doc($sections ?? idems_sections((int)($doc['report_type_id'] ?? 0)), $fields, $data) : null;
+            if ($sc && ($sc['overall'] ?? null) !== null && (float)$sc['overall'] >= 80 && ($es['milestones']['delayed'] ?? 0) > 0)
+                $add('medium', 'expediting', 'High overall progress despite a delayed milestone', 'Milestone status',
+                     'Overall progress reads ' . rtrim(rtrim(number_format((float)$sc['overall'],1),'0'),'.') . '% but ' . $es['milestones']['delayed'] . ' milestone(s) are marked delayed.', 'Milestone status',
+                     'Check that the stage weights and the milestone status are consistent.');
+        } catch (Throwable $e) {}
     }
 
     $counts = ['critical'=>0,'high'=>0,'medium'=>0,'low'=>0,'info'=>0];
@@ -4239,10 +4464,14 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         $p->rectFill($cardX, $cardY, $p->contentW(), $need-6, [248,249,251]);
         $p->rectFill($cardX, $cardY, 3, $need-6, $oc);
         $tx = $cardX + 12; $p->y = $cardY + 9;
-        $p->text($tx, 'ASSESSMENT SCORE', 8, true, [110,110,110]);
+        // An expediting report reads "OVERALL PROGRESS", others "ASSESSMENT SCORE".
+        $isER = ($doc['type_code'] ?? '') === 'ER';
+        $cardLbl = $isER ? 'OVERALL PROGRESS' : 'ASSESSMENT SCORE';
+        $cardBand = $isER && function_exists('idems_progress_band') ? idems_progress_band($scard['overall']) : (string)$scard['band'];
+        $p->text($tx, $cardLbl, 8, true, [110,110,110]);
         $ovTxt = rtrim(rtrim(number_format((float)$scard['overall'],1),'0'),'.');
-        $p->y = $cardY + 9; $p->text($tx + 120, $ovTxt.' / 100', 13, true, $oc);
-        $p->y = $cardY + 9; $p->text($ml, strtoupper((string)$scard['band']), 9, true, $oc, $right, 'R');
+        $p->y = $cardY + 9; $p->text($tx + 120, $ovTxt . ($isER ? '%' : ' / 100'), 13, true, $oc);
+        $p->y = $cardY + 9; $p->text($ml, strtoupper($cardBand), 9, true, $oc, $right, 'R');
         // Category bars.
         $barX = $tx + 175; $barW = ($ml + $p->contentW() - 40) - $barX;
         $by = $cardY + 28;
