@@ -211,6 +211,7 @@
         <a class="s-item<?= $navOn(['endorsements','endorsement','endorsement-new','endorsement-edit']) ?>" href="/endorsements"><span class="s-ic">✅</span><span><?= e(T_REG('endorsement')) ?></span></a>
         <a class="s-item<?= $navOn(['vendors','vendor-profile']) ?>" href="/vendors"><span class="s-ic">🏭</span><span>Vendor register</span></a>
         <a class="s-item<?= $navOn(['expediting']) ?>" href="/expediting"><span class="s-ic">🚚</span><span>Expediting register</span></a>
+        <a class="s-item<?= $navOn(['expediting-projects']) ?>" href="/expediting-projects"><span class="s-ic">🗂️</span><span>Project delivery</span></a>
         <a class="s-item<?= $navOn(['writing-assistant','phrase-library','phrase-edit']) ?>" href="/writing-assistant"><span class="s-ic">✒️</span><span>Technical writing</span></a>
         <a class="s-item<?= $navOn(['learning']) ?>" href="/learning"><span class="s-ic">🧠</span><span>Learning insights</span></a>
         <?php if (licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('users.manage.global'))): ?><a class="s-item<?= $navOn(['approver-map']) ?>" href="/approver-map"><span class="s-ic">👤</span><span>Approver mapping</span></a><?php endif; ?>

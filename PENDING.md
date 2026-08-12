@@ -54,8 +54,18 @@ Vendor-360 are all reused.
   reliability** (`idems_vendor_expediting_perf`: reliability % from commitment
   registers; forecast-optimism % from vendor-vs-expeditor forecasts) now shows as
   an "Expediting performance" panel on **Vendor-360**, joining schedule behaviour
-  to the quality picture. (Full multi-PO/package project-tree consolidation
-  deferred to a P4b.)
+  to the quality picture.
+- **Phase 4b — ✅ DONE (Aug 2026).** Multi-PO / package **project consolidation**
+  — one screen (`/expediting-projects`, "Project delivery" in the nav) that rolls
+  every PO-level ER up into a per-project delivery tree. `idems_expediting_projects()`
+  groups reports by project, keeps the **latest report per PO** (older revisions
+  superseded), and rolls up: average progress, **worst status** across POs,
+  aggregate delivery risk (worst+average, reusing `idems_expediting_risk`), the
+  **binding delivery date** (the latest-finishing open PO — a project is delivered
+  only when its last PO is, with the binding PO named) and the count of POs
+  forecast late. Each project row expands to its PO/package children (linking to
+  the ER), sorted worst-first; a management KPI strip counts projects, POs,
+  projects at risk, high delivery-risk projects and late POs. Deterministic.
 - **Phase 5 — ✅ DONE (Aug 2026).** Advisory layer, **deterministic (no LLM),
   advisory only** — it never changes a stored value or gates issue.
   `idems_expediting_advisory()` composes, from the report's own data: a **draft
@@ -88,8 +98,8 @@ Vendor-360 are all reused.
   cached to avoid N+1); (3) `idems_vendor_delivery_risk()` aggregates the worst
   and average risk across a vendor's **open POs** (completed POs excluded) and
   shows it on **Vendor-360** with a link to the worst PO. **The Universal
-  Expediting engine (P1–P6) is COMPLETE** (P4b multi-PO project-tree
-  consolidation remains the one optional extension).
+  Expediting engine is COMPLETE end to end — P1–P6 plus P4b (project
+  consolidation).**
 
 **Report presentation (Aug 2026, applies to every report type):** every report
 now opens with an at-a-glance **KPI snapshot card row** (`idems_report_kpis()`) —
