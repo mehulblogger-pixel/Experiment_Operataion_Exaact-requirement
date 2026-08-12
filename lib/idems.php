@@ -447,6 +447,25 @@ function idems_migrate() {
         } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('var_evidence_v1', '1');
     }
+    // ONE-TIME: add "Evidence referred" + "Attached" (tick) to every ITP /
+    // activity table (scope_activities) that lacks them. Done as an in-place
+    // table_cols edit — NOT a reseed — so any admin customisation of the form is
+    // preserved. The columns are inserted just before the Disposition column.
+    if (function_exists('setting_get') && !setting_get('ir_evidence_v1', '')) {
+        try {
+            foreach (ops_all("SELECT id, table_cols FROM report_fields WHERE fkey='scope_activities' AND ftype='table'") as $ff) {
+                $tc = (string)($ff['table_cols'] ?? ''); if ($tc === '' || stripos($tc, 'Attached') !== false) continue;
+                $lines = preg_split('/\r?\n/', $tc); $out = []; $done = false;
+                foreach ($lines as $ln) {
+                    if (!$done && stripos(trim($ln), 'Disposition') === 0) { $out[] = 'Evidence referred'; $out[] = 'Attached|select|Yes,No,N/A'; $done = true; }
+                    $out[] = $ln;
+                }
+                if (!$done) { $out[] = 'Evidence referred'; $out[] = 'Attached|select|Yes,No,N/A'; }
+                db()->prepare("UPDATE report_fields SET table_cols=? WHERE id=?")->execute([implode("\n", $out), (int)$ff['id']]);
+            }
+        } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('ir_evidence_v1', '1');
+    }
     // ---- Vendor qualification profile — one row per vendor partner, updated by
     // assessments. Kept separate from business_partners so the core directory CRUD
     // is untouched; joined by partner_id when a vendor is viewed or listed.
@@ -678,7 +697,7 @@ function idems_install_inspection_sections($typeId) {
     // 4) ITP / Inspection scope.
     $s = $addSection('ITP / Inspection scope', 'Each activity in the ITP — clause, quantum of check, inspection type, observation and disposition.');
     $addField($s, 'scope_activities', 'Scope of activities', 'table', '',
-        "ITP / Clause No.|merge\nSub-clause\nDescription of activity\nQuantum of check\nInspection type|select|lookup:itp_inspection_type\nObservation\nRemarks\nDisposition|select|lookup:inspection_disposition\nStatus|select|lookup:activity_progress", 2);
+        "ITP / Clause No.|merge\nSub-clause\nDescription of activity\nQuantum of check\nInspection type|select|lookup:itp_inspection_type\nObservation\nRemarks\nEvidence referred\nAttached|select|Yes,No,N/A\nDisposition|select|lookup:inspection_disposition\nStatus|select|lookup:activity_progress", 2);
 
     // 5) Instruments & calibration — linked to the equipment register.
     $s = $addSection('Instruments & calibration', 'Pick an instrument from the equipment register — serial and calibration dates fill in automatically.');
@@ -757,7 +776,7 @@ function idems_install_release_note_sections($typeId) {
     // Activities carried out — the ITP scope carried from the report.
     $s = $addSection('Activities carried out', 'The ITP / inspection scope activities carried out — carried from the inspection report.');
     $addField($s, 'scope_activities', 'Scope of activities', 'table', '',
-        "ITP / Clause No.|merge\nSub-clause\nDescription of activity\nQuantum of check\nInspection type|select|lookup:itp_inspection_type\nObservation\nRemarks\nDisposition|select|lookup:inspection_disposition\nStatus|select|lookup:activity_progress", 2);
+        "ITP / Clause No.|merge\nSub-clause\nDescription of activity\nQuantum of check\nInspection type|select|lookup:itp_inspection_type\nObservation\nRemarks\nEvidence referred\nAttached|select|Yes,No,N/A\nDisposition|select|lookup:inspection_disposition\nStatus|select|lookup:activity_progress", 2);
 
     // Release statement — the conclusion, with a field for the inspection report
     // number(s) entered by hand (kept together, not split across a page).
@@ -2868,7 +2887,7 @@ function ops_idems_builder($route, $method) {
             $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span)
                            VALUES (?,?,?,?,?,?,?,?,2)")
                 ->execute([$typeId, $secId, 'scope_activities', 'Activities', 'table',
-                    "ITP / Clause No.|merge\nSub-clause\nDescription of activity\nQuantum of check\nInspection type|select|lookup:itp_inspection_type\nObservation\nRemarks\nDisposition|select|lookup:inspection_disposition\nStatus|select|lookup:activity_progress",
+                    "ITP / Clause No.|merge\nSub-clause\nDescription of activity\nQuantum of check\nInspection type|select|lookup:itp_inspection_type\nObservation\nRemarks\nEvidence referred\nAttached|select|Yes,No,N/A\nDisposition|select|lookup:inspection_disposition\nStatus|select|lookup:activity_progress",
                     'Inspection type: Witness / Review / Verify… Disposition: ' . $dispo . '. Status: ' . $prog . '. (All editable in Masters.)',
                     (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId])]);
             flash('Added a “Scope of activities (ITP)” section — ITP clause, sub-clause, description, quantum of check, inspection type (Witness/Review/Verify), observation, remarks and disposition.');
@@ -4391,7 +4410,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                 $isTickCol = function($lbl) { $l=strtolower(trim((string)$lbl)); return strpos($l,'attach')!==false || $l==='evidence?' || $l==='attached'; };
                 foreach ($defs as $ck=>$d) {
                     $l=strtolower(trim((string)$d['label'])); $t=$d['type'];
-                    if ($isTickCol($d['label'])) $weights[$ck]=0.7;             // narrow — just a checkbox
+                    if ($isTickCol($d['label'])) $weights[$ck]=1.0;             // narrow — checkbox + fits the "Attached" header
                     elseif (in_array($l,$statusLabels,true)) $weights[$ck]=1.55;   // room for the status badge
                     elseif (preg_match('/desc|observ|remark|activit|scope|detail|particular|nature/', $l)) $weights[$ck]=2.2;
                     elseif (in_array($t,['number','date'],true)) $weights[$ck]=0.85;
@@ -4424,11 +4443,14 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                     else { $rr=[200,60,60]; $p->lineAt($bx+1.6,$by+1.6,$bx+5.9,$by+5.9,$rr,1.1); $p->lineAt($bx+5.9,$by+1.6,$bx+1.6,$by+5.9,$rr,1.1); }
                 };
                 // Header cells are WRAPPED and sit at each column's own x/width. §layout
-                $drawHead = function() use ($p,$ml,$cols,$wpx,$xpos) {
+                // The header font shrinks on wide tables so single-word labels
+                // (Disposition, Attached, …) fit their column instead of colliding.
+                $hFont = $ncol > 8 ? 6.5 : 7.5; $hLh = $ncol > 8 ? 8 : 9;
+                $drawHead = function() use ($p,$ml,$cols,$wpx,$xpos,$hFont,$hLh) {
                     $wrapped=[]; $maxL=1;
-                    foreach ($cols as $ck=>$cl){ $w=$p->wrap((string)$cl,7.5,$wpx[$ck]-4,true); if(count($w)>3)$w=array_slice($w,0,3); if(!$w)$w=['']; $wrapped[$ck]=$w; $maxL=max($maxL,count($w)); }
-                    $hh=$maxL*9+4; $hy=$p->y; $p->rectFill($ml,$hy,$p->contentW(),$hh,[235,238,245]);
-                    foreach ($wrapped as $ck=>$w){ for($j=0;$j<count($w);$j++){ $p->y=$hy+3+$j*9; $p->text($xpos[$ck]+3,$w[$j],7.5,true,[60,60,60]); } }
+                    foreach ($cols as $ck=>$cl){ $w=$p->wrap((string)$cl,$hFont,$wpx[$ck]-4,true); if(count($w)>3)$w=array_slice($w,0,3); if(!$w)$w=['']; $wrapped[$ck]=$w; $maxL=max($maxL,count($w)); }
+                    $hh=$maxL*$hLh+4; $hy=$p->y; $p->rectFill($ml,$hy,$p->contentW(),$hh,[235,238,245]);
+                    foreach ($wrapped as $ck=>$w){ for($j=0;$j<count($w);$j++){ $p->y=$hy+3+$j*$hLh; $p->text($xpos[$ck]+3,$w[$j],$hFont,true,[60,60,60]); } }
                     $p->y=$hy+$hh+1;
                 };
                 $p->needSpace(34);   // keep the label with its header + a first row
