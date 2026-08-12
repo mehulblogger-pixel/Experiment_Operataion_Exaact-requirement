@@ -394,6 +394,12 @@ function idems_migrate() {
         try { idems_build_vendor_assessment(); } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('vasr_form_seeded_v1', '1');
     }
+    // ONE-TIME: give the "VAR — Vendor Audit Report" type its form (findings →
+    // NCR/CAPA on issue).
+    if (function_exists('setting_get') && !setting_get('var_form_seeded_v1', '')) {
+        try { idems_build_vendor_audit(); } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('var_form_seeded_v1', '1');
+    }
     // ---- Vendor qualification profile — one row per vendor partner, updated by
     // assessments. Kept separate from business_partners so the core directory CRUD
     // is untouched; joined by partner_id when a vendor is viewed or listed.
@@ -856,6 +862,166 @@ function idems_install_vendor_assessment_sections($typeId) {
     $addField($s, 'signoff', 'For ' . app_name(), 'sigblock', "Assessed by\nReviewed by\nApproved by", 2);
 
     return $typeId;
+}
+
+// Resolve (creating/seeding once) the "VAR — Vendor Audit Report" type. A
+// vendor-scoped audit whose findings table feeds the NCR / CAPA engine on issue.
+function idems_build_vendor_audit() {
+    $pdo = db();
+    $t = ops_one("SELECT id FROM report_types WHERE code='VAR'");
+    if ($t) { $typeId = (int)$t['id']; }
+    else {
+        $sort = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_types");
+        $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_at) VALUES (?,?, 'TPIA_REPORT',1,0,?,?)")
+            ->execute(['VAR', 'Vendor Audit Report', $sort, date('c')]);
+        $typeId = (int)$pdo->lastInsertId();
+    }
+    $has = (int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=?", [$typeId]);
+    if (!$has) idems_install_vendor_audit_sections($typeId);
+    return $typeId;
+}
+
+// Seed the Vendor Audit form. The Audit findings table is the one the NCR engine
+// reads on issue: each Major / Minor row becomes a nonconformity against the
+// vendor. Column headers are matched by keyword, so wording can be edited freely.
+function idems_install_vendor_audit_sections($typeId) {
+    $pdo = db();
+    $so = 0; $fo = 0;
+    $addSection = function($title, $help = '', $pgb = 0, $keep = 0) use ($pdo, $typeId, &$so) {
+        $so += 10;
+        $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,page_break_before,keep_together,sort_order) VALUES (?,?,?,?,?,?)")
+            ->execute([$typeId, $title, $help, $pgb, $keep, $so]);
+        return (int)$pdo->lastInsertId();
+    };
+    $addField = function($secId, $fkey, $label, $ftype, $opts = '', $span = 1, $help = '') use ($pdo, $typeId, &$fo) {
+        $fo += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,help,sort_order,col_span) VALUES (?,?,?,?,?,?,?,?,?)")
+            ->execute([$typeId, $secId, $fkey, $label, $ftype, $opts, $help, $fo, $span]);
+    };
+    $addTable = function($secId, $fkey, $label, $cols, $span = 2, $help = '') use ($pdo, $typeId, &$fo) {
+        $fo += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span) VALUES (?,?,?,?, 'table',?,?,?,?)")
+            ->execute([$typeId, $secId, $fkey, $label, $cols, $help, $fo, $span]);
+    };
+
+    // Section I — audit identification.
+    $s = $addSection('Audit identification', 'Who was audited, against what, when and by whom.', 0, 1);
+    $addField($s, 'vendor', 'Vendor / supplier audited', 'text');
+    $addField($s, 'vendor_code', 'Vendor code', 'text');
+    $addField($s, 'location', 'Site / location', 'text', '', 2);
+    $addField($s, 'audit_type', 'Audit type', 'select', "Adequacy (desktop)\nCompliance (on-site)\nSurveillance\nRe-audit / follow-up\nPre-award");
+    $addField($s, 'audit_standard', 'Audit criteria / standard', 'text');
+    $addField($s, 'audit_date', 'Audit date', 'date');
+    $addField($s, 'auditor', 'Lead auditor', 'text');
+    $addField($s, 'auditee', 'Auditee / vendor representative', 'text');
+    $addField($s, 'prev_audit_ref', 'Previous audit reference', 'text');
+
+    // Section II — scope & criteria.
+    $s = $addSection('Scope & criteria', 'What the audit covered and the requirements audited against.', 0, 1);
+    $addField($s, 'scope', 'Audit scope', 'textarea', '', 2);
+    $addField($s, 'criteria', 'Criteria / clauses audited', 'textarea', '', 2);
+
+    // Section III — audit findings. THIS is the table the NCR engine reads.
+    $s = $addSection('Audit findings', 'Each finding graded Major / Minor / Observation. On issue, Major and Minor findings are raised as nonconformities against this vendor.');
+    $addTable($s, 'audit_findings', 'Findings',
+        "Sr. No.|merge\nClause / requirement\nFinding / observation\nCategory|select|Major,Minor,Observation\nObjective evidence\nCorrective action required\nTarget date|date",
+        2, 'Grade each finding. Major = a requirement not met / system gap; Minor = partial lapse; Observation = improvement opportunity (not raised as an NCR).');
+
+    // Section IV — conformance summary (lightly scored, reuses the scoring engine).
+    $s = $addSection('Conformance summary', 'A quick rating per audited area — feeds an overall conformance score.');
+    $scale = "Conforms\nMinor gaps\nMajor gaps\nNot applicable";
+    $map = json_encode(['Conforms' => 100, 'Minor gaps' => 60, 'Major gaps' => 20]);
+    $addScored = function($secId, $fkey, $label, $weight) use ($pdo, $typeId, &$fo, $scale, $map) {
+        $fo += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,score_map,weight,sort_order,col_span) VALUES (?,?,?,?, 'select',?,?,?,?,1)")
+            ->execute([$typeId, $secId, $fkey, $label, $scale, $map, $weight, $fo]);
+    };
+    $addScored($s, 'c_qms', 'Quality management system', 3);
+    $addScored($s, 'c_process', 'Process & production control', 3);
+    $addScored($s, 'c_material', 'Material & incoming control', 2);
+    $addScored($s, 'c_measure', 'Inspection, test & calibration', 2);
+    $addScored($s, 'c_docs', 'Documentation & traceability', 2);
+    $addScored($s, 'c_capa', 'Corrective-action effectiveness', 1);
+
+    // Section V — conclusion.
+    $s = $addSection('Conclusion', 'Overall audit outcome and the recommendation for this vendor.', 0, 1);
+    $addField($s, 'summary', 'Audit summary', 'textarea', '', 2);
+    $addField($s, 'recommendation', 'Recommendation', 'select',
+        "Approved\nApproved with conditions\nConditional — re-audit after actions\nNot approved / suspend", 2);
+    $addField($s, 'next_audit', 'Next audit due', 'date');
+    $addField($s, 'nc_major', 'No. of Major NCs', 'number');
+    $addField($s, 'nc_minor', 'No. of Minor NCs', 'number');
+
+    // Sign-off.
+    $s = $addSection('Sign-off', 'Audited / Reviewed / Approved — name, designation and date auto-fill from the workflow.', 0, 1);
+    $addField($s, 'signoff', 'For ' . app_name(), 'sigblock', "Audited by\nReviewed by\nApproved by", 2);
+
+    return $typeId;
+}
+
+// Raise nonconformities from an issued Vendor Audit's findings table. Each Major
+// or Minor finding becomes an NCR against the vendor (source AUDIT), linked to
+// this report. Observations are not raised. Idempotent: if any NCR already
+// exists for this report, none are raised again. Returns the number raised.
+function idems_raise_ncrs_from_audit($doc) {
+    if (!function_exists('ncr_create')) return 0;
+    $docId = (int)($doc['id'] ?? 0); if (!$docId) return 0;
+    // Idempotency — never double-raise for the same report.
+    try { if ((int)ops_val("SELECT COUNT(*) FROM nonconformities WHERE report_doc_id=?", [$docId]) > 0) return 0; } catch (Throwable $e) { return 0; }
+    $fields = idems_fields((int)($doc['report_type_id'] ?? 0));
+    $data = json_decode($doc['data'] ?? '[]', true); if (!is_array($data)) $data = [];
+    // Find the findings table (a table field with a "category"/"finding" column).
+    $tbl = null;
+    foreach ($fields as $f) {
+        if (($f['ftype'] ?? '') !== 'table') continue;
+        $defs = idems_table_col_defs($f);
+        $hasCat = false; foreach ($defs as $d) { $l = strtolower((string)$d['label']); if (strpos($l,'category')!==false || strpos($l,'severity')!==false || strpos($l,'grade')!==false) { $hasCat = true; break; } }
+        if ($hasCat) { $tbl = $f; break; }
+    }
+    if (!$tbl) return 0;
+    $rows = $data[$tbl['fkey']] ?? null; if (!is_array($rows) || !$rows) return 0;
+    $defs = idems_table_col_defs($tbl);
+    $findKey = function($needles) use ($defs) { foreach ($defs as $ck => $d) { $l = strtolower((string)$d['label']); foreach ($needles as $n) if (strpos($l, $n) !== false) return $ck; } return null; };
+    $catK    = $findKey(['category','severity','grade']);
+    $clauseK = $findKey(['clause','requirement']);
+    $findK   = $findKey(['finding','observation','description','nonconform']);
+    $actK    = $findKey(['corrective','action']);
+    $dateK   = $findKey(['target','due','date']);
+    $evK     = $findKey(['evidence']);
+    if ($catK === null || $findK === null) return 0;
+    $auditDate = ''; foreach ($fields as $f) if (($f['fkey'] ?? '') === 'audit_date') { $auditDate = trim((string)($data['audit_date'] ?? '')); break; }
+    $n = 0;
+    foreach ($rows as $i => $r) {
+        $rr = (array)$r;
+        $cat = strtolower(trim((string)($rr[$catK] ?? '')));
+        if ($cat === '') continue;
+        if (strpos($cat, 'major') !== false) $sev = 'MAJOR';
+        elseif (strpos($cat, 'minor') !== false) $sev = 'MINOR';
+        else continue; // observations (and anything else) are not raised
+        $finding = trim((string)($rr[$findK] ?? '')); if ($finding === '') continue;
+        $clause = $clauseK !== null ? trim((string)($rr[$clauseK] ?? '')) : '';
+        $action = $actK !== null ? trim((string)($rr[$actK] ?? '')) : '';
+        $evid   = $evK !== null ? trim((string)($rr[$evK] ?? '')) : '';
+        $target = $dateK !== null ? trim((string)($rr[$dateK] ?? '')) : '';
+        $descParts = array_filter([$finding, $evid !== '' ? 'Evidence: ' . $evid : '', $action !== '' ? 'Action required: ' . $action : '']);
+        ncr_create([
+            'source' => 'AUDIT',
+            'source_note' => 'Vendor audit ' . (string)($doc['irn'] ?? ''),
+            'report_doc_id' => $docId,
+            'partner_id' => (int)($doc['vendor_id'] ?? 0) ?: null,
+            'office_id' => (int)($doc['office_id'] ?? 0) ?: null,
+            'sbu' => (string)($doc['sbu'] ?? ''),
+            'title' => substr(($clause !== '' ? $clause . ' — ' : '') . $finding, 0, 255),
+            'description' => implode("\n", $descParts),
+            'clause' => $clause,
+            'severity' => $sev,
+            'detected_on' => $auditDate,
+            'due_on' => $target,
+        ]);
+        $n++;
+    }
+    if ($n > 0 && function_exists('idems_log')) idems_log('report_doc', $docId, 'NCRS_RAISED', ['irn'=>$doc['irn'] ?? '', 'count'=>$n]);
+    return $n;
 }
 // Keep only the RELEASED line items for a Release Note — rows that have a
 // passed / cleared / released / accepted quantity greater than zero. Rows that
@@ -1824,14 +1990,16 @@ function ops_idems_vendors($route, $method) {
         $partner = $pid ? ops_one("SELECT * FROM business_partners WHERE id=?", [$pid]) : null;
         if (!$partner) { flash('Vendor not found.', 'error'); redirect('/vendors'); }
         $profile = idems_vendor_profile($pid);
-        // Assessment history — every Vendor Assessment raised against this vendor.
-        $history = ops_all("SELECT id, irn, status, issue_date, result, data FROM report_docs
-            WHERE deleted=0 AND vendor_id=? AND type_code='VASR' ORDER BY id DESC", [$pid]);
+        // Assessment history — every Vendor Assessment / Audit against this vendor.
+        $history = ops_all("SELECT id, irn, type_code, status, issue_date, result, data FROM report_docs
+            WHERE deleted=0 AND vendor_id=? AND type_code IN ('VASR','VAR') ORDER BY id DESC", [$pid]);
         foreach ($history as &$h) {
             $dj = json_decode($h['data'] ?: '[]', true); if (!is_array($dj)) $dj = [];
-            $sc = function_exists('idems_score_doc') ? idems_score_doc(idems_sections_by_code('VASR'), idems_fields_by_code('VASR'), $dj) : null;
+            $tc = (string)$h['type_code'];
+            $sc = function_exists('idems_score_doc') ? idems_score_doc(idems_sections_by_code($tc), idems_fields_by_code($tc), $dj) : null;
             $h['score'] = $sc['overall'] ?? null; $h['band'] = $sc['band'] ?? '';
             $h['recommendation'] = (string)($dj['recommendation'] ?? '');
+            $h['kind'] = $tc === 'VAR' ? 'Audit' : 'Assessment';
         }
         unset($h);
         view('ops/idems/vendor_detail', ['partner'=>$partner, 'profile'=>$profile, 'history'=>$history,
@@ -2187,6 +2355,16 @@ function ops_idems_documents($route, $method) {
                     $newStatus = idems_vendor_apply_assessment($fresh, $sc);
                     if ($newStatus !== '') idems_log('report_doc', $doc['id'], 'VENDOR_QUALIFIED', ['irn'=>$doc['irn'], 'vendor_id'=>(int)$fresh['vendor_id'], 'status'=>$newStatus, 'score'=>$sc['overall']]);
                 }
+            } catch (Throwable $e) {}
+        }
+        // Vendor Audit — raise nonconformities from the audit findings so each
+        // Major / Minor finding lands in the NCR/CAPA register against the vendor.
+        // Fail-open; never blocks issue.
+        if (function_exists('idems_raise_ncrs_from_audit') && ($doc['type_code'] ?? '') === 'VAR') {
+            try {
+                $freshA = ops_one("SELECT * FROM report_docs WHERE id=?", [$doc['id']]);
+                $raised = idems_raise_ncrs_from_audit($freshA);
+                if ($raised > 0) flash($raised . ' nonconformit' . ($raised === 1 ? 'y' : 'ies') . ' raised from the audit findings — see the NCR register.');
             } catch (Throwable $e) {}
         }
         // Raise hold / witness / review / clearance points from any activity the
