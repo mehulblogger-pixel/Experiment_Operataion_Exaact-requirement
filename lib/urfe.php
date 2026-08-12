@@ -265,3 +265,98 @@ function urfe_lib_section_field_codes($code) {
 function urfe_report_statuses($module = 'report') {
     return ops_all("SELECT * FROM report_statuses WHERE module=? AND active=1 ORDER BY sequence", [$module]);
 }
+
+// ---------------------------------------------------------------------------
+//  Clone-from-library engine (the keystone). "Assemble from Library" resolves
+//  to plain report_sections / report_fields rows on a report type — so the
+//  existing builder, renderer, QA, workflow and PDF all consume them unchanged.
+//  A stable code becomes the field's fkey; provenance (lib_code + version) is
+//  stamped so the "used-by" view and drift detection work. Nothing here edits
+//  an issued report — those are frozen at issue.
+// ---------------------------------------------------------------------------
+
+// Clone one Library field into a report type's section. Returns the new field id,
+// or 0 if that fkey already exists on the type (no duplicates). $overrides may set
+// required / hidden / col_span / cond_field / cond_op / cond_val / label.
+function urfe_insert_library_field($typeId, $sectionId, $fieldCode, $overrides = []) {
+    $typeId = (int)$typeId; $sectionId = (int)$sectionId;
+    $lf = urfe_lib_field($fieldCode); if (!$lf) return 0;
+    $fkey = (string)$lf['code'];
+    if ((int)ops_val("SELECT COUNT(*) FROM report_fields WHERE report_type_id=? AND fkey=?", [$typeId, $fkey]) > 0) return 0;
+    $so = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=? AND section_id=?", [$typeId, $sectionId]);
+    $row = [
+        'report_type_id' => $typeId, 'section_id' => $sectionId ?: null, 'fkey' => $fkey,
+        'label' => $overrides['label'] ?? $lf['label'], 'ftype' => $lf['ftype'], 'options' => $lf['options'],
+        'required' => (int)($overrides['required'] ?? 0), 'hidden' => (int)($overrides['hidden'] ?? 0),
+        'cond_field' => $overrides['cond_field'] ?? '', 'cond_op' => $overrides['cond_op'] ?? '', 'cond_val' => $overrides['cond_val'] ?? '',
+        'calc_expr' => $lf['calc_expr'], 'placeholder' => $lf['placeholder'], 'help' => $lf['help'],
+        'col_span' => (int)($overrides['col_span'] ?? $lf['col_span'] ?? 1), 'table_cols' => $lf['table_cols'],
+        'weight' => $lf['weight'], 'max_score' => $lf['max_score'], 'score_map' => $lf['score_map'],
+        'grp' => $lf['grp'], 'lib_code' => $fkey, 'lib_version' => (int)$lf['version'], 'sort_order' => $so,
+    ];
+    $cols = array_keys($row); $ph = implode(',', array_fill(0, count($cols), '?'));
+    db()->prepare("INSERT INTO report_fields (" . implode(',', $cols) . ") VALUES ($ph)")->execute(array_values($row));
+    return (int)db()->lastInsertId();
+}
+
+// Clone a Library section (and all its Library fields) into a report type.
+// Returns the new section id, or the existing one if already present (idempotent
+// by lib_code within the type). $opts: page_break_before, keep_together, title.
+function urfe_insert_library_section($typeId, $sectionCode, $opts = []) {
+    $typeId = (int)$typeId;
+    $ls = urfe_lib_section($sectionCode); if (!$ls) return 0;
+    $existing = ops_one("SELECT id FROM report_sections WHERE report_type_id=? AND lib_code=?", [$typeId, $sectionCode]);
+    if ($existing) return (int)$existing['id'];
+    $so = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_sections WHERE report_type_id=?", [$typeId]);
+    $row = [
+        'report_type_id' => $typeId, 'title' => $opts['title'] ?? $ls['title'], 'help' => $ls['help'],
+        'page_break_before' => (int)($opts['page_break_before'] ?? $ls['page_break_before'] ?? 0),
+        'keep_together' => (int)($opts['keep_together'] ?? $ls['keep_together'] ?? 0),
+        'section_type' => $ls['section_type'], 'component' => $ls['component'], 'repeatable' => (int)$ls['repeatable'],
+        'lib_code' => $sectionCode, 'lib_version' => (int)$ls['version'], 'sort_order' => $so,
+    ];
+    $cols = array_keys($row); $ph = implode(',', array_fill(0, count($cols), '?'));
+    db()->prepare("INSERT INTO report_sections (" . implode(',', $cols) . ") VALUES ($ph)")->execute(array_values($row));
+    $sid = (int)db()->lastInsertId();
+    // Clone the section's curated fields, honouring placement overrides.
+    foreach (ops_all("SELECT * FROM report_lib_section_fields WHERE section_code=? ORDER BY sort_order", [$sectionCode]) as $p) {
+        urfe_insert_library_field($typeId, $sid, $p['field_code'], [
+            'required' => (int)$p['required'], 'col_span' => (int)$p['col_span'] ?: null,
+            'cond_field' => $p['cond_field'], 'cond_op' => $p['cond_op'], 'cond_val' => $p['cond_val'],
+        ]);
+    }
+    return $sid;
+}
+
+// Assemble a whole report type from an ordered list of Library section codes.
+// Convenience for programmatic assembly and the future "New from Library" builder
+// flow. Returns the report type id. Creates the type if $code is new.
+function urfe_assemble_report_type($code, $name, $sectionCodes, $opts = []) {
+    $code = strtoupper(trim((string)$code)); $name = trim((string)$name);
+    $rt = ops_one("SELECT id FROM report_types WHERE code=?", [$code]);
+    if ($rt) { $typeId = (int)$rt['id']; }
+    else {
+        $sort = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_types");
+        db()->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_at,description,lifecycle,finding_enabled,evidence_enabled)
+                       VALUES (?,?,?,1,0,?,?,?,?,?,?)")
+            ->execute([$code, $name, $opts['category'] ?? 'TPIA_REPORT', $sort, date('c'),
+                       $opts['description'] ?? '', $opts['lifecycle'] ?? 'ACTIVE',
+                       (int)($opts['finding_enabled'] ?? 0), (int)($opts['evidence_enabled'] ?? 1)]);
+        $typeId = (int)db()->lastInsertId();
+    }
+    foreach ((array)$sectionCodes as $sc) urfe_insert_library_section($typeId, $sc);
+    return $typeId;
+}
+
+// Dependency / "used-by" view (URFE §98-99): which report types currently carry a
+// clone of this Library section / field. Prevents accidental Library edits.
+function urfe_section_used_by($sectionCode) {
+    return ops_all("SELECT DISTINCT rt.id, rt.code, rt.name
+                    FROM report_sections rs JOIN report_types rt ON rt.id=rs.report_type_id
+                    WHERE rs.lib_code=? ORDER BY rt.name", [$sectionCode]);
+}
+function urfe_field_used_by($fieldCode) {
+    return ops_all("SELECT DISTINCT rt.id, rt.code, rt.name
+                    FROM report_fields rf JOIN report_types rt ON rt.id=rf.report_type_id
+                    WHERE rf.lib_code=? ORDER BY rt.name", [$fieldCode]);
+}
