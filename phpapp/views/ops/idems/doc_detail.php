@@ -131,8 +131,28 @@
         <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px"><?php foreach ($minor as $it) $card($it); ?></div>
       </details>
     <?php endif; ?>
+    <?php // ---- AI advisory (LLM) — optional, never part of the pass/fail ---- ?>
+    <?php if (!empty($aiSections)): ?>
+      <div style="margin-top:8px;border-top:1px dashed var(--line);padding-top:8px">
+        <div style="font-size:12.5px;font-weight:600;color:var(--accent)">🤖 AI suggestions <span class="muted" style="font-weight:400">— advisory only, not part of the pass/fail</span></div>
+        <?php foreach ($aiSections as $h => $body): $b = trim((string)$body); if ($b === '' || (stripos($b,'none identified')!==false && strlen($b) < 40)) continue; ?>
+          <div style="margin-top:6px"><div style="font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--muted)"><?= e(ucwords(strtolower($h))) ?></div>
+            <div style="font-size:12.5px;white-space:pre-wrap;color:var(--ink)"><?= e($b) ?></div></div>
+        <?php endforeach; ?>
+        <?php if (idems_can_edit_doc($doc)): ?><form method="post" action="/document-ai-review" style="margin-top:6px"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><button class="btn small secondary" type="submit">↻ Re-run AI review</button></form><?php endif; ?>
+      </div>
+    <?php elseif (!empty($aiOn) && idems_can_edit_doc($doc)): ?>
+      <div style="margin-top:8px;border-top:1px dashed var(--line);padding-top:8px">
+        <form method="post" action="/document-ai-review"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
+          <button class="btn small secondary" type="submit">🤖 Run AI language &amp; consistency review</button>
+          <span class="muted" style="font-size:11.5px">Optional — suggests wording and flags possible conflicts. Advisory only; it never changes the report.</span>
+        </form>
+      </div>
+    <?php elseif (empty($aiOn) && is_master()): ?>
+      <p class="muted" style="font-size:11px;margin-top:8px;border-top:1px dashed var(--line);padding-top:8px">Tip: enable an AI provider under <b>Settings → AI providers</b> to add optional AI language &amp; consistency suggestions here (advisory only — the checks above always run without it).</p>
+    <?php endif; ?>
     <?php if (idems_can_edit_doc($doc) && !empty($hasSchema)): ?>
-      <div style="margin-top:4px"><a class="btn small" href="/document-fill?id=<?= (int)$doc['id'] ?>">✍ Open report to fix</a> <a class="btn small secondary" href="/document-edit?id=<?= (int)$doc['id'] ?>">✎ Edit details</a></div>
+      <div style="margin-top:8px"><a class="btn small" href="/document-fill?id=<?= (int)$doc['id'] ?>">✍ Open report to fix</a> <a class="btn small secondary" href="/document-edit?id=<?= (int)$doc['id'] ?>">✎ Edit details</a></div>
     <?php endif; ?>
     <?php if ($st === 'BLOCKED' && empty($doc['finalized']) && (is_master() || can('idems.finalize'))): ?>
       <?php if (is_master()): ?>
