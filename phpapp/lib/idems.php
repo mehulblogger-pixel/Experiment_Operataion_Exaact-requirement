@@ -394,6 +394,32 @@ function idems_migrate() {
         try { idems_build_vendor_assessment(); } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('vasr_form_seeded_v1', '1');
     }
+    // ---- Vendor qualification profile — one row per vendor partner, updated by
+    // assessments. Kept separate from business_partners so the core directory CRUD
+    // is untouched; joined by partner_id when a vendor is viewed or listed.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS vendor_profiles (
+        id $pk, partner_id INT, vendor_type VARCHAR(60) DEFAULT '', product_category VARCHAR(80) DEFAULT '',
+        risk_class VARCHAR(40) DEFAULT '', approval_status VARCHAR(30) DEFAULT 'PROSPECT',
+        vendor_rating REAL DEFAULT 0, last_score REAL NULL, last_band VARCHAR(30) DEFAULT '',
+        last_assessment_id INT NULL, last_assessed_on VARCHAR(20) DEFAULT '',
+        approved_on VARCHAR(20) DEFAULT '', valid_until VARCHAR(20) DEFAULT '', reassess_on VARCHAR(20) DEFAULT '',
+        notes TEXT, updated_by VARCHAR(150) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')");
+    idems_unique_index('vendor_profiles', 'partner_id');
+    // Seeded, fully editable vendor master lists (never hard-coded downstream).
+    if (function_exists('lk_ensure_type_map')) {
+        lk_ensure_type_map('vendor_type', 'Vendor / supplier type', [
+            'MANUFACTURER'=>'Manufacturer','SERVICE'=>'Service provider','DISTRIBUTOR'=>'Distributor / trader',
+            'CONTRACTOR'=>'Contractor','OEM'=>'OEM','LAB'=>'Testing laboratory','CONSULTANT'=>'Consultant'], 'Vendor');
+        lk_ensure_type_map('vendor_product_category', 'Vendor product / service category', [
+            'RAW_MATERIAL'=>'Raw material','COMPONENTS'=>'Components','EQUIPMENT'=>'Equipment / machinery',
+            'FABRICATION'=>'Fabrication','ELECTRICAL'=>'Electrical / instrumentation','CIVIL'=>'Civil / construction',
+            'SERVICES'=>'Services','CONSUMABLES'=>'Consumables','TESTING'=>'Testing / calibration'], 'Vendor');
+        lk_ensure_type_map('vendor_risk_class', 'Vendor risk class', [
+            'CRITICAL'=>'Critical','HIGH'=>'High','MEDIUM'=>'Medium','LOW'=>'Low'], 'Vendor');
+        lk_ensure_type_map('vendor_approval_status', 'Vendor approval status', [
+            'PROSPECT'=>'Prospect','UNDER_ASSESSMENT'=>'Under assessment','APPROVED'=>'Approved',
+            'CONDITIONAL'=>'Approved with conditions','SUSPENDED'=>'Suspended','BLACKLISTED'=>'Blacklisted'], 'Vendor');
+    }
 }
 // ITP inspection type for a scope activity — how the point is covered.
 const INSPECTION_TYPES_ITP = [
@@ -978,6 +1004,91 @@ function idems_score_band($score) {
     return 'Not approved';
 }
 // ===========================================================================
+//  Vendor qualification profile — one row per vendor partner, kept current by
+//  assessments. Read/created on demand; updated when a Vendor Assessment is
+//  issued so the approved-vendor register reflects the latest score & status.
+// ===========================================================================
+
+// Fetch the vendor profile for a partner (or null). Never creates a row.
+function idems_vendor_profile($partnerId) {
+    $partnerId = (int)$partnerId; if (!$partnerId) return null;
+    return ops_one("SELECT * FROM vendor_profiles WHERE partner_id=?", [$partnerId]) ?: null;
+}
+// Get-or-create the vendor profile row for a partner, returning its id.
+function idems_vendor_profile_ensure($partnerId) {
+    $partnerId = (int)$partnerId; if (!$partnerId) return 0;
+    $row = idems_vendor_profile($partnerId);
+    if ($row) return (int)$row['id'];
+    db()->prepare("INSERT INTO vendor_profiles (partner_id, approval_status, updated_at) VALUES (?, 'PROSPECT', ?)")
+        ->execute([$partnerId, date('c')]);
+    return (int)db()->lastInsertId();
+}
+// Save the editable master attributes on a vendor profile (type, category, risk).
+function idems_vendor_profile_save($partnerId, $attrs) {
+    $partnerId = (int)$partnerId; if (!$partnerId) return;
+    idems_vendor_profile_ensure($partnerId);
+    $allowed = ['vendor_type','product_category','risk_class','approval_status','notes'];
+    $sets = []; $args = [];
+    foreach ($allowed as $k) { if (array_key_exists($k, $attrs)) { $sets[] = "$k=?"; $args[] = trim((string)$attrs[$k]); } }
+    if (!$sets) return;
+    $sets[] = 'updated_at=?'; $args[] = date('c');
+    $sets[] = 'updated_by=?'; $args[] = (string)(current_user()['username'] ?? '');
+    $args[] = $partnerId;
+    db()->prepare("UPDATE vendor_profiles SET " . implode(', ', $sets) . " WHERE partner_id=?")->execute($args);
+}
+// Default re-qualification period, in months (editable via a setting).
+function idems_vendor_requal_months() {
+    $m = function_exists('setting_get') ? (int)setting_get('vendor_requal_months', '') : 0;
+    return $m > 0 ? $m : 12;
+}
+// Map an assessment's recommendation + score to a vendor approval status.
+// The recommendation (a human decision) leads; the score is the fallback.
+function idems_vendor_status_from($recommendation, $score) {
+    $r = strtolower(trim((string)$recommendation));
+    if ($r !== '') {
+        if (strpos($r, 'not approved') !== false) return 'SUSPENDED';
+        if (strpos($r, 'condition') !== false)   return 'CONDITIONAL';
+        if (strpos($r, 'approv') !== false)       return 'APPROVED';
+    }
+    if ($score === null) return 'UNDER_ASSESSMENT';
+    $s = (float)$score;
+    if ($s >= 75) return 'APPROVED';
+    if ($s >= 60) return 'CONDITIONAL';
+    return 'SUSPENDED';
+}
+// Apply an issued Vendor Assessment to the vendor's profile: record the score,
+// band, approval status and the validity / re-assessment dates. Fail-open —
+// never blocks issuing a report. Returns the new status, or '' if not applied.
+function idems_vendor_apply_assessment($doc, $score = null) {
+    try {
+        $partnerId = (int)($doc['vendor_id'] ?? 0); if (!$partnerId) return '';
+        $data = json_decode($doc['data'] ?? '[]', true); if (!is_array($data)) $data = [];
+        if ($score === null && function_exists('idems_score_doc')) {
+            $secs = idems_sections((int)($doc['report_type_id'] ?? 0));
+            $flds = idems_fields((int)($doc['report_type_id'] ?? 0));
+            $score = idems_score_doc($secs, $flds, $data);
+        }
+        $overall = is_array($score) ? ($score['overall'] ?? null) : $score;
+        $band    = is_array($score) ? (string)($score['band'] ?? '') : (($overall !== null) ? idems_score_band($overall) : '');
+        $rec = (string)($data['recommendation'] ?? '');
+        $status = idems_vendor_status_from($rec, $overall);
+        idems_vendor_profile_ensure($partnerId);
+        $today = date('Y-m-d');
+        $months = idems_vendor_requal_months();
+        $reassess = date('Y-m-d', strtotime("+$months months"));
+        $approvedOn = in_array($status, ['APPROVED','CONDITIONAL'], true) ? $today : '';
+        $validUntil = in_array($status, ['APPROVED','CONDITIONAL'], true) ? $reassess : '';
+        db()->prepare("UPDATE vendor_profiles SET vendor_rating=?, last_score=?, last_band=?, last_assessment_id=?, last_assessed_on=?, approval_status=?, approved_on=CASE WHEN ?='' THEN approved_on ELSE ? END, valid_until=?, reassess_on=?, updated_at=?, updated_by=? WHERE partner_id=?")
+            ->execute([
+                $overall !== null ? (float)$overall : 0, $overall !== null ? (float)$overall : null, $band,
+                (int)($doc['id'] ?? 0), $today, $status,
+                $approvedOn, $approvedOn, $validUntil, $reassess, date('c'),
+                (string)(current_user()['username'] ?? ''), $partnerId,
+            ]);
+        return $status;
+    } catch (Throwable $e) { return ''; }
+}
+// ===========================================================================
 //  AI Report Auditor — deterministic QA pass (Phase 1)
 //  Runs the existing completeness + rule checks and adds a few high-value
 //  deterministic checks (quantity reconciliation, result/release vs pending
@@ -1189,6 +1300,14 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
 }
 
 function idems_sections($typeId) { return ops_all("SELECT * FROM report_sections WHERE report_type_id=? ORDER BY sort_order, id", [(int)$typeId]); }
+// Resolve a report type's id from its code (cached per request), then its schema.
+function idems_type_id_by_code($code) {
+    static $cache = [];
+    $code = (string)$code; if (isset($cache[$code])) return $cache[$code];
+    return $cache[$code] = (int)ops_val("SELECT id FROM report_types WHERE code=?", [$code]);
+}
+function idems_sections_by_code($code) { $id = idems_type_id_by_code($code); return $id ? idems_sections($id) : []; }
+function idems_fields_by_code($code) { $id = idems_type_id_by_code($code); return $id ? idems_fields($id) : []; }
 function idems_fields($typeId, $sectionId = null) {
     if ($sectionId === null) return ops_all("SELECT * FROM report_fields WHERE report_type_id=? ORDER BY sort_order, id", [(int)$typeId]);
     return ops_all("SELECT * FROM report_fields WHERE report_type_id=? AND section_id=? ORDER BY sort_order, id", [(int)$typeId, (int)$sectionId]);
@@ -1676,6 +1795,81 @@ function idems_completeness_check($doc) {
 //  Handlers
 // ---------------------------------------------------------------------------
 // Document Register + a single report instance (create / view / edit / submit / finalize).
+// Vendor qualification register + per-vendor profile (view / edit attributes /
+// assessment history). The scored Vendor Assessment writes the score & status
+// here on issue; this is where a buyer sees their approved-vendor list.
+function ops_idems_vendors($route, $method) {
+    $pdo = db();
+    $canView = is_master() || can('mod.idems.view') || can('mod.idems.edit') || can('mod.partners.view');
+    ops_require($canView, 'You cannot view the vendor register.');
+    $canEdit = is_master() || can('mod.idems.edit') || can('mod.partners.edit');
+
+    if ($route === 'vendor-profile-save' && $method === 'POST') {
+        ops_require($canEdit, 'You cannot edit vendor profiles.');
+        $pid = (int)($_POST['partner_id'] ?? 0);
+        if ($pid) {
+            idems_vendor_profile_save($pid, [
+                'vendor_type' => $_POST['vendor_type'] ?? '', 'product_category' => $_POST['product_category'] ?? '',
+                'risk_class' => $_POST['risk_class'] ?? '', 'approval_status' => $_POST['approval_status'] ?? '',
+                'notes' => $_POST['notes'] ?? '',
+            ]);
+            if (function_exists('idems_log')) idems_log('vendor_profile', $pid, 'EDIT', ['status'=>$_POST['approval_status'] ?? '']);
+            flash('Vendor profile saved.');
+        }
+        redirect('/vendor-profile?id=' . $pid);
+    }
+
+    if ($route === 'vendor-profile') {
+        $pid = (int)($_GET['id'] ?? 0);
+        $partner = $pid ? ops_one("SELECT * FROM business_partners WHERE id=?", [$pid]) : null;
+        if (!$partner) { flash('Vendor not found.', 'error'); redirect('/vendors'); }
+        $profile = idems_vendor_profile($pid);
+        // Assessment history — every Vendor Assessment raised against this vendor.
+        $history = ops_all("SELECT id, irn, status, issue_date, result, data FROM report_docs
+            WHERE deleted=0 AND vendor_id=? AND type_code='VASR' ORDER BY id DESC", [$pid]);
+        foreach ($history as &$h) {
+            $dj = json_decode($h['data'] ?: '[]', true); if (!is_array($dj)) $dj = [];
+            $sc = function_exists('idems_score_doc') ? idems_score_doc(idems_sections_by_code('VASR'), idems_fields_by_code('VASR'), $dj) : null;
+            $h['score'] = $sc['overall'] ?? null; $h['band'] = $sc['band'] ?? '';
+            $h['recommendation'] = (string)($dj['recommendation'] ?? '');
+        }
+        unset($h);
+        view('ops/idems/vendor_detail', ['partner'=>$partner, 'profile'=>$profile, 'history'=>$history,
+            'canEdit'=>$canEdit,
+            'typeOpts'=>lk_options_or('vendor_type', []), 'catOpts'=>lk_options_or('vendor_product_category', []),
+            'riskOpts'=>lk_options_or('vendor_risk_class', []), 'statusOpts'=>lk_options_or('vendor_approval_status', [])]);
+        return true;
+    }
+
+    // Register — every vendor partner, with its qualification profile (LEFT JOIN so
+    // vendors never yet assessed still appear as prospects).
+    $q = trim($_GET['q'] ?? ''); $fs = $_GET['status'] ?? ''; $fr = $_GET['risk'] ?? ''; $ftp = $_GET['vtype'] ?? '';
+    $where = "bp.is_vendor=1"; $args = [];
+    if ($q)   { $where .= " AND (bp.display_name LIKE ? OR bp.legal_name LIKE ? OR bp.code LIKE ?)"; array_push($args, "%$q%", "%$q%", "%$q%"); }
+    if ($fs)  { $where .= " AND COALESCE(vp.approval_status,'PROSPECT')=?"; $args[] = $fs; }
+    if ($fr)  { $where .= " AND vp.risk_class=?"; $args[] = $fr; }
+    if ($ftp) { $where .= " AND vp.vendor_type=?"; $args[] = $ftp; }
+    $rows = ops_all("SELECT bp.id, bp.code, bp.display_name, bp.legal_name,
+        vp.vendor_type, vp.product_category, vp.risk_class, COALESCE(vp.approval_status,'PROSPECT') approval_status,
+        vp.vendor_rating, vp.last_score, vp.last_band, vp.last_assessed_on, vp.valid_until, vp.reassess_on
+        FROM business_partners bp LEFT JOIN vendor_profiles vp ON vp.partner_id=bp.id
+        WHERE $where ORDER BY bp.display_name, bp.legal_name", $args);
+    $today = date('Y-m-d');
+    $counts = ['total'=>0,'approved'=>0,'conditional'=>0,'pending'=>0,'due'=>0];
+    foreach ($rows as $r) {
+        $counts['total']++;
+        $st = $r['approval_status'];
+        if ($st === 'APPROVED') $counts['approved']++;
+        elseif ($st === 'CONDITIONAL') $counts['conditional']++;
+        elseif (in_array($st, ['PROSPECT','UNDER_ASSESSMENT'], true)) $counts['pending']++;
+        if (!empty($r['reassess_on']) && $r['reassess_on'] < $today && in_array($st, ['APPROVED','CONDITIONAL'], true)) $counts['due']++;
+    }
+    view('ops/idems/vendor_register', ['rows'=>$rows, 'q'=>$q, 'fs'=>$fs, 'fr'=>$fr, 'ftp'=>$ftp, 'today'=>$today, 'counts'=>$counts,
+        'statusOpts'=>lk_options_or('vendor_approval_status', []), 'riskOpts'=>lk_options_or('vendor_risk_class', []),
+        'typeOpts'=>lk_options_or('vendor_type', [])]);
+    return true;
+}
+
 function ops_idems_documents($route, $method) {
     $pdo = db();
     if ($route === 'documents') {
@@ -1982,6 +2176,19 @@ function ops_idems_documents($route, $method) {
         idems_snapshot_signatures($doc);   // freeze inspector + approver signatures onto the report
         idems_seal_content($doc['id']);    // freeze a content hash so /verify can prove it is unaltered
         idems_freeze_presentation($doc['id']); // §33 freeze the form schema + company template used, so later edits never change this issued report
+        // Vendor platform — when a scored Vendor Assessment is issued against a
+        // vendor, roll its score / approval status / validity forward onto that
+        // vendor's qualification profile. Fail-open; never blocks issue.
+        if (function_exists('idems_vendor_apply_assessment') && (int)($doc['vendor_id'] ?? 0) > 0) {
+            try {
+                $fresh = ops_one("SELECT * FROM report_docs WHERE id=?", [$doc['id']]);
+                $sc = function_exists('idems_score_doc') ? idems_score_doc(idems_sections((int)$fresh['report_type_id']), idems_fields((int)$fresh['report_type_id']), json_decode($fresh['data'] ?? '[]', true) ?: []) : null;
+                if ($sc && ($sc['overall'] ?? null) !== null) {
+                    $newStatus = idems_vendor_apply_assessment($fresh, $sc);
+                    if ($newStatus !== '') idems_log('report_doc', $doc['id'], 'VENDOR_QUALIFIED', ['irn'=>$doc['irn'], 'vendor_id'=>(int)$fresh['vendor_id'], 'status'=>$newStatus, 'score'=>$sc['overall']]);
+                }
+            } catch (Throwable $e) {}
+        }
         // Raise hold / witness / review / clearance points from any activity the
         // inspector dispositioned as such. Never blocks issue.
         if (function_exists('hwp_derive_from_doc')) { try { hwp_derive_from_doc(ops_one("SELECT * FROM report_docs WHERE id=?", [$doc['id']])); } catch (Throwable $e) {} }
