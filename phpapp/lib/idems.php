@@ -1769,6 +1769,87 @@ function idems_vendor_delivery_risk($partnerId) {
     return ['band'=>$band,'score'=>$score,'open_pos'=>$open,'worst'=>$worst,'perf'=>$perf];
 }
 
+// Severity rank for an expediting status (higher = worse) — so a project rolls up
+// to its worst-off PO. COMPLETED is best; CRITICAL is worst.
+function idems_expediting_status_rank($st) {
+    switch (strtoupper(trim((string)$st))) {
+        case 'CRITICAL': return 5; case 'DELAYED': return 4; case 'AT RISK': return 3;
+        case 'ON TRACK': return 2; case 'COMPLETED': return 1; default: return 0;
+    }
+}
+
+// §expediting-project-tree (Phase 4b) — consolidate many PO-level Expediting
+// Reports into ONE project delivery view. Given a list of ER report_docs rows,
+// group them by project, keep the LATEST report per PO/package, and roll up:
+// progress (average), worst status, aggregate delivery risk (worst+average),
+// the binding delivery date (the latest-finishing PO — a project is delivered
+// only when its last PO is) and how many POs are forecast late. Deterministic;
+// the risk reuses idems_expediting_risk. Returns a list of project nodes, each
+// with its PO children, sorted worst-first (status, then risk). §rollup
+function idems_expediting_projects($docs, $today = null) {
+    $today = $today ?: date('Y-m-d');
+    $pd = function($s){ $s=trim((string)$s); if($s==='')return null; $t=strtotime($s); return $t?:null; };
+    $vperfCache = [];
+    // Group docs by project, then keep the most-recent report per PO within each.
+    $projects = [];
+    foreach ($docs as $d) {
+        $data = json_decode($d['data'] ?? '[]', true); if (!is_array($data)) $data = [];
+        $proj = trim((string)($d['project_name'] ?? '')) ?: trim((string)($data['project'] ?? '')) ?: '(No project set)';
+        $pkey = strtolower($proj);
+        if (!isset($projects[$pkey])) $projects[$pkey] = ['project'=>$proj, 'code'=>trim((string)($d['project_code'] ?? '')), 'client'=>trim((string)($data['client'] ?? ($d['client_name'] ?? ''))), 'pos'=>[]];
+        elseif ($projects[$pkey]['client']==='' ) $projects[$pkey]['client'] = trim((string)($data['client'] ?? ''));
+        $po = strtolower(trim((string)($data['po_number'] ?? ''))) ?: ('doc'.$d['id']);
+        // Docs arrive newest-first (caller orders DESC); first seen per PO wins.
+        if (!isset($projects[$pkey]['pos'][$po])) $projects[$pkey]['pos'][$po] = ['doc'=>$d, 'data'=>$data];
+    }
+    $out = [];
+    foreach ($projects as $pk => $proj) {
+        $children = []; $scores=[]; $progs=[]; $worstRank=0; $worstStatus=''; $open=0; $late=0;
+        $bindReq=null; $bindFc=null; $bindPo=null; $worstVar=null;
+        foreach ($proj['pos'] as $po => $e) {
+            $d = $e['doc']; $data = $e['data'];
+            $fields = idems_fields((int)$d['report_type_id']);
+            $es = idems_expediting_status($d, $fields, $data);
+            $sc = function_exists('idems_score_doc') ? idems_score_doc(idems_sections((int)$d['report_type_id']), $fields, $data) : null;
+            $vid = (int)($d['vendor_id'] ?? 0);
+            if ($vid && !array_key_exists($vid,$vperfCache)) $vperfCache[$vid] = function_exists('idems_vendor_expediting_perf') ? idems_vendor_expediting_perf($vid) : null;
+            $risk = function_exists('idems_expediting_risk') ? idems_expediting_risk($d, $fields, $data, $vid?$vperfCache[$vid]:null, $today) : null;
+            $st = $es['status']; $ev = $es['forecast']['expeditor_variance_days'];
+            $isOpen = ($st !== 'COMPLETED');
+            if ($isOpen) { $open++; if ($risk) $scores[] = $risk['score']; }
+            if ($sc && $sc['overall']!==null) $progs[] = (float)$sc['overall'];
+            $r = idems_expediting_status_rank($st); if ($r > $worstRank) { $worstRank=$r; $worstStatus=$st; }
+            if ($ev !== null && $ev > 0) { $late++; if ($worstVar===null || $ev>$worstVar) $worstVar=$ev; }
+            // Binding delivery = the latest expeditor forecast among open POs.
+            $fcT = $pd($es['forecast']['expeditor']); $reqT = $pd($es['forecast']['required']);
+            if ($isOpen && $fcT && ($bindFc===null || $fcT > $bindFc)) { $bindFc=$fcT; $bindReq=$reqT; $bindPo=$po; }
+            $children[] = ['po'=>trim((string)($data['po_number'] ?? '')), 'package'=>trim((string)($data['package'] ?? '')),
+                'irn'=>$d['irn'], 'id'=>(int)$d['id'], 'vendor'=>trim((string)($data['vendor'] ?? ($d['vendor_name'] ?? ''))),
+                'progress'=>($sc['overall'] ?? null), 'status'=>$st,
+                'risk'=>($risk?$risk['band']:null), 'risk_score'=>($risk?(int)$risk['score']:null),
+                'required'=>$es['forecast']['required'], 'forecast'=>$es['forecast']['expeditor'], 'variance'=>$ev,
+                'date'=>($d['issue_date'] ?: ''), 'open'=>$isOpen];
+        }
+        // Sort PO children worst-first (status severity, then risk score).
+        usort($children, fn($a,$b)=> (idems_expediting_status_rank($b['status'])<=>idems_expediting_status_rank($a['status'])) ?: (($b['risk_score']??0)<=>($a['risk_score']??0)));
+        $riskScore = $scores ? (int)round(max($scores)*0.6 + (array_sum($scores)/count($scores))*0.4) : 0;
+        $riskBand = $riskScore>=70?'CRITICAL':($riskScore>=45?'HIGH':($riskScore>=20?'MEDIUM':'LOW'));
+        $out[] = [
+            'project'=>$proj['project'], 'code'=>$proj['code'], 'client'=>$proj['client'],
+            'total_pos'=>count($children), 'open_pos'=>$open, 'late_pos'=>$late,
+            'progress'=>$progs ? round(array_sum($progs)/count($progs),1) : null,
+            'status'=>$worstStatus ?: 'ON TRACK', 'risk'=>['band'=>$riskBand,'score'=>$riskScore],
+            'required'=>$bindReq?date('Y-m-d',$bindReq):'', 'forecast'=>$bindFc?date('Y-m-d',$bindFc):'',
+            'variance'=>($bindReq&&$bindFc)?(int)floor(($bindFc-$bindReq)/86400):null,
+            'worst_variance'=>$worstVar, 'binding_po'=>($bindPo!==null?trim((string)($proj['pos'][$bindPo]['data']['po_number']??'')):''),
+            'pos'=>$children,
+        ];
+    }
+    // Projects sorted worst-first: status severity, then risk, then late count.
+    usort($out, fn($a,$b)=> (idems_expediting_status_rank($b['status'])<=>idems_expediting_status_rank($a['status'])) ?: (($b['risk']['score']<=>$a['risk']['score']) ?: ($b['late_pos']<=>$a['late_pos'])));
+    return $out;
+}
+
 // Keep only the RELEASED line items for a Release Note — rows that have a
 // passed / cleared / released / accepted quantity greater than zero. Rows that
 // were fully rejected or held are dropped. If no such column can be identified,
@@ -3117,6 +3198,33 @@ function ops_idems_expediting($route, $method) {
     }
     view('ops/idems/expediting_register', ['rows'=>$rows, 'q'=>$q, 'fs'=>$fs, 'counts'=>$k, 'today'=>$today,
         'statusOpts'=>['ON TRACK'=>'On track','AT RISK'=>'At risk','DELAYED'=>'Delayed','CRITICAL'=>'Critical','COMPLETED'=>'Completed']]);
+    return true;
+}
+
+// Expediting — project consolidation view (Phase 4b). Rolls every PO-level ER up
+// into a per-project delivery tree: project progress, worst status, aggregate
+// delivery risk, the binding delivery date and how many POs are forecast late,
+// each expandable to its PO/package children. One project, many POs, one view.
+function ops_idems_expediting_projects($route, $method) {
+    ops_require(is_master() || can('mod.idems.view') || can('mod.idems.edit'), 'You cannot view the expediting register.');
+    $q = trim($_GET['q'] ?? '');
+    [$w, $a] = scope_clause('d.office_id', 'd.sbu');
+    $where = "d.deleted=0 AND d.type_code='ER' AND $w"; $args = $a;
+    if ($q) { $where .= " AND (d.irn LIKE ? OR d.title LIKE ? OR d.project_name LIKE ?)"; array_push($args, "%$q%", "%$q%", "%$q%"); }
+    $docs = ops_all("SELECT d.*, bp.display_name vendor_disp, bp.legal_name vendor_name
+        FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.vendor_id
+        WHERE $where ORDER BY COALESCE(d.issue_date,d.created_at) DESC, d.id DESC", $args);
+    // Prefer the joined vendor display name when the data JSON has none.
+    foreach ($docs as &$d) if (empty($d['vendor_name']) && !empty($d['vendor_disp'])) $d['vendor_name'] = $d['vendor_disp'];
+    unset($d);
+    $projects = function_exists('idems_expediting_projects') ? idems_expediting_projects($docs) : [];
+    $k = ['projects'=>count($projects), 'pos'=>0, 'at_risk_projects'=>0, 'late_pos'=>0, 'high_risk_projects'=>0];
+    foreach ($projects as $p) {
+        $k['pos'] += (int)$p['total_pos']; $k['late_pos'] += (int)$p['late_pos'];
+        if (in_array($p['status'], ['AT RISK','DELAYED','CRITICAL'], true)) $k['at_risk_projects']++;
+        if (in_array($p['risk']['band'], ['HIGH','CRITICAL'], true)) $k['high_risk_projects']++;
+    }
+    view('ops/idems/expediting_projects', ['projects'=>$projects, 'q'=>$q, 'counts'=>$k]);
     return true;
 }
 

@@ -2071,7 +2071,7 @@ function ops_module_gate($route) {
         'availability'=>'jobs',
         'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems','release-notes'=>'idems','document-ai-review'=>'idems',
         'vendors'=>'idems','vendor-profile'=>'idems','vendor-profile-save'=>'idems',
-        'expediting'=>'idems',
+        'expediting'=>'idems','expediting-projects'=>'idems',
         'report-types'=>'idems','report-type-edit'=>'idems','report-builder'=>'idems','report-field-edit'=>'idems','report-file'=>'idems','irn-rules'=>'idems','audit-log'=>'idems',
         'document-approve'=>'idems','document-vet'=>'idems','approver-map'=>'idems','idems-approval-rules'=>'idems','idems-approval-rule-edit'=>'idems',
         'document-pdf'=>'idems','document-timestamp'=>'idems','document-docx'=>'idems','report-type-preview'=>'idems','report-template-preview'=>'idems',
@@ -2549,6 +2549,8 @@ function ops_dispatch($route, $method) {
             return ops_idems_vendors($route, $method);
         case $route === 'expediting':
             return ops_idems_expediting($route, $method);
+        case $route === 'expediting-projects':
+            return ops_idems_expediting_projects($route, $method);
         case $route === 'report-types' || $route === 'report-type-edit':
             return ops_idems_report_types($route, $method);
         case $route === 'report-builder' || $route === 'report-field-edit':

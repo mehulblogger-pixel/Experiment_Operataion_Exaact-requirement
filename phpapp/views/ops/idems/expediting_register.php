@@ -25,6 +25,7 @@
   <div><h1>Expediting register</h1>
     <p class="sub" style="margin:2px 0 0">Every expediting report with its live progress, status and the expeditor's delivery forecast. <?= (int)$counts['total'] ?> report(s).</p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <a class="btn secondary" href="/expediting-projects">Projects view</a>
     <a class="btn secondary" href="/documents">Reports</a>
     <?php if (is_master() || can('mod.idems.edit')): ?><a class="btn" href="/document-new">+ New expediting report</a><?php endif; ?>
   </div>
