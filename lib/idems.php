@@ -1332,6 +1332,83 @@ function idems_vendor_run_reminders($today = null) {
     } catch (Throwable $e) {}
     return ['expired' => $expired, 'reminded' => $reminded];
 }
+
+// ===========================================================================
+//  Vendor 360 — performance intelligence assembled from live operational data:
+//  inspection results, nonconformities and complaints raised against the vendor,
+//  plus the latest assessment. Produces one explainable performance score.
+// ===========================================================================
+
+// A live, deterministic performance score (0-100) for a vendor, with the
+// breakdown that produced it. Returns null only when there is nothing to score.
+function idems_vendor_performance($partnerId) {
+    $partnerId = (int)$partnerId; if (!$partnerId) return null;
+    $val = function($sql, $args = []) { try { return (int)ops_val($sql, $args); } catch (Throwable $e) { return 0; } };
+    $today = date('Y-m-d');
+
+    // 1) Inspection results against this vendor (issued reports only).
+    $graded   = $val("SELECT COUNT(*) FROM report_docs WHERE vendor_id=? AND deleted=0 AND finalized=1 AND result IN ('ACCEPTED','ACCEPTED_COND','REJECTED')", [$partnerId]);
+    $accepted = $val("SELECT COUNT(*) FROM report_docs WHERE vendor_id=? AND deleted=0 AND finalized=1 AND result IN ('ACCEPTED','ACCEPTED_COND')", [$partnerId]);
+    $rejected = $val("SELECT COUNT(*) FROM report_docs WHERE vendor_id=? AND deleted=0 AND finalized=1 AND result='REJECTED'", [$partnerId]);
+    $reportsTotal = $val("SELECT COUNT(*) FROM report_docs WHERE vendor_id=? AND deleted=0 AND finalized=1", [$partnerId]);
+    $acceptRate = $graded > 0 ? ($accepted / $graded) * 100 : null;
+
+    // 2) Nonconformities.
+    $ncrTotal   = $val("SELECT COUNT(*) FROM nonconformities WHERE partner_id=?", [$partnerId]);
+    $ncrOpen    = $val("SELECT COUNT(*) FROM nonconformities WHERE partner_id=? AND status <> 'CLOSED'", [$partnerId]);
+    $ncrOverdue = $val("SELECT COUNT(*) FROM nonconformities WHERE partner_id=? AND status <> 'CLOSED' AND due_on <> '' AND due_on < ?", [$partnerId, $today]);
+    $ncrMajor   = $val("SELECT COUNT(*) FROM nonconformities WHERE partner_id=? AND status <> 'CLOSED' AND severity='MAJOR'", [$partnerId]);
+
+    // 3) Complaints.
+    $cmpTotal = $val("SELECT COUNT(*) FROM complaints WHERE partner_id=?", [$partnerId]);
+    $cmpOpen  = $val("SELECT COUNT(*) FROM complaints WHERE partner_id=? AND status <> 'CLOSED'", [$partnerId]);
+
+    // 4) Latest assessment.
+    $vp = idems_vendor_profile($partnerId);
+    $assessScore = ($vp && $vp['last_score'] !== null && $vp['last_score'] !== '') ? (float)$vp['last_score'] : null;
+
+    // Nothing to score at all.
+    if ($acceptRate === null && $assessScore === null && $ncrTotal === 0 && $cmpTotal === 0) return null;
+
+    // Base: blend acceptance rate and assessment score (whichever exist).
+    $parts = []; if ($acceptRate !== null) $parts[] = $acceptRate; if ($assessScore !== null) $parts[] = $assessScore;
+    $base = $parts ? array_sum($parts) / count($parts) : 100.0;
+
+    // Penalties for live quality signals (open items only; capped so one bad month
+    // can't zero a strong vendor).
+    $pen = [];
+    if ($ncrMajor)   $pen['Open major NCRs']   = min(24, $ncrMajor * 8);
+    $minorOpen = max(0, $ncrOpen - $ncrMajor);
+    if ($minorOpen)  $pen['Open minor NCRs']   = min(12, $minorOpen * 3);
+    if ($ncrOverdue) $pen['Overdue NCRs']      = min(15, $ncrOverdue * 5);
+    if ($cmpOpen)    $pen['Open complaints']   = min(16, $cmpOpen * 4);
+    $penalty = min(45, array_sum($pen));
+    $score = max(0.0, min(100.0, $base - $penalty));
+
+    return [
+        'score' => round($score, 1), 'band' => idems_score_band($score), 'base' => round($base, 1), 'penalty' => round($penalty, 1),
+        'penalties' => $pen,
+        'reports' => ['total' => $reportsTotal, 'graded' => $graded, 'accepted' => $accepted, 'rejected' => $rejected,
+                      'acceptance_rate' => $acceptRate === null ? null : round($acceptRate, 1)],
+        'ncr' => ['total' => $ncrTotal, 'open' => $ncrOpen, 'overdue' => $ncrOverdue, 'major_open' => $ncrMajor],
+        'complaints' => ['total' => $cmpTotal, 'open' => $cmpOpen],
+        'assessment' => ['score' => $assessScore, 'band' => $vp['last_band'] ?? '', 'on' => $vp['last_assessed_on'] ?? ''],
+    ];
+}
+
+// The recent operational records behind the Vendor 360 view (each list capped).
+function idems_vendor_360($partnerId) {
+    $partnerId = (int)$partnerId; if (!$partnerId) return ['reports'=>[], 'ncrs'=>[], 'complaints'=>[]];
+    $rows = function($sql, $args = []) { try { return ops_all($sql, $args); } catch (Throwable $e) { return []; } };
+    return [
+        'reports' => $rows("SELECT id, irn, type_code, result, status, issue_date FROM report_docs
+                            WHERE vendor_id=? AND deleted=0 ORDER BY id DESC LIMIT 8", [$partnerId]),
+        'ncrs' => $rows("SELECT id, ref, title, severity, status, due_on FROM nonconformities
+                         WHERE partner_id=? ORDER BY id DESC LIMIT 8", [$partnerId]),
+        'complaints' => $rows("SELECT id, ref, kind, subject, status, received_on FROM complaints
+                               WHERE partner_id=? ORDER BY id DESC LIMIT 6", [$partnerId]),
+    ];
+}
 // ===========================================================================
 //  AI Report Auditor — deterministic QA pass (Phase 1)
 //  Runs the existing completeness + rule checks and adds a few high-value
@@ -2089,8 +2166,10 @@ function ops_idems_vendors($route, $method) {
         }
         unset($h);
         $events = function_exists('idems_vendor_status_events') ? idems_vendor_status_events($pid) : [];
+        $perf = function_exists('idems_vendor_performance') ? idems_vendor_performance($pid) : null;
+        $v360 = function_exists('idems_vendor_360') ? idems_vendor_360($pid) : ['reports'=>[],'ncrs'=>[],'complaints'=>[]];
         view('ops/idems/vendor_detail', ['partner'=>$partner, 'profile'=>$profile, 'history'=>$history, 'events'=>$events,
-            'canEdit'=>$canEdit,
+            'perf'=>$perf, 'v360'=>$v360, 'canEdit'=>$canEdit,
             'typeOpts'=>lk_options_or('vendor_type', []), 'catOpts'=>lk_options_or('vendor_product_category', []),
             'riskOpts'=>lk_options_or('vendor_risk_class', []), 'statusOpts'=>lk_options_or('vendor_approval_status', [])]);
         return true;
