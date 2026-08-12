@@ -2,6 +2,46 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🧱 URFE — Universal Report Foundation Engine (Aug 2026) — IN PROGRESS
+
+Phase 1 foundation the whole reporting ecosystem consumes. Strictly ADDITIVE on
+top of the IDEMS engine; nothing existing changes; issued reports stay frozen.
+Built in `lib/urfe.php`, wired into run_schema after `idems_migrate`.
+
+- **Slice 1 — ✅ DONE.** Shared **Field Library** (`report_lib_fields`, 36 seeded
+  fields incl. 5 tables) + **Section Library** (`report_lib_sections`, 16 seeded
+  reusable sections) + section→field placements + configurable **Status master**
+  (`report_statuses`, 9 states). Report-type **metadata** columns (description,
+  subcategory, urfe_version, lifecycle, owner, active window, feature flags:
+  ai_qa/evidence/finding/signature/revision_control). **Provenance** columns on
+  report_sections/report_fields (lib_code, lib_version, section_type, component,
+  grp). Verified IR/VASR/ER still build & render.
+- **Slice 2 — ✅ DONE.** **Clone-from-library engine** — the keystone.
+  `urfe_insert_library_field/section`, `urfe_assemble_report_type` (build a whole
+  type from an ordered list of Library section codes), `urfe_section_used_by` /
+  `urfe_field_used_by` dependency view. A Library item clones into ordinary
+  report_sections/report_fields so the existing builder/renderer/QA/PDF consume it
+  unchanged; stable fkey = Library code; provenance stamped; idempotent.
+  **Acceptance test §112 PASSES:** a new "Supplier Performance Report" assembled
+  ONLY from the Library (11 sections, 27 fields) renders through the existing PDF
+  engine with no report-specific code.
+- **Slice 3 — TODO.** Builder UI: "**Insert from Library**" (section + field) in
+  `/report-builder`; Report-Type metadata editor; a Report-Configuration center;
+  Status-master admin. (Engine is ready; this exposes it to a non-programmer.)
+- **Slice 4 — TODO.** Component registry: Finding / Action / Risk / Evidence /
+  Photo / Progress / Comparison as droppable section **components** that link to
+  the existing NCR / CAPA / risk_items / report_files modules (no new object
+  infrastructure — reuse).
+- **Slice 5 — TODO.** Enriched rule/applicability builder (required-if, readonly-if,
+  nested AND/OR) + validation classification (ERROR/WARNING/INFO/BLOCKING) +
+  visual rule builder UX.
+- **Slice 6 — TODO.** Remaining sample Library configs (Inspection, NCR, Release,
+  Audit) as the §113–115 acceptance tests; dependency-view UI; regression pass.
+
+Design guardrails held: no hard-coded report layouts, no duplicated modules, no
+change to issued reports, the existing configurable form builder is EXTENDED not
+replaced.
+
 ## 🚚 Universal Expediting & Supplier Progress Intelligence Engine (Aug 2026)
 
 Industry-neutral expediting engine built on the report engine — NOT an
