@@ -1203,6 +1203,32 @@ function ops_idems_documents($route, $method) {
         view('ops/idems/register', ['rows'=>$rows, 'q'=>$q, 'types'=>idems_types(false), 'ft'=>$ft, 'fs'=>$fs, 'counts'=>$counts]);
         return true;
     }
+    // Release Note register — Release Notes only, each showing the inspection
+    // report it was raised against and its release status. §releasenote
+    if ($route === 'release-notes') {
+        $q = trim($_GET['q'] ?? ''); $fs = $_GET['status'] ?? '';
+        [$w, $a] = scope_clause('d.office_id', 'd.sbu');
+        $where = "d.deleted=0 AND d.type_code='RN' AND $w"; $args = $a;
+        if ($q)  { $where .= " AND (d.irn LIKE ? OR d.title LIKE ? OR d.project_name LIKE ?)"; array_push($args, "%$q%", "%$q%", "%$q%"); }
+        if ($fs) { $where .= " AND d.status=?"; $args[] = $fs; }
+        $rows = ops_all("SELECT d.*, bp.display_name client_disp, bp.legal_name client_name, v.display_name vendor_disp, v.legal_name vendor_name
+            FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id
+            WHERE $where ORDER BY d.id DESC", $args);
+        // Pull the linked inspection report number (and its id, so the row can link
+        // back to it) out of each RN's data JSON.
+        foreach ($rows as &$r) {
+            $dj = json_decode($r['data'] ?: '[]', true); if (!is_array($dj)) $dj = [];
+            $r['source_irn'] = trim((string)($dj['source_irn'] ?? '')) ?: trim((string)($dj['ir_numbers'] ?? ''));
+            $r['source_report_id'] = (int)($dj['source_report_id'] ?? 0);
+        }
+        unset($r);
+        $counts = ops_one("SELECT COUNT(*) total,
+            SUM(CASE WHEN status IN ('DRAFT','SUBMITTED','UNDER_REVIEW','REJECTED') THEN 1 ELSE 0 END) open_n,
+            SUM(CASE WHEN status IN ('APPROVED','ISSUED') THEN 1 ELSE 0 END) issued_n
+            FROM report_docs d WHERE d.deleted=0 AND d.type_code='RN' AND $w", $a) ?: [];
+        view('ops/idems/release_register', ['rows'=>$rows, 'q'=>$q, 'fs'=>$fs, 'counts'=>$counts]);
+        return true;
+    }
     if ($route === 'document-new' || $route === 'document-edit') {
         $doc = null;
         if ($route === 'document-edit') {
