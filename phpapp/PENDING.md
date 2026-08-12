@@ -107,8 +107,20 @@ Phased build (per spec §56):
     reminder window (`vendor_reminder_days`, default 30). Wired into `cron.php`.
   - Re-qualification = raise a new assessment/audit; the write-back re-approves
     and resets validity, all captured on the timeline.
-- **P4 Performance** — vendor scorecard fed from NCR/complaints/delivery; Vendor
-  360 (reuse the customer-360 assembly pattern); periodic reassessment cycle.
+- **P4 Performance — ✅ COMPLETE (Aug 2026).**
+  - ✅ **Live performance score** (`idems_vendor_performance`) — a deterministic,
+    explainable 0–100 score built from operational data: a base blending the
+    inspection **acceptance rate** (accepted vs rejected reports against the
+    vendor) and the latest **assessment score**, minus capped penalties for open
+    **major/minor NCRs**, **overdue NCRs** and **open complaints**. Returns the
+    full breakdown (base, each penalty, all counts) so the number is auditable.
+  - ✅ **Vendor 360** (`idems_vendor_360`) — recent reports (with Accepted/
+    Rejected disposition), nonconformities (severity + overdue) and complaints,
+    assembled on the vendor page beneath a performance card. Surfaces the key
+    insight: a vendor can be *approved on paper* yet *marginal in live
+    performance*.
+  - Reassessment cycle already delivered in P3 (validity dates + expiry +
+    reminders).
 - **P5 AI** — vendor-specific checks into the existing AI Auditor (score-vs-
   finding conflict, capacity inconsistency, cert-expiry-overrides-score).
 - **P6 Advanced** — vendor portal self-assessment; predictive risk; automatic

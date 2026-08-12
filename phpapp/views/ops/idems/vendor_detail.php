@@ -81,6 +81,64 @@
   </div>
 </div>
 
+<?php // ---- Vendor 360 — live performance from operational data ---- ?>
+<?php if (!empty($perf)): $pcol = $scoreCol($perf['score']);
+  $resPill = ['ACCEPTED'=>['p-ok','Accepted'],'ACCEPTED_COND'=>['p-ok','Accepted (obs.)'],'REJECTED'=>['p-bad','Rejected'],'HOLD'=>['p-warn','Hold'],'NA'=>['p-mut','—']];
+?>
+<div class="panel" style="margin-top:14px;border:1px solid <?= $pcol ?>;background:color-mix(in srgb,<?= $pcol ?> 4%,transparent)">
+  <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+    <div style="text-align:center;min-width:104px">
+      <div style="font-size:13px;font-weight:700;letter-spacing:.03em;color:var(--muted)">PERFORMANCE</div>
+      <div style="font-size:34px;font-weight:800;line-height:1.1;color:<?= $pcol ?>;font-variant-numeric:tabular-nums"><?= e(rtrim(rtrim(number_format((float)$perf['score'],1),'0'),'.')) ?><span style="font-size:14px;color:var(--muted)">/100</span></div>
+      <div style="font-size:12px;font-weight:700;color:<?= $pcol ?>"><?= e(strtoupper($perf['band'])) ?></div>
+    </div>
+    <div style="flex:1;min-width:280px;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">
+      <div><div class="muted" style="font-size:11px">Acceptance rate</div><div style="font-size:18px;font-weight:700"><?= $perf['reports']['acceptance_rate']===null?'—':e(rtrim(rtrim(number_format((float)$perf['reports']['acceptance_rate'],1),'0'),'.')).'%' ?></div><div class="muted" style="font-size:11px"><?= (int)$perf['reports']['accepted'] ?> ok · <?= (int)$perf['reports']['rejected'] ?> rej of <?= (int)$perf['reports']['graded'] ?></div></div>
+      <div><div class="muted" style="font-size:11px">Open NCRs</div><div style="font-size:18px;font-weight:700;color:<?= $perf['ncr']['open']>0?'var(--bad)':'inherit' ?>"><?= (int)$perf['ncr']['open'] ?></div><div class="muted" style="font-size:11px"><?= (int)$perf['ncr']['overdue'] ?> overdue · <?= (int)$perf['ncr']['major_open'] ?> major</div></div>
+      <div><div class="muted" style="font-size:11px">Open complaints</div><div style="font-size:18px;font-weight:700;color:<?= $perf['complaints']['open']>0?'var(--bad)':'inherit' ?>"><?= (int)$perf['complaints']['open'] ?></div><div class="muted" style="font-size:11px">of <?= (int)$perf['complaints']['total'] ?> total</div></div>
+      <div><div class="muted" style="font-size:11px">Last assessment</div><div style="font-size:18px;font-weight:700"><?= $perf['assessment']['score']===null?'—':e(rtrim(rtrim(number_format((float)$perf['assessment']['score'],1),'0'),'.')) ?></div><div class="muted" style="font-size:11px"><?= e($perf['assessment']['on'] ?: 'not assessed') ?></div></div>
+    </div>
+  </div>
+  <?php if (!empty($perf['penalties'])): ?>
+    <div class="muted" style="font-size:11.5px;margin-top:10px">Base <?= e(rtrim(rtrim(number_format((float)$perf['base'],1),'0'),'.')) ?> − penalties (<?php $ps=[]; foreach($perf['penalties'] as $k=>$v){$ps[]=e($k).' −'.e(rtrim(rtrim(number_format((float)$v,1),'0'),'.'));} echo implode(', ',$ps); ?>) = <?= e(rtrim(rtrim(number_format((float)$perf['score'],1),'0'),'.')) ?>. Live score from operational data; open quality issues reduce it.</div>
+  <?php else: ?>
+    <div class="muted" style="font-size:11.5px;margin-top:10px">Live score from assessment and inspection results. No open quality issues against this vendor.</div>
+  <?php endif; ?>
+</div>
+
+<div class="two-col" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start;margin-top:14px">
+  <div class="panel">
+    <h3 style="margin:0 0 8px;font-size:14px">Recent reports</h3>
+    <?php if (empty($v360['reports'])): ?><p class="muted" style="margin:0;font-size:12.5px">None yet.</p><?php else: foreach ($v360['reports'] as $r): [$rc,$rl] = $resPill[$r['result']] ?? ['p-mut','—']; ?>
+      <div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:12.5px">
+        <a href="/document?id=<?= (int)$r['id'] ?>" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($r['irn']) ?></a>
+        <span><?php if (($r['result']??'')!=='' && $r['result']!=='NA'): ?><span class="pill <?= $rc ?>"><?= e($rl) ?></span><?php else: ?><span class="muted"><?= e($r['type_code']) ?></span><?php endif; ?></span>
+      </div>
+    <?php endforeach; endif; ?>
+  </div>
+  <div class="panel">
+    <h3 style="margin:0 0 8px;font-size:14px">Nonconformities</h3>
+    <?php if (empty($v360['ncrs'])): ?><p class="muted" style="margin:0;font-size:12.5px">None raised.</p><?php else: foreach ($v360['ncrs'] as $n): ?>
+      <div style="padding:5px 0;border-bottom:1px solid var(--line);font-size:12.5px">
+        <div style="display:flex;justify-content:space-between;gap:8px"><strong><?= e($n['ref']) ?></strong>
+          <span class="pill <?= $n['severity']==='MAJOR'?'p-bad':($n['severity']==='MINOR'?'p-warn':'p-mut') ?>"><?= e(ucfirst(strtolower($n['severity']))) ?></span></div>
+        <div class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($n['title']) ?></div>
+        <div class="muted" style="font-size:11px"><?= e($n['status']) ?><?= (($n['status']??'')!=='CLOSED' && !empty($n['due_on']) && $n['due_on']<date('Y-m-d'))?' · <span style="color:var(--bad)">overdue</span>':'' ?></div>
+      </div>
+    <?php endforeach; endif; ?>
+  </div>
+  <div class="panel">
+    <h3 style="margin:0 0 8px;font-size:14px">Complaints</h3>
+    <?php if (empty($v360['complaints'])): ?><p class="muted" style="margin:0;font-size:12.5px">None recorded.</p><?php else: foreach ($v360['complaints'] as $c): ?>
+      <div style="padding:5px 0;border-bottom:1px solid var(--line);font-size:12.5px">
+        <div style="display:flex;justify-content:space-between;gap:8px"><strong><?= e($c['ref']) ?></strong><span class="pill <?= ($c['status']??'')!=='CLOSED'?'p-warn':'p-mut' ?>"><?= e($c['status']) ?></span></div>
+        <div class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($c['subject'] ?: $c['kind']) ?></div>
+      </div>
+    <?php endforeach; endif; ?>
+  </div>
+</div>
+<?php endif; // perf ?>
+
 <?php // ---- Assessment history ---- ?>
 <div class="panel" style="margin-top:14px;padding:0;overflow:hidden">
   <div style="padding:10px 14px;border-bottom:1px solid var(--line)"><h3 style="margin:0">Assessment history</h3></div>
