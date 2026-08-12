@@ -46,9 +46,16 @@ Vendor-360 are all reused.
   headers & cells, so 9-11 column tables (delay register, logistics) never
   collide — a universal fix for every wide table, done without a landscape
   rewrite of the PDF core.
-- **Phase 4** — project-wide consolidation + three outputs from one engine:
-  Register (working data) · Dashboard (management) · Report (formal deliverable);
-  vendor commitment-reliability & forecast-reliability trends → Vendor-360.
+- **Phase 4 — ✅ DONE (Aug 2026).** The three outputs from one engine: the
+  **Report** is the PDF; the **Register + Dashboard** is `/expediting` — a live
+  list of every ER with its computed progress %, status and expeditor forecast,
+  under a management KPI strip (active · on-track · at-risk · delayed · forecast-
+  late), filterable, linked in the Reporting nav. **Commitment- & forecast-
+  reliability** (`idems_vendor_expediting_perf`: reliability % from commitment
+  registers; forecast-optimism % from vendor-vs-expeditor forecasts) now shows as
+  an "Expediting performance" panel on **Vendor-360**, joining schedule behaviour
+  to the quality picture. (Full multi-PO/package project-tree consolidation
+  deferred to a P4b.)
 - **Phase 5** — AI advisory: exec-summary drafting, delay explanation, forecast
   plausibility, cross-report comparison, progress-anomaly detection (advisory
   only, never replaces values).
