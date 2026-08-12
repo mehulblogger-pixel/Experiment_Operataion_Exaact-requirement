@@ -15,15 +15,34 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
   already-seeded RN type, and `reference_documents` in the generator's `$carry`
   list in `ops_idems_release_note`.)
 
-- **All other report formats still to be drafted.** Only the inspection report
-  (and now the Release Note) are fully form-built. The remaining TPIA report
-  types still need their forms designed / pre-built: Daily Inspection Report,
-  Inspection Visit Report, Inspection Certificate, Daily/Weekly/Fortnightly/
-  Monthly Deputation & summary reports, Vendor Assessment, Vendor Audit,
-  Expediting Report, NCR Report, Corrective Action / CAPA Report, Deviation
-  Report, Site Inspection Report, Surveillance Report, Final Inspection Report.
-  Build each as a form-driven type (like the inspection report) so it renders
-  through the shared engine and is picked up by the AI Report Auditor.
+- **Remaining report formats — build by FAMILY, not one-by-one.** Only the
+  Inspection Report and the Release Note are fully form-built today. The
+  catalogue (`IDEMS_REPORT_SEED`) registers ~37 type *names*, but a type is only
+  a name until it has a designed form. Do NOT hand-build 35 forms — they cluster
+  into ~6 families that share building blocks; build one strong base per family
+  and DERIVE the variants (exactly how the Release Note was derived from the IR),
+  so each inherits the shared render engine + the AI Report Auditor automatically.
+
+  Recommended build order:
+  1. **Inspection variants** (low effort — IR base + per-type tweaks): DIR Daily
+     Inspection, DVR Daily Visit, SIR Stage, FIR Final, STIR Site, RIR
+     Re-inspection, SUR Surveillance, FLR Flash, OBR Observation, PPR Punch-point.
+  2. **Certificates** (low — short one-page: header + statement + reference +
+     sign-off): COC Certificate of Conformity, IC Inspection Certificate, WC
+     Witness Certificate, HC Hold Certificate, TCRV Test-cert Review, TCR
+     Technical Clarification.
+  3. **Vendor family** (medium — question/finding/rating/score tables; also
+     unlocks the Phase-3 vendor-scoring AI checks): VAR Vendor Audit, VASR Vendor
+     Assessment, FAR Factory Assessment.
+  4. **Expediting / progress** (medium — progress-% + dates tables; unlocks the
+     Phase-3 expediting AI checks): ER Expediting, MPR Manufacturing Progress.
+  5. **Summaries** (higher — these AGGREGATE other reports, i.e. the cross-report
+     rollup, build last): WS Weekly, FNR Fortnightly, MPGR Monthly, CSR Client
+     Summary, PCR Project Closure.
+
+  Already full working MODULES — do NOT rebuild as report forms (at most add a
+  branded PDF export): NCR, CAPA / Corrective Action, Deviation, Complaints, and
+  the admin ones (TS Timesheet, ATR Attendance, TVR Travel, EXP Expense).
 
 
 ## 🎨 PARKED — UI / UX optimization pass (Aug 2026)
