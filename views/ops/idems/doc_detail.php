@@ -199,6 +199,36 @@
 </details>
 <?php endif; ?>
 
+<?php // ---- Expediting advisory (Phase 5) — deterministic, advisory only ---- ?>
+<?php if (!empty($expAdvisory) && (trim((string)$expAdvisory['summary'])!=='' || !empty($expAdvisory['items']))):
+  $advTone = ['bad'=>'var(--bad)','warn'=>'#b45309','ok'=>'var(--ok)','neutral'=>'#2563eb'];
+  $advOpen = false; foreach ($expAdvisory['items'] as $it) if (in_array($it['tone']??'', ['bad','warn'], true)) { $advOpen = true; break; }
+?>
+<details class="panel" style="margin:0 0 12px;border:1px solid #6366f1" <?= $advOpen?'open':'' ?>>
+  <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font-size:18px">🧭</span>
+    <b style="color:#4f46e5">Expediting advisory</b>
+    <span class="muted" style="font-size:12.5px">draft narrative — advisory only, never changes the report</span>
+  </summary>
+  <div style="margin-top:10px;display:flex;flex-direction:column;gap:9px">
+    <?php if (trim((string)$expAdvisory['summary'])!==''): ?>
+      <div style="border-left:3px solid #6366f1;background:color-mix(in srgb,#6366f1 6%,transparent);padding:9px 12px;border-radius:8px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.03em;color:#4f46e5">DRAFT EXECUTIVE SUMMARY</div>
+        <div style="font-size:13px;margin-top:3px;color:var(--ink)" id="advSummary"><?= e($expAdvisory['summary']) ?></div>
+        <button type="button" class="btn small secondary" style="margin-top:6px" onclick="(function(b){var t=document.getElementById('advSummary').innerText;navigator.clipboard&&navigator.clipboard.writeText(t);b.textContent='Copied ✓';setTimeout(function(){b.textContent='Copy summary';},1500);})(this)">Copy summary</button>
+      </div>
+    <?php endif; ?>
+    <?php foreach ($expAdvisory['items'] as $it): $c = $advTone[$it['tone']??'neutral'] ?? '#2563eb'; ?>
+      <div style="border-left:3px solid <?= $c ?>;background:color-mix(in srgb,<?= $c ?> 6%,transparent);padding:8px 11px;border-radius:8px">
+        <div style="font-size:13px;font-weight:600;color:<?= $c ?>"><?= e($it['title']) ?></div>
+        <div class="muted" style="font-size:12.5px;margin-top:2px;color:var(--ink)"><?= e($it['text']) ?></div>
+      </div>
+    <?php endforeach; ?>
+    <p class="muted" style="font-size:11px;margin:2px 0 0">Composed from this report's own milestones, forecast dates, delay &amp; NCR registers and the previous report — every line is reproducible. Read it, then adopt or edit the wording; it is never inserted automatically.</p>
+  </div>
+</details>
+<?php endif; ?>
+
 <?php // ---- Revision lineage ------------------------------------------------ ?>
 <?php if (!empty($doc['revises_id']) || !empty($doc['revised_by_id']) || (int)($doc['rev'] ?? 0) > 0): ?>
 <div class="panel" style="padding:10px 14px;margin:0 0 12px;font-size:13.5px">

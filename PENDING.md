@@ -56,10 +56,32 @@ Vendor-360 are all reused.
   an "Expediting performance" panel on **Vendor-360**, joining schedule behaviour
   to the quality picture. (Full multi-PO/package project-tree consolidation
   deferred to a P4b.)
-- **Phase 5** — AI advisory: exec-summary drafting, delay explanation, forecast
-  plausibility, cross-report comparison, progress-anomaly detection (advisory
-  only, never replaces values).
+- **Phase 5 — ✅ DONE (Aug 2026).** Advisory layer, **deterministic (no LLM),
+  advisory only** — it never changes a stored value or gates issue.
+  `idems_expediting_advisory()` composes, from the report's own data: a **draft
+  executive summary** (progress, milestone tally, three-date forecast + variance,
+  open NCRs, dispatch readiness — copy-to-clipboard so the expeditor can adopt
+  it), **delay explanations** (from the delay register: cause → responsibility →
+  impact → agreed action), a **forecast-plausibility** read (vendor-vs-expeditor
+  optimism in days, backed by the milestone/NCR evidence, flagged when the
+  forecast lands beyond the required date), **progress anomalies** (high % masking
+  a delayed milestone / a late forecast / a dispatch blocker / a delivery-
+  impacting NCR — "percentage ≠ ready-to-ship"), and a **trend vs the previous
+  report** (`idems_expediting_previous()` finds the prior ER for the same
+  vendor+PO → progress movement, forecast slip in days, status change). Shown as
+  an "Expediting advisory" panel on the report page, auto-opened when anything is
+  amber/red. An optional AI provider still adds its separate suggestions
+  elsewhere; this layer needs no provider. Helper `idems_list_join()`.
 - **Phase 6** — predictive delay/vendor risk, recovery intelligence, analytics.
+
+**Report presentation (Aug 2026, applies to every report type):** every report
+now opens with an at-a-glance **KPI snapshot card row** (`idems_report_kpis()`) —
+expediting shows progress · status · forecast-vs-need · dispatch-ready · blockers;
+scored reports show score · band · clauses-covered · recommendation; inspection
+reports show result · release. The compact field grid uses a **fixed label
+column** so values align; the scorecard drops its repeated headline when the
+snapshot already shows it (single-bar scorecards suppressed as duplication); the
+report title always reads a friendly name, never a bare type code.
 
 Design rule (per spec §79): never hard-code an industry; applicability is driven
 by vendor type / product / process / criteria pack via lookups + the criteria
