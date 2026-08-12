@@ -1500,11 +1500,34 @@ function ops_idems_documents($route, $method) {
         // AI Report Auditor — a deterministic QA pass, run automatically so the
         // reviewer sees a traffic light and plain-English issues without any action.
         $qa = function_exists('idems_qa_run') ? idems_qa_run($doc, $fields, $data, []) : null;
+        // Optional AI advisory (LLM) suggestions — shown only when a provider is
+        // configured and the reviewer has run one; cached in the session so it does
+        // not re-call the model on every page view.
+        $aiText = $_SESSION['idems_ai_' . $doc['id']] ?? '';
+        $aiSections = ($aiText && function_exists('idems_ai_sections')) ? idems_ai_sections($aiText) : [];
+        $aiOn = function_exists('ai_enabled') && ai_enabled();
         view('ops/idems/doc_detail', ['doc'=>$doc, 'approver'=>$approver, 'audit'=>$audit, 'qa'=>$qa,
+            'aiSections'=>$aiSections, 'aiOn'=>$aiOn,
             'sections'=>$sections, 'fields'=>$fields, 'data'=>$data, 'files'=>idems_doc_files($doc['id']), 'hasSchema'=>!empty($fields),
             'approvals'=>$approvals, 'curStep'=>$curStep, 'canAct'=>idems_can_act_step($curStep),
             'vetting'=>idems_vetting_log($doc['id']), 'canVet'=>idems_can_vet(),
             'delegateUsers'=>($curStep && idems_can_act_step($curStep)) ? ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name") : []]);
+        return true;
+    }
+    if ($route === 'document-ai-review' && $method === 'POST') {
+        // Run the optional LLM advisory review from the report page itself and
+        // come straight back to it, so the suggestions appear in the QA panel.
+        $doc = ops_one("SELECT d.*, bp.display_name client_disp, bp.legal_name client_name, v.display_name vendor_disp, v.legal_name vendor_name, rt.name type_name
+            FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
+            WHERE d.id=? AND d.deleted=0", [(int)($_POST['id'] ?? 0)]);
+        if (!$doc) { http_response_code(404); view('notfound'); return true; }
+        ops_require(is_master() || can('mod.idems.edit') || can('idems.finalize'), 'You cannot run a review on this report.');
+        $fx = idems_fields($doc['report_type_id']);
+        $dt = json_decode($doc['data'] ?: '[]', true) ?: [];
+        [$text, $err] = idems_ai_review($doc, $fx, $dt, function_exists('idems_source_docs') ? idems_source_docs($doc['id']) : []);
+        if ($err) flash('AI review unavailable: ' . $err, 'warning');
+        else { $_SESSION['idems_ai_' . $doc['id']] = $text; idems_log('report_doc', (int)$doc['id'], 'AI_REVIEW', ['irn'=>$doc['irn']]); flash('AI review completed — the suggestions are advisory. You remain the approving authority.'); }
+        redirect('/document?id=' . $doc['id']);
         return true;
     }
     if ($route === 'document-submit' && $method === 'POST') {
