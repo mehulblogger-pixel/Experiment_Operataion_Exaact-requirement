@@ -25,9 +25,16 @@ Vendor-360 are all reused.
   expeditor; high progress despite a delayed milestone). Seeded lookups:
   expediting_type / _method / _status / _delay_category. Renders through the
   shared PDF engine. Migration er_form_seeded_v1.
-- **Phase 2** — engineering/document expediting register, procurement/material
-  monitoring, manufacturing/service progress stages, inspection/test status
-  (link the Inspection engine), quality/NCR summary (link NCR).
+- **Phase 2 — ✅ DONE (Aug 2026).** Added to the ER form: engineering &
+  documentation register (submission vs approval tracked separately),
+  procurement & material register, **Inspection & test status** and **Quality /
+  NCR summary** — the last two **auto-prefilled from live data** when the ER is
+  raised against a vendor (`idems_vendor_prefill_inspections` reads the vendor's
+  inspection reports incl. result & release; `idems_vendor_prefill_ncrs` reads
+  the NCR register with delivery-impact). Expediting reflects, never edits,
+  inspection results. The auditor gained an "open major NCR may affect delivery"
+  check. Migration er_p2_v1. (Manufacturing-stage detail beyond the weighted
+  progress fields deferred to P3.)
 - **Phase 3** — capacity/resource/manpower, sub-supplier monitoring & chain
   traceability, packing/preservation, dispatch-readiness checklist, logistics.
 - **Phase 4** — project-wide consolidation + three outputs from one engine:
