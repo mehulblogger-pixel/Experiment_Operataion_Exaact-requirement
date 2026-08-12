@@ -362,6 +362,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('access_migrate')) access_migrate();
     if (function_exists('crm_migrate')) crm_migrate();   // after lookups exist (masters)
     if (function_exists('idems_migrate')) idems_migrate();   // IDEMS report engine
+    if (function_exists('urfe_migrate')) urfe_migrate();     // URFE — universal report foundation (shared field/section library, metadata)
     if (function_exists('orgadmin_migrate')) orgadmin_migrate();   // office tree + heads
     if (function_exists('contracts_migrate')) contracts_migrate();  // contract validity gates
     if (function_exists('security_migrate')) security_migrate();    // password age, second factor
