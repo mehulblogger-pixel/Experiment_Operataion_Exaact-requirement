@@ -2,6 +2,30 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 📋 PARKED — reporting completeness (Aug 2026)
+
+- **Release Note — reference-documents table.** The auto-generated Release Note
+  already carries the identifying details, the (released) PO item table and the
+  ITP activity list forward from the inspection report. It should ALSO carry a
+  **table of all the documents referred to** in issuing the release note (the
+  inspection report's "Reference documents" table — QAP/ITP, drawings,
+  specifications, MTCs, etc.), so the RN stands on its own with the full
+  document basis for the release. (Needs: add a `reference_documents` field to
+  `idems_install_release_note_sections`, a one-time migration to add it to the
+  already-seeded RN type, and `reference_documents` in the generator's `$carry`
+  list in `ops_idems_release_note`.)
+
+- **All other report formats still to be drafted.** Only the inspection report
+  (and now the Release Note) are fully form-built. The remaining TPIA report
+  types still need their forms designed / pre-built: Daily Inspection Report,
+  Inspection Visit Report, Inspection Certificate, Daily/Weekly/Fortnightly/
+  Monthly Deputation & summary reports, Vendor Assessment, Vendor Audit,
+  Expediting Report, NCR Report, Corrective Action / CAPA Report, Deviation
+  Report, Site Inspection Report, Surveillance Report, Final Inspection Report.
+  Build each as a form-driven type (like the inspection report) so it renders
+  through the shared engine and is picked up by the AI Report Auditor.
+
+
 ## 🎨 PARKED — UI / UX optimization pass (Aug 2026)
 
 **Owner note (Aug 2026):** after the functional build is well along, do a
