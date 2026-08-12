@@ -696,6 +696,22 @@ function idems_build_release_note() {
     if (!$has) idems_install_release_note_sections($typeId);
     return $typeId;
 }
+// Keep only the RELEASED line items for a Release Note — rows that have a
+// passed / cleared / released / accepted quantity greater than zero. Rows that
+// were fully rejected or held are dropped. If no such column can be identified,
+// or if the filter would leave nothing, the full list is kept (never hide data
+// silently). §releasenote
+function idems_released_line_items($rows) {
+    if (!is_array($rows) || !$rows) return $rows;
+    $first = (array)($rows[0] ?? []); $passKey = null;
+    foreach ($first as $k => $_) { $lk = strtolower((string)$k); if (strpos($lk,'passed')!==false || strpos($lk,'cleared')!==false || strpos($lk,'released')!==false || strpos($lk,'accepted')!==false) { $passKey = $k; break; } }
+    if ($passKey === null) return $rows;
+    $out = array_values(array_filter($rows, function($r) use ($passKey) {
+        $rr = (array)$r; $v = preg_replace('/[^0-9.\-]/', '', (string)($rr[$passKey] ?? ''));
+        return $v !== '' && (float)$v > 0;
+    }));
+    return $out ?: $rows;
+}
 function idems_sections($typeId) { return ops_all("SELECT * FROM report_sections WHERE report_type_id=? ORDER BY sort_order, id", [(int)$typeId]); }
 function idems_fields($typeId, $sectionId = null) {
     if ($sectionId === null) return ops_all("SELECT * FROM report_fields WHERE report_type_id=? ORDER BY sort_order, id", [(int)$typeId]);
@@ -5245,6 +5261,7 @@ function ops_idems_release_note($method) {
     $carry = ['client','end_user','vendor','po_number','project','inspection_stage','inspection_date','location','inspector','po_items','scope_activities'];
     $rnArr = ['source_irn' => $src['irn'], 'source_report_id' => (int)$src['id']];
     foreach ($carry as $ck) if (isset($data[$ck]) && $data[$ck] !== '' && $data[$ck] !== 'NA') $rnArr[$ck] = $data[$ck];
+    if (isset($rnArr['po_items'])) $rnArr['po_items'] = idems_released_line_items($rnArr['po_items']);   // §releasenote — show only released line items
     $rnArr['release_statement'] = idems_release_statement_default();
     $rnArr['ir_numbers']        = '';
     $rnData = json_encode($rnArr);
