@@ -30,9 +30,7 @@ register + qualification/validity/requalification workflow; (7) vendor scorecard
 self-assessment + document upload.
 
 Phased build (per spec §56):
-- **P1 Assessment foundation** — *scoring keystone DONE + VASR form DONE (Aug
-  2026)*; remaining: vendor attributes + seeded lookups; bind assessment to a
-  vendor.
+- **P1 Assessment foundation — ✅ COMPLETE (Aug 2026).**
   - ✅ **Scoring in the form engine** — `report_fields` gained `weight`,
     `max_score`, `score_map` (ensure_column, guarded). `idems_field_score()`
     normalises any answer to 0–100 (score_map JSON / max_score ceiling / ftype
@@ -53,10 +51,28 @@ Phased build (per spec §56):
     scorecard block: overall score, band, colour-coded category bars).
   - ✅ **Score → QA** — deterministic QA now flags recommendation-vs-score
     contradictions (approves despite low score / rejects a strong vendor).
-  - ⬜ Remaining P1: vendor attributes on the partner (type, category, risk
-    class, approval status, rating, reassessment dates); seeded vendor-type /
-    product-category / risk-class lookups; assessment↔vendor linkage;
-    admin UI to set per-field weights/scales in the report builder.
+  - ✅ **Builder scoring UI** — the report builder's field editor now sets
+    weight / max score / score map (friendly "Option = points" lines), so
+    scoring is fully admin-configurable with no code. Scored fields show a
+    "weight" pill in the field list.
+  - ✅ **Vendor attributes + seeded lookups** — `vendor_profiles` (one row per
+    vendor partner: type, product/service category, risk class, approval
+    status, rating, last score/band, validity & re-assessment dates). Seeded
+    editable master lists: vendor_type, vendor_product_category,
+    vendor_risk_class, vendor_approval_status.
+  - ✅ **Assessment ↔ vendor linkage** — issuing a scored VASR against a vendor
+    rolls its score, band, approval status and validity/re-assessment dates onto
+    that vendor's profile (`idems_vendor_apply_assessment`, fail-open; the
+    recommendation leads, the score is the fallback). Re-qual period is a setting
+    (`vendor_requal_months`, default 12).
+  - ✅ **Approved-vendor register** (`/vendors`) + per-vendor profile
+    (`/vendor-profile`) — register with KPI tiles, status/risk/type filters, and
+    the latest score + re-assessment-due column; profile page with the score
+    gauge, editable classification, and full assessment history. Linked from the
+    report register and the Reporting nav.
+
+  **P1 is COMPLETE.** Next: P2 Audit (vendor-scoped VAR audit form; findings →
+  NCR/CAPA reuse), then P3 Qualification workflow (approval chain, requal cycle).
 - **P2 Audit** — vendor-scoped VAR audit form; findings → NCR/CAPA (reuse);
   audit report.
 - **P3 Qualification** — approved-vendor register; approval status; validity /
