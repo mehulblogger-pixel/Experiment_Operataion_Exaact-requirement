@@ -199,6 +199,47 @@
 </details>
 <?php endif; ?>
 
+<?php // ---- Predictive delivery risk (Phase 6) — deterministic, advisory only ---- ?>
+<?php if (!empty($expRisk)):
+  $rb = $expRisk['band'];
+  $rc = $rb==='CRITICAL' ? 'var(--bad)' : ($rb==='HIGH' ? '#c2410c' : ($rb==='MEDIUM' ? '#b45309' : 'var(--ok)'));
+  $rtone = ['bad'=>'var(--bad)','warn'=>'#b45309','ok'=>'var(--ok)','neutral'=>'#2563eb'];
+  $rOpen = in_array($rb, ['HIGH','CRITICAL'], true);
+  $rec = $expRisk['recovery'];
+?>
+<details class="panel" style="margin:0 0 12px;border:1px solid <?= $rc ?>" <?= $rOpen?'open':'' ?>>
+  <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font-size:18px">📡</span>
+    <b style="color:<?= $rc ?>">Delivery risk — <?= e(ucfirst(strtolower($rb))) ?></b>
+    <span class="muted" style="font-size:12.5px">predictive · advisory only</span>
+    <span style="flex:1"></span>
+    <span class="pill" style="background:color-mix(in srgb,<?= $rc ?> 15%,transparent);color:<?= $rc ?>;font-variant-numeric:tabular-nums"><?= (int)$expRisk['score'] ?>/100</span>
+  </summary>
+  <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
+    <?php if (!empty($rec['note'])): ?>
+      <div style="border-left:3px solid <?= $rc ?>;background:color-mix(in srgb,<?= $rc ?> 6%,transparent);padding:8px 11px;border-radius:8px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.03em;color:<?= $rc ?>">RECOVERY READ<?php if (($rec['gap_days']??0)>0): ?> — <?= (int)$rec['gap_days'] ?> day(s) late<?php if($rec['available_days']!==null): ?>, ~<?= (int)$rec['available_days'] ?> day(s) lead remaining<?php endif; ?><?php endif; ?></div>
+        <div style="font-size:12.5px;margin-top:2px;color:var(--ink)"><?= e($rec['note']) ?></div>
+      </div>
+    <?php endif; ?>
+    <?php if (!empty($expRisk['factors'])): ?>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.03em;color:var(--muted)">RISK DRIVERS (weighted, heaviest first)</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+      <?php foreach ($expRisk['factors'] as $f): $fc2 = $rtone[$f['tone']??'neutral'] ?? '#2563eb'; ?>
+        <div style="display:flex;gap:9px;align-items:baseline">
+          <span class="pill" style="background:color-mix(in srgb,<?= $fc2 ?> 14%,transparent);color:<?= $fc2 ?>;min-width:34px;text-align:center;font-variant-numeric:tabular-nums">+<?= (int)$f['points'] ?></span>
+          <span style="font-size:12.5px"><b><?= e($f['label']) ?></b> <span class="muted">— <?= e($f['detail']) ?></span></span>
+        </div>
+      <?php endforeach; ?>
+      </div>
+    <?php else: ?>
+      <p class="muted" style="margin:0;font-size:12.5px">✓ No material delivery-risk drivers detected on this report.</p>
+    <?php endif; ?>
+    <p class="muted" style="font-size:11px;margin:2px 0 0">Predicted from this report's forecast variance, milestones, NCRs, dispatch blockers, capacity/sub-supplier signals and the vendor's track record. Advisory — it never gates issue or changes a value.</p>
+  </div>
+</details>
+<?php endif; ?>
+
 <?php // ---- Expediting advisory (Phase 5) — deterministic, advisory only ---- ?>
 <?php if (!empty($expAdvisory) && (trim((string)$expAdvisory['summary'])!=='' || !empty($expAdvisory['items']))):
   $advTone = ['bad'=>'var(--bad)','warn'=>'#b45309','ok'=>'var(--ok)','neutral'=>'#2563eb'];

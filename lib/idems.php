@@ -1626,6 +1626,149 @@ function idems_expediting_advisory($doc, $fields = null, $data = null, $prev = n
     return ['summary'=>$summary, 'items'=>$items];
 }
 
+// §expediting-risk (Phase 6) — a DETERMINISTIC forward-looking delivery-risk read
+// for one Expediting Report. It answers "how likely is this PO to miss its
+// required date, and why", as a 0-100 risk score (higher = more risk), a band and
+// the weighted contributing factors — plus a recovery read (how many days late,
+// how much lead time is left, is a recovery action on record). No LLM: every
+// point is a reproducible function of the report's own signals and the vendor's
+// track record. Advisory — it never gates issue. Returns
+// ['score','band','factors'=>[['label','detail','points','tone']],'recovery'=>[...]].
+function idems_expediting_risk($doc, $fields = null, $data = null, $vperf = null, $today = null) {
+    if ($fields === null) $fields = idems_fields((int)($doc['report_type_id'] ?? 0));
+    if ($data === null) { $data = json_decode($doc['data'] ?? '[]', true); if (!is_array($data)) $data = []; }
+    $sections = idems_sections((int)($doc['report_type_id'] ?? 0));
+    $today = $today ?: date('Y-m-d');
+    $pd = function($s){ $s=trim((string)$s); if($s==='')return null; $t=strtotime($s); return $t?:null; };
+    $tableRows = function($fkey) use ($fields,$data){
+        foreach ($fields as $f) if (($f['fkey']??'')===$fkey && ($f['ftype']??'')==='table') {
+            $rows=$data[$fkey]??null; if(!is_array($rows)) return [null,[]];
+            $defs=idems_table_col_defs($f); $map=[]; foreach($defs as $ck=>$d) $map[strtolower((string)$d['label'])]=$ck;
+            return [$rows,$map];
+        } return [null,[]];
+    };
+    $col=function($map,$needles){ foreach($map as $lbl=>$ck){ foreach((array)$needles as $n) if(strpos($lbl,$n)!==false) return $ck; } return null; };
+
+    $sc = function_exists('idems_score_doc') ? idems_score_doc($sections,$fields,$data) : null;
+    $pct = ($sc && $sc['overall']!==null) ? (float)$sc['overall'] : null;
+    $st = idems_expediting_status($doc,$fields,$data);
+    $fc = $st['forecast']; $ms = $st['milestones'];
+    $dr = function_exists('idems_expediting_dispatch_readiness') ? idems_expediting_dispatch_readiness($fields,$data) : null;
+
+    $factors=[]; $score=0;
+    $add=function($label,$detail,$points,$tone) use (&$factors,&$score){ $points=(int)round($points); if($points<=0) return; $score+=$points; $factors[]=['label'=>$label,'detail'=>$detail,'points'=>$points,'tone'=>$tone]; };
+
+    // 1) Forecast beyond required — the strongest signal (2 pts/day, cap 30).
+    $ev = $fc['expeditor_variance_days'];
+    if ($ev !== null && $ev > 0) $add('Forecast beyond required', 'Expeditor forecasts delivery '.$ev.' day'.($ev==1?'':'s').' after the required date', min(30, $ev*2), 'bad');
+
+    // 2) Milestone health — delayed (8 each, cap 24) + at-risk (4 each, cap 12).
+    if ($ms['delayed']>0) $add('Delayed milestones', $ms['delayed'].' milestone'.($ms['delayed']==1?'':'s').' delayed', min(24, $ms['delayed']*8), 'bad');
+    if ($ms['at_risk']>0) $add('At-risk milestones', $ms['at_risk'].' milestone'.($ms['at_risk']==1?'':'s').' at risk', min(12, $ms['at_risk']*4), 'warn');
+
+    // 3) Open major NCRs — delivery-impacting weigh most.
+    [$ncrRows,$ncrMap]=$tableRows('ncr_register');
+    if (is_array($ncrRows)) {
+        $sevK=$col($ncrMap,['sever']); $stK=$col($ncrMap,['status']); $impK=$col($ncrMap,['impact','delivery']);
+        $maj=0;$impc=0; foreach($ncrRows as $r){ $rr=(array)$r; $sev=strtolower(trim((string)($rr[$sevK]??''))); $stt=strtolower(trim((string)($rr[$stK]??'')));
+            if($stt!=='' && strpos($stt,'clos')===false && strpos($sev,'major')!==false){ $maj++; $imp=strtolower(trim((string)($rr[$impK]??''))); if(in_array($imp,['yes','y','1','true'],true))$impc++; } }
+        if ($impc>0) $add('Delivery-impacting NCRs', $impc.' open major NCR'.($impc==1?'':'s').' flagged delivery-impacting', min(16,$impc*8), 'bad');
+        if ($maj-$impc>0) $add('Open major NCRs', ($maj-$impc).' open major NCR'.(($maj-$impc)==1?'':'s'), min(9,($maj-$impc)*3), 'warn');
+    }
+
+    // 4) Dispatch blockers — mandatory open go/no-go items (6 each, cap 18).
+    if ($dr && $dr['pct']!==null && count($dr['blockers'])>0) $add('Dispatch blockers', count($dr['blockers']).' mandatory dispatch item(s) still open', min(18,count($dr['blockers'])*6), 'bad');
+
+    // 5) Vendor forecast optimism on THIS report (vendor earlier than expeditor).
+    $veo = $fc['vendor_vs_expeditor_days'];
+    if ($veo !== null && $veo > 0) $add('Vendor forecast optimism', "Vendor's date is ".$veo.' day'.($veo==1?'':'s').' earlier than the expeditor read', min(10, (int)ceil($veo/2)), 'warn');
+
+    // 6) Time-vs-progress pressure — required date near while progress lags.
+    $req = $fc['required']!=='' ? $pd($fc['required']) : null; $tnow = $pd($today);
+    $daysToReq = ($req && $tnow) ? (int)floor(($req - $tnow)/86400) : null;
+    if ($daysToReq !== null && $pct !== null && $daysToReq <= 30 && $daysToReq >= 0 && $pct < 80)
+        $add('Schedule pressure', 'Only '.$daysToReq.' day'.($daysToReq==1?'':'s').' to the required date at '.rtrim(rtrim(number_format($pct,1),'0'),'.').'% progress', min(16, (int)round((80-$pct)/5) + (30-$daysToReq)/3), 'warn');
+    elseif ($daysToReq !== null && $daysToReq < 0 && ($ms['total']===0 || $ms['complete']<$ms['total']))
+        $add('Past required date', 'The required date has passed and work is not complete', 14, 'bad');
+
+    // 7) Capacity / sub-supplier constraints.
+    [$rsRows,$rsMap]=$tableRows('resources');
+    if (is_array($rsRows)) { $gapK=$col($rsMap,['gap','short','deficit']);
+        foreach($rsRows as $r){ $rr=(array)$r; $g=preg_replace('/[^0-9.\-]/','',(string)($rr[$gapK]??'')); if($g!=='' && (float)$g>0){ $add('Capacity constraint','A resource shortfall is recorded against capacity',6,'warn'); break; } } }
+    [$ssRows,$ssMap]=$tableRows('subsuppliers');
+    if (is_array($ssRows)) { $stK3=$col($ssMap,['status']); $n=0;
+        foreach($ssRows as $r){ $rr=(array)$r; $s=strtolower(trim((string)($rr[$stK3]??''))); if($s!=='' && (strpos($s,'risk')!==false||strpos($s,'delay')!==false)) $n++; }
+        if($n>0) $add('Sub-supplier risk', $n.' sub-supplier(s) at risk or delayed', min(10,$n*5), 'warn'); }
+
+    // 8) Vendor track record (forward-looking) — from the vendor's expediting perf.
+    if ($vperf === null && !empty($doc['vendor_id']) && function_exists('idems_vendor_expediting_perf'))
+        $vperf = idems_vendor_expediting_perf((int)$doc['vendor_id']);
+    if (is_array($vperf)) {
+        $rel = $vperf['commitments']['reliability_pct'] ?? null;
+        if ($rel !== null && $rel < 70) $add('Weak commitment track record', 'Vendor has met only '.rtrim(rtrim(number_format($rel,1),'0'),'.').'% of past commitments on time', min(12, (int)round((70-$rel)/5)), 'warn');
+        $opt = $vperf['forecast']['optimism_pct'] ?? null;
+        if ($opt !== null && $opt >= 50) $add('Chronically optimistic forecasts', 'Vendor forecasts ran optimistic on '.rtrim(rtrim(number_format($opt,1),'0'),'.').'% of past reports', min(8, (int)round($opt/12)), 'warn');
+    }
+
+    $score = min(100, $score);
+    $band = $score>=70 ? 'CRITICAL' : ($score>=45 ? 'HIGH' : ($score>=20 ? 'MEDIUM' : 'LOW'));
+
+    // Recovery intelligence — gap vs lead time, and whether a recovery action exists.
+    $recovery = ['gap_days'=>($ev!==null&&$ev>0)?$ev:0, 'available_days'=>$daysToReq, 'feasible'=>null, 'note'=>''];
+    [$dRows,$dMap]=$tableRows('delays');
+    $recoveryAction=''; if (is_array($dRows)) { $actK=$col($dMap,['action','recovery','mitig']);
+        foreach($dRows as $r){ $rr=(array)$r; $a=trim((string)($rr[$actK]??'')); if($a!==''){ $recoveryAction=$a; break; } } }
+    if ($recovery['gap_days']>0) {
+        $lead = $daysToReq; $gap=$recovery['gap_days'];
+        if ($lead !== null) {
+            if ($lead < 0) { $recovery['feasible']=false; $recovery['note']='The required date has already passed; the '.$gap.'-day slippage cannot be recovered — re-baseline with the client.'; }
+            elseif ($lead >= $gap*2 && $recoveryAction!=='') { $recovery['feasible']=true; $recovery['note']='Delivery is forecast '.$gap.' day'.($gap==1?'':'s').' late, but ~'.$lead.' day(s) of lead time remain and a recovery action is on record ("'.$recoveryAction.'") — recovery is plausible if that action holds.'; }
+            elseif ($recoveryAction!=='') { $recovery['feasible']=false; $recovery['note']='Delivery is forecast '.$gap.' day'.($gap==1?'':'s').' late with only ~'.$lead.' day(s) of lead time — recovery is tight; the action on record ("'.$recoveryAction.'") must be accelerated or the date re-baselined.'; }
+            else { $recovery['feasible']=false; $recovery['note']='Delivery is forecast '.$gap.' day'.($gap==1?'':'s').' late and no recovery action is on record — raise one or re-baseline the date.'; }
+        } else { $recovery['note']='Delivery is forecast '.$gap.' day'.($gap==1?'':'s').' late'.($recoveryAction!==''?' — recovery action on record: "'.$recoveryAction.'".':' and no recovery action is on record.'); }
+    } else { $recovery['note']='No slippage against the required date is currently forecast.'; }
+
+    // Sort factors by weight, heaviest first.
+    usort($factors, fn($a,$b)=>$b['points']<=>$a['points']);
+    return ['score'=>$score, 'band'=>$band, 'factors'=>$factors, 'recovery'=>$recovery];
+}
+
+// Vendor-level delivery risk (Phase 6) — aggregates the predictive risk across a
+// vendor's OPEN expediting reports (latest per PO, excluding completed) and joins
+// it to the commitment/forecast track record, for Vendor-360. Returns
+// ['band','score','open_pos','worst'=>['irn','po','score','band'],'perf'=>...] or null.
+function idems_vendor_delivery_risk($partnerId) {
+    $partnerId=(int)$partnerId; if(!$partnerId) return null;
+    try { $docs = ops_all("SELECT * FROM report_docs WHERE vendor_id=? AND deleted=0 AND type_code='ER' ORDER BY COALESCE(issue_date,created_at) DESC, id DESC LIMIT 60", [$partnerId]); }
+    catch (Throwable $e) { return null; }
+    if (!$docs) return null;
+    $perf = function_exists('idems_vendor_expediting_perf') ? idems_vendor_expediting_perf($partnerId) : null;
+    // Latest report per PO (data.po_number), skipping completed ones.
+    $latest=[];
+    foreach ($docs as $d) {
+        $data=json_decode($d['data']??'[]',true); if(!is_array($data)) $data=[];
+        $po=strtolower(trim((string)($data['po_number']??''))) ?: ('doc'.$d['id']);
+        if (!isset($latest[$po])) $latest[$po]=['doc'=>$d,'data'=>$data]; // first seen = most recent (ordered desc)
+    }
+    $scores=[]; $worst=null; $open=0;
+    foreach ($latest as $po=>$e) {
+        $fields=idems_fields((int)$e['doc']['report_type_id']);
+        $stt=idems_expediting_status($e['doc'],$fields,$e['data']);
+        if (($stt['status']??'')==='COMPLETED') continue;
+        $open++;
+        $r=idems_expediting_risk($e['doc'],$fields,$e['data'],$perf);
+        $scores[]=$r['score'];
+        if ($worst===null || $r['score']>$worst['score']) $worst=['irn'=>$e['doc']['irn']??'','po'=>trim((string)($e['data']['po_number']??'')),'score'=>$r['score'],'band'=>$r['band'],'id'=>(int)$e['doc']['id']];
+    }
+    if (!$scores) return ['band'=>'LOW','score'=>0,'open_pos'=>0,'worst'=>null,'perf'=>$perf];
+    // Vendor risk = the worst open PO weighted with the average (a single bad PO
+    // matters, but breadth of risk matters too).
+    $avg=array_sum($scores)/count($scores); $mx=max($scores);
+    $score=(int)round($mx*0.6 + $avg*0.4);
+    $band=$score>=70?'CRITICAL':($score>=45?'HIGH':($score>=20?'MEDIUM':'LOW'));
+    return ['band'=>$band,'score'=>$score,'open_pos'=>$open,'worst'=>$worst,'perf'=>$perf];
+}
+
 // Keep only the RELEASED line items for a Release Note — rows that have a
 // passed / cleared / released / accepted quantity greater than zero. Rows that
 // were fully rejected or held are dropped. If no such column can be identified,
@@ -2947,7 +3090,8 @@ function ops_idems_expediting($route, $method) {
         WHERE $where ORDER BY d.id DESC", $args);
     $secs = idems_sections_by_code('ER'); $flds = idems_fields_by_code('ER');
     $today = date('Y-m-d');
-    $rows = []; $k = ['total'=>0,'on_track'=>0,'at_risk'=>0,'delayed'=>0,'late_forecast'=>0];
+    $rows = []; $k = ['total'=>0,'on_track'=>0,'at_risk'=>0,'delayed'=>0,'late_forecast'=>0,'high_risk'=>0];
+    $vperfCache = [];   // vendor track record — computed once per vendor for the risk read
     foreach ($docs as $d) {
         $data = json_decode($d['data'] ?: '[]', true); if (!is_array($data)) $data = [];
         $es = idems_expediting_status($d, $flds, $data);
@@ -2959,10 +3103,16 @@ function ops_idems_expediting($route, $method) {
         else $k['delayed']++;
         $ev = $es['forecast']['expeditor_variance_days'];
         if ($ev !== null && $ev > 0) $k['late_forecast']++;
+        // Predictive delivery risk (Phase 6). Vendor perf cached to avoid N+1.
+        $vid = (int)($d['vendor_id'] ?? 0);
+        if ($vid && !array_key_exists($vid, $vperfCache)) $vperfCache[$vid] = function_exists('idems_vendor_expediting_perf') ? idems_vendor_expediting_perf($vid) : null;
+        $risk = function_exists('idems_expediting_risk') ? idems_expediting_risk($d, $flds, $data, $vid ? $vperfCache[$vid] : null, $today) : null;
+        if ($risk && in_array($risk['band'], ['HIGH','CRITICAL'], true)) $k['high_risk']++;
         $rows[] = ['id'=>(int)$d['id'], 'irn'=>$d['irn'], 'vendor'=>($d['vendor_disp'] ?: $d['vendor_name'] ?: ($data['vendor'] ?? '')),
                    'project'=>($d['project_name'] ?: ($data['project'] ?? '')), 'po'=>($data['po_number'] ?? $d['po_ref'] ?? ''),
                    'progress'=>$sc['overall'] ?? null, 'status'=>$st,
                    'required'=>$es['forecast']['required'], 'forecast'=>$es['forecast']['expeditor'], 'variance'=>$ev,
+                   'risk'=>$risk ? $risk['band'] : null, 'risk_score'=>$risk ? (int)$risk['score'] : null,
                    'date'=>$d['issue_date'] ?: '', 'finalized'=>(int)$d['finalized']];
     }
     view('ops/idems/expediting_register', ['rows'=>$rows, 'q'=>$q, 'fs'=>$fs, 'counts'=>$k, 'today'=>$today,
@@ -3020,8 +3170,9 @@ function ops_idems_vendors($route, $method) {
         $perf = function_exists('idems_vendor_performance') ? idems_vendor_performance($pid) : null;
         $v360 = function_exists('idems_vendor_360') ? idems_vendor_360($pid) : ['reports'=>[],'ncrs'=>[],'complaints'=>[]];
         $xperf = function_exists('idems_vendor_expediting_perf') ? idems_vendor_expediting_perf($pid) : null;
+        $xrisk = function_exists('idems_vendor_delivery_risk') ? idems_vendor_delivery_risk($pid) : null;
         view('ops/idems/vendor_detail', ['partner'=>$partner, 'profile'=>$profile, 'history'=>$history, 'events'=>$events,
-            'perf'=>$perf, 'v360'=>$v360, 'xperf'=>$xperf, 'canEdit'=>$canEdit,
+            'perf'=>$perf, 'v360'=>$v360, 'xperf'=>$xperf, 'xrisk'=>$xrisk, 'canEdit'=>$canEdit,
             'typeOpts'=>lk_options_or('vendor_type', []), 'catOpts'=>lk_options_or('vendor_product_category', []),
             'riskOpts'=>lk_options_or('vendor_risk_class', []), 'statusOpts'=>lk_options_or('vendor_approval_status', [])]);
         return true;
@@ -3249,8 +3400,12 @@ function ops_idems_documents($route, $method) {
         // forecast reads, anomalies and trend vs the previous report. Advisory only.
         $expAdvisory = (($doc['type_code'] ?? '') === 'ER' && function_exists('idems_expediting_advisory'))
             ? idems_expediting_advisory($doc, $fields, $data) : null;
+        // Predictive delivery risk (Phase 6) — forward-looking risk score + factors
+        // + recovery read. Advisory only.
+        $expRisk = (($doc['type_code'] ?? '') === 'ER' && function_exists('idems_expediting_risk'))
+            ? idems_expediting_risk($doc, $fields, $data) : null;
         view('ops/idems/doc_detail', ['doc'=>$doc, 'approver'=>$approver, 'audit'=>$audit, 'qa'=>$qa,
-            'scorecard'=>$scorecard, 'aiSections'=>$aiSections, 'aiOn'=>$aiOn, 'expAdvisory'=>$expAdvisory,
+            'scorecard'=>$scorecard, 'aiSections'=>$aiSections, 'aiOn'=>$aiOn, 'expAdvisory'=>$expAdvisory, 'expRisk'=>$expRisk,
             'sections'=>$sections, 'fields'=>$fields, 'data'=>$data, 'files'=>idems_doc_files($doc['id']), 'hasSchema'=>!empty($fields),
             'approvals'=>$approvals, 'curStep'=>$curStep, 'canAct'=>idems_can_act_step($curStep),
             'vetting'=>idems_vetting_log($doc['id']), 'canVet'=>idems_can_vet(),

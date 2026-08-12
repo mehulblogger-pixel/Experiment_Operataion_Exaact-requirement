@@ -152,7 +152,24 @@
     <div><div class="muted" style="font-size:11px">Forecast optimism</div><div style="font-size:20px;font-weight:800;color:<?= ($opt!==null && $opt>=50)?'var(--bad)':'inherit' ?>"><?= $opt===null?'—':e(rtrim(rtrim(number_format((float)$opt,1),'0'),'.')).'%' ?></div><div class="muted" style="font-size:11px">of <?= (int)$xperf['forecast']['compared'] ?> forecasts ran late vs the expeditor</div></div>
     <div><div class="muted" style="font-size:11px">Avg optimism</div><div style="font-size:20px;font-weight:800"><?= (float)$xperf['forecast']['avg_optimism_days']>0 ? e(rtrim(rtrim(number_format((float)$xperf['forecast']['avg_optimism_days'],1),'0'),'.')).' d' : '—' ?></div><div class="muted" style="font-size:11px">expeditor later than vendor</div></div>
   </div>
-  <p class="muted" style="font-size:11px;margin:10px 0 0">Commitment reliability = commitments met on time ÷ commitments completed. Forecast optimism = how often the vendor's forecast ran ahead of the expeditor's evidence-based forecast. Computed from this vendor's expediting reports.</p>
+  <?php // ---- Predictive delivery risk (Phase 6) across open POs ---- ?>
+  <?php if (!empty($xrisk) && (int)($xrisk['open_pos']??0) > 0):
+    $vb = $xrisk['band']; $vc = $vb==='CRITICAL'?'#dc2626':($vb==='HIGH'?'#c2410c':($vb==='MEDIUM'?'#b45309':'#15803d'));
+    $w = $xrisk['worst'] ?? null;
+  ?>
+  <div style="margin-top:12px;border-top:1px dashed var(--line);padding-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-size:16px">📡</span>
+    <div><div class="muted" style="font-size:11px">Predictive delivery risk</div>
+      <div style="font-size:16px;font-weight:800;color:<?= $vc ?>"><?= e(ucfirst(strtolower($vb))) ?> <span class="muted" style="font-size:12px;font-weight:600">· <?= (int)$xrisk['score'] ?>/100</span></div></div>
+    <div class="muted" style="font-size:12px">across <?= (int)$xrisk['open_pos'] ?> open PO<?= (int)$xrisk['open_pos']===1?'':'s' ?></div>
+    <?php if ($w && ($w['band']??'')!=='LOW'): ?>
+      <div style="flex:1;text-align:right"><span class="muted" style="font-size:11.5px">Worst:</span>
+        <a href="/document?id=<?= (int)$w['id'] ?>" style="font-weight:700;color:<?= $vc ?>"><?= e($w['irn'] ?: ($w['po'] ?: 'report')) ?></a>
+        <span class="muted" style="font-size:11.5px">(<?= (int)$w['score'] ?>/100)</span></div>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
+  <p class="muted" style="font-size:11px;margin:10px 0 0">Commitment reliability = commitments met on time ÷ commitments completed. Forecast optimism = how often the vendor's forecast ran ahead of the expeditor's evidence-based forecast. Delivery risk is predicted across the vendor's open POs. Computed from this vendor's expediting reports.</p>
 </div>
 <?php endif; ?>
 

@@ -72,7 +72,24 @@ Vendor-360 are all reused.
   an "Expediting advisory" panel on the report page, auto-opened when anything is
   amber/red. An optional AI provider still adds its separate suggestions
   elsewhere; this layer needs no provider. Helper `idems_list_join()`.
-- **Phase 6** — predictive delay/vendor risk, recovery intelligence, analytics.
+- **Phase 6 — ✅ DONE (Aug 2026).** Predictive delivery risk, recovery
+  intelligence and risk analytics — **deterministic (no LLM), advisory only**.
+  `idems_expediting_risk()` returns a 0-100 forward-looking risk score, a band
+  (Low/Medium/High/Critical) and the **weighted contributing factors** (forecast
+  beyond required · delayed/at-risk milestones · delivery-impacting & open major
+  NCRs · mandatory dispatch blockers · vendor forecast optimism · schedule
+  pressure = time-left-vs-progress · capacity shortfall · sub-supplier risk ·
+  weak vendor track record from `idems_vendor_expediting_perf`), plus a
+  **recovery read** (days late vs lead time remaining vs whether a recovery
+  action is on record → plausible / tight / not recoverable). Surfaced three
+  ways: (1) a "Delivery risk" panel on the report page (auto-opened at
+  High/Critical, drivers listed heaviest-first, recovery note); (2) a **Risk
+  column + "High delivery risk" KPI** on the `/expediting` register (vendor perf
+  cached to avoid N+1); (3) `idems_vendor_delivery_risk()` aggregates the worst
+  and average risk across a vendor's **open POs** (completed POs excluded) and
+  shows it on **Vendor-360** with a link to the worst PO. **The Universal
+  Expediting engine (P1–P6) is COMPLETE** (P4b multi-PO project-tree
+  consolidation remains the one optional extension).
 
 **Report presentation (Aug 2026, applies to every report type):** every report
 now opens with an at-a-glance **KPI snapshot card row** (`idems_report_kpis()`) —
