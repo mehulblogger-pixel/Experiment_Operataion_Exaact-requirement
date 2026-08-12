@@ -2,6 +2,53 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🏭 PLANNED — Universal Vendor Assessment / Audit / Qualification / Performance platform (Aug 2026)
+
+Industry-neutral, configurable vendor-evaluation platform (assessment, audit,
+qualification/approval, performance & reassessment). **Build by REUSE** — the
+plumbing already exists and must not be duplicated: the config-driven report
+engine (types→sections→fields→JSON, no-code builder) is the questionnaire /
+criteria / scoring form layer; `report_files` is the evidence engine; NCR
+(`partner_id`,`report_doc_id`,`audit_finding_id`) + CAPA are findings/corrective
+action; `report_approvals` + `idems_build_approval_chain` is multi-level
+approval; `frozen_schema`+`content_seal`+revision lineage is criteria-version
+freeze; `idems_audit` (hash-chained) + `tenants.php` (separate-DB) are audit &
+tenancy; the lookups engine is the master lists; the AI Report Auditor already
+reads field metadata generically; `business_partners` (+ `partner_registrations
+.valid_to`) is the vendor master. VASR/VAR/FAR report types are already SEEDED
+but are empty shells (no form yet).
+
+Genuinely MISSING (the vendor domain): (1) **scoring in the form engine** —
+per-field weight/score + category rollup (keystone; also upgrades every report
+type); (2) vendor attributes on the partner — vendor type, product/service
+category, risk class, approval status, rating, reassessment/requalification
+dates; (3) seeded vendor-type / product-category / risk-class lookups; (4) an
+assessment↔vendor linkage; (5) a vendor-scoped audit (`audits.php` today is
+internal QMS only, no partner_id, hardcoded checklist); (6) approved-vendor
+register + qualification/validity/requalification workflow; (7) vendor scorecard
+/ performance (today's `rating.php` is inspector-only); (8) vendor portal
+self-assessment + document upload.
+
+Phased build (per spec §56):
+- **P1 Assessment foundation** — add scoring to the form engine (weight/score +
+  category rollup); build the VASR assessment form; vendor attributes + seeded
+  lookups; bind assessment to a vendor; assessment-score → audit-recommendation
+  rule. (Keystone = scoring.)
+- **P2 Audit** — vendor-scoped VAR audit form; findings → NCR/CAPA (reuse);
+  audit report.
+- **P3 Qualification** — approved-vendor register; approval status; validity /
+  reassessment dates; multi-level approval (reuse chain); requalification.
+- **P4 Performance** — vendor scorecard fed from NCR/complaints/delivery; Vendor
+  360 (reuse the customer-360 assembly pattern); periodic reassessment cycle.
+- **P5 AI** — vendor-specific checks into the existing AI Auditor (score-vs-
+  finding conflict, capacity inconsistency, cert-expiry-overrides-score).
+- **P6 Advanced** — vendor portal self-assessment; predictive risk; automatic
+  reassessment triggers; vendor comparison / trend.
+
+Design rule: never hard-code an industry or scoring weights — everything
+admin-configurable via lookups + the criteria library + the form/scoring engine.
+
+
 ## 📋 PARKED — reporting completeness (Aug 2026)
 
 - **Release Note — reference-documents table.** The auto-generated Release Note
