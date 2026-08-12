@@ -871,6 +871,26 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
             $add('low', 'date', ($f['label'] ?? 'A date') . ' looks out of range', $f['label'] ?? '', 'The date ' . date('d-M-Y', $t) . ' is outside the expected range — please confirm.', $f['label'] ?? '', 'Check this date.');
     }
 
+    // 9) NCR intelligence — a nonconformity on this report closed without evidence,
+    // or one left overdue. (Deterministic; the deeper root-cause quality read is AI.)
+    if (!empty($doc['id'])) {
+        try {
+            $ncrs = ops_all("SELECT * FROM nonconformities WHERE report_doc_id=?", [(int)$doc['id']]);
+            $today = date('Y-m-d');
+            foreach ((array)$ncrs as $n) {
+                $ref = trim((string)($n['ref'] ?? '')) ?: ('NCR #' . (int)$n['id']);
+                $stt = strtoupper((string)($n['status'] ?? ''));
+                if (strpos($stt, 'CLOS') !== false) {
+                    $hasEv = trim((string)($n['close_note'] ?? '')) !== '' || (int)($n['capa_id'] ?? 0) > 0 || trim((string)($n['disposition'] ?? '')) !== '';
+                    if (!$hasEv) $add('high', 'ncr', 'NCR closed without closure evidence', $ref, $ref . ' is marked closed but has no closure note, disposition or corrective-action link.', $ref, 'Record the closure evidence, or reopen the NCR.');
+                } else {
+                    $due = trim((string)($n['due_on'] ?? ''));
+                    if ($due !== '' && $due < $today) $add('medium', 'ncr', 'NCR is overdue', $ref, $ref . ' was due on ' . $due . ' and is still ' . ($stt ? strtolower($stt) : 'open') . '.', $ref, 'Progress or re-date this NCR.');
+                }
+            }
+        } catch (Throwable $e) {}
+    }
+
     $counts = ['critical'=>0,'high'=>0,'medium'=>0,'low'=>0,'info'=>0];
     foreach ($issues as $it) { $s = $it['severity']; if (isset($counts[$s])) $counts[$s]++; }
     $score = 100 - ($counts['critical']*40 + $counts['high']*12 + $counts['medium']*5 + $counts['low']*1 + $counts['info']*0);
