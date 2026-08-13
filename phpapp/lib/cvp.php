@@ -43,9 +43,470 @@ const CVP_VISIBILITY_AUDIENCE = [
 
 function cvp_migrate() {
     static $done = false; if ($done) return; $done = true;
-    // Slice 1 adds no tables — it is a read-time gate over columns the engines
-    // already own. The function exists so the boot chain can call it and later
-    // slices (vendor users, portal notifications) can extend it in one place.
+    $pdo = db(); $pk = pk_clause();
+
+    // -- Slice 2: the vendor portal ------------------------------------------
+    // A person at a VENDOR company. Deliberately its OWN table and its own
+    // session key (vuid), exactly as client_users is kept apart from staff: a
+    // vendor can never be returned by portal_user() or current_user(), so no
+    // client screen and no staff screen can ever be reached by one, even if a
+    // route is added carelessly later. Scope is the vendor's business_partner id.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS vendor_users (
+        id $pk, vendor_id INT, contact_id INT NULL,
+        email VARCHAR(200) DEFAULT '', name VARCHAR(150) DEFAULT '',
+        password_hash VARCHAR(255) DEFAULT '',
+        is_active INT DEFAULT 1, must_change INT DEFAULT 1,
+        perms VARCHAR(400) DEFAULT '',
+        invite_token VARCHAR(64) DEFAULT '', invite_expires VARCHAR(30) DEFAULT '',
+        last_login_at VARCHAR(30) DEFAULT '', last_login_ip VARCHAR(60) DEFAULT '',
+        created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // Every page a vendor opened — the same cheap trail the client portal keeps.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS vendor_audit (
+        id $pk, vendor_user_id INT NULL, vendor_id INT NULL,
+        action VARCHAR(40) DEFAULT '', detail VARCHAR(300) DEFAULT '',
+        ip VARCHAR(60) DEFAULT '', at VARCHAR(30) DEFAULT '')");
+    // A report reaches the vendor portal ONLY when staff explicitly share it.
+    // Confidentiality first: a report naming a vendor is not automatically the
+    // vendor's to read — a client's inspection of goods can name the vendor and
+    // still be the client's alone. So nothing is shown until this flag is set.
+    if (function_exists('ensure_column')) {
+        ensure_column('report_docs', 'vendor_visible', 'INT DEFAULT 0');
+    }
+}
+
+// ============================================================================
+//  VENDOR PORTAL — its own identity, its own session key (vuid), scoped to the
+//  vendor's business_partner id. Mirrors the client portal's design rules.
+// ============================================================================
+
+// Minimal, extensible permission set. Blank perms = everything (so an existing
+// vendor account is never locked out by a new key). Slice 3 adds 'issues'.
+const VENDOR_PERMS = ['reports' => 'Their reports', 'issues' => 'Nonconformities raised to them'];
+
+function cvp_vendor_enabled() { return setting_get('vendor_portal_enabled', '0') === '1'; }
+
+function cvp_vendor_user() {
+    if (empty($_SESSION['vuid'])) return null;
+    static $u = null, $for = 0;
+    if ($u === null || $for !== (int)$_SESSION['vuid']) {
+        $for = (int)$_SESSION['vuid'];
+        $u = portal_try(fn() => ops_one(
+            "SELECT vu.*, p.legal_name, p.display_name
+             FROM vendor_users vu JOIN business_partners p ON p.id = vu.vendor_id
+             WHERE vu.id = ? AND vu.is_active = 1", [$for]), null);
+    }
+    return $u ?: null;
+}
+function cvp_vendor_reload() {
+    $id = (int)($_SESSION['vuid'] ?? 0);
+    if (!$id) return null;
+    return portal_try(fn() => ops_one(
+        "SELECT vu.*, p.legal_name, p.display_name
+         FROM vendor_users vu JOIN business_partners p ON p.id = vu.vendor_id
+         WHERE vu.id = ? AND vu.is_active = 1", [$id]), null) ?: null;
+}
+// The ONLY source of vendor scope — from the session, never from the request.
+function cvp_vendor_id() { $u = cvp_vendor_user(); return $u ? (int)$u['vendor_id'] : 0; }
+function cvp_vendor_name() {
+    $u = cvp_vendor_user();
+    return $u ? (string)(($u['display_name'] ?? '') ?: ($u['legal_name'] ?? '')) : '';
+}
+function cvp_vendor_perms() {
+    $u = cvp_vendor_user();
+    if (!$u) return [];
+    $p = trim((string)($u['perms'] ?? ''));
+    return $p === '' ? array_keys(VENDOR_PERMS) : array_values(array_filter(explode(',', $p)));
+}
+function vcan($key) { return in_array($key, cvp_vendor_perms(), true); }
+
+function cvp_vendor_off() {
+    http_response_code(404);
+    require __DIR__ . '/../views/vendor/off.php';
+    exit;
+}
+function cvp_vendor_require() {
+    if (!cvp_vendor_enabled()) cvp_vendor_off();
+    if (!cvp_vendor_user()) redirect('/vendor/login');
+    $u = cvp_vendor_user();
+    if (!empty($u['must_change']) && strpos((string)($_SERVER['REQUEST_URI'] ?? ''), '/vendor/password') === false)
+        redirect('/vendor/password');
+}
+function cvp_vendor_log($action, $detail = '') {
+    $u = cvp_vendor_user();
+    try {
+        db()->prepare("INSERT INTO vendor_audit (vendor_user_id,vendor_id,action,detail,ip,at) VALUES (?,?,?,?,?,?)")
+            ->execute([$u ? (int)$u['id'] : null, $u ? (int)$u['vendor_id'] : null,
+                       $action, substr((string)$detail, 0, 300),
+                       function_exists('client_ip') ? client_ip() : '', date('c')]);
+    } catch (Throwable $e) { /* the trail must never break the screen */ }
+}
+
+function cvp_vendor_login($email, $password) {
+    $email = strtolower(trim((string)$email));
+    if ($email === '') return 'Enter your e-mail address.';
+    $wait = function_exists('login_locked_for') ? login_locked_for('vendor:' . $email) : 0;
+    if ($wait > 0) return 'Too many attempts. Try again in ' . $wait . ' minute(s).';
+    $u = portal_try(fn() => ops_one("SELECT * FROM vendor_users WHERE LOWER(email)=? AND is_active=1", [$email]), null);
+    if (!$u || (string)$u['password_hash'] === '' || !password_verify((string)$password, (string)$u['password_hash'])) {
+        if (function_exists('login_fail')) login_fail('vendor:' . $email);
+        return 'That e-mail address and password do not match.';
+    }
+    cvp_vendor_start_session((int)$u['id']);
+    if (function_exists('login_clear')) login_clear('vendor:' . $email);
+    try { db()->prepare("UPDATE vendor_users SET last_login_at=?, last_login_ip=? WHERE id=?")
+              ->execute([date('c'), function_exists('client_ip') ? client_ip() : '', (int)$u['id']]); }
+    catch (Throwable $e) {}
+    cvp_vendor_log('LOGIN', $email);
+    return '';
+}
+// A fresh session id with no client OR staff identity left in it. A vendor,
+// a client and a staff member are three different people and must never share
+// a session — hence the unset of both cuid and uid, not a merge.
+function cvp_vendor_start_session($vendorUserId) {
+    if (session_status() === PHP_SESSION_ACTIVE) session_regenerate_id(true);
+    unset($_SESSION['csrf'], $_SESSION['uid'], $_SESSION['pending_uid'], $_SESSION['cuid']);
+    $_SESSION['vuid'] = (int)$vendorUserId;
+}
+
+// ---- Vendor reads — every one filters by the session's vendor id -----------
+// Only reports staff have SHARED (vendor_visible=1) and finalized. No cost, no
+// margin, no client commercial columns — the same omission discipline as the
+// client portal.
+function cvp_vendor_reports($limit = 200) {
+    $vid = cvp_vendor_id();
+    if (!$vid) return [];
+    return portal_try(fn() => ops_all(
+        "SELECT d.id, d.irn, d.title, d.type_code, d.result, d.release_status,
+                d.inspection_date, d.finalized_at, d.issue_date, d.verify_code, d.rev
+         FROM report_docs d
+         WHERE d.vendor_id = ? AND d.finalized = 1 AND COALESCE(d.deleted,0) = 0
+           AND COALESCE(d.vendor_visible,0) = 1
+         ORDER BY d.finalized_at DESC, d.id DESC LIMIT " . max(1, (int)$limit), [$vid]));
+}
+function cvp_vendor_report($id) {
+    $vid = cvp_vendor_id();
+    if (!$vid) return null;
+    // The vendor id is in the WHERE clause, and so is the share flag — a report
+    // that is not theirs, or not shared, simply does not exist here.
+    return portal_try(fn() => ops_one(
+        "SELECT d.*, v.display_name vendor_disp, v.legal_name vendor_name, rt.name type_name
+         FROM report_docs d
+         LEFT JOIN business_partners v ON v.id = d.vendor_id
+         LEFT JOIN report_types rt     ON rt.id = d.report_type_id
+         WHERE d.id = ? AND d.vendor_id = ? AND d.finalized = 1
+           AND COALESCE(d.deleted,0) = 0 AND COALESCE(d.vendor_visible,0) = 1",
+        [(int)$id, $vid]), null) ?: null;
+}
+function cvp_vendor_report_pdf($doc) {
+    $lh = function_exists('quote_letterhead') ? quote_letterhead() : ['name' => app_name()];
+    $pdf = report_pdf_build($doc, idems_sections($doc['report_type_id']), idems_fields($doc['report_type_id']),
+        json_decode($doc['data'] ?: '[]', true) ?: [], idems_doc_files($doc['id']), $lh,
+        idems_report_signatures($doc));
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="'
+         . preg_replace('/[^A-Za-z0-9._-]/', '_', (string)$doc['irn']) . '.pdf"');
+    echo $pdf;
+}
+function cvp_vendor_dashboard() {
+    $vid = cvp_vendor_id();
+    $reports = (int)(portal_try(fn() => ops_val(
+        "SELECT COUNT(*) FROM report_docs WHERE vendor_id=? AND finalized=1 AND COALESCE(deleted,0)=0 AND COALESCE(vendor_visible,0)=1", [$vid]), 0));
+    $recent = cvp_vendor_reports(5);
+    // Open nonconformities raised to this vendor and marked vendor-visible — the
+    // count is safe to show now; Slice 3 wires the respond loop behind it.
+    $issues = 0;
+    if (function_exists('cvp_visibility_sql')) {
+        [$vw, $va] = cvp_visibility_sql('n.visibility', 'VENDOR');
+        $issues = (int)(portal_try(fn() => ops_val(
+            "SELECT COUNT(*) FROM nonconformities n WHERE n.partner_id=? AND n.status <> 'CLOSED' AND $vw",
+            array_merge([$vid], $va)), 0));
+    }
+    return ['reports' => $reports, 'recent' => $recent, 'issues_open' => $issues];
+}
+
+// ---- Vendor onboarding (staff invite; vendor sets own password) ------------
+function cvp_vendor_users_for($vendorId) {
+    return portal_try(fn() => ops_all("SELECT * FROM vendor_users WHERE vendor_id=? ORDER BY name, id", [(int)$vendorId]));
+}
+function cvp_vendor_users_all() {
+    return portal_try(fn() => ops_all(
+        "SELECT vu.*, COALESCE(p.display_name, p.legal_name) partner_name
+         FROM vendor_users vu LEFT JOIN business_partners p ON p.id = vu.vendor_id
+         ORDER BY partner_name, vu.name"));
+}
+function cvp_vendor_invite($vendorId, $email, $name, $contactId = 0) {
+    $vendorId = (int)$vendorId; $contactId = (int)$contactId;
+    if ($contactId > 0) {
+        $c = portal_try(fn() => ops_one("SELECT * FROM partner_contacts WHERE id=?", [$contactId]), null);
+        if (!$c) return ['err' => 'That contact no longer exists.'];
+        $vendorId = (int)$c['partner_id'];
+        if (trim((string)($c['email'] ?? '')) === '') return ['err' => 'That contact has no e-mail on the vendor record — add one first, or type the address.'];
+        $email = strtolower(trim((string)$c['email']));
+        if (trim((string)$name) === '') $name = (string)$c['name'];
+    } else {
+        $email = strtolower(trim((string)$email));
+    }
+    if (!$vendorId) return ['err' => 'Choose the vendor company.'];
+    // The partner must actually be a vendor — a client id must not be onboarded
+    // into the vendor portal by mistake.
+    $isVendor = portal_try(fn() => ops_val("SELECT COALESCE(is_vendor,0) FROM business_partners WHERE id=?", [$vendorId]), 0);
+    if (!(int)$isVendor) return ['err' => 'That company is not marked as a vendor. Mark it as a vendor in the directory first.'];
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) return ['err' => 'A valid e-mail address is needed.'];
+    $exists = portal_try(fn() => ops_val("SELECT COUNT(*) FROM vendor_users WHERE LOWER(email)=?", [$email]), 0);
+    if ((int)$exists > 0) return ['err' => 'That address already has vendor portal access.'];
+    if ($contactId === 0) {
+        $match = portal_try(fn() => ops_one("SELECT id FROM partner_contacts WHERE partner_id=? AND LOWER(email)=? ORDER BY is_primary DESC, id LIMIT 1", [$vendorId, $email]), null);
+        if ($match) $contactId = (int)$match['id'];
+    }
+    $token = bin2hex(random_bytes(24));
+    db()->prepare("INSERT INTO vendor_users (vendor_id,contact_id,email,name,password_hash,is_active,must_change,
+                   invite_token,invite_expires,created_by,created_at) VALUES (?,?,?,?,'',1,1,?,?,?,?)")
+        ->execute([$vendorId, $contactId ?: null, $email, substr(trim((string)$name), 0, 150), $token,
+                   date('c', time() + 7 * 86400), function_exists('user_name') ? user_name(current_user()) : '', date('c')]);
+    return ['id' => (int)db()->lastInsertId(), 'token' => $token,
+            'link' => portal_base_url() . '/vendor/accept?t=' . $token];
+}
+function cvp_vendor_invite_problem($token) {
+    $token = trim((string)$token);
+    $u = $token === '' ? null : portal_try(fn() => ops_one(
+        "SELECT * FROM vendor_users WHERE invite_token=? AND invite_token<>'' AND is_active=1", [$token]), null);
+    if (!$u) return 'That invitation is not valid — it may already have been used. '
+                  . 'Ask your contact at ' . app_name() . ' to send a new one.';
+    if ($u['invite_expires'] !== '' && $u['invite_expires'] < date('c'))
+        return 'That invitation has expired. Ask your contact for a new one.';
+    return '';
+}
+function cvp_vendor_accept($token, $password, $confirm) {
+    $why = cvp_vendor_invite_problem($token);
+    if ($why !== '') return $why;
+    $u = ops_one("SELECT * FROM vendor_users WHERE invite_token=? AND is_active=1", [trim((string)$token)]);
+    if ((string)$password !== (string)$confirm) return 'The two passwords do not match.';
+    $why = function_exists('password_problem_text') ? password_problem_text((string)$password, (string)$u['email'], (string)$u['name']) : '';
+    if ($why !== '') return $why;
+    db()->prepare("UPDATE vendor_users SET password_hash=?, must_change=0, invite_token='', invite_expires='' WHERE id=?")
+        ->execute([password_hash((string)$password, PASSWORD_DEFAULT), (int)$u['id']]);
+    cvp_vendor_start_session((int)$u['id']);
+    cvp_vendor_log('ACCEPTED_INVITE', $u['email']);
+    if (function_exists('consent_record')) {
+        consent_record([
+            'subject_kind' => 'VENDOR_PORTAL', 'subject_id' => (int)$u['id'],
+            'subject_name' => (string)($u['name'] ?: $u['email']),
+            'purpose' => 'Vendor portal access to their own reports and nonconformities',
+            'basis' => 'CONSENT', 'given_at' => date('c'),
+            'note' => 'Recorded automatically when the invitee accepted the invitation and set their own password.',
+            'recorded_by' => 'The person themselves (vendor invitation accepted)',
+        ]);
+    }
+    return '';
+}
+
+// Staff control: share (or un-share) a finalized report with its vendor's
+// portal. Returns true on a change. Only a report that actually names a vendor
+// can be shared — there is nobody to share it with otherwise.
+function cvp_report_set_vendor_visible($docId, $on) {
+    $d = ops_one("SELECT id, vendor_id, finalized FROM report_docs WHERE id=? AND COALESCE(deleted,0)=0", [(int)$docId]);
+    if (!$d || !(int)$d['vendor_id']) return false;
+    db()->prepare("UPDATE report_docs SET vendor_visible=? WHERE id=?")->execute([$on ? 1 : 0, (int)$d['id']]);
+    return true;
+}
+
+// ---- Vendor screens & routing ----------------------------------------------
+function cvp_vendor_view($name, $vars = [], $nav = true) {
+    extract($vars);
+    $u = cvp_vendor_user();
+    ob_start();
+    require __DIR__ . '/../views/vendor/top.php';
+    require __DIR__ . "/../views/vendor/$name.php";
+    require __DIR__ . '/../views/vendor/bottom.php';
+    echo csrf_stamp_forms((string)ob_get_clean());
+}
+function cvp_vendor_csrf_or_die($method) {
+    if ($method !== 'POST') return;
+    if (csrf_ok($_POST['_csrf'] ?? '')) return;
+    http_response_code(400);
+    $err = 'That form was not sent from this page, or it had expired. Open the page again and retype it — nothing was changed.';
+    cvp_vendor_view('message', ['title' => 'Please try that again', 'body' => $err], (bool)cvp_vendor_user());
+    exit;
+}
+function cvp_vendor_need($key, $what = 'that') {
+    if (vcan($key)) return;
+    cvp_vendor_view('message', ['title' => 'Not available to you',
+        'body' => 'Your access here does not include ' . $what . '. Ask your main contact at ' . app_name() . ' if you need it.']);
+    exit;
+}
+
+function cvp_vendor_route($route, $method) {
+    cvp_vendor_csrf_or_die($method);
+
+    if ($route === 'vendor/login') {
+        if (!cvp_vendor_enabled()) cvp_vendor_off();
+        if (cvp_vendor_user()) redirect('/vendor');
+        $err = '';
+        if ($method === 'POST') {
+            $err = cvp_vendor_login($_POST['email'] ?? '', $_POST['password'] ?? '');
+            if ($err === '') redirect('/vendor');
+        }
+        cvp_vendor_view('login', ['err' => $err], false);
+        exit;
+    }
+    if ($route === 'vendor/accept') {
+        if (!cvp_vendor_enabled()) cvp_vendor_off();
+        $token = (string)($_GET['t'] ?? $_POST['t'] ?? '');
+        $err = cvp_vendor_invite_problem($token);
+        $dead = $err !== '';
+        if (!$dead && $method === 'POST') {
+            $err = cvp_vendor_accept($token, $_POST['password'] ?? '', $_POST['confirm'] ?? '');
+            if ($err === '') redirect('/vendor');
+        }
+        cvp_vendor_view('accept', ['err' => $err, 'token' => $token, 'dead' => $dead], false);
+        exit;
+    }
+    if ($route === 'vendor/logout') {
+        cvp_vendor_log('LOGOUT');
+        unset($_SESSION['vuid']);
+        session_destroy();
+        redirect('/vendor/login');
+    }
+
+    cvp_vendor_require();
+    $u = cvp_vendor_user();
+
+    switch ($route) {
+        case 'vendor':
+            cvp_vendor_log('DASHBOARD');
+            cvp_vendor_view('dashboard', ['d' => cvp_vendor_dashboard()]);
+            exit;
+
+        case 'vendor/reports':
+            cvp_vendor_need('reports', 'reports');
+            cvp_vendor_view('reports', ['rows' => cvp_vendor_reports()]);
+            exit;
+
+        case 'vendor/report':
+            cvp_vendor_need('reports', 'reports');
+            $d = cvp_vendor_report((int)($_GET['id'] ?? 0));
+            if (!$d) { http_response_code(404); cvp_vendor_view('notfound'); exit; }
+            cvp_vendor_log('REPORT_OPENED', $d['irn']);
+            cvp_vendor_report_pdf($d);
+            exit;
+
+        case 'vendor/password':
+            $err = ''; $done = false;
+            if ($method === 'POST') {
+                $new = (string)($_POST['password'] ?? '');
+                if ($new !== (string)($_POST['confirm'] ?? '')) $err = 'The two passwords do not match.';
+                else {
+                    $why = function_exists('password_problem_text')
+                         ? password_problem_text($new, (string)$u['email'], (string)$u['name']) : '';
+                    if ($why !== '') $err = $why;
+                    else {
+                        db()->prepare("UPDATE vendor_users SET password_hash=?, must_change=0 WHERE id=?")
+                            ->execute([password_hash($new, PASSWORD_DEFAULT), (int)$u['id']]);
+                        cvp_vendor_log('PASSWORD_CHANGED');
+                        $done = true;
+                        $u = cvp_vendor_reload();
+                    }
+                }
+            }
+            cvp_vendor_view('password', ['err' => $err, 'done' => $done]);
+            exit;
+    }
+
+    // Slice 3 will add vendor/issues + vendor/issue here.
+    if (function_exists('cvp_vendor_route_issues') && cvp_vendor_route_issues($route, $method, $u)) exit;
+
+    http_response_code(404);
+    cvp_vendor_view('notfound');
+    exit;
+}
+
+// ============================================================================
+//  STAFF SIDE — invite vendor users, switch the portal on, share reports.
+//  Mirrors ops_portal_admin. Gated by the same portal module permission, so
+//  whoever manages the client portal manages the vendor portal too.
+// ============================================================================
+function cvp_vendor_can_manage() { return is_master() || (function_exists('can') && can('mod.portal.edit')); }
+
+// Finalized reports that name a vendor, with their current share state — the
+// list staff tick to share a report into the vendor portal.
+function cvp_vendor_shareable_reports($limit = 300) {
+    return portal_try(fn() => ops_all(
+        "SELECT d.id, d.irn, d.title, d.type_code, d.finalized_at, d.vendor_visible,
+                COALESCE(v.display_name, v.legal_name) vendor_name
+         FROM report_docs d JOIN business_partners v ON v.id = d.vendor_id
+         WHERE d.finalized = 1 AND COALESCE(d.deleted,0) = 0 AND COALESCE(v.is_vendor,0) = 1
+         ORDER BY d.finalized_at DESC, d.id DESC LIMIT " . max(1, (int)$limit)), []);
+}
+
+function ops_cvp_vendor_admin($route, $method) {
+    ops_require(cvp_vendor_can_manage(), 'Only somebody who manages the portal can open the vendor register.');
+
+    if ($route === 'vendor-users') {
+        $invite = null;
+        if ($method === 'POST') {
+            $r = cvp_vendor_invite((int)($_POST['vendor_id'] ?? 0), $_POST['email'] ?? '', $_POST['name'] ?? '', (int)($_POST['contact_id'] ?? 0));
+            if (!empty($r['err'])) flash($r['err'], 'error');
+            else { $invite = $r; flash('Invitation created. Send them the link below — we never choose or e-mail a password.'); }
+        }
+        view('ops/vendor_users', [
+            'rows'    => cvp_vendor_users_all(),
+            'vendors' => vendors_list(),
+            'invite'  => $invite,
+            'enabled' => cvp_vendor_enabled(),
+            'base'    => portal_base_url(),
+            'reports' => cvp_vendor_shareable_reports(),
+            'contactsByPartner' => portal_contacts_by_partner(),
+        ]);
+        return true;
+    }
+
+    if ($route === 'vendor-user-toggle' && $method === 'POST') {
+        $id = (int)($_POST['id'] ?? 0);
+        $u = portal_try(fn() => ops_one("SELECT * FROM vendor_users WHERE id=?", [$id]), null);
+        if ($u) {
+            db()->prepare("UPDATE vendor_users SET is_active=? WHERE id=?")->execute([empty($u['is_active']) ? 1 : 0, $id]);
+            flash(empty($u['is_active']) ? 'Access restored for ' . $u['email'] . '.'
+                : 'Access withdrawn from ' . $u['email'] . '. They cannot sign in again.');
+        }
+        redirect('/vendor-users');
+    }
+
+    if ($route === 'vendor-user-reinvite' && $method === 'POST') {
+        $id = (int)($_POST['id'] ?? 0);
+        $u = portal_try(fn() => ops_one("SELECT * FROM vendor_users WHERE id=?", [$id]), null);
+        if ($u) {
+            $token = bin2hex(random_bytes(24));
+            db()->prepare("UPDATE vendor_users SET invite_token=?, invite_expires=?, password_hash='', must_change=1 WHERE id=?")
+                ->execute([$token, date('c', time() + 7 * 86400), $id]);
+            $_SESSION['vendor_invite_link'] = portal_base_url() . '/vendor/accept?t=' . $token;
+            flash('A new invitation link has been made for ' . $u['email'] . '. Their old password no longer works.');
+        }
+        redirect('/vendor-users');
+    }
+
+    if ($route === 'vendor-settings' && $method === 'POST') {
+        ops_require(is_master() || is_admin_level(), 'Only an administrator can switch the vendor portal on.');
+        setting_set('vendor_portal_enabled', !empty($_POST['vendor_portal_enabled']) ? '1' : '0');
+        flash(cvp_vendor_enabled()
+            ? 'The vendor portal is on. Nobody can reach it until you invite them.'
+            : 'The vendor portal is off. Every /vendor address now answers "not found".');
+        redirect('/vendor-users');
+    }
+
+    if ($route === 'vendor-share' && $method === 'POST') {
+        $id = (int)($_POST['id'] ?? 0);
+        $on = !empty($_POST['on']);
+        if (cvp_report_set_vendor_visible($id, $on)) {
+            cvp_vendor_log('REPORT_SHARE', $id . ':' . ($on ? 'on' : 'off'));
+            flash($on ? 'Report shared with the vendor portal.' : 'Report removed from the vendor portal.');
+        } else {
+            flash('That report cannot be shared — it must be finalized and name a vendor.', 'error');
+        }
+        redirect('/vendor-users');
+    }
+
+    redirect('/vendor-users');
+    return true;
 }
 
 // ---------------------------------------------------------------------------

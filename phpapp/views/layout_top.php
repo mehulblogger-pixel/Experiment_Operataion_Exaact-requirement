@@ -207,6 +207,7 @@
         <?php if ($inspPack && function_exists('trust_can_review') && trust_can_review()): $evN = function_exists('trust_readiness') ? trust_readiness()['pending'] : 0; ?><a class="s-item<?= $navOn(['evidence-review']) ?>" href="/evidence-review"><span class="s-ic">📍</span><span>Evidence review<?= $evN ? ' (' . $evN . ')' : '' ?></span></a><?php endif; ?>
         <?php if ($inspPack && can('mod.datacontrol.view')): ?><a class="s-item<?= $navOn(['data-control']) ?>" href="/data-control"><span class="s-ic">🗃</span><span>Data &amp; information control</span></a><?php endif; ?>
         <?php if (can('mod.portal.view')): $pqN = function_exists('portal_requests_all') ? count(portal_requests_all('NEW')) : 0; ?><a class="s-item<?= $navOn(['portal-users']) ?>" href="/portal-users"><span class="s-ic">🌐</span><span>Client portal<?= $pqN ? ' (' . $pqN . ')' : '' ?></span></a><?php endif; ?>
+        <?php if (can('mod.portal.view')): ?><a class="s-item<?= $navOn(['vendor-users']) ?>" href="/vendor-users"><span class="s-ic">🏭</span><span>Vendor portal</span></a><?php endif; ?>
         <?php if (can('mod.identity.view') && function_exists('iddoc_can_view') && iddoc_can_view()): ?><a class="s-item<?= $navOn(['identity']) ?>" href="/identity"><span class="s-ic">🪪</span><span>Identity documents</span></a><?php endif; ?>
         <?php $endgrp(); endif; ?>
 
