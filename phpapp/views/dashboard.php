@@ -15,6 +15,11 @@
   <span class="scope-tag"><?= $scopeAll ? 'All offices' : ($office ? e($office) : 'Your scope') ?></span>
 </div>
 
+<?php // Self-service daily attendance — shows for any user with an inspector
+      // record (inspectors + field coordinators). Location is mandatory for
+      // In-office / On-site; the mark flows to availability + links to the report.
+      if (function_exists('attend_render_widget')) attend_render_widget($u); ?>
+
 <?php if (is_inspector()): ?>
   <?php $myId = $u['inspector_id'] ?? 0;
     $mc = fn($sql, $extra = []) => $myId ? (int)ops_val("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND $sql", array_merge([$myId], $extra)) : 0;
