@@ -366,6 +366,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('uire_migrate')) uire_migrate();     // UIRE — universal inspection engine (inspection-type master + criteria library)
     if (function_exists('urade_migrate')) urade_migrate();   // URADE — universal release/acceptance engine (eligibility rules + release masters)
     if (function_exists('uvae_migrate')) uvae_migrate();     // UVAE — universal vendor assessment engine (assessment-type master + criteria library)
+    if (function_exists('uvaae_migrate')) uvaae_migrate();   // UVAAE — universal vendor audit / MS-audit engine (audit-type master + audit criteria library + conclusion rules)
     if (function_exists('orgadmin_migrate')) orgadmin_migrate();   // office tree + heads
     if (function_exists('contracts_migrate')) contracts_migrate();  // contract validity gates
     if (function_exists('security_migrate')) security_migrate();    // password age, second factor
