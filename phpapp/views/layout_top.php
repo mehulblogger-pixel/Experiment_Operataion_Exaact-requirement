@@ -136,11 +136,14 @@
 
         <?php if (can('mod.calls.view')||can('mod.jobs.view')||can('mod.vouchers.view')||can('mod.hiring.view')||can('mod.reconcile.view')): ?>
         <?php $grp('Operations'); ?>
+        <?php if (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can()): ?><a class="s-item<?= $navOn(['ops-desk']) ?>" href="/ops-desk"><span class="s-ic">🎛️</span><span>Operations desk</span></a><?php endif; ?>
         <?php if (can('mod.calls.view')): ?><a class="s-item<?= $navOn(['calls','call']) ?>" href="/calls"><span class="s-ic">☎️</span><span><?= e(THP('call')) ?></span></a><?php endif; ?>
         <?php if (can('mod.jobs.view')): ?><a class="s-item<?= $navOn(['jobs','job']) ?>" href="/jobs"><span class="s-ic">🗂</span><span><?= e(THP('job')) ?></span></a><?php endif; ?>
         <?php if ((can('mod.jobs.view')||can('mod.calls.view')) && (!function_exists('svc_globally_active') || svc_globally_active('DEPUTATION'))): ?><a class="s-item<?= $navOn(['deputations']) ?>" href="/deputations"><span class="s-ic">👷</span><span>Deputation &amp; site ops</span></a><?php endif; ?>
         <?php if (can('mod.jobs.view') && function_exists('can_manage_availability') && can_manage_availability()): ?><a class="s-item<?= $navOn(['availability']) ?>" href="/availability"><span class="s-ic">🟢</span><span><?= e(TH('engineer')) ?> availability</span></a><?php endif; ?>
         <?php if (function_exists('sched_board_can') && sched_board_can()): ?><a class="s-item<?= $navOn(['schedule']) ?>" href="/schedule"><span class="s-ic">🗓️</span><span>Scheduling board</span></a><?php endif; ?>
+        <?php if (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can()): ?><a class="s-item<?= $navOn(['capacity-outlook']) ?>" href="/capacity-outlook"><span class="s-ic">📈</span><span>Capacity outlook</span></a><?php endif; ?>
+        <?php if (can('mod.calls.view')): ?><a class="s-item<?= $navOn(['recurring']) ?>" href="/recurring"><span class="s-ic">🔁</span><span>Recurring services</span></a><?php endif; ?>
         <?php if (function_exists('timesheet_can') && timesheet_can()): ?><a class="s-item<?= $navOn(['timesheet']) ?>" href="/timesheet"><span class="s-ic">⏱️</span><span>Timesheet</span></a><?php endif; ?>
         <?php if (function_exists('rating_can') && rating_can()): ?><a class="s-item<?= $navOn(['ratings']) ?>" href="/ratings"><span class="s-ic">⭐</span><span>Inspector ratings</span></a><?php endif; ?>
         <?php if (can('mod.vouchers.view')): ?><a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span><?= e(THP('voucher')) ?></span></a><?php endif; ?>
@@ -300,6 +303,7 @@
                 // and then refused at the door — which reads as a broken app. ?>
           <?php if (can('mod.settings.view') && can('settings.manage')): ?><a class="s-item<?= $navOn(['settings','terminology','ai-settings','reset-data']) ?>" href="/settings"><span class="s-ic">⚙️</span><span>System settings</span></a><?php endif; ?>
           <?php if (can('settings.manage') || is_master()): ?><a class="s-item<?= $navOn(['service-scope']) ?>" href="/service-scope"><span class="s-ic">🧩</span><span>Service scope</span></a><?php endif; ?>
+          <?php if (can('settings.manage') || is_master() || (function_exists('is_coordinator_level') && is_coordinator_level())): ?><a class="s-item<?= $navOn(['sla-targets']) ?>" href="/sla-targets"><span class="s-ic">⏳</span><span>SLA targets</span></a><?php endif; ?>
           <?php if (can('settings.manage') || is_master()): ?><a class="s-item<?= $navOn(['company-profile']) ?>" href="/company-profile"><span class="s-ic">🏢</span><span>Company profile</span></a><?php endif; ?>
           <?php if ((can('settings.manage') || is_master()) && function_exists('books_licensed') && books_licensed()): $bxc = function_exists('books_outbox_counts') ? books_outbox_counts() : []; ?><a class="s-item<?= $navOn(['books-bridge']) ?>" href="/books-bridge"><span class="s-ic">📗</span><span>MGH Books<?= !empty($bxc['stuck']) ? ' (' . (int)$bxc['stuck'] . ')' : '' ?></span></a><?php endif; ?>
         <?php $endgrp(); endif; ?>

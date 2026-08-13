@@ -262,6 +262,11 @@
   <a id="sla"></a>
   <?php tosrm_render_call_sla($call); ?>
 <?php endif; ?>
+<?php // Phase 9 (TOSRM Slice E) — communication log (reuses the activity spine).
+      if (function_exists('tosrm_render_comms')): ?>
+  <a id="comms"></a>
+  <?php tosrm_render_comms('CALL', (int)$call['id']); ?>
+<?php endif; ?>
 
 <h3 class="tab-sub" id="jobs">Jobs allocated from this call</h3>
 <table class="grid">

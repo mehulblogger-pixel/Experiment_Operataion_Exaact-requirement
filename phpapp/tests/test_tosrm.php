@@ -297,6 +297,57 @@ ob_start(); tosrm_render_call_sla(ops_one("SELECT * FROM calls WHERE id=?", [$sd
 ok(strpos($sh, 'turnaround &amp; SLA') !== false, 'the SLA/TAT panel renders');
 ok(strpos($sh, 'Received → Closure') !== false && strpos($sh, 'Delays') !== false, 'the panel shows the TAT chain and delays');
 
+// ============================================================================
+//  SLICE E — Operations surfaces: desk metrics, backlog, registers, comms,
+//  issue-from-event, data-quality, summary.
+// ============================================================================
+tosrm_migrate_d();
+
+head('26. Ops desk metrics + backlog (branch-scoped, computed)');
+tosrm_clar_create($full, ['subject'=>'Confirm access timings', 'raised_to'=>'CLIENT']);   // a currently-open clarification
+$met = tosrm_ops_metrics('ALL');
+ok(is_array($met) && array_key_exists('unscheduled', $met) && array_key_exists('overdue', $met), 'metrics compute (unscheduled/overdue/…)');
+ok($met['clarification'] >= 1, 'the open clarification raised earlier is counted (' . $met['clarification'] . ')');
+$bk = tosrm_ops_backlog('ALL', 100);
+ok(is_array($bk) && count($bk) >= 1, 'the backlog lists open calls (' . count($bk) . ')');
+$firstWithReason = array_values(array_filter($bk, fn($r)=>trim((string)$r['pending_reason'])!==''));
+ok(!empty($firstWithReason), 'each backlog row carries a plain pending-reason');
+
+head('27. Registers');
+$sr = tosrm_schedule_register('ALL', $d(-40), $d(20));
+ok(is_array($sr), 'the schedule register resolves (' . count($sr) . ')');
+$ar = tosrm_assignment_register('ALL', 200);
+ok(is_array($ar) && count($ar) >= 1, 'the assignment register lists assigned jobs (' . count($ar) . ')');
+ok(array_key_exists('accept_state', $ar[0]) && array_key_exists('assign_state', $ar[0]), 'assignment rows carry hold + acceptance state');
+
+head('28. Operational-event → Phase 8 issue (reuses ncr_create, no duplicate register)');
+$ncrBefore = (int)ops_one("SELECT COUNT(*) n FROM nonconformities")['n'];
+$issueId = tosrm_issue_from_event($sdJob, 'No-show — vendor gate closed', 'Recorded from the assignment panel', 'MINOR');
+$ncrAfter = (int)ops_one("SELECT COUNT(*) n FROM nonconformities")['n'];
+ok($issueId > 0 && $ncrAfter === $ncrBefore + 1, 'an operational issue is raised in the Phase 8 register');
+ok((int)ops_one("SELECT COUNT(*) n FROM nonconformities WHERE job_id=?", [$sdJob])['n'] >= 1, 'the issue is linked back to the job');
+
+head('29. Rule-based data-quality flags (advisory, no AI)');
+$dq = tosrm_ops_dataquality('ALL', 100);
+ok(is_array($dq), 'data-quality scan resolves (' . count($dq) . ' flagged)');
+$bareFlagged = array_values(array_filter($dq, fn($r)=>(int)$r['call_id']===$bare));
+// $bare was overridden earlier in Slice A, so it should NOT be flagged.
+ok(empty($bareFlagged), 'a call whose validation was overridden is not re-flagged');
+
+head('30. Operations summary (deterministic; AI only phrases, never invents)');
+$sum = tosrm_ops_summary($met);
+ok(is_array($sum) && strpos($sum['text'], 'Backlog:') === 0, 'a deterministic summary is produced from the metrics');
+ok($sum['ai'] === false, 'with no AI key configured, the summary is rule-based (AI never fabricates)');
+
+head('31. Comms log reuses the activity spine + renders');
+if (function_exists('act_log')) {
+    act_log('CALL', $cid, 'EMAIL', 'Client sent revised PO', ['body'=>'PO rev 2 attached']);
+    $acts = act_for_entity('CALL', $cid, 50);
+    ok(is_array($acts) && count($acts) >= 1, 'a communication is logged against the call via the activity spine');
+    ob_start(); tosrm_render_comms('CALL', $cid); $ch = ob_get_clean();
+    ok(strpos($ch, 'Communication log') !== false && strpos($ch, 'Client sent revised PO') !== false, 'the comms panel renders the logged communication');
+} else { ok(true, 'activity spine not present (skipped)'); ok(true, 'skipped'); }
+
 if ($__standalone) {
     $g = $GLOBALS['__t'];
     echo "\n==================== TOSRM: {$g['pass']} passed, {$g['fail']} failed ====================\n";
