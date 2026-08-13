@@ -52,6 +52,8 @@ const SERVICE_CATALOG = [
         'Release notes / acceptance / disposition as a controlled consequence of verification.'],
     'DEPUTATION'        => ['Project Deputation', 'operations', 'mod.calls.view',  '/calls',               'Operations', '👷',
         'Manpower / project deputation and site assignments.'],
+    'NCR_CAPA'          => ['Nonconformity & CAPA', 'operations', 'mod.ncr.view',  '/issues',              'Operations', '⚠️',
+        'Universal issue engine — NCR, nonconformity, CAPA, deviation, concession & corrective action.'],
 ];
 
 // Scope levels, MOST SPECIFIC FIRST. The context key each level reads from the
