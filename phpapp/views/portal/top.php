@@ -11,6 +11,7 @@ $links = ['portal' => 'Overview'];
 if (pcan('calls'))     $links['portal/calls']      = TP('call');
 if (pcan('reports'))   $links['portal/reports']    = 'Reports';
 if (pcan('deputation')) $links['portal/deputations'] = 'Deputations';
+if (pcan('issues') && function_exists('cvp_issues_for')) $links['portal/issues'] = 'Nonconformities';
 if (pcan('invoices'))  $links['portal/invoices']   = 'Invoices';
 if (pcan('request'))   $links['portal/request']    = 'Request an inspection';
 if (pcan('complaint')) $links['portal/complaints'] = 'Complaints &amp; appeals';

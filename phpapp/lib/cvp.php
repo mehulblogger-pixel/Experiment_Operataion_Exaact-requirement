@@ -421,6 +421,116 @@ function cvp_vendor_route($route, $method) {
 }
 
 // ============================================================================
+//  SLICE 3 — the external nonconformity loop, shared by BOTH portals.
+//
+//  A client and a vendor can now VIEW nonconformities raised to them and
+//  RESPOND (accept / partially accept / disagree / clarify / propose an action),
+//  with a root-cause note, a proposed corrective action and an evidence
+//  reference. The response feeds the SAME engine staff use: it is written as an
+//  issue_disputes row (the party-response register, ncdca.php) and stamped on the
+//  NCR's event trail (ncr_log). Nothing is shown that is not marked visible to
+//  that audience — the read passes through the Slice-1 visibility gate, in the
+//  WHERE clause, on top of an ownership match on partner_id.
+// ============================================================================
+
+// Nonconformities raised to $partnerId that $audience ('CLIENT'|'VENDOR') may
+// see. Ownership (partner_id) AND visibility are both required — belt and braces.
+function cvp_issues_for($audience, $partnerId, $openOnly = false) {
+    $partnerId = (int)$partnerId;
+    if (!$partnerId) return [];
+    [$vw, $va] = cvp_visibility_sql('n.visibility', $audience);
+    $extra = $openOnly ? " AND n.status <> 'CLOSED'" : '';
+    return portal_try(fn() => ops_all(
+        "SELECT n.id, n.ref, n.title, n.description, n.severity, n.status, n.issue_type,
+                n.detected_on, n.due_on, n.disposition, n.clause,
+                (SELECT COUNT(*) FROM issue_disputes d WHERE d.ncr_id = n.id AND d.party = ?) my_responses
+         FROM nonconformities n
+         WHERE n.partner_id = ? AND $vw $extra
+         ORDER BY (n.status <> 'CLOSED') DESC, n.id DESC",
+        array_merge([strtoupper((string)$audience), $partnerId], $va)), []);
+}
+
+// A single nonconformity, ownership + visibility gated in the WHERE clause — an
+// issue that is not theirs, or not marked visible to them, simply does not exist.
+function cvp_issue($audience, $partnerId, $ncrId) {
+    $partnerId = (int)$partnerId;
+    if (!$partnerId) return null;
+    [$vw, $va] = cvp_visibility_sql('n.visibility', $audience);
+    return portal_try(fn() => ops_one(
+        "SELECT n.* FROM nonconformities n WHERE n.id = ? AND n.partner_id = ? AND $vw",
+        array_merge([(int)$ncrId, $partnerId], $va)), null) ?: null;
+}
+
+// The party's own responses on an issue, for the thread on the detail screen.
+function cvp_issue_responses($audience, $ncrId) {
+    return portal_try(fn() => ops_all(
+        "SELECT * FROM issue_disputes WHERE ncr_id = ? AND party = ? ORDER BY id DESC",
+        [(int)$ncrId, strtoupper((string)$audience)]), []);
+}
+
+// Record a party's response to an issue. Validates ownership+visibility again
+// (never trusts the caller), and that the response kind is a real one. Writes
+// through the SAME engine staff read (issue_disputes + ncr_log). Returns '' on
+// success, or a message.
+function cvp_issue_respond($audience, $partnerId, $ncrId, $data, $actorName = '') {
+    $n = cvp_issue($audience, $partnerId, $ncrId);
+    if (!$n) return 'That item is not available to you.';
+    if ((string)$n['status'] === 'CLOSED') return 'This item is closed. If you need to reopen it, contact us.';
+    $kind = strtoupper(trim((string)($data['response_kind'] ?? '')));
+    if (!isset(NCDCA_RESPONSE_KINDS[$kind])) return 'Choose how you are responding.';
+    $response = trim((string)($data['response'] ?? ''));
+    if ($response === '') return 'Write your response — a bare acknowledgement is not enough for the record.';
+    ncdca_dispute_create((int)$n['id'], [
+        'party'           => strtoupper((string)$audience),
+        'disputed_field'  => (string)($data['disputed_field'] ?? ''),
+        'reason'          => (string)($data['reason'] ?? ''),           // root cause
+        'response_kind'   => $kind,
+        'response'        => $response,
+        'proposed_action' => (string)($data['proposed_action'] ?? ''), // corrective action
+        'evidence_ref'    => (string)($data['evidence_ref'] ?? ''),
+    ]);
+    if (function_exists('ncr_log')) {
+        try { ncr_log((int)$n['id'], 'PARTY_RESPONSE',
+            ucfirst(strtolower((string)$audience)) . ' response (' . (NCDCA_RESPONSE_KINDS[$kind] ?? $kind) . ')'
+            . ($actorName !== '' ? ' by ' . $actorName : '')); } catch (Throwable $e) {}
+    }
+    return '';
+}
+
+// Marker used by the vendor nav to decide whether to show the issues link
+// (present = Slice 3 loaded). Kept tiny and side-effect-free.
+function cvp_vendor_issue_links() { return true; }
+
+// The vendor portal's issue routes, called from cvp_vendor_route(). Returns true
+// when it handled the route (and has emitted a page), false otherwise.
+function cvp_vendor_route_issues($route, $method, $u) {
+    if ($route === 'vendor/issues') {
+        cvp_vendor_need('issues', 'nonconformities');
+        cvp_vendor_view('issues', ['rows' => cvp_issues_for('VENDOR', cvp_vendor_id())]);
+        return true;
+    }
+    if ($route === 'vendor/issue') {
+        cvp_vendor_need('issues', 'nonconformities');
+        $n = cvp_issue('VENDOR', cvp_vendor_id(), (int)($_GET['id'] ?? $_POST['id'] ?? 0));
+        if (!$n) { http_response_code(404); cvp_vendor_view('notfound'); return true; }
+        $err = '';
+        if ($method === 'POST') {
+            $err = cvp_issue_respond('VENDOR', cvp_vendor_id(), (int)$n['id'], $_POST, (string)($u['name'] ?? ''));
+            if ($err === '') {
+                cvp_vendor_log('ISSUE_RESPONSE', (string)$n['ref']);
+                $_SESSION['vendor_flash'] = 'Thank you — your response to ' . $n['ref'] . ' is recorded and with our team.';
+                redirect('/vendor/issues');
+            }
+        }
+        cvp_vendor_view('issue', ['n' => $n, 'err' => $err,
+            'responses' => cvp_issue_responses('VENDOR', (int)$n['id']),
+            'kinds' => NCDCA_RESPONSE_KINDS]);
+        return true;
+    }
+    return false;
+}
+
+// ============================================================================
 //  STAFF SIDE — invite vendor users, switch the portal on, share reports.
 //  Mirrors ops_portal_admin. Gated by the same portal module permission, so
 //  whoever manages the client portal manages the vendor portal too.
