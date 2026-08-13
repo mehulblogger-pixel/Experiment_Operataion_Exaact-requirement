@@ -70,14 +70,16 @@ svc_set_default_scope('VENDOR_ASSESSMENT', true);
 head('4. Independence — one service never gates another');
 $map = svc_scope_map(['client_id'=>100]);
 ok($map['INSPECTION'] === true && $map['EXPEDITING'] === true, 'Inspection & Expediting active independently');
-// Turn every OTHER service off for client 100; Inspection must still be active.
-foreach (['EXPEDITING','VENDOR_ASSESSMENT','VENDOR_AUDIT','RELEASE','DEPUTATION'] as $c) svc_set_scope('CLIENT', 100, $c, false);
+// Turn every OTHER service off for client 100 (dynamically, so new catalog
+// services don't break this); Inspection must still be active.
+$others = array_values(array_filter(array_map(fn($c)=>$c['code'], svc_catalog()), fn($c)=>$c!=='INSPECTION'));
+foreach ($others as $c) svc_set_scope('CLIENT', 100, $c, false);
 ok(svc_active('INSPECTION', ['client_id'=>100]), 'Inspection runs with every other service switched off');
 ok(!svc_active('RELEASE', ['client_id'=>100]) && !svc_active('DEPUTATION', ['client_id'=>100]), 'the others are genuinely off');
 $active = svc_active_codes(['client_id'=>100]);
 ok($active === ['INSPECTION'], 'only Inspection is in scope for client 100 (' . implode(',', $active) . ')');
 // Clean up client 100 overrides.
-foreach (['EXPEDITING','VENDOR_ASSESSMENT','VENDOR_AUDIT','RELEASE','DEPUTATION'] as $c) svc_set_scope('CLIENT', 100, $c, null);
+foreach ($others as $c) svc_set_scope('CLIENT', 100, $c, null);
 
 // ---------------------------------------------------------------------------
 head('5. Optional dependencies — none by default; configured = scoped & advisory');

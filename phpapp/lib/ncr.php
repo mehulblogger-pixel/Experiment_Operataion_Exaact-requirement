@@ -352,6 +352,10 @@ function ncr_create(array $b) {
             (string)($b['containment'] ?? ''),
             user_name(current_user()), date('c')]);
     $id = (int)db()->lastInsertId();
+    // Phase 8 (NCDCA): let the universal issue layer stamp the issue type /
+    // classification / responsibility / visibility if provided. Additive and
+    // guarded — absent keys leave the record exactly as before (a plain NCR).
+    if (function_exists('ncdca_apply_classification')) { try { ncdca_apply_classification($id, $b); } catch (Throwable $e) {} }
     if (function_exists('act_log'))
         act_log('NCR', $id, 'SYSTEM', 'Nonconformity ' . $ref . ' raised',
                 ['auto' => 1, 'body' => (string)($b['title'] ?? ''),

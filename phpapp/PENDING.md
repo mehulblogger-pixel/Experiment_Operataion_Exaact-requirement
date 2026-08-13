@@ -2,6 +2,52 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ⚠️ NCDCA — Universal Nonconformity, NCR, CAPA, Deviation & Concession Engine (Phase 8, Aug 2026) — ELEVATION + GAP-FILLER
+
+Owner steer: "Make it a Universal Issue Engine, not a primitive NCR form — NCR is
+one type of issue." The app ALREADY has the corrective-action spine (LOCKED):
+nonconformities (source-linking, containment, disposition, closure; ncr_create is
+the universal entry every module calls) + capa/capa_actions (correction, root
+cause + method, recurrence check similar_*, multi-action register, effectiveness
+verification, reopen chain follows_id) + evidence + approvals + Template Builder.
+So `lib/ncdca.php` ELEVATES that spine and fills only the genuine gaps — it
+creates NO duplicate NCR/CAPA/evidence/complaint/audit-finding record. Wired into
+run_schema after pdso, required after pdso in index.php. NCR_CAPA registered as a
+Service-Scope service (standalone-capable, §2/§48).
+
+- **Slice 1 — DONE (engine).** All additive, nothing rebuilt:
+  - ISSUE-TYPE dimension — nonconformities gains issue_type (NCR is one of 18) +
+    issue_class + responsibility + visibility, stamped via a guarded hook in the
+    existing ncr_create (absent keys → a plain NCR, backward compatible). An
+    observation is no longer forced to be an NCR (§96). Reclassifiable later.
+  - Controlled DEPARTURES (issue_departures) — deviation / concession / waiver,
+    ONE typed table, each with its own DEV-/CON-/WAV- reference, approval workflow
+    (Draft→Submitted→Tech/Client review→Approved with named authority + client
+    approval + date) and validity (temporary + expiry sweep, never deleted). A
+    departure is NOT an NCR closure (§36/§37/§38).
+  - DISPUTE + response (issue_disputes) — the original finding is retained (§53/§54).
+  - DUE-DATE EXTENSION history (issue_extensions) — original date never overwritten;
+    live NCR/CAPA/action due moves only on approval (§32).
+  - Recurrence — ncdca_possible_repeats (same partner/clause) suggests; a human
+    confirms, nothing auto-labelled (§57/§58). Reuses CAPA similar_*.
+  - Masters: effectiveness_result, rc_method, disposition (broadened), responsibility,
+    visibility, departure_status, dispute_status.
+  - Issue REPORT TYPES via the Template Builder (URFE library: ISS_IDENT/FINDING/
+    EVIDENCE/CONTAINMENT/ROOTCAUSE/ACTIONS/VERIFICATION/CLOSURE + DEP_DETAILS) —
+    NCR / CAPA / Deviation / Concession / Closure; all 5 build & render.
+  - Advisory QA (idems_qa_run item 18): finding-structure gaps, an NC with no
+    correction, closing a major NC without effectiveness, evidence-vs-finding
+    conflict — flags, NEVER invents a finding/root-cause/action, changes severity/
+    responsibility, approves a departure or closes (§75-79).
+  Verified: tests/test_ncdca.php 34 assertions incl. independence (standalone
+  issue + concession with every other service off). Full suite 623 passed / 0 failed.
+
+**Deferred to next slice (surfaces, reuse-heavy — not new engines): a unified
+Issue register/dashboard spanning types (the existing /ncr + /capa registers are
+live; this adds the type filter + deviation/concession/waiver registers + an issue
+dashboard), and the per-issue departure/dispute/extension panels. The engine,
+masters, report types and AI QA are live now.**
+
 ## 👷 PDSO — Project Deputation & Site Operations (Phase 7, Aug 2026) — GAP-FILLER
 
 Owner directive: "Build only the gap which is missing in our existing system."
