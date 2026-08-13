@@ -75,10 +75,174 @@ function urade_migrate() {
         created_at VARCHAR(30) DEFAULT '')");
     idems_unique_index('release_rules', 'code');
 
+    // Release links on report_docs (§12/§63) — which inspection this release is
+    // based on, and its aggregate readiness snapshot. Additive, nullable.
+    if (function_exists('ensure_column')) {
+        ensure_column('report_docs', 'release_of_id', 'INT NULL');       // primary inspection this release is based on
+        ensure_column('report_docs', 'release_disposition', "VARCHAR(20) DEFAULT ''");
+    }
+
     if (function_exists('setting_get') && !setting_get('urade_rules_seeded_v1', '')) {
         try { urade_seed_rules(); } catch (Throwable $e) { /* never break login/migrate */ }
         if (function_exists('setting_set')) setting_set('urade_rules_seeded_v1', '1');
     }
+    // Release sections/fields into the URFE Library (needs urfe_migrate first).
+    if (function_exists('setting_get') && !setting_get('urade_library_seeded_v1', '')) {
+        try { urade_seed_release_library(); } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('urade_library_seeded_v1', '1');
+    }
+    if (function_exists('setting_get') && !setting_get('urade_samples_seeded_v1', '')) {
+        try { urade_seed_sample_release_types(); } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('urade_samples_seeded_v1', '1');
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  Release additions to the URFE LIBRARY — so release document types assemble
+//  from the same Library. Select fields reference the release masters via
+//  lookup:<key>. [code,label,ftype,options,grp] / tables [code,label,grp,cols].
+// ---------------------------------------------------------------------------
+const URADE_LIB_FIELDS = [
+    ['release_type',      'Release type',        'select',      'lookup:release_type',        'Release'],
+    ['release_date',      'Release date',        'date',        '',                            'Release'],
+    ['disposition',       'Disposition',         'select',      'lookup:release_disposition', 'Release'],
+    ['release_basis',     'Release basis',       'multiselect', 'lookup:release_basis',       'Release'],
+    ['released_qty',      'Released quantity',   'number',      '',                            'Release'],
+    ['restrictions',      'Restrictions',        'multiselect', 'lookup:release_restriction', 'Release'],
+    ['release_statement', 'Release statement',   'textarea',    '',                            'Release'],
+    ['authorized_by',     'Authorized by',       'text',        '',                            'Release'],
+];
+const URADE_LIB_TABLES = [
+    ['release_items',    'Release items', 'Release',
+        "Item / description\nSerial / tag\nQty presented\nQty accepted\nQty released\nStatus|select|lookup:release_disposition\nConditions\nRemarks"],
+    ['evidence_matrix',  'Evidence matrix', 'Release',
+        "Requirement\nReference\nEvidence type\nEvidence no.\nDate|date\nResult\nStatus\nRemarks"],
+    ['release_checklist','Release readiness checklist', 'Release',
+        "Check\nRequirement\nStatus|select|Completed,Pending,Failed,Waived,N/A\nEvidence\nRemarks"],
+    ['rel_conditions',   'Release conditions', 'Release',
+        "Condition\nReference\nReason\nResponsible\nDue|date\nStatus|select|Open,In Progress,Closed\nEvidence\nVerified by"],
+    ['rel_exceptions',   'Release exceptions', 'Release',
+        "Exception\nRequirement\nReason\nRisk|select|Low,Medium,High\nDisposition\nApproval\nResponsible\nDue|date\nStatus"],
+];
+const URADE_LIB_SECTIONS = [
+    ['REL_DETAILS',     'Release details',        'FIELDS', '', 'Type, date, disposition and basis',
+        ['release_type','release_date','disposition','release_basis'], []],
+    ['REL_ITEMS',       'Release items',          'TABLE',  '', 'Item-level release with per-item disposition',
+        ['release_items'], []],
+    ['REL_EVIDENCE',    'Evidence matrix',        'TABLE',  '', 'What each release decision is based on',
+        ['evidence_matrix'], []],
+    ['REL_CHECKLIST',   'Release readiness checklist','TABLE','', 'The mandatory conditions and their status',
+        ['release_checklist'], []],
+    ['REL_CONDITIONS',  'Release conditions',     'TABLE',  '', 'What must still happen (conditional release)',
+        ['rel_conditions'], []],
+    ['REL_RESTRICTIONS','Restrictions',           'FIELDS', '', 'What the release does NOT authorize',
+        ['restrictions'], []],
+    ['REL_EXCEPTIONS',  'Exceptions',             'TABLE',  '', 'Accepted exceptions with risk & approval',
+        ['rel_exceptions'], []],
+    ['REL_DISPOSITION', 'Disposition & authorization','FIELDS','', 'The decision, released quantity and authority',
+        ['disposition','released_qty','authorized_by','release_statement'], []],
+];
+function urade_seed_release_library() {
+    $pdo = db(); $now = date('c');
+    $hasF = fn($c) => (int)ops_val("SELECT COUNT(*) FROM report_lib_fields WHERE code=?", [$c]) > 0;
+    $insF = $pdo->prepare("INSERT INTO report_lib_fields (code,label,ftype,options,grp,table_cols,is_system,status,version,created_at) VALUES (?,?,?,?,?,?,1,'PUBLISHED',1,?)");
+    foreach (URADE_LIB_FIELDS as $f) { if ($hasF($f[0])) continue; $insF->execute([$f[0],$f[1],$f[2],$f[3]??'',$f[4]??'','',$now]); }
+    foreach (URADE_LIB_TABLES as $t) { if ($hasF($t[0])) continue; $insF->execute([$t[0],$t[1],'table','',$t[2]??'',$t[3]??'',$now]); }
+    $hasS = fn($c) => (int)ops_val("SELECT COUNT(*) FROM report_lib_sections WHERE code=?", [$c]) > 0;
+    $insS = $pdo->prepare("INSERT INTO report_lib_sections (code,title,help,section_type,component,is_system,status,version,category,sort_order,created_at) VALUES (?,?,?,?,?,1,'PUBLISHED',1,'Release',?,?)");
+    $insSF = $pdo->prepare("INSERT INTO report_lib_section_fields (section_code,field_code,sort_order) VALUES (?,?,?)");
+    $ord = 400;
+    foreach (URADE_LIB_SECTIONS as $s) { $ord+=10; if ($hasS($s[0])) continue;
+        $insS->execute([$s[0],$s[1],$s[4]??'',$s[2]??'FIELDS',$s[3]??'',$ord,$now]);
+        $fo=0; foreach (($s[5]??[]) as $fc){ $fo+=10; $insSF->execute([$s[0],$fc,$fo]); } }
+}
+
+// Assemble a release document type from the Library (§47 — one engine, many
+// release document formats). Returns the report type id.
+function urade_assemble_release_type($code, $name, $sectionCodes, $opts = []) {
+    $opts = array_merge(['category' => 'RELEASE', 'finding_enabled' => 0, 'evidence_enabled' => 1], $opts);
+    return urfe_assemble_report_type($code, $name, $sectionCodes, $opts);
+}
+
+// The §79 sample release configurations — each a Library assembly of the SAME
+// engine, differing only by applicable sections. Removable by the admin.
+const URADE_SAMPLE_TYPES = [
+    ['URD_RN',   'Release Note (URADE)',
+        ['DOC_CONTROL','CLIENT_INFO','VENDOR_INFO','PROJECT_INFO','REL_DETAILS','SCOPE','REFERENCES','REL_ITEMS','REL_EVIDENCE','REL_CHECKLIST','REL_RESTRICTIONS','REL_DISPOSITION','CONCLUSION','APPROVAL']],
+    ['URD_RC',   'Release Certificate',
+        ['DOC_CONTROL','CLIENT_INFO','VENDOR_INFO','PROJECT_INFO','REL_DETAILS','REL_ITEMS','REL_DISPOSITION','APPROVAL']],
+    ['URD_PART', 'Partial Release Note',
+        ['DOC_CONTROL','CLIENT_INFO','VENDOR_INFO','PROJECT_INFO','REL_DETAILS','SCOPE','REL_ITEMS','REL_EVIDENCE','REL_CHECKLIST','REL_CONDITIONS','REL_RESTRICTIONS','REL_DISPOSITION','CONCLUSION','APPROVAL']],
+    ['URD_COND', 'Conditional Release Note',
+        ['DOC_CONTROL','CLIENT_INFO','VENDOR_INFO','PROJECT_INFO','REL_DETAILS','SCOPE','REL_ITEMS','REL_EVIDENCE','REL_CHECKLIST','REL_CONDITIONS','REL_EXCEPTIONS','REL_RESTRICTIONS','REL_DISPOSITION','CONCLUSION','APPROVAL']],
+    ['URD_FINAL','Final Acceptance Certificate',
+        ['DOC_CONTROL','CLIENT_INFO','VENDOR_INFO','PROJECT_INFO','REL_DETAILS','SCOPE','REFERENCES','REL_ITEMS','REL_EVIDENCE','REL_DISPOSITION','CONCLUSION','APPROVAL']],
+    ['URD_SITE', 'Site Acceptance Certificate',
+        ['DOC_CONTROL','CLIENT_INFO','PROJECT_INFO','REL_DETAILS','SCOPE','REL_CHECKLIST','REL_CONDITIONS','REL_DISPOSITION','INSP_OUTSTANDING','CONCLUSION','APPROVAL']],
+    ['URD_SERV', 'Service Acceptance Certificate',
+        ['DOC_CONTROL','CLIENT_INFO','PROJECT_INFO','REL_DETAILS','SCOPE','REL_CHECKLIST','REL_DISPOSITION','CONCLUSION','APPROVAL']],
+];
+function urade_seed_sample_release_types() {
+    foreach (URADE_SAMPLE_TYPES as $s) {
+        if (ops_one("SELECT id FROM report_types WHERE code=?", [$s[0]])) continue;
+        urade_assemble_release_type($s[0], $s[1], $s[2], ['subcategory'=>'URADE','description'=>'Sample release configuration (URADE) — editable & removable.']);
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  Consume inspection data (§12/§22/§69). Build the eligibility context from a
+//  linked Phase-2 inspection report WITHOUT re-entering data. Deterministic.
+// ---------------------------------------------------------------------------
+function urade_context_from_inspection($inspDoc) {
+    if (!$inspDoc) return [];
+    $fields = idems_fields((int)($inspDoc['report_type_id'] ?? 0));
+    $data = is_array($inspDoc['data'] ?? null) ? $inspDoc['data'] : (json_decode($inspDoc['data'] ?? '[]', true) ?: []);
+    $num = fn($x)=>($x===''||$x===null)?null:(float)preg_replace('/[^0-9.\-]/','',(string)$x);
+    $ctx = [];
+    $st = strtoupper((string)($inspDoc['status'] ?? ''));
+    $ctx['inspection_complete'] = (!empty($inspDoc['finalized']) || in_array($st, ['ISSUED','APPROVED','COMPLETED'], true)) ? 1 : 0;
+    $ctx['inspection_result'] = (string)($data['inspection_result'] ?? ($inspDoc['result'] ?? ''));
+    $ctx['accepted_qty'] = $num($data['accepted_qty'] ?? null);
+    // Failed tests from a test_results table; missing docs from documents_reviewed.
+    $failish = fn($v)=>($v!=='' && (stripos($v,'fail')!==false || stripos($v,'reject')!==false));
+    $tf=0; $tt=0; $dm=0;
+    foreach ($fields as $f) {
+        if (($f['ftype'] ?? '') !== 'table') continue;
+        $rows = $data[$f['fkey']] ?? null; if (!is_array($rows)) continue;
+        $defs = idems_table_col_defs($f);
+        $col = function($needle) use ($defs){ foreach ($defs as $k=>$d) if (stripos((string)$d['label'],$needle)!==false) return $k; return null; };
+        if (($f['fkey'] ?? '') === 'test_results' || $col('test')!==null && $col('result')!==null && stripos((string)($f['label']??''),'test')!==false) {
+            $kr=$col('result'); foreach ($rows as $r){ $rr=(array)$r; $v=trim((string)($rr[$kr]??'')); if($v==='')continue; $tt++; if($failish($v))$tf++; }
+        }
+        if (($f['fkey'] ?? '') === 'documents_reviewed' || (stripos((string)($f['label']??''),'document')!==false && $col('status')!==null)) {
+            $ks=$col('status'); foreach ($rows as $r){ $rr=(array)$r; $v=strtolower(trim((string)($rr[$ks]??''))); if($v==='')continue; if(strpos($v,'missing')!==false||strpos($v,'not submitted')!==false)$dm++; }
+        }
+    }
+    $ctx['tests_failed']=$tf; $ctx['tests_total']=$tt; $ctx['docs_missing']=$dm;
+    // Open NCRs linked to this inspection report (reuse the NCR register).
+    $iid = (int)($inspDoc['id'] ?? 0);
+    if ($iid) {
+        try {
+            $ctx['ncr_critical_open'] = (int)ops_val("SELECT COUNT(*) FROM nonconformities WHERE report_doc_id=? AND status<>'CLOSED' AND UPPER(severity)='CRITICAL'", [$iid]);
+            $ctx['ncr_major_open']    = (int)ops_val("SELECT COUNT(*) FROM nonconformities WHERE report_doc_id=? AND status<>'CLOSED' AND UPPER(severity)='MAJOR'", [$iid]);
+        } catch (Throwable $e) {}
+    }
+    return $ctx;
+}
+
+// Full eligibility for a release document — merges the linked inspection context
+// with the release's own released_qty, then evaluates the rules. §12/§55/§63.
+function urade_release_eligibility($releaseDoc) {
+    $data = is_array($releaseDoc['data'] ?? null) ? $releaseDoc['data'] : (json_decode($releaseDoc['data'] ?? '[]', true) ?: []);
+    $ctx = [];
+    $insId = (int)($releaseDoc['release_of_id'] ?? 0);
+    if ($insId) { $insp = ops_one("SELECT * FROM report_docs WHERE id=?", [$insId]); if ($insp) $ctx = urade_context_from_inspection($insp); }
+    // Release data can override / supply context directly too.
+    foreach (['inspection_result','accepted_qty','tests_failed','docs_missing','ncr_critical_open','ncr_major_open','inspection_complete'] as $k)
+        if (array_key_exists($k, $data) && $data[$k] !== '') $ctx[$k] = $data[$k];
+    if (array_key_exists('released_qty', $data) && $data['released_qty'] !== '') $ctx['released_qty'] = (float)preg_replace('/[^0-9.\-]/','',(string)$data['released_qty']);
+    $rt = (string)($data['release_type'] ?? '');
+    return urade_eligibility($ctx, $rt, (int)($releaseDoc['client_id'] ?? 0) ?: null);
 }
 
 // Default eligibility rules — sensible policy; the administrator can change every
