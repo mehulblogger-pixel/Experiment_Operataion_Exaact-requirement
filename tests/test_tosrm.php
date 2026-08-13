@@ -92,6 +92,68 @@ ok(strpos($html, 'Operations — service request') !== false, 'the operations pa
 ok(strpos($html, 'Clarifications') !== false && strpos($html, 'Confirm heat-treatment scope') !== false, 'the panel shows the clarification thread');
 ok(strpos($html, 'Status history') !== false, 'the panel shows status history');
 
+// ============================================================================
+//  SLICE B — Assignment lifecycle on the jobs spine.
+// ============================================================================
+tosrm_migrate_b();
+// Two resources + a job to move around.
+db()->prepare("INSERT INTO inspectors (name, status) VALUES ('Asha Rao','ACTIVE')")->execute(); $inspA = (int)db()->lastInsertId();
+db()->prepare("INSERT INTO inspectors (name, status) VALUES ('Bala Nair','ACTIVE')")->execute(); $inspB = (int)db()->lastInsertId();
+db()->prepare("INSERT INTO jobs (call_id, inspector_id, scheduled_date, stage, created_at) VALUES (?,?,?,?,?)")
+    ->execute([$cid, $inspA, date('Y-m-d', strtotime('+3 days')), 'ALLOCATED', date('c')]);
+$jid = (int)db()->lastInsertId();
+$J = fn() => ops_one("SELECT * FROM jobs WHERE id=?", [$jid]);
+
+head('8. Additive assignment columns; legacy allocation reads as CONFIRMED');
+$job = $J();
+ok(array_key_exists('assign_state', $job) && array_key_exists('accept_state', $job), 'jobs.assign_state / accept_state columns added');
+ok(tosrm_assign_state($job) === 'CONFIRMED', 'a legacy allocation (inspector set, no state) reads as CONFIRMED');
+
+head('9. Tentative → Confirmed hold (no auto-move)');
+ok(tosrm_assign_hold($jid, 'TENTATIVE', 'pencilled in') === true, 'a resource can be held TENTATIVE');
+ok(tosrm_assign_state($J()) === 'TENTATIVE', 'the hold state is TENTATIVE');
+ok(tosrm_assign_hold($jid, 'BOGUS') === false, 'an unknown hold state is rejected');
+ok(tosrm_assign_hold($jid, 'CONFIRMED') === true && tosrm_assign_state($J()) === 'CONFIRMED', 'it can be confirmed');
+
+head('10. Acceptance — decline requires a reason');
+ok(tosrm_assign_accept($jid, 'DECLINED', '') === false, 'a decline with no reason is refused');
+ok(tosrm_assign_accept($jid, 'DECLINED', 'On another site that day') === true, 'a decline with a reason is accepted');
+ok($J()['accept_state'] === 'DECLINED' && trim($J()['accept_reason']) !== '', 'the decision + reason are stored');
+ok(tosrm_assign_accept($jid, 'ACCEPTED') === true && $J()['accept_state'] === 'ACCEPTED', 'an acceptance needs no reason');
+
+head('11. Reassignment PRESERVES the original + resets acceptance');
+$before = $J()['inspector_id'];
+ok(tosrm_reassign($jid, $inspB, 'A unavailable', 'Ops Mgr') === true, 'reassign to a different resource succeeds');
+ok((int)$J()['inspector_id'] === $inspB, 'the job now carries the new resource');
+ok($J()['accept_state'] === 'PENDING', 'acceptance resets to PENDING for the new resource');
+ok(tosrm_reassign($jid, $inspB) === false, 'reassigning to the SAME resource is a no-op');
+$ev = ops_one("SELECT * FROM assignment_events WHERE job_id=? AND kind='REASSIGN' ORDER BY id DESC", [$jid]);
+ok((int)$ev['old_inspector_id'] === (int)$before && (int)$ev['new_inspector_id'] === $inspB, 'the ORIGINAL resource is preserved in history (never overwritten)');
+ok($ev['approver'] === 'Ops Mgr', 'the approver is recorded on the reassignment');
+
+head('12. Reschedule keeps the original date');
+$oldDate = $J()['scheduled_date'];
+$newDate = date('Y-m-d', strtotime('+10 days'));
+ok(tosrm_reschedule($jid, $newDate, 'client shifted', 'Coordinator') === true, 'reschedule to a new date succeeds');
+ok($J()['scheduled_date'] === $newDate, 'the job carries the new date');
+$rev = ops_one("SELECT * FROM assignment_events WHERE job_id=? AND kind='RESCHEDULE' ORDER BY id DESC", [$jid]);
+ok($rev['old_date'] === $oldDate && $rev['new_date'] === $newDate, 'the original date is kept in history');
+ok(tosrm_reschedule($jid, $newDate) === false, 'rescheduling to the same date is a no-op');
+
+head('13. No-show (no auto-blame) + cancellation with reason');
+ok(tosrm_assign_noshow($jid, 'VENDOR', 'Gate closed, works not ready') === true, 'a no-show is recorded against a party');
+ok(tosrm_assign_noshow($jid, 'NOBODY') === false, 'an unknown party is rejected');
+ok(tosrm_assign_cancel($jid, '') === false, 'cancellation without a reason is refused');
+ok(tosrm_assign_cancel($jid, 'Client withdrew the order') === true, 'cancellation with a reason is accepted');
+ok($J()['stage'] === 'CANCELLED', 'the job stage moves to CANCELLED (an existing stage value)');
+
+head('14. Full history retained + job panel renders');
+$hist = tosrm_assign_history($jid);
+ok(count($hist) >= 7, 'every assignment transition is retained in history (' . count($hist) . ')');
+ob_start(); tosrm_render_job_panel($J()); $jh = ob_get_clean();
+ok(strpos($jh, 'assignment lifecycle') !== false, 'the assignment-lifecycle panel renders on a job');
+ok(strpos($jh, 'Assignment history') !== false && strpos($jh, 'Reassign') !== false, 'the panel shows history + the reassign control');
+
 if ($__standalone) {
     $g = $GLOBALS['__t'];
     echo "\n==================== TOSRM: {$g['pass']} passed, {$g['fail']} failed ====================\n";

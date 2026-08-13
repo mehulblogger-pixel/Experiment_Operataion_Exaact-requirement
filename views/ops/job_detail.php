@@ -11,6 +11,13 @@
   </div>
 </div>
 
+<?php // Phase 9 (TOSRM Slice B) — assignment lifecycle: hold, acceptance,
+      // reassignment / reschedule / cancel / no-show, all with kept history.
+      if (function_exists('tosrm_render_job_panel')): ?>
+  <a id="assign"></a>
+  <?php tosrm_render_job_panel($job); ?>
+<?php endif; ?>
+
 <?php // ---- Where this job stands, and the one next thing ------------------- ?>
 <?php
   $jClosed   = !empty($job['closed_flag']);

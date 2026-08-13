@@ -353,6 +353,7 @@ function ops_tosrm_action($route, $method) {
     if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect($back); }
     ops_require(tosrm_can_edit(), 'You do not have permission to change this service request.');
     tosrm_migrate();
+    tosrm_migrate_b();
 
     switch ($route) {
         case 'call-status':
@@ -384,6 +385,277 @@ function ops_tosrm_action($route, $method) {
         case 'call-clar-status':
             tosrm_clar_set_status((int)($_POST['id'] ?? 0), (string)($_POST['status'] ?? ''));
             flash('Clarification updated.');
+            break;
+    }
+    redirect($back);
+}
+
+// ===========================================================================
+//  SLICE B — Assignment lifecycle over the EXISTING jobs / job_visits spine.
+//  An assignment is still jobs.inspector_id (+ per-date job_visits). This adds,
+//  additively, what an assignment did not carry:
+//    • a TENTATIVE / CONFIRMED / RELEASED hold state (pencil-in before commit);
+//    • ACCEPTANCE by the resource (accept / decline / clarify / replace) with a
+//      recorded reason;
+//    • REASSIGNMENT, RESCHEDULE, CANCELLATION and NO-SHOW that PRESERVE history
+//      (the original is never overwritten — it is kept in assignment_events).
+//  Nothing here changes how allocation, the availability board or job close
+//  work; the legacy /job-reassign path still functions untouched.
+// ===========================================================================
+
+const TOSRM_ASSIGN_STATES = ['TENTATIVE'=>'Tentative (held)','CONFIRMED'=>'Confirmed','RELEASED'=>'Released'];
+const TOSRM_ACCEPT_STATES = ['PENDING'=>'Awaiting acceptance','ACCEPTED'=>'Accepted','DECLINED'=>'Declined','CLARIFY'=>'Clarification requested','REPLACE'=>'Replacement requested'];
+const TOSRM_NOSHOW_PARTIES = ['CLIENT'=>'Client','VENDOR'=>'Vendor','RESOURCE'=>'Resource','OTHER'=>'Other'];
+// Kinds recorded in the assignment history.
+const TOSRM_ASSIGN_KINDS = [
+    'HOLD'=>'Hold changed','ACCEPT'=>'Acceptance','REASSIGN'=>'Reassigned','RESCHEDULE'=>'Rescheduled',
+    'CANCEL'=>'Cancelled','NOSHOW'=>'No-show',
+];
+
+function tosrm_migrate_b() {
+    static $done = false; if ($done) return; $done = true;
+    tosrm_migrate();
+    if (function_exists('lk_ensure_type_map')) {
+        lk_ensure_type_map('assign_state',   'Assignment hold state',   TOSRM_ASSIGN_STATES,  'tosrm');
+        lk_ensure_type_map('accept_state',    'Assignment acceptance',   TOSRM_ACCEPT_STATES,  'tosrm');
+        lk_ensure_type_map('noshow_party',    'No-show party',           TOSRM_NOSHOW_PARTIES, 'tosrm');
+    }
+    if (function_exists('ensure_column')) {
+        ensure_column('jobs', 'assign_state',  "VARCHAR(16) DEFAULT ''");
+        ensure_column('jobs', 'accept_state',  "VARCHAR(16) DEFAULT ''");
+        ensure_column('jobs', 'accept_reason', "VARCHAR(400) DEFAULT ''");
+        ensure_column('jobs', 'accept_by',     "VARCHAR(120) DEFAULT ''");
+        ensure_column('jobs', 'accept_at',     "VARCHAR(30) DEFAULT ''");
+    }
+    $pk = pk_clause();
+    db()->exec("CREATE TABLE IF NOT EXISTS assignment_events (
+        id $pk, job_id INT DEFAULT 0, kind VARCHAR(16) DEFAULT '',
+        old_inspector_id INT DEFAULT 0, new_inspector_id INT DEFAULT 0,
+        old_date VARCHAR(20) DEFAULT '', new_date VARCHAR(20) DEFAULT '',
+        party VARCHAR(16) DEFAULT '', reason VARCHAR(600) DEFAULT '',
+        actor VARCHAR(120) DEFAULT '', approver VARCHAR(120) DEFAULT '', at VARCHAR(30) DEFAULT '')");
+}
+
+// The current hold state — a legacy allocation (inspector set, no state) reads
+// as CONFIRMED so old jobs behave exactly as before.
+function tosrm_assign_state($job) {
+    $s = trim((string)($job['assign_state'] ?? ''));
+    if ($s !== '') return $s;
+    return (int)($job['inspector_id'] ?? 0) > 0 ? 'CONFIRMED' : '';
+}
+function tosrm_accept_state($job) { return trim((string)($job['accept_state'] ?? '')) ?: ((int)($job['inspector_id'] ?? 0) > 0 ? 'PENDING' : ''); }
+
+function tosrm_assign_event($jobId, $kind, $data = []) {
+    db()->prepare("INSERT INTO assignment_events (job_id, kind, old_inspector_id, new_inspector_id, old_date, new_date, party, reason, actor, approver, at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)")->execute([
+        (int)$jobId, (string)$kind, (int)($data['old_inspector_id'] ?? 0), (int)($data['new_inspector_id'] ?? 0),
+        (string)($data['old_date'] ?? ''), (string)($data['new_date'] ?? ''), (string)($data['party'] ?? ''),
+        (string)($data['reason'] ?? ''), tosrm_actor(), (string)($data['approver'] ?? ''), tosrm_now()]);
+    if (function_exists('idems_log')) { try { idems_log('job', (int)$jobId, 'ASSIGN_' . $kind, ['reason'=>$data['reason'] ?? '']); } catch (Throwable $e) {} }
+    return (int)db()->lastInsertId();
+}
+function tosrm_assign_history($jobId) { return ops_all("SELECT * FROM assignment_events WHERE job_id=? ORDER BY id DESC", [(int)$jobId]) ?: []; }
+
+// Tentative / Confirmed / Released hold. Does NOT auto-move anyone.
+function tosrm_assign_hold($jobId, $state, $reason = '') {
+    $state = strtoupper(trim((string)$state));
+    if (!array_key_exists($state, TOSRM_ASSIGN_STATES)) return false;
+    $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$jobId]); if (!$job) return false;
+    db()->prepare("UPDATE jobs SET assign_state=? WHERE id=?")->execute([$state, (int)$jobId]);
+    tosrm_assign_event($jobId, 'HOLD', ['reason'=>($state . ($reason !== '' ? ' — ' . $reason : ''))]);
+    return true;
+}
+
+// Resource acceptance decision. A decline (or replacement request) requires a
+// reason; blame is never assigned automatically.
+function tosrm_assign_accept($jobId, $decision, $reason = '', $actor = '') {
+    $decision = strtoupper(trim((string)$decision));
+    if (!array_key_exists($decision, TOSRM_ACCEPT_STATES)) return false;
+    if (in_array($decision, ['DECLINED','REPLACE'], true) && trim((string)$reason) === '') return false;
+    $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$jobId]); if (!$job) return false;
+    db()->prepare("UPDATE jobs SET accept_state=?, accept_reason=?, accept_by=?, accept_at=? WHERE id=?")
+        ->execute([$decision, (string)$reason, $actor !== '' ? $actor : tosrm_actor(), tosrm_now(), (int)$jobId]);
+    tosrm_assign_event($jobId, 'ACCEPT', ['reason'=>($decision . ($reason !== '' ? ' — ' . $reason : ''))]);
+    return true;
+}
+
+// Reassign to a new resource, KEEPING the original in history. Resets the
+// acceptance to PENDING for the new person.
+function tosrm_reassign($jobId, $newInspectorId, $reason = '', $approver = '') {
+    $newInspectorId = (int)$newInspectorId; if ($newInspectorId <= 0) return false;
+    $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$jobId]); if (!$job) return false;
+    $old = (int)($job['inspector_id'] ?? 0);
+    if ($old === $newInspectorId) return false;
+    db()->prepare("UPDATE jobs SET inspector_id=?, accept_state='PENDING', accept_reason='', accept_by='', accept_at='' WHERE id=?")
+        ->execute([$newInspectorId, (int)$jobId]);
+    tosrm_assign_event($jobId, 'REASSIGN', ['old_inspector_id'=>$old, 'new_inspector_id'=>$newInspectorId, 'reason'=>$reason, 'approver'=>$approver]);
+    return true;
+}
+
+// Move the scheduled date, keeping the original in history.
+function tosrm_reschedule($jobId, $newDate, $reason = '', $approver = '') {
+    $newDate = trim((string)$newDate); if ($newDate === '') return false;
+    $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$jobId]); if (!$job) return false;
+    $oldDate = (string)($job['scheduled_date'] ?? '');
+    if ($oldDate === $newDate) return false;
+    db()->prepare("UPDATE jobs SET scheduled_date=? WHERE id=?")->execute([$newDate, (int)$jobId]);
+    tosrm_assign_event($jobId, 'RESCHEDULE', ['old_date'=>$oldDate, 'new_date'=>$newDate, 'reason'=>$reason, 'approver'=>$approver]);
+    return true;
+}
+
+// Cancel the assignment — records a reason + history, and marks the job stage
+// CANCELLED (an existing JOB_STAGES value) unless it is already closed.
+function tosrm_assign_cancel($jobId, $reason = '') {
+    if (trim((string)$reason) === '') return false;
+    $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$jobId]); if (!$job) return false;
+    if (empty($job['closed_flag'])) db()->prepare("UPDATE jobs SET stage='CANCELLED' WHERE id=?")->execute([(int)$jobId]);
+    tosrm_assign_event($jobId, 'CANCEL', ['reason'=>$reason]);
+    return true;
+}
+
+// Record a no-show — party + reason, no automatic blame.
+function tosrm_assign_noshow($jobId, $party, $reason = '') {
+    $party = strtoupper(trim((string)$party));
+    if (!array_key_exists($party, TOSRM_NOSHOW_PARTIES)) return false;
+    $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$jobId]); if (!$job) return false;
+    tosrm_assign_event($jobId, 'NOSHOW', ['party'=>$party, 'reason'=>$reason]);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+//  Job assignment-lifecycle panel (rendered on the job detail page).
+// ---------------------------------------------------------------------------
+function tosrm_render_job_panel($job) {
+    if (!$job) return;
+    tosrm_migrate_b();
+    $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $jid = (int)($job['id'] ?? 0);
+    $canEdit = tosrm_can_edit();
+    $hold = tosrm_assign_state($job); $accept = tosrm_accept_state($job);
+    $hist = tosrm_assign_history($jid);
+    $csrf = function_exists('csrf_token') ? csrf_token() : '';
+    $insps = ops_all("SELECT id, name FROM inspectors WHERE COALESCE(status,'')<>'INACTIVE' ORDER BY name") ?: [];
+    $curInsp = (int)($job['inspector_id'] ?? 0);
+    $curDate = (string)($job['scheduled_date'] ?? '');
+    ob_start(); ?>
+    <div class="card tosrm-assign" style="margin-top:16px">
+      <h3 style="margin:0 0 10px">Operations — assignment lifecycle</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+        <?php if ($hold !== ''): ?><span class="badge">Hold: <strong><?=$esc(TOSRM_ASSIGN_STATES[$hold] ?? $hold)?></strong></span><?php endif; ?>
+        <?php if ($accept !== ''): ?><span class="badge">Acceptance: <strong><?=$esc(TOSRM_ACCEPT_STATES[$accept] ?? $accept)?></strong><?php if (trim((string)($job['accept_reason'] ?? '')) !== ''): ?> — <?=$esc($job['accept_reason'])?><?php endif; ?></span><?php endif; ?>
+      </div>
+      <?php if ($canEdit): ?>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <form method="post" action="/assign-hold">
+          <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
+          <label style="display:block;font-size:12px;color:#666">Hold state (pencil-in vs commit)</label>
+          <div style="display:flex;gap:6px"><select name="state"><?php foreach (TOSRM_ASSIGN_STATES as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$hold?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select><button class="btn" type="submit">Set</button></div>
+        </form>
+        <form method="post" action="/assign-accept">
+          <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
+          <label style="display:block;font-size:12px;color:#666">Record resource decision</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <select name="decision"><?php foreach (TOSRM_ACCEPT_STATES as $k=>$v): if ($k==='PENDING') continue; ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
+            <input type="text" name="reason" placeholder="Reason (required to decline)" style="flex:1;min-width:160px">
+            <button class="btn" type="submit">Save</button>
+          </div>
+        </form>
+        <form method="post" action="/assign-reassign">
+          <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
+          <label style="display:block;font-size:12px;color:#666">Reassign (original kept in history)</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <select name="inspector_id"><option value="">Choose resource…</option><?php foreach ($insps as $ip): ?><option value="<?=(int)$ip['id']?>" <?=(int)$ip['id']===$curInsp?'selected':''?>><?=$esc($ip['name'])?></option><?php endforeach; ?></select>
+            <input type="text" name="reason" placeholder="Reason" style="flex:1;min-width:120px">
+            <input type="text" name="approver" placeholder="Approved by" style="width:120px">
+            <button class="btn" type="submit">Reassign</button>
+          </div>
+        </form>
+        <form method="post" action="/assign-reschedule">
+          <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
+          <label style="display:block;font-size:12px;color:#666">Reschedule (original date kept)</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <input type="date" name="new_date" value="<?=$esc($curDate)?>">
+            <input type="text" name="reason" placeholder="Reason" style="flex:1;min-width:120px">
+            <input type="text" name="approver" placeholder="Approved by" style="width:120px">
+            <button class="btn" type="submit">Reschedule</button>
+          </div>
+        </form>
+        <form method="post" action="/assign-noshow">
+          <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
+          <label style="display:block;font-size:12px;color:#666">Record a no-show (no automatic blame)</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <select name="party"><?php foreach (TOSRM_NOSHOW_PARTIES as $k=>$v): ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
+            <input type="text" name="reason" placeholder="What happened" style="flex:1;min-width:140px">
+            <button class="btn" type="submit">Record</button>
+          </div>
+        </form>
+        <form method="post" action="/assign-cancel" onsubmit="return confirm('Cancel this assignment?');">
+          <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
+          <label style="display:block;font-size:12px;color:#666">Cancel assignment (reason kept)</label>
+          <div style="display:flex;gap:6px"><input type="text" name="reason" placeholder="Reason to cancel" style="flex:1" required><button class="btn btn-danger" type="submit">Cancel</button></div>
+        </form>
+      </div>
+      <?php endif; ?>
+      <?php if ($hist): $iname = []; foreach ($insps as $ip) $iname[(int)$ip['id']] = $ip['name']; ?>
+      <details style="margin-top:10px" open><summary class="muted">Assignment history (<?=count($hist)?>)</summary>
+        <table class="tbl" style="width:100%;margin-top:6px;font-size:12px">
+          <thead><tr><th>When</th><th>Event</th><th>Detail</th><th>By</th></tr></thead>
+          <tbody><?php foreach ($hist as $ev):
+            $detail = $esc($ev['reason']);
+            if ($ev['kind']==='REASSIGN') $detail = $esc(($iname[(int)$ev['old_inspector_id']] ?? '—') . ' → ' . ($iname[(int)$ev['new_inspector_id']] ?? '—')) . ($ev['reason']?' · '.$esc($ev['reason']):'');
+            if ($ev['kind']==='RESCHEDULE') $detail = $esc(($ev['old_date']?:'—') . ' → ' . ($ev['new_date']?:'—')) . ($ev['reason']?' · '.$esc($ev['reason']):'');
+            if ($ev['kind']==='NOSHOW') $detail = $esc((TOSRM_NOSHOW_PARTIES[$ev['party']] ?? $ev['party']) . ($ev['reason']?' · '.$ev['reason']:''));
+          ?>
+            <tr><td><?=$esc(substr((string)$ev['at'],0,16))?></td><td><strong><?=$esc(TOSRM_ASSIGN_KINDS[$ev['kind']] ?? $ev['kind'])?></strong></td><td><?=$detail?><?php if ($ev['approver']): ?> <span class="muted">(appr: <?=$esc($ev['approver'])?>)</span><?php endif; ?></td><td><?=$esc($ev['actor'])?></td></tr>
+          <?php endforeach; ?></tbody>
+        </table>
+      </details>
+      <?php endif; ?>
+    </div>
+    <?php
+    echo ob_get_clean();
+}
+
+// ---------------------------------------------------------------------------
+//  Handler — assignment-lifecycle actions on a job.
+// ---------------------------------------------------------------------------
+function ops_tosrm_job_action($route, $method) {
+    $jobId = (int)($_POST['job_id'] ?? $_GET['id'] ?? 0);
+    $job = $jobId ? ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]) : null;
+    if (!$job) { flash('Job not found.', 'error'); redirect('/jobs'); }
+    $back = '/job?id=' . $jobId . '#assign';
+    if ($method !== 'POST') redirect($back);
+    if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect($back); }
+    ops_require(tosrm_can_edit(), 'You do not have permission to change this assignment.');
+    tosrm_migrate_b();
+
+    switch ($route) {
+        case 'assign-hold':
+            if (tosrm_assign_hold($jobId, (string)($_POST['state'] ?? ''), (string)($_POST['reason'] ?? ''))) flash('Hold state updated.');
+            else flash('Pick a valid hold state.', 'error');
+            break;
+        case 'assign-accept':
+            if (tosrm_assign_accept($jobId, (string)($_POST['decision'] ?? ''), (string)($_POST['reason'] ?? '')))
+                flash('Resource decision recorded.');
+            else flash('A reason is required to decline or request replacement.', 'error');
+            break;
+        case 'assign-reassign':
+            if (tosrm_reassign($jobId, (int)($_POST['inspector_id'] ?? 0), (string)($_POST['reason'] ?? ''), (string)($_POST['approver'] ?? '')))
+                flash('Reassigned — the original is kept in the history.');
+            else flash('Choose a different resource to reassign to.', 'error');
+            break;
+        case 'assign-reschedule':
+            if (tosrm_reschedule($jobId, (string)($_POST['new_date'] ?? ''), (string)($_POST['reason'] ?? ''), (string)($_POST['approver'] ?? '')))
+                flash('Rescheduled — the original date is kept in the history.');
+            else flash('Pick a new date different from the current one.', 'error');
+            break;
+        case 'assign-cancel':
+            if (tosrm_assign_cancel($jobId, (string)($_POST['reason'] ?? ''))) flash('Assignment cancelled (reason recorded).');
+            else flash('A reason is required to cancel.', 'error');
+            break;
+        case 'assign-noshow':
+            if (tosrm_assign_noshow($jobId, (string)($_POST['party'] ?? ''), (string)($_POST['reason'] ?? ''))) flash('No-show recorded.');
+            else flash('Pick who did not show.', 'error');
             break;
     }
     redirect($back);
