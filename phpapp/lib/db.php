@@ -370,7 +370,8 @@ function run_schema($withSeeds = true) {
     if (function_exists('services_migrate')) services_migrate(); // Service Scope engine — service independence, activation & override (catalog + per-scope + optional dependencies)
     if (function_exists('pdso_migrate')) pdso_migrate();     // PDSO — project deputation & site operations (gap-filler on the existing deputation/job spine: lifecycle, mobilization, manpower, site registers, timesheet, client approval, deputation reports)
     if (function_exists('ncdca_migrate')) ncdca_migrate();   // NCDCA — universal issue engine (elevates NCR+CAPA: issue types, deviation/concession/waiver, dispute, due-date extension, issue reports)
-    if (function_exists('tosrm_migrate')) tosrm_migrate();   // TOSRM Phase 9 — service-request lifecycle over the calls spine (status, priority, criticality, source, validation+override, clarification thread)
+    if (function_exists('tosrm_migrate_d')) tosrm_migrate_d(); // TOSRM Phase 9 — service-request lifecycle + assignment lifecycle + readiness/confirmation/competence + SLA/TAT/delay/recurring/capacity (chains A→B→C→D)
+    elseif (function_exists('tosrm_migrate')) tosrm_migrate();
     if (function_exists('orgadmin_migrate')) orgadmin_migrate();   // office tree + heads
     if (function_exists('contracts_migrate')) contracts_migrate();  // contract validity gates
     if (function_exists('security_migrate')) security_migrate();    // password age, second factor
