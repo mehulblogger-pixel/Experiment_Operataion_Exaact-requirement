@@ -132,6 +132,10 @@
   <?php endif; ?>
 </div>
 
+<?php // Phase 8 (NCDCA): universal issue panel — classification, departures,
+      // disputes, extensions & possible repeats. Only for a deputation… issue.
+      if (!empty($issue)) require __DIR__ . '/_issue_panel.php'; ?>
+
 <div class="panel" style="margin-top:16px">
   <h3 style="margin-top:0">History</h3>
   <?php if (!$events): ?><p class="muted" style="margin:0">Nothing yet.</p><?php else: ?>

@@ -476,11 +476,24 @@ function ops_ncr($route, $method) {
     if ($route === 'ncr-item') {
         $n = ncr_row($_GET['id'] ?? 0);
         if (!$n) { http_response_code(404); view('notfound'); return true; }
+        // Phase-8 (NCDCA) issue panel — classification, departures, disputes,
+        // extensions & possible repeats. Only when the universal issue engine is
+        // present and the service is active.
+        $issueOn = function_exists('ncdca_enabled') && ncdca_enabled() && function_exists('ncdca_issue_panel');
         view('ops/ncr_detail', [
             'n' => $n, 'events' => ncr_events((int)$n['id']),
             'missing' => ncr_close_missing($n),
             'canEdit' => ncr_can_raise(), 'canClose' => ncr_can_close(),
             'capa' => (!empty($n['capa_id']) && function_exists('capa_row')) ? capa_row((int)$n['capa_id']) : null,
+            'issue'         => $issueOn ? ncdca_issue_panel((int)$n['id']) : null,
+            'issueTypes'    => $issueOn ? ncdca_issue_types() : [],
+            'issueClasses'  => $issueOn ? ncdca_classes() : [],
+            'issueResp'     => $issueOn ? ncdca_responsibilities() : [],
+            'issueVis'      => $issueOn ? ncdca_visibilities() : [],
+            'depKinds'      => defined('NCDCA_DEPARTURE_KINDS') ? NCDCA_DEPARTURE_KINDS : [],
+            'depStatuses'   => $issueOn ? ncdca_departure_statuses() : [],
+            'disputeStatus' => defined('NCDCA_DISPUTE_STATUS') ? NCDCA_DISPUTE_STATUS : [],
+            'issueCanEdit'  => $issueOn ? ncdca_can_edit() : false,
         ]);
         return true;
     }
