@@ -421,7 +421,72 @@ function seed_demo($force = false) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         $failed[] = demo_explain($e);
     }
+
+    // Phase 9 (TOSRM) demo — service-request lifecycle, assignment lifecycle,
+    // readiness, SLA targets, a delay, a recurring schedule and a comms entry.
+    // MYSQL-SAFE: every migration is run OUTSIDE the transaction below, so no DDL
+    // can land inside it (that was the cause of the earlier "no active
+    // transaction" error). The block is DML-only and the commit is guarded.
+    try {
+        if (function_exists('tosrm_migrate_d')) tosrm_migrate_d();   // no-op after boot; if it ever runs, its DDL is OUTSIDE the tx
+        if (function_exists('act_migrate'))      act_migrate();       // same — keep any activity-table DDL out of the tx
+        $pdo->beginTransaction();
+        $c += demo_seed_phase9($pdo, [
+            'cid' => $cid, 'vid' => $vid, 'callid' => $callid, 'jid' => $jid, 'oid' => $oid,
+            'now' => $now, 'today' => $today, 'd' => $d,
+        ]);
+        if ($pdo->inTransaction()) $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $failed[] = demo_explain($e);
+    }
     return ['counts' => $c, 'failed' => $failed];
+}
+
+// ---------------------------------------------------------------------------
+//  Phase 9 (TOSRM) demo — layered onto the EXISTING demo cast. DML only (the
+//  tables are migrated at boot / before the caller's transaction). Idempotent:
+//  a marker recurring row guards re-seeding; tagged 'DEMO' so removal is clean.
+// ---------------------------------------------------------------------------
+function demo_seed_phase9($pdo, $x) {
+    $n = [];
+    if (!function_exists('tosrm_sla_set')) return $n;               // Phase 9 not present
+    if (ops_one("SELECT id FROM recurring_services WHERE title=?", ['DEMO — Monthly vendor audit'])) return $n;  // already seeded
+    $first = fn($m) => (int)(is_array($m) && $m ? reset($m) : 0);
+    $d = $x['d']; $now = $x['now']; $today = $x['today'];
+    $clientId = $first($x['cid'] ?? []); $callId = $first($x['callid'] ?? []); $jobId = $first($x['jid'] ?? []);
+
+    // 1) Default SLA target set (tagged DEMO so removal finds them).
+    foreach (['RESPONSE'=>3, 'SCHEDULING'=>5, 'EXECUTION'=>7, 'REPORT'=>3, 'CLOSURE'=>20] as $st=>$days) {
+        tosrm_sla_set(0, $st, $days, 'DEMO'); $n['sla'] = ($n['sla'] ?? 0) + 1;
+    }
+    // 2) A recurring schedule (the marker row). Not generated here — the cron does that.
+    if (tosrm_recurring_create(['client_id'=>$clientId, 'title'=>'DEMO — Monthly vendor audit', 'frequency'=>'MONTHLY',
+        'start_date'=>$today, 'template'=>['inspection_type'=>'VENDOR_AUDIT', 'deliverables'=>'VAR', 'sbu'=>'IND']])) $n['recurring'] = 1;
+
+    // 3) Lifecycle on an existing demo call: status, priority/criticality/source, a clarification.
+    if ($callId) {
+        tosrm_set_status($callId, 'UNDER_REVIEW', 'DEMO — triage');
+        $pdo->prepare("UPDATE calls SET priority='HIGH', criticality='SCHEDULE', source='EMAIL' WHERE id=?")->execute([$callId]);
+        tosrm_clar_create($callId, ['subject'=>'DEMO — confirm PWHT is in scope', 'detail'=>'Awaiting client reply', 'raised_to'=>'CLIENT']);
+        if (function_exists('act_log')) act_log('CALL', $callId, 'EMAIL', 'DEMO — client sent revised PO', ['body'=>'PO rev 2 attached']);
+        $n['call'] = 1;
+    }
+    // 4) Assignment lifecycle + readiness + a delay on an existing demo job.
+    if ($jobId) {
+        tosrm_assign_hold($jobId, 'CONFIRMED', 'DEMO');
+        tosrm_assign_accept($jobId, 'ACCEPTED');
+        $seeded = tosrm_readiness_seed($jobId);
+        if ($seeded) {
+            $items = tosrm_readiness_list($jobId);
+            if (isset($items[0])) tosrm_readiness_set((int)$items[0]['id'], 'READY');
+            if (isset($items[2])) tosrm_readiness_set((int)$items[2]['id'], 'BLOCKED', 'DEMO — material not at works');
+        }
+        tosrm_confirm_set($jobId, 'CLIENT', true, 'DEMO — confirmed by email');
+        tosrm_delay_add($jobId, ['reason'=>'CLIENT', 'responsibility'=>'CLIENT', 'impact'=>'DEMO — client shifted the date']);
+        $n['job'] = 1;
+    }
+    return $n;
 }
 
 // ---------------------------------------------------------------------------
@@ -551,6 +616,17 @@ function seed_demo_remove() {
         $try("DELETE FROM dep_timesheet WHERE job_id IN (SELECT id FROM jobs WHERE job_code='JOB-DEP-DEMO')");
         $try("DELETE FROM dep_att_approval WHERE job_id IN (SELECT id FROM jobs WHERE job_code='JOB-DEP-DEMO')");
         $try("DELETE FROM dep_manpower WHERE project='Dahej Petrochemical Complex'");
+        // Phase 9 (TOSRM) child rows — cleared while their demo call/job still
+        // exists, so nothing is orphaned when the job/call is deleted below.
+        $try("DELETE FROM call_status_events WHERE call_id IN (SELECT id FROM calls WHERE created_by='demo')");
+        $try("DELETE FROM call_clarifications WHERE call_id IN (SELECT id FROM calls WHERE created_by='demo')");
+        $try("DELETE FROM job_readiness WHERE job_id IN (SELECT id FROM jobs WHERE created_by='demo')");
+        $try("DELETE FROM job_delays WHERE job_id IN (SELECT id FROM jobs WHERE created_by='demo') OR call_id IN (SELECT id FROM calls WHERE created_by='demo')");
+        $try("DELETE FROM assignment_events WHERE job_id IN (SELECT id FROM jobs WHERE created_by='demo')");
+        $try("DELETE FROM activities WHERE entity_kind='CALL' AND subject LIKE 'DEMO —%'");
+        // Standalone Phase 9 demo markers.
+        $try("DELETE FROM recurring_services WHERE title LIKE 'DEMO —%'");
+        $try("DELETE FROM sla_targets WHERE note='DEMO'");
         // Transactional records carry created_by='demo'
         $del("DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE created_by='demo')");
         $del("DELETE FROM vouchers WHERE created_by='demo'");

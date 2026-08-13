@@ -239,6 +239,7 @@ ok($tat['stages']['executed_to_report'] === 2, 'executed → report = 2 days');
 ok($tat['stages']['received_to_closure'] === 14, 'received → closure = 14 days (whole chain)');
 
 head('21. SLA targets (default + per-client override) and evaluation');
+db()->exec("DELETE FROM sla_targets");   // deterministic — ignore any demo-seeded targets
 tosrm_sla_set(0, 'RESPONSE', 3); tosrm_sla_set(0, 'SCHEDULING', 5); tosrm_sla_set(0, 'REPORT', 1);
 $tg = tosrm_sla_targets(0);
 ok($tg['SCHEDULING'] === 5, 'a default SLA target is stored and read');
