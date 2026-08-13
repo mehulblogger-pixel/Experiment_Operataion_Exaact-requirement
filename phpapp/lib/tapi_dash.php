@@ -201,6 +201,33 @@ function ops_tapi($route, $method) {
         return true;
     }
 
+    if ($route === 'analytics-scorecard') {
+        $cards = tapi_scorecards();
+        $sid = (int)($_GET['id'] ?? ($cards ? $cards[0]['id'] : 0));
+        $eval = $sid ? tapi_scorecard_eval($sid, tapi_ctx_from_filters($filters)) : ['rows'=>[], 'total'=>null, 'excluded'=>0];
+        view('ops/tapi_scorecard', ['cards' => $cards, 'sid' => $sid, 'eval' => $eval, 'filters' => $filters]);
+        return true;
+    }
+
+    if ($route === 'analytics-alerts') {
+        if ($method === 'POST') {
+            if (($_POST['act'] ?? '') === 'save') {
+                tapi_alert_save([
+                    'id' => (int)($_POST['id'] ?? 0), 'name' => trim((string)($_POST['name'] ?? '')),
+                    'kpi_key' => (string)($_POST['kpi_key'] ?? ''), 'op' => (string)($_POST['op'] ?? 'LT'),
+                    'threshold' => $_POST['threshold'] ?? '', 'severity' => (string)($_POST['severity'] ?? 'WARN'),
+                    'recipients' => (string)($_POST['recipients'] ?? ''), 'scope_office' => (int)($_POST['scope_office'] ?? 0),
+                    'enabled' => !empty($_POST['enabled']),
+                ]);
+                flash('Alert saved.');
+            }
+            redirect('/analytics-alerts');
+        }
+        view('ops/tapi_alerts', ['alerts' => tapi_alerts(), 'firing' => tapi_alerts_eval(tapi_ctx_from_filters($filters)),
+            'kpis' => tapi_kpi_defs(false), 'ops' => TAPI_ALERT_OPS, 'sev' => TAPI_SEVERITY]);
+        return true;
+    }
+
     if ($route === 'analytics-quality') {
         if ($method === 'POST' && function_exists('integrity_run')) { integrity_run(); flash('Data-quality checks re-run.'); redirect('/analytics-quality'); }
         view('ops/tapi_quality', tapi_data_quality());

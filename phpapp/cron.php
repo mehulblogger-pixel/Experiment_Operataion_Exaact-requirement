@@ -160,6 +160,12 @@ if (function_exists('idems_vendor_run_reminders')) {
     $vr = idems_vendor_run_reminders();
     echo "Vendor approvals expired: {$vr['expired']}; re-assessment reminders sent: {$vr['reminded']}\n";
 }
+// TAPI threshold alerts — fire any KPI alert whose rule is currently breached
+// (once per rule per day).
+if (function_exists('tapi_alerts_run')) {
+    $ta = tapi_alerts_run();
+    echo "Analytics alerts sent: $ta\n";
+}
 
 // Passports, visas, medicals and gate passes running out. Looked at 45 days
 // ahead rather than 30, because a visa takes weeks to renew and a document that
