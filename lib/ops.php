@@ -2094,6 +2094,8 @@ function ops_module_gate($route) {
         'dep-status'=>'jobs','dep-check-seed'=>'jobs','dep-check-set'=>'jobs','dep-site-log'=>'jobs',
         'dep-site-log-close'=>'jobs','dep-timesheet'=>'jobs','dep-approval'=>'jobs','dep-approval-status'=>'jobs',
         'dep-manpower-add'=>'jobs','dep-manpower-update'=>'jobs','dep-manpower-del'=>'jobs',
+        'issues'=>'ncr','departures'=>'ncr','issue-classify'=>'ncr','departure-new'=>'ncr','departure-status'=>'ncr',
+        'dispute-new'=>'ncr','dispute-decide'=>'ncr','issue-extend'=>'ncr','extension-approve'=>'ncr',
         'preflight'=>'settings',
         'trace-thread'=>'settings','trace-thread-remove'=>'settings',
         'trace-audit'=>'settings','trace-audit-remove'=>'settings',
@@ -2519,6 +2521,8 @@ function ops_dispatch($route, $method) {
             return ops_pdso_action($route, $method);
         case in_array($route, ['dep-manpower-add','dep-manpower-update','dep-manpower-del'], true):
             return ops_pdso_manpower($route, $method);
+        case in_array($route, ['issues','departures','issue-classify','departure-new','departure-status','dispute-new','dispute-decide','issue-extend','extension-approve'], true):
+            return ops_ncdca($route, $method);
         // Merged screens — one heading, one tab per module underneath.
         case $route === 'approval-rules':
             return ops_approval_rules($method);

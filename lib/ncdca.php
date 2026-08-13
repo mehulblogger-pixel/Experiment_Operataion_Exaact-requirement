@@ -474,3 +474,131 @@ function ncdca_qa_checks($doc, $fields = null, $data = null) {
 // ---------------------------------------------------------------------------
 function ncdca_issue_class_label($k) { $m = ncdca_classes(); return $m[$k] ?? ($k ?: '—'); }
 function ncdca_issue_type_label($k)  { $m = ncdca_issue_types(); return $m[$k] ?? ($k ?: 'NCR'); }
+
+// Dashboard aggregates — reuse the existing office-scoped ncr_count so nobody
+// sees a count outside their scope. Departures are read from the gap table.
+function ncdca_issue_stats() {
+    $dep = fn($sql, $a = []) => (int)(ops_val($sql, $a) ?: 0);
+    return [
+        'total'       => function_exists('ncr_count') ? ncr_count('all') : 0,
+        'open'        => function_exists('ncr_count') ? ncr_count('open') : 0,
+        'overdue'     => function_exists('ncr_count') ? ncr_count('overdue') : 0,
+        'major'       => function_exists('ncr_count') ? ncr_count('major') : 0,
+        'ncr'         => function_exists('ncr_count') ? ncr_count('all', "n.issue_type='NCR'") : 0,
+        'observation' => function_exists('ncr_count') ? ncr_count('all', "n.issue_type='OBSERVATION'") : 0,
+        'deviation'   => $dep("SELECT COUNT(*) FROM issue_departures WHERE kind='DEVIATION' AND status NOT IN ('CLOSED','REJECTED','EXPIRED')"),
+        'concession'  => $dep("SELECT COUNT(*) FROM issue_departures WHERE kind='CONCESSION' AND status NOT IN ('CLOSED','REJECTED','EXPIRED')"),
+        'waiver'      => $dep("SELECT COUNT(*) FROM issue_departures WHERE kind='WAIVER' AND status NOT IN ('CLOSED','REJECTED','EXPIRED')"),
+        'dep_pending' => $dep("SELECT COUNT(*) FROM issue_departures WHERE status IN ('SUBMITTED','TECH_REVIEW','CLIENT_REVIEW')"),
+    ];
+}
+// The unified issue register (all types) — reuses ncr_all (scope + joins).
+function ncdca_issues($type = '', $status = 'all', $q = '') {
+    if (!function_exists('ncr_all')) return [];
+    $where = ''; $args = [];
+    if ($type !== '') { $where = 'n.issue_type=?'; $args[] = $type; }
+    return ncr_all($status ?: 'all', $where, $args, $q) ?: [];
+}
+// Type breakdown for the dashboard (scoped).
+function ncdca_type_breakdown() {
+    $out = [];
+    foreach (ncdca_issue_types() as $code => $label) {
+        $c = function_exists('ncr_count') ? ncr_count('all', "n.issue_type=?", [$code]) : 0;
+        if ($c > 0) $out[$code] = ['label' => $label, 'count' => $c];
+    }
+    return $out;
+}
+// Everything the per-issue (NCR detail) Phase-8 panel needs.
+function ncdca_issue_panel($ncrId) {
+    $ncrId = (int)$ncrId;
+    $ncr = function_exists('ncr_row') ? ncr_row($ncrId) : null;
+    return [
+        'departures' => ncdca_departures(null, ['ncr_id' => $ncrId]),
+        'disputes'   => ncdca_disputes($ncrId),
+        'extensions' => ncdca_extensions('NCR', $ncrId),
+        'repeats'    => $ncr ? ncdca_possible_repeats($ncr) : [],
+    ];
+}
+function ncdca_can_view() { return function_exists('ncr_can_view') ? ncr_can_view() : (function_exists('is_master') && is_master()); }
+function ncdca_can_edit() { return function_exists('ncr_can_raise') ? ncr_can_raise() : (function_exists('is_master') && is_master()); }
+
+// ---------------------------------------------------------------------------
+//  Handlers — the Issue dashboard/register, the departures register, and every
+//  Phase-8 write action. CSRF + permission gated; additive; redirect + flash.
+// ---------------------------------------------------------------------------
+function ops_ncdca($route, $method) {
+    ops_require(ncdca_enabled(), 'The Nonconformity & CAPA service is not active for this installation.');
+    ncdca_migrate();
+
+    // --- Read screens ---
+    if ($route === 'issues') {
+        ops_require(ncdca_can_view(), 'You do not have access to the issue register.');
+        $type = (string)($_GET['type'] ?? ''); $status = (string)($_GET['status'] ?? 'open'); $q = (string)($_GET['q'] ?? '');
+        view('ops/issues', [
+            'stats' => ncdca_issue_stats(), 'rows' => ncdca_issues($type, $status, $q),
+            'breakdown' => ncdca_type_breakdown(), 'types' => ncdca_issue_types(),
+            'type' => $type, 'status' => $status, 'q' => $q, 'canEdit' => ncdca_can_edit(),
+        ]);
+        return true;
+    }
+    if ($route === 'departures') {
+        ops_require(ncdca_can_view(), 'You do not have access to the deviation / concession register.');
+        $kind = strtoupper((string)($_GET['kind'] ?? ''));
+        $clients = [];
+        if (function_exists('clients_list')) foreach (clients_list() as $c)
+            $clients[] = ['id'=>(int)$c['id'], 'name'=>($c['display_name'] ?? '') !== '' ? $c['display_name'] : ($c['legal_name'] ?? '')];
+        view('ops/departures', [
+            'kind' => isset(NCDCA_DEPARTURE_KINDS[$kind]) ? $kind : '',
+            'rows' => ncdca_departures(isset(NCDCA_DEPARTURE_KINDS[$kind]) ? $kind : null),
+            'kinds' => NCDCA_DEPARTURE_KINDS, 'statuses' => ncdca_departure_statuses(),
+            'clients' => $clients, 'canEdit' => ncdca_can_edit(),
+        ]);
+        return true;
+    }
+
+    // --- Write actions ---
+    if ($method !== 'POST') redirect('/issues');
+    if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect('/issues'); }
+    ops_require(ncdca_can_edit(), 'You do not have permission for that.');
+    $ncrId = (int)($_POST['ncr_id'] ?? 0);
+    $backNcr = $ncrId ? '/ncr-item?id=' . $ncrId . '#issue' : '/issues';
+
+    switch ($route) {
+        case 'issue-classify':
+            ncdca_classify($ncrId, $_POST);
+            flash('Issue classification updated.');
+            redirect($backNcr);
+        case 'departure-new':
+            $kind = strtoupper((string)($_POST['kind'] ?? 'DEVIATION'));
+            if (trim((string)($_POST['title'] ?? '')) === '') { flash('Give the ' . strtolower($kind) . ' a title.', 'error'); redirect($ncrId ? $backNcr : '/departures'); }
+            $id = ncdca_departure_create($kind, $_POST);
+            flash(ucfirst(strtolower($kind)) . ' ' . (ncdca_departure($id)['ref'] ?? '') . ' created.');
+            redirect($ncrId ? $backNcr : '/departures?kind=' . $kind);
+        case 'departure-status':
+            ncdca_departure_set_status((int)($_POST['id'] ?? 0), (string)($_POST['status'] ?? ''),
+                (string)($_POST['approver'] ?? ''), isset($_POST['client_approval']) ? 1 : null);
+            flash('Departure updated.');
+            redirect((string)($_POST['back'] ?? '/departures'));
+        case 'dispute-new':
+            ncdca_dispute_create($ncrId, $_POST);
+            flash('Dispute recorded. The original finding is unchanged.');
+            redirect($backNcr);
+        case 'dispute-decide':
+            ncdca_dispute_decide((int)($_POST['id'] ?? 0), (string)($_POST['decision'] ?? ''), (string)($_POST['note'] ?? ''));
+            flash('Dispute resolved.');
+            redirect($backNcr);
+        case 'issue-extend':
+            $orig = (string)($_POST['original_due'] ?? '');
+            $extId = ncdca_extension_request((string)($_POST['entity'] ?? 'NCR'), (int)($_POST['entity_id'] ?? $ncrId), $orig, (string)($_POST['requested_due'] ?? ''), (string)($_POST['reason'] ?? ''));
+            // A user who can close may approve their own request in one step where
+            // policy allows; otherwise it waits as REQUESTED.
+            if (!empty($_POST['approve']) && (function_exists('ncr_can_close') ? ncr_can_close() : true)) ncdca_extension_approve($extId);
+            flash('Extension recorded — the original due date is preserved.');
+            redirect($backNcr);
+        case 'extension-approve':
+            ncdca_extension_approve((int)($_POST['id'] ?? 0));
+            flash('Extension approved.');
+            redirect($backNcr);
+    }
+    redirect('/issues');
+}

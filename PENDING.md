@@ -42,11 +42,23 @@ Service-Scope service (standalone-capable, §2/§48).
   Verified: tests/test_ncdca.php 34 assertions incl. independence (standalone
   issue + concession with every other service off). Full suite 623 passed / 0 failed.
 
-**Deferred to next slice (surfaces, reuse-heavy — not new engines): a unified
-Issue register/dashboard spanning types (the existing /ncr + /capa registers are
-live; this adds the type filter + deviation/concession/waiver registers + an issue
-dashboard), and the per-issue departure/dispute/extension panels. The engine,
-masters, report types and AI QA are live now.**
+- **Slice 2 — DONE (surfaces).** `/issues` — a unified Issue dashboard + register
+  spanning ALL types (NCR is one), reusing the home dashboard's kpi-row/kpi and the
+  existing office-scoped ncr_all; type-breakdown chips; each row links to the
+  existing /ncr-item detail. `/departures` — the Deviation / Concession / Waiver
+  register with a kind filter, a raise form (Draft) and inline approval workflow.
+  Per-issue PANEL on the NCR detail (#issue): issue-type classification, departures
+  raised from the issue, dispute/response, due-date extensions and possible-repeat
+  warnings. ops_ncdca() handler (CSRF + ncr permission gated); 9 routes mapped +
+  dispatched; nav link "Issues & departures" under Operations (svc-gated). Verified:
+  tests/test_ncdca.php now 42 assertions incl. all three surfaces render + read-only
+  gating. Full suite 631 passed / 0 failed.
+
+**PHASE 8 (NCDCA) COMPLETE — engine (issue types, deviation/concession/waiver,
+dispute, due-date extension, recurrence, issue reports, AI QA) + surfaces (unified
+issue dashboard/register, departures register, per-issue panel), an elevation of
+the locked NCR+CAPA spine, service-independent under NCR_CAPA. Deferred (reuse-only):
+a portal issue view for vendor/client (reuses the existing portal) — optional.**
 
 ## 👷 PDSO — Project Deputation & Site Operations (Phase 7, Aug 2026) — GAP-FILLER
 

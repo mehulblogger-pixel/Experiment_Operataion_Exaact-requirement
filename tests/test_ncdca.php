@@ -139,6 +139,30 @@ if (function_exists('svc_set_global')) {
 } else { ok(true, 'service scope engine not present — independence trivially holds'); }
 
 // ---------------------------------------------------------------------------
+head('10. Surfaces — issue dashboard/register, departures register, issue panel');
+$stats = ncdca_issue_stats();
+ok($stats['total'] >= 3 && $stats['deviation'] >= 0, 'issue stats aggregate over the existing NCR register + departures');
+ok(count(ncdca_issues('NCR','all','')) >= 1, 'the unified register filters by issue type (NCR)');
+ok(count(ncdca_issues('OBSERVATION','all','')) >= 1, 'the unified register shows observations as a distinct type');
+$bd = ncdca_type_breakdown();
+ok(isset($bd['NCR']) && isset($bd['OBSERVATION']), 'the type breakdown counts each type separately');
+// Render the three surfaces.
+$rows = ncdca_issues('','all',''); $breakdown = $bd; $types = ncdca_issue_types(); $type=''; $status='all'; $q=''; $canEdit=true;
+ob_start(); require __DIR__ . '/../views/ops/issues.php'; $hv = ob_get_clean();
+ok(strpos($hv,'kpi-row')!==false && strpos($hv,'/ncr-item?id=')!==false, 'issue dashboard/register renders and links to the existing NCR detail');
+$kind=''; $rows=ncdca_departures(null); $kinds=NCDCA_DEPARTURE_KINDS; $statuses=ncdca_departure_statuses(); $clients=[]; $canEdit=true;
+ob_start(); require __DIR__ . '/../views/ops/departures.php'; $hd = ob_get_clean();
+ok(strpos($hd,'/departure-new')!==false, 'departures register renders with the raise form');
+$n = ncr_row($ncrId); $closed=false; $issue=ncdca_issue_panel($ncrId);
+$issueTypes=ncdca_issue_types(); $issueClasses=ncdca_classes(); $issueResp=ncdca_responsibilities(); $issueVis=ncdca_visibilities();
+$depKinds=NCDCA_DEPARTURE_KINDS; $depStatuses=ncdca_departure_statuses(); $disputeStatus=NCDCA_DISPUTE_STATUS; $issueCanEdit=true;
+ob_start(); require __DIR__ . '/../views/ops/_issue_panel.php'; $hp = ob_get_clean();
+ok(strpos($hp,'/issue-classify')!==false && strpos($hp,'/dispute-new')!==false && strpos($hp,'id="issue"')!==false, 'per-issue panel renders classification / departure / dispute / extension actions');
+// Read-only view hides the write forms.
+$issueCanEdit=false; ob_start(); require __DIR__ . '/../views/ops/_issue_panel.php'; $hp2 = ob_get_clean();
+ok(strpos($hp2,'/issue-classify')===false, 'read-only issue panel hides the write forms (permission-gated)');
+
+// ---------------------------------------------------------------------------
 if ($__standalone) {
     $g = $GLOBALS['__t'];
     echo "\n==================== NCDCA: {$g['pass']} passed, {$g['fail']} failed ====================\n";
