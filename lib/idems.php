@@ -1113,9 +1113,17 @@ function idems_raise_ncrs_from_audit($doc) {
     try { if ((int)ops_val("SELECT COUNT(*) FROM nonconformities WHERE report_doc_id=?", [$docId]) > 0) return 0; } catch (Throwable $e) { return 0; }
     $fields = idems_fields((int)($doc['report_type_id'] ?? 0));
     $data = json_decode($doc['data'] ?? '[]', true); if (!is_array($data)) $data = [];
-    // Find the findings table (a table field with a "category"/"finding" column).
+    // Find the findings table. Prefer the explicit findings table (fkey/label says
+    // "finding") — a checklist may also carry a "Category" column, and only the
+    // findings table's Major/Minor rows are the ones that become NCRs. Fall back to
+    // the first table with a grade/category/severity column (legacy behaviour).
     $tbl = null;
     foreach ($fields as $f) {
+        if (($f['ftype'] ?? '') !== 'table') continue;
+        $fk = strtolower((string)($f['fkey'] ?? '')); $lbl = strtolower((string)($f['label'] ?? ''));
+        if (strpos($fk,'finding')!==false || strpos($lbl,'finding')!==false || strpos($lbl,'nonconform')!==false) { $tbl = $f; break; }
+    }
+    if (!$tbl) foreach ($fields as $f) {
         if (($f['ftype'] ?? '') !== 'table') continue;
         $defs = idems_table_col_defs($f);
         $hasCat = false; foreach ($defs as $d) { $l = strtolower((string)$d['label']); if (strpos($l,'category')!==false || strpos($l,'severity')!==false || strpos($l,'grade')!==false) { $hasCat = true; break; } }
@@ -2675,6 +2683,16 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
         catch (Throwable $e) {}
     }
 
+    // 16) Vendor-audit data-integrity (UVAAE) — conclusion-vs-findings, evidence
+    // contradictions and findings-vs-checklist reconciliation. ADVISORY: it flags,
+    // it NEVER changes a finding, grade or conclusion (§120). Self-gates on the
+    // audit library fields, so it is inert on non-audit reports.
+    if (function_exists('uvaae_qa_checks')) {
+        try { foreach (uvaae_qa_checks($doc, $fields, $data) as $qi)
+            $add($qi['sev'], $qi['cat'], $qi['title'], $qi['loc'], $qi['why'], $qi['loc'], $qi['fix'] ?? ''); }
+        catch (Throwable $e) {}
+    }
+
     $counts = ['critical'=>0,'high'=>0,'medium'=>0,'low'=>0,'info'=>0];
     foreach ($issues as $it) { $s = $it['severity']; if (isset($counts[$s])) $counts[$s]++; }
     $score = 100 - ($counts['critical']*40 + $counts['high']*12 + $counts['medium']*5 + $counts['low']*1 + $counts['info']*0);
@@ -3699,7 +3717,11 @@ function ops_idems_documents($route, $method) {
         // Vendor Audit — raise nonconformities from the audit findings so each
         // Major / Minor finding lands in the NCR/CAPA register against the vendor.
         // Fail-open; never blocks issue.
-        if (function_exists('idems_raise_ncrs_from_audit') && ($doc['type_code'] ?? '') === 'VAR') {
+        // Legacy VAR and every UVAAE audit type (UAUD_*) share the findings→NCR
+        // engine: a Major / Minor audit finding IS a nonconformity (§42/§49) — the
+        // key distinction from a Phase-4 assessment finding, which is not.
+        $tc = strtoupper((string)($doc['type_code'] ?? ''));
+        if (function_exists('idems_raise_ncrs_from_audit') && ($tc === 'VAR' || strpos($tc, 'UAUD_') === 0)) {
             try {
                 $freshA = ops_one("SELECT * FROM report_docs WHERE id=?", [$doc['id']]);
                 $raised = idems_raise_ncrs_from_audit($freshA);

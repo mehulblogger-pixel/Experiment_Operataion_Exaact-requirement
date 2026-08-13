@@ -2,6 +2,61 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🔍 UVAAE — Universal Vendor Audit, Compliance & Management-System Audit Engine (Phase 5, Aug 2026)
+
+Built on locked Phase 1-4 and the app's EXISTING audit infrastructure — reused,
+not rebuilt: the VAR audit report + its findings→NCR engine
+(idems_raise_ncrs_from_audit), the NCR/CAPA registers, risk/actions/evidence/
+workflow/approval/PDF/numbering/QA (Phase 1), the report field/section LIBRARY
+(URFE), the CRITERIA-LIBRARY architecture (Phase 2/4 pattern, EXTENDED not
+duplicated), vendor master/status/360, and lib/audits.php (§8.8 the body's OWN
+audits — UVAAE is the vendor-facing complement). `lib/uvaae.php`, wired into
+run_schema after uvae, required in index.php after uvae.
+
+The key architectural distinction from Phase 4 (honoured): a UVAAE audit judges
+"does what the vendor DOES conform to the agreed criteria?" — its Major/Minor
+findings ARE nonconformities and DO flow into the NCR/CAPA register (§42/§49),
+the opposite of a Phase-4 assessment finding, which is not an NCR (§59/§151).
+
+- **Slice 1 — DONE.** Audit Type master (30) + finding-grade / conformance /
+  conclusion / method masters. Audit CRITERIA LIBRARY (audit_criteria + packs) —
+  dynamically assembled by applicability (audit type + explicit extra packs),
+  EXTENDING the Phase 2/4 criteria architecture (not a new one). Universal core
+  (10 management-system fundamentals, every audit) + configurable QMS / ISO17020 /
+  Process / Special-Process / HSE / Supplier-Quality packs. NO hard-coded standard
+  text in logic — every criterion row is editable seed data. Verified §169
+  architectural test: an ISO 9001 audit pulls QMS; an ISO 17020 audit pulls the
+  inspection-body pack (and not QMS); process/HSE/special-process each pull theirs;
+  universal core is present in every audit; an extra pack can be layered.
+- **Slice 2 — DONE.** Audit sections into the URFE Library (AUD_DETAILS/TEAM/PLAN/
+  CHECKLIST/TRAIL/FINDINGS/CONFORM/CONCLUSION) + 11 sample audit configs from ONE
+  engine (§147/§169: Vendor, ISO9001 MS, ISO17020, Supplier-Quality, Process,
+  Technical, HSE, Special-Process, Remote, Follow-up, Surveillance).
+  uvaae_checklist_prefill_rows fills the checklist from the applicable criteria at
+  fill time. Every sample builds and its PDF renders.
+- **Slice 3 — DONE.** Audit CONCLUSION engine (uvaae_conclusion_decision): a
+  conclusion is a CONTROLLED consequence of the findings (§45/§120) — a Major NC
+  cannot end in "Conforms"; configurable rules, worst-effect wins (NOT_CONFORMS >
+  MAJOR_ACTIONS > CONDITIONAL > MINOR_ACTIONS > SURVEILLANCE > CONFORMS); critical
+  criterion failure → NOT_CONFORMS. uvaae_findings_rollup + uvaae_context_from_audit
+  feed it from the checklist + findings tables.
+- **Slice 4 — DONE.** Findings→NCR wired: legacy VAR and every UAUD_* type share
+  idems_raise_ncrs_from_audit; selection now prefers the findings table (a
+  checklist may also carry a "Category" column). Verified Major+Minor raise NCRs,
+  Observation does not, idempotent (no double-raise). Audit data-integrity QA
+  (idems_qa_run item 16 → uvaae_qa_checks): conclusion-vs-findings contradiction,
+  evidence contradiction (conforms with missing/rejected evidence), findings-vs-
+  checklist reconciliation (a checklist NC not raised as a finding won't become an
+  NCR) — ADVISORY, never changes a finding/grade/conclusion (§120). uvaae_audit_
+  history for trend/follow-up. Regression LOCK: full suite 491 passed / 0 failed
+  (19 engines Phase 1-5 build & render); combined library 51 sections.
+
+**UVAAE Phase 5 acceptance (§168/§169/§170) demonstrated; Phase 1-4 regression
+clean. Audit findings ARE NCRs (§42/§49) — the deliberate inverse of Phase 4.
+Deferred (reuse, not new): a dedicated audit-programme scheduler UX (reuses
+lib/audits.php coverage/cycle + the documents register) and an auditor-facing
+mobile checklist UX (reuses the offline-first field UX).**
+
 ## 🏢 UVAE — Universal Vendor Assessment, Qualification & Supplier Evaluation Engine (Phase 4, Aug 2026)
 
 Built on locked Phase 1-3 and the app's EXISTING vendor platform (VASR report +
