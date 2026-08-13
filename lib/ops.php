@@ -2088,6 +2088,7 @@ function ops_module_gate($route) {
         'reports'=>'reports',
         'analytics'=>'reports','analytics-kpis'=>'reports','analytics-kpi-edit'=>'reports','analytics-quality'=>'reports','analytics-drill'=>'reports',
         'analytics-scorecard'=>'reports','analytics-alerts'=>'reports',
+        'analytics-export'=>'reports','analytics-review'=>'reports','analytics-snapshot'=>'reports',
         'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users','org-template'=>'users',
         'user-unlock'=>'users','user-2fa-reset'=>'users','user-retire'=>'users',
         'contract-overrides'=>'calls','contract-override'=>'calls','contract-open'=>'quotes',

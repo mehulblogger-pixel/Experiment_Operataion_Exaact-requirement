@@ -10,7 +10,9 @@
   <?php endforeach; ?>
   <span style="flex:1"></span>
   <a class="btn btn-sm secondary" href="/analytics-scorecard">Scorecard</a>
+  <a class="btn btn-sm secondary" href="/analytics-review">Review</a>
   <a class="btn btn-sm secondary" href="/analytics-alerts">Alerts</a>
+  <a class="btn btn-sm secondary" href="/analytics-snapshot">Periods</a>
   <a class="btn btn-sm secondary" href="/analytics-kpis">KPI library</a>
   <a class="btn btn-sm secondary" href="/analytics-quality">Data quality</a>
 </div>

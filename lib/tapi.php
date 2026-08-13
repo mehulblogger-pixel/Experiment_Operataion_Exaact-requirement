@@ -417,6 +417,10 @@ function tapi_kpi_save($d) {
     $now = date('c');
     $exists = tapi_kpi_get($d['kpi_key']);
     if ($exists) {
+        // KPI versioning — if the meaning of the KPI changes (formula / target /
+        // threshold / direction), snapshot the OLD definition first so historical
+        // interpretation is never silently overwritten (§80).
+        if (function_exists('tapi_kpi_version_snapshot')) { try { tapi_kpi_version_snapshot($exists, $d); } catch (Throwable $e) {} }
         db()->prepare("UPDATE kpi_defs SET name=?, description=?, category=?, formula=?, unit=?, period=?,
             target=?, threshold=?, direction=?, data_source=?, scope_json=?, active_from=?, active_until=?,
             status=?, sort_order=?, updated_at=? WHERE kpi_key=?")
