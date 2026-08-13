@@ -463,3 +463,352 @@ function tapi_seed_defaults() {
     ];
     foreach ($starter as $d) { if (!tapi_kpi_get($d['kpi_key'])) { try { tapi_kpi_save($d); } catch (Throwable $e) {} } }
 }
+
+// ============================================================================
+//  SLICE 2 — the presentation kit.
+//
+//  Everything a dashboard is assembled from, made declarative and shared so no
+//  screen hand-writes a tile or re-implements a filter bar again:
+//    · kpi_card()          — render a KPI-eval payload as a card (status colour,
+//                            no-data handling, delta, lineage).
+//    · period ranges + comparison — current vs previous / target / YoY / MoM /
+//                            QoQ / rolling, with variance, achievement % and a
+//                            trend arrow.
+//    · a shared filter engine — one parser + one sticky bar, scope-aware.
+//    · chart types beyond bar/donut/gauge — line, sparkline, pareto, heatmap,
+//      stacked bars — dependency-free themed SVG, same house style as ops.php.
+// ============================================================================
+
+// ---- Value formatting ------------------------------------------------------
+function tapi_fmt_value($value, $unit) {
+    if ($value === null) return '—';
+    $unit = strtolower((string)$unit);
+    if ($unit === 'money')  return function_exists('fmoney_short') ? fmoney_short($value) : number_format((float)$value);
+    if ($unit === '%')      return rtrim(rtrim(number_format((float)$value, 1), '0'), '.') . '%';
+    if ($unit === 'days')   return rtrim(rtrim(number_format((float)$value, 1), '0'), '.') . ' d';
+    if ($unit === 'hours')  return rtrim(rtrim(number_format((float)$value, 1), '0'), '.') . ' h';
+    // count / anything else
+    return (float)$value == (int)$value ? number_format((int)$value) : number_format((float)$value, 1);
+}
+function tapi_status_tone($status) {
+    return ['GOOD'=>'ok', 'WARN'=>'warn', 'BAD'=>'bad', 'NO_DATA'=>'mut', 'INFO'=>'info'][$status] ?? 'info';
+}
+
+// ---- The KPI card ----------------------------------------------------------
+// $card is a tapi_kpi_eval() payload. $cmp (optional) is a tapi_compare() result
+// to draw the delta. Reuses the existing .kpi CSS; adds a status stripe + a
+// muted lineage/updated line so the number is never a bare, untraceable figure.
+function kpi_card($card, $cmp = null, $opts = []) {
+    $esc = fn($s) => function_exists('e') ? e($s) : htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+    $tone = tapi_status_tone($card['status'] ?? 'INFO');
+    $val  = ($card['no_data'] ?? false) ? 'No data' : tapi_fmt_value($card['value'] ?? null, $card['unit'] ?? 'count');
+    $href = $opts['href'] ?? '';
+    $delta = '';
+    if ($cmp && !($card['no_data'] ?? false) && ($cmp['variance_pct'] ?? null) !== null) {
+        $dir = $cmp['trend'] === 'up' ? 'up' : ($cmp['trend'] === 'down' ? 'down' : 'flat');
+        $arrow = $dir === 'up' ? '▲' : ($dir === 'down' ? '▼' : '▬');
+        // "good" colour depends on the KPI's direction, not merely the sign.
+        $goodUp = strtoupper((string)($card['direction'] ?? '')) === 'HIGHER';
+        $isGood = ($cmp['trend'] === 'up' && $goodUp) || ($cmp['trend'] === 'down' && !$goodUp);
+        $cls = $cmp['trend'] === 'flat' ? '' : ($isGood ? 'up' : 'down');
+        $delta = '<div class="d ' . $cls . '">' . $arrow . ' ' . $esc(abs((float)$cmp['variance_pct'])) . '% ' . $esc($cmp['label'] ?? 'vs prev') . '</div>';
+    }
+    $tgt = '';
+    if (($card['target'] ?? null) !== null && $card['target'] !== '') {
+        $tgt = '<div class="kt">Target ' . $esc(tapi_fmt_value($card['target'], $card['unit'] ?? 'count')) . '</div>';
+    }
+    $lin = '';
+    if (!empty($card['lineage'])) {
+        $src = implode(', ', array_unique(array_map(fn($l) => (string)$l['source'], $card['lineage'])));
+        $lin = '<div class="klin" title="Data source">' . $esc($src) . '</div>';
+    }
+    $inner = '<div class="k">' . $esc($card['name'] ?? '') . '</div>'
+           . '<div class="v">' . $esc($val) . '</div>' . $delta . $tgt . $lin;
+    $open = $href !== '' ? '<a class="kpi tapi-kpi tone-' . $tone . '" href="' . $esc($href) . '">' : '<div class="kpi tapi-kpi tone-' . $tone . '">';
+    $close = $href !== '' ? '</a>' : '</div>';
+    return $open . $inner . $close;
+}
+
+// A row of KPI cards from a list of definitions, each evaluated for $ctx (and
+// optionally compared). $defs are kpi_defs rows.
+function kpi_card_row($defs, $ctx = [], $cmpMode = '') {
+    $out = '<div class="kpi-row tapi-kpi-row">';
+    foreach ($defs as $d) {
+        $card = tapi_kpi_eval($d, $ctx);
+        $cmp = $cmpMode !== '' ? tapi_compare($d, $ctx, $cmpMode) : null;
+        $out .= kpi_card($card, $cmp);
+    }
+    return $out . '</div>';
+}
+
+// The small amount of CSS the kit adds on top of the existing .kpi rules.
+function tapi_style() {
+    static $done = false; if ($done) return ''; $done = true;
+    return '<style>
+    .tapi-kpi{border:1px solid var(--line);border-radius:12px;padding:14px 16px;border-left-width:4px;text-decoration:none;color:inherit;display:block}
+    .tapi-kpi.tone-ok{border-left-color:var(--ok)} .tapi-kpi.tone-warn{border-left-color:var(--warn)}
+    .tapi-kpi.tone-bad{border-left-color:var(--bad)} .tapi-kpi.tone-mut{border-left-color:var(--line)} .tapi-kpi.tone-info{border-left-color:var(--info,#0ea5e9)}
+    .tapi-kpi .k{font-size:12.5px;color:var(--muted);letter-spacing:.02em} .tapi-kpi .v{font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:2px}
+    .tapi-kpi .d{font-size:12px;margin-top:3px} .tapi-kpi .d.up{color:var(--ok)} .tapi-kpi .d.down{color:var(--bad)}
+    .tapi-kpi .kt,.tapi-kpi .klin{font-size:11.5px;color:var(--muted);margin-top:3px}
+    .tapi-kpi-row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin:0 0 20px}
+    .tapi-filter{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:8px;align-items:end;padding:10px 0;margin:0 0 16px;border-bottom:1px solid var(--line);background:var(--bg)}
+    .tapi-filter label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:3px}
+    .tapi-fresh{font-size:12px;color:var(--muted);margin:0 0 14px}
+    </style>';
+}
+
+// ---- Period ranges + comparison -------------------------------------------
+// [from,to] for a named period around an anchor date (default today).
+function tapi_period_range($preset, $anchor = null) {
+    $a = $anchor ?: date('Y-m-d');
+    $ts = strtotime($a); $Y = (int)date('Y', $ts); $M = (int)date('n', $ts);
+    switch (strtoupper((string)$preset)) {
+        case 'DAY':   return [$a, $a];
+        case 'WEEK':  $mon = strtotime('monday this week', $ts); return [date('Y-m-d', $mon), date('Y-m-d', strtotime('+6 days', $mon))];
+        case 'MONTH': return [sprintf('%04d-%02d-01', $Y, $M), date('Y-m-t', $ts)];
+        case 'QUARTER': $q = intdiv($M - 1, 3); $qs = $q * 3 + 1; return [sprintf('%04d-%02d-01', $Y, $qs), date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $Y, $qs + 2)))];
+        case 'HALF':  return $M <= 6 ? ["$Y-01-01", "$Y-06-30"] : ["$Y-07-01", "$Y-12-31"];
+        case 'YEAR':  return ["$Y-01-01", "$Y-12-31"];
+        case 'FY':    return function_exists('fy_range') && function_exists('current_fy') ? fy_range(current_fy()) : ["$Y-01-01", "$Y-12-31"];
+        default:      return ['', ''];   // all time
+    }
+}
+// The comparable previous window for a [from,to] range.
+function tapi_prev_range($from, $to, $mode = 'PREV') {
+    if ($from === '' || $to === '') return ['', ''];
+    $f = strtotime($from); $t = strtotime($to);
+    switch (strtoupper((string)$mode)) {
+        case 'YOY': return [date('Y-m-d', strtotime('-1 year', $f)), date('Y-m-d', strtotime('-1 year', $t))];
+        case 'MOM': return [date('Y-m-d', strtotime('-1 month', $f)), date('Y-m-d', strtotime('-1 month', $t))];
+        case 'QOQ': return [date('Y-m-d', strtotime('-3 months', $f)), date('Y-m-d', strtotime('-3 months', $t))];
+        case 'PREV': default:
+            $len = $t - $f;                                   // same-length window immediately before
+            $pt = strtotime('-1 day', $f);
+            return [date('Y-m-d', $pt - $len), date('Y-m-d', $pt)];
+    }
+}
+// Compare a KPI across the current window and a comparison window (or its target).
+// Returns current/previous/variance/variance_pct/achievement_pct/trend/label,
+// honouring no-data: if either side is no-data the variance is null (never faked).
+function tapi_compare($def, $ctx, $mode = 'PREV') {
+    $cur = tapi_kpi_eval($def, $ctx);
+    $mode = strtoupper((string)$mode);
+    $label = ['PREV'=>'vs prev','YOY'=>'YoY','MOM'=>'MoM','QOQ'=>'QoQ','TARGET'=>'vs target'][$mode] ?? 'vs prev';
+    $prevVal = null;
+    if ($mode === 'TARGET') {
+        $prevVal = ($def['target'] ?? null) === '' ? null : ($def['target'] ?? null);
+        $prevVal = $prevVal === null ? null : (float)$prevVal;
+    } else {
+        [$pf, $pt] = tapi_prev_range((string)($ctx['from'] ?? ''), (string)($ctx['to'] ?? ''), $mode);
+        $prevCard = tapi_kpi_eval($def, ['from' => $pf, 'to' => $pt] + $ctx);
+        $prevVal = ($prevCard['no_data'] ?? false) ? null : $prevCard['value'];
+    }
+    $curVal = ($cur['no_data'] ?? false) ? null : $cur['value'];
+    $variance = ($curVal === null || $prevVal === null) ? null : round((float)$curVal - (float)$prevVal, 2);
+    $variancePct = ($curVal === null || $prevVal === null || (float)$prevVal == 0.0) ? null
+        : round(((float)$curVal - (float)$prevVal) / abs((float)$prevVal) * 100, 1);
+    $achv = null;
+    if (($def['target'] ?? null) !== null && $def['target'] !== '' && (float)$def['target'] != 0.0 && $curVal !== null)
+        $achv = round((float)$curVal / (float)$def['target'] * 100, 1);
+    $trend = $variance === null ? 'na' : ($variance > 0 ? 'up' : ($variance < 0 ? 'down' : 'flat'));
+    return ['current'=>$curVal, 'previous'=>$prevVal, 'variance'=>$variance, 'variance_pct'=>$variancePct,
+            'achievement_pct'=>$achv, 'trend'=>$trend, 'label'=>$label, 'mode'=>$mode];
+}
+
+// ---- The shared filter engine ---------------------------------------------
+// Normalise a filter set (from an array or $_GET). Period preset resolves to
+// from/to unless explicit dates are given. Office/SBU are intersected with the
+// caller's scope so a filter can only ever NARROW, never widen, access.
+function tapi_filters($in = null) {
+    $in = $in ?? $_GET ?? [];
+    $g = fn($k, $d = '') => isset($in[$k]) ? trim((string)$in[$k]) : $d;
+    $period = $g('period', 'MONTH');
+    $from = $g('from'); $to = $g('to');
+    if ($from === '' && $to === '' && $period !== 'CUSTOM' && $period !== 'ALL') {
+        [$from, $to] = tapi_period_range($period);
+    }
+    $f = [
+        'period' => $period, 'from' => $from, 'to' => $to,
+        'office' => (int)$g('office', '0'), 'sbu' => $g('sbu'),
+        'client' => (int)$g('client', '0'), 'service' => $g('service'),
+        'status' => $g('status'), 'compare' => strtoupper($g('compare', 'PREV')),
+    ];
+    return $f;
+}
+// A metric context {from,to,...} from a filter set.
+function tapi_ctx_from_filters($f) {
+    return ['from' => (string)($f['from'] ?? ''), 'to' => (string)($f['to'] ?? ''),
+            'office' => (int)($f['office'] ?? 0), 'sbu' => (string)($f['sbu'] ?? ''),
+            'client' => (int)($f['client'] ?? 0)];
+}
+// The sticky filter bar. $show lists which controls to render; period + dates
+// are always present. Auto-submits on change.
+function tapi_filter_bar($f, $opts = []) {
+    $esc = fn($s) => function_exists('e') ? e($s) : htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+    $show = $opts['show'] ?? ['office', 'sbu', 'compare'];
+    $action = $opts['action'] ?? '';
+    $h = tapi_style();
+    $h .= '<form class="tapi-filter" method="get"' . ($action ? ' action="' . $esc($action) . '"' : '') . '>';
+    // period
+    $h .= '<div><label>Period</label><select name="period" onchange="this.form.submit()">';
+    foreach (TAPI_PERIODS as $k => $lbl) $h .= '<option value="' . $k . '"' . ($f['period'] === $k ? ' selected' : '') . '>' . $esc($lbl) . '</option>';
+    $h .= '<option value="ALL"' . ($f['period'] === 'ALL' ? ' selected' : '') . '>All time</option></select></div>';
+    // explicit dates (used when period=CUSTOM)
+    $h .= '<div><label>From</label><input type="date" name="from" value="' . $esc($f['from']) . '"></div>';
+    $h .= '<div><label>To</label><input type="date" name="to" value="' . $esc($f['to']) . '"></div>';
+    if (in_array('office', $show, true) && function_exists('scope_office_options')) {
+        $h .= '<div><label>Office</label><select name="office" onchange="this.form.submit()"><option value="0">All offices</option>';
+        foreach (scope_office_options() as $id => $nm) $h .= '<option value="' . (int)$id . '"' . ((int)$f['office'] === (int)$id ? ' selected' : '') . '>' . $esc($nm) . '</option>';
+        $h .= '</select></div>';
+    }
+    if (in_array('sbu', $show, true) && function_exists('lk_options_or')) {
+        $h .= '<div><label>Business unit</label><select name="sbu" onchange="this.form.submit()"><option value="">All</option>';
+        foreach (lk_options_or('sbu', []) as $k => $lbl) $h .= '<option value="' . $esc($k) . '"' . ($f['sbu'] === (string)$k ? ' selected' : '') . '>' . $esc($lbl) . '</option>';
+        $h .= '</select></div>';
+    }
+    if (in_array('compare', $show, true)) {
+        $h .= '<div><label>Compare</label><select name="compare" onchange="this.form.submit()">';
+        foreach (['PREV'=>'vs previous','YOY'=>'Year on year','MOM'=>'Month on month','QOQ'=>'Quarter on quarter','TARGET'=>'vs target'] as $k => $lbl)
+            $h .= '<option value="' . $k . '"' . ($f['compare'] === $k ? ' selected' : '') . '>' . $esc($lbl) . '</option>';
+        $h .= '</select></div>';
+    }
+    $h .= '<div><button class="btn btn-sm" type="submit">Apply</button></div>';
+    $h .= '</form>';
+    return $h;
+}
+
+// A data-freshness line — analytics is only as current as its source.
+function tapi_freshness($label = 'Live — computed from source records now') {
+    return '<div class="tapi-fresh">🕒 ' . (function_exists('e') ? e($label) : $label) . ' · ' . date('d M Y H:i') . '</div>';
+}
+
+// ============================================================================
+//  Chart primitives beyond bar/donut/gauge — themed, dependency-free SVG.
+//  All read CSS variables so they follow light/dark like the existing charts,
+//  and all show a labelled placeholder (never a blank box) when there is no data.
+// ============================================================================
+function tapi_chart_color($i) { return function_exists('chart_color') ? chart_color($i) : (['#0ea5e9','#f59e0b','#10b981','#a78bfa','#fb7185'][$i % 5]); }
+function tapi_chart_empty($msg = 'No data for this period') {
+    return '<div class="pnote" style="padding:22px 6px;color:var(--muted);font-size:13.5px">' . (function_exists('e') ? e($msg) : $msg) . '</div>';
+}
+
+// Line / trend chart. $series = ['label'=>..,'points'=>[['x'=>label,'y'=>num], ...]] or a bare list of series.
+function tapi_svg_line($series, $opts = []) {
+    if (!$series) return tapi_chart_empty();
+    if (isset($series['points'])) $series = [$series];
+    $w = (int)($opts['w'] ?? 640); $h = (int)($opts['h'] ?? 220); $pad = 30;
+    $xs = []; $allY = [];
+    foreach ($series as $s) foreach ($s['points'] as $p) { $xs[(string)$p['x']] = true; if ($p['y'] !== null) $allY[] = (float)$p['y']; }
+    if (!$allY) return tapi_chart_empty();
+    $labels = array_keys($xs); $n = max(1, count($labels) - 1);
+    $maxY = max($allY); $minY = min(0, min($allY)); $range = ($maxY - $minY) ?: 1;
+    $px = fn($i) => $pad + ($i / $n) * ($w - 2 * $pad);
+    $py = fn($y) => $h - $pad - (($y - $minY) / $range) * ($h - 2 * $pad);
+    $svg = '<svg viewBox="0 0 ' . $w . ' ' . $h . '" width="100%" style="max-width:' . $w . 'px" role="img">';
+    // baseline + gridlines
+    $svg .= '<line x1="' . $pad . '" y1="' . ($h - $pad) . '" x2="' . ($w - $pad) . '" y2="' . ($h - $pad) . '" stroke="var(--line)" />';
+    $si = 0;
+    foreach ($series as $s) {
+        $col = $s['color'] ?? tapi_chart_color($si++);
+        $d = ''; $i = 0; $started = false;
+        foreach ($labels as $lab) {
+            $pt = null; foreach ($s['points'] as $p) if ((string)$p['x'] === $lab) { $pt = $p; break; }
+            if ($pt && $pt['y'] !== null) { $d .= ($started ? ' L' : 'M') . round($px($i), 1) . ' ' . round($py((float)$pt['y']), 1); $started = true; }
+            $i++;
+        }
+        if ($d !== '') $svg .= '<path d="' . $d . '" fill="none" stroke="' . $col . '" stroke-width="2" />';
+    }
+    // x labels (thinned)
+    $step = max(1, (int)ceil(count($labels) / 8));
+    foreach ($labels as $i => $lab) if ($i % $step === 0)
+        $svg .= '<text x="' . round($px($i), 1) . '" y="' . ($h - 8) . '" font-size="10" fill="var(--muted)" text-anchor="middle">' . htmlspecialchars((string)$lab) . '</text>';
+    $svg .= '</svg>';
+    return $svg;
+}
+
+// Sparkline — a tiny inline trend, no axes.
+function tapi_svg_sparkline($values, $opts = []) {
+    $values = array_values(array_filter($values, fn($v) => $v !== null));
+    if (count($values) < 2) return '<span class="pnote">—</span>';
+    $w = (int)($opts['w'] ?? 110); $h = (int)($opts['h'] ?? 26);
+    $max = max($values); $min = min($values); $range = ($max - $min) ?: 1; $n = count($values) - 1;
+    $col = $opts['color'] ?? tapi_chart_color(0);
+    $d = ''; foreach ($values as $i => $v) { $x = ($i / $n) * ($w - 2); $y = $h - 2 - (($v - $min) / $range) * ($h - 4); $d .= ($i ? ' L' : 'M') . round($x + 1, 1) . ' ' . round($y, 1); }
+    return '<svg viewBox="0 0 ' . $w . ' ' . $h . '" width="' . $w . '" height="' . $h . '" style="vertical-align:middle"><path d="' . $d . '" fill="none" stroke="' . $col . '" stroke-width="1.5"/></svg>';
+}
+
+// Pareto — bars sorted desc with a cumulative % line. $data = [label=>value].
+function tapi_svg_pareto($data, $opts = []) {
+    $data = array_filter($data, fn($v) => $v !== null);
+    arsort($data);
+    if (!$data) return tapi_chart_empty();
+    $total = array_sum($data); if ($total <= 0) return tapi_chart_empty();
+    $w = (int)($opts['w'] ?? 640); $h = (int)($opts['h'] ?? 240); $pad = 34;
+    $labels = array_keys($data); $vals = array_values($data); $n = count($vals);
+    $maxV = max($vals) ?: 1; $bw = ($w - 2 * $pad) / max(1, $n);
+    $svg = '<svg viewBox="0 0 ' . $w . ' ' . $h . '" width="100%" style="max-width:' . $w . 'px" role="img">';
+    $svg .= '<line x1="' . $pad . '" y1="' . ($h - $pad) . '" x2="' . ($w - $pad) . '" y2="' . ($h - $pad) . '" stroke="var(--line)"/>';
+    $cum = 0; $linePts = '';
+    foreach ($vals as $i => $v) {
+        $bh = ($v / $maxV) * ($h - 2 * $pad); $x = $pad + $i * $bw + 3; $y = $h - $pad - $bh;
+        $svg .= '<rect x="' . round($x, 1) . '" y="' . round($y, 1) . '" width="' . round($bw - 6, 1) . '" height="' . round($bh, 1) . '" fill="' . tapi_chart_color(0) . '" rx="2"/>';
+        $svg .= '<text x="' . round($x + ($bw - 6) / 2, 1) . '" y="' . ($h - 10) . '" font-size="9.5" fill="var(--muted)" text-anchor="middle">' . htmlspecialchars(mb_substr((string)$labels[$i], 0, 8)) . '</text>';
+        $cum += $v; $cx = $pad + $i * $bw + $bw / 2; $cy = $pad + ($h - 2 * $pad) * (1 - $cum / $total);
+        $linePts .= ($i ? ' L' : 'M') . round($cx, 1) . ' ' . round($cy, 1);
+    }
+    $svg .= '<path d="' . $linePts . '" fill="none" stroke="' . tapi_chart_color(4) . '" stroke-width="2"/>';
+    $svg .= '</svg>';
+    return $svg;
+}
+
+// Heatmap — rows × cols grid coloured by value. $rows=[label], $cols=[label],
+// $matrix[rowLabel][colLabel]=value.
+function tapi_svg_heatmap($rows, $cols, $matrix, $opts = []) {
+    if (!$rows || !$cols) return tapi_chart_empty();
+    $all = [];
+    foreach ($matrix as $r) foreach ($r as $v) if ($v !== null) $all[] = (float)$v;
+    $max = $all ? max($all) : 0; if ($max <= 0) return tapi_chart_empty('No values for this period');
+    $cw = (int)($opts['cw'] ?? 46); $ch = (int)($opts['ch'] ?? 26); $lw = (int)($opts['lw'] ?? 120);
+    $w = $lw + count($cols) * $cw + 10; $h = 24 + count($rows) * $ch + 6;
+    $svg = '<svg viewBox="0 0 ' . $w . ' ' . $h . '" width="100%" style="max-width:' . $w . 'px" role="img">';
+    foreach ($cols as $ci => $c) $svg .= '<text x="' . ($lw + $ci * $cw + $cw / 2) . '" y="16" font-size="10" fill="var(--muted)" text-anchor="middle">' . htmlspecialchars(mb_substr((string)$c, 0, 7)) . '</text>';
+    foreach ($rows as $ri => $r) {
+        $y = 24 + $ri * $ch;
+        $svg .= '<text x="0" y="' . ($y + $ch / 2 + 3) . '" font-size="10.5" fill="var(--ink)">' . htmlspecialchars(mb_substr((string)$r, 0, 18)) . '</text>';
+        foreach ($cols as $ci => $c) {
+            $v = $matrix[$r][$c] ?? null; $x = $lw + $ci * $cw;
+            $op = $v === null ? 0 : max(0.08, min(1, (float)$v / $max));
+            $fill = $v === null ? 'transparent' : 'color-mix(in srgb, ' . tapi_chart_color(0) . ' ' . round($op * 100) . '%, transparent)';
+            $svg .= '<rect x="' . $x . '" y="' . $y . '" width="' . ($cw - 3) . '" height="' . ($ch - 3) . '" rx="3" fill="' . $fill . '" stroke="var(--line)"/>';
+            if ($v !== null) $svg .= '<text x="' . ($x + ($cw - 3) / 2) . '" y="' . ($y + $ch / 2 + 2) . '" font-size="9.5" fill="var(--ink)" text-anchor="middle">' . htmlspecialchars((string)(is_float($v) ? round($v, 1) : $v)) . '</text>';
+        }
+    }
+    $svg .= '</svg>';
+    return $svg;
+}
+
+// Stacked bars — $groups = [label => [seriesLabel => value]].
+function tapi_svg_stack($groups, $seriesLabels, $opts = []) {
+    if (!$groups) return tapi_chart_empty();
+    $w = (int)($opts['w'] ?? 640); $h = (int)($opts['h'] ?? 240); $pad = 34;
+    $totals = []; foreach ($groups as $k => $g) $totals[$k] = array_sum(array_map(fn($v) => (float)($v ?? 0), $g));
+    $maxV = $totals ? max($totals) : 0; if ($maxV <= 0) return tapi_chart_empty();
+    $labels = array_keys($groups); $n = count($labels); $bw = ($w - 2 * $pad) / max(1, $n);
+    $svg = '<svg viewBox="0 0 ' . $w . ' ' . $h . '" width="100%" style="max-width:' . $w . 'px" role="img">';
+    $svg .= '<line x1="' . $pad . '" y1="' . ($h - $pad) . '" x2="' . ($w - $pad) . '" y2="' . ($h - $pad) . '" stroke="var(--line)"/>';
+    foreach ($labels as $i => $lab) {
+        $x = $pad + $i * $bw + 3; $yBase = $h - $pad;
+        foreach ($seriesLabels as $si => $sl) {
+            $v = (float)($groups[$lab][$sl] ?? 0); if ($v <= 0) continue;
+            $bh = ($v / $maxV) * ($h - 2 * $pad); $yBase -= $bh;
+            $svg .= '<rect x="' . round($x, 1) . '" y="' . round($yBase, 1) . '" width="' . round($bw - 6, 1) . '" height="' . round($bh, 1) . '" fill="' . tapi_chart_color($si) . '"/>';
+        }
+        $svg .= '<text x="' . round($x + ($bw - 6) / 2, 1) . '" y="' . ($h - 10) . '" font-size="9.5" fill="var(--muted)" text-anchor="middle">' . htmlspecialchars(mb_substr((string)$lab, 0, 8)) . '</text>';
+    }
+    // legend
+    $lx = $pad;
+    foreach ($seriesLabels as $si => $sl) { $svg .= '<rect x="' . $lx . '" y="6" width="10" height="10" fill="' . tapi_chart_color($si) . '"/><text x="' . ($lx + 14) . '" y="15" font-size="10" fill="var(--muted)">' . htmlspecialchars((string)$sl) . '</text>'; $lx += 30 + strlen((string)$sl) * 6; }
+    $svg .= '</svg>';
+    return $svg;
+}
