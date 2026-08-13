@@ -49,6 +49,16 @@
     <?php endforeach; ?>
   <?php endif; ?>
 
+  <h3 style="margin-top:20px">Administration &amp; access period</h3>
+  <label style="display:flex;gap:9px;align-items:flex-start;margin:6px 0;font-size:14px">
+    <input type="checkbox" name="is_org_admin" value="1" <?= !empty($u['is_org_admin']) ? 'checked' : '' ?>>
+    <span>Let this person manage their own organisation's portal users (invite / withdraw colleagues, set access dates).
+      Scoped to their own company only.</span></label>
+  <div style="margin-top:12px">
+    <label class="muted" style="display:block;font-size:12.5px;margin-bottom:4px">Access ends on <span style="opacity:.7">(optional — blank means never; access is revoked automatically after this date)</span></label>
+    <input class="form-control" type="date" name="access_expires" value="<?= e($u['access_expires'] ?? '') ?>" style="max-width:200px">
+  </div>
+
   <div style="margin-top:18px;display:flex;gap:10px">
     <button class="btn">Save</button>
     <a class="btn secondary" href="/portal-users">Cancel</a>

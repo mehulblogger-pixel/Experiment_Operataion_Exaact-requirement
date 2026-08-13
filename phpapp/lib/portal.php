@@ -140,10 +140,13 @@ function portal_user() {
     static $u = null, $for = 0;
     if ($u === null || $for !== (int)$_SESSION['cuid']) {
         $for = (int)$_SESSION['cuid'];
+        // Auto-revoke without a cron: an expired account is simply not returned,
+        // so every downstream gate treats it as signed-out the instant it lapses.
+        [$xw, $xa] = function_exists('cvp_access_live_sql') ? cvp_access_live_sql('cu.access_expires') : ['1=1', []];
         $u = portal_try(fn() => ops_one(
             "SELECT cu.*, p.legal_name, p.display_name
              FROM client_users cu JOIN business_partners p ON p.id = cu.partner_id
-             WHERE cu.id = ? AND cu.is_active = 1", [$for]), null);
+             WHERE cu.id = ? AND cu.is_active = 1 AND $xw", array_merge([$for], $xa)), null);
     }
     return $u ?: null;
 }
@@ -200,6 +203,9 @@ function portal_login($email, $password) {
         // registered tells them who our clients are.
         return 'That e-mail address and password do not match.';
     }
+    // Auto-revoke: an expired account cannot sign in, with no cron.
+    if (trim((string)($u['access_expires'] ?? '')) !== '' && (string)$u['access_expires'] < date('Y-m-d'))
+        return 'Your access has expired. Ask your contact at ' . app_name() . ' to renew it.';
     portal_start_session((int)$u['id']);
     if (function_exists('login_clear')) login_clear('portal:' . $email);
     try { db()->prepare("UPDATE client_users SET last_login_at=?, last_login_ip=? WHERE id=?")
@@ -826,6 +832,41 @@ function portal_route($route, $method) {
                 'responses' => cvp_issue_responses('CLIENT', (int)$n['id']), 'kinds' => NCDCA_RESPONSE_KINDS]);
             exit;
 
+        // Phase 10 (CVP) Slice 5a — a client org admin manages their own team.
+        case 'portal/team':
+            if (!function_exists('cvp_client_is_admin') || !cvp_client_is_admin()) { http_response_code(404); portal_view('notfound'); exit; }
+            $pid = portal_partner_id(); $err = ''; $invite = null;
+            if ($method === 'POST') {
+                $act = (string)($_POST['act'] ?? '');
+                if ($act === 'invite') {
+                    $r = cvp_client_team_invite($pid, $_POST['email'] ?? '', $_POST['name'] ?? '', $_POST['access_expires'] ?? '');
+                    if (!empty($r['err'])) $err = $r['err'];
+                    else { $invite = $r; $_SESSION['portal_flash'] = 'Invitation created — send them the link below.'; }
+                } elseif ($act === 'toggle') {
+                    $e = cvp_client_team_toggle($pid, (int)($_POST['id'] ?? 0), (int)($u['id'] ?? 0));
+                    if ($e !== '') $err = $e; else $_SESSION['portal_flash'] = 'Access updated.';
+                } elseif ($act === 'expiry') {
+                    $e = cvp_client_team_expiry($pid, (int)($_POST['id'] ?? 0), (string)($_POST['access_expires'] ?? ''));
+                    if ($e !== '') $err = $e; else $_SESSION['portal_flash'] = 'Access period updated.';
+                }
+                if ($err === '') { $_SESSION['portal_team_invite'] = $invite; redirect('/portal/team'); }
+            }
+            $invite = $_SESSION['portal_team_invite'] ?? $invite; unset($_SESSION['portal_team_invite']);
+            portal_view('team', ['rows' => cvp_client_team($pid), 'err' => $err, 'invite' => $invite, 'me' => (int)($u['id'] ?? 0)]);
+            exit;
+
+        // Phase 10 (CVP) Slice 5b — the scoped assistant (client's own data only).
+        case 'portal/assistant':
+            if (!function_exists('cvp_ai_answer')) { http_response_code(404); portal_view('notfound'); exit; }
+            $q = ''; $ans = ''; $aerr = '';
+            if ($method === 'POST') {
+                $q = trim((string)($_POST['q'] ?? ''));
+                [$ans, $aerr] = cvp_ai_answer('CLIENT', portal_partner_id(), $q);
+                portal_log('ASSISTANT', substr($q, 0, 120));
+            }
+            portal_view('assistant', ['q' => $q, 'ans' => $ans, 'aerr' => $aerr, 'available' => cvp_ai_available()]);
+            exit;
+
         case 'portal/password':
             $err = ''; $done = false;
             if ($method === 'POST') {
@@ -858,10 +899,11 @@ function portal_route($route, $method) {
 function portal_user_reload() {
     $id = (int)($_SESSION['cuid'] ?? 0);
     if (!$id) return null;
+    [$xw, $xa] = function_exists('cvp_access_live_sql') ? cvp_access_live_sql('cu.access_expires') : ['1=1', []];
     return portal_try(fn() => ops_one(
         "SELECT cu.*, p.legal_name, p.display_name
          FROM client_users cu JOIN business_partners p ON p.id = cu.partner_id
-         WHERE cu.id = ? AND cu.is_active = 1", [$id]), null) ?: null;
+         WHERE cu.id = ? AND cu.is_active = 1 AND $xw", array_merge([$id], $xa)), null) ?: null;
 }
 
 // ============================================================================
@@ -1097,7 +1139,17 @@ function portal_perms_save($clientUserId, array $b) {
     $keys = [];
     foreach (array_keys(PORTAL_PERMS) as $k) if (!empty($b['p_' . str_replace('.', '_', $k)])) $keys[] = $k;
     $sites = array_values(array_filter(array_map('intval', (array)($b['site_ids'] ?? []))));
-    db()->prepare("UPDATE client_users SET perms=?, site_ids=?, role_preset=? WHERE id=?")
-        ->execute([implode(',', $keys), implode(',', $sites),
-                   substr(trim((string)($b['role_preset'] ?? '')), 0, 30), (int)$clientUserId]);
+    // Phase 10 (CVP) Slice 5 — org-admin flag + access-expiry (columns added by
+    // cvp_migrate; guarded so the save still works before that migrate runs).
+    $orgAdmin = !empty($b['is_org_admin']) ? 1 : 0;
+    $expires  = substr(trim((string)($b['access_expires'] ?? '')), 0, 10);
+    try {
+        db()->prepare("UPDATE client_users SET perms=?, site_ids=?, role_preset=?, is_org_admin=?, access_expires=? WHERE id=?")
+            ->execute([implode(',', $keys), implode(',', $sites),
+                       substr(trim((string)($b['role_preset'] ?? '')), 0, 30), $orgAdmin, $expires, (int)$clientUserId]);
+    } catch (Throwable $e) {
+        db()->prepare("UPDATE client_users SET perms=?, site_ids=?, role_preset=? WHERE id=?")
+            ->execute([implode(',', $keys), implode(',', $sites),
+                       substr(trim((string)($b['role_preset'] ?? '')), 0, 30), (int)$clientUserId]);
+    }
 }
