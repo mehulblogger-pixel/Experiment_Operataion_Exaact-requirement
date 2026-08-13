@@ -251,6 +251,13 @@
   foreach ($jobs as $aj) { if ($aj['inspector_name'] && $aj['scheduled_date']): ?>
     <div class="msg msg-success">✅ Call assigned to <strong><?= e($aj['inspector_name']) ?></strong> for <strong><?= e($aj['scheduled_date']) ?></strong> — engineer is <?= e($engKind[$aj['staff_kind'] ?? 'ASSET'] ?? 'own employee') ?><?= $aj['subcon_agency'] ? ' (' . e($aj['subcon_agency']) . ')' : '' ?>. Job <?= e($aj['job_code']) ?>, stage: <?= e(lk_options_or('job_stage', JOB_STAGES)[$aj['stage'] ?? 'ALLOCATED'] ?? '') ?>.</div>
   <?php endif; } ?>
+<?php // Phase 9 (TOSRM) — operations service-request panel: status lifecycle,
+      // priority/criticality/source, validation gate + override, clarifications.
+      if (function_exists('tosrm_render_call_panel')): ?>
+  <a id="ops"></a>
+  <?php tosrm_render_call_panel($call); ?>
+<?php endif; ?>
+
 <h3 class="tab-sub" id="jobs">Jobs allocated from this call</h3>
 <table class="grid">
   <tr><th>Job</th><th>Inspector</th><th>Engineer</th><th>Scheduled</th><th>Stage</th><th>Expected credit</th><th>Closed</th><th></th></tr>
