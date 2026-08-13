@@ -81,6 +81,12 @@ function urade_migrate() {
         ensure_column('report_docs', 'release_of_id', 'INT NULL');       // primary inspection this release is based on
         ensure_column('report_docs', 'release_disposition', "VARCHAR(20) DEFAULT ''");
     }
+    // Multiple-inspection linkage (§66/§85) — one release may consolidate several
+    // inspections. Structured link table (reuses report_docs; no data copied).
+    $pk0 = pk_clause();
+    $pdo->exec("CREATE TABLE IF NOT EXISTS release_inspections (
+        id $pk0, release_doc_id INT, inspection_doc_id INT, is_primary INT DEFAULT 0, created_at VARCHAR(30) DEFAULT '')");
+    // A release+inspection pair is unique (dedup enforced in code on link).
 
     if (function_exists('setting_get') && !setting_get('urade_rules_seeded_v1', '')) {
         try { urade_seed_rules(); } catch (Throwable $e) { /* never break login/migrate */ }
@@ -230,19 +236,62 @@ function urade_context_from_inspection($inspDoc) {
     return $ctx;
 }
 
-// Full eligibility for a release document — merges the linked inspection context
-// with the release's own released_qty, then evaluates the rules. §12/§55/§63.
+// Link an inspection to a release (§66/§85). Idempotent per pair. The first link
+// (or an explicit primary) also sets report_docs.release_of_id for compatibility.
+function urade_link_inspection($releaseId, $inspectionId, $isPrimary = false) {
+    $releaseId = (int)$releaseId; $inspectionId = (int)$inspectionId;
+    if (!$releaseId || !$inspectionId) return;
+    if ((int)ops_val("SELECT COUNT(*) FROM release_inspections WHERE release_doc_id=? AND inspection_doc_id=?", [$releaseId, $inspectionId]) === 0)
+        db()->prepare("INSERT INTO release_inspections (release_doc_id,inspection_doc_id,is_primary,created_at) VALUES (?,?,?,?)")
+            ->execute([$releaseId, $inspectionId, $isPrimary ? 1 : 0, date('c')]);
+    if ($isPrimary || !ops_val("SELECT release_of_id FROM report_docs WHERE id=?", [$releaseId]))
+        db()->prepare("UPDATE report_docs SET release_of_id=? WHERE id=?")->execute([$inspectionId, $releaseId]);
+}
+// All inspection docs a release consolidates — the link table, plus the primary
+// release_of_id (so a release with a single link still works). §66
+function urade_release_inspections($releaseDoc) {
+    $rid = (int)($releaseDoc['id'] ?? 0); $ids = [];
+    if ($rid) foreach (ops_all("SELECT inspection_doc_id FROM release_inspections WHERE release_doc_id=? ORDER BY is_primary DESC, id", [$rid]) as $r) $ids[] = (int)$r['inspection_doc_id'];
+    $primary = (int)($releaseDoc['release_of_id'] ?? 0); if ($primary && !in_array($primary, $ids, true)) array_unshift($ids, $primary);
+    $out = []; foreach (array_unique($ids) as $iid) { $d = ops_one("SELECT * FROM report_docs WHERE id=?", [$iid]); if ($d) $out[] = $d; }
+    return $out;
+}
+// Aggregate the eligibility context across ALL linked inspections (§66/§85):
+// worst-case for gates (any failed test / missing doc / open NCR blocks; a
+// result is acceptable only if EVERY inspection is), and sums for quantities.
+function urade_aggregate_context($inspections) {
+    if (!$inspections) return [];
+    $agg = ['inspection_complete'=>1,'tests_failed'=>0,'tests_total'=>0,'docs_missing'=>0,'ncr_critical_open'=>0,'ncr_major_open'=>0,'accepted_qty'=>0];
+    $allAccepted = true; $anyResult = false;
+    foreach ($inspections as $insp) {
+        $c = urade_context_from_inspection($insp);
+        if (array_key_exists('inspection_complete',$c) && empty($c['inspection_complete'])) $agg['inspection_complete'] = 0;
+        $agg['tests_failed'] += (int)($c['tests_failed'] ?? 0); $agg['tests_total'] += (int)($c['tests_total'] ?? 0);
+        $agg['docs_missing'] += (int)($c['docs_missing'] ?? 0);
+        $agg['ncr_critical_open'] += (int)($c['ncr_critical_open'] ?? 0); $agg['ncr_major_open'] += (int)($c['ncr_major_open'] ?? 0);
+        if (($c['accepted_qty'] ?? null) !== null) $agg['accepted_qty'] += (float)$c['accepted_qty'];
+        $r = strtolower((string)($c['inspection_result'] ?? '')); if ($r !== '') { $anyResult = true;
+            $ok = (strpos($r,'accept')!==false || strpos($r,'pass')!==false || strpos($r,'releas')!==false) && strpos($r,'not')===false && strpos($r,'reject')===false;
+            if (!$ok) $allAccepted = false; }
+    }
+    $agg['inspection_result'] = $anyResult ? ($allAccepted ? 'accepted' : 'rejected') : '';
+    return $agg;
+}
+
+// Full eligibility for a release document — aggregates ALL linked inspections
+// with the release's own released_qty, then evaluates the rules. §12/§55/§63/§66.
 function urade_release_eligibility($releaseDoc) {
     $data = is_array($releaseDoc['data'] ?? null) ? $releaseDoc['data'] : (json_decode($releaseDoc['data'] ?? '[]', true) ?: []);
-    $ctx = [];
-    $insId = (int)($releaseDoc['release_of_id'] ?? 0);
-    if ($insId) { $insp = ops_one("SELECT * FROM report_docs WHERE id=?", [$insId]); if ($insp) $ctx = urade_context_from_inspection($insp); }
+    $inspections = urade_release_inspections($releaseDoc);
+    $ctx = $inspections ? urade_aggregate_context($inspections) : [];
     // Release data can override / supply context directly too.
     foreach (['inspection_result','accepted_qty','tests_failed','docs_missing','ncr_critical_open','ncr_major_open','inspection_complete'] as $k)
         if (array_key_exists($k, $data) && $data[$k] !== '') $ctx[$k] = $data[$k];
     if (array_key_exists('released_qty', $data) && $data['released_qty'] !== '') $ctx['released_qty'] = (float)preg_replace('/[^0-9.\-]/','',(string)$data['released_qty']);
     $rt = (string)($data['release_type'] ?? '');
-    return urade_eligibility($ctx, $rt, (int)($releaseDoc['client_id'] ?? 0) ?: null);
+    $elig = urade_eligibility($ctx, $rt, (int)($releaseDoc['client_id'] ?? 0) ?: null);
+    $elig['inspection_count'] = count($inspections);
+    return $elig;
 }
 
 // Item-level disposition rollup (§67/§68/§86) — from the release_items table.

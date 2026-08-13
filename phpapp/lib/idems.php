@@ -3531,8 +3531,15 @@ function ops_idems_documents($route, $method) {
         // + recovery read. Advisory only.
         $expRisk = (($doc['type_code'] ?? '') === 'ER' && function_exists('idems_expediting_risk'))
             ? idems_expediting_risk($doc, $fields, $data) : null;
+        // Release readiness gate (URADE §10/§55) — shown on release-type reports.
+        $relEligibility = null;
+        $isReleaseDoc = false; foreach ($fields as $ff) if (($ff['fkey'] ?? '') === 'disposition') { $isReleaseDoc = true; break; }
+        if (!$isReleaseDoc && in_array($doc['type_code'] ?? '', ['RN','IRN'], true)) $isReleaseDoc = true;
+        if ($isReleaseDoc && function_exists('urade_release_eligibility')) {
+            try { $relEligibility = urade_release_eligibility($doc); } catch (Throwable $e) {}
+        }
         view('ops/idems/doc_detail', ['doc'=>$doc, 'approver'=>$approver, 'audit'=>$audit, 'qa'=>$qa,
-            'scorecard'=>$scorecard, 'aiSections'=>$aiSections, 'aiOn'=>$aiOn, 'expAdvisory'=>$expAdvisory, 'expRisk'=>$expRisk,
+            'scorecard'=>$scorecard, 'aiSections'=>$aiSections, 'aiOn'=>$aiOn, 'expAdvisory'=>$expAdvisory, 'expRisk'=>$expRisk, 'relEligibility'=>$relEligibility,
             'sections'=>$sections, 'fields'=>$fields, 'data'=>$data, 'files'=>idems_doc_files($doc['id']), 'hasSchema'=>!empty($fields),
             'approvals'=>$approvals, 'curStep'=>$curStep, 'canAct'=>idems_can_act_step($curStep),
             'vetting'=>idems_vetting_log($doc['id']), 'canVet'=>idems_can_vet(),
