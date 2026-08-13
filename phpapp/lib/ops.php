@@ -2091,6 +2091,8 @@ function ops_module_gate($route) {
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'service-scope'=>'settings',
         'deputations'=>'jobs',
+        'dep-status'=>'jobs','dep-check-seed'=>'jobs','dep-check-set'=>'jobs','dep-site-log'=>'jobs',
+        'dep-site-log-close'=>'jobs','dep-timesheet'=>'jobs','dep-approval'=>'jobs','dep-approval-status'=>'jobs',
         'preflight'=>'settings',
         'trace-thread'=>'settings','trace-thread-remove'=>'settings',
         'trace-audit'=>'settings','trace-audit-remove'=>'settings',
@@ -2512,6 +2514,8 @@ function ops_dispatch($route, $method) {
             return ops_services($route, $method);
         case $route === 'deputations':
             return ops_pdso($route, $method);
+        case in_array($route, ['dep-status','dep-check-seed','dep-check-set','dep-site-log','dep-site-log-close','dep-timesheet','dep-approval','dep-approval-status'], true):
+            return ops_pdso_action($route, $method);
         // Merged screens — one heading, one tab per module underneath.
         case $route === 'approval-rules':
             return ops_approval_rules($method);
@@ -4887,6 +4891,10 @@ function ops_jobs($route, $method) {
                 'report_link' => (string)($v['report_link'] ?? ''),
                 'closed_by' => (string)($v['closed_by'] ?? '')];
         }
+        // Phase-7 deputation & site-ops panel — only when this job is a deputation
+        // and the service is active. Reuses the existing job; adds a site-ops layer.
+        $depIsDep = function_exists('pdso_is_deputation') && function_exists('pdso_enabled')
+            && pdso_enabled() && pdso_is_deputation($job, $jcall);
         view('ops/job_detail', ['job'=>$job,'expenses'=>$expenses,'profit'=>job_profit($job),
             'jcall'=>$jcall, 'siteAddr'=>$siteAddr,
             'clientInfo'=>$jcall ? partner_full($jcall['client_id']) : null,
@@ -4894,7 +4902,13 @@ function ops_jobs($route, $method) {
             'visitPlan'=>$visitPlan, 'inspectors'=>inspectors_list(),
             'booksInvoices'=>function_exists('books_invoices_for_job') ? books_invoices_for_job($job['id']) : [],
             'qaps'=>function_exists('job_qaps') ? job_qaps($job['id']) : [],
-            'quoteDocs'=>function_exists('quote_docs_for_job') ? quote_docs_for_job($job['id']) : []]);
+            'quoteDocs'=>function_exists('quote_docs_for_job') ? quote_docs_for_job($job['id']) : [],
+            'dep'=> $depIsDep ? pdso_job_panel($job['id']) : null,
+            'depStatuses'=> $depIsDep ? pdso_statuses() : [],
+            'depMobStatuses'=> $depIsDep ? pdso_mob_statuses() : [],
+            'depLogKinds'=> $depIsDep ? pdso_log_kinds() : [],
+            'depApprovalStatuses'=> $depIsDep ? pdso_approval_statuses() : [],
+            'depCanEdit'=> $depIsDep ? pdso_can_edit($job) : false]);
         return;
     }
 }

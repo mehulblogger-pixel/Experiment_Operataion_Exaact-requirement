@@ -55,12 +55,23 @@ Wired into run_schema after services, required after services in index.php.
   Operations (gated by svc_globally_active('DEPUTATION') + the ops permission).
   Verified: tests/test_pdso.php now 45 assertions incl. dashboard view render.
 
-**Deferred to next slice (surfaces, reuse-heavy — not new engines): a Deputation
-site-ops PANEL on the job/deputation detail (lifecycle buttons, mobilization
-checklist, site registers, timesheet, client-approval — the write side of the
-engine, currently API-only), the manpower-plan editor, and the personnel/
-client-portal views (reuse the existing portal). The engine, report types and the
-read-side dashboard are live now; the per-job write panel hangs off them next.**
+- **Slice 3 — DONE (per-job site-ops write panel).** views/ops/_deputation_panel.php
+  included in the job detail (#deputation anchor) whenever the job is a deputation
+  and the service is on — reuses the job detail's .panel/.ctitle/.pill/.grid
+  conventions: lifecycle status (with history + auto-seed of the mob/demob checklist
+  on transition), mobilization checklist (inline status set + readiness pill), site
+  register (add observation/issue/instruction/meeting + close — a site observation
+  is NOT an NCR), activity timesheet (add + running totals), and client attendance
+  approval → billing sign-off (submit period + advance Draft→Submitted→Approved with
+  client rep/date). ops_pdso_action() write handler (CSRF + pdso_can_edit: management
+  or the assigned inspector for their own posting, §65/§92); 8 routes mapped +
+  dispatched. Verified: tests/test_pdso.php now 52 assertions incl. panel render +
+  read-only (permission) gating. Full suite 578 passed / 0 failed.
+
+**Deferred (reuse-heavy, not new engines): the manpower-plan editor screen (the
+register/gap view is live; only the add/edit form is pending) and the personnel /
+client-portal deputation views (reuse the existing portal). The engine, report
+types, read-side dashboard and per-job write panel are all live now.**
 
 ## 🧩 Service Scope Engine — service independence, activation & override (Aug 2026)
 

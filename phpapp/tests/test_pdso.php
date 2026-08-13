@@ -181,6 +181,25 @@ ok(strpos($html, 'kpi-row') !== false && strpos($html, 'Active postings') !== fa
 ok(strpos($html, 'JOB-DEP-1') !== false || strpos($html, 'Deputations') !== false, 'the register lists the deputation postings');
 
 // ---------------------------------------------------------------------------
+head('13. Per-job site-ops panel (data + render)');
+ok(pdso_is_deputation(['dep_status'=>'ACTIVE']) === true, 'a job carrying a lifecycle status is a deputation');
+ok(pdso_is_deputation(['job_type'=>'DEPUTATION']) === true, 'a DEPUTATION-type job is a deputation');
+ok(pdso_is_deputation(['job_type'=>'INSPECTION']) === false, 'an inspection job is not a deputation');
+$panel = pdso_job_panel($jobId);
+ok(isset($panel['status'],$panel['mob'],$panel['site_log'],$panel['timesheet'],$panel['approvals'],$panel['conflicts']), 'pdso_job_panel returns the whole panel dataset in one read');
+// Render the panel partial.
+$job = ops_one("SELECT j.*, c.client_id FROM jobs j LEFT JOIN calls c ON c.id=j.call_id WHERE j.id=?", [$jobId]);
+$jcall = ops_one("SELECT * FROM calls WHERE id=?", [$callId]);
+$dep = $panel; $depStatuses = pdso_statuses(); $depMobStatuses = pdso_mob_statuses();
+$depLogKinds = pdso_log_kinds(); $depApprovalStatuses = pdso_approval_statuses(); $depCanEdit = true;
+ob_start(); require __DIR__ . '/../views/ops/_deputation_panel.php'; $ph = ob_get_clean();
+ok(strpos($ph,'/dep-status')!==false && strpos($ph,'/dep-site-log')!==false && strpos($ph,'/dep-timesheet')!==false && strpos($ph,'/dep-approval')!==false, 'panel renders all site-ops action forms');
+ok(strpos($ph,'id="deputation"')!==false, 'panel carries the #deputation anchor for the job-detail link');
+// Read-only render (an inspector who is not the assigned person) hides the forms.
+$depCanEdit = false; ob_start(); require __DIR__ . '/../views/ops/_deputation_panel.php'; $ph2 = ob_get_clean();
+ok(strpos($ph2,'/dep-status')===false, 'read-only view hides the write forms (permission-gated)');
+
+// ---------------------------------------------------------------------------
 if ($__standalone) {
     $g = $GLOBALS['__t'];
     echo "\n==================== PDSO: {$g['pass']} passed, {$g['fail']} failed ====================\n";
