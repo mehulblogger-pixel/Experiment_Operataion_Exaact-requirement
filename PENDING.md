@@ -2,6 +2,43 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🎫 URADE — Universal Release, Acceptance & Disposition Engine (Phase 3, Aug 2026)
+
+Built on the LOCKED Phase 1 (URFE) + Phase 2 (UIRE). `lib/urade.php`, wired into
+run_schema after uire_migrate. A release is a CONTROLLED CONSEQUENCE of evidence,
+not a template. Reuses the existing Release Note (RN/IRN, release_status,
+idems_released_line_items), NCR, workflow, signatures, numbering, versioning
+(frozen at issue) — adds only the decision layer. The engine decides NOTHING and
+changes NO fact; it computes readiness and flags for a human.
+
+- **Slice 1 — ✅ DONE.** Configurable masters (release_type/disposition/basis/
+  restriction via lookup engine). **Release Eligibility Engine** (release_rules +
+  urade_eligibility) — the keystone: READY / CONDITIONAL / BLOCKED from a context
+  via named deterministic checks (inspection complete/accepted, tests passed,
+  docs complete, critical/major NCR, qty reconciles, approvals), with per-
+  condition reasons; mandatory rules block, allow_conditional downgrades to
+  CONDITIONAL. Verified §80/§81/§82/§83/§84.
+- **Slice 2 — ✅ DONE.** Release Library sections/fields + 7 sample release configs
+  (Note/Certificate/Partial/Conditional/Final-Acceptance/Site/Service) from ONE
+  engine (§79). **Consumes inspection data** (§12/§69): urade_context_from_
+  inspection() + urade_release_eligibility() pull result / accepted-qty / failed
+  tests / missing docs / open NCRs from the linked Phase-2 inspection — no
+  re-entry. Additive report_docs.release_of_id. Verified §85/§88 (over-release &
+  failed-test-in-inspection both block).
+- **Slice 3 — ✅ DONE.** Release data-integrity in the single QA result
+  (idems_qa_run item 14 → urade_qa_checks): disposition-vs-eligibility contradiction
+  (§88 critical), released>accepted math (§58), item-level status vs overall
+  disposition (§86), release-before-inspection date (§59). ADVISORY — never
+  changes a disposition; §61 verified. Item-level rollup urade_item_rollup (§67/§68).
+- **Slice 4 — ✅ DONE.** Acceptance tests §80-89 + full REGRESSION LOCK: all 22
+  report engines (IR/MGHIR/RN/IRN/VASR/VAR/ER + 8 UIR + 7 URD) build & render
+  clean; combined URFE+UIRE+URADE library (34 sections) intact.
+
+**URADE Phase 3 acceptance (§90/§91/§80-89) demonstrated; Phase 1+2 regression
+clean. Deferred (reuse, not new): a dedicated release register/reviewer dashboard
+— the existing documents register, fill screen, approval workflow and release
+register already serve it; a bespoke UI is polish, not capability.**
+
 ## 🔎 UIRE — Universal Inspection Reporting Engine (Phase 2, Aug 2026) — IN PROGRESS
 
 Built on the LOCKED Phase 1 (URFE). `lib/uire.php`, wired into run_schema after
