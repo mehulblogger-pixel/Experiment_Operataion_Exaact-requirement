@@ -2,6 +2,15 @@
 <p class="plead">The inspection, audit and assessment work <?= e(app_name()) ?> has shared with
   <?= e(cvp_vendor_name()) ?>, at a glance. Reports appear here the moment we share them — you do not have to ask.</p>
 
+<?php if (!empty($d['actions'])): ?>
+<div class="pcard" style="border-left:5px solid var(--warn)">
+  <div style="font-weight:600;margin-bottom:8px">Awaiting you</div>
+  <?php foreach ($d['actions'] as $a): ?>
+    <div style="margin:4px 0"><a href="<?= e($a['url']) ?>"><?= e($a['label']) ?> →</a></div>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
 <div class="ptiles">
   <?php if (vcan('reports')): ?>
   <div class="ptile"><div class="n"><?= (int)$d['reports'] ?></div>

@@ -72,6 +72,19 @@ function cvp_migrate() {
     if (function_exists('ensure_column')) {
         ensure_column('report_docs', 'vendor_visible', 'INT DEFAULT 0');
     }
+
+    // -- Slice 4: the portal notification feed --------------------------------
+    // One store for BOTH audiences. A row is a thing that HAPPENED to this party
+    // (a report issued/shared, a nonconformity raised, a response decided). The
+    // (audience, partner_id, event, ref_kind, ref_id) tuple is the natural key —
+    // the sync below inserts once and never duplicates. Confidentiality is
+    // inherited: a notification is only ever created for a record the audience
+    // may already see, so the feed can leak nothing the reads would not.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS portal_notifications (
+        id $pk, audience VARCHAR(10) DEFAULT 'CLIENT', partner_id INT,
+        event VARCHAR(30) DEFAULT '', ref_kind VARCHAR(20) DEFAULT '', ref_id INT DEFAULT 0,
+        title VARCHAR(255) DEFAULT '', url VARCHAR(200) DEFAULT '',
+        is_read INT DEFAULT 0, created_at VARCHAR(30) DEFAULT '')");
 }
 
 // ============================================================================
@@ -221,7 +234,9 @@ function cvp_vendor_dashboard() {
             "SELECT COUNT(*) FROM nonconformities n WHERE n.partner_id=? AND n.status <> 'CLOSED' AND $vw",
             array_merge([$vid], $va)), 0));
     }
-    return ['reports' => $reports, 'recent' => $recent, 'issues_open' => $issues];
+    return ['reports' => $reports, 'recent' => $recent, 'issues_open' => $issues,
+            'actions' => cvp_action_centre('VENDOR', $vid, 'vcan'),
+            'unread'  => cvp_notify_count('VENDOR', $vid)];
 }
 
 // ---- Vendor onboarding (staff invite; vendor sets own password) ------------
@@ -374,7 +389,18 @@ function cvp_vendor_route($route, $method) {
     switch ($route) {
         case 'vendor':
             cvp_vendor_log('DASHBOARD');
+            cvp_notify_sync('VENDOR', cvp_vendor_id());
             cvp_vendor_view('dashboard', ['d' => cvp_vendor_dashboard()]);
+            exit;
+
+        case 'vendor/alerts':
+            cvp_notify_sync('VENDOR', cvp_vendor_id());
+            if ($method === 'POST') {
+                if (!empty($_POST['read_all'])) cvp_notify_read_all('VENDOR', cvp_vendor_id());
+                elseif (!empty($_POST['id']))   cvp_notify_read('VENDOR', cvp_vendor_id(), (int)$_POST['id']);
+                redirect('/vendor/alerts');
+            }
+            cvp_vendor_view('alerts', ['rows' => cvp_notifications('VENDOR', cvp_vendor_id()), 'events' => CVP_EVENTS]);
             exit;
 
         case 'vendor/reports':
@@ -528,6 +554,134 @@ function cvp_vendor_route_issues($route, $method, $u) {
         return true;
     }
     return false;
+}
+
+// ============================================================================
+//  SLICE 4 — the portal notification feed + the "awaiting you" action centre.
+//
+//  The feed is state-derived, not event-hooked: cvp_notify_sync() reconciles a
+//  party's feed with what already exists for them (issued/shared reports,
+//  visible nonconformities, decided responses) and inserts a row the first time
+//  it sees each. That means it needs NO edits to the report, NCR or CAPA engines
+//  — it is a lens over their output, self-healing and impossible to leave in a
+//  half-wired state. It runs cheaply on each portal load. Every notification is
+//  for a record the audience can already open, so it can leak nothing.
+//
+//  The action centre is purely live: "these N things are waiting for YOU right
+//  now" — reports to decide, nonconformities to respond to, attendance to
+//  approve. No storage; it is always the truth.
+// ============================================================================
+
+const CVP_EVENTS = [
+    'REPORT_ISSUED'  => 'A report was issued to you',
+    'REPORT_SHARED'  => 'A report was shared with you',
+    'NCR_RAISED'     => 'A nonconformity needs your response',
+    'NCR_DECIDED'    => 'We reviewed your response',
+];
+
+// Insert a notification once. The natural key stops the sync duplicating it.
+function cvp_notify_once($audience, $partnerId, $event, $refKind, $refId, $title, $url) {
+    $audience = strtoupper((string)$audience); $partnerId = (int)$partnerId;
+    if (!$partnerId) return false;
+    $exists = portal_try(fn() => ops_val(
+        "SELECT COUNT(*) FROM portal_notifications WHERE audience=? AND partner_id=? AND event=? AND ref_kind=? AND ref_id=?",
+        [$audience, $partnerId, $event, $refKind, (int)$refId]), 0);
+    if ((int)$exists > 0) return false;
+    db()->prepare("INSERT INTO portal_notifications (audience,partner_id,event,ref_kind,ref_id,title,url,is_read,created_at)
+                   VALUES (?,?,?,?,?,?,?,0,?)")
+        ->execute([$audience, $partnerId, $event, $refKind, (int)$refId, substr((string)$title, 0, 255), (string)$url, date('c')]);
+    return true;
+}
+
+// Reconcile a party's feed with current state. Cheap, idempotent, no engine edits.
+function cvp_notify_sync($audience, $partnerId) {
+    $audience = strtoupper((string)$audience); $partnerId = (int)$partnerId;
+    if (!$partnerId) return;
+    try {
+        if ($audience === 'CLIENT') {
+            foreach (portal_try(fn() => ops_all(
+                "SELECT id, irn FROM report_docs WHERE client_id=? AND finalized=1 AND COALESCE(deleted,0)=0
+                 ORDER BY id DESC LIMIT 100", [$partnerId]), []) as $r)
+                cvp_notify_once('CLIENT', $partnerId, 'REPORT_ISSUED', 'report', (int)$r['id'],
+                    'Report ' . $r['irn'] . ' issued to you', '/portal/report?id=' . (int)$r['id']);
+        } elseif ($audience === 'VENDOR') {
+            foreach (portal_try(fn() => ops_all(
+                "SELECT id, irn FROM report_docs WHERE vendor_id=? AND finalized=1 AND COALESCE(deleted,0)=0
+                 AND COALESCE(vendor_visible,0)=1 ORDER BY id DESC LIMIT 100", [$partnerId]), []) as $r)
+                cvp_notify_once('VENDOR', $partnerId, 'REPORT_SHARED', 'report', (int)$r['id'],
+                    'Report ' . $r['irn'] . ' shared with you', '/vendor/report?id=' . (int)$r['id']);
+        }
+        // Nonconformities visible to this audience (open ones need a response).
+        $issueUrl = $audience === 'VENDOR' ? '/vendor/issue?id=' : '/portal/issue?id=';
+        foreach (cvp_issues_for($audience, $partnerId, true) as $n)
+            cvp_notify_once($audience, $partnerId, 'NCR_RAISED', 'ncr', (int)$n['id'],
+                'Nonconformity ' . ($n['ref'] ?: ('#' . (int)$n['id'])) . ' needs your response', $issueUrl . (int)$n['id']);
+        // Responses we have since decided.
+        foreach (portal_try(fn() => ops_all(
+            "SELECT id, ncr_id, decision FROM issue_disputes WHERE party=? AND COALESCE(decision,'')<>''
+             ORDER BY id DESC LIMIT 100", [$audience]), []) as $d) {
+            // Only for issues that belong to this partner (ownership check).
+            if (!cvp_issue($audience, $partnerId, (int)$d['ncr_id'])) continue;
+            cvp_notify_once($audience, $partnerId, 'NCR_DECIDED', 'dispute', (int)$d['id'],
+                'We reviewed your response (' . $d['decision'] . ')', $issueUrl . (int)$d['ncr_id']);
+        }
+    } catch (Throwable $e) { /* the feed must never break the page */ }
+}
+
+function cvp_notifications($audience, $partnerId, $unreadOnly = false, $limit = 100) {
+    $partnerId = (int)$partnerId; if (!$partnerId) return [];
+    $w = $unreadOnly ? ' AND is_read=0' : '';
+    return portal_try(fn() => ops_all(
+        "SELECT * FROM portal_notifications WHERE audience=? AND partner_id=?$w
+         ORDER BY is_read ASC, id DESC LIMIT " . max(1, (int)$limit),
+        [strtoupper((string)$audience), $partnerId]), []);
+}
+function cvp_notify_count($audience, $partnerId) {
+    $partnerId = (int)$partnerId; if (!$partnerId) return 0;
+    return (int)(portal_try(fn() => ops_val(
+        "SELECT COUNT(*) FROM portal_notifications WHERE audience=? AND partner_id=? AND is_read=0",
+        [strtoupper((string)$audience), $partnerId]), 0));
+}
+function cvp_notify_read($audience, $partnerId, $id) {
+    db()->prepare("UPDATE portal_notifications SET is_read=1 WHERE id=? AND audience=? AND partner_id=?")
+        ->execute([(int)$id, strtoupper((string)$audience), (int)$partnerId]);
+}
+function cvp_notify_read_all($audience, $partnerId) {
+    db()->prepare("UPDATE portal_notifications SET is_read=1 WHERE audience=? AND partner_id=? AND is_read=0")
+        ->execute([strtoupper((string)$audience), (int)$partnerId]);
+}
+
+// The live "awaiting you" list — always the current truth, never stored.
+// Returns [['label'=>..,'count'=>N,'url'=>..], ...] for the things this party
+// must act on. $can is a permission checker (pcan for client, vcan for vendor).
+function cvp_action_centre($audience, $partnerId, $can) {
+    $audience = strtoupper((string)$audience); $partnerId = (int)$partnerId;
+    $out = [];
+    if (!$partnerId) return $out;
+
+    if ($audience === 'CLIENT') {
+        if ($can('reports.decide')) {
+            // Finalized reports with no client decision recorded for the current rev.
+            $n = (int)(portal_try(fn() => ops_val(
+                "SELECT COUNT(*) FROM report_docs d WHERE d.client_id=? AND d.finalized=1 AND COALESCE(d.deleted,0)=0
+                 AND NOT EXISTS (SELECT 1 FROM report_client_reviews r WHERE r.report_doc_id=d.id AND r.rev=d.rev)",
+                [$partnerId]), 0));
+            if ($n > 0) $out[] = ['label' => $n . ' report' . ($n > 1 ? 's' : '') . ' to accept or reject', 'count' => $n, 'url' => '/portal/reports'];
+        }
+        if ($can('deputation.approve') && function_exists('pdso_portal_approvals')) {
+            $ap = portal_try(fn() => pdso_portal_approvals($partnerId), []);
+            $n = 0; foreach ((array)$ap as $a) if (in_array(($a['status'] ?? ''), ['SUBMITTED','CLIENT_REVIEW'], true)) $n++;
+            if ($n > 0) $out[] = ['label' => $n . ' attendance period' . ($n > 1 ? 's' : '') . ' to approve', 'count' => $n, 'url' => '/portal/deputations'];
+        }
+    }
+    // Open nonconformities awaiting a response — both audiences.
+    if ($can('issues') && function_exists('cvp_issues_for')) {
+        $open = cvp_issues_for($audience, $partnerId, true);
+        $n = count($open);
+        if ($n > 0) $out[] = ['label' => $n . ' nonconformity' . ($n > 1 ? '(ies)' : '') . ' to respond to', 'count' => $n,
+            'url' => $audience === 'VENDOR' ? '/vendor/issues' : '/portal/issues'];
+    }
+    return $out;
 }
 
 // ============================================================================

@@ -2,6 +2,15 @@
 <p class="plead">Everything <?= e(app_name()) ?> is doing for <?= e(portal_client_name()) ?>, at a glance.
   Reports appear here the moment they are issued — you do not have to ask for them.</p>
 
+<?php if (!empty($d['actions'])): ?>
+<div class="pcard" style="border-left:5px solid var(--warn)">
+  <div style="font-weight:600;margin-bottom:8px">Awaiting you</div>
+  <?php foreach ($d['actions'] as $a): ?>
+    <div style="margin:4px 0"><a href="<?= e($a['url']) ?>"><?= e($a['label']) ?> →</a></div>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
 <?php // Each tile is a figure from a register, so it is only shown to somebody
       // who may open that register. A money tile in front of a QA engineer who
       // is not allowed to see invoices is the leak, not the invoice screen. ?>

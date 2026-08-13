@@ -15,6 +15,10 @@ if (pcan('issues') && function_exists('cvp_issues_for')) $links['portal/issues']
 if (pcan('invoices'))  $links['portal/invoices']   = 'Invoices';
 if (pcan('request'))   $links['portal/request']    = 'Request an inspection';
 if (pcan('complaint')) $links['portal/complaints'] = 'Complaints &amp; appeals';
+if (function_exists('cvp_notify_count')) {
+    $__cn = cvp_notify_count('CLIENT', portal_partner_id());
+    $links['portal/alerts'] = 'Alerts' . ($__cn ? ' (' . $__cn . ')' : '');
+}
 ?><!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
