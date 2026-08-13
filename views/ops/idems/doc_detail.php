@@ -199,6 +199,37 @@
 </details>
 <?php endif; ?>
 
+<?php // ---- Release readiness gate (URADE §10/§55) — evidence-based, advisory ---- ?>
+<?php if (!empty($relEligibility)):
+  $rs = $relEligibility['status'];
+  $gc = $rs==='BLOCKED' ? 'var(--bad)' : ($rs==='CONDITIONAL' ? '#b45309' : 'var(--ok)');
+  $glabel = $rs==='BLOCKED' ? 'Blocked' : ($rs==='CONDITIONAL' ? 'Conditional' : 'Ready');
+  $glight = $rs==='BLOCKED' ? '🔴' : ($rs==='CONDITIONAL' ? '🟡' : '🟢');
+  $stCol = ['PASS'=>'var(--ok)','BLOCKED'=>'var(--bad)','CONDITIONAL'=>'#b45309','FAIL'=>'#c2410c','NA'=>'var(--muted)'];
+?>
+<details class="panel" style="margin:0 0 12px;border:1px solid <?= $gc ?>" <?= $rs!=='READY'?'open':'' ?>>
+  <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font-size:18px"><?= $glight ?></span>
+    <b style="color:<?= $gc ?>">Release readiness — <?= e($glabel) ?></b>
+    <span class="muted" style="font-size:12.5px">evidence-based gate · advisory · authority decides</span>
+    <span style="flex:1"></span>
+    <?php if (($relEligibility['inspection_count']??0)>0): ?><span class="muted" style="font-size:11.5px">from <?= (int)$relEligibility['inspection_count'] ?> inspection(s)</span><?php endif; ?>
+  </summary>
+  <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+    <?php if ($rs==='BLOCKED'): ?><p style="margin:0;font-size:12.5px;color:var(--bad)"><b>This release cannot proceed</b> until the blocking condition(s) below are resolved, or an authorized exception is recorded.</p>
+    <?php elseif ($rs==='CONDITIONAL'): ?><p style="margin:0;font-size:12.5px;color:#b45309">A <b>conditional release</b> is possible — record the condition(s) and obtain approval.</p>
+    <?php else: ?><p style="margin:0;font-size:12.5px;color:var(--ok)">All mandatory release conditions are satisfied.</p><?php endif; ?>
+    <?php foreach ($relEligibility['conditions_list'] as $c): if (($c['result']??'')==='NA') continue; $cc=$stCol[$c['state']]??'var(--muted)'; ?>
+      <div style="display:flex;gap:9px;align-items:baseline">
+        <span class="pill" style="background:color-mix(in srgb,<?= $cc ?> 14%,transparent);color:<?= $cc ?>;min-width:80px;text-align:center;font-size:10px"><?= e(ucfirst(strtolower($c['state']))) ?></span>
+        <span style="font-size:12.5px"><b><?= e($c['label']) ?></b><?= !empty($c['reason'])?' <span class="muted">— '.e($c['reason']).'</span>':'' ?></span>
+      </div>
+    <?php endforeach; ?>
+    <p class="muted" style="font-size:11px;margin:2px 0 0">Computed from the linked inspection(s) — result, accepted quantity, tests, documents and open NCRs — against the configurable release rules. It never releases or changes a value; an authorized person makes the decision.</p>
+  </div>
+</details>
+<?php endif; ?>
+
 <?php // ---- Predictive delivery risk (Phase 6) — deterministic, advisory only ---- ?>
 <?php if (!empty($expRisk)):
   $rb = $expRisk['band'];
