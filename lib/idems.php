@@ -7694,6 +7694,10 @@ function ops_idems_release_note($method) {
         'inspection_date'=>$src['inspection_date'], 'result'=>$src['result'] ?: $p['result'], 'release_status'=>$rel,
         'remarks'=>'',
     ];
+    // §12/§63 — link the Release to the inspection it is generated from, so the
+    // Phase-3 eligibility engine reads the inspection's result / accepted qty /
+    // tests / documents / NCRs directly (no re-entry). Column added by URADE.
+    if (function_exists('urade_migrate')) $fieldsNew['release_of_id'] = (int)$src['id'];
     [$irn, $serial] = idems_generate_irn($fieldsNew);
     $tok = idems_tokens_for($fieldsNew);
     // Carry the inspection report's own field values across — the identifying
@@ -7701,7 +7705,11 @@ function ops_idems_release_note($method) {
     // renders through the same form engine with the same content, under its own
     // number. The release statement is prefilled with the default wording; the
     // inspection report number(s) are left blank for manual entry. §releasenote
-    $carry = ['client','end_user','vendor','po_number','project','inspection_stage','inspection_date','location','inspector','po_items','scope_activities'];
+    $carry = ['client','end_user','vendor','po_number','project','inspection_stage','inspection_date','location','inspector','po_items','scope_activities',
+        // UIRE (Phase 2) inspection fields — carried so a Release generated from a
+        // universal inspection report keeps the same identifying + outcome details.
+        'inspection_type','item_desc','tag_no','serial_no','heat_no','batch_no',
+        'inspection_result','inspected_qty','accepted_qty','rejected_qty','inspection_items'];
     $rnArr = ['source_irn' => $src['irn'], 'source_report_id' => (int)$src['id']];
     foreach ($carry as $ck) if (isset($data[$ck]) && $data[$ck] !== '' && $data[$ck] !== 'NA') $rnArr[$ck] = $data[$ck];
     if (isset($rnArr['po_items'])) $rnArr['po_items'] = idems_released_line_items($rnArr['po_items']);   // §releasenote — show only released line items
