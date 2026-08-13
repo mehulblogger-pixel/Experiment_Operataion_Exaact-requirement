@@ -2,6 +2,42 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🏢 UVAE — Universal Vendor Assessment, Qualification & Supplier Evaluation Engine (Phase 4, Aug 2026)
+
+Built on locked Phase 1-3 and the app's EXISTING vendor platform (VASR report +
+scoring engine, vendor_profiles qualification record + status lifecycle,
+Vendor-360, performance, reassessment) — reused, not rebuilt. lib/uvae.php.
+
+- **Slice 1 — DONE.** Assessment Type master (30) + result/finding/method masters.
+  Assessment CRITERIA LIBRARY (assessment_criteria + packs) — dynamically
+  assembled by applicability (vendor type/industry/product). Universal core +
+  Manufacturing/Service/Trader packs. Verified §135-138 (manufacturer sees mfg &
+  not service/trader; service sees service; trader sees source/traceability).
+- **Slice 2 — DONE.** Assessment sections into the URFE Library + 5 sample
+  assessment types (§134) + uvae_questionnaire_prefill_rows (fills the
+  questionnaire from the applicable criteria at fill time). Verified the
+  questionnaire filters by vendor type; renders through the existing engine.
+- **Slice 3 — DONE.** Qualification DECISION engine (uvae_qualification_decision):
+  configurable disqualification rules (§68) — critical fail -> Not Qualified
+  (overrides score, §141); missing mandatory + policy -> Conditional (§140), else
+  Pending; score-threshold baseline; score != decision (§70). Per-product
+  qualification matrix rollup (§74/§146 - keeps separate scope, overall PARTIAL if
+  any not-qualified) + vendor_qualifications register. Suspension/reinstatement
+  (§99/§100) via the existing vendor status lifecycle (history preserved).
+- **Slice 4 — DONE.** Consume vendor performance (§143) via idems_vendor_360 /
+  performance / expediting_perf (no re-entry). Assessment QA (idems_qa_run item 15
+  -> uvae_qa_checks): expired/invalid certs (§85), evidence contradiction
+  (positive answer vs expired/missing evidence §106/§144), performance-claim
+  mismatch (§107/§145) — ADVISORY, never changes an answer/score/decision (§109).
+  §148 reproducibility verified. Regression LOCK: all 18 engines (Phase 1-4)
+  build & render; combined library 43 sections.
+
+**UVAE Phase 4 acceptance (§149/§150 + §135-148) demonstrated; Phase 1-3
+regression clean. Assessment findings are NOT NCRs (§59/§151). Deferred (reuse,
+not new): vendor self-assessment portal UX (§76/§121 - reuses the client-portal
+architecture) and a dedicated assessment dashboard (§122 - reuses the documents
+register + Vendor-360).**
+
 ## 🎫 URADE — Universal Release, Acceptance & Disposition Engine (Phase 3, Aug 2026)
 
 Built on the LOCKED Phase 1 (URFE) + Phase 2 (UIRE). `lib/urade.php`, wired into

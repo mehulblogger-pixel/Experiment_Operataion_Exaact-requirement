@@ -2666,6 +2666,15 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
         catch (Throwable $e) {}
     }
 
+    // 15) Vendor-assessment cross-checks (UVAE) — expired certs, evidence
+    // contradictions and performance mismatches. ADVISORY: never changes an
+    // answer, score or decision (§109). Self-gates on assessment fields.
+    if (function_exists('uvae_qa_checks')) {
+        try { foreach (uvae_qa_checks($doc, $fields, $data) as $qi)
+            $add($qi['sev'], $qi['cat'], $qi['title'], $qi['loc'], $qi['why'], $qi['loc'], $qi['fix'] ?? ''); }
+        catch (Throwable $e) {}
+    }
+
     $counts = ['critical'=>0,'high'=>0,'medium'=>0,'low'=>0,'info'=>0];
     foreach ($issues as $it) { $s = $it['severity']; if (isset($counts[$s])) $counts[$s]++; }
     $score = 100 - ($counts['critical']*40 + $counts['high']*12 + $counts['medium']*5 + $counts['low']*1 + $counts['info']*0);
