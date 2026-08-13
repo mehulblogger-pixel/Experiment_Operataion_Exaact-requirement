@@ -15,8 +15,8 @@
 $__standalone = empty($GLOBALS['__test_db']);
 if ($__standalone) { require __DIR__ . '/lib.php'; require __DIR__ . '/bootstrap.php'; }
 
-function ok($cond, $msg) { return t_ok($cond, $msg); }
-function head($t) { t_section($t); }
+if (!function_exists('ok'))   { function ok($cond, $msg) { return t_ok($cond, $msg); } }
+if (!function_exists('head')) { function head($t) { t_section($t); } }
 
 // ---------------------------------------------------------------------------
 head('1. Migration — masters, criteria library, packs, conclusion rules');

@@ -2,6 +2,48 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🧩 Service Scope Engine — service independence, activation & override (Aug 2026)
+
+Governing rule (owner mandate): NO service is a mandatory prerequisite for another
+at runtime. Inspection, Expediting, Vendor Assessment, Vendor Audit, Release and
+Project Deputation each run on their own. Phase build order is implementation
+sequence only — NOT a business workflow. `lib/services.php`, wired into run_schema
+after uvaae, required in index.php after uvaae. Admin at Settings → Service scope.
+
+It separates two questions the app was conflating:
+- **Offered on this installation?** — global catalog toggle, composes with (never
+  fights) the commercial licence (a service whose licence module is off is
+  unavailable). Drives the menu. `svc_globally_active($code)`.
+- **In scope for this client / contract / project / PO / assignment?** — per-scope
+  activation resolved MOST-SPECIFIC-FIRST (Assignment > PO > Project > Contract >
+  Client > catalog default). Drives what a user may create/see within a client,
+  without one service ever depending on another. `svc_active($code, $ctx)`,
+  `svc_resolve`, `svc_scope_map`, `svc_active_codes`.
+
+- **Slice 1 — DONE.** service_catalog (6 services, each mapped to licence module +
+  permission + route + nav) + service_scope (per-entity overrides, any level) +
+  service_dependencies (optional, configurable). Seeds everything ON by default →
+  fully backward compatible (behaves exactly as before until an admin narrows it).
+- **Slice 2 — DONE.** Resolver + admin screen (global catalog toggles, per-client
+  scope Default/Active/Inactive, dependency editor) + menu gating (Expediting nav
+  gated by svc_globally_active; Service-scope link under Admin). Every cross-service
+  link in the app was already function_exists-guarded and reads live data, so an
+  inactive service is simply absent — never an error.
+- **Slice 3 — DONE.** Optional dependencies: NONE by default (no forced workflow).
+  A configured dependency (Service A before B, with condition/approval/effective/
+  scope) is scoped (global or per client/contract/…) and ADVISORY via
+  svc_unmet_dependencies — a prerequisite not in scope cannot block; the engine
+  imposes nothing itself. Verified: tests/test_services.php 35 assertions.
+
+**Independence acceptance demonstrated: Inspection runs with every other service
+switched off; turning one service off never affects another; most-specific-active
+wins across all five levels. Full suite 526 passed / 0 failed. Deferred (reuse, not
+new): wiring per-scope Contract/Project/PO/Assignment override editors into those
+records' own screens (the resolver already supports all five levels via the generic
+svc_set_scope API — only the CLIENT-level admin UI is built so far); and having each
+module call svc_active() at its create-point (API ready; the guard is
+svc_unmet_dependencies + svc_active).**
+
 ## 🔍 UVAAE — Universal Vendor Audit, Compliance & Management-System Audit Engine (Phase 5, Aug 2026)
 
 Built on locked Phase 1-4 and the app's EXISTING audit infrastructure — reused,

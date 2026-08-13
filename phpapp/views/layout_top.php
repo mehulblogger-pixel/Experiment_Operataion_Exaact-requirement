@@ -210,8 +210,10 @@
         <?php if (can('mod.idems.edit') || is_master_of('idems')): ?><a class="s-item<?= $navOn(['document-new']) ?>" href="/document-new"><span class="s-ic">➕</span><span><?= e(ucfirst(T_NEW('report'))) ?></span></a><?php endif; ?>
         <a class="s-item<?= $navOn(['endorsements','endorsement','endorsement-new','endorsement-edit']) ?>" href="/endorsements"><span class="s-ic">✅</span><span><?= e(T_REG('endorsement')) ?></span></a>
         <a class="s-item<?= $navOn(['vendors','vendor-profile']) ?>" href="/vendors"><span class="s-ic">🏭</span><span>Vendor register</span></a>
+        <?php if (!function_exists('svc_globally_active') || svc_globally_active('EXPEDITING')): ?>
         <a class="s-item<?= $navOn(['expediting']) ?>" href="/expediting"><span class="s-ic">🚚</span><span>Expediting register</span></a>
         <a class="s-item<?= $navOn(['expediting-projects']) ?>" href="/expediting-projects"><span class="s-ic">🗂️</span><span>Project delivery</span></a>
+        <?php endif; ?>
         <a class="s-item<?= $navOn(['writing-assistant','phrase-library','phrase-edit']) ?>" href="/writing-assistant"><span class="s-ic">✒️</span><span>Technical writing</span></a>
         <a class="s-item<?= $navOn(['learning']) ?>" href="/learning"><span class="s-ic">🧠</span><span>Learning insights</span></a>
         <?php if (licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('users.manage.global'))): ?><a class="s-item<?= $navOn(['approver-map']) ?>" href="/approver-map"><span class="s-ic">👤</span><span>Approver mapping</span></a><?php endif; ?>
@@ -294,6 +296,7 @@
                 // mod.settings.view meant a business director was shown the link
                 // and then refused at the door — which reads as a broken app. ?>
           <?php if (can('mod.settings.view') && can('settings.manage')): ?><a class="s-item<?= $navOn(['settings','terminology','ai-settings','reset-data']) ?>" href="/settings"><span class="s-ic">⚙️</span><span>System settings</span></a><?php endif; ?>
+          <?php if (can('settings.manage') || is_master()): ?><a class="s-item<?= $navOn(['service-scope']) ?>" href="/service-scope"><span class="s-ic">🧩</span><span>Service scope</span></a><?php endif; ?>
           <?php if (can('settings.manage') || is_master()): ?><a class="s-item<?= $navOn(['company-profile']) ?>" href="/company-profile"><span class="s-ic">🏢</span><span>Company profile</span></a><?php endif; ?>
           <?php if ((can('settings.manage') || is_master()) && function_exists('books_licensed') && books_licensed()): $bxc = function_exists('books_outbox_counts') ? books_outbox_counts() : []; ?><a class="s-item<?= $navOn(['books-bridge']) ?>" href="/books-bridge"><span class="s-ic">📗</span><span>MGH Books<?= !empty($bxc['stuck']) ? ' (' . (int)$bxc['stuck'] . ')' : '' ?></span></a><?php endif; ?>
         <?php $endgrp(); endif; ?>
