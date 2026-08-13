@@ -44,13 +44,23 @@ Wired into run_schema after services, required after services in index.php.
   Independence proven: lifecycle, site registers and a new site issue all keep
   working with Inspection/Assessment/Audit/Expediting/Release AND NCR switched off.
 
+- **Slice 2 — DONE (Deputation dashboard + register).** `/deputations` screen in
+  the SAME visual language as the home dashboard (reuses .kpi-row/.kpi and the
+  "what's waiting" qcards band): KPI tiles (active postings, mobilization pending,
+  manpower gap, on leave/replacement) + a waiting band (attendance sign-offs,
+  overdue site actions, double-booked people, upcoming demob, suspended) + the
+  manpower plan/gap table + a filterable deputation register (person/client/site/
+  period/status, each row linking to the existing job detail). pdso_dashboard()
+  aggregates; ops_pdso() handler; route `deputations` dispatched + nav link under
+  Operations (gated by svc_globally_active('DEPUTATION') + the ops permission).
+  Verified: tests/test_pdso.php now 45 assertions incl. dashboard view render.
+
 **Deferred to next slice (surfaces, reuse-heavy — not new engines): a Deputation
-site-ops panel on the job/deputation detail (lifecycle buttons, checklist, site
-registers, timesheet, client-approval), a Deputation dashboard (active postings,
-mobilization pending, manpower gap, today's attendance, overdue actions, conflicts,
-upcoming demob), the manpower-plan admin, and the personnel/client-portal views
-(reuse the existing portal). The engine + report types are live now; the screens
-hang off them.**
+site-ops PANEL on the job/deputation detail (lifecycle buttons, mobilization
+checklist, site registers, timesheet, client-approval — the write side of the
+engine, currently API-only), the manpower-plan editor, and the personnel/
+client-portal views (reuse the existing portal). The engine, report types and the
+read-side dashboard are live now; the per-job write panel hangs off them next.**
 
 ## 🧩 Service Scope Engine — service independence, activation & override (Aug 2026)
 

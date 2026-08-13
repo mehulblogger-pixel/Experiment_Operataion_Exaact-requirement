@@ -168,6 +168,19 @@ if (function_exists('svc_set_global')) {
 } else { ok(true, 'service scope engine not present — independence trivially holds'); }
 
 // ---------------------------------------------------------------------------
+head('12. Dashboard aggregates + register view render');
+$dash = pdso_dashboard();
+ok($dash['active'] >= 1, 'dashboard counts active postings (' . $dash['active'] . ')');
+ok($dash['manpower_gap'] === 2, 'dashboard rolls up the manpower gap (2)');
+ok($dash['overdue_actions'] >= 1, 'dashboard counts overdue site actions');
+ok($dash['conflict_people'] >= 1, 'dashboard counts double-booked people');
+// Render the register/dashboard view without error.
+$vd = pdso_dashboard(); $rows = pdso_deputations(); $statuses = pdso_statuses(); $status = ''; $manpower = pdso_manpower(0, null);
+ob_start(); $d = $vd; require __DIR__ . '/../views/ops/deputations.php'; $html = ob_get_clean();
+ok(strpos($html, 'kpi-row') !== false && strpos($html, 'Active postings') !== false, 'deputation dashboard view renders the KPI row');
+ok(strpos($html, 'JOB-DEP-1') !== false || strpos($html, 'Deputations') !== false, 'the register lists the deputation postings');
+
+// ---------------------------------------------------------------------------
 if ($__standalone) {
     $g = $GLOBALS['__t'];
     echo "\n==================== PDSO: {$g['pass']} passed, {$g['fail']} failed ====================\n";

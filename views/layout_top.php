@@ -138,6 +138,7 @@
         <?php $grp('Operations'); ?>
         <?php if (can('mod.calls.view')): ?><a class="s-item<?= $navOn(['calls','call']) ?>" href="/calls"><span class="s-ic">☎️</span><span><?= e(THP('call')) ?></span></a><?php endif; ?>
         <?php if (can('mod.jobs.view')): ?><a class="s-item<?= $navOn(['jobs','job']) ?>" href="/jobs"><span class="s-ic">🗂</span><span><?= e(THP('job')) ?></span></a><?php endif; ?>
+        <?php if ((can('mod.jobs.view')||can('mod.calls.view')) && (!function_exists('svc_globally_active') || svc_globally_active('DEPUTATION'))): ?><a class="s-item<?= $navOn(['deputations']) ?>" href="/deputations"><span class="s-ic">👷</span><span>Deputation &amp; site ops</span></a><?php endif; ?>
         <?php if (can('mod.jobs.view') && function_exists('can_manage_availability') && can_manage_availability()): ?><a class="s-item<?= $navOn(['availability']) ?>" href="/availability"><span class="s-ic">🟢</span><span><?= e(TH('engineer')) ?> availability</span></a><?php endif; ?>
         <?php if (function_exists('timesheet_can') && timesheet_can()): ?><a class="s-item<?= $navOn(['timesheet']) ?>" href="/timesheet"><span class="s-ic">⏱️</span><span>Timesheet</span></a><?php endif; ?>
         <?php if (function_exists('rating_can') && rating_can()): ?><a class="s-item<?= $navOn(['ratings']) ?>" href="/ratings"><span class="s-ic">⭐</span><span>Inspector ratings</span></a><?php endif; ?>
