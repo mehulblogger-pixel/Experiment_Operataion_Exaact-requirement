@@ -189,6 +189,7 @@ try {
     require __DIR__ . '/lib/attend.php';
     require __DIR__ . '/lib/cvp.php';
     require __DIR__ . '/lib/tapi.php';
+    require __DIR__ . '/lib/tapi_dash.php';
     require __DIR__ . '/lib/idems_autoform.php';
     require __DIR__ . '/lib/hwpoints.php';
     require __DIR__ . '/lib/seed_demo.php';

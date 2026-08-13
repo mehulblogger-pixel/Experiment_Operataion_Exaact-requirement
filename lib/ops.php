@@ -2086,6 +2086,7 @@ function ops_module_gate($route) {
         'office-finance'=>'overheads','cost-run'=>'overheads',
         'sbu-pl'=>'profitability','call-profit'=>'profitability','mis'=>'reports',
         'reports'=>'reports',
+        'analytics'=>'reports','analytics-kpis'=>'reports','analytics-kpi-edit'=>'reports','analytics-quality'=>'reports','analytics-drill'=>'reports',
         'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users','org-template'=>'users',
         'user-unlock'=>'users','user-2fa-reset'=>'users','user-retire'=>'users',
         'contract-overrides'=>'calls','contract-override'=>'calls','contract-open'=>'quotes',
@@ -2259,6 +2260,8 @@ function ops_dispatch($route, $method) {
             ops_my_jobs(); return true;
         case $route === 'reports':
             ops_reports(); return true;
+        case strncmp($route, 'analytics', 9) === 0:
+            return ops_tapi($route, $method);
         case $route === 'profitability':
             ops_profitability(); return true;
         case $route === 'invoicing':
