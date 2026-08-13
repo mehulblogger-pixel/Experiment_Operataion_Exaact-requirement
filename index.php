@@ -178,6 +178,7 @@ try {
     require __DIR__ . '/lib/idems.php';
     require __DIR__ . '/lib/urfe.php';
     require __DIR__ . '/lib/uire.php';
+    require __DIR__ . '/lib/urade.php';
     require __DIR__ . '/lib/idems_autoform.php';
     require __DIR__ . '/lib/hwpoints.php';
     require __DIR__ . '/lib/seed_demo.php';
