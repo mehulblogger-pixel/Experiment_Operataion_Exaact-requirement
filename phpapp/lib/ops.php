@@ -2091,6 +2091,8 @@ function ops_module_gate($route) {
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'service-scope'=>'settings',
         'deputations'=>'jobs',
+        'call-status'=>'calls','call-attrs'=>'calls','call-override'=>'calls',
+        'call-clar-new'=>'calls','call-clar-respond'=>'calls','call-clar-status'=>'calls',
         'dep-status'=>'jobs','dep-check-seed'=>'jobs','dep-check-set'=>'jobs','dep-site-log'=>'jobs',
         'dep-site-log-close'=>'jobs','dep-timesheet'=>'jobs','dep-approval'=>'jobs','dep-approval-status'=>'jobs',
         'dep-manpower-add'=>'jobs','dep-manpower-update'=>'jobs','dep-manpower-del'=>'jobs',
@@ -2517,6 +2519,8 @@ function ops_dispatch($route, $method) {
             return ops_services($route, $method);
         case $route === 'deputations':
             return ops_pdso($route, $method);
+        case in_array($route, ['call-status','call-attrs','call-override','call-clar-new','call-clar-respond','call-clar-status'], true):
+            return ops_tosrm_action($route, $method);
         case in_array($route, ['dep-status','dep-check-seed','dep-check-set','dep-site-log','dep-site-log-close','dep-timesheet','dep-approval','dep-approval-status'], true):
             return ops_pdso_action($route, $method);
         case in_array($route, ['dep-manpower-add','dep-manpower-update','dep-manpower-del'], true):
