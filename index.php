@@ -182,6 +182,7 @@ try {
     require __DIR__ . '/lib/uvae.php';
     require __DIR__ . '/lib/uvaae.php';
     require __DIR__ . '/lib/services.php';
+    require __DIR__ . '/lib/pdso.php';
     require __DIR__ . '/lib/idems_autoform.php';
     require __DIR__ . '/lib/hwpoints.php';
     require __DIR__ . '/lib/seed_demo.php';
