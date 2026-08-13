@@ -2693,6 +2693,15 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
         catch (Throwable $e) {}
     }
 
+    // 17) Deputation data-integrity (PDSO) — attendance-vs-activity, overdue
+    // open actions. ADVISORY: it flags, it NEVER invents work/attendance/hours
+    // and never approves anything (§88/§89). Self-gates on deputation report fields.
+    if (function_exists('pdso_qa_checks')) {
+        try { foreach (pdso_qa_checks($doc, $fields, $data) as $qi)
+            $add($qi['sev'], $qi['cat'], $qi['title'], $qi['loc'], $qi['why'], $qi['loc'], $qi['fix'] ?? ''); }
+        catch (Throwable $e) {}
+    }
+
     $counts = ['critical'=>0,'high'=>0,'medium'=>0,'low'=>0,'info'=>0];
     foreach ($issues as $it) { $s = $it['severity']; if (isset($counts[$s])) $counts[$s]++; }
     $score = 100 - ($counts['critical']*40 + $counts['high']*12 + $counts['medium']*5 + $counts['low']*1 + $counts['info']*0);

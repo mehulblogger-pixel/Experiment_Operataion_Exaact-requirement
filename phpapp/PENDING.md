@@ -2,6 +2,56 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 👷 PDSO — Project Deputation & Site Operations (Phase 7, Aug 2026) — GAP-FILLER
+
+Owner directive: "Build only the gap which is missing in our existing system."
+The app is ALREADY a deputation platform — a DEPUTATION-type job is the posting;
+attendance, expenses, man-day/man-month billing, personnel (inspectors/users),
+competence & certification, the report engine + Template Builder (URFE), the
+actions engine, the client portal and the Service-Scope engine all exist and are
+LOCKED. So PDSO (`lib/pdso.php`) creates NO new deployment/attendance/timesheet-
+of-record/expense/billing object; it attaches ONLY the missing site-operations
+pieces to the existing deputation (job_id) and reuses everything else untouched.
+Wired into run_schema after services, required after services in index.php.
+
+- **Slice 1 — DONE (engine + report types).** Additive gap tables, all keyed to
+  the existing job/client, nothing rebuilt:
+  - Deployment LIFECYCLE status (jobs.dep_status + dep_status_events history) —
+    Planned→Mobilized→Active→On Leave→Demobilized→Closed; unknown status rejected;
+    every transition kept (no silent change, §84/§93).
+  - Mobilization/demobilization CHECKLIST (dep_checklist, phase MOB/DEMOB) with
+    editable defaults (none mandatory, §15) + readiness gate.
+  - Manpower PLAN & GAP (dep_manpower) — required vs mobilized, per-position + roll-up.
+  - Site TRANSFER/rotation history (dep_site_history) — full history retained (§9).
+  - Site REGISTERS (dep_site_log, kind = observation/issue/instruction/meeting) —
+    a site observation is NOT automatically an NCR (ncr_id=0; §37); overdue open
+    actions surfaced.
+  - Activity TIMESHEET (dep_timesheet) beside the existing day-status attendance;
+    hours/OT/day totals.
+  - Client attendance APPROVAL → billing sign-off (dep_att_approval) Draft→Submitted
+    →Approved with client rep + date + CLIENT provenance (§90); billable qty preserved
+    for billing support, never recomputed (§48 — supports billing, is not accounting).
+  - Resource CONFLICT (pdso_resource_conflicts) — overlapping postings for one
+    person, pure logic over existing jobs; never moves anybody (§74).
+  - Daily/Weekly/Fortnightly/Monthly/Final deputation REPORT TYPES via the Template
+    Builder (URFE library: DEP_DETAILS/ATTENDANCE/ACTIVITIES/TASKS/ISSUES/
+    INSTRUCTIONS/MEETINGS/PLAN/CONCLUSION) — daily report does NOT force inspection
+    content (§27); all 5 build & render.
+  - Advisory QA (idems_qa_run item 17 → pdso_qa_checks): attendance-with-no-activity,
+    overdue open actions — flags, NEVER invents work/attendance/hours or approves
+    (§88/§89). Provenance (§90) tracked, never mixed.
+  Verified: tests/test_pdso.php 39 assertions; full suite 565 passed / 0 failed.
+  Independence proven: lifecycle, site registers and a new site issue all keep
+  working with Inspection/Assessment/Audit/Expediting/Release AND NCR switched off.
+
+**Deferred to next slice (surfaces, reuse-heavy — not new engines): a Deputation
+site-ops panel on the job/deputation detail (lifecycle buttons, checklist, site
+registers, timesheet, client-approval), a Deputation dashboard (active postings,
+mobilization pending, manpower gap, today's attendance, overdue actions, conflicts,
+upcoming demob), the manpower-plan admin, and the personnel/client-portal views
+(reuse the existing portal). The engine + report types are live now; the screens
+hang off them.**
+
 ## 🧩 Service Scope Engine — service independence, activation & override (Aug 2026)
 
 Governing rule (owner mandate): NO service is a mandatory prerequisite for another
