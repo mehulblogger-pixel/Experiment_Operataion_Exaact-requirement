@@ -554,6 +554,117 @@ function pdso_dashboard() {
 }
 
 function pdso_can_view() { return (function_exists('can') && (can('mod.calls.view') || can('mod.jobs.view'))) || (function_exists('is_master') && is_master()); }
+// Management may run the whole site-ops layer; the assigned inspector may log
+// their OWN posting's site ops (§65/§92 — site personnel per permissions).
+function pdso_can_edit($job = null) {
+    if (function_exists('is_master') && is_master()) return true;
+    if (function_exists('is_coordinator_level') && is_coordinator_level()) return true;
+    if ($job && function_exists('is_inspector') && is_inspector()) {
+        $me = function_exists('current_user') ? (int)(current_user()['inspector_id'] ?? 0) : 0;
+        if ($me && $me === (int)($job['inspector_id'] ?? 0)) return true;
+    }
+    return false;
+}
+
+// Everything the per-job Deputation & site-ops panel needs, in one read.
+function pdso_job_panel($jobId) {
+    $jobId = (int)$jobId;
+    $insp = (int)(ops_val("SELECT inspector_id FROM jobs WHERE id=?", [$jobId]) ?: 0);
+    return [
+        'status'        => pdso_status_of($jobId),
+        'history'       => pdso_status_history($jobId),
+        'mob'           => pdso_checklist($jobId, 'MOB'),
+        'demob'         => pdso_checklist($jobId, 'DEMOB'),
+        'mob_readiness' => pdso_mob_readiness($jobId, 'MOB'),
+        'site_log'      => pdso_site_log($jobId),
+        'timesheet'     => pdso_timesheet($jobId),
+        'ts_totals'     => pdso_timesheet_totals($jobId),
+        'approvals'     => pdso_att_approvals($jobId),
+        'conflicts'     => $insp ? pdso_resource_conflicts($insp, $jobId) : [],
+    ];
+}
+// True when a job should show the deputation panel.
+function pdso_is_deputation($job, $call = null) {
+    if (!$job) return false;
+    if (($job['dep_status'] ?? '') !== '') return true;
+    if (strtoupper((string)($job['job_type'] ?? '')) === 'DEPUTATION') return true;
+    if ($call && strtoupper((string)($call['inspection_type'] ?? '')) === 'DEPUTATION') return true;
+    return false;
+}
+
+// ---------------------------------------------------------------------------
+//  Write handler for the per-job site-ops panel. Every action redirects back to
+//  the job's #deputation anchor. CSRF + permission gated; additive only.
+// ---------------------------------------------------------------------------
+function ops_pdso_action($route, $method) {
+    ops_require(pdso_enabled(), 'The Deputation service is not active for this installation.');
+    $jobId = (int)($_POST['job_id'] ?? $_GET['id'] ?? 0);
+    $job = $jobId ? ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]) : null;
+    if (!$job) { flash('Deputation not found.', 'error'); redirect('/deputations'); }
+    $back = '/job?id=' . $jobId . '#deputation';
+    if ($method !== 'POST') redirect($back);
+    if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect($back); }
+    ops_require(pdso_can_edit($job), 'You do not have permission to change this deputation.');
+    pdso_migrate();
+
+    switch ($route) {
+        case 'dep-status':
+            $st = (string)($_POST['dep_status'] ?? '');
+            if (pdso_set_status($jobId, $st, (string)($_POST['reason'] ?? ''))) {
+                if (in_array($st, ['MOB_PENDING','MOBILIZED'], true)) pdso_checklist_seed($jobId, 'MOB');
+                if ($st === 'DEMOB_PLANNED') pdso_checklist_seed($jobId, 'DEMOB');
+                flash('Deputation status updated to ' . (pdso_statuses()[$st] ?? $st) . '.');
+            } else flash('Please pick a valid status.', 'error');
+            break;
+        case 'dep-check-seed':
+            $ph = strtoupper((string)($_POST['phase'] ?? 'MOB'));
+            $n = pdso_checklist_seed($jobId, $ph);
+            flash($n > 0 ? (ucfirst(strtolower($ph)) . ' checklist added (' . $n . ' items — edit or remove freely).') : 'That checklist is already present.');
+            break;
+        case 'dep-check-set':
+            pdso_checklist_set((int)($_POST['item_id'] ?? 0), (string)($_POST['status'] ?? ''), (string)($_POST['note'] ?? ''));
+            flash('Checklist item updated.');
+            break;
+        case 'dep-site-log':
+            if (trim((string)($_POST['detail'] ?? '')) === '') { flash('Write what was observed / instructed / discussed.', 'error'); break; }
+            pdso_site_log_add([
+                'job_id'=>$jobId, 'client_id'=>(int)($_POST['client_id'] ?? 0), 'kind'=>(string)($_POST['kind'] ?? 'OBSERVATION'),
+                'log_date'=>(string)($_POST['log_date'] ?? date('Y-m-d')), 'location'=>(string)($_POST['location'] ?? ''),
+                'detail'=>(string)($_POST['detail'] ?? ''), 'risk'=>(string)($_POST['risk'] ?? ''), 'action'=>(string)($_POST['action'] ?? ''),
+                'responsible'=>(string)($_POST['responsible'] ?? ''), 'due_on'=>(string)($_POST['due_on'] ?? ''),
+                'client_visible'=>isset($_POST['client_visible']) ? 1 : 0, 'source'=>'TPIA',
+            ]);
+            flash('Site register entry added. (A site observation is not a nonconformity unless you raise one.)');
+            break;
+        case 'dep-site-log-close':
+            db()->prepare("UPDATE dep_site_log SET status=? WHERE id=? AND job_id=?")->execute([(string)($_POST['status'] ?? 'CLOSED'), (int)($_POST['log_id'] ?? 0), $jobId]);
+            flash('Site register entry updated.');
+            break;
+        case 'dep-timesheet':
+            pdso_timesheet_add([
+                'job_id'=>$jobId, 'inspector_id'=>(int)($job['inspector_id'] ?? 0), 'ts_date'=>(string)($_POST['ts_date'] ?? date('Y-m-d')),
+                'activity'=>(string)($_POST['activity'] ?? ''), 'description'=>(string)($_POST['description'] ?? ''),
+                'hours'=>(float)($_POST['hours'] ?? 0), 'ot_hours'=>(float)($_POST['ot_hours'] ?? 0),
+                'billable'=>isset($_POST['billable']) ? 1 : 0, 'source'=>'PERSONNEL',
+            ]);
+            flash('Timesheet entry added.');
+            break;
+        case 'dep-approval':
+            pdso_att_approval_add([
+                'job_id'=>$jobId, 'client_id'=>(int)($_POST['client_id'] ?? 0), 'period_from'=>(string)($_POST['period_from'] ?? ''),
+                'period_to'=>(string)($_POST['period_to'] ?? ''), 'basis'=>(string)($_POST['basis'] ?? ''),
+                'billable_days'=>(float)($_POST['billable_days'] ?? 0), 'billable_hours'=>(float)($_POST['billable_hours'] ?? 0),
+                'status'=>'SUBMITTED',
+            ]);
+            flash('Attendance period submitted for client approval.');
+            break;
+        case 'dep-approval-status':
+            pdso_att_approval_set_status((int)($_POST['ap_id'] ?? 0), (string)($_POST['status'] ?? ''), (string)($_POST['client_rep'] ?? ''), (string)($_POST['comments'] ?? ''));
+            flash('Attendance approval updated.');
+            break;
+    }
+    redirect($back);
+}
 
 function ops_pdso($route, $method) {
     ops_require(pdso_enabled(), 'The Deputation service is not active for this installation. Switch it on under Settings → Service scope.');

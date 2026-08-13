@@ -90,6 +90,10 @@
 </div>
 <?php endif; ?>
 
+<?php // ---- Phase 7 (PDSO): deputation & site-operations panel — only for a
+      // deputation posting; reuses this job, adds the site-ops layer.
+      if (!empty($dep)) require __DIR__ . '/_deputation_panel.php'; ?>
+
 <?php // ---- §WO-8: day-by-day completion — close each visit with its report
       if (count($vp) > 1 && empty($job['closed_flag'])): ?>
 <div class="panel" id="visit-close">
