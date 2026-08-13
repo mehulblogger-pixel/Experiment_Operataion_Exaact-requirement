@@ -2657,6 +2657,15 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
         catch (Throwable $e) {}
     }
 
+    // 14) Release data-integrity (URADE) — disposition-vs-eligibility, quantity
+    // math, item-level and date contradictions. ADVISORY: it flags, it never
+    // releases or changes a disposition (§61/§88). Self-gates on release fields.
+    if (function_exists('urade_qa_checks')) {
+        try { foreach (urade_qa_checks($doc, $fields, $data) as $qi)
+            $add($qi['sev'], $qi['cat'], $qi['title'], $qi['loc'], $qi['why'], $qi['loc'], $qi['fix'] ?? ''); }
+        catch (Throwable $e) {}
+    }
+
     $counts = ['critical'=>0,'high'=>0,'medium'=>0,'low'=>0,'info'=>0];
     foreach ($issues as $it) { $s = $it['severity']; if (isset($counts[$s])) $counts[$s]++; }
     $score = 100 - ($counts['critical']*40 + $counts['high']*12 + $counts['medium']*5 + $counts['low']*1 + $counts['info']*0);

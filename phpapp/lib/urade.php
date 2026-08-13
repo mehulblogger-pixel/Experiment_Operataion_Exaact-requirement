@@ -245,6 +245,88 @@ function urade_release_eligibility($releaseDoc) {
     return urade_eligibility($ctx, $rt, (int)($releaseDoc['client_id'] ?? 0) ?: null);
 }
 
+// Item-level disposition rollup (§67/§68/§86) — from the release_items table.
+// Returns counts by disposition and a derived overall (worst-first: any rejected/
+// held → the release is not a clean full release).
+function urade_item_rollup($fields, $data) {
+    foreach ($fields as $f) {
+        if (($f['ftype'] ?? '') !== 'table' || ($f['fkey'] ?? '') !== 'release_items') continue;
+        $rows = $data[$f['fkey']] ?? null; if (!is_array($rows) || !$rows) return null;
+        $defs = idems_table_col_defs($f);
+        $kSt=null; foreach ($defs as $k=>$d) if (stripos((string)$d['label'],'status')!==false) { $kSt=$k; break; }
+        if ($kSt===null) return null;
+        $c = ['released'=>0,'conditional'=>0,'held'=>0,'rejected'=>0,'other'=>0,'total'=>0];
+        foreach ($rows as $r) { $s=strtolower(trim((string)((array)$r)[$kSt] ?? '')); if($s==='')continue; $c['total']++;
+            if (strpos($s,'reject')!==false) $c['rejected']++;
+            elseif (strpos($s,'held')!==false || strpos($s,'hold')!==false) $c['held']++;
+            elseif (strpos($s,'condition')!==false) $c['conditional']++;
+            elseif (strpos($s,'releas')!==false || strpos($s,'accept')!==false) $c['released']++;
+            else $c['other']++; }
+        if (!$c['total']) return null;
+        $overall = $c['rejected']>0 ? 'PARTIAL' : ($c['held']>0 ? 'PARTIAL' : ($c['conditional']>0 ? 'COND_RELEASED' : 'RELEASED'));
+        return ['counts'=>$c, 'overall'=>$overall];
+    }
+    return null;
+}
+
+// ---------------------------------------------------------------------------
+//  Release data-integrity checks (§57-59, §88). DETERMINISTIC and ADVISORY —
+//  flags contradictions & math errors; NEVER changes a disposition or a fact
+//  (§61). Called from idems_qa_run. Self-gates on release fields.
+// ---------------------------------------------------------------------------
+function urade_qa_checks($doc, $fields = null, $data = null) {
+    if ($fields === null) $fields = idems_fields((int)($doc['report_type_id'] ?? 0));
+    if ($data === null) { $data = json_decode($doc['data'] ?? '[]', true); if (!is_array($data)) $data = []; }
+    // Self-gate: only for reports that carry a release disposition field.
+    $isRelease = false; foreach ($fields as $f) if (($f['fkey'] ?? '') === 'disposition') { $isRelease = true; break; }
+    if (!$isRelease) return [];
+    $out = []; $num = fn($x)=>($x===''||$x===null)?null:(float)preg_replace('/[^0-9.\-]/','',(string)$x);
+    $disp = strtolower(trim((string)($data['disposition'] ?? '')));
+    $positive = $disp !== '' && (strpos($disp,'releas')!==false || strpos($disp,'accept')!==false) && strpos($disp,'not')===false && strpos($disp,'cond')===false && strpos($disp,'partial')===false;
+
+    // (a) Disposition vs eligibility (§88): a positive release while eligibility is
+    // BLOCKED — the strongest contradiction. Flag; never change the disposition.
+    try {
+        $elig = urade_release_eligibility($doc);
+        if ($positive && $elig['status'] === 'BLOCKED') {
+            $reasons = implode('; ', array_map(fn($b)=>$b['label'], array_slice($elig['blockers'],0,4)));
+            $out[] = ['sev'=>'critical','cat'=>'release','title'=>'Release is marked released while eligibility is BLOCKED','loc'=>'Disposition',
+                'why'=>'The disposition is "'.($data['disposition']).'" but a mandatory release condition is not met: '.$reasons.'.',
+                'fix'=>'Resolve the blocking condition, or use an authorized exception/conditional-release path. The system will not release it for you.'];
+        } elseif ($positive && $elig['status'] === 'CONDITIONAL' && strpos($disp,'cond')===false) {
+            $out[] = ['sev'=>'high','cat'=>'release','title'=>'Release looks conditional but is marked as a full release','loc'=>'Disposition',
+                'why'=>'Eligibility is CONDITIONAL (a mandatory item needs a recorded condition + approval) but the disposition is "'.($data['disposition']).'".',
+                'fix'=>'Record the condition and set a conditional disposition, or clear the item.'];
+        }
+    } catch (Throwable $e) {}
+
+    // (b) Quantity math (§58): released > accepted; negative quantities.
+    $acc=$num($data['accepted_qty'] ?? null); $rel=$num($data['released_qty'] ?? null);
+    if ($acc !== null && $rel !== null && $rel > $acc + 0.001)
+        $out[] = ['sev'=>'high','cat'=>'release','title'=>'Released quantity exceeds the accepted quantity','loc'=>'Disposition',
+            'why'=>'Released ('.$rel.') is greater than accepted ('.$acc.').','fix'=>'Released quantity cannot exceed accepted quantity.'];
+    if ($rel !== null && $rel < 0)
+        $out[] = ['sev'=>'high','cat'=>'release','title'=>'Negative released quantity','loc'=>'Disposition','why'=>'Released quantity is negative ('.$rel.').','fix'=>'Correct the quantity.'];
+
+    // (c) Item-level rollup vs overall (§67/§86): a rejected/held item under an
+    // overall full release.
+    $roll = urade_item_rollup($fields, $data);
+    if ($roll && $positive && ($roll['counts']['rejected']>0 || $roll['counts']['held']>0))
+        $out[] = ['sev'=>'high','cat'=>'release','title'=>'Item-level status contradicts an overall full release','loc'=>'Release items',
+            'why'=>$roll['counts']['rejected'].' item(s) rejected and '.$roll['counts']['held'].' held, but the overall disposition is a full release.',
+            'fix'=>'Use a partial/conditional disposition, or reconcile the item statuses.'];
+
+    // (d) Date logic (§59): release before its inspection.
+    $rd = strtotime((string)($data['release_date'] ?? ($doc['issue_date'] ?? '')));
+    $insId = (int)($doc['release_of_id'] ?? 0);
+    if ($rd && $insId) { $ins = ops_one("SELECT issue_date,inspection_date FROM report_docs WHERE id=?", [$insId]);
+        $idt = strtotime((string)($ins['issue_date'] ?? $ins['inspection_date'] ?? ''));
+        if ($idt && $rd < $idt)
+            $out[] = ['sev'=>'medium','cat'=>'release','title'=>'Release date is before the inspection date','loc'=>'Release details',
+                'why'=>'The release is dated before the inspection it is based on.','fix'=>'Check the dates; a release cannot precede its inspection.']; }
+    return $out;
+}
+
 // Default eligibility rules — sensible policy; the administrator can change every
 // flag. [code,label,category,check_type,mandatory,allow_conditional,fail_message]
 const URADE_DEFAULT_RULES = [
