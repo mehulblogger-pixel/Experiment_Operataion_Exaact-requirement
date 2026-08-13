@@ -784,6 +784,33 @@ function portal_route($route, $method) {
             portal_view('request', ['rows' => portal_requests_mine(), 'err' => $err]);
             exit;
 
+        // Phase 10 (CVP) Slice 3: the client sees nonconformities raised to them
+        // (marked client-visible) and responds — the same engine loop the vendor
+        // portal uses. cvp_issue*/cvp_issues_for are the shared, gated engine.
+        case 'portal/issues':
+            if (!function_exists('cvp_issues_for')) { http_response_code(404); portal_view('notfound'); exit; }
+            portal_need('issues', 'nonconformities');
+            portal_view('issues', ['rows' => cvp_issues_for('CLIENT', portal_partner_id())]);
+            exit;
+
+        case 'portal/issue':
+            if (!function_exists('cvp_issue')) { http_response_code(404); portal_view('notfound'); exit; }
+            portal_need('issues', 'nonconformities');
+            $n = cvp_issue('CLIENT', portal_partner_id(), (int)($_GET['id'] ?? $_POST['id'] ?? 0));
+            if (!$n) { http_response_code(404); portal_view('notfound'); exit; }
+            $err = '';
+            if ($method === 'POST') {
+                $err = cvp_issue_respond('CLIENT', portal_partner_id(), (int)$n['id'], $_POST, (string)(portal_user()['name'] ?? ''));
+                if ($err === '') {
+                    portal_log('ISSUE_RESPONSE', (string)$n['ref']);
+                    $_SESSION['portal_flash'] = 'Thank you — your response to ' . $n['ref'] . ' is recorded and with our team.';
+                    redirect('/portal/issues');
+                }
+            }
+            portal_view('issue', ['n' => $n, 'err' => $err,
+                'responses' => cvp_issue_responses('CLIENT', (int)$n['id']), 'kinds' => NCDCA_RESPONSE_KINDS]);
+            exit;
+
         case 'portal/password':
             $err = ''; $done = false;
             if ($method === 'POST') {
@@ -974,6 +1001,7 @@ const PORTAL_PERMS = [
     'complaint'          => 'Raise a complaint or an appeal',
     'deputation'         => 'See deputed personnel, attendance and site reports',
     'deputation.approve' => 'Approve or return attendance / timesheet periods',
+    'issues'             => 'See nonconformities raised to them and respond',
 ];
 
 // A constant cannot call T(), so the labels that name a business noun are
