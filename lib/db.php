@@ -372,6 +372,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('ncdca_migrate')) ncdca_migrate();   // NCDCA — universal issue engine (elevates NCR+CAPA: issue types, deviation/concession/waiver, dispute, due-date extension, issue reports)
     if (function_exists('attend_migrate')) attend_migrate();
     if (function_exists('cvp_migrate')) cvp_migrate();       // CVP Phase 10 — Client & Vendor Portal (confidentiality spine + vendor portal + external issue loop + notifications + governance)
+    if (function_exists('tapi_migrate')) tapi_migrate();     // TAPI Phase 11 — Analytics & Performance Intelligence (KPI master + safe formula engine + metric registry)
     if (function_exists('tosrm_migrate_d')) tosrm_migrate_d(); // TOSRM Phase 9 — service-request lifecycle + assignment lifecycle + readiness/confirmation/competence + SLA/TAT/delay/recurring/capacity (chains A→B→C→D)
     elseif (function_exists('tosrm_migrate')) tosrm_migrate();
     if (function_exists('orgadmin_migrate')) orgadmin_migrate();   // office tree + heads
