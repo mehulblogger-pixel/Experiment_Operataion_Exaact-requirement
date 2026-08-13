@@ -4622,9 +4622,25 @@ function idems_handle_uploads($doc, $fields) {
     }
 }
 // Stream a stored attachment.
+// Object-level authorization for a report attachment. The route is already
+// behind the idems module gate, but that only proves the staff user may see
+// SOME reports — not this one. A file hangs off a report_doc, and a report_doc
+// belongs to an office + business unit, so we apply the very same office/SBU
+// scope the report register uses (scope_clause). A user outside the report's
+// scope gets nothing back — the file "does not exist" for them, exactly as an
+// out-of-scope report does not appear in their register. Masters (scope = ALL)
+// are unaffected. Returns the file row, or null when unseen/deleted/missing.
+function idems_file_authorized($id) {
+    $master = function_exists('is_master') && is_master();
+    [$sw, $sa] = (!$master && function_exists('scope_clause')) ? scope_clause('d.office_id', 'd.sbu') : ['1=1', []];
+    $row = ops_one("SELECT rf.*, d.deleted FROM report_files rf JOIN report_docs d ON d.id=rf.report_doc_id
+                    WHERE rf.id=? AND $sw", array_merge([(int)$id], $sa));
+    if (!$row || $row['deleted']) return null;
+    return $row;
+}
 function ops_idems_file($method) {
-    $f = ops_one("SELECT rf.*, d.deleted FROM report_files rf JOIN report_docs d ON d.id=rf.report_doc_id WHERE rf.id=?", [(int)($_GET['id'] ?? 0)]);
-    if (!$f || $f['deleted']) { http_response_code(404); echo 'Not found'; return true; }
+    $f = idems_file_authorized((int)($_GET['id'] ?? 0));
+    if (!$f) { http_response_code(404); echo 'Not found'; return true; }
     $data = (string)$f['data'];
     if (strpos($data, 'base64,') !== false) $data = base64_decode(substr($data, strpos($data, 'base64,') + 7));
     send_uploaded_file($data, $f['file_name'] ?: 'file', $f['mime'] ?? '');
@@ -4670,9 +4686,19 @@ function ops_job_qap_upload($method) {
              : ('Nothing uploaded.' . ($skipped ? ' Skipped: ' . implode(', ', $skipped) : '')), $n ? 'success' : 'error');
     redirect('/job?id=' . $jobId);
 }
+// Object-level authorization for a QAP attachment — same principle as
+// idems_file_authorized, scoped through the job the QAP hangs off (executing
+// office + business unit). Returns the QAP row or null when out of scope.
+function job_qap_authorized($id) {
+    $master = function_exists('is_master') && is_master();
+    [$sw, $sa] = (!$master && function_exists('scope_clause')) ? scope_clause('j.executing_office_id', 'j.sbu') : ['1=1', []];
+    $row = ops_one("SELECT q.* FROM job_qaps q JOIN jobs j ON j.id=q.job_id WHERE q.id=? AND $sw",
+                   array_merge([(int)$id], $sa));
+    return $row ?: null;
+}
 // Stream a QAP file (inline so the inspector can read it while writing).
 function ops_job_qap_download() {
-    $f = ops_one("SELECT * FROM job_qaps WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+    $f = job_qap_authorized((int)($_GET['id'] ?? 0));
     if (!$f) { http_response_code(404); echo 'Not found'; return true; }
     $data = (string)$f['data'];
     if (strpos($data, 'base64,') !== false) $data = base64_decode(substr($data, strpos($data, 'base64,') + 7));
