@@ -680,6 +680,35 @@ function portal_route($route, $method) {
             portal_view('reports', ['rows' => portal_reports(), 'err' => '']);
             exit;
 
+        // Phase 7 (PDSO): the client sees their deputed personnel, attendance
+        // periods and — where permitted — approves the man-day quantity that
+        // supports our billing. Read helpers filter to this client's partner id.
+        case 'portal/deputations':
+            portal_need('deputation', 'deputations');
+            if (!function_exists('pdso_portal_deputations')) { portal_view('message', ['title' => 'Deputations', 'body' => 'Deputation is not enabled.']); exit; }
+            portal_view('deputations', [
+                'rows'      => pdso_portal_deputations(portal_partner_id()),
+                'approvals' => pdso_portal_approvals(portal_partner_id()),
+                'canApprove'=> pcan('deputation.approve'),
+                'statuses'  => function_exists('pdso_statuses') ? pdso_statuses() : [],
+            ]);
+            exit;
+
+        case 'portal/dep-approve':
+            portal_need('deputation.approve', 'approving attendance');
+            $ap = pdso_portal_approval((int)($_POST['id'] ?? $_GET['id'] ?? 0), portal_partner_id());
+            if (!$ap) { http_response_code(404); portal_view('notfound'); exit; }
+            if ($method === 'POST' && in_array($ap['status'], ['SUBMITTED','CLIENT_REVIEW'], true)) {
+                $decision = ($_POST['decision'] ?? '') === 'APPROVED' ? 'APPROVED' : 'RETURNED';
+                $rep = trim((string)($_POST['client_rep'] ?? '')) !== '' ? (string)$_POST['client_rep'] : (string)(portal_user()['name'] ?? 'Client');
+                pdso_att_approval_set_status((int)$ap['id'], $decision, $rep, (string)($_POST['comments'] ?? ''));
+                portal_log('DEP_APPROVAL', $ap['job_id'] . ':' . $decision);
+                $_SESSION['portal_flash'] = $decision === 'APPROVED'
+                    ? 'Thank you — the attendance period is approved.'
+                    : 'Recorded — the period has been returned to our team with your note.';
+            }
+            redirect('/portal/deputations');
+
         // The client's answer to a report we issued. portal_report() is what
         // proves the report belongs to them — rcr_decide() trusts that and does
         // not re-check, so nothing else may call it with an unchecked row.
@@ -937,12 +966,14 @@ function ops_portal_admin($route, $method) {
 // ============================================================================
 
 const PORTAL_PERMS = [
-    'calls'          => 'See work orders and visits',
-    'reports'        => 'See issued reports and download them',
-    'reports.decide' => 'Accept or reject a report on the company’s behalf',
-    'invoices'       => 'See invoices and what is outstanding',
-    'request'        => 'Ask for a new job',
-    'complaint'      => 'Raise a complaint or an appeal',
+    'calls'              => 'See work orders and visits',
+    'reports'            => 'See issued reports and download them',
+    'reports.decide'     => 'Accept or reject a report on the company’s behalf',
+    'invoices'           => 'See invoices and what is outstanding',
+    'request'            => 'Ask for a new job',
+    'complaint'          => 'Raise a complaint or an appeal',
+    'deputation'         => 'See deputed personnel, attendance and site reports',
+    'deputation.approve' => 'Approve or return attendance / timesheet periods',
 ];
 
 // A constant cannot call T(), so the labels that name a business noun are
@@ -960,15 +991,15 @@ function portal_perm_labels() {
 // Starting points, not a cage — every one is editable after it is applied.
 const PORTAL_PRESETS = [
     'FULL'       => ['label' => 'Full access — a main contact',
-                     'perms' => ['calls','reports','reports.decide','invoices','request','complaint']],
+                     'perms' => ['calls','reports','reports.decide','invoices','request','complaint','deputation','deputation.approve']],
     'QUALITY'    => ['label' => 'Quality / technical — accepts reports, sees no money',
-                     'perms' => ['calls','reports','reports.decide','request','complaint']],
+                     'perms' => ['calls','reports','reports.decide','request','complaint','deputation']],
     'COMMERCIAL' => ['label' => 'Commercial / purchasing — sees reports and invoices, does not accept reports',
-                     'perms' => ['calls','reports','invoices','request','complaint']],
+                     'perms' => ['calls','reports','invoices','request','complaint','deputation','deputation.approve']],
     'ACCOUNTS'   => ['label' => 'Accounts — invoices only',
                      'perms' => ['invoices','complaint']],
     'READONLY'   => ['label' => 'Read only — sees everything, changes nothing',
-                     'perms' => ['calls','reports','invoices']],
+                     'perms' => ['calls','reports','invoices','deputation']],
 ];
 
 // The permissions this signed-in client user holds. A blank stored value means

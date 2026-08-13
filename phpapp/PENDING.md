@@ -68,10 +68,23 @@ Wired into run_schema after services, required after services in index.php.
   dispatched. Verified: tests/test_pdso.php now 52 assertions incl. panel render +
   read-only (permission) gating. Full suite 578 passed / 0 failed.
 
-**Deferred (reuse-heavy, not new engines): the manpower-plan editor screen (the
-register/gap view is live; only the add/edit form is pending) and the personnel /
-client-portal deputation views (reuse the existing portal). The engine, report
-types, read-side dashboard and per-job write panel are all live now.**
+- **Slice 4 — DONE (manpower editor + client portal).** Manpower plan is now
+  editable on /deputations (add position, inline required/planned/mobilized edit,
+  delete — coordinator/master only; routes dep-manpower-add/update/del via
+  ops_pdso_manpower). Client portal (§64): new portal perms `deputation` +
+  `deputation.approve`; portal/deputations lists the client's deputed personnel,
+  their attendance periods and — where permitted — lets the client APPROVE or
+  RETURN an attendance period (portal/dep-approve → pdso_att_approval_set_status).
+  Tenant-isolated: pdso_portal_* filter to the signed-in client's partner id and
+  the decision guard (pdso_portal_approval) refuses a non-owned row. Verified:
+  tests/test_pdso.php now 63 assertions incl. isolation + portal render. Full
+  suite 589 passed / 0 failed.
+
+**PHASE 7 (PDSO) COMPLETE — gap engine → deputation report types → read-side
+dashboard → per-job site-ops write panel → manpower editor → client portal, all
+built as a gap-filler on the existing deputation/job spine (no new deployment/
+attendance/timesheet-of-record/expense/billing object), service-independent under
+the DEPUTATION scope. Nothing further outstanding.**
 
 ## 🧩 Service Scope Engine — service independence, activation & override (Aug 2026)
 

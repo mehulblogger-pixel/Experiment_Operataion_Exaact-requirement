@@ -55,28 +55,65 @@
 <?php endif; ?>
 
 <!-- Manpower plan & gap -->
-<?php if ($manpower): ?>
-<section class="card" style="margin-top:18px">
+<?php $canPlan = (function_exists('is_coordinator_level') && is_coordinator_level()) || (function_exists('is_master') && is_master()); ?>
+<section class="card" style="margin-top:18px" id="manpower">
   <h2 style="margin:0 0 10px">Manpower plan &amp; gap</h2>
-  <div class="tbl-wrap">
-    <table class="tbl">
-      <thead><tr><th>Project</th><th>Position</th><th style="text-align:right">Required</th>
-        <th style="text-align:right">Mobilized</th><th style="text-align:right">Gap</th></tr></thead>
-      <tbody>
-      <?php foreach ($manpower as $m): $g = (int)$m['gap']; ?>
-        <tr>
-          <td><?= e($m['project']) ?: '—' ?></td>
-          <td><?= e($m['position']) ?></td>
-          <td style="text-align:right;font-variant-numeric:tabular-nums"><?= (int)$m['required'] ?></td>
-          <td style="text-align:right;font-variant-numeric:tabular-nums"><?= (int)$m['mobilized'] ?></td>
-          <td style="text-align:right;font-variant-numeric:tabular-nums"><?= $g > 0 ? '<span class="down">'.$g.'</span>' : '0' ?></td>
-        </tr>
-      <?php endforeach; ?>
-      </tbody>
-    </table>
-  </div>
+  <?php if ($manpower): ?>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Project</th><th>Position</th><th style="text-align:right">Required</th>
+          <th style="text-align:right">Planned</th><th style="text-align:right">Mobilized</th>
+          <th style="text-align:right">Gap</th><?php if ($canPlan): ?><th></th><?php endif; ?></tr></thead>
+        <tbody>
+        <?php foreach ($manpower as $m): $g = (int)$m['gap']; ?>
+          <tr>
+            <td><?= e($m['project']) ?: '—' ?></td>
+            <td><?= e($m['position']) ?></td>
+            <?php if ($canPlan): ?>
+              <td colspan="3" style="text-align:right">
+                <form method="post" action="/dep-manpower-update" style="display:inline-flex;gap:6px;align-items:center;justify-content:flex-end">
+                  <input type="hidden" name="id" value="<?= (int)$m['id'] ?>">
+                  <input type="number" name="required" value="<?= (int)$m['required'] ?>" style="width:64px" title="Required">
+                  <input type="number" name="planned" value="<?= (int)$m['planned'] ?>" style="width:64px" title="Planned">
+                  <input type="number" name="mobilized" value="<?= (int)$m['mobilized'] ?>" style="width:64px" title="Mobilized">
+                  <button class="btn sm secondary" type="submit">Save</button>
+                </form>
+              </td>
+            <?php else: ?>
+              <td style="text-align:right;font-variant-numeric:tabular-nums"><?= (int)$m['required'] ?></td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums"><?= (int)$m['planned'] ?></td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums"><?= (int)$m['mobilized'] ?></td>
+            <?php endif; ?>
+            <td style="text-align:right;font-variant-numeric:tabular-nums"><?= $g > 0 ? '<span class="down">'.$g.'</span>' : '0' ?></td>
+            <?php if ($canPlan): ?>
+              <td><form method="post" action="/dep-manpower-del" style="display:inline" onsubmit="return confirm('Remove this position?')">
+                <input type="hidden" name="id" value="<?= (int)$m['id'] ?>"><button class="btn sm danger" type="submit">✕</button></form></td>
+            <?php endif; ?>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  <?php else: ?>
+    <p class="muted" style="margin:0 0 10px">No manpower plan yet<?= $canPlan ? ' — add positions below.' : '.' ?></p>
+  <?php endif; ?>
+  <?php if ($canPlan): ?>
+    <details style="margin-top:12px"><summary>➕ Add a position to the plan</summary>
+      <form method="post" action="/dep-manpower-add" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;max-width:760px">
+        <label>Client
+          <select name="client_id"><option value="0">— none —</option>
+            <?php foreach ($clientsForPlan ?? [] as $cl): ?><option value="<?= (int)$cl['id'] ?>"><?= e($cl['name']) ?></option><?php endforeach; ?>
+          </select></label>
+        <label>Project <input type="text" name="project" placeholder="e.g. Alpha"></label>
+        <label>Position <input type="text" name="position" required placeholder="e.g. QC Inspector"></label>
+        <label>Required <input type="number" name="required" value="1" min="0"></label>
+        <label>Planned <input type="number" name="planned" value="0" min="0"></label>
+        <label>Mobilized <input type="number" name="mobilized" value="0" min="0"></label>
+        <div style="grid-column:1/4"><button class="btn" type="submit">Add position</button></div>
+      </form>
+    </details>
+  <?php endif; ?>
 </section>
-<?php endif; ?>
 
 <!-- Deputation register -->
 <section class="card" style="margin-top:18px">
