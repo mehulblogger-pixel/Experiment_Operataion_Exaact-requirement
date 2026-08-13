@@ -9,6 +9,8 @@
     <a class="btn btn-sm <?= $role === $k ? '' : 'secondary' ?>" href="/analytics?view=<?= e($k) ?>"><?= e($cfg['label']) ?></a>
   <?php endforeach; ?>
   <span style="flex:1"></span>
+  <a class="btn btn-sm secondary" href="/analytics-scorecard">Scorecard</a>
+  <a class="btn btn-sm secondary" href="/analytics-alerts">Alerts</a>
   <a class="btn btn-sm secondary" href="/analytics-kpis">KPI library</a>
   <a class="btn btn-sm secondary" href="/analytics-quality">Data quality</a>
 </div>
