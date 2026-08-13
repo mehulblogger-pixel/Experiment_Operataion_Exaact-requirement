@@ -257,6 +257,11 @@
   <a id="ops"></a>
   <?php tosrm_render_call_panel($call); ?>
 <?php endif; ?>
+<?php // Phase 9 (TOSRM Slice D) — turnaround, SLA and delay on the call.
+      if (function_exists('tosrm_render_call_sla')): ?>
+  <a id="sla"></a>
+  <?php tosrm_render_call_sla($call); ?>
+<?php endif; ?>
 
 <h3 class="tab-sub" id="jobs">Jobs allocated from this call</h3>
 <table class="grid">

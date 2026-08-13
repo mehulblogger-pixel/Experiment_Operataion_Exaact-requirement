@@ -216,6 +216,87 @@ ok(strpos($rh, 'readiness &amp; confirmation') !== false, 'the readiness panel r
 ok(strpos($rh, 'Competence &amp; certification') !== false && strpos($rh, 'CSWIP 3.1') !== false, 'the panel shows the competence advisory');
 ok(strpos($rh, 'Readiness checklist') !== false && strpos($rh, 'Pre-execution confirmation') !== false, 'the panel shows readiness + confirmation');
 
+// ============================================================================
+//  SLICE D — SLA, full-chain TAT, delay, recurring, capacity horizon.
+// ============================================================================
+tosrm_migrate_d();
+$d = fn($n) => date('Y-m-d', strtotime($n . ' days'));
+// A call with a full, dated lifecycle + a closed job.
+$sd = $mkCall(['status'=>'OPEN', 'client_id'=>77, 'inspection_type'=>'INSPECTION',
+    'call_received_date'=>$d(-20), 'forwarded_at'=>$d(-18), 'inspection_required_date'=>$d(-12), 'created_at'=>date('c')]);
+db()->prepare("INSERT INTO jobs (call_id, inspector_id, scheduled_date, inspection_end_date, closed_at, closed_flag, created_at) VALUES (?,?,?,?,?,1,?)")
+    ->execute([$sd, $inspA, $d(-10), $d(-8), $d(-6), date('c')]);
+$sdJob = (int)db()->lastInsertId();
+// The report the TAT chain reads comes from report_docs (issued at −6).
+db()->prepare("INSERT INTO report_docs (job_id, irn, status, finalized, issue_date, created_at, updated_at) VALUES (?,?,?,1,?,?,?)")
+    ->execute([$sdJob, 'TAT/26/0001', 'ISSUED', $d(-6), date('c'), date('c')]);
+
+head('20. Full-chain TAT is computed from existing data');
+$tat = tosrm_tat(ops_one("SELECT * FROM calls WHERE id=?", [$sd]));
+ok($tat['stages']['received_to_scheduled'] === 10, 'received → scheduled = 10 days');
+ok($tat['stages']['scheduled_to_executed'] === 2, 'scheduled → executed = 2 days');
+ok($tat['stages']['executed_to_report'] === 2, 'executed → report = 2 days');
+ok($tat['stages']['received_to_closure'] === 14, 'received → closure = 14 days (whole chain)');
+
+head('21. SLA targets (default + per-client override) and evaluation');
+tosrm_sla_set(0, 'RESPONSE', 3); tosrm_sla_set(0, 'SCHEDULING', 5); tosrm_sla_set(0, 'REPORT', 1);
+$tg = tosrm_sla_targets(0);
+ok($tg['SCHEDULING'] === 5, 'a default SLA target is stored and read');
+tosrm_sla_set(77, 'SCHEDULING', 15);   // client 77 gets a laxer scheduling SLA
+$tgC = tosrm_sla_targets(77);
+ok($tgC['SCHEDULING'] === 15 && $tgC['RESPONSE'] === 3, 'a per-client override wins; other stages fall back to default');
+$eval = tosrm_sla_eval(ops_one("SELECT * FROM calls WHERE id=?", [$sd]));
+ok($eval['RESPONSE']['status'] === 'WITHIN', 'response 2d within 3d = WITHIN');
+ok($eval['SCHEDULING']['status'] === 'WITHIN', 'scheduling 10d within the client override 15d = WITHIN');
+ok($eval['REPORT']['status'] === 'BREACHED', 'report 2d over 1d target = BREACHED');
+ok($eval['EXECUTION']['status'] === 'NA', 'a stage with no target reads N/A (never invented)');
+ok(tosrm_sla_set(0, 'BOGUS', 4) === false, 'an unknown SLA stage is rejected');
+
+head('22. Delay on the core job (auto days; links to Phase 6 for expediting)');
+$delId = tosrm_delay_add($sdJob, ['reason'=>'RESOURCE', 'responsibility'=>'TPIA', 'impact'=>'slipped 2 days']);
+ok($delId > 0, 'a delay is recorded on the job');
+$del = ops_one("SELECT * FROM job_delays WHERE id=?", [$delId]);
+ok((int)$del['delay_days'] === 2, 'delay days auto-computed from required (−12) vs scheduled (−10) = 2');
+ok((int)$del['is_expediting'] === 0, 'a non-expediting job does not carry the Phase-6 link flag');
+// An expediting job marks the Phase-6 link instead of duplicating.
+db()->prepare("INSERT INTO jobs (call_id, inspection_type, scheduled_date, created_at) VALUES (?,?,?,?)")->execute([$sd, 'EXPEDITING', $d(-9), date('c')]);
+$expJob = (int)db()->lastInsertId();
+$expDel = tosrm_delay_add($expJob, ['reason'=>'VENDOR']);
+ok((int)ops_one("SELECT is_expediting FROM job_delays WHERE id=?", [$expDel])['is_expediting'] === 1, 'an expediting delay is flagged to link to Phase 6 (not duplicated)');
+ok(count(tosrm_delay_list_for_call($sd)) === 2, 'delays list for the call');
+
+head('23. Recurring services generate future calls, clearly marked');
+ok(tosrm_recur_next('WEEKLY', 1, '2026-01-01') === '2026-01-08', 'weekly recurrence advances by 7 days');
+ok(tosrm_recur_next('MONTHLY', 1, '2026-01-15') === '2026-02-15', 'monthly recurrence advances by a month');
+$recId = tosrm_recurring_create(['client_id'=>77, 'title'=>'Monthly vendor audit', 'frequency'=>'MONTHLY',
+    'start_date'=>date('Y-m-d'), 'template'=>['inspection_type'=>'VENDOR_AUDIT', 'deliverables'=>'VAR']]);
+ok($recId > 0, 'a recurring schedule is created');
+ok(tosrm_recurring_create(['title'=>'']) === 0, 'a schedule with no title is refused');
+$due = tosrm_recurring_due(date('Y-m-d'));
+ok(count(array_filter($due, fn($r)=>(int)$r['id']===$recId)) === 1, 'a schedule starting today is due');
+$before = (int)ops_one("SELECT COUNT(*) n FROM calls")['n'];
+$newCall = tosrm_recurring_generate(ops_one("SELECT * FROM recurring_services WHERE id=?", [$recId]));
+$after = (int)ops_one("SELECT COUNT(*) n FROM calls")['n'];
+ok($after === $before + 1, 'generating creates exactly one call');
+$gc = ops_one("SELECT * FROM calls WHERE id=?", [$newCall]);
+ok($gc['source'] === 'RECURRING' && (int)$gc['generated_by_recurring_id'] === $recId, 'the generated call is clearly tagged as generated (source + link)');
+ok($gc['inspection_type'] === 'VENDOR_AUDIT', 'the generated call carries the template service type');
+$rec2 = ops_one("SELECT * FROM recurring_services WHERE id=?", [$recId]);
+ok((int)$rec2['generated_count'] === 1 && $rec2['next_run'] > date('Y-m-d'), 'the schedule advanced its next run and counted the generation');
+ok(tosrm_run_recurring($d(-1)) === 0, 'the cron entry generates nothing when nothing is due');
+
+head('24. Capacity horizon (reuses the availability engine)');
+$hz = tosrm_capacity_horizon('ALL', date('Y-m-d'), $d(13));
+ok(is_array($hz) && count($hz) >= 1, 'the capacity outlook produces weekly buckets (' . count($hz) . ')');
+$b0 = $hz[0];
+ok(array_key_exists('supply', $b0) && array_key_exists('demand', $b0) && array_key_exists('gap', $b0), 'each bucket carries supply, demand and gap');
+ok($b0['gap'] === $b0['demand'] - $b0['supply'], 'the gap is a plain, traceable demand − supply');
+
+head('25. SLA/TAT/delay panel renders on the call');
+ob_start(); tosrm_render_call_sla(ops_one("SELECT * FROM calls WHERE id=?", [$sd])); $sh = ob_get_clean();
+ok(strpos($sh, 'turnaround &amp; SLA') !== false, 'the SLA/TAT panel renders');
+ok(strpos($sh, 'Received → Closure') !== false && strpos($sh, 'Delays') !== false, 'the panel shows the TAT chain and delays');
+
 if ($__standalone) {
     $g = $GLOBALS['__t'];
     echo "\n==================== TOSRM: {$g['pass']} passed, {$g['fail']} failed ====================\n";

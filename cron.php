@@ -103,6 +103,12 @@ if (function_exists('idems_run_sla_escalations')) {
     echo "IDEMS approval SLA escalations: $esc\n";
 }
 
+// TOSRM Phase 9 — generate any calls that recurring schedules have made due.
+if (function_exists('tosrm_run_recurring')) {
+    $gen = tosrm_run_recurring();
+    if ($gen > 0) echo "TOSRM recurring: $gen call(s) generated.\n";
+}
+
 // Automated MIS digest to leadership — weekly on Monday, monthly on the 1st.
 // A per-day guard prevents duplicates if cron runs more than once a day.
 if (function_exists('ops_run_mis_digest')) {

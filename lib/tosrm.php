@@ -949,3 +949,392 @@ function ops_tosrm_ready_action($route, $method) {
     }
     redirect($back);
 }
+
+// ===========================================================================
+//  SLICE D — SLA, full-chain TAT, delay, recurring services, capacity horizon.
+//  Additive. TAT/SLA are COMPUTED from data the call/job already carry (plus the
+//  Slice-A status history) — no new bookkeeping needed. Delay on the core job is
+//  captured here (expediting delay stays in Phase 6 — this links, never
+//  duplicates). Recurring generates future calls, each clearly marked. Capacity
+//  outlook REUSES the availability engine.
+// ===========================================================================
+
+const TOSRM_SLA_STAGES = ['RESPONSE'=>'Response','SCHEDULING'=>'Scheduling','EXECUTION'=>'Execution','REPORT'=>'Report submission','CLOSURE'=>'Closure'];
+const TOSRM_SLA_STATUS = ['WITHIN'=>'Within SLA','AT_RISK'=>'At risk','BREACHED'=>'Breached','NA'=>'Not applicable'];
+const TOSRM_DELAY_REASONS = [
+    'RESOURCE'=>'Resource unavailable','CLIENT'=>'Client change','VENDOR'=>'Vendor change','SCOPE'=>'Scope change',
+    'LOCATION'=>'Location issue','ACCESS'=>'Access issue','TRAVEL'=>'Travel','WEATHER'=>'Weather',
+    'TECHNICAL'=>'Technical requirement','DOCS'=>'Documentation','READINESS'=>'Inspection readiness',
+    'APPROVAL'=>'Approval','CAPACITY'=>'TPIA capacity','OTHER'=>'Other',
+];
+const TOSRM_DELAY_RESP = ['TPIA'=>'TPIA','CLIENT'=>'Client','VENDOR'=>'Vendor','EXTERNAL'=>'External','NEUTRAL'=>'No fault / neutral'];
+const TOSRM_RECUR_FREQ = ['DAILY'=>'Daily','WEEKLY'=>'Weekly','FORTNIGHTLY'=>'Fortnightly','MONTHLY'=>'Monthly','QUARTERLY'=>'Quarterly','CUSTOM'=>'Custom (every N days)'];
+
+function tosrm_migrate_d() {
+    static $done = false; if ($done) return; $done = true;
+    tosrm_migrate_c();
+    if (function_exists('lk_ensure_type_map')) {
+        lk_ensure_type_map('sla_stage',   'SLA stage',        TOSRM_SLA_STAGES,   'tosrm');
+        lk_ensure_type_map('sla_status',   'SLA status',       TOSRM_SLA_STATUS,   'tosrm');
+        lk_ensure_type_map('delay_reason', 'Delay reason',     TOSRM_DELAY_REASONS,'tosrm');
+        lk_ensure_type_map('delay_resp',   'Delay responsibility', TOSRM_DELAY_RESP,'tosrm');
+        lk_ensure_type_map('recur_freq',   'Recurrence',       TOSRM_RECUR_FREQ,   'tosrm');
+    }
+    if (function_exists('ensure_column')) {
+        // A generated call remains identifiable as a generated record (§77).
+        ensure_column('calls', 'generated_by_recurring_id', 'INT DEFAULT 0');
+    }
+    $pk = pk_clause();
+    db()->exec("CREATE TABLE IF NOT EXISTS sla_targets (
+        id $pk, client_id INT DEFAULT 0, stage VARCHAR(20) DEFAULT '', target_days INT DEFAULT 0,
+        note VARCHAR(200) DEFAULT '', updated_by VARCHAR(120) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')");
+    db()->exec("CREATE TABLE IF NOT EXISTS job_delays (
+        id $pk, job_id INT DEFAULT 0, call_id INT DEFAULT 0, requested_date VARCHAR(20) DEFAULT '',
+        scheduled_date VARCHAR(20) DEFAULT '', execution_date VARCHAR(20) DEFAULT '', delay_days INT DEFAULT 0,
+        reason VARCHAR(24) DEFAULT '', category VARCHAR(24) DEFAULT '', responsibility VARCHAR(16) DEFAULT '',
+        impact VARCHAR(300) DEFAULT '', action VARCHAR(300) DEFAULT '', is_expediting INT DEFAULT 0,
+        created_by VARCHAR(120) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    db()->exec("CREATE TABLE IF NOT EXISTS recurring_services (
+        id $pk, client_id INT DEFAULT 0, title VARCHAR(200) DEFAULT '', template TEXT,
+        frequency VARCHAR(16) DEFAULT 'MONTHLY', interval_n INT DEFAULT 1, start_date VARCHAR(20) DEFAULT '',
+        end_date VARCHAR(20) DEFAULT '', next_run VARCHAR(20) DEFAULT '', active INT DEFAULT 1,
+        last_generated VARCHAR(20) DEFAULT '', generated_count INT DEFAULT 0,
+        created_by VARCHAR(120) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+}
+
+// ---- Full-chain TAT (computed) ---------------------------------------------
+function tosrm_tat($call) {
+    tosrm_migrate_d();
+    $cid = (int)($call['id'] ?? 0);
+    $received = substr((string)($call['call_received_date'] ?? ''), 0, 10);
+    $forwarded = substr((string)($call['forwarded_at'] ?? ''), 0, 10);
+    $jobs = ops_all("SELECT id, scheduled_date, inspection_end_date, closed_at, closed_flag FROM jobs WHERE call_id=?", [$cid]) ?: [];
+    $minNonEmpty = function($rows, $k) { $vals = array_filter(array_map(fn($r)=>substr((string)($r[$k] ?? ''),0,10), $rows)); return $vals ? min($vals) : ''; };
+    $maxNonEmpty = function($rows, $k) { $vals = array_filter(array_map(fn($r)=>substr((string)($r[$k] ?? ''),0,10), $rows)); return $vals ? max($vals) : ''; };
+    $scheduled = $minNonEmpty($jobs, 'scheduled_date');
+    $executed  = $maxNonEmpty($jobs, 'inspection_end_date') ?: $maxNonEmpty($jobs, 'scheduled_date');
+    // Report — the earliest issued report tied to this call's jobs (report_docs).
+    $report = '';
+    $jids = array_values(array_filter(array_map(fn($j)=>(int)$j['id'], $jobs)));
+    if ($jids) {
+        $in = implode(',', $jids);
+        try { $rr = ops_one("SELECT issue_date FROM report_docs WHERE job_id IN ($in) AND COALESCE(issue_date,'')<>'' AND COALESCE(deleted,0)=0 ORDER BY issue_date LIMIT 1"); if ($rr) $report = substr((string)$rr['issue_date'], 0, 10); }
+        catch (Throwable $e) {}
+    }
+    // Closure — the CLOSED status event, else the latest closed-job timestamp.
+    $closure = '';
+    $ce = ops_one("SELECT at FROM call_status_events WHERE call_id=? AND new_status='CLOSED' ORDER BY id DESC", [$cid]);
+    if ($ce && $ce['at']) $closure = substr((string)$ce['at'], 0, 10);
+    if ($closure === '') { $closedJobs = array_filter($jobs, fn($j)=>!empty($j['closed_flag'])); if ($closedJobs) $closure = $maxNonEmpty($closedJobs, 'closed_at'); }
+    $db = fn($a,$b) => ($a !== '' && $b !== '' && function_exists('days_between')) ? days_between($a, $b) : null;
+    return [
+        'dates' => compact('received','forwarded','scheduled','executed','report','closure'),
+        'stages' => [
+            'received_to_scheduled' => $db($received, $scheduled),
+            'scheduled_to_executed' => $db($scheduled, $executed),
+            'executed_to_report'    => $db($executed, $report),
+            'received_to_closure'   => $db($received, $closure),
+        ],
+    ];
+}
+
+// ---- SLA targets + evaluation ----------------------------------------------
+function tosrm_sla_set($clientId, $stage, $days, $note = '') {
+    tosrm_migrate_d();
+    $stage = strtoupper(trim((string)$stage)); if (!array_key_exists($stage, TOSRM_SLA_STAGES)) return false;
+    $ex = ops_one("SELECT id FROM sla_targets WHERE client_id=? AND stage=?", [(int)$clientId, $stage]);
+    if ($ex) db()->prepare("UPDATE sla_targets SET target_days=?, note=?, updated_by=?, updated_at=? WHERE id=?")->execute([(int)$days, (string)$note, tosrm_actor(), tosrm_now(), (int)$ex['id']]);
+    else db()->prepare("INSERT INTO sla_targets (client_id, stage, target_days, note, updated_by, updated_at) VALUES (?,?,?,?,?,?)")->execute([(int)$clientId, $stage, (int)$days, (string)$note, tosrm_actor(), tosrm_now()]);
+    return true;
+}
+function tosrm_sla_delete($id) { db()->prepare("DELETE FROM sla_targets WHERE id=?")->execute([(int)$id]); return true; }
+function tosrm_sla_targets($clientId = 0) {
+    tosrm_migrate_d();
+    $out = [];
+    foreach (ops_all("SELECT stage, target_days FROM sla_targets WHERE client_id=0") ?: [] as $r) $out[$r['stage']] = (int)$r['target_days'];
+    if ($clientId > 0) foreach (ops_all("SELECT stage, target_days FROM sla_targets WHERE client_id=?", [(int)$clientId]) ?: [] as $r) $out[$r['stage']] = (int)$r['target_days'];
+    return $out;
+}
+// Per-stage target vs actual for a call. Stage endpoint reached → within/breached;
+// not reached → pending / at-risk / breached against elapsed time.
+function tosrm_sla_eval($call) {
+    $targets = tosrm_sla_targets((int)($call['client_id'] ?? 0));
+    $tat = tosrm_tat($call);
+    $d = $tat['dates'];
+    $today = date('Y-m-d');
+    $dbn = fn($a,$b) => ($a !== '' && $b !== '' && function_exists('days_between')) ? days_between($a, $b) : null;
+    // stage => [startDate, endDate]
+    $map = [
+        'RESPONSE'   => [$d['received'], $d['forwarded']],
+        'SCHEDULING' => [$d['received'], $d['scheduled']],
+        'EXECUTION'  => [$d['scheduled'], $d['executed']],
+        'REPORT'     => [$d['executed'], $d['report']],
+        'CLOSURE'    => [$d['received'], $d['closure']],
+    ];
+    $out = [];
+    foreach (TOSRM_SLA_STAGES as $stage => $label) {
+        $target = $targets[$stage] ?? null;
+        [$start, $end] = $map[$stage];
+        if ($target === null) { $out[$stage] = ['label'=>$label, 'target'=>null, 'actual'=>null, 'status'=>'NA']; continue; }
+        if ($end !== '' && $start !== '') {                    // completed
+            $actual = $dbn($start, $end);
+            $status = ($actual !== null && $actual <= $target) ? 'WITHIN' : 'BREACHED';
+        } elseif ($start !== '') {                             // in flight
+            $elapsed = $dbn($start, $today); $actual = $elapsed;
+            if ($elapsed !== null && $elapsed > $target) $status = 'BREACHED';
+            elseif ($elapsed !== null && $elapsed >= 0.8 * $target) $status = 'AT_RISK';
+            else $status = 'WITHIN';
+        } else { $actual = null; $status = 'NA'; }
+        $out[$stage] = ['label'=>$label, 'target'=>$target, 'actual'=>$actual, 'status'=>$status];
+    }
+    return $out;
+}
+
+// ---- Delay on the core job (links to Phase 6 for expediting) ----------------
+function tosrm_delay_auto_days($job, $call = null) {
+    $req = substr((string)($call['inspection_required_date'] ?? ''), 0, 10);
+    $sch = substr((string)($job['scheduled_date'] ?? ''), 0, 10);
+    if ($req === '' || $sch === '' || !function_exists('days_between')) return null;
+    return days_between($req, $sch);   // + => scheduled after required (a delay)
+}
+function tosrm_delay_add($jobId, $data) {
+    tosrm_migrate_d();
+    $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$jobId]); if (!$job) return 0;
+    $call = (int)($job['call_id'] ?? 0) ? ops_one("SELECT * FROM calls WHERE id=?", [(int)$job['call_id']]) : null;
+    $isExp = false;
+    $itype = (string)($job['inspection_type'] ?? ($call['inspection_type'] ?? ''));
+    if (strtoupper($itype) === 'EXPEDITING') $isExp = true;
+    $days = $data['delay_days'] ?? tosrm_delay_auto_days($job, $call);
+    db()->prepare("INSERT INTO job_delays (job_id, call_id, requested_date, scheduled_date, execution_date, delay_days, reason, category, responsibility, impact, action, is_expediting, created_by, created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute([
+        (int)$jobId, (int)($job['call_id'] ?? 0), (string)($call['inspection_required_date'] ?? ''), (string)($job['scheduled_date'] ?? ''),
+        (string)($data['execution_date'] ?? ''), (int)($days ?? 0), strtoupper((string)($data['reason'] ?? '')), strtoupper((string)($data['category'] ?? '')),
+        strtoupper((string)($data['responsibility'] ?? '')), (string)($data['impact'] ?? ''), (string)($data['action'] ?? ''),
+        $isExp ? 1 : 0, tosrm_actor(), tosrm_now()]);
+    return (int)db()->lastInsertId();
+}
+function tosrm_delay_list_for_call($callId) { return ops_all("SELECT * FROM job_delays WHERE call_id=? ORDER BY id DESC", [(int)$callId]) ?: []; }
+function tosrm_delay_list_for_job($jobId) { return ops_all("SELECT * FROM job_delays WHERE job_id=? ORDER BY id DESC", [(int)$jobId]) ?: []; }
+
+// ---- Recurring services (auto-generate future calls) ------------------------
+function tosrm_recur_next($frequency, $intervalN, $from) {
+    $from = substr((string)$from, 0, 10) ?: date('Y-m-d');
+    $n = max(1, (int)$intervalN);
+    switch (strtoupper((string)$frequency)) {
+        case 'DAILY':       return date('Y-m-d', strtotime("$from +$n day"));
+        case 'WEEKLY':      return date('Y-m-d', strtotime("$from +" . (7 * $n) . " day"));
+        case 'FORTNIGHTLY': return date('Y-m-d', strtotime("$from +14 day"));
+        case 'MONTHLY':     return date('Y-m-d', strtotime("$from +$n month"));
+        case 'QUARTERLY':   return date('Y-m-d', strtotime("$from +3 month"));
+        case 'CUSTOM':      return date('Y-m-d', strtotime("$from +$n day"));
+    }
+    return date('Y-m-d', strtotime("$from +1 month"));
+}
+function tosrm_recurring_create($data) {
+    tosrm_migrate_d();
+    $title = trim((string)($data['title'] ?? '')); if ($title === '') return 0;
+    $start = substr((string)($data['start_date'] ?? date('Y-m-d')), 0, 10);
+    db()->prepare("INSERT INTO recurring_services (client_id, title, template, frequency, interval_n, start_date, end_date, next_run, active, created_by, created_at)
+        VALUES (?,?,?,?,?,?,?,?,1,?,?)")->execute([
+        (int)($data['client_id'] ?? 0), $title, json_encode($data['template'] ?? []), strtoupper((string)($data['frequency'] ?? 'MONTHLY')),
+        (int)($data['interval_n'] ?? 1), $start, substr((string)($data['end_date'] ?? ''),0,10), $start, tosrm_actor(), tosrm_now()]);
+    return (int)db()->lastInsertId();
+}
+function tosrm_recurring_due($today = null) {
+    tosrm_migrate_d();
+    $today = $today ?: date('Y-m-d');
+    return ops_all("SELECT * FROM recurring_services WHERE active=1 AND next_run<>'' AND next_run<=? AND (end_date='' OR end_date>=?) ORDER BY next_run", [$today, $today]) ?: [];
+}
+// Generate ONE call from a recurring template, mark it as generated, advance.
+function tosrm_recurring_generate($rec, $today = null) {
+    tosrm_migrate_d();
+    $today = $today ?: date('Y-m-d');
+    $tpl = json_decode((string)$rec['template'], true) ?: [];
+    $cols = ['client_id'=>(int)$rec['client_id'], 'inspection_type'=>(string)($tpl['inspection_type'] ?? ''),
+             'vendor_id'=>(int)($tpl['vendor_id'] ?? 0), 'site_address_id'=>(int)($tpl['site_address_id'] ?? 0),
+             'sbu'=>(string)($tpl['sbu'] ?? ''), 'deliverables'=>(string)($tpl['deliverables'] ?? ''),
+             'executing_office_id'=>(int)($tpl['executing_office_id'] ?? 0), 'notes'=>(string)($tpl['notes'] ?? ''),
+             'status'=>'OPEN', 'op_status'=>'RECEIVED', 'source'=>'RECURRING',
+             'call_received_date'=>$today, 'inspection_required_date'=>(string)$rec['next_run'],
+             'generated_by_recurring_id'=>(int)$rec['id'], 'created_at'=>tosrm_now()];
+    $keys = array_keys($cols); $ph = implode(',', array_fill(0, count($keys), '?'));
+    db()->prepare("INSERT INTO calls (" . implode(',', $keys) . ") VALUES ($ph)")->execute(array_values($cols));
+    $newId = (int)db()->lastInsertId();
+    $next = tosrm_recur_next($rec['frequency'], $rec['interval_n'], $rec['next_run']);
+    db()->prepare("UPDATE recurring_services SET next_run=?, last_generated=?, generated_count=generated_count+1 WHERE id=?")
+        ->execute([$next, $today, (int)$rec['id']]);
+    if (function_exists('idems_log')) { try { idems_log('call', $newId, 'GENERATED', ['new'=>'recurring #' . $rec['id']]); } catch (Throwable $e) {} }
+    return $newId;
+}
+// Cron entry — generate everything due. Returns the count generated.
+function tosrm_run_recurring($today = null) {
+    $n = 0;
+    foreach (tosrm_recurring_due($today) as $rec) { if (tosrm_recurring_generate($rec, $today)) $n++; }
+    return $n;
+}
+
+// ---- Capacity horizon (reuses the availability engine) ----------------------
+// Weekly buckets of free inspector-days (supply) vs unallocated demand calls.
+function tosrm_capacity_horizon($offices, $from, $to) {
+    tosrm_migrate_d();
+    if (!function_exists('availability_matrix')) return [];
+    [$matrix, $days, $people] = availability_matrix($offices, $from, $to);
+    // Free inspector-days per day (working days only).
+    $freePerDay = [];
+    foreach ($days as $day) {
+        $free = 0;
+        foreach ($people as $p) {
+            $office = (int)($p['home_office_id'] ?? 0) ?: null;
+            $working = function_exists('is_working_day') ? is_working_day($day, $office) : (date('N', strtotime($day)) < 6);
+            if (!$working) continue;
+            if (($matrix[(int)$p['id']][$day] ?? 'AVAILABLE') === 'AVAILABLE') $free++;
+        }
+        $freePerDay[$day] = $free;
+    }
+    // Unallocated demand calls by required date.
+    $demand = [];
+    foreach (sched_unallocated_calls($offices, 500) as $c) {
+        $d = substr((string)($c['inspection_required_date'] ?? ''), 0, 10);
+        if ($d !== '') $demand[$d] = ($demand[$d] ?? 0) + 1;
+    }
+    // Bucket into ISO weeks.
+    $buckets = [];
+    foreach ($days as $day) {
+        $wk = date('o-\WW', strtotime($day));
+        if (!isset($buckets[$wk])) $buckets[$wk] = ['label'=>$wk, 'from'=>$day, 'to'=>$day, 'supply'=>0, 'demand'=>0];
+        $buckets[$wk]['to'] = $day;
+        $buckets[$wk]['supply'] += $freePerDay[$day] ?? 0;
+        $buckets[$wk]['demand'] += $demand[$day] ?? 0;
+    }
+    foreach ($buckets as &$b) { $b['gap'] = $b['demand'] - $b['supply']; $b['tight'] = $b['demand'] > $b['supply']; }
+    return array_values($buckets);
+}
+
+// ---------------------------------------------------------------------------
+//  SLA / TAT / delay panel (call detail page).
+// ---------------------------------------------------------------------------
+function tosrm_render_call_sla($call) {
+    if (!$call) return;
+    tosrm_migrate_d();
+    $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $cid = (int)($call['id'] ?? 0);
+    $canEdit = tosrm_can_edit();
+    $csrf = function_exists('csrf_token') ? csrf_token() : '';
+    $tat = tosrm_tat($call); $sla = tosrm_sla_eval($call);
+    $delays = tosrm_delay_list_for_call($cid);
+    $jobs = ops_all("SELECT id, job_code, scheduled_date FROM jobs WHERE call_id=? ORDER BY id DESC", [$cid]) ?: [];
+    $tatLabels = ['received_to_scheduled'=>'Received → Scheduled','scheduled_to_executed'=>'Scheduled → Executed','executed_to_report'=>'Executed → Report','received_to_closure'=>'Received → Closure'];
+    $slaTone = fn($s) => $s==='BREACHED' ? '#b4232b' : ($s==='AT_RISK' ? '#b45309' : ($s==='WITHIN' ? '#15803d' : '#6b7480'));
+    ob_start(); ?>
+    <div class="card tosrm-sla" style="margin-top:16px">
+      <h3 style="margin:0 0 10px">Operations — turnaround &amp; SLA</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:16px">
+        <div style="flex:1;min-width:240px">
+          <strong>Turnaround (days)</strong>
+          <table class="tbl" style="width:100%;margin-top:6px;font-size:13px">
+            <?php foreach ($tatLabels as $k=>$lbl): $v = $tat['stages'][$k]; ?>
+              <tr><td><?=$esc($lbl)?></td><td style="text-align:right;font-variant-numeric:tabular-nums"><?= $v===null ? '<span class="muted">—</span>' : (int)$v ?></td></tr>
+            <?php endforeach; ?>
+          </table>
+        </div>
+        <div style="flex:1;min-width:240px">
+          <strong>SLA (target vs actual)</strong>
+          <table class="tbl" style="width:100%;margin-top:6px;font-size:13px">
+            <thead><tr><th>Stage</th><th>Target</th><th>Actual</th><th>Status</th></tr></thead>
+            <tbody><?php foreach ($sla as $st=>$row): ?>
+              <tr><td><?=$esc($row['label'])?></td><td><?= $row['target']===null?'<span class="muted">—</span>':(int)$row['target'].'d' ?></td><td><?= $row['actual']===null?'—':(int)$row['actual'].'d' ?></td><td style="color:<?=$slaTone($row['status'])?>"><?=$esc(TOSRM_SLA_STATUS[$row['status']] ?? $row['status'])?></td></tr>
+            <?php endforeach; ?></tbody>
+          </table>
+          <div class="muted" style="font-size:12px">Set targets in <a href="/sla-targets">SLA targets</a> (default + per-client).</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
+        <strong>Delays</strong> <?php if ($delays): ?><span class="muted">(<?=count($delays)?>)</span><?php endif; ?>
+        <?php if ($delays): ?>
+        <table class="tbl" style="width:100%;margin-top:6px;font-size:12.5px">
+          <thead><tr><th>Days</th><th>Reason</th><th>Responsibility</th><th>Impact / action</th></tr></thead>
+          <tbody><?php foreach ($delays as $d): ?>
+            <tr><td><?= (int)$d['delay_days'] ?></td><td><?=$esc(TOSRM_DELAY_REASONS[$d['reason']] ?? $d['reason'])?><?php if ((int)$d['is_expediting']===1): ?> <span class="badge" title="Expediting delay detail lives in Phase 6">↔ Phase 6</span><?php endif; ?></td><td><?=$esc(TOSRM_DELAY_RESP[$d['responsibility']] ?? $d['responsibility'])?></td><td><?=$esc(trim($d['impact'].' '.$d['action']))?></td></tr>
+          <?php endforeach; ?></tbody>
+        </table>
+        <?php endif; ?>
+        <?php if ($canEdit && $jobs): ?>
+        <form method="post" action="/delay-add" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center">
+          <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>">
+          <select name="job_id"><?php foreach ($jobs as $j): ?><option value="<?=(int)$j['id']?>"><?=$esc($j['job_code'])?><?=$j['scheduled_date']?' · '.$esc($j['scheduled_date']):''?></option><?php endforeach; ?></select>
+          <select name="reason"><?php foreach (TOSRM_DELAY_REASONS as $k=>$v): ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
+          <select name="responsibility"><?php foreach (TOSRM_DELAY_RESP as $k=>$v): ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
+          <input type="text" name="impact" placeholder="Impact / action" style="flex:1;min-width:160px">
+          <button class="btn btn-sm" type="submit">Record delay</button>
+        </form>
+        <div class="muted" style="font-size:12px">Delay days auto-computed from required vs scheduled; expediting delays link to Phase 6 rather than duplicating it.</div>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php
+    echo ob_get_clean();
+}
+
+// ---------------------------------------------------------------------------
+//  Handlers.
+// ---------------------------------------------------------------------------
+function ops_tosrm_delay_action($route, $method) {
+    $jobId = (int)($_POST['job_id'] ?? 0);
+    $job = $jobId ? ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]) : null;
+    $back = $job ? '/call?id=' . (int)$job['call_id'] . '#sla' : '/calls';
+    if ($method !== 'POST') redirect($back);
+    if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect($back); }
+    ops_require(tosrm_can_edit(), 'You do not have permission to record a delay.');
+    if (!$job) { flash('Job not found.', 'error'); redirect('/calls'); }
+    tosrm_delay_add($jobId, ['reason'=>$_POST['reason'] ?? '', 'category'=>$_POST['category'] ?? '', 'responsibility'=>$_POST['responsibility'] ?? '', 'impact'=>$_POST['impact'] ?? '', 'action'=>$_POST['action'] ?? '']);
+    flash('Delay recorded.');
+    redirect($back);
+}
+
+// Admin — SLA targets, recurring services, capacity outlook.
+function ops_tosrm_admin($route, $method) {
+    ops_require((function_exists('can') && can('mod.calls.edit')) || (function_exists('is_coordinator_level') && is_coordinator_level()) || (function_exists('is_master') && is_master()), 'You do not have access to this screen.');
+    tosrm_migrate_d();
+    if ($route === 'sla-targets') {
+        if ($method === 'POST' && csrf_ok($_POST['_csrf'] ?? '')) {
+            if (($_POST['do'] ?? '') === 'del') tosrm_sla_delete((int)($_POST['id'] ?? 0));
+            else tosrm_sla_set((int)($_POST['client_id'] ?? 0), (string)($_POST['stage'] ?? ''), (int)($_POST['target_days'] ?? 0), (string)($_POST['note'] ?? ''));
+            flash('SLA targets updated.'); redirect('/sla-targets');
+        }
+        $rows = ops_all("SELECT s.*, bp.display_name client_name FROM sla_targets s LEFT JOIN business_partners bp ON bp.id=s.client_id ORDER BY s.client_id, s.stage") ?: [];
+        $clients = function_exists('clients_list') ? clients_list() : (ops_all("SELECT id, display_name FROM business_partners WHERE COALESCE(is_client,0)=1 ORDER BY display_name") ?: []);
+        view('ops/sla_targets', ['rows'=>$rows, 'clients'=>$clients, 'stages'=>TOSRM_SLA_STAGES]);
+        return true;
+    }
+    if ($route === 'recurring') {
+        if ($method === 'POST' && csrf_ok($_POST['_csrf'] ?? '')) {
+            $do = $_POST['do'] ?? 'new';
+            if ($do === 'toggle') { $r = ops_one("SELECT active FROM recurring_services WHERE id=?", [(int)($_POST['id'] ?? 0)]); if ($r) db()->prepare("UPDATE recurring_services SET active=? WHERE id=?")->execute([$r['active'] ? 0 : 1, (int)$_POST['id']]); flash('Schedule updated.'); }
+            elseif ($do === 'run') { $n = tosrm_run_recurring(); flash($n > 0 ? "$n call(s) generated from due schedules." : 'Nothing was due to generate.'); }
+            else {
+                tosrm_recurring_create(['client_id'=>(int)($_POST['client_id'] ?? 0), 'title'=>(string)($_POST['title'] ?? ''),
+                    'frequency'=>(string)($_POST['frequency'] ?? 'MONTHLY'), 'interval_n'=>(int)($_POST['interval_n'] ?? 1),
+                    'start_date'=>(string)($_POST['start_date'] ?? date('Y-m-d')), 'end_date'=>(string)($_POST['end_date'] ?? ''),
+                    'template'=>['inspection_type'=>(string)($_POST['inspection_type'] ?? ''), 'sbu'=>(string)($_POST['sbu'] ?? ''),
+                                 'deliverables'=>(string)($_POST['deliverables'] ?? ''), 'vendor_id'=>(int)($_POST['vendor_id'] ?? 0),
+                                 'site_address_id'=>(int)($_POST['site_address_id'] ?? 0), 'executing_office_id'=>(int)($_POST['executing_office_id'] ?? 0)]]);
+                flash('Recurring schedule created.');
+            }
+            redirect('/recurring');
+        }
+        $rows = ops_all("SELECT r.*, bp.display_name client_name FROM recurring_services r LEFT JOIN business_partners bp ON bp.id=r.client_id ORDER BY r.active DESC, r.next_run") ?: [];
+        $clients = function_exists('clients_list') ? clients_list() : [];
+        view('ops/recurring', ['rows'=>$rows, 'clients'=>$clients, 'freq'=>TOSRM_RECUR_FREQ, 'itypes'=>INSPECTION_TYPES]);
+        return true;
+    }
+    if ($route === 'capacity-outlook') {
+        $offices = function_exists('availability_scope_offices') ? availability_scope_offices() : 'ALL';
+        $from = trim((string)($_GET['from'] ?? '')) ?: date('Y-m-d');
+        $to   = trim((string)($_GET['to'] ?? '')) ?: date('Y-m-d', strtotime($from . ' +55 days'));
+        $buckets = tosrm_capacity_horizon($offices, $from, $to);
+        view('ops/capacity_outlook', ['buckets'=>$buckets, 'from'=>$from, 'to'=>$to]);
+        return true;
+    }
+    return false;
+}

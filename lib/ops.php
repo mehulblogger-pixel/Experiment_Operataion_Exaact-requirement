@@ -2096,6 +2096,7 @@ function ops_module_gate($route) {
         'assign-hold'=>'jobs','assign-accept'=>'jobs','assign-reassign'=>'jobs',
         'assign-reschedule'=>'jobs','assign-cancel'=>'jobs','assign-noshow'=>'jobs',
         'job-ready-seed'=>'jobs','job-ready-set'=>'jobs','job-confirm'=>'jobs','job-confirm-req'=>'jobs',
+        'delay-add'=>'jobs','sla-targets'=>'settings','recurring'=>'calls','capacity-outlook'=>'jobs',
         'dep-status'=>'jobs','dep-check-seed'=>'jobs','dep-check-set'=>'jobs','dep-site-log'=>'jobs',
         'dep-site-log-close'=>'jobs','dep-timesheet'=>'jobs','dep-approval'=>'jobs','dep-approval-status'=>'jobs',
         'dep-manpower-add'=>'jobs','dep-manpower-update'=>'jobs','dep-manpower-del'=>'jobs',
@@ -2528,6 +2529,10 @@ function ops_dispatch($route, $method) {
             return ops_tosrm_job_action($route, $method);
         case in_array($route, ['job-ready-seed','job-ready-set','job-confirm','job-confirm-req'], true):
             return ops_tosrm_ready_action($route, $method);
+        case $route === 'delay-add':
+            return ops_tosrm_delay_action($route, $method);
+        case in_array($route, ['sla-targets','recurring','capacity-outlook'], true):
+            return ops_tosrm_admin($route, $method);
         case in_array($route, ['dep-status','dep-check-seed','dep-check-set','dep-site-log','dep-site-log-close','dep-timesheet','dep-approval','dep-approval-status'], true):
             return ops_pdso_action($route, $method);
         case in_array($route, ['dep-manpower-add','dep-manpower-update','dep-manpower-del'], true):
