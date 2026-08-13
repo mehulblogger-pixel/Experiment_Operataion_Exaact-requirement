@@ -65,6 +65,7 @@ function tapi_migrate() {
         created_at VARCHAR(30) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')");
     if (function_exists('idems_unique_index')) { try { idems_unique_index('kpi_defs', 'kpi_key'); } catch (Throwable $e) {} }
     tapi_seed_defaults();
+    if (function_exists('tapi_seed_domain')) tapi_seed_domain();   // Slice 3 KPIs
 }
 
 // ============================================================================
@@ -181,6 +182,7 @@ function tapi_metrics() {
                 return $n ? round($sum / $n, 1) : null;
             }],
     ];
+    if (function_exists('tapi_domain_metrics')) $reg = array_merge($reg, tapi_domain_metrics());
     return $reg;
 }
 
@@ -811,4 +813,188 @@ function tapi_svg_stack($groups, $seriesLabels, $opts = []) {
     foreach ($seriesLabels as $si => $sl) { $svg .= '<rect x="' . $lx . '" y="6" width="10" height="10" fill="' . tapi_chart_color($si) . '"/><text x="' . ($lx + 14) . '" y="15" font-size="10" fill="var(--muted)">' . htmlspecialchars((string)$sl) . '</text>'; $lx += 30 + strlen((string)$sl) * 6; }
     $svg .= '</svg>';
     return $svg;
+}
+
+// ============================================================================
+//  SLICE 3 — domain roll-ups.
+//
+//  Portfolio-level aggregations the per-entity functions never provided. Each
+//  reuses the SAME source tables (and, for SLA, the SAME per-call engine
+//  tosrm_sla_eval) the domains own — TAPI interprets, it does not re-model.
+//  Two shapes:
+//    · scalar METRICS (tapi_domain_metrics) — compose into KPIs like any atom.
+//    · BREAKDOWN functions (tapi_bd_*) — return [label => value] for charts and
+//      drill-down (the bare gaps: delay categories, root causes, service mix,
+//      SLA status, release status, vendor-score bands, portal activity).
+//  Every query ANDs in scope, and the zero-vs-no-data rule holds (rates over an
+//  empty base are null, not 0).
+// ============================================================================
+
+function tapi_report_status_metric($statuses) {
+    return function ($ctx) use ($statuses) {
+        [$sw, $sa] = tapi_scope('d.office_id', 'd.sbu');
+        [$pw, $pa] = tapi_period_sql("substr(COALESCE(NULLIF(d.issue_date,''), d.created_at),1,10)", $ctx);
+        $ph = implode(',', array_fill(0, count($statuses), '?'));
+        return (int) ops_val("SELECT COUNT(*) FROM report_docs d WHERE COALESCE(d.deleted,0)=0 AND d.status IN ($ph) AND $sw AND $pw",
+            array_merge($statuses, $sa, $pa));
+    };
+}
+function tapi_release_metric($codes) {
+    return function ($ctx) use ($codes) {
+        [$sw, $sa] = tapi_scope('d.office_id', 'd.sbu');
+        [$pw, $pa] = tapi_period_sql("substr(COALESCE(NULLIF(d.issue_date,''), d.created_at),1,10)", $ctx);
+        $ph = implode(',', array_fill(0, count($codes), '?'));
+        return (int) ops_val("SELECT COUNT(*) FROM report_docs d WHERE COALESCE(d.deleted,0)=0 AND d.release_status IN ($ph) AND $sw AND $pw",
+            array_merge($codes, $sa, $pa));
+    };
+}
+
+function tapi_domain_metrics() {
+    static $reg = null; if ($reg !== null) return $reg;
+    $reg = [
+        // -- Report pipeline (bare gap: only inline register buckets existed) ---
+        'reports.draft'        => ['label'=>'Reports in draft','unit'=>'count','agg'=>'count','source'=>'idems/report_docs','method'=>"status='DRAFT'", 'resolve'=>tapi_report_status_metric(['DRAFT'])],
+        'reports.under_review' => ['label'=>'Reports under review','unit'=>'count','agg'=>'count','source'=>'idems/report_docs','method'=>"status IN (SUBMITTED,UNDER_REVIEW)", 'resolve'=>tapi_report_status_metric(['SUBMITTED','UNDER_REVIEW'])],
+        'reports.rejected'     => ['label'=>'Reports returned','unit'=>'count','agg'=>'count','source'=>'idems/report_docs','method'=>"status='REJECTED'", 'resolve'=>tapi_report_status_metric(['REJECTED'])],
+        'reports.revised'      => ['label'=>'Revised reports','unit'=>'count','agg'=>'count','source'=>'idems/report_docs','method'=>'rev>0', 'resolve'=>function ($ctx) {
+            [$sw, $sa] = tapi_scope('d.office_id', 'd.sbu');
+            [$pw, $pa] = tapi_period_sql("substr(COALESCE(NULLIF(d.issue_date,''), d.created_at),1,10)", $ctx);
+            return (int) ops_val("SELECT COUNT(*) FROM report_docs d WHERE COALESCE(d.deleted,0)=0 AND COALESCE(d.rev,0)>0 AND $sw AND $pw", array_merge($sa, $pa));
+        }],
+        // -- Release (bare gap: never GROUP BY-aggregated) ---------------------
+        'release.released'    => ['label'=>'Released','unit'=>'count','agg'=>'count','source'=>'idems/report_docs','method'=>"release_status='RELEASED'", 'resolve'=>tapi_release_metric(['RELEASED'])],
+        'release.conditional' => ['label'=>'Released with conditions','unit'=>'count','agg'=>'count','source'=>'idems/report_docs','method'=>"release_status='RELEASED_COND'", 'resolve'=>tapi_release_metric(['RELEASED_COND'])],
+        'release.not_released' => ['label'=>'Not released','unit'=>'count','agg'=>'count','source'=>'idems/report_docs','method'=>"release_status='NOT_RELEASED'", 'resolve'=>tapi_release_metric(['NOT_RELEASED'])],
+        // -- SLA compliance (bare gap: only per-call tosrm_sla_eval existed) ----
+        'sla.evaluable' => ['label'=>'Calls with an SLA','unit'=>'count','agg'=>'count','source'=>'tosrm/calls','method'=>'calls with ≥1 non-NA SLA stage', 'resolve'=>function ($ctx) { return tapi_sla_tally($ctx)['evaluable']; }],
+        'sla.within'    => ['label'=>'Within SLA','unit'=>'count','agg'=>'count','source'=>'tosrm/calls','method'=>'calls with no breached stage', 'resolve'=>function ($ctx) { return tapi_sla_tally($ctx)['within']; }],
+        'sla.breached'  => ['label'=>'SLA breached','unit'=>'count','agg'=>'count','source'=>'tosrm/calls','method'=>'calls with ≥1 breached stage', 'resolve'=>function ($ctx) { return tapi_sla_tally($ctx)['breached']; }],
+        // -- CAPA effectiveness (bare gap: counts existed, not a rate) ----------
+        'capa.rated'     => ['label'=>'CAPA rated for effectiveness','unit'=>'count','agg'=>'count','source'=>'capa','method'=>"eff_result<>''", 'resolve'=>function ($ctx) {
+            [$sw, $sa] = function_exists('scope_office_clause') ? scope_office_clause('c.office_id') : ['1=1', []];
+            [$pw, $pa] = tapi_period_sql("substr(COALESCE(NULLIF(c.raised_on,''), c.created_at),1,10)", $ctx);
+            return (int) ops_val("SELECT COUNT(*) FROM capa c WHERE COALESCE(c.eff_result,'')<>'' AND $sw AND $pw", array_merge($sa, $pa));
+        }],
+        'capa.effective' => ['label'=>'CAPA effective','unit'=>'count','agg'=>'count','source'=>'capa','method'=>"eff_result='EFFECTIVE'", 'resolve'=>function ($ctx) {
+            [$sw, $sa] = function_exists('scope_office_clause') ? scope_office_clause('c.office_id') : ['1=1', []];
+            [$pw, $pa] = tapi_period_sql("substr(COALESCE(NULLIF(c.raised_on,''), c.created_at),1,10)", $ctx);
+            return (int) ops_val("SELECT COUNT(*) FROM capa c WHERE c.eff_result='EFFECTIVE' AND $sw AND $pw", array_merge($sa, $pa));
+        }],
+        // -- Vendor re-assessment due (bare gap: only inline in the register) ---
+        'vendor.reassess_due' => ['label'=>'Vendor re-assessments due','unit'=>'count','agg'=>'count','source'=>'idems/vendor_profiles','method'=>'reassess_on ≤ today', 'resolve'=>function ($ctx) {
+            return (int) ops_val("SELECT COUNT(*) FROM vendor_profiles WHERE COALESCE(reassess_on,'')<>'' AND reassess_on <= ?", [date('Y-m-d')]);
+        }],
+        // -- Portal adoption (fully bare: audit tables never aggregated) --------
+        'portal.active_users' => ['label'=>'Active client-portal users','unit'=>'count','agg'=>'count','source'=>'portal/client_users','method'=>'distinct client_users with a login in period', 'resolve'=>function ($ctx) {
+            [$pw, $pa] = tapi_period_sql("substr(cu.last_login_at,1,10)", $ctx);
+            return (int) ops_val("SELECT COUNT(*) FROM client_users cu WHERE COALESCE(cu.last_login_at,'')<>'' AND $pw", $pa);
+        }],
+        'portal.events' => ['label'=>'Portal actions','unit'=>'count','agg'=>'count','source'=>'portal/portal_audit','method'=>'portal_audit rows in period', 'resolve'=>function ($ctx) {
+            [$pw, $pa] = tapi_period_sql("substr(pa.at,1,10)", $ctx);
+            return (int) ops_val("SELECT COUNT(*) FROM portal_audit pa WHERE $pw", $pa);
+        }],
+    ];
+    return $reg;
+}
+
+// The SLA portfolio tally — reuses the per-call engine, once per call in scope.
+// Cached per context so the three sla.* metrics do not each re-scan.
+function tapi_sla_tally($ctx) {
+    static $cache = [];
+    $ck = md5(json_encode([$ctx['from'] ?? '', $ctx['to'] ?? '']));
+    if (isset($cache[$ck])) return $cache[$ck];
+    $out = ['evaluable' => 0, 'within' => 0, 'breached' => 0, 'at_risk' => 0];
+    if (!function_exists('tosrm_sla_eval')) return $cache[$ck] = $out;
+    [$sw, $sa] = tapi_scope('c.executing_office_id', 'c.sbu');
+    [$pw, $pa] = tapi_period_sql("substr(COALESCE(NULLIF(c.call_received_date,''), c.created_at),1,10)", $ctx);
+    try {
+        $calls = ops_all("SELECT c.* FROM calls c WHERE $sw AND $pw ORDER BY c.id DESC LIMIT 2000", array_merge($sa, $pa));
+    } catch (Throwable $e) { return $cache[$ck] = $out; }
+    foreach ($calls as $c) {
+        $stages = tosrm_sla_eval($c);
+        $hasEval = false; $breach = false; $risk = false;
+        foreach ($stages as $s) {
+            if (($s['status'] ?? 'NA') === 'NA') continue;
+            $hasEval = true;
+            if ($s['status'] === 'BREACHED') $breach = true;
+            elseif ($s['status'] === 'AT_RISK') $risk = true;
+        }
+        if (!$hasEval) continue;
+        $out['evaluable']++;
+        if ($breach) $out['breached']++; elseif ($risk) $out['at_risk']++; else $out['within']++;
+    }
+    return $cache[$ck] = $out;
+}
+
+// ---- Breakdown functions — [label => value], scoped, for charts + drill-down.
+function tapi_bd_delay_categories($ctx) {
+    [$pw, $pa] = tapi_period_sql("substr(COALESCE(NULLIF(dl.scheduled_date,''), dl.created_at),1,10)", $ctx);
+    $rows = ops_all("SELECT COALESCE(NULLIF(dl.category,''),'Uncategorised') k, COUNT(*) n
+                     FROM job_delays dl WHERE $pw GROUP BY k ORDER BY n DESC", $pa) ?: [];
+    $out = []; foreach ($rows as $r) $out[$r['k']] = (int)$r['n']; return $out;
+}
+function tapi_bd_sla_status($ctx) {
+    $t = tapi_sla_tally($ctx);
+    return ['Within' => $t['within'], 'At risk' => $t['at_risk'], 'Breached' => $t['breached']];
+}
+function tapi_bd_report_pipeline($ctx) {
+    [$sw, $sa] = tapi_scope('d.office_id', 'd.sbu');
+    [$pw, $pa] = tapi_period_sql("substr(COALESCE(NULLIF(d.issue_date,''), d.created_at),1,10)", $ctx);
+    $rows = ops_all("SELECT d.status k, COUNT(*) n FROM report_docs d WHERE COALESCE(d.deleted,0)=0 AND $sw AND $pw GROUP BY d.status ORDER BY n DESC", array_merge($sa, $pa)) ?: [];
+    $out = []; foreach ($rows as $r) $out[$r['k'] ?: '—'] = (int)$r['n']; return $out;
+}
+function tapi_bd_release_status($ctx) {
+    [$sw, $sa] = tapi_scope('d.office_id', 'd.sbu');
+    [$pw, $pa] = tapi_period_sql("substr(COALESCE(NULLIF(d.issue_date,''), d.created_at),1,10)", $ctx);
+    $rows = ops_all("SELECT COALESCE(NULLIF(d.release_status,''),'—') k, COUNT(*) n FROM report_docs d WHERE COALESCE(d.deleted,0)=0 AND $sw AND $pw GROUP BY k ORDER BY n DESC", array_merge($sa, $pa)) ?: [];
+    $out = []; foreach ($rows as $r) $out[$r['k']] = (int)$r['n']; return $out;
+}
+function tapi_bd_rootcause($ctx) {
+    [$sw, $sa] = function_exists('scope_office_clause') ? scope_office_clause('c.office_id') : ['1=1', []];
+    [$pw, $pa] = tapi_period_sql("substr(COALESCE(NULLIF(c.raised_on,''), c.created_at),1,10)", $ctx);
+    $rows = ops_all("SELECT COALESCE(NULLIF(c.rc_method,''),'Unspecified') k, COUNT(*) n FROM capa c WHERE $sw AND $pw GROUP BY k ORDER BY n DESC", array_merge($sa, $pa)) ?: [];
+    $out = []; foreach ($rows as $r) $out[$r['k']] = (int)$r['n']; return $out;
+}
+function tapi_bd_service_mix($ctx) {
+    [$sw, $sa] = tapi_scope('d.office_id', 'd.sbu');
+    [$pw, $pa] = tapi_period_sql("substr(COALESCE(NULLIF(d.issue_date,''), d.created_at),1,10)", $ctx);
+    $rows = ops_all("SELECT COALESCE(NULLIF(d.type_code,''),'—') k, COUNT(*) n FROM report_docs d WHERE COALESCE(d.deleted,0)=0 AND $sw AND $pw GROUP BY k ORDER BY n DESC", array_merge($sa, $pa)) ?: [];
+    $out = []; foreach ($rows as $r) $out[$r['k']] = (int)$r['n']; return $out;
+}
+function tapi_bd_vendor_scores($ctx) {
+    $rows = ops_all("SELECT last_score s FROM vendor_profiles WHERE last_score IS NOT NULL AND last_score>0") ?: [];
+    $bands = ['0–40' => 0, '40–60' => 0, '60–75' => 0, '75–90' => 0, '90–100' => 0];
+    foreach ($rows as $r) { $s = (float)$r['s'];
+        if ($s < 40) $bands['0–40']++; elseif ($s < 60) $bands['40–60']++; elseif ($s < 75) $bands['60–75']++; elseif ($s < 90) $bands['75–90']++; else $bands['90–100']++; }
+    return $bands;
+}
+function tapi_bd_portal_activity($ctx) {
+    [$pw, $pa] = tapi_period_sql("substr(pa.at,1,10)", $ctx);
+    $rows = ops_all("SELECT COALESCE(NULLIF(pa.action,''),'—') k, COUNT(*) n FROM portal_audit pa WHERE $pw GROUP BY k ORDER BY n DESC", $pa) ?: [];
+    $out = []; foreach ($rows as $r) $out[$r['k']] = (int)$r['n']; return $out;
+}
+
+// Seed the domain KPIs (idempotent, additive to the Slice-1 starter set).
+function tapi_seed_domain() {
+    static $seeded = false; if ($seeded) return; $seeded = true;
+    $more = [
+        ['kpi_key'=>'sla_compliance', 'name'=>'SLA compliance', 'category'=>'OPERATIONS',
+         'formula'=>'round(sla.within / sla.evaluable * 100, 1)', 'unit'=>'%', 'direction'=>'HIGHER',
+         'target'=>95, 'threshold'=>85, 'sort_order'=>90, 'data_source'=>'tosrm/calls'],
+        ['kpi_key'=>'report_revision_rate', 'name'=>'Report revision rate', 'category'=>'SERVICE',
+         'formula'=>'round(reports.revised / reports.total * 100, 1)', 'unit'=>'%', 'direction'=>'LOWER',
+         'target'=>10, 'threshold'=>25, 'sort_order'=>100, 'data_source'=>'idems/report_docs'],
+        ['kpi_key'=>'release_rate', 'name'=>'Release rate', 'category'=>'SERVICE',
+         'formula'=>'round((release.released + release.conditional) / reports.issued * 100, 1)', 'unit'=>'%',
+         'direction'=>'HIGHER', 'target'=>90, 'threshold'=>75, 'sort_order'=>110, 'data_source'=>'idems/report_docs'],
+        ['kpi_key'=>'capa_effectiveness', 'name'=>'CAPA effectiveness', 'category'=>'QUALITY',
+         'formula'=>'round(capa.effective / capa.rated * 100, 1)', 'unit'=>'%', 'direction'=>'HIGHER',
+         'target'=>90, 'threshold'=>70, 'sort_order'=>120, 'data_source'=>'capa'],
+        ['kpi_key'=>'vendor_reassess_due', 'name'=>'Vendor re-assessments due', 'category'=>'VENDOR',
+         'formula'=>'vendor.reassess_due', 'unit'=>'count', 'direction'=>'LOWER', 'target'=>0, 'threshold'=>5,
+         'sort_order'=>130, 'data_source'=>'idems/vendor_profiles'],
+        ['kpi_key'=>'portal_active_users', 'name'=>'Active portal users', 'category'=>'CLIENT',
+         'formula'=>'portal.active_users', 'unit'=>'count', 'direction'=>'HIGHER', 'sort_order'=>140, 'data_source'=>'portal/client_users'],
+    ];
+    foreach ($more as $d) { if (!tapi_kpi_get($d['kpi_key'])) { try { tapi_kpi_save($d); } catch (Throwable $e) {} } }
 }
