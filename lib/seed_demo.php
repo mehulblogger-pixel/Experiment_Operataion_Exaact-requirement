@@ -374,7 +374,7 @@ function seed_demo($force = false) {
         if (function_exists('org_auto_arrange')) $c['reporting_lines'] = count(org_auto_arrange(true, true));
 
         setting_set('demo_seeded', '1');
-        $pdo->commit();
+        if ($pdo->inTransaction()) $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         return ['error' => demo_explain($e)];
@@ -401,7 +401,7 @@ function seed_demo($force = false) {
             'callid' => $callid, 'jid' => $jid, 'bid' => $bid,
             'now' => $now, 'today' => $today, 'd' => $d, 'hash' => $hash,
         ]);
-        $pdo->commit();
+        if ($pdo->inTransaction()) $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         $failed[] = demo_explain($e);
@@ -416,7 +416,7 @@ function seed_demo($force = false) {
             'callid' => $callid, 'jid' => $jid, 'bid' => $bid,
             'now' => $now, 'today' => $today, 'd' => $d, 'hash' => $hash,
         ]);
-        $pdo->commit();
+        if ($pdo->inTransaction()) $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         $failed[] = demo_explain($e);
@@ -621,7 +621,7 @@ function seed_demo_remove() {
         $ph = implode(',', array_fill(0, count($unames), '?'));
         $del("DELETE FROM users WHERE username IN ($ph)", $unames);
         setting_set('demo_seeded', '');
-        $pdo->commit();
+        if ($pdo->inTransaction()) $pdo->commit();
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         return ['error' => demo_explain($e)];
