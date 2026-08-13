@@ -726,6 +726,16 @@ if ($route === 'portal' || strncmp($route, 'portal/', 7) === 0) {
     exit;
 }
 
+// The vendor portal — a THIRD audience, kept as separate from the client portal
+// as the client portal is from staff: its own table (vendor_users), its own
+// session key (vuid) and its own /vendor addresses. Dispatched here, in front of
+// require_login(), for the same reason: a vendor has no staff account and must
+// never be pushed towards one. cvp_vendor_route() always exits.
+if (function_exists('cvp_vendor_route') && ($route === 'vendor' || strncmp($route, 'vendor/', 7) === 0)) {
+    cvp_vendor_route($route, $method);
+    exit;
+}
+
 // A signed handoff from a sibling MGH application (Books, BlogPro, Ads Pro).
 // It sits HERE, in front of require_login(), because its whole job is to satisfy
 // that gate — and behind the portal dispatch, because a client is not a staff

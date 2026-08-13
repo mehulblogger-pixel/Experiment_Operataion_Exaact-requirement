@@ -2080,6 +2080,7 @@ function ops_module_gate($route) {
         'phrase-library'=>'idems','phrase-edit'=>'idems','learning'=>'idems',
         'document-smart'=>'idems','document-release-note'=>'idems','document-review'=>'idems','document-evidence'=>'idems',
         'portal-users'=>'portal','portal-user-toggle'=>'portal','portal-user-reinvite'=>'portal','portal-user-perms'=>'portal',
+        'vendor-users'=>'portal','vendor-user-toggle'=>'portal','vendor-user-reinvite'=>'portal','vendor-settings'=>'portal','vendor-share'=>'portal',
         'portal-settings'=>'portal','portal-request'=>'portal',
         'masters'=>'masters','work-norms'=>'masters',
         'office-finance'=>'overheads','cost-run'=>'overheads',
@@ -2381,6 +2382,10 @@ function ops_dispatch($route, $method) {
              || $route === 'portal-user-reinvite' || $route === 'portal-settings'
              || $route === 'portal-request' || $route === 'portal-user-perms':
             return ops_portal_admin($route, $method);
+        case $route === 'vendor-users' || $route === 'vendor-user-toggle'
+             || $route === 'vendor-user-reinvite' || $route === 'vendor-settings'
+             || $route === 'vendor-share':
+            return ops_cvp_vendor_admin($route, $method);
         case $route === 'data-control' || $route === 'data-check-run'
              || $route === 'sw-validation-add' || strncmp($route, 'failure-', 8) === 0:
             return ops_datacontrol($route, $method);
