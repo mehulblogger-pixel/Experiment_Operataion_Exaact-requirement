@@ -201,6 +201,45 @@ function ops_tapi($route, $method) {
         return true;
     }
 
+    if ($route === 'analytics-export') {
+        if (function_exists('tapi_audit')) tapi_audit('EXPORT', ($_GET['fmt'] ?? 'csv') . ' ' . ($filters['from'] ?? ''));
+        $rows = tapi_export_matrix($filters);
+        $fmt = strtolower((string)($_GET['fmt'] ?? 'csv'));
+        if ($fmt === 'xlsx' && function_exists('tapi_xlsx') && ($bytes = tapi_xlsx($rows)) !== null) {
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment; filename="analytics.xlsx"');
+            echo $bytes; return true;
+        }
+        if (function_exists('csv_download')) { csv_download('analytics', $rows); return true; }
+        header('Content-Type: text/csv'); header('Content-Disposition: attachment; filename="analytics.csv"');
+        foreach ($rows as $r) echo implode(',', array_map(fn($c) => '"' . str_replace('"', '""', (string)$c) . '"', $r)) . "\n";
+        return true;
+    }
+
+    if ($route === 'analytics-review') {
+        if (function_exists('tapi_audit')) tapi_audit('REVIEW', (string)($filters['from'] ?? ''));
+        $ai = ['', ''];
+        if (($_GET['ai'] ?? '') === '1' && function_exists('tapi_ai_summary')) $ai = tapi_ai_summary($filters);
+        view('ops/tapi_review', ['review' => tapi_management_review($filters), 'filters' => $filters,
+            'ai' => $ai[0], 'aierr' => $ai[1], 'ai_on' => function_exists('ai_active') && ai_active()]);
+        return true;
+    }
+
+    if ($route === 'analytics-snapshot') {
+        if ($method === 'POST') {
+            $pk = preg_replace('/[^0-9-]/', '', (string)($_POST['period_key'] ?? ''));
+            $act = (string)($_POST['act'] ?? '');
+            if ($act === 'snapshot' && $pk !== '') { $r = tapi_snapshot_period($pk); flash($r['ok'] ? ('Snapshot taken — ' . $r['count'] . ' KPIs frozen for ' . $pk . '.') : $r['error'], $r['ok'] ? 'success' : 'error'); }
+            elseif ($act === 'state' && $pk !== '') { tapi_period_set_state($pk, (string)($_POST['state'] ?? 'OPEN')); flash('Period ' . $pk . ' set to ' . ($_POST['state'] ?? '') . '.'); }
+            redirect('/analytics-snapshot');
+        }
+        $periods = ops_all("SELECT * FROM analytics_periods ORDER BY period_key DESC") ?: [];
+        $recent = ops_all("SELECT period_key, COUNT(*) n, MAX(taken_at) taken_at FROM kpi_snapshots GROUP BY period_key ORDER BY period_key DESC LIMIT 24") ?: [];
+        view('ops/tapi_snapshot', ['periods' => $periods, 'recent' => $recent, 'states' => TAPI_PERIOD_STATES,
+            'thisMonth' => date('Y-m')]);
+        return true;
+    }
+
     if ($route === 'analytics-scorecard') {
         $cards = tapi_scorecards();
         $sid = (int)($_GET['id'] ?? ($cards ? $cards[0]['id'] : 0));
