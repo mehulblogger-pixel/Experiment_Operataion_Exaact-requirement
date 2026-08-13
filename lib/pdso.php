@@ -256,6 +256,41 @@ function pdso_manpower_gap($clientId = 0, $project = null) {
     foreach (pdso_manpower($clientId, $project) as $r) { $req += (int)$r['required']; $mob += (int)$r['mobilized']; }
     return ['required'=>$req, 'mobilized'=>$mob, 'gap'=>max(0, $req-$mob), 'shortfall'=>$req > $mob];
 }
+function pdso_manpower_add($data) {
+    db()->prepare("INSERT INTO dep_manpower (client_id,project,position,required,planned,mobilized,start_on,end_on,note,updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?)")->execute([
+        (int)($data['client_id'] ?? 0), (string)($data['project'] ?? ''), (string)($data['position'] ?? ''),
+        (int)($data['required'] ?? 0), (int)($data['planned'] ?? 0), (int)($data['mobilized'] ?? 0),
+        (string)($data['start_on'] ?? ''), (string)($data['end_on'] ?? ''), (string)($data['note'] ?? ''), date('c')]);
+    return (int)db()->lastInsertId();
+}
+function pdso_manpower_update($id, $data) {
+    db()->prepare("UPDATE dep_manpower SET required=?, planned=?, mobilized=?, updated_at=? WHERE id=?")
+        ->execute([(int)($data['required'] ?? 0), (int)($data['planned'] ?? 0), (int)($data['mobilized'] ?? 0), date('c'), (int)$id]);
+}
+function pdso_manpower_del($id) { db()->prepare("DELETE FROM dep_manpower WHERE id=?")->execute([(int)$id]); }
+
+// Manpower-plan editor handler (project-level; no job). Coordinator/master only.
+function ops_pdso_manpower($route, $method) {
+    ops_require(pdso_enabled(), 'The Deputation service is not active.');
+    ops_require((function_exists('is_coordinator_level') && is_coordinator_level()) || (function_exists('is_master') && is_master()),
+        'Only coordinators and administrators can edit the manpower plan.');
+    if ($method === 'POST') {
+        if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect('/deputations'); }
+        pdso_migrate();
+        if ($route === 'dep-manpower-add') {
+            if (trim((string)($_POST['position'] ?? '')) === '') flash('Name the position.', 'error');
+            else { pdso_manpower_add($_POST); flash('Position added to the manpower plan.'); }
+        } elseif ($route === 'dep-manpower-update') {
+            pdso_manpower_update((int)($_POST['id'] ?? 0), $_POST);
+            flash('Manpower plan updated.');
+        } elseif ($route === 'dep-manpower-del') {
+            pdso_manpower_del((int)($_POST['id'] ?? 0));
+            flash('Position removed from the manpower plan.');
+        }
+    }
+    redirect('/deputations#manpower');
+}
 
 // ---- Site registers (§36/§37/§38/§40) --------------------------------------
 function pdso_site_log_add($data) {
@@ -522,6 +557,32 @@ function pdso_deputations($filter = []) {
 }
 
 // ---------------------------------------------------------------------------
+//  Client-portal reads (§64) — client-safe columns only; always filtered to the
+//  signed-in client's partner id by the caller. No internal notes, no cost data.
+// ---------------------------------------------------------------------------
+function pdso_portal_deputations($clientId) {
+    $clientId = (int)$clientId; if (!$clientId) return [];
+    return ops_all("SELECT j.id, j.job_code, j.dep_status, j.dep_site,
+                        j.inspection_start_date, j.inspection_end_date, i.name AS person_name
+                    FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN inspectors i ON i.id=j.inspector_id
+                    WHERE c.client_id=? AND (j.dep_status<>'' OR c.inspection_type='DEPUTATION' OR j.job_type='DEPUTATION')
+                    ORDER BY j.id DESC", [$clientId]) ?: [];
+}
+function pdso_portal_approvals($clientId, $pendingOnly = false) {
+    $clientId = (int)$clientId; if (!$clientId) return [];
+    $w = "a.client_id=?"; $a = [$clientId];
+    if ($pendingOnly) $w .= " AND a.status IN ('SUBMITTED','CLIENT_REVIEW')";
+    return ops_all("SELECT a.*, j.job_code, i.name AS person_name
+                    FROM dep_att_approval a LEFT JOIN jobs j ON j.id=a.job_id LEFT JOIN inspectors i ON i.id=j.inspector_id
+                    WHERE $w ORDER BY a.period_from DESC, a.id DESC", $a) ?: [];
+}
+// The one row a portal decision may act on — proves it belongs to this client.
+function pdso_portal_approval($id, $clientId) {
+    $clientId = (int)$clientId; if (!$clientId) return null;
+    return ops_one("SELECT * FROM dep_att_approval WHERE id=? AND client_id=?", [(int)$id, $clientId]) ?: null;
+}
+
+// ---------------------------------------------------------------------------
 //  Deputation dashboard aggregates + register handler. Reuses the home
 //  dashboard's kpi-row / kpi visual language; every figure links to where the
 //  work is. Self-gates on the DEPUTATION service and the operations permission.
@@ -672,12 +733,19 @@ function ops_pdso($route, $method) {
     pdso_migrate();
     $status = (string)($_GET['status'] ?? '');
     $rows = pdso_deputations($status !== '' ? ['status' => $status] : []);
+    // Client list for the manpower-plan add form (reuse the app's own helper).
+    $clientsForPlan = [];
+    if (function_exists('clients_list')) {
+        foreach (clients_list() as $c)
+            $clientsForPlan[] = ['id' => (int)$c['id'], 'name' => ($c['display_name'] ?? '') !== '' ? $c['display_name'] : ($c['legal_name'] ?? '')];
+    }
     view('ops/deputations', [
-        'd'        => pdso_dashboard(),
-        'rows'     => $rows,
-        'statuses' => pdso_statuses(),
-        'status'   => $status,
-        'manpower' => pdso_manpower(0, null),
+        'd'             => pdso_dashboard(),
+        'rows'          => $rows,
+        'statuses'      => pdso_statuses(),
+        'status'        => $status,
+        'manpower'      => pdso_manpower(0, null),
+        'clientsForPlan'=> $clientsForPlan,
     ]);
     return true;
 }

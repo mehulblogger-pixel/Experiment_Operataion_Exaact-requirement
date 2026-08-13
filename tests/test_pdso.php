@@ -200,6 +200,38 @@ $depCanEdit = false; ob_start(); require __DIR__ . '/../views/ops/_deputation_pa
 ok(strpos($ph2,'/dep-status')===false, 'read-only view hides the write forms (permission-gated)');
 
 // ---------------------------------------------------------------------------
+head('14. Manpower-plan editor (add / update / delete)');
+$mpId = pdso_manpower_add(['client_id'=>501,'project'=>'Beta','position'=>'Site Engineer','required'=>3,'planned'=>3,'mobilized'=>1]);
+ok($mpId > 0, 'a position can be added to the manpower plan');
+$row = ops_one("SELECT * FROM dep_manpower WHERE id=?", [$mpId]);
+ok((int)$row['required'] === 3 && (int)$row['mobilized'] === 1, 'the position stores required & mobilized');
+pdso_manpower_update($mpId, ['required'=>3,'planned'=>3,'mobilized'=>3]);
+ok((int)pdso_manpower_gap(501,'Beta')['gap'] === 0, 'updating mobilized closes the gap');
+pdso_manpower_del($mpId);
+ok(ops_one("SELECT id FROM dep_manpower WHERE id=?", [$mpId]) === false, 'a position can be removed');
+
+// ---------------------------------------------------------------------------
+head('15. Client-portal deputation reads (tenant-isolated)');
+// Approvals for client 501 (the jobId call above is client 501).
+$myDeps = pdso_portal_deputations(501);
+ok(count($myDeps) >= 1, 'the client sees their own deputations (' . count($myDeps) . ')');
+// A DIFFERENT client sees nothing of client 501's.
+ok(pdso_portal_deputations(999) === [], 'another client sees none of this client’s deputations (isolation)');
+$myAppr = pdso_portal_approvals(501);
+ok(count($myAppr) >= 1, 'the client sees their attendance approval periods');
+ok(pdso_portal_approvals(999) === [], 'attendance periods are tenant-isolated');
+// The decision guard proves ownership.
+$anAppr = $myAppr[0];
+ok(pdso_portal_approval((int)$anAppr['id'], 501) !== null, 'the portal decision guard finds an owned approval');
+ok(pdso_portal_approval((int)$anAppr['id'], 999) === null, 'the portal decision guard rejects a non-owned approval (no cross-client action)');
+// Render the portal view (with a pending period so the approve form shows).
+pdso_att_approval_add(['job_id'=>$jobId,'client_id'=>501,'period_from'=>'2026-09-01','period_to'=>'2026-09-30','basis'=>'MANDAY','billable_days'=>20,'status'=>'SUBMITTED']);
+$rows = $myDeps; $approvals = pdso_portal_approvals(501); $canApprove = true; $statuses = pdso_statuses();
+if (!function_exists('fdate')) { function fdate($s){ return (string)$s; } }
+ob_start(); require __DIR__ . '/../views/portal/deputations.php'; $pv = ob_get_clean();
+ok(strpos($pv,'People deputed to you')!==false && strpos($pv,'/portal/dep-approve')!==false, 'portal deputation view renders with the approve action');
+
+// ---------------------------------------------------------------------------
 if ($__standalone) {
     $g = $GLOBALS['__t'];
     echo "\n==================== PDSO: {$g['pass']} passed, {$g['fail']} failed ====================\n";

@@ -10,6 +10,7 @@ $here = trim((string)parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_
 $links = ['portal' => 'Overview'];
 if (pcan('calls'))     $links['portal/calls']      = TP('call');
 if (pcan('reports'))   $links['portal/reports']    = 'Reports';
+if (pcan('deputation')) $links['portal/deputations'] = 'Deputations';
 if (pcan('invoices'))  $links['portal/invoices']   = 'Invoices';
 if (pcan('request'))   $links['portal/request']    = 'Request an inspection';
 if (pcan('complaint')) $links['portal/complaints'] = 'Complaints &amp; appeals';
