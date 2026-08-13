@@ -154,6 +154,68 @@ ob_start(); tosrm_render_job_panel($J()); $jh = ob_get_clean();
 ok(strpos($jh, 'assignment lifecycle') !== false, 'the assignment-lifecycle panel renders on a job');
 ok(strpos($jh, 'Assignment history') !== false && strpos($jh, 'Reassign') !== false, 'the panel shows history + the reassign control');
 
+// ============================================================================
+//  SLICE C — Readiness, client/vendor confirmation, competence-at-allocation.
+// ============================================================================
+tosrm_migrate_c();
+db()->prepare("INSERT INTO jobs (call_id, inspector_id, scheduled_date, stage, created_at) VALUES (?,?,?,?,?)")
+    ->execute([$cid, $inspA, date('Y-m-d'), 'ALLOCATED', date('c')]);
+$jc = (int)db()->lastInsertId();
+$JC = fn() => ops_one("SELECT * FROM jobs WHERE id=?", [$jc]);
+
+head('15. Additive readiness/confirmation schema');
+$job = $JC();
+ok(array_key_exists('client_confirmed', $job) && array_key_exists('vendor_confirmed', $job) && array_key_exists('client_confirm_required', $job), 'confirmation columns added to jobs');
+ok(is_array(tosrm_readiness_list($jc)), 'job_readiness table is queryable');
+
+head('16. Generic readiness checklist (seed, set, rollup)');
+ok(tosrm_readiness_seed($jc) === count(TOSRM_READY_ITEMS), 'seeding adds the default readiness items');
+ok(tosrm_readiness_seed($jc) === 0, 'seeding again is idempotent (no duplicates)');
+$items = tosrm_readiness_list($jc);
+$roll0 = tosrm_readiness_rollup($jc);
+ok($roll0['ready_bool'] === false && $roll0['open'] === count($items), 'a freshly-seeded checklist is NOT ready (all items open)');
+foreach ($items as $it) tosrm_readiness_set((int)$it['id'], 'READY');
+$roll1 = tosrm_readiness_rollup($jc);
+ok($roll1['ready_bool'] === true && $roll1['open'] === 0, 'marking every item READY makes it ready');
+tosrm_readiness_set((int)$items[0]['id'], 'BLOCKED', 'material not at works');
+$roll2 = tosrm_readiness_rollup($jc);
+ok($roll2['ready_bool'] === false && $roll2['blocked'] === 1, 'a blocked item drops readiness and is counted');
+ok(tosrm_readiness_set((int)$items[0]['id'], 'BOGUS') === false, 'an unknown readiness status is rejected');
+
+head('17. Client / vendor pre-execution confirmation (optional, gated only when required)');
+$gate0 = tosrm_confirm_gate($JC());
+ok($gate0['required'] === false && $gate0['blocks'] === false, 'confirmation is NOT required by default (never mandatory for every service)');
+ok(tosrm_confirm_set($jc, 'CLIENT', true, 'Email 12-Aug from QA') === true, 'a client confirmation can be recorded with a reference');
+ok((int)$JC()['client_confirmed'] === 1 && trim($JC()['client_confirm_ref']) !== '', 'the confirmation + reference are stored');
+ok(tosrm_confirm_set($jc, 'NOBODY', true) === false, 'an unknown confirmation party is rejected');
+tosrm_confirm_set($jc, 'CLIENT', false);            // clear it
+tosrm_confirm_set_required($jc, true);              // now require it
+$gate1 = tosrm_confirm_gate($JC());
+ok($gate1['required'] === true && $gate1['blocks'] === true, 'when required-but-not-confirmed, the gate blocks (TEST 13)');
+tosrm_confirm_set($jc, 'CLIENT', true, 'Confirmed on call');
+ok(tosrm_confirm_gate($JC())['blocks'] === false, 'confirming clears the gate (TEST 14 path when not required also proceeds)');
+
+head('18. Competence-at-allocation — advisory, reuses the competence engine, never blocks');
+$warnNone = tosrm_competence_warn($JC());
+ok(count($warnNone) === 1 && $warnNone[0]['level'] === 'ok', 'a resource with no cert concerns reads clean');
+// A lapsed MANDATORY certificate and an expiring one.
+db()->prepare("INSERT INTO inspector_certs (inspector_id, name, number, valid_to, is_mandatory) VALUES (?,?,?,?,1)")
+    ->execute([$inspA, 'CSWIP 3.1', 'C-100', date('Y-m-d', strtotime('-10 days'))]);
+db()->prepare("INSERT INTO inspector_certs (inspector_id, name, number, valid_to, is_mandatory) VALUES (?,?,?,?,0)")
+    ->execute([$inspA, 'ASNT NDT L-II', 'A-200', date('Y-m-d', strtotime('+20 days'))]);
+$warn = tosrm_competence_warn($JC());
+$levels = array_column($warn, 'level');
+ok(in_array('error', $levels, true), 'a lapsed mandatory certificate raises an ERROR-level warning at allocation');
+ok(in_array('warn', $levels, true), 'a soon-expiring certificate raises a WARN-level advisory');
+$roll = tosrm_readiness_rollup($jc);   // competence warning did NOT touch readiness or block anything
+ok(is_array($roll), 'competence warnings are advisory only — nothing was blocked or changed');
+
+head('19. The readiness/confirmation/competence panel renders');
+ob_start(); tosrm_render_readiness_panel($JC()); $rh = ob_get_clean();
+ok(strpos($rh, 'readiness &amp; confirmation') !== false, 'the readiness panel renders on a job');
+ok(strpos($rh, 'Competence &amp; certification') !== false && strpos($rh, 'CSWIP 3.1') !== false, 'the panel shows the competence advisory');
+ok(strpos($rh, 'Readiness checklist') !== false && strpos($rh, 'Pre-execution confirmation') !== false, 'the panel shows readiness + confirmation');
+
 if ($__standalone) {
     $g = $GLOBALS['__t'];
     echo "\n==================== TOSRM: {$g['pass']} passed, {$g['fail']} failed ====================\n";

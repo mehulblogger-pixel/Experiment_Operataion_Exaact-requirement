@@ -660,3 +660,292 @@ function ops_tosrm_job_action($route, $method) {
     }
     redirect($back);
 }
+
+// ===========================================================================
+//  SLICE C — Readiness, client/vendor confirmation, and competence-at-allocation.
+//  All ADDITIVE on the job. Competence checks REUSE the existing competence /
+//  certificate engine (lib/competence.php, inspector_certs) and are ADVISORY at
+//  allocation — they warn, they never silently block (override stays with the
+//  authorised user, exactly as the spec requires). The readiness checklist is
+//  GENERIC (any service, not only deputation, which keeps its own MOB checklist).
+// ===========================================================================
+
+const TOSRM_READY_STATUS = ['NOT_CHECKED'=>'Not checked','READY'=>'Ready','PARTIAL'=>'Partially ready','NOT_READY'=>'Not ready','BLOCKED'=>'Blocked','NA'=>'Not applicable'];
+// Default pre-execution readiness items — not every service needs every one.
+const TOSRM_READY_ITEMS = [
+    ['Scope available','Scope'], ['Location confirmed','Site'], ['Vendor confirmed','Vendor'],
+    ['Documents available','Documents'], ['Material ready','Material'], ['Personnel available','Personnel'],
+    ['Equipment available','Equipment'], ['Test / inspection facility ready','Facility'],
+    ['Access ready','Access'], ['Travel ready','Travel'], ['Client contact confirmed','Contact'],
+];
+const TOSRM_CONFIRM_PARTIES = ['CLIENT'=>'Client','VENDOR'=>'Vendor'];
+
+function tosrm_migrate_c() {
+    static $done = false; if ($done) return; $done = true;
+    tosrm_migrate_b();
+    if (function_exists('lk_ensure_type_map')) {
+        lk_ensure_type_map('readiness_status', 'Readiness status', TOSRM_READY_STATUS, 'tosrm');
+    }
+    if (function_exists('ensure_column')) {
+        // Pre-execution confirmation to proceed (optional; only a gate when the
+        // per-job "required" flag is set — never mandatory for every service).
+        ensure_column('jobs', 'client_confirmed',    'INT DEFAULT 0');
+        ensure_column('jobs', 'client_confirm_by',   "VARCHAR(120) DEFAULT ''");
+        ensure_column('jobs', 'client_confirm_at',   "VARCHAR(30) DEFAULT ''");
+        ensure_column('jobs', 'client_confirm_ref',  "VARCHAR(200) DEFAULT ''");
+        ensure_column('jobs', 'client_confirm_required', 'INT DEFAULT 0');
+        ensure_column('jobs', 'vendor_confirmed',    'INT DEFAULT 0');
+        ensure_column('jobs', 'vendor_confirm_by',   "VARCHAR(120) DEFAULT ''");
+        ensure_column('jobs', 'vendor_confirm_at',   "VARCHAR(30) DEFAULT ''");
+        ensure_column('jobs', 'vendor_readiness',    "VARCHAR(200) DEFAULT ''");
+    }
+    $pk = pk_clause();
+    db()->exec("CREATE TABLE IF NOT EXISTS job_readiness (
+        id $pk, job_id INT DEFAULT 0, item VARCHAR(200) DEFAULT '', category VARCHAR(80) DEFAULT '',
+        required INT DEFAULT 1, status VARCHAR(16) DEFAULT 'NOT_CHECKED', note VARCHAR(400) DEFAULT '',
+        sort_order INT DEFAULT 0, updated_by VARCHAR(120) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')");
+}
+
+// ---- Competence & certification advisory (REUSES lib/competence.php) --------
+// Returns a list of ['level'=>'error'|'warn'|'ok', 'text'=>…] — never blocks.
+function tosrm_competence_warn($job) {
+    tosrm_migrate_c();
+    $out = [];
+    $inspId = (int)($job['inspector_id'] ?? 0);
+    if ($inspId <= 0) return $out;
+    $date = substr((string)($job['scheduled_date'] ?? ''), 0, 10) ?: date('Y-m-d');
+    // Context — inspection type / activity / client (from the job, else its call).
+    $itype = trim((string)($job['inspection_type'] ?? ''));
+    $activity = (int)($job['activity_id'] ?? 0);
+    $clientId = (int)($job['client_id'] ?? 0);
+    if (($itype === '' || $clientId === 0) && (int)($job['call_id'] ?? 0) > 0) {
+        $call = ops_one("SELECT client_id, inspection_type, activity_id FROM calls WHERE id=?", [(int)$job['call_id']]);
+        if ($call) { if ($itype === '') $itype = (string)$call['inspection_type']; if ($activity === 0) $activity = (int)$call['activity_id']; if ($clientId === 0) $clientId = (int)$call['client_id']; }
+    }
+    // 1) Lapsed MANDATORY certificate on the work date (reuse competence_lapsed).
+    if (function_exists('competence_lapsed')) {
+        foreach (competence_lapsed($inspId, $date) as $c)
+            $out[] = ['level'=>'error', 'text'=>'Required certificate lapsed: ' . $c['name'] . ($c['number'] ? ' (' . $c['number'] . ')' : '') . ' expired ' . $c['valid_to']];
+    }
+    // 2) Certificates EXPIRING soon around the work date (reuse inspector_cert_state).
+    if (function_exists('inspector_cert_state')) {
+        foreach (ops_all("SELECT name, number, valid_to FROM inspector_certs WHERE inspector_id=? AND valid_to<>''", [$inspId]) ?: [] as $c) {
+            $st = inspector_cert_state($c['valid_to'], 45);
+            $lbl = is_array($st) ? ($st['label'] ?? '') : (string)$st;
+            if ($lbl === 'expiring') $out[] = ['level'=>'warn', 'text'=>'Certificate expiring soon: ' . $c['name'] . ' (valid to ' . $c['valid_to'] . ')'];
+        }
+    }
+    // 3) Authorisation coverage for THIS scope (reuse auth_covers) — advisory even
+    //    when enforcement is switched off, so the coordinator sees the gap.
+    if (function_exists('auth_covers') && ($itype !== '' || $activity || $clientId)) {
+        if (!auth_covers($inspId, $itype, $activity, $clientId, $date)) {
+            $enf = function_exists('auth_enforced') && auth_enforced();
+            $out[] = ['level'=>$enf ? 'error' : 'warn', 'text'=>'Not on the authorisation record for this scope' . ($enf ? ' (enforcement is ON — issuance will be blocked)' : ' (advisory — enforcement is off)')];
+        }
+    }
+    if (!$out) $out[] = ['level'=>'ok', 'text'=>'No competence or certificate concerns for this assignment.'];
+    return $out;
+}
+
+// ---- Generic readiness checklist -------------------------------------------
+function tosrm_readiness_seed($jobId) {
+    tosrm_migrate_c();
+    $have = ops_one("SELECT COUNT(*) n FROM job_readiness WHERE job_id=?", [(int)$jobId]);
+    if ((int)($have['n'] ?? 0) > 0) return 0;
+    $i = 0; $n = 0;
+    foreach (TOSRM_READY_ITEMS as [$item, $cat]) {
+        db()->prepare("INSERT INTO job_readiness (job_id, item, category, required, status, sort_order, updated_at) VALUES (?,?,?,1,'NOT_CHECKED',?,?)")
+            ->execute([(int)$jobId, $item, $cat, $i++, tosrm_now()]);
+        $n++;
+    }
+    return $n;
+}
+function tosrm_readiness_set($itemId, $status, $note = '') {
+    $status = strtoupper(trim((string)$status));
+    if (!array_key_exists($status, TOSRM_READY_STATUS)) return false;
+    db()->prepare("UPDATE job_readiness SET status=?, note=?, updated_by=?, updated_at=? WHERE id=?")
+        ->execute([$status, (string)$note, tosrm_actor(), tosrm_now(), (int)$itemId]);
+    return true;
+}
+function tosrm_readiness_list($jobId) { return ops_all("SELECT * FROM job_readiness WHERE job_id=? ORDER BY sort_order, id", [(int)$jobId]) ?: []; }
+function tosrm_readiness_rollup($jobId) {
+    $rows = tosrm_readiness_list($jobId);
+    $r = ['total'=>count($rows), 'ready'=>0, 'open'=>0, 'blocked'=>0];
+    foreach ($rows as $x) {
+        $st = $x['status'];
+        if ($st === 'READY' || $st === 'NA') $r['ready']++;
+        if ($st === 'BLOCKED') $r['blocked']++;
+        if ((int)$x['required'] === 1 && !in_array($st, ['READY','NA'], true)) $r['open']++;
+    }
+    $r['ready_bool'] = $r['total'] > 0 && $r['open'] === 0;
+    return $r;
+}
+
+// ---- Client / vendor pre-execution confirmation ----------------------------
+function tosrm_confirm_set($jobId, $party, $on, $ref = '') {
+    tosrm_migrate_c();
+    $party = strtoupper(trim((string)$party));
+    if (!array_key_exists($party, TOSRM_CONFIRM_PARTIES)) return false;
+    $on = $on ? 1 : 0;
+    if ($party === 'CLIENT') {
+        db()->prepare("UPDATE jobs SET client_confirmed=?, client_confirm_by=?, client_confirm_at=?, client_confirm_ref=? WHERE id=?")
+            ->execute([$on, $on ? tosrm_actor() : '', $on ? tosrm_now() : '', (string)$ref, (int)$jobId]);
+    } else {
+        db()->prepare("UPDATE jobs SET vendor_confirmed=?, vendor_confirm_by=?, vendor_confirm_at=?, vendor_readiness=? WHERE id=?")
+            ->execute([$on, $on ? tosrm_actor() : '', $on ? tosrm_now() : '', (string)$ref, (int)$jobId]);
+    }
+    if (function_exists('idems_log')) { try { idems_log('job', (int)$jobId, 'CONFIRM_' . $party, ['new'=>$on ? 'confirmed' : 'cleared']); } catch (Throwable $e) {} }
+    return true;
+}
+function tosrm_confirm_set_required($jobId, $required) {
+    tosrm_migrate_c();
+    db()->prepare("UPDATE jobs SET client_confirm_required=? WHERE id=?")->execute([$required ? 1 : 0, (int)$jobId]);
+    return true;
+}
+// Advisory gate — only bites when the per-job "required" flag is set. Never
+// mandatory for every service.
+function tosrm_confirm_gate($job) {
+    $required = (int)($job['client_confirm_required'] ?? 0) === 1;
+    $confirmed = (int)($job['client_confirmed'] ?? 0) === 1;
+    return ['required'=>$required, 'confirmed'=>$confirmed, 'blocks'=>($required && !$confirmed)];
+}
+
+// A combined "ready to execute?" view (advisory) — used by dashboards later.
+function tosrm_job_ready_to_execute($job) {
+    $roll = tosrm_readiness_rollup((int)($job['id'] ?? 0));
+    $gate = tosrm_confirm_gate($job);
+    return ['ok'=>($roll['ready_bool'] && !$gate['blocks']), 'readiness'=>$roll, 'confirm'=>$gate];
+}
+
+// ---------------------------------------------------------------------------
+//  Readiness / confirmation / competence panel (job detail page).
+// ---------------------------------------------------------------------------
+function tosrm_render_readiness_panel($job) {
+    if (!$job) return;
+    tosrm_migrate_c();
+    $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $jid = (int)($job['id'] ?? 0);
+    $canEdit = tosrm_can_edit();
+    $csrf = function_exists('csrf_token') ? csrf_token() : '';
+    $warn = tosrm_competence_warn($job);
+    $items = tosrm_readiness_list($jid);
+    $roll = tosrm_readiness_rollup($jid);
+    $gate = tosrm_confirm_gate($job);
+    ob_start(); ?>
+    <div class="card tosrm-ready" style="margin-top:16px">
+      <h3 style="margin:0 0 10px">Operations — readiness &amp; confirmation</h3>
+
+      <?php // Competence & certification advisory (reuses the competence engine) ?>
+      <div style="margin-bottom:12px">
+        <strong>Competence &amp; certification</strong>
+        <ul style="margin:6px 0 0;padding-left:18px">
+          <?php foreach ($warn as $w): $col = $w['level']==='error' ? '#b4232b' : ($w['level']==='warn' ? '#b45309' : '#15803d'); ?>
+            <li style="color:<?=$col?>"><?=$esc($w['text'])?></li>
+          <?php endforeach; ?>
+        </ul>
+        <div class="muted" style="font-size:12px;margin-top:4px">Advisory only — the coordinator decides; issuance-time enforcement is unchanged.</div>
+      </div>
+
+      <?php // Client / vendor confirmation ?>
+      <div style="margin-bottom:12px">
+        <strong>Pre-execution confirmation</strong>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
+          <span class="badge"><?=((int)($job['client_confirmed']??0)===1)?'✅ Client confirmed':'Client not confirmed'?><?php if (trim((string)($job['client_confirm_ref']??''))!==''): ?> · <?=$esc($job['client_confirm_ref'])?><?php endif; ?></span>
+          <span class="badge"><?=((int)($job['vendor_confirmed']??0)===1)?'✅ Vendor confirmed':'Vendor not confirmed'?><?php if (trim((string)($job['vendor_readiness']??''))!==''): ?> · <?=$esc($job['vendor_readiness'])?><?php endif; ?></span>
+          <?php if ($gate['required']): ?><span class="badge" style="background:#fde7e7;color:#b4232b">Client confirmation REQUIRED<?=$gate['blocks']?' — not yet given':''?></span><?php endif; ?>
+        </div>
+        <?php if ($canEdit): ?>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px">
+          <form method="post" action="/job-confirm" style="display:flex;gap:6px;align-items:center">
+            <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>"><input type="hidden" name="party" value="CLIENT">
+            <input type="hidden" name="on" value="<?=((int)($job['client_confirmed']??0)===1)?'0':'1'?>">
+            <input type="text" name="ref" placeholder="Client confirm ref / contact" style="min-width:180px">
+            <button class="btn btn-sm" type="submit"><?=((int)($job['client_confirmed']??0)===1)?'Clear client':'Mark client confirmed'?></button>
+          </form>
+          <form method="post" action="/job-confirm" style="display:flex;gap:6px;align-items:center">
+            <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>"><input type="hidden" name="party" value="VENDOR">
+            <input type="hidden" name="on" value="<?=((int)($job['vendor_confirmed']??0)===1)?'0':'1'?>">
+            <input type="text" name="ref" placeholder="Vendor readiness note" style="min-width:180px">
+            <button class="btn btn-sm" type="submit"><?=((int)($job['vendor_confirmed']??0)===1)?'Clear vendor':'Mark vendor confirmed'?></button>
+          </form>
+          <form method="post" action="/job-confirm-req" style="display:flex;gap:6px;align-items:center">
+            <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
+            <input type="hidden" name="required" value="<?=$gate['required']?'0':'1'?>">
+            <button class="btn btn-sm secondary" type="submit"><?=$gate['required']?'Make client confirmation optional':'Require client confirmation'?></button>
+          </form>
+        </div>
+        <?php endif; ?>
+      </div>
+
+      <?php // Readiness checklist ?>
+      <div>
+        <strong>Readiness checklist</strong>
+        <?php if ($items): ?><span class="muted"> — <?=$roll['ready']?>/<?=$roll['total']?> ready<?php if ($roll['open']>0): ?>, <?=$roll['open']?> open<?php endif; ?><?php if ($roll['blocked']>0): ?>, <span style="color:#b4232b"><?=$roll['blocked']?> blocked</span><?php endif; ?></span><?php endif; ?>
+        <?php if (!$items && $canEdit): ?>
+          <form method="post" action="/job-ready-seed" style="margin-top:6px">
+            <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
+            <button class="btn btn-sm" type="submit">Add readiness checklist</button>
+            <span class="muted" style="font-size:12px">Optional — not every service needs it. Items are editable afterwards.</span>
+          </form>
+        <?php elseif ($items): ?>
+        <table class="tbl" style="width:100%;margin-top:6px;font-size:13px">
+          <thead><tr><th>Item</th><th>Status</th><?php if ($canEdit): ?><th></th><?php endif; ?></tr></thead>
+          <tbody>
+          <?php foreach ($items as $it): ?>
+            <tr>
+              <td><?=$esc($it['item'])?> <span class="muted">· <?=$esc($it['category'])?></span><?php if (trim((string)$it['note'])!==''): ?><br><span class="muted"><?=$esc($it['note'])?></span><?php endif; ?></td>
+              <td><span class="badge"><?=$esc(TOSRM_READY_STATUS[$it['status']] ?? $it['status'])?></span></td>
+              <?php if ($canEdit): ?>
+              <td>
+                <form method="post" action="/job-ready-set" style="display:flex;gap:4px">
+                  <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>"><input type="hidden" name="item_id" value="<?=$esc($it['id'])?>">
+                  <select name="status"><?php foreach (TOSRM_READY_STATUS as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$it['status']?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select>
+                  <input type="text" name="note" placeholder="Note" value="<?=$esc($it['note'])?>" style="width:120px">
+                  <button class="btn btn-sm" type="submit">Set</button>
+                </form>
+              </td>
+              <?php endif; ?>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php
+    echo ob_get_clean();
+}
+
+// ---------------------------------------------------------------------------
+//  Handler — readiness / confirmation actions on a job.
+// ---------------------------------------------------------------------------
+function ops_tosrm_ready_action($route, $method) {
+    $jobId = (int)($_POST['job_id'] ?? $_GET['id'] ?? 0);
+    $job = $jobId ? ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]) : null;
+    if (!$job) { flash('Job not found.', 'error'); redirect('/jobs'); }
+    $back = '/job?id=' . $jobId . '#ready';
+    if ($method !== 'POST') redirect($back);
+    if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect($back); }
+    ops_require(tosrm_can_edit(), 'You do not have permission to change this job.');
+    tosrm_migrate_c();
+
+    switch ($route) {
+        case 'job-ready-seed':
+            $n = tosrm_readiness_seed($jobId);
+            flash($n > 0 ? "Readiness checklist added ($n items — edit or mark N/A freely)." : 'A readiness checklist is already present.');
+            break;
+        case 'job-ready-set':
+            if (tosrm_readiness_set((int)($_POST['item_id'] ?? 0), (string)($_POST['status'] ?? ''), (string)($_POST['note'] ?? ''))) flash('Readiness item updated.');
+            else flash('Pick a valid readiness status.', 'error');
+            break;
+        case 'job-confirm':
+            tosrm_confirm_set($jobId, (string)($_POST['party'] ?? ''), (int)($_POST['on'] ?? 0) === 1, (string)($_POST['ref'] ?? ''));
+            flash('Confirmation updated.');
+            break;
+        case 'job-confirm-req':
+            tosrm_confirm_set_required($jobId, (int)($_POST['required'] ?? 0) === 1);
+            flash('Client-confirmation requirement updated.');
+            break;
+    }
+    redirect($back);
+}
