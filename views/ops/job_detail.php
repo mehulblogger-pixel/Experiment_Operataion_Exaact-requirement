@@ -23,6 +23,11 @@
   <a id="ready"></a>
   <?php tosrm_render_readiness_panel($job); ?>
 <?php endif; ?>
+<?php // Phase 9 (TOSRM Slice E) — communication log on the job.
+      if (function_exists('tosrm_render_comms')): ?>
+  <a id="comms"></a>
+  <?php tosrm_render_comms('JOB', (int)$job['id']); ?>
+<?php endif; ?>
 
 <?php // ---- Where this job stands, and the one next thing ------------------- ?>
 <?php

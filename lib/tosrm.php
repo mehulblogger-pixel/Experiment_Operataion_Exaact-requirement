@@ -594,6 +594,17 @@ function tosrm_render_job_panel($job) {
           <label style="display:block;font-size:12px;color:#666">Cancel assignment (reason kept)</label>
           <div style="display:flex;gap:6px"><input type="text" name="reason" placeholder="Reason to cancel" style="flex:1" required><button class="btn btn-danger" type="submit">Cancel</button></div>
         </form>
+        <?php if (function_exists('tosrm_issue_from_event')): ?>
+        <form method="post" action="/assign-issue">
+          <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
+          <label style="display:block;font-size:12px;color:#666">Raise a Phase 8 issue (no-show, competence, access…) — links, no duplicate register</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <input type="text" name="title" placeholder="Operational issue" style="flex:1;min-width:160px">
+            <select name="severity"><option value="MINOR">Minor</option><option value="MAJOR">Major</option><option value="OBSERVATION">Observation</option></select>
+            <button class="btn btn-sm" type="submit">Raise issue</button>
+          </div>
+        </form>
+        <?php endif; ?>
       </div>
       <?php endif; ?>
       <?php if ($hist): $iname = []; foreach ($insps as $ip) $iname[(int)$ip['id']] = $ip['name']; ?>
@@ -1337,4 +1348,224 @@ function ops_tosrm_admin($route, $method) {
         return true;
     }
     return false;
+}
+
+// ===========================================================================
+//  SLICE E — Operations surfaces: the ops desk, backlog + registers, the comms
+//  log on a call/job, the operational-event → Phase 8 issue link, rule-based
+//  data-quality flags and an optional (advisory) AI operations summary.
+//  Everything REUSES existing engines — the activity spine (lib/activity.php),
+//  the Phase-8 issue creator (ncr_create), the availability engine and the AI
+//  seam (lib/ai.php). No second CRM, NCR, report builder or scheduler.
+// ===========================================================================
+
+// Office scope predicate for the calls table (respects the user's branch scope).
+function tosrm_office_scope() {
+    if (function_exists('availability_scope_offices')) { $o = availability_scope_offices(); if ($o !== 'ALL' && is_array($o)) return $o; return 'ALL'; }
+    if (function_exists('scope_offices')) { $o = scope_offices(); return is_array($o) ? $o : 'ALL'; }
+    return 'ALL';
+}
+function tosrm_call_office_sql($offices, $alias = 'c') {
+    if (!is_array($offices)) return '1=1';
+    if (!$offices) return '1=0';
+    $in = implode(',', array_map('intval', $offices));
+    return "($alias.executing_office_id IN ($in) OR $alias.executing_office_id IS NULL)";
+}
+
+// ---- Ops desk metrics ------------------------------------------------------
+function tosrm_ops_metrics($offices = 'ALL') {
+    tosrm_migrate_d();
+    $w = tosrm_call_office_sql($offices, 'c');
+    $today = date('Y-m-d');
+    $one = fn($sql, $a = []) => (int)(ops_one($sql, $a)['n'] ?? 0);
+    $m = [];
+    $m['unscheduled'] = count(function_exists('sched_unallocated_calls') ? sched_unallocated_calls($offices, 999) : []);
+    $m['clarification'] = $one("SELECT COUNT(DISTINCT c.id) n FROM calls c JOIN call_clarifications cc ON cc.call_id=c.id AND cc.status='OPEN' WHERE $w");
+    $m['ready'] = $one("SELECT COUNT(*) n FROM calls c WHERE c.op_status='READY_TO_SCHEDULE' AND $w");
+    $m['new'] = $one("SELECT COUNT(*) n FROM calls c WHERE (c.op_status IN ('RECEIVED','DRAFT','UNDER_REVIEW') OR (COALESCE(c.op_status,'')='' AND c.status='OPEN')) AND $w");
+    $m['today'] = $one("SELECT COUNT(*) n FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.scheduled_date=? AND $w", [$today]);
+    $m['overdue'] = $one("SELECT COUNT(*) n FROM calls c WHERE c.status<>'CLOSED' AND COALESCE(c.op_status,'')<>'CLOSED' AND c.inspection_required_date<>'' AND c.inspection_required_date<? AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.call_id=c.id AND j.closed_flag=1) AND $w", [$today]);
+    $m['report_pending'] = $one("SELECT COUNT(*) n FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.stage='REPORT_PENDING' AND $w");
+    $m['critical'] = $one("SELECT COUNT(*) n FROM calls c WHERE c.priority='CRITICAL' AND c.status<>'CLOSED' AND $w");
+    return $m;
+}
+
+// ---- Backlog (received → not yet done), oldest / most-urgent first ---------
+function tosrm_ops_backlog($offices = 'ALL', $limit = 100) {
+    tosrm_migrate_d();
+    $w = tosrm_call_office_sql($offices, 'c');
+    $today = date('Y-m-d');
+    $rows = ops_all("SELECT c.id, c.call_code, c.op_status, c.status, c.priority, c.inspection_type,
+                            c.call_received_date, c.inspection_required_date,
+                            bp.display_name client_name,
+                            (SELECT COUNT(*) FROM call_clarifications cc WHERE cc.call_id=c.id AND cc.status='OPEN') open_clar,
+                            (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id AND j.inspector_id IS NOT NULL) has_res
+                     FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id
+                     WHERE c.status<>'CLOSED' AND COALESCE(c.op_status,'')<>'CLOSED' AND COALESCE(c.op_status,'')<>'CANCELLED' AND $w
+                     ORDER BY CASE WHEN c.inspection_required_date='' THEN 1 ELSE 0 END, c.inspection_required_date, c.id
+                     LIMIT " . (int)$limit) ?: [];
+    foreach ($rows as &$r) {
+        $r['age_days'] = ($r['call_received_date'] ?? '') !== '' && function_exists('days_between') ? days_between($r['call_received_date'], $today) : null;
+        $r['overdue'] = ($r['inspection_required_date'] ?? '') !== '' && $r['inspection_required_date'] < $today;
+        $r['pending_reason'] = (int)$r['open_clar'] > 0 ? 'Clarification open'
+            : ((int)$r['has_res'] === 0 ? 'No resource assigned' : (($r['op_status'] ?: 'RECEIVED')));
+    }
+    return $rows;
+}
+
+// ---- Registers -------------------------------------------------------------
+function tosrm_schedule_register($offices = 'ALL', $from = null, $to = null) {
+    tosrm_migrate_d();
+    $from = $from ?: date('Y-m-d'); $to = $to ?: date('Y-m-d', strtotime($from . ' +13 days'));
+    $w = tosrm_call_office_sql($offices, 'c');
+    return ops_all("SELECT j.id job_id, j.job_code, j.scheduled_date, j.stage, j.assign_state, j.accept_state,
+                           c.id call_id, c.call_code, c.inspection_type, bp.display_name client_name,
+                           i.name inspector_name
+                    FROM jobs j JOIN calls c ON c.id=j.call_id
+                    LEFT JOIN business_partners bp ON bp.id=c.client_id
+                    LEFT JOIN inspectors i ON i.id=j.inspector_id
+                    WHERE j.scheduled_date>=? AND j.scheduled_date<=? AND $w
+                    ORDER BY j.scheduled_date, j.id", [$from, $to]) ?: [];
+}
+function tosrm_assignment_register($offices = 'ALL', $limit = 200) {
+    tosrm_migrate_d();
+    $w = tosrm_call_office_sql($offices, 'c');
+    return ops_all("SELECT j.id job_id, j.job_code, j.scheduled_date, j.assign_state, j.accept_state, j.accept_reason,
+                           c.call_code, c.inspection_type, bp.display_name client_name, i.name inspector_name
+                    FROM jobs j JOIN calls c ON c.id=j.call_id
+                    LEFT JOIN business_partners bp ON bp.id=c.client_id
+                    LEFT JOIN inspectors i ON i.id=j.inspector_id
+                    WHERE j.inspector_id IS NOT NULL AND $w
+                    ORDER BY j.id DESC LIMIT " . (int)$limit) ?: [];
+}
+
+// ---- Operational-event → Phase 8 issue (REUSES ncr_create) -----------------
+function tosrm_issue_from_event($jobId, $title, $description = '', $severity = 'MINOR') {
+    if (!function_exists('ncr_create')) return 0;
+    $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$jobId]);
+    try {
+        $id = ncr_create([
+            'job_id' => (int)$jobId, 'source' => 'INTERNAL', 'source_note' => 'Operations (Phase 9) event',
+            'title' => substr((string)$title, 0, 255), 'description' => (string)$description,
+            'severity' => in_array($severity, ['MAJOR','MINOR','OBSERVATION'], true) ? $severity : 'MINOR',
+            'partner_id' => (int)($job['client_id'] ?? 0) ?: 0,
+        ]);
+        return is_numeric($id) ? (int)$id : 1;
+    } catch (Throwable $e) { return 0; }
+}
+
+// ---- Rule-based data-quality flags (advisory; no AI needed) -----------------
+function tosrm_ops_dataquality($offices = 'ALL', $limit = 60) {
+    $w = tosrm_call_office_sql($offices, 'c');
+    $rows = ops_all("SELECT c.* FROM calls c WHERE c.status<>'CLOSED' AND $w ORDER BY c.id DESC LIMIT " . (int)$limit) ?: [];
+    $out = [];
+    foreach ($rows as $c) {
+        $missing = tosrm_validate_call($c);
+        $overridden = trim((string)($c['val_override_reason'] ?? '')) !== '';
+        if ($missing && !$overridden) $out[] = ['call_id'=>(int)$c['id'], 'call_code'=>$c['call_code'], 'flags'=>$missing];
+    }
+    return $out;
+}
+
+// ---- Operations summary (deterministic; AI-wrapped only when enabled) -------
+function tosrm_ops_summary($metrics) {
+    $base = sprintf('Backlog: %d unscheduled, %d awaiting clarification, %d ready to schedule. %d overdue, %d critical, %d report(s) pending. %d service(s) today.',
+        $metrics['unscheduled'], $metrics['clarification'], $metrics['ready'], $metrics['overdue'], $metrics['critical'], $metrics['report_pending'], $metrics['today']);
+    // AI may PHRASE it more helpfully, but never invents numbers and never acts.
+    if (function_exists('ai_enabled') && ai_enabled() && function_exists('ai_chat')) {
+        try {
+            $sys = 'You are an operations assistant for a third-party inspection agency. Summarise the day\'s workload in 2-3 short sentences for a coordinator. Use ONLY the figures given. Do not invent data, do not assign or schedule anyone, do not make decisions.';
+            $r = ai_chat($sys, $base, 200);
+            if (is_string($r) && trim($r) !== '') return ['text'=>trim($r), 'ai'=>true];
+        } catch (Throwable $e) {}
+    }
+    return ['text'=>$base, 'ai'=>false];
+}
+
+// ---- Comms log panel (REUSES the activity spine) ---------------------------
+function tosrm_render_comms($entityKind, $entityId, $backAnchor = 'comms') {
+    if (!function_exists('act_for_entity') || !function_exists('act_log')) return;
+    $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $rows = act_for_entity($entityKind, (int)$entityId, 50) ?: [];
+    $canEdit = tosrm_can_edit();
+    $csrf = function_exists('csrf_token') ? csrf_token() : '';
+    $kinds = defined('ACT_KINDS') ? ACT_KINDS : ['NOTE'=>'Note','CALL'=>'Call','EMAIL'=>'Email','WHATSAPP'=>'WhatsApp','MEETING'=>'Meeting'];
+    ob_start(); ?>
+    <div class="card tosrm-comms" style="margin-top:16px">
+      <h3 style="margin:0 0 10px">Communication log</h3>
+      <?php if ($rows): ?>
+      <table class="tbl" style="width:100%;font-size:13px">
+        <thead><tr><th>When</th><th>Kind</th><th>Subject</th><th>By</th></tr></thead>
+        <tbody><?php foreach ($rows as $a): ?>
+          <tr><td><?=$esc(substr((string)($a['occurred_at'] ?? $a['created_at'] ?? ''),0,16))?></td>
+              <td><?=$esc($kinds[$a['kind']] ?? $a['kind'])?></td>
+              <td><?=$esc($a['subject'])?><?php if (trim((string)($a['body']??''))!==''): ?><br><span class="muted"><?=$esc($a['body'])?></span><?php endif; ?></td>
+              <td><?=$esc($a['owner'] ?: $a['created_by'])?></td></tr>
+        <?php endforeach; ?></tbody>
+      </table>
+      <?php else: ?><p class="muted">No communications logged yet. (This does not replace email or WhatsApp — it records the significant ones.)</p><?php endif; ?>
+      <?php if ($canEdit): ?>
+      <form method="post" action="/comm-add" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>">
+        <input type="hidden" name="entity_kind" value="<?=$esc($entityKind)?>"><input type="hidden" name="entity_id" value="<?=(int)$entityId?>">
+        <select name="kind"><?php foreach ($kinds as $k=>$v): ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
+        <input type="text" name="subject" placeholder="What was communicated?" style="flex:1;min-width:200px" required>
+        <input type="text" name="body" placeholder="Detail (optional)" style="flex:1;min-width:160px">
+        <button class="btn btn-sm" type="submit">Log</button>
+      </form>
+      <?php endif; ?>
+    </div>
+    <?php echo ob_get_clean();
+}
+
+// ---------------------------------------------------------------------------
+//  Handlers.
+// ---------------------------------------------------------------------------
+function tosrm_ops_desk_can() {
+    return (function_exists('can') && (can('dash.operations') || can('mod.calls.view') || can('mod.jobs.view')))
+        || (function_exists('is_coordinator_level') && is_coordinator_level())
+        || (function_exists('is_master') && is_master());
+}
+function ops_tosrm_desk($method) {
+    ops_require(tosrm_ops_desk_can(), 'You do not have access to the operations desk.');
+    tosrm_migrate_d();
+    $offices = tosrm_office_scope();
+    $metrics = tosrm_ops_metrics($offices);
+    $from = trim((string)($_GET['from'] ?? '')) ?: date('Y-m-d');
+    $to   = trim((string)($_GET['to'] ?? '')) ?: date('Y-m-d', strtotime($from . ' +13 days'));
+    view('ops/ops_desk', [
+        'metrics' => $metrics, 'backlog' => tosrm_ops_backlog($offices, 60),
+        'schedule' => tosrm_schedule_register($offices, $from, $to),
+        'assignments' => tosrm_assignment_register($offices, 60),
+        'dataquality' => tosrm_ops_dataquality($offices, 40),
+        'summary' => tosrm_ops_summary($metrics), 'from' => $from, 'to' => $to,
+    ]);
+    return true;
+}
+function ops_tosrm_comm_action($route, $method) {
+    if ($route === 'comm-add') {
+        $ek = strtoupper((string)($_POST['entity_kind'] ?? '')); $eid = (int)($_POST['entity_id'] ?? 0);
+        $back = $ek === 'JOB' ? '/job?id=' . $eid . '#comms' : '/call?id=' . $eid . '#comms';
+        if ($method !== 'POST') redirect($back);
+        if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect($back); }
+        ops_require(tosrm_can_edit(), 'You do not have permission to log a communication.');
+        if (function_exists('act_log') && trim((string)($_POST['subject'] ?? '')) !== '') {
+            act_log($ek, $eid, (string)($_POST['kind'] ?? 'NOTE'), (string)($_POST['subject'] ?? ''), ['body'=>(string)($_POST['body'] ?? '')]);
+            flash('Communication logged.');
+        } else flash('Give the entry a subject.', 'error');
+        redirect($back);
+    }
+    if ($route === 'assign-issue') {
+        $jobId = (int)($_POST['job_id'] ?? 0);
+        $job = $jobId ? ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]) : null;
+        $back = $job ? '/job?id=' . $jobId . '#assign' : '/jobs';
+        if ($method !== 'POST') redirect($back);
+        if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect($back); }
+        ops_require(tosrm_can_edit(), 'You do not have permission to raise an issue.');
+        $title = trim((string)($_POST['title'] ?? '')); if ($title === '') { flash('Describe the operational issue.', 'error'); redirect($back); }
+        $id = tosrm_issue_from_event($jobId, $title, (string)($_POST['description'] ?? ''), (string)($_POST['severity'] ?? 'MINOR'));
+        flash($id ? 'Operational issue raised in the Phase 8 register (linked to this job).' : 'Could not raise the issue.', $id ? 'success' : 'error');
+        redirect($back);
+    }
+    redirect('/');
 }
