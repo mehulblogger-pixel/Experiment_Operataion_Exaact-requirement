@@ -44,6 +44,10 @@ const CVP_VISIBILITY_AUDIENCE = [
 function cvp_migrate() {
     static $done = false; if ($done) return; $done = true;
     $pdo = db(); $pk = pk_clause();
+    // client_users is owned by portal.php and its migrate may run after ours in
+    // the boot order. We add columns to it below, so guarantee it exists first —
+    // portal_migrate is static-guarded, so this is a cheap no-op once done.
+    if (function_exists('portal_migrate')) { try { portal_migrate(); } catch (Throwable $e) {} }
 
     // -- Slice 2: the vendor portal ------------------------------------------
     // A person at a VENDOR company. Deliberately its OWN table and its own
@@ -85,6 +89,25 @@ function cvp_migrate() {
         event VARCHAR(30) DEFAULT '', ref_kind VARCHAR(20) DEFAULT '', ref_id INT DEFAULT 0,
         title VARCHAR(255) DEFAULT '', url VARCHAR(200) DEFAULT '',
         is_read INT DEFAULT 0, created_at VARCHAR(30) DEFAULT '')");
+
+    // -- Slice 5: governance -------------------------------------------------
+    // access_expires — a date after which an account can no longer sign in, with
+    // NO cron needed: the identity read simply stops returning an expired row, so
+    // the account is revoked the instant the date passes. Blank = never expires
+    // (so existing accounts are untouched). is_org_admin — a client user who may
+    // manage their OWN organisation's portal users (invite / withdraw), scoped to
+    // their own partner id and never beyond it.
+    if (function_exists('ensure_column')) {
+        ensure_column('client_users', 'access_expires', "VARCHAR(20) DEFAULT ''");
+        ensure_column('client_users', 'is_org_admin',  'INT DEFAULT 0');
+        ensure_column('vendor_users', 'access_expires', "VARCHAR(20) DEFAULT ''");
+    }
+}
+
+// Shared expiry test — an account is live when it has no expiry date or the date
+// has not yet passed. Used by both identity reads so "auto-revoke" needs no job.
+function cvp_access_live_sql($col = 'access_expires') {
+    return ["(COALESCE($col,'') = '' OR $col >= ?)", [date('Y-m-d')]];
 }
 
 // ============================================================================
@@ -103,20 +126,22 @@ function cvp_vendor_user() {
     static $u = null, $for = 0;
     if ($u === null || $for !== (int)$_SESSION['vuid']) {
         $for = (int)$_SESSION['vuid'];
+        [$xw, $xa] = cvp_access_live_sql('vu.access_expires');
         $u = portal_try(fn() => ops_one(
             "SELECT vu.*, p.legal_name, p.display_name
              FROM vendor_users vu JOIN business_partners p ON p.id = vu.vendor_id
-             WHERE vu.id = ? AND vu.is_active = 1", [$for]), null);
+             WHERE vu.id = ? AND vu.is_active = 1 AND $xw", array_merge([$for], $xa)), null);
     }
     return $u ?: null;
 }
 function cvp_vendor_reload() {
     $id = (int)($_SESSION['vuid'] ?? 0);
     if (!$id) return null;
+    [$xw, $xa] = cvp_access_live_sql('vu.access_expires');
     return portal_try(fn() => ops_one(
         "SELECT vu.*, p.legal_name, p.display_name
          FROM vendor_users vu JOIN business_partners p ON p.id = vu.vendor_id
-         WHERE vu.id = ? AND vu.is_active = 1", [$id]), null) ?: null;
+         WHERE vu.id = ? AND vu.is_active = 1 AND $xw", array_merge([$id], $xa)), null) ?: null;
 }
 // The ONLY source of vendor scope — from the session, never from the request.
 function cvp_vendor_id() { $u = cvp_vendor_user(); return $u ? (int)$u['vendor_id'] : 0; }
@@ -164,6 +189,9 @@ function cvp_vendor_login($email, $password) {
         if (function_exists('login_fail')) login_fail('vendor:' . $email);
         return 'That e-mail address and password do not match.';
     }
+    // Auto-revoke: an expired account cannot sign in, with no cron.
+    if (trim((string)($u['access_expires'] ?? '')) !== '' && (string)$u['access_expires'] < date('Y-m-d'))
+        return 'Your access has expired. Ask your contact at ' . app_name() . ' to renew it.';
     cvp_vendor_start_session((int)$u['id']);
     if (function_exists('login_clear')) login_clear('vendor:' . $email);
     try { db()->prepare("UPDATE vendor_users SET last_login_at=?, last_login_ip=? WHERE id=?")
@@ -414,6 +442,16 @@ function cvp_vendor_route($route, $method) {
             if (!$d) { http_response_code(404); cvp_vendor_view('notfound'); exit; }
             cvp_vendor_log('REPORT_OPENED', $d['irn']);
             cvp_vendor_report_pdf($d);
+            exit;
+
+        case 'vendor/assistant':
+            $q = ''; $ans = ''; $aerr = '';
+            if ($method === 'POST') {
+                $q = trim((string)($_POST['q'] ?? ''));
+                [$ans, $aerr] = cvp_ai_answer('VENDOR', cvp_vendor_id(), $q);
+                cvp_vendor_log('ASSISTANT', substr($q, 0, 120));
+            }
+            cvp_vendor_view('assistant', ['q' => $q, 'ans' => $ans, 'aerr' => $aerr, 'available' => cvp_ai_available()]);
             exit;
 
         case 'vendor/password':
@@ -682,6 +720,105 @@ function cvp_action_centre($audience, $partnerId, $can) {
             'url' => $audience === 'VENDOR' ? '/vendor/issues' : '/portal/issues'];
     }
     return $out;
+}
+
+// ============================================================================
+//  SLICE 5a — client self-administration.
+//
+//  A client user marked is_org_admin may manage THEIR OWN organisation's portal
+//  users — invite a colleague, withdraw one who has left, set an access-expiry —
+//  without waiting for our office. Everything is scoped to their own partner id
+//  and can never reach beyond it: the partner id comes from their session, and
+//  every write re-checks that the target user belongs to the same partner.
+//  An org admin cannot mint another org admin (that stays a staff decision).
+// ============================================================================
+function cvp_client_is_admin() {
+    $u = function_exists('portal_user') ? portal_user() : null;
+    return $u && !empty($u['is_org_admin']);
+}
+function cvp_client_team($partnerId) {
+    return portal_try(fn() => ops_all(
+        "SELECT id, name, email, is_active, is_org_admin, access_expires, password_hash, last_login_at
+         FROM client_users WHERE partner_id=? ORDER BY name, id", [(int)$partnerId]), []);
+}
+// Invite a colleague into the admin's OWN organisation. partner id is forced to
+// the admin's own — a client can never invite into another company.
+function cvp_client_team_invite($partnerId, $email, $name, $expires = '') {
+    $r = portal_invite((int)$partnerId, $email, $name, 0);   // never an org admin
+    if (!empty($r['err'])) return $r;
+    if (trim((string)$expires) !== '' && !empty($r['id'])) {
+        try { db()->prepare("UPDATE client_users SET access_expires=? WHERE id=? AND partner_id=?")
+                  ->execute([substr((string)$expires, 0, 10), (int)$r['id'], (int)$partnerId]); } catch (Throwable $e) {}
+    }
+    return $r;
+}
+// Activate / deactivate a colleague — only within the admin's own org, and never
+// the admin's own account (so they cannot lock themselves out).
+function cvp_client_team_toggle($partnerId, $userId, $selfId) {
+    $userId = (int)$userId;
+    if ($userId === (int)$selfId) return 'You cannot change your own access here.';
+    $u = portal_try(fn() => ops_one("SELECT * FROM client_users WHERE id=? AND partner_id=?", [$userId, (int)$partnerId]), null);
+    if (!$u) return 'That person is not in your organisation.';
+    db()->prepare("UPDATE client_users SET is_active=? WHERE id=? AND partner_id=?")
+        ->execute([empty($u['is_active']) ? 1 : 0, $userId, (int)$partnerId]);
+    return '';
+}
+function cvp_client_team_expiry($partnerId, $userId, $date) {
+    $u = portal_try(fn() => ops_one("SELECT id FROM client_users WHERE id=? AND partner_id=?", [(int)$userId, (int)$partnerId]), null);
+    if (!$u) return 'That person is not in your organisation.';
+    db()->prepare("UPDATE client_users SET access_expires=? WHERE id=? AND partner_id=?")
+        ->execute([substr((string)$date, 0, 10), (int)$userId, (int)$partnerId]);
+    return '';
+}
+
+// ============================================================================
+//  SLICE 5b — the scoped portal assistant.
+//
+//  An AI assistant that CANNOT reveal a restricted record, enforced by
+//  construction: the only data it is ever given is a summary of THIS party's own
+//  visible records (their reports, their open nonconformities) — the same reads
+//  the portal already gates. The model never touches the database; it answers
+//  from the context handed to it. If AI is not configured, it degrades to a
+//  plain "not available" message rather than failing.
+// ============================================================================
+function cvp_ai_available() { return function_exists('ai_active') && ai_active(); }
+
+// The ONLY data the assistant sees — this party's own records, already gated.
+function cvp_ai_scope_context($audience, $partnerId) {
+    $audience = strtoupper((string)$audience); $partnerId = (int)$partnerId;
+    $lines = [];
+    if ($audience === 'CLIENT') {
+        $reps = portal_try(fn() => ops_all(
+            "SELECT irn, title, result, release_status, inspection_date FROM report_docs
+             WHERE client_id=? AND finalized=1 AND COALESCE(deleted,0)=0 ORDER BY id DESC LIMIT 40", [$partnerId]), []);
+    } else {
+        $reps = portal_try(fn() => ops_all(
+            "SELECT irn, title, result, release_status, inspection_date FROM report_docs
+             WHERE vendor_id=? AND finalized=1 AND COALESCE(deleted,0)=0 AND COALESCE(vendor_visible,0)=1 ORDER BY id DESC LIMIT 40", [$partnerId]), []);
+    }
+    $lines[] = 'REPORTS (' . count($reps) . '):';
+    foreach ($reps as $r) $lines[] = '- ' . $r['irn'] . ' | ' . ($r['title'] ?: '') . ' | result: ' . ($r['result'] ?: '-')
+        . ' | release: ' . ($r['release_status'] ?: '-') . ' | inspected: ' . ($r['inspection_date'] ?: '-');
+    $issues = function_exists('cvp_issues_for') ? cvp_issues_for($audience, $partnerId) : [];
+    $lines[] = '';
+    $lines[] = 'NONCONFORMITIES (' . count($issues) . '):';
+    foreach ($issues as $n) $lines[] = '- ' . ($n['ref'] ?: ('#' . $n['id'])) . ' | ' . ($n['title'] ?: '')
+        . ' | severity: ' . ($n['severity'] ?: '-') . ' | status: ' . ($n['status'] ?: '-') . ' | due: ' . ($n['due_on'] ?: '-');
+    return implode("\n", $lines);
+}
+
+function cvp_ai_answer($audience, $partnerId, $question) {
+    $question = trim((string)$question);
+    if ($question === '') return ['', 'Type a question.'];
+    if (!cvp_ai_available()) return ['', 'The assistant is not switched on. You can still find everything on the pages here.'];
+    $who = strtoupper((string)$audience) === 'VENDOR' ? 'vendor/supplier' : 'client';
+    $ctx = cvp_ai_scope_context($audience, $partnerId);
+    $system = "You are a helpful assistant inside the $who portal of a third-party inspection agency. "
+        . "Answer ONLY from the CONTEXT below, which contains this $who's OWN records and nothing else. "
+        . "Never invent a report, a result or a date. If the answer is not in the context, say you do not have "
+        . "that here and suggest they contact their inspection agency. Be brief and factual. "
+        . "Never mention another company.\n\nCONTEXT:\n" . $ctx;
+    return ai_chat($system, $question, 700);
 }
 
 // ============================================================================

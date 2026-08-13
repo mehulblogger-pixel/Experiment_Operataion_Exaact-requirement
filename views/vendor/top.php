@@ -12,6 +12,7 @@ if (function_exists('cvp_notify_count')) {
     $__vn = cvp_notify_count('VENDOR', cvp_vendor_id());
     $links['vendor/alerts'] = 'Alerts' . ($__vn ? ' (' . $__vn . ')' : '');
 }
+if (function_exists('cvp_ai_available') && cvp_ai_available()) $links['vendor/assistant'] = 'Assistant';
 ?><!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
