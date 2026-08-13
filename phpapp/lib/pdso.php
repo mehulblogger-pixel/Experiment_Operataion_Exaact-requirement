@@ -504,12 +504,69 @@ function pdso_qa_checks($doc, $fields = null, $data = null) {
 // ---------------------------------------------------------------------------
 function pdso_deputations($filter = []) {
     // A deputation is a job of the DEPUTATION type or one carrying a lifecycle
-    // status. Reuses the existing jobs register; adds nothing to it.
+    // status. Reuses the existing jobs register; adds nothing to it. Names are
+    // resolved from the existing inspector + client masters (not re-stored).
     $w = ["(j.dep_status<>'' OR c.inspection_type='DEPUTATION' OR j.job_type='DEPUTATION')"]; $a = [];
     if (!empty($filter['status'])) { $w[] = "j.dep_status=?"; $a[] = $filter['status']; }
     if (!empty($filter['inspector_id'])) { $w[] = "j.inspector_id=?"; $a[] = (int)$filter['inspector_id']; }
-    $sql = "SELECT j.*, c.client_id, c.inspection_type, c.call_code
-            FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
+    if (!empty($filter['open'])) { $w[] = "COALESCE(NULLIF(j.dep_status,''),'') NOT IN ('CLOSED','CANCELLED','DEMOBILIZED')"; }
+    $sql = "SELECT j.*, c.client_id, c.inspection_type, c.call_code,
+                   i.name AS person_name,
+                   COALESCE(NULLIF(bp.display_name,''), bp.legal_name) AS client_name
+            FROM jobs j
+            LEFT JOIN calls c ON c.id=j.call_id
+            LEFT JOIN inspectors i ON i.id=j.inspector_id
+            LEFT JOIN business_partners bp ON bp.id=c.client_id
             WHERE " . implode(' AND ', $w) . " ORDER BY j.id DESC";
     try { return ops_all($sql, $a) ?: []; } catch (Throwable $e) { return []; }
+}
+
+// ---------------------------------------------------------------------------
+//  Deputation dashboard aggregates + register handler. Reuses the home
+//  dashboard's kpi-row / kpi visual language; every figure links to where the
+//  work is. Self-gates on the DEPUTATION service and the operations permission.
+// ---------------------------------------------------------------------------
+function pdso_dashboard() {
+    $today = date('Y-m-d');
+    $deps = pdso_deputations();
+    $c = ['active'=>0,'mob_pending'=>0,'on_leave'=>0,'demob_planned'=>0,'replacement'=>0,'suspended'=>0,'no_status'=>0];
+    $conflictPeople = 0; $seen = [];
+    foreach ($deps as $d) {
+        $s = (string)($d['dep_status'] ?? '');
+        if ($s === 'ACTIVE') $c['active']++;
+        elseif (in_array($s, ['PLANNED','APPROVED','MOB_PENDING'], true)) $c['mob_pending']++;
+        elseif ($s === 'ON_LEAVE') $c['on_leave']++;
+        elseif ($s === 'DEMOB_PLANNED') $c['demob_planned']++;
+        elseif ($s === 'REPLACEMENT_REQ') $c['replacement']++;
+        elseif ($s === 'SUSPENDED') $c['suspended']++;
+        elseif ($s === '') $c['no_status']++;
+        $iid = (int)($d['inspector_id'] ?? 0);
+        if ($iid && !isset($seen[$iid])) { $seen[$iid] = 1; if (pdso_resource_conflicts($iid)) $conflictPeople++; }
+    }
+    $overdueActions = 0; foreach (pdso_open_actions(0, $today) as $a) if ($a['overdue']) $overdueActions++;
+    $pendingAppr = (int)(ops_val("SELECT COUNT(*) FROM dep_att_approval WHERE status IN ('SUBMITTED','CLIENT_REVIEW')") ?: 0);
+    $gap = pdso_manpower_gap(0, null);
+    return $c + [
+        'total' => count($deps), 'overdue_actions' => $overdueActions, 'pending_approvals' => $pendingAppr,
+        'manpower_required' => $gap['required'], 'manpower_mobilized' => $gap['mobilized'], 'manpower_gap' => $gap['gap'],
+        'conflict_people' => $conflictPeople,
+    ];
+}
+
+function pdso_can_view() { return (function_exists('can') && (can('mod.calls.view') || can('mod.jobs.view'))) || (function_exists('is_master') && is_master()); }
+
+function ops_pdso($route, $method) {
+    ops_require(pdso_enabled(), 'The Deputation service is not active for this installation. Switch it on under Settings → Service scope.');
+    ops_require(pdso_can_view(), 'You do not have access to deputation.');
+    pdso_migrate();
+    $status = (string)($_GET['status'] ?? '');
+    $rows = pdso_deputations($status !== '' ? ['status' => $status] : []);
+    view('ops/deputations', [
+        'd'        => pdso_dashboard(),
+        'rows'     => $rows,
+        'statuses' => pdso_statuses(),
+        'status'   => $status,
+        'manpower' => pdso_manpower(0, null),
+    ]);
+    return true;
 }

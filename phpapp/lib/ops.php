@@ -2090,6 +2090,7 @@ function ops_module_gate($route) {
         'contract-overrides'=>'calls','contract-override'=>'calls','contract-open'=>'quotes',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'service-scope'=>'settings',
+        'deputations'=>'jobs',
         'preflight'=>'settings',
         'trace-thread'=>'settings','trace-thread-remove'=>'settings',
         'trace-audit'=>'settings','trace-audit-remove'=>'settings',
@@ -2509,6 +2510,8 @@ function ops_dispatch($route, $method) {
             ops_terminology($method); return true;
         case $route === 'service-scope':
             return ops_services($route, $method);
+        case $route === 'deputations':
+            return ops_pdso($route, $method);
         // Merged screens — one heading, one tab per module underneath.
         case $route === 'approval-rules':
             return ops_approval_rules($method);
