@@ -17,6 +17,12 @@
   <a id="assign"></a>
   <?php tosrm_render_job_panel($job); ?>
 <?php endif; ?>
+<?php // Phase 9 (TOSRM Slice C) — readiness, client/vendor confirmation,
+      // and competence-at-allocation advisory (reuses the competence engine).
+      if (function_exists('tosrm_render_readiness_panel')): ?>
+  <a id="ready"></a>
+  <?php tosrm_render_readiness_panel($job); ?>
+<?php endif; ?>
 
 <?php // ---- Where this job stands, and the one next thing ------------------- ?>
 <?php
