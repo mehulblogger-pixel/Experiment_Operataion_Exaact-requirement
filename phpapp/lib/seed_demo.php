@@ -406,7 +406,101 @@ function seed_demo($force = false) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         $failed[] = demo_explain($e);
     }
+
+    // Phases 4-8, in their own non-fatal transaction so a register not built on
+    // this install (or an older schema) cannot strand the operations demo.
+    try {
+        $pdo->beginTransaction();
+        $c += demo_seed_phase48($pdo, [
+            'oid' => $oid, 'iid' => $iid, 'cid' => $cid, 'vid' => $vid,
+            'callid' => $callid, 'jid' => $jid, 'bid' => $bid,
+            'now' => $now, 'today' => $today, 'd' => $d, 'hash' => $hash,
+        ]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $failed[] = demo_explain($e);
+    }
     return ['counts' => $c, 'failed' => $failed];
+}
+
+// ---------------------------------------------------------------------------
+//  Phases 4-8 demo data — vendor assessment/audit/expediting report documents,
+//  a fully-populated DEPUTATION posting (Phase 7) and a spread of ISSUES
+//  (Phase 8: NCR, observation, discrepancy, CAPA, a deviation and a concession),
+//  seeded off the SAME demo cast so the newest modules demo with real, connected
+//  records. Idempotent (existence-guarded) and tagged so "Remove demo data"
+//  cleans it. Its own failure is non-fatal — reported, never fatal.
+// ---------------------------------------------------------------------------
+function demo_seed_phase48($pdo, $x) {
+    $n = [];
+    $now = $x['now']; $today = $x['today']; $d = $x['d'];
+    $first = fn($m) => (int)(is_array($m) && $m ? reset($m) : 0);
+    $vendorId = $first($x['vid'] ?? []); $clientId = $first($x['cid'] ?? []);
+    $inspId   = $first($x['iid'] ?? []); $officeId = $first($x['oid'] ?? []);
+
+    // ---- Phase 7: a fully-populated deputation posting -------------------
+    if (function_exists('pdso_migrate') && !ops_one("SELECT id FROM jobs WHERE job_code='JOB-DEP-DEMO'")) {
+        try {
+            pdso_migrate();
+            $pdo->prepare("INSERT INTO calls (call_code,client_id,vendor_id,inspection_type,executing_office_id,sbu,inspection_required_date,status,created_by,created_at) VALUES (?,?,?,?,?,?,?, 'OPEN','demo',?)")
+                ->execute(['CALL-DEP-DEMO', $clientId, $vendorId, 'DEPUTATION', $officeId, 'IND', $d(-20), $now]);
+            $depCall = (int)$pdo->lastInsertId();
+            $pdo->prepare("INSERT INTO jobs (job_code,call_id,executing_office_id,inspector_id,job_type,dep_status,dep_site,scheduled_date,inspection_start_date,inspection_end_date,reporting_frequency,sbu,mandays,created_by,created_at) VALUES (?,?,?,?, 'DEPUTATION','','Dahej Petrochemical Complex',?,?,?, 'WEEKLY','IND',30,'demo',?)")
+                ->execute(['JOB-DEP-DEMO', $depCall, $officeId, $inspId, $d(-20), $d(-20), $d(25), $now]);
+            $depJob = (int)$pdo->lastInsertId();
+            pdso_set_status($depJob, 'MOBILIZED', 'Client approval received');
+            pdso_set_status($depJob, 'ACTIVE', 'Reported to site');
+            pdso_checklist_seed($depJob, 'MOB');
+            foreach (pdso_checklist($depJob, 'MOB') as $ci) if ((int)$ci['required'] === 1) pdso_checklist_set((int)$ci['id'], 'COMPLETED');
+            pdso_site_log_add(['job_id'=>$depJob,'client_id'=>$clientId,'kind'=>'OBSERVATION','log_date'=>$d(-5),'detail'=>'Scaffold tag missing at unit 3','risk'=>'Medium','action'=>'Retag before next lift','responsible'=>'Site QA','due_on'=>$d(-1),'status'=>'OPEN']);
+            pdso_site_log_add(['job_id'=>$depJob,'client_id'=>$clientId,'kind'=>'INSTRUCTION','log_date'=>$d(-3),'detail'=>'Client asked for daily progress photographs','responsible'=>'Resident Engineer','status'=>'CLOSED']);
+            foreach ([[-14,'Witness hydro test',8,1],[-13,'Document review — MTC',6,0],[-12,'Stage inspection — piping',8,0]] as $t)
+                pdso_timesheet_add(['job_id'=>$depJob,'inspector_id'=>$inspId,'ts_date'=>$d($t[0]),'activity'=>$t[1],'hours'=>$t[2],'ot_hours'=>$t[3]]);
+            pdso_att_approval_add(['job_id'=>$depJob,'client_id'=>$clientId,'period_from'=>$d(-20),'period_to'=>$d(-1),'basis'=>'MANDAY','billable_days'=>18,'status'=>'SUBMITTED']);
+            pdso_manpower_add(['client_id'=>$clientId,'project'=>'Dahej Petrochemical Complex','position'=>'QA/QC Engineer','required'=>4,'planned'=>4,'mobilized'=>2]);
+            pdso_manpower_add(['client_id'=>$clientId,'project'=>'Dahej Petrochemical Complex','position'=>'Welding Inspector','required'=>2,'planned'=>2,'mobilized'=>2]);
+            $n['deputation'] = 1;
+        } catch (Throwable $e) { /* non-fatal */ }
+    }
+
+    // ---- Phase 8: a spread of issues + CAPA + deviation + concession ------
+    if (function_exists('ncr_create') && !ops_one("SELECT id FROM nonconformities WHERE source_note='DEMO'")) {
+        try {
+            $ncr1 = ncr_create(['title'=>'Weld undercut beyond acceptance','severity'=>'MAJOR','source'=>'INTERNAL','source_note'=>'DEMO','issue_type'=>'NCR','issue_class'=>'MAJOR_NC','responsibility'=>'VENDOR','partner_id'=>$vendorId,'office_id'=>$officeId,'clause'=>'AWS D1.1','description'=>'Undercut 1.2mm over 150mm at joint W-14, exceeds 0.5mm acceptance.']);
+            ncr_create(['title'=>'Housekeeping in paint booth could improve','severity'=>'OBSERVATION','source'=>'INTERNAL','source_note'=>'DEMO','issue_type'=>'OBSERVATION','issue_class'=>'OBSERVATION','partner_id'=>$vendorId,'office_id'=>$officeId]);
+            ncr_create(['title'=>'Heat number not legible on drawing','severity'=>'MINOR','source'=>'REPORT','source_note'=>'DEMO','issue_type'=>'DOC_DISCREPANCY','issue_class'=>'MINOR_NC','partner_id'=>$vendorId,'office_id'=>$officeId]);
+            if (function_exists('ncr_to_capa')) { try { ncr_to_capa($ncr1); } catch (Throwable $e) {} }
+            if (function_exists('ncdca_departure_create')) {
+                $dev = ncdca_departure_create('DEVIATION', ['ncr_id'=>$ncr1,'client_id'=>$clientId,'vendor_id'=>$vendorId,'office_id'=>$officeId,'title'=>'Coating DFT 230µm vs 250µm spec','requirement'=>'DFT ≥ 250µm','planned_condition'=>'250µm','actual_condition'=>'230µm','reason'=>'Applicator maximum build','justification'=>'Salt-spray passed at 230µm; C3 environment','risk'=>'Low','valid_to'=>$d(180)]);
+                ncdca_departure_set_status($dev, 'SUBMITTED'); ncdca_departure_set_status($dev, 'APPROVED', 'Technical Authority', 1);
+                $con = ncdca_departure_create('CONCESSION', ['client_id'=>$clientId,'vendor_id'=>$vendorId,'office_id'=>$officeId,'title'=>'Accept 2 vessels 1mm under nominal','requirement'=>'Nominal 12mm','reason'=>'Within corrosion allowance','risk'=>'Low']);
+                $pdo->prepare("UPDATE issue_departures SET created_by='demo' WHERE id IN (?,?)")->execute([$dev, $con]);
+            }
+            if (function_exists('ncdca_dispute_create')) ncdca_dispute_create($ncr1, ['party'=>'VENDOR','disputed_field'=>'severity','reason'=>'Vendor believes minor; localised','response_kind'=>'DISAGREE']);
+            if (function_exists('ncdca_extension_request')) { $nr = ncr_row($ncr1); $ex = ncdca_extension_request('NCR', $ncr1, (string)($nr['due_on'] ?? ''), $d(30), 'Awaiting replacement material'); if (function_exists('ncdca_extension_approve')) ncdca_extension_approve($ex, 'QA Manager'); }
+            $n['issues'] = 3;
+        } catch (Throwable $e) { /* non-fatal */ }
+    }
+
+    // ---- Phase 4/5/6: assessment / audit / expediting report documents ---
+    if (!ops_one("SELECT id FROM report_docs WHERE irn='VASR-DEMO-01'")) {
+        try {
+            $mkDoc = function($code, $title, $data) use ($pdo, $vendorId, $clientId, $now, $today) {
+                $t = ops_one("SELECT id FROM report_types WHERE code=?", [$code]); if (!$t) return 0;
+                $pdo->prepare("INSERT INTO report_docs (report_type_id,type_code,irn,title,status,data,vendor_id,client_id,issue_date,finalized,created_by,created_at) VALUES (?,?,?,?, 'ISSUED',?,?,?,?,1,'demo',?)")
+                    ->execute([(int)$t['id'], $code, $code.'-DEMO-01', $title, json_encode($data), $vendorId, $clientId, $today, $now]);
+                return (int)$pdo->lastInsertId();
+            };
+            $r = 0;
+            $r += $mkDoc('VASR', 'Vendor Assessment — demo vendor', ['assessment_result'=>'QUALIFIED']) ? 1 : 0;
+            $r += $mkDoc('VAR',  'Vendor Audit — demo vendor', ['audit_conclusion'=>'CONDITIONAL']) ? 1 : 0;
+            $r += $mkDoc('ER',   'Expediting Report — demo PO', []) ? 1 : 0;
+            if ($r) $n['review_docs'] = $r;
+        } catch (Throwable $e) { /* non-fatal */ }
+    }
+
+    return $n;
 }
 
 // Turn a driver message into something the person pressing the button can act
@@ -442,6 +536,21 @@ function seed_demo_remove() {
     $pdo->beginTransaction();
     try {
         $del = function($sql, $args = []) use ($pdo, &$n) { $st = $pdo->prepare($sql); $st->execute($args); $n += $st->rowCount(); };
+        // Guarded delete — a table not built on this install must not abort the
+        // removal and strand the rest of the demo data. Defined early so the
+        // Phase-7 child rows can be cleared BEFORE their parent job is deleted.
+        $try = function ($sql, $args = []) use ($pdo, &$n) {
+            try { $st = $pdo->prepare($sql); $st->execute($args); $n += $st->rowCount(); }
+            catch (Throwable $e) { /* table not built here */ }
+        };
+        // Phase-7 deputation site-ops child rows — cleared while the demo job
+        // still exists, so nothing is orphaned when the job is deleted below.
+        $try("DELETE FROM dep_status_events WHERE job_id IN (SELECT id FROM jobs WHERE job_code='JOB-DEP-DEMO')");
+        $try("DELETE FROM dep_checklist WHERE job_id IN (SELECT id FROM jobs WHERE job_code='JOB-DEP-DEMO')");
+        $try("DELETE FROM dep_site_log WHERE job_id IN (SELECT id FROM jobs WHERE job_code='JOB-DEP-DEMO')");
+        $try("DELETE FROM dep_timesheet WHERE job_id IN (SELECT id FROM jobs WHERE job_code='JOB-DEP-DEMO')");
+        $try("DELETE FROM dep_att_approval WHERE job_id IN (SELECT id FROM jobs WHERE job_code='JOB-DEP-DEMO')");
+        $try("DELETE FROM dep_manpower WHERE project='Dahej Petrochemical Complex'");
         // Transactional records carry created_by='demo'
         $del("DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE created_by='demo')");
         $del("DELETE FROM vouchers WHERE created_by='demo'");
@@ -458,12 +567,12 @@ function seed_demo_remove() {
         $del("DELETE FROM requisitions WHERE created_by='demo'");
         $del("DELETE FROM business_partners WHERE code IN ('CL-NIL','CL-SVP','CL-GHE','VN-VAP','VN-MUN') OR code LIKE 'EC-%' OR code LIKE 'EV-%'");
         // ---- Everything the module seed added -------------------------------
-        // Wrapped one at a time: a table that does not exist on this install
-        // must not abort the removal and strand the rest of the demo data.
-        $try = function ($sql, $args = []) use ($pdo, &$n) {
-            try { $st = $pdo->prepare($sql); $st->execute($args); $n += $st->rowCount(); }
-            catch (Throwable $e) { /* table not built here */ }
-        };
+        // Phase-8 issue records (tagged source_note='DEMO'), independent of jobs.
+        $try("DELETE FROM issue_extensions WHERE entity='NCR' AND entity_id IN (SELECT id FROM nonconformities WHERE source_note='DEMO')");
+        $try("DELETE FROM issue_disputes WHERE ncr_id IN (SELECT id FROM nonconformities WHERE source_note='DEMO')");
+        $try("DELETE FROM issue_departures WHERE created_by='demo'");
+        $try("DELETE FROM ncr_events WHERE ncr_id IN (SELECT id FROM nonconformities WHERE source_note='DEMO')");
+        $try("DELETE FROM nonconformities WHERE source_note='DEMO'");
         // Reports first, then what hangs off them.
         $try("DELETE FROM evidence_chain WHERE report_doc_id IN (SELECT id FROM report_docs WHERE created_by='demo')");
         $try("DELETE FROM report_equipment WHERE report_doc_id IN (SELECT id FROM report_docs WHERE created_by='demo')");
