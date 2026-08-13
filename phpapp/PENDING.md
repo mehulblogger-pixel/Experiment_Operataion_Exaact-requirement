@@ -2,6 +2,30 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🗓️ Scheduling board + capacity + best-inspector suggestion (Aug 2026) — SURFACE
+
+The "missing scheduling core" was ~70% already built (availability matrix, office
+working-day calendar, conflict detection, allocation, reminders). This slice adds
+only the visual surface, `lib/schedboard.php` — a pure READ over the existing
+availability engine (availability_matrix / free_for_span / free_window /
+is_working_day / sched_alternatives); it stores nothing and duplicates nothing.
+
+- **Board grid** (/schedule) — inspectors × days for the fortnight, colour-coded
+  free / on-job (with job code) / leave; sticky first column, horizontal scroll,
+  a per-day "free that day" strip, Earlier/Today/Later paging. Scoped identically
+  to the availability board (availability_scope_offices).
+- **Capacity band** — working inspector-days, free vs on-job, utilisation %, and
+  the count of unallocated calls (office-calendar aware).
+- **Needs a person** — open calls with no inspector allocated (the demand side);
+  each has a "Who's free?" deep-link that pre-fills the suggestion by date + SBU.
+- **Who's free?** — best free & qualified inspectors for a date span: reuses
+  free_for_span (free EVERY day) + free_window (how long the run lasts), filtered
+  by SBU, RANKED by longest free run then least loaded. It SUGGESTS; the
+  coordinator still allocates through the normal job flow (nobody auto-assigned).
+- Nav link under Operations (gated by ops.job.allocate / coordinator / master).
+  Verified: tests/test_schedboard.php 17 assertions. Full suite 648 passed / 0 failed.
+
+
 ## ⚠️ NCDCA — Universal Nonconformity, NCR, CAPA, Deviation & Concession Engine (Phase 8, Aug 2026) — ELEVATION + GAP-FILLER
 
 Owner steer: "Make it a Universal Issue Engine, not a primitive NCR form — NCR is

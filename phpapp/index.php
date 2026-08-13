@@ -184,6 +184,7 @@ try {
     require __DIR__ . '/lib/services.php';
     require __DIR__ . '/lib/pdso.php';
     require __DIR__ . '/lib/ncdca.php';
+    require __DIR__ . '/lib/schedboard.php';
     require __DIR__ . '/lib/idems_autoform.php';
     require __DIR__ . '/lib/hwpoints.php';
     require __DIR__ . '/lib/seed_demo.php';
