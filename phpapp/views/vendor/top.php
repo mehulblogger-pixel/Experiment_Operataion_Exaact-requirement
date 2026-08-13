@@ -8,6 +8,10 @@ $here = trim((string)parse_url((string)($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_
 $links = ['vendor' => 'Overview'];
 if (vcan('reports')) $links['vendor/reports'] = 'Reports';
 if (vcan('issues') && function_exists('cvp_vendor_issue_links')) $links['vendor/issues'] = 'Nonconformities';
+if (function_exists('cvp_notify_count')) {
+    $__vn = cvp_notify_count('VENDOR', cvp_vendor_id());
+    $links['vendor/alerts'] = 'Alerts' . ($__vn ? ' (' . $__vn . ')' : '');
+}
 ?><!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">

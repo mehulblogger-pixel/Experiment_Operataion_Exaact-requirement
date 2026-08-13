@@ -390,6 +390,8 @@ function portal_dashboard() {
                         fn($c) => strtoupper((string)$c['status']) !== 'CLOSED')), 0, 5),
         'outstanding' => round($outstanding, 2), 'overdue' => $overdue, 'invoices' => count($inv),
         'requests_open' => $reqOpen,
+        // Phase 10 (CVP) Slice 4 — the live "awaiting you" queue.
+        'actions' => function_exists('cvp_action_centre') ? cvp_action_centre('CLIENT', portal_partner_id(), 'pcan') : [],
     ];
 }
 
@@ -660,7 +662,20 @@ function portal_route($route, $method) {
     switch ($route) {
         case 'portal':
             portal_log('DASHBOARD');
+            if (function_exists('cvp_notify_sync')) cvp_notify_sync('CLIENT', portal_partner_id());
             portal_view('dashboard', ['d' => portal_dashboard()]);
+            exit;
+
+        // Phase 10 (CVP) Slice 4 — the client's notification feed.
+        case 'portal/alerts':
+            if (!function_exists('cvp_notifications')) { http_response_code(404); portal_view('notfound'); exit; }
+            cvp_notify_sync('CLIENT', portal_partner_id());
+            if ($method === 'POST') {
+                if (!empty($_POST['read_all'])) cvp_notify_read_all('CLIENT', portal_partner_id());
+                elseif (!empty($_POST['id']))   cvp_notify_read('CLIENT', portal_partner_id(), (int)$_POST['id']);
+                redirect('/portal/alerts');
+            }
+            portal_view('alerts', ['rows' => cvp_notifications('CLIENT', portal_partner_id()), 'events' => CVP_EVENTS]);
             exit;
 
         case 'portal/calls':
