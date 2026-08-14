@@ -1692,6 +1692,261 @@ function tosrm_disruptions_html($d, $rangeLabel = '') {
     return $h;
 }
 
+// ===========================================================================
+//  CROSS-OFFICE CALL TRACKING  (contracting office ↔ executing office)
+//
+//  A call is RAISED by the CONTRACTING office (ibo_office_id — it owns the
+//  client / PO). When the field work belongs to another branch, the call is
+//  FORWARDED to an EXECUTING office (executing_office_id). The rule is firm and
+//  already enforced by call_can_allocate():
+//    · only the EXECUTING office allocates the engineer;
+//    · the CONTRACTING office may WATCH and CHASE, never allocate.
+//  Both offices therefore need to see the SAME call so nobody loses the TAT
+//  clock. This gives each side its own live view of the forwarded call:
+//    · executing office  → "Inbound — calls to allocate" (Allocate button)
+//    · contracting office → "Sent out — calls we're tracking" (Nudge only)
+//  and, once a forwarded call sits unallocated past its response target, an
+//  automatic escalation flag to the EXECUTING office's manager.
+// ===========================================================================
+
+// Default days a forwarded call may sit unallocated before it escalates to the
+// executing office's manager. A client SLA "SCHEDULING" target overrides this.
+const TOSRM_XO_ESCALATE_DAYS = 2;
+
+function tosrm_xo_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    tosrm_migrate();
+    $pk = pk_clause();
+    // A nudge = a reminder the contracting office sends the executing office to
+    // act on a forwarded call. Kept as its own log so we can show "last chased".
+    db()->exec("CREATE TABLE IF NOT EXISTS call_nudges (
+        id $pk, call_id INT DEFAULT 0, from_office_id INT DEFAULT 0,
+        to_office_id INT DEFAULT 0, note VARCHAR(600) DEFAULT '',
+        actor VARCHAR(120) DEFAULT '', at VARCHAR(30) DEFAULT '')");
+}
+
+// Per-call TAT snapshot for the cross-office view: where the call is on the
+// Received → Forwarded → Allocated → Scheduled chain, how long it has waited,
+// and whether it has crossed the escalation threshold.
+function tosrm_xo_tat($r) {
+    $today = date('Y-m-d');
+    $recv = substr((string)($r['call_received_date'] ?? ''), 0, 10);
+    $fwd  = substr((string)($r['forwarded_at'] ?? ''), 0, 10);
+    $sched = substr((string)($r['sched_date'] ?? ''), 0, 10);
+    $reqd  = substr((string)($r['inspection_required_date'] ?? ''), 0, 10);
+    $alloc = (int)($r['alloc_n'] ?? 0) > 0;
+    $db = fn($a, $b) => ($a !== '' && $b !== '' && function_exists('days_between')) ? days_between($a, $b) : null;
+    if ($sched !== '')   { $stage = 'Scheduled'; $tone = 'ok'; }
+    elseif ($alloc)      { $stage = 'Allocated'; $tone = 'ok'; }
+    elseif ($fwd !== '') { $stage = 'Forwarded'; $tone = 'warn'; }
+    else                 { $stage = 'Received';  $tone = 'mut'; }
+    // Waiting = days unallocated since forwarded (fallback received).
+    $waitFrom = $fwd !== '' ? $fwd : $recv;
+    $waiting = (!$alloc && $waitFrom !== '') ? $db($waitFrom, $today) : null;
+    $thr = TOSRM_XO_ESCALATE_DAYS;
+    if (function_exists('tosrm_sla_targets')) { $t = tosrm_sla_targets((int)($r['client_id'] ?? 0)); if (!empty($t['SCHEDULING'])) $thr = (int)$t['SCHEDULING']; }
+    $overdueReqd = ($reqd !== '' && !$alloc && $reqd < $today);
+    $escalated = (!$alloc) && (($waiting !== null && $waiting > $thr) || $overdueReqd);
+    return [
+        'recv' => $recv, 'fwd' => $fwd, 'sched' => $sched, 'reqd' => $reqd, 'alloc' => $alloc,
+        'stage' => $stage, 'tone' => $tone, 'waiting' => $waiting, 'thr' => $thr,
+        'escalated' => $escalated, 'overdueReqd' => $overdueReqd,
+        'recv_to_fwd'   => $db($recv, $fwd),
+        'fwd_to_sched'  => $db($fwd !== '' ? $fwd : $recv, $sched),
+    ];
+}
+
+// The forwarded (cross-office) calls that touch the caller's branches, split
+// into what my office must ALLOCATE (inbound) and what my office is TRACKING
+// (sent out). $offices is 'ALL' (head office) or an int[] of branch ids.
+function tosrm_xo_calls($offices, $limit = 120) {
+    tosrm_xo_migrate();
+    $base = "c.status<>'CLOSED' AND COALESCE(c.op_status,'') NOT IN ('CLOSED','CANCELLED')
+             AND COALESCE(c.executing_office_id,0)>0 AND COALESCE(c.ibo_office_id,0)>0
+             AND c.executing_office_id <> c.ibo_office_id";
+    try {
+        $rows = ops_all("SELECT c.id, c.call_code, c.ibo_office_id, c.executing_office_id, c.client_id,
+                                c.call_received_date, c.forwarded_at, c.inspection_required_date,
+                                c.inspection_type, c.priority, c.op_status, c.status,
+                                bp.display_name client_name,
+                                io.name ibo_name, io.manager_name ibo_mgr,
+                                eo.name exec_name, eo.coordinator_name exec_coord,
+                                eo.coordinator_email exec_coord_email, eo.manager_name exec_mgr,
+                                eo.manager_email exec_mgr_email,
+                                (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id AND j.inspector_id IS NOT NULL) alloc_n,
+                                (SELECT MIN(j.scheduled_date) FROM jobs j WHERE j.call_id=c.id AND COALESCE(j.scheduled_date,'')<>'') sched_date,
+                                (SELECT MAX(n.at) FROM call_nudges n WHERE n.call_id=c.id) last_nudge,
+                                (SELECT COUNT(*) FROM call_nudges n WHERE n.call_id=c.id) nudge_n
+                         FROM calls c
+                         LEFT JOIN business_partners bp ON bp.id=c.client_id
+                         LEFT JOIN offices io ON io.id=c.ibo_office_id
+                         LEFT JOIN offices eo ON eo.id=c.executing_office_id
+                         WHERE $base
+                         ORDER BY CASE WHEN c.inspection_required_date='' THEN 1 ELSE 0 END,
+                                  c.inspection_required_date, c.id
+                         LIMIT " . (int)$limit) ?: [];
+    } catch (Throwable $e) { return ['inbound' => [], 'sentout' => [], 'all_scope' => false]; }
+    $inScope = fn($o) => $offices === 'ALL' || (is_array($offices) && in_array((int)$o, array_map('intval', $offices), true));
+    $inbound = []; $sentout = [];
+    foreach ($rows as $r) {
+        $r['tat'] = tosrm_xo_tat($r);
+        if ($inScope($r['executing_office_id'])) $inbound[] = $r;   // my office must allocate
+        if ($inScope($r['ibo_office_id']))       $sentout[] = $r;   // my office is tracking
+    }
+    return ['inbound' => $inbound, 'sentout' => $sentout, 'all_scope' => ($offices === 'ALL')];
+}
+
+// Record + notify a nudge from the contracting office to the executing office.
+function tosrm_xo_nudge($callId, $note = '') {
+    tosrm_xo_migrate();
+    $c = ops_one("SELECT c.*, eo.name exec_name, eo.coordinator_name exec_coord,
+                         eo.coordinator_email exec_coord_email, eo.manager_email exec_mgr_email,
+                         io.name ibo_name
+                  FROM calls c LEFT JOIN offices eo ON eo.id=c.executing_office_id
+                  LEFT JOIN offices io ON io.id=c.ibo_office_id WHERE c.id=?", [(int)$callId]);
+    if (!$c) return false;
+    $note = trim((string)$note);
+    if ($note === '') $note = 'Please allocate and schedule this ' . (function_exists('Tl') ? Tl('call') : 'call') . ' — TAT is running.';
+    db()->prepare("INSERT INTO call_nudges (call_id, from_office_id, to_office_id, note, actor, at)
+                   VALUES (?,?,?,?,?,?)")
+        ->execute([(int)$callId, (int)($c['ibo_office_id'] ?? 0), (int)($c['executing_office_id'] ?? 0),
+                   substr($note, 0, 600), tosrm_actor(), tosrm_now()]);
+    if (function_exists('act_log')) act_log('CALL', (int)$callId, 'SYSTEM',
+        'Nudge sent to ' . ($c['exec_name'] ?: 'executing office') . ' — ' . $note, ['auto' => 1]);
+    // A courtesy e-mail to the executing coordinator (cc its manager) if we have one.
+    $to = trim((string)($c['exec_coord_email'] ?? ''));
+    $cc = trim((string)($c['exec_mgr_email'] ?? ''));
+    if ($to !== '' && function_exists('ops_mail')) {
+        $subj = 'Reminder: allocate ' . ($c['call_code'] ?? ('call #' . (int)$callId)) . ' (' . ($c['ibo_name'] ?: 'contracting office') . ')';
+        $body = ($c['exec_coord'] ?: 'Team') . ",\n\n" . $note . "\n\nCall: " . ($c['call_code'] ?? ('#' . (int)$callId))
+              . "\nRaised by: " . ($c['ibo_name'] ?: '—') . "\nRequired by: " . (substr((string)($c['inspection_required_date'] ?? ''), 0, 10) ?: '—')
+              . "\n\n— " . tosrm_actor();
+        try { ops_mail($to, $subj, $body, $cc, 'nudge'); } catch (Throwable $e) {}
+    }
+    return true;
+}
+
+// Self-contained cross-office panels (inbound + sent-out) + shared TAT strip.
+// Reused on the Operations home. $csrf lets the nudge form submit safely.
+function tosrm_xo_html($xo, $csrf = '') {
+    if (!$xo) return '';
+    $inbound = $xo['inbound'] ?? []; $sentout = $xo['sentout'] ?? []; $allScope = !empty($xo['all_scope']);
+    if (!$inbound && !$sentout) return '';
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $callWord = function_exists('THP') ? THP('call') : 'Calls';
+    static $css = false; $h = '';
+    if (!$css) { $css = true; $h .= '<style>'
+        . '.xo-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 8px}'
+        . '@media(max-width:900px){.xo-wrap{grid-template-columns:1fr}}'
+        . '.xo-card{background:var(--card,#fff);border:1px solid var(--line,#e5e7eb);border-radius:12px;overflow:hidden}'
+        . '.xo-card.in{border-top:3px solid var(--brand,#1e40af)} .xo-card.out{border-top:3px solid var(--warn,#d97706)}'
+        . '.xo-h{padding:12px 15px 4px} .xo-h .t{font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:8px}'
+        . '.xo-h .d{color:var(--muted,#656e7a);font-size:12px;margin-top:2px}'
+        . '.xo-h .n{margin-left:auto;font-size:12px;font-weight:700;color:var(--muted,#656e7a)}'
+        . '.xo-list{padding:6px 10px 12px}'
+        . '.xo-row{border:1px solid var(--line,#eef0f3);border-radius:10px;padding:10px 12px;margin:6px 4px}'
+        . '.xo-row .top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}'
+        . '.xo-row .cc{font-weight:700} .xo-row .cl{color:var(--muted,#656e7a);font-size:12.5px}'
+        . '.xo-row .meta{color:var(--muted,#656e7a);font-size:12px;margin-top:2px}'
+        . '.xo-strip{display:flex;align-items:center;gap:0;margin:9px 0 8px;flex-wrap:wrap}'
+        . '.xo-step{display:flex;flex-direction:column;align-items:center;min-width:52px}'
+        . '.xo-step .dt{width:11px;height:11px;border-radius:50%;background:#cbd5e1}'
+        . '.xo-step.done .dt{background:var(--green,#16a34a)} .xo-step.now .dt{background:var(--brand,#1e40af);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand,#1e40af) 22%,transparent)}'
+        . '.xo-step .sl{font-size:9.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted,#656e7a);margin-top:3px}'
+        . '.xo-step .sd{font-size:10px;color:#9aa3af}'
+        . '.xo-line{flex:1;height:2px;background:#e2e8f0;min-width:14px;margin:0 1px 16px}'
+        . '.xo-line.done{background:var(--green,#16a34a)}'
+        . '.xo-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px}'
+        . '.xo-btn{background:var(--brand,#1e40af);color:#fff;border:0;border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:700;text-decoration:none;cursor:pointer;display:inline-block}'
+        . '.xo-btn.g{background:#fff;color:var(--warn,#b45309);border:1px solid #f0d492}'
+        . '.xo-esc{font-size:11px;font-weight:700;color:var(--bad,#b91c1c);background:var(--bad-bg,#fef2f2);border:1px solid #f6caca;border-radius:20px;padding:2px 9px}'
+        . '.xo-chased{font-size:11px;color:var(--muted,#656e7a)}'
+        . '.xo-empty{color:var(--muted,#656e7a);font-size:12.5px;padding:6px 8px 12px}'
+        . '</style>'; }
+
+    // One call's Received→Forwarded→Allocated→Scheduled strip.
+    $strip = function ($t) use ($e) {
+        $steps = [
+            ['Received',  $t['recv'],  true,        null],
+            ['Forwarded', $t['fwd'],   $t['fwd'] !== '',      $t['recv_to_fwd']],
+            ['Allocated', $t['alloc'] ? '✓' : '', $t['alloc'], null],
+            ['Scheduled', $t['sched'], $t['sched'] !== '',    $t['fwd_to_sched']],
+        ];
+        // Which step is "now" (first not-done).
+        $nowIdx = -1;
+        foreach ($steps as $i => $s) { if (!$s[2]) { $nowIdx = $i; break; } }
+        $out = '<div class="xo-strip">';
+        foreach ($steps as $i => $s) {
+            [$lab, $val, $done, $days] = $s;
+            $cls = $done ? 'done' : ($i === $nowIdx ? 'now' : '');
+            $sub = $days !== null ? ($days . 'd') : ($val && $val !== '✓' ? $e(substr((string)$val, 5)) : '');
+            $out .= '<div class="xo-step ' . $cls . '"><span class="dt"></span><span class="sl">' . $e($lab) . '</span><span class="sd">' . $e($sub) . '</span></div>';
+            if ($i < count($steps) - 1) $out .= '<span class="xo-line' . ($done ? ' done' : '') . '"></span>';
+        }
+        return $out . '</div>';
+    };
+
+    // INBOUND — my office must allocate (or, at head office, everything crossing).
+    $inTitle = $allScope ? ('All cross-branch ' . strtolower($callWord)) : 'Inbound — to allocate';
+    $inDesc  = $allScope ? 'Every call raised by one branch and executed by another.' : 'Raised by another branch, executed by yours. You allocate the engineer.';
+    $h .= '<div class="xo-wrap">';
+    $h .= '<div class="xo-card in"><div class="xo-h"><div class="t">📥 ' . $e($inTitle) . ' <span class="n">' . count($inbound) . '</span></div><div class="d">' . $e($inDesc) . '</div></div><div class="xo-list">';
+    if (!$inbound) $h .= '<div class="xo-empty">Nothing waiting — no calls from other branches to allocate.</div>';
+    foreach ($inbound as $r) {
+        $t = $r['tat'];
+        $other = $allScope ? ($r['ibo_name'] . ' → ' . $r['exec_name']) : ('from ' . ($r['ibo_name'] ?: '—'));
+        $h .= '<div class="xo-row"><div class="top"><a class="cc" href="/call?id=' . (int)$r['id'] . '">' . $e($r['call_code'] ?: ('#' . (int)$r['id'])) . '</a>'
+            . '<span class="cl">' . $e($r['client_name'] ?: '—') . '</span>'
+            . ($t['escalated'] ? '<span class="xo-esc" title="Past target — flagged to ' . $e($r['exec_mgr'] ?: 'the branch manager') . '">⚠ Escalated to manager</span>' : '')
+            . '</div>'
+            . '<div class="meta">' . $e($other) . ($r['inspection_type'] ? ' · ' . $e($r['inspection_type']) : '')
+            . ($t['reqd'] !== '' ? ' · required ' . $e($t['reqd']) : '')
+            . ($t['waiting'] !== null ? ' · waiting <b>' . (int)$t['waiting'] . 'd</b>' : '') . '</div>'
+            . $strip($t)
+            . '<div class="xo-foot">';
+        // Allocate only when this viewer's office may allocate the call.
+        $canAlloc = function_exists('call_can_allocate') ? call_can_allocate($r) : false;
+        if ($canAlloc && !$t['alloc']) $h .= '<a class="xo-btn" href="/job-new?call=' . (int)$r['id'] . '">Allocate engineer</a>';
+        elseif ($t['alloc']) $h .= '<span class="pill p-ok" style="font-size:11.5px">Allocated</span>';
+        $h .= '</div></div>';
+    }
+    $h .= '</div></div>';
+
+    // SENT OUT — my office is tracking; read-only + Nudge. (Hidden at head-office
+    // ALL scope, where the inbound list already shows every crossing call once.)
+    if (!$allScope) {
+        $h .= '<div class="xo-card out"><div class="xo-h"><div class="t">📤 Sent out — tracking <span class="n">' . count($sentout) . '</span></div><div class="d">Raised by your branch, executed elsewhere. You follow up; you do not allocate.</div></div><div class="xo-list">';
+        if (!$sentout) $h .= '<div class="xo-empty">Nothing outstanding — no calls you sent to other branches.</div>';
+        foreach ($sentout as $r) {
+            $t = $r['tat'];
+            $chased = '';
+            if (!empty($r['last_nudge'])) $chased = 'Chased ' . (int)($r['nudge_n'] ?? 1) . '× · last ' . $e(substr((string)$r['last_nudge'], 0, 10));
+            $h .= '<div class="xo-row"><div class="top"><a class="cc" href="/call?id=' . (int)$r['id'] . '">' . $e($r['call_code'] ?: ('#' . (int)$r['id'])) . '</a>'
+                . '<span class="cl">' . $e($r['client_name'] ?: '—') . '</span>'
+                . ($t['escalated'] ? '<span class="xo-esc" title="Past target at ' . $e($r['exec_name']) . '">⚠ Escalated to ' . $e($r['exec_name'] ?: 'branch') . ' mgr</span>' : '')
+                . '</div>'
+                . '<div class="meta">with ' . $e($r['exec_name'] ?: '—') . ($r['inspection_type'] ? ' · ' . $e($r['inspection_type']) : '')
+                . ($t['reqd'] !== '' ? ' · required ' . $e($t['reqd']) : '')
+                . ($t['waiting'] !== null ? ' · waiting <b>' . (int)$t['waiting'] . 'd</b>' : '') . '</div>'
+                . $strip($t)
+                . '<div class="xo-foot">';
+            if (!$t['alloc']) {
+                $h .= '<form method="post" action="/xo-nudge" style="display:inline">'
+                    . '<input type="hidden" name="_csrf" value="' . $e($csrf) . '">'
+                    . '<input type="hidden" name="call_id" value="' . (int)$r['id'] . '">'
+                    . '<button class="xo-btn g" type="submit" title="Send a reminder to ' . $e($r['exec_name'] ?: 'the executing branch') . '">🔔 Nudge</button></form>';
+            } else {
+                $h .= '<span class="pill p-ok" style="font-size:11.5px">Allocated at ' . $e($r['exec_name']) . '</span>';
+            }
+            if ($chased) $h .= '<span class="xo-chased">' . $chased . '</span>';
+            $h .= '</div></div>';
+        }
+        $h .= '</div></div>';
+    }
+    $h .= '</div>';
+    return $h;
+}
+
 function ops_operations_home($method) {
     ops_require(can('mod.calls.view') || can('mod.jobs.view') || (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can()),
         'You do not have access to Operations.');
@@ -1730,9 +1985,11 @@ function ops_operations_home($method) {
     if (!array_key_exists(preg_replace('/[^a-z]/', '', strtolower($dr)), TOSRM_DISRUPT_RANGES)) $dr = 'fy';
     [$dFrom, $dTo, $dLabel] = tosrm_disruptions_range($dr);
     $disrupt = tosrm_disruptions($offices, $dFrom, $dTo);
+    $xo = tosrm_xo_calls($offices);   // cross-office: inbound to allocate + sent-out to track
     view('ops/operations_home', [
         'metrics' => $metrics, 'counts' => $counts, 'services' => $services, 'scopeLabel' => $offLabel,
         'disrupt' => $disrupt, 'drKey' => preg_replace('/[^a-z]/', '', strtolower($dr)), 'drLabel' => $dLabel,
+        'xo' => $xo, 'csrf' => function_exists('csrf_token') ? csrf_token() : '',
     ]);
     return true;
 }
@@ -1747,6 +2004,25 @@ function ops_tosrm_comm_action($route, $method) {
             act_log($ek, $eid, (string)($_POST['kind'] ?? 'NOTE'), (string)($_POST['subject'] ?? ''), ['body'=>(string)($_POST['body'] ?? '')]);
             flash('Communication logged.');
         } else flash('Give the entry a subject.', 'error');
+        redirect($back);
+    }
+    if ($route === 'xo-nudge') {
+        $callId = (int)($_POST['call_id'] ?? 0);
+        $back = '/operations';
+        if ($method !== 'POST') redirect($back);
+        if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect($back); }
+        ops_require(can('mod.calls.view') || (function_exists('is_coordinator_level') && is_coordinator_level()),
+            'You do not have permission to chase this ' . (function_exists('Tl') ? Tl('call') : 'call') . '.');
+        // The contracting office may nudge; it must be a call their branch raised
+        // and someone else executes. (Allocation stays with the executing office.)
+        $call = $callId ? ops_one("SELECT * FROM calls WHERE id=?", [$callId]) : null;
+        if (!$call) { flash('That ' . (function_exists('Tl') ? Tl('call') : 'call') . ' was not found.', 'error'); redirect($back); }
+        $scope = tosrm_office_scope();
+        $ibo = (int)($call['ibo_office_id'] ?? 0);
+        $ownsIt = $scope === 'ALL' || (is_array($scope) && in_array($ibo, array_map('intval', $scope), true));
+        if (!$ownsIt) { flash('You can only chase calls your own branch raised.', 'error'); redirect($back); }
+        $ok = tosrm_xo_nudge($callId, (string)($_POST['note'] ?? ''));
+        flash($ok ? 'Reminder sent to the executing branch — logged against the call.' : 'Could not send the reminder.', $ok ? 'success' : 'error');
         redirect($back);
     }
     if ($route === 'assign-issue') {

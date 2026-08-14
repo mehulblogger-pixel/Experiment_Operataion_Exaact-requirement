@@ -94,6 +94,16 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
   <a class="op-kpi warn" href="/jobs"><div class="v"><?= (int)($m['report_pending'] ?? 0) ?></div><div class="l">Report pending</div><div class="h">done, not issued</div></a>
 </div>
 
+<?php // ---- Cross-office calls (contracting ↔ executing) ---------------------
+      //  Calls raised by one branch and executed by another. Each office keeps
+      //  the TAT clock in view: the executing branch allocates; the contracting
+      //  branch tracks and can nudge. Only shown when such calls exist.
+      $xoData = $xo ?? null;
+      if ($xoData && (!empty($xoData['inbound']) || !empty($xoData['sentout']))): ?>
+  <div class="op-sec">Cross-office calls — allocate &amp; follow-up</div>
+  <?= tosrm_xo_html($xoData, $csrf ?? '') ?>
+<?php endif; ?>
+
 <?php // ---- Disruptions & changes — churn already logged on jobs, rolled up.
       //  Client / office cancellations, engineer changes and no-shows, each with
       //  its recorded reason. This financial year, scoped to your branches. ?>

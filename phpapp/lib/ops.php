@@ -2109,7 +2109,7 @@ function ops_module_gate($route) {
         // an area aggregates several modules, so its handler enforces an OR of the
         // area's view permissions instead of one module gate that would lock out
         // someone who owns half the area.
-        'ops-desk'=>'jobs','comm-add'=>'jobs','assign-issue'=>'jobs',
+        'ops-desk'=>'jobs','comm-add'=>'jobs','assign-issue'=>'jobs','xo-nudge'=>'calls',
         // 'attend-mark' is deliberately UNGATED here — any logged-in staff member
         // with an inspector record self-marks their own day; the handler checks it.
         'dep-status'=>'jobs','dep-check-seed'=>'jobs','dep-check-set'=>'jobs','dep-site-log'=>'jobs',
@@ -2564,7 +2564,7 @@ function ops_dispatch($route, $method) {
             return ops_area_home($route, $method);
         case $route === 'ops-desk':
             return ops_tosrm_desk($method);
-        case in_array($route, ['comm-add','assign-issue'], true):
+        case in_array($route, ['comm-add','assign-issue','xo-nudge'], true):
             return ops_tosrm_comm_action($route, $method);
         case in_array($route, ['dep-status','dep-check-seed','dep-check-set','dep-site-log','dep-site-log-close','dep-timesheet','dep-approval','dep-approval-status'], true):
             return ops_pdso_action($route, $method);
