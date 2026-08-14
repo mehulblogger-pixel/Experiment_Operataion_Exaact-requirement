@@ -2,6 +2,8 @@
 // Recruitment & Workforce — Command Centre (read-only; data from recruit_data()).
 $d = $d ?? [];
 $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+// Friendly designation label (codes like SR_INSPECTOR → "Sr. Inspector"; pass-through if already a label).
+$desig = fn($k) => (defined('DESIGNATIONS') && isset(DESIGNATIONS[$k])) ? DESIGNATIONS[$k] : ($k ?: '—');
 $fdate = function ($s) { $s = substr((string)$s, 0, 10); return $s !== '' && function_exists('fdate') ? fdate($s, $s) : $s; };
 // Days from today (negative = overdue/past).
 $daysTo = function ($s) { $s = substr((string)$s, 0, 10); if ($s === '') return null; return (int)floor((strtotime($s) - strtotime(date('Y-m-d'))) / 86400); };
@@ -81,8 +83,9 @@ $grp = function ($icon, $title, $n) use ($e) {
     <?php $anyToday = ($d['counts']['today'] ?? 0) > 0; ?>
     <?php if (!empty($d['t_reqs'])): $grp('📋', 'Requirements to work', count($d['t_reqs']));
       foreach ($d['t_reqs'] as $r) {
-        $need = (int)$r['filled']; $tone = $need > 0 ? ['partly filled', 'p-warn'] : ['sourcing', 'p-info'];
-        $row('/requisition?id=' . (int)$r['id'], $r['req_code'] . ' · ' . ($r['designation'] ?: '—'),
+        $qty = max(1, (int)$r['quantity']); $filled = (int)$r['filled'];
+        $tone = $filled >= $qty ? ['filled', 'p-ok'] : ($filled > 0 ? [$filled . ' of ' . $qty, 'p-warn'] : ['sourcing', 'p-info']);
+        $row('/requisition?id=' . (int)$r['id'], $r['req_code'] . ' · ' . $desig($r['designation']) . ($qty > 1 ? ' × ' . $qty : ''),
              trim(($r['office'] ?? '') . ($r['project_site'] ? ' · ' . $r['project_site'] : '')), $tone);
       } endif; ?>
     <?php if (!empty($d['t_interviews'])): $grp('🗓️', 'Interviews', count($d['t_interviews']));
@@ -109,7 +112,7 @@ $grp = function ($icon, $title, $n) use ($e) {
     <div class="rc-head"><h2>Risks</h2><span class="sub">slipping</span></div>
     <?php $anyRisk = ($d['counts']['risks'] ?? 0) > 0; ?>
     <?php if (!empty($d['r_reqs'])): $grp('⚠️', 'Requirements at risk (14d+, no pipeline)', count($d['r_reqs']));
-      foreach ($d['r_reqs'] as $r) $row('/requisition?id=' . (int)$r['id'], $r['req_code'] . ' · ' . ($r['designation'] ?: '—'),
+      foreach ($d['r_reqs'] as $r) $row('/requisition?id=' . (int)$r['id'], $r['req_code'] . ' · ' . $desig($r['designation']),
              ($r['office'] ?: '') . ' · ' . (int)$r['cands'] . ' candidate' . ((int)$r['cands'] === 1 ? '' : 's'), ['aging', 'p-bad']); endif; ?>
     <?php if (!empty($d['r_urgent'])): $grp('🚨', 'Deployment ending ≤7d', count($d['r_urgent']));
       foreach ($d['r_urgent'] as $r) { $dt = $daysTo($r['endd']);

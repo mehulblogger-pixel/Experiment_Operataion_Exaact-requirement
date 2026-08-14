@@ -135,17 +135,18 @@ Order follows the directive's priority: **STABILITY → REUSE → ENHANCEMENT �
 INTELLIGENCE → WORLD-CLASS UX**. Each phase is independently shippable, additive,
 and ends with a regression pass against §45.
 
-- **Phase 0 — Baseline (this document).** No code.
-- **Phase 1 — Recruitment & Workforce Command Centre.** New read-only `/recruitment`
-  home reusing existing data: Today (requirements needing action, follow-ups,
-  interviews, joinings, deployments, deputations expiring, missing documents,
-  billing blockers), Risks, Opportunities (existing workforce/dormant candidates
-  match, upcoming availability, extensions). **Zero schema change, zero risk.**
-- **Phase 2 — Requirement enrichment + Simple/Advanced.** Additive nullable columns
-  on `requisitions` (quantity, discipline/category, skills, qualification,
-  experience, deployment block, billing_rate, target_margin, negotiation_floor,
-  structured client/contact/project refs). Progressive-disclosure form; old
-  requisitions still valid.
+- **Phase 0 — Baseline (this document).** No code. ✅ DONE
+- **Phase 1 — Recruitment & Workforce Command Centre.** ✅ DONE (`lib/recruit.php`,
+  `views/ops/recruitment_home.php`, route `/recruitment`). Read-only Today / Risks /
+  Opportunities from existing data. Zero schema change; regression-clean.
+- **Phase 2 — Requirement enrichment + Simple/Advanced.** ✅ DONE. Added ~38
+  nullable columns to `requisitions` (client/contact/contract, quantity,
+  discipline/category, skills, qualification, experience, full deployment block,
+  selection + compliance flags, billing_rate/basis, target_margin,
+  negotiation_floor, and computed expected_revenue/expected_profit). New
+  Simple/Advanced progressive-disclosure form with a live commercial calculator;
+  enriched detail with Position/Deployment, Selection/Compliance and Commercial
+  panels. Old requisitions still open, edit and save (verified). Regression-clean.
 - **Phase 3 — Candidate 360 + duplicate & submission protection.** Tabbed 360 +
   timeline over the existing candidate; duplicate detection (mobile/email/name)
   on create/import; "already submitted to this client" warning. Additive.

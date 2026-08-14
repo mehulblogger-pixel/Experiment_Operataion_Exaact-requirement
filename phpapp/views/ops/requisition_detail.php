@@ -7,7 +7,7 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/requisitions"><?= e(TP('requisition')) ?></a> › <?= e($req['req_code']) ?></div>
 <div class="master-head">
   <div><h1><?= e(T_DETAIL('requisition', $req['req_code'])) ?> <span class="pill <?= $stCls ?>" style="vertical-align:middle;font-size:12px"><?= e(lk_options_or('requisition_status', REQ_STATUS)[$req['status']] ?? $req['status']) ?></span></h1>
-    <p class="sub" style="margin:2px 0 0"><?= e(DESIGNATIONS[$req['designation']] ?? ($req['designation'] ?: 'Position')) ?> · <?= e(lk_options_or('requisition_type', REQ_TYPES)[$req['req_type']] ?? '') ?> · <?= e($req['office_name'] ?: '—') ?></p></div>
+    <p class="sub" style="margin:2px 0 0"><?= e(DESIGNATIONS[$req['designation']] ?? ($req['designation'] ?: 'Position')) ?><?php if ((int)($req['quantity'] ?? 1) > 1): ?> <span class="pill p-info" style="font-size:11px">× <?= (int)$req['quantity'] ?></span><?php endif; ?> · <?= e(lk_options_or('requisition_type', REQ_TYPES)[$req['req_type']] ?? '') ?> · <?= e($req['office_name'] ?: '—') ?><?php if (!empty($req['client_name']) || !empty($req['client_legal'])): ?> · <?= e($req['client_name'] ?: $req['client_legal']) ?><?php endif; ?></p></div>
   <?php if (is_coordinator_level()): ?><a class="btn secondary" href="/requisition-edit?id=<?= (int)$req['id'] ?>">Edit</a><?php endif; ?>
 </div>
 
@@ -22,6 +22,66 @@
     <div><span class="k"><?= e($cf['label']) ?></span><?= e($cf['value'] ?: '—') ?></div>
   <?php endforeach; ?>
 </div></div>
+
+<?php
+// ---- Phase 2 enrichment panels: only render what has been filled in --------
+$has = fn($k) => isset($req[$k]) && trim((string)$req[$k]) !== '' && (string)$req[$k] !== '0';
+$yes = fn($k) => !empty($req[$k]);
+$WM = defined('PHP_INT_MAX') && function_exists('recruit_home_can') ? (REQ_WORK_MODELS[$req['work_model'] ?? ''] ?? ($req['work_model'] ?? '')) : ($req['work_model'] ?? '');
+$SH = REQ_SHIFTS[$req['shift'] ?? ''] ?? ($req['shift'] ?? '');
+$position = $has('discipline') || $has('category') || $has('qualification') || $has('skills') || $has('experience_min') || $has('relevant_experience') || (int)($req['quantity'] ?? 1) > 1;
+$deploy = $has('work_model') || $has('deploy_location') || $has('start_date') || $has('end_date') || $has('duration_months') || $has('duty_hours') || $has('shift') || $yes('prov_travel') || $yes('prov_accommodation') || $yes('prov_food') || $has('other_allowances');
+$selc = $yes('sel_client_interview') || $yes('sel_tech_interview') || $yes('sel_hr_interview') || $yes('client_approval_req') || $yes('training_req') || $yes('cmp_medical') || $yes('cmp_pcc') || $yes('cmp_gate_pass') || $yes('cmp_safety') || $yes('cmp_certification') || $has('documents_note');
+$commer = $has('billing_rate') || (float)($req['expected_revenue'] ?? 0) != 0 || $has('target_margin') || $has('negotiation_floor');
+?>
+
+<?php if ($position || $deploy): ?>
+<div class="panel"><h3 class="tab-sub" style="margin-top:0">Position &amp; deployment</h3><div class="kv-grid">
+  <?php if ((int)($req['quantity'] ?? 1) > 0): ?><div><span class="k">Headcount</span><?= (int)($req['quantity'] ?? 1) ?></div><?php endif; ?>
+  <?php if ($has('discipline')): ?><div><span class="k">Discipline</span><?= e($req['discipline']) ?></div><?php endif; ?>
+  <?php if ($has('category')): ?><div><span class="k">Category</span><?= e($req['category']) ?></div><?php endif; ?>
+  <?php if ($has('qualification')): ?><div><span class="k">Qualification</span><?= e($req['qualification']) ?></div><?php endif; ?>
+  <?php if ($has('skills')): ?><div><span class="k">Skills / certifications</span><?= e($req['skills']) ?></div><?php endif; ?>
+  <?php if ($has('experience_min')): ?><div><span class="k">Min experience</span><?= e($req['experience_min']) ?> yrs<?= $has('relevant_experience') ? ' · '.e($req['relevant_experience']).' relevant' : '' ?></div><?php endif; ?>
+  <?php if ($has('work_model')): ?><div><span class="k">Work model</span><?= e($WM) ?></div><?php endif; ?>
+  <?php if ($has('deploy_location')): ?><div><span class="k">Location</span><?= e($req['deploy_location']) ?></div><?php endif; ?>
+  <?php if ($has('start_date') || $has('end_date')): ?><div><span class="k">Period</span><?= e($req['start_date'] ?: '—') ?> → <?= e($req['end_date'] ?: '—') ?><?= (float)($req['duration_months'] ?? 0) > 0 ? ' · '.rtrim(rtrim(number_format((float)$req['duration_months'],2),'0'),'.').' mo' : '' ?></div><?php endif; ?>
+  <?php if ($has('duty_hours')): ?><div><span class="k">Duty hours</span><?= e($req['duty_hours']) ?></div><?php endif; ?>
+  <?php if ($has('shift')): ?><div><span class="k">Shift</span><?= e($SH) ?></div><?php endif; ?>
+  <?php $prov = array_filter(['Travel'=>$yes('prov_travel'),'Accommodation'=>$yes('prov_accommodation'),'Food'=>$yes('prov_food')]);
+        if ($prov || $has('other_allowances')): ?><div><span class="k">Provided</span><?= e(implode(' · ', array_keys($prov)) ?: '—') ?><?= $has('other_allowances') ? ' · '.e($req['other_allowances']) : '' ?></div><?php endif; ?>
+  <?php if (!empty($req['contact_name'])): ?><div><span class="k">Client contact</span><?= e($req['contact_name']) ?><?= !empty($req['contact_phone']) ? ' · '.e($req['contact_phone']) : '' ?></div><?php endif; ?>
+  <?php if (!empty($req['contract_ref'])): ?><div><span class="k">Contract / PO</span><?= e($req['contract_ref']) ?></div><?php endif; ?>
+</div></div>
+<?php endif; ?>
+
+<?php if ($selc): ?>
+<div class="panel"><h3 class="tab-sub" style="margin-top:0">Selection &amp; compliance</h3>
+  <?php
+  $chips = array_filter([
+    $yes('sel_client_interview') ? 'Client interview' : '', $yes('sel_tech_interview') ? 'Technical interview' : '',
+    $yes('sel_hr_interview') ? 'HR interview' : '', $yes('client_approval_req') ? 'Client approval' : '', $yes('training_req') ? 'Training' : '',
+    $yes('cmp_medical') ? 'Medical' : '', $yes('cmp_pcc') ? 'Police verification' : '', $yes('cmp_gate_pass') ? 'Gate pass' : '',
+    $yes('cmp_safety') ? 'Safety induction' : '', $yes('cmp_certification') ? 'Certification' : '',
+  ]);
+  foreach ($chips as $c) echo '<span class="pill p-info" style="margin:2px 4px 2px 0">' . e($c) . '</span>';
+  if ($has('documents_note')) echo '<p class="sub" style="margin:8px 0 0">' . e($req['documents_note']) . '</p>';
+  ?>
+</div>
+<?php endif; ?>
+
+<?php if ($commer && $seeSal):
+  $rev = (float)($req['expected_revenue'] ?? 0); $prof = (float)($req['expected_profit'] ?? 0);
+  $cost = $rev - $prof; $marg = $rev > 0 ? $prof / $rev * 100 : 0; ?>
+<div class="panel"><h3 class="tab-sub" style="margin-top:0">Commercial (expected)</h3>
+  <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi"><span class="kic">💰</span><div class="k">Revenue</div><div class="v"><?= fmoney_short($rev) ?></div><div class="d"><?= e($req['quantity'] ?? 1) ?> × <?= fmoney_short($req['billing_rate'] ?? 0) ?> <?= e(REQ_RATE_BASIS[$req['rate_basis'] ?? 'MONTHLY'] ?? '') ?></div></div>
+    <div class="kpi"><span class="kic">🧾</span><div class="k">Cost</div><div class="v"><?= fmoney_short($cost) ?></div><div class="d">est.</div></div>
+    <div class="kpi"><span class="kic">📈</span><div class="k">Profit</div><div class="v <?= $prof>=0?'up':'down' ?>"><?= fmoney_short($prof) ?></div><div class="d"><?= $marg>=0?'':'−' ?><?= number_format(abs($marg),1) ?>% margin</div></div>
+    <div class="kpi"><span class="kic">🎯</span><div class="k">Target / floor</div><div class="v"><?= $has('target_margin') ? number_format((float)$req['target_margin'],1).'%' : '—' ?></div><div class="d"><?= $has('negotiation_floor') ? 'floor '.fmoney_short($req['negotiation_floor']) : 'no floor set' ?></div></div>
+  </div>
+</div>
+<?php endif; ?>
 
 <?php if ($seeSal && ($outgoing || $hired)): ?>
 <div class="panel"><h3 class="tab-sub" style="margin-top:0">Cost comparison (monthly)</h3>

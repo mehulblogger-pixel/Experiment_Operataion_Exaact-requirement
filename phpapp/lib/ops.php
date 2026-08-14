@@ -3805,6 +3805,7 @@ function requisitions_list($openOnly = false) {
 }
 function ops_requisitions($route, $method) {
     $pdo = db();
+    if (function_exists('req_migrate')) req_migrate();   // additive Phase-2 columns
     if ($route === 'requisitions') {
         [$scopeW, $args] = scope_clause('r.office_id', 'r.sbu');
         $q = trim($_GET['q'] ?? ''); $where = $scopeW;
@@ -3822,17 +3823,33 @@ function ops_requisitions($route, $method) {
         if ($route === 'requisition-edit') { $req = ops_one("SELECT * FROM requisitions WHERE id=?", [(int)($_GET['id'] ?? 0)]); if (!$req) { http_response_code(404); view('notfound'); return; } }
         if ($method === 'POST') {
             $b = $_POST;
-            $fields = ['office_id','sbu','designation','project_site','req_type','outgoing_inspector_id','budgeted_cost','approved_by','approval_ref','approval_date','status','notes'];
-            $norm = function($f, $v) { if (in_array($f, ['office_id','outgoing_inspector_id'], true)) return $v === '' ? null : (int)$v; if ($f === 'budgeted_cost') return $v === '' ? 0 : (float)$v; return $v; };
+            $base = ['office_id','sbu','designation','project_site','req_type','outgoing_inspector_id','budgeted_cost','approved_by','approval_ref','approval_date','status','notes'];
+            $fields = array_merge($base, function_exists('req_extra_fields') ? req_extra_fields() : []);
+            // Type coercion: ints (ids, counts, yes/no flags) and money/number fields.
+            $intF = ['office_id','outgoing_inspector_id','client_id','quantity','prov_travel','prov_accommodation','prov_food',
+                     'sel_client_interview','sel_tech_interview','sel_hr_interview','client_approval_req','training_req',
+                     'cmp_medical','cmp_pcc','cmp_gate_pass','cmp_safety','cmp_certification'];
+            $numF = ['budgeted_cost','billing_rate','target_margin','negotiation_floor','duration_months','experience_min'];
+            $norm = function($f, $v) use ($intF, $numF) {
+                if (in_array($f, ['office_id','outgoing_inspector_id','client_id'], true)) return $v === '' ? null : (int)$v;
+                if (in_array($f, $intF, true)) return $v === '' ? 0 : (int)$v;
+                if (in_array($f, $numF, true)) return $v === '' ? 0 : (float)$v;
+                return $v;
+            };
+            // Derived commercials — recomputed on every save so they never drift.
+            $com = function_exists('req_commercials') ? req_commercials($b) : ['revenue'=>0,'profit'=>0,'months'=>0];
+            $extraCols = ['expected_revenue','expected_profit','duration_months'];
+            $extraVals = [$com['revenue'], $com['profit'], $com['months']];
             if ($req) {
-                $set = implode(',', array_map(fn($f)=>"$f=?", $fields)); $vals = array_map(fn($f)=>$norm($f, $b[$f] ?? ''), $fields); $vals[] = $req['id'];
+                $set = implode(',', array_map(fn($f)=>"$f=?", $fields)) . ',' . implode(',', array_map(fn($f)=>"$f=?", $extraCols));
+                $vals = array_merge(array_map(fn($f)=>$norm($f, $b[$f] ?? ''), $fields), $extraVals, [$req['id']]);
                 $pdo->prepare("UPDATE requisitions SET $set WHERE id=?")->execute($vals);
                 if (function_exists('custom_save')) custom_save('requisition', (int)$req['id'], $b);
                 flash("Requisition {$req['req_code']} updated."); redirect('/requisition?id=' . $req['id']);
             } else {
                 $code = ops_next_code('requisitions', 'req_code', 'REQ');
-                $cols = array_merge(['req_code'], $fields, ['created_by','created_at']);
-                $vals = array_merge([$code], array_map(fn($f)=>$norm($f, $b[$f] ?? ''), $fields), [user_name(current_user()), date('c')]);
+                $cols = array_merge(['req_code'], $fields, $extraCols, ['created_by','created_at']);
+                $vals = array_merge([$code], array_map(fn($f)=>$norm($f, $b[$f] ?? ''), $fields), $extraVals, [user_name(current_user()), date('c')]);
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO requisitions (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
@@ -3841,10 +3858,13 @@ function ops_requisitions($route, $method) {
             }
         }
         view('ops/requisition_form', ['req' => $req, 'offices' => offices_list(), 'inspectors' => inspectors_list(false),
+            'clients' => clients_list(),
             'cfvals' => $req ? custom_values_map('requisition', $req['id']) : []]); return;
     }
     if ($route === 'requisition') {
-        $req = ops_one("SELECT r.*, o.name office_name FROM requisitions r LEFT JOIN offices o ON o.id=r.office_id WHERE r.id=?", [(int)($_GET['id'] ?? 0)]);
+        $req = ops_one("SELECT r.*, o.name office_name, bp.display_name client_name, bp.legal_name client_legal
+                        FROM requisitions r LEFT JOIN offices o ON o.id=r.office_id
+                        LEFT JOIN business_partners bp ON bp.id=r.client_id WHERE r.id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$req) { http_response_code(404); view('notfound'); return; }
         $outgoing = $req['outgoing_inspector_id'] ? ops_one("SELECT id,name,salary_ctc,agency_cost FROM inspectors WHERE id=?", [$req['outgoing_inspector_id']]) : null;
         $hired = $req['hired_inspector_id'] ? ops_one("SELECT id,name,salary_ctc,agency_cost,placement_fee,roll_type FROM inspectors WHERE id=?", [$req['hired_inspector_id']]) : null;
