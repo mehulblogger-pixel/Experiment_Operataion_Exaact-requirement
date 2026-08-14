@@ -5,6 +5,9 @@
 
 <form method="post" action="<?= $p ? '/partner-edit?id=' . (int)$p['id'] : '/partner-new' ?>" class="panel">
   <?php if ($picker): ?><input type="hidden" name="picker" value="1"><?php endif; ?>
+<div data-tabs data-tabs-key="partnerform" class="form-tabs">
+<section class="fs-pane" data-tab="Identity &amp; roles">
+  <h3 class="tab-sub" style="margin-top:0">Identity &amp; roles</h3>
   <div class="form-grid">
     <div class="ff"><label>Legal name *</label><input class="form-control" name="legal_name" required value="<?= e($p['legal_name'] ?? '') ?>"></div>
     <div class="ff"><label>Display name <span class="muted">(auto from legal, editable)</span></label><input class="form-control" name="display_name" value="<?= e($p['display_name'] ?? '') ?>"></div>
@@ -29,6 +32,11 @@
       <input class="form-control" name="industry_new" placeholder="New industry" style="display:none;margin-top:6px" data-newfor="industry"></div>
     <div class="ff"><label>Ownership type</label><select class="form-control" name="ownership_type"><option value="">—</option><?php foreach (lk_options_or('ownership', OWNERSHIP) as $k=>$v): ?><option value="<?= $k ?>" <?= ($p && $p['ownership_type']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Status</label><select class="form-control" name="status"><?php foreach (lk_options_or('partner_status', STATUSES) as $k=>$v): ?><option value="<?= $k ?>" <?= (($p['status'] ?? 'ACTIVE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+  </div>
+</section>
+<section class="fs-pane" data-tab="Tax &amp; terms">
+  <h3 class="tab-sub" style="margin-top:0">Tax, registration &amp; terms</h3>
+  <div class="form-grid">
     <div class="ff"><label>GSTIN</label><input class="form-control" name="gstin" value="<?= e($p['gstin'] ?? '') ?>" placeholder="e.g. 24ADUPL3517E2ZJ"></div>
     <div class="ff"><label>PAN (auto from GSTIN)</label><input class="form-control readonly-field" id="pan_display" value="<?= e($p['pan'] ?? '') ?>" readonly></div>
     <div class="ff"><label>State (auto from GSTIN)</label><input class="form-control readonly-field" id="state_display" value="<?= e($p['state'] ?? '') ?>" readonly></div>
@@ -72,7 +80,12 @@
           // punch-in can be checked against the real site and a spoofed / fake-GPS
           // location is rejected. Optional: leave blank to keep the geofence off.
     ?>
-    <div class="ff ff-wide" style="border-top:1px solid var(--line,#e5e7eb);padding-top:10px;margin-top:4px">
+  </div>
+</section>
+<section class="fs-pane" data-tab="Site &amp; scope">
+  <h3 class="tab-sub" style="margin-top:0">Site, scope &amp; contract terms</h3>
+  <div class="form-grid">
+    <div class="ff ff-wide">
       <label>📍 Site location <span class="muted">— for geofenced attendance; stops an inspector punching in on a fake GPS. Leave blank to switch it off.</span></label>
       <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px">
         <div><span class="lab">Latitude</span><input class="form-control" type="number" step="any" id="site_lat" name="site_lat" placeholder="e.g. 23.0225" value="<?= e((string)($p['site_lat'] ?? '')) ?>"></div>
@@ -142,7 +155,9 @@
       <small class="muted">Below this the month is claimable pro-rata; above it, it is still one man-month.</small></div>
     <?php if (function_exists('render_custom_fields')) render_custom_fields('partner', $pcfvals ?? []); ?>
   </div>
-  <div style="margin-top:18px;">
+</section>
+</div><!-- /.form-tabs -->
+  <div class="fs-actions" style="margin-top:18px;">
     <button class="btn" type="submit">Save</button>
     <a class="btn secondary" href="<?= $p ? '/partner?id=' . (int)$p['id'] : '/clients' ?>">Cancel</a>
   </div>

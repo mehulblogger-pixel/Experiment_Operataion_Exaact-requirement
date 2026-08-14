@@ -26,6 +26,9 @@
   </div>
 </div>
 <form method="post" action="<?= $user ? '/user-edit?id=' . (int)$user['id'] : '/user-new' ?>" class="panel">
+<div data-tabs data-tabs-key="userform" class="form-tabs">
+<section class="fs-pane" data-tab="Who they are">
+  <h3 class="tab-sub" style="margin-top:0">Who they are</h3>
   <div class="form-grid">
     <div class="ff"><label>Username *</label><input class="form-control" name="username" required value="<?= e($user['username'] ?? '') ?>"></div>
     <div class="ff"><label>Password <?= $user ? '(blank = keep)' : '' ?></label>
@@ -112,9 +115,11 @@
     </script>
     <div class="ff ff-check"><input type="checkbox" name="is_active" <?= (!$user || $user['is_active'])?'checked':'' ?>><label>Active</label></div>
   </div>
+</section>
 
   <?php if ($globalMgr): ?>
-  <h3 class="tab-sub">Data scope</h3>
+<section class="fs-pane" data-tab="Data scope">
+  <h3 class="tab-sub" style="margin-top:0">Data scope</h3>
   <?php // These were two free-text boxes asking for "comma-separated office ids".
         // Nobody knows an office id, and a typo silently gave somebody the wrong
         // data. Both are now tick-lists built from the same masters the rest of
@@ -161,9 +166,11 @@
       });
     })();
   </script>
+</section>
   <?php endif; ?>
 
-  <h3 class="tab-sub">Reporting &amp; position <span class="muted">— builds the organisation hierarchy (N+1) and drives approvals</span></h3>
+<section class="fs-pane" data-tab="Position &amp; pay">
+  <h3 class="tab-sub" style="margin-top:0">Reporting &amp; position <span class="muted">— builds the organisation hierarchy (N+1) and drives approvals</span></h3>
   <div class="form-grid">
     <?php // Designation comes from the master so everybody's card reads the same
           // way and reports can group by it. A title genuinely not on the list can
@@ -324,8 +331,10 @@
       if (m) m.addEventListener('change', fill);
     })();
   </script>
+</section>
 
-  <h3 class="tab-sub">Permissions <span class="muted">— grouped like the menu; leave all unticked to use the role's defaults</span></h3>
+<section class="fs-pane" data-tab="Permissions">
+  <h3 class="tab-sub" style="margin-top:0">Permissions <span class="muted">— grouped like the menu; leave all unticked to use the role's defaults</span></h3>
   <?php
     // Render the permissions under the same headings as the main navigation, so
     // this reads like the menu instead of one long list. Only permissions this
@@ -355,7 +364,9 @@
     </div>
   <?php endif; ?>
 
-  <div style="margin-top:16px;">
+</section>
+</div><!-- /.form-tabs -->
+  <div class="fs-actions" style="margin-top:16px;">
     <button class="btn" type="submit">Save user</button>
     <a class="btn secondary" href="/users">Cancel</a>
   </div>
