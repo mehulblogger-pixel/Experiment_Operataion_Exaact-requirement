@@ -8,24 +8,36 @@
 //  area contains: the same permission and feature gates the sidebar used, in
 //  one place, so the rail link and the landing page can never disagree.
 //
-//  Operations has its own richer Home (ops_operations_home, with live metrics);
-//  every other area is rendered from here.
+//  Tiles can carry a live count badge and are grouped into sections; a big area
+//  (Quality, Reporting, Admin) reads as a few labelled groups rather than a
+//  wall. Operations has its own richer Home (ops_operations_home).
 //
 //  Nothing is removed — each tile links to the screen that already exists.
 // ============================================================================
 
 // Build the definition for one area: title, icon, subtitle, the visible tiles
-// (already filtered by permission), and the route prefixes that mark the rail
-// link "current". Only tiles the user may actually open are returned, so an
-// empty tile list means "no access to this area".
+// grouped into sections (already filtered by permission), and the route
+// prefixes that mark the rail link "current". Only tiles the user may open are
+// returned, so an empty area means "no access".
 function ops_area_def($area) {
     $inspPack = !function_exists('accredited_pack_on') || accredited_pack_on();
-    // A tile is [icon, label, route, description]; $show decides if it appears.
-    $tiles = [];
-    $t = function ($show, $icon, $label, $route, $desc = '', $ext = false) use (&$tiles) {
-        if ($show) $tiles[] = ['icon' => $icon, 'label' => $label, 'route' => $route, 'desc' => $desc, 'ext' => $ext];
-    };
     $fx = fn($f) => function_exists($f);
+    // A positive integer or null. Never let a count query break the page.
+    $num = function ($fn) { try { $v = (int)$fn(); return $v > 0 ? $v : null; } catch (Throwable $e) { return null; } };
+
+    $sections = [];
+    // Start a new (optionally labelled) section.
+    $sec = function ($label = '') use (&$sections) { $sections[] = ['label' => $label, 'tiles' => []]; };
+    // Append a tile to the current section. $count -> a badge; $tone one of
+    // 'red' | 'amber' | 'green' | '' (neutral). $ext opens in a new tab.
+    $t = function ($show, $icon, $label, $route, $desc = '', $count = null, $tone = '', $ext = false) use (&$sections) {
+        if (!$show) return;
+        if (empty($sections)) $sections[] = ['label' => '', 'tiles' => []];
+        $sections[count($sections) - 1]['tiles'][] = [
+            'icon' => $icon, 'label' => $label, 'route' => $route, 'desc' => $desc,
+            'count' => $count, 'tone' => $tone, 'ext' => $ext,
+        ];
+    };
 
     switch ($area) {
         case 'sales':
@@ -36,9 +48,10 @@ function ops_area_def($area) {
             $t($fx('opp_can_view') && opp_can_view(), '💡', 'Opportunities', '/opportunities', 'Qualified deals being worked.');
             $t(can('mod.inquiries.view'), '📨', THP('inquiry'), '/inquiries', 'Requests for a quotation.');
             $t(can('mod.quotes.view'), '📝', THP('quote'), '/quotes', 'Quotations, revisions and approvals.');
+            $t($fx('gate_can_view') && gate_can_view(), '🛂', 'Approvals', '/approvals', 'Deals held at a stage gate.',
+                $num(fn() => $fx('gate_pending_count') ? gate_pending_count() : 0), 'amber');
             $t($fx('crmdash_can') && crmdash_can(), '📈', 'Sales dashboard', '/crm-dashboard', 'Win rates and value by stage.');
             $t($fx('pipe_can_view') && pipe_can_view(), '🪜', 'Pipelines & funnels', '/pipelines', 'Stages and conversion.');
-            $t($fx('gate_can_view') && gate_can_view(), '🛂', 'Approvals', '/approvals', 'Deals held at a stage gate.');
             $t($fx('roi_available') && roi_available() && $fx('roi_can') && roi_can(), '💸', 'Advertising return', '/ads-roi', 'Spend against leads produced.');
             break;
 
@@ -46,33 +59,53 @@ function ops_area_def($area) {
             $title = 'Quality & Accreditation'; $icon = '🛡️';
             $sub = 'The registers an accreditation assessor asks for — equipment, competence, impartiality, complaints, nonconformities and the portals.';
             $routes = ['quality','equipment','samples','sample','methods','method','drules','drule','cdocs','cdoc','risks','risk','retention','disclosure','competence','impartiality','complaints','complaint','satisfaction','confidentiality','conf-breach','site-docs','report-reviews','ncr','issues','departures','hold-points','capa','internal-audits','internal-audit','management-reviews','management-review','evidence-review','data-control','portal-users','vendor-users','analytics','identity'];
+
+            $sec('Measurement, methods & documents');
             $t($inspPack && can('mod.equipment.view'), '📏', 'Equipment & calibration', '/equipment', 'Instruments and calibration status.');
-            $t($fx('sample_can_view') && sample_can_view(), '📦', 'Items & samples', '/samples', 'Items received for verification.');
+            $t($fx('sample_can_view') && sample_can_view(), '📦', 'Items & samples', '/samples', 'Items received for verification.',
+                $num(fn() => $fx('sample_counts') ? sample_counts()['open'] : 0), 'amber');
             $t($fx('method_can_view') && method_can_view(), '📚', 'Method library', '/methods', 'Standards and methods applied.');
             $t($fx('drule_can_view') && drule_can_view(), '⚖️', 'Decision rules', '/drules', 'Statements of conformity rules.');
-            $t($fx('cdoc_can_view') && cdoc_can_view(), '📄', 'Controlled documents', '/cdocs', 'The controlled document set.');
-            $t($fx('risk_can_view') && risk_can_view(), '🎲', 'Risks & opportunities', '/risks', 'The risk register.');
+            $t($fx('cdoc_can_view') && cdoc_can_view(), '📄', 'Controlled documents', '/cdocs', 'The controlled document set.',
+                $num(fn() => $fx('cdoc_counts') ? cdoc_counts()['review_due'] : 0), 'amber');
             $t($fx('retention_can_view') && retention_can_view(), '🗄️', 'Retention schedule', '/retention', 'How long records are kept.');
-            $t($fx('disclosure_can_view') && disclosure_can_view(), '📢', 'Disclosure consent', '/disclosure', 'Consents to disclose.');
+            $t($inspPack && can('mod.datacontrol.view'), '🗃', 'Data & information control', '/data-control', 'Information management controls.');
+
+            $sec('Risk, competence & impartiality');
+            $t($fx('risk_can_view') && risk_can_view(), '🎲', 'Risks & opportunities', '/risks', 'The risk register.',
+                $num(fn() => $fx('risk_counts') ? risk_counts()['high'] : 0), 'red');
             $t($inspPack && can('mod.competence.view'), '🎓', 'Competence & authorisation', '/competence', 'Training, assessment and authorisation.');
             $t($inspPack && can('mod.impartiality.view'), '⚖️', 'Impartiality', '/impartiality', 'Threats to impartiality and controls.');
-            $t(can('mod.complaints.view'), '📮', 'Complaints & appeals', '/complaints', 'Complaints and appeals register.');
-            $t($fx('sat_can_view') && sat_can_view(), '⭐', 'Customer satisfaction', '/satisfaction', 'Surveys and follow-up.');
-            $t(can('mod.confidentiality.view') || can('mod.identity.view') || is_master_of(['confidentiality','identity']), '🔒', 'Confidentiality', '/confidentiality', 'Undertakings, NDAs and breaches.');
-            $t($fx('ops_sitedocs') && licence_enabled('operations') && (can('mod.identity.view') || can('mod.clients.view') || is_master_of(['identity','clients'])), '🛂', 'Site entry documents', '/site-docs', 'Papers needed for site access.');
-            $t($fx('rcr_can_view') && rcr_can_view(), '📬', 'Client acceptance', '/report-reviews', 'Reports the client accepted or rejected.');
-            $t($inspPack && (can('mod.ncr.view') || can('mod.capa.view')), '⚠', 'Nonconformities', '/ncr', 'The NCR register.');
-            $t((can('mod.ncr.view') || can('mod.capa.view')) && (!$fx('svc_globally_active') || svc_globally_active('NCR_CAPA')), '🗂️', 'Issues & departures', '/issues', 'Universal issue, deviation and concession log.');
-            $t($fx('hwp_can_view') && hwp_can_view(), '✋', 'Hold & witness points', '/hold-points', 'Points where work must pause for us.');
-            $t($inspPack && can('mod.capa.view'), '🛠', 'Corrective actions', '/capa', 'CAPA against nonconformities.');
+            $t($fx('disclosure_can_view') && disclosure_can_view(), '📢', 'Disclosure consent', '/disclosure', 'Consents to disclose.',
+                $num(fn() => $fx('disclosure_counts') ? disclosure_counts()['pending'] : 0), 'amber');
+
+            $sec('Nonconformity, audit & evidence');
+            $t($inspPack && (can('mod.ncr.view') || can('mod.capa.view')), '⚠', 'Nonconformities', '/ncr', 'The NCR register.',
+                $num(fn() => $fx('ncr_counts') ? ncr_counts()['open'] : 0), 'red');
+            $t((can('mod.ncr.view') || can('mod.capa.view')) && (!$fx('svc_globally_active') || svc_globally_active('NCR_CAPA')), '🗂️', 'Issues & departures', '/issues', 'Issue, deviation and concession log.');
+            $t($fx('hwp_can_view') && hwp_can_view(), '✋', 'Hold & witness points', '/hold-points', 'Points where work pauses for us.',
+                $num(fn() => $fx('hwp_open_all') ? count(hwp_open_all($fx('scope_offices') && is_array(scope_offices()) ? scope_offices() : null)) : 0), 'amber');
+            $t($inspPack && can('mod.capa.view'), '🛠', 'Corrective actions', '/capa', 'CAPA against nonconformities.',
+                $num(fn() => $fx('capa_all') ? count(capa_all(['open' => 1])) : 0), 'amber');
             $t($inspPack && can('mod.audits.view'), '🔍', 'Internal audits', '/internal-audits', 'The internal audit programme.');
             $t($inspPack && can('mod.audits.view'), '🏛', 'Management review', '/management-reviews', 'Management review records.');
-            $t($inspPack && $fx('trust_can_review') && trust_can_review(), '📍', 'Evidence review', '/evidence-review', 'Field evidence awaiting review.');
-            $t($inspPack && can('mod.datacontrol.view'), '🗃', 'Data & information control', '/data-control', 'Information management controls.');
-            $t(can('mod.portal.view'), '🌐', 'Client portal', '/portal-users', 'Client portal users and requests.');
+            $t($inspPack && $fx('trust_can_review') && trust_can_review(), '📍', 'Evidence review', '/evidence-review', 'Field evidence awaiting review.',
+                $num(fn() => $fx('trust_readiness') ? trust_readiness()['pending'] : 0), 'amber');
+
+            $sec('Customer, confidentiality & portals');
+            $t(can('mod.complaints.view'), '📮', 'Complaints & appeals', '/complaints', 'Complaints and appeals register.',
+                $num(fn() => $fx('cmp_all') ? count(cmp_all(['status' => 'OPEN'])) : 0), 'amber');
+            $t($fx('sat_can_view') && sat_can_view(), '⭐', 'Customer satisfaction', '/satisfaction', 'Surveys and follow-up.',
+                $num(fn() => $fx('sat_summary') ? sat_summary()['followup'] : 0), 'amber');
+            $t($fx('rcr_can_view') && rcr_can_view(), '📬', 'Client acceptance', '/report-reviews', 'Reports accepted or rejected.',
+                $num(fn() => $fx('rcr_counts') ? rcr_counts()['rejected'] : 0), 'red');
+            $t(can('mod.confidentiality.view') || can('mod.identity.view') || is_master_of(['confidentiality','identity']), '🔒', 'Confidentiality', '/confidentiality', 'Undertakings, NDAs and breaches.');
+            $t($fx('ops_sitedocs') && licence_enabled('operations') && (can('mod.identity.view') || can('mod.clients.view') || is_master_of(['identity','clients'])), '🛂', 'Site entry documents', '/site-docs', 'Papers needed for site access.');
+            $t(can('mod.identity.view') && $fx('iddoc_can_view') && iddoc_can_view(), '🪪', 'Identity documents', '/identity', 'ID that gates site access.');
+            $t(can('mod.portal.view'), '🌐', 'Client portal', '/portal-users', 'Client portal users and requests.',
+                $num(fn() => $fx('portal_requests_all') ? count(portal_requests_all('NEW')) : 0), 'amber');
             $t(can('mod.portal.view'), '🏭', 'Vendor portal', '/vendor-users', 'Vendor portal access.');
             $t($fx('tapi_can') && tapi_can(), '📈', 'Analytics', '/analytics', 'KPI dashboards and drill-down.');
-            $t(can('mod.identity.view') && $fx('iddoc_can_view') && iddoc_can_view(), '🪪', 'Identity documents', '/identity', 'ID that gates site access.');
             break;
 
         case 'reporting':
@@ -80,17 +113,24 @@ function ops_area_def($area) {
             $sub = 'Where inspection reports are written, endorsed, expedited and the formats that govern them.';
             $routes = ['reporting','documents','document','endorsements','endorsement','vendors','vendor-profile','expediting','expediting-projects','writing-assistant','phrase-library','learning','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log','compliance'];
             if (can('mod.idems.view')) {
+                $sec('Reports & endorsements');
                 $t(true, '📑', T_REG('report'), '/documents', 'The report register.');
                 $t(can('mod.idems.edit') || is_master_of('idems'), '➕', ucfirst(T_NEW('report')), '/document-new', 'Start a new report.');
                 $t(true, '✅', T_REG('endorsement'), '/endorsements', 'Manufacturer document endorsements.');
                 $t(true, '🏭', 'Vendor register', '/vendors', 'Vendors and their profiles.');
+
+                $sec('Expediting');
                 $t(!$fx('svc_globally_active') || svc_globally_active('EXPEDITING'), '🚚', 'Expediting register', '/expediting', 'Chasing vendor delivery.');
                 $t(!$fx('svc_globally_active') || svc_globally_active('EXPEDITING'), '🗂️', 'Project delivery', '/expediting-projects', 'Multi-vendor projects by milestone.');
+
+                $sec('Writing, rules & templates');
                 $t(true, '✒️', 'Technical writing', '/writing-assistant', 'Phrase library and writing help.');
                 $t(true, '🧠', 'Learning insights', '/learning', 'Suggestions learned from past reports.');
                 $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('users.manage.global')), '👤', 'Approver mapping', '/approver-map', 'Who signs which report.');
                 $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '🔀', 'Approval rules', '/approval-rules', 'Routing rules for approval.');
                 $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('crm.template.manage')), '📝', 'Document templates', '/templates', 'The report template library.');
+
+                $sec('Governance');
                 $t(licence_enabled('reporting') && (can('idems.audit.view') || is_master()), '🛡️', 'Audit trail', '/audit-log', 'Who changed what, and when.');
                 $t(is_master() || can('settings.manage'), '⚖️', 'Where we stand', '/compliance', 'Which obligations are met, measured live.');
             }
@@ -100,15 +140,17 @@ function ops_area_def($area) {
             $title = 'Money'; $icon = '💰';
             $sub = 'From what is waiting to be billed, through invoices and money in, to the profit each ' . strtolower(Tl('sbu')) . ' makes.';
             $routes = ['money','invoicing','to-bill','invoices','invoice','receipts','receipt','receivables','tally','profitability','sbu-pl'];
+            $sec('Billing');
             $t(can('mod.invoicing.view'), '💳', T_REG('invoice'), '/invoicing', 'The invoice register.');
             if (can('mod.invoicing.view') && (can('finance.reconcile') || can('data.credit') || is_master())) {
                 $t(true, '⧗', 'Waiting to be billed', '/to-bill', 'Closed work not yet invoiced.');
                 $t(true, '🧾', 'Invoices', '/invoices', 'Invoices with lines and tax.');
                 $t(true, '💰', 'Money in', '/receipts', 'Receipts matched to invoices.');
+                $sec('Ledger, export & profit');
                 $t(true, '⏳', 'Receivables ageing', '/receivables', 'What is owed, by age.');
                 $t(true, '📤', 'Tally export', '/tally', 'Export for the accounts package.');
             }
-            $t($fx('books_switch_ready') && books_switch_ready(), '📗', 'Accounts & GST ↗', ($fx('books_app_url') ? books_app_url() : '#'), 'Open MGH Books, already signed in.', true);
+            $t($fx('books_switch_ready') && books_switch_ready(), '📗', 'Accounts & GST ↗', ($fx('books_app_url') ? books_app_url() : '#'), 'Open MGH Books, already signed in.', null, '', true);
             $t(can('mod.profitability.view'), '💹', T_REG('boss'), '/profitability', 'Profit and margin by job.');
             break;
 
@@ -134,39 +176,55 @@ function ops_area_def($area) {
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'Masters, costs, people, access and the settings that shape the app.';
             $routes = ['admin','masters','m/','lookups','office-finance','cost-run','sbu-pl','call-profit','mis','users','user-new','user-edit','hierarchy','access','adspro','sso','licence','settings','terminology','service-scope','service-formats','sla-targets','company-profile','books-bridge'];
-            $t(can('mod.masters.view'), '📋', 'Masters', '/masters', 'The configurable lists behind every dropdown.');
+
+            $sec('Masters & costs');
+            $t(can('mod.masters.view'), '📋', 'Masters', '/masters', 'The lists behind every dropdown.');
             $t(can('mod.overheads.view'), '📐', TH('office') . ' costs & overheads', '/office-finance', 'Per-office cost model.');
             $t(can('mod.overheads.view'), '🧮', 'Month-end cost run', '/cost-run', 'Roll up costs for the month.');
             $t(can('mod.profitability.view'), '📊', T('sbu') . ' profit & loss', '/sbu-pl', 'P&L by business unit.');
             $t(can('mod.profitability.view'), '🧾', 'Profit by ' . strtolower(Tl('call')), '/call-profit', 'What each inspection made.');
             $t(licence_enabled('operations') && (can('mod.reports.view') || can('dash.operations') || can('dash.financial')), '📈', 'Management dashboard', '/mis', 'The MIS overview.');
+
+            $sec('People & access');
             $t(can('mod.users.view'), '👥', T_REG('user'), '/users', 'People who can sign in.');
             $t(can('mod.users.view'), '🗂️', 'Organisation', '/hierarchy', 'The reporting hierarchy.');
             $t(is_master(), '🔐', 'Roles & permissions', '/access', 'Who can do what.');
-            $t($fx('ads_can_manage') && ads_can_manage(), '📢', 'Ads Pro connection', '/adspro', 'Connect the advertising source.');
             $t($fx('sso_on') && (can('users.manage.global') || is_master()), '🔑', 'Single sign-on', '/sso', 'Identity provider settings.');
-            $t($fx('lk_can_manage') && lk_can_manage(), '📜', 'Licence', '/licence', 'The product licence and its state.');
+
+            $sec('Configuration');
             $t(can('mod.settings.view') && can('settings.manage'), '⚙️', 'System settings', '/settings', 'Company-wide settings and terminology.');
             $t(can('settings.manage') || is_master(), '🧩', 'Service scope', '/service-scope', 'Which services are offered and where.');
             $t(can('settings.manage') || is_master(), '📄', 'Report formats by service', '/service-formats', 'The report format each service allocates.');
             $t(can('settings.manage') || is_master() || ($fx('is_coordinator_level') && is_coordinator_level()), '⏳', 'SLA targets', '/sla-targets', 'Turnaround targets.');
             $t(can('settings.manage') || is_master(), '🏢', 'Company profile', '/company-profile', 'Legal name, logo and details.');
-            $t((can('settings.manage') || is_master()) && $fx('books_licensed') && books_licensed(), '📗', 'MGH Books', '/books-bridge', 'The accounts bridge.');
+
+            $sec('Connections & licence');
+            $t($fx('ads_can_manage') && ads_can_manage(), '📢', 'Ads Pro connection', '/adspro', 'Connect the advertising source.');
+            $t($fx('lk_can_manage') && lk_can_manage(), '📜', 'Licence', '/licence', 'The product licence and its state.');
+            $t((can('settings.manage') || is_master()) && $fx('books_licensed') && books_licensed(), '📗', 'MGH Books', '/books-bridge', 'The accounts bridge.',
+                $num(fn() => $fx('books_outbox_counts') ? (books_outbox_counts()['stuck'] ?? 0) : 0), 'red');
             break;
 
         default:
             return null;
     }
 
-    return ['key' => $area, 'title' => $title, 'icon' => $icon, 'sub' => $sub, 'tiles' => $tiles, 'routes' => $routes];
+    // Drop any section that ended up empty (all its tiles were gated away).
+    $sections = array_values(array_filter($sections, fn($s) => !empty($s['tiles'])));
+    return ['key' => $area, 'title' => $title, 'icon' => $icon, 'sub' => $sub, 'sections' => $sections, 'routes' => $routes];
 }
 
-// Does this user have any access to the area? (Drives both the rail link and
-// the route gate.) True when at least one tile is visible.
-function ops_area_has($area) {
+// Total visible tiles across all sections.
+function ops_area_tile_count($area) {
     $d = ops_area_def($area);
-    return $d && !empty($d['tiles']);
+    if (!$d) return 0;
+    $n = 0; foreach ($d['sections'] as $s) $n += count($s['tiles']);
+    return $n;
 }
+
+// Does this user have any access to the area? Drives both the rail link and the
+// route gate.
+function ops_area_has($area) { return ops_area_tile_count($area) > 0; }
 
 // The route prefixes that mark this area "current" in the rail.
 function ops_area_routes($area) {
@@ -177,7 +235,7 @@ function ops_area_routes($area) {
 // Render an area Home.
 function ops_area_home($area, $method) {
     $def = ops_area_def($area);
-    ops_require($def && !empty($def['tiles']), 'You do not have access to this area.');
+    ops_require($def && ops_area_tile_count($area) > 0, 'You do not have access to this area.');
     view('ops/area_home', ['def' => $def]);
     return true;
 }
