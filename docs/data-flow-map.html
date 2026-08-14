@@ -1,0 +1,332 @@
+<title>Lead to Money</title>
+<style>
+  :root{
+    --ground:#f6f8fb; --panel:#ffffff; --ink:#12203c; --muted:#5b6577;
+    --line:#d7dee8; --grid:rgba(30,64,175,.055);
+    --accent:#1e40af; --accent2:#3b82f6; --accent-soft:#e8eefb;
+    --ok:#15803d; --ok-bg:#e7f4ec; --warn:#b45309; --warn-bg:#fbf0df; --bad:#b91c1c; --bad-bg:#fbe9e9;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    --shadow:0 1px 2px rgba(18,32,60,.05),0 8px 24px rgba(18,32,60,.06);
+  }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+    --ground:#0d1526; --panel:#141d31; --ink:#e8edf6; --muted:#93a0b5;
+    --line:#26324a; --grid:rgba(96,165,250,.07);
+    --accent:#60a5fa; --accent2:#93c5fd; --accent-soft:#17233c;
+    --ok:#4ade80; --ok-bg:#122a1c; --warn:#fbbf24; --warn-bg:#2c2210; --bad:#f87171; --bad-bg:#2c1616;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }}
+  :root[data-theme="dark"]{
+    --ground:#0d1526; --panel:#141d31; --ink:#e8edf6; --muted:#93a0b5;
+    --line:#26324a; --grid:rgba(96,165,250,.07);
+    --accent:#60a5fa; --accent2:#93c5fd; --accent-soft:#17233c;
+    --ok:#4ade80; --ok-bg:#122a1c; --warn:#fbbf24; --warn-bg:#2c2210; --bad:#f87171; --bad-bg:#2c1616;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{
+    margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+    font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;
+    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+    background-size:26px 26px;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 22px 72px}
+  .mono{font-family:var(--mono)}
+  a{color:inherit}
+
+  /* ---- header ---- */
+  header{margin-bottom:14px}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.28em;text-transform:uppercase;color:var(--accent);font-weight:600}
+  h1{font-size:clamp(34px,6vw,58px);line-height:.98;margin:.28em 0 .18em;letter-spacing:-.02em;font-weight:800;text-wrap:balance}
+  h1 .arrow{color:var(--muted);font-weight:400}
+  .lede{max-width:63ch;color:var(--muted);font-size:16.5px;margin:0}
+  .lede b{color:var(--ink);font-weight:600}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+  .chip{font-family:var(--mono);font-size:12.5px;border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:5px 10px;color:var(--muted)}
+  .chip b{color:var(--ink);font-weight:600}
+  .chip.hl{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+
+  /* ---- section heading ---- */
+  .sec{display:flex;align-items:baseline;gap:12px;margin:52px 0 22px}
+  .sec .n{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:600}
+  .sec h2{font-size:20px;margin:0;letter-spacing:-.01em;font-weight:750}
+  .sec .r{flex:1;height:1px;background:var(--line)}
+
+  /* ---- the thread (spine) ---- */
+  .thread{position:relative;margin-left:8px}
+  .thread::before{content:"";position:absolute;left:15px;top:12px;bottom:12px;width:2px;
+    background:linear-gradient(var(--accent),var(--accent2));border-radius:2px}
+  .station{position:relative;padding:0 0 20px 52px}
+  .dot{position:absolute;left:6px;top:4px;width:20px;height:20px;border-radius:50%;background:var(--panel);
+    border:2px solid var(--accent);display:grid;place-items:center;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--accent);z-index:1}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+  .card .head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .card h3{margin:0;font-size:16.5px;font-weight:700;letter-spacing:-.01em}
+  .card .screen{font-family:var(--mono);font-size:12px;color:var(--accent);background:var(--accent-soft);border-radius:6px;padding:2px 7px}
+  .card p{margin:8px 0 0;color:var(--muted);font-size:14px}
+  .tables{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+  .t{font-family:var(--mono);font-size:11.5px;border:1px solid var(--line);border-radius:5px;padding:2px 7px;color:var(--ink);background:var(--ground)}
+  .carry{margin-top:10px;font-size:13px;color:var(--ink);display:flex;gap:7px;align-items:baseline}
+  .carry .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);white-space:nowrap;padding-top:1px}
+
+  /* ---- tributaries grid ---- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
+  .trib{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 16px;box-shadow:var(--shadow);border-top:3px solid var(--accent)}
+  .trib .th{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:3px}
+  .trib h3{margin:0;font-size:15.5px;font-weight:700}
+  .trib .dock{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap}
+  .trib .dock b{color:var(--accent)}
+  .trib .regs{margin:10px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px}
+  .trib .regs li{display:flex;gap:9px;align-items:baseline;font-size:13.5px;line-height:1.4}
+  .trib .regs .nm{font-weight:600;white-space:nowrap}
+  .trib .regs .ds{color:var(--muted)}
+  .pill{font-family:var(--mono);font-size:10px;font-weight:600;border-radius:20px;padding:1px 7px;letter-spacing:.02em;white-space:nowrap;flex:0 0 auto;align-self:center}
+  .p-ok{background:var(--ok-bg);color:var(--ok)} .p-warn{background:var(--warn-bg);color:var(--warn)} .p-bad{background:var(--bad-bg);color:var(--bad)}
+
+  /* ---- legend / edge cases ---- */
+  .note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:10px;padding:14px 16px;margin-top:22px;font-size:14px;color:var(--muted)}
+  .note b{color:var(--ink)}
+  .legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:16px;font-size:12.5px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:11px;height:11px;border-radius:3px;display:inline-block}
+  footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted);font-family:var(--mono)}
+  @media (max-width:560px){ .wrap{padding:28px 16px 56px} .station{padding-left:44px} }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Inspection Operations · Demo Dataset</div>
+    <h1>Lead <span class="arrow">→</span> Money</h1>
+    <p class="lede">How one order threads through the whole application — from the first enquiry to
+      cash in the bank — and every register that branches off it. This is the map of the
+      <b>demo data</b>: 200 of 207 tables populated, all anchored to one company, all interlinked,
+      each screen showing a real, connected figure.</p>
+    <div class="meta">
+      <span class="chip hl"><b>200</b>&nbsp;/ 207 tables seeded</span>
+      <span class="chip"><b>83</b>&nbsp;registers tracked</span>
+      <span class="chip"><b>12</b>&nbsp;thread stations</span>
+      <span class="chip">clients: <b>Narmada · Suryavan · Girnar · Kutch</b></span>
+      <span class="chip">offices: <b>Ahmedabad · Mumbai · Pune</b></span>
+    </div>
+  </header>
+
+  <div class="sec"><span class="n">01</span><h2>The thread — one order, end to end</h2><span class="r"></span></div>
+
+  <div class="thread">
+
+    <div class="station">
+      <span class="dot mono">1</span>
+      <div class="card">
+        <div class="head"><h3>Lead</h3><span class="screen">/leads</span></div>
+        <p>An enquiry lands. Kutch Petrochem, referred by Girnar — captured with a contact, a scope note and two files.</p>
+        <div class="tables"><span class="t">leads</span><span class="t">lead_files</span><span class="t">lead_stage_history</span></div>
+        <div class="carry"><span class="k">carries →</span><span>the company, contact and the scope worksheet flagged to reuse in the quote</span></div>
+      </div>
+    </div>
+
+    <div class="station">
+      <span class="dot mono">2</span>
+      <div class="card">
+        <div class="head"><h3>Deal</h3><span class="screen">/opportunities</span></div>
+        <p>The lead becomes a tracked deal with a value, probability and pipeline stage. Four demo deals — Won, Open, Lost, Qualified.</p>
+        <div class="tables"><span class="t">opportunities</span><span class="t">opportunity_stage_history</span><span class="t">opportunity_quotes</span></div>
+        <div class="carry"><span class="k">carries →</span><span>the qualified requirement, ready to quote against</span></div>
+      </div>
+    </div>
+
+    <div class="station">
+      <span class="dot mono">3</span>
+      <div class="card">
+        <div class="head"><h3>Quotation</h3><span class="screen">/quote?id=</span></div>
+        <p>A priced quotation with line items, revisions and an approval chain. Q-2607-001 is accepted; -002 sent; -003 lost.</p>
+        <div class="tables"><span class="t">quotations</span><span class="t">quote_lines</span><span class="t">quote_revisions</span><span class="t">quote_approvals</span><span class="t">quote_followups</span><span class="t">quote_files</span></div>
+        <div class="carry"><span class="k">carries →</span><span>the accepted price and scope, plus the contract number once won</span></div>
+      </div>
+    </div>
+
+    <div class="station">
+      <span class="dot mono">4</span>
+      <div class="card">
+        <div class="head"><h3>Work order (call)</h3><span class="screen">/call?id=</span></div>
+        <p>The won quotation raises an inspection call. It keeps the link back to the quote, and names the contracting vs executing office.</p>
+        <div class="tables"><span class="t">calls</span><span class="t">call_status_events</span><span class="t">call_clarifications</span></div>
+        <div class="carry"><span class="k">carries →</span><span>the quotation link, contract number, dates and the executing branch</span></div>
+      </div>
+    </div>
+
+    <div class="station">
+      <span class="dot mono">5</span>
+      <div class="card">
+        <div class="head"><h3>Job / deputation</h3><span class="screen">/job?id=</span></div>
+        <p>The executing office allocates an engineer, uploads the QAP, and works the job day by day. Visits and site history are logged.</p>
+        <div class="tables"><span class="t">jobs</span><span class="t">job_qaps</span><span class="t">job_visits</span><span class="t">dep_site_history</span><span class="t">hw_points</span></div>
+        <div class="carry"><span class="k">carries →</span><span>the engineer, the QAP hold/witness points and the executed dates</span></div>
+      </div>
+    </div>
+
+    <div class="station">
+      <span class="dot mono">6</span>
+      <div class="card">
+        <div class="head"><h3>Site check-in</h3><span class="screen">/availability · attendance</span></div>
+        <p>The engineer marks attendance with geo-coordinates against the job — the proof the visit happened.</p>
+        <div class="tables"><span class="t">attendance</span><span class="t">inspector_day_status</span><span class="t">site_visits</span></div>
+        <div class="carry"><span class="k">carries →</span><span>attested field time that gates the closure and the bill</span></div>
+      </div>
+    </div>
+
+    <div class="station">
+      <span class="dot mono">7</span>
+      <div class="card">
+        <div class="head"><h3>Report</h3><span class="screen">/document?id=</span></div>
+        <p>The findings become a report: drafted, technically vetted, approved through the chain, then issued with an IRN.</p>
+        <div class="tables"><span class="t">report_docs</span><span class="t">report_vetting</span><span class="t">report_approvals</span><span class="t">report_doc_review</span><span class="t">idems_counters</span></div>
+        <div class="carry"><span class="k">carries →</span><span>an issued, numbered report tied to the job it came from</span></div>
+      </div>
+    </div>
+
+    <div class="station">
+      <span class="dot mono">8</span>
+      <div class="card">
+        <div class="head"><h3>Client acceptance</h3><span class="screen">/report-reviews</span></div>
+        <p>The client accepts or rejects the report from the portal. One demo report is accepted; one is <b>rejected</b> over a PO-number mismatch.</p>
+        <div class="tables"><span class="t">report_client_reviews</span><span class="t">release_inspections</span><span class="t">portal_audit</span></div>
+        <div class="carry"><span class="k">carries →</span><span>acceptance that unlocks the Release Note and the invoice</span></div>
+      </div>
+    </div>
+
+    <div class="station">
+      <span class="dot mono">9</span>
+      <div class="card">
+        <div class="head"><h3>Invoice</h3><span class="screen">/invoice?id=</span></div>
+        <p>Only after the job closes. Lines sum to the total, GST is split, and a credit note handles a de-scoped vessel.</p>
+        <div class="tables"><span class="t">invoices</span><span class="t">invoice_lines</span><span class="t">credit_notes</span><span class="t">job_bills</span></div>
+        <div class="carry"><span class="k">carries →</span><span>a raised receivable against the client and the contracting office</span></div>
+      </div>
+    </div>
+
+    <div class="station">
+      <span class="dot mono">10</span>
+      <div class="card">
+        <div class="head"><h3>Money in</h3><span class="screen">/receipt?id=</span></div>
+        <p>A receipt is recorded and allocated against the invoice; inter-office credit is reconciled between branches.</p>
+        <div class="tables"><span class="t">receipts</span><span class="t">receipt_allocations</span><span class="t">credit_recon</span></div>
+        <div class="carry"><span class="k">carries →</span><span>settled cash, and the SBU / office margin once costs are run</span></div>
+      </div>
+    </div>
+
+    <div class="station">
+      <span class="dot mono">11</span>
+      <div class="card">
+        <div class="head"><h3>Cost &amp; margin</h3><span class="screen">/cost-run · /mis</span></div>
+        <p>Payroll, overheads and sub-con are apportioned across offices and SBUs, turning the thread into a profit-and-loss line.</p>
+        <div class="tables"><span class="t">cost_runs</span><span class="t">cost_allocations</span><span class="t">office_expenses</span><span class="t">tally_exports</span></div>
+        <div class="carry"><span class="k">carries →</span><span>the true margin on the order, per office and per business unit</span></div>
+      </div>
+    </div>
+
+    <div class="station">
+      <span class="dot mono">12</span>
+      <div class="card">
+        <div class="head"><h3>Governance</h3><span class="screen">/analytics</span></div>
+        <p>Every step above feeds the KPIs — TAT, SLA compliance, closure rate — measured against targets, with alerts on breach.</p>
+        <div class="tables"><span class="t">kpi_snapshots</span><span class="t">kpi_targets</span><span class="t">kpi_alerts</span><span class="t">analytics_periods</span></div>
+        <div class="carry"><span class="k">measures ↺</span><span>the whole thread — SLA compliance is seeded at <b>82.5% (breached)</b> so the alert fires</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="sec"><span class="n">02</span><h2>Tributaries — the registers that branch off the thread</h2><span class="r"></span></div>
+
+  <div class="grid">
+
+    <div class="trib">
+      <div class="th"><h3>Directory &amp; vendors</h3><span class="dock">docks at <b>①②</b></span></div>
+      <ul class="regs">
+        <li><span class="nm">Partner contracts</span><span class="ds">— rate contract, 200 mandays</span></li>
+        <li><span class="nm">Purchase orders</span><span class="pill p-warn">85% used</span></li>
+        <li><span class="nm">Vendor profiles</span><span class="ds">— approved / suspended / prospect</span></li>
+        <li><span class="nm">Vendor qualifications</span><span class="pill p-bad">expired</span></li>
+        <li><span class="nm">Vendor portal + audit</span><span class="ds">— login → view → download</span></li>
+      </ul>
+    </div>
+
+    <div class="trib">
+      <div class="th"><h3>Quality &amp; accreditation</h3><span class="dock">docks at <b>⑤⑦</b></span></div>
+      <ul class="regs">
+        <li><span class="nm">Inspector certificates</span><span class="pill p-bad">1 lapsed</span></li>
+        <li><span class="nm">Test methods</span><span class="pill p-warn">review due</span></li>
+        <li><span class="nm">Decision rules</span><span class="ds">— guard-band acceptance</span></li>
+        <li><span class="nm">Samples + custody</span><span class="ds">— received → tested → returned</span></li>
+        <li><span class="nm">Equipment &amp; calibration</span><span class="pill p-bad">1 expired</span></li>
+        <li><span class="nm">Controlled documents · risks</span><span class="ds">— manual, SOPs, register</span></li>
+      </ul>
+    </div>
+
+    <div class="trib">
+      <div class="th"><h3>Confidentiality &amp; DPDP</h3><span class="dock">docks at <b>①⑧</b></span></div>
+      <ul class="regs">
+        <li><span class="nm">Undertakings · NDAs</span><span class="ds">— staff &amp; client</span></li>
+        <li><span class="nm">Breach register</span><span class="pill p-bad">open</span></li>
+        <li><span class="nm">Consent register</span><span class="ds">— one withdrawn</span></li>
+        <li><span class="nm">Data requests (DSAR)</span><span class="ds">— access &amp; erasure</span></li>
+        <li><span class="nm">Disclosure consents</span><span class="ds">— share to insurer</span></li>
+      </ul>
+    </div>
+
+    <div class="trib">
+      <div class="th"><h3>Quality events</h3><span class="dock">docks at <b>⑦⑧</b></span></div>
+      <ul class="regs">
+        <li><span class="nm">Nonconformities (NCR)</span><span class="ds">— from findings</span></li>
+        <li><span class="nm">CAPA action plans</span><span class="pill p-warn">1 overdue</span></li>
+        <li><span class="nm">Complaints &amp; appeals</span><span class="ds">— client-raised</span></li>
+        <li><span class="nm">Satisfaction surveys</span><span class="pill p-bad">2 / 5</span></li>
+        <li><span class="nm">Security incidents</span><span class="ds">— phishing, lost device</span></li>
+      </ul>
+    </div>
+
+    <div class="trib">
+      <div class="th"><h3>Workforce &amp; hiring</h3><span class="dock">docks at <b>⑤⑥</b></span></div>
+      <ul class="regs">
+        <li><span class="nm">Attendance · holidays</span><span class="ds">— month + FY calendar</span></li>
+        <li><span class="nm">Work norms</span><span class="ds">— days/hours per role</span></li>
+        <li><span class="nm">Candidates + events</span><span class="ds">— mid-pipeline</span></li>
+        <li><span class="nm">Sub-contractors + rates</span><span class="ds">— rate matrix</span></li>
+        <li><span class="nm">Contract exceptions</span><span class="pill p-bad">exhausted</span></li>
+      </ul>
+    </div>
+
+    <div class="trib">
+      <div class="th"><h3>Sales support &amp; config</h3><span class="dock">docks at <b>③④</b></span></div>
+      <ul class="regs">
+        <li><span class="nm">CRM templates</span><span class="ds">— follow-up e-mail / WhatsApp</span></li>
+        <li><span class="nm">Approval &amp; stage-gate rules</span><span class="pill p-warn">1 blocked</span></li>
+        <li><span class="nm">Service scope + dependencies</span><span class="ds">— per client</span></li>
+        <li><span class="nm">Custom forms</span><span class="ds">— Toolbox Talk register</span></li>
+        <li><span class="nm">Ad-campaign ROI</span><span class="ds">— spend + attributed leads</span></li>
+      </ul>
+    </div>
+
+  </div>
+
+  <div class="note">
+    <b>Roughly half of these rows are deliberate edge cases.</b> A register full of tidy, compliant
+    rows proves nothing — you cannot tell a working gate from a missing one. So the demo also carries
+    the expired certificate, the rejected report, the breached KPI, the exhausted PO, the open breach
+    and the low survey score, each on the exact screen where its rule should bite.
+    <div class="legend">
+      <span><i class="sw" style="background:var(--ok)"></i> healthy / passed</span>
+      <span><i class="sw" style="background:var(--warn)"></i> attention — due / pending</span>
+      <span><i class="sw" style="background:var(--bad)"></i> breach — expired / rejected / exhausted</span>
+    </div>
+  </div>
+
+  <footer>
+    Load: Settings → Load demo data · Remove: Settings → Remove demo data (every row carries a
+    <span style="color:var(--accent)">demo</span> marker; removal leaves zero orphans).
+    7 tables stay empty by design — transient runtime queues (login/SSO counters, send/sync outboxes,
+    telemetry, per-user UI state) with no register screen.
+  </footer>
+</div>
