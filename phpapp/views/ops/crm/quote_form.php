@@ -26,6 +26,8 @@
   <?php if ($inqId !== ''): ?><input type="hidden" name="inquiry_id" value="<?= (int)$inqId ?>"><?php endif; ?>
   <?php if ($preLead): ?><input type="hidden" name="lead_id" value="<?= (int)$preLead['id'] ?>"><?php endif; ?>
 
+<div data-tabs data-tabs-key="quoteform" class="form-tabs">
+<section class="fs-pane" data-tab="<?= e(T('client')) ?> &amp; header">
   <h3 class="tab-sub" style="margin-top:0"><?= e(T('client')) ?> &amp; header</h3>
   <div class="form-grid">
     <div class="ff"><label><?= e(T('client')) ?> <a href="#" class="addlink" data-qa="client" data-target="#client_id">+ Add new</a></label>
@@ -69,7 +71,9 @@
       <input class="form-control" name="origin_ref" value="<?= e($g('origin_ref')) ?>" placeholder="their reference / bid no." style="margin-top:6px"></div>
   </div>
 
-  <h3 class="tab-sub">Executing <?= e(TP('office')) ?> <span class="muted">— who will actually do the work</span></h3>
+</section>
+<section class="fs-pane" data-tab="Offices">
+  <h3 class="tab-sub" style="margin-top:0">Executing <?= e(TP('office')) ?> <span class="muted">— who will actually do the work</span></h3>
   <div class="form-grid">
     <div class="ff"><label>Primary / owning <?= e(T('office')) ?></label>
       <select class="form-control searchable" name="office_id"><option value="">—</option>
@@ -95,7 +99,9 @@
       </select></div>
   </div>
 
-  <h3 class="tab-sub">Sites <span class="muted">— add every location the work covers</span></h3>
+</section>
+<section class="fs-pane" data-tab="Sites">
+  <h3 class="tab-sub" style="margin-top:0">Sites <span class="muted">— add every location the work covers</span></h3>
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt" id="locs">
     <thead><tr>
@@ -138,7 +144,9 @@
   <div style="margin:8px 0"><button type="button" class="btn small secondary" id="addloc">+ Add site</button>
     <span class="muted" style="margin-left:8px">Each line item below picks the site it belongs to.</span></div>
 
-  <h3 class="tab-sub">Commercials</h3>
+</section>
+<section class="fs-pane" data-tab="Commercials">
+  <h3 class="tab-sub" style="margin-top:0">Commercials</h3>
   <div class="form-grid">
     <div class="ff"><label>Validity (days)</label><input class="form-control" type="number" name="validity_days" value="<?= e($g('validity_days','30')) ?>"></div>
     <div class="ff"><label>Currency</label><input class="form-control" name="currency" value="<?= e($g('currency','INR')) ?>"></div>
@@ -194,7 +202,9 @@
       </small></div>
   </div>
 
-  <h3 class="tab-sub">Line items</h3>
+</section>
+<section class="fs-pane" data-tab="Line items">
+  <h3 class="tab-sub" style="margin-top:0">Line items</h3>
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt qlines" id="lines">
     <thead><tr>
@@ -241,11 +251,15 @@
     <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line);font-size:16px"><span>Total</span><b><?= e(cur_sym()) ?><span id="t_tot">0</span></b></div>
   </div>
 
-  <h3 class="tab-sub">Terms &amp; conditions <span class="muted">— the company default, edit for this <?= e(Tl('quote')) ?> if needed</span></h3>
+</section>
+<section class="fs-pane" data-tab="Terms">
+  <h3 class="tab-sub" style="margin-top:0">Terms &amp; conditions <span class="muted">— the company default, edit for this <?= e(Tl('quote')) ?> if needed</span></h3>
   <textarea class="form-control" name="terms_conditions" rows="10" style="font-family:inherit"><?= e($terms) ?></textarea>
   <small class="muted">Change the default for every future <?= e(Tl('quote')) ?> under Settings.</small>
+</section>
+</div><!-- /.form-tabs -->
 
-  <div style="margin-top:16px">
+  <div class="fs-actions" style="margin-top:16px">
     <button class="btn" type="submit"><?= $isEdit ? 'Save ' . Tl('quote') : 'Create ' . Tl('quote') ?></button>
     <a class="btn secondary" href="<?= $isEdit ? '/quote?id=' . (int)$q['id'] : '/quotes' ?>">Cancel</a>
   </div>
