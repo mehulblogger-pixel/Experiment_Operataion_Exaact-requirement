@@ -1394,8 +1394,23 @@
     var wraps = document.querySelectorAll('[data-tabs]');
     Array.prototype.forEach.call(wraps, function (wrap) {
       if (wrap.dataset.tabsReady) return;
-      var panels = Array.prototype.filter.call(wrap.children, function (c) { return c.hasAttribute('data-tab'); });
-      if (panels.length < 2) return;               // one panel is not worth a tab bar
+      // Collect tab panels: every [data-tab] inside the wrap that is not itself
+      // nested inside another [data-tab]. Panels sharing a label are one tab, so
+      // a detail screen can group scattered panels into a handful of tabs.
+      var panels = Array.prototype.slice.call(wrap.querySelectorAll('[data-tab]')).filter(function (el) {
+        var p = el.parentElement;
+        while (p && p !== wrap) { if (p.hasAttribute('data-tab')) return false; p = p.parentElement; }
+        return true;
+      });
+      if (panels.length < 2) return;
+      var groups = [], byLabel = {};
+      panels.forEach(function (p) {
+        var lab = p.getAttribute('data-tab') || 'More';
+        if (!byLabel[lab]) { byLabel[lab] = { label: lab, panels: [], count: 0 }; groups.push(byLabel[lab]); }
+        byLabel[lab].panels.push(p);
+        var c = parseInt(p.getAttribute('data-count') || '0', 10); if (c > 0) byLabel[lab].count += c;
+      });
+      if (groups.length < 2) return;               // one group is not worth a tab bar
       wrap.dataset.tabsReady = '1';
       var key = wrap.getAttribute('data-tabs-key') || 'tab';
       var slug = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
@@ -1403,28 +1418,26 @@
       bar.className = 'tabbar';
       bar.setAttribute('role', 'tablist');
       var btns = [];
-      panels.forEach(function (panel, i) {
-        var label = panel.getAttribute('data-tab') || ('Section ' + (i + 1));
-        var cnt = panel.getAttribute('data-count');
+      groups.forEach(function (g, i) {
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'tabbtn';
         b.setAttribute('role', 'tab');
-        var safe = label.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-        b.innerHTML = '<span>' + safe + '</span>' + (cnt && +cnt > 0 ? ' <span class="tabcnt">' + (+cnt) + '</span>' : '');
+        var safe = g.label.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        b.innerHTML = '<span>' + safe + '</span>' + (g.count > 0 ? ' <span class="tabcnt">' + g.count + '</span>' : '');
         b.addEventListener('click', function () { show(i, true); });
         bar.appendChild(b);
         btns.push(b);
       });
       wrap.parentNode.insertBefore(bar, wrap);
       function show(i, push) {
-        panels.forEach(function (p, j) { p.hidden = j !== i; });
+        groups.forEach(function (g, j) { g.panels.forEach(function (p) { p.hidden = j !== i; }); });
         btns.forEach(function (b, j) { b.classList.toggle('on', j === i); b.setAttribute('aria-selected', j === i ? 'true' : 'false'); });
-        if (push) { try { history.replaceState(null, '', '#' + key + '=' + slug(panels[i].getAttribute('data-tab') || i)); } catch (e) {} }
+        if (push) { try { history.replaceState(null, '', '#' + key + '=' + slug(groups[i].label)); } catch (e) {} }
       }
       var want = 0;
       var m = (location.hash || '').match(new RegExp(key + '=([^&]+)'));
-      if (m) { panels.forEach(function (p, j) { if (slug(p.getAttribute('data-tab') || '') === m[1]) want = j; }); }
+      if (m) { groups.forEach(function (g, j) { if (slug(g.label) === m[1]) want = j; }); }
       show(want, false);
     });
   }

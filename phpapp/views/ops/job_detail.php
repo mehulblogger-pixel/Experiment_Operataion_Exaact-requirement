@@ -11,24 +11,6 @@
   </div>
 </div>
 
-<?php // Phase 9 (TOSRM Slice B) — assignment lifecycle: hold, acceptance,
-      // reassignment / reschedule / cancel / no-show, all with kept history.
-      if (function_exists('tosrm_render_job_panel')): ?>
-  <a id="assign"></a>
-  <?php tosrm_render_job_panel($job); ?>
-<?php endif; ?>
-<?php // Phase 9 (TOSRM Slice C) — readiness, client/vendor confirmation,
-      // and competence-at-allocation advisory (reuses the competence engine).
-      if (function_exists('tosrm_render_readiness_panel')): ?>
-  <a id="ready"></a>
-  <?php tosrm_render_readiness_panel($job); ?>
-<?php endif; ?>
-<?php // Phase 9 (TOSRM Slice E) — communication log on the job.
-      if (function_exists('tosrm_render_comms')): ?>
-  <a id="comms"></a>
-  <?php tosrm_render_comms('JOB', (int)$job['id']); ?>
-<?php endif; ?>
-
 <?php // ---- Where this job stands, and the one next thing ------------------- ?>
 <?php
   $jClosed   = !empty($job['closed_flag']);
@@ -60,6 +42,27 @@
   <?php endif; ?>
 </div>
 
+<?php // The whole record below is organised into tabs (app.js → initSectionTabs):
+      // panels sharing a data-tab label become one tab, so this long screen reads
+      // as Overview · Schedule & site · Reports & QA · Money instead of one endless
+      // scroll. Tabs wrap so every one is visible without scrolling. ?>
+<div data-tabs data-tabs-key="job">
+
+<?php // Phase 9 (TOSRM Slice B) — assignment lifecycle: hold, acceptance,
+      // reassignment / reschedule / cancel / no-show, all with kept history.
+      if (function_exists('tosrm_render_job_panel')): ?>
+  <div data-tab="Overview"><a id="assign"></a><?php tosrm_render_job_panel($job); ?></div>
+<?php endif; ?>
+<?php // Phase 9 (TOSRM Slice C) — readiness, client/vendor confirmation,
+      // and competence-at-allocation advisory (reuses the competence engine).
+      if (function_exists('tosrm_render_readiness_panel')): ?>
+  <div data-tab="Overview"><a id="ready"></a><?php tosrm_render_readiness_panel($job); ?></div>
+<?php endif; ?>
+<?php // Phase 9 (TOSRM Slice E) — communication log on the job.
+      if (function_exists('tosrm_render_comms')): ?>
+  <div data-tab="Overview"><a id="comms"></a><?php tosrm_render_comms('JOB', (int)$job['id']); ?></div>
+<?php endif; ?>
+
 <?php // ---- Day-by-day plan & reshuffle -----------------------------------
       // A multi-day deputation can carry a different engineer on different days.
       // This shows the plan and lets a coordinator swap who goes on any one day
@@ -68,7 +71,7 @@
       $vp = $visitPlan ?? [];
       $canReshuffle = !$job['closed_flag'] && is_coordinator_level();
       if (count($vp) > 1): ?>
-<div class="panel" id="visits">
+<div class="panel" id="visits" data-tab="Schedule &amp; site">
   <div class="ctitle" style="margin-top:0"><h3>Who goes on each day
     <span class="muted">(<?= count($vp) ?> <?= count($vp) === 1 ? 'day' : 'days' ?>)</span></h3></div>
   <?php $vpClash = count(array_filter($vp, fn($x) => $x['busy'] !== '')); ?>
@@ -114,7 +117,7 @@
 
 <?php // ---- §WO-8: day-by-day completion — close each visit with its report
       if (count($vp) > 1 && empty($job['closed_flag'])): ?>
-<div class="panel" id="visit-close">
+<div class="panel" id="visit-close" data-tab="Schedule &amp; site">
   <div class="ctitle" style="margin-top:0"><h3>Day-by-day completion
     <span class="muted">— close each visit with its report; the <?= e(Tl('job')) ?> closes once every working day is done</span></h3></div>
   <table class="grid">
@@ -154,7 +157,7 @@
       $canCheckIn = !$job['closed_flag'] && function_exists('site_checkin')
           && (is_coordinator_level() || (is_inspector()
               && (int)(current_user()['inspector_id'] ?? 0) === (int)($job['inspector_id'] ?? 0))); ?>
-<div class="panel" id="checkin">
+<div class="panel" id="checkin" data-tab="Schedule &amp; site">
   <div class="ctitle" style="margin-top:0"><h3>Site check-in <span class="muted">(<?= count($visits) ?>)</span></h3></div>
   <?php if (function_exists('geofence_on') && geofence_on()): $gt = geofence_target($job); ?>
     <?php if ($gt): ?>
@@ -315,7 +318,7 @@
   if (!$site && !empty($clientInfo['addresses'])) $site = $clientInfo['addresses'][0];
   $siteTxt = $addrLine($site);
 ?>
-<div class="panel">
+<div class="panel" data-tab="Overview">
   <h3 class="tab-sub" style="margin-top:0">Who to contact, and where to go</h3>
   <div class="panel-split">
     <div>
@@ -356,7 +359,7 @@
       // on once the call has been allocated.
       $jgap = ($jcall && function_exists('call_contract_gap')) ? call_contract_gap($jcall) : null; ?>
 <?php if ($jgap): ?>
-<div class="panel" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)">
+<div class="panel" data-tab="Schedule &amp; site" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)">
   <b style="color:var(--warn)">⚠ Contract number not available</b>
   <div class="muted" style="margin-top:4px"><?= e($jgap['text']) ?></div>
   <?php if (!empty($jgap['quote_id']) && (can('crm.contract.register') || is_master())): ?>
@@ -386,7 +389,7 @@
       // many (one per line item). They are attached as-is (usually PDF), never
       // parsed, and the inspector reads them while writing the report. ?>
 <?php $qaps = $qaps ?? []; $canQap = can('ops.job.edit') || can('mod.idems.edit') || is_master(); ?>
-<div class="panel" id="qaps">
+<div class="panel" id="qaps" data-tab="Reports &amp; QA">
   <div class="ctitle" style="margin-top:0"><h3>QAP / reference documents <span class="muted">(<?= count($qaps) ?>)</span></h3></div>
   <p class="muted" style="margin:0 0 10px">The Quality Assurance Plan(s) for this <?= e(Tl('job')) ?> — one or several, per PO line item.
     The inspector opens them while writing the <?= e(Tl('report')) ?>, and they are kept on record for traceability.</p>
@@ -423,7 +426,7 @@
       // so if the coordinator missed that tick, the engineer had no route to the
       // reporting module at all and fell back to pasting a link to a file kept
       // somewhere else. It now always renders. ?>
-<div class="panel" id="reports">
+<div class="panel" id="reports" data-tab="Reports &amp; QA">
   <div class="ctitle" style="margin-top:0"><h3><?= e(ucfirst(TP('report'))) ?> on this <?= e(Tl('job')) ?> <span class="muted">(<?= count($dlCodes) + count($extraCodes) ?>)</span></h3></div>
   <?php if ($dlCodes): ?>
   <p class="muted" style="margin:0 0 10px">These are the formats agreed on the <?= e(Tl('call')) ?>. Each one opens in the
@@ -490,7 +493,7 @@ $hwTypePill = function($t) {
 };
 if (function_exists('hwp_for_job')):
 ?>
-<div class="panel" id="holdpoints">
+<div class="panel" id="holdpoints" data-tab="Reports &amp; QA">
   <div class="ctitle" style="margin-top:0"><h3>Hold &amp; witness points
     <span class="muted">(<?= count($hwPts) ?><?= $hwOpen ? ', ' . $hwOpen . ' open' : '' ?>)</span></h3></div>
   <?php if ($hwOpen): ?>
@@ -553,19 +556,19 @@ if (function_exists('hwp_for_job')):
 <?php endif; ?>
 
 <?php $holds = function_exists('job_hold_reasons') ? job_hold_reasons($job) : []; if ($holds): ?>
-<div class="panel" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent)">
+<div class="panel" data-tab="Reports &amp; QA" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent)">
   <b style="color:var(--bad)">🚫 HOLD — do not issue the report / deliverable to the client:</b> <?= e(implode('; ', $holds)) ?>.
   <?php if (!empty($job['adv_required']) && empty($job['adv_received']) && (is_coordinator_level() || can('data.credit') || can('finance.reconcile'))): ?>
     <form method="post" action="/job-advance?id=<?= (int)$job['id'] ?>" style="margin-top:8px"><input type="hidden" name="adv_received" value="1"><button class="btn small" type="submit">Mark advance received</button></form>
   <?php endif; ?>
 </div>
 <?php elseif (!empty($job['quotation_id']) && (!empty($job['adv_required']) || !empty($job['report_hold']))): ?>
-<div class="panel" style="border:1px solid var(--ok)"><b style="color:var(--ok)">✓ Payment conditions cleared</b> — advance/payment received; the deliverable may be issued.</div>
+<div class="panel" data-tab="Reports &amp; QA" style="border:1px solid var(--ok)"><b style="color:var(--ok)">✓ Payment conditions cleared</b> — advance/payment received; the deliverable may be issued.</div>
 <?php endif; ?>
 
 <?php if (($job['report_approval'] ?? '') !== ''): ?>
   <?php $ra = $job['report_approval']; $canAppr = function_exists('can_approve_report') && can_approve_report($job); ?>
-  <div class="panel" style="border:1px solid <?= $ra==='APPROVED'?'var(--ok)':($ra==='REJECTED'?'var(--bad)':'var(--warn,#c90)') ?>">
+  <div class="panel" data-tab="Reports &amp; QA" style="border:1px solid <?= $ra==='APPROVED'?'var(--ok)':($ra==='REJECTED'?'var(--bad)':'var(--warn,#c90)') ?>">
     <?php if ($ra==='PENDING'): ?>
       <b>🕓 Report awaiting approval</b> from <?= e($job['inspector_name'] ?: 'the ' . Tl('engineer')) ?>'s reporting manager.
       <?php if ($canAppr): ?>
@@ -586,7 +589,7 @@ if (function_exists('hwp_for_job')):
   </div>
 <?php endif; ?>
 
-<div class="panel">
+<div class="panel" data-tab="Overview">
   <div class="kv-grid">
     <?php if (!empty($job['quotation_id'])): $lq = ops_one("SELECT quote_no, rev, contract_number FROM quotations WHERE id=?", [$job['quotation_id']]); ?>
     <div><span class="k">Against <?= e(Tl('quote')) ?></span><?= $lq ? e($lq['quote_no'].((int)$lq['rev']>0?' R'.$lq['rev']:'')) : '—' ?><?= ($lq && $lq['contract_number'])?' · '.e($lq['contract_number']):'' ?></div>
@@ -657,7 +660,7 @@ if (function_exists('hwp_for_job')):
       $missing  = job_bills_missing($job);
       $canBill  = job_bill_can_upload($job); ?>
 <?php if ($chgHeads || $byHead): ?>
-<div class="panel" id="bills">
+<div class="panel" id="bills" data-tab="Money">
   <div class="ctitle" style="margin-top:0"><h3>Charged to the <?= e(Tl('client')) ?> — bills required
     <span class="muted">(<?= count($chgHeads) ?>)</span></h3></div>
   <?php if ($missing): ?>
@@ -723,7 +726,7 @@ if (function_exists('hwp_for_job')):
 </div>
 <?php endif; ?>
 
-<details class="fold">
+<details class="fold" data-tab="Money">
   <summary>Expenses &amp; profitability <span class="sub">what it cost, and what the <?= e(Tl('job')) ?> made</span></summary>
   <div class="fold-body">
   <div class="panel-split">
@@ -786,7 +789,7 @@ if (function_exists('hwp_for_job')):
 </details>
 
 <?php if (can('data.credit') || can('finance.reconcile')): ?>
-<div class="panel" id="invoice">
+<div class="panel" id="invoice" data-tab="Money">
   <h3 class="tab-sub">Invoice &amp; payment / credit</h3>
   <?php // One click raises a real GST invoice in the Money module from this closed
         // job, with the amount already filled from the quote/call — no re-keying,
@@ -842,3 +845,4 @@ if (function_exists('hwp_for_job')):
   </details>
 </div>
 <?php endif; ?>
+</div><!-- /data-tabs (job record) -->

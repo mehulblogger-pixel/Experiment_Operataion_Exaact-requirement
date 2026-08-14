@@ -253,6 +253,13 @@ table.grid tr:hover td{background:color-mix(in srgb,var(--brand) 5%,transparent)
      are one line as before. (`.container` raises specificity so this wins over
      the base `.pill{white-space:nowrap}` defined later in the file.) */
   .container .pill{white-space:normal;overflow-wrap:break-word;max-width:100%}
+
+  /* A two-column grid does not fit a phone — stack it to one column. Targets
+     the inline `grid-template-columns:1fr 1fr` used across the detail panels. */
+  .container [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
+  /* Safety net: a panel whose inner content is still too wide scrolls inside
+     its own box instead of pushing the whole page sideways. */
+  .container .panel{overflow-x:auto;-webkit-overflow-scrolling:touch}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
