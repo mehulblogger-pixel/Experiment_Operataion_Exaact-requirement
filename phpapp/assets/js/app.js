@@ -1457,9 +1457,47 @@
         btns.push(b);
       });
       wrap.parentNode.insertBefore(bar, wrap);
+
+      // A form marked .form-tabs is walked through like a wizard: Back and Next
+      // at the foot move between panels one at a time, and the real Save button
+      // only appears on the last one. Nothing is lost moving between panels —
+      // every field stays in the DOM, merely hidden — so a value typed on step
+      // one is still there, and still submitted, when Save is pressed on step six.
+      var isForm = wrap.classList.contains('form-tabs');
+      var curIdx = 0, backBtn = null, nextBtn = null, stepOut = null, actions = null;
+      if (isForm) {
+        actions = wrap.parentNode.querySelector('.fs-actions');   // the Save / Cancel row
+        var nav = document.createElement('div'); nav.className = 'fs-nav';
+        backBtn = document.createElement('button'); backBtn.type = 'button';
+        backBtn.className = 'btn secondary fs-back'; backBtn.innerHTML = '← Back';
+        nextBtn = document.createElement('button'); nextBtn.type = 'button';
+        nextBtn.className = 'btn fs-next'; nextBtn.innerHTML = 'Next →';
+        stepOut = document.createElement('span'); stepOut.className = 'fs-step muted';
+        var right = document.createElement('div'); right.className = 'fs-nav-right';
+        right.appendChild(nextBtn);
+        if (actions) right.appendChild(actions);                  // fold Save / Cancel into the nav
+        nav.appendChild(backBtn); nav.appendChild(stepOut); nav.appendChild(right);
+        wrap.appendChild(nav);
+        var goto = function (i) {
+          show(i, true);
+          // Land the person at the top of the new panel, not halfway down it.
+          try { bar.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {}
+        };
+        backBtn.addEventListener('click', function () { goto(Math.max(0, curIdx - 1)); });
+        nextBtn.addEventListener('click', function () { goto(Math.min(groups.length - 1, curIdx + 1)); });
+      }
+
       function show(i, push) {
+        curIdx = i;
         groups.forEach(function (g, j) { g.panels.forEach(function (p) { p.hidden = j !== i; }); });
         btns.forEach(function (b, j) { b.classList.toggle('on', j === i); b.setAttribute('aria-selected', j === i ? 'true' : 'false'); });
+        if (isForm) {
+          var last = i === groups.length - 1;
+          backBtn.style.visibility = i > 0 ? 'visible' : 'hidden';
+          nextBtn.style.display = last ? 'none' : '';
+          if (actions) actions.style.display = last ? '' : 'none';
+          stepOut.textContent = 'Step ' + (i + 1) + ' of ' + groups.length;
+        }
         if (push) { try { history.replaceState(null, '', '#' + key + '=' + slug(groups[i].label)); } catch (e) {} }
       }
       var want = 0;
