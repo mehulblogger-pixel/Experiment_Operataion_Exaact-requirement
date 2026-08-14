@@ -1702,6 +1702,9 @@ function ops_run_reminders($today = null) {
     if (function_exists('iddoc_run_retention')) iddoc_run_retention($today);
     if (function_exists('cmp_run_reminders')) $sent += cmp_run_reminders($today);
     if (function_exists('capa_run_reminders')) $sent += capa_run_reminders($today);
+    // Cross-office: e-mail the executing manager when a forwarded call sits
+    // unallocated past its target. Idempotent — mailed once per call.
+    if (function_exists('tosrm_xo_escalate_scan')) $sent += tosrm_xo_escalate_scan('ALL', $today);
     return $sent;
 }
 

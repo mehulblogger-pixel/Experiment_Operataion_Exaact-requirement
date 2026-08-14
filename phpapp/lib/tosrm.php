@@ -1716,6 +1716,9 @@ const TOSRM_XO_ESCALATE_DAYS = 2;
 function tosrm_xo_migrate() {
     static $done = false; if ($done) return; $done = true;
     tosrm_migrate();
+    // Stamped the first time a forwarded call is auto-escalated to the executing
+    // office's manager, so the mail goes out once and not on every scan.
+    if (function_exists('ensure_column')) ensure_column('calls', 'xo_escalated_at', "VARCHAR(30) DEFAULT ''");
     $pk = pk_clause();
     // A nudge = a reminder the contracting office sends the executing office to
     // act on a forwarded call. Kept as its own log so we can show "last chased".
@@ -1767,7 +1770,7 @@ function tosrm_xo_calls($offices, $limit = 120) {
     try {
         $rows = ops_all("SELECT c.id, c.call_code, c.ibo_office_id, c.executing_office_id, c.client_id,
                                 c.call_received_date, c.forwarded_at, c.inspection_required_date,
-                                c.inspection_type, c.priority, c.op_status, c.status,
+                                c.inspection_type, c.priority, c.op_status, c.status, c.xo_escalated_at,
                                 bp.display_name client_name,
                                 io.name ibo_name, io.manager_name ibo_mgr,
                                 eo.name exec_name, eo.coordinator_name exec_coord,
@@ -1824,6 +1827,46 @@ function tosrm_xo_nudge($callId, $note = '') {
         try { ops_mail($to, $subj, $body, $cc, 'nudge'); } catch (Throwable $e) {}
     }
     return true;
+}
+
+// Automatic escalation: e-mail the EXECUTING office's manager the first time a
+// forwarded call has sat unallocated past its response target (SLA SCHEDULING
+// target, else TOSRM_XO_ESCALATE_DAYS). Idempotent — each call is mailed once
+// (xo_escalated_at is stamped), so it is safe to run from cron AND lazily when
+// someone opens Operations. $offices limits the sweep ('ALL' or int[]).
+function tosrm_xo_escalate_scan($offices = 'ALL', $today = null) {
+    tosrm_xo_migrate();
+    $xo = tosrm_xo_calls($offices, 300);
+    // Union of both lists (a call can be inbound for one branch, sent-out for
+    // another); de-duplicate on call id so we never mail twice in one sweep.
+    $seen = []; $sent = 0;
+    foreach (array_merge($xo['inbound'] ?? [], $xo['sentout'] ?? []) as $r) {
+        $cid = (int)$r['id'];
+        if (isset($seen[$cid])) continue; $seen[$cid] = true;
+        $t = $r['tat'];
+        if (empty($t['escalated']) || !empty($t['alloc'])) continue;      // only unallocated + overdue
+        if (trim((string)($r['xo_escalated_at'] ?? '')) !== '') continue;  // already mailed
+        $mgr = trim((string)($r['exec_mgr_email'] ?? ''));
+        $stamp = tosrm_now();
+        // Stamp first so a second concurrent/lazy sweep cannot double-send even
+        // if the mail step is slow. (No manager e-mail on file → stamp + skip.)
+        db()->prepare("UPDATE calls SET xo_escalated_at=? WHERE id=?")->execute([$stamp, $cid]);
+        if (function_exists('act_log')) act_log('CALL', $cid, 'SYSTEM',
+            'Auto-escalated to ' . ($r['exec_mgr'] ?: ($r['exec_name'] . ' manager')) . ' — unallocated past target ('
+            . ((int)($t['waiting'] ?? 0)) . 'd, target ' . (int)$t['thr'] . 'd)', ['auto' => 1]);
+        if ($mgr === '' || !function_exists('ops_mail')) continue;
+        $wait = (int)($t['waiting'] ?? 0);
+        $subj = 'ESCALATION: ' . ($r['call_code'] ?? ('call #' . $cid)) . ' unallocated ' . $wait . 'd at ' . ($r['exec_name'] ?: 'your branch');
+        $body = ($r['exec_mgr'] ?: 'Manager') . ",\n\n"
+              . "A call forwarded to " . ($r['exec_name'] ?: 'your branch') . " by " . ($r['ibo_name'] ?: 'another branch')
+              . " has been waiting " . $wait . " day(s) without an engineer allocated — past the " . (int)$t['thr'] . "-day target.\n\n"
+              . "Call: " . ($r['call_code'] ?? ('#' . $cid)) . "\nClient: " . ($r['client_name'] ?: '—')
+              . "\nRaised by: " . ($r['ibo_name'] ?: '—') . "\nRequired by: " . ($t['reqd'] ?: '—')
+              . "\n\nPlease have your coordinator allocate it.\n\n" . (function_exists('app_name') ? app_name() : 'Operations');
+        $cc = trim((string)($r['exec_coord_email'] ?? ''));   // keep the coordinator in the loop
+        try { ops_mail($mgr, $subj, $body, $cc, 'escalation'); $sent++; } catch (Throwable $e) {}
+    }
+    return $sent;
 }
 
 // Self-contained cross-office panels (inbound + sent-out) + shared TAT strip.
@@ -1895,9 +1938,10 @@ function tosrm_xo_html($xo, $csrf = '') {
     foreach ($inbound as $r) {
         $t = $r['tat'];
         $other = $allScope ? ($r['ibo_name'] . ' → ' . $r['exec_name']) : ('from ' . ($r['ibo_name'] ?: '—'));
+        $escOn = trim((string)($r['xo_escalated_at'] ?? '')) !== '' ? ' · manager e-mailed ' . $e(substr((string)$r['xo_escalated_at'], 0, 10)) : '';
         $h .= '<div class="xo-row"><div class="top"><a class="cc" href="/call?id=' . (int)$r['id'] . '">' . $e($r['call_code'] ?: ('#' . (int)$r['id'])) . '</a>'
             . '<span class="cl">' . $e($r['client_name'] ?: '—') . '</span>'
-            . ($t['escalated'] ? '<span class="xo-esc" title="Past target — flagged to ' . $e($r['exec_mgr'] ?: 'the branch manager') . '">⚠ Escalated to manager</span>' : '')
+            . ($t['escalated'] ? '<span class="xo-esc" title="Past target — flagged to ' . $e($r['exec_mgr'] ?: 'the branch manager') . $escOn . '">⚠ Escalated to manager</span>' : '')
             . '</div>'
             . '<div class="meta">' . $e($other) . ($r['inspection_type'] ? ' · ' . $e($r['inspection_type']) : '')
             . ($t['reqd'] !== '' ? ' · required ' . $e($t['reqd']) : '')
@@ -1921,9 +1965,10 @@ function tosrm_xo_html($xo, $csrf = '') {
             $t = $r['tat'];
             $chased = '';
             if (!empty($r['last_nudge'])) $chased = 'Chased ' . (int)($r['nudge_n'] ?? 1) . '× · last ' . $e(substr((string)$r['last_nudge'], 0, 10));
+            $escOn = trim((string)($r['xo_escalated_at'] ?? '')) !== '' ? ' · their manager e-mailed ' . $e(substr((string)$r['xo_escalated_at'], 0, 10)) : '';
             $h .= '<div class="xo-row"><div class="top"><a class="cc" href="/call?id=' . (int)$r['id'] . '">' . $e($r['call_code'] ?: ('#' . (int)$r['id'])) . '</a>'
                 . '<span class="cl">' . $e($r['client_name'] ?: '—') . '</span>'
-                . ($t['escalated'] ? '<span class="xo-esc" title="Past target at ' . $e($r['exec_name']) . '">⚠ Escalated to ' . $e($r['exec_name'] ?: 'branch') . ' mgr</span>' : '')
+                . ($t['escalated'] ? '<span class="xo-esc" title="Past target at ' . $e($r['exec_name']) . $escOn . '">⚠ Escalated to ' . $e($r['exec_name'] ?: 'branch') . ' mgr</span>' : '')
                 . '</div>'
                 . '<div class="meta">with ' . $e($r['exec_name'] ?: '—') . ($r['inspection_type'] ? ' · ' . $e($r['inspection_type']) : '')
                 . ($t['reqd'] !== '' ? ' · required ' . $e($t['reqd']) : '')
@@ -1985,6 +2030,10 @@ function ops_operations_home($method) {
     if (!array_key_exists(preg_replace('/[^a-z]/', '', strtolower($dr)), TOSRM_DISRUPT_RANGES)) $dr = 'fy';
     [$dFrom, $dTo, $dLabel] = tosrm_disruptions_range($dr);
     $disrupt = tosrm_disruptions($offices, $dFrom, $dTo);
+    // Fire the auto-escalation the moment a coordinator opens Operations, so a
+    // freshly-overdue call reaches the executing manager without waiting for the
+    // nightly cron. Idempotent (mailed once per call) and best-effort.
+    try { tosrm_xo_escalate_scan($offices); } catch (Throwable $e) {}
     $xo = tosrm_xo_calls($offices);   // cross-office: inbound to allocate + sent-out to track
     view('ops/operations_home', [
         'metrics' => $metrics, 'counts' => $counts, 'services' => $services, 'scopeLabel' => $offLabel,
