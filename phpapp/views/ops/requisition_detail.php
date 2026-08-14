@@ -103,6 +103,30 @@ $commer = $has('billing_rate') || (float)($req['expected_revenue'] ?? 0) != 0 ||
 </div>
 <?php endif; ?>
 
+<?php // Phase 5 — commercial rollup across the placements made on this requirement.
+$rollup = $rollup ?? null;
+if ($seeSal && !empty($rollup) && (int)($rollup['n'] ?? 0) > 0): $R = $rollup; ?>
+<div class="panel"><h3 class="tab-sub" style="margin-top:0">Placements — planned vs approved vs actual
+  <span class="muted">— <?= (int)$R['n'] ?> hired · <?= (int)$R['approved'] ?> approved<?= (int)$R['n_act']>0 ? ' · '.(int)$R['n_act'].' with actuals' : '' ?></span></h3>
+  <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
+    <?php
+    $rtier = function($label, $rev, $prof, $marg, $sub) {
+      $mc = $prof >= 0 ? 'up' : 'down';
+      return '<div class="kpi"><div class="k">'.$label.'</div><div class="v">'.fmoney_short($rev).'</div>'
+        .'<div class="d"><b class="'.$mc.'">'.fmoney_short($prof).'</b> · '.($marg>=0?'':'−').number_format(abs($marg),1).'% · '.$sub.'</div></div>';
+    };
+    echo $rtier('Planned <span class="muted" style="font-weight:400">(requirement)</span>', $R['plan_rev'], $R['plan_profit'], $R['plan_margin'], 'as budgeted');
+    echo $rtier('Approved <span class="muted" style="font-weight:400">(locked hires)</span>', $R['appr_rev'], $R['appr_profit'], $R['appr_margin'], 'this many hires');
+    if ((int)$R['n_act'] > 0) echo $rtier('Actual <span class="muted" style="font-weight:400">(billed &amp; paid)</span>', $R['act_rev'], $R['act_profit'], $R['act_margin'], (int)$R['n_act'].' recorded');
+    else echo '<div class="kpi"><div class="k">Actual <span class="muted" style="font-weight:400">(billed &amp; paid)</span></div><div class="v" style="color:var(--muted)">—</div><div class="d">no actuals recorded yet</div></div>';
+    ?>
+  </div>
+  <?php $dv = $R['appr_profit'] - $R['plan_profit']; if (abs($dv) >= 1): ?>
+  <p class="muted" style="font-size:12px;margin:8px 2px 0">Approved profit is running <span class="pill <?= $dv>=0?'p-ok':'p-bad' ?>" style="font-size:11px"><?= $dv>=0?'+':'−' ?><?= fmoney_short(abs($dv)) ?></span> against the requirement plan.</p>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php if ($seeSal && ($outgoing || $hired)): ?>
 <div class="panel"><h3 class="tab-sub" style="margin-top:0">Cost comparison (monthly)</h3>
   <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">

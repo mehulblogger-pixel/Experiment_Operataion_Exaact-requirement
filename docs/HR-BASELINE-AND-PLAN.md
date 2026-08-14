@@ -169,9 +169,19 @@ and ends with a regression pass against §45.
   (`recruit_ai_extract` → `/req-ai-extract`, gated on `ai_enabled`, strict-JSON
   system prompt, fills the form for human review). All computed/additive — no
   schema change, AI always human-approved, degrades gracefully when AI is off.
-- **Phase 5 — Commercials.** Per-assignment estimate → approved → actual cost +
-  cost/margin variance (extend costing); billing-readiness packet handed to the
-  existing billing/finance flow.
+- **Phase 5 — Commercials.** ✅ DONE. Per-placement commercial lifecycle on the
+  hired candidate: estimate (computed from the requirement) → approved (locked
+  billing & cost rate for this hire, `assignment_commercials`) → actual (billed &
+  paid), with revenue/cost/profit/margin at every tier and variance shown
+  approved-vs-estimate and actual-vs-approved. A `candidate-commercial` route lets
+  a coordinator approve then record actuals; the candidate 360 shows a Placement-
+  commercials card and a Billing-readiness packet (`assignment_billing_packet`)
+  that reuses the deputation bill gate (`job_bills_missing`) rather than
+  re-implementing it; the requisition detail rolls every hire up into planned vs
+  approved vs actual (`recruit_req_commercial_rollup`). All figures gated on
+  salary visibility; storage is additive nullable `asg_*` columns on candidates —
+  nothing renamed or dropped, a candidate with no commercials simply shows the
+  estimate.
 - **Phase 6 — Manpower mode, Person/Talent multi-application, UX polish, full
   regression.** Manpower configuration; optional person link enabling multiple
   applications without duplicating candidates; consistent status/table/mobile UX;

@@ -439,3 +439,149 @@ function ops_recruitment_home($method) {
     view('ops/recruitment_home', ['d' => $d]);
     return true;
 }
+
+// ============================================================================
+//  Phase 5 — Assignment commercials
+//
+//  A hired candidate placed against a requirement IS the "assignment". The
+//  requirement already carries the EXPECTED commercial (billing rate, budgeted
+//  cost, target margin). What was missing is the per-placement lifecycle every
+//  manpower business actually runs on:
+//
+//     estimate  →  approved  →  actual        (with variance and margin at each)
+//
+//  Estimate is always computed fresh from the requirement, so it can never drift
+//  out of step. Approved is what a coordinator locks for THIS person (the rate we
+//  will really bill and the cost we will really carry). Actual is what was truly
+//  billed and paid, recorded once the placement has run. All of it lives in
+//  additive, nullable columns on the candidate row — nothing renamed, nothing
+//  dropped, and a candidate with no commercials set simply shows the estimate.
+// ============================================================================
+
+// Additive, nullable commercial-lifecycle columns on the assignment (candidate).
+function asg_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    $cols = [
+        ['asg_bill_rate','DECIMAL(14,2) NULL'], ['asg_bill_basis',"VARCHAR(20) NULL"],
+        ['asg_cost_rate','DECIMAL(14,2) NULL'], ['asg_months','DECIMAL(8,2) NULL'],
+        ['asg_onetime','DECIMAL(14,2) NULL'],  ['asg_status',"VARCHAR(16) NULL"],
+        ['asg_approved_by',"VARCHAR(150) NULL"], ['asg_approved_at',"VARCHAR(30) NULL"],
+        ['asg_ref',"VARCHAR(60) NULL"], ['asg_act_rev','DECIMAL(16,2) NULL'],
+        ['asg_act_cost','DECIMAL(16,2) NULL'], ['asg_note',"VARCHAR(400) NULL"],
+    ];
+    foreach ($cols as $c) ensure_column('candidates', $c[0], $c[1]);
+}
+
+// A rate + basis + months turned into one person's amount. Mirrors req_commercials'
+// unit logic so estimate and approved use exactly the same arithmetic.
+function asg_amount($rate, $basis, $months) {
+    $rate = (float)$rate; $months = (float)$months; $basis = $basis ?: 'MONTHLY';
+    if ($basis === 'FIXED') return round($rate, 2);
+    $units = ($basis === 'MANDAY' || $basis === 'DAILY') ? round($months * 22) : $months;
+    return round($rate * max($units, 0), 2);
+}
+
+// A stored numeric column that may be NULL (never set) vs 0 (deliberately zero).
+function _asg_num($v, $fallback) {
+    return ($v === null || $v === '') ? (float)$fallback : (float)$v;
+}
+
+// The three-tier commercial for a single assignment (a candidate vs its
+// requirement). Estimate from the requirement; approved/actual from stored
+// asg_* when present. Always safe to call — falls back to the estimate.
+function assignment_commercials($cand, $req) {
+    $req = $req ?: [];
+    $months = _asg_num($cand['asg_months'] ?? null, req_duration_months($req));
+    $basis  = ($cand['asg_bill_basis'] ?? '') ?: ($req['rate_basis'] ?? 'MONTHLY');
+
+    $estBillRate = (float)($req['billing_rate'] ?? 0);
+    $estCostRate = (float)($req['budgeted_cost'] ?? 0);
+    $est = ['rev' => asg_amount($estBillRate, $basis, $months),
+            'cost' => asg_amount($estCostRate, 'MONTHLY', $months)];
+    $est['profit'] = $est['rev'] - $est['cost'];
+    $est['margin'] = $est['rev'] > 0 ? $est['profit'] / $est['rev'] * 100 : 0;
+
+    $apBillRate = _asg_num($cand['asg_bill_rate'] ?? null, $estBillRate);
+    $apCostRate = _asg_num($cand['asg_cost_rate'] ?? null, $estCostRate);
+    $onetime    = (float)($cand['asg_onetime'] ?? 0);
+    $appr = ['rev' => asg_amount($apBillRate, $basis, $months),
+             'cost' => asg_amount($apCostRate, 'MONTHLY', $months) + $onetime];
+    $appr['profit'] = $appr['rev'] - $appr['cost'];
+    $appr['margin'] = $appr['rev'] > 0 ? $appr['profit'] / $appr['rev'] * 100 : 0;
+
+    $hasAct = (($cand['asg_act_rev'] ?? null) !== null && ($cand['asg_act_rev'] ?? '') !== '')
+           || (($cand['asg_act_cost'] ?? null) !== null && ($cand['asg_act_cost'] ?? '') !== '');
+    $act = null;
+    if ($hasAct) {
+        $act = ['rev' => (float)($cand['asg_act_rev'] ?? 0), 'cost' => (float)($cand['asg_act_cost'] ?? 0)];
+        $act['profit'] = $act['rev'] - $act['cost'];
+        $act['margin'] = $act['rev'] > 0 ? $act['profit'] / $act['rev'] * 100 : 0;
+    }
+
+    $status = (string)($cand['asg_status'] ?? '');
+    $var = [
+        'appr_rev'    => round($appr['rev'] - $est['rev'], 2),
+        'appr_profit' => round($appr['profit'] - $est['profit'], 2),
+        'act_rev'     => $act ? round($act['rev'] - $appr['rev'], 2) : null,
+        'act_profit'  => $act ? round($act['profit'] - $appr['profit'], 2) : null,
+    ];
+    return ['months' => $months, 'basis' => $basis, 'onetime' => $onetime,
+            'est' => $est, 'appr' => $appr, 'act' => $act, 'var' => $var,
+            'status' => $status, 'approved' => in_array($status, ['APPROVED','ACTUAL'], true),
+            'approved_by' => (string)($cand['asg_approved_by'] ?? ''),
+            'approved_at' => (string)($cand['asg_approved_at'] ?? ''),
+            'ref' => (string)($cand['asg_ref'] ?? ''),
+            'bill_rate' => $apBillRate, 'cost_rate' => $apCostRate];
+}
+
+// Is this assignment ready to hand to billing? A packet of explicit checks —
+// reuses the existing deputation bill gate (job_bills_missing) for chargeable
+// expenses so recruitment never re-implements what Operations already enforces.
+function assignment_billing_packet($cand, $req) {
+    $checks = []; $ready = true;
+    $add = function ($ok, $label, $hint = '') use (&$checks, &$ready) {
+        $checks[] = ['ok' => (bool)$ok, 'label' => $label, 'hint' => $hint];
+        if (!$ok) $ready = false;
+    };
+    $c = assignment_commercials($cand, $req);
+    $hired = ($cand['stage'] ?? '') === 'ACCEPTED' || !empty($cand['inspector_id']);
+    $add($hired, 'Candidate hired & on the workforce', 'Move to Accepted and add to the workforce first.');
+    $add($c['approved'], 'Commercials approved', 'A coordinator must approve the billing rate for this placement.');
+    $add($c['appr']['rev'] > 0, 'Billing rate set', 'No billing rate on this assignment yet.');
+
+    // Chargeable expense bills owed to the client — via the deputation, if any.
+    $job = null;
+    if (!empty($cand['inspector_id'])) {
+        try { $job = ops_one("SELECT * FROM jobs WHERE inspector_id=? ORDER BY id DESC LIMIT 1", [(int)$cand['inspector_id']]); }
+        catch (Throwable $e) { $job = null; }
+    }
+    if ($job && function_exists('job_bills_missing')) {
+        $miss = job_bills_missing($job);
+        $add(empty($miss), 'Chargeable bills on file', $miss ? ('Awaiting: ' . implode(', ', $miss)) : '');
+    }
+    return ['ready' => $ready, 'checks' => $checks, 'commercials' => $c, 'job' => $job];
+}
+
+// Roll every hire on a requirement up into planned vs approved vs actual, so the
+// requisition detail can show whether the placements are landing on plan.
+function recruit_req_commercial_rollup($req) {
+    asg_migrate();
+    $rows = [];
+    try {
+        $rows = ops_all("SELECT * FROM candidates WHERE requisition_id=? AND (stage='ACCEPTED' OR inspector_id IS NOT NULL)", [(int)($req['id'] ?? 0)]);
+    } catch (Throwable $e) { $rows = []; }
+    $s = ['n' => 0, 'approved' => 0, 'n_act' => 0,
+          'plan_rev' => (float)($req['expected_revenue'] ?? 0), 'plan_profit' => (float)($req['expected_profit'] ?? 0),
+          'appr_rev' => 0.0, 'appr_cost' => 0.0, 'appr_profit' => 0.0,
+          'act_rev' => 0.0, 'act_cost' => 0.0, 'act_profit' => 0.0];
+    foreach ($rows as $r) {
+        $c = assignment_commercials($r, $req); $s['n']++;
+        $s['appr_rev'] += $c['appr']['rev']; $s['appr_cost'] += $c['appr']['cost']; $s['appr_profit'] += $c['appr']['profit'];
+        if ($c['approved']) $s['approved']++;
+        if ($c['act']) { $s['n_act']++; $s['act_rev'] += $c['act']['rev']; $s['act_cost'] += $c['act']['cost']; $s['act_profit'] += $c['act']['profit']; }
+    }
+    $s['plan_margin'] = $s['plan_rev'] > 0 ? $s['plan_profit'] / $s['plan_rev'] * 100 : 0;
+    $s['appr_margin'] = $s['appr_rev'] > 0 ? $s['appr_profit'] / $s['appr_rev'] * 100 : 0;
+    $s['act_margin']  = $s['act_rev']  > 0 ? $s['act_profit']  / $s['act_rev']  * 100 : 0;
+    return $s;
+}

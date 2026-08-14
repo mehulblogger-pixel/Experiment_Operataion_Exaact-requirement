@@ -84,6 +84,95 @@ if (!empty($readiness) && in_array($cand['stage'], ['INTERVIEW','OFFERED','ACCEP
 </div>
 <?php endif; ?>
 
+<?php // Phase 5 — this placement's commercials: estimate → approved → actual.
+$asgComm = $asgComm ?? null; $asgPacket = $asgPacket ?? null;
+$seeSal = function_exists('can_see_salary') ? can_see_salary() : is_coordinator_level();
+if (!empty($asgComm) && !empty($linkReq) && $seeSal):
+  $C = $asgComm; $sym = cur_sym();
+  $basisLbl = REQ_RATE_BASIS[$C['basis']] ?? $C['basis'];
+  $tier = function($t, $label, $tone) use ($sym) {
+    if (!$t) return '<div class="kpi"><div class="k">'.$label.'</div><div class="v" style="color:var(--muted)">—</div><div class="d">not recorded yet</div></div>';
+    $m = $t['margin']; $mc = $m >= 0 ? 'up' : 'down';
+    return '<div class="kpi"><div class="k">'.$label.'</div>'
+      .'<div class="v">'.fmoney_short($t['rev']).'</div>'
+      .'<div class="d">cost '.fmoney_short($t['cost']).' · <b class="'.$mc.'">'.fmoney_short($t['profit']).'</b> · '
+      .($m>=0?'':'−').number_format(abs($m),1).'% margin</div></div>';
+  };
+  $vChip = function($v, $unit='') use ($sym) {
+    if ($v === null) return '';
+    $s = $v >= 0 ? 'p-ok' : 'p-bad'; $sign = $v > 0 ? '+' : ($v < 0 ? '−' : '');
+    return '<span class="pill '.$s.'" style="font-size:11px">'.$sign.fmoney_short(abs($v)).' '.$unit.'</span>';
+  };
+?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Placement commercials
+    <span class="muted">— against <?= e($linkReq['req_code']) ?> · <?= rtrim(rtrim(number_format($C['months'],2),'0'),'.') ?> mo · <?= e($basisLbl) ?></span>
+    <?php if ($C['status'] === 'APPROVED'): ?><span class="pill p-ok" style="font-size:11px;margin-left:6px">Approved</span>
+    <?php elseif ($C['status'] === 'ACTUAL'): ?><span class="pill p-info" style="font-size:11px;margin-left:6px">Actuals in</span>
+    <?php else: ?><span class="pill p-warn" style="font-size:11px;margin-left:6px">Estimate only</span><?php endif; ?>
+  </h3>
+  <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
+    <?= $tier($C['est'], 'Estimate <span class="muted" style="font-weight:400">(from requirement)</span>', 'mut') ?>
+    <?= $tier($C['appr'], 'Approved <span class="muted" style="font-weight:400">(locked for this hire)</span>', 'ok') ?>
+    <?= $tier($C['act'], 'Actual <span class="muted" style="font-weight:400">(billed &amp; paid)</span>', 'info') ?>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:12px">
+    <span class="muted">Variance vs estimate:</span> profit <?= $vChip($C['var']['appr_profit']) ?: '<span class="pill p-mut" style="font-size:11px">on plan</span>' ?>
+    <?php if ($C['var']['act_profit'] !== null): ?><span class="muted" style="margin-left:8px">actual vs approved:</span> profit <?= $vChip($C['var']['act_profit']) ?><?php endif; ?>
+    <?php if ($C['approved_by']): ?><span class="muted" style="margin-left:auto">Approved by <?= e($C['approved_by']) ?><?= $C['approved_at'] ? ' · '.e(substr($C['approved_at'],0,10)) : '' ?><?= $C['ref'] ? ' · ref '.e($C['ref']) : '' ?></span><?php endif; ?>
+  </div>
+
+  <?php if (is_coordinator_level()): ?>
+  <details style="margin-top:10px"<?= $C['status']==='' ? ' open' : '' ?>>
+    <summary style="cursor:pointer;font-weight:600;font-size:13px"><?= $C['approved'] ? 'Revise approved commercials' : 'Approve the commercials for this placement' ?></summary>
+    <form method="post" action="/candidate-commercial?id=<?= (int)$cand['id'] ?>" style="margin-top:8px">
+      <div class="form-grid">
+        <div class="ff"><label>Billing rate to client (<?= e($sym) ?>)</label><input class="form-control" type="number" step="0.01" name="bill_rate" value="<?= $C['bill_rate']>0 ? e(number_format($C['bill_rate'],2,'.','')) : '' ?>" placeholder="<?= e(number_format((float)($linkReq['billing_rate'] ?? 0),0)) ?>"></div>
+        <div class="ff"><label>Basis</label><select class="form-control" name="bill_basis"><?php foreach (REQ_RATE_BASIS as $k=>$v): ?><option value="<?= e($k) ?>"<?= $C['basis']===$k?' selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+        <div class="ff"><label>Our cost — monthly (<?= e($sym) ?>)</label><input class="form-control" type="number" step="0.01" name="cost_rate" value="<?= $C['cost_rate']>0 ? e(number_format($C['cost_rate'],2,'.','')) : '' ?>" placeholder="<?= e(number_format((float)($linkReq['budgeted_cost'] ?? 0),0)) ?>"></div>
+        <div class="ff"><label>Duration (months)</label><input class="form-control" type="number" step="0.01" name="months" value="<?= $C['months']>0 ? e(rtrim(rtrim(number_format($C['months'],2,'.',''),'0'),'.')) : '' ?>"></div>
+        <div class="ff"><label>One-time cost (<?= e($sym) ?>) <span class="muted">placement fee etc.</span></label><input class="form-control" type="number" step="0.01" name="onetime" value="<?= (float)$C['onetime']>0 ? e(number_format((float)$C['onetime'],2,'.','')) : '' ?>"></div>
+        <div class="ff"><label>Approval ref <span class="muted">optional</span></label><input class="form-control" name="ref" maxlength="60" value="<?= e($C['ref']) ?>"></div>
+      </div>
+      <p class="muted" style="font-size:12px;margin:4px 2px">Approving locks the rate we will bill and the cost we will carry for this person. The estimate stays on record for variance.</p>
+      <div style="margin-top:6px"><button class="btn" type="submit">Approve commercials</button></div>
+    </form>
+    <?php if ($C['approved']): ?>
+    <form method="post" action="/candidate-commercial?id=<?= (int)$cand['id'] ?>" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
+      <input type="hidden" name="mode" value="actual">
+      <p style="font-weight:600;font-size:13px;margin:0 0 6px">Record the actuals once the placement has run</p>
+      <div class="form-grid">
+        <div class="ff"><label>Actual revenue billed (<?= e($sym) ?>)</label><input class="form-control" type="number" step="0.01" name="act_rev" value="<?= $C['act'] ? e(number_format($C['act']['rev'],2,'.','')) : '' ?>"></div>
+        <div class="ff"><label>Actual cost incurred (<?= e($sym) ?>)</label><input class="form-control" type="number" step="0.01" name="act_cost" value="<?= $C['act'] ? e(number_format($C['act']['cost'],2,'.','')) : '' ?>"></div>
+      </div>
+      <div style="margin-top:6px"><button class="btn btn-ghost" type="submit">Save actuals</button></div>
+    </form>
+    <?php endif; ?>
+  </details>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php // Phase 5 — billing readiness packet (reuses the deputation bill gate).
+if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPacket; ?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Billing readiness
+    <?php if ($P['ready']): ?><span class="pill p-ok" style="font-size:11px;margin-left:6px">Ready to bill</span>
+    <?php else: ?><span class="pill p-warn" style="font-size:11px;margin-left:6px">Not ready</span><?php endif; ?>
+  </h3>
+  <div style="display:flex;flex-wrap:wrap;gap:6px">
+    <?php foreach ($P['checks'] as $ck): ?>
+      <span class="pill <?= !empty($ck['ok']) ? 'p-ok' : 'p-warn' ?>" style="font-size:11px"><?= !empty($ck['ok']) ? '✓' : '○' ?> <?= e($ck['label']) ?><?= !empty($ck['hint']) && empty($ck['ok']) ? ' · ' . e($ck['hint']) : '' ?></span>
+    <?php endforeach; ?>
+  </div>
+  <?php if ($P['ready']): ?>
+    <p class="msg msg-success" style="margin-top:10px">This placement is ready to invoice at <?= e(cur_sym()).number_format($P['commercials']['appr']['rev'],0) ?> revenue<?php if (!empty($P['job'])): ?> — <a href="/job?id=<?= (int)$P['job']['id'] ?>">open the deputation</a> to raise the client bill<?php endif; ?>.</p>
+  <?php else: ?>
+    <p class="muted" style="font-size:12px;margin-top:8px">Clear the open items above, then this placement can be handed to billing. Chargeable-expense bills are enforced on the deputation itself.</p>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 </section>
 <section data-tab="CV">
 <!-- CV analysis + keyword search -->

@@ -2049,7 +2049,7 @@ function ops_module_gate($route) {
         // to this person. One module gate here would either hide the whole screen
         // from someone who owns half of it, or show them findings they cannot act on.
         'profitability'=>'profitability','boss-renew'=>'profitability',
-        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring',
+        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring',
         'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','req-ai-extract'=>'hiring',
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads',
@@ -2253,7 +2253,7 @@ function ops_dispatch($route, $method) {
         // Bills backing the expenses the client is being charged for.
         case $route === 'bill-add' || $route === 'bill-delete' || $route === 'bill-file':
             return ops_job_bill($route, $method);
-        case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage' || $route === 'candidate-cv' || $route === 'candidate-client' || $route === 'candidate-credential':
+        case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage' || $route === 'candidate-cv' || $route === 'candidate-client' || $route === 'candidate-credential' || $route === 'candidate-commercial':
             ops_candidates($route, $method); return true;
         case $route === 'inquiries' || $route === 'inquiry-new' || $route === 'inquiry-edit':
             ops_crm_inquiries($route, $method); return true;
@@ -3810,6 +3810,7 @@ function requisitions_list($openOnly = false) {
 function ops_requisitions($route, $method) {
     $pdo = db();
     if (function_exists('req_migrate')) req_migrate();   // additive Phase-2 columns
+    if (function_exists('asg_migrate')) asg_migrate();   // additive Phase-5 assignment-commercial columns
     if ($route === 'requisitions') {
         [$scopeW, $args] = scope_clause('r.office_id', 'r.sbu');
         $q = trim($_GET['q'] ?? ''); $where = $scopeW;
@@ -3888,7 +3889,13 @@ function ops_requisitions($route, $method) {
             foreach ($others as $o) { $f = recruit_fit_score($o, $req); if ($f['score'] >= 55) { $o['fit'] = $f; $pool[] = $o; } }
             usort($pool, fn($a, $b) => $b['fit']['score'] <=> $a['fit']['score']); $pool = array_slice($pool, 0, 5);
         }
-        view('ops/requisition_detail', ['req' => $req, 'outgoing' => $outgoing, 'hired' => $hired, 'cands' => $cands, 'health' => $health, 'pool' => $pool]); return;
+        // Phase 5 — commercial rollup across hires (planned vs approved vs actual) + per-candidate commercials for the table.
+        $rollup = function_exists('recruit_req_commercial_rollup') ? recruit_req_commercial_rollup($req) : null;
+        $candComm = [];
+        if (function_exists('assignment_commercials')) {
+            foreach ($cands as $c) if (($c['stage'] ?? '') === 'ACCEPTED' || !empty($c['inspector_id'])) $candComm[$c['id']] = assignment_commercials($c, $req);
+        }
+        view('ops/requisition_detail', ['req' => $req, 'outgoing' => $outgoing, 'hired' => $hired, 'cands' => $cands, 'health' => $health, 'pool' => $pool, 'rollup' => $rollup, 'candComm' => $candComm]); return;
     }
 }
 
@@ -4071,6 +4078,31 @@ function ops_candidates($route, $method) {
     }
 
     // detail
+    // Phase 5 — approve / actualise this placement's commercials.
+    if ($route === 'candidate-commercial') {
+        ops_require(is_coordinator_level(), 'Only coordinators and admins can set assignment commercials.');
+        if (function_exists('asg_migrate')) asg_migrate();
+        $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+        $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
+        if (!$cand) { http_response_code(404); view('notfound'); return; }
+        if ($method === 'POST') {
+            if (($_POST['mode'] ?? '') === 'actual') {
+                $pdo->prepare("UPDATE candidates SET asg_act_rev=?, asg_act_cost=?, asg_status='ACTUAL', asg_note=? WHERE id=?")
+                    ->execute([num($_POST['act_rev'] ?? 0), num($_POST['act_cost'] ?? 0),
+                               substr(trim($_POST['note'] ?? ''), 0, 400), $id]);
+                flash('Actual revenue and cost recorded for this placement.');
+            } else {
+                $pdo->prepare("UPDATE candidates SET asg_bill_rate=?, asg_bill_basis=?, asg_cost_rate=?, asg_months=?, asg_onetime=?, asg_ref=?, asg_note=?, asg_status='APPROVED', asg_approved_by=?, asg_approved_at=? WHERE id=?")
+                    ->execute([num($_POST['bill_rate'] ?? 0), substr((string)($_POST['bill_basis'] ?? 'MONTHLY'), 0, 20),
+                               num($_POST['cost_rate'] ?? 0), num($_POST['months'] ?? 0), num($_POST['onetime'] ?? 0),
+                               substr(trim($_POST['ref'] ?? ''), 0, 60), substr(trim($_POST['note'] ?? ''), 0, 400),
+                               user_name(current_user()), date('c'), $id]);
+                flash('Placement commercials approved.');
+            }
+        }
+        redirect('/candidate?id=' . $id);
+    }
+
     if ($route === 'candidate') {
         ops_require(is_coordinator_level());
         $cand = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp,
@@ -4086,8 +4118,20 @@ function ops_candidates($route, $method) {
         $linkReq = !empty($cand['requisition_id']) ? ops_one("SELECT * FROM requisitions WHERE id=?", [(int)$cand['requisition_id']]) : null;
         $fit = ($linkReq && function_exists('recruit_fit_score')) ? recruit_fit_score($cand, $linkReq) : null;
         $readiness = function_exists('recruit_deploy_readiness') ? recruit_deploy_readiness($cand, $linkReq) : null;
+        // Phase 5 — this placement's commercials (estimate→approved→actual) + billing readiness.
+        $asgComm = $asgPacket = null;
+        if ($linkReq && function_exists('assignment_commercials')) {
+            if (function_exists('asg_migrate')) asg_migrate();
+            $cand = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp,
+                t.label trade_label, s.label skill_label, ca.call_code
+                FROM candidates c LEFT JOIN business_partners bp ON bp.id=c.client_id
+                LEFT JOIN lookup_values t ON t.id=c.trade_id LEFT JOIN lookup_values s ON s.id=c.skill_id
+                LEFT JOIN calls ca ON ca.id=c.call_id WHERE c.id=?", [(int)$cand['id']]);
+            $asgComm   = assignment_commercials($cand, $linkReq);
+            $asgPacket = assignment_billing_packet($cand, $linkReq);
+        }
         view('ops/candidate_detail', ['cand' => $cand, 'events' => $events, 'dupes' => $dupes, 'subDupes' => $subDupes,
-            'fit' => $fit, 'readiness' => $readiness, 'linkReq' => $linkReq]);
+            'fit' => $fit, 'readiness' => $readiness, 'linkReq' => $linkReq, 'asgComm' => $asgComm, 'asgPacket' => $asgPacket]);
         return;
     }
 }
