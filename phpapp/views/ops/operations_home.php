@@ -94,6 +94,47 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
   <a class="op-kpi warn" href="/jobs"><div class="v"><?= (int)($m['report_pending'] ?? 0) ?></div><div class="l">Report pending</div><div class="h">done, not issued</div></a>
 </div>
 
+<?php // ---- Disruptions & changes — churn already logged on jobs, rolled up.
+      //  Client / office cancellations, engineer changes and no-shows, each with
+      //  its recorded reason. This financial year, scoped to your branches. ?>
+<?php $d = $disrupt ?? null; if ($d):
+  $anyD = ((int)$d['client_cancel'] + (int)$d['office_cancel'] + (int)$d['engineer_change'] + (int)$d['noshow']) > 0 || !empty($d['recent']); ?>
+<div class="op-sec">Disruptions &amp; changes <span style="text-transform:none;letter-spacing:0;font-weight:400;color:#9aa3af">— this financial year</span></div>
+<div class="op-kpis">
+  <div class="op-kpi bad"><div class="v"><?= (int)$d['client_cancel'] ?></div><div class="l">Client cancelled</div><div class="h">the call was called off</div></div>
+  <div class="op-kpi warn"><div class="v"><?= (int)$d['engineer_change'] ?></div><div class="l">Engineer changes</div><div class="h">reassigned to another</div></div>
+  <div class="op-kpi bad"><div class="v"><?= (int)$d['office_cancel'] ?></div><div class="l">Office cancelled</div><div class="h">executing branch pulled it</div></div>
+  <div class="op-kpi warn"><div class="v"><?= (int)$d['noshow'] ?></div><div class="l">No-shows</div><div class="h">client / vendor did not turn up</div></div>
+</div>
+<?php if (!empty($d['recent'])): ?>
+<div class="card" style="margin-top:12px;padding:0;overflow-x:auto">
+  <table class="grid" style="width:100%;margin:0">
+    <thead><tr><th>When</th><th><?= e(TH('job')) ?></th><th>What happened</th><th>By whom</th><th>Reason recorded</th></tr></thead>
+    <tbody>
+      <?php foreach ($d['recent'] as $r):
+        $kind = $r['kind']; $party = strtoupper((string)($r['party'] ?? ''));
+        if ($kind === 'REASSIGN')      { $label = 'Engineer changed';  $tone = 'p-warn'; $who = 'Coordinator'; }
+        elseif ($kind === 'NOSHOW')    { $label = 'No-show';           $tone = 'p-warn'; $who = TOSRM_NOSHOW_PARTIES[$party] ?? '—'; }
+        elseif ($party === 'CLIENT')   { $label = 'Client cancelled';  $tone = 'p-bad';  $who = 'Client'; }
+        elseif ($party === 'OFFICE')   { $label = 'Office cancelled';  $tone = 'p-bad';  $who = 'Executing office'; }
+        else                           { $label = 'Cancelled';         $tone = 'p-mut';  $who = TOSRM_CANCEL_PARTIES[$party] ?? '—'; }
+      ?>
+      <tr>
+        <td class="muted" style="white-space:nowrap"><?= e(substr((string)$r['at'], 0, 10)) ?></td>
+        <td><a href="/job?id=<?= (int)$r['job_id'] ?>"><?= e($r['job_code'] ?: ('#' . (int)$r['job_id'])) ?></a></td>
+        <td><span class="pill <?= $tone ?>"><?= e($label) ?></span></td>
+        <td><?= e($who) ?></td>
+        <td class="muted"><?= e($r['reason'] ?: '—') ?></td>
+      </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
+<?php elseif (!$anyD): ?>
+<p class="muted" style="margin:8px 2px 0">No cancellations, engineer changes or no-shows recorded this year — a clean run.</p>
+<?php endif; ?>
+<?php endif; ?>
+
 <?php // The three groups become tabs (app.js → initSectionTabs); the KPI row
       // above stays pinned as the summary. One long screen → three short ones. ?>
 <div data-tabs data-tabs-key="area">

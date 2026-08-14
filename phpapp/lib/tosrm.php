@@ -406,6 +406,9 @@ function ops_tosrm_action($route, $method) {
 const TOSRM_ASSIGN_STATES = ['TENTATIVE'=>'Tentative (held)','CONFIRMED'=>'Confirmed','RELEASED'=>'Released'];
 const TOSRM_ACCEPT_STATES = ['PENDING'=>'Awaiting acceptance','ACCEPTED'=>'Accepted','DECLINED'=>'Declined','CLARIFY'=>'Clarification requested','REPLACE'=>'Replacement requested'];
 const TOSRM_NOSHOW_PARTIES = ['CLIENT'=>'Client','VENDOR'=>'Vendor','RESOURCE'=>'Resource','OTHER'=>'Other'];
+// Who called a cancellation off — so client-driven and office-driven cancellations
+// can be told apart on the disruptions scoreboard.
+const TOSRM_CANCEL_PARTIES = ['CLIENT'=>'Client','OFFICE'=>'Executing office','VENDOR'=>'Vendor','INTERNAL'=>'Internal'];
 // Kinds recorded in the assignment history.
 const TOSRM_ASSIGN_KINDS = [
     'HOLD'=>'Hold changed','ACCEPT'=>'Acceptance','REASSIGN'=>'Reassigned','RESCHEDULE'=>'Rescheduled',
@@ -505,11 +508,13 @@ function tosrm_reschedule($jobId, $newDate, $reason = '', $approver = '') {
 
 // Cancel the assignment — records a reason + history, and marks the job stage
 // CANCELLED (an existing JOB_STAGES value) unless it is already closed.
-function tosrm_assign_cancel($jobId, $reason = '') {
+function tosrm_assign_cancel($jobId, $reason = '', $party = '') {
     if (trim((string)$reason) === '') return false;
     $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$jobId]); if (!$job) return false;
+    $party = strtoupper(trim((string)$party));
+    if (!array_key_exists($party, TOSRM_CANCEL_PARTIES)) $party = 'INTERNAL';
     if (empty($job['closed_flag'])) db()->prepare("UPDATE jobs SET stage='CANCELLED' WHERE id=?")->execute([(int)$jobId]);
-    tosrm_assign_event($jobId, 'CANCEL', ['reason'=>$reason]);
+    tosrm_assign_event($jobId, 'CANCEL', ['reason'=>$reason, 'party'=>$party]);
     return true;
 }
 
@@ -537,6 +542,12 @@ function tosrm_render_job_panel($job) {
     $insps = ops_all("SELECT id, name FROM inspectors WHERE COALESCE(status,'')<>'INACTIVE' ORDER BY name") ?: [];
     $curInsp = (int)($job['inspector_id'] ?? 0);
     $curDate = (string)($job['scheduled_date'] ?? '');
+    // §resource-decision — accept/decline only matters for a non-employee
+    //  (freelancer / sub-contractor). For an own TPIA engineer it is not a step,
+    //  so the box is not shown at all.
+    $staffKind = $curInsp ? (string)ops_val("SELECT staff_kind FROM inspectors WHERE id=?", [$curInsp]) : '';
+    $isNonEmp  = in_array($staffKind, ['FREELANCER', 'SUBCON'], true);
+    $decWho    = $staffKind === 'SUBCON' ? 'sub-contractor' : 'freelancer';
     ob_start(); ?>
     <style>
       /* Assignment lifecycle — proper fields, aligned, on the app's form styling. */
@@ -558,7 +569,7 @@ function tosrm_render_job_panel($job) {
       <p class="ta-sub">Hold, acceptance, reassignment, reschedule, no-show and cancellation — every change is kept in the history below.</p>
       <div class="ta-badges">
         <?php if ($hold !== ''): ?><span class="pill p-info">Hold: <?=$esc(TOSRM_ASSIGN_STATES[$hold] ?? $hold)?></span><?php endif; ?>
-        <?php if ($accept !== ''): ?><span class="pill p-mut">Acceptance: <?=$esc(TOSRM_ACCEPT_STATES[$accept] ?? $accept)?><?php if (trim((string)($job['accept_reason'] ?? '')) !== ''): ?> — <?=$esc($job['accept_reason'])?><?php endif; ?></span><?php endif; ?>
+        <?php if ($isNonEmp && $accept !== ''): ?><span class="pill p-mut">Acceptance: <?=$esc(TOSRM_ACCEPT_STATES[$accept] ?? $accept)?><?php if (trim((string)($job['accept_reason'] ?? '')) !== ''): ?> — <?=$esc($job['accept_reason'])?><?php endif; ?></span><?php endif; ?>
       </div>
       <?php if ($canEdit): ?>
       <div class="ta-grid">
@@ -567,15 +578,18 @@ function tosrm_render_job_panel($job) {
           <label>Hold state <span class="ta-hint">(pencil-in vs commit)</span></label>
           <div class="ta-row"><select class="form-control" name="state"><?php foreach (TOSRM_ASSIGN_STATES as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$hold?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select><button class="btn" type="submit">Set</button></div>
         </form>
+        <?php // Only shown when the assigned resource is a freelancer / sub-contractor. ?>
+        <?php if ($isNonEmp): ?>
         <form method="post" action="/assign-accept" class="ta-field">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
-          <label>Record resource decision</label>
+          <label>Did the <?=$esc($decWho)?> accept? <span class="ta-hint">(required for non-employees)</span></label>
           <div class="ta-row">
             <select class="form-control" name="decision"><?php foreach (TOSRM_ACCEPT_STATES as $k=>$v): if ($k==='PENDING') continue; ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
             <input class="form-control" type="text" name="reason" placeholder="Reason (required to decline)">
             <button class="btn" type="submit">Save</button>
           </div>
         </form>
+        <?php endif; ?>
         <form method="post" action="/assign-reassign" class="ta-field">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
           <label>Reassign <span class="ta-hint">(original kept in history)</span></label>
@@ -607,8 +621,10 @@ function tosrm_render_job_panel($job) {
         </form>
         <form method="post" action="/assign-cancel" class="ta-field" onsubmit="return confirm('Cancel this assignment?');">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
-          <label>Cancel assignment <span class="ta-hint">(reason kept)</span></label>
-          <div class="ta-row"><input class="form-control" type="text" name="reason" placeholder="Reason to cancel" required><button class="btn secondary" type="submit" style="color:var(--bad);border-color:var(--bad)">Cancel</button></div>
+          <label>Cancel assignment <span class="ta-hint">(who &amp; why — kept on record)</span></label>
+          <div class="ta-row">
+            <select class="form-control" name="cancel_by" style="flex:0 0 150px"><?php foreach (TOSRM_CANCEL_PARTIES as $k=>$v): ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
+            <input class="form-control" type="text" name="reason" placeholder="Reason to cancel" required><button class="btn secondary" type="submit" style="color:var(--bad);border-color:var(--bad)">Cancel</button></div>
         </form>
         <?php if (function_exists('tosrm_issue_from_event')): ?>
         <form method="post" action="/assign-issue" class="ta-field" style="grid-column:1/-1">
@@ -632,6 +648,7 @@ function tosrm_render_job_panel($job) {
             if ($ev['kind']==='REASSIGN') $detail = $esc(($iname[(int)$ev['old_inspector_id']] ?? '—') . ' → ' . ($iname[(int)$ev['new_inspector_id']] ?? '—')) . ($ev['reason']?' · '.$esc($ev['reason']):'');
             if ($ev['kind']==='RESCHEDULE') $detail = $esc(($ev['old_date']?:'—') . ' → ' . ($ev['new_date']?:'—')) . ($ev['reason']?' · '.$esc($ev['reason']):'');
             if ($ev['kind']==='NOSHOW') $detail = $esc((TOSRM_NOSHOW_PARTIES[$ev['party']] ?? $ev['party']) . ($ev['reason']?' · '.$ev['reason']:''));
+            if ($ev['kind']==='CANCEL' && trim((string)($ev['party']??''))!=='') $detail = $esc((TOSRM_CANCEL_PARTIES[$ev['party']] ?? $ev['party']) . ($ev['reason']?' · '.$ev['reason']:''));
           ?>
             <tr><td><?=$esc(substr((string)$ev['at'],0,16))?></td><td><strong><?=$esc(TOSRM_ASSIGN_KINDS[$ev['kind']] ?? $ev['kind'])?></strong></td><td><?=$detail?><?php if ($ev['approver']): ?> <span class="muted">(appr: <?=$esc($ev['approver'])?>)</span><?php endif; ?></td><td><?=$esc($ev['actor'])?></td></tr>
           <?php endforeach; ?></tbody>
@@ -677,7 +694,7 @@ function ops_tosrm_job_action($route, $method) {
             else flash('Pick a new date different from the current one.', 'error');
             break;
         case 'assign-cancel':
-            if (tosrm_assign_cancel($jobId, (string)($_POST['reason'] ?? ''))) flash('Assignment cancelled (reason recorded).');
+            if (tosrm_assign_cancel($jobId, (string)($_POST['reason'] ?? ''), (string)($_POST['cancel_by'] ?? ''))) flash('Assignment cancelled (who & reason recorded).');
             else flash('A reason is required to cancel.', 'error');
             break;
         case 'assign-noshow':
@@ -1579,6 +1596,43 @@ function ops_tosrm_desk($method) {
 //  menu group. Every screen that used to hide inside that dropdown is laid out
 //  on one page, grouped, with its live state. Nothing is removed.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//  Disruptions & changes — a roll-up of the churn already logged on jobs:
+//  client-driven cancellations, executing-office cancellations, engineer
+//  changes (reassignments) and no-shows, each with its recorded reason.
+//  Scoped to the caller's branches and, by default, the current financial year.
+// ---------------------------------------------------------------------------
+function tosrm_disruptions($offices = null, $fromDate = '') {
+    tosrm_migrate_b();
+    $out = ['client_cancel'=>0,'office_cancel'=>0,'engineer_change'=>0,'noshow'=>0,'from'=>$fromDate,'recent'=>[]];
+    $where = '1=1'; $args = [];
+    if (is_array($offices)) {
+        if (!$offices) return $out;                    // scoped to no branch → nothing
+        $in = implode(',', array_fill(0, count($offices), '?'));
+        $where .= " AND j.executing_office_id IN ($in)";
+        foreach ($offices as $o) $args[] = (int)$o;
+    }
+    if ($fromDate !== '') { $where .= " AND e.at >= ?"; $args[] = $fromDate; }
+    try {
+        $rows = ops_all("SELECT e.kind, e.party, e.reason, e.at, e.actor, e.old_inspector_id, e.new_inspector_id,
+                                j.id job_id, j.job_code
+                         FROM assignment_events e JOIN jobs j ON j.id=e.job_id
+                         WHERE $where AND e.kind IN ('CANCEL','REASSIGN','NOSHOW')
+                         ORDER BY e.at DESC", $args) ?: [];
+    } catch (Throwable $ex) { return $out; }
+    foreach ($rows as $r) {
+        if ($r['kind'] === 'REASSIGN') $out['engineer_change']++;
+        elseif ($r['kind'] === 'NOSHOW') $out['noshow']++;
+        elseif ($r['kind'] === 'CANCEL') {
+            $p = strtoupper((string)($r['party'] ?? ''));
+            if ($p === 'CLIENT') $out['client_cancel']++;
+            elseif ($p === 'OFFICE') $out['office_cancel']++;
+        }
+    }
+    $out['recent'] = array_slice($rows, 0, 8);
+    return $out;
+}
+
 function ops_operations_home($method) {
     ops_require(can('mod.calls.view') || can('mod.jobs.view') || (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can()),
         'You do not have access to Operations.');
@@ -1612,8 +1666,13 @@ function ops_operations_home($method) {
         $n = count($offices);
         $offLabel = $n ? ('scoped to ' . $n . ' branch' . ($n === 1 ? '' : 'es')) : '';
     }
+    // Disruptions & changes — this financial year, scoped to the same branches.
+    $fyFrom = '';
+    if (function_exists('current_fy') && function_exists('fy_range')) { $r = fy_range(current_fy()); $fyFrom = $r[0] ?? ''; }
+    $disrupt = tosrm_disruptions($offices, $fyFrom);
     view('ops/operations_home', [
         'metrics' => $metrics, 'counts' => $counts, 'services' => $services, 'scopeLabel' => $offLabel,
+        'disrupt' => $disrupt,
     ]);
     return true;
 }
