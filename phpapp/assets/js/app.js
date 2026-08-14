@@ -1345,7 +1345,56 @@
     Array.prototype.forEach.call(document.querySelectorAll('select.searchable'), enhanceSelect);
     // Any text input wired to a datalist becomes the themed combo instead.
     Array.prototype.forEach.call(document.querySelectorAll('input.combo, input[list]'), enhanceCombo);
+    initSectionTabs();
   }
+
+  // ---- Section tabs -------------------------------------------------------
+  // Progressive enhancement: a container marked [data-tabs] whose direct
+  // children carry [data-tab="Label"] becomes a row of tabs at the top with
+  // one panel shown at a time — turning a long vertical screen into a few
+  // short ones, the same on a phone as on a desktop. The open tab is kept in
+  // the URL hash so a refresh or a shared link lands on the same one. With no
+  // JavaScript every panel simply shows, so nothing is ever hidden from
+  // someone who cannot run this.
+  function initSectionTabs() {
+    var wraps = document.querySelectorAll('[data-tabs]');
+    Array.prototype.forEach.call(wraps, function (wrap) {
+      if (wrap.dataset.tabsReady) return;
+      var panels = Array.prototype.filter.call(wrap.children, function (c) { return c.hasAttribute('data-tab'); });
+      if (panels.length < 2) return;               // one panel is not worth a tab bar
+      wrap.dataset.tabsReady = '1';
+      var key = wrap.getAttribute('data-tabs-key') || 'tab';
+      var slug = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
+      var bar = document.createElement('div');
+      bar.className = 'tabbar';
+      bar.setAttribute('role', 'tablist');
+      var btns = [];
+      panels.forEach(function (panel, i) {
+        var label = panel.getAttribute('data-tab') || ('Section ' + (i + 1));
+        var cnt = panel.getAttribute('data-count');
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'tabbtn';
+        b.setAttribute('role', 'tab');
+        var safe = label.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        b.innerHTML = '<span>' + safe + '</span>' + (cnt && +cnt > 0 ? ' <span class="tabcnt">' + (+cnt) + '</span>' : '');
+        b.addEventListener('click', function () { show(i, true); });
+        bar.appendChild(b);
+        btns.push(b);
+      });
+      wrap.parentNode.insertBefore(bar, wrap);
+      function show(i, push) {
+        panels.forEach(function (p, j) { p.hidden = j !== i; });
+        btns.forEach(function (b, j) { b.classList.toggle('on', j === i); b.setAttribute('aria-selected', j === i ? 'true' : 'false'); });
+        if (push) { try { history.replaceState(null, '', '#' + key + '=' + slug(panels[i].getAttribute('data-tab') || i)); } catch (e) {} }
+      }
+      var want = 0;
+      var m = (location.hash || '').match(new RegExp(key + '=([^&]+)'));
+      if (m) { panels.forEach(function (p, j) { if (slug(p.getAttribute('data-tab') || '') === m[1]) want = j; }); }
+      show(want, false);
+    });
+  }
+
   if (document.readyState !== 'loading') init();
   else document.addEventListener('DOMContentLoaded', init);
 })();

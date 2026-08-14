@@ -94,8 +94,10 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
   <a class="op-kpi warn" href="/jobs"><div class="v"><?= (int)($m['report_pending'] ?? 0) ?></div><div class="l">Report pending</div><div class="h">done, not issued</div></a>
 </div>
 
-<div class="op-sec">Work intake &amp; delivery</div>
-<div class="op-grid">
+<?php // The three groups become tabs (app.js → initSectionTabs); the KPI row
+      // above stays pinned as the summary. One long screen → three short ones. ?>
+<div data-tabs data-tabs-key="area">
+<section data-tab="Work intake &amp; delivery"><div class="op-grid">
   <?php
   $tile('/calls', '📋', THP('call'), 'Orders from the client, with lead time and delay.',
         [[$c['calls_open'], 'Open'], [$m['new'] ?? null, 'New']]);
@@ -114,10 +116,9 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
     $tile('/recurring', '🔁', 'Recurring services', 'Contracts that raise work on a schedule.',
           [[$c['recurring'], 'Active']]);
   ?>
-</div>
+</div></section>
 
-<div class="op-sec">TPIA service lines</div>
-<div class="op-grid">
+<section data-tab="TPIA service lines"><div class="op-grid">
   <?php
   // Rendered from the Service Scope Engine — only services active on this
   // install appear, each linking to the screen that delivers it.
@@ -127,10 +128,9 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
   if (can('mod.jobs.view') && function_exists('can_manage_availability') && can_manage_availability())
     $tile('/availability', '🟢', TH('engineer') . ' availability', 'Daily availability board for the field team.');
   ?>
-</div>
+</div></section>
 
-<div class="op-sec">Controls, time &amp; people</div>
-<div class="op-grid">
+<section data-tab="Controls, time &amp; people"><div class="op-grid">
   <?php
   if (can('mod.calls.view'))
     $tile('/contract-overrides', '🛑', 'Contract exceptions', 'Overrides where a contract is exhausted or expired.',
@@ -148,6 +148,7 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
     $tile('/candidates', '🧑‍💼', 'Hiring', 'Candidates & requisitions for field capacity.',
           [[$c['requisitions'], 'Open reqs']]);
   ?>
+</div></section>
 </div>
 
 <div class="op-note"><b>Nothing is removed.</b> Every screen that lived inside the old “Operations” menu is still here — it now opens from this page instead of a nested dropdown.</div>

@@ -39,20 +39,36 @@ $multi = count($d['sections']) > 1 || ($d['sections'] && $d['sections'][0]['labe
   </div>
 </div>
 
-<?php foreach ($d['sections'] as $s): ?>
+<?php
+  // Two or more sections become tabs at the top (app.js → initSectionTabs),
+  // so a big area like Quality is a few short tabs instead of one long scroll.
+  // A single section just renders as a plain group.
+  $useTabs = count($d['sections']) > 1;
+  $renderTiles = function ($tiles) {
+      echo '<div class="op-grid">';
+      foreach ($tiles as $tl) {
+          echo '<a class="op-tile" href="' . e($tl['route']) . '"' . (!empty($tl['ext']) ? ' target="_blank" rel="noopener"' : '') . '>';
+          echo '<span class="op-ic">' . $tl['icon'] . '</span><span class="op-b"><span class="op-t">' . e($tl['label']);
+          if (!empty($tl['count'])) echo ' <span class="op-badge ' . e($tl['tone'] ?: 'info') . '">' . (int)$tl['count'] . '</span>';
+          echo '</span>';
+          if (trim((string)($tl['desc'] ?? '')) !== '') echo '<span class="op-d">' . e($tl['desc']) . '</span>';
+          echo '</span><span class="op-go">' . (!empty($tl['ext']) ? '↗' : '›') . '</span></a>';
+      }
+      echo '</div>';
+  };
+?>
+<?php if ($useTabs): ?>
+<div data-tabs data-tabs-key="area">
+  <?php foreach ($d['sections'] as $s):
+      $secCount = array_sum(array_map(fn($t) => (int)($t['count'] ?? 0), $s['tiles'])); ?>
+    <section data-tab="<?= e($s['label'] !== '' ? $s['label'] : $d['title']) ?>"<?= $secCount ? ' data-count="' . $secCount . '"' : '' ?>>
+      <?php $renderTiles($s['tiles']); ?>
+    </section>
+  <?php endforeach; ?>
+</div>
+<?php else: foreach ($d['sections'] as $s): ?>
   <div class="op-sec"><?= e($s['label'] !== '' ? $s['label'] : $d['title']) ?></div>
-  <div class="op-grid">
-    <?php foreach ($s['tiles'] as $tl): ?>
-      <a class="op-tile" href="<?= e($tl['route']) ?>"<?= !empty($tl['ext']) ? ' target="_blank" rel="noopener"' : '' ?>>
-        <span class="op-ic"><?= $tl['icon'] ?></span>
-        <span class="op-b">
-          <span class="op-t"><?= e($tl['label']) ?><?php if (!empty($tl['count'])): ?> <span class="op-badge <?= e($tl['tone'] ?: 'info') ?>"><?= (int)$tl['count'] ?></span><?php endif; ?></span>
-          <?php if (trim((string)($tl['desc'] ?? '')) !== ''): ?><span class="op-d"><?= e($tl['desc']) ?></span><?php endif; ?>
-        </span>
-        <span class="op-go"><?= !empty($tl['ext']) ? '↗' : '›' ?></span>
-      </a>
-    <?php endforeach; ?>
-  </div>
-<?php endforeach; ?>
+  <?php $renderTiles($s['tiles']); ?>
+<?php endforeach; endif; ?>
 
 <div class="op-note"><b>Nothing is removed.</b> Every screen that lived inside the old “<?= e($d['title']) ?>” menu is still here — it now opens from this page instead of a nested dropdown.</div>
