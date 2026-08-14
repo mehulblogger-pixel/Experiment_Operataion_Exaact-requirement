@@ -171,7 +171,11 @@
   </div>
 <?php endif; ?>
 
-<div class="panel">
+<?php // The record below is organised into tabs (app.js). Header, status band
+      // and contract alerts above stay pinned; panels sharing a data-tab label
+      // become one tab. ?>
+<div data-tabs data-tabs-key="call">
+<div class="panel" data-tab="Overview">
   <div class="kv-grid">
     <div><span class="k">Client</span><?= e($call['client_disp'] ?: $call['client_name'] ?: '—') ?></div>
     <div><span class="k">Vendor / Site</span><?= e($call['vendor_name'] ?: '—') ?></div>
@@ -201,7 +205,7 @@
   </div>
 </div>
 
-<details class="fold" id="credit">
+<details class="fold" id="credit" data-tab="Money">
   <summary>Money — credit, billing &amp; cost so far <span class="sub">who bills whom, and what it has cost</span></summary>
   <div class="fold-body">
   <div class="kv-grid">
@@ -230,7 +234,7 @@
   </div>
 </details>
 
-<details class="fold">
+<details class="fold" data-tab="Timing &amp; SLA">
   <summary>Timing &amp; lead time <span class="sub">when it came in, and how fast it moved</span></summary>
   <div class="fold-body">
   <div class="kv-grid">
@@ -249,26 +253,23 @@
   // Assignment confirmation banner (executing branch has allocated an inspector)
   $engKind = ['ASSET'=>'own employee','FREELANCER'=>'freelancer','SUBCON'=>'sub-contractor'];
   foreach ($jobs as $aj) { if ($aj['inspector_name'] && $aj['scheduled_date']): ?>
-    <div class="msg msg-success">✅ Call assigned to <strong><?= e($aj['inspector_name']) ?></strong> for <strong><?= e($aj['scheduled_date']) ?></strong> — engineer is <?= e($engKind[$aj['staff_kind'] ?? 'ASSET'] ?? 'own employee') ?><?= $aj['subcon_agency'] ? ' (' . e($aj['subcon_agency']) . ')' : '' ?>. Job <?= e($aj['job_code']) ?>, stage: <?= e(lk_options_or('job_stage', JOB_STAGES)[$aj['stage'] ?? 'ALLOCATED'] ?? '') ?>.</div>
+    <div class="msg msg-success" data-tab="Overview">✅ Call assigned to <strong><?= e($aj['inspector_name']) ?></strong> for <strong><?= e($aj['scheduled_date']) ?></strong> — engineer is <?= e($engKind[$aj['staff_kind'] ?? 'ASSET'] ?? 'own employee') ?><?= $aj['subcon_agency'] ? ' (' . e($aj['subcon_agency']) . ')' : '' ?>. Job <?= e($aj['job_code']) ?>, stage: <?= e(lk_options_or('job_stage', JOB_STAGES)[$aj['stage'] ?? 'ALLOCATED'] ?? '') ?>.</div>
   <?php endif; } ?>
 <?php // Phase 9 (TOSRM) — operations service-request panel: status lifecycle,
       // priority/criticality/source, validation gate + override, clarifications.
       if (function_exists('tosrm_render_call_panel')): ?>
-  <a id="ops"></a>
-  <?php tosrm_render_call_panel($call); ?>
+  <div data-tab="Overview"><a id="ops"></a><?php tosrm_render_call_panel($call); ?></div>
 <?php endif; ?>
 <?php // Phase 9 (TOSRM Slice D) — turnaround, SLA and delay on the call.
       if (function_exists('tosrm_render_call_sla')): ?>
-  <a id="sla"></a>
-  <?php tosrm_render_call_sla($call); ?>
+  <div data-tab="Timing &amp; SLA"><a id="sla"></a><?php tosrm_render_call_sla($call); ?></div>
 <?php endif; ?>
 <?php // Phase 9 (TOSRM Slice E) — communication log (reuses the activity spine).
       if (function_exists('tosrm_render_comms')): ?>
-  <a id="comms"></a>
-  <?php tosrm_render_comms('CALL', (int)$call['id']); ?>
+  <div data-tab="Overview"><a id="comms"></a><?php tosrm_render_comms('CALL', (int)$call['id']); ?></div>
 <?php endif; ?>
 
-<h3 class="tab-sub" id="jobs">Jobs allocated from this call</h3>
+<div data-tab="Jobs"><h3 class="tab-sub" id="jobs">Jobs allocated from this call</h3>
 <table class="grid">
   <tr><th>Job</th><th>Inspector</th><th>Engineer</th><th>Scheduled</th><th>Stage</th><th>Expected credit</th><th>Closed</th><th></th></tr>
   <?php foreach ($jobs as $j): ?>
@@ -285,3 +286,5 @@
   <?php endforeach; ?>
   <?php if (!$jobs): ?><tr><td colspan="8">No jobs yet. <?php if (is_coordinator_level()): ?><a href="/job-new?call=<?= (int)$call['id'] ?>">Allocate one</a>.<?php endif; ?></td></tr><?php endif; ?>
 </table>
+</div><!-- /Jobs -->
+</div><!-- /data-tabs (work order) -->
