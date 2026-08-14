@@ -608,6 +608,9 @@ function seed_demo_remove() {
             try { $st = $pdo->prepare($sql); $st->execute($args); $n += $st->rowCount(); }
             catch (Throwable $e) { /* table not built here */ }
         };
+        // Part-three registers (lib/seed_demo_c.php) — cleared FIRST, while the
+        // parents they hang off (partners, report_docs, jobs, calls) still exist.
+        if (function_exists('demo_seed_c_remove')) $n += demo_seed_c_remove($pdo);
         // Phase-7 deputation site-ops child rows — cleared while the demo job
         // still exists, so nothing is orphaned when the job is deleted below.
         $try("DELETE FROM dep_status_events WHERE job_id IN (SELECT id FROM jobs WHERE job_code='JOB-DEP-DEMO')");
@@ -1323,6 +1326,9 @@ function demo_seed_modules_b($pdo, $x, $has, $ins) {
         }
     }
 
+    // Part three — the ~80 registers the original seed never reached
+    // (lib/seed_demo_c.php). Guarded per-group so it can never abort _b.
+    if (function_exists('demo_seed_modules_c')) $n = $n + demo_seed_modules_c($pdo, $x, $has, $ins);
     return $n;
 }
 
@@ -1375,6 +1381,58 @@ function demo_modules_expected() {
         'System failures'           => 'system_failures',
         'Client portal users'       => 'client_users',
         'Client portal requests'    => 'portal_requests',
+        // ---- Part three (lib/seed_demo_c.php) --------------------------------
+        'Sales leads'               => 'leads',
+        'Opportunities'             => 'opportunities',
+        'Quotation approvals'       => 'quote_approvals',
+        'Quotation follow-ups'      => 'quote_followups',
+        'CRM templates'             => 'crm_templates',
+        'Partner notes'             => 'partner_notes',
+        'Partner contracts'         => 'partner_contracts',
+        'Purchase orders'           => 'partner_purchase_orders',
+        'Vendor profiles'           => 'vendor_profiles',
+        'Vendor qualifications'     => 'vendor_qualifications',
+        'Vendor portal users'       => 'vendor_users',
+        'Invoice lines'             => 'invoice_lines',
+        'Credit notes'              => 'credit_notes',
+        'Receipt allocations'       => 'receipt_allocations',
+        'Deputation bills'          => 'job_bills',
+        'Office overheads'          => 'office_expenses',
+        'Cost runs'                 => 'cost_runs',
+        'Report templates'          => 'report_templates',
+        'Report approvals'          => 'report_approvals',
+        'Client report reviews'     => 'report_client_reviews',
+        'Release Note links'        => 'release_inspections',
+        'Approver mapping'          => 'idems_approver_map',
+        'Job QAPs'                  => 'job_qaps',
+        'Inspector certificates'    => 'inspector_certs',
+        'Test methods'              => 'methods',
+        'Decision rules'            => 'decision_rules',
+        'Controlled documents'      => 'controlled_docs',
+        'Risk register'             => 'risk_items',
+        'Samples'                   => 'sample_items',
+        'Sample custody'            => 'sample_custody',
+        'Satisfaction surveys'      => 'satisfaction_surveys',
+        'Security incidents'        => 'security_incidents',
+        'Confidentiality undertakings' => 'confidentiality_undertakings',
+        'Client NDAs'               => 'client_ndas',
+        'Confidentiality breaches'  => 'confidentiality_breaches',
+        'Consent register'          => 'data_consents',
+        'Data requests (DSAR)'      => 'data_requests',
+        'Attendance'                => 'attendance',
+        'Public holidays'           => 'holidays',
+        'Work norms'                => 'work_norms',
+        'Candidates'                => 'candidates',
+        'Sub-contractors'           => 'subcons',
+        'Contract exceptions'       => 'contract_overrides',
+        'KPI targets'               => 'kpi_targets',
+        'KPI snapshots'             => 'kpi_snapshots',
+        'KPI alerts'                => 'kpi_alerts',
+        'Custom forms'              => 'custom_forms',
+        'Job visits'                => 'job_visits',
+        'Hold / witness points'     => 'hw_points',
+        'CAPA action plans'         => 'capa_actions',
+        'Service scope'             => 'service_scope',
     ];
 }
 
