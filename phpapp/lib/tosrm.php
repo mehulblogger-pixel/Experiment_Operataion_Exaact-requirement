@@ -859,76 +859,91 @@ function tosrm_render_readiness_panel($job) {
     $roll = tosrm_readiness_rollup($jid);
     $gate = tosrm_confirm_gate($job);
     ob_start(); ?>
+    <style>
+      .tosrm-ready>h3{margin:0 0 4px}
+      .tosrm-ready .tr-sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+      .tosrm-ready .tr-sec{margin-top:18px}
+      .tosrm-ready .tr-sec:first-of-type{margin-top:0}
+      .tosrm-ready .tr-h{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:0 0 9px}
+      .tosrm-ready ul.tr-list{margin:0;padding-left:2px;list-style:none;display:flex;flex-direction:column;gap:5px}
+      .tosrm-ready ul.tr-list li{font-size:13.5px;padding-left:18px;position:relative}
+      .tosrm-ready ul.tr-list li::before{content:"•";position:absolute;left:4px;top:-1px}
+      .tosrm-ready .tr-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+      .tosrm-ready .tr-actions form{background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin:0}
+      .tosrm-ready .tr-actions .tr-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+      .tosrm-ready .tr-actions .tr-row>.form-control{flex:1 1 150px;min-width:0}
+      @media(max-width:640px){.tosrm-ready .tr-actions{grid-template-columns:1fr}.tosrm-ready .tr-actions .tr-row>.form-control{flex-basis:100%}}
+    </style>
     <div class="card tosrm-ready" style="margin-top:16px">
-      <h3 style="margin:0 0 10px">Operations — readiness &amp; confirmation</h3>
+      <h3>Operations — readiness &amp; confirmation</h3>
+      <p class="tr-sub">Competence advisories, client / vendor confirmation, and the pre-execution readiness checklist.</p>
 
       <?php // Competence & certification advisory (reuses the competence engine) ?>
-      <div style="margin-bottom:12px">
-        <strong>Competence &amp; certification</strong>
-        <ul style="margin:6px 0 0;padding-left:18px">
-          <?php foreach ($warn as $w): $col = $w['level']==='error' ? '#b4232b' : ($w['level']==='warn' ? '#b45309' : '#15803d'); ?>
+      <div class="tr-sec">
+        <div class="tr-h">Competence &amp; certification</div>
+        <ul class="tr-list">
+          <?php foreach ($warn as $w): $col = $w['level']==='error' ? 'var(--bad)' : ($w['level']==='warn' ? 'var(--warn)' : 'var(--ok)'); ?>
             <li style="color:<?=$col?>"><?=$esc($w['text'])?></li>
           <?php endforeach; ?>
         </ul>
-        <div class="muted" style="font-size:12px;margin-top:4px">Advisory only — the coordinator decides; issuance-time enforcement is unchanged.</div>
+        <p class="muted" style="font-size:12px;margin:6px 0 0">Advisory only — the coordinator decides; issuance-time enforcement is unchanged.</p>
       </div>
 
       <?php // Client / vendor confirmation ?>
-      <div style="margin-bottom:12px">
-        <strong>Pre-execution confirmation</strong>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
-          <span class="badge"><?=((int)($job['client_confirmed']??0)===1)?'✅ Client confirmed':'Client not confirmed'?><?php if (trim((string)($job['client_confirm_ref']??''))!==''): ?> · <?=$esc($job['client_confirm_ref'])?><?php endif; ?></span>
-          <span class="badge"><?=((int)($job['vendor_confirmed']??0)===1)?'✅ Vendor confirmed':'Vendor not confirmed'?><?php if (trim((string)($job['vendor_readiness']??''))!==''): ?> · <?=$esc($job['vendor_readiness'])?><?php endif; ?></span>
-          <?php if ($gate['required']): ?><span class="badge" style="background:#fde7e7;color:#b4232b">Client confirmation REQUIRED<?=$gate['blocks']?' — not yet given':''?></span><?php endif; ?>
+      <div class="tr-sec">
+        <div class="tr-h">Pre-execution confirmation</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <span class="pill <?=((int)($job['client_confirmed']??0)===1)?'p-ok':'p-mut'?>"><?=((int)($job['client_confirmed']??0)===1)?'✓ Client confirmed':'Client not confirmed'?><?php if (trim((string)($job['client_confirm_ref']??''))!==''): ?> · <?=$esc($job['client_confirm_ref'])?><?php endif; ?></span>
+          <span class="pill <?=((int)($job['vendor_confirmed']??0)===1)?'p-ok':'p-mut'?>"><?=((int)($job['vendor_confirmed']??0)===1)?'✓ Vendor confirmed':'Vendor not confirmed'?><?php if (trim((string)($job['vendor_readiness']??''))!==''): ?> · <?=$esc($job['vendor_readiness'])?><?php endif; ?></span>
+          <?php if ($gate['required']): ?><span class="pill p-bad">Client confirmation required<?=$gate['blocks']?' — not yet given':''?></span><?php endif; ?>
         </div>
         <?php if ($canEdit): ?>
-        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px">
-          <form method="post" action="/job-confirm" style="display:flex;gap:6px;align-items:center">
+        <div class="tr-actions">
+          <form method="post" action="/job-confirm">
             <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>"><input type="hidden" name="party" value="CLIENT">
             <input type="hidden" name="on" value="<?=((int)($job['client_confirmed']??0)===1)?'0':'1'?>">
-            <input type="text" name="ref" placeholder="Client confirm ref / contact" style="min-width:180px">
-            <button class="btn btn-sm" type="submit"><?=((int)($job['client_confirmed']??0)===1)?'Clear client':'Mark client confirmed'?></button>
+            <div class="tr-row"><input class="form-control" type="text" name="ref" placeholder="Client confirm ref / contact"><button class="btn" type="submit"><?=((int)($job['client_confirmed']??0)===1)?'Clear':'Mark confirmed'?></button></div>
           </form>
-          <form method="post" action="/job-confirm" style="display:flex;gap:6px;align-items:center">
+          <form method="post" action="/job-confirm">
             <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>"><input type="hidden" name="party" value="VENDOR">
             <input type="hidden" name="on" value="<?=((int)($job['vendor_confirmed']??0)===1)?'0':'1'?>">
-            <input type="text" name="ref" placeholder="Vendor readiness note" style="min-width:180px">
-            <button class="btn btn-sm" type="submit"><?=((int)($job['vendor_confirmed']??0)===1)?'Clear vendor':'Mark vendor confirmed'?></button>
+            <div class="tr-row"><input class="form-control" type="text" name="ref" placeholder="Vendor readiness note"><button class="btn" type="submit"><?=((int)($job['vendor_confirmed']??0)===1)?'Clear':'Mark confirmed'?></button></div>
           </form>
-          <form method="post" action="/job-confirm-req" style="display:flex;gap:6px;align-items:center">
+          <form method="post" action="/job-confirm-req" style="grid-column:1/-1">
             <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
             <input type="hidden" name="required" value="<?=$gate['required']?'0':'1'?>">
-            <button class="btn btn-sm secondary" type="submit"><?=$gate['required']?'Make client confirmation optional':'Require client confirmation'?></button>
+            <button class="btn secondary" type="submit"><?=$gate['required']?'Make client confirmation optional':'Require client confirmation'?></button>
           </form>
         </div>
         <?php endif; ?>
       </div>
 
       <?php // Readiness checklist ?>
-      <div>
-        <strong>Readiness checklist</strong>
-        <?php if ($items): ?><span class="muted"> — <?=$roll['ready']?>/<?=$roll['total']?> ready<?php if ($roll['open']>0): ?>, <?=$roll['open']?> open<?php endif; ?><?php if ($roll['blocked']>0): ?>, <span style="color:#b4232b"><?=$roll['blocked']?> blocked</span><?php endif; ?></span><?php endif; ?>
+      <div class="tr-sec">
+        <div class="tr-h">Readiness checklist
+          <?php if ($items): ?><span class="muted" style="font-weight:600;text-transform:none;letter-spacing:0"> — <?=$roll['ready']?>/<?=$roll['total']?> ready<?php if ($roll['open']>0): ?>, <?=$roll['open']?> open<?php endif; ?><?php if ($roll['blocked']>0): ?>, <span style="color:var(--bad)"><?=$roll['blocked']?> blocked</span><?php endif; ?></span><?php endif; ?>
+        </div>
         <?php if (!$items && $canEdit): ?>
-          <form method="post" action="/job-ready-seed" style="margin-top:6px">
+          <form method="post" action="/job-ready-seed">
             <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
-            <button class="btn btn-sm" type="submit">Add readiness checklist</button>
-            <span class="muted" style="font-size:12px">Optional — not every service needs it. Items are editable afterwards.</span>
+            <button class="btn secondary" type="submit">Add readiness checklist</button>
+            <span class="muted" style="font-size:12px;margin-left:8px">Optional — not every service needs it. Items are editable afterwards.</span>
           </form>
         <?php elseif ($items): ?>
-        <table class="tbl" style="width:100%;margin-top:6px;font-size:13px">
-          <thead><tr><th>Item</th><th>Status</th><?php if ($canEdit): ?><th></th><?php endif; ?></tr></thead>
+        <table class="grid" style="width:100%;margin-top:4px">
+          <thead><tr><th>Item</th><th>Status</th><?php if ($canEdit): ?><th style="width:1%">Update</th><?php endif; ?></tr></thead>
           <tbody>
-          <?php foreach ($items as $it): ?>
+          <?php foreach ($items as $it): $st=$it['status']; $tone = $st==='READY'?'p-ok':($st==='BLOCKED'?'p-bad':($st==='NA'?'p-mut':'p-warn')); ?>
             <tr>
               <td><?=$esc($it['item'])?> <span class="muted">· <?=$esc($it['category'])?></span><?php if (trim((string)$it['note'])!==''): ?><br><span class="muted"><?=$esc($it['note'])?></span><?php endif; ?></td>
-              <td><span class="badge"><?=$esc(TOSRM_READY_STATUS[$it['status']] ?? $it['status'])?></span></td>
+              <td><span class="pill <?=$tone?>"><?=$esc(TOSRM_READY_STATUS[$it['status']] ?? $it['status'])?></span></td>
               <?php if ($canEdit): ?>
               <td>
-                <form method="post" action="/job-ready-set" style="display:flex;gap:4px">
+                <form method="post" action="/job-ready-set" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
                   <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>"><input type="hidden" name="item_id" value="<?=$esc($it['id'])?>">
-                  <select name="status"><?php foreach (TOSRM_READY_STATUS as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$it['status']?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select>
-                  <input type="text" name="note" placeholder="Note" value="<?=$esc($it['note'])?>" style="width:120px">
-                  <button class="btn btn-sm" type="submit">Set</button>
+                  <select class="form-control" name="status" style="width:auto"><?php foreach (TOSRM_READY_STATUS as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$it['status']?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select>
+                  <input class="form-control" type="text" name="note" placeholder="Note" value="<?=$esc($it['note'])?>" style="width:140px">
+                  <button class="btn" type="submit">Set</button>
                 </form>
               </td>
               <?php endif; ?>
@@ -1508,26 +1523,27 @@ function tosrm_render_comms($entityKind, $entityId, $backAnchor = 'comms') {
     $kinds = defined('ACT_KINDS') ? ACT_KINDS : ['NOTE'=>'Note','CALL'=>'Call','EMAIL'=>'Email','WHATSAPP'=>'WhatsApp','MEETING'=>'Meeting'];
     ob_start(); ?>
     <div class="card tosrm-comms" style="margin-top:16px">
-      <h3 style="margin:0 0 10px">Communication log</h3>
+      <h3 style="margin:0 0 4px">Communication log</h3>
+      <p class="muted" style="font-size:13px;margin:0 0 12px">The significant calls, e-mails and meetings on this <?= function_exists('Tl') ? e(Tl('job')) : 'job' ?> — this does not replace e-mail or WhatsApp.</p>
       <?php if ($rows): ?>
-      <table class="tbl" style="width:100%;font-size:13px">
+      <table class="grid" style="width:100%">
         <thead><tr><th>When</th><th>Kind</th><th>Subject</th><th>By</th></tr></thead>
         <tbody><?php foreach ($rows as $a): ?>
           <tr><td><?=$esc(substr((string)($a['occurred_at'] ?? $a['created_at'] ?? ''),0,16))?></td>
-              <td><?=$esc($kinds[$a['kind']] ?? $a['kind'])?></td>
+              <td><span class="pill p-mut"><?=$esc($kinds[$a['kind']] ?? $a['kind'])?></span></td>
               <td><?=$esc($a['subject'])?><?php if (trim((string)($a['body']??''))!==''): ?><br><span class="muted"><?=$esc($a['body'])?></span><?php endif; ?></td>
               <td><?=$esc($a['owner'] ?: $a['created_by'])?></td></tr>
         <?php endforeach; ?></tbody>
       </table>
-      <?php else: ?><p class="muted">No communications logged yet. (This does not replace email or WhatsApp — it records the significant ones.)</p><?php endif; ?>
+      <?php else: ?><p class="muted" style="margin:0 0 4px">Nothing logged yet.</p><?php endif; ?>
       <?php if ($canEdit): ?>
-      <form method="post" action="/comm-add" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+      <form method="post" action="/comm-add" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px">
         <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>">
         <input type="hidden" name="entity_kind" value="<?=$esc($entityKind)?>"><input type="hidden" name="entity_id" value="<?=(int)$entityId?>">
-        <select name="kind"><?php foreach ($kinds as $k=>$v): ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
-        <input type="text" name="subject" placeholder="What was communicated?" style="flex:1;min-width:200px" required>
-        <input type="text" name="body" placeholder="Detail (optional)" style="flex:1;min-width:160px">
-        <button class="btn btn-sm" type="submit">Log</button>
+        <select class="form-control" name="kind" style="width:auto"><?php foreach ($kinds as $k=>$v): ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
+        <input class="form-control" type="text" name="subject" placeholder="What was communicated?" style="flex:1 1 220px;min-width:0" required>
+        <input class="form-control" type="text" name="body" placeholder="Detail (optional)" style="flex:1 1 160px;min-width:0">
+        <button class="btn" type="submit">Log</button>
       </form>
       <?php endif; ?>
     </div>
