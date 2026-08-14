@@ -10,7 +10,8 @@
   <a class="btn secondary" href="/m/inspectors">← Back to <?= e(THP('engineer')) ?></a>
 </div>
 
-<form method="post" action="/m/inspectors/<?= $ins ? 'edit?id=' . (int)$ins['id'] : 'new' ?>" class="panel" enctype="multipart/form-data">
+<div data-tabs data-tabs-key="inspector">
+<form method="post" action="/m/inspectors/<?= $ins ? 'edit?id=' . (int)$ins['id'] : 'new' ?>" class="panel" data-tab="Details" enctype="multipart/form-data">
   <div class="form-grid">
     <div class="ff"><label>First name *</label><input class="form-control" name="first_name" required value="<?= e($ins['first_name'] ?? '') ?>"></div>
     <div class="ff"><label>Middle name</label><input class="form-control" name="middle_name" value="<?= e($ins['middle_name'] ?? '') ?>"></div>
@@ -90,8 +91,8 @@
 </form>
 
 <?php if ($ins): ?>
-<div class="panel">
-  <h3 class="tab-sub">Digital signature <span class="muted">— added automatically to this <?= e(Tl('engineer')) ?>'s reports (IDEMS)</span></h3>
+<div class="panel" data-tab="Signature">
+  <h3 class="tab-sub" style="margin-top:0">Digital signature <span class="muted">— added automatically to this <?= e(Tl('engineer')) ?>'s reports (IDEMS)</span></h3>
   <?php if (!empty($ins['signature'])): ?><div style="margin-bottom:8px"><img src="<?= e($ins['signature']) ?>" alt="signature" style="max-width:240px;border:1px solid var(--line);border-radius:8px;background:#fff"></div><?php endif; ?>
   <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>" enctype="multipart/form-data">
     <input type="hidden" name="_do" value="signature">
@@ -106,8 +107,8 @@
 </div>
 
 <?php if ($ins): ?>
-<div class="panel" id="certs">
-  <h3 class="tab-sub">Certifications &amp; validity</h3>
+<div class="panel" id="certs" data-tab="Certificates">
+  <h3 class="tab-sub" style="margin-top:0">Certifications &amp; validity</h3>
   <p class="sub">The system e-mails the <?= e(Tl('engineer')) ?> and the QA/QC nominee when a certificate is within a month of expiry. Once the hard copy is received, update the validity date here.
     Tick <strong>Required</strong> on the ones this person may not work without<?php if (function_exists('accredited_pack_on') && accredited_pack_on()): ?> — <?= e(accreditation_ref('competence')) ?><?php endif; ?>. A required certificate that has lapsed
     <strong>stops them being allocated</strong>; a manager can still allow it, but must say why, and the reason is kept on the <?= e(Tl('job')) ?>.</p>
@@ -160,8 +161,8 @@
 <?php endif; ?>
 
 <?php if ($ins && is_master()): ?>
-<div class="panel" style="border:1px solid #d9b38c;background:#fffaf3">
-  <h3 class="tab-sub">Allowances &amp; rates <span class="muted">— Super Admin only. Not visible to anyone else.</span></h3>
+<div class="panel" data-tab="Allowances &amp; rates" style="border:1px solid #d9b38c;background:#fffaf3">
+  <h3 class="tab-sub" style="margin-top:0">Allowances &amp; rates <span class="muted">— Super Admin only. Not visible to anyone else.</span></h3>
   <p class="sub">Tick what this <?= e(Tl('engineer')) ?> is entitled to claim on the monthly voucher, and set their personal rate where it differs from the default. Blank rate = use the master default.</p>
   <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>">
     <input type="hidden" name="_do" value="allow_save">
@@ -196,6 +197,7 @@
   </form>
 </div>
 <?php endif; ?>
+</div><!-- /data-tabs (inspector) -->
 
 <script>
 window.SKILLS = <?= json_encode(skills_by_trade()) ?>;
