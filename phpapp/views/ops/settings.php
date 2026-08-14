@@ -35,6 +35,8 @@
 <?php endif; ?>
 
 <form method="post" action="/settings" enctype="multipart/form-data" class="panel settings-form">
+<div data-tabs data-tabs-key="prefs" data-tabs-order="Branding &amp; theme,Financial &amp; norms,Display &amp; terms,Numbering &amp; reports,Security">
+<section class="fs-pane" data-tab="Branding &amp; theme">
   <h3 class="tab-sub" style="margin-top:0;">Branding</h3>
   <div class="form-grid">
     <div class="ff"><label>Application name</label><input class="form-control" name="app_name" value="<?= e(setting_get('app_name','')) ?>" placeholder="e.g. Exaact Inspection Ops"></div>
@@ -92,7 +94,9 @@
     </div>
   </div>
 
-  <h3 class="tab-sub">Financial &amp; operations</h3>
+</section>
+<section class="fs-pane" data-tab="Financial &amp; norms">
+  <h3 class="tab-sub" style="margin-top:0">Financial &amp; operations</h3>
   <div class="form-grid">
     <div class="ff"><label>Financial year starts in</label>
       <select class="form-control" name="fy_start_month">
@@ -159,7 +163,9 @@
       <small class="muted">Sub-contractors stay <code>SC-</code>, freelancers <code>FL-</code>.</small></div>
   </div>
 
-  <h3 class="tab-sub">Display</h3>
+</section>
+<section class="fs-pane" data-tab="Display &amp; terms">
+  <h3 class="tab-sub" style="margin-top:0">Display</h3>
   <div class="form-grid">
     <div class="ff"><label>Currency symbol</label>
       <input class="form-control" name="currency_symbol" value="<?= e(setting_get('currency_symbol','')) ?>" placeholder="<?= e(cur_sym()) ?>" maxlength="4"></div>
@@ -178,7 +184,9 @@
   <textarea class="form-control" name="quote_terms" rows="10" style="font-family:inherit"><?= e(setting_get('quote_terms','') !== '' ? setting_get('quote_terms') : crm_default_terms()) ?></textarea>
 
   <?php if (function_exists('numbering_types')): ?>
-  <h3 class="tab-sub">Document numbering</h3>
+</section>
+<section class="fs-pane" data-tab="Numbering &amp; reports">
+  <h3 class="tab-sub" style="margin-top:0">Document numbering</h3>
   <p class="sub" style="margin-bottom:10px">Set how each reference is built — the prefix, the separator, how many digits,
     whether the financial year is in it, and the number to start from. The example updates as you change it. Numbers already
     issued are never renumbered; new ones follow the scheme from the next one on.</p>
@@ -255,7 +263,9 @@
         can see reports, or the primary contact if none.</small></div>
   </div>
 
-  <h3 class="tab-sub">Security</h3>
+</section>
+<section class="fs-pane" data-tab="Security">
+  <h3 class="tab-sub" style="margin-top:0">Security</h3>
   <p class="sub" style="margin-bottom:10px">
     These choose how strict each guard is. None of them switches a guard off — a password is always
     scrambled before it is stored, every save is always checked for where it came from, and every
@@ -354,6 +364,8 @@
   </div>
   <p class="muted" style="margin:6px 2px">Office 365: host <code>smtp.office365.com</code>, port <code>587</code>. Use an app password if MFA is on. <?= smtp_config() ? '<strong style="color:#15803d">✓ SMTP is configured — emails will auto-send.</strong>' : 'Not configured yet — emails are logged only.' ?></p>
 
+</section>
+</div><!-- /.prefs tabs -->
   <div style="margin-top:16px;"><button class="btn" type="submit">Save settings</button></div>
 </form>
 
