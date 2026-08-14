@@ -146,6 +146,170 @@ function cand_submission_dupes($cand) {
     return array_slice($out, 0, 5);
 }
 
+// ===========================================================================
+//  Phase 4 — intelligence (all deterministic & explainable; AI is opt-in and
+//  human-approved). Nothing here writes data or makes a decision on its own.
+// ===========================================================================
+
+// Lower-cased token set from a free-text string (skills, keywords, disciplines).
+function _rk_tokens($s) {
+    $s = strtolower((string)$s);
+    $parts = preg_split('/[,;\/\|\n]+|\s{2,}/', $s) ?: [];
+    $out = [];
+    foreach ($parts as $p) { $p = trim($p); if ($p !== '' && strlen($p) >= 2) $out[] = $p; }
+    return $out;
+}
+// Does any needle token appear in the haystack text?
+function _rk_hit($haystack, $needles) {
+    $h = strtolower((string)$haystack);
+    foreach ((array)$needles as $n) { $n = trim(strtolower((string)$n)); if ($n !== '' && strpos($h, $n) !== false) return true; }
+    return false;
+}
+
+// §16 — explainable Workforce-Fit of a candidate against a requirement.
+// Returns ['score'=>0..100, 'factors'=>[['label','state'=>ok|part|no,'note','wt'], …]].
+function recruit_fit_score($cand, $req) {
+    $F = [];
+    $add = function ($label, $state, $note, $wt) use (&$F) { $F[] = ['label' => $label, 'state' => $state, 'note' => $note, 'wt' => $wt]; };
+    $candText = strtolower(trim(($cand['trade_label'] ?? '') . ' ' . ($cand['skill_label'] ?? '') . ' ' . ($cand['cv_keywords'] ?? '') . ' ' . ($cand['designation'] ?? '')));
+
+    // Designation (20)
+    $rd = (string)($req['designation'] ?? ''); $cd = (string)($cand['designation'] ?? '');
+    if ($rd !== '' && $cd !== '') $add('Designation', $rd === $cd ? 'ok' : 'no', $rd === $cd ? 'matches' : 'differs', 20);
+    else $add('Designation', 'part', 'not specified', 20);
+
+    // Discipline / trade (20)
+    $disc = trim((string)($req['discipline'] ?? ''));
+    if ($disc !== '') $add('Discipline', _rk_hit($candText, _rk_tokens($disc)) ? 'ok' : 'no', $disc, 20);
+    else $add('Discipline', 'part', 'any', 20);
+
+    // Skills / certifications (15)
+    $sk = _rk_tokens($req['skills'] ?? '');
+    if ($sk) { $hit = array_filter($sk, fn($t) => strpos($candText, $t) !== false);
+        $add('Skills', count($hit) === count($sk) ? 'ok' : (count($hit) ? 'part' : 'no'), count($hit) . '/' . count($sk) . ' matched', 15); }
+    else $add('Skills', 'part', 'none required', 15);
+
+    // Experience (15)
+    $need = (float)($req['experience_min'] ?? 0); $have = (float)($cand['experience_years'] ?? 0);
+    if ($need > 0) $add('Experience', $have >= $need ? 'ok' : ($have >= $need - 1 ? 'part' : 'no'), $have . ' vs ' . $need . ' yrs', 15);
+    else $add('Experience', 'ok', $have . ' yrs', 15);
+
+    // Business unit (10)
+    $rs = (string)($req['sbu'] ?? ''); $cs = (string)($cand['sbu'] ?? '');
+    if ($rs !== '') $add('Business unit', $rs === $cs ? 'ok' : 'no', $rs === $cs ? 'same' : 'different', 10);
+    else $add('Business unit', 'part', 'any', 10);
+
+    // Location (10)
+    $loc = trim((string)($req['deploy_location'] ?? '') . ' ' . (string)($req['project_site'] ?? ''));
+    if (trim($loc) !== '' && trim((string)($cand['proposed_site'] ?? '')) !== '')
+        $add('Location', _rk_hit($loc, _rk_tokens($cand['proposed_site'])) || _rk_hit($cand['proposed_site'], _rk_tokens($loc)) ? 'ok' : 'no', 'proposed vs site', 10);
+    else $add('Location', 'part', 'flexible', 10);
+
+    // Cost vs billing rate (10)
+    $rate = (float)($cand['expected_rate'] ?? 0); $bill = (float)($req['billing_rate'] ?? 0);
+    if ($rate > 0 && $bill > 0) $add('Cost', $rate <= $bill ? 'ok' : ($rate <= $bill * 1.1 ? 'part' : 'no'), 'expected vs bill rate', 10);
+    else $add('Cost', 'part', 'not priced', 10);
+
+    $score = 0; $max = 0;
+    foreach ($F as $f) { $max += $f['wt']; $score += $f['wt'] * ($f['state'] === 'ok' ? 1 : ($f['state'] === 'part' ? 0.5 : 0)); }
+    return ['score' => $max ? (int)round($score / $max * 100) : 0, 'factors' => $F];
+}
+function recruit_fit_band($s) { return $s >= 80 ? ['Strong', 'p-ok'] : ($s >= 55 ? ['Fair', 'p-warn'] : ['Weak', 'p-bad']); }
+
+// §18 — Requirement Health: is this vacancy on track to fill in time?
+function recruit_req_health($req) {
+    $id = (int)($req['id'] ?? 0);
+    $qty = max(1, (int)($req['quantity'] ?? 1));
+    $one = function ($sql, $a = []) { try { return (int)(ops_one($sql, $a)['n'] ?? 0); } catch (Throwable $e) { return 0; } };
+    $filled     = $one("SELECT COUNT(*) n FROM candidates WHERE requisition_id=? AND stage IN ('OFFERED','ACCEPTED')", [$id]);
+    $inPipe     = $one("SELECT COUNT(*) n FROM candidates WHERE requisition_id=? AND stage IN ('RECEIVED','SUBMITTED','SHORTLISTED','INTERVIEW','HOLD')", [$id]);
+    $vacancies  = max(0, $qty - $filled);
+    $start = substr((string)($req['start_date'] ?? ''), 0, 10);
+    $days  = $start !== '' && function_exists('days_between') ? days_between(date('Y-m-d'), $start) : null;
+
+    $score = 100; $reasons = []; $actions = [];
+    if ($vacancies > 0) {
+        if ($inPipe === 0)         { $score -= 55; $reasons[] = 'No candidates in the pipeline'; $actions[] = 'Start sourcing / activate an agency'; }
+        elseif ($inPipe < $vacancies) { $score -= 30; $reasons[] = "$inPipe in pipeline for $vacancies vacancy(ies)"; $actions[] = 'Add more candidates for cover'; }
+        else                        { $reasons[] = "$inPipe in pipeline"; }
+        if ($days !== null) {
+            if ($days < 0)      { $score -= 25; $reasons[] = 'Start date already passed'; $actions[] = 'Confirm revised start with client'; }
+            elseif ($days <= 7) { $score -= 25; $reasons[] = "Mobilises in $days day(s)"; $actions[] = 'Fast-track shortlisting & documents'; }
+            elseif ($days <= 21){ $score -= 10; $reasons[] = "Mobilises in $days day(s)"; }
+        }
+    } else { $reasons[] = 'All positions filled'; }
+    $age = ($req['created_at'] ?? '') !== '' && function_exists('days_between') ? days_between(substr((string)$req['created_at'], 0, 10), date('Y-m-d')) : null;
+    if ($vacancies > 0 && $age !== null && $age > 21 && $inPipe === 0) { $score -= 10; $reasons[] = "Open $age days with no pipeline"; }
+    $score = max(0, min(100, $score));
+    $band = $score >= 75 ? ['On track', 'p-ok'] : ($score >= 45 ? ['At risk', 'p-warn'] : ['Critical', 'p-bad']);
+    if ($vacancies > 0 && !$actions) $actions[] = 'Keep the pipeline warm';
+    return ['score' => $score, 'band' => $band, 'vacancies' => $vacancies, 'filled' => $filled, 'quantity' => $qty,
+            'pipeline' => $inPipe, 'days_to_start' => $days, 'reasons' => $reasons, 'actions' => $actions];
+}
+
+// §17 — Deployment Readiness of a hired/offered candidate. Reuses the deputation
+// mobilisation checklist (pdso_mob_readiness) when a deputation exists; otherwise
+// derives from the candidate + the requirement's compliance requirements.
+function recruit_deploy_readiness($cand, $req = null) {
+    $items = [];
+    $add = function ($label, $ok, $reqd = true) use (&$items) { $items[] = ['label' => $label, 'ok' => (bool)$ok, 'req' => (bool)$reqd]; };
+    $stage = (string)($cand['stage'] ?? '');
+    $add('Technical fit / shortlisted', in_array($stage, ['SHORTLISTED','INTERVIEW','OFFERED','ACCEPTED'], true));
+    $add('Client approval', (($cand['interview_outcome'] ?? '') === 'SELECTED') || (($cand['client_feedback'] ?? '') === 'SHORTLISTED'));
+    $add('CV on file', trim((string)($cand['cv_link'] ?? '')) !== '' || trim((string)($cand['cv_text'] ?? '')) !== '');
+    $add('Credentials requested', !empty($cand['credential_requested']));
+    // Requirement-driven compliance gates (only those the requirement demands).
+    if ($req) {
+        foreach ([['cmp_medical','Medical fitness'], ['cmp_pcc','Police verification'], ['cmp_gate_pass','Gate pass'],
+                  ['cmp_safety','Safety induction'], ['cmp_certification','Certification']] as $c) {
+            if (!empty($req[$c[0]])) $add($c[1], false);   // required by the role; unverified until an inspector record exists
+        }
+    }
+    $add('Joining confirmed', $stage === 'ACCEPTED', true);
+    // If already hired and on a deputation, prefer the live mobilisation checklist.
+    if (!empty($cand['inspector_id']) && function_exists('pdso_mob_readiness')) {
+        try {
+            $job = ops_one("SELECT id FROM jobs WHERE inspector_id=? ORDER BY id DESC LIMIT 1", [(int)$cand['inspector_id']]);
+            if ($job) { $mr = pdso_mob_readiness((int)$job['id']); if (($mr['total'] ?? 0) > 0) {
+                $items[] = ['label' => 'Mobilisation checklist', 'ok' => !empty($mr['ready']), 'req' => true,
+                            'note' => ($mr['required_done'] ?? 0) . '/' . ($mr['required'] ?? 0) . ' required done']; } }
+        } catch (Throwable $e) {}
+    }
+    $reqItems = array_filter($items, fn($i) => $i['req']);
+    $done = count(array_filter($reqItems, fn($i) => $i['ok']));
+    $pct = count($reqItems) ? (int)round($done / count($reqItems) * 100) : 0;
+    return ['pct' => $pct, 'done' => $done, 'total' => count($reqItems), 'ready' => $pct === 100, 'items' => $items];
+}
+
+// §15 — AI extraction of a requirement from a pasted email / JD / WhatsApp.
+// Returns JSON {ok, fields:{…}} for the form to fill in — the user always
+// reviews and saves; the AI never creates a requirement itself.
+function recruit_ai_extract() {
+    header('Content-Type: application/json');
+    if (!function_exists('ai_enabled') || !ai_enabled() || !function_exists('ai_chat')) {
+        echo json_encode(['ok' => false, 'error' => 'AI is not enabled. Add a provider key under Settings → AI providers.']); return;
+    }
+    if (function_exists('csrf_ok') && !csrf_ok($_POST['_csrf'] ?? '')) { echo json_encode(['ok' => false, 'error' => 'Session expired — reload the page.']); return; }
+    $text = trim((string)($_POST['text'] ?? ''));
+    if ($text === '') { echo json_encode(['ok' => false, 'error' => 'Paste the requirement text first.']); return; }
+    $sys = "You extract a structured recruitment requirement from a client's message (email / job description / WhatsApp) "
+         . "for a technical-manpower / inspection agency. Return ONLY compact JSON, no prose, with these keys (use \"\" or omit when unknown): "
+         . "designation, quantity (integer), discipline, category, skills, qualification, experience_min (years, number), "
+         . "project_site, deploy_location, work_model (DEPUTATION|SPOT|CONTRACT|PERMANENT), start_date (YYYY-MM-DD), end_date (YYYY-MM-DD), "
+         . "duty_hours, shift (GENERAL|DAY|NIGHT|ROTATING|FLEX), billing_rate (number), rate_basis (MONTHLY|MANMONTH|MANDAY|DAILY|FIXED), "
+         . "contact_name, contact_phone, notes. Never invent facts.";
+    try { [$out, $err] = ai_chat($sys, $text, 700); } catch (Throwable $e) { $out = null; $err = $e->getMessage(); }
+    if (!is_string($out) || trim($out) === '') { echo json_encode(['ok' => false, 'error' => $err ?: 'The AI did not respond.']); return; }
+    $json = $out; if (preg_match('/\{.*\}/s', $out, $m)) $json = $m[0];
+    $data = json_decode($json, true);
+    if (!is_array($data)) { echo json_encode(['ok' => false, 'error' => 'Could not read the AI response — try again or fill the form manually.']); return; }
+    $allow = ['designation','quantity','discipline','category','skills','qualification','experience_min','project_site',
+        'deploy_location','work_model','start_date','end_date','duty_hours','shift','billing_rate','rate_basis','contact_name','contact_phone','notes'];
+    $fields = [];
+    foreach ($allow as $k) if (isset($data[$k]) && is_scalar($data[$k]) && (string)$data[$k] !== '') $fields[$k] = (string)$data[$k];
+    echo json_encode(['ok' => true, 'fields' => $fields]);
+}
+
 function recruit_home_can() {
     return function_exists('can') && (can('mod.hiring.view') || (function_exists('is_master') && is_master()));
 }

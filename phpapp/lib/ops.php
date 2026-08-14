@@ -2050,7 +2050,7 @@ function ops_module_gate($route) {
         // from someone who owns half of it, or show them findings they cannot act on.
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring',
-        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring',
+        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','req-ai-extract'=>'hiring',
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads',
         'opportunity-move'=>'leads','opportunity-quote'=>'leads','opportunity-from-lead'=>'leads',
@@ -2269,6 +2269,10 @@ function ops_dispatch($route, $method) {
             ops_requisitions($route, $method); return true;
         case $route === 'recruitment':
             return ops_recruitment_home($method);
+        case $route === 'req-ai-extract':
+            ops_require(is_coordinator_level());
+            if ($method === 'POST' && function_exists('recruit_ai_extract')) { recruit_ai_extract(); return true; }
+            header('Content-Type: application/json'); echo json_encode(['ok' => false, 'error' => 'POST only']); return true;
         case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry' || $route === 'voucher-save' || $route === 'voucher-header' || $route === 'voucher-status' || $route === 'voucher-print' || $route === 'voucher-file' || $route === 'voucher-csv':
             ops_vouchers($route, $method); return true;
         case $route === 'my-jobs':
@@ -3868,8 +3872,23 @@ function ops_requisitions($route, $method) {
         if (!$req) { http_response_code(404); view('notfound'); return; }
         $outgoing = $req['outgoing_inspector_id'] ? ops_one("SELECT id,name,salary_ctc,agency_cost FROM inspectors WHERE id=?", [$req['outgoing_inspector_id']]) : null;
         $hired = $req['hired_inspector_id'] ? ops_one("SELECT id,name,salary_ctc,agency_cost,placement_fee,roll_type FROM inspectors WHERE id=?", [$req['hired_inspector_id']]) : null;
-        $cands = ops_all("SELECT * FROM candidates WHERE requisition_id=? ORDER BY id DESC", [$req['id']]);
-        view('ops/requisition_detail', ['req' => $req, 'outgoing' => $outgoing, 'hired' => $hired, 'cands' => $cands]); return;
+        $cands = ops_all("SELECT c.*, t.label trade_label, s.label skill_label FROM candidates c
+                          LEFT JOIN lookup_values t ON t.id=c.trade_id LEFT JOIN lookup_values s ON s.id=c.skill_id
+                          WHERE c.requisition_id=? ORDER BY c.id DESC", [$req['id']]) ?: [];
+        // Phase 4 intelligence: requirement health + explainable fit + pool matches.
+        $health = function_exists('recruit_req_health') ? recruit_req_health($req) : null;
+        if (function_exists('recruit_fit_score')) foreach ($cands as &$cd) { $cd['fit'] = recruit_fit_score($cd, $req); } unset($cd);
+        $pool = [];
+        if (function_exists('recruit_fit_score')) {
+            $others = ops_all("SELECT c.*, t.label trade_label, s.label skill_label FROM candidates c
+                               LEFT JOIN lookup_values t ON t.id=c.trade_id LEFT JOIN lookup_values s ON s.id=c.skill_id
+                               WHERE (c.requisition_id IS NULL OR c.requisition_id<>?)
+                                 AND c.stage NOT IN ('ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED')
+                               ORDER BY c.id DESC LIMIT 80", [$req['id']]) ?: [];
+            foreach ($others as $o) { $f = recruit_fit_score($o, $req); if ($f['score'] >= 55) { $o['fit'] = $f; $pool[] = $o; } }
+            usort($pool, fn($a, $b) => $b['fit']['score'] <=> $a['fit']['score']); $pool = array_slice($pool, 0, 5);
+        }
+        view('ops/requisition_detail', ['req' => $req, 'outgoing' => $outgoing, 'hired' => $hired, 'cands' => $cands, 'health' => $health, 'pool' => $pool]); return;
     }
 }
 
@@ -4063,7 +4082,12 @@ function ops_candidates($route, $method) {
         $events = ops_all("SELECT * FROM candidate_events WHERE candidate_id=? ORDER BY id DESC", [$cand['id']]);
         $dupes    = function_exists('cand_find_duplicates') ? cand_find_duplicates($cand, (int)$cand['id']) : [];
         $subDupes = function_exists('cand_submission_dupes') ? cand_submission_dupes($cand) : [];
-        view('ops/candidate_detail', ['cand' => $cand, 'events' => $events, 'dupes' => $dupes, 'subDupes' => $subDupes]);
+        // Phase 4 intelligence: fit against the linked requirement + deployment readiness.
+        $linkReq = !empty($cand['requisition_id']) ? ops_one("SELECT * FROM requisitions WHERE id=?", [(int)$cand['requisition_id']]) : null;
+        $fit = ($linkReq && function_exists('recruit_fit_score')) ? recruit_fit_score($cand, $linkReq) : null;
+        $readiness = function_exists('recruit_deploy_readiness') ? recruit_deploy_readiness($cand, $linkReq) : null;
+        view('ops/candidate_detail', ['cand' => $cand, 'events' => $events, 'dupes' => $dupes, 'subDupes' => $subDupes,
+            'fit' => $fit, 'readiness' => $readiness, 'linkReq' => $linkReq]);
         return;
     }
 }

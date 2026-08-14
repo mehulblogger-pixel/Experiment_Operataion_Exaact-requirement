@@ -52,6 +52,38 @@ if ($dupes): ?>
   <?php endif; ?>
 </div>
 
+<?php // §16 — explainable workforce fit against the linked requirement.
+$fit = $fit ?? null; $readiness = $readiness ?? null; $linkReq = $linkReq ?? null;
+if (!empty($fit) && !empty($linkReq)): [$fl, $ftone] = recruit_fit_band($fit['score']); ?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Workforce fit <span class="muted">— against <?= e($linkReq['req_code']) ?> · <?= e(DESIGNATIONS[$linkReq['designation']] ?? ($linkReq['designation'] ?? '')) ?></span></h3>
+  <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+    <div style="text-align:center;min-width:82px"><div style="font-size:30px;font-weight:800;line-height:1;color:var(--<?= $fit['score']>=80?'ok':($fit['score']>=55?'warn':'bad') ?>,#333)"><?= (int)$fit['score'] ?>%</div><div class="pill <?= e($ftone) ?>" style="margin-top:4px"><?= e($fl) ?></div></div>
+    <div style="flex:1;min-width:240px;display:flex;flex-wrap:wrap;gap:6px">
+      <?php foreach ($fit['factors'] as $f): $ic = $f['state'] === 'ok' ? '✓' : ($f['state'] === 'part' ? '~' : '✕'); $tone = $f['state'] === 'ok' ? 'p-ok' : ($f['state'] === 'part' ? 'p-mut' : 'p-bad'); ?>
+        <span class="pill <?= $tone ?>" style="font-size:11px"><?= $ic ?> <?= e($f['label']) ?><?= $f['note'] ? ' · ' . e($f['note']) : '' ?></span>
+      <?php endforeach; ?>
+    </div>
+  </div>
+  <p class="muted" style="font-size:11.5px;margin:8px 0 0">A guide to shortlisting from the recorded data — not an automatic hiring decision.</p>
+</div>
+<?php endif; ?>
+
+<?php // §17 — deployment readiness for a candidate heading to mobilisation.
+if (!empty($readiness) && in_array($cand['stage'], ['INTERVIEW','OFFERED','ACCEPTED'], true) && ($readiness['total'] ?? 0) > 0): ?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Deployment readiness</h3>
+  <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+    <div style="text-align:center;min-width:82px"><div style="font-size:30px;font-weight:800;line-height:1;color:var(--<?= !empty($readiness['ready'])?'ok':'warn' ?>,#333)"><?= (int)$readiness['pct'] ?>%</div><div class="muted" style="font-size:11px;margin-top:4px"><?= (int)$readiness['done'] ?>/<?= (int)$readiness['total'] ?> ready</div></div>
+    <div style="flex:1;min-width:240px;display:flex;flex-wrap:wrap;gap:6px">
+      <?php foreach ($readiness['items'] as $it): if (empty($it['req']) && !empty($it['ok'])) continue; ?>
+        <span class="pill <?= !empty($it['ok']) ? 'p-ok' : 'p-warn' ?>" style="font-size:11px"><?= !empty($it['ok']) ? '✓' : '○' ?> <?= e($it['label']) ?><?= !empty($it['note']) ? ' · ' . e($it['note']) : '' ?></span>
+      <?php endforeach; ?>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
 </section>
 <section data-tab="CV">
 <!-- CV analysis + keyword search -->

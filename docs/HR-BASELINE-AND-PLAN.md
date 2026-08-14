@@ -157,10 +157,18 @@ and ends with a regression pass against §45.
   same person was already submitted to the same client and needs "submit anyway".
   All read-only helpers (`cand_find_duplicates`, `cand_submission_dupes`) — no
   merge/delete, no schema change. Regression-clean.
-- **Phase 4 — Intelligence.** Explainable Workforce Fit score; Requirement Health;
-  Deployment Readiness (wrap `pdso_mob_readiness` + compliance docs); AI
-  requirement extraction from pasted text; AI CV enhancements. Computed/additive;
-  AI always human-approved.
+- **Phase 4 — Intelligence.** ✅ DONE. Explainable Workforce Fit score
+  (`recruit_fit_score` — 8 weighted factors = 100, each returning a ✓/✕ reason
+  pill) surfaced as a Fit column on the requisition's candidate table and a
+  Workforce-fit card on the candidate 360; Requirement Health
+  (`recruit_req_health` — score/band/vacancies/pipeline/days-to-start with a
+  "do next" action) as a card on the requisition detail plus a best-matches-from-
+  pool panel; Deployment Readiness (`recruit_deploy_readiness` — wraps
+  `pdso_mob_readiness` for hired candidates and folds in compliance docs) as a
+  checklist card on the candidate 360; AI requirement extraction from pasted text
+  (`recruit_ai_extract` → `/req-ai-extract`, gated on `ai_enabled`, strict-JSON
+  system prompt, fills the form for human review). All computed/additive — no
+  schema change, AI always human-approved, degrades gracefully when AI is off.
 - **Phase 5 — Commercials.** Per-assignment estimate → approved → actual cost +
   cost/margin variance (extend costing); billing-readiness packet handed to the
   existing billing/finance flow.

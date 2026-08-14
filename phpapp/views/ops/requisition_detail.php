@@ -11,6 +11,26 @@
   <?php if (is_coordinator_level()): ?><a class="btn secondary" href="/requisition-edit?id=<?= (int)$req['id'] ?>">Edit</a><?php endif; ?>
 </div>
 
+<?php // §18 — Requirement Health: is this vacancy on track to fill in time?
+$h = $health ?? null; if ($h): [$hband, $htone] = $h['band']; ?>
+<div class="panel" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+  <div style="text-align:center;min-width:96px">
+    <div style="font-size:34px;font-weight:800;line-height:1;color:var(--<?= $h['score']>=75?'ok':($h['score']>=45?'warn':'bad') ?>,#333)"><?= (int)$h['score'] ?></div>
+    <div class="pill <?= e($htone) ?>" style="margin-top:5px"><?= e($hband) ?></div>
+    <div class="muted" style="font-size:11px;margin-top:4px">Requirement health</div>
+  </div>
+  <div style="flex:1;min-width:220px">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-bottom:6px">
+      <span><b><?= (int)$h['filled'] ?></b> / <?= (int)$h['quantity'] ?> filled</span>
+      <span><b><?= (int)$h['pipeline'] ?></b> in pipeline</span>
+      <?php if ($h['days_to_start'] !== null): ?><span>mobilises in <b><?= (int)$h['days_to_start'] ?></b> day(s)</span><?php endif; ?>
+    </div>
+    <?php if (!empty($h['reasons'])): ?><div class="muted" style="font-size:12.5px"><?= e(implode(' · ', $h['reasons'])) ?></div><?php endif; ?>
+    <?php if (!empty($h['actions'])): ?><div style="margin-top:6px;font-size:12.5px"><b>Do next:</b> <?= e(implode(' · ', $h['actions'])) ?></div><?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <div class="panel"><div class="kv-grid">
   <div><span class="k">Type</span><?= e(lk_options_or('requisition_type', REQ_TYPES)[$req['req_type']] ?? '') ?></div>
   <div><span class="k">Project / site</span><?= e($req['project_site'] ?: '—') ?></div>
@@ -95,13 +115,35 @@ $commer = $has('billing_rate') || (float)($req['expected_revenue'] ?? 0) != 0 ||
 
 <div class="panel"><h3 class="tab-sub" style="margin-top:0">Candidates against this requisition <span class="muted">(<?= count($cands) ?>)</span></h3>
   <?php if ($cands): ?>
-  <table class="dt"><thead><tr><th>Candidate</th><th>Source</th><th>Stage</th><th></th></tr></thead><tbody>
+  <table class="dt"><thead><tr><th>Candidate</th><th>Source</th><th>Stage</th><th>Fit</th><th></th></tr></thead><tbody>
     <?php foreach ($cands as $cd): ?><tr>
       <td><b><?= e(candidate_name($cd)) ?></b></td>
       <td><?= e(lk_options_or('candidate_source', CAND_SOURCES)[$cd['source']] ?? $cd['source']) ?></td>
       <td><span class="pill <?= in_array($cd['stage'],['ACCEPTED'],true)?'p-ok':(in_array($cd['stage'],['REJECTED','WITHDRAWN','OFFER_DECLINED'],true)?'p-bad':'p-info') ?>"><?= e(lk_options_or('candidate_stage', CAND_STAGES)[$cd['stage']] ?? $cd['stage']) ?></span></td>
+      <td><?php $ft = $cd['fit'] ?? null; if ($ft) { [$fl, $ftone] = recruit_fit_band($ft['score']);
+            $tip = implode(' · ', array_map(fn($x) => $x['label'] . ': ' . $x['note'], array_filter($ft['factors'], fn($x) => $x['state'] !== 'part'))); ?>
+        <span class="pill <?= e($ftone) ?>" title="<?= e($tip) ?>"><?= (int)$ft['score'] ?>% <?= e($fl) ?></span><?php } else { echo '—'; } ?></td>
       <td><a class="btn small secondary" href="/candidate?id=<?= (int)$cd['id'] ?>">Open</a></td>
     </tr><?php endforeach; ?>
   </tbody></table>
   <?php else: ?><p class="muted">No candidates yet. Add a CV against this requisition from <a href="/candidate-new?req=<?= (int)$req['id'] ?>">Hiring</a>.</p><?php endif; ?>
 </div>
+
+<?php // §16/§19 — before recruiting outside, who in the existing pool fits?
+if (!empty($pool)): ?>
+<div class="panel"><h3 class="tab-sub" style="margin-top:0">💡 Best matches from the pool <span class="muted">— existing people who fit, not yet on this requirement</span></h3>
+  <table class="dt"><thead><tr><th>Candidate</th><th>Designation</th><th>Fit</th><th>Why</th><th></th></tr></thead><tbody>
+    <?php foreach ($pool as $pc): [$fl, $ftone] = recruit_fit_band($pc['fit']['score']);
+      $why = implode(' · ', array_map(fn($x) => $x['label'], array_filter($pc['fit']['factors'], fn($x) => $x['state'] === 'ok'))); ?>
+    <tr>
+      <td><b><?= e(candidate_name($pc)) ?></b> <span class="muted"><?= e($pc['cand_code']) ?></span></td>
+      <td><?= e(lk_options_or('designation', DESIGNATIONS)[$pc['designation']] ?? ($pc['designation'] ?: '—')) ?></td>
+      <td><span class="pill <?= e($ftone) ?>"><?= (int)$pc['fit']['score'] ?>% <?= e($fl) ?></span></td>
+      <td class="muted" style="font-size:12px"><?= e($why ?: '—') ?></td>
+      <td><a class="btn small secondary" href="/candidate?id=<?= (int)$pc['id'] ?>">Open</a></td>
+    </tr>
+    <?php endforeach; ?>
+  </tbody></table>
+  <p class="muted" style="font-size:12px;margin:6px 2px 0">Scored on discipline, skills, experience, designation, business unit, location and cost — reuse a fit person before sourcing externally.</p>
+</div>
+<?php endif; ?>

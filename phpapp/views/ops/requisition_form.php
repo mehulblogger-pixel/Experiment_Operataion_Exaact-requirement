@@ -41,6 +41,43 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
     <span class="hint">Simple asks only the essentials. Advanced reveals discipline, deployment, selection, compliance and commercials.</span>
   </div>
 
+  <?php // §15 — paste a requirement, let AI extract the fields (human always reviews).
+  if (function_exists('ai_enabled') && ai_enabled()): ?>
+  <div class="rq-sec" style="border-color:#c7d2fe;background:#eef2ff">
+    <h3 style="color:#3730a3"><span class="num" style="background:#e0e7ff;color:#3730a3">✨</span> Paste a requirement — let AI fill the form</h3>
+    <p class="sub" style="margin:0 0 8px">Paste the client's email, job description or WhatsApp message. AI extracts the fields for you to <b>review before saving</b> — it never creates the requirement itself.</p>
+    <textarea class="form-control" id="ai_src" rows="4" placeholder="e.g. We need 5 senior welding inspectors (CSWIP 3.1) at our Dahej site for 12 months, day shift; gate pass and medical required; rate around 90k per month…"></textarea>
+    <div style="margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button type="button" class="btn" id="ai_go">✨ Extract with AI</button>
+      <span id="ai_msg" class="muted" style="font-size:12.5px"></span>
+    </div>
+  </div>
+  <script>
+  (function(){
+    var go=document.getElementById('ai_go'), src=document.getElementById('ai_src'), msg=document.getElementById('ai_msg'), form=document.getElementById('rqForm');
+    if(!go||!form) return;
+    function setField(name,val){ if(val===undefined||val===null||String(val)==='') return; var el=form.elements[name]; if(!el||el.length===undefined&&!el.tagName) return;
+      if(el.tagName==='SELECT'){ var v=String(val).toLowerCase().trim();
+        for(var i=0;i<el.options.length;i++){ var o=el.options[i]; var ov=o.value.toLowerCase(), ot=o.text.toLowerCase();
+          if(ov===v||ot===v||(v.length>2&&(ot.indexOf(v)>=0||v.indexOf(ov)>=0&&ov!=='' ))){ el.selectedIndex=i; el.dispatchEvent(new Event('change')); return; } } }
+      else { el.value=val; el.dispatchEvent(new Event('input')); } }
+    go.addEventListener('click', function(){
+      var text=(src.value||'').trim(); if(!text){ msg.textContent='Paste the requirement text first.'; return; }
+      go.disabled=true; msg.textContent='Reading…';
+      var fd=new FormData(); fd.append('_csrf','<?= e(csrf_token()) ?>'); fd.append('text',text);
+      fetch('/req-ai-extract',{method:'POST',body:fd,headers:{'X-Requested-With':'fetch'}}).then(function(r){return r.json();}).then(function(d){
+        go.disabled=false;
+        if(!d||!d.ok){ msg.textContent=(d&&d.error)||'Could not extract — fill the form manually.'; return; }
+        var f=d.fields||{}, n=0;
+        ['designation','quantity','discipline','category','skills','qualification','experience_min','project_site','deploy_location','work_model','start_date','end_date','duty_hours','shift','billing_rate','rate_basis','contact_name','contact_phone','notes'].forEach(function(k){ if(f[k]!==undefined&&String(f[k])!==''){ setField(k,f[k]); n++; } });
+        form.classList.remove('rq-simple'); var segs=form.querySelectorAll('.rq-seg button'); for(var j=0;j<segs.length;j++){ segs[j].classList.toggle('on', segs[j].dataset.mode==='advanced'); }
+        msg.innerHTML='<b style="color:#3730a3">AI filled '+n+' field(s)</b> — please review every field before saving.';
+      }).catch(function(){ go.disabled=false; msg.textContent='Network error — try again.'; });
+    });
+  })();
+  </script>
+  <?php endif; ?>
+
   <!-- ===== 1 · Client & position ===== -->
   <div class="rq-sec">
     <h3><span class="num">1</span> Client &amp; position</h3>
