@@ -1348,7 +1348,37 @@
     initSectionTabs();
     initTabValidation();
     initTabAnchors();
+    initModuleCrumb();
     initResponsiveTables();
+  }
+
+  // The breadcrumb on a register read "Home › Opportunities" — nothing took you
+  // back to the area it lives in. The left menu already knows which area is
+  // open (its item is highlighted), so slot that area in right after Home:
+  // "Home › Sales › Opportunities", and the middle crumb returns to the area
+  // home. One place, every screen — no per-page breadcrumb to maintain.
+  function initModuleCrumb() {
+    var crumbs = document.querySelector('.crumbs');
+    if (!crumbs) return;
+    var AREAS = ['/sales', '/operations', '/quality', '/reporting', '/money', '/insights', '/directory', '/admin'];
+    var active = null;
+    Array.prototype.forEach.call(document.querySelectorAll('.side-nav a.s-item.on'), function (a) {
+      if (!active && AREAS.indexOf(a.getAttribute('href')) !== -1) active = a;
+    });
+    if (!active) return;
+    var href = active.getAttribute('href');
+    if (window.location.pathname === href) return;          // already on the area home
+    if (crumbs.querySelector('a[href="' + href + '"]')) return;  // area crumb already present
+    var home = crumbs.querySelector('a');
+    if (!home || home.getAttribute('href') !== '/') return;  // only augment the standard Home › … crumb
+    var labelEl = active.querySelector('span:not(.s-ic)');
+    var label = (labelEl ? labelEl.textContent : active.textContent).trim();
+    if (!label) return;
+    var mod = document.createElement('a');
+    mod.setAttribute('href', href);
+    mod.textContent = label;
+    home.parentNode.insertBefore(document.createTextNode(' › '), home.nextSibling);
+    home.parentNode.insertBefore(mod, home.nextSibling.nextSibling);
   }
 
   // An in-page link (#contract, #revisions …) whose target has been tucked
