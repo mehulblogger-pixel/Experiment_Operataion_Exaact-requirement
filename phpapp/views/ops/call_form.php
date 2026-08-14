@@ -42,6 +42,22 @@ document.addEventListener('DOMContentLoaded', function () {
     mark.addEventListener('change', clear);
     el.addEventListener('change', clear);
   });
+  // If the first bad box sits on a tab that is not the open one, switch to it —
+  // otherwise the person is looking at a page with no visible error.
+  if (first) {
+    var pane = first.closest('[data-tab]');
+    if (pane) {
+      var label = pane.getAttribute('data-tab');
+      var bar = pane.closest('[data-tabs]');
+      bar = bar ? bar.previousElementSibling : null;   // the tab bar the engine inserts
+      if (bar && bar.classList.contains('tabbar')) {
+        Array.prototype.forEach.call(bar.querySelectorAll('.tabbtn'), function (b) {
+          var t = (b.textContent || '').replace(/\s+/g, ' ').trim();
+          if (t === (label || '').replace(/\s+/g, ' ').trim()) b.click();
+        });
+      }
+    }
+  }
   var msg = document.getElementById('call_err');
   if (msg) msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
   if (first) setTimeout(function () { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }, 350);
@@ -51,6 +67,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <form method="post" action="<?= $isEdit ? '/call-edit?id=' . (int)$call['id'] : '/call-new' ?>" class="panel">
 
+<div data-tabs data-tabs-key="callform" class="form-tabs">
+<section class="fs-pane" data-tab="<?= e(T('client')) ?> &amp; <?= e(Tl('quote')) ?>">
   <h3 class="tab-sub" style="margin-top:0">1. <?= e(T('client')) ?> &amp; <?= e(Tl('quote')) ?></h3>
   <?php // §b — a party added in a hurry has a name and nothing else. Say so here,
         // while the client is still on the phone, rather than three weeks later
@@ -96,7 +114,9 @@ document.addEventListener('DOMContentLoaded', function () {
       <small class="muted">Travels with the <?= e(Tl('job')) ?>, so the <?= e(Tl('engineer')) ?> gets it too.</small></div>
   </div>
 
-  <h3 class="tab-sub">2. What is being inspected <span class="muted">— filled from the <?= e(Tl('quote')) ?>, change if this <?= e(Tl('call')) ?> differs</span></h3>
+</section>
+<section class="fs-pane" data-tab="What's inspected">
+  <h3 class="tab-sub" style="margin-top:0">2. What is being inspected <span class="muted">— filled from the <?= e(Tl('quote')) ?>, change if this <?= e(Tl('call')) ?> differs</span></h3>
   <div class="form-grid">
     <div class="ff"><label><?= e(T('sbu')) ?></label>
       <select class="form-control" id="sbu_sel" name="sbu"><option value="">—</option>
@@ -156,7 +176,9 @@ document.addEventListener('DOMContentLoaded', function () {
         // worked out on the server — Sundays and the branch's own public
         // holidays are not working days, and nobody should be counting those by
         // hand against a wall calendar. ?>
-  <h3 class="tab-sub">3. When</h3>
+</section>
+<section class="fs-pane" data-tab="When">
+  <h3 class="tab-sub" style="margin-top:0">3. When</h3>
   <div class="form-grid">
     <div class="ff"><label><?= e(TH('call')) ?> received <span class="muted">— the day the contracting <?= e(Tl('office')) ?> got it</span></label>
       <input class="form-control" type="date" name="call_received_date" value="<?= e($call['call_received_date'] ?? date('Y-m-d')) ?>"></div>
@@ -246,7 +268,9 @@ document.addEventListener('DOMContentLoaded', function () {
         // server as the boxes are filled, so nobody presses Save wondering. ?>
   <div class="msg" id="sched_out" style="display:none;margin:8px 0"></div>
 
-  <h3 class="tab-sub">4. Which <?= e(TP('office')) ?>, and the money between them</h3>
+</section>
+<section class="fs-pane" data-tab="Offices &amp; money">
+  <h3 class="tab-sub" style="margin-top:0">4. Which <?= e(TP('office')) ?>, and the money between them</h3>
   <div class="form-grid">
     <div class="ff"><label>Contracting <?= e(T('office')) ?> <span class="muted">— who holds the order</span></label>
       <select class="form-control searchable" id="ibo_sel" name="ibo_office_id"><option value="">— my <?= e(T('office')) ?> —</option>
@@ -325,7 +349,9 @@ document.addEventListener('DOMContentLoaded', function () {
     <?php endif; ?>
   </div>
 
-  <h3 class="tab-sub">5. Against the <?= e(Tl('client')) ?>'s purchase order <span class="muted">(optional)</span></h3>
+</section>
+<section class="fs-pane" data-tab="Purchase order">
+  <h3 class="tab-sub" style="margin-top:0">5. Against the <?= e(Tl('client')) ?>'s purchase order <span class="muted">(optional)</span></h3>
   <div class="form-grid">
     <?php // When the client has not sent a formal PO, the work is still against a
           // line of OUR accepted quotation — offer those lines here so the call is
@@ -360,7 +386,9 @@ document.addEventListener('DOMContentLoaded', function () {
         // call is taken, not invented at allocation. Both fields are carried onto
         // every job raised from this call, so the engineer is asked for exactly
         // what was promised. ?>
-  <h3 class="tab-sub">6. Reporting owed to the <?= e(Tl('client')) ?> <span class="muted">— carried onto the <?= e(TP('job')) ?></span></h3>
+</section>
+<section class="fs-pane" data-tab="Reporting">
+  <h3 class="tab-sub" style="margin-top:0">6. Reporting owed to the <?= e(Tl('client')) ?> <span class="muted">— carried onto the <?= e(TP('job')) ?></span></h3>
   <?php
     $callFreq  = $call['reporting_frequency'] ?? '';
     $callDays  = $call['report_custom_days'] ?? '';
@@ -396,7 +424,10 @@ document.addEventListener('DOMContentLoaded', function () {
       <small class="muted">Travelling, lodging, boarding and the rest — tick whatever this <?= e(Tl('client')) ?> has agreed to reimburse on top of the fee. Anything ticked <strong>must have its bill uploaded</strong> before the <?= e(Tl('job')) ?> can be closed, and is then taken out of the cost when the profit is worked out. Headings come from the <a href="/lookup?key=expense_heading" target="_blank">expense headings</a> list.</small></div>
   </div>
 
-  <div style="margin-top:16px;">
+</section>
+</div><!-- /.form-tabs -->
+
+  <div class="fs-actions" style="margin-top:16px;">
     <button class="btn" type="submit">Save <?= e(Tl('call')) ?></button>
     <a class="btn secondary" href="/calls">Cancel</a>
   </div>

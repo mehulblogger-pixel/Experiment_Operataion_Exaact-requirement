@@ -1346,7 +1346,34 @@
     // Any text input wired to a datalist becomes the themed combo instead.
     Array.prototype.forEach.call(document.querySelectorAll('input.combo, input[list]'), enhanceCombo);
     initSectionTabs();
+    initTabValidation();
     initResponsiveTables();
+  }
+
+  // A required box on a tab that is not the open one would fail the browser's
+  // own check with nothing on screen to show why — the Save button just does
+  // nothing. Catch that: when a field reports itself invalid, bring its tab to
+  // the front first, so the person is looking at the box being complained about.
+  function activateTabForField(el) {
+    var pane = el.closest && el.closest('[data-tab]');
+    if (!pane) return;
+    var wrap = pane.closest('[data-tabs]');
+    var bar = wrap ? wrap.previousElementSibling : null;
+    if (!bar || !bar.classList.contains('tabbar')) return;
+    var want = (pane.getAttribute('data-tab') || '').replace(/\s+/g, ' ').trim();
+    Array.prototype.forEach.call(bar.querySelectorAll('.tabbtn'), function (b) {
+      var t = (b.textContent || '').replace(/\s+/g, ' ').trim();
+      // the count badge is appended after the label, so match on the start
+      if (t === want || t.indexOf(want) === 0) { if (!b.classList.contains('on')) b.click(); }
+    });
+  }
+  function initTabValidation() {
+    // Capturing, because 'invalid' does not bubble. The browser fires it for
+    // every invalid control then focuses the first — switching its tab here,
+    // before that focus lands, is what makes the field visible to receive it.
+    document.addEventListener('invalid', function (e) {
+      if (e.target && e.target.closest) activateTabForField(e.target);
+    }, true);
   }
 
   // ---- Responsive tables --------------------------------------------------

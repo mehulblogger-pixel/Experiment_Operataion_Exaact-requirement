@@ -143,6 +143,9 @@
 <?php endif; ?>
 
 <form method="post" id="jobform" action="<?= $job ? '/job-edit?id=' . (int)$job['id'] : '/job-new?call=' . (int)$call['id'] ?>" class="panel">
+<div data-tabs data-tabs-key="jobform" class="form-tabs">
+<section class="fs-pane" data-tab="Assignment">
+  <h3 class="tab-sub" style="margin-top:0">Assignment</h3>
   <div class="form-grid">
     <div class="ff"><label>Executing office</label>
       <select class="form-control searchable" id="jexec_sel" name="executing_office_id" data-contracting="<?= (int)($call['ibo_office_id'] ?? 0) ?>">
@@ -192,6 +195,11 @@
         <?php if ($curActRow) echo '<option value="'.(int)$curActRow['id'].'" selected>'.e($curActRow['label']).'</option>'; ?>
       </select></div>
 
+  </div>
+</section>
+<section class="fs-pane" data-tab="Engineer">
+  <h3 class="tab-sub" style="margin-top:0">Who does it</h3>
+  <div class="form-grid">
     <div class="ff"><label>Who does it</label>
       <select class="form-control" id="kind_sel" name="staff_kind_pick">
         <option value="ASSET"      <?= $curKind==='ASSET'?'selected':'' ?>>Our own employee</option>
@@ -273,6 +281,11 @@
     <div class="ff"><label>What was it for?</label>
       <input class="form-control" name="other_cost_note" value="<?= e($job['other_cost_note'] ?? '') ?>"
              placeholder="e.g. hired UT thickness gauge"></div>
+  </div>
+</section>
+<section class="fs-pane" data-tab="Order &amp; dates">
+  <h3 class="tab-sub" style="margin-top:0">Order &amp; dates</h3>
+  <div class="form-grid">
     <?php // The contract number is agreed once, on the quotation, and carried
           // from there — quotation → inspection call → deputation. It is shown
           // here rather than chosen, because choosing it again from a register
@@ -416,6 +429,11 @@
     <input type="hidden" name="inspection_end_date" id="insp_end"
            value="<?= e($job['inspection_end_date'] ?? '') ?>">
 
+  </div>
+</section>
+<section class="fs-pane" data-tab="Money">
+  <h3 class="tab-sub" style="margin-top:0">Money</h3>
+  <div class="form-grid">
     <?php // Two different numbers, and confusing them is how a branch's profit
           // stops meaning anything. The invoice value is what the client is
           // charged. The credit is what one branch passes another for doing the
@@ -484,6 +502,11 @@
       </select>
       <small class="muted" id="dir_note"><?= e($ex['text']) ?></small></div>
 
+  </div>
+</section>
+<section class="fs-pane" data-tab="Reporting">
+  <h3 class="tab-sub" style="margin-top:0">Reporting &amp; closure</h3>
+  <div class="form-grid">
     <div class="ff"><label>Reporting frequency</label>
       <select class="form-control" id="freq_sel" name="reporting_frequency"><?php foreach (lk_options_or('reporting_frequency', REPORT_FREQ) as $k=>$v): ?><option value="<?= e($k) ?>" <?= $curFreq===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff" id="custom_days_wrap" style="<?= $curFreq==='CUSTOM'?'':'display:none' ?>"><label>…every how many days?</label>
@@ -537,7 +560,9 @@
 
     <?php render_custom_fields('job', $cfvals ?? []); ?>
   </div>
-  <div style="margin-top:16px;">
+</section>
+</div><!-- /.form-tabs -->
+  <div class="fs-actions" style="margin-top:16px;">
     <button class="btn" type="submit"><?= $job ? 'Save job' : 'Allocate & send email' ?></button>
     <a class="btn secondary" href="/call?id=<?= (int)$call['id'] ?>">Cancel</a>
   </div>
