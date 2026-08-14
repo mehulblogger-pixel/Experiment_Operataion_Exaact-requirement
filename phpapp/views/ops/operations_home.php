@@ -178,8 +178,10 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
   if (function_exists('rating_can') && rating_can())
     $tile('/ratings', '⭐', 'Inspector ratings', 'Post-job quality & conduct ratings.');
   if (can('mod.hiring.view'))
-    $tile('/candidates', '🧑‍💼', 'Hiring', 'Candidates & requisitions for field capacity.',
+    $tile('/recruitment', '🧭', 'Recruitment &amp; workforce', 'Command centre — today, risks and who you can deploy.',
           [[$c['requisitions'], 'Open reqs']]);
+  if (can('mod.hiring.view'))
+    $tile('/candidates', '🧑‍💼', 'Candidates &amp; requirements', 'The recruitment registers behind the command centre.');
   ?>
 </div></section>
 </div>
