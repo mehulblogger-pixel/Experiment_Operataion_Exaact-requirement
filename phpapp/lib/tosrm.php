@@ -538,78 +538,94 @@ function tosrm_render_job_panel($job) {
     $curInsp = (int)($job['inspector_id'] ?? 0);
     $curDate = (string)($job['scheduled_date'] ?? '');
     ob_start(); ?>
+    <style>
+      /* Assignment lifecycle — proper fields, aligned, on the app's form styling. */
+      .tosrm-assign>h3{margin:0 0 4px}
+      .tosrm-assign .ta-sub{color:var(--muted);font-size:13px;margin:0 0 12px}
+      .tosrm-assign .ta-badges{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+      .tosrm-assign .ta-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+      .tosrm-assign .ta-field{border:1px solid var(--line);border-radius:10px;padding:12px 13px;background:var(--soft);margin:0}
+      .tosrm-assign .ta-field>label{display:block;font-size:11px;font-weight:700;color:var(--muted);
+        text-transform:uppercase;letter-spacing:.4px;margin:0 0 9px}
+      .tosrm-assign .ta-field>label .ta-hint{font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)}
+      .tosrm-assign .ta-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+      .tosrm-assign .ta-row>.form-control{flex:1 1 140px;min-width:0}
+      .tosrm-assign .ta-row>.btn{flex:0 0 auto}
+      @media(max-width:640px){.tosrm-assign .ta-grid{grid-template-columns:1fr}.tosrm-assign .ta-row>.form-control{flex-basis:100%}}
+    </style>
     <div class="card tosrm-assign" style="margin-top:16px">
-      <h3 style="margin:0 0 10px">Operations — assignment lifecycle</h3>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
-        <?php if ($hold !== ''): ?><span class="badge">Hold: <strong><?=$esc(TOSRM_ASSIGN_STATES[$hold] ?? $hold)?></strong></span><?php endif; ?>
-        <?php if ($accept !== ''): ?><span class="badge">Acceptance: <strong><?=$esc(TOSRM_ACCEPT_STATES[$accept] ?? $accept)?></strong><?php if (trim((string)($job['accept_reason'] ?? '')) !== ''): ?> — <?=$esc($job['accept_reason'])?><?php endif; ?></span><?php endif; ?>
+      <h3>Operations — assignment lifecycle</h3>
+      <p class="ta-sub">Hold, acceptance, reassignment, reschedule, no-show and cancellation — every change is kept in the history below.</p>
+      <div class="ta-badges">
+        <?php if ($hold !== ''): ?><span class="pill p-info">Hold: <?=$esc(TOSRM_ASSIGN_STATES[$hold] ?? $hold)?></span><?php endif; ?>
+        <?php if ($accept !== ''): ?><span class="pill p-mut">Acceptance: <?=$esc(TOSRM_ACCEPT_STATES[$accept] ?? $accept)?><?php if (trim((string)($job['accept_reason'] ?? '')) !== ''): ?> — <?=$esc($job['accept_reason'])?><?php endif; ?></span><?php endif; ?>
       </div>
       <?php if ($canEdit): ?>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <form method="post" action="/assign-hold">
+      <div class="ta-grid">
+        <form method="post" action="/assign-hold" class="ta-field">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
-          <label style="display:block;font-size:12px;color:#666">Hold state (pencil-in vs commit)</label>
-          <div style="display:flex;gap:6px"><select name="state"><?php foreach (TOSRM_ASSIGN_STATES as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$hold?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select><button class="btn" type="submit">Set</button></div>
+          <label>Hold state <span class="ta-hint">(pencil-in vs commit)</span></label>
+          <div class="ta-row"><select class="form-control" name="state"><?php foreach (TOSRM_ASSIGN_STATES as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$hold?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select><button class="btn" type="submit">Set</button></div>
         </form>
-        <form method="post" action="/assign-accept">
+        <form method="post" action="/assign-accept" class="ta-field">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
-          <label style="display:block;font-size:12px;color:#666">Record resource decision</label>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <select name="decision"><?php foreach (TOSRM_ACCEPT_STATES as $k=>$v): if ($k==='PENDING') continue; ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
-            <input type="text" name="reason" placeholder="Reason (required to decline)" style="flex:1;min-width:160px">
+          <label>Record resource decision</label>
+          <div class="ta-row">
+            <select class="form-control" name="decision"><?php foreach (TOSRM_ACCEPT_STATES as $k=>$v): if ($k==='PENDING') continue; ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
+            <input class="form-control" type="text" name="reason" placeholder="Reason (required to decline)">
             <button class="btn" type="submit">Save</button>
           </div>
         </form>
-        <form method="post" action="/assign-reassign">
+        <form method="post" action="/assign-reassign" class="ta-field">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
-          <label style="display:block;font-size:12px;color:#666">Reassign (original kept in history)</label>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <select name="inspector_id"><option value="">Choose resource…</option><?php foreach ($insps as $ip): ?><option value="<?=(int)$ip['id']?>" <?=(int)$ip['id']===$curInsp?'selected':''?>><?=$esc($ip['name'])?></option><?php endforeach; ?></select>
-            <input type="text" name="reason" placeholder="Reason" style="flex:1;min-width:120px">
-            <input type="text" name="approver" placeholder="Approved by" style="width:120px">
+          <label>Reassign <span class="ta-hint">(original kept in history)</span></label>
+          <div class="ta-row">
+            <select class="form-control" name="inspector_id"><option value="">Choose resource…</option><?php foreach ($insps as $ip): ?><option value="<?=(int)$ip['id']?>" <?=(int)$ip['id']===$curInsp?'selected':''?>><?=$esc($ip['name'])?></option><?php endforeach; ?></select>
+            <input class="form-control" type="text" name="reason" placeholder="Reason">
+            <input class="form-control" type="text" name="approver" placeholder="Approved by">
             <button class="btn" type="submit">Reassign</button>
           </div>
         </form>
-        <form method="post" action="/assign-reschedule">
+        <form method="post" action="/assign-reschedule" class="ta-field">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
-          <label style="display:block;font-size:12px;color:#666">Reschedule (original date kept)</label>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <input type="date" name="new_date" value="<?=$esc($curDate)?>">
-            <input type="text" name="reason" placeholder="Reason" style="flex:1;min-width:120px">
-            <input type="text" name="approver" placeholder="Approved by" style="width:120px">
+          <label>Reschedule <span class="ta-hint">(original date kept)</span></label>
+          <div class="ta-row">
+            <input class="form-control" type="date" name="new_date" value="<?=$esc($curDate)?>">
+            <input class="form-control" type="text" name="reason" placeholder="Reason">
+            <input class="form-control" type="text" name="approver" placeholder="Approved by">
             <button class="btn" type="submit">Reschedule</button>
           </div>
         </form>
-        <form method="post" action="/assign-noshow">
+        <form method="post" action="/assign-noshow" class="ta-field">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
-          <label style="display:block;font-size:12px;color:#666">Record a no-show (no automatic blame)</label>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <select name="party"><?php foreach (TOSRM_NOSHOW_PARTIES as $k=>$v): ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
-            <input type="text" name="reason" placeholder="What happened" style="flex:1;min-width:140px">
+          <label>Record a no-show <span class="ta-hint">(no automatic blame)</span></label>
+          <div class="ta-row">
+            <select class="form-control" name="party"><?php foreach (TOSRM_NOSHOW_PARTIES as $k=>$v): ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
+            <input class="form-control" type="text" name="reason" placeholder="What happened">
             <button class="btn" type="submit">Record</button>
           </div>
         </form>
-        <form method="post" action="/assign-cancel" onsubmit="return confirm('Cancel this assignment?');">
+        <form method="post" action="/assign-cancel" class="ta-field" onsubmit="return confirm('Cancel this assignment?');">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
-          <label style="display:block;font-size:12px;color:#666">Cancel assignment (reason kept)</label>
-          <div style="display:flex;gap:6px"><input type="text" name="reason" placeholder="Reason to cancel" style="flex:1" required><button class="btn btn-danger" type="submit">Cancel</button></div>
+          <label>Cancel assignment <span class="ta-hint">(reason kept)</span></label>
+          <div class="ta-row"><input class="form-control" type="text" name="reason" placeholder="Reason to cancel" required><button class="btn secondary" type="submit" style="color:var(--bad);border-color:var(--bad)">Cancel</button></div>
         </form>
         <?php if (function_exists('tosrm_issue_from_event')): ?>
-        <form method="post" action="/assign-issue">
+        <form method="post" action="/assign-issue" class="ta-field" style="grid-column:1/-1">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
-          <label style="display:block;font-size:12px;color:#666">Raise a Phase 8 issue (no-show, competence, access…) — links, no duplicate register</label>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <input type="text" name="title" placeholder="Operational issue" style="flex:1;min-width:160px">
-            <select name="severity"><option value="MINOR">Minor</option><option value="MAJOR">Major</option><option value="OBSERVATION">Observation</option></select>
-            <button class="btn btn-sm" type="submit">Raise issue</button>
+          <label>Raise an operational issue <span class="ta-hint">(no-show, competence, access… — links to the issue register, no duplicate)</span></label>
+          <div class="ta-row">
+            <input class="form-control" type="text" name="title" placeholder="Describe the operational issue">
+            <select class="form-control" name="severity" style="flex:0 0 130px"><option value="MINOR">Minor</option><option value="MAJOR">Major</option><option value="OBSERVATION">Observation</option></select>
+            <button class="btn" type="submit">Raise issue</button>
           </div>
         </form>
         <?php endif; ?>
       </div>
       <?php endif; ?>
       <?php if ($hist): $iname = []; foreach ($insps as $ip) $iname[(int)$ip['id']] = $ip['name']; ?>
-      <details style="margin-top:10px" open><summary class="muted">Assignment history (<?=count($hist)?>)</summary>
-        <table class="tbl" style="width:100%;margin-top:6px;font-size:12px">
+      <details style="margin-top:12px" open><summary class="muted">Assignment history (<?=count($hist)?>)</summary>
+        <table class="grid" style="width:100%;margin-top:8px">
           <thead><tr><th>When</th><th>Event</th><th>Detail</th><th>By</th></tr></thead>
           <tbody><?php foreach ($hist as $ev):
             $detail = $esc($ev['reason']);
