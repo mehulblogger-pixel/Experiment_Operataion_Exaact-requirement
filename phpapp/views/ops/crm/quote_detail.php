@@ -253,7 +253,8 @@
   </form>
 </div>
 
-<div class="panel-split">
+<div data-tabs data-tabs-key="quote">
+<div class="panel-split" data-tab="Overview">
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0"><?= e(T('client')) ?></h3>
     <table class="kv">
@@ -274,7 +275,7 @@
   </div>
 </div>
 
-<div class="panel" style="padding:0;overflow:hidden">
+<div class="panel" style="padding:0;overflow:hidden" data-tab="Overview">
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
     <thead><tr><th>#</th><th><?= e(T('sbu')) ?></th><th>Service</th><th>Description</th><th>Location</th><th>Order</th><th class="num">Qty</th><th>Unit</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
@@ -306,7 +307,7 @@
 
 <?php if (!empty($orderJobs)):
   $oInv=0;$oPaid=0; foreach($orderJobs as $oj){ $oInv+=(float)$oj['invoice_amount']; $oPaid+= !empty($oj['payment_received'])?(float)$oj['payment_amount']:0; } ?>
-<div class="panel">
+<div class="panel" data-tab="Jobs &amp; order">
   <h3 class="tab-sub" style="margin-top:0">Jobs &amp; revenue against this order</h3>
   <div class="chip-row" style="margin-bottom:8px">
     <span class="ct">Ordered <b><?= e(cur_sym()) ?><?= number_format((float)$q['total_amount'],0) ?></b></span>
@@ -328,7 +329,7 @@
 <?php endif; ?>
 
 <?php if ($st==='ACCEPTED'): ?>
-<div class="panel" id="contract" style="border:1px solid var(--ok)">
+<div class="panel" id="contract" style="border:1px solid var(--ok)" data-tab="Jobs &amp; order">
   <h3 class="tab-sub" style="margin-top:0">Won — client &amp; contract registration (Accounts)</h3>
   <?php
     $cr = $contractRow ?? null;
@@ -410,13 +411,13 @@
 <?php endif; ?>
 
 <?php if ($st==='LOST' && $q['lost_reason']): ?>
-<div class="panel" style="border:1px solid var(--bad)"><b>Lost reason:</b> <?= e(lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS)[$q['lost_reason']] ?? $q['lost_reason']) ?><?= $q['lost_reason_other']?' — '.e($q['lost_reason_other']):'' ?></div>
+<div class="panel" style="border:1px solid var(--bad)" data-tab="Overview"><b>Lost reason:</b> <?= e(lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS)[$q['lost_reason']] ?? $q['lost_reason']) ?><?= $q['lost_reason_other']?' — '.e($q['lost_reason_other']):'' ?></div>
 <?php endif; ?>
 
 <?php // Open by default once there is more than one version or any recorded change,
       // so the revision trail is visible without a click — a quotation's history is
       // part of the record, not a detail to hunt for. ?>
-<details class="fold" id="revisions"<?= (count($revs) > 1 || !empty($hist)) ? ' open' : '' ?>>
+<details class="fold" id="revisions" data-tab="History"<?= (count($revs) > 1 || !empty($hist)) ? ' open' : '' ?>>
   <summary>Revisions &amp; change history <span class="sub"><?= count($revs) ?> version<?= count($revs) === 1 ? '' : 's' ?><?= $hist ? ' · ' . count($hist) . ' logged change' . (count($hist) === 1 ? '' : 's') : '' ?><?= $followups ? ' · ' . count($followups) . ' follow-up' . (count($followups) === 1 ? '' : 's') : '' ?></span></summary>
   <div class="fold-body">
 <div class="panel-split">
@@ -543,7 +544,7 @@
   </div>
 </details>
 
-<div class="panel">
+<div class="panel" data-tab="Sites &amp; docs">
   <h3 class="tab-sub" style="margin-top:0">Sites <span class="muted">— every location this <?= e(Tl('quote')) ?> covers</span></h3>
   <?php if ($locs): ?>
   <table class="dt">
@@ -564,7 +565,7 @@
   <?php else: ?><p class="muted">No sites recorded. Add them on the edit screen.</p><?php endif; ?>
 </div>
 
-<div class="panel">
+<div class="panel" data-tab="Sites &amp; docs">
   <h3 class="tab-sub" style="margin-top:0">Documents <span class="muted">— our format, attachments, the <?= e(Tl('client')) ?>'s PO and anything the <?= e(Tl('engineer')) ?> will need</span></h3>
   <?php if ($files): ?>
   <table class="dt">
@@ -616,3 +617,4 @@
   </script>
   <?php endif; ?>
 </div>
+</div><!-- /data-tabs (quote) -->

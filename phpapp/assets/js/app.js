@@ -1347,7 +1347,27 @@
     Array.prototype.forEach.call(document.querySelectorAll('input.combo, input[list]'), enhanceCombo);
     initSectionTabs();
     initTabValidation();
+    initTabAnchors();
     initResponsiveTables();
+  }
+
+  // An in-page link (#contract, #revisions …) whose target has been tucked
+  // onto a tab that is not open would jump to nothing. Catch the click, bring
+  // that tab to the front, then scroll to the target inside it.
+  function initTabAnchors() {
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[href^="#"]');
+      if (!a) return;
+      var id = a.getAttribute('href').slice(1);
+      if (!id) return;
+      var tgt = document.getElementById(id) ||
+                document.querySelector('[name="' + (window.CSS && CSS.escape ? CSS.escape(id) : id) + '"]');
+      if (!tgt) return;
+      var pane = tgt.closest && tgt.closest('[data-tab]');
+      if (!pane || !pane.hidden) return;         // already visible — let the browser handle it
+      activateTabForField(tgt);
+      setTimeout(function () { try { tgt.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {} }, 60);
+    });
   }
 
   // A required box on a tab that is not the open one would fail the browser's
