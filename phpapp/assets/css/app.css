@@ -219,11 +219,40 @@ table.grid tr:hover td{background:color-mix(in srgb,var(--brand) 5%,transparent)
 /* keep wide tables from pushing the page sideways on small screens: each
    scrolls inside its own box instead of stretching (or freezing) the page */
 @media (max-width:640px){
+  /* Fallback for any table JS did not convert: scroll inside its own box
+     rather than stretching the page. Data tables get the card layout below. */
   table.grid,table.dt{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;max-width:100%}
   .tbl-scroll{-webkit-overflow-scrolling:touch}
   /* the widest register (quote lines) must not force a 1500px page — let it scroll */
   table.dt.qlines{min-width:0;width:max-content}
   .crumbs{flex-wrap:wrap}
+
+  /* Professional mobile tables: each row becomes a labelled card — Field: value
+     — so a wide register never scrolls sideways. Built by initResponsiveTables()
+     in app.js, which tags the header row .rt-head and copies each column name
+     onto its cells as data-label. */
+  table.grid.rtable,table.dt.rtable{display:block;overflow:visible;white-space:normal;
+    background:none;border:0;box-shadow:none;width:100%}
+  table.grid.rtable thead,table.dt.rtable thead,.rt-head{display:none}
+  table.grid.rtable tbody,table.grid.rtable tr,table.dt.rtable tbody,table.dt.rtable tr{display:block;width:auto}
+  table.grid.rtable tr,table.dt.rtable tr{background:var(--card);border:1px solid var(--line);
+    border-radius:10px;box-shadow:var(--shadow-sm);margin:0 0 10px;overflow:hidden}
+  table.grid.rtable tr:hover td,table.dt.rtable tr:hover td{background:transparent}
+  table.grid.rtable td,table.dt.rtable td{display:flex;gap:12px;justify-content:space-between;
+    align-items:baseline;padding:8px 12px;border:0;border-bottom:1px solid var(--line);
+    white-space:normal;text-align:right;font-size:13.5px;min-width:0;overflow-wrap:anywhere}
+  table.grid.rtable tr td:last-child,table.dt.rtable tr td:last-child{border-bottom:0}
+  table.grid.rtable td[data-label]::before,table.dt.rtable td[data-label]::before{
+    content:attr(data-label);flex:0 0 40%;text-align:left;font-weight:600;color:var(--muted);
+    text-transform:none;letter-spacing:0;font-size:12px}
+  table.grid.rtable td:not([data-label]),table.dt.rtable td:not([data-label]){justify-content:flex-start;text-align:left}
+  table.grid.rtable td[data-label]:empty::after,table.dt.rtable td[data-label]:empty::after{content:'—';color:var(--muted)}
+
+  /* A pill is meant for a short label. When one is (mis)used to carry a long
+     message it must wrap rather than push the whole page sideways; short pills
+     are one line as before. (`.container` raises specificity so this wins over
+     the base `.pill{white-space:nowrap}` defined later in the file.) */
+  .container .pill{white-space:normal;overflow-wrap:break-word;max-width:100%}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 

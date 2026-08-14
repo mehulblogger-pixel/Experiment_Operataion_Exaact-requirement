@@ -1346,6 +1346,40 @@
     // Any text input wired to a datalist becomes the themed combo instead.
     Array.prototype.forEach.call(document.querySelectorAll('input.combo, input[list]'), enhanceCombo);
     initSectionTabs();
+    initResponsiveTables();
+  }
+
+  // ---- Responsive tables --------------------------------------------------
+  // A wide register that scrolls sideways on a phone reads as unfinished. This
+  // copies each column's heading onto its cells (data-label); the stylesheet
+  // then turns every row into a labelled card on a narrow screen — Field: value
+  // — so nothing scrolls sideways and every value keeps its name. Entry grids
+  // (tables that contain a field) are left alone, and with JavaScript off the
+  // table simply falls back to the old scroll-in-a-box.
+  function initResponsiveTables() {
+    var tables = document.querySelectorAll('table.grid, table.dt');
+    Array.prototype.forEach.call(tables, function (t) {
+      if (t.dataset.rtReady) return;
+      // An entry grid (has editable fields) is left alone; a data table with an
+      // inline action form (only hidden inputs + a submit button) is fine to card.
+      if (t.querySelector('input:not([type=hidden]):not([type=submit]):not([type=button]), select, textarea')) return;
+      var head = t.querySelector('thead tr');
+      if (!head) { for (var i = 0; i < t.rows.length; i++) { if (t.rows[i].querySelector('th')) { head = t.rows[i]; break; } } }
+      if (!head) return;
+      var labels = Array.prototype.map.call(head.cells, function (c) { return c.textContent.trim(); });
+      if (!labels.some(function (s) { return s; })) return;      // headerless layout table — leave it
+      t.dataset.rtReady = '1';
+      head.classList.add('rt-head');
+      Array.prototype.forEach.call(t.rows, function (tr) {
+        if (tr === head) return;
+        Array.prototype.forEach.call(tr.cells, function (td, idx) {
+          if (td.tagName === 'TD' && (td.colSpan || 1) <= 1 && labels[idx] && !td.hasAttribute('data-label')) {
+            td.setAttribute('data-label', labels[idx]);
+          }
+        });
+      });
+      t.classList.add('rtable');
+    });
   }
 
   // ---- Section tabs -------------------------------------------------------
