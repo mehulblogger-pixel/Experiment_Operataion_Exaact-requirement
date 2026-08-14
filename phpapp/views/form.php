@@ -11,8 +11,8 @@
   <div class="form-grid">
     <div class="ff"><label>Legal name *</label><input class="form-control" name="legal_name" required value="<?= e($p['legal_name'] ?? '') ?>"></div>
     <div class="ff"><label>Display name <span class="muted">(auto from legal, editable)</span></label><input class="form-control" name="display_name" value="<?= e($p['display_name'] ?? '') ?>"></div>
-    <?php if (!$p): ?>
-    <div class="ff"><label>Contracting branch <span class="muted">(drives the code)</span></label>
+    <?php if (!$p): $branchWord = ($defaultRole === 'is_vendor') ? 'Executing' : 'Contracting'; ?>
+    <div class="ff"><label><span id="branch_word"><?= $branchWord ?></span> office <span class="muted">(drives the code)</span></label>
       <select class="form-control searchable" name="home_branch_id">
         <?php foreach (($offices ?? []) as $o): ?><option value="<?= (int)$o['id'] ?>" <?= $o['code']==='AHM'?'selected':'' ?>><?= e($o['name']) ?> (<?= e($o['code']) ?>)</option><?php endforeach; ?>
       </select><small class="muted">Code will look like <strong>AHM-<?= substr(date('Y'),2,2) ?>-NAME-00001</strong>.</small></div>
@@ -21,12 +21,36 @@
     <?php endif; ?>
     <div class="ff ff-wide"><label>Roles</label>
       <div class="checkgrid" style="grid-template-columns:repeat(3,minmax(150px,1fr));">
-        <label class="chk"><input type="checkbox" name="is_client" <?= ($p ? $p['is_client'] : ($defaultRole==='is_client')) ? 'checked' : '' ?>> Is a Client</label>
+        <label class="chk"><input type="checkbox" id="is_client" name="is_client" <?= ($p ? $p['is_client'] : ($defaultRole==='is_client')) ? 'checked' : '' ?>> Is a Client</label>
         <label class="chk"><input type="checkbox" id="is_vendor" name="is_vendor" <?= ($p ? $p['is_vendor'] : ($defaultRole==='is_vendor')) ? 'checked' : '' ?>> Is a Vendor</label>
         <label class="chk"><input type="checkbox" id="is_subcon" name="is_subcontractor" <?= ($p && $p['is_subcontractor']) ? 'checked' : '' ?>> Is a Sub-contractor</label>
       </div>
       <small class="muted">Tick both Client and Vendor for a company that is both. A Sub-contractor (manpower supplier) is automatically also a Vendor.</small></div>
-    <div class="ff"><label>Client type</label><select class="form-control searchable" name="client_type"><option value="">—</option><?php foreach (lk_options_or('client_type', CLIENT_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($p && $p['client_type']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?><option value="__new__">➕ Other (add new)…</option></select>
+    <?php // The office and the "type" mean different things by role: a client is
+          //  contracted with, a vendor is executed at. Say which, live, as the
+          //  roles are ticked — and a sub-contractor counts as a vendor. ?>
+    <script>(function(){
+      // #ptype_word is rendered further down the form, so wait for the whole
+      // form to exist before wiring the two labels up.
+      function wire(){
+        var cl = document.getElementById('is_client'),
+            vn = document.getElementById('is_vendor'),
+            sc = document.getElementById('is_subcon'),
+            bw = document.getElementById('branch_word'),
+            tw = document.getElementById('ptype_word');
+        if (!vn) return;
+        function sync(){
+          var isCl = cl && cl.checked, isVn = vn.checked || (sc && sc.checked);
+          if (bw) bw.textContent = (isVn && isCl) ? 'Contracting / Executing' : (isVn ? 'Executing' : 'Contracting');
+          if (tw) tw.textContent = (isVn && isCl) ? 'Partner' : (isVn ? 'Vendor' : 'Client');
+        }
+        [cl, vn, sc].forEach(function(el){ if (el) el.addEventListener('change', sync); });
+        sync();
+      }
+      if (document.readyState !== 'loading') wire();
+      else document.addEventListener('DOMContentLoaded', wire);
+    })();</script>
+    <div class="ff"><label><span id="ptype_word"><?= ($p ? ($p['is_vendor'] && !$p['is_client']) : ($defaultRole === 'is_vendor')) ? 'Vendor' : (($p && $p['is_client'] && $p['is_vendor']) ? 'Partner' : 'Client') ?></span> type</label><select class="form-control searchable" name="client_type"><option value="">—</option><?php foreach (lk_options_or('client_type', CLIENT_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($p && $p['client_type']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?><option value="__new__">➕ Other (add new)…</option></select>
       <input class="form-control" name="client_type_new" placeholder="New client type" style="display:none;margin-top:6px" data-newfor="client_type"></div>
     <div class="ff"><label>Industry</label><select class="form-control searchable" name="industry"><option value="">—</option><?php foreach (lk_options_or('industry', INDUSTRIES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($p && $p['industry']===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?><option value="__new__">➕ Other (add new)…</option></select>
       <input class="form-control" name="industry_new" placeholder="New industry" style="display:none;margin-top:6px" data-newfor="industry"></div>
