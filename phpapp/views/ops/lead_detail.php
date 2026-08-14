@@ -51,8 +51,9 @@
   <?php endif; ?>
 </div>
 
+<div data-tabs data-tabs-key="lead" data-tabs-order="Overview,Contacts,Quotes,Documents,History,Actions">
 <?php // ---- The essentials, plainly ---------------------------------------- ?>
-<div class="panel" style="margin-top:16px">
+<div class="panel" data-tab="Overview" style="margin-top:16px">
   <table class="grid">
     <tr><th>Who to talk to</th><td><?= e($l['contact_name'] ?: '—') ?></td><th>Telephone</th><td><?= e($l['contact_phone'] ?: '—') ?></td></tr>
     <tr><th>E-mail</th><td><?= e($l['contact_email'] ?: '—') ?></td><th>Best reached by</th><td><?= e(($l['pref_contact'] ?? '') !== '' ? (LEAD_PREF_CONTACT[$l['pref_contact']] ?? $l['pref_contact']) : '—') ?></td></tr>
@@ -70,7 +71,7 @@
 
 <?php // ---- Log a contact — the main daily action --------------------------- ?>
 <?php if ($canEdit && $open): ?>
-<div class="panel" style="margin-top:16px" id="log">
+<div class="panel" data-tab="Contacts" style="margin-top:16px" id="log">
   <h3 style="margin-top:0">Log a contact</h3>
   <p class="muted" style="margin:0 0 12px">Every call, message or meeting — so the story is never lost and the follow-up is never forgotten.</p>
   <form method="post" action="/lead-contact">
@@ -130,7 +131,7 @@
 
 <?php // ---- Quotations, straight off the lead ------------------------------ ?>
 <?php if (!empty($canQuote) || $quotes): ?>
-<div class="panel" style="margin-top:16px">
+<div class="panel" data-tab="Quotes" style="margin-top:16px">
   <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px">
     <h3 style="margin:0">Quotations <span class="muted" style="font-weight:400;font-size:13px">(<?= count($quotes) ?>)</span></h3>
     <?php if (!empty($canQuote) && $l['status'] !== 'LOST'): ?>
@@ -163,7 +164,7 @@
       // customer's RFQ, a spec, an e-mail thread. They travel onto the quote
       // when one is raised from this lead. ?>
 <?php $files = $files ?? []; $fileKinds = $fileKinds ?? []; ?>
-<div class="panel" style="margin-top:16px" id="files">
+<div class="panel" data-tab="Documents" style="margin-top:16px" id="files">
   <h3 style="margin-top:0">Documents <span class="muted" style="font-weight:400;font-size:13px">(<?= count($files) ?>)</span></h3>
   <p class="muted" style="font-size:13px;margin:8px 0 0">Attach the customer's enquiry, specifications, drawings or e-mails — as many as you like, up to 8&nbsp;MB each. They stay on record and are carried onto the quotation raised from this lead.</p>
   <?php if ($files): ?>
@@ -201,7 +202,7 @@
   $won = array_values(array_filter($stages, fn($s) => $s['kind']==='WON'));
   $lost= array_values(array_filter($stages, fn($s) => $s['kind']==='LOST'));
 ?>
-<div class="panel" style="margin-top:16px">
+<div class="panel" data-tab="Actions" style="margin-top:16px">
   <h3 style="margin-top:0">Move it to the next step</h3>
   <p class="muted" style="margin:0 0 14px;font-size:13px">Move it <b>forward</b> only when something really changed. <b>They said yes</b> makes them a customer. <b>It did not happen</b> closes it, and asks why.</p>
 
@@ -254,7 +255,7 @@
 <?php endif; ?>
 
 <?php // ---- Folded away: the detail you only need sometimes ----------------- ?>
-<details class="fold">
+<details class="fold" data-tab="Overview">
   <summary>How promising is it? <span class="sub">score <?= (int)$score['score'] ?>/100</span></summary>
   <div class="fold-body">
     <p class="muted" style="margin:0 0 8px;font-size:12.5px">A rules engine, not a guess — every rule that fired is listed.</p>
@@ -265,7 +266,7 @@
 </details>
 
 <?php if ($canEdit && $open): ?>
-<details class="fold">
+<details class="fold" data-tab="Actions">
   <summary>Edit the details</summary>
   <div class="fold-body">
     <form method="post" action="/lead-edit">
@@ -317,7 +318,7 @@
 </details>
 <?php endif; ?>
 
-<details class="fold">
+<details class="fold" data-tab="History">
   <summary>Its history <span class="sub"><?= count($timeline ?? []) ?> logged · <?= count($history ?? []) ?> move<?= count($history ?? []) === 1 ? '' : 's' ?></span></summary>
   <div class="fold-body" id="timeline">
     <h4 style="margin:0 0 8px">What's happened</h4>
@@ -357,7 +358,7 @@
 </details>
 
 <?php if (can('mod.leads.edit') || is_master()): ?>
-<details class="fold">
+<details class="fold" data-tab="Actions">
   <summary>Remove this lead</summary>
   <div class="fold-body">
     <?php if ($converted): ?>
@@ -373,3 +374,4 @@
   </div>
 </details>
 <?php endif; ?>
+</div><!-- /data-tabs (lead) -->

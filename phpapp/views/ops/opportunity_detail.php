@@ -75,8 +75,9 @@
   <?php endif; ?>
 </div>
 
+<div data-tabs data-tabs-key="opp" data-tabs-order="Overview,Quotes,History,Actions">
 <?php // ---- The essentials, plainly ---------------------------------------- ?>
-<div class="panel" style="margin-top:16px">
+<div class="panel" data-tab="Overview" style="margin-top:16px">
   <div class="kv-grid">
     <div><span class="k">Worth about</span><span><?= (float)$o['value'] ? e(fmoney($o['value'])) : '—' ?></span></div>
     <div><span class="k">Likely value</span><span><b><?= e(fmoney(opp_weighted($o))) ?></b> <span class="muted" style="font-size:12px">(<?= (int)($o['probability'] ?: $o['stage_prob']) ?>% chance)</span></span></div>
@@ -101,7 +102,7 @@
 </div>
 
 <?php // ---- Quotations on this deal ---------------------------------------- ?>
-<div class="panel" style="margin-top:16px">
+<div class="panel" data-tab="Quotes" style="margin-top:16px">
   <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px">
     <h3 style="margin:0">Quotations on this deal <span class="muted" style="font-weight:400;font-size:13px">(<?= count($quotes) ?>)</span></h3>
   </div>
@@ -172,7 +173,7 @@
       <?php endif; ?>
     </div>
   <?php else: ?>
-    <form method="post" action="/opportunity-raise-order" class="panel" style="margin-top:16px;border-left:3px solid var(--brand)">
+    <form method="post" action="/opportunity-raise-order" class="panel" data-tab="Actions" style="margin-top:16px;border-left:3px solid var(--brand)">
       <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
       <h3 style="margin-top:0">Raise the work order</h3>
       <p class="muted" style="font-size:13px;margin:0 0 10px">
@@ -203,7 +204,7 @@
 
 <?php // ---- Move it to the next step --------------------------------------- ?>
 <?php if ($canEdit && $open): ?>
-<form method="post" action="/opportunity-move" class="panel" style="margin-top:16px" id="move">
+<form method="post" action="/opportunity-move" class="panel" data-tab="Actions" style="margin-top:16px" id="move">
   <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
   <h3 style="margin-top:0">Move it to the next step</h3>
   <p class="muted" style="margin:0 0 14px;font-size:13px">Pick the step this deal has genuinely reached and press <b>Move it</b>.
@@ -247,7 +248,7 @@
 
 <?php // ---- Folded away: edit, and the history ------------------------------ ?>
 <?php if ($canEdit && $open): ?>
-<details class="fold">
+<details class="fold" data-tab="Actions">
   <summary>Edit the details</summary>
   <div class="fold-body">
     <form method="post" action="/opportunity-edit">
@@ -303,7 +304,7 @@
 <?php endif; ?>
 
 <?php if ($history): ?>
-<details class="fold">
+<details class="fold" data-tab="History">
   <summary>How it moved <span class="sub"><?= count($history) ?> move<?= count($history) === 1 ? '' : 's' ?></span></summary>
   <div class="fold-body">
     <table class="dt">
@@ -320,3 +321,4 @@
   </div>
 </details>
 <?php endif; ?>
+</div><!-- /data-tabs (opp) -->
