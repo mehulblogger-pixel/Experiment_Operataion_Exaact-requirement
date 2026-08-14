@@ -39,7 +39,8 @@
     <div class="v" style="font-size:18px"><?= $c['notified_on'] ? e(fdate($c['notified_on'])) : 'not yet' ?></div></div>
 </div>
 
-<div class="panel">
+<div data-tabs data-tabs-key="complaint" data-tabs-order="Overview,Handle,History">
+<div class="panel" data-tab="Overview">
   <div class="ctitle" style="margin-top:0"><h3>What they told us</h3></div>
   <p style="white-space:pre-wrap;margin:0"><?= e($c['description']) ?></p>
   <table class="dt" style="margin-top:12px">
@@ -55,7 +56,7 @@
 </div>
 
 <?php // §7.5.4 in the flesh: the names the software will not accept as the decider. ?>
-<div class="panel">
+<div class="panel" data-tab="Handle">
   <div class="ctitle" style="margin-top:0"><h3>Who may not decide this</h3></div>
   <p class="sub" style="margin-top:0"><?php $accr = function_exists('accredited_pack_on') && accredited_pack_on(); ?><?php if ($accr): ?><?= e(accreditation_ref('complaints')) ?> — the<?php else: ?>The<?php endif; ?> decision has to be made by, or reviewed and approved
     by, somebody who was not involved in the inspection being complained about.
@@ -76,7 +77,7 @@
 </div>
 
 <?php if ($canRecord && !$closed): ?>
-<div class="panel">
+<div class="panel" data-tab="Handle">
   <div class="ctitle" style="margin-top:0"><h3>Handle it</h3></div>
 
   <?php if ($c['acknowledged_on'] === ''): ?>
@@ -202,7 +203,7 @@
   <?php endif; ?>
 </div>
 <?php elseif ($canRecord && $closed): ?>
-<div class="panel">
+<div class="panel" data-tab="Handle">
   <h3 class="tab-sub" style="margin-top:0">Reopen</h3>
   <form method="post" action="/complaint-reopen" class="inline-add">
     <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
@@ -213,7 +214,7 @@
 <?php endif; ?>
 
 <?php if ($appeals): ?>
-<div class="panel">
+<div class="panel" data-tab="Overview">
   <div class="ctitle" style="margin-top:0"><h3>Appealed</h3></div>
   <table class="dt">
     <thead><tr><th>Ref</th><th>Received</th><th>Outcome</th><th>Decided by</th></tr></thead>
@@ -227,7 +228,7 @@
 </div>
 <?php endif; ?>
 
-<div class="panel">
+<div class="panel" data-tab="History">
   <div class="ctitle" style="margin-top:0"><h3>What happened, in order</h3></div>
   <table class="dt">
     <thead><tr><th>When</th><th>What</th><th>Who</th><th>Note</th></tr></thead>
@@ -242,3 +243,4 @@
     </tbody>
   </table>
 </div>
+</div><!-- /data-tabs (complaint) -->

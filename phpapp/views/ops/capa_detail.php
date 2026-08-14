@@ -43,7 +43,8 @@
     <div class="d"><?= e($c['verified_by'] ?: 'nobody yet') ?></div></div>
 </div>
 
-<div class="panel">
+<div data-tabs data-tabs-key="capa" data-tabs-order="Overview,Work,History">
+<div class="panel" data-tab="Overview">
   <div class="ctitle" style="margin-top:0"><h3>What went wrong</h3></div>
   <p style="white-space:pre-wrap;margin:0"><?= e($c['description']) ?></p>
   <?php if (trim((string)$c['immediate_action']) !== ''): ?>
@@ -53,7 +54,7 @@
 </div>
 
 <?php if ($canEdit && $open): ?>
-<div class="panel">
+<div class="panel" data-tab="Work">
   <div class="ctitle" style="margin-top:0"><h3>Work it through</h3></div>
 
   <h3 class="tab-sub">1 · Cause <span class="muted">(§8.7.2)</span></h3>
@@ -206,7 +207,7 @@
   <?php endif; ?>
 </div>
 <?php elseif (!$open): ?>
-<div class="panel">
+<div class="panel" data-tab="Overview">
   <div class="ctitle" style="margin-top:0"><h3>What was done</h3></div>
   <table class="dt"><tbody>
     <tr><th style="width:200px">Root cause</th><td style="white-space:pre-wrap"><?= e($c['root_cause'] ?: '—') ?></td></tr>
@@ -218,7 +219,7 @@
 </div>
 <?php endif; ?>
 
-<div class="panel">
+<div class="panel" data-tab="History">
   <div class="ctitle" style="margin-top:0"><h3>What happened, in order</h3></div>
   <table class="dt">
     <thead><tr><th>When</th><th>What</th><th>Who</th><th>Note</th></tr></thead>
@@ -233,3 +234,4 @@
     </tbody>
   </table>
 </div>
+</div><!-- /data-tabs (capa) -->
