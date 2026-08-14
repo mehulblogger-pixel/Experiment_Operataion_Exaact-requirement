@@ -134,38 +134,14 @@
 
         <?php $endgrp(); endif; ?>
 
+        <?php // Operations is no longer a folding group. Tapping it navigates to
+              // the Operations Home, where every one of the screens that used to
+              // hang under this heading is laid out on the page with its live
+              // state. The link is "on" for any Operations-area route so you are
+              // never on an Operations screen with nothing highlighted. ?>
         <?php if (can('mod.calls.view')||can('mod.jobs.view')||can('mod.vouchers.view')||can('mod.hiring.view')||can('mod.reconcile.view')): ?>
-        <?php $grp('Operations'); ?>
-        <?php if (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can()): ?><a class="s-item<?= $navOn(['ops-desk']) ?>" href="/ops-desk"><span class="s-ic">🎛️</span><span>Operations desk</span></a><?php endif; ?>
-        <?php if (can('mod.calls.view')): ?><a class="s-item<?= $navOn(['calls','call']) ?>" href="/calls"><span class="s-ic">☎️</span><span><?= e(THP('call')) ?></span></a><?php endif; ?>
-        <?php if (can('mod.jobs.view')): ?><a class="s-item<?= $navOn(['jobs','job']) ?>" href="/jobs"><span class="s-ic">🗂</span><span><?= e(THP('job')) ?></span></a><?php endif; ?>
-        <?php if ((can('mod.jobs.view')||can('mod.calls.view')) && (!function_exists('svc_globally_active') || svc_globally_active('DEPUTATION'))): ?><a class="s-item<?= $navOn(['deputations']) ?>" href="/deputations"><span class="s-ic">👷</span><span>Deputation &amp; site ops</span></a><?php endif; ?>
-        <?php if (can('mod.jobs.view') && function_exists('can_manage_availability') && can_manage_availability()): ?><a class="s-item<?= $navOn(['availability']) ?>" href="/availability"><span class="s-ic">🟢</span><span><?= e(TH('engineer')) ?> availability</span></a><?php endif; ?>
-        <?php if (function_exists('sched_board_can') && sched_board_can()): ?><a class="s-item<?= $navOn(['schedule']) ?>" href="/schedule"><span class="s-ic">🗓️</span><span>Scheduling board</span></a><?php endif; ?>
-        <?php if (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can()): ?><a class="s-item<?= $navOn(['capacity-outlook']) ?>" href="/capacity-outlook"><span class="s-ic">📈</span><span>Capacity outlook</span></a><?php endif; ?>
-        <?php if (can('mod.calls.view')): ?><a class="s-item<?= $navOn(['recurring']) ?>" href="/recurring"><span class="s-ic">🔁</span><span>Recurring services</span></a><?php endif; ?>
-        <?php if (function_exists('timesheet_can') && timesheet_can()): ?><a class="s-item<?= $navOn(['timesheet']) ?>" href="/timesheet"><span class="s-ic">⏱️</span><span>Timesheet</span></a><?php endif; ?>
-        <?php if (function_exists('rating_can') && rating_can()): ?><a class="s-item<?= $navOn(['ratings']) ?>" href="/ratings"><span class="s-ic">⭐</span><span>Inspector ratings</span></a><?php endif; ?>
-        <?php if (can('mod.vouchers.view')): ?><a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span><?= e(THP('voucher')) ?></span></a><?php endif; ?>
-        <?php if (can('mod.hiring.view')): ?><a class="s-item<?= $navOn(['candidates','candidate']) ?>" href="/candidates"><span class="s-ic">🧑‍💼</span><span><?= e(THP('candidate')) ?></span></a><?php endif; ?>
-        <?php if (can('mod.hiring.view')): ?><a class="s-item<?= $navOn(['requisitions','requisition']) ?>" href="/requisitions"><span class="s-ic">📋</span><span><?= e(THP('requisition')) ?></span></a><?php endif; ?>
-        <?php if (can('mod.reconcile.view')): ?><a class="s-item<?= $navOn(['attendance-recon']) ?>" href="/attendance-recon"><span class="s-ic">✅</span><span>Attendance reconciliation</span></a><?php endif; ?>
-        <?php // The badge counts what is waiting on *you*. An expired contract goes
-              // straight to the Super Admin, so a Branch Manager is not nagged about
-              // a decision they cannot take.
-              if (can('mod.calls.view')):
-                $ovN = 0;
-                foreach (ops_all("SELECT kind, status FROM contract_overrides WHERE status IN ('PENDING','ENDORSED')") as $_o) {
-                    $needsBm = function_exists('override_needs_endorsement') && override_needs_endorsement($_o['kind']);
-                    $mine = ($_o['status'] === 'ENDORSED' || !$needsBm)
-                        ? (function_exists('can_grant_override') && can_grant_override())
-                        : (function_exists('can_endorse_override') && can_endorse_override());
-                    if ($mine) $ovN++;
-                }
-        ?>
-          <a class="s-item<?= $navOn(['contract-overrides']) ?>" href="/contract-overrides"><span class="s-ic">🛑</span><span>Contract exceptions<?= $ovN ? ' (' . $ovN . ')' : '' ?></span></a>
+        <a class="s-item<?= $navOn(['operations','ops-desk','calls','call','jobs','job','deputations','availability','schedule','capacity-outlook','recurring','timesheet','ratings','vouchers','voucher','candidates','candidate','requisitions','requisition','attendance-recon','contract-overrides']) ?>" href="/operations"><span class="s-ic">🛠️</span><span>Operations</span></a>
         <?php endif; ?>
-        <?php $endgrp(); endif; ?>
 
         <?php // These eleven were rendered loose, with no heading of their own, so
               // they read as a continuation of Operations and made that group

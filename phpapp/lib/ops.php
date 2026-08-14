@@ -2101,7 +2101,7 @@ function ops_module_gate($route) {
         'assign-reschedule'=>'jobs','assign-cancel'=>'jobs','assign-noshow'=>'jobs',
         'job-ready-seed'=>'jobs','job-ready-set'=>'jobs','job-confirm'=>'jobs','job-confirm-req'=>'jobs',
         'delay-add'=>'jobs','sla-targets'=>'settings','recurring'=>'calls','capacity-outlook'=>'jobs',
-        'ops-desk'=>'jobs','comm-add'=>'jobs','assign-issue'=>'jobs',
+        'operations'=>'jobs','ops-desk'=>'jobs','comm-add'=>'jobs','assign-issue'=>'jobs',
         // 'attend-mark' is deliberately UNGATED here — any logged-in staff member
         // with an inspector record self-marks their own day; the handler checks it.
         'dep-status'=>'jobs','dep-check-seed'=>'jobs','dep-check-set'=>'jobs','dep-site-log'=>'jobs',
@@ -2548,6 +2548,8 @@ function ops_dispatch($route, $method) {
             return ops_tosrm_admin($route, $method);
         case $route === 'attend-mark':
             return ops_attend_action($route, $method);
+        case $route === 'operations':
+            return ops_operations_home($method);
         case $route === 'ops-desk':
             return ops_tosrm_desk($method);
         case in_array($route, ['comm-add','assign-issue'], true):

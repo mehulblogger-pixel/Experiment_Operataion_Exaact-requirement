@@ -1542,6 +1542,49 @@ function ops_tosrm_desk($method) {
     ]);
     return true;
 }
+// ---------------------------------------------------------------------------
+//  OPERATIONS HOME — the area landing that replaces the folding "Operations"
+//  menu group. Every screen that used to hide inside that dropdown is laid out
+//  on one page, grouped, with its live state. Nothing is removed.
+// ---------------------------------------------------------------------------
+function ops_operations_home($method) {
+    ops_require(can('mod.calls.view') || can('mod.jobs.view') || (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can()),
+        'You do not have access to Operations.');
+    tosrm_migrate_d();
+    $offices = tosrm_office_scope();
+    $metrics = tosrm_ops_metrics($offices);
+    $w = tosrm_call_office_sql($offices, 'c');
+    // Every count is best-effort: a missing table or column must never take the
+    // landing down, so each query is wrapped and falls back to null (the tile
+    // then simply shows no number).
+    $safe = function ($sql, $args = []) { try { return (int)(ops_one($sql, $args)['n'] ?? 0); } catch (Throwable $e) { return null; } };
+    $counts = [
+        'calls_open'  => $safe("SELECT COUNT(*) n FROM calls c WHERE c.status<>'CLOSED' AND COALESCE(c.op_status,'')<>'CLOSED' AND $w"),
+        'jobs_active' => $safe("SELECT COUNT(*) n FROM jobs j JOIN calls c ON c.id=j.call_id WHERE COALESCE(j.closed_flag,0)=0 AND $w"),
+        'recurring'   => $safe("SELECT COUNT(*) n FROM calls c WHERE COALESCE(c.is_recurring,0)=1 AND c.status<>'CLOSED' AND $w"),
+        'overrides'   => $safe("SELECT COUNT(*) n FROM contract_overrides WHERE status IN ('PENDING','ENDORSED')"),
+        'vouchers'    => $safe("SELECT COUNT(*) n FROM vouchers WHERE status IN ('DRAFT','SUBMITTED')"),
+        'requisitions'=> $safe("SELECT COUNT(*) n FROM requisitions WHERE COALESCE(status,'') NOT IN ('CLOSED','FILLED','CANCELLED')"),
+    ];
+    // The TPIA service lines, straight from the Service Scope Engine — only the
+    // services switched on for this install appear.
+    $services = [];
+    if (function_exists('svc_catalog')) {
+        foreach (svc_catalog() as $s) {
+            if (function_exists('svc_globally_active') && !svc_globally_active($s['code'])) continue;
+            $services[] = $s;
+        }
+    }
+    $offLabel = '';
+    if (is_array($offices)) {
+        $n = count($offices);
+        $offLabel = $n ? ('scoped to ' . $n . ' branch' . ($n === 1 ? '' : 'es')) : '';
+    }
+    view('ops/operations_home', [
+        'metrics' => $metrics, 'counts' => $counts, 'services' => $services, 'scopeLabel' => $offLabel,
+    ]);
+    return true;
+}
 function ops_tosrm_comm_action($route, $method) {
     if ($route === 'comm-add') {
         $ek = strtoupper((string)($_POST['entity_kind'] ?? '')); $eid = (int)($_POST['entity_id'] ?? 0);
