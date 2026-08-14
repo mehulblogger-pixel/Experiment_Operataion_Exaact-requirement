@@ -95,6 +95,15 @@ function services_migrate() {
         effective_on VARCHAR(20) DEFAULT '', level VARCHAR(20) DEFAULT '', ref_id INT DEFAULT 0,
         scope_note VARCHAR(300) DEFAULT '', active INT DEFAULT 1, is_system INT DEFAULT 0,
         set_by VARCHAR(120) DEFAULT '', set_at VARCHAR(30) DEFAULT '')");
+    // Service line → report format. One row per report type a service owes; the
+    // primary one is the format allocated by default when the job is created.
+    // client_id lets a service map to a client-specific format later (0 = the
+    // house default). The template picker still resolves the actual .docx.
+    db()->exec("CREATE TABLE IF NOT EXISTS service_report_map (
+        id $pk, service_code VARCHAR(40) DEFAULT '', report_type_code VARCHAR(20) DEFAULT '',
+        client_id INT DEFAULT 0, is_primary INT DEFAULT 0, is_system INT DEFAULT 1,
+        sort_order INT DEFAULT 0, set_by VARCHAR(120) DEFAULT '', set_at VARCHAR(30) DEFAULT '')");
+    idems_unique_index('service_report_map', 'service_code,report_type_code,client_id');
 
     if (function_exists('setting_get') && !setting_get('service_catalog_seeded_v1', '')) {
         try { services_seed_catalog(); } catch (Throwable $e) { /* never break login/migrate */ }
@@ -115,6 +124,95 @@ function services_seed_catalog($addOnly = false) {
         $so += 10;
         if ((int)ops_val("SELECT COUNT(*) FROM service_catalog WHERE code=?", [$code]) > 0) continue;
         $ins->execute([$code, $c[0], $c[6] ?? '', $c[1] ?? '', $c[2] ?? '', $c[3] ?? '', $c[4] ?? '', $c[5] ?? '', $so, $now]);
+    }
+    svc_report_seed();
+}
+
+// ---------------------------------------------------------------------------
+//  SERVICE LINE → REPORT FORMAT
+//
+//  The service line chosen on the work order (and carried to the job) decides
+//  which report format the job is given. Each service maps to a default report
+//  type; the .docx template for that type (house or client-specific) is then
+//  resolved by the existing picker. Seeded with sensible defaults, editable by
+//  an administrator — a smart default, not a hard lock.
+// ---------------------------------------------------------------------------
+const SERVICE_REPORT_DEFAULTS = [
+    'INSPECTION'        => ['IR'],    // Inspection Report
+    'EXPEDITING'        => ['ER'],    // Expediting Report
+    'VENDOR_ASSESSMENT' => ['VASR'],  // Vendor Assessment Report
+    'VENDOR_AUDIT'      => ['VAR'],   // Vendor Audit Report
+    'RELEASE'           => ['RN'],    // Release Note
+    'DEPUTATION'        => ['DVR'],   // Daily Visit Report
+    'NCR_CAPA'          => ['NCR'],   // Non-Conformance Report
+];
+
+// Seed the house defaults once (adds only — never overwrites an admin's edits).
+function svc_report_seed() {
+    if (function_exists('setting_get') && setting_get('service_report_map_seeded_v1', '')) return;
+    $ins = db()->prepare("INSERT INTO service_report_map
+        (service_code,report_type_code,client_id,is_primary,is_system,sort_order,set_by,set_at)
+        VALUES (?,?,0,?,1,?,'seed',?)");
+    $now = date('c');
+    foreach (SERVICE_REPORT_DEFAULTS as $svc => $codes) {
+        $so = 0;
+        foreach ($codes as $i => $rt) {
+            $so += 10;
+            // Only seed a mapping whose report type actually exists on this install.
+            if ((int)ops_val("SELECT COUNT(*) FROM report_types WHERE code=?", [$rt]) === 0) continue;
+            if ((int)ops_val("SELECT COUNT(*) FROM service_report_map WHERE service_code=? AND report_type_code=? AND client_id=0", [$svc, $rt]) > 0) continue;
+            try { $ins->execute([$svc, $rt, $i === 0 ? 1 : 0, $so, $now]); } catch (Throwable $e) {}
+        }
+    }
+    if (function_exists('setting_set')) setting_set('service_report_map_seeded_v1', '1');
+}
+
+// The report-type codes a service line owes, primary first. Client-specific
+// rows (client_id = the client) win over the house default (client_id = 0).
+function svc_report_codes($serviceCode, $clientId = 0) {
+    $serviceCode = (string)$serviceCode;
+    if ($serviceCode === '') return [];
+    $rows = ops_all("SELECT report_type_code FROM service_report_map
+        WHERE service_code=? AND client_id IN (0,?) ORDER BY (client_id=0), is_primary DESC, sort_order",
+        [$serviceCode, (int)$clientId]) ?: [];
+    // Prefer the client-specific set if one exists.
+    $client = array_values(array_filter($rows, fn($r) => true));
+    $out = [];
+    foreach ($rows as $r) { $c = (string)$r['report_type_code']; if ($c !== '' && !in_array($c, $out, true)) $out[] = $c; }
+    return $out;
+}
+
+// The single default report format (report type code) for a service line.
+function svc_report_primary($serviceCode, $clientId = 0) {
+    $codes = svc_report_codes($serviceCode, $clientId);
+    return $codes[0] ?? '';
+}
+
+// Whole map for the admin screen: service_code => [ ['code'=>, 'name'=>, 'primary'=>bool], ... ]
+function svc_report_map_all() {
+    $out = [];
+    $rows = ops_all("SELECT m.service_code, m.report_type_code, m.is_primary, m.client_id, rt.name
+        FROM service_report_map m LEFT JOIN report_types rt ON rt.code=m.report_type_code
+        WHERE m.client_id=0 ORDER BY m.service_code, m.is_primary DESC, m.sort_order") ?: [];
+    foreach ($rows as $r) {
+        $out[$r['service_code']][] = ['code' => $r['report_type_code'], 'name' => $r['name'] ?: $r['report_type_code'], 'primary' => (int)$r['is_primary'] === 1];
+    }
+    return $out;
+}
+
+// Replace the house mapping for one service line with an ordered list of report
+// type codes (first is primary).
+function svc_report_set($serviceCode, array $codes, $clientId = 0) {
+    $serviceCode = (string)$serviceCode;
+    if ($serviceCode === '') return;
+    db()->prepare("DELETE FROM service_report_map WHERE service_code=? AND client_id=?")->execute([$serviceCode, (int)$clientId]);
+    $ins = db()->prepare("INSERT INTO service_report_map
+        (service_code,report_type_code,client_id,is_primary,is_system,sort_order,set_by,set_at)
+        VALUES (?,?,?,?,0,?,?,?)");
+    $now = date('c'); $so = 0; $by = function_exists('user_name') && current_user() ? user_name(current_user()) : 'admin';
+    foreach (array_values(array_unique(array_filter($codes))) as $i => $rt) {
+        $so += 10;
+        try { $ins->execute([$serviceCode, $rt, (int)$clientId, $i === 0 ? 1 : 0, $so, $by, $now]); } catch (Throwable $e) {}
     }
 }
 
@@ -335,5 +433,35 @@ function ops_services($route, $method) {
         'deps'       => svc_all_dependencies(),
         'levels'     => SERVICE_SCOPE_LEVELS,
     ]);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+//  Admin — Report formats by service line. A short screen that lets an
+//  administrator change which report format each service line allocates. The
+//  seeded defaults work out of the box; this is where a business tunes them.
+// ---------------------------------------------------------------------------
+function svc_report_admin($method) {
+    ops_require((function_exists('is_master') && is_master()) || can('settings.manage'),
+        'Only an administrator can set report formats.');
+    services_migrate();
+    if ($method === 'POST') {
+        if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect('/service-formats'); }
+        foreach (svc_catalog() as $s) {
+            if (function_exists('svc_globally_active') && !svc_globally_active($s['code'])) continue;
+            $code = $s['code'];
+            $prim = trim((string)($_POST['fmt_' . $code] ?? ''));
+            $also = array_filter(array_map('trim', (array)($_POST['also_' . $code] ?? [])));
+            $list = array_values(array_unique(array_merge($prim !== '' ? [$prim] : [], $also)));
+            svc_report_set($code, $list, 0);
+        }
+        flash('Report formats updated.');
+        redirect('/service-formats');
+    }
+    $types = ops_all("SELECT code,name FROM report_types WHERE active=1 ORDER BY sort_order,code") ?: [];
+    $map = svc_report_map_all();
+    $services = array_values(array_filter(svc_catalog(),
+        fn($s) => !function_exists('svc_globally_active') || svc_globally_active($s['code'])));
+    view('ops/service_formats', ['types' => $types, 'map' => $map, 'services' => $services]);
     return true;
 }

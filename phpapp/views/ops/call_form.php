@@ -106,6 +106,32 @@ document.addEventListener('DOMContentLoaded', function () {
       <select class="form-control" id="activity_sel" name="activity_id"><option value="">— pick <?= e(T('sbu')) ?> first —</option>
         <?php if ($call && ($call['activity_id']??null)) { $curAct = lk_value($call['activity_id']); if ($curAct) echo '<option value="'.(int)$curAct['id'].'" selected>'.e($curAct['label']).'</option>'; } ?>
       </select></div>
+    <?php // §svc — the TPIA service line. It leads the form because it decides
+          //  the report format the job will be given: pick "Vendor Audit" and the
+          //  job is allocated the Vendor Audit Report format, and so on. Only the
+          //  services switched on for this install appear.
+          $svcFmt = [];
+          foreach (svc_catalog() as $__s) {
+              if (function_exists('svc_globally_active') && !svc_globally_active($__s['code'])) continue;
+              $__pc = function_exists('svc_report_primary') ? svc_report_primary($__s['code']) : '';
+              if ($__pc !== '') { $__nm = ops_val("SELECT name FROM report_types WHERE code=?", [$__pc]); $svcFmt[$__s['code']] = ['code' => $__pc, 'name' => $__nm ?: $__pc]; }
+          } ?>
+    <div class="ff"><label>Service line <span class="muted">(sets the report format)</span></label>
+      <select class="form-control" id="service_sel" name="service_code"><option value="">—</option>
+        <?php foreach (svc_catalog() as $__s): if (function_exists('svc_globally_active') && !svc_globally_active($__s['code'])) continue; ?>
+          <option value="<?= e($__s['code']) ?>" <?= ($call && ($call['service_code']??'')===$__s['code'])?'selected':'' ?>><?= e($__s['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <p class="muted" id="svc_fmt_hint" style="margin:6px 0 0;font-size:12px"></p>
+      <script>
+        window.SVC_FMT = <?= json_encode($svcFmt) ?>;
+        (function(){ var sel=document.getElementById('service_sel'), h=document.getElementById('svc_fmt_hint');
+          function upd(){ var f=window.SVC_FMT[sel.value];
+            h.innerHTML = f ? ('→ Report format: <strong>'+f.name+'</strong> ('+f.code+') — allocated automatically. You can still tick different reports below.') : ''; }
+          if(sel){ sel.addEventListener('change',upd); upd(); }
+        })();
+      </script>
+    </div>
     <div class="ff"><label>Type of inspection <span class="muted">(narrows to the <?= e(Tl('client')) ?>'s types)</span></label>
       <select class="form-control searchable" id="insp_sel" name="inspection_type"><option value="">—</option>
         <?php foreach (lk_options_or('inspection_type', INSPECTION_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($call && ($call['inspection_type']??'')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>

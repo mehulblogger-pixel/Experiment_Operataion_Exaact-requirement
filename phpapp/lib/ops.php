@@ -279,6 +279,9 @@ function ops_migrate() {
     ensure_column('calls', 'forwarded_at', "VARCHAR(30) DEFAULT ''");
     ensure_column('calls', 'inspection_type', "VARCHAR(40) DEFAULT ''");
     ensure_column('calls', 'inspection_type_other', "VARCHAR(150) DEFAULT ''");
+    // §svc — the TPIA service line (Service Scope Engine code). Chosen on the
+    // work order, carried to the job, and used to allocate the report format.
+    ensure_column('calls', 'service_code', "VARCHAR(40) DEFAULT ''");
     ensure_column('calls', 'site_address_id', 'INT NULL');
     // §i — the reporting rhythm and the reports the client wants are agreed on
     // the call, not invented at allocation. Both flow onto the job.
@@ -336,6 +339,7 @@ function ops_migrate() {
     // jobs gain type of inspection (carried from call), custom report frequency,
     // activity and the required deliverables/report formats.
     ensure_column('jobs', 'inspection_type', "VARCHAR(40) DEFAULT ''");
+    ensure_column('jobs', 'service_code', "VARCHAR(40) DEFAULT ''");
     ensure_column('jobs', 'activity_id', 'INT NULL');
     ensure_column('jobs', 'report_custom_days', 'INT NULL');
     ensure_column('jobs', 'deliverables', "VARCHAR(500) DEFAULT ''");
@@ -2093,7 +2097,7 @@ function ops_module_gate($route) {
         'user-unlock'=>'users','user-2fa-reset'=>'users','user-retire'=>'users',
         'contract-overrides'=>'calls','contract-override'=>'calls','contract-open'=>'quotes',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
-        'service-scope'=>'settings',
+        'service-scope'=>'settings','service-formats'=>'settings',
         'deputations'=>'jobs',
         'call-status'=>'calls','call-attrs'=>'calls','call-override'=>'calls',
         'call-clar-new'=>'calls','call-clar-respond'=>'calls','call-clar-status'=>'calls',
@@ -2534,6 +2538,8 @@ function ops_dispatch($route, $method) {
             ops_terminology($method); return true;
         case $route === 'service-scope':
             return ops_services($route, $method);
+        case $route === 'service-formats':
+            return svc_report_admin($method);
         case $route === 'deputations':
             return ops_pdso($route, $method);
         case in_array($route, ['call-status','call-attrs','call-override','call-clar-new','call-clar-respond','call-clar-status'], true):
@@ -3472,6 +3478,15 @@ function ops_calls($route, $method) {
             // and are stored as a CSV of report-type codes: the same shape the job
             // uses, which is what lets them be handed over untouched at allocation.
             $b['deliverables'] = implode(',', array_filter((array)($b['deliverables'] ?? [])));
+            // §svc — the service line decides the report format. When a service
+            // line is chosen and no report types were ticked by hand, allocate
+            // the format(s) that service owes (client-specific if one is mapped,
+            // else the house default). A smart default — the coordinator can
+            // still tick different ones and those win.
+            if (function_exists('svc_report_codes') && trim((string)($b['service_code'] ?? '')) !== '' && trim((string)$b['deliverables']) === '') {
+                $svcCodes = svc_report_codes($b['service_code'], (int)($b['client_id'] ?? 0));
+                if ($svcCodes) $b['deliverables'] = implode(',', $svcCodes);
+            }
             // Which expense headings the client has agreed to pay on top of the
             // fee. A tick here is what later stops the deputation closing until
             // the bill for it is on file.
@@ -3612,7 +3627,7 @@ function call_form_vars($call, $posted = null) {
 // ---------------------------------------------------------------------------
 function call_save_fields() {
     return ['client_id','vendor_id','ibo_office_id','executing_office_id','region','sbu','activity_id',
-        'inspection_type','inspection_type_other','site_address_id','po_id','po_line_item_id',
+        'inspection_type','inspection_type_other','service_code','site_address_id','po_id','po_line_item_id',
         'product_category','product_other','deputation_type','expected_credit','credit_type',
         'billable_value','billable_basis','billable_rate','billable_qty','credit_rate','call_received_date',
         'inspection_required_date','notes',
@@ -3629,7 +3644,7 @@ function job_save_fields() {
         'engagement_type','days_count','months_count','pattern_kind','pattern_n',
         'schedule_weekdays','schedule_end_date','force_dates','manmonth_basis','manmonth_min_days',
         'invoice_value','contracting_office_id','expected_credit','credit_rate','credit_type','credit_direction',
-        'reporting_frequency','report_custom_days','inspection_type','activity_id','sbu','mandays',
+        'reporting_frequency','report_custom_days','inspection_type','service_code','activity_id','sbu','mandays',
         'subcon_cost','other_cost','other_cost_note','quotation_id','is_outstation','chargeable_heads',
         'cert_override_note','cert_override_by',
         'sitedoc_override_note','sitedoc_override_by',
@@ -4449,6 +4464,14 @@ function ops_jobs($route, $method) {
             if (function_exists('existing_columns_only')) $fields = existing_columns_only('jobs', $fields);
             // deliverables come as a checkbox array -> stored as CSV of codes
             $deliverables = implode(',', array_filter((array)($b['deliverables'] ?? [])));
+            // §svc — the service line drives the report format on the job too.
+            // Prefer what was posted; else carry the call/job's service line and
+            // allocate the format(s) it owes when none were ticked by hand.
+            $svcCode = trim((string)($b['service_code'] ?? ($job['service_code'] ?? ($call['service_code'] ?? ''))));
+            if (function_exists('svc_report_codes') && $svcCode !== '' && trim($deliverables) === '') {
+                $svcCodes = svc_report_codes($svcCode, (int)($call['client_id'] ?? 0));
+                if ($svcCodes) $deliverables = implode(',', $svcCodes);
+            }
             // Same shape for the chargeable headings. If the allocate form did
             // not post them at all, the call's agreement stands — never blank
             // them by accident, because blanking removes the bill requirement.

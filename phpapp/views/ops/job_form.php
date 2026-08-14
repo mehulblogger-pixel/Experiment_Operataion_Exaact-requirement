@@ -4,6 +4,10 @@
   $curSbu   = $job ? ($job['sbu'] ?? '')             : ($call['sbu'] ?? '');
   $curActId = $job ? ($job['activity_id'] ?? '')     : ($call['activity_id'] ?? '');
   $curInsp  = $job ? ($job['inspection_type'] ?? '') : ($call['inspection_type'] ?? '');
+  // §svc — the TPIA service line agreed on the call. It carries here and, unless
+  // the coordinator ticks different reports, decides the report format the job
+  // is given.
+  $curSvc   = $job ? ($job['service_code'] ?? '') : ($call['service_code'] ?? '');
   // §i — the reporting rhythm and the report formats are agreed on the call, so
   // they arrive here already answered. The coordinator can still change them for
   // this one deputation, but nobody has to remember what was promised.
@@ -155,6 +159,28 @@
         <?= !empty($job['is_outstation'] ?? ($call['is_outstation'] ?? 0)) ? 'checked' : '' ?>>
         Outstation — the <?= e(Tl('engineer')) ?> travels to reach this site</label>
       <small class="muted">Carried from the <?= e(Tl('call')) ?>. Travel days either side are costed to this <?= e(Tl('sbu')) ?> and activity code.</small></div>
+    <?php // §svc — service line carried from the work order; it sets the report format.
+          $svcFmtJ = [];
+          foreach (svc_catalog() as $__s) {
+              if (function_exists('svc_globally_active') && !svc_globally_active($__s['code'])) continue;
+              $__pc = function_exists('svc_report_primary') ? svc_report_primary($__s['code'], (int)($call['client_id'] ?? 0)) : '';
+              if ($__pc !== '') { $__nm = ops_val("SELECT name FROM report_types WHERE code=?", [$__pc]); $svcFmtJ[$__s['code']] = ['code' => $__pc, 'name' => $__nm ?: $__pc]; }
+          } ?>
+    <div class="ff"><label>Service line <span class="muted">(from the <?= e(Tl('call')) ?> — sets the report format)</span></label>
+      <select class="form-control" id="service_sel" name="service_code"><option value="">—</option>
+        <?php foreach (svc_catalog() as $__s): if (function_exists('svc_globally_active') && !svc_globally_active($__s['code'])) continue; ?>
+          <option value="<?= e($__s['code']) ?>" <?= $curSvc===$__s['code']?'selected':'' ?>><?= e($__s['name']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <p class="muted" id="svc_fmt_hint" style="margin:6px 0 0;font-size:12px"></p>
+      <script>
+        window.SVC_FMT = <?= json_encode($svcFmtJ) ?>;
+        (function(){ var sel=document.getElementById('service_sel'), h=document.getElementById('svc_fmt_hint');
+          function upd(){ var f=window.SVC_FMT[sel.value];
+            h.innerHTML = f ? ('→ Report format: <strong>'+f.name+'</strong> ('+f.code+') — allocated automatically. Tick different reports below to override.') : ''; }
+          if(sel){ sel.addEventListener('change',upd); upd(); }
+        })();
+      </script></div>
     <div class="ff"><label>Type of inspection <span class="muted">(from the <?= e(Tl('call')) ?>, narrowed to the <?= e(Tl('client')) ?>'s types)</span></label>
       <select class="form-control searchable" id="insp_sel" name="inspection_type"><option value="">—</option>
         <?php foreach (lk_options_or('inspection_type', INSPECTION_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= $curInsp===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
