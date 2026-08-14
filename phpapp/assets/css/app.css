@@ -960,19 +960,19 @@ select.form-control{appearance:none;background-image:
 @media(max-width:560px){.punchbar{padding:8px 12px}.punchbar .pb-label{display:none}}
 
 /* ── Section tabs ──────────────────────────────────────────────────────────
-   Turn a long vertical screen into a few short ones. A horizontal, swipeable
-   tab bar sits at the top of the content; each tab shows one panel. Same on a
-   phone as on a desktop. Built by initSectionTabs() in app.js from any
-   [data-tabs] block; with JS off the panels just stack (nothing hidden). */
-.tabbar{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line,#e5e7eb);
-  margin:0 0 16px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-.tabbar::-webkit-scrollbar{display:none}
-.tabbtn{flex:0 0 auto;padding:10px 14px;border:0;background:none;font:inherit;font-size:13.5px;
-  font-weight:600;color:var(--muted,#656e7a);cursor:pointer;border-bottom:2px solid transparent;
-  white-space:nowrap;display:inline-flex;align-items:center;gap:7px;transition:color .12s}
-.tabbtn:hover{color:var(--ink,#1f2937)}
-.tabbtn.on{color:var(--brand,#1e40af);border-bottom-color:var(--brand,#1e40af)}
-.tabbtn:focus-visible{outline:none;box-shadow:var(--focus-ring,0 0 0 3px rgba(30,64,175,.35));border-radius:8px}
+   Turn a long vertical screen into a few short ones. The tabs are chips that
+   WRAP onto as many rows as needed, so every tab is visible at once — you never
+   scroll sideways to find one, on a phone or a desktop. Built by
+   initSectionTabs() in app.js from any [data-tabs] block; with JS off the
+   panels just stack (nothing hidden). */
+.tabbar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.tabbtn{flex:0 0 auto;padding:8px 14px;border:1px solid var(--line,#e5e7eb);background:var(--card,#fff);
+  border-radius:22px;font:inherit;font-size:13px;font-weight:600;color:var(--muted,#656e7a);cursor:pointer;
+  white-space:nowrap;display:inline-flex;align-items:center;gap:7px;box-shadow:var(--shadow-sm,0 1px 2px rgba(18,32,60,.06));
+  transition:background .12s,color .12s,border-color .12s}
+.tabbtn:hover{color:var(--ink,#1f2937);border-color:var(--field-line,#dbe3f0)}
+.tabbtn.on{background:var(--brand,#1e40af);color:#fff;border-color:var(--brand,#1e40af)}
+.tabbtn:focus-visible{outline:none;box-shadow:var(--focus-ring,0 0 0 3px rgba(30,64,175,.35))}
 .tabcnt{font-size:10.5px;font-weight:700;background:var(--warn-bg,#fffbeb);color:var(--warn,#b45309);
   border-radius:20px;padding:1px 7px;line-height:1.7}
-.tabbtn.on .tabcnt{background:color-mix(in srgb,var(--brand,#1e40af) 12%,transparent);color:var(--brand,#1e40af)}
+.tabbtn.on .tabcnt{background:rgba(255,255,255,.22);color:#fff}

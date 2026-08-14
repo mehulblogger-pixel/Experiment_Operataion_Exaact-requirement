@@ -60,7 +60,7 @@ function ops_area_def($area) {
             $sub = 'The registers an accreditation assessor asks for — equipment, competence, impartiality, complaints, nonconformities and the portals.';
             $routes = ['quality','equipment','samples','sample','methods','method','drules','drule','cdocs','cdoc','risks','risk','retention','disclosure','competence','impartiality','complaints','complaint','satisfaction','confidentiality','conf-breach','site-docs','report-reviews','ncr','issues','departures','hold-points','capa','internal-audits','internal-audit','management-reviews','management-review','evidence-review','data-control','portal-users','vendor-users','analytics','identity'];
 
-            $sec('Measurement, methods & documents');
+            $sec('Measurement & docs');
             $t($inspPack && can('mod.equipment.view'), '📏', 'Equipment & calibration', '/equipment', 'Instruments and calibration status.');
             $t($fx('sample_can_view') && sample_can_view(), '📦', 'Items & samples', '/samples', 'Items received for verification.',
                 $num(fn() => $fx('sample_counts') ? sample_counts()['open'] : 0), 'amber');
@@ -71,7 +71,7 @@ function ops_area_def($area) {
             $t($fx('retention_can_view') && retention_can_view(), '🗄️', 'Retention schedule', '/retention', 'How long records are kept.');
             $t($inspPack && can('mod.datacontrol.view'), '🗃', 'Data & information control', '/data-control', 'Information management controls.');
 
-            $sec('Risk, competence & impartiality');
+            $sec('Risk & competence');
             $t($fx('risk_can_view') && risk_can_view(), '🎲', 'Risks & opportunities', '/risks', 'The risk register.',
                 $num(fn() => $fx('risk_counts') ? risk_counts()['high'] : 0), 'red');
             $t($inspPack && can('mod.competence.view'), '🎓', 'Competence & authorisation', '/competence', 'Training, assessment and authorisation.');
@@ -79,7 +79,7 @@ function ops_area_def($area) {
             $t($fx('disclosure_can_view') && disclosure_can_view(), '📢', 'Disclosure consent', '/disclosure', 'Consents to disclose.',
                 $num(fn() => $fx('disclosure_counts') ? disclosure_counts()['pending'] : 0), 'amber');
 
-            $sec('Nonconformity, audit & evidence');
+            $sec('Nonconformity & audit');
             $t($inspPack && (can('mod.ncr.view') || can('mod.capa.view')), '⚠', 'Nonconformities', '/ncr', 'The NCR register.',
                 $num(fn() => $fx('ncr_counts') ? ncr_counts()['open'] : 0), 'red');
             $t((can('mod.ncr.view') || can('mod.capa.view')) && (!$fx('svc_globally_active') || svc_globally_active('NCR_CAPA')), '🗂️', 'Issues & departures', '/issues', 'Issue, deviation and concession log.');
@@ -92,7 +92,7 @@ function ops_area_def($area) {
             $t($inspPack && $fx('trust_can_review') && trust_can_review(), '📍', 'Evidence review', '/evidence-review', 'Field evidence awaiting review.',
                 $num(fn() => $fx('trust_readiness') ? trust_readiness()['pending'] : 0), 'amber');
 
-            $sec('Customer, confidentiality & portals');
+            $sec('Customer & portals');
             $t(can('mod.complaints.view'), '📮', 'Complaints & appeals', '/complaints', 'Complaints and appeals register.',
                 $num(fn() => $fx('cmp_all') ? count(cmp_all(['status' => 'OPEN'])) : 0), 'amber');
             $t($fx('sat_can_view') && sat_can_view(), '⭐', 'Customer satisfaction', '/satisfaction', 'Surveys and follow-up.',
@@ -113,7 +113,7 @@ function ops_area_def($area) {
             $sub = 'Where inspection reports are written, endorsed, expedited and the formats that govern them.';
             $routes = ['reporting','documents','document','endorsements','endorsement','vendors','vendor-profile','expediting','expediting-projects','writing-assistant','phrase-library','learning','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log','compliance'];
             if (can('mod.idems.view')) {
-                $sec('Reports & endorsements');
+                $sec('Reports');
                 $t(true, '📑', T_REG('report'), '/documents', 'The report register.');
                 $t(can('mod.idems.edit') || is_master_of('idems'), '➕', ucfirst(T_NEW('report')), '/document-new', 'Start a new report.');
                 $t(true, '✅', T_REG('endorsement'), '/endorsements', 'Manufacturer document endorsements.');
@@ -123,7 +123,7 @@ function ops_area_def($area) {
                 $t(!$fx('svc_globally_active') || svc_globally_active('EXPEDITING'), '🚚', 'Expediting register', '/expediting', 'Chasing vendor delivery.');
                 $t(!$fx('svc_globally_active') || svc_globally_active('EXPEDITING'), '🗂️', 'Project delivery', '/expediting-projects', 'Multi-vendor projects by milestone.');
 
-                $sec('Writing, rules & templates');
+                $sec('Writing & rules');
                 $t(true, '✒️', 'Technical writing', '/writing-assistant', 'Phrase library and writing help.');
                 $t(true, '🧠', 'Learning insights', '/learning', 'Suggestions learned from past reports.');
                 $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('users.manage.global')), '👤', 'Approver mapping', '/approver-map', 'Who signs which report.');
@@ -146,7 +146,7 @@ function ops_area_def($area) {
                 $t(true, '⧗', 'Waiting to be billed', '/to-bill', 'Closed work not yet invoiced.');
                 $t(true, '🧾', 'Invoices', '/invoices', 'Invoices with lines and tax.');
                 $t(true, '💰', 'Money in', '/receipts', 'Receipts matched to invoices.');
-                $sec('Ledger, export & profit');
+                $sec('Ledger & profit');
                 $t(true, '⏳', 'Receivables ageing', '/receivables', 'What is owed, by age.');
                 $t(true, '📤', 'Tally export', '/tally', 'Export for the accounts package.');
             }
@@ -185,7 +185,7 @@ function ops_area_def($area) {
             $t(can('mod.profitability.view'), '🧾', 'Profit by ' . strtolower(Tl('call')), '/call-profit', 'What each inspection made.');
             $t(licence_enabled('operations') && (can('mod.reports.view') || can('dash.operations') || can('dash.financial')), '📈', 'Management dashboard', '/mis', 'The MIS overview.');
 
-            $sec('People & access');
+            $sec('People');
             $t(can('mod.users.view'), '👥', T_REG('user'), '/users', 'People who can sign in.');
             $t(can('mod.users.view'), '🗂️', 'Organisation', '/hierarchy', 'The reporting hierarchy.');
             $t(is_master(), '🔐', 'Roles & permissions', '/access', 'Who can do what.');
@@ -198,7 +198,7 @@ function ops_area_def($area) {
             $t(can('settings.manage') || is_master() || ($fx('is_coordinator_level') && is_coordinator_level()), '⏳', 'SLA targets', '/sla-targets', 'Turnaround targets.');
             $t(can('settings.manage') || is_master(), '🏢', 'Company profile', '/company-profile', 'Legal name, logo and details.');
 
-            $sec('Connections & licence');
+            $sec('Connections');
             $t($fx('ads_can_manage') && ads_can_manage(), '📢', 'Ads Pro connection', '/adspro', 'Connect the advertising source.');
             $t($fx('lk_can_manage') && lk_can_manage(), '📜', 'Licence', '/licence', 'The product licence and its state.');
             $t((can('settings.manage') || is_master()) && $fx('books_licensed') && books_licensed(), '📗', 'MGH Books', '/books-bridge', 'The accounts bridge.',
