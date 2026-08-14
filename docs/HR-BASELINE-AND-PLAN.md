@@ -147,9 +147,16 @@ and ends with a regression pass against §45.
   Simple/Advanced progressive-disclosure form with a live commercial calculator;
   enriched detail with Position/Deployment, Selection/Compliance and Commercial
   panels. Old requisitions still open, edit and save (verified). Regression-clean.
-- **Phase 3 — Candidate 360 + duplicate & submission protection.** Tabbed 360 +
-  timeline over the existing candidate; duplicate detection (mobile/email/name)
-  on create/import; "already submitted to this client" warning. Additive.
+- **Phase 3 — Candidate 360 + duplicate & submission protection.** ✅ DONE.
+  Candidate detail reorganised into a tabbed 360 (Overview · Recruitment · CV ·
+  Timeline) with a merged chronological timeline (stage events + CV/submission/
+  interview/decision milestones); the DPDP erase panel kept below the tabs. §11
+  duplicate detection (mobile/email/name, with confidence + reasons) blocks a
+  new candidate and shows the look-alikes, with an explicit "Save anyway"; the
+  detail shows a possible-duplicate banner. §12 submission guard warns when the
+  same person was already submitted to the same client and needs "submit anyway".
+  All read-only helpers (`cand_find_duplicates`, `cand_submission_dupes`) — no
+  merge/delete, no schema change. Regression-clean.
 - **Phase 4 — Intelligence.** Explainable Workforce Fit score; Requirement Health;
   Deployment Readiness (wrap `pdso_mob_readiness` + compliance docs); AI
   requirement extraction from pasted text; AI CV enhancements. Computed/additive;

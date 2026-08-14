@@ -91,6 +91,61 @@ function req_commercials($b) {
     return ['revenue' => round($revenue, 2), 'cost' => round($costTotal, 2), 'profit' => round($profit, 2), 'months' => $months, 'units' => $units];
 }
 
+// ===========================================================================
+//  Phase 3 — candidate intelligence: duplicate detection & submission guard.
+//  Read-only helpers; they never merge or delete anything on their own.
+// ===========================================================================
+
+// §11 — candidates that look like the SAME person (by mobile / email / name),
+// each with a confidence and the reason(s). Sorted strongest first.
+function cand_find_duplicates($b, $excludeId = 0) {
+    $mobile = preg_replace('/\D+/', '', (string)($b['mobile'] ?? ''));
+    $email  = strtolower(trim((string)($b['email'] ?? '')));
+    $first  = strtolower(trim((string)($b['first_name'] ?? '')));
+    $last   = strtolower(trim((string)($b['last_name'] ?? '')));
+    if ($mobile === '' && $email === '' && ($first === '' || $last === '')) return [];
+    try {
+        $rows = ops_all("SELECT id, cand_code, first_name, middle_name, last_name, email, mobile, stage,
+                                requisition_id, client_id,
+                                (SELECT display_name FROM business_partners WHERE id=candidates.client_id) client_disp
+                         FROM candidates WHERE id<>? ORDER BY id DESC LIMIT 500", [(int)$excludeId]) ?: [];
+    } catch (Throwable $e) { return []; }
+    $out = [];
+    foreach ($rows as $r) {
+        $conf = 0; $reasons = [];
+        $rm = preg_replace('/\D+/', '', (string)$r['mobile']);
+        if ($mobile !== '' && $rm !== '' && substr($rm, -10) === substr($mobile, -10)) { $conf = max($conf, 96); $reasons[] = 'same mobile'; }
+        if ($email !== '' && strtolower(trim((string)$r['email'])) === $email) { $conf = max($conf, 94); $reasons[] = 'same email'; }
+        $rf = strtolower(trim((string)$r['first_name'])); $rl = strtolower(trim((string)$r['last_name']));
+        if ($first !== '' && $last !== '' && $rf === $first && $rl === $last) { $conf = max($conf, 72); $reasons[] = 'same name'; }
+        elseif ($last !== '' && $rl === $last && $first !== '' && $rf !== '' && $rf[0] === $first[0]) { $conf = max($conf, 46); $reasons[] = 'similar name'; }
+        if ($conf >= 46) { $r['confidence'] = $conf; $r['reasons'] = implode(' · ', $reasons); $out[] = $r; }
+    }
+    usort($out, fn($a, $b) => $b['confidence'] <=> $a['confidence']);
+    return array_slice($out, 0, 6);
+}
+
+// §12 — has this SAME person already been submitted to this SAME client?
+function cand_submission_dupes($cand) {
+    $clientId = (int)($cand['client_id'] ?? 0); if (!$clientId) return [];
+    $mobile = preg_replace('/\D+/', '', (string)($cand['mobile'] ?? ''));
+    $email  = strtolower(trim((string)($cand['email'] ?? '')));
+    if ($mobile === '' && $email === '') return [];
+    try {
+        $rows = ops_all("SELECT id, cand_code, first_name, last_name, submitted_client_date, client_feedback, stage, mobile, email
+                         FROM candidates WHERE client_id=? AND id<>? AND COALESCE(submitted_client_date,'')<>''
+                         ORDER BY submitted_client_date DESC LIMIT 40", [$clientId, (int)($cand['id'] ?? 0)]) ?: [];
+    } catch (Throwable $e) { return []; }
+    $out = [];
+    foreach ($rows as $r) {
+        $rm = preg_replace('/\D+/', '', (string)$r['mobile']);
+        $match = ($mobile !== '' && $rm !== '' && substr($rm, -10) === substr($mobile, -10))
+              || ($email !== '' && strtolower(trim((string)$r['email'])) === $email);
+        if ($match) $out[] = $r;
+    }
+    return array_slice($out, 0, 5);
+}
+
 function recruit_home_can() {
     return function_exists('can') && (can('mod.hiring.view') || (function_exists('is_master') && is_master()));
 }

@@ -3905,6 +3905,18 @@ function ops_candidates($route, $method) {
         $id = (int)($_GET['id'] ?? 0); $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
         if (!$cand) { http_response_code(404); view('notfound'); return; }
         $b = $_POST;
+        // §12 submission guard — first time we mark this person submitted to this
+        // client, warn if the same person was already submitted (avoid a double
+        // client submission). "Submit anyway" (sub_ack) proceeds.
+        $newSub = trim((string)($b['submitted_client_date'] ?? '')) !== '' && trim((string)($cand['submitted_client_date'] ?? '')) === '';
+        if ($newSub && empty($b['sub_ack']) && function_exists('cand_submission_dupes')) {
+            $sd = cand_submission_dupes($cand);
+            if ($sd) {
+                $who = implode(', ', array_map(fn($x) => $x['cand_code'] . ' (' . trim(($x['first_name'] ?? '') . ' ' . ($x['last_name'] ?? '')) . ', ' . ($x['submitted_client_date'] ?: '—') . ')', $sd));
+                flash('Already submitted to this client — ' . $who . '. Check the submission history, then tick “submit anyway” to record it.', 'warning');
+                redirect('/candidate?id=' . $id);
+            }
+        }
         $pdo->prepare("UPDATE candidates SET submitted_client_date=?, client_feedback=?, client_feedback_date=?, client_feedback_note=?, interview_required=?, interview_date=?, interview_done_date=?, interview_outcome=? WHERE id=?")
             ->execute([$b['submitted_client_date'] ?? '', $b['client_feedback'] ?? '', $b['client_feedback_date'] ?? '', trim($b['client_feedback_note'] ?? ''),
                 !empty($b['interview_required']) ? 1 : 0, $b['interview_date'] ?? '', $b['interview_done_date'] ?? '', $b['interview_outcome'] ?? '', $id]);
@@ -3992,19 +4004,27 @@ function ops_candidates($route, $method) {
             $cand = ops_one("SELECT * FROM candidates WHERE id=?", [(int)($_GET['id'] ?? 0)]);
             if (!$cand) { http_response_code(404); view('notfound'); return; }
         }
+        $dupBlock = []; $prefill = null;
         if ($method === 'POST') {
             $b = $_POST;
             $fields = ['first_name','middle_name','last_name','client_id','call_id','trade_id','skill_id',
                 'designation','source','agency','proposed_site','sbu','experience_years','email','mobile',
                 'cv_link','expected_rate','rate_type','cv_received_date','remarks','requisition_id'];
-            if ($cand) {
+            // §11 duplicate guard — on a NEW candidate, stop and show look-alikes
+            // (same mobile / email / name) before creating a second record for the
+            // same person. "Save anyway" (dup_ack) proceeds.
+            if (!$cand && empty($b['dup_ack']) && function_exists('cand_find_duplicates')) {
+                $dupBlock = cand_find_duplicates($b);
+                if ($dupBlock) $prefill = $b;
+            }
+            if (!$dupBlock && $cand) {
                 $set = implode(',', array_map(fn($f) => "$f=?", $fields));
                 $vals = array_map(fn($f) => nzc_cand($f, $b[$f] ?? ''), $fields); $vals[] = $cand['id'];
                 $pdo->prepare("UPDATE candidates SET $set WHERE id=?")->execute($vals);
                 if (function_exists('custom_save')) custom_save('candidate', (int)$cand['id'], $b);
                 flash('Candidate updated.');
                 redirect('/candidate?id=' . $cand['id']);
-            } else {
+            } elseif (!$dupBlock) {
                 $code = ops_next_code('candidates', 'cand_code', 'CV');
                 $cols = array_merge(['cand_code'], $fields, ['stage','created_by','created_at']);
                 $vals = array_merge([$code], array_map(fn($f) => nzc_cand($f, $b[$f] ?? ''), $fields),
@@ -4026,6 +4046,7 @@ function ops_candidates($route, $method) {
         view('ops/candidate_form', ['cand' => $cand, 'clients' => clients_list(), 'depCalls' => $depCalls, 'agencies' => $agencies,
             'requisitions' => requisitions_list(true), 'preReq' => $preReq,
             'cfvals' => $cand ? custom_values_map('candidate', $cand['id']) : [],
+            'dupes' => $dupBlock ?? [], 'prefill' => $prefill ?? null,
             'trades' => lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [], 'skillsByTrade' => skills_by_trade()]);
         return;
     }
@@ -4040,7 +4061,9 @@ function ops_candidates($route, $method) {
             LEFT JOIN calls ca ON ca.id=c.call_id WHERE c.id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$cand) { http_response_code(404); view('notfound'); return; }
         $events = ops_all("SELECT * FROM candidate_events WHERE candidate_id=? ORDER BY id DESC", [$cand['id']]);
-        view('ops/candidate_detail', ['cand' => $cand, 'events' => $events]);
+        $dupes    = function_exists('cand_find_duplicates') ? cand_find_duplicates($cand, (int)$cand['id']) : [];
+        $subDupes = function_exists('cand_submission_dupes') ? cand_submission_dupes($cand) : [];
+        view('ops/candidate_detail', ['cand' => $cand, 'events' => $events, 'dupes' => $dupes, 'subDupes' => $subDupes]);
         return;
     }
 }

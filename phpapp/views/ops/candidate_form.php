@@ -1,15 +1,43 @@
 <?php
+  // $prefill repopulates the form when a NEW candidate was stopped by the
+  // duplicate guard — we stay in "new" mode but keep what the user typed.
+  $isEdit = !empty($cand);
+  $cand = $cand ?: ($prefill ?? null);
+  $dupes = $dupes ?? [];
   $curTrade = $cand['trade_id'] ?? '';
   $curSkills = ($curTrade && isset($skillsByTrade[$curTrade])) ? $skillsByTrade[$curTrade] : [];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/candidates"><?= e(TP('candidate')) ?></a> › <?= $cand ? 'Edit' : 'Add CV' ?></div>
+<div class="crumbs"><a href="/">Home</a> › <a href="/candidates"><?= e(TP('candidate')) ?></a> › <?= $isEdit ? 'Edit' : 'Add CV' ?></div>
 <div class="master-head">
-  <div><h1><?= $cand ? 'Edit — ' . e(candidate_name($cand)) : 'Add candidate CV' ?></h1>
+  <div><h1><?= $isEdit ? 'Edit — ' . e(candidate_name($cand)) : 'Add candidate CV' ?></h1>
     <p class="sub">Submit a candidate for project work. You can move them through Submitted → Shortlisted → Interview → Accept / Hold / Reject afterwards.</p></div>
   <a class="btn secondary" href="/candidates">← Back</a>
 </div>
 
-<form method="post" action="/<?= $cand ? 'candidate-edit?id=' . (int)$cand['id'] : 'candidate-new' ?>" class="panel">
+<?php if ($dupes): ?>
+<div class="panel" style="border-left:4px solid var(--amber,#d97706);background:#fffdf5">
+  <h3 class="tab-sub" style="margin-top:0;color:#92400e">⚠ Possible duplicate — is this the same person?</h3>
+  <p class="sub" style="margin:0 0 8px">We found existing candidate record(s) that look like this person. Open one to continue their file instead of creating a second, or confirm below that this is genuinely a new person.</p>
+  <table class="grid" style="margin:0">
+    <thead><tr><th>Existing candidate</th><th>Match</th><th>Stage</th><th>Client</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($dupes as $dp): ?>
+      <tr>
+        <td><b><?= e(trim(($dp['first_name'] ?? '') . ' ' . ($dp['last_name'] ?? ''))) ?></b> <span class="muted"><?= e($dp['cand_code']) ?></span><br>
+          <span class="muted" style="font-size:12px"><?= e($dp['mobile'] ?: '') ?><?= $dp['email'] ? ' · ' . e($dp['email']) : '' ?></span></td>
+        <td><span class="pill <?= $dp['confidence'] >= 90 ? 'p-bad' : 'p-warn' ?>"><?= (int)$dp['confidence'] ?>%</span><br><span class="muted" style="font-size:11px"><?= e($dp['reasons']) ?></span></td>
+        <td><?= e(lk_options_or('candidate_stage', CAND_STAGES)[$dp['stage']] ?? $dp['stage']) ?></td>
+        <td class="muted"><?= e($dp['client_disp'] ?: '—') ?></td>
+        <td><a class="btn small secondary" href="/candidate?id=<?= (int)$dp['id'] ?>">Open →</a></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
+<?php endif; ?>
+
+<form method="post" action="/<?= $isEdit ? 'candidate-edit?id=' . (int)$cand['id'] : 'candidate-new' ?>" class="panel">
+<?php if ($dupes): ?><input type="hidden" name="dup_ack" value="1"><?php endif; ?>
   <div class="ff ff-wide" style="background:var(--soft);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">
     <label>Against requisition (management approval) *</label>
     <select class="form-control searchable" name="requisition_id" required>
@@ -77,7 +105,7 @@
     <div class="form-grid"><?php render_custom_fields('candidate', $cfvals ?? []); ?></div>
   <?php endif; ?>
   <div style="margin-top:16px;">
-    <button class="btn" type="submit"><?= $cand ? 'Save candidate' : 'Add candidate' ?></button>
+    <button class="btn" type="submit"><?= $isEdit ? 'Save candidate' : ($dupes ? 'Save anyway — this is a new person' : 'Add candidate') ?></button>
     <a class="btn secondary" href="/candidates">Cancel</a>
   </div>
 </form>

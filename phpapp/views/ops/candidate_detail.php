@@ -14,6 +14,18 @@
   </div>
 </div>
 
+<?php // §11 — heads-up when other records look like the same person.
+$dupes = $dupes ?? []; $subDupes = $subDupes ?? [];
+if ($dupes): ?>
+<div class="panel" style="border-left:4px solid var(--amber,#d97706);background:#fffdf5;padding:12px 15px">
+  <b style="color:#92400e">⚠ Possible duplicate<?= count($dupes) > 1 ? 's' : '' ?>:</b>
+  <?php foreach ($dupes as $i => $dp): ?><?= $i ? ' · ' : ' ' ?><a href="/candidate?id=<?= (int)$dp['id'] ?>"><?= e(trim(($dp['first_name'] ?? '') . ' ' . ($dp['last_name'] ?? ''))) ?> (<?= e($dp['cand_code']) ?>)</a> <span class="pill <?= $dp['confidence'] >= 90 ? 'p-bad' : 'p-warn' ?>" style="font-size:10.5px"><?= (int)$dp['confidence'] ?>% · <?= e($dp['reasons']) ?></span><?php endforeach; ?>
+  <span class="muted"> — same person? Open the other record instead of keeping two.</span>
+</div>
+<?php endif; ?>
+
+<div data-tabs data-tabs-key="ct" data-tabs-order="Overview,Recruitment,CV,Timeline">
+<section data-tab="Overview">
 <div class="panel">
   <h3 class="tab-sub">Candidate details</h3>
   <div class="kv-grid">
@@ -40,6 +52,8 @@
   <?php endif; ?>
 </div>
 
+</section>
+<section data-tab="CV">
 <!-- CV analysis + keyword search -->
 <div class="panel">
   <h3 class="tab-sub" style="margin-top:0">CV analysis <span class="muted">— keywords are stored for searching</span></h3>
@@ -63,11 +77,26 @@
   <?php endif; ?>
 </div>
 
+</section>
+<section data-tab="Recruitment">
 <!-- §20 client submission & interview tracking -->
 <?php if (is_coordinator_level()): $fb = $cand['client_feedback'] ?? ''; $io = $cand['interview_outcome'] ?? ''; ?>
 <div class="panel">
   <h3 class="tab-sub" style="margin-top:0">Client submission &amp; interview</h3>
+  <?php // §12 — this same person already submitted to this client?
+  if ($subDupes): ?>
+  <div style="border-left:4px solid var(--bad,#b91c1c);background:#fef2f2;border-radius:8px;padding:10px 13px;margin-bottom:12px">
+    <b style="color:#991b1b">⚠ Already submitted to this client.</b>
+    <?php foreach ($subDupes as $sd): ?>
+      <div style="font-size:13px;margin-top:3px"><a href="/candidate?id=<?= (int)$sd['id'] ?>"><?= e(trim(($sd['first_name'] ?? '') . ' ' . ($sd['last_name'] ?? ''))) ?> (<?= e($sd['cand_code']) ?>)</a> — submitted <?= e($sd['submitted_client_date'] ?: '—') ?><?= $sd['client_feedback'] ? ' · ' . e($sd['client_feedback']) : '' ?></div>
+    <?php endforeach; ?>
+    <p class="muted" style="font-size:12px;margin:6px 0 0">Recording a fresh submission for the same person needs the “submit anyway” tick below.</p>
+  </div>
+  <?php endif; ?>
   <form method="post" action="/candidate-client?id=<?= (int)$cand['id'] ?>">
+    <?php if ($subDupes && trim((string)($cand['submitted_client_date'] ?? '')) === ''): ?>
+    <label class="chk" style="display:inline-flex;gap:7px;margin:0 0 8px"><input type="checkbox" name="sub_ack" value="1"> I’ve checked the above — submit anyway</label>
+    <?php endif; ?>
     <div class="form-grid">
       <div class="ff"><label>CV submitted to client on</label><input class="form-control" type="date" name="submitted_client_date" value="<?= e($cand['submitted_client_date'] ?? '') ?>"></div>
       <div class="ff"><label>Client feedback</label>
@@ -152,21 +181,58 @@
 </script>
 <?php endif; ?>
 
+</section>
+<section data-tab="Timeline">
+<?php
+// A single chronological story — stage changes plus the recruitment milestones
+// recorded on the candidate (CV, submission, feedback, interview, decision).
+$sname = fn($s) => lk_options_or('candidate_stage', CAND_STAGES)[$s] ?? $s;
+$tl = [];
+foreach ($events as $ev) {
+    $tl[] = ['at' => (string)$ev['created_at'], 'icon' => '●',
+        'title' => ($ev['from_stage'] ? $sname($ev['from_stage']) . ' → ' : '') . $sname($ev['to_stage']),
+        'meta' => (string)($ev['remark'] ?? ''), 'by' => (string)($ev['actor'] ?? ''), 'tone' => 'brand'];
+}
+$mile = [
+    ['cv_analyzed_at', '📄', 'CV analysed', ''],
+    ['submitted_client_date', '📤', 'Submitted to client', ''],
+    ['client_feedback_date', '💬', 'Client feedback', $cand['client_feedback'] ?? ''],
+    ['interview_date', '🗓️', 'Interview planned', ''],
+    ['interview_done_date', '✅', 'Interview completed', $cand['interview_outcome'] ?? ''],
+    ['decided_at', '⚖️', 'Decision recorded', ''],
+];
+foreach ($mile as $m) { $d = substr((string)($cand[$m[0]] ?? ''), 0, 10);
+    if ($d !== '') $tl[] = ['at' => $d, 'icon' => $m[1], 'title' => $m[2], 'meta' => (string)$m[3], 'by' => '', 'tone' => 'mut']; }
+usort($tl, fn($a, $b) => strcmp(substr($b['at'], 0, 10) . $b['at'], substr($a['at'], 0, 10) . $a['at']));
+?>
+<style>
+  .ctl{position:relative;margin:6px 0 0;padding-left:26px}
+  .ctl::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:var(--line,#e5e7eb)}
+  .ctl .ev{position:relative;padding:0 0 15px}
+  .ctl .ev .dot{position:absolute;left:-24px;top:1px;width:18px;height:18px;border-radius:50%;background:var(--card,#fff);border:2px solid var(--brand,#1e40af);display:grid;place-items:center;font-size:9px}
+  .ctl .ev.mut .dot{border-color:var(--muted,#94a3b8)}
+  .ctl .ev .t{font-weight:600;font-size:14px}
+  .ctl .ev .d{font-size:12px;color:var(--muted,#656e7a)}
+  .ctl .ev .m{font-size:13px;color:var(--ink,#374151);margin-top:1px}
+</style>
 <div class="panel">
-  <h3 class="tab-sub">History</h3>
-  <table class="grid">
-    <tr><th>When</th><th>Change</th><th>Remark</th><th>By</th></tr>
-    <?php foreach ($events as $ev): ?>
-    <tr>
-      <td><?= e(substr($ev['created_at'],0,16)) ?></td>
-      <td><?= $ev['from_stage'] ? e(lk_options_or('candidate_stage', CAND_STAGES)[$ev['from_stage']] ?? $ev['from_stage']).' → ' : '' ?><strong><?= e(lk_options_or('candidate_stage', CAND_STAGES)[$ev['to_stage']] ?? $ev['to_stage']) ?></strong></td>
-      <td><?= e($ev['remark'] ?: '—') ?></td>
-      <td><?= e($ev['actor'] ?: '—') ?></td>
-    </tr>
+  <h3 class="tab-sub" style="margin-top:0">Timeline</h3>
+  <?php if ($tl): ?>
+  <div class="ctl">
+    <?php foreach ($tl as $ev): ?>
+    <div class="ev <?= $ev['tone'] === 'mut' ? 'mut' : '' ?>">
+      <span class="dot"><?= $ev['tone'] === 'mut' ? e($ev['icon']) : '●' ?></span>
+      <div class="t"><?= e($ev['title']) ?></div>
+      <div class="d"><?= e(substr($ev['at'], 0, 16)) ?><?= $ev['by'] ? ' · ' . e($ev['by']) : '' ?></div>
+      <?php if (trim($ev['meta']) !== ''): ?><div class="m"><?= e($ev['meta']) ?></div><?php endif; ?>
+    </div>
     <?php endforeach; ?>
-    <?php if (!$events): ?><tr><td colspan="4">No history yet.</td></tr><?php endif; ?>
-  </table>
+  </div>
+  <?php else: ?><p class="muted" style="margin:0">No history yet.</p><?php endif; ?>
 </div>
+
+</section>
+</div><!-- /data-tabs -->
 
 <?php
 // ---------------------------------------------------------------------------
