@@ -30,3 +30,7 @@ licence-server/data/
 phpapp/reset-admin.txt
 reset-admin.txt
 handoff_docs/
+
+# local dev SQLite database (seeded for screenshots; never commit)
+phpapp/dev.sqlite
+dev.sqlite
