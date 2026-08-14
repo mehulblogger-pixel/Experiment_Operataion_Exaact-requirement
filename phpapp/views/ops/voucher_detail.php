@@ -29,8 +29,9 @@
   <div class="kpi"><span class="kic">📌</span><div class="k">Status</div><div class="v" style="font-size:17px;margin-top:8px"><span class="pill <?= $vpill[0] ?>"><?= e($vpill[1]) ?></span></div><div class="d"><?= $v['approved_by'] ? 'by '.e($v['approved_by']) : 'not yet approved' ?></div></div>
 </div>
 
+<div data-tabs data-tabs-key="voucher" data-tabs-order="Entries,Summary">
 <?php if ($canEdit): ?>
-<div class="panel" style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+<div class="panel" data-tab="Entries" style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
   <form method="post" action="/voucher-generate?id=<?= (int)$v['id'] ?>">
     <button class="btn" type="submit">↻ Pull working days from jobs</button>
     <p class="muted" style="margin:6px 2px 0;max-width:280px">Auto-fills each inspection day (date, site, File No / <?= e(Tl("boss")) ?>, <?= e(Tl("sbu")) ?>) from the jobs allotted to this inspector. Safe to click again — it won't duplicate.</p>
@@ -144,7 +145,7 @@
   <p class="muted" style="margin-top:8px">KM auto-fills from what you last entered for that vendor (↺) and stays editable. Travel <?= e(cur_sym()) ?> = KM × your rate; the bottom row totals every column. Only the heads &amp; modes you're entitled to appear.</p>
 <?php endif; ?>
 
-<div class="panel-split" style="margin-top:16px">
+<div class="panel-split" data-tab="Summary" style="margin-top:16px">
   <div class="panel">
     <h3 class="tab-sub">Summary — particulars</h3>
     <table class="grid">
@@ -213,6 +214,7 @@
     </div>
   </div>
 </div>
+</div><!-- /data-tabs (voucher) -->
 
 <script>
   (function(){
