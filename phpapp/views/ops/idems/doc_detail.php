@@ -87,13 +87,14 @@
   </div>
 </div>
 
+<div data-tabs data-tabs-key="report" data-tabs-order="Report,Checks,Approvals,Audit">
 <?php // ---- Scorecard — only for scored report types (vendor assessment, audit) ---- ?>
 <?php if (!empty($scorecard) && $scorecard['overall'] !== null):
   $ov = (float)$scorecard['overall'];
   $bandCol = function($s){ $s=(float)$s; if($s>=90) return '#15803d'; if($s>=75) return '#2563eb'; if($s>=60) return '#b45309'; if($s>=40) return '#c2410c'; return 'var(--bad)'; };
   $oc = $bandCol($ov);
 ?>
-<div class="panel" style="margin:0 0 12px;border:1px solid <?= $oc ?>;background:color-mix(in srgb,<?= $oc ?> 5%,transparent)">
+<div class="panel" data-tab="Report" style="margin:0 0 12px;border:1px solid <?= $oc ?>;background:color-mix(in srgb,<?= $oc ?> 5%,transparent)">
   <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
     <div style="display:flex;flex-direction:column;align-items:center;min-width:96px">
       <div style="font-size:34px;font-weight:800;line-height:1;color:<?= $oc ?>;font-variant-numeric:tabular-nums"><?= rtrim(rtrim(number_format($ov,1),'0'),'.') ?><span style="font-size:15px;font-weight:600;color:var(--muted)">/100</span></div>
@@ -137,7 +138,7 @@
   $major = array_values(array_filter($qa['issues'], fn($i)=>in_array($i['severity'],['critical','high','medium'],true)));
   $minor = array_values(array_filter($qa['issues'], fn($i)=>in_array($i['severity'],['low','info'],true)));
 ?>
-<details class="panel" style="margin:0 0 12px;border:1px solid <?= $tone ?>" <?= $openByDefault?'open':'' ?>>
+<details class="panel" data-tab="Checks" style="margin:0 0 12px;border:1px solid <?= $tone ?>" <?= $openByDefault?'open':'' ?>>
   <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <span style="font-size:18px"><?= $light ?></span>
     <b style="color:<?= $tone ?>">Report QA — <?= $lab ?></b>
@@ -207,7 +208,7 @@
   $glight = $rs==='BLOCKED' ? '🔴' : ($rs==='CONDITIONAL' ? '🟡' : '🟢');
   $stCol = ['PASS'=>'var(--ok)','BLOCKED'=>'var(--bad)','CONDITIONAL'=>'#b45309','FAIL'=>'#c2410c','NA'=>'var(--muted)'];
 ?>
-<details class="panel" style="margin:0 0 12px;border:1px solid <?= $gc ?>" <?= $rs!=='READY'?'open':'' ?>>
+<details class="panel" data-tab="Checks" style="margin:0 0 12px;border:1px solid <?= $gc ?>" <?= $rs!=='READY'?'open':'' ?>>
   <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <span style="font-size:18px"><?= $glight ?></span>
     <b style="color:<?= $gc ?>">Release readiness — <?= e($glabel) ?></b>
@@ -238,7 +239,7 @@
   $rOpen = in_array($rb, ['HIGH','CRITICAL'], true);
   $rec = $expRisk['recovery'];
 ?>
-<details class="panel" style="margin:0 0 12px;border:1px solid <?= $rc ?>" <?= $rOpen?'open':'' ?>>
+<details class="panel" data-tab="Checks" style="margin:0 0 12px;border:1px solid <?= $rc ?>" <?= $rOpen?'open':'' ?>>
   <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <span style="font-size:18px">📡</span>
     <b style="color:<?= $rc ?>">Delivery risk — <?= e(ucfirst(strtolower($rb))) ?></b>
@@ -276,7 +277,7 @@
   $advTone = ['bad'=>'var(--bad)','warn'=>'#b45309','ok'=>'var(--ok)','neutral'=>'#2563eb'];
   $advOpen = false; foreach ($expAdvisory['items'] as $it) if (in_array($it['tone']??'', ['bad','warn'], true)) { $advOpen = true; break; }
 ?>
-<details class="panel" style="margin:0 0 12px;border:1px solid #6366f1" <?= $advOpen?'open':'' ?>>
+<details class="panel" data-tab="Checks" style="margin:0 0 12px;border:1px solid #6366f1" <?= $advOpen?'open':'' ?>>
   <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <span style="font-size:18px">🧭</span>
     <b style="color:#4f46e5">Expediting advisory</b>
@@ -303,7 +304,7 @@
 
 <?php // ---- Revision lineage ------------------------------------------------ ?>
 <?php if (!empty($doc['revises_id']) || !empty($doc['revised_by_id']) || (int)($doc['rev'] ?? 0) > 0): ?>
-<div class="panel" style="padding:10px 14px;margin:0 0 12px;font-size:13.5px">
+<div class="panel" data-tab="Report" style="padding:10px 14px;margin:0 0 12px;font-size:13.5px">
   <?php if ((int)($doc['rev'] ?? 0) > 0): ?><b>Revision <?= (int)$doc['rev'] ?></b><?php endif; ?>
   <?php if (!empty($doc['revises_id'])): $pv = ops_one("SELECT id, irn FROM report_docs WHERE id=?", [(int)$doc['revises_id']]); if ($pv): ?>
     · revises <a href="/document?id=<?= (int)$pv['id'] ?>"><?= e($pv['irn']) ?></a><?php endif; endif; ?>
@@ -314,7 +315,7 @@
 
 <?php // ---- Inspection Completeness Check (pre-submission gate) ------------- ?>
 <?php if ($comp !== null): ?>
-<div class="panel" id="completeness" style="margin:0 0 12px;border:1px solid <?= $comp['ok']?'var(--ok)':'var(--bad)' ?>">
+<div class="panel" id="completeness" data-tab="Checks" style="margin:0 0 12px;border:1px solid <?= $comp['ok']?'var(--ok)':'var(--bad)' ?>">
   <div class="ctitle" style="margin-top:0"><h3>Inspection completeness check
     <span class="pill <?= $comp['ok']?'p-ok':'p-bad' ?>" style="margin-left:6px"><?= (int)$comp['passed'] ?>/<?= (int)$comp['applicable'] ?> passed</span>
     <?php if ($comp['na']): ?><span class="muted" style="font-size:12px">· <?= (int)$comp['na'] ?> n/a</span><?php endif; ?></h3></div>
@@ -355,7 +356,7 @@
   $rBody = !empty($hasSchema);
   $rCanEdit = idems_can_edit_doc($doc);
 ?>
-<div class="nowband">
+<div class="nowband" data-tab="Report">
   <?php if ($rFin || $rSt === 'ISSUED'): ?>
     <div class="step">Issued &amp; locked.</div>
     <p class="next">This <?= e(Tl('report')) ?> has gone to the <?= e(Tl('client')) ?> and can no longer be changed. You can still download the PDF or the client format above.</p>
@@ -377,7 +378,7 @@
 </div>
 
 <?php if ($doc['finalized']): ?>
-<div class="panel" style="border:1px solid var(--ok);background:color-mix(in srgb,var(--ok) 7%,transparent)">
+<div class="panel" data-tab="Report" style="border:1px solid var(--ok);background:color-mix(in srgb,var(--ok) 7%,transparent)">
   <b style="color:var(--ok)">🔒 Finalized &amp; issued</b> — locked on <?= e($doc['finalized_at'] ? date('d M Y H:i', strtotime($doc['finalized_at'])) : '—') ?> by <?= e($doc['finalized_by']) ?>. This report is immutable.
 </div>
 
@@ -386,7 +387,7 @@
       // genuine and unaltered without an account and without asking you. ?>
 <?php if (function_exists('verify_code_for')): $vc = verify_code_for($doc); $vu = verify_url($doc);
         $vst = function_exists('chain_verify') ? chain_verify((int)$doc['id']) : ['ok'=>true,'entries'=>0]; ?>
-<details class="panel">
+<details class="panel" data-tab="Checks">
   <summary style="cursor:pointer;font-weight:700">Let the client check this themselves</summary>
   <p class="sub" style="margin-top:8px">Put these two lines on the report. Anyone holding it can confirm it is genuine
     and unaltered — without an account, and without asking you.</p>
@@ -412,7 +413,7 @@
   $vetPill = ['VETTED'=>'p-ok','RETURNED'=>'p-bad','DEBRIEFED'=>'p-info'];
   if (($vetting || $canVet) && empty($doc['finalized'])):
 ?>
-<div class="panel">
+<div class="panel" data-tab="Approvals">
   <div class="ctitle" style="margin-top:0"><h3>Vetting &amp; debriefing</h3>
     <?php if (!empty($doc['vet_status']) && isset(IDEMS_VET_STATUS[$doc['vet_status']])): ?>
       <span class="pill <?= $vetPill[$doc['vet_status']] ?? 'p-mut' ?>"><?= e(IDEMS_VET_STATUS[$doc['vet_status']]) ?></span>
@@ -445,7 +446,7 @@
 <?php endif; ?>
 
 <?php if (!empty($approvals)): ?>
-<div class="panel">
+<div class="panel" data-tab="Approvals">
   <div class="ctitle" style="margin-top:0"><h3>Approval chain</h3></div>
   <div class="appr-steps">
     <?php foreach ($approvals as $a):
@@ -481,7 +482,7 @@
 <?php endif; ?>
 
 <?php $srcRef = json_decode($doc['data'] ?: '[]', true); if (!empty($srcRef['source_irn'])): ?>
-<div class="panel" style="border:1px solid var(--brand)">
+<div class="panel" data-tab="Report" style="border:1px solid var(--brand)">
   <b>📋 Drafted from inspection report</b> —
   <?php $srcId = (int)($srcRef['source_report_id'] ?? 0); ?>
   <?= $srcId ? '<a href="/document?id='.$srcId.'">'.e($srcRef['source_irn']).'</a>' : e($srcRef['source_irn']) ?>.
@@ -489,7 +490,7 @@
 </div>
 <?php endif; ?>
 
-<div class="panel">
+<div class="panel" data-tab="Report">
   <div class="kv-grid">
     <div><span class="k">IRN</span><strong><?= e($doc['irn']) ?></strong></div>
     <div><span class="k">Report type</span><?= e($doc['type_code']) ?> — <?= e($doc['type_name'] ?: '—') ?></div>
@@ -569,7 +570,7 @@
     };
 ?>
 <?php foreach ($sections as $s): if (empty($bySec[(int)$s['id']])) continue; ?>
-  <div class="panel">
+  <div class="panel" data-tab="Report">
     <div class="ctitle" style="margin-top:0"><h3><?= e($s['title']) ?></h3></div>
     <div class="kv-grid">
       <?php foreach ($bySec[(int)$s['id']] as $f): if(in_array($f['ftype'],['heading','note'],true)) continue; ?>
@@ -579,7 +580,7 @@
   </div>
 <?php endforeach; ?>
 <?php if (!empty($bySec[0])): ?>
-  <div class="panel"><div class="kv-grid"><?php foreach ($bySec[0] as $f): if(in_array($f['ftype'],['heading','note'],true)) continue; ?><div class="<?= (int)$f['col_span']===2?'kv-wide':'' ?>"><span class="k"><?= e($f['label']) ?></span><?= $showVal($f) ?></div><?php endforeach; ?></div></div>
+  <div class="panel" data-tab="Report"><div class="kv-grid"><?php foreach ($bySec[0] as $f): if(in_array($f['ftype'],['heading','note'],true)) continue; ?><div class="<?= (int)$f['col_span']===2?'kv-wide':'' ?>"><span class="k"><?= e($f['label']) ?></span><?= $showVal($f) ?></div><?php endforeach; ?></div></div>
 <?php endif; ?>
 <style>
   .ev-th{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
@@ -603,7 +604,7 @@
         $eqDate = report_equipment_date($doc);
         $eqBlock = report_equipment_block($doc);
         $canEq = !$doc['finalized'] && (can('mod.equipment.view') || is_master()); ?>
-<details class="panel" id="equipment" <?= ($eqBlock !== '' || $req) ? 'open' : '' ?>>
+<details class="panel" id="equipment" data-tab="Report" <?= ($eqBlock !== '' || $req) ? 'open' : '' ?>>
   <summary style="cursor:pointer;font-weight:700">📏 Measuring &amp; test equipment used (<?= count($req) ?>)</summary>
   <div style="margin-top:8px"><a href="/equipment">Register →</a></div>
   <?php if ($eqBlock !== ''): ?>
@@ -651,7 +652,7 @@
 <?php endif; ?>
 
 <?php if (is_master() || can('idems.timestamp.edit')): ?>
-<details class="panel" style="border:1px dashed var(--line)">
+<details class="panel" data-tab="Audit" style="border:1px dashed var(--line)">
   <summary style="cursor:pointer;font-weight:700">🔧 Adjust dates <span class="muted" style="font-weight:400">— Branch Application Manager only</span></summary>
   <p class="muted" style="margin:8px 0 8px">System dates are normally locked. A change here is recorded permanently (old &amp; new value, who, when, reason).</p>
   <form method="post" action="/document-timestamp" style="display:flex;gap:6px;flex-wrap:wrap;align-items:end">
@@ -665,7 +666,7 @@
 </details>
 <?php endif; ?>
 
-<details class="fold">
+<details class="fold" data-tab="Audit">
   <summary>Audit trail <span class="sub">every change to this <?= e(Tl('report')) ?>, with who and when (<?= count($audit) ?>)</span></summary>
   <div class="fold-body" style="padding-left:0;padding-right:0">
   <div class="tbl-scroll" style="overflow-x:auto">
@@ -685,3 +686,4 @@
   </div>
   </div>
 </details>
+</div><!-- /data-tabs (report) -->

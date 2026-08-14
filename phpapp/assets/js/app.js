@@ -1458,6 +1458,14 @@
         var c = parseInt(p.getAttribute('data-count') || '0', 10); if (c > 0) byLabel[lab].count += c;
       });
       if (groups.length < 2) return;               // one group is not worth a tab bar
+      // An explicit order wins over first-appearance — needed where the panels
+      // that decide a screen's default tab are conditional and may not render.
+      var order = wrap.getAttribute('data-tabs-order');
+      if (order) {
+        var ord = order.split(',').map(function (s) { return s.trim(); });
+        var rank = function (lab) { var i = ord.indexOf(lab); return i < 0 ? 1e6 : i; };
+        groups.sort(function (a, b) { return rank(a.label) - rank(b.label); });
+      }
       wrap.dataset.tabsReady = '1';
       var key = wrap.getAttribute('data-tabs-key') || 'tab';
       var slug = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
