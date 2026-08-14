@@ -221,7 +221,7 @@ table.grid tr:hover td{background:color-mix(in srgb,var(--brand) 5%,transparent)
 @media (max-width:640px){
   /* Fallback for any table JS did not convert: scroll inside its own box
      rather than stretching the page. Data tables get the card layout below. */
-  table.grid,table.dt{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;max-width:100%}
+  table.grid,table.dt,table.tbl{display:block;overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;max-width:100%}
   .tbl-scroll{-webkit-overflow-scrolling:touch}
   /* the widest register (quote lines) must not force a 1500px page — let it scroll */
   table.dt.qlines{min-width:0;width:max-content}
@@ -231,22 +231,22 @@ table.grid tr:hover td{background:color-mix(in srgb,var(--brand) 5%,transparent)
      — so a wide register never scrolls sideways. Built by initResponsiveTables()
      in app.js, which tags the header row .rt-head and copies each column name
      onto its cells as data-label. */
-  table.grid.rtable,table.dt.rtable{display:block;overflow:visible;white-space:normal;
+  table.rtable,table.rtable{display:block;overflow:visible;white-space:normal;
     background:none;border:0;box-shadow:none;width:100%}
-  table.grid.rtable thead,table.dt.rtable thead,.rt-head{display:none}
-  table.grid.rtable tbody,table.grid.rtable tr,table.dt.rtable tbody,table.dt.rtable tr{display:block;width:auto}
-  table.grid.rtable tr,table.dt.rtable tr{background:var(--card);border:1px solid var(--line);
+  table.rtable thead,table.rtable thead,.rt-head{display:none}
+  table.rtable tbody,table.rtable tr,table.rtable tbody,table.rtable tr{display:block;width:auto}
+  table.rtable tr,table.rtable tr{background:var(--card);border:1px solid var(--line);
     border-radius:10px;box-shadow:var(--shadow-sm);margin:0 0 10px;overflow:hidden}
-  table.grid.rtable tr:hover td,table.dt.rtable tr:hover td{background:transparent}
-  table.grid.rtable td,table.dt.rtable td{display:flex;gap:12px;justify-content:space-between;
+  table.rtable tr:hover td,table.rtable tr:hover td{background:transparent}
+  table.rtable td,table.rtable td{display:flex;gap:12px;justify-content:space-between;
     align-items:baseline;padding:8px 12px;border:0;border-bottom:1px solid var(--line);
     white-space:normal;text-align:right;font-size:13.5px;min-width:0;overflow-wrap:anywhere}
-  table.grid.rtable tr td:last-child,table.dt.rtable tr td:last-child{border-bottom:0}
-  table.grid.rtable td[data-label]::before,table.dt.rtable td[data-label]::before{
+  table.rtable tr td:last-child,table.rtable tr td:last-child{border-bottom:0}
+  table.rtable td[data-label]::before,table.rtable td[data-label]::before{
     content:attr(data-label);flex:0 0 40%;text-align:left;font-weight:600;color:var(--muted);
     text-transform:none;letter-spacing:0;font-size:12px}
-  table.grid.rtable td:not([data-label]),table.dt.rtable td:not([data-label]){justify-content:flex-start;text-align:left}
-  table.grid.rtable td[data-label]:empty::after,table.dt.rtable td[data-label]:empty::after{content:'—';color:var(--muted)}
+  table.rtable td:not([data-label]),table.rtable td:not([data-label]){justify-content:flex-start;text-align:left}
+  table.rtable td[data-label]:empty::after,table.rtable td[data-label]:empty::after{content:'—';color:var(--muted)}
 
   /* A pill is meant for a short label. When one is (mis)used to carry a long
      message it must wrap rather than push the whole page sideways; short pills
@@ -983,3 +983,29 @@ select.form-control{appearance:none;background-image:
 .tabcnt{font-size:10.5px;font-weight:700;background:var(--warn-bg,#fffbeb);color:var(--warn,#b45309);
   border-radius:20px;padding:1px 7px;line-height:1.7}
 .tabbtn.on .tabcnt{background:rgba(255,255,255,.22);color:#fff}
+
+/* ── Bare-controls fallback ─────────────────────────────────────────────────
+   Some older, function-rendered panels wrote <input>/<select>/<textarea>
+   without the .form-control class, so they rendered as raw browser defaults and
+   looked unfinished. Give any UNCLASSED text-like control the same look as
+   .form-control, so the whole app is consistent without editing every file.
+   Anything that already carries a class keeps its own styling; inline width /
+   flex sizing is preserved. */
+.container input:not([class]):not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=submit]):not([type=button]):not([type=file]):not([type=image]):not([type=range]):not([type=color]),
+.container select:not([class]),
+.container textarea:not([class]){
+  background:var(--field);border:1px solid var(--field-line);border-radius:var(--radius-sm);
+  padding:9px 11px;color:var(--ink);font-family:inherit;font-size:14px;max-width:100%;box-sizing:border-box;
+  transition:border-color .15s,box-shadow .15s,background .15s}
+.container select:not([class]){cursor:pointer}
+.container input:not([class])::placeholder,.container textarea:not([class])::placeholder{color:var(--muted);opacity:.7}
+.container input:not([class]):focus,.container select:not([class]):focus,.container textarea:not([class]):focus{
+  outline:none;border-color:var(--brand);background:var(--card);box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 20%,transparent)}
+
+/* Unstyled .tbl tables get the same look as .grid (and the mobile card layout
+   below, via initResponsiveTables which now also targets table.tbl). */
+table.tbl{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);
+  border-radius:10px;box-shadow:var(--shadow-sm);overflow:hidden}
+table.tbl th,table.tbl td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);font-size:13.5px}
+table.tbl th{background:var(--soft);color:var(--muted);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em}
+table.tbl tr:hover td{background:color-mix(in srgb,var(--brand) 5%,transparent)}

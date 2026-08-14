@@ -1357,7 +1357,7 @@
   // (tables that contain a field) are left alone, and with JavaScript off the
   // table simply falls back to the old scroll-in-a-box.
   function initResponsiveTables() {
-    var tables = document.querySelectorAll('table.grid, table.dt');
+    var tables = document.querySelectorAll('table.grid, table.dt, table.tbl');
     Array.prototype.forEach.call(tables, function (t) {
       if (t.dataset.rtReady) return;
       // An entry grid (has editable fields) is left alone; a data table with an
