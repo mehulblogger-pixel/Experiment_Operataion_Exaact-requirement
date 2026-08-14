@@ -112,27 +112,13 @@
         <a class="s-item<?= $navOn(['vouchers','voucher']) ?>" href="/vouchers"><span class="s-ic">🧾</span><span>My <?= e(Tlp('voucher')) ?></span></a>
         <?php $endgrp(); ?>
       <?php else: ?>
-        <?php if (can('mod.leads.view')||can('mod.inquiries.view')||can('mod.quotes.view')||can('mod.crm_reports.view')||is_master()): ?>
-        <?php $grp('Sales'); ?>
-        <?php if (function_exists('leads_can_view') && leads_can_view()): ?><a class="s-item<?= $navOn(['leads','lead']) ?>" href="/leads"><span class="s-ic">🎯</span><span>Leads</span></a><?php endif; ?>
-        <?php if (function_exists('opp_can_view') && opp_can_view()): ?><a class="s-item<?= $navOn(['opportunities','opportunity']) ?>" href="/opportunities"><span class="s-ic">💡</span><span>Opportunities</span></a><?php endif; ?>
-        <?php if (can('mod.inquiries.view')): ?><a class="s-item<?= $navOn(['inquiries','inquiry']) ?>" href="/inquiries"><span class="s-ic">📨</span><span><?= e(THP('inquiry')) ?></span></a><?php endif; ?>
-        <?php if (can('mod.quotes.view')): ?><a class="s-item<?= $navOn(['quotes','quote']) ?>" href="/quotes"><span class="s-ic">📝</span><span><?= e(THP('quote')) ?></span></a><?php endif; ?>
-        <?php if (function_exists('crmdash_can') && crmdash_can()): ?><a class="s-item<?= $navOn(['crm-dashboard']) ?>" href="/crm-dashboard"><span class="s-ic">📈</span><span>Sales dashboard</span></a><?php endif; ?>
-        <?php if (function_exists('pipe_can_view') && pipe_can_view()): ?><a class="s-item<?= $navOn(['pipelines','pipeline']) ?>" href="/pipelines"><span class="s-ic">🪜</span><span>Pipelines &amp; funnels</span></a><?php endif; ?>
-        <?php // Deals held at a stage. The count is what makes it a queue rather
-              // than a screen somebody remembers to visit. ?>
-        <?php if (function_exists('gate_can_view') && gate_can_view()):
-                $gN = function_exists('gate_pending_count') ? gate_pending_count() : 0; ?>
-          <a class="s-item<?= $navOn(['approvals','stage-gates']) ?>" href="/approvals"><span class="s-ic">🛂</span><span>Approvals<?= $gN ? ' (' . (int)$gN . ')' : '' ?></span></a>
+        <?php // Every area below is a flat link to its Home (a page that lays out
+              //  the area's screens as tiles), not a folding accordion. Visibility
+              //  and the highlight route-set both come from lib/areas.php, so the
+              //  rail and the landing page can never disagree. ?>
+        <?php if (ops_area_has('sales')): ?>
+        <a class="s-item<?= $navOn(ops_area_routes('sales')) ?>" href="/sales"><span class="s-ic">🎯</span><span>Sales</span></a>
         <?php endif; ?>
-        <?php // Both only appear once Ads Pro is actually connected. A company
-              // that does not advertise should never be shown an empty report. ?>
-        <?php if (function_exists('roi_available') && roi_available() && roi_can()): ?>
-          <a class="s-item<?= $navOn(['ads-roi']) ?>" href="/ads-roi"><span class="s-ic">💸</span><span>Advertising return</span></a>
-        <?php endif; ?>
-
-        <?php $endgrp(); endif; ?>
 
         <?php // Operations is no longer a folding group. Tapping it navigates to
               // the Operations Home, where every one of the screens that used to
@@ -143,149 +129,29 @@
         <a class="s-item<?= $navOn(['operations','ops-desk','calls','call','jobs','job','deputations','availability','schedule','capacity-outlook','recurring','timesheet','ratings','vouchers','voucher','candidates','candidate','requisitions','requisition','attendance-recon','contract-overrides']) ?>" href="/operations"><span class="s-ic">🛠️</span><span>Operations</span></a>
         <?php endif; ?>
 
-        <?php // These eleven were rendered loose, with no heading of their own, so
-              // they read as a continuation of Operations and made that group
-              // nineteen items long. They are their own subject — the things an
-              // accreditation assessor asks for — and now they say so.
-              // Which of these registers only an accredited body needs is decided
-              // by the accreditation packs (inspection OR laboratory). With none
-              // on, they are hidden (and refused at the route). The universal ones
-              // — complaints, the client portal, identity and confidentiality —
-              // always show.
-              $inspPack = !function_exists('accredited_pack_on') || accredited_pack_on();
-              if (($inspPack && (can('mod.equipment.view')||can('mod.competence.view')||can('mod.impartiality.view')
-                  ||can('mod.ncr.view')||can('mod.capa.view')||can('mod.audits.view')||can('mod.datacontrol.view')
-                  ||(function_exists('trust_can_review') && trust_can_review())))
-                  ||can('mod.complaints.view')||can('mod.confidentiality.view')
-                  ||can('mod.portal.view')||can('mod.identity.view')): ?>
-        <?php $grp('Quality & accreditation'); ?>
-        <?php if ($inspPack && can('mod.equipment.view')): ?><a class="s-item<?= $navOn(['equipment','equip-new','equip-edit']) ?>" href="/equipment"><span class="s-ic">📏</span><span>Equipment &amp; calibration</span></a><?php endif; ?>
-        <?php if (function_exists('sample_can_view') && sample_can_view()): $smpN = function_exists('sample_counts') ? sample_counts()['open'] : 0; ?><a class="s-item<?= $navOn(['samples','sample','sample-new','sample-edit']) ?>" href="/samples"><span class="s-ic">📦</span><span>Items &amp; samples<?= $smpN ? ' (' . (int)$smpN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if (function_exists('method_can_view') && method_can_view()): ?><a class="s-item<?= $navOn(['methods','method','method-new','method-edit']) ?>" href="/methods"><span class="s-ic">📚</span><span>Method library</span></a><?php endif; ?>
-        <?php if (function_exists('drule_can_view') && drule_can_view()): ?><a class="s-item<?= $navOn(['drules','drule','drule-new','drule-edit']) ?>" href="/drules"><span class="s-ic">⚖️</span><span>Decision rules</span></a><?php endif; ?>
-        <?php if (function_exists('cdoc_can_view') && cdoc_can_view()): $cdN = function_exists('cdoc_counts') ? cdoc_counts()['review_due'] : 0; ?><a class="s-item<?= $navOn(['cdocs','cdoc','cdoc-new','cdoc-edit']) ?>" href="/cdocs"><span class="s-ic">📄</span><span>Controlled documents<?= $cdN ? ' (' . (int)$cdN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if (function_exists('risk_can_view') && risk_can_view()): $rkN = function_exists('risk_counts') ? risk_counts()['high'] : 0; ?><a class="s-item<?= $navOn(['risks','risk','risk-new','risk-edit']) ?>" href="/risks"><span class="s-ic">🎲</span><span>Risks &amp; opportunities<?= $rkN ? ' (' . (int)$rkN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if (function_exists('retention_can_view') && retention_can_view()): ?><a class="s-item<?= $navOn(['retention']) ?>" href="/retention"><span class="s-ic">🗄️</span><span>Retention schedule</span></a><?php endif; ?>
-        <?php if (function_exists('disclosure_can_view') && disclosure_can_view()): $dsN = function_exists('disclosure_counts') ? disclosure_counts()['pending'] : 0; ?><a class="s-item<?= $navOn(['disclosure']) ?>" href="/disclosure"><span class="s-ic">📢</span><span>Disclosure consent<?= $dsN ? ' (' . (int)$dsN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if ($inspPack && can('mod.competence.view')): ?><a class="s-item<?= $navOn(['competence']) ?>" href="/competence"><span class="s-ic">🎓</span><span>Competence &amp; authorisation</span></a><?php endif; ?>
-        <?php if ($inspPack && can('mod.impartiality.view')): ?><a class="s-item<?= $navOn(['impartiality']) ?>" href="/impartiality"><span class="s-ic">⚖️</span><span>Impartiality</span></a><?php endif; ?>
-        <?php if (can('mod.complaints.view')): $cmpN = function_exists('cmp_all') ? count(cmp_all(['status'=>'OPEN'])) : 0; ?><a class="s-item<?= $navOn(['complaints','complaint','complaint-new']) ?>" href="/complaints"><span class="s-ic">📮</span><span>Complaints &amp; appeals<?= $cmpN ? ' (' . $cmpN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if (function_exists('sat_can_view') && sat_can_view()): $stN = function_exists('sat_summary') ? sat_summary()['followup'] : 0; ?><a class="s-item<?= $navOn(['satisfaction','satisfaction-survey','satisfaction-new']) ?>" href="/satisfaction"><span class="s-ic">⭐</span><span>Customer satisfaction<?= $stN ? ' (' . (int)$stN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if (can('mod.confidentiality.view') || can('mod.identity.view') || is_master_of(['confidentiality','identity'])): ?><a class="s-item<?= $navOn(['confidentiality','conf-breach']) ?>" href="/confidentiality"><span class="s-ic">🔒</span><span>Confidentiality</span></a><?php endif; ?>
-        <?php if (function_exists('ops_sitedocs') && licence_enabled('operations') && (can('mod.identity.view') || can('mod.clients.view') || is_master_of(['identity','clients']))): ?><a class="s-item<?= $navOn(['site-docs']) ?>" href="/site-docs"><span class="s-ic">🛂</span><span>Site entry documents</span></a><?php endif; ?>
-        <?php if (function_exists('rcr_can_view') && rcr_can_view()): $rcrN = function_exists('rcr_counts') ? rcr_counts()['rejected'] : 0; ?><a class="s-item<?= $navOn(['report-reviews']) ?>" href="/report-reviews"><span class="s-ic">📬</span><span>Client acceptance<?= $rcrN ? ' (' . $rcrN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if ($inspPack && (can('mod.ncr.view') || can('mod.capa.view'))): $ncrN = function_exists('ncr_counts') ? ncr_counts()['open'] : 0; ?><a class="s-item<?= $navOn(['ncr','ncr-item','ncr-new']) ?>" href="/ncr"><span class="s-ic">⚠</span><span>Nonconformities<?= $ncrN ? ' (' . $ncrN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if ((can('mod.ncr.view') || can('mod.capa.view')) && (!function_exists('svc_globally_active') || svc_globally_active('NCR_CAPA'))): ?><a class="s-item<?= $navOn(['issues','departures']) ?>" href="/issues"><span class="s-ic">🗂️</span><span>Issues &amp; departures</span></a><?php endif; ?>
-        <?php if (function_exists('hwp_can_view') && hwp_can_view()): $hwN = function_exists('hwp_open_all') ? count(hwp_open_all(function_exists('scope_offices') && is_array(scope_offices()) ? scope_offices() : null)) : 0; ?><a class="s-item<?= $navOn(['hold-points']) ?>" href="/hold-points"><span class="s-ic">✋</span><span>Hold &amp; witness points<?= $hwN ? ' (' . (int)$hwN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if ($inspPack && can('mod.capa.view')): $capaN = function_exists('capa_all') ? count(capa_all(['open'=>1])) : 0; ?><a class="s-item<?= $navOn(['capa','capa-item','capa-new']) ?>" href="/capa"><span class="s-ic">🛠</span><span>Corrective actions<?= $capaN ? ' (' . $capaN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if ($inspPack && can('mod.audits.view')): ?><a class="s-item<?= $navOn(['internal-audits','internal-audit','internal-audit-new']) ?>" href="/internal-audits"><span class="s-ic">🔍</span><span>Internal audits</span></a>
-        <a class="s-item<?= $navOn(['management-reviews','management-review']) ?>" href="/management-reviews"><span class="s-ic">🏛</span><span>Management review</span></a><?php endif; ?>
-        <?php if ($inspPack && function_exists('trust_can_review') && trust_can_review()): $evN = function_exists('trust_readiness') ? trust_readiness()['pending'] : 0; ?><a class="s-item<?= $navOn(['evidence-review']) ?>" href="/evidence-review"><span class="s-ic">📍</span><span>Evidence review<?= $evN ? ' (' . $evN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if ($inspPack && can('mod.datacontrol.view')): ?><a class="s-item<?= $navOn(['data-control']) ?>" href="/data-control"><span class="s-ic">🗃</span><span>Data &amp; information control</span></a><?php endif; ?>
-        <?php if (can('mod.portal.view')): $pqN = function_exists('portal_requests_all') ? count(portal_requests_all('NEW')) : 0; ?><a class="s-item<?= $navOn(['portal-users']) ?>" href="/portal-users"><span class="s-ic">🌐</span><span>Client portal<?= $pqN ? ' (' . $pqN . ')' : '' ?></span></a><?php endif; ?>
-        <?php if (can('mod.portal.view')): ?><a class="s-item<?= $navOn(['vendor-users']) ?>" href="/vendor-users"><span class="s-ic">🏭</span><span>Vendor portal</span></a><?php endif; ?>
-        <?php if (function_exists('tapi_can') && tapi_can()): ?><a class="s-item<?= $navOn(['analytics','analytics-kpis','analytics-quality','analytics-drill']) ?>" href="/analytics"><span class="s-ic">📈</span><span>Analytics</span></a><?php endif; ?>
-        <?php if (can('mod.identity.view') && function_exists('iddoc_can_view') && iddoc_can_view()): ?><a class="s-item<?= $navOn(['identity']) ?>" href="/identity"><span class="s-ic">🪪</span><span>Identity documents</span></a><?php endif; ?>
-        <?php $endgrp(); endif; ?>
-
-        <?php if (can('mod.idems.view')): ?>
-        <?php $grp('Reporting'); ?>
-        <a class="s-item<?= $navOn(['documents','document','document-new','document-edit']) ?>" href="/documents"><span class="s-ic">📑</span><span><?= e(T_REG('report')) ?></span></a>
-        <?php if (can('mod.idems.edit') || is_master_of('idems')): ?><a class="s-item<?= $navOn(['document-new']) ?>" href="/document-new"><span class="s-ic">➕</span><span><?= e(ucfirst(T_NEW('report'))) ?></span></a><?php endif; ?>
-        <a class="s-item<?= $navOn(['endorsements','endorsement','endorsement-new','endorsement-edit']) ?>" href="/endorsements"><span class="s-ic">✅</span><span><?= e(T_REG('endorsement')) ?></span></a>
-        <a class="s-item<?= $navOn(['vendors','vendor-profile']) ?>" href="/vendors"><span class="s-ic">🏭</span><span>Vendor register</span></a>
-        <?php if (!function_exists('svc_globally_active') || svc_globally_active('EXPEDITING')): ?>
-        <a class="s-item<?= $navOn(['expediting']) ?>" href="/expediting"><span class="s-ic">🚚</span><span>Expediting register</span></a>
-        <a class="s-item<?= $navOn(['expediting-projects']) ?>" href="/expediting-projects"><span class="s-ic">🗂️</span><span>Project delivery</span></a>
+        <?php if (ops_area_has('quality')): ?>
+        <a class="s-item<?= $navOn(ops_area_routes('quality')) ?>" href="/quality"><span class="s-ic">🛡️</span><span>Quality &amp; Accreditation</span></a>
         <?php endif; ?>
-        <a class="s-item<?= $navOn(['writing-assistant','phrase-library','phrase-edit']) ?>" href="/writing-assistant"><span class="s-ic">✒️</span><span>Technical writing</span></a>
-        <a class="s-item<?= $navOn(['learning']) ?>" href="/learning"><span class="s-ic">🧠</span><span>Learning insights</span></a>
-        <?php if (licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('users.manage.global'))): ?><a class="s-item<?= $navOn(['approver-map']) ?>" href="/approver-map"><span class="s-ic">👤</span><span>Approver mapping</span></a><?php endif; ?>
-        <?php if (licence_enabled('reporting') && (can('idems.type.manage') || is_master())): ?><a class="s-item<?= $navOn(['idems-approval-rules','idems-approval-rule-edit','approval-rules']) ?>" href="/approval-rules"><span class="s-ic">🔀</span><span>Approval rules</span></a><?php endif; ?>
-        <?php if (licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('crm.template.manage'))): ?><a class="s-item<?= $navOn(['report-templates','report-template-edit','templates']) ?>" href="/templates"><span class="s-ic">📝</span><span>Document templates</span></a><?php endif; ?>
-        <?php if (licence_enabled('reporting') && (can('idems.audit.view') || is_master())): ?><a class="s-item<?= $navOn(['audit-log']) ?>" href="/audit-log"><span class="s-ic">🛡️</span><span>Audit trail</span></a><?php endif; ?>
-        <?php // One screen that says, measured from the running system, which of the
-              // legal obligations are met and which are not. Kept next to the audit
-              // trail because that is where somebody looks when a client asks. ?>
-        <?php if (is_master() || can('settings.manage')): ?><a class="s-item<?= $navOn(['compliance','incidents','incident','incident-new','incident-edit','data-requests','person-erase']) ?>" href="/compliance"><span class="s-ic">⚖️</span><span>Where we stand</span></a><?php endif; ?>
-        <?php $endgrp(); endif; ?>
 
-        <?php if (can('mod.invoicing.view') || can('mod.profitability.view')): ?>
-        <?php $grp('Money'); ?>
-        <?php if (can('mod.invoicing.view')): ?><a class="s-item<?= $navOn(['invoicing']) ?>" href="/invoicing"><span class="s-ic">💳</span><span><?= e(T_REG('invoice')) ?></span></a><?php endif; ?>
-        <?php if (can('mod.invoicing.view') && (can('finance.reconcile') || can('data.credit') || is_master())): ?>
-          <?php // Where operations hands over to the books, and then the books
-                // themselves: invoices with lines and tax, money in matched to
-                // them, and one ledger per customer. ?>
-          <a class="s-item<?= $navOn(['to-bill']) ?>" href="/to-bill"><span class="s-ic">⧗</span><span>Waiting to be billed</span></a>
-          <a class="s-item<?= $navOn(['invoices','invoice']) ?>" href="/invoices"><span class="s-ic">🧾</span><span>Invoices</span></a>
-          <a class="s-item<?= $navOn(['receipts','receipt']) ?>" href="/receipts"><span class="s-ic">💰</span><span>Money in</span></a>
-          <a class="s-item<?= $navOn(['receivables']) ?>" href="/receivables"><span class="s-ic">⏳</span><span>Receivables ageing</span></a>
-          <a class="s-item<?= $navOn(['tally']) ?>" href="/tally"><span class="s-ic">📤</span><span>Tally export</span></a>
+        <?php if (ops_area_has('reporting')): ?>
+        <a class="s-item<?= $navOn(ops_area_routes('reporting')) ?>" href="/reporting"><span class="s-ic">📑</span><span>Reporting</span></a>
         <?php endif; ?>
-        <?php // The app-switcher: opens MGH Books in a new tab, already signed in
-              // through the shared login. Shown only once Books is connected and its
-              // web address is set. No token is minted here — the shared session
-              // carries the identity, so this is just an outbound link. ?>
-        <?php if (function_exists('books_switch_ready') && books_switch_ready()): ?><a class="s-item" href="<?= e(books_app_url()) ?>" target="_blank" rel="noopener"><span class="s-ic">📗</span><span>Accounts &amp; GST ↗</span></a><?php endif; ?>
-        <?php if (can('mod.profitability.view')): ?><a class="s-item<?= $navOn(['profitability']) ?>" href="/profitability"><span class="s-ic">💹</span><span><?= e(T_REG('boss')) ?></span></a><?php endif; ?>
-        <?php $endgrp(); endif; ?>
 
-        <?php if (can('mod.reports.view')): ?>
-        <?php $grp('Insights'); ?>
-          <a class="s-item<?= $navOn(['reports']) ?>" href="/reports"><span class="s-ic">📊</span><span>Dashboards</span></a>
-        <?php $endgrp(); endif; ?>
+        <?php if (ops_area_has('money')): ?>
+        <a class="s-item<?= $navOn(ops_area_routes('money')) ?>" href="/money"><span class="s-ic">💰</span><span>Money</span></a>
+        <?php endif; ?>
 
-        <?php if (can('mod.clients.view') || can('mod.vendors.view')): ?>
-        <?php $grp('Directory'); ?>
-        <?php if (function_exists('act_can_view') && act_can_view()): ?><a class="s-item<?= $navOn(['activities']) ?>" href="/activities"><span class="s-ic">🕘</span><span>Activity</span></a><?php endif; ?>
-        <?php if (can('mod.clients.view')): ?><a class="s-item<?= $navOn(['clients']) ?>" href="/clients"><span class="s-ic">🏢</span><span><?= e(T_REG('client')) ?></span></a><?php endif; ?>
-        <?php if (can('mod.vendors.view')): ?><a class="s-item<?= $navOn(['vendors']) ?>" href="/vendors"><span class="s-ic">🚚</span><span><?= e(T_REG('vendor')) ?></span></a><?php endif; ?>
-        <?php $endgrp(); endif; ?>
+        <?php if (ops_area_has('insights')): ?>
+        <a class="s-item<?= $navOn(ops_area_routes('insights')) ?>" href="/insights"><span class="s-ic">📊</span><span>Insights</span></a>
+        <?php endif; ?>
 
-        <?php if (can('mod.masters.view')||can('mod.overheads.view')||can('mod.users.view')
-                  ||can('mod.profitability.view')||can('mod.reports.view')||is_master()
-                  ||(can('mod.settings.view') && can('settings.manage'))): ?>
-        <?php $grp('Admin'); ?>
-          <?php if (can('mod.masters.view')): ?><a class="s-item<?= $navOn(['masters','m/','lookups']) ?>" href="/masters"><span class="s-ic">📋</span><span>Masters</span></a><?php endif; ?>
-          <?php if (can('mod.overheads.view')): ?><a class="s-item<?= $navOn(['office-finance']) ?>" href="/office-finance"><span class="s-ic">📐</span><span><?= e(TH("office")) ?> costs &amp; overheads</span></a><?php endif; ?>
-          <?php if (can('mod.overheads.view')): ?><a class="s-item<?= $navOn(['cost-run']) ?>" href="/cost-run"><span class="s-ic">🧮</span><span>Month-end cost run</span></a><?php endif; ?>
-          <?php if (can('mod.profitability.view')): ?><a class="s-item<?= $navOn(['sbu-pl']) ?>" href="/sbu-pl"><span class="s-ic">📊</span><span><?= e(T('sbu')) ?> profit &amp; loss</span></a><?php endif; ?>
-          <?php // A branch manager runs the branch one job at a time, not off a
-                // monthly total — so the per-inspection figure sits beside the
-                // branch one rather than being buried in it. ?>
-          <?php if (can('mod.profitability.view')): ?><a class="s-item<?= $navOn(['call-profit']) ?>" href="/call-profit"><span class="s-ic">🧾</span><span>Profit by <?= e(Tl('call')) ?></span></a><?php endif; ?>
-          <?php if (licence_enabled('operations') && (can('mod.reports.view')||can('dash.operations')||can('dash.financial'))): ?><a class="s-item<?= $navOn(['mis']) ?>" href="/mis"><span class="s-ic">📈</span><span>Management dashboard</span></a><?php endif; ?>
-          <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['users','user-new','user-edit']) ?>" href="/users"><span class="s-ic">👥</span><span><?= e(T_REG('user')) ?></span></a><?php endif; ?>
-          <?php if (can('mod.users.view')): ?><a class="s-item<?= $navOn(['hierarchy']) ?>" href="/hierarchy"><span class="s-ic">🗂️</span><span>Organisation</span></a><?php endif; ?>
-          <?php if (is_master()): ?><a class="s-item<?= $navOn(['access']) ?>" href="/access"><span class="s-ic">🔐</span><span>Roles &amp; permissions</span></a><?php endif; ?>
-          <?php // The Ads Pro connection lives here rather than under Sales, and
-                // is shown before it is connected — a settings screen that only
-                // appears once the thing is configured cannot be used to
-                // configure it. ?>
-          <?php if (function_exists('ads_can_manage') && ads_can_manage()): ?><a class="s-item<?= $navOn(['adspro']) ?>" href="/adspro"><span class="s-ic">📢</span><span>Ads Pro connection</span></a><?php endif; ?>
-          <?php if (function_exists('sso_on') && (can('users.manage.global') || is_master())): ?><a class="s-item<?= $navOn(['sso']) ?>" href="/sso"><span class="s-ic">🔑</span><span>Single sign-on</span></a><?php endif; ?>
-          <?php // The licence. Shown to anyone who could act on it, and carrying
-                // the state in the label so an expiry is noticed before it bites
-                // rather than on the morning somebody cannot save an invoice. ?>
-          <?php if (function_exists('lk_can_manage') && lk_can_manage()):
-                  $lkS = lk_state(); $lkBad = in_array($lkS['state'], ['GRACE','READONLY','INVALID'], true); ?>
-            <a class="s-item<?= $navOn(['licence']) ?>" href="/licence"><span class="s-ic">📜</span><span>Licence<?php
-              if ($lkBad) echo ' ⚠';
-              elseif ($lkS['state'] === 'TRIAL') echo ' (' . (int)$lkS['days_left'] . 'd)';
-              elseif ($lkS['state'] === 'VALID' && $lkS['days_left'] !== null && $lkS['days_left'] <= 30) echo ' (' . (int)$lkS['days_left'] . 'd)';
-            ?></span></a>
-          <?php endif; ?>
-          <?php // The screen itself requires settings.manage. Offering it on
-                // mod.settings.view meant a business director was shown the link
-                // and then refused at the door — which reads as a broken app. ?>
-          <?php if (can('mod.settings.view') && can('settings.manage')): ?><a class="s-item<?= $navOn(['settings','terminology','ai-settings','reset-data']) ?>" href="/settings"><span class="s-ic">⚙️</span><span>System settings</span></a><?php endif; ?>
-          <?php if (can('settings.manage') || is_master()): ?><a class="s-item<?= $navOn(['service-scope']) ?>" href="/service-scope"><span class="s-ic">🧩</span><span>Service scope</span></a><?php endif; ?>
-          <?php if (can('settings.manage') || is_master()): ?><a class="s-item<?= $navOn(['service-formats']) ?>" href="/service-formats"><span class="s-ic">📄</span><span>Report formats by service</span></a><?php endif; ?>
-          <?php if (can('settings.manage') || is_master() || (function_exists('is_coordinator_level') && is_coordinator_level())): ?><a class="s-item<?= $navOn(['sla-targets']) ?>" href="/sla-targets"><span class="s-ic">⏳</span><span>SLA targets</span></a><?php endif; ?>
-          <?php if (can('settings.manage') || is_master()): ?><a class="s-item<?= $navOn(['company-profile']) ?>" href="/company-profile"><span class="s-ic">🏢</span><span>Company profile</span></a><?php endif; ?>
-          <?php if ((can('settings.manage') || is_master()) && function_exists('books_licensed') && books_licensed()): $bxc = function_exists('books_outbox_counts') ? books_outbox_counts() : []; ?><a class="s-item<?= $navOn(['books-bridge']) ?>" href="/books-bridge"><span class="s-ic">📗</span><span>MGH Books<?= !empty($bxc['stuck']) ? ' (' . (int)$bxc['stuck'] . ')' : '' ?></span></a><?php endif; ?>
-        <?php $endgrp(); endif; ?>
+        <?php if (ops_area_has('directory')): ?>
+        <a class="s-item<?= $navOn(ops_area_routes('directory')) ?>" href="/directory"><span class="s-ic">🏢</span><span>Directory</span></a>
+        <?php endif; ?>
+
+        <?php if (ops_area_has('admin')): ?>
+        <a class="s-item<?= $navOn(ops_area_routes('admin')) ?>" href="/admin"><span class="s-ic">⚙️</span><span>Admin</span></a>
+        <?php endif; ?>
       <?php endif; ?>
     </nav>
     <div class="side-foot">
