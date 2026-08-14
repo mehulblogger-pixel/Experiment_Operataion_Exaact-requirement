@@ -82,6 +82,18 @@ function tapi_render_dashboard($role, $filters) {
         }
         $h .= '</div>';
     }
+
+    // Disruptions & changes — management/operations views only. Uses the same
+    // date range and branch scope as the rest of the dashboard.
+    if (in_array($role, ['executive', 'operations'], true) && function_exists('tosrm_disruptions')) {
+        $dOff = null;
+        if (!empty($filters['office'])) $dOff = [(int)$filters['office']];
+        elseif (function_exists('tosrm_office_scope')) $dOff = tosrm_office_scope();
+        $dd = tosrm_disruptions($dOff, (string)($ctx['from'] ?? ''), (string)($ctx['to'] ?? ''));
+        $h .= '<h3 style="margin:22px 0 10px;font-size:15px">Disruptions &amp; changes '
+            . '<span style="font-size:12px;font-weight:400;color:#9aa3af">— client &amp; office cancellations, engineer changes, no-shows for the selected period</span></h3>'
+            . tosrm_disruptions_html($dd);
+    }
     return $h;
 }
 

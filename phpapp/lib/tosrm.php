@@ -1602,9 +1602,9 @@ function ops_tosrm_desk($method) {
 //  changes (reassignments) and no-shows, each with its recorded reason.
 //  Scoped to the caller's branches and, by default, the current financial year.
 // ---------------------------------------------------------------------------
-function tosrm_disruptions($offices = null, $fromDate = '') {
+function tosrm_disruptions($offices = null, $fromDate = '', $toDate = '') {
     tosrm_migrate_b();
-    $out = ['client_cancel'=>0,'office_cancel'=>0,'engineer_change'=>0,'noshow'=>0,'from'=>$fromDate,'recent'=>[]];
+    $out = ['client_cancel'=>0,'office_cancel'=>0,'engineer_change'=>0,'noshow'=>0,'from'=>$fromDate,'to'=>$toDate,'recent'=>[]];
     $where = '1=1'; $args = [];
     if (is_array($offices)) {
         if (!$offices) return $out;                    // scoped to no branch → nothing
@@ -1613,6 +1613,7 @@ function tosrm_disruptions($offices = null, $fromDate = '') {
         foreach ($offices as $o) $args[] = (int)$o;
     }
     if ($fromDate !== '') { $where .= " AND e.at >= ?"; $args[] = $fromDate; }
+    if ($toDate   !== '') { $where .= " AND e.at <= ?"; $args[] = $toDate . ' 23:59:59'; }
     try {
         $rows = ops_all("SELECT e.kind, e.party, e.reason, e.at, e.actor, e.old_inspector_id, e.new_inspector_id,
                                 j.id job_id, j.job_code
@@ -1631,6 +1632,64 @@ function tosrm_disruptions($offices = null, $fromDate = '') {
     }
     $out['recent'] = array_slice($rows, 0, 8);
     return $out;
+}
+
+// A date-range key → [from, to, label]. Used by the disruptions filter chips.
+function tosrm_disruptions_range($key) {
+    $key = preg_replace('/[^a-z]/', '', strtolower((string)$key));
+    switch ($key) {
+        case 'month':     return [date('Y-m-01'), date('Y-m-d'), 'this month'];
+        case 'lastmonth': $f = date('Y-m-01', strtotime('first day of last month'));
+                          return [$f, date('Y-m-t', strtotime($f)), 'last month'];
+        case 'all':       return ['', '', 'all time'];
+        case 'fy':
+        default:          if (function_exists('current_fy') && function_exists('fy_range')) { $r = fy_range(current_fy()); return [$r[0] ?? '', $r[1] ?? '', 'this financial year']; }
+                          return [date('Y-01-01'), date('Y-m-d'), 'this year'];
+    }
+}
+const TOSRM_DISRUPT_RANGES = ['month'=>'This month','lastmonth'=>'Last month','fy'=>'This FY','all'=>'All time'];
+
+// Self-contained card (tiles + recent table) — reused on the Operations
+// dashboard and the management (Analytics) dashboards.
+function tosrm_disruptions_html($d, $rangeLabel = '') {
+    if (!$d) return '';
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $any = ((int)$d['client_cancel'] + (int)$d['office_cancel'] + (int)$d['engineer_change'] + (int)$d['noshow']) > 0 || !empty($d['recent']);
+    static $css = false; $h = '';
+    if (!$css) { $css = true; $h .= '<style>'
+        . '.dz-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:0 0 12px}'
+        . '.dz{background:var(--card,#fff);border:1px solid var(--line,#e5e7eb);border-left:4px solid var(--muted,#94a3b8);border-radius:12px;padding:12px 14px}'
+        . '.dz .v{font-size:24px;font-weight:700;line-height:1.1}.dz .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted,#656e7a);margin-top:2px}.dz .h{font-size:11px;color:#9aa3af;margin-top:3px}'
+        . '.dz.bad{border-left-color:var(--bad,#dc2626)}.dz.bad .v{color:var(--bad,#dc2626)}'
+        . '.dz.warn{border-left-color:var(--warn,#d97706)}.dz.warn .v{color:var(--warn,#d97706)}'
+        . '@media(max-width:820px){.dz-row{grid-template-columns:repeat(2,1fr)}}'
+        . '</style>'; }
+    $h .= '<div class="dz-row">'
+        . '<div class="dz bad"><div class="v">'  . (int)$d['client_cancel']   . '</div><div class="l">Client cancelled</div><div class="h">the call was called off</div></div>'
+        . '<div class="dz warn"><div class="v">' . (int)$d['engineer_change'] . '</div><div class="l">Engineer changes</div><div class="h">reassigned to another</div></div>'
+        . '<div class="dz bad"><div class="v">'  . (int)$d['office_cancel']   . '</div><div class="l">Office cancelled</div><div class="h">executing branch pulled it</div></div>'
+        . '<div class="dz warn"><div class="v">' . (int)$d['noshow']          . '</div><div class="l">No-shows</div><div class="h">client / vendor no-show</div></div>'
+        . '</div>';
+    if (!empty($d['recent'])) {
+        $jobHdr = function_exists('TH') ? TH('job') : 'Job';
+        $h .= '<div class="panel" style="padding:0;overflow-x:auto"><table class="grid" style="width:100%;margin:0"><thead><tr><th>When</th><th>' . $e($jobHdr) . '</th><th>What happened</th><th>By whom</th><th>Reason recorded</th></tr></thead><tbody>';
+        foreach ($d['recent'] as $r) {
+            $kind = $r['kind']; $party = strtoupper((string)($r['party'] ?? ''));
+            if ($kind === 'REASSIGN')      { $label = 'Engineer changed'; $tone = 'p-warn'; $who = 'Coordinator'; }
+            elseif ($kind === 'NOSHOW')    { $label = 'No-show';          $tone = 'p-warn'; $who = TOSRM_NOSHOW_PARTIES[$party] ?? '—'; }
+            elseif ($party === 'CLIENT')   { $label = 'Client cancelled'; $tone = 'p-bad';  $who = 'Client'; }
+            elseif ($party === 'OFFICE')   { $label = 'Office cancelled'; $tone = 'p-bad';  $who = 'Executing office'; }
+            else                           { $label = 'Cancelled';        $tone = 'p-mut';  $who = TOSRM_CANCEL_PARTIES[$party] ?? '—'; }
+            $h .= '<tr><td class="muted" style="white-space:nowrap">' . $e(substr((string)$r['at'], 0, 10)) . '</td>'
+                . '<td><a href="/job?id=' . (int)$r['job_id'] . '">' . $e($r['job_code'] ?: ('#' . (int)$r['job_id'])) . '</a></td>'
+                . '<td><span class="pill ' . $tone . '">' . $e($label) . '</span></td><td>' . $e($who) . '</td>'
+                . '<td class="muted">' . $e($r['reason'] ?: '—') . '</td></tr>';
+        }
+        $h .= '</tbody></table></div>';
+    } elseif (!$any) {
+        $h .= '<p class="muted" style="margin:8px 2px 0">No cancellations, engineer changes or no-shows recorded' . ($rangeLabel ? ' ' . $e($rangeLabel) : '') . ' — a clean run.</p>';
+    }
+    return $h;
 }
 
 function ops_operations_home($method) {
@@ -1666,13 +1725,14 @@ function ops_operations_home($method) {
         $n = count($offices);
         $offLabel = $n ? ('scoped to ' . $n . ' branch' . ($n === 1 ? '' : 'es')) : '';
     }
-    // Disruptions & changes — this financial year, scoped to the same branches.
-    $fyFrom = '';
-    if (function_exists('current_fy') && function_exists('fy_range')) { $r = fy_range(current_fy()); $fyFrom = $r[0] ?? ''; }
-    $disrupt = tosrm_disruptions($offices, $fyFrom);
+    // Disruptions & changes — date-range filtered, scoped to the same branches.
+    $dr = (string)($_GET['dr'] ?? 'fy');
+    if (!array_key_exists(preg_replace('/[^a-z]/', '', strtolower($dr)), TOSRM_DISRUPT_RANGES)) $dr = 'fy';
+    [$dFrom, $dTo, $dLabel] = tosrm_disruptions_range($dr);
+    $disrupt = tosrm_disruptions($offices, $dFrom, $dTo);
     view('ops/operations_home', [
         'metrics' => $metrics, 'counts' => $counts, 'services' => $services, 'scopeLabel' => $offLabel,
-        'disrupt' => $disrupt,
+        'disrupt' => $disrupt, 'drKey' => preg_replace('/[^a-z]/', '', strtolower($dr)), 'drLabel' => $dLabel,
     ]);
     return true;
 }
