@@ -1404,6 +1404,12 @@ function demo_seed_c6($pdo, $x, $has, $ins) {
     //  Custom form — a live register with fields and one filled record
     //  (real writers customforms.php / lookups.php are $_POST; direct here)
     // ------------------------------------------------------------------
+    // custom_forms / custom_records are created lazily by cforms_migrate() —
+    // only when a Custom-forms screen is opened. On an install where nobody has,
+    // the tables are absent, $has() is false and this block is skipped (the demo
+    // "coverage" board then reads "custom forms — not installed"). Create them
+    // here so the seed is self-sufficient.
+    if (function_exists('cforms_migrate')) { try { cforms_migrate(); } catch (Throwable $e) {} }
     if ($has('custom_forms') && $has('custom_fields') && $has('custom_records') && $has('custom_values')) {
         $slug = 'toolbox-talk';
         $formId = $ins("INSERT INTO custom_forms (name,slug,nav_group,icon,help,active,sort_order,created_by,created_at)
