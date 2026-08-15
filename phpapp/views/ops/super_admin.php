@@ -121,6 +121,28 @@ $stateTone = ['OPEN'=>'p-info','ACTIVE'=>'p-ok','GRACE'=>'p-warn','EXPIRED'=>'p-
     </div>
   </div>
 
+  <!-- PLANS & PACKAGING -->
+  <?php $tiers = $d['tiers'] ?? []; $ml = $d['module_labels'] ?? []; $price = (float)($bill['price_month'] ?? 0);
+    $mult = ['STARTER'=>1, 'PRO'=>1.8, 'ENTERPRISE'=>2.8]; ?>
+  <div class="band"><h2>Plans &amp; packaging</h2><span class="bd">what each tier grants when you issue a licence key · prices set under Billing</span></div>
+  <div class="g3">
+    <?php foreach ($tiers as $tk=>$t): ?>
+    <div class="panel" style="<?= $tk==='PRO' ? 'border:2px solid var(--brand)' : '' ?>">
+      <div class="ph"><h3><?= $e($t['label']) ?><?php if ($tk==='PRO'): ?> <span class="pill p-info" style="margin-left:4px">Popular</span><?php endif; ?></h3></div>
+      <div class="pb">
+        <div style="font-size:20px;font-weight:800"><?= $price>0 ? $sym.number_format($price*$mult[$tk]).' <span style="font-size:12px;font-weight:600;color:var(--muted)">/seat·mo</span>' : '<span class="muted" style="font-size:14px;font-weight:600">price in Billing</span>' ?></div>
+        <p class="muted" style="font-size:12.5px;margin:4px 0 8px"><?= $e($t['pitch']) ?></p>
+        <div class="mods">
+          <?php foreach ($t['mods'] as $mk): $lbl = $ml[$mk] ?? ucfirst($mk); ?>
+            <div class="mod"><span class="pill p-ok">＋</span> <span class="mn"><?= $e($lbl) ?></span></div>
+          <?php endforeach; ?>
+        </div>
+      </div>
+    </div>
+    <?php endforeach; ?>
+  </div>
+  <p class="sub" style="margin-top:8px">These are the recommended presets — the licence key's <code>mods</code> list is what actually gates a customer. Prices shown scale a base seat price from Billing (illustrative until you set your own). <a href="/licence">Issue / manage licence ›</a></p>
+
   <!-- SYSTEM & DATA -->
   <div class="band"><h2>System &amp; data</h2></div>
   <div class="g2">

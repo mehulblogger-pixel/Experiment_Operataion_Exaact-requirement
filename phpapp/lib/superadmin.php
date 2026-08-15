@@ -11,6 +11,20 @@
 
 function superadmin_can() { return function_exists('is_master') && is_master(); }
 
+// Recommended plan packaging: which PRODUCT_MODULES each tier grants when a
+// licence key is issued. The licence engine already reads `mods` from the key —
+// these presets are the map you pick from at issue time. Prices stay in Settings.
+function superadmin_tiers() {
+    return [
+        'STARTER' => ['label' => 'Starter', 'mods' => ['admin', 'operations'],
+            'pitch' => 'Core operations for a single office / small TPIA.'],
+        'PRO'     => ['label' => 'Professional', 'mods' => ['admin', 'operations', 'sales', 'hr', 'money'],
+            'pitch' => 'Adds Recruitment Command Centre, Sales/CRM, invoicing & portals.'],
+        'ENTERPRISE' => ['label' => 'Enterprise', 'mods' => ['admin', 'operations', 'sales', 'hr', 'money', 'reporting'],
+            'pitch' => 'Everything, incl. the IDEMS report engine and analytics.'],
+    ];
+}
+
 // Gather everything the panel shows, guarding each source so a missing module
 // never breaks the page.
 function superadmin_data() {
@@ -30,6 +44,8 @@ function superadmin_data() {
     return [
         'lic'        => $lic,
         'bill'       => $bill,
+        'tiers'      => superadmin_tiers(),
+        'module_labels' => array_map(fn($m) => $m['label'] ?? '', $lic['modules'] ?? []),
         'tenants'    => $tenants,
         'base_domain'=> (string)($reg['base_domain'] ?? ''),
         'saas'       => (bool)($g('saas_enabled') ?? false),
