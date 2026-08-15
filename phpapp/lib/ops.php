@@ -3981,7 +3981,13 @@ function ops_candidates($route, $method) {
             if (!isset(lk_options_or('candidate_stage', CAND_STAGES)[$to])) { flash('Unknown stage.', 'error'); redirect('/candidate?id=' . $id); }
             $remark = trim($_POST['remark'] ?? '');
             $decided = in_array($to, ['ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED'], true) ? date('c') : ($cand['decided_at'] ?: '');
-            $pdo->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")->execute([$to, $decided, $id]);
+            // Phase 7 — when a candidate is lost, record WHERE (drop point) and WHY
+            // (drop reason). Moving to a live stage clears any stale drop info.
+            $lost = in_array($to, ['REJECTED','WITHDRAWN','OFFER_DECLINED','HOLD'], true);
+            $dropPoint  = $lost ? substr(trim((string)($_POST['drop_point'] ?? '')), 0, 30) : '';
+            $dropReason = $lost ? substr(trim((string)($_POST['drop_reason'] ?? '')), 0, 60) : '';
+            try { $pdo->prepare("UPDATE candidates SET stage=?, decided_at=?, drop_point=?, drop_reason=? WHERE id=?")->execute([$to, $decided, $dropPoint, $dropReason, $id]); }
+            catch (Throwable $e) { $pdo->prepare("UPDATE candidates SET stage=?, decided_at=? WHERE id=?")->execute([$to, $decided, $id]); }
             $pdo->prepare("INSERT INTO candidate_events (candidate_id,from_stage,to_stage,remark,actor,created_at) VALUES (?,?,?,?,?,?)")
                 ->execute([$id, $cand['stage'], $to, $remark, user_name(current_user()), date('c')]);
             $msg = 'Candidate moved to ' . lk_options_or('candidate_stage', CAND_STAGES)[$to] . '.';
@@ -4162,7 +4168,8 @@ function ops_candidates($route, $method) {
         $personApps = function_exists('person_applications') ? person_applications($cand) : [];
         view('ops/candidate_detail', ['cand' => $cand, 'events' => $events, 'dupes' => $dupes, 'subDupes' => $subDupes,
             'fit' => $fit, 'readiness' => $readiness, 'linkReq' => $linkReq, 'asgComm' => $asgComm, 'asgPacket' => $asgPacket,
-            'personApps' => $personApps]);
+            'personApps' => $personApps,
+            'rccDropPoints' => function_exists('rcc_drop_points') ? rcc_drop_points() : [], 'rccDropReasons' => function_exists('rcc_drop_reasons') ? rcc_drop_reasons() : []]);
         return;
     }
 }

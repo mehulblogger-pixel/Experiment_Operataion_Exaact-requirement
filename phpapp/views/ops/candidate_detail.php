@@ -315,6 +315,17 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
       <p class="muted" style="margin:2px 2px 0;font-size:12px">Recruitment → our roll + one-time fee (added to costing, one-time). Manpower → agency roll + monthly charge (their bill; we invoice the client our rate).</p>
     </div>
     <?php endif; ?>
+    <?php // Phase 7 — capture WHERE and WHY when a candidate is being lost.
+    $rccDropPoints = $rccDropPoints ?? []; $rccDropReasons = $rccDropReasons ?? []; ?>
+    <div id="lost_details" class="panel" style="display:none;background:var(--soft);margin-top:6px">
+      <div class="form-grid">
+        <div class="ff"><label>Drop point <span class="muted">where in the pipeline</span></label>
+          <select class="form-control" name="drop_point"><option value="">—</option><?php foreach ($rccDropPoints as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($cand['drop_point'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+        <div class="ff"><label>Drop reason <span class="muted">why</span></label>
+          <select class="form-control" name="drop_reason"><option value="">—</option><?php foreach ($rccDropReasons as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($cand['drop_reason'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+      </div>
+      <p class="muted" style="margin:2px 2px 0;font-size:12px">Recorded on the candidate and rolled up in the command centre’s “Where they drop off”.</p>
+    </div>
     <div style="margin-top:8px"><button class="btn" type="submit">Update stage</button></div>
   </form>
 </div>
@@ -327,7 +338,9 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
     var mk = document.getElementById('mk_insp'), det = document.getElementById('hire_details');
     var ag = document.getElementById('ag_sel'), roll = document.getElementById('roll_sel');
     var feeOne = document.getElementById('fee_one'), feeMonth = document.getElementById('fee_month');
-    function syncStage(){ if (chk) chk.style.display = (sel.value === 'ACCEPTED') ? 'inline-flex' : 'none'; if (sel.value!=='ACCEPTED' && det) det.style.display='none'; }
+    var lost = document.getElementById('lost_details');
+    var LOST_STAGES = {REJECTED:1, WITHDRAWN:1, OFFER_DECLINED:1, HOLD:1};
+    function syncStage(){ if (chk) chk.style.display = (sel.value === 'ACCEPTED') ? 'inline-flex' : 'none'; if (sel.value!=='ACCEPTED' && det) det.style.display='none'; if (lost) lost.style.display = LOST_STAGES[sel.value] ? 'block' : 'none'; }
     function syncHire(){ if (det) det.style.display = (mk && mk.checked && sel.value==='ACCEPTED') ? 'block' : 'none'; }
     function syncAgency(){
       if (!ag) return; var o = ag.options[ag.selectedIndex], t = o.getAttribute('data-type');
