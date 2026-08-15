@@ -3847,7 +3847,7 @@ function ops_requisitions($route, $method) {
                      'cmp_medical','cmp_pcc','cmp_gate_pass','cmp_safety','cmp_certification'];
             $numF = ['budgeted_cost','billing_rate','target_margin','negotiation_floor','duration_months','experience_min'];
             $norm = function($f, $v) use ($intF, $numF) {
-                if (in_array($f, ['office_id','outgoing_inspector_id','client_id'], true)) return $v === '' ? null : (int)$v;
+                if (in_array($f, ['office_id','outgoing_inspector_id','client_id','recruiter_id','manager_id'], true)) return $v === '' ? null : (int)$v;
                 if (in_array($f, $intF, true)) return $v === '' ? 0 : (int)$v;
                 if (in_array($f, $numF, true)) return $v === '' ? 0 : (float)$v;
                 return $v;
@@ -3875,6 +3875,8 @@ function ops_requisitions($route, $method) {
         }
         view('ops/requisition_form', ['req' => $req, 'offices' => offices_list(), 'inspectors' => inspectors_list(false),
             'clients' => clients_list(),
+            'rccUsers' => function_exists('rcc_users') ? rcc_users() : [],
+            'rccDepts' => function_exists('rcc_departments') ? rcc_departments() : [],
             'cfvals' => $req ? custom_values_map('requisition', $req['id']) : []]); return;
     }
     if ($route === 'requisition') {
@@ -3915,7 +3917,7 @@ function candidate_name($c) {
     return trim(($c['first_name'] ?? '') . ' ' . ($c['middle_name'] ?? '') . ' ' . ($c['last_name'] ?? '')) ?: '(no name)';
 }
 function nzc_cand($f, $v) {
-    if (in_array($f, ['client_id','call_id','trade_id','skill_id','requisition_id'], true)) return $v === '' ? null : (int)$v;
+    if (in_array($f, ['client_id','call_id','trade_id','skill_id','requisition_id','recruiter_id'], true)) return $v === '' ? null : (int)$v;
     if (in_array($f, ['experience_years','expected_rate'], true)) return $v === '' ? 0 : $v;
     return $v;
 }
@@ -4046,7 +4048,8 @@ function ops_candidates($route, $method) {
             $b = $_POST;
             $fields = ['first_name','middle_name','last_name','client_id','call_id','trade_id','skill_id',
                 'designation','source','agency','proposed_site','sbu','experience_years','email','mobile',
-                'cv_link','expected_rate','rate_type','cv_received_date','remarks','requisition_id'];
+                'cv_link','expected_rate','rate_type','cv_received_date','remarks','requisition_id',
+                'recruiter_id','department','drop_reason'];   // Phase 7 — ownership + why-lost
             // §11 duplicate guard — on a NEW candidate, stop and show look-alikes
             // (same mobile / email / name) before creating a second record for the
             // same person. "Save anyway" (dup_ack) proceeds.
@@ -4084,6 +4087,7 @@ function ops_candidates($route, $method) {
             'requisitions' => requisitions_list(true), 'preReq' => $preReq,
             'cfvals' => $cand ? custom_values_map('candidate', $cand['id']) : [],
             'dupes' => $dupBlock ?? [], 'prefill' => $prefill ?? null,
+            'rccUsers' => function_exists('rcc_users') ? rcc_users() : [], 'rccDepts' => function_exists('rcc_departments') ? rcc_departments() : [],
             'trades' => lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [], 'skillsByTrade' => skills_by_trade()]);
         return;
     }

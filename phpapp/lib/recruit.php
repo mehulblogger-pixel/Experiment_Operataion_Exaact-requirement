@@ -63,7 +63,9 @@ function req_extra_fields() {
         'prov_travel','prov_accommodation','prov_food','other_allowances',
         'sel_client_interview','sel_tech_interview','sel_hr_interview','client_approval_req','training_req',
         'cmp_medical','cmp_pcc','cmp_gate_pass','cmp_safety','cmp_certification','documents_note',
-        'billing_rate','rate_basis','target_margin','negotiation_floor'];
+        'billing_rate','rate_basis','target_margin','negotiation_floor',
+        // Phase 7 — ownership (Responsible 1 = recruiter, Responsible 2 = manager) + department.
+        'recruiter_id','manager_id','department'];
 }
 
 // Duration in months from an explicit value, else derived from start/end dates.

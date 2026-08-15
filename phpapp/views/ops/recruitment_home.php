@@ -77,7 +77,8 @@ $grp = function ($icon, $title, $n) use ($e) {
   </div>
   <div class="row-actions rc-quick">
     <?php if (can('mod.hiring.view')): ?>
-      <a class="btn primary" href="/requisition-new">＋ New requirement</a>
+      <a class="btn primary" href="/recruitment-cc">📊 Command centre</a>
+      <a class="btn secondary" href="/requisition-new">＋ New requirement</a>
       <a class="btn secondary" href="/candidate-new">＋ Add candidate</a>
       <a class="btn secondary" href="/requisitions">Requirements</a>
       <a class="btn secondary" href="/candidates">Candidates</a>
