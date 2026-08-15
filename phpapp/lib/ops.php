@@ -2050,7 +2050,7 @@ function ops_module_gate($route) {
         // from someone who owns half of it, or show them findings they cannot act on.
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring',
-        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring',
+        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring',
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads',
         'opportunity-move'=>'leads','opportunity-quote'=>'leads','opportunity-from-lead'=>'leads',
@@ -2269,6 +2269,8 @@ function ops_dispatch($route, $method) {
             ops_requisitions($route, $method); return true;
         case $route === 'recruitment':
             return ops_recruitment_home($method);
+        case $route === 'recruitment-cc':
+            return ops_recruitment_cc($method);
         case $route === 'recruit-config':
             ops_require(is_admin_level(), 'Only an administrator can change the engagement mode.');
             if ($method === 'POST' && function_exists('setting_set')) {
