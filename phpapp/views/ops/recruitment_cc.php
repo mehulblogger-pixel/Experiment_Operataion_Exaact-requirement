@@ -15,7 +15,7 @@ $qs = function ($over = []) use ($f) {
 };
 // donut geometry
 $C_ = 2 * M_PI * 54; $tot = array_sum(array_map(fn($s) => $s['n'], $d['status'] ?? [])); $tot = max(1, $tot);
-$cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','5'=>'--c5','7'=>'--c7','8'=>'--c8'];
+$cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7','8'=>'--c8'];
 ?>
 <style>
   .rcc{--c1:#3b6fb0;--c2:#e08a3c;--c3:#4a9d5b;--c4:#7d5ba6;--c5:#3aa6a6;--c6:#b07a3c;--c7:#b0413c;--c8:#c98a94;--band:var(--soft,#f1f5f9);--grid:var(--line,#e6e9ef)}
@@ -243,6 +243,18 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','5'=>'--c5','7'=>'--c7','8'=>'--c8'
 
   <!-- 5. DROP REASONS + AGEING -->
   <div class="band"><h2>Why we lose candidates &amp; how long they wait</h2></div>
+  <?php $dp = $d['droppoints'] ?? []; $dpTot = array_sum(array_map(fn($x)=>$x['n'],$dp)); if ($dpTot > 0):
+    $dpTone = ['INITIAL'=>'var(--c2)','IN_BETWEEN'=>'var(--warn)','SALARY'=>'var(--c4)','ACCEPTED_NO_JOIN'=>'var(--bad)']; $dpMax = max(1,max(array_map(fn($x)=>$x['n'],$dp))); ?>
+  <div class="panel" style="margin-bottom:16px"><div class="ph"><h3>Where they drop off</h3><span class="note">by point in the pipeline · <?= (int)$dpTot ?> tracked</span></div>
+    <div class="pb"><div class="hb">
+      <?php foreach ($dp as $x): $tone = $dpTone[$x['key']] ?? 'var(--bad)'; ?>
+        <div class="hbrow"><span class="hl" title="<?= $e($x['label']) ?>"><?= $e($x['label']) ?></span><span class="hbtrack"><i style="width:<?= round($x['n']/$dpMax*100) ?>%;background:<?= $tone ?>"></i></span><span class="hv"><?= (int)$x['n'] ?></span></div>
+      <?php endforeach; ?>
+    </div>
+    <p class="sub" style="margin:8px 2px 0;font-size:11.5px">Drop points are configurable in Masters. <b><?= (int)($d['accepted_no_join'] ?? 0) ?></b> candidates accepted an offer but did not join.</p>
+    </div>
+  </div>
+  <?php endif; ?>
   <div class="g2">
     <div class="panel"><div class="ph"><h3>Drop / hold reasons</h3><span class="note">candidates lost, by reason</span></div>
       <div class="pb"><?php if (!$d['drops']): ?><div class="empty">No dropped candidates in this window.</div><?php else: $dr=max(1,max(array_map(fn($x)=>$x['n'],$d['drops']))); ?>

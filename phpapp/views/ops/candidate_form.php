@@ -84,6 +84,10 @@
       <select class="form-control searchable" name="recruiter_id"><option value="">—</option><?php foreach (($rccUsers ?? []) as $uid=>$un): ?><option value="<?= (int)$uid ?>" <?= ((int)($cand['recruiter_id'] ?? 0)===(int)$uid)?'selected':'' ?>><?= e($un) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Department</label>
       <select class="form-control searchable" name="department"><option value="">—</option><?php foreach (($rccDepts ?? []) as $dk=>$dv): ?><option value="<?= e($dk) ?>" <?= (($cand['department'] ?? '')===$dk)?'selected':'' ?>><?= e($dv) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>If lost — drop point <span class="muted">where in the pipeline</span></label>
+      <select class="form-control" name="drop_point"><option value="">— not lost —</option><?php foreach (($rccDropPoints ?? []) as $dk=>$dv): ?><option value="<?= e($dk) ?>" <?= (($cand['drop_point'] ?? '')===$dk)?'selected':'' ?>><?= e($dv) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>If lost — reason <span class="muted">why</span></label>
+      <select class="form-control" name="drop_reason"><option value="">—</option><?php foreach (($rccDropReasons ?? []) as $dk=>$dv): ?><option value="<?= e($dk) ?>" <?= (($cand['drop_reason'] ?? '')===$dk)?'selected':'' ?>><?= e($dv) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label id="agency_lbl">Agency (sub-con / HR agency) <a href="#" class="addlink" data-qa="agency">+ Add new</a></label>
       <?php $curAgency = $cand['agency'] ?? ''; $inList = in_array($curAgency, $agencies, true); ?>
       <select class="form-control searchable" id="agency_sel" name="agency">

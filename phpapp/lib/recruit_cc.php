@@ -25,6 +25,7 @@ function rcc_migrate() {
     ensure_column('candidates',   'recruiter_id', 'INT NULL');   // who is chasing this person
     ensure_column('candidates',   'department',    "VARCHAR(60) NULL");
     ensure_column('candidates',   'drop_reason',   "VARCHAR(60) NULL"); // why lost (configurable)
+    ensure_column('candidates',   'drop_point',    "VARCHAR(30) NULL"); // WHERE in the funnel they dropped (configurable)
     ensure_column('candidates',   'source_type',   "VARCHAR(30) NULL"); // alias of source, kept configurable
 }
 
@@ -32,7 +33,17 @@ function rcc_migrate() {
 function rcc_departments()  { return lk_options_or('hr_department', RCC_DEPARTMENTS); }
 function rcc_sources()      { return lk_options_or('candidate_source', CAND_SOURCES); }
 function rcc_drop_reasons() { return lk_options_or('drop_reason', RCC_DROP_REASONS); }
+function rcc_drop_points()  { return lk_options_or('drop_point', RCC_DROP_POINTS); }
 function rcc_stage_labels() { return lk_options_or('candidate_stage', CAND_STAGES); }
+
+// WHERE in the pipeline a candidate fell off — distinct from WHY (drop_reason).
+// Configurable through the drop_point master.
+const RCC_DROP_POINTS = [
+    'INITIAL'          => 'Dropped initially (screening / before submission)',
+    'IN_BETWEEN'       => 'Dropped in between (interview stage)',
+    'SALARY'           => 'Salary-discussion drop',
+    'ACCEPTED_NO_JOIN' => 'Accepted but did not join',
+];
 
 const RCC_DEPARTMENTS = [
     'INSPECTION'=>'Inspection', 'ENGINEERING'=>'Engineering', 'QAQC'=>'QA / QC',
@@ -215,6 +226,19 @@ function rcc_data($f) {
     $dropOpt = rcc_drop_reasons(); $drops = [];
     foreach ($rows("SELECT COALESCE(NULLIF(drop_reason,''),'OTHER') dr, COUNT(*) n FROM candidates c WHERE $cw AND stage IN ('REJECTED','WITHDRAWN','OFFER_DECLINED','HOLD') GROUP BY dr", $ca) as $r) $drops[] = ['label' => $dropOpt[$r['dr']] ?? $r['dr'], 'n' => (int)$r['n']];
     usort($drops, fn($a, $b) => $b['n'] <=> $a['n']); $d['drops'] = array_slice($drops, 0, 10);
+
+    // ---- Where they drop off (drop point) — Initially / In between / Salary / Accepted-no-join ----
+    $dpOpt = rcc_drop_points(); $d['droppoints'] = [];
+    $dpCount = [];
+    foreach ($rows("SELECT drop_point dp, COUNT(*) n FROM candidates c WHERE $cw AND COALESCE(drop_point,'')<>'' GROUP BY dp", $ca) as $r) $dpCount[$r['dp']] = (int)$r['n'];
+    foreach ($dpOpt as $k => $label) $d['droppoints'][] = ['key' => $k, 'label' => $label, 'n' => (int)($dpCount[$k] ?? 0)];
+    $d['accepted_no_join'] = (int)($dpCount['ACCEPTED_NO_JOIN'] ?? 0);
+    // Surface "Accepted but did not join" as its own outcome in the status donut.
+    if ($d['accepted_no_join'] > 0) {
+        foreach ($d['status'] as &$s2) if ($s2['key'] === 'DROPPED') $s2['n'] = max(0, $s2['n'] - $d['accepted_no_join']);
+        unset($s2);
+        $d['status'][] = ['key' => 'ACCEPTED_NO_JOIN', 'label' => 'Accepted, did not join', 'n' => $d['accepted_no_join'], 'c' => 4];
+    }
 
     // ---- How long active (ageing buckets) ----
     $buckets = ['0–15 days' => 0, '16–30 days' => 0, '31–45 days' => 0, 'Over 45 days' => 0];

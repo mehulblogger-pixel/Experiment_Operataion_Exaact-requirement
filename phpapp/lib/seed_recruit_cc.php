@@ -75,12 +75,13 @@ function demo_seed_recruit_cc($pdo, $x, $has, $ins) {
     // [stage, count]
     $plan = [['RECEIVED',12],['SUBMITTED',8],['SHORTLISTED',7],['INTERVIEW',6],['OFFERED',4],['HOLD',2],['REJECTED',7],['WITHDRAWN',3],['OFFER_DECLINED',1],['ACCEPTED',5]];
 
+    $DPMAP = ['REJECTED'=>['INITIAL','IN_BETWEEN'],'WITHDRAWN'=>['ACCEPTED_NO_JOIN','SALARY'],'OFFER_DECLINED'=>['SALARY','ACCEPTED_NO_JOIN'],'HOLD'=>['IN_BETWEEN','INITIAL']];
     $ic = $pdo->prepare("INSERT INTO candidates
         (cand_code,first_name,middle_name,last_name,client_id,designation,source,source_type,department,recruiter_id,proposed_site,sbu,
          experience_years,email,mobile,cv_link,expected_rate,rate_type,cv_received_date,submitted_client_date,interview_date,
-         stage,drop_reason,requisition_id,inspector_id,decided_at,remarks,created_by,created_at,
+         stage,drop_reason,drop_point,requisition_id,inspector_id,decided_at,remarks,created_by,created_at,
          asg_status,asg_bill_rate,asg_cost_rate,asg_months,asg_approved_by,asg_approved_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'MANDAY', ?,?,?, ?,?,?,?,?,?, 'demo', ?, ?,?,?,?,?,?)");
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'MANDAY', ?,?,?, ?,?,?,?,?,?,?, 'demo', ?, ?,?,?,?,?,?)");
 
     $clients = array_values(array_filter([$cid['CL-SVP'] ?? null, $cid['CL-GHE'] ?? null, $cid['CL-NIL'] ?? null])) ?: [null];
     $inspPool = array_values(array_filter([$iid['EMP01'] ?? null, $iid['EMP02'] ?? null, $iid['EMP03'] ?? null, $iid['EMP04'] ?? null]));
@@ -103,6 +104,7 @@ function demo_seed_recruit_cc($pdo, $x, $has, $ins) {
             $client = $clients[$k % count($clients)];
             $terminal = in_array($stage, ['REJECTED','WITHDRAWN','OFFER_DECLINED','HOLD'], true);
             $drop = $terminal ? $DROPS[$k % count($DROPS)] : null;
+            $dpoint = $terminal ? $DPMAP[$stage][$k % count($DPMAP[$stage])] : null;
             $decided = in_array($stage, ['ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED'], true) ? $d(-max(1, $ageDays - 20)) : '';
 
             // Hires: link to a requirement + an inspector, with approved commercials.
@@ -118,7 +120,7 @@ function demo_seed_recruit_cc($pdo, $x, $has, $ins) {
             try {
                 $ins2 = $ic->execute(['CV-RC-'.str_pad((string)($k+1),3,'0',STR_PAD_LEFT), $fn, '', $ln, $client, $desig, $src, $src, $dept, $rc($k),
                     'Client site — '.$dept, ['OGC','IND'][$k%2], $exp, $email, $mobile, 'https://drive.example/cv/'.strtolower($fn.$ln).'.pdf', $rate,
-                    $cvDate, $subDate, $intDate, $stage, $drop, $reqIdV, $inspV, $decided,
+                    $cvDate, $subDate, $intDate, $stage, $drop, $dpoint, $reqIdV, $inspV, $decided,
                     ucfirst(strtolower($dept)).' profile · sourced via '.$src, $now,
                     $asgStatus, $asgBill, $asgCost, $asgMonths, $asgBy, $asgAt]);
                 if ($ins2) $n++;

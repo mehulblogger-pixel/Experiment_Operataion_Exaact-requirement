@@ -4049,7 +4049,7 @@ function ops_candidates($route, $method) {
             $fields = ['first_name','middle_name','last_name','client_id','call_id','trade_id','skill_id',
                 'designation','source','agency','proposed_site','sbu','experience_years','email','mobile',
                 'cv_link','expected_rate','rate_type','cv_received_date','remarks','requisition_id',
-                'recruiter_id','department','drop_reason'];   // Phase 7 — ownership + why-lost
+                'recruiter_id','department','drop_reason','drop_point'];   // Phase 7 — ownership + why/where lost
             // §11 duplicate guard — on a NEW candidate, stop and show look-alikes
             // (same mobile / email / name) before creating a second record for the
             // same person. "Save anyway" (dup_ack) proceeds.
@@ -4088,6 +4088,7 @@ function ops_candidates($route, $method) {
             'cfvals' => $cand ? custom_values_map('candidate', $cand['id']) : [],
             'dupes' => $dupBlock ?? [], 'prefill' => $prefill ?? null,
             'rccUsers' => function_exists('rcc_users') ? rcc_users() : [], 'rccDepts' => function_exists('rcc_departments') ? rcc_departments() : [],
+            'rccDropReasons' => function_exists('rcc_drop_reasons') ? rcc_drop_reasons() : [], 'rccDropPoints' => function_exists('rcc_drop_points') ? rcc_drop_points() : [],
             'trades' => lk_type('trade') ? lk_root_values(lk_type('trade')['id']) : [], 'skillsByTrade' => skills_by_trade()]);
         return;
     }
