@@ -1571,7 +1571,7 @@ function demo_seed_c7($pdo, $x, $has, $ins) {
 // Dispatcher — runs every part-three group, isolating failures.
 function demo_seed_modules_c($pdo, $x, $has, $ins) {
     $n = []; $GLOBALS['__seedc_fail'] = [];
-    foreach (['demo_seed_c1','demo_seed_c2','demo_seed_c3','demo_seed_c4','demo_seed_c5','demo_seed_c6','demo_seed_c7','demo_seed_recruit_cc'] as $fn) {
+    foreach (['demo_seed_c1','demo_seed_c2','demo_seed_c3','demo_seed_c4','demo_seed_c5','demo_seed_c6','demo_seed_c7','demo_seed_recruit_cc','demo_seed_costing'] as $fn) {
         if (!function_exists($fn)) continue;
         try {
             $r = $fn($pdo, $x, $has, $ins);
@@ -1600,6 +1600,9 @@ function demo_seed_c_remove($pdo) {
     $demoJobs     = "SELECT id FROM jobs WHERE created_by='demo'";
     $demoQuotes   = "SELECT id FROM quotations WHERE quote_no LIKE 'Q-2607-%'";
 
+    // ---- project costing (demo sheets) ----
+    $try("DELETE FROM project_costing_lines WHERE costing_id IN (SELECT id FROM project_costings WHERE created_by='demo')");
+    $try("DELETE FROM project_costings WHERE created_by='demo'");
     // ---- c7: CAPA actions / service scope / portal audit / ads ----
     $try("DELETE FROM capa_actions WHERE created_by='demo'");
     $try("DELETE FROM service_dependencies WHERE set_by='demo'");
