@@ -294,6 +294,156 @@
   })();
   </script>
 
+  <?php // ---- "Go to anything" command palette --------------------------------
+        //  A global jump list over every screen the user may open (ops_nav_index),
+        //  with ★ pinned favourites and recent screens remembered per browser.
+        //  Purely additive: the rail, the tiles and the record search are all
+        //  untouched — this is a fourth, faster way in. ?>
+  <div class="cmdk" id="cmdk" hidden aria-hidden="true">
+    <div class="cmdk-back" id="cmdkBack"></div>
+    <div class="cmdk-box" role="dialog" aria-modal="true" aria-label="Go to a screen">
+      <div class="cmdk-in-wrap">
+        <span class="cmdk-in-ic" aria-hidden="true">🧭</span>
+        <input type="search" id="cmdkIn" class="cmdk-in" placeholder="Go to a screen…  (type to filter)"
+               autocomplete="off" spellcheck="false" aria-label="Go to a screen">
+        <kbd class="cmdk-esc">Esc</kbd>
+      </div>
+      <div class="cmdk-list" id="cmdkList" role="listbox" aria-label="Screens"></div>
+      <div class="cmdk-foot">
+        <span><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>↵</kbd> open · <kbd>Esc</kbd> close</span>
+        <span class="cmdk-foot-r">★ to pin</span>
+      </div>
+    </div>
+  </div>
+  <script id="cmdkData" type="application/json"><?= json_encode(function_exists('ops_nav_index') ? ops_nav_index() : [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
+  <script>
+  (function () {
+    var root = document.getElementById("cmdk");
+    if (!root) return;
+    var dataEl = document.getElementById("cmdkData");
+    var ITEMS = [];
+    try { ITEMS = JSON.parse(dataEl.textContent || "[]"); } catch (e) { ITEMS = []; }
+    var input = document.getElementById("cmdkIn");
+    var list  = document.getElementById("cmdkList");
+    var back  = document.getElementById("cmdkBack");
+    var btn   = document.getElementById("cmdkBtn");
+    var PIN_KEY = "cmdkPins", REC_KEY = "cmdkRecent";
+    var active = -1, rows = [];
+
+    function load(k) { try { return JSON.parse(localStorage.getItem(k) || "[]"); } catch (e) { return []; } }
+    function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+    function pins() { return load(PIN_KEY); }
+    function isPinned(url) { return pins().indexOf(url) >= 0; }
+    function togglePin(url) {
+      var p = pins(), i = p.indexOf(url);
+      if (i >= 0) p.splice(i, 1); else p.unshift(url);
+      save(PIN_KEY, p.slice(0, 40));
+    }
+    function pushRecent(url) {
+      var r = load(REC_KEY); var i = r.indexOf(url);
+      if (i >= 0) r.splice(i, 1);
+      r.unshift(url); save(REC_KEY, r.slice(0, 8));
+    }
+    var byUrl = {};
+    ITEMS.forEach(function (it) { if (!byUrl[it.url]) byUrl[it.url] = it; });
+
+    function esc(s) { return (s == null ? "" : String(s)).replace(/[&<>"]/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+
+    // Simple subsequence/substring score: substring in label beats scattered.
+    function score(it, q) {
+      var l = it.label.toLowerCase(), a = (it.area || "").toLowerCase(), d = (it.desc || "").toLowerCase();
+      if (q === "") return 0;
+      var i = l.indexOf(q);
+      if (i === 0) return 100; if (i > 0) return 80;
+      if (a.indexOf(q) >= 0) return 55;
+      if (d.indexOf(q) >= 0) return 40;
+      // subsequence over label
+      var qi = 0; for (var k = 0; k < l.length && qi < q.length; k++) if (l[k] === q[qi]) qi++;
+      return qi === q.length ? 20 : -1;
+    }
+
+    function rowHtml(it, pinned) {
+      return '<div class="cmdk-row" role="option" data-url="' + esc(it.url) + '" tabindex="-1">'
+        + '<span class="cmdk-ic">' + esc(it.icon || "•") + '</span>'
+        + '<span class="cmdk-tx"><span class="cmdk-lb">' + esc(it.label)
+        + (it.kind === "action" ? ' <span class="cmdk-tag">action</span>' : '') + '</span>'
+        + '<span class="cmdk-ar">' + esc(it.area || "") + (it.desc ? ' · ' + esc(it.desc) : '') + '</span></span>'
+        + '<button type="button" class="cmdk-pin' + (pinned ? ' on' : '') + '" data-pin="' + esc(it.url) + '" aria-label="Pin" title="Pin / unpin">★</button>'
+        + '</div>';
+    }
+    function group(title, items) {
+      if (!items.length) return "";
+      var h = '<div class="cmdk-grp">' + esc(title) + '</div>';
+      var seen = {};
+      items.forEach(function (it) { if (it && !seen[it.url]) { seen[it.url] = 1; h += rowHtml(it, isPinned(it.url)); } });
+      return h;
+    }
+
+    function render() {
+      var q = input.value.trim().toLowerCase();
+      var html = "";
+      if (q === "") {
+        var pinnedItems = pins().map(function (u) { return byUrl[u]; }).filter(Boolean);
+        var recentItems = load(REC_KEY).map(function (u) { return byUrl[u]; }).filter(Boolean);
+        html += group("★ Pinned", pinnedItems);
+        html += group("Recent", recentItems);
+        // Everything else, grouped by area, in registry order.
+        var areas = [], byArea = {};
+        ITEMS.forEach(function (it) { if (!byArea[it.area]) { byArea[it.area] = []; areas.push(it.area); } byArea[it.area].push(it); });
+        areas.forEach(function (a) { html += group(a, byArea[a]); });
+      } else {
+        var scored = [];
+        ITEMS.forEach(function (it) { var s = score(it, q); if (s >= 0) scored.push([s, it]); });
+        scored.sort(function (a, b) { return b[0] - a[0] || a[1].label.length - b[1].label.length; });
+        var items = scored.map(function (x) { return x[1]; });
+        html = items.length ? group("Results", items) : '<div class="cmdk-none">Nothing matches “' + esc(q) + '”.</div>';
+      }
+      list.innerHTML = html;
+      rows = [].slice.call(list.querySelectorAll(".cmdk-row"));
+      active = rows.length ? 0 : -1;
+      paint();
+    }
+    function paint() {
+      rows.forEach(function (r, i) { r.classList.toggle("on", i === active); });
+      if (active >= 0 && rows[active]) rows[active].scrollIntoView({ block: "nearest" });
+    }
+    function go(url) { if (url) { pushRecent(url); window.location.href = url; } }
+
+    function open() {
+      root.hidden = false; root.setAttribute("aria-hidden", "false");
+      document.documentElement.classList.add("cmdk-open");
+      input.value = ""; render();
+      setTimeout(function () { input.focus(); }, 20);
+    }
+    function close() {
+      root.hidden = true; root.setAttribute("aria-hidden", "true");
+      document.documentElement.classList.remove("cmdk-open");
+    }
+    function toggle() { root.hidden ? open() : close(); }
+
+    if (btn) btn.addEventListener("click", open);
+    if (back) back.addEventListener("click", close);
+    input.addEventListener("input", render);
+    list.addEventListener("click", function (e) {
+      var pin = e.target.closest(".cmdk-pin");
+      if (pin) { e.stopPropagation(); togglePin(pin.getAttribute("data-pin")); render(); return; }
+      var row = e.target.closest(".cmdk-row");
+      if (row) go(row.getAttribute("data-url"));
+    });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown") { e.preventDefault(); if (rows.length) { active = (active + 1) % rows.length; paint(); } }
+      else if (e.key === "ArrowUp") { e.preventDefault(); if (rows.length) { active = (active - 1 + rows.length) % rows.length; paint(); } }
+      else if (e.key === "Enter") { e.preventDefault(); if (active >= 0 && rows[active]) go(rows[active].getAttribute("data-url")); }
+      else if (e.key === "Escape") { e.preventDefault(); close(); }
+    });
+    // Global shortcut: Ctrl/⌘-K anywhere opens it; Esc closes.
+    document.addEventListener("keydown", function (e) {
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); toggle(); }
+      else if (e.key === "Escape" && !root.hidden) { close(); }
+    });
+  })();
+  </script>
+
   <div class="main">
     <header class="topbar-slim">
       <button class="nav-toggle" aria-label="Menu" onclick="document.getElementById('side').classList.add('open');document.getElementById('scrim').classList.add('on');">☰</button>
@@ -309,6 +459,12 @@
                placeholder="Search records…  (/)">
         <button type="submit" aria-label="Search">🔍</button>
       </form>
+      <?php // "Go to anything" — a jump list of every screen you may open, from a
+            // button that is always in the top bar (so it is reachable on a phone
+            // without opening the hamburger). Ctrl/⌘-K opens it too. ?>
+      <button type="button" class="tb-cmdk" id="cmdkBtn" aria-label="Go to any screen" title="Go to any screen  (Ctrl/⌘ K)">
+        <span aria-hidden="true">🧭</span><span class="tb-cmdk-t">Go to…</span><kbd class="tb-cmdk-k">⌘K</kbd>
+      </button>
       <div class="tb-spacer"></div>
       <?php if ($office): ?><span class="tb-chip">📍 <?= e($office) ?></span><?php endif; ?>
       <span class="tb-chip">FY <?= e(current_fy()) ?></span>
