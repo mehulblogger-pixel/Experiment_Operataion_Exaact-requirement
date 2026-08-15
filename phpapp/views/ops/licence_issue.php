@@ -49,14 +49,37 @@ openssl ec -in licence-private.pem -pubout -out licence-public.pem</pre></li>
       <div class="ff"><label>Install id <span class="muted">— optional</span></label><input class="form-control" name="install_id" placeholder="for automatic pull">
         <small class="muted">Set this to let the customer's install fetch renewals automatically.</small></div>
     </div>
+    <?php // One-click plan: pre-fills the modules below. Server also honours `tier` for robustness.
+    $planTiers = function_exists('superadmin_tiers') ? superadmin_tiers() : []; ?>
+    <?php if ($planTiers): ?>
+    <h3 class="tab-sub">Plan <span class="muted" style="font-weight:400;font-size:12px">— pick one to set the modules, or choose Custom below</span></h3>
+    <input type="hidden" name="tier" id="lic_tier" value="">
+    <div class="row-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      <?php foreach ($planTiers as $tk=>$t): ?>
+        <button type="button" class="btn secondary lic-plan" data-tier="<?= e($tk) ?>" data-mods="<?= e(implode(',', $t['mods'])) ?>" title="<?= e($t['pitch']) ?>"><?= e($t['label']) ?></button>
+      <?php endforeach; ?>
+      <button type="button" class="btn btn-ghost lic-plan" data-tier="" data-mods="__ALL__">Custom / everything</button>
+    </div>
+    <?php endif; ?>
     <h3 class="tab-sub">Modules included</h3>
     <div class="checkgrid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
       <?php foreach ($modules as $k => $m): $core = !empty($m[3]); ?>
-        <label class="chk" style="align-items:flex-start"><input type="checkbox" name="mods[<?= e($k) ?>]" value="1" checked <?= $core?'disabled':'' ?>>
+        <label class="chk" style="align-items:flex-start"><input type="checkbox" class="lic-mod" data-mod="<?= e($k) ?>" name="mods[<?= e($k) ?>]" value="1" checked <?= $core?'disabled':'' ?>>
           <span><strong><?= e($m[0]) ?></strong><?= $core?' <span class="pill p-mut">always</span>':'' ?><br><span class="muted" style="font-size:12px"><?= e($m[1]) ?></span></span></label>
       <?php endforeach; ?>
     </div>
     <button class="btn" type="submit" style="margin-top:12px">Generate signed key</button>
+    <?php if ($planTiers): ?>
+    <script>(function(){
+      var btns=document.querySelectorAll('.lic-plan'), boxes=document.querySelectorAll('.lic-mod'), tierField=document.getElementById('lic_tier');
+      btns.forEach(function(b){ b.addEventListener('click', function(){
+        var all=b.getAttribute('data-mods')==='__ALL__', mods=all?null:(b.getAttribute('data-mods')||'').split(',');
+        if(tierField) tierField.value = b.getAttribute('data-tier')||'';
+        boxes.forEach(function(cb){ if(cb.disabled) return; cb.checked = all ? true : mods.indexOf(cb.getAttribute('data-mod'))>=0; });
+        btns.forEach(function(x){ x.classList.remove('primary'); }); if(!all) b.classList.add('primary');
+      }); });
+    })();</script>
+    <?php endif; ?>
   </form>
 </div>
 <?php endif; ?>

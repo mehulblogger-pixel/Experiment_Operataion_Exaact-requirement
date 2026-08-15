@@ -355,7 +355,16 @@ function ops_licence_issue($route, $method) {
         }
         $mods = [];
         foreach (array_keys(PRODUCT_MODULES) as $k) if (!empty($_POST['mods'][$k])) $mods[] = $k;
+        // One-click plan: a posted tier overrides the module set with its preset,
+        // so a Starter/Pro/Enterprise key is correct even if the JS didn't run.
+        $tier = strtoupper(trim((string)($_POST['tier'] ?? '')));
+        if ($tier !== '' && function_exists('superadmin_tiers')) {
+            $preset = superadmin_tiers()[$tier] ?? null;
+            if ($preset) $mods = $preset['mods'];
+        }
         if (!$mods) $mods = array_keys(PRODUCT_MODULES);               // default: the whole product
+        // Always include core modules so an install is never left unusable.
+        foreach (array_keys(PRODUCT_MODULES) as $k) if (!empty(PRODUCT_MODULES[$k][3]) && !in_array($k, $mods, true)) $mods[] = $k;
         $ref = 'LIC-' . date('ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
         $claims = ['cust' => $cust, 'exp' => $exp, 'seats' => $seats, 'grace' => $grace, 'ref' => $ref, 'mods' => $mods];
         $r = lk_issue($claims);
