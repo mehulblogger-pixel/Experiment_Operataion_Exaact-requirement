@@ -40,6 +40,17 @@ function db() {
         // with. Wrapped because a locked-down host may refuse SET, and a refused
         // charset must not stop the application from starting.
         try { $pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"); } catch (Throwable $e) {}
+        // The whole application — schema, queries and the demo seed — is authored
+        // against SQLite, which is typeless and lenient: an empty string '' is a
+        // fine stand-in for a blank date or number. Modern MySQL/MariaDB defaults
+        // to STRICT_TRANS_TABLES + NO_ZERO_DATE, which REJECT those rows outright,
+        // so a seed block (or a real form save) that stores '' in a DATE/INT column
+        // fails on production MySQL though it worked on the dev sandbox — the demo
+        // "coverage" board showed exactly this (a handful of modules loading empty).
+        // Relax the session to match the engine the code was written for. This is
+        // a per-connection setting, so it changes nothing on the server itself, and
+        // it is wrapped because a locked-down host may refuse SET.
+        try { $pdo->exec("SET SESSION sql_mode = ''"); } catch (Throwable $e) {}
     }
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
