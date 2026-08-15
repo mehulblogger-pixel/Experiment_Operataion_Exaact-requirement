@@ -69,6 +69,9 @@ function seed_demo($force = false) {
     // removal goes by the seed's own markers.
     if ($recovering) seed_demo_remove();
     $pdo = db();
+    // Match SQLite's leniency for this seed connection so blank-date rows the demo
+    // carries load on strict MySQL too (see demo_seed_modules_c for the full note).
+    try { $pdo->exec("SET SESSION sql_mode = ''"); } catch (Throwable $e) {}
     $now = date('c'); $today = date('Y-m-d'); $m = date('Y-m');
     $hash = password_hash('demo12345', PASSWORD_DEFAULT);
     $d = fn($days) => date('Y-m-d', strtotime("$days days"));

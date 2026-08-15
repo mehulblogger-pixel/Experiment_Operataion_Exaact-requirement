@@ -1577,6 +1577,13 @@ function demo_seed_c7($pdo, $x, $has, $ins) {
 // Dispatcher — runs every part-three group, isolating failures.
 function demo_seed_modules_c($pdo, $x, $has, $ins) {
     $n = []; $GLOBALS['__seedc_fail'] = [];
+    // The seed is authored against SQLite (typeless): several rows carry an empty
+    // string '' where a date is blank. Strict MySQL (STRICT_TRANS_TABLES +
+    // NO_ZERO_DATE, the modern default) rejects those, so a block throws and its
+    // register loads empty on production. Relax this connection to match SQLite
+    // for the duration of the seed, so the fix travels with the seed itself even
+    // if db.php was not yet updated. Per-connection only; wrapped for locked hosts.
+    try { $pdo->exec("SET SESSION sql_mode = ''"); } catch (Throwable $e) {}
     foreach (['demo_seed_c1','demo_seed_c2','demo_seed_c3','demo_seed_c4','demo_seed_c5','demo_seed_c6','demo_seed_c7','demo_seed_recruit_cc','demo_seed_costing'] as $fn) {
         if (!function_exists($fn)) continue;
         try {
