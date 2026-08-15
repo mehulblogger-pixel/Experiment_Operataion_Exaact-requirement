@@ -2388,6 +2388,8 @@ function ops_dispatch($route, $method) {
             ops_data_requests($route, $method); return true;
         case $route === 'consents' || $route === 'consent-add' || $route === 'consent-withdraw':
             ops_consents($route, $method); return true;
+        case $route === 'super-admin' || $route === 'control-panel':
+            return ops_super_admin($method);
         case $route === 'tenants' || $route === 'tenant-enable' || $route === 'tenant-add'
              || $route === 'tenant-status' || $route === 'tenant-remove'
              || $route === 'cpanel-save' || $route === 'cpanel-test':
