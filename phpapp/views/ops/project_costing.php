@@ -109,6 +109,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
         <span class="muted" style="font-size:12px">One quote line per role, priced at the proposed rate × <?= $e(strtolower($qtyLabel)) ?>.</span>
       <?php endif; ?>
     <?php endif; ?>
+    <?php if (!empty($h['opportunity_id'])): ?><a class="btn secondary" href="/opportunity?id=<?= (int)$h['opportunity_id'] ?>">💡 Linked deal</a><?php endif; ?>
   </div>
   <?php if ($canHire): ?>
   <div class="scroll"><table class="grid" style="font-size:12.5px">

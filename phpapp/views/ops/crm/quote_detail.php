@@ -170,6 +170,36 @@
   <?php endif; ?>
 </div>
 
+<?php // ---- Project costing linked to this quotation --------------------------
+  if (!empty($costingCan)): $pcRow = $costing ?? null; $back = '/quote?id=' . (int)$q['id']; ?>
+<div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <span class="muted">🧮 Project costing:</span>
+  <?php if ($pcRow): ?>
+    <a class="btn small secondary" href="/project-costing?id=<?= (int)$pcRow['id'] ?>"><b><?= e($pcRow['code']) ?></b> — <?= e($pcRow['title']) ?></a>
+    <span class="muted" style="font-size:12.5px">revenue <?= fmoney_short($pcRow['exp_revenue']) ?> · margin <?= (float)$pcRow['exp_revenue']>0 ? number_format((float)$pcRow['exp_profit']/(float)$pcRow['exp_revenue']*100,1) : '0' ?>%</span>
+    <form method="post" action="/project-costing-attach" style="display:inline;margin-left:auto" onsubmit="return confirm('Unlink this costing from the quotation?')">
+      <input type="hidden" name="costing_id" value="<?= (int)$pcRow['id'] ?>"><input type="hidden" name="quote_id" value="0"><input type="hidden" name="back" value="<?= e($back) ?>">
+      <button class="btn small btn-ghost">Unlink</button>
+    </form>
+  <?php else: ?>
+    <form method="post" action="/project-costing-new" style="display:inline">
+      <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>"><input type="hidden" name="client_id" value="<?= (int)($q['client_id'] ?? 0) ?>">
+      <input type="hidden" name="office_id" value="<?= (int)($q['office_id'] ?? 0) ?>"><input type="hidden" name="title" value="<?= e($q['subject'] ?: quote_label($q)) ?>">
+      <input type="hidden" name="site" value="<?= e($q['site_location'] ?? '') ?>">
+      <button class="btn small primary">＋ Create costing for this quotation</button>
+    </form>
+    <?php if (!empty($costingUnlinked)): ?>
+    <form method="post" action="/project-costing-attach" style="display:inline-flex;gap:6px;align-items:center">
+      <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>"><input type="hidden" name="back" value="<?= e($back) ?>">
+      <select name="costing_id" class="form-control" style="padding:5px 8px;font-size:13px"><option value="">attach existing…</option>
+        <?php foreach ($costingUnlinked as $u): ?><option value="<?= (int)$u['id'] ?>"><?= e($u['code'].' — '.$u['title']) ?></option><?php endforeach; ?>
+      </select><button class="btn small secondary">Attach</button>
+    </form>
+    <?php endif; ?>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php if ($approvals): ?>
 <div class="panel">
   <h3 class="tab-sub" style="margin-top:0">Approval chain</h3>

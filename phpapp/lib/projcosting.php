@@ -142,6 +142,16 @@ function pc_all($limit = 200) {
                     FROM project_costings c LEFT JOIN business_partners p ON p.id=c.client_id
                     ORDER BY c.id DESC LIMIT " . (int)$limit) ?: [];
 }
+// The costing linked to a given quotation / opportunity (or null).
+function pc_for_quote($qid) { pc_migrate(); return $qid ? (ops_one("SELECT * FROM project_costings WHERE quote_id=? ORDER BY id DESC LIMIT 1", [(int)$qid]) ?: null) : null; }
+function pc_for_opportunity($oid) { pc_migrate(); return $oid ? (ops_one("SELECT * FROM project_costings WHERE opportunity_id=? ORDER BY id DESC LIMIT 1", [(int)$oid]) ?: null) : null; }
+// Costings not yet linked to any quote/opportunity — the "attach existing" list.
+function pc_unlinked($limit = 100) {
+    pc_migrate();
+    return ops_all("SELECT id, code, title, exp_revenue FROM project_costings
+                    WHERE COALESCE(quote_id,0)=0 AND COALESCE(opportunity_id,0)=0
+                    ORDER BY id DESC LIMIT " . (int)$limit) ?: [];
+}
 
 // ---- The maths -------------------------------------------------------------
 // One line's numbers, given the header (for the loading %s and basis).
@@ -395,6 +405,21 @@ function ops_projcosting($route, $method) {
             flash('Reopened as draft.');
         }
         redirect('/project-costing?id=' . $id);
+    }
+
+    // ---- Attach / detach a costing to an existing quotation or opportunity ----
+    if ($route === 'project-costing-attach' && $method === 'POST') {
+        $id = (int)($_POST['costing_id'] ?? 0); $h = pc_get($id);
+        if (!$h) { flash('Costing not found.', 'error'); redirect('/project-costings'); }
+        ops_require(pc_can_edit() || (function_exists('can') && (can('mod.quotes.edit') || can('mod.hiring.edit'))), 'You cannot link this costing.');
+        $qid = isset($_POST['quote_id']) ? (int)$_POST['quote_id'] : null;
+        $oid = isset($_POST['opportunity_id']) ? (int)$_POST['opportunity_id'] : null;
+        if ($qid !== null) $pdo->prepare("UPDATE project_costings SET quote_id=?, updated_at=? WHERE id=?")->execute([$qid ?: null, date('c'), $id]);
+        if ($oid !== null) $pdo->prepare("UPDATE project_costings SET opportunity_id=?, updated_at=? WHERE id=?")->execute([$oid ?: null, date('c'), $id]);
+        flash(($qid || $oid) ? 'Costing linked.' : 'Costing unlinked.');
+        // Return to wherever the request came from.
+        $back = (string)($_POST['back'] ?? '');
+        redirect($back !== '' ? $back : '/project-costing?id=' . $id);
     }
 
     // ---- Generate a quotation from the costing ----

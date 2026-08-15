@@ -1177,6 +1177,10 @@ function ops_crm_quotes($route, $method) {
             'locs' => crm_quote_locations($q['id']),
             'files' => crm_quote_files($q['id']),
             'fileKinds' => QUOTE_FILE_KINDS,
+            // Project costing linked to this quotation (attach / create from here).
+            'costing' => function_exists('pc_for_quote') ? pc_for_quote($q['id']) : null,
+            'costingUnlinked' => function_exists('pc_unlinked') ? pc_unlinked() : [],
+            'costingCan' => function_exists('pc_can') && pc_can(),
             'payTerms' => lk_options_or('payment_term', PAYMENT_TERMS),
             'offAll' => offices_list(),
             'clientReg' => !empty($q['client_id']) ? ops_one("SELECT code, legal_name FROM business_partners WHERE id=?", [$q['client_id']]) : null,
