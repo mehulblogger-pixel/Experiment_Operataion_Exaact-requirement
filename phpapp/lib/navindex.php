@@ -93,6 +93,8 @@ function ops_nav_index() {
             $add('New requirement', '/requisition-new', $A, '➕', 'Raise a new requirement.', 'action');
             $add('Add candidate', '/candidate-new', $A, '➕', 'Add a candidate.', 'action');
         }
+        if ($fx('pc_can') && pc_can())
+            $add('Project costing', '/project-costings', $A, '🧮', 'Team cost build-ups → rates & margin.');
         // TPIA service lines from the Service Scope Engine — only those switched
         // on for this install, same rule the Operations Home uses.
         if ($fx('svc_catalog')) {

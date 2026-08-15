@@ -43,11 +43,12 @@ function ops_area_def($area) {
         case 'sales':
             $title = 'Sales'; $icon = '🎯';
             $sub = 'Leads, opportunities, ' . strtolower(THP('inquiry')) . ', ' . strtolower(THP('quote')) . ' and the pipeline.';
-            $routes = ['sales','leads','lead','opportunities','opportunity','inquiries','inquiry','quotes','quote','crm-dashboard','pipelines','pipeline','approvals','stage-gates','ads-roi'];
+            $routes = ['sales','leads','lead','opportunities','opportunity','inquiries','inquiry','quotes','quote','crm-dashboard','pipelines','pipeline','approvals','stage-gates','ads-roi','project-costings','project-costing'];
             $t($fx('leads_can_view') && leads_can_view(), '🎯', 'Leads', '/leads', 'Enquiries not yet qualified.');
             $t($fx('opp_can_view') && opp_can_view(), '💡', 'Opportunities', '/opportunities', 'Qualified deals being worked.');
             $t(can('mod.inquiries.view'), '📨', THP('inquiry'), '/inquiries', 'Requests for a quotation.');
             $t(can('mod.quotes.view'), '📝', THP('quote'), '/quotes', 'Quotations, revisions and approvals.');
+            $t(function_exists('pc_can') && pc_can(), '🧮', 'Project costing', '/project-costings', 'Team cost build-ups → man-month / man-day / lump rates and margin.');
             $t($fx('gate_can_view') && gate_can_view(), '🛂', 'Approvals', '/approvals', 'Deals held at a stage gate.',
                 $num(fn() => $fx('gate_pending_count') ? gate_pending_count() : 0), 'amber');
             $t($fx('crmdash_can') && crmdash_can(), '📈', 'Sales dashboard', '/crm-dashboard', 'Win rates and value by stage.');

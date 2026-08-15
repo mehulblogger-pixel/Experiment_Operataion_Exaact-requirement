@@ -104,6 +104,7 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
       <a class="btn secondary" href="/candidate-new">＋ Add candidate</a>
       <a class="btn secondary" href="/requisitions">Requirements</a>
       <a class="btn secondary" href="/candidates">Candidates</a>
+      <?php if (function_exists('pc_can') && pc_can()): ?><a class="btn secondary" href="/project-costings">🧮 Project costing</a><?php endif; ?>
       <a class="btn secondary" href="/recruitment">Action view</a>
     </div>
   </div>

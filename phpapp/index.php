@@ -192,6 +192,7 @@ try {
     require __DIR__ . '/lib/tapi_dash.php';
     require __DIR__ . '/lib/tapi_score.php';
     require __DIR__ . '/lib/tapi_gov.php';
+    require __DIR__ . '/lib/projcosting.php';
     require __DIR__ . '/lib/areas.php';
     require __DIR__ . '/lib/navindex.php';
     require __DIR__ . '/lib/idems_autoform.php';

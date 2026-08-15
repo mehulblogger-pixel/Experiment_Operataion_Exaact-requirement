@@ -2271,6 +2271,8 @@ function ops_dispatch($route, $method) {
             return ops_recruitment_home($method);
         case $route === 'recruitment-cc':
             return ops_recruitment_cc($method);
+        case $route === 'project-costings' || strpos($route, 'project-costing') === 0:
+            return ops_projcosting($route, $method);
         case $route === 'recruit-config':
             ops_require(is_admin_level(), 'Only an administrator can change the engagement mode.');
             if ($method === 'POST' && function_exists('setting_set')) {
