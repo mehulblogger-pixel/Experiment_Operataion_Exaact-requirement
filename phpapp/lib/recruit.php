@@ -20,6 +20,16 @@ const REQ_WORK_MODELS = ['DEPUTATION'=>'Deputation (to client site)', 'SPOT'=>'S
 const REQ_SHIFTS      = ['GENERAL'=>'General', 'DAY'=>'Day', 'NIGHT'=>'Night', 'ROTATING'=>'Rotating', 'FLEX'=>'Flexible'];
 const REQ_RATE_BASIS  = ['MONTHLY'=>'Per month', 'MANMONTH'=>'Per man-month', 'MANDAY'=>'Per man-day', 'DAILY'=>'Per day', 'FIXED'=>'Fixed (whole order)'];
 
+// How WE source the person — the cost side. Each model builds the monthly cost
+// per person from different heads, which is why a flat "cost/person" was never
+// enough to compare a sub-contract agency against a manpower-supply agency.
+const REQ_SOURCING_MODELS = [
+    'OWN_PAYROLL'     => 'Own payroll / asset',
+    'MANPOWER_AGENCY' => 'Manpower supply agency',
+    'SUBCON_AGENCY'   => 'Third-party (sub-contract) agency',
+    'FREELANCER'      => 'Freelancer / consultant',
+];
+
 // Additive, nullable columns that enrich a requirement (Phase 2). Never renames
 // or drops anything — a requisition raised before this still loads and saves.
 function req_migrate() {
@@ -50,6 +60,16 @@ function req_migrate() {
         ['billing_rate',"DECIMAL(14,2) DEFAULT 0"], ['rate_basis',"VARCHAR(20) DEFAULT 'MONTHLY'"],
         ['target_margin',"DECIMAL(6,2) DEFAULT 0"], ['negotiation_floor',"DECIMAL(14,2) DEFAULT 0"],
         ['expected_revenue',"DECIMAL(16,2) DEFAULT 0"], ['expected_profit',"DECIMAL(16,2) DEFAULT 0"],
+        // Cost build-up — how WE source this person, and the heads that make up
+        // the monthly cost. Kept per requirement so the same screen shows the
+        // costing for a third-party sub-contract agency, a manpower-supply
+        // agency, own payroll or a freelancer. All additive & nullable.
+        ['sourcing_model',"VARCHAR(24) DEFAULT ''"],
+        ['cost_wage',"DECIMAL(14,2) DEFAULT 0"],          // base wage / salary (or the sub-contractor's lump rate) per month
+        ['cost_statutory_pct',"DECIMAL(6,2) DEFAULT 0"],  // PF/ESIC/bonus/leave, as % of wage
+        ['cost_agency_pct',"DECIMAL(6,2) DEFAULT 0"],     // manpower-agency service fee / markup, as %
+        ['cost_reimburse',"DECIMAL(14,2) DEFAULT 0"],     // monthly reimbursables (travel/accommodation/food/PPE)
+        ['cost_oneoff',"DECIMAL(14,2) DEFAULT 0"],        // one-time per person (medical/PCC/training/mobilisation)
     ];
     foreach ($cols as $c) ensure_column('requisitions', $c[0], $c[1]);
 }
@@ -64,6 +84,8 @@ function req_extra_fields() {
         'sel_client_interview','sel_tech_interview','sel_hr_interview','client_approval_req','training_req',
         'cmp_medical','cmp_pcc','cmp_gate_pass','cmp_safety','cmp_certification','documents_note',
         'billing_rate','rate_basis','target_margin','negotiation_floor',
+        // Cost build-up heads (sourcing-model aware).
+        'sourcing_model','cost_wage','cost_statutory_pct','cost_agency_pct','cost_reimburse','cost_oneoff',
         // Phase 7 — ownership (Responsible 1 = recruiter, Responsible 2 = manager) + department.
         'recruiter_id','manager_id','department'];
 }
@@ -77,20 +99,61 @@ function req_duration_months($b) {
     return 0;
 }
 
+// Build the monthly cost per person from the cost heads, the way the chosen
+// sourcing model actually bills. Deterministic and mirrored in the form's live
+// preview. Returns the per-head lines, the monthly total and the one-off total.
+//
+//   Own payroll / asset : wage + wage×statutory% + reimbursables
+//   Manpower agency     : (wage + wage×statutory%) × (1 + agency%) + reimbursables
+//   Sub-contract agency : wage (their all-in lump rate) + reimbursables we carry
+//   Freelancer          : wage (professional fee) + reimbursables  (no statutory)
+function req_cost_buildup($b) {
+    $model = strtoupper((string)($b['sourcing_model'] ?? ''));
+    $wage  = max(0, (float)($b['cost_wage'] ?? 0));
+    $statP = max(0, (float)($b['cost_statutory_pct'] ?? 0));
+    $agncP = max(0, (float)($b['cost_agency_pct'] ?? 0));
+    $reimb = max(0, (float)($b['cost_reimburse'] ?? 0));
+    $oneoff= max(0, (float)($b['cost_oneoff'] ?? 0));
+
+    $lines = [];
+    $statutory = 0; $agency = 0;
+    // Statutory applies to the two models where we carry the person on a roll.
+    if (in_array($model, ['OWN_PAYROLL', 'MANPOWER_AGENCY'], true)) $statutory = $wage * $statP / 100;
+    // Agency service fee applies only to a manpower-supply agency, on wage+statutory.
+    if ($model === 'MANPOWER_AGENCY') $agency = ($wage + $statutory) * $agncP / 100;
+
+    $wageLabel = $model === 'SUBCON_AGENCY' ? 'Sub-contractor rate' : ($model === 'FREELANCER' ? 'Professional fee' : 'Base wage / salary');
+    $lines[] = ['k' => $wageLabel, 'v' => $wage];
+    if ($statutory > 0) $lines[] = ['k' => 'Statutory & benefits (' . rtrim(rtrim(number_format($statP, 2), '0'), '.') . '%)', 'v' => $statutory];
+    if ($agency > 0)    $lines[] = ['k' => 'Agency service fee (' . rtrim(rtrim(number_format($agncP, 2), '0'), '.') . '%)', 'v' => $agency];
+    if ($reimb > 0)     $lines[] = ['k' => 'Reimbursables / month', 'v' => $reimb];
+
+    $monthly = $wage + $statutory + $agency + $reimb;
+    return ['model' => $model, 'lines' => $lines, 'monthly' => round($monthly, 2), 'oneoff' => round($oneoff, 2)];
+}
+
 // Expected revenue & profit from quantity × rate × duration vs monthly cost.
 // Deterministic and mirrored in the form's live preview.
 function req_commercials($b) {
     $qty   = max(1, (int)($b['quantity'] ?? 1));
     $rate  = (float)($b['billing_rate'] ?? 0);
-    $cost  = (float)($b['budgeted_cost'] ?? 0);         // monthly cost per person
     $basis = (string)($b['rate_basis'] ?? 'MONTHLY');
     $months = req_duration_months($b);
+    // Monthly cost per person: prefer the built-up figure when the heads are
+    // filled, else fall back to the flat budgeted_cost that was always here.
+    $bu = req_cost_buildup($b);
+    $cost  = $bu['monthly'] > 0 ? $bu['monthly'] : (float)($b['budgeted_cost'] ?? 0);
+    $oneoff = $bu['oneoff'];
     $units = ($basis === 'MANDAY' || $basis === 'DAILY') ? round($months * 22) : $months;
     if ($basis === 'FIXED') $revenue = $qty * $rate;
     else                    $revenue = $qty * $rate * max($units, 0);
-    $costTotal = $qty * $cost * max($months, 0);
+    $recurringCost = $qty * $cost * max($months, 0);
+    $oneoffTotal   = $qty * $oneoff;
+    $costTotal = $recurringCost + $oneoffTotal;
     $profit = $revenue - $costTotal;
-    return ['revenue' => round($revenue, 2), 'cost' => round($costTotal, 2), 'profit' => round($profit, 2), 'months' => $months, 'units' => $units];
+    return ['revenue' => round($revenue, 2), 'cost' => round($costTotal, 2), 'profit' => round($profit, 2),
+            'months' => $months, 'units' => $units, 'monthly_cost' => round($cost, 2),
+            'oneoff_total' => round($oneoffTotal, 2), 'recurring_cost' => round($recurringCost, 2)];
 }
 
 // ===========================================================================

@@ -103,6 +103,38 @@ $commer = $has('billing_rate') || (float)($req['expected_revenue'] ?? 0) != 0 ||
 </div>
 <?php endif; ?>
 
+<?php // Cost build-up — how the per-person cost is made up, per the sourcing
+      // model, and the project-level rollup (recurring + one-off).
+if ($seeSal && function_exists('req_cost_buildup')
+    && (!empty($req['sourcing_model']) || (float)($req['cost_wage'] ?? 0) > 0)):
+  $bu = req_cost_buildup($req); $cm = req_commercials($req);
+  $smLabel = (defined('REQ_SOURCING_MODELS') ? (REQ_SOURCING_MODELS[$req['sourcing_model'] ?? ''] ?? '') : '');
+  $qty = max(1,(int)($req['quantity'] ?? 1)); ?>
+<div class="panel"><h3 class="tab-sub" style="margin-top:0">Cost build-up
+  <?php if ($smLabel): ?><span class="pill p-info" style="font-size:11px;margin-left:4px"><?= e($smLabel) ?></span><?php endif; ?>
+  <span class="muted" style="font-weight:400">— how the per-person cost is made up</span></h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+    <div>
+      <table class="grid" style="width:100%">
+        <tbody>
+        <?php foreach ($bu['lines'] as $ln): ?>
+          <tr><td style="color:var(--muted)"><?= e($ln['k']) ?></td><td style="text-align:right"><?= fmoney($ln['v']) ?></td></tr>
+        <?php endforeach; ?>
+          <tr style="border-top:2px solid var(--line)"><td><b>Cost / person / month</b></td><td style="text-align:right"><b><?= fmoney($bu['monthly']) ?></b></td></tr>
+          <?php if ($bu['oneoff'] > 0): ?><tr><td style="color:var(--muted)">One-time / person <span class="muted">(medical/PCC/training/mobilisation)</span></td><td style="text-align:right"><?= fmoney($bu['oneoff']) ?></td></tr><?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+    <div class="kpi-row" style="grid-template-columns:1fr 1fr">
+      <div class="kpi"><span class="kic">👥</span><div class="k">Project cost</div><div class="v"><?= fmoney_short($cm['cost']) ?></div><div class="d"><?= $qty ?> person(s) · <?= number_format((float)$cm['months'],1) ?> mo</div></div>
+      <div class="kpi"><span class="kic">🔁</span><div class="k">Recurring</div><div class="v"><?= fmoney_short($cm['recurring_cost'] ?? 0) ?></div><div class="d"><?= fmoney_short($bu['monthly']) ?>/person·mo</div></div>
+      <?php if (($cm['oneoff_total'] ?? 0) > 0): ?><div class="kpi"><span class="kic">📦</span><div class="k">One-off total</div><div class="v"><?= fmoney_short($cm['oneoff_total']) ?></div><div class="d"><?= $qty ?> × <?= fmoney_short($bu['oneoff']) ?></div></div><?php endif; ?>
+      <div class="kpi"><span class="kic">📈</span><div class="k">Project profit</div><div class="v <?= ($cm['profit']??0)>=0?'up':'down' ?>"><?= fmoney_short($cm['profit'] ?? 0) ?></div><div class="d"><?= ($cm['revenue']??0)>0 ? number_format(($cm['profit']/$cm['revenue'])*100,1).'% margin' : 'set billing rate' ?></div></div>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
 <?php // Phase 5 — commercial rollup across the placements made on this requirement.
 $rollup = $rollup ?? null;
 if ($seeSal && !empty($rollup) && (int)($rollup['n'] ?? 0) > 0): $R = $rollup; ?>

@@ -184,6 +184,7 @@ function lk_module_lists() {
         ['fee_status',          'Placement fee status',      FEE_STATUS,             'People'],
         ['requisition_type',    'Requisition type',          REQ_TYPES,              'People'],
         ['requisition_status',  'Requisition status',        REQ_STATUS,             'People'],
+        ['req_sourcing_model',  'Sourcing model (cost)',     defined('REQ_SOURCING_MODELS') ? REQ_SOURCING_MODELS : [], 'People'],
         // --- Scheduling ------------------------------------------------------
         // The wording is yours; the behaviour is keyed on the code behind it, so
         // renaming "Continuous days" does not stop the working-day arithmetic.

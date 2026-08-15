@@ -29,6 +29,18 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
   .rq-calc .c .n{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums} .rq-calc .c .n.good{color:var(--green,#16a34a)} .rq-calc .c .n.bad{color:var(--red,#dc2626)}
   .rq-calc .note{font-size:12px;color:var(--muted,#656e7a);margin-top:8px}
   @media(max-width:720px){ .rq-calc .row{grid-template-columns:repeat(2,1fr)} }
+  /* Cost build-up */
+  .rq-cost{border:1px dashed var(--line,#e5e7eb);border-radius:12px;padding:12px 14px;background:var(--soft,#f7f9fc)}
+  .rq-cost .rq-cost-head{max-width:520px}
+  .rq-cost .muted{color:var(--muted,#656e7a);font-weight:400}
+  .rq-cost .ff[data-head][hidden]{display:none}
+  .rq-bu{margin-top:10px;border-top:1px solid var(--line,#e5e7eb);padding-top:10px}
+  .rq-bu .bu-lines{display:flex;flex-direction:column;gap:3px}
+  .rq-bu .bu-lines .li{display:flex;justify-content:space-between;font-size:13px;color:var(--ink,#334155)}
+  .rq-bu .bu-lines .li i{color:var(--muted,#656e7a);font-style:normal}
+  .rq-bu .bu-total{display:flex;justify-content:space-between;align-items:baseline;margin-top:7px;font-size:13.5px;font-weight:600}
+  .rq-bu .bu-total b{font-size:18px;color:var(--brand,#1e40af);font-variant-numeric:tabular-nums}
+  #rq_cost_auto{cursor:pointer;text-decoration:underline;color:var(--brand,#1e40af)}
 </style>
 
 <div class="crumbs"><a href="/">Home</a> › <a href="/requisitions"><?= e(TP('requisition')) ?></a> › <?= $req ? 'Edit' : 'New' ?></div>
@@ -152,21 +164,56 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
   <!-- ===== 4 · Commercial ===== -->
   <div class="rq-sec">
     <h3><span class="num">4</span> Commercial</h3>
-    <div class="form-grid">
-      <div class="ff"><label>Billing rate (<?= e($cur) ?>)</label><input class="form-control" type="number" step="0.01" name="billing_rate" id="rq_rate" value="<?= e(($r['billing_rate'] ?? 0) ?: '') ?>"></div>
+
+    <?php // ---- Cost build-up (sourcing-model aware) --------------------------
+          //  How WE source this person decides which cost heads apply. The
+          //  monthly cost per person is built up from them, feeds the flat
+          //  "Est. cost/person/month" below, and drives the project costing. ?>
+    <div class="rq-cost" id="rq_cost_bu">
+      <div class="rq-cost-head">
+        <div class="ff" style="margin:0">
+          <label>Sourcing model — how we supply this person</label>
+          <select class="form-control" name="sourcing_model" id="rq_smodel">
+            <option value="">— choose —</option>
+            <?php foreach (lk_options_or('req_sourcing_model', REQ_SOURCING_MODELS) as $k=>$val): ?>
+              <option value="<?= e($k) ?>" <?= $sel('sourcing_model',$k) ?>><?= e($val) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <small class="muted" id="rq_smodel_hint"></small>
+        </div>
+      </div>
+      <div class="form-grid" style="margin-top:8px">
+        <div class="ff" data-head="wage"><label id="lbl_wage">Base wage / salary — / person / month (<?= e($cur) ?>)</label>
+          <input class="form-control" type="number" step="0.01" name="cost_wage" id="rq_wage" value="<?= e(($r['cost_wage'] ?? 0) ?: '') ?>"></div>
+        <div class="ff" data-head="statutory"><label>Statutory &amp; benefits (%) <span class="muted">PF/ESIC/bonus/leave</span></label>
+          <input class="form-control" type="number" step="0.1" name="cost_statutory_pct" id="rq_stat" value="<?= e(($r['cost_statutory_pct'] ?? 0) ?: '') ?>"></div>
+        <div class="ff" data-head="agency"><label>Agency service fee / markup (%)</label>
+          <input class="form-control" type="number" step="0.1" name="cost_agency_pct" id="rq_agency" value="<?= e(($r['cost_agency_pct'] ?? 0) ?: '') ?>"></div>
+        <div class="ff" data-head="reimburse"><label>Reimbursables — / person / month (<?= e($cur) ?>) <span class="muted">travel/stay/food/PPE</span></label>
+          <input class="form-control" type="number" step="0.01" name="cost_reimburse" id="rq_reimb" value="<?= e(($r['cost_reimburse'] ?? 0) ?: '') ?>"></div>
+        <div class="ff" data-head="oneoff"><label>One-time / person (<?= e($cur) ?>) <span class="muted">medical/PCC/training/mobilisation</span></label>
+          <input class="form-control" type="number" step="0.01" name="cost_oneoff" id="rq_oneoff" value="<?= e(($r['cost_oneoff'] ?? 0) ?: '') ?>"></div>
+      </div>
+      <div class="rq-bu" id="rq_bu"><div class="bu-lines" id="rq_bu_lines"></div>
+        <div class="bu-total"><span>Built-up cost / person / month</span><b id="rq_bu_total">—</b></div>
+      </div>
+    </div>
+
+    <div class="form-grid" style="margin-top:12px">
+      <div class="ff"><label>Billing rate (<?= e($cur) ?>) <span class="muted">what we charge the client</span></label><input class="form-control" type="number" step="0.01" name="billing_rate" id="rq_rate" value="<?= e(($r['billing_rate'] ?? 0) ?: '') ?>"></div>
       <div class="ff"><label>Rate basis</label><select class="form-control" name="rate_basis" id="rq_basis"><?php foreach (REQ_RATE_BASIS as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('rate_basis',$k ?: 'MONTHLY') ?: ($k==='MONTHLY' && empty($r['rate_basis'])?'selected':'') ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
-      <div class="ff"><label>Est. cost / person / month (<?= e($cur) ?>)</label><input class="form-control" type="number" step="0.01" name="budgeted_cost" id="rq_cost" value="<?= e(($r['budgeted_cost'] ?? 0) ?: '') ?>"></div>
+      <div class="ff"><label>Est. cost / person / month (<?= e($cur) ?>) <span class="muted" id="rq_cost_auto"></span></label><input class="form-control" type="number" step="0.01" name="budgeted_cost" id="rq_cost" value="<?= e(($r['budgeted_cost'] ?? 0) ?: '') ?>"></div>
       <div class="ff rq-adv"><label>Target margin (%)</label><input class="form-control" type="number" step="0.1" name="target_margin" value="<?= e(($r['target_margin'] ?? 0) ?: '') ?>"></div>
       <div class="ff rq-adv"><label>Negotiation floor (<?= e($cur) ?>)</label><input class="form-control" type="number" step="0.01" name="negotiation_floor" value="<?= e(($r['negotiation_floor'] ?? 0) ?: '') ?>"></div>
     </div>
     <div class="rq-calc" id="rq_calc">
       <div class="row">
         <div class="c"><div class="l">Expected revenue</div><div class="n" id="cx_rev">—</div></div>
-        <div class="c"><div class="l">Expected cost</div><div class="n" id="cx_cost">—</div></div>
+        <div class="c"><div class="l">Expected cost <span class="muted">(project)</span></div><div class="n" id="cx_cost">—</div></div>
         <div class="c"><div class="l">Expected profit</div><div class="n" id="cx_prof">—</div></div>
         <div class="c"><div class="l">Margin</div><div class="n" id="cx_marg">—</div></div>
       </div>
-      <div class="note" id="cx_note">Enter quantity, billing rate, basis, cost and duration to preview the commercials. Recomputed and stored on save.</div>
+      <div class="note" id="cx_note">Choose the sourcing model and fill the cost heads, plus quantity, billing rate, basis and duration, to preview the project costing. Recomputed and stored on save.</div>
     </div>
   </div>
 
@@ -207,26 +254,80 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
   function so(){ if(o) o.style.display=(t.value==='REPLACEMENT' && !form.classList.contains('rq-simple'))?'':'none'; }
   if(t){ t.addEventListener('change',so); }
 
-  // Live commercial preview (mirrors req_commercials() on the server).
+  // Live commercial preview (mirrors req_commercials()/req_cost_buildup() server-side).
   var qty=document.getElementById('rq_qty'), rate=document.getElementById('rq_rate'),
       basis=document.getElementById('rq_basis'), cost=document.getElementById('rq_cost'),
       start=document.getElementById('rq_start'), end=document.getElementById('rq_end'), months=document.getElementById('rq_months');
+  // Cost build-up inputs
+  var smodel=document.getElementById('rq_smodel'), wage=document.getElementById('rq_wage'),
+      stat=document.getElementById('rq_stat'), agency=document.getElementById('rq_agency'),
+      reimb=document.getElementById('rq_reimb'), oneoff=document.getElementById('rq_oneoff');
   var sym='<?= e($cur) ?>';
   function fmt(n){ return sym+' '+Math.round(n).toLocaleString('en-IN'); }
   function months_(){ var m=parseFloat(months.value)||0; if(m>0) return m;
     if(start.value && end.value){ var d=(new Date(end.value)-new Date(start.value))/86400000; if(d>=0) return Math.round(d/30.4*100)/100; } return 0; }
+  function num(el){ return el?(parseFloat(el.value)||0):0; }
+
+  // Which cost heads each sourcing model uses, and the wage label + hint.
+  var MODELS={
+    OWN_PAYROLL:{heads:['wage','statutory','reimburse','oneoff'],wage:'Base wage / salary',hint:'Person on our roll — wage plus statutory (PF/ESIC/bonus/leave) plus any reimbursables.'},
+    MANPOWER_AGENCY:{heads:['wage','statutory','agency','reimburse','oneoff'],wage:'Base wage / salary',hint:'Manpower supply agency — wage + statutory, then the agency service fee on top, plus reimbursables.'},
+    SUBCON_AGENCY:{heads:['wage','reimburse','oneoff'],wage:"Sub-contractor's all-in rate",hint:'Third-party sub-contract — their rate is all-inclusive; add only what we carry (e.g. reimbursables, one-offs).'},
+    FREELANCER:{heads:['wage','reimburse','oneoff'],wage:'Professional fee',hint:'Freelancer / consultant — a flat professional fee; no statutory, no agency fee.'},
+    '':{heads:['wage','statutory','agency','reimburse','oneoff'],wage:'Base wage / salary',hint:'Pick a sourcing model to show only the cost heads that apply.'}
+  };
+  function applyModel(){
+    var m=MODELS[smodel.value]||MODELS[''];
+    document.getElementById('lbl_wage').firstChild.nodeValue='';
+    document.getElementById('lbl_wage').textContent=m.wage+' — / person / month ('+sym+')';
+    document.getElementById('rq_smodel_hint').textContent=m.hint;
+    document.querySelectorAll('#rq_cost_bu .ff[data-head]').forEach(function(ff){
+      ff.hidden = m.heads.indexOf(ff.getAttribute('data-head'))<0;
+    });
+  }
+  // Monthly build-up per the model. Returns {monthly, oneoff, lines:[[label,val]]}.
+  function buildup(){
+    var mdl=smodel.value, w=num(wage), sp=num(stat), ap=num(agency), rb=num(reimb), of=num(oneoff);
+    var statutory=0, fee=0, lines=[];
+    if(mdl==='OWN_PAYROLL'||mdl==='MANPOWER_AGENCY') statutory=w*sp/100;
+    if(mdl==='MANPOWER_AGENCY') fee=(w+statutory)*ap/100;
+    var wLbl=(MODELS[mdl]||MODELS['']).wage;
+    lines.push([wLbl,w]);
+    if(statutory>0) lines.push(['Statutory & benefits ('+sp+'%)',statutory]);
+    if(fee>0) lines.push(['Agency service fee ('+ap+'%)',fee]);
+    if(rb>0) lines.push(['Reimbursables / month',rb]);
+    return {monthly:w+statutory+fee+rb, oneoff:of, lines:lines};
+  }
+  function renderBuildup(bu){
+    var box=document.getElementById('rq_bu_lines'); box.innerHTML='';
+    bu.lines.forEach(function(l){ var d=document.createElement('div'); d.className='li'; d.innerHTML='<i>'+l[0]+'</i><span>'+fmt(l[1])+'</span>'; box.appendChild(d); });
+    document.getElementById('rq_bu_total').textContent=bu.monthly?fmt(bu.monthly):'—';
+    // Auto-fill the flat "Est. cost/person/month" from the build-up unless the
+    // user has typed their own override. Track whether cost is auto-managed.
+    if(bu.monthly>0 && !cost.dataset.userset){ cost.value=Math.round(bu.monthly*100)/100;
+      document.getElementById('rq_cost_auto').textContent='· auto from build-up'; }
+  }
+  cost.addEventListener('input',function(){ cost.dataset.userset='1'; document.getElementById('rq_cost_auto').textContent='· manual override — click to re-link'; });
+  document.getElementById('rq_cost_auto').addEventListener('click',function(){ delete cost.dataset.userset; calc(); });
+
   function calc(){
+    applyModel();
+    var bu=buildup(); renderBuildup(bu);
     var q=Math.max(1,parseInt(qty.value)||1), r=parseFloat(rate.value)||0, c=parseFloat(cost.value)||0, b=basis.value, m=months_();
     var units=(b==='MANDAY'||b==='DAILY')?Math.round(m*22):m;
     var rev=(b==='FIXED')?q*r:q*r*Math.max(units,0);
-    var ct=q*c*Math.max(m,0); var pf=rev-ct; var mg=rev>0?(pf/rev*100):0;
+    var recurring=q*c*Math.max(m,0), oneoffTot=q*(bu.oneoff||0);
+    var ct=recurring+oneoffTot; var pf=rev-ct; var mg=rev>0?(pf/rev*100):0;
     document.getElementById('cx_rev').textContent=rev?fmt(rev):'—';
     document.getElementById('cx_cost').textContent=ct?fmt(ct):'—';
     var pe=document.getElementById('cx_prof'); pe.textContent=(rev||ct)?fmt(pf):'—'; pe.className='n '+(pf>=0?'good':'bad');
     var me=document.getElementById('cx_marg'); me.textContent=rev?mg.toFixed(1)+'%':'—'; me.className='n '+(mg>=0?'good':'bad');
     var note=document.getElementById('cx_note');
-    if(rev||ct){ note.textContent=q+' × '+fmt(r)+' ('+(basis.options[basis.selectedIndex].text)+')'+(b==='FIXED'?'':' × '+ (units||0) +' unit(s)')+' over '+(m||0)+' month(s).'; }
+    if(rev||ct){ note.textContent=q+' person(s) × '+fmt(c)+'/mo × '+(m||0)+' month(s) = '+fmt(recurring)+' recurring'
+      +(oneoffTot>0?' + '+fmt(oneoffTot)+' one-off':'')+'.  Revenue: '+q+' × '+fmt(r)+' ('+(basis.options[basis.selectedIndex].text)+')'+(b==='FIXED'?'':' × '+(units||0)+' unit(s)')+'.'; }
   }
-  [qty,rate,basis,cost,start,end,months].forEach(function(el){ if(el){ el.addEventListener('input',calc); el.addEventListener('change',calc);} });
+  [qty,rate,basis,start,end,months,smodel,wage,stat,agency,reimb,oneoff].forEach(function(el){ if(el){ el.addEventListener('input',calc); el.addEventListener('change',calc);} });
+  // If editing a req that already had a manual cost different from the build-up, respect it.
+  <?php if ($req && (float)($r['budgeted_cost'] ?? 0) > 0): ?>cost.dataset.userset='1';<?php endif; ?>
   calc();
 })();</script>

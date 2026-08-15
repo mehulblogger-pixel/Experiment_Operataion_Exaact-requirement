@@ -3847,13 +3847,21 @@ function ops_requisitions($route, $method) {
             $intF = ['office_id','outgoing_inspector_id','client_id','quantity','prov_travel','prov_accommodation','prov_food',
                      'sel_client_interview','sel_tech_interview','sel_hr_interview','client_approval_req','training_req',
                      'cmp_medical','cmp_pcc','cmp_gate_pass','cmp_safety','cmp_certification'];
-            $numF = ['budgeted_cost','billing_rate','target_margin','negotiation_floor','duration_months','experience_min'];
+            $numF = ['budgeted_cost','billing_rate','target_margin','negotiation_floor','duration_months','experience_min',
+                     'cost_wage','cost_statutory_pct','cost_agency_pct','cost_reimburse','cost_oneoff'];
             $norm = function($f, $v) use ($intF, $numF) {
                 if (in_array($f, ['office_id','outgoing_inspector_id','client_id','recruiter_id','manager_id'], true)) return $v === '' ? null : (int)$v;
                 if (in_array($f, $intF, true)) return $v === '' ? 0 : (int)$v;
                 if (in_array($f, $numF, true)) return $v === '' ? 0 : (float)$v;
                 return $v;
             };
+            // If the cost heads were filled but the flat "Est. cost/person/month"
+            // was left blank (e.g. JS off), persist the built-up monthly figure so
+            // the stored budgeted_cost matches the build-up shown on the form.
+            if (function_exists('req_cost_buildup') && (float)($b['budgeted_cost'] ?? 0) <= 0) {
+                $bu0 = req_cost_buildup($b);
+                if (($bu0['monthly'] ?? 0) > 0) $b['budgeted_cost'] = $bu0['monthly'];
+            }
             // Derived commercials — recomputed on every save so they never drift.
             $com = function_exists('req_commercials') ? req_commercials($b) : ['revenue'=>0,'profit'=>0,'months'=>0];
             $extraCols = ['expected_revenue','expected_profit','duration_months'];
