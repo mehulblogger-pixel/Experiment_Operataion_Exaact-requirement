@@ -1041,7 +1041,15 @@ function demo_seed_c5($pdo, $x, $has, $ins) {
     //  Security incidents (DPDP / CERT-In). One OPEN, one CLOSED+reported.
     //  prefer nothing clean — direct INSERT (the route builds columns from $_POST).
     // ------------------------------------------------------------------
-    if ($has('security_incidents')) {
+    // Each register below runs in its own guard so a single failing INSERT
+    // (a strict-MySQL rejection, a missing column, a null FK) can only blank its
+    // OWN register — never cascade and take the next four down with it — and it
+    // records the exact reason, which the Settings coverage board then shows.
+    $seedBlock = function (string $table, callable $fn) use (&$n) {
+        try { $fn(); }
+        catch (Throwable $e) { $GLOBALS['__seedc_fail'][] = $table . ': ' . $e->getMessage(); }
+    };
+    if ($has('security_incidents')) $seedBlock('security_incidents', function () use ($ins, $d, $now, &$n) {
         $ise = "INSERT INTO security_incidents
                 (ref,detected_at,kind,severity,summary,systems,people_affected,data_kinds,immediate_action,root_cause,certin_reported_at,certin_ref,dpb_reported_at,people_told_at,status,closed_at,created_by,created_at)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'demo', ?)";
@@ -1050,7 +1058,7 @@ function demo_seed_c5($pdo, $x, $has, $ins) {
         // CLOSED, CERT-In reported, people told.
         $ins($ise, ['SEC-2026-002',$d(-40).'T09:00:00+05:30','LOST_DEVICE','MEDIUM','An inspector laptop was lost in transit; disk was encrypted.','Field laptop',0,'Cached inspection reports (encrypted at rest).','Remote wipe issued; device certificate revoked.','Bag left in a taxi.',$d(-39).'T14:00:00+05:30','CERTIN-2026-4471','',$d(-38),'CLOSED',$d(-10),$now]);
         $n['security_incidents'] = 2;
-    }
+    });
 
     // ------------------------------------------------------------------
     //  Site document requirements (client gate/access docs). doc_kind must be
@@ -1082,15 +1090,15 @@ function demo_seed_c5($pdo, $x, $has, $ins) {
         $ins($icu, [$iid['SC-001'],'Mohan Rao','SUBCON','CU-SUB Rev1',$d(-200),$d(-5),'','','','Agency undertaking lapsed — renewal pending.',$now]);
         $n['confidentiality_undertakings'] = 2;
     }
-    if ($has('client_ndas')) {
+    if ($has('client_ndas')) $seedBlock('client_ndas', function () use ($ins, $cid, $d, $now, &$n) {
         $ind = "INSERT INTO client_ndas
                 (partner_id,title,signed_on,valid_to,survives_months,terms,file_name,mime,file_data,recorded_by,created_at)
                 VALUES (?,?,?,?,?,?,?,?,?, 'demo', ?)";
         $ins($ind, [$cid['CL-NIL'],'Mutual NDA — Narmada Industries',$d(-300),$d(430),24,'Mutual confidentiality; survives 24 months after expiry.','','','',$now]);
         $ins($ind, [$cid['CL-SVP'],'NDA — Suryavan Ports project',$d(-90),$d(640),36,'One-way NDA covering project drawings and reports.','','','',$now]);
         $n['client_ndas'] = 2;
-    }
-    if ($has('confidentiality_breaches')) {
+    });
+    if ($has('confidentiality_breaches')) $seedBlock('confidentiality_breaches', function () use ($ins, $cid, $jid, $oid, $d, $now, &$n) {
         $icb = "INSERT INTO confidentiality_breaches
                 (ref,kind,partner_id,job_id,office_id,happened_on,discovered_on,what_got_out,who_saw_it,by_whom,containment,party_told,party_told_note,regulator_told,status,raised_by,created_at)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'demo', ?)";
@@ -1100,12 +1108,12 @@ function demo_seed_c5($pdo, $x, $has, $ins) {
                     'One external recipient (wrong domain).','Sana Kapoor',
                     'Recipient asked to delete and confirm; awaiting confirmation.','NO','Assessing severity before deciding on notification.','NO','OPEN',$now]);
         $n['confidentiality_breaches'] = 1;
-    }
+    });
 
     // ------------------------------------------------------------------
     //  DPDP consent register and data-subject requests (DSAR).
     // ------------------------------------------------------------------
-    if ($has('data_consents')) {
+    if ($has('data_consents')) $seedBlock('data_consents', function () use ($ins, $cid, $iid, $d, &$n) {
         $idc = "INSERT INTO data_consents
                 (subject_kind,subject_id,subject_name,purpose,basis,given_at,withdrawn_at,note,recorded_by)
                 VALUES (?,?,?,?,?,?,?,?, 'demo')";
@@ -1114,8 +1122,8 @@ function demo_seed_c5($pdo, $x, $has, $ins) {
         // Withdrawn consent — the trigger to review what was kept.
         $ins($idc, ['CONTACT',$cid['CL-GHE'],'Deepa Balan','Marketing updates about services.','CONSENT',$d(-200),$d(-15),'Consent withdrawn; removed from the mailing list.']);
         $n['data_consents'] = 3;
-    }
-    if ($has('data_requests')) {
+    });
+    if ($has('data_requests')) $seedBlock('data_requests', function () use ($ins, $cid, $d, &$n) {
         // NOTE: handled_by='demo' is the provenance marker AND shows as the owner
         // on screen — fine for the in-progress DSAR ("someone is handling it").
         $idr2 = "INSERT INTO data_requests
@@ -1126,7 +1134,7 @@ function demo_seed_c5($pdo, $x, $has, $ins) {
         // Answered / closed.
         $ins($idr2, [$d(-30).'T10:00:00+05:30','Deepa Balan','deepa.balan@example.com','ERASURE','CONTACT',$cid['CL-GHE'],'Asked to be removed from marketing lists.','CLOSED',$d(-28).'T16:00:00+05:30','Removed from all marketing lists; confirmed by e-mail.']);
         $n['data_requests'] = 2;
-    }
+    });
 
     // ------------------------------------------------------------------
     //  Disclosure consents (permission to disclose results to a third party).
