@@ -67,9 +67,9 @@ function superadmin_seat_classes() {
     if ($full <= 0) $full = (int) setting_get('billing_price_user_month', 0);
     if ($full <= 0) $full = 1799;                       // Professional default, so the panel is never blank
     $field  = (int) setting_get('billing_price_field_month', 0);  if ($field  <= 0) $field  = 499;
-    $portal = (int) setting_get('billing_price_portal_month', 0); // 0 is legitimate — portal can stay free
-    if ($portal < 0) $portal = 0;
-    $freeBundle = (int) setting_get('billing_portal_free', 5);    if ($freeBundle < 0) $freeBundle = 0;
+    $portal = (int) setting_get('billing_price_portal_month', 99); // recommended token price above the free bundle
+    if ($portal < 0) $portal = 0;                                  // a vendor may set 0 to keep portal free
+    $freeBundle = (int) setting_get('billing_portal_free', 10);   if ($freeBundle < 0) $freeBundle = 0;
 
     return [
         'FULL'  => ['label' => 'Full seat', 'price' => $full, 'free' => 0,
