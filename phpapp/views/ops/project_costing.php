@@ -13,6 +13,12 @@ $basis = (string)$h['basis'];
 $qtyLabel = $basis === 'DAILY' ? 'Man-days' : ($basis === 'FIXED' ? 'Units' : 'Man-months');
 $rateLabel = $basis === 'DAILY' ? '/man-day' : ($basis === 'FIXED' ? '/lump' : '/man-month');
 $stTone = ['DRAFT'=>'p-mut','SUBMITTED'=>'p-warn','APPROVED'=>'p-ok','REJECTED'=>'p-bad'];
+// Only show head COLUMNS that are actually used by a role, so a full catalogue
+// (18 heads) does not make the table unreadably wide. The add-role form below
+// still offers every head.
+$shownHeads = array_filter($heads, fn($lbl, $hk) => isset($byHead[$hk]) && (float)$byHead[$hk] != 0, ARRAY_FILTER_USE_BOTH);
+if (!$shownHeads) $shownHeads = [];
+$nCols = count($shownHeads) + ($canEdit ? 9 : 8);
 ?>
 <style>
   .pc .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0}
@@ -35,6 +41,7 @@ $stTone = ['DRAFT'=>'p-mut','SUBMITTED'=>'p-warn','APPROVED'=>'p-ok','REJECTED'=
 <div class="master-head">
   <div><h1 style="margin:0"><?= $e($h['title']) ?> <span class="pill <?= $stTone[$h['status']] ?? 'p-mut' ?>"><?= $e(PC_STATUS[$h['status']] ?? $h['status']) ?></span></h1>
     <p class="sub" style="margin:2px 0 0"><?= $e($h['code']) ?> · <?= $e(PC_BASES[$basis] ?? $basis) ?><?= !empty($h['site']) ? ' · '.$e($h['site']) : '' ?></p></div>
+  <div class="row-actions"><a class="btn secondary" href="/project-costing-print?id=<?= (int)$h['id'] ?>" target="_blank" rel="noopener">🖨 Print / PDF</a></div>
 </div>
 
 <?php if ($locked): ?><div class="lockmsg">🔒 This costing is <b><?= $e(PC_STATUS[$h['status']] ?? $h['status']) ?></b> and read-only.<?php if ($h['status']==='APPROVED' && !empty($h['approved_by'])): ?> Approved by <?= $e($h['approved_by']) ?><?= !empty($h['approval_ref']) ? ' · ref '.$e($h['approval_ref']) : '' ?>.<?php endif; ?><?php if ($canEdit===false && (pc_can_edit())): ?> <form method="post" action="/project-costing-reopen" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn btn-ghost" style="padding:4px 10px">Reopen as draft</button></form><?php endif; ?></div><?php endif; ?>
@@ -53,14 +60,14 @@ $stTone = ['DRAFT'=>'p-mut','SUBMITTED'=>'p-warn','APPROVED'=>'p-ok','REJECTED'=
   <h3 class="tab-sub" style="margin-top:0">Team roles <span class="muted">— <?= count($lines) ?> role(s), each built up from the cost heads</span></h3>
   <table class="grid">
     <thead><tr><th>Role</th>
-      <?php foreach ($heads as $hk=>$hl): ?><th class="num" title="<?= $e($hl) ?>"><?= $e(mb_strimwidth($hl,0,10,'…')) ?></th><?php endforeach; ?>
+      <?php foreach ($shownHeads as $hk=>$hl): ?><th class="num" title="<?= $e($hl) ?>"><?= $e(mb_strimwidth($hl,0,10,'…')) ?></th><?php endforeach; ?>
       <th class="num">Direct/mo</th><th class="num">Loaded/mo</th><th class="num">Rate<?= $e($rateLabel) ?></th><th class="num"><?= $e($qtyLabel) ?></th><th class="num">Revenue</th><th class="num">Profit</th><th class="num">Margin</th><?php if ($canEdit): ?><th></th><?php endif; ?></tr></thead>
     <tbody>
     <?php $lastGrp = null; foreach ($lines as $ln): $c = pc_line_calc($ln, $h); $lh = $c['heads'];
-      if (($ln['group_label'] ?? '') !== $lastGrp && ($ln['group_label'] ?? '') !== '') { $lastGrp = $ln['group_label']; echo '<tr><td colspan="'.(count($heads)+ ($canEdit?9:8)).'" class="grp">'.$e($lastGrp).'</td></tr>'; } ?>
+      if (($ln['group_label'] ?? '') !== $lastGrp && ($ln['group_label'] ?? '') !== '') { $lastGrp = $ln['group_label']; echo '<tr><td colspan="'.$nCols.'" class="grp">'.$e($lastGrp).'</td></tr>'; } ?>
       <tr>
         <td><b><?= $e($ln['role_label']) ?></b></td>
-        <?php foreach ($heads as $hk=>$hl): ?><td class="num"><?= isset($lh[$hk]) ? number_format((float)$lh[$hk]) : '<span class="muted">—</span>' ?></td><?php endforeach; ?>
+        <?php foreach ($shownHeads as $hk=>$hl): ?><td class="num"><?= isset($lh[$hk]) ? number_format((float)$lh[$hk]) : '<span class="muted">—</span>' ?></td><?php endforeach; ?>
         <td class="num"><?= number_format($c['direct']) ?></td>
         <td class="num"><?= number_format($c['loaded']) ?></td>
         <td class="num"><b><?= number_format($c['proposed']) ?></b><?= (float)$ln['target_margin']>0 && (float)$ln['rate_manual']<=0 ? '<br><span class="muted" style="font-size:10px">@'.rtrim(rtrim(number_format((float)$ln['target_margin'],1),'0'),'.').'% marg</span>' : '' ?></td>
@@ -71,12 +78,12 @@ $stTone = ['DRAFT'=>'p-mut','SUBMITTED'=>'p-warn','APPROVED'=>'p-ok','REJECTED'=
         <?php if ($canEdit): ?><td class="num"><form method="post" action="/project-costing-line-delete" onsubmit="return confirm('Remove this role?')" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>"><input type="hidden" name="line_id" value="<?= (int)$ln['id'] ?>"><button class="btn btn-ghost" style="padding:2px 8px" title="Remove">✕</button></form></td><?php endif; ?>
       </tr>
     <?php endforeach; ?>
-    <?php if (empty($lines)): ?><tr><td colspan="<?= count($heads)+($canEdit?9:8) ?>" class="muted" style="padding:10px">No roles yet.<?= $canEdit ? ' Add the first below.' : '' ?></td></tr><?php endif; ?>
+    <?php if (empty($lines)): ?><tr><td colspan="<?= $nCols ?>" class="muted" style="padding:10px">No roles yet.<?= $canEdit ? ' Add the first below.' : '' ?></td></tr><?php endif; ?>
     </tbody>
     <?php if (!empty($lines)): ?>
     <tfoot><tr style="border-top:2px solid var(--line);font-weight:700">
       <td>Totals</td>
-      <?php foreach ($heads as $hk=>$hl): ?><td class="num"><?= isset($byHead[$hk]) ? number_format((float)$byHead[$hk]) : '' ?></td><?php endforeach; ?>
+      <?php foreach ($shownHeads as $hk=>$hl): ?><td class="num"><?= isset($byHead[$hk]) ? number_format((float)$byHead[$hk]) : '' ?></td><?php endforeach; ?>
       <td class="num"><?= number_format($T['direct']) ?></td><td></td><td></td><td></td>
       <td class="num"><?= fmoney_short($T['revenue']) ?></td>
       <td class="num" style="color:var(--<?= $T['profit']>=0?'ok':'bad' ?>)"><?= fmoney_short($T['profit']) ?></td>
@@ -85,6 +92,42 @@ $stTone = ['DRAFT'=>'p-mut','SUBMITTED'=>'p-warn','APPROVED'=>'p-ok','REJECTED'=
     <?php endif; ?>
   </table>
 </div>
+
+<?php // ---- Use this costing: quotation + requirements --------------------------
+  $canQuote = function_exists('can') && can('mod.quotes.edit');
+  $canHire  = function_exists('can') && can('mod.hiring.edit');
+  if (!empty($lines) && ($canQuote || $canHire)): ?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">Use this costing</h3>
+  <div class="bar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
+    <?php if ($canQuote): ?>
+      <?php if (!empty($h['quote_id'])): ?>
+        <a class="btn secondary" href="/quote?id=<?= (int)$h['quote_id'] ?>">📝 View linked quotation</a>
+        <span class="muted" style="font-size:12px">A quotation was generated from this costing.</span>
+      <?php else: ?>
+        <form method="post" action="/project-costing-to-quote"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn primary">📝 Create quotation</button></form>
+        <span class="muted" style="font-size:12px">One quote line per role, priced at the proposed rate × <?= $e(strtolower($qtyLabel)) ?>.</span>
+      <?php endif; ?>
+    <?php endif; ?>
+  </div>
+  <?php if ($canHire): ?>
+  <div class="scroll"><table class="grid" style="font-size:12.5px">
+    <thead><tr><th>Role</th><th class="num">Rate<?= $e($rateLabel) ?></th><th class="num">Loaded/mo</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($lines as $ln): $c = pc_line_calc($ln, $h); ?>
+      <tr>
+        <td><?= !empty($ln['group_label']) ? '<span class="muted">'.$e($ln['group_label']).' / </span>' : '' ?><b><?= $e($ln['role_label']) ?></b></td>
+        <td class="num"><?= number_format($c['proposed']) ?></td>
+        <td class="num"><?= number_format($c['loaded']) ?></td>
+        <td class="num"><form method="post" action="/project-costing-to-req" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>"><input type="hidden" name="line_id" value="<?= (int)$ln['id'] ?>"><button class="btn btn-ghost" style="padding:3px 10px" title="Create a recruitment requirement from this role">→ Requirement</button></form></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table></div>
+  <p class="sub" style="margin-top:6px">Each requirement carries this role's per-person economics (loaded cost, proposed rate, target margin); set the headcount &amp; duration on the requirement.</p>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <?php if ($canEdit): ?>
 <!-- Add / edit a role -->

@@ -36,12 +36,22 @@ const PC_STATUS = [
 function pc_head_defaults() {
     return [
         'PERSONNEL'     => 'Personnel / salary',
+        'STATUTORY'     => 'Statutory (PF/ESIC/bonus/leave)',
         'TRANSPORT'     => 'Transport / travel',
         'ACCOMMODATION' => 'Accommodation / rentals',
         'FOOD'          => 'Food / meal allowance',
         'SITE_ALLOWANCE'=> 'Site allowance',
         'PPE'           => 'PPE / safety kit',
+        'UNIFORM'       => 'Uniform / clean-room wearables',
         'CAPEX'         => 'Capital / equipment (amortised)',
+        'TOOLS'         => 'Tools & testing equipment',
+        'CALIBRATION'   => 'Calibration of instruments/tools',
+        'CONSUMABLES'   => 'Consumables & spares',
+        'COMMUNICATION' => 'Communication / SIM / data',
+        'MEDICAL'       => 'Medical / PCC / fitness',
+        'TRAINING'      => 'Training & induction',
+        'HOUSEKEEPING'  => 'Housekeeping / general items',
+        'INSURANCE_LINE'=> 'Insurance (per person)',
         'MISC'          => 'Miscellaneous / other',
     ];
 }
@@ -204,6 +214,76 @@ function pc_restamp($id) {
 // A locked (submitted/approved) sheet is read-only until sent back to draft.
 function pc_locked($h) { return in_array((string)($h['status'] ?? 'DRAFT'), ['SUBMITTED', 'APPROVED'], true); }
 
+// Basis → the unit word a quote line / requirement uses.
+function pc_unit($basis) { return $basis === 'DAILY' ? 'MANDAY' : ($basis === 'FIXED' ? 'LOT' : 'MANMONTH'); }
+function pc_req_basis($basis) { return $basis === 'DAILY' ? 'MANDAY' : ($basis === 'FIXED' ? 'FIXED' : 'MONTHLY'); }
+
+// Draft a quotation from a costing: one quote line per role, priced at the
+// proposed rate × BOQ. Links the quote back to the costing. Returns ['id','no'].
+function pc_make_quote($roll) {
+    $h = $roll['header']; $lines = $roll['lines'];
+    if (empty($lines)) return ['err' => 'Add at least one role first.'];
+    try {
+        $no = ops_next_code('quotations', 'quote_no', 'Q');
+        $sub = 0; $unit = pc_unit((string)$h['basis']);
+        foreach ($lines as $ln) { $c = pc_line_calc($ln, $h); $sub += $c['revenue']; }
+        $gstPct = 18; $gst = round($sub * $gstPct / 100, 2); $total = $sub + $gst;
+        db()->prepare("INSERT INTO quotations (quote_no,rev,is_current,client_id,client_name,office_id,subject,site_location,
+                        currency,validity_days,subtotal,gst_pct,gst_amount,total_amount,status,created_by,created_at)
+                       VALUES (?,0,1,?,?,?,?,?, 'INR',30,?,?,?,?, 'DRAFT',?,?)")
+            ->execute([$no, (int)$h['client_id'] ?: null,
+                (string)ops_val("SELECT COALESCE(display_name,legal_name) FROM business_partners WHERE id=?", [(int)$h['client_id']]),
+                (int)$h['office_id'] ?: null, (string)$h['title'], (string)$h['site'],
+                $sub, $gstPct, $gst, $total, user_name(current_user()), date('c')]);
+        $qid = (int)db()->lastInsertId();
+        $n = 0;
+        foreach ($lines as $ln) {
+            $c = pc_line_calc($ln, $h); $n++;
+            $desc = trim(((string)$ln['group_label'] !== '' ? $ln['group_label'] . ' — ' : '') . (string)$ln['role_label']);
+            db()->prepare("INSERT INTO quote_lines (quote_id,line_no,description,order_type,qty,unit,rate,amount)
+                           VALUES (?,?,?, 'LINE', ?,?,?,?)")
+                ->execute([$qid, $n, $desc, ($h['basis'] === 'FIXED' ? 1 : (float)$ln['boq_qty']), $unit, $c['proposed'], $c['revenue']]);
+        }
+        db()->prepare("UPDATE project_costings SET quote_id=? WHERE id=?")->execute([$qid, (int)$h['id']]);
+        return ['id' => $qid, 'no' => $no];
+    } catch (Throwable $e) { return ['err' => $e->getMessage()]; }
+}
+
+// Create a recruitment requirement from one role line. Carries the per-person
+// economics (loaded cost, proposed rate, target margin); headcount/duration are
+// left for the recruiter to set. Returns ['id','code'].
+function pc_make_requisition($cid, $lineId) {
+    $h = pc_get($cid); if (!$h) return ['err' => 'Costing not found.'];
+    $ln = ops_one("SELECT * FROM project_costing_lines WHERE id=? AND costing_id=?", [(int)$lineId, (int)$cid]);
+    if (!$ln) return ['err' => 'Role not found.'];
+    if (!function_exists('req_migrate')) return ['err' => 'Recruitment module is not available.'];
+    req_migrate();
+    $c = pc_line_calc($ln, $h);
+    $heads = $c['heads'];
+    $wage = (float)($heads['PERSONNEL'] ?? 0);
+    $reimb = max(0, $c['direct'] - $wage);            // everything else monthly
+    try {
+        $code = ops_next_code('requisitions', 'req_code', 'REQ');
+        $b = ['quantity' => 1, 'billing_rate' => $c['proposed'], 'budgeted_cost' => $c['loaded'],
+              'rate_basis' => pc_req_basis((string)$h['basis'])];
+        $com = function_exists('req_commercials') ? req_commercials($b) : ['revenue' => 0, 'profit' => 0, 'months' => 0];
+        db()->prepare("INSERT INTO requisitions
+            (req_code, office_id, client_id, designation, project_site, req_type, status, quantity,
+             billing_rate, rate_basis, target_margin, budgeted_cost,
+             sourcing_model, cost_wage, cost_reimburse, cost_oneoff,
+             expected_revenue, expected_profit, notes, created_by, created_at)
+            VALUES (?,?,?,?,?, 'NEW', 'OPEN', 1, ?,?,?,?, 'OWN_PAYROLL', ?,?,?, ?,?,?,?,?)")
+            ->execute([$code, (int)$h['office_id'] ?: null, (int)$h['client_id'] ?: null,
+                (string)$ln['role_label'], (string)$h['site'],
+                $c['proposed'], pc_req_basis((string)$h['basis']), (float)$ln['target_margin'], $c['loaded'],
+                $wage, $reimb, (float)$ln['oneoff'],
+                $com['revenue'], $com['profit'],
+                'From costing ' . $h['code'] . ' · ' . trim(((string)$ln['group_label'] !== '' ? $ln['group_label'] . ' / ' : '') . $ln['role_label']),
+                user_name(current_user()), date('c')]);
+        return ['id' => (int)db()->lastInsertId(), 'code' => $code];
+    } catch (Throwable $e) { return ['err' => $e->getMessage()]; }
+}
+
 // ---- Routing ---------------------------------------------------------------
 function ops_projcosting($route, $method) {
     ops_require(pc_can(), 'You do not have access to project costing.');
@@ -315,6 +395,37 @@ function ops_projcosting($route, $method) {
             flash('Reopened as draft.');
         }
         redirect('/project-costing?id=' . $id);
+    }
+
+    // ---- Generate a quotation from the costing ----
+    if ($route === 'project-costing-to-quote' && $method === 'POST') {
+        $id = (int)($_POST['id'] ?? 0); $roll = pc_rollup($id);
+        if (!$roll) { flash('Costing not found.', 'error'); redirect('/project-costings'); }
+        ops_require(function_exists('can') && can('mod.quotes.edit'), 'You cannot create a quotation.');
+        $r = pc_make_quote($roll);
+        if (!empty($r['id'])) { flash('Quotation ' . $r['no'] . ' drafted from this costing — review and send.'); redirect('/quote?id=' . $r['id']); }
+        flash($r['err'] ?? 'Could not create the quotation.', 'error'); redirect('/project-costing?id=' . $id);
+    }
+
+    // ---- Spawn a recruitment requirement from one role line ----
+    if ($route === 'project-costing-to-req' && $method === 'POST') {
+        $cid = (int)($_POST['costing_id'] ?? 0); $lineId = (int)($_POST['line_id'] ?? 0);
+        $h = pc_get($cid); if (!$h) { flash('Costing not found.', 'error'); redirect('/project-costings'); }
+        ops_require(function_exists('can') && can('mod.hiring.edit'), 'You cannot create a requirement.');
+        $r = pc_make_requisition($cid, $lineId);
+        if (!empty($r['id'])) { flash('Requirement ' . $r['code'] . ' created from this role — set the headcount & duration.'); redirect('/requisition?id=' . $r['id']); }
+        flash($r['err'] ?? 'Could not create the requirement.', 'error'); redirect('/project-costing?id=' . $cid);
+    }
+
+    // ---- Printable sheet (PDF via the browser's Save-as-PDF) ----
+    if ($route === 'project-costing-print') {
+        $roll = pc_rollup((int)($_GET['id'] ?? 0));
+        if (!$roll) { http_response_code(404); view('notfound'); return true; }
+        $client = null;
+        if (!empty($roll['header']['client_id'])) $client = ops_one("SELECT * FROM business_partners WHERE id=?", [(int)$roll['header']['client_id']]);
+        $roll['client'] = $client; $roll['heads'] = pc_heads();
+        require __DIR__ . '/../views/ops/project_costing_print.php';
+        return true;
     }
 
     // ---- Views ----
