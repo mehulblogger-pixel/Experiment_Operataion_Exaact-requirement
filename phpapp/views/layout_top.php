@@ -126,7 +126,15 @@
               // state. The link is "on" for any Operations-area route so you are
               // never on an Operations screen with nothing highlighted. ?>
         <?php if (can('mod.calls.view')||can('mod.jobs.view')||can('mod.vouchers.view')||can('mod.hiring.view')||can('mod.reconcile.view')): ?>
-        <a class="s-item<?= $navOn(['operations','ops-desk','calls','call','jobs','job','deputations','availability','schedule','capacity-outlook','recurring','timesheet','ratings','vouchers','voucher','candidates','candidate','requisitions','requisition','attendance-recon','contract-overrides']) ?>" href="/operations"><span class="s-ic">🛠️</span><span>Operations</span></a>
+        <a class="s-item<?= $navOn(['operations','ops-desk','calls','call','jobs','job','deputations','availability','schedule','capacity-outlook','recurring','timesheet','ratings','vouchers','voucher','attendance-recon','contract-overrides']) ?>" href="/operations"><span class="s-ic">🛠️</span><span>Operations</span></a>
+        <?php endif; ?>
+
+        <?php // Recruitment Command Centre — promoted to its own rail item so the
+              // pipeline dashboard is one tap from anywhere, not buried in a tab
+              // of the Operations Home. Same gate as the Operations recruitment
+              // tile, which still exists. ?>
+        <?php if (can('mod.hiring.view')): ?>
+        <a class="s-item<?= $navOn(['recruitment-cc','recruitment','requisitions','requisition','requisition-new','requisition-edit','candidates','candidate','recruit-config','req-ai-extract']) ?>" href="/recruitment-cc"><span class="s-ic">🧭</span><span>Recruitment</span></a>
         <?php endif; ?>
 
         <?php if (ops_area_has('quality')): ?>

@@ -190,7 +190,7 @@ $stateTone = ['OPEN'=>'p-info','ACTIVE'=>'p-ok','GRACE'=>'p-warn','EXPIRED'=>'p-
           <tr><td class="muted">External portal logins</td><td><span class="pill p-mut">Portal seat</span></td><td style="text-align:right" class="tnum"><?= (int)$cls['PORTAL']['count'] ?></td></tr>
           <?php endif; ?>
         </tbody></table>
-        <?php else: ?><p class="muted" style="font-size:12.5px">No active staff yet. Add users under <a href="/m/users">Users</a> and the class mix appears here.</p><?php endif; ?>
+        <?php else: ?><p class="muted" style="font-size:12.5px">No active staff yet. Add users under <a href="/users">Users</a> and the class mix appears here.</p><?php endif; ?>
         <div class="warnbox" style="margin-top:12px">
           Field roles are configurable — set <code>seat_field_roles</code> (comma list), <code>billing_price_field_month</code> and <code>billing_price_portal_month</code> under <a href="/settings">Settings</a>. The Full‑seat price tracks your Billing per‑seat rate automatically.
         </div>
@@ -211,7 +211,7 @@ $stateTone = ['OPEN'=>'p-info','ACTIVE'=>'p-ok','GRACE'=>'p-warn','EXPIRED'=>'p-
         <div style="margin-top:10px" class="actions">
           <a href="/settings">⚙ Settings</a>
           <a href="/access">🔑 Roles &amp; access</a>
-          <a href="/m/users">👥 Users</a>
+          <a href="/users">👥 Users</a>
           <?php if (!empty($d['books']['url'])): ?><a href="<?= $e($d['books']['url']) ?>" target="_blank" rel="noopener">📚 Open Books ↗</a><?php endif; ?>
         </div>
       </div>

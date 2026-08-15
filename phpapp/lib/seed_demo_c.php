@@ -611,7 +611,7 @@ function demo_seed_c3($pdo, $x, $has, $ins) {
             [$oid['AMD'],'IND','OVERHEAD',null,null,'',      'OFFICE_EXP',0,'DEMO — Office overheads (Ahmedabad)',  'EQUAL',                55000],
             [$oid['AMD'],'OGC','SUBCON',  null,$jid['J-2607-102'],'40881','SUBCON', 0,'DEMO — Sub-contractor (Mundra jetty)','THE_JOB_IT_WAS_FOR', 90000],
         ];
-        $tAmd = 0; foreach ($amd as $r) { $ins($ia, $r); $tAmd += $r[12]; }
+        $tAmd = 0; foreach ($amd as $r) { $ins($ia, array_merge($r, [$now])); $tAmd += $r[10]; }
         $ins($ir, [$oid['AMD'],round($tAmd,2),'DEMO — July overhead allocation',$now]);
 
         // --- Mumbai run (second office) ---
@@ -619,7 +619,7 @@ function demo_seed_c3($pdo, $x, $has, $ins) {
             [$oid['MUM'],'OGC','PAYROLL',null,null,'', 'SALARY',    0,'DEMO — Inspector payroll share (Mumbai)','HEADCOUNT',180000],
             [$oid['MUM'],'OGC','OVERHEAD',null,null,'','OFFICE_EXP', 0,'DEMO — Office overheads (Mumbai)',       'EQUAL',     40000],
         ];
-        $tMum = 0; foreach ($mum as $r) { $ins($ia, $r); $tMum += $r[12]; }
+        $tMum = 0; foreach ($mum as $r) { $ins($ia, array_merge($r, [$now])); $tMum += $r[10]; }
         $ins($ir, [$oid['MUM'],round($tMum,2),'DEMO — July overhead allocation',$now]);
 
         $n['cost_allocations'] = count($amd) + count($mum);
