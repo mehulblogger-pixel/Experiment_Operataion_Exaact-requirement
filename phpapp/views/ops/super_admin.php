@@ -123,7 +123,7 @@ $stateTone = ['OPEN'=>'p-info','ACTIVE'=>'p-ok','GRACE'=>'p-warn','EXPIRED'=>'p-
 
   <!-- PLANS & PACKAGING -->
   <?php $tiers = $d['tiers'] ?? []; $ml = $d['module_labels'] ?? []; $price = (float)($bill['price_month'] ?? 0);
-    $mult = ['STARTER'=>1, 'PRO'=>1.8, 'ENTERPRISE'=>2.8]; ?>
+    $mult = ['STARTER'=>1, 'PRO'=>2.0, 'ENTERPRISE'=>3.9]; // ratios to the base seat price (₹899 → 1,799 → 3,499) ?>
   <div class="band"><h2>Plans &amp; packaging</h2><span class="bd">what each tier grants when you issue a licence key · prices set under Billing</span></div>
   <div class="g3">
     <?php foreach ($tiers as $tk=>$t): ?>
