@@ -1592,6 +1592,21 @@ function demo_seed_modules_c($pdo, $x, $has, $ins) {
     // for the duration of the seed, so the fix travels with the seed itself even
     // if db.php was not yet updated. Per-connection only; wrapped for locked hosts.
     try { $pdo->exec("SET SESSION sql_mode = ''"); } catch (Throwable $e) {}
+
+    // Several registers live in tables that are created LAZILY — the first time
+    // someone opens that module, its *_migrate() runs and builds the table. On a
+    // fresh production database those tables do not exist yet when the seed runs,
+    // so $has() returns false and the block is silently skipped: the register
+    // loads empty with no error to show for it (the "6 of 83" gap — security
+    // incidents, client NDAs, confidentiality breaches, consent register, DSAR,
+    // custom forms). Build the tables here, before any block checks for them, so
+    // the seed no longer depends on the module having been opened first. Each
+    // migrate has its own static guard and is a no-op if already run; wrapped so a
+    // locked host cannot take the whole seed down.
+    foreach (['compliance_migrate','conf_migrate','cforms_migrate'] as $mig) {
+        if (function_exists($mig)) { try { $mig(); } catch (Throwable $e) { $GLOBALS['__seedc_fail'][] = $mig . ': ' . $e->getMessage(); } }
+    }
+
     foreach (['demo_seed_c1','demo_seed_c2','demo_seed_c3','demo_seed_c4','demo_seed_c5','demo_seed_c6','demo_seed_c7','demo_seed_recruit_cc','demo_seed_costing'] as $fn) {
         if (!function_exists($fn)) continue;
         try {

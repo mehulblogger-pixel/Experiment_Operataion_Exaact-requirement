@@ -19,14 +19,23 @@
 if (PHP_SAPI !== 'cli') { http_response_code(403); exit("Command line only.\n"); }
 
 chdir(__DIR__ . '/..');
-foreach (['db','helpers','ops','lookups','licence','access','terms','compose','crm','pdf','ai','workforce',
-          'orgadmin','contracts','security','compliance','costing','reset','partnerimport','mis','dedupe',
-          'joblock','schedule','callprofit','bills','competence','preflight','equipment','impartiality',
-          'identity','complaints','capa','audits','datacontrol','trust','portal','tally','receivables',
-          'idems','seed_demo'] as $m) {
-    $f = __DIR__ . "/../lib/$m.php";
-    if (is_file($f)) require $f;
+// Load exactly the library files the web front controller loads, in its order,
+// by reading index.php's own require list. A hand-kept list here fell behind —
+// it did not load seed_demo_c.php (all the part-three modules — CRM funnel,
+// recruitment, project costing, the compliance registers), nor the lazy-table
+// migrations (confidentiality, custom forms) — so a command-line seed quietly
+// skipped them and left those registers empty. Deriving the list from index.php
+// keeps the command line identical to the button, now and after any new module.
+$idx = @file_get_contents(__DIR__ . '/../index.php');
+$libs = [];
+if ($idx && preg_match_all('#require\s+__DIR__\s*\.\s*\'(/lib/[a-zA-Z0-9_]+\.php)\'#', $idx, $mm)) {
+    $libs = $mm[1];
 }
+// Fallback to a minimal core if index.php could not be read for any reason.
+if (!$libs) foreach (['db','helpers','ops','lookups','licence','access','terms','compliance',
+                      'confidentiality','customforms','crm','costing','seed_demo','seed_demo_c'] as $m)
+    $libs[] = "/lib/$m.php";
+foreach ($libs as $rel) { $f = __DIR__ . '/..' . $rel; if (is_file($f)) require_once $f; }
 
 $arg = $argv[1] ?? '';
 
