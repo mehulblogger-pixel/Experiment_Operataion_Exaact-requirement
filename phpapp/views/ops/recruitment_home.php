@@ -55,6 +55,25 @@ $grp = function ($icon, $title, $n) use ($e) {
   <div>
     <h1>Recruitment &amp; Workforce</h1>
     <p class="sub" style="margin:2px 0 0">One place for what needs action today, what's at risk, and who you can deploy before recruiting outside. Every figure is live and scoped to your branches.</p>
+    <?php // Phase 6 — engagement mode: how this agency hires. A setting, not re-decided per candidate.
+    $mode = function_exists('recruit_engagement_mode') ? recruit_engagement_mode() : 'BOTH';
+    $modeShort = ['BOTH' => 'Recruitment + Manpower', 'RECRUITMENT' => 'Recruitment only', 'MANPOWER' => 'Manpower only'];
+    ?>
+    <div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span class="pill p-info" style="font-size:11px" title="How this installation engages people">Engagement: <?= $e($modeShort[$mode] ?? $mode) ?></span>
+      <?php if (function_exists('is_admin_level') && is_admin_level()): ?>
+      <details style="display:inline-block">
+        <summary style="cursor:pointer;font-size:12px;color:var(--muted,#656e7a)">change</summary>
+        <form method="post" action="/recruit-config" style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <select class="form-control" name="engagement_mode" style="max-width:340px;font-size:13px">
+            <?php foreach (RECRUIT_ENGAGEMENT_MODES as $k => $v): ?><option value="<?= $e($k) ?>"<?= $mode === $k ? ' selected' : '' ?>><?= $e($v) ?></option><?php endforeach; ?>
+          </select>
+          <button class="btn secondary" type="submit" style="padding:4px 12px">Save</button>
+        </form>
+        <p class="muted" style="font-size:11.5px;margin:5px 0 0;max-width:420px">Sets the default hire type on every candidate. It never removes an option — a coordinator can still pick the other on any hire.</p>
+      </details>
+      <?php endif; ?>
+    </div>
   </div>
   <div class="row-actions rc-quick">
     <?php if (can('mod.hiring.view')): ?>

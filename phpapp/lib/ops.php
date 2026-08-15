@@ -2049,8 +2049,8 @@ function ops_module_gate($route) {
         // to this person. One module gate here would either hide the whole screen
         // from someone who owns half of it, or show them findings they cannot act on.
         'profitability'=>'profitability','boss-renew'=>'profitability',
-        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring',
-        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','req-ai-extract'=>'hiring',
+        'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring',
+        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring',
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads',
         'opportunity-move'=>'leads','opportunity-quote'=>'leads','opportunity-from-lead'=>'leads',
@@ -2253,7 +2253,7 @@ function ops_dispatch($route, $method) {
         // Bills backing the expenses the client is being charged for.
         case $route === 'bill-add' || $route === 'bill-delete' || $route === 'bill-file':
             return ops_job_bill($route, $method);
-        case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage' || $route === 'candidate-cv' || $route === 'candidate-client' || $route === 'candidate-credential' || $route === 'candidate-commercial':
+        case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage' || $route === 'candidate-cv' || $route === 'candidate-client' || $route === 'candidate-credential' || $route === 'candidate-commercial' || $route === 'candidate-link-person':
             ops_candidates($route, $method); return true;
         case $route === 'inquiries' || $route === 'inquiry-new' || $route === 'inquiry-edit':
             ops_crm_inquiries($route, $method); return true;
@@ -2269,6 +2269,15 @@ function ops_dispatch($route, $method) {
             ops_requisitions($route, $method); return true;
         case $route === 'recruitment':
             return ops_recruitment_home($method);
+        case $route === 'recruit-config':
+            ops_require(is_admin_level(), 'Only an administrator can change the engagement mode.');
+            if ($method === 'POST' && function_exists('setting_set')) {
+                $m = strtoupper((string)($_POST['engagement_mode'] ?? 'BOTH'));
+                if (!isset(RECRUIT_ENGAGEMENT_MODES[$m])) $m = 'BOTH';
+                setting_set('recruit_engagement_mode', $m);
+                flash('Engagement mode set to ' . RECRUIT_ENGAGEMENT_MODES[$m] . '.');
+            }
+            redirect('/recruitment'); return true;
         case $route === 'req-ai-extract':
             ops_require(is_coordinator_level());
             if ($method === 'POST' && function_exists('recruit_ai_extract')) { recruit_ai_extract(); return true; }
@@ -4103,6 +4112,18 @@ function ops_candidates($route, $method) {
         redirect('/candidate?id=' . $id);
     }
 
+    // Phase 6 — thread two application rows together as the same person.
+    if ($route === 'candidate-link-person') {
+        ops_require(is_coordinator_level(), 'Only coordinators and admins can link applications.');
+        $id    = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+        $other = (int)($_POST['other_id'] ?? 0);
+        if ($method === 'POST' && $id && $other && function_exists('person_link_rows')) {
+            $why = person_link_rows([$id, $other]);
+            flash($why !== '' ? $why : 'Applications linked — they are now recorded as the same person.', $why !== '' ? 'error' : 'success');
+        }
+        redirect('/candidate?id=' . $id);
+    }
+
     if ($route === 'candidate') {
         ops_require(is_coordinator_level());
         $cand = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp,
@@ -4130,8 +4151,11 @@ function ops_candidates($route, $method) {
             $asgComm   = assignment_commercials($cand, $linkReq);
             $asgPacket = assignment_billing_packet($cand, $linkReq);
         }
+        // Phase 6 — this person's other application rows (same person, kept distinct).
+        $personApps = function_exists('person_applications') ? person_applications($cand) : [];
         view('ops/candidate_detail', ['cand' => $cand, 'events' => $events, 'dupes' => $dupes, 'subDupes' => $subDupes,
-            'fit' => $fit, 'readiness' => $readiness, 'linkReq' => $linkReq, 'asgComm' => $asgComm, 'asgPacket' => $asgPacket]);
+            'fit' => $fit, 'readiness' => $readiness, 'linkReq' => $linkReq, 'asgComm' => $asgComm, 'asgPacket' => $asgPacket,
+            'personApps' => $personApps]);
         return;
     }
 }

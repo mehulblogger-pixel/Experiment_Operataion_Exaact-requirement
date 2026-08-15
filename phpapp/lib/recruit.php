@@ -585,3 +585,109 @@ function recruit_req_commercial_rollup($req) {
     $s['act_margin']  = $s['act_rev']  > 0 ? $s['act_profit']  / $s['act_rev']  * 100 : 0;
     return $s;
 }
+
+// ============================================================================
+//  Phase 6 — Engagement mode + the person (multi-application) model
+//
+//  Two long-standing gaps, both filled additively:
+//
+//   1. An agency is usually one of: it RECRUITS people onto the client's own
+//      roll for a one-time fee, or it SUPPLIES manpower on its own roll for a
+//      monthly charge — or it does both. That choice colours every hire, so it
+//      belongs in one setting instead of being re-decided on each candidate.
+//
+//   2. One human being applies to several requirements over time. The register
+//      keeps one row per APPLICATION (so history is never lost), which means the
+//      same person can appear as several candidate rows. Rather than merge and
+//      destroy history, a nullable person_ref threads those rows together, and
+//      the view falls back to a phone/e-mail match so it works even before any
+//      linking is done. Nothing is deleted; the applications stay distinct.
+// ============================================================================
+
+const RECRUIT_ENGAGEMENT_MODES = [
+    'BOTH'        => 'Both — recruit onto client roll and supply manpower',
+    'RECRUITMENT' => 'Recruitment only — place onto the client roll (one-time fee)',
+    'MANPOWER'    => 'Manpower only — supply on our roll (monthly charge)',
+];
+
+// The installation's engagement mode (Settings-backed, defaults to BOTH).
+function recruit_engagement_mode() {
+    $m = function_exists('setting_get') ? strtoupper((string)setting_get('recruit_engagement_mode', 'BOTH')) : 'BOTH';
+    return isset(RECRUIT_ENGAGEMENT_MODES[$m]) ? $m : 'BOTH';
+}
+
+// The hire-type the form should default to, given the mode. BOTH → let the user pick.
+function recruit_default_hire_type() {
+    $m = recruit_engagement_mode();
+    return $m === 'BOTH' ? '' : $m;
+}
+
+// Additive, nullable thread that ties a person's several application rows.
+function person_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    ensure_column('candidates', 'person_ref', "VARCHAR(40) NULL");
+}
+
+// The stable person key for a candidate row: an explicit link if set, else the
+// last 10 digits of the mobile, else the lower-cased e-mail. '' when unknowable.
+function person_key($cand) {
+    $ref = trim((string)($cand['person_ref'] ?? ''));
+    if ($ref !== '') return 'ref:' . $ref;
+    $mob = preg_replace('/\D+/', '', (string)($cand['mobile'] ?? ''));
+    if (strlen($mob) >= 10) return 'mob:' . substr($mob, -10);
+    $em = strtolower(trim((string)($cand['email'] ?? '')));
+    if ($em !== '') return 'em:' . $em;
+    return '';
+}
+
+// Every OTHER application row that belongs to the same person — explicit link
+// first, phone/e-mail match as the fallback. Read-only; keeps each application.
+function person_applications($cand) {
+    person_migrate();
+    $selfId = (int)($cand['id'] ?? 0);
+    $ref    = trim((string)($cand['person_ref'] ?? ''));
+    $mob    = preg_replace('/\D+/', '', (string)($cand['mobile'] ?? ''));
+    $email  = strtolower(trim((string)($cand['email'] ?? '')));
+    $mob10  = strlen($mob) >= 10 ? substr($mob, -10) : '';
+    if ($ref === '' && $mob10 === '' && $email === '') return [];
+    try {
+        $rows = ops_all("SELECT c.id, c.cand_code, c.first_name, c.last_name, c.stage, c.designation,
+                            c.mobile, c.email, c.person_ref, c.requisition_id, c.client_id, c.created_at,
+                            c.submitted_client_date, c.interview_outcome, c.client_feedback,
+                            r.req_code, bp.legal_name client_name
+                         FROM candidates c
+                         LEFT JOIN requisitions r ON r.id=c.requisition_id
+                         LEFT JOIN business_partners bp ON bp.id=c.client_id
+                         WHERE c.id<>? ORDER BY c.id DESC LIMIT 400", [$selfId]) ?: [];
+    } catch (Throwable $e) { return []; }
+    $out = [];
+    foreach ($rows as $r) {
+        $rRef = trim((string)($r['person_ref'] ?? ''));
+        $rMob = preg_replace('/\D+/', '', (string)$r['mobile']);
+        $rEm  = strtolower(trim((string)$r['email']));
+        $match = ($ref !== '' && $rRef !== '' && $rRef === $ref)
+              || ($mob10 !== '' && strlen($rMob) >= 10 && substr($rMob, -10) === $mob10)
+              || ($email !== '' && $rEm === $email);
+        if ($match) $out[] = $r;
+    }
+    return array_slice($out, 0, 20);
+}
+
+// Link a set of candidate rows as one person: they all take a single shared
+// person_ref (an existing one in the group, else a fresh key from the lowest id).
+// Additive — only stamps person_ref, never merges or deletes an application.
+function person_link_rows(array $ids) {
+    person_migrate();
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+    if (count($ids) < 2) return '';
+    $ph  = implode(',', array_fill(0, count($ids), '?'));
+    try {
+        $rows = ops_all("SELECT id, person_ref FROM candidates WHERE id IN ($ph)", $ids) ?: [];
+    } catch (Throwable $e) { return 'Could not read those records.'; }
+    if (count($rows) !== count($ids)) return 'One of those records no longer exists.';
+    $ref = '';
+    foreach ($rows as $r) if (trim((string)$r['person_ref']) !== '') { $ref = trim((string)$r['person_ref']); break; }
+    if ($ref === '') $ref = 'P' . str_pad((string)min($ids), 6, '0', STR_PAD_LEFT);
+    db()->prepare("UPDATE candidates SET person_ref=? WHERE id IN ($ph)")->execute(array_merge([$ref], $ids));
+    return '';
+}

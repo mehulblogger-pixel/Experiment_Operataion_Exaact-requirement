@@ -52,6 +52,48 @@ if ($dupes): ?>
   <?php endif; ?>
 </div>
 
+<?php // Phase 6 — the same person's other applications (one row per application; nothing merged).
+$personApps = $personApps ?? [];
+if ($personApps):
+  $stageOpt = lk_options_or('candidate_stage', CAND_STAGES);
+  $myRef = trim((string)($cand['person_ref'] ?? ''));
+  $stTone = fn($s) => in_array($s, ['ACCEPTED'], true) ? 'p-ok' : (in_array($s, ['REJECTED','WITHDRAWN','OFFER_DECLINED'], true) ? 'p-bad' : 'p-warn');
+?>
+<div class="panel">
+  <h3 class="tab-sub" style="margin-top:0">This person&rsquo;s other applications
+    <span class="pill p-info" style="font-size:11px;margin-left:4px"><?= count($personApps) ?></span>
+    <?php if ($myRef !== ''): ?><span class="pill p-ok" style="font-size:11px;margin-left:4px">linked · <?= e($myRef) ?></span><?php endif; ?>
+  </h3>
+  <p class="muted" style="font-size:12px;margin:0 0 8px">One human, several applications — each is kept as its own record so no history is lost. Matched by <?= $myRef !== '' ? 'an explicit link' : 'phone / e-mail' ?>.</p>
+  <div style="overflow-x:auto">
+  <table class="grid" style="min-width:640px">
+    <thead><tr><th>Application</th><th>Role</th><th>Against</th><th>Stage</th><th>When</th><?php if (is_coordinator_level() && $myRef === ''): ?><th></th><?php endif; ?></tr></thead>
+    <tbody>
+      <?php foreach ($personApps as $a): $an = trim(($a['first_name'] ?? '') . ' ' . ($a['last_name'] ?? '')); ?>
+      <tr>
+        <td><a href="/candidate?id=<?= (int)$a['id'] ?>"><?= e($a['cand_code'] ?: ('#'.$a['id'])) ?></a><?php if ($an && $an !== trim(($cand['first_name'] ?? '').' '.($cand['last_name'] ?? ''))): ?> <span class="muted">· <?= e($an) ?></span><?php endif; ?></td>
+        <td><?= e(lk_options_or('designation', DESIGNATIONS)[$a['designation']] ?? $a['designation'] ?: '—') ?></td>
+        <td><?= $a['req_code'] ? e($a['req_code']) : e($a['client_name'] ?: '—') ?></td>
+        <td><span class="pill <?= $stTone($a['stage']) ?>" style="font-size:11px"><?= e($stageOpt[$a['stage']] ?? $a['stage']) ?></span></td>
+        <td class="muted" style="font-size:12px"><?= e(substr((string)($a['created_at'] ?? ''),0,10) ?: '—') ?></td>
+        <?php if (is_coordinator_level() && $myRef === ''): ?>
+        <td style="text-align:right">
+          <?php if (trim((string)($a['person_ref'] ?? '')) === ''): ?>
+          <form method="post" action="/candidate-link-person?id=<?= (int)$cand['id'] ?>" style="display:inline" onsubmit="return confirm('Record these two applications as the same person?')">
+            <input type="hidden" name="other_id" value="<?= (int)$a['id'] ?>">
+            <button class="btn btn-ghost" type="submit" style="padding:2px 9px;font-size:12px">Same person</button>
+          </form>
+          <?php else: ?><span class="pill p-ok" style="font-size:11px">linked</span><?php endif; ?>
+        </td>
+        <?php endif; ?>
+      </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+  </div>
+</div>
+<?php endif; ?>
+
 <?php // §16 — explainable workforce fit against the linked requirement.
 $fit = $fit ?? null; $readiness = $readiness ?? null; $linkReq = $linkReq ?? null;
 if (!empty($fit) && !empty($linkReq)): [$fl, $ftone] = recruit_fit_band($fit['score']); ?>
@@ -280,6 +322,8 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
   (function(){
     var sel = document.getElementById('cand_stage'), chk = document.getElementById('hire_chk');
     if (!sel) return;
+    // Phase 6 — the installation's engagement mode defaults the direct (no-agency) hire.
+    var engMode = <?= json_encode(function_exists('recruit_engagement_mode') ? recruit_engagement_mode() : 'BOTH') ?>;
     var mk = document.getElementById('mk_insp'), det = document.getElementById('hire_details');
     var ag = document.getElementById('ag_sel'), roll = document.getElementById('roll_sel');
     var feeOne = document.getElementById('fee_one'), feeMonth = document.getElementById('fee_month');
@@ -287,9 +331,11 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
     function syncHire(){ if (det) det.style.display = (mk && mk.checked && sel.value==='ACCEPTED') ? 'block' : 'none'; }
     function syncAgency(){
       if (!ag) return; var o = ag.options[ag.selectedIndex], t = o.getAttribute('data-type');
-      if (roll) roll.value = (t === 'MANPOWER') ? 'AGENCY' : 'OWN';
-      if (feeOne)   feeOne.style.display   = (t === 'RECRUITMENT' || t==='') ? '' : 'none';
-      if (feeMonth) feeMonth.style.display = (t === 'MANPOWER') ? '' : 'none';
+      // No agency picked → fall back to the engagement mode (MANPOWER acts like a supply hire).
+      var eff = (t === '') ? (engMode === 'MANPOWER' ? 'MANPOWER' : (engMode === 'RECRUITMENT' ? 'RECRUITMENT' : '')) : t;
+      if (roll) roll.value = (eff === 'MANPOWER') ? 'AGENCY' : 'OWN';
+      if (feeOne)   feeOne.style.display   = (eff === 'RECRUITMENT' || eff==='') ? '' : 'none';
+      if (feeMonth) feeMonth.style.display = (eff === 'MANPOWER') ? '' : 'none';
       var f = feeOne && feeOne.querySelector('input'), m = feeMonth && feeMonth.querySelector('input');
       if (f && t==='RECRUITMENT' && !f.value) f.value = o.getAttribute('data-fee')||'';
       if (m && t==='MANPOWER' && !m.value) m.value = o.getAttribute('data-monthly')||'';

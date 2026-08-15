@@ -183,9 +183,26 @@ and ends with a regression pass against §45.
   nothing renamed or dropped, a candidate with no commercials simply shows the
   estimate.
 - **Phase 6 — Manpower mode, Person/Talent multi-application, UX polish, full
-  regression.** Manpower configuration; optional person link enabling multiple
-  applications without duplicating candidates; consistent status/table/mobile UX;
-  §45 regression sign-off.
+  regression.** ✅ DONE. Engagement mode is now one Settings-backed choice
+  (`recruit_engagement_mode` — Recruitment / Manpower / Both) shown as a chip on
+  the command centre and editable by an admin; it defaults the hire type on every
+  candidate without ever removing the other option. The person model threads a
+  human's several application rows together with an additive nullable `person_ref`
+  (`person_migrate`): the candidate 360 shows "This person's other applications"
+  — matched by an explicit link or, as a fallback, phone/e-mail — with a "Same
+  person" action (`candidate-link-person` → `person_link_rows`) that stamps a
+  shared ref and never merges or deletes an application, so all history is kept.
+  UX: consistent status pills and a scroll-safe table on the new panel. §45
+  regression: full route sweep across recruitment, operations, finance, quality
+  and directory returns 200/expected-404 with no PHP fatals. All additive — one
+  nullable column, no renames, no drops.
+
+**Roadmap complete — all six phases delivered.** The recruitment / workforce
+module was improved in place across Command Centre (1), rich requirements &
+commercial fields (2), Candidate 360 with duplicate/submission protection (3),
+explainable intelligence (4), the per-placement commercial lifecycle (5), and
+engagement mode + the person multi-application model (6) — with a zero-break,
+additive-only discipline throughout.
 
 ---
 
