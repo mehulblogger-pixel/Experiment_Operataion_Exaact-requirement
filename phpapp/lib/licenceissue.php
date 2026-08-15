@@ -365,8 +365,13 @@ function ops_licence_issue($route, $method) {
         if (!$mods) $mods = array_keys(PRODUCT_MODULES);               // default: the whole product
         // Always include core modules so an install is never left unusable.
         foreach (array_keys(PRODUCT_MODULES) as $k) if (!empty(PRODUCT_MODULES[$k][3]) && !in_array($k, $mods, true)) $mods[] = $k;
+        // Optional role-based cap: how many of the seats are field (light) seats.
+        // Left at 0 for a flat licence, so nothing changes for existing keys.
+        $fieldSeats = max(0, (int) ($_POST['field_seats'] ?? 0));
+        if ($seats > 0) $fieldSeats = min($fieldSeats, $seats);        // can't reserve more field seats than total
         $ref = 'LIC-' . date('ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
         $claims = ['cust' => $cust, 'exp' => $exp, 'seats' => $seats, 'grace' => $grace, 'ref' => $ref, 'mods' => $mods];
+        if ($fieldSeats > 0) $claims['field_seats'] = $fieldSeats;
         $r = lk_issue($claims);
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/issue-licence'); }
         try {

@@ -5975,7 +5975,7 @@ function ops_users($route, $method) {
                 // might be. Editing an existing person is never blocked — that
                 // would strand a customer who is over their seat count with no
                 // way to correct anybody's details.
-                if (function_exists('lk_seat_block') && ($seatErr = lk_seat_block()) !== '') {
+                if (function_exists('lk_seat_block') && ($seatErr = lk_seat_block($role)) !== '') {
                     flash($seatErr, 'error');
                     redirect('/users');
                 }

@@ -78,6 +78,9 @@ $stateTone = ['OPEN'=>'p-info','ACTIVE'=>'p-ok','GRACE'=>'p-warn','EXPIRED'=>'p-
         <?php if (!empty($lic['expires'])): ?><div class="kv"><span class="k">Expires</span><span><?= $e(substr((string)$lic['expires'],0,10)) ?><?= isset($lic['days_left'])&&$lic['days_left']!==null?' ('.(int)$lic['days_left'].'d)':'' ?></span></div><?php endif; ?>
         <div class="kv"><span class="k">Seats</span><span class="tnum"><?= $used ?> used <?= $seats>0 ? 'of '.$seats.' licensed' : '(unlimited in dev)' ?></span></div>
         <?php if ($seats>0): ?><div class="track <?= $seatPct>=90?'bad':($seatPct>=75?'warn':'') ?>"><i style="width:<?= $seatPct ?>%"></i></div><?php endif; ?>
+        <?php if ((int)($lic['field_seats'] ?? 0) > 0): ?>
+        <div class="kv"><span class="k">Field seats</span><span class="tnum"><?= (int)($lic['field_used'] ?? 0) ?> used of <?= (int)$lic['field_seats'] ?> <span class="muted">(inspectors, capped separately)</span></span></div>
+        <?php endif; ?>
         <div class="kv"><span class="k">Enforcement</span><span><?= !empty($lic['enforcing']) ? '<span class="pill p-ok">Enforced</span>' : '<span class="pill p-mut">Not enforced (dev/open)</span>' ?></span></div>
         <?php if (!empty($lic['err'])): ?><div class="warnbox">⚠ <?= $e($lic['err']) ?></div><?php endif; ?>
       </div>
@@ -142,6 +145,59 @@ $stateTone = ['OPEN'=>'p-info','ACTIVE'=>'p-ok','GRACE'=>'p-warn','EXPIRED'=>'p-
     <?php endforeach; ?>
   </div>
   <p class="sub" style="margin-top:8px">These are the recommended presets — the licence key's <code>mods</code> list is what actually gates a customer. Prices shown scale a base seat price from Billing (illustrative until you set your own). <a href="/licence">Issue / manage licence ›</a></p>
+
+  <!-- SEAT CLASSES / COST BREAKDOWN -->
+  <?php $sc = $d['seat_classes'] ?? null; if ($sc): $cls = $sc['classes']; $cur = $sc['currency'] ?? 'INR';
+    $fmt = fn($n) => $sym.number_format((float)$n);
+    $classTone = ['FULL'=>'p-info','FIELD'=>'p-ok','PORTAL'=>'p-mut']; ?>
+  <div class="band"><h2>Seat classes &amp; monthly cost</h2><span class="bd">roles are priced by class, so a field inspector never costs what a manager does · <a href="/billing">set prices ›</a></span></div>
+  <div class="g2">
+    <div class="panel"><div class="ph"><h3>What this installation would bill</h3><span class="note">active seats × class price</span></div>
+      <div class="pb">
+        <table>
+          <thead><tr><th>Seat class</th><th style="text-align:right">Seats</th><th style="text-align:right">Billable</th><th style="text-align:right">Price / mo</th><th style="text-align:right">Subtotal</th></tr></thead>
+          <tbody>
+          <?php foreach ($cls as $ck=>$c): ?>
+            <tr>
+              <td><span class="pill <?= $classTone[$ck] ?? 'p-mut' ?>"><?= $e($c['label']) ?></span><br><span class="md muted" style="font-size:11px"><?= $e($c['desc']) ?></span></td>
+              <td style="text-align:right" class="tnum"><?= (int)$c['count'] ?></td>
+              <td style="text-align:right" class="tnum"><?= (int)$c['billable'] ?><?= $c['free']>0 ? '<br><span class="md muted" style="font-size:10.5px">'.(int)$c['free'].' free</span>' : '' ?></td>
+              <td style="text-align:right" class="tnum"><?= $c['price']>0 ? $fmt($c['price']) : '<span class="muted">free</span>' ?></td>
+              <td style="text-align:right" class="tnum"><b><?= $fmt($c['cost']) ?></b></td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+          <tfoot>
+            <tr style="border-top:2px solid var(--line)"><td colspan="4" style="text-align:right;font-weight:700;padding-top:10px">Monthly total (role-based)</td><td style="text-align:right;padding-top:10px" class="tnum"><b style="font-size:16px;color:var(--brand)"><?= $fmt($sc['total']) ?></b></td></tr>
+          </tfoot>
+        </table>
+        <?php if (($sc['saving'] ?? 0) > 0): ?>
+        <div class="warnbox" style="background:var(--ok-soft,#e7f6ec);margin-top:12px">
+          ✅ A flat per-seat price would charge <b><?= $fmt($sc['flat_total']) ?></b>/mo for the same staff.
+          Role-based pricing saves the customer <b><?= $fmt($sc['saving']) ?></b>/mo (<?= $sc['flat_total']>0 ? round($sc['saving']/$sc['flat_total']*100) : 0 ?>% less) — the fairness argument that closes field-heavy TPIAs.
+        </div>
+        <?php endif; ?>
+      </div>
+    </div>
+    <div class="panel"><div class="ph"><h3>Who is in each class</h3><span class="note">active staff by role · <a href="/access">roles ›</a></span></div>
+      <div class="pb">
+        <?php if (!empty($sc['by_role'])): ?>
+        <table><thead><tr><th>Role</th><th>Class</th><th style="text-align:right">Active</th></tr></thead><tbody>
+          <?php foreach ($sc['by_role'] as $r): ?>
+          <tr><td><?= $e($r['label']) ?></td><td><span class="pill <?= $classTone[$r['class']] ?? 'p-mut' ?>"><?= $e($cls[$r['class']]['label'] ?? $r['class']) ?></span></td><td style="text-align:right" class="tnum"><?= (int)$r['count'] ?></td></tr>
+          <?php endforeach; ?>
+          <?php if (($cls['PORTAL']['count'] ?? 0) > 0): ?>
+          <tr><td class="muted">External portal logins</td><td><span class="pill p-mut">Portal seat</span></td><td style="text-align:right" class="tnum"><?= (int)$cls['PORTAL']['count'] ?></td></tr>
+          <?php endif; ?>
+        </tbody></table>
+        <?php else: ?><p class="muted" style="font-size:12.5px">No active staff yet. Add users under <a href="/m/users">Users</a> and the class mix appears here.</p><?php endif; ?>
+        <div class="warnbox" style="margin-top:12px">
+          Field roles are configurable — set <code>seat_field_roles</code> (comma list), <code>billing_price_field_month</code> and <code>billing_price_portal_month</code> under <a href="/settings">Settings</a>. The Full‑seat price tracks your Billing per‑seat rate automatically.
+        </div>
+      </div>
+    </div>
+  </div>
+  <?php endif; ?>
 
   <!-- SYSTEM & DATA -->
   <div class="band"><h2>System &amp; data</h2></div>

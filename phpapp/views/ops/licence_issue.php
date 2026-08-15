@@ -37,6 +37,8 @@ openssl ec -in licence-private.pem -pubout -out licence-public.pem</pre></li>
       <div class="ff ff-wide"><label>Customer</label><input class="form-control" name="customer" required placeholder="Acme Inspection Pvt Ltd"></div>
       <div class="ff"><label>Seats <span class="muted">— people who may sign in</span></label>
         <input class="form-control" type="number" min="0" name="seats" value="5"><small class="muted">0 = unlimited.</small></div>
+      <div class="ff"><label>…of which field seats <span class="muted">— optional</span></label>
+        <input class="form-control" type="number" min="0" name="field_seats" value="0"><small class="muted">Light seats for inspectors, capped separately. 0 = one flat pool.</small></div>
       <div class="ff"><label>Valid for</label>
         <select class="form-control" name="months">
           <?php foreach ([1=>'1 month',3=>'3 months',6=>'6 months',12=>'1 year',24=>'2 years',36=>'3 years'] as $m=>$lbl): ?>

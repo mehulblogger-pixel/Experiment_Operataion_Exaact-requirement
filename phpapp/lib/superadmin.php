@@ -25,6 +25,118 @@ function superadmin_tiers() {
     ];
 }
 
+// ---------------------------------------------------------------------------
+//  Role-based seat classes
+//
+//  A flat per-seat price is unfair when a field inspector — who only ever opens
+//  the mobile job screens — costs the same as a branch manager who lives in the
+//  whole suite. So a seat has a CLASS, and the class carries the price:
+//
+//    • FULL   — office staff who use the desktop suite (managers, ED, SBU head,
+//               branch/ops/asst managers, coordinators, sales, admin, finance).
+//               Priced at the plan's per-seat rate (billing_price_user_month).
+//    • FIELD  — inspectors on the field/mobile apps only. A light, flat rate.
+//    • PORTAL — external client / vendor logins (client_users). A free bundle,
+//               then a token per-head price above it.
+//
+//  Nothing here is hard-coded that a vendor cannot change: FIELD and PORTAL
+//  prices, and the free-portal bundle, are Settings keys with sensible
+//  defaults. The FULL price is simply the existing billing per-seat price, so
+//  the two models never disagree.
+// ---------------------------------------------------------------------------
+
+// Which roles fall into the FIELD (light) class. Everyone else who is a real
+// staff login is a FULL seat. Portal users are counted separately (they are not
+// in `users`), so they are not listed here.
+function superadmin_field_roles() {
+    // Configurable: a comma list in Settings can override the default of just
+    // the inspector, in case a vendor deploys a second field-only role.
+    $raw = trim((string) setting_get('seat_field_roles', ''));
+    if ($raw !== '') {
+        $r = array_values(array_filter(array_map(fn($s) => strtoupper(trim($s)), explode(',', $raw))));
+        if ($r) return $r;
+    }
+    return ['INSPECTOR'];
+}
+
+// The seat-class catalogue: label, price (major units / month) and a one-line
+// pitch. FULL tracks the live billing price; FIELD/PORTAL are their own keys.
+function superadmin_seat_classes() {
+    $bill = function_exists('billing_config') ? billing_config() : [];
+    $full = (int) ($bill['price_month'] ?? 0);
+    if ($full <= 0) $full = (int) setting_get('billing_price_user_month', 0);
+    if ($full <= 0) $full = 1799;                       // Professional default, so the panel is never blank
+    $field  = (int) setting_get('billing_price_field_month', 0);  if ($field  <= 0) $field  = 499;
+    $portal = (int) setting_get('billing_price_portal_month', 0); // 0 is legitimate — portal can stay free
+    if ($portal < 0) $portal = 0;
+    $freeBundle = (int) setting_get('billing_portal_free', 5);    if ($freeBundle < 0) $freeBundle = 0;
+
+    return [
+        'FULL'  => ['label' => 'Full seat', 'price' => $full, 'free' => 0,
+            'desc' => 'Office staff on the desktop suite — managers, coordinators, sales, finance, admin.'],
+        'FIELD' => ['label' => 'Field seat', 'price' => $field, 'free' => 0,
+            'desc' => 'Inspectors on the field / mobile apps only.'],
+        'PORTAL'=> ['label' => 'Portal seat', 'price' => $portal, 'free' => $freeBundle,
+            'desc' => 'External client / vendor logins. First ' . $freeBundle . ' free, then a token per head.'],
+    ];
+}
+
+// Map one staff role to its seat class (FULL / FIELD).
+function superadmin_role_class($role) {
+    $role = strtoupper((string) $role);
+    return in_array($role, superadmin_field_roles(), true) ? 'FIELD' : 'FULL';
+}
+
+// Count the active seats in each class and cost them out. Returns the class
+// catalogue enriched with `count`, `billable` (after any free bundle) and
+// `cost`, plus a grand `total` and a `flat_total` for the "what a flat price
+// would have charged" comparison the panel shows.
+function superadmin_seat_breakdown() {
+    $classes = superadmin_seat_classes();
+    $val = function ($sql, $a = []) { try { return (int) ops_val($sql, $a); } catch (Throwable $e) { return 0; } };
+
+    // Staff, grouped by role, from active users.
+    $field = superadmin_field_roles();
+    $counts = ['FULL' => 0, 'FIELD' => 0, 'PORTAL' => 0];
+    $byRole = [];
+    try {
+        $rows = ops_all("SELECT role, COUNT(*) n FROM users WHERE is_active=1 GROUP BY role");
+    } catch (Throwable $e) { $rows = []; }
+    foreach ($rows as $r) {
+        $role = strtoupper((string) ($r['role'] ?? ''));
+        $n = (int) ($r['n'] ?? 0);
+        $cls = in_array($role, $field, true) ? 'FIELD' : 'FULL';
+        $counts[$cls] += $n;
+        $byRole[] = ['role' => $role,
+            'label' => (defined('ORG_ROLES') ? (ORG_ROLES[$role] ?? $role) : $role),
+            'class' => $cls, 'count' => $n];
+    }
+    // Portal logins live in their own table; guard for installs without it.
+    $counts['PORTAL'] = $val("SELECT COUNT(*) FROM client_users WHERE is_active=1");
+
+    $total = 0; $flatSeats = 0;
+    $flatPrice = $classes['FULL']['price'];
+    foreach ($classes as $k => &$c) {
+        $c['count'] = $counts[$k];
+        $c['billable'] = max(0, $counts[$k] - $c['free']);
+        $c['cost'] = $c['billable'] * $c['price'];
+        $total += $c['cost'];
+        if ($k !== 'PORTAL') $flatSeats += $counts[$k];   // a flat model bills every staff seat at the full price
+    }
+    unset($c);
+
+    usort($byRole, fn($a, $b) => $b['count'] <=> $a['count']);
+    return [
+        'classes'    => $classes,
+        'by_role'    => $byRole,
+        'total'      => $total,
+        'flat_total' => $flatSeats * $flatPrice,
+        'flat_price' => $flatPrice,
+        'saving'     => max(0, $flatSeats * $flatPrice - $total),
+        'currency'   => function_exists('billing_config') ? (billing_config()['currency'] ?? 'INR') : 'INR',
+    ];
+}
+
 // Gather everything the panel shows, guarding each source so a missing module
 // never breaks the page.
 function superadmin_data() {
@@ -45,6 +157,7 @@ function superadmin_data() {
         'lic'        => $lic,
         'bill'       => $bill,
         'tiers'      => superadmin_tiers(),
+        'seat_classes' => superadmin_seat_breakdown(),
         'module_labels' => array_map(fn($m) => $m['label'] ?? '', $lic['modules'] ?? []),
         'tenants'    => $tenants,
         'base_domain'=> (string)($reg['base_domain'] ?? ''),

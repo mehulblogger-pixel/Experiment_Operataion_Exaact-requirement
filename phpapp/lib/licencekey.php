@@ -220,6 +220,10 @@ function lk_state_base($reload = false) {
     $out['claims']   = $c;
     $out['customer'] = (string)($c['cust'] ?? '');
     $out['seats']    = (int)($c['seats'] ?? 0);
+    // Optional role-based cap: a key may split its seats into full + field. When
+    // absent (the common case, and every key issued before this) field_seats is
+    // 0 and every active user counts against the single `seats` cap as before.
+    $out['field_seats'] = (int)($c['field_seats'] ?? 0);
 
     $exp   = strtotime((string)$c['exp'] . ' 23:59:59');
     $grace = (int)($c['grace'] ?? LICENCE_GRACE_DEFAULT);
@@ -270,12 +274,54 @@ function lk_seats_used() {
     return (int)(lk_try(fn() => ops_val("SELECT COUNT(*) FROM users WHERE is_active = 1"), 0) ?: 0);
 }
 
+// Which roles are "field" (light) seats. Defers to the seat-class helper when it
+// is loaded (Super Admin panel), and otherwise falls back to just the inspector,
+// so seat accounting is identical whether or not that module is present.
+function lk_field_roles() {
+    if (function_exists('superadmin_field_roles')) return superadmin_field_roles();
+    return ['INSPECTOR'];
+}
+
+// Active seats used in the FIELD class, for a licence that caps field seats
+// separately.
+function lk_field_seats_used() {
+    $roles = lk_field_roles();
+    if (!$roles) return 0;
+    $in = implode(',', array_fill(0, count($roles), '?'));
+    return (int)(lk_try(fn() => ops_val(
+        "SELECT COUNT(*) FROM users WHERE is_active = 1 AND UPPER(role) IN ($in)",
+        array_map('strtoupper', $roles)), 0) ?: 0);
+}
+
 // Called before a user is created or re-activated. Returns '' when allowed, or
 // the reason it is refused — in the words of the person who has to fix it.
-function lk_seat_block() {
+// $role is the role of the person about to be created/reactivated; it lets a
+// role-based key charge that person against the right pool. Callers that don't
+// pass a role keep the old single-pool behaviour.
+function lk_seat_block($role = '') {
     $st = lk_state();
     if ($st['state'] === 'OPEN' || $st['state'] === 'TRIAL') return '';
     $seats = (int)$st['seats'];
+    $fieldCap = (int)($st['field_seats'] ?? 0);
+
+    // Role-based cap: full and field seats are counted and limited separately.
+    if ($fieldCap > 0 && $role !== '') {
+        $isField = in_array(strtoupper((string)$role), array_map('strtoupper', lk_field_roles()), true);
+        if ($isField) {
+            $usedF = lk_field_seats_used();
+            if ($usedF < $fieldCap) return '';
+            return 'Your plan covers ' . $fieldCap . ' field ' . ($fieldCap === 1 ? 'seat' : 'seats')
+                 . ' and ' . $usedF . ' are already active. Deactivate a field user who has left, or ask MGH to add field seats.';
+        }
+        // Full pool = total seats minus the field allocation.
+        $fullCap = max(0, $seats - $fieldCap);
+        if ($fullCap <= 0) return '';
+        $usedFull = max(0, lk_seats_used() - lk_field_seats_used());
+        if ($usedFull < $fullCap) return '';
+        return 'Your plan covers ' . $fullCap . ' full ' . ($fullCap === 1 ? 'seat' : 'seats')
+             . ' and ' . $usedFull . ' are already active. Deactivate somebody who has left, or ask MGH to add seats.';
+    }
+
     if ($seats <= 0) return '';                            // unlimited
     $used = lk_seats_used();
     if ($used < $seats) return '';
@@ -314,6 +360,8 @@ function lk_summary() {
         'expires'   => (string)($st['claims']['exp'] ?? ''),
         'days_left' => $st['days_left'],
         'seats'     => (int)$st['seats'],
+        'field_seats' => (int)($st['field_seats'] ?? 0),
+        'field_used'  => lk_field_seats_used(),
         'used'      => lk_seats_used(),
         'err'       => $st['err'],
         'enforcing' => lk_enforcing(),
