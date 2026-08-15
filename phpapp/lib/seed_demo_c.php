@@ -1571,7 +1571,8 @@ function demo_seed_c7($pdo, $x, $has, $ins) {
 // Dispatcher — runs every part-three group, isolating failures.
 function demo_seed_modules_c($pdo, $x, $has, $ins) {
     $n = []; $GLOBALS['__seedc_fail'] = [];
-    foreach (['demo_seed_c1','demo_seed_c2','demo_seed_c3','demo_seed_c4','demo_seed_c5','demo_seed_c6','demo_seed_c7'] as $fn) {
+    foreach (['demo_seed_c1','demo_seed_c2','demo_seed_c3','demo_seed_c4','demo_seed_c5','demo_seed_c6','demo_seed_c7','demo_seed_recruit_cc'] as $fn) {
+        if (!function_exists($fn)) continue;
         try {
             $r = $fn($pdo, $x, $has, $ins);
             if (is_array($r)) foreach ($r as $k => $v) { $n[$k] = ($n[$k] ?? 0) + $v; }
