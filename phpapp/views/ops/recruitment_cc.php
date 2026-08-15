@@ -99,8 +99,12 @@ $cvar = ['1'=>'--c1','2'=>'--c2','3'=>'--c3','4'=>'--c4','5'=>'--c5','7'=>'--c7'
       <p class="sub">Live hiring pipeline, funnel health and open demand — every number below responds to the filters.</p>
       <div class="refreshed"><?= $e($f['dept'] ? ($f['opts']['dept'][$f['dept']] ?? $f['dept']) : 'All departments') ?> · <?= $e($f['fy'] ?: '') ?> · Refreshed <?= date('d-M-Y') ?></div>
     </div>
-    <div class="rfacts">
-      <a class="btn secondary" href="/recruitment">Action view (Today · Risks · Opportunities)</a>
+    <div class="rfacts" style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn primary" href="/requisition-new">＋ New requirement</a>
+      <a class="btn secondary" href="/candidate-new">＋ Add candidate</a>
+      <a class="btn secondary" href="/requisitions">Requirements</a>
+      <a class="btn secondary" href="/candidates">Candidates</a>
+      <a class="btn secondary" href="/recruitment">Action view</a>
     </div>
   </div>
 
