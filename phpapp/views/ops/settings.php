@@ -489,7 +489,17 @@
   // said so. Now it does, on the screen where somebody would notice.
   $cov = function_exists('demo_coverage') ? demo_coverage() : [];
   $gaps = array_filter($cov, fn($c) => $c['state'] !== 'ok');
+  $seedFail = [];
+  if (function_exists('setting_get')) { $sf = setting_get('demo_seed_last_fail', ''); if ($sf) { $seedFail = json_decode((string)$sf, true) ?: []; } }
   ?>
+  <?php if ($gaps && $seedFail): ?>
+  <div class="msg msg-error" style="margin-top:14px;font-size:12.5px;line-height:1.55">
+    <b>Why some registers loaded empty</b> — the last “Load demo data” reported these errors. Send this text and it can be fixed precisely:
+    <ul style="margin:6px 0 0;padding-left:18px">
+      <?php foreach (array_slice($seedFail, 0, 12) as $f): ?><li style="font-family:ui-monospace,monospace;font-size:11.5px"><?= e($f) ?></li><?php endforeach; ?>
+    </ul>
+  </div>
+  <?php endif; ?>
   <?php if ($cov): ?>
   <details style="margin-top:14px">
     <summary style="cursor:pointer;font-size:13px" class="muted">

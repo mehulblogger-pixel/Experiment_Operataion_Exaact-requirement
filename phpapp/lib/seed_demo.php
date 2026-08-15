@@ -443,6 +443,13 @@ function seed_demo($force = false) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         $failed[] = demo_explain($e);
     }
+    // The Part-three (c-module) registers record their own failures in a global,
+    // which until now never reached the caller — so a register that failed to load
+    // (e.g. on strict MySQL) left no message and no clue why. Merge them in, and
+    // persist the lot so the coverage board can show the EXACT reason each empty
+    // register failed, instead of only a red flash that scrolls away on a phone.
+    foreach ((array)($GLOBALS['__seedc_fail'] ?? []) as $f) $failed[] = $f;
+    try { setting_set('demo_seed_last_fail', json_encode(array_values($failed))); } catch (Throwable $e) {}
     return ['counts' => $c, 'failed' => $failed];
 }
 
