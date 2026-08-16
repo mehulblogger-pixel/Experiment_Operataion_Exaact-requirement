@@ -6040,6 +6040,10 @@ function ops_settings($method) {
         }
         $m = (int)($_POST['fy_start_month'] ?? 4);
         setting_set('fy_start_month', ($m >= 1 && $m <= 12) ? $m : 4);
+        // Global "current FY" the registers open on. AUTO / blank = follow today;
+        // otherwise a well-formed FY label ("2026-27" or "2026"), else fall back.
+        $fyc = strtoupper(trim((string)($_POST['fy_current'] ?? 'AUTO')));
+        setting_set('fy_current', ($fyc === '' || $fyc === 'AUTO' || !preg_match('/^\d{4}(-\d{2})?$/', $fyc)) ? 'AUTO' : $fyc);
         setting_set('tat_threshold_days', (int)($_POST['tat_threshold_days'] ?? 3));
         setting_set('fy_revenue_target', (float)($_POST['fy_revenue_target'] ?? 0));
         setting_set('report_escalate_days', max(1, (int)($_POST['report_escalate_days'] ?? 3)));

@@ -102,7 +102,13 @@
       <select class="form-control" name="fy_start_month">
         <?php $months=['1'=>'January','2'=>'February','3'=>'March','4'=>'April','5'=>'May','6'=>'June','7'=>'July','8'=>'August','9'=>'September','10'=>'October','11'=>'November','12'=>'December'];
         $cur=(string)fy_start_month(); foreach ($months as $k=>$v): ?><option value="<?= $k ?>" <?= $cur===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
-      </select><small class="muted">India = April. Current FY = <strong><?= e(current_fy()) ?></strong>.</small></div>
+      </select><small class="muted">India = April. This year (from today) = <strong><?= e(current_fy()) ?></strong>.</small></div>
+    <div class="ff"><label>Current financial year <span class="muted">— what every register opens on</span></label>
+      <select class="form-control" name="fy_current">
+        <?php $fyPin = strtoupper(trim((string)setting_get('fy_current', ''))); ?>
+        <option value="AUTO" <?= ($fyPin === '' || $fyPin === 'AUTO') ? 'selected' : '' ?>>Automatic — follow today (<?= e(current_fy()) ?>)</option>
+        <?php foreach (fy_options() as $o): ?><option value="<?= e($o) ?>" <?= $fyPin === strtoupper($o) ? 'selected' : '' ?>>FY <?= e($o) ?></option><?php endforeach; ?>
+      </select><small class="muted">Calls, quotes, jobs and invoices open on this year. A per-screen year filter still overrides it. Opening on <strong>FY <?= e(active_fy()) ?></strong><?= fy_is_pinned() ? ' (pinned)' : '' ?>.</small></div>
     <div class="ff"><label>On-time TAT threshold (days)</label>
       <input class="form-control" type="number" min="0" name="tat_threshold_days" value="<?= e(setting_get('tat_threshold_days', 3)) ?>"></div>
     <div class="ff"><label>Annual revenue target (<?= e(cur_sym()) ?>) <span class="muted">— shows on the leadership dashboard</span></label>

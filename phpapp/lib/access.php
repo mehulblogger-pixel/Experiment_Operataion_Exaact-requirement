@@ -569,6 +569,24 @@ function fy_of($date) {
     return $s === 1 ? (string)$start : sprintf('%d-%02d', $start, ($start + 1) % 100);
 }
 function current_fy() { return fy_of(date('Y-m-d')); }
+// The financial year the whole app opens registers on by default. Normally the
+// year we are actually in (from today's date), but an administrator can pin a
+// specific year under Settings — e.g. to keep everyone working in the year being
+// closed off, or to prepare next year's data early. A per-screen ?fy= filter
+// still wins over this, and "All years" still shows everything. Stored as the FY
+// label in the `fy_current` setting; blank or "AUTO" means follow today.
+function active_fy() {
+    $pin = strtoupper(trim((string)setting_get('fy_current', '')));
+    if ($pin === '' || $pin === 'AUTO') return current_fy();
+    return preg_match('/^\d{4}(-\d{2})?$/', $pin) ? $pin : current_fy();
+}
+// True when an administrator has pinned the year, i.e. it is not just following
+// today. Used to label the top-bar chip so nobody is confused about why a
+// register opened on a year that is not the calendar one.
+function fy_is_pinned() {
+    $pin = strtoupper(trim((string)setting_get('fy_current', '')));
+    return $pin !== '' && $pin !== 'AUTO' && $pin !== strtoupper(current_fy());
+}
 // [from,to] YYYY-MM-DD for an FY label.
 function fy_range($fyLabel) {
     $s = fy_start_month();
@@ -593,9 +611,9 @@ function fy_label($startYear) {
 // register pull up any past year without the top-bar year being a global switch.
 function fy_filter($default = null) {
     $sel = trim((string)($_GET['fy'] ?? ''));
-    if ($sel === '') $sel = $default ?? current_fy();
+    if ($sel === '') $sel = $default ?? active_fy();               // the pinned year, else this year
     if (strtoupper($sel) === 'ALL') return ['fy' => 'ALL', 'from' => '', 'to' => '', 'to_excl' => '', 'all' => true];
-    if (!in_array($sel, fy_options(), true)) $sel = current_fy();   // only a year we actually offer
+    if (!in_array($sel, fy_options(), true)) $sel = active_fy();   // only a year we actually offer
     [$from, $to] = fy_range($sel);
     return ['fy' => $sel, 'from' => $from, 'to' => $to, 'to_excl' => date('Y-m-d', strtotime($to . ' +1 day')), 'all' => false];
 }
@@ -651,6 +669,10 @@ function fy_options($n = 6) {
     // Always offer the year ahead, so next year's work can be entered before it
     // starts without anybody having to wait for April.
     $hi = max($hi, $curStart + 1);
+    // Always offer a pinned "current FY" too, so the year an admin selected in
+    // Settings is a real, selectable option even if no data falls in it yet.
+    $pinStart = (int)substr(active_fy(), 0, 4);
+    if ($pinStart >= 1990 && $pinStart <= 2200) { $lo = min($lo, $pinStart); $hi = max($hi, $pinStart); }
     // A very old stray date must not produce a hundred-entry dropdown.
     $lo = max($lo, $hi - max(1, (int)$n) - 4);
     $out = [];

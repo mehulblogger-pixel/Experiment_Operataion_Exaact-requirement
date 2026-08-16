@@ -480,7 +480,7 @@
       </button>
       <div class="tb-spacer"></div>
       <?php if ($office): ?><span class="tb-chip">📍 <?= e($office) ?></span><?php endif; ?>
-      <span class="tb-chip">FY <?= e(current_fy()) ?></span>
+      <span class="tb-chip"<?= (function_exists('fy_is_pinned') && fy_is_pinned()) ? ' title="Pinned in Settings — registers open on this year, not today\'s"' : '' ?>>FY <?= e(function_exists('active_fy') ? active_fy() : current_fy()) ?><?= (function_exists('fy_is_pinned') && fy_is_pinned()) ? ' 📌' : '' ?></span>
       <span class="tb-user">
         <a href="/my-signature" class="tb-sig" title="Upload or draw the signature that goes on your approved documents and quotations">✍️ <span>Signature</span></a>
         <a href="/change-password" title="Change password">🔑</a>
