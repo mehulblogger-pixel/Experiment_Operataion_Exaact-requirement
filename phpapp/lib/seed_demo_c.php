@@ -1603,7 +1603,11 @@ function demo_seed_modules_c($pdo, $x, $has, $ins) {
     // the seed no longer depends on the module having been opened first. Each
     // migrate has its own static guard and is a no-op if already run; wrapped so a
     // locked host cannot take the whole seed down.
-    foreach (['compliance_migrate','conf_migrate','cforms_migrate'] as $mig) {
+    // lk_ensure_schema builds custom_fields + custom_values (the custom-form field
+    // engine); cforms_migrate builds custom_forms + custom_records. The custom-form
+    // seed needs all four, so both must run or that block is skipped and "Custom
+    // forms" reads empty.
+    foreach (['compliance_migrate','conf_migrate','cforms_migrate','lk_ensure_schema'] as $mig) {
         if (function_exists($mig)) { try { $mig(); } catch (Throwable $e) { $GLOBALS['__seedc_fail'][] = $mig . ': ' . $e->getMessage(); } }
     }
 
