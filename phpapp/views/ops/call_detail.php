@@ -257,7 +257,10 @@
   <?php endif; } ?>
 <?php // Phase 9 (TOSRM) — operations service-request panel: status lifecycle,
       // priority/criticality/source, validation gate + override, clarifications.
-      if (function_exists('tosrm_render_call_panel')): ?>
+      if (function_exists('tosrm_render_call_playbook')): ?>
+  <div data-tab="Overview"><a id="playbook"></a><?php tosrm_render_call_playbook($call); ?></div>
+<?php endif; ?>
+<?php if (function_exists('tosrm_render_call_panel')): ?>
   <div data-tab="Overview"><a id="ops"></a><?php tosrm_render_call_panel($call); ?></div>
 <?php endif; ?>
 <?php // Phase 9 (TOSRM Slice D) — turnaround, SLA and delay on the call.

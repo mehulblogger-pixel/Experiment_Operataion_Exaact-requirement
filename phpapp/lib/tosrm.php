@@ -223,6 +223,124 @@ function tosrm_can_edit() {
 //  Panel — rendered on the call detail page. Self-contained (echoes HTML), so
 //  hosting it is a one-line include and it stays fully unit-testable.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//  Order playbook — the coordinator's forward path on a call (the order), the
+//  sibling of the job playbook. Same shape: pure computation, one 'do this now'
+//  step, a real blocker when the order is not ready to schedule.
+//    details complete -> allocate the work -> set the dates -> track to close
+// ---------------------------------------------------------------------------
+function tosrm_call_playbook($call) {
+    $cid   = (int)($call['id'] ?? 0);
+    $ready = function_exists('tosrm_call_ready') ? tosrm_call_ready($call) : ['missing'=>[], 'overridden'=>false];
+    $missing    = $ready['missing'] ?? [];
+    $overridden = !empty($ready['overridden']);
+    $detailsOk  = empty($missing) || $overridden;
+
+    $rows = $cid ? ops_all("SELECT scheduled_date, closed_flag FROM jobs WHERE call_id=?", [$cid]) : [];
+    $jobsN = count($rows); $schedN = 0; $closedN = 0;
+    foreach ($rows as $j) {
+        if (trim((string)($j['scheduled_date'] ?? '')) !== '') $schedN++;
+        if (!empty($j['closed_flag'])) $closedN++;
+    }
+    $callDone  = strtoupper((string)($call['status'] ?? '')) === 'CLOSED' || ($jobsN > 0 && $closedN === $jobsN);
+    $canAlloc  = function_exists('call_can_allocate') ? call_can_allocate($call)
+                 : (function_exists('is_coordinator_level') && is_coordinator_level());
+    $openClars = function_exists('tosrm_clar_open_count') ? (int) tosrm_clar_open_count($cid) : 0;
+    $newJob    = '/job-new?call=' . $cid;
+
+    $steps = [];
+
+    // 1 — Order details complete (or explicitly overridden).
+    $steps[] = ['key'=>'details', 'label'=>'Complete the order details', 'actionable'=>true,
+        'done'=>$detailsOk, 'blocker'=>(!$detailsOk),
+        'line'=> $detailsOk
+            ? ($overridden && $missing ? 'Proceeding on an override — still missing: ' . implode(', ', $missing) . '.'
+                                       : 'All mandatory details are present.')
+            : 'Missing: ' . implode(', ', $missing) . ' — fill these in, or override to proceed.',
+        'href'=>'#ops', 'cta'=>'Complete details'];
+
+    // 2 — Allocate the work to an engineer (this creates the job).
+    $steps[] = ['key'=>'allocate', 'label'=>'Allocate the work', 'actionable'=>true,
+        'done'=>$jobsN > 0,
+        'line'=> $jobsN > 0 ? ($jobsN . ' job' . ($jobsN > 1 ? 's' : '') . ' allocated.')
+               : ($canAlloc ? 'Assign an engineer so someone can be sent to site.'
+                            : 'The executing office allocates this — you can see and track it here.'),
+        'href'=> $canAlloc ? $newJob : '', 'cta'=> $jobsN > 0 ? 'Allocate another' : 'Allocate a job'];
+
+    // 3 — Every allocated job has a visit date.
+    $schedDone = $jobsN > 0 && $schedN === $jobsN;
+    $steps[] = ['key'=>'schedule', 'label'=>'Set the visit dates', 'actionable'=>true,
+        'done'=>$schedDone,
+        'line'=> $jobsN === 0 ? 'Set once the work is allocated.'
+               : ($schedDone ? 'Every allocated job has a date.'
+                  : (($jobsN - $schedN) . ' allocated job(s) still have no date — open them to set it.')),
+        'href'=>'#jobs', 'cta'=>'Open jobs'];
+
+    // 4 — Track to close (informational — closes when every job is done).
+    $steps[] = ['key'=>'close', 'label'=>'Track to close', 'actionable'=>false,
+        'done'=>$callDone,
+        'line'=> $callDone ? 'All work carried out and closed — nothing more to do here.'
+               : ($schedN > 0 ? 'Work is under way — each visit is tracked on the Jobs tab. The order closes once every job is done.'
+                  : 'Once scheduled, the engineer goes to site, writes the report, and the job closes.'),
+        'href'=>'#jobs', 'cta'=>'Jobs'];
+
+    $firstOpen = -1;
+    foreach ($steps as $i => $s) if (!empty($s['actionable']) && empty($s['done'])) { $firstOpen = $i; break; }
+    foreach ($steps as $i => &$s) {
+        if (empty($s['actionable']))   { $s['state'] = 'info'; continue; }
+        if (!empty($s['done']))        { $s['state'] = 'done'; continue; }
+        if ($i === $firstOpen)         { $s['state'] = !empty($s['blocker']) ? 'blocked' : 'now'; }
+        else                           { $s['state'] = 'todo'; }
+    }
+    unset($s);
+
+    $openCount = 0; foreach ($steps as $s) if (!empty($s['actionable']) && empty($s['done'])) $openCount++;
+    return ['steps'=>$steps, 'open'=>$openCount, 'all_done'=>($openCount === 0), 'closed'=>$callDone,
+            'open_clars'=>$openClars, 'can_alloc'=>$canAlloc, 'jobs'=>$jobsN, 'scheduled'=>$schedN];
+}
+
+// Renders the order playbook card at the top of the call Overview tab.
+function tosrm_render_call_playbook($call) {
+    if (!$call || !tosrm_can_edit()) return;
+    $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $pb  = tosrm_call_playbook($call);
+    ob_start();
+    echo tosrm_playbook_css(); ?>
+    <div class="card tosrm-pb" style="margin-top:16px">
+      <h3>Order playbook — this <?= e(Tl('call')) ?></h3>
+      <p class="pb-sub">The path from order to done: complete the details, allocate an engineer, fix the dates, then track it to close. The service-request panel below holds the full detail and any exceptions.</p>
+      <?php if (!empty($pb['open_clars'])): ?>
+        <p class="pb-note">⚠ <?= (int)$pb['open_clars'] ?> open clarification<?= $pb['open_clars'] > 1 ? 's' : '' ?> — answer <?= $pb['open_clars'] > 1 ? 'them' : 'it' ?> in the service-request panel before dispatch.</p>
+      <?php endif; ?>
+      <?php if ($pb['closed']): ?>
+        <div class="pb-done-banner"><b style="color:var(--ok)">✓ Order closed.</b> All work has been carried out and closed.</div>
+      <?php elseif ($pb['all_done']): ?>
+        <div class="pb-done-banner"><b style="color:var(--ok)">✓ Scheduled and under way.</b> Every job is allocated and dated. Track each visit on the <a href="#jobs">Jobs</a> tab; the order closes once they are all done.</div>
+      <?php else: ?>
+      <ol class="pb-steps">
+        <?php $n = 0; foreach ($pb['steps'] as $s): $n++; $st = $s['state']; $num = $st === 'done' ? '✓' : $n; ?>
+          <li class="pb-step is-<?= $st ?>">
+            <span class="pb-num"><?= $esc($num) ?></span>
+            <div class="pb-body">
+              <div class="pb-label"><?= $esc($s['label']) ?>
+                <?php if ($st === 'now'): ?><span class="pb-tag t-now">Do this now</span>
+                <?php elseif ($st === 'blocked'): ?><span class="pb-tag t-blocked">Needed first</span>
+                <?php elseif ($st === 'done'): ?><span class="pb-tag t-done">Done</span><?php endif; ?>
+              </div>
+              <div class="pb-line"><?= $s['line'] /* may contain markup */ ?></div>
+            </div>
+            <?php if (!empty($s['href']) && !empty($s['cta']) && in_array($st, ['now','blocked','todo','info'], true)): ?>
+              <a class="btn small <?= ($st === 'now' || $st === 'blocked') ? '' : 'secondary' ?> pb-cta" href="<?= $esc($s['href']) ?>"><?= $esc($s['cta']) ?></a>
+            <?php endif; ?>
+          </li>
+        <?php endforeach; ?>
+      </ol>
+      <?php endif; ?>
+    </div>
+    <?php
+    echo ob_get_clean();
+}
+
 function tosrm_render_call_panel($call) {
     if (!$call) return;
     $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
@@ -638,13 +756,11 @@ function tosrm_job_playbook($job) {
     return ['steps'=>$steps, 'open'=>$openCount, 'all_done'=>($openCount === 0), 'closed'=>$closed];
 }
 
-// Renders the coordinator playbook card at the top of the job Overview tab.
-function tosrm_render_playbook($job) {
-    if (!$job || !tosrm_can_edit()) return;   // it is the coordinator's guide; read-only viewers don't act on it
-    tosrm_migrate_c();
-    $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
-    $pb  = tosrm_job_playbook($job);
-    ob_start(); ?>
+// The stepper's CSS, emitted at most once per request (both the job and the call
+// playbook share the .tosrm-pb look).
+function tosrm_playbook_css() {
+    static $done = false; if ($done) return ''; $done = true;
+    return <<<CSS
     <style>
       .tosrm-pb>h3{margin:0 0 4px}
       .tosrm-pb .pb-sub{color:var(--muted);font-size:13px;margin:0 0 14px}
@@ -670,10 +786,23 @@ function tosrm_render_playbook($job) {
       .tosrm-pb .pb-tag.t-now{background:var(--brand);color:#fff}
       .tosrm-pb .pb-tag.t-blocked{background:var(--bad);color:#fff}
       .tosrm-pb .pb-tag.t-done{color:var(--ok);border:1px solid var(--ok)}
+      .tosrm-pb .pb-note{font-size:12.5px;margin:0 0 12px;padding:8px 11px;border-radius:8px;
+        background:color-mix(in srgb,var(--warn) 10%,var(--card));border:1px solid var(--warn);color:var(--warn)}
       .tosrm-pb .pb-done-banner{border:1px solid var(--ok);border-radius:10px;padding:11px 13px;
         background:color-mix(in srgb,var(--ok) 8%,var(--card));font-size:13.5px}
       @media(max-width:560px){.tosrm-pb .pb-step{flex-wrap:wrap}.tosrm-pb .pb-cta{flex-basis:100%;margin-top:6px}}
     </style>
+    CSS;
+}
+
+// Renders the coordinator playbook card at the top of the job Overview tab.
+function tosrm_render_playbook($job) {
+    if (!$job || !tosrm_can_edit()) return;   // it is the coordinator's guide; read-only viewers don't act on it
+    tosrm_migrate_c();
+    $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $pb  = tosrm_job_playbook($job);
+    ob_start();
+    echo tosrm_playbook_css(); ?>
     <div class="card tosrm-pb" style="margin-top:16px">
       <h3>Coordinator playbook — this assignment</h3>
       <p class="pb-sub">Your desk for getting this <?= e(Tl('job')) ?> ready to run. Work down the steps; the field engineer takes over at site check-in, and you close it at the end. Everything else on this page is detail and exceptions.</p>
