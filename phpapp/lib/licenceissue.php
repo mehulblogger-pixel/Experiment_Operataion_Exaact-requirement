@@ -107,7 +107,15 @@ function licissue_migrate() {
             id " . (function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT') . ",
             ref VARCHAR(40) DEFAULT '', customer VARCHAR(200) DEFAULT '', install_id VARCHAR(80) DEFAULT '',
             seats INT DEFAULT 0, exp VARCHAR(20) DEFAULT '', grace INT DEFAULT 0, mods TEXT,
+            amount INT DEFAULT 0, currency VARCHAR(8) DEFAULT '',
             key_text TEXT, by_user VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+        // What was charged for this key — a record for the vendor, so "how much did
+        // we bill for this licence" is answerable. Added after first release, so
+        // existing issuer databases get the columns here.
+        if (function_exists('ensure_column')) {
+            ensure_column('issued_licences', 'amount',   "INT DEFAULT 0");
+            ensure_column('issued_licences', 'currency', "VARCHAR(8) DEFAULT ''");
+        }
     } catch (Throwable $e) {}
 }
 
@@ -369,18 +377,24 @@ function ops_licence_issue($route, $method) {
         // Left at 0 for a flat licence, so nothing changes for existing keys.
         $fieldSeats = max(0, (int) ($_POST['field_seats'] ?? 0));
         if ($seats > 0) $fieldSeats = min($fieldSeats, $seats);        // can't reserve more field seats than total
+        // What the customer was charged for this key — a record only, NOT part of
+        // the signed claims (the grant is seats/expiry/modules; money is bookkeeping).
+        $amount   = max(0, (int) ($_POST['amount'] ?? 0));
+        $currency = strtoupper(substr(trim((string) ($_POST['currency'] ?? '')), 0, 5));
+        if ($currency === '') $currency = function_exists('billing_config') ? billing_config()['currency'] : 'INR';
         $ref = 'LIC-' . date('ymd') . '-' . strtoupper(bin2hex(random_bytes(3)));
         $claims = ['cust' => $cust, 'exp' => $exp, 'seats' => $seats, 'grace' => $grace, 'ref' => $ref, 'mods' => $mods];
         if ($fieldSeats > 0) $claims['field_seats'] = $fieldSeats;
         $r = lk_issue($claims);
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/issue-licence'); }
         try {
-            db()->prepare("INSERT INTO issued_licences (ref,customer,install_id,seats,exp,grace,mods,key_text,by_user,created_at)
-                           VALUES (?,?,?,?,?,?,?,?,?,?)")
-                ->execute([$ref, $cust, $install, $seats, $exp, $grace, implode(',', $mods), $r['key'],
+            db()->prepare("INSERT INTO issued_licences (ref,customer,install_id,seats,exp,grace,mods,amount,currency,key_text,by_user,created_at)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+                ->execute([$ref, $cust, $install, $seats, $exp, $grace, implode(',', $mods), $amount, $currency, $r['key'],
                            user_name(current_user()), date('c')]);
         } catch (Throwable $e) {}
-        view('ops/licence_issued', ['key' => $r['key'], 'claims' => $claims, 'ref' => $ref, 'install' => $install]);
+        view('ops/licence_issued', ['key' => $r['key'], 'claims' => $claims, 'ref' => $ref, 'install' => $install,
+                                    'amount' => $amount, 'currency' => $currency]);
         return;
     }
 

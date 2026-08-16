@@ -50,6 +50,15 @@ openssl ec -in licence-private.pem -pubout -out licence-public.pem</pre></li>
         <small class="muted">Read-only after expiry, for this long, before write is refused.</small></div>
       <div class="ff"><label>Install id <span class="muted">— optional</span></label><input class="form-control" name="install_id" placeholder="for automatic pull">
         <small class="muted">Set this to let the customer's install fetch renewals automatically.</small></div>
+      <?php // What the customer was billed for this key — a record for us, so the
+            // "Keys issued" list can answer "how much did we charge". It is NOT part
+            // of the signed key; it changes nothing the customer's copy enforces. ?>
+      <div class="ff"><label>Price charged <span class="muted">— optional, our record only</span></label>
+        <div style="display:flex;gap:6px">
+          <input class="form-control" style="max-width:90px" name="currency" value="<?= e(function_exists('billing_config') ? billing_config()['currency'] : 'INR') ?>" maxlength="5">
+          <input class="form-control" type="number" min="0" step="1" name="amount" value="0" placeholder="total amount">
+        </div>
+        <small class="muted">The total you invoiced for this licence. Leave 0 if billed elsewhere.</small></div>
     </div>
     <?php // One-click plan: pre-fills the modules below. Server also honours `tier` for robustness.
     $planTiers = function_exists('superadmin_tiers') ? superadmin_tiers() : []; ?>
@@ -114,11 +123,16 @@ openssl ec -in licence-private.pem -pubout -out licence-public.pem</pre></li>
 <div class="panel" style="margin-top:16px">
   <h3 class="tab-sub" style="margin-top:0">Keys issued</h3>
   <table class="dt">
-    <thead><tr><th>Ref</th><th>Customer</th><th>Seats</th><th>Expires</th><th>Install id</th><th>When</th><?php if ($can): ?><th>Reissue</th><?php endif; ?></tr></thead>
+    <thead><tr><th>Ref</th><th>Customer</th><th>Seats</th><th class="num">Charged</th><th>Expires</th><th>Install id</th><th>When</th><?php if ($can): ?><th>Reissue</th><?php endif; ?></tr></thead>
     <tbody>
-    <?php foreach ($history as $h): ?>
+    <?php $chgTot = [];
+      foreach ($history as $h): ?>
       <tr><td><code><?= e($h['ref']) ?></code></td><td><?= e($h['customer']) ?></td>
-        <td><?= (int)$h['seats'] ?: 'unlimited' ?></td><td class="muted"><?= e(fdate($h['exp'])) ?></td>
+        <td><?= (int)$h['seats'] ?: 'unlimited' ?></td>
+        <?php $amt = (int)($h['amount'] ?? 0); $ccy = (string)($h['currency'] ?? '');
+              if ($amt > 0) $chgTot[$ccy ?: '?'] = ($chgTot[$ccy ?: '?'] ?? 0) + $amt; ?>
+        <td class="num"><?= $amt > 0 ? e(($ccy ? $ccy . ' ' : '') . number_format($amt)) : '<span class="muted">—</span>' ?></td>
+        <td class="muted"><?= e(fdate($h['exp'])) ?></td>
         <td class="muted"><?= e($h['install_id'] ?: '—') ?></td><td class="muted"><?= e(fdate(substr((string)$h['created_at'],0,10))) ?></td>
         <?php if ($can): ?>
         <td><?php if ((int)$h['seats'] > 0): ?>
@@ -136,7 +150,11 @@ openssl ec -in licence-private.pem -pubout -out licence-public.pem</pre></li>
     <?php endforeach; ?>
     </tbody>
   </table>
+  <?php if ($chgTot): ?><p class="sub" style="margin:10px 0 0"><strong>Recorded charged:</strong>
+    <?= e(implode(' · ', array_map(fn($c, $v) => ($c === '?' ? '' : $c . ' ') . number_format($v), array_keys($chgTot), $chgTot))) ?>
+    <span class="muted">— from the keys where a price was entered.</span></p><?php endif; ?>
   <p class="muted" style="font-size:12px;margin:8px 0 0">Reissue keeps the same expiry and modules and only changes the seat count —
-    hand the customer the new key it produces (or they pick it up automatically if they renew online).</p>
+    hand the customer the new key it produces (or they pick it up automatically if they renew online). The
+    <em>Charged</em> column is your own record; the licence itself carries seats, expiry and modules, never a price.</p>
 </div>
 <?php endif; ?>

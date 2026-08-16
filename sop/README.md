@@ -15,6 +15,8 @@ person can follow it click-by-click.
 | [`02-admin-demo-builder-guide.md`](02-admin-demo-builder-guide.md) | **Us** — the team setting up demos | You are preparing the app for a prospect or a new client. Step-by-step build order + checklist. |
 | [`03-end-user-guide.md`](03-end-user-guide.md) | **The client's own admin** | Hand this to the customer. Day-to-day "how do I add a choice / a new list / a new field". |
 | [`04-quick-reference.md`](04-quick-reference.md) | Everyone | The one-page cheat sheet. Print it. |
+| [`10-licensing-for-us.md`](10-licensing-for-us.md) | **Us** — the vendor | How to issue licence keys (incl. for a role mix), how money/billing works, and the pricing gaps. |
+| [`11-licensing-for-customer.md`](11-licensing-for-customer.md) | **The customer** | Installing on their own server, entering the key, seats, renewals. Hand this over. |
 
 ## The one thing to remember
 

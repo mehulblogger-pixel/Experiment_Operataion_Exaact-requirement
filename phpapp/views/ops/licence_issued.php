@@ -1,4 +1,4 @@
-<?php $key = $key ?? ''; $claims = $claims ?? []; $ref = $ref ?? ''; $install = $install ?? ''; ?>
+<?php $key = $key ?? ''; $claims = $claims ?? []; $ref = $ref ?? ''; $install = $install ?? ''; $amount = (int)($amount ?? 0); $currency = (string)($currency ?? ''); ?>
 <div class="crumbs"><a href="/">Home</a> › <a href="/issue-licence">Licence console</a> › Key</div>
 <div class="master-head"><div>
   <h1>Licence key ready</h1>
@@ -23,6 +23,7 @@
     <tr><td>Seats</td><td><?= (int)($claims['seats'] ?? 0) ?: 'unlimited' ?></td></tr>
     <tr><td>Expires</td><td><?= e(fdate((string)($claims['exp'] ?? ''))) ?> (grace <?= (int)($claims['grace'] ?? 0) ?> days)</td></tr>
     <tr><td>Modules</td><td><?= e(implode(', ', (array)($claims['mods'] ?? []))) ?></td></tr>
+    <?php if ($amount > 0): ?><tr><td>Charged</td><td><?= e(($currency ? $currency . ' ' : '') . number_format($amount)) ?> <span class="muted">(our record — not part of the key)</span></td></tr><?php endif; ?>
     <?php if ($install): ?><tr><td>Install id</td><td><code><?= e($install) ?></code></td></tr><?php endif; ?>
   </table>
 </div>
