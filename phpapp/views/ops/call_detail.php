@@ -255,13 +255,17 @@
   foreach ($jobs as $aj) { if ($aj['inspector_name'] && $aj['scheduled_date']): ?>
     <div class="msg msg-success" data-tab="Overview">✅ Call assigned to <strong><?= e($aj['inspector_name']) ?></strong> for <strong><?= e($aj['scheduled_date']) ?></strong> — engineer is <?= e($engKind[$aj['staff_kind'] ?? 'ASSET'] ?? 'own employee') ?><?= $aj['subcon_agency'] ? ' (' . e($aj['subcon_agency']) . ')' : '' ?>. Job <?= e($aj['job_code']) ?>, stage: <?= e(lk_options_or('job_stage', JOB_STAGES)[$aj['stage'] ?? 'ALLOCATED'] ?? '') ?>.</div>
   <?php endif; } ?>
-<?php // Phase 9 (TOSRM) — operations service-request panel: status lifecycle,
-      // priority/criticality/source, validation gate + override, clarifications.
-      if (function_exists('tosrm_render_call_playbook')): ?>
-  <div data-tab="Overview"><a id="playbook"></a><?php tosrm_render_call_playbook($call); ?></div>
-<?php endif; ?>
-<?php if (function_exists('tosrm_render_call_panel')): ?>
-  <div data-tab="Overview"><a id="ops"></a><?php tosrm_render_call_panel($call); ?></div>
+<?php // Phase 9 (TOSRM) — the coordinator/manager console: order playbook plus the
+      // service-request panel (status lifecycle, priority/criticality/source,
+      // validation gate + override, clarifications). Operations management, so it
+      // is shown only to those who can manage operations — never to an inspector.
+      if (function_exists('tosrm_can_edit') && tosrm_can_edit()): ?>
+  <?php if (function_exists('tosrm_render_call_playbook')): ?>
+    <div data-tab="Overview"><a id="playbook"></a><?php tosrm_render_call_playbook($call); ?></div>
+  <?php endif; ?>
+  <?php if (function_exists('tosrm_render_call_panel')): ?>
+    <div data-tab="Overview"><a id="ops"></a><?php tosrm_render_call_panel($call); ?></div>
+  <?php endif; ?>
 <?php endif; ?>
 <?php // Phase 9 (TOSRM Slice D) — turnaround, SLA and delay on the call.
       if (function_exists('tosrm_render_call_sla')): ?>

@@ -48,21 +48,25 @@
       // scroll. Tabs wrap so every one is visible without scrolling. ?>
 <div data-tabs data-tabs-key="job">
 
-<?php // Coordinator playbook — the guided, ordered path to get this assignment
-      // ready to run. First thing on Overview so the next step is never buried
-      // under the exception tools below.
-      if (function_exists('tosrm_render_playbook')): ?>
-  <div data-tab="Overview"><a id="playbook"></a><?php tosrm_render_playbook($job); ?></div>
-<?php endif; ?>
-<?php // Phase 9 (TOSRM Slice B) — assignment lifecycle: hold, acceptance,
-      // reassignment / reschedule / cancel / no-show, all with kept history.
-      if (function_exists('tosrm_render_job_panel')): ?>
-  <div data-tab="Overview"><a id="assign"></a><?php tosrm_render_job_panel($job); ?></div>
-<?php endif; ?>
-<?php // Phase 9 (TOSRM Slice C) — readiness, client/vendor confirmation,
-      // and competence-at-allocation advisory (reuses the competence engine).
-      if (function_exists('tosrm_render_readiness_panel')): ?>
-  <div data-tab="Overview"><a id="ready"></a><?php tosrm_render_readiness_panel($job); ?></div>
+<?php // The coordinator/manager console — guided playbook, assignment lifecycle
+      // (hold/reassign/reschedule/cancel/no-show) and readiness/confirmation.
+      // This is operations management, not the field engineer's view: an
+      // inspector who cannot manage operations does not see it at all. Their
+      // Overview is the contact/site card and the record below; their work is on
+      // the Schedule & site and Reports & QA tabs.
+      if (function_exists('tosrm_can_edit') && tosrm_can_edit()): ?>
+  <?php if (function_exists('tosrm_render_playbook')): ?>
+    <div data-tab="Overview"><a id="playbook"></a><?php tosrm_render_playbook($job); ?></div>
+  <?php endif; ?>
+  <?php // Assignment lifecycle: hold, acceptance, reassignment / reschedule /
+        // cancel / no-show, all with kept history.
+        if (function_exists('tosrm_render_job_panel')): ?>
+    <div data-tab="Overview"><a id="assign"></a><?php tosrm_render_job_panel($job); ?></div>
+  <?php endif; ?>
+  <?php // Readiness, client/vendor confirmation, and competence-at-allocation.
+        if (function_exists('tosrm_render_readiness_panel')): ?>
+    <div data-tab="Overview"><a id="ready"></a><?php tosrm_render_readiness_panel($job); ?></div>
+  <?php endif; ?>
 <?php endif; ?>
 <?php // Phase 9 (TOSRM Slice E) — communication log on the job.
       if (function_exists('tosrm_render_comms')): ?>

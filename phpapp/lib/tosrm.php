@@ -356,6 +356,21 @@ function tosrm_render_call_panel($call) {
     $prioOpt = tosrm_priority_options(); $critOpt = tosrm_criticality_options(); $srcOpt = tosrm_source_options();
     $canEdit = tosrm_can_edit();
     ob_start(); ?>
+    <style>
+      .tosrm-panel .sr-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+      .tosrm-panel .sr-field{border:1px solid var(--line);border-radius:10px;padding:12px 13px;background:var(--soft);margin:0}
+      .tosrm-panel .sr-field>label{display:block;font-size:11px;font-weight:700;color:var(--muted);
+        text-transform:uppercase;letter-spacing:.4px;margin:0 0 9px}
+      .tosrm-panel .sr-field>label .sr-hint{font-weight:400;text-transform:none;letter-spacing:0}
+      .tosrm-panel .sr-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+      .tosrm-panel .sr-row>.form-control{flex:1 1 140px;min-width:0}
+      .tosrm-panel .sr-row>.btn{flex:0 0 auto}
+      .tosrm-panel .sr-clar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+      .tosrm-panel .sr-clar>.form-control{flex:1 1 160px;min-width:0}
+      .tosrm-panel table.tbl .form-control{min-width:0}
+      @media(max-width:640px){.tosrm-panel .sr-grid{grid-template-columns:1fr}
+        .tosrm-panel .sr-row>.form-control,.tosrm-panel .sr-clar>.form-control{flex-basis:100%}}
+    </style>
     <div class="card tosrm-panel" style="margin-top:16px">
       <h3 style="margin:0 0 10px">Operations — service request</h3>
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
@@ -370,9 +385,9 @@ function tosrm_render_call_panel($call) {
         <div class="notice notice-warn" style="margin-bottom:12px">
           <strong>Not ready for scheduling.</strong> Missing: <?=$esc(implode(', ', $ready['missing']))?>.
           <?php if ($canEdit): ?>
-          <form method="post" action="/call-override" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+          <form method="post" action="/call-override" class="sr-clar" style="margin-top:8px">
             <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="call_id" value="<?=$cid?>">
-            <input type="text" name="reason" placeholder="Reason to override and proceed" style="flex:1;min-width:220px" required>
+            <input class="form-control" type="text" name="reason" placeholder="Reason to override and proceed" required>
             <button class="btn" type="submit">Override &amp; proceed</button>
           </form>
           <?php endif; ?>
@@ -384,23 +399,23 @@ function tosrm_render_call_panel($call) {
       <?php endif; ?>
 
       <?php if ($canEdit): ?>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <form method="post" action="/call-status">
+      <div class="sr-grid">
+        <form method="post" action="/call-status" class="sr-field">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="call_id" value="<?=$cid?>">
-          <label style="display:block;font-size:12px;color:#666">Change status</label>
-          <div style="display:flex;gap:6px">
-            <select name="op_status"><?php foreach ($statuses as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$cur?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select>
-            <input type="text" name="reason" placeholder="Reason (optional)" style="flex:1">
+          <label>Change status <span class="sr-hint">(reason optional)</span></label>
+          <div class="sr-row">
+            <select class="form-control" name="op_status"><?php foreach ($statuses as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$cur?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select>
+            <input class="form-control" type="text" name="reason" placeholder="Reason (optional)">
             <button class="btn" type="submit">Set</button>
           </div>
         </form>
-        <form method="post" action="/call-attrs">
+        <form method="post" action="/call-attrs" class="sr-field">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="call_id" value="<?=$cid?>">
-          <label style="display:block;font-size:12px;color:#666">Priority · Criticality · Source</label>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <select name="priority"><option value="">Priority…</option><?php foreach ($prioOpt as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$prio?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select>
-            <select name="criticality"><option value="">Criticality…</option><?php foreach ($critOpt as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$crit?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select>
-            <select name="source"><option value="">Source…</option><?php foreach ($srcOpt as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$src?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select>
+          <label>Priority · Criticality · Source</label>
+          <div class="sr-row">
+            <select class="form-control" name="priority"><option value="">Priority…</option><?php foreach ($prioOpt as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$prio?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select>
+            <select class="form-control" name="criticality"><option value="">Criticality…</option><?php foreach ($critOpt as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$crit?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select>
+            <select class="form-control" name="source"><option value="">Source…</option><?php foreach ($srcOpt as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$src?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select>
             <button class="btn" type="submit">Save</button>
           </div>
         </form>
@@ -421,9 +436,9 @@ function tosrm_render_call_panel($call) {
               <td>
                 <?php if (trim((string)$c['response']) !== ''): ?><?=$esc($c['response'])?>
                 <?php elseif ($canEdit): ?>
-                  <form method="post" action="/call-clar-respond" style="display:flex;gap:4px">
+                  <form method="post" action="/call-clar-respond" style="display:flex;gap:6px;align-items:center">
                     <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="call_id" value="<?=$cid?>"><input type="hidden" name="id" value="<?=$esc($c['id'])?>">
-                    <input type="text" name="response" placeholder="Record the answer" style="flex:1" required>
+                    <input class="form-control" type="text" name="response" placeholder="Record the answer" style="flex:1" required>
                     <button class="btn btn-sm" type="submit">Save</button>
                   </form>
                 <?php else: ?><span class="muted">awaiting</span><?php endif; ?>
@@ -435,11 +450,11 @@ function tosrm_render_call_panel($call) {
         </table>
         <?php endif; ?>
         <?php if ($canEdit): ?>
-        <form method="post" action="/call-clar-new" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        <form method="post" action="/call-clar-new" class="sr-clar">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="call_id" value="<?=$cid?>">
-          <select name="raised_to"><?php foreach (tosrm_clar_to_options() as $k=>$v): ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
-          <input type="text" name="subject" placeholder="What needs clarifying?" style="flex:1;min-width:200px" required>
-          <input type="text" name="detail" placeholder="Detail (optional)" style="flex:1;min-width:160px">
+          <select class="form-control" name="raised_to" style="flex:0 0 130px"><?php foreach (tosrm_clar_to_options() as $k=>$v): ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
+          <input class="form-control" type="text" name="subject" placeholder="What needs clarifying?" required>
+          <input class="form-control" type="text" name="detail" placeholder="Detail (optional)">
           <button class="btn" type="submit">Raise</button>
         </form>
         <?php endif; ?>
