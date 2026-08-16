@@ -46,3 +46,9 @@ t_ok(substr_count($cb, $GATE) >= 2, 'comm-add and assign-issue each gate on tosr
 $ops = file_get_contents(dirname(__DIR__) . '/lib/ops.php');
 t_ok((bool)preg_match('/function ops_require\([^)]*\)\s*\{\s*if\s*\(!\$ok\)\s*\{[^}]*redirect\(/', $ops),
      'ops_require() redirects away when the check fails (hard stop, before any write)');
+
+// The gate must refuse an inspector outright — the ops console is not a field
+// role's, even if the account carries a stray edit permission.
+$b = $body('tosrm_can_edit');
+t_ok($b !== '' && strpos($b, 'is_inspector()') !== false && strpos($b, 'return false') !== false,
+     'tosrm_can_edit() refuses an inspector before granting on any edit permission');

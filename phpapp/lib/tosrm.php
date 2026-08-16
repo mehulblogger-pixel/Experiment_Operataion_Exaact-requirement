@@ -213,9 +213,16 @@ function tosrm_clar_open_count($callId) { $r = ops_one("SELECT COUNT(*) n FROM c
 //  Permission — who may drive the operations lifecycle on a call.
 // ---------------------------------------------------------------------------
 function tosrm_can_edit() {
+    // A master admin may do anything.
+    if (function_exists('is_master') && is_master()) return true;
+    // An inspector is a field role, never an operations manager. The assignment
+    // console (hold/reassign/reschedule/cancel), readiness and the service-request
+    // panel are not theirs to see or change — their work is the schedule, site
+    // check-in and the report. Refuse here even if the account happens to carry a
+    // stray edit permission, so the console can never leak to the field.
+    if (function_exists('is_inspector') && is_inspector()) return false;
     if (function_exists('can') && (can('mod.calls.edit') || can('ops.job.allocate'))) return true;
     if (function_exists('is_coordinator_level') && is_coordinator_level()) return true;
-    if (function_exists('is_master') && is_master()) return true;
     return false;
 }
 

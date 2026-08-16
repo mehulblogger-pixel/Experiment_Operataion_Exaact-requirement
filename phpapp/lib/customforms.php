@@ -22,7 +22,12 @@ function cform_nav_groups() {
 }
 
 function cforms_migrate() {
-    static $done = false; if ($done) return; $done = true;
+    // Cache only a SUCCESSFUL run. The previous version set $done BEFORE the
+    // CREATEs, so if either table failed to create even once (or was skipped on an
+    // older install), it was remembered as "done" and never retried — leaving a
+    // live install querying a table that does not exist ("custom_records doesn't
+    // exist"). Now a failed attempt is retried on the next call.
+    static $done = false; if ($done) return;
     $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
     try {
         db()->exec("CREATE TABLE IF NOT EXISTS custom_forms (
@@ -32,7 +37,8 @@ function cforms_migrate() {
         db()->exec("CREATE TABLE IF NOT EXISTS custom_records (
             id $pk, form_id INT, title VARCHAR(200) DEFAULT '', created_by VARCHAR(150) DEFAULT '',
             created_at VARCHAR(30) DEFAULT '', updated_at VARCHAR(30) DEFAULT '')");
-    } catch (Throwable $e) {}
+        $done = true;   // both tables are present — safe to stop retrying
+    } catch (Throwable $e) { /* leave $done false so the next call retries */ }
 }
 
 function cforms_all($activeOnly = true) {
@@ -126,7 +132,11 @@ function ops_customforms($route, $method) {
 function cform_record_counts() {
     cforms_migrate();
     $out = [];
-    foreach (ops_all("SELECT form_id, COUNT(*) c FROM custom_records GROUP BY form_id") ?: [] as $r) $out[(int)$r['form_id']] = (int)$r['c'];
+    // Defensive: if the table still cannot be created (e.g. a permission issue on
+    // a hosted DB), a missing-table error must not 500 the whole Settings screen.
+    try {
+        foreach (ops_all("SELECT form_id, COUNT(*) c FROM custom_records GROUP BY form_id") ?: [] as $r) $out[(int)$r['form_id']] = (int)$r['c'];
+    } catch (Throwable $e) { return []; }
     return $out;
 }
 function cform_field_counts() {
