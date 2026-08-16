@@ -453,6 +453,66 @@ function custom_display($entity, $recordId) {
     return $out;
 }
 
+// ---- Show a list on a form (the one-step "which form?" answer) -------------
+//  Making a list and putting it on a form used to be two separate journeys:
+//  create it under Masters, then walk over to Custom fields and add a dropdown
+//  that points back at it. These helpers fold that into one tick-box, so an
+//  admin says "show this list on the Call form" while they are making the list.
+//
+//  lk_form_targets() is deliberately short — the everyday forms. Every other
+//  form (each module, each custom form) is still reachable from the Custom
+//  fields screen; this is the shortcut for the ones people ask for by name.
+function lk_form_targets() {
+    return [
+        'call'    => function_exists('TH') ? TH('call') : 'Call',
+        'job'     => function_exists('TH') ? TH('job')  : 'Job',
+        'partner' => 'Client / Vendor',
+    ];
+}
+// The forms a list already shows on: any form carrying a dropdown/dependent
+// custom field that points at this list. Returns [entity => label].
+function lk_forms_for_type($typeId) {
+    if (!$typeId) return [];
+    $targets = lk_form_targets();
+    $out = [];
+    foreach (ops_all("SELECT DISTINCT entity FROM custom_fields WHERE lookup_type_id=? AND active=1", [$typeId]) as $r) {
+        $en = $r['entity'];
+        $out[$en] = $targets[$en] ?? ucfirst($en);
+    }
+    return $out;
+}
+// Put a list on a form: add a dropdown custom field pointing at it, unless one
+// already exists. A dependent (child) list becomes a cascading field on its own.
+function lk_attach_to_form($entity, $type) {
+    if (!$type) return;
+    $exists = (int)ops_val("SELECT COUNT(*) FROM custom_fields WHERE entity=? AND lookup_type_id=?", [$entity, $type['id']]);
+    if ($exists) { // re-activate a field that was switched off, keep saved data
+        db()->prepare("UPDATE custom_fields SET active=1 WHERE entity=? AND lookup_type_id=?")->execute([$entity, $type['id']]);
+        return;
+    }
+    $fieldType = $type['parent_type_id'] ? 'dependent' : 'select';
+    $fkey = strtolower(trim(preg_replace('/[^a-zA-Z0-9_]+/', '_', $type['label']), '_'));
+    // keep the key unique on this form so two lists with similar names don't clash
+    if ((int)ops_val("SELECT COUNT(*) FROM custom_fields WHERE entity=? AND field_key=?", [$entity, $fkey]) > 0) {
+        $fkey .= '_' . (int)$type['id'];
+    }
+    db()->prepare("INSERT INTO custom_fields (entity,field_key,label,field_type,lookup_type_id,required,sort_order,active,created_at)
+                   VALUES (?,?,?,?,?,0,50,1,?)")
+        ->execute([$entity, $fkey, $type['label'], $fieldType, $type['id'], date('c')]);
+}
+// Take a list off a form: switch the field off (data entered stays, just hides).
+function lk_detach_from_form($entity, $typeId) {
+    db()->prepare("UPDATE custom_fields SET active=0 WHERE entity=? AND lookup_type_id=?")->execute([$entity, $typeId]);
+}
+// Make the forms a list shows on match exactly the ticked set (add/remove).
+function lk_sync_forms($type, $wanted) {
+    if (!$type) return;
+    $wanted = array_values(array_intersect($wanted, array_keys(lk_form_targets())));
+    $current = array_keys(lk_forms_for_type($type['id']));
+    foreach (array_diff($wanted, $current) as $en) lk_attach_to_form($en, $type);
+    foreach (array_diff($current, $wanted) as $en) lk_detach_from_form($en, $type['id']);
+}
+
 // ---- Admin handlers (master-list & custom-field management) -----------------
 function lk_admin($route, $method) {
     ops_require(is_admin_level(), 'Only admins can manage master lists.');
@@ -468,7 +528,12 @@ function lk_admin($route, $method) {
             if ($key === '' || $label === '') { flash('Give the list a name.', 'error'); redirect('/lookups'); }
             if (lk_type($key)) { flash('A list with that key already exists.', 'error'); redirect('/lookups'); }
             lk_add_type($key, $label, $parent, 0, 99);
-            flash("Master list \"$label\" created. Now add its values.");
+            // "Show this list on…" — put it straight onto the ticked forms, so the
+            // admin does not have to make a custom field by hand afterwards.
+            $forms = array_values(array_intersect((array)($_POST['forms'] ?? []), array_keys(lk_form_targets())));
+            if ($forms) { $newType = lk_type($key); foreach ($forms as $en) lk_attach_to_form($en, $newType); }
+            $shown = $forms ? ' It now shows on: ' . implode(', ', array_map(fn($e) => lk_form_targets()[$e], $forms)) . '.' : '';
+            flash("Master list \"$label\" created. Now add its values." . $shown);
             redirect('/lookup?key=' . $key);
         }
         if (($_GET['del'] ?? '') !== '') {
@@ -481,13 +546,26 @@ function lk_admin($route, $method) {
             } else flash('Only the Super Admin can delete built-in lists.', 'error');
             redirect('/lookups');
         }
-        view('ops/lookups', ['types' => lk_types()]); return;
+        // One pass over custom fields → which forms each list shows on, so the
+        // table can say it without a query per row.
+        $targets = lk_form_targets(); $formsByType = [];
+        foreach (ops_all("SELECT DISTINCT entity, lookup_type_id FROM custom_fields WHERE lookup_type_id IS NOT NULL AND active=1") as $r) {
+            $en = $r['entity']; if (!isset($targets[$en])) continue;
+            $formsByType[(int)$r['lookup_type_id']][] = $targets[$en];
+        }
+        view('ops/lookups', ['types' => lk_types(), 'formsByType' => $formsByType]); return;
     }
 
     if ($route === 'lookup') {
         $t = lk_type($_GET['key'] ?? '');
         if (!$t) { http_response_code(404); view('notfound'); return; }
         $parentType = lk_type_by_id($t['parent_type_id']);
+        if ($method === 'POST' && isset($_POST['set_forms'])) {
+            // "Appears on these forms" panel — sync the list's forms to the ticks.
+            lk_sync_forms($t, (array)($_POST['forms'] ?? []));
+            flash('Updated where this list appears.');
+            redirect('/lookup?key=' . $t['type_key']);
+        }
         if ($method === 'POST') {
             $label = trim($_POST['label'] ?? '');
             $code = trim($_POST['code'] ?? '');
@@ -522,7 +600,7 @@ function lk_admin($route, $method) {
         }
         $parentValues = $parentType ? lk_all_values($parentType['id']) : [];
         $editRow = ($_GET['edit'] ?? '') !== '' ? lk_value((int)$_GET['edit']) : null;
-        view('ops/lookup_values', ['t' => $t, 'parentType' => $parentType, 'values' => lk_all_values($t['id']), 'parentValues' => $parentValues, 'editRow' => $editRow]);
+        view('ops/lookup_values', ['t' => $t, 'parentType' => $parentType, 'values' => lk_all_values($t['id']), 'parentValues' => $parentValues, 'editRow' => $editRow, 'shownOn' => lk_forms_for_type($t['id'])]);
         return;
     }
 

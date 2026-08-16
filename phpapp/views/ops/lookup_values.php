@@ -5,6 +5,22 @@
   <a class="btn secondary" href="/lookups">← All master lists</a>
 </div>
 
+<?php // Where this list appears. Tick a form to add it as a dropdown there; untick
+      // to take it off (values people already chose stay saved, just stop showing). ?>
+<details class="panel" <?= empty($shownOn) ? '' : 'open' ?> style="margin-bottom:14px">
+  <summary style="cursor:pointer;font-weight:600">🖥️ Appears on these forms<?= $shownOn ? ' — ' . e(implode(', ', $shownOn)) : ' — not on any form yet' ?></summary>
+  <form method="post" action="/lookup?key=<?= e($t['type_key']) ?>" style="margin-top:12px">
+    <input type="hidden" name="set_forms" value="1">
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <?php foreach (lk_form_targets() as $en => $lbl): ?>
+        <label class="chk" style="font-weight:400"><input type="checkbox" name="forms[]" value="<?= e($en) ?>" <?= isset($shownOn[$en]) ? 'checked' : '' ?>> <?= e($lbl) ?> form</label>
+      <?php endforeach; ?>
+    </div>
+    <small class="muted">The list shows as a dropdown on each ticked form. For other forms, or to make a field required, use <a href="/custom-fields">Custom fields</a>.</small>
+    <div style="margin-top:12px"><button class="btn small" type="submit">Save where it appears</button></div>
+  </form>
+</details>
+
 <table class="grid">
   <tr><th>Value</th><?php if ($parentType): ?><th>Under (<?= e($parentType['label']) ?>)</th><?php endif; ?><th>Code</th><th>Active</th><th>Actions</th></tr>
   <?php foreach ($values as $v): ?>

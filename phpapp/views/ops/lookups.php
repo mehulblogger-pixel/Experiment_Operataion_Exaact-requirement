@@ -15,7 +15,7 @@
 <div class="crumbs"><a href="/">Home</a> › Masters</div>
 <div class="master-head">
   <div><h1>Masters</h1>
-    <p class="sub" style="margin:2px 0 0">Every dropdown in the app, grouped by module. Edit the values, or add your own list — a dependent list filters by a parent list's value. <?= count($types) ?> lists, <?= array_sum($counts) ?> values.</p></div>
+    <p class="sub" style="margin:2px 0 0">Every dropdown in the app, grouped by module. Edit the values, add your own list, and tick which forms it shows on — all in one place. A dependent list filters by a parent list's value. <?= count($types) ?> lists, <?= array_sum($counts) ?> values.</p></div>
 </div>
 
 <form method="get" action="/lookups" class="panel" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
@@ -39,6 +39,16 @@
         </select>
         <small class="muted">Pick a parent to make each value belong under a parent value (e.g. Activity under <?= e(T('sbu')) ?>).</small></div>
     </div>
+    <?php // The "which form?" question, answered right here. Tick the forms this
+          // list should appear on and it is added to them — no separate custom-field
+          // step. Leave all unticked to make a list you will attach later. ?>
+    <div class="ff" style="margin-top:6px"><label>Show this list on <span class="muted">(optional — you can change this later)</span></label>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
+        <?php foreach (lk_form_targets() as $en => $lbl): ?>
+          <label class="chk" style="font-weight:400"><input type="checkbox" name="forms[]" value="<?= e($en) ?>"> <?= e($lbl) ?> form</label>
+        <?php endforeach; ?>
+      </div>
+      <small class="muted">Ticking a form adds this list as a dropdown on it automatically. Other forms are still available under Custom fields.</small></div>
     <div style="margin-top:14px;"><button class="btn" type="submit">Create list</button></div>
   </form>
 </details>
@@ -53,7 +63,7 @@
   <div class="panel" style="padding:0;overflow:hidden">
     <div class="tbl-scroll" style="overflow-x:auto">
     <table class="dt">
-      <thead><tr><th>List</th><th>Key</th><th>Depends on</th><th class="num">Values</th><th>Type</th><th></th></tr></thead>
+      <thead><tr><th>List</th><th>Key</th><th>Depends on</th><th class="num">Values</th><th>Shows on</th><th>Type</th><th></th></tr></thead>
       <tbody>
       <?php foreach ($list as $t): $parent = $t['parent_type_id'] ? lk_type_by_id($t['parent_type_id']) : null; ?>
       <tr>
@@ -61,6 +71,8 @@
         <td><code><?= e($t['type_key']) ?></code></td>
         <td><?= $parent ? e($parent['label']) : '—' ?></td>
         <td class="num"><?= (int)($counts[(int)$t['id']] ?? 0) ?></td>
+        <td><?php $shown = $formsByType[(int)$t['id']] ?? [];
+              echo $shown ? e(implode(', ', $shown)) : '<span class="muted">—</span>'; ?></td>
         <td><?= $t['is_system'] ? '<span class="pill p-info">Built-in</span>' : '<span class="pill p-ok">Custom</span>' ?></td>
         <td class="num" style="white-space:nowrap">
           <a class="btn small secondary" href="/lookup?key=<?= e($t['type_key']) ?>">Edit values</a>
