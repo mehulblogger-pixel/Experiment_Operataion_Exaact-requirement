@@ -22,6 +22,12 @@
 <div class="panel" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
   <a class="btn small<?= $view==='board'?'':' secondary' ?>" href="/opportunities?v=board">Board</a>
   <a class="btn small<?= $view==='list'?'':' secondary' ?>" href="/opportunities?v=list">List</a>
+  <?php // Year filter for the List (the Board shows the live pipeline regardless). ?>
+  <form method="get" action="/opportunities" style="display:inline-flex;gap:6px;align-items:center">
+    <input type="hidden" name="v" value="<?= e($view) ?>">
+    <?php if (($_GET['q'] ?? '') !== ''): ?><input type="hidden" name="q" value="<?= e($_GET['q']) ?>"><?php endif; ?>
+    <label class="muted" style="font-size:12px">Year</label><?= fy_select_html($fy ?? current_fy()) ?>
+  </form>
   <?php if ($view !== 'list'): ?>
     <form method="get" action="/opportunities" style="display:flex;gap:8px;margin-left:auto" role="search">
       <input type="hidden" name="v" value="list">

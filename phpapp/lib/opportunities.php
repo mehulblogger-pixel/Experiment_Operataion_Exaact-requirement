@@ -165,6 +165,9 @@ function opp_where(array $f = []) {
         $w[] = '(o.ref LIKE ? OR o.name LIKE ? OR o.partner_name LIKE ? OR o.contact_name LIKE ?)';
         $like = '%' . $f['q'] . '%'; array_push($a, $like, $like, $like, $like);
     }
+    // Financial-year window (empty when "All years").
+    if (!empty($f['fy_from']))    { $w[] = 'o.created_at >= ?'; $a[] = $f['fy_from']; }
+    if (!empty($f['fy_to_excl'])) { $w[] = 'o.created_at < ?';  $a[] = $f['fy_to_excl']; }
     return [implode(' AND ', $w), $a];
 }
 
@@ -708,7 +711,9 @@ function ops_opportunities($route, $method) {
         $view = $_GET['v'] ?? 'board';
         $cols = opp_dt_columns();
         $dt   = dt_state('opportunities', $cols, ['default_sort' => 'value', 'default_dir' => 'desc', 'per' => 50]);
-        $filter = ['status' => (string)($_GET['status'] ?? ''), 'q' => $dt['q']];
+        $fy   = fy_filter();
+        $filter = ['status' => (string)($_GET['status'] ?? ''), 'q' => $dt['q'],
+                   'fy_from' => $fy['all'] ? '' : $fy['from'], 'fy_to_excl' => $fy['all'] ? '' : $fy['to_excl']];
 
         if (wants_csv()) {
             $csv = [['Ref','Opportunity','Customer','Stage','Status','Estimate','Weighted','%','Expected close',
@@ -726,7 +731,7 @@ function ops_opportunities($route, $method) {
             $rows  = opp_all($filter, dt_sql_tail($dt, $cols, "(o.status='OPEN') DESC, s.seq, o.value DESC, o.id DESC"));
         }
         view('ops/opportunities', [
-            'view' => $view, 'rows' => $rows ?: [], 'total' => (int)$total,
+            'view' => $view, 'rows' => $rows ?: [], 'total' => (int)$total, 'fy' => $fy['fy'],
             'dt' => $dt, 'cols' => $cols, 'counts' => opp_counts(),
             'board' => $view === 'list' ? ['pipeline' => null, 'stages' => [], 'columns' => []] : opp_board((int)($_GET['pipeline'] ?? 0)),
             'pipelines' => pipelines_all('OPPORTUNITY'), 'canEdit' => $canEdit,

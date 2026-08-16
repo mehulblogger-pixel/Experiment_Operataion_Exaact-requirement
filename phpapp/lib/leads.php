@@ -221,6 +221,9 @@ function leads_where($filter = []) {
         $w[] = '(l.company_name LIKE ? OR l.contact_name LIKE ? OR l.ref LIKE ? OR l.contact_email LIKE ?)';
         $like = '%' . $filter['q'] . '%'; array_push($a, $like, $like, $like, $like);
     }
+    // Financial-year window (empty when "All years").
+    if (!empty($filter['fy_from']))    { $w[] = 'l.created_at >= ?'; $a[] = $filter['fy_from']; }
+    if (!empty($filter['fy_to_excl'])) { $w[] = 'l.created_at < ?';  $a[] = $filter['fy_to_excl']; }
     return [implode(' AND ', $w), $a];
 }
 
@@ -821,7 +824,9 @@ function ops_leads($route, $method) {
         $view = $_GET['v'] ?? 'board';
         $cols = leads_dt_columns();
         $dt   = dt_state('leads', $cols, ['default_sort' => 'value', 'default_dir' => 'desc', 'per' => 50]);
-        $filter = ['status' => (string)($_GET['status'] ?? ''), 'q' => $dt['q']];
+        $fy   = fy_filter();
+        $filter = ['status' => (string)($_GET['status'] ?? ''), 'q' => $dt['q'],
+                   'fy_from' => $fy['all'] ? '' : $fy['from'], 'fy_to_excl' => $fy['all'] ? '' : $fy['to_excl']];
 
         if (wants_csv()) {
             // Every row the filters match, not the page on screen.
@@ -844,7 +849,7 @@ function ops_leads($route, $method) {
             $rows  = leads_all($filter, dt_sql_tail($dt, $cols, "(l.status='OPEN') DESC, s.seq, l.value DESC, l.id DESC"));
         }
         view('ops/leads', [
-            'view' => $view, 'rows' => $rows ?: [], 'total' => (int)$total,
+            'view' => $view, 'rows' => $rows ?: [], 'total' => (int)$total, 'fy' => $fy['fy'],
             'dt' => $dt, 'cols' => $cols, 'counts' => leads_counts(),
             'board' => $view === 'list' ? ['pipeline' => null, 'stages' => [], 'columns' => []]
                                         : lead_board((int)($_GET['pipeline'] ?? 0)),

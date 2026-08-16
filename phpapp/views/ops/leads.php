@@ -23,6 +23,14 @@
 <div class="panel" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
   <a class="btn small<?= $view==='board'?'':' secondary' ?>" href="/leads?v=board">Board</a>
   <a class="btn small<?= $view==='list'?'':' secondary' ?>" href="/leads?v=list">List</a>
+  <?php // Financial-year filter for the List. The Board shows the live pipeline
+        // whatever year is picked, so this narrows the list of leads by when they
+        // were created. ?>
+  <form method="get" action="/leads" style="display:inline-flex;gap:6px;align-items:center">
+    <input type="hidden" name="v" value="<?= e($view) ?>">
+    <?php if (($_GET['q'] ?? '') !== ''): ?><input type="hidden" name="q" value="<?= e($_GET['q']) ?>"><?php endif; ?>
+    <label class="muted" style="font-size:12px">Year</label><?= fy_select_html($fy ?? current_fy()) ?>
+  </form>
   <?php if ($view !== 'list'): ?>
     <form method="get" action="/leads" style="display:flex;gap:8px;margin-left:auto">
       <input type="hidden" name="v" value="list">
