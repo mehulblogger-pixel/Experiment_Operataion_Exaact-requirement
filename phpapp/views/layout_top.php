@@ -334,7 +334,6 @@
     var input = document.getElementById("cmdkIn");
     var list  = document.getElementById("cmdkList");
     var back  = document.getElementById("cmdkBack");
-    var btn   = document.getElementById("cmdkBtn");
     var PIN_KEY = "cmdkPins", REC_KEY = "cmdkRecent";
     var active = -1, rows = [];
 
@@ -429,7 +428,13 @@
     }
     function toggle() { root.hidden ? open() : close(); }
 
-    if (btn) btn.addEventListener("click", open);
+    // The button lives further down the page than this script, so it is not in
+    // the DOM yet when this runs — a direct addEventListener here bound to null
+    // and the button did nothing (only the Ctrl/⌘-K keydown worked). Delegating
+    // off document catches the click whenever the button is finally present.
+    document.addEventListener("click", function (e) {
+      if (e.target.closest("#cmdkBtn")) { e.preventDefault(); open(); }
+    });
     if (back) back.addEventListener("click", close);
     input.addEventListener("input", render);
     list.addEventListener("click", function (e) {

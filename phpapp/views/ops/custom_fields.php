@@ -10,7 +10,13 @@
   <form method="get" action="/custom-fields" class="row-actions">
     <label class="muted" style="align-self:center">Form:</label>
     <select class="form-control searchable" name="entity" onchange="this.form.submit()">
-      <?php foreach ($entities as $en): ?><option value="<?= e($en) ?>" <?= $entity===$en?'selected':'' ?>><?= e($entLabels[$en] ?? $en) ?></option><?php endforeach; ?>
+      <?php // Grouped under the same headings the Masters "show on forms" ticks use,
+            // so the two screens read as one design. ?>
+      <?php foreach (lk_entity_groups($entities, $entLabels) as $gname => $forms): ?>
+      <optgroup label="<?= e($gname) ?>">
+        <?php foreach ($forms as $en => $lbl): ?><option value="<?= e($en) ?>" <?= $entity===$en?'selected':'' ?>><?= e($lbl) ?></option><?php endforeach; ?>
+      </optgroup>
+      <?php endforeach; ?>
     </select>
   </form>
 </div>

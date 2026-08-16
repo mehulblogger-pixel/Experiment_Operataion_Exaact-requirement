@@ -504,6 +504,29 @@ function lk_form_target_groups() {
     }
     return $groups;
 }
+// Group an arbitrary set of form entities under the SAME category names the
+// "show on forms" ticks use, so the Custom fields form-picker and the Masters
+// tick-list read as one design. Anything unrecognised falls under "Other".
+function lk_entity_groups($entities, $labels = []) {
+    $cat = [
+        'call' => 'Everyday forms', 'job' => 'Everyday forms', 'partner' => 'Everyday forms',
+        'sample' => 'Operations & compliance', 'method' => 'Operations & compliance',
+        'risk' => 'Operations & compliance', 'decision_rule' => 'Operations & compliance',
+        'controlled_doc' => 'Operations & compliance', 'satisfaction' => 'Operations & compliance',
+        'requisition' => 'People & hiring', 'candidate' => 'People & hiring',
+    ];
+    $masters = function_exists('ops_masters') ? array_keys(ops_masters()) : [];
+    $cforms  = function_exists('cform_slugs') ? cform_slugs() : [];
+    $order = ['Everyday forms', 'Operations & compliance', 'People & hiring', 'Master records', 'Your custom forms', 'Other'];
+    $groups = array_fill_keys($order, []);
+    foreach ($entities as $en) {
+        $g = $cat[$en]
+           ?? (in_array($en, $masters, true) ? 'Master records'
+              : (in_array($en, $cforms, true) ? 'Your custom forms' : 'Other'));
+        $groups[$g][$en] = $labels[$en] ?? ucfirst($en);
+    }
+    return array_filter($groups); // drop empty groups
+}
 // Flat [entity => label] across every group — used for validation and labels.
 function lk_form_targets() {
     $flat = [];
