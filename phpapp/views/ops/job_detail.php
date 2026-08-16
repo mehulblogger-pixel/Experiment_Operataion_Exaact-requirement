@@ -48,6 +48,12 @@
       // scroll. Tabs wrap so every one is visible without scrolling. ?>
 <div data-tabs data-tabs-key="job">
 
+<?php // Coordinator playbook — the guided, ordered path to get this assignment
+      // ready to run. First thing on Overview so the next step is never buried
+      // under the exception tools below.
+      if (function_exists('tosrm_render_playbook')): ?>
+  <div data-tab="Overview"><a id="playbook"></a><?php tosrm_render_playbook($job); ?></div>
+<?php endif; ?>
 <?php // Phase 9 (TOSRM Slice B) — assignment lifecycle: hold, acceptance,
       // reassignment / reschedule / cancel / no-show, all with kept history.
       if (function_exists('tosrm_render_job_panel')): ?>

@@ -530,6 +530,186 @@ function tosrm_assign_noshow($jobId, $party, $reason = '') {
 // ---------------------------------------------------------------------------
 //  Job assignment-lifecycle panel (rendered on the job detail page).
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//  Coordinator playbook — the forward, guided path for a freshly-allocated job.
+//
+//  The job screen is the coordinator's desk for one assignment. Landing on it
+//  cold — with every exception tool (reassign, no-show, cancel…) laid out at
+//  once — hid the one thing that actually matters right after allocation: the
+//  short, ordered path to getting the job ready to run. This computes that path.
+//
+//  Pure computation, no output, so it is testable and reusable. Returns an
+//  ordered list of steps. Each: key, label, line (a human status/next line),
+//  state, href, cta, actionable. State is one of done | now | todo | blocked |
+//  info. Exactly one actionable step is 'now' (the first not-yet-done, or
+//  'blocked' if that step is held up); steps ahead of it are 'todo'.
+// ---------------------------------------------------------------------------
+function tosrm_job_playbook($job) {
+    $jid    = (int)($job['id'] ?? 0);
+    $closed = !empty($job['closed_flag']);
+    $inspId = (int)($job['inspector_id'] ?? 0);
+    $assign = tosrm_assign_state($job);                 // '', TENTATIVE, CONFIRMED, RELEASED
+    $accept = tosrm_accept_state($job);                 // '', PENDING, ACCEPTED, …
+    $staffKind = $inspId ? (string)ops_val("SELECT staff_kind FROM inspectors WHERE id=?", [$inspId]) : '';
+    $isNonEmp  = in_array($staffKind, ['FREELANCER', 'SUBCON'], true);
+    $decWho    = $staffKind === 'SUBCON' ? 'sub-contractor' : 'freelancer';
+    $scheduled = trim((string)($job['scheduled_date'] ?? '')) !== '';
+    $gate      = tosrm_confirm_gate($job);
+    $clientOk  = (int)($job['client_confirmed'] ?? 0) === 1;
+    $roll      = tosrm_readiness_rollup($jid);
+    $compErr   = false;
+    foreach (tosrm_competence_warn($job) as $w) if (($w['level'] ?? '') === 'error') $compErr = true;
+    $reports   = (int) ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND deleted=0", [$jid]);
+
+    $steps = [];
+
+    // 1 — Inspector assigned (normally already done by the allocation itself).
+    $steps[] = ['key'=>'assigned', 'label'=>'Inspector assigned', 'actionable'=>true,
+        'done'=> $inspId > 0,
+        'line'=> $inspId > 0 ? (string)($job['inspector_name'] ?? 'Assigned')
+                             : 'No one is assigned yet — pick who goes, under “Something changed?” below.',
+        'href'=>'#assign', 'cta'=>'Assign'];
+
+    // 2 — Commit (hold = Confirmed; a freelancer / sub-contractor must also accept).
+    $committed = ($assign === 'CONFIRMED') && (!$isNonEmp || $accept === 'ACCEPTED');
+    if ($committed) {
+        $line = $isNonEmp ? "Confirmed — the {$decWho} accepted." : 'Confirmed.';
+    } elseif ($assign !== 'CONFIRMED') {
+        $line = 'Move it from tentative to <b>Confirmed</b>'
+              . ($isNonEmp ? ", and record the {$decWho}’s acceptance." : '.');
+    } else { // confirmed but the non-employee has not accepted
+        $line = "Record the {$decWho}’s acceptance ("
+              . strtolower(TOSRM_ACCEPT_STATES[$accept] ?? 'awaiting acceptance') . ').';
+    }
+    $steps[] = ['key'=>'commit', 'label'=>'Commit the assignment', 'actionable'=>true,
+        'done'=>$committed, 'line'=>$line, 'href'=>'#assign', 'cta'=>'Confirm assignment'];
+
+    // 3 — Visit date, so the engineer knows when to go.
+    $steps[] = ['key'=>'date', 'label'=>'Set the visit date', 'actionable'=>true,
+        'done'=>$scheduled,
+        'line'=>$scheduled ? ('Visit on ' . substr((string)$job['scheduled_date'],0,10) . '.')
+                           : 'Set the date the engineer goes to site.',
+        'href'=>'/job-edit?id=' . $jid, 'cta'=>'Set date'];
+
+    // 4 — Client / vendor confirmation (only mandatory when the job asks for it).
+    $confDone = $clientOk || !$gate['required'];
+    $steps[] = ['key'=>'confirm', 'label'=>'Confirm with the client', 'actionable'=>true,
+        'done'=>$confDone, 'blocker'=>($gate['required'] && !$clientOk),
+        'line'=> $clientOk
+                   ? ('Client confirmed' . (trim((string)($job['client_confirm_ref'] ?? '')) !== '' ? ' · ' . $job['client_confirm_ref'] : '') . '.')
+                   : ($gate['required'] ? 'This job needs the client’s go-ahead before work starts — record it.'
+                                        : 'Optional for this job — record it if the client confirmed.'),
+        'href'=>'#ready', 'cta'=>'Record confirmation'];
+
+    // 5 — Readiness & competence (advisory; a competence error is a real hold).
+    $readyOk = !$compErr && ($roll['total'] === 0 || !empty($roll['ready_bool']));
+    if ($compErr) {
+        $line = 'A competence / certificate problem needs a decision — see the advisory below.';
+    } elseif ($roll['total'] > 0) {
+        $line = $roll['ready_bool'] ? "All {$roll['total']} items ready." : "{$roll['open']} readiness item(s) still open.";
+    } else {
+        $line = 'No blockers. Add a readiness checklist if this service needs one.';
+    }
+    $steps[] = ['key'=>'ready', 'label'=>'Check readiness & competence', 'actionable'=>true,
+        'done'=>$readyOk, 'blocker'=>$compErr, 'line'=>$line, 'href'=>'#ready', 'cta'=>'Open readiness'];
+
+    // 6 — Hand off to the field (informational; not the coordinator’s action).
+    $steps[] = ['key'=>'handoff', 'label'=>'Hand off to the field', 'actionable'=>false,
+        'done'=>$closed || $reports > 0,
+        'line'=> $closed ? 'Job closed.'
+               : ($reports > 0 ? 'Report written — issue it, then close the job.'
+                  : 'The engineer records arrival at <b>Site check-in</b>, writes the report, then you close the job.'),
+        'href'=> ($scheduled && !$closed) ? '#checkin' : '', 'cta'=>'Site check-in'];
+
+    // Mark the single 'now' step: the first actionable step not yet done.
+    $firstOpen = -1;
+    foreach ($steps as $i => $s) {
+        if (!empty($s['actionable']) && empty($s['done'])) { $firstOpen = $i; break; }
+    }
+    foreach ($steps as $i => &$s) {
+        if (empty($s['actionable']))      { $s['state'] = 'info'; continue; }
+        if (!empty($s['done']))           { $s['state'] = 'done'; continue; }
+        if ($i === $firstOpen)            { $s['state'] = (!empty($s['blocker'])) ? 'blocked' : 'now'; }
+        else                              { $s['state'] = 'todo'; }
+    }
+    unset($s);
+
+    $openCount = 0; foreach ($steps as $s) if (!empty($s['actionable']) && empty($s['done'])) $openCount++;
+    return ['steps'=>$steps, 'open'=>$openCount, 'all_done'=>($openCount === 0), 'closed'=>$closed];
+}
+
+// Renders the coordinator playbook card at the top of the job Overview tab.
+function tosrm_render_playbook($job) {
+    if (!$job || !tosrm_can_edit()) return;   // it is the coordinator's guide; read-only viewers don't act on it
+    tosrm_migrate_c();
+    $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $pb  = tosrm_job_playbook($job);
+    ob_start(); ?>
+    <style>
+      .tosrm-pb>h3{margin:0 0 4px}
+      .tosrm-pb .pb-sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+      .tosrm-pb ol.pb-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+      .tosrm-pb .pb-step{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);
+        border-radius:10px;padding:11px 13px;background:var(--soft)}
+      .tosrm-pb .pb-num{flex:0 0 26px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+        font-size:13px;font-weight:700;background:var(--card);border:1px solid var(--line);color:var(--muted)}
+      .tosrm-pb .pb-body{flex:1 1 auto;min-width:0}
+      .tosrm-pb .pb-label{font-weight:700;font-size:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+      .tosrm-pb .pb-line{color:var(--muted);font-size:13px;margin-top:2px}
+      .tosrm-pb .pb-line b{color:var(--fg,inherit);font-weight:700}
+      .tosrm-pb .pb-cta{flex:0 0 auto;align-self:center}
+      .tosrm-pb .pb-tag{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+        padding:1px 7px;border-radius:999px}
+      .tosrm-pb .is-done .pb-num{background:var(--ok);border-color:var(--ok);color:#fff}
+      .tosrm-pb .is-now{border-color:var(--brand);background:color-mix(in srgb,var(--brand) 8%,var(--card))}
+      .tosrm-pb .is-now .pb-num{background:var(--brand);border-color:var(--brand);color:#fff}
+      .tosrm-pb .is-blocked{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 7%,var(--card))}
+      .tosrm-pb .is-blocked .pb-num{background:var(--bad);border-color:var(--bad);color:#fff}
+      .tosrm-pb .is-todo{opacity:.72}
+      .tosrm-pb .is-info{background:transparent;border-style:dashed}
+      .tosrm-pb .pb-tag.t-now{background:var(--brand);color:#fff}
+      .tosrm-pb .pb-tag.t-blocked{background:var(--bad);color:#fff}
+      .tosrm-pb .pb-tag.t-done{color:var(--ok);border:1px solid var(--ok)}
+      .tosrm-pb .pb-done-banner{border:1px solid var(--ok);border-radius:10px;padding:11px 13px;
+        background:color-mix(in srgb,var(--ok) 8%,var(--card));font-size:13.5px}
+      @media(max-width:560px){.tosrm-pb .pb-step{flex-wrap:wrap}.tosrm-pb .pb-cta{flex-basis:100%;margin-top:6px}}
+    </style>
+    <div class="card tosrm-pb" style="margin-top:16px">
+      <h3>Coordinator playbook — this assignment</h3>
+      <p class="pb-sub">Your desk for getting this <?= e(Tl('job')) ?> ready to run. Work down the steps; the field engineer takes over at site check-in, and you close it at the end. Everything else on this page is detail and exceptions.</p>
+      <?php if ($pb['all_done'] && !$pb['closed']): ?>
+        <div class="pb-done-banner"><b style="color:var(--ok)">✓ Ready to run.</b> The assignment is committed, the date is set and there are no open blockers. Next it moves to the field — the engineer records arrival at <a href="#checkin">Site check-in</a>.</div>
+      <?php elseif ($pb['closed']): ?>
+        <div class="pb-done-banner"><b style="color:var(--ok)">✓ Closed.</b> This <?= e(Tl('job')) ?> is done. The report and photographs can still be uploaded if something was missed.</div>
+      <?php else: ?>
+      <ol class="pb-steps">
+        <?php $n = 0; foreach ($pb['steps'] as $s): $n++; $st = $s['state'];
+          $cls = 'is-' . $st;
+          $num = $st === 'done' ? '✓' : $n; ?>
+          <li class="pb-step <?= $cls ?>">
+            <span class="pb-num"><?= $esc($num) ?></span>
+            <div class="pb-body">
+              <div class="pb-label"><?= $esc($s['label']) ?>
+                <?php if ($st === 'now'): ?><span class="pb-tag t-now">Do this now</span>
+                <?php elseif ($st === 'blocked'): ?><span class="pb-tag t-blocked">Blocked</span>
+                <?php elseif ($st === 'done'): ?><span class="pb-tag t-done">Done</span><?php endif; ?>
+              </div>
+              <div class="pb-line"><?= $s['line'] /* may contain <b> */ ?></div>
+            </div>
+            <?php if (in_array($st, ['now','blocked','todo'], true) && !empty($s['href']) && !empty($s['cta'])): ?>
+              <a class="btn small <?= $st === 'now' || $st === 'blocked' ? '' : 'secondary' ?> pb-cta" href="<?= $esc($s['href']) ?>"><?= $esc($s['cta']) ?></a>
+            <?php elseif ($st === 'info' && !empty($s['href']) && !empty($s['cta'])): ?>
+              <a class="btn small secondary pb-cta" href="<?= $esc($s['href']) ?>"><?= $esc($s['cta']) ?></a>
+            <?php endif; ?>
+          </li>
+        <?php endforeach; ?>
+      </ol>
+      <?php endif; ?>
+    </div>
+    <?php
+    echo ob_get_clean();
+}
+
 function tosrm_render_job_panel($job) {
     if (!$job) return;
     tosrm_migrate_b();
@@ -566,7 +746,7 @@ function tosrm_render_job_panel($job) {
     </style>
     <div class="card tosrm-assign" style="margin-top:16px">
       <h3>Operations — assignment lifecycle</h3>
-      <p class="ta-sub">Hold, acceptance, reassignment, reschedule, no-show and cancellation — every change is kept in the history below.</p>
+      <p class="ta-sub">Commit the assignment here. Reassignment, reschedule, no-show and cancellation are tucked under “Something changed?” — every change is kept in the history below.</p>
       <div class="ta-badges">
         <?php if ($hold !== ''): ?><span class="pill p-info">Hold: <?=$esc(TOSRM_ASSIGN_STATES[$hold] ?? $hold)?></span><?php endif; ?>
         <?php if ($isNonEmp && $accept !== ''): ?><span class="pill p-mut">Acceptance: <?=$esc(TOSRM_ACCEPT_STATES[$accept] ?? $accept)?><?php if (trim((string)($job['accept_reason'] ?? '')) !== ''): ?> — <?=$esc($job['accept_reason'])?><?php endif; ?></span><?php endif; ?>
@@ -590,6 +770,11 @@ function tosrm_render_job_panel($job) {
           </div>
         </form>
         <?php endif; ?>
+      </div><!-- /ta-grid: the normal commit controls -->
+
+      <details class="fold ta-fold" style="margin-top:12px">
+        <summary><b>Something changed?</b> <span class="ta-hint" style="font-weight:400">Reassign, reschedule, record a no-show, cancel, or raise an issue — each is kept in the history.</span></summary>
+        <div class="ta-grid" style="margin-top:12px">
         <form method="post" action="/assign-reassign" class="ta-field">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="job_id" value="<?=$jid?>">
           <label>Reassign <span class="ta-hint">(original kept in history)</span></label>
@@ -637,7 +822,8 @@ function tosrm_render_job_panel($job) {
           </div>
         </form>
         <?php endif; ?>
-      </div>
+        </div><!-- /ta-grid inside the fold -->
+      </details>
       <?php endif; ?>
       <?php if ($hist): $iname = []; foreach ($insps as $ip) $iname[(int)$ip['id']] = $ip['name']; ?>
       <details style="margin-top:12px" open><summary class="muted">Assignment history (<?=count($hist)?>)</summary>
