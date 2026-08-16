@@ -9,8 +9,9 @@
   <input class="form-control" name="q" value="<?= e($q) ?>" placeholder="Search no. / subject / client" style="min-width:220px">
   <select class="form-control" name="st" onchange="this.form.submit()"><option value="">All statuses</option>
     <?php foreach (lk_options_or('inquiry_status', INQUIRY_STATUS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= $st===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
+  <?= fy_select_html($fy ?? current_fy()) ?>
   <button class="btn small" type="submit">Search</button>
-  <?php if ($q!==''||$st!==''): ?><a class="btn small secondary" href="/inquiries">Reset</a><?php endif; ?>
+  <?php if ($q!==''||$st!==''||($fy ?? current_fy())!==current_fy()): ?><a class="btn small secondary" href="/inquiries">Reset</a><?php endif; ?>
 </form>
 
 <div class="panel" style="padding:0;overflow:hidden">

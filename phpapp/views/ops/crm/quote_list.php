@@ -57,9 +57,10 @@
   <?php foreach ($tabs as $k=>$lbl): ?>
     <a class="ct" href="<?= e($qs($k)) ?>" style="<?= $view===$k?'background:var(--brand);color:#fff;border-color:var(--brand)':'' ?>"><?= e($lbl) ?></a>
   <?php endforeach; ?>
-  <form method="get" action="/quotes" style="display:inline-flex;gap:6px;margin-left:auto">
+  <form method="get" action="/quotes" style="display:inline-flex;gap:6px;margin-left:auto;flex-wrap:wrap">
     <input type="hidden" name="v" value="<?= e($view) ?>">
     <input class="form-control" name="q" value="<?= e($q) ?>" placeholder="Search no./subject/client" style="min-width:200px">
+    <?= fy_select_html($fy ?? current_fy()) ?>
     <button class="btn small" type="submit">Search</button>
   </form>
 </div>

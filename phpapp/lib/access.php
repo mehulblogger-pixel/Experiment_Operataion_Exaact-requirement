@@ -584,6 +584,39 @@ function fy_label($startYear) {
     return fy_start_month() === 1 ? (string)$startYear : sprintf('%d-%02d', $startYear, ($startYear + 1) % 100);
 }
 
+// ---- Shared FY filter for data screens (registers) -------------------------
+// The chosen financial year for a list screen. Reads ?fy=, defaults to the
+// current FY, and understands 'ALL' (every year). Returns the label, the date
+// range, and a half-open upper bound `to_excl` (the day AFTER the FY end) — used
+// for created_at, which is stored as an ISO datetime string, so a plain
+// "<= end-date" would drop records made on the last day. This is what lets a
+// register pull up any past year without the top-bar year being a global switch.
+function fy_filter($default = null) {
+    $sel = trim((string)($_GET['fy'] ?? ''));
+    if ($sel === '') $sel = $default ?? current_fy();
+    if (strtoupper($sel) === 'ALL') return ['fy' => 'ALL', 'from' => '', 'to' => '', 'to_excl' => '', 'all' => true];
+    if (!in_array($sel, fy_options(), true)) $sel = current_fy();   // only a year we actually offer
+    [$from, $to] = fy_range($sel);
+    return ['fy' => $sel, 'from' => $from, 'to' => $to, 'to_excl' => date('Y-m-d', strtotime($to . ' +1 day')), 'all' => false];
+}
+// A SQL fragment + args restricting a created-date column to the chosen FY.
+// Empty (matches everything) when 'All years' is chosen. $fy defaults to the
+// current request's fy_filter().
+function fy_sql($col, $fy = null) {
+    $fy = $fy ?? fy_filter();
+    if (!empty($fy['all'])) return ['', []];
+    return [" AND $col >= ? AND $col < ?", [$fy['from'], $fy['to_excl']]];
+}
+// The <select name="fy"> for a screen's own GET filter form. Drop it inside the
+// existing filter <form> so the other filters are kept. Includes "All years" so
+// nothing is ever hidden permanently.
+function fy_select_html($current) {
+    $h = '<select class="form-control" name="fy" onchange="this.form.submit()" aria-label="Financial year" title="Financial year">';
+    $h .= '<option value="ALL"' . ($current === 'ALL' ? ' selected' : '') . '>All years</option>';
+    foreach (fy_options() as $o) $h .= '<option value="' . e($o) . '"' . ($current === $o ? ' selected' : '') . '>FY ' . e($o) . '</option>';
+    return $h . '</select>';
+}
+
 // Every financial year the data actually touches, newest first, always
 // including the one we are in.
 //

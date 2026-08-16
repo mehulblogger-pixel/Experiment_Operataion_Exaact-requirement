@@ -878,8 +878,11 @@ function ops_crm_inquiries($route, $method) {
         if ($q !== '') { $w[] = '(i.inquiry_no LIKE ? OR i.subject LIKE ? OR i.client_name LIKE ?)'; array_push($args, "%$q%", "%$q%", "%$q%"); }
         $sb = scope_sbus();
         if ($sb !== 'ALL' && is_array($sb) && $sb) { $ph = implode(',', array_fill(0, count($sb), '?')); $w[] = "(i.sbu IN ($ph) OR i.sbu='')"; foreach ($sb as $s) $args[] = $s; }
+        // Financial-year window (defaults to the current FY; "All years" removes it).
+        $fy = fy_filter();
+        if (!$fy['all']) { $w[] = 'i.created_at >= ?'; $args[] = $fy['from']; $w[] = 'i.created_at < ?'; $args[] = $fy['to_excl']; }
         $rows = ops_all("SELECT i.*, bp.display_name client_disp FROM crm_inquiries i LEFT JOIN business_partners bp ON bp.id=i.client_id WHERE " . implode(' AND ', $w) . " ORDER BY i.id DESC", $args);
-        view('ops/crm/inquiry_list', ['rows' => $rows, 'q' => $q, 'st' => $st]); return;
+        view('ops/crm/inquiry_list', ['rows' => $rows, 'q' => $q, 'st' => $st, 'fy' => $fy['fy']]); return;
     }
     if ($route === 'inquiry-new' || $route === 'inquiry-edit') {
         ops_require(can('mod.inquiries.edit'), 'You cannot add or edit inquiries.');
@@ -928,19 +931,22 @@ function ops_crm_quotes($route, $method) {
         if (isset($stateSets[$view])) { $set = $stateSets[$view]; $ph = implode(',', array_fill(0, count($set), '?')); $w[] = "q.status IN ($ph)"; foreach ($set as $s) $args[] = $s; }
         $qq = trim($_GET['q'] ?? '');
         if ($qq !== '') { $w[] = '(q.quote_no LIKE ? OR q.subject LIKE ? OR q.client_name LIKE ?)'; array_push($args, "%$qq%", "%$qq%", "%$qq%"); }
+        // Financial-year window (defaults to the current FY; "All years" removes it).
+        $fy = fy_filter();
+        [$fyW, $fyA] = fy_sql('q.created_at', $fy);
         $rows = ops_all("SELECT q.*, bp.display_name client_disp, o.name office_name FROM quotations q
             LEFT JOIN business_partners bp ON bp.id=q.client_id LEFT JOIN offices o ON o.id=q.office_id
-            WHERE " . implode(' AND ', $w) . " ORDER BY q.id DESC", $args);
-        // headline counts (scope-respecting)
+            WHERE " . implode(' AND ', $w) . $fyW . " ORDER BY q.id DESC", array_merge($args, $fyA));
+        // headline counts (scope-respecting, and within the same FY window)
         $counts = [];
         foreach (['open', 'pending', 'closed', 'lost'] as $k) {
             [$sw, $sa] = scope_clause('q.office_id', 'q.sbu'); $set = $stateSets[$k]; $ph = implode(',', array_fill(0, count($set), '?'));
             foreach ($set as $s) $sa[] = $s;
-            $counts[$k] = (int)ops_val("SELECT COUNT(*) FROM quotations q WHERE $sw AND q.is_current=1 AND q.status IN ($ph)", $sa);
+            $counts[$k] = (int)ops_val("SELECT COUNT(*) FROM quotations q WHERE $sw AND q.is_current=1 AND q.status IN ($ph)" . $fyW, array_merge($sa, $fyA));
         }
         // §xxii — the same rows the screen shows, as a spreadsheet.
         if (($_GET['export'] ?? '') === '1') { csv_download('quotes-' . date('Y-m-d') . '.csv', crm_quotes_export($rows)); return; }
-        view('ops/crm/quote_list', ['rows' => $rows, 'view' => $view, 'q' => $qq, 'counts' => $counts]); return;
+        view('ops/crm/quote_list', ['rows' => $rows, 'view' => $view, 'q' => $qq, 'counts' => $counts, 'fy' => $fy['fy']]); return;
     }
     // §xv — a quote we did not write (client / tender portal) still belongs in the
     // register. Same record, marked with where it came from, so the win/loss and
