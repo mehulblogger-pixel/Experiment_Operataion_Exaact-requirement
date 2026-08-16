@@ -25,6 +25,24 @@
   <?php if ($q !== ''): ?><a class="btn small secondary" href="/lookups">Clear</a><?php endif; ?>
 </form>
 
+<?php // The "add a list" form lives at the top, right under the search, so a new
+      // list can be started without scrolling past every existing one. ?>
+<details class="panel" open style="margin-bottom:14px">
+  <summary style="cursor:pointer;font-weight:600">➕ Add a new master list</summary>
+  <form method="post" action="/lookups" style="margin-top:12px">
+    <div class="form-grid">
+      <div class="ff"><label>List name *</label><input class="form-control" name="label" placeholder="e.g. Activity code, Product family, Service type" required></div>
+      <div class="ff"><label>Short key (auto if blank)</label><input class="form-control" name="type_key" placeholder="e.g. activity"></div>
+      <div class="ff"><label>Depends on (optional — makes it a dependent list)</label>
+        <select class="form-control searchable" name="parent_type_id"><option value="">— none (top-level list) —</option>
+          <?php foreach ($types as $t): ?><option value="<?= (int)$t['id'] ?>"><?= e($t['label']) ?></option><?php endforeach; ?>
+        </select>
+        <small class="muted">Pick a parent to make each value belong under a parent value (e.g. Activity under <?= e(T('sbu')) ?>).</small></div>
+    </div>
+    <div style="margin-top:14px;"><button class="btn" type="submit">Create list</button></div>
+  </form>
+</details>
+
 <?php foreach ($groups as $gname => $list):
       if ($q !== '') {
           $list = array_values(array_filter($list, fn($t) =>
@@ -57,17 +75,3 @@
     </div>
   </div>
 <?php endforeach; ?>
-
-<h3 class="tab-sub">Add a new master list</h3>
-<form method="post" action="/lookups" class="panel">
-  <div class="form-grid">
-    <div class="ff"><label>List name *</label><input class="form-control" name="label" placeholder="e.g. Activity code, Product family, Service type" required></div>
-    <div class="ff"><label>Short key (auto if blank)</label><input class="form-control" name="type_key" placeholder="e.g. activity"></div>
-    <div class="ff"><label>Depends on (optional — makes it a dependent list)</label>
-      <select class="form-control searchable" name="parent_type_id"><option value="">— none (top-level list) —</option>
-        <?php foreach ($types as $t): ?><option value="<?= (int)$t['id'] ?>"><?= e($t['label']) ?></option><?php endforeach; ?>
-      </select>
-      <small class="muted">Pick a parent to make each value belong under a parent value (e.g. Activity under <?= e(T('sbu')) ?>).</small></div>
-  </div>
-  <div style="margin-top:14px;"><button class="btn" type="submit">Create list</button></div>
-</form>
