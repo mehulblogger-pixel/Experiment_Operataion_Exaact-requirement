@@ -43,12 +43,8 @@
           // list should appear on and it is added to them — no separate custom-field
           // step. Leave all unticked to make a list you will attach later. ?>
     <div class="ff" style="margin-top:6px"><label>Show this list on <span class="muted">(optional — you can change this later)</span></label>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">
-        <?php foreach (lk_form_targets() as $en => $lbl): ?>
-          <label class="chk" style="font-weight:400"><input type="checkbox" name="forms[]" value="<?= e($en) ?>"> <?= e($lbl) ?> form</label>
-        <?php endforeach; ?>
-      </div>
-      <small class="muted">Ticking a form adds this list as a dropdown on it automatically. Other forms are still available under Custom fields.</small></div>
+      <div style="margin-top:4px"><?php lk_render_form_ticks(); ?></div>
+      <small class="muted">Ticking a form adds this list as a dropdown on it automatically. Text / number / date fields and required fields are set under Custom fields.</small></div>
     <div style="margin-top:14px;"><button class="btn" type="submit">Create list</button></div>
   </form>
 </details>

@@ -11,12 +11,8 @@
   <summary style="cursor:pointer;font-weight:600">🖥️ Appears on these forms<?= $shownOn ? ' — ' . e(implode(', ', $shownOn)) : ' — not on any form yet' ?></summary>
   <form method="post" action="/lookup?key=<?= e($t['type_key']) ?>" style="margin-top:12px">
     <input type="hidden" name="set_forms" value="1">
-    <div style="display:flex;gap:16px;flex-wrap:wrap">
-      <?php foreach (lk_form_targets() as $en => $lbl): ?>
-        <label class="chk" style="font-weight:400"><input type="checkbox" name="forms[]" value="<?= e($en) ?>" <?= isset($shownOn[$en]) ? 'checked' : '' ?>> <?= e($lbl) ?> form</label>
-      <?php endforeach; ?>
-    </div>
-    <small class="muted">The list shows as a dropdown on each ticked form. For other forms, or to make a field required, use <a href="/custom-fields">Custom fields</a>.</small>
+    <?php lk_render_form_ticks($shownOn); ?>
+    <small class="muted">The list shows as a dropdown on each ticked form. To make a field required, use <a href="/custom-fields">Custom fields</a>.</small>
     <div style="margin-top:12px"><button class="btn small" type="submit">Save where it appears</button></div>
   </form>
 </details>

@@ -76,7 +76,9 @@ the right choices.
 
 1. Menu → **Masters → All master lists** → click the list.
 2. Open **🖥️ Appears on these forms**.
-3. Tick the forms it should show on; untick to remove it.
+3. Tick the forms it should show on; untick to remove it. The three everyday forms
+   are shown first — click **More forms…** for the rest (Sample, Risk, Requisition,
+   your own custom forms, and so on).
 4. **Save where it appears.**
 
 Removing a list from a form only **hides** it — anything already chosen stays saved.

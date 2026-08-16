@@ -459,15 +459,83 @@ function custom_display($entity, $recordId) {
 //  that points back at it. These helpers fold that into one tick-box, so an
 //  admin says "show this list on the Call form" while they are making the list.
 //
-//  lk_form_targets() is deliberately short — the everyday forms. Every other
-//  form (each module, each custom form) is still reachable from the Custom
-//  fields screen; this is the shortcut for the ones people ask for by name.
-function lk_form_targets() {
-    return [
-        'call'    => function_exists('TH') ? TH('call') : 'Call',
-        'job'     => function_exists('TH') ? TH('job')  : 'Job',
-        'partner' => 'Client / Vendor',
+//  The everyday three (Call, Job, Client/Vendor) are shown up front; every other
+//  form that can carry custom fields is grouped behind "More forms…", so the
+//  quick path stays quick but nothing is out of reach. This is the same universe
+//  of forms the Custom fields screen offers, kept in step from one place.
+function lk_form_target_groups() {
+    $th = fn($k, $fallback) => function_exists('TH') ? TH($k) : $fallback;
+    $groups = [
+        'Everyday forms' => [
+            'call'    => $th('call', 'Call'),
+            'job'     => $th('job',  'Job'),
+            'partner' => 'Client / Vendor',
+        ],
+        'Operations & compliance' => [
+            'sample'         => 'Sample',
+            'method'         => 'Test method',
+            'risk'           => 'Risk',
+            'decision_rule'  => 'Decision rule',
+            'controlled_doc' => 'Controlled document',
+            'satisfaction'   => 'Satisfaction survey',
+        ],
+        'People & hiring' => [
+            'requisition' => $th('requisition', 'Requisition'),
+            'candidate'   => $th('candidate',   'Candidate'),
+        ],
     ];
+    // Master-record forms (Inspectors, Agencies, …). Skip any that are edited
+    // elsewhere (a 'goto' card) — their own form isn't the live editor, so a
+    // field added there would never show.
+    if (function_exists('ops_masters')) {
+        $m = [];
+        foreach (ops_masters() as $mk => $mc) {
+            if (!empty($mc['goto'])) continue;
+            if (function_exists('master_access_ok') && !master_access_ok($mc['access'] ?? '')) continue;
+            $m[$mk] = $mc['label'] ?? ucfirst($mk);
+        }
+        if ($m) $groups['Master records'] = $m;
+    }
+    // Forms the company designed itself.
+    if (function_exists('cforms_all')) {
+        $c = [];
+        foreach (cforms_all(false) as $cf) $c[$cf['slug']] = $cf['name'] ?? $cf['slug'];
+        if ($c) $groups['Your custom forms'] = $c;
+    }
+    return $groups;
+}
+// Flat [entity => label] across every group — used for validation and labels.
+function lk_form_targets() {
+    $flat = [];
+    foreach (lk_form_target_groups() as $forms) foreach ($forms as $k => $v) $flat[$k] = $v;
+    return $flat;
+}
+// Render the "show on forms" tick-boxes: the everyday three up front, the rest
+// folded behind "More forms…". $checked keys (any truthy value) pre-tick a box.
+function lk_render_form_ticks($checked = []) {
+    $groups = lk_form_target_groups();
+    $everyday = $groups['Everyday forms'] ?? []; unset($groups['Everyday forms']);
+    $box = function ($en, $lbl) use ($checked) {
+        $c = !empty($checked[$en]) ? ' checked' : '';
+        echo '<label class="chk" style="font-weight:400;margin:0 16px 4px 0"><input type="checkbox" name="forms[]" value="'
+           . e($en) . '"' . $c . '> ' . e($lbl) . '</label>';
+    };
+    echo '<div style="display:flex;flex-wrap:wrap;align-items:center">';
+    foreach ($everyday as $en => $lbl) $box($en, $lbl . ' form');
+    echo '</div>';
+    $more = array_filter($groups); // drop empty groups
+    if (!$more) return;
+    $openMore = false;
+    foreach ($more as $forms) foreach ($forms as $en => $l) if (!empty($checked[$en])) $openMore = true;
+    echo '<details' . ($openMore ? ' open' : '') . ' style="margin-top:6px">';
+    echo '<summary style="cursor:pointer;font-size:13px" class="muted">More forms…</summary><div style="margin-top:8px">';
+    foreach ($more as $gname => $forms) {
+        echo '<div style="margin:8px 0 3px;font-weight:600;font-size:13px">' . e($gname) . '</div>';
+        echo '<div style="display:flex;flex-wrap:wrap">';
+        foreach ($forms as $en => $lbl) $box($en, $lbl);
+        echo '</div>';
+    }
+    echo '</div></details>';
 }
 // The forms a list already shows on: any form carrying a dropdown/dependent
 // custom field that points at this list. Returns [entity => label].
@@ -507,8 +575,11 @@ function lk_detach_from_form($entity, $typeId) {
 // Make the forms a list shows on match exactly the ticked set (add/remove).
 function lk_sync_forms($type, $wanted) {
     if (!$type) return;
-    $wanted = array_values(array_intersect($wanted, array_keys(lk_form_targets())));
-    $current = array_keys(lk_forms_for_type($type['id']));
+    // Only add/remove within the forms we actually offer as tick-boxes. A field
+    // set up on some other form (via Custom fields) is left untouched.
+    $known   = array_keys(lk_form_targets());
+    $wanted  = array_values(array_intersect($wanted, $known));
+    $current = array_values(array_intersect(array_keys(lk_forms_for_type($type['id'])), $known));
     foreach (array_diff($wanted, $current) as $en) lk_attach_to_form($en, $type);
     foreach (array_diff($current, $wanted) as $en) lk_detach_from_form($en, $type['id']);
 }

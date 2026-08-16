@@ -60,9 +60,12 @@ The choices change depending on what was picked in a *parent* list.
 **Where:** `Masters → All master lists` (`/lookups`).
 
 **The new bit — "Show this list on…"**
-When you make a list you can tick **which forms it should appear on** (Call, Job,
-Client/Vendor) right there. You no longer have to make the list *and then* go
-somewhere else to put it on a form. (See Layer 3 for the longer route to other forms.)
+When you make a list you can tick **which forms it should appear on** right there. The
+three everyday forms (Call, Job, Client/Vendor) are shown up front; **"More forms…"**
+opens the rest — Operations & compliance (Sample, Test method, Risk, Decision rule,
+Controlled document, Satisfaction survey), People & hiring (Requisition, Candidate),
+your Master records, and any custom forms you've built. You no longer have to make the
+list *and then* go somewhere else to put it on a form.
 
 **Rule of thumb:** if it's *just a word you pick from a short menu*, it belongs in
 Layer 2.

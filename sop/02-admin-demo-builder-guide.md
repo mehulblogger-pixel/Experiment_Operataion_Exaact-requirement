@@ -98,6 +98,12 @@ Anything the client picks that we don't ship. Example — *Rig type*:
 Open the list → **"Appears on these forms"** panel → tick/untick the forms →
 **Save where it appears**. Unticking hides it but keeps any data already chosen.
 
+The three everyday forms (Call, Job, Client/Vendor) are shown first; **"More
+forms…"** opens the rest — Sample, Test method, Risk, Decision rule, Controlled
+document, Satisfaction survey, Requisition, Candidate, your master-record forms, and
+any custom forms you've built. (Ticking here only makes an *optional dropdown* — to
+make a field required, or to add a text/number/date box, use Custom fields.)
+
 **Checklist:** the `/lookups` table's **"Shows on"** column reads correctly for every
 list the demo uses.
 
