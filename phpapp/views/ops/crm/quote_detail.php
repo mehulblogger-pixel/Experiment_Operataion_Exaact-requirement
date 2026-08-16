@@ -284,6 +284,11 @@
 </div>
 
 <div data-tabs data-tabs-key="quote">
+<?php // Quotation playbook — the guided sales path, first thing on Overview so
+      // Quote -> Order -> Job all read the same.
+      if (function_exists('crm_render_quote_playbook')): ?>
+  <div data-tab="Overview"><?php crm_render_quote_playbook($q); ?></div>
+<?php endif; ?>
 <div class="panel-split" data-tab="Overview">
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0"><?= e(T('client')) ?></h3>

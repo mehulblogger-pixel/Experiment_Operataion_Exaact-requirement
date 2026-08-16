@@ -475,6 +475,115 @@ function contract_no_clash($contractNo, $clientId, $exceptId = null) {
 }
 // "Q-00042 Rev 01" style label.
 function quote_label($q) { $n = $q['quote_no'] ?? ''; $r = (int)($q['rev'] ?? 0); return $r > 0 ? "$n Rev " . str_pad((string)$r, 2, '0', STR_PAD_LEFT) : $n; }
+
+// ---------------------------------------------------------------------------
+//  Quotation playbook — the sales forward path, the third sibling of the call
+//  and job playbooks so Quote -> Order -> Job all read the same. Pure, testable
+//  computation; one 'do this now' step; a rejection is a real blocker.
+//    build & submit -> approved -> sent -> client's answer -> register contract
+//    -> raise the order (hand to operations)
+// ---------------------------------------------------------------------------
+function crm_quote_playbook($q) {
+    $qid = (int)($q['id'] ?? 0);
+    $st  = (string)($q['status'] ?? 'DRAFT');
+    $hasContract = trim((string)($q['contract_number'] ?? '')) !== '';
+    $raised = $qid ? ((int) ops_val("SELECT COUNT(*) FROM calls WHERE quotation_id=?", [$qid]) > 0) : false;
+    // How far along the happy path the status sits (rejected sits at the approval step).
+    $rankMap = ['DRAFT'=>0,'PENDING_APPROVAL'=>1,'REJECTED'=>1,'APPROVED'=>2,'SENT'=>3,'ACCEPTED'=>4,'LOST'=>4,'EXPIRED'=>4];
+    $rank = $rankMap[$st] ?? 0;
+    $lost     = in_array($st, ['LOST','EXPIRED'], true);
+    $rejected = $st === 'REJECTED';
+    $pending  = $st === 'PENDING_APPROVAL';
+    $accepted = $st === 'ACCEPTED';
+    $cl = function_exists('Tl') ? Tl('client') : 'client';
+
+    $steps = [];
+    $steps[] = ['key'=>'draft', 'label'=>'Build & submit the quotation', 'actionable'=>true,
+        'done'=>$rank >= 1,
+        'line'=>$rank >= 1 ? 'Drafted and submitted.' : 'Add the line items and terms, then submit it for approval.',
+        'href'=>'/quote-edit?id=' . $qid, 'cta'=>'Edit the quote'];
+    $steps[] = ['key'=>'approve', 'label'=>'Get it approved', 'actionable'=>true,
+        'done'=>$rank >= 2, 'blocker'=>$rejected,
+        'line'=>$rank >= 2 ? 'Approved and ready to go out.'
+              : ($rejected ? 'Sent back by the approver — correct it and submit again, or raise a revision.'
+                 : ($pending ? 'With the approver now — they approve it, or send it back with a comment.'
+                    : 'Submit it so the approver can sign off.')),
+        'href'=>'', 'cta'=>''];
+    $steps[] = ['key'=>'send', 'label'=>'Send it to the ' . $cl, 'actionable'=>true,
+        'done'=>$rank >= 3,
+        'line'=>$rank >= 3 ? 'Sent — awaiting their reply.' : 'Once approved, send it out (buttons at the top).',
+        'href'=>'', 'cta'=>''];
+    $steps[] = ['key'=>'answer', 'label'=>'The ' . $cl . '’s answer', 'actionable'=>true,
+        'done'=>$accepted,
+        'line'=>$accepted ? 'Accepted — they said yes.'
+              : ($rank >= 3 ? 'Waiting for their reply — mark it accepted, or lost.' : 'Comes after it is sent.'),
+        'href'=>'', 'cta'=>''];
+    $steps[] = ['key'=>'contract', 'label'=>'Register the contract number', 'actionable'=>true,
+        'done'=>$accepted && $hasContract,
+        'line'=>($accepted && $hasContract) ? ('Contract ' . $q['contract_number'] . ' registered.')
+              : ($accepted ? 'Register the ' . $cl . ' and enter the contract number.' : 'Comes after it is accepted.'),
+        'href'=>'#contract', 'cta'=>'Register contract'];
+    $steps[] = ['key'=>'order', 'label'=>'Raise the order', 'actionable'=>true,
+        'done'=>$raised,
+        'line'=>$raised ? 'Order raised — operations has it.'
+              : ($accepted ? 'Hand it to operations as an inspection order.' : 'Comes after it is accepted.'),
+        'href'=>$accepted ? '/call-new?quote=' . $qid : '', 'cta'=>'Raise an order'];
+
+    $firstOpen = -1;
+    foreach ($steps as $i => $s) if (!empty($s['actionable']) && empty($s['done'])) { $firstOpen = $i; break; }
+    foreach ($steps as $i => &$s) {
+        if (empty($s['actionable'])) { $s['state'] = 'info'; continue; }
+        if (!empty($s['done']))      { $s['state'] = 'done'; continue; }
+        if ($i === $firstOpen)       { $s['state'] = !empty($s['blocker']) ? 'blocked' : 'now'; }
+        else                         { $s['state'] = 'todo'; }
+    }
+    unset($s);
+    $open = 0; foreach ($steps as $s) if (!empty($s['actionable']) && empty($s['done'])) $open++;
+
+    return ['steps'=>$steps, 'open'=>$open, 'all_done'=>($open === 0), 'lost'=>$lost,
+            'lost_label'=>($st === 'EXPIRED' ? 'expired' : 'not accepted'), 'rejected'=>$rejected,
+            'accepted'=>$accepted, 'raised'=>$raised];
+}
+
+// Renders the quotation playbook card at the top of the quote Overview tab.
+function crm_render_quote_playbook($q) {
+    if (!$q) return;
+    $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $pb  = crm_quote_playbook($q);
+    $cl  = function_exists('Tl') ? Tl('client') : 'client';
+    ob_start();
+    if (function_exists('tosrm_playbook_css')) echo tosrm_playbook_css(); ?>
+    <div class="card tosrm-pb" style="margin-top:16px">
+      <h3>Quotation playbook — this <?= $esc(function_exists('Tl') ? Tl('quote') : 'quotation') ?></h3>
+      <p class="pb-sub">From draft to a live order: build &amp; submit, get it approved, send it, capture the <?= $esc($cl) ?>’s answer, register the contract, then raise the order. The panels below carry the specifics.</p>
+      <?php if ($pb['lost']): ?>
+        <div class="pb-done-banner" style="border-color:var(--bad);background:color-mix(in srgb,var(--bad) 7%,var(--card))"><b style="color:var(--bad)">Closed — <?= $esc($pb['lost_label']) ?>.</b> Raise a revision to re-issue it if the <?= $esc($cl) ?> comes back.</div>
+      <?php elseif ($pb['all_done']): ?>
+        <div class="pb-done-banner"><b style="color:var(--ok)">✓ Won and handed over.</b> Accepted, contract registered and the order raised — operations has it now.</div>
+      <?php else: ?>
+      <ol class="pb-steps">
+        <?php $n = 0; foreach ($pb['steps'] as $s): $n++; $stp = $s['state']; $num = $stp === 'done' ? '✓' : $n; ?>
+          <li class="pb-step is-<?= $stp ?>">
+            <span class="pb-num"><?= $esc($num) ?></span>
+            <div class="pb-body">
+              <div class="pb-label"><?= $esc($s['label']) ?>
+                <?php if ($stp === 'now'): ?><span class="pb-tag t-now">Do this now</span>
+                <?php elseif ($stp === 'blocked'): ?><span class="pb-tag t-blocked">Needs a fix</span>
+                <?php elseif ($stp === 'done'): ?><span class="pb-tag t-done">Done</span><?php endif; ?>
+              </div>
+              <div class="pb-line"><?= $esc($s['line']) ?></div>
+            </div>
+            <?php if (!empty($s['href']) && !empty($s['cta']) && in_array($stp, ['now','blocked','todo'], true)): ?>
+              <a class="btn small <?= ($stp === 'now' || $stp === 'blocked') ? '' : 'secondary' ?> pb-cta" href="<?= $esc($s['href']) ?>"><?= $esc($s['cta']) ?></a>
+            <?php endif; ?>
+          </li>
+        <?php endforeach; ?>
+      </ol>
+      <?php endif; ?>
+    </div>
+    <?php
+    echo ob_get_clean();
+}
 function crm_inquiry_get($id) { return ops_one("SELECT * FROM crm_inquiries WHERE id=?", [(int)$id]); }
 function crm_quote_get($id) { return ops_one("SELECT * FROM quotations WHERE id=?", [(int)$id]); }
 function crm_quote_lines($qid) { return ops_all("SELECT * FROM quote_lines WHERE quote_id=? ORDER BY line_no, id", [(int)$qid]); }
