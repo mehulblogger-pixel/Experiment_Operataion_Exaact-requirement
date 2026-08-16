@@ -185,6 +185,15 @@ function lk_module_lists() {
         ['requisition_type',    'Requisition type',          REQ_TYPES,              'People'],
         ['requisition_status',  'Requisition status',        REQ_STATUS,             'People'],
         ['req_sourcing_model',  'Sourcing model (cost)',     defined('REQ_SOURCING_MODELS') ? REQ_SOURCING_MODELS : [], 'People'],
+        // Recruitment funnel lists. The forms already read these through
+        // lk_options_or(), and the pipeline screen tells people they are
+        // "configurable in Masters" — but they were never registered, so the
+        // list did not exist to configure. Register them so that is true.
+        ['drop_point',          'Drop point',                defined('RCC_DROP_POINTS')  ? RCC_DROP_POINTS  : [], 'People'],
+        ['drop_reason',         'Drop reason',               defined('RCC_DROP_REASONS') ? RCC_DROP_REASONS : [], 'People'],
+        // The recruitment forms' Department picker reads this (kept separate from
+        // the org-wide "Department" list on purpose); it too was unregistered.
+        ['hr_department',       'Hiring department',         defined('RCC_DEPARTMENTS')  ? RCC_DEPARTMENTS  : [], 'People'],
         ['projcosting_head',        'Costing head',              function_exists('pc_head_defaults') ? pc_head_defaults() : [], 'Money'],
         // --- Scheduling ------------------------------------------------------
         // The wording is yours; the behaviour is keyed on the code behind it, so
