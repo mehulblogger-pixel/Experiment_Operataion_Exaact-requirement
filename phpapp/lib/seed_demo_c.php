@@ -188,28 +188,28 @@ function demo_seed_c1($pdo, $x, $has, $ins) {
             null,null,$pipeOpp,$stg($pipeOpp,'Quotation sent'),283200,65,$d(20),'INQUIRY',
             'Structural inspection of jetty fabrication at Mundra SEZ.','Bureau Veritas',
             'Sunita Rao','sunita.rao@example.com','9825011002',null,'Nisha Rao',$oid['MUM'],'OGC','OPEN',
-            $d(-13),$d(-2),'[demo] BM approval pending; then chase client','','','','','',null,$now]);
+            $d(-13),$d(-2),'[demo] BM approval pending; then chase client','','','','','',null,$now,$now]);
 
         // OPP-2: WON — anchored to Q-2607-001 (ACCEPTED)
         $op2 = $ins($oc, ['DEMO-OPP-2607-02','Narmada — 12 pressure vessels TPI',$cid['CL-NIL'],'Narmada Industries Ltd',
             null,$inq1?:null,$pipeOpp,$stg($pipeOpp,'Won'),177000,100,$d(-30),'INQUIRY',
             'TPI of 12 ASME VIII Div 1 vessels at Vapi.','',
             'Rakesh Menon','rakesh.menon@example.com','9825011001',null,'Nisha Rao',$oid['AMD'],'IND','WON',
-            $d(-30),'','','','','',$d(-30),'Meena Shah',$qA?:null,$now]);
+            $d(-30),'','','','','',$d(-30),'Meena Shah',$qA?:null,$now,$now]);
 
         // OPP-3: LOST — CL-GHE, competitor took it on price
         $op3 = $ins($oc, ['DEMO-OPP-2607-03','Girnar — coating inspection, 4 tanks',$cid['CL-GHE'],'Girnar Energy Hydrocarbon',
             null,null,$pipeOpp,$stg($pipeOpp,'Lost'),365800,0,$d(-10),'INQUIRY',
             'Coating/DFT inspection campaign, 4 storage tanks at Chakan.','TUV India',
             'Deepa Balan','deepa.balan@example.com','9825011004',null,'Nisha Rao',$oid['AMD'],'OGC','LOST',
-            $d(-8),'','','PRICE','[demo] Undercut on manday rate','TUV India','','',null,$now]);
+            $d(-8),'','','PRICE','[demo] Undercut on manday rate','TUV India','','',null,$now,$now]);
 
         // OPP-4: early stage, sprung from the demo lead (lead → opportunity link)
         $op4 = $leadId ? $ins($oc, ['DEMO-OPP-2607-04','Kutch Petrochem — hydrocracker NDT+PWHT',$cid['CL-GHE'],'Kutch Petrochem Pvt Ltd',
             $leadId,null,$pipeOpp,$stg($pipeOpp,'Qualified'),450000,25,$d(45),'REFERRAL',
             'NDT plus PWHT witness for hydrocracker skid at Dahej.','',
             'Farida Qureshi','farida.q@example.com','9825022210',null,'Nisha Rao',$oid['AMD'],'OGC','OPEN',
-            $d(-3),$d(5),'[demo] Prepare quotation from lead scope','','','','','',null,$now]) : 0;
+            $d(-3),$d(5),'[demo] Prepare quotation from lead scope','','','','','',null,$now,$now]) : 0;
         $n['opportunities'] = $op4 ? 4 : 3;
 
         if ($has('opportunity_quotes')) {
@@ -889,7 +889,7 @@ function demo_seed_c4($pdo, $x, $has, $ins) {
                VALUES (?,?,?,?,?,?,?,?,0,?)";
         $learn = function ($scope, $client, $field, $text, $key, $uses) use ($val, $ins, $ls, $rt, $now) {
             if ($val("SELECT id FROM learned_suggestions WHERE norm_key=?", [$key])) return 0;
-            $ins($ls, [$scope, $rt, $client, $field, $text, $key, $uses, $now]); return 1;
+            $ins($ls, [$scope, $rt, $client, $field, $text, $key, $uses, $now, $now]); return 1;
         };
         $c = 0;
         $c += $learn('FIELD', null, 'inspection_result', 'Accepted — released for despatch', 'demo:field:accepted-released', 7);
@@ -1033,7 +1033,7 @@ function demo_seed_c5($pdo, $x, $has, $ins) {
         // Low score (2 of 5), recommend=N, follow-up flagged and not yet done.
         $ins($iss, ['CSS-26-0002',$cid['CL-SVP'],'Stage inspection — jetty fabrication',$jid['J-2607-102'],'MGH/AMD/2026/D-0002',$oid['AMD'],'OGC','RECEIVED',$d(-6),'Meena Shah','Sunita Rao','QA Lead',$d(-3),2,'N',json_encode(['timeliness'=>2,'technical'=>3,'communication'=>2,'professionalism'=>3]),'Report turnaround slow; communication patchy.',1,'BM to call the client and agree a recovery plan.',0,$now,$now]);
         // Requested only — no response yet (score NULL).
-        $ins($iss, ['CSS-26-0003',$cid['CL-GHE'],'Coating inspection — storage tanks',null,'',$oid['MUM'],'OGC','REQUESTED',$d(-2),'Meena Shah','','',null,'','','',0,'',0,$now,$now]);
+        $ins($iss, ['CSS-26-0003',$cid['CL-GHE'],'Coating inspection — storage tanks',null,'',$oid['MUM'],'OGC','REQUESTED',$d(-2),'Meena Shah','','',null,'','','','',0,'',0,$now,$now]);
         $n['satisfaction_surveys'] = 3;
     }
 
