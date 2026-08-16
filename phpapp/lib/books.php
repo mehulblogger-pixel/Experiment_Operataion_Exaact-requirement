@@ -475,8 +475,17 @@ function books_line_add($invoiceId, array $b) {
         if (books_job_invoiced($job, (int)$invoiceId)) return TH('job') . ' ' . $j['job_code'] . ' is already on another invoice.';
         $callId = $j['call_id'] ? (int)$j['call_id'] : null;
         if ($desc === '') $desc = 'Inspection services — ' . $j['job_code'];
-        if (($b['rate'] ?? '') === '') $b['rate'] = (float)($j['billable_rate'] ?: $j['invoice_value'] ?: $j['billable_value'] ?: 0);
-        if (($b['qty'] ?? '') === '')  $b['qty']  = (float)($j['billable_qty'] ?: 1);
+        // Fall through zero-but-set figures to the next source. A truthiness test
+        // (`?:`) breaks on MySQL, where an empty DECIMAL comes back as the string
+        // '0.00' — which is truthy, so the rate would lock to 0 and the invoice
+        // would total nothing. Compare as numbers so 0 really means "not set".
+        if (($b['rate'] ?? '') === '') {
+            $rate = (float)($j['billable_rate'] ?? 0);
+            if ($rate <= 0) $rate = (float)($j['invoice_value'] ?? 0);
+            if ($rate <= 0) $rate = (float)($j['billable_value'] ?? 0);
+            $b['rate'] = $rate;
+        }
+        if (($b['qty'] ?? '') === '')  $b['qty']  = ((float)($j['billable_qty'] ?? 0) > 0) ? (float)$j['billable_qty'] : 1.0;
     }
     $seq = (int)books_try(fn() => ops_val("SELECT COALESCE(MAX(seq),0) FROM invoice_lines WHERE invoice_id=?", [(int)$invoiceId]), 0) + 1;
     $gst = ($b['gst_pct'] ?? '') === '' ? books_default_gst() : (float)$b['gst_pct'];
