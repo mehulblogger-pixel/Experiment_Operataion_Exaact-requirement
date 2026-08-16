@@ -170,6 +170,12 @@ function ops_billing($route, $method) {
         setting_set('billing_currency', strtoupper(substr(trim((string) ($_POST['currency'] ?? 'INR')), 0, 5)) ?: 'INR');
         setting_set('billing_price_user_month', (string) max(0, (int) ($_POST['price_month'] ?? 0)));
         setting_set('billing_price_user_year', (string) max(0, (int) ($_POST['price_year'] ?? 0)));
+        // Field-seat and portal pricing were only defaults in code (₹499 / ₹99,
+        // 10 free) with no way to change them — the Super Admin screen even
+        // pointed here to set them. Now they actually save.
+        setting_set('billing_price_field_month', (string) max(0, (int) ($_POST['price_field_month'] ?? 0)));
+        setting_set('billing_price_portal_month', (string) max(0, (int) ($_POST['price_portal_month'] ?? 0)));
+        setting_set('billing_portal_free', (string) max(0, (int) ($_POST['portal_free'] ?? 0)));
         setting_set('rzp_key_id', trim((string) ($_POST['rzp_key_id'] ?? '')));
         if (trim((string) ($_POST['rzp_key_secret'] ?? '')) !== '')      // blank = keep existing
             setting_set('rzp_key_secret', trim((string) $_POST['rzp_key_secret']));

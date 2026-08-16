@@ -84,8 +84,11 @@
   <form method="post" action="/billing-config" class="settings-form">
     <div class="form-grid">
       <div class="ff"><label>Currency</label><input class="form-control" name="currency" value="<?= e($cur) ?>" maxlength="5"></div>
-      <div class="ff"><label>Price per user / month</label><input class="form-control" type="number" min="0" name="price_month" value="<?= $pm ?>"></div>
-      <div class="ff"><label>Price per user / year</label><input class="form-control" type="number" min="0" name="price_year" value="<?= $py ?>"></div>
+      <div class="ff"><label>Full seat / month <span class="muted">(office &amp; management users)</span></label><input class="form-control" type="number" min="0" name="price_month" value="<?= $pm ?>"></div>
+      <div class="ff"><label>Full seat / year</label><input class="form-control" type="number" min="0" name="price_year" value="<?= $py ?>"></div>
+      <div class="ff"><label>Field seat / month <span class="muted">(inspector &amp; site roles)</span></label><input class="form-control" type="number" min="0" name="price_field_month" value="<?= (int) setting_get('billing_price_field_month', 499) ?>"></div>
+      <div class="ff"><label>Portal seat / month <span class="muted">(client / vendor logins)</span></label><input class="form-control" type="number" min="0" name="price_portal_month" value="<?= (int) setting_get('billing_price_portal_month', 99) ?>"></div>
+      <div class="ff"><label>Free portal seats <span class="muted">(included, never billed)</span></label><input class="form-control" type="number" min="0" name="portal_free" value="<?= (int) setting_get('billing_portal_free', 10) ?>"></div>
       <div class="ff"><label>Razorpay Key Id</label><input class="form-control" name="rzp_key_id" value="<?= e($cfg['key_id'] ?? '') ?>" placeholder="rzp_live_… or rzp_test_…" autocomplete="off"></div>
       <div class="ff ff-wide"><label>Razorpay Key Secret</label><input class="form-control" type="password" name="rzp_key_secret" autocomplete="new-password" placeholder="<?= !empty($cfg['key_secret']) ? '•••••••• (leave blank to keep)' : 'paste the secret' ?>"></div>
     </div>

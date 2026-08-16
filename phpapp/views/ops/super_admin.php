@@ -192,7 +192,7 @@ $stateTone = ['OPEN'=>'p-info','ACTIVE'=>'p-ok','GRACE'=>'p-warn','EXPIRED'=>'p-
         </tbody></table>
         <?php else: ?><p class="muted" style="font-size:12.5px">No active staff yet. Add users under <a href="/users">Users</a> and the class mix appears here.</p><?php endif; ?>
         <div class="warnbox" style="margin-top:12px">
-          Field roles are configurable — set <code>seat_field_roles</code> (comma list), <code>billing_price_field_month</code> and <code>billing_price_portal_month</code> under <a href="/settings">Settings</a>. The Full‑seat price tracks your Billing per‑seat rate automatically.
+          Seat prices — full, field and portal, plus the free portal bundle — are set on the <a href="/billing">Billing</a> screen under “Pricing &amp; payment keys”. The field roles themselves (<code>seat_field_roles</code>) are configured under <a href="/settings">Settings</a>.
         </div>
       </div>
     </div>
