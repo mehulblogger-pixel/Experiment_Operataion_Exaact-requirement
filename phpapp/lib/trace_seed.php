@@ -325,8 +325,13 @@ function trace_checks(array $ids) {
         $add('Invoice', 'The invoice is for the right customer', $clientId, $v("SELECT partner_id FROM invoices WHERE id=?", [$invId]));
         $add('Invoice', 'The invoice carries the quotation', $quoteId, $v("SELECT quotation_id FROM invoices WHERE id=?", [$invId]));
         $add('Invoice', 'A line bills the job', '1', (int)$v("SELECT COUNT(*) FROM invoice_lines WHERE invoice_id=? AND job_id=?", [$invId, $jobId]));
-        $add('Invoice', 'The invoice is issued (has a number)', '1',
-             (int)$v("SELECT CASE WHEN COALESCE(invoice_no,'')<>'' THEN 1 ELSE 0 END FROM invoices WHERE id=?", [$invId]));
+        $invRow   = ops_one("SELECT * FROM invoices WHERE id=?", [$invId]);
+        $issuedOk = $invRow && trim((string)($invRow['invoice_no'] ?? '')) !== '';
+        // When it did NOT issue, say exactly which gate refused it, so the reason
+        // is on screen instead of a bare "missing".
+        $whyNot = (!$issuedOk && $invRow && function_exists('books_issue_missing'))
+                  ? (' — refused: ' . implode(' ', books_issue_missing($invRow))) : '';
+        $add('Invoice', 'The invoice is issued (has a number)' . $whyNot, '1', $issuedOk ? 1 : 0);
         if ($rcId) {
             $add('Money-in', 'The receipt is for the right customer', $clientId, $v("SELECT partner_id FROM receipts WHERE id=?", [$rcId]));
             $add('Money-in', 'The receipt is matched to the invoice', '1',
