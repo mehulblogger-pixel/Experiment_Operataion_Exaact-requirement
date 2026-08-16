@@ -2406,6 +2406,32 @@ function idems_qa_quantity_checks($f, $rows) {
 // The unified deterministic QA pass. Returns
 //   ['score'=>0-100, 'counts'=>[critical,high,medium,low,info], 'status'=>BLOCKED|REVIEW|READY, 'issues'=>[...]]
 // Each issue: severity, category, title, location, why, source, suggestion, fixable.
+// Where to go to fix a QA finding — routes each issue to the exact screen so the
+// reviewer jumps straight to it instead of hunting. Source documents are uploaded
+// on the review screen; header identification & traceability (PO, QAP/ITP,
+// drawing, standard, result) live on Edit details; everything in the report body
+// — fields, tables, quantities, signature — is on the fill screen. Returns
+// ['href' => …, 'label' => …].
+function idems_qa_fix_link($issue, $docId) {
+    $docId = (int)$docId;
+    $cat = strtolower((string)($issue['category'] ?? ''));
+    $hay = strtolower((string)($issue['title'] ?? '') . ' ' . (string)($issue['location'] ?? '') . ' ' . (string)($issue['why'] ?? ''));
+    $fill   = ['href' => '/document-fill?id=' . $docId,   'label' => 'Open report'];
+    $edit   = ['href' => '/document-edit?id=' . $docId,   'label' => 'Edit details'];
+    $upload = ['href' => '/document-review?id=' . $docId, 'label' => 'Upload document'];
+    // A source document that hasn't been attached — upload it on the review screen.
+    if ($cat === 'missing-document' || strpos($hay, 'not been uploaded') !== false || strpos($hay, 'missing document') !== false)
+        return $upload;
+    // Signature is captured on the report body / on file.
+    if (strpos($hay, 'signature') !== false) return $fill;
+    // Header identification & traceability — PO, QAP/ITP, drawing, standard, result…
+    if ($cat === 'traceability' || $cat === 'completeness'
+        || preg_match('/\b(p\.?o\.?|purchase[\s\-]?order|qap|itp|drawing|standard|specification|traceab|client|vendor|result|release|revision)\b/', $hay))
+        return $edit;
+    // Quantities, contradictions, evidence and anything else — the report body.
+    return $fill;
+}
+
 function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
     if ($fields === null) $fields = function_exists('idems_fields') ? idems_fields((int)($doc['report_type_id'] ?? 0)) : [];
     if ($data === null)   $data = json_decode($doc['data'] ?? '[]', true); if (!is_array($data)) $data = [];

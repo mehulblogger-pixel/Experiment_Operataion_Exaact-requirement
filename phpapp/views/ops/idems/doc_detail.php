@@ -126,13 +126,19 @@
   $sevColor = ['critical'=>'var(--bad)','high'=>'#c2410c','medium'=>'#b45309','low'=>'#6b7280','info'=>'#2563eb'];
   $sevLab   = ['critical'=>'CRITICAL','high'=>'HIGH','medium'=>'MEDIUM','low'=>'LOW','info'=>'INFO'];
   $openByDefault = ($cn['critical']>0 || $cn['high']>0 || $cn['medium']>0);
-  $card = function($it) use ($sevColor,$sevLab) {
+  $canFixDoc = function_exists('idems_can_edit_doc') ? idems_can_edit_doc($doc) : false;
+  $card = function($it) use ($sevColor,$sevLab,$doc,$canFixDoc) {
     $sv = $it['severity']; $c = $sevColor[$sv] ?? '#6b7280';
     echo '<div style="border-left:3px solid '.$c.';background:color-mix(in srgb,'.$c.' 6%,transparent);padding:8px 11px;border-radius:8px">';
     echo '<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><span style="font-size:10px;font-weight:700;letter-spacing:.04em;color:'.$c.'">'.($sevLab[$sv]??'').'</span><b style="font-size:13.5px">'.e($it['title']).'</b></div>';
     if (trim((string)$it['why'])!=='') echo '<div class="muted" style="font-size:12.5px;margin-top:3px">'.e($it['why']).'</div>';
     if (trim((string)$it['location'])!=='') echo '<div class="muted" style="font-size:11.5px;margin-top:2px">Where: '.e($it['location']).'</div>';
     if (trim((string)($it['suggestion']??''))!=='') echo '<div style="font-size:12px;margin-top:3px;color:var(--ink)">→ '.e($it['suggestion']).'</div>';
+    // A direct link to the exact place this is fixed — so nobody has to hunt for it.
+    if ($canFixDoc && function_exists('idems_qa_fix_link')) {
+      $fx = idems_qa_fix_link($it, (int)$doc['id']);
+      if (!empty($fx['href'])) echo '<div style="margin-top:6px"><a href="'.e($fx['href']).'" style="display:inline-block;font-size:11.5px;font-weight:700;color:'.$c.';border:1px solid '.$c.';border-radius:6px;padding:2px 9px;text-decoration:none">'.e($fx['label']).' →</a></div>';
+    }
     echo '</div>';
   };
   $major = array_values(array_filter($qa['issues'], fn($i)=>in_array($i['severity'],['critical','high','medium'],true)));
