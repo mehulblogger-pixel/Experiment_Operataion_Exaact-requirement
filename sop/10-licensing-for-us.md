@@ -163,18 +163,67 @@ updates itself — no re-issue by us. This is the **Users & billing** screen.
 
 ---
 
-## 8 · Suggested pricing model (fill in your real numbers)
+## 8 · Seat-based pricing
 
-We ship no prices on purpose. Decide, then enter them under Users & billing. A simple
-per-seat model for the example company:
+We charge **per seat** — one price per person, per period. We ship **no prices** on
+purpose; you decide them and enter them (self-service) or invoice them (direct).
 
-| | Per user / month | Per user / year |
+### 8.1 Two seat classes
+Seats come in two classes so office staff and field staff can be priced differently:
+
+| Seat class | Who it's for | Typical price |
 |---|---|---|
-| Standard seat | *(your ₹)* | *(your ₹ — usually ~10 months)* |
+| **Full seat** | Office staff — directors, managers, admins, coordinators, finance | Higher |
+| **Field seat** | Inspectors (the "field" roles) | Lower |
 
-16 seats × your monthly rate = the monthly total the customer sees at checkout. If you
-price field (inspector) seats lower, use the **field seats** split (§6) and quote two
-line items on your invoice.
+`Total seats = full + field`. On the key, set **Seats = total** and **field seats =
+the field count** (§6). If you charge one blended rate for everyone, leave field seats
+at 0 and use a single price.
+
+### 8.2 The rate card (fill in your real numbers)
+
+| Seat class | Per user / **month** | Per user / **year** |
+|---|---|---|
+| Full seat  | ₹ *___* | ₹ *___*  *(≈ 10× monthly — 2 months free)* |
+| Field seat | ₹ *___* | ₹ *___* |
+
+> Annual is normally priced at **~10 months** so a yearly commitment gives ≈2 months
+> free. Adjust to your own discount.
+
+### 8.3 Worked example — the 16-seat company
+
+1 director + 2 admins + 1 branch manager + 2 coordinators = **6 full seats**;
+10 inspectors = **10 field seats**; total **16 seats**.
+
+On the key: **Seats = 16, field seats = 10.**
+
+Monthly invoice:
+
+| Line | Qty | Rate/mo | Amount |
+|---|---|---|---|
+| Full seats  | 6  | ₹ *F* | 6 × *F* |
+| Field seats | 10 | ₹ *f* | 10 × *f* |
+| **Monthly total** | | | **6F + 10f** |
+| **Annual total** *(if billed yearly)* | | | **10 × (6F + 10f)** |
+
+Put the agreed period total into the **Price charged** box when you issue the key, so
+it's on record (§7A).
+
+### 8.4 How each path handles the two classes
+
+- **Direct billing (path A):** invoice the two lines above yourself, issue **one key**
+  (Seats 16 / field 10), and record the **total** in *Price charged*. This is the way
+  to bill two rates.
+- **Self-service Razorpay (path B):** the online checkout supports **one blended
+  per-seat price**, not two — it multiplies your single *price per user* by the seat
+  count. So for self-service either:
+  - charge **one blended rate** for all 16 (simplest — set that one number under Users
+    & billing), or
+  - keep the split on the **licence** (for the seat cap) but bill the two classes on a
+    **manual invoice** rather than through the online checkout.
+
+  *(The field/full split governs how many of each may sign in; it does not make the
+  online checkout charge two different prices.)*
 
 ---
 
