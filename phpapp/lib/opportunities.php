@@ -794,14 +794,23 @@ function ops_opportunities($route, $method) {
     ops_require($canEdit, 'You cannot change an opportunity.');
 
     if ($route === 'opportunity-new') {
+        // On a first visit we prefill from the query string (e.g. opened from a
+        // lead). On a POST that fails validation we prefill from what they just
+        // typed and show the error ON the form — never redirect the entry away and
+        // lose everything they filled in.
+        $prefill = $_GET;
+        $formErr = '';
         if ($method === 'POST') {
             $r = opp_create($_POST);
-            if (!empty($r['err'])) { flash($r['err'], 'error'); redirect_back('/opportunities'); }
-            flash('Opportunity ' . $r['ref'] . ' opened.');
-            redirect('/opportunity?id=' . $r['id']);
+            if (empty($r['err'])) {
+                flash('Opportunity ' . $r['ref'] . ' opened.');
+                redirect('/opportunity?id=' . $r['id']);
+            }
+            $prefill = $_POST;
+            $formErr = $r['err'];
         }
         view('ops/opportunity_form', [
-            'pipelines' => pipelines_all('OPPORTUNITY'), 'prefill' => $_GET,
+            'pipelines' => pipelines_all('OPPORTUNITY'), 'prefill' => $prefill, 'form_err' => $formErr,
             'offices' => ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name"),
             'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND status='ACTIVE' ORDER BY COALESCE(display_name, legal_name) LIMIT 800"),
             'sources' => function_exists('lk_options_or') && defined('LEAD_SOURCES') ? lk_options_or('lead_source', LEAD_SOURCES) : [],
