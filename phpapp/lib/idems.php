@@ -322,6 +322,17 @@ function idems_migrate() {
         try { idems_build_fire_extinguisher_report(); } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('fext_report_seeded', '1');
     }
+    // ONE-TIME: a few seeded section titles / field labels stored a literal
+    // "&amp;" that then rendered as "&amp;" on screen (double-escaped). A label a
+    // user types stores a real "&", never "&amp;", so replacing the literal
+    // entity is safe and only touches the double-escaped ones.
+    if (function_exists('setting_get') && !setting_get('labels_amp_fixed', '')) {
+        try {
+            $pdo->exec("UPDATE report_sections SET title=REPLACE(title,'&amp;','&') WHERE title LIKE '%&amp;%'");
+            $pdo->exec("UPDATE report_fields SET label=REPLACE(label,'&amp;','&') WHERE label LIKE '%&amp;%'");
+        } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('labels_amp_fixed', '1');
+    }
     // ONE-TIME rescue: an "IR" inspection report whose form was auto-imported from
     // a Word file ended up with garbled labels ("Client s p o no date", "Item as
     // percontract order table"…). Replace that garbled form with the clean layout,
@@ -875,27 +886,27 @@ function idems_install_fire_extinguisher_sections($typeId) {
 
     // 4) Physical & functional checklist — each standard check point spelled out,
     //    so the report explicitly records every one (IS 2190 / NFPA 10).
-    $s = $addSection('Physical &amp; functional checklist', 'Every routine check point — mark each Satisfactory / Unsatisfactory / Not applicable, and note anything found in the observations below.');
-    $addField($s, 'chk_location', 'Located in its designated place, accessible &amp; visible', 'select', $sat);
+    $s = $addSection('Physical & functional checklist', 'Every routine check point — mark each Satisfactory / Unsatisfactory / Not applicable, and note anything found in the observations below.');
+    $addField($s, 'chk_location', 'Located in its designated place, accessible & visible', 'select', $sat);
     $addField($s, 'chk_signage', 'Location signage / marking provided', 'select', $sat);
-    $addField($s, 'chk_nameplate', 'Nameplate &amp; operating instructions legible, facing outward', 'select', $sat);
-    $addField($s, 'chk_seal', 'Safety pin, tamper seal &amp; anti-tamper indicator intact', 'select', $sat);
+    $addField($s, 'chk_nameplate', 'Nameplate & operating instructions legible, facing outward', 'select', $sat);
+    $addField($s, 'chk_seal', 'Safety pin, tamper seal & anti-tamper indicator intact', 'select', $sat);
     $addField($s, 'chk_gauge', 'Pressure gauge reading in the green / operable range', 'select', $sat);
     $addField($s, 'chk_weight', 'Fullness confirmed by weighing / hefting (charge OK)', 'select', $sat);
     $addField($s, 'chk_body', 'Cylinder body — no corrosion, dents, pitting or leakage', 'select', $sat);
-    $addField($s, 'chk_paint', 'Paint &amp; finish in good condition', 'select', $sat);
-    $addField($s, 'chk_hose', 'Hose, discharge nozzle / horn — free of cracks &amp; blockage', 'select', $sat);
-    $addField($s, 'chk_valve', 'Cap, valve &amp; operating lever / handle in order', 'select', $sat);
-    $addField($s, 'chk_bracket', 'Wall bracket / stand / trolley secure &amp; correctly mounted', 'select', $sat);
+    $addField($s, 'chk_paint', 'Paint & finish in good condition', 'select', $sat);
+    $addField($s, 'chk_hose', 'Hose, discharge nozzle / horn — free of cracks & blockage', 'select', $sat);
+    $addField($s, 'chk_valve', 'Cap, valve & operating lever / handle in order', 'select', $sat);
+    $addField($s, 'chk_bracket', 'Wall bracket / stand / trolley secure & correctly mounted', 'select', $sat);
     $addField($s, 'chk_oring', 'O-ring / washer / gasket condition', 'select', $sat);
     $addField($s, 'chk_powder', 'Charge free-flowing / not caked (dry powder types)', 'select', $sat);
     $addField($s, 'chk_cartridge', 'Gas cartridge weight within limit (cartridge types)', 'select', $sat);
     $addField($s, 'chk_hpt', 'Hydrostatic test within validity', 'select', $sat);
     $addField($s, 'chk_refill', 'Refilling within validity / not overdue', 'select', $sat);
 
-    // 5) Pressure, weight &amp; refill record — per-unit measurements.
-    $s = $addSection('Pressure, weight &amp; refill record', 'Measured values per extinguisher — test pressure, hydrostatic-test validity, weights, leak test and refilling dates.');
-    $addField($s, 'fe_tests', 'Test &amp; weight record', 'table', '',
+    // 5) Pressure, weight & refill record — per-unit measurements.
+    $s = $addSection('Pressure, weight & refill record', 'Measured values per extinguisher — test pressure, hydrostatic-test validity, weights, leak test and refilling dates.');
+    $addField($s, 'fe_tests', 'Test & weight record', 'table', '',
         "Sr. No.|merge\n"
         . "Serial / ID No.\n"
         . "Test pressure (kg/cm²)|number\n"
@@ -909,12 +920,12 @@ function idems_install_fire_extinguisher_sections($typeId) {
         . "Next refill due|date", 2);
 
     // 6) Instruments & calibration — linked to the equipment register.
-    $s = $addSection('Instruments &amp; calibration', 'Pick an instrument from the equipment register (weighing scale, pressure gauge …) — serial and calibration dates fill in automatically.');
+    $s = $addSection('Instruments & calibration', 'Pick an instrument from the equipment register (weighing scale, pressure gauge …) — serial and calibration dates fill in automatically.');
     $addField($s, 'instruments', 'Instruments used', 'table', '',
         "Instrument|select|equip:instruments\nSr. No. / Identification number\nCalibrated on|date\nCalibrated due date|date\nNABL Traceable|select|Yes,No", 2);
 
     // 7) Observations & conclusion.
-    $s = $addSection('Observations &amp; conclusion');
+    $s = $addSection('Observations & conclusion');
     $addField($s, 'observations', 'Details of inspection carried out / observations', 'textarea', '', '', 2);
     $addField($s, 'conclusion', 'Conclusion', 'textarea', '', '', 2);
     $addField($s, 'general_remarks', 'General remarks', 'textarea', '', '', 2);
@@ -3413,16 +3424,16 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
 
     // 6 — finalize & issue
     if ($issued) {
-        $steps[] = ['key'=>'issue', 'label'=>'Issued &amp; locked', 'state'=>'done',
+        $steps[] = ['key'=>'issue', 'label'=>'Issued & locked', 'state'=>'done',
             'line'=>'The report is finalised, signed and immutable' . (!empty($doc['issue_date']) ? ' (issued ' . $b($doc['issue_date']) . ')' : '') . '.'];
     } elseif ($approved && $canFinal) {
-        $steps[] = ['key'=>'issue', 'label'=>'Finalise &amp; issue', 'state'=>'now',
+        $steps[] = ['key'=>'issue', 'label'=>'Finalise & issue', 'state'=>'now',
             'line'=>'Approved and ready. Issuing stamps the signature, locks the report and produces the final PDF.'
                   . (!$sigOnFile ? ' <b style="color:var(--warn)">The signature is not on file — it will issue unsigned.</b>' : ''),
             'post'=>['action'=>'/document-finalize?id=' . $id, 'label'=>'Finalise &amp; issue',
                      'confirm'=>'Finalise & issue this report? It becomes permanently locked (immutable).']];
     } else {
-        $steps[] = ['key'=>'issue', 'label'=>'Finalise &amp; issue', 'state'=>'todo',
+        $steps[] = ['key'=>'issue', 'label'=>'Finalise & issue', 'state'=>'todo',
             'line'=>'Once approved, a manager finalises and issues the report — the signature is stamped on automatically here.'];
     }
 
