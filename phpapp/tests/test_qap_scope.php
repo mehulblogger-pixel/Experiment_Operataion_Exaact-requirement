@@ -74,3 +74,46 @@ t_ok((int)$res2['n'] === 0 && !empty($res2['err']), 'a report type without a sco
 // Guard: a QAP that belongs to a different job is refused.
 $res3 = idems_scope_from_qap($doc, 999999);
 t_ok(!empty($res3['err']), 'a QAP that is not on this report\'s job is refused');
+
+// --- Item particulars: copied FREE from the linked purchase order -----------
+t_section('QAP/PO → item particulars autofill');
+
+$itemsField = idems_items_target_field($tid);
+t_ok(is_array($itemsField) && $itemsField['fkey'] === 'po_items', 'the PO-items table is found as the item autofill target');
+
+// A purchase order with two line items, linked through call → job → report.
+db()->prepare("INSERT INTO partner_purchase_orders (partner_id, po_number, po_type, value) VALUES (0,'PO-IT-1','REGULAR',0)")->execute();
+$poId = (int) db()->lastInsertId();
+db()->prepare("INSERT INTO po_line_items (purchase_order_id, description, item_type, quantity) VALUES (?,?,?,?)")
+    ->execute([$poId, 'Hex bolts M16x60 Gr 8.8', 'NOS', 500]);
+db()->prepare("INSERT INTO po_line_items (purchase_order_id, description, item_type, quantity) VALUES (?,?,?,?)")
+    ->execute([$poId, 'Hex nuts M16 Gr 8', 'NOS', 500]);
+db()->prepare("INSERT INTO calls (po_id, created_at) VALUES (?, ?)")->execute([$poId, date('c')]);
+$callId = (int) db()->lastInsertId();
+db()->prepare("UPDATE jobs SET call_id=? WHERE id=?")->execute([$callId, $jobId]);
+
+$doc2 = ops_one("SELECT * FROM report_docs WHERE id=?", [$docId]);
+t_eq(idems_report_po_id($doc2), $poId, 'the report resolves its linked purchase order (report → call → PO)');
+
+$ir = idems_items_from_qap($doc2, $qapId);
+t_eq((string)$ir['source'], 'po', 'items are taken straight from the linked PO (no AI)');
+t_ok((int)$ir['n'] === 2, 'both PO line items become item rows');
+
+$fresh2 = ops_one("SELECT data FROM report_docs WHERE id=?", [$docId]);
+$data2 = json_decode($fresh2['data'] ?: '[]', true);
+t_ok(isset($data2['po_items']) && count($data2['po_items']) === 2, 'the PO-items table is populated');
+$descs = implode(' | ', array_map(fn($r) => (string)($r['description_as_per_po'] ?? ''), $data2['po_items']));
+t_ok(stripos($descs, 'Hex bolts') !== false, 'the PO line description lands in the description column');
+$qtys = array_map(fn($r) => (string)($r['po_qty'] ?? ''), $data2['po_items']);
+t_ok(in_array('500', $qtys, true), 'the ordered quantity lands in the PO Qty column');
+
+// Idempotent — running again does not double-fill an already-populated table.
+$ir2 = idems_items_from_qap(ops_one("SELECT * FROM report_docs WHERE id=?", [$docId]), $qapId);
+t_eq((int)$ir2['n'], 0, 'a second run does not duplicate the item rows');
+
+// Item mapping picks PO Qty specifically, not offered/passed/rejected qty.
+$mi = idems_items_map_rows([['sr' => '1', 'description' => 'Test item', 'size' => '10', 'unit' => 'nos', 'po_qty' => '42', 'heat_no' => 'H99']], $itemsField);
+t_eq(count($mi), 1, 'a generic item row maps to one table row');
+t_eq((string)$mi[0]['po_qty'], '42', 'the quantity maps to the PO Qty column (not offered/passed)');
+t_eq((string)$mi[0]['heat_no'], 'H99', 'the heat number maps across');
+t_eq((string)$mi[0]['offered_qty'], '', 'the offered/passed columns are left blank for the inspector');

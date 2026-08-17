@@ -8468,18 +8468,160 @@ function idems_scope_from_qap($doc, $qapId) {
         ['irn' => $doc['irn'] ?? '', 'field' => $key, 'reason' => count($mapped) . ' scope rows from QAP #' . (int)$qapId . ' (' . $source . ')']);
     return ['n' => count($mapped), 'source' => $source, 'err' => ''];
 }
-// Handler: POST /document-scope-from-qap  (id, qap_id) → autofill + back to fill.
+// ---- Item / product particulars (the PO-items table) -----------------------
+// Same "fill it for me" idea for the second big table: the items offered for
+// inspection. The structured Purchase Order (if the report is against one) is
+// the authoritative, FREE source — copied straight in, no AI. Only when there is
+// no linked PO does it fall back to reading the items out of the QAP with AI.
+function idems_items_target_field($typeId) {
+    $fields = function_exists('idems_fields') ? idems_fields((int)$typeId) : [];
+    foreach ($fields as $f) if (($f['ftype'] ?? '') === 'table' && ($f['fkey'] ?? '') === 'po_items') return $f;
+    foreach ($fields as $f) {
+        if (($f['ftype'] ?? '') !== 'table') continue;
+        $hay = strtolower(((string)($f['label'] ?? '')) . ' ' . ((string)($f['fkey'] ?? '')));
+        if (preg_match('/po items|items?\s*&?\s*quantit|products?\s*offered|line items|item particulars/', $hay)) return $f;
+    }
+    return null;
+}
+// The purchase order this report is against (via its call / job), if any.
+function idems_report_po_id($doc) {
+    $callId = (int)($doc['call_id'] ?? 0);
+    if (!$callId && !empty($doc['job_id'])) $callId = (int)(ops_val("SELECT call_id FROM jobs WHERE id=?", [(int)$doc['job_id']]) ?: 0);
+    if (!$callId) return 0;
+    return (int)(ops_val("SELECT po_id FROM calls WHERE id=?", [$callId]) ?: 0);
+}
+// The PO's line items as generic item rows (description, unit, ordered qty).
+function idems_po_lines_generic($poId) {
+    if (!$poId) return [];
+    $units = function_exists('lk_options_or') ? lk_options_or('charge_unit', defined('PO_ITEM_TYPES') ? PO_ITEM_TYPES : []) : [];
+    $out = [];
+    foreach (ops_all("SELECT description, item_type, quantity FROM po_line_items WHERE purchase_order_id=? ORDER BY id", [(int)$poId]) as $l) {
+        $q = (float)$l['quantity']; $qs = rtrim(rtrim(number_format($q, 2, '.', ''), '0'), '.');
+        $out[] = ['sr' => '', 'description' => (string)$l['description'], 'size' => '',
+                  'unit' => (string)($units[$l['item_type']] ?? $l['item_type']), 'po_qty' => $qs, 'heat_no' => ''];
+    }
+    return $out;
+}
+// AI: read the items / products offered out of a QAP / ITP / PO text.
+function idems_ai_extract_items($text) {
+    if (!function_exists('ai_enabled') || !ai_enabled() || !function_exists('ai_chat')) return ['rows' => [], 'err' => 'AI is not enabled.'];
+    $sys = "You read a Quality Assurance Plan / Inspection & Test Plan / Purchase Order for an industrial product and extract "
+         . "the ITEMS or products offered for inspection. Return ONLY a compact JSON array, no prose. Each element is an object with keys: "
+         . "sr, description, size, unit, po_qty, heat_no. Only include real line items that appear in the text; never invent items. "
+         . "If there are no line items, return [].";
+    try { [$out, $err] = ai_chat($sys, substr((string)$text, 0, 14000), 1500); }
+    catch (Throwable $e) { return ['rows' => [], 'err' => $e->getMessage()]; }
+    if (!is_string($out) || trim($out) === '') return ['rows' => [], 'err' => $err ?: 'The AI did not respond.'];
+    $json = $out; if (preg_match('/\[.*\]/s', $out, $m)) $json = $m[0];
+    $data = json_decode($json, true);
+    if (!is_array($data)) return ['rows' => [], 'err' => 'Could not read the AI response.'];
+    $allow = ['sr', 'description', 'size', 'unit', 'po_qty', 'heat_no'];
+    $rows = [];
+    foreach ($data as $d) {
+        if (!is_array($d)) continue;
+        $r = []; foreach ($allow as $k) $r[$k] = (isset($d[$k]) && is_scalar($d[$k])) ? trim((string)$d[$k]) : '';
+        if ($r['description'] !== '') $rows[] = $r;
+    }
+    return ['rows' => $rows, 'err' => ''];
+}
+// Map generic item rows onto the live PO-items table's own column keys.
+function idems_items_map_rows($rows, $field) {
+    $defs = function_exists('idems_table_col_defs') ? idems_table_col_defs($field) : [];
+    if (!$defs) return [];
+    $find = function($patterns, $exclude = []) use ($defs) {
+        foreach ($defs as $ck => $d) {
+            $l = strtolower((string)($d['label'] ?? ''));
+            foreach ($exclude as $x) if (strpos($l, $x) !== false) continue 2;
+            foreach ($patterns as $p) if (strpos($l, $p) !== false) return $ck;
+        }
+        return null;
+    };
+    $cSr    = $find(['sr', 'sl', 'item no', 's. no', 's.no']);
+    $cDesc  = $find(['description', 'product', 'material', 'item']);
+    $cSize  = $find(['size', 'dimension', 'dia']);
+    $cUnit  = $find(['unit', 'uom']);
+    // "PO Qty" specifically — not offered/passed/rejected/hold/balance qty.
+    $cQty   = $find(['po qty', 'ordered qty', 'order qty'], []) ?: $find(['qty'], ['offered', 'passed', 'rejected', 'hold', 'balance']);
+    $cHeat  = $find(['heat']);
+    $put = fn(&$row, $ck, $v) => (!$ck || trim((string)$v) === '') ? null : ($row[$ck] = $v);
+    $out = [];
+    foreach ($rows as $r) {
+        $row = [];
+        $put($row, $cSr, $r['sr'] ?? '');
+        $put($row, $cDesc, $r['description'] ?? '');
+        $put($row, $cSize, $r['size'] ?? '');
+        $put($row, $cUnit, $r['unit'] ?? '');
+        $put($row, $cQty, $r['po_qty'] ?? '');
+        $put($row, $cHeat, $r['heat_no'] ?? '');
+        if (!isset($row[$cDesc]) || trim((string)$row[$cDesc]) === '') continue;   // a description is the minimum
+        foreach ($defs as $ck => $d) if (!isset($row[$ck])) $row[$ck] = '';
+        $out[] = $row;
+    }
+    return $out;
+}
+// Fill the item table: linked PO first (free), else AI from the QAP (cached).
+// Returns ['n'=>int, 'source'=>'po|ai|cache|', 'err'=>''].  n=0 with no err = nothing to do (skipped).
+function idems_items_from_qap($doc, $qapId) {
+    $field = idems_items_target_field((int)($doc['report_type_id'] ?? 0));
+    if (!$field) return ['n' => 0, 'source' => '', 'err' => ''];        // no item table on this type — skip quietly
+    $poId = idems_report_po_id($doc);
+    $source = '';
+    if ($poId) {
+        $generic = idems_po_lines_generic($poId);
+        $source = 'po';
+    } else {
+        if (!(function_exists('ai_enabled') && ai_enabled())) return ['n' => 0, 'source' => '', 'err' => ''];   // no PO, no AI → skip
+        $qap = ops_one("SELECT * FROM job_qaps WHERE id=?", [(int)$qapId]);
+        if (!$qap || (int)$qap['job_id'] !== (int)($doc['job_id'] ?? 0)) return ['n' => 0, 'source' => '', 'err' => ''];
+        $raw = (string)$qap['data']; if (($p = strpos($raw, 'base64,')) !== false) $raw = base64_decode(substr($raw, $p + 7)) ?: '';
+        $textq = function_exists('idems_source_text') ? idems_source_text($qap['mime'] ?: 'application/pdf', $raw, 16000) : '';
+        if (trim($textq) === '') return ['n' => 0, 'source' => '', 'err' => ''];
+        $sig = sha1('itemsv1|' . $textq);
+        $cached = ops_one("SELECT rows_json FROM qap_scope_cache WHERE sig=?", [$sig]);
+        if ($cached && !empty($cached['rows_json'])) { $generic = json_decode($cached['rows_json'], true) ?: []; $source = 'cache'; }
+        else {
+            $res = idems_ai_extract_items($textq); $source = 'ai';
+            if (!empty($res['err'])) return ['n' => 0, 'source' => $source, 'err' => ''];   // fail-soft: items are a bonus
+            $generic = $res['rows'];
+            if ($generic) { try { db()->prepare("INSERT INTO qap_scope_cache (sig,product,standards,rows_json,source,n,created_at) VALUES (?,?,?,?,?,?,?)")
+                ->execute([$sig, (string)($doc['product_category'] ?? ''), (string)($doc['standards'] ?? ''), json_encode($generic), 'ai_items', count($generic), date('c')]); } catch (Throwable $e) {} }
+        }
+    }
+    if (!$generic) return ['n' => 0, 'source' => $source, 'err' => ''];
+    $mapped = idems_items_map_rows($generic, $field);
+    if (!$mapped) return ['n' => 0, 'source' => $source, 'err' => ''];
+    $key = $field['fkey'];
+    $data = json_decode(($doc['data'] ?? '') ?: '[]', true); if (!is_array($data)) $data = [];
+    // Don't double-fill if the item table already has rows (e.g. filled earlier).
+    if (!empty($data[$key]) && is_array($data[$key])) return ['n' => 0, 'source' => $source, 'err' => ''];
+    $data[$key] = $mapped;
+    db()->prepare("UPDATE report_docs SET data=?, updated_at=? WHERE id=?")->execute([json_encode($data), date('c'), (int)$doc['id']]);
+    if (function_exists('idems_log')) idems_log('report_doc', (int)$doc['id'], 'ITEMS_FROM_QAP',
+        ['irn' => $doc['irn'] ?? '', 'field' => $key, 'reason' => count($mapped) . ' item rows (' . $source . ')']);
+    return ['n' => count($mapped), 'source' => $source, 'err' => ''];
+}
+
+// Handler: POST /document-scope-from-qap  (id, qap_id) → autofill scope + items.
 function ops_idems_scope_from_qap($method) {
     if ($method !== 'POST') redirect('/documents');
     $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
     if (!$doc) { http_response_code(404); view('notfound'); return true; }
     ops_require(function_exists('idems_can_edit_doc') ? idems_can_edit_doc($doc) : true, 'This report can no longer be changed.');
-    $res = idems_scope_from_qap($doc, (int)($_POST['qap_id'] ?? 0));
-    if (!empty($res['err'])) { flash($res['err'], 'error'); redirect('/document-fill?id=' . (int)$doc['id']); }
-    $how = $res['source'] === 'cache' ? ' (reused from a previous QAP — no AI used)'
-         : ($res['source'] === 'ai' ? ' with AI' : ' (basic extraction — enable AI for richer results)');
-    flash('Filled in ' . (int)$res['n'] . ' inspection-scope ' . ((int)$res['n'] === 1 ? 'activity' : 'activities')
-        . ' from the QAP' . $how . '. Review and adjust the observations below, then submit.');
+    $qapId = (int)($_POST['qap_id'] ?? 0);
+    $scope = idems_scope_from_qap($doc, $qapId);
+    // Items are a best-effort bonus — a fresh $doc so the item fill sees the rows
+    // the scope fill just wrote (they persist independently to the same column set).
+    $doc2 = ops_one("SELECT * FROM report_docs WHERE id=?", [(int)$doc['id']]) ?: $doc;
+    $items = idems_items_from_qap($doc2, $qapId);
+    if (!empty($scope['err'])) { flash($scope['err'], 'error'); redirect('/document-fill?id=' . (int)$doc['id']); }
+    $how = $scope['source'] === 'cache' ? ' (reused from a previous QAP — no AI used)'
+         : ($scope['source'] === 'ai' ? ' with AI' : ' (basic extraction — enable AI for richer results)');
+    $msg = 'Filled in ' . (int)$scope['n'] . ' inspection-scope ' . ((int)$scope['n'] === 1 ? 'activity' : 'activities') . ' from the QAP' . $how . '.';
+    if ((int)$items['n'] > 0) {
+        $isrc = $items['source'] === 'po' ? ' from the linked purchase order' : ' from the QAP';
+        $msg .= ' Also added ' . (int)$items['n'] . ' item ' . ((int)$items['n'] === 1 ? 'row' : 'rows') . $isrc . '.';
+    }
+    flash($msg . ' Review and adjust below, then submit.');
     redirect('/document-fill?id=' . (int)$doc['id']);
     return true;
 }
