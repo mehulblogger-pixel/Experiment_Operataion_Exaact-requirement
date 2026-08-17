@@ -7841,6 +7841,34 @@ function tech_note_usage($ids) {
 }
 
 // ---- Handler: writing assistant (standalone tool + AJAX expand) ----
+// AJAX: turn a rough / regional-language dictation into clean inspection-report
+// English. AI-gated (ai_enabled) and token-thrifty (short field, capped output).
+// Preserves every fact/number/finding; never invents. Returns JSON {ok, text}.
+function idems_polish_text($text, $fieldLabel = '') {
+    if (!function_exists('ai_enabled') || !ai_enabled() || !function_exists('ai_chat')) return ['ok' => false, 'error' => 'AI is not enabled. Add a provider under Settings → AI.'];
+    $text = trim((string)$text);
+    if ($text === '') return ['ok' => false, 'error' => 'Nothing to polish.'];
+    $ctx = $fieldLabel !== '' ? ' The field is: "' . preg_replace('/[^A-Za-z0-9 \/&().-]/', '', substr($fieldLabel, 0, 60)) . '".' : '';
+    $sys = "You are cleaning up ONE field of a third-party inspection report, dictated by a field engineer whose first "
+         . "language may not be English — the text may be in Hindi or another Indian language, or in broken English." . $ctx
+         . " Rewrite it as clear, concise, professional technical inspection-report English. Preserve every technical fact, "
+         . "number, dimension, standard, clause and finding EXACTLY — never add, invent, soften, exaggerate or omit anything. "
+         . "If it is in another language, translate it. Keep it brief and factual (a few sentences at most). "
+         . "Return ONLY the rewritten text — no preamble, quotes, notes or explanation.";
+    try { [$out, $err] = ai_chat($sys, substr($text, 0, 4000), 700); } catch (Throwable $e) { return ['ok' => false, 'error' => $e->getMessage()]; }
+    if (!is_string($out) || trim($out) === '') return ['ok' => false, 'error' => $err ?: 'The AI did not respond.'];
+    $clean = trim($out);
+    $clean = trim(preg_replace('/^\s*["“\'‘]|["”\'’]\s*$/u', '', $clean));   // drop any wrapping quotes
+    return ['ok' => true, 'text' => $clean];
+}
+function ops_idems_polish_text($method) {
+    header('Content-Type: application/json');
+    if (!current_user()) { echo json_encode(['ok' => false, 'error' => 'Please log in.']); return true; }
+    if ($method !== 'POST') { echo json_encode(['ok' => false, 'error' => 'POST only.']); return true; }
+    if (function_exists('csrf_ok') && !csrf_ok($_POST['_csrf'] ?? '')) { echo json_encode(['ok' => false, 'error' => 'Session expired — reload the page.']); return true; }
+    echo json_encode(idems_polish_text($_POST['text'] ?? '', (string)($_POST['field'] ?? '')));
+    return true;
+}
 function ops_idems_writing($method) {
     ops_require((bool)current_user(), 'Please log in.');
     // AJAX: expand text, used by the inline "Improve" button on report forms

@@ -36,8 +36,14 @@
     $opts = idems_field_options($f, $doc);
     switch ($f['ftype']) {
       case 'textarea':
+        $aiOn = function_exists('ai_enabled') && ai_enabled();
         echo '<textarea class="form-control ta-improve" id="ta_'.e($k).'" name="f['.e($k).']" data-key="'.e($k).'"'.$reqAttr.' rows="3" placeholder="'.e($f['placeholder']).'">'.e(is_array($val)?'':$val).'</textarea>';
-        echo '<div style="margin-top:4px"><button type="button" class="btn small secondary" onclick="idemsImprove(\''.e($k).'\')">✒️ Improve wording</button> <span class="muted" style="font-size:11px">type shorthand — e.g. “dimension ok”</span></div>';
+        echo '<div class="ta-tools" style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">';
+        echo '<button type="button" class="btn small secondary dict-btn" onclick="idemsDictate(\''.e($k).'\',this)" style="display:none">🎤 Dictate</button>';
+        if ($aiOn) echo '<button type="button" class="btn small secondary" onclick="idemsPolish(\''.e($k).'\',this)" title="Turn a rough or regional-language dictation into clear report English — nothing is invented or removed">✨ Polish / translate</button>';
+        echo '<button type="button" class="btn small secondary" onclick="idemsImprove(\''.e($k).'\')">✒️ Improve wording</button>';
+        echo '<span class="muted" style="font-size:11px">type or dictate — shorthand like “dimension ok” is fine</span>';
+        echo '</div>';
         break;
       case 'number': case 'text': case 'date': case 'time': case 'qr':
         $t = $f['ftype']==='number'?'number':($f['ftype']==='date'?'date':($f['ftype']==='time'?'time':'text'));
@@ -207,6 +213,27 @@
 </div>
 <div class="panel" style="margin-bottom:12px;border-left:3px solid var(--brand);background:var(--soft);font-size:12.5px;padding:8px 12px">
   Header details — <b>Client, Vendor, PO, Applicable standards, Result &amp; Release status</b> — are on <a href="/document-edit?id=<?= (int)$doc['id'] ?>">✎ Edit details</a>. Your signature (draw or upload) is set once on <a href="/my-signature" target="_blank">My signature</a> and applied automatically.
+</div>
+
+<?php // Voice dictation bar — revealed by JS only where the browser supports speech
+      // input. Dictate in your own language on any paragraph field, then Polish /
+      // translate turns it into report English. ?>
+<div id="dictBar" class="panel" style="display:none;margin-bottom:12px;padding:8px 12px;font-size:12.5px;gap:8px;flex-wrap:wrap;align-items:center">
+  🎤 <b>Dictation</b> — speak instead of typing on any paragraph field. Language:
+  <select id="dictLang" class="form-control" style="max-width:210px;display:inline-block;width:auto">
+    <option value="en-IN">English (India)</option>
+    <option value="en-US">English (US/UK)</option>
+    <option value="hi-IN">हिन्दी — Hindi</option>
+    <option value="gu-IN">ગુજરાતી — Gujarati</option>
+    <option value="mr-IN">मराठी — Marathi</option>
+    <option value="ta-IN">தமிழ் — Tamil</option>
+    <option value="te-IN">తెలుగు — Telugu</option>
+    <option value="bn-IN">বাংলা — Bengali</option>
+    <option value="kn-IN">ಕನ್ನಡ — Kannada</option>
+    <option value="ml-IN">മലയാളം — Malayalam</option>
+    <option value="pa-IN">ਪੰਜਾਬੀ — Punjabi</option>
+  </select>
+  <span class="muted">Speak in your language, then <b>✨ Polish / translate</b> turns it into clear report English.</span>
 </div>
 
 <?php // Where the report stands + the approval trail + Submit — all on this screen,
@@ -386,6 +413,54 @@ function idemsImprove(k){
     .then(function(r){return r.json();}).then(function(d){ if(d&&d.text) ta.value=d.text; })
     .catch(function(){ alert('Could not reach the writing assistant.'); });
 }
+// ---- Voice dictation (browser speech → text) + AI polish / translate -------
+(function(){
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var bar = document.getElementById('dictBar'), langSel = document.getElementById('dictLang');
+  if (SR) {
+    if (bar) bar.style.display = 'flex';
+    Array.prototype.forEach.call(document.querySelectorAll('.dict-btn'), function(b){ b.style.display=''; });
+    try { var saved = localStorage.getItem('dictLang'); if (saved && langSel) langSel.value = saved; } catch(e){}
+    if (langSel) langSel.addEventListener('change', function(){ try{ localStorage.setItem('dictLang', langSel.value); }catch(e){} });
+  }
+  var rec = null, recKey = null;
+  window.idemsDictate = function(k, btn){
+    if (!SR) { alert('Voice input is not supported in this browser. Chrome (Android or desktop) works best.'); return; }
+    var ta = document.getElementById('ta_'+k); if (!ta) return;
+    if (rec && recKey === k) { try{ rec.stop(); }catch(e){} return; }   // toggle off
+    if (rec) { try{ rec.stop(); }catch(e){} }
+    rec = new SR();
+    rec.lang = (langSel && langSel.value) || 'en-IN';
+    rec.continuous = true; rec.interimResults = true;
+    var base = ta.value ? (ta.value.replace(/\s*$/,'') + ' ') : '';
+    function stopUI(){ rec = null; recKey = null; if (btn){ btn.textContent = '🎤 Dictate'; btn.style.borderColor=''; btn.style.color=''; } }
+    rec.onresult = function(ev){
+      var finalT = '', interim = '';
+      for (var i = ev.resultIndex; i < ev.results.length; i++){
+        if (ev.results[i].isFinal) finalT += ev.results[i][0].transcript; else interim += ev.results[i][0].transcript;
+      }
+      if (finalT) base = base + finalT.trim() + ' ';
+      ta.value = base + interim;
+      ta.dispatchEvent(new Event('input', {bubbles:true}));
+    };
+    rec.onerror = function(e){ var err = e && e.error; stopUI(); if (err === 'not-allowed' || err === 'service-not-allowed') alert('Microphone permission is needed to dictate.'); };
+    rec.onend = stopUI;
+    recKey = k;
+    if (btn){ btn.textContent = '⏹ Stop'; btn.style.borderColor='var(--bad)'; btn.style.color='var(--bad)'; }
+    try { rec.start(); } catch(e){ stopUI(); }
+  };
+  window.idemsPolish = function(k, btn){
+    var ta = document.getElementById('ta_'+k); if (!ta || !ta.value.trim()) return;
+    var body = new URLSearchParams({ text: ta.value, field: k, _csrf: '<?= e(csrf_token()) ?>' });
+    var old = btn.textContent; btn.disabled = true; btn.textContent = 'Polishing…';
+    fetch('/document-polish-text', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: body.toString()})
+      .then(function(r){ return r.json(); })
+      .then(function(d){ btn.disabled = false;
+        if (d && d.ok && d.text){ ta.value = d.text; ta.dispatchEvent(new Event('input',{bubbles:true})); btn.textContent = '✓ Polished'; setTimeout(function(){ btn.textContent = old; }, 1600); }
+        else { btn.textContent = old; alert((d && d.error) || 'Could not polish the text.'); } })
+      .catch(function(){ btn.disabled = false; btn.textContent = old; alert('Could not reach the writing assistant.'); });
+  };
+})();
 function idemsAddRow(btn){ var wrap=btn.closest('.rep-table'); var tpl=wrap.querySelector('template'); var tb=wrap.querySelector('tbody');
   // give the new row a unique index so all its cells POST together as ONE row.
   window.__rowSeq=(window.__rowSeq||1000)+1;
