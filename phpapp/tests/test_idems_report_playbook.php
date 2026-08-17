@@ -52,6 +52,21 @@ db()->prepare("INSERT INTO report_files (report_doc_id, field_key, kind, file_na
 [$onFile3] = idems_report_signature_state($doc);
 t_ok($onFile3 === true, 'a signature captured on the report body also counts as on file');
 
+// --- Approval hand-off: a submitted report shows an approval step ---
+// Put the report under review with a pending approver who is NOT the current
+// (guest) viewer, so the step is informational — it must never offer the approve
+// buttons to someone who cannot act.
+db()->prepare("UPDATE report_docs SET status='UNDER_REVIEW' WHERE id=?")->execute([$docId]);
+db()->prepare("INSERT INTO report_approvals (report_doc_id, level, approver_kind, approver_role, resolved_user_id, status, created_at)
+    VALUES (?,?,?,?,?,'PENDING',?)")->execute([$docId, 1, 'REPORT_PICK', '', 99999, date('c')]);
+$docUR = ops_one("SELECT * FROM report_docs WHERE id=?", [$docId]);
+$appr = idems_report_approvals($docId);
+$pbUR = idems_report_playbook($docUR, $appr, true);
+$ap = null; foreach ($pbUR['steps'] as $s) if ($s['key'] === 'approve') $ap = $s;
+t_ok(is_array($ap) && $ap['state'] === 'info', 'a submitted report shows an awaiting-approval step to a non-approver');
+t_ok(empty($ap['approve']), 'the approve buttons are NOT offered to someone who cannot act');
+t_ok($pbUR['can_act'] === false, 'the playbook reports the viewer cannot act on this step');
+
 // An issued report shows the closing state, not an actionable step.
 db()->prepare("UPDATE report_docs SET status='ISSUED', finalized=1 WHERE id=?")->execute([$docId]);
 $docIssued = ops_one("SELECT * FROM report_docs WHERE id=?", [$docId]);

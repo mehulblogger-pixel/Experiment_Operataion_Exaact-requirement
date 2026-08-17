@@ -3169,6 +3169,12 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
     }
     $approved = $anyApproved && !$anyPending;
 
+    // The step waiting on someone right now, and whether the LOGGED-IN person is
+    // the one it waits on — so the approver can act straight from the playbook
+    // instead of hunting for the approve button on a secondary tab.
+    $curStep = ($id && function_exists('idems_current_step')) ? idems_current_step($id) : null;
+    $canAct  = ($curStep && function_exists('idems_can_act_step')) ? idems_can_act_step($curStep) : false;
+
     // Completeness only matters while the report is still the author's to submit.
     $comp = ($isDraft && $canEdit && function_exists('idems_completeness_check')) ? idems_completeness_check($doc) : null;
     $filled = $submitted || ($comp ? !empty($comp['ok']) : false);
@@ -3231,16 +3237,22 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
             'line'=>'Fill the report, then submit it for approval.'];
     }
 
-    // 5 — approval (not the author's action — informational)
+    // 5 — approval. When the report is waiting on YOU, the approve / send-back /
+    // reject buttons are right here — this is how a submitted report is carried
+    // forward, without hunting for the action on another tab.
     if ($approved) {
         $steps[] = ['key'=>'approve', 'label'=>'Approved', 'state'=>'done',
             'line'=>$names ? 'Approved by ' . $b(implode(', ', $names)) : 'Approved.'];
+    } elseif ($submitted && $canAct) {
+        $steps[] = ['key'=>'approve', 'label'=>'Your approval is needed', 'state'=>'now',
+            'line'=>'This report has been submitted to you. Approve it to move it forward, send it back for changes, or reject it.',
+            'approve'=>true];
     } elseif ($submitted) {
         $steps[] = ['key'=>'approve', 'label'=>'Awaiting approval', 'state'=>'info',
-            'line'=>$names ? ('With ' . implode(', ', array_map($b, $names))) : 'Waiting on the approver.'];
+            'line'=>$names ? ('With ' . implode(', ', array_map($b, $names)) . ' — they approve, send back or reject it.') : 'Waiting on the approver.'];
     } else {
         $steps[] = ['key'=>'approve', 'label'=>'Approval', 'state'=>'todo',
-            'line'=>'An approver signs off after the report is submitted.'];
+            'line'=>'When you submit, it is routed to your approver, who approves, sends back or rejects it.'];
     }
 
     // 6 — finalize & issue
@@ -3258,16 +3270,19 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
             'line'=>'Once approved, a manager finalises and issues the report — the signature is stamped on automatically here.'];
     }
 
-    return ['steps'=>$steps, 'issued'=>$issued, 'sig_on_file'=>$sigOnFile, 'doc'=>$doc];
+    return ['steps'=>$steps, 'issued'=>$issued, 'sig_on_file'=>$sigOnFile, 'can_act'=>$canAct, 'doc'=>$doc];
 }
 // Render the playbook card. Supports link CTAs and POST-button CTAs.
 function idems_render_report_playbook($doc, $approvals = [], $hasSchema = true) {
     if (!$doc) return;
     $canEdit = function_exists('idems_can_edit_doc') ? idems_can_edit_doc($doc) : false;
     $canFinal = is_master() || (function_exists('can') && can('idems.finalize'));
-    if (!$canEdit && !$canFinal) return;                 // guide is for the people who act on it
     $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
     $pb  = idems_report_playbook($doc, $approvals, $hasSchema);
+    // Show it to the people who act on it: the author/editor, a finaliser, or —
+    // crucially — the approver this report is currently waiting on, so they get
+    // the approve/send-back/reject buttons here rather than nowhere obvious.
+    if (!$canEdit && !$canFinal && empty($pb['can_act'])) return;
     ob_start();
     echo function_exists('tosrm_playbook_css') ? tosrm_playbook_css() : ''; ?>
     <div class="card tosrm-pb" style="margin:0 0 16px">
@@ -3287,6 +3302,18 @@ function idems_render_report_playbook($doc, $approvals = [], $hasSchema = true) 
                 <?php elseif ($st === 'done'): ?><span class="pb-tag t-done">Done</span><?php endif; ?>
               </div>
               <div class="pb-line"><?= $s['line'] /* trusted: built above with escaping */ ?></div>
+              <?php if (!empty($s['approve'])): ?>
+                <form method="post" action="/document-approve" style="margin-top:9px">
+                  <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
+                  <input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
+                  <input class="form-control" name="remarks" placeholder="Remarks (required to send back / reject)" style="margin-bottom:8px;max-width:520px">
+                  <div style="display:flex;gap:6px;flex-wrap:wrap">
+                    <button class="btn small" type="submit" name="decision" value="approve">✓ Approve &amp; move forward</button>
+                    <button class="btn small secondary" type="submit" name="decision" value="sendback">↩ Send back for changes</button>
+                    <button class="btn small secondary" type="submit" name="decision" value="reject">✕ Reject</button>
+                  </div>
+                </form>
+              <?php endif; ?>
             </div>
             <?php if (!empty($s['post']) && ($st === 'now' || $st === 'blocked')): ?>
               <form method="post" action="<?= $esc($s['post']['action']) ?>" class="pb-cta" style="margin:0"
@@ -3597,11 +3624,19 @@ function ops_idems_documents($route, $method) {
     $pdo = db();
     if ($route === 'documents') {
         $q = trim($_GET['q'] ?? ''); $ft = $_GET['type'] ?? ''; $fs = $_GET['status'] ?? '';
+        $mine = ($_GET['mine'] ?? '') === 'approve';
         [$w, $a] = scope_clause('d.office_id', 'd.sbu');
         $where = "d.deleted=0 AND $w"; $args = $a;
         if ($q)  { $where .= " AND (d.irn LIKE ? OR d.title LIKE ? OR d.project_name LIKE ?)"; array_push($args, "%$q%", "%$q%", "%$q%"); }
         if ($ft) { $where .= " AND d.type_code=?"; $args[] = $ft; }
         if ($fs) { $where .= " AND d.status=?"; $args[] = $fs; }
+        // "Awaiting my approval": the report is under review and the step it is
+        // currently waiting on (the lowest still-pending level) resolves to me —
+        // by name, by delegation, by my role, or the open "any approver" step
+        // when I may finalize. This is where the approver finds what an inspector
+        // has just submitted to them.
+        [$aw, $aa] = idems_awaiting_my_approval_clause();
+        if ($mine) { $where .= " AND $aw"; $args = array_merge($args, $aa); }
         $rows = ops_all("SELECT d.*, bp.display_name client_disp, bp.legal_name client_name, i.name inspector_name
             FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN inspectors i ON i.id=d.inspector_id
             WHERE $where ORDER BY d.id DESC", $args);
@@ -3609,7 +3644,10 @@ function ops_idems_documents($route, $method) {
             SUM(CASE WHEN status IN ('DRAFT','SUBMITTED','UNDER_REVIEW','REJECTED') THEN 1 ELSE 0 END) open_n,
             SUM(CASE WHEN status IN ('APPROVED','ISSUED') THEN 1 ELSE 0 END) issued_n
             FROM report_docs d WHERE d.deleted=0 AND $w", $a) ?: [];
-        view('ops/idems/register', ['rows'=>$rows, 'q'=>$q, 'types'=>idems_types(false), 'ft'=>$ft, 'fs'=>$fs, 'counts'=>$counts]);
+        // How many are waiting on ME right now, for the queue chip.
+        $mineN = (int) ops_val("SELECT COUNT(*) FROM report_docs d WHERE d.deleted=0 AND $w AND $aw", array_merge($a, $aa));
+        view('ops/idems/register', ['rows'=>$rows, 'q'=>$q, 'types'=>idems_types(false), 'ft'=>$ft, 'fs'=>$fs,
+            'counts'=>$counts, 'mine'=>$mine, 'mineN'=>$mineN]);
         return true;
     }
     // Release Note register — Release Notes only, each showing the inspection
@@ -5031,6 +5069,26 @@ function idems_can_act_step($step) {
     if (!empty($step['approver_role']) && user_role() === $step['approver_role']) return true;
     if (empty($step['resolved_user_id']) && empty($step['approver_role']) && can('idems.finalize')) return true;
     return false;
+}
+// A SQL fragment (against report_docs alias `d`) + args that select the reports
+// currently waiting on the LOGGED-IN person to approve — the same test as
+// idems_can_act_step(), expressed in SQL so a register/queue can list them.
+// Matches the report's current pending step (lowest still-pending level) when it
+// resolves to me by name, delegation, or my role, or is an open "any approver"
+// step I may finalize. Returns ['0', []] when nobody is logged in.
+function idems_awaiting_my_approval_clause() {
+    $uid = (int)(current_user()['id'] ?? 0);
+    if (!$uid) return ['0', []];
+    $role = function_exists('user_role') ? (string)user_role() : '';
+    $canFin = (is_master() || (function_exists('can') && can('idems.finalize'))) ? true : false;
+    $sql = "d.status='UNDER_REVIEW' AND EXISTS (
+              SELECT 1 FROM report_approvals a
+              WHERE a.report_doc_id=d.id AND a.status='PENDING'
+                AND a.level=(SELECT MIN(a2.level) FROM report_approvals a2 WHERE a2.report_doc_id=d.id AND a2.status='PENDING')
+                AND ( a.resolved_user_id=? OR a.delegated_to=? OR (COALESCE(a.approver_role,'')<>'' AND a.approver_role=?)"
+              . ($canFin ? " OR (COALESCE(a.resolved_user_id,0)=0 AND COALESCE(a.approver_role,'')='')" : "")
+              . " ) )";
+    return [$sql, [$uid, $uid, $role]];
 }
 function idems_approver_email($userId) { return $userId ? (string)ops_val("SELECT email FROM users WHERE id=? AND is_active=1", [(int)$userId]) : ''; }
 function idems_notify_approver($doc, $step) {

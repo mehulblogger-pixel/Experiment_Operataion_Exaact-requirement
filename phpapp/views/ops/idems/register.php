@@ -16,7 +16,19 @@
   <div class="kpi"><div class="k-lab">Total</div><div class="k-val"><?= (int)($counts['total'] ?? 0) ?></div><div class="k-sub">in register</div></div>
   <div class="kpi"><div class="k-lab">Open / in progress</div><div class="k-val"><?= (int)($counts['open_n'] ?? 0) ?></div><div class="k-sub">draft · submitted · review</div></div>
   <div class="kpi"><div class="k-lab">Approved / issued</div><div class="k-val up"><?= (int)($counts['issued_n'] ?? 0) ?></div><div class="k-sub">finalized</div></div>
+  <?php // The approver's inbox: reports an inspector has submitted that are
+        // waiting on ME to approve, send back or reject. Clicking filters to them. ?>
+  <?php if ((int)($mineN ?? 0) > 0 || !empty($mine)): ?>
+  <a class="kpi" href="/documents<?= empty($mine) ? '?mine=approve' : '' ?>" style="text-decoration:none;<?= !empty($mine) ? 'outline:2px solid var(--brand);' : '' ?>border-color:var(--brand)">
+    <div class="k-lab" style="color:var(--brand)">Awaiting my approval</div>
+    <div class="k-val" style="color:var(--brand)"><?= (int)($mineN ?? 0) ?></div>
+    <div class="k-sub"><?= !empty($mine) ? 'showing these — clear filter' : 'submitted to me — click to act' ?></div>
+  </a>
+  <?php endif; ?>
 </div>
+<?php if (!empty($mine)): ?>
+  <p class="sub" style="margin:8px 2px"><a href="/documents">← All reports</a> · showing only reports waiting on you to approve.</p>
+<?php endif; ?>
 
 <form method="get" action="/documents" class="chip-row" style="margin:10px 0;gap:6px">
   <select class="form-control" name="type" onchange="this.form.submit()" style="max-width:200px"><option value="">All types</option>
