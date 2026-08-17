@@ -3120,6 +3120,192 @@ function idems_status_pill($s) {
     return ['DRAFT'=>'p-mut','SUBMITTED'=>'p-info','UNDER_REVIEW'=>'p-warn','APPROVED'=>'p-ok','ISSUED'=>'p-ok','REJECTED'=>'p-bad','ARCHIVED'=>'p-mut'][$s] ?? 'p-mut';
 }
 
+// ---------------------------------------------------------------------------
+//  Report playbook — the one clear path from a blank report to an issued PDF.
+//
+//  The report screen had grown a dozen scattered buttons (fill, edit, submit,
+//  finalize, download, evidence, review, revise …) with no sense of order, so
+//  people could not tell what to do next — and the automatic signature was
+//  invisible: it is stamped on issue only if a signature is on file, but
+//  nothing told the inspector that, or offered to add one. This turns the whole
+//  thing into an ordered checklist with exactly one "do this now" step, and
+//  makes the signature a first-class step you can complete in one click.
+// ---------------------------------------------------------------------------
+// Is the report's inspector's signature on file (so it auto-stamps at issue)?
+// Returns [bool onFile, string inspectorName, bool currentUserIsInspector].
+function idems_report_signature_state($doc) {
+    $insId = (int)($doc['inspector_id'] ?? 0);
+    $name  = trim((string)($doc['inspector_name'] ?? ''));
+    if ($name === '' && $insId) $name = (string)ops_val("SELECT name FROM inspectors WHERE id=?", [$insId]);
+    // A signature file already captured ON the report body (a signature field)
+    // counts too — that also reaches the PDF.
+    $onReport = $doc && !empty($doc['id'])
+        ? (int)ops_val("SELECT COUNT(*) FROM report_files WHERE report_doc_id=? AND kind IN ('signature','sig_inspector') AND COALESCE(data,'')<>''", [(int)$doc['id']]) > 0
+        : false;
+    $onFile = $onReport || ($insId && function_exists('inspector_signature') && trim((string)inspector_signature($insId)) !== '');
+    $u = function_exists('current_user') ? current_user() : null;
+    $isMine = $u && $insId && (int)($u['inspector_id'] ?? 0) === $insId;
+    return [$onFile, $name, (bool)$isMine];
+}
+// Build the ordered steps. Pure-ish (reads doc state); returns a structure the
+// renderer turns into the card. Exactly one step is 'now' at any time.
+function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
+    $id       = (int)($doc['id'] ?? 0);
+    $status   = (string)($doc['status'] ?? 'DRAFT');
+    $issued   = !empty($doc['finalized']) || $status === 'ISSUED';
+    $isDraft  = in_array($status, ['DRAFT', 'REJECTED'], true);
+    $submitted= in_array($status, ['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'ISSUED'], true);
+    $canEdit  = function_exists('idems_can_edit_doc') ? idems_can_edit_doc($doc) : false;
+    $canFinal = is_master() || (function_exists('can') && can('idems.finalize'));
+
+    $anyApproved = false; $anyPending = false; $names = [];
+    foreach ((array)$approvals as $a) {
+        if (($a['status'] ?? '') === 'APPROVED') $anyApproved = true;
+        if (in_array($a['status'] ?? '', ['PENDING', 'SENTBACK'], true)) $anyPending = true;
+        $nm = trim(trim((string)($a['first_name'] ?? '') . ' ' . (string)($a['last_name'] ?? '')));
+        if ($nm === '') $nm = trim((string)($a['username'] ?? $a['approver_name'] ?? ''));
+        if ($nm === '' && !empty($a['approver_role'])) $nm = (string)(ORG_ROLES[$a['approver_role']] ?? $a['approver_role']);
+        if ($nm !== '') $names[] = $nm . (($a['status'] ?? '') === 'APPROVED' ? ' ✓' : (($a['status'] ?? '') === 'SENTBACK' ? ' (sent back)' : ' (pending)'));
+    }
+    $approved = $anyApproved && !$anyPending;
+
+    // Completeness only matters while the report is still the author's to submit.
+    $comp = ($isDraft && $canEdit && function_exists('idems_completeness_check')) ? idems_completeness_check($doc) : null;
+    $filled = $submitted || ($comp ? !empty($comp['ok']) : false);
+
+    [$sigOnFile, $insName, $sigIsMine] = idems_report_signature_state($doc);
+
+    $steps = [];
+    $b = fn($s) => '<b>' . htmlspecialchars((string)$s, ENT_QUOTES) . '</b>';
+
+    // 1 — opened
+    $steps[] = ['key'=>'open', 'label'=>'Report opened', 'state'=>'done',
+        'line'=>'Reference ' . $b($doc['irn'] ?? '') . ' · ' . htmlspecialchars((string)($doc['type_name'] ?: $doc['type_code'] ?? ''), ENT_QUOTES)
+              . ($insName !== '' ? ' · inspector ' . $b($insName) : '')];
+
+    // 2 — fill (only when the type has a form to fill)
+    if ($hasSchema) {
+        $st = $filled ? 'done' : ($canEdit ? 'now' : 'todo');
+        $line = $filled ? 'The report body is filled in.'
+              : ($comp ? ('Fill the report body — ' . $b($comp['passed'] . '/' . $comp['applicable']) . ' completeness checks passing.')
+                       : 'Fill the report body with the inspection details.');
+        $steps[] = ['key'=>'fill', 'label'=>'Fill in the report', 'state'=>$st, 'line'=>$line,
+            'href'=>$canEdit ? '/document-fill?id=' . $id : '', 'cta'=>$canEdit ? '✍ Fill report' : ''];
+    }
+
+    // 3 — signature (the auto-stamp, made visible + one-click)
+    if ($sigOnFile) {
+        $steps[] = ['key'=>'sign', 'label'=>'Signature ready', 'state'=>'done',
+            'line'=>'The inspector\'s signature is on file — it is stamped on the issued PDF automatically. Nothing more to do.'];
+    } elseif ($issued) {
+        $steps[] = ['key'=>'sign', 'label'=>'Signature', 'state'=>'info',
+            'line'=>'This report was issued without an inspector signature on file.'];
+    } elseif ($sigIsMine) {
+        $steps[] = ['key'=>'sign', 'label'=>'Add your signature', 'state'=>($filled ? 'now' : 'todo'),
+            'line'=>'Set your signature once and it is stamped on every report you sign or approve — automatically, when the report is issued. You have none on file yet.',
+            'href'=>'/my-signature', 'cta'=>'✍ Add my signature'];
+    } else {
+        $steps[] = ['key'=>'sign', 'label'=>'Inspector signature not on file', 'state'=>'todo',
+            'line'=>($insName !== '' ? $b($insName) . ' has' : 'The inspector has') . ' no signature on file, so the issued PDF would be unsigned. They add it under “My signature”, or a manager uploads it on their profile.',
+            'href'=>$insName !== '' && (int)($doc['inspector_id'] ?? 0) ? '/inspector?id=' . (int)$doc['inspector_id'] : '',
+            'cta'=>$insName !== '' && (int)($doc['inspector_id'] ?? 0) ? 'Open profile' : ''];
+    }
+
+    // 4 — submit for review
+    if ($submitted) {
+        $steps[] = ['key'=>'submit', 'label'=>'Submitted for review', 'state'=>'done',
+            'line'=>'The report has gone forward for approval.'];
+    } elseif ($isDraft && $canEdit) {
+        if ($comp && !empty($comp['ok'])) {
+            $steps[] = ['key'=>'submit', 'label'=>'Submit for review', 'state'=>'now',
+                'line'=>'All completeness checks pass — send it forward to the approver.',
+                'post'=>['action'=>'/document-submit?id=' . $id, 'label'=>'✓ Submit for review']];
+        } else {
+            $n = $comp ? (int)$comp['failed'] : 0;
+            $steps[] = ['key'=>'submit', 'label'=>'Submit for review', 'state'=>'blocked',
+                'line'=>($n ? $b($n . ' completeness check(s)') . ' still failing. ' : '') . 'Clear them, then this opens.',
+                'href'=>'#completeness', 'cta'=>'See what\'s missing'];
+        }
+    } else {
+        $steps[] = ['key'=>'submit', 'label'=>'Submit for review', 'state'=>'todo',
+            'line'=>'Fill the report, then submit it for approval.'];
+    }
+
+    // 5 — approval (not the author's action — informational)
+    if ($approved) {
+        $steps[] = ['key'=>'approve', 'label'=>'Approved', 'state'=>'done',
+            'line'=>$names ? 'Approved by ' . $b(implode(', ', $names)) : 'Approved.'];
+    } elseif ($submitted) {
+        $steps[] = ['key'=>'approve', 'label'=>'Awaiting approval', 'state'=>'info',
+            'line'=>$names ? ('With ' . implode(', ', array_map($b, $names))) : 'Waiting on the approver.'];
+    } else {
+        $steps[] = ['key'=>'approve', 'label'=>'Approval', 'state'=>'todo',
+            'line'=>'An approver signs off after the report is submitted.'];
+    }
+
+    // 6 — finalize & issue
+    if ($issued) {
+        $steps[] = ['key'=>'issue', 'label'=>'Issued &amp; locked', 'state'=>'done',
+            'line'=>'The report is finalised, signed and immutable' . (!empty($doc['issue_date']) ? ' (issued ' . $b($doc['issue_date']) . ')' : '') . '.'];
+    } elseif ($approved && $canFinal) {
+        $steps[] = ['key'=>'issue', 'label'=>'Finalise &amp; issue', 'state'=>'now',
+            'line'=>'Approved and ready. Issuing stamps the signature, locks the report and produces the final PDF.'
+                  . (!$sigOnFile ? ' <b style="color:var(--warn)">The signature is not on file — it will issue unsigned.</b>' : ''),
+            'post'=>['action'=>'/document-finalize?id=' . $id, 'label'=>'Finalise &amp; issue',
+                     'confirm'=>'Finalise & issue this report? It becomes permanently locked (immutable).']];
+    } else {
+        $steps[] = ['key'=>'issue', 'label'=>'Finalise &amp; issue', 'state'=>'todo',
+            'line'=>'Once approved, a manager finalises and issues the report — the signature is stamped on automatically here.'];
+    }
+
+    return ['steps'=>$steps, 'issued'=>$issued, 'sig_on_file'=>$sigOnFile, 'doc'=>$doc];
+}
+// Render the playbook card. Supports link CTAs and POST-button CTAs.
+function idems_render_report_playbook($doc, $approvals = [], $hasSchema = true) {
+    if (!$doc) return;
+    $canEdit = function_exists('idems_can_edit_doc') ? idems_can_edit_doc($doc) : false;
+    $canFinal = is_master() || (function_exists('can') && can('idems.finalize'));
+    if (!$canEdit && !$canFinal) return;                 // guide is for the people who act on it
+    $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $pb  = idems_report_playbook($doc, $approvals, $hasSchema);
+    ob_start();
+    echo function_exists('tosrm_playbook_css') ? tosrm_playbook_css() : ''; ?>
+    <div class="card tosrm-pb" style="margin:0 0 16px">
+      <h3>How to get this <?= e(Tl('report')) ?> issued</h3>
+      <p class="pb-sub">Work down the steps — one is highlighted as your next move. The inspector’s signature is stamped on the issued PDF automatically once it is on file.</p>
+      <?php if ($pb['issued']): ?>
+        <div class="pb-done-banner"><b style="color:var(--ok)">✓ Issued.</b> This <?= e(Tl('report')) ?> is finalised, signed and locked. Download it below, or reissue a new revision if something must change.</div>
+      <?php else: ?>
+      <ol class="pb-steps">
+        <?php $n = 0; foreach ($pb['steps'] as $s): $n++; $st = $s['state']; $num = $st === 'done' ? '✓' : $n; ?>
+          <li class="pb-step is-<?= $esc($st) ?>">
+            <span class="pb-num"><?= $esc($num) ?></span>
+            <div class="pb-body">
+              <div class="pb-label"><?= $esc($s['label']) ?>
+                <?php if ($st === 'now'): ?><span class="pb-tag t-now">Do this now</span>
+                <?php elseif ($st === 'blocked'): ?><span class="pb-tag t-blocked">Blocked</span>
+                <?php elseif ($st === 'done'): ?><span class="pb-tag t-done">Done</span><?php endif; ?>
+              </div>
+              <div class="pb-line"><?= $s['line'] /* trusted: built above with escaping */ ?></div>
+            </div>
+            <?php if (!empty($s['post']) && ($st === 'now' || $st === 'blocked')): ?>
+              <form method="post" action="<?= $esc($s['post']['action']) ?>" class="pb-cta" style="margin:0"
+                    <?= !empty($s['post']['confirm']) ? 'onsubmit="return confirm(\'' . $esc($s['post']['confirm']) . '\')"' : '' ?>>
+                <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
+                <button class="btn small" type="submit"><?= $s['post']['label'] ?></button>
+              </form>
+            <?php elseif (!empty($s['href']) && !empty($s['cta'])): ?>
+              <a class="btn small <?= in_array($st, ['now','blocked'], true) ? '' : 'secondary' ?> pb-cta" href="<?= $esc($s['href']) ?>"><?= $esc($s['cta']) ?></a>
+            <?php endif; ?>
+          </li>
+        <?php endforeach; ?>
+      </ol>
+      <?php endif; ?>
+    </div>
+    <?php
+    echo ob_get_clean();
+}
+
 // ===========================================================================
 //  Inspection Completeness Check — the pre-submission gate.
 //  Distinct from template validation (which checks the FORMAT). This checks the

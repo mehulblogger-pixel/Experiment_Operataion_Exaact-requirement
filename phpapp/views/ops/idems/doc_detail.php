@@ -87,6 +87,10 @@
   </div>
 </div>
 
+<?php // Guided path from a blank report to an issued, signed PDF — one clear
+      // "do this now" step, with the automatic signature made a visible step. ?>
+<?php if (function_exists('idems_render_report_playbook')) idems_render_report_playbook($doc, $approvals ?? [], $hasSchema ?? false); ?>
+
 <div data-tabs data-tabs-key="report" data-tabs-order="Report,Checks,Approvals,Audit">
 <?php // ---- Scorecard — only for scored report types (vendor assessment, audit) ---- ?>
 <?php if (!empty($scorecard) && $scorecard['overall'] !== null):
@@ -327,12 +331,25 @@
     <?php if ($comp['na']): ?><span class="muted" style="font-size:12px">· <?= (int)$comp['na'] ?> n/a</span><?php endif; ?></h3></div>
   <p class="muted" style="margin:0 0 10px">Every applicable check must pass before the report can be submitted for review. Identity, PO, location and specification flow in from the <?= e(Tl('call')) ?> &amp; <?= e(Tl('job')) ?> — fill only what is genuinely new.</p>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 16px">
-    <?php foreach ($comp['checks'] as $c):
+    <?php
+      // A failing check that has a known place to fix it gets a deep link, so
+      // "✕ No inspector signature" becomes a task you can finish in one click
+      // rather than a dead end.
+      $fixFor = function($key) use ($doc) {
+        switch ($key) {
+          case 'signature':   return ['/my-signature', 'Add my signature'];
+          case 'declaration':
+          case 'attachments': return ['/document-fill?id=' . (int)$doc['id'], 'Open report'];
+          default: return null;
+        }
+      };
+      foreach ($comp['checks'] as $c):
       $pill = $c['status']==='PASS' ? '✓' : ($c['status']==='FAIL' ? '✕' : '–');
-      $col  = $c['status']==='PASS' ? 'var(--ok)' : ($c['status']==='FAIL' ? 'var(--bad)' : 'var(--muted)'); ?>
+      $col  = $c['status']==='PASS' ? 'var(--ok)' : ($c['status']==='FAIL' ? 'var(--bad)' : 'var(--muted)');
+      $fix  = $c['status']==='FAIL' ? $fixFor($c['key'] ?? '') : null; ?>
       <div style="display:flex;align-items:baseline;gap:7px;padding:3px 0;font-size:13.5px">
         <span style="color:<?= $col ?>;font-weight:800;width:12px;flex:none"><?= $pill ?></span>
-        <span><?= e($c['label']) ?><?php if ($c['status']!=='PASS' && $c['detail']): ?> <span class="muted" style="font-size:11.5px">— <?= e($c['detail']) ?></span><?php endif; ?></span>
+        <span><?= e($c['label']) ?><?php if ($c['status']!=='PASS' && $c['detail']): ?> <span class="muted" style="font-size:11.5px">— <?= e($c['detail']) ?></span><?php endif; ?><?php if ($fix): ?> <a href="<?= e($fix[0]) ?>" style="font-size:11.5px;font-weight:700;white-space:nowrap"><?= e($fix[1]) ?> →</a><?php endif; ?></span>
       </div>
     <?php endforeach; ?>
   </div>
