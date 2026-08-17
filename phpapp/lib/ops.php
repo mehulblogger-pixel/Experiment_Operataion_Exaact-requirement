@@ -2993,11 +2993,28 @@ function ops_quick_add() {
             return;
         }
         if ($kind === 'activity') {
-            $t = lk_type('activity');
+            // Self-heal the two lists this depends on, so "Add new activity" works
+            // even on an install that shows Business Units from the shipped constant
+            // but never registered them as editable lists. The activity list is a
+            // CHILD of the business-unit list, so ensure the parent first.
             $sbu = lk_type('sbu');
-            if (!$t || !$sbu) { echo json_encode(['ok' => false, 'error' => 'No activity list']); return; }
+            if (!$sbu && function_exists('lk_ensure_type_map') && defined('OPS_SBUS')) {
+                lk_ensure_type_map('sbu', function_exists('TH') ? TH('sbu') : 'Business Unit', OPS_SBUS);
+                $sbu = lk_type('sbu');
+            }
+            if (!$sbu) { echo json_encode(['ok' => false, 'error' => 'The ' . Tl('sbu') . ' list is not set up yet — open Masters → ' . Tlp('sbu') . ' once, then try again.']); return; }
+            $t = lk_type('activity');
+            if (!$t && function_exists('lk_add_type')) { lk_add_type('activity', 'Activity code', $sbu['id'], 0, 99); $t = lk_type('activity'); }
+            if (!$t) { echo json_encode(['ok' => false, 'error' => 'Could not open the activity list.']); return; }
             $sbuCode = $b['sbu'] ?? '';
+            if (trim((string)$sbuCode) === '') { echo json_encode(['ok' => false, 'error' => 'Pick a ' . Tl('sbu') . ' first.']); return; }
             $sbuVal = ops_one("SELECT * FROM lookup_values WHERE type_id=? AND (code=? OR id=?)", [$sbu['id'], $sbuCode, (int)$sbuCode]);
+            // The picked business unit shows from the constant but has no lookup row
+            // yet — seed the whole business-unit list from the constant, then retry.
+            if (!$sbuVal && function_exists('lk_add_value') && defined('OPS_SBUS')) {
+                $so = 0; foreach (OPS_SBUS as $sc => $sl) { if (!ops_one("SELECT id FROM lookup_values WHERE type_id=? AND code=?", [$sbu['id'], $sc])) lk_add_value($sbu['id'], null, (string)$sc, (string)$sl, $so); $so++; }
+                $sbuVal = ops_one("SELECT * FROM lookup_values WHERE type_id=? AND (code=? OR id=?)", [$sbu['id'], $sbuCode, (int)$sbuCode]);
+            }
             if (!$sbuVal) { echo json_encode(['ok' => false, 'error' => 'Pick a ' . Tl('sbu') . ' first.']); return; }
             $id = lk_add_value($t['id'], $sbuVal['id'], '', $name, 99);
             echo json_encode(['ok' => true, 'id' => $id, 'label' => $name, 'sbu' => $sbuCode]);
