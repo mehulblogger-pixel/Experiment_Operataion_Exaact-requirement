@@ -306,6 +306,14 @@ function idems_migrate() {
         try { idems_build_mgh_report(); } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('mgh_report_seeded', '1');
     }
+    // Prebuild the ready-to-use FIRE EXTINGUISHER inspection report ONCE — a
+    // complete, fully-designed type so it renders like every other report (not a
+    // blank "no form designed yet" screen). Guarded so a user who deletes it does
+    // not get it back; wrapped so a failure can never break login/migrate.
+    if (function_exists('setting_get') && !setting_get('fext_report_seeded', '')) {
+        try { idems_build_fire_extinguisher_report(); } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('fext_report_seeded', '1');
+    }
     // ONE-TIME rescue: an "IR" inspection report whose form was auto-imported from
     // a Word file ended up with garbled labels ("Client s p o no date", "Item as
     // percontract order table"…). Replace that garbled form with the clean layout,
@@ -770,6 +778,146 @@ function idems_install_inspection_sections($typeId) {
     // 9) Disclaimer (kept together, not split across a page).
     $s = $addSection('', '', 0, 1);
     $disc = "This report is issued on the basis of the inspection carried out at the time and place stated. It reflects the condition of the items inspected and does not relieve the manufacturer / supplier of their contractual obligations. Our liability is limited to the fee charged for this inspection.";
+    $addField($s, 'disclaimer', 'Disclaimer', 'richtext', $disc, '', 2);
+
+    // 10) Sign-off (Prepared / Reviewed / Approved), kept together.
+    $s = $addSection('Sign-off', 'Prepared / Reviewed / Approved — name, designation and date auto-fill from the workflow.', 0, 1);
+    $addField($s, 'signoff', 'For ' . app_name(), 'sigblock', "Prepared by\nReviewed by\nApproved by", '', 2);
+
+    return $typeId;
+}
+
+// ---------------------------------------------------------------------------
+//  Prebuilt FIRE EXTINGUISHER inspection report — a complete, ready-to-use
+//  report type covering every detail a portable fire-extinguisher inspection
+//  carries (IS 2190 / IS 15683 / NFPA 10): the autofilled header, reference
+//  documents, an extinguisher schedule, an explicit physical & functional
+//  checklist, pressure/weight/refill records, master-linked instruments,
+//  observations, photographs, a disclaimer and a per-role sign-off. It renders
+//  through the same polished PDF engine as the standard inspection report, so a
+//  formless report type is never the reason a report "looks different". Reuses
+//  the same header field keys (client, vendor, po_number …) so the identifying
+//  details autofill from the job/call exactly as the standard report does.
+//  Idempotent: returns the existing type if already built.
+// ---------------------------------------------------------------------------
+function idems_build_fire_extinguisher_report($code = 'FEXT', $name = 'Fire Extinguisher Inspection Report') {
+    $pdo = db();
+    $existing = ops_one("SELECT id FROM report_types WHERE code=?", [$code]);
+    if ($existing) return (int)$existing['id'];
+    $sort = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_types");
+    $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_at) VALUES (?,?, 'TPIA_REPORT',1,0,?,?)")
+        ->execute([$code, $name, $sort, date('c')]);
+    $typeId = (int)$pdo->lastInsertId();
+    idems_install_fire_extinguisher_sections($typeId);
+    return $typeId;
+}
+// Install the full fire-extinguisher inspection layout into an (empty) type.
+function idems_install_fire_extinguisher_sections($typeId) {
+    $pdo = db();
+    $so = 0;
+    $addSection = function($title, $help = '', $pgb = 0, $keep = 0) use ($pdo, $typeId, &$so) {
+        $so += 10;
+        $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,page_break_before,keep_together,sort_order) VALUES (?,?,?,?,?,?)")
+            ->execute([$typeId, $title, $help, $pgb, $keep, $so]);
+        return (int)$pdo->lastInsertId();
+    };
+    $fo = 0;
+    $addField = function($secId, $fkey, $label, $ftype, $opts = '', $tableCols = '', $span = 1) use ($pdo, $typeId, &$fo) {
+        $fo += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,table_cols,sort_order,col_span) VALUES (?,?,?,?,?,?,?,?,?)")
+            ->execute([$typeId, $secId, $fkey, $label, $ftype, $opts, $tableCols, $fo, $span]);
+    };
+    // A satisfactory / not / N-A dropdown reused across the checklist.
+    $sat = "Satisfactory\nUnsatisfactory\nNot applicable";
+
+    // 1) Inspection details — same identifying keys as the standard report, so
+    //    Client / Vendor / PO / Project / dates autofill from the job/call.
+    $s = $addSection('Inspection details', 'Most of this carries forward from the job — Client, Manufacturer / supplier, PO, Project and dates fill in automatically.', 0, 1);
+    $addField($s, 'client', 'Client', 'text');
+    $addField($s, 'end_user', 'End user', 'text');
+    $addField($s, 'vendor', 'Manufacturer / Supplier', 'text');
+    $addField($s, 'po_number', 'P.O. No.', 'text');
+    $addField($s, 'project', 'Project / Site', 'text');
+    $addField($s, 'applicable_standard', 'Applicable standard', 'select',
+        "IS 15683 — Portable fire extinguishers\nIS 2190 — Selection, installation & maintenance\nIS 933 — CO2 type\nIS 15505 — Refilling\nNFPA 10\nManufacturer standard");
+    $addField($s, 'inspection_stage', 'Type / stage of inspection', 'select',
+        "New / Installation\nPeriodic (monthly)\nQuarterly\nHalf-yearly\nAnnual\nAfter refilling\nHydrostatic pressure test\nPre-dispatch");
+    $addField($s, 'inspection_date', 'Date of inspection', 'date');
+    $addField($s, 'location', 'Place of inspection', 'text');
+    $addField($s, 'inspector', 'Inspector', 'text');
+
+    // 2) Reference documents.
+    $s = $addSection('Reference documents', 'The standards, specifications, drawings and layout inspected against — one row per document.');
+    $addField($s, 'reference_documents', 'Reference documents', 'table', '',
+        "Document Name\nDocument Number\nRevision No.\nApproval Code\nDate of Approval|date", 2);
+
+    // 3) Fire extinguisher schedule — one row per extinguisher (identity).
+    $s = $addSection('Fire extinguisher schedule', 'One row per extinguisher — type, capacity, make, serial, manufacturing date, location and quantity.');
+    $addField($s, 'fe_items', 'Extinguishers', 'table', '',
+        "Sr. No.|merge\n"
+        . "Type|select|Water (stored pressure),ABC Dry Powder,BC Dry Powder,CO2,Mechanical Foam (AFFF),Clean Agent,Wet Chemical,Water Mist,DCP (gas cartridge)\n"
+        . "Capacity|select|1 kg,2 kg,4 kg,5 kg,6 kg,9 kg,10 kg,22.5 kg,25 kg,50 kg,75 kg,2 L,3 L,6 L,9 L\n"
+        . "Fire rating / class\n"
+        . "Make / Brand\n"
+        . "Serial / ID No.\n"
+        . "Mfg. month & year\n"
+        . "Location / Area installed\n"
+        . "Qty|number\n"
+        . "ISI / Standard mark|select|Yes,No,N/A", 2);
+
+    // 4) Physical & functional checklist — each standard check point spelled out,
+    //    so the report explicitly records every one (IS 2190 / NFPA 10).
+    $s = $addSection('Physical &amp; functional checklist', 'Every routine check point — mark each Satisfactory / Unsatisfactory / Not applicable, and note anything found in the observations below.');
+    $addField($s, 'chk_location', 'Located in its designated place, accessible &amp; visible', 'select', $sat);
+    $addField($s, 'chk_signage', 'Location signage / marking provided', 'select', $sat);
+    $addField($s, 'chk_nameplate', 'Nameplate &amp; operating instructions legible, facing outward', 'select', $sat);
+    $addField($s, 'chk_seal', 'Safety pin, tamper seal &amp; anti-tamper indicator intact', 'select', $sat);
+    $addField($s, 'chk_gauge', 'Pressure gauge reading in the green / operable range', 'select', $sat);
+    $addField($s, 'chk_weight', 'Fullness confirmed by weighing / hefting (charge OK)', 'select', $sat);
+    $addField($s, 'chk_body', 'Cylinder body — no corrosion, dents, pitting or leakage', 'select', $sat);
+    $addField($s, 'chk_paint', 'Paint &amp; finish in good condition', 'select', $sat);
+    $addField($s, 'chk_hose', 'Hose, discharge nozzle / horn — free of cracks &amp; blockage', 'select', $sat);
+    $addField($s, 'chk_valve', 'Cap, valve &amp; operating lever / handle in order', 'select', $sat);
+    $addField($s, 'chk_bracket', 'Wall bracket / stand / trolley secure &amp; correctly mounted', 'select', $sat);
+    $addField($s, 'chk_oring', 'O-ring / washer / gasket condition', 'select', $sat);
+    $addField($s, 'chk_powder', 'Charge free-flowing / not caked (dry powder types)', 'select', $sat);
+    $addField($s, 'chk_cartridge', 'Gas cartridge weight within limit (cartridge types)', 'select', $sat);
+    $addField($s, 'chk_hpt', 'Hydrostatic test within validity', 'select', $sat);
+    $addField($s, 'chk_refill', 'Refilling within validity / not overdue', 'select', $sat);
+
+    // 5) Pressure, weight &amp; refill record — per-unit measurements.
+    $s = $addSection('Pressure, weight &amp; refill record', 'Measured values per extinguisher — test pressure, hydrostatic-test validity, weights, leak test and refilling dates.');
+    $addField($s, 'fe_tests', 'Test &amp; weight record', 'table', '',
+        "Sr. No.|merge\n"
+        . "Serial / ID No.\n"
+        . "Test pressure (kg/cm²)|number\n"
+        . "Hydrostatic test date|date\n"
+        . "Next HPT due|date\n"
+        . "Gross weight (kg)|number\n"
+        . "Tare / empty weight (kg)|number\n"
+        . "Net charge weight (kg)|number\n"
+        . "Leak test|select|Pass,Fail,N/A\n"
+        . "Last refilled on|date\n"
+        . "Next refill due|date", 2);
+
+    // 6) Instruments & calibration — linked to the equipment register.
+    $s = $addSection('Instruments &amp; calibration', 'Pick an instrument from the equipment register (weighing scale, pressure gauge …) — serial and calibration dates fill in automatically.');
+    $addField($s, 'instruments', 'Instruments used', 'table', '',
+        "Instrument|select|equip:instruments\nSr. No. / Identification number\nCalibrated on|date\nCalibrated due date|date\nNABL Traceable|select|Yes,No", 2);
+
+    // 7) Observations & conclusion.
+    $s = $addSection('Observations &amp; conclusion');
+    $addField($s, 'observations', 'Details of inspection carried out / observations', 'textarea', '', '', 2);
+    $addField($s, 'conclusion', 'Conclusion', 'textarea', '', '', 2);
+    $addField($s, 'general_remarks', 'General remarks', 'textarea', '', '', 2);
+
+    // 8) Photographs.
+    $s = $addSection('Photographs', 'Take or upload photos of each extinguisher, its gauge, nameplate and location — auto-compressed and captioned.');
+    $addField($s, 'photos', 'Photographs', 'photo', '', '', 2);
+
+    // 9) Disclaimer (kept together).
+    $s = $addSection('', '', 0, 1);
+    $disc = "This report is issued on the basis of the inspection carried out at the time and place stated. It reflects the condition of the fire extinguishers inspected and does not relieve the manufacturer / supplier / owner of their statutory and contractual obligations. Our liability is limited to the fee charged for this inspection.";
     $addField($s, 'disclaimer', 'Disclaimer', 'richtext', $disc, '', 2);
 
     // 10) Sign-off (Prepared / Reviewed / Approved), kept together.
