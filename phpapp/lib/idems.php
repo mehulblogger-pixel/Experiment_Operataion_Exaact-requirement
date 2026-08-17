@@ -173,6 +173,14 @@ function idems_migrate() {
         id $pk, job_id INT, po_line VARCHAR(200) DEFAULT '', file_name VARCHAR(255) DEFAULT '',
         mime VARCHAR(100) DEFAULT '', data LONGTEXT, note VARCHAR(400) DEFAULT '',
         uploaded_by VARCHAR(150) DEFAULT '', uploaded_at VARCHAR(30) DEFAULT '')");
+    // Extracted inspection scope, keyed by the QAP's content hash, so the SAME
+    // QAP (the common case — one QAP, many reports on a project) is turned into
+    // scope rows by AI ONCE and reused for free thereafter. Keeps AI token use to
+    // a single call per distinct QAP.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS qap_scope_cache (
+        id $pk, sig VARCHAR(64), product VARCHAR(120) DEFAULT '', standards VARCHAR(255) DEFAULT '',
+        rows_json LONGTEXT, source VARCHAR(20) DEFAULT 'ai', n INT DEFAULT 0, created_at VARCHAR(30) DEFAULT '')");
+    idems_unique_index('qap_scope_cache', 'sig');
     // Evidence / attachments captured against a report's fields (photos, files, signatures).
     $pdo->exec("CREATE TABLE IF NOT EXISTS report_files (
         id $pk, report_doc_id INT, field_key VARCHAR(60) DEFAULT '', kind VARCHAR(20) DEFAULT 'file',
@@ -8304,6 +8312,178 @@ function expected_source_docs() {
     return $v ?: EXPECTED_SOURCE_DOCS;
 }
 // Extract readable text from an uploaded source document (best-effort, no libs).
+// ---------------------------------------------------------------------------
+//  QAP → inspection scope autofill
+//
+//  Upload the Quality Assurance Plan / ITP once, and the report's ITP / scope
+//  table fills itself — the biggest block of typing on an inspection report, and
+//  the one part that genuinely differs product-to-product (fasteners → pressure
+//  vessels → refinery equipment). This is what lets ONE generic inspection
+//  report cover every product: the product-specific scope comes from its QAP.
+//
+//  Token-thrift, and AI only when the company enables it (ai_enabled()):
+//   - the extraction is ONE structured call per distinct QAP, capped tokens;
+//   - the result is cached by the QAP's content hash, so the same QAP (one QAP,
+//     many reports on a project) is never sent to the AI twice;
+//   - with no AI provider configured it still does a basic clause-parse fallback,
+//     so the feature degrades instead of disappearing.
+// ---------------------------------------------------------------------------
+// The report's ITP / inspection-scope table field (works on a customised form).
+function idems_scope_target_field($typeId) {
+    $fields = function_exists('idems_fields') ? idems_fields((int)$typeId) : [];
+    foreach ($fields as $f) if (($f['ftype'] ?? '') === 'table' && ($f['fkey'] ?? '') === 'scope_activities') return $f;
+    foreach ($fields as $f) {
+        if (($f['ftype'] ?? '') !== 'table') continue;
+        $hay = strtolower(((string)($f['label'] ?? '')) . ' ' . ((string)($f['fkey'] ?? '')));
+        if (preg_match('/scope|itp|inspection.*(activit|plan|test)|\bactivit/', $hay)) return $f;
+    }
+    return null;
+}
+// Ask the model for the scope as a compact JSON array. Returns ['rows'=>[], 'err'=>''].
+function idems_ai_extract_scope($text) {
+    if (!function_exists('ai_enabled') || !ai_enabled() || !function_exists('ai_chat')) return ['rows' => [], 'err' => 'AI is not enabled.'];
+    $sys = "You read a Quality Assurance Plan (QAP) or Inspection & Test Plan (ITP) for an industrial product "
+         . "(fasteners, pipes, valves, pressure vessels, structural or refinery equipment, etc.) and extract the "
+         . "inspection and test activities. Return ONLY a compact JSON array, no prose. Each element is an object with keys: "
+         . "clause, sub_clause, activity, quantum, inspection_type, acceptance, remarks. "
+         . "inspection_type MUST be one of: Review, Witness, Hold, Monitor, Surveillance. "
+         . "quantum is the extent of check (e.g. 100%, 10%, 1 per lot, each). "
+         . "acceptance is the acceptance norm or reference document / clause. "
+         . "Include every distinct characteristic, test or check in the plan. Never invent activities not in the text. "
+         . "If the text is not a recognisable plan, return [].";
+    try { [$out, $err] = ai_chat($sys, substr((string)$text, 0, 14000), 1800); }
+    catch (Throwable $e) { return ['rows' => [], 'err' => $e->getMessage()]; }
+    if (!is_string($out) || trim($out) === '') return ['rows' => [], 'err' => $err ?: 'The AI did not respond.'];
+    $json = $out; if (preg_match('/\[.*\]/s', $out, $m)) $json = $m[0];
+    $data = json_decode($json, true);
+    if (!is_array($data)) return ['rows' => [], 'err' => 'Could not read the AI response.'];
+    $allow = ['clause', 'sub_clause', 'activity', 'quantum', 'inspection_type', 'acceptance', 'remarks'];
+    $rows = [];
+    foreach ($data as $d) {
+        if (!is_array($d)) continue;
+        $r = []; foreach ($allow as $k) $r[$k] = (isset($d[$k]) && is_scalar($d[$k])) ? trim((string)$d[$k]) : '';
+        if ($r['activity'] !== '') $rows[] = $r;
+    }
+    return ['rows' => $rows, 'err' => ''];
+}
+// No-AI fallback: pull clause-numbered activities straight out of the text.
+// Conservative — returns nothing rather than guess when it can't see a plan.
+function idems_heuristic_scope($text) {
+    $text = (string)$text;
+    $blank = fn($clause, $act) => ['clause' => $clause, 'sub_clause' => '', 'activity' => $act,
+        'quantum' => '', 'inspection_type' => '', 'acceptance' => '', 'remarks' => ''];
+    $rows = [];
+    $lines = preg_split('/\r?\n/', $text);
+    if (count($lines) >= 4) {
+        foreach ($lines as $ln) {
+            $ln = trim($ln); if ($ln === '') continue;
+            if (preg_match('/^(\d+(?:\.\d+){0,2})[)\.\s-]+(.{4,120}?)$/u', $ln, $m)) $rows[] = $blank($m[1], trim($m[2]));
+        }
+    }
+    if (count($rows) < 3) {          // collapsed / single-line text (common from PDFs)
+        $rows = [];
+        if (preg_match_all('/(\d+(?:\.\d+){0,2})\s+([A-Za-z][^0-9]{4,100}?)(?=\s+\d+(?:\.\d+){0,2}\s+[A-Za-z]|$)/u', $text, $mm, PREG_SET_ORDER)) {
+            foreach ($mm as $m) { $act = trim(preg_replace('/\s+/', ' ', $m[2])); if (strlen($act) >= 4) $rows[] = $blank($m[1], $act); }
+        }
+    }
+    if (count($rows) < 3) return ['rows' => [], 'err' => ''];   // not confident → empty
+    return ['rows' => array_slice($rows, 0, 60), 'err' => ''];
+}
+// Map generic {clause, activity, quantum, inspection_type, acceptance, remarks}
+// rows onto the live scope table's OWN column keys (so a customised form works).
+function idems_scope_map_rows($rows, $field) {
+    $defs = function_exists('idems_table_col_defs') ? idems_table_col_defs($field) : [];
+    if (!$defs) return [];
+    $find = function($patterns) use ($defs) {
+        foreach ($defs as $ck => $d) {
+            $l = strtolower((string)($d['label'] ?? ''));
+            foreach ($patterns as $p) if (strpos($l, $p) !== false) return $ck;
+        }
+        return null;
+    };
+    $cClause   = $find(['clause', 'itp']);
+    $cSub      = $find(['sub-clause', 'sub clause', 'sub']);
+    $cActivity = $find(['description', 'activit', 'characteristic', 'parameter']);
+    $cQuantum  = $find(['quantum', 'extent', 'sampl', 'frequency']);
+    $cInsType  = $find(['inspection type', 'type of', 'type', 'intervention']);
+    $cRemarks  = $find(['remark', 'acceptance', 'criteria', 'note']);
+    $put = function(&$row, $ck, $v) { if (!$ck || trim((string)$v) === '') return;
+        $row[$ck] = (isset($row[$ck]) && $row[$ck] !== '') ? ($row[$ck] . ' | ' . $v) : $v; };
+    $out = [];
+    foreach ($rows as $r) {
+        $row = [];
+        $put($row, $cClause, $r['clause'] ?? '');
+        $put($row, $cSub, $r['sub_clause'] ?? '');
+        $put($row, $cActivity, $r['activity'] ?? '');
+        $put($row, $cQuantum, $r['quantum'] ?? '');
+        $put($row, $cInsType, $r['inspection_type'] ?? '');
+        $put($row, $cRemarks, $r['acceptance'] ?? '');
+        $put($row, $cRemarks, $r['remarks'] ?? '');
+        if (!isset($row[$cActivity]) || trim((string)$row[$cActivity]) === '') continue;  // an activity is the minimum
+        foreach ($defs as $ck => $d) if (!isset($row[$ck])) $row[$ck] = '';               // full-width rows
+        $out[] = $row;
+    }
+    return $out;
+}
+// Orchestrate: read the QAP, extract (cache → AI → heuristic), map, append.
+// Returns ['n'=>int, 'source'=>'cache|ai|heuristic', 'err'=>''].
+function idems_scope_from_qap($doc, $qapId) {
+    $field = idems_scope_target_field((int)($doc['report_type_id'] ?? 0));
+    if (!$field) return ['n' => 0, 'source' => '', 'err' => 'This report type has no inspection-scope table to fill. Use the standard Inspection Report, or add a scope table under Form builder.'];
+    $qap = ops_one("SELECT * FROM job_qaps WHERE id=?", [(int)$qapId]);
+    if (!$qap || (int)$qap['job_id'] !== (int)($doc['job_id'] ?? 0)) return ['n' => 0, 'source' => '', 'err' => 'That QAP could not be found for this report\'s job.'];
+    $raw = (string)$qap['data'];
+    if (($p = strpos($raw, 'base64,')) !== false) $raw = base64_decode(substr($raw, $p + 7)) ?: '';
+    $textq = function_exists('idems_source_text') ? idems_source_text($qap['mime'] ?: 'application/pdf', $raw, 16000) : '';
+    if (trim($textq) === '') return ['n' => 0, 'source' => '', 'err' => 'Could not read text from this QAP (a scanned-image PDF has no selectable text). Upload a text-based QAP / ITP, or type the scope in.'];
+
+    $sig = sha1('scopev1|' . $textq);
+    $cached = ops_one("SELECT rows_json FROM qap_scope_cache WHERE sig=?", [$sig]);
+    if ($cached && !empty($cached['rows_json'])) {
+        $generic = json_decode($cached['rows_json'], true) ?: [];
+        $source = 'cache';
+    } else {
+        $useAi = function_exists('ai_enabled') && ai_enabled();
+        $res = $useAi ? idems_ai_extract_scope($textq) : idems_heuristic_scope($textq);
+        $source = $useAi ? 'ai' : 'heuristic';
+        if (!empty($res['err'])) return ['n' => 0, 'source' => $source, 'err' => $res['err']];
+        $generic = $res['rows'];
+        if (!$generic) return ['n' => 0, 'source' => $source, 'err' => $useAi
+            ? 'The AI did not find any inspection activities in this QAP — check it is the right file, or type the scope in.'
+            : 'Could not read a scope from this QAP automatically. Enable an AI provider (Settings → AI) for reliable extraction, or type the scope in.'];
+        if ($useAi) {                 // cache AI output only (deterministic reuse; heuristic is free to redo)
+            try { db()->prepare("INSERT INTO qap_scope_cache (sig,product,standards,rows_json,source,n,created_at) VALUES (?,?,?,?,?,?,?)")
+                ->execute([$sig, (string)($doc['product_category'] ?? ''), (string)($doc['standards'] ?? ''), json_encode($generic), 'ai', count($generic), date('c')]); }
+            catch (Throwable $e) {}
+        }
+    }
+    $mapped = idems_scope_map_rows($generic, $field);
+    if (!$mapped) return ['n' => 0, 'source' => $source, 'err' => 'The scope could not be mapped onto this report\'s columns.'];
+    $key = $field['fkey'];
+    $data = json_decode(($doc['data'] ?? '') ?: '[]', true); if (!is_array($data)) $data = [];
+    $existing = (isset($data[$key]) && is_array($data[$key])) ? $data[$key] : [];
+    $data[$key] = array_merge($existing, $mapped);
+    db()->prepare("UPDATE report_docs SET data=?, updated_at=? WHERE id=?")->execute([json_encode($data), date('c'), (int)$doc['id']]);
+    if (function_exists('idems_log')) idems_log('report_doc', (int)$doc['id'], 'SCOPE_FROM_QAP',
+        ['irn' => $doc['irn'] ?? '', 'field' => $key, 'reason' => count($mapped) . ' scope rows from QAP #' . (int)$qapId . ' (' . $source . ')']);
+    return ['n' => count($mapped), 'source' => $source, 'err' => ''];
+}
+// Handler: POST /document-scope-from-qap  (id, qap_id) → autofill + back to fill.
+function ops_idems_scope_from_qap($method) {
+    if ($method !== 'POST') redirect('/documents');
+    $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
+    if (!$doc) { http_response_code(404); view('notfound'); return true; }
+    ops_require(function_exists('idems_can_edit_doc') ? idems_can_edit_doc($doc) : true, 'This report can no longer be changed.');
+    $res = idems_scope_from_qap($doc, (int)($_POST['qap_id'] ?? 0));
+    if (!empty($res['err'])) { flash($res['err'], 'error'); redirect('/document-fill?id=' . (int)$doc['id']); }
+    $how = $res['source'] === 'cache' ? ' (reused from a previous QAP — no AI used)'
+         : ($res['source'] === 'ai' ? ' with AI' : ' (basic extraction — enable AI for richer results)');
+    flash('Filled in ' . (int)$res['n'] . ' inspection-scope ' . ((int)$res['n'] === 1 ? 'activity' : 'activities')
+        . ' from the QAP' . $how . '. Review and adjust the observations below, then submit.');
+    redirect('/document-fill?id=' . (int)$doc['id']);
+    return true;
+}
+
 function idems_source_text($mime, $raw, $limit = 20000) {
     $mime = strtolower((string)$mime);
     if (strpos($mime, 'text/') === 0 || strpos($mime, 'json') !== false || strpos($mime, 'csv') !== false) return substr($raw, 0, $limit);

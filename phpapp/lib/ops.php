@@ -2106,7 +2106,7 @@ function ops_module_gate($route) {
         'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes',
         'attendance-recon'=>'reconcile',
         'availability'=>'jobs','schedule'=>'jobs',
-        'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems','release-notes'=>'idems','document-ai-review'=>'idems',
+        'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems','release-notes'=>'idems','document-ai-review'=>'idems','document-scope-from-qap'=>'idems',
         'vendors'=>'idems','vendor-profile'=>'idems','vendor-profile-save'=>'idems',
         'expediting'=>'idems','expediting-projects'=>'idems',
         'report-types'=>'idems','report-type-edit'=>'idems','report-builder'=>'idems','report-field-edit'=>'idems','report-file'=>'idems','irn-rules'=>'idems','audit-log'=>'idems',
@@ -2685,6 +2685,8 @@ function ops_dispatch($route, $method) {
             return ops_idems_builder($route, $method);
         case $route === 'document-fill':
             return ops_idems_fill($route, $method);
+        case $route === 'document-scope-from-qap':
+            return ops_idems_scope_from_qap($method);
         case $route === 'document-approve':
             return ops_idems_approve($method);
         case $route === 'document-vet':

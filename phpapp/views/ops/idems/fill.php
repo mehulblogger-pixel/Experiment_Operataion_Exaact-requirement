@@ -258,15 +258,36 @@
 
 <?php // §R1-D — the QAP(s) for this job, so the inspector can read them while
       // writing the report without leaving the screen. Read-only here. ?>
-<?php $qaps = $qaps ?? []; if ($qaps): ?>
+<?php $qaps = $qaps ?? [];
+      // The report's inspection-scope table (if any) — the QAP autofill target.
+      $scopeField = function_exists('idems_scope_target_field') ? idems_scope_target_field((int)$doc['report_type_id']) : null;
+      $aiOn = function_exists('ai_enabled') && ai_enabled();
+      if ($qaps): ?>
 <div class="panel" style="border-left:3px solid var(--brand);background:var(--soft);margin-bottom:14px">
   <div class="ctitle" style="margin-top:0"><h3 style="margin:0">📋 QAP for this <?= e(Tl('job')) ?> <span class="muted">(<?= count($qaps) ?>)</span></h3></div>
-  <p class="sub" style="margin:2px 0 8px">Open the Quality Assurance Plan while you write — the method, acceptance criteria and hold points to inspect against.</p>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">
+  <p class="sub" style="margin:2px 0 8px">Open the Quality Assurance Plan while you write — the method, acceptance criteria and hold points to inspect against.<?php if ($scopeField): ?> Or let the app read the scope out of it for you.<?php endif; ?></p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
     <?php foreach ($qaps as $q): ?>
-      <a class="btn small secondary" href="/job-qap?id=<?= (int)$q['id'] ?>" target="_blank" rel="noopener" title="<?= e($q['note'] ?: '') ?>">📄 <?= e($q['po_line'] ? $q['po_line'].' — ' : '') ?><?= e($q['file_name'] ?: 'QAP') ?></a>
+      <span style="display:inline-flex;gap:4px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:3px 4px 3px 8px;background:var(--card)">
+        <a href="/job-qap?id=<?= (int)$q['id'] ?>" target="_blank" rel="noopener" title="<?= e($q['note'] ?: '') ?>" style="text-decoration:none">📄 <?= e($q['po_line'] ? $q['po_line'].' — ' : '') ?><?= e($q['file_name'] ?: 'QAP') ?></a>
+        <?php if ($scopeField): ?>
+          <form method="post" action="/document-scope-from-qap?id=<?= (int)$doc['id'] ?>" style="margin:0"
+                onsubmit="return confirm('Read the inspection scope from this QAP and add it to the report? You can edit or remove any row afterwards.');">
+            <input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
+            <input type="hidden" name="qap_id" value="<?= (int)$q['id'] ?>">
+            <button class="btn small" type="submit" title="<?= $aiOn ? 'AI reads the QAP and fills the ITP / scope table' : 'Reads the numbered clauses from the QAP into the scope table' ?>">✨ Auto-fill scope</button>
+          </form>
+        <?php endif; ?>
+      </span>
     <?php endforeach; ?>
   </div>
+  <?php if ($scopeField): ?>
+    <p class="muted" style="font-size:11.5px;margin:8px 2px 0">
+      “Auto-fill scope” reads the plan and fills the <b><?= e($scopeField['label'] ?: 'inspection scope') ?></b> table below — clause, activity, quantum and inspection type — so you only add the observations.
+      <?php if ($aiOn): ?>Uses your configured AI once per QAP, then reuses it for free on the next report.
+      <?php else: ?><a href="/ai-settings">Enable an AI provider</a> for richer extraction; without it, only the numbered clauses are read.<?php endif; ?>
+    </p>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 
