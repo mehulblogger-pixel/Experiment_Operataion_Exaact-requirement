@@ -550,6 +550,34 @@ function opp_unlink_quote($oppId, $quoteId) {
     return '';
 }
 
+// Create a fresh DRAFT quotation straight from the deal — the forward step the
+// pipeline was missing (you could only attach an existing one). It carries the
+// customer, the deal name and the working value across, links itself back to the
+// opportunity so the forecast stays joined, and lands on the quote so line items
+// can be added and it can be submitted. Returns ['id','no'] or ['err'].
+function opp_create_quote($oppId) {
+    opp_migrate();
+    $o = opp_row($oppId);
+    if (!$o) return ['err' => 'That opportunity no longer exists.'];
+    if (empty($o['partner_id']))
+        return ['err' => 'Add the customer to this deal first — a quotation needs a client on the master.'];
+    try {
+        $no = ops_next_code('quotations', 'quote_no', 'Q');
+        $val = (float)($o['value'] ?? 0);
+        $clientName = (string) ops_val("SELECT COALESCE(display_name, legal_name) FROM business_partners WHERE id=?", [(int)$o['partner_id']]);
+        db()->prepare("INSERT INTO quotations
+            (quote_no, rev, is_current, client_id, client_name, office_id, subject, site_location,
+             currency, validity_days, subtotal, gst_pct, gst_amount, total_amount, status, created_by, created_at)
+            VALUES (?,0,1,?,?,?,?, '', 'INR',30, ?,0,0,?, 'DRAFT', ?,?)")
+          ->execute([$no, (int)$o['partner_id'], $clientName, (int)($o['office_id'] ?? 0) ?: null,
+                     trim((string)$o['name']) ?: ('Deal ' . (string)$o['ref']), $val, $val,
+                     function_exists('user_name') ? user_name(current_user()) : '', date('c')]);
+        $qid = (int)db()->lastInsertId();
+        opp_link_quote($oppId, $qid);        // keep the deal and the quote joined
+        return ['id' => $qid, 'no' => $no];
+    } catch (Throwable $e) { return ['err' => 'The quotation could not be created: ' . $e->getMessage()]; }
+}
+
 // A lead that is worth pursuing becomes an opportunity. This replaces going
 // straight to an enquiry: the enquiry is still raised, because the existing
 // funnel reads it, but the DEAL now has somewhere to live while it is being won.
@@ -836,6 +864,14 @@ function ops_opportunities($route, $method) {
         else flash($r['status'] === 'WON' ? 'Won. Raise the order when the customer confirms.'
                  : ($r['status'] === 'LOST' ? 'Recorded as lost, with the reason.' : 'Moved.'));
         redirect('/opportunity?id=' . $id);
+    }
+
+    if ($route === 'opportunity-new-quote' && $method === 'POST') {
+        $id = (int)($_POST['id'] ?? 0);
+        $r = opp_create_quote($id);
+        if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id); }
+        flash('Quotation ' . $r['no'] . ' drafted from this deal — add the line items and submit it for approval.');
+        redirect('/quote?id=' . $r['id']);
     }
 
     if ($route === 'opportunity-quote' && $method === 'POST') {

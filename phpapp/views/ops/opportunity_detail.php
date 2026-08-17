@@ -134,8 +134,14 @@
 <div class="panel" data-tab="Quotes" style="margin-top:16px">
   <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px">
     <h3 style="margin:0">Quotations on this deal <span class="muted" style="font-weight:400;font-size:13px">(<?= count($quotes) ?>)</span></h3>
+    <?php if ($canEdit && $open): ?>
+      <form method="post" action="/opportunity-new-quote" style="margin:0">
+        <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+        <button class="btn small"<?= empty($o['partner_id']) ? ' disabled title="Add the customer to this deal first"' : '' ?>>＋ Create a new quotation</button>
+      </form>
+    <?php endif; ?>
   </div>
-  <p class="muted" style="font-size:13px;margin:8px 0 0">Three options and a revision are four quotations and one deal. Keeping them here is what stops the forecast counting the same business four times.</p>
+  <p class="muted" style="font-size:13px;margin:8px 0 0">Create a quotation straight from the deal — it carries the customer and the working value, and lands on the quote so you can add line items and submit. (Or attach an existing one below.) Keeping them all here stops the forecast counting the same business more than once.</p>
   <?php if ($quotes): ?>
     <table class="dt" style="margin-top:10px">
       <caption class="sr-only">Quotations attached to this deal</caption>
