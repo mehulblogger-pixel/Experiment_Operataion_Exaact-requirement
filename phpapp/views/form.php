@@ -61,6 +61,15 @@
 <section class="fs-pane" data-tab="Tax &amp; terms">
   <h3 class="tab-sub" style="margin-top:0">Tax, registration &amp; terms</h3>
   <div class="form-grid">
+    <?php // These are commercial / billing details. They are needed only for a
+          // party you invoice — a client, or a company that is both. For a
+          // vendor-only record (a site you inspect at, never bill) they are
+          // hidden, so nobody is asked for a GSTIN or payment terms that will
+          // never be used. Ticking "Is a Client" brings them back. §WO-1 ?>
+    <div class="ff ff-wide" id="commercialVendorNote" style="display:none">
+      <div class="msg msg-info" style="margin:0">Commercial &amp; billing details (GSTIN, PAN, payment terms…) are <b>not needed for a vendor</b> — a vendor is a site you inspect at, not a party you invoice. Tick <b>Is a Client</b> above if you also bill them, and these fields appear.</div>
+    </div>
+    <div id="commercialFields" style="display:contents">
     <div class="ff"><label>GSTIN</label><input class="form-control" name="gstin" value="<?= e($p['gstin'] ?? '') ?>" placeholder="e.g. 24ADUPL3517E2ZJ"></div>
     <div class="ff"><label>PAN (auto from GSTIN)</label><input class="form-control readonly-field" id="pan_display" value="<?= e($p['pan'] ?? '') ?>" readonly></div>
     <div class="ff"><label>State (auto from GSTIN)</label><input class="form-control readonly-field" id="state_display" value="<?= e($p['state'] ?? '') ?>" readonly></div>
@@ -89,15 +98,29 @@
     <?php // §WO-1 — payment terms are required for a client, optional for a
           // vendor-only record. Reflect that as the roles are ticked. ?>
     <script>(function(){
-      var cl=document.querySelector('input[name="is_client"]'), star=document.getElementById('pt_req'), hint=document.getElementById('pt_hint');
-      if(!cl||!star) return;
-      function sync(){ var on=cl.checked; star.style.display=on?'':'none';
-        if(hint) hint.innerHTML = on ? '<b>Required for a '+<?= json_encode(strtolower(function_exists('Tl')?Tl('client'):'client')) ?>+'.</b> ' + 'Add or edit options under <a href="/lookup?key=payment_term">Masters → Payment terms</a>.' : 'Add or edit options under <a href="/lookup?key=payment_term">Masters → Payment terms</a>. Not needed for a vendor-only record.'; }
+      var cl=document.querySelector('input[name="is_client"]'),
+          star=document.getElementById('pt_req'),
+          hint=document.getElementById('pt_hint'),
+          comm=document.getElementById('commercialFields'),
+          note=document.getElementById('commercialVendorNote'),
+          cw=<?= json_encode(strtolower(function_exists('Tl')?Tl('client'):'client')) ?>;
+      if(!cl) return;
+      function sync(){ var on=cl.checked;
+        // Commercial / billing details belong to a client (or a both). For a
+        // vendor-only record, hide the whole block and explain why.
+        if(comm) comm.style.display = on ? 'contents' : 'none';
+        if(note) note.style.display = on ? 'none' : '';
+        if(star) star.style.display = on ? '' : 'none';
+        if(hint) hint.innerHTML = on
+          ? '<b>Required for a '+cw+'.</b> Add or edit options under <a href="/lookup?key=payment_term">Masters → Payment terms</a>.'
+          : 'Add or edit options under <a href="/lookup?key=payment_term">Masters → Payment terms</a>. Not needed for a vendor-only record.';
+      }
       cl.addEventListener('change', sync); sync();
     })();</script>
     <div class="ff"><label>Credit days <span class="muted">— sets the due date on their invoices</span></label>
       <input class="form-control" type="number" min="0" name="credit_days" value="<?= e((string)($p['credit_days'] ?? '')) ?>"
              placeholder="e.g. 45"></div>
+    </div><!-- /#commercialFields -->
     <div class="ff ff-wide"><label>Description</label><input class="form-control" name="description" value="<?= e($p['description'] ?? '') ?>"></div>
 
     <?php // Site location for geofenced attendance — so an inspection engineer's
