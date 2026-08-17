@@ -370,7 +370,8 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="ff"><label>Purchase order</label>
       <select class="form-control searchable" id="po_sel" name="po_id"><option value="">— open / none —</option>
         <?php if ($call && ($call['po_id']??null)) { $po=ops_one("SELECT id,po_number FROM partner_purchase_orders WHERE id=?", [$call['po_id']]); if ($po) echo '<option value="'.(int)$po['id'].'" selected>'.e($po['po_number']?:'Open order').'</option>'; } ?>
-      </select></div>
+      </select>
+      <small class="muted"><a id="po_add_link" href="#" target="_blank" style="display:none">＋ Record this <?= e(Tl('client')) ?>'s PO in the directory</a></small></div>
     <div class="ff"><label>PO line item <span class="muted">(tracks quantity)</span></label>
       <select class="form-control searchable" id="po_line_sel" name="po_line_item_id"><option value="">—</option>
         <?php if ($call && ($call['po_line_item_id']??null)) { $li=ops_one("SELECT id,description,rate,item_type,quantity,consumed FROM po_line_items WHERE id=?", [$call['po_line_item_id']]); if ($li) echo '<option value="'.(int)$li['id'].'" selected data-rate="'.e((string)$li['rate']).'" data-unit="'.e((string)$li['item_type']).'" data-balance="'.e((string)((float)$li['quantity'] - (float)$li['consumed'])).'">'.e($li['description']).'</option>'; } ?>
@@ -831,10 +832,83 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   function esc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
 
-  clientSel.addEventListener('change', function(){ fillQuotes(false); checkGaps(); });
+  // ---- §PO: the client's purchase orders flow into the call -----------------
+  // Picking the client loads that client's purchase orders straight from the
+  // directory; picking an order loads its line items and shows the balance left
+  // on the chosen line. The endpoints (/partner-pos, /po-lines) already exist —
+  // this wires the form to them so PO detail is a single source that flows in
+  // from the directory instead of being re-typed (or left blank) here.
+  var poSel = document.getElementById('po_sel'),
+      poLineSel = document.getElementById('po_line_sel'),
+      poBal = document.getElementById('po_bal_note');
+  if (poSel) { poSel.dataset.cur = poSel.value || ''; }
+  if (poLineSel) { poLineSel.dataset.cur = poLineSel.value || ''; }
+  function updatePOBal(){
+    if (!poLineSel || !poBal) return;
+    var opt = poLineSel.options[poLineSel.selectedIndex];
+    if (opt && opt.value && opt.dataset.balance !== undefined && opt.dataset.balance !== '') {
+      poBal.textContent = 'Balance left on this line: ' + opt.dataset.balance + ' ' + (opt.dataset.unit || '');
+    } else if (poLineSel.value) {
+      poBal.textContent = '';
+    }
+  }
+  function fillPOLines(keep){
+    if (!poLineSel) return;
+    var want = keep ? (poLineSel.value || poLineSel.dataset.cur || '') : '';
+    poLineSel.innerHTML = '';
+    var o0 = document.createElement('option'); o0.value=''; o0.textContent='—'; poLineSel.appendChild(o0);
+    if (poBal) poBal.textContent = '';
+    if (!poSel || !poSel.value) return;
+    fetch('/po-lines?id=' + encodeURIComponent(poSel.value))
+      .then(function(r){ return r.json(); })
+      .then(function(res){
+        var lines = (res && res.lines) || [];
+        lines.forEach(function(l){
+          var el=document.createElement('option'); el.value=l.id; el.textContent=l.label;
+          el.dataset.rate = (l.rate==null?'':l.rate); el.dataset.unit = l.unit||'';
+          el.dataset.balance = (l.balance==null?'':l.balance);
+          if (String(l.id) === String(want)) el.selected = true;
+          poLineSel.appendChild(el);
+        });
+        if (!lines.length && res && res.hint && poBal) {
+          poBal.innerHTML = esc(res.hint.text || 'This order has no line items yet.')
+            + (res.hint.url ? ' <a href="'+esc(res.hint.url)+'" target="_blank">'+esc(res.hint.link||'Open the order')+' →</a>' : '');
+        }
+        updatePOBal();
+      }).catch(function(){});
+  }
+  function fillPOs(keep){
+    if (!poSel) return;
+    var want = keep ? (poSel.value || poSel.dataset.cur || '') : '';
+    poSel.innerHTML = '';
+    var o0=document.createElement('option'); o0.value='';
+    o0.textContent = clientSel.value ? '— open / none —' : '— pick a client first —';
+    poSel.appendChild(o0);
+    var addLink = document.getElementById('po_add_link');
+    if (addLink) {
+      if (clientSel.value) { addLink.href = '/partner?id=' + encodeURIComponent(clientSel.value) + '&tab=purchase_orders'; addLink.style.display = ''; }
+      else { addLink.style.display = 'none'; }
+    }
+    if (!clientSel.value) { fillPOLines(false); return; }
+    fetch('/partner-pos?id=' + encodeURIComponent(clientSel.value))
+      .then(function(r){ return r.json(); })
+      .then(function(list){
+        (list||[]).forEach(function(o){
+          var el=document.createElement('option'); el.value=o.id; el.textContent=o.label;
+          if (String(o.id) === String(want)) el.selected = true;
+          poSel.appendChild(el);
+        });
+        fillPOLines(true);
+      }).catch(function(){});
+  }
+  if (poSel) poSel.addEventListener('change', function(){ fillPOLines(false); });
+  if (poLineSel) poLineSel.addEventListener('change', updatePOBal);
+
+  clientSel.addEventListener('change', function(){ fillQuotes(false); fillPOs(false); checkGaps(); });
   if (vendorSel) vendorSel.addEventListener('change', checkGaps);
   qSel.addEventListener('change', function(){ loadQuote(false); });
   fillQuotes(true);
+  fillPOs(true);
   checkGaps();
   // Coming back from the master in the other tab should not need a reload.
   window.addEventListener('focus', checkGaps);

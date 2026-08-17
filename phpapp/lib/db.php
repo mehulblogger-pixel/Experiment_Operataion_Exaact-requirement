@@ -388,6 +388,8 @@ function run_schema($withSeeds = true) {
     if (function_exists('tapi_gov_migrate')) tapi_gov_migrate();      // TAPI KPI versioning + period snapshots/closure + Phase-12 metadata
     if (function_exists('tosrm_migrate_d')) tosrm_migrate_d(); // TOSRM Phase 9 — service-request lifecycle + assignment lifecycle + readiness/confirmation/competence + SLA/TAT/delay/recurring/capacity (chains A→B→C→D)
     elseif (function_exists('tosrm_migrate')) tosrm_migrate();
+    if (function_exists('tosrm_xo_migrate')) tosrm_xo_migrate();  // TOSRM exception tools (folded into the request lifecycle)
+    if (function_exists('pc_migrate')) pc_migrate();              // project costing header + role/cost-head lines
     if (function_exists('orgadmin_migrate')) orgadmin_migrate();   // office tree + heads
     if (function_exists('contracts_migrate')) contracts_migrate();  // contract validity gates
     if (function_exists('security_migrate')) security_migrate();    // password age, second factor

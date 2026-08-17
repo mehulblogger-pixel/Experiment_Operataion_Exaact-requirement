@@ -921,6 +921,7 @@ function org_import_apply($rows) {
                 $pdo->prepare("UPDATE users SET password_hash=? WHERE id=?")
                     ->execute([password_hash($r['password'], PASSWORD_DEFAULT), (int)$r['user_id']]);
             $idOfRow[$idx] = (int)$r['user_id'];
+            org_import_link_team($idOfRow[$idx], $role, $r['first_name'], $r['last_name'], $r['email'], $off);
             $updated++;
         } else {
             $pw = trim((string)($r['password'] ?? '')) !== '' ? $r['password'] : 'changeme123';
@@ -930,6 +931,7 @@ function org_import_apply($rows) {
                            $r['email'], $role, $isSuper, (int)$r['active'], $off, $r['position_title'], $r['sbu'],
                            (float)$r['weekly_working_days']]);
             $idOfRow[$idx] = (int)$pdo->lastInsertId();
+            org_import_link_team($idOfRow[$idx], $role, $r['first_name'], $r['last_name'], $r['email'], $off);
             $created++;
         }
     }
@@ -947,6 +949,27 @@ function org_import_apply($rows) {
         $linked++;
     }
     return ['created' => $created, 'updated' => $updated, 'linked' => $linked, 'skipped' => $skipped, 'no_role' => $noRole];
+}
+// Every login (bar the root Master Admin) belongs to a team-member row — the
+// same rule the single-user form enforces inline. The Excel register import
+// used to write only `users`, so imported people never gained a team-member
+// row and were absent from the inspection-allocate list. Link them here so the
+// register is a single source that flows through to allocation. Idempotent:
+// a login that already carries a link is left untouched.
+function org_import_link_team($userId, $role, $firstName, $lastName, $email, $officeId) {
+    $userId = (int)$userId;
+    if (!$userId || $role === 'MASTER_ADMIN') return;      // root login is not deputable
+    if (!function_exists('team_member_create')) return;
+    $cur = (int)(ops_val("SELECT inspector_id FROM users WHERE id=?", [$userId]) ?: 0);
+    if ($cur > 0) return;                                  // already linked — keep it
+    $name = trim(((string)$firstName) . ' ' . ((string)$lastName));
+    if ($name === '') return;
+    // Where they sit in the allocate list: field people first, coordinators
+    // next, everyone else in the office pool (all three are deputable).
+    $tr = $role === 'INSPECTOR' ? 'FIELD'
+        : (in_array($role, ['COORDINATOR', 'ASST_MANAGER'], true) ? 'COORD' : 'OFFICE');
+    $insId = team_member_create($name, $tr, $officeId ?: null, (string)$email);
+    if ($insId) db()->prepare("UPDATE users SET inspector_id=? WHERE id=?")->execute([$insId, $userId]);
 }
 // Would making $managerId the manager of $userId close a loop?
 function org_would_loop($userId, $managerId) {

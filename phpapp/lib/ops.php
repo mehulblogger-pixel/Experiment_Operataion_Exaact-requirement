@@ -816,6 +816,29 @@ function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
     }
     return null;
 }
+// Link inspector-role logins to a team-member row so they are deputable.
+// The allocate list reads `inspectors`; a login without a linked team member
+// (e.g. imported from the Excel register, which writes only `users`) can never
+// be picked. This is the single source healer: for every active INSPECTOR-role
+// user missing the link, create the team member and set users.inspector_id.
+// Cheap to call repeatedly: when there is nothing unlinked the guard query
+// returns no rows and it does no work.
+function link_inspector_users() {
+    if (!function_exists('team_member_create')) return;
+    try {
+        $rows = ops_all("SELECT id, first_name, last_name, username, email, home_office_id
+                         FROM users
+                         WHERE role='INSPECTOR' AND is_active=1
+                           AND (inspector_id IS NULL OR inspector_id=0)");
+    } catch (\Throwable $e) { return; }                 // older schema without the column
+    foreach ($rows as $u) {
+        $name = trim(((string)($u['first_name'] ?? '')) . ' ' . ((string)($u['last_name'] ?? '')));
+        if ($name === '') $name = trim((string)($u['username'] ?? ''));
+        if ($name === '') continue;
+        $insId = team_member_create($name, 'FIELD', $u['home_office_id'] ?: null, (string)($u['email'] ?? ''));
+        if ($insId) db()->prepare("UPDATE users SET inspector_id=? WHERE id=?")->execute([$insId, (int)$u['id']]);
+    }
+}
 function inspectors_list($activeOnly = true) {
     // Field inspectors first (they go to site), then coordinators, then office
     // staff — everyone is deputable, but the person most likely to be sent sits
@@ -828,6 +851,13 @@ function inspectors_list($activeOnly = true) {
     // triggered the migration hits exactly that, so add the column here (cheap
     // and idempotent) before it is selected.
     if (function_exists('ensure_column')) ensure_column('inspectors', 'team_role', "VARCHAR(10) DEFAULT 'FIELD'");
+    // Self-heal the "imported people don't show for allocation" gap: a field
+    // person brought in via the Excel register (or created as a login some other
+    // way) lands in `users` but, unlike the single-user form, never gets a
+    // team-member row — so they are absent from this list. Give every active
+    // inspector-role login a matching team-member row and link it, once per
+    // request, before the list is read. No-op when there is nothing to link.
+    link_inspector_users();
     $rows = ops_all("SELECT id, name, emp_code, sbu, salary_ctc, staff_kind, home_office_id,
                             COALESCE(team_role,'FIELD') team_role
                      FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name");
