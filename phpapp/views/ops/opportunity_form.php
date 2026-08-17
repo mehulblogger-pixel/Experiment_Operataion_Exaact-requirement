@@ -52,3 +52,20 @@
   <button class="btn" style="margin-top:14px">Open the opportunity</button>
   <a class="btn secondary" href="/opportunities" style="margin-left:8px">Cancel</a>
 </form>
+<?php // Pick a customer and their contact flows in from the client master — the
+      // same details entered under the Directory, so nobody re-types them here. ?>
+<script>(function(){
+  var sel=document.querySelector('select[name="partner_id"]'); if(!sel) return;
+  var f={name:document.querySelector('[name="contact_name"]'),
+         email:document.querySelector('[name="contact_email"]'),
+         phone:document.querySelector('[name="contact_phone"]')};
+  Object.keys(f).forEach(function(k){ if(f[k]) f[k].addEventListener('input',function(){ f[k].dataset.af=''; }); });
+  function set(el,v){ if(!el) return; v=v||''; if((el.value||'')!=='' && el.dataset.af!=='1') return; el.value=v; el.dataset.af=v!==''?'1':''; }
+  function load(){ var id=sel.value; if(!id) return;
+    fetch('/partner-contact?id='+encodeURIComponent(id),{headers:{'X-Requested-With':'fetch'}})
+      .then(function(r){return r.json();})
+      .then(function(d){ var c=(d&&d.contact)||{}; set(f.name,c.name); set(f.email,c.email); set(f.phone,c.mobile); })
+      .catch(function(){});
+  }
+  sel.addEventListener('change', load);
+})();</script>

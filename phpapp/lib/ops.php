@@ -2570,6 +2570,12 @@ function ops_dispatch($route, $method) {
             return svc_report_admin($method);
         case $route === 'deputations':
             return ops_pdso($route, $method);
+        // Shared client autofill: primary contact + address for a picked customer,
+        // used by the lead and opportunity forms (and anywhere else). Any signed-in
+        // user may call it; it exposes only what is already on the client card.
+        case $route === 'partner-contact':
+            if (function_exists('ops_partner_contact')) { ops_partner_contact(); return true; }
+            return false;
         case in_array($route, ['call-status','call-attrs','call-override','call-clar-new','call-clar-respond','call-clar-status'], true):
             return ops_tosrm_action($route, $method);
         case in_array($route, ['assign-hold','assign-accept','assign-reassign','assign-reschedule','assign-cancel','assign-noshow'], true):

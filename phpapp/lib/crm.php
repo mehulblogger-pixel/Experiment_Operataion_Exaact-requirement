@@ -743,6 +743,36 @@ function crm_client_addresses($cid) {
     } catch (Throwable $e) { return []; }
 }
 
+// A partner's primary contact + address as JSON, so that picking a customer on
+// ANY form (a lead, an opportunity, …) fills the contact/address in by itself,
+// exactly the way the quote form does. Deliberately light — it returns only what
+// is already on the client card, and is reachable by any signed-in user (route
+// is not behind a module gate) so a sales person working only leads can use it.
+function ops_partner_contact() {
+    header('Content-Type: application/json');
+    $pid = (int)($_GET['id'] ?? 0);
+    $contacts = function_exists('crm_client_contacts') ? crm_client_contacts($pid) : [];
+    $c = $contacts[0] ?? null;
+    $addrs = function_exists('crm_client_addresses') ? crm_client_addresses($pid) : [];
+    $a = $addrs[0] ?? null;
+    echo json_encode([
+        'contact' => $c ? [
+            'name'   => (string)($c['name'] ?? ''),
+            'email'  => (string)($c['email'] ?? ''),
+            'mobile' => (string)(($c['mobile'] ?? '') ?: ($c['phone'] ?? '')),
+        ] : null,
+        'address' => $a ? [
+            'label'   => (string)($a['label'] ?? ''),
+            'line1'   => (string)($a['line1'] ?? ''),
+            'line2'   => (string)($a['line2'] ?? ''),
+            'city'    => (string)($a['city'] ?? ''),
+            'state'   => (string)($a['state'] ?? ''),
+            'pincode' => (string)($a['pincode'] ?? ''),
+        ] : null,
+        'contacts' => $contacts,
+    ]);
+}
+
 // ---- The customer's group, for "what have we quoted them before" -----------
 // A customer can belong to a group (business_partners.parent_id). When you are
 // about to quote one company, the useful history is the whole group's — the

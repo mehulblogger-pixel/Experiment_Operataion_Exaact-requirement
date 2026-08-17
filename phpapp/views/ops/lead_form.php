@@ -169,5 +169,20 @@ $me  = current_user();
   }
   sel.addEventListener('change', sync);
   sync();   // honour a bounced-back partner_id on a retry
+
+  // Picking a customer also flows their primary contact in from the client
+  // master — the same person entered under the Directory, not re-typed here.
+  var cf={name:document.querySelector('[name="contact_name"]'),
+          email:document.querySelector('[name="contact_email"]'),
+          phone:document.querySelector('[name="contact_phone"]')};
+  Object.keys(cf).forEach(function(k){ if(cf[k]) cf[k].addEventListener('input',function(){ cf[k].dataset.af=''; }); });
+  function put(el,v){ if(!el) return; v=v||''; if((el.value||'')!=='' && el.dataset.af!=='1') return; el.value=v; el.dataset.af=v!==''?'1':''; }
+  function pull(){ var id=sel.value; if(!id) return;
+    fetch('/partner-contact?id='+encodeURIComponent(id),{headers:{'X-Requested-With':'fetch'}})
+      .then(function(r){return r.json();})
+      .then(function(d){ var c=(d&&d.contact)||{}; put(cf.name,c.name); put(cf.email,c.email); put(cf.phone,c.mobile); })
+      .catch(function(){});
+  }
+  sel.addEventListener('change', pull);
 })();
 </script>
