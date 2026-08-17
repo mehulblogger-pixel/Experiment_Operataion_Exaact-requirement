@@ -145,6 +145,13 @@
         <button type="button" class="btn secondary" id="geo_paste_btn">Read coordinates</button>
         <span class="muted" id="geo_msg"></span>
       </div>
+      <?php // Locate straight from the company name / address — no need to know the
+            // coordinates. Fills lat/long from the map; if there is no clean match it
+            // opens Google Maps so the pin can be picked and pasted above. ?>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">
+        <input class="form-control" id="geo_query" placeholder="…or find by company name / address — e.g. “Reliance, Jamnagar”" style="flex:1;min-width:220px">
+        <button type="button" class="btn secondary" id="geo_find">🔎 Find coordinates</button>
+      </div>
     </div>
     <script>
     (function(){
@@ -171,6 +178,32 @@
         var c=parse(pbox.value||'');
         if(!c){ say('Could not find coordinates in that text.'); return; }
         lat.value=c.la.toFixed(7); lon.value=c.lo.toFixed(7); say('Coordinates read.');
+      });
+
+      // Find coordinates from the company name / address. Prefills from the name
+      // and State already on the form; geocodes with OpenStreetMap (no key needed),
+      // and falls back to opening Google Maps when there is no clean match.
+      var q=document.getElementById('geo_query'), find=document.getElementById('geo_find');
+      function guess(){
+        var dn=document.querySelector('[name="display_name"]'), ln=document.querySelector('[name="legal_name"]'),
+            st=document.getElementById('state_display');
+        var nm=((dn&&dn.value)||(ln&&ln.value)||'').trim(), s=((st&&st.value)||'').trim();
+        return (nm + (s?(', '+s):'') + ((nm||s)?', India':'')).replace(/^,\s*/,'').trim();
+      }
+      function openMaps(query){ try{ window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(query),'_blank','noopener'); }catch(e){} }
+      if(q){ q.addEventListener('focus',function(){ if(!q.value) q.value=guess(); }); }
+      if(find) find.addEventListener('click',function(){
+        var query=((q&&q.value)||'').trim() || guess();
+        if(!query){ say('Type a company name or address to locate.'); return; }
+        say('Searching the map…');
+        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(query),{headers:{'Accept':'application/json'}})
+          .then(function(r){ return r.json(); })
+          .then(function(a){
+            if(a && a.length){ lat.value=parseFloat(a[0].lat).toFixed(7); lon.value=parseFloat(a[0].lon).toFixed(7);
+              say('Found: '+String(a[0].display_name||query).slice(0,90)+' — check the pin is right.'); }
+            else { openMaps(query); say('No exact match — opened Google Maps; drop the pin, then paste the link above and press “Read coordinates”.'); }
+          })
+          .catch(function(){ openMaps(query); say('Opened Google Maps — copy the pin’s link and paste it above, then “Read coordinates”.'); });
       });
     })();
     </script>

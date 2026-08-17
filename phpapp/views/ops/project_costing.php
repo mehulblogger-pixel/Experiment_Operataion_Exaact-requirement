@@ -55,6 +55,23 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   <div class="kpi <?= $T['margin']>=0?'ok':'bad' ?>"><div class="l">Margin</div><div class="v"><?= number_format($T['margin'],1) ?>%</div></div>
 </div>
 
+<?php // Why the figures can read ₹0. The totals are built up from the team roles
+      // below — saving the header alone never produces a number. Say so, plainly,
+      // instead of leaving a wall of zeros with no explanation. ?>
+<?php if ((float)$T['revenue'] == 0 && (float)$T['cost'] == 0): ?>
+  <div class="msg msg-info" style="margin:0 0 12px">
+    <?php if (empty($lines)): ?>
+      <b>The totals are ₹0 because no team roles have been added yet.</b>
+      The revenue, cost and margin build up from the roles below — <b>saving the header alone does not produce a figure</b>.
+      <?php if ($canEdit): ?>Add a role under <a href="#add-role"><b>＋ Add a role</b></a>, enter at least one cost head (for example the monthly salary) and the BOQ quantity, and the numbers appear here.<?php endif; ?>
+    <?php else: ?>
+      <b>You have <?= count($lines) ?> role(s) but every figure is still ₹0.</b>
+      A role only contributes once it has a <b>cost head</b> amount (e.g. the monthly salary) <i>and</i> a <b>BOQ quantity</b>.
+      <?php if ($canEdit): ?>Open a role below and fill its cost heads and quantity.<?php endif; ?>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
 <!-- Roles table -->
 <div class="panel wide-scroll">
   <h3 class="tab-sub" style="margin-top:0">Team roles <span class="muted">— <?= count($lines) ?> role(s), each built up from the cost heads</span></h3>
@@ -132,7 +149,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
 
 <?php if ($canEdit): ?>
 <!-- Add / edit a role -->
-<div class="panel">
+<div class="panel" id="add-role">
   <h3 class="tab-sub" style="margin-top:0">＋ Add a role</h3>
   <form method="post" action="/project-costing-line-save" id="lineForm">
     <input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>">
