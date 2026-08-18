@@ -48,7 +48,7 @@ Every module from Master Inventory v1.0. Order = priority (b): high-risk operati
 - [x] 36 Licensing & Seats / Super-admin — MOD-SETTINGS (licensing)
 
 ## Then
-- [ ] Prompt 4 — End-to-End TPIA Workflow Test report
+- [x] Prompt 4 — End-to-End TPIA Workflow Test report
 - [ ] Prompt 5 — Gap, Risk & Readiness Assessment
 
 *Updated as each module lands. A module is only ticked when its .md + .docx are
