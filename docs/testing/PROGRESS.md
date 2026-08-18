@@ -53,3 +53,7 @@ Every module from Master Inventory v1.0. Order = priority (b): high-risk operati
 
 *Updated as each module lands. A module is only ticked when its .md + .docx are
 committed and delivered.*
+
+## Manual testing (hands-on)
+- [x] Manual Test Execution Guide — `manual-test-execution-guide.md` / .docx
+      (concrete login → screen → values → expected result → pass/fail; grounded in demo data)
