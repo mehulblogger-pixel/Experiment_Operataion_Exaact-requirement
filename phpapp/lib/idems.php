@@ -222,6 +222,9 @@ function idems_migrate() {
         ensure_column('report_docs', 'vet_status', "VARCHAR(20) DEFAULT ''");
         ensure_column('report_docs', 'vet_at', "VARCHAR(30) DEFAULT ''");
         ensure_column('report_docs', 'vet_by', "VARCHAR(150) DEFAULT ''");
+        // The vetting authority's ticked checklist for this report (JSON: item=>1).
+        // Only used when the configurable checklist is switched on.
+        ensure_column('report_docs', 'vet_checklist', "MEDIUMTEXT");
     }
     ensure_column('users', 'signature', 'MEDIUMTEXT');          // base64 data-URL of the signature image
     ensure_column('inspectors', 'signature', 'MEDIUMTEXT');
@@ -4180,6 +4183,8 @@ function ops_idems_documents($route, $method) {
             'sections'=>$sections, 'fields'=>$fields, 'data'=>$data, 'files'=>idems_doc_files($doc['id']), 'hasSchema'=>!empty($fields),
             'approvals'=>$approvals, 'curStep'=>$curStep, 'canAct'=>idems_can_act_step($curStep),
             'vetting'=>idems_vetting_log($doc['id']), 'canVet'=>idems_can_vet(),
+            'vetChecklistOn'=>idems_vetting_checklist_enabled(), 'vetChecklistItems'=>idems_vetting_checklist_items(),
+            'vetChecklistState'=>idems_vetting_checklist_state($doc), 'vetChecklistRequireAll'=>idems_vetting_checklist_require_all(),
             'delegateUsers'=>($curStep && idems_can_act_step($curStep)) ? ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name") : []]);
         return true;
     }
@@ -5519,6 +5524,49 @@ function idems_vetting_log($docId) {
 }
 // Who may vet / debrief a report — a senior reviewer (finalizer) or a master.
 function idems_can_vet() { return is_master() || can('idems.finalize'); }
+
+// ---- Configurable vetting checklist (for the vetting authority) ----
+// A list of check points the vetting authority ticks before clearing a report.
+// Entirely admin-configured and switchable on/off — nothing is hardcoded into
+// the workflow. Off by default, so existing installs are unchanged until enabled.
+function idems_vetting_checklist_enabled() {
+    return function_exists('setting_get') && (string)setting_get('vetting_checklist_on', '') === '1';
+}
+// Whether every applicable point must be ticked before a report can be vetted.
+function idems_vetting_checklist_require_all() {
+    return function_exists('setting_get') && (string)setting_get('vetting_checklist_require', '') === '1';
+}
+// The configured check points (one per line in the setting). Returns a clean list
+// of non-empty lines. Empty when nothing has been configured.
+function idems_vetting_checklist_items() {
+    $raw = function_exists('setting_get') ? (string)setting_get('vetting_checklist_items', '') : '';
+    $out = [];
+    foreach (preg_split('/\r?\n/', $raw) as $ln) { $ln = trim($ln); if ($ln !== '') $out[] = $ln; }
+    return $out;
+}
+// A sensible starter checklist, offered as the initial value on the settings
+// screen. It is a SUGGESTION the admin edits or replaces — never applied unless
+// saved, so it is configuration, not hardcoded behaviour.
+function idems_vetting_checklist_default() {
+    return implode("\n", [
+        'Client, vendor, PO and project details are correct',
+        'Scope covers the applicable ITP / QAP clauses',
+        'Inspection results and dispositions are clearly recorded',
+        'Observations / non-conformities are complete and unambiguous',
+        'Required photographs are attached and captioned',
+        'Applicable standards and acceptance criteria are referenced',
+        'Signatures / sign-off are in order',
+        'Report number, dates and revision are correct',
+    ]);
+}
+// A stable key for a checklist item (so ticks survive minor wording edits poorly,
+// but stay simple). Uses a short hash of the item text.
+function idems_vetting_item_key($item) { return 'c' . substr(md5(trim((string)$item)), 0, 10); }
+// The saved tick state for a report: [item_key => 1].
+function idems_vetting_checklist_state($doc) {
+    $j = json_decode((string)($doc['vet_checklist'] ?? ''), true);
+    return is_array($j) ? $j : [];
+}
 // ---- Handler: technical vetting / debriefing (distinct from approval) ----
 function ops_idems_vet($method) {
     if ($method !== 'POST') redirect('/documents');
@@ -5531,6 +5579,25 @@ function ops_idems_vet($method) {
     $note = trim((string)($_POST['note'] ?? ''));
     if ($action === 'RETURNED' && $note === '') { flash('A note is mandatory when returning a report for correction.', 'error'); redirect('/document?id=' . $doc['id']); }
     $pdo = db();
+    // Configurable vetting checklist: record which points the vetter ticked, and
+    // (when configured) block "Vet (cleared)" until every point is ticked. Never
+    // affects Return / Debrief, and does nothing when the checklist is switched off.
+    $vc = [];
+    if (idems_vetting_checklist_enabled()) {
+        $ticked = (array)($_POST['vc'] ?? []);
+        foreach (idems_vetting_checklist_items() as $it) {
+            $k = idems_vetting_item_key($it);
+            if (!empty($ticked[$k])) $vc[$k] = 1;
+        }
+        if ($action === 'VETTED' && idems_vetting_checklist_require_all()) {
+            $items = idems_vetting_checklist_items();
+            if (count($vc) < count($items)) {
+                flash('Tick every point on the vetting checklist before clearing the report (' . count($vc) . '/' . count($items) . ' ticked).', 'error');
+                redirect('/document?id=' . $doc['id']);
+            }
+        }
+        $pdo->prepare("UPDATE report_docs SET vet_checklist=? WHERE id=?")->execute([json_encode($vc), $doc['id']]);
+    }
     $stage = ($action === 'DEBRIEFED') ? 'DEBRIEF' : 'VET';
     $pdo->prepare("INSERT INTO report_vetting (report_doc_id,stage,action,note,acted_by,acted_at) VALUES (?,?,?,?,?,?)")
         ->execute([$doc['id'], $stage, $action, $note, user_name(current_user()), date('c')]);
@@ -5543,6 +5610,32 @@ function ops_idems_vet($method) {
     idems_log('report_doc', $doc['id'], 'VET_' . $action, ['irn'=>$doc['irn'], 'reason'=>$note]);
     flash(['VETTED'=>'Report vetted — cleared for approval.', 'RETURNED'=>'Report returned to the inspector for correction.', 'DEBRIEFED'=>'Debrief recorded.'][$action] ?? 'Vetting recorded.');
     redirect('/document?id=' . $doc['id']);
+    return true;
+}
+
+// ---- Handler: configure the vetting checklist (admin) ----
+function ops_idems_vetting_checklist($method) {
+    ops_require(is_master() || can('idems.type.manage') || can('idems.finalize'), 'You cannot configure the vetting checklist.');
+    if ($method === 'POST') {
+        $on  = !empty($_POST['enabled']) ? '1' : '';
+        $req = !empty($_POST['require_all']) ? '1' : '';
+        // Normalise the items: trim, drop blanks, cap length, keep order.
+        $items = [];
+        foreach (preg_split('/\r?\n/', (string)($_POST['items'] ?? '')) as $ln) { $ln = trim($ln); if ($ln !== '') $items[] = substr($ln, 0, 300); }
+        setting_set('vetting_checklist_on', $on);
+        setting_set('vetting_checklist_require', $req);
+        setting_set('vetting_checklist_items', implode("\n", $items));
+        idems_log('setting', 0, 'VETTING_CHECKLIST', ['field'=>'vetting checklist', 'new'=>($on ? 'on' : 'off') . ', ' . count($items) . ' item(s)']);
+        flash('Vetting checklist saved.' . ($on ? '' : ' (It is switched off, so it will not appear during vetting.)'));
+        redirect('/vetting-checklist');
+    }
+    $items = (string)setting_get('vetting_checklist_items', '');
+    if (trim($items) === '') $items = idems_vetting_checklist_default();   // offer a starter list to edit
+    view('ops/idems/vetting_checklist', [
+        'enabled' => idems_vetting_checklist_enabled(),
+        'require_all' => idems_vetting_checklist_require_all(),
+        'items' => $items,
+    ]);
     return true;
 }
 

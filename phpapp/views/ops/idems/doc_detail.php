@@ -455,8 +455,23 @@
     </div>
   <?php endif; ?>
   <?php if ($canVet): ?>
+    <?php
+      $vetChecklistOn = $vetChecklistOn ?? false; $vetChecklistItems = $vetChecklistItems ?? [];
+      $vetChecklistState = $vetChecklistState ?? []; $vetChecklistRequireAll = $vetChecklistRequireAll ?? false;
+    ?>
     <form method="post" action="/document-vet">
       <input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
+      <?php if ($vetChecklistOn && $vetChecklistItems): ?>
+        <div class="vet-checklist" style="border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:11px 13px;margin-bottom:10px;background:var(--soft,#f8fafc)">
+          <div style="font-weight:600;font-size:12.5px;margin-bottom:7px">Vetting checklist<?= $vetChecklistRequireAll ? ' <span class="muted" style="font-weight:400">— all points required to clear</span>' : '' ?></div>
+          <?php foreach ($vetChecklistItems as $it): $k = idems_vetting_item_key($it); ?>
+            <label class="chk" style="display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;font-size:13px">
+              <input type="checkbox" name="vc[<?= e($k) ?>]" value="1" <?= !empty($vetChecklistState[$k]) ? 'checked' : '' ?> style="margin-top:2px">
+              <span><?= e($it) ?></span>
+            </label>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
       <input class="form-control" name="note" placeholder="Note (required to return for correction)" style="margin-bottom:8px">
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn" type="submit" name="vet_action" value="VETTED">✓ Vet (cleared)</button>
@@ -464,6 +479,9 @@
         <button class="btn secondary" type="submit" name="vet_action" value="DEBRIEFED">🗣 Record debrief</button>
       </div>
     </form>
+    <?php if (is_master() || can('idems.type.manage')): ?>
+      <div style="margin-top:7px"><a class="muted" style="font-size:11.5px" href="/vetting-checklist"><?= $vetChecklistOn ? 'Edit the vetting checklist' : 'Set up a vetting checklist' ?> →</a></div>
+    <?php endif; ?>
   <?php endif; ?>
 </div>
 <?php endif; ?>
