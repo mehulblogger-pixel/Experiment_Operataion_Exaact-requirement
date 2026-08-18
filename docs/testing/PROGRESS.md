@@ -49,7 +49,7 @@ Every module from Master Inventory v1.0. Order = priority (b): high-risk operati
 
 ## Then
 - [x] Prompt 4 — End-to-End TPIA Workflow Test report
-- [ ] Prompt 5 — Gap, Risk & Readiness Assessment
+- [x] Prompt 5 — Gap, Risk & Readiness Assessment
 
 *Updated as each module lands. A module is only ticked when its .md + .docx are
 committed and delivered.*
