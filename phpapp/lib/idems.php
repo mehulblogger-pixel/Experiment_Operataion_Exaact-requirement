@@ -4405,6 +4405,28 @@ function ops_idems_report_types($route, $method) {
             elseif ($t) { $pdo->prepare("UPDATE report_types SET active=0 WHERE id=?")->execute([$t['id']]); flash('Built-in type deactivated (kept for history).'); }
             redirect('/report-types');
         }
+        // Minimise the catalogue to what people can actually use: deactivate every
+        // ACTIVE type that has no designed form AND no reports filed against it —
+        // exactly the ones that would open a blank screen and clutter the pickers.
+        // Reversible (nothing is deleted; re-activate any type to bring it back) and
+        // safe (a type in use is never touched). §curate
+        if ($do === 'hide_empty') {
+            // NOT EXISTS (not NOT IN) so a NULL report_type_id in a legacy row can
+            // never silently make the whole set empty.
+            $victims = ops_all("SELECT id, code, name FROM report_types rt WHERE COALESCE(rt.active,1)=1
+                AND NOT EXISTS (SELECT 1 FROM report_fields f WHERE f.report_type_id=rt.id)
+                AND NOT EXISTS (SELECT 1 FROM report_docs d WHERE d.report_type_id=rt.id AND COALESCE(d.deleted,0)=0)");
+            $n = 0; foreach ($victims as $v) { $pdo->prepare("UPDATE report_types SET active=0 WHERE id=?")->execute([(int)$v['id']]); $n++; }
+            flash($n ? "Hid $n empty report type(s) that had no form and no reports. Nothing was deleted — re-activate any of them from the list below (Inactive) whenever you need it." : 'Nothing to hide — every active type already has a form or reports.');
+            redirect('/report-types');
+        }
+        // Bring them all back (undo the above): re-activate every inactive type.
+        if ($do === 'show_all') {
+            $n = (int)ops_val("SELECT COUNT(*) FROM report_types WHERE COALESCE(active,1)=0");
+            $pdo->exec("UPDATE report_types SET active=1 WHERE COALESCE(active,1)=0");
+            flash($n ? "Re-activated $n report type(s) — all types are now visible again." : 'All report types are already active.');
+            redirect('/report-types');
+        }
         $id = (int)($_POST['id'] ?? 0);
         $code = strtoupper(trim($_POST['code'] ?? '')); $name = trim($_POST['name'] ?? '');
         $cat = isset(lk_options_or('report_category', IDEMS_CATEGORIES)[$_POST['category'] ?? '']) ? $_POST['category'] : 'TPIA_REPORT';

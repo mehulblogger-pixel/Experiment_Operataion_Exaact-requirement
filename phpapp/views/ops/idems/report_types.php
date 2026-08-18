@@ -42,14 +42,40 @@
 
 <?php
   $fieldCounts = $fieldCounts ?? []; $docCounts = $docCounts ?? [];
-  $readyN = 0; $emptyN = 0;
-  foreach ($rows as $r) { if (($fieldCounts[(int)$r['id']] ?? 0) > 0) $readyN++; elseif ($r['active']) $emptyN++; }
+  $readyN = 0; $emptyN = 0; $inactiveN = 0; $hideableN = 0;
+  foreach ($rows as $r) {
+    $nf = $fieldCounts[(int)$r['id']] ?? 0; $nd = $docCounts[(int)$r['id']] ?? 0;
+    if (!$r['active']) { $inactiveN++; continue; }
+    if ($nf > 0) $readyN++; else { $emptyN++; if ($nd === 0) $hideableN++; }
+  }
 ?>
 <div class="panel" style="margin-top:14px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">
   <span class="pill p-ok" style="font-size:12.5px"><?= $readyN ?> ready to fill</span>
   <?php if ($emptyN): ?><span class="pill p-warn" style="font-size:12.5px"><?= $emptyN ?> active but no form yet</span><?php endif; ?>
+  <?php if ($inactiveN): ?><span class="pill p-mut" style="font-size:12.5px"><?= $inactiveN ?> hidden</span><?php endif; ?>
   <span class="muted" style="font-size:12.5px">“Ready to fill” means the form is designed — opening it goes straight to writing. “No form yet” opens a blank screen until you design it.</span>
 </div>
+
+<?php if (!$edit && ($hideableN || $inactiveN)): ?>
+<div class="panel" style="margin-top:12px">
+  <h3 class="tab-sub" style="margin-top:0">🧹 Tidy the catalogue</h3>
+  <p class="muted" style="margin:0 0 10px;font-size:12.5px">Keep the list to the reports you actually use. This only hides empty types (no form, no reports) — <b>nothing is deleted</b>, and a hidden type shows as <i>Inactive</i> below so you can bring it back anytime.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <?php if ($hideableN): ?>
+    <form method="post" action="/report-types" style="margin:0" onsubmit="return confirm('Hide <?= (int)$hideableN ?> empty report type(s)? They have no form and no reports. Nothing is deleted — you can re-activate them anytime.')">
+      <input type="hidden" name="_do" value="hide_empty">
+      <button class="btn" type="submit">Hide <?= (int)$hideableN ?> empty type<?= $hideableN==1?'':'s' ?></button>
+    </form>
+    <?php endif; ?>
+    <?php if ($inactiveN): ?>
+    <form method="post" action="/report-types" style="margin:0">
+      <input type="hidden" name="_do" value="show_all">
+      <button class="btn secondary" type="submit">Show all <?= (int)$inactiveN ?> hidden type<?= $inactiveN==1?'':'s' ?> again</button>
+    </form>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
 
 <div class="panel" style="padding:0;overflow:hidden;margin-top:14px">
   <div class="tbl-scroll" style="overflow-x:auto">
