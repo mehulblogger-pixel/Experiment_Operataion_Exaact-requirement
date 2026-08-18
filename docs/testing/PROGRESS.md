@@ -25,7 +25,7 @@ Every module from Master Inventory v1.0. Order = priority (b): high-risk operati
 ## Registers & config (after spine)
 - [x] 14 Settings & Terminology — MOD-SETTINGS
 - [x] 15 Clients — MOD-CLIENTS
-- [ ] 16 Vendors — MOD-VENDORS
+- [x] 16 Vendors — MOD-VENDORS
 - [ ] 17 Leads & pipeline — MOD-LEADS
 - [ ] 18 Orders / Contracts — MOD-CRMORD
 - [ ] 19 Inquiries — MOD-INQUIRIES
