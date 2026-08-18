@@ -15,7 +15,7 @@ const ORG_ROLES = [
     // Marketing & Sales (CRM) roles
     'BUSINESS_DEV_MANAGER' => 'Business Development Manager', 'KEY_ACCOUNTS_MANAGER' => 'Key Accounts Manager',
     'MARKETING_MANAGER' => 'Marketing Manager', 'MARKETING_EXECUTIVE' => 'Marketing Executive',
-    'FINANCE' => 'Finance', 'INSPECTOR' => 'Inspector', 'ADMIN' => 'Admin (legacy)',
+    'FINANCE' => 'Finance', 'SR_INSPECTOR' => 'Senior Inspector', 'INSPECTOR' => 'Inspector', 'ADMIN' => 'Admin (legacy)',
 ];
 // Management-level roles (kept compatible with existing is_admin_level gates)
 const MGMT_ROLES = ['MASTER_ADMIN','ADMIN','BUSINESS_DIRECTOR','SBU_HEAD','BRANCH_MANAGER','BRANCH_APP_MANAGER','OPERATION_MANAGER',
@@ -277,7 +277,7 @@ function module_defaults($role) {
         case 'FINANCE':
             $edit = ['invoicing','crm_orders'];
             $view = ['quotes','crm_reports','profitability','reports','jobs','calls','vouchers','idems']; break;
-        case 'INSPECTOR': $edit = ['idems']; break; // inspectors write reports; else My Jobs / My Voucher
+        case 'INSPECTOR': case 'SR_INSPECTOR': $edit = ['idems']; break; // inspectors write reports; else My Jobs / My Voucher
     }
     // Identity documents are never handed out by a blanket "everything" grant.
     // A Business Director gets every module by default; that is a reasonable
@@ -383,6 +383,11 @@ function role_defaults_base($role) {
             return ['perms' => ['dash.financial','data.credit','data.revenue','data.salary','data.profitability','finance.reconcile','crm.contract.register'], 'offices' => 'ALL', 'sbus' => 'ALL'];
         case 'INSPECTOR':
             return ['perms' => [], 'offices' => 'OWN', 'sbus' => 'OWN'];
+        case 'SR_INSPECTOR':
+            // A senior inspector is an inspector who may also be named an approver
+            // (that works by being the resolved approver — no extra permission), and
+            // may vet reports. Kept least-privilege otherwise.
+            return ['perms' => ['idems.finalize'], 'offices' => 'OWN', 'sbus' => 'OWN'];
     }
     return ['perms' => [], 'offices' => 'OWN', 'sbus' => 'OWN'];
 }
