@@ -11,7 +11,7 @@ Every module from Master Inventory v1.0. Order = priority (b): high-risk operati
 - [x] 01 Masters — MOD-MASTERS
 - [x] 02 Users & Access — MOD-USERS
 - [x] 03 Quotations — MOD-QUOTES
-- [ ] 04 Calls (work orders) — MOD-CALLS
+- [x] 04 Calls (work orders) — MOD-CALLS
 - [ ] 05 Jobs / Scheduling / Deputation — MOD-JOBS
 - [ ] 06 Inspection Reporting (IDEMS core) — MOD-IDEMS
 - [ ] 07 Vetting & Approval — MOD-IDEMS (workflow)
