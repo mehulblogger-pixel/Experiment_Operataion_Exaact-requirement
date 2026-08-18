@@ -23,7 +23,7 @@ Every module from Master Inventory v1.0. Order = priority (b): high-risk operati
 - [x] 13 Corrective Action (CAPA) — MOD-CAPA
 
 ## Registers & config (after spine)
-- [ ] 14 Settings & Terminology — MOD-SETTINGS
+- [x] 14 Settings & Terminology — MOD-SETTINGS
 - [ ] 15 Clients — MOD-CLIENTS
 - [ ] 16 Vendors — MOD-VENDORS
 - [ ] 17 Leads & pipeline — MOD-LEADS
