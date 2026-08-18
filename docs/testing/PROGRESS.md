@@ -26,9 +26,9 @@ Every module from Master Inventory v1.0. Order = priority (b): high-risk operati
 - [x] 14 Settings & Terminology — MOD-SETTINGS
 - [x] 15 Clients — MOD-CLIENTS
 - [x] 16 Vendors — MOD-VENDORS
-- [ ] 17 Leads & pipeline — MOD-LEADS
+- [x] 17 Leads & pipeline — MOD-LEADS
 - [x] 18 Orders / Contracts — MOD-CRMORD
-- [ ] 19 Inquiries — MOD-INQUIRIES
+- [x] 19 Inquiries — MOD-INQUIRIES
 - [x] 20 Project Costing — MOD-PROJCOST
 - [x] 21 Hold / Witness Points — (jobs/idems)
 - [x] 22 Complaints & Appeals — MOD-COMPLAINTS
@@ -39,13 +39,13 @@ Every module from Master Inventory v1.0. Order = priority (b): high-risk operati
 - [x] 27 Confidentiality — MOD-CONF
 - [x] 28 Internal Audits & Mgmt Review — MOD-AUDITS
 - [x] 29 Data & Information Control — MOD-DATACTRL
-- [ ] 30 Vouchers / Expenses — MOD-VOUCHERS
-- [ ] 31 Attendance & Reconcile — MOD-RECONCILE
-- [ ] 32 Invoicing→Profitability — MOD-PROFIT
-- [ ] 33 Overheads (office finance) — MOD-OVERHEADS
-- [ ] 34 Dashboards & Analytics (TAPI) — MOD-REPORTS
-- [ ] 35 Recruitment / Workforce — MOD-HIRING
-- [ ] 36 Licensing & Seats / Super-admin — MOD-SETTINGS (licensing)
+- [x] 30 Vouchers / Expenses — MOD-VOUCHERS
+- [x] 31 Attendance & Reconcile — MOD-RECONCILE
+- [x] 32 Invoicing→Profitability — MOD-PROFIT
+- [x] 33 Overheads (office finance) — MOD-OVERHEADS
+- [x] 34 Dashboards & Analytics (TAPI) — MOD-REPORTS
+- [x] 35 Recruitment / Workforce — MOD-HIRING
+- [x] 36 Licensing & Seats / Super-admin — MOD-SETTINGS (licensing)
 
 ## Then
 - [ ] Prompt 4 — End-to-End TPIA Workflow Test report
