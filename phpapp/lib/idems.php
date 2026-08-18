@@ -322,6 +322,14 @@ function idems_migrate() {
         try { idems_build_fire_extinguisher_report(); } catch (Throwable $e) {}
         if (function_exists('setting_set')) setting_set('fext_report_seeded', '1');
     }
+    // ONE-TIME: give the project-site progress reports (Daily / Weekly /
+    // Fortnightly / Monthly) a shared ready-to-fill form, so they no longer open
+    // the blank "no form designed yet" screen. Guarded so a user who removes one
+    // does not get it back; wrapped so a failure never breaks migrate/login.
+    if (function_exists('setting_get') && !setting_get('progress_reports_seeded', '')) {
+        try { idems_build_progress_reports(); } catch (Throwable $e) {}
+        if (function_exists('setting_set')) setting_set('progress_reports_seeded', '1');
+    }
     // ONE-TIME: a few seeded section titles / field labels stored a literal
     // "&amp;" that then rendered as "&amp;" on screen (double-escaped). A label a
     // user types stores a real "&", never "&amp;", so replacing the literal
@@ -1032,6 +1040,105 @@ function idems_build_release_note() {
     $has = (int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=?", [$typeId]);
     if (!$has) idems_install_release_note_sections($typeId);
     return $typeId;
+}
+
+// ---------------------------------------------------------------------------
+//  Project-site Progress Report family (Daily / Weekly / Fortnightly / Monthly)
+//  A single shared, ready-to-fill form used on a project site to report progress
+//  over a period — planned vs actual, manpower, materials/equipment, issues and
+//  photographs. The four period variants differ ONLY in name and the period word
+//  in the help text, so one form definition serves all of them. Industry-neutral;
+//  nothing hardcoded to a specific client or trade.
+// ---------------------------------------------------------------------------
+// The four progress-report variants: [code, name, period-word].
+const IDEMS_PROGRESS_VARIANTS = [
+    ['DPR',  'Daily Progress Report',       'day'],
+    ['WPR',  'Weekly Progress Report',      'week'],
+    ['FNR',  'Fortnightly Progress Report', 'fortnight'],
+    ['MPGR', 'Monthly Progress Report',     'month'],
+];
+function idems_install_progress_report_sections($typeId, $period = 'period') {
+    $pdo = db();
+    $so = 0; $fo = 0;
+    $addSection = function($title, $help = '', $pgb = 0, $keep = 0) use ($pdo, $typeId, &$so) {
+        $so += 10;
+        $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,page_break_before,keep_together,sort_order) VALUES (?,?,?,?,?,?)")
+            ->execute([$typeId, $title, $help, $pgb, $keep, $so]);
+        return (int)$pdo->lastInsertId();
+    };
+    $addField = function($secId, $fkey, $label, $ftype, $opts = '', $tableCols = '', $span = 1) use ($pdo, $typeId, &$fo) {
+        $fo += 10;
+        $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,options,table_cols,sort_order,col_span) VALUES (?,?,?,?,?,?,?,?,?)")
+            ->execute([$typeId, $secId, $fkey, $label, $ftype, $opts, $tableCols, $fo, $span]);
+    };
+
+    // Project & period — identity autofills from the job (shared field keys).
+    $s = $addSection('Project & reporting period', 'Project, client, contractor and the ' . $period . ' this report covers — the identity fills in from the ' . Tl('job') . '.', 0, 1);
+    $addField($s, 'project', 'Project', 'text');
+    $addField($s, 'client', 'Client', 'text');
+    $addField($s, 'vendor', 'Contractor / Vendor', 'text');
+    $addField($s, 'location', 'Site / location', 'text');
+    $addField($s, 'po_number', 'Contract / P.O. No.', 'text');
+    $addField($s, 'period_from', 'Period from', 'date');
+    $addField($s, 'period_to', 'Period to', 'date');
+    $addField($s, 'inspection_date', 'Report date', 'date');
+    $addField($s, 'inspector', 'Prepared by', 'text');
+
+    // Progress summary — planned vs actual, per activity.
+    $s = $addSection('Progress summary', 'Overall progress this ' . $period . ', and planned-vs-actual for each activity.');
+    $addField($s, 'overall_progress', 'Overall progress (%)', 'number');
+    $addField($s, 'progress_activities', 'Activity progress', 'table', '',
+        "Activity / work item|merge\nUnit|unit\nPlanned qty|number\nActual to date|number\nPlanned %|number\nActual %|number\nVariance %|number\nStatus|select|lookup:activity_progress\nRemarks", 2);
+
+    // Narrative — work done and planned. Both dictatable / polishable.
+    $s = $addSection('Work carried out this ' . $period, 'What was completed during this ' . $period . '. You can dictate this and tap Polish.', 0, 1);
+    $addField($s, 'work_done', 'Work carried out', 'textarea', '', '', 2);
+    $s = $addSection('Planned for next ' . $period, 'What is planned for the next ' . $period . '.', 0, 1);
+    $addField($s, 'work_planned', 'Planned work', 'textarea', '', '', 2);
+
+    // Manpower & resources deployed.
+    $s = $addSection('Manpower & resources', 'Manpower and key equipment deployed this ' . $period . '.');
+    $addField($s, 'manpower', 'Manpower deployed', 'table', '',
+        "Category / trade|merge\nPlanned|number\nActual|number\nRemarks");
+    $addField($s, 'equipment', 'Key equipment / materials', 'table', '',
+        "Item|merge\nStatus|select|Available,In transit,Short,Not required\nRemarks");
+
+    // Issues, delays & risks; safety.
+    $s = $addSection('Issues, delays & safety', 'Anything holding up progress, and the safety position for the ' . $period . '.', 0, 1);
+    $addField($s, 'issues', 'Key issues / delays / risks', 'table', '',
+        "Issue / risk|merge\nImpact|select|Low,Medium,High\nAction / owner\nTarget date|date\nStatus|select|lookup:activity_progress", 2);
+    $addField($s, 'safety_note', 'Safety / HSE observations', 'textarea', '', '', 2);
+
+    // Photographs.
+    $s = $addSection('Photographs', 'Site photographs for this ' . $period . '. Type a caption under each.');
+    $addField($s, 'photos', 'Photographs', 'photo', '', '', 2);
+
+    // Sign-off.
+    $s = $addSection('Sign-off', 'Prepared / Reviewed / Approved — name, designation and date auto-fill from the workflow.', 0, 1);
+    $addField($s, 'signoff', 'For ' . app_name(), 'sigblock', "Prepared by\nReviewed by\nApproved by", '', 2);
+
+    return $typeId;
+}
+// Resolve (creating/seeding once) all four progress-report variants, each with the
+// shared form. Idempotent: only installs the form on a variant that has none, and
+// only creates a type code that is missing. Returns [code => typeId].
+function idems_build_progress_reports() {
+    $pdo = db();
+    $out = [];
+    foreach (IDEMS_PROGRESS_VARIANTS as [$code, $name, $period]) {
+        $t = ops_one("SELECT id FROM report_types WHERE code=?", [$code]);
+        if ($t) { $typeId = (int)$t['id']; }
+        else {
+            $sort = (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_types");
+            $pdo->prepare("INSERT INTO report_types (code,name,category,active,is_system,sort_order,created_at) VALUES (?,?, 'SUMMARY',1,0,?,?)")
+                ->execute([$code, $name, $sort, date('c')]);
+            $typeId = (int)$pdo->lastInsertId();
+        }
+        $has = (int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=?", [$typeId]);
+        if (!$has) idems_install_progress_report_sections($typeId, $period);
+        $out[$code] = $typeId;
+    }
+    return $out;
 }
 
 // Resolve (creating/seeding once) the scored "VASR — Vendor Assessment Report"
