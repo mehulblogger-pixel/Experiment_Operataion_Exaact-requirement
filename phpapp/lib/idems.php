@@ -3391,9 +3391,19 @@ function idems_next_serial($scopeKey) {
 function idems_types($activeOnly = true) {
     return ops_all("SELECT * FROM report_types " . ($activeOnly ? "WHERE active=1 " : "") . "ORDER BY sort_order, name");
 }
+// A report is open to editing only as a fresh draft or after being sent back for
+// correction (REJECTED). Once submitted it belongs to the vetting authority /
+// approver and its body is frozen. Pure status test (permission is separate).
+function idems_status_allows_edit($status) {
+    $s = strtoupper(trim((string)$status));
+    return $s === '' || $s === 'DRAFT' || $s === 'REJECTED';
+}
 function idems_can_edit_doc($doc) {
     if (empty($doc)) return false;
     if (!empty($doc['finalized'])) return false;                 // finalized = immutable
+    // Once submitted, only a super-admin may still edit (a genuine correction);
+    // the inspector cannot change a report that has gone for vetting/approval.
+    if (!idems_status_allows_edit($doc['status'] ?? 'DRAFT') && !is_master()) return false;
     return is_master() || can('mod.idems.edit');
 }
 function idems_status_pill($s) {
