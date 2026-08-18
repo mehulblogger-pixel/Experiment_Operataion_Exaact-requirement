@@ -3079,8 +3079,11 @@ function idems_equipment_active() {
 function idems_val($data, $fkey, $default = '') { return $data[$fkey] ?? $default; }
 // Attachments for a doc (optionally one field).
 function idems_doc_files($docId, $fieldKey = null) {
-    if ($fieldKey === null) return ops_all("SELECT id, field_key, kind, file_name, mime, gps, note, created_at FROM report_files WHERE report_doc_id=? ORDER BY id", [(int)$docId]);
-    return ops_all("SELECT id, field_key, kind, file_name, mime, gps, note, created_at FROM report_files WHERE report_doc_id=? AND field_key=? ORDER BY id", [(int)$docId, $fieldKey]);
+    // caption is included (it is short) so the fill screen shows back the name a
+    // person typed under each photo, and screens can label evidence. The heavy
+    // `data` blob is deliberately NOT selected here — the PDF path loads it itself.
+    if ($fieldKey === null) return ops_all("SELECT id, field_key, kind, file_name, mime, gps, note, caption, created_at FROM report_files WHERE report_doc_id=? ORDER BY id", [(int)$docId]);
+    return ops_all("SELECT id, field_key, kind, file_name, mime, gps, note, caption, created_at FROM report_files WHERE report_doc_id=? AND field_key=? ORDER BY id", [(int)$docId, $fieldKey]);
 }
 
 // ---------------------------------------------------------------------------
@@ -4898,22 +4901,17 @@ function idems_sigblock_rows($f, $data, $sigs = []) {
 // preserving readable clarity. Returns [bytes, mime, note]. Non-images pass through.
 function idems_compress_image($bytes, $mime, $maxDim = 1600, $quality = 82) {
     if (strpos((string)$mime, 'image/') !== 0) return [$bytes, $mime, ''];
-    if (!function_exists('imagecreatefromstring')) return [$bytes, $mime, ''];
-    $im = @imagecreatefromstring($bytes);
-    if (!$im) return [$bytes, $mime, ''];
-    $w = imagesx($im); $h = imagesy($im);
-    $scale = ($w > $maxDim || $h > $maxDim) ? $maxDim / max($w, $h) : 1;
-    $nw = max(1, (int)round($w * $scale)); $nh = max(1, (int)round($h * $scale));
-    $dst = imagecreatetruecolor($nw, $nh);
-    $white = imagecolorallocate($dst, 255, 255, 255);
-    imagefilledrectangle($dst, 0, 0, $nw, $nh, $white);       // flatten transparency onto white
-    imagecopyresampled($dst, $im, 0, 0, 0, 0, $nw, $nh, $w, $h);
-    ob_start(); imagejpeg($dst, null, $quality); $out = ob_get_clean();
-    imagedestroy($im); imagedestroy($dst);
-    if ($out === false || $out === '') return [$bytes, $mime, ''];
-    // keep the original if compression didn't actually help and no resize happened
-    if ($scale === 1 && strlen($out) >= strlen($bytes)) return [$bytes, $mime, ''];
-    return [$out, 'image/jpeg', $scale < 1 ? "resized to {$nw}×{$nh}" : 'recompressed'];
+    // Route through the single shared decoder (GD, then Imagick for HEIC/TIFF/…),
+    // so a photo the field staff can see on their phone also embeds in the PDF.
+    // A format neither can decode is stored as-is; the PDF then shows a labelled
+    // placeholder rather than a blank box.
+    $wasJpeg = strncmp((string)$bytes, "\xFF\xD8", 2) === 0;
+    [$out, $err] = function_exists('image_to_jpeg') ? image_to_jpeg($bytes, $maxDim, $quality) : [$bytes, ''];
+    if ($err !== '' || $out === '') return [$bytes, $mime, ''];       // undecodable — keep original bytes
+    // keep the original if it was already JPEG and re-encoding didn't actually help
+    if ($wasJpeg && strlen($out) >= strlen($bytes)) return [$bytes, $mime, ''];
+    $note = $wasJpeg ? 'recompressed' : ('converted from ' . preg_replace('~^image/~', '', (string)$mime) . ' to JPEG');
+    return [$out, 'image/jpeg', $note];
 }
 // Pull the capture time out of a JPEG's EXIF, if present.
 function idems_exif_taken($bytes) {
@@ -5720,6 +5718,15 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         if ($rt) { $fmtNo = trim((string)($rt['format_number'] ?? '')); $docCtl = trim((string)($rt['doc_control_no'] ?? '')); $rev = trim((string)($rt['revision'] ?? '')); }
     }
     $copy = strtoupper(trim((string)$copy));
+    // The PDF needs the real image BYTES (and captions) to draw the photographs.
+    // idems_doc_files() omits the heavy `data` blob so list screens stay light, so
+    // the rows handed in here carry no bytes — reload them once, with data+caption,
+    // for this document. Without this every photo drew as a blank box and no
+    // caption ever printed. §photobytes  (Guarded: only when rows lack `data`.)
+    if (!empty($files) && is_array($files) && !array_key_exists('data', (array)$files[0]) && !empty($doc['id'])) {
+        $full = ops_all("SELECT id, field_key, kind, file_name, mime, gps, note, caption, data, created_at FROM report_files WHERE report_doc_id=? ORDER BY id", [(int)$doc['id']]);
+        if ($full) $files = $full;
+    }
     // §paginate — the whole document is produced by this closure so it can be built
     // TWICE: once to measure how the sections fall, then again forcing a page break
     // before a chosen section so a short final page is not left mostly empty. It
@@ -6182,10 +6189,17 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
                         foreach ($rowImgs as $n=>$im){
                             $photoNo = $i2 + $n + 1;
                             $p->rectFill($x,$rowY,$cellW,$imgH,[248,249,251]);
-                            $jpg=idems_sig_jpeg($im['data']);
+                            $jpg=idems_sig_jpeg($im['data']); $drew=false;
                             if($jpg){ $nm=$p->addJpeg($jpg); if($nm){ [$iw,$ih]=$p->imgDim($nm);
                                 $availW=$cellW-8; $availH=$imgH-8; $r=min($availW/max(1,$iw),$availH/max(1,$ih));
-                                $dw=$iw*$r; $dh=$ih*$r; $ix=$x+($cellW-$dw)/2; $iy=$rowY+($imgH-$dh)/2; $p->drawImage($nm,$ix,$iy,$dw,$dh); } }
+                                $dw=$iw*$r; $dh=$ih*$r; $ix=$x+($cellW-$dw)/2; $iy=$rowY+($imgH-$dh)/2; $p->drawImage($nm,$ix,$iy,$dw,$dh); $drew=true; } }
+                            if(!$drew){ // never leave a blank box — say what the photo is and why it isn't shown §photofallback
+                                $fmt=strtoupper(preg_replace('~^image/~','',(string)($im['mime']??''))); if($fmt==='') $fmt='image';
+                                $ph=$rowY+$imgH/2-14;
+                                $p->y=$ph; $p->text($x+6,'[ '.$fmt.' photo ]',9,true,[150,120,60],$x+$cellW-6,'C');
+                                $p->y=$ph+13; $p->text($x+6,'Original attached — preview needs JPG/PNG',7.5,false,[150,120,60],$x+$cellW-6,'C');
+                                $fn=trim((string)($im['file_name']??'')); if($fn!==''){ $p->y=$ph+24; $p->text($x+6,$fn,7,false,[160,160,160],$x+$cellW-6,'C'); }
+                            }
                             $box($x,$rowY,$cellW,$imgH);
                             $cy=$rowY+$imgH+5;
                             $p->y=$cy; $p->text($x, 'Photo '.sprintf('%02d',$photoNo), 7.5, true, [90,90,90]);

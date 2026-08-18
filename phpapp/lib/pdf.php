@@ -244,23 +244,66 @@ class SimplePDF {
     }
 }
 
-// Normalise an uploaded signature image to JPEG bytes (embeddable). Uses GD when
-// available (handles PNG/transparent → white bg). Returns [jpegBytes, error].
-function signature_to_jpeg($raw) {
+// Normalise ANY common image to embeddable JPEG bytes (the PDF writer only
+// embeds baseline JPEG). Tries GD first (JPEG/PNG/GIF/WebP on almost every host),
+// then Imagick when installed (HEIC/HEIF from iPhones, TIFF, AVIF, BMP — formats
+// GD cannot decode). Transparency is flattened onto white. When $maxDim > 0 the
+// longest edge is scaled down to it. Returns [jpegBytes, error]; error is a
+// human-readable reason when nothing could decode the bytes.
+//
+// This is the single decode path shared by signatures, report photos and the
+// compression-on-upload step, so a format that fails here fails (or succeeds)
+// everywhere consistently — no screen ever silently disagrees with another.
+function image_to_jpeg($raw, $maxDim = 0, $quality = 90) {
+    $raw = (string)$raw;
     if ($raw === '') return ['', 'empty file'];
-    if (strncmp($raw, "\xFF\xD8", 2) === 0) return [$raw, ''];        // already JPEG
-    if (!function_exists('imagecreatefromstring')) return ['', 'PNG signatures need the GD extension — upload a JPG instead.'];
-    $im = @imagecreatefromstring($raw);
-    if (!$im) return ['', 'unreadable image — upload a PNG or JPG.'];
-    $w = imagesx($im); $h = imagesy($im);
-    $bg = imagecreatetruecolor($w, $h);
-    $white = imagecolorallocate($bg, 255, 255, 255);
-    imagefilledrectangle($bg, 0, 0, $w, $h, $white);
-    imagecopy($bg, $im, 0, 0, 0, 0, $w, $h);
-    ob_start(); imagejpeg($bg, null, 92); $jpg = ob_get_clean();
-    imagedestroy($im); imagedestroy($bg);
-    return [$jpg, ''];
+    // Already JPEG and no resize requested → hand back untouched (cheapest path).
+    if ($maxDim <= 0 && strncmp($raw, "\xFF\xD8", 2) === 0) return [$raw, ''];
+    // 1) GD — present on nearly every PHP host.
+    if (function_exists('imagecreatefromstring')) {
+        $im = @imagecreatefromstring($raw);
+        if ($im) {
+            $w = imagesx($im); $h = imagesy($im);
+            $scale = ($maxDim > 0 && ($w > $maxDim || $h > $maxDim)) ? $maxDim / max($w, $h) : 1;
+            $nw = max(1, (int)round($w * $scale)); $nh = max(1, (int)round($h * $scale));
+            $dst = imagecreatetruecolor($nw, $nh);
+            $white = imagecolorallocate($dst, 255, 255, 255);
+            imagefilledrectangle($dst, 0, 0, $nw, $nh, $white);       // flatten transparency onto white
+            imagecopyresampled($dst, $im, 0, 0, 0, 0, $nw, $nh, $w, $h);
+            ob_start(); imagejpeg($dst, null, $quality); $jpg = ob_get_clean();
+            imagedestroy($im); imagedestroy($dst);
+            if ($jpg !== false && $jpg !== '') return [$jpg, ''];
+        }
+    }
+    // 2) Imagick — decodes what GD can't (HEIC/HEIF, TIFF, AVIF, BMP, …).
+    if (class_exists('Imagick')) {
+        try {
+            $ik = new Imagick();
+            $ik->readImageBlob($raw);
+            $ik->setImageBackgroundColor('white');
+            if (method_exists($ik, 'mergeImageLayers')) $ik = $ik->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
+            else $ik->flattenImages();
+            $ik->setImageFormat('jpeg');
+            if ($maxDim > 0) {
+                $g = $ik->getImageGeometry();
+                if (($g['width'] ?? 0) > $maxDim || ($g['height'] ?? 0) > $maxDim)
+                    $ik->resizeImage($maxDim, $maxDim, Imagick::FILTER_LANCZOS, 1, true);
+            }
+            $ik->setImageCompressionQuality($quality);
+            $jpg = $ik->getImageBlob();
+            $ik->clear();
+            if ($jpg !== '') return [$jpg, ''];
+        } catch (\Throwable $e) { /* fall through to the error below */ }
+    }
+    // Last resort: if the bytes were JPEG all along, embed them even without a resize.
+    if (strncmp($raw, "\xFF\xD8", 2) === 0) return [$raw, ''];
+    if (!function_exists('imagecreatefromstring'))
+        return ['', 'Image support (GD) is not installed on this server — upload a JPG.'];
+    return ['', 'Unreadable / unsupported image format (e.g. HEIC). Upload a JPG or PNG, or install Imagick.'];
 }
+// Back-compat alias: signatures go through the same decoder. Kept as a distinct
+// name so every existing caller (there are many) keeps working unchanged.
+function signature_to_jpeg($raw) { return image_to_jpeg($raw, 0, 92); }
 
 // Build the client-facing quotation PDF.
 //  $sig = ['img'=>jpegBytes,'name'=>..,'desig'=>..]
