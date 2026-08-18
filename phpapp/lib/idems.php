@@ -3440,7 +3440,44 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
             'line'=>'Once approved, a manager finalises and issues the report — the signature is stamped on automatically here.'];
     }
 
+    // 7 — Release Note. A Release / Discrepancy Note is raised FROM an inspection
+    // report once it is approved/issued — the same details, carried over under its
+    // own number. This surfaces the one-click action (which used to hide inside a
+    // Tools menu, so people believed there was "no button"). The status/type
+    // decision is the pure helper below; the permission to actually create one is
+    // a separate gate (and the create endpoint enforces it too).
+    $canMakeRn = (is_master() || (function_exists('can') && can('mod.idems.edit')));
+    $rnOffer = $canMakeRn ? idems_release_note_offer($doc) : null;
+    if ($rnOffer) {
+        if (!empty($rnOffer['existing'])) {
+            $steps[] = ['key'=>'release', 'label'=>'Release Note created', 'state'=>'done',
+                'line'=>'Release Note ' . $b($rnOffer['existing']['irn']) . ' has been raised from this report.',
+                'href'=>'/document?id=' . (int)$rnOffer['existing']['id'], 'cta'=>'Open Release Note'];
+        } else {
+            $steps[] = ['key'=>'release', 'label'=>'Create the Release Note', 'state'=>'now',
+                'line'=>'This report is approved. Create its Release / Discrepancy Note in one click — the client, vendor, PO, item table and outcome carry over automatically, under a new number. Review the wording, then issue it.',
+                'post'=>['action'=>'/document-release-note', 'id'=>$id, 'label'=>'📋 Create Release Note']];
+        }
+    }
+
     return ['steps'=>$steps, 'issued'=>$issued, 'sig_on_file'=>$sigOnFile, 'can_act'=>$canAct, 'doc'=>$doc];
+}
+// Whether a report should present a Release Note action, from its status and type
+// alone (the permission to create one is enforced separately, in the playbook and
+// in the create endpoint). Returns null when no action applies, else
+// ['existing'=>row|null, 'doc_id'=>int] — 'existing' is the Release Note already
+// raised from this report, if any. A release note never spawns another. Generic:
+// offered on any approved/issued report that is not itself a release note — no
+// hardcoding to one inspection type.
+function idems_release_note_offer($doc) {
+    $typeCode = strtoupper((string)($doc['type_code'] ?? ''));
+    if (in_array($typeCode, ['RN', 'IRN'], true)) return null;
+    $status = (string)($doc['status'] ?? '');
+    $issued = !empty($doc['finalized']) || $status === 'ISSUED';
+    if (!$issued && !in_array($status, ['APPROVED', 'ISSUED'], true)) return null;
+    $id = (int)($doc['id'] ?? 0);
+    $existing = $id ? ops_one("SELECT id, irn FROM report_docs WHERE type_code='RN' AND deleted=0 AND data LIKE ?", ['%"source_report_id":' . $id . '%']) : null;
+    return ['existing' => $existing ?: null, 'doc_id' => $id];
 }
 // Render the playbook card. Supports link CTAs and POST-button CTAs.
 function idems_render_report_playbook($doc, $approvals = [], $hasSchema = true) {
@@ -3449,10 +3486,14 @@ function idems_render_report_playbook($doc, $approvals = [], $hasSchema = true) 
     $canFinal = is_master() || (function_exists('can') && can('idems.finalize'));
     $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
     $pb  = idems_report_playbook($doc, $approvals, $hasSchema);
+    // Is there a Release Note action to offer (create it, or open the one already
+    // raised)? If so, the playbook must show even to someone who can't edit an
+    // already-issued report — otherwise the button hides again. §rn-guard
+    $hasRelease = false; foreach ($pb['steps'] as $s) if (($s['key'] ?? '') === 'release') { $hasRelease = true; break; }
     // Show it to the people who act on it: the author/editor, a finaliser, or —
     // crucially — the approver this report is currently waiting on, so they get
     // the approve/send-back/reject buttons here rather than nowhere obvious.
-    if (!$canEdit && !$canFinal && empty($pb['can_act'])) return;
+    if (!$canEdit && !$canFinal && empty($pb['can_act']) && !$hasRelease) return;
     ob_start();
     echo function_exists('tosrm_playbook_css') ? tosrm_playbook_css() : ''; ?>
     <div class="card tosrm-pb" style="margin:0 0 16px">
@@ -3460,6 +3501,24 @@ function idems_render_report_playbook($doc, $approvals = [], $hasSchema = true) 
       <p class="pb-sub">Work down the steps — one is highlighted as your next move. The inspector’s signature is stamped on the issued PDF automatically once it is on file.</p>
       <?php if ($pb['issued']): ?>
         <div class="pb-done-banner"><b style="color:var(--ok)">✓ Issued.</b> This <?= e(Tl('report')) ?> is finalised, signed and locked. Download it below, or reissue a new revision if something must change.</div>
+        <?php // An issued report skips the step list, so surface the Release Note
+              // action (from the same computed steps) right here — the one place
+              // people look after a report is issued. §rn-on-issued
+              foreach ($pb['steps'] as $s): if (($s['key'] ?? '') !== 'release') continue; ?>
+          <div class="pb-release" style="margin-top:12px;padding:12px 14px;border:1px solid var(--line,#e5e7eb);border-radius:10px;background:var(--soft,#f8fafc)">
+            <div style="font-weight:600;margin-bottom:3px"><?= $esc($s['label']) ?></div>
+            <div class="muted" style="font-size:12.5px;margin-bottom:9px"><?= $s['line'] /* trusted, escaped above */ ?></div>
+            <?php if (!empty($s['post'])): ?>
+              <form method="post" action="<?= $esc($s['post']['action']) ?>" style="margin:0">
+                <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
+                <?php if (isset($s['post']['id'])): ?><input type="hidden" name="id" value="<?= (int)$s['post']['id'] ?>"><?php endif; ?>
+                <button class="btn small" type="submit"><?= $s['post']['label'] ?></button>
+              </form>
+            <?php elseif (!empty($s['href']) && !empty($s['cta'])): ?>
+              <a class="btn small secondary" href="<?= $esc($s['href']) ?>"><?= $esc($s['cta']) ?></a>
+            <?php endif; ?>
+          </div>
+        <?php endforeach; ?>
       <?php else: ?>
       <ol class="pb-steps">
         <?php $n = 0; foreach ($pb['steps'] as $s): $n++; $st = $s['state']; $num = $st === 'done' ? '✓' : $n; ?>
@@ -3489,6 +3548,7 @@ function idems_render_report_playbook($doc, $approvals = [], $hasSchema = true) 
               <form method="post" action="<?= $esc($s['post']['action']) ?>" class="pb-cta" style="margin:0"
                     <?= !empty($s['post']['confirm']) ? 'onsubmit="return confirm(\'' . $esc($s['post']['confirm']) . '\')"' : '' ?>>
                 <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
+                <?php if (isset($s['post']['id'])): ?><input type="hidden" name="id" value="<?= (int)$s['post']['id'] ?>"><?php endif; ?>
                 <button class="btn small" type="submit"><?= $s['post']['label'] ?></button>
               </form>
             <?php elseif (!empty($s['href']) && !empty($s['cta'])): ?>
