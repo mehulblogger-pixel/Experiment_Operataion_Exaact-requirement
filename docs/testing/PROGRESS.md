@@ -57,3 +57,16 @@ committed and delivered.*
 ## Manual testing (hands-on)
 - [x] Manual Test Execution Guide — `manual-test-execution-guide.md` / .docx
       (concrete login → screen → values → expected result → pass/fail; grounded in demo data)
+
+## Field-level element checklists (Excel — one row per field/dropdown/checkbox/button)
+Every screen, every text box, every button — with a value to enter, whether it is
+required, the expected result, and a Pass/Fail dropdown. Grounded in the demo seed
+data (Narmada Industries Ltd, Vapi Chemical Works, inspector Ravi, QA Manager Sunita Rao).
+- [x] 01 Sales — `Inspection-Ops-Field-Test-Checklist-01-Sales.xlsx` (4 sheets · 21 screens · 313 rows)
+- [x] 02 Operations — `...-02-Operations.xlsx` (4 sheets · 15 screens · 185 rows)
+- [x] 03 Reporting / IDEMS — `...-03-Reporting-IDEMS.xlsx` (5 sheets · 24 screens · 159 rows)
+- [x] 04 Money — `...-04-Money.xlsx` (4 sheets · 16 screens · 88 rows)
+- [x] 05 Quality & Compliance — `...-05-Quality.xlsx` (6 sheets · 32 screens · 381 rows)
+- [x] 06 Directory, Admin & Portals — `...-06-Directory-Admin-Portals.xlsx` (6 sheets · 34 screens · 317 rows)
+
+All six areas delivered — 29 sheets, 142 screens, 1,443 element-level rows in total.
