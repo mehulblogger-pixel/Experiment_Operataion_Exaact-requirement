@@ -3951,7 +3951,10 @@ function ops_idems_documents($route, $method) {
             $narrow = array_values(array_filter($allTypes, fn($t) => in_array($t['code'], $wantCodes, true)));
             if ($narrow) $types = $narrow;      // never narrow to nothing
         }
-        view('ops/idems/doc_form', ['doc'=>$doc, 'pre'=>$pre, 'types'=>$types, 'allTypes'=>$allTypes,
+        // Field count per type, so the picker can warn "(no form yet)" before an
+        // engineer selects a type that would open a blank screen.
+        $typeReady = []; foreach (ops_all("SELECT report_type_id tid, COUNT(*) c FROM report_fields GROUP BY report_type_id") as $fc) $typeReady[(int)$fc['tid']] = (int)$fc['c'];
+        view('ops/idems/doc_form', ['doc'=>$doc, 'pre'=>$pre, 'types'=>$types, 'allTypes'=>$allTypes, 'typeReady'=>$typeReady,
             'clients'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_client=1 ORDER BY nm"),
             'vendors'=>ops_all("SELECT id, COALESCE(display_name,legal_name) nm FROM business_partners WHERE is_vendor=1 ORDER BY nm"),
             'inspectors'=>ops_all("SELECT id, name FROM inspectors WHERE status='ACTIVE' ORDER BY name"),
@@ -4248,7 +4251,14 @@ function ops_idems_report_types($route, $method) {
         redirect('/report-types');
     }
     $edit = ($route === 'report-type-edit') ? ops_one("SELECT * FROM report_types WHERE id=?", [(int)($_GET['id'] ?? 0)]) : null;
-    view('ops/idems/report_types', ['rows'=>idems_types(false), 'edit'=>$edit]);
+    // Field count per type, so the screen shows at a glance which types are
+    // ready to fill (have a designed form) and which would open a blank
+    // "no form designed yet" screen — the single biggest source of confusion.
+    $fieldCounts = []; foreach (ops_all("SELECT report_type_id tid, COUNT(*) c FROM report_fields GROUP BY report_type_id") as $fc) $fieldCounts[(int)$fc['tid']] = (int)$fc['c'];
+    // How many finished reports already exist per type — a type in real use
+    // should never be presented as if it were an empty draft to design.
+    $docCounts = []; foreach (ops_all("SELECT report_type_id tid, COUNT(*) c FROM report_docs WHERE COALESCE(deleted,0)=0 GROUP BY report_type_id") as $dc) $docCounts[(int)$dc['tid']] = (int)$dc['c'];
+    view('ops/idems/report_types', ['rows'=>idems_types(false), 'edit'=>$edit, 'fieldCounts'=>$fieldCounts, 'docCounts'=>$docCounts]);
     return true;
 }
 

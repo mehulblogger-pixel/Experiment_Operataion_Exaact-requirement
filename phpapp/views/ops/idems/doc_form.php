@@ -47,9 +47,11 @@
               // format in the URL, so the engineer lands on the right one rather
               // than picking it out of a list they were meant to be narrowed to.
               $wantType = trim((string)($_GET['type'] ?? '')); ?>
-        <?php foreach ($types as $t): $selT = $doc ? ((int)$doc['report_type_id'] === (int)$t['id']) : ($wantType !== '' && $t['code'] === $wantType); ?>
-          <option value="<?= (int)$t['id'] ?>" <?= $selT?'selected':'' ?>><?= e($t['code']) ?> — <?= e($t['name']) ?></option><?php endforeach; ?>
+        <?php $typeReady = $typeReady ?? []; ?>
+        <?php foreach ($types as $t): $selT = $doc ? ((int)$doc['report_type_id'] === (int)$t['id']) : ($wantType !== '' && $t['code'] === $wantType); $noForm = (($typeReady[(int)$t['id']] ?? 0) === 0); ?>
+          <option value="<?= (int)$t['id'] ?>" <?= $selT?'selected':'' ?>><?= e($t['code']) ?> — <?= e($t['name']) ?><?= $noForm ? ' · (no form yet)' : '' ?></option><?php endforeach; ?>
       </select>
+      <small class="muted">Types marked <b>(no form yet)</b> have no designed form — an admin needs to design one under Report types before it can be filled.</small>
       <?php if ($freqLbl !== ''): ?>
         <small class="muted">Reporting frequency on this <?= e(Tl('job')) ?>: <b><?= e($freqLbl) ?></b></small>
       <?php endif; ?>
