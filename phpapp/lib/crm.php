@@ -311,6 +311,9 @@ function crm_migrate() {
         // straight off a lead and see every quotation back on it — without
         // first converting the lead or hunting through the register.
         ensure_column('quotations', 'lead_id', 'INT NULL');
+        // Pre-order review checklist ticks for this quotation (JSON: item=>1). Only
+        // used when the configurable pre-order checklist is switched on.
+        ensure_column('quotations', 'preorder_checklist', 'MEDIUMTEXT');
         // Per-line: which office executes, which site, and the activity under the Business Unit.
         ensure_column('quote_lines', 'office_id', 'INT NULL');
         ensure_column('quote_lines', 'location_id', 'INT NULL');
@@ -1311,6 +1314,8 @@ function ops_crm_quotes($route, $method) {
         $base = (int)($q['parent_id'] ?: $q['id']);
         view('ops/crm/quote_detail', [
             'q' => $q, 'lines' => crm_quote_lines($q['id']),
+            'preorderOn' => preorder_checklist_enabled(), 'preorderItems' => preorder_checklist_items(),
+            'preorderState' => preorder_checklist_state($q), 'preorderRequireAll' => preorder_checklist_require_all(),
             'revs' => ops_all("SELECT id, rev, status, total_amount, is_current, created_at FROM quotations WHERE quote_no=? ORDER BY rev", [$q['quote_no']]),
             'hist' => ops_all("SELECT * FROM quote_revisions WHERE quote_id=? ORDER BY rev DESC, id DESC", [$base]),
             'followups' => ops_all("SELECT * FROM quote_followups WHERE quote_id=? ORDER BY due_date", [$q['id']]),
@@ -1603,11 +1608,31 @@ function ops_crm_quotes($route, $method) {
         header('Content-Length: ' . strlen($pdf));
         echo $pdf; exit;
     }
+    // Save the pre-order review checklist ticks for a quotation.
+    if ($route === 'quote-preorder-save' && $method === 'POST') {
+        $q = crm_quote_get((int)($_POST['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
+        ops_require(can('crm.quote.create') || can('mod.quotes.edit') || can('crm.quote.approve') || is_master(), 'You cannot update this ' . Tl('quote') . '.');
+        $ticked = (array)($_POST['pc'] ?? []); $vc = [];
+        foreach (preorder_checklist_items() as $it) { $k = preorder_item_key($it); if (!empty($ticked[$k])) $vc[$k] = 1; }
+        $pdo->prepare("UPDATE quotations SET preorder_checklist=? WHERE id=?")->execute([json_encode($vc), $q['id']]);
+        flash('Pre-order checklist saved.');
+        redirect('/quote?id=' . $q['id']);
+    }
     if ($route === 'quote-approve' && $method === 'POST') {
         $step = ops_one("SELECT * FROM quote_approvals WHERE id=?", [(int)($_POST['step'] ?? 0)]);
         if (!$step) { flash('Approval step not found.', 'error'); redirect('/quotes'); }
         $q = crm_quote_get($step['quote_id']); if (!$q) { http_response_code(404); view('notfound'); return; }
         ops_require(crm_can_act_approval($step), 'You are not an approver for this step.');
+        // Pre-order control: when the checklist is on and every point is required,
+        // an approval cannot be given until the review checklist is complete. Only
+        // gates approval — a rejection is always allowed.
+        if (($_POST['decision'] ?? '') !== 'reject' && preorder_checklist_enabled() && preorder_checklist_require_all()) {
+            $pg = preorder_checklist_progress($q);
+            if (!$pg['complete']) {
+                flash('Complete the pre-order review checklist before approving (' . $pg['done'] . '/' . $pg['total'] . ' done).', 'error');
+                redirect('/quote?id=' . $q['id']);
+            }
+        }
         $remarks = trim($_POST['remarks'] ?? '');
         $me = user_name(current_user());
         if (($_POST['decision'] ?? '') === 'reject') {
@@ -2299,6 +2324,46 @@ function crm_float_ops_packet($q) {
 //  Approvals (§9) — configurable matrix by amount band and/or Business Unit
 // ---------------------------------------------------------------------------
 function crm_approvals($qid) { return ops_all("SELECT * FROM quote_approvals WHERE quote_id=? ORDER BY level, id", [(int)$qid]); }
+
+// ---- Configurable pre-order review checklist (Enquiry / Tender / Contract) ----
+// A list of points reviewed before a quotation is approved — enquiry/tender/
+// contract review, blocked-client and commercial checks. Entirely admin-configured
+// and switchable on/off; off by default, so nothing changes until it is enabled.
+function preorder_checklist_enabled() {
+    return function_exists('setting_get') && (string)setting_get('preorder_checklist_on', '') === '1';
+}
+function preorder_checklist_require_all() {
+    return function_exists('setting_get') && (string)setting_get('preorder_checklist_require', '') === '1';
+}
+function preorder_checklist_items() {
+    $raw = function_exists('setting_get') ? (string)setting_get('preorder_checklist_items', '') : '';
+    $out = [];
+    foreach (preg_split('/\r?\n/', $raw) as $ln) { $ln = trim($ln); if ($ln !== '') $out[] = $ln; }
+    return $out;
+}
+// A starter list, offered on the settings screen for the admin to edit/replace.
+function preorder_checklist_default() {
+    return implode("\n", [
+        'Enquiry / tender reviewed — scope, standards and deliverables are clear',
+        'Client is not on hold or blocked',
+        'Commercials (rates, taxes, currency) checked and within delegation',
+        'Payment terms, advance and validity agreed',
+        'Executing office(s) and capability confirmed',
+        'Any EMD / bank guarantee / security deposit noted',
+        'Impartiality / conflict of interest considered',
+    ]);
+}
+function preorder_item_key($item) { return 'c' . substr(md5(trim((string)$item)), 0, 10); }
+function preorder_checklist_state($q) {
+    $j = json_decode((string)($q['preorder_checklist'] ?? ''), true);
+    return is_array($j) ? $j : [];
+}
+// How many of the configured points are ticked on this quotation.
+function preorder_checklist_progress($q) {
+    $items = preorder_checklist_items(); $state = preorder_checklist_state($q);
+    $done = 0; foreach ($items as $it) if (!empty($state[preorder_item_key($it)])) $done++;
+    return ['done' => $done, 'total' => count($items), 'complete' => $done >= count($items)];
+}
 // Build the approval steps for a quote from the active rules. A rule matches when
 // its Business Unit matches (or it is "any Business Unit") and the quote total falls in its amount band
 // (max 0 = no upper limit). If nothing matches, one generic step (any approver).

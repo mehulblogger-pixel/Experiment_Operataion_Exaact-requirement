@@ -200,6 +200,32 @@
 </div>
 <?php endif; ?>
 
+<?php
+  // ---- Pre-order review checklist (configurable, on/off) ----
+  $preorderOn = $preorderOn ?? false; $preorderItems = $preorderItems ?? [];
+  $preorderState = $preorderState ?? []; $preorderRequireAll = $preorderRequireAll ?? false;
+  if ($preorderOn && $preorderItems):
+    $pcDone = 0; foreach ($preorderItems as $it) if (!empty($preorderState[preorder_item_key($it)])) $pcDone++;
+    $pcAll = $pcDone >= count($preorderItems);
+?>
+<div class="panel" style="border:1px solid <?= $pcAll ? 'var(--ok)' : 'var(--warn,#c90)' ?>">
+  <div class="ctitle" style="margin-top:0"><h3>Pre-order review</h3>
+    <span class="pill <?= $pcAll ? 'p-ok' : 'p-warn' ?>"><?= (int)$pcDone ?>/<?= count($preorderItems) ?> done</span></div>
+  <p class="muted" style="margin:0 0 8px;font-size:12px">Enquiry / tender / contract review before this <?= e(Tl('quote')) ?> is approved.<?= $preorderRequireAll ? ' <b>All points must be ticked to approve.</b>' : '' ?></p>
+  <form method="post" action="/quote-preorder-save">
+    <input type="hidden" name="id" value="<?= (int)$q['id'] ?>">
+    <?php foreach ($preorderItems as $it): $k = preorder_item_key($it); ?>
+      <label class="chk" style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;font-size:13px">
+        <input type="checkbox" name="pc[<?= e($k) ?>]" value="1" <?= !empty($preorderState[$k]) ? 'checked' : '' ?> style="margin-top:2px">
+        <span><?= e($it) ?></span>
+      </label>
+    <?php endforeach; ?>
+    <div style="margin-top:8px"><button class="btn small" type="submit">Save checklist</button>
+      <?php if (is_master() || can('settings.manage')): ?><a class="muted" style="font-size:11.5px;margin-left:8px" href="/preorder-checklist">Edit the checklist →</a><?php endif; ?></div>
+  </form>
+</div>
+<?php endif; ?>
+
 <?php if ($approvals): ?>
 <div class="panel">
   <h3 class="tab-sub" style="margin-top:0">Approval chain</h3>

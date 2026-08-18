@@ -679,6 +679,29 @@ function ops_client_holds($method) {
     view('ops/client_holds', ['held' => $held, 'clients' => $clients]);
     return true;
 }
+// Admin screen: configure the pre-order review checklist (Enquiry/Tender/Contract).
+function ops_preorder_checklist($method) {
+    ops_require(is_master() || can('settings.manage') || can('crm.quote.approve'), 'You cannot configure the pre-order checklist.');
+    if ($method === 'POST') {
+        $on  = !empty($_POST['enabled']) ? '1' : '';
+        $req = !empty($_POST['require_all']) ? '1' : '';
+        $items = [];
+        foreach (preg_split('/\r?\n/', (string)($_POST['items'] ?? '')) as $ln) { $ln = trim($ln); if ($ln !== '') $items[] = substr($ln, 0, 300); }
+        setting_set('preorder_checklist_on', $on);
+        setting_set('preorder_checklist_require', $req);
+        setting_set('preorder_checklist_items', implode("\n", $items));
+        flash('Pre-order checklist saved.' . ($on ? '' : ' (It is switched off, so it will not appear on quotations.)'));
+        redirect('/preorder-checklist');
+    }
+    $items = (string)setting_get('preorder_checklist_items', '');
+    if (trim($items) === '') $items = preorder_checklist_default();
+    view('ops/preorder_checklist', [
+        'enabled' => preorder_checklist_enabled(),
+        'require_all' => preorder_checklist_require_all(),
+        'items' => $items,
+    ]);
+    return true;
+}
 function partner_missing($id, $role = 'client') {
     $id = (int)$id;
     if (!$id) return [];
@@ -2182,7 +2205,7 @@ function ops_module_gate($route) {
         'adspro-sync'=>'leads','adspro-backfill'=>'leads',
         'stage-gates'=>'leads','stage-gate-save'=>'leads','stage-gate-delete'=>'leads',
         'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries',
-        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes',
+        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes','quote-preorder-save'=>'quotes','preorder-checklist'=>'quotes',
         'attendance-recon'=>'reconcile',
         'availability'=>'jobs','schedule'=>'jobs',
         'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems','release-notes'=>'idems','document-ai-review'=>'idems','document-scope-from-qap'=>'idems','document-polish-text'=>'idems',
@@ -2366,8 +2389,10 @@ function ops_dispatch($route, $method) {
             ops_candidates($route, $method); return true;
         case $route === 'inquiries' || $route === 'inquiry-new' || $route === 'inquiry-edit':
             ops_crm_inquiries($route, $method); return true;
-        case $route === 'quotes' || $route === 'quote' || $route === 'quote-new' || $route === 'quote-edit' || $route === 'quote-revise' || $route === 'quote-status' || $route === 'quote-doc' || $route === 'quote-pdf' || $route === 'quote-approve' || $route === 'quote-unapprove' || $route === 'quote-contract' || $route === 'quote-float' || $route === 'quote-client' || $route === 'partner-address' || $route === 'quote-files' || $route === 'quote-file' || $route === 'quote-file-delete' || $route === 'quote-unlock' || $route === 'quote-followup' || $route === 'quote-external' || $route === 'quotes-export' || $route === 'quote-final' || $route === 'quote-compose' || $route === 'followup-compose':
+        case $route === 'quotes' || $route === 'quote' || $route === 'quote-new' || $route === 'quote-edit' || $route === 'quote-revise' || $route === 'quote-status' || $route === 'quote-doc' || $route === 'quote-pdf' || $route === 'quote-approve' || $route === 'quote-unapprove' || $route === 'quote-contract' || $route === 'quote-float' || $route === 'quote-client' || $route === 'partner-address' || $route === 'quote-files' || $route === 'quote-file' || $route === 'quote-file-delete' || $route === 'quote-unlock' || $route === 'quote-followup' || $route === 'quote-external' || $route === 'quotes-export' || $route === 'quote-final' || $route === 'quote-compose' || $route === 'followup-compose' || $route === 'quote-preorder-save':
             ops_crm_quotes($route, $method); return true;
+        case $route === 'preorder-checklist':
+            return ops_preorder_checklist($method);
         case $route === 'crm-templates' || $route === 'crm-template-new' || $route === 'crm-template-edit' || $route === 'crm-template-delete' || $route === 'crm-template-download' || $route === 'crm-signature' || $route === 'crm-letterhead':
             ops_crm_templates($route, $method); return true;
         case $route === 'quote-approval-rules' || $route === 'quote-approval-rule-new' || $route === 'quote-approval-rule-edit' || $route === 'quote-approval-rule-delete':
