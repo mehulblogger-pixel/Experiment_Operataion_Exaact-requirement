@@ -227,6 +227,10 @@ function idems_migrate() {
         // The vetting authority's ticked checklist for this report (JSON: item=>1).
         // Only used when the configurable checklist is switched on.
         ensure_column('report_docs', 'vet_checklist', "MEDIUMTEXT");
+        // Whether the inspector has marked this report for a Release Note / IRN. 0
+        // (default) means not marked — a Release Note cannot be raised until it is
+        // ticked. Set on the report by the inspector.
+        ensure_column('report_docs', 'rn_to_issue', "INT DEFAULT 0");
     }
     ensure_column('users', 'signature', 'MEDIUMTEXT');          // base64 data-URL of the signature image
     ensure_column('inspectors', 'signature', 'MEDIUMTEXT');
@@ -3622,9 +3626,18 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
             $steps[] = ['key'=>'release', 'label'=>'Release Note created', 'state'=>'done',
                 'line'=>'Release Note ' . $b($rnOffer['existing']['irn']) . ' has been raised from this report.',
                 'href'=>'/document?id=' . (int)$rnOffer['existing']['id'], 'cta'=>'Open Release Note'];
+        } elseif (!empty($rnOffer['blockers'])) {
+            // The button is shown but NOT clickable while anything is pending; the
+            // reasons are spelled out so the inspector knows exactly what to clear.
+            $reasons = '<ul style="margin:6px 0 0 16px;padding:0">';
+            foreach ($rnOffer['blockers'] as $bl) $reasons .= '<li>' . htmlspecialchars((string)$bl, ENT_QUOTES) . '</li>';
+            $reasons .= '</ul>';
+            $steps[] = ['key'=>'release', 'label'=>'Release Note — not yet', 'state'=>'blocked',
+                'line'=>'A Release Note cannot be raised yet:' . $reasons
+                    . '<div style="margin-top:6px">Once these are cleared (reissuing the report as a revision if needed), the button becomes clickable.</div>'];
         } else {
             $steps[] = ['key'=>'release', 'label'=>'Create the Release Note', 'state'=>'now',
-                'line'=>'This report is issued (accepted). Create its Release / Discrepancy Note in one click — the client, vendor, PO, item table and outcome carry over automatically, under a new number. Review the wording, then issue it.',
+                'line'=>'This report is issued (accepted) and clear. Create its Release / Discrepancy Note in one click — the client, vendor, PO, item table and outcome carry over automatically, under a new number. Review the wording, then issue it.',
                 'post'=>['action'=>'/document-release-note', 'id'=>$id, 'label'=>'📋 Create Release Note']];
         }
     }
@@ -3651,7 +3664,36 @@ function idems_release_note_offer($doc) {
     $status = (string)($doc['status'] ?? '');
     $issued = !empty($doc['finalized']) || $status === 'ISSUED';
     if (!$issued) return null;                                          // not yet accepted/issued → no button
-    return ['existing' => null, 'doc_id' => $id];
+    return ['existing' => null, 'doc_id' => $id, 'blockers' => idems_rn_blockers($doc)];
+}
+// What still stops a Release Note being raised from this inspection report. An
+// empty list means it is clear to raise. The button is shown but not clickable
+// while any blocker stands, with the reasons spelled out. §rn-gate
+//   · not marked for a Release Note (the inspector must tick it),
+//   · open hold / witness points on the job,
+//   · open deviations / nonconformities on the report or job,
+//   · client acceptance pending (only when that control is switched on) or the
+//     client rejected the report.
+function idems_rn_blockers($doc) {
+    $b = [];
+    if (empty($doc['rn_to_issue'])) $b[] = 'It is not marked for a Release Note — the inspector must tick “Release Note to be issued”.';
+    $jobId = (int)($doc['job_id'] ?? 0);
+    if ($jobId && function_exists('hwp_open_count')) {
+        $h = (int)hwp_open_count($jobId);
+        if ($h > 0) $b[] = $h . ' hold / witness point' . ($h === 1 ? '' : 's') . ' still open — close them first.';
+    }
+    $docId = (int)($doc['id'] ?? 0);
+    $ncrOpen = 0;
+    try {
+        $ncrOpen = (int) ops_val("SELECT COUNT(*) FROM nonconformities WHERE status<>'CLOSED' AND (report_doc_id=? " . ($jobId ? "OR job_id=?" : "") . ")",
+            $jobId ? [$docId, $jobId] : [$docId]);
+    } catch (Throwable $e) { $ncrOpen = 0; }
+    if ($ncrOpen > 0) $b[] = $ncrOpen . ' deviation / nonconformity' . ($ncrOpen === 1 ? '' : 's') . ' still open — close them first.';
+    $cd = strtoupper(trim((string)($doc['client_decision'] ?? '')));
+    if ($cd === 'REJECTED') $b[] = 'The client rejected this report — it cannot be released.';
+    elseif ($cd !== 'ACCEPTED' && function_exists('setting_get') && (string)setting_get('rn_require_client_acceptance', '') === '1')
+        $b[] = 'Client acceptance is pending — the client has not yet accepted this report.';
+    return $b;
 }
 // Render the playbook card. Supports link CTAs and POST-button CTAs.
 function idems_render_report_playbook($doc, $approvals = [], $hasSchema = true) {
@@ -4278,6 +4320,20 @@ function ops_idems_documents($route, $method) {
         else { $_SESSION['idems_ai_' . $doc['id']] = $text; idems_log('report_doc', (int)$doc['id'], 'AI_REVIEW', ['irn'=>$doc['irn']]); flash('AI review completed — the suggestions are advisory. You remain the approving authority.'); }
         redirect('/document?id=' . $doc['id']);
         return true;
+    }
+    if ($route === 'document-rn-flag' && $method === 'POST') {
+        // The inspector marks whether a Release Note / IRN is to be issued for this
+        // report. Until it is ticked, a Release Note cannot be raised. This is a
+        // disposition decision (not report body), so it stays settable by the
+        // inspector / coordinator even after the report is locked from editing.
+        $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
+        if (!$doc) { http_response_code(404); view('notfound'); return true; }
+        ops_require(is_master() || can('mod.idems.edit'), 'You cannot change this report.');
+        $v = !empty($_POST['rn_to_issue']) ? 1 : 0;
+        $pdo->prepare("UPDATE report_docs SET rn_to_issue=?, updated_at=? WHERE id=?")->execute([$v, date('c'), $doc['id']]);
+        idems_log('report_doc', $doc['id'], 'RN_FLAG', ['irn'=>$doc['irn'], 'new'=>$v ? 'Release Note to be issued' : 'no Release Note']);
+        flash($v ? 'Marked: a Release Note is to be issued for this report.' : 'Marked: no Release Note for this report.');
+        redirect('/document?id=' . $doc['id']);
     }
     if ($route === 'document-submit' && $method === 'POST') {
         $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_GET['id'] ?? $_POST['id'] ?? 0)]);
@@ -8686,6 +8742,13 @@ function ops_idems_release_note($method) {
     $srcIssued = !empty($src['finalized']) || ($src['status'] ?? '') === 'ISSUED';
     if (!$srcIssued && !is_master()) {
         flash('A Release Note can only be raised once the inspection report is issued (accepted). Issue the report first.', 'error');
+        redirect('/document?id=' . $src['id']);
+    }
+    // Everything must be clear: marked for a Release Note, no open hold/witness or
+    // deviation points, and client acceptance in order. A super-admin may override.
+    $blockers = idems_rn_blockers($src);
+    if ($blockers && !is_master()) {
+        flash('A Release Note cannot be raised yet — ' . implode(' ', $blockers), 'error');
         redirect('/document?id=' . $src['id']);
     }
     $rnTypeId = idems_build_release_note();   // form-driven RN type, seeded once

@@ -91,6 +91,25 @@
       // "do this now" step, with the automatic signature made a visible step. ?>
 <?php if (function_exists('idems_render_report_playbook')) idems_render_report_playbook($doc, $approvals ?? [], $hasSchema ?? false); ?>
 
+<?php
+  // ---- Release Note decision: the inspector marks whether an IRN / Release Note
+  // is to be issued for this report. Until ticked, no Release Note can be raised. ----
+  $isReleaseType = in_array(strtoupper((string)($doc['type_code'] ?? '')), ['RN','IRN'], true);
+  if (!$isReleaseType && (is_master() || can('mod.idems.edit'))):
+    $rnOn = !empty($doc['rn_to_issue']);
+?>
+<div class="panel" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid <?= $rnOn ? 'var(--ok)' : 'var(--line,#e5e7eb)' ?>">
+  <form method="post" action="/document-rn-flag" style="margin:0;display:flex;gap:9px;align-items:center">
+    <input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
+    <input type="hidden" name="rn_to_issue" value="<?= $rnOn ? '0' : '1' ?>">
+    <button class="btn small <?= $rnOn ? 'secondary' : '' ?>" type="submit"><?= $rnOn ? '☑ Release Note: to be issued (click to unmark)' : '☐ Mark: Release Note to be issued' ?></button>
+  </form>
+  <span class="muted" style="font-size:12px"><?= $rnOn
+    ? 'A Release Note will be raised from this report once it is issued and all hold / deviation points and client acceptance are cleared.'
+    : 'Tick this if a Release Note / IRN is to be issued for this report. Until it is ticked, a Release Note cannot be generated.' ?></span>
+</div>
+<?php endif; ?>
+
 <div data-tabs data-tabs-key="report" data-tabs-order="Report,Checks,Approvals,Audit">
 <?php // ---- Scorecard — only for scored report types (vendor assessment, audit) ---- ?>
 <?php if (!empty($scorecard) && $scorecard['overall'] !== null):
