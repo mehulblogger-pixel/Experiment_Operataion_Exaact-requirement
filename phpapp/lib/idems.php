@@ -3047,6 +3047,24 @@ function idems_fields($typeId, $sectionId = null) {
 // that make two reports the same report. With no date to key on, fall back to a
 // short window, which is long enough to catch a resend and short enough never to
 // stand in the way of real work.
+// Once an inspection report for a set of items is APPROVED or ISSUED, no other
+// report of the same kind can be prepared for the SAME items — the items are
+// settled. "Same items" is keyed on the P.O. (plus client and report type), so a
+// vendor with several P.O.s on the same day is handled naturally: each P.O. gets
+// its own report, and only a second report for a P.O. already reported is blocked.
+// Returns the settling report (id, irn, status) or null. No P.O. → no lock (there
+// is nothing to key the items on), so nothing that worked before is prevented.
+function idems_po_locked($f, $excludeId = 0) {
+    $typeId = (int)($f['report_type_id'] ?? 0);
+    $client = (int)($f['client_id'] ?? 0);
+    $po     = trim((string)($f['po_ref'] ?? ''));
+    if (!$typeId || $po === '') return null;
+    $where = "deleted=0 AND report_type_id=? AND po_ref=? AND (status IN ('APPROVED','ISSUED') OR COALESCE(finalized,0)=1)";
+    $args = [$typeId, $po];
+    if ($client) { $where .= " AND client_id=?"; $args[] = $client; }
+    if ($excludeId) { $where .= " AND id<>?"; $args[] = (int)$excludeId; }
+    return ops_one("SELECT id, irn, status FROM report_docs WHERE $where ORDER BY id DESC LIMIT 1", $args) ?: null;
+}
 function idems_existing_twin($f) {
     $typeId = (int)($f['report_type_id'] ?? 0);
     if (!$typeId) return null;
@@ -4116,6 +4134,18 @@ function ops_idems_documents($route, $method) {
                         . ($fields['inspection_date'] ? ', same inspection date' : ', created moments ago')
                         . '. Nothing was created twice; open it below to carry on.', 'warning');
                     redirect('/document?id=' . (int)$twin['id']);
+                }
+                // Once a report of this kind for this P.O. has been approved/issued,
+                // the items are settled — another cannot be prepared for the same
+                // P.O. (a different P.O. is fine, which is how several P.O.s for one
+                // vendor on the same day are handled). A super-admin may override.
+                $poLock = idems_po_locked($fields);
+                if ($poLock && !is_master()) {
+                    flash('An inspection report for this P.O. is already ' . strtolower(IDEMS_STATUS[$poLock['status']] ?? $poLock['status'])
+                        . ' (' . $poLock['irn'] . '). The items on this P.O. are settled, so another ' . Tl('report')
+                        . ' of the same type cannot be prepared for it. Use a different P.O., open the existing '
+                        . Tl('report') . ', or reissue it as a revision.', 'error');
+                    redirect('/document?id=' . (int)$poLock['id']);
                 }
                 // generate the IRN from the resolved fields
                 [$irn, $serial] = idems_generate_irn($fields + ['inspection_date'=>$fields['inspection_date']]);
