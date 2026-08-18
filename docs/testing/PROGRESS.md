@@ -17,7 +17,7 @@ Every module from Master Inventory v1.0. Order = priority (b): high-risk operati
 - [x] 07 Vetting & Approval — MOD-IDEMS (workflow)
 - [x] 08 Release Notes — MOD-IDEMS (RN)
 - [x] 09 Invoicing — MOD-INVOICING
-- [ ] 10 Client Portal — MOD-PORTAL
+- [x] 10 Client Portal — MOD-PORTAL
 - [ ] 11 Vendor Portal — MOD-VPORTAL
 - [ ] 12 Nonconformities (NCR) — MOD-NCR
 - [ ] 13 Corrective Action (CAPA) — MOD-CAPA
