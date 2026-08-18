@@ -443,6 +443,9 @@
     <?php endif; ?>
   </div>
   <p class="muted" style="margin:0 0 8px;font-size:12px">A senior reviewer vets the report (technical check) or records a debrief before it goes for approval. Returning a report sends it back to the inspector as a draft.</p>
+  <?php if ($canVet && empty($doc['finalized'])): ?>
+    <div style="margin-bottom:10px"><a class="btn small" href="/document-vet-review?id=<?= (int)$doc['id'] ?>">⇋ Vet side by side (report + checklist)</a></div>
+  <?php endif; ?>
   <?php if ($vetting): ?>
     <div class="appr-steps" style="margin-bottom:10px">
       <?php foreach ($vetting as $v): ?>

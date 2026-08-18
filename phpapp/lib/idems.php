@@ -3565,7 +3565,7 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
                 'href'=>'/document?id=' . (int)$rnOffer['existing']['id'], 'cta'=>'Open Release Note'];
         } else {
             $steps[] = ['key'=>'release', 'label'=>'Create the Release Note', 'state'=>'now',
-                'line'=>'This report is approved. Create its Release / Discrepancy Note in one click — the client, vendor, PO, item table and outcome carry over automatically, under a new number. Review the wording, then issue it.',
+                'line'=>'This report is issued (accepted). Create its Release / Discrepancy Note in one click — the client, vendor, PO, item table and outcome carry over automatically, under a new number. Review the wording, then issue it.',
                 'post'=>['action'=>'/document-release-note', 'id'=>$id, 'label'=>'📋 Create Release Note']];
         }
     }
@@ -3576,18 +3576,23 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
 // alone (the permission to create one is enforced separately, in the playbook and
 // in the create endpoint). Returns null when no action applies, else
 // ['existing'=>row|null, 'doc_id'=>int] — 'existing' is the Release Note already
-// raised from this report, if any. A release note never spawns another. Generic:
-// offered on any approved/issued report that is not itself a release note — no
-// hardcoding to one inspection type.
+// raised from this report, if any. A release note never spawns another.
+//
+// The action is enabled ONLY once the inspection report is ACCEPTED — i.e. it has
+// been issued (finalised): a Release Note is raised against a final, accepted
+// report, never against a draft or a merely-approved one still to be issued.
+// Exception: if a Release Note already exists we still surface the link to it,
+// whatever the current status, so it is never orphaned.
 function idems_release_note_offer($doc) {
     $typeCode = strtoupper((string)($doc['type_code'] ?? ''));
     if (in_array($typeCode, ['RN', 'IRN'], true)) return null;
-    $status = (string)($doc['status'] ?? '');
-    $issued = !empty($doc['finalized']) || $status === 'ISSUED';
-    if (!$issued && !in_array($status, ['APPROVED', 'ISSUED'], true)) return null;
     $id = (int)($doc['id'] ?? 0);
     $existing = $id ? ops_one("SELECT id, irn FROM report_docs WHERE type_code='RN' AND deleted=0 AND data LIKE ?", ['%"source_report_id":' . $id . '%']) : null;
-    return ['existing' => $existing ?: null, 'doc_id' => $id];
+    if ($existing) return ['existing' => $existing, 'doc_id' => $id];   // already raised — always link it
+    $status = (string)($doc['status'] ?? '');
+    $issued = !empty($doc['finalized']) || $status === 'ISSUED';
+    if (!$issued) return null;                                          // not yet accepted/issued → no button
+    return ['existing' => null, 'doc_id' => $id];
 }
 // Render the playbook card. Supports link CTAs and POST-button CTAs.
 function idems_render_report_playbook($doc, $approvals = [], $hasSchema = true) {
@@ -5610,6 +5615,29 @@ function ops_idems_vet($method) {
     idems_log('report_doc', $doc['id'], 'VET_' . $action, ['irn'=>$doc['irn'], 'reason'=>$note]);
     flash(['VETTED'=>'Report vetted — cleared for approval.', 'RETURNED'=>'Report returned to the inspector for correction.', 'DEBRIEFED'=>'Debrief recorded.'][$action] ?? 'Vetting recorded.');
     redirect('/document?id=' . $doc['id']);
+    return true;
+}
+
+// ---- Handler: side-by-side vetting (the actual report + the checklist) ----
+// The vetting authority reads the real report on one side and ticks the checklist
+// on the other, then vets / returns / debriefs — all on one screen. The tick
+// actions POST to /document-vet (the same handler), so nothing about the workflow
+// changes; this is purely a side-by-side way to do it.
+function ops_idems_vet_review($method) {
+    $doc = ops_one("SELECT d.*, bp.display_name client_disp, bp.legal_name client_name, v.display_name vendor_disp, v.legal_name vendor_name, rt.name type_name
+        FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
+        WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? 0)]);
+    if (!$doc) { http_response_code(404); view('notfound'); return true; }
+    ops_require(idems_can_vet(), 'You are not permitted to vet reports.');
+    view('ops/idems/vet_review', [
+        'doc' => $doc,
+        'vetting' => idems_vetting_log($doc['id']),
+        'finalized' => !empty($doc['finalized']),
+        'checklistOn' => idems_vetting_checklist_enabled(),
+        'checklistItems' => idems_vetting_checklist_items(),
+        'checklistState' => idems_vetting_checklist_state($doc),
+        'requireAll' => idems_vetting_checklist_require_all(),
+    ]);
     return true;
 }
 
@@ -8519,8 +8547,12 @@ function ops_idems_release_note($method) {
         WHERE d.id=? AND d.deleted=0", [(int)($_POST['id'] ?? 0)]);
     if (!$src) { http_response_code(404); view('notfound'); return true; }
     ops_require(is_master() || can('mod.idems.edit'), 'You cannot create reports.');
-    if (!in_array($src['status'], ['APPROVED','ISSUED'], true) && !is_master()) {
-        flash('A Release Note can only be drafted from an approved or issued report.', 'error');
+    // A Release Note is raised only once the inspection report is ACCEPTED — i.e.
+    // issued (finalised). A draft or a merely-approved-but-not-issued report cannot
+    // spawn one. (A master may still force it, for corrections.)
+    $srcIssued = !empty($src['finalized']) || ($src['status'] ?? '') === 'ISSUED';
+    if (!$srcIssued && !is_master()) {
+        flash('A Release Note can only be raised once the inspection report is issued (accepted). Issue the report first.', 'error');
         redirect('/document?id=' . $src['id']);
     }
     $rnTypeId = idems_build_release_note();   // form-driven RN type, seeded once

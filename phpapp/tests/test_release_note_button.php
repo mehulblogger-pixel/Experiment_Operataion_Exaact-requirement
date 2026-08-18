@@ -21,16 +21,18 @@ $mk = function ($typeCode, $typeRef, $status, $finalized = 0, $data = []) use ($
 t_ok(idems_release_note_offer($mk('FEXT', $typeId, 'DRAFT')) === null,
      'a draft report offers no Release Note');
 
-// An APPROVED report offers it, with no existing RN yet.
+// An APPROVED-but-not-issued report does NOT offer it — a Release Note is raised
+// only once the inspection report is accepted (issued).
 $appr = $mk('FEXT', $typeId, 'APPROVED');
-$offer = idems_release_note_offer($appr);
-t_ok(is_array($offer), 'an approved report offers a Release Note');
-t_ok($offer['existing'] === null, 'no Release Note exists yet for it');
-t_eq((int)($offer['doc_id'] ?? 0), (int)$appr['id'], 'the offer carries this report id');
+t_ok(idems_release_note_offer($appr) === null,
+     'an approved but not-yet-issued report offers no Release Note (must be issued first)');
 
-// An ISSUED report (finalized) also offers it.
+// An ISSUED (finalized/accepted) report offers it, with no existing RN yet.
 $iss = $mk('FEXT', $typeId, 'ISSUED', 1);
-t_ok(is_array(idems_release_note_offer($iss)), 'an issued report also offers a Release Note');
+$offer = idems_release_note_offer($iss);
+t_ok(is_array($offer), 'an issued (accepted) report offers a Release Note');
+t_ok($offer['existing'] === null, 'no Release Note exists yet for it');
+t_eq((int)($offer['doc_id'] ?? 0), (int)$iss['id'], 'the offer carries this report id');
 
 // Once an RN is raised from it, the offer points to the existing RN (no dup).
 $pdo->prepare("INSERT INTO report_docs (report_type_id,type_code,irn,status,data,created_at) VALUES (?,?,?,?,?,?)")
