@@ -1413,6 +1413,26 @@ function job_revenue_for($job, $officeId = null) {
 // invoice against every cost the job caused. Named a branch, it is that
 // branch's share of the revenue — and the costs, which sit with whoever did
 // the work.
+// "Everything on this job, at a glance" — a compact index of the related things
+// (reports, release notes, QAPs, NCRs, invoices, expenses, photos) with counts
+// and where each lives, so whoever opens a job sees the whole picture and jumps
+// straight to any part without hunting through tabs or other screens. Every count
+// is guarded, so a module that isn't installed (or a table not yet migrated) can
+// never break the page. Generic — nothing hardcoded to a client or trade.
+function job_glance($job) {
+    $jid = (int)($job['id'] ?? 0);
+    $cnt = function($sql, $args = []) { try { return (int) ops_val($sql, $args); } catch (Throwable $e) { return 0; } };
+    $lblReport = function_exists('Tl') ? Tl('report') : 'report';
+    return [
+        'reports'  => ['n'=>$cnt("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0", [$jid]), 'href'=>'#reports', 'label'=>$lblReport.'s'],
+        'releases' => ['n'=>$cnt("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND type_code IN ('RN','IRN')", [$jid]), 'href'=>'#reports', 'label'=>'release notes'],
+        'qaps'     => ['n'=>(function_exists('job_qaps') ? count(job_qaps($jid)) : 0), 'href'=>'#qaps', 'label'=>'QAP / refs'],
+        'ncrs'     => ['n'=>$cnt("SELECT COUNT(*) FROM nonconformities WHERE job_id=?", [$jid]), 'href'=>'/ncr', 'label'=>'NCRs'],
+        'invoices' => ['n'=>(function_exists('books_invoices_for_job') ? count(books_invoices_for_job($jid)) : 0), 'href'=>'#invoice', 'label'=>'invoices'],
+        'expenses' => ['n'=>$cnt("SELECT COUNT(*) FROM expenses WHERE job_id=?", [$jid]), 'href'=>'#bills', 'label'=>'expenses'],
+        'photos'   => ['n'=>$cnt("SELECT COUNT(*) FROM report_files rf JOIN report_docs d ON d.id=rf.report_doc_id WHERE d.job_id=? AND rf.kind='photo'", [$jid]), 'href'=>'#reports', 'label'=>'photos'],
+    ];
+}
 function job_profit($job, $officeId = null) {
     $mandays = job_mandays($job);
     $office = $job['executing_office_id'] ?? null;
@@ -5196,6 +5216,7 @@ function ops_jobs($route, $method) {
         $depIsDep = function_exists('pdso_is_deputation') && function_exists('pdso_enabled')
             && pdso_enabled() && pdso_is_deputation($job, $jcall);
         view('ops/job_detail', ['job'=>$job,'expenses'=>$expenses,'profit'=>job_profit($job),
+            'glance'=>job_glance($job),
             'jcall'=>$jcall, 'siteAddr'=>$siteAddr,
             'clientInfo'=>$jcall ? partner_full($jcall['client_id']) : null,
             'vendorInfo'=>$jcall ? partner_full($jcall['vendor_id']) : null,

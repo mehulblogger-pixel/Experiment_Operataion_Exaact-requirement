@@ -42,6 +42,23 @@
   <?php endif; ?>
 </div>
 
+<?php // ---- Everything on this job, at a glance — one index, jump anywhere ---- ?>
+<?php if (!empty($glance)): ?>
+<div class="panel job-glance" style="margin-top:12px;padding:10px 12px">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <span class="muted" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">On this <?= e(Tl('job')) ?></span>
+    <?php foreach ($glance as $g): $has = (int)$g['n'] > 0; ?>
+      <a href="<?= e($g['href']) ?>" class="pill <?= $has ? 'p-info' : 'p-mut' ?>" style="text-decoration:none;font-size:12px<?= $has ? '' : ';opacity:.6' ?>">
+        <b><?= (int)$g['n'] ?></b> <?= e($g['label']) ?>
+      </a>
+    <?php endforeach; ?>
+    <?php if (can('mod.idems.edit') || is_master()): ?>
+      <a href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call='.(int)$job['call_id'] : '' ?>" class="pill p-ok" style="text-decoration:none;font-size:12px">+ New <?= e(Tl('report')) ?></a>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <?php // The whole record below is organised into tabs (app.js → initSectionTabs):
       // panels sharing a data-tab label become one tab, so this long screen reads
       // as Overview · Schedule & site · Reports & QA · Money instead of one endless
