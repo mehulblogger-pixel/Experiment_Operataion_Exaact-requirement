@@ -53,11 +53,13 @@ const IDEMS_REPORT_SEED = [
     ['PCR','Project Closure Report','SUMMARY'],
 ];
 const IDEMS_CATEGORIES = ['TPIA_REPORT'=>'TPIA report','ENDORSEMENT'=>'Manufacturer endorsement','ADMIN'=>'Timesheet / admin','SUMMARY'=>'Summary / periodic'];
-// Report-instance lifecycle.
-const IDEMS_STATUS = ['DRAFT'=>'Draft','SUBMITTED'=>'Submitted','UNDER_REVIEW'=>'Under review','APPROVED'=>'Approved','ISSUED'=>'Issued','REJECTED'=>'Sent back','ARCHIVED'=>'Archived'];
+// Report-instance lifecycle. VETTING is the intermediate state a report sits in,
+// when the vetting gate is on, between the inspector submitting it and the
+// approval chain — it is with the vetting authority.
+const IDEMS_STATUS = ['DRAFT'=>'Draft','SUBMITTED'=>'Submitted','VETTING'=>'At vetting','UNDER_REVIEW'=>'Under review','APPROVED'=>'Approved','ISSUED'=>'Issued','REJECTED'=>'Sent back','ARCHIVED'=>'Archived'];
 // Technical vetting / debriefing states (distinct from the approval chain).
 const IDEMS_VET_STATUS = ['VETTED'=>'Vetted','RETURNED'=>'Returned for correction','DEBRIEFED'=>'Debriefed'];
-const IDEMS_OPEN_STATES = ['DRAFT','SUBMITTED','UNDER_REVIEW','REJECTED'];
+const IDEMS_OPEN_STATES = ['DRAFT','SUBMITTED','VETTING','UNDER_REVIEW','REJECTED'];
 const IDEMS_RESULTS = ['ACCEPTED'=>'Accepted','ACCEPTED_COND'=>'Accepted with observations','REJECTED'=>'Rejected','HOLD'=>'Hold','NA'=>'Not applicable'];
 const IDEMS_RELEASE = ['RELEASED'=>'Released','RELEASED_COND'=>'Released with observations','NOT_RELEASED'=>'Not released','PENDING'=>'Pending'];
 
@@ -3407,7 +3409,7 @@ function idems_can_edit_doc($doc) {
     return is_master() || can('mod.idems.edit');
 }
 function idems_status_pill($s) {
-    return ['DRAFT'=>'p-mut','SUBMITTED'=>'p-info','UNDER_REVIEW'=>'p-warn','APPROVED'=>'p-ok','ISSUED'=>'p-ok','REJECTED'=>'p-bad','ARCHIVED'=>'p-mut'][$s] ?? 'p-mut';
+    return ['DRAFT'=>'p-mut','SUBMITTED'=>'p-info','VETTING'=>'p-warn','UNDER_REVIEW'=>'p-warn','APPROVED'=>'p-ok','ISSUED'=>'p-ok','REJECTED'=>'p-bad','ARCHIVED'=>'p-mut'][$s] ?? 'p-mut';
 }
 
 // ---------------------------------------------------------------------------
@@ -3444,7 +3446,13 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
     $status   = (string)($doc['status'] ?? 'DRAFT');
     $issued   = !empty($doc['finalized']) || $status === 'ISSUED';
     $isDraft  = in_array($status, ['DRAFT', 'REJECTED'], true);
-    $submitted= in_array($status, ['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'ISSUED'], true);
+    $atVetting= ($status === 'VETTING');
+    // "submitted" = it has left the inspector's hands (gone to vetting or approval).
+    $submitted= in_array($status, ['SUBMITTED', 'VETTING', 'UNDER_REVIEW', 'APPROVED', 'ISSUED'], true);
+    $atApproval = in_array($status, ['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'ISSUED'], true);
+    $vetGate  = function_exists('idems_vetting_required') ? idems_vetting_required($doc) : false;
+    $vetted   = strtoupper((string)($doc['vet_status'] ?? '')) === 'VETTED';
+    $canVet   = function_exists('idems_can_vet') && idems_can_vet();
     $canEdit  = function_exists('idems_can_edit_doc') ? idems_can_edit_doc($doc) : false;
     $canFinal = is_master() || (function_exists('can') && can('idems.finalize'));
 
@@ -3510,11 +3518,11 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
     // 4 — submit for review
     if ($submitted) {
         $steps[] = ['key'=>'submit', 'label'=>'Submitted for review', 'state'=>'done',
-            'line'=>'The report has gone forward for approval.'];
+            'line'=>$vetGate ? 'The report has gone forward — to the vetting authority first.' : 'The report has gone forward for approval.'];
     } elseif ($isDraft && $canEdit) {
         if ($comp && !empty($comp['ok'])) {
             $steps[] = ['key'=>'submit', 'label'=>'Submit for review', 'state'=>'now',
-                'line'=>'All completeness checks pass — send it forward to the approver.',
+                'line'=>$vetGate ? 'All completeness checks pass — submit it to the vetting authority.' : 'All completeness checks pass — send it forward to the approver.',
                 'post'=>['action'=>'/document-submit?id=' . $id, 'label'=>'✓ Submit for review']];
         } else {
             $n = $comp ? (int)$comp['failed'] : 0;
@@ -3527,16 +3535,39 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
             'line'=>'Fill the report, then submit it for approval.'];
     }
 
+    // 4b — vetting (only when the gate is on for this report). The report sits with
+    // the vetting authority; once vetted it is forwarded to the approver
+    // automatically. Shown as an actionable step to a vetter when it is at vetting.
+    if ($vetGate || $atVetting) {
+        if ($atVetting && $canVet) {
+            $steps[] = ['key'=>'vet', 'label'=>'Vet this report', 'state'=>'now',
+                'line'=>'This report is with you for vetting. Check it against the report side by side, then vet it (it goes to the approver automatically) or return it for correction.',
+                'href'=>'/document-vet-review?id=' . $id, 'cta'=>'⇋ Vet side by side'];
+        } elseif ($atVetting) {
+            $steps[] = ['key'=>'vet', 'label'=>'With the vetting authority', 'state'=>'info',
+                'line'=>'The report is being vetted. Once vetted it goes to the approver automatically.'];
+        } elseif ($atApproval || $approved || $issued || $vetted) {
+            $steps[] = ['key'=>'vet', 'label'=>'Vetted', 'state'=>'done',
+                'line'=>'The vetting authority has cleared this report.'];
+        } else {
+            $steps[] = ['key'=>'vet', 'label'=>'Vetting', 'state'=>'todo',
+                'line'=>'After you submit, the vetting authority checks the report before it goes to the approver.'];
+        }
+    }
+
     // 5 — approval. When the report is waiting on YOU, the approve / send-back /
     // reject buttons are right here — this is how a submitted report is carried
     // forward, without hunting for the action on another tab.
     if ($approved) {
         $steps[] = ['key'=>'approve', 'label'=>'Approved', 'state'=>'done',
             'line'=>$names ? 'Approved by ' . $b(implode(', ', $names)) : 'Approved.'];
-    } elseif ($submitted && $canAct) {
+    } elseif ($atApproval && $canAct) {
         $steps[] = ['key'=>'approve', 'label'=>'Your approval is needed', 'state'=>'now',
             'line'=>'This report has been submitted to you. Approve it to move it forward, send it back for changes, or reject it.',
             'approve'=>true];
+    } elseif ($atVetting) {
+        $steps[] = ['key'=>'approve', 'label'=>'Approval', 'state'=>'todo',
+            'line'=>'Once the report is vetted it comes to the approver automatically, who approves, sends back or rejects it.'];
     } elseif ($submitted) {
         $steps[] = ['key'=>'approve', 'label'=>'Awaiting approval', 'state'=>'info',
             'line'=>$names ? ('With ' . implode(', ', array_map($b, $names)) . ' — they approve, send back or reject it.') : 'Waiting on the approver.'];
@@ -3611,14 +3642,13 @@ function idems_render_report_playbook($doc, $approvals = [], $hasSchema = true) 
     $canFinal = is_master() || (function_exists('can') && can('idems.finalize'));
     $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
     $pb  = idems_report_playbook($doc, $approvals, $hasSchema);
-    // Is there a Release Note action to offer (create it, or open the one already
-    // raised)? If so, the playbook must show even to someone who can't edit an
-    // already-issued report — otherwise the button hides again. §rn-guard
-    $hasRelease = false; foreach ($pb['steps'] as $s) if (($s['key'] ?? '') === 'release') { $hasRelease = true; break; }
-    // Show it to the people who act on it: the author/editor, a finaliser, or —
-    // crucially — the approver this report is currently waiting on, so they get
-    // the approve/send-back/reject buttons here rather than nowhere obvious.
-    if (!$canEdit && !$canFinal && empty($pb['can_act']) && !$hasRelease) return;
+    // The playbook is read-only progress for anyone viewing the report (the detail
+    // page is already permission-gated), and carries the action buttons for whoever
+    // may act on the current step. It is shown to everyone so the inspector can see
+    // where their submitted report stands — with the vetting authority, then the
+    // approver — even though they can no longer edit it. Only a truly empty doc is
+    // skipped (guarded above). (Formerly hidden from non-editors, which left an
+    // inspector staring at a locked report with no idea where it was.)
     ob_start();
     echo function_exists('tosrm_playbook_css') ? tosrm_playbook_css() : ''; ?>
     <div class="card tosrm-pb" style="margin:0 0 16px">
@@ -4237,6 +4267,32 @@ function ops_idems_documents($route, $method) {
             }
             idems_log('report_doc', $doc['id'], 'GATE_OVERRIDE', ['irn'=>$doc['irn'], 'reason'=>trim((string)$_POST['override_reason']), 'field'=>$comp['failed'].' check(s) overridden']);
         }
+        // T10 — a submitted report should carry no blank entries: every text-like
+        // field left empty is recorded as "NA" (not applicable) automatically, so
+        // nobody types it by hand and no field reads as simply forgotten. Applies to
+        // both the vetting and the direct-to-approval paths below.
+        $naText = function_exists('setting_get') ? (setting_get('report_blank_fill', '') ?: 'NA') : 'NA';
+        $bodyData = json_decode($doc['data'] ?: '[]', true); if (!is_array($bodyData)) $bodyData = [];
+        $naChanged = false;
+        foreach (idems_fields($doc['report_type_id']) as $f) {
+            if (!in_array($f['ftype'], ['text', 'textarea', 'select'], true)) continue;  // leave numbers, dates, tables, media
+            $k = $f['fkey'];
+            if (trim((string)($bodyData[$k] ?? '')) === '') { $bodyData[$k] = $naText; $naChanged = true; }
+        }
+        if ($naChanged) $pdo->prepare("UPDATE report_docs SET data=? WHERE id=?")->execute([json_encode($bodyData), $doc['id']]);
+        // Vetting gate: when it is on (and this is not a release note), the report
+        // goes to the vetting authority FIRST. The approval chain is not built yet —
+        // it is built and the approver notified automatically once the report is
+        // vetted (see ops_idems_vet). This freezes the report from the inspector
+        // (status is no longer DRAFT) while it is checked.
+        if (idems_vetting_required($doc)) {
+            $pdo->prepare("DELETE FROM report_approvals WHERE report_doc_id=?")->execute([$doc['id']]);
+            $pdo->prepare("UPDATE report_docs SET status='VETTING', submitted_at=?, updated_at=? WHERE id=?")->execute([date('c'), date('c'), $doc['id']]);
+            idems_log('report_doc', $doc['id'], 'SUBMIT_TO_VET', ['irn'=>$doc['irn'], 'old'=>$doc['status'], 'new'=>'VETTING']);
+            if (function_exists('idems_notify_vetters')) idems_notify_vetters($doc);
+            flash('Report submitted — sent to the vetting authority. Once vetted it goes to the approver automatically.');
+            redirect('/document?id=' . $doc['id']);
+        }
         // Build the approval chain. Every inspector must have at least one approver.
         $n = idems_build_approval_chain($doc);
         if ($n === 0) {
@@ -4247,19 +4303,6 @@ function ops_idems_documents($route, $method) {
             flash($msg, 'error');
             redirect('/document?id=' . $doc['id']);
         }
-        // T10 — a submitted report should carry no blank entries: every text-like
-        // field left empty is recorded as "NA" (not applicable) automatically, so
-        // nobody types it by hand and no field reads as simply forgotten. Drafts
-        // are left untouched; this only stamps the version that goes for approval.
-        $naText = function_exists('setting_get') ? (setting_get('report_blank_fill', '') ?: 'NA') : 'NA';
-        $bodyData = json_decode($doc['data'] ?: '[]', true); if (!is_array($bodyData)) $bodyData = [];
-        $naChanged = false;
-        foreach (idems_fields($doc['report_type_id']) as $f) {
-            if (!in_array($f['ftype'], ['text', 'textarea', 'select'], true)) continue;  // leave numbers, dates, tables, media
-            $k = $f['fkey'];
-            if (trim((string)($bodyData[$k] ?? '')) === '') { $bodyData[$k] = $naText; $naChanged = true; }
-        }
-        if ($naChanged) $pdo->prepare("UPDATE report_docs SET data=? WHERE id=?")->execute([json_encode($bodyData), $doc['id']]);
         $pdo->prepare("UPDATE report_docs SET status='UNDER_REVIEW', submitted_at=?, updated_at=? WHERE id=?")->execute([date('c'), date('c'), $doc['id']]);
         idems_log('report_doc', $doc['id'], 'SUBMIT', ['irn'=>$doc['irn'], 'old'=>$doc['status'], 'new'=>'UNDER_REVIEW']);
         $cur = idems_current_step($doc['id']);
@@ -5486,6 +5529,16 @@ function idems_notify_approver($doc, $step) {
         . "Open it in the system → Documents → {$doc['irn']} to approve, send back or reject.\n\n" . app_name();
     ops_mail($to, "Approval required: {$doc['irn']}", $body, '', 'idems_approval');
 }
+// Tell the vetting authority a report is waiting to be vetted (best-effort — the
+// vetting authority is whoever may finalise reports). Never blocks the flow.
+function idems_notify_vetters($doc) {
+    $rows = ops_all("SELECT DISTINCT email FROM users WHERE is_active=1 AND COALESCE(email,'')<>'' AND (COALESCE(is_superuser,0)=1 OR COALESCE(permissions,'') LIKE '%idems.finalize%')");
+    $to = implode(',', array_filter(array_column($rows, 'email')));
+    if (!$to) return;
+    $body = "A report awaits vetting before it goes to the approver.\n\nIRN: {$doc['irn']}\nType: {$doc['type_code']}\nTitle: " . ($doc['title'] ?: '—') . "\n\n"
+        . "Open it in the system → Documents → {$doc['irn']} to vet (clear) or return it.\n\n" . app_name();
+    ops_mail($to, "Vetting required: {$doc['irn']}", $body, '', 'idems_vetting');
+}
 
 // ---- Handler: act on an approval step (approve / reject / send-back / delegate) ----
 function ops_idems_approve($method) {
@@ -5539,6 +5592,22 @@ function idems_vetting_log($docId) {
 }
 // Who may vet / debrief a report — a senior reviewer (finalizer) or a master.
 function idems_can_vet() { return is_master() || can('idems.finalize'); }
+
+// ---- Vetting gate: vetting authority BEFORE the approver ----
+// When switched on, a submitted inspection report goes to the vetting authority
+// first; only once vetted is it forwarded to the approval chain. Off by default,
+// so nothing changes for a tenant that has not enabled it. Generic — not tied to
+// any one report type; release notes are the one exclusion (they go straight to
+// the approver), which idems_vetting_required() encodes.
+function idems_vetting_gate_on() {
+    return function_exists('setting_get') && (string)setting_get('vetting_gate_required', '') === '1';
+}
+function idems_vetting_required($doc) {
+    if (!idems_vetting_gate_on()) return false;
+    $tc = strtoupper((string)($doc['type_code'] ?? ''));
+    if (in_array($tc, ['RN', 'IRN'], true)) return false;   // a release note needs no vetting
+    return true;
+}
 
 // ---- Configurable vetting checklist (for the vetting authority) ----
 // A list of check points the vetting authority ticks before clearing a report.
@@ -5618,11 +5687,32 @@ function ops_idems_vet($method) {
         ->execute([$doc['id'], $stage, $action, $note, user_name(current_user()), date('c')]);
     $pdo->prepare("UPDATE report_docs SET vet_status=?, vet_at=?, vet_by=?, updated_at=? WHERE id=?")
         ->execute([$action, date('c'), user_name(current_user()), date('c'), $doc['id']]);
-    // Returning for correction routes the report back to the inspector as a draft.
+    // Returning for correction routes the report back to the inspector as a draft
+    // (and clears any half-built approval chain).
     if ($action === 'RETURNED' && in_array($doc['status'], IDEMS_OPEN_STATES, true)) {
         $pdo->prepare("UPDATE report_docs SET status='DRAFT' WHERE id=?")->execute([$doc['id']]);
+        $pdo->prepare("DELETE FROM report_approvals WHERE report_doc_id=?")->execute([$doc['id']]);
     }
     idems_log('report_doc', $doc['id'], 'VET_' . $action, ['irn'=>$doc['irn'], 'reason'=>$note]);
+    // Auto-forward on vetting: a report sitting at the vetting gate that is VETTED is
+    // handed straight to the approval chain — the approver is resolved and notified,
+    // with no extra click. This is the "once vetted, it goes to the approver
+    // automatically" step.
+    if ($action === 'VETTED' && strtoupper((string)$doc['status']) === 'VETTING') {
+        $fresh = ops_one("SELECT * FROM report_docs WHERE id=?", [$doc['id']]);
+        $n = idems_build_approval_chain($fresh);
+        if ($n === 0) {
+            $pdo->prepare("DELETE FROM report_approvals WHERE report_doc_id=?")->execute([$doc['id']]);
+            flash('Report vetted, but no approver could be resolved. Set this inspector’s approver (Inspection Reports → Approver mapping) or pick one on the report — then vet it again to forward it.', 'error');
+            redirect('/document?id=' . $doc['id']);
+        }
+        $pdo->prepare("UPDATE report_docs SET status='UNDER_REVIEW', updated_at=? WHERE id=?")->execute([date('c'), $doc['id']]);
+        idems_log('report_doc', $doc['id'], 'VET_FORWARD', ['irn'=>$doc['irn'], 'old'=>'VETTING', 'new'=>'UNDER_REVIEW']);
+        $cur = idems_current_step($doc['id']);
+        if ($cur) idems_notify_approver($fresh, $cur);
+        flash('Report vetted and forwarded to the approver automatically (' . $n . ' level' . ($n > 1 ? 's' : '') . ').');
+        redirect('/document?id=' . $doc['id']);
+    }
     flash(['VETTED'=>'Report vetted — cleared for approval.', 'RETURNED'=>'Report returned to the inspector for correction.', 'DEBRIEFED'=>'Debrief recorded.'][$action] ?? 'Vetting recorded.');
     redirect('/document?id=' . $doc['id']);
     return true;
@@ -5657,14 +5747,16 @@ function ops_idems_vetting_checklist($method) {
     if ($method === 'POST') {
         $on  = !empty($_POST['enabled']) ? '1' : '';
         $req = !empty($_POST['require_all']) ? '1' : '';
+        $gate = !empty($_POST['gate_required']) ? '1' : '';
         // Normalise the items: trim, drop blanks, cap length, keep order.
         $items = [];
         foreach (preg_split('/\r?\n/', (string)($_POST['items'] ?? '')) as $ln) { $ln = trim($ln); if ($ln !== '') $items[] = substr($ln, 0, 300); }
         setting_set('vetting_checklist_on', $on);
         setting_set('vetting_checklist_require', $req);
+        setting_set('vetting_gate_required', $gate);
         setting_set('vetting_checklist_items', implode("\n", $items));
-        idems_log('setting', 0, 'VETTING_CHECKLIST', ['field'=>'vetting checklist', 'new'=>($on ? 'on' : 'off') . ', ' . count($items) . ' item(s)']);
-        flash('Vetting checklist saved.' . ($on ? '' : ' (It is switched off, so it will not appear during vetting.)'));
+        idems_log('setting', 0, 'VETTING_CHECKLIST', ['field'=>'vetting checklist', 'new'=>'checklist ' . ($on ? 'on' : 'off') . ', gate ' . ($gate ? 'on' : 'off') . ', ' . count($items) . ' item(s)']);
+        flash('Vetting settings saved.');
         redirect('/vetting-checklist');
     }
     $items = (string)setting_get('vetting_checklist_items', '');
@@ -5672,6 +5764,7 @@ function ops_idems_vetting_checklist($method) {
     view('ops/idems/vetting_checklist', [
         'enabled' => idems_vetting_checklist_enabled(),
         'require_all' => idems_vetting_checklist_require_all(),
+        'gate_required' => idems_vetting_gate_on(),
         'items' => $items,
     ]);
     return true;
