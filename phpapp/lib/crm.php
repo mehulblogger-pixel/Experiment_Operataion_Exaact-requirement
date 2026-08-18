@@ -1211,6 +1211,16 @@ function ops_crm_quotes($route, $method) {
         if ($method === 'POST') {
             $b = $_POST;
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
+            // Pre-order control: a BLOCKED client stops a non-manager from quoting
+            // (a manager may proceed but is warned); HOLD always warns, never stops.
+            if ($cid && function_exists('partner_hold')) {
+                $ph = partner_hold($cid);
+                if ($ph && partner_hold_blocks($cid)) {
+                    flash('This ' . Tl('client') . ' is BLOCKED (' . $ph['reason'] . '). A ' . Tl('quote') . ' cannot be raised for them until a manager clears the block under Client holds.', 'error');
+                    redirect($q ? '/quote-edit?id=' . $q['id'] : '/quote-new');
+                }
+                if ($ph) flash('Note: this ' . Tl('client') . ' is ' . $ph['label'] . ' — ' . $ph['reason'], 'warning');
+            }
             // §i — when a client is picked, the free-text name is ignored entirely.
             $hdr = [
                 'client_id' => $cid, 'client_name' => $cid ? crm_client_name($cid) : trim($b['client_name'] ?? ''),

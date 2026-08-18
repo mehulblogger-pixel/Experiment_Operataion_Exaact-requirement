@@ -347,6 +347,12 @@ function ops_migrate() {
     ensure_column('business_partners', 'inspection_types', "VARCHAR(600) DEFAULT ''");
     // contracting branch that registered the company (drives the code)
     ensure_column('business_partners', 'home_branch_id', 'INT NULL');
+    // Pre-order control: a client can be put on HOLD or BLOCKED (with a reason),
+    // so raising a quote or a call for them warns / stops until it is cleared. A
+    // dedicated field, kept apart from the generic `status`, so nothing else that
+    // reads `status` is affected. Empty = ordinary (no hold).
+    ensure_column('business_partners', 'hold_status', "VARCHAR(20) DEFAULT ''");
+    ensure_column('business_partners', 'hold_reason', "VARCHAR(400) DEFAULT ''");
     // richer address (town/village + district) and contact (department + project)
     ensure_column('partner_addresses', 'town_village', "VARCHAR(150) DEFAULT ''");
     ensure_column('partner_addresses', 'district', "VARCHAR(150) DEFAULT ''");
@@ -620,6 +626,59 @@ function ops_next_code($table, $col, $prefix) {
 //  complete. Sites and manufacturers need less than clients — nobody invoices a
 //  site — so the list depends on the role the party is being used in.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+//  Pre-order control — a client on HOLD or BLOCKED (Blocked-Client check).
+//  Generic and reason-driven: a manager puts a client on hold (warn) or blocks
+//  them (stop), and raising a quote or a call for them surfaces it. Nothing is
+//  hardcoded — the reasons are free text and the states are the two below.
+// ---------------------------------------------------------------------------
+const PARTNER_HOLD_STATES = ['' => 'Active (no hold)', 'HOLD' => 'On hold', 'BLOCKED' => 'Blocked'];
+// The hold state of a client, or null when none / not applicable. Returns
+// ['status'=>'HOLD'|'BLOCKED', 'reason'=>..., 'label'=>...].
+function partner_hold($id) {
+    $id = (int)$id; if (!$id) return null;
+    $p = ops_one("SELECT hold_status, hold_reason FROM business_partners WHERE id=?", [$id]);
+    if (!$p) return null;
+    $st = strtoupper(trim((string)($p['hold_status'] ?? '')));
+    if ($st !== 'HOLD' && $st !== 'BLOCKED') return null;
+    return ['status' => $st, 'reason' => (string)($p['hold_reason'] ?? ''), 'label' => PARTNER_HOLD_STATES[$st] ?? $st];
+}
+// Set / clear a client's hold. $status '' clears it. Returns true on success.
+function partner_hold_set($id, $status, $reason = '') {
+    $id = (int)$id; if (!$id) return false;
+    $status = strtoupper(trim((string)$status));
+    if (!array_key_exists($status, PARTNER_HOLD_STATES)) $status = '';
+    db()->prepare("UPDATE business_partners SET hold_status=?, hold_reason=? WHERE id=?")
+        ->execute([$status, $status === '' ? '' : substr(trim((string)$reason), 0, 400), $id]);
+    if (function_exists('act_log')) act_log('PARTNER', $id, 'HOLD', $status === '' ? 'Hold cleared' : ('Set ' . (PARTNER_HOLD_STATES[$status] ?? $status)), ['partner_id' => $id]);
+    return true;
+}
+// Whether a BLOCKED client should stop a non-manager from raising work. Managers
+// (coordinator level and up) may proceed past a block with the warning shown.
+function partner_hold_blocks($id) {
+    $h = partner_hold($id);
+    if (!$h || $h['status'] !== 'BLOCKED') return false;
+    return !(function_exists('is_coordinator_level') && is_coordinator_level());
+}
+// Admin screen: put clients on hold / block them, or clear it.
+function ops_client_holds($method) {
+    ops_require(is_master() || can('settings.manage') || (function_exists('is_coordinator_level') && is_coordinator_level()), 'You cannot manage client holds.');
+    if ($method === 'POST') {
+        $cid = (int)($_POST['client_id'] ?? 0);
+        $st  = strtoupper(trim((string)($_POST['hold_status'] ?? '')));
+        $reason = trim((string)($_POST['hold_reason'] ?? ''));
+        if (!$cid) { flash('Choose a client.', 'error'); redirect('/client-holds'); }
+        if (($st === 'HOLD' || $st === 'BLOCKED') && $reason === '') { flash('A reason is required to put a client on hold or block them.', 'error'); redirect('/client-holds'); }
+        partner_hold_set($cid, $st, $reason);
+        flash($st === '' ? 'Hold cleared.' : ('Client set to ' . (PARTNER_HOLD_STATES[$st] ?? $st) . '.'));
+        redirect('/client-holds');
+    }
+    $held = ops_all("SELECT id, COALESCE(NULLIF(display_name,''),legal_name) nm, hold_status, hold_reason
+        FROM business_partners WHERE is_client=1 AND hold_status IN ('HOLD','BLOCKED') ORDER BY nm");
+    $clients = ops_all("SELECT id, COALESCE(NULLIF(display_name,''),legal_name) nm FROM business_partners WHERE is_client=1 ORDER BY nm");
+    view('ops/client_holds', ['held' => $held, 'clients' => $clients]);
+    return true;
+}
 function partner_missing($id, $role = 'client') {
     $id = (int)$id;
     if (!$id) return [];
@@ -2527,6 +2586,8 @@ function ops_dispatch($route, $method) {
             ops_agreement($route, $method); return true;
         case $route === 'company-profile':
             ops_company_profile($route, $method); return true;
+        case $route === 'client-holds':
+            return ops_client_holds($method);
         case $route === 'books-bridge' || $route === 'books-bridge-save' || $route === 'books-bridge-drain':
             return ops_books_bridge($route, $method);
         case $route === 'cforms' || $route === 'cform-def-save' || $route === 'cform-def-del':
@@ -3469,6 +3530,19 @@ function ops_calls($route, $method) {
         }
         if ($method === 'POST') {
             $b = $_POST;
+            // Pre-order control: a BLOCKED client stops a non-manager from raising a
+            // call; a manager may proceed but is warned. HOLD always warns, never
+            // stops. Nothing changes when the client has no hold.
+            $holdCid = (int)($b['client_id'] ?? ($call['client_id'] ?? 0));
+            if ($holdCid && function_exists('partner_hold')) {
+                $ph = partner_hold($holdCid);
+                if ($ph && partner_hold_blocks($holdCid)) {
+                    view('ops/call_form', array_merge(call_form_vars($call, $b), ['errorFields' => ['client_id'], 'error' =>
+                        'This ' . Tl('client') . ' is BLOCKED (' . $ph['reason'] . '). Raising a ' . Tl('call') . ' for them is not allowed — a manager must clear the block under Client holds first.']));
+                    return;
+                }
+                if ($ph) flash('Note: this ' . Tl('client') . ' is ' . $ph['label'] . ' — ' . $ph['reason'], 'warning');
+            }
             $execOffice = ($b['executing_office_id'] ?? '') !== '' ? (int)$b['executing_office_id'] : null;
             // Default the managing / contracting office to the creator's home office if blank.
             if (($b['ibo_office_id'] ?? '') === '') {
