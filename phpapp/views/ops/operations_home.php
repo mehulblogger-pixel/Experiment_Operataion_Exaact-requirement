@@ -83,6 +83,8 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
 
 <div class="op-live"><span class="dot"></span> Live — computed from source records now · <?= e(date('d M Y H:i')) ?><?= $scopeLabel ? ' · ' . e($scopeLabel) : '' ?></div>
 
+<?= function_exists('ops_render_pending_tasks') ? ops_render_pending_tasks() : '' ?>
+
 <div class="op-kpis">
   <a class="op-kpi" href="/calls"><div class="v"><?= (int)($m['new'] ?? 0) ?></div><div class="l">New requests</div><div class="h">awaiting triage</div></a>
   <a class="op-kpi warn" href="/schedule"><div class="v"><?= (int)($m['unscheduled'] ?? 0) ?></div><div class="l">Unscheduled</div><div class="h">ready but no date</div></a>

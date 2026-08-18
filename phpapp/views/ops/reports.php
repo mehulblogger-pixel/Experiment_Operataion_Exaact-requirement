@@ -2,6 +2,8 @@
 <h1>Dashboards</h1>
 <p class="sub">Live figures within your access. <?= role_label() ?> · scope applied automatically.</p>
 
+<?= function_exists('ops_render_pending_tasks') ? ops_render_pending_tasks() : '' ?>
+
 <style>
   .filter-bar{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
     box-shadow:var(--shadow-sm);padding:12px 14px;position:sticky;top:56px;z-index:20}

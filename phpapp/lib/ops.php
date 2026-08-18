@@ -5820,6 +5820,78 @@ function ops_boss_renew() {
     redirect('/profitability?boss=' . $newId);
 }
 
+// ---------------------------------------------------------------------------
+//  Pending tasks — the current user's actionable work, shown on every dashboard.
+//  A short, honest list: what is waiting on ME right now (to vet, to approve, to
+//  fix, to issue, to release), each a count linking straight to it. Scoped to the
+//  user's offices/SBUs, and every count guarded so a missing module never breaks
+//  the home page. Empty list → "all caught up".
+// ---------------------------------------------------------------------------
+function ops_pending_tasks() {
+    $u = function_exists('current_user') ? current_user() : null;
+    if (!$u) return [];
+    $tasks = [];
+    $cnt = function($sql, $args = []) { try { return (int) ops_val($sql, $args); } catch (Throwable $e) { return 0; } };
+    [$scopeW, $scopeArgs] = function_exists('scope_clause') ? scope_clause('d.office_id', 'd.sbu') : ['1', []];
+    $base = "FROM report_docs d WHERE d.deleted=0 AND $scopeW";
+
+    // To vet — reports sitting with the vetting authority (only if I may vet).
+    if (function_exists('idems_can_vet') && idems_can_vet()) {
+        $n = $cnt("SELECT COUNT(*) $base AND d.status='VETTING'", $scopeArgs);
+        if ($n) $tasks[] = ['icon'=>'⇋', 'n'=>$n, 'label'=>'to vet', 'sub'=>'reports with you for vetting', 'href'=>'/documents?status=VETTING', 'tone'=>'warn'];
+    }
+    // To approve — reports whose current step is waiting on me.
+    if (function_exists('idems_awaiting_my_approval_clause')) {
+        [$aw, $aa] = idems_awaiting_my_approval_clause();
+        $n = $cnt("SELECT COUNT(*) $base AND $aw", array_merge($scopeArgs, $aa));
+        if ($n) $tasks[] = ['icon'=>'✔', 'n'=>$n, 'label'=>'to approve', 'sub'=>'reports awaiting your approval', 'href'=>'/documents?mine=approve', 'tone'=>'info'];
+    }
+    // Sent back to me — my reports returned for correction (as the inspector).
+    if (!empty($u['inspector_id'])) {
+        $n = $cnt("SELECT COUNT(*) FROM report_docs d WHERE d.deleted=0 AND d.status='REJECTED' AND d.inspector_id=?", [(int)$u['inspector_id']]);
+        if ($n) $tasks[] = ['icon'=>'↩', 'n'=>$n, 'label'=>'to fix &amp; resubmit', 'sub'=>'reports sent back to you', 'href'=>'/documents?status=REJECTED', 'tone'=>'bad'];
+    }
+    // To issue — approved reports waiting to be finalised (only if I may finalise).
+    if (is_master() || can('idems.finalize')) {
+        $n = $cnt("SELECT COUNT(*) $base AND d.status='APPROVED' AND COALESCE(d.finalized,0)=0", $scopeArgs);
+        if ($n) $tasks[] = ['icon'=>'📄', 'n'=>$n, 'label'=>'to issue', 'sub'=>'approved reports to finalise', 'href'=>'/documents?status=APPROVED', 'tone'=>'ok'];
+    }
+    // To release — issued reports marked for a Release Note that have none yet.
+    // Uses the release_of_id link (portable across databases); if that column is
+    // not present the guarded count simply returns 0 (no chip).
+    if (is_master() || can('mod.idems.edit')) {
+        $n = $cnt("SELECT COUNT(*) $base AND COALESCE(d.finalized,0)=1 AND COALESCE(d.rn_to_issue,0)=1 AND d.type_code NOT IN ('RN','IRN')
+                   AND NOT EXISTS (SELECT 1 FROM report_docs r WHERE r.type_code='RN' AND r.deleted=0 AND r.release_of_id=d.id)", $scopeArgs);
+        if ($n) $tasks[] = ['icon'=>'📋', 'n'=>$n, 'label'=>'to release', 'sub'=>'issued reports needing a Release Note', 'href'=>'/documents', 'tone'=>'info'];
+    }
+    return $tasks;
+}
+// Render the pending-tasks panel (safe to call on any dashboard).
+function ops_render_pending_tasks() {
+    $tasks = ops_pending_tasks();
+    $tone = ['info'=>'#2563eb','warn'=>'#b45309','bad'=>'var(--bad,#c0392b)','ok'=>'#15803d'];
+    ob_start(); ?>
+    <div class="panel" style="margin-top:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:<?= $tasks ? '10' : '0' ?>px">
+        <h3 class="tab-sub" style="margin:0">Your pending tasks</h3>
+        <?php if ($tasks): ?><a class="muted" style="font-size:12px" href="/documents">Open the register →</a><?php endif; ?>
+      </div>
+      <?php if (!$tasks): ?>
+        <p class="muted" style="margin:0;font-size:13px">✓ You’re all caught up — nothing is waiting on you right now.</p>
+      <?php else: ?>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <?php foreach ($tasks as $t): $c = $tone[$t['tone']] ?? '#555'; ?>
+            <a href="<?= e($t['href']) ?>" style="text-decoration:none;flex:1 1 150px;min-width:150px;border:1px solid var(--line,#e5e7eb);border-left:3px solid <?= $c ?>;border-radius:8px;padding:10px 12px;background:var(--soft,#f8fafc)">
+              <div style="font-size:20px;font-weight:700;color:<?= $c ?>"><?= (int)$t['n'] ?> <span style="font-size:13px;font-weight:600"><?= $t['icon'] ?></span></div>
+              <div style="font-weight:600;font-size:13px;margin-top:1px"><?= $t['label'] /* pre-escaped labels */ ?></div>
+              <div class="muted" style="font-size:11.5px"><?= e($t['sub']) ?></div>
+            </a>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+    <?php return ob_get_clean();
+}
 function ops_reports() {
     ops_require(can('dash.operations') || can('dash.financial') || can('dash.utilization') || can('dash.people'), 'You do not have dashboard access.');
     $seeFin = can('dash.financial'); $seeSalary = can('data.salary');
