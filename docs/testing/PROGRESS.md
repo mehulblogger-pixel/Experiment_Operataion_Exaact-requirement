@@ -19,7 +19,7 @@ Every module from Master Inventory v1.0. Order = priority (b): high-risk operati
 - [x] 09 Invoicing — MOD-INVOICING
 - [x] 10 Client Portal — MOD-PORTAL
 - [x] 11 Vendor Portal — MOD-VPORTAL
-- [ ] 12 Nonconformities (NCR) — MOD-NCR
+- [x] 12 Nonconformities (NCR) — MOD-NCR
 - [ ] 13 Corrective Action (CAPA) — MOD-CAPA
 
 ## Registers & config (after spine)
