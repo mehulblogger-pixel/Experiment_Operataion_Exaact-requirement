@@ -33,12 +33,12 @@ Every module from Master Inventory v1.0. Order = priority (b): high-risk operati
 - [x] 21 Hold / Witness Points — (jobs/idems)
 - [x] 22 Complaints & Appeals — MOD-COMPLAINTS
 - [x] 23 Equipment & Calibration — MOD-EQUIP
-- [ ] 24 Competence & Authorisation — MOD-COMPETENCE
-- [ ] 25 Impartiality & Conflicts — MOD-IMPART
-- [ ] 26 Identity Documents — MOD-IDENTITY
-- [ ] 27 Confidentiality — MOD-CONF
-- [ ] 28 Internal Audits & Mgmt Review — MOD-AUDITS
-- [ ] 29 Data & Information Control — MOD-DATACTRL
+- [x] 24 Competence & Authorisation — MOD-COMPETENCE
+- [x] 25 Impartiality & Conflicts — MOD-IMPART
+- [x] 26 Identity Documents — MOD-IDENTITY
+- [x] 27 Confidentiality — MOD-CONF
+- [x] 28 Internal Audits & Mgmt Review — MOD-AUDITS
+- [x] 29 Data & Information Control — MOD-DATACTRL
 - [ ] 30 Vouchers / Expenses — MOD-VOUCHERS
 - [ ] 31 Attendance & Reconcile — MOD-RECONCILE
 - [ ] 32 Invoicing→Profitability — MOD-PROFIT
