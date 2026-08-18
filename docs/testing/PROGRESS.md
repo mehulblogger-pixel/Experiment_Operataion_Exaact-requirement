@@ -27,12 +27,12 @@ Every module from Master Inventory v1.0. Order = priority (b): high-risk operati
 - [x] 15 Clients — MOD-CLIENTS
 - [x] 16 Vendors — MOD-VENDORS
 - [ ] 17 Leads & pipeline — MOD-LEADS
-- [ ] 18 Orders / Contracts — MOD-CRMORD
+- [x] 18 Orders / Contracts — MOD-CRMORD
 - [ ] 19 Inquiries — MOD-INQUIRIES
-- [ ] 20 Project Costing — MOD-PROJCOST
-- [ ] 21 Hold / Witness Points — (jobs/idems)
-- [ ] 22 Complaints & Appeals — MOD-COMPLAINTS
-- [ ] 23 Equipment & Calibration — MOD-EQUIP
+- [x] 20 Project Costing — MOD-PROJCOST
+- [x] 21 Hold / Witness Points — (jobs/idems)
+- [x] 22 Complaints & Appeals — MOD-COMPLAINTS
+- [x] 23 Equipment & Calibration — MOD-EQUIP
 - [ ] 24 Competence & Authorisation — MOD-COMPETENCE
 - [ ] 25 Impartiality & Conflicts — MOD-IMPART
 - [ ] 26 Identity Documents — MOD-IDENTITY
