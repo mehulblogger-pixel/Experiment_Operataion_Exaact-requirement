@@ -72,6 +72,48 @@ const IDDOC_NO_NUMBER = ['DECLARATION', 'EDUCATION', 'EXPERIENCE'];
 function iddoc_kind_expires($kind)   { return !in_array((string)$kind, IDDOC_NO_EXPIRY, true); }
 function iddoc_kind_has_number($kind) { return !in_array((string)$kind, IDDOC_NO_NUMBER, true); }
 
+// ---- What papers agency staff must have -------------------------------------
+// The set a freelancer / sub-contractor is expected to have on file. Company
+// editable (a setting), with a sensible default. Kept generic — a tenant that
+// does not use PAN simply unticks it.
+const PERSON_REQ_DOCS_DEFAULT = ['NATIONAL_ID', 'TAX_ID', 'DECLARATION', 'EDUCATION'];
+function person_req_docs() {
+    $raw = trim((string)setting_get('person_req_docs', ''));
+    if ($raw === '__NONE__') return [];   // explicitly cleared
+    if ($raw === '') return PERSON_REQ_DOCS_DEFAULT;
+    $set = array_values(array_filter(array_map('trim', explode(',', $raw))));
+    return $set ?: PERSON_REQ_DOCS_DEFAULT;
+}
+
+// Per-person document completeness against the required set. Presence-only (it
+// never reads a number or a file), so it is safe to show wider than the
+// register itself. A required document counts as present when a non-redacted
+// one is on file and — for the kinds that expire — has not expired.
+function person_docs_summary($personId, $kind = 'INSPECTOR') {
+    $req  = person_req_docs();
+    $opts = iddoc_kind_options();
+    $byKind = [];
+    foreach (iddoc_list($personId, $kind) as $d) $byKind[$d['doc_kind']][] = $d;
+    $present = function ($k) use ($byKind) {
+        foreach ($byKind[$k] ?? [] as $d) {
+            if (!empty($d['redacted_at'])) continue;
+            if (iddoc_kind_expires($k) && ($d['expires_on'] ?? '') !== '' && $d['expires_on'] < date('Y-m-d')) continue;
+            return true;
+        }
+        return false;
+    };
+    $rows = []; $missing = [];
+    foreach ($req as $k) {
+        $ok = $present($k);
+        $rows[$k] = ['label' => $opts[$k] ?? $k, 'ok' => $ok];
+        if (!$ok) $missing[] = $opts[$k] ?? $k;
+    }
+    $total = count($req); $need = count($missing);
+    return ['rows' => $rows, 'total' => $total, 'have' => $total - $need, 'need' => $need,
+            'missing' => $missing, 'complete' => ($total > 0 && $need === 0),
+            'total_docs' => array_sum(array_map('count', $byKind))];
+}
+
 // What every one of these is held for. Shown on the screen, and stamped onto
 // the row at the moment of upload.
 const IDDOC_PURPOSE = 'Identity verification for site access — issuing gate passes and '
@@ -353,6 +395,40 @@ function iddoc_readiness() {
 
 // ---- Screens ----------------------------------------------------------------
 function ops_identity($route, $method) {
+    // The agency-staff roster is presence-only (who has which papers, not the
+    // papers themselves), so a coordinator or manager can see it without the
+    // identity-document permission. Filing a document still needs that permission.
+    if ($route === 'agency-staff') {
+        ops_require(is_coordinator_level() || iddoc_can_view(),
+            'The agency-staff roster is for coordinators and managers.');
+        $fAgency = (int)($_GET['agency'] ?? 0);
+        $onlyGap = ($_GET['gap'] ?? '') === '1';
+        // Freelancers and sub-contractors — the people engaged through an agency.
+        $sql = "SELECT id, name, emp_code, staff_kind, agency_id, agency_name, trade_id
+                FROM inspectors WHERE status='ACTIVE' AND COALESCE(staff_kind,'ASSET') IN ('FREELANCER','SUBCON')";
+        $args = [];
+        if ($fAgency) { $sql .= " AND agency_id=?"; $args[] = $fAgency; }
+        $sql .= " ORDER BY COALESCE(agency_name,''), name";
+        $groups = [];
+        foreach (ops_all($sql, $args) as $p) {
+            $sum = person_docs_summary((int)$p['id']);
+            if ($onlyGap && $sum['complete']) continue;
+            $key = $p['agency_name'] !== '' ? $p['agency_name'] : '— no agency set —';
+            $groups[$key][] = $p + ['sum' => $sum, 'trade' => trade_label($p['trade_id'] ?? 0)];
+        }
+        ksort($groups);
+        view('ops/agency_staff', [
+            'groups' => $groups,
+            'agencies' => agencies_list(),
+            'fAgency' => $fAgency,
+            'onlyGap' => $onlyGap,
+            'reqDocs' => person_req_docs(),
+            'kinds' => iddoc_kind_options(),
+            'canFile' => iddoc_can_view(),
+        ]);
+        return true;
+    }
+
     ops_require(iddoc_can_view(),
         'Identity documents are held under a separate permission. Ask your administrator for '
       . '“See identity documents” if your work needs it.');
@@ -375,6 +451,7 @@ function ops_identity($route, $method) {
             'log'     => $person ? iddoc_access_log(0, $pid, 60) : [],
             'kinds'   => iddoc_kind_options(),
             'purpose' => iddoc_purpose(),
+            'reqDocs' => person_req_docs(),
             'canManage' => iddoc_can_manage(),
             'reveal'  => (int)($_GET['reveal'] ?? 0),
             'revealed'=> iddoc_flash_number(),
@@ -459,6 +536,14 @@ function ops_identity($route, $method) {
         if ($d > 0) setting_set('iddoc_retain_days', (string)$d);
         $p = trim((string)($_POST['iddoc_purpose'] ?? ''));
         setting_set('iddoc_purpose', $p);
+        // Which documents agency staff must have on file (the checklist). An
+        // empty tick-set is stored as a sentinel so it means "none required"
+        // rather than "fall back to the default".
+        if (array_key_exists('person_req_docs', $_POST)) {
+            $valid = array_keys(iddoc_kind_options());
+            $picked = array_values(array_intersect($valid, (array)($_POST['person_req_docs'] ?? [])));
+            setting_set('person_req_docs', $picked ? implode(',', $picked) : '__NONE__');
+        }
         $n = iddoc_run_retention();
         flash('Retention set to ' . iddoc_retain_days() . ' days past expiry.'
             . ($n ? ' ' . $n . ' document(s) past that limit were redacted now.' : ''));

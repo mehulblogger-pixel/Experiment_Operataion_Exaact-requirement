@@ -2303,7 +2303,7 @@ function ops_module_gate($route) {
         'complaint-ack'=>'complaints','complaint-validity'=>'complaints','complaint-investigate'=>'complaints',
         'complaint-decide'=>'complaints','complaint-notify'=>'complaints','complaint-capa'=>'complaints',
         'complaint-close'=>'complaints','complaint-reopen'=>'complaints','complaint-settings'=>'complaints',
-        'identity'=>'identity','iddoc-add'=>'identity','iddoc-file'=>'identity',
+        'identity'=>'identity','iddoc-add'=>'identity','iddoc-file'=>'identity','agency-staff'=>'identity',
         'iddoc-reveal'=>'identity','iddoc-share'=>'identity','iddoc-redact'=>'identity',
         'iddoc-retention'=>'identity',
         'impartiality'=>'impartiality','imp-type'=>'impartiality','imp-declare'=>'impartiality',
@@ -2686,7 +2686,7 @@ function ops_dispatch($route, $method) {
               || $route === 'internal-audit-new'
               || (strncmp($route, 'audit-', 6) === 0 && $route !== 'audit-log')):
             return ops_audits($route, $method);
-        case $route === 'identity' || strncmp($route, 'iddoc-', 6) === 0:
+        case $route === 'identity' || $route === 'agency-staff' || strncmp($route, 'iddoc-', 6) === 0:
             return ops_identity($route, $method);
         case $route === 'impartiality' || strncmp($route, 'imp-', 4) === 0:
             return ops_impartiality($route, $method);

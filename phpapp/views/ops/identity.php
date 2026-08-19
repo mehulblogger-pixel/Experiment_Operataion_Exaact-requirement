@@ -3,7 +3,10 @@
 <div class="master-head">
   <div><h1>Identity documents</h1>
     <p class="sub" style="margin:2px 0 0">Held for one stated reason, for a limited time, and every look is recorded.</p></div>
-  <a class="btn secondary" href="/">← Back</a>
+  <div style="display:flex;gap:8px">
+    <a class="btn secondary" href="/agency-staff">Agency-staff roster →</a>
+    <a class="btn secondary" href="/">← Back</a>
+  </div>
 </div>
 
 <div class="panel" style="border-left:4px solid var(--accent)">
@@ -156,6 +159,13 @@
       <input class="form-control" type="number" min="1" name="iddoc_retain_days" value="<?= (int)$ready['retain_days'] ?>"></div>
     <div class="ff ff-wide"><label>Purpose, in this company’s words</label>
       <input class="form-control" name="iddoc_purpose" value="<?= e($purpose) ?>"></div>
+    <div class="ff ff-wide"><label>Documents required for agency staff <span class="muted">— the checklist for a freelancer / sub-contractor</span></label>
+      <div class="checkgrid">
+        <?php $reqSet = $reqDocs ?? []; foreach ($kinds as $k=>$v): ?>
+          <label class="chk"><input type="checkbox" name="person_req_docs[]" value="<?= e($k) ?>" <?= in_array($k, $reqSet, true)?'checked':'' ?>> <?= e($v) ?></label>
+        <?php endforeach; ?>
+      </div>
+      <small class="muted">Untick everything to require none. Missing items show on each person’s record and on the agency-staff roster.</small></div>
     <button class="btn small" type="submit">Save &amp; sweep</button>
   </form>
 </div>

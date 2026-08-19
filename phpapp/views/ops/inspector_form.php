@@ -83,6 +83,21 @@
     <div class="ff ff-wide"><label>Skills (from the chosen trade)</label>
       <div class="skill-box" id="skills_box"><span class="muted">Pick a trade to see its skills.</span></div>
       <small class="muted">Skills come from the Trade you select. Add more under <a href="/lookup?key=skill">Skill</a>.</small></div>
+
+    <?php // Document checklist (gap 3) — presence-only, so it shows here without
+          //   the identity-document permission. What is missing is one click from
+          //   being filed. Only meaningful once the person exists. ?>
+    <?php if ($ins && !empty($personDocs) && (int)$personDocs['total'] > 0): $pd = $personDocs; ?>
+    <div class="ff ff-wide"><label>Document checklist
+        <span class="muted">— <?= (int)$pd['have'] ?>/<?= (int)$pd['total'] ?> on file<?= $pd['complete'] ? ', complete' : '' ?></span></label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px">
+        <?php foreach ($pd['rows'] as $r): ?>
+          <span class="pill <?= $r['ok'] ? 'p-ok' : 'p-warn' ?>"><?= $r['ok'] ? '✓' : '✗' ?> <?= e($r['label']) ?></span>
+        <?php endforeach; ?>
+      </div>
+      <small class="muted"><?= $pd['complete'] ? 'All required documents are on file.' : ((int)$pd['need'] . ' missing.') ?>
+        <?php if (function_exists('iddoc_can_view') && iddoc_can_view()): ?><a href="/identity?i=<?= (int)$ins['id'] ?>">File documents →</a><?php endif; ?></small></div>
+    <?php endif; ?>
   </div>
 
   <?php if (!$ins): // §WO-7 — attach a first certificate (with its scan) right while adding ?>
