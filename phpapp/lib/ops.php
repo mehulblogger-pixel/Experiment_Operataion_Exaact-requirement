@@ -340,6 +340,10 @@ function ops_migrate() {
     // activity and the required deliverables/report formats.
     ensure_column('jobs', 'inspection_type', "VARCHAR(40) DEFAULT ''");
     ensure_column('jobs', 'service_code', "VARCHAR(40) DEFAULT ''");
+    // The trade / discipline this deputation calls for (mechanical, electrical,
+    // civil …). Optional — when set, the allocate picker ranks matching
+    // engineers first. Stores a Trade lookup-value id, same as inspectors.trade_id.
+    ensure_column('jobs', 'req_trade_id', 'INT NULL');
     ensure_column('jobs', 'activity_id', 'INT NULL');
     ensure_column('jobs', 'report_custom_days', 'INT NULL');
     ensure_column('jobs', 'deliverables', "VARCHAR(500) DEFAULT ''");
@@ -933,6 +937,9 @@ function inspectors_list($activeOnly = true) {
     // triggered the migration hits exactly that, so add the column here (cheap
     // and idempotent) before it is selected.
     if (function_exists('ensure_column')) ensure_column('inspectors', 'team_role', "VARCHAR(10) DEFAULT 'FIELD'");
+    // trade_id (the person's discipline) is read below for the allocate picker;
+    // self-heal it too so an install that never gained the column does not throw.
+    if (function_exists('ensure_column')) ensure_column('inspectors', 'trade_id', 'INT NULL');
     // Self-heal the "imported people don't show for allocation" gap: a field
     // person brought in via the Excel register (or created as a login some other
     // way) lands in `users` but, unlike the single-user form, never gets a
@@ -940,7 +947,7 @@ function inspectors_list($activeOnly = true) {
     // inspector-role login a matching team-member row and link it, once per
     // request, before the list is read. No-op when there is nothing to link.
     link_inspector_users();
-    $rows = ops_all("SELECT id, name, emp_code, sbu, salary_ctc, staff_kind, home_office_id,
+    $rows = ops_all("SELECT id, name, emp_code, sbu, salary_ctc, staff_kind, home_office_id, trade_id,
                             COALESCE(team_role,'FIELD') team_role
                      FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name");
     $rank = ['FIELD' => 0, 'COORD' => 1, 'OFFICE' => 2];
@@ -1003,7 +1010,8 @@ function inspector_busy_dates($inspectorId, $exceptJobId = 0) {
 //   0  every other active inspector (the full fallback list).
 // Availability (a clash with the required dates) is attached but never removes
 // anyone from the list — the coordinator always sees everybody and decides.
-function inspector_suggestions($call, array $dates = [], $exceptJobId = 0) {
+function inspector_suggestions($call, array $dates = [], $exceptJobId = 0, $reqTradeId = 0) {
+    $reqTradeId = (int)$reqTradeId;
     $clientId = (int)($call['client_id'] ?? 0);
     $vendorId = (int)($call['vendor_id'] ?? 0);
     $contract = trim((string)($call['contract_number'] ?? ''));
@@ -1032,14 +1040,22 @@ function inspector_suggestions($call, array $dates = [], $exceptJobId = 0) {
     foreach ($score as $id => $s) {
         $busy = $dates ? inspector_busy_dates($id, $exceptJobId) : [];
         $clash = array_values(array_filter($dates, fn($d) => isset($busy[$d])));
+        $tradeId = (int)($names[$id]['trade_id'] ?? 0);
         $out[] = ['id' => $id, 'name' => (string)$names[$id]['name'], 'emp_code' => (string)($names[$id]['emp_code'] ?? ''),
                   'score' => $s, 'reason' => $reason[$id], 'clash' => $clash, 'available' => empty($clash),
-                  'team_role' => (string)($names[$id]['team_role'] ?? 'FIELD')];
+                  'team_role' => (string)($names[$id]['team_role'] ?? 'FIELD'),
+                  'trade_id' => $tradeId,
+                  // null when no discipline was asked for; else true/false so the
+                  // form can mark who matches and the ranking can lift them.
+                  'trade_match' => $reqTradeId ? ($tradeId === $reqTradeId) : null];
     }
-    // Rank: history score, then who is free, then a FIELD inspector over a
-    // coordinator / office person (they go to site), then name.
+    // Rank: when a discipline is required, the people who hold it come first —
+    // that is the whole point of asking. Then the existing ladder: history
+    // score, who is free, a FIELD inspector over a coordinator / office person
+    // (they go to site), then name.
     $trRank = ['FIELD' => 0, 'COORD' => 1, 'OFFICE' => 2];
-    usort($out, fn($a, $b) => ($b['score'] <=> $a['score'])
+    usort($out, fn($a, $b) => (($b['trade_match'] ? 1 : 0) <=> ($a['trade_match'] ? 1 : 0))
+        ?: ($b['score'] <=> $a['score'])
         ?: (($b['available'] ? 1 : 0) <=> ($a['available'] ? 1 : 0))
         ?: (($trRank[$a['team_role']] ?? 0) <=> ($trRank[$b['team_role']] ?? 0))
         ?: strcasecmp($a['name'], $b['name']));
@@ -3854,7 +3870,7 @@ function job_save_fields() {
         'engagement_type','days_count','months_count','pattern_kind','pattern_n',
         'schedule_weekdays','schedule_end_date','force_dates','manmonth_basis','manmonth_min_days',
         'invoice_value','contracting_office_id','expected_credit','credit_rate','credit_type','credit_direction',
-        'reporting_frequency','report_custom_days','inspection_type','service_code','activity_id','sbu','mandays',
+        'reporting_frequency','report_custom_days','inspection_type','service_code','activity_id','req_trade_id','sbu','mandays',
         'subcon_cost','other_cost','other_cost_note','quotation_id','is_outstation','chargeable_heads',
         'cert_override_note','cert_override_by',
         'sitedoc_override_note','sitedoc_override_by',
@@ -5342,16 +5358,33 @@ function call_job_form_vars($job, $call) {
     // one of them shows a clash. Take the job's own dates if it has them, else
     // fall back to what the call asked for.
     $jobDates = job_call_required_dates($job, $call);
+    // The discipline this deputation asks for, if one was set on the job. When
+    // present the picker lists the engineers who hold that trade first; it never
+    // hides anyone, so an unusual assignment is always still possible.
+    $reqTrade = (int)($job['req_trade_id'] ?? 0);
+    $inspectors = inspectors_list();
+    if ($reqTrade) {
+        // Stable matches-first sort for the full <select>, keeping the existing
+        // field-first order within each group.
+        $keyed = [];
+        foreach ($inspectors as $ix => $iv) $keyed[] = [$ix, $iv];
+        usort($keyed, fn($a, $b) => (((int)($b[1]['trade_id'] ?? 0) === $reqTrade ? 1 : 0)
+                                     <=> ((int)($a[1]['trade_id'] ?? 0) === $reqTrade ? 1 : 0))
+            ?: ($a[0] <=> $b[0]));
+        $inspectors = array_map(fn($p) => $p[1], $keyed);
+    }
     return [
         'job' => $job, 'call' => $call, 'error' => null, 'gate' => null,
-        'offices' => offices_list(), 'inspectors' => inspectors_list(), 'subcons' => subcons_list(),
+        'offices' => offices_list(), 'inspectors' => $inspectors, 'subcons' => subcons_list(),
         'boss' => boss_for_client($call['client_id']),
         'clientInfo' => partner_full($call['client_id']),
         'vendorInfo' => partner_full($call['vendor_id']),
         'quotes' => job_linkable_quotes($call['client_id']),
         'cfvals' => $job ? custom_values_map('job', $job['id']) : [],
-        'suggestions' => inspector_suggestions($call, $jobDates, (int)($job['id'] ?? 0)),
+        'suggestions' => inspector_suggestions($call, $jobDates, (int)($job['id'] ?? 0), $reqTrade),
         'jobDates' => $jobDates,
+        'reqTrade' => $reqTrade,
+        'tradeOpts' => function_exists('trade_options') ? trade_options() : [],
         'pendingSiblings' => pending_allocation_siblings($call),
     ];
 }
@@ -5374,7 +5407,7 @@ function job_call_required_dates($job, $call) {
 
 function nzc($f, $v) {
     if ($f === 'is_outstation') return empty($v) ? 0 : 1;   // an unticked box posts nothing
-    $nullable = ['executing_office_id','contracting_office_id','inspector_id','subcon_id','boss_id','activity_id','report_custom_days','quotation_id'];
+    $nullable = ['executing_office_id','contracting_office_id','inspector_id','subcon_id','boss_id','activity_id','req_trade_id','report_custom_days','quotation_id'];
     if (in_array($f, $nullable) && $v === '') return null;
     if (in_array($f, ['expected_credit','invoice_value','credit_rate','mandays','subcon_cost','other_cost']) && $v === '') return 0;
     if (in_array($f, ['days_count','months_count','pattern_n','manmonth_min_days'], true)) return $v === '' ? 0 : (int)$v;

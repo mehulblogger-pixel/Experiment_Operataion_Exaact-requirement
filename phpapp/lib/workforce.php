@@ -166,7 +166,8 @@ function inspector_availability($offices, $day = null) {
         $in = implode(',', array_map('intval', $offices));
         $where .= " AND (home_office_id IN ($in))";
     }
-    $ins = ops_all("SELECT id, name, emp_code, home_office_id, sbu, weekly_working_days, mobile, email
+    if (function_exists('ensure_column')) ensure_column('inspectors', 'trade_id', 'INT NULL');
+    $ins = ops_all("SELECT id, name, emp_code, home_office_id, sbu, weekly_working_days, mobile, email, trade_id
         FROM inspectors WHERE $where ORDER BY name", $args);
     if (!$ins) return [];
     $onJob = inspectors_on_job($day);
@@ -337,11 +338,13 @@ function ops_inspector_availability($method) {
     $fOffice = (int)($_GET['office'] ?? 0);
     $fSbu    = trim($_GET['sbu'] ?? '');
     $fStatus = trim($_GET['status'] ?? '');
+    $fTrade  = (int)($_GET['trade'] ?? 0);   // §d — narrow to one discipline
     $fq      = trim($_GET['q'] ?? '');
-    $filtered = array_values(array_filter($rows, function ($r) use ($fOffice, $fSbu, $fStatus, $fq) {
+    $filtered = array_values(array_filter($rows, function ($r) use ($fOffice, $fSbu, $fStatus, $fTrade, $fq) {
         if ($fOffice && (int)($r['home_office_id'] ?? 0) !== $fOffice) return false;
         if ($fSbu !== '' && strpos(',' . ($r['sbu'] ?? '') . ',', ',' . $fSbu . ',') === false) return false;
         if ($fStatus !== '' && ($r['eff_status'] ?? '') !== $fStatus) return false;
+        if ($fTrade && (int)($r['trade_id'] ?? 0) !== $fTrade) return false;
         if ($fq !== '' && stripos(($r['name'] ?? '') . ' ' . ($r['emp_code'] ?? ''), $fq) === false) return false;
         return true;
     }));
@@ -365,9 +368,10 @@ function ops_inspector_availability($method) {
         $horizon = date('Y-m-d', strtotime($chkFrom . ' +45 days'));
         [$mC, $dC, $peopleC] = availability_matrix($offices, $chkFrom, $horizon);
         $span = array_slice($dC, 0, $chkDays);
-        $peopleC = array_values(array_filter($peopleC, function ($p) use ($fOffice, $fSbu, $fq) {
+        $peopleC = array_values(array_filter($peopleC, function ($p) use ($fOffice, $fSbu, $fTrade, $fq) {
             if ($fOffice && (int)($p['home_office_id'] ?? 0) !== $fOffice) return false;
             if ($fSbu !== '' && strpos(',' . ($p['sbu'] ?? '') . ',', ',' . $fSbu . ',') === false) return false;
+            if ($fTrade && (int)($p['trade_id'] ?? 0) !== $fTrade) return false;
             if ($fq !== '' && stripos(($p['name'] ?? '') . ' ' . ($p['emp_code'] ?? ''), $fq) === false) return false;
             return true;
         }));
@@ -391,9 +395,10 @@ function ops_inspector_availability($method) {
         $mFrom = $month . '-01';
         $mTo   = date('Y-m-t', strtotime($mFrom));
         [$mG, $dG, $peopleG] = availability_matrix($offices, $mFrom, $mTo);
-        $peopleG = array_values(array_filter($peopleG, function ($p) use ($fOffice, $fSbu, $fq) {
+        $peopleG = array_values(array_filter($peopleG, function ($p) use ($fOffice, $fSbu, $fTrade, $fq) {
             if ($fOffice && (int)($p['home_office_id'] ?? 0) !== $fOffice) return false;
             if ($fSbu !== '' && strpos(',' . ($p['sbu'] ?? '') . ',', ',' . $fSbu . ',') === false) return false;
+            if ($fTrade && (int)($p['trade_id'] ?? 0) !== $fTrade) return false;
             if ($fq !== '' && stripos(($p['name'] ?? '') . ' ' . ($p['emp_code'] ?? ''), $fq) === false) return false;
             return true;
         }));
@@ -405,7 +410,8 @@ function ops_inspector_availability($method) {
         'freeBoth' => $freeBoth, 'tomorrow' => $tomorrow,
         'check' => $check, 'grid' => $grid, 'month' => $month,
         'officeList' => offices_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
-        'fOffice' => $fOffice, 'fSbu' => $fSbu, 'fStatus' => $fStatus, 'fq' => $fq,
+        'tradeOpts' => function_exists('trade_options') ? trade_options() : [],
+        'fOffice' => $fOffice, 'fSbu' => $fSbu, 'fStatus' => $fStatus, 'fTrade' => $fTrade, 'fq' => $fq,
         'chkFrom' => $chkFrom, 'chkDays' => $chkDays,
     ]);
     return true;

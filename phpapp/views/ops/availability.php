@@ -57,9 +57,17 @@
       <option value="<?= e($k) ?>" <?= (($fStatus ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option>
     <?php endforeach; ?>
   </select>
+  <?php if (!empty($tradeOpts)): ?>
+  <select class="form-control searchable" name="trade" onchange="this.form.submit()" title="Filter by trade / discipline">
+    <option value="">Any discipline</option>
+    <?php foreach ($tradeOpts as $tid=>$tlabel): ?>
+      <option value="<?= (int)$tid ?>" <?= ((int)($fTrade ?? 0)===(int)$tid)?'selected':'' ?>><?= e($tlabel) ?></option>
+    <?php endforeach; ?>
+  </select>
+  <?php endif; ?>
   <input class="form-control" type="month" name="month" value="<?= e($month ?? '') ?>" title="Show the whole month" style="max-width:170px">
   <button class="btn secondary" type="submit">Apply</button>
-  <?php if (($fq ?? '')!=='' || !empty($fOffice) || ($fSbu ?? '')!=='' || ($fStatus ?? '')!=='' || ($month ?? '')!==''): ?>
+  <?php if (($fq ?? '')!=='' || !empty($fOffice) || ($fSbu ?? '')!=='' || ($fStatus ?? '')!=='' || !empty($fTrade) || ($month ?? '')!==''): ?>
     <a class="btn secondary" href="/availability?day=<?= e($day) ?>">Clear</a>
   <?php endif; ?>
 </form>
@@ -91,7 +99,7 @@
     <h3 class="tab-sub" style="margin-top:0">Who is free on a date <span class="muted">— and for how long</span></h3>
     <form method="get" action="/availability" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
       <input type="hidden" name="day" value="<?= e($day) ?>">
-      <?php foreach (['q'=>$fq ?? '','office'=>$fOffice ?? '','sbu'=>$fSbu ?? ''] as $k=>$v): ?>
+      <?php foreach (['q'=>$fq ?? '','office'=>$fOffice ?? '','sbu'=>$fSbu ?? '','trade'=>$fTrade ?? 0] as $k=>$v): ?>
         <?php if ($v !== '' && $v !== 0): ?><input type="hidden" name="<?= e($k) ?>" value="<?= e($v) ?>"><?php endif; ?>
       <?php endforeach; ?>
       <div class="ff" style="margin:0"><label>From</label>

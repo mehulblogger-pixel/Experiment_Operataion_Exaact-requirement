@@ -130,6 +130,19 @@ function skills_by_trade() {
     }
     return $out;
 }
+// Trades (the "Trade / discipline" list) as [value-id => label]. The
+// inspectors.trade_id column stores the lookup_value id, so this is keyed the
+// same way — used by the allocate picker, the availability board and anywhere a
+// person's discipline is shown or filtered. Cached per request; empty when the
+// installation has no Trade list yet (the feature simply stays quiet).
+function trade_options() {
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $t = lk_type('trade');
+    $out = [];
+    if ($t) foreach (lk_root_values($t['id']) as $r) $out[(int)$r['id']] = $r['label'];
+    return $cache = $out;
+}
 // Like lk_ensure_type but seeds coded values from a [code=>label] map.
 // $module groups the list on the Masters screen so an admin can find it.
 function lk_ensure_type_map($key, $label, $map, $module = '') {

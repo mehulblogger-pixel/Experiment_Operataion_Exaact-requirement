@@ -200,6 +200,22 @@
 <section class="fs-pane" data-tab="Engineer">
   <h3 class="tab-sub" style="margin-top:0">Who does it</h3>
   <div class="form-grid">
+    <?php // Discipline this deputation needs. Optional — when set, the engineers
+          //   who hold that trade are listed first and marked ✓, and you can
+          //   type the discipline into the picker's search box to filter to
+          //   them. It never hides anyone: an unusual assignment is still one
+          //   click away. Shown only when a Trade list has been set up.
+          $reqTrade = (int)($reqTrade ?? ($job['req_trade_id'] ?? 0)); $tradeOpts = $tradeOpts ?? []; ?>
+    <?php if ($tradeOpts): ?>
+    <div class="ff"><label>Required trade / discipline <span class="muted">— optional; lists matching <?= e(Tlp('engineer')) ?> first</span></label>
+      <select class="form-control searchable" id="req_trade_sel" name="req_trade_id" onchange="if(window.rankByTrade)rankByTrade()">
+        <option value="">— any discipline —</option>
+        <?php foreach ($tradeOpts as $tid=>$tlabel): ?>
+          <option value="<?= (int)$tid ?>" <?= $reqTrade===(int)$tid?'selected':'' ?>><?= e($tlabel) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <small class="muted">Set each person's discipline on their <a href="/m/inspectors" target="_blank">record</a>.</small></div>
+    <?php endif; ?>
     <div class="ff"><label>Who does it</label>
       <select class="form-control" id="kind_sel" name="staff_kind_pick">
         <option value="ASSET"      <?= $curKind==='ASSET'?'selected':'' ?>>Our own employee</option>
@@ -232,11 +248,12 @@
         <?php foreach ($topSugg as $s):
               $cls = $s['score'] >= 4 ? 'p-ok' : ($s['score'] >= 2 ? 'p-info' : '');
               $lapsedS = competence_lapsed((int)$s['id'], $certDate); ?>
-          <button type="button" class="sugg-chip" data-insp="<?= (int)$s['id'] ?>"
+          <button type="button" class="sugg-chip" data-insp="<?= (int)$s['id'] ?>" data-trade="<?= (int)($s['trade_id'] ?? 0) ?>"
                   title="<?= e($s['reason']) ?><?= $s['available'] ? '' : ' — busy on ' . e(implode(', ', $s['clash'])) ?>"
                   style="text-align:left;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--card);cursor:pointer;<?= $s['available'] ? '' : 'opacity:.7;' ?>">
             <span style="font-weight:700;"><?= e($s['name']) ?></span>
             <?php if ($s['emp_code']): ?><span class="muted"> (<?= e($s['emp_code']) ?>)</span><?php endif; ?>
+            <?php if (!empty($s['trade_match'])): ?><span class="pill p-ok trade-mark" style="margin-left:6px;">✓ discipline</span><?php endif; ?>
             <?php if ($s['score'] >= 2): ?><span class="pill <?= $cls ?>" style="margin-left:6px;"><?= $s['score'] >= 4 ? '★ last on this client & vendor' : 'worked for client' ?></span><?php endif; ?>
             <?php if (!$s['available']): ?><span class="pill p-warn" style="margin-left:6px;">busy <?= e(implode(', ', $s['clash'])) ?></span>
             <?php else: ?><span class="pill p-ok" style="margin-left:6px;">free</span><?php endif; ?>
@@ -260,10 +277,12 @@
       </div>
     </div>
     <?php endif; ?>
-    <div class="ff"><label><?= e(T('engineer')) ?></label>
+    <div class="ff"><label><?= e(T('engineer')) ?> <span class="muted">— type a discipline to filter</span></label>
       <select class="form-control searchable" id="insp_pick" name="inspector_id"><option value="">—</option>
-        <?php foreach ($inspectors as $i): $lapsed = competence_lapsed((int)$i['id'], $certDate); ?>
-          <option value="<?= (int)$i['id'] ?>" data-kind="<?= e($i['staff_kind'] ?? 'ASSET') ?>" <?= ($job && $job['inspector_id']==$i['id'])?'selected':'' ?>><?= e($i['name']) ?><?= $i['emp_code']?' ('.e($i['emp_code']).')':'' ?><?= $lapsed ? ' — certificate lapsed' : '' ?></option>
+        <?php foreach ($inspectors as $i): $lapsed = competence_lapsed((int)$i['id'], $certDate);
+              $itrade = ((int)($i['trade_id'] ?? 0) && function_exists('trade_label')) ? trade_label($i['trade_id']) : '';
+              if ($itrade === '—') $itrade = ''; ?>
+          <option value="<?= (int)$i['id'] ?>" data-kind="<?= e($i['staff_kind'] ?? 'ASSET') ?>" data-trade="<?= (int)($i['trade_id'] ?? 0) ?>" <?= ($job && $job['inspector_id']==$i['id'])?'selected':'' ?>><?= e($i['name']) ?><?= $i['emp_code']?' ('.e($i['emp_code']).')':'' ?><?= $itrade!=='' ? ' · '.e($itrade) : '' ?><?= $lapsed ? ' — certificate lapsed' : '' ?></option>
         <?php endforeach; ?>
       </select>
       <small class="muted" id="insp_hint"></small></div>
@@ -621,6 +640,30 @@ window.TERM_SBU = <?= json_encode(Tl('sbu')) ?>;
       pick.scrollIntoView({behavior:'smooth', block:'center'});
     });
   });
+
+  // #1 — required discipline. Changing it re-marks and re-orders the suggested
+  //   chips instantly (matching trade first, tagged ✓ discipline). The full
+  //   picker below already carries each person's discipline in its label, so it
+  //   is ranked server-side and can be narrowed by typing the discipline into
+  //   its search box — no fragile reordering of the enhanced widget needed.
+  window.rankByTrade = function(){
+    var sel = document.getElementById('req_trade_sel'); if(!sel) return;
+    var want = sel.value || '';
+    var row = document.querySelector('#best_insp_panel .sugg-row'); if(!row) return;
+    var chips = Array.prototype.slice.call(row.querySelectorAll('.sugg-chip'));
+    chips.forEach(function(c,i){
+      var m = want !== '' && c.getAttribute('data-trade') === want;
+      c._m = m ? 1 : 0; c._i = i;
+      var mk = c.querySelector('.trade-mark');
+      if (m && !mk){ mk=document.createElement('span'); mk.className='pill p-ok trade-mark';
+        mk.style.marginLeft='6px'; mk.textContent='✓ discipline';
+        c.insertBefore(mk, c.querySelector('.pill') || null); }
+      else if (!m && mk){ mk.remove(); }
+    });
+    chips.sort(function(a,b){ return (b._m - a._m) || (a._i - b._i); });
+    chips.forEach(function(c){ row.appendChild(c); });
+  };
+  if (document.getElementById('req_trade_sel') && document.getElementById('req_trade_sel').value) window.rankByTrade();
 
   // §iv — change the executing office and the credit direction follows it. A
   // cross-office job means the contracting office gives; a same-office job has
