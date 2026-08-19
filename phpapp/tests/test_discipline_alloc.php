@@ -57,3 +57,35 @@ t_ok(in_array('req_trade_id', job_save_fields(), true), 'req_trade_id is a saved
 t_ok(function_exists('trade_options'), 'trade_options() is available for the picker and the availability board');
 $src = (string)file_get_contents(__DIR__ . '/../lib/ops.php');
 t_ok(strpos($src, "ensure_column('jobs', 'req_trade_id'") !== false, 'the jobs table gains a req_trade_id column');
+
+// #2 — the double-booking guard. It rests on inspector_busy_dates() seeing a
+// person's other open jobs, and on the allocation handler turning a clash into a
+// soft stop a manager can override with a recorded reason.
+t_section('double-booking guard (#2)');
+$own2 = !db()->inTransaction();
+if ($own2) db()->beginTransaction();
+try {
+    $busyPerson = team_member_create('Busy Person One', 'FIELD');
+    db()->prepare("INSERT INTO jobs (job_code, call_id, inspector_id, scheduled_date, inspection_dates, closed_flag, created_at)
+                   VALUES (?,?,?,?,?,?,?)")
+        ->execute(['JOB-DB-1', 0, $busyPerson, '2026-09-10', '2026-09-10', 0, 'x']);
+    $jid = (int)db()->lastInsertId();
+
+    $busy = inspector_busy_dates($busyPerson, 0);
+    t_ok(isset($busy['2026-09-10']), 'a person booked on a date shows busy on that date');
+
+    $clash = array_values(array_filter(['2026-09-10', '2026-09-11'], fn($d) => isset($busy[$d])));
+    t_ok($clash === ['2026-09-10'], 'a second job on the same date is flagged as the clash');
+
+    $selfBusy = inspector_busy_dates($busyPerson, $jid);
+    t_ok(!isset($selfBusy['2026-09-10']), 'editing the same job does not clash with itself');
+} finally {
+    if ($own2 && db()->inTransaction()) db()->rollBack();
+}
+
+t_ok(in_array('dblbook_override_note', job_save_fields(), true) && in_array('dblbook_override_by', job_save_fields(), true),
+    'the double-booking override reason + who are saved job fields');
+t_ok(strpos($src, "\$vars['dblBookBlock']") !== false, 'the allocation handler soft-blocks a double-booking with an override box');
+t_ok(strpos($src, "ensure_column('jobs', 'dblbook_override_note'") !== false, 'the jobs table gains the double-booking override columns');
+t_ok(strpos($src, 'dblbook_override_by') !== false && strpos($src, 'competence_can_override') !== false,
+    'only a manager (override permission) may double-book, and it is recorded against the job');

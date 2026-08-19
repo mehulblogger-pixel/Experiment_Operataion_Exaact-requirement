@@ -344,6 +344,10 @@ function ops_migrate() {
     // civil …). Optional — when set, the allocate picker ranks matching
     // engineers first. Stores a Trade lookup-value id, same as inspectors.trade_id.
     ensure_column('jobs', 'req_trade_id', 'INT NULL');
+    // #2 — a manager's recorded reason for allocating somebody already booked on
+    // one of the job's dates (a deliberate double-booking). Empty = no override.
+    ensure_column('jobs', 'dblbook_override_note', "VARCHAR(400) DEFAULT ''");
+    ensure_column('jobs', 'dblbook_override_by', "VARCHAR(150) DEFAULT ''");
     ensure_column('jobs', 'activity_id', 'INT NULL');
     ensure_column('jobs', 'report_custom_days', 'INT NULL');
     ensure_column('jobs', 'deliverables', "VARCHAR(500) DEFAULT ''");
@@ -3874,6 +3878,7 @@ function job_save_fields() {
         'subcon_cost','other_cost','other_cost_note','quotation_id','is_outstation','chargeable_heads',
         'cert_override_note','cert_override_by',
         'sitedoc_override_note','sitedoc_override_by',
+        'dblbook_override_note','dblbook_override_by',
         'impartiality_ok','impartiality_note','impartiality_by','impartiality_at'];
 }
 
@@ -4989,6 +4994,39 @@ function ops_jobs($route, $method) {
             } else {
                 $b['impartiality_ok'] = 0;
                 $b['impartiality_by'] = ''; $b['impartiality_at'] = '';
+            }
+            // ---- Double-booking guard (#2) ----------------------------------
+            // Availability was always shown on this form (busy pills, a clash
+            // count); now a clash on one of the job's own dates is a soft stop,
+            // not just a hint — the same shape as the competence and site-document
+            // overrides above. A manager may still go ahead by saying why, and the
+            // reason is kept against the job. Nobody without that permission can
+            // double-book. This is core (not a pack): two deputations on one
+            // person on one day is wrong whatever the trade.
+            $b['dblbook_override_note'] = trim((string)($b['dblbook_override_note'] ?? ''));
+            if (!empty($b['inspector_id']) && !empty($jdates)) {
+                $busy  = inspector_busy_dates((int)$b['inspector_id'], (int)($job['id'] ?? 0));
+                $clash = array_values(array_filter($jdates, fn($d) => isset($busy[$d])));
+                if ($clash) {
+                    $canOv = function_exists('competence_can_override') && competence_can_override();
+                    if ($b['dblbook_override_note'] !== '' && $canOv) {
+                        $b['dblbook_override_by'] = user_name(current_user());
+                    } else {
+                        $who = ops_val("SELECT name FROM inspectors WHERE id=?", [(int)$b['inspector_id']]);
+                        $why = ($who ?: ucfirst(Tl('engineer'))) . ' is already booked on ' . implode(', ', $clash) . '.';
+                        $vars = array_merge(call_job_form_vars($job, $call), ['error' => $why
+                            . ($canOv ? ' To go ahead anyway, state the reason in the box below.'
+                                      : ' Pick a ' . Tl('engineer') . ' who is free, or change the dates.')]);
+                        if ($canOv) $vars['dblBookBlock'] = $why;
+                        view('ops/job_form', $vars);
+                        return;
+                    }
+                } elseif ($b['dblbook_override_note'] !== '' && empty($b['dblbook_override_by'])) {
+                    // No clash — do not keep a reason for a gate that did not fire.
+                    $b['dblbook_override_note'] = ''; $b['dblbook_override_by'] = '';
+                }
+            } elseif ($b['dblbook_override_note'] !== '' && empty($b['dblbook_override_by'])) {
+                $b['dblbook_override_note'] = ''; $b['dblbook_override_by'] = '';
             }
             // The contract number comes down the chain and the register fills
             // itself, so nothing has to be chosen from a list that may be empty.

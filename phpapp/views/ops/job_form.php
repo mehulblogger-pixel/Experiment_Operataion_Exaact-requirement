@@ -95,6 +95,21 @@
 </div>
 <?php endif; ?>
 
+<?php // #2 — the double-booking override. Appears only when the chosen person
+      // is already booked on one of these dates, and only for a manager. Same
+      // deal as the two above: a reason is required and it is kept on record. ?>
+<?php if (!empty($dblBookBlock) && competence_can_override()): ?>
+<div class="panel" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent)">
+  <b>Double-book them anyway?</b>
+  <p class="muted" style="margin:4px 0 8px"><?= e($dblBookBlock) ?> This is recorded against the <?= e(Tl('job')) ?>
+    with your name. Say what makes it acceptable — for example that the other booking is a short desk review, or the
+    two sites are on the same campus.</p>
+  <input class="form-control" form="jobform" name="dblbook_override_note" required
+         value="<?= e($_POST['dblbook_override_note'] ?? '') ?>"
+         placeholder="e.g. other job that day is a half-day desk review at the same office">
+</div>
+<?php endif; ?>
+
 <?php // The contract position, stated before the form is filled in. A blocked
       // allocation is refused on submit as well, but being told up front is the
       // difference between a warning and a wasted five minutes. ?>
@@ -282,7 +297,11 @@
         <?php foreach ($inspectors as $i): $lapsed = competence_lapsed((int)$i['id'], $certDate);
               $itrade = ((int)($i['trade_id'] ?? 0) && function_exists('trade_label')) ? trade_label($i['trade_id']) : '';
               if ($itrade === '—') $itrade = ''; ?>
-          <option value="<?= (int)$i['id'] ?>" data-kind="<?= e($i['staff_kind'] ?? 'ASSET') ?>" data-trade="<?= (int)($i['trade_id'] ?? 0) ?>" <?= ($job && $job['inspector_id']==$i['id'])?'selected':'' ?>><?= e($i['name']) ?><?= $i['emp_code']?' ('.e($i['emp_code']).')':'' ?><?= $itrade!=='' ? ' · '.e($itrade) : '' ?><?= $lapsed ? ' — certificate lapsed' : '' ?></option>
+          <?php // Keep the picked person selected when the form comes back from a
+                //   soft-block (double-booking / cert), so the reason box can be
+                //   filled without re-choosing everybody. ?>
+          <?php $selInsp = isset($_POST['inspector_id']) ? ($_POST['inspector_id']==$i['id']) : ($job && $job['inspector_id']==$i['id']); ?>
+          <option value="<?= (int)$i['id'] ?>" data-kind="<?= e($i['staff_kind'] ?? 'ASSET') ?>" data-trade="<?= (int)($i['trade_id'] ?? 0) ?>" <?= $selInsp?'selected':'' ?>><?= e($i['name']) ?><?= $i['emp_code']?' ('.e($i['emp_code']).')':'' ?><?= $itrade!=='' ? ' · '.e($itrade) : '' ?><?= $lapsed ? ' — certificate lapsed' : '' ?></option>
         <?php endforeach; ?>
       </select>
       <small class="muted" id="insp_hint"></small></div>
@@ -354,7 +373,7 @@
       <input class="form-control" type="date" value="<?= e($call['inspection_required_date'] ?? '') ?>" readonly style="background:var(--soft)"></div>
     <div class="ff"><label>Actual scheduled date <span class="muted">— when we are going</span></label>
       <input class="form-control" type="date" id="req_date" name="scheduled_date"
-             value="<?= e(($job['scheduled_date'] ?? '') ?: ($call['inspection_required_date'] ?? '')) ?>">
+             value="<?= e($_POST['scheduled_date'] ?? (($job['scheduled_date'] ?? '') ?: ($call['inspection_required_date'] ?? ''))) ?>">
       <small class="muted">Move this and the end date moves with it.</small></div>
 
     <?php // The shape is settled on the call; it is shown here and can be
