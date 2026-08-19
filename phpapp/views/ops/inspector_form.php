@@ -26,6 +26,18 @@
       </select></div>
     <div class="ff"><label>Engineer type</label>
       <select class="form-control" name="staff_kind"><?php foreach (['ASSET'=>'Own employee','FREELANCER'=>'Freelancer','SUBCON'=>'Sub-contractor'] as $k=>$v): ?><option value="<?= $k ?>" <?= (($ins['staff_kind'] ?? 'ASSET')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <?php // The sub-contracting / manpower agency this person is engaged through.
+          //   A real link to the Agencies master (not a typed name), so a freelancer
+          //   sits under an agency and the roster can group by it. Left "none" for
+          //   an own employee. ?>
+    <div class="ff"><label>Engaged via agency <span class="muted">— for a freelancer / sub-contractor</span></label>
+      <select class="form-control searchable" name="agency_id">
+        <option value="">— none / own employee —</option>
+        <?php foreach (($agencies ?? []) as $ag): ?>
+          <option value="<?= (int)$ag['id'] ?>" <?= ((int)($ins['agency_id'] ?? 0)===(int)$ag['id'])?'selected':'' ?>><?= e($ag['name']) ?><?= !empty($ag['agency_type']) ? ' ('.e($ag['agency_type']).')' : '' ?></option>
+        <?php endforeach; ?>
+      </select>
+      <small class="muted">Add or edit agencies under <a href="/m/agencies" target="_blank">Masters → Agencies</a>.</small></div>
     <?php // Where this person sits for deputation. A FIELD inspector goes to site
           // and is ranked to the top of every allocate list; a coordinator or
           // office person can still be deputed but sits below the field inspectors. ?>
@@ -53,7 +65,6 @@
       </select></div>
     <?php if (can_see_salary()): ?>
     <div class="ff"><label>Annual CTC (<?= e(cur_sym()) ?>) <span class="muted">— cost split across <?= e(Tlp("sbu")) ?></span></label><input class="form-control" type="number" step="0.01" name="salary_ctc" value="<?= e($ins['salary_ctc'] ?? '') ?>"></div>
-    <div class="ff"><label>Hiring agency <span class="muted">— if engaged via an external agency</span></label><input class="form-control" name="agency_name" value="<?= e($ins['agency_name'] ?? '') ?>" placeholder="e.g. Patel Manpower"></div>
     <div class="ff"><label>Agency hiring cost (<?= e(cur_sym()) ?>/yr) <span class="muted">— extra cost paid to the agency</span></label><input class="form-control" type="number" step="0.01" name="agency_cost" value="<?= e($ins['agency_cost'] ?? '') ?>"></div>
     <?php endif; ?>
 
