@@ -7,7 +7,12 @@
 <div class="crumbs"><a href="/">Home</a> › <a href="/masters">Masters</a> › <a href="/m/inspectors"><?= e(TP('engineer')) ?></a> › <?= $ins ? 'Edit' : 'Add' ?></div>
 <div class="master-head">
   <div><h1><?= $ins ? 'Edit — ' . e($ins['name']) : 'Add ' . Tl('engineer') ?></h1></div>
-  <a class="btn secondary" href="/m/inspectors">← Back to <?= e(THP('engineer')) ?></a>
+  <div style="display:flex;gap:8px">
+    <?php if ($ins && function_exists('iddoc_can_view') && iddoc_can_view()): ?>
+      <a class="btn secondary" href="/identity?i=<?= (int)$ins['id'] ?>">Documents &amp; KYC →</a>
+    <?php endif; ?>
+    <a class="btn secondary" href="/m/inspectors">← Back to <?= e(THP('engineer')) ?></a>
+  </div>
 </div>
 
 <div data-tabs data-tabs-key="inspector">

@@ -107,12 +107,13 @@
       <select class="form-control" name="doc_kind" required>
         <?php foreach ($kinds as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff"><label>Number *</label><input class="form-control" name="doc_number" required></div>
-    <div class="ff"><label>Issued by</label><input class="form-control" name="issuing_authority" placeholder="issuing office"></div>
+    <div class="ff"><label>Number <span class="muted">— if it has one</span></label><input class="form-control" name="doc_number">
+      <small class="muted">Required for an ID/passport; a declaration or degree has none.</small></div>
+    <div class="ff"><label>Issued by</label><input class="form-control" name="issuing_authority" placeholder="issuing office / board"></div>
     <div class="ff"><label>Country</label><input class="form-control" name="issuing_country"></div>
     <div class="ff"><label>Issued on</label><input class="form-control" type="date" name="issued_on"></div>
-    <div class="ff"><label>Expires on *</label><input class="form-control" type="date" name="expires_on" required>
-      <small class="muted">Without it the copy can never be retired on time.</small></div>
+    <div class="ff"><label>Expires on <span class="muted">— if it expires</span></label><input class="form-control" type="date" name="expires_on">
+      <small class="muted">Required for anything that expires (passport, medical). A PAN, declaration or degree does not.</small></div>
     <div class="ff"><label>Scan / photo</label><input class="form-control" type="file" name="doc_file"></div>
     <div class="ff"><label>Told them on</label><input class="form-control" type="date" name="consent_on" value="<?= e(date('Y-m-d')) ?>">
       <small class="muted">When the person was told what this is for.</small></div>

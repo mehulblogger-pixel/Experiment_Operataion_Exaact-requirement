@@ -47,13 +47,30 @@
 const IDDOC_KINDS = [
     'PASSPORT'   => 'Passport',
     'VISA'       => 'Visa / entry permit',
-    'NATIONAL_ID'=> 'National identity card',
+    'NATIONAL_ID'=> 'National identity card (e.g. Aadhaar)',
     'DRIVING_LIC'=> 'Driving licence',
     'WORK_PERMIT'=> 'Work permit',
     'GATE_PASS'  => 'Site / plant gate pass',
     'MEDICAL'    => 'Medical fitness certificate',
     'POLICE_VER' => 'Police verification',
+    // Onboarding / KYC papers — held for the same person, especially for a
+    // freelancer or an agency-provided engineer. Generic on purpose (a tenant
+    // renames them under the 'identity_doc' list); most carry no expiry.
+    'TAX_ID'     => 'Tax ID (e.g. PAN)',
+    'DECLARATION'=> 'Signed declaration',
+    'EDUCATION'  => 'Education / qualification certificate',
+    'EXPERIENCE' => 'Experience certificate',
 ];
+
+// Which kinds actually carry an expiry, and which carry a document number. A
+// passport expires and has a number; a signed declaration or a degree does
+// neither, so the register must not force them — otherwise the papers simply do
+// not get filed. Everything not named here behaves the old way (expiry +
+// number expected), so the gate-pass discipline is unchanged.
+const IDDOC_NO_EXPIRY = ['TAX_ID', 'DECLARATION', 'EDUCATION', 'EXPERIENCE'];
+const IDDOC_NO_NUMBER = ['DECLARATION', 'EDUCATION', 'EXPERIENCE'];
+function iddoc_kind_expires($kind)   { return !in_array((string)$kind, IDDOC_NO_EXPIRY, true); }
+function iddoc_kind_has_number($kind) { return !in_array((string)$kind, IDDOC_NO_NUMBER, true); }
 
 // What every one of these is held for. Shown on the screen, and stamped onto
 // the row at the moment of upload.
@@ -238,15 +255,21 @@ function iddoc_add($personId, $post, $file, $kind = 'INSPECTOR') {
     $valid = iddoc_kind_options();
     if (!isset($valid[$docKind])) return 'Choose which kind of document this is.';
     $number = trim((string)($post['doc_number'] ?? ''));
-    if ($number === '') return 'The document number is what makes the record useful — enter it.';
+    // A passport is useless without its number; a signed declaration or a degree
+    // certificate has none, so it is only required for the kinds that carry one.
+    if ($number === '' && iddoc_kind_has_number($docKind))
+        return 'The document number is what makes the record useful — enter it.';
     $bytes = ($file && ($file['tmp_name'] ?? '') !== '' && is_uploaded_file($file['tmp_name']))
         ? (string)file_get_contents($file['tmp_name']) : '';
     if ($bytes !== '' && ($why = upload_reject_reason($bytes, $file['name'] ?? '', $file['type'] ?? '')) !== '')
         return $why;
     // A scan of a passport with no expiry date is a copy nobody can ever retire
-    // on the document's own terms, so it is asked for.
+    // on the document's own terms, so it is asked for — but a PAN, a declaration
+    // or a degree does not expire, so those are not forced (retention then runs
+    // from the day it was filed instead).
     $expires = (string)($post['expires_on'] ?? '');
-    if ($expires === '') return 'Enter the expiry date. Without it this copy can never be retired on time.';
+    if ($expires === '' && iddoc_kind_expires($docKind))
+        return 'Enter the expiry date. Without it this copy can never be retired on time.';
     db()->prepare("INSERT INTO person_documents
         (person_kind,person_id,doc_kind,doc_number,number_last4,issuing_authority,issuing_country,
          issued_on,expires_on,file_name,mime,file_data,purpose,consent_on,consent_note,retain_until,note,uploaded_by,uploaded_at)

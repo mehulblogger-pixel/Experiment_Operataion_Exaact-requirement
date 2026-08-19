@@ -35,3 +35,32 @@ t_ok(strpos($ops, '$ag = agency_get($agencyId)') !== false, 'the handler syncs t
 $form = (string)file_get_contents(__DIR__ . '/../views/ops/inspector_form.php');
 t_ok(strpos($form, 'name="agency_id"') !== false, 'the inspector form offers an agency dropdown');
 t_ok(strpos($form, 'name="agency_name"') === false, 'the free-text agency box is replaced by the dropdown');
+
+// ---------------------------------------------------------------------------
+t_section('KYC document kinds on a person (gap 2)');
+identity_migrate();
+
+$kinds = iddoc_kind_options();
+t_ok(isset($kinds['TAX_ID'], $kinds['DECLARATION'], $kinds['EDUCATION']),
+    'PAN (tax id), declaration and education are available document kinds');
+t_ok(iddoc_kind_expires('PASSPORT') === true && iddoc_kind_expires('TAX_ID') === false,
+    'a passport carries an expiry; a PAN does not');
+t_ok(iddoc_kind_has_number('TAX_ID') === true && iddoc_kind_has_number('DECLARATION') === false,
+    'a PAN carries a number; a signed declaration does not');
+
+$own2 = !db()->inTransaction();
+if ($own2) db()->beginTransaction();
+try {
+    $kp = team_member_create('KYC Person One', 'FIELD');
+    t_eq(iddoc_add($kp, ['doc_kind' => 'DECLARATION', 'consent_on' => date('Y-m-d')], null), '',
+        'a signed declaration files with no number and no expiry');
+    t_eq(iddoc_add($kp, ['doc_kind' => 'TAX_ID', 'doc_number' => 'ABCDE1234F', 'consent_on' => date('Y-m-d')], null), '',
+        'a PAN files with a number and no expiry');
+    t_ok(iddoc_add($kp, ['doc_kind' => 'PASSPORT', 'doc_number' => 'P1234567', 'consent_on' => date('Y-m-d')], null) !== '',
+        'a passport still demands an expiry date (the old discipline is intact)');
+    t_ok(count(iddoc_list($kp)) === 2, 'the two KYC documents are held against the person');
+} finally {
+    if ($own2 && db()->inTransaction()) db()->rollBack();
+}
+
+t_ok(strpos($form, '/identity?i=') !== false, 'the inspector record links to that person’s documents');
