@@ -21,7 +21,8 @@
     <tbody>
     <?php foreach ($rows as $r): ?>
     <tr>
-      <td><b><?= e($r['inquiry_no']) ?></b></td>
+      <td><b><?= e($r['inquiry_no']) ?></b>
+        <?php if (!empty($r['origin_ref'])): ?><div class="muted" style="font-size:12px">from lead <?= e($r['origin_ref']) ?></div><?php endif; ?></td>
       <td><?= e($r['received_date'] ?: '—') ?></td>
       <td><?= e($r['client_disp'] ?: $r['client_name'] ?: '—') ?></td>
       <td><?= e($r['subject'] ?: '—') ?></td>

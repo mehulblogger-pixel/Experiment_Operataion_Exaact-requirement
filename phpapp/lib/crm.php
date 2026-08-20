@@ -277,6 +277,9 @@ function crm_migrate() {
     crm_migrate_charge_units();
 
     if (function_exists('ensure_column')) {
+        // The lead an inquiry was converted from, so its origin is a real link
+        // (and shows on the register) rather than only a line of notes.
+        ensure_column('crm_inquiries', 'lead_id', 'INT NULL');
         // Where the quote came from: our own, or a client / tender portal that we
         // still want in the register (§xv).
         ensure_column('quotations', 'origin', "VARCHAR(20) DEFAULT 'OWN'");
@@ -1023,7 +1026,13 @@ function ops_crm_inquiries($route, $method) {
         // Financial-year window (defaults to the current FY; "All years" removes it).
         $fy = fy_filter();
         if (!$fy['all']) { $w[] = 'i.created_at >= ?'; $args[] = $fy['from']; $w[] = 'i.created_at < ?'; $args[] = $fy['to_excl']; }
-        $rows = ops_all("SELECT i.*, bp.display_name client_disp FROM crm_inquiries i LEFT JOIN business_partners bp ON bp.id=i.client_id WHERE " . implode(' AND ', $w) . " ORDER BY i.id DESC", $args);
+        // origin_ref = the lead this inquiry was converted from (if any), so the
+        // register shows where it came from.
+        $rows = ops_all("SELECT i.*, bp.display_name client_disp, l.ref origin_ref
+                         FROM crm_inquiries i
+                         LEFT JOIN business_partners bp ON bp.id=i.client_id
+                         LEFT JOIN leads l ON l.id=i.lead_id
+                         WHERE " . implode(' AND ', $w) . " ORDER BY i.id DESC", $args);
         view('ops/crm/inquiry_list', ['rows' => $rows, 'q' => $q, 'st' => $st, 'fy' => $fy['fy']]); return;
     }
     if ($route === 'inquiry-new' || $route === 'inquiry-edit') {
@@ -1072,7 +1081,8 @@ function ops_crm_inquiries($route, $method) {
                 redirect('/inquiries');
             }
         }
-        view('ops/crm/inquiry_form', ['inq' => $inq, 'clients' => clients_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
+        $originRef = ($inq && !empty($inq['lead_id'])) ? (string)ops_val("SELECT ref FROM leads WHERE id=?", [(int)$inq['lead_id']]) : '';
+        view('ops/crm/inquiry_form', ['inq' => $inq, 'originRef' => $originRef, 'clients' => clients_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
             'sourceOpts' => INQUIRY_SOURCES, 'statusOpts' => INQUIRY_STATUS,
             'users' => ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username")]);
         return;

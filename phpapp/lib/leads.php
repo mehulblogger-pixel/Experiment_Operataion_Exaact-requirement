@@ -641,6 +641,10 @@ function lead_convert($leadId, array $b = []) {
                        date('Y-m-d'), (string)$l['owner_name'],
                        'Converted from lead ' . $l['ref'] . '.', user_name(current_user()), date('c')]);
         $inqId = (int)$pdo->lastInsertId();
+        // Record the origin as a real link, not just the note above. Best-effort:
+        // an older install without the column must still convert the lead.
+        try { $pdo->prepare("UPDATE crm_inquiries SET lead_id=? WHERE id=?")->execute([(int)$leadId, $inqId]); }
+        catch (Throwable $e) { /* lead_id column not present yet */ }
     } catch (Throwable $e) { /* CRM tables not built on this install */ }
 
     $stageId = (int)($b['stage_id'] ?? 0) ?: (int)$l['stage_id'];

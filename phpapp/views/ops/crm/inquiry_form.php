@@ -7,6 +7,7 @@
 </div>
 
 <?php if (!empty($error)): ?><div class="msg msg-error" style="margin-bottom:12px"><?= e($error) ?></div><?php endif; ?>
+<?php if (!empty($originRef)): ?><div class="msg" style="margin-bottom:12px;background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:8px 12px">Converted from lead <strong><?= e($originRef) ?></strong> — the client, contact and requirement were carried over automatically.</div><?php endif; ?>
 
 <form method="post" action="/<?= $isEdit ? 'inquiry-edit?id=' . (int)$inq['id'] : 'inquiry-new' ?>" class="panel">
   <div class="form-grid">
