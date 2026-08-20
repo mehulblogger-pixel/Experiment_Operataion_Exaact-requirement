@@ -47,7 +47,9 @@ $multi = count($d['sections']) > 1 || ($d['sections'] && $d['sections'][0]['labe
   $renderTiles = function ($tiles) {
       echo '<div class="op-grid">';
       foreach ($tiles as $tl) {
-          echo '<a class="op-tile" href="' . e($tl['route']) . '"' . (!empty($tl['ext']) ? ' target="_blank" rel="noopener"' : '') . '>';
+          echo '<a class="op-tile" href="' . e($tl['route']) . '"'
+             . (trim((string)($tl['desc'] ?? '')) !== '' ? ' title="' . e($tl['desc']) . '"' : '')
+             . (!empty($tl['ext']) ? ' target="_blank" rel="noopener"' : '') . '>';
           echo '<span class="op-ic">' . $tl['icon'] . '</span><span class="op-b"><span class="op-t">' . e($tl['label']);
           if (!empty($tl['count'])) echo ' <span class="op-badge ' . e($tl['tone'] ?: 'info') . '">' . (int)$tl['count'] . '</span>';
           echo '</span>';

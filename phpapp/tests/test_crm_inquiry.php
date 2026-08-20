@@ -80,3 +80,13 @@ t_ok(strpos($od, '/opportunity-delete') !== false, 'the opportunity page has a d
 t_ok(strpos($ld, '/lead-delete') !== false, 'the lead page has a delete button');
 t_ok(strpos($il, 'confirm(') !== false && strpos($od, 'confirm(') !== false && strpos($ld, 'confirm(') !== false,
     'every delete asks for confirmation first');
+
+// ---------------------------------------------------------------------------
+t_section('CRM term definitions (CRM-A)');
+$areas = (string)file_get_contents(__DIR__ . '/../lib/areas.php');
+t_ok(strpos($areas, 'A company worth pursuing') !== false, 'Leads has a plain-English definition');
+t_ok(strpos($areas, 'A live deal you are working to win or lose') !== false, 'Opportunities has a definition');
+t_ok(strpos($areas, 'A specific request to quote') !== false, 'Inquiries has a definition');
+$ah = (string)file_get_contents(__DIR__ . '/../views/ops/area_home.php');
+t_ok(strpos($ah, "' title=\"' . e(\$tl['desc'])") !== false,
+    'each tile shows its definition as a hover tooltip');
