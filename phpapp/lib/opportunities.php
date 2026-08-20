@@ -768,6 +768,26 @@ function ops_opportunities($route, $method) {
         return true;
     }
 
+    // Deleting an opportunity — administrators only, and never once it is WON or
+    // has quotations linked to it (those are the record of real business).
+    if ($route === 'opportunity-delete' && $method === 'POST') {
+        ops_require(is_admin_level() || is_master(), 'Only an administrator can delete opportunities.');
+        $id = (int)($_POST['id'] ?? 0);
+        $o  = $id ? opp_row($id) : null;
+        if (!$o) { flash('That opportunity no longer exists.', 'error'); redirect('/opportunities'); }
+        $quotes = (int)ops_val("SELECT COUNT(*) FROM opportunity_quotes WHERE opportunity_id=?", [$id]);
+        if ($o['status'] === 'WON' || $quotes) {
+            flash('This opportunity is ' . ($o['status'] === 'WON' ? 'won' : 'linked to ' . $quotes . ' quotation(s)')
+                . ', so it is part of the record and cannot be deleted. Mark it lost instead if it should not be chased.', 'error');
+            redirect('/opportunity?id=' . $id);
+        }
+        if (function_exists('act_log')) act_log('OPPORTUNITY', $id, 'DELETED', 'Opportunity ' . $o['ref'] . ' deleted — ' . $o['name']);
+        try { db()->prepare("DELETE FROM opportunity_stage_history WHERE opportunity_id=?")->execute([$id]); } catch (Throwable $e) {}
+        db()->prepare("DELETE FROM opportunities WHERE id=?")->execute([$id]);
+        flash('Opportunity ' . $o['ref'] . ' deleted.');
+        redirect('/opportunities');
+    }
+
     if ($route === 'opportunity') {
         $o = opp_row($_GET['id'] ?? 0);
         if (!$o) { http_response_code(404); view('notfound'); return true; }

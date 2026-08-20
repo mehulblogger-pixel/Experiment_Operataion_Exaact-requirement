@@ -1087,6 +1087,23 @@ function ops_crm_inquiries($route, $method) {
             'users' => ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username")]);
         return;
     }
+    // Deleting an inquiry — administrators only, and never once a quotation has
+    // been raised against it (that would orphan the quote and lose the trail).
+    if ($route === 'inquiry-delete' && $method === 'POST') {
+        ops_require(is_admin_level() || is_master(), 'Only an administrator can delete inquiries.');
+        $id  = (int)($_POST['id'] ?? 0);
+        $inq = $id ? crm_inquiry_get($id) : null;
+        if (!$inq) { flash('That inquiry no longer exists.', 'error'); redirect('/inquiries'); }
+        $quotes = (int)ops_val("SELECT COUNT(*) FROM quotations WHERE inquiry_id=?", [$id]);
+        if ($quotes) {
+            flash('A ' . Tl('quote') . ' has been raised against ' . $inq['inquiry_no'] . ', so it is part of the record and cannot be deleted. Set its status to Dropped instead.', 'error');
+            redirect('/inquiries');
+        }
+        if (function_exists('act_log')) act_log('INQUIRY', $id, 'DELETED', 'Inquiry ' . $inq['inquiry_no'] . ' deleted.');
+        db()->prepare("DELETE FROM crm_inquiries WHERE id=?")->execute([$id]);
+        flash('Inquiry ' . $inq['inquiry_no'] . ' deleted.');
+        redirect('/inquiries');
+    }
 }
 
 // ---------------------------------------------------------------------------

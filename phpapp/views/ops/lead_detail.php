@@ -15,7 +15,15 @@
   <p class="sub" style="margin:2px 0 0"><?= e($l['ref']) ?>
     <span class="pill <?= $l['status']==='CONVERTED'?'p-ok':($l['status']==='LOST'?'p-bad':'p-warn') ?>"><?= e(LEAD_STATUS[$l['status']] ?? $l['status']) ?></span>
     <?php if ($curStage): ?><span class="pill p-mut"><?= e($curStage) ?></span><?php endif; ?>
-  </p></div></div>
+  </p></div>
+  <?php // Delete — administrators only, and never once converted (a converted
+        //   lead is the record of where a customer came from; mark it lost). ?>
+  <?php if ((is_admin_level() || is_master()) && !$converted): ?>
+  <form method="post" action="/lead-delete" onsubmit="return confirm('Delete lead <?= e($l['ref']) ?>? This cannot be undone. (Mark it lost instead if you just want to stop chasing it.)')">
+    <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
+    <button class="btn small danger" type="submit">Delete</button></form>
+  <?php endif; ?>
+</div>
 
 <?php // ---- Where it is now, and the one next thing ------------------------- ?>
 <div class="nowband">

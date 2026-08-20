@@ -47,3 +47,36 @@ t_ok(strpos($crm, 'LEFT JOIN leads l ON l.id=i.lead_id') !== false,
     'the inquiry register shows the origin lead reference');
 t_ok(strpos($form, 'Converted from lead') !== false,
     'the inquiry form shows it was converted from a lead');
+
+// ---------------------------------------------------------------------------
+t_section('protected delete (CRM-B)');
+$opp = (string)file_get_contents(__DIR__ . '/../lib/opportunities.php');
+
+// Inquiry delete: admin-only, blocked when a quote exists.
+t_ok(strpos($crm, "\$route === 'inquiry-delete'") !== false, 'the inquiry-delete route exists');
+t_ok(strpos($crm, "is_admin_level() || is_master()") !== false, 'delete is administrators-only');
+t_ok(strpos($crm, "SELECT COUNT(*) FROM quotations WHERE inquiry_id=?") !== false,
+    'an inquiry with a quotation is protected from deletion');
+
+// Opportunity delete: admin-only, blocked when WON or has linked quotes.
+t_ok(strpos($opp, "\$route === 'opportunity-delete'") !== false, 'the opportunity-delete route exists');
+t_ok(strpos($opp, "\$o['status'] === 'WON' || \$quotes") !== false,
+    'a won opportunity, or one with quotations, is protected from deletion');
+
+// Lead delete already existed and protects a converted lead.
+t_ok(strpos($leads, "\$route === 'lead-delete'") !== false, 'the lead-delete route exists');
+t_ok(strpos($leads, "=== 'CONVERTED'") !== false, 'a converted lead is protected from deletion');
+
+// Routing is registered for the new delete routes.
+t_ok(strpos($ops2 = (string)file_get_contents(__DIR__ . '/../lib/ops.php'), "'inquiry-delete'=>'inquiries'") !== false
+     && strpos($ops2, "'opportunity-delete'=>'leads'") !== false, 'both new delete routes are registered');
+
+// The delete buttons are on the screens.
+$il = (string)file_get_contents(__DIR__ . '/../views/ops/crm/inquiry_list.php');
+$od = (string)file_get_contents(__DIR__ . '/../views/ops/opportunity_detail.php');
+$ld = (string)file_get_contents(__DIR__ . '/../views/ops/lead_detail.php');
+t_ok(strpos($il, '/inquiry-delete') !== false, 'the inquiry list has a delete button');
+t_ok(strpos($od, '/opportunity-delete') !== false, 'the opportunity page has a delete button');
+t_ok(strpos($ld, '/lead-delete') !== false, 'the lead page has a delete button');
+t_ok(strpos($il, 'confirm(') !== false && strpos($od, 'confirm(') !== false && strpos($ld, 'confirm(') !== false,
+    'every delete asks for confirmation first');

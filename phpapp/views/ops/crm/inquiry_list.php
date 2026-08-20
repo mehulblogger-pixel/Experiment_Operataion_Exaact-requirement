@@ -32,6 +32,11 @@
       <td class="num" style="white-space:nowrap">
         <?php if (can('mod.inquiries.edit')): ?><a class="btn small secondary" href="/inquiry-edit?id=<?= (int)$r['id'] ?>">Edit</a><?php endif; ?>
         <?php if (can('mod.quotes.edit') && $r['status']!=='DROPPED'): ?><a class="btn small" href="/quote-new?inquiry=<?= (int)$r['id'] ?>">Quote</a><?php endif; ?>
+        <?php if ((is_admin_level() || is_master()) && $r['status']!=='QUOTED'): ?>
+          <form method="post" action="/inquiry-delete" style="display:inline" onsubmit="return confirm('Delete inquiry <?= e($r['inquiry_no']) ?>? This cannot be undone.')">
+            <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+            <button class="btn small danger" type="submit">Delete</button></form>
+        <?php endif; ?>
       </td>
     </tr>
     <?php endforeach; ?>
