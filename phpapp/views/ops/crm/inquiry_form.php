@@ -1,24 +1,27 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/inquiries"><?= e(TP('inquiry')) ?></a> › <?= $inq ? 'Edit' : 'New' ?></div>
+<?php $isEdit = !empty($inq['id']); ?>
+<div class="crumbs"><a href="/">Home</a> › <a href="/inquiries"><?= e(TP('inquiry')) ?></a> › <?= $isEdit ? 'Edit' : 'New' ?></div>
 <div class="master-head">
-  <div><h1><?= $inq ? 'Edit inquiry — ' . e($inq['inquiry_no']) : 'New ' . Tl('client') . ' ' . Tl('inquiry') ?></h1>
+  <div><h1><?= $isEdit ? 'Edit inquiry — ' . e($inq['inquiry_no']) : 'New ' . Tl('client') . ' ' . Tl('inquiry') ?></h1>
     <p class="sub" style="margin:2px 0 0">Capture what the <?= e(Tl('client')) ?> asked for. You can raise a <?= e(Tl('quote')) ?> against it afterwards.</p></div>
   <a class="btn secondary" href="/inquiries">← Back</a>
 </div>
 
-<form method="post" action="/<?= $inq ? 'inquiry-edit?id=' . (int)$inq['id'] : 'inquiry-new' ?>" class="panel">
+<?php if (!empty($error)): ?><div class="msg msg-error" style="margin-bottom:12px"><?= e($error) ?></div><?php endif; ?>
+
+<form method="post" action="/<?= $isEdit ? 'inquiry-edit?id=' . (int)$inq['id'] : 'inquiry-new' ?>" class="panel">
   <div class="form-grid">
-    <div class="ff"><label>Client <a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a></label>
+    <div class="ff"><label><?= e(Tl('client')) ?> * <a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a></label>
       <select class="form-control searchable" name="client_id"><option value="">— pick or type below —</option>
         <?php foreach ($clients as $cl): ?><option value="<?= (int)$cl['id'] ?>" <?= (string)($inq['client_id'] ?? '')===(string)$cl['id']?'selected':'' ?>><?= e($cl['display_name'] ?: $cl['legal_name']) ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"><label>…or client name (if not yet registered)</label><input class="form-control" name="client_name" value="<?= e($inq['client_name'] ?? '') ?>"></div>
     <div class="ff"><label>Received date</label><input class="form-control" type="date" name="received_date" value="<?= e($inq['received_date'] ?? date('Y-m-d')) ?>"></div>
 
-    <div class="ff"><label>Contact person</label><input class="form-control" name="contact_name" value="<?= e($inq['contact_name'] ?? '') ?>"></div>
-    <div class="ff"><label>Contact email</label><input class="form-control" name="contact_email" value="<?= e($inq['contact_email'] ?? '') ?>"></div>
-    <div class="ff"><label>Contact mobile</label><input class="form-control" name="contact_mobile" value="<?= e($inq['contact_mobile'] ?? '') ?>"></div>
+    <div class="ff"><label>Contact person *</label><input class="form-control" name="contact_name" value="<?= e($inq['contact_name'] ?? '') ?>"></div>
+    <div class="ff"><label>Contact email <span class="muted">— email or mobile</span></label><input class="form-control" type="email" name="contact_email" value="<?= e($inq['contact_email'] ?? '') ?>"></div>
+    <div class="ff"><label>Contact mobile <span class="muted">— email or mobile</span></label><input class="form-control" name="contact_mobile" value="<?= e($inq['contact_mobile'] ?? '') ?>"></div>
 
-    <div class="ff"><label><?= e(T('sbu')) ?></label>
+    <div class="ff"><label><?= e(T('sbu')) ?> *</label>
       <select class="form-control searchable" name="sbu"><option value="">—</option>
         <?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($inq['sbu'] ?? '')===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Source</label>
@@ -30,7 +33,7 @@
       <select class="form-control searchable" name="assigned_to"><option value="">—</option>
         <?php foreach ($users as $u): $nm = trim(($u['first_name'] ?? '').' '.($u['last_name'] ?? '')) ?: $u['username']; ?><option value="<?= (int)$u['id'] ?>" <?= (string)($inq['assigned_to'] ?? '')===(string)$u['id']?'selected':'' ?>><?= e($nm) ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff ff-wide"><label>Subject</label><input class="form-control" name="subject" value="<?= e($inq['subject'] ?? '') ?>" placeholder="e.g. Third-party inspection — Suryavan Mundra"></div>
+    <div class="ff ff-wide"><label>Subject *</label><input class="form-control" name="subject" value="<?= e($inq['subject'] ?? '') ?>" placeholder="e.g. Third-party inspection — Suryavan Mundra"></div>
     <div class="ff ff-wide"><label>Service requirement / details</label><textarea class="form-control" name="service_requirement" rows="3"><?= e($inq['service_requirement'] ?? '') ?></textarea></div>
     <div class="ff ff-wide"><label>Notes</label><input class="form-control" name="notes" value="<?= e($inq['notes'] ?? '') ?>"></div>
   </div>

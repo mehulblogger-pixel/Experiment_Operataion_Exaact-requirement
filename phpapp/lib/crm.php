@@ -1037,6 +1037,25 @@ function ops_crm_inquiries($route, $method) {
             $vals = [$cid, $cname, trim($b['contact_name'] ?? ''), trim($b['contact_email'] ?? ''), trim($b['contact_mobile'] ?? ''),
                 trim($b['subject'] ?? ''), trim($b['service_requirement'] ?? ''), $b['sbu'] ?? '', $b['source'] ?? 'EMAIL',
                 $b['received_date'] ?? '', ($b['assigned_to'] ?? '') !== '' ? (int)$b['assigned_to'] : null, $b['status'] ?? 'OPEN', trim($b['notes'] ?? '')];
+            // An inquiry with no client, no contact and no subject is not a
+            // record of anything — it is a blank row somebody has to chase later.
+            // So the few things that make it a real enquiry are required. Email
+            // OR mobile satisfies "how do we reach them", so a genuine phone
+            // enquiry with no e-mail yet is not blocked.
+            $need = [];
+            if (!$cid && trim($b['client_name'] ?? '') === '') $need[] = 'a ' . Tl('client') . ' (pick one, or type a name)';
+            if (trim($b['contact_name'] ?? '') === '')          $need[] = 'the contact person';
+            if (trim($b['contact_email'] ?? '') === '' && trim($b['contact_mobile'] ?? '') === '')
+                                                                $need[] = 'a contact e-mail or mobile';
+            if (($b['sbu'] ?? '') === '')                        $need[] = 'the ' . Tl('sbu') . ' (business unit)';
+            if (trim($b['subject'] ?? '') === '')               $need[] = 'a subject';
+            if ($need) {
+                view('ops/crm/inquiry_form', ['inq' => ($inq ? array_merge($inq, $b) : $b), 'error' => 'Please add ' . implode('; ', $need) . '.',
+                    'clients' => clients_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
+                    'sourceOpts' => INQUIRY_SOURCES, 'statusOpts' => INQUIRY_STATUS,
+                    'users' => ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username")]);
+                return;
+            }
             if ($inq) {
                 $pdo->prepare("UPDATE crm_inquiries SET client_id=?,client_name=?,contact_name=?,contact_email=?,contact_mobile=?,subject=?,service_requirement=?,sbu=?,source=?,received_date=?,assigned_to=?,status=?,notes=? WHERE id=?")
                     ->execute(array_merge($vals, [$inq['id']]));
