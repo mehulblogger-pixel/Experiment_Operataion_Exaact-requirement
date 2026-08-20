@@ -90,3 +90,14 @@ t_ok(strpos($areas, 'A specific request to quote') !== false, 'Inquiries has a d
 $ah = (string)file_get_contents(__DIR__ . '/../views/ops/area_home.php');
 t_ok(strpos($ah, "' title=\"' . e(\$tl['desc'])") !== false,
     'each tile shows its definition as a hover tooltip');
+
+// ---------------------------------------------------------------------------
+t_section('open deal can link a customer to quote (CRM-E)');
+$od2 = (string)file_get_contents(__DIR__ . '/../views/ops/opportunity_detail.php');
+t_ok(strpos($od2, 'Link the customer to raise a quotation') !== false,
+    'an open deal with no customer is told why the quote button is off');
+// The customer-link form must be available while the deal is OPEN, not only WON.
+t_ok(strpos($od2, "\$canEdit && \$open && empty(\$o['partner_id'])") !== false,
+    'the customer-link control shows on an OPEN deal (previously only when Won)');
+t_ok(strpos($od2, 'id="opp-cust-open"') !== false && strpos($od2, 'name="partner_id"') !== false,
+    'the open-deal control posts the chosen customer to set partner_id');

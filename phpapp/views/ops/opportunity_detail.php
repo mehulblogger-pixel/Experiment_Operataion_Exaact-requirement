@@ -149,6 +149,35 @@
     <?php endif; ?>
   </div>
   <p class="muted" style="font-size:13px;margin:8px 0 0">Create a quotation straight from the deal — it carries the customer and the working value, and lands on the quote so you can add line items and submit. (Or attach an existing one below.) Keeping them all here stops the forecast counting the same business more than once.</p>
+
+  <?php // Why the button above is greyed, and how to fix it — right here, so an
+        //   OPEN deal that only has a customer NAME (not a linked customer
+        //   record) can be tied to one and start quoting. Previously this control
+        //   only appeared once the deal was Won, leaving open deals stuck. ?>
+  <?php if ($canEdit && $open && empty($o['partner_id'])): ?>
+    <div class="msg msg-warning" style="margin-top:10px">
+      <strong>Link the customer to raise a quotation.</strong>
+      This deal has a customer name but is not yet tied to a customer record, and a <?= e(Tl('quote')) ?> needs the customer (for billing and GST). Set it below and the button turns on.
+      <?php if (!empty($o['lead_id'])): ?>
+        <div style="margin-top:6px"><a href="/lead?id=<?= (int)$o['lead_id'] ?>"><b>Convert the lead</b></a> creates the customer and fills this in automatically — or pick one already on the master:</div>
+      <?php endif; ?>
+      <?php if (!empty($clients)): ?>
+        <form method="post" action="/opportunity-edit" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+          <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+          <div class="ff" style="flex:1;min-width:220px"><label for="opp-cust-open">Customer</label>
+            <select id="opp-cust-open" name="partner_id" class="form-control searchable">
+              <option value="">— pick a customer —</option>
+              <?php foreach ($clients as $c): ?>
+                <option value="<?= (int)$c['id'] ?>"><?= e($c['display_name'] ?: $c['legal_name']) ?></option>
+              <?php endforeach; ?>
+            </select></div>
+          <button class="btn small" type="submit">Set the customer</button>
+        </form>
+      <?php else: ?>
+        <div style="margin-top:8px"><a class="btn small secondary" href="/clients">Add the customer to the master first →</a></div>
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
   <?php if ($quotes): ?>
     <table class="dt" style="margin-top:10px">
       <caption class="sr-only">Quotations attached to this deal</caption>
