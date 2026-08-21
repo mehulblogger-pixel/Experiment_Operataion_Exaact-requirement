@@ -2136,6 +2136,35 @@ function tosrm_xo_calls($offices, $limit = 120) {
     return ['inbound' => $inbound, 'sentout' => $sentout, 'all_scope' => ($offices === 'ALL')];
 }
 
+// Every call MY branch still has to put an engineer on — same-office AND
+// cross-office inbound together, so this one panel answers "what needs
+// scheduling". A call is pending when it is open and no job carries a date yet.
+// Scope: calls this branch executes (or raised with no executing branch set yet).
+function tosrm_pending_scheduling($offices, $limit = 200) {
+    $w = ["c.status<>'CLOSED'",
+          "COALESCE(c.op_status,'') NOT IN ('CLOSED','CANCELLED')",
+          "NOT EXISTS (SELECT 1 FROM jobs j WHERE j.call_id=c.id AND COALESCE(j.scheduled_date,'')<>'')"];
+    if (is_array($offices)) {
+        if (!$offices) return [];
+        $in = implode(',', array_map('intval', $offices));
+        $w[] = "(c.executing_office_id IN ($in) OR (COALESCE(c.executing_office_id,0)=0 AND c.ibo_office_id IN ($in)))";
+    }
+    try {
+        return ops_all("SELECT c.id, c.call_code, c.client_id, c.inspection_type, c.sbu,
+                               c.call_received_date, c.inspection_required_date,
+                               c.executing_office_id, c.ibo_office_id,
+                               COALESCE(NULLIF(bp.display_name,''), bp.legal_name) client_name,
+                               eo.name exec_name
+                        FROM calls c
+                        LEFT JOIN business_partners bp ON bp.id=c.client_id
+                        LEFT JOIN offices eo ON eo.id=c.executing_office_id
+                        WHERE " . implode(' AND ', $w) . "
+                        ORDER BY CASE WHEN c.inspection_required_date='' THEN 1 ELSE 0 END,
+                                 c.inspection_required_date, c.id
+                        LIMIT " . (int)$limit) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
 // Record + notify a nudge from the contracting office to the executing office.
 function tosrm_xo_nudge($callId, $note = '') {
     tosrm_xo_migrate();
@@ -2372,10 +2401,11 @@ function ops_operations_home($method) {
     // nightly cron. Idempotent (mailed once per call) and best-effort.
     try { tosrm_xo_escalate_scan($offices); } catch (Throwable $e) {}
     $xo = tosrm_xo_calls($offices);   // cross-office: inbound to allocate + sent-out to track
+    $pending = tosrm_pending_scheduling($offices);   // every call still awaiting a person (same-office + cross-office)
     view('ops/operations_home', [
         'metrics' => $metrics, 'counts' => $counts, 'services' => $services, 'scopeLabel' => $offLabel,
         'disrupt' => $disrupt, 'drKey' => preg_replace('/[^a-z]/', '', strtolower($dr)), 'drLabel' => $dLabel,
-        'xo' => $xo, 'csrf' => function_exists('csrf_token') ? csrf_token() : '',
+        'xo' => $xo, 'pending' => $pending, 'csrf' => function_exists('csrf_token') ? csrf_token() : '',
     ]);
     return true;
 }

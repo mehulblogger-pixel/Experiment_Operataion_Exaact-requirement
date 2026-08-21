@@ -96,6 +96,30 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
   <a class="op-kpi warn" href="/jobs"><div class="v"><?= (int)($m['report_pending'] ?? 0) ?></div><div class="l">Report pending</div><div class="h">done, not issued</div></a>
 </div>
 
+<?php // ---- Pending scheduling — the cumulative list -------------------------
+      //  Every call this branch still has to put an engineer on, same-office and
+      //  cross-office together, so there is one place that answers "what needs
+      //  scheduling". Cross-office ones are tagged; their hand-off lives below.
+      $pend = $pending ?? []; if ($pend): $today0 = strtotime(date('Y-m-d')); ?>
+  <div class="op-sec">Pending scheduling — every <?= e(Tl('call')) ?> awaiting a person <span class="muted" style="font-weight:400;text-transform:none;letter-spacing:0">(<?= count($pend) ?>)</span></div>
+  <div class="card-grid">
+    <?php foreach ($pend as $pc):
+        $req = (string)$pc['inspection_required_date'];
+        $days = $req !== '' ? (int)round((strtotime($req) - $today0) / 86400) : null;
+        $cross = !empty($pc['executing_office_id']) && !empty($pc['ibo_office_id'])
+                 && (int)$pc['executing_office_id'] !== (int)$pc['ibo_office_id']; ?>
+      <div class="master-card" style="cursor:default">
+        <strong><a href="/call?id=<?= (int)$pc['id'] ?>" style="text-decoration:none;color:inherit"><?= e($pc['call_code']) ?></a></strong>
+        <span class="muted"><?= e($pc['client_name'] ?: '—') ?><?= $cross ? ' · <span class="badge AMBER">cross-office</span>' : '' ?></span>
+        <span class="muted"><?= e(lk_options_or('inspection_type', INSPECTION_TYPES)[$pc['inspection_type']] ?? ($pc['inspection_type'] ?: '—')) ?><?= $pc['sbu'] ? ' · ' . e(lk_options_or('sbu', OPS_SBUS)[$pc['sbu']] ?? $pc['sbu']) : '' ?></span>
+        <span class="muted">Needed by <?= e($req ?: '—') ?><?php if ($days !== null): ?> · <span class="badge <?= $days < 0 ? 'RED' : ($days <= 2 ? 'AMBER' : 'GREEN') ?>"><?= $days < 0 ? abs($days) . 'd overdue' : $days . 'd' ?></span><?php endif; ?></span>
+        <span style="margin-top:6px"><a class="btn small" href="/job-new?call=<?= (int)$pc['id'] ?>">Allocate</a>
+          <a class="btn small secondary" href="/call?id=<?= (int)$pc['id'] ?>">Open</a></span>
+      </div>
+    <?php endforeach; ?>
+  </div>
+<?php endif; ?>
+
 <?php // ---- Cross-office calls (contracting ↔ executing) ---------------------
       //  Calls raised by one branch and executed by another. Each office keeps
       //  the TAT clock in view: the executing branch allocates; the contracting
