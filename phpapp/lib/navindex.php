@@ -74,7 +74,6 @@ function ops_nav_index() {
         if ($can('mod.jobs.view'))  $add($thp('job'), '/jobs', $A, '🗂️', 'Allocation, execution & closure.');
         if ($fx('sched_board_can') && sched_board_can()) $add('Scheduling board', '/schedule', $A, '🗓️', 'Assign inspectors to dates.');
         if ($fx('tosrm_ops_desk_can') && tosrm_ops_desk_can()) {
-            $add('Operations desk', '/ops-desk', $A, '🎛️', 'Backlog, schedule & assignment.');
             $add('Capacity outlook', '/capacity-outlook', $A, '📈', 'Who is free, who is stretched.');
         }
         if ($can('mod.calls.view')) {

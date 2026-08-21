@@ -76,7 +76,6 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
   </div>
   <div class="row-actions">
     <?php if (can('mod.calls.edit') || can('mod.calls.view')): ?><a class="btn primary" href="/call-new">＋ <?= e(ucfirst(T_NEW('call'))) ?></a><?php endif; ?>
-    <?php if (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can()): ?><a class="btn secondary" href="/ops-desk">Operations desk</a><?php endif; ?>
     <?php if (function_exists('sched_board_can') && sched_board_can()): ?><a class="btn secondary" href="/schedule">Scheduling board</a><?php endif; ?>
   </div>
 </div>
@@ -90,8 +89,8 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
   <a class="op-kpi warn" href="/schedule"><div class="v"><?= (int)($m['unscheduled'] ?? 0) ?></div><div class="l">Unscheduled</div><div class="h">ready but no date</div></a>
   <a class="op-kpi warn" href="/calls"><div class="v"><?= (int)($m['clarification'] ?? 0) ?></div><div class="l">Clarification open</div><div class="h">waiting on client/vendor</div></a>
   <a class="op-kpi good" href="/schedule"><div class="v"><?= (int)($m['ready'] ?? 0) ?></div><div class="l">Ready to schedule</div><div class="h">all inputs complete</div></a>
-  <a class="op-kpi" href="/ops-desk"><div class="v"><?= (int)($m['today'] ?? 0) ?></div><div class="l">Today’s services</div><div class="h">scheduled for today</div></a>
-  <a class="op-kpi bad" href="/ops-desk"><div class="v"><?= (int)($m['overdue'] ?? 0) ?></div><div class="l">Overdue</div><div class="h">past required date</div></a>
+  <a class="op-kpi" href="/operations#schedule"><div class="v"><?= (int)($m['today'] ?? 0) ?></div><div class="l">Today’s services</div><div class="h">scheduled for today</div></a>
+  <a class="op-kpi bad" href="/operations#backlog"><div class="v"><?= (int)($m['overdue'] ?? 0) ?></div><div class="l">Overdue</div><div class="h">past required date</div></a>
   <a class="op-kpi bad" href="/calls"><div class="v"><?= (int)($m['critical'] ?? 0) ?></div><div class="l">Critical</div><div class="h">flagged priority</div></a>
   <a class="op-kpi warn" href="/jobs"><div class="v"><?= (int)($m['report_pending'] ?? 0) ?></div><div class="l">Report pending</div><div class="h">done, not issued</div></a>
 </div>
@@ -156,6 +155,9 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
 <?php // The three groups become tabs (app.js → initSectionTabs); the KPI row
       // above stays pinned as the summary. One long screen → three short ones. ?>
 <div data-tabs data-tabs-key="area">
+<section data-tab="Backlog &amp; registers">
+  <?php include __DIR__ . '/_ops_registers.php'; ?>
+</section>
 <section data-tab="Work intake &amp; delivery"><div class="op-grid">
   <?php
   $tile('/calls', '📋', THP('call'), 'Orders from the client, with lead time and delay.',
@@ -166,9 +168,6 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
   if (function_exists('sched_board_can') && sched_board_can())
     $tile('/schedule', '🗓️', 'Scheduling board', 'Assign inspectors to dates; capacity-aware.',
           [[$m['today'] ?? null, 'Today'], [$m['ready'] ?? null, 'Ready']]);
-  if (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can())
-    $tile('/ops-desk', '🎛️', 'Operations desk', 'The control centre — backlog, schedule & assignment registers.',
-          [[$m['overdue'] ?? null, 'At risk']]);
   if (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can())
     $tile('/capacity-outlook', '📈', 'Capacity outlook', 'Who is free, who is stretched, over the coming weeks.');
   if (can('mod.calls.view'))

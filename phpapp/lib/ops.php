@@ -2751,7 +2751,10 @@ function ops_dispatch($route, $method) {
         case in_array($route, ['sales','quality','reporting','money','insights','directory','admin'], true):
             return ops_area_home($route, $method);
         case $route === 'ops-desk':
-            return ops_tosrm_desk($method);
+            // Merged into the Operations home (Backlog & registers tab). Kept as a
+            // redirect so old links and bookmarks still land somewhere sensible.
+            redirect('/operations#backlog');
+            return true;
         case in_array($route, ['comm-add','assign-issue','xo-nudge'], true):
             return ops_tosrm_comm_action($route, $method);
         case in_array($route, ['dep-status','dep-check-seed','dep-check-set','dep-site-log','dep-site-log-close','dep-timesheet','dep-approval','dep-approval-status'], true):

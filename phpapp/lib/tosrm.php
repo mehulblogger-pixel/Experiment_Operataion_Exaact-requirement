@@ -2402,10 +2402,19 @@ function ops_operations_home($method) {
     try { tosrm_xo_escalate_scan($offices); } catch (Throwable $e) {}
     $xo = tosrm_xo_calls($offices);   // cross-office: inbound to allocate + sent-out to track
     $pending = tosrm_pending_scheduling($offices);   // every call still awaiting a person (same-office + cross-office)
+    // The registers that used to live on the separate Operations desk, folded in
+    // here as a tab so there is one Operations screen, not two overlapping ones.
+    $deskFrom = trim((string)($_GET['from'] ?? '')) ?: date('Y-m-d');
+    $deskTo   = trim((string)($_GET['to'] ?? '')) ?: date('Y-m-d', strtotime($deskFrom . ' +13 days'));
     view('ops/operations_home', [
         'metrics' => $metrics, 'counts' => $counts, 'services' => $services, 'scopeLabel' => $offLabel,
         'disrupt' => $disrupt, 'drKey' => preg_replace('/[^a-z]/', '', strtolower($dr)), 'drLabel' => $dLabel,
         'xo' => $xo, 'pending' => $pending, 'csrf' => function_exists('csrf_token') ? csrf_token() : '',
+        'backlog' => tosrm_ops_backlog($offices, 60),
+        'schedule' => tosrm_schedule_register($offices, $deskFrom, $deskTo),
+        'assignments' => tosrm_assignment_register($offices, 60),
+        'dataquality' => tosrm_ops_dataquality($offices, 40),
+        'from' => $deskFrom, 'to' => $deskTo,
     ]);
     return true;
 }
