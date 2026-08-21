@@ -34,6 +34,8 @@ $h = $health ?? null; if ($h): [$hband, $htone] = $h['band']; ?>
 <div class="panel"><div class="kv-grid">
   <div><span class="k">Type</span><?= e(lk_options_or('requisition_type', REQ_TYPES)[$req['req_type']] ?? '') ?></div>
   <div><span class="k">Project / site</span><?= e($req['project_site'] ?: '—') ?></div>
+  <?php $reqLocs = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string)($req['locations'] ?? ''))))); ?>
+  <?php if ($reqLocs): ?><div><span class="k">Locations required</span><span><?php foreach ($reqLocs as $L): ?><span class="pill p-mut" style="margin:0 4px 3px 0;display:inline-block"><?= e($L) ?></span><?php endforeach; ?></span></div><?php endif; ?>
   <div><span class="k"><?= e(T("sbu")) ?></span><?= e(OPS_SBUS[$req['sbu']] ?? ($req['sbu'] ?: '—')) ?></div>
   <div><span class="k">Approval</span><?= e($req['approval_ref'] ?: '—') ?><?= $req['approval_date'] ? ' · '.e($req['approval_date']) : '' ?><?= $req['approved_by'] ? ' · by '.e($req['approved_by']) : '' ?></div>
   <?php if ($seeSal): ?><div><span class="k">Budgeted monthly cost</span><?= fmoney($req['budgeted_cost']) ?></div><?php endif; ?>

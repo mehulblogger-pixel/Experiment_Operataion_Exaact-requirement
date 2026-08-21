@@ -48,7 +48,11 @@ function req_migrate() {
         ['start_date',"VARCHAR(20) DEFAULT ''"], ['end_date',"VARCHAR(20) DEFAULT ''"],
         ['duration_months',"DECIMAL(6,2) DEFAULT 0"], ['duty_hours',"VARCHAR(40) DEFAULT ''"],
         ['shift',"VARCHAR(40) DEFAULT ''"], ['work_model',"VARCHAR(30) DEFAULT ''"],
-        ['deploy_location',"VARCHAR(160) DEFAULT ''"], ['prov_travel','INT DEFAULT 0'],
+        ['deploy_location',"VARCHAR(160) DEFAULT ''"],
+        // Several locations can be needed against one requirement — one per line.
+        // Received CVs are then tagged to one of them.
+        ['locations',"TEXT"],
+        ['prov_travel','INT DEFAULT 0'],
         ['prov_accommodation','INT DEFAULT 0'], ['prov_food','INT DEFAULT 0'], ['other_allowances',"VARCHAR(300) DEFAULT ''"],
         // Selection
         ['sel_client_interview','INT DEFAULT 0'], ['sel_tech_interview','INT DEFAULT 0'],

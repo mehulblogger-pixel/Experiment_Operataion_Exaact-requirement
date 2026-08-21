@@ -40,7 +40,7 @@
 <?php if ($dupes): ?><input type="hidden" name="dup_ack" value="1"><?php endif; ?>
   <div class="ff ff-wide" style="background:var(--soft);border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px">
     <label>Against requisition (management approval) *</label>
-    <select class="form-control searchable" name="requisition_id" required>
+    <select class="form-control searchable" name="requisition_id" id="cand_req" required>
       <option value="">— pick an approved requisition —</option>
       <?php foreach (($requisitions ?? []) as $rq): ?><option value="<?= (int)$rq['id'] ?>" <?= (string)($preReq ?? '')===(string)$rq['id']?'selected':'' ?>><?= e($rq['req_code']) ?> · <?= e(DESIGNATIONS[$rq['designation']] ?? $rq['designation']) ?> · <?= e(lk_options_or('requisition_type', REQ_TYPES)[$rq['req_type']] ?? '') ?></option><?php endforeach; ?>
     </select>
@@ -59,7 +59,10 @@
       <select class="form-control searchable" name="call_id"><option value="">— optional —</option>
         <?php foreach ($depCalls as $dc): ?><option value="<?= (int)$dc['id'] ?>" <?= (string)($cand['call_id'] ?? '')===(string)$dc['id']?'selected':'' ?>><?= e($dc['call_code']) ?><?= $dc['inspection_type']?' · '.e(INSPECTION_TYPES[$dc['inspection_type']] ?? $dc['inspection_type']):'' ?></option><?php endforeach; ?>
       </select><small class="muted">Not listed? Open the full New Call form, add it, then reopen this form to pick it.</small></div>
-    <div class="ff"><label>Proposed site / location</label><input class="form-control" name="proposed_site" value="<?= e($cand['proposed_site'] ?? '') ?>"></div>
+    <div class="ff"><label>Proposed site / location <span class="muted">— tag to the requirement’s location</span></label>
+      <input class="form-control" name="proposed_site" id="cand_loc" list="reqLocList" value="<?= e($cand['proposed_site'] ?? '') ?>" placeholder="pick from the requirement, or type">
+      <datalist id="reqLocList"></datalist>
+      <small class="muted" id="cand_loc_hint"></small></div>
 
     <div class="ff"><label>Trade / discipline</label>
       <select class="form-control searchable" id="trade_sel" name="trade_id"><option value="">—</option>
@@ -141,5 +144,21 @@ window.SKILLS = <?= json_encode($skillsByTrade) ?>;
   var need=<?= json_encode(CAND_AGENCY_SOURCES) ?>;
   function sync(){ var on=need.indexOf(src.value)>=0; if(lbl) lbl.style.fontWeight=on?'700':''; if(sel){ sel.style.borderColor=on?'#d98a2b':''; } }
   if(src){ src.addEventListener('change', sync); sync(); }
+
+  // Location tagging — offer the chosen requirement's locations for this CV.
+  var REQ_LOCS = <?= json_encode($reqLocations ?? []) ?>;
+  var reqSel = document.getElementById('cand_req'),
+      locDl  = document.getElementById('reqLocList'),
+      locHint= document.getElementById('cand_loc_hint');
+  function fillLocs(){
+    if(!reqSel || !locDl) return;
+    var locs = REQ_LOCS[reqSel.value] || [];
+    locDl.innerHTML = '';
+    locs.forEach(function(l){ var o=document.createElement('option'); o.value=l; locDl.appendChild(o); });
+    if(locHint) locHint.textContent = locs.length
+      ? 'This requirement has ' + locs.length + ' location(s) — pick one, or type another.'
+      : 'This requirement has no locations listed.';
+  }
+  if(reqSel){ reqSel.addEventListener('change', fillLocs); fillLocs(); }
 })();
 </script>

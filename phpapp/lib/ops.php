@@ -4065,7 +4065,7 @@ function ops_requisitions($route, $method) {
         if ($route === 'requisition-edit') { $req = ops_one("SELECT * FROM requisitions WHERE id=?", [(int)($_GET['id'] ?? 0)]); if (!$req) { http_response_code(404); view('notfound'); return; } }
         if ($method === 'POST') {
             $b = $_POST;
-            $base = ['office_id','sbu','designation','project_site','req_type','outgoing_inspector_id','budgeted_cost','approved_by','approval_ref','approval_date','status','notes'];
+            $base = ['office_id','sbu','designation','project_site','locations','req_type','outgoing_inspector_id','budgeted_cost','approved_by','approval_ref','approval_date','status','notes'];
             $fields = array_merge($base, function_exists('req_extra_fields') ? req_extra_fields() : []);
             // Type coercion: ints (ids, counts, yes/no flags) and money/number fields.
             $intF = ['office_id','outgoing_inspector_id','client_id','quantity','prov_travel','prov_accommodation','prov_food',
@@ -4323,8 +4323,15 @@ function ops_candidates($route, $method) {
         $depCalls = ops_all("SELECT id, call_code, inspection_type FROM calls ORDER BY id DESC");
         $agencies = array_values(array_filter(array_column(ops_all("SELECT DISTINCT agency FROM subcons WHERE agency<>'' ORDER BY agency"), 'agency')));
         $preReq = $cand ? ($cand['requisition_id'] ?? null) : (($_GET['req'] ?? '') !== '' ? (int)$_GET['req'] : null);
+        // Each requirement's locations, so a received CV can be tagged to one of
+        // them once its requisition is chosen.
+        $reqLocations = [];
+        try {
+            foreach (ops_all("SELECT id, locations FROM requisitions WHERE COALESCE(locations,'')<>''") as $rr)
+                $reqLocations[(int)$rr['id']] = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string)$rr['locations']))));
+        } catch (Throwable $e) { /* locations column not present on an older install */ }
         view('ops/candidate_form', ['cand' => $cand, 'clients' => clients_list(), 'depCalls' => $depCalls, 'agencies' => $agencies,
-            'requisitions' => requisitions_list(true), 'preReq' => $preReq,
+            'requisitions' => requisitions_list(true), 'preReq' => $preReq, 'reqLocations' => $reqLocations,
             'cfvals' => $cand ? custom_values_map('candidate', $cand['id']) : [],
             'dupes' => $dupBlock ?? [], 'prefill' => $prefill ?? null,
             'rccUsers' => function_exists('rcc_users') ? rcc_users() : [], 'rccDepts' => function_exists('rcc_departments') ? rcc_departments() : [],
