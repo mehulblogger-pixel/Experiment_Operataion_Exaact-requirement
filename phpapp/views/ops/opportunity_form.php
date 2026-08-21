@@ -14,16 +14,17 @@
       <input class="form-control" name="name" required maxlength="255" value="<?= e($prefill['name'] ?? '') ?>"
              placeholder="e.g. Annual vessel inspection contract — 2027 renewal">
       <span class="muted" style="font-size:12px">Name it the way you would say it out loud in a review.</span></div>
-    <div><label>Customer <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
-      <select name="partner_id" class="searchable">
+    <div><label>Customer <span class="muted" style="font-size:12px">— pick one to be able to quote</span> <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
+      <select name="partner_id" class="form-control searchable">
         <option value="">— not on the master yet —</option>
         <?php foreach ($clients as $c): ?>
           <option value="<?= (int)$c['id'] ?>" <?= ((int)($prefill['partner_id'] ?? 0)===(int)$c['id'])?'selected':'' ?>><?= e($c['display_name'] ?: $c['legal_name']) ?></option>
         <?php endforeach; ?>
       </select></div>
-    <div><label>…or who it is for</label>
+    <div><label>…or who it is for <span class="muted" style="font-size:12px">— a name only</span></label>
       <input class="form-control" name="partner_name" maxlength="200" value="<?= e($prefill['partner_name'] ?? '') ?>"
-             placeholder="Company name, if they are not a customer yet"></div>
+             placeholder="Company name, if they are not a customer yet">
+      <span class="muted" style="font-size:12px">A name-only deal can't be quoted until you link a real customer — pick one above when you can.</span></div>
     <div><label>Pipeline</label>
       <select class="form-control" name="pipeline_id">
         <?php foreach ($pipelines as $p): ?><option value="<?= (int)$p['id'] ?>" <?= ((int)($prefill['pipeline_id'] ?? 0)===(int)$p['id'])?'selected':'' ?>><?= e($p['name']) ?></option><?php endforeach; ?>
