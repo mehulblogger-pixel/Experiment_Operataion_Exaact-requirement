@@ -100,8 +100,12 @@ function asset_counts() {
             'out'    => (int)ops_val("SELECT COUNT(*) FROM asset_issues WHERE status='ISSUED'"),
             'noack'  => (int)ops_val("SELECT COUNT(*) FROM asset_issues WHERE status='ISSUED' AND (ack_on='' OR ack_on IS NULL)"),
             'people' => (int)ops_val("SELECT COUNT(DISTINCT person_id) FROM asset_issues WHERE status='ISSUED'"),
+            // Still out with somebody who is no longer active — the kit most likely
+            // to be lost track of.
+            'left'   => (int)ops_val("SELECT COUNT(*) FROM asset_issues a JOIN inspectors i ON i.id=a.person_id
+                                      WHERE a.status='ISSUED' AND COALESCE(i.status,'ACTIVE')<>'ACTIVE'"),
         ];
-    } catch (Throwable $e) { if (asset_missing_table($e)) return ['out'=>0,'noack'=>0,'people'=>0]; throw $e; }
+    } catch (Throwable $e) { if (asset_missing_table($e)) return ['out'=>0,'noack'=>0,'people'=>0,'left'=>0]; throw $e; }
 }
 
 // ---- Writes ----------------------------------------------------------------
@@ -207,15 +211,17 @@ function ops_assets($route, $method) {
     $fPerson = (int)($_GET['person'] ?? 0);
     $fType   = (string)($_GET['type'] ?? '');
     $fStatus = (string)($_GET['status'] ?? '');
+    $fLeft   = ($_GET['left'] ?? '') === '1';   // still out with someone who has left
     $q       = trim((string)($_GET['q'] ?? ''));
     $w = ['1=1']; $args = [];
     if ($fPerson) { $w[] = 'a.person_id=?'; $args[] = $fPerson; }
     if ($fType !== '' && isset(asset_types()[$fType])) { $w[] = 'a.asset_type=?'; $args[] = $fType; }
     if ($fStatus !== '' && isset(ASSET_STATUS[$fStatus])) { $w[] = 'a.status=?'; $args[] = $fStatus; }
+    if ($fLeft) { $w[] = "a.status='ISSUED' AND COALESCE(i.status,'ACTIVE')<>'ACTIVE'"; }
     if ($q !== '') { $w[] = '(a.asset_name LIKE ? OR a.identifier LIKE ? OR i.name LIKE ?)'; array_push($args, "%$q%", "%$q%", "%$q%"); }
     $rows = [];
     try {
-        $rows = ops_all("SELECT a.*, i.name person_name, i.emp_code
+        $rows = ops_all("SELECT a.*, i.name person_name, i.emp_code, COALESCE(i.status,'ACTIVE') person_status
                          FROM asset_issues a LEFT JOIN inspectors i ON i.id=a.person_id
                          WHERE " . implode(' AND ', $w) . " ORDER BY (a.status='ISSUED') DESC, a.id DESC", $args);
     } catch (Throwable $e) { if (!asset_missing_table($e)) throw $e; }
@@ -224,7 +230,7 @@ function ops_assets($route, $method) {
         'rows' => $rows, 'counts' => asset_counts(),
         'people' => ops_all("SELECT id, name, emp_code FROM inspectors WHERE status='ACTIVE' ORDER BY name"),
         'types' => asset_types(), 'statuses' => ASSET_STATUS, 'conditions' => ASSET_CONDITIONS,
-        'fPerson' => $fPerson, 'fType' => $fType, 'fStatus' => $fStatus, 'q' => $q,
+        'fPerson' => $fPerson, 'fType' => $fType, 'fStatus' => $fStatus, 'fLeft' => $fLeft, 'q' => $q,
         'canManage' => asset_can_manage(),
     ]);
     return true;

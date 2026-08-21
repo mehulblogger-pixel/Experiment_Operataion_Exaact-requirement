@@ -3376,6 +3376,15 @@ function ops_inspectors($action, $method) {
                 if ($agencyCost !== null) { $sql .= ",agency_cost=?"; $args[] = $agencyCost; }
                 $sql .= " WHERE id=?"; $args[] = $ins['id'];
                 $pdo->prepare($sql)->execute($args);
+                // Flag kit that has not come back when somebody is deactivated —
+                // this is exactly when a stamp or a laptop gets forgotten.
+                if (($b['status'] ?? '') === 'INACTIVE' && ($ins['status'] ?? '') !== 'INACTIVE'
+                    && function_exists('person_assets_summary')) {
+                    $pa = person_assets_summary((int)$ins['id']);
+                    if ((int)($pa['out'] ?? 0) > 0)
+                        flash((int)$pa['out'] . ' asset(s) issued to ' . $full . ' are still not returned. '
+                            . 'Record their return in the asset register before they are forgotten.', 'warning');
+                }
                 flash('Inspector saved.');
                 redirect('/m/inspectors/edit?id=' . $ins['id']);
             } else {

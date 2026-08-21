@@ -13,8 +13,16 @@
   <div class="kpi"><span class="kic">📦</span><div class="k">Assets out</div><div class="v"><?= (int)$counts['out'] ?></div><div class="d">currently issued</div></div>
   <div class="kpi"><span class="kic">✍️</span><div class="k">Not acknowledged</div>
     <div class="v"><?= $counts['noack'] ? '<span class="down">'.(int)$counts['noack'].'</span>' : '0' ?></div><div class="d">awaiting the person’s sign-off</div></div>
+  <a class="kpi" href="/asset-register?left=1" style="text-decoration:none;color:inherit<?= !empty($counts['left']) ? ';outline:2px solid var(--bad);outline-offset:1px' : '' ?>">
+    <span class="kic">🚪</span><div class="k">Not returned — person left</div>
+    <div class="v"><?= !empty($counts['left']) ? '<span class="down">'.(int)$counts['left'].'</span>' : '0' ?></div><div class="d">still out with someone inactive</div></a>
   <div class="kpi"><span class="kic">👷</span><div class="k">People holding kit</div><div class="v"><?= (int)$counts['people'] ?></div></div>
 </div>
+
+<?php if (!empty($counts['left']) && !$fLeft): ?>
+  <div class="msg msg-warning" style="margin-bottom:12px"><strong><?= (int)$counts['left'] ?> asset(s) are still out with people who are no longer active.</strong>
+    <a href="/asset-register?left=1">Show them →</a> and record their return, or mark them lost.</div>
+<?php endif; ?>
 
 <form method="get" action="/asset-register" class="filter-bar">
   <input class="form-control" name="q" value="<?= e($q) ?>" placeholder="Asset / serial / person…" style="min-width:200px">
@@ -30,9 +38,11 @@
     <option value="">Any status</option>
     <?php foreach ($statuses as $k=>$v): ?><option value="<?= e($k) ?>" <?= $fStatus===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
   </select>
+  <?php if (!empty($fLeft)): ?><input type="hidden" name="left" value="1"><?php endif; ?>
   <button class="btn secondary" type="submit">Search</button>
-  <?php if ($q!==''||$fPerson||$fType!==''||$fStatus!==''): ?><a class="btn secondary" href="/asset-register">Clear</a><?php endif; ?>
+  <?php if ($q!==''||$fPerson||$fType!==''||$fStatus!==''||!empty($fLeft)): ?><a class="btn secondary" href="/asset-register">Clear</a><?php endif; ?>
 </form>
+<?php if (!empty($fLeft)): ?><p class="sub" style="margin:0 0 10px">Showing assets still out with people who have left or been deactivated.</p><?php endif; ?>
 
 <?php if ($canManage): ?>
 <div class="panel">
@@ -71,7 +81,8 @@
       <tr>
         <td><strong><?= e($r['asset_name']) ?></strong><?php if ($r['identifier']): ?><div class="muted" style="font-size:12px"><?= e($r['identifier']) ?><?= (int)$r['quantity']>1 ? ' · ×'.(int)$r['quantity'] : '' ?></div><?php endif; ?></td>
         <td class="muted"><?= e($types[$r['asset_type']] ?? $r['asset_type']) ?></td>
-        <td><?= e($r['person_name'] ?: '—') ?><?php if ($r['emp_code']): ?> <span class="muted">(<?= e($r['emp_code']) ?>)</span><?php endif; ?></td>
+        <td><?= e($r['person_name'] ?: '—') ?><?php if ($r['emp_code']): ?> <span class="muted">(<?= e($r['emp_code']) ?>)</span><?php endif; ?>
+          <?php if ($issued && ($r['person_status'] ?? 'ACTIVE') !== 'ACTIVE'): ?><span class="pill p-bad" title="This person is inactive but still holds this asset">🚪 left — not returned</span><?php endif; ?></td>
         <td class="muted"><?= e($r['issued_on'] ?: '—') ?></td>
         <td><?php if (trim((string)$r['ack_on'])!==''): ?>
               <span class="pill p-ok">✓</span> <span class="muted" style="font-size:12px"><?= e($r['ack_by'] ?: '') ?> · <?= e($r['ack_on']) ?></span>

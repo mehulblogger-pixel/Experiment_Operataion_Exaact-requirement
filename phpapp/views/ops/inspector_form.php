@@ -105,7 +105,9 @@
         <span class="muted">— <?= (int)$pa['out'] ?> currently held<?= $pa['noack'] ? ', '.(int)$pa['noack'].' not acknowledged' : '' ?></span></label>
       <div>
         <?php if ((int)$pa['out'] === 0): ?><span class="muted">Nothing issued yet.</span>
-        <?php else: ?><span class="pill p-ok"><?= (int)$pa['out'] ?> in hand</span>
+        <?php else: $inactive = ($ins['status'] ?? 'ACTIVE') !== 'ACTIVE'; ?>
+          <span class="pill <?= $inactive ? 'p-bad' : 'p-ok' ?>"><?= (int)$pa['out'] ?> in hand<?= $inactive ? ' — not returned' : '' ?></span>
+          <?php if ($inactive): ?> <span class="pill p-bad">🚪 this person is inactive — collect their kit</span><?php endif; ?>
           <?php if ($pa['noack']): ?> <span class="pill p-warn"><?= (int)$pa['noack'] ?> awaiting sign-off</span><?php endif; ?>
         <?php endif; ?>
       </div>
