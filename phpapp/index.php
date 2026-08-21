@@ -140,6 +140,7 @@ try {
     require __DIR__ . '/lib/satisfaction.php';
     require __DIR__ . '/lib/impartiality.php';
     require __DIR__ . '/lib/identity.php';
+    require __DIR__ . '/lib/assets.php';
     require __DIR__ . '/lib/complaints.php';
     require __DIR__ . '/lib/capa.php';
     require __DIR__ . '/lib/ncr.php';

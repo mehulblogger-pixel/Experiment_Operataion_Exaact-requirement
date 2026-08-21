@@ -98,6 +98,19 @@
       <small class="muted"><?= $pd['complete'] ? 'All required documents are on file.' : ((int)$pd['need'] . ' missing.') ?>
         <?php if (function_exists('iddoc_can_view') && iddoc_can_view()): ?><a href="/identity?i=<?= (int)$ins['id'] ?>">File documents →</a><?php endif; ?></small></div>
     <?php endif; ?>
+
+    <?php // Assets issued to this person (stamps, safety gear, devices…). ?>
+    <?php if ($ins && !empty($personAssets)): $pa = $personAssets; ?>
+    <div class="ff ff-wide"><label>Assets issued
+        <span class="muted">— <?= (int)$pa['out'] ?> currently held<?= $pa['noack'] ? ', '.(int)$pa['noack'].' not acknowledged' : '' ?></span></label>
+      <div>
+        <?php if ((int)$pa['out'] === 0): ?><span class="muted">Nothing issued yet.</span>
+        <?php else: ?><span class="pill p-ok"><?= (int)$pa['out'] ?> in hand</span>
+          <?php if ($pa['noack']): ?> <span class="pill p-warn"><?= (int)$pa['noack'] ?> awaiting sign-off</span><?php endif; ?>
+        <?php endif; ?>
+      </div>
+      <?php if (function_exists('asset_can_view') && asset_can_view()): ?><small class="muted"><a href="/asset-register?person=<?= (int)$ins['id'] ?>">Issue / return assets →</a></small><?php endif; ?></div>
+    <?php endif; ?>
   </div>
 
   <?php if (!$ins): // §WO-7 — attach a first certificate (with its scan) right while adding ?>

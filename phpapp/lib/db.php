@@ -413,6 +413,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('competence_cycle_migrate')) competence_cycle_migrate();  // basis, review cycle, witnessing interval  // authorisation matrix, §6.1
     if (function_exists('impartiality_migrate')) impartiality_migrate();  // §4.1 threats & declarations
     if (function_exists('identity_migrate')) identity_migrate();
+    if (function_exists('assets_migrate')) assets_migrate();           // kit issued to engineers — stamps, safety gear, devices
     if (function_exists('sitedoc_migrate')) sitedoc_migrate();         // what a site demands before the gate opens       // passports & IDs, held under DPDP guardrails
     if (function_exists('complaints_migrate')) complaints_migrate();   // §7.5 complaints, §7.6 appeals
     if (function_exists('capa_migrate')) capa_migrate();

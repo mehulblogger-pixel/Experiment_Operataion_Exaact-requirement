@@ -193,6 +193,7 @@ function lk_module_lists() {
         ['candidate_stage',     'Candidate stage',           CAND_STAGES,            'People'],
         ['candidate_source',    'Candidate source',          CAND_SOURCES,           'People'],
         ['agency_type',         'Agency type',               AGENCY_TYPES,           'People'],
+        ['asset_type',          'Asset type',                ASSET_TYPES,            'People'],
         ['roll_type',           'Whose roll',                ROLL_TYPES,             'People'],
         ['fee_status',          'Placement fee status',      FEE_STATUS,             'People'],
         ['requisition_type',    'Requisition type',          REQ_TYPES,              'People'],

@@ -168,11 +168,12 @@ function ops_area_def($area) {
         case 'directory':
             $title = 'Directory'; $icon = '🏢';
             $sub = 'The people and companies the work is done with.';
-            $routes = ['directory','activities','clients','client','vendors','vendor','client-holds'];
+            $routes = ['directory','activities','clients','client','vendors','vendor','client-holds','asset-register'];
             $t($fx('act_can_view') && act_can_view(), '🕘', 'Activity', '/activities', 'A timeline of what happened.');
             $t(can('mod.clients.view'), '🏢', T_REG('client'), '/clients', 'The client register.');
             $t(can('mod.vendors.view'), '🚚', T_REG('vendor'), '/vendors', 'The vendor register.');
             $t(is_master() || can('settings.manage') || ($fx('is_coordinator_level') && is_coordinator_level()), '⛔', 'Client holds', '/client-holds', 'Put a client on hold or block them before ordering.');
+            $t($fx('asset_can_view') && asset_can_view(), '📦', 'Asset issuance', '/asset-register', 'Stamps, diaries, safety gear & devices issued to engineers — acknowledged and tracked.');
             break;
 
         case 'admin':

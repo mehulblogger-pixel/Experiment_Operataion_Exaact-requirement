@@ -2688,6 +2688,8 @@ function ops_dispatch($route, $method) {
             return ops_audits($route, $method);
         case $route === 'identity' || $route === 'agency-staff' || strncmp($route, 'iddoc-', 6) === 0:
             return ops_identity($route, $method);
+        case $route === 'asset-register' || strncmp($route, 'asset-', 6) === 0:
+            return ops_assets($route, $method);
         case $route === 'impartiality' || strncmp($route, 'imp-', 4) === 0:
             return ops_impartiality($route, $method);
         case $route === 'competence' || strncmp($route, 'auth-', 5) === 0 || $route === 'witness-add':
@@ -3392,6 +3394,7 @@ function ops_inspectors($action, $method) {
         view('ops/inspector_form', ['ins' => $ins, 'certs' => $certs, 'skillsByTrade' => skills_by_trade(),
             'agencies' => agencies_list(),
             'personDocs' => ($ins && function_exists('person_docs_summary')) ? person_docs_summary((int)$ins['id']) : null,
+            'personAssets' => ($ins && function_exists('person_assets_summary')) ? person_assets_summary((int)$ins['id']) : null,
             'offices' => ops_all("SELECT id, name FROM offices ORDER BY is_ahmedabad DESC, name"),
             'managers' => ops_all("SELECT id, first_name, last_name, username, role FROM users WHERE is_active=1 ORDER BY first_name, last_name"),
             'expHeads' => ops_all("SELECT * FROM expense_heads WHERE active=1 ORDER BY sort_order, id"),
