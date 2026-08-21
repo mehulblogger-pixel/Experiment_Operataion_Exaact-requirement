@@ -231,13 +231,14 @@ function availability_matrix($offices, $from, $to) {
 
     // Days taken by an open deputation — a single scheduled day, a start/end
     // period, or any of the visit dates now held on the deputation.
-    $busy = [];
-    foreach (ops_all("SELECT inspector_id, job_code, scheduled_date, inspection_start_date, inspection_end_date, inspection_dates
+    $busy = []; $busyId = [];   // busyId: inspector_id => day => job id, for a direct link to the job
+    foreach (ops_all("SELECT id, inspector_id, job_code, scheduled_date, inspection_start_date, inspection_end_date, inspection_dates
                       FROM jobs WHERE inspector_id IS NOT NULL AND closed_flag=0 AND inspector_id IN ($inIds)") as $j) {
         $iid = (int)$j['inspector_id'];
-        $mark = function ($d) use (&$busy, $iid, $j, $first, $last) {
+        $mark = function ($d) use (&$busy, &$busyId, $iid, $j, $first, $last) {
             if ($d === '' || $d < $first || $d > $last) return;
             $busy[$iid][$d] = $j['job_code'];
+            $busyId[$iid][$d] = (int)$j['id'];
         };
         $mark((string)$j['scheduled_date']);
         foreach (call_dates_parse($j['inspection_dates'] ?? '') as $d) $mark($d);
@@ -252,7 +253,7 @@ function availability_matrix($offices, $from, $to) {
             $matrix[$id][$d] = $manual[$id][$d] ?? (isset($busy[$id][$d]) ? 'ON_JOB' : 'AVAILABLE');
         }
     }
-    return [$matrix, $days, $people, $busy];
+    return [$matrix, $days, $people, $busy, $busyId];
 }
 
 // From $start, how many consecutive days is this person free, and what stops

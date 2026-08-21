@@ -61,10 +61,10 @@
             <td style="position:sticky;left:0;background:var(--card,#fff);z-index:1;white-space:nowrap">
               <b><?= e($p['name']) ?></b><?= !empty($p['emp_code']) ? ' <span class="muted" style="font-size:11px">'.e($p['emp_code']).'</span>' : '' ?>
             </td>
-            <?php foreach ($days as $d): $st = $matrix[$id][$d] ?? 'AVAILABLE'; $c = $cell($st); $job = $board['busy'][$id][$d] ?? ''; ?>
+            <?php foreach ($days as $d): $st = $matrix[$id][$d] ?? 'AVAILABLE'; $c = $cell($st); $job = $board['busy'][$id][$d] ?? ''; $jid = $board['busyId'][$id][$d] ?? 0; ?>
               <td title="<?= e($p['name'].' · '.$fmtD($d).' · '.($job ?: strtolower($st))) ?>"
                   style="text-align:center;padding:3px 4px;background:<?= $c['bg'] ?>;color:<?= $c['fg'] ?>;font-size:10px;<?= $isWeekend($d)&&$st==='AVAILABLE'?'opacity:.55':'' ?>">
-                <?php if ($job): ?><a href="/jobs" style="color:inherit;text-decoration:none;font-weight:600"><?= e($job) ?></a>
+                <?php if ($job): ?><a href="<?= $jid ? '/job?id='.(int)$jid : '/jobs' ?>" style="color:inherit;text-decoration:none;font-weight:600"><?= e($job) ?></a>
                 <?php else: ?><?= e($c['lbl']) ?><?php endif; ?>
               </td>
             <?php endforeach; ?>
@@ -120,7 +120,7 @@
             <td><span class="pill p-ok"><?= (int)$s['run'] ?> day<?= $s['run']==1?'':'s' ?></span><?= $s['until']?' <span class="muted" style="font-size:11px">to '.e($fmtD($s['until'])).'</span>':'' ?></td>
             <td class="muted" style="font-size:12px"><?= $s['next_busy'] ? 'busy '.e($fmtD($s['next_busy'])) : ($s['load']?'':'clear') ?></td>
             <?php if ($canAllocate): ?>
-              <td><a class="btn sm secondary" href="<?= $s_call ? '/job-new?call_id='.(int)$s_call : '/calls' ?>">Allocate</a></td>
+              <td><a class="btn sm secondary" href="<?= $s_call ? '/job-new?call='.(int)$s_call : '/calls' ?>">Allocate</a></td>
             <?php endif; ?>
           </tr>
         <?php endforeach; ?>

@@ -22,8 +22,8 @@ function sched_offices() {
 // The board grid for a date span — reuses availability_matrix wholesale.
 // Returns ['matrix','days','people','busy'].
 function sched_board_data($offices, $from, $to) {
-    [$matrix, $days, $people, $busy] = availability_matrix($offices, $from, $to);
-    return ['matrix' => $matrix, 'days' => $days, 'people' => $people, 'busy' => $busy];
+    [$matrix, $days, $people, $busy, $busyId] = availability_matrix($offices, $from, $to);
+    return ['matrix' => $matrix, 'days' => $days, 'people' => $people, 'busy' => $busy, 'busyId' => $busyId ?? []];
 }
 
 // Capacity vs demand across the span. A day counts as capacity only if it is a
