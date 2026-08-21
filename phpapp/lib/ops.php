@@ -4085,7 +4085,7 @@ function ops_requisitions($route, $method) {
                     'cfvals' => $req ? custom_values_map('requisition', $req['id']) : []]);
                 return;
             }
-            $base = ['office_id','sbu','designation','project_site','locations','req_type','outgoing_inspector_id','budgeted_cost','approved_by','approval_ref','approval_date','status','notes'];
+            $base = ['office_id','sbu','designation','project_site','locations','req_type','outgoing_inspector_id','budgeted_cost','approved_by','approval_ref','approval_date','status','notes','quotation_ref'];
             $fields = array_merge($base, function_exists('req_extra_fields') ? req_extra_fields() : []);
             // Type coercion: ints (ids, counts, yes/no flags) and money/number fields.
             $intF = ['office_id','outgoing_inspector_id','client_id','quantity','prov_travel','prov_accommodation','prov_food',
@@ -4117,7 +4117,10 @@ function ops_requisitions($route, $method) {
                 if (function_exists('custom_save')) custom_save('requisition', (int)$req['id'], $b);
                 flash("Requisition {$req['req_code']} updated."); redirect('/requisition?id=' . $req['id']);
             } else {
-                $code = ops_next_code('requisitions', 'req_code', 'REQ');
+                $code = function_exists('recruit_req_code')
+                    ? recruit_req_code(($b['office_id'] ?? '') !== '' ? (int)$b['office_id'] : 0,
+                                       ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : 0, date('Y-m-d'))
+                    : ops_next_code('requisitions', 'req_code', 'REQ');
                 $cols = array_merge(['req_code'], $fields, $extraCols, ['created_by','created_at']);
                 $vals = array_merge([$code], array_map(fn($f)=>$norm($f, $b[$f] ?? ''), $fields), $extraVals, [user_name(current_user()), date('c')]);
                 $ph = implode(',', array_fill(0, count($cols), '?'));
@@ -4325,7 +4328,8 @@ function ops_candidates($route, $method) {
                 flash('Candidate updated.');
                 redirect('/candidate?id=' . $cand['id']);
             } elseif (!$dupBlock) {
-                $code = ops_next_code('candidates', 'cand_code', 'CV');
+                $cReq = ($b['requisition_id'] ?? '') !== '' ? ops_one("SELECT id, req_code FROM requisitions WHERE id=?", [(int)$b['requisition_id']]) : null;
+                $code = ($cReq && function_exists('recruit_cand_code')) ? recruit_cand_code($cReq) : ops_next_code('candidates', 'cand_code', 'CV');
                 $cols = array_merge(['cand_code'], $fields, ['stage','created_by','created_at']);
                 $vals = array_merge([$code], array_map(fn($f) => nzc_cand($f, $b[$f] ?? ''), $fields),
                     ['RECEIVED', user_name(current_user()), date('c')]);

@@ -74,6 +74,7 @@ $commer = $has('billing_rate') || (float)($req['expected_revenue'] ?? 0) != 0 ||
         if ($prov || $has('other_allowances')): ?><div><span class="k">Provided</span><?= e(implode(' · ', array_keys($prov)) ?: '—') ?><?= $has('other_allowances') ? ' · '.e($req['other_allowances']) : '' ?></div><?php endif; ?>
   <?php if (!empty($req['contact_name'])): ?><div><span class="k">Client contact</span><?= e($req['contact_name']) ?><?= !empty($req['contact_phone']) ? ' · '.e($req['contact_phone']) : '' ?></div><?php endif; ?>
   <?php if (!empty($req['contract_ref'])): ?><div><span class="k">Contract / PO</span><?= e($req['contract_ref']) ?></div><?php endif; ?>
+  <?php if (!empty($req['quotation_ref'])): ?><div><span class="k">Quotation ref</span><?= e($req['quotation_ref']) ?></div><?php endif; ?>
 </div></div>
 <?php endif; ?>
 

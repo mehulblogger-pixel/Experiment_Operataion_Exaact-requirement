@@ -76,6 +76,61 @@ function req_migrate() {
         ['cost_oneoff',"DECIMAL(14,2) DEFAULT 0"],        // one-time per person (medical/PCC/training/mobilisation)
     ];
     foreach ($cols as $c) ensure_column('requisitions', $c[0], $c[1]);
+    // Track the source paperwork against the requirement.
+    ensure_column('requisitions', 'quotation_ref', "VARCHAR(80) DEFAULT ''");
+    // The structured, meaningful code carries office/client/month/year + two
+    // running numbers, so it can be longer than the old 30-char field. Widening
+    // is a no-op on SQLite (no fixed length) and best-effort on MySQL.
+    foreach (['requisitions.req_code', 'candidates.cand_code'] as $tc) {
+        [$t, $c] = explode('.', $tc);
+        try { db()->exec("ALTER TABLE $t MODIFY $c VARCHAR(70)"); } catch (Throwable $e) { /* sqlite / already wide */ }
+    }
+}
+
+// A short, readable code from a name: letters only, upper-cased, first few.
+// "L&T" -> "LT", "Narmada Industries" -> "NAR". Falls back to 'NA'.
+function recruit_shortcode($name, $len = 3) {
+    $s = strtoupper(preg_replace('/[^A-Za-z]/', '', (string)$name));
+    return $s === '' ? 'NA' : substr($s, 0, max(2, $len));
+}
+
+// The structured requirement code:
+//   REQ / <office> / <client> / <YYMM> / C<client-req-no> / O<office-run-no>
+// e.g. REQ/AMD/LNT/2608/C005/O047. Client 'NA' (and its own counter bucket)
+// when no client is linked yet; the code stays stable afterwards.
+function recruit_req_code($officeId, $clientId, $when = null) {
+    $officeId = (int)$officeId; $clientId = (int)$clientId;
+    $when = $when ?: date('Y-m-d');
+    $ym = date('ym', strtotime($when));
+    $off = $officeId ? trim((string)ops_val("SELECT code FROM offices WHERE id=?", [$officeId])) : '';
+    if ($off === '' && $officeId) $off = recruit_shortcode(ops_val("SELECT name FROM offices WHERE id=?", [$officeId]));
+    $off = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $off)) ?: 'HO';
+    $cli = $clientId
+        ? recruit_shortcode((string)ops_val("SELECT COALESCE(NULLIF(display_name,''),legal_name) FROM business_partners WHERE id=?", [$clientId]))
+        : 'NA';
+    $cliNo = $clientId
+        ? (int)ops_val("SELECT COUNT(*) FROM requisitions WHERE client_id=?", [$clientId]) + 1
+        : (int)ops_val("SELECT COUNT(*) FROM requisitions WHERE COALESCE(client_id,0)=0") + 1;
+    $offNo = $officeId
+        ? (int)ops_val("SELECT COUNT(*) FROM requisitions WHERE office_id=?", [$officeId]) + 1
+        : (int)ops_val("SELECT COUNT(*) FROM requisitions WHERE COALESCE(office_id,0)=0") + 1;
+    $code = sprintf('REQ/%s/%s/%s/C%03d/O%03d', $off, $cli, $ym, $cliNo, $offNo);
+    $base = $code; $n = 1;
+    while ((int)ops_val("SELECT COUNT(*) FROM requisitions WHERE req_code=?", [$code])) $code = $base . '-' . (++$n);
+    return $code;
+}
+
+// The candidate code hangs off its requirement: <req-code>-CV<nn>, nn being the
+// CV number against that requirement. Falls back to the old CV-series for a
+// candidate raised against a legacy requisition with no structured code.
+function recruit_cand_code($req) {
+    $rc = trim((string)($req['req_code'] ?? ''));
+    if ($rc === '' || strncmp($rc, 'REQ/', 4) !== 0)
+        return function_exists('ops_next_code') ? ops_next_code('candidates', 'cand_code', 'CV') : 'CV-1';
+    $n = (int)ops_val("SELECT COUNT(*) FROM candidates WHERE requisition_id=?", [(int)($req['id'] ?? 0)]) + 1;
+    $code = sprintf('%s-CV%02d', $rc, $n);
+    while ((int)ops_val("SELECT COUNT(*) FROM candidates WHERE cand_code=?", [$code])) { $n++; $code = sprintf('%s-CV%02d', $rc, $n); }
+    return $code;
 }
 
 // The additive Phase-2 field list (used by the save handler). Kept here so the
