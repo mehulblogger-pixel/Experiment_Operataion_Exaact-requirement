@@ -1232,16 +1232,23 @@ function tosrm_render_readiness_panel($job) {
       <h3>Operations — readiness &amp; confirmation</h3>
       <p class="tr-sub">Competence advisories, client / vendor confirmation, and the pre-execution readiness checklist.</p>
 
-      <?php // Competence & certification advisory (reuses the competence engine) ?>
+      <?php // Competence & certification advisory (reuses the competence engine).
+            //   Shown when it matters: a real blocker (a lapsed/error item), or
+            //   when enforcement is switched on. When enforcement is OFF and there
+            //   is no blocker, it is noise for the coordinator, so it is hidden.
+            $compErr = false; foreach ($warn as $w) if (($w['level'] ?? '') === 'error') $compErr = true;
+            $showComp = $compErr || (function_exists('auth_enforced') && auth_enforced());
+            if ($showComp): ?>
       <div class="tr-sec">
         <div class="tr-h">Competence &amp; certification</div>
         <ul class="tr-list">
-          <?php foreach ($warn as $w): $col = $w['level']==='error' ? 'var(--bad)' : ($w['level']==='warn' ? 'var(--warn)' : 'var(--ok)'); ?>
+          <?php foreach ($warn as $w): if (($w['level'] ?? '') === 'ok') continue; $col = $w['level']==='error' ? 'var(--bad)' : ($w['level']==='warn' ? 'var(--warn)' : 'var(--ok)'); ?>
             <li style="color:<?=$col?>"><?=$esc($w['text'])?></li>
           <?php endforeach; ?>
         </ul>
         <p class="muted" style="font-size:12px;margin:6px 0 0">Advisory only — the coordinator decides; issuance-time enforcement is unchanged.</p>
       </div>
+      <?php endif; ?>
 
       <?php // Client / vendor confirmation ?>
       <div class="tr-sec">

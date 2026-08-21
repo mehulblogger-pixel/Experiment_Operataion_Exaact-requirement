@@ -76,18 +76,27 @@
     <div data-tab="Overview"><a id="playbook"></a><?php tosrm_render_playbook($job); ?></div>
   <?php endif; ?>
   <?php // Assignment lifecycle: hold, acceptance, reassignment / reschedule /
-        // cancel / no-show, all with kept history.
+        // cancel / no-show, all with kept history. Collapsed to keep Overview short.
         if (function_exists('tosrm_render_job_panel')): ?>
-    <div data-tab="Overview"><a id="assign"></a><?php tosrm_render_job_panel($job); ?></div>
+    <details class="fold" data-tab="Overview"><a id="assign"></a>
+      <summary>Assignment lifecycle <span class="sub">hold, reschedule, reassign, no-show — with history</span></summary>
+      <div class="fold-body"><?php tosrm_render_job_panel($job); ?></div>
+    </details>
   <?php endif; ?>
   <?php // Readiness, client/vendor confirmation, and competence-at-allocation.
         if (function_exists('tosrm_render_readiness_panel')): ?>
-    <div data-tab="Overview"><a id="ready"></a><?php tosrm_render_readiness_panel($job); ?></div>
+    <details class="fold" data-tab="Overview"><a id="ready"></a>
+      <summary>Readiness &amp; confirmation <span class="sub">client / vendor confirmation &amp; the pre-execution checklist</span></summary>
+      <div class="fold-body"><?php tosrm_render_readiness_panel($job); ?></div>
+    </details>
   <?php endif; ?>
 <?php endif; ?>
 <?php // Phase 9 (TOSRM Slice E) — communication log on the job.
       if (function_exists('tosrm_render_comms')): ?>
-  <div data-tab="Overview"><a id="comms"></a><?php tosrm_render_comms('JOB', (int)$job['id']); ?></div>
+  <details class="fold" data-tab="Overview"><a id="comms"></a>
+    <summary>Communication log <span class="sub">calls, e-mails &amp; meetings on this <?= e(Tl('job')) ?></span></summary>
+    <div class="fold-body"><?php tosrm_render_comms('JOB', (int)$job['id']); ?></div>
+  </details>
 <?php endif; ?>
 
 <?php // ---- Day-by-day plan & reshuffle -----------------------------------
@@ -616,7 +625,9 @@ if (function_exists('hwp_for_job')):
   </div>
 <?php endif; ?>
 
-<div class="panel" data-tab="Overview">
+<details class="fold" data-tab="Overview">
+  <summary>Full <?= e(Tl('job')) ?> details <span class="sub">call, stage, office, dates, reporting, credit &amp; deliverables</span></summary>
+  <div class="fold-body">
   <div class="kv-grid">
     <?php if (!empty($job['quotation_id'])): $lq = ops_one("SELECT quote_no, rev, contract_number FROM quotations WHERE id=?", [$job['quotation_id']]); ?>
     <div><span class="k">Against <?= e(Tl('quote')) ?></span><?= $lq ? e($lq['quote_no'].((int)$lq['rev']>0?' R'.$lq['rev']:'')) : '—' ?><?= ($lq && $lq['contract_number'])?' · '.e($lq['contract_number']):'' ?></div>
@@ -653,7 +664,8 @@ if (function_exists('hwp_for_job')):
       <div><span class="k"><?= e($cf['label']) ?></span><?= e($cf['value']) ?></div>
     <?php endforeach; ?>
   </div>
-</div>
+  </div>
+</details>
 
 <?php if (!empty($quoteDocs)): ?>
 <details class="fold">
@@ -873,3 +885,16 @@ if (function_exists('hwp_for_job')):
 </div>
 <?php endif; ?>
 </div><!-- /data-tabs (job record) -->
+
+<?php // A deep link to a section that is now collapsed (e.g. #assign from the
+      //   schedule register) should open that section, not land on a shut panel. ?>
+<script>(function(){
+  function openForHash(){
+    var h = (location.hash || '').slice(1); if(!h) return;
+    var el = document.getElementById(h); if(!el) return;
+    var d = el.closest ? el.closest('details') : null;
+    if(d){ d.open = true; setTimeout(function(){ el.scrollIntoView({block:'start'}); }, 30); }
+  }
+  window.addEventListener('hashchange', openForHash);
+  openForHash();
+})();</script>
