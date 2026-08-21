@@ -4,11 +4,13 @@
 // position / deployment / selection / compliance detail. Every field is
 // backward-compatible: an old requisition simply has the new fields empty.
 $r = $req ?? [];
+$isEdit = !empty($req['id']);
 $v = fn($k, $d = '') => e($r[$k] ?? $d);
 $sel = fn($k, $val) => (isset($r[$k]) && (string)$r[$k] === (string)$val) ? 'selected' : '';
 $chk = fn($k) => !empty($r[$k]) ? 'checked' : '';
 $cur = function_exists('cur_sym') ? cur_sym() : '₹';
 ?>
+<?php if (!empty($form_err)): ?><div class="msg msg-error" style="margin:10px 0"><?= e($form_err) ?></div><?php endif; ?>
 <style>
   .rq-modebar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0 16px}
   .rq-seg{display:inline-flex;border:1px solid var(--line,#e5e7eb);border-radius:9px;overflow:hidden;background:var(--card,#fff)}
@@ -43,11 +45,11 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
   #rq_cost_auto{cursor:pointer;text-decoration:underline;color:var(--brand,#1e40af)}
 </style>
 
-<div class="crumbs"><a href="/">Home</a> › <a href="/requisitions"><?= e(TP('requisition')) ?></a> › <?= $req ? 'Edit' : 'New' ?></div>
-<h1><?= $req ? 'Edit requirement '.e($req['req_code']) : 'New requirement' ?></h1>
+<div class="crumbs"><a href="/">Home</a> › <a href="/requisitions"><?= e(TP('requisition')) ?></a> › <?= $isEdit ? 'Edit' : 'New' ?></div>
+<h1><?= $isEdit ? 'Edit requirement '.e($req['req_code']) : 'New requirement' ?></h1>
 <p class="sub">Approved positions to recruit against. Start in <b>Simple</b> for an ordinary hire; switch to <b>Advanced</b> for full technical, deployment and commercial detail.</p>
 
-<form method="post" action="<?= $req ? '/requisition-edit?id='.(int)$req['id'] : '/requisition-new' ?>" class="rq-simple" id="rqForm">
+<form method="post" action="<?= $isEdit ? '/requisition-edit?id='.(int)$req['id'] : '/requisition-new' ?>" class="rq-simple" id="rqForm">
   <div class="rq-modebar">
     <span class="rq-seg"><button type="button" class="on" data-mode="simple">Simple</button><button type="button" data-mode="advanced">Advanced</button></span>
     <span class="hint">Simple asks only the essentials. Advanced reveals discipline, deployment, selection, compliance and commercials.</span>
@@ -189,10 +191,11 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
       <div class="form-grid" style="margin-top:8px">
         <div class="ff" data-head="wage"><label id="lbl_wage">Base wage / salary — / person / month (<?= e($cur) ?>)</label>
           <input class="form-control" type="number" step="0.01" name="cost_wage" id="rq_wage" value="<?= e(($r['cost_wage'] ?? 0) ?: '') ?>"></div>
-        <div class="ff" data-head="statutory"><label>Statutory &amp; benefits (%) <span class="muted">PF/ESIC/bonus/leave</span></label>
-          <input class="form-control" type="number" step="0.1" name="cost_statutory_pct" id="rq_stat" value="<?= e(($r['cost_statutory_pct'] ?? 0) ?: '') ?>"></div>
-        <div class="ff" data-head="agency"><label>Agency service fee / markup (%)</label>
-          <input class="form-control" type="number" step="0.1" name="cost_agency_pct" id="rq_agency" value="<?= e(($r['cost_agency_pct'] ?? 0) ?: '') ?>"></div>
+        <div class="ff" data-head="statutory"><label>Statutory &amp; benefits — <b>% of wage</b> <span class="muted">PF/ESIC/bonus/leave</span></label>
+          <input class="form-control" type="number" step="0.1" min="0" max="100" name="cost_statutory_pct" id="rq_stat" value="<?= e(($r['cost_statutory_pct'] ?? 0) ?: '') ?>" placeholder="e.g. 25 (a percent, not rupees)">
+          <small class="muted">A percentage of the wage, not a rupee amount. Typically 15–45%.</small></div>
+        <div class="ff" data-head="agency"><label>Agency service fee / markup — <b>%</b></label>
+          <input class="form-control" type="number" step="0.1" min="0" max="100" name="cost_agency_pct" id="rq_agency" value="<?= e(($r['cost_agency_pct'] ?? 0) ?: '') ?>" placeholder="e.g. 8 (a percent)"></div>
         <div class="ff" data-head="reimburse"><label>Reimbursables — / person / month (<?= e($cur) ?>) <span class="muted">travel/stay/food/PPE</span></label>
           <input class="form-control" type="number" step="0.01" name="cost_reimburse" id="rq_reimb" value="<?= e(($r['cost_reimburse'] ?? 0) ?: '') ?>"></div>
         <div class="ff" data-head="oneoff"><label>One-time / person (<?= e($cur) ?>) <span class="muted">medical/PCC/training/mobilisation</span></label>
@@ -207,7 +210,7 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
       <div class="ff"><label>Billing rate (<?= e($cur) ?>) <span class="muted">what we charge the client</span></label><input class="form-control" type="number" step="0.01" name="billing_rate" id="rq_rate" value="<?= e(($r['billing_rate'] ?? 0) ?: '') ?>"></div>
       <div class="ff"><label>Rate basis</label><select class="form-control" name="rate_basis" id="rq_basis"><?php foreach (REQ_RATE_BASIS as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('rate_basis',$k ?: 'MONTHLY') ?: ($k==='MONTHLY' && empty($r['rate_basis'])?'selected':'') ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
       <div class="ff"><label>Est. cost / person / month (<?= e($cur) ?>) <span class="muted" id="rq_cost_auto"></span></label><input class="form-control" type="number" step="0.01" name="budgeted_cost" id="rq_cost" value="<?= e(($r['budgeted_cost'] ?? 0) ?: '') ?>"></div>
-      <div class="ff rq-adv"><label>Target margin (%)</label><input class="form-control" type="number" step="0.1" name="target_margin" value="<?= e(($r['target_margin'] ?? 0) ?: '') ?>"></div>
+      <div class="ff rq-adv"><label>Target margin (%)</label><input class="form-control" type="number" step="0.1" min="0" max="100" name="target_margin" value="<?= e(($r['target_margin'] ?? 0) ?: '') ?>" placeholder="e.g. 20"></div>
       <div class="ff rq-adv"><label>Negotiation floor (<?= e($cur) ?>)</label><input class="form-control" type="number" step="0.01" name="negotiation_floor" value="<?= e(($r['negotiation_floor'] ?? 0) ?: '') ?>"></div>
     </div>
     <div class="rq-calc" id="rq_calc">

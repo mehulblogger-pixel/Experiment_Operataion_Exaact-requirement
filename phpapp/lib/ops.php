@@ -4065,6 +4065,26 @@ function ops_requisitions($route, $method) {
         if ($route === 'requisition-edit') { $req = ops_one("SELECT * FROM requisitions WHERE id=?", [(int)($_GET['id'] ?? 0)]); if (!$req) { http_response_code(404); view('notfound'); return; } }
         if ($method === 'POST') {
             $b = $_POST;
+            // Guard the percentage fields. Statutory and agency are a PER-CENT of
+            // the wage, so a value over 100 is almost always a rupee amount typed
+            // into a % box (e.g. 8000) — which would inflate the cost a hundredfold
+            // and wreck the profit. Catch it before it is saved.
+            $pctBad = [];
+            foreach (['cost_statutory_pct' => 'Statutory & benefits', 'cost_agency_pct' => 'Agency service fee / markup'] as $pf => $plbl) {
+                $pv = (float)($b[$pf] ?? 0);
+                if ($pv > 100) $pctBad[] = $plbl . ' = ' . rtrim(rtrim(number_format($pv, 2), '0'), '.') . '%';
+            }
+            if ($pctBad) {
+                view('ops/requisition_form', [
+                    'req' => array_merge($req ?: [], $b),
+                    'form_err' => 'This looks like a rupee amount typed into a percentage box: ' . implode('; ', $pctBad)
+                        . '. These are a PERCENT of the wage, so they cannot be over 100. Enter a percentage — e.g. 25 for 25% statutory.',
+                    'offices' => offices_list(), 'inspectors' => inspectors_list(false), 'clients' => clients_list(),
+                    'rccUsers' => function_exists('rcc_users') ? rcc_users() : [],
+                    'rccDepts' => function_exists('rcc_departments') ? rcc_departments() : [],
+                    'cfvals' => $req ? custom_values_map('requisition', $req['id']) : []]);
+                return;
+            }
             $base = ['office_id','sbu','designation','project_site','locations','req_type','outgoing_inspector_id','budgeted_cost','approved_by','approval_ref','approval_date','status','notes'];
             $fields = array_merge($base, function_exists('req_extra_fields') ? req_extra_fields() : []);
             // Type coercion: ints (ids, counts, yes/no flags) and money/number fields.
