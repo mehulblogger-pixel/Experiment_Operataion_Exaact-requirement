@@ -8,6 +8,7 @@
   ];
 ?>
 <div class="crumbs"><a href="/">Home</a> › Nonconformities</div>
+<?php if (function_exists('nc_tabs')) nc_tabs('ncr'); ?>
 <div class="master-head">
   <div><h1>Nonconformities</h1>
   <p class="sub" style="margin:2px 0 0">What was wrong, what was done about the work that was already affected, and whether it needed a corrective action. A major one cannot be closed without one.</p></div>

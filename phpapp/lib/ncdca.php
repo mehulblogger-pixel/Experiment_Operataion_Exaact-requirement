@@ -522,6 +522,36 @@ function ncdca_issue_panel($ncrId) {
 function ncdca_can_view() { return function_exists('ncr_can_view') ? ncr_can_view() : (function_exists('is_master') && is_master()); }
 function ncdca_can_edit() { return function_exists('ncr_can_raise') ? ncr_can_raise() : (function_exists('is_master') && is_master()); }
 
+// One nonconformity workspace, one tab per screen. Issues, NCRs, corrective
+// actions and departures are one family — the app's own words: "an NCR is one
+// type of issue, not the whole system." A shared tab strip sits atop each list
+// so they read as a single workspace; each tab routes to its own handler and
+// is shown only to someone who can open it. This only navigates.
+function nc_tabs($active) {
+    $ncdca = ncdca_enabled(); // Issues + Departures live behind the NCR_CAPA service
+    $tabs = [];
+    if ($ncdca && function_exists('ncdca_can_view') && ncdca_can_view())
+        $tabs['issues'] = ['🗂️', 'Issues', '/issues'];
+    if (function_exists('ncr_can_view') && ncr_can_view())
+        $tabs['ncr'] = ['⚠', 'Nonconformities', '/ncr'];
+    if (function_exists('capa_can_view') && capa_can_view())
+        $tabs['capa'] = ['🛠', 'Corrective actions', '/capa'];
+    if ($ncdca && function_exists('ncdca_can_view') && ncdca_can_view())
+        $tabs['departures'] = ['📝', 'Departures', '/departures'];
+    if (count($tabs) < 2) return; // nothing to tab between
+    echo '<nav class="tabbar" aria-label="Nonconformity" style="display:flex;gap:6px;flex-wrap:wrap;'
+       . 'border-bottom:1px solid var(--line,#e5e7eb);margin:0 0 16px">';
+    foreach ($tabs as $key => [$ic, $label, $href]) {
+        $on = $key === $active;
+        echo '<a href="' . e($href) . '" class="tab' . ($on ? ' on' : '') . '"'
+           . ($on ? ' aria-current="page"' : '')
+           . ' style="padding:9px 14px;text-decoration:none;font-size:14px;border-bottom:2px solid '
+           . ($on ? 'var(--accent,#2563eb);font-weight:600;color:var(--accent,#2563eb)' : 'transparent;color:inherit')
+           . '">' . e($ic) . ' ' . e($label) . '</a>';
+    }
+    echo '</nav>';
+}
+
 // ---------------------------------------------------------------------------
 //  Handlers — the Issue dashboard/register, the departures register, and every
 //  Phase-8 write action. CSRF + permission gated; additive; redirect + flash.

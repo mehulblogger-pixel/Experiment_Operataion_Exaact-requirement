@@ -76,11 +76,14 @@ function ops_area_def($area) {
                 $num(fn() => $fx('hwp_open_all') ? count(hwp_open_all($fx('scope_offices') && is_array(scope_offices()) ? scope_offices() : null)) : 0), 'amber');
             $t($inspPack && $fx('trust_can_review') && trust_can_review(), '📍', 'Evidence review', '/evidence-review', 'Field evidence awaiting review.',
                 $num(fn() => $fx('trust_readiness') ? trust_readiness()['pending'] : 0), 'amber');
-            $t($inspPack && (can('mod.ncr.view') || can('mod.capa.view')), '⚠', 'Nonconformities', '/ncr', 'The NCR register.',
+            // Issues, NCRs, corrective actions and departures are one family — now
+            // one tabbed workspace. The tile lands on the umbrella Issue register
+            // and the tab strip carries you across NCR / CAPA / Departures. The
+            // count badge is open nonconformities, the thing worth chasing.
+            $t($inspPack && (can('mod.ncr.view') || can('mod.capa.view')), '⚠', 'Nonconformity workspace',
+                (($fx('ncdca_enabled') && ncdca_enabled()) ? '/issues' : '/ncr'),
+                'Issues, NCRs, corrective actions and departures — one screen with tabs.',
                 $num(fn() => $fx('ncr_counts') ? ncr_counts()['open'] : 0), 'red');
-            $t((can('mod.ncr.view') || can('mod.capa.view')) && (!$fx('svc_globally_active') || svc_globally_active('NCR_CAPA')), '🗂️', 'Issues & departures', '/issues', 'Issue, deviation and concession log.');
-            $t($inspPack && can('mod.capa.view'), '🛠', 'Corrective actions', '/capa', 'CAPA against nonconformities.',
-                $num(fn() => $fx('capa_all') ? count(capa_all(['open' => 1])) : 0), 'amber');
 
             // ── Accreditation registers — the set-once/periodic records an assessor asks for. ──
             $sec('Accreditation registers');

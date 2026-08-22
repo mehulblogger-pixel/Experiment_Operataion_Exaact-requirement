@@ -24,9 +24,15 @@ foreach (['Measurement & docs', 'Risk & competence', 'Nonconformity & audit', 'C
 $everyday = substr($quality, $everyday_at, $accred_at - $everyday_at);
 $accred   = substr($quality, $accred_at);
 foreach (['/complaints', '/report-reviews', '/satisfaction', '/samples', '/hold-points',
-          '/evidence-review', '/ncr', '/issues', '/capa'] as $rt) {
+          '/evidence-review'] as $rt) {
     t_ok(strpos($everyday, "'$rt'") !== false, "$rt sits under Everyday quality");
 }
+// The nonconformity family (NCR/Issues/CAPA/departures) was folded into one
+// workspace tile in step 8; it lands under Everyday quality on /issues or /ncr.
+t_ok(strpos($everyday, "'Nonconformity workspace'") !== false,
+    'the Nonconformity workspace tile sits under Everyday quality');
+t_ok(strpos($everyday, "'/issues' : '/ncr'") !== false,
+    'the workspace lands on a nonconformity screen under Everyday quality');
 foreach (['/equipment', '/methods', '/drules', '/cdocs', '/retention', '/data-control',
           '/risks', '/competence', '/impartiality', '/disclosure', '/internal-audits',
           '/management-reviews', '/confidentiality', '/site-docs', '/identity'] as $rt) {

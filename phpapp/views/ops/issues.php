@@ -7,6 +7,7 @@
   $today = date('Y-m-d');
 ?>
 <div class="crumbs"><a href="/">Home</a> › Issues</div>
+<?php if (function_exists('nc_tabs')) nc_tabs('issues'); ?>
 <div class="master-head">
   <div><h1>Issues</h1>
     <p class="sub" style="margin:2px 0 0">One register for every issue — nonconformity, observation, audit / inspection finding,
