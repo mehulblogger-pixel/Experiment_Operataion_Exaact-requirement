@@ -17,9 +17,14 @@ const ORG_ROLES = [
     'MARKETING_MANAGER' => 'Marketing Manager', 'MARKETING_EXECUTIVE' => 'Marketing Executive',
     'FINANCE' => 'Finance', 'SR_INSPECTOR' => 'Senior Inspector', 'INSPECTOR' => 'Inspector', 'ADMIN' => 'Admin (legacy)',
 ];
-// Management-level roles (kept compatible with existing is_admin_level gates)
-const MGMT_ROLES = ['MASTER_ADMIN','ADMIN','BUSINESS_DIRECTOR','SBU_HEAD','BRANCH_MANAGER','BRANCH_APP_MANAGER','OPERATION_MANAGER',
-    'BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','FINANCE'];
+// Operations/branch management roles — the ones is_admin_level()/is_coordinator_level()
+// are meant to identify (they run calls, jobs, scheduling, vouchers, recruitment).
+// SALES roles (BDM/KAM/Marketing) and FINANCE are deliberately NOT here: they are
+// not operations managers, and lumping them in made every is_admin_level-gated
+// operational widget/action leak to them (a salesperson seeing "vouchers to
+// approve", an accountant seeing "raise inspection call"). Their own CRM/finance
+// access is enforced by module/permission can() checks, which is unaffected.
+const MGMT_ROLES = ['MASTER_ADMIN','ADMIN','BUSINESS_DIRECTOR','SBU_HEAD','BRANCH_MANAGER','BRANCH_APP_MANAGER','OPERATION_MANAGER'];
 // Marketing & Sales roles (CRM funnel owners)
 const SALES_ROLES = ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'];
 
