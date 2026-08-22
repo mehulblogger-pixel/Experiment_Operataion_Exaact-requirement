@@ -201,6 +201,15 @@
               && (int)(current_user()['inspector_id'] ?? 0) === (int)($job['inspector_id'] ?? 0))); ?>
 <div class="panel" id="checkin" data-tab="Schedule &amp; site">
   <div class="ctitle" style="margin-top:0"><h3>Site check-in <span class="muted">(<?= count($visits) ?>)</span></h3></div>
+  <?php // The timesheet is not typed — it is built from these punches. Say so here,
+        //  so an engineer knows that checking IN and OUT on site is how their hours
+        //  are recorded. Coordinators/managers get a link to the assembled sheet. ?>
+  <p class="muted" style="font-size:12px;margin:0 0 10px">
+    Check <b>in</b> when you reach site and <b>out</b> when you leave — this is how your
+    time is recorded. Your <?= e(Tl('report')) ?> and closure days come from here, and the
+    <?php if (function_exists('timesheet_can') && timesheet_can()): ?><a href="/timesheet?ins=<?= (int)($job['inspector_id'] ?? 0) ?>">monthly timesheet</a><?php else: ?>monthly timesheet<?php endif; ?>
+    is built automatically from these punches. (Travel &amp; expenses go on your <a href="/vouchers">voucher</a>.)
+  </p>
   <?php if (function_exists('geofence_on') && geofence_on()): $gt = geofence_target($job); ?>
     <?php if ($gt): ?>
       <div class="msg msg-info" style="margin-top:0;margin-bottom:10px">📍 Punch-in is fenced to <b><?= e($gt['label']) ?></b> —
