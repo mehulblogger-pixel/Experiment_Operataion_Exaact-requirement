@@ -31,6 +31,19 @@
     <?php if (($_GET['q'] ?? '') !== ''): ?><input type="hidden" name="q" value="<?= e($_GET['q']) ?>"><?php endif; ?>
     <label class="muted" style="font-size:12px">Year</label><?= fy_select_html($fy ?? current_fy()) ?>
   </form>
+  <?php // Which pipeline the board shows. Offered whenever more than one exists,
+        // so leads on a non-default pipeline are one click away rather than lost. ?>
+  <?php if ($view === 'board' && count($pipelines ?? []) > 1): $curPipe = (int)($board['pipeline'] ?? 0); ?>
+    <form method="get" action="/leads" style="display:inline-flex;gap:6px;align-items:center">
+      <input type="hidden" name="v" value="board">
+      <label class="muted" style="font-size:12px">Pipeline</label>
+      <select class="form-control" name="pipeline" onchange="this.form.submit()" style="height:30px;padding:2px 8px;font-size:13px">
+        <?php foreach ($pipelines as $pp): ?>
+          <option value="<?= (int)$pp['id'] ?>" <?= $curPipe === (int)$pp['id'] ? 'selected' : '' ?>><?= e($pp['name']) ?><?= !empty($pp['is_default']) ? ' (default)' : '' ?></option>
+        <?php endforeach; ?>
+      </select>
+    </form>
+  <?php endif; ?>
   <?php if ($view !== 'list'): ?>
     <form method="get" action="/leads" style="display:flex;gap:8px;margin-left:auto">
       <input type="hidden" name="v" value="list">

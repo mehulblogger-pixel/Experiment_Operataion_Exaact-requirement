@@ -686,6 +686,18 @@ function lead_convert($leadId, array $b = []) {
 function lead_board($pipelineId = 0) {
     leads_migrate();
     $pipe = $pipelineId ?: (int)(pipeline_default()['id'] ?? 0);
+    // If no pipeline was explicitly chosen and the default one holds no open
+    // leads, show the pipeline that actually has the work. Without this, leads
+    // stranded on a previous pipeline — e.g. after an industry template made a
+    // NEW default pipeline (existing leads keep their old one on purpose) —
+    // silently vanish from the board while the list still shows them.
+    if (!$pipelineId) {
+        $openHere = (int) leads_try(fn() => ops_val("SELECT COUNT(*) FROM leads WHERE status='OPEN' AND pipeline_id=?", [$pipe]), 0);
+        if ($openHere === 0) {
+            $alt = leads_try(fn() => ops_val("SELECT pipeline_id FROM leads WHERE status='OPEN' AND pipeline_id IS NOT NULL GROUP BY pipeline_id ORDER BY COUNT(*) DESC LIMIT 1"), null);
+            if ($alt) $pipe = (int)$alt;
+        }
+    }
     $stages = pipeline_stages($pipe);
     $rows = leads_all(['pipeline' => $pipe, 'open' => 1]);
     $by = [];
