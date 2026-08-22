@@ -59,48 +59,46 @@ function ops_area_def($area) {
 
         case 'quality':
             $title = 'Quality & Accreditation'; $icon = '🛡️';
-            $sub = 'The registers an accreditation assessor asks for — equipment, competence, impartiality, complaints, nonconformities and the portals.';
+            $sub = 'Two halves: the everyday quality work you touch during jobs, and the accreditation registers an assessor asks for.';
             $routes = ['quality','equipment','samples','sample','methods','method','drules','drule','cdocs','cdoc','risks','risk','retention','disclosure','competence','impartiality','complaints','complaint','satisfaction','confidentiality','conf-breach','site-docs','report-reviews','ncr','issues','departures','hold-points','capa','internal-audits','internal-audit','management-reviews','management-review','evidence-review','data-control','identity'];
 
-            $sec('Measurement & docs');
-            $t($inspPack && can('mod.equipment.view'), '📏', 'Equipment & calibration', '/equipment', 'Instruments and calibration status.');
+            // ── Everyday quality — the things you touch during live jobs. ──
+            $sec('Everyday quality');
+            $t(can('mod.complaints.view'), '📮', 'Complaints & appeals', '/complaints', 'Complaints and appeals register.',
+                $num(fn() => $fx('cmp_all') ? count(cmp_all(['status' => 'OPEN'])) : 0), 'amber');
+            $t($fx('rcr_can_view') && rcr_can_view(), '📬', 'Client acceptance', '/report-reviews', 'Reports accepted or rejected.',
+                $num(fn() => $fx('rcr_counts') ? rcr_counts()['rejected'] : 0), 'red');
+            $t($fx('sat_can_view') && sat_can_view(), '⭐', 'Customer satisfaction', '/satisfaction', 'Surveys and follow-up.',
+                $num(fn() => $fx('sat_summary') ? sat_summary()['followup'] : 0), 'amber');
             $t($fx('sample_can_view') && sample_can_view(), '📦', 'Items & samples', '/samples', 'Items received for verification.',
                 $num(fn() => $fx('sample_counts') ? sample_counts()['open'] : 0), 'amber');
+            $t($fx('hwp_can_view') && hwp_can_view(), '✋', 'Hold & witness points', '/hold-points', 'Points where work pauses for us.',
+                $num(fn() => $fx('hwp_open_all') ? count(hwp_open_all($fx('scope_offices') && is_array(scope_offices()) ? scope_offices() : null)) : 0), 'amber');
+            $t($inspPack && $fx('trust_can_review') && trust_can_review(), '📍', 'Evidence review', '/evidence-review', 'Field evidence awaiting review.',
+                $num(fn() => $fx('trust_readiness') ? trust_readiness()['pending'] : 0), 'amber');
+            $t($inspPack && (can('mod.ncr.view') || can('mod.capa.view')), '⚠', 'Nonconformities', '/ncr', 'The NCR register.',
+                $num(fn() => $fx('ncr_counts') ? ncr_counts()['open'] : 0), 'red');
+            $t((can('mod.ncr.view') || can('mod.capa.view')) && (!$fx('svc_globally_active') || svc_globally_active('NCR_CAPA')), '🗂️', 'Issues & departures', '/issues', 'Issue, deviation and concession log.');
+            $t($inspPack && can('mod.capa.view'), '🛠', 'Corrective actions', '/capa', 'CAPA against nonconformities.',
+                $num(fn() => $fx('capa_all') ? count(capa_all(['open' => 1])) : 0), 'amber');
+
+            // ── Accreditation registers — the set-once/periodic records an assessor asks for. ──
+            $sec('Accreditation registers');
+            $t($inspPack && can('mod.equipment.view'), '📏', 'Equipment & calibration', '/equipment', 'Instruments and calibration status.');
             $t($fx('method_can_view') && method_can_view(), '📚', 'Method library', '/methods', 'Standards and methods applied.');
             $t($fx('drule_can_view') && drule_can_view(), '⚖️', 'Decision rules', '/drules', 'Statements of conformity rules.');
             $t($fx('cdoc_can_view') && cdoc_can_view(), '📄', 'Controlled documents', '/cdocs', 'The controlled document set.',
                 $num(fn() => $fx('cdoc_counts') ? cdoc_counts()['review_due'] : 0), 'amber');
             $t($fx('retention_can_view') && retention_can_view(), '🗄️', 'Retention schedule', '/retention', 'How long records are kept.');
             $t($inspPack && can('mod.datacontrol.view'), '🗃', 'Data & information control', '/data-control', 'Information management controls.');
-
-            $sec('Risk & competence');
             $t($fx('risk_can_view') && risk_can_view(), '🎲', 'Risks & opportunities', '/risks', 'The risk register.',
                 $num(fn() => $fx('risk_counts') ? risk_counts()['high'] : 0), 'red');
             $t($inspPack && can('mod.competence.view'), '🎓', 'Competence & authorisation', '/competence', 'Training, assessment and authorisation.');
             $t($inspPack && can('mod.impartiality.view'), '⚖️', 'Impartiality', '/impartiality', 'Threats to impartiality and controls.');
             $t($fx('disclosure_can_view') && disclosure_can_view(), '📢', 'Disclosure consent', '/disclosure', 'Consents to disclose.',
                 $num(fn() => $fx('disclosure_counts') ? disclosure_counts()['pending'] : 0), 'amber');
-
-            $sec('Nonconformity & audit');
-            $t($inspPack && (can('mod.ncr.view') || can('mod.capa.view')), '⚠', 'Nonconformities', '/ncr', 'The NCR register.',
-                $num(fn() => $fx('ncr_counts') ? ncr_counts()['open'] : 0), 'red');
-            $t((can('mod.ncr.view') || can('mod.capa.view')) && (!$fx('svc_globally_active') || svc_globally_active('NCR_CAPA')), '🗂️', 'Issues & departures', '/issues', 'Issue, deviation and concession log.');
-            $t($fx('hwp_can_view') && hwp_can_view(), '✋', 'Hold & witness points', '/hold-points', 'Points where work pauses for us.',
-                $num(fn() => $fx('hwp_open_all') ? count(hwp_open_all($fx('scope_offices') && is_array(scope_offices()) ? scope_offices() : null)) : 0), 'amber');
-            $t($inspPack && can('mod.capa.view'), '🛠', 'Corrective actions', '/capa', 'CAPA against nonconformities.',
-                $num(fn() => $fx('capa_all') ? count(capa_all(['open' => 1])) : 0), 'amber');
             $t($inspPack && can('mod.audits.view'), '🔍', 'Internal audits', '/internal-audits', 'The internal audit programme.');
             $t($inspPack && can('mod.audits.view'), '🏛', 'Management review', '/management-reviews', 'Management review records.');
-            $t($inspPack && $fx('trust_can_review') && trust_can_review(), '📍', 'Evidence review', '/evidence-review', 'Field evidence awaiting review.',
-                $num(fn() => $fx('trust_readiness') ? trust_readiness()['pending'] : 0), 'amber');
-
-            $sec('Customer & portals');
-            $t(can('mod.complaints.view'), '📮', 'Complaints & appeals', '/complaints', 'Complaints and appeals register.',
-                $num(fn() => $fx('cmp_all') ? count(cmp_all(['status' => 'OPEN'])) : 0), 'amber');
-            $t($fx('sat_can_view') && sat_can_view(), '⭐', 'Customer satisfaction', '/satisfaction', 'Surveys and follow-up.',
-                $num(fn() => $fx('sat_summary') ? sat_summary()['followup'] : 0), 'amber');
-            $t($fx('rcr_can_view') && rcr_can_view(), '📬', 'Client acceptance', '/report-reviews', 'Reports accepted or rejected.',
-                $num(fn() => $fx('rcr_counts') ? rcr_counts()['rejected'] : 0), 'red');
             $t(can('mod.confidentiality.view') || can('mod.identity.view') || is_master_of(['confidentiality','identity']), '🔒', 'Confidentiality', '/confidentiality', 'Undertakings, NDAs and breaches.');
             $t($fx('ops_sitedocs') && licence_enabled('operations') && (can('mod.identity.view') || can('mod.clients.view') || is_master_of(['identity','clients'])), '🛂', 'Site entry documents', '/site-docs', 'Papers needed for site access.');
             $t(can('mod.identity.view') && $fx('iddoc_can_view') && iddoc_can_view(), '🪪', 'Identity documents', '/identity', 'ID that gates site access.');
