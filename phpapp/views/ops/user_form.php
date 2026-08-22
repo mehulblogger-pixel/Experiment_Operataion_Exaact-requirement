@@ -334,35 +334,51 @@
 </section>
 
 <section class="fs-pane" data-tab="Permissions">
-  <h3 class="tab-sub" style="margin-top:0">Permissions <span class="muted">— grouped like the menu; leave all unticked to use the role's defaults</span></h3>
+  <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+    <h3 class="tab-sub" style="margin:0">Permissions <span class="muted">— grouped like the menu; leave all unticked to use the role's defaults</span></h3>
+    <label class="chk" style="margin-left:auto;font-weight:600"><input type="checkbox" id="perm_all_toggle"> Select <b style="margin:0 3px">everything</b> (full access)</label>
+  </div>
   <?php
     // Render the permissions under the same headings as the main navigation, so
     // this reads like the menu instead of one long list. Only permissions this
     // manager is allowed to grant ($allowPerms) are shown; anything a group does
     // not claim still appears, under "Other", so nothing is ever hidden.
+    //
+    // Each group carries a "Select all" toggle in its heading, so giving a Sales
+    // manager the whole Sales module is one tick, not many.
     $navGroups = function_exists('permission_nav_groups') ? permission_nav_groups() : [];
     $shown = [];
-    $hStyle = 'margin:16px 0 6px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#64748b);border-bottom:1px solid var(--line,#e5e7eb);padding-bottom:4px';
+    $hStyle = 'display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0 6px;border-bottom:1px solid var(--line,#e5e7eb);padding-bottom:4px';
+    $hLabel = 'font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#64748b)';
+    $allStyle = 'margin-left:auto;font-size:12px;font-weight:600;color:var(--accent,#234e70)';
+    $renderGroup = function($gname, $pairs) use ($curPerms, $hStyle, $hLabel, $allStyle) {
+        // $pairs: [key => label]
+        ?>
+        <div class="permgroup">
+          <div style="<?= $hStyle ?>">
+            <span style="<?= $hLabel ?>"><?= e($gname) ?></span>
+            <?php if (count($pairs) > 1): ?>
+              <label class="chk grp-all-label" style="<?= $allStyle ?>"><input type="checkbox" class="grp-all"> All of <?= e($gname) ?></label>
+            <?php endif; ?>
+          </div>
+          <div class="checkgrid">
+            <?php foreach ($pairs as $k => $lbl): ?>
+              <label class="chk"><input type="checkbox" class="perm-box" name="permissions[]" value="<?= e($k) ?>" <?= in_array($k, $curPerms, true)?'checked':'' ?>> <?= e($lbl) ?></label>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <?php
+    };
     foreach ($navGroups as $gname => $keys):
         $inThis = array_values(array_filter($keys, fn($k) => isset($allowPerms[$k])));
         if (!$inThis) continue;
-        foreach ($inThis as $k) $shown[$k] = true;
+        $pairs = [];
+        foreach ($inThis as $k) { $pairs[$k] = $allowPerms[$k]; $shown[$k] = true; }
+        $renderGroup($gname, $pairs);
+    endforeach;
+    $orphans = array_diff_key($allowPerms, $shown);
+    if ($orphans) $renderGroup('Other', $orphans);
   ?>
-    <div style="<?= $hStyle ?>"><?= e($gname) ?></div>
-    <div class="checkgrid">
-      <?php foreach ($inThis as $k): ?>
-        <label class="chk"><input type="checkbox" name="permissions[]" value="<?= e($k) ?>" <?= in_array($k, $curPerms, true)?'checked':'' ?>> <?= e($allowPerms[$k]) ?></label>
-      <?php endforeach; ?>
-    </div>
-  <?php endforeach; ?>
-  <?php $orphans = array_diff_key($allowPerms, $shown); if ($orphans): ?>
-    <div style="<?= $hStyle ?>">Other</div>
-    <div class="checkgrid">
-      <?php foreach ($orphans as $k=>$v): ?>
-        <label class="chk"><input type="checkbox" name="permissions[]" value="<?= e($k) ?>" <?= in_array($k, $curPerms, true)?'checked':'' ?>> <?= e($v) ?></label>
-      <?php endforeach; ?>
-    </div>
-  <?php endif; ?>
 
 </section>
 </div><!-- /.form-tabs -->
@@ -371,3 +387,46 @@
     <a class="btn secondary" href="/users">Cancel</a>
   </div>
 </form>
+
+<script>
+(function(){
+  // "Select all" for each permission group, and one master toggle for everything.
+  // Purely client-side — the individual permission checkboxes are what post.
+  var groups = [].slice.call(document.querySelectorAll('.permgroup'));
+  var master = document.getElementById('perm_all_toggle');
+  var allBoxes = [].slice.call(document.querySelectorAll('.perm-box'));
+
+  function syncGroup(g){
+    var all = g.querySelector('.grp-all');
+    if (!all) return;
+    var boxes = [].slice.call(g.querySelectorAll('.perm-box'));
+    var on = boxes.filter(function(b){ return b.checked; }).length;
+    all.checked = on === boxes.length && boxes.length > 0;
+    all.indeterminate = on > 0 && on < boxes.length;
+  }
+  function syncMaster(){
+    if (!master) return;
+    var on = allBoxes.filter(function(b){ return b.checked; }).length;
+    master.checked = on === allBoxes.length && allBoxes.length > 0;
+    master.indeterminate = on > 0 && on < allBoxes.length;
+  }
+
+  groups.forEach(function(g){
+    var all = g.querySelector('.grp-all');
+    if (all) all.addEventListener('change', function(){
+      g.querySelectorAll('.perm-box').forEach(function(b){ b.checked = all.checked; });
+      syncMaster();
+    });
+    g.querySelectorAll('.perm-box').forEach(function(b){
+      b.addEventListener('change', function(){ syncGroup(g); syncMaster(); });
+    });
+    syncGroup(g);
+  });
+
+  if (master) master.addEventListener('change', function(){
+    allBoxes.forEach(function(b){ b.checked = master.checked; });
+    groups.forEach(syncGroup);
+  });
+  syncMaster();
+})();
+</script>
