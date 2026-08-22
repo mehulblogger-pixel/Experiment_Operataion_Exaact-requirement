@@ -6022,13 +6022,17 @@ function ops_pending_tasks() {
             '📋', 'to release', 'issued reports needing a Release Note', '/documents', 'info');
 
     // ---- Nonconformity / customer work assigned to ME ----------------------
-    // CAPA and complaints record the owner as a free-text name, so we match on it.
+    // CAPA and complaints record the owner as a FREE-TEXT name, so we match on it.
+    // Gate these on the EDIT capability, not just view: the screens (and their
+    // handlers) require edit to act, so surfacing the task to a view-only user
+    // would be a dead end — a task with no button. Showing it only to those who
+    // can act keeps the list honest and avoids granting rights off a name match.
     if ($myName !== '') {
         $like = '%' . $myName . '%';
-        if (can('mod.capa.view') || is_master())
+        if (can('mod.capa.edit') || is_master())
             $add($cnt("SELECT COUNT(*) FROM capa WHERE COALESCE(status,'') NOT IN ('CLOSED','CLOSED_FAILED') AND owner LIKE ?", [$like]),
                 '🛠', 'corrective actions', 'CAPA assigned to you and still open', '/capa', 'warn');
-        if (can('mod.complaints.view') || is_master())
+        if (can('mod.complaints.edit') || is_master())
             $add($cnt("SELECT COUNT(*) FROM complaints WHERE COALESCE(status,'')='OPEN' AND assigned_to LIKE ?", [$like]),
                 '📣', 'complaints', 'complaints assigned to you to handle', '/complaints', 'warn');
     }
