@@ -23,6 +23,9 @@
       <?= $inv['office_name'] ? ' · ' . e($inv['office_name']) : '' ?>
     </p>
   </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <a class="btn secondary" href="/invoice-print?id=<?= (int)$inv['id'] ?>" target="_blank" rel="noopener">🖨 Print / PDF</a>
+  </div>
 </div>
 
 <?php // ---- In MGH Books (when this invoice has been sent there) ----------- ?>

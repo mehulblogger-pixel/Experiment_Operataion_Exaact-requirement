@@ -2611,7 +2611,7 @@ function ops_dispatch($route, $method) {
         case $route === 'advisor':
             return ops_advisor($route, $method);
         // The books: invoices, money in, credit notes, the customer ledger.
-        case in_array($route, ['invoices','invoice','invoice-new','invoice-line-add','invoice-line-delete',
+        case in_array($route, ['invoices','invoice','invoice-print','invoice-new','invoice-line-add','invoice-line-delete',
                                'invoice-issue','invoice-cancel','to-bill','receipts','receipt','receipt-new',
                                'receipt-allocate','receipt-unallocate','credit-note-new','ledger'], true):
             return ops_books($route, $method);

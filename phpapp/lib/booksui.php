@@ -171,6 +171,21 @@ function ops_books($route, $method) {
         return true;
     }
 
+    // The printable / PDF tax invoice — the same bill the client gets, with its
+    // lines grouped by contract when the invoice spans more than one project.
+    if ($route === 'invoice-print') {
+        $inv = books_invoice($_GET['id'] ?? 0);
+        if (!$inv) { http_response_code(404); view('notfound'); return true; }
+        // A standalone printable document — rendered directly, not through view(),
+        // so it is not wrapped in the app chrome (same pattern as voucher-print).
+        $lines     = books_lines((int)$inv['id']);
+        $settled   = books_settled((int)$inv['id']);
+        $office    = !empty($inv['office_id']) ? ops_one("SELECT * FROM offices WHERE id=?", [(int)$inv['office_id']]) : null;
+        $buyerAddr = function_exists('partner_primary_address') ? partner_primary_address((int)$inv['partner_id']) : null;
+        require __DIR__ . '/../views/ops/invoice_print.php';
+        return true;
+    }
+
     // Everything below writes.
     ops_require($canIssue || can('data.credit'), 'You cannot change the books.');
 
