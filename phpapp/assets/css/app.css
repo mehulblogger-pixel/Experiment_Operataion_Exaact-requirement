@@ -53,7 +53,10 @@ form.stack label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4
 .inline-add .ff-wide,.inline-add button{grid-column:1/-1}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px}.form-grid .ff-wide{grid-column:1/-1}
 .ff label{display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:3px}
-.ff-check{display:flex;align-items:center;gap:8px}.ff-check label{margin:0}
+.ff-check{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ff-check label{margin:0}
+/* Help text under a checkbox field drops to its own full-width line instead of
+   being squeezed to the right of the box. */
+.ff-check > small{flex-basis:100%;width:100%;margin:2px 0 0}
 .timeline{border-left:2px solid var(--line);margin-left:8px;padding-left:4px}
 .tl-item{display:flex;align-items:baseline;gap:10px;padding:8px 0 8px 14px;position:relative;font-size:14px}
 .tl-item::before{content:"";position:absolute;left:-7px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--brand)}

@@ -172,7 +172,7 @@
     <div class="ff"><label>How it is worked</label>
       <select class="form-control" name="job_type"><?php foreach (lk_options_or('job_type', JOB_TYPES) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($job['job_type'] ?? 'INSPECTION')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
       <small class="muted">A resident posting runs over a period; set the start and completion dates.</small></div>
-    <div class="ff ff-check">
+    <div class="ff ff-wide ff-check">
       <label><input type="checkbox" name="is_outstation" value="1"
         <?= !empty($job['is_outstation'] ?? ($call['is_outstation'] ?? 0)) ? 'checked' : '' ?>>
         Outstation — the <?= e(Tl('engineer')) ?> travels to reach this site</label>

@@ -241,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function () {
       <input class="form-control" type="date" id="schedule_end_date" name="schedule_end_date" value="<?= e($call['schedule_end_date'] ?? '') ?>"></div>
 
     <?php // Travel days belong to the inspection they are travelling for. ?>
-    <div class="ff ff-check">
+    <div class="ff ff-wide ff-check">
       <label><input type="checkbox" name="is_outstation" value="1"
         <?= !empty($call['is_outstation']) ? 'checked' : '' ?>> Outstation — the <?= e(Tl('engineer')) ?> travels to reach this site</label>
       <small class="muted">Travel days either side are then costed to this <?= e(Tl('sbu')) ?> and activity code rather than counted as non-chargeable.</small></div>
