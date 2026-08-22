@@ -35,6 +35,19 @@
   </div>
 </div>
 
+<?php // Jump-nav: every section of this quote in one place, so nothing has to be
+      // hunted for down the page. Links only to sections that actually exist for
+      // this quote; #-links into a tabbed section activate that tab automatically. ?>
+<nav class="quote-jump" aria-label="On this quote" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:12px 0 4px;font-size:13px">
+  <span class="muted" style="font-size:12px">On this quote:</span>
+  <a class="btn small secondary" href="#actions">Actions</a>
+  <?php if (!empty($approvals)): ?><a class="btn small secondary" href="#approval">Approval chain</a><?php endif; ?>
+  <?php if (!empty($preorderOn) && !empty($preorderItems)): ?><a class="btn small secondary" href="#preorder">Pre-order checklist</a><?php endif; ?>
+  <?php if ($st === 'ACCEPTED' || !empty($q['contract_number'])): ?><a class="btn small secondary" href="#contract">Contract</a><?php endif; ?>
+  <?php if (!empty($costingCan)): ?><a class="btn small secondary" href="#costing">Costing</a><?php endif; ?>
+  <a class="btn small secondary" href="#quote-docs">📎 Documents</a>
+</nav>
+
 <?php
   // Where this quotation is in its journey, said in one line with the one next
   // step — so a person knows what to do without reading the whole page. The
@@ -144,8 +157,8 @@
 <?php endif; ?>
 
 <!-- Status action bar -->
-<div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-  <span class="muted">Move this quote:</span>
+<div class="panel" id="actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <span class="muted"><b>Actions</b> — move this <?= e(Tl('quote')) ?>:</span>
   <?php // A rejected quote is not an ending — it goes back round. It must offer
         // the same submit button a draft does, or the only way forward is to
         // raise a whole new revision for what may be a one-word correction. ?>
@@ -180,7 +193,7 @@
 
 <?php // ---- Project costing linked to this quotation --------------------------
   if (!empty($costingCan)): $pcRow = $costing ?? null; $back = '/quote?id=' . (int)$q['id']; ?>
-<div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+<div class="panel" id="costing" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
   <span class="muted">🧮 Project costing:</span>
   <?php if ($pcRow): ?>
     <a class="btn small secondary" href="/project-costing?id=<?= (int)$pcRow['id'] ?>"><b><?= e($pcRow['code']) ?></b> — <?= e($pcRow['title']) ?></a>
@@ -216,7 +229,7 @@
     $pcDone = 0; foreach ($preorderItems as $it) if (!empty($preorderState[preorder_item_key($it)])) $pcDone++;
     $pcAll = $pcDone >= count($preorderItems);
 ?>
-<div class="panel" style="border:1px solid <?= $pcAll ? 'var(--ok)' : 'var(--warn,#c90)' ?>">
+<div class="panel" id="preorder" style="border:1px solid <?= $pcAll ? 'var(--ok)' : 'var(--warn,#c90)' ?>">
   <div class="ctitle" style="margin-top:0"><h3>Pre-order review</h3>
     <span class="pill <?= $pcAll ? 'p-ok' : 'p-warn' ?>"><?= (int)$pcDone ?>/<?= count($preorderItems) ?> done</span></div>
   <p class="muted" style="margin:0 0 8px;font-size:12px">Enquiry / tender / contract review before this <?= e(Tl('quote')) ?> is approved.<?= $preorderRequireAll ? ' <b>All points must be ticked to approve.</b>' : '' ?></p>
@@ -235,7 +248,7 @@
 <?php endif; ?>
 
 <?php if ($approvals): ?>
-<div class="panel">
+<div class="panel" id="approval">
   <h3 class="tab-sub" style="margin-top:0">Approval chain</h3>
   <?php if ($st==='PENDING_APPROVAL' && $pendingWith): ?>
     <div class="panel" style="margin:0 0 10px;background:var(--soft)">
