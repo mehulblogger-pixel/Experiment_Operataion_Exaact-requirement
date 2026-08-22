@@ -2537,12 +2537,18 @@ function crm_notify_owner($q, $what, $remarks = '') {
 }
 
 function crm_can_act_approval($step) {
-    if (!can('crm.quote.approve') && !is_master()) return false;
     if (($step['status'] ?? '') !== 'PENDING') return false;
+    if (is_master()) return true;
     $u = current_user();
-    if (!empty($step['approver_user_id'])) return (int)$step['approver_user_id'] === (int)($u['id'] ?? 0) || is_master();
-    if (($step['approver_role'] ?? '') !== '') return user_role() === $step['approver_role'] || is_master();
-    return true;   // generic step — any approver
+    // Being named on the step IS the authority to act on it: the approval matrix
+    // routed this quote here on purpose, so a person addressed by name — or by
+    // their role — may approve it even if their role does not carry the blanket
+    // crm.quote.approve permission. (That is exactly the branch-manager case: the
+    // step is routed to BRANCH_MANAGER, so the branch manager can sign it.)
+    if (!empty($step['approver_user_id'])) return (int)$step['approver_user_id'] === (int)($u['id'] ?? 0);
+    if (($step['approver_role'] ?? '') !== '') return user_role() === $step['approver_role'];
+    // A generic "any approver" step is open to anyone who holds the permission.
+    return can('crm.quote.approve');
 }
 
 // ---------------------------------------------------------------------------
