@@ -3494,11 +3494,14 @@ function ops_raise_call() {
     $client = $clientId ? ops_one("SELECT id, legal_name, display_name FROM business_partners WHERE id=? AND is_client=1", [$clientId]) : null;
     $contracts = [];
     if ($client) {
+        // Only OPEN contracts can take a call. A contract still PENDING its
+        // endorsement / branch-manager approval is not ready for operations —
+        // that two-person control is the whole point of opening a contract.
         $rows = ops_all("SELECT pc.*, q.quote_no, q.rev, q.subject quote_subject
                          FROM partner_contracts pc
                          LEFT JOIN quotations q ON q.id = pc.quotation_id
                          WHERE pc.partner_id=? AND COALESCE(pc.is_active,1)=1
-                           AND COALESCE(pc.open_status,'OPEN') NOT IN ('CLOSED','REJECTED')
+                           AND COALESCE(pc.open_status,'OPEN') = 'OPEN'
                          ORDER BY pc.id DESC", [$clientId]) ?: [];
         foreach ($rows as $r) {
             $cn = trim((string)($r['contract_number'] ?? ''));
@@ -3666,6 +3669,22 @@ function ops_calls($route, $method) {
         }
         if ($method === 'POST') {
             $b = $_POST;
+            // A call under a registered contract can only be raised once that
+            // contract is OPEN — i.e. a manager has endorsed it and the branch
+            // manager has approved it. A contract still PENDING is not ready for
+            // operations. (A direct call whose number is not a registered contract
+            // is unaffected — that is an ARC / typed number.) Master may override.
+            if ($route === 'call-new') {
+                $cnum = trim((string)($b['contract_number'] ?? ''));
+                if ($cnum !== '' && !is_master()) {
+                    $ctRow = ops_one("SELECT open_status FROM partner_contracts WHERE contract_number=? ORDER BY id DESC LIMIT 1", [$cnum]);
+                    if ($ctRow && strtoupper((string)($ctRow['open_status'] ?? 'OPEN')) !== 'OPEN') {
+                        view('ops/call_form', array_merge(call_form_vars($call, $b), ['errorFields' => ['contract_number'], 'error' =>
+                            'Contract ' . $cnum . ' is not open yet — it needs a manager to endorse it and the branch manager to approve it (Contract openings) before ' . Tlp('call') . ' can be raised against it.']));
+                        return;
+                    }
+                }
+            }
             // Pre-order control: a BLOCKED client stops a non-manager from raising a
             // call; a manager may proceed but is warned. HOLD always warns, never
             // stops. Nothing changes when the client has no hold.

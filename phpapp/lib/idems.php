@@ -5421,12 +5421,20 @@ function job_qaps($jobId) {
                     FROM job_qaps WHERE job_id=? ORDER BY id", [(int)$jobId]);
 }
 // Upload one or more QAP files against a job.
+// Who may attach / remove a QAP / ITP on a job: anyone who runs the job
+// (coordinators & operations via ops.job.allocate/close) or writes its report
+// (mod.idems.edit — inspectors, coordinators, ops managers), plus master. The
+// old gate checked ops.job.edit / idems.report.write, which are not real
+// permission keys, so in practice only the master could attach — that is the bug.
+function job_qap_can() {
+    return (function_exists('can') && (can('mod.idems.edit') || can('ops.job.allocate') || can('ops.job.close')))
+        || (function_exists('is_master') && is_master());
+}
 function ops_job_qap_upload($method) {
     $jobId = (int)($_POST['job_id'] ?? $_GET['job_id'] ?? 0);
     $j = $jobId ? ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]) : null;
     if (!$j) { flash('Job not found.', 'error'); redirect('/jobs'); }
-    ops_require((function_exists('can') && (can('ops.job.edit') || can('idems.report.write'))) || (function_exists('is_master') && is_master()),
-        'You cannot attach QAP documents.');
+    ops_require(job_qap_can(), 'You cannot attach QAP / ITP documents.');
     if ($method !== 'POST') redirect('/job?id=' . $jobId);
     $poLine = trim($_POST['po_line'] ?? '');
     $note   = trim($_POST['note'] ?? '');
@@ -5472,8 +5480,7 @@ function ops_job_qap_download() {
 function ops_job_qap_del($method) {
     $f = ops_one("SELECT * FROM job_qaps WHERE id=?", [(int)($_POST['id'] ?? 0)]);
     if (!$f) { flash('QAP not found.', 'error'); redirect('/jobs'); }
-    ops_require((function_exists('can') && can('ops.job.edit')) || (function_exists('is_master') && is_master()),
-        'You cannot remove QAP documents.');
+    ops_require(job_qap_can(), 'You cannot remove QAP / ITP documents.');
     db()->prepare("DELETE FROM job_qaps WHERE id=?")->execute([(int)$f['id']]);
     flash('QAP removed.');
     redirect('/job?id=' . (int)$f['job_id']);

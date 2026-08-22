@@ -19,13 +19,11 @@
           // calls are raised FROM the contract — so the handover button points at
           // the contract, not straight at a call. If the contract is not registered
           // yet, it nudges you to register it first. ?>
-    <?php // Only someone who actually raises calls (operations/coordinators) sees
-          // this — never Finance or Sales, who merely watch the status. ?>
-    <?php if ($st === 'ACCEPTED' && (can('ops.call.create') || is_master())):
-            $cnum = trim((string)($q['contract_number'] ?? '')); ?>
-      <?php if ($cnum !== ''): ?>
-        <a class="btn" href="/call-new?contract_id=<?= (int)($contractRow['id'] ?? 0) ?>&contract=<?= e(urlencode($cnum)) ?>">▶ Raise <?= e(Tl('call')) ?></a>
-      <?php endif; ?>
+    <?php // Only someone who raises calls (operations/coordinators) sees this — and
+          // only once the contract is OPEN (endorsed + branch-manager approved). ?>
+    <?php $cOpen = $contractRow && strtoupper((string)($contractRow['open_status'] ?? 'OPEN')) === 'OPEN';
+          if ($st === 'ACCEPTED' && $cOpen && (can('ops.call.create') || is_master())): ?>
+        <a class="btn" href="/call-new?contract_id=<?= (int)($contractRow['id'] ?? 0) ?>&contract=<?= e(urlencode((string)$q['contract_number'])) ?>">▶ Raise <?= e(Tl('call')) ?></a>
     <?php endif; ?>
     <a class="btn<?= $st === 'ACCEPTED' ? ' secondary' : '' ?>" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
     <a class="btn secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a>
@@ -462,7 +460,7 @@
     <?php // Inspection / deputation calls are raised FROM the contract — the client,
           // the contract number, the business unit and the office all carry across.
           // Repeatable: as many calls as the work needs, on any later day.
-          if ((can('ops.call.create') || is_master()) && $os !== 'CLOSED' && $os !== 'REJECTED'): ?>
+          if ((can('ops.call.create') || is_master()) && $os === 'OPEN'): ?>
       <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-top:1px dashed var(--line);padding-top:10px">
         <a class="btn small" href="/call-new?contract_id=<?= (int)($cr['id'] ?? 0) ?>&contract=<?= e(urlencode((string)$q['contract_number'])) ?>">▶ Raise <?= e(Tl('call')) ?></a>
         <span class="sub" style="margin:0">Raise as many <?= e(Tlp('call')) ?> as the work needs against this contract — today or any later day.</span>

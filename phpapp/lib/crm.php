@@ -492,7 +492,14 @@ function quote_label($q) { $n = $q['quote_no'] ?? ''; $r = (int)($q['rev'] ?? 0)
 function crm_quote_playbook($q) {
     $qid = (int)($q['id'] ?? 0);
     $st  = (string)($q['status'] ?? 'DRAFT');
-    $hasContract = trim((string)($q['contract_number'] ?? '')) !== '';
+    $cnum = trim((string)($q['contract_number'] ?? ''));
+    $hasContract = $cnum !== '';
+    // Calls can only be raised once the contract is OPEN (endorsed + approved).
+    $contractOpen = false;
+    if ($hasContract) {
+        try { $contractOpen = strtoupper((string)(ops_val("SELECT open_status FROM partner_contracts WHERE contract_number=? ORDER BY id DESC LIMIT 1", [$cnum]) ?? 'OPEN')) === 'OPEN'; }
+        catch (Throwable $e) { $contractOpen = true; }
+    }
     $raised = $qid ? ((int) ops_val("SELECT COUNT(*) FROM calls WHERE quotation_id=?", [$qid]) > 0) : false;
     // How far along the happy path the status sits (rejected sits at the approval step).
     $rankMap = ['DRAFT'=>0,'PENDING_APPROVAL'=>1,'REJECTED'=>1,'APPROVED'=>2,'SENT'=>3,'ACCEPTED'=>4,'LOST'=>4,'EXPIRED'=>4];
@@ -542,11 +549,12 @@ function crm_quote_playbook($q) {
     $steps[] = ['key'=>'order', 'label'=>'Raise ' . $callWordP . ' from the contract', 'actionable'=>true,
         'done'=>$raised,
         'line'=>$raised ? ('The ' . $callWordP . ' are being raised against the contract — operations has it.')
-              : ($hasContract ? ('Operations raise the ' . $callWordP . ' from the contract — as many as the work needs, whenever they come in.')
-                 : ($accepted ? ('Register the contract number first; the ' . $callWordP . ' are then raised from the contract.')
-                    : 'Comes after it is accepted.')),
-        'href'=>($hasContract && $canRaiseCall) ? '/call-new?contract=' . urlencode((string)$q['contract_number']) : '',
-        'cta'=>($hasContract && $canRaiseCall) ? ('Raise ' . $callWord) : ''];
+              : ($contractOpen ? ('Operations raise the ' . $callWordP . ' from the contract — as many as the work needs, whenever they come in.')
+                 : ($hasContract ? ('The contract must be endorsed and approved (opened) before ' . $callWordP . ' can be raised.')
+                    : ($accepted ? ('Register the contract number first; the ' . $callWordP . ' are then raised once it is opened.')
+                       : 'Comes after it is accepted.'))),
+        'href'=>($contractOpen && $canRaiseCall) ? '/call-new?contract=' . urlencode($cnum) : '',
+        'cta'=>($contractOpen && $canRaiseCall) ? ('Raise ' . $callWord) : ''];
 
     $firstOpen = -1;
     foreach ($steps as $i => $s) if (!empty($s['actionable']) && empty($s['done'])) { $firstOpen = $i; break; }

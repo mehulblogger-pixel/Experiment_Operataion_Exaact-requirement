@@ -307,7 +307,7 @@
               <?php if ($ct['title']): ?><div class="muted" style="font-size:12.5px"><?= e($ct['title']) ?></div><?php endif; ?>
             </div>
             <?php // Raise inspection / deputation calls FROM the contract, any day. ?>
-            <?php if ($canRaiseCall && $cos !== 'CLOSED' && $cos !== 'REJECTED'): ?>
+            <?php if ($canRaiseCall && strtoupper($cos) === 'OPEN'): ?>
               <a class="btn small" href="/call-new?contract_id=<?= (int)$ct['id'] ?>&contract=<?= e(urlencode((string)$ct['contract_number'])) ?>">▶ Raise <?= e(Tl('call')) ?></a>
             <?php endif; ?>
           </div>

@@ -424,7 +424,7 @@
 <?php // §R1-D — Quality Assurance Plans for this job. A PO may bring one QAP or
       // many (one per line item). They are attached as-is (usually PDF), never
       // parsed, and the inspector reads them while writing the report. ?>
-<?php $qaps = $qaps ?? []; $canQap = can('ops.job.edit') || can('mod.idems.edit') || is_master(); ?>
+<?php $qaps = $qaps ?? []; $canQap = function_exists('job_qap_can') ? job_qap_can() : (can('mod.idems.edit') || is_master()); ?>
 <div class="panel" id="qaps" data-tab="Reports &amp; QA">
   <div class="ctitle" style="margin-top:0"><h3>QAP / reference documents <span class="muted">(<?= count($qaps) ?>)</span></h3></div>
   <p class="muted" style="margin:0 0 10px">The Quality Assurance Plan(s) for this <?= e(Tl('job')) ?> — one or several, per PO line item.
