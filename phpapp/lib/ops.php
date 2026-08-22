@@ -3487,7 +3487,7 @@ function trade_label($id) { $v = $id ? lk_value($id) : null; return $v ? $v['lab
 // several contracts for one client are easy to tell apart. Each leads straight to
 // a call form prefilled from that contract.
 function ops_raise_call() {
-    ops_require(is_coordinator_level(), 'Only coordinators and admins can raise ' . Tlp('call') . '.');
+    ops_require(can('ops.call.create') || is_master(), 'Only operations / coordinators can raise ' . Tlp('call') . '.');
     $clientId = (int)($_GET['client_id'] ?? 0);
     $client = $clientId ? ops_one("SELECT id, legal_name, display_name FROM business_partners WHERE id=? AND is_client=1", [$clientId]) : null;
     $contracts = [];
@@ -3590,7 +3590,7 @@ function ops_calls($route, $method) {
             'fContract' => $fContract, 'fQuote' => $fQuote]); return;
     }
     if ($route === 'call-new' || $route === 'call-edit') {
-        ops_require(is_coordinator_level(), 'Only coordinators and admins can create calls.');
+        ops_require(can('ops.call.create') || is_master(), 'Only operations / coordinators can create ' . Tlp('call') . '.');
         $call = null;
         if ($route === 'call-edit') {
             $call = ops_one("SELECT * FROM calls WHERE id=?", [(int)($_GET['id'] ?? 0)]);

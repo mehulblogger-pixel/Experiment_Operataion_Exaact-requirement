@@ -533,14 +533,20 @@ function crm_quote_playbook($q) {
     // calls are a separate, repeatable step raised FROM the contract — often on a
     // later day, because acceptance is given to the quote, not to a call. So this
     // step points at the contract, never straight at a fresh call off the quote.
-    $steps[] = ['key'=>'order', 'label'=>'Raise inspection ' . (function_exists('Tlp') ? Tlp('call') : 'calls') . ' from the contract', 'actionable'=>true,
+    // The "raise" button only shows to someone who actually raises calls
+    // (operations/coordinators) — never to Finance or Sales, who just see the
+    // status. ($callWord is already "inspection call", so we do not prefix it.)
+    $callWord  = function_exists('Tl') ? Tl('call') : 'call';
+    $callWordP = function_exists('Tlp') ? Tlp('call') : 'calls';
+    $canRaiseCall = (function_exists('can') && can('ops.call.create')) || (function_exists('is_master') && is_master());
+    $steps[] = ['key'=>'order', 'label'=>'Raise ' . $callWordP . ' from the contract', 'actionable'=>true,
         'done'=>$raised,
-        'line'=>$raised ? 'Calls are being raised against the contract — operations has it.'
-              : ($hasContract ? 'Raise inspection / deputation ' . (function_exists('Tlp') ? Tlp('call') : 'calls') . ' from the contract — as many as the work needs, whenever they come in.'
-                 : ($accepted ? 'Register the contract number first; ' . (function_exists('Tlp') ? Tlp('call') : 'calls') . ' are then raised from the contract.'
+        'line'=>$raised ? ('The ' . $callWordP . ' are being raised against the contract — operations has it.')
+              : ($hasContract ? ('Operations raise the ' . $callWordP . ' from the contract — as many as the work needs, whenever they come in.')
+                 : ($accepted ? ('Register the contract number first; the ' . $callWordP . ' are then raised from the contract.')
                     : 'Comes after it is accepted.')),
-        'href'=>$hasContract ? '/call-new?contract=' . urlencode((string)$q['contract_number']) : '',
-        'cta'=>$hasContract ? 'Raise inspection ' . (function_exists('Tl') ? Tl('call') : 'call') : ''];
+        'href'=>($hasContract && $canRaiseCall) ? '/call-new?contract=' . urlencode((string)$q['contract_number']) : '',
+        'cta'=>($hasContract && $canRaiseCall) ? ('Raise ' . $callWord) : ''];
 
     $firstOpen = -1;
     foreach ($steps as $i => $s) if (!empty($s['actionable']) && empty($s['done'])) { $firstOpen = $i; break; }

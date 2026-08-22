@@ -55,7 +55,13 @@
     $showMoney  = can('data.credit') || can('finance.reconcile');
     $showProfit = can('data.profitability');
     $showCharts = can('dash.operations') || can('dash.financial') || can('dash.utilization') || can('dash.people');
-    $canSched   = can('ops.job.allocate') || is_coordinator_level();
+    // Who actually OPERATES — has a real operations permission. This is what gates
+    // the operational widgets (open calls/jobs, scheduling, availability, the Jobs
+    // shortcut), so a Finance or Sales role that only has read access never sees
+    // "raise a call / pending scheduling / team availability".
+    $opsUser    = can('ops.call.create') || can('ops.job.allocate') || can('ops.job.close') || can('workforce.availability') || is_master();
+    $salesUser  = can('crm.quote.create') || (defined('SALES_ROLES') && in_array($role, SALES_ROLES, true));
+    $canSched   = can('ops.job.allocate') || can('workforce.availability') || can('ops.call.create') || is_master();
     $moneyFirst = in_array($role, ['FINANCE'], true);
     $schedFirst = in_array($role, ['COORDINATOR','ASST_MANAGER'], true);
 
@@ -71,13 +77,14 @@
           // Show the operations KPIs only to someone who can actually open Calls
           // or Jobs. A sales role (BDM/KAM) can't, so they get the pipeline KPIs
           // instead of un-clickable "Open jobs" tiles. ?>
-          <?php $showOpsKpi = $hasOps && (can('mod.calls.view') || can('mod.jobs.view')); ?>
+          <?php $showOpsKpi = $hasOps && $opsUser; ?>
     <div class="kpi-row" style="margin-top:18px">
       <?php if ($showOpsKpi): ?>
       <div class="kpi"><span class="kic">☎️</span><div class="k">Open <?= e(Tlp('call')) ?></div><div class="v"><a href="/calls"><?= $openCalls ?></a></div><div class="d">To schedule / in progress</div></div>
       <div class="kpi"><span class="kic">🗂</span><div class="k">Open <?= e(Tlp('job')) ?></div><div class="v"><a href="/jobs?status=open"><?= $openJobs ?></a></div><div class="d"><?= $overdue ? '<span class="down">'.$overdue.' overdue</span>' : 'All on time' ?></div></div>
-      <?php else: ?>
-      <?php // Sales-only: the pipeline is what this customer came for. ?>
+      <?php elseif ($salesUser || !$hasOps): ?>
+      <?php // Sales: the pipeline is what they work. A money-only role (Finance)
+            // skips these and gets the money tiles below instead. ?>
       <div class="kpi"><span class="kic">🎯</span><div class="k">Open leads</div><div class="v"><a href="/leads"><?= (int)(function_exists('ops_val') ? (ops_val("SELECT COUNT(*) FROM leads WHERE status='OPEN'") ?: 0) : 0) ?></a></div><div class="d">Being chased</div></div>
       <div class="kpi"><span class="kic">💡</span><div class="k">Open deals</div><div class="v"><a href="/opportunities"><?= (int)(function_exists('ops_val') ? (ops_val("SELECT COUNT(*) FROM opportunities WHERE status='OPEN'") ?: 0) : 0) ?></a></div><div class="d">In the pipeline</div></div>
       <?php endif; ?>
@@ -186,7 +193,7 @@
     ob_start(); ?>
     <div class="qcards">
       <?php if (can('ops.call.create')): ?><a class="qcard tone-info" href="/raise-call"><div class="qic">➕</div><div class="qn" style="font-size:18px">Raise <?= e(Tl('call')) ?></div><div class="ql">Pick client → contract → done</div></a><?php endif; ?>
-      <a class="qcard" href="/jobs"><div class="qic">🗂</div><div class="qn" style="font-size:18px">Jobs</div><div class="ql">Allocate · schedule · close</div></a>
+      <?php if ($opsUser): ?><a class="qcard" href="/jobs"><div class="qic">🗂</div><div class="qn" style="font-size:18px">Jobs</div><div class="ql">Allocate · schedule · close</div></a><?php endif; ?>
       <?php if (can('mod.vouchers.view')): ?><a class="qcard" href="/vouchers"><div class="qic">🧾</div><div class="qn" style="font-size:18px">Vouchers</div><div class="ql">Travelling expenses</div></a><?php endif; ?>
       <?php if ($showProfit): ?><a class="qcard" href="/profitability"><div class="qic">💹</div><div class="qn" style="font-size:18px">Profitability</div><div class="ql">Margin by <?= e(Tl("boss")) ?></div></a><?php endif; ?>
     </div>

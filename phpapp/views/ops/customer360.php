@@ -298,7 +298,7 @@
     <?php if ($contracts): ?>
       <div class="panel" style="margin-bottom:14px">
         <h3 style="margin-top:0">Contracts</h3>
-        <?php $canRaiseCall = function_exists('is_coordinator_level') && is_coordinator_level(); ?>
+        <?php $canRaiseCall = (function_exists('can') && can('ops.call.create')) || (function_exists('is_master') && is_master()); ?>
         <?php foreach ($contracts as $ct): $cos = (string)($ct['open_status'] ?? 'OPEN'); ?>
           <div style="padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
             <div style="flex:1;min-width:180px">
