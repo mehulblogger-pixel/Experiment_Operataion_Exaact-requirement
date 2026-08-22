@@ -7524,6 +7524,16 @@ function idems_context_for($callId, $jobId = 0) {
         $ctx['client_code']  = $call['client_code'] ?? '';
         $ctx['vendor_id']    = $call['vendor_id'];
         $ctx['vendor_name']  = $call['vendor_disp'] ?: $call['vendor_name'];
+        // When the call names no separate vendor/manufacturer, the place being
+        // inspected is the client's own premises — so the vendor/site on the
+        // report defaults to the client ("if the vendor place is the same as the
+        // client place, the same shall be there"). It is only a default: the
+        // vendor can still be picked or cleared on the report form.
+        if (empty($ctx['vendor_id']) && !empty($ctx['client_id'])) {
+            $ctx['vendor_id']        = $call['client_id'];
+            $ctx['vendor_name']      = $ctx['client_name'];
+            $ctx['vendor_is_client'] = 1;
+        }
         $ctx['sbu']          = $call['sbu'];
         $ctx['office_id']    = $call['executing_office_id'] ?: $call['ibo_office_id'];
         // The product list is registered as 'product'. Asking for
@@ -7552,7 +7562,10 @@ function idems_context_for($callId, $jobId = 0) {
             if ($ad) $ctx['location'] = trim(implode(', ', array_filter([$ad['line1'], $ad['line2'], $ad['town_village'], $ad['city'], $ad['state']])));
         }
         if (empty($ctx['location'])) {
-            $ad = $call['vendor_id'] ? ops_one("SELECT line1, city, state FROM partner_addresses WHERE partner_id=? ORDER BY is_primary DESC, id LIMIT 1", [$call['vendor_id']]) : null;
+            // Use the resolved vendor/site — which, for a client-premises call, is
+            // now the client — so the location follows the same place.
+            $siteId = (int)($ctx['vendor_id'] ?? 0);
+            $ad = $siteId ? ops_one("SELECT line1, city, state FROM partner_addresses WHERE partner_id=? ORDER BY is_primary DESC, id LIMIT 1", [$siteId]) : null;
             if ($ad) $ctx['location'] = trim(implode(', ', array_filter([$ad['line1'], $ad['city'], $ad['state']])));
         }
     }
