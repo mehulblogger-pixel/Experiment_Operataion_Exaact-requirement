@@ -6057,8 +6057,10 @@ function ops_pending_tasks() {
         $n = $cnt("SELECT COUNT(*) FROM partner_contracts WHERE COALESCE(open_status,'')='PENDING' AND COALESCE(mgr_endorsed_at,'')<>'' AND COALESCE(bm_approved_at,'')=''");
         $add($n, '📝', 'contracts to approve', 'contract openings awaiting your approval', $contractLink(true), 'info');
     }
-    // Vouchers submitted for a manager's approval.
-    if (function_exists('is_coordinator_level') && is_coordinator_level()) {
+    // Vouchers submitted for approval — shown to whoever can actually act on a
+    // voucher (edit rights or finance), not to every management-level role. A
+    // sales manager does not approve travel vouchers.
+    if (can('mod.vouchers.edit') || can('finance.reconcile') || is_master()) {
         $n = $cnt("SELECT COUNT(*) FROM vouchers WHERE status='SUBMITTED'");
         $add($n, '🧾', 'vouchers to approve', 'expense vouchers submitted for approval', '/vouchers', 'warn');
     }

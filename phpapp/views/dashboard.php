@@ -67,9 +67,13 @@
           // installation has not licensed is worse than showing nothing: the
           // number is real, the link refuses, and the customer reasonably calls
           // it broken. So each tile asks the same question the menu asks.
-          $hasOps = !function_exists('licence_enabled') || licence_enabled('operations'); ?>
+          $hasOps = !function_exists('licence_enabled') || licence_enabled('operations');
+          // Show the operations KPIs only to someone who can actually open Calls
+          // or Jobs. A sales role (BDM/KAM) can't, so they get the pipeline KPIs
+          // instead of un-clickable "Open jobs" tiles. ?>
+          <?php $showOpsKpi = $hasOps && (can('mod.calls.view') || can('mod.jobs.view')); ?>
     <div class="kpi-row" style="margin-top:18px">
-      <?php if ($hasOps): ?>
+      <?php if ($showOpsKpi): ?>
       <div class="kpi"><span class="kic">☎️</span><div class="k">Open <?= e(Tlp('call')) ?></div><div class="v"><a href="/calls"><?= $openCalls ?></a></div><div class="d">To schedule / in progress</div></div>
       <div class="kpi"><span class="kic">🗂</span><div class="k">Open <?= e(Tlp('job')) ?></div><div class="v"><a href="/jobs?status=open"><?= $openJobs ?></a></div><div class="d"><?= $overdue ? '<span class="down">'.$overdue.' overdue</span>' : 'All on time' ?></div></div>
       <?php else: ?>
@@ -81,7 +85,7 @@
         <div class="kpi"><span class="kic">💳</span><div class="k">Unbilled</div><div class="v"><a href="/invoicing?f=pending"><?= fmoney_short($mc['unbilled']) ?></a></div><div class="d"><?= (int)$mc['pending'] ?> job(s) to invoice</div></div>
         <div class="kpi"><span class="kic"><?= e(cur_sym()) ?></span><div class="k">Outstanding</div><div class="v"><a href="/invoicing?f=awaiting"><?= fmoney_short($mc['outstanding']) ?></a></div><div class="d"><?= $mc['overdue'] ? '<span class="down">'.$mc['overdue'].' overdue</span>' : (int)$mc['awaiting'].' awaiting' ?></div></div>
       <?php else: ?>
-        <?php if ($hasOps): ?>
+        <?php if ($showOpsKpi): ?>
           <div class="kpi"><span class="kic">✅</span><div class="k">Closed <?= e(Tlp('job')) ?></div><div class="v"><a href="/jobs?status=closed"><?= $closedJobs ?></a></div><div class="d">Completed</div></div>
         <?php endif; ?>
         <div class="kpi"><span class="kic">🏢</span><div class="k">Clients</div><div class="v"><a href="/clients"><?= (int)($clients ?? 0) ?></a></div><div class="d"><?= (int)($vendors ?? 0) ?> vendors</div></div>
@@ -183,7 +187,7 @@
     <div class="qcards">
       <?php if (can('ops.call.create')): ?><a class="qcard tone-info" href="/raise-call"><div class="qic">➕</div><div class="qn" style="font-size:18px">Raise <?= e(Tl('call')) ?></div><div class="ql">Pick client → contract → done</div></a><?php endif; ?>
       <a class="qcard" href="/jobs"><div class="qic">🗂</div><div class="qn" style="font-size:18px">Jobs</div><div class="ql">Allocate · schedule · close</div></a>
-      <?php if (is_coordinator_level()): ?><a class="qcard" href="/vouchers"><div class="qic">🧾</div><div class="qn" style="font-size:18px">Vouchers</div><div class="ql">Travelling expenses</div></a><?php endif; ?>
+      <?php if (can('mod.vouchers.view')): ?><a class="qcard" href="/vouchers"><div class="qic">🧾</div><div class="qn" style="font-size:18px">Vouchers</div><div class="ql">Travelling expenses</div></a><?php endif; ?>
       <?php if ($showProfit): ?><a class="qcard" href="/profitability"><div class="qic">💹</div><div class="qn" style="font-size:18px">Profitability</div><div class="ql">Margin by <?= e(Tl("boss")) ?></div></a><?php endif; ?>
     </div>
     <?php $secQuick = ob_get_clean();
@@ -233,7 +237,7 @@
 
     // ---------- section: reports awaiting my approval (reporting managers) ----------
     $secRepAppr = '';
-    if (function_exists('jobs_awaiting_report_approval') && (can('ops.job.close') || is_admin_level() || is_master())) {
+    if (function_exists('jobs_awaiting_report_approval') && (can('ops.job.close') || can('idems.finalize') || can('mod.idems.edit') || is_master())) {
       $ra = jobs_awaiting_report_approval(12);
       if ($ra) { ob_start(); ?>
         <h3 class="tab-sub" style="margin-top:26px;">Reports awaiting your approval <span class="muted">(<?= count($ra) ?>)</span></h3>
@@ -379,7 +383,10 @@
     else                  { echo $secAvail; echo $secRepAppr; echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; echo $secSched; }
   ?>
   <?php
-    $deskAdmin = is_coordinator_level() || is_admin_level();
+    // Recruitment belongs to people who actually run hiring — gate on the hiring
+    // module, not on a coarse "is management" flag, so a sales role (BDM/KAM)
+    // never sees manpower requisitions, placement fees or agency renewals.
+    $deskAdmin = can('mod.hiring.view') || is_master();
     if ($deskAdmin) confirm_lapsed_placement_fees(); // flip provisional→confirmed once guarantees lapse
     $pf = $deskAdmin ? placement_fee_summary(30) : null;
     if ($pf && ($pf['prov_n'] || $pf['conf_n'])): ?>
