@@ -6051,7 +6051,10 @@ function ops_pending_tasks() {
                 . ($needEndorsed ? " AND COALESCE(mgr_endorsed_at,'')<>'' AND COALESCE(bm_approved_at,'')=''"
                                  : " AND COALESCE(mgr_endorsed_at,'')=''")
                 . " ORDER BY id LIMIT 1");
-            if ($c && function_exists('contract_quote_id')) { $q = contract_quote_id($c); if ($q) return '/quote?id=' . $q; }
+            // Land straight on the contract panel (with the Endorse / Approve
+            // buttons), not the top of a long quote — #contract scrolls there and
+            // opens its tab.
+            if ($c && function_exists('contract_quote_id')) { $q = contract_quote_id($c); if ($q) return '/quote?id=' . $q . '#contract'; }
         } catch (Throwable $e) {}
         return '/quotes?v=closed';
     };
