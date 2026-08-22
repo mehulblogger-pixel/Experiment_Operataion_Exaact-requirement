@@ -113,7 +113,7 @@ function ops_area_def($area) {
         case 'reporting':
             $title = 'Reporting'; $icon = '📑';
             $sub = 'Where inspection reports are written, endorsed, expedited and the formats that govern them.';
-            $routes = ['reporting','documents','document','endorsements','endorsement','vendors','vendor-profile','expediting','expediting-projects','writing-assistant','phrase-library','learning','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log','compliance'];
+            $routes = ['reporting','documents','document','endorsements','endorsement','vendors','vendor-profile','expediting','expediting-projects','writing-assistant','phrase-library','learning','compliance'];
             if (can('mod.idems.view')) {
                 $sec('Reports');
                 $t(true, '📑', T_REG('report'), '/documents', 'The report register.');
@@ -125,15 +125,14 @@ function ops_area_def($area) {
                 $t(!$fx('svc_globally_active') || svc_globally_active('EXPEDITING'), '🚚', 'Expediting register', '/expediting', 'Chasing vendor delivery.');
                 $t(!$fx('svc_globally_active') || svc_globally_active('EXPEDITING'), '🗂️', 'Project delivery', '/expediting-projects', 'Multi-vendor projects by milestone.');
 
-                $sec('Writing & rules');
+                $sec('Writing');
                 $t(true, '✒️', 'Technical writing', '/writing-assistant', 'Phrase library and writing help.');
                 $t(true, '🧠', 'Learning insights', '/learning', 'Suggestions learned from past reports.');
-                $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('users.manage.global')), '👤', 'Approver mapping', '/approver-map', 'Who signs which report.');
-                $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '🔀', 'Approval rules', '/approval-rules', 'Routing rules for approval.');
-                $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('crm.template.manage')), '📝', 'Document templates', '/templates', 'The report template library.');
+                // Approver mapping, Approval rules, Document templates and the audit
+                // trail are set-once configuration — they now live under Admin so
+                // Reporting stays about writing reports.
 
                 $sec('Governance');
-                $t(licence_enabled('reporting') && (can('idems.audit.view') || is_master()), '🛡️', 'Audit trail', '/audit-log', 'Who changed what, and when.');
                 $t(is_master() || can('settings.manage'), '⚖️', 'Where we stand', '/compliance', 'Which obligations are met, measured live.');
             }
             break;
@@ -182,7 +181,7 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'Masters, costs, people, access and the settings that shape the app.';
-            $routes = ['admin','masters','m/','lookups','office-finance','cost-run','sbu-pl','call-profit','users','user-new','user-edit','hierarchy','access','adspro','sso','licence','settings','terminology','service-scope','service-formats','sla-targets','company-profile','books-bridge'];
+            $routes = ['admin','masters','m/','lookups','office-finance','cost-run','sbu-pl','call-profit','users','user-new','user-edit','hierarchy','access','adspro','sso','licence','settings','terminology','service-scope','service-formats','sla-targets','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             $sec('Masters & costs');
             $t(can('mod.masters.view'), '📋', 'Masters', '/masters', 'The lists behind every dropdown.');
@@ -204,6 +203,12 @@ function ops_area_def($area) {
             $t(can('settings.manage') || is_master(), '📄', 'Report formats by service', '/service-formats', 'The report format each service allocates.');
             $t(can('settings.manage') || is_master() || ($fx('is_coordinator_level') && is_coordinator_level()), '⏳', 'SLA targets', '/sla-targets', 'Turnaround targets.');
             $t(can('settings.manage') || is_master(), '🏢', 'Company profile', '/company-profile', 'Legal name, logo and details.');
+
+            $sec('Report configuration');
+            $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('users.manage.global')), '👤', 'Approver mapping', '/approver-map', 'Who signs which report.');
+            $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '🔀', 'Approval rules', '/approval-rules', 'Routing rules for approval.');
+            $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('crm.template.manage')), '📝', 'Document templates', '/templates', 'The report template library.');
+            $t(licence_enabled('reporting') && (can('idems.audit.view') || is_master()), '🛡️', 'Report audit trail', '/audit-log', 'Who changed what, and when.');
 
             $sec('Super admin');
             $t(is_master(), '🛰️', 'Control panel', '/super-admin', 'Licence, seats, modules, subscription, tenants and system tools in one place.');
