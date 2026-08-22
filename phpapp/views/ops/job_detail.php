@@ -47,10 +47,16 @@
 <div class="panel job-glance" style="margin-top:12px;padding:10px 12px">
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
     <span class="muted" style="font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">On this <?= e(Tl('job')) ?></span>
-    <?php foreach ($glance as $g): $has = (int)$g['n'] > 0; ?>
-      <a href="<?= e($g['href']) ?>" class="pill <?= $has ? 'p-info' : 'p-mut' ?>" style="text-decoration:none;font-size:12px<?= $has ? '' : ';opacity:.6' ?>">
-        <b><?= (int)$g['n'] ?></b> <?= e($g['label']) ?>
-      </a>
+    <?php foreach ($glance as $g): $has = (int)$g['n'] > 0; $link = ($g['href'] ?? '') !== ''; ?>
+      <?php if ($link): ?>
+        <a href="<?= e($g['href']) ?>" class="pill <?= $has ? 'p-info' : 'p-mut' ?>" style="text-decoration:none;font-size:12px<?= $has ? '' : ';opacity:.6' ?>">
+          <b><?= (int)$g['n'] ?></b> <?= e($g['label']) ?>
+        </a>
+      <?php else: ?>
+        <span class="pill <?= $has ? 'p-info' : 'p-mut' ?>" style="font-size:12px<?= $has ? '' : ';opacity:.6' ?>">
+          <b><?= (int)$g['n'] ?></b> <?= e($g['label']) ?>
+        </span>
+      <?php endif; ?>
     <?php endforeach; ?>
     <?php if (can('mod.idems.edit') || is_master()): ?>
       <a href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call='.(int)$job['call_id'] : '' ?>" class="pill p-ok" style="text-decoration:none;font-size:12px">+ New <?= e(Tl('report')) ?></a>
@@ -793,6 +799,25 @@ if (function_exists('hwp_for_job')):
       <?php endforeach; ?>
       <?php if (!$expenses): ?><tr><td colspan="<?= $canDropExp ? 9 : 8 ?>">No expenses recorded (entered at closure).</td></tr><?php endif; ?>
     </table>
+    <?php // This list is the CLIENT-BILLABLE expenses, entered by the coordinator
+          //  when the job is closed. An engineer's own travel & out-of-pocket
+          //  expenses are not typed here — they go on the monthly voucher (which is
+          //  also the timesheet) and flow back into this job automatically. Point
+          //  the engineer at it, because the empty list above reads like a dead end. ?>
+    <?php if (function_exists('is_inspector') && is_inspector()): ?>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">
+        Recording your <strong>own</strong> travel &amp; expenses? They go on your monthly
+        <a href="/vouchers">voucher</a>, not here — one voucher a month, one line a day, and
+        every line you tag to a <?= e(Tl('job')) ?> is added to it automatically. The list above
+        is the client-billable expenses the coordinator files when the <?= e(Tl('job')) ?> closes.
+      </p>
+    <?php elseif (is_coordinator_level() || is_master()): ?>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">
+        These are the client-billable expenses, entered at closure. The engineer's own
+        travel is claimed on their monthly <a href="/vouchers">voucher</a> and already
+        rolled into profitability below.
+      </p>
+    <?php endif; ?>
   </div>
   <div class="panel">
     <h3 class="tab-sub">Profitability<?= can_see_salary() ? '' : ' (summary)' ?></h3>

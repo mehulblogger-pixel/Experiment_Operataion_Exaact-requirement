@@ -292,6 +292,7 @@ function ops_migrate() {
     ensure_column('calls', 'po_line_item_id', 'INT NULL');
     // Contracting-vs-executing credit model
     ensure_column('calls', 'contracting_office_id', 'INT NULL');       // office that owns the client/PO
+    ensure_column('calls', 'coordinator_id', 'INT NULL');             // the named coordinator the call is forwarded to
     ensure_column('calls', 'billable_value', 'DECIMAL(14,2) DEFAULT 0'); // ex-GST value when same office
     // §13 — the value billable is not typed, it is worked out: the rate the order
     // was priced at, times the quantity actually being asked for. Both are kept,
@@ -1525,11 +1526,19 @@ function job_glance($job) {
     $jid = (int)($job['id'] ?? 0);
     $cnt = function($sql, $args = []) { try { return (int) ops_val($sql, $args); } catch (Throwable $e) { return 0; } };
     $lblReport = function_exists('Tl') ? Tl('report') : 'report';
+    // The NCR register is a full route (not an in-page anchor), and it is guarded
+    // twice over: the viewer needs mod.ncr.view AND the inspection/lab
+    // accreditation pack must be switched on. Linking to it unconditionally sends
+    // anyone without both — an inspector, or any office with the pack off —
+    // bouncing to the dashboard. So the chip only becomes a link when the
+    // register is actually reachable; otherwise it shows the count, inert.
+    $ncrReach = (function_exists('can') && can('mod.ncr.view') || (function_exists('is_master') && is_master()))
+        && (!function_exists('accredited_pack_on') || accredited_pack_on());
     return [
         'reports'  => ['n'=>$cnt("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0", [$jid]), 'href'=>'#reports', 'label'=>$lblReport.'s'],
         'releases' => ['n'=>$cnt("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND type_code IN ('RN','IRN')", [$jid]), 'href'=>'#reports', 'label'=>'release notes'],
         'qaps'     => ['n'=>(function_exists('job_qaps') ? count(job_qaps($jid)) : 0), 'href'=>'#qaps', 'label'=>'QAP / refs'],
-        'ncrs'     => ['n'=>$cnt("SELECT COUNT(*) FROM nonconformities WHERE job_id=?", [$jid]), 'href'=>'/ncr', 'label'=>'NCRs'],
+        'ncrs'     => ['n'=>$cnt("SELECT COUNT(*) FROM nonconformities WHERE job_id=?", [$jid]), 'href'=>($ncrReach ? '/ncr?job='.$jid : ''), 'label'=>'NCRs'],
         'invoices' => ['n'=>(function_exists('books_invoices_for_job') ? count(books_invoices_for_job($jid)) : 0), 'href'=>'#invoice', 'label'=>'invoices'],
         'expenses' => ['n'=>$cnt("SELECT COUNT(*) FROM expenses WHERE job_id=?", [$jid]), 'href'=>'#bills', 'label'=>'expenses'],
         'photos'   => ['n'=>$cnt("SELECT COUNT(*) FROM report_files rf JOIN report_docs d ON d.id=rf.report_doc_id WHERE d.job_id=? AND rf.kind='photo'", [$jid]), 'href'=>'#reports', 'label'=>'photos'],
@@ -1695,6 +1704,42 @@ function ops_mail($to, $subject, $body, $cc = '', $kind = '', $attachments = [])
 function coordinator_emails() {
     $rows = ops_all("SELECT email FROM users WHERE role IN ('COORDINATOR','ADMIN') AND email <> '' AND is_active=1");
     return implode(',', array_filter(array_column($rows, 'email')));
+}
+// Coordinator-level users posted to a given office — the people a call can be
+// forwarded to BY NAME. An office routinely has several coordinators, so a call
+// handed to "the office" lands in a shared inbox and, as the user put it, "went
+// to one coordinator which even I am unable to find." Naming the owner is what
+// makes a raised call findable. Ordered so the plain "coordinator" designations
+// come first, then assistant managers, then everyone else who can coordinate.
+function office_coordinators($officeId) {
+    $officeId = (int)$officeId;
+    if (!$officeId) return [];
+    $roles = array_values(array_unique(array_merge(MGMT_ROLES, ['ASST_MANAGER', 'COORDINATOR'])));
+    $ph = implode(',', array_fill(0, count($roles), '?'));
+    try {
+        return ops_all(
+            "SELECT id, first_name, last_name, username, email, role, home_office_id
+             FROM users
+             WHERE is_active=1 AND home_office_id=? AND role IN ($ph)
+             ORDER BY CASE role WHEN 'COORDINATOR' THEN 0 WHEN 'ASST_MANAGER' THEN 1 ELSE 2 END,
+                      first_name, last_name, username",
+            array_merge([$officeId], $roles)
+        ) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+// A short, human label for a users-table row (first/last, else username).
+function user_row_name($u) {
+    $n = trim(((string)($u['first_name'] ?? '')) . ' ' . ((string)($u['last_name'] ?? '')));
+    return $n !== '' ? $n : (string)($u['username'] ?? ('#' . (int)($u['id'] ?? 0)));
+}
+// The coordinator a call has been forwarded to, as a display name (or '').
+function call_coordinator_name($call) {
+    $cid = (int)($call['coordinator_id'] ?? 0);
+    if (!$cid) return '';
+    try {
+        $u = ops_one("SELECT id, first_name, last_name, username FROM users WHERE id=?", [$cid]);
+        return $u ? user_row_name($u) : '';
+    } catch (Throwable $e) { return ''; }
 }
 function job_email_context($jobId) {
     return ops_one("SELECT j.*, c.call_code, c.region, c.sbu csbu, bp.legal_name client_name, bp.display_name client_disp,
@@ -3557,6 +3602,7 @@ function ops_calls($route, $method) {
         $rows = ops_all("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name,
             eo.name exec_office_name, eo.coordinator_name exec_coordinator,
             io2.name ibo_office_name,
+            cu.first_name coord_fname, cu.last_name coord_lname, cu.username coord_uname,
             (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) job_count, $costExpr AS cost_incurred,
             (SELECT MIN(j2.scheduled_date) FROM jobs j2 WHERE j2.call_id=c.id AND j2.scheduled_date<>'') sched_date,
             (SELECT i.name FROM jobs j3 LEFT JOIN inspectors i ON i.id=j3.inspector_id
@@ -3565,8 +3611,16 @@ function ops_calls($route, $method) {
             LEFT JOIN business_partners v ON v.id=c.vendor_id
             LEFT JOIN offices eo ON eo.id=c.executing_office_id
             LEFT JOIN offices io2 ON io2.id=c.ibo_office_id
+            LEFT JOIN users cu ON cu.id=c.coordinator_id
             WHERE $where ORDER BY c.id DESC", $args);
-        foreach ($rows as &$r) $r['lead'] = call_lead_times($r);
+        foreach ($rows as &$r) {
+            $r['lead'] = call_lead_times($r);
+            // Prefer the coordinator the call was actually forwarded to, by name;
+            // fall back to the executing office's default coordinator.
+            $named = trim(((string)($r['coord_fname'] ?? '')) . ' ' . ((string)($r['coord_lname'] ?? '')));
+            if ($named === '') $named = (string)($r['coord_uname'] ?? '');
+            $r['coordinator_display'] = $named !== '' ? $named : (string)($r['exec_coordinator'] ?? '');
+        }
         unset($r);
         if ($minCost !== null) $rows = array_values(array_filter($rows, fn($r) => (float)$r['cost_incurred'] >= $minCost));
         if (wants_csv()) {
@@ -3582,7 +3636,7 @@ function ops_calls($route, $method) {
                     lk_options_or('sbu', OPS_SBUS)[$c['sbu']] ?? $c['sbu'],
                     $c['activity_id'] ? lk_value_path($c['activity_id']) : '',
                     $c['ibo_office_name'] ?? '', $c['exec_office_name'] ?? '',
-                    (float)($c['expected_credit'] ?? 0), $c['exec_coordinator'] ?? '', $c['inspector_name'] ?? '',
+                    (float)($c['expected_credit'] ?? 0), $c['coordinator_display'] ?? ($c['exec_coordinator'] ?? ''), $c['inspector_name'] ?? '',
                     fdate($c['call_received_date'], ''), fdate(substr((string)($c['forwarded_at'] ?? ''), 0, 10), ''),
                     fdate(substr((string)($c['allocated_at'] ?? ''), 0, 10), ''),
                     fdate($c['inspection_required_date'], ''), fdate($c['sched_date'] ?? '', ''),
@@ -3856,7 +3910,12 @@ function ops_calls($route, $method) {
                 $pdo->prepare("UPDATE calls SET notify_manager=? WHERE id=?")->execute([$notifyMgr, $call['id']]);
                 if ($forwardNow) $pdo->prepare("UPDATE calls SET forwarded_at=?, status='FORWARDED' WHERE id=?")->execute([date('c'), $call['id']]);
                 custom_save('call', $call['id'], $b);
-                if ($forwardNow) send_forward_email($call['id']);
+                // Notify on the office forward, and also when a coordinator is
+                // newly named (a same-office hand-off, or a re-assignment) so the
+                // person now owning the call actually hears about it.
+                $coordNew = (int)($b['coordinator_id'] ?? 0);
+                $coordChanged = $coordNew && $coordNew !== (int)($call['coordinator_id'] ?? 0);
+                if ($forwardNow || $coordChanged) send_forward_email($call['id']);
                 // Carry the edit forward onto any open deputation already raised
                 // from this call — dates, days, reporting, formats, contract — so
                 // a change made here does not silently leave the field out of date.
@@ -3876,8 +3935,10 @@ function ops_calls($route, $method) {
                 $pdo->prepare("INSERT INTO calls (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
                 custom_save('call', $id, $b);
-                if ($execOffice) send_forward_email($id);
-                flash("$code created." . ($execOffice ? ' Forwarded to the branch — email sent.' : ' Now allocate a job.'));
+                $coordNamed = (int)($b['coordinator_id'] ?? 0) > 0;
+                if ($execOffice || $coordNamed) send_forward_email($id);
+                flash("$code created." . ($execOffice ? ' Forwarded to the branch — email sent.'
+                    : ($coordNamed ? ' Forwarded to the coordinator — email sent.' : ' Now allocate a job.')));
                 redirect('/call?id=' . $id);
             }
         }
@@ -3963,8 +4024,30 @@ function call_form_vars($call, $posted = null) {
         // §a.iii — Region is a reporting roll-up for the Business Unit heads and the
         // Business Director. It is noise for everyone else, so only they see it.
         'showRegion' => in_array(user_role(), ['SBU_HEAD','BUSINESS_DIRECTOR','MASTER_ADMIN','ADMIN'], true) || is_master(),
+        // Who the call can be forwarded to, by name — the coordinators of each
+        // office, so the picker can narrow to the chosen executing office (or the
+        // raiser's own office when the work stays here). Keyed by office id.
+        'officeCoordinators' => call_office_coordinators_map(offices_list()),
+        // When no executing office is chosen the work stays with the raiser's own
+        // office; default the coordinator list to that.
+        'homeOfficeId' => (int)($u['home_office_id'] ?? 0),
         'error' => null,
     ];
+}
+// Build [officeId => [ {id,name,role}, … ]] for a set of office rows, so the
+// call form can offer the right coordinators as the executing office changes,
+// without a round-trip.
+function call_office_coordinators_map($offices) {
+    $map = [];
+    foreach ((array)$offices as $o) {
+        $oid = (int)($o['id'] ?? 0);
+        if (!$oid) continue;
+        $map[$oid] = array_map(function ($c) {
+            return ['id' => (int)$c['id'], 'name' => user_row_name($c),
+                    'role' => (string)($c['role'] ?? '')];
+        }, office_coordinators($oid));
+    }
+    return $map;
 }
 // ---------------------------------------------------------------------------
 //  What a save writes
@@ -3977,7 +4060,7 @@ function call_form_vars($call, $posted = null) {
 //  same mistake cannot reach the site again.
 // ---------------------------------------------------------------------------
 function call_save_fields() {
-    return ['client_id','vendor_id','ibo_office_id','executing_office_id','region','sbu','activity_id',
+    return ['client_id','vendor_id','ibo_office_id','executing_office_id','coordinator_id','region','sbu','activity_id',
         'inspection_type','inspection_type_other','service_code','site_address_id','po_id','po_line_item_id',
         'product_category','product_other','deputation_type','expected_credit','credit_type',
         'billable_value','billable_basis','billable_rate','billable_qty','credit_rate','call_received_date',
@@ -4094,7 +4177,7 @@ function nzc_call($f, $v) {
     // An unticked checkbox posts nothing at all, so '' has to mean 0 here or
     // "no longer outstation" could never be saved.
     if ($f === 'is_outstation') return empty($v) ? 0 : 1;
-    if (in_array($f, ['client_id','vendor_id','ibo_office_id','executing_office_id','contracting_office_id','activity_id','site_address_id','po_id','po_line_item_id','quotation_id','quote_line_id'], true)) return $v === '' ? null : (int)$v;
+    if (in_array($f, ['client_id','vendor_id','ibo_office_id','executing_office_id','contracting_office_id','coordinator_id','activity_id','site_address_id','po_id','po_line_item_id','quotation_id','quote_line_id'], true)) return $v === '' ? null : (int)$v;
     if (in_array($f, ['expected_credit','billable_value','credit_required','credit_rate'], true)) return $v === '' ? 0 : $v;
     // The counts only exist for the shape that uses them; a box that was never
     // shown posts nothing, and nothing means none.
@@ -4120,17 +4203,38 @@ function call_cost_incurred($callId) {
     $exp   = (float)ops_val("SELECT COALESCE(SUM(travel+local+food+lodging+misc),0) FROM expenses WHERE job_id IN ($ph)", $jobIds);
     return $vouch + $exp;
 }
-// Email the executing branch's coordinator (+ manager if ticked) when a call is forwarded.
+// Email the coordinator the call is forwarded to (+ manager if ticked). When a
+// coordinator has been named on the call, they are the addressee and the
+// office's shared inbox is only cc'd — so the call reaches a person, not a queue,
+// and the raiser can point at who has it. Falls back to the office inbox when no
+// one was named, and works for a same-office forward (no executing branch) too.
 function send_forward_email($callId) {
-    $c = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name, o.name office_name,
-        o.coordinator_email, o.coordinator_name, o.manager_email, o.manager_name
+    $c = ops_one("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, v.legal_name vendor_name,
+        o.name office_name, o.coordinator_email, o.coordinator_name, o.manager_email, o.manager_name,
+        mo.name managing_office_name
         FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id LEFT JOIN business_partners v ON v.id=c.vendor_id
-        LEFT JOIN offices o ON o.id=c.executing_office_id WHERE c.id=?", [$callId]);
-    if (!$c || !$c['coordinator_email']) return;
+        LEFT JOIN offices o ON o.id=c.executing_office_id
+        LEFT JOIN offices mo ON mo.id=c.ibo_office_id WHERE c.id=?", [$callId]);
+    if (!$c) return;
+    // The named coordinator, if one was chosen.
+    $named = (int)($c['coordinator_id'] ?? 0)
+        ? ops_one("SELECT first_name, last_name, username, email FROM users WHERE id=?", [(int)$c['coordinator_id']])
+        : null;
+    $namedEmail = $named ? trim((string)($named['email'] ?? '')) : '';
+    $officeEmail = trim((string)($c['coordinator_email'] ?? ''));
+    // To: the named coordinator; else the office inbox. Nowhere to send → stop.
+    $to = $namedEmail ?: $officeEmail;
+    if (!$to) return;
+    $toName = $named ? user_row_name($named) : ($c['coordinator_name'] ?: 'Coordinator');
+    $officeName = $c['office_name'] ?: ($c['managing_office_name'] ?: T('office'));
     $client = $c['client_disp'] ?: $c['client_name'];
-    $to = $c['coordinator_email'];
-    $cc = (!empty($c['notify_manager']) && $c['manager_email']) ? $c['manager_email'] : '';
-    $body = "Dear {$c['coordinator_name']},\n\nA " . Tl('call') . " is forwarded to {$c['office_name']} for execution.\n\n"
+    // cc the office inbox (when the addressee is a person and the inbox differs)
+    // and the manager when asked — filtered so nothing is cc'd to the same box.
+    $ccList = [];
+    if ($namedEmail && $officeEmail && strcasecmp($officeEmail, $namedEmail) !== 0) $ccList[] = $officeEmail;
+    if (!empty($c['notify_manager']) && !empty($c['manager_email'])) $ccList[] = $c['manager_email'];
+    $cc = implode(',', array_values(array_unique(array_filter($ccList))));
+    $body = "Dear {$toName},\n\nA " . Tl('call') . " is forwarded to {$officeName} for execution.\n\n"
         . "Call: {$c['call_code']}\nClient: {$client}\nVendor/Site: {$c['vendor_name']}\n"
         . "Region: " . (OPS_REGIONS[$c['region']] ?? $c['region']) . "\nSBU: " . (OPS_SBUS[$c['sbu']] ?? $c['sbu']) . "\n"
         . "Activity: " . ($c['activity_id'] ? lk_value_path($c['activity_id']) : '—') . "\n"

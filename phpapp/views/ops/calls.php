@@ -95,7 +95,7 @@
         ?></td>
         <td><?= !empty($c['exec_office_name']) ? e($c['exec_office_name']) : '<span class="muted">same ' . e(T('office')) . '</span>' ?></td>
         <td class="num"><?= ((float)($c['expected_credit'] ?? 0)) > 0 ? fmoney($c['expected_credit']) : $dash ?></td>
-        <td><?= !empty($c['exec_coordinator']) ? e($c['exec_coordinator']) : $dash ?></td>
+        <td><?= !empty($c['coordinator_display']) ? e($c['coordinator_display']) : $dash ?></td>
         <td><?= !empty($c['inspector_name']) ? e($c['inspector_name'])
                  : '<span class="pill p-warn">not allocated' . (isset($L['unallocated_days']) && $L['unallocated_days'] !== null ? ' · ' . (int)$L['unallocated_days'] . 'd' : '') . '</span>' ?></td>
         <td><?= $c['call_received_date'] ? e(fdate($c['call_received_date'])) : $dash ?></td>

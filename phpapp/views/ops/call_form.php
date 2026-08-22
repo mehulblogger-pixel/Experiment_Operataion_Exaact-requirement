@@ -281,6 +281,44 @@ document.addEventListener('DOMContentLoaded', function () {
       <select class="form-control searchable" id="exec_sel" name="executing_office_id"><option value="">— the same <?= e(T('office')) ?> —</option>
         <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ($call && ($call['executing_office_id']??null)==$o['id'])?'selected':'' ?>><?= e($o['name']) ?><?= $o['coordinator_name']?' · '.e($o['coordinator_name']):'' ?></option><?php endforeach; ?>
       </select></div>
+    <?php // Forward BY NAME. An office has several coordinators; handing the call
+          // to "the office" is exactly how one lands with someone the raiser can no
+          // longer find. The list narrows to the executing office's coordinators
+          // (or this office's, when the work stays here). ?>
+    <div class="ff" id="coord_wrap">
+      <label>Forward to coordinator <span class="muted">— who owns this <?= e(Tl('call')) ?> in that <?= e(T('office')) ?></span></label>
+      <select class="form-control searchable" id="coord_sel" name="coordinator_id">
+        <option value="">— any coordinator in the <?= e(T('office')) ?> —</option>
+      </select>
+      <small class="muted">Leave blank to notify every coordinator in that <?= e(T('office')) ?>.</small>
+    </div>
+    <script>
+    (function(){
+      var COORDS = <?= json_encode($officeCoordinators ?? [], JSON_UNESCAPED_UNICODE) ?>;
+      var HOME   = <?= (int)($homeOfficeId ?? 0) ?>;
+      var CUR    = <?= (int)($call['coordinator_id'] ?? 0) ?>;
+      var exec   = document.getElementById('exec_sel');
+      var sel    = document.getElementById('coord_sel');
+      var wrap   = document.getElementById('coord_wrap');
+      if (!sel) return;
+      function fill(){
+        var oid = (exec && exec.value) ? parseInt(exec.value,10) : HOME;
+        var list = (COORDS && COORDS[oid]) ? COORDS[oid] : [];
+        var keep = CUR;
+        sel.innerHTML = '<option value="">— any coordinator in the office —</option>';
+        list.forEach(function(c){
+          var o = document.createElement('option');
+          o.value = c.id; o.textContent = c.name + (c.role ? ' · ' + c.role.replace(/_/g,' ').toLowerCase() : '');
+          if (parseInt(c.id,10) === parseInt(keep,10)) o.selected = true;
+          sel.appendChild(o);
+        });
+        // Nowhere to forward (office has no coordinators on file) — hide the row.
+        if (wrap) wrap.style.display = list.length ? '' : 'none';
+      }
+      fill();
+      if (exec) exec.addEventListener('change', function(){ CUR = 0; fill(); });
+    })();
+    </script>
     <?php if (!empty($showRegion)): ?>
     <div class="ff"><label>Region <span class="muted">— roll-up for <?= e(T('sbu')) ?> heads and the Business Director</span></label>
       <select class="form-control searchable" name="region"><option value="">—</option>

@@ -93,6 +93,19 @@
   <?php endif; ?>
 </div>
 
+<?php // Whose desk this call is on. A call handed to an office used to vanish into
+      // a shared inbox; naming the coordinator on the call is what makes it
+      // findable — "it went to one coordinator which I am unable to find" should
+      // not happen again. Shown whenever the call names one.
+      $coordWho = function_exists('call_coordinator_name') ? call_coordinator_name($call) : '';
+      if ($coordWho !== ''):
+        $coordOffice = ops_val("SELECT name FROM offices WHERE id=?", [call_exec_office($call) ?: (int)($call['ibo_office_id'] ?? 0)]); ?>
+<div class="panel" style="margin-top:8px;padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <span class="pill p-info" style="font-size:12px">👤 On <?= e($coordWho) ?>’s desk<?= $coordOffice ? ' · ' . e($coordOffice) : '' ?></span>
+  <span class="muted" style="font-size:12px">This <?= e(Tl('call')) ?> was forwarded to <?= e($coordWho) ?> to coordinate.</span>
+</div>
+<?php endif; ?>
+
 <?php
   // Contract cover behind this call: dates and quantity. Shown before the
   // coordinator tries to allocate, not after they have filled a form.

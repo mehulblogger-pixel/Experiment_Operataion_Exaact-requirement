@@ -13,11 +13,30 @@ $pdo->prepare("INSERT INTO jobs (job_code, created_at) VALUES ('JG-1', ?)")->exe
 $jid = (int)$pdo->lastInsertId();
 $job = ops_one("SELECT * FROM jobs WHERE id=?", [$jid]);
 
+// Make the NCR register reachable for the at-a-glance checks: a master, with the
+// inspection pack on (the default). The register is a full route guarded twice —
+// mod.ncr.view AND an accreditation pack — so the chip only links when both hold.
+setting_set('packs_enabled', 'inspection'); packs_enabled(true);
+$pdo->prepare("INSERT INTO users (username,first_name,role,is_active,is_superuser) VALUES ('jg_master','JG','MASTER_ADMIN',1,1)")->execute();
+$jgMaster = (int)$pdo->lastInsertId();
+$_SESSION['uid'] = $jgMaster; current_user(true); ua(true);
+
 $g = job_glance($job);
 foreach (['reports','releases','qaps','ncrs','invoices','expenses','photos'] as $k)
     t_ok(isset($g[$k]) && (int)$g[$k]['n'] === 0, "empty job: $k count is 0");
 t_ok($g['reports']['href'] === '#reports', 'reports chip links to the reports section');
-t_ok($g['ncrs']['href'] === '/ncr', 'NCR chip links to the NCR register');
+// The NCR chip links to the register, scoped to this job so it opens in context.
+t_ok(strpos($g['ncrs']['href'], '/ncr') === 0, 'NCR chip links to the NCR register');
+t_ok(strpos($g['ncrs']['href'], 'job=' . $jid) !== false, 'the NCR chip is scoped to this job');
+
+// When the viewer cannot reach the register (no session → not a master, no
+// mod.ncr.view) the chip must NOT link — a live link would bounce to the
+// dashboard. It shows the count, inert.
+unset($_SESSION['uid']); current_user(true); ua(true);
+$gNo = job_glance($job);
+t_ok($gNo['ncrs']['href'] === '', 'the NCR chip does not link when the register is unreachable');
+// Restore the master session for the remaining counts.
+$_SESSION['uid'] = $jgMaster; current_user(true); ua(true);
 
 // Add an inspection report, a release note, a photo, an expense and an NCR.
 $pdo->prepare("INSERT INTO report_docs (report_type_id,type_code,irn,status,job_id,data,created_at) VALUES (?,?,?,?,?,?,?)")
@@ -40,3 +59,6 @@ t_ok((int)$g2['ncrs']['n'] >= 1, 'the NCR is counted (when the module is present
 // A missing job id must not error — it simply counts nothing.
 $g3 = job_glance(['id' => 0]);
 t_ok((int)$g3['reports']['n'] === 0, 'a zero/missing job id counts nothing, without error');
+
+// Do not leak the master session into later tests.
+unset($_SESSION['uid']); current_user(true); ua(true);
