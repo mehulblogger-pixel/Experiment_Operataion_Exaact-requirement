@@ -40,6 +40,8 @@
       <select class="form-control searchable" name="sbu"><option value="">—</option>
         <?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= $g('sbu')===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
 
+    <div class="ff" id="contact_pick_ff" style="display:none"><label>Which contact? <span class="muted">— this client has several</span></label>
+      <select class="form-control" id="contact_pick"><option value="">— choose a contact —</option></select></div>
     <div class="ff"><label>Contact person</label><input class="form-control" name="contact_name" id="contact_name" value="<?= e($g('contact_name')) ?>"></div>
     <div class="ff"><label>Contact e-mail</label><input class="form-control" type="email" name="contact_email" id="contact_email" value="<?= e($g('contact_email')) ?>"></div>
     <div class="ff"><label>Contact mobile</label><input class="form-control" name="contact_mobile" id="contact_mobile" value="<?= e($g('contact_mobile')) ?>"></div>
@@ -293,6 +295,30 @@
     fetch('/quote-client?id=' + encodeURIComponent(sel.value) + '&exclude=' + excludeQuote)
       .then(function(r){ return r.json(); })
       .then(function(d){
+        // A client can have several contacts. Offer a picker whenever there is
+        // more than one, so the right person can be chosen — and say plainly that
+        // there are several. Populated on load and on change alike.
+        (function(){
+          var ff = document.getElementById('contact_pick_ff'), pk = document.getElementById('contact_pick');
+          var list = (d.contacts || []);
+          if (!ff || !pk) return;
+          if (list.length > 1) {
+            pk.innerHTML = '<option value="">— choose a contact —</option>';
+            list.forEach(function(c, i){
+              var mob = (c.mobile || c.phone || '');
+              var lbl = (c.name || 'Contact ' + (i+1)) + (c.designation ? ' · ' + c.designation : '') + (mob ? ' · ' + mob : '') + (c.is_primary ? ' (primary)' : '');
+              var o = document.createElement('option');
+              o.value = String(i); o.textContent = lbl; pk.appendChild(o);
+            });
+            pk.onchange = function(){
+              var c = list[parseInt(pk.value, 10)]; if (!c) return;
+              document.getElementById('contact_name').value  = c.name || '';
+              document.getElementById('contact_email').value = c.email || '';
+              document.getElementById('contact_mobile').value = (c.mobile || c.phone || '');
+            };
+            ff.style.display = '';
+          } else { ff.style.display = 'none'; }
+        })();
         if (fill) {
           [['contact_name','name'],['contact_email','email'],['contact_mobile','mobile']].forEach(function(p){
             var el = document.getElementById(p[0]);
@@ -376,7 +402,12 @@
       allow ? ' · narrowed to this ' + <?= json_encode(Tl('client')) ?> + '’s ' + n + ' type(s)' : '';
   }
   sel.addEventListener('change', function(){ syncClient(true); });
-  syncClient(false);
+  // On a NEW quote (e.g. raised from an opportunity) a client is already chosen
+  // but the contact fields may be blank — fill them from the client master on
+  // load too, so nobody has to re-pick the same client to pull its contact. Fill
+  // only touches EMPTY fields, so anything carried from the opportunity is kept.
+  // On an EDIT we never auto-fill, to avoid clobbering the saved quote.
+  syncClient(<?= $isEdit ? 'false' : 'true' ?>);
 
   // offer the client's addresses as ready-made sites
   function norm(s){ return String(s == null ? '' : s).trim().toLowerCase(); }
