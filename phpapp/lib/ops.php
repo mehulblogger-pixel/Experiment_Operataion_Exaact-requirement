@@ -3633,12 +3633,23 @@ function ops_calls($route, $method) {
             elseif (!empty($_GET['contract'])) $ct = ops_one("SELECT * FROM partner_contracts WHERE contract_number=? ORDER BY id DESC LIMIT 1", [trim((string)$_GET['contract'])]);
             if ($ct) {
                 $fromQ = !empty($ct['quotation_id']) ? ops_one("SELECT * FROM quotations WHERE id=?", [(int)$ct['quotation_id']]) : null;
+                // Business unit and activity carry from the quotation so the call
+                // (and the job it allocates) start already coded. Activity comes
+                // from the quote's line — when every line shares one activity it is
+                // unambiguous; otherwise leave it for the coordinator to pick.
+                $qActId = 0; $qSbu = (string)($fromQ['sbu'] ?? '');
+                if ($fromQ) {
+                    $la = ops_all("SELECT DISTINCT activity_id FROM quote_lines WHERE quote_id=? AND activity_id IS NOT NULL AND activity_id<>0", [(int)$fromQ['id']]);
+                    if (count($la) === 1) $qActId = (int)$la[0]['activity_id'];
+                    if ($qSbu === '') { $ls = ops_one("SELECT sbu FROM quote_lines WHERE quote_id=? AND sbu<>'' LIMIT 1", [(int)$fromQ['id']]); $qSbu = (string)($ls['sbu'] ?? ''); }
+                }
                 $call = [
                     'quotation_id'    => ((int)($ct['quotation_id'] ?? 0)) ?: null,
                     'client_id'       => ($ct['partner_id'] ?? null) ?: ($fromQ['client_id'] ?? null),
                     'vendor_id'       => $fromQ['vendor_id'] ?? null,
                     'contract_number' => ((string)($ct['contract_number'] ?? '')) ?: (string)($fromQ['contract_number'] ?? ''),
-                    'sbu'             => ((string)($ct['sbu'] ?? '')) ?: (string)($fromQ['sbu'] ?? ''),
+                    'sbu'             => ((string)($ct['sbu'] ?? '')) ?: $qSbu,
+                    'activity_id'     => $qActId ?: null,
                     'ibo_office_id'   => ($fromQ['office_id'] ?? null) ?: (current_user()['home_office_id'] ?? null),
                 ];
             }
