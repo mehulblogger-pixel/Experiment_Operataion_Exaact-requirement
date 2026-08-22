@@ -56,6 +56,7 @@ function contracts_migrate() {
     ensure_column('partner_contracts', 'auto_closed',       'INT DEFAULT 0');
     ensure_column('partner_contracts', 'last_activity_at',  "VARCHAR(30) DEFAULT ''");
     ensure_column('partner_contracts', 'idle_notified',     "VARCHAR(20) DEFAULT ''");
+    ensure_column('partner_contracts', 'coordinator_id',    'INT NULL');   // coordinator nominated at endorsement to own the calls raised from this contract
     // An override is a written request to schedule anyway. It carries its own
     // two-step approval, so the same row records who asked, who endorsed and
     // who finally granted it.
@@ -612,11 +613,16 @@ function ops_contract_openings() {
          ORDER BY pc.requested_at, pc.id") ?: [];
     // A quote link is only useful to someone who can actually view quotes.
     $canSeeQuote = can('mod.quotes.view') || is_master();
+    // The coordinators the endorsing manager can forward to — his own office's.
+    $myOffice = (int)(current_user()['home_office_id'] ?? 0);
+    $myCoordinators = $myOffice ? office_coordinators($myOffice) : [];
     view('ops/contract_openings', [
         'rows' => $rows,
         'canEndorse' => can_endorse_contract_open(),
         'canApprove' => can_approve_contract_open(),
         'canSeeQuote' => $canSeeQuote,
+        'myCoordinators' => $myCoordinators,
+        'myOfficeName' => $myOffice ? (string)ops_val("SELECT name FROM offices WHERE id=?", [$myOffice]) : '',
     ]);
     return true;
 }
@@ -638,10 +644,17 @@ function ops_contract_open($route, $method) {
         ops_require(can_endorse_contract_open(), 'Only a manager can endorse opening a contract.');
         if ($status !== 'PENDING') { flash('This contract is not awaiting endorsement.', 'warning'); redirect($back); }
         if (trim((string)$c['mgr_endorsed_at']) !== '') { flash('Already endorsed.', 'warning'); redirect($back); }
-        $pdo->prepare("UPDATE partner_contracts SET mgr_endorsed_by=?, mgr_endorsed_by_id=?, mgr_endorsed_at=? WHERE id=?")
-            ->execute([$me, $meId, date('c'), (int)$c['id']]);
-        if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' opening endorsed by ' . $me . ($note !== '' ? ' — ' . $note : '') . '. Awaiting branch-manager approval.');
-        flash('Endorsed — it is now with the branch manager for approval.');
+        // The endorsing manager may nominate the coordinator who will own the
+        // calls raised from this contract — an office has several, and naming one
+        // here means the work does not later land in a shared inbox. Optional;
+        // the coordinator can still be chosen (or changed) when a call is raised.
+        $coordId = (int)($_POST['coordinator_id'] ?? 0) ?: null;
+        $pdo->prepare("UPDATE partner_contracts SET mgr_endorsed_by=?, mgr_endorsed_by_id=?, mgr_endorsed_at=?, coordinator_id=? WHERE id=?")
+            ->execute([$me, $meId, date('c'), $coordId, (int)$c['id']]);
+        $coordNote = '';
+        if ($coordId) { $cn = call_coordinator_name(['coordinator_id' => $coordId]); if ($cn !== '') $coordNote = ' Forwarded to ' . $cn . ' to coordinate.'; }
+        if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' opening endorsed by ' . $me . ($note !== '' ? ' — ' . $note : '') . '.' . $coordNote . ' Awaiting branch-manager approval.');
+        flash('Endorsed — it is now with the branch manager for approval.' . $coordNote);
         redirect($back);
     }
     if ($do === 'approve') {

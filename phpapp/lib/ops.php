@@ -3705,6 +3705,9 @@ function ops_calls($route, $method) {
                     'sbu'             => ((string)($ct['sbu'] ?? '')) ?: $qSbu,
                     'activity_id'     => $qActId ?: null,
                     'ibo_office_id'   => ($fromQ['office_id'] ?? null) ?: (current_user()['home_office_id'] ?? null),
+                    // The coordinator the manager nominated when endorsing the
+                    // contract carries onto the call, so it opens already owned.
+                    'coordinator_id'  => ((int)($ct['coordinator_id'] ?? 0)) ?: null,
                 ];
             }
         }
