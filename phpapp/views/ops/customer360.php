@@ -298,11 +298,18 @@
     <?php if ($contracts): ?>
       <div class="panel" style="margin-bottom:14px">
         <h3 style="margin-top:0">Contracts</h3>
-        <?php foreach ($contracts as $ct): ?>
-          <div style="padding:6px 0;border-bottom:1px solid var(--line);font-size:13px">
-            <b><?= e($ct['contract_number']) ?></b>
-            <?php if ($ct['end_date']): ?><span class="muted"> — to <?= e(fdate($ct['end_date'])) ?></span><?php endif; ?>
-            <?php if ($ct['title']): ?><div class="muted" style="font-size:12.5px"><?= e($ct['title']) ?></div><?php endif; ?>
+        <?php $canRaiseCall = function_exists('is_coordinator_level') && is_coordinator_level(); ?>
+        <?php foreach ($contracts as $ct): $cos = (string)($ct['open_status'] ?? 'OPEN'); ?>
+          <div style="padding:6px 0;border-bottom:1px solid var(--line);font-size:13px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
+            <div style="flex:1;min-width:180px">
+              <b><?= e($ct['contract_number']) ?></b>
+              <?php if ($ct['end_date']): ?><span class="muted"> — to <?= e(fdate($ct['end_date'])) ?></span><?php endif; ?>
+              <?php if ($ct['title']): ?><div class="muted" style="font-size:12.5px"><?= e($ct['title']) ?></div><?php endif; ?>
+            </div>
+            <?php // Raise inspection / deputation calls FROM the contract, any day. ?>
+            <?php if ($canRaiseCall && $cos !== 'CLOSED' && $cos !== 'REJECTED'): ?>
+              <a class="btn small" href="/call-new?contract_id=<?= (int)$ct['id'] ?>&contract=<?= e(urlencode((string)$ct['contract_number'])) ?>">▶ Raise <?= e(Tl('call')) ?></a>
+            <?php endif; ?>
           </div>
         <?php endforeach; ?>
       </div>

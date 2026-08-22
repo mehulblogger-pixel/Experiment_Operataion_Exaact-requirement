@@ -529,11 +529,18 @@ function crm_quote_playbook($q) {
         'line'=>($accepted && $hasContract) ? ('Contract ' . $q['contract_number'] . ' registered.')
               : ($accepted ? 'Register the ' . $cl . ' and enter the contract number.' : 'Comes after it is accepted.'),
         'href'=>'#contract', 'cta'=>'Register contract'];
-    $steps[] = ['key'=>'order', 'label'=>'Raise the order', 'actionable'=>true,
+    // The quotation's journey ENDS at the contract number. Inspection / deputation
+    // calls are a separate, repeatable step raised FROM the contract — often on a
+    // later day, because acceptance is given to the quote, not to a call. So this
+    // step points at the contract, never straight at a fresh call off the quote.
+    $steps[] = ['key'=>'order', 'label'=>'Raise inspection ' . (function_exists('Tlp') ? Tlp('call') : 'calls') . ' from the contract', 'actionable'=>true,
         'done'=>$raised,
-        'line'=>$raised ? 'Order raised — operations has it.'
-              : ($accepted ? 'Hand it to operations as an inspection order.' : 'Comes after it is accepted.'),
-        'href'=>$accepted ? '/call-new?quote=' . $qid : '', 'cta'=>'Raise an order'];
+        'line'=>$raised ? 'Calls are being raised against the contract — operations has it.'
+              : ($hasContract ? 'Raise inspection / deputation ' . (function_exists('Tlp') ? Tlp('call') : 'calls') . ' from the contract — as many as the work needs, whenever they come in.'
+                 : ($accepted ? 'Register the contract number first; ' . (function_exists('Tlp') ? Tlp('call') : 'calls') . ' are then raised from the contract.'
+                    : 'Comes after it is accepted.')),
+        'href'=>$hasContract ? '/call-new?contract=' . urlencode((string)$q['contract_number']) : '',
+        'cta'=>$hasContract ? 'Raise inspection ' . (function_exists('Tl') ? Tl('call') : 'call') : ''];
 
     $firstOpen = -1;
     foreach ($steps as $i => $s) if (!empty($s['actionable']) && empty($s['done'])) { $firstOpen = $i; break; }

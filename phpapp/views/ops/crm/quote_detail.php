@@ -14,11 +14,18 @@
     <?php $verN = count($revs); ?><a href="#revisions" class="pill p-info" style="font-size:12px;vertical-align:middle;text-decoration:none" title="See the revision list and the full change history">🕑 Rev <?= str_pad((string)(int)$q['rev'],2,'0',STR_PAD_LEFT) ?> · <?= $verN ?> version<?= $verN === 1 ? '' : 's' ?></a></h1>
     <p class="sub" style="margin:2px 0 0"><?= e($q['subject'] ?: '—') ?></p></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
-    <?php // Sales hands over to operations here. Before this the handover was
-          // pull-only — a coordinator had to know a quote had been won and go
-          // and find it from the call form. ?>
-    <?php if ($st === 'ACCEPTED' && is_coordinator_level()): ?>
-      <a class="btn" href="/call-new?quote=<?= (int)$q['id'] ?>">▶ Raise an <?= e(Tl('call')) ?></a>
+    <?php // Sales hands over to operations here. Acceptance is given to the quote;
+          // the contract number is registered off that acceptance; then inspection
+          // calls are raised FROM the contract — so the handover button points at
+          // the contract, not straight at a call. If the contract is not registered
+          // yet, it nudges you to register it first. ?>
+    <?php if ($st === 'ACCEPTED' && is_coordinator_level()):
+            $cnum = trim((string)($q['contract_number'] ?? '')); ?>
+      <?php if ($cnum !== ''): ?>
+        <a class="btn" href="/call-new?contract_id=<?= (int)($contractRow['id'] ?? 0) ?>&contract=<?= e(urlencode($cnum)) ?>">▶ Raise inspection <?= e(Tl('call')) ?></a>
+      <?php else: ?>
+        <a class="btn" href="#contract">▶ Register contract to raise <?= e(Tlp('call')) ?></a>
+      <?php endif; ?>
     <?php endif; ?>
     <a class="btn<?= $st === 'ACCEPTED' ? ' secondary' : '' ?>" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
     <a class="btn secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a>
@@ -38,7 +45,7 @@
     case 'PENDING_APPROVAL': $nbTitle = 'Waiting for approval' . (!empty($pendingWith) ? ' — with ' . $pendingWith : '') . '.'; $nbNext = 'They approve it, or send it back with a comment.'; break;
     case 'APPROVED': $nbTitle = 'Approved and ready to go out.'; $nbNext = 'Next: send it to the ' . Tl('client') . '.'; break;
     case 'SENT': $nbTitle = 'Sent to the ' . Tl('client') . (trim((string)($q['sent_at'] ?? '')) !== '' ? ' on ' . fdate(substr((string)$q['sent_at'], 0, 10)) : '') . '.'; $nbNext = 'Waiting for their answer — mark it accepted, or lost.'; break;
-    case 'ACCEPTED': $nbTitle = 'Accepted 🎉 — they said yes.'; $nbNext = trim((string)($q['contract_number'] ?? '')) === '' ? 'Next: register the contract number, then raise the order.' : 'Raise the order to hand it to operations.'; break;
+    case 'ACCEPTED': $nbTitle = 'Accepted 🎉 — they said yes.'; $nbNext = trim((string)($q['contract_number'] ?? '')) === '' ? 'Next: register the contract number. Inspection calls are then raised from the contract.' : 'Contract registered — raise inspection ' . Tlp('call') . ' from it whenever the work comes in, as many as needed.'; break;
     case 'REJECTED': $nbTitle = 'Sent back by ' . ($q['rejected_by'] ?: 'the approver') . '.'; $nbNext = 'Correct it and submit again, or raise a revision.'; break;
     case 'LOST': $nbTitle = 'Closed — not accepted.'; break;
     case 'EXPIRED': $nbTitle = 'Expired — its validity has passed.'; $nbNext = 'Raise a revision to re-issue it.'; break;
@@ -408,6 +415,16 @@
       <?php if ($cr && trim((string)$cr['bm_approved_at'])!==''): ?><tr><td class="muted">Approved (branch mgr)</td><td><?= e($cr['bm_approved_by']) ?> · <?= e(substr($cr['bm_approved_at'],0,10)) ?></td></tr><?php endif; ?>
       <?php if ($cr && trim((string)$cr['close_reason'])!==''): ?><tr><td class="muted">Note</td><td><?= e($cr['close_reason']) ?></td></tr><?php endif; ?>
     </table>
+
+    <?php // Inspection / deputation calls are raised FROM the contract — the client,
+          // the contract number, the business unit and the office all carry across.
+          // Repeatable: as many calls as the work needs, on any later day.
+          if (is_coordinator_level() && $os !== 'CLOSED' && $os !== 'REJECTED'): ?>
+      <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-top:1px dashed var(--line);padding-top:10px">
+        <a class="btn small" href="/call-new?contract_id=<?= (int)($cr['id'] ?? 0) ?>&contract=<?= e(urlencode((string)$q['contract_number'])) ?>">▶ Raise inspection <?= e(Tl('call')) ?></a>
+        <span class="sub" style="margin:0">Raise as many <?= e(Tlp('call')) ?> as the work needs against this contract — today or any later day.</span>
+      </div>
+    <?php endif; ?>
 
     <?php if ($os === 'PENDING'): ?>
       <div class="panel" style="margin-top:8px;border-left:3px solid #b45309">

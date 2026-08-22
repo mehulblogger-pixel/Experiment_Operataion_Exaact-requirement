@@ -3578,6 +3578,30 @@ function ops_calls($route, $method) {
                 ];
             }
         }
+        // Raised FROM a contract (the normal path). Acceptance is given to the
+        // quotation; the contract number is registered off that acceptance; then
+        // inspection / deputation calls are raised from the contract — often on a
+        // later day, and as many as the work needs. So the client, the contract
+        // number, the business unit and the managing office come across from the
+        // contract row and its originating quotation, and the first call under a
+        // brand-new contract is prefilled just like the ones that follow it.
+        // Accepts the contract row id (?contract_id=) or a bare number (?contract=).
+        if ($route === 'call-new' && empty($call['client_id'])) {
+            $ct = null;
+            if (!empty($_GET['contract_id'])) $ct = ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$_GET['contract_id']]);
+            elseif (!empty($_GET['contract'])) $ct = ops_one("SELECT * FROM partner_contracts WHERE contract_number=? ORDER BY id DESC LIMIT 1", [trim((string)$_GET['contract'])]);
+            if ($ct) {
+                $fromQ = !empty($ct['quotation_id']) ? ops_one("SELECT * FROM quotations WHERE id=?", [(int)$ct['quotation_id']]) : null;
+                $call = [
+                    'quotation_id'    => ((int)($ct['quotation_id'] ?? 0)) ?: null,
+                    'client_id'       => ($ct['partner_id'] ?? null) ?: ($fromQ['client_id'] ?? null),
+                    'vendor_id'       => $fromQ['vendor_id'] ?? null,
+                    'contract_number' => ((string)($ct['contract_number'] ?? '')) ?: (string)($fromQ['contract_number'] ?? ''),
+                    'sbu'             => ((string)($ct['sbu'] ?? '')) ?: (string)($fromQ['sbu'] ?? ''),
+                    'ibo_office_id'   => ($fromQ['office_id'] ?? null) ?: (current_user()['home_office_id'] ?? null),
+                ];
+            }
+        }
         // T9 — carry the allocation "format" forward across a contract. Once a call
         // has been set up on a contract (its deliverables, chargeable heads,
         // reporting frequency and inspection type), a new call under the SAME
