@@ -3538,6 +3538,12 @@ function ops_calls($route, $method) {
         }
         $where = $conds ? implode(' AND ', $conds) : '1=1';
         if ($q) { $where .= " AND (c.call_code LIKE ? OR bp.legal_name LIKE ? OR v.legal_name LIKE ?)"; array_push($args, "%$q%","%$q%","%$q%"); }
+        // See every call under one contract, or under one quotation — the "all
+        // calls under this contract / quote" view asked for from those screens.
+        $fContract = trim((string)($_GET['contract'] ?? ''));
+        $fQuote    = (int)($_GET['quote'] ?? 0);
+        if ($fContract !== '') { $where .= " AND c.contract_number = ?"; $args[] = $fContract; }
+        if ($fQuote)           { $where .= " AND c.quotation_id = ?";   $args[] = $fQuote; }
         $costExpr = "((SELECT COALESCE(SUM(ve.row_total),0) FROM voucher_entries ve JOIN jobs jv ON jv.id=ve.job_id WHERE jv.call_id=c.id)"
                   . " + (SELECT COALESCE(SUM(ex.travel+ex.local+ex.food+ex.lodging+ex.misc),0) FROM expenses ex JOIN jobs je ON je.id=ex.job_id WHERE je.call_id=c.id))";
         // §a.ix — the register has to answer "where is this call stuck?" without
@@ -3580,7 +3586,8 @@ function ops_calls($route, $method) {
             }
             csv_download('calls-' . date('Y-m-d') . '.csv', $csv);
         }
-        view('ops/calls', ['rows' => $rows, 'q' => $q, 'minCost' => $_GET['mincost'] ?? '']); return;
+        view('ops/calls', ['rows' => $rows, 'q' => $q, 'minCost' => $_GET['mincost'] ?? '',
+            'fContract' => $fContract, 'fQuote' => $fQuote]); return;
     }
     if ($route === 'call-new' || $route === 'call-edit') {
         ops_require(is_coordinator_level(), 'Only coordinators and admins can create calls.');

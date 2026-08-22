@@ -40,7 +40,7 @@
           $os   = (string)($ct['open_status'] ?: 'OPEN');
           $desc = trim((string)($ct['quote_subject'] ?? '')) ?: trim((string)($ct['title'] ?? ''));
         ?>
-        <a class="pickrow" href="/call-new?contract_id=<?= (int)$ct['id'] ?>&contract=<?= e(urlencode((string)$ct['contract_number'])) ?>">
+        <div class="pickrow">
           <div style="flex:1;min-width:0">
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
               <b style="font-size:15px"><?= e($ct['contract_number']) ?></b>
@@ -50,11 +50,15 @@
             <div class="muted" style="font-size:12px;margin-top:3px">
               <?php if (!empty($ct['quote_no'])): ?><?= e(Tl('quote')) ?> <?= e($ct['quote_no']) ?><?php if ((int)($ct['rev'] ?? 0) > 0): ?> r<?= (int)$ct['rev'] ?><?php endif; ?> · <?php endif; ?>
               <?php if (!empty($ct['end_date'])): ?>valid to <?= e(fdate($ct['end_date'])) ?> · <?php endif; ?>
-              <b><?= (int)$ct['calls'] ?></b> <?= e(Tlp('call')) ?> raised<?php if (!empty($ct['last_call'])): ?> · last <?= e(fdate(substr((string)$ct['last_call'], 0, 10))) ?><?php endif; ?>
+              <?php if ((int)$ct['calls'] > 0): ?>
+                <a href="/calls?contract=<?= e(urlencode((string)$ct['contract_number'])) ?>"><b><?= (int)$ct['calls'] ?></b> <?= e(Tlp('call')) ?> raised</a><?php if (!empty($ct['last_call'])): ?> · last <?= e(fdate(substr((string)$ct['last_call'], 0, 10))) ?><?php endif; ?>
+              <?php else: ?>
+                no <?= e(Tlp('call')) ?> yet
+              <?php endif; ?>
             </div>
           </div>
-          <span class="btn small">Raise <?= e(Tl('call')) ?> ▶</span>
-        </a>
+          <a class="btn small" href="/call-new?contract_id=<?= (int)$ct['id'] ?>&contract=<?= e(urlencode((string)$ct['contract_number'])) ?>">Raise <?= e(Tl('call')) ?> ▶</a>
+        </div>
         <?php endforeach; ?>
       </div>
       <div style="margin-top:12px;border-top:1px dashed var(--line);padding-top:10px">

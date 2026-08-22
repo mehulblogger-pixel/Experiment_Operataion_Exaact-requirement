@@ -1401,7 +1401,18 @@ function ops_crm_quotes($route, $method) {
             'contractRow'  => !empty($q['contract_id']) ? ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$q['contract_id']]) : null,
             'canEndorseContract' => function_exists('can_endorse_contract_open') && can_endorse_contract_open(),
             'canApproveContract' => function_exists('can_approve_contract_open') && can_approve_contract_open(),
-            'orderJobs' => ops_all("SELECT j.id, j.job_code, j.stage, j.closed_flag, j.invoice_raised, j.invoice_amount, j.payment_received, j.payment_amount, i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.quotation_id=? ORDER BY j.id", [$q['id']])]);
+            'orderJobs' => ops_all("SELECT j.id, j.job_code, j.stage, j.closed_flag, j.invoice_raised, j.invoice_amount, j.payment_received, j.payment_amount, i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.quotation_id=? ORDER BY j.id", [$q['id']]),
+            // Every inspection call raised under this quotation or its contract, with
+            // the jobs and the money on each — so the whole order is checkable here.
+            'orderCalls' => ops_all(
+                "SELECT c.id, c.call_code, c.created_at, c.status, c.contract_number,
+                        (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) job_count,
+                        (SELECT COALESCE(SUM(j.invoice_amount),0) FROM jobs j WHERE j.call_id=c.id AND j.invoice_raised=1) invoiced,
+                        (SELECT COALESCE(SUM(CASE WHEN j.payment_received=1 THEN j.payment_amount ELSE 0 END),0) FROM jobs j WHERE j.call_id=c.id) received
+                 FROM calls c
+                 WHERE c.quotation_id=? OR (COALESCE(c.contract_number,'')<>'' AND c.contract_number=?)
+                 ORDER BY c.id DESC",
+                [$q['id'], (string)($q['contract_number'] ?? '')])]);
         return;
     }
     if ($route === 'quote-status' && $method === 'POST') {

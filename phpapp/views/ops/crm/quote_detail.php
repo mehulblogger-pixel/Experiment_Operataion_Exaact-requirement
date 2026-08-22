@@ -373,6 +373,35 @@
   </div>
 </div>
 
+<?php if (!empty($orderCalls)):
+  $cInv=0;$cRec=0; foreach($orderCalls as $oc){ $cInv+=(float)$oc['invoiced']; $cRec+=(float)$oc['received']; } ?>
+<div class="panel" data-tab="Jobs &amp; order">
+  <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+    <h3 class="tab-sub" style="margin:0">Inspection <?= e(Tlp('call')) ?> under this order</h3>
+    <a style="margin-left:auto;font-size:12.5px" href="/calls?<?= $q['contract_number'] ? 'contract=' . e(urlencode((string)$q['contract_number'])) : 'quote=' . (int)$q['id'] ?>">Open in the register →</a>
+  </div>
+  <div class="chip-row" style="margin:8px 0">
+    <span class="ct"><b><?= count($orderCalls) ?></b> <?= e(Tlp('call')) ?></span>
+    <span class="ct">Invoiced <b><?= e(cur_sym()) ?><?= number_format($cInv,0) ?></b></span>
+    <span class="ct">Received <b><?= e(cur_sym()) ?><?= number_format($cRec,0) ?></b></span>
+  </div>
+  <table class="grid"><tr><th><?= e(T('call')) ?></th><th>Raised</th><th>Status</th><th class="num"><?= e(Tlp('job')) ?></th><th class="num">Invoiced</th><th class="num">Received</th></tr>
+    <?php foreach ($orderCalls as $oc):
+      $cst = ($oc['status'] ?? '') === 'CLOSED' ? 'Closed' : ((int)$oc['job_count'] === 0 ? 'To schedule' : 'In progress'); ?>
+    <tr>
+      <td><a href="/call?id=<?= (int)$oc['id'] ?>"><?= e($oc['call_code'] ?: ('#' . (int)$oc['id'])) ?></a></td>
+      <td class="muted"><?= e(fdate(substr((string)$oc['created_at'],0,10))) ?></td>
+      <td><?= e($cst) ?></td>
+      <td class="num"><?= (int)$oc['job_count'] ?></td>
+      <td class="num"><?= (float)$oc['invoiced']>0?cur_sym().number_format((float)$oc['invoiced'],0):'—' ?></td>
+      <td class="num"><?= (float)$oc['received']>0?cur_sym().number_format((float)$oc['received'],0):'—' ?></td>
+    </tr>
+    <?php endforeach; ?>
+  </table>
+  <p class="muted" style="margin-top:6px">Each <?= e(Tl('call')) ?> opens to its <?= e(Tlp('job')) ?>, deputations and invoicing. Raise more from the contract panel above.</p>
+</div>
+<?php endif; ?>
+
 <?php if (!empty($orderJobs)):
   $oInv=0;$oPaid=0; foreach($orderJobs as $oj){ $oInv+=(float)$oj['invoice_amount']; $oPaid+= !empty($oj['payment_received'])?(float)$oj['payment_amount']:0; } ?>
 <div class="panel" data-tab="Jobs &amp; order">

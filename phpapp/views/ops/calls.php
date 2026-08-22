@@ -7,9 +7,16 @@
     elseif ($needs) { $nSched++; if (($c['inspection_required_date'] ?? '') && $c['inspection_required_date'] < $today) $nOverdue++; }
   }
 ?>
+<?php $fContract = $fContract ?? ''; $fQuote = $fQuote ?? 0; $filtered = ($fContract !== '' || $fQuote); ?>
 <div class="master-head">
   <div><h1><?= e(T_REG('call')) ?></h1>
-  <p class="sub" style="margin:2px 0 0">Received from clients — open one to allocate, or edit the details. Rows tinted red are running late; the lead column reads received→forwarded · forwarded→allocated · received→scheduled.</p></div>
+  <?php if ($filtered): ?>
+    <p class="sub" style="margin:2px 0 0">Showing every <?= e(Tl('call')) ?> under
+      <?= $fContract !== '' ? 'contract <b>' . e($fContract) . '</b>' : (e(Tl('quote')) . ' #' . (int)$fQuote) ?>.
+      <a href="/calls" style="margin-left:6px">Clear filter →</a></p>
+  <?php else: ?>
+  <p class="sub" style="margin:2px 0 0">Received from clients — open one to allocate, or edit the details. Rows tinted red are running late; the lead column reads received→forwarded · forwarded→allocated · received→scheduled.</p>
+  <?php endif; ?></div>
   <div style="display:flex;gap:8px">
     <a class="btn secondary" href="/calls?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ CSV</a>
     <?php if (is_coordinator_level()): ?><a class="btn" href="/call-new">➕ <?= e(ucfirst(T_NEW('call'))) ?></a><?php endif; ?>
