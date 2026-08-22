@@ -14,6 +14,16 @@
           // carry-over). Only used when creating; an existing record wins. ?>
     <div class="ff"><label>Legal name *</label><input class="form-control" name="legal_name" required value="<?= e(($p['legal_name'] ?? '') ?: (string)($_GET['prefill'] ?? '')) ?>"></div>
     <div class="ff"><label>Display name <span class="muted">(auto from legal, editable)</span></label><input class="form-control" name="display_name" value="<?= e($p['display_name'] ?? '') ?>"></div>
+    <?php // Primary contact — captured at creation (and carried from the lead /
+          // inquiry / quote this client was added from) so it lands on the client
+          // master straight away. More contacts are added on the client's Contacts
+          // tab afterwards. Only offered while creating a new record. ?>
+    <?php if (!$p): ?>
+    <div class="ff"><label>Primary contact <span class="muted">— optional; more can be added later</span></label>
+      <input class="form-control" name="contact_name" value="<?= e((string)($_GET['contact_name'] ?? '')) ?>" placeholder="Contact person"></div>
+    <div class="ff"><label>Contact e-mail</label><input class="form-control" type="email" name="contact_email" value="<?= e((string)($_GET['contact_email'] ?? '')) ?>" placeholder="name@company.com"></div>
+    <div class="ff"><label>Contact mobile</label><input class="form-control" name="contact_mobile" value="<?= e((string)($_GET['contact_mobile'] ?? '')) ?>" placeholder="Phone / mobile"></div>
+    <?php endif; ?>
     <?php if (!$p): $branchWord = ($defaultRole === 'is_vendor') ? 'Executing' : 'Contracting'; ?>
     <div class="ff"><label><span id="branch_word"><?= $branchWord ?></span> office <span class="muted">(drives the code)</span></label>
       <select class="form-control searchable" name="home_branch_id">

@@ -951,6 +951,15 @@ if ($route === 'partner-new') {
             ->execute([$mmB, (int)($b['manmonth_min_days'] ?? 0), $id]);
         partner_save_geofence($pdo, $id, $b);
         custom_save('partner', $id, $b);
+        // Primary contact carried in from the lead / inquiry / quote this client
+        // was added against — so the person we already know lands on the client
+        // master, not re-keyed later. Only when a name was actually provided.
+        $pcName = trim((string)($b['contact_name'] ?? ''));
+        if ($pcName !== '') {
+            $pcMobile = trim((string)($b['contact_mobile'] ?? '')) ?: trim((string)($b['contact_phone'] ?? ''));
+            $pdo->prepare("INSERT INTO partner_contacts (partner_id,name,email,mobile,is_primary) VALUES (?,?,?,?,1)")
+                ->execute([$id, substr($pcName, 0, 150), substr(trim((string)($b['contact_email'] ?? '')), 0, 200), substr($pcMobile, 0, 40)]);
+        }
         // Whatever sales already knew about this company: the inspections they
         // asked for, the person they were talking to, and the inquiries and
         // quotations that only ever carried the name.

@@ -443,6 +443,21 @@
             if (q && q.value) nm = q.value;
           }
           if (nm) url += '&prefill=' + encodeURIComponent(nm.trim());
+          // Carry the contact person too (from the lead / inquiry / quote form),
+          // so the new client's primary contact is filled in, not re-keyed.
+          var cget = function (names) {
+            for (var i = 0; i < names.length; i++) {
+              var el = document.querySelector(names[i]);
+              if (el && el.value && el.value.trim()) return el.value.trim();
+            }
+            return '';
+          };
+          var cN = cget(['#contact_name', '[name="contact_name"]', '[name="loc_contact[]"]']);
+          var cE = cget(['#contact_email', '[name="contact_email"]']);
+          var cM = cget(['#contact_mobile', '[name="contact_mobile"]', '[name="contact_phone"]']);
+          if (cN) url += '&contact_name=' + encodeURIComponent(cN);
+          if (cE) url += '&contact_email=' + encodeURIComponent(cE);
+          if (cM) url += '&contact_mobile=' + encodeURIComponent(cM);
         }
         win = window.open(url, 'exaactPartnerPicker', 'width=900,height=920,menubar=no,toolbar=no,scrollbars=yes');
         if (win) win.focus();
