@@ -6035,7 +6035,7 @@ function ops_pending_tasks() {
     // ---- Approvals waiting on ME -------------------------------------------
     // Quotations — the current step is mine to sign (named, by role, or generic).
     if (function_exists('crm_quotes_awaiting_me'))
-        $add(crm_quotes_awaiting_me(), '🧾', 'quotes to approve', 'quotations awaiting your approval', '/quotes?v=pending', 'info');
+        $add(crm_quotes_awaiting_me(), '🧾', 'quotes to approve', 'quotations awaiting your approval', '/quotes?mine=approve', 'info');
 
     // Contract openings — a manager endorses, then the branch manager approves.
     // Acted on from the quote screen, so the link lands on the oldest one.

@@ -1119,6 +1119,31 @@ function ops_crm_inquiries($route, $method) {
 function ops_crm_quotes($route, $method) {
     $pdo = db();
     if ($route === 'quotes') {
+        // "Awaiting my approval" — the exact set the dashboard's "quotes to
+        // approve" counts. Routed to me (by name, role, or a generic step I may
+        // sign); NO office/FY scope, because the routing is the authority — so
+        // the list can never disagree with the dashboard count.
+        if (($_GET['mine'] ?? '') === 'approve') {
+            $u = current_user(); $me = (int)($u['id'] ?? 0); $role = (string)user_role();
+            $canApprove = can('crm.quote.approve') || is_master();
+            $rows = ops_all(
+                "SELECT q.*, bp.display_name client_disp, o.name office_name
+                 FROM quotations q
+                 LEFT JOIN business_partners bp ON bp.id=q.client_id
+                 LEFT JOIN offices o ON o.id=q.office_id
+                 JOIN quote_approvals a ON a.quote_id=q.id AND a.status='PENDING'
+                      AND a.level=(SELECT MIN(a2.level) FROM quote_approvals a2 WHERE a2.quote_id=q.id AND a2.status='PENDING')
+                 WHERE q.is_current=1 AND q.status='PENDING_APPROVAL'
+                   AND ( a.approver_user_id=?
+                         OR (a.approver_role=? AND (a.approver_user_id IS NULL OR a.approver_user_id=0))
+                         OR ((a.approver_role='' OR a.approver_role IS NULL)
+                             AND (a.approver_user_id IS NULL OR a.approver_user_id=0) AND ?) )
+                 GROUP BY q.id ORDER BY q.id DESC", [$me, $role, $canApprove ? 1 : 0]);
+            view('ops/crm/quote_list', ['rows' => $rows, 'view' => 'pending', 'q' => '',
+                'counts' => ['open' => 0, 'pending' => count($rows), 'closed' => 0, 'lost' => 0],
+                'fy' => current_fy(), 'mineApprove' => true]);
+            return;
+        }
         $view = $_GET['v'] ?? 'all';   // all | open | pending | closed | lost
         $stateSets = ['open' => QUOTE_OPEN_STATES, 'pending' => QUOTE_PENDING_STATES, 'closed' => QUOTE_CLOSED_STATES, 'lost' => ['LOST', 'EXPIRED']];
         [$scopeW, $args] = scope_clause('q.office_id', 'q.sbu');

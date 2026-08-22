@@ -4,9 +4,14 @@
   $tabs = ['all'=>'All','open'=>'Open','pending'=>'Pending','closed'=>'Closed (won)','lost'=>'Lost'];
   $qs = function($v) { return '/quotes?' . http_build_query(array_merge($_GET, ['v'=>$v])); };
 ?>
+<?php $mineApprove = !empty($mineApprove); ?>
 <div class="master-head">
-  <div><h1><?= e(T_REG('quote')) ?></h1>
-    <p class="sub" style="margin:2px 0 0">Quote → approval → send → follow-up → acceptance. <?= count($rows) ?> shown.</p></div>
+  <div><h1><?= e(T_REG('quote')) ?><?= $mineApprove ? ' <span class="pill p-warn" style="font-size:13px;vertical-align:middle">Awaiting your approval</span>' : '' ?></h1>
+    <?php if ($mineApprove): ?>
+      <p class="sub" style="margin:2px 0 0"><?= count($rows) ?> <?= e(Tl('quote')) ?><?= count($rows)===1?'':'s' ?> routed to you for approval — from any office. <a href="/quotes?v=all">See all <?= e(Tlp('quote')) ?> →</a></p>
+    <?php else: ?>
+      <p class="sub" style="margin:2px 0 0">Quote → approval → send → follow-up → acceptance. <?= count($rows) ?> shown.</p>
+    <?php endif; ?></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
     <a class="btn secondary" href="/quotes?<?= e(http_build_query(array_merge($_GET, ['export'=>'1']))) ?>">⬇ Export</a>
     <?php if (can('crm.quote.approve') || is_master()): ?><a class="btn secondary" href="/approval-rules?module=quote">Approval rules</a><?php endif; ?>
