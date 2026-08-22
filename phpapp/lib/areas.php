@@ -107,7 +107,7 @@ function ops_area_def($area) {
             $t(can('mod.portal.view'), '🌐', 'Client portal', '/portal-users', 'Client portal users and requests.',
                 $num(fn() => $fx('portal_requests_all') ? count(portal_requests_all('NEW')) : 0), 'amber');
             $t(can('mod.portal.view'), '🏭', 'Vendor portal', '/vendor-users', 'Vendor portal access.');
-            $t($fx('tapi_can') && tapi_can(), '📈', 'Analytics', '/analytics', 'KPI dashboards and drill-down.');
+            // Analytics lives under Insights; the duplicate that was here is parked in Admin.
             break;
 
         case 'reporting':
@@ -119,7 +119,7 @@ function ops_area_def($area) {
                 $t(true, '📑', T_REG('report'), '/documents', 'The report register.');
                 $t(can('mod.idems.edit') || is_master_of('idems'), '➕', ucfirst(T_NEW('report')), '/document-new', 'Start a new report.');
                 $t(true, '✅', T_REG('endorsement'), '/endorsements', 'Manufacturer document endorsements.');
-                $t(true, '🏭', 'Vendor register', '/vendors', 'Vendors and their profiles.');
+                // Vendor register lives under Directory; the duplicate that was here is parked in Admin.
 
                 $sec('Expediting');
                 $t(!$fx('svc_globally_active') || svc_globally_active('EXPEDITING'), '🚚', 'Expediting register', '/expediting', 'Chasing vendor delivery.');
@@ -210,6 +210,16 @@ function ops_area_def($area) {
             $t($fx('lk_can_manage') && lk_can_manage(), '📜', 'Licence', '/licence', 'The product licence and its state.');
             $t((can('settings.manage') || is_master()) && $fx('books_licensed') && books_licensed(), '📗', 'MGH Books', '/books-bridge', 'The accounts bridge.',
                 $num(fn() => $fx('books_outbox_counts') ? (books_outbox_counts()['stuck'] ?? 0) : 0), 'red');
+
+            // ---- Parked: duplicates & extras moved out of the main areas so the
+            //      menus stay clean. Every screen here still works and still lives
+            //      in its proper home too; this is a holding list to review and
+            //      decide keep-or-drop later. Nothing is deleted.
+            if (is_master() || can('settings.manage')) {
+                $sec('🅿️ Parked — duplicates & extras (to review)');
+                $t($fx('tapi_can') && tapi_can(), '📈', 'Analytics — duplicate', '/analytics', 'Its home is Insights → Analytics. This was a second copy under Quality.');
+                $t(can('mod.vendors.view'), '🚚', 'Vendor register — duplicate', '/vendors', 'Its home is Directory → Vendors. This was a second copy under Reporting.');
+            }
             break;
 
         default:
