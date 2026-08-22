@@ -937,7 +937,7 @@ function books_billable_jobs($partnerId = 0, $limit = 300) {
     if ($partnerId) { $extra = ' AND c.client_id = ?'; $a[] = (int)$partnerId; }
     return books_try(fn() => ops_all(
         "SELECT j.id, j.job_code, j.closed_at, j.invoice_value, j.executing_office_id,
-                c.id call_id, c.billable_value, c.billable_rate, c.billable_qty, c.client_id,
+                c.id call_id, c.call_code, c.contract_number, c.billable_value, c.billable_rate, c.billable_qty, c.client_id,
                 COALESCE(bp.display_name, bp.legal_name) client_name
          FROM jobs j
          LEFT JOIN calls c ON c.id = j.call_id

@@ -122,17 +122,32 @@ function ops_books($route, $method) {
     // ---- Work finished and not yet billed -----------------------------------
     if ($route === 'to-bill') {
         $rows = books_billable_jobs((int)($_GET['partner'] ?? 0));
-        // Grouped by customer, because one invoice per customer per month is
-        // how this is actually billed — not one invoice per deputation.
+        // The three real billing rhythms all come off this one pool:
+        //   • per call      — tick one job, draft its invoice
+        //   • per month     — pick a month, tick a whole project's work for it
+        //   • per project   — one contract's deputations, on one invoice
+        // So the pool is filtered by the CLOSED month, and grouped customer →
+        // contract/project. Each project draws its own invoice.
+        $month  = trim((string)($_GET['month'] ?? ''));
+        $months = [];
+        foreach ($rows as $r) { $m = substr((string)($r['closed_at'] ?? ''), 0, 7); if ($m !== '') $months[$m] = true; }
+        krsort($months); $months = array_keys($months);
+        if ($month !== '') $rows = array_values(array_filter($rows, fn($r) => substr((string)($r['closed_at'] ?? ''), 0, 7) === $month));
         $by = [];
         foreach ($rows as $r) {
-            $k = (int)$r['client_id'];
-            if (!isset($by[$k])) $by[$k] = ['name' => $r['client_name'] ?: 'Customer not set', 'rows' => [], 'value' => 0.0];
-            $by[$k]['rows'][] = $r;
-            $by[$k]['value'] += (float)($r['billable_value'] ?: $r['invoice_value'] ?: 0);
+            $cid = (int)$r['client_id'];
+            if (!isset($by[$cid])) $by[$cid] = ['name' => $r['client_name'] ?: 'Customer not set', 'value' => 0.0, 'projects' => []];
+            $cn = trim((string)($r['contract_number'] ?? ''));
+            $pk = $cn !== '' ? $cn : '~none';   // '~none' sorts last, shown as "no contract"
+            if (!isset($by[$cid]['projects'][$pk])) $by[$cid]['projects'][$pk] = ['contract' => $cn, 'rows' => [], 'value' => 0.0];
+            $v = (float)($r['billable_value'] ?: $r['invoice_value'] ?: 0);
+            $by[$cid]['projects'][$pk]['rows'][] = $r;
+            $by[$cid]['projects'][$pk]['value'] += $v;
+            $by[$cid]['value'] += $v;
         }
+        foreach ($by as &$g) { uasort($g['projects'], fn($a, $b) => $b['value'] <=> $a['value']); } unset($g);
         uasort($by, fn($a, $b) => $b['value'] <=> $a['value']);
-        view('ops/to_bill', ['groups' => $by, 'canIssue' => $canIssue]);
+        view('ops/to_bill', ['groups' => $by, 'canIssue' => $canIssue, 'month' => $month, 'months' => $months]);
         return true;
     }
 
