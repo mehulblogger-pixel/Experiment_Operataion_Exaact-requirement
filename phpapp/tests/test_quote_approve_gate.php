@@ -42,6 +42,9 @@ $pdo->prepare("INSERT INTO quotations (quote_no,rev,is_current,status,created_at
 $qid = (int)$pdo->lastInsertId();
 $pdo->prepare("INSERT INTO quote_approvals (quote_id,level,approver_role,status) VALUES (?,1,'BRANCH_MANAGER','PENDING')")->execute([$qid]);
 t_ok(crm_can_act_on_quote($qid) === true, 'the routed branch-manager approver can act on the quote (checklist save allowed)');
+// The quote has NO office, yet it is routed to the branch manager — it must still
+// reach their "quotes to approve" pending list (routing overrides office scope).
+t_ok(crm_quotes_awaiting_me() >= 1, 'a routed quote reaches the approver even with no office / out of their scope');
 $pdo->prepare("UPDATE quote_approvals SET approver_role='FINANCE' WHERE quote_id=?")->execute([$qid]);
 t_ok(crm_can_act_on_quote($qid) === false, 'someone not on the pending step cannot act on the quote');
 

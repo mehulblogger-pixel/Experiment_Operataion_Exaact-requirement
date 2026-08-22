@@ -2532,18 +2532,20 @@ function crm_quotes_awaiting_me() {
     $role = function_exists('user_role') ? (string)user_role() : (string)($u['role'] ?? '');
     $canApprove = (function_exists('can') && can('crm.quote.approve')) || (function_exists('is_master') && is_master());
     try {
-        [$sw, $sa] = function_exists('scope_clause') ? scope_clause('q.office_id', 'q.sbu') : ['1', []];
+        // NO office scope here: a quote routed to this person for approval must
+        // reach them even if it belongs to another office. The routing IS the
+        // authority — office scope would strand the very approval assigned to them
+        // (e.g. a quote with no office, or another branch's, waiting on this BM).
         $sql = "SELECT COUNT(DISTINCT q.id)
                 FROM quotations q
                 JOIN quote_approvals a ON a.quote_id=q.id AND a.status='PENDING'
                      AND a.level = (SELECT MIN(a2.level) FROM quote_approvals a2 WHERE a2.quote_id=q.id AND a2.status='PENDING')
-                WHERE q.is_current=1 AND q.status='PENDING_APPROVAL' AND $sw
+                WHERE q.is_current=1 AND q.status='PENDING_APPROVAL'
                   AND ( a.approver_user_id = ?
                         OR (a.approver_role = ? AND (a.approver_user_id IS NULL OR a.approver_user_id=0))
                         OR ((a.approver_role='' OR a.approver_role IS NULL)
                             AND (a.approver_user_id IS NULL OR a.approver_user_id=0) AND ?) )";
-        $args = array_merge($sa, [$me, $role, $canApprove ? 1 : 0]);
-        return (int) ops_val($sql, $args);
+        return (int) ops_val($sql, [$me, $role, $canApprove ? 1 : 0]);
     } catch (Throwable $e) { return 0; }
 }
 // Tell the sales owner what the approver decided.
