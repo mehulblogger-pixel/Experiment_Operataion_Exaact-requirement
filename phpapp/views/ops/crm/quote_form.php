@@ -213,7 +213,7 @@
       <th style="min-width:130px"><?= e(T('sbu')) ?></th><th style="min-width:150px">Activity</th>
       <th style="min-width:190px">Service <span class="muted" style="font-weight:400">— from the types above</span></th>
       <th style="min-width:220px">Description</th><th style="min-width:170px">Site</th>
-      <th style="min-width:150px"><?= e(T('office')) ?></th><th style="min-width:130px">Order</th>
+      <th style="min-width:130px">Order</th>
       <th class="num" style="min-width:80px">Qty</th><th style="min-width:130px">Unit</th>
       <th class="num" style="min-width:110px">Rate <?= e(cur_sym()) ?></th>
       <th class="num" style="min-width:110px">Amount <?= e(cur_sym()) ?></th><th></th>
@@ -230,10 +230,11 @@
             // rebuilt by JS from the "Types of inspection requested" ticked above,
             // so a line can never quote something outside the agreed scope. ?>
       <td><select class="form-control l_service" name="l_service[]" data-cur="<?= e($ln['service_type'] ?? '') ?>"></select></td>
-      <td><input class="form-control" name="l_desc[]" value="<?= e($ln['description'] ?? '') ?>"></td>
+      <td><input class="form-control" name="l_desc[]" value="<?= e($ln['description'] ?? '') ?>">
+          <?php // Office is set once for the whole quote (Executing offices tab), not
+                // per line — kept as a hidden value so existing quotes are preserved. ?>
+          <input type="hidden" name="l_office[]" value="<?= e((string)($ln['office_id'] ?? '')) ?>"></td>
       <td><select class="form-control l_loc" name="l_location[]" data-cur="<?= (int)($ln['location_id'] ?? 0) ?>"><option value="">— add a site above —</option></select></td>
-      <td><select class="form-control" name="l_office[]"><option value="">— primary —</option>
-            <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= ((string)($ln['office_id'] ?? '')===(string)$o['id'])?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?></select></td>
       <td><select class="form-control" name="l_order[]"><?php foreach ($orderOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ln['order_type'] ?? 'LINE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
       <td><input class="form-control num l_qty" type="number" step="0.01" name="l_qty[]" value="<?= e($ln['qty'] ?? '') ?>"></td>
       <td><select class="form-control" name="l_unit[]"><?php foreach ($unitOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ln['unit'] ?? 'MANDAY')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
