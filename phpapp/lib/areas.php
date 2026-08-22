@@ -60,7 +60,7 @@ function ops_area_def($area) {
         case 'quality':
             $title = 'Quality & Accreditation'; $icon = '🛡️';
             $sub = 'The registers an accreditation assessor asks for — equipment, competence, impartiality, complaints, nonconformities and the portals.';
-            $routes = ['quality','equipment','samples','sample','methods','method','drules','drule','cdocs','cdoc','risks','risk','retention','disclosure','competence','impartiality','complaints','complaint','satisfaction','confidentiality','conf-breach','site-docs','report-reviews','ncr','issues','departures','hold-points','capa','internal-audits','internal-audit','management-reviews','management-review','evidence-review','data-control','portal-users','vendor-users','analytics','identity'];
+            $routes = ['quality','equipment','samples','sample','methods','method','drules','drule','cdocs','cdoc','risks','risk','retention','disclosure','competence','impartiality','complaints','complaint','satisfaction','confidentiality','conf-breach','site-docs','report-reviews','ncr','issues','departures','hold-points','capa','internal-audits','internal-audit','management-reviews','management-review','evidence-review','data-control','identity'];
 
             $sec('Measurement & docs');
             $t($inspPack && can('mod.equipment.view'), '📏', 'Equipment & calibration', '/equipment', 'Instruments and calibration status.');
@@ -104,10 +104,9 @@ function ops_area_def($area) {
             $t(can('mod.confidentiality.view') || can('mod.identity.view') || is_master_of(['confidentiality','identity']), '🔒', 'Confidentiality', '/confidentiality', 'Undertakings, NDAs and breaches.');
             $t($fx('ops_sitedocs') && licence_enabled('operations') && (can('mod.identity.view') || can('mod.clients.view') || is_master_of(['identity','clients'])), '🛂', 'Site entry documents', '/site-docs', 'Papers needed for site access.');
             $t(can('mod.identity.view') && $fx('iddoc_can_view') && iddoc_can_view(), '🪪', 'Identity documents', '/identity', 'ID that gates site access.');
-            $t(can('mod.portal.view'), '🌐', 'Client portal', '/portal-users', 'Client portal users and requests.',
-                $num(fn() => $fx('portal_requests_all') ? count(portal_requests_all('NEW')) : 0), 'amber');
-            $t(can('mod.portal.view'), '🏭', 'Vendor portal', '/vendor-users', 'Vendor portal access.');
-            // Analytics lives under Insights; the duplicate that was here is parked in Admin.
+            // Client & vendor portal administration now lives under Directory (it is
+            // portal admin, not a quality register). Analytics lives under Insights;
+            // the duplicate that was here is parked in Admin.
             break;
 
         case 'reporting':
@@ -176,13 +175,20 @@ function ops_area_def($area) {
 
         case 'directory':
             $title = 'Directory'; $icon = '🏢';
-            $sub = 'The people and companies the work is done with.';
-            $routes = ['directory','activities','clients','client','vendors','vendor','client-holds','asset-register'];
+            $sub = 'The people and companies the work is done with — and the portals they sign in to.';
+            $routes = ['directory','activities','clients','client','vendors','vendor','client-holds','asset-register','portal-users','vendor-users'];
             $t($fx('act_can_view') && act_can_view(), '🕘', 'Activity', '/activities', 'A timeline of what happened.');
             $t(can('mod.clients.view'), '🏢', T_REG('client'), '/clients', 'The client register.');
             $t(can('mod.vendors.view'), '🚚', T_REG('vendor'), '/vendors', 'The vendor register.');
             $t(is_master() || can('settings.manage') || ($fx('is_coordinator_level') && is_coordinator_level()), '⛔', 'Client holds', '/client-holds', 'Put a client on hold or block them before ordering.');
             $t($fx('asset_can_view') && asset_can_view(), '📦', 'Asset issuance', '/asset-register', 'Stamps, diaries, safety gear & devices issued to engineers — acknowledged and tracked.');
+
+            // Portal administration — moved here from Quality (it manages the people
+            // who sign in to the client/vendor portals, not a quality register).
+            $sec('Portals');
+            $t(can('mod.portal.view'), '🌐', 'Client portal', '/portal-users', 'Client portal users and requests.',
+                $num(fn() => $fx('portal_requests_all') ? count(portal_requests_all('NEW')) : 0), 'amber');
+            $t(can('mod.portal.view'), '🏭', 'Vendor portal', '/vendor-users', 'Vendor portal access.');
             break;
 
         case 'admin':
