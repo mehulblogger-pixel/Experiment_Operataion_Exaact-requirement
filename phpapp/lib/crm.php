@@ -1675,7 +1675,13 @@ function ops_crm_quotes($route, $method) {
     // Save the pre-order review checklist ticks for a quotation.
     if ($route === 'quote-preorder-save' && $method === 'POST') {
         $q = crm_quote_get((int)($_POST['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
-        ops_require(can('crm.quote.create') || can('mod.quotes.edit') || can('crm.quote.approve') || is_master(), 'You cannot update this ' . Tl('quote') . '.');
+        // The routed approver must be able to tick the pre-order checklist too —
+        // it is a condition of THEIR approval, and a branch manager assigned the
+        // quote often holds none of the blanket create/edit/approve permissions
+        // (their authority is the assignment). Without this the save is refused
+        // and bounces to the dashboard, so the checklist can never be completed.
+        ops_require(crm_can_act_on_quote((int)$q['id']) || can('crm.quote.create') || can('mod.quotes.edit') || can('crm.quote.approve') || is_master(),
+            'You cannot update this ' . Tl('quote') . '.');
         $ticked = (array)($_POST['pc'] ?? []); $vc = [];
         foreach (preorder_checklist_items() as $it) { $k = preorder_item_key($it); if (!empty($ticked[$k])) $vc[$k] = 1; }
         $pdo->prepare("UPDATE quotations SET preorder_checklist=? WHERE id=?")->execute([json_encode($vc), $q['id']]);
@@ -2567,6 +2573,13 @@ function crm_can_act_approval($step) {
     if (($step['approver_role'] ?? '') !== '') return user_role() === $step['approver_role'];
     // A generic "any approver" step is open to anyone who holds the permission.
     return can('crm.quote.approve');
+}
+// Can the current user act on any still-pending approval step of this quote? True
+// for the routed approver — used so they can also tick the pre-order checklist
+// that gates their own approval, even without a blanket quote permission.
+function crm_can_act_on_quote($qid) {
+    foreach (crm_approvals((int)$qid) as $st) if (crm_can_act_approval($st)) return true;
+    return false;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,10 +1,15 @@
 <?php
   $m  = fn($n) => cur_sym() . number_format((float)$n, 2);
   $qn = fn($n) => rtrim(rtrim(number_format((float)$n, 3, '.', ''), '0'), '.');
-  $company = function_exists('app_name') ? app_name() : 'Company';
-  $coGstin = function_exists('setting_get') ? (string)setting_get('company_gstin', '') : '';
-  $coAddr  = function_exists('setting_get') ? (string)setting_get('company_address', '') : '';
-  $office  = $office ?? null;
+  // Seller identity comes from the one "Your company" profile (Admin → Company
+  // profile), the same source the quote letterhead and GST export already use.
+  $co       = function_exists('company_profile') ? company_profile() : [];
+  $company  = trim((string)($co['legal_name'] ?? '')) ?: (trim((string)($co['brand'] ?? '')) ?: (function_exists('app_name') ? app_name() : 'Company'));
+  $coGstin  = (string)($co['gstin'] ?? '');
+  $coPan    = (string)($co['pan'] ?? '');
+  $coState  = (string)($co['state'] ?? '');
+  $coAddr   = (string)($co['address'] ?? '');
+  $office   = $office ?? null;
   $isDraft = ($inv['status'] ?? '') === 'DRAFT';
   $intra   = (float)($inv['cgst'] ?? 0) + (float)($inv['sgst'] ?? 0) > 0;
   // Group the lines by contract; a sub-header shows only when the bill spans more
@@ -57,8 +62,9 @@
       <div class="lbl">Seller</div>
       <b><?= e($company) ?></b>
       <?php if ($office && trim((string)($office['name'] ?? '')) !== ''): ?><div><?= e($office['name']) ?><?= !empty($office['city']) ? ', ' . e($office['city']) : '' ?></div><?php endif; ?>
-      <?php if ($office && trim((string)($office['address'] ?? '')) !== ''): ?><div class="muted"><?= nl2br(e($office['address'])) ?></div><?php elseif ($coAddr !== ''): ?><div class="muted"><?= nl2br(e($coAddr)) ?></div><?php endif; ?>
-      <?php if ($coGstin !== ''): ?><div>GSTIN: <b><?= e($coGstin) ?></b></div><?php endif; ?>
+      <?php if ($coAddr !== ''): ?><div class="muted"><?= nl2br(e($coAddr)) ?></div><?php elseif ($office && trim((string)($office['address'] ?? '')) !== ''): ?><div class="muted"><?= nl2br(e($office['address'])) ?></div><?php endif; ?>
+      <?php if ($coGstin !== ''): ?><div>GSTIN: <b><?= e($coGstin) ?></b><?= $coState !== '' ? ' <span class="muted">(' . e($coState) . ')</span>' : '' ?></div><?php endif; ?>
+      <?php if ($coPan !== ''): ?><div class="muted">PAN: <?= e($coPan) ?></div><?php endif; ?>
     </td>
     <td>
       <div class="lbl">Bill to</div>

@@ -35,6 +35,16 @@ if (!can('crm.quote.approve'))
 t_ok(crm_can_act_approval($pending(['approver_user_id'=>$uid, 'status'=>'APPROVED'])) === false,
     'an already-decided step is not actionable');
 
+// The routed approver can act on the quote as a whole (so they may also save the
+// pre-order checklist that gates their own approval — the bug that bounced the
+// branch manager to the dashboard). Guards crm_can_act_on_quote().
+$pdo->prepare("INSERT INTO quotations (quote_no,rev,is_current,status,created_at) VALUES ('QAG-1',0,1,'PENDING_APPROVAL',?)")->execute([date('c')]);
+$qid = (int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO quote_approvals (quote_id,level,approver_role,status) VALUES (?,1,'BRANCH_MANAGER','PENDING')")->execute([$qid]);
+t_ok(crm_can_act_on_quote($qid) === true, 'the routed branch-manager approver can act on the quote (checklist save allowed)');
+$pdo->prepare("UPDATE quote_approvals SET approver_role='FINANCE' WHERE quote_id=?")->execute([$qid]);
+t_ok(crm_can_act_on_quote($qid) === false, 'someone not on the pending step cannot act on the quote');
+
 // Restore guest state for later tests.
 unset($_SESSION['uid']);
 current_user(true); ua(true);
