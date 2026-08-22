@@ -56,32 +56,51 @@
 <form method="post" action="/access" class="panel">
   <input type="hidden" name="role" value="<?= e($sel) ?>">
 
-  <h3 class="tab-sub" style="margin-top:0;">Modules — what screens they can open</h3>
+  <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-top:0">
+    <h3 class="tab-sub" style="margin:0">Modules — what screens they can open</h3>
+    <label class="chk" style="margin-left:auto;font-weight:600"><input type="checkbox" id="perm_all_toggle"> Select <b style="margin:0 3px">everything</b> for this role</label>
+  </div>
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
     <thead><tr><th>Module</th><th style="text-align:center">View</th><th style="text-align:center">Add / edit</th></tr></thead>
-    <tbody>
-    <?php foreach ($moduleGroups as $grp => $keys): ?>
-      <tr><td colspan="3" style="background:var(--soft);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.03em"><?= e($grp) ?></td></tr>
-      <?php foreach ($keys as $k): if (!isset(ACCESS_MODULES[$k])) continue; ?>
+    <?php foreach ($moduleGroups as $grp => $keys):
+      $mods = array_values(array_filter($keys, fn($k) => isset(ACCESS_MODULES[$k])));
+      if (!$mods) continue; ?>
+    <tbody class="mgroup">
+      <tr><td colspan="3" style="background:var(--soft);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.03em">
+        <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span><?= e($grp) ?></span>
+          <label class="chk" style="margin-left:auto;font-weight:600;font-size:11px;text-transform:none;letter-spacing:0;color:var(--accent,#234e70)"><input type="checkbox" class="grp-all"> All of <?= e($grp) ?></label>
+        </span>
+      </td></tr>
+      <?php foreach ($mods as $k): ?>
       <tr>
         <td><b><?= e(access_module_label($k)) ?></b> <?= $rec("mod.$k.view")?'<span class="pill p-ok" style="padding:0 5px;font-size:10px">recommended</span>':'' ?></td>
-        <td style="text-align:center"><input type="checkbox" name="perms[mod.<?= e($k) ?>.view]" value="1" <?= $has("mod.$k.view")?'checked':'' ?>></td>
-        <td style="text-align:center"><input type="checkbox" name="perms[mod.<?= e($k) ?>.edit]" value="1" <?= $has("mod.$k.edit")?'checked':'' ?>></td>
+        <td style="text-align:center"><input type="checkbox" class="role-perm" name="perms[mod.<?= e($k) ?>.view]" value="1" <?= $has("mod.$k.view")?'checked':'' ?>></td>
+        <td style="text-align:center"><input type="checkbox" class="role-perm" name="perms[mod.<?= e($k) ?>.edit]" value="1" <?= $has("mod.$k.edit")?'checked':'' ?>></td>
       </tr>
       <?php endforeach; ?>
-    <?php endforeach; ?>
     </tbody>
+    <?php endforeach; ?>
   </table>
   </div>
 
   <h3 class="tab-sub">Data &amp; feature permissions — what they can do &amp; see</h3>
-  <?php foreach ($permGroups as $grp => $keys): ?>
-    <div style="margin:10px 0 4px;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--brand)"><?= e($grp) ?></div>
-    <div class="checkgrid">
-      <?php foreach ($keys as $k): if (!isset($allPerm[$k])) continue; ?>
-        <label class="chk<?= $rec($k)?' rec':'' ?>"><input type="checkbox" name="perms[<?= e($k) ?>]" value="1" <?= $has($k)?'checked':'' ?>> <?= e($allPerm[$k]) ?><?= $rec($k)?' <span class="pill p-ok" style="padding:0 5px;font-size:10px">rec</span>':'' ?></label>
-      <?php endforeach; ?>
+  <?php foreach ($permGroups as $grp => $keys):
+    $pk = array_values(array_filter($keys, fn($k) => isset($allPerm[$k])));
+    if (!$pk) continue; ?>
+    <div class="permgroup">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0 4px">
+        <span style="font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--brand)"><?= e($grp) ?></span>
+        <?php if (count($pk) > 1): ?>
+          <label class="chk" style="margin-left:auto;font-weight:600;font-size:11px;color:var(--accent,#234e70)"><input type="checkbox" class="grp-all"> All of <?= e($grp) ?></label>
+        <?php endif; ?>
+      </div>
+      <div class="checkgrid">
+        <?php foreach ($pk as $k): ?>
+          <label class="chk<?= $rec($k)?' rec':'' ?>"><input type="checkbox" class="role-perm" name="perms[<?= e($k) ?>]" value="1" <?= $has($k)?'checked':'' ?>> <?= e($allPerm[$k]) ?><?= $rec($k)?' <span class="pill p-ok" style="padding:0 5px;font-size:10px">rec</span>':'' ?></label>
+        <?php endforeach; ?>
+      </div>
     </div>
   <?php endforeach; ?>
 
@@ -94,3 +113,32 @@
 <p class="muted" style="margin-top:10px">Tip: <strong>Add / edit</strong> also grants <strong>View</strong>. Individual exceptions per person are set under <a href="/users">Users</a>. See the whole reporting tree in <a href="/hierarchy">Org hierarchy</a>.</p>
 
 <style>.checkgrid .chk.rec{border-left:3px solid var(--ok);padding-left:7px}</style>
+
+<script>
+(function(){
+  // "Select all" for each module/permission group, plus a master toggle for the
+  // whole role. Client-side only — the same perms[...] checkboxes still post.
+  var groups = [].slice.call(document.querySelectorAll('.mgroup, .permgroup'));
+  var master = document.getElementById('perm_all_toggle');
+  var all = [].slice.call(document.querySelectorAll('.role-perm'));
+  function sync(el, boxes){
+    if(!el) return;
+    var on = boxes.filter(function(b){return b.checked;}).length;
+    el.checked = on === boxes.length && boxes.length > 0;
+    el.indeterminate = on > 0 && on < boxes.length;
+  }
+  function syncMaster(){ sync(master, all); }
+  groups.forEach(function(g){
+    var t = g.querySelector('.grp-all');
+    var boxes = [].slice.call(g.querySelectorAll('.role-perm'));
+    if(t) t.addEventListener('change', function(){ boxes.forEach(function(b){b.checked=t.checked;}); syncMaster(); });
+    boxes.forEach(function(b){ b.addEventListener('change', function(){ sync(t, boxes); syncMaster(); }); });
+    sync(t, boxes);
+  });
+  if(master) master.addEventListener('change', function(){
+    all.forEach(function(b){ b.checked = master.checked; });
+    groups.forEach(function(g){ sync(g.querySelector('.grp-all'), [].slice.call(g.querySelectorAll('.role-perm'))); });
+  });
+  syncMaster();
+})();
+</script>
