@@ -104,6 +104,25 @@ function ai_http_post($url, $headers, $payload, $timeout = 45) {
 // Send a prompt to the active provider/model. Returns [text, error].
 // Providers differ in endpoint + payload + response shape; all are handled here so
 // features can simply call ai_chat($system, $user).
+// Turn a provider's error (transport error + response body) into ONE short, human
+// line. Providers return their own JSON envelope ({error:{message,...}}); dumping
+// that verbatim on the page is what produced the "HTTP 400 — { error … }" wall.
+function ai_error_message($err, $body) {
+    $msg = '';
+    if ($body) {
+        $d = json_decode((string)$body, true);
+        if (is_array($d)) {
+            $msg = $d['error']['message']            // gemini / openai
+                ?? $d['error']['msg']
+                ?? (is_string($d['error'] ?? null) ? $d['error'] : '')
+                ?? $d['message'] ?? '';
+        }
+        if ($msg === '') $msg = trim(strip_tags((string)$body));
+    }
+    $msg = trim(preg_replace('/\s+/', ' ', (string)$msg));
+    if ($msg === '') $msg = (string)$err ?: 'The AI provider returned an error.';
+    return 'AI provider error: ' . substr($msg, 0, 240);
+}
 function ai_chat($system, $user, $maxTokens = 1200) {
     $act = ai_active();
     if (!$act) return [null, 'No AI provider is enabled. Add a key under Settings → AI providers.'];
@@ -111,6 +130,12 @@ function ai_chat($system, $user, $maxTokens = 1200) {
     $cfg = ai_provider_cfg($p); $key = trim((string)$cfg['key']);
     $reg = ai_providers()[$p] ?? null;
     if (!$reg || $key === '') return [null, 'The selected AI provider has no API key.'];
+    // Never send an empty prompt. Gemini answers an empty "contents" with a raw
+    // 400 ("contents is not specified") — which used to surface to the user as a
+    // wall of provider JSON. When there is nothing to work on (e.g. a QAP whose
+    // text could not be read), say so plainly and don't call the API at all.
+    $system = trim((string)$system); $user = trim((string)$user);
+    if ($user === '') return [null, 'There was nothing readable to send to the AI — the source document had no extractable text.'];
     switch ($p) {
         case 'anthropic':
             $url = 'https://api.anthropic.com/v1/messages';
@@ -140,7 +165,7 @@ function ai_chat($system, $user, $maxTokens = 1200) {
             $payload = ['model'=>$model, 'max_tokens'=>$maxTokens, 'messages'=>[['role'=>'system','content'=>$system],['role'=>'user','content'=>$user]]];
     }
     [$body, $code, $err] = ai_http_post($url, $headers, $payload);
-    if ($err) return [null, $err . ($body ? ' — ' . substr(strip_tags((string)$body), 0, 300) : '')];
+    if ($err) return [null, ai_error_message($err, $body)];
     $d = json_decode($body, true);
     if (!is_array($d)) return [null, 'Unexpected response from the AI provider.'];
     // normalise the reply text across providers

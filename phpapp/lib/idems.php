@@ -9230,10 +9230,32 @@ function idems_source_text($mime, $raw, $limit = 20000) {
         @unlink($tmp);
     }
     if (strpos($mime, 'pdf') !== false) {
-        // pull any uncompressed text operators; scanned PDFs yield nothing (that's fine)
-        $out = '';
-        if (preg_match_all('/\((?:\\\\.|[^\\\\()])*\)/s', $raw, $m)) {
-            foreach ($m[0] as $s) { $s = substr($s, 1, -1); $s = str_replace(['\\(','\\)','\\\\'], ['(',')','\\'], $s); if (preg_match('/[A-Za-z0-9]/', $s)) $out .= $s . ' '; }
+        // Pull the text-showing operators out of PDF content. Real PDFs keep that
+        // content in FlateDecode-compressed streams, so reading only the raw bytes
+        // (the old behaviour) found nothing on almost every real QAP. Now we also
+        // inflate each stream and read the operators inside it. Scanned/image PDFs
+        // still yield nothing — that is fine and handled by the callers.
+        $grab = function ($buf) {
+            $t = '';
+            // (…) Tj  and the strings inside [ … ] TJ arrays
+            if (preg_match_all('/\((?:\\\\.|[^\\\\()])*\)/s', $buf, $m)) {
+                foreach ($m[0] as $s) {
+                    $s = substr($s, 1, -1);
+                    $s = str_replace(['\\(', '\\)', '\\\\'], ['(', ')', '\\'], $s);
+                    if (preg_match('/[A-Za-z0-9]/', $s)) $t .= $s . ' ';
+                }
+            }
+            return $t;
+        };
+        $out = $grab($raw);   // any uncompressed text operators
+        // Inflate every content stream and read the operators inside it.
+        if (function_exists('gzuncompress') && preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $raw, $sm)) {
+            foreach ($sm[1] as $stream) {
+                $dec = @gzuncompress($stream);
+                if ($dec === false) $dec = @gzinflate($stream);       // raw deflate, no zlib header
+                if (is_string($dec) && $dec !== '') $out .= ' ' . $grab($dec);
+                if (strlen($out) > $limit * 3) break;                 // enough text; stop inflating
+            }
         }
         return substr(trim(preg_replace('/\s+/', ' ', $out)), 0, $limit);
     }
