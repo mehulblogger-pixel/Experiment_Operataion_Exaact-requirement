@@ -43,7 +43,7 @@ function ops_area_def($area) {
         case 'sales':
             $title = 'Sales'; $icon = '🎯';
             $sub = 'Leads, opportunities, ' . strtolower(THP('inquiry')) . ', ' . strtolower(THP('quote')) . ' and the pipeline.';
-            $routes = ['sales','leads','lead','opportunities','opportunity','inquiries','inquiry','quotes','quote','crm-dashboard','pipelines','pipeline','approvals','stage-gates','ads-roi','project-costings','project-costing','preorder-checklist'];
+            $routes = ['sales','leads','lead','opportunities','opportunity','inquiries','inquiry','quotes','quote','pipelines','pipeline','approvals','stage-gates','ads-roi','project-costings','project-costing','preorder-checklist'];
             $t($fx('leads_can_view') && leads_can_view(), '🎯', 'Leads', '/leads', 'A company worth pursuing — before any specific job.');
             $t($fx('opp_can_view') && opp_can_view(), '💡', 'Opportunities', '/opportunities', 'A live deal you are working to win or lose.');
             $t(can('mod.inquiries.view'), '📨', THP('inquiry'), '/inquiries', 'A specific request to quote — a ' . strtolower(Tl('quote')) . ' is raised from it.');
@@ -52,7 +52,7 @@ function ops_area_def($area) {
             $t(function_exists('pc_can') && pc_can(), '🧮', 'Project costing', '/project-costings', 'Team cost build-ups → man-month / man-day / lump rates and margin.');
             $t($fx('gate_can_view') && gate_can_view(), '🛂', 'Approvals', '/approvals', 'Deals held at a stage gate.',
                 $num(fn() => $fx('gate_pending_count') ? gate_pending_count() : 0), 'amber');
-            $t($fx('crmdash_can') && crmdash_can(), '📈', 'Sales dashboard', '/crm-dashboard', 'Win rates and value by stage.');
+            // Sales dashboard now lives under Insights (one dashboards home).
             $t($fx('pipe_can_view') && pipe_can_view(), '🪜', 'Pipelines & funnels', '/pipelines', 'Stages and conversion.');
             $t($fx('roi_available') && roi_available() && $fx('roi_can') && roi_can(), '💸', 'Advertising return', '/ads-roi', 'Spend against leads produced.');
             break;
@@ -158,11 +158,14 @@ function ops_area_def($area) {
 
         case 'insights':
             $title = 'Insights'; $icon = '📊';
-            $sub = 'The dashboards that read across everything — role views and the live analytics hub.';
-            $routes = ['insights','reports','analytics','analytics-kpis','analytics-quality','analytics-drill'];
+            $sub = 'One home for every dashboard — role views, the sales view, the management overview and the live analytics hub.';
+            $routes = ['insights','reports','analytics','analytics-kpis','analytics-quality','analytics-drill','crm-dashboard','mis'];
             $t(can('mod.reports.view'), '📊', 'Dashboards', '/reports', 'Role dashboards across the business.');
             // The analytics hub was buried under Quality and hard to find; surface it here too.
             $t($fx('tapi_can') && tapi_can(), '📈', 'Analytics & performance', '/analytics', 'KPI cards, trends and drill-down.');
+            // Dashboards gathered here from Sales and Admin so there is one home for them.
+            $t($fx('crmdash_can') && crmdash_can(), '📈', 'Sales dashboard', '/crm-dashboard', 'Win rates and value by stage.');
+            $t(licence_enabled('operations') && (can('mod.reports.view') || can('dash.operations') || can('dash.financial')), '📉', 'Management dashboard', '/mis', 'The MIS overview.');
             break;
 
         case 'directory':
@@ -179,7 +182,7 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'Masters, costs, people, access and the settings that shape the app.';
-            $routes = ['admin','masters','m/','lookups','office-finance','cost-run','sbu-pl','call-profit','mis','users','user-new','user-edit','hierarchy','access','adspro','sso','licence','settings','terminology','service-scope','service-formats','sla-targets','company-profile','books-bridge'];
+            $routes = ['admin','masters','m/','lookups','office-finance','cost-run','sbu-pl','call-profit','users','user-new','user-edit','hierarchy','access','adspro','sso','licence','settings','terminology','service-scope','service-formats','sla-targets','company-profile','books-bridge'];
 
             $sec('Masters & costs');
             $t(can('mod.masters.view'), '📋', 'Masters', '/masters', 'The lists behind every dropdown.');
@@ -187,7 +190,7 @@ function ops_area_def($area) {
             $t(can('mod.overheads.view'), '🧮', 'Month-end cost run', '/cost-run', 'Roll up costs for the month.');
             $t(can('mod.profitability.view'), '📊', T('sbu') . ' profit & loss', '/sbu-pl', 'P&L by business unit.');
             $t(can('mod.profitability.view'), '🧾', 'Profit by ' . strtolower(Tl('call')), '/call-profit', 'What each inspection made.');
-            $t(licence_enabled('operations') && (can('mod.reports.view') || can('dash.operations') || can('dash.financial')), '📈', 'Management dashboard', '/mis', 'The MIS overview.');
+            // Management dashboard (MIS) now lives under Insights (one dashboards home).
 
             $sec('People');
             $t(can('mod.users.view'), '👥', T_REG('user'), '/users', 'People who can sign in.');
