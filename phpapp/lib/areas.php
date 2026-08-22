@@ -140,7 +140,7 @@ function ops_area_def($area) {
         case 'money':
             $title = 'Money'; $icon = '💰';
             $sub = 'From what is waiting to be billed, through invoices and money in, to the profit each ' . strtolower(Tl('sbu')) . ' makes.';
-            $routes = ['money','invoicing','to-bill','invoices','invoice','receipts','receipt','receivables','tally','profitability','sbu-pl'];
+            $routes = ['money','invoicing','to-bill','invoices','invoice','receipts','receipt','receivables','tally','profitability','sbu-pl','office-finance','cost-run','call-profit'];
             $sec('Billing');
             $t(can('mod.invoicing.view'), '💳', T_REG('invoice'), '/invoicing', 'The invoice register.');
             if (can('mod.invoicing.view') && (can('finance.reconcile') || can('data.credit') || is_master())) {
@@ -152,7 +152,14 @@ function ops_area_def($area) {
                 $t(true, '📤', 'Tally export', '/tally', 'Export for the accounts package.');
             }
             $t($fx('books_switch_ready') && books_switch_ready(), '📗', 'Accounts & GST ↗', ($fx('books_app_url') ? books_app_url() : '#'), 'Open MGH Books, already signed in.', null, '', true);
+
+            // Costs & margins — moved here from Admin so all of money lives together.
+            $sec('Costs & margins');
             $t(can('mod.profitability.view'), '💹', T_REG('boss'), '/profitability', 'Profit and margin by job.');
+            $t(can('mod.overheads.view'), '📐', TH('office') . ' costs & overheads', '/office-finance', 'Per-office cost model.');
+            $t(can('mod.overheads.view'), '🧮', 'Month-end cost run', '/cost-run', 'Roll up costs for the month.');
+            $t(can('mod.profitability.view'), '📊', T('sbu') . ' profit & loss', '/sbu-pl', 'P&L by business unit.');
+            $t(can('mod.profitability.view'), '🧾', 'Profit by ' . strtolower(Tl('call')), '/call-profit', 'What each inspection made.');
             break;
 
         case 'insights':
@@ -180,15 +187,13 @@ function ops_area_def($area) {
 
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
-            $sub = 'Masters, costs, people, access and the settings that shape the app.';
-            $routes = ['admin','masters','m/','lookups','office-finance','cost-run','sbu-pl','call-profit','users','user-new','user-edit','hierarchy','access','adspro','sso','licence','settings','terminology','service-scope','service-formats','sla-targets','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $sub = 'Masters, people, access and the settings that shape the app.';
+            $routes = ['admin','masters','m/','lookups','users','user-new','user-edit','hierarchy','access','adspro','sso','licence','settings','terminology','service-scope','service-formats','sla-targets','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
-            $sec('Masters & costs');
+            $sec('Masters');
             $t(can('mod.masters.view'), '📋', 'Masters', '/masters', 'The lists behind every dropdown.');
-            $t(can('mod.overheads.view'), '📐', TH('office') . ' costs & overheads', '/office-finance', 'Per-office cost model.');
-            $t(can('mod.overheads.view'), '🧮', 'Month-end cost run', '/cost-run', 'Roll up costs for the month.');
-            $t(can('mod.profitability.view'), '📊', T('sbu') . ' profit & loss', '/sbu-pl', 'P&L by business unit.');
-            $t(can('mod.profitability.view'), '🧾', 'Profit by ' . strtolower(Tl('call')), '/call-profit', 'What each inspection made.');
+            // Office costs, month-end cost run, business-unit P&L and profit-by-call
+            // now live under Money (all of money in one place).
             // Management dashboard (MIS) now lives under Insights (one dashboards home).
 
             $sec('People');
