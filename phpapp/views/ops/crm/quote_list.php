@@ -4,11 +4,13 @@
   $tabs = ['all'=>'All','open'=>'Open','pending'=>'Pending','closed'=>'Closed (won)','lost'=>'Lost'];
   $qs = function($v) { return '/quotes?' . http_build_query(array_merge($_GET, ['v'=>$v])); };
 ?>
-<?php $mineApprove = !empty($mineApprove); ?>
+<?php $mineApprove = !empty($mineApprove); $mineContract = !empty($mineContract); ?>
 <div class="master-head">
-  <div><h1><?= e(T_REG('quote')) ?><?= $mineApprove ? ' <span class="pill p-warn" style="font-size:13px;vertical-align:middle">Awaiting your approval</span>' : '' ?></h1>
+  <div><h1><?= e(T_REG('quote')) ?><?= $mineApprove ? ' <span class="pill p-warn" style="font-size:13px;vertical-align:middle">Awaiting your approval</span>' : ($mineContract ? ' <span class="pill p-warn" style="font-size:13px;vertical-align:middle">To register a contract</span>' : '') ?></h1>
     <?php if ($mineApprove): ?>
       <p class="sub" style="margin:2px 0 0"><?= count($rows) ?> <?= e(Tl('quote')) ?><?= count($rows)===1?'':'s' ?> routed to you for approval — from any office. <a href="/quotes?v=all">See all <?= e(Tlp('quote')) ?> →</a></p>
+    <?php elseif ($mineContract): ?>
+      <p class="sub" style="margin:2px 0 0"><?= count($rows) ?> accepted <?= e(Tl('quote')) ?><?= count($rows)===1?'':'s' ?> waiting for a contract number — open one and register it in its Contract panel. <a href="/quotes?v=all">See all <?= e(Tlp('quote')) ?> →</a></p>
     <?php else: ?>
       <p class="sub" style="margin:2px 0 0">Quote → approval → send → follow-up → acceptance. <?= count($rows) ?> shown.</p>
     <?php endif; ?></div>

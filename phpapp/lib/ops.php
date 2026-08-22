@@ -6037,6 +6037,12 @@ function ops_pending_tasks() {
     if (function_exists('crm_quotes_awaiting_me'))
         $add(crm_quotes_awaiting_me(), '🧾', 'quotes to approve', 'quotations awaiting your approval', '/quotes?mine=approve', 'info');
 
+    // Accepted quotes waiting for a contract number — the Accounts hand-off, so a
+    // won order does not sit unregistered. Shown to whoever may register a
+    // contract (Finance / admin).
+    if (function_exists('quotes_awaiting_contract_count') && (can('crm.contract.register') || is_master()))
+        $add(quotes_awaiting_contract_count(), '📄', 'contracts to register', 'accepted quotes waiting for a contract number', '/quotes?mine=contract', 'warn');
+
     // Contract openings — a manager endorses, then the branch manager approves.
     // Acted on from the quote screen, so the link lands on the oldest one.
     $contractLink = function($needEndorsed) {

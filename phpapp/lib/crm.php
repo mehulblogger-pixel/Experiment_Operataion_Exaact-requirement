@@ -1144,6 +1144,23 @@ function ops_crm_quotes($route, $method) {
                 'fy' => current_fy(), 'mineApprove' => true]);
             return;
         }
+        // "Awaiting a contract number" — accepted quotes Accounts still has to
+        // register. Same scope as quotes_awaiting_contract_count(), so the list
+        // matches the dashboard task.
+        if (($_GET['mine'] ?? '') === 'contract') {
+            [$cw, $ca] = scope_clause('q.office_id', 'q.sbu');
+            $rows = ops_all(
+                "SELECT q.*, bp.display_name client_disp, o.name office_name FROM quotations q
+                 LEFT JOIN business_partners bp ON bp.id=q.client_id
+                 LEFT JOIN offices o ON o.id=q.office_id
+                 WHERE q.is_current=1 AND q.status='ACCEPTED'
+                   AND (q.contract_number IS NULL OR q.contract_number='') AND $cw
+                 ORDER BY q.accepted_date, q.id", $ca);
+            view('ops/crm/quote_list', ['rows' => $rows, 'view' => 'closed', 'q' => '',
+                'counts' => ['open' => 0, 'pending' => 0, 'closed' => count($rows), 'lost' => 0],
+                'fy' => current_fy(), 'mineContract' => true]);
+            return;
+        }
         $view = $_GET['v'] ?? 'all';   // all | open | pending | closed | lost
         $stateSets = ['open' => QUOTE_OPEN_STATES, 'pending' => QUOTE_PENDING_STATES, 'closed' => QUOTE_CLOSED_STATES, 'lost' => ['LOST', 'EXPIRED']];
         [$scopeW, $args] = scope_clause('q.office_id', 'q.sbu');
