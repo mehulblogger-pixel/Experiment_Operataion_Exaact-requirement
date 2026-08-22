@@ -80,6 +80,24 @@ function seed_demo($force = false) {
     $pdo->beginTransaction();
     try {
         // ---------- Offices (peer offices; Mumbai = commercial HO) ----------
+        // Idempotent by code: reuse an existing office rather than inserting a
+        // second one. The unload does NOT delete offices (they may carry real
+        // work), so a plain INSERT here duplicated MUM/AMD/PUN on every reload.
+        // First collapse any duplicate demo offices a previous non-idempotent
+        // seed left behind — keeping the earliest, deleting only extras that
+        // nothing references, so no real data is ever orphaned.
+        foreach (['MUM','AMD','PUN'] as $ocode) {
+            $dups = ops_all("SELECT id FROM offices WHERE code=? ORDER BY id", [$ocode]);
+            for ($i = 1; $i < count($dups); $i++) {
+                $oidx = (int)$dups[$i]['id'];
+                $ref = (int) ops_val(
+                    "SELECT (SELECT COUNT(*) FROM users WHERE home_office_id=?)
+                          + (SELECT COUNT(*) FROM calls WHERE executing_office_id=? OR ibo_office_id=?)
+                          + (SELECT COUNT(*) FROM jobs  WHERE executing_office_id=?)",
+                    [$oidx, $oidx, $oidx, $oidx]);
+                if ($ref === 0) { try { $pdo->prepare("DELETE FROM offices WHERE id=?")->execute([$oidx]); } catch (Throwable $e) {} }
+            }
+        }
         $hasAhm = (int)ops_val("SELECT COUNT(*) FROM offices WHERE is_ahmedabad=1");
         $offices = [
             ['MUM','Mumbai','Mumbai',0,15,3],
@@ -88,7 +106,10 @@ function seed_demo($force = false) {
         ];
         $oid = [];
         $insO = $pdo->prepare("INSERT INTO offices(code,name,city,is_ahmedabad,overhead_pct,contingency_pct) VALUES(?,?,?,?,?,?)");
-        foreach ($offices as $o) { $insO->execute($o); $oid[$o[0]] = (int)$pdo->lastInsertId(); }
+        foreach ($offices as $o) {
+            $exist = (int) ops_val("SELECT id FROM offices WHERE code=? ORDER BY id LIMIT 1", [$o[0]]);
+            $oid[$o[0]] = $exist ?: (function() use ($insO, $o, $pdo) { $insO->execute($o); return (int)$pdo->lastInsertId(); })();
+        }
         $c['offices'] = count($offices);
 
         // ---------- Inspectors (assets + one agency sub-con) ----------
