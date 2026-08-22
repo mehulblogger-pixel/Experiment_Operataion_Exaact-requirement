@@ -2800,6 +2800,8 @@ function ops_dispatch($route, $method) {
             return ops_partner_template();
         case $route === 'contract-overrides' || $route === 'contract-override':
             return ops_contract_overrides($route, $method);
+        case $route === 'contract-openings':
+            return ops_contract_openings();
         case $route === 'contract-open':
             return ops_contract_open($route, $method);
         case $route === 'work-norms':
@@ -6044,27 +6046,15 @@ function ops_pending_tasks() {
         $add(quotes_awaiting_contract_count(), '📄', 'contracts to register', 'accepted quotes waiting for a contract number', '/quotes?mine=contract', 'warn');
 
     // Contract openings — a manager endorses, then the branch manager approves.
-    // Acted on from the quote screen, so the link lands on the oldest one.
-    $contractLink = function($needEndorsed) {
-        try {
-            $c = ops_one("SELECT id FROM partner_contracts WHERE COALESCE(open_status,'')='PENDING'"
-                . ($needEndorsed ? " AND COALESCE(mgr_endorsed_at,'')<>'' AND COALESCE(bm_approved_at,'')=''"
-                                 : " AND COALESCE(mgr_endorsed_at,'')=''")
-                . " ORDER BY id LIMIT 1");
-            // Land straight on the contract panel (with the Endorse / Approve
-            // buttons), not the top of a long quote — #contract scrolls there and
-            // opens its tab.
-            if ($c && function_exists('contract_quote_id')) { $q = contract_quote_id($c); if ($q) return '/quote?id=' . $q . '#contract'; }
-        } catch (Throwable $e) {}
-        return '/quotes?v=closed';
-    };
+    // Both act on the dedicated /contract-openings screen, so an endorser who
+    // cannot view quotations still reaches the buttons.
     if (function_exists('can_endorse_contract_open') && can_endorse_contract_open()) {
         $n = $cnt("SELECT COUNT(*) FROM partner_contracts WHERE COALESCE(open_status,'')='PENDING' AND COALESCE(mgr_endorsed_at,'')=''");
-        $add($n, '✍', 'contracts to endorse', 'contract openings awaiting your endorsement', $contractLink(false), 'warn');
+        $add($n, '✍', 'contracts to endorse', 'contract openings awaiting your endorsement', '/contract-openings', 'warn');
     }
     if (function_exists('can_approve_contract_open') && can_approve_contract_open()) {
         $n = $cnt("SELECT COUNT(*) FROM partner_contracts WHERE COALESCE(open_status,'')='PENDING' AND COALESCE(mgr_endorsed_at,'')<>'' AND COALESCE(bm_approved_at,'')=''");
-        $add($n, '📝', 'contracts to approve', 'contract openings awaiting your approval', $contractLink(true), 'info');
+        $add($n, '📝', 'contracts to approve', 'contract openings awaiting your approval', '/contract-openings', 'info');
     }
     // Vouchers submitted for approval — shown to whoever can actually act on a
     // voucher (edit rights or finance), not to every management-level role. A

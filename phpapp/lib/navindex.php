@@ -80,6 +80,8 @@ function ops_nav_index() {
             $add('Recurring services', '/recurring', $A, '🔁', 'Contracts that raise work on a schedule.');
             $add('Contract exceptions', '/contract-overrides', $A, '🛑', 'Exhausted or expired contract overrides.');
         }
+        if (($fx('can_endorse_contract_open') && can_endorse_contract_open()) || ($fx('can_approve_contract_open') && can_approve_contract_open()))
+            $add('Contract openings', '/contract-openings', $A, '✍', 'Endorse / approve won orders so they open to operations.');
         if ($fx('can_manage_availability') && can_manage_availability()) $add(($fx('TH') ? TH('engineer') : 'Engineer') . ' availability', '/availability', $A, '🟢', 'Daily availability board — a tab of the scheduling board.');
         if ($can('mod.reconcile.view')) $add('Attendance reconciliation', '/attendance-recon', $A, '✅', 'Entry / exit vs billed.');
         if ($fx('timesheet_can') && timesheet_can()) $add('Timesheet', '/timesheet', $A, '⏱️', 'Hours logged against jobs.');

@@ -594,6 +594,33 @@ function contract_quote_id($c) {
 //  operations. Every step is written into the quotation thread with who and
 //  when, so the full trail lives with the file.
 // ---------------------------------------------------------------------------
+// The endorse/approve hand-off, on its own screen — so the people who do it
+// (Operation Manager / SBU head endorse, Branch Manager approves) reach the
+// buttons without needing to open the quotation (which they may not have rights
+// to view). Lists every contract still waiting to be opened, with the action
+// each viewer can take inline. The write still goes through /contract-open.
+function ops_contract_openings() {
+    ops_require(can_endorse_contract_open() || can_approve_contract_open() || is_master(),
+        'You are not part of the contract-opening approval.');
+    $rows = ops_all(
+        "SELECT pc.*, q.id quote_id, q.quote_no, q.rev, q.subject quote_subject,
+                COALESCE(bp.display_name, bp.legal_name) client_name
+         FROM partner_contracts pc
+         LEFT JOIN quotations q ON q.id = pc.quotation_id
+         LEFT JOIN business_partners bp ON bp.id = pc.partner_id
+         WHERE COALESCE(pc.open_status,'') = 'PENDING'
+         ORDER BY pc.requested_at, pc.id") ?: [];
+    // A quote link is only useful to someone who can actually view quotes.
+    $canSeeQuote = can('mod.quotes.view') || is_master();
+    view('ops/contract_openings', [
+        'rows' => $rows,
+        'canEndorse' => can_endorse_contract_open(),
+        'canApprove' => can_approve_contract_open(),
+        'canSeeQuote' => $canSeeQuote,
+    ]);
+    return true;
+}
+
 function ops_contract_open($route, $method) {
     if ($route !== 'contract-open' || $method !== 'POST') return false;
     $pdo = db();
