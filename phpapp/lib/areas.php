@@ -231,15 +231,10 @@ function ops_area_def($area) {
             $t((can('settings.manage') || is_master()) && $fx('books_licensed') && books_licensed(), '📗', 'MGH Books', '/books-bridge', 'The accounts bridge.',
                 $num(fn() => $fx('books_outbox_counts') ? (books_outbox_counts()['stuck'] ?? 0) : 0), 'red');
 
-            // ---- Parked: duplicates & extras moved out of the main areas so the
-            //      menus stay clean. Every screen here still works and still lives
-            //      in its proper home too; this is a holding list to review and
-            //      decide keep-or-drop later. Nothing is deleted.
-            if (is_master() || can('settings.manage')) {
-                $sec('🅿️ Parked — duplicates & extras (to review)');
-                $t($fx('tapi_can') && tapi_can(), '📈', 'Analytics — duplicate', '/analytics', 'Its home is Insights → Analytics. This was a second copy under Quality.');
-                $t(can('mod.vendors.view'), '🚚', 'Vendor register — duplicate', '/vendors', 'Its home is Directory → Vendors. This was a second copy under Reporting.');
-            }
+            // Parked-duplicates review complete: the two duplicate menu tiles
+            // (Analytics under Quality, Vendors under Reporting) were dropped.
+            // Both screens keep their canonical homes — Insights → Analytics and
+            // Directory → Vendors — and their routes are untouched.
             break;
 
         default:
