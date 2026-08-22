@@ -29,6 +29,7 @@
     <?php endif; ?>
     <a class="btn<?= $st === 'ACCEPTED' ? ' secondary' : '' ?>" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
     <a class="btn secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a>
+    <a class="btn secondary" href="#quote-docs" title="Attach the enquiry e-mail, PO, QAP, scope of inspection or any document received">📎 Documents</a>
     <?php if ($canEdit && in_array($st, ['DRAFT','PENDING_APPROVAL','REJECTED'], true)): ?><a class="btn secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>">Edit</a><?php endif; ?>
     <a class="btn secondary" href="/quotes">← Back</a>
   </div>
@@ -672,8 +673,8 @@
   <?php else: ?><p class="muted">No sites recorded. Add them on the edit screen.</p><?php endif; ?>
 </div>
 
-<div class="panel" data-tab="Sites &amp; docs">
-  <h3 class="tab-sub" style="margin-top:0">Documents <span class="muted">— our format, attachments, the <?= e(Tl('client')) ?>'s PO and anything the <?= e(Tl('engineer')) ?> will need</span></h3>
+<div class="panel" data-tab="Sites &amp; docs" id="quote-docs">
+  <h3 class="tab-sub" style="margin-top:0">Documents <span class="muted">— the enquiry e-mail, the <?= e(Tl('client')) ?>'s PO, QAP / scope of inspection, our format and anything the <?= e(Tl('engineer')) ?> will need</span></h3>
   <?php if ($files): ?>
   <table class="dt">
     <thead><tr><th>File</th><th>Kind</th><th>Note</th><th>Shared with <?= e(Tl('engineer')) ?></th><th>Added</th><th></th></tr></thead>
