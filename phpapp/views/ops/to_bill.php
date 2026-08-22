@@ -1,4 +1,5 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/invoices">Invoices</a> › Waiting to be billed</div>
+<div class="crumbs"><a href="/">Home</a> › Billing › Waiting to be billed</div>
+<?php billing_tabs('to-bill'); ?>
 <div class="master-head">
   <div><h1>Work waiting to be billed</h1>
   <p class="sub" style="margin:2px 0 0">Every <?= e(Tl('job')) ?> that has been closed and is not on any invoice. This is the handover from operations to the books, and until now nobody could see it — work was invoiced when somebody remembered it.</p></div>

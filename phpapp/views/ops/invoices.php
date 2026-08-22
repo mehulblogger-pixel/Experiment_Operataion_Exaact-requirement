@@ -6,7 +6,8 @@
     'draft'   => ['n'=>$c['draft'],   'l'=>'Draft',           'ic'=>'✎', 'tone'=>'tone-warn'],
   ];
 ?>
-<div class="crumbs"><a href="/">Home</a> › Invoices</div>
+<div class="crumbs"><a href="/">Home</a> › Billing › Invoices</div>
+<?php billing_tabs('invoices'); ?>
 <div class="master-head">
   <div><h1>Invoices</h1>
   <p class="sub" style="margin:2px 0 0">Real invoices with lines and tax, not a number typed onto a <?= e(Tl('job')) ?>. Money received is recorded separately and matched to them, so half a payment reads as half.</p></div>

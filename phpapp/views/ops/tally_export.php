@@ -6,7 +6,8 @@
   $readyTotal = 0.0;
   foreach ($ready as $r) $readyTotal += $isRcp ? $r['receipt_amount'] : $r['total'];
 ?>
-<div class="crumbs"><a href="/">Home</a> › <a href="/invoicing">Invoicing</a> › Tally export</div>
+<div class="crumbs"><a href="/">Home</a> › Billing › Tally export</div>
+<?php billing_tabs('tally'); ?>
 <div class="master-head">
   <div><h1>Tally export</h1>
   <p class="sub" style="margin:2px 0 0">Hand the invoices over to Tally as vouchers it can import — with the party, the bill reference and the tax split already worked out. Nothing is guessed: a row that cannot be decided is refused and says why.</p></div>

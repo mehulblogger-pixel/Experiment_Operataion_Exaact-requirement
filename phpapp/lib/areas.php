@@ -139,14 +139,14 @@ function ops_area_def($area) {
             $sub = 'From what is waiting to be billed, through invoices and money in, to the profit each ' . strtolower(Tl('sbu')) . ' makes.';
             $routes = ['money','invoicing','to-bill','invoices','invoice','receipts','receipt','receivables','tally','profitability','sbu-pl','office-finance','cost-run','call-profit'];
             $sec('Billing');
-            $t(can('mod.invoicing.view'), '💳', T_REG('invoice'), '/invoicing', 'The invoice register.');
+            // A quick per-job tracker (invoiced? paid? credit received?) that feeds
+            // profitability — kept as its own tile because everyone uses it.
+            $t(can('mod.invoicing.view'), '💳', 'Invoice tracker', '/invoicing', 'Tick each job: invoiced, paid, inter-office credit.');
+            // The five accounts screens are now one tabbed workspace — bill closed
+            // work, raise invoices, match money in, watch ageing, export to Tally.
+            // Every route still resolves; the tab strip carries you across them.
             if (can('mod.invoicing.view') && (can('finance.reconcile') || can('data.credit') || is_master())) {
-                $t(true, '⧗', 'Waiting to be billed', '/to-bill', 'Closed work not yet invoiced.');
-                $t(true, '🧾', 'Invoices', '/invoices', 'Invoices with lines and tax.');
-                $t(true, '💰', 'Money in', '/receipts', 'Receipts matched to invoices.');
-                $sec('Ledger & profit');
-                $t(true, '⏳', 'Receivables ageing', '/receivables', 'What is owed, by age.');
-                $t(true, '📤', 'Tally export', '/tally', 'Export for the accounts package.');
+                $t(true, '🧾', 'Billing workspace', '/to-bill', 'Bill, invoice, collect, age and export — one screen with tabs.');
             }
             $t($fx('books_switch_ready') && books_switch_ready(), '📗', 'Accounts & GST ↗', ($fx('books_app_url') ? books_app_url() : '#'), 'Open MGH Books, already signed in.', null, '', true);
 

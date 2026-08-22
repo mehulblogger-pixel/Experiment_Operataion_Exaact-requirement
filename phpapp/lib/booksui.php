@@ -18,6 +18,33 @@
 //    /to-bill         finished work nobody has invoiced — operations → books
 // ============================================================================
 
+// One workspace, five tabs. The billing screens are one continuous accounts
+// flow — bill closed work, raise the invoice, match the money in, watch the
+// ageing, hand it to Tally — so they carry a shared tab strip and read as a
+// single screen instead of five separate nav tiles. Each tab still routes to
+// its own handler, which keeps its own permission check; this only navigates.
+function billing_tabs($active) {
+    if (!function_exists('books_can') || !books_can()) return;
+    $tabs = [
+        'to-bill'     => ['⧗', 'To bill',   '/to-bill'],
+        'invoices'    => ['🧾', 'Invoices',  '/invoices'],
+        'receipts'    => ['💰', 'Money in',  '/receipts'],
+        'receivables' => ['⏳', 'Ageing',    '/receivables'],
+        'tally'       => ['📤', 'Export',    '/tally'],
+    ];
+    echo '<nav class="tabbar" aria-label="Billing" style="display:flex;gap:6px;flex-wrap:wrap;'
+       . 'border-bottom:1px solid var(--line,#e5e7eb);margin:0 0 16px">';
+    foreach ($tabs as $key => [$ic, $label, $href]) {
+        $on = $key === $active;
+        echo '<a href="' . e($href) . '" class="tab' . ($on ? ' on' : '') . '"'
+           . ($on ? ' aria-current="page"' : '')
+           . ' style="padding:9px 14px;text-decoration:none;font-size:14px;border-bottom:2px solid '
+           . ($on ? 'var(--accent,#2563eb);font-weight:600;color:var(--accent,#2563eb)' : 'transparent;color:inherit')
+           . '">' . e($ic) . ' ' . e($label) . '</a>';
+    }
+    echo '</nav>';
+}
+
 function books_dt_invoice_columns($today) {
     return [
         'no' => ['label' => 'Invoice', 'sort' => 'i.invoice_no', 'render' => fn($r) =>

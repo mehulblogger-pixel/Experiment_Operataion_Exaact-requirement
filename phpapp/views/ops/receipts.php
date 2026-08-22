@@ -1,4 +1,5 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/invoices">Invoices</a> › Money in</div>
+<div class="crumbs"><a href="/">Home</a> › Billing › Money in</div>
+<?php billing_tabs('receipts'); ?>
 <div class="master-head">
   <div><h1>Money in</h1>
   <p class="sub" style="margin:2px 0 0">Every payment received. A receipt is recorded when the money arrives; matching it to invoices is a separate step, because a customer sends one payment against four invoices and sometimes sends one nobody can place yet.</p></div>
