@@ -85,19 +85,29 @@
       <select class="form-control searchable" name="vendor_id"><option value="">—</option>
         <?php foreach ($vendors as $c): ?><option value="<?= (int)$c['id'] ?>" <?= ((int)$v('vendor_id')===(int)$c['id'])?'selected':'' ?>><?= e($c['nm']) ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff"><label>Project code <span class="muted">(used in the IRN)</span></label><input class="form-control" name="project_code" value="<?= e($doc['project_code'] ?? '') ?>" placeholder="e.g. P001"></div>
-    <div class="ff"><label>Project name</label><input class="form-control" name="project_name" value="<?= e($v('project_name')) ?>"></div>
     <div class="ff"><label>Purchase order</label><input class="form-control" name="po_ref" value="<?= e($v('po_ref')) ?>"></div>
-    <div class="ff"><label>Drawing no.</label><input class="form-control" name="drawing_no" value="<?= e($doc['drawing_no'] ?? '') ?>"></div>
-    <div class="ff"><label>Drawing rev.</label><input class="form-control" name="drawing_rev" value="<?= e($doc['drawing_rev'] ?? '') ?>"></div>
-    <div class="ff"><label>QAP rev.</label><input class="form-control" name="qap_rev" value="<?= e($doc['qap_rev'] ?? '') ?>"></div>
     <div class="ff"><label>Product category</label><input class="form-control" name="product_category" value="<?= e($v('product_category')) ?>"></div>
-    <div class="ff"><label>Material grade</label><input class="form-control" name="material_grade" value="<?= e($doc['material_grade'] ?? '') ?>"></div>
-    <div class="ff"><label>Applicable standards</label><input class="form-control" name="standards" value="<?= e($doc['standards'] ?? '') ?>" placeholder="e.g. ASME Sec VIII Div 1"></div>
-    <div class="ff"><label>Location</label><input class="form-control" name="location" value="<?= e($v('location')) ?>"></div>
   </div>
+  <?php // Fields taken off this creation form on purpose (kept as hidden values so
+        //  editing an existing report never wipes them, and IRN/PDF references keep
+        //  working):
+        //   • Drawing no. / Drawing rev. / QAP rev. — already carried in the
+        //     document reference, so they are not asked for again here;
+        //   • Project code / Project name / Material grade / Applicable standards /
+        //     Location — carried from the call or captured on the report type's own
+        //     designed form, not re-typed on this header;
+        //   • Inspection result / Release status — set when the report is filled and
+        //     finalised (the outcome does not exist yet at creation), not here. ?>
+  <input type="hidden" name="project_code"   value="<?= e($doc['project_code'] ?? '') ?>">
+  <input type="hidden" name="project_name"   value="<?= e($v('project_name')) ?>">
+  <input type="hidden" name="drawing_no"     value="<?= e($doc['drawing_no'] ?? '') ?>">
+  <input type="hidden" name="drawing_rev"    value="<?= e($doc['drawing_rev'] ?? '') ?>">
+  <input type="hidden" name="qap_rev"        value="<?= e($doc['qap_rev'] ?? '') ?>">
+  <input type="hidden" name="material_grade" value="<?= e($doc['material_grade'] ?? '') ?>">
+  <input type="hidden" name="standards"      value="<?= e($doc['standards'] ?? '') ?>">
+  <input type="hidden" name="location"       value="<?= e($v('location')) ?>">
 
-  <h3 class="tab-sub">People &amp; outcome</h3>
+  <h3 class="tab-sub">People</h3>
   <div class="form-grid">
     <div class="ff"><label>Inspector</label>
       <select class="form-control searchable" id="idr_inspector" name="inspector_id"><option value="">—</option>
@@ -130,14 +140,12 @@
       ins.addEventListener('change', function(){ sync(true); });
       sync(false);   // on load, fill only if the approver is still blank
     })();</script>
-    <div class="ff"><label>Inspection result</label>
-      <select class="form-control" name="result"><option value="">—</option>
-        <?php foreach (lk_options_or('inspection_result', IDEMS_RESULTS) as $rk=>$rv): ?><option value="<?= e($rk) ?>" <?= ($doc && $doc['result']===$rk)?'selected':'' ?>><?= e($rv) ?></option><?php endforeach; ?>
-      </select></div>
-    <div class="ff"><label>Release status</label>
-      <select class="form-control" name="release_status"><option value="">—</option>
-        <?php foreach (lk_options_or('release_status', IDEMS_RELEASE) as $rk=>$rv): ?><option value="<?= e($rk) ?>" <?= ($doc && $doc['release_status']===$rk)?'selected':'' ?>><?= e($rv) ?></option><?php endforeach; ?>
-      </select></div>
+    <?php // Inspection result & release status are the OUTCOME — set when the report
+          //  is filled and finalised (via the report and its smart-remarks step), not
+          //  on the blank creation form. Carried as hidden values so an edit here
+          //  never clears a result already recorded. ?>
+    <input type="hidden" name="result"         value="<?= e($doc['result'] ?? '') ?>">
+    <input type="hidden" name="release_status" value="<?= e($doc['release_status'] ?? '') ?>">
     <div class="ff ff-wide"><label>Remarks</label><textarea class="form-control" name="remarks" rows="3"><?= e($doc['remarks'] ?? '') ?></textarea></div>
   </div>
 
