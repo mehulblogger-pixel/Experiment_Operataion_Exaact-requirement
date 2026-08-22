@@ -145,13 +145,16 @@
         <button type="button" class="btn secondary" id="geo_paste_btn">Read coordinates</button>
         <span class="muted" id="geo_msg"></span>
       </div>
-      <?php // Locate straight from the company name / address — no need to know the
-            // coordinates. Fills lat/long from the map; if there is no clean match it
-            // opens Google Maps so the pin can be picked and pasted above. ?>
+      <?php // Locate from the company name / address, OR pick straight off an
+            // interactive map — click / drag the pin and the latitude & longitude
+            // fill in above automatically. No copy-pasting a Google Maps link. ?>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">
         <input class="form-control" id="geo_query" placeholder="…or find by company name / address — e.g. “Reliance, Jamnagar”" style="flex:1;min-width:220px">
-        <button type="button" class="btn secondary" id="geo_find">🔎 Find coordinates</button>
+        <button type="button" class="btn secondary" id="geo_find">🔎 Find on map</button>
+        <button type="button" class="btn secondary" id="geo_pick">🗺️ Pick on map</button>
       </div>
+      <div id="site_map" style="display:none;height:340px;margin-top:10px;border:1px solid var(--line,#e5e7eb);border-radius:10px;overflow:hidden;z-index:0"></div>
+      <div id="site_map_hint" class="muted" style="display:none;font-size:12px;margin-top:5px">Click the map to drop the pin, or drag it — the latitude &amp; longitude fill in above automatically. Search a place in the box to jump there.</div>
     </div>
     <script>
     (function(){
@@ -180,18 +183,57 @@
         lat.value=c.la.toFixed(7); lon.value=c.lo.toFixed(7); say('Coordinates read.');
       });
 
-      // Find coordinates from the company name / address. Prefills from the name
-      // and State already on the form; geocodes with OpenStreetMap (no key needed),
-      // and falls back to opening Google Maps when there is no clean match.
-      var q=document.getElementById('geo_query'), find=document.getElementById('geo_find');
+      // Pick straight off an interactive map (Leaflet + OpenStreetMap, no API
+      // key). Search the company/address to fly there, then click or drag the pin
+      // — the latitude & longitude fill in above automatically. Leaflet is loaded
+      // only when the map is first opened, so the form is not slowed otherwise.
+      var q=document.getElementById('geo_query'), find=document.getElementById('geo_find'),
+          pick=document.getElementById('geo_pick'), mapDiv=document.getElementById('site_map'),
+          mapHint=document.getElementById('site_map_hint');
       function guess(){
         var dn=document.querySelector('[name="display_name"]'), ln=document.querySelector('[name="legal_name"]'),
             st=document.getElementById('state_display');
         var nm=((dn&&dn.value)||(ln&&ln.value)||'').trim(), s=((st&&st.value)||'').trim();
         return (nm + (s?(', '+s):'') + ((nm||s)?', India':'')).replace(/^,\s*/,'').trim();
       }
-      function openMaps(query){ try{ window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(query),'_blank','noopener'); }catch(e){} }
+      function setLL(la,lo){ lat.value=(+la).toFixed(7); lon.value=(+lo).toFixed(7); }
       if(q){ q.addEventListener('focus',function(){ if(!q.value) q.value=guess(); }); }
+
+      var map=null, marker=null, leafletTried=false;
+      function loadLeaflet(cb){
+        if(window.L){ cb(); return; }
+        if(leafletTried && !window.L){ /* retry allowed */ }
+        leafletTried=true;
+        var css=document.createElement('link'); css.rel='stylesheet';
+        css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(css);
+        var s=document.createElement('script'); s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        s.onload=function(){ cb(); };
+        s.onerror=function(){ say('The map could not load (offline or blocked). Use “Find on map”, this device’s location, or paste a Google Maps link.'); };
+        document.head.appendChild(s);
+      }
+      function placePin(la,lo,zoom){
+        if(!map) return;
+        marker.setLatLng([la,lo]); map.setView([la,lo], zoom||map.getZoom()); setLL(la,lo);
+      }
+      function openMap(cb){
+        mapDiv.style.display='block'; mapHint.style.display='block';
+        loadLeaflet(function(){
+          if(!window.L){ return; }
+          if(!map){
+            var la=parseFloat(lat.value)||22.9734, lo=parseFloat(lon.value)||78.6569, z=(lat.value?15:5);
+            map=L.map(mapDiv).setView([la,lo], z);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              {maxZoom:19, attribution:'© OpenStreetMap contributors'}).addTo(map);
+            marker=L.marker([la,lo],{draggable:true}).addTo(map);
+            marker.on('dragend',function(){ var p=marker.getLatLng(); setLL(p.lat,p.lng); say('Pin moved — coordinates set.'); });
+            map.on('click',function(e){ marker.setLatLng(e.latlng); setLL(e.latlng.lat,e.latlng.lng); say('Pin placed — coordinates set.'); });
+          }
+          setTimeout(function(){ map.invalidateSize(); if(cb) cb(); }, 60);
+        });
+      }
+      if(pick) pick.addEventListener('click',function(){ openMap(function(){ say('Click the map or drag the pin to set the site.'); }); });
+
+      // "Find on map": geocode the query, open the map there and drop the pin.
       if(find) find.addEventListener('click',function(){
         var query=((q&&q.value)||'').trim() || guess();
         if(!query){ say('Type a company name or address to locate.'); return; }
@@ -199,11 +241,16 @@
         fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(query),{headers:{'Accept':'application/json'}})
           .then(function(r){ return r.json(); })
           .then(function(a){
-            if(a && a.length){ lat.value=parseFloat(a[0].lat).toFixed(7); lon.value=parseFloat(a[0].lon).toFixed(7);
-              say('Found: '+String(a[0].display_name||query).slice(0,90)+' — check the pin is right.'); }
-            else { openMaps(query); say('No exact match — opened Google Maps; drop the pin, then paste the link above and press “Read coordinates”.'); }
+            if(a && a.length){
+              var la=parseFloat(a[0].lat), lo=parseFloat(a[0].lon);
+              setLL(la,lo);
+              openMap(function(){ placePin(la,lo,15); });
+              say('Found: '+String(a[0].display_name||query).slice(0,90)+' — drag the pin to fine-tune.');
+            } else {
+              openMap(function(){ say('No exact match — click the map to drop the pin where the site is.'); });
+            }
           })
-          .catch(function(){ openMaps(query); say('Opened Google Maps — copy the pin’s link and paste it above, then “Read coordinates”.'); });
+          .catch(function(){ openMap(function(){ say('Search unavailable — click the map to drop the pin where the site is.'); }); });
       });
     })();
     </script>
