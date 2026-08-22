@@ -15,7 +15,8 @@
   $shift = fn($n) => '/schedule?from=' . date('Y-m-d', strtotime($from . ' ' . $n . ' days')) . '&to=' . date('Y-m-d', strtotime($to . ' ' . $n . ' days'));
   $spanDays = max(1, (strtotime($to) - strtotime($from)) / 86400 + 1);
 ?>
-<div class="crumbs"><a href="/">Home</a> › Scheduling board</div>
+<div class="crumbs"><a href="/">Home</a> › Scheduling</div>
+<?php if (function_exists('sched_tabs')) sched_tabs('schedule'); ?>
 <div class="master-head">
   <div><h1>Scheduling board</h1>
     <p class="sub" style="margin:2px 0 0">Who is where, who is free, and what still needs a person — for the fortnight.

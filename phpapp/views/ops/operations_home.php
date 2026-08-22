@@ -165,11 +165,11 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
   $tile('/jobs', '🗂️', THP('job'), 'Allocation, execution and per-day closure.',
         [[$c['jobs_active'], 'Active'], [$m['unscheduled'] ?? null, 'Unscheduled']],
         ($m['report_pending'] ?? 0) > 0 ? [(int)$m['report_pending'] . ' report pending', 'amber'] : null);
+  // Scheduling board, capacity outlook and availability are now one workspace
+  // reached through a tab strip on the board — one tile instead of three.
   if (function_exists('sched_board_can') && sched_board_can())
-    $tile('/schedule', '🗓️', 'Scheduling board', 'Assign inspectors to dates; capacity-aware.',
+    $tile('/schedule', '🗓️', 'Scheduling board', 'Board, capacity and availability — one workspace with tabs.',
           [[$m['today'] ?? null, 'Today'], [$m['ready'] ?? null, 'Ready']]);
-  if (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can())
-    $tile('/capacity-outlook', '📈', 'Capacity outlook', 'Who is free, who is stretched, over the coming weeks.');
   if (can('mod.calls.view'))
     $tile('/recurring', '🔁', 'Recurring services', 'Contracts that raise work on a schedule.',
           [[$c['recurring'], 'Active']]);
@@ -183,8 +183,7 @@ $tile = function ($href, $icon, $title, $desc, $stats = [], $badge = null) {
   foreach ($services as $s) {
     $tile($s['route'] ?: '#', ($s['icon'] ?: '🧩'), $s['name'], $s['description'] ?: '', [], ['Service', 'svc']);
   }
-  if (can('mod.jobs.view') && function_exists('can_manage_availability') && can_manage_availability())
-    $tile('/availability', '🟢', TH('engineer') . ' availability', 'Daily availability board for the field team.');
+  // Availability now lives as a tab of the scheduling board (see Work intake).
   ?>
 </div></section>
 

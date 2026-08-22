@@ -127,6 +127,33 @@ function sched_board_can() {
         || (function_exists('is_master') && is_master());
 }
 
+// One scheduling workspace, one tab per screen. The board, the capacity outlook
+// and the availability board all read the same workforce/availability engine, so
+// they carry a shared tab strip and read as a single screen instead of three
+// separate tiles. Each tab routes to its own handler and keeps its own gate;
+// it is shown only to someone who can open it. This only navigates.
+function sched_tabs($active) {
+    $tabs = [];
+    if (sched_board_can())
+        $tabs['schedule'] = ['🗓️', 'Board', '/schedule'];
+    if (function_exists('tosrm_ops_desk_can') && tosrm_ops_desk_can())
+        $tabs['capacity-outlook'] = ['📈', 'Capacity', '/capacity-outlook'];
+    if (function_exists('can_manage_availability') && can_manage_availability())
+        $tabs['availability'] = ['🟢', 'Availability', '/availability'];
+    if (count($tabs) < 2) return; // nothing to tab between
+    echo '<nav class="tabbar" aria-label="Scheduling" style="display:flex;gap:6px;flex-wrap:wrap;'
+       . 'border-bottom:1px solid var(--line,#e5e7eb);margin:0 0 16px">';
+    foreach ($tabs as $key => [$ic, $label, $href]) {
+        $on = $key === $active;
+        echo '<a href="' . e($href) . '" class="tab' . ($on ? ' on' : '') . '"'
+           . ($on ? ' aria-current="page"' : '')
+           . ' style="padding:9px 14px;text-decoration:none;font-size:14px;border-bottom:2px solid '
+           . ($on ? 'var(--accent,#2563eb);font-weight:600;color:var(--accent,#2563eb)' : 'transparent;color:inherit')
+           . '">' . e($ic) . ' ' . e($label) . '</a>';
+    }
+    echo '</nav>';
+}
+
 function ops_schedule_board($method) {
     ops_require(sched_board_can(), 'You do not have access to the scheduling board.');
     $offices = sched_offices();

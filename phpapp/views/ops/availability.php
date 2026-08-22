@@ -16,6 +16,8 @@
   $offName = function($id){ return $id ? (ops_val("SELECT name FROM offices WHERE id=?", [$id]) ?: '—') : 'Unassigned'; };
   $isToday = ($day === date('Y-m-d'));
 ?>
+<div class="crumbs"><a href="/">Home</a> › Scheduling › <?= e(TH('engineer')) ?> availability</div>
+<?php if (function_exists('sched_tabs')) sched_tabs('availability'); ?>
 <div class="master-head">
   <div><h1><?= e(TH('engineer')) ?> availability</h1>
     <p class="sub" style="margin:2px 0 0"><?= $isToday ? 'Today' : e(date('l, d M Y', strtotime($day))) ?> · <?= (int)$sum['total'] ?> <?= e(Tlp('engineer')) ?> shown</p></div>

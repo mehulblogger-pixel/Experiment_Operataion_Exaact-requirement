@@ -3,7 +3,6 @@
       //  $backlog, $schedule, $assignments, $dataquality, $from, $to. ?>
 <div class="row-actions" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
   <?php if (function_exists('sched_board_can') && sched_board_can()): ?><a class="btn secondary" href="/schedule">Scheduling board</a><?php endif; ?>
-  <a class="btn secondary" href="/capacity-outlook">Capacity outlook</a>
   <a class="btn secondary" href="/recurring">Recurring</a>
   <a class="btn secondary" href="/sla-targets">SLA targets</a>
 </div>

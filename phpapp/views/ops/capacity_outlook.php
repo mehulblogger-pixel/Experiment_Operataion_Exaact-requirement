@@ -1,4 +1,5 @@
-<div class="crumbs"><a href="/">Home</a> › <a href="/schedule">Scheduling board</a> › Capacity outlook</div>
+<div class="crumbs"><a href="/">Home</a> › Scheduling › Capacity outlook</div>
+<?php if (function_exists('sched_tabs')) sched_tabs('capacity-outlook'); ?>
 <div class="master-head">
   <div><h1>Capacity outlook</h1>
     <p class="sub" style="margin:2px 0 0">Free inspector-days (supply) against unallocated demand, week by week — so a

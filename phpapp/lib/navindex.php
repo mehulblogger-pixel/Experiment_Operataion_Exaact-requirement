@@ -72,15 +72,15 @@ function ops_nav_index() {
         if ($can('mod.calls.view')) $add($thp('call'), '/calls', $A, '📋', 'Work orders from the client.');
         if ($can('mod.calls.edit') || $can('mod.calls.view')) $add($tnew('call'), '/call-new', $A, '➕', 'Raise a new work order.', 'action');
         if ($can('mod.jobs.view'))  $add($thp('job'), '/jobs', $A, '🗂️', 'Allocation, execution & closure.');
-        if ($fx('sched_board_can') && sched_board_can()) $add('Scheduling board', '/schedule', $A, '🗓️', 'Assign inspectors to dates.');
+        if ($fx('sched_board_can') && sched_board_can()) $add('Scheduling board', '/schedule', $A, '🗓️', 'Assign inspectors to dates — board, capacity and availability tabs.');
         if ($fx('tosrm_ops_desk_can') && tosrm_ops_desk_can()) {
-            $add('Capacity outlook', '/capacity-outlook', $A, '📈', 'Who is free, who is stretched.');
+            $add('Capacity outlook', '/capacity-outlook', $A, '📈', 'Who is free, who is stretched — a tab of the scheduling board.');
         }
         if ($can('mod.calls.view')) {
             $add('Recurring services', '/recurring', $A, '🔁', 'Contracts that raise work on a schedule.');
             $add('Contract exceptions', '/contract-overrides', $A, '🛑', 'Exhausted or expired contract overrides.');
         }
-        if ($fx('can_manage_availability') && can_manage_availability()) $add(($fx('TH') ? TH('engineer') : 'Engineer') . ' availability', '/availability', $A, '🟢', 'Daily availability board.');
+        if ($fx('can_manage_availability') && can_manage_availability()) $add(($fx('TH') ? TH('engineer') : 'Engineer') . ' availability', '/availability', $A, '🟢', 'Daily availability board — a tab of the scheduling board.');
         if ($can('mod.reconcile.view')) $add('Attendance reconciliation', '/attendance-recon', $A, '✅', 'Entry / exit vs billed.');
         if ($fx('timesheet_can') && timesheet_can()) $add('Timesheet', '/timesheet', $A, '⏱️', 'Hours logged against jobs.');
         if ($can('mod.vouchers.view')) $add($thp('voucher'), '/vouchers', $A, '🧾', 'Field expenses raised against a job.');

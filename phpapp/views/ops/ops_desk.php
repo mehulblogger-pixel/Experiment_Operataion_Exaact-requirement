@@ -5,7 +5,6 @@
       Figures are scoped to your branches. Nothing here decides anything for you.</p></div>
   <div class="row-actions">
     <a class="btn secondary" href="/schedule">Scheduling board</a>
-    <a class="btn secondary" href="/capacity-outlook">Capacity outlook</a>
     <a class="btn secondary" href="/recurring">Recurring</a>
     <a class="btn secondary" href="/sla-targets">SLA targets</a>
   </div>
