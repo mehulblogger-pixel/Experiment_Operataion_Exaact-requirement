@@ -86,7 +86,7 @@
         <?php foreach ($vendors as $c): ?><option value="<?= (int)$c['id'] ?>" <?= ((int)$v('vendor_id')===(int)$c['id'])?'selected':'' ?>><?= e($c['nm']) ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"><label>Project code <span class="muted">(used in the IRN)</span></label><input class="form-control" name="project_code" value="<?= e($doc['project_code'] ?? '') ?>" placeholder="e.g. P001"></div>
-    <div class="ff"><label>Project name</label><input class="form-control" name="project_name" value="<?= e($doc['project_name'] ?? '') ?>"></div>
+    <div class="ff"><label>Project name</label><input class="form-control" name="project_name" value="<?= e($v('project_name')) ?>"></div>
     <div class="ff"><label>Purchase order</label><input class="form-control" name="po_ref" value="<?= e($v('po_ref')) ?>"></div>
     <div class="ff"><label>Drawing no.</label><input class="form-control" name="drawing_no" value="<?= e($doc['drawing_no'] ?? '') ?>"></div>
     <div class="ff"><label>Drawing rev.</label><input class="form-control" name="drawing_rev" value="<?= e($doc['drawing_rev'] ?? '') ?>"></div>
