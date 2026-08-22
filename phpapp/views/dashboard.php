@@ -20,10 +20,6 @@
       // In-office / On-site; the mark flows to availability + links to the report.
       if (function_exists('attend_render_widget')) attend_render_widget($u); ?>
 
-<?php // Pending tasks — what is waiting on ME right now (to vet / approve / fix /
-      // issue / release). Shown on every dashboard, whatever the role. ?>
-<?= function_exists('ops_render_pending_tasks') ? ops_render_pending_tasks() : '' ?>
-
 <?php if (is_inspector()): ?>
   <?php $myId = $u['inspector_id'] ?? 0;
     $mc = fn($sql, $extra = []) => $myId ? (int)ops_val("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND $sql", array_merge([$myId], $extra)) : 0;
@@ -42,6 +38,9 @@
     <a class="qcard" href="/my-jobs"><div class="qic">🗂</div><div class="qn" style="font-size:18px">All my jobs</div><div class="ql"><?= $myOpen ?> open · <?= $myDone ?> completed</div></a>
     <a class="qcard" href="/vouchers"><div class="qic">🧾</div><div class="qn" style="font-size:18px">My Voucher</div><div class="ql">Enter km &amp; expenses</div></a>
   </div>
+
+  <?php // What is waiting on ME right now — shown just below the KPI cards. ?>
+  <?= function_exists('ops_render_pending_tasks') ? ops_render_pending_tasks() : '' ?>
 
 <?php else: ?>
   <?php
@@ -368,6 +367,9 @@
 
     // ---------- role-based ordering ----------
     echo $secKpi;
+    // What is waiting on ME right now — shown just below the KPI cards, whatever
+    // the role (quotes/contracts/vouchers to approve, reports to vet/approve, …).
+    if (function_exists('ops_render_pending_tasks')) echo ops_render_pending_tasks();
     echo $secCompliance;
     if ($isExec)          { echo $secExec; echo $secCrm; echo $secMoney; echo $secCharts; echo $secAvail; echo $secRepAppr; echo $secQuick; echo $secSched; }
     elseif (in_array($role, ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'], true))

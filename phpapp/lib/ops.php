@@ -5958,37 +5958,93 @@ function ops_pending_tasks() {
     if (!$u) return [];
     $tasks = [];
     $cnt = function($sql, $args = []) { try { return (int) ops_val($sql, $args); } catch (Throwable $e) { return 0; } };
+    // One place to add a task, so nothing shows a zero and nothing is added twice.
+    $add = function($n, $icon, $label, $sub, $href, $tone) use (&$tasks) {
+        $n = (int)$n; if ($n > 0) $tasks[] = ['icon'=>$icon, 'n'=>$n, 'label'=>$label, 'sub'=>$sub, 'href'=>$href, 'tone'=>$tone];
+    };
+    $myId   = (int)($u['id'] ?? 0);
+    $insId  = (int)($u['inspector_id'] ?? 0);
+    // Name/username, used to match the free-text owner fields on CAPA & complaints.
+    $myName = function_exists('user_name') ? trim((string)user_name($u)) : trim((string)($u['username'] ?? ''));
+
+    // ---- Approvals waiting on ME -------------------------------------------
+    // Quotations — the current step is mine to sign (named, by role, or generic).
+    if (function_exists('crm_quotes_awaiting_me'))
+        $add(crm_quotes_awaiting_me(), '🧾', 'quotes to approve', 'quotations awaiting your approval', '/quotes?v=pending', 'info');
+
+    // Contract openings — a manager endorses, then the branch manager approves.
+    // Acted on from the quote screen, so the link lands on the oldest one.
+    $contractLink = function($needEndorsed) {
+        try {
+            $c = ops_one("SELECT id FROM partner_contracts WHERE COALESCE(open_status,'')='PENDING'"
+                . ($needEndorsed ? " AND COALESCE(mgr_endorsed_at,'')<>'' AND COALESCE(bm_approved_at,'')=''"
+                                 : " AND COALESCE(mgr_endorsed_at,'')=''")
+                . " ORDER BY id LIMIT 1");
+            if ($c && function_exists('contract_quote_id')) { $q = contract_quote_id($c); if ($q) return '/quote?id=' . $q; }
+        } catch (Throwable $e) {}
+        return '/quotes?v=closed';
+    };
+    if (function_exists('can_endorse_contract_open') && can_endorse_contract_open()) {
+        $n = $cnt("SELECT COUNT(*) FROM partner_contracts WHERE COALESCE(open_status,'')='PENDING' AND COALESCE(mgr_endorsed_at,'')=''");
+        $add($n, '✍', 'contracts to endorse', 'contract openings awaiting your endorsement', $contractLink(false), 'warn');
+    }
+    if (function_exists('can_approve_contract_open') && can_approve_contract_open()) {
+        $n = $cnt("SELECT COUNT(*) FROM partner_contracts WHERE COALESCE(open_status,'')='PENDING' AND COALESCE(mgr_endorsed_at,'')<>'' AND COALESCE(bm_approved_at,'')=''");
+        $add($n, '📝', 'contracts to approve', 'contract openings awaiting your approval', $contractLink(true), 'info');
+    }
+    // Vouchers submitted for a manager's approval.
+    if (function_exists('is_coordinator_level') && is_coordinator_level()) {
+        $n = $cnt("SELECT COUNT(*) FROM vouchers WHERE status='SUBMITTED'");
+        $add($n, '🧾', 'vouchers to approve', 'expense vouchers submitted for approval', '/vouchers', 'warn');
+    }
+
+    // ---- Reports (IDEMS) waiting on ME -------------------------------------
     [$scopeW, $scopeArgs] = function_exists('scope_clause') ? scope_clause('d.office_id', 'd.sbu') : ['1', []];
     $base = "FROM report_docs d WHERE d.deleted=0 AND $scopeW";
-
     // To vet — reports sitting with the vetting authority (only if I may vet).
-    if (function_exists('idems_can_vet') && idems_can_vet()) {
-        $n = $cnt("SELECT COUNT(*) $base AND d.status='VETTING'", $scopeArgs);
-        if ($n) $tasks[] = ['icon'=>'⇋', 'n'=>$n, 'label'=>'to vet', 'sub'=>'reports with you for vetting', 'href'=>'/documents?status=VETTING', 'tone'=>'warn'];
-    }
+    if (function_exists('idems_can_vet') && idems_can_vet())
+        $add($cnt("SELECT COUNT(*) $base AND d.status='VETTING'", $scopeArgs),
+            '⇋', 'to vet', 'reports with you for vetting', '/documents?status=VETTING', 'warn');
     // To approve — reports whose current step is waiting on me.
     if (function_exists('idems_awaiting_my_approval_clause')) {
         [$aw, $aa] = idems_awaiting_my_approval_clause();
-        $n = $cnt("SELECT COUNT(*) $base AND $aw", array_merge($scopeArgs, $aa));
-        if ($n) $tasks[] = ['icon'=>'✔', 'n'=>$n, 'label'=>'to approve', 'sub'=>'reports awaiting your approval', 'href'=>'/documents?mine=approve', 'tone'=>'info'];
-    }
-    // Sent back to me — my reports returned for correction (as the inspector).
-    if (!empty($u['inspector_id'])) {
-        $n = $cnt("SELECT COUNT(*) FROM report_docs d WHERE d.deleted=0 AND d.status='REJECTED' AND d.inspector_id=?", [(int)$u['inspector_id']]);
-        if ($n) $tasks[] = ['icon'=>'↩', 'n'=>$n, 'label'=>'to fix &amp; resubmit', 'sub'=>'reports sent back to you', 'href'=>'/documents?status=REJECTED', 'tone'=>'bad'];
+        $add($cnt("SELECT COUNT(*) $base AND $aw", array_merge($scopeArgs, $aa)),
+            '✔', 'reports to approve', 'reports awaiting your approval', '/documents?mine=approve', 'info');
     }
     // To issue — approved reports waiting to be finalised (only if I may finalise).
-    if (is_master() || can('idems.finalize')) {
-        $n = $cnt("SELECT COUNT(*) $base AND d.status='APPROVED' AND COALESCE(d.finalized,0)=0", $scopeArgs);
-        if ($n) $tasks[] = ['icon'=>'📄', 'n'=>$n, 'label'=>'to issue', 'sub'=>'approved reports to finalise', 'href'=>'/documents?status=APPROVED', 'tone'=>'ok'];
-    }
+    if (is_master() || can('idems.finalize'))
+        $add($cnt("SELECT COUNT(*) $base AND d.status='APPROVED' AND COALESCE(d.finalized,0)=0", $scopeArgs),
+            '📄', 'to issue', 'approved reports to finalise', '/documents?status=APPROVED', 'ok');
     // To release — issued reports marked for a Release Note that have none yet.
-    // Uses the release_of_id link (portable across databases); if that column is
-    // not present the guarded count simply returns 0 (no chip).
-    if (is_master() || can('mod.idems.edit')) {
-        $n = $cnt("SELECT COUNT(*) $base AND COALESCE(d.finalized,0)=1 AND COALESCE(d.rn_to_issue,0)=1 AND d.type_code NOT IN ('RN','IRN')
-                   AND NOT EXISTS (SELECT 1 FROM report_docs r WHERE r.type_code='RN' AND r.deleted=0 AND r.release_of_id=d.id)", $scopeArgs);
-        if ($n) $tasks[] = ['icon'=>'📋', 'n'=>$n, 'label'=>'to release', 'sub'=>'issued reports needing a Release Note', 'href'=>'/documents', 'tone'=>'info'];
+    if (is_master() || can('mod.idems.edit'))
+        $add($cnt("SELECT COUNT(*) $base AND COALESCE(d.finalized,0)=1 AND COALESCE(d.rn_to_issue,0)=1 AND d.type_code NOT IN ('RN','IRN')
+                   AND NOT EXISTS (SELECT 1 FROM report_docs r WHERE r.type_code='RN' AND r.deleted=0 AND r.release_of_id=d.id)", $scopeArgs),
+            '📋', 'to release', 'issued reports needing a Release Note', '/documents', 'info');
+
+    // ---- Nonconformity / customer work assigned to ME ----------------------
+    // CAPA and complaints record the owner as a free-text name, so we match on it.
+    if ($myName !== '') {
+        $like = '%' . $myName . '%';
+        if (can('mod.capa.view') || is_master())
+            $add($cnt("SELECT COUNT(*) FROM capa WHERE COALESCE(status,'') NOT IN ('CLOSED','CLOSED_FAILED') AND owner LIKE ?", [$like]),
+                '🛠', 'corrective actions', 'CAPA assigned to you and still open', '/capa', 'warn');
+        if (can('mod.complaints.view') || is_master())
+            $add($cnt("SELECT COUNT(*) FROM complaints WHERE COALESCE(status,'')='OPEN' AND assigned_to LIKE ?", [$like]),
+                '📣', 'complaints', 'complaints assigned to you to handle', '/complaints', 'warn');
+    }
+
+    // ---- MINE to act on (as the field engineer) ----------------------------
+    if ($insId) {
+        // My reports sent back for correction.
+        $add($cnt("SELECT COUNT(*) FROM report_docs d WHERE d.deleted=0 AND d.status='REJECTED' AND d.inspector_id=?", [$insId]),
+            '↩', 'to fix &amp; resubmit', 'reports sent back to you', '/documents?status=REJECTED', 'bad');
+        // My open jobs still needing a report uploaded.
+        $today = date('Y-m-d');
+        $add($cnt("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')", [$insId]),
+            '📄', 'reports to upload', 'jobs of yours still needing a report', '/my-jobs?f=reports', 'warn');
+        // My vouchers still in draft (not yet submitted for approval).
+        $add($cnt("SELECT COUNT(*) FROM vouchers WHERE inspector_id=? AND status='DRAFT'", [$insId]),
+            '🧾', 'vouchers to submit', 'expense vouchers you have not submitted', '/vouchers', 'info');
     }
     return $tasks;
 }

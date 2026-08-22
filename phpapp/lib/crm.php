@@ -2496,6 +2496,32 @@ function crm_pending_with($qid) {
 function crm_pending_step($qid) {
     return ops_one("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id LIMIT 1", [(int)$qid]);
 }
+// How many quotations are sitting on ME right now for approval — used by the
+// dashboard "Your pending tasks" list. A quote counts when its CURRENT step (the
+// lowest still-pending level) is one I may sign: named to me, addressed to my
+// role, or a generic step and I hold the approve permission. Scope-respecting;
+// returns 0 quietly if the tables are not present.
+function crm_quotes_awaiting_me() {
+    $u = function_exists('current_user') ? current_user() : null;
+    if (!$u) return 0;
+    $me   = (int)($u['id'] ?? 0);
+    $role = function_exists('user_role') ? (string)user_role() : (string)($u['role'] ?? '');
+    $canApprove = (function_exists('can') && can('crm.quote.approve')) || (function_exists('is_master') && is_master());
+    try {
+        [$sw, $sa] = function_exists('scope_clause') ? scope_clause('q.office_id', 'q.sbu') : ['1', []];
+        $sql = "SELECT COUNT(DISTINCT q.id)
+                FROM quotations q
+                JOIN quote_approvals a ON a.quote_id=q.id AND a.status='PENDING'
+                     AND a.level = (SELECT MIN(a2.level) FROM quote_approvals a2 WHERE a2.quote_id=q.id AND a2.status='PENDING')
+                WHERE q.is_current=1 AND q.status='PENDING_APPROVAL' AND $sw
+                  AND ( a.approver_user_id = ?
+                        OR (a.approver_role = ? AND (a.approver_user_id IS NULL OR a.approver_user_id=0))
+                        OR ((a.approver_role='' OR a.approver_role IS NULL)
+                            AND (a.approver_user_id IS NULL OR a.approver_user_id=0) AND ?) )";
+        $args = array_merge($sa, [$me, $role, $canApprove ? 1 : 0]);
+        return (int) ops_val($sql, $args);
+    } catch (Throwable $e) { return 0; }
+}
 // Tell the sales owner what the approver decided.
 function crm_notify_owner($q, $what, $remarks = '') {
     $uid = $q['owner_id'] ?? null;

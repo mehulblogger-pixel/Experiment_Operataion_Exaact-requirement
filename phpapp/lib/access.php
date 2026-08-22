@@ -393,10 +393,11 @@ function role_defaults_base($role) {
 }
 
 // ---- Effective access for the current user (cached) ------------------------
-function ua() {
+function ua($fresh = false) {
     static $a = null;
-    if ($a !== null) return $a;
-    $u = current_user();
+    if (!$fresh && $a !== null) return $a;
+    if ($fresh) $a = null;
+    $u = current_user($fresh);
     if (!$u) return $a = ['role' => 'GUEST', 'perms' => [], 'offices' => [], 'sbus' => [], 'self' => true, 'home' => null, 'master' => false];
     $role = !empty($u['is_superuser']) ? 'MASTER_ADMIN' : strtoupper($u['role'] ?? 'ADMIN');
     if (!isset(ORG_ROLES[$role])) $role = 'ADMIN';

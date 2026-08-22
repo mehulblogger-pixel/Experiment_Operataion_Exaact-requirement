@@ -40,13 +40,17 @@ function take_flash() {
 }
 
 // --- Auth ---
-function current_user() {
-    if (empty($_SESSION['uid'])) return null;
+function current_user($fresh = false) {
     static $u = null;
-    if ($u === null) {
+    static $forUid = null;
+    if (empty($_SESSION['uid'])) { if ($fresh) { $u = null; $forUid = null; } return null; }
+    // Re-resolve when asked to, or when the signed-in uid has changed (tests that
+    // switch user, or a re-login within one request). The default path is cached.
+    if ($fresh || $u === null || $forUid !== $_SESSION['uid']) {
         $q = db()->prepare("SELECT * FROM users WHERE id = ? AND is_active = 1");
         $q->execute([$_SESSION['uid']]);
         $u = $q->fetch() ?: null;
+        $forUid = $_SESSION['uid'];
     }
     return $u;
 }
