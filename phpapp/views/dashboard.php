@@ -181,7 +181,7 @@
     // ---------- section: quick actions ----------
     ob_start(); ?>
     <div class="qcards">
-      <?php if (can('ops.call.create')): ?><a class="qcard tone-info" href="/call-new"><div class="qic">➕</div><div class="qn" style="font-size:18px">New Call</div><div class="ql">Log an inspection call</div></a><?php endif; ?>
+      <?php if (can('ops.call.create')): ?><a class="qcard tone-info" href="/raise-call"><div class="qic">➕</div><div class="qn" style="font-size:18px">Raise <?= e(Tl('call')) ?></div><div class="ql">Pick client → contract → done</div></a><?php endif; ?>
       <a class="qcard" href="/jobs"><div class="qic">🗂</div><div class="qn" style="font-size:18px">Jobs</div><div class="ql">Allocate · schedule · close</div></a>
       <?php if (is_coordinator_level()): ?><a class="qcard" href="/vouchers"><div class="qic">🧾</div><div class="qn" style="font-size:18px">Vouchers</div><div class="ql">Travelling expenses</div></a><?php endif; ?>
       <?php if ($showProfit): ?><a class="qcard" href="/profitability"><div class="qic">💹</div><div class="qn" style="font-size:18px">Profitability</div><div class="ql">Margin by <?= e(Tl("boss")) ?></div></a><?php endif; ?>
@@ -375,7 +375,7 @@
     elseif (in_array($role, ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'], true))
                           { echo $secCrm; echo $secQuick; echo $secMoney; echo $secCharts; }
     elseif ($moneyFirst)  { echo $secMoney; echo $secCharts; echo $secSched; echo $secAvail; echo $secRepAppr; echo $secQuick; echo $secCrm; }
-    elseif ($schedFirst)  { echo $secSched; echo $secAvail; echo $secRepAppr; echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; }
+    elseif ($schedFirst)  { echo $secQuick; echo $secSched; echo $secAvail; echo $secRepAppr; echo $secMoney; echo $secCharts; echo $secCrm; }
     else                  { echo $secAvail; echo $secRepAppr; echo $secMoney; echo $secCharts; echo $secCrm; echo $secQuick; echo $secSched; }
   ?>
   <?php

@@ -2394,6 +2394,8 @@ function ops_dispatch($route, $method) {
         return true;
     }
     switch (true) {
+        case $route === 'raise-call':
+            ops_raise_call(); return true;
         case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call' || $route === 'call-delete' || $route === 'call-credit':
             ops_calls($route, $method); return true;
         case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-bill' || $route === 'job-advance' || $route === 'job-reassign' || $route === 'job-visit-close' || $route === 'expense-delete':
@@ -3479,6 +3481,33 @@ function skill_labels($csv) {
 function trade_label($id) { $v = $id ? lk_value($id) : null; return $v ? $v['label'] : '—'; }
 
 // ---- Calls -----------------------------------------------------------------
+// Guided "raise a call" for coordinators: pick the client, then the contract the
+// work is under. Contracts are shown with enough on each — number, status, what
+// it is for, the quote, validity and how many calls already went under it — that
+// several contracts for one client are easy to tell apart. Each leads straight to
+// a call form prefilled from that contract.
+function ops_raise_call() {
+    ops_require(is_coordinator_level(), 'Only coordinators and admins can raise ' . Tlp('call') . '.');
+    $clientId = (int)($_GET['client_id'] ?? 0);
+    $client = $clientId ? ops_one("SELECT id, legal_name, display_name FROM business_partners WHERE id=? AND is_client=1", [$clientId]) : null;
+    $contracts = [];
+    if ($client) {
+        $rows = ops_all("SELECT pc.*, q.quote_no, q.rev, q.subject quote_subject
+                         FROM partner_contracts pc
+                         LEFT JOIN quotations q ON q.id = pc.quotation_id
+                         WHERE pc.partner_id=? AND COALESCE(pc.is_active,1)=1
+                           AND COALESCE(pc.open_status,'OPEN') NOT IN ('CLOSED','REJECTED')
+                         ORDER BY pc.id DESC", [$clientId]) ?: [];
+        foreach ($rows as $r) {
+            $cn = trim((string)($r['contract_number'] ?? ''));
+            $r['calls']     = $cn !== '' ? (int) ops_val("SELECT COUNT(*) FROM calls WHERE contract_number=?", [$cn]) : 0;
+            $r['last_call'] = $cn !== '' ? (string)(ops_val("SELECT MAX(created_at) FROM calls WHERE contract_number=?", [$cn]) ?? '') : '';
+            $contracts[] = $r;
+        }
+    }
+    view('ops/raise_call', ['clients' => clients_list(), 'clientId' => $clientId, 'client' => $client, 'contracts' => $contracts]);
+}
+
 function ops_calls($route, $method) {
     $pdo = db();
     if ($route === 'call-delete') {
@@ -3601,6 +3630,11 @@ function ops_calls($route, $method) {
                     'ibo_office_id'   => ($fromQ['office_id'] ?? null) ?: (current_user()['home_office_id'] ?? null),
                 ];
             }
+        }
+        // A direct call with no contract (the "none of these" fallback from the
+        // raise-call picker, or an ARC draw-down): just seed the client.
+        if ($route === 'call-new' && empty($call['client_id']) && !empty($_GET['client_id'])) {
+            $call = ['client_id' => (int)$_GET['client_id'], 'ibo_office_id' => (current_user()['home_office_id'] ?? null)];
         }
         // T9 — carry the allocation "format" forward across a contract. Once a call
         // has been set up on a contract (its deliverables, chargeable heads,
