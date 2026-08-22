@@ -9,7 +9,10 @@
 <section class="fs-pane" data-tab="Identity &amp; roles">
   <h3 class="tab-sub" style="margin-top:0">Identity &amp; roles</h3>
   <div class="form-grid">
-    <div class="ff"><label>Legal name *</label><input class="form-control" name="legal_name" required value="<?= e($p['legal_name'] ?? '') ?>"></div>
+    <?php // A client added from a lead / inquiry / quote arrives with the company
+          // name it was typed against, so it is not re-keyed (Salesforce-style
+          // carry-over). Only used when creating; an existing record wins. ?>
+    <div class="ff"><label>Legal name *</label><input class="form-control" name="legal_name" required value="<?= e(($p['legal_name'] ?? '') ?: (string)($_GET['prefill'] ?? '')) ?>"></div>
     <div class="ff"><label>Display name <span class="muted">(auto from legal, editable)</span></label><input class="form-control" name="display_name" value="<?= e($p['display_name'] ?? '') ?>"></div>
     <?php if (!$p): $branchWord = ($defaultRole === 'is_vendor') ? 'Executing' : 'Contracting'; ?>
     <div class="ff"><label><span id="branch_word"><?= $branchWord ?></span> office <span class="muted">(drives the code)</span></label>

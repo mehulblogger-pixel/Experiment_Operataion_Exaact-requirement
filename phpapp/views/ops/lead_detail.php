@@ -44,6 +44,22 @@
       <?php endif; ?></p>
     <?php if ($canEdit): ?>
       <div class="cta">
+        <?php
+          // The immediate next step in the pipeline, surfaced up top so moving a
+          // lead forward is one obvious click — the full stage list still lives on
+          // the Actions tab. ("Work this as a deal" jumps straight to won.)
+          $nextStage = null; $seenCur = false;
+          foreach ($stages as $s) {
+            if ($seenCur && $s['kind'] === 'OPEN') { $nextStage = $s; break; }
+            if ((int)$s['id'] === (int)$l['stage_id']) $seenCur = true;
+          }
+          if (($l['status'] ?? '') === 'OPEN' && $nextStage): ?>
+          <form method="post" action="/lead-move" style="display:inline">
+            <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
+            <input type="hidden" name="stage_id" value="<?= (int)$nextStage['id'] ?>">
+            <button class="btn small">Move to <?= e($nextStage['name']) ?> →</button>
+          </form>
+        <?php endif; ?>
         <?php if ($oppId): ?>
           <a class="btn small secondary" href="/opportunity?id=<?= (int)$oppId ?>">Open the deal →</a>
         <?php elseif (function_exists('opp_can_edit') && opp_can_edit()): ?>

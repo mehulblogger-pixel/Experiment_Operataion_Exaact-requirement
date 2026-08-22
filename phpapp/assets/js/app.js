@@ -428,6 +428,22 @@
         e.preventDefault();
         pending = { targets: targetsFor(link, kind) };
         var url = '/partner-new?role=' + encodeURIComponent(PARTNER_KIND_ROLE[kind]) + '&picker=1';
+        // Carry the company name the user already typed on the form they came
+        // from (client/lead name box, or the typed text of a searchable picker)
+        // so the new record is not re-keyed. Clients only — a vendor add is
+        // usually a fresh site.
+        if (kind === 'client') {
+          var nm = '';
+          var box = document.querySelector('#client_name, [name="client_name"], [name="company_name"]');
+          if (box && box.value) nm = box.value;
+          if (!nm) {
+            var tgt = (pending.targets && pending.targets[0]) || null;
+            var typed = tgt && tgt.closest ? tgt.closest('.ff, .field, div') : null;
+            var q = typed ? typed.querySelector('input.ss-search, input[type="search"]') : null;
+            if (q && q.value) nm = q.value;
+          }
+          if (nm) url += '&prefill=' + encodeURIComponent(nm.trim());
+        }
         win = window.open(url, 'exaactPartnerPicker', 'width=900,height=920,menubar=no,toolbar=no,scrollbars=yes');
         if (win) win.focus();
         else window.location.href = url;         // popups blocked → just navigate
