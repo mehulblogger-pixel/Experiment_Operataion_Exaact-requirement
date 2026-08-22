@@ -268,6 +268,45 @@ function office_in_use_text(array $uses) {
     $last = array_pop($bits);
     return 'it is still used by ' . ($bits ? implode(', ', $bits) . ' and ' . $last : $last) . '.';
 }
+// Merge one office into another: repoint every *office_id reference across the
+// whole schema (people, calls, jobs, vouchers, quotations, reports, sub-offices…)
+// from the source to the target, then delete the now-empty source. This is the
+// safe way to clean up a duplicate office that already has work booked against it
+// — Delete refuses those on purpose. Uses the same dynamic column scan as
+// office_in_use(), so it covers every table without a hand-maintained list.
+function office_merge($sourceId, $targetId) {
+    $sourceId = (int)$sourceId; $targetId = (int)$targetId;
+    if (!$sourceId || !$targetId) return ['err' => 'Pick the ' . Tl('office') . ' to merge and the one to keep.'];
+    if ($sourceId === $targetId)  return ['err' => 'Choose two different ' . Tlp('office') . '.'];
+    $src = ops_one("SELECT * FROM offices WHERE id=?", [$sourceId]);
+    $tgt = ops_one("SELECT * FROM offices WHERE id=?", [$targetId]);
+    if (!$src || !$tgt) return ['err' => 'One of those ' . Tlp('office') . ' no longer exists.'];
+    $pdo = db();
+    $moved = 0;
+    try {
+        foreach (db_tables() as $t) {
+            foreach (db_columns($t) as $c) {
+                if (!preg_match('/office_id$/i', $c)) continue;
+                try {
+                    $st = $pdo->prepare("UPDATE `$t` SET `$c` = ? WHERE `$c` = ?");
+                    $st->execute([$targetId, $sourceId]);
+                    $moved += (int)$st->rowCount();
+                } catch (Throwable $e) { /* a view or odd column — skip it */ }
+            }
+        }
+        // Keep the primary-office flag if the source carried it and the target did not.
+        if ((int)($src['is_ahmedabad'] ?? 0) === 1 && (int)($tgt['is_ahmedabad'] ?? 0) !== 1) {
+            try { $pdo->prepare("UPDATE offices SET is_ahmedabad=1 WHERE id=?")->execute([$targetId]); } catch (Throwable $e) {}
+        }
+        $pdo->prepare("DELETE FROM offices WHERE id=?")->execute([$sourceId]);
+    } catch (Throwable $e) {
+        return ['err' => 'The merge could not be completed: ' . $e->getMessage()];
+    }
+    if (function_exists('idems_log'))
+        idems_log('office', $sourceId, 'MERGE', ['field' => (string)($src['name'] ?? ''),
+            'reason' => 'merged into ' . (string)($tgt['name'] ?? '') . ' (#' . $targetId . '); ' . $moved . ' reference(s) repointed']);
+    return ['ok' => true, 'moved' => $moved, 'src' => (string)($src['name'] ?? ''), 'tgt' => (string)($tgt['name'] ?? '')];
+}
 
 // ---------------------------------------------------------------------------
 //  Office tree
@@ -1173,6 +1212,15 @@ function ops_hierarchy_screen($method) {
                     flash(TH('office') . ' “' . $o['name'] . '” deleted. Nothing was recorded against it, so nothing else changed.');
                 }
             }
+
+        } elseif ($do === 'office-merge') {
+            // Fold a duplicate office into the one being kept — repoints all its
+            // work, then removes it. Works even when the source has data (that is
+            // exactly the case Delete cannot handle).
+            $r = office_merge($_POST['office_id'] ?? 0, $_POST['target_office_id'] ?? 0);
+            if (!empty($r['err'])) flash($r['err'], 'error');
+            else flash(TH('office') . ' “' . $r['src'] . '” merged into “' . $r['tgt'] . '” — '
+                . (int)$r['moved'] . ' record(s) moved across, and the duplicate removed.');
 
         } elseif ($do === 'import-preview') {
             if (empty($_FILES['sheet']['tmp_name']) || !is_uploaded_file($_FILES['sheet']['tmp_name'])) {

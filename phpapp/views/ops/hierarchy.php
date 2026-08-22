@@ -114,6 +114,20 @@
       } else {
         echo '<span class="muted ot-why" title="' . e(office_in_use_text($uses)) . '">in use · cannot delete</span>';
       }
+      // Merge into another office — the safe cleanup for a DUPLICATE office that
+      // has work booked against it (Delete refuses those). Repoints everything to
+      // the chosen office and removes this one.
+      $mergeTargets = array_filter($offOpts, fn($oid) => (int)$oid !== $id, ARRAY_FILTER_USE_KEY);
+      if ($mergeTargets) {
+        echo '<form method="post" action="/hierarchy" class="ot-inline"'
+           . ' onsubmit="var s=this.querySelector(\'select\'); if(!s.value){return false;} return confirm(\'Merge ' . e(addslashes($o['name'] ?? '')) . ' into \'+s.options[s.selectedIndex].text+\'? All its work moves across and this office is removed. This cannot be undone.\')">';
+        echo   '<input type="hidden" name="do" value="office-merge"><input type="hidden" name="tab" value="offices">';
+        echo   '<input type="hidden" name="office_id" value="' . $id . '">';
+        echo   '<select name="target_office_id" class="form-control" style="height:28px;padding:2px 6px;font-size:12px;max-width:150px"><option value="">Merge into…</option>';
+        foreach ($mergeTargets as $oid => $lbl) echo '<option value="' . (int)$oid . '">' . e($lbl) . '</option>';
+        echo   '</select> <button class="btn small secondary" type="submit">Merge</button>';
+        echo '</form>';
+      }
       echo '</div>';
     }
     echo '</div>';
