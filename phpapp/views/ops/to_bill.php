@@ -32,26 +32,34 @@
     <div class="qcard tone-bad"><div class="qic">Σ</div><div class="qn" style="font-size:20px"><?= fmoney_short($grand) ?></div><div class="ql">Not yet invoiced<?= $month !== '' ? ' · ' . e(date('M Y', strtotime($month . '-01'))) : '' ?></div></div>
   </div>
 
-  <?php foreach ($groups as $cid => $g): ?>
-    <div class="panel" style="margin-top:16px;padding:0;overflow:hidden">
+  <?php foreach ($groups as $cid => $g): $multi = count($g['projects']) > 1; ?>
+    <!-- One form per client, so a combined invoice can span the client's projects. -->
+    <form method="post" action="/invoice-new" class="panel" style="margin-top:16px;padding:0;overflow:hidden">
+      <input type="hidden" name="partner_id" value="<?= (int)$cid ?>">
       <div style="padding:12px 16px;background:var(--soft);border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <b style="font-size:15px"><?= e($g['name']) ?></b>
-        <span class="muted" style="font-size:12.5px"><?= count($g['projects']) ?> project<?= count($g['projects'])===1?'':'s' ?> · <?= e(fmoney($g['value'])) ?></span>
-        <a class="btn small secondary" style="margin-left:auto" href="/ledger?id=<?= (int)$cid ?>">Ledger</a>
+        <span class="muted" style="font-size:12.5px"><?= count($g['projects']) ?> project<?= $multi?'s':'' ?> · <?= e(fmoney($g['value'])) ?></span>
+        <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+          <a class="btn small secondary" href="/ledger?id=<?= (int)$cid ?>">Ledger</a>
+          <?php if ($canIssue && $cid): ?>
+            <button class="btn small" type="submit" name="only" value="">
+              <?= $multi ? 'Draft combined invoice (all projects' . ($month !== '' ? ', ' . e(date('M Y', strtotime($month . '-01'))) : '') . ')' : 'Draft invoice for the ticked work' ?>
+            </button>
+          <?php endif; ?>
+        </span>
       </div>
 
       <?php foreach ($g['projects'] as $pk => $pj):
         $cn = $pj['contract']; ?>
-        <form method="post" action="/invoice-new" style="border-bottom:1px solid var(--line)">
-          <input type="hidden" name="partner_id" value="<?= (int)$cid ?>">
+        <div style="border-bottom:1px solid var(--line)">
           <div style="padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface)">
             <span style="font-weight:600;font-size:13px">
               <?= $cn !== '' ? '▤ Contract ' . e($cn) : '<span class="muted">Direct ' . e(Tlp('call')) . ' (no contract)</span>' ?>
             </span>
             <span class="muted" style="font-size:12px"><?= count($pj['rows']) ?> <?= e(count($pj['rows'])==1 ? Tl('job') : Tlp('job')) ?> · <?= e(fmoney($pj['value'])) ?></span>
             <?php if ($cn !== ''): ?><a class="muted" style="font-size:12px" href="/calls?contract=<?= e(urlencode($cn)) ?>">all <?= e(Tlp('call')) ?> →</a><?php endif; ?>
-            <?php if ($canIssue && $cid): ?>
-              <button class="btn small" type="submit" style="margin-left:auto">Draft invoice for the ticked work</button>
+            <?php if ($canIssue && $cid && $multi && $cn !== ''): ?>
+              <button class="btn small secondary" type="submit" name="only" value="<?= e($cn) ?>" style="margin-left:auto">Draft this project only</button>
             <?php endif; ?>
           </div>
           <div class="dt-scroll">
@@ -75,9 +83,9 @@
               </tbody>
             </table>
           </div>
-        </form>
+        </div>
       <?php endforeach; ?>
-    </div>
+    </form>
   <?php endforeach; ?>
-  <p class="muted" style="margin-top:12px;font-size:12.5px">Each contract / project drafts its own invoice, so a month's work on one project goes onto one bill. Untick a <?= e(Tl('job')) ?> to hold it back, or bill a single <?= e(Tl('call')) ?> by ticking only its work. A <?= e(Tl('job')) ?> with no value still shows — set the rate on the line once the invoice is drafted.</p>
+  <p class="muted" style="margin-top:12px;font-size:12.5px">A client with more than one project gets <b>one combined monthly invoice</b> — its lines are grouped by contract on the bill — or you can draft a single project on its own. Untick a <?= e(Tl('job')) ?> to hold it back, or bill a single <?= e(Tl('call')) ?> by ticking only its work. A <?= e(Tl('job')) ?> with no value still shows — set the rate on the line once the invoice is drafted.</p>
 <?php endif; ?>

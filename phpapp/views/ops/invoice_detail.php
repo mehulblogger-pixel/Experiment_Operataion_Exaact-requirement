@@ -132,9 +132,25 @@
         <th scope="col" class="num">Amount</th><th scope="col" class="num">GST</th><th scope="col" class="num">Line total</th>
         <?php if ($isDraft): ?><th scope="col"></th><?php endif; ?></tr></thead>
       <tbody>
+      <?php
+        // A combined monthly invoice carries several projects; when the lines
+        // span more than one contract, break them under a contract sub-header so
+        // the bill reads project by project. A single-contract invoice shows none.
+        $contractsOnBill = [];
+        foreach ($lines as $ln) $contractsOnBill[trim((string)($ln['contract_number'] ?? ''))] = true;
+        $multiContract = count($contractsOnBill) > 1;
+        $lastContract = null;
+        $lineCols = $isDraft ? 10 : 9;
+      ?>
       <?php if (!$lines): ?>
-        <tr><td colspan="<?= $isDraft?10:9 ?>" class="muted" style="padding:18px;text-align:center">No lines yet.</td></tr>
-      <?php else: foreach ($lines as $ln): ?>
+        <tr><td colspan="<?= $lineCols ?>" class="muted" style="padding:18px;text-align:center">No lines yet.</td></tr>
+      <?php else: foreach ($lines as $ln):
+        $lc = trim((string)($ln['contract_number'] ?? ''));
+        if ($multiContract && $lc !== $lastContract):
+          $lastContract = $lc; ?>
+          <tr><td colspan="<?= $lineCols ?>" style="background:var(--soft);font-weight:600;font-size:12.5px;padding:7px 10px">
+            <?= $lc !== '' ? '▤ Contract ' . e($lc) : 'Other work (no contract)' ?></td></tr>
+        <?php endif; ?>
         <tr>
           <td><?= (int)$ln['seq'] ?></td>
           <td><?= e($ln['description']) ?></td>

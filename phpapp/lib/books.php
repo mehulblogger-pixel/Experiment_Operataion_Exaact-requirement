@@ -129,7 +129,11 @@ function books_migrate() {
         amount DECIMAL(16,2) DEFAULT 0,
         gst_pct DECIMAL(6,2) DEFAULT 0,
         cgst DECIMAL(16,2) DEFAULT 0, sgst DECIMAL(16,2) DEFAULT 0, igst DECIMAL(16,2) DEFAULT 0,
+        contract_number VARCHAR(40) DEFAULT '',
         line_total DECIMAL(16,2) DEFAULT 0)");
+    // A combined monthly invoice carries several projects; the contract on each
+    // line lets the bill group the work by contract. Back-fill for older DBs.
+    if (function_exists('ensure_column')) ensure_column('invoice_lines', 'contract_number', "VARCHAR(40) DEFAULT ''");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS receipts (
         id $pk, receipt_no VARCHAR(40) DEFAULT '',
@@ -298,7 +302,7 @@ function books_lines($invoiceId) {
     return books_try(fn() => ops_all(
         "SELECT l.*, j.job_code FROM invoice_lines l
          LEFT JOIN jobs j ON j.id = l.job_id
-         WHERE l.invoice_id=? ORDER BY l.seq, l.id", [(int)$invoiceId]));
+         WHERE l.invoice_id=? ORDER BY COALESCE(l.contract_number,''), l.seq, l.id", [(int)$invoiceId]));
 }
 
 // What has actually settled this invoice: cash allocated, TDS withheld, and
@@ -461,7 +465,7 @@ function books_line_add($invoiceId, array $b) {
     // re-key them, which is where the two versions of a number come from.
     $callId = null;
     if ($job) {
-        $j = ops_one("SELECT j.*, c.id call_id, c.billable_value, c.billable_rate, c.billable_qty, c.billable_basis
+        $j = ops_one("SELECT j.*, c.id call_id, c.contract_number, c.billable_value, c.billable_rate, c.billable_qty, c.billable_basis
                       FROM jobs j LEFT JOIN calls c ON c.id = j.call_id WHERE j.id=?", [$job]);
         if (!$j) return 'That ' . Tl('job') . ' no longer exists.';
         // §INV-2 — a job can be billed only once it is closed on its last day (a
@@ -489,11 +493,12 @@ function books_line_add($invoiceId, array $b) {
     }
     $seq = (int)books_try(fn() => ops_val("SELECT COALESCE(MAX(seq),0) FROM invoice_lines WHERE invoice_id=?", [(int)$invoiceId]), 0) + 1;
     $gst = ($b['gst_pct'] ?? '') === '' ? books_default_gst() : (float)$b['gst_pct'];
-    db()->prepare("INSERT INTO invoice_lines (invoice_id,seq,job_id,call_id,description,hsn_sac,qty,unit,rate,gst_pct)
-                   VALUES (?,?,?,?,?,?,?,?,?,?)")
+    $lineContract = trim((string)(($b['contract_number'] ?? '') ?: (isset($j) ? ($j['contract_number'] ?? '') : '')));
+    db()->prepare("INSERT INTO invoice_lines (invoice_id,seq,job_id,call_id,description,hsn_sac,qty,unit,rate,gst_pct,contract_number)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)")
        ->execute([(int)$invoiceId, $seq, $job, $callId, $desc,
                   trim((string)($b['hsn_sac'] ?? '')) ?: books_default_sac(), (float)($b['qty'] ?? 1),
-                  (string)($b['unit'] ?? ''), (float)($b['rate'] ?? 0), $gst]);
+                  (string)($b['unit'] ?? ''), (float)($b['rate'] ?? 0), $gst, $lineContract]);
     books_recalc($invoiceId);
     return '';
 }

@@ -50,4 +50,15 @@ $rows2 = books_billable_jobs($clientId);
 $stillThere = false; foreach ($rows2 as $r) if ((string)($r['contract_number'] ?? '') === 'PRJ-B') $stillThere = true;
 t_ok(!$stillThere, 'a job already on a live invoice leaves the billable pool');
 
+// A combined invoice carries the contract on every line, so the bill can group
+// the work by project. Draft one and add job A's line through the books path.
+$pdo->prepare("INSERT INTO invoices (partner_id, status, invoice_date, created_at) VALUES (?,?,?,?)")
+    ->execute([$clientId, 'DRAFT', '2026-08-10', date('c')]);
+$inv2 = (int)$pdo->lastInsertId();
+$jobA = (int)ops_val("SELECT id FROM jobs WHERE job_code='JA-1'");
+$err  = books_line_add($inv2, ['job_id' => $jobA]);
+t_eq($err, '', 'a closed job adds to the invoice as a line');
+$lc = ops_val("SELECT contract_number FROM invoice_lines WHERE invoice_id=? AND job_id=?", [$inv2, $jobA]);
+t_eq((string)$lc, 'PRJ-A', 'the invoice line carries its contract, so a combined bill separates projects');
+
 unset($_SESSION['uid']); current_user(true); ua(true);

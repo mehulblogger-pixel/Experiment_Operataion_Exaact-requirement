@@ -185,7 +185,20 @@ function ops_books($route, $method) {
             // A line that is refused — usually because the deputation is already
             // on somebody else's invoice — has to SAY so. Ticking five and
             // silently getting four is how work goes unbilled for a month.
-            $wanted = (array)($_POST['jobs'] ?? []);
+            $wanted = array_map('intval', (array)($_POST['jobs'] ?? []));
+            // "Draft this project only" carries only=<contract number>: keep just
+            // the ticked jobs on that contract, so one project bills on its own
+            // even when the whole customer's month is on screen. Absent, every
+            // ticked job across all the customer's projects goes on one combined
+            // invoice (the lines stay grouped by contract on the bill itself).
+            $only = trim((string)($_POST['only'] ?? ''));
+            if ($only !== '' && $wanted) {
+                $ph = implode(',', array_fill(0, count($wanted), '?'));
+                $keep = ops_all("SELECT j.id FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
+                                 WHERE j.id IN ($ph) AND COALESCE(c.contract_number,'')=?", array_merge($wanted, [$only]));
+                $keepIds = array_map(fn($x) => (int)$x['id'], $keep);
+                $wanted = array_values(array_intersect($wanted, $keepIds));
+            }
             $refused = [];
             foreach ($wanted as $jid)
                 if (($e = books_line_add((int)$r['id'], ['job_id' => (int)$jid])) !== '') $refused[] = $e;
