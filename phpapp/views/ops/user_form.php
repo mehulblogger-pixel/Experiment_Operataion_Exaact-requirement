@@ -338,6 +338,15 @@
     <h3 class="tab-sub" style="margin:0">Permissions <span class="muted">— grouped like the menu; leave all unticked to use the role's defaults</span></h3>
     <label class="chk" style="margin-left:auto;font-weight:600"><input type="checkbox" id="perm_all_toggle"> Select <b style="margin:0 3px">everything</b> (full access)</label>
   </div>
+  <?php // A per-login permission set REPLACES the role's defaults — so a save that
+        //  left a box unticked can narrow an admin. This clears the override and
+        //  returns the login to its ROLE's full default access (and any modules
+        //  added later). The one-click recovery when access was accidentally lost. ?>
+  <?php if (!empty($globalMgr) && !empty($user['id'])): ?>
+    <label class="chk" style="margin:6px 0 0;color:var(--accent,#234e70);font-weight:600">
+      <input type="checkbox" name="reset_perms" value="1"> ↺ Reset this login's access to its <b><?= e(ORG_ROLES[$curRole] ?? $curRole) ?></b> role default
+      <span class="muted" style="font-weight:400">— clears any custom permissions; on save this login gets its full role access back</span></label>
+  <?php endif; ?>
   <?php
     // Render the permissions under the same headings as the main navigation, so
     // this reads like the menu instead of one long list. Only permissions this

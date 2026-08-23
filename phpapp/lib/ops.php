@@ -6678,6 +6678,11 @@ function ops_users($route, $method) {
             $chosen = array_filter((array)($b['permissions'] ?? []));
             if (!$globalMgr) $chosen = array_intersect($chosen, ['dash.operations','dash.utilization','data.credit','ops.call.create','ops.job.allocate','ops.job.close','master.manage']);
             $perms = implode(',', $chosen);
+            // "Reset access to the role default" — clears the per-user override so the
+            // login tracks its ROLE's full default access (and any modules added
+            // later) instead of a frozen ticked set. This is the recovery when an
+            // edit accidentally narrowed an admin. Global managers only.
+            if ($globalMgr && !empty($b['reset_perms'])) $perms = '';
             // Reporting manager (for the org hierarchy + approvals): a system user when
             // one exists, else a manual name/position/email for a manager without a login.
             // "+ add them" is not a person id — it means the manager has no login,
