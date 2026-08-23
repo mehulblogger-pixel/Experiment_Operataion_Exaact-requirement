@@ -4734,40 +4734,56 @@ function voucher_generate($v) {
     [$y, $m] = array_map('intval', explode('-', $v['month']));
     $from = sprintf('%04d-%02d-01', $y, $m);
     $to = date('Y-m-t', strtotime($from));
-    $jobs = ops_all("SELECT j.id, j.boss_id, j.sbu, j.scheduled_date, j.inspection_start_date, j.inspection_end_date,
-        c.client_id, c.vendor_id, bn.boss_number,
-        vn.display_name vdisp, vn.legal_name vleg, cl.display_name cdisp, cl.legal_name cleg
-        FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN boss_numbers bn ON bn.id=j.boss_id
-        LEFT JOIN business_partners vn ON vn.id=c.vendor_id LEFT JOIN business_partners cl ON cl.id=c.client_id
-        WHERE j.inspector_id=?", [$v['inspector_id']]);
-    $added = 0;
+    $insId = (int)$v['inspector_id'];
+
+    // Job details for every job this inspector holds.
+    $det = [];
+    foreach (ops_all("SELECT j.id, j.boss_id, j.sbu, j.scheduled_date, j.inspection_dates, j.inspection_start_date,
+            c.client_id, c.vendor_id, bn.boss_number,
+            vn.display_name vdisp, vn.legal_name vleg, cl.display_name cdisp, cl.legal_name cleg
+            FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN boss_numbers bn ON bn.id=j.boss_id
+            LEFT JOIN business_partners vn ON vn.id=c.vendor_id LEFT JOIN business_partners cl ON cl.id=c.client_id
+            WHERE j.inspector_id=?", [$insId]) as $j) $det[(int)$j['id']] = $j;
+
+    // Build the (date, job) list the SAME way the My-Jobs schedule does — the actual
+    // BOOKED visit dates — not each job's whole start→end span. Expanding the span
+    // made a continuous deputation (e.g. a monthly posting) flood every single day of
+    // the voucher, disagreeing with the schedule; using the booked dates keeps the
+    // voucher and the calendar in step.
+    $pairs = []; $covered = [];
+    // 1) explicit per-inspector visit rows (multi-day jobs, reshuffled days)
+    foreach (ops_all("SELECT visit_date, job_id FROM job_visits WHERE inspector_id=? AND substr(visit_date,1,10) BETWEEN ? AND ?", [$insId, $from, $to]) as $r) {
+        $d = substr((string)$r['visit_date'], 0, 10); $jid = (int)$r['job_id'];
+        if ($d === '' || !isset($det[$jid])) continue;
+        $pairs[] = [$d, $jid]; $covered[$jid] = true;
+    }
+    // 2) jobs with no visit rows → their booked inspection_dates, else the scheduled
+    //    day, else a single start day (never the whole range).
+    foreach ($det as $jid => $j) {
+        if (isset($covered[$jid])) continue;
+        $dates = array_filter(array_map('trim', explode(',', (string)($j['inspection_dates'] ?? ''))));
+        if (!$dates && trim((string)($j['scheduled_date'] ?? '')) !== '') $dates = [substr((string)$j['scheduled_date'], 0, 10)];
+        if (!$dates && trim((string)($j['inspection_start_date'] ?? '')) !== '') $dates = [substr((string)$j['inspection_start_date'], 0, 10)];
+        foreach ($dates as $d) { $d = substr($d, 0, 10); if ($d < $from || $d > $to) continue; $pairs[] = [$d, $jid]; }
+    }
+
     $ins = $pdo->prepare("INSERT INTO voucher_entries (voucher_id,entry_date,day_type,job_id,boss_id,client_id,vendor_id,file_no,line_no,sbu,site_label,hours,is_auto)
         VALUES (?,?, 'WORK', ?,?,?,?,?,'',?,?, ?, 1)");
-    foreach ($jobs as $j) {
-        $s = $j['inspection_start_date'] ?: ($j['scheduled_date'] ?: '');
-        $e = $j['inspection_end_date'] ?: $s;
-        if (!$s) continue;
-        $start = max(strtotime($from), strtotime($s));
-        $stop  = min(strtotime($to), strtotime($e ?: $s));
-        for ($d = $start; $d !== false && $d <= $stop; $d = strtotime('+1 day', $d)) {
-            $date = date('Y-m-d', $d);
-            // A day already marked non-working (leave / in office) can't also be a
-            // site day — leave it alone.
-            if ((int)ops_val("SELECT COUNT(*) FROM voucher_entries WHERE voucher_id=? AND entry_date=? AND day_type<>'WORK'", [$v['id'], $date])) continue;
-            // Idempotent per JOB, not per date: an inspector allotted several jobs on
-            // one day visited several sites and needs a line for EACH — its own file
-            // number, client/vendor and expenses. Only skip a job already pulled for
-            // this date, not the whole date.
-            if ((int)ops_val("SELECT COUNT(*) FROM voucher_entries WHERE voucher_id=? AND entry_date=? AND job_id=?", [$v['id'], $date, $j['id']])) continue;
-            // The day's 8 hours are counted ONCE: the first work line on the date
-            // carries them; further jobs the same day carry 0 so attendance is not
-            // doubled — but each job still gets its own line for its expenses.
-            $dayHasWork = (int)ops_val("SELECT COUNT(*) FROM voucher_entries WHERE voucher_id=? AND entry_date=? AND day_type='WORK'", [$v['id'], $date]);
-            $hours = $dayHasWork ? 0 : 8;
-            $site = $j['vdisp'] ?: ($j['vleg'] ?: ($j['cdisp'] ?: ($j['cleg'] ?: '')));
-            $ins->execute([$v['id'], $date, $j['id'], $j['boss_id'], $j['client_id'], $j['vendor_id'], $j['boss_number'] ?: '', $j['sbu'], $site, $hours]);
-            $added++;
-        }
+    $added = 0;
+    foreach ($pairs as [$date, $jid]) {
+        $j = $det[$jid];
+        // A day already marked non-working (leave / in office) can't also be a site day.
+        if ((int)ops_val("SELECT COUNT(*) FROM voucher_entries WHERE voucher_id=? AND entry_date=? AND day_type<>'WORK'", [$v['id'], $date])) continue;
+        // Idempotent per JOB, not per date: several jobs on one day → a line for each
+        // (its own file number, client/vendor and expenses).
+        if ((int)ops_val("SELECT COUNT(*) FROM voucher_entries WHERE voucher_id=? AND entry_date=? AND job_id=?", [$v['id'], $date, $jid])) continue;
+        // The day's 8 hours are counted ONCE — the first work line on the date carries
+        // them; further jobs the same day carry 0 so attendance is not doubled.
+        $dayHasWork = (int)ops_val("SELECT COUNT(*) FROM voucher_entries WHERE voucher_id=? AND entry_date=? AND day_type='WORK'", [$v['id'], $date]);
+        $hours = $dayHasWork ? 0 : 8;
+        $site = $j['vdisp'] ?: ($j['vleg'] ?: ($j['cdisp'] ?: ($j['cleg'] ?: '')));
+        $ins->execute([$v['id'], $date, $jid, $j['boss_id'], $j['client_id'], $j['vendor_id'], $j['boss_number'] ?: '', $j['sbu'], $site, $hours]);
+        $added++;
     }
     return $added;
 }
