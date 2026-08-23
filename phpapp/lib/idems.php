@@ -3518,7 +3518,11 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
     $vetted   = strtoupper((string)($doc['vet_status'] ?? '')) === 'VETTED';
     $canVet   = function_exists('idems_can_vet') && idems_can_vet();
     $canEdit  = function_exists('idems_can_edit_doc') ? idems_can_edit_doc($doc) : false;
-    $canFinal = is_master() || (function_exists('can') && can('idems.finalize'));
+    // The approver may not also issue: whoever approved this report cannot finalise
+    // it (master/admin excepted). Keeps the button off the approver's own screen so
+    // the UI matches the server rule below.
+    $approverSelf = !is_master() && idems_user_approved_doc($doc, (int)(current_user()['id'] ?? 0));
+    $canFinal = is_master() || (function_exists('can') && can('idems.finalize') && !$approverSelf);
 
     $anyApproved = false; $anyPending = false; $names = [];
     foreach ((array)$approvals as $a) {
@@ -3651,8 +3655,10 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
             'post'=>['action'=>'/document-finalize?id=' . $id, 'label'=>'Finalise &amp; issue',
                      'confirm'=>'Finalise & issue this report? It becomes permanently locked (immutable).']];
     } else {
-        $steps[] = ['key'=>'issue', 'label'=>'Finalise & issue', 'state'=>'todo',
-            'line'=>'Once approved, a manager finalises and issues the report — the signature is stamped on automatically here.'];
+        $line = 'Once approved, a manager finalises and issues the report — the signature is stamped on automatically here.';
+        if ($approved && $approverSelf)
+            $line = 'You approved this ' . (function_exists('Tl') ? Tl('report') : 'report') . ', so a <b>different</b> person must finalise &amp; issue it — the approver and the issuer cannot be the same (segregation of duties).';
+        $steps[] = ['key'=>'issue', 'label'=>'Finalise & issue', 'state'=>'todo', 'line'=>$line];
     }
 
     // 7 — Release Note. A Release / Discrepancy Note is raised FROM an inspection
@@ -4449,6 +4455,12 @@ function ops_idems_documents($route, $method) {
         if (!$doc) { http_response_code(404); view('notfound'); return true; }
         ops_require(is_master() || can('idems.finalize'), 'You are not permitted to finalize / issue reports.');
         if ($doc['finalized']) { flash('This report is already finalized.', 'warning'); redirect('/document?id=' . $doc['id']); }
+        // Segregation of duties: the person who approved this report must not also
+        // issue it. Master/admin is the standing exception for a one-person office.
+        if (!is_master() && idems_user_approved_doc($doc, (int)(current_user()['id'] ?? 0))) {
+            flash('You approved this ' . Tl('report') . ', so it must be finalised & issued by a different person — the approver and the issuer cannot be the same (segregation of duties).', 'error');
+            redirect('/document?id=' . $doc['id']);
+        }
         // If an approval chain exists, the report must be fully approved first (master may override).
         $hasChain = (int)ops_val("SELECT COUNT(*) FROM report_approvals WHERE report_doc_id=?", [$doc['id']]);
         if ($hasChain && $doc['status'] !== 'APPROVED' && !is_master()) {
@@ -5624,6 +5636,25 @@ function idems_build_approval_chain($doc) {
 }
 function idems_report_approvals($docId) {
     return ops_all("SELECT a.*, u.first_name, u.last_name, u.username FROM report_approvals a LEFT JOIN users u ON u.id=a.resolved_user_id WHERE a.report_doc_id=? ORDER BY a.level, a.id", [(int)$docId]);
+}
+// Segregation of duties: did THIS user give (one of) the report's approvals? The
+// person who approved a report must not also be the one who finalises & issues it.
+// Master/admin is the standing exception — a one-person office where nobody else
+// could issue — mirroring the contract endorse-vs-approve rule.
+function idems_user_approved_doc($doc, $uid) {
+    $uid = (int)$uid;
+    if (!$uid || empty($doc['id'])) return false;
+    $me = function_exists('user_name') ? trim((string)user_name(current_user())) : '';
+    try {
+        // Acted on any approval step of this report (by resolved user or by name).
+        $n = (int)ops_val("SELECT COUNT(*) FROM report_approvals WHERE report_doc_id=? AND status='APPROVED' AND (resolved_user_id=? OR (acted_by<>'' AND acted_by=?))", [(int)$doc['id'], $uid, $me]);
+        if ($n > 0) return true;
+    } catch (Throwable $e) {}
+    // No-chain approval: the report records who approved it, by name.
+    if ($me !== '' && trim((string)($doc['approved_by'] ?? '')) === $me) return true;
+    // The designated approver, once the report is approved.
+    if ((int)($doc['approver_user_id'] ?? 0) === $uid && ($doc['status'] ?? '') === 'APPROVED') return true;
+    return false;
 }
 function idems_current_step($docId) {
     return ops_one("SELECT * FROM report_approvals WHERE report_doc_id=? AND status='PENDING' ORDER BY level, id LIMIT 1", [(int)$docId]);
