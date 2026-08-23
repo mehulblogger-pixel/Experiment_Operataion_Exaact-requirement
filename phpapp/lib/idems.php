@@ -591,6 +591,35 @@ function idems_migrate() {
         id $pk, partner_id INT, old_status VARCHAR(30) DEFAULT '', new_status VARCHAR(30) DEFAULT '',
         source VARCHAR(20) DEFAULT 'MANUAL', report_doc_id INT NULL, score REAL NULL,
         reason VARCHAR(500) DEFAULT '', actor VARCHAR(150) DEFAULT '', at VARCHAR(30) DEFAULT '')");
+    idems_add_refdoc_issuer_column();
+}
+// Add the "Approved / Issued by" column to Reference-documents tables that were
+// created before it existed — so report types already in use gain the column too,
+// not only newly-seeded ones. Conservative and idempotent: only the standard
+// column set is touched (has "Approval Code" AND "Date of Approval", lacks the new
+// column), and the column is inserted right after "Approval Code". Any table a user
+// has customised away from that shape is left alone.
+function idems_add_refdoc_issuer_column() {
+    try {
+        $rows = ops_all("SELECT id, table_cols FROM report_fields WHERE fkey='reference_documents'");
+    } catch (Throwable $e) { return; }
+    foreach ($rows as $r) {
+        $cols = (string)($r['table_cols'] ?? '');
+        if ($cols === '' || stripos($cols, 'Approved / Issued by') !== false) continue;
+        if (stripos($cols, 'Approval Code') === false || stripos($cols, 'Date of Approval') === false) continue;
+        $lines = preg_split('/\r?\n/', $cols);
+        $new = [];
+        foreach ($lines as $ln) {
+            $new[] = $ln;
+            // Insert straight after the "Approval Code" column line.
+            if (stripos(trim($ln), 'Approval Code') === 0) $new[] = 'Approved / Issued by';
+        }
+        $updated = implode("\n", $new);
+        if ($updated !== $cols) {
+            try { db()->prepare("UPDATE report_fields SET table_cols=? WHERE id=?")->execute([$updated, (int)$r['id']]); }
+            catch (Throwable $e) {}
+        }
+    }
 }
 // ITP inspection type for a scope activity — how the point is covered.
 const INSPECTION_TYPES_ITP = [
@@ -778,7 +807,7 @@ function idems_install_inspection_sections($typeId) {
 
     // 2) Reference documents.
     $s = $addSection('Reference documents', 'The QAP/ITP, drawings, specifications and standards inspected against — one row per document.');
-    $addField($s, 'reference_documents', 'Reference documents', 'table', '', "Document Name\nDocument Number\nRevision No.\nApproval Code\nDate of Approval|date", 2);
+    $addField($s, 'reference_documents', 'Reference documents', 'table', '', "Document Name\nDocument Number\nRevision No.\nApproval Code\nApproved / Issued by\nDate of Approval|date", 2);
 
     // 3) PO line items & quantities (unit chosen once per line).
     $s = $addSection('PO items & quantities', 'One row per PO line item — quantities and the unit chosen once per line.');
@@ -885,7 +914,7 @@ function idems_install_fire_extinguisher_sections($typeId) {
     // 2) Reference documents.
     $s = $addSection('Reference documents', 'The standards, specifications, drawings and layout inspected against — one row per document.');
     $addField($s, 'reference_documents', 'Reference documents', 'table', '',
-        "Document Name\nDocument Number\nRevision No.\nApproval Code\nDate of Approval|date", 2);
+        "Document Name\nDocument Number\nRevision No.\nApproval Code\nApproved / Issued by\nDate of Approval|date", 2);
 
     // 3) Fire extinguisher schedule — one row per extinguisher (identity).
     $s = $addSection('Fire extinguisher schedule', 'One row per extinguisher — type, capacity, make, serial, manufacturing date, location and quantity.');
@@ -4698,7 +4727,7 @@ function ops_idems_builder($route, $method) {
             $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span)
                            VALUES (?,?,?,?,?,?,?,?,2)")
                 ->execute([$typeId, $secId, 'reference_documents', 'Reference documents', 'table',
-                    "Document Name\nDocument Number\nRevision No.\nApproval Code\nDate of Approval|date",
+                    "Document Name\nDocument Number\nRevision No.\nApproval Code\nApproved / Issued by\nDate of Approval|date",
                     'Add one row per controlling document — QAP/ITP, drawing, specification, standard, customer instruction.',
                     (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId])]);
             flash('Added a “Reference documents” section — a repeatable table: Document Name, Number, Revision, Approval code and Date of approval (date picker).');
