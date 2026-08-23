@@ -780,8 +780,14 @@ if (function_exists('hwp_for_job')):
 </div>
 <?php endif; ?>
 
+<?php // Profitability — revenue, invoice value, margin, net profit — is commercial
+      // and restricted to managers/finance who hold the figure permissions. A
+      // coordinator or inspector sees the expenses list (their operational cost),
+      // never what the job earned. ("Profitability shall only be shown to Managers
+      // and above who have the access. Nothing to coordinators, inspectors, etc.")
+      $canSeeProfit = (function_exists('can') && (can('data.profitability') || can('data.revenue'))) || is_master(); ?>
 <details class="fold" data-tab="Money">
-  <summary>Expenses &amp; profitability <span class="sub">what it cost, and what the <?= e(Tl('job')) ?> made</span></summary>
+  <summary><?= $canSeeProfit ? 'Expenses &amp; profitability' : 'Expenses' ?> <span class="sub"><?= $canSeeProfit ? 'what it cost, and what the ' . e(Tl('job')) . ' made' : 'what it cost' ?></span></summary>
   <div class="fold-body">
   <div class="panel-split">
   <div class="panel">
@@ -828,6 +834,7 @@ if (function_exists('hwp_for_job')):
       </p>
     <?php endif; ?>
   </div>
+  <?php if ($canSeeProfit): ?>
   <div class="panel">
     <h3 class="tab-sub">Profitability<?= can_see_salary() ? '' : ' (summary)' ?></h3>
     <div class="kv-grid">
@@ -857,6 +864,7 @@ if (function_exists('hwp_for_job')):
       <?php endif; ?>
     </div>
   </div>
+  <?php endif; /* $canSeeProfit */ ?>
   </div>
   </div>
 </details>
