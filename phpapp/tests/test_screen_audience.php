@@ -171,3 +171,39 @@ t_ok(!money_refs_visible(), 'an assistant manager is not cleared for money refer
 t_eq(chain_label_seen('INVOICE', $invRow)[0], 'raised', 'and is masked on the trace page as well as the strip');
 
 unset($_SESSION['uid']); current_user(true); ua(true);
+
+// ---- /flow-gaps carries the same references ---------------------------------
+//  Same access gate as /trace, so the Assistant Manager who reaches one reaches
+//  the other. Two of its sections are finance's work and list finance's
+//  references — and one appends the outstanding amount to the customer's name.
+t_section('the flow-gaps list does not hand out invoice or receipt numbers');
+
+$moneyGaps = ['invoice_overdue', 'receipt_unmatched'];
+
+$as($fin);
+$gaps = chain_gaps();
+foreach ($moneyGaps as $k) t_ok(isset($gaps[$k]), "finance still gets the $k gap");
+t_ok(isset($gaps['job_no_invoice']), 'finance still gets "work closed and never billed"');
+
+$as($asst);
+$gaps = chain_gaps();
+foreach ($moneyGaps as $k)
+    t_ok(!isset($gaps[$k]), "an assistant manager is not shown the $k gap");
+
+// Nothing operational is taken away. Work closed and never billed is keyed by
+// the job code, names no invoice and no figure, and chasing it is their job.
+t_ok(isset($gaps['job_no_invoice']),
+     'an assistant manager keeps "work closed and never billed" — it names no invoice and no figure');
+t_ok(count($gaps) > 0, 'the flow-gaps screen is not emptied for them');
+
+$as($insp2);
+$gaps = chain_gaps();
+foreach ($moneyGaps as $k) t_ok(!isset($gaps[$k]), "an inspector is not shown the $k gap either");
+
+// The page exports itself as CSV straight from these rows, so dropping them at
+// the source is what makes the download safe too, not just the screen.
+$src = file_get_contents(dirname(__DIR__) . '/lib/chain.php');
+t_ok(strpos($src, "function_exists('books_migrate') && money_refs_visible()") !== false,
+     'the money gaps are dropped at the source the CSV reads, not blanked in the template');
+
+unset($_SESSION['uid']); current_user(true); ua(true);

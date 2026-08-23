@@ -656,7 +656,20 @@ function chain_gaps() {
         ];
     }
 
-    if (function_exists('books_migrate')) {
+    // The two money gaps are finance's work and carry finance's references: an
+    // invoice number, a receipt number, the customer, and — appended to the
+    // "who" column below — the amount still outstanding. Anyone not cleared for
+    // money figures is not shown them, on the same line that withholds the
+    // invoice number from the thread.
+    //
+    // Dropped here rather than blanked in the template, because /flow-gaps also
+    // exports itself as a CSV straight from these rows. Masking the page and
+    // leaving the download would be no gate at all.
+    //
+    // Nothing operational is lost. "Work closed and never billed" stays for
+    // everybody: it is keyed by the job code, names no invoice and no figure,
+    // and closing that loop is exactly the operational chase it describes.
+    if (function_exists('books_migrate') && money_refs_visible()) {
         books_migrate();
         [$iw, $ia] = scope_clause('i.office_id', 'i.sbu');
         $today = date('Y-m-d');
