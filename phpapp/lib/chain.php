@@ -332,6 +332,231 @@ function chain_strip($kind, $id, $hereKind = '', $hereId = 0) {
     return $h;
 }
 
+// ---- Does the thread carry the data, or only the links? ---------------------
+//  The strip and /flow-gaps both answer one question: does the next record
+//  exist. That is presence. It is not the question the owner actually asks,
+//  which is "why am I typing the PO number again on every screen".
+//
+//  Presence is not fidelity. A quotation, an order and an invoice can all
+//  exist, all be linked, and still disagree about the contract they belong to,
+//  because each screen was happy to let somebody type it fresh. Every field a
+//  screen re-asks is a field the hop before it dropped — and it is also one
+//  more input cluttering the screen, which is why this reader and the work on
+//  screen complexity are the same job seen from two ends.
+//
+//  So: for each field that must be inherited and never re-typed, walk the
+//  thread left to right and say, at every stage, what happened to it.
+//
+//  The states are kept distinct because each calls for a different fix:
+//
+//    origin  ●  the first record holding the value. Nothing to inherit from.
+//    carried ✓  agrees with what came before. The one we want.
+//    link    ↗  no column here and none wanted — the record points at the
+//               parent that holds it, so it cannot be re-typed. Also good.
+//    differs ⚠  holds a value that disagrees with upstream. Somebody re-typed
+//               it and the two records now tell different stories.
+//    missing ✗  the column is here and empty while upstream has a value. This
+//               is the hop that drops the field, and the reason for re-typing.
+//    blank   ·  nothing upstream and nothing here. Not a fault.
+//    none    ⊘  nowhere on this record to keep it, and no parent that has it.
+//    absent  —  no record at this stage; /flow-gaps already owns that.
+//
+//  Nothing here writes, for the same reason as the rest of this file: a report
+//  that quietly repaired the data would hide how often the handover is skipped.
+
+// Money is excluded from RECEIPT and the contract/PO rows stop at the invoice,
+// so the matrix covers the stages where inheritance is a real expectation.
+const CHAIN_TRACK = ['LEAD', 'OPPORTUNITY', 'INQUIRY', 'QUOTE', 'CALL', 'JOB', 'REPORT', 'INVOICE'];
+
+// Where each tracked field lives, stage by stage.
+//   'id'   — the foreign key, compared first because names get re-spelled.
+//   'text' — the human value, compared when there is no key on both sides.
+//   'num'  — a money/quantity column; present-or-not, never compared for equality.
+//   'via'  — no column, and none needed: the named parent link holds it.
+//  A stage absent from the map has nowhere at all to keep the field (⊘).
+function chain_fields() {
+    return [
+        ['key' => 'client', 'label' => 'Client',
+         'why' => 'Who the work is for. Re-typed here, the invoice can end up addressed to a different partner than the order.',
+         'at' => [
+            'LEAD'        => ['id' => 'partner_id',  'text' => 'company_name'],
+            'OPPORTUNITY' => ['id' => 'partner_id',  'text' => 'partner_name'],
+            'INQUIRY'     => ['id' => 'client_id',   'text' => 'client_name'],
+            'QUOTE'       => ['id' => 'client_id',   'text' => 'client_name'],
+            'CALL'        => ['id' => 'client_id',   'text' => 'client_name'],
+            'JOB'         => ['via' => 'CALL'],
+            'REPORT'      => ['id' => 'client_id'],
+            'INVOICE'     => ['id' => 'partner_id',  'text' => 'partner_name'],
+         ]],
+        ['key' => 'vendor', 'label' => 'Vendor',
+         'why' => 'The party being inspected. It appears first on the quotation and must reach the report unchanged.',
+         'at' => [
+            'QUOTE'  => ['id' => 'vendor_id'],
+            'CALL'   => ['id' => 'vendor_id'],
+            'JOB'    => ['via' => 'CALL'],
+            'REPORT' => ['id' => 'vendor_id'],
+         ]],
+        ['key' => 'site', 'label' => 'Site',
+         'why' => 'Where the work happens. Typed fresh on the job, the report can name a different place than the order.',
+         'at' => [
+            'QUOTE'  => ['text' => 'site_location'],
+            'CALL'   => ['id' => 'site_address_id'],
+            'JOB'    => ['text' => ['dep_site', 'site_label']],
+            'REPORT' => ['text' => 'location'],
+         ]],
+        ['key' => 'contract', 'label' => 'Contract no.',
+         'why' => 'What the rate was agreed under. An invoice with no contract number is the one finance queries.',
+         'at' => [
+            'QUOTE'   => ['id' => 'contract_id', 'text' => 'contract_number'],
+            'CALL'    => ['text' => 'contract_number'],
+            'JOB'     => ['text' => 'contract_number'],
+            'REPORT'  => ['via' => 'JOB'],
+            'INVOICE' => ['text' => 'contract_number'],
+         ]],
+        ['key' => 'po', 'label' => 'PO / PO line',
+         'why' => 'What the customer will pay against. Dropped anywhere along here and the invoice cannot be reconciled.',
+         'at' => [
+            'QUOTE'   => ['text' => 'po_number'],
+            'CALL'    => ['id' => 'po_id'],
+            'JOB'     => ['via' => 'CALL'],
+            'REPORT'  => ['text' => 'po_ref'],
+            'INVOICE' => ['text' => 'po_number'],
+         ]],
+        ['key' => 'sbu', 'label' => 'Business unit',
+         'why' => 'Whose number the work counts towards. The only field every stage can hold — so every break here is avoidable.',
+         'at' => [
+            'LEAD'        => ['text' => 'sbu'], 'OPPORTUNITY' => ['text' => 'sbu'],
+            'INQUIRY'     => ['text' => 'sbu'], 'QUOTE'       => ['text' => 'sbu'],
+            'CALL'        => ['text' => 'sbu'], 'JOB'         => ['text' => 'sbu'],
+            'REPORT'      => ['text' => 'sbu'], 'INVOICE'     => ['text' => 'sbu'],
+         ]],
+        ['key' => 'activity', 'label' => 'Activity',
+         'why' => 'What service was sold. If the job says something else, the report is written against the wrong scope.',
+         'at' => [
+            'QUOTE'  => ['text' => ['product_category', 'inspection_types']],
+            'CALL'   => ['id' => 'activity_id', 'text' => ['service_code', 'inspection_type']],
+            'JOB'    => ['id' => 'activity_id', 'text' => ['service_code', 'inspection_type']],
+            'REPORT' => ['text' => ['product_category', 'type_code']],
+         ]],
+        ['key' => 'money', 'label' => 'Rate / value',
+         'compare' => 'present',   // a quote total and an invoice total differ for good reasons
+         'why' => 'Checked for presence only — a quoted total and a billed total are allowed to differ. Empty is the fault.',
+         'at' => [
+            'QUOTE'   => ['num' => 'total_amount'],
+            'CALL'    => ['num' => ['billable_value', 'billable_rate']],
+            'JOB'     => ['num' => ['invoice_value', 'expected_credit']],
+            'INVOICE' => ['num' => 'total'],
+         ]],
+        ['key' => 'deliverables', 'label' => 'Deliverables',
+         'why' => 'What the customer was promised. The inspector cannot deliver what the order never told them.',
+         'at' => [
+            'QUOTE' => ['text' => '_deliverables'],
+            'CALL'  => ['text' => ['deliverables', 'reporting_frequency']],
+            'JOB'   => ['text' => ['deliverables', 'reporting_frequency']],
+         ]],
+    ];
+}
+
+// One record's value for one field, as a pair: the key we compare on, and the
+// text we show. Ids beat names, because a name re-spelled is still the same
+// partner and a name typed over is not something we can tell apart otherwise.
+function chain_value(array $spec, array $row) {
+    $id = isset($spec['id']) ? (int)($row[$spec['id']] ?? 0) : 0;
+
+    $nums = [];
+    foreach ((array)($spec['num'] ?? []) as $c) {
+        $v = (float)($row[$c] ?? 0);
+        if (abs($v) > 0.0001) { $nums[] = $v; break; }
+    }
+    if ($nums) return ['num:' . $nums[0], fmoney($nums[0])];
+
+    // A list of text columns is a fallback chain, not a concatenation: the first
+    // one that is filled IS the value. Joining them looked tidier and was wrong —
+    // `jobs.reporting_frequency` defaults to NOREPORT while the order's is empty,
+    // so identical deliverables compared as two different strings and every job
+    // reported a re-type that had not happened.
+    $show = '';
+    foreach ((array)($spec['text'] ?? []) as $c) {
+        $v = trim((string)($row[$c] ?? ''));
+        if ($v !== '') { $show = $v; break; }
+    }
+
+    if ($id > 0) return ['id:' . $id, $show !== '' ? $show : '#' . $id];
+    if ($show !== '') return ['tx:' . strtolower(preg_replace('/\s+/', ' ', $show)), $show];
+    return ['', ''];
+}
+
+// The matrix. Pure over the chain array chain_from() already returns, so the
+// tests can hand it rows without a database.
+function chain_continuity(array $chain) {
+    $stages = chain_stages();
+    $cols = [];
+    foreach (CHAIN_TRACK as $s) $cols[$s] = $stages[$s][0] ?? $s;
+
+    $rows = [];
+    $breaks = $checks = 0;
+
+    foreach (chain_fields() as $f) {
+        $mode = $f['compare'] ?? 'match';
+        $cells = [];
+        $prev = null;          // last non-empty key seen upstream
+        $prevStage = '';
+
+        foreach (CHAIN_TRACK as $stage) {
+            $recs = $chain[$stage] ?? [];
+            if (!$recs) { $cells[$stage] = ['state' => 'absent', 'show' => '']; continue; }
+
+            $spec = $f['at'][$stage] ?? null;
+            if ($spec === null) { $cells[$stage] = ['state' => 'none', 'show' => '']; continue; }
+            if (isset($spec['via'])) {
+                $cells[$stage] = ['state' => 'link', 'show' => '',
+                                  'note' => 'held by the ' . strtolower($stages[$spec['via']][0] ?? $spec['via'])];
+                continue;
+            }
+
+            [$key, $show] = chain_value($spec, $recs[0]);
+
+            if ($key === '') {
+                $state = ($prev === null) ? 'blank' : 'missing';
+            } elseif ($prev === null) {
+                $state = 'origin';
+            } elseif ($mode === 'present' || $key === $prev) {
+                $state = 'carried';
+            } else {
+                $state = 'differs';
+            }
+
+            $cell = ['state' => $state, 'show' => $show];
+            if ($state === 'differs') $cell['note'] = 'upstream (' . strtolower($cols[$prevStage] ?? $prevStage) . ') says something else';
+            if ($state === 'missing') $cell['note'] = 'the ' . strtolower($cols[$prevStage] ?? $prevStage) . ' has it; this dropped it';
+            $cells[$stage] = $cell;
+
+            if (in_array($state, ['origin', 'carried', 'differs', 'missing'], true)) $checks++;
+            if ($state === 'differs' || $state === 'missing') $breaks++;
+            if ($key !== '') { $prev = $key; $prevStage = $stage; }
+        }
+
+        $rows[] = ['key' => $f['key'], 'label' => $f['label'], 'why' => $f['why'],
+                   'compare' => $mode, 'cells' => $cells];
+    }
+
+    return ['cols' => $cols, 'rows' => $rows, 'breaks' => $breaks, 'checks' => $checks];
+}
+
+// The quotation keeps its deliverables on the lines, not the header, so lift
+// them onto the header row before the matrix reads it. Kept out of chain_from()
+// deliberately — the strip has no use for it and should not pay for the query.
+function chain_with_quote_lines(array $chain) {
+    if (empty($chain['QUOTE'])) return $chain;
+    foreach ($chain['QUOTE'] as $i => $q) {
+        $lines = chain_all("SELECT deliverables FROM quote_lines WHERE quote_id=? ORDER BY line_no, id", [(int)$q['id']]);
+        $d = [];
+        foreach ($lines as $l) { $v = trim((string)$l['deliverables']); if ($v !== '' && !in_array($v, $d, true)) $d[] = $v; }
+        $chain['QUOTE'][$i]['_deliverables'] = implode(' · ', $d);
+    }
+    return $chain;
+}
+
 // ---- Where the thread is cut ------------------------------------------------
 // Each gap is a handover somebody skipped, with the screen that closes it. The
 // counts are the honest measure of how joined-up the data actually is.
@@ -471,6 +696,8 @@ function ops_chain($route, $method) {
     $id   = (int)($_GET['id'] ?? 0);
     if (!isset(CHAIN_STAGES[$kind]) || !$id) { http_response_code(404); view('notfound'); return true; }
     [$rk, $ri] = chain_root($kind, $id);
-    view('ops/trace', ['chain' => chain_from($rk, $ri), 'kind' => $kind, 'id' => $id]);
+    $chain = chain_with_quote_lines(chain_from($rk, $ri));
+    view('ops/trace', ['chain' => $chain, 'kind' => $kind, 'id' => $id,
+                       'cont' => chain_continuity($chain)]);
     return true;
 }
