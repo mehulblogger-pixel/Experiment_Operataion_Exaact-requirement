@@ -72,8 +72,8 @@ function hwp_missing_table(Throwable $e) {
         && (stripos($e->getMessage(), 'no such table') !== false || stripos($e->getMessage(), "doesn't exist") !== false);
 }
 
-function hwp_can_view() { return function_exists('can') && (can('mod.idems.view') || can('ops.job.view') || is_master()); }
-function hwp_can_edit() { return function_exists('can') && (can('mod.idems.edit') || can('ops.job.edit') || is_master()); }
+function hwp_can_view() { return function_exists('can') && (can('mod.idems.view') || can('mod.jobs.view') || is_master()); }
+function hwp_can_edit() { return function_exists('can') && (can('mod.idems.edit') || can('mod.jobs.edit') || is_master()); }
 
 function hwp_type_label($t)   { return HW_POINT_TYPES[$t] ?? $t; }
 function hwp_status_label($s) { return HW_POINT_STATUS[$s] ?? $s; }

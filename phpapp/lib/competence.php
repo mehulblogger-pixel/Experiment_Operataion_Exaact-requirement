@@ -79,7 +79,7 @@ function competence_job_date($b, $call = null) {
 
 // Only a manager may let a lapsed certificate through, and only with a reason.
 function competence_can_override() {
-    return can('jobs.edit') && (is_admin_level() || is_master());
+    return can('mod.jobs.edit') && (is_admin_level() || is_master());
 }
 
 // ============================================================================

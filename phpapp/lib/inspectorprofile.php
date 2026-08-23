@@ -55,7 +55,7 @@ function ops_inspector_profile($route, $method) {
         'ins' => $ins, 'certs' => $certs, 'rating' => $rating,
         'jobStats' => $jobStats, 'recentJobs' => $recentJobs, 'reportsDone' => $reportsDone,
         'ts' => $ts, 'tsMonth' => $tsMonth,
-        'canSalary' => is_master() || (function_exists('can') && can('salary.view')),
+        'canSalary' => is_master() || (function_exists('can') && can('data.salary')),
     ]);
     return true;
 }

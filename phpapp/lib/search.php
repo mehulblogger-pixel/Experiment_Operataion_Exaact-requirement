@@ -282,7 +282,7 @@ function search_sources() {
         });
 
     // ---- People and instruments ---------------------------------------------
-    $add('people', 'People', '👷', can('mod.inspectors.view') || is_master_of('inspectors'),
+    $add('people', 'People', '👷', can('mod.masters.view') || is_master_of('inspectors'),
         function ($q, $n) use ($like) {
             $l = $like($q);
             return array_map(fn($r) => [

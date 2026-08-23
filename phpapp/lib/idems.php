@@ -4034,9 +4034,9 @@ function ops_idems_expediting_projects($route, $method) {
 
 function ops_idems_vendors($route, $method) {
     $pdo = db();
-    $canView = is_master() || can('mod.idems.view') || can('mod.idems.edit') || can('mod.partners.view');
+    $canView = is_master() || can('mod.idems.view') || can('mod.idems.edit') || can('mod.clients.view') || can('mod.vendors.view');
     ops_require($canView, 'You cannot view the vendor register.');
-    $canEdit = is_master() || can('mod.idems.edit') || can('mod.partners.edit');
+    $canEdit = is_master() || can('mod.idems.edit') || can('mod.clients.edit') || can('mod.vendors.edit');
 
     if ($route === 'vendor-profile-save' && $method === 'POST') {
         ops_require($canEdit, 'You cannot edit vendor profiles.');

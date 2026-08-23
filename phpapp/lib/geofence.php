@@ -160,7 +160,7 @@ function geofence_editor($action, $id, $cur, $withLabel = false) {
 
 // ---- Save handlers: coordinates on the party and on the job ------------------
 function geofence_save_party($route, $method) {
-    ops_require(is_master() || (function_exists('can') && can('partners.manage')) || is_admin_level(), 'You cannot set a party location.');
+    ops_require(is_master() || (function_exists('can') && can('master.manage')) || is_admin_level(), 'You cannot set a party location.');
     geofence_migrate();
     $pid = (int)($_POST['id'] ?? 0);
     $p = $pid ? ops_one("SELECT id FROM business_partners WHERE id=?", [$pid]) : null;

@@ -209,7 +209,7 @@ function ops_job_bill($route, $method) {
 
 // The engineer who did the work, the desk that runs it, or a manager.
 function job_bill_can_upload($job) {
-    if (is_admin_level() || can('jobs.close') || can('jobs.edit')) return true;
+    if (is_admin_level() || can('ops.job.close') || can('mod.jobs.edit')) return true;
     if (is_inspector()) {
         $me = (int)(current_user()['inspector_id'] ?? 0);
         return $me && $me === (int)($job['inspector_id'] ?? 0);
@@ -218,5 +218,5 @@ function job_bill_can_upload($job) {
 }
 function job_bill_can_see($bill) {
     $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$bill['job_id']]);
-    return $job ? (job_bill_can_upload($job) || can('jobs.view')) : false;
+    return $job ? (job_bill_can_upload($job) || can('mod.jobs.view')) : false;
 }
