@@ -898,15 +898,73 @@ if (function_exists('hwp_for_job')):
 </details>
 <?php endif; ?>
 
-<?php if (can('data.credit') || can('finance.reconcile')): ?>
+<?php // "Can Finance see whether the reports are issued?" — yes, and only that.
+      // Finance has no part in issuing a report and gets none of the QA panel:
+      // no QAP, no hold points, no "write it" button. What they get is the
+      // answer to the question, in the tab they are already in.
+      //
+      // It is stated as information and never as a gate, because the order of
+      // the two is not fixed: where the order requires payment in advance the
+      // invoice is raised BEFORE the work is done, so "no report yet" is the
+      // normal state of a perfectly correct advance invoice, not a problem to
+      // be chased. Reading it as a blocker is the mistake this wording exists
+      // to prevent.
+      //
+      // Shown only to somebody who does NOT get the full report panel —
+      // printing both would be exactly the duplication this pass removes. ?>
+<?php if (screen_shows('job.money') && !screen_shows('job.qa')):
+      $rcAll = []; foreach ($jobDocs as $code => $ds) foreach ($ds as $d) $rcAll[] = $d;
+      $rcIssued = 0; foreach ($rcAll as $d) if (!empty($d['finalized'])) $rcIssued++;
+      $rcExpected = count($dlCodes) ?: count($rcAll);
+      $rcOpen = function_exists('can') && (can('mod.idems.view') || can('mod.idems.edit') || is_master()); ?>
+<div class="panel" data-tab="Money">
+  <div class="ctitle" style="margin-top:0"><h3><?= e(ucfirst(TP('report'))) ?> issued?
+    <span class="pill <?= ($rcExpected && $rcIssued >= $rcExpected) ? 'p-ok' : 'p-mut' ?>" style="font-size:11px">
+      <?= $rcExpected ? (int)$rcIssued . ' of ' . (int)$rcExpected . ' issued' : 'none written yet' ?></span></h3></div>
+
+  <?php if ($dlCodes || $rcAll): ?>
+  <table class="kv" style="margin-bottom:8px">
+    <?php foreach (($dlCodes ?: array_keys($jobDocs)) as $code): $docs = $jobDocs[$code] ?? []; ?>
+    <tr>
+      <td><?= e($dlMap[$code] ?? $code) ?></td>
+      <td><?php if (!$docs): ?><span class="muted">not started</span>
+          <?php else: foreach ($docs as $d): ?>
+            <?php if ($rcOpen): ?><a href="/document?id=<?= (int)$d['id'] ?>"><?= e($d['irn']) ?></a>
+            <?php else: ?><span class="muted"><?= e($d['irn']) ?></span><?php endif; ?>
+            <span class="pill <?= !empty($d['finalized']) ? 'p-ok' : 'p-mut' ?>" style="font-size:11px"><?= e(!empty($d['finalized']) ? 'issued' : strtolower((string)($d['status'] ?: 'draft'))) ?></span>
+          <?php endforeach; endif; ?></td>
+    </tr>
+    <?php endforeach; ?>
+  </table>
+  <?php endif; ?>
+
+  <p class="muted" style="margin:2px;font-size:12.5px">
+    For information. The invoice is not held back by this
+    <?php if (!empty($job['adv_required'])): ?>— and this <?= e(Tl('job')) ?> is on an advance, so the invoice comes first by design.
+    <?php else: ?>— where the order requires payment in advance, the invoice is raised before the work is done.<?php endif; ?>
+  </p>
+</div>
+<?php endif; ?>
+
+<?php // Seeing which work has been billed and recording money against it are two
+      // different jobs, and gating both on data.credit had them the wrong way
+      // round. data.credit is the INTER-OFFICE CREDIT permission; an Operation
+      // Manager does not hold it, so the one person who most needs to ask "which
+      // of my jobs are invoiced and which are not" could not see this panel at
+      // all, while a Coordinator — who holds data.credit and neither revenue nor
+      // profitability — could. So: anyone trusted with money FIGURES may read the
+      // panel; only those trusted to RECORD money get the forms.
+      $canSeeBill  = job_invoice_can_view();
+      $canEditBill = job_invoice_can_record(); ?>
+<?php if ($canSeeBill): ?>
 <?php if (screen_shows('job.money')): ?>
 <div class="panel" id="invoice" data-tab="Money">
-  <h3 class="tab-sub">Invoice &amp; payment / credit</h3>
+  <h3 class="tab-sub">Invoice &amp; payment / credit<?= $canEditBill ? '' : ' <span class="muted" style="font-weight:400;font-size:12.5px">(read-only)</span>' ?></h3>
   <?php // One click raises a real GST invoice in the Money module from this closed
         // job, with the amount already filled from the quote/call — no re-keying,
         // no separate screen to start it (#4 / #5). Shown once the job is closed
         // and only when the Money module is licensed. ?>
-  <?php if (!empty($job['closed_flag']) && function_exists('books_invoice_create') && (function_exists('licence_enabled') ? (licence_enabled('money') || licence_enabled('invoicing')) : true)): ?>
+  <?php if ($canEditBill && !empty($job['closed_flag']) && function_exists('books_invoice_create') && (function_exists('licence_enabled') ? (licence_enabled('money') || licence_enabled('invoicing')) : true)): ?>
     <form method="post" action="/job-bill?id=<?= (int)$job['id'] ?>" style="margin-bottom:12px"
           onsubmit="return confirm('Raise a draft GST invoice for this <?= e(Tl('job')) ?>? The amount is filled from the <?= e(Tl('quote')) ?>.');">
       <button class="btn" type="submit">🧾 Raise GST invoice from this <?= e(Tl('job')) ?> →</button>
@@ -936,6 +994,17 @@ if (function_exists('hwp_for_job')):
   <?php // The old manual checkbox/number entry, kept for corrections and installs
         // not using the Money module — tucked away so the real invoice above is the
         // one thing people look at (§INV-1 "one invoice truth"). ?>
+  <?php if (!$canEditBill): ?>
+    <?php // Nothing to type, so say what is true rather than showing empty inputs.
+          $mRaised = !empty($job['invoice_raised']); $mPaid = !empty($job['payment_received']); ?>
+    <?php if (!$bInv): ?>
+      <p class="muted" style="margin:2px">
+        <?php if ($mRaised): ?>Recorded as invoiced<?= !empty($job['invoice_number']) ? ' — ' . e($job['invoice_number']) : '' ?><?= !empty($job['invoice_date']) ? ' on ' . e($job['invoice_date']) : '' ?>.
+        <?php else: ?>Not invoiced yet.<?php endif ?>
+        <?= $mPaid ? ' Payment received.' : '' ?>
+      </p>
+    <?php endif; ?>
+  <?php else: ?>
   <details<?= $bInv ? '' : ' open' ?> style="margin-top:4px">
     <summary class="muted" style="cursor:pointer;font-size:13px">Manual invoice / payment entry<?= $bInv ? ' (the real invoice is shown above)' : '' ?></summary>
   <form method="post" action="/job-invoice?id=<?= (int)$job['id'] ?>" style="margin-top:10px">
@@ -954,6 +1023,7 @@ if (function_exists('hwp_for_job')):
     <div style="margin-top:8px"><button class="btn small" type="submit">Save invoice / payment</button></div>
   </form>
   </details>
+  <?php endif; /* $canEditBill */ ?>
 </div>
 <?php endif; ?>
 <?php endif; ?>

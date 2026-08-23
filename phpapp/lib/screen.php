@@ -77,3 +77,23 @@ function screen_shows($key) {
     foreach ($mine as $b) if (in_array($b, $want, true)) return true;
     return false;
 }
+
+// ---- Reading the money on a job, versus recording it -------------------------
+//  These were one gate, `can('data.credit') || can('finance.reconcile')`, and it
+//  had the two the wrong way round.
+//
+//  data.credit is the INTER-OFFICE CREDIT permission. An Operation Manager does
+//  not hold it, so the person who most needs to ask "which of my jobs are
+//  invoiced and which are not" could not see the panel at all — while a
+//  Coordinator, who holds data.credit and neither data.revenue nor
+//  data.profitability, could see it and edit it. The manager was locked out of
+//  a screen their own subordinate could change.
+//
+//  So they are separated along the line that actually matters: whether you are
+//  trusted with money FIGURES, and whether you are trusted to RECORD money.
+function job_invoice_can_view() {
+    return is_master() || can('data.revenue') || can('data.credit') || can('finance.reconcile');
+}
+function job_invoice_can_record() {
+    return is_master() || can('data.credit') || can('finance.reconcile');
+}
