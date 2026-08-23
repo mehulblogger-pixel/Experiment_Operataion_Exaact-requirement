@@ -232,6 +232,81 @@ function access_module_label($k) {
     return $m[$k] ?? (ACCESS_MODULES[$k] ?? $k);
 }
 
+// A one-line, plain-English explanation of what a permission grants and who
+// typically needs it — shown as an "ⓘ" next to each tick-box on the access editor
+// so whoever assigns a role understands exactly what they are handing out. Covers
+// every fine-grained permission and every per-module view/edit permission.
+function perm_help($key) {
+    static $h = null;
+    if ($h === null) {
+        $call = Tl('call'); $callP = Tlp('call'); $job = Tl('job'); $jobP = Tlp('job');
+        $eng = Tl('engineer'); $client = Tl('client'); $rep = Tl('report');
+        $h = [
+            // --- Dashboards & sensitive figures ---
+            'dash.operations'  => 'See the Operations dashboard — live ' . $callP . ', ' . $jobP . ', allocation and turnaround tiles. Who: coordinators, operations & managers.',
+            'dash.financial'   => 'See the Financial dashboard — money-in, invoicing and receivables tiles. Who: finance and branch / business heads.',
+            'dash.utilization' => 'See the Utilization dashboard — ' . $eng . ' days used vs available. Who: managers and resourcing.',
+            'dash.people'      => 'See the People & compliance dashboard — attendance, competence and HR-compliance tiles. Who: managers, HR and quality.',
+            'data.credit'      => 'See the inter-office credit figures on ' . $callP . ' / ' . $jobP . '. Who: coordinators & managers who balance inter-branch work — NOT ' . Tlp('engineer') . '.',
+            'data.revenue'     => 'See the revenue / billable value on a ' . $call . ' / ' . $job . '. Who: managers and finance — NOT operational staff.',
+            'data.salary'      => 'See salary / loaded-cost figures. Sensitive — grant only to finance / HR / senior managers.',
+            'data.profitability' => 'See profitability & margin by contract. Who: managers and above only — never coordinators or ' . Tlp('engineer') . '.',
+            // --- Operations ---
+            'ops.call.create'  => 'Create and edit ' . $callP . ' — raise the work and forward it to the executing office. Who: coordinators and operations.',
+            'ops.job.allocate' => 'Allocate a ' . $job . ' to an ' . $eng . ' and edit it. Who: coordinators.',
+            'ops.job.close'    => 'Close a ' . $job . ' — record days & expenses and lock it. Who: coordinators (and the assigned ' . $eng . ' for their own ' . $job . ').',
+            'ops.call.delete'  => 'Delete a ' . $call . '. Destructive — managers only.',
+            'workforce.availability'   => 'Manage the ' . $eng . ' availability board (who is free when). Who: coordinators and resourcing.',
+            'workforce.report.approve' => 'Approve ' . $rep . 's as the reporting manager. Who: managers who sign off their ' . $eng . 's’ work.',
+            // --- Reporting (IDEMS) ---
+            'idems.finalize'   => 'Finalise / issue & lock an inspection ' . $rep . ' — stamps the signature and produces the final PDF. Who: senior ' . $eng . 's / approvers. Note: the person who APPROVED a ' . $rep . ' cannot also issue it.',
+            'idems.type.manage'=> 'Design report types and the IRN numbering rules. Who: quality / administrators.',
+            'idems.timestamp.edit' => 'Edit locked report timestamps. Audit-sensitive — Branch App Admin only.',
+            'idems.template.approve' => 'Review & approve report FORMATS (templates) before they go live — the document-controller role. Who: quality / document control.',
+            'idems.audit.view' => 'View the compliance audit log — who changed what, when. Who: quality, auditors and managers.',
+            // --- Money ---
+            'finance.reconcile'=> 'Reconcile credit and attendance and act on expense vouchers. Who: finance / accounts.',
+            // --- Sales / CRM ---
+            'crm.quote.create' => 'Create and edit quotations. Who: sales & marketing.',
+            'crm.quote.approve'=> 'Approve quotations in the approval chain. Who: sales managers / designated approvers.',
+            'crm.quote.send'   => 'Send a quotation to the customer. Who: sales.',
+            'crm.followup.manage' => 'Manage quotation follow-ups & reminders. Who: sales.',
+            'crm.contract.register' => 'Register the ' . $client . ' & contract number — turn a won quotation into a live contract and set its branch. Who: accounts / back-office.',
+            'crm.template.manage' => 'Manage quotation & e-mail templates. Who: sales / marketing admins.',
+            // --- Directory / masters ---
+            'master.manage'    => 'Add and edit master data — ' . Tlp('client') . ', ' . Tlp('vendor') . ', lookups, offices. Who: back-office, coordinators, admins.',
+            'org.hierarchy.view' => 'View the organisation hierarchy (who reports to whom). Who: managers.',
+            // --- Admin ---
+            'users.manage.branch' => 'Create and edit logins in your OWN office only. Who: branch managers / branch app admins.',
+            'users.manage.global' => 'Create and edit ALL logins and their access, in any office. Powerful — administrators only.',
+            'settings.manage'  => 'Change system settings — industry packs, terminology, numbering, integrations. Administrators only.',
+            // --- Quality & Accreditation (ISO/IEC 17020) ---
+            'person.iddoc.view'   => 'See that an identity document is on file (the numbers stay masked). Personal data — grant deliberately, to HR / admin with a real need.',
+            'person.iddoc.manage' => 'Hold identity documents — file them, reveal a number, log a copy sent out, redact. Highly sensitive (DPDP) — a named custodian only.',
+            'complaints.decide'   => 'Decide the outcome of complaints & appeals (§7.5.4 — the decider must not have been involved). Who: an independent manager / quality head.',
+            'capa.close'          => 'Close a corrective action — asserts it actually worked (§8.7.3). Kept separate from doing the action. Who: quality.',
+            'ncr.close'           => 'Close a nonconformity — asserts the disposition was carried out. Who: the responsible quality / coordinator.',
+        ];
+    }
+    if (isset($h[$key])) return $h[$key];
+    // Per-module view / edit permissions: generic, with a note for the sensitive ones.
+    if (strncmp($key, 'mod.', 4) === 0 && preg_match('/^mod\.(.+)\.(view|edit)$/', $key, $mm)) {
+        $lbl = access_module_label($mm[1]);
+        $extra = [
+            'users'         => ' Controls login accounts and their access — administrators only.',
+            'settings'      => ' System configuration — administrators only.',
+            'profitability' => ' Shows margin / profit — managers & finance only.',
+            'invoicing'     => ' The billing module — finance / accounts.',
+            'identity'      => ' Personal identity documents — grant deliberately.',
+            'overheads'     => ' Office finance figures — finance / managers.',
+        ][$mm[1]] ?? '';
+        return $mm[2] === 'edit'
+            ? 'Add and change records in "' . $lbl . '" (also lets them view it).' . $extra
+            : 'See the "' . $lbl . '" screens, read-only.' . $extra;
+    }
+    return PERMISSIONS[$key] ?? $key;
+}
+
 // Full permission map = fine-grained perms + per-module view/edit perms.
 function all_permissions() {
     $p = [];

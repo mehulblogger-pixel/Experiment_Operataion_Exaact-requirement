@@ -334,8 +334,14 @@
 </section>
 
 <section class="fs-pane" data-tab="Permissions">
+  <style>
+    .perm-i{display:inline-block;width:15px;height:15px;line-height:15px;text-align:center;font-size:11px;
+      color:var(--muted,#64748b);cursor:help;opacity:.7;margin-left:2px}
+    .perm-i:hover,.perm-i:focus{opacity:1;color:var(--accent,#234e70);outline:none}
+    .permgroup .chk{align-items:center}
+  </style>
   <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
-    <h3 class="tab-sub" style="margin:0">Permissions <span class="muted">— grouped like the menu; leave all unticked to use the role's defaults</span></h3>
+    <h3 class="tab-sub" style="margin:0">Permissions <span class="muted">— grouped like the menu; hover the ⓘ on any item to see what it grants and who needs it; leave all unticked to use the role's defaults</span></h3>
     <label class="chk" style="margin-left:auto;font-weight:600"><input type="checkbox" id="perm_all_toggle"> Select <b style="margin:0 3px">everything</b> (full access)</label>
   </div>
   <?php // A per-login permission set REPLACES the role's defaults — so a save that
@@ -371,8 +377,8 @@
             <?php endif; ?>
           </div>
           <div class="checkgrid">
-            <?php foreach ($pairs as $k => $lbl): ?>
-              <label class="chk"><input type="checkbox" class="perm-box" name="permissions[]" value="<?= e($k) ?>" <?= in_array($k, $curPerms, true)?'checked':'' ?>> <?= e($lbl) ?></label>
+            <?php foreach ($pairs as $k => $lbl): $help = function_exists('perm_help') ? perm_help($k) : ''; ?>
+              <label class="chk"><input type="checkbox" class="perm-box" name="permissions[]" value="<?= e($k) ?>" <?= in_array($k, $curPerms, true)?'checked':'' ?>> <?= e($lbl) ?><?php if ($help !== ''): ?> <span class="perm-i" tabindex="0" role="img" aria-label="<?= e($help) ?>" title="<?= e($help) ?>">ⓘ</span><?php endif; ?></label>
             <?php endforeach; ?>
           </div>
         </div>
