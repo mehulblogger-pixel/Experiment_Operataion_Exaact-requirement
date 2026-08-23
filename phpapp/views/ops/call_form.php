@@ -88,10 +88,17 @@ document.addEventListener('DOMContentLoaded', function () {
           // is no cascade to fill it, and a call drawing down against a live ARC
           // still has a contract number the client will quote back at you — a
           // locked, permanently blank box made that impossible to record. ?>
-    <div class="ff"><label>Contract number <span class="muted" id="cn_hint">— from the <?= e(Tl('quote')) ?></span></label>
+    <?php // One quotation → one contract → many calls. A call INHERITS its contract
+          //  number and never creates a new one, so once it is carried from the
+          //  contract the box is locked. It stays typeable only for a genuinely
+          //  direct call / ARC draw-down that has no contract yet. ?>
+    <?php $cnInherited = trim((string)($call['contract_number'] ?? '')) !== ''; ?>
+    <div class="ff"><label>Contract number <span class="muted" id="cn_hint"><?= $cnInherited ? '— inherited from the contract' : '— from the ' . e(Tl('quote')) ?></span></label>
       <input class="form-control" id="contract_no" name="contract_number" value="<?= e($call['contract_number'] ?? '') ?>"
+             <?= $cnInherited ? 'readonly style="background:var(--soft)"' : '' ?>
              placeholder="pick a <?= e(Tl('quote')) ?>, or type it for a direct <?= e(Tl('call')) ?>">
-      <small class="muted" id="cn_note" style="display:none">Typed by hand — no <?= e(Tl('quote')) ?> is driving this <?= e(Tl('call')) ?>.</small></div>
+      <small class="muted" id="cn_note" style="display:none">Typed by hand — no <?= e(Tl('quote')) ?> is driving this <?= e(Tl('call')) ?>.</small>
+      <?php if ($cnInherited): ?><small class="muted">A <?= e(Tl('call')) ?> inherits its contract number — it never creates a new one.</small><?php endif; ?></div>
 
     <div class="ff ff-wide"><label>Line item on the <?= e(Tl('quote')) ?> <span class="muted">— which part of the order this <?= e(Tl('call')) ?> draws on</span></label>
       <select class="form-control searchable" id="qline_sel" name="quote_line_id" data-cur="<?= (int)($call['quote_line_id'] ?? 0) ?>">
