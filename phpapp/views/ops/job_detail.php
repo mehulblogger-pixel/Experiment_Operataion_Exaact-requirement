@@ -113,6 +113,7 @@
       $vp = $visitPlan ?? [];
       $canReshuffle = !$job['closed_flag'] && is_coordinator_level();
       if (count($vp) > 1): ?>
+<?php if (screen_shows('job.schedule')): ?>
 <div class="panel" id="visits" data-tab="Schedule &amp; site">
   <div class="ctitle" style="margin-top:0"><h3>Who goes on each day
     <span class="muted">(<?= count($vp) ?> <?= count($vp) === 1 ? 'day' : 'days' ?>)</span></h3></div>
@@ -152,6 +153,7 @@
   </form>
 </div>
 <?php endif; ?>
+<?php endif; ?>
 
 <?php // ---- Phase 7 (PDSO): deputation & site-operations panel — only for a
       // deputation posting; reuses this job, adds the site-ops layer.
@@ -159,6 +161,7 @@
 
 <?php // ---- §WO-8: day-by-day completion — close each visit with its report
       if (count($vp) > 1 && empty($job['closed_flag'])): ?>
+<?php if (screen_shows('job.schedule')): ?>
 <div class="panel" id="visit-close" data-tab="Schedule &amp; site">
   <div class="ctitle" style="margin-top:0"><h3>Day-by-day completion
     <span class="muted">— close each visit with its report; the <?= e(Tl('job')) ?> closes once every working day is done</span></h3></div>
@@ -187,6 +190,7 @@
   </table>
 </div>
 <?php endif; ?>
+<?php endif; ?>
 
 <?php // ---- Site check-in -------------------------------------------------
       // The engineer photographs the work at the plant, drives home, and writes
@@ -199,6 +203,7 @@
       $canCheckIn = !$job['closed_flag'] && function_exists('site_checkin')
           && (is_coordinator_level() || (is_inspector()
               && (int)(current_user()['inspector_id'] ?? 0) === (int)($job['inspector_id'] ?? 0))); ?>
+<?php if (screen_shows('job.schedule')): ?>
 <div class="panel" id="checkin" data-tab="Schedule &amp; site">
   <div class="ctitle" style="margin-top:0"><h3>Site check-in <span class="muted">(<?= count($visits) ?>)</span></h3></div>
   <?php // The timesheet is not typed — it is built from these punches. Say so here,
@@ -303,6 +308,7 @@
   </script>
   <?php endif; ?>
 </div>
+<?php endif; ?>
 
 <?php // The deadline, said out loud while there is still time to act on it —
       // and after, said plainly, with what can still be done. ?>
@@ -410,6 +416,7 @@
       // on once the call has been allocated.
       $jgap = ($jcall && function_exists('call_contract_gap')) ? call_contract_gap($jcall) : null; ?>
 <?php if ($jgap): ?>
+<?php if (screen_shows('job.schedule')): ?>
 <div class="panel" data-tab="Schedule &amp; site" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)">
   <b style="color:var(--warn)">⚠ Contract number not available</b>
   <div class="muted" style="margin-top:4px"><?= e($jgap['text']) ?></div>
@@ -417,6 +424,7 @@
     <div style="margin-top:8px"><a class="btn small" href="/quote?id=<?= (int)$jgap['quote_id'] ?>#contract">Register the contract number</a></div>
   <?php endif; ?>
 </div>
+<?php endif; ?>
 <?php endif; ?>
 
 <?php // §v — the formats the order promised are the formats this engineer is
@@ -440,6 +448,7 @@
       // many (one per line item). They are attached as-is (usually PDF), never
       // parsed, and the inspector reads them while writing the report. ?>
 <?php $qaps = $qaps ?? []; $canQap = function_exists('job_qap_can') ? job_qap_can() : (can('mod.idems.edit') || is_master()); ?>
+<?php if (screen_shows('job.qa')): ?>
 <div class="panel" id="qaps" data-tab="Reports &amp; QA">
   <div class="ctitle" style="margin-top:0"><h3>QAP / reference documents <span class="muted">(<?= count($qaps) ?>)</span></h3></div>
   <p class="muted" style="margin:0 0 10px">The Quality Assurance Plan(s) for this <?= e(Tl('job')) ?> — one or several, per PO line item.
@@ -472,11 +481,13 @@
   </form>
   <?php endif; ?>
 </div>
+<?php endif; ?>
 <?php // This panel is the ONLY bridge from a deputation into the report engine.
       // It used to render only when deliverables had been ticked on the call —
       // so if the coordinator missed that tick, the engineer had no route to the
       // reporting module at all and fell back to pasting a link to a file kept
       // somewhere else. It now always renders. ?>
+<?php if (screen_shows('job.qa')): ?>
 <div class="panel" id="reports" data-tab="Reports &amp; QA">
   <div class="ctitle" style="margin-top:0"><h3><?= e(ucfirst(TP('report'))) ?> on this <?= e(Tl('job')) ?> <span class="muted">(<?= count($dlCodes) + count($extraCodes) ?>)</span></h3></div>
   <?php if ($dlCodes): ?>
@@ -529,6 +540,7 @@
       <a href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call=' . (int)$job['call_id'] : '' ?>">Write another <?= e(Tl('report')) ?></a>.</p>
   <?php endif; ?>
 </div>
+<?php endif; ?>
 
 <?php
 // --- Hold / witness points --------------------------------------------------
@@ -544,6 +556,7 @@ $hwTypePill = function($t) {
 };
 if (function_exists('hwp_for_job')):
 ?>
+<?php if (screen_shows('job.qa')): ?>
 <div class="panel" id="holdpoints" data-tab="Reports &amp; QA">
   <div class="ctitle" style="margin-top:0"><h3>Hold &amp; witness points
     <span class="muted">(<?= count($hwPts) ?><?= $hwOpen ? ', ' . $hwOpen . ' open' : '' ?>)</span></h3></div>
@@ -605,18 +618,24 @@ if (function_exists('hwp_for_job')):
   <?php endif; ?>
 </div>
 <?php endif; ?>
+<?php endif; ?>
 
 <?php $holds = function_exists('job_hold_reasons') ? job_hold_reasons($job) : []; if ($holds): ?>
+<?php if (screen_shows('job.qa')): ?>
 <div class="panel" data-tab="Reports &amp; QA" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent)">
   <b style="color:var(--bad)">🚫 HOLD — do not issue the report / deliverable to the client:</b> <?= e(implode('; ', $holds)) ?>.
   <?php if (!empty($job['adv_required']) && empty($job['adv_received']) && (is_coordinator_level() || can('data.credit') || can('finance.reconcile'))): ?>
     <form method="post" action="/job-advance?id=<?= (int)$job['id'] ?>" style="margin-top:8px"><input type="hidden" name="adv_received" value="1"><button class="btn small" type="submit">Mark advance received</button></form>
   <?php endif; ?>
 </div>
+<?php endif; ?>
 <?php elseif (!empty($job['quotation_id']) && (!empty($job['adv_required']) || !empty($job['report_hold']))): ?>
+<?php if (screen_shows('job.qa')): ?>
 <div class="panel" data-tab="Reports &amp; QA" style="border:1px solid var(--ok)"><b style="color:var(--ok)">✓ Payment conditions cleared</b> — advance/payment received; the deliverable may be issued.</div>
 <?php endif; ?>
+<?php endif; ?>
 
+<?php if (screen_shows('job.qa')): ?>
 <?php if (($job['report_approval'] ?? '') !== ''): ?>
   <?php $ra = $job['report_approval']; $canAppr = function_exists('can_approve_report') && can_approve_report($job); ?>
   <div class="panel" data-tab="Reports &amp; QA" style="border:1px solid <?= $ra==='APPROVED'?'var(--ok)':($ra==='REJECTED'?'var(--bad)':'var(--warn,#c90)') ?>">
@@ -638,6 +657,7 @@ if (function_exists('hwp_for_job')):
       <?php endif; ?>
     <?php endif; ?>
   </div>
+<?php endif; ?>
 <?php endif; ?>
 
 <details class="fold" data-tab="Overview">
@@ -719,6 +739,7 @@ if (function_exists('hwp_for_job')):
       $missing  = job_bills_missing($job);
       $canBill  = job_bill_can_upload($job); ?>
 <?php if ($chgHeads || $byHead): ?>
+<?php if (screen_shows('job.expenses')): ?>
 <div class="panel" id="bills" data-tab="Money">
   <div class="ctitle" style="margin-top:0"><h3>Charged to the <?= e(Tl('client')) ?> — bills required
     <span class="muted">(<?= count($chgHeads) ?>)</span></h3></div>
@@ -784,6 +805,7 @@ if (function_exists('hwp_for_job')):
   <?php endif; ?>
 </div>
 <?php endif; ?>
+<?php endif; ?>
 
 <?php // Profitability — revenue, invoice value, margin, net profit — is commercial
       // and restricted to managers/finance who hold the figure permissions. A
@@ -791,6 +813,7 @@ if (function_exists('hwp_for_job')):
       // never what the job earned. ("Profitability shall only be shown to Managers
       // and above who have the access. Nothing to coordinators, inspectors, etc.")
       $canSeeProfit = (function_exists('can') && (can('data.profitability') || can('data.revenue'))) || is_master(); ?>
+<?php if (screen_shows('job.expenses')): ?>
 <details class="fold" data-tab="Money">
   <summary><?= $canSeeProfit ? 'Expenses &amp; profitability' : 'Expenses' ?> <span class="sub"><?= $canSeeProfit ? 'what it cost, and what the ' . e(Tl('job')) . ' made' : 'what it cost' ?></span></summary>
   <div class="fold-body">
@@ -873,8 +896,10 @@ if (function_exists('hwp_for_job')):
   </div>
   </div>
 </details>
+<?php endif; ?>
 
 <?php if (can('data.credit') || can('finance.reconcile')): ?>
+<?php if (screen_shows('job.money')): ?>
 <div class="panel" id="invoice" data-tab="Money">
   <h3 class="tab-sub">Invoice &amp; payment / credit</h3>
   <?php // One click raises a real GST invoice in the Money module from this closed
@@ -930,6 +955,7 @@ if (function_exists('hwp_for_job')):
   </form>
   </details>
 </div>
+<?php endif; ?>
 <?php endif; ?>
 </div><!-- /data-tabs (job record) -->
 
