@@ -83,6 +83,29 @@
   </div>
 <?php endif; ?>
 
+<?php // What this invoice is FOR — the interlinks in one place, so the bill is
+      // clearly tied to its customer, contract, PO, business unit and the jobs it
+      // charges, instead of those being scattered down the page. Each is clickable.
+  $invJobs = [];
+  foreach ($lines as $ln) { $jc = trim((string)($ln['job_code'] ?? '')); if ($jc !== '' && !isset($invJobs[$jc])) $invJobs[$jc] = (int)($ln['job_id'] ?? 0); }
+  $sbuLbl = trim((string)($inv['sbu'] ?? '')) !== '' ? (OPS_SBUS[$inv['sbu']] ?? $inv['sbu']) : '';
+?>
+<div class="panel" style="margin-top:14px">
+  <h3 style="margin-top:0">This invoice bills</h3>
+  <div class="kv-grid">
+    <div><span class="k"><?= e(TH('client')) ?></span><a href="/ledger?id=<?= (int)$inv['partner_id'] ?>"><?= e($inv['partner_name']) ?></a></div>
+    <div><span class="k">Branch</span><?= e($inv['office_name'] ?: '—') ?></div>
+    <div><span class="k">Contract</span><?php if (trim((string)($inv['contract_number'] ?? '')) !== ''): ?><a href="/calls?contract=<?= e(urlencode((string)$inv['contract_number'])) ?>"><?= e($inv['contract_number']) ?></a><?php else: ?>—<?php endif; ?></div>
+    <div><span class="k">PO</span><?= e($inv['po_number'] ?: '—') ?></div>
+    <?php if ($sbuLbl !== ''): ?><div><span class="k"><?= e(T('sbu')) ?></span><?= e($sbuLbl) ?></div><?php endif; ?>
+  </div>
+  <?php if ($invJobs): ?>
+    <div style="margin-top:10px"><span class="k" style="display:block;margin-bottom:4px">Jobs on this invoice</span>
+      <?php foreach ($invJobs as $jc => $jid): ?><a class="pill p-info" style="text-decoration:none;margin:0 6px 6px 0;display:inline-block" href="/job?id=<?= (int)$jid ?>">📋 <?= e($jc) ?></a><?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+</div>
+
 <div class="panel-split" style="margin-top:16px">
   <div class="panel">
     <h3 style="margin-top:0">Money</h3>
@@ -118,10 +141,8 @@
       <div><span class="k">Our state</span><span><?= e($inv['supplier_state'] !== '' ? (GST_STATE_CODES[$inv['supplier_state']] ?? $inv['supplier_state']) : 'not set') ?></span></div>
       <div><span class="k">Charged as</span><span><?= (int)$inv['is_igst'] ? 'IGST (inter-state)' : 'CGST + SGST (same state)' ?></span></div>
       <div><span class="k">Customer GSTIN</span><span><?= e($inv['gstin'] ?: '—') ?></span></div>
-      <div><span class="k">PO</span><span><?= e($inv['po_number'] ?: '—') ?></span></div>
-      <div><span class="k">Contract</span><span><?= e($inv['contract_number'] ?: '—') ?></span></div>
     </div>
-    <p class="muted" style="font-size:12.5px;margin:10px 0 0">Decided once, when the invoice was created, and stored. A customer who later moves state does not silently rewrite last year's tax.</p>
+    <p class="muted" style="font-size:12.5px;margin:10px 0 0">Decided once, when the invoice was created, and stored. A customer who later moves state does not silently rewrite last year's tax. (PO &amp; contract are shown under “This invoice bills” above.)</p>
   </div>
 </div>
 
