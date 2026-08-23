@@ -3122,7 +3122,20 @@ function idems_field_options($f, $doc = null) {
     // editable "measurement units" master (mm, kg, nos, %, °C …).
     if (($f['ftype'] ?? '') === 'unit' && $o === '') return lk_options_or('measurement_units', defined('MEASUREMENT_UNITS') ? MEASUREMENT_UNITS : []);
     if ($o === '') return [];
-    if (strpos($o, 'lookup:') === 0) return lk_options_or(substr($o, 7), []);
+    if (strpos($o, 'lookup:') === 0) {
+        // Fall back to the shipped constant when the editable master has not been
+        // seeded (or was emptied) — otherwise a dropdown like P.O. status renders
+        // with no options at all. The lookup master still wins when it has values.
+        $key = substr($o, 7);
+        $fb = [
+            'po_status'              => defined('PO_STATUS_OPTS') ? PO_STATUS_OPTS : [],
+            'inspection_disposition' => defined('INSPECTION_DISPOSITIONS') ? INSPECTION_DISPOSITIONS : [],
+            'activity_progress'      => defined('ACTIVITY_PROGRESS') ? ACTIVITY_PROGRESS : [],
+            'measurement_units'      => defined('MEASUREMENT_UNITS') ? MEASUREMENT_UNITS : [],
+            'itp_inspection_type'    => defined('INSPECTION_TYPES_ITP') ? INSPECTION_TYPES_ITP : [],
+        ];
+        return lk_options_or($key, $fb[$key] ?? []);
+    }
     // A dropdown whose choices come from THIS report's inspection call/job, e.g.
     // call:po_items lists every line item on the order behind the call.
     if (strpos($o, 'call:') === 0) return $doc ? idems_call_options($doc, substr($o, 5)) : [];
@@ -3848,8 +3861,13 @@ function idems_completeness_check($doc) {
     [$s,$d] = $yn(!empty($doc['vendor_id']), '', 'No vendor / manufacturer'); $add('vendor','Vendor / manufacturer identified',$s,$d);
     $po = $eff([0=>'po_ref', 'job'=>'po_ref', 'call'=>'po_ref']);
     [$s,$d] = $yn($po !== '', $po, 'No PO reference'); $add('po','PO identified',$s,$d);
+    // Location and the applicable standard are no longer typed on the report header
+    // (they carry from the call, or are captured on the report type's own form). So
+    // they PASS when a value flows in, and are N/A — not a blocking failure — when
+    // nothing is captured, rather than demanding an entry the form no longer offers.
     $loc = $eff([0=>'location', 'job'=>'site_label', 'call'=>'location']);
-    [$s,$d] = $yn($loc !== '', $loc, 'No inspection location'); $add('location','Inspection location',$s,$d);
+    if ($loc !== '') $add('location','Inspection location','PASS',$loc);
+    else $add('location','Inspection location','NA','Carried from the call when present; not captured here');
     [$s,$d] = $yn(trim((string)($doc['inspection_date'] ?? '')) !== '', $doc['inspection_date'] ?? '', 'No inspection date'); $add('date','Inspection date',$s,$d);
 
     // --- Scope, spec, QAP ---
@@ -3858,7 +3876,8 @@ function idems_completeness_check($doc) {
     if (!$scopeOk) foreach ($fields as $f) { $lbl = strtolower(($f['label'] ?? '').' '.($f['fkey'] ?? '')); if (strpos($lbl,'scope')!==false && trim((string)($data[$f['fkey']] ?? ''))!=='') { $scopeOk = true; break; } }
     [$s,$d] = $yn($scopeOk, '', 'No scope / activities recorded'); $add('scope','Scope of inspection',$s,$d);
     $spec = $eff([0=>'standards']);
-    [$s,$d] = $yn($spec !== '', $spec, 'No applicable specification / standard'); $add('spec','Applicable specification',$s,$d);
+    if ($spec !== '') $add('spec','Applicable specification','PASS',$spec);
+    else $add('spec','Applicable specification','NA','Held in the reference documents / not captured on this report type');
     $qapRev = trim((string)($doc['qap_rev'] ?? ''));
     $qapFiles = (!empty($doc['job_id']) && function_exists('job_qaps')) ? count(job_qaps((int)$doc['job_id'])) : 0;
     [$s,$d] = ($qapRev !== '' || $qapFiles > 0) ? ['PASS', $qapRev !== '' ? 'Rev '.$qapRev : $qapFiles.' file(s)'] : ['FAIL','No QAP/ITP rev or attachment']; $add('qap','QAP / ITP identified',$s,$d);
