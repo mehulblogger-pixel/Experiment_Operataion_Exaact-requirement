@@ -660,8 +660,13 @@ if (function_exists('hwp_for_job')):
     <div><span class="k">Type of inspection</span><?= e(INSPECTION_TYPES[$job['inspection_type']] ?? ($job['inspection_type'] ?: '—')) ?></div>
     <div><span class="k">Activity</span><?= e(($job['activity_id']??null) ? lk_value_path($job['activity_id']) : '—') ?></div>
     <div><span class="k">Reporting</span><?= e(REPORT_FREQ[$job['reporting_frequency']] ?? '—') ?><?= ($job['reporting_frequency']==='CUSTOM' && !empty($job['report_custom_days'])) ? ' (every '.(int)$job['report_custom_days'].' days)' : '' ?></div>
+    <?php // Inter-office credit is a commercial figure — shown only to those who hold
+          //  the credit permission, never to a field inspector who now reaches their
+          //  own job. ?>
+    <?php if (can('data.credit') || is_master()): ?>
     <div><span class="k">Credit direction</span><?= e(CREDIT_DIRECTIONS[$job['credit_direction']] ?? '—') ?></div>
     <div><span class="k">Expected credit</span><?= fmoney($job['expected_credit']) ?></div>
+    <?php endif; ?>
     <div><span class="k">Report uploaded</span><?= e($job['report_upload_date'] ?: '—') ?></div>
     <div><span class="k">TAT</span><?= $job['tat_days']===null?'—':(int)$job['tat_days'].' day(s)' ?></div>
     <div class="kv-wide"><span class="k">Report folder</span><?php if ($job['folder_link']): ?><a href="<?= e($job['folder_link']) ?>" target="_blank" rel="noopener"><?= e($job['folder_link']) ?></a><?php else: ?>—<?php endif; ?></div>

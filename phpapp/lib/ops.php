@@ -3648,24 +3648,36 @@ function ops_calls($route, $method) {
         unset($r);
         if ($minCost !== null) $rows = array_values(array_filter($rows, fn($r) => (float)$r['cost_incurred'] >= $minCost));
         if (wants_csv()) {
-            $csv = [[TH('call'), T('client'), T('vendor') . ' / site', T('sbu'), 'Activity',
-                'Contracting ' . T('office'), 'Executing ' . T('office'), 'Credit to give', 'Coordinator',
-                T('engineer'), 'Received', 'Forwarded', 'Allocated', 'Required by', 'Scheduled',
+            // The export honours the same commercial gates as the screen: credit and
+            // the cost figure are only columns for those permitted to see them.
+            $seeCredit = can('data.credit') || is_master();
+            $seeCost   = can('data.profitability') || (function_exists('can_see_salary') && can_see_salary()) || is_master();
+            $head = [TH('call'), T('client'), T('vendor') . ' / site', T('sbu'), 'Activity',
+                'Contracting ' . T('office'), 'Executing ' . T('office')];
+            if ($seeCredit) $head[] = 'Credit to give';
+            array_push($head, 'Coordinator', T('engineer'), 'Received', 'Forwarded', 'Allocated', 'Required by', 'Scheduled',
                 'Received to forwarded (days)', 'Forwarded to allocated (days)', 'Received to scheduled (days)',
-                'Delay vs required (days)', THP('job') . ' count', 'Cost incurred', 'Status']];
+                'Delay vs required (days)', THP('job') . ' count');
+            if ($seeCost) $head[] = 'Cost incurred';
+            $head[] = 'Status';
+            $csv = [$head];
             foreach ($rows as $c) {
                 $st = ($c['status'] ?? '') === 'CLOSED' ? 'Closed' : ((int)$c['job_count'] === 0 ? 'To schedule' : 'In progress');
                 $L = $c['lead'];
-                $csv[] = [$c['call_code'], $c['client_disp'] ?: $c['client_name'], $c['vendor_name'],
+                $row = [$c['call_code'], $c['client_disp'] ?: $c['client_name'], $c['vendor_name'],
                     lk_options_or('sbu', OPS_SBUS)[$c['sbu']] ?? $c['sbu'],
                     $c['activity_id'] ? lk_value_path($c['activity_id']) : '',
-                    $c['ibo_office_name'] ?? '', $c['exec_office_name'] ?? '',
-                    (float)($c['expected_credit'] ?? 0), $c['coordinator_display'] ?? ($c['exec_coordinator'] ?? ''), $c['inspector_name'] ?? '',
+                    $c['ibo_office_name'] ?? '', $c['exec_office_name'] ?? ''];
+                if ($seeCredit) $row[] = (float)($c['expected_credit'] ?? 0);
+                array_push($row, $c['coordinator_display'] ?? ($c['exec_coordinator'] ?? ''), $c['inspector_name'] ?? '',
                     fdate($c['call_received_date'], ''), fdate(substr((string)($c['forwarded_at'] ?? ''), 0, 10), ''),
                     fdate(substr((string)($c['allocated_at'] ?? ''), 0, 10), ''),
                     fdate($c['inspection_required_date'], ''), fdate($c['sched_date'] ?? '', ''),
                     $L['to_forward'] ?? '', $L['to_allocate'] ?? '', $L['to_schedule'] ?? '', $L['delay'] ?? '',
-                    (int)$c['job_count'], (float)($c['cost_incurred'] ?? 0), $st];
+                    (int)$c['job_count']);
+                if ($seeCost) $row[] = (float)($c['cost_incurred'] ?? 0);
+                $row[] = $st;
+                $csv[] = $row;
             }
             csv_download('calls-' . date('Y-m-d') . '.csv', $csv);
         }

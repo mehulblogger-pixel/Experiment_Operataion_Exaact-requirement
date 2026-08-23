@@ -8,6 +8,11 @@
   }
 ?>
 <?php $fContract = $fContract ?? ''; $fQuote = $fQuote ?? 0; $filtered = ($fContract !== '' || $fQuote); ?>
+<?php // Commercial columns are permission-gated: credit follows data.credit, the
+      //  cost figure follows the profitability/salary permission. Operational staff
+      //  without them (e.g. an assistant manager) see the register without these.
+      $seeCredit = can('data.credit') || is_master();
+      $seeCost   = can('data.profitability') || (function_exists('can_see_salary') && can_see_salary()) || is_master(); ?>
 <div class="master-head">
   <div><h1><?= e(T_REG('call')) ?></h1>
   <?php if ($filtered): ?>
@@ -47,12 +52,12 @@
     <thead><tr>
       <th><?= e(ucfirst(Tl('call'))) ?></th><th><?= e(T('client')) ?></th><th><?= e(T('vendor')) ?> / site</th>
       <th><?= e(T('sbu')) ?></th><th>Activity</th><th>Reporting</th>
-      <th>Executing <?= e(T('office')) ?></th><th class="num">Credit to give</th>
+      <th>Executing <?= e(T('office')) ?></th><?php if ($seeCredit): ?><th class="num">Credit to give</th><?php endif; ?>
       <th>Coordinator</th><th><?= e(T('engineer')) ?></th>
       <th>Received</th><th>Forwarded</th><th>Allocated</th>
       <th>Required by</th><th>Engagement</th><th>Ends</th><th>Scheduled</th>
       <th class="num" title="Received → forwarded · forwarded → allocated · received → scheduled">Lead (days)</th>
-      <th class="num">Delay</th><th class="num"><?= e(TP('job')) ?></th><th class="num">Cost</th><th>Status</th><th></th>
+      <th class="num">Delay</th><th class="num"><?= e(TP('job')) ?></th><?php if ($seeCost): ?><th class="num">Cost</th><?php endif; ?><th>Status</th><th></th>
     </tr></thead>
     <tbody>
     <?php foreach ($rows as $c):
@@ -94,7 +99,7 @@
                       . (count($dl) > 4 ? ' +' . (count($dl) - 4) : '') . '</div>';
         ?></td>
         <td><?= !empty($c['exec_office_name']) ? e($c['exec_office_name']) : '<span class="muted">same ' . e(T('office')) . '</span>' ?></td>
-        <td class="num"><?= ((float)($c['expected_credit'] ?? 0)) > 0 ? fmoney($c['expected_credit']) : $dash ?></td>
+        <?php if ($seeCredit): ?><td class="num"><?= ((float)($c['expected_credit'] ?? 0)) > 0 ? fmoney($c['expected_credit']) : $dash ?></td><?php endif; ?>
         <td><?= !empty($c['coordinator_display']) ? e($c['coordinator_display']) : $dash ?></td>
         <td><?= !empty($c['inspector_name']) ? e($c['inspector_name'])
                  : '<span class="pill p-warn">not allocated' . (isset($L['unallocated_days']) && $L['unallocated_days'] !== null ? ' · ' . (int)$L['unallocated_days'] . 'd' : '') . '</span>' ?></td>
@@ -122,7 +127,7 @@
           <?php else: ?><span class="pill p-ok">on time</span><?php endif; ?>
         </td>
         <td class="num"><?= (int)$c['job_count'] ?: '<span class="muted">0</span>' ?></td>
-        <td class="num"><?= ((float)($c['cost_incurred'] ?? 0))>0 ? fmoney($c['cost_incurred']) : $dash ?></td>
+        <?php if ($seeCost): ?><td class="num"><?= ((float)($c['cost_incurred'] ?? 0))>0 ? fmoney($c['cost_incurred']) : $dash ?></td><?php endif; ?>
         <td>
           <?php if ($closed): ?><span class="pill p-ok">Closed</span>
           <?php elseif ($needs): ?><span class="pill p-warn">To schedule</span>

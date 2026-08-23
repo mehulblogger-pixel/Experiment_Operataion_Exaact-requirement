@@ -172,6 +172,11 @@
       $maxv = $byOffice ? max(array_map(fn($r)=>(float)$r['v'], $byOffice)) : 0;
     ?>
     <div class="dash-2col">
+      <?php // The expected-credit chart is a commercial figure: only for those who
+            //  can see credit. An operations-only viewer (e.g. an assistant manager
+            //  with dashboards but no money permission) gets the Job-status chart
+            //  without the credit bars. ?>
+      <?php if ($showMoney): ?>
       <div class="panel">
         <div class="ctitle"><h3><?= $scopeAll ? 'Expected credit by office' : 'Expected credit (your scope)' ?></h3><?php if ($showProfit): ?><a href="/profitability">Profitability →</a><?php endif; ?></div>
         <?php if ($byOffice && $maxv>0): ?>
@@ -182,6 +187,7 @@
           </div>
         <?php else: ?><p class="muted">No credit booked yet in your scope.</p><?php endif; ?>
       </div>
+      <?php endif; ?>
       <div class="panel" style="text-align:center">
         <div class="ctitle" style="justify-content:center"><h3>Job status</h3></div>
         <?= svg_donut($status) ?>

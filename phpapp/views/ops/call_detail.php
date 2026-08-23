@@ -14,6 +14,12 @@
   <div><h1><?= e(T_DETAIL('call', $call['call_code'])) ?></h1>
     <p class="sub"><?= e($call['client_disp'] ?: $call['client_name'] ?: 'No client') ?> · <?= e(OPS_REGIONS[$call['region']] ?? '') ?></p></div>
 <?php
+  // Who may see commercial figures on this call. Credit follows data.credit,
+  // revenue (billable value) follows data.revenue/admin, cost/profit follows the
+  // profitability/salary permission. Operational staff without these see neither.
+  $seeRev    = function_exists('can_see_revenue') ? can_see_revenue() : (can('data.revenue') || is_admin_level());
+  $seeCredit = can('data.credit') || is_master();
+  $seeCost   = can('data.profitability') || (function_exists('can_see_salary') && can_see_salary()) || is_master();
   // "Open in Outlook" — mailto to the executing branch's coordinator (+ manager if ticked).
   $mailTo = $call['coordinator_email'] ?? '';
   $mailCc = (!empty($call['notify_manager']) && !empty($call['manager_email'])) ? $call['manager_email'] : '';
@@ -22,7 +28,7 @@
   $bodyLines = "Call: {$call['call_code']}\nClient: {$clientNm}\nVendor/Site: " . ($call['vendor_name'] ?: '-') .
     "\n" . T("sbu") . ": " . (OPS_SBUS[$call['sbu']] ?? $call['sbu']) . "\nActivity: " . ($call['activity_id'] ? lk_value_path($call['activity_id']) : '-') .
     "\nClient required date: " . ($call['inspection_required_date'] ?: '-') .
-    "\nCredit to executing branch: " . fmoney($call['expected_credit']) .
+    ($seeCredit ? "\nCredit to executing branch: " . fmoney($call['expected_credit']) : '') .
     "\n\n(Attach the original client inspection-request email before sending.)";
   $mailBody = rawurlencode($bodyLines);
   $mailtoHref = 'mailto:' . rawurlencode($mailTo) . '?' . ($mailCc ? 'cc=' . rawurlencode($mailCc) . '&' : '') . 'subject=' . $subj . '&body=' . $mailBody;
@@ -206,8 +212,8 @@
     <div><span class="k">Product</span><?= e((lk_options_or('product', PRODUCT_CATS)[$call['product_category']] ?? '') ?: ($call['product_other'] ?: '—')) ?></div>
     <div><span class="k">Engagement</span><?= e($call['deputation_type'] ?: '—') ?></div>
     <?php if (!empty($sameOffice)): ?>
-      <div><span class="k">Billable (ex-GST)</span><?= fmoney($call['billable_value']) ?><?= ($call['billable_basis']??'') ? ' <small class="muted">('.e(CREDIT_TYPES[$call['billable_basis']] ?? '').')</small>' : '' ?></div>
-    <?php else: ?>
+      <?php if ($seeRev): ?><div><span class="k">Billable (ex-GST)</span><?= fmoney($call['billable_value']) ?><?= ($call['billable_basis']??'') ? ' <small class="muted">('.e(CREDIT_TYPES[$call['billable_basis']] ?? '').')</small>' : '' ?></div><?php endif; ?>
+    <?php elseif ($seeCredit): ?>
       <div><span class="k">Credit to executing</span><?= fmoney($call['expected_credit']) ?><?= $call['credit_type'] ? ' <small class="muted">('.e(CREDIT_TYPES[$call['credit_type']] ?? '').')</small>' : '' ?></div>
     <?php endif; ?>
     <div><span class="k">Status</span><?= e($call['status']) ?></div>
@@ -224,11 +230,11 @@
   <div class="kv-grid">
     <div><span class="k">Managing / contracting office</span><?= e($call['ibo_name'] ?: '—') ?></div>
     <div><span class="k">Executing office</span><?= e($call['exec_name'] ?: ($call['ibo_name'] ?: 'Same office')) ?></div>
-    <div><span class="k">Cost incurred so far</span><strong><?= fmoney($costIncurred ?? 0) ?></strong> <small class="muted">(vouchers + expenses)</small></div>
+    <?php if ($seeCost): ?><div><span class="k">Cost incurred so far</span><strong><?= fmoney($costIncurred ?? 0) ?></strong> <small class="muted">(vouchers + expenses)</small></div><?php endif; ?>
   </div>
   <?php if (!empty($sameOffice)): ?>
-    <p class="sub" style="margin-top:10px"><span class="pill p-mut">Same office</span> No inter-office credit — the client-billable value (ex-GST) is <strong><?= fmoney($call['billable_value']) ?></strong><?= ($call['billable_basis']??'') ? ' ('.e(CREDIT_TYPES[$call['billable_basis']] ?? '').')' : '' ?>.</p>
-  <?php else: ?>
+    <?php if ($seeRev): ?><p class="sub" style="margin-top:10px"><span class="pill p-mut">Same office</span> No inter-office credit — the client-billable value (ex-GST) is <strong><?= fmoney($call['billable_value']) ?></strong><?= ($call['billable_basis']??'') ? ' ('.e(CREDIT_TYPES[$call['billable_basis']] ?? '').')' : '' ?>.</p><?php endif; ?>
+  <?php elseif ($seeCredit): ?>
     <div class="kv-grid" style="margin-top:10px">
       <div><span class="k">Credit proposed (to executing)</span><strong><?= fmoney($call['expected_credit']) ?></strong><?= $call['credit_type'] ? ' <small class="muted">('.e(CREDIT_TYPES[$call['credit_type']] ?? '').')</small>' : '' ?></div>
       <div><span class="k">Credit required by executing</span><?= ($call['credit_required']??0)>0 ? '<strong>'.fmoney($call['credit_required']).'</strong>' : '<span class="muted">not set</span>' ?><?= ($call['credit_status']??'') ? ' <span class="pill '.(($call['credit_status']==='AGREED')?'p-ok':'p-warn').'">'.e(ucfirst(strtolower($call['credit_status']))).'</span>' : '' ?></div>
