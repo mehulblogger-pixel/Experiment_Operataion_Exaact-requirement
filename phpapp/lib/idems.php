@@ -4570,7 +4570,7 @@ function ops_idems_documents($route, $method) {
         $jobOpen = $jid && (int)ops_val("SELECT COALESCE(closed_flag,0) FROM jobs WHERE id=?", [$jid]) === 0;
         if ($jid && $jobOpen && function_exists('job_owned_by_me') && job_owned_by_me($jid)) {
             flash($issuedMsg . ' If the ' . Tl('job') . ' is complete, close it from the list below to record the day\'s expenses.');
-            redirect('/my-jobs?f=open');
+            redirect('/my-jobs?f=toclose');
         }
         flash($issuedMsg);
         redirect('/document?id=' . $doc['id']);

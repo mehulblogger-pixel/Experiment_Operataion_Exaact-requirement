@@ -4672,6 +4672,12 @@ function ops_candidates($route, $method) {
 
 // ---- Monthly voucher (P3: auto-fill skeleton) ------------------------------
 function my_inspector_id() { $u = current_user(); return $u['inspector_id'] ?? null; }
+// Does this job have an issued (finalised) report? Used to decide it is "ready to
+// close" — a job can carry several reports, so closing is its own step.
+function job_has_issued_report($jobId) {
+    try { return (int)ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND COALESCE(finalized,0)=1", [(int)$jobId]) > 0; }
+    catch (Throwable $e) { return false; }
+}
 // Friendly, actionable message when an Inspector login has no inspector profile linked.
 function inspector_link_msg() {
     return 'Your login is on the ' . Tl('engineer') . ' role but is not linked to a ' . Tl('engineer')
@@ -6273,6 +6279,13 @@ function ops_pending_tasks() {
         $today = date('Y-m-d');
         $add($cnt("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')", [$insId]),
             '📄', 'reports to upload', 'jobs of yours still needing a report', '/my-jobs?f=reports', 'warn');
+        // My open jobs whose report is issued (or none needed) — ready to close and
+        // record the day's expenses. Surfaced here because a job may carry several
+        // reports, so closing is its own step, not a tail of issuing one report.
+        $add($cnt("SELECT COUNT(*) FROM jobs j WHERE j.inspector_id=? AND j.closed_flag=0
+                   AND (j.reporting_frequency='NOREPORT'
+                        OR EXISTS(SELECT 1 FROM report_docs d WHERE d.job_id=j.id AND COALESCE(d.deleted,0)=0 AND COALESCE(d.finalized,0)=1))", [$insId]),
+            '✅', 'jobs to close', 'work done — close the job &amp; record its expenses', '/my-jobs?f=toclose', 'info');
         // My vouchers still in draft (not yet submitted for approval).
         $add($cnt("SELECT COUNT(*) FROM vouchers WHERE inspector_id=? AND status='DRAFT'", [$insId]),
             '🧾', 'vouchers to submit', 'expense vouchers you have not submitted', '/vouchers', 'info');

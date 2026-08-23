@@ -6,6 +6,7 @@
     'open'    => ['Open jobs to do',   fn($j)=>!$j['closed_flag']],
     'overdue' => ['Overdue jobs',       fn($j)=>!$j['closed_flag'] && ($j['inspection_end_date']?:$j['scheduled_date']) && ($j['inspection_end_date']?:$j['scheduled_date'])<$today],
     'reports' => ['Reports pending',    fn($j)=>!$j['closed_flag'] && ($j['reporting_frequency']??'')!=='NOREPORT' && ($j['reporting_frequency']??'')!=='' && ($j['report_upload_date']??'')===''],
+    'toclose' => ['Jobs ready to close', fn($j)=>!$j['closed_flag'] && (($j['reporting_frequency']??'')==='NOREPORT' || (function_exists('job_has_issued_report') && job_has_issued_report((int)$j['id'])))],
     'closed'  => ['Completed jobs',     fn($j)=>(bool)$j['closed_flag']],
   ];
   if ($f && isset($filters[$f])) $rows = array_values(array_filter($rows, $filters[$f][1]));
@@ -37,7 +38,12 @@
       <?php endif; ?>
       <div class="jc-actions">
         <a class="btn secondary" href="/job?id=<?= (int)$j['id'] ?>">Open</a>
-        <?php if (!$j['closed_flag']): ?><a class="btn" href="/job-close?id=<?= (int)$j['id'] ?>">Upload &amp; Close</a><?php endif; ?>
+        <?php if (!$j['closed_flag']): $ready = ($j['reporting_frequency']??'')==='NOREPORT' || (function_exists('job_has_issued_report') && job_has_issued_report((int)$j['id'])); ?>
+          <button type="button" class="btn jobclose-open" data-job="<?= (int)$j['id'] ?>" data-code="<?= e($j['job_code']) ?>"
+                  data-needsreport="<?= (($j['reporting_frequency']??'')!=='NOREPORT') ? '1' : '0' ?>">
+            <?= $ready ? 'Close &amp; record expenses' : 'Upload &amp; Close' ?>
+          </button>
+        <?php endif; ?>
       </div>
     </div>
     <?php return ob_get_clean();
@@ -160,4 +166,68 @@
     background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--ink);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent)}
   .cal-chip.p-ok{background:color-mix(in srgb,var(--ok) 15%,transparent);border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
   @media(max-width:820px){.cal-week{grid-template-columns:repeat(7,1fr)}.cal-chip{font-size:10px}.cal-cell{min-height:60px}}
+  /* Close-with-expenses popup */
+  .jcx-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-start;justify-content:center;z-index:1000;padding:24px;overflow:auto}
+  .jcx-overlay.open{display:flex}
+  .jcx-modal{background:var(--card);border:1px solid var(--line);border-radius:12px;max-width:560px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.25);padding:18px 20px}
+  .jcx-modal h3{margin:0 0 2px}
+  .jcx-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  .jcx-grid .full{grid-column:1 / -1}
+  .jcx-grid label{display:block;font-size:12px;font-weight:600;margin-bottom:3px}
+  .jcx-actions{display:flex;gap:8px;margin-top:16px}
+  @media(max-width:560px){.jcx-grid{grid-template-columns:1fr}}
 </style>
+
+<?php // A job may carry several reports, so closing is its own step — offered from
+      //  the dashboard / My Jobs, not forced after issuing one report. This popup
+      //  captures the day's expenses and closes in one move. Jobs that still owe a
+      //  chargeable bill or a site check-in are bounced by the server to the full
+      //  close screen (linked below) to settle those first.
+      $curSym = function_exists('cur_sym') ? cur_sym() : '';
+      $eLbl = function_exists('expense_heading_labels') ? expense_heading_labels()
+              : ['travel'=>'Travel','local'=>'Local','food'=>'Food','lodging'=>'Lodging','misc'=>'Misc']; ?>
+<div class="jcx-overlay" id="jcxOverlay">
+  <div class="jcx-modal" role="dialog" aria-modal="true" aria-labelledby="jcxTitle">
+    <h3 id="jcxTitle">Close <span id="jcxCode"></span> &amp; record expenses</h3>
+    <p class="muted" style="margin:0;font-size:12.5px">Enter the day's expenses (they lock to this <?= e(Tl('job')) ?> automatically), then close.</p>
+    <form method="post" id="jcxForm" action="">
+      <input type="hidden" name="sbu" value=""><?php /* blank → the close uses the job's own SBU */ ?>
+      <div class="jcx-grid">
+        <div id="jcxReportWrap"><label>Report upload date *</label>
+          <input class="form-control" type="date" name="report_upload_date" id="jcxReportDate" value="<?= e($today) ?>"></div>
+        <div><label><?= e($eLbl['travel'] ?? 'Travel') ?> (<?= e($curSym) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="travel" value="0"></div>
+        <div><label><?= e($eLbl['local'] ?? 'Local') ?> (<?= e($curSym) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="local" value="0"></div>
+        <div><label><?= e($eLbl['food'] ?? 'Food') ?> (<?= e($curSym) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="food" value="0"></div>
+        <div><label><?= e($eLbl['lodging'] ?? 'Lodging') ?> (<?= e($curSym) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="lodging" value="0"></div>
+        <div><label><?= e($eLbl['misc'] ?? 'Misc') ?> (<?= e($curSym) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="misc" value="0"></div>
+        <div class="full"><label>Expense notes</label><input class="form-control" name="exp_notes" placeholder="optional"></div>
+      </div>
+      <div class="jcx-actions">
+        <button class="btn" type="submit">Close job &amp; record expenses</button>
+        <button class="btn secondary" type="button" id="jcxCancel">Cancel</button>
+        <a class="btn secondary" id="jcxFull" href="#" style="margin-left:auto">Full close screen →</a>
+      </div>
+      <p class="muted" style="margin:10px 0 0;font-size:11.5px">If a chargeable bill or a site check-in is still outstanding, closing here will take you to the full close screen to settle it first.</p>
+    </form>
+  </div>
+</div>
+<script>(function(){
+  var ov=document.getElementById('jcxOverlay'); if(!ov) return;
+  var form=document.getElementById('jcxForm'), code=document.getElementById('jcxCode'),
+      full=document.getElementById('jcxFull'), rw=document.getElementById('jcxReportWrap'),
+      rd=document.getElementById('jcxReportDate');
+  function open(job,codeTxt,needsReport){
+    form.action='/job-close?id='+encodeURIComponent(job);
+    full.href='/job-close?id='+encodeURIComponent(job);
+    code.textContent=codeTxt||('#'+job);
+    if(rw){ rw.style.display=needsReport?'':'none'; if(rd) rd.required=!!needsReport; }
+    ov.classList.add('open');
+  }
+  function close(){ ov.classList.remove('open'); }
+  document.querySelectorAll('.jobclose-open').forEach(function(b){
+    b.addEventListener('click',function(){ open(b.getAttribute('data-job'), b.getAttribute('data-code'), b.getAttribute('data-needsreport')==='1'); });
+  });
+  document.getElementById('jcxCancel').addEventListener('click',close);
+  ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') close(); });
+})();</script>
