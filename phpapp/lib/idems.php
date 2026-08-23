@@ -8962,7 +8962,10 @@ function idems_scope_target_field($typeId) {
     return null;
 }
 // Ask the model for the scope as a compact JSON array. Returns ['rows'=>[], 'err'=>''].
-function idems_ai_extract_scope($text) {
+// When $file (['mime'=>,'data'=>raw bytes]) is given and the provider can read it,
+// the ACTUAL document is sent — the model reads the QAP's tables (and scans, via its
+// own OCR) directly, which is far more reliable than our scraped text.
+function idems_ai_extract_scope($text, $file = null) {
     if (!function_exists('ai_enabled') || !ai_enabled() || !function_exists('ai_chat')) return ['rows' => [], 'err' => 'AI is not enabled.'];
     $sys = "You read a Quality Assurance Plan (QAP) or Inspection & Test Plan (ITP) for an industrial product "
          . "(fasteners, pipes, valves, pressure vessels, structural or refinery equipment, etc.) and extract the "
@@ -8972,8 +8975,14 @@ function idems_ai_extract_scope($text) {
          . "quantum is the extent of check (e.g. 100%, 10%, 1 per lot, each). "
          . "acceptance is the acceptance norm or reference document / clause. "
          . "Include every distinct characteristic, test or check in the plan. Never invent activities not in the text. "
-         . "If the text is not a recognisable plan, return [].";
-    try { [$out, $err] = ai_chat($sys, substr((string)$text, 0, 14000), 1800); }
+         . "If the document is not a recognisable plan, return [].";
+    try {
+        if ($file && !empty($file['data']) && function_exists('ai_chat_doc') && function_exists('ai_can_send_doc') && ai_can_send_doc($file['mime'] ?? '')) {
+            [$out, $err] = ai_chat_doc($sys, 'Extract every inspection and test activity from the attached QAP / ITP as instructed.', [$file], 2200);
+        } else {
+            [$out, $err] = ai_chat($sys, substr((string)$text, 0, 14000), 1800);
+        }
+    }
     catch (Throwable $e) { return ['rows' => [], 'err' => $e->getMessage()]; }
     if (!is_string($out) || trim($out) === '') return ['rows' => [], 'err' => $err ?: 'The AI did not respond.'];
     $json = $out; if (preg_match('/\[.*\]/s', $out, $m)) $json = $m[0];
@@ -9054,19 +9063,25 @@ function idems_scope_from_qap($doc, $qapId) {
     if (!$field) return ['n' => 0, 'source' => '', 'err' => 'This report type has no inspection-scope table to fill. Use the standard Inspection Report, or add a scope table under Form builder.'];
     $qap = ops_one("SELECT * FROM job_qaps WHERE id=?", [(int)$qapId]);
     if (!$qap || (int)$qap['job_id'] !== (int)($doc['job_id'] ?? 0)) return ['n' => 0, 'source' => '', 'err' => 'That QAP could not be found for this report\'s job.'];
+    $mime = $qap['mime'] ?: 'application/pdf';
     $raw = (string)$qap['data'];
     if (($p = strpos($raw, 'base64,')) !== false) $raw = base64_decode(substr($raw, $p + 7)) ?: '';
-    $textq = function_exists('idems_source_text') ? idems_source_text($qap['mime'] ?: 'application/pdf', $raw, 16000) : '';
-    if (trim($textq) === '') return ['n' => 0, 'source' => '', 'err' => 'Could not read text from this QAP (a scanned-image PDF has no selectable text). Upload a text-based QAP / ITP, or type the scope in.'];
+    $textq = function_exists('idems_source_text') ? idems_source_text($mime, $raw, 16000) : '';
+    // The model can read the actual file when the provider supports it — the reliable
+    // path for real QAPs (tables) and even scanned PDFs (its own OCR).
+    $canDoc = function_exists('ai_enabled') && ai_enabled() && function_exists('ai_can_send_doc') && $raw !== '' && ai_can_send_doc($mime);
+    if (trim($textq) === '' && !$canDoc) return ['n' => 0, 'source' => '', 'err' => 'Could not read this QAP (a scanned-image PDF has no selectable text, and the AI provider in use cannot read the file directly). Upload a text-based QAP / ITP, enable a document-reading AI provider (Gemini or Claude), or type the scope in.'];
 
-    $sig = sha1('scopev1|' . $textq);
+    // Cache by the file's content, so the same QAP is turned into scope once and reused.
+    $sig = sha1('scopev2|' . sha1($raw) . '|' . $textq);
     $cached = ops_one("SELECT rows_json FROM qap_scope_cache WHERE sig=?", [$sig]);
     if ($cached && !empty($cached['rows_json'])) {
         $generic = json_decode($cached['rows_json'], true) ?: [];
         $source = 'cache';
     } else {
         $useAi = function_exists('ai_enabled') && ai_enabled();
-        $res = $useAi ? idems_ai_extract_scope($textq) : idems_heuristic_scope($textq);
+        $file = $canDoc ? ['mime' => $mime, 'data' => $raw] : null;
+        $res = $useAi ? idems_ai_extract_scope($textq, $file) : idems_heuristic_scope($textq);
         $source = $useAi ? 'ai' : 'heuristic';
         if (!empty($res['err'])) return ['n' => 0, 'source' => $source, 'err' => $res['err']];
         $generic = $res['rows'];
@@ -9124,14 +9139,20 @@ function idems_po_lines_generic($poId) {
     }
     return $out;
 }
-// AI: read the items / products offered out of a QAP / ITP / PO text.
-function idems_ai_extract_items($text) {
+// AI: read the items / products offered out of a QAP / ITP / PO text (or the file).
+function idems_ai_extract_items($text, $file = null) {
     if (!function_exists('ai_enabled') || !ai_enabled() || !function_exists('ai_chat')) return ['rows' => [], 'err' => 'AI is not enabled.'];
     $sys = "You read a Quality Assurance Plan / Inspection & Test Plan / Purchase Order for an industrial product and extract "
          . "the ITEMS or products offered for inspection. Return ONLY a compact JSON array, no prose. Each element is an object with keys: "
-         . "sr, description, size, unit, po_qty, heat_no. Only include real line items that appear in the text; never invent items. "
+         . "sr, description, size, unit, po_qty, heat_no. Only include real line items that appear in the document; never invent items. "
          . "If there are no line items, return [].";
-    try { [$out, $err] = ai_chat($sys, substr((string)$text, 0, 14000), 1500); }
+    try {
+        if ($file && !empty($file['data']) && function_exists('ai_chat_doc') && function_exists('ai_can_send_doc') && ai_can_send_doc($file['mime'] ?? '')) {
+            [$out, $err] = ai_chat_doc($sys, 'Extract the item / product line items from the attached document as instructed.', [$file], 1800);
+        } else {
+            [$out, $err] = ai_chat($sys, substr((string)$text, 0, 14000), 1500);
+        }
+    }
     catch (Throwable $e) { return ['rows' => [], 'err' => $e->getMessage()]; }
     if (!is_string($out) || trim($out) === '') return ['rows' => [], 'err' => $err ?: 'The AI did not respond.'];
     $json = $out; if (preg_match('/\[.*\]/s', $out, $m)) $json = $m[0];
@@ -9195,14 +9216,16 @@ function idems_items_from_qap($doc, $qapId) {
         if (!(function_exists('ai_enabled') && ai_enabled())) return ['n' => 0, 'source' => '', 'err' => ''];   // no PO, no AI → skip
         $qap = ops_one("SELECT * FROM job_qaps WHERE id=?", [(int)$qapId]);
         if (!$qap || (int)$qap['job_id'] !== (int)($doc['job_id'] ?? 0)) return ['n' => 0, 'source' => '', 'err' => ''];
+        $mime = $qap['mime'] ?: 'application/pdf';
         $raw = (string)$qap['data']; if (($p = strpos($raw, 'base64,')) !== false) $raw = base64_decode(substr($raw, $p + 7)) ?: '';
-        $textq = function_exists('idems_source_text') ? idems_source_text($qap['mime'] ?: 'application/pdf', $raw, 16000) : '';
-        if (trim($textq) === '') return ['n' => 0, 'source' => '', 'err' => ''];
-        $sig = sha1('itemsv1|' . $textq);
+        $textq = function_exists('idems_source_text') ? idems_source_text($mime, $raw, 16000) : '';
+        $canDoc = function_exists('ai_can_send_doc') && $raw !== '' && ai_can_send_doc($mime);
+        if (trim($textq) === '' && !$canDoc) return ['n' => 0, 'source' => '', 'err' => ''];
+        $sig = sha1('itemsv2|' . sha1($raw) . '|' . $textq);
         $cached = ops_one("SELECT rows_json FROM qap_scope_cache WHERE sig=?", [$sig]);
         if ($cached && !empty($cached['rows_json'])) { $generic = json_decode($cached['rows_json'], true) ?: []; $source = 'cache'; }
         else {
-            $res = idems_ai_extract_items($textq); $source = 'ai';
+            $res = idems_ai_extract_items($textq, $canDoc ? ['mime' => $mime, 'data' => $raw] : null); $source = 'ai';
             if (!empty($res['err'])) return ['n' => 0, 'source' => $source, 'err' => ''];   // fail-soft: items are a bonus
             $generic = $res['rows'];
             if ($generic) { try { db()->prepare("INSERT INTO qap_scope_cache (sig,product,standards,rows_json,source,n,created_at) VALUES (?,?,?,?,?,?,?)")

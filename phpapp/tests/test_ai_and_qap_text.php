@@ -35,3 +35,14 @@ if (function_exists('idems_source_text') && function_exists('gzcompress')) {
     $t2 = idems_source_text('application/pdf', $scanned, 16000);
     t_ok(trim($t2) === '' || strpos($t2, 'Hello') === false, 'an image-only PDF yields no spurious text');
 }
+
+// --- 3. document (multimodal) capability matrix ------------------------------
+// Which providers can be sent the actual QAP file (so the model reads tables/scans
+// directly). PDFs → Gemini & Claude; images → all three; nothing → perplexity etc.
+t_ok(ai_doc_supported('application/pdf', 'gemini') === true, 'Gemini can read a PDF directly');
+t_ok(ai_doc_supported('application/pdf', 'anthropic') === true, 'Claude can read a PDF directly');
+t_ok(ai_doc_supported('application/pdf', 'openai') === false, 'OpenAI chat cannot take a PDF (images only)');
+t_ok(ai_doc_supported('image/jpeg', 'openai') === true, 'OpenAI can read an image');
+t_ok(ai_doc_supported('image/png', 'gemini') === true, 'Gemini can read an image');
+t_ok(ai_doc_supported('application/pdf', 'perplexity') === false, 'Perplexity cannot read a document');
+t_ok(ai_doc_supported('text/plain', 'gemini') === false, 'a plain-text mime is not treated as a document attachment');

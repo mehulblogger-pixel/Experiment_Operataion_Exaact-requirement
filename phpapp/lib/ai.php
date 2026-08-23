@@ -176,6 +176,90 @@ function ai_chat($system, $user, $maxTokens = 1200) {
     if ($text === null || trim((string)$text) === '') return [null, 'The AI provider returned no usable text.'];
     return [trim((string)$text), null];
 }
+
+// Can this provider read an attached document/image of this MIME directly?
+// Vision/document models read a real PDF (tables, and scans via built-in OCR) far
+// better than any text we could scrape — this is what makes QAP parsing reliable.
+function ai_doc_supported($mime, $provider) {
+    $mime = strtolower((string)$mime);
+    $isImg = strpos($mime, 'image/') === 0;
+    $isPdf = strpos($mime, 'pdf') !== false;
+    switch ($provider) {
+        case 'gemini':    return $isImg || $isPdf;   // inline_data (images + PDF)
+        case 'anthropic': return $isImg || $isPdf;   // image + document blocks
+        case 'openai':    return $isImg;             // chat completions: images only
+        default:          return false;              // perplexity / copilot / others
+    }
+}
+// True when the active provider can be sent this file directly.
+function ai_can_send_doc($mime) {
+    $act = ai_active();
+    return $act ? ai_doc_supported($mime, $act['provider']) : false;
+}
+// Like ai_chat(), but ATTACHES documents/images the model reads directly. $files is
+// a list of ['mime'=>..., 'data'=>RAW BYTES]. Files the active provider cannot read
+// are dropped; if none remain it falls back to the plain-text ai_chat().
+function ai_chat_doc($system, $user, $files, $maxTokens = 1500) {
+    $act = ai_active();
+    if (!$act) return [null, 'No AI provider is enabled. Add a key under Settings → AI providers.'];
+    $p = $act['provider']; $model = $act['model'];
+    $cfg = ai_provider_cfg($p); $key = trim((string)$cfg['key']);
+    if (!isset(ai_providers()[$p]) || $key === '') return [null, 'The selected AI provider has no API key.'];
+    $system = trim((string)$system); $user = trim((string)$user);
+    if ($user === '') $user = 'Extract the requested information from the attached document.';
+    // Keep only files this provider can actually read, and cap the payload so a
+    // huge upload cannot stall the request.
+    $keep = [];
+    foreach ((array)$files as $f) {
+        if (empty($f['data']) || !ai_doc_supported($f['mime'] ?? '', $p)) continue;
+        if (strlen((string)$f['data']) > 18 * 1024 * 1024) continue;   // ~18 MB raw ceiling
+        $keep[] = $f;
+    }
+    if (!$keep) return ai_chat($system, $user, $maxTokens);   // nothing sendable → text path
+    switch ($p) {
+        case 'gemini':
+            $parts = [];
+            foreach ($keep as $f) $parts[] = ['inline_data' => ['mime_type' => $f['mime'], 'data' => base64_encode($f['data'])]];
+            $parts[] = ['text' => $user];
+            $url = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($model) . ':generateContent?key=' . urlencode($key);
+            $headers = [];
+            $payload = ['systemInstruction' => ['parts' => [['text' => $system]]], 'contents' => [['role' => 'user', 'parts' => $parts]]];
+            break;
+        case 'anthropic':
+            $content = [];
+            foreach ($keep as $f) {
+                $mime = strtolower($f['mime']);
+                if (strpos($mime, 'pdf') !== false) $content[] = ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => base64_encode($f['data'])]];
+                else $content[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mime, 'data' => base64_encode($f['data'])]];
+            }
+            $content[] = ['type' => 'text', 'text' => $user];
+            $url = 'https://api.anthropic.com/v1/messages';
+            $headers = ['x-api-key: ' . $key, 'anthropic-version: 2023-06-01'];
+            $payload = ['model' => $model, 'max_tokens' => $maxTokens, 'system' => $system, 'messages' => [['role' => 'user', 'content' => $content]]];
+            break;
+        case 'openai':
+            $content = [['type' => 'text', 'text' => $user]];
+            foreach ($keep as $f) $content[] = ['type' => 'image_url', 'image_url' => ['url' => 'data:' . $f['mime'] . ';base64,' . base64_encode($f['data'])]];
+            $base = rtrim($cfg['base'] ?: 'https://api.openai.com/v1', '/');
+            if (substr($base, -7) === '/models') $base = substr($base, 0, -7);
+            $url = $base . '/chat/completions';
+            $headers = ['Authorization: Bearer ' . $key];
+            $payload = ['model' => $model, 'max_tokens' => $maxTokens, 'messages' => [['role' => 'system', 'content' => $system], ['role' => 'user', 'content' => $content]]];
+            break;
+        default:
+            return ai_chat($system, $user, $maxTokens);
+    }
+    [$body, $code, $err] = ai_http_post($url, $headers, $payload, 90);   // documents need a longer window
+    if ($err) return [null, ai_error_message($err, $body)];
+    $d = json_decode($body, true);
+    if (!is_array($d)) return [null, 'Unexpected response from the AI provider.'];
+    $text = $d['choices'][0]['message']['content']
+        ?? (is_array($d['content'] ?? null) ? implode("\n", array_map(fn($c) => $c['text'] ?? '', $d['content'])) : null)
+        ?? ($d['candidates'][0]['content']['parts'][0]['text'] ?? null)
+        ?? null;
+    if ($text === null || trim((string)$text) === '') return [null, 'The AI provider returned no usable text.'];
+    return [trim((string)$text), null];
+}
 function ai_parse_models($mode, $data) {
     $ids = [];
     if ($mode === 'gemini') { foreach (($data['models'] ?? []) as $m) { $n = $m['name'] ?? ''; if ($n) $ids[] = preg_replace('#^models/#', '', $n); } }
