@@ -4751,12 +4751,21 @@ function voucher_generate($v) {
         $stop  = min(strtotime($to), strtotime($e ?: $s));
         for ($d = $start; $d !== false && $d <= $stop; $d = strtotime('+1 day', $d)) {
             $date = date('Y-m-d', $d);
-            // Skip the date if ANYTHING is already on it — the same job pulled
-            // before, another job, or a day entered by hand. Two rows on one date
-            // double-count it whichever way they got there.
-            if ((int)ops_val("SELECT COUNT(*) FROM voucher_entries WHERE voucher_id=? AND entry_date=?", [$v['id'], $date])) continue;
+            // A day already marked non-working (leave / in office) can't also be a
+            // site day — leave it alone.
+            if ((int)ops_val("SELECT COUNT(*) FROM voucher_entries WHERE voucher_id=? AND entry_date=? AND day_type<>'WORK'", [$v['id'], $date])) continue;
+            // Idempotent per JOB, not per date: an inspector allotted several jobs on
+            // one day visited several sites and needs a line for EACH — its own file
+            // number, client/vendor and expenses. Only skip a job already pulled for
+            // this date, not the whole date.
+            if ((int)ops_val("SELECT COUNT(*) FROM voucher_entries WHERE voucher_id=? AND entry_date=? AND job_id=?", [$v['id'], $date, $j['id']])) continue;
+            // The day's 8 hours are counted ONCE: the first work line on the date
+            // carries them; further jobs the same day carry 0 so attendance is not
+            // doubled — but each job still gets its own line for its expenses.
+            $dayHasWork = (int)ops_val("SELECT COUNT(*) FROM voucher_entries WHERE voucher_id=? AND entry_date=? AND day_type='WORK'", [$v['id'], $date]);
+            $hours = $dayHasWork ? 0 : 8;
             $site = $j['vdisp'] ?: ($j['vleg'] ?: ($j['cdisp'] ?: ($j['cleg'] ?: '')));
-            $ins->execute([$v['id'], $date, $j['id'], $j['boss_id'], $j['client_id'], $j['vendor_id'], $j['boss_number'] ?: '', $j['sbu'], $site, 8]);
+            $ins->execute([$v['id'], $date, $j['id'], $j['boss_id'], $j['client_id'], $j['vendor_id'], $j['boss_number'] ?: '', $j['sbu'], $site, $hours]);
             $added++;
         }
     }
