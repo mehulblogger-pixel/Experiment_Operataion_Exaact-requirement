@@ -62,7 +62,11 @@
 ?>
 <?php if ($canEdit): ?><form method="post" action="/voucher-save?id=<?= (int)$v['id'] ?>" id="vform"><?php endif; ?>
 <style>
-  #vgrid th{position:sticky;top:56px;background:var(--soft);z-index:3;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted)}
+  <?php /* Sticky header: it must fully COVER the rows scrolling under it. var(--soft)
+           was not opaque, so the first rows bled through and read as an overlap.
+           Use the solid card background, lift the z-index above the inputs, and add
+           a divider so the header sits cleanly above the grid. */ ?>
+  #vgrid th{position:sticky;top:56px;background:var(--card);z-index:6;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);box-shadow:inset 0 -1px 0 var(--line),0 2px 4px rgba(0,0,0,.06)}
   #vgrid td,#vgrid th{padding:7px 8px;white-space:nowrap}
   #vgrid .form-control{padding:6px 8px;font-size:13px;background:var(--card)}
   #vgrid .v-travel,#vgrid .v-rowtotal{font-variant-numeric:tabular-nums;text-align:right}
