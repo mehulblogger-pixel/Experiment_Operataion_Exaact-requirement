@@ -3747,7 +3747,11 @@ function ops_calls($route, $method) {
                     'contract_number' => ((string)($ct['contract_number'] ?? '')) ?: (string)($fromQ['contract_number'] ?? ''),
                     'sbu'             => ((string)($ct['sbu'] ?? '')) ?: $qSbu,
                     'activity_id'     => $qActId ?: null,
-                    'ibo_office_id'   => ($fromQ['office_id'] ?? null) ?: (current_user()['home_office_id'] ?? null),
+                    // The office is set ONCE at contract registration and carries from
+                    // here. The call's managing / contracting office is the contract's
+                    // branch; the quote office and the raiser's home office are only
+                    // fallbacks for a contract registered before the branch was captured.
+                    'ibo_office_id'   => ((int)($ct['branch_id'] ?? 0)) ?: (($fromQ['office_id'] ?? null) ?: (current_user()['home_office_id'] ?? null)),
                     // The coordinator the manager nominated when endorsing the
                     // contract carries onto the call, so it opens already owned.
                     'coordinator_id'  => ((int)($ct['coordinator_id'] ?? 0)) ?: null,
@@ -4691,6 +4695,29 @@ function ops_candidates($route, $method) {
 
 // ---- Monthly voucher (P3: auto-fill skeleton) ------------------------------
 function my_inspector_id() { $u = current_user(); return $u['inspector_id'] ?? null; }
+// The branch that invoices a job — the CONTRACTING office, decided once when the
+// contract was registered and carried down. Resolution order: the job's own
+// contracting office, the call's contracting / managing office, the contract's
+// registered branch, then (only as last resorts) the executing office or the
+// raiser's home office — so a same-office call, which has no separate executing
+// branch, still lands on a real branch and gets a numbering series. Returns an
+// office id, or 0 if nothing at all can be resolved.
+function invoice_office_for($job, $call) {
+    $job = (array)$job; $call = (array)$call;
+    $contractNo = (string)($job['contract_number'] ?? ($call['contract_number'] ?? ''));
+    $contractBranch = 0;
+    if ($contractNo !== '') {
+        try { $contractBranch = (int)ops_val("SELECT branch_id FROM partner_contracts WHERE contract_number=? AND branch_id IS NOT NULL ORDER BY id DESC LIMIT 1", [$contractNo]); }
+        catch (Throwable $e) { $contractBranch = 0; }
+    }
+    return (int)($job['contracting_office_id'] ?? 0)
+        ?: (int)($call['contracting_office_id'] ?? 0)
+        ?: (int)($call['ibo_office_id'] ?? 0)
+        ?: $contractBranch
+        ?: (int)($job['executing_office_id'] ?? 0)
+        ?: (int)($call['executing_office_id'] ?? 0)
+        ?: (int)(current_user()['home_office_id'] ?? 0);
+}
 // Does this job have an issued (finalised) report? Used to decide it is "ready to
 // close" — a job can carry several reports, so closing is its own step.
 function job_has_issued_report($jobId) {
@@ -5501,11 +5528,12 @@ function ops_jobs($route, $method) {
             redirect('/invoice?id=' . $existingInv);
         }
         $call = ops_one("SELECT * FROM calls WHERE id=?", [$job['call_id']]);
+        $contractNo = (string)($job['contract_number'] ?? ($call['contract_number'] ?? ''));
         $inv = books_invoice_create([
             'partner_id'      => (int)($call['client_id'] ?? 0),
-            'office_id'       => (int)($job['executing_office_id'] ?? ($call['executing_office_id'] ?? 0)) ?: null,
+            'office_id'       => invoice_office_for($job, $call) ?: null,
             'sbu'             => (string)($job['sbu'] ?? ($call['sbu'] ?? '')),
-            'contract_number' => (string)($job['contract_number'] ?? ($call['contract_number'] ?? '')),
+            'contract_number' => $contractNo,
             'po_number'       => (string)($call['po_number'] ?? ''),
             'quotation_id'    => (int)($job['quotation_id'] ?? ($call['quotation_id'] ?? 0)),
         ]);

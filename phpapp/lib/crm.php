@@ -1829,7 +1829,9 @@ function ops_crm_quotes($route, $method) {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office can register the contract.');
         $cid = crm_register_client_for_quote($q);
-        $branchId = (int)($q['office_id'] ?? 0) ?: null;
+        // The office is chosen once here and carries to every call, job and invoice.
+        // Accounts may change it at registration; it defaults to the quote's office.
+        $branchId = (int)($_POST['branch_id'] ?? 0) ?: ((int)($q['office_id'] ?? 0) ?: null);
         // §6b — a structured number can be generated instead of typed: BRANCH/C/FY/NNNNN.
         $contractNo = trim($_POST['contract_number'] ?? '');
         if (!empty($_POST['auto_contract']) || $contractNo === '') {

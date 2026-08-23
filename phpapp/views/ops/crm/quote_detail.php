@@ -516,6 +516,16 @@
         <div class="ff"><label>Contract number</label>
           <input class="form-control" name="contract_number" id="contract_number" placeholder="e.g. CON/2026/0142">
           <label class="chk" style="margin-top:6px"><input type="checkbox" name="auto_contract" value="1" id="auto_contract"> Generate automatically <span class="muted">(BRANCH/C/FY/00001)</span></label></div>
+        <?php // The branch is set ONCE here and carries to every call, job and the
+              //  invoice (its numbering series). Defaults to the quotation's office;
+              //  change it only if another branch owns and bills this contract. ?>
+        <div class="ff"><label>Billing branch <span class="muted">— owns this contract &amp; its invoices</span></label>
+          <select class="form-control searchable" name="branch_id">
+            <?php $qOff = (int)($q['office_id'] ?? 0); foreach (offices_list() as $o): ?>
+              <option value="<?= (int)$o['id'] ?>" <?= $qOff === (int)$o['id'] ? 'selected' : '' ?>><?= e($o['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <small class="muted">Set once; the calls, jobs and invoice all inherit it.</small></div>
         <div class="ff"><label>Contract start</label><input class="form-control" type="date" name="start_date"></div>
         <div class="ff"><label>Contract end</label><input class="form-control" type="date" name="end_date"></div>
       </div>
