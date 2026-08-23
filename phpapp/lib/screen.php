@@ -91,9 +91,14 @@ function screen_shows($key) {
 //
 //  So they are separated along the line that actually matters: whether you are
 //  trusted with money FIGURES, and whether you are trusted to RECORD money.
-function job_invoice_can_view() {
+//  The same line decides whether the COMMERCIAL REFERENCES on the thread —
+//  the invoice number, the receipt number, the amounts beside them — are shown
+//  at all. An inspector who cannot open the invoice panel should not be handed
+//  the invoice number by the navigation strip sitting above it either.
+function money_refs_visible() {
     return is_master() || can('data.revenue') || can('data.credit') || can('finance.reconcile');
 }
+function job_invoice_can_view() { return money_refs_visible(); }
 function job_invoice_can_record() {
     return is_master() || can('data.credit') || can('finance.reconcile');
 }

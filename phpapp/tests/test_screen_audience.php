@@ -124,3 +124,50 @@ t_ok(strpos($view, 'the invoice comes first by design') !== false,
      'a job on an advance says so, rather than reading as a missing report');
 
 unset($_SESSION['uid']); current_user(true); ua(true);
+
+// ---- Commercial references on the thread ------------------------------------
+//  The invoice panel was gated and the navigation strip above it was not, so an
+//  inspector who could not open the panel was still handed the invoice number by
+//  the strip. Same line, applied to the thread.
+t_section('the thread does not hand out invoice numbers');
+
+$invRow = ['id' => 1, 'invoice_no' => 'INV-77', 'total' => 9500, 'status' => 'ISSUED'];
+$rcpRow = ['id' => 2, 'receipt_no' => 'RC-12', 'alloc_amount' => 9500];
+
+// chain_label() must stay pure: the strip, the trace page and the tests all read
+// it with no session at all. Masking belongs in chain_label_seen(), not here.
+[$ref, $sub, ] = chain_label('INVOICE', $invRow);
+t_eq($ref, 'INV-77', 'chain_label itself is unchanged and knows nothing about the viewer');
+t_ok($sub !== '', 'chain_label still returns the amount to whoever is allowed to use it');
+
+$as($insp2);
+t_ok(!money_refs_visible(), 'an inspector is not cleared for money references');
+[$ref, $sub, $state] = chain_label_seen('INVOICE', $invRow);
+t_eq($ref, 'raised', 'the strip tells an inspector the work is billed, not what the invoice is called');
+t_eq($sub, '',       'and not what it is worth');
+t_ok($state !== '',  'the status survives, so the strip still says where the thread has reached');
+t_eq(chain_label_seen('RECEIPT', $rcpRow)[0], 'received', 'the receipt number is withheld on the same grounds');
+t_eq(chain_label_seen('RECEIPT', $rcpRow)[1], '', 'and so is what was received');
+
+// Everything before the money stages is operational, and is not touched.
+t_eq(chain_label_seen('JOB', ['job_code' => 'JB-1', 'closed_flag' => 1])[0], 'JB-1',
+     'the job code is operational and stays visible to the inspector doing the work');
+t_eq(chain_label_seen('REPORT', ['irn' => 'IRN-001', 'title' => 't', 'status' => 'ISSUED'])[0], 'IRN-001',
+     'the report reference stays visible — the inspector wrote it');
+
+// Everyone trusted with money figures sees the references exactly as before.
+foreach ([['finance', $fin], ['operation manager', $mgr], ['coordinator', $coord], ['master admin', $mast]] as [$who, $uid]) {
+    $as($uid);
+    t_eq(chain_label_seen('INVOICE', $invRow)[0], 'INV-77', "a $who still sees the invoice number");
+    t_eq(chain_label_seen('RECEIPT', $rcpRow)[0], 'RC-12',  "a $who still sees the receipt number");
+}
+
+// The gap this closes is not only the inspector. An Assistant Manager holds no
+// money permission at all, yet holds the jobs module — so unlike an inspector
+// they CAN open /trace, where the amounts are printed in full.
+$asst = $mk('ASST_MANAGER', 'sa_asst');
+$as($asst);
+t_ok(!money_refs_visible(), 'an assistant manager is not cleared for money references either');
+t_eq(chain_label_seen('INVOICE', $invRow)[0], 'raised', 'and is masked on the trace page as well as the strip');
+
+unset($_SESSION['uid']); current_user(true); ua(true);

@@ -297,6 +297,29 @@ function chain_label($stage, array $r) {
     return ['', '', ''];
 }
 
+// The same line, applied to the thread itself.
+//
+//  chain_label() above is deliberately pure — the strip and the trace page both
+//  read it, and the tests hand it rows with no session at all. Who is allowed to
+//  SEE what it returns is a separate question, asked here.
+//
+//  The money stages are the only ones carrying a commercial reference: the
+//  invoice number, the receipt number and the amounts beside them. Somebody not
+//  trusted with money figures still gets the useful half — whether the work has
+//  been billed and whether it has been paid — without the document number. The
+//  status beside it is untouched, so the strip says as much as it ever did about
+//  where the thread has reached.
+//
+//  Defaults to hiding: if the audience table has not been loaded there is no
+//  viewer to have cleared, and a reference withheld is recoverable in a way one
+//  already shown on screen is not.
+function chain_label_seen($stage, array $r) {
+    [$ref, $sub, $state] = chain_label($stage, $r);
+    if ($stage !== 'INVOICE' && $stage !== 'RECEIPT') return [$ref, $sub, $state];
+    if (function_exists('money_refs_visible') && money_refs_visible()) return [$ref, $sub, $state];
+    return [$stage === 'INVOICE' ? 'raised' : 'received', '', $state];
+}
+
 // The compact bar that goes at the top of a detail screen. Deliberately small:
 // its job is to say "here is where this sits and what is missing", not to be a
 // second copy of every screen it links to.
@@ -317,7 +340,7 @@ function chain_strip($kind, $id, $hereKind = '', $hereId = 0) {
             continue;
         }
         $first = $rows[0];
-        [$ref, , $state] = chain_label($key, $first);
+        [$ref, , $state] = chain_label_seen($key, $first);
         $isHere = ($key === $hereKind) && (int)($first['id'] ?? 0) === $hereId;
         $more = count($rows) > 1 ? ' +' . (count($rows) - 1) : '';
         $href = !empty($first['_href']) ? (string)$first['_href'] : ($url . (int)$first['id']);
@@ -697,7 +720,14 @@ function ops_chain($route, $method) {
     if (!isset(CHAIN_STAGES[$kind]) || !$id) { http_response_code(404); view('notfound'); return true; }
     [$rk, $ri] = chain_root($kind, $id);
     $chain = chain_with_quote_lines(chain_from($rk, $ri));
-    view('ops/trace', ['chain' => $chain, 'kind' => $kind, 'id' => $id,
-                       'cont' => chain_continuity($chain)]);
+    // The matrix's rate/value row prints real figures. Whether each hop CARRIED
+    // a value is not itself a figure, so the ✓/✗ stay for everybody and only the
+    // amounts come off for somebody not cleared to see money.
+    $cont = chain_continuity($chain);
+    if (!money_refs_visible())
+        foreach ($cont['rows'] as $i => $r)
+            if ($r['key'] === 'money')
+                foreach ($r['cells'] as $k => $c) $cont['rows'][$i]['cells'][$k]['show'] = '';
+    view('ops/trace', ['chain' => $chain, 'kind' => $kind, 'id' => $id, 'cont' => $cont]);
     return true;
 }

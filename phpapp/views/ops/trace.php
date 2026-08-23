@@ -86,7 +86,7 @@ $STATE = [
     </div>
     <?php if ($rows): ?>
       <ul style="list-style:none;margin:0;padding:0">
-      <?php foreach ($rows as $r): [$ref, $sub, $state] = chain_label($key, $r); ?>
+      <?php foreach ($rows as $r): [$ref, $sub, $state] = chain_label_seen($key, $r); ?>
         <li style="border-bottom:1px solid var(--line)">
           <a href="<?= e($url . (int)$r['id']) ?>" style="display:flex;gap:12px;align-items:baseline;padding:10px 16px;text-decoration:none">
             <b style="font-size:13.5px;min-width:150px"><?= e($ref) ?></b>
