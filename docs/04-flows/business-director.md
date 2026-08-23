@@ -58,7 +58,8 @@ Change anything at all — that is the entire design of the role.
 > ⚠ **Except that you can.** You are in the management tier
 > (`phpapp/lib/access.php:27`) and hold `mod.jobs.view`, which is all the job routes
 > check — so the board-level, read-only role can **allocate, edit, reassign and close
-> jobs** (`phpapp/lib/ops.php:5136`, `:5531`) and **approve and mark paid any voucher
-> in the company** (`phpapp/lib/ops.php:4863-4977`). This is the widest gap between
-> what a role is documented to be and what it can actually do, and it is ranked
-> accordingly in `99-gaps-and-risks.md`.
+> jobs** (`phpapp/lib/ops.php:5136`, `:5531`), and can still approve vouchers. This is
+> the widest gap between what a role is documented to be and what it can actually do.
+> It is **risk 4 in `99-gaps-and-risks.md`, and it is not yet fixed** — the critical
+> fixes narrowed the voucher half (the register is now branch-scoped, and nobody can
+> approve a claim they submitted) but left the tier itself alone.

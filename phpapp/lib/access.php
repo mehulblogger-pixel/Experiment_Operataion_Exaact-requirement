@@ -17,6 +17,19 @@ const ORG_ROLES = [
     'MARKETING_MANAGER' => 'Marketing Manager', 'MARKETING_EXECUTIVE' => 'Marketing Executive',
     'FINANCE' => 'Finance', 'SR_INSPECTOR' => 'Senior Inspector', 'INSPECTOR' => 'Inspector', 'ADMIN' => 'Admin (legacy)',
 ];
+// The role an account falls back to when its stored role is not one of the above.
+// It is deliberately NOT a member of ORG_ROLES, so it matches no case in
+// role_defaults_base() or module_defaults() and therefore carries no permission,
+// no module, and no scope beyond "own".
+//
+// This used to fall back to ADMIN, which holds every permission across every
+// office. That meant a typo in the role column, a role retired in a later
+// version, or a bad import silently granted company-wide access — the access
+// model failing OPEN at the one point where it has to fail shut. The account can
+// still sign in, so somebody can be told what is wrong; it simply cannot do
+// anything until an administrator corrects its role.
+const UNKNOWN_ROLE = 'UNRECOGNISED';
+
 // Operations/branch management roles — the ones is_admin_level()/is_coordinator_level()
 // are meant to identify (they run calls, jobs, scheduling, vouchers, recruitment).
 // SALES roles (BDM/KAM/Marketing) and FINANCE are deliberately NOT here: they are
@@ -397,6 +410,25 @@ function role_defaults_base($role) {
     return ['perms' => [], 'offices' => 'OWN', 'sbus' => 'OWN'];
 }
 
+// Record that an account carries a role the application does not know about.
+// Silence is how the old fail-open behaviour stayed invisible: the person simply
+// had more access than anyone intended and nothing said so. Now they have none,
+// and the reason is written where an administrator can find it. Never fatal — a
+// logging problem must not stop somebody signing in.
+function access_note_unknown_role($u, $role) {
+    static $seen = [];
+    $key = (string)($u['id'] ?? '?') . '|' . $role;
+    if (isset($seen[$key])) return;                 // once per request, not per can()
+    $seen[$key] = true;
+    $msg = 'Unrecognised role "' . $role . '" on user #' . ($u['id'] ?? '?')
+         . ' (' . ($u['username'] ?? '?') . ') — access denied until it is corrected.';
+    try { error_log($msg); } catch (Throwable $e) {}
+    if (function_exists('idems_log')) {
+        try { idems_log('user', (int)($u['id'] ?? 0), 'ROLE_UNRECOGNISED', ['field' => $role]); }
+        catch (Throwable $e) {}
+    }
+}
+
 // ---- Effective access for the current user (cached) ------------------------
 function ua($fresh = false) {
     static $a = null;
@@ -404,13 +436,19 @@ function ua($fresh = false) {
     if ($fresh) $a = null;
     $u = current_user($fresh);
     if (!$u) return $a = ['role' => 'GUEST', 'perms' => [], 'offices' => [], 'sbus' => [], 'self' => true, 'home' => null, 'master' => false];
-    $role = !empty($u['is_superuser']) ? 'MASTER_ADMIN' : strtoupper($u['role'] ?? 'ADMIN');
-    if (!isset(ORG_ROLES[$role])) $role = 'ADMIN';
+    $role = !empty($u['is_superuser']) ? 'MASTER_ADMIN' : strtoupper(trim((string)($u['role'] ?? '')));
+    if (!isset(ORG_ROLES[$role])) { access_note_unknown_role($u, $role); $role = UNKNOWN_ROLE; }
     $def = role_defaults($role);
     // permissions: per-user csv override wins; else the role's effective set
     // (which itself honours a Settings → Roles & access override). Master = all.
     if ($role === 'MASTER_ADMIN') {
         $perms = array_keys(all_permissions());
+    } elseif ($role === UNKNOWN_ROLE) {
+        // Nothing, and deliberately not even the per-user list below. If the role
+        // column holds something this version does not understand, the account's
+        // configuration cannot be trusted as a whole — granting the half of it we
+        // happen to recognise would be guessing with somebody's access.
+        $perms = [];
     } elseif (trim((string)($u['permissions'] ?? '')) !== '') {
         $perms = array_values(array_filter(explode(',', $u['permissions'])));
         // backward-compat: users configured before module perms existed keep
@@ -720,7 +758,20 @@ function access_migrate() {
     ensure_column('users', 'home_office_id', 'INT NULL');
     ensure_column('users', 'scope_offices', "VARCHAR(255) DEFAULT ''");
     ensure_column('users', 'scope_sbus', "VARCHAR(255) DEFAULT ''");
-    ensure_column('users', 'permissions', "VARCHAR(600) DEFAULT ''");
+    // A per-user permission override is a comma-separated list of permission keys.
+    // There are ~98 keys and the full list runs to about 1,700 characters, so the
+    // original VARCHAR(600) could hold roughly a third of them: MySQL in
+    // non-strict mode truncated the rest silently, mid-key, leaving a fragment
+    // that matches nothing — and in strict mode the save simply failed. Either
+    // way an administrator tuning a senior user's access got a wrong answer with
+    // no error to explain it. SQLite ignores the length, so only MySQL was ever
+    // affected. TEXT for new installs; existing ones are widened just below.
+    ensure_column('users', 'permissions', "TEXT");
+    if (db_driver() !== 'sqlite') {
+        // MySQL will not take a DEFAULT on TEXT; nothing relies on one, because
+        // every read of this column already coalesces a missing value to ''.
+        try { db()->exec("ALTER TABLE users MODIFY permissions TEXT"); } catch (Throwable $e) {}
+    }
     ensure_column('users', 'reports_to_id', 'INT NULL');
     if (setting_get('fy_start_month') === null) setting_set('fy_start_month', '4');
     // One-time: remove the Candles/Wax/Tier demo (the confusing "Product line" field).

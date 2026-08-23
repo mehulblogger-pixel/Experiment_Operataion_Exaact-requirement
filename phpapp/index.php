@@ -905,6 +905,7 @@ if ($route === 'clients' || $route === 'vendors') {
 }
 
 if ($route === 'partner-new') {
+    ops_require(partner_can_create(), 'You don’t have permission to add a client or vendor. Ask your administrator.');
     // Picker mode: the form was opened in a small window from a "+ Add new" link
     // beside a dropdown (quote, call, candidate…). On save we hand the new record
     // back to that window instead of redirecting, so it is selected there.
@@ -997,6 +998,7 @@ if ($route === 'partner-new') {
 if ($route === 'partner-edit') {
     $p = find_partner((int)($_GET['id'] ?? 0));
     if (!$p) { http_response_code(404); return view('notfound'); }
+    ops_require(partner_can_edit($p), 'You don’t have permission to edit this record. Ask your administrator.');
     if ($method === 'POST') {
         $b = $_POST;
         if (!empty($b['is_subcontractor'])) $b['is_vendor'] = 1; // sub-contractor ⇒ vendor
@@ -1031,6 +1033,7 @@ if ($route === 'partner-edit') {
 if ($route === 'partner-add' && $method === 'POST') {
     $p = find_partner((int)($_GET['id'] ?? 0));
     if (!$p) { http_response_code(404); return view('notfound'); }
+    ops_require(partner_can_edit($p), 'You don’t have permission to change this record. Ask your administrator.');
     $kind = $_GET['kind'] ?? '';
     $b = $_POST;
     $map = [
@@ -1140,6 +1143,7 @@ if ($route === 'partner-add' && $method === 'POST') {
 if ($route === 'partner') {
     $p = find_partner((int)($_GET['id'] ?? 0));
     if (!$p) { http_response_code(404); return view('notfound'); }
+    ops_require(partner_can_view($p), 'You don’t have access to this record. Ask your administrator.');
     $subs = $pdo->prepare("SELECT * FROM business_partners WHERE parent_id = ?"); $subs->execute([$p['id']]);
     $parent = $p['parent_id'] ? find_partner($p['parent_id']) : null;
     return view('detail', [
@@ -1166,6 +1170,9 @@ if ($route === 'po') {
     $s->execute([(int)($_GET['id'] ?? 0)]);
     $po = $s->fetch();
     if (!$po) { http_response_code(404); return view('notfound'); }
+    // A purchase order is read with its partner and changed with it.
+    ops_require($method === 'POST' ? po_can_edit($po) : po_can_view($po),
+        'You don’t have access to this purchase order. Ask your administrator.');
     if ($method === 'POST' && ($_POST['do'] ?? '') === 'pull-quote') {
         // The quotation has been revised since this order was raised. Pull the
         // lines through again rather than making somebody re-key twelve of them.

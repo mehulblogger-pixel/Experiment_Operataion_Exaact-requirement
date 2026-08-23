@@ -451,6 +451,10 @@ function ops_migrate() {
     ensure_column('expenses', 'extra', 'TEXT');
     // voucher supporting-file mime (voucher table itself is created in ensure_schema)
     ensure_column('vouchers', 'supporting_mime', "VARCHAR(100) DEFAULT ''");
+    // Who put the claim forward. Needed so approval can refuse the person who
+    // submitted it: submit, approve and mark-paid all accepted the same role tier,
+    // so one coordinator could carry a claim from creation to paid unaided.
+    ensure_column('vouchers', 'submitted_by_uid', 'INT NULL');
     // per-office finance params (overhead % + contingency %) for accurate profitability
     ensure_column('offices', 'overhead_pct', 'DECIMAL(6,2) NULL');
     ensure_column('offices', 'contingency_pct', 'DECIMAL(6,2) NULL');
@@ -536,13 +540,26 @@ function ops_seed() {
 }
 
 // ---- Roles & permissions ---------------------------------------------------
+// An unrecognised role is NOT an administrator. This mirrors ua() in access.php:
+// both resolve an unknown role string to UNKNOWN_ROLE, which grants nothing. They
+// have to agree — is_admin_level() and friends read this one, while can() reads
+// the other, and a disagreement would be a hole shaped exactly like the bug this
+// replaced.
 function user_role($u = null) {
     if ($u === null) return ua()['role'];
     if (!empty($u['is_superuser'])) return 'MASTER_ADMIN';
-    $r = strtoupper($u['role'] ?? 'ADMIN');
-    return (defined('ORG_ROLES') && isset(ORG_ROLES[$r])) ? $r : 'ADMIN';
+    $r = strtoupper(trim((string)($u['role'] ?? '')));
+    $unknown = defined('UNKNOWN_ROLE') ? UNKNOWN_ROLE : 'UNRECOGNISED';
+    return (defined('ORG_ROLES') && isset(ORG_ROLES[$r])) ? $r : $unknown;
 }
-function role_label($u = null) { $roles = defined('ORG_ROLES') ? ORG_ROLES : []; return $roles[user_role($u)] ?? 'User'; }
+// Say plainly what an unrecognised role is, rather than calling it "User" and
+// leaving somebody to wonder why that account can do nothing.
+function role_label($u = null) {
+    $roles = defined('ORG_ROLES') ? ORG_ROLES : [];
+    $r = user_role($u);
+    if (isset($roles[$r])) return $roles[$r];
+    return (defined('UNKNOWN_ROLE') && $r === UNKNOWN_ROLE) ? 'Unrecognised role — no access' : 'User';
+}
 function is_master() { return ua()['master']; }
 function is_admin_level() { return in_array(user_role(), MGMT_ROLES, true); }
 function is_coordinator_level() { return is_admin_level() || in_array(user_role(), ['ASST_MANAGER','COORDINATOR'], true); }
@@ -578,6 +595,54 @@ function can_see_salary() { return can('data.salary'); } // salary/cost visibili
 // from the credit itself: a coordinator has to see the credit to do the job,
 // and has no business seeing what the branch earns on it.
 function can_see_revenue() { return can('data.revenue') || is_admin_level(); }
+// ---- Business partners: who may see and change a directory record ----------
+//
+// A partner record is one row that can be a client, a vendor, a sub-contractor,
+// or several at once — so access is decided by the roles the record actually
+// carries, not by one module. Holding EITHER module is enough to see a record
+// that is both: refusing a vendor-module user because the company also happens to
+// be a client would hide half the directory from them for no reason.
+//
+// A sub-contractor is a vendor (the edit form forces is_vendor on save), so it
+// needs no separate module of its own.
+//
+// These exist because the partner and purchase-order routes in index.php ran with
+// NO access check of any kind — every signed-in user, an inspector included,
+// could create and edit clients, vendors and purchase orders by opening the URL.
+// The registers at /clients and /vendors were gated; the record editor behind
+// them was not.
+function partner_modules($p) {
+    $mods = [];
+    if (!empty($p['is_client'])) $mods[] = 'clients';
+    if (!empty($p['is_vendor']) || !empty($p['is_subcontractor'])) $mods[] = 'vendors';
+    // A record with no role set yet (a half-finished import, or a brand-new row)
+    // is treated as needing either module rather than none — "no role" must not
+    // read as "no permission required".
+    return $mods ?: ['clients', 'vendors'];
+}
+function partner_can_view($p) {
+    foreach (partner_modules($p) as $m) if (can("mod.$m.view")) return true;
+    return false;
+}
+function partner_can_edit($p) {
+    foreach (partner_modules($p) as $m) if (can("mod.$m.edit")) return true;
+    return false;
+}
+// Creating a new partner needs edit rights on the side of the directory it will
+// land in. The form's own "role" tick-boxes decide that, so accept either.
+function partner_can_create() { return can('mod.clients.edit') || can('mod.vendors.edit'); }
+
+// A purchase order belongs to a partner and is read and changed with it, so it
+// borrows that partner's access rather than inventing a module of its own.
+function po_can_view($po) {
+    $p = $po ? ops_one("SELECT * FROM business_partners WHERE id=?", [(int)($po['partner_id'] ?? 0)]) : null;
+    return $p ? partner_can_view($p) : false;
+}
+function po_can_edit($po) {
+    $p = $po ? ops_one("SELECT * FROM business_partners WHERE id=?", [(int)($po['partner_id'] ?? 0)]) : null;
+    return $p ? partner_can_edit($p) : false;
+}
+
 // A convenient guard for handlers.
 function ops_require($ok, $msg = 'You do not have access to that screen.') {
     if (!$ok) { flash($msg, 'error'); redirect('/'); }
@@ -2285,6 +2350,14 @@ function ops_module_gate($route) {
         'stage-gates'=>'leads','stage-gate-save'=>'leads','stage-gate-delete'=>'leads',
         'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries','inquiry-delete'=>'inquiries',
         'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes','quote-preorder-save'=>'quotes','preorder-checklist'=>'quotes',
+        // Vouchers had NO entry here at all, so the module was never checked and
+        // access fell entirely to the role tier below — which let roles holding no
+        // voucher module (Branch Application Manager, Assistant Manager) view and
+        // approve every claim in the company.
+        'vouchers'=>'vouchers','voucher'=>'vouchers','voucher-generate'=>'vouchers',
+        'voucher-entry'=>'vouchers','voucher-save'=>'vouchers','voucher-header'=>'vouchers',
+        'voucher-status'=>'vouchers','voucher-print'=>'vouchers','voucher-file'=>'vouchers',
+        'voucher-csv'=>'vouchers',
         'attendance-recon'=>'reconcile',
         'availability'=>'jobs','schedule'=>'jobs',
         'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems','release-notes'=>'idems','document-ai-review'=>'idems','document-rn-flag'=>'idems','document-scope-from-qap'=>'idems','document-polish-text'=>'idems',
@@ -2385,6 +2458,21 @@ function ops_module_gate($route) {
         && in_array($base, ['job','job-close','job-qap-upload','job-qap','job-qap-del','bill-add','bill-file','bill-delete','expense-delete','job-visit-close','checkin-photo'], true)) {
         $jid = (int)($_GET['id'] ?? $_GET['job'] ?? $_POST['id'] ?? $_POST['job_id'] ?? $_POST['job'] ?? 0);
         if ($jid && job_owned_by_me($jid)) return;   // owner may proceed
+    }
+    // An engineer owns their own monthly voucher. They are given no voucher module
+    // (see module_defaults), so without this the gate added above would lock them
+    // out of their own expense claim. Same shape as the job exception: a named
+    // allowlist, ownership checked per record, and the handler still applies the
+    // finer rules (approve and mark-paid stay with managers).
+    if ($mod === 'vouchers' && !can('mod.vouchers.view')
+        && in_array($base, ['vouchers','voucher','voucher-generate','voucher-entry','voucher-save',
+                            'voucher-header','voucher-status','voucher-print','voucher-file',
+                            'voucher-csv'], true)) {
+        $vid = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+        if ($vid) { if (voucher_owned_by_me($vid)) return; }
+        // No id yet: their own list, or find-or-create for their own month. The
+        // handler scopes both to the signed-in engineer.
+        elseif (function_exists('my_inspector_id') && my_inspector_id()) return;
     }
     if ($mod && !can("mod.$mod.view")) {
         // Two different "no"s, and they need two different sentences. Telling
@@ -4708,7 +4796,17 @@ function inspector_link_msg() {
          . Tl('engineer') . ' instead — then use the full ' . THP('job') . ' and ' . THP('voucher') . ' registers under Operations.';
 }
 function voucher_owner_is_me($v) { return my_inspector_id() && (int)$v['inspector_id'] === (int)my_inspector_id(); }
-function can_view_voucher($v) { return is_coordinator_level() || voucher_owner_is_me($v); }
+// The same question by id, for the module gate — which sees a route and a query
+// string, not a loaded row. Mirrors job_owned_by_me().
+function voucher_owned_by_me($vid) {
+    $vid = (int)$vid;
+    if (!$vid || !function_exists('my_inspector_id')) return false;
+    $mine = (int)my_inspector_id();
+    if (!$mine) return false;
+    try { return (int)ops_val("SELECT inspector_id FROM vouchers WHERE id=?", [$vid]) === $mine; }
+    catch (Throwable $e) { return false; }
+}
+function can_view_voucher($v) { return is_coordinator_level() || can('finance.reconcile') || voucher_owner_is_me($v); }
 // A voucher is the timesheet the whole cost run is built on. Once the month has
 // been calculated and closed, changing a day behind it would make the stored
 // allocation describe a month that no longer exists — the figures would still
@@ -4728,6 +4826,31 @@ function voucher_lock_reason($v) {
          . ' cannot be changed: that month has been calculated and closed on the month-end cost run, '
          . 'and the costs already allocated were worked out from these days. '
          . 'Reopen the month first if a day really has to be corrected.';
+}
+// Approving your own submission is not an approval. The three money transitions
+// (submit, approve, mark-paid) all accepted is_coordinator_level(), which one
+// person satisfies for all three — so a claim could be prepared, waved through
+// and marked paid without anybody else seeing it. Whoever submitted is now barred
+// from approving; anyone else at the same level still may, so a branch with two
+// coordinators needs no manager, and a branch with one does.
+function voucher_submitter_uid($v) { return (int)($v['submitted_by_uid'] ?? 0); }
+function voucher_is_own_submission($v) {
+    $sub = voucher_submitter_uid($v);
+    $me  = (int)(current_user()['id'] ?? 0);
+    return $sub > 0 && $me > 0 && $sub === $me;
+}
+function voucher_can_approve($v) {
+    if (($v['status'] ?? '') !== 'SUBMITTED') return false;
+    if (!is_coordinator_level()) return false;
+    return !voucher_is_own_submission($v);
+}
+// Recording payment belongs with the people who actually pay. Finance was left
+// out of the tier (deliberately — they are not operations managers), which left
+// the money moving under a control they could not operate, so finance.reconcile
+// counts here too.
+function voucher_can_mark_paid($v) {
+    if (($v['status'] ?? '') !== 'APPROVED') return false;
+    return is_coordinator_level() || can('finance.reconcile');
 }
 function can_edit_voucher($v) {
     if (voucher_month_frozen($v)) return false;
@@ -4860,8 +4983,20 @@ function ops_vouchers($route, $method) {
             view('ops/voucher_list', ['rows' => $rows, 'mine' => true, 'inspectors' => []]);
             return;
         }
-        ops_require(is_coordinator_level(), 'You cannot view vouchers.');
-        $rows = ops_all("SELECT v.*, i.name inspector_name FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id ORDER BY v.month DESC, i.name");
+        // Accounts records payment here, so accounts has to be able to open it.
+        // Finance was deliberately taken out of the operations management tier and
+        // this screen asked only for that tier, so the people who actually pay the
+        // claims could not see them.
+        ops_require(is_coordinator_level() || can('finance.reconcile'), 'You cannot view vouchers.');
+        // Scoped to the offices this person actually covers. The register used to
+        // select every voucher in the database with no office clause at all, so a
+        // coordinator in one branch read every other branch's day-rates and
+        // expense claims. A voucher carries its own office; where it does not, the
+        // engineer's home office stands in — the same fallback the month-freeze
+        // check uses, so the two screens agree about which branch a claim belongs
+        // to.
+        [$vw, $va] = scope_office_clause("COALESCE(v.office_id, i.home_office_id)");
+        $rows = ops_all("SELECT v.*, i.name inspector_name FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id WHERE $vw ORDER BY v.month DESC, i.name", $va);
         view('ops/voucher_list', ['rows' => $rows, 'mine' => false, 'inspectors' => inspectors_list(false)]);
         return;
     }
@@ -4889,6 +5024,11 @@ function ops_vouchers($route, $method) {
             'heads' => voucher_heads_for($v['inspector_id']), 'modes' => voucher_modes_for($v['inspector_id']),
             'rates' => voucher_mode_rates($v['inspector_id']), 'sum' => voucher_summary($v['id']),
             'headLabels' => expense_head_label_map(), 'canApprove' => is_coordinator_level(),
+            // Offered separately from the tier so the screen shows exactly what
+            // this person may actually do — a button that refuses when pressed
+            // reads as a broken app.
+            'canApproveNow' => voucher_can_approve($v), 'canMarkPaid' => voucher_can_mark_paid($v),
+            'ownSubmission' => voucher_is_own_submission($v),
             'natureOpts' => ['REVENUE'=>'Revenue','NONREV'=>'Non-Revenue','SUPPORT'=>'Support function','MD'=>'MD']]);
         return;
     }
@@ -4960,15 +5100,18 @@ function ops_vouchers($route, $method) {
         $act = $_POST['action'] ?? '';
         if ($act === 'submit') {
             ops_require(($v['status'] === 'DRAFT') && (is_coordinator_level() || voucher_owner_is_me($v)), 'Cannot submit this voucher.');
-            $pdo->prepare("UPDATE vouchers SET status='SUBMITTED', submitted_at=? WHERE id=?")->execute([date('c'), $v['id']]);
+            $pdo->prepare("UPDATE vouchers SET status='SUBMITTED', submitted_at=?, submitted_by_uid=? WHERE id=?")
+                ->execute([date('c'), (int)(current_user()['id'] ?? 0) ?: null, $v['id']]);
             flash('Voucher submitted for approval.');
         } elseif ($act === 'approve') {
-            ops_require(is_coordinator_level() && $v['status'] === 'SUBMITTED', 'Only a manager can approve a submitted voucher.');
+            ops_require(voucher_can_approve($v), voucher_is_own_submission($v)
+                ? 'You submitted this ' . Tl('voucher') . ', so somebody else has to approve it.'
+                : 'Only a manager can approve a submitted voucher.');
             $pdo->prepare("UPDATE vouchers SET status='APPROVED', checked_by=?, approved_by=?, authorized_by=?, approved_at=? WHERE id=?")
                 ->execute([$_POST['checked_by'] ?? '', ($_POST['approved_by'] ?? '') ?: user_name(current_user()), $_POST['authorized_by'] ?? '', date('c'), $v['id']]);
             flash('Voucher approved.');
         } elseif ($act === 'paid') {
-            ops_require(is_coordinator_level() && $v['status'] === 'APPROVED', 'Only an approved voucher can be marked paid.');
+            ops_require(voucher_can_mark_paid($v), 'Only an approved voucher can be marked paid, by a manager or accounts.');
             $pdo->prepare("UPDATE vouchers SET status='PAID' WHERE id=?")->execute([$v['id']]);
             flash('Voucher marked as paid.');
         } elseif ($act === 'reopen') {

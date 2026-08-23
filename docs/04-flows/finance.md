@@ -98,41 +98,37 @@ a mistaken second click costs nothing.
 
 ---
 
-## ⚠ Two things about this role that need a decision
+## ✅ Vouchers: you can now open them, and record payment
 
 Finance was **deliberately removed from the operations management tier** (commit
-`ff0b94a`, `phpapp/lib/access.php:21-27`). That was the right call — it stopped an
+`ff0b94a`, `phpapp/lib/access.php:31-27`). That was the right call — it stopped an
 accountant being shown "raise inspection call". But it had two consequences that were
-probably not intended.
+not intended, and both are now fixed.
 
-### 1. You are shown an Operations menu you cannot use
+**You could not open the voucher register.** You hold view access to Calls, Jobs and
+Vouchers, which puts **Operations** in your sidebar
+(`phpapp/views/layout_top.php:128`) — but the register demanded the management tier,
+so the menu offered a screen that refused you. It now accepts `finance.reconcile`
+(`phpapp/lib/ops.php:4990`), which you hold.
 
-You hold view access to Calls, Jobs and Vouchers, which is enough to put **Operations**
-in your sidebar (`phpapp/views/layout_top.php:128`). But the voucher register demands
-the management tier, which you are no longer in — so the screen refuses you
-(`phpapp/lib/ops.php:4863`).
-
-The menu offers something the application then declines. Your own `PENDING.md` names
-this exact pattern as item **B1** and calls it "the smallest fix on this list"
-(`phpapp/PENDING.md:2285-2287`). This is a new instance of it.
-
-### 2. You cannot mark a voucher paid — but a coordinator can
-
-Marking a voucher `PAID` requires the management tier
-(`phpapp/lib/ops.php:4970`). You are not in it. A `COORDINATOR` is.
+**You could not mark a voucher paid, while a coordinator could.** The control was
+inverted: the people who prepare a claim could record it as paid, and the person who
+actually moves the money could not. Marking paid now accepts `finance.reconcile` too
+(`phpapp/lib/ops.php:4851`).
 
 ```mermaid
 flowchart LR
-  A["Coordinator<br/>prepares"] --> B["Coordinator<br/>submits"]
-  B --> C["Coordinator<br/>approves"]
-  C --> D["Coordinator<br/>marks PAID"]
-  D --> E["Finance<br/>actually pays the money"]
-  E -.->|"but cannot record it"| D
+  A["Coordinator<br/>prepares and submits"] --> B["Someone else<br/>approves"]
+  B --> C["Finance<br/>marks PAID"]
+  C --> D["Money out"]
 ```
 
-**The control is inverted.** The people who prepare the claim can approve it and
-record it as paid; the person who actually moves the money cannot. Both points are in
-`99-gaps-and-risks.md` with recommended fixes.
+Alongside this, nobody can now approve a voucher they submitted themselves
+(`phpapp/lib/ops.php:4842`), and the register is scoped to the viewer's offices
+(`phpapp/lib/ops.php:4998`). See `99-gaps-and-risks.md` risks 3 and 11.
+
+**Still open:** the rest of the Operations rail is still driven by a different rule
+from the screens behind it — that is the remainder of risk 11.
 
 ---
 
@@ -143,5 +139,5 @@ record it as paid; the person who actually moves the money cannot. Both points a
 | Raise a call or allocate a job | `COORDINATOR` or `OPERATION_MANAGER` — correct, and should stay that way |
 | Open a contract you have registered | `BRANCH_MANAGER` — the two-person control |
 | Approve a quotation | `MARKETING_MANAGER` — you register *after* approval |
-| Open a voucher | Nobody today — the screen refuses you. See above. |
+| Approve a voucher | A manager or coordinator — you may open it and mark it paid, not approve it |
 | Manage users or settings | `MASTER_ADMIN` |

@@ -164,8 +164,13 @@ would otherwise be menu navigation — this path has clearly been tightened befo
 | Add or change an inspector's master record | `BRANCH_MANAGER` or above — the inspector master is management-tier only (`phpapp/lib/ops.php:2185`) |
 | Correct a locked timestamp | `BRANCH_APP_MANAGER` |
 
-> ⚠ **Two things you can do that you probably should not.** You can approve and mark
-> paid the same voucher you prepared (`phpapp/lib/ops.php:4961-4977`), and the
-> voucher register you open is not filtered to your branch
-> (`phpapp/lib/ops.php:4864`) — you can see every inspector's claims company-wide.
-> Both are recorded in `99-gaps-and-risks.md`.
+> ✅ **Two things you could once do that you no longer can.** You used to be able to
+> approve and mark paid the same voucher you prepared, and the register you opened
+> showed every inspector's claims company-wide. Approval now refuses whoever
+> submitted the claim (`phpapp/lib/ops.php:4842`), and the register is scoped to your
+> own offices (`phpapp/lib/ops.php:4998`). See `99-gaps-and-risks.md` risk 3.
+>
+> ⚠ **And one thing that changed for you.** Creating a client or vendor now needs
+> edit rights on the directory, which you do not hold by default — the "+ Add new"
+> quick-add beside a client dropdown will refuse. Ask a Branch Manager, or ask your
+> administrator for `mod.clients.edit`.

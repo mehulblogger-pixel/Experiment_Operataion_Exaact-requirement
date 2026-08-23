@@ -12,15 +12,14 @@ is "Admin (legacy)" (`phpapp/lib/access.php:18`) — and it is a **second Master
 in all but name**. It is granted every permission and every module across every
 office and business unit (`phpapp/lib/access.php:362-363`, `phpapp/lib/access.php:253`).
 
-Worse, it is the **silent fallback for any role the system does not recognise**:
+It also **used to be the silent fallback** for any role the system did not
+recognise, so a typo in a user's role field, a role removed in a later version, or a
+bad import handed out full company-wide access. That is fixed
+(`phpapp/lib/access.php:440`) — an unrecognised role now grants nothing and is
+logged. See `99-gaps-and-risks.md` risk 1.
 
-```php
-if (!isset(ORG_ROLES[$role])) $role = 'ADMIN';   // phpapp/lib/access.php:408
-```
-
-A typo in a user's role field, a role removed in a future version, or a bad import
-does not lock the account down. It hands out **full company-wide access**. The model
-fails open at the one point where it most needs to fail shut.
+**The role itself is unchanged.** Anyone explicitly assigned `ADMIN` still holds
+every permission across every office.
 
 ---
 
@@ -54,5 +53,5 @@ not available.
 1. **Audit now.** Any user carrying `ADMIN` has Master Admin power without appearing
    to.
 2. **Move them** to a role that reflects what they actually do.
-3. **Change the fallback** at `phpapp/lib/access.php:408` to deny rather than to
-   grant. See `99-gaps-and-risks.md` risk #1 for the recommended shape.
+3. ~~Change the fallback so it denies rather than grants.~~ ✅ Done — see
+   `99-gaps-and-risks.md` risk 1.

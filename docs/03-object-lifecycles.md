@@ -165,7 +165,7 @@ and double the engineer's claim (`phpapp/lib/ops.php:5544-5551`).
 | `FINANCE` | ⚠ **Yes** | Holds `mod.jobs.view` — and nothing more is required |
 | Sales roles, `SR_INSPECTOR` | No | No jobs module |
 
-**The closure route checks no permission at all** (`phpapp/lib/ops.php:5531-5534`).
+**The closure route checks no permission at all** (`phpapp/lib/ops.php:5571-5534`).
 The `ops.job.close` permission that appears to govern this is never consulted here —
 holding `mod.jobs.view` is sufficient. That is why Finance and the Business Director
 appear in that table.
@@ -174,7 +174,7 @@ appear in that table.
 
 The permission model is loose here; the **business rules are not.** Before
 `closed_flag` is set, the handler refuses closure for any of these
-(`phpapp/lib/ops.php:5536-5610`):
+(`phpapp/lib/ops.php:5576-5610`):
 
 ```mermaid
 flowchart TD
@@ -232,11 +232,11 @@ stateDiagram-v2
 
 | Transition | Who may trigger it | Precondition | Where |
 |---|---|---|---|
-| `→ DRAFT` (create) | The owning inspector, or coordinator-level | — | `phpapp/lib/ops.php:4871-4873` |
-| `DRAFT → SUBMITTED` | **The owning inspector**, or coordinator-level | Must be `DRAFT` | `phpapp/lib/ops.php:4961-4963` |
-| `SUBMITTED → APPROVED` | Coordinator-level **only** | Must be `SUBMITTED` | `phpapp/lib/ops.php:4965-4969` |
-| `APPROVED → PAID` | Coordinator-level **only** | Must be `APPROVED` | `phpapp/lib/ops.php:4970-4973` |
-| `any → DRAFT` (reopen) | Coordinator-level **only** | ⚠ **none** | `phpapp/lib/ops.php:4974-4977` |
+| `→ DRAFT` (create) | The owning inspector, or coordinator-level | — | `phpapp/lib/ops.php:5015` |
+| `DRAFT → SUBMITTED` | **The owning inspector**, or coordinator-level | Must be `DRAFT` | `phpapp/lib/ops.php:5109` |
+| `SUBMITTED → APPROVED` | Coordinator-level, **excluding whoever submitted it** | Must be `SUBMITTED` | `phpapp/lib/ops.php:4842`, applied at `:5108` |
+| `APPROVED → PAID` | Coordinator-level **or** `finance.reconcile` | Must be `APPROVED` | `phpapp/lib/ops.php:4851`, applied at `:5116` |
+| `any → DRAFT` (reopen) | Coordinator-level **only** | ⚠ **none** | `phpapp/lib/ops.php:5128` |
 
 ### Three things to know about this lifecycle
 
@@ -257,23 +257,34 @@ edited**. And unlike a call's status change, which writes a full history row
 (`phpapp/lib/tosrm.php:139-141`), no voucher transition is recorded anywhere. There
 is no way to answer "who reopened this, and what did it say before?"
 
-### ⚠ And the segregation-of-duties problem
+### ✅ The segregation-of-duties problem was fixed
 
-Look at the "who" column again. `is_coordinator_level()` appears three times, and a
-`COORDINATOR` satisfies it:
+It used to read like this — `is_coordinator_level()` appeared on all three money
+transitions, and one `COORDINATOR` satisfied all three, so a claim could go from
+creation to paid with nobody else seeing it. Meanwhile Finance, who actually pays,
+could not mark anything paid.
+
+Both halves are now closed (`99-gaps-and-risks.md` risk 3c):
 
 ```mermaid
 flowchart LR
-  A["Coordinator<br/>prepares the claim"] --> B["Coordinator<br/>submits it"]
-  B --> C["Coordinator<br/>approves it"]
-  C --> D["Coordinator<br/>marks it paid"]
+  A["Coordinator<br/>prepares and submits"] --> B{"Approve?"}
+  B -->|"refused — same person"| A
+  B --> C["Anyone else at<br/>coordinator level<br/>approves"]
+  C --> D["Manager or<br/>Accounts marks paid"]
   D --> E["Money out"]
 ```
 
-One person can carry an expense claim from creation to paid with no second pair of
-eyes. Meanwhile **Finance — who actually pays — cannot mark anything paid**, because
-Finance is not in the tier (`phpapp/lib/access.php:21-27`). The control is inverted:
-the people who prepare can approve, and the people who pay cannot record payment.
+A `submitted_by_uid` column records who put the claim forward
+(`phpapp/lib/ops.php:457`), and `voucher_can_approve()` refuses that same person
+(`phpapp/lib/ops.php:4842`). Anyone else at the same level still may — a branch with
+two coordinators needs no manager, a branch with one does. `voucher_can_mark_paid()`
+now also accepts `finance.reconcile` (`phpapp/lib/ops.php:4851`), and the register
+opens for accounts (`:4992`), so the people who pay can record payment.
+
+**Two things did not change.** The `reopen` transition still has no precondition, so
+a `PAID` voucher can still be sent back to `DRAFT` — that is risk 12. And there is
+still no audit trail on any voucher transition.
 
 ---
 
@@ -347,7 +358,7 @@ seeing what individuals are paid.
 | **Call** (legacy) | 4 | Automatic only | No | Vestigial. Three competing notions of "done" |
 | **Job stage** | 8 | **No** — free dropdown | No | A label, not a state |
 | **Job closure** | 2 | Weak on permission, **strong on business rules** | `closed_at`, `closed_by` | The business gates are excellent; the permission gate is absent |
-| **Voucher** | 4 | Yes, except reopen | **No** | Clean shape, no audit, and no separation of duties |
+| **Voucher** | 4 | Yes, except reopen | **No** | Clean shape and a real second pair of eyes; still no audit trail |
 | **Contract** | 3 | Registration yes; hold/close no | No | Adequate |
 | **Profitability** | — | Read-only, doubly gated | n/a | The best-protected figure in the system |
 

@@ -54,5 +54,7 @@ another business unit.
 > ⚠ **"Read-only on every module" is not true in practice.** You are in the
 > management tier (`phpapp/lib/access.php:27`) and hold `mod.jobs.view`, which is all
 > the job routes require — so you can allocate, edit, reassign and close jobs
-> (`phpapp/lib/ops.php:5136`, `:5531`), and view, approve and mark paid any voucher
-> company-wide (`phpapp/lib/ops.php:4863-4977`). In `99-gaps-and-risks.md`.
+> (`phpapp/lib/ops.php:5136`, `:5531`). You hold `mod.vouchers.view` too, so you can
+> still approve vouchers — though the register is now scoped to your offices and you
+> can no longer approve one you submitted yourself. This is risk 4 in
+> `99-gaps-and-risks.md`, and it is not yet fixed.

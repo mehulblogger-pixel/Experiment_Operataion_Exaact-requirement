@@ -55,7 +55,11 @@ discrete clicks on the shortest path.
 Nothing is withheld by permission. Give it to as few people as possible and rely on
 the audit log rather than on restrictions.
 
-> ⚠ **Audit for the `ADMIN` role.** It is a second Master Admin in all but name, and
-> it is the **fallback for any role the system does not recognise**
-> (`phpapp/lib/access.php:408`). Anyone carrying it — or carrying a typo'd role — has
-> your power without appearing to. Ranked #1 in `99-gaps-and-risks.md`.
+> ⚠ **Audit for the `ADMIN` role.** It is a second Master Admin in all but name —
+> anyone carrying it has your power without appearing to.
+>
+> ✅ It used to be the fallback for any role the system did not recognise, so a typo'd
+> role had it too. That is fixed (`phpapp/lib/access.php:440`): an unrecognised role
+> now grants nothing and is logged. **Before deploying that change, find those
+> accounts** — they have been running as administrators and will now have no access
+> at all. See `99-gaps-and-risks.md` risk 1.

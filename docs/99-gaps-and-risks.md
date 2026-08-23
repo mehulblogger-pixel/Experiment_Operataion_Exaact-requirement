@@ -21,6 +21,17 @@ you money, data, or an accreditation finding.
 | 🟡 **Medium** | Works today, will bite during a change or an audit. |
 | 🔵 **Low** | Untidy or confusing rather than dangerous. |
 
+---
+
+## Status — four of these are now fixed
+
+Risks **1, 2, 3 and 7** were fixed in commit `docs+fix` on this branch, with 56 new
+assertions in `phpapp/tests/test_critical_access_fixes.php`. Each is marked
+**✅ FIXED** below, with what changed and what it means for you. Risk **11** was
+partly resolved as a necessary consequence of fixing 3.
+
+The remaining sixteen are untouched and still describe the code as it stands.
+
 **Two things are deliberately excluded.** Items recorded in `phpapp/PENDING.md` are
 known and intentional — they are not repeated here as if they were discoveries.
 Where a finding is a *new instance* of a pattern `PENDING.md` already names, that is
@@ -59,7 +70,34 @@ shut.
 column with no foreign key and no constraint. Any process that writes a user record —
 import, SSO provisioning, a future migration — can produce a value not in the list.
 
-**Recommended fix.** Fall back to a **no-permission** role rather than to `ADMIN`.
+### ✅ FIXED
+
+An unrecognised role now resolves to `UNKNOWN_ROLE` (`phpapp/lib/access.php:31`), a
+sentinel that is deliberately **not** a member of `ORG_ROLES` — so it matches no
+case in `role_defaults_base()` or `module_defaults()` and carries no permission, no
+module, and no scope beyond "own". Both resolution points were changed and now
+agree: `ua()` (`phpapp/lib/access.php:440`) and `user_role()`
+(`phpapp/lib/ops.php:552`).
+
+Three further details:
+
+- **A per-user permission list no longer rescues a broken role**
+  (`phpapp/lib/access.php:446`). If the role column holds something this version
+  does not understand, the account's configuration cannot be trusted as a whole.
+- **The account can still sign in**, so somebody can be told what is wrong. It
+  simply cannot do anything.
+- **It is written down.** Each affected account is logged once per request, to the
+  error log and to the compliance audit trail
+  (`access_note_unknown_role()`, `phpapp/lib/access.php:418`), and the screen now
+  labels the role "Unrecognised role — no access" rather than "User"
+  (`phpapp/lib/ops.php:557`).
+
+> ⚠ **Before you deploy:** audit for users whose role is not one of the sixteen.
+> They have been running as full administrators and will now have **no access at
+> all**. `SELECT id, username, role FROM users WHERE role NOT IN (…the sixteen…)`.
+> This is the intended behaviour, but it is a lockout, so find them first.
+
+**Original recommendation (now implemented).** Fall back to a **no-permission** role rather than to `ADMIN`.
 The `role_defaults_base()` function already ends with exactly that
 (`phpapp/lib/access.php:397`: empty permissions, `OWN` scope) — the fallback should
 land there. Then either retire `ADMIN` entirely or make it a real, narrow role.
@@ -97,10 +135,33 @@ on `mod.clients.view` / `mod.vendors.view`. Someone protected the register and l
 the record editor open — which is why this has probably gone unnoticed: the menu
 does not offer it, so nobody stumbles in. A typed or bookmarked URL reaches it.
 
-**Recommended fix.** Add `mod.clients.edit` / `mod.vendors.edit` checks to the
-partner write routes and a gate to `po`, or add all five to the map in
-`ops_module_gate()` and move their handling after `ops_dispatch()`. The second is
-tidier but touches routing order, so it needs care.
+### ✅ FIXED
+
+All five routes now carry a guard (`phpapp/index.php:908`, `:1001`, `:1036`,
+`:1146`, `:1173`), built on four small predicates in `phpapp/lib/ops.php:614-651`
+so the rules are testable without a browser:
+
+| Route | Now requires |
+|---|---|
+| `partner-new` | `partner_can_create()` — edit on clients **or** vendors |
+| `partner-edit`, `partner-add` | `partner_can_edit($p)` — edit on a module the record belongs to |
+| `partner` (detail) | `partner_can_view($p)` |
+| `po` | `po_can_view($po)` on GET, `po_can_edit($po)` on POST — it borrows its partner's access |
+
+A partner record can be a client, a vendor, or both, so **holding either module is
+enough** for a dual-role record: refusing a vendor-module user because the company
+also happens to be a client would hide half the directory from them. A record with
+no role set yet needs either module rather than none — "no role" must not read as
+"no permission required".
+
+> ⚠ **One workflow changes.** A `COORDINATOR` holds clients/vendors **view**, not
+> edit, so the "+ Add new" quick-add beside a client dropdown now refuses them. That
+> matches the documented design — Finance registers the client and contract before
+> operations begins — but if your coordinators do create clients in practice, grant
+> them `mod.clients.edit` under Settings → Roles & access rather than reverting this.
+
+**Original recommendation (now implemented).** Add `mod.clients.edit` / `mod.vendors.edit` checks to the
+partner write routes and a gate to `po`.
 
 ---
 
@@ -141,9 +202,50 @@ person, for any branch, with no audit trail (see risk 12). This is the classic s
 of an expense fraud, and it is also the kind of finding an external auditor writes
 down.
 
-**Recommended fix.** Three separate changes: add `vouchers` to the gate map; apply
-`scope_clause()` to the register query; and split approval from preparation — require
-a permission for approve/pay that a `COORDINATOR` does not hold by default, and grant
+### ✅ FIXED
+
+All three parts, plus the screen that has to agree with them.
+
+**3a — the module is now checked.** Ten voucher routes were added to the gate map
+(`phpapp/lib/ops.php:2357-2364`). An engineer holds no voucher module, so an
+owner exception mirrors the existing job one — a named allowlist, ownership checked
+per record (`phpapp/lib/ops.php:2467-2479`, predicate at `:4798`). Every link and
+form on the voucher screen is in that allowlist, verified by a test, so no button
+is offered that then refuses.
+
+**3b — the register is scoped.** It now filters on
+`COALESCE(v.office_id, i.home_office_id)` (`phpapp/lib/ops.php:4998`) — a voucher
+carries its own office, and where it does not the engineer's home office stands in,
+the same fallback the month-freeze check already used.
+
+**3c — approval is separated from preparation.** A new `submitted_by_uid` column
+(`phpapp/lib/ops.php:457`) records who put the claim forward, and
+`voucher_can_approve()` (`phpapp/lib/ops.php:4842`) refuses that same person.
+Anyone else at the same level still may — so a branch with two coordinators needs
+no manager, and a branch with one does. `voucher_can_mark_paid()`
+(`phpapp/lib/ops.php:4851`) now also accepts `finance.reconcile`, and the register
+opens for accounts (`phpapp/lib/ops.php:4990`), so **the people who actually pay
+can record payment** — which they could not before.
+
+The screen was changed to match: the approve button is offered only to somebody who
+may actually approve, and the submitter is told why it is not there
+(`phpapp/views/ops/voucher_detail.php:215-222`).
+
+> ⚠ **Two roles lose voucher access**, correctly but noticeably.
+> `BRANCH_APP_MANAGER` and `ASST_MANAGER` hold **no voucher module** and were
+> reaching the screens only because the module was never checked. They are now
+> refused. That matches the documented design; if your Assistant Managers do handle
+> vouchers, grant them `mod.vouchers.view` under Settings → Roles & access.
+>
+> **Vouchers already submitted are unaffected** — their `submitted_by_uid` is empty,
+> so nobody is barred from approving work that is already in flight.
+
+**Still open after this fix:** `BUSINESS_DIRECTOR` and `SBU_HEAD` hold
+`mod.vouchers.view` and remain in the tier, so they can still approve. That is
+risk 4, which is not addressed here.
+
+**Original recommendation (now implemented).** Add `vouchers` to the gate map; apply
+office scope to the register; split approval from preparation and grant
 mark-paid to `FINANCE`.
 
 ---
@@ -176,7 +278,7 @@ that tier. Three of those nine should never be near daily operations:
 
 **Why it happened.** `MGMT_ROLES` was recently narrowed to fix a real problem —
 sales and finance roles were seeing operational widgets (commit `ff0b94a`,
-`phpapp/lib/access.php:21-27`). That fix was correct. But the list is still a
+`phpapp/lib/access.php:31-27`). That fix was correct. But the list is still a
 *seniority* list being used as an *operational* list, and the oversight roles were
 left in.
 
@@ -274,9 +376,27 @@ senior user's permissions gets a wrong answer with no error to explain it.
 that need many permissions (`MASTER_ADMIN`) do not use the column — they get
 everything from the bypass.
 
-**Recommended fix.** Widen the column to `TEXT`. One-line migration, no data loss,
-no behaviour change. Then check existing rows for values at or near 600 characters,
-because any that exist are already corrupt.
+### ✅ FIXED
+
+The column is now `TEXT`, both for new installs and for existing ones
+(`phpapp/lib/access.php:769-782`). MySQL will not take a `DEFAULT` on `TEXT`;
+nothing relies on one, because every read of this column already coalesces a
+missing value to `''` — checked across `access.php`, `datacontrol.php`,
+`identity.php`, `ops.php` and `user_form.php`.
+
+A test stores the complete 98-key list and reads it back byte-for-byte, then
+asserts the **last** key in the list still works — truncation would have cut it
+mid-word.
+
+> ⚠ **Check for damage already done.** This widens the column; it cannot recover
+> what MySQL already truncated. Any row at or near 600 characters was silently cut
+> and its final permission is a meaningless fragment:
+> `SELECT id, username, LENGTH(permissions) FROM users WHERE LENGTH(permissions) > 560;`
+> Re-save those users' permissions from the admin screen.
+>
+> **SQLite installs were never affected** — SQLite ignores the declared length.
+
+**Original recommendation (now implemented).** Widen the column to `TEXT`.
 
 ---
 
@@ -381,16 +501,26 @@ naming them as an approver already works without a role change.
 
 Finance holds view access to Calls, Jobs and Vouchers, which puts **Operations** in
 the rail. The voucher register then demands the management tier, which Finance was
-deliberately removed from (`phpapp/lib/access.php:21-27`) — so the screen refuses.
+deliberately removed from (`phpapp/lib/access.php:31-27`) — so the screen refuses.
 
 A second oddity in the same area: **Finance cannot mark a voucher paid, but a
 coordinator can** (`phpapp/lib/ops.php:4970`). The control is inverted.
 
 **Note:** another instance of `PENDING.md` item **B1**.
 
-**Recommended fix.** Decide what Finance should see of vouchers. If read-only, add a
-Finance path to the register. If nothing, remove `mod.vouchers.view` from the role's
-defaults so the rail stops offering it. Separately, grant mark-paid to `FINANCE`.
+### ◐ PARTLY RESOLVED, as a consequence of fixing risk 3
+
+The voucher half is fixed: the register now opens for `finance.reconcile` holders
+(`phpapp/lib/ops.php:4990`) and Finance can mark a voucher paid
+(`phpapp/lib/ops.php:4851`). The inversion is gone — the people who pay can record
+payment.
+
+**Still open:** the rest of the Operations area. Finance holds view on Calls and
+Jobs, so those screens appear and behave read-only, which is coherent; but the rail
+item is still driven by a different rule from the screens behind it.
+
+**Remaining fix.** Decide what Finance should see of Operations as a whole, and
+drive the rail item from the same rule the screens use.
 
 ---
 
@@ -605,17 +735,17 @@ scope.
 
 | # | Risk | Band | Where | Fix size |
 |---|---|---|---|---|
-| 1 | Unrecognised role → full admin | 🔴 | `access.php:408` | One line |
-| 2 | Partner & PO routes ungated | 🔴 | `index.php:907-1220` | Small |
-| 3 | Vouchers: no gate, no scope, no separation | 🔴 | `ops.php:4863-4977` | Medium |
+| 1 | ~~Unrecognised role → full admin~~ | ✅ **fixed** | `access.php:440` | done |
+| 2 | ~~Partner & PO routes ungated~~ | ✅ **fixed** | `index.php:908-1173` | done |
+| 3 | ~~Vouchers: no gate, no scope, no separation~~ | ✅ **fixed** | `ops.php:2357`, `:4998`, `:4820` | done |
 | 4 | Read-only roles can allocate & approve pay | 🟠 | `access.php:27` | Small |
 | 5 | `ops.job.*` permissions not enforced | 🟠 | `ops.php:5136`, `:5531` | Small |
 | 6 | Route gate never checks `.edit` | 🟠 | `ops.php:2389` | Architectural |
-| 7 | Permission column too small | 🟠 | `access.php:723` | One line |
+| 7 | ~~Permission column too small~~ | ✅ **fixed** | `access.php:769` | done |
 | 8 | Branch App Manager's powers unreachable | 🟠 | `access.php:261` | One line |
 | 9 | Hold-points unreachable; phantom permissions | 🟠 | `ops.php:2407` | Small |
 | 10 | `SR_INSPECTOR` unimplemented | 🟠 | `access.php:18` | Small |
-| 11 | Finance shown a menu it cannot use | 🟡 | `layout_top.php:128` | Small |
+| 11 | Finance shown a menu it cannot use | ◐ partly | `layout_top.php:128` | Small |
 | 12 | No voucher audit trail; reopen unguarded | 🟡 | `ops.php:4974` | Small |
 | 13 | Job stage is a free dropdown | 🟡 | `ops.php:4121` | Design decision |
 | 14 | Seniority substitutes for `data.revenue` | 🟡 | `ops.php:580` | One line |
@@ -626,10 +756,11 @@ scope.
 | 19 | `master.manage` does not govern masters | 🔵 | `lookups.php:635` | Small |
 | 20 | Marketing Manager sees all profitability | 🔵 | `access.php:384` | Decision |
 
-**If you fix four things, fix 1, 2, 3 and 7.** Between them they are two one-line
-changes, one small routing change, and one query fix — and they close the gaps that
-could hand out administrator rights, let anyone edit your client list, and let one
-person pay themselves.
+**Those four are done.** Between them they closed the gaps that could hand out
+administrator rights, let anyone edit your client list, and let one person pay
+themselves. The next most valuable is **risk 4** — the management tier being used as
+an operations tier — because it is the root of several others and is a small change
+to one constant.
 
 ---
 

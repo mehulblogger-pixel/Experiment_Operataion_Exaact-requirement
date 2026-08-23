@@ -138,15 +138,17 @@ different directions.
 
 ---
 
-> ⚠ **Two things worth knowing about your approvals.**
+> ✅ **Two things about your approvals that used to be wrong are now fixed.**
 >
-> **Voucher approval is not exclusive to managers.** It is gated on the management
-> tier (`phpapp/lib/ops.php:4965`), which includes the `COORDINATOR` who prepared the
-> claim — so the same person can submit, approve and mark it paid. If you believe you
-> are the control on inspector pay, today you are one of several.
+> **Nobody can approve a claim they submitted.** Approval still accepts the
+> management tier, but it now refuses whoever put the claim forward
+> (`phpapp/lib/ops.php:4842`) — so a coordinator can no longer carry one from
+> preparation to paid unaided. You are a real control again, not one of several.
 >
-> **The voucher register is not filtered to your branch.** The query carries no
-> office filter (`phpapp/lib/ops.php:4864`), so you see — and can approve — vouchers
-> from branches that are not yours, and coordinators in other branches can see yours.
+> **The voucher register is filtered to your branch.** It now scopes on the
+> voucher's office, falling back to the engineer's home office
+> (`phpapp/lib/ops.php:4998`). You no longer see other branches' claims, and they no
+> longer see yours.
 >
-> Both are in `99-gaps-and-risks.md` with recommended fixes.
+> See `99-gaps-and-risks.md` risk 3. Accounts can now mark a voucher paid too, which
+> they could not before.

@@ -212,7 +212,12 @@
       <?php if ($v['status']==='DRAFT' && ($canApprove || voucher_owner_is_me($v))): ?>
         <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="submit"><button class="btn" type="submit">Submit for approval</button></form>
       <?php endif; ?>
-      <?php if ($v['status']==='SUBMITTED' && $canApprove): ?>
+      <?php // Whoever submitted the claim may not approve it — say so, rather than
+            // showing nothing and leaving them to wonder where the button went. ?>
+      <?php if ($v['status']==='SUBMITTED' && !empty($ownSubmission)): ?>
+        <p class="muted" style="margin:0">You submitted this <?= e(Tl('voucher')) ?>, so somebody else has to approve it.</p>
+      <?php endif; ?>
+      <?php if ($v['status']==='SUBMITTED' && !empty($canApproveNow)): ?>
         <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" class="inline-add" style="align-items:flex-end">
           <input type="hidden" name="action" value="approve">
           <div class="ff"><label>Checked by</label><input class="form-control" name="checked_by"></div>
@@ -221,7 +226,7 @@
           <button class="btn" type="submit">Approve</button>
         </form>
       <?php endif; ?>
-      <?php if ($v['status']==='APPROVED' && $canApprove): ?>
+      <?php if ($v['status']==='APPROVED' && !empty($canMarkPaid)): ?>
         <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="paid"><button class="btn" type="submit">Mark paid</button></form>
       <?php endif; ?>
       <?php if ($v['status']!=='DRAFT' && $canApprove): ?>

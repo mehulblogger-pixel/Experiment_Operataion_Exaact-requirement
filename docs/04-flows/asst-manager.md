@@ -54,9 +54,12 @@ counted as discrete clicks on the shortest path.
 
 See any money figure · touch vouchers · approve reports · manage users or settings.
 
-> ⚠ **Two of those boundaries do not hold.** You are deliberately not granted
-> `ops.job.close` (`phpapp/lib/access.php:377`) but can close jobs anyway, because
-> the close route never checks that permission (`phpapp/lib/ops.php:5531`). And you
-> have no voucher module at all, yet can view, approve and mark paid every voucher in
-> the company, because the voucher screens are gated on role tier rather than module
-> (`phpapp/lib/ops.php:4863-4977`). Both in `99-gaps-and-risks.md`.
+> ⚠ **One of those boundaries still does not hold.** You are deliberately not granted
+> `ops.job.close` (`phpapp/lib/access.php:377`) but can close jobs anyway, because the
+> close route never checks that permission (`phpapp/lib/ops.php:5571`). That is risk 5,
+> still open.
+>
+> ✅ **The voucher boundary now holds.** You hold no voucher module, and the module is
+> now checked (`phpapp/lib/ops.php:2357-2364`) — so vouchers are genuinely closed to
+> you, where before you could view, approve and mark paid every claim in the company.
+> If you do handle vouchers in practice, ask for `mod.vouchers.view`.

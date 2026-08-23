@@ -56,7 +56,7 @@ Where that is true it is called out under the role, and every instance is listed
 `99-gaps-and-risks.md`.
 
 The tier deliberately **excludes** Finance and all four Sales roles
-(`phpapp/lib/access.php:21-27`). That exclusion is recent and intentional: the
+(`phpapp/lib/access.php:31-27`). That exclusion is recent and intentional: the
 comment in the code explains that lumping them in made every operational widget leak
 to them — "a salesperson seeing *vouchers to approve*, an accountant seeing *raise
 inspection call*". It fixed a real problem, and it created a smaller new one, which
@@ -120,12 +120,16 @@ before the required date, that is a coordinator failure.
 - **Delete a call.** `ops.call.delete` is not theirs (`phpapp/lib/ops.php:3588`).
 - **Change settings, manage users, or edit role permissions.**
 
-> ⚠ **Two boundaries the code does not actually hold.** A coordinator can *submit*
-> a voucher, then *approve* it, then mark it *paid* — all three transitions accept
-> `is_coordinator_level()` (`phpapp/lib/ops.php:4961-4977`). There is no second pair
-> of eyes on inspector pay. Separately, the voucher register they open is **not
-> filtered by branch** (`phpapp/lib/ops.php:4864`), so a coordinator in one branch
-> sees every inspector's claims company-wide. Both are in `99-gaps-and-risks.md`.
+> ✅ **Two boundaries that used to be missing are now enforced.** A coordinator could
+> once submit a voucher, approve it and mark it paid unaided, and the register they
+> opened was not filtered by branch. Whoever submits a claim can no longer approve it
+> (`phpapp/lib/ops.php:4842`), and the register is scoped to their own offices
+> (`phpapp/lib/ops.php:4998`). See `99-gaps-and-risks.md` risk 3.
+>
+> ⚠ **One thing changed for you.** Creating a client or vendor now needs edit rights
+> on the directory, which a coordinator does not hold by default — the "+ Add new"
+> quick-add beside a client dropdown will refuse. Ask a Branch Manager, or ask for
+> `mod.clients.edit`.
 
 ---
 
@@ -285,12 +289,16 @@ them.
   narrower financial view than the coordinator they supervise.
 - **Touch vouchers.** No voucher module (`phpapp/lib/access.php:266`).
 
-> ⚠ **The job-close boundary does not hold.** Withholding `ops.job.close` has no
-> practical effect, because the close route never checks that permission — it is
-> gated by the Jobs module and job ownership only (`phpapp/lib/ops.php:5531-5534`).
-> An Assistant Manager holds Jobs edit, so they can close jobs. Likewise the voucher
-> boundary: they are coordinator-level, so they can approve and pay vouchers despite
-> having no voucher module. Both in `99-gaps-and-risks.md`.
+> ⚠ **The job-close boundary still does not hold.** Withholding `ops.job.close` has
+> no practical effect, because the close route never checks that permission — it is
+> gated by the Jobs module and job ownership only (`phpapp/lib/ops.php:5571-5534`).
+> An Assistant Manager holds Jobs edit, so they can close jobs. That is risk 5, still
+> open.
+>
+> ✅ **The voucher boundary now holds.** They hold no voucher module, and the module
+> is now checked (`phpapp/lib/ops.php:2357-2364`), so vouchers are genuinely closed
+> to them. If your Assistant Managers do handle vouchers in practice, grant
+> `mod.vouchers.view` rather than reverting the fix.
 
 ---
 
@@ -520,13 +528,20 @@ module, across every office and business unit (`phpapp/lib/access.php:362-363`,
 `ADMIN` is the **fallback for any role the system does not recognise**:
 
 ```php
-if (!isset(ORG_ROLES[$role])) $role = 'ADMIN';   // access.php:408
+// Before — the fallback handed out full company-wide access:
+if (!isset(ORG_ROLES[$role])) $role = 'ADMIN';
+// Now (phpapp/lib/access.php:440) — an unrecognised role grants nothing:
+if (!isset(ORG_ROLES[$role])) { access_note_unknown_role($u, $role); $role = UNKNOWN_ROLE; }
 ```
 
-A typo in a user's role field, a role removed in a future version, a bad import — any
-of these does not lock the account down. It **hands out full company-wide access**.
-The model fails open, at the one point where it most needs to fail shut. Ranked #1 in
-`99-gaps-and-risks.md`.
+✅ **Fixed.** A typo in a user's role field, a role removed in a future version or a
+bad import used to hand out full company-wide access. An unrecognised role now
+resolves to `UNKNOWN_ROLE`, which carries no permission, no module and no scope —
+and the account is logged so an administrator can find it. See
+`99-gaps-and-risks.md` risk 1.
+
+**`ADMIN` itself is unchanged**, and it is still a second Master Admin in all but
+name. The recommendation below stands.
 
 ### Recommendation
 
@@ -676,21 +691,16 @@ is correct for an accounts function.
 
 - **Raise a call or allocate a job.** No `ops.*` permissions, and they were
   deliberately removed from the operations management tier
-  (`phpapp/lib/access.php:21-27`).
+  (`phpapp/lib/access.php:31-27`).
 - **Approve a quotation.** `crm.quote.approve` is not theirs — they register the
   contract *after* somebody else has approved the quote.
 
-> ⚠ **Finance is shown an Operations menu it cannot use.** Because Finance holds
-> view access to Calls, Jobs and Vouchers, the Operations item appears in their rail
-> (`phpapp/views/layout_top.php:128`). But the voucher register demands
-> coordinator-level, which Finance no longer is — so the screen refuses
-> (`phpapp/lib/ops.php:4863`). The menu offers something the app then declines.
-> Your own `PENDING.md` calls this pattern out as item B1 and calls it "the smallest
-> fix on this list"; this is a new instance of it. In `99-gaps-and-risks.md`.
->
-> There is a second oddity worth a decision: **Finance cannot mark a voucher paid,
-> but a coordinator can** (`phpapp/lib/ops.php:4970`). The people who pay cannot
-> record payment; the people who prepare the claim can.
+> ✅ **Finance can now open vouchers and record payment.** The register used to demand
+> the operations tier, which Finance is deliberately not in — so the menu offered a
+> screen that refused, and the people who actually pay could not mark anything paid.
+> Both are fixed: the register accepts `finance.reconcile`
+> (`phpapp/lib/ops.php:4990`) and so does mark-paid (`phpapp/lib/ops.php:4851`).
+> See `99-gaps-and-risks.md` risks 3 and 11.
 
 ---
 ---
@@ -699,7 +709,7 @@ is correct for an accounts function.
 
 These four roles fill the pipeline. None of them can touch a call, a job or a
 voucher, and none is in the operations management tier
-(`phpapp/lib/access.php:21-27`).
+(`phpapp/lib/access.php:31-27`).
 
 ---
 

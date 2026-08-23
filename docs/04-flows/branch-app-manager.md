@@ -52,7 +52,7 @@ flowchart TD
 add (1) → type the value → save (1) = **≈ 4 clicks plus one typed field**, counted as
 discrete clicks on the shortest path.
 
-### ⚠ Three things about this role that are wrong today
+### Three things about this role that were wrong — one is now fixed
 
 **Your two signature powers are unreachable.** You hold `idems.type.manage` and
 `idems.timestamp.edit` — and the role has **no IDEMS module access**
@@ -65,9 +65,14 @@ you.
 the management tier — so revenue figures appear despite the role being built to
 exclude them.
 
-**You can allocate work and approve pay.** Being in the management tier puts you past
-the job-allocation gate (`phpapp/lib/ops.php:5136`) and the voucher gates
-(`phpapp/lib/ops.php:4863-4977`), even though you hold no voucher module and no
+**You can allocate work.** Being in the management tier puts you past the
+job-allocation gate (`phpapp/lib/ops.php:5136`) even though you hold no
 `ops.job.allocate`.
 
-All three are in `99-gaps-and-risks.md`.
+✅ **Vouchers are no longer reachable.** You hold no voucher module and the module is
+now checked (`phpapp/lib/ops.php:2357-2364`), so the claims you were never meant to
+see are genuinely closed to you. If your role does handle vouchers in practice, ask
+for `mod.vouchers.view` rather than reverting the fix.
+
+The first two are in `99-gaps-and-risks.md` (risks 5 and 14); the third is risk 3,
+now fixed.
