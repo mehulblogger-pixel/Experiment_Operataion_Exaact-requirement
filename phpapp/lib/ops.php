@@ -3627,10 +3627,17 @@ function ops_calls($route, $method) {
             eo.name exec_office_name, eo.coordinator_name exec_coordinator,
             io2.name ibo_office_name,
             cu.first_name coord_fname, cu.last_name coord_lname, cu.username coord_uname,
-            (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) job_count, $costExpr AS cost_incurred,
+            (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) job_count,
+            (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id AND COALESCE(j.closed_flag,0)=1) closed_count,
+            $costExpr AS cost_incurred,
             (SELECT MIN(j2.scheduled_date) FROM jobs j2 WHERE j2.call_id=c.id AND j2.scheduled_date<>'') sched_date,
             (SELECT i.name FROM jobs j3 LEFT JOIN inspectors i ON i.id=j3.inspector_id
-               WHERE j3.call_id=c.id AND j3.inspector_id IS NOT NULL ORDER BY j3.id LIMIT 1) inspector_name
+               WHERE j3.call_id=c.id AND j3.inspector_id IS NOT NULL ORDER BY j3.id LIMIT 1) inspector_name,
+            (SELECT i.name FROM report_docs d LEFT JOIN inspectors i ON i.id=d.inspector_id
+               WHERE d.job_id IN (SELECT id FROM jobs WHERE call_id=c.id)
+               AND d.inspector_id IS NOT NULL AND COALESCE(d.deleted,0)=0 ORDER BY d.id LIMIT 1) report_inspector,
+            (SELECT COUNT(*) FROM report_docs d WHERE d.job_id IN (SELECT id FROM jobs WHERE call_id=c.id)
+               AND COALESCE(d.deleted,0)=0 AND COALESCE(d.finalized,0)=1) issued_reports
             FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id
             LEFT JOIN business_partners v ON v.id=c.vendor_id
             LEFT JOIN offices eo ON eo.id=c.executing_office_id
@@ -4796,9 +4803,20 @@ function voucher_modes_for($insId) {
     return ops_all("SELECT * FROM travel_modes WHERE active=1 ORDER BY id");
 }
 function voucher_heads_for($insId) {
-    if ((int)ops_val("SELECT COUNT(*) FROM inspector_allowances WHERE inspector_id=? AND kind='HEAD'", [$insId]))
+    if ((int)ops_val("SELECT COUNT(*) FROM inspector_allowances WHERE inspector_id=? AND kind='HEAD'", [$insId])) {
         $rows = ops_all("SELECT eh.* FROM expense_heads eh JOIN inspector_allowances a ON a.code=eh.code AND a.kind='HEAD' AND a.allowed=1 WHERE a.inspector_id=? AND eh.active=1 ORDER BY eh.sort_order, eh.id", [$insId]);
-    else $rows = ops_all("SELECT * FROM expense_heads WHERE active=1 ORDER BY sort_order, id");
+        // Even under a narrow entitlement, every inspector needs somewhere to record
+        // a genuine one-off — an incidental / miscellaneous expense the entitlement
+        // list did not foresee. Always offer the catch-all "Others (specify)" head so
+        // there is never "no option to add" an expense.
+        $codes = array_map(fn($h) => strtoupper((string)$h['code']), $rows);
+        if (!in_array('OTHER', $codes, true)) {
+            $other = ops_one("SELECT * FROM expense_heads WHERE code='OTHER' AND active=1");
+            if ($other) $rows[] = $other;
+        }
+    } else {
+        $rows = ops_all("SELECT * FROM expense_heads WHERE active=1 ORDER BY sort_order, id");
+    }
     return array_values(array_filter($rows, fn($h) => $h['code'] !== 'KMTRAVEL')); // travel is computed from mode × km
 }
 function voucher_mode_rates($insId) {

@@ -2,8 +2,11 @@
   $today = date('Y-m-d');
   $nSched = 0; $nOverdue = 0; $nClosed = 0;
   foreach ($rows as $c) {
-    $needs = ($c['status'] ?? '') !== 'CLOSED' && (int)$c['job_count'] === 0;
-    if (($c['status'] ?? '') === 'CLOSED') $nClosed++;
+    // A call is DONE when its status is CLOSED, or every job under it has closed —
+    // the same rule the call detail uses, so the register agrees with it.
+    $cDone = ($c['status'] ?? '') === 'CLOSED' || ((int)$c['job_count'] > 0 && (int)($c['closed_count'] ?? 0) === (int)$c['job_count']);
+    $needs = !$cDone && (int)$c['job_count'] === 0;
+    if ($cDone) $nClosed++;
     elseif ($needs) { $nSched++; if (($c['inspection_required_date'] ?? '') && $c['inspection_required_date'] < $today) $nOverdue++; }
   }
 ?>
@@ -61,7 +64,7 @@
     </tr></thead>
     <tbody>
     <?php foreach ($rows as $c):
-      $closed = ($c['status'] ?? '') === 'CLOSED';
+      $closed = ($c['status'] ?? '') === 'CLOSED' || ((int)$c['job_count'] > 0 && (int)($c['closed_count'] ?? 0) === (int)$c['job_count']);
       $needs = !$closed && (int)$c['job_count'] === 0;
       $req = $c['inspection_required_date'] ?? '';
       $reqOverdue = $needs && $req && $req < $today;
@@ -97,12 +100,20 @@
           $dl = array_values(array_filter(array_map('trim', explode(',', (string)($c['deliverables'] ?? '')))));
           if ($dl) echo '<div class="muted" style="font-size:11px;margin-top:2px">' . e(implode(' · ', array_slice($dl, 0, 4)))
                       . (count($dl) > 4 ? ' +' . (count($dl) - 4) : '') . '</div>';
+          // The rhythm above is what is OWED; if reports have actually been issued,
+          // say so — otherwise a reported call still read "no report".
+          if ((int)($c['issued_reports'] ?? 0) > 0)
+            echo '<div style="margin-top:2px"><span class="pill p-ok" style="font-size:10.5px">✓ ' . (int)$c['issued_reports'] . ' issued</span></div>';
         ?></td>
         <td><?= !empty($c['exec_office_name']) ? e($c['exec_office_name']) : '<span class="muted">same ' . e(T('office')) . '</span>' ?></td>
         <?php if ($seeCredit): ?><td class="num"><?= ((float)($c['expected_credit'] ?? 0)) > 0 ? fmoney($c['expected_credit']) : $dash ?></td><?php endif; ?>
         <td><?= !empty($c['coordinator_display']) ? e($c['coordinator_display']) : $dash ?></td>
-        <td><?= !empty($c['inspector_name']) ? e($c['inspector_name'])
-                 : '<span class="pill p-warn">not allocated' . (isset($L['unallocated_days']) && $L['unallocated_days'] !== null ? ' · ' . (int)$L['unallocated_days'] . 'd' : '') . '</span>' ?></td>
+        <?php // The engineer on the job, or — if the job carries no named inspector
+              //  but the work was reported — whoever wrote the report, so a completed
+              //  call never reads "not allocated". ?>
+        <td><?php $who = $c['inspector_name'] ?: ($c['report_inspector'] ?? '');
+             echo $who !== '' ? e($who)
+                 : '<span class="pill p-warn">not allocated' . (isset($L['unallocated_days']) && $L['unallocated_days'] !== null ? ' · ' . (int)$L['unallocated_days'] . 'd' : '') . '</span>'; ?></td>
         <td><?= $c['call_received_date'] ? e(fdate($c['call_received_date'])) : $dash ?></td>
         <td><?= !empty($c['forwarded_at']) ? e(fdate(substr((string)$c['forwarded_at'],0,10))) : $dash ?></td>
         <td><?= !empty($c['allocated_at']) ? e(fdate(substr((string)$c['allocated_at'],0,10))) : $dash ?></td>

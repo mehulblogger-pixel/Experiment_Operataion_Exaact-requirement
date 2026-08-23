@@ -26,7 +26,10 @@
 <div class="panel">
   <div class="ctitle" style="margin-top:0"><h3>Where each document stands</h3></div>
   <p class="sub" style="margin:0 0 10px">Mark every expected document. Anything set to
-    <b>not applicable</b> or <b>not available</b> is left out of the automatic checks.</p>
+    <b>not applicable</b> or <b>not available</b> is left out of the automatic checks.
+    <?php if (idems_can_edit_doc($doc)): ?><br>To attach the actual file (PO, QAP/ITP, drawing, spec…), use
+    <b>Add source documents</b> below and pick its <b>Document type</b> — the file then shows in the
+    <b>Files</b> column and clears its “missing document” check.<?php endif; ?></p>
   <form method="post" action="/document-review?id=<?= (int)$doc['id'] ?>">
     <input type="hidden" name="_do" value="state">
     <div style="overflow-x:auto">
