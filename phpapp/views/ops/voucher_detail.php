@@ -122,6 +122,18 @@
       <td><strong><?= e(cur_sym()) ?><?= $fmt($e['row_total']) ?></strong></td>
       <?php endif; ?>
     </tr>
+    <?php // A per-line note / remark — so an incidental or "Others (specify)" expense
+          //  can say what it was for. Kept as a light sub-row rather than another
+          //  column, so the wide grid stays readable. ?>
+    <?php if ($canEdit): ?>
+    <tr class="v-noterow" data-eid="<?= $eid ?>">
+      <td class="muted" style="text-align:right;font-size:11px" colspan="2">Note / remark</td>
+      <td colspan="<?= $ncol - 2 ?>"><input form="vform" class="form-control" style="width:100%" name="<?= $P ?>[note]"
+          value="<?= e($e['notes'] ?? '') ?>" placeholder="what the expense was for — e.g. incidental / conveyance / other"></td>
+    </tr>
+    <?php elseif (!empty($e['notes'])): ?>
+    <tr class="muted" style="font-size:11px"><td></td><td colspan="<?= $ncol - 1 ?>">↳ <?= e($e['notes']) ?></td></tr>
+    <?php endif; ?>
     <?php endforeach; ?>
     <?php if (count($rows) > 1): ?><tr class="muted" style="font-size:12px"><td colspan="<?= $ncol ?>">↳ <?= e($date) ?> — day total hours: <strong><?= e($fmt($dayHours)) ?></strong></td></tr><?php endif; ?>
   <?php endforeach; ?>

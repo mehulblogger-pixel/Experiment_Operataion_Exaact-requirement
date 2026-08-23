@@ -5020,9 +5020,9 @@ function ops_vouchers($route, $method) {
             $amounts = [];
             foreach ($heads as $h) { $a = (float)($r['amt'][$h['code']] ?? 0); if ($a != 0) $amounts[$h['code']] = $a; }
             $rowTotal = $travel + array_sum($amounts);
-            $pdo->prepare("UPDATE voucher_entries SET hours=?, line_no=?, file_no=?, mode_code=?, km=?, travel_amount=?, amounts=?, row_total=? WHERE id=? AND voucher_id=?")
+            $pdo->prepare("UPDATE voucher_entries SET hours=?, line_no=?, file_no=?, mode_code=?, km=?, travel_amount=?, amounts=?, row_total=?, notes=? WHERE id=? AND voucher_id=?")
                 ->execute([(float)($r['hours'] ?? 0), $r['line_no'] ?? '', $r['file_no'] ?? '', $mode, $km, $travel,
-                    $amounts ? json_encode($amounts) : '', $rowTotal, $e['id'], $v['id']]);
+                    $amounts ? json_encode($amounts) : '', $rowTotal, substr(trim((string)($r['note'] ?? '')), 0, 255), $e['id'], $v['id']]);
             if ($e['day_type'] === 'WORK' && $e['vendor_id'] && $km > 0) vendor_km_remember($v['inspector_id'], $e['vendor_id'], $mode, $km);
             $grand += $rowTotal;
         }
@@ -5489,6 +5489,17 @@ function ops_jobs($route, $method) {
         if (!$job) { http_response_code(404); view('notfound'); return; }
         if (!function_exists('books_invoice_create')) { flash('The Money module is not enabled on this installation.', 'error'); redirect('/job?id=' . $job['id']); }
         if (empty($job['closed_flag'])) { flash('Close the ' . Tl('job') . ' before raising its invoice.', 'error'); redirect('/job?id=' . $job['id']); }
+        // Already invoiced? Open THAT invoice instead of raising a second, empty one.
+        // Pressing the button again used to create a fresh invoice whose job line was
+        // then refused (a job bills once), leaving a blank draft — which read as
+        // "nothing carried forward". Now the button is idempotent.
+        $existingInv = (int)(function_exists('books_try')
+            ? books_try(fn() => ops_val("SELECT i.id FROM invoice_lines l JOIN invoices i ON i.id=l.invoice_id WHERE l.job_id=? AND i.status<>'CANCELLED' ORDER BY i.id DESC LIMIT 1", [(int)$job['id']]), 0)
+            : 0);
+        if ($existingInv) {
+            flash('This ' . Tl('job') . ' is already billed on invoice #' . $existingInv . ' — opened it here. Add a line or raise a credit note to bill anything more.', 'info');
+            redirect('/invoice?id=' . $existingInv);
+        }
         $call = ops_one("SELECT * FROM calls WHERE id=?", [$job['call_id']]);
         $inv = books_invoice_create([
             'partner_id'      => (int)($call['client_id'] ?? 0),
