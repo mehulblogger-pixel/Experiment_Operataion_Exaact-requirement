@@ -4560,8 +4560,19 @@ function ops_idems_documents($route, $method) {
         // but are never told about might as well not be there. Never blocks issue.
         $notified = 0;
         try { $notified = idems_notify_client_issued(ops_one("SELECT * FROM report_docs WHERE id=?", [$doc['id']])); } catch (Throwable $e) {}
-        flash('Report ' . $doc['irn'] . ' finalized & issued. It is now locked (immutable).'
-            . ($notified ? ' The ' . Tl('client') . ' has been notified (' . $notified . ' recipient' . ($notified === 1 ? '' : 's') . ').' : ''));
+        $issuedMsg = 'Report ' . $doc['irn'] . ' finalized & issued. It is now locked (immutable).'
+            . ($notified ? ' The ' . Tl('client') . ' has been notified (' . $notified . ' recipient' . ($notified === 1 ? '' : 's') . ').' : '');
+        // The next step after issuing is closing the job and recording the day's
+        // expenses. Send the assigned inspector to their job list — where "Upload &
+        // close" now opens the close screen — instead of leaving them on the locked
+        // report with no obvious way forward. Others stay on the issued report.
+        $jid = (int)($doc['job_id'] ?? 0);
+        $jobOpen = $jid && (int)ops_val("SELECT COALESCE(closed_flag,0) FROM jobs WHERE id=?", [$jid]) === 0;
+        if ($jid && $jobOpen && function_exists('job_owned_by_me') && job_owned_by_me($jid)) {
+            flash($issuedMsg . ' If the ' . Tl('job') . ' is complete, close it from the list below to record the day\'s expenses.');
+            redirect('/my-jobs?f=open');
+        }
+        flash($issuedMsg);
         redirect('/document?id=' . $doc['id']);
     }
     if ($route === 'document-revise' && $method === 'POST') {

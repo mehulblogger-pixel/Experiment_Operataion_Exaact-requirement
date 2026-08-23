@@ -2223,6 +2223,20 @@ function option_rows($fieldMeta) {
 // Per-module view-access gate. Maps a route to its module and blocks it if the
 // user lacks mod.<module>.view. Inspector-owned paths (my-jobs, vouchers) and
 // utility routes are intentionally NOT mapped, so they stay reachable.
+// Does the job identified here belong to the signed-in inspector? An assigned
+// engineer owns their own job and must be able to open it, upload its documents
+// and bills, and close it — even though they do not hold the jobs module. Main
+// inspector or any per-day visit counts.
+function job_owned_by_me($jobId) {
+    $jobId = (int)$jobId;
+    if (!$jobId || !function_exists('my_inspector_id')) return false;
+    $mine = (int)my_inspector_id();
+    if (!$mine) return false;
+    try {
+        if ((int)ops_val("SELECT inspector_id FROM jobs WHERE id=?", [$jobId]) === $mine) return true;
+        return (int)ops_val("SELECT COUNT(*) FROM job_visits WHERE job_id=? AND inspector_id=?", [$jobId, $mine]) > 0;
+    } catch (Throwable $e) { return false; }
+}
 function ops_module_gate($route) {
     $base = (strncmp($route, 'm/', 2) === 0) ? 'masters' : $route;
     static $map = [
@@ -2362,6 +2376,16 @@ function ops_module_gate($route) {
         'partner-import'=>'clients','partner-template'=>'clients','duplicates'=>'clients',
     ];
     $mod = $map[$base] ?? null;
+    // An assigned inspector owns their own job: let them open it, upload its
+    // documents/bills and close it (recording the day's expenses) without the jobs
+    // module. Scoped to a safe allowlist of owner actions on the job in ?id= (or
+    // the posted job id); every other job route still needs the module, and each
+    // handler still applies its own finer checks (e.g. reassign stays coordinator).
+    if ($mod === 'jobs' && !can('mod.jobs.view')
+        && in_array($base, ['job','job-close','job-qap-upload','job-qap','job-qap-del','bill-add','bill-file','bill-delete','expense-delete','job-visit-close','checkin-photo'], true)) {
+        $jid = (int)($_GET['id'] ?? $_GET['job'] ?? $_POST['id'] ?? $_POST['job_id'] ?? $_POST['job'] ?? 0);
+        if ($jid && job_owned_by_me($jid)) return;   // owner may proceed
+    }
     if ($mod && !can("mod.$mod.view")) {
         // Two different "no"s, and they need two different sentences. Telling
         // somebody to ask their administrator for a module the company has not
