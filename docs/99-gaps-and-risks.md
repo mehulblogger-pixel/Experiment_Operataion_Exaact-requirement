@@ -25,12 +25,19 @@ you money, data, or an accreditation finding.
 
 ## Status — four of these are now fixed
 
-Risks **1, 2, 3 and 7** were fixed in commit `docs+fix` on this branch, with 56 new
-assertions in `phpapp/tests/test_critical_access_fixes.php`. Each is marked
-**✅ FIXED** below, with what changed and what it means for you. Risk **11** was
-partly resolved as a necessary consequence of fixing 3.
+Risks **1, 2, 3, 4 and 7** are fixed on this branch, with 80 assertions in
+`phpapp/tests/test_critical_access_fixes.php`. Each is marked **✅ FIXED** below,
+with what changed and what it means for you. Risk **11** was partly resolved as a
+consequence of fixing 3.
 
-The remaining sixteen are untouched and still describe the code as it stands.
+**Voucher approval was additionally moved to the organisation structure** at the
+owner's instruction — it now belongs to the engineer's reporting manager or an
+operations manager, not to anyone at coordinator level. That is described under
+risk 3.
+
+The remaining fifteen are untouched and still describe the code as it stands.
+**Risk 5 now carries the largest remaining exposure**, because closing a job is
+still gated on nothing but the Jobs module.
 
 **Two things are deliberately excluded.** Items recorded in `phpapp/PENDING.md` are
 known and intentional — they are not repeated here as if they were discoveries.
@@ -76,21 +83,21 @@ An unrecognised role now resolves to `UNKNOWN_ROLE` (`phpapp/lib/access.php:31`)
 sentinel that is deliberately **not** a member of `ORG_ROLES` — so it matches no
 case in `role_defaults_base()` or `module_defaults()` and carries no permission, no
 module, and no scope beyond "own". Both resolution points were changed and now
-agree: `ua()` (`phpapp/lib/access.php:440`) and `user_role()`
-(`phpapp/lib/ops.php:552`).
+agree: `ua()` (`phpapp/lib/access.php:433`) and `user_role()`
+(`phpapp/lib/ops.php:545`).
 
 Three further details:
 
 - **A per-user permission list no longer rescues a broken role**
-  (`phpapp/lib/access.php:446`). If the role column holds something this version
+  (`phpapp/lib/access.php:439`). If the role column holds something this version
   does not understand, the account's configuration cannot be trusted as a whole.
 - **The account can still sign in**, so somebody can be told what is wrong. It
   simply cannot do anything.
 - **It is written down.** Each affected account is logged once per request, to the
   error log and to the compliance audit trail
-  (`access_note_unknown_role()`, `phpapp/lib/access.php:418`), and the screen now
+  (`access_note_unknown_role()`, `phpapp/lib/access.php:411`), and the screen now
   labels the role "Unrecognised role — no access" rather than "User"
-  (`phpapp/lib/ops.php:557`).
+  (`phpapp/lib/ops.php:550`).
 
 > ⚠ **Before you deploy:** audit for users whose role is not one of the sixteen.
 > They have been running as full administrators and will now have **no access at
@@ -138,7 +145,7 @@ does not offer it, so nobody stumbles in. A typed or bookmarked URL reaches it.
 ### ✅ FIXED
 
 All five routes now carry a guard (`phpapp/index.php:908`, `:1001`, `:1036`,
-`:1146`, `:1173`), built on four small predicates in `phpapp/lib/ops.php:614-651`
+`:1146`, `:1173`), built on four small predicates in `phpapp/lib/ops.php:621-651`
 so the rules are testable without a browser:
 
 | Route | Now requires |
@@ -207,25 +214,53 @@ down.
 All three parts, plus the screen that has to agree with them.
 
 **3a — the module is now checked.** Ten voucher routes were added to the gate map
-(`phpapp/lib/ops.php:2357-2364`). An engineer holds no voucher module, so an
+(`phpapp/lib/ops.php:2368-2375`). An engineer holds no voucher module, so an
 owner exception mirrors the existing job one — a named allowlist, ownership checked
-per record (`phpapp/lib/ops.php:2467-2479`, predicate at `:4798`). Every link and
+per record (`phpapp/lib/ops.php:2478-2490`, predicate at `:4812`). Every link and
 form on the voucher screen is in that allowlist, verified by a test, so no button
 is offered that then refuses.
 
 **3b — the register is scoped.** It now filters on
-`COALESCE(v.office_id, i.home_office_id)` (`phpapp/lib/ops.php:4998`) — a voucher
+`COALESCE(v.office_id, i.home_office_id)` (`phpapp/lib/ops.php:5041`) — a voucher
 carries its own office, and where it does not the engineer's home office stands in,
 the same fallback the month-freeze check already used.
 
-**3c — approval is separated from preparation.** A new `submitted_by_uid` column
-(`phpapp/lib/ops.php:457`) records who put the claim forward, and
-`voucher_can_approve()` (`phpapp/lib/ops.php:4842`) refuses that same person.
-Anyone else at the same level still may — so a branch with two coordinators needs
-no manager, and a branch with one does. `voucher_can_mark_paid()`
-(`phpapp/lib/ops.php:4851`) now also accepts `finance.reconcile`, and the register
-opens for accounts (`phpapp/lib/ops.php:4990`), so **the people who actually pay
-can record payment** — which they could not before.
+**3c — approval now follows the organisation structure.** Two changes, one on top
+of the other.
+
+*First*, a `submitted_by_uid` column (`phpapp/lib/ops.php:459`) records who put the
+claim forward, and approval refuses that same person — **whatever their role**. A
+manager who fills in a claim on an engineer's behalf still needs somebody else to
+pass it.
+
+*Second, at the owner's instruction*, approval was moved off the coordinator tier
+altogether. `voucher_can_approve()` (`phpapp/lib/ops.php:4871`) now accepts only:
+
+- the **engineer's reporting manager**, read from `inspectors.reports_to_id` —
+  the organisation structure, not a role tier (`voucher_approver_user_id()`,
+  `phpapp/lib/ops.php:4864`);
+- an **`OPERATION_MANAGER`**, **`BRANCH_MANAGER`**, or an administrator
+  (`VOUCHER_APPROVER_ROLES`, `phpapp/lib/ops.php:4870`).
+
+A `COORDINATOR` can prepare and submit a claim and can no longer approve one. This
+is the same shape the codebase already used for approving a job closed without its
+site check-in (`can_close_attendance_missing()`, `phpapp/lib/trust.php:346-352`).
+
+> The **Branch Manager** is included because they sit above the Operation Manager
+> and carry the branch — and because without them, a branch with no Operation
+> Manager and an engineer whose reporting manager is unset would have nobody able
+> to approve at all. To make approval strictly the Operation Manager's, remove
+> `'BRANCH_MANAGER'` from `VOUCHER_APPROVER_ROLES` (`phpapp/lib/ops.php:4870`).
+
+`voucher_can_mark_paid()` (`phpapp/lib/ops.php:4894`) accepts the operations tier
+**or** `finance.reconcile`, and the register opens for accounts
+(`phpapp/lib/ops.php:5033`), so **the people who actually pay can record payment**
+— which they could not before. Approving and paying are now two different people.
+
+> ⚠ **Set `reports_to_id` on your engineers.** Where it is blank, only an
+> Operation Manager, Branch Manager or administrator can approve that engineer's
+> claim — the reporting-manager route simply does not resolve. It is set on the
+> engineer's record under Masters → Engineers.
 
 The screen was changed to match: the approve button is offered only to somebody who
 may actually approve, and the submitter is told why it is not there
@@ -240,9 +275,9 @@ may actually approve, and the submitter is told why it is not there
 > **Vouchers already submitted are unaffected** — their `submitted_by_uid` is empty,
 > so nobody is barred from approving work that is already in flight.
 
-**Still open after this fix:** `BUSINESS_DIRECTOR` and `SBU_HEAD` hold
-`mod.vouchers.view` and remain in the tier, so they can still approve. That is
-risk 4, which is not addressed here.
+**And `BUSINESS_DIRECTOR` / `SBU_HEAD` are out too** — they left the operations
+tier when risk 4 was fixed, so the voucher register now refuses them. Nothing about
+vouchers is left open.
 
 **Original recommendation (now implemented).** Add `vouchers` to the gate map; apply
 office scope to the register; split approval from preparation and grant
@@ -257,8 +292,8 @@ mark-paid to `FINANCE`.
 
 ## 4. Three "read-only" roles can allocate work and approve pay
 
-**Where:** `phpapp/lib/access.php:27` combined with `phpapp/lib/ops.php:548`,
-`:5136`, `:4863`
+**Where:** `phpapp/lib/access.php:40` combined with `phpapp/lib/ops.php:548`,
+`:5321`, `:4863`
 
 `is_coordinator_level()` admits nine roles — the seven in `MGMT_ROLES` plus
 `ASST_MANAGER` and `COORDINATOR`. Job allocation and voucher approval are gated on
@@ -272,26 +307,65 @@ that tier. Three of those nine should never be near daily operations:
 
 **Verify it yourself:** the tier is `MGMT_ROLES` + two
 (`phpapp/lib/ops.php:548`); `MGMT_ROLES` contains `BUSINESS_DIRECTOR` and `SBU_HEAD`
-(`phpapp/lib/access.php:27`); job allocation asks only for the tier
-(`phpapp/lib/ops.php:5136`); the module gate asks only for `mod.jobs.view`
+(`phpapp/lib/access.php:40`); job allocation asks only for the tier
+(`phpapp/lib/ops.php:5321`); the module gate asks only for `mod.jobs.view`
 (`phpapp/lib/ops.php:2389`), which both hold.
 
 **Why it happened.** `MGMT_ROLES` was recently narrowed to fix a real problem —
 sales and finance roles were seeing operational widgets (commit `ff0b94a`,
-`phpapp/lib/access.php:31-27`). That fix was correct. But the list is still a
+`phpapp/lib/access.php:33-40`). That fix was correct. But the list is still a
 *seniority* list being used as an *operational* list, and the oversight roles were
 left in.
 
-**Recommended fix.** Introduce a separate `OPS_ROLES` constant containing only the
-roles that actually run operations — `BRANCH_MANAGER`, `OPERATION_MANAGER`,
-`ASST_MANAGER`, `COORDINATOR`, plus the administrators — and point
-`is_coordinator_level()` at that. Leave `MGMT_ROLES` for what it means: seniority.
+### ✅ FIXED
+
+`OPS_ROLES` now names the roles that actually run operations
+(`phpapp/lib/access.php:55`), and `is_coordinator_level()` reads that instead of
+being built from the seniority list (`phpapp/lib/ops.php:569`):
+
+```php
+const OPS_ROLES = ['MASTER_ADMIN','ADMIN','BRANCH_MANAGER','OPERATION_MANAGER','ASST_MANAGER','COORDINATOR'];
+```
+
+`MGMT_ROLES` is unchanged and still answers the question it was written for — *is
+this person senior* — which is what master data and the revenue figures ask.
+`is_admin_level()` is untouched, so nothing that legitimately depends on seniority
+moved.
+
+**What the three roles lost:** allocating, editing and reassigning jobs; changing a
+call's service-request status; setting the required credit; the hiring pipeline;
+attendance reconciliation; the scheduling and deputation write actions; and the
+voucher screens. Roughly ninety call sites, all of them operational.
+
+**What they kept:** everything that asks `is_admin_level()` — master data, the
+availability board, the organisation hierarchy, the audit log — plus every module
+they hold in their own right. A Business Director still sees the whole company; it
+can just no longer allocate work.
+
+One deliberate exception: `master_access_ok('coordinator')` now accepts
+**coordinator level *or* above in seniority** (`phpapp/lib/ops.php:2262`). Master
+data is reference data, not an operational action, and narrowing the tier must not
+take the sub-contractor, rate and contract lists away from the Branch Application
+Manager, whose whole job is maintaining them.
+
+> ⚠ **Before you deploy:** if a Business Director, Business Unit Head or Branch
+> Application Manager has been allocating jobs or approving vouchers in practice —
+> which the old code allowed — they will stop being able to. That is the point of
+> the change, but check it against how your branches actually work first.
+
+**Still open — `job-close`.** Closing a job checks no permission at all, only the
+Jobs module (risk 5), so these three roles hold `mod.jobs.view` and can still
+*close* a job even though they can no longer allocate or edit one. Fixing risk 5
+closes that last gap; it is now the most valuable remaining item on this list.
+
+**Original recommendation (now implemented).** Introduce a separate `OPS_ROLES` constant containing only the
+roles that actually run operations, and point `is_coordinator_level()` at that.
 
 ---
 
 ## 5. The permissions that name operational actions do not control them
 
-**Where:** `phpapp/lib/ops.php:5136` and `:5531`
+**Where:** `phpapp/lib/ops.php:5321` and `:5716`
 
 Two of the four `ops.*` permissions are **never checked on the routes they name.**
 
@@ -305,9 +379,9 @@ route.** `ops.job.allocate` is the same story.
 
 | Action | What appears to govern it | What actually governs it |
 |---|---|---|
-| Allocate / edit a job | `ops.job.allocate` | `is_coordinator_level()` (`:5136`) |
-| Close a job | `ops.job.close` | **nothing** — `mod.jobs.view` or job ownership (`:5531`) |
-| Reassign a job | `ops.job.allocate` | `is_coordinator_level()` (`:5663`) |
+| Allocate / edit a job | `ops.job.allocate` | `is_coordinator_level()` (`:5321`) |
+| Close a job | `ops.job.close` | **nothing** — `mod.jobs.view` or job ownership (`:5716`) |
+| Reassign a job | `ops.job.allocate` | `is_coordinator_level()` (`:5848`) |
 
 **What goes wrong.** Granting or removing these permissions changes almost nothing,
 while appearing in the admin interface as though it does. `ASST_MANAGER` is the live
@@ -316,7 +390,7 @@ example: `ops.job.close` was deliberately withheld from it
 tightening access will believe they have done something they have not.
 
 For the record, the other two are properly enforced: `ops.call.create`
-(`phpapp/lib/ops.php:3695`) and `ops.call.delete` (`phpapp/lib/ops.php:3588`).
+(`phpapp/lib/ops.php:3737`) and `ops.call.delete` (`phpapp/lib/ops.php:3630`).
 
 **Recommended fix.** Add the real checks — `can('ops.job.allocate')` on new/edit/
 reassign, `can('ops.job.close')` on close (alongside the existing owner path for
@@ -379,7 +453,7 @@ everything from the bypass.
 ### ✅ FIXED
 
 The column is now `TEXT`, both for new installs and for existing ones
-(`phpapp/lib/access.php:769-782`). MySQL will not take a `DEFAULT` on `TEXT`;
+(`phpapp/lib/access.php:762-775`). MySQL will not take a `DEFAULT` on `TEXT`;
 nothing relies on one, because every read of this column already coalesces a
 missing value to `''` — checked across `access.php`, `datacontrol.php`,
 `identity.php`, `ops.php` and `user_form.php`.
@@ -501,7 +575,7 @@ naming them as an approver already works without a role change.
 
 Finance holds view access to Calls, Jobs and Vouchers, which puts **Operations** in
 the rail. The voucher register then demands the management tier, which Finance was
-deliberately removed from (`phpapp/lib/access.php:31-27`) — so the screen refuses.
+deliberately removed from (`phpapp/lib/access.php:33-40`) — so the screen refuses.
 
 A second oddity in the same area: **Finance cannot mark a voucher paid, but a
 coordinator can** (`phpapp/lib/ops.php:4970`). The control is inverted.
@@ -511,8 +585,8 @@ coordinator can** (`phpapp/lib/ops.php:4970`). The control is inverted.
 ### ◐ PARTLY RESOLVED, as a consequence of fixing risk 3
 
 The voucher half is fixed: the register now opens for `finance.reconcile` holders
-(`phpapp/lib/ops.php:4990`) and Finance can mark a voucher paid
-(`phpapp/lib/ops.php:4851`). The inversion is gone — the people who pay can record
+(`phpapp/lib/ops.php:5033`) and Finance can mark a voucher paid
+(`phpapp/lib/ops.php:4894`). The inversion is gone — the people who pay can record
 payment.
 
 **Still open:** the rest of the Operations area. Finance holds view on Calls and
@@ -548,7 +622,7 @@ credit, not an edit.
 
 ## 13. The job stage is a free dropdown, not a state machine
 
-**Where:** `phpapp/views/ops/job_form.php:171`, saved at `phpapp/lib/ops.php:4121`
+**Where:** `phpapp/views/ops/job_form.php:171`, saved at `phpapp/lib/ops.php:4163`
 
 `jobs.stage` holds eight values (`phpapp/lib/ops.php:32`) and is edited as an
 ordinary form field. **No transition table, no ordering, no check that one state may
@@ -568,7 +642,7 @@ transition table and a guard, as calls have (`phpapp/lib/tosrm.php:132-143`).
 
 ## 14. Being senior silently substitutes for the revenue permission
 
-**Where:** `phpapp/lib/ops.php:580`
+**Where:** `phpapp/lib/ops.php:604`
 
 ```php
 function can_see_salary()  { return can('data.salary'); }
@@ -690,7 +764,7 @@ feature built on call status until then has to know which of the three it means.
 
 ## 19. Master-data permissions do not govern master data
 
-**Where:** `phpapp/lib/lookups.php:635`, `phpapp/lib/ops.php:2185`
+**Where:** `phpapp/lib/lookups.php:635`, `phpapp/lib/ops.php:2257`
 
 Lookups and custom fields are gated on **`is_admin_level()`** — the management tier —
 not on the `master.manage` permission, which is what an administrator would
@@ -702,7 +776,7 @@ Two odd consequences:
 - A **`BUSINESS_DIRECTOR`**, who holds edit rights on nothing anywhere, can.
 
 The same applies to the **inspector master** (`/m/inspectors`, access level `admin` —
-`phpapp/lib/ops.php:2049`, resolved at `:2185`): a coordinator who allocates jobs to
+`phpapp/lib/ops.php:2060`, resolved at `:2257`): a coordinator who allocates jobs to
 inspectors all day cannot add one, while the board-level read-only role can.
 
 **Recommended fix.** Point `master_access_ok('admin')` and `lk_admin()` at
@@ -735,20 +809,20 @@ scope.
 
 | # | Risk | Band | Where | Fix size |
 |---|---|---|---|---|
-| 1 | ~~Unrecognised role → full admin~~ | ✅ **fixed** | `access.php:440` | done |
+| 1 | ~~Unrecognised role → full admin~~ | ✅ **fixed** | `access.php:433` | done |
 | 2 | ~~Partner & PO routes ungated~~ | ✅ **fixed** | `index.php:908-1173` | done |
-| 3 | ~~Vouchers: no gate, no scope, no separation~~ | ✅ **fixed** | `ops.php:2357`, `:4998`, `:4820` | done |
-| 4 | Read-only roles can allocate & approve pay | 🟠 | `access.php:27` | Small |
-| 5 | `ops.job.*` permissions not enforced | 🟠 | `ops.php:5136`, `:5531` | Small |
+| 3 | ~~Vouchers: no gate, no scope, no separation~~ | ✅ **fixed** | `ops.php:2368`, `:4998`, `:4820` | done |
+| 4 | ~~Read-only roles can allocate & approve pay~~ | ✅ **fixed** | `access.php:55`, `ops.php:569` | done |
+| 5 | `ops.job.*` permissions not enforced | 🟠 **now the top item** | `ops.php:5321`, `:5674` | Small |
 | 6 | Route gate never checks `.edit` | 🟠 | `ops.php:2389` | Architectural |
-| 7 | ~~Permission column too small~~ | ✅ **fixed** | `access.php:769` | done |
+| 7 | ~~Permission column too small~~ | ✅ **fixed** | `access.php:762` | done |
 | 8 | Branch App Manager's powers unreachable | 🟠 | `access.php:261` | One line |
 | 9 | Hold-points unreachable; phantom permissions | 🟠 | `ops.php:2407` | Small |
 | 10 | `SR_INSPECTOR` unimplemented | 🟠 | `access.php:18` | Small |
 | 11 | Finance shown a menu it cannot use | ◐ partly | `layout_top.php:128` | Small |
 | 12 | No voucher audit trail; reopen unguarded | 🟡 | `ops.php:4974` | Small |
-| 13 | Job stage is a free dropdown | 🟡 | `ops.php:4121` | Design decision |
-| 14 | Seniority substitutes for `data.revenue` | 🟡 | `ops.php:580` | One line |
+| 13 | Job stage is a free dropdown | 🟡 | `ops.php:4163` | Design decision |
+| 14 | Seniority substitutes for `data.revenue` | 🟡 | `ops.php:604` | One line |
 | 15 | No record locking | 🟡 | absent | Medium |
 | 16 | Scope defaults fail open | 🟡 | `access.php:429`, `:435` | Small |
 | 17 | My Jobs fallback unscoped | 🟡 | `ops.php:5892` | One line |
@@ -756,11 +830,16 @@ scope.
 | 19 | `master.manage` does not govern masters | 🔵 | `lookups.php:635` | Small |
 | 20 | Marketing Manager sees all profitability | 🔵 | `access.php:384` | Decision |
 
-**Those four are done.** Between them they closed the gaps that could hand out
-administrator rights, let anyone edit your client list, and let one person pay
-themselves. The next most valuable is **risk 4** — the management tier being used as
-an operations tier — because it is the root of several others and is a small change
-to one constant.
+**Five are done** — 1, 2, 3, 4 and 7 — and voucher approval now follows the
+organisation chart rather than a role tier. Between them they closed the gaps that
+could hand out administrator rights, let anyone edit your client list, let one
+person pay themselves, and let a board-level read-only role allocate work.
+
+**The next one is risk 5**, and it is now the most valuable thing on this list.
+Closing a job still checks no permission at all — only the Jobs module — which is
+why a Business Director or Finance can still close a job they could never have
+allocated. It is a small change: check `can('ops.job.close')` on the close route,
+alongside the existing owner path for engineers.
 
 ---
 
@@ -781,7 +860,7 @@ reasoning, which is rarer than it should be.
   acquires a stray permission. This is the model the rest of the gates should follow.
 - **Job closure enforces the business rules rigorously** — the report, the bills, the
   site check-in, every visit day — and checks them on the server because "this is a
-  promise made to a customer" (`phpapp/lib/ops.php:5573-5576`).
+  promise made to a customer" (`phpapp/lib/ops.php:5503-5576`).
 - **A closed month freezes its vouchers** (`phpapp/lib/ops.php:4715-4730`), because
   changing a day behind a completed cost run would leave figures that still add up
   and are still wrong.

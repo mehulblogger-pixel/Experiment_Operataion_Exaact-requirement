@@ -11,7 +11,7 @@ measured on keeping and growing them.
 ## ⚠ Identical permissions to `BUSINESS_DEV_MANAGER`
 
 The two roles **share a single branch in the code** — for module access
-(`phpapp/lib/access.php:273`) and for fine-grained permissions
+(`phpapp/lib/access.php:403`) and for fine-grained permissions
 (`phpapp/lib/access.php:381-382`). They are two business roles with one permission
 set.
 

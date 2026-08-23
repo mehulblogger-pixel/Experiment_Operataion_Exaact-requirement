@@ -58,6 +58,17 @@ the job (1) → reassign (1) → pick the inspector (1) → save (1) = **≈ 5 c
 counted as discrete clicks on the shortest path, excluding any competence or
 conflict warning that sends you back to re-pick.
 
+### Voucher approval is yours
+
+Since risk 3 was fixed, approving an engineer's monthly claim belongs to **you, the
+Branch Manager, or that engineer's named reporting manager**
+(`VOUCHER_APPROVER_ROLES`, `phpapp/lib/ops.php:4870`) — not to the coordinator who
+prepared it. Nobody may approve a claim they submitted themselves, you included.
+
+Where an engineer has no reporting manager set on their record, you are the only
+route besides the Branch Manager. Setting `reports_to_id` under Masters → Engineers
+spreads that load.
+
 ### Cannot do
 
 Manage users · change settings · see salaries · delete calls · register contracts.

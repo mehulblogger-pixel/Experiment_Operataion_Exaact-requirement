@@ -15,7 +15,7 @@ office and business unit (`phpapp/lib/access.php:362-363`, `phpapp/lib/access.ph
 It also **used to be the silent fallback** for any role the system did not
 recognise, so a typo in a user's role field, a role removed in a later version, or a
 bad import handed out full company-wide access. That is fixed
-(`phpapp/lib/access.php:440`) — an unrecognised role now grants nothing and is
+(`phpapp/lib/access.php:433`) — an unrecognised role now grants nothing and is
 logged. See `99-gaps-and-risks.md` risk 1.
 
 **The role itself is unchanged.** Anyone explicitly assigned `ADMIN` still holds
@@ -39,7 +39,7 @@ flowchart TD
 1. **Sign in.** Every module, every permission, every office.
 2. **Do anything** — with one exception.
 3. **Roles & access refuses you.** It checks `is_master()`
-   (`phpapp/lib/ops.php:2412`), which tests the bypass flag rather than a permission.
+   (`phpapp/lib/ops.php:2423`), which tests the bypass flag rather than a permission.
    `ADMIN` holds every permission and still cannot open it. That is the only
    practical difference between this role and `MASTER_ADMIN`.
 

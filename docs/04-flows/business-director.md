@@ -55,11 +55,14 @@ the shortest path.
 
 Change anything at all — that is the entire design of the role.
 
-> ⚠ **Except that you can.** You are in the management tier
-> (`phpapp/lib/access.php:27`) and hold `mod.jobs.view`, which is all the job routes
-> check — so the board-level, read-only role can **allocate, edit, reassign and close
-> jobs** (`phpapp/lib/ops.php:5136`, `:5531`), and can still approve vouchers. This is
-> the widest gap between what a role is documented to be and what it can actually do.
-> It is **risk 4 in `99-gaps-and-risks.md`, and it is not yet fixed** — the critical
-> fixes narrowed the voucher half (the register is now branch-scoped, and nobody can
-> approve a claim they submitted) but left the tier itself alone.
+> ✅ **Read-only now means read-only.** This role used to sit in the management tier,
+> which the job and voucher routes mistook for operational authority — so a
+> board-level, view-only role could allocate work and approve pay. `OPS_ROLES`
+> (`phpapp/lib/access.php:55`) now names only the six roles that actually run
+> operations, and this is not one of them. You can no longer allocate, edit or
+> reassign a job, and the voucher register refuses you. See `99-gaps-and-risks.md`
+> risk 4.
+>
+> ⚠ **One thing survives.** You can still *close* a job, because the close route
+> checks no permission at all — only `mod.jobs.view`, which you hold. That is risk 5,
+> still open, and it is now the most valuable item on that list.

@@ -38,6 +38,21 @@ const UNKNOWN_ROLE = 'UNRECOGNISED';
 // approve", an accountant seeing "raise inspection call"). Their own CRM/finance
 // access is enforced by module/permission can() checks, which is unaffected.
 const MGMT_ROLES = ['MASTER_ADMIN','ADMIN','BUSINESS_DIRECTOR','SBU_HEAD','BRANCH_MANAGER','BRANCH_APP_MANAGER','OPERATION_MANAGER'];
+// The roles that actually RUN operations — raise calls, allocate and close jobs,
+// reschedule, reassign, run the hiring pipeline, reconcile attendance.
+//
+// MGMT_ROLES above is a SENIORITY list, and is_coordinator_level() used to be
+// built from it. That put three roles on the operations floor that have no
+// business there: a Business Director and an Business Unit Head are documented as
+// read-only on every module, and a Branch Application Manager is a records
+// custodian with no operational role — yet all three could allocate work and
+// approve pay, because the tier admitted them and the job and voucher routes ask
+// for the tier rather than for a permission.
+//
+// Seniority and operational responsibility are two different things. MGMT_ROLES
+// still answers "is this person senior" (master data, revenue figures); this
+// answers "does this person run the work".
+const OPS_ROLES = ['MASTER_ADMIN','ADMIN','BRANCH_MANAGER','OPERATION_MANAGER','ASST_MANAGER','COORDINATOR'];
 // Marketing & Sales roles (CRM funnel owners)
 const SALES_ROLES = ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'];
 

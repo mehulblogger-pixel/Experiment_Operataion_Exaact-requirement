@@ -56,7 +56,7 @@ Where that is true it is called out under the role, and every instance is listed
 `99-gaps-and-risks.md`.
 
 The tier deliberately **excludes** Finance and all four Sales roles
-(`phpapp/lib/access.php:31-27`). That exclusion is recent and intentional: the
+(`phpapp/lib/access.php:33-40`). That exclusion is recent and intentional: the
 comment in the code explains that lumping them in made every operational widget leak
 to them — "a salesperson seeing *vouchers to approve*, an accountant seeing *raise
 inspection call*". It fixed a real problem, and it created a smaller new one, which
@@ -117,14 +117,16 @@ before the required date, that is a coordinator failure.
   `data.profitability` (`phpapp/lib/access.php:380`). The code comments this
   explicitly: a coordinator "has no business seeing what the branch earns on it"
   (`phpapp/lib/ops.php:577-579`).
-- **Delete a call.** `ops.call.delete` is not theirs (`phpapp/lib/ops.php:3588`).
+- **Delete a call.** `ops.call.delete` is not theirs (`phpapp/lib/ops.php:3630`).
 - **Change settings, manage users, or edit role permissions.**
 
-> ✅ **Two boundaries that used to be missing are now enforced.** A coordinator could
-> once submit a voucher, approve it and mark it paid unaided, and the register they
-> opened was not filtered by branch. Whoever submits a claim can no longer approve it
-> (`phpapp/lib/ops.php:4842`), and the register is scoped to their own offices
-> (`phpapp/lib/ops.php:4998`). See `99-gaps-and-risks.md` risk 3.
+> ✅ **Voucher approval is no longer a coordinator's job.** A coordinator could once
+> submit a claim, approve it and mark it paid unaided, on any branch. Approval now
+> belongs to the engineer's **reporting manager** or an **Operation / Branch
+> Manager** (`phpapp/lib/ops.php:4871`), never to whoever submitted it; and the
+> register is scoped to your own offices (`phpapp/lib/ops.php:5041`). You still
+> prepare and submit claims, and you can still mark an approved one paid. See
+> `99-gaps-and-risks.md` risk 3.
 >
 > ⚠ **One thing changed for you.** Creating a client or vendor now needs edit rights
 > on the directory, which a coordinator does not hold by default — the "+ Add new"
@@ -192,7 +194,7 @@ company pays and what the contract's margin is calculated from.
 An inspector has **no Jobs module access at all** — yet they can open, upload to and
 close their own job. This is a deliberate, narrow exception: a named allowlist of
 owner-only actions, each checked against `job_owned_by_me()`
-(`phpapp/lib/ops.php:2379-2387`, `phpapp/lib/ops.php:2230-2239`). It is well built
+(`phpapp/lib/ops.php:2390-2398`, `phpapp/lib/ops.php:2230-2239`). It is well built
 — worth knowing about, not worth worrying about.
 
 ---
@@ -291,12 +293,12 @@ them.
 
 > ⚠ **The job-close boundary still does not hold.** Withholding `ops.job.close` has
 > no practical effect, because the close route never checks that permission — it is
-> gated by the Jobs module and job ownership only (`phpapp/lib/ops.php:5571-5534`).
+> gated by the Jobs module and job ownership only (`phpapp/lib/ops.php:5716-5719`).
 > An Assistant Manager holds Jobs edit, so they can close jobs. That is risk 5, still
 > open.
 >
 > ✅ **The voucher boundary now holds.** They hold no voucher module, and the module
-> is now checked (`phpapp/lib/ops.php:2357-2364`), so vouchers are genuinely closed
+> is now checked (`phpapp/lib/ops.php:2368-2375`), so vouchers are genuinely closed
 > to them. If your Assistant Managers do handle vouchers in practice, grant
 > `mod.vouchers.view` rather than reverting the fix.
 
@@ -401,7 +403,7 @@ flowchart LR
 - **Manage users outside their own office.** They hold `users.manage.branch`, not
   `users.manage.global` (`phpapp/lib/access.php:369`).
 - **Change system settings or edit role permissions.** `settings.manage` is not
-  theirs; Roles & access is Master Admin only (`phpapp/lib/ops.php:2412`).
+  theirs; Roles & access is Master Admin only (`phpapp/lib/ops.php:2423`).
 - **Delete a call.** Reserved to the Branch Application Manager — see below.
 
 ---
@@ -445,7 +447,7 @@ numbering is unbroken. Also the audit trail — `idems.audit.view` is theirs.
 - **`idems.timestamp.edit`** — editing a locked timestamp. The code names this role
   as the *only* one that may (`phpapp/lib/access.php:371`).
 - **`ops.call.delete`** — deleting a call. Not even the Branch Manager has this
-  (`phpapp/lib/access.php:372`, enforced at `phpapp/lib/ops.php:3588`).
+  (`phpapp/lib/access.php:372`, enforced at `phpapp/lib/ops.php:3630`).
 
 Both are correct in principle: destructive corrections belong with the custodian,
 not the person whose numbers they affect. Both deserve monitoring, because between
@@ -459,7 +461,7 @@ them they can make work disappear.
 - **Raise or allocate work.** No `ops.call.create`, no `ops.job.allocate`.
 
 > ⚠ **The money boundary does not hold.** `can_see_revenue()` is
-> `can('data.revenue') || is_admin_level()` (`phpapp/lib/ops.php:580`), and this role
+> `can('data.revenue') || is_admin_level()` (`phpapp/lib/ops.php:604`), and this role
 > is in the management tier — so it sees revenue figures anyway, despite never being
 > granted the permission. Note that the salary check on the line above has no such
 > bypass, so the two are inconsistent. In `99-gaps-and-risks.md`.
@@ -489,7 +491,7 @@ a search box and folding groups (`phpapp/views/layout_top.php:75-84`).
 
 That the system is correctly configured and that the permission model reflects how
 the business actually runs. Uniquely, they can edit what every other role may do
-(`phpapp/lib/ops.php:2412`).
+(`phpapp/lib/ops.php:2423`).
 
 ### The one thing they cannot do — and it is deliberate
 
@@ -530,7 +532,7 @@ module, across every office and business unit (`phpapp/lib/access.php:362-363`,
 ```php
 // Before — the fallback handed out full company-wide access:
 if (!isset(ORG_ROLES[$role])) $role = 'ADMIN';
-// Now (phpapp/lib/access.php:440) — an unrecognised role grants nothing:
+// Now (phpapp/lib/access.php:433) — an unrecognised role grants nothing:
 if (!isset(ORG_ROLES[$role])) { access_note_unknown_role($u, $role); $role = UNKNOWN_ROLE; }
 ```
 
@@ -691,7 +693,7 @@ is correct for an accounts function.
 
 - **Raise a call or allocate a job.** No `ops.*` permissions, and they were
   deliberately removed from the operations management tier
-  (`phpapp/lib/access.php:31-27`).
+  (`phpapp/lib/access.php:33-40`).
 - **Approve a quotation.** `crm.quote.approve` is not theirs — they register the
   contract *after* somebody else has approved the quote.
 
@@ -699,7 +701,7 @@ is correct for an accounts function.
 > the operations tier, which Finance is deliberately not in — so the menu offered a
 > screen that refused, and the people who actually pay could not mark anything paid.
 > Both are fixed: the register accepts `finance.reconcile`
-> (`phpapp/lib/ops.php:4990`) and so does mark-paid (`phpapp/lib/ops.php:4851`).
+> (`phpapp/lib/ops.php:5033`) and so does mark-paid (`phpapp/lib/ops.php:4894`).
 > See `99-gaps-and-risks.md` risks 3 and 11.
 
 ---
@@ -709,7 +711,7 @@ is correct for an accounts function.
 
 These four roles fill the pipeline. None of them can touch a call, a job or a
 voucher, and none is in the operations management tier
-(`phpapp/lib/access.php:31-27`).
+(`phpapp/lib/access.php:33-40`).
 
 ---
 
@@ -724,7 +726,7 @@ lead into a real opportunity, and gets a quotation in front of them.
 
 **Navigation:** Dashboard · Search · **Sales** ✓ · **Insights** ✓ · **Directory** ✓.
 Nothing else. Edit on Enquiries, Quotations and Contracts; read-only on Sales
-reports, Clients and Dashboards (`phpapp/lib/access.php:273-275`).
+reports, Clients and Dashboards (`phpapp/lib/access.php:301-303`).
 
 **Accountable for:** new business won. They can create quotes, send them and manage
 follow-ups (`phpapp/lib/access.php:382`).
@@ -746,7 +748,7 @@ revenue, and is measured on keeping and growing them rather than on finding new 
 **Device and context:** laptop and phone, often at the client's office.
 
 **Navigation and permissions:** **identical to `BUSINESS_DEV_MANAGER`** — the two
-share a single branch in the code (`phpapp/lib/access.php:273`,
+share a single branch in the code (`phpapp/lib/access.php:403`,
 `phpapp/lib/access.php:381-382`). They are two business roles with one permission
 set. That is reasonable today; it means any future change to one silently changes
 the other, which is worth knowing.
@@ -770,7 +772,7 @@ second signature.
 **Navigation:** Dashboard · Search · **Sales** ✓ · **Money** ✓ · **Insights** ✓ ·
 **Directory** ✓ · **Admin** ✓ (document templates only). Edit on Enquiries,
 Quotations, Contracts, Sales reports and Clients
-(`phpapp/lib/access.php:277-278`).
+(`phpapp/lib/access.php:304-306`).
 
 **Accountable for:** the quality and profitability of what is sold. They uniquely
 hold `crm.quote.approve` and `crm.template.manage` among the sales roles

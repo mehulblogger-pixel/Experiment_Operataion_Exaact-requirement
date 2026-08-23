@@ -47,8 +47,8 @@ each row.
 | Module | MA | AD | BD | SH | BM | BAM | OM | AM | CO | BDM | KAM | MM | ME | FI | SI | IN |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | **Calls / Enquiries** <sup>1</sup> | Create Edit Delete | Create Edit Delete | View | View | Create Edit (branch) | View · **Delete** | Create Edit | Create Edit | Create Edit | — | — | — | — | View | — | — |
-| **Jobs** <sup>2</sup> | Create Edit Close | Create Edit Close | View ⚠Create ⚠Edit ⚠Close | View ⚠Create ⚠Edit ⚠Close | Create Edit Close (branch) | View ⚠Create ⚠Edit ⚠Close | Create Edit Close | Create Edit ⚠Close | Create Edit Close | — | — | — | — | View | — | View own · Close own |
-| **Vouchers** <sup>3</sup> | View Edit Approve Reopen | View Edit Approve Reopen | ⚠View ⚠Approve ⚠Reopen | ⚠View ⚠Approve ⚠Reopen | View Approve Reopen (branch) | — | View Approve Reopen (branch) | — | View Edit Approve Reopen (branch) | — | — | — | — | View · **Mark paid** | **—** | View own Edit own Submit own |
+| **Jobs** <sup>2</sup> | Create Edit Close | Create Edit Close | View ⚠Close | View ⚠Close | Create Edit Close (branch) | View ⚠Close | Create Edit Close | Create Edit ⚠Close | Create Edit Close | — | — | — | — | View ⚠Close | — | View own · Close own |
+| **Vouchers** <sup>3</sup> | View Edit Approve Reopen | View Edit Approve Reopen | — | — | View **Approve** Reopen (branch) | — | View **Approve** Reopen (branch) | — | View Edit Reopen (branch) | — | — | — | — | View · **Mark paid** | — | View own Edit own Submit own |
 | **Profitability** <sup>4</sup> | View | View | View | View | View | — | View | — | — | — | — | View | — | View | — | — |
 | **Business Partners** <sup>5</sup> | View Edit | View Edit | View | View | View Edit | — | View | View | View | View | View | View Edit | View | — | — | — |
 | **Contracts** <sup>6</sup> | Edit | Edit | View | View | View | — | View | — | View | Edit | Edit | Edit | View | **Edit · Register** | — | — |
@@ -75,47 +75,56 @@ each row.
 
 1. **Calls.** Module gate `mod.calls.view` (`phpapp/lib/ops.php:2243`, applied at
    `phpapp/lib/ops.php:2389`). Create/edit checks `can('ops.call.create')`
-   (`phpapp/lib/ops.php:3695`). Delete checks `can('ops.call.delete')`
-   (`phpapp/lib/ops.php:3588`). Setting the credit figure needs
+   (`phpapp/lib/ops.php:3737`). Delete checks `can('ops.call.delete')`
+   (`phpapp/lib/ops.php:3630`). Setting the credit figure needs
    `can('mod.calls.edit') || is_coordinator_level()` (`phpapp/lib/ops.php:3998`).
    *Note the shape of the `BAM` cell: the Branch Application Manager is the only
    non-administrator who can **delete** a call, and cannot create or edit one.*
 
 2. **Jobs.** Module gate `mod.jobs.view` (`phpapp/lib/ops.php:2244`). Allocate and
    edit check **`is_coordinator_level()`** — the role tier, *not* the
-   `ops.job.allocate` permission (`phpapp/lib/ops.php:5136`). Reassign likewise
+   `ops.job.allocate` permission (`phpapp/lib/ops.php:5321`). Reassign likewise
    (`phpapp/lib/ops.php:5663`). Closing a visit day likewise
    (`phpapp/lib/ops.php:5654`). **Closing a job checks no permission at all**
-   (`phpapp/lib/ops.php:5571-5534`) — the module view gate or job ownership is the
+   (`phpapp/lib/ops.php:5716-5719`) — the module view gate or job ownership is the
    only barrier. An inspector reaches their own job through a named owner allowlist
-   (`phpapp/lib/ops.php:2379-2387`).
-   ⚠ `BD`, `SH` and `BAM` are all in the management tier
-   (`phpapp/lib/access.php:27`) and all hold `mod.jobs.view`, so all three can
-   allocate, edit, reassign and close jobs despite being documented as read-only or
-   as having no operational role. ⚠ `AM` is deliberately **not** granted
-   `ops.job.close` (`phpapp/lib/access.php:377`), and closes jobs anyway, because
-   that permission is never consulted.
+   (`phpapp/lib/ops.php:2390-2398`).
+   ✅ `BD`, `SH` and `BAM` can no longer **allocate, edit or reassign** — those ask
+   for the operations tier, which they left when risk 4 was fixed (`OPS_ROLES`,
+   `phpapp/lib/access.php:55`).
+   ⚠ They can still **close** a job, and so can `FI`, because the close route asks
+   for nothing but `mod.jobs.view` (risk 5, still open). ⚠ `AM` is deliberately
+   **not** granted `ops.job.close` (`phpapp/lib/access.php:377`) and closes jobs
+   anyway, for the same reason.
 
 3. **Vouchers.** *(Rewritten — the three defects here were fixed; see
    `99-gaps-and-risks.md` risk 3.)* The routes are now covered by the central gate
-   (`phpapp/lib/ops.php:2357-2364`), so the **module is checked** — which is why
+   (`phpapp/lib/ops.php:2368-2375`), so the **module is checked** — which is why
    `BAM` and `AM`, who hold no voucher module, are now `—` rather than able to
    approve everything. An engineer reaches their own claim through an owner
-   allowlist mirroring the jobs one (`phpapp/lib/ops.php:2467-2479`).
+   allowlist mirroring the jobs one (`phpapp/lib/ops.php:2478-2490`).
    The register is **scoped to the viewer's offices**
-   (`phpapp/lib/ops.php:4998`), so "View" means their own branch, not the company.
-   Submit accepts the owner or the tier (`phpapp/lib/ops.php:5109`); **approve
-   refuses whoever submitted** (`voucher_can_approve()`,
-   `phpapp/lib/ops.php:4842`); mark-paid accepts the tier **or**
-   `finance.reconcile` (`phpapp/lib/ops.php:4851`), which is why `FI` now carries
-   **Mark paid**.
-   ⚠ `BD` and `SH` remain marked implicit: they hold `mod.vouchers.view` and are
-   still in the management tier, so they can still approve. That is risk 4, which
-   is not yet fixed.
+   (`phpapp/lib/ops.php:5041`), so "View" means their own branch, not the company.
+   Submit accepts the owner or the operations tier (`phpapp/lib/ops.php:5145`).
+   **Approval follows the organisation structure, not a role tier**
+   (`voucher_can_approve()`, `phpapp/lib/ops.php:4871`): the engineer's **reporting
+   manager** (`inspectors.reports_to_id`), or an `OPERATION_MANAGER`,
+   `BRANCH_MANAGER` or administrator — and never whoever submitted the claim,
+   whatever their role. That is why `CO` shows no **Approve**: a coordinator
+   prepares and submits, somebody else passes it.
+   Mark-paid accepts the operations tier **or** `finance.reconcile`
+   (`phpapp/lib/ops.php:4894`), which is why `FI` carries **Mark paid**. `BD`, `SH`
+   and `BAM` are `—` throughout: they left the operations tier when risk 4 was
+   fixed, so the register refuses them.
+
+   **A per-record exception the table cannot show:** anyone named as an engineer's
+   reporting manager may approve that engineer's claims, whatever their own role —
+   an `ASST_MANAGER` who is the named manager for three engineers approves those
+   three and no others.
 
 4. **Profitability.** Module gate `mod.profitability.view`
-   (`phpapp/lib/ops.php:2262`) **and** an explicit `can('data.profitability')` in the
-   handler (`phpapp/lib/ops.php:6096`). One of the cleanest gates in the
+   (`phpapp/lib/ops.php:2273`) **and** an explicit `can('data.profitability')` in the
+   handler (`phpapp/lib/ops.php:6138`). One of the cleanest gates in the
    application — two independent checks, both explicit.
 
 5. **Business Partners (clients & vendors).** *(Rewritten — these routes were
@@ -125,7 +134,7 @@ each row.
    requires `partner_can_create()` (`phpapp/index.php:908`), `partner-edit` and
    `partner-add` require `partner_can_edit()` (`:1001`, `:1036`), and the detail
    screen requires `partner_can_view()` (`:1146`). The predicates are in
-   `phpapp/lib/ops.php:614-641`.
+   `phpapp/lib/ops.php:621-641`.
    A record can be a client, a vendor, or both, so **either module is enough** for
    a dual-role record — refusing a vendor-module user because the company is also a
    client would hide half the directory. A record with no role set needs either
@@ -140,7 +149,7 @@ each row.
    `99-gaps-and-risks.md` risk 2.)* A purchase order belongs to a partner and is
    read and changed with it, so it borrows that partner's access rather than
    inventing a module of its own: `po_can_view()` on GET and `po_can_edit()` on
-   POST (`phpapp/index.php:1174`, predicates at `phpapp/lib/ops.php:637-651`).
+   POST (`phpapp/index.php:1174`, predicates at `phpapp/lib/ops.php:644-651`).
    Every mutation in the handler is inside a `POST` branch, so the read/write split
    is complete.
 
@@ -151,7 +160,7 @@ each row.
 
 9. **Inspector Master.** Reached as `/m/inspectors`, gated by
    `master_access_ok('admin')`, which resolves to **`is_admin_level()`**
-   (`phpapp/lib/ops.php:2185`, master declared at `phpapp/lib/ops.php:2049`).
+   (`phpapp/lib/ops.php:2257`, master declared at `phpapp/lib/ops.php:2060`).
    *Two consequences worth a decision:* a **Coordinator cannot edit the inspector
    master** even though allocating jobs to inspectors is their main task; and a
    **Business Director can**, despite holding edit rights on nothing else.
@@ -187,7 +196,7 @@ each row.
 15. **Settings and Roles & access.** The settings tile needs
     `can('mod.settings.view') && can('settings.manage')`
     (`phpapp/lib/areas.php:213`). **Roles & access is Master Admin only**, checked
-    with `is_master()` (`phpapp/lib/ops.php:2412`) — `ADMIN` cannot reach it despite
+    with `is_master()` (`phpapp/lib/ops.php:2423`) — `ADMIN` cannot reach it despite
     holding every permission, because that check asks for the bypass flag rather than
     a permission.
 
@@ -203,7 +212,7 @@ each row.
 
 17. **Invoicing.** Module `invoicing` (`phpapp/lib/ops.php:2246`). Recording an
     invoice against a job needs `can('data.credit') || can('finance.reconcile')`
-    (`phpapp/lib/ops.php:5527`) — note that `data.credit` is a *visibility*
+    (`phpapp/lib/ops.php:5457`) — note that `data.credit` is a *visibility*
     permission being used as a *write* gate, which is why a Coordinator can record
     invoices. Raising one needs
     `is_master() || can('finance.reconcile') || can('mod.invoicing.view')`
@@ -247,19 +256,21 @@ allocate or close. Those actions are gated on the management tier instead. The
 practical effect: granting or removing them changes almost nothing.
 
 **2. The central gate only ever asks about viewing.** `ops_module_gate()` checks
-`mod.<module>.view` and nothing else (`phpapp/lib/ops.php:2477`), including for
+`mod.<module>.view` and nothing else (`phpapp/lib/ops.php:2488`), including for
 routes that delete and close. Write protection depends entirely on each handler
 adding its own second check. Most do — and the partner and purchase-order routes,
 which did not, now do (risk 2, fixed). Where one still does not, **view access is
 write access**. Risk 6 remains open.
 
-**3. Being senior is treated as being operational.** Nine roles pass
-`is_coordinator_level()`, and it is that tier — not module rights, not the `ops.*`
-permissions — that opens job allocation and voucher approval. Because the tier was
-built from the *management* list, three roles that should never touch daily
-operations (Business Director, SBU Head, Branch Application Manager) can allocate
-work and approve pay.
+**3. Being senior was treated as being operational — fixed.** The tier that opens
+job allocation used to be built from the *seniority* list, so a Business Director,
+Business Unit Head and Branch Application Manager could allocate work and approve
+pay. `OPS_ROLES` (`phpapp/lib/access.php:55`) now names only the six roles that run
+operations, and `is_coordinator_level()` reads that (`phpapp/lib/ops.php:569`).
+Seniority still governs master data and the revenue figures, which is what it was
+for.
 
-None of this is catastrophic in a company where everyone is trusted. All of it
-matters the moment you hire someone you do not yet know well. The recommended fixes
-are in `99-gaps-and-risks.md`.
+Patterns 1 and 2 are still live — risks 5 and 6 in `99-gaps-and-risks.md`. Between
+them they are why a role can still *close* a job it can no longer allocate. None of
+this is catastrophic in a company where everyone is trusted; all of it matters the
+moment you hire someone you do not yet know well.

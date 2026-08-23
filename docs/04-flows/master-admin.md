@@ -26,7 +26,7 @@ flowchart TD
    search box and folding groups (`phpapp/views/layout_top.php:75-84`).
 2. **Edit what a role may do.** Settings → Roles & access. **You are the only role
    that can** — the check asks for the master bypass flag, not a permission
-   (`phpapp/lib/ops.php:2412`). Note that `ADMIN`, despite holding every permission,
+   (`phpapp/lib/ops.php:2423`). Note that `ADMIN`, despite holding every permission,
    cannot reach this screen.
 3. **Manage anyone.** `users.manage.global`.
 4. **Configure.** Settings, terminology, industry packs, service scope.
@@ -59,7 +59,7 @@ the audit log rather than on restrictions.
 > anyone carrying it has your power without appearing to.
 >
 > ✅ It used to be the fallback for any role the system did not recognise, so a typo'd
-> role had it too. That is fixed (`phpapp/lib/access.php:440`): an unrecognised role
+> role had it too. That is fixed (`phpapp/lib/access.php:433`): an unrecognised role
 > now grants nothing and is logged. **Before deploying that change, find those
 > accounts** — they have been running as administrators and will now have no access
 > at all. See `99-gaps-and-risks.md` risk 1.

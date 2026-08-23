@@ -107,7 +107,7 @@ flowchart TD
    (`phpapp/lib/ops.php:5552-5555`), unless the call agreed no report was needed.
 3. **Check the bills.** Any expense head the client is being charged for must have a
    bill behind it. This is checked on the server, not just in the browser, because
-   it is a promise made to a customer (`phpapp/lib/ops.php:5573-5576`). If a head
+   it is a promise made to a customer (`phpapp/lib/ops.php:5503-5576`). If a head
    genuinely was not incurred, mark it "nil" rather than inventing a bill —
    that satisfies the rule honestly (`phpapp/lib/ops.php:5559-5566`).
 4. **Close each visit day.** A multi-day job cannot close while any day is still
@@ -161,14 +161,15 @@ would otherwise be menu navigation — this path has clearly been tightened befo
 | Open a contract so calls can be raised | `FINANCE`, then `BRANCH_MANAGER` to endorse |
 | Delete a call raised in error | `BRANCH_APP_MANAGER` — uniquely holds `ops.call.delete` |
 | See what the job made | `BRANCH_MANAGER` or `OPERATION_MANAGER` — profitability is not yours |
-| Add or change an inspector's master record | `BRANCH_MANAGER` or above — the inspector master is management-tier only (`phpapp/lib/ops.php:2185`) |
+| Add or change an inspector's master record | `BRANCH_MANAGER` or above — the inspector master is management-tier only (`phpapp/lib/ops.php:2257`) |
 | Correct a locked timestamp | `BRANCH_APP_MANAGER` |
 
-> ✅ **Two things you could once do that you no longer can.** You used to be able to
-> approve and mark paid the same voucher you prepared, and the register you opened
-> showed every inspector's claims company-wide. Approval now refuses whoever
-> submitted the claim (`phpapp/lib/ops.php:4842`), and the register is scoped to your
-> own offices (`phpapp/lib/ops.php:4998`). See `99-gaps-and-risks.md` risk 3.
+> ✅ **Voucher approval has moved off your desk.** You used to be able to approve and
+> mark paid the same claim you prepared, on any branch. Approval now belongs to the
+> engineer's **reporting manager** or an **Operation / Branch Manager**
+> (`phpapp/lib/ops.php:4871`), and the register is scoped to your own offices
+> (`phpapp/lib/ops.php:5041`). You still prepare and submit claims, and you can still
+> mark an approved one paid. See `99-gaps-and-risks.md` risk 3.
 >
 > ⚠ **And one thing that changed for you.** Creating a client or vendor now needs
 > edit rights on the directory, which you do not hold by default — the "+ Add new"

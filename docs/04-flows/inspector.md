@@ -51,14 +51,14 @@ flowchart TD
 
 3. **Open today's job.** You reach it even though you hold **no Jobs module access
    at all** — a narrow owner-only exception lets you open, upload to and close a job
-   that is yours (`phpapp/lib/ops.php:2379-2387`, ownership checked at
+   that is yours (`phpapp/lib/ops.php:2390-2398`, ownership checked at
    `phpapp/lib/ops.php:2230-2239`). If you are named on the job or on one of its
    visit days, it is yours.
 
 4. **Check in at the gate.** Where the company has switched this on, arrival and
    departure are recorded with your location. It is **off by default**, and the
    reason is good: a body whose engineers hand their phones in at a refinery gate
-   could not comply (`phpapp/lib/ops.php:5578-5581`). If your company has it on, you
+   could not comply (`phpapp/lib/ops.php:5508-5581`). If your company has it on, you
    cannot close the job without both check-in and check-out — only a manager can
    approve closing without them, they must give a reason, and it affects your rating
    (`phpapp/lib/ops.php:5586-5600`).

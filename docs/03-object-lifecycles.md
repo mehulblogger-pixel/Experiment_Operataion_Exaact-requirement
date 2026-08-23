@@ -43,7 +43,7 @@ stateDiagram-v2
 
 | Transition | Who triggers it | Where |
 |---|---|---|
-| `→ OPEN` | Anyone with `ops.call.create`: `BRANCH_MANAGER`, `OPERATION_MANAGER`, `ASST_MANAGER`, `COORDINATOR`, `MASTER_ADMIN`, `ADMIN` | `phpapp/lib/ops.php:3695` |
+| `→ OPEN` | Anyone with `ops.call.create`: `BRANCH_MANAGER`, `OPERATION_MANAGER`, `ASST_MANAGER`, `COORDINATOR`, `MASTER_ADMIN`, `ADMIN` | `phpapp/lib/ops.php:3737` |
 | `→ FORWARDED` | Automatic, when the call is forwarded to a coordinator | `phpapp/lib/ops.php:3957` |
 | `→ ALLOCATED` | Automatic, when a job is raised against it | `phpapp/lib/ops.php:5413` |
 
@@ -110,7 +110,7 @@ application.
 
 `jobs.stage` holds eight values (`phpapp/lib/ops.php:32`) and it is edited as **a
 free dropdown on the job form** (`phpapp/views/ops/job_form.php:171`, saved as an
-ordinary field at `phpapp/lib/ops.php:4121`). There is no transition table, no
+ordinary field at `phpapp/lib/ops.php:4163`). There is no transition table, no
 ordering, and no check that one state may follow another. Anyone who can edit the
 job can set any stage at any time, including straight to `CLOSED`.
 
@@ -158,14 +158,14 @@ and double the engineer's claim (`phpapp/lib/ops.php:5544-5551`).
 
 | Role | May close? | Why |
 |---|---|---|
-| `INSPECTOR` | **Their own job only** | Owner allowlist, checked with `job_owned_by_me()` (`phpapp/lib/ops.php:2379-2387`) |
+| `INSPECTOR` | **Their own job only** | Owner allowlist, checked with `job_owned_by_me()` (`phpapp/lib/ops.php:2390-2398`) |
 | `COORDINATOR`, `ASST_MANAGER`, `OPERATION_MANAGER`, `BRANCH_MANAGER` | Yes | Hold `mod.jobs.view` |
 | `BUSINESS_DIRECTOR`, `SBU_HEAD`, `BRANCH_APP_MANAGER` | ⚠ **Yes** | Hold `mod.jobs.view`; nothing else is checked |
 | `MASTER_ADMIN`, `ADMIN` | Yes | Everything |
 | `FINANCE` | ⚠ **Yes** | Holds `mod.jobs.view` — and nothing more is required |
 | Sales roles, `SR_INSPECTOR` | No | No jobs module |
 
-**The closure route checks no permission at all** (`phpapp/lib/ops.php:5571-5534`).
+**The closure route checks no permission at all** (`phpapp/lib/ops.php:5716-5719`).
 The `ops.job.close` permission that appears to govern this is never consulted here —
 holding `mod.jobs.view` is sufficient. That is why Finance and the Business Director
 appear in that table.
@@ -174,7 +174,7 @@ appear in that table.
 
 The permission model is loose here; the **business rules are not.** Before
 `closed_flag` is set, the handler refuses closure for any of these
-(`phpapp/lib/ops.php:5576-5610`):
+(`phpapp/lib/ops.php:5506-5610`):
 
 ```mermaid
 flowchart TD
@@ -209,7 +209,7 @@ every visit day.
 
 Each of those gates is a real business promise. The bills gate in particular is
 checked on the server rather than only in the browser, and the comment says why:
-"this is a promise made to a customer" (`phpapp/lib/ops.php:5573-5576`).
+"this is a promise made to a customer" (`phpapp/lib/ops.php:5503-5576`).
 
 ---
 
@@ -232,11 +232,11 @@ stateDiagram-v2
 
 | Transition | Who may trigger it | Precondition | Where |
 |---|---|---|---|
-| `→ DRAFT` (create) | The owning inspector, or coordinator-level | — | `phpapp/lib/ops.php:5015` |
-| `DRAFT → SUBMITTED` | **The owning inspector**, or coordinator-level | Must be `DRAFT` | `phpapp/lib/ops.php:5109` |
-| `SUBMITTED → APPROVED` | Coordinator-level, **excluding whoever submitted it** | Must be `SUBMITTED` | `phpapp/lib/ops.php:4842`, applied at `:5108` |
-| `APPROVED → PAID` | Coordinator-level **or** `finance.reconcile` | Must be `APPROVED` | `phpapp/lib/ops.php:4851`, applied at `:5116` |
-| `any → DRAFT` (reopen) | Coordinator-level **only** | ⚠ **none** | `phpapp/lib/ops.php:5128` |
+| `→ DRAFT` (create) | The owning inspector, or coordinator-level | — | `phpapp/lib/ops.php:5049` |
+| `DRAFT → SUBMITTED` | **The owning inspector**, or coordinator-level | Must be `DRAFT` | `phpapp/lib/ops.php:5145` |
+| `SUBMITTED → APPROVED` | The engineer's **reporting manager**, or an `OPERATION_MANAGER` / `BRANCH_MANAGER` / administrator — **never whoever submitted it** | Must be `SUBMITTED` | `phpapp/lib/ops.php:4871`, applied at `:5148` |
+| `APPROVED → PAID` | Operations tier **or** `finance.reconcile` | Must be `APPROVED` | `phpapp/lib/ops.php:4894`, applied at `:5153` |
+| `any → DRAFT` (reopen) | Operations tier **only** | ⚠ **none** | `phpapp/lib/ops.php:5160` |
 
 ### Three things to know about this lifecycle
 
@@ -268,19 +268,36 @@ Both halves are now closed (`99-gaps-and-risks.md` risk 3c):
 
 ```mermaid
 flowchart LR
-  A["Coordinator<br/>prepares and submits"] --> B{"Approve?"}
+  A["Coordinator or engineer<br/>prepares and submits"] --> B{"Approve?"}
   B -->|"refused — same person"| A
-  B --> C["Anyone else at<br/>coordinator level<br/>approves"]
-  C --> D["Manager or<br/>Accounts marks paid"]
+  B --> C["Reporting manager, or<br/>Operation / Branch Manager"]
+  C --> D["Operations or Accounts<br/>marks paid"]
   D --> E["Money out"]
 ```
 
-A `submitted_by_uid` column records who put the claim forward
-(`phpapp/lib/ops.php:457`), and `voucher_can_approve()` refuses that same person
-(`phpapp/lib/ops.php:4842`). Anyone else at the same level still may — a branch with
-two coordinators needs no manager, a branch with one does. `voucher_can_mark_paid()`
-now also accepts `finance.reconcile` (`phpapp/lib/ops.php:4851`), and the register
-opens for accounts (`:4992`), so the people who pay can record payment.
+Three separate people, by design.
+
+**Who prepares** is anyone at coordinator level, or the engineer themselves.
+
+**Who approves** follows the organisation chart, not a role tier
+(`voucher_can_approve()`, `phpapp/lib/ops.php:4871`): the engineer's **reporting
+manager**, read from `inspectors.reports_to_id` (`phpapp/lib/ops.php:4864`), or an
+`OPERATION_MANAGER`, `BRANCH_MANAGER` or administrator (`VOUCHER_APPROVER_ROLES`,
+`phpapp/lib/ops.php:4870`). A `submitted_by_uid` column records who put the claim
+forward (`phpapp/lib/ops.php:459`) and approval refuses that person **whatever their
+role** — a manager filling in a claim on an engineer's behalf still needs somebody
+else to pass it.
+
+This mirrors the rule the codebase already used for approving a job closed without
+its site check-in (`can_close_attendance_missing()`, `phpapp/lib/trust.php:346-352`).
+
+**Who pays** is the operations tier or `finance.reconcile`
+(`phpapp/lib/ops.php:4894`), and the register opens for accounts
+(`phpapp/lib/ops.php:5033`) so they can actually do it.
+
+> Where an engineer's `reports_to_id` is blank, only an Operation Manager, Branch
+> Manager or administrator can approve their claims — the reporting-manager route
+> does not resolve. Set it under Masters → Engineers.
 
 **Two things did not change.** The `reopen` transition still has no precondition, so
 a `PAID` voucher can still be sent back to `DRAFT` — that is risk 12. And there is
@@ -334,8 +351,8 @@ whole chain.
 
 Two independent checks, both explicit — the strictest gate on any screen:
 
-1. The module: `mod.profitability.view` (`phpapp/lib/ops.php:2262`)
-2. The permission: `can('data.profitability')` (`phpapp/lib/ops.php:6096`)
+1. The module: `mod.profitability.view` (`phpapp/lib/ops.php:2273`)
+2. The permission: `can('data.profitability')` (`phpapp/lib/ops.php:6138`)
 
 Allowed: `MASTER_ADMIN`, `ADMIN`, `BUSINESS_DIRECTOR`, `SBU_HEAD`,
 `BRANCH_MANAGER`, `OPERATION_MANAGER`, `FINANCE`, `MARKETING_MANAGER`.
@@ -358,7 +375,7 @@ seeing what individuals are paid.
 | **Call** (legacy) | 4 | Automatic only | No | Vestigial. Three competing notions of "done" |
 | **Job stage** | 8 | **No** — free dropdown | No | A label, not a state |
 | **Job closure** | 2 | Weak on permission, **strong on business rules** | `closed_at`, `closed_by` | The business gates are excellent; the permission gate is absent |
-| **Voucher** | 4 | Yes, except reopen | **No** | Clean shape and a real second pair of eyes; still no audit trail |
+| **Voucher** | 4 | Yes, except reopen | **No** | Approval follows the org chart and cannot be self-served; still no audit trail |
 | **Contract** | 3 | Registration yes; hold/close no | No | Adequate |
 | **Profitability** | — | Read-only, doubly gated | n/a | The best-protected figure in the system |
 

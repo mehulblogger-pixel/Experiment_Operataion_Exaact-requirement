@@ -562,7 +562,14 @@ function role_label($u = null) {
 }
 function is_master() { return ua()['master']; }
 function is_admin_level() { return in_array(user_role(), MGMT_ROLES, true); }
-function is_coordinator_level() { return is_admin_level() || in_array(user_role(), ['ASST_MANAGER','COORDINATOR'], true); }
+// "Does this person run the work" — NOT "is this person senior". It used to be
+// is_admin_level() plus two, which quietly handed operational control to the
+// Business Director, the Business Unit Head and the Branch Application Manager.
+// See OPS_ROLES in access.php for why those three are out.
+function is_coordinator_level() {
+    $ops = defined('OPS_ROLES') ? OPS_ROLES : ['MASTER_ADMIN','ADMIN','BRANCH_MANAGER','OPERATION_MANAGER','ASST_MANAGER','COORDINATOR'];
+    return in_array(user_role(), $ops, true);
+}
 function is_inspector() { return user_role() === 'INSPECTOR'; }
 
 // Which office actually executes a call (does the field work). Falls back to the
@@ -2248,7 +2255,11 @@ function ops_masters() {
 }
 function master_access_ok($access) {
     if ($access === 'admin') return is_admin_level();
-    if ($access === 'coordinator') return is_coordinator_level();
+    // Coordinator level OR above in seniority. Master data is reference data, not
+    // an operational action, so narrowing is_coordinator_level() to the roles that
+    // run operations must not take the sub-contractor and contract lists away from
+    // the Branch Application Manager, whose whole job is maintaining them.
+    if ($access === 'coordinator') return is_coordinator_level() || is_admin_level();
     if ($access === 'master') return is_master();
     return true;
 }
@@ -4827,22 +4838,54 @@ function voucher_lock_reason($v) {
          . 'and the costs already allocated were worked out from these days. '
          . 'Reopen the month first if a day really has to be corrected.';
 }
-// Approving your own submission is not an approval. The three money transitions
-// (submit, approve, mark-paid) all accepted is_coordinator_level(), which one
-// person satisfies for all three — so a claim could be prepared, waved through
-// and marked paid without anybody else seeing it. Whoever submitted is now barred
-// from approving; anyone else at the same level still may, so a branch with two
-// coordinators needs no manager, and a branch with one does.
+// ---- Who approves an expense claim -----------------------------------------
+//
+// The person the engineer reports to, or the manager who runs the work — as the
+// organisation chart says, not "anyone senior enough". Approval used to accept
+// is_coordinator_level(), which the coordinator who prepared the claim also
+// satisfies, so one person could carry it from creation to paid unseen.
+//
+// This is the same shape the codebase already uses for approving a job closed
+// without its site check-in (can_close_attendance_missing(), trust.php): the
+// named reporting manager, or an operations manager by role.
+//
+// The Branch Manager is kept because they sit above the Operation Manager and are
+// accountable for the branch — and because without them a branch with no
+// Operation Manager and an engineer whose reporting manager is unset would have
+// nobody able to approve at all. Remove 'BRANCH_MANAGER' from the list below if
+// you want approval strictly at the Operation Manager.
 function voucher_submitter_uid($v) { return (int)($v['submitted_by_uid'] ?? 0); }
 function voucher_is_own_submission($v) {
     $sub = voucher_submitter_uid($v);
     $me  = (int)(current_user()['id'] ?? 0);
     return $sub > 0 && $me > 0 && $sub === $me;
 }
+// The system user an engineer reports to, from the organisation structure.
+function voucher_approver_user_id($v) {
+    $ins = (int)($v['inspector_id'] ?? 0);
+    if (!$ins) return null;
+    $rt = ops_val("SELECT reports_to_id FROM inspectors WHERE id=?", [$ins]);
+    return $rt ? (int)$rt : null;
+}
+const VOUCHER_APPROVER_ROLES = ['OPERATION_MANAGER', 'BRANCH_MANAGER', 'ADMIN', 'MASTER_ADMIN'];
 function voucher_can_approve($v) {
     if (($v['status'] ?? '') !== 'SUBMITTED') return false;
-    if (!is_coordinator_level()) return false;
-    return !voucher_is_own_submission($v);
+    // Never your own submission, whatever your role. A manager who fills a claim
+    // in on an engineer's behalf still needs somebody else to pass it.
+    if (voucher_is_own_submission($v)) return false;
+    if (is_master()) return true;
+    $me = (int)(current_user()['id'] ?? 0);
+    if ($me && voucher_approver_user_id($v) === $me) return true;   // reporting manager
+    return in_array(user_role(), VOUCHER_APPROVER_ROLES, true);
+}
+// Why the approve button is not there, in words the person can act on.
+function voucher_approve_block_reason($v) {
+    if (($v['status'] ?? '') !== 'SUBMITTED') return '';
+    if (voucher_is_own_submission($v)) {
+        return 'You submitted this ' . Tl('voucher') . ', so somebody else has to approve it.';
+    }
+    return 'Only the ' . Tl('engineer') . '\'s reporting manager or an operations manager can approve this '
+         . Tl('voucher') . '.';
 }
 // Recording payment belongs with the people who actually pay. Finance was left
 // out of the tier (deliberately — they are not operations managers), which left
@@ -5028,7 +5071,7 @@ function ops_vouchers($route, $method) {
             // this person may actually do — a button that refuses when pressed
             // reads as a broken app.
             'canApproveNow' => voucher_can_approve($v), 'canMarkPaid' => voucher_can_mark_paid($v),
-            'ownSubmission' => voucher_is_own_submission($v),
+            'approveBlockedWhy' => voucher_can_approve($v) ? '' : voucher_approve_block_reason($v),
             'natureOpts' => ['REVENUE'=>'Revenue','NONREV'=>'Non-Revenue','SUPPORT'=>'Support function','MD'=>'MD']]);
         return;
     }
@@ -5104,9 +5147,8 @@ function ops_vouchers($route, $method) {
                 ->execute([date('c'), (int)(current_user()['id'] ?? 0) ?: null, $v['id']]);
             flash('Voucher submitted for approval.');
         } elseif ($act === 'approve') {
-            ops_require(voucher_can_approve($v), voucher_is_own_submission($v)
-                ? 'You submitted this ' . Tl('voucher') . ', so somebody else has to approve it.'
-                : 'Only a manager can approve a submitted voucher.');
+            ops_require(voucher_can_approve($v), voucher_approve_block_reason($v)
+                ?: 'This ' . Tl('voucher') . ' is not awaiting approval.');
             $pdo->prepare("UPDATE vouchers SET status='APPROVED', checked_by=?, approved_by=?, authorized_by=?, approved_at=? WHERE id=?")
                 ->execute([$_POST['checked_by'] ?? '', ($_POST['approved_by'] ?? '') ?: user_name(current_user()), $_POST['authorized_by'] ?? '', date('c'), $v['id']]);
             flash('Voucher approved.');

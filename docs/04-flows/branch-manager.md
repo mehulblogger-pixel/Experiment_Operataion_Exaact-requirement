@@ -131,7 +131,7 @@ different directions.
 | Reach another branch's records | `SBU_HEAD`, `BUSINESS_DIRECTOR` or `MASTER_ADMIN` |
 | Create a user outside your own office | `MASTER_ADMIN` — you hold `users.manage.branch`, not `.global` |
 | Change system settings | `MASTER_ADMIN` |
-| Edit what a role may do | `MASTER_ADMIN` only (`phpapp/lib/ops.php:2412`) |
+| Edit what a role may do | `MASTER_ADMIN` only (`phpapp/lib/ops.php:2423`) |
 | Delete a call | `BRANCH_APP_MANAGER` — you do not have `ops.call.delete` |
 | Correct a locked timestamp | `BRANCH_APP_MANAGER` |
 | Decide a complaint or close a nonconformity | Nobody holds these by default — they must be granted deliberately (`phpapp/lib/access.php:76-83`) |
@@ -140,14 +140,14 @@ different directions.
 
 > ✅ **Two things about your approvals that used to be wrong are now fixed.**
 >
-> **Nobody can approve a claim they submitted.** Approval still accepts the
-> management tier, but it now refuses whoever put the claim forward
-> (`phpapp/lib/ops.php:4842`) — so a coordinator can no longer carry one from
-> preparation to paid unaided. You are a real control again, not one of several.
+> **Voucher approval is now yours, the Operation Manager's, or the engineer's named
+> reporting manager's** (`phpapp/lib/ops.php:4871`) — not any coordinator's. And
+> nobody may approve a claim they submitted themselves, you included. You are a real
+> control again, not one of several.
 >
 > **The voucher register is filtered to your branch.** It now scopes on the
 > voucher's office, falling back to the engineer's home office
-> (`phpapp/lib/ops.php:4998`). You no longer see other branches' claims, and they no
+> (`phpapp/lib/ops.php:5041`). You no longer see other branches' claims, and they no
 > longer see yours.
 >
 > See `99-gaps-and-risks.md` risk 3. Accounts can now mark a voucher paid too, which

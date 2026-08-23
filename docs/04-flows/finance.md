@@ -101,7 +101,7 @@ a mistaken second click costs nothing.
 ## ✅ Vouchers: you can now open them, and record payment
 
 Finance was **deliberately removed from the operations management tier** (commit
-`ff0b94a`, `phpapp/lib/access.php:31-27`). That was the right call — it stopped an
+`ff0b94a`, `phpapp/lib/access.php:33-40`). That was the right call — it stopped an
 accountant being shown "raise inspection call". But it had two consequences that were
 not intended, and both are now fixed.
 
@@ -109,12 +109,12 @@ not intended, and both are now fixed.
 Vouchers, which puts **Operations** in your sidebar
 (`phpapp/views/layout_top.php:128`) — but the register demanded the management tier,
 so the menu offered a screen that refused you. It now accepts `finance.reconcile`
-(`phpapp/lib/ops.php:4990`), which you hold.
+(`phpapp/lib/ops.php:5033`), which you hold.
 
 **You could not mark a voucher paid, while a coordinator could.** The control was
 inverted: the people who prepare a claim could record it as paid, and the person who
 actually moves the money could not. Marking paid now accepts `finance.reconcile` too
-(`phpapp/lib/ops.php:4851`).
+(`phpapp/lib/ops.php:4894`).
 
 ```mermaid
 flowchart LR
@@ -124,8 +124,8 @@ flowchart LR
 ```
 
 Alongside this, nobody can now approve a voucher they submitted themselves
-(`phpapp/lib/ops.php:4842`), and the register is scoped to the viewer's offices
-(`phpapp/lib/ops.php:4998`). See `99-gaps-and-risks.md` risks 3 and 11.
+(`phpapp/lib/ops.php:4871`), and the register is scoped to the viewer's offices
+(`phpapp/lib/ops.php:5041`). See `99-gaps-and-risks.md` risks 3 and 11.
 
 **Still open:** the rest of the Operations rail is still driven by a different rule
 from the screens behind it — that is the remainder of risk 11.

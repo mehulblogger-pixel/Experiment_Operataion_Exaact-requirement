@@ -51,10 +51,14 @@ the shortest path.
 Create or edit any operational record · manage users · change settings · reach
 another business unit.
 
-> ⚠ **"Read-only on every module" is not true in practice.** You are in the
-> management tier (`phpapp/lib/access.php:27`) and hold `mod.jobs.view`, which is all
-> the job routes require — so you can allocate, edit, reassign and close jobs
-> (`phpapp/lib/ops.php:5136`, `:5531`). You hold `mod.vouchers.view` too, so you can
-> still approve vouchers — though the register is now scoped to your offices and you
-> can no longer approve one you submitted yourself. This is risk 4 in
-> `99-gaps-and-risks.md`, and it is not yet fixed.
+> ✅ **"Read-only on every module" is now true.** This role used to sit in the
+> management tier, which the job and voucher routes mistook for operational
+> authority. `OPS_ROLES` (`phpapp/lib/access.php:55`) now names only the roles that
+> actually run operations, and this is not one of them — so you can no longer
+> allocate, edit or reassign a job, and the voucher register refuses you. Approving
+> **reports** is unaffected: that comes from `idems.finalize` and
+> `workforce.report.approve`, which are yours by right. See `99-gaps-and-risks.md`
+> risk 4.
+>
+> ⚠ **One thing survives.** You can still *close* a job, because the close route
+> checks only `mod.jobs.view`. That is risk 5, still open.

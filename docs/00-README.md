@@ -71,7 +71,7 @@ the everyday work of recording them (`phpapp/lib/access.php:76-83`).
 
 **It is multi-branch.** A call can be sold by one office and carried out by another.
 The office that does the work is the one that allocates it, even though the office
-that sold it can see it and will invoice it (`phpapp/lib/ops.php:557-573`).
+that sold it can see it and will invoice it (`phpapp/lib/ops.php:550-573`).
 
 ---
 
@@ -97,7 +97,7 @@ is the same.
 | **Scope** | *Which records* you can see — set by office and business unit. Distinct from permission. |
 | **Permission** | *Which features* you may use. Someone can hold a permission and still see nothing, if their scope is empty. |
 | **Module** | A switchable area of the app (Calls, Jobs, Vouchers, …). Each gives two permissions: view and edit. |
-| **Licence** | Whether the company has *bought* a module. Checked before permissions, and it overrules everyone — including the Master Admin (`phpapp/lib/access.php:445-456`). |
+| **Licence** | Whether the company has *bought* a module. Checked before permissions, and it overrules everyone — including the Master Admin (`phpapp/lib/access.php:505-509`). |
 
 ### Two technical terms worth knowing
 

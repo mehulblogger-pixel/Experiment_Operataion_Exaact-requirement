@@ -172,20 +172,50 @@ $vRow = ops_one("SELECT * FROM vouchers WHERE id=?", [$vA]);
 t_ok(voucher_is_own_submission($vRow) === true, 'the submitter is recognised as the submitter');
 t_ok(voucher_can_approve($vRow) === false, 'the person who submitted a voucher cannot approve it');
 
-// A different coordinator-level person can.
+// Another coordinator can NOT approve — approval belongs to the reporting manager
+// or an operations manager, per the organisation structure.
 $pdo->prepare("INSERT INTO users (username, first_name, role, home_office_id, is_active) VALUES ('caf_coordA2','CoordA2','COORDINATOR',?,1)")->execute([$offA]);
 $coordA2Uid = (int)$pdo->lastInsertId();
 $asUser($coordA2Uid);
 $vRow = ops_one("SELECT * FROM vouchers WHERE id=?", [$vA]);
-t_ok(voucher_can_approve($vRow) === true, 'a second pair of eyes at the same level still can');
+t_ok(voucher_can_approve($vRow) === false, 'another coordinator cannot approve either — it is not a coordinator job');
+
+// The Operation Manager can.
+$pdo->prepare("INSERT INTO users (username, first_name, role, home_office_id, is_active) VALUES ('caf_om','OM','OPERATION_MANAGER',?,1)")->execute([$offA]);
+$omUid = (int)$pdo->lastInsertId();
+$asUser($omUid);
+t_ok(voucher_can_approve($vRow) === true, 'the Operation Manager can approve');
+
+// So can the Branch Manager, who sits above them and carries the branch.
+$asUser($bmUid);
+t_ok(voucher_can_approve($vRow) === true, 'so can the Branch Manager');
+
+// And so can the engineer's own reporting manager, whatever their role — this is
+// the organisation structure, not a role tier.
+$pdo->prepare("INSERT INTO users (username, first_name, role, home_office_id, is_active) VALUES ('caf_rm','RepMgr','ASST_MANAGER',?,1)")->execute([$offA]);
+$rmUid = (int)$pdo->lastInsertId();
+$pdo->prepare("UPDATE inspectors SET reports_to_id=? WHERE id=?")->execute([$rmUid, $insA]);
+$vRow = ops_one("SELECT * FROM vouchers WHERE id=?", [$vA]);
+t_eq(voucher_approver_user_id($vRow), $rmUid, 'the reporting manager is read from the organisation structure');
+$asUser($rmUid);
+t_ok(voucher_can_approve($vRow) === true, 'the named reporting manager can approve, though an Asst. Manager otherwise could not');
+$asUser($coordA2Uid);
+t_ok(voucher_can_approve($vRow) === false, 'a coordinator who is not the reporting manager still cannot');
+
+// Not even the reporting manager may approve a claim they submitted themselves.
+$pdo->prepare("UPDATE vouchers SET submitted_by_uid=? WHERE id=?")->execute([$rmUid, $vA]);
+$asUser($rmUid);
+t_ok(voucher_can_approve(ops_one("SELECT * FROM vouchers WHERE id=?", [$vA])) === false,
+     'not even the reporting manager may approve their own submission');
+$pdo->prepare("UPDATE vouchers SET submitted_by_uid=? WHERE id=?")->execute([$coordAUid, $vA]);
 
 // An inspector cannot approve anything, own or otherwise.
 $asUser($iaUid);
-t_ok(voucher_can_approve($vRow) === false, 'an engineer cannot approve a voucher');
+t_ok(voucher_can_approve(ops_one("SELECT * FROM vouchers WHERE id=?", [$vA])) === false, 'an engineer cannot approve a voucher');
 
 // Only a SUBMITTED voucher can be approved.
 $pdo->prepare("UPDATE vouchers SET status='DRAFT' WHERE id=?")->execute([$vA]);
-$asUser($coordA2Uid);
+$asUser($omUid);
 t_ok(voucher_can_approve(ops_one("SELECT * FROM vouchers WHERE id=?", [$vA])) === false, 'a DRAFT voucher cannot be approved');
 
 // -- accounts can record payment, and can reach the screen to do it ----------
@@ -200,6 +230,8 @@ t_ok(voucher_can_mark_paid($vRow) === true, 'Finance — who actually pays — c
 t_ok(can_view_voucher($vRow) === true, 'and can open the voucher in order to do it');
 $asUser($coordA2Uid);
 t_ok(voucher_can_mark_paid($vRow) === true, 'a manager can still mark it paid too');
+t_ok(voucher_can_approve(ops_one("SELECT * FROM vouchers WHERE id=?", [$vA])) === false,
+     'but marking paid is not approving — the two are separate people now');
 $asUser($iaUid);
 t_ok(voucher_can_mark_paid($vRow) === false, 'an engineer cannot mark their own claim paid');
 $signOut();
@@ -216,4 +248,54 @@ t_eq(strlen($back), strlen($all), 'it is stored and read back whole, with nothin
 t_eq(substr($back, -strlen('mod.settings.edit')), 'mod.settings.edit', 'the final key survives intact rather than being cut mid-word');
 $asUser($wideUid);
 t_ok(can('mod.settings.edit'), 'and the last permission in the list actually works');
+$signOut();
+
+// ---------------------------------------------------------------------------
+t_section('risk 4 — seniority is no longer treated as operational authority');
+
+// The three roles that used to reach the operations floor through MGMT_ROLES.
+foreach ([
+    ['caf_bd2',  'BUSINESS_DIRECTOR',  'a Business Director'],
+    ['caf_sbu2', 'SBU_HEAD',           'a Business Unit Head'],
+    ['caf_bam2', 'BRANCH_APP_MANAGER', 'a Branch Application Manager'],
+] as [$un, $role, $label]) {
+    $pdo->prepare("INSERT INTO users (username, first_name, role, is_active) VALUES (?,?,?,1)")->execute([$un, $role, $role]);
+    $asUser((int)$pdo->lastInsertId());
+    t_ok(is_admin_level() === true,        "$label is still senior (is_admin_level)");
+    t_ok(is_coordinator_level() === false, "$label no longer counts as operations staff");
+}
+
+// The roles that genuinely run operations keep it.
+foreach ([
+    ['caf_bm3', 'BRANCH_MANAGER',    'a Branch Manager'],
+    ['caf_om3', 'OPERATION_MANAGER', 'an Operation Manager'],
+    ['caf_am3', 'ASST_MANAGER',      'an Asst. Manager'],
+    ['caf_co3', 'COORDINATOR',       'a Coordinator'],
+] as [$un, $role, $label]) {
+    $pdo->prepare("INSERT INTO users (username, first_name, role, is_active) VALUES (?,?,?,1)")->execute([$un, $role, $role]);
+    $asUser((int)$pdo->lastInsertId());
+    t_ok(is_coordinator_level() === true, "$label still runs operations");
+}
+
+// Roles that were never in the tier are unchanged.
+foreach ([['caf_fin3','FINANCE','Finance'], ['caf_in3','INSPECTOR','an engineer']] as [$un, $role, $label]) {
+    $pdo->prepare("INSERT INTO users (username, first_name, role, is_active) VALUES (?,?,?,1)")->execute([$un, $role, $role]);
+    $asUser((int)$pdo->lastInsertId());
+    t_ok(is_coordinator_level() === false, "$label is still outside the operations tier");
+}
+
+// Master data is reference data, not an operational action: the records custodian
+// must not lose the lists they exist to maintain.
+$pdo->prepare("INSERT INTO users (username, first_name, role, is_active) VALUES ('caf_bam4','BAM','BRANCH_APP_MANAGER',1)")->execute();
+$asUser((int)$pdo->lastInsertId());
+t_ok(master_access_ok('coordinator') === true, 'the Branch Application Manager keeps the coordinator-level master lists');
+t_ok(master_access_ok('admin') === true,       'and the admin-level ones');
+t_ok(master_access_ok('master') === false,     'but not the master-admin-only ones');
+
+// The point of the whole exercise: a read-only oversight role can no longer
+// allocate work.
+$pdo->prepare("INSERT INTO users (username, first_name, role, is_active) VALUES ('caf_bd4','BD','BUSINESS_DIRECTOR',1)")->execute();
+$asUser((int)$pdo->lastInsertId());
+t_ok(can('mod.jobs.view') && !can('mod.jobs.edit'), 'the Business Director is view-only on jobs, as documented');
+t_ok(!is_coordinator_level(), 'and can no longer pass the job-allocation gate');
 $signOut();
