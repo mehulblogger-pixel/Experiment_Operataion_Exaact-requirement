@@ -42,7 +42,10 @@
     <label>Against requisition (management approval) *</label>
     <select class="form-control searchable" name="requisition_id" id="cand_req" required>
       <option value="">— pick an approved requisition —</option>
-      <?php foreach (($requisitions ?? []) as $rq): ?><option value="<?= (int)$rq['id'] ?>" <?= (string)($preReq ?? '')===(string)$rq['id']?'selected':'' ?>><?= e($rq['req_code']) ?> · <?= e(DESIGNATIONS[$rq['designation']] ?? $rq['designation']) ?> · <?= e(lk_options_or('requisition_type', REQ_TYPES)[$rq['req_type']] ?? '') ?></option><?php endforeach; ?>
+      <?php foreach (($requisitions ?? []) as $rq): ?><option value="<?= (int)$rq['id'] ?>"
+        data-client="<?= (int)($rq['client_id'] ?? 0) ?>" data-designation="<?= e($rq['designation'] ?? '') ?>"
+        data-sbu="<?= e($rq['sbu'] ?? '') ?>" data-rate="<?= e($rq['billing_rate'] ?? '') ?>" data-ratebasis="<?= e($rq['rate_basis'] ?? '') ?>"
+        <?= (string)($preReq ?? '')===(string)$rq['id']?'selected':'' ?>><?= e($rq['req_code']) ?> · <?= e(DESIGNATIONS[$rq['designation']] ?? $rq['designation']) ?> · <?= e(lk_options_or('requisition_type', REQ_TYPES)[$rq['req_type']] ?? '') ?></option><?php endforeach; ?>
     </select>
     <small class="muted">Every hire must trace to an approved requisition. Not listed? <a href="/requisition-new">Raise one first</a>.</small>
   </div>
@@ -160,5 +163,22 @@ window.SKILLS = <?= json_encode($skillsByTrade) ?>;
       : 'This requirement has no locations listed.';
   }
   if(reqSel){ reqSel.addEventListener('change', fillLocs); fillLocs(); }
+
+  // 1b — carry the requirement's client, designation, SBU and rate onto this CV, so
+  //  they are not re-keyed. Only fills fields that are still blank (nothing typed is
+  //  overwritten), and runs on load too when a requirement is pre-selected.
+  function prefillFromReq(){
+    if(!reqSel) return;
+    var o = reqSel.options[reqSel.selectedIndex]; if(!o || !o.value) return;
+    function setIfEmpty(name, val){ if(val===undefined||val===null||String(val)==='') return;
+      var el=document.getElementsByName(name)[0]; if(!el) return;
+      if(el.tagName==='SELECT'){ if(el.value) return; for(var i=0;i<el.options.length;i++){ if(el.options[i].value===String(val)){ el.selectedIndex=i; el.dispatchEvent(new Event('change')); return; } } }
+      else { if(String(el.value).trim()!=='') return; el.value=val; el.dispatchEvent(new Event('input')); } }
+    setIfEmpty('client_id', (o.dataset.client && o.dataset.client!=='0') ? o.dataset.client : '');
+    setIfEmpty('designation', o.dataset.designation);
+    setIfEmpty('sbu', o.dataset.sbu);
+    setIfEmpty('expected_rate', o.dataset.rate);
+  }
+  if(reqSel){ reqSel.addEventListener('change', prefillFromReq); prefillFromReq(); }
 })();
 </script>

@@ -48,3 +48,19 @@ t_ok(strpos($reqForm, "lk_options_or('req_work_model'") !== false
     && strpos($reqForm, "lk_options_or('req_rate_basis'") !== false
     && strpos($reqForm, "lk_options_or('sbu'") !== false,
     'the requisition form reads those dropdowns (and SBU) from the editable lookups');
+
+t_section('recruitment: requisition → candidate data flow (1b)');
+// The picker list carries the fields the candidate form pre-fills.
+$rl = requisitions_list(false);
+// (Insert a requisition to prove the enriched columns come back.)
+db()->prepare("INSERT INTO requisitions (req_code, designation, sbu, client_id, billing_rate, rate_basis, status, created_at) VALUES ('REQ-PF1','WELDING_INSPECTOR','NDT', 7, 90000, 'MONTHLY', 'OPEN', ?)")->execute([date('c')]);
+$row = ops_one("SELECT * FROM requisitions WHERE req_code='REQ-PF1'");
+$listed = null; foreach (requisitions_list(true) as $r) if ((int)$r['id'] === (int)$row['id']) { $listed = $r; break; }
+t_ok($listed && array_key_exists('client_id', $listed) && array_key_exists('sbu', $listed) && array_key_exists('billing_rate', $listed),
+    'requisitions_list carries client / SBU / rate for prefill');
+$candForm = file_get_contents(__DIR__ . '/../views/ops/candidate_form.php');
+t_ok(strpos($candForm, 'data-client="') !== false && strpos($candForm, 'data-designation="') !== false
+    && strpos($candForm, 'data-sbu="') !== false && strpos($candForm, 'data-rate="') !== false,
+    'the requisition picker carries the prefill fields as data-attributes');
+t_ok(strpos($candForm, 'prefillFromReq') !== false && strpos($candForm, 'setIfEmpty') !== false,
+    'the candidate form prefills client/designation/SBU/rate from the chosen requisition (only blank fields)');

@@ -4356,7 +4356,9 @@ function send_forward_email($callId) {
 
 // ---- Manpower requisition / position approval (mandatory before hiring) ----
 function requisitions_list($openOnly = false) {
-    return ops_all("SELECT id, req_code, designation, req_type, status FROM requisitions" . ($openOnly ? " WHERE status IN ('OPEN','PROPOSED','OFFERED')" : "") . " ORDER BY id DESC");
+    // Carries the fields the candidate form pre-fills from the chosen requisition
+    // (1b — client, designation, SBU, rate) so they are not re-keyed.
+    return ops_all("SELECT id, req_code, designation, req_type, status, client_id, sbu, billing_rate, rate_basis, discipline, skills, project_site FROM requisitions" . ($openOnly ? " WHERE status IN ('OPEN','PROPOSED','OFFERED')" : "") . " ORDER BY id DESC");
 }
 function ops_requisitions($route, $method) {
     $pdo = db();
