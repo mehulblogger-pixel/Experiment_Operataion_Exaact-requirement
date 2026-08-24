@@ -5737,6 +5737,118 @@ function idems_notify_vetters($doc) {
     ops_mail($to, "Vetting required: {$doc['irn']}", $body, '', 'idems_vetting');
 }
 
+// ============================================================================
+//  Module 07 — additive UX helpers for the vetting → review → approval → issue
+//  quality gate. These READ the existing data and enforce no new control except
+//  the soft self-review acknowledgement (which never blocks, it only asks).
+// ============================================================================
+
+// A short display name for a user id (DB-agnostic — no || / CONCAT).
+function idems_user_display($uid) {
+    $uid = (int)$uid; if (!$uid) return '';
+    $u = ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$uid]);
+    if (!$u) return '';
+    $n = trim(trim((string)($u['first_name'] ?? '')) . ' ' . trim((string)($u['last_name'] ?? '')));
+    return $n !== '' ? $n : (string)($u['username'] ?? '');
+}
+
+// Is the signed-in user the report's own preparer (the inspector on it)?
+// Used only for the soft self-review acknowledgement — never a hard block.
+function idems_is_self_review($doc) {
+    $u = function_exists('current_user') ? current_user() : null;
+    if (!$u) return false;
+    $myIns = (int)($u['inspector_id'] ?? 0);
+    return $myIns > 0 && $myIns === (int)($doc['inspector_id'] ?? 0);
+}
+
+// Prepared / Vetted / Approved / Issued — one ordered, read-only provenance list
+// built from stored fields. Each entry: role, name, at (date str), state
+// (done|pending|returned|na).
+function idems_provenance($doc) {
+    $st = strtoupper((string)($doc['status'] ?? 'DRAFT'));
+    $out = [];
+    // Prepared
+    $insName = trim((string)($doc['inspector_name'] ?? ''));
+    if ($insName === '' && !empty($doc['inspector_id']))
+        $insName = (string)ops_val("SELECT name FROM inspectors WHERE id=?", [(int)$doc['inspector_id']]);
+    $out[] = ['role'=>'Prepared', 'name'=>$insName ?: '—', 'at'=>'', 'state'=>$insName ? 'done' : 'pending'];
+    // Vetted
+    $vetReq = !function_exists('idems_vetting_required') || idems_vetting_required($doc);
+    $vetBy = trim((string)($doc['vet_by'] ?? '')); $vetSt = strtoupper((string)($doc['vet_status'] ?? ''));
+    if (!$vetReq && $vetBy === '') {
+        $out[] = ['role'=>'Vetted', 'name'=>'not required', 'at'=>'', 'state'=>'na'];
+    } elseif ($vetSt === 'VETTED') {
+        $out[] = ['role'=>'Vetted', 'name'=>$vetBy ?: '—', 'at'=>(string)($doc['vet_at'] ?? ''), 'state'=>'done'];
+    } elseif ($vetSt === 'RETURNED') {
+        $out[] = ['role'=>'Vetted', 'name'=>'returned by ' . ($vetBy ?: '—'), 'at'=>'', 'state'=>'returned'];
+    } else {
+        $out[] = ['role'=>'Vetted', 'name'=>'pending', 'at'=>'', 'state'=>'pending'];
+    }
+    // Approved
+    $apprBy = trim((string)($doc['approved_by'] ?? ''));
+    if (in_array($st, ['APPROVED','ISSUED'], true) && $apprBy !== '') {
+        $out[] = ['role'=>'Approved', 'name'=>$apprBy, 'at'=>(string)($doc['approved_at'] ?? ''), 'state'=>'done'];
+    } elseif ($st === 'UNDER_REVIEW') {
+        $who = '';
+        if (function_exists('idems_current_step')) {
+            $cur = idems_current_step($doc['id']);
+            if ($cur) { $who = idems_user_display((int)($cur['resolved_user_id'] ?? 0)); if ($who === '') $who = (string)($cur['approver_role'] ?? ''); }
+        }
+        $out[] = ['role'=>'Approved', 'name'=>$who !== '' ? 'pending — ' . $who : 'pending', 'at'=>'', 'state'=>'pending'];
+    } else {
+        $out[] = ['role'=>'Approved', 'name'=>'pending', 'at'=>'', 'state'=>'pending'];
+    }
+    // Issued
+    if (!empty($doc['finalized']))
+        $out[] = ['role'=>'Issued', 'name'=>trim((string)($doc['finalized_by'] ?? '')) ?: '—', 'at'=>(string)($doc['finalized_at'] ?? ''), 'state'=>'done'];
+    else
+        $out[] = ['role'=>'Issued', 'name'=>'pending', 'at'=>'', 'state'=>'pending'];
+    return $out;
+}
+
+// The latest "returned to the inspector" event (vetting return vs approver
+// reject/sendback), whichever is most recent. Returns null if none.
+function idems_latest_return($doc) {
+    $id = (int)($doc['id'] ?? 0); if (!$id) return null;
+    $cands = [];
+    $v = ops_one("SELECT note, acted_by, acted_at FROM report_vetting WHERE report_doc_id=? AND action='RETURNED' ORDER BY id DESC LIMIT 1", [$id]);
+    if ($v) $cands[] = ['kind'=>'vetting', 'reason'=>(string)$v['note'], 'by'=>(string)$v['acted_by'], 'at'=>(string)$v['acted_at']];
+    $a = ops_one("SELECT remarks, acted_by, acted_at, status FROM report_approvals WHERE report_doc_id=? AND status IN ('REJECTED','SENTBACK') ORDER BY COALESCE(acted_at,'') DESC, id DESC LIMIT 1", [$id]);
+    if ($a) $cands[] = ['kind'=>($a['status'] === 'REJECTED' ? 'reject' : 'sendback'), 'reason'=>(string)$a['remarks'], 'by'=>(string)$a['acted_by'], 'at'=>(string)$a['acted_at']];
+    if (!$cands) return null;
+    usort($cands, fn($x, $y) => strcmp((string)$y['at'], (string)$x['at']));
+    return $cands[0];
+}
+
+// A display status that disambiguates the REJECTED="Sent back" collision without
+// changing the stored status value (backward compatible).
+function idems_status_label($doc) {
+    $st = strtoupper((string)($doc['status'] ?? 'DRAFT'));
+    if ($st === 'REJECTED') return 'Rejected — revise & resubmit';
+    if ($st === 'DRAFT' && idems_latest_return($doc)) return 'Returned for correction';
+    return IDEMS_STATUS[$st] ?? $st;
+}
+
+// Email the inspector when their report is returned (vetting return, approver
+// send-back or reject). Best-effort; never blocks the workflow. This closes the
+// gap where a return fired no notification at all.
+function idems_notify_inspector_returned($doc, $kind, $reason) {
+    $insId = (int)($doc['inspector_id'] ?? 0); if (!$insId) return;
+    $emails = [];
+    $e = trim((string)ops_val("SELECT email FROM inspectors WHERE id=?", [$insId]));
+    if ($e !== '') $emails[] = $e;
+    foreach (ops_all("SELECT email FROM users WHERE inspector_id=? AND COALESCE(email,'')<>'' AND is_active=1", [$insId]) as $r)
+        $emails[] = (string)$r['email'];
+    $to = implode(',', array_filter(array_unique($emails)));
+    if ($to === '') return;
+    $label = ['vetting'=>'returned at vetting', 'sendback'=>'sent back by the approver', 'reject'=>'rejected']["$kind"] ?? 'returned';
+    $body = "Your report has been $label and needs your attention.\n\n"
+        . "IRN: {$doc['irn']}\nType: {$doc['type_code']}\nTitle: " . ($doc['title'] ?: '—') . "\n\n"
+        . "Reason: " . ($reason !== '' ? $reason : '(none recorded)') . "\n\n"
+        . "Open it → " . T_REG('report') . " → {$doc['irn']} (or My Work → Returned for correction), fix it and submit again.\n\n" . app_name();
+    ops_mail($to, "Report returned for correction: {$doc['irn']}", $body, '', 'idems_returned');
+}
+
 // ---- Handler: act on an approval step (approve / reject / send-back / delegate) ----
 function ops_idems_approve($method) {
     if ($method !== 'POST') redirect('/documents');
@@ -5747,6 +5859,14 @@ function ops_idems_approve($method) {
     $decision = $_POST['decision'] ?? '';
     $remarks = trim($_POST['remarks'] ?? '');
     $pdo = db();
+    // Soft segregation acknowledgement: if you prepared this report, approving your
+    // own work needs a one-tick confirmation. It never blocks (you may still proceed)
+    // and preserves the master/one-person-office exception — it just makes self-review
+    // a deliberate, recorded choice instead of a silent one.
+    if ($decision === 'approve' && idems_is_self_review($doc) && empty($_POST['self_ack'])) {
+        flash('You prepared this report. Approving your own work breaks segregation of duties — tick the acknowledgement to confirm you are doing so deliberately, then approve again.', 'error');
+        redirect('/document?id=' . $doc['id']);
+    }
     if ($decision === 'approve') {
         $pdo->prepare("UPDATE report_approvals SET status='APPROVED', acted_by=?, acted_at=?, remarks=? WHERE id=?")
             ->execute([user_name(current_user()), date('c'), $remarks, $step['id']]);
@@ -5764,12 +5884,14 @@ function ops_idems_approve($method) {
         $pdo->prepare("UPDATE report_approvals SET status='REJECTED', acted_by=?, acted_at=?, remarks=? WHERE id=?")->execute([user_name(current_user()), date('c'), $remarks, $step['id']]);
         $pdo->prepare("UPDATE report_docs SET status='REJECTED', updated_at=? WHERE id=?")->execute([date('c'), $doc['id']]);
         idems_log('report_doc', $doc['id'], 'REJECT', ['irn'=>$doc['irn'], 'reason'=>$remarks]);
+        try { idems_notify_inspector_returned($doc, 'reject', $remarks); } catch (Throwable $e) {}
         flash('Report rejected and returned to the inspector.');
     } elseif ($decision === 'sendback') {
         if ($remarks === '') { flash('A remark is mandatory when sending back for correction.', 'error'); redirect('/document?id=' . $doc['id']); }
         $pdo->prepare("UPDATE report_approvals SET status='SENTBACK', acted_by=?, acted_at=?, remarks=? WHERE id=?")->execute([user_name(current_user()), date('c'), $remarks, $step['id']]);
         $pdo->prepare("UPDATE report_docs SET status='DRAFT', updated_at=? WHERE id=?")->execute([date('c'), $doc['id']]);
         idems_log('report_doc', $doc['id'], 'SENDBACK', ['irn'=>$doc['irn'], 'reason'=>$remarks]);
+        try { idems_notify_inspector_returned($doc, 'sendback', $remarks); } catch (Throwable $e) {}
         flash('Sent back to the inspector for correction.');
     } elseif ($decision === 'delegate') {
         $to = (int)($_POST['delegate_to'] ?? 0);
@@ -5859,6 +5981,11 @@ function ops_idems_vet($method) {
     if (!isset(IDEMS_VET_STATUS[$action])) { flash('Choose a vetting action.', 'error'); redirect('/document?id=' . $doc['id']); }
     $note = trim((string)($_POST['note'] ?? ''));
     if ($action === 'RETURNED' && $note === '') { flash('A note is mandatory when returning a report for correction.', 'error'); redirect('/document?id=' . $doc['id']); }
+    // Soft segregation acknowledgement on clearing your own report at vetting (never blocks).
+    if ($action === 'VETTED' && idems_is_self_review($doc) && empty($_POST['self_ack'])) {
+        flash('You prepared this report. Vetting your own work breaks segregation of duties — tick the acknowledgement to confirm you are doing so deliberately, then vet it again.', 'error');
+        redirect('/document?id=' . $doc['id']);
+    }
     $pdo = db();
     // Configurable vetting checklist: record which points the vetter ticked, and
     // (when configured) block "Vet (cleared)" until every point is ticked. Never
@@ -5890,6 +6017,7 @@ function ops_idems_vet($method) {
         $pdo->prepare("UPDATE report_docs SET status='DRAFT' WHERE id=?")->execute([$doc['id']]);
         $pdo->prepare("DELETE FROM report_approvals WHERE report_doc_id=?")->execute([$doc['id']]);
     }
+    if ($action === 'RETURNED') { try { idems_notify_inspector_returned($doc, 'vetting', $note); } catch (Throwable $e) {} }
     idems_log('report_doc', $doc['id'], 'VET_' . $action, ['irn'=>$doc['irn'], 'reason'=>$note]);
     // Auto-forward on vetting: a report sitting at the vetting gate that is VETTED is
     // handed straight to the approval chain — the approver is resolved and notified,

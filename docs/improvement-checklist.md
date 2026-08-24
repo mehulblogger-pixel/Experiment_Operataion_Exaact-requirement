@@ -26,7 +26,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 04 | Calls / Service Requests | P1 | ⬜ | — |
 | 05 | Jobs (Job 360) | P1 | ⬜ | — |
 | 06 | Inspection / IDEMS core + Applicability | P0 | ⬜ | — |
-| 07 | Vetting / Technical Review / Approval | P0 | 📝 edge-cases drafted (awaiting go + 3 decisions) | — |
+| 07 | Vetting / Technical Review / Approval | P0 | ✅ done & pushed | 2026-08-24 |
 | 08 | Report Release / Issue | P0 | ⬜ | — |
 | 09 | Invoicing | P0 | ⬜ | — |
 | 10 | Client Portal | P0 | ⬜ | — |
@@ -79,6 +79,27 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 07 — Vetting / Technical Review / Approval · 2026-08-24
+**Decisions taken:** self-review → soft warning + acknowledge (11.1-A); notify on return →
+**also email** (11.2); status labels disambiguated (11.3-yes).
+**Added (additive UX, no control weakened):**
+- **Provenance strip** on the report screen — Prepared / Vetted / Approved / Issued, each
+  with actor + date or pending/not-required, built read-only from stored fields.
+- **Return-reason banner** — a returned/rejected report now shows the reviewer's actual
+  reason, who and when, prominently at the top (was "read the remark below").
+- **Status disambiguation** — REJECTED → "Rejected — revise & resubmit"; a returned draft →
+  "Returned for correction" (display only; stored status unchanged).
+- **Soft self-review acknowledgement** — if you prepared a report, vetting/approving your
+  own work now needs a one-tick confirmation (never blocks; preserves master exception).
+- **Email to the inspector on return** — reject / send-back / vetting-return now notify the
+  inspector (previously no notification fired at all). Best-effort, never blocks.
+- **Segregation visibility** — the approver is told why they cannot issue their own approval.
+**Preserved (verified by tests):** issuer≠approver finalize guard; mandatory return reasons;
+all gates and transitions; no new permission; report status model untouched.
+**Edge cases:** `docs/edge-cases/07-vetting-review-approval.md`.
+**Tests:** `tests/test_module07_quality_gate.php` (25 assertions). Suite 2408 passed / 3
+pre-existing baseline failures.
 
 ### Module 39 — My Work · 2026-08-24
 **Added (non-destructive):**

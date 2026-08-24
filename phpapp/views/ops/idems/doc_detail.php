@@ -398,13 +398,45 @@
   $rBody = !empty($hasSchema);
   $rCanEdit = idems_can_edit_doc($doc);
 ?>
+<?php // ---- Module 07: return-reason banner (prominent, for the preparer) ---- ?>
+<?php $m7ret = in_array($rSt, ['DRAFT','REJECTED'], true) ? idems_latest_return($doc) : null; ?>
+<?php if ($m7ret): ?>
+  <div class="panel" data-tab="Report" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent)">
+    <b style="color:var(--bad)">↩ Returned for correction</b> —
+    <?= e(['reject'=>'rejected', 'vetting'=>'returned at vetting', 'sendback'=>'sent back by the approver'][$m7ret['kind']] ?? 'returned') ?>
+    by <b><?= e($m7ret['by'] ?: '—') ?></b><?= $m7ret['at'] ? ' on ' . e(date('d M Y', strtotime($m7ret['at']))) : '' ?>.
+    <div style="margin-top:6px">Reason: <b><?= e($m7ret['reason'] !== '' ? $m7ret['reason'] : '(none recorded)') ?></b></div>
+  </div>
+<?php endif; ?>
+
+<?php // ---- Module 07: provenance strip — Prepared / Vetted / Approved / Issued ---- ?>
+<?php $m7prov = idems_provenance($doc);
+  $m7ico = ['done'=>'✓', 'pending'=>'…', 'returned'=>'↩', 'na'=>'—'];
+  $m7col = ['done'=>'var(--ok)', 'pending'=>'var(--muted,#6b7280)', 'returned'=>'var(--bad)', 'na'=>'var(--muted,#6b7280)']; ?>
+<div class="panel" data-tab="Report">
+  <div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:6px">Provenance — who did what</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch">
+    <?php foreach ($m7prov as $p): ?>
+      <div style="flex:1 1 150px;min-width:140px;border:1px solid var(--line);border-radius:8px;padding:8px 10px">
+        <div style="font-size:11px;color:var(--muted)"><?= e($p['role']) ?></div>
+        <div style="font-weight:700;font-size:13px;color:<?= $m7col[$p['state']] ?? 'var(--ink)' ?>"><?= e(($m7ico[$p['state']] ?? '') . ' ' . $p['name']) ?></div>
+        <?php if ($p['at']): ?><div class="muted" style="font-size:11px"><?= e(date('d M Y', strtotime($p['at']))) ?></div><?php endif; ?>
+      </div>
+    <?php endforeach; ?>
+  </div>
+</div>
+
 <div class="nowband" data-tab="Report">
   <?php if ($rFin || $rSt === 'ISSUED'): ?>
     <div class="step">Issued &amp; locked.</div>
     <p class="next">This <?= e(Tl('report')) ?> has gone to the <?= e(Tl('client')) ?> and can no longer be changed. You can still download the PDF or the client format above.</p>
   <?php elseif ($rSt === 'APPROVED'): ?>
     <div class="step">Approved — ready to issue.</div>
-    <p class="next"><b>Next:</b> press <b>Finalize &amp; issue</b> above to send it and lock it. After that nothing on it can change.</p>
+    <?php if (!$doc['finalized'] && function_exists('idems_user_approved_doc') && !is_master() && idems_user_approved_doc($doc, (int)(current_user()['id'] ?? 0))): ?>
+      <p class="next"><b>You approved this report</b>, so a <b>different person</b> must finalize &amp; issue it — the approver and the issuer cannot be the same (segregation of duties).</p>
+    <?php else: ?>
+      <p class="next"><b>Next:</b> press <b>Finalize &amp; issue</b> above to send it and lock it. After that nothing on it can change.</p>
+    <?php endif; ?>
   <?php elseif ($rSt === 'REJECTED'): ?>
     <div class="step">Sent back for changes.</div>
     <p class="next"><b>Next:</b> read the reviewer's remark below, fix the body, and submit it again.</p>
@@ -495,6 +527,12 @@
         </div>
       <?php endif; ?>
       <input class="form-control" name="note" placeholder="Note (required to return for correction)" style="margin-bottom:8px">
+      <?php if (idems_is_self_review($doc)): ?>
+        <label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;font-size:12.5px;color:var(--bad)">
+          <input type="checkbox" name="self_ack" value="1" style="margin-top:2px">
+          <span>I prepared this report. I confirm I am vetting my own work deliberately — segregation of duties.</span>
+        </label>
+      <?php endif; ?>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn" type="submit" name="vet_action" value="VETTED">✓ Vet (cleared)</button>
         <button class="btn secondary" type="submit" name="vet_action" value="RETURNED">↩ Return for correction</button>
@@ -528,6 +566,12 @@
     <form method="post" action="/document-approve" class="appr-act" style="margin-top:10px">
       <input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
       <input class="form-control" name="remarks" placeholder="Remarks (required to reject / send back)" style="margin-bottom:8px">
+      <?php if (idems_is_self_review($doc)): ?>
+        <label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;font-size:12.5px;color:var(--bad)">
+          <input type="checkbox" name="self_ack" value="1" style="margin-top:2px">
+          <span>I prepared this report. I confirm I am approving my own work deliberately — segregation of duties.</span>
+        </label>
+      <?php endif; ?>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <button class="btn" type="submit" name="decision" value="approve">✓ Approve</button>
         <button class="btn secondary" type="submit" name="decision" value="sendback">↩ Send back</button>

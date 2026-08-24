@@ -1,8 +1,9 @@
 # Module 07 — Vetting / Technical Review / Approval · Edge-case analysis (pre-build)
 
-**Status:** edge-cases drafted — **awaiting your go + answers to the open decisions
-(§11) before any code.** This module is **P0** and sits on the segregation-of-duties
-controls, so nothing here weakens a control; every change is additive UX.
+**Status:** ✅ BUILT (2026-08-24). Decisions: 11.1→(A) soft warning+ack · 11.2→also email ·
+11.3→yes. Tests in `tests/test_module07_quality_gate.php`. This module is **P0** and sits on
+the segregation-of-duties controls; nothing here weakened a control — every change is
+additive UX, verified by regression assertions.
 
 ---
 
