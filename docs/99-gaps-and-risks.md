@@ -23,16 +23,21 @@ The `clients`/`vendors` *list* is gated (`index.php:879`) but the records behind
 to the create/edit/add routes, and `can('mod.clients.view')||…` to `partner`/`po` view;
 gate contract-add by `crm.contract.register`/endorse rights and PO-add by an ops/finance right.
 
-## R2 — HIGH · `job-close` has no permission guard (and ignores `ops.job.close`)
-**What:** the `job-close` handler (`ops.php:5559`+) has **no `ops_require`**; it is protected
-only by the module gate `mod.jobs.view` or the job-owner bypass (`ops.php:2384-2388`). The
-dedicated `ops.job.close` permission is **never evaluated here**.
-**Who reaches it:** anyone holding `mod.jobs.view` — including **FINANCE, SBU_HEAD,
+## R2 — HIGH · `job-close` had no permission guard (ignored `ops.job.close`) — **FIXED**
+**What:** the `job-close` handler had **no `ops_require`**; it was protected only by the
+module gate `mod.jobs.view` or the job-owner bypass (`ops.php:2384-2388`), so the dedicated
+`ops.job.close` permission was **never evaluated**.
+**Who reached it:** anyone holding `mod.jobs.view` — including **FINANCE, SBU_HEAD,
 BRANCH_APP_MANAGER, ASST_MANAGER**, none of whom hold `ops.job.close` by default.
-**Why it matters:** closing a job records days/expenses and locks it (financial effect);
-the wrong roles can do it, and the permission you designed for it is inert.
-**Fix:** `ops_require(is_master()||can('ops.job.close')||is_coordinator_level()||job_owned_by_me($id))`
-at the top of `job-close`.
+**Why it mattered:** closing a job records days/expenses and locks it (financial effect);
+the wrong roles could do it, and the permission designed for it was inert.
+**Fixed this session:** `ops_require(is_master() || can('ops.job.close') || job_owned_by_me($id))`
+at the top of `job-close` (guards GET and POST). Deliberately keyed off the **real
+permission**, not `is_coordinator_level()` (which the earlier note suggested but which would
+keep letting ASST_MANAGER close despite lacking the permission — the app's rule is "gate by
+ability, not tier"). Closers now: CO, BM, OM (hold `ops.job.close`), master, and the assigned
+inspector on their own job; FIN/SBU/BAM/AM can no longer close. Tests:
+`tests/test_job_close_guard.php`.
 
 ## R3 — HIGH · A per-user permission set REPLACES role defaults (silent lock-out)
 **What:** if a login has any custom `permissions` value, it *replaces* the role defaults

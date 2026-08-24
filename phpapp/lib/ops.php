@@ -5560,6 +5560,18 @@ function ops_jobs($route, $method) {
         // Inspector (or coordinator) closes: report + expenses required
         $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$job) { http_response_code(404); view('notfound'); return; }
+        // R2 — closing a job records days & expenses and LOCKS it (a financial
+        // effect), so it is gated on the permission designed for it — ops.job.close —
+        // not merely on holding the jobs module. Before this, the module gate let
+        // anyone with mod.jobs.view close a job, so FINANCE, SBU_HEAD,
+        // BRANCH_APP_MANAGER and ASST_MANAGER — none of whom hold ops.job.close —
+        // could close one, and the permission was inert. The assigned engineer may
+        // still close their OWN job (the owner bypass that unblocks the field flow);
+        // everyone else needs ops.job.close (coordinators, branch / operation
+        // managers) or master. Gated for GET and POST so the form is not even shown
+        // to someone who cannot act on it.
+        ops_require(is_master() || can('ops.job.close') || job_owned_by_me((int)$job['id']),
+            'You do not have permission to close this ' . Tl('job') . '. Ask a coordinator.');
         if ($method === 'POST') {
             $b = $_POST;
             // Past the deadline the engineer can no longer close it themselves —
