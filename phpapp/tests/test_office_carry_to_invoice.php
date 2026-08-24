@@ -33,6 +33,23 @@ t_ok(strpos($crm, "\$_POST['branch_id']") !== false, 'contract registration read
 $ops = file_get_contents(__DIR__ . '/../lib/ops.php');
 t_ok(strpos($ops, "\$ct['branch_id']") !== false, 'a call raised from a contract inherits the contract branch');
 
+// The spine: when the managing branch is left BLANK on a call under a contract,
+// the CONTRACT's branch is used — never silently swapped for the raiser's own
+// office. The contract lookup must sit BEFORE the home-office fallback.
+t_ok(strpos($ops, 'branch_id FROM partner_contracts WHERE contract_number=? AND branch_id IS NOT NULL ORDER BY id DESC LIMIT 1') !== false
+    && strpos($ops, "\$b['ibo_office_id'] = (\$call['ibo_office_id'] ?? '') ?: (\$ctBranch ?: (current_user()['home_office_id'] ?? ''))") !== false,
+    'a blank call branch falls back to the contract branch before the raiser\'s home office');
+
+// Behavioural: the exact lookup the code uses resolves the contract's branch.
+(function () {
+    $own = !db()->inTransaction(); if ($own) db()->beginTransaction();
+    try {
+        db()->prepare("INSERT INTO partner_contracts (partner_id, contract_number, branch_id, open_status, is_active) VALUES (0,'SPINE/2026/1', 42, 'OPEN', 1)")->execute();
+        $found = (int)ops_val("SELECT branch_id FROM partner_contracts WHERE contract_number=? AND branch_id IS NOT NULL ORDER BY id DESC LIMIT 1", ['SPINE/2026/1']);
+        t_ok($found === 42, 'the contract branch is found from the contract number the call carries');
+    } finally { if ($own && db()->inTransaction()) db()->rollBack(); }
+})();
+
 // Recovering a stranded draft: a branch can be SET on a draft that has none, and
 // a draft is never born without one when the user is acting in a branch.
 if (function_exists('books_invoice_create')) {

@@ -3879,9 +3879,21 @@ function ops_calls($route, $method) {
                 if ($ph) flash('Note: this ' . Tl('client') . ' is ' . $ph['label'] . ' — ' . $ph['reason'], 'warning');
             }
             $execOffice = ($b['executing_office_id'] ?? '') !== '' ? (int)$b['executing_office_id'] : null;
-            // Default the managing / contracting office to the creator's home office if blank.
+            // Default the managing / contracting office when it is left blank. The
+            // CONTRACT is the source of truth: a call raised under a registered
+            // contract must bill from THAT contract's branch — the one chosen at
+            // quote/registration time — not from whoever happens to raise the call.
+            // Silently substituting the raiser's own office here is exactly how a
+            // deal's branch got lost on the way to the invoice. Only when there is
+            // no contract do we fall back to the raiser's home office.
             if (($b['ibo_office_id'] ?? '') === '') {
-                $b['ibo_office_id'] = ($call['ibo_office_id'] ?? '') ?: (current_user()['home_office_id'] ?? '');
+                $ctBranch = 0;
+                $cnum = trim((string)($b['contract_number'] ?? ''));
+                if ($cnum !== '') {
+                    try { $ctBranch = (int)ops_val("SELECT branch_id FROM partner_contracts WHERE contract_number=? AND branch_id IS NOT NULL ORDER BY id DESC LIMIT 1", [$cnum]); }
+                    catch (Throwable $e) { $ctBranch = 0; }
+                }
+                $b['ibo_office_id'] = ($call['ibo_office_id'] ?? '') ?: ($ctBranch ?: (current_user()['home_office_id'] ?? ''));
             }
             $mngOffice = ($b['ibo_office_id'] ?? '') !== '' ? (int)$b['ibo_office_id'] : null;
             $crossOffice = $execOffice && (!$mngOffice || $mngOffice !== $execOffice);
