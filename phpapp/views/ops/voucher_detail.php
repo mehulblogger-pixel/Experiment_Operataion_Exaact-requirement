@@ -72,10 +72,60 @@
   #vgrid .v-travel,#vgrid .v-rowtotal{font-variant-numeric:tabular-nums;text-align:right}
   #vgrid tr[data-eid]:hover td{background:color-mix(in srgb,var(--brand) 4%,transparent)}
   .tbl-scroll{border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-sm)}
+
+  <?php /* ---- Phone: the 12-column spreadsheet is unusable behind a sideways
+           scroll on a thumb, so below 720px the SAME grid (same inputs, same
+           names, same recalc JS — nothing about the data changes) reflows into
+           one card per day. Each cell becomes a "Label: value" line, the column
+           header row is dropped, and inputs go full-width. Desktop is untouched:
+           every rule here lives inside the media query. */ ?>
+  @media (max-width: 720px){
+    .tbl-scroll{overflow-x:visible;border:none;box-shadow:none;border-radius:0}
+    #vgrid, #vgrid tbody, #vgrid tr, #vgrid td{display:block;width:auto}
+    #vgrid .vgrid-head{display:none}                       /* column headers make no sense stacked */
+    #vgrid td{white-space:normal}
+    /* each entry is a card */
+    #vgrid tr[data-eid]:not(.v-noterow){border:1px solid var(--line);border-radius:var(--radius);
+      background:var(--card);box-shadow:var(--shadow-sm);margin:0 0 12px;padding:4px 0 6px;overflow:hidden}
+    #vgrid tr[data-eid]:hover td{background:transparent}   /* no hover paint on touch cards */
+    /* the Date cell is the card's title bar */
+    #vgrid td.v-date{background:var(--soft);font-weight:700;padding:9px 12px;margin-bottom:4px;
+      border-bottom:1px solid var(--line)}
+    /* every other cell: label left, value/input right. The label is emitted only
+       when data-label is present AND non-empty, so action/spacer cells get no
+       stray empty label column. */
+    #vgrid tr[data-eid] td:not(.v-date){display:flex;justify-content:space-between;align-items:center;
+      gap:12px;padding:6px 12px;border:none}
+    #vgrid tr[data-eid] td[data-label]:not([data-label=""])::before{content:attr(data-label);font-size:11px;
+      font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);flex:0 0 40%}
+    #vgrid td:empty{display:none}                          /* drop the spacer cells */
+    #vgrid tr[data-eid] .form-control{width:100% !important;flex:1 1 auto;max-width:60%}
+    #vgrid td.v-travel,#vgrid td.v-rowtotal{justify-content:space-between}
+    #vgrid td.v-rowtotal{background:var(--soft);border-top:1px solid var(--line);padding-top:8px;padding-bottom:8px}
+    #vgrid td.row-actions{justify-content:flex-end}
+    /* the per-day note: sits attached under its card */
+    #vgrid tr.v-noterow{border:1px solid var(--line);border-top:none;border-radius:0 0 var(--radius) var(--radius);
+      background:var(--card);margin:-12px 0 12px;padding:6px 12px 10px}
+    #vgrid tr.v-noterow td{display:block;padding:2px 0;border:none;white-space:normal}
+    #vgrid tr.v-noterow td::before{content:none}
+    #vgrid tr[data-eid]:not(.v-noterow):has(+ .v-noterow){margin-bottom:0;border-bottom:none;
+      border-radius:var(--radius) var(--radius) 0 0}
+    /* running per-day + grand totals read as plain lines, not a broken table row */
+    #vgrid tr.v-daytot,#vgrid tr.v-totalrow,#vgrid tr.v-grandrow{background:transparent}
+    #vgrid tr.v-totalrow,#vgrid tr.v-grandrow{border:1px solid var(--line);border-radius:var(--radius);
+      background:var(--soft);margin:0 0 10px;padding:4px 0}
+    #vgrid tr.v-totalrow td,#vgrid tr.v-grandrow td{display:flex;justify-content:space-between;
+      gap:12px;padding:6px 12px;text-align:left !important;border:none}
+    #vgrid tr.v-totalrow td[data-label]:not([data-label=""])::before,
+    #vgrid tr.v-grandrow td[data-label]:not([data-label=""])::before{content:attr(data-label);
+      font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);flex:0 0 40%}
+    #vgrid tr.v-daytot td{padding:6px 4px}
+    .inline-add{flex-wrap:wrap}
+  }
 </style>
 <div class="tbl-scroll" style="overflow-x:auto">
 <table class="grid" id="vgrid">
-  <tr>
+  <tr class="vgrid-head">
     <th>Date</th><th>Attendance / Site</th><th>File No (<?= e(T("boss")) ?>)</th><th>Line No</th><th>Hrs</th>
     <th>Mode</th><th>KM</th><th>Travel <?= e(cur_sym()) ?></th>
     <?php foreach ($heads as $h): ?><th title="<?= e($h['code']) ?>"><?= e($h['label']) ?></th><?php endforeach; ?>
@@ -96,30 +146,32 @@
       $eid = (int)$e['id']; $P = "rows[$eid]";
     ?>
     <tr data-eid="<?= $eid ?>">
-      <td><?= e(date('d-M', strtotime($date))) ?><?= $e['is_auto']?' <span class="badge GREEN" style="font-size:10px">auto</span>':'' ?><?= $mem?' <span class="muted" title="km remembered for this vendor" style="font-size:11px">↺</span>':'' ?></td>
-      <td><?= e($att) ?></td>
+      <td class="v-date"><?= e(date('d-M', strtotime($date))) ?><?= $e['is_auto']?' <span class="badge GREEN" style="font-size:10px">auto</span>':'' ?><?= $mem?' <span class="muted" title="km remembered for this vendor" style="font-size:11px">↺</span>':'' ?></td>
+      <td data-label="Attendance / Site"><?= e($att) ?></td>
       <?php if ($canEdit): ?>
-      <td><input form="vform" class="form-control" style="width:110px" name="<?= $P ?>[file_no]" value="<?= e($e['file_no']) ?>" <?= $isWork?'':'readonly' ?>></td>
-      <td><input form="vform" class="form-control" style="width:80px" name="<?= $P ?>[line_no]" value="<?= e($e['line_no']) ?>" placeholder="acct"></td>
-      <td><input form="vform" class="form-control v-hours" style="width:64px" type="number" step="0.25" name="<?= $P ?>[hours]" value="<?= e($fmt($e['hours'])) ?>"></td>
-      <td><select form="vform" class="form-control v-mode" style="width:110px" name="<?= $P ?>[mode]"><option value="">—</option>
+      <td data-label="File No (<?= e(T('boss')) ?>)"><input form="vform" class="form-control" style="width:110px" name="<?= $P ?>[file_no]" value="<?= e($e['file_no']) ?>" <?= $isWork?'':'readonly' ?>></td>
+      <td data-label="Line No"><input form="vform" class="form-control" style="width:80px" name="<?= $P ?>[line_no]" value="<?= e($e['line_no']) ?>" placeholder="acct"></td>
+      <td data-label="Hours"><input form="vform" class="form-control v-hours" style="width:64px" type="number" step="0.25" name="<?= $P ?>[hours]" value="<?= e($fmt($e['hours'])) ?>"></td>
+      <td data-label="Mode"><select form="vform" class="form-control v-mode" style="width:110px" name="<?= $P ?>[mode]"><option value="">—</option>
         <?php foreach ($modes as $m): ?><option value="<?= e($m['code']) ?>" <?= $modeVal===$m['code']?'selected':'' ?>><?= e($m['label']) ?></option><?php endforeach; ?></select></td>
-      <td><input form="vform" class="form-control v-km" style="width:70px" type="number" step="0.1" name="<?= $P ?>[km]" value="<?= e($kmVal!==''?$fmt($kmVal):'') ?>"></td>
-      <td class="v-travel" data-eid="<?= $eid ?>"><?= e(cur_sym()) ?><?= $fmt($e['travel_amount']) ?></td>
+      <td data-label="KM"><input form="vform" class="form-control v-km" style="width:70px" type="number" step="0.1" name="<?= $P ?>[km]" value="<?= e($kmVal!==''?$fmt($kmVal):'') ?>"></td>
+      <td class="v-travel" data-label="Travel <?= e(cur_sym()) ?>" data-eid="<?= $eid ?>"><?= e(cur_sym()) ?><?= $fmt($e['travel_amount']) ?></td>
       <?php foreach ($heads as $h): ?>
-        <td><input form="vform" class="form-control v-amt" data-code="<?= e($h['code']) ?>" style="width:80px" type="number" step="0.01" name="<?= $P ?>[amt][<?= e($h['code']) ?>]" value="<?= e(isset($amt[$h['code']])?$fmt($amt[$h['code']]):'') ?>" <?= $h['head_type']==='BILL'?'title="actual bill"':'' ?>></td>
+        <td data-label="<?= e($h['label']) ?>"><input form="vform" class="form-control v-amt" data-code="<?= e($h['code']) ?>" style="width:80px" type="number" step="0.01" name="<?= $P ?>[amt][<?= e($h['code']) ?>]" value="<?= e(isset($amt[$h['code']])?$fmt($amt[$h['code']]):'') ?>" <?= $h['head_type']==='BILL'?'title="actual bill"':'' ?>></td>
       <?php endforeach; ?>
-      <td class="v-rowtotal" data-eid="<?= $eid ?>"><strong><?= e(cur_sym()) ?><?= $fmt($e['row_total']) ?></strong></td>
-      <td class="row-actions"><button form="del_<?= $eid ?>" class="btn small danger" type="submit" onclick="return confirm('Remove this row?')">✕</button></td>
+      <td class="v-rowtotal" data-label="Row total <?= e(cur_sym()) ?>" data-eid="<?= $eid ?>"><strong><?= e(cur_sym()) ?><?= $fmt($e['row_total']) ?></strong></td>
+      <td class="row-actions" data-label=""><button form="del_<?= $eid ?>" class="btn small danger" type="submit" onclick="return confirm('Remove this row?')">✕</button></td>
       <?php else: ?>
-      <td><?= e($e['file_no'] ?: '—') ?></td>
-      <td><?= e($e['line_no'] ?: '—') ?></td>
-      <td><?= e($fmt($e['hours'])) ?></td>
-      <td><?= e($e['mode_code'] ?: '—') ?></td>
-      <td><?= (float)$e['km']>0 ? e($fmt($e['km'])) : '—' ?></td>
-      <td><?= e(cur_sym()) ?><?= $fmt($e['travel_amount']) ?></td>
-      <?php foreach ($heads as $h): ?><td><?= isset($amt[$h['code']]) ? cur_sym().$fmt($amt[$h['code']]) : '—' ?></td><?php endforeach; ?>
-      <td><strong><?= e(cur_sym()) ?><?= $fmt($e['row_total']) ?></strong></td>
+      <td data-label="File No (<?= e(T('boss')) ?>)"><?= e($e['file_no'] ?: '—') ?></td>
+      <td data-label="Line No"><?= e($e['line_no'] ?: '—') ?></td>
+      <td data-label="Hours"><?= e($fmt($e['hours'])) ?></td>
+      <td data-label="Mode"><?= e($e['mode_code'] ?: '—') ?></td>
+      <td data-label="KM"><?= (float)$e['km']>0 ? e($fmt($e['km'])) : '—' ?></td>
+      <td data-label="Travel <?= e(cur_sym()) ?>"><?= e(cur_sym()) ?><?= $fmt($e['travel_amount']) ?></td>
+      <?php foreach ($heads as $h): ?><td data-label="<?= e($h['label']) ?>"><?= isset($amt[$h['code']]) ? cur_sym().$fmt($amt[$h['code']]) : '—' ?></td><?php endforeach; ?>
+      <?php // Row total in the read-only view carries NO v-rowtotal class on purpose:
+            //  the recalc script (which runs on every load) must not find and zero it. ?>
+      <td data-label="Row total <?= e(cur_sym()) ?>" style="text-align:right"><strong><?= e(cur_sym()) ?><?= $fmt($e['row_total']) ?></strong></td>
       <?php endif; ?>
     </tr>
     <?php // A per-line note / remark — so an incidental or "Others (specify)" expense
@@ -135,20 +187,20 @@
     <tr class="muted" style="font-size:11px"><td></td><td colspan="<?= $ncol - 1 ?>">↳ <?= e($e['notes']) ?></td></tr>
     <?php endif; ?>
     <?php endforeach; ?>
-    <?php if (count($rows) > 1): ?><tr class="muted" style="font-size:12px"><td colspan="<?= $ncol ?>">↳ <?= e($date) ?> — day total hours: <strong><?= e($fmt($dayHours)) ?></strong></td></tr><?php endif; ?>
+    <?php if (count($rows) > 1): ?><tr class="v-daytot muted" style="font-size:12px"><td colspan="<?= $ncol ?>">↳ <?= e($date) ?> — day total hours: <strong><?= e($fmt($dayHours)) ?></strong></td></tr><?php endif; ?>
   <?php endforeach; ?>
   <?php if (!$entries): ?><tr><td colspan="<?= $ncol ?>">No days yet. <?= $canEdit?'Click “Pull working days from jobs”.':'' ?></td></tr><?php endif; ?>
   <?php if ($entries): ?>
-  <tr style="background:var(--soft)">
+  <tr class="v-totalrow" style="background:var(--soft)">
     <td colspan="4" style="text-align:right"><strong>TOTAL</strong></td>
-    <td><strong class="tot-hours"><?= e($fmt($monthHours)) ?></strong></td>
+    <td data-label="Total hours"><strong class="tot-hours"><?= e($fmt($monthHours)) ?></strong></td>
     <td></td><td></td>
-    <td id="tot-travel"><strong><?= e(cur_sym()) ?><?= $fmt($tTravel) ?></strong></td>
-    <?php foreach ($heads as $h): ?><td id="tot-amt-<?= e($h['code']) ?>"><strong><?= e(cur_sym()) ?><?= $fmt($tHead[$h['code']]) ?></strong></td><?php endforeach; ?>
-    <td id="tot-grand"><strong><?= e(cur_sym()) ?><?= $fmt($grand) ?></strong></td>
+    <td id="tot-travel" data-label="Travel <?= e(cur_sym()) ?>"><strong><?= e(cur_sym()) ?><?= $fmt($tTravel) ?></strong></td>
+    <?php foreach ($heads as $h): ?><td id="tot-amt-<?= e($h['code']) ?>" data-label="<?= e($h['label']) ?>"><strong><?= e(cur_sym()) ?><?= $fmt($tHead[$h['code']]) ?></strong></td><?php endforeach; ?>
+    <td id="tot-grand" data-label="Total <?= e(cur_sym()) ?>"><strong><?= e(cur_sym()) ?><?= $fmt($grand) ?></strong></td>
     <?php if ($canEdit): ?><td></td><?php endif; ?>
   </tr>
-  <tr><td colspan="<?= $ncol - 1 ?>" style="text-align:right"><strong>Grand Total</strong></td><td id="tot-grand2"><strong><?= e(cur_sym()) ?><?= $fmt($grand) ?></strong></td></tr>
+  <tr class="v-grandrow"><td colspan="<?= $ncol - 1 ?>" style="text-align:right"><strong>Grand Total</strong></td><td id="tot-grand2" data-label="Grand total <?= e(cur_sym()) ?>"><strong><?= e(cur_sym()) ?><?= $fmt($grand) ?></strong></td></tr>
   <?php endif; ?>
 </table>
 </div>

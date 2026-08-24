@@ -31,7 +31,7 @@ voucher — plus "All my jobs", "My Voucher", and the "Your pending tasks" panel
 5. **Fill** → `/document-fill?id=` — write the body (dictation/AI-polish helpers available).
 6. **Submit for review** → `/document-submit` (`idems.php:4392`). A completeness gate must pass first (`idems.php:4399-4409`); untouched text fields default to "NA".
 7. **Close the job & record expenses** — the close popup on `/my-jobs` posts to `/job-close` (`my_jobs.php:220`), capturing the day's travel/food/lodging.
-8. **Voucher** → `/vouchers` — a monthly draft is generated from the inspector's jobs (`voucher_generate`, `ops.php:4766`); submit it for approval. Travel & incidental expenses go here (the voucher is also the timesheet).
+8. **Voucher** → `/vouchers` — a monthly draft is generated from the inspector's jobs (`voucher_generate`, `ops.php:4766`); submit it for approval. Travel & incidental expenses go here (the voucher is also the timesheet). **On a phone** the 12-column grid reflows into one card per day (`voucher_detail.php`, `@media ≤720px`): each cell becomes a "Label: value" line and inputs go full-width — the same inputs and the same live-total JS, just stacked so it is usable with a thumb instead of scrolling sideways.
 
 **The job view is phone-first and stripped for the inspector.** The job screen
 (`views/ops/job_detail.php`) is shared with coordinators and managers, so it carries
