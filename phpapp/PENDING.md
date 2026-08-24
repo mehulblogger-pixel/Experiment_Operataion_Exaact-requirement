@@ -21,7 +21,10 @@ Built:
   demo/seed reloads — the app-level guards are the right guarantee. **Existing** duplicates
   are cleaned with the already-built **`office_merge()`** tool (UI on the Organisation &
   people screen, `orgadmin.php` `office-merge` — re-points calls/jobs/users, then removes the
-  dup; refuses to delete an in-use office).
+  dup; refuses to delete an in-use office). A **"Possible duplicate offices" finder**
+  (`office_duplicate_groups()`) now sits at the top of that screen: it lists same-named
+  offices, flags which copy has work booked (the safe "keep"), and offers a one-click merge
+  of each empty copy into it (`tests/test_office_duplicate_finder.php`).
 - Research memo (real-CRM comparison, edge cases) delivered in chat; not forcing a quote per
   order is deliberate and matches SAP/Salesforce/Oracle rate-contract + call-off practice.
 

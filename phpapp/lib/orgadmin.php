@@ -268,6 +268,28 @@ function office_in_use_text(array $uses) {
     $last = array_pop($bits);
     return 'it is still used by ' . ($bits ? implode(', ', $bits) . ' and ' . $last : $last) . '.';
 }
+// Offices that share a name (case-insensitive) — the "possible duplicates" to clean
+// up. Returns one entry per clashing name: the name and the list of offices under it,
+// each flagged with whether work is booked against it (so the UI can suggest keeping
+// the used one and merging the empties into it). Only groups of 2+ are returned.
+function office_duplicate_groups() {
+    $rows = ops_all("SELECT id, name, code, COALESCE(is_active,1) is_active FROM offices ORDER BY name, id") ?: [];
+    $byKey = [];
+    foreach ($rows as $r) {
+        $key = strtolower(trim((string)$r['name']));
+        if ($key === '') continue;
+        $byKey[$key][] = $r;
+    }
+    $groups = [];
+    foreach ($byKey as $list) {
+        if (count($list) < 2) continue;
+        foreach ($list as &$o) $o['in_use'] = office_in_use((int)$o['id']) !== [];
+        unset($o);
+        $groups[] = ['name' => $list[0]['name'], 'offices' => $list];
+    }
+    return $groups;
+}
+
 // Merge one office into another: repoint every *office_id reference across the
 // whole schema (people, calls, jobs, vouchers, quotations, reports, sub-offices…)
 // from the source to the target, then delete the now-empty source. This is the

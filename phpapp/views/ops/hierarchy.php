@@ -345,6 +345,42 @@
     </div>
   <?php endif; ?>
 
+  <?php // Possible duplicates — offices that share a name. Surfaced so an admin can
+        //  spot and merge them (new duplicates are already blocked at creation). The
+        //  suggested "keep" is one that has work booked against it, else the first. ?>
+  <?php $dupGroups = ($canEdit && function_exists('office_duplicate_groups')) ? office_duplicate_groups() : []; ?>
+  <?php if ($dupGroups): ?>
+  <div class="panel" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 6%,transparent);margin-bottom:12px">
+    <div class="ctitle" style="margin-top:0"><h3 style="color:var(--warn)">⚠ Possible duplicate <?= e(Tlp('office')) ?> <span class="muted">(<?= count($dupGroups) ?>)</span></h3></div>
+    <p class="sub" style="margin:0 0 6px">These <?= e(Tlp('office')) ?> share a name. Keep one and <b>merge</b> the others into it — every <?= e(Tl('call')) ?>, <?= e(Tl('job')) ?> and person moves across, and the duplicate is removed. The one with work booked against it is the safest to keep.</p>
+    <?php foreach ($dupGroups as $g):
+          $keep = null; foreach ($g['offices'] as $ko) { if (!empty($ko['in_use'])) { $keep = $ko; break; } }
+          if (!$keep) $keep = $g['offices'][0]; ?>
+      <div style="border-top:1px solid var(--line);padding:8px 0">
+        <b><?= e($g['name']) ?></b> <span class="muted">— <?= count($g['offices']) ?> copies</span>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+        <?php foreach ($g['offices'] as $o): ?>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px">
+            <span><?= e($o['name']) ?> <span class="muted">#<?= (int)$o['id'] ?><?= $o['code'] ? ' · ' . e($o['code']) : '' ?><?= empty($o['is_active']) ? ' · inactive' : '' ?></span>
+              <?= !empty($o['in_use']) ? '<span class="pill p-info">has work</span>' : '<span class="pill p-mut">empty</span>' ?>
+              <?= (int)$o['id'] === (int)$keep['id'] ? ' <span class="pill p-ok">suggested keep</span>' : '' ?></span>
+            <?php if ((int)$o['id'] !== (int)$keep['id']): ?>
+              <form method="post" action="/hierarchy" style="display:inline"
+                    onsubmit="return confirm('Merge <?= e(addslashes($o['name'])) ?> (#<?= (int)$o['id'] ?>) into <?= e(addslashes($keep['name'])) ?> (#<?= (int)$keep['id'] ?>)? Its work moves across and it is removed. This cannot be undone.')">
+                <input type="hidden" name="do" value="office-merge"><input type="hidden" name="tab" value="offices">
+                <input type="hidden" name="office_id" value="<?= (int)$o['id'] ?>">
+                <input type="hidden" name="target_office_id" value="<?= (int)$keep['id'] ?>">
+                <button class="btn small" type="submit">Merge into “<?= e($keep['name']) ?>” →</button>
+              </form>
+            <?php endif; ?>
+          </div>
+        <?php endforeach; ?>
+        </div>
+      </div>
+    <?php endforeach; ?>
+  </div>
+  <?php endif; ?>
+
   <div class="panel">
     <div class="master-head" style="margin-bottom:8px">
       <div><h3 class="tab-sub" style="margin:0"><?= e(THP('office')) ?> structure</h3>
