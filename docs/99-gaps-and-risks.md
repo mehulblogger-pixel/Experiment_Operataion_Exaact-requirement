@@ -94,14 +94,18 @@ both submit and approve an expense claim.
   (graceful). The Approve button also hides from those two, with an in-place "maker ≠ checker"
   note. Tests: `tests/test_voucher_sod_and_reopen.php`.
 
-## R6 — MEDIUM · Call `op_status` is a free-form manual picker with no transition rules
-**What:** `call-status` (`tosrm.php:499`) lets any `tosrm_can_edit()` user set **any** of 15
-`CALL_STATUSES` (`tosrm.php:26-42`), validated only for set-membership (`:134`) — no rule
-about which state may follow which.
-**Why it matters:** a call can be moved to a nonsensical state (e.g. COMPLETED with no job),
-undermining any reporting built on `op_status`.
-**Fix:** define an allowed-transition map and validate against it; or drive `op_status`
-from the real events (jobs/reports) instead of a free picker.
+## R6 — MEDIUM · Call `op_status` was a free-form picker with no transition rules — **FIXED**
+**What:** `call-status` let any `tosrm_can_edit()` user set **any** of 15 `CALL_STATUSES`,
+validated only for set-membership — no rule about which state may follow which.
+**Why it mattered:** a call could be moved to a nonsensical state (e.g. CLOSED then back to
+RECEIVED, or a cancelled call silently revived), undermining any reporting built on `op_status`.
+**Fixed this session (`tosrm.php`):** the active statuses carry a forward **rank**
+(`tosrm_status_rank`); `tosrm_allowed_next()` / `tosrm_can_transition()` allow forward /
+same-phase moves, ON_HOLD or CANCELLED from any live status, REJECTED only during intake, and
+give the three terminal states (CLOSED / REJECTED / CANCELLED) **no exit**. `tosrm_set_status`
+rejects an illegal step; the picker now lists only the legal next steps. A manager
+(`is_admin_level`) may still **override with a reason**, recorded as `[override]` in the status
+history. Tests: `tests/test_call_status_transitions.php`.
 
 ## R7 — MEDIUM · SR_INSPECTOR does not get the inspector field UI
 **What:** `is_inspector()` matches the literal `INSPECTOR` only (`ops.php:549`), so a

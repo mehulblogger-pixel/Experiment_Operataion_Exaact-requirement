@@ -17,8 +17,10 @@ A call carries **two** status columns:
   `OPEN → FORWARDED → ALLOCATED`. **`CLOSED` is read as a guard but never written by
   app code** (only by seed data) — treat it as vestigial (`ops.php:5175`, `:6459` read it; no write).
 - **`calls.op_status`** (`tosrm.php:77`) — the richer TOSRM service-request lifecycle
-  (`CALL_STATUSES`, `tosrm.php:26-42`), set by a **free-form manual picker** with no
-  per-transition rules (only set-membership validation).
+  (`CALL_STATUSES`, `tosrm.php:26-42`), set by a manual picker that now follows
+  **forward-rank transition rules** (R6 fixed): forward/same-phase moves, ON_HOLD/CANCELLED
+  from any live status, REJECTED only in intake, terminal states have no exit; a manager may
+  override with a reason.
 
 ### Legacy `calls.status` (what actually moves)
 
@@ -35,18 +37,23 @@ stateDiagram-v2
   end note
 ```
 
-### `calls.op_status` (TOSRM — manual, unguarded per-transition)
+### `calls.op_status` (TOSRM — rank-based transitions, R6)
 
 Any user passing `tosrm_can_edit()` (master, or `mod.calls.edit`/`ops.job.allocate`,
-or coordinator-level; **inspectors refused** — `tosrm.php:216-227`) can set **any** of
-the 15 `CALL_STATUSES` via `call-status` (`tosrm.php:499-503`, setter `132-142`). There
-is **no rule about which state may follow which** — validated only for membership
-(`tosrm.php:134`); every change writes an audit row (`tosrm.php:139`). When blank it is
-*derived* from the legacy status + jobs (`tosrm_derive_status()` `tosrm.php:117-124`).
+or coordinator-level; **inspectors refused** — `tosrm.php:216-227`) can advance a call
+via `call-status`. The active statuses carry a forward **rank** (`tosrm_status_rank`):
+`tosrm_set_status` now allows only a **legal next step** (`tosrm_can_transition` /
+`tosrm_allowed_next`) — forward or same-phase, ON_HOLD/CANCELLED from any live status,
+REJECTED only in intake — and the picker lists only those. The terminal states
+(CLOSED / REJECTED / CANCELLED) have **no exit**. A manager (`is_admin_level`) may
+**override with a reason**, recorded as `[override]` in history. Every change writes an
+audit row (`tosrm.php`). When blank it is *derived* from the legacy status + jobs
+(`tosrm_derive_status()`).
 
-> States: RECEIVED, DRAFT, UNDER_REVIEW, CLARIFICATION, ACCEPTED, REJECTED, ON_HOLD,
-> READY_TO_SCHEDULE, SCHEDULED, ASSIGNED, IN_PROGRESS, COMPLETED, REPORT_PENDING,
-> CLOSED, CANCELLED (`tosrm.php:26-42`). **⚠ free-form — see gaps doc.**
+> States (by rank): RECEIVED/DRAFT (1) → UNDER_REVIEW/CLARIFICATION (2) → ACCEPTED (3)
+> → READY_TO_SCHEDULE (4) → SCHEDULED (5) → ASSIGNED (6) → IN_PROGRESS (7) →
+> COMPLETED/REPORT_PENDING (8) → CLOSED (9); plus ON_HOLD, REJECTED, CANCELLED
+> (`tosrm.php:26-42`).
 
 ---
 
@@ -60,7 +67,7 @@ is `stage='CANCELLED'` (`tosrm.php:656`); it never advances through the intermed
 ```mermaid
 stateDiagram-v2
   [*] --> Open : job-new allocates · is_coordinator_level (ops.php:5163)
-  Open --> Closed : job-close · ⚠ NO permission guard, only business-rule blocks (ops.php:5559-5668)
+  Open --> Closed : job-close · is_master OR ops.job.close OR job owner (R2), then business-rule blocks (ops.php job-close)
   Closed --> ReportPending : report produced at close → report_approval=PENDING (ops.php:5666)
   ReportPending --> ReportApproved : report-approve (approve) · can_approve_report (workforce.php:700-704)
   ReportPending --> ReportRejected : report-approve (reject) · can_approve_report (workforce.php:700-704)

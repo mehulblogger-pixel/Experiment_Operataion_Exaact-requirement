@@ -127,18 +127,53 @@ function tosrm_call_status($call) {
     return $op !== '' ? $op : tosrm_derive_status($call);
 }
 
-// Move a call to a new lifecycle status, recording the transition. Returns
-// false for an unknown target. Never changes the legacy `status` column.
-function tosrm_set_status($callId, $to, $reason = '', $actor = '') {
+// R6 — the lifecycle a call may actually walk. The op_status picker used to let any
+// editor jump to ANY of the 15 statuses (validated only for set-membership), so a
+// call could be CLOSED then moved back to RECEIVED, or a cancelled one silently
+// revived. The active statuses have a forward RANK: a call may move forward along
+// it (or within a phase), pause (ON_HOLD) or abort (CANCELLED) from any live status,
+// and be REJECTED only while still in intake. The three terminal states have no exit.
+// A manager may still OVERRIDE with a reason for the genuine exception.
+function tosrm_status_rank() {
+    return ['RECEIVED'=>1,'DRAFT'=>1,'UNDER_REVIEW'=>2,'CLARIFICATION'=>2,'ACCEPTED'=>3,
+        'READY_TO_SCHEDULE'=>4,'SCHEDULED'=>5,'ASSIGNED'=>6,'IN_PROGRESS'=>7,
+        'COMPLETED'=>8,'REPORT_PENDING'=>8,'CLOSED'=>9];
+}
+// The statuses that may legally follow $from.
+function tosrm_allowed_next($from) {
+    $from = strtoupper(trim((string)$from));
+    $rank = tosrm_status_rank();
+    if (in_array($from, ['REJECTED','CLOSED','CANCELLED'], true)) return [];   // terminal — no exit
+    if ($from === 'ON_HOLD') {                                                 // resume anywhere active, or abort
+        return array_values(array_unique(array_merge(array_keys($rank), ['CANCELLED'])));
+    }
+    $next = [];
+    foreach ($rank as $s => $r) if ($s !== $from && $r >= ($rank[$from] ?? 0)) $next[] = $s;  // forward / same phase
+    $next[] = 'ON_HOLD'; $next[] = 'CANCELLED';                                // pause / abort from any live status
+    if (($rank[$from] ?? 99) <= 2) $next[] = 'REJECTED';                       // reject only while in intake
+    return array_values(array_unique($next));
+}
+function tosrm_can_transition($from, $to) {
+    $from = strtoupper(trim((string)$from)); $to = strtoupper(trim((string)$to));
+    if ($from === $to) return true;                        // a no-op is always fine
+    return in_array($to, tosrm_allowed_next($from), true);
+}
+
+// Move a call to a new lifecycle status, recording the transition. Returns false
+// for an unknown target OR a disallowed transition (unless $force — a manager
+// override, which is still recorded with its reason). Never changes legacy `status`.
+function tosrm_set_status($callId, $to, $reason = '', $actor = '', $force = false) {
     $to = strtoupper(trim((string)$to));
     if ($to === '' || !array_key_exists($to, tosrm_status_options())) return false;
     $call = ops_one("SELECT * FROM calls WHERE id=?", [(int)$callId]);
     if (!$call) return false;
     $from = tosrm_call_status($call);
+    if (!$force && !tosrm_can_transition($from, $to)) return false;   // R6 — not a legal step
     db()->prepare("UPDATE calls SET op_status=? WHERE id=?")->execute([$to, (int)$callId]);
+    $note = ($force && !tosrm_can_transition($from, $to)) ? trim('[override] ' . $reason) : (string)$reason;
     db()->prepare("INSERT INTO call_status_events (call_id, old_status, new_status, reason, actor, at) VALUES (?,?,?,?,?,?)")
-        ->execute([(int)$callId, $from, $to, (string)$reason, $actor !== '' ? $actor : tosrm_actor(), tosrm_now()]);
-    if (function_exists('idems_log')) { try { idems_log('call', (int)$callId, 'OP_STATUS', ['field'=>'op_status','old'=>$from,'new'=>$to,'reason'=>$reason]); } catch (Throwable $e) {} }
+        ->execute([(int)$callId, $from, $to, $note, $actor !== '' ? $actor : tosrm_actor(), tosrm_now()]);
+    if (function_exists('idems_log')) { try { idems_log('call', (int)$callId, 'OP_STATUS', ['field'=>'op_status','old'=>$from,'new'=>$to,'reason'=>$note]); } catch (Throwable $e) {} }
     return true;
 }
 function tosrm_status_history($callId) {
@@ -409,12 +444,27 @@ function tosrm_render_call_panel($call) {
       <div class="sr-grid">
         <form method="post" action="/call-status" class="sr-field">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="call_id" value="<?=$cid?>">
-          <label>Change status <span class="sr-hint">(reason optional)</span></label>
+          <label>Change status <span class="sr-hint">(only the valid next steps are listed)</span></label>
+          <?php // R6 — the picker offers the current status plus the steps that may
+                // legally follow it. A manager additionally sees every other status
+                // under an "Override" group; choosing one ticks the override box, and
+                // the server requires a reason for it. ?>
+          <?php $allowedNext = tosrm_allowed_next($cur); $isMgr = function_exists('is_admin_level') && is_admin_level(); ?>
           <div class="sr-row">
-            <select class="form-control" name="op_status"><?php foreach ($statuses as $k=>$v): ?><option value="<?=$esc($k)?>" <?=$k===$cur?'selected':''?>><?=$esc($v)?></option><?php endforeach; ?></select>
-            <input class="form-control" type="text" name="reason" placeholder="Reason (optional)">
+            <select class="form-control sr-status" name="op_status">
+              <option value="<?=$esc($cur)?>" selected><?=$esc($statuses[$cur] ?? $cur)?> (current)</option>
+              <?php foreach ($allowedNext as $k): if ($k===$cur) continue; ?><option value="<?=$esc($k)?>"><?=$esc($statuses[$k] ?? $k)?></option><?php endforeach; ?>
+              <?php if ($isMgr): $override = array_diff(array_keys($statuses), $allowedNext, [$cur]); if ($override): ?>
+                <optgroup label="Override — needs a reason">
+                  <?php foreach ($override as $k): ?><option value="<?=$esc($k)?>" data-override="1"><?=$esc($statuses[$k] ?? $k)?></option><?php endforeach; ?>
+                </optgroup>
+              <?php endif; endif; ?>
+            </select>
+            <input class="form-control" type="text" name="reason" placeholder="Reason<?= $isMgr ? ' (required for an override)' : ' (optional)' ?>">
+            <?php if ($isMgr): ?><label class="sr-hint" style="display:flex;align-items:center;gap:5px"><input type="checkbox" name="override" class="sr-override"> Override</label><?php endif; ?>
             <button class="btn" type="submit">Set</button>
           </div>
+          <?php if ($isMgr): ?><script>(function(){var s=document.currentScript.closest('form').querySelector('.sr-status'),o=document.currentScript.closest('form').querySelector('.sr-override');if(!s||!o)return;s.addEventListener('change',function(){var op=s.options[s.selectedIndex];o.checked=!!(op&&op.dataset.override);});})();</script><?php endif; ?>
         </form>
         <form method="post" action="/call-attrs" class="sr-field">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>"><input type="hidden" name="call_id" value="<?=$cid?>">
@@ -497,8 +547,18 @@ function ops_tosrm_action($route, $method) {
 
     switch ($route) {
         case 'call-status':
-            if (tosrm_set_status($callId, (string)($_POST['op_status'] ?? ''), (string)($_POST['reason'] ?? ''))) {
+            $to     = (string)($_POST['op_status'] ?? '');
+            $reason = (string)($_POST['reason'] ?? '');
+            // R6 — a manager may force a non-standard transition, but only with a reason.
+            $force  = !empty($_POST['override']) && function_exists('is_admin_level') && is_admin_level();
+            if ($force && trim($reason) === '') { flash('An override needs a reason.', 'error'); break; }
+            if (tosrm_set_status($callId, $to, $reason, '', $force)) {
                 flash('Status updated.');
+            } elseif ($to !== '' && array_key_exists(strtoupper(trim($to)), tosrm_status_options())) {
+                $from = tosrm_call_status($call);
+                flash('“' . (tosrm_status_options()[strtoupper(trim($to))] ?? $to) . '” is not a valid next step from “'
+                    . (tosrm_status_options()[strtoupper(trim($from))] ?? $from) . '”.'
+                    . (is_admin_level() ? ' A manager can override with a reason.' : ''), 'error');
             } else flash('Please pick a valid status.', 'error');
             break;
         case 'call-attrs':
