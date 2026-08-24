@@ -1,0 +1,50 @@
+<?php
+// Recruitment module fixes (from the field review). Grows as each item lands.
+t_section('recruitment: navigation & cross-linking (1a)');
+
+// Breadcrumbs on the two list screens that lacked them.
+$reqList = file_get_contents(__DIR__ . '/../views/ops/requisition_list.php');
+$candList = file_get_contents(__DIR__ . '/../views/ops/candidate_list.php');
+t_ok(strpos($reqList, 'class="crumbs"') !== false && strpos($reqList, '/recruitment') !== false,
+    'the requisition list has breadcrumbs back to Recruitment');
+t_ok(strpos($candList, 'class="crumbs"') !== false && strpos($candList, '/recruitment') !== false,
+    'the candidate list has breadcrumbs back to Recruitment');
+
+// Candidate detail links back to its requisition.
+$candDetail = file_get_contents(__DIR__ . '/../views/ops/candidate_detail.php');
+t_ok(strpos($candDetail, '/requisition?id=<?= (int)$linkReq[\'id\'] ?>') !== false,
+    'the candidate detail links to its requisition');
+
+t_section('recruitment: PO ref / contract number split, facilities provider, editable masters (1d/1e/1f)');
+req_migrate();
+
+// 1d — PO ref and contract number are now separate columns and fields.
+$reqCols = array_map(fn($c) => $c['name'], ops_all("PRAGMA table_info(requisitions)"));
+t_ok(in_array('po_ref', $reqCols, true) && in_array('contract_ref', $reqCols, true),
+    'the requisition has separate po_ref and contract_ref columns');
+t_ok(in_array('po_ref', req_extra_fields(), true), 'po_ref is persisted on save');
+$reqForm = file_get_contents(__DIR__ . '/../views/ops/requisition_form.php');
+t_ok(strpos($reqForm, 'name="contract_ref"') !== false && strpos($reqForm, 'name="po_ref"') !== false,
+    'the form has both a Contract number and a PO reference box');
+
+// 1f — facilities have a Client/Us provider selector, incl. Local conveyance.
+t_ok(in_array('prov_food_by', $reqCols, true) && in_array('prov_local_by', $reqCols, true),
+    'facility provider columns exist (incl. local conveyance)');
+t_ok(strpos($reqForm, "\$provBy('prov_local_by', 'Local conveyance')") !== false
+    && strpos($reqForm, "\$provBy('prov_food_by', 'Food')") !== false
+    && strpos($reqForm, "'CLIENT' => 'Client'") !== false,
+    'the form offers a provided-by (Us / Client) selector for each facility, including Local conveyance');
+$ops = file_get_contents(__DIR__ . '/../lib/ops.php');
+t_ok(strpos($ops, "\$b['prov_food']          = ((\$b['prov_food_by']   ?? '') === 'US')") !== false,
+    'the legacy prov_* booleans are kept in sync with the new selectors');
+
+// 1e — the previously hard-coded requisition dropdowns are registered as masters and
+// read through lk_options_or (editable in Admin -> Masters -> People).
+$lk = file_get_contents(__DIR__ . '/../lib/lookups.php');
+t_ok(strpos($lk, "'req_work_model'") !== false && strpos($lk, "'req_shift'") !== false && strpos($lk, "'req_rate_basis'") !== false,
+    'work model / shift / rate basis are registered as editable masters');
+t_ok(strpos($reqForm, "lk_options_or('req_work_model'") !== false
+    && strpos($reqForm, "lk_options_or('req_shift'") !== false
+    && strpos($reqForm, "lk_options_or('req_rate_basis'") !== false
+    && strpos($reqForm, "lk_options_or('sbu'") !== false,
+    'the requisition form reads those dropdowns (and SBU) from the editable lookups');

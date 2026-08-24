@@ -78,6 +78,16 @@ function req_migrate() {
     foreach ($cols as $c) ensure_column('requisitions', $c[0], $c[1]);
     // Track the source paperwork against the requirement.
     ensure_column('requisitions', 'quotation_ref', "VARCHAR(80) DEFAULT ''");
+    // 1d — PO reference and Contract number are DIFFERENT things, so they get
+    // separate boxes. contract_ref becomes the contract number; po_ref is the client's PO.
+    ensure_column('requisitions', 'po_ref', "VARCHAR(120) DEFAULT ''");
+    // 1f — who provides each facility: '' = not applicable, 'US' = we provide,
+    // 'CLIENT' = the client provides. Replaces the old us-only booleans and adds
+    // local conveyance. The legacy prov_* booleans are still written for compatibility.
+    ensure_column('requisitions', 'prov_food_by',   "VARCHAR(10) DEFAULT ''");
+    ensure_column('requisitions', 'prov_accom_by',  "VARCHAR(10) DEFAULT ''");
+    ensure_column('requisitions', 'prov_travel_by', "VARCHAR(10) DEFAULT ''");
+    ensure_column('requisitions', 'prov_local_by',  "VARCHAR(10) DEFAULT ''");
     // The structured, meaningful code carries office/client/month/year + two
     // running numbers, so it can be longer than the old 30-char field. Widening
     // is a no-op on SQLite (no fixed length) and best-effort on MySQL.
@@ -136,10 +146,10 @@ function recruit_cand_code($req) {
 // The additive Phase-2 field list (used by the save handler). Kept here so the
 // form, the handler and the detail stay in step.
 function req_extra_fields() {
-    return ['client_id','contact_name','contact_email','contact_phone','contract_ref',
+    return ['client_id','contact_name','contact_email','contact_phone','contract_ref','po_ref',
         'quantity','discipline','category','skills','qualification','experience_min','relevant_experience',
         'start_date','end_date','duty_hours','shift','work_model','deploy_location',
-        'prov_travel','prov_accommodation','prov_food','other_allowances',
+        'prov_travel','prov_accommodation','prov_food','prov_food_by','prov_accom_by','prov_travel_by','prov_local_by','other_allowances',
         'sel_client_interview','sel_tech_interview','sel_hr_interview','client_approval_req','training_req',
         'cmp_medical','cmp_pcc','cmp_gate_pass','cmp_safety','cmp_certification','documents_note',
         'billing_rate','rate_basis','target_margin','negotiation_floor',

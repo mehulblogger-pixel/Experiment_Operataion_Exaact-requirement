@@ -4424,6 +4424,11 @@ function ops_requisitions($route, $method) {
             $com = function_exists('req_commercials') ? req_commercials($b) : ['revenue'=>0,'profit'=>0,'months'=>0];
             $extraCols = ['expected_revenue','expected_profit','duration_months'];
             $extraVals = [$com['revenue'], $com['profit'], $com['months']];
+            // 1f — keep the legacy prov_* booleans in step with the new "provided by"
+            // selectors (US = we provide), so anything still reading the booleans is correct.
+            $b['prov_food']          = (($b['prov_food_by']   ?? '') === 'US') ? 1 : 0;
+            $b['prov_accommodation'] = (($b['prov_accom_by']  ?? '') === 'US') ? 1 : 0;
+            $b['prov_travel']        = (($b['prov_travel_by'] ?? '') === 'US') ? 1 : 0;
             if ($req) {
                 $set = implode(',', array_map(fn($f)=>"$f=?", $fields)) . ',' . implode(',', array_map(fn($f)=>"$f=?", $extraCols));
                 $vals = array_merge(array_map(fn($f)=>$norm($f, $b[$f] ?? ''), $fields), $extraVals, [$req['id']]);

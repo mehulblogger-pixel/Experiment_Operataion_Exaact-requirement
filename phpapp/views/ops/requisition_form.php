@@ -104,13 +104,14 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
       <div class="ff rq-adv"><label>Client contact</label><input class="form-control" name="contact_name" value="<?= $v('contact_name') ?>" placeholder="Name at the client"></div>
       <div class="ff rq-adv"><label>Contact email</label><input class="form-control" type="email" name="contact_email" value="<?= $v('contact_email') ?>"></div>
       <div class="ff rq-adv"><label>Contact phone</label><input class="form-control" name="contact_phone" value="<?= $v('contact_phone') ?>"></div>
-      <div class="ff rq-adv"><label>Contract / PO ref</label><input class="form-control" name="contract_ref" value="<?= $v('contract_ref') ?>" placeholder="PO / contract no. (if any)"></div>
+      <div class="ff rq-adv"><label>Contract number</label><input class="form-control" name="contract_ref" value="<?= $v('contract_ref') ?>" placeholder="Contract no. (if any)"></div>
+      <div class="ff rq-adv"><label>PO reference</label><input class="form-control" name="po_ref" value="<?= $v('po_ref') ?>" placeholder="Client's PO number (if any)"></div>
       <div class="ff rq-adv"><label>Quotation ref <span class="muted">— for tracking</span></label><input class="form-control" name="quotation_ref" value="<?= $v('quotation_ref') ?>" placeholder="e.g. QTN/2026/0123"></div>
       <div class="ff"><label>Office</label><select class="form-control searchable" name="office_id"><option value="">—</option><?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= $sel('office_id',$o['id']) ?>><?= e($o['name']) ?></option><?php endforeach; ?></select></div>
       <div class="ff"><label>Responsible 1 — Recruiter</label><select class="form-control searchable" name="recruiter_id"><option value="">—</option><?php foreach (($rccUsers ?? []) as $uid=>$un): ?><option value="<?= (int)$uid ?>" <?= $sel('recruiter_id',$uid) ?>><?= e($un) ?></option><?php endforeach; ?></select></div>
       <div class="ff"><label>Responsible 2 — Reporting manager</label><select class="form-control searchable" name="manager_id"><option value="">—</option><?php foreach (($rccUsers ?? []) as $uid=>$un): ?><option value="<?= (int)$uid ?>" <?= $sel('manager_id',$uid) ?>><?= e($un) ?></option><?php endforeach; ?></select></div>
       <div class="ff"><label>Department</label><select class="form-control searchable" name="department"><option value="">—</option><?php foreach (($rccDepts ?? []) as $dk=>$dv): ?><option value="<?= e($dk) ?>" <?= $sel('department',$dk) ?>><?= e($dv) ?></option><?php endforeach; ?></select></div>
-      <div class="ff"><label><?= e(T("sbu")) ?></label><select class="form-control" name="sbu"><option value="">—</option><?php foreach (OPS_SBUS as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('sbu',$k) ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
+      <div class="ff"><label><?= e(T("sbu")) ?></label><select class="form-control" name="sbu"><option value="">—</option><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('sbu',$k) ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
       <div class="ff"><label>Designation / position *</label><select class="form-control searchable" name="designation"><option value="">—</option><?php foreach (lk_options_or('designation', DESIGNATIONS) as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('designation',$k) ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
       <div class="ff"><label>How many? *</label><input class="form-control" type="number" min="1" step="1" name="quantity" id="rq_qty" value="<?= e($r['quantity'] ?? '1') ?>"></div>
       <div class="ff"><label>Project / site</label><input class="form-control" name="project_site" value="<?= $v('project_site') ?>" placeholder="Client works / project"></div>
@@ -130,20 +131,34 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
   <div class="rq-sec rq-adv">
     <h3><span class="num">2</span> Deployment — where &amp; when</h3>
     <div class="form-grid">
-      <div class="ff"><label>Work model</label><select class="form-control" name="work_model"><option value="">—</option><?php foreach (REQ_WORK_MODELS as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('work_model',$k) ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
+      <div class="ff"><label>Work model</label><select class="form-control" name="work_model"><option value="">—</option><?php foreach (lk_options_or('req_work_model', REQ_WORK_MODELS) as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('work_model',$k) ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
       <div class="ff"><label>Deployment location</label><input class="form-control" name="deploy_location" value="<?= $v('deploy_location') ?>"></div>
       <div class="ff"><label>Start date</label><input class="form-control" type="date" name="start_date" id="rq_start" value="<?= $v('start_date') ?>"></div>
       <div class="ff"><label>End date</label><input class="form-control" type="date" name="end_date" id="rq_end" value="<?= $v('end_date') ?>"></div>
       <div class="ff"><label>Duration (months)</label><input class="form-control" type="number" step="0.5" name="duration_months" id="rq_months" value="<?= e(($r['duration_months'] ?? 0) ?: '') ?>" placeholder="auto from dates"></div>
       <div class="ff"><label>Duty hours</label><input class="form-control" name="duty_hours" value="<?= $v('duty_hours') ?>" placeholder="e.g. 8 hrs / 6 days"></div>
-      <div class="ff"><label>Shift</label><select class="form-control" name="shift"><option value="">—</option><?php foreach (REQ_SHIFTS as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('shift',$k) ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
+      <div class="ff"><label>Shift</label><select class="form-control" name="shift"><option value="">—</option><?php foreach (lk_options_or('req_shift', REQ_SHIFTS) as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('shift',$k) ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
       <div class="ff"><label>Other allowances</label><input class="form-control" name="other_allowances" value="<?= $v('other_allowances') ?>"></div>
     </div>
-    <h3 style="margin-top:6px">Provided by us</h3>
-    <div class="rq-chk">
-      <label><input type="checkbox" name="prov_travel" value="1" <?= $chk('prov_travel') ?>> Travel</label>
-      <label><input type="checkbox" name="prov_accommodation" value="1" <?= $chk('prov_accommodation') ?>> Accommodation</label>
-      <label><input type="checkbox" name="prov_food" value="1" <?= $chk('prov_food') ?>> Food</label>
+    <?php // 1f — who provides each facility on deployment: not applicable / we provide /
+          //  the client provides. Covers Food, Accommodation, Travel and Local conveyance. ?>
+    <h3 style="margin-top:6px">Facilities — provided by</h3>
+    <div class="form-grid">
+      <?php $provBy = function($key, $label) use ($v) {
+              $cur = (string)$v($key);
+              // Back-compat: if only the legacy boolean is set, treat it as "US".
+              if ($cur === '' && $key === 'prov_food_by' && (int)$v('prov_food') === 1) $cur = 'US';
+              if ($cur === '' && $key === 'prov_accom_by' && (int)$v('prov_accommodation') === 1) $cur = 'US';
+              if ($cur === '' && $key === 'prov_travel_by' && (int)$v('prov_travel') === 1) $cur = 'US';
+              echo '<div class="ff"><label>' . e($label) . '</label><select class="form-control" name="' . e($key) . '">';
+              foreach (['' => '— not applicable —', 'US' => 'Us', 'CLIENT' => 'Client'] as $k => $lbl)
+                  echo '<option value="' . e($k) . '"' . ($cur === $k ? ' selected' : '') . '>' . e($lbl) . '</option>';
+              echo '</select></div>';
+          }; ?>
+      <?php $provBy('prov_food_by', 'Food'); ?>
+      <?php $provBy('prov_accom_by', 'Accommodation'); ?>
+      <?php $provBy('prov_travel_by', 'Travel'); ?>
+      <?php $provBy('prov_local_by', 'Local conveyance'); ?>
     </div>
   </div>
 
@@ -209,7 +224,7 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
 
     <div class="form-grid" style="margin-top:12px">
       <div class="ff"><label>Billing rate (<?= e($cur) ?>) <span class="muted">what we charge the client</span></label><input class="form-control" type="number" step="0.01" name="billing_rate" id="rq_rate" value="<?= e(($r['billing_rate'] ?? 0) ?: '') ?>"></div>
-      <div class="ff"><label>Rate basis</label><select class="form-control" name="rate_basis" id="rq_basis"><?php foreach (REQ_RATE_BASIS as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('rate_basis',$k ?: 'MONTHLY') ?: ($k==='MONTHLY' && empty($r['rate_basis'])?'selected':'') ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
+      <div class="ff"><label>Rate basis</label><select class="form-control" name="rate_basis" id="rq_basis"><?php foreach (lk_options_or('req_rate_basis', REQ_RATE_BASIS) as $k=>$val): ?><option value="<?= e($k) ?>" <?= $sel('rate_basis',$k ?: 'MONTHLY') ?: ($k==='MONTHLY' && empty($r['rate_basis'])?'selected':'') ?>><?= e($val) ?></option><?php endforeach; ?></select></div>
       <div class="ff"><label>Est. cost / person / month (<?= e($cur) ?>) <span class="muted" id="rq_cost_auto"></span></label><input class="form-control" type="number" step="0.01" name="budgeted_cost" id="rq_cost" value="<?= e(($r['budgeted_cost'] ?? 0) ?: '') ?>"></div>
       <div class="ff rq-adv"><label>Target margin (%)</label><input class="form-control" type="number" step="0.1" min="0" max="100" name="target_margin" value="<?= e(($r['target_margin'] ?? 0) ?: '') ?>" placeholder="e.g. 20"></div>
       <div class="ff rq-adv"><label>Negotiation floor (<?= e($cur) ?>)</label><input class="form-control" type="number" step="0.01" name="negotiation_floor" value="<?= e(($r['negotiation_floor'] ?? 0) ?: '') ?>"></div>

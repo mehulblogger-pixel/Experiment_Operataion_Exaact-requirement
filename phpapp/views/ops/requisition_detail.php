@@ -52,7 +52,7 @@ $yes = fn($k) => !empty($req[$k]);
 $WM = defined('PHP_INT_MAX') && function_exists('recruit_home_can') ? (REQ_WORK_MODELS[$req['work_model'] ?? ''] ?? ($req['work_model'] ?? '')) : ($req['work_model'] ?? '');
 $SH = REQ_SHIFTS[$req['shift'] ?? ''] ?? ($req['shift'] ?? '');
 $position = $has('discipline') || $has('category') || $has('qualification') || $has('skills') || $has('experience_min') || $has('relevant_experience') || (int)($req['quantity'] ?? 1) > 1;
-$deploy = $has('work_model') || $has('deploy_location') || $has('start_date') || $has('end_date') || $has('duration_months') || $has('duty_hours') || $has('shift') || $yes('prov_travel') || $yes('prov_accommodation') || $yes('prov_food') || $has('other_allowances');
+$deploy = $has('work_model') || $has('deploy_location') || $has('start_date') || $has('end_date') || $has('duration_months') || $has('duty_hours') || $has('shift') || $yes('prov_travel') || $yes('prov_accommodation') || $yes('prov_food') || $has('prov_food_by') || $has('prov_accom_by') || $has('prov_travel_by') || $has('prov_local_by') || $has('other_allowances');
 $selc = $yes('sel_client_interview') || $yes('sel_tech_interview') || $yes('sel_hr_interview') || $yes('client_approval_req') || $yes('training_req') || $yes('cmp_medical') || $yes('cmp_pcc') || $yes('cmp_gate_pass') || $yes('cmp_safety') || $yes('cmp_certification') || $has('documents_note');
 $commer = $has('billing_rate') || (float)($req['expected_revenue'] ?? 0) != 0 || $has('target_margin') || $has('negotiation_floor');
 ?>
@@ -70,10 +70,15 @@ $commer = $has('billing_rate') || (float)($req['expected_revenue'] ?? 0) != 0 ||
   <?php if ($has('start_date') || $has('end_date')): ?><div><span class="k">Period</span><?= e($req['start_date'] ?: '—') ?> → <?= e($req['end_date'] ?: '—') ?><?= (float)($req['duration_months'] ?? 0) > 0 ? ' · '.rtrim(rtrim(number_format((float)$req['duration_months'],2),'0'),'.').' mo' : '' ?></div><?php endif; ?>
   <?php if ($has('duty_hours')): ?><div><span class="k">Duty hours</span><?= e($req['duty_hours']) ?></div><?php endif; ?>
   <?php if ($has('shift')): ?><div><span class="k">Shift</span><?= e($SH) ?></div><?php endif; ?>
-  <?php $prov = array_filter(['Travel'=>$yes('prov_travel'),'Accommodation'=>$yes('prov_accommodation'),'Food'=>$yes('prov_food')]);
-        if ($prov || $has('other_allowances')): ?><div><span class="k">Provided</span><?= e(implode(' · ', array_keys($prov)) ?: '—') ?><?= $has('other_allowances') ? ' · '.e($req['other_allowances']) : '' ?></div><?php endif; ?>
+  <?php // 1f — facilities and who provides each (new selectors, legacy booleans as fallback).
+        $provMap = ['Food'=>$req['prov_food_by'] ?? '', 'Accommodation'=>$req['prov_accom_by'] ?? '', 'Travel'=>$req['prov_travel_by'] ?? '', 'Local conveyance'=>$req['prov_local_by'] ?? ''];
+        if (!array_filter($provMap)) { if ($yes('prov_food')) $provMap['Food']='US'; if ($yes('prov_accommodation')) $provMap['Accommodation']='US'; if ($yes('prov_travel')) $provMap['Travel']='US'; }
+        $provBits = [];
+        foreach ($provMap as $lbl=>$by) { if ((string)$by === '') continue; $provBits[] = e($lbl) . ' <span class="muted">(' . ($by === 'CLIENT' ? 'client' : 'us') . ')</span>'; }
+        if ($provBits || $has('other_allowances')): ?><div><span class="k">Facilities</span><?= $provBits ? implode(' · ', $provBits) : '—' ?><?= $has('other_allowances') ? ' · ' . e($req['other_allowances']) : '' ?></div><?php endif; ?>
   <?php if (!empty($req['contact_name'])): ?><div><span class="k">Client contact</span><?= e($req['contact_name']) ?><?= !empty($req['contact_phone']) ? ' · '.e($req['contact_phone']) : '' ?></div><?php endif; ?>
-  <?php if (!empty($req['contract_ref'])): ?><div><span class="k">Contract / PO</span><?= e($req['contract_ref']) ?></div><?php endif; ?>
+  <?php if (!empty($req['contract_ref'])): ?><div><span class="k">Contract number</span><?= e($req['contract_ref']) ?></div><?php endif; ?>
+  <?php if (!empty($req['po_ref'])): ?><div><span class="k">PO reference</span><?= e($req['po_ref']) ?></div><?php endif; ?>
   <?php if (!empty($req['quotation_ref'])): ?><div><span class="k">Quotation ref</span><?= e($req['quotation_ref']) ?></div><?php endif; ?>
 </div></div>
 <?php endif; ?>

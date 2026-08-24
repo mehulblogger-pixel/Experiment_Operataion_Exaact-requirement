@@ -2,6 +2,7 @@
   $stageBadge = ['RECEIVED'=>'AMBER','SUBMITTED'=>'AMBER','SHORTLISTED'=>'AMBER','INTERVIEW'=>'AMBER',
                 'HOLD'=>'AMBER','REJECTED'=>'RED','ACCEPTED'=>'GREEN','WITHDRAWN'=>'RED'];
 ?>
+<div class="crumbs"><a href="/">Home</a> › <a href="/recruitment">Recruitment</a> › <?= e(TP('candidate')) ?></div>
 <div class="master-head">
   <div><h1><?= e(T_REG('candidate')) ?></h1>
     <p class="sub">Candidate CVs for project work / resident staff · <?= count($rows) ?> shown</p></div>

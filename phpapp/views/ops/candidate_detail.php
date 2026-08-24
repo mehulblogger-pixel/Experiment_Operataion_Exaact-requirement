@@ -98,7 +98,7 @@ if ($personApps):
 $fit = $fit ?? null; $readiness = $readiness ?? null; $linkReq = $linkReq ?? null;
 if (!empty($fit) && !empty($linkReq)): [$fl, $ftone] = recruit_fit_band($fit['score']); ?>
 <div class="panel">
-  <h3 class="tab-sub" style="margin-top:0">Workforce fit <span class="muted">— against <?= e($linkReq['req_code']) ?> · <?= e(DESIGNATIONS[$linkReq['designation']] ?? ($linkReq['designation'] ?? '')) ?></span></h3>
+  <h3 class="tab-sub" style="margin-top:0">Workforce fit <span class="muted">— against <a href="/requisition?id=<?= (int)$linkReq['id'] ?>"><?= e($linkReq['req_code']) ?></a> · <?= e(DESIGNATIONS[$linkReq['designation']] ?? ($linkReq['designation'] ?? '')) ?></span></h3>
   <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
     <div style="text-align:center;min-width:82px"><div style="font-size:30px;font-weight:800;line-height:1;color:var(--<?= $fit['score']>=80?'ok':($fit['score']>=55?'warn':'bad') ?>,#333)"><?= (int)$fit['score'] ?>%</div><div class="pill <?= e($ftone) ?>" style="margin-top:4px"><?= e($fl) ?></div></div>
     <div style="flex:1;min-width:240px;display:flex;flex-wrap:wrap;gap:6px">
@@ -148,7 +148,7 @@ if (!empty($asgComm) && !empty($linkReq) && $seeSal):
 ?>
 <div class="panel">
   <h3 class="tab-sub" style="margin-top:0">Placement commercials
-    <span class="muted">— against <?= e($linkReq['req_code']) ?> · <?= rtrim(rtrim(number_format($C['months'],2),'0'),'.') ?> mo · <?= e($basisLbl) ?></span>
+    <span class="muted">— against <a href="/requisition?id=<?= (int)$linkReq['id'] ?>"><?= e($linkReq['req_code']) ?></a> · <?= rtrim(rtrim(number_format($C['months'],2),'0'),'.') ?> mo · <?= e($basisLbl) ?></span>
     <?php if ($C['status'] === 'APPROVED'): ?><span class="pill p-ok" style="font-size:11px;margin-left:6px">Approved</span>
     <?php elseif ($C['status'] === 'ACTUAL'): ?><span class="pill p-info" style="font-size:11px;margin-left:6px">Actuals in</span>
     <?php else: ?><span class="pill p-warn" style="font-size:11px;margin-left:6px">Estimate only</span><?php endif; ?>

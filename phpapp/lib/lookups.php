@@ -208,6 +208,12 @@ function lk_module_lists() {
         // The recruitment forms' Department picker reads this (kept separate from
         // the org-wide "Department" list on purpose); it too was unregistered.
         ['hr_department',       'Hiring department',         defined('RCC_DEPARTMENTS')  ? RCC_DEPARTMENTS  : [], 'People'],
+        // 1e — requisition form dropdowns that were hard-coded constants (not editable
+        // in Masters). Registered so an admin can add/rename them, and the form now
+        // reads them through lk_options_or().
+        ['req_work_model',      'Work model (deployment)',   defined('REQ_WORK_MODELS') ? REQ_WORK_MODELS : [], 'People'],
+        ['req_shift',           'Shift',                     defined('REQ_SHIFTS')      ? REQ_SHIFTS      : [], 'People'],
+        ['req_rate_basis',      'Requisition rate basis',    defined('REQ_RATE_BASIS')  ? REQ_RATE_BASIS  : [], 'People'],
         ['projcosting_head',        'Costing head',              function_exists('pc_head_defaults') ? pc_head_defaults() : [], 'Money'],
         // --- Scheduling ------------------------------------------------------
         // The wording is yours; the behaviour is keyed on the code behind it, so
