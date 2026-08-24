@@ -547,6 +547,17 @@ function is_master() { return ua()['master']; }
 function is_admin_level() { return in_array(user_role(), MGMT_ROLES, true); }
 function is_coordinator_level() { return is_admin_level() || in_array(user_role(), ['ASST_MANAGER','COORDINATOR'], true); }
 function is_inspector() { return user_role() === 'INSPECTOR'; }
+// R7 — the field engineer for UI purposes: a plain INSPECTOR, a SR_INSPECTOR (a senior
+// inspector who also does field work), or any non-management login seated on an
+// inspector record. is_inspector() matches only the literal role, so a SR_INSPECTOR
+// used to miss My Jobs / site check-in / My Voucher entirely. Use THIS for the
+// phone-first field tools; keep is_inspector() for strict-role behaviour.
+function is_field_inspector() {
+    if (in_array(user_role(), ['INSPECTOR', 'SR_INSPECTOR'], true)) return true;
+    if (is_master() || is_coordinator_level()) return false;   // a manager keeps the desk UI
+    $u = current_user();
+    return $u && (int)($u['inspector_id'] ?? 0) > 0;
+}
 
 // Which office actually executes a call (does the field work). Falls back to the
 // inter-branch order office; 0 means it was never set.
@@ -4881,7 +4892,7 @@ function ops_vouchers($route, $method) {
     $pdo = db();
 
     if ($route === 'vouchers') {
-        if (is_inspector()) {
+        if (is_field_inspector()) {
             if (!my_inspector_id()) { flash(inspector_link_msg(), 'error'); redirect('/'); }
             $rows = ops_all("SELECT * FROM vouchers WHERE inspector_id=? ORDER BY month DESC", [my_inspector_id()]);
             view('ops/voucher_list', ['rows' => $rows, 'mine' => true, 'inspectors' => []]);

@@ -107,15 +107,20 @@ rejects an illegal step; the picker now lists only the legal next steps. A manag
 (`is_admin_level`) may still **override with a reason**, recorded as `[override]` in the status
 history. Tests: `tests/test_call_status_transitions.php`.
 
-## R7 — MEDIUM · SR_INSPECTOR does not get the inspector field UI
-**What:** `is_inspector()` matches the literal `INSPECTOR` only (`ops.php:549`), so a
-`SR_INSPECTOR` gets the desktop area rail (Reporting only) and the **non-inspector**
-dashboard — **no** My Jobs, site check-in, or My Voucher (`layout_top.php:100-113`,
-`dashboard.php:23`).
-**Why it matters:** a senior inspector who also does field work is missing the phone-first
-field tools; likely unintended.
-**Fix:** make the inspector UI trigger on "has an `inspector_id`" (or role ∈ {INSPECTOR,
-SR_INSPECTOR}) rather than the exact string.
+## R7 — MEDIUM · SR_INSPECTOR did not get the inspector field UI — **FIXED**
+**What:** `is_inspector()` matches the literal `INSPECTOR` only, so a `SR_INSPECTOR` got the
+desktop area rail and the **non-inspector** dashboard — **no** My Jobs, site check-in, or
+My Voucher.
+**Why it mattered:** a senior inspector who also does field work was missing the phone-first
+field tools.
+**Fixed this session:** new `is_field_inspector()` (`ops.php`) recognises **INSPECTOR,
+SR_INSPECTOR, or any non-management login seated on an inspector record** (a manager keeps the
+desk UI even if linked). The field-tool triggers now use it — the navigation rail
+(`layout_top.php`), the inspector dashboard branch (`dashboard.php`), the nav index
+(`navindex.php`), the "my voucher" route (`ops.php`), own-job **site check-in** and bill
+upload (`job_detail.php`, `bills.php`), site-ops (`pdso.php`), and the phone-first job-view
+declutter (R7 + the inspector declutter share one predicate). `is_inspector()` stays the
+strict literal-role check for strict-role behaviour. Tests: `tests/test_sr_inspector_field_ui.php`.
 
 ## R8 — LOW-MED · BRANCH_APP_MANAGER holds IDEMS config perms but not `mod.idems.view`
 **What:** the role has `idems.type.manage`/`idems.timestamp.edit` but no `mod.idems.view`

@@ -3,7 +3,10 @@
 The field engineer: goes to site, checks in, does the inspection, writes and submits
 the report, then closes the job and files their expense/time voucher. **Phone-first,
 patchy 4G** (offline queue). Least-privilege: no permissions, `idems` module only
-(`access.php:464-465,360`); identified by having an `inspector_id`.
+(`access.php:464-465,360`); identified by having an `inspector_id`. The phone-first field UI
+(My Jobs, site check-in, My Voucher, the stripped job view) triggers on `is_field_inspector()`
+— **INSPECTOR or SR_INSPECTOR** (a senior inspector who also does field work), or any
+non-management login seated on an inspector record (R7).
 
 ```mermaid
 flowchart TD

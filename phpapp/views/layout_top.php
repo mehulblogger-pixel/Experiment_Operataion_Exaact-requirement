@@ -7,7 +7,7 @@
     return ($cur === '' && in_array('', $routes, true)) ? ' on' : '';
   };
   $office = ($u && ($u['home_office_id'] ?? null)) ? ops_val("SELECT name FROM offices WHERE id=?", [$u['home_office_id']]) : '';
-  $isInsp = $u ? is_inspector() : false;
+  $isInsp = $u ? (function_exists('is_field_inspector') ? is_field_inspector() : is_inspector()) : false;
 
   // ---------------------------------------------------------------------------
   //  Groups that fold

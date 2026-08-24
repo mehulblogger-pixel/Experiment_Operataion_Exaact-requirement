@@ -620,7 +620,7 @@ function pdso_can_view() { return (function_exists('can') && (can('mod.calls.vie
 function pdso_can_edit($job = null) {
     if (function_exists('is_master') && is_master()) return true;
     if (function_exists('is_coordinator_level') && is_coordinator_level()) return true;
-    if ($job && function_exists('is_inspector') && is_inspector()) {
+    if ($job && (function_exists('is_field_inspector') ? is_field_inspector() : (function_exists('is_inspector') && is_inspector()))) {
         $me = function_exists('current_user') ? (int)(current_user()['inspector_id'] ?? 0) : 0;
         if ($me && $me === (int)($job['inspector_id'] ?? 0)) return true;
     }

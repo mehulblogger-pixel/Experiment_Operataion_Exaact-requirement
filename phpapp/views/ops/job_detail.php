@@ -79,7 +79,7 @@
       // coordinator/manager, and anyone holding the money permissions, still sees
       // the full record. (The inspector's own travel/expenses guidance still lives
       // on the Site check-in panel, so no guidance is lost by dropping the Money tab.)
-      $fieldInspector = function_exists('is_inspector') && is_inspector(); ?>
+      $fieldInspector = function_exists('is_field_inspector') ? is_field_inspector() : (function_exists('is_inspector') && is_inspector()); ?>
 <div data-tabs data-tabs-key="job">
 
 <?php // The coordinator/manager console — guided playbook, assignment lifecycle
@@ -209,7 +209,7 @@
       // pictures — which many corporate phones do.
       $visits = function_exists('site_visits') ? site_visits((int)$job['id']) : [];
       $canCheckIn = !$job['closed_flag'] && function_exists('site_checkin')
-          && (is_coordinator_level() || (is_inspector()
+          && (is_coordinator_level() || ($fieldInspector
               && (int)(current_user()['inspector_id'] ?? 0) === (int)($job['inspector_id'] ?? 0))); ?>
 <div class="panel" id="checkin" data-tab="Schedule &amp; site">
   <div class="ctitle" style="margin-top:0"><h3>Site check-in <span class="muted">(<?= count($visits) ?>)</span></h3></div>

@@ -43,7 +43,7 @@ function ops_nav_index() {
     $thp = fn($k) => $fx('THP') ? THP($k) : ucfirst($k);
     $tnew = fn($k) => $fx('T_NEW') ? ucfirst(T_NEW($k)) : ('New ' . $k);
 
-    $isInsp = $fx('is_inspector') && is_inspector();
+    $isInsp = $fx('is_field_inspector') ? is_field_inspector() : ($fx('is_inspector') && is_inspector());
 
     // ---- Always-there, cross-module destinations ---------------------------
     $add('Dashboard', '/', 'Home', '🏠', 'Your landing dashboard.');

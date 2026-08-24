@@ -210,7 +210,7 @@ function ops_job_bill($route, $method) {
 // The engineer who did the work, the desk that runs it, or a manager.
 function job_bill_can_upload($job) {
     if (is_admin_level() || can('ops.job.close') || can('mod.jobs.edit')) return true;
-    if (is_inspector()) {
+    if (function_exists('is_field_inspector') ? is_field_inspector() : is_inspector()) {
         $me = (int)(current_user()['inspector_id'] ?? 0);
         return $me && $me === (int)($job['inspector_id'] ?? 0);
     }

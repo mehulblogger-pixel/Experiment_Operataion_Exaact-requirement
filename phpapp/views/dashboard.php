@@ -20,7 +20,7 @@
       // In-office / On-site; the mark flows to availability + links to the report.
       if (function_exists('attend_render_widget')) attend_render_widget($u); ?>
 
-<?php if (is_inspector()): ?>
+<?php if (function_exists('is_field_inspector') ? is_field_inspector() : is_inspector()): ?>
   <?php $myId = $u['inspector_id'] ?? 0;
     $mc = fn($sql, $extra = []) => $myId ? (int)ops_val("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND $sql", array_merge([$myId], $extra)) : 0;
     $myOpen    = $mc("closed_flag=0");
