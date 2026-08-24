@@ -6686,10 +6686,21 @@ function ops_users($route, $method) {
             $sbuOpts = lk_options_or('sbu', OPS_SBUS);
             $scopeSbus = !empty($b['scope_sbus_all']) ? 'ALL'
                 : implode(',', array_values(array_intersect(array_keys($sbuOpts), (array)($b['scope_sbus'] ?? []))));
-            // permissions: branch mgr can only grant a safe subset (no salary/global/settings)
-            $chosen = array_filter((array)($b['permissions'] ?? []));
-            if (!$globalMgr) $chosen = array_intersect($chosen, ['dash.operations','dash.utilization','data.credit','ops.call.create','ops.job.allocate','ops.job.close','master.manage']);
-            $perms = implode(',', $chosen);
+            // permissions: an administrator may toggle only the set they can see
+            // (a branch manager gets a safe operational subset; a global manager gets
+            // everything) — assignable_permissions() is the SAME set the form renders.
+            $assignable = array_keys(assignable_permissions($globalMgr));
+            $chosen = array_intersect(array_filter((array)($b['permissions'] ?? [])), $assignable);
+            // R3 — never silently lock someone out: any permission the login already
+            // holds that this editor could NOT see (outside $assignable) is preserved,
+            // not dropped. Without this, a branch-level admin editing a user wiped
+            // every permission that was not on their limited screen.
+            if ($user && trim((string)($user['permissions'] ?? '')) !== '') {
+                $existing  = array_values(array_filter(explode(',', (string)$user['permissions'])));
+                $preserved = array_diff($existing, $assignable);
+                $chosen    = array_merge($chosen, $preserved);
+            }
+            $perms = implode(',', array_values(array_unique($chosen)));
             // "Reset access to the role default" — clears the per-user override so the
             // login tracks its ROLE's full default access (and any modules added
             // later) instead of a frozen ticked set. This is the recovery when an

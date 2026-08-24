@@ -4,14 +4,25 @@
   // refused save hands back what was typed. Accept either rather than trusting
   // the caller — getting this wrong takes the whole screen down.
   $permRaw  = $user['permissions'] ?? '';
-  $curPerms = is_array($permRaw) ? $permRaw
-            : (trim((string)$permRaw) !== '' ? explode(',', (string)$permRaw) : ($defaults['perms'] ?? []));
+  // Pre-tick what the login ACTUALLY has (R3): a refused save hands back the posted
+  // list; an existing login shows its resolved effective set (so a no-op save
+  // preserves access and a legacy set is not silently narrowed); a brand-new login
+  // starts from the role defaults.
+  if (is_array($permRaw)) {
+      $curPerms = $permRaw;
+  } elseif (!empty($user['id'])) {
+      $curPerms = function_exists('user_effective_perms') ? user_effective_perms($user)
+                : (trim((string)$permRaw) !== '' ? explode(',', (string)$permRaw) : ($defaults['perms'] ?? []));
+  } elseif (trim((string)$permRaw) !== '') {
+      $curPerms = explode(',', (string)$permRaw);
+  } else {
+      $curPerms = $defaults['perms'] ?? [];
+  }
   $roleList = $globalMgr ? ORG_ROLES : ['OPERATION_MANAGER'=>ORG_ROLES['OPERATION_MANAGER'],'ASST_MANAGER'=>ORG_ROLES['ASST_MANAGER'],'COORDINATOR'=>ORG_ROLES['COORDINATOR'],'INSPECTOR'=>ORG_ROLES['INSPECTOR']];
-  $allowPerms = $globalMgr ? all_permissions() : array_intersect_key(all_permissions(), array_flip([
-    'mod.calls.view','mod.calls.edit','mod.jobs.view','mod.jobs.edit','mod.vouchers.view','mod.vouchers.edit',
-    'mod.hiring.view','mod.hiring.edit','mod.reconcile.view','mod.reconcile.edit','mod.clients.view','mod.vendors.view',
-    'mod.masters.view','mod.masters.edit','mod.reports.view','mod.invoicing.view',
-    'dash.operations','dash.utilization','data.credit','ops.call.create','ops.job.allocate','ops.job.close','master.manage']));
+  // The set this administrator may toggle — shared with the save handler so the two
+  // never drift (a permission the editor cannot see is preserved on save, not dropped).
+  $allowPerms = function_exists('assignable_permissions') ? assignable_permissions($globalMgr)
+    : ($globalMgr ? all_permissions() : []);
   $asCsv = function ($v) { return is_array($v) ? implode(',', $v) : trim((string)$v); };
   $scOff = $asCsv($user['scope_offices'] ?? '');
   $scSbu = $asCsv($user['scope_sbus'] ?? '');
@@ -476,5 +487,27 @@
     groups.forEach(syncGroup);
   });
   syncMaster();
+
+  // R3 — a save that would take away a module the login CURRENTLY holds asks first.
+  // Pre-ticking the effective set already means a no-op save preserves access; this
+  // catches the deliberate untick, which is how access was lost before. Skipped when
+  // "reset to role default" is on (that intentionally restores full role access).
+  if (allBoxes.length){
+    var form = allBoxes[0].form;
+    var heldModules = allBoxes.filter(function(b){ return b.checked && b.value.indexOf('mod.') === 0; })
+                             .map(function(b){ return b.value; });
+    if (form) form.addEventListener('submit', function(e){
+      var reset = document.querySelector('input[name="reset_perms"]');
+      if (reset && reset.checked) return;                       // reset restores everything
+      var removed = allBoxes.filter(function(b){
+        return !b.checked && b.value.indexOf('mod.') === 0 && heldModules.indexOf(b.value) !== -1;
+      }).map(function(b){
+        var l = b.closest ? b.closest('label') : null;
+        return l ? l.textContent.replace(/[\sⓘⓘ]+$/,'').trim() : b.value;
+      });
+      if (removed.length && !window.confirm('This will remove access to: ' + removed.join(', ')
+          + '.\nThe person will lose these modules. Continue?')) e.preventDefault();
+    });
+  }
 })();
 </script>

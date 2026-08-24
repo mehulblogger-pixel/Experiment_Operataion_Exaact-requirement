@@ -39,15 +39,28 @@ ability, not tier"). Closers now: CO, BM, OM (hold `ops.job.close`), master, and
 inspector on their own job; FIN/SBU/BAM/AM can no longer close. Tests:
 `tests/test_job_close_guard.php`.
 
-## R3 — HIGH · A per-user permission set REPLACES role defaults (silent lock-out)
+## R3 — HIGH · A per-user permission set REPLACES role defaults (silent lock-out) — **MITIGATED**
 **What:** if a login has any custom `permissions` value, it *replaces* the role defaults
-entirely (`access.php:414-420,489-495`). Editing an admin and saving with fewer boxes ticked
-drops them to exactly what's ticked.
-**Why it matters:** this already locked the founder out of Users/Settings. It is a
-foot-gun with no in-product warning, and recovery needed server/DB access.
-**Fix (partly mitigated this session — a "Reset to role default" control now exists):**
-consider also (a) pre-ticking the effective set so a no-op save preserves access, and
-(b) a confirm when a save would remove a module an admin currently holds.
+entirely (`access.php` `ua()`/`user_effective_perms()`). Editing a login and saving with
+fewer boxes ticked used to drop them to exactly what was ticked.
+**Why it mattered:** this had locked the founder out of Users/Settings; recovery needed
+server/DB access. Worse, a *branch-level* admin only sees a safe subset of permissions, so
+their save silently wiped every permission outside that subset — including ones they could
+not even see.
+**Fixed this session (four parts):**
+1. **One source of truth** — `user_effective_perms($row)` resolves a login's real set, and
+   `ua()` now calls it, so what the editor sees is exactly what the gate enforces.
+2. **Effective pre-tick** — the access editor pre-ticks that effective set for an existing
+   login (a legacy set with no module perms shows its resolved modules too), so a **no-op
+   save preserves access** instead of narrowing it.
+3. **No silent lock-out on save** — `assignable_permissions($globalMgr)` is the SINGLE set an
+   editor may toggle (shared by form and handler); on save, any permission the login holds
+   **outside** that set is **preserved**, never dropped. A branch admin can no longer wipe
+   permissions they cannot see.
+4. **Confirm on removal** — un-ticking a module the login currently holds asks first (skipped
+   when "Reset to role default" is on).
+   Plus the existing "Reset to role default" control. Tests: `tests/test_perms_no_lockout.php`.
+   (`MASTER_ADMIN` remains un-lockable via `is_superuser` — keep one, per the recovery note below.)
 
 ## R4 — HIGH · Contract registration has two doors, one unguarded — **permission door now closed**
 **What:** the CRM path `quote-contract` requires `crm.contract.register` (`crm.php:1830`),

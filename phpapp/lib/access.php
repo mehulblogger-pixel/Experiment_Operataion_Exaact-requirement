@@ -431,6 +431,38 @@ function role_defaults($role) {
     $d['perms'] = array_values(array_unique(array_merge($d['perms'], module_defaults($role))));
     return $d;
 }
+
+// The effective permission set for a given user ROW (not the current session) —
+// the same resolution ua() applies, factored out so the access editor can pre-tick
+// exactly what a login actually has (R3). Master = everything; a per-user override
+// wins (with the legacy module back-fill); otherwise the role's effective set.
+function user_effective_perms($u) {
+    $role = !empty($u['is_superuser']) ? 'MASTER_ADMIN' : strtoupper($u['role'] ?? 'ADMIN');
+    if (!isset(ORG_ROLES[$role])) $role = 'ADMIN';
+    if ($role === 'MASTER_ADMIN') return array_keys(all_permissions());
+    if (trim((string)($u['permissions'] ?? '')) !== '') {
+        $perms = array_values(array_filter(explode(',', (string)$u['permissions'])));
+        $hasMod = false; foreach ($perms as $p) if (strncmp($p, 'mod.', 4) === 0) { $hasMod = true; break; }
+        if (!$hasMod) $perms = array_merge($perms, module_defaults($role));   // pre-module logins keep module access
+        else $perms = merge_new_module_defaults($perms, $role);               // grant brand-new modules
+        return array_values(array_unique($perms));
+    }
+    return role_perms($role);
+}
+
+// The permissions an administrator is allowed to TOGGLE on the access editor. A
+// global user-manager may set anything; a branch-level manager may set only a safe
+// operational subset (never salary / global-user / settings). Used by BOTH the form
+// (what it renders) and the save handler (what it accepts + what it must preserve),
+// so the two can never drift and silently drop a permission the editor never saw.
+function assignable_permissions($globalMgr) {
+    if ($globalMgr) return all_permissions();
+    $keys = ['mod.calls.view','mod.calls.edit','mod.jobs.view','mod.jobs.edit','mod.vouchers.view','mod.vouchers.edit',
+        'mod.hiring.view','mod.hiring.edit','mod.reconcile.view','mod.reconcile.edit','mod.clients.view','mod.vendors.view',
+        'mod.masters.view','mod.masters.edit','mod.reports.view','mod.invoicing.view',
+        'dash.operations','dash.utilization','data.credit','ops.call.create','ops.job.allocate','ops.job.close','master.manage'];
+    return array_intersect_key(all_permissions(), array_flip($keys));
+}
 function role_defaults_base($role) {
     $all = array_keys(PERMISSIONS);
     switch ($role) {
@@ -484,18 +516,10 @@ function ua($fresh = false) {
     $def = role_defaults($role);
     // permissions: per-user csv override wins; else the role's effective set
     // (which itself honours a Settings → Roles & access override). Master = all.
-    if ($role === 'MASTER_ADMIN') {
-        $perms = array_keys(all_permissions());
-    } elseif (trim((string)($u['permissions'] ?? '')) !== '') {
-        $perms = array_values(array_filter(explode(',', $u['permissions'])));
-        // backward-compat: users configured before module perms existed keep
-        // module access from their role defaults (until re-saved with the new UI).
-        $hasMod = false; foreach ($perms as $p) if (strncmp($p, 'mod.', 4) === 0) { $hasMod = true; break; }
-        if (!$hasMod) $perms = array_merge($perms, module_defaults($role));
-        else $perms = merge_new_module_defaults($perms, $role);   // grant brand-new modules (e.g. CRM)
-    } else {
-        $perms = role_perms($role);
-    }
+    // Resolved by user_effective_perms() so the access editor pre-ticks EXACTLY
+    // what this same choke point grants (R3 — no drift between what is shown and
+    // what is enforced).
+    $perms = user_effective_perms($u);
     // office scope
     $so = trim((string)($u['scope_offices'] ?? ''));
     if ($role === 'MASTER_ADMIN' || $def['offices'] === 'ALL' && $so === '') $offices = 'ALL';
