@@ -2,6 +2,23 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🧾 Quote/contract model — "trace, don't force" (Aug 2026) — DONE
+
+Decision (user-approved): a quotation is never mandatory before an order, but must always
+be **available**; the invariant is **order → contract → rate-basis**, not a quote per order.
+Built:
+- **Generate quotation** on any deal without one — a draft quote-of-record pre-filled from the
+  deal, greyed once a quote exists (`opp_generate_quote`, `tests/test_opp_generate_quote.php`).
+- **One rate quote → many contracts** for group companies — Accounts register additional
+  contracts under the same quote for related subsidiaries (same rates, own numbers); default
+  stays one primary contract (`crm_add_group_contract`, `tests/test_quote_group_contracts.php`).
+- **Duplicate branch offices** blocked at both unguarded insert paths
+  (`tests/test_office_no_duplicate.php`). ⚠ existing DB dupes need a manual merge (not auto-run).
+- Research memo (real-CRM comparison, edge cases) delivered in chat; not forcing a quote per
+  order is deliberate and matches SAP/Salesforce/Oracle rate-contract + call-off practice.
+Follow-up (minor): a tool to **merge existing duplicate offices** (re-point calls/jobs/users)
+is not built — deliberately, since it mutates references; do it by hand or ask for a guarded tool.
+
 ## 🧭 Session wrap-up — screen de-clutter + gap fixes R1–R11 (Aug 2026) — WHAT'S LEFT
 
 Context: this session decluttered the inspector job view + voucher, hardened the

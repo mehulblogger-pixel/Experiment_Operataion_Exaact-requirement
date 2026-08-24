@@ -529,6 +529,49 @@
       <?php endif; ?>
     <?php endif; ?>
 
+    <?php // One rate quotation → contracts for several GROUP companies. Beyond the main
+          //  contract above, a related company (a subsidiary billing on its own number)
+          //  can hold its own contract at the SAME rates, raised from here. ?>
+    <?php $extraContracts = array_values(array_filter($quoteContracts ?? [], fn($c) => (int)$c['id'] !== (int)($cr['id'] ?? 0))); ?>
+    <?php if ($extraContracts || (($canContract ?? false) && !empty($groupCandidates))): ?>
+      <div style="margin-top:12px;border-top:1px dashed var(--line);padding-top:10px">
+        <div style="font-weight:600;margin-bottom:6px">Group-company contracts <span class="muted" style="font-weight:400">— same rates, different contract numbers</span></div>
+        <?php if ($extraContracts): ?>
+          <table class="kv" style="margin-bottom:8px">
+            <?php foreach ($extraContracts as $ec): $eos = $ec['open_status'] ?: 'OPEN'; ?>
+              <tr><td class="muted"><?= e($ec['partner_disp'] ?: $ec['partner_legal'] ?: '—') ?></td>
+                  <td><b><?= e($ec['contract_number']) ?></b>
+                    <span class="pill" style="background:<?= $osColors[$eos] ?? '#64748b' ?>;color:#fff"><?= e(defined('CONTRACT_OPEN_STATES') ? (CONTRACT_OPEN_STATES[$eos] ?? $eos) : $eos) ?></span>
+                    <?php if ($eos === 'OPEN' && (can('ops.call.create') || is_master())): ?> <a href="/call-new?contract_id=<?= (int)$ec['id'] ?>" class="btn small secondary">▶ Raise <?= e(Tl('call')) ?></a><?php endif; ?>
+                  </td></tr>
+            <?php endforeach; ?>
+          </table>
+        <?php endif; ?>
+        <?php if (($canContract ?? false) && !empty($groupCandidates)): ?>
+          <details class="fold"><summary>Register a contract for another group company</summary>
+            <div class="fold-body">
+            <form method="post" action="/quote-add-contract?id=<?= (int)$q['id'] ?>">
+              <div class="form-grid">
+                <div class="ff"><label>Group company</label>
+                  <select class="form-control searchable" name="partner_id" required>
+                    <option value="">— pick a related company —</option>
+                    <?php foreach ($groupCandidates as $g): ?><option value="<?= (int)$g['id'] ?>"><?= e($g['display_name'] ?: $g['legal_name']) ?></option><?php endforeach; ?>
+                  </select>
+                  <small class="muted">Only companies linked to <?= e($q['client_name'] ?: 'this client') ?> as parent / subsidiary appear here.</small></div>
+                <div class="ff"><label>Contract number</label><input class="form-control" name="contract_number" placeholder="their number, or auto">
+                  <label class="chk" style="margin-top:6px"><input type="checkbox" name="auto_contract" value="1"> Generate automatically</label></div>
+                <div class="ff"><label>Value (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="value" placeholder="their PO value (optional)"></div>
+                <div class="ff"><label>Start</label><input class="form-control" type="date" name="start_date"></div>
+                <div class="ff"><label>End</label><input class="form-control" type="date" name="end_date"></div>
+              </div>
+              <div style="margin-top:10px"><button class="btn small" type="submit">Register group contract</button></div>
+            </form>
+            </div>
+          </details>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
+
   <?php elseif ($canContract): ?>
     <p class="sub">Register the contract number to open it. A new number is registered as <b>pending</b> — a manager endorses and the branch manager approves before the order floats to operations.</p>
     <form method="post" action="/quote-contract?id=<?= (int)$q['id'] ?>">

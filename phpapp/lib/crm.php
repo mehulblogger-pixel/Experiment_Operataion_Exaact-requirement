@@ -846,6 +846,66 @@ function quotes_for_group($pid, $excludeQuoteId = 0) {
     } catch (Throwable $e) { return []; }
 }
 
+// ---- One rate quotation → contracts for several group companies -------------
+//  A rate quotation is agreed once with a group; each group company (a subsidiary
+//  with its own GST / billing) may then need ITS OWN contract number at the SAME
+//  rates. So beyond the quote's primary contract, additional contracts can be
+//  registered under the same quotation for RELATED companies (the group tree). Each
+//  is a normal PENDING → endorse → approve → OPEN contract; the quote's primary
+//  contract_id is untouched, and every contract points back via quotation_id.
+
+// Every contract registered under a quotation (the primary and any group ones).
+function contracts_for_quote($quoteId) {
+    return ops_all("SELECT pc.*, b.legal_name partner_legal, b.display_name partner_disp
+                    FROM partner_contracts pc LEFT JOIN business_partners b ON b.id=pc.partner_id
+                    WHERE pc.quotation_id=? ORDER BY pc.id", [(int)$quoteId]) ?: [];
+}
+// The group companies eligible for an additional contract under this quote: the
+// quote's client and its group tree that are clients and don't already hold a
+// contract under this quotation.
+function quote_group_contract_candidates($quoteId) {
+    $q = ops_one("SELECT client_id FROM quotations WHERE id=?", [(int)$quoteId]);
+    if (!$q || empty($q['client_id'])) return [];
+    $group = partner_group_ids((int)$q['client_id']);
+    if (!$group) return [];
+    $have = array_map(fn($c) => (int)$c['partner_id'], contracts_for_quote($quoteId));
+    $ids  = array_values(array_diff(array_map('intval', $group), $have));
+    if (!$ids) return [];
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    return ops_all("SELECT id, legal_name, display_name FROM business_partners
+                    WHERE id IN ($in) AND is_client=1 ORDER BY display_name, legal_name", $ids) ?: [];
+}
+// Register an ADDITIONAL contract under a quote for a related group company. The
+// primary contract must already be registered; the company must be in the client's
+// group (deliberate — not any client). Mirrors the quote→contract lifecycle.
+function crm_add_group_contract($quoteId, $partnerId, array $b = []) {
+    $q = ops_one("SELECT * FROM quotations WHERE id=?", [(int)$quoteId]);
+    if (!$q) return ['err' => 'That quotation no longer exists.'];
+    if (strtoupper((string)($q['status'] ?? '')) !== 'ACCEPTED') return ['err' => 'Additional contracts are registered on a won quotation.'];
+    if (empty($q['contract_id'])) return ['err' => 'Register the main contract first, then add group-company contracts under it.'];
+    $partnerId = (int)$partnerId;
+    if (!$partnerId) return ['err' => 'Pick the group company the contract is for.'];
+    $group = array_map('intval', partner_group_ids((int)($q['client_id'] ?? 0)));
+    if (!in_array($partnerId, $group, true)) return ['err' => 'That company is not in this client’s group. Link it as a subsidiary / related company on the client record first.'];
+    $branchId = (int)($b['branch_id'] ?? 0) ?: (($q['office_id'] ?? null) ?: null);
+    $no = trim((string)($b['contract_number'] ?? ''));
+    if (!empty($b['auto_contract']) || $no === '') $no = function_exists('gen_contract_number') ? gen_contract_number($branchId) : $no;
+    if ($no === '') return ['err' => 'Enter the contract number, or tick auto-generate.'];
+    $clash = function_exists('contract_no_clash') ? contract_no_clash($no, $partnerId) : null;
+    if ($clash) return ['err' => 'Contract number ' . $no . ' is already registered against ' . ($clash['owner_name'] ?: 'another party') . '.'];
+    $ex = ops_one("SELECT id FROM partner_contracts WHERE partner_id=? AND contract_number=?", [$partnerId, $no]);
+    if ($ex) { $cid = (int)$ex['id']; }
+    else {
+        $me = user_name(current_user()); $meId = (int)(current_user()['id'] ?? 0);
+        db()->prepare("INSERT INTO partner_contracts (partner_id,contract_number,title,value,start_date,end_date,notes,branch_id,quotation_id,open_status,requested_by,requested_by_id,requested_at,is_active) VALUES (?,?,?,?,?,?,?,?,?, 'PENDING', ?,?,?, 0)")
+            ->execute([$partnerId, $no, (string)($q['subject'] ?? ''), (float)($b['value'] ?? 0), (string)($b['start_date'] ?? ''), (string)($b['end_date'] ?? ''),
+                       'Group contract under quotation ' . $q['quote_no'] . ' — same rates', $branchId, (int)$quoteId, $me, $meId, date('c')]);
+        $cid = (int)db()->lastInsertId();
+    }
+    if (function_exists('crm_log_change')) crm_log_change((int)$quoteId, 'Group contract ' . $no . ' registered for a related company under this quotation.');
+    return ['ok' => true, 'contract_id' => $cid, 'contract_no' => $no];
+}
+
 // The group history shaped for JSON — what the quote form draws. The company
 // name is blank when the row is the same customer, and named when it is a group
 // company, so a reader sees at a glance which are the subsidiaries'.
@@ -1455,6 +1515,10 @@ function ops_crm_quotes($route, $method) {
             'clientReg' => !empty($q['client_id']) ? ops_one("SELECT code, legal_name FROM business_partners WHERE id=?", [$q['client_id']]) : null,
             // §6 — the contract row and who may act on its opening approval.
             'contractRow'  => !empty($q['contract_id']) ? ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$q['contract_id']]) : null,
+            // One rate quotation → contracts for group companies: all contracts under
+            // this quote, and the related companies still eligible for one.
+            'quoteContracts' => function_exists('contracts_for_quote') ? contracts_for_quote((int)$q['id']) : [],
+            'groupCandidates' => function_exists('quote_group_contract_candidates') ? quote_group_contract_candidates((int)$q['id']) : [],
             'canEndorseContract' => function_exists('can_endorse_contract_open') && can_endorse_contract_open(),
             'canApproveContract' => function_exists('can_approve_contract_open') && can_approve_contract_open(),
             'orderJobs' => ops_all("SELECT j.id, j.job_code, j.stage, j.closed_flag, j.invoice_raised, j.invoice_amount, j.payment_received, j.payment_amount, i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.quotation_id=? ORDER BY j.id", [$q['id']]),
@@ -1886,6 +1950,15 @@ function ops_crm_quotes($route, $method) {
             flash('Registered against contract ' . $contractNo . ', which is still ' . strtolower(CONTRACT_OPEN_STATES[$openStatus] ?? $openStatus) . '.', 'warning');
         }
         redirect('/quote?id=' . $q['id']);
+    }
+    // One rate quotation → an additional contract for a related GROUP company.
+    if ($route === 'quote-add-contract' && $method === 'POST') {
+        ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office can register a contract.');
+        $qid = (int)($_GET['id'] ?? 0);
+        $r = crm_add_group_contract($qid, (int)($_POST['partner_id'] ?? 0), $_POST);
+        if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/quote?id=' . $qid . '#contract'); }
+        flash('Group contract ' . $r['contract_no'] . ' registered and awaiting approval — it opens after a manager endorses and the branch manager approves, and then its ' . Tlp('call') . ' are raised from it.', 'warning');
+        redirect('/quote?id=' . $qid . '#contract');
     }
     if ($route === 'quote-float' && $method === 'POST') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
