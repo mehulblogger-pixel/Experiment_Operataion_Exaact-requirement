@@ -2760,6 +2760,8 @@ function ops_dispatch($route, $method) {
             return geofence_save_party($route, $method);
         case $route === 'job-geo' && $method === 'POST':
             return geofence_save_job($route, $method);
+        case $route === 'contract':
+            return ops_contract_360();
         case $route === 'address-geo' && $method === 'POST':
             return geofence_save_address($route, $method);
         case $route === 'site-geo-capture' && $method === 'POST':

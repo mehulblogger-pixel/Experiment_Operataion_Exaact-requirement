@@ -158,6 +158,27 @@ function search_sources() {
                 array_merge($sa, [$l, $l, $l, $l, $l, $l])));
         });
 
+    // ---- Contracts ----------------------------------------------------------
+    // Search a contract by number, title or client and open its 360 — the whole
+    // thread (quote, POs, calls, jobs, reports, money) on one screen.
+    $add('contracts', (function_exists('THP') ? THP('contract') : 'Contracts'), '📄',
+        can('mod.clients.view') || can('crm.contract.register') || can('data.credit') || is_master() || (function_exists('is_coordinator_level') && is_coordinator_level()),
+        function ($q, $n) use ($like) {
+            $l = $like($q);
+            return array_map(fn($r) => [
+                'title'    => $r['contract_number'] ?: ('#' . (int)$r['id']),
+                'subtitle' => $r['client_name'] ?: '',
+                'meta'     => trim(($r['title'] ?: '') . ' · ' . ($r['open_status'] ?: ''), ' ·'),
+                'url'      => '/contract?id=' . (int)$r['id'],
+            ], ops_all(
+                "SELECT pc.id, pc.contract_number, pc.title, pc.open_status,
+                        COALESCE(bp.display_name, bp.legal_name) client_name
+                 FROM partner_contracts pc LEFT JOIN business_partners bp ON bp.id=pc.partner_id
+                 WHERE pc.contract_number LIKE ? OR pc.title LIKE ? OR bp.legal_name LIKE ? OR bp.display_name LIKE ?
+                 ORDER BY pc.id DESC LIMIT $n",
+                [$l, $l, $l, $l]));
+        });
+
     // ---- Inspection calls ---------------------------------------------------
     $add('calls', THP('call'), '📞', can('mod.calls.view') || is_master_of('calls'),
         function ($q, $n) use ($like) {

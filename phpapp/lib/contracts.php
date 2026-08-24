@@ -783,3 +783,65 @@ function ops_contract_overrides($route, $method) {
         'canEndorse' => can_endorse_override(), 'canGrant' => can_grant_override()]);
     return true;
 }
+
+// ---------------------------------------------------------------------------
+//  Contract 360 — one screen that shows EVERYTHING about a contract: its
+//  commercial terms and opening trail, the quotation it came from, its purchase
+//  orders, every inspection call raised under it, the jobs on those calls, the
+//  reports produced, and the money (invoiced / received / outstanding). Reachable
+//  from search and the client's Contracts tab; drill in and use Back to step out.
+// ---------------------------------------------------------------------------
+function ops_contract_360() {
+    ops_require(is_master()
+        || (function_exists('can') && (can('mod.clients.view') || can('mod.vendors.view') || can('crm.contract.register') || can('data.credit') || can('finance.reconcile')))
+        || (function_exists('is_coordinator_level') && is_coordinator_level()),
+        'You do not have permission to view contracts.');
+    $id = (int)($_GET['id'] ?? 0);
+    $c = ops_one("SELECT pc.*, b.legal_name, b.display_name, o.name branch_name
+                  FROM partner_contracts pc
+                  LEFT JOIN business_partners b ON b.id=pc.partner_id
+                  LEFT JOIN offices o ON o.id=pc.branch_id
+                  WHERE pc.id=?", [$id]);
+    if (!$c) { http_response_code(404); view('notfound'); return true; }
+    $cno = (string)($c['contract_number'] ?? '');
+    $hasNo = $cno !== '';
+
+    $quote = !empty($c['quotation_id'])
+        ? ops_one("SELECT id, quote_no, rev, status, subject, total_amount FROM quotations WHERE id=?", [(int)$c['quotation_id']])
+        : null;
+
+    $pos = ops_all("SELECT id, po_number, po_type, title, value, start_date, end_date FROM partner_purchase_orders WHERE contract_id=? ORDER BY id", [$id]) ?: [];
+
+    // Calls raised under this contract number (the reliable join once registered).
+    $calls = $hasNo ? (ops_all(
+        "SELECT c.id, c.call_code, c.status, c.created_at, c.inspection_type, c.inspection_required_date,
+                (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) job_count,
+                (SELECT COALESCE(SUM(j.invoice_amount),0) FROM jobs j WHERE j.call_id=c.id AND j.invoice_raised=1) invoiced
+         FROM calls c WHERE COALESCE(c.contract_number,'')=? ORDER BY c.id DESC", [$cno]) ?: []) : [];
+
+    $jobs = $hasNo ? (ops_all(
+        "SELECT j.id, j.job_code, j.stage, j.closed_flag, j.invoice_raised, j.invoice_amount, j.payment_received, j.payment_amount,
+                i.name inspector_name, cl.call_code,
+                (SELECT COUNT(*) FROM report_docs rd WHERE rd.job_id=j.id AND rd.deleted=0) report_count
+         FROM jobs j JOIN calls cl ON cl.id=j.call_id LEFT JOIN inspectors i ON i.id=j.inspector_id
+         WHERE COALESCE(cl.contract_number,'')=? ORDER BY j.id DESC", [$cno]) ?: []) : [];
+
+    $reports = $hasNo ? (ops_all(
+        "SELECT rd.id, rd.irn, rd.type_code, rd.status, rd.finalized, rd.job_id, j.job_code
+         FROM report_docs rd JOIN jobs j ON j.id=rd.job_id JOIN calls cl ON cl.id=j.call_id
+         WHERE COALESCE(cl.contract_number,'')=? AND rd.deleted=0 ORDER BY rd.id DESC", [$cno]) ?: []) : [];
+
+    // Commercial rollup across the jobs.
+    $invoiced = 0.0; $received = 0.0;
+    foreach ($jobs as $j) {
+        if (!empty($j['invoice_raised'])) $invoiced += (float)$j['invoice_amount'];
+        if (!empty($j['payment_received'])) $received += (float)$j['payment_amount'];
+    }
+    $money = ['value' => (float)($c['value'] ?? 0), 'invoiced' => $invoiced, 'received' => $received,
+              'outstanding' => max(0, $invoiced - $received)];
+
+    view('ops/contract_detail', ['c' => $c, 'quote' => $quote, 'pos' => $pos, 'calls' => $calls,
+        'jobs' => $jobs, 'reports' => $reports, 'money' => $money,
+        'canSeeMoney' => is_master() || (function_exists('can') && (can('data.credit') || can('data.revenue') || can('finance.reconcile')))]);
+    return true;
+}

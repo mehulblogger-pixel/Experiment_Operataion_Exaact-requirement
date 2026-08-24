@@ -143,7 +143,7 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
   <table class="grid"><tr><th>Contract No.</th><th>Against <?= e(Tl('quote')) ?></th><th>Title</th><th>Value</th><th>Start</th><th>End</th></tr>
     <?php foreach ($contracts as $c):
       $cq = !empty($c['quotation_id']) ? ops_one("SELECT id, quote_no, rev, total_amount FROM quotations WHERE id=?", [(int)$c['quotation_id']]) : null; ?>
-      <tr><td><?= e($c['contract_number']) ?></td>
+      <tr><td><a href="/contract?id=<?= (int)$c['id'] ?>" title="Everything about this contract"><b><?= e($c['contract_number']) ?></b></a></td>
         <td><?php if ($cq): ?><a href="/quote?id=<?= (int)$cq['id'] ?>"><?= e($cq['quote_no']) ?><?= (int)$cq['rev'] ? ' R' . (int)$cq['rev'] : '' ?></a>
             <?php else: ?><span class="muted">— recorded directly —</span><?php endif; ?></td>
         <td><?= e($c['title'] ?: '—') ?></td><td><?= $c['value']!==null?cur_sym().e($c['value']):'—' ?></td>
