@@ -91,6 +91,17 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
     <div class="addr-card"><div><span class="badge GREEN"><?= e(lk_options_or('address_type', ADDRESS_TYPES)[$a['address_type']] ?? $a['address_type']) ?></span> <strong><?= e($a['label']) ?></strong><?php if ($a['is_primary']): ?> <span class="badge AMBER">head office</span><?php endif; ?></div>
     <div class="muted"><?= e(addr_line($a)) ?></div>
     <?php foreach (($contactsByAddr[$a['id']] ?? []) as $ct): ?><div class="muted">· <?= e($ct['name']) ?> <?= e($ct['designation']) ?> — <?= e(trim($ct['mobile'].' '.$ct['email'])) ?></div><?php endforeach; ?>
+    <?php // Per-site coordinates — a multi-site client's distinct sites each carry their
+          //  own location, set once here and inherited by every inspection at this site.
+          if (function_exists('geofence_editor')):
+            $hasGeo = isset($a['site_lat']) && $a['site_lat'] !== null && $a['site_lat'] !== ''; ?>
+      <details class="fold" style="margin-top:6px"><summary style="font-size:12.5px" class="muted"><?= $hasGeo ? '📍 Site location set — edit' : '📍 Set this site’s location (for on-site check-in)' ?></summary>
+        <div class="fold-body" style="max-width:520px">
+          <?= geofence_editor('address-geo', (int)$a['id'], ['lat'=>$a['site_lat'] ?? null, 'lon'=>$a['site_lon'] ?? null, 'rad'=>(int)($a['geofence_m'] ?? 0)]) ?>
+          <p class="muted" style="font-size:11.5px;margin:6px 0 0">Every inspection that uses this address inherits this location. Don’t have it? Leave it blank — the inspector can capture it on site.</p>
+        </div>
+      </details>
+    <?php endif; ?>
     </div>
   <?php endforeach; ?>
   <?php if (!$addresses): ?><p>No addresses yet.</p><?php endif; ?>

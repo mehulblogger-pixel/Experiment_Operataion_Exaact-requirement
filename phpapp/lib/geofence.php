@@ -44,6 +44,12 @@ function geofence_migrate() {
         ensure_column('jobs', 'site_lon', "DECIMAL(10,7) NULL");
         ensure_column('jobs', 'site_geofence_m', "INT DEFAULT 0");
         ensure_column('jobs', 'site_label', "VARCHAR(160) DEFAULT ''");
+        // On each SITE ADDRESS — so a multi-site client's distinct sites each carry
+        // their own coordinates. A call points at a site address; every inspection at
+        // that site then inherits its location, set once instead of per job.
+        ensure_column('partner_addresses', 'site_lat', "DECIMAL(10,7) NULL");
+        ensure_column('partner_addresses', 'site_lon', "DECIMAL(10,7) NULL");
+        ensure_column('partner_addresses', 'geofence_m', "INT DEFAULT 0");
     } catch (Throwable $e) { /* never let a column add break boot */ }
 }
 
@@ -90,14 +96,38 @@ function geofence_job_party($job) {
     return null;
 }
 
-// The target the check-in is measured against for a job: the job's own site
-// point if set, otherwise the party's. Returns [lat,lon,radius,label,source] or null.
+// The specific SITE ADDRESS this job's call points at (calls.site_address_id), with
+// its own coordinates — so different sites under one client/contract each fence to
+// their own spot. Returns the address row (with coords) or null.
+function geofence_call_site($job) {
+    $callId = (int)($job['call_id'] ?? 0);
+    if (!$callId) return null;
+    $addrId = (int) ops_val("SELECT site_address_id FROM calls WHERE id=?", [$callId]);
+    if (!$addrId) return null;
+    $a = ops_one("SELECT id, label, line1, city, site_lat, site_lon, geofence_m FROM partner_addresses WHERE id=?", [$addrId]);
+    if ($a && $a['site_lat'] !== null && $a['site_lon'] !== null) return $a;
+    return null;
+}
+
+// The target the check-in is measured against for a job, in priority order:
+//   1. the job's OWN site point (a manual override for this one inspection),
+//   2. the call's SITE ADDRESS coordinates (set once per site, inherited by every
+//      call/job at that site — the multi-site answer),
+//   3. the party's (customer/vendor) default location.
+// Returns [lat,lon,radius,label,source] or null.
 function geofence_target($job) {
     geofence_migrate();
     if ($job['site_lat'] !== null && $job['site_lon'] !== null && $job['site_lat'] !== '') {
         $r = (int)($job['site_geofence_m'] ?? 0) ?: geofence_radius();
         return ['lat' => (float)$job['site_lat'], 'lon' => (float)$job['site_lon'], 'radius' => $r,
                 'label' => (string)($job['site_label'] ?? '') ?: 'the job site', 'source' => 'job'];
+    }
+    $a = geofence_call_site($job);
+    if ($a) {
+        $r = (int)($a['geofence_m'] ?? 0) ?: geofence_radius();
+        $lbl = trim((string)($a['label'] ?: trim(($a['line1'] ?? '') . ' ' . ($a['city'] ?? '')))) ?: 'the site';
+        return ['lat' => (float)$a['site_lat'], 'lon' => (float)$a['site_lon'], 'radius' => $r,
+                'label' => $lbl, 'source' => 'address'];
     }
     $p = geofence_job_party($job);
     if ($p) {
@@ -183,7 +213,49 @@ function geofence_save_job($route, $method) {
     if ($c === null && trim((string)($_POST['coords'] ?? '')) !== '') { flash('Could not read a location. Paste a Google Maps link, or type "lat, long".', 'error'); redirect('/job?id=' . $jid); }
     $rad = max(0, (int)($_POST['geofence_m'] ?? 0));
     $label = substr(trim((string)($_POST['site_label'] ?? '')), 0, 160);
-    if ($c === null) { db()->prepare("UPDATE jobs SET site_lat=NULL, site_lon=NULL, site_geofence_m=?, site_label=? WHERE id=?")->execute([$rad, $label, $jid]); flash('Job site cleared — it will use the party location.'); }
+    if ($c === null) { db()->prepare("UPDATE jobs SET site_lat=NULL, site_lon=NULL, site_geofence_m=?, site_label=? WHERE id=?")->execute([$rad, $label, $jid]); flash('Job site cleared — it will use the site / party location.'); }
     else { db()->prepare("UPDATE jobs SET site_lat=?, site_lon=?, site_geofence_m=?, site_label=? WHERE id=?")->execute([$c[0], $c[1], $rad, $label, $jid]); flash('Job site location saved.'); }
+    redirect('/job?id=' . $jid);
+}
+
+// Save coordinates on a SITE ADDRESS (the partner detail → Addresses tab), so every
+// call/job that points at that address fences to it. Blank clears it (fence off).
+function geofence_save_address($route, $method) {
+    ops_require(is_master() || (function_exists('can') && (can('mod.clients.edit') || can('mod.vendors.edit'))) || is_coordinator_level(),
+        'You cannot set a site location.');
+    geofence_migrate();
+    $aid = (int)($_POST['id'] ?? 0);
+    $a = $aid ? ops_one("SELECT id, partner_id FROM partner_addresses WHERE id=?", [$aid]) : null;
+    if (!$a) { flash('Address not found.', 'error'); redirect('/'); }
+    $back = '/partner?id=' . (int)$a['partner_id'] . '&tab=addresses';
+    $c = geo_extract((string)($_POST['coords'] ?? ''));
+    if ($c === null && trim((string)($_POST['coords'] ?? '')) !== '') { flash('Could not read a location. Paste a Google Maps link, or type "lat, long".', 'error'); redirect($back); }
+    $rad = max(0, (int)($_POST['geofence_m'] ?? 0));
+    if ($c === null) { db()->prepare("UPDATE partner_addresses SET site_lat=NULL, site_lon=NULL, geofence_m=? WHERE id=?")->execute([$rad, $aid]); flash('Site location cleared.'); }
+    else { db()->prepare("UPDATE partner_addresses SET site_lat=?, site_lon=?, geofence_m=? WHERE id=?")->execute([$c[0], $c[1], $rad, $aid]); flash('Site location saved.'); }
+    redirect($back);
+}
+
+// On-site capture: the engineer standing at the site saves their device GPS fix as
+// the SITE'S location — the reliable way to pin a site whose exact coordinates were
+// never known. Written to the call's site address (so future inspections there inherit
+// it) when the call has one, else pinned on the job. The owning inspector may do it.
+function geofence_capture_site($route, $method) {
+    geofence_migrate();
+    $jid = (int)($_POST['id'] ?? 0);
+    $job = $jid ? ops_one("SELECT id, call_id FROM jobs WHERE id=?", [$jid]) : null;
+    if (!$job) { flash('Job not found.', 'error'); redirect('/'); }
+    ops_require(is_master() || is_coordinator_level() || (function_exists('job_owned_by_me') && job_owned_by_me($jid)),
+        'You cannot set this site location.');
+    $c = geo_extract((string)($_POST['coords'] ?? ''));
+    if ($c === null) { flash('No location was captured — allow location access and try again.', 'error'); redirect('/job?id=' . $jid); }
+    $addrId = (int) ops_val("SELECT site_address_id FROM calls WHERE id=?", [(int)$job['call_id']]);
+    if ($addrId) {
+        db()->prepare("UPDATE partner_addresses SET site_lat=?, site_lon=? WHERE id=?")->execute([$c[0], $c[1], $addrId]);
+        flash('Saved as this site’s location — future inspections at this site inherit it.');
+    } else {
+        db()->prepare("UPDATE jobs SET site_lat=?, site_lon=? WHERE id=?")->execute([$c[0], $c[1], $jid]);
+        flash('Saved as this ' . (function_exists('Tl') ? Tl('job') : 'job') . '’s site location.');
+    }
     redirect('/job?id=' . $jid);
 }

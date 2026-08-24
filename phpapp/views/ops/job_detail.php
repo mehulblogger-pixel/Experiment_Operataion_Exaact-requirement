@@ -230,6 +230,27 @@
     <?php else: ?>
       <div class="msg msg-warning" style="margin-top:0;margin-bottom:10px">Geofencing is on but this job has no site location set, so punch-in is not fenced. Set one below.</div>
     <?php endif; ?>
+    <?php // On-site capture — the engineer standing at the site pins its EXACT location
+          //  from their own device GPS (the reliable fix when the coordinates were never
+          //  known). Saved to the site address so every future inspection here inherits
+          //  it. Shown while the site is not yet pinned to its own point.
+          $siteUnpinned = !$gt || ($gt['source'] ?? '') === 'party';
+          $canPinSite = is_coordinator_level() || is_master()
+              || ($fieldInspector && (int)(current_user()['inspector_id'] ?? 0) === (int)($job['inspector_id'] ?? 0));
+          if ($siteUnpinned && $canPinSite && empty($job['closed_flag'])): ?>
+      <form method="post" action="/site-geo-capture" id="sgcForm" style="margin:0 0 10px">
+        <input type="hidden" name="_csrf" value="<?= e(function_exists('csrf_token') ? csrf_token() : '') ?>">
+        <input type="hidden" name="id" value="<?= (int)$job['id'] ?>">
+        <input type="hidden" name="coords" id="sgcCoords">
+        <button class="btn small" type="button" id="sgcBtn">📍 I’m at the site — save its exact location</button>
+        <span class="muted" id="sgcMsg" style="font-size:12px"></span>
+      </form>
+      <script>(function(){var b=document.getElementById('sgcBtn'),m=document.getElementById('sgcMsg');if(!b)return;
+        b.addEventListener('click',function(){if(!navigator.geolocation){m.textContent='This browser cannot give a location.';return;}
+          b.disabled=true;m.textContent='Getting your location…';
+          navigator.geolocation.getCurrentPosition(function(p){document.getElementById('sgcCoords').value=p.coords.latitude.toFixed(7)+', '+p.coords.longitude.toFixed(7);document.getElementById('sgcForm').submit();},
+            function(err){b.disabled=false;m.textContent='No location: '+(err&&err.message?err.message:'permission refused')+'.';},{enableHighAccuracy:true,timeout:15000,maximumAge:0});});})();</script>
+    <?php endif; ?>
     <?php if (is_coordinator_level() || is_master()): ?>
       <details style="margin-bottom:12px"><summary style="cursor:pointer;font-size:13px" class="muted">Set / adjust this job's exact site location</summary>
         <div style="margin-top:8px;max-width:520px"><?= geofence_editor('job-geo', (int)$job['id'],

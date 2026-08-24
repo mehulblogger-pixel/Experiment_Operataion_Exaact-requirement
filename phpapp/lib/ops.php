@@ -2759,6 +2759,10 @@ function ops_dispatch($route, $method) {
             return geofence_save_party($route, $method);
         case $route === 'job-geo' && $method === 'POST':
             return geofence_save_job($route, $method);
+        case $route === 'address-geo' && $method === 'POST':
+            return geofence_save_address($route, $method);
+        case $route === 'site-geo-capture' && $method === 'POST':
+            return geofence_capture_site($route, $method);
         case $route === 'timesheet':
             return ops_timesheet($route, $method);
         case $route === 'ratings' || $route === 'ratings-config':
