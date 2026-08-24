@@ -31,9 +31,35 @@ try {
     asset_return($id, ['status' => 'RETURNED', 'returned_on' => '2026-09-01', 'condition_returned' => 'GOOD']);
     t_eq(asset_row($id)['status'], 'RETURNED', 'the asset is marked returned');
     t_ok(person_assets_summary($p)['out'] === 0, 'nothing is out after it is returned');
+
+    // Batch issue — several assets in one submit, each its own tracked row with its
+    // own serial, quantity and condition. A blank line is skipped, not stored.
+    $pb = team_member_create('Batch Holder', 'FIELD');
+    t_eq(asset_issue_add(['person_id' => $pb, 'issued_on' => '2026-08-10',
+        'asset_type'       => ['HARD_STAMP', 'SAFETY_HELMET', ''],
+        'asset_name'       => ['Hard stamp B', '', ''],
+        'identifier'       => ['HS-100', 'HELM-7', ''],
+        'quantity'         => ['1', '2', '1'],
+        'condition_issued' => ['GOOD', 'GOOD', 'GOOD']], null), '',
+        'a batch of assets is issued in one go');
+    $brows = person_assets($pb);
+    t_ok(count($brows) === 2, 'exactly the two filled lines were stored — the blank line was skipped');
+    $serials = array_map(function($r){ return $r['identifier']; }, $brows);
+    t_ok(in_array('HS-100', $serials, true) && in_array('HELM-7', $serials, true),
+        'each batch line kept its own serial number');
+    $helmet = null; foreach ($brows as $r) { if ($r['asset_type'] === 'SAFETY_HELMET') $helmet = $r; }
+    t_ok($helmet && (int)$helmet['quantity'] === 2 && $helmet['asset_name'] === asset_types()['SAFETY_HELMET'],
+        'a batch line keeps its own quantity and falls back to the type label when description is blank');
+    t_ok(asset_issue_add(['person_id' => $pb, 'asset_type' => ['', '']], null) !== '',
+        'a batch with no real line is refused');
 } finally {
     if ($own && db()->inTransaction()) db()->rollBack();
 }
+
+// The register offers repeatable asset lines (batch issue) and an add-line control.
+$reg = (string)file_get_contents(__DIR__ . '/../views/ops/asset_register.php');
+t_ok(strpos($reg, 'name="asset_type[]"') !== false && strpos($reg, 'id="assetLineAdd"') !== false,
+    'the issue form takes several asset lines in one go');
 
 t_ok(isset(asset_types()['HARD_STAMP'], asset_types()['SAFETY_HELMET'], asset_types()['DIARY']),
     'default asset types include hard stamp, safety helmet and diary');

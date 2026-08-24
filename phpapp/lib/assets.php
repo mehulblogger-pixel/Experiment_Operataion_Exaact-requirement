@@ -109,31 +109,54 @@ function asset_counts() {
 }
 
 // ---- Writes ----------------------------------------------------------------
+// Issue one OR SEVERAL assets to a person in one go. The asset-specific fields
+// (type / description / serial / qty / condition) may arrive as ARRAYS — one entry
+// per asset line — and each line becomes its own tracked asset_issues row, so returns
+// and acknowledgement stay per-asset. A blank line (no type) is skipped. The shared
+// fields (person, issued-on, acknowledged-by/on, signed slip, notes) apply to all
+// lines. A single non-array post still works (backward compatible).
 function asset_issue_add($post, $file = null) {
     assets_migrate();
     $personId = (int)($post['person_id'] ?? 0);
     if (!$personId) return 'Choose who the asset is issued to.';
-    $type = (string)($post['asset_type'] ?? '');
-    if (!isset(asset_types()[$type])) return 'Choose the kind of asset.';
-    $name = trim((string)($post['asset_name'] ?? ''));
-    if ($name === '') $name = asset_types()[$type];   // fall back to the kind's label
-    $qty = max(1, (int)($post['quantity'] ?? 1));
-    // Optional signed-slip scan.
+
+    $types = $post['asset_type'] ?? '';
+    $keys  = is_array($types) ? array_keys($types) : [0];   // one pass for the single-field case
+    $names = (array)($post['asset_name'] ?? []);
+    $idents= (array)($post['identifier'] ?? []);
+    $qtys  = (array)($post['quantity'] ?? []);
+    $conds = (array)($post['condition_issued'] ?? []);
+
+    // Shared across every line.
     [$fn, $mime, $data] = asset_file_capture($file);
+    $issuedOn = (string)($post['issued_on'] ?? date('Y-m-d'));
+    $issuedBy = user_name(current_user());
     $ackOn = trim((string)($post['ack_on'] ?? ''));
     $ackBy = trim((string)($post['ack_by'] ?? ''));
-    db()->prepare("INSERT INTO asset_issues
+    $ackNote = substr(trim((string)($post['ack_note'] ?? '')), 0, 400);
+    $notes = substr(trim((string)($post['notes'] ?? '')), 0, 400);
+
+    $ins = db()->prepare("INSERT INTO asset_issues
         (asset_type,asset_name,identifier,quantity,person_kind,person_id,issued_on,issued_by,condition_issued,
          ack_on,ack_by,ack_note,ack_file_name,ack_mime,ack_file_data,status,notes,created_by,created_at)
-        VALUES (?,?,?,?, 'INSPECTOR', ?,?,?,?,?,?,?,?,?,?, 'ISSUED', ?,?,?)")
-        ->execute([$type, substr($name, 0, 200), substr(trim((string)($post['identifier'] ?? '')), 0, 120), $qty,
-                   $personId,
-                   (string)($post['issued_on'] ?? date('Y-m-d')), user_name(current_user()),
-                   isset(ASSET_CONDITIONS[$post['condition_issued'] ?? '']) ? $post['condition_issued'] : 'GOOD',
-                   $ackOn, $ackBy, substr(trim((string)($post['ack_note'] ?? '')), 0, 400),
-                   $fn, $mime, $data,
-                   substr(trim((string)($post['notes'] ?? '')), 0, 400),
-                   user_name(current_user()), date('c')]);
+        VALUES (?,?,?,?, 'INSPECTOR', ?,?,?,?,?,?,?,?,?,?, 'ISSUED', ?,?,?)");
+
+    $n = 0;
+    foreach ($keys as $i) {
+        $type = is_array($types) ? (string)($types[$i] ?? '') : (string)$types;
+        if ($type === '' || !isset(asset_types()[$type])) continue;   // skip a blank / invalid line
+        $name = trim((string)(is_array($names) ? ($names[$i] ?? '') : $names));
+        if ($name === '') $name = asset_types()[$type];               // fall back to the kind's label
+        $ident = trim((string)(is_array($idents) ? ($idents[$i] ?? '') : $idents));
+        $qty = max(1, (int)(is_array($qtys) ? ($qtys[$i] ?? 1) : $qtys));
+        $cond = is_array($conds) ? (string)($conds[$i] ?? 'GOOD') : (string)$conds;
+        if (!isset(ASSET_CONDITIONS[$cond])) $cond = 'GOOD';
+        $ins->execute([$type, substr($name, 0, 200), substr($ident, 0, 120), $qty,
+                       $personId, $issuedOn, $issuedBy, $cond,
+                       $ackOn, $ackBy, $ackNote, $fn, $mime, $data, $notes, $issuedBy, date('c')]);
+        $n++;
+    }
+    if ($n === 0) return 'Add at least one asset — pick its type.';
     return '';
 }
 
@@ -185,7 +208,7 @@ function ops_assets($route, $method) {
     if ($route === 'asset-issue-new' && $method === 'POST') {
         ops_require(asset_can_manage(), 'You cannot issue assets.');
         $err = asset_issue_add($_POST, $_FILES['ack_file'] ?? null);
-        flash($err !== '' ? $err : 'Asset issued and recorded.', $err !== '' ? 'error' : 'success');
+        flash($err !== '' ? $err : 'Assets issued and recorded.', $err !== '' ? 'error' : 'success');
         redirect('/asset-register' . (!empty($_POST['person_id']) ? '?person=' . (int)$_POST['person_id'] : ''));
     }
     if ($route === 'asset-ack' && $method === 'POST') {

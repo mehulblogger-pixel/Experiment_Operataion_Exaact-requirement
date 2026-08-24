@@ -46,30 +46,68 @@
 
 <?php if ($canManage): ?>
 <div class="panel">
-  <h3 class="tab-sub" style="margin-top:0">Issue an asset</h3>
-  <form method="post" action="/asset-issue-new" enctype="multipart/form-data" class="inline-add">
+  <h3 class="tab-sub" style="margin-top:0">Issue assets</h3>
+  <p class="muted" style="margin:0 0 10px">Pick the person once, then stack every asset they’re taking — each line keeps its own serial, quantity and condition, so returns and sign-off stay per-asset.</p>
+  <form method="post" action="/asset-issue-new" enctype="multipart/form-data" class="inline-add" id="assetIssueForm">
     <div class="ff"><label>Issue to *</label>
       <select class="form-control searchable" name="person_id" required>
         <option value="">— choose —</option>
         <?php foreach ($people as $p): ?><option value="<?= (int)$p['id'] ?>" <?= (int)$fPerson===(int)$p['id']?'selected':'' ?>><?= e($p['name']) ?><?= $p['emp_code']?' ('.e($p['emp_code']).')':'' ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff"><label>Type *</label>
-      <select class="form-control searchable" name="asset_type" required>
-        <?php foreach ($types as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
-      </select></div>
-    <div class="ff"><label>Description</label><input class="form-control" name="asset_name" placeholder="e.g. Hard stamp — welder A"></div>
-    <div class="ff"><label>Serial / stamp no.</label><input class="form-control" name="identifier" placeholder="e.g. HS-042"></div>
-    <div class="ff"><label>Qty</label><input class="form-control" type="number" min="1" name="quantity" value="1"></div>
     <div class="ff"><label>Issued on</label><input class="form-control" type="date" name="issued_on" value="<?= e(date('Y-m-d')) ?>"></div>
-    <div class="ff"><label>Condition</label>
-      <select class="form-control" name="condition_issued"><?php foreach ($conditions as $k=>$v): ?><option value="<?= e($k) ?>" <?= $k==='GOOD'?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+
+    <div class="ff ff-wide"><label>Assets *</label>
+      <table class="dt" id="assetLines" style="margin:0"><thead><tr>
+        <th style="min-width:150px">Type</th><th>Description</th><th style="width:130px">Serial / stamp no.</th><th style="width:70px">Qty</th><th style="width:120px">Condition</th><th style="width:34px"></th>
+      </tr></thead><tbody>
+        <?php for ($r=0; $r<2; $r++): ?>
+        <tr class="asset-line">
+          <td><select class="form-control searchable" name="asset_type[]"><option value="">— choose —</option><?php foreach ($types as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></td>
+          <td><input class="form-control" name="asset_name[]" placeholder="e.g. Hard stamp — welder A"></td>
+          <td><input class="form-control" name="identifier[]" placeholder="HS-042"></td>
+          <td><input class="form-control" type="number" min="1" name="quantity[]" value="1"></td>
+          <td><select class="form-control" name="condition_issued[]"><?php foreach ($conditions as $k=>$v): ?><option value="<?= e($k) ?>" <?= $k==='GOOD'?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
+          <td class="num"><button type="button" class="btn small secondary asset-line-del" title="Remove this line" tabindex="-1">×</button></td>
+        </tr>
+        <?php endfor; ?>
+      </tbody></table>
+      <button type="button" class="btn small secondary" id="assetLineAdd" style="margin-top:6px">+ Add another asset</button>
+    </div>
+
     <div class="ff"><label>Acknowledged by <span class="muted">— now, if signed on the spot</span></label><input class="form-control" name="ack_by" placeholder="person’s name (optional)"></div>
     <div class="ff"><label>Acknowledged on</label><input class="form-control" type="date" name="ack_on"></div>
-    <div class="ff"><label>Signed slip <span class="muted">— optional scan</span></label><input class="form-control" type="file" name="ack_file" accept=".pdf,.jpg,.jpeg,.png,.webp"></div>
+    <div class="ff"><label>Signed slip <span class="muted">— optional scan (covers the whole issue)</span></label><input class="form-control" type="file" name="ack_file" accept=".pdf,.jpg,.jpeg,.png,.webp"></div>
     <div class="ff ff-wide"><label>Notes</label><input class="form-control" name="notes"></div>
-    <button class="btn small" type="submit">Issue it</button>
+    <button class="btn small" type="submit">Issue them</button>
   </form>
 </div>
+<script>
+(function(){
+  var tb = document.querySelector('#assetLines tbody');
+  if (!tb) return;
+  function refresh(){
+    // Keep at least one line; hide the remove button when only one remains.
+    var rows = tb.querySelectorAll('tr.asset-line');
+    rows.forEach(function(r){ var b = r.querySelector('.asset-line-del'); if (b) b.style.visibility = rows.length>1 ? 'visible' : 'hidden'; });
+  }
+  var add = document.getElementById('assetLineAdd');
+  if (add) add.addEventListener('click', function(){
+    var rows = tb.querySelectorAll('tr.asset-line');
+    var clone = rows[rows.length-1].cloneNode(true);
+    clone.querySelectorAll('input').forEach(function(i){ if (i.type==='number') i.value='1'; else i.value=''; });
+    clone.querySelectorAll('select').forEach(function(s){ s.selectedIndex = 0; s.classList.remove('select2-hidden-accessible'); });
+    // Drop any enhanced-select wrapper the clone dragged along so the plain <select> shows.
+    clone.querySelectorAll('.select2-container').forEach(function(w){ w.remove(); });
+    tb.appendChild(clone); refresh();
+  });
+  tb.addEventListener('click', function(ev){
+    var b = ev.target.closest('.asset-line-del'); if (!b) return;
+    var rows = tb.querySelectorAll('tr.asset-line');
+    if (rows.length>1) { b.closest('tr.asset-line').remove(); refresh(); }
+  });
+  refresh();
+})();
+</script>
 <?php endif; ?>
 
 <div class="panel" style="padding:0;overflow:hidden">
