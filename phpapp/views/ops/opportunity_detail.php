@@ -216,6 +216,23 @@
       <button class="btn small">Attach</button>
     </form>
   <?php endif; ?>
+  <?php // Generate a quotation-of-record even for an order won WITHOUT a quotation, so
+        //  the deal always CAN carry one. One is enough — once a quotation is on the
+        //  deal the button is greyed out (a second quote-of-record would be noise). ?>
+  <?php if ($canEdit && ($o['status'] ?? '') !== 'LOST' && !empty($o['partner_id'])): ?>
+    <?php if (!$quotes): ?>
+      <form method="post" action="/opportunity-generate-quote" style="margin-top:12px">
+        <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+        <button class="btn small secondary" type="submit">＋ Generate quotation</button>
+        <span class="muted" style="font-size:12px;margin-left:6px">Creates a draft quotation from this deal — a quote-of-record, even for a direct order.</span>
+      </form>
+    <?php else: ?>
+      <div style="margin-top:12px">
+        <button class="btn small secondary" type="button" disabled style="opacity:.5;cursor:not-allowed" title="A quotation has already been raised for this deal">＋ Generate quotation</button>
+        <span class="muted" style="font-size:12px;margin-left:6px">A quotation is already on this deal.</span>
+      </div>
+    <?php endif; ?>
+  <?php endif; ?>
 </div>
 
 <?php // ---- Won: to Accounts for a contract, or straight to a work order -----

@@ -775,6 +775,33 @@ function opps_awaiting_contract() {
           ORDER BY o.sent_to_accounts_at") ?: [];
 }
 
+// Generate a quotation-of-record from a deal — so even an order won WITHOUT a
+// quotation can carry one (traceability), retroactively. One is enough: if the deal
+// already has a quotation, this refuses. The draft opens for the owner to finalise.
+function opp_generate_quote($oppId) {
+    opp_migrate();
+    $o = opp_row($oppId);
+    if (!$o) return ['err' => 'That opportunity no longer exists.'];
+    if (empty($o['partner_id'])) return ['err' => 'Add the customer first, so the quotation has a client.'];
+    if (($o['status'] ?? '') === 'LOST') return ['err' => 'A lost deal does not get a quotation.'];
+    if (opp_quotes((int)$o['id'])) return ['err' => 'This deal already has a quotation.'];
+    $pdo = db();
+    $qno = function_exists('crm_next_quote_no') ? crm_next_quote_no() : ops_next_code('quotations', 'quote_no', 'Q');
+    $me  = user_name(current_user());
+    $val = (float)($o['value'] ?? 0);
+    // Only the columns guaranteed by the base schema — the draft is finalised on the
+    // quote screen (lines added, GST applied), which recomputes the totals.
+    $pdo->prepare("INSERT INTO quotations (quote_no, rev, is_current, client_id, client_name, sbu, office_id, subject, subtotal, total_amount, status, created_by, created_at)
+                   VALUES (?,0,1,?,?,?,?,?,?,?, 'DRAFT', ?, ?)")
+        ->execute([$qno, (int)$o['partner_id'], (string)($o['partner_name'] ?? ''), (string)($o['sbu'] ?? ''),
+                   ($o['office_id'] ?? null) ?: null, (string)($o['name'] ?? ''), $val, $val, $me, date('c')]);
+    $qid = (int)$pdo->lastInsertId();
+    opp_link_quote((int)$o['id'], $qid);
+    if (function_exists('act_log')) act_log('OPPORTUNITY', (int)$o['id'], 'SYSTEM',
+        'Quotation ' . $qno . ' generated (quote-of-record for a direct order)', ['auto' => 1, 'partner_id' => $o['partner_id'] ?: null]);
+    return ['ok' => true, 'quote_id' => $qid, 'quote_no' => $qno];
+}
+
 // ---- The register's columns -------------------------------------------------
 function opp_dt_columns() {
     return [
@@ -1006,6 +1033,15 @@ function ops_opportunities($route, $method) {
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id); }
         flash('Sent to Accounts — they will register the contract for this deal, and the order opens to operations once it is approved. Nothing more for Sales to do here.');
         redirect('/opportunity?id=' . $id);
+    }
+
+    // Generate a quotation-of-record from the deal (even for a direct order).
+    if ($route === 'opportunity-generate-quote' && $method === 'POST') {
+        $id = (int)($_POST['id'] ?? 0);
+        $r = opp_generate_quote($id);
+        if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id); }
+        flash('Quotation ' . $r['quote_no'] . ' generated as a draft — finish the lines and rate here, then it is on record for this deal.');
+        redirect('/quote-edit?id=' . $r['quote_id']);
     }
 
     // Accounts register the contract straight from the won deal (no quotation).
