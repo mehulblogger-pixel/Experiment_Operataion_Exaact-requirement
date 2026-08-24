@@ -88,17 +88,18 @@ stateDiagram-v2
 stateDiagram-v2
   [*] --> DRAFT : voucher find-or-create (ops.php:4904)
   DRAFT --> SUBMITTED : submit · coordinator-level OR owner, status==DRAFT (ops.php:4988-4990)
-  SUBMITTED --> APPROVED : approve · is_coordinator_level, status==SUBMITTED (ops.php:4992-4995)
-  APPROVED --> PAID : paid · is_coordinator_level, status==APPROVED (ops.php:4997-4999)
-  PAID --> DRAFT : reopen · is_coordinator_level, ⚠ NO source-status guard (ops.php:5001-5003)
-  APPROVED --> DRAFT : reopen
-  SUBMITTED --> DRAFT : reopen
+  SUBMITTED --> APPROVED : approve · is_coordinator_level, status==SUBMITTED, approver != claimant & != submitter (R5)
+  APPROVED --> PAID : paid · is_coordinator_level, status==APPROVED
+  PAID --> DRAFT : reopen · is_admin_level ONLY (R5)
+  APPROVED --> DRAFT : reopen · is_coordinator_level
+  SUBMITTED --> DRAFT : reopen · is_coordinator_level
 ```
 
-- **⚠ Two weaknesses (gaps doc):** `reopen` has no source-status check — a coordinator
-  can revert **any** voucher, including PAID, to DRAFT (`ops.php:5001`). And **approve has
-  no segregation of duties** — the same coordinator-level person who submits can approve
-  (`ops.php:4992`), unlike contracts and reports.
+- **R5 fixed:** `reopen` now checks the source status — a **PAID** voucher reopens only for a
+  real manager (`is_admin_level`), not any coordinator; SUBMITTED/APPROVED reopen by
+  coordinator-level. **Approve now enforces segregation of duties** — the approver must be
+  neither the claimant nor the person who submitted it (`vouchers.submitted_by`), matching the
+  maker≠checker control used for contracts and reports.
 
 ---
 

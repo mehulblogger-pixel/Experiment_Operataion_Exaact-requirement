@@ -4907,15 +4907,22 @@ function ops_vouchers($route, $method) {
             } else { $id = $v['id']; }
             redirect('/voucher?id=' . $id);
         }
+        if (function_exists('ensure_column')) ensure_column('vouchers', 'submitted_by', "VARCHAR(20) DEFAULT ''");
         $v = ops_one("SELECT v.*, i.name inspector_name, i.emp_code, i.sbu FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id WHERE v.id=?", [$id]);
         if (!$v) { http_response_code(404); view('notfound'); return; }
         ops_require(can_view_voucher($v), 'You cannot view this voucher.');
         $entries = ops_all("SELECT * FROM voucher_entries WHERE voucher_id=? ORDER BY entry_date, id", [$id]);
+        // R5 — the Approve button hides from the claimant and from whoever submitted
+        // it (maker != checker), matching the server-side guard so no one is offered a
+        // button that will only error. Mark-paid / reopen stay on the general control.
+        $meUid = (int)(current_user()['id'] ?? 0);
+        $canApproveThis = is_coordinator_level() && !voucher_owner_is_me($v)
+            && ((int)($v['submitted_by'] ?? 0) === 0 || (int)$v['submitted_by'] !== $meUid);
         view('ops/voucher_detail', ['v' => $v, 'entries' => $entries, 'canEdit' => can_edit_voucher($v),
             'leaveOpts' => lk_options_or('leave_type', LEAVE_TYPES), 'dayOpts' => lk_options_or('day_code', DAY_CODES),
             'heads' => voucher_heads_for($v['inspector_id']), 'modes' => voucher_modes_for($v['inspector_id']),
             'rates' => voucher_mode_rates($v['inspector_id']), 'sum' => voucher_summary($v['id']),
-            'headLabels' => expense_head_label_map(), 'canApprove' => is_coordinator_level(),
+            'headLabels' => expense_head_label_map(), 'canApprove' => is_coordinator_level(), 'canApproveThis' => $canApproveThis,
             'natureOpts' => ['REVENUE'=>'Revenue','NONREV'=>'Non-Revenue','SUPPORT'=>'Support function','MD'=>'MD']]);
         return;
     }
@@ -4984,13 +4991,24 @@ function ops_vouchers($route, $method) {
     if ($route === 'voucher-status' && $method === 'POST') {
         $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$v) { http_response_code(404); view('notfound'); return; }
-        $act = $_POST['action'] ?? '';
+        // R5 — record WHO submitted, so approval can enforce maker != checker.
+        if (function_exists('ensure_column')) ensure_column('vouchers', 'submitted_by', "VARCHAR(20) DEFAULT ''");
+        $act   = $_POST['action'] ?? '';
+        $meUid = (int)(current_user()['id'] ?? 0);
         if ($act === 'submit') {
             ops_require(($v['status'] === 'DRAFT') && (is_coordinator_level() || voucher_owner_is_me($v)), 'Cannot submit this voucher.');
-            $pdo->prepare("UPDATE vouchers SET status='SUBMITTED', submitted_at=? WHERE id=?")->execute([date('c'), $v['id']]);
+            $pdo->prepare("UPDATE vouchers SET status='SUBMITTED', submitted_at=?, submitted_by=? WHERE id=?")->execute([date('c'), (string)$meUid, $v['id']]);
             flash('Voucher submitted for approval.');
         } elseif ($act === 'approve') {
             ops_require(is_coordinator_level() && $v['status'] === 'SUBMITTED', 'Only a manager can approve a submitted voucher.');
+            // R5 — segregation of duties: the approver may not be the claimant whose
+            // expenses these are, nor the person who submitted the voucher. One person
+            // cannot both raise and approve an expense claim. (Legacy vouchers with no
+            // recorded submitter fall back to allowing approval.)
+            ops_require(!voucher_owner_is_me($v), 'You cannot approve your own expense voucher — it must be checked by someone else.');
+            $submittedBy = (int)($v['submitted_by'] ?? 0);
+            ops_require($submittedBy === 0 || $submittedBy !== $meUid,
+                'This voucher must be approved by someone other than the person who submitted it (maker ≠ checker).');
             $pdo->prepare("UPDATE vouchers SET status='APPROVED', checked_by=?, approved_by=?, authorized_by=?, approved_at=? WHERE id=?")
                 ->execute([$_POST['checked_by'] ?? '', ($_POST['approved_by'] ?? '') ?: user_name(current_user()), $_POST['authorized_by'] ?? '', date('c'), $v['id']]);
             flash('Voucher approved.');
@@ -4999,8 +5017,17 @@ function ops_vouchers($route, $method) {
             $pdo->prepare("UPDATE vouchers SET status='PAID' WHERE id=?")->execute([$v['id']]);
             flash('Voucher marked as paid.');
         } elseif ($act === 'reopen') {
-            ops_require(is_coordinator_level(), 'Only a manager can reopen a voucher.');
-            $pdo->prepare("UPDATE vouchers SET status='DRAFT' WHERE id=?")->execute([$v['id']]);
+            // R5 — a PAID voucher is settled money; reopening it (which would let the
+            // figures be altered) is restricted to a real manager, not any coordinator.
+            // A SUBMITTED / APPROVED voucher may still be reopened by coordinator-level.
+            if ($v['status'] === 'PAID') {
+                ops_require(is_admin_level(), 'A paid voucher can only be reopened by a manager.');
+            } else {
+                ops_require(is_coordinator_level() && in_array($v['status'], ['SUBMITTED', 'APPROVED'], true),
+                    'Only a submitted or approved voucher can be reopened.');
+            }
+            // Clear the recorded submitter so the next submit re-establishes maker ≠ checker.
+            $pdo->prepare("UPDATE vouchers SET status='DRAFT', submitted_by='' WHERE id=?")->execute([$v['id']]);
             flash('Voucher reopened for editing.');
         }
         redirect('/voucher?id=' . $v['id']);

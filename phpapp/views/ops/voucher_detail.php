@@ -264,7 +264,7 @@
       <?php if ($v['status']==='DRAFT' && ($canApprove || voucher_owner_is_me($v))): ?>
         <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="submit"><button class="btn" type="submit">Submit for approval</button></form>
       <?php endif; ?>
-      <?php if ($v['status']==='SUBMITTED' && $canApprove): ?>
+      <?php if ($v['status']==='SUBMITTED' && ($canApproveThis ?? $canApprove)): ?>
         <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" class="inline-add" style="align-items:flex-end">
           <input type="hidden" name="action" value="approve">
           <div class="ff"><label>Checked by</label><input class="form-control" name="checked_by"></div>
@@ -272,6 +272,9 @@
           <div class="ff"><label>Authorized by</label><input class="form-control" name="authorized_by"></div>
           <button class="btn" type="submit">Approve</button>
         </form>
+      <?php elseif ($v['status']==='SUBMITTED' && $canApprove && !($canApproveThis ?? true)): ?>
+        <p class="muted" style="margin:0;font-size:12.5px">Awaiting approval — it must be approved by someone other than
+          <?= voucher_owner_is_me($v) ? 'you (the claimant)' : 'the person who submitted it' ?> (maker&nbsp;≠&nbsp;checker).</p>
       <?php endif; ?>
       <?php if ($v['status']==='APPROVED' && $canApprove): ?>
         <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="paid"><button class="btn" type="submit">Mark paid</button></form>

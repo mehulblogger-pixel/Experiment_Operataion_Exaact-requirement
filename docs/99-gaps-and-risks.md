@@ -77,15 +77,22 @@ door (`index.php` partner-add; `tests/test_contract_backdoor_guard.php`).
 PENDING→endorse→approve lifecycle — a follow-up if the two-signature control is wanted on
 this path too.
 
-## R5 — MEDIUM · Voucher: reopen from any state + no segregation of duties
-**What:** `voucher` reopen has **no source-status guard** — a coordinator can revert **any**
-voucher, including **PAID**, to DRAFT (`ops.php:5001-5003`). And **approve** is done by the
-same `is_coordinator_level()` who can submit (`ops.php:4992`) — no maker≠checker split
-(unlike contracts and reports).
-**Why it matters:** a PAID voucher can be silently reopened and altered; one person can
+## R5 — MEDIUM · Voucher: reopen from any state + no segregation of duties — **FIXED**
+**What:** `voucher` reopen had **no source-status guard** — a coordinator could revert **any**
+voucher, including **PAID**, to DRAFT. And **approve** was done by the same
+`is_coordinator_level()` who could submit — no maker≠checker split (unlike contracts and
+reports).
+**Why it mattered:** a PAID voucher could be silently reopened and altered; one person could
 both submit and approve an expense claim.
-**Fix:** restrict reopen to non-PAID (or manager-only with a reason); require the approver
-to differ from the submitter.
+**Fixed this session (`ops.php` voucher-status):**
+- **Reopen guard** — a **PAID** voucher reopens only for `is_admin_level()` (a real manager),
+  not any coordinator; SUBMITTED/APPROVED still reopen by coordinator-level; reopening clears
+  the recorded submitter.
+- **Segregation of duties** — the submitter is recorded (`vouchers.submitted_by`), and approve
+  now requires the approver to be **neither the claimant** (`!voucher_owner_is_me`) **nor the
+  submitter** (`submitted_by !== me`). Legacy vouchers with no recorded submitter still approve
+  (graceful). The Approve button also hides from those two, with an in-place "maker ≠ checker"
+  note. Tests: `tests/test_voucher_sod_and_reopen.php`.
 
 ## R6 — MEDIUM · Call `op_status` is a free-form manual picker with no transition rules
 **What:** `call-status` (`tosrm.php:499`) lets any `tosrm_can_edit()` user set **any** of 15
