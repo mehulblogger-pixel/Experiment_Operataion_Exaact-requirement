@@ -335,13 +335,18 @@
 
 <section class="fs-pane" data-tab="Permissions">
   <style>
-    .perm-i{display:inline-block;width:15px;height:15px;line-height:15px;text-align:center;font-size:11px;
-      color:var(--muted,#64748b);cursor:help;opacity:.7;margin-left:2px}
+    .perm-i{display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;font-size:12px;
+      color:var(--muted,#64748b);cursor:pointer;opacity:.75;margin-left:2px}
     .perm-i:hover,.perm-i:focus{opacity:1;color:var(--accent,#234e70);outline:none}
     .permgroup .chk{align-items:center}
+    /* Tap-friendly help popover (works on phones, where title tooltips never show) */
+    .perm-tip{position:fixed;z-index:1000;max-width:280px;background:var(--ink,#111827);color:#fff;
+      padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.45;
+      box-shadow:0 6px 24px rgba(0,0,0,.3);display:none}
+    .perm-tip.show{display:block}
   </style>
   <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
-    <h3 class="tab-sub" style="margin:0">Permissions <span class="muted">— grouped like the menu; hover the ⓘ on any item to see what it grants and who needs it; leave all unticked to use the role's defaults</span></h3>
+    <h3 class="tab-sub" style="margin:0">Permissions <span class="muted">— grouped like the menu; tap the ⓘ on any item to see what it grants and who needs it; leave all unticked to use the role's defaults</span></h3>
     <label class="chk" style="margin-left:auto;font-weight:600"><input type="checkbox" id="perm_all_toggle"> Select <b style="margin:0 3px">everything</b> (full access)</label>
   </div>
   <?php // A per-login permission set REPLACES the role's defaults — so a save that
@@ -378,7 +383,7 @@
           </div>
           <div class="checkgrid">
             <?php foreach ($pairs as $k => $lbl): $help = function_exists('perm_help') ? perm_help($k) : ''; ?>
-              <label class="chk"><input type="checkbox" class="perm-box" name="permissions[]" value="<?= e($k) ?>" <?= in_array($k, $curPerms, true)?'checked':'' ?>> <?= e($lbl) ?><?php if ($help !== ''): ?> <span class="perm-i" tabindex="0" role="img" aria-label="<?= e($help) ?>" title="<?= e($help) ?>">ⓘ</span><?php endif; ?></label>
+              <label class="chk"><input type="checkbox" class="perm-box" name="permissions[]" value="<?= e($k) ?>" <?= in_array($k, $curPerms, true)?'checked':'' ?>> <?= e($lbl) ?><?php if ($help !== ''): ?> <span class="perm-i" tabindex="0" role="button" aria-label="<?= e($help) ?>" title="<?= e($help) ?>" data-help="<?= e($help) ?>">ⓘ</span><?php endif; ?></label>
             <?php endforeach; ?>
           </div>
         </div>
@@ -394,6 +399,34 @@
     $orphans = array_diff_key($allowPerms, $shown);
     if ($orphans) $renderGroup('Other', $orphans);
   ?>
+  <script>(function(){
+    // The ⓘ explains each permission. A title tooltip only shows on hover, so on a
+    // phone (no hover) tapping it did nothing — and, being inside the label, the tap
+    // toggled the checkbox. This shows the text on tap/click for touch AND desktop,
+    // and stops the tap from flipping the permission.
+    var tip = document.createElement('div'); tip.className = 'perm-tip';
+    document.body.appendChild(tip);
+    function hide(){ tip.classList.remove('show'); }
+    document.addEventListener('click', function(e){
+      var i = e.target.closest ? e.target.closest('.perm-i') : null;
+      if (!i){ hide(); return; }
+      e.preventDefault(); e.stopPropagation();          // don't toggle the checkbox
+      var txt = i.getAttribute('data-help') || i.getAttribute('title') || '';
+      if (!txt){ hide(); return; }
+      tip.textContent = txt; tip.classList.add('show');
+      var r = i.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+      var left = Math.min(Math.max(8, r.left), window.innerWidth - tw - 8);
+      var top = r.bottom + 6; if (top + th > window.innerHeight - 8) top = r.top - th - 6;
+      tip.style.left = left + 'px'; tip.style.top = Math.max(8, top) + 'px';
+    });
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Enter' && document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('perm-i'))
+        document.activeElement.click();
+      if (e.key === 'Escape') hide();
+    });
+    window.addEventListener('scroll', hide, true);
+    window.addEventListener('resize', hide);
+  })();</script>
 
 </section>
 </div><!-- /.form-tabs -->

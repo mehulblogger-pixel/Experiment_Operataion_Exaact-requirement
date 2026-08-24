@@ -19,3 +19,10 @@ t_ok(stripos(perm_help('data.profitability'), 'managers') !== false, 'profitabil
 t_ok(stripos(perm_help('users.manage.global'), 'administrator') !== false, 'global user management is flagged as admin-only');
 t_ok(stripos(perm_help('mod.identity.view'), 'read-only') !== false, 'a module view permission explains it is read-only');
 t_ok(stripos(perm_help('mod.jobs.edit'), 'change') !== false || stripos(perm_help('mod.jobs.edit'), 'add') !== false, 'a module edit permission explains it can change records');
+
+// The help must be reachable by TAP (phones have no hover): each ⓘ carries its text
+// in data-help and a click popover shows it without toggling the checkbox.
+$form = file_get_contents(__DIR__ . '/../views/ops/user_form.php');
+t_ok(strpos($form, 'data-help="') !== false, 'each permission ⓘ carries its help in data-help (tap-readable)');
+t_ok(strpos($form, 'perm-tip') !== false && strpos($form, "closest('.perm-i')") !== false, 'a tap/click popover renders the help on touch devices');
+t_ok(strpos($form, 'e.preventDefault(); e.stopPropagation();') !== false, 'tapping the ⓘ does not toggle the permission checkbox');
