@@ -45,17 +45,17 @@ branch is deployed by the pipeline.** The items below are what remains.
 - **R7** — a SR_INSPECTOR with **no linked `inspector_id`** gets the inspector dashboard
   branch with empty KPIs; link them to an inspector record (edge case).
 
-### C. Guidance given but NOT yet built (awaiting your green light)
-These were the "just guide me" items — advice delivered, no code written:
-- **Sales→Finance→Operations wall (visible handoff)** — beyond closing the off-book door
-  (R4 done), the *visible* half is not built: on an **Accepted/Won** quote show
-  "Won — handed to Accounts for contract registration" and **lock the accepted quote to
-  view-only for sales** (changes go through a revision) so the boundary is unmistakable.
-- **Coordinator screen polish** — the call form and job detail are already tabbed with the
-  management panels folded, so I judged a further pass *marginal* and did not do it. Still
-  offered: collapse the advanced call-form sections (credit / cross-office / patterns)
-  behind one "More options" fold, and fold the coordinator job-detail panels they don't act
-  on. Say the word if you want it.
+### C. (DONE) — the two guidance items are now built
+- **C1 — Sales→Finance→Operations wall (visible handoff)** — DONE. On an ACCEPTED quote a
+  sales viewer sees a "✓ Won — handed to Accounts for contract registration" wall; the
+  accepted quote is locked (`quote_is_locked`, already enforced) so changes go through a
+  revision. `tests/test_sales_handoff_wall.php`.
+- **C2 — Coordinator screen polish** — DONE. The call form already hides the advanced
+  groups contextually (credit/cross-office fields only for a cross-office call; pattern/
+  monthly/multi-date only for that engagement shape) — better than a blanket "More options"
+  fold, so no change was needed there. On the job detail, the *Hold & witness points* panel
+  is now a fold that auto-opens only when a point is OPEN and stays collapsed otherwise.
+  `tests/test_job_detail_declutter.php`.
 
 ### D. Standing offer
 - Open a PR for the branch (not opened — you haven't asked).

@@ -45,3 +45,12 @@ Charts. Both work-starters live on this first screen.
 **Click-count — most common task:**
 - **Raise a call from a contract:** `/raise-call` (1) → select client (1) → "Raise call ▶" (1) → Save prefilled form (1) = **~4 clicks**.
 - **Allocate a job:** landing "Allocate" (1) → pick inspector (1) → "Allocate" submit (1) = **~3 clicks**.
+
+**Screen de-clutter (C2):** the **call form** keeps the common path short by showing the
+advanced field groups only when they apply — the cross-office **credit** fields appear
+only for a cross-office call (`#crossbox`), and the **pattern / monthly / multi-date**
+fields appear only for that engagement shape (`.eng-box[data-for]`) — a contextual toggle
+rather than a blanket "More options" fold. On the **job detail**, the *Hold & witness
+points* panel is now a fold that auto-opens only when a point is OPEN (action needed) and
+stays collapsed — with the count in its summary — otherwise, so the Reports & QA tab is not
+filled by an add-form when there is nothing to act on.

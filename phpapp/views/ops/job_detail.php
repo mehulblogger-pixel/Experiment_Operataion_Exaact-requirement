@@ -559,9 +559,13 @@ $hwTypePill = function($t) {
 };
 if (function_exists('hwp_for_job')):
 ?>
-<div class="panel" id="holdpoints" data-tab="Reports &amp; QA">
-  <div class="ctitle" style="margin-top:0"><h3>Hold &amp; witness points
-    <span class="muted">(<?= count($hwPts) ?><?= $hwOpen ? ', ' . $hwOpen . ' open' : '' ?>)</span></h3></div>
+<?php // C2 — a coordinator declutter: this panel is only actionable when a point is
+      // OPEN, so it is a fold that auto-opens when there is something to clear/waive and
+      // stays collapsed (with the count in its summary) otherwise, instead of always
+      // filling the Reports & QA tab with explanatory text and an add form. ?>
+<details class="fold" id="holdpoints" data-tab="Reports &amp; QA" <?= $hwOpen ? 'open' : '' ?>>
+  <summary>Hold &amp; witness points <span class="sub">(<?= count($hwPts) ?><?= $hwOpen ? ', ' . $hwOpen . ' open' : '' ?>)</span></summary>
+  <div class="fold-body">
   <?php if ($hwOpen): ?>
     <div class="msg-warning" style="margin:0 0 10px"><strong>🚫 <?= (int)$hwOpen ?> open point<?= $hwOpen===1?'':'s' ?></strong>
       — the manufacturer should not proceed / despatch until these are cleared or waived.</div>
@@ -618,7 +622,8 @@ if (function_exists('hwp_for_job')):
     </form>
   </div>
   <?php endif; ?>
-</div>
+  </div><!-- /.fold-body -->
+</details>
 <?php endif; ?>
 
 <?php $holds = function_exists('job_hold_reasons') ? job_hold_reasons($job) : []; if ($holds): ?>
