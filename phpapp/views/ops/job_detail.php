@@ -69,6 +69,17 @@
       // panels sharing a data-tab label become one tab, so this long screen reads
       // as Overview · Schedule & site · Reports & QA · Money instead of one endless
       // scroll. Tabs wrap so every one is visible without scrolling. ?>
+<?php // A field engineer (role INSPECTOR) gets a phone-first, stripped view: their
+      // work is the site check-in, the report and the QAP — not the desk/commercial
+      // panels (the communication log, the contract-number gap notice, the client
+      // bills, the expenses/profitability fold, invoicing). Those are HIDDEN for the
+      // inspector, not merely collapsed — hiding them is what actually clears the
+      // screen for someone standing at a plant gate on a phone. When there is
+      // nothing left on a tab (e.g. Money), that whole tab stops appearing. Every
+      // coordinator/manager, and anyone holding the money permissions, still sees
+      // the full record. (The inspector's own travel/expenses guidance still lives
+      // on the Site check-in panel, so no guidance is lost by dropping the Money tab.)
+      $fieldInspector = function_exists('is_inspector') && is_inspector(); ?>
 <div data-tabs data-tabs-key="job">
 
 <?php // The coordinator/manager console — guided playbook, assignment lifecycle
@@ -97,8 +108,9 @@
     </details>
   <?php endif; ?>
 <?php endif; ?>
-<?php // Phase 9 (TOSRM Slice E) — communication log on the job.
-      if (function_exists('tosrm_render_comms')): ?>
+<?php // Phase 9 (TOSRM Slice E) — communication log on the job. A management panel
+      // (client/coordinator correspondence), not field work — hidden from the inspector.
+      if (function_exists('tosrm_render_comms') && !$fieldInspector): ?>
   <details class="fold" data-tab="Overview"><a id="comms"></a>
     <summary>Communication log <span class="sub">calls, e-mails &amp; meetings on this <?= e(Tl('job')) ?></span></summary>
     <div class="fold-body"><?php tosrm_render_comms('JOB', (int)$job['id']); ?></div>
@@ -409,7 +421,10 @@
       // too, because this is the screen the coordinator and the engineer live
       // on once the call has been allocated.
       $jgap = ($jcall && function_exists('call_contract_gap')) ? call_contract_gap($jcall) : null; ?>
-<?php if ($jgap): ?>
+<?php // A commercial/coordinator notice the field engineer can neither cause nor
+      // clear — hidden from the inspector so it does not read as a blocker on work
+      // that is never actually blocked for want of a contract number.
+      if ($jgap && !$fieldInspector): ?>
 <div class="panel" data-tab="Schedule &amp; site" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)">
   <b style="color:var(--warn)">⚠ Contract number not available</b>
   <div class="muted" style="margin-top:4px"><?= e($jgap['text']) ?></div>
@@ -718,7 +733,9 @@ if (function_exists('hwp_for_job')):
       $byHead   = job_bills_by_head($job['id']);
       $missing  = job_bills_missing($job);
       $canBill  = job_bill_can_upload($job); ?>
-<?php if ($chgHeads || $byHead): ?>
+<?php // Client-billable bills are coordinator/finance work — hidden from the field
+      // inspector (their own out-of-pocket expenses go on the monthly voucher, not here).
+      if (($chgHeads || $byHead) && !$fieldInspector): ?>
 <div class="panel" id="bills" data-tab="Money">
   <div class="ctitle" style="margin-top:0"><h3>Charged to the <?= e(Tl('client')) ?> — bills required
     <span class="muted">(<?= count($chgHeads) ?>)</span></h3></div>
@@ -791,6 +808,12 @@ if (function_exists('hwp_for_job')):
       // never what the job earned. ("Profitability shall only be shown to Managers
       // and above who have the access. Nothing to coordinators, inspectors, etc.")
       $canSeeProfit = (function_exists('can') && (can('data.profitability') || can('data.revenue'))) || is_master(); ?>
+<?php // The expenses list here is the CLIENT-BILLABLE cost the coordinator files at
+      // closure, and profitability is managers-only — neither is the field engineer's
+      // concern, so the whole fold is hidden from the inspector. Their own travel and
+      // out-of-pocket expenses go on the monthly voucher (pointed to from the Site
+      // check-in panel above), so no inspector-facing guidance is lost.
+      if (!$fieldInspector): ?>
 <details class="fold" data-tab="Money">
   <summary><?= $canSeeProfit ? 'Expenses &amp; profitability' : 'Expenses' ?> <span class="sub"><?= $canSeeProfit ? 'what it cost, and what the ' . e(Tl('job')) . ' made' : 'what it cost' ?></span></summary>
   <div class="fold-body">
@@ -873,6 +896,7 @@ if (function_exists('hwp_for_job')):
   </div>
   </div>
 </details>
+<?php endif; /* !$fieldInspector — expenses/profitability fold */ ?>
 
 <?php if (can('data.credit') || can('finance.reconcile')): ?>
 <div class="panel" id="invoice" data-tab="Money">

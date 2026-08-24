@@ -33,6 +33,25 @@ voucher — plus "All my jobs", "My Voucher", and the "Your pending tasks" panel
 7. **Close the job & record expenses** — the close popup on `/my-jobs` posts to `/job-close` (`my_jobs.php:220`), capturing the day's travel/food/lodging.
 8. **Voucher** → `/vouchers` — a monthly draft is generated from the inspector's jobs (`voucher_generate`, `ops.php:4766`); submit it for approval. Travel & incidental expenses go here (the voucher is also the timesheet).
 
+**The job view is phone-first and stripped for the inspector.** The job screen
+(`views/ops/job_detail.php`) is shared with coordinators and managers, so it carries
+desk/commercial panels the field engineer neither needs nor can act on. For a user
+whose role is `INSPECTOR` (`$fieldInspector`, `job_detail.php`) those panels are
+**hidden, not merely collapsed**:
+- the **communication log** (client/coordinator correspondence),
+- the **"contract number not available"** notice (a commercial gap they cannot cause or clear — work is never actually blocked for it),
+- the **client-bills** panel ("Charged to the client — bills required"),
+- the whole **Expenses & profitability** fold (client-billable cost is the coordinator's; profitability is managers-only).
+
+With nothing left on it, the **Money tab stops appearing** for the inspector, leaving
+**Overview** (who to contact / where to go, full job details, client documents),
+**Schedule & site** (site check-in, day-by-day plan) and **Reports & QA** (QAP,
+report formats, hold/witness points, approval status). Their own travel and
+out-of-pocket expenses are pointed to on the **Site check-in** panel ("Travel &
+expenses go on your voucher"), so no inspector-facing guidance is lost by dropping
+the Money tab. This is a **visibility** change only — no permission changes; a
+coordinator, manager or anyone holding the money permissions still sees the full record.
+
 **Decision points:**
 - **Job close is gated by business rules:** report upload date required unless NOREPORT (`ops.php:5581`); the chargeable bill must be on file (`ops.php:5602`); both site check-ins must exist or the close is bounced (a manager can override with a recorded reason that dents the rating, §WO-9 `ops.php:5609-5628`).
 - **Report path forks on the vetting gate:** Submit → `VETTING` (to a vetter first) if the gate is on, else straight to the approval chain (`idems.php:4428-4436`).
