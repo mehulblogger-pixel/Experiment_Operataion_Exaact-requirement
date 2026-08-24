@@ -3257,6 +3257,12 @@ function ops_quick_add() {
             return;
         }
         if ($kind === 'office') {
+            // No duplicate branch offices — this "+ Add new" beside a dropdown only
+            // needs an office id to select. If one with this name already exists,
+            // return it instead of quietly creating a second (the same silent-insert
+            // that produced the duplicates). Mirrors the 'agency' path below.
+            $existId = (int) ops_val("SELECT id FROM offices WHERE LOWER(name)=LOWER(?) LIMIT 1", [$name]);
+            if ($existId) { echo json_encode(['ok' => true, 'id' => $existId, 'label' => $name, 'existing' => true]); return; }
             $code = strtoupper(trim($b['code'] ?? '')) ?: strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $name), 0, 3));
             $pdo->prepare("INSERT INTO offices (code,name,city,coordinator_name,coordinator_email,manager_name,manager_email,is_ahmedabad) VALUES (?,?,?,?,?,?,?,0)")
                 ->execute([$code, $name, $b['city'] ?? '', $b['coordinator_name'] ?? '', $b['coordinator_email'] ?? '', $b['manager_name'] ?? '', $b['manager_email'] ?? '']);

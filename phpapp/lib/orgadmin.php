@@ -1118,6 +1118,14 @@ function ops_hierarchy_screen($method) {
             $id = (int)($_POST['office_id'] ?? 0);
             $name = trim($_POST['o_name'] ?? '');
             if ($name === '') { flash(TH('office') . ' name is required.', 'error'); redirect($back); }
+            // No duplicate branch offices — reject a name another office already uses
+            // (case-insensitive), on create or on a rename that would collide.
+            $dupId = (int) ops_val("SELECT id FROM offices WHERE LOWER(name)=LOWER(?)" . ($id ? " AND id<>?" : ""),
+                                   $id ? [$name, $id] : [$name]);
+            if ($dupId) {
+                flash('An ' . Tl('office') . ' named "' . $name . '" already exists — names must be unique. Open that one, or use a different name.', 'error');
+                redirect($back);
+            }
             $parent = (int)($_POST['o_parent'] ?? 0) ?: null;
             if ($id && $parent && in_array($parent, array_merge([$id], office_descendants($id)), true)) {
                 flash('An ' . Tl('office') . ' cannot sit under itself or under one of its own sub-' . Tlp('office') . '.', 'error');
