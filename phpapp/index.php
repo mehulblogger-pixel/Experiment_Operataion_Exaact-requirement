@@ -1135,6 +1135,21 @@ if ($route === 'partner-add' && $method === 'POST') {
                 flash('This ' . Tl('client') . ' already has contract ' . $cn . '. Open it to change its dates or value.', 'error');
                 redirect("/partner?id={$p['id']}&tab=contracts");
             }
+            // Adding a client's contract here is fine for a separate agreement, but
+            // this door must not re-forward a deal that Finance already contracted.
+            // If it names a quotation that already carries a live contract, stop and
+            // point to the group-company path (a REJECTED/CLOSED prior may proceed).
+            $linkQid = (int)($b['quotation_id'] ?? 0);
+            if ($linkQid) {
+                $lq = ops_one("SELECT contract_id FROM quotations WHERE id=?", [$linkQid]);
+                $prevC = !empty($lq['contract_id']) ? ops_one("SELECT contract_number, open_status FROM partner_contracts WHERE id=?", [(int)$lq['contract_id']]) : null;
+                if ($prevC && in_array((string)($prevC['open_status'] ?? 'OPEN'), ['OPEN','PENDING'], true)) {
+                    flash('That ' . Tl('quote') . ' is already registered under contract ' . $prevC['contract_number']
+                        . '. A won deal gets one contract — for a related group company, add its contract from the '
+                        . Tl('quote') . ' screen instead.', 'error');
+                    redirect("/partner?id={$p['id']}&tab=contracts");
+                }
+            }
         }
         $cols = array_merge(['partner_id'], $fields);
         $ph = implode(',', array_fill(0, count($cols), '?'));

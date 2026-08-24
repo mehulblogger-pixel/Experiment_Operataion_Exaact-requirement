@@ -1903,6 +1903,23 @@ function ops_crm_quotes($route, $method) {
         }
         $start = $_POST['start_date'] ?? ''; $end = $_POST['end_date'] ?? '';
         $contractId = $q['contract_id'] ?: null;
+        // A won deal gets ONE contract. If this quotation already carries a LIVE
+        // contract (open or awaiting approval) and a DIFFERENT number is being
+        // registered, that would orphan the first and re-forward the same deal to
+        // Finance under a second number. Refuse, and point to the right door.
+        // A prior contract that was REJECTED or CLOSED may be registered afresh —
+        // that is a genuine restart, not a duplicate.
+        if ($contractId) {
+            $prev = ops_one("SELECT id, contract_number, open_status FROM partner_contracts WHERE id=?", [(int)$contractId]);
+            if ($prev && in_array((string)($prev['open_status'] ?? 'OPEN'), ['OPEN','PENDING'], true)
+                && $contractNo !== '' && $contractNo !== (string)$prev['contract_number']) {
+                flash('This ' . Tl('quote') . ' is already registered under contract ' . $prev['contract_number']
+                    . ' (' . strtolower(CONTRACT_OPEN_STATES[$prev['open_status']] ?? (string)$prev['open_status']) . '). '
+                    . 'A won deal gets one contract — it cannot be forwarded to Finance again under a new number. '
+                    . 'For a related group company, add a group-company contract below; to revive a closed one, reopen it.', 'error');
+                redirect('/quote?id=' . $q['id']);
+            }
+        }
         // §3 — the same contract number on the same client is a rate contract
         // being drawn down again, which is normal. The same number on a DIFFERENT
         // client is a duplicate, and every expiry and quantity figure downstream

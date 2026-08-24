@@ -163,6 +163,26 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
   <p class="muted">Contracts are usually recorded after a purchase order is received. If the order came from a
     <?= e(Tl('quote')) ?> we raised, name it — the number is written back onto that <?= e(Tl('quote')) ?>,
     and the value and dates are offered from it.</p>
+  <?php // Warn — do not block. Adding another contract is legitimate for a separate
+        // agreement (a new project, a new year, a group company), so the client's live
+        // contracts are named here rather than the door refusing. Registering a won
+        // quotation, or a related group company, has its own door on the quotation.
+    $liveContracts = array_values(array_filter($contracts, function ($c) {
+        $os = strtoupper((string)($c['open_status'] ?? ''));
+        return $os === '' ? ((int)($c['is_active'] ?? 1) === 1) : in_array($os, ['OPEN', 'PENDING'], true);
+    }));
+    if ($liveContracts): $nlc = count($liveContracts); ?>
+  <div class="msg msg-warning" style="margin:0 0 12px">
+    This <?= e(Tl('client')) ?> already has <?= $nlc ?> live contract<?= $nlc > 1 ? 's' : '' ?>:
+    <?php $i = 0; foreach ($liveContracts as $lc): $i++;
+        $os = strtoupper((string)($lc['open_status'] ?? '')); ?>
+      <a href="/contract?id=<?= (int)$lc['id'] ?>"><b><?= e($lc['contract_number']) ?></b></a><?= $os !== '' ? ' (' . e(strtolower(CONTRACT_OPEN_STATES[$os] ?? $os)) . ')' : '' ?><?= $i < $nlc ? ',' : '' ?>
+    <?php endforeach; ?>.
+    Add another <b>only</b> if it is a genuinely separate agreement — a new project, a new year, or a group company.
+    To register the contract for a <b>won <?= e(Tl('quote')) ?></b>, do it from the <?= e(Tl('quote')) ?>; to add a related
+    <b>group-company</b> contract under one <?= e(Tl('quote')) ?>, use the <?= e(Tl('quote')) ?>’s group-contract action.
+  </div>
+  <?php endif; ?>
   <form method="post" action="/partner-add?id=<?= $id ?>&kind=contract" class="inline-add">
     <div class="ff"><label>Contract number</label><input class="form-control" name="contract_number" required></div>
     <div class="ff"><label>Against <?= e(Tl('quote')) ?> <span class="muted">— only those with no contract number</span></label>
