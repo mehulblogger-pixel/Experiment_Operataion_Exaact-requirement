@@ -4128,11 +4128,21 @@ function ops_idems_documents($route, $method) {
     if ($route === 'documents') {
         $q = trim($_GET['q'] ?? ''); $ft = $_GET['type'] ?? ''; $fs = $_GET['status'] ?? '';
         $mine = ($_GET['mine'] ?? '') === 'approve';
+        // "Returned for correction" (My Work): my own reports that a vetter RETURNED or
+        // an approver SENT BACK, which reset the report to DRAFT — so they no longer look
+        // like a plain new draft. Inspector-scoped; needs a linked inspector record.
+        $mineReturned = ($_GET['mine'] ?? '') === 'returned';
+        $myInsId = function_exists('my_inspector_id') ? (int)my_inspector_id() : 0;
         [$w, $a] = scope_clause('d.office_id', 'd.sbu');
         $where = "d.deleted=0 AND $w"; $args = $a;
         if ($q)  { $where .= " AND (d.irn LIKE ? OR d.title LIKE ? OR d.project_name LIKE ?)"; array_push($args, "%$q%", "%$q%", "%$q%"); }
         if ($ft) { $where .= " AND d.type_code=?"; $args[] = $ft; }
         if ($fs) { $where .= " AND d.status=?"; $args[] = $fs; }
+        if ($mineReturned && $myInsId) {
+            $where .= " AND d.status='DRAFT' AND d.inspector_id=? AND (UPPER(COALESCE(d.vet_status,''))='RETURNED'"
+                    . " OR EXISTS (SELECT 1 FROM report_approvals a WHERE a.report_doc_id=d.id AND a.status='SENTBACK'))";
+            $args[] = $myInsId;
+        }
         // "Awaiting my approval": the report is under review and the step it is
         // currently waiting on (the lowest still-pending level) resolves to me —
         // by name, by delegation, by my role, or the open "any approver" step

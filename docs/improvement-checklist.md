@@ -58,7 +58,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 36 | Licensing / SaaS Admin | P1 | ⬜ | — |
 | 37 | Global Search | P1 | ⬜ | — |
 | 38 | Notification Centre | P2 | ⬜ | — |
-| **39** | **My Work** | **P1** | **📝 edge-cases drafted (awaiting go)** | — |
+| **39** | **My Work** | **P1** | **✅ done & pushed** | 2026-08-24 |
 | 40 | Activity Timeline | P2 | ⬜ | — |
 | 41 | Document Control | P1 | ⬜ | — |
 | 42 | Change Control | P2 | ⬜ | — |
@@ -79,3 +79,23 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 39 — My Work · 2026-08-24
+**Added (non-destructive):**
+- New `/my-work` route + `views/ops/my_work.php`: one role-relevant landing page that
+  groups the existing pending-task buckets into lanes (Do now · My reports · My jobs ·
+  My money · Quality), phone-first for field inspectors.
+- New **"Returned for correction"** bucket: reports a vetter RETURNED or an approver SENT
+  BACK (reset to DRAFT) are now surfaced distinctly from ordinary new drafts — via a new
+  `/documents?mine=returned` filter — so an inspector always sees a report has come back.
+- Nav gains a top-level **My Work** destination; the dashboard "Your pending tasks" panel
+  links to it.
+**Preserved:** `ops_pending_tasks()` is the single source (reused, not duplicated); the
+dashboard/operations-home panel, `/my-jobs`, `/vouchers`, `/documents`, all statuses and
+permissions unchanged. No new permission. Report status model untouched.
+**Edge cases handled:** see `docs/edge-cases/39-my-work.md` — returned-vs-rejected disjoint
+(no double count), fresh draft excluded, unlinked-inspector notice, empty state, office
+user sees no personal lanes, lane grouping, per-tile pluralised links, accessibility.
+**Tests:** `tests/test_my_work.php` (16 assertions). Suite 2385 passed / 3 pre-existing
+baseline failures unrelated to this change.
+**Commit:** on branch `claude/quotation-management-workflow-5dokb2`.

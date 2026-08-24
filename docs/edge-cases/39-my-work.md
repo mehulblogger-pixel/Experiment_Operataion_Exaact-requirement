@@ -1,6 +1,7 @@
 # Module 39 — My Work · Edge-case analysis (pre-build)
 
-**Status:** edge-cases drafted — awaiting go before any code.
+**Status:** ✅ BUILT (2026-08-24) — all edge cases below handled; tests in
+`tests/test_my_work.php`.
 **Priority:** P1. **Risk:** low (additive, read-only launcher over existing data).
 
 ---

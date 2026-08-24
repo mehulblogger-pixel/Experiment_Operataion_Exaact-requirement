@@ -2560,6 +2560,8 @@ function ops_dispatch($route, $method) {
             ops_vouchers($route, $method); return true;
         case $route === 'my-jobs':
             ops_my_jobs(); return true;
+        case $route === 'my-work':
+            ops_my_work(); return true;
         case $route === 'reports':
             ops_reports(); return true;
         case strncmp($route, 'analytics', 9) === 0:
@@ -6085,6 +6087,25 @@ function ops_my_jobs() {
     view('ops/my_jobs', ['rows' => $rows, 'f' => $_GET['f'] ?? '', 'sched' => $sched, 'ym' => $ym]);
 }
 
+// My Work — one role-relevant landing page: everything waiting on the signed-in
+// person, grouped into lanes. It is a launcher over ops_pending_tasks() (the single
+// source used by the dashboard panel too) — it changes no state and adds no
+// permission; each lane is already gated inside ops_pending_tasks().
+function ops_my_work() {
+    $u = current_user();
+    if (!$u) { redirect('/'); }
+    $tasks = ops_pending_tasks();
+    $lanes = [];
+    foreach ($tasks as $t) { $lanes[$t['lane'] ?? 'do'][] = $t; }
+    view('ops/my_work', [
+        'lanes'             => $lanes,
+        'total'             => count($tasks),
+        'isInspector'       => function_exists('is_field_inspector') && is_field_inspector(),
+        'inspectorUnlinked' => function_exists('is_field_inspector') && is_field_inspector() && !my_inspector_id(),
+        'name'              => function_exists('user_name') ? user_name($u) : '',
+    ]);
+}
+
 // ---- Dashboards / reports (scoped + filtered) ------------------------------
 function job_eff_date($j) { return ($j['scheduled_date'] ?? '') !== '' ? $j['scheduled_date'] : substr($j['created_at'] ?? '', 0, 10); }
 
@@ -6440,8 +6461,10 @@ function ops_pending_tasks() {
     $tasks = [];
     $cnt = function($sql, $args = []) { try { return (int) ops_val($sql, $args); } catch (Throwable $e) { return 0; } };
     // One place to add a task, so nothing shows a zero and nothing is added twice.
-    $add = function($n, $icon, $label, $sub, $href, $tone) use (&$tasks) {
-        $n = (int)$n; if ($n > 0) $tasks[] = ['icon'=>$icon, 'n'=>$n, 'label'=>$label, 'sub'=>$sub, 'href'=>$href, 'tone'=>$tone];
+    // $lane groups the task on the My Work page (do / reports / jobs / money / quality).
+    // It is an extra key only — the dashboard panel ignores it (backward compatible).
+    $add = function($n, $icon, $label, $sub, $href, $tone, $lane = 'do') use (&$tasks) {
+        $n = (int)$n; if ($n > 0) $tasks[] = ['icon'=>$icon, 'n'=>$n, 'label'=>$label, 'sub'=>$sub, 'href'=>$href, 'tone'=>$tone, 'lane'=>$lane];
     };
     $myId   = (int)($u['id'] ?? 0);
     $insId  = (int)($u['inspector_id'] ?? 0);
@@ -6511,31 +6534,39 @@ function ops_pending_tasks() {
         $like = '%' . $myName . '%';
         if (can('mod.capa.edit') || is_master())
             $add($cnt("SELECT COUNT(*) FROM capa WHERE COALESCE(status,'') NOT IN ('CLOSED','CLOSED_FAILED') AND owner LIKE ?", [$like]),
-                '🛠', 'corrective actions', 'CAPA assigned to you and still open', '/capa', 'warn');
+                '🛠', 'corrective actions', 'CAPA assigned to you and still open', '/capa', 'warn', 'quality');
         if (can('mod.complaints.edit') || is_master())
             $add($cnt("SELECT COUNT(*) FROM complaints WHERE COALESCE(status,'')='OPEN' AND assigned_to LIKE ?", [$like]),
-                '📣', 'complaints', 'complaints assigned to you to handle', '/complaints', 'warn');
+                '📣', 'complaints', 'complaints assigned to you to handle', '/complaints', 'warn', 'quality');
     }
 
     // ---- MINE to act on (as the field engineer) ----------------------------
     if ($insId) {
-        // My reports sent back for correction.
+        // Reports RETURNED for correction that were reset to DRAFT — a vetter returned
+        // them, or an approver sent them back. Without this they look like ordinary new
+        // drafts and the inspector is never told they came back. Kept separate from the
+        // REJECTED tile below (disjoint status), so nothing is counted twice.
+        $add($cnt("SELECT COUNT(*) FROM report_docs d WHERE d.deleted=0 AND d.status='DRAFT' AND d.inspector_id=?
+                   AND (UPPER(COALESCE(d.vet_status,''))='RETURNED'
+                        OR EXISTS(SELECT 1 FROM report_approvals a WHERE a.report_doc_id=d.id AND a.status='SENTBACK'))", [$insId]),
+            '↩', 'returned for correction', 'reports a reviewer sent back to you to fix', '/documents?mine=returned', 'bad', 'reports');
+        // My reports formally rejected (status stays REJECTED, shown as "Sent back").
         $add($cnt("SELECT COUNT(*) FROM report_docs d WHERE d.deleted=0 AND d.status='REJECTED' AND d.inspector_id=?", [$insId]),
-            '↩', 'to fix &amp; resubmit', 'reports sent back to you', '/documents?status=REJECTED', 'bad');
+            '↩', 'to fix &amp; resubmit', 'reports sent back to you', '/documents?status=REJECTED', 'bad', 'reports');
         // My open jobs still needing a report uploaded.
         $today = date('Y-m-d');
         $add($cnt("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')", [$insId]),
-            '📄', 'reports to upload', 'jobs of yours still needing a report', '/my-jobs?f=reports', 'warn');
+            '📄', 'reports to upload', 'jobs of yours still needing a report', '/my-jobs?f=reports', 'warn', 'jobs');
         // My open jobs whose report is issued (or none needed) — ready to close and
         // record the day's expenses. Surfaced here because a job may carry several
         // reports, so closing is its own step, not a tail of issuing one report.
         $add($cnt("SELECT COUNT(*) FROM jobs j WHERE j.inspector_id=? AND j.closed_flag=0
                    AND (j.reporting_frequency='NOREPORT'
                         OR EXISTS(SELECT 1 FROM report_docs d WHERE d.job_id=j.id AND COALESCE(d.deleted,0)=0 AND COALESCE(d.finalized,0)=1))", [$insId]),
-            '✅', 'jobs to close', 'work done — close the job &amp; record its expenses', '/my-jobs?f=toclose', 'info');
+            '✅', 'jobs to close', 'work done — close the job &amp; record its expenses', '/my-jobs?f=toclose', 'info', 'jobs');
         // My vouchers still in draft (not yet submitted for approval).
         $add($cnt("SELECT COUNT(*) FROM vouchers WHERE inspector_id=? AND status='DRAFT'", [$insId]),
-            '🧾', 'vouchers to submit', 'expense vouchers you have not submitted', '/vouchers', 'info');
+            '🧾', 'vouchers to submit', 'expense vouchers you have not submitted', '/vouchers', 'info', 'money');
     }
     return $tasks;
 }
@@ -6547,7 +6578,7 @@ function ops_render_pending_tasks() {
     <div class="panel" style="margin-top:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:<?= $tasks ? '10' : '0' ?>px">
         <h3 class="tab-sub" style="margin:0">Your pending tasks</h3>
-        <?php if ($tasks): ?><a class="muted" style="font-size:12px" href="/documents">Open the register →</a><?php endif; ?>
+        <a class="muted" style="font-size:12px" href="/my-work">See all in My Work →</a>
       </div>
       <?php if (!$tasks): ?>
         <p class="muted" style="margin:0;font-size:13px">✓ You’re all caught up — nothing is waiting on you right now.</p>

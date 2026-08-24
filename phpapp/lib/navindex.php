@@ -47,6 +47,7 @@ function ops_nav_index() {
 
     // ---- Always-there, cross-module destinations ---------------------------
     $add('Dashboard', '/', 'Home', '🏠', 'Your landing dashboard.');
+    $add('My Work', '/my-work', 'Home', '📌', 'Everything waiting on you, in one place.');
     $add('Search records', '/search', 'Home', '🔍', 'Search across every register.');
     if ($fx('adv_can') && adv_can())        $add('What to fix', '/advisor', 'Home', '🧭', 'The one action list, money attached.');
     if ($fx('chain_can') && chain_can())    $add('Where the flow is broken', '/flow-gaps', 'Home', '🔗', 'Hand-offs that were skipped.');
