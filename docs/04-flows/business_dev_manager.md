@@ -15,5 +15,5 @@ flowchart TD
 - **Landing:** `/` dashboard, sales flavour (`dashboard.php:63`); sees Sales, Insights, Directory (clients).
 - **Can:** edit inquiries/quotes/orders, create & send quotes, manage follow-ups; view sales reports & clients.
 - **Cannot:** approve quotes (that's MARKETING_MANAGER), register contracts (Finance), touch operations, or manage users.
-- **Handoff:** an accepted quote becomes Finance's "contracts to register" task (`ops.php:6306`).
+- **Handoff:** an accepted quote becomes Finance's "contracts to register" task (`ops.php:6306`). On the quote page a sales viewer sees an explicit **"✓ Won — handed to Accounts"** wall (C1, `quote_detail.php`): the accepted quote is locked (`quote_is_locked`), the only way to change it is a **revision**, and the contract/calls are Accounts' and Operations' to do — sales' part is done.
 - Most common task = create & send a quote (a few clicks through the quote form).

@@ -68,6 +68,26 @@
   <?php if ($nbNext !== ''): ?><p class="next"><?= e($nbNext) ?></p><?php endif; ?>
 </div>
 
+<?php // C1 — the Sales → Finance → Operations wall, said plainly to a SALES viewer.
+      // Sales own the thread only up to "won"; the accepted quote is then LOCKED
+      // (quote_is_locked — edits go through a revision) and the contract is Accounts'
+      // to register. A person who owns quotations but can neither register the
+      // contract nor raise calls is on the sales side, so the handoff is made explicit
+      // rather than leaving them hunting for a next action that is not theirs.
+      $isSalesViewer = (can('crm.quote.create') || can('crm.quote.send') || can('crm.followup.manage'))
+          && !$canContract && !can('ops.call.create') && !is_master();
+      if ($st === 'ACCEPTED' && $isSalesViewer): ?>
+<div class="panel" style="border:1px solid var(--ok);background:color-mix(in srgb,var(--ok) 6%,transparent)">
+  <b style="color:var(--ok)">✓ Won — handed to Accounts for contract registration</b>
+  <div class="muted" style="margin-top:4px">
+    Sales' part is complete. The thread stops here: <b>Accounts</b> register the contract number, then
+    <b>Operations</b> raise inspection <?= e(Tlp('call')) ?> from it. There is nothing more to do on this
+    <?= e(Tl('quote')) ?> — and because the accepted version is what the <?= e(Tl('client')) ?> is holding, the
+    only way to change it now is to raise a <b>revision</b> (a new revision number that re-enters approval).
+  </div>
+</div>
+<?php endif; ?>
+
 <?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email'])): ?>
 <div class="panel" style="background:var(--soft)">
   <b>Two ways to send this</b>

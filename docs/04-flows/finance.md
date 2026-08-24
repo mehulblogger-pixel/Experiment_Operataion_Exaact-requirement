@@ -25,7 +25,7 @@ Charts → … The pending-tasks panel shows "contracts to register" (`ops.php:6
 **Walkthrough:** the five accounts screens are one tabbed **Billing workspace**
 (`booksui.php:26-46`): To bill → Invoices → Money in → Ageing → Export.
 1. Land on the Money desk.
-2. **Register a contract** (sales→accounts handoff): from "won quotes without a contract number" → `/quote?id=…#contract` "Register" → POST `/quote-contract` (`crm.php:1828`, gated `crm.contract.register`). Registers the client + contract number and e-mails the ops packet.
+2. **Register a contract** (sales→accounts handoff): from "won quotes without a contract number" → `/quote?id=…#contract` "Register" → POST `/quote-contract` (`crm.php:1828`, gated `crm.contract.register`). Registers the client + contract number and e-mails the ops packet. The handoff is now explicit on the quote: sales see a "✓ Won — handed to Accounts" wall (C1) and the accepted quote is locked to them; Finance is the "This is yours to do — register…" side of the same panel.
 3. **To bill:** `/to-bill` (`booksui.php:123-151`) pools closed, un-invoiced jobs by customer → contract/project, filterable by closed month.
 4. **Raise & issue an invoice:** tick jobs → "Draft this project" carries the work onto the draft (`booksui.php:207-216`) → review lines on `/invoice?id=` → **Issue** (`/invoice-issue`, `ops_require($canIssue)`, `booksui.php:256-262`) — enters the ledger and ageing, taking the branch's next number.
 5. **Receipts (money in):** `/receipts` → `/receipt-new` records a receipt (`booksui.php:303-318`) → `/receipt-allocate` spreads it across open invoices (`:320-331`).
