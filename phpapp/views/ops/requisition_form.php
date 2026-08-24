@@ -118,6 +118,77 @@ $cur = function_exists('cur_sym') ? cur_sym() : '₹';
       <div class="ff ff-wide"><label>Locations required <span class="muted">— one per line; add as many as you need</span></label>
         <textarea class="form-control" name="locations" rows="3" placeholder="e.g.&#10;Dahej — 3&#10;Hazira — 2&#10;Mundra — 1"><?= e($r['locations'] ?? '') ?></textarea>
         <small class="muted">Each line is a location for this requirement. Received CVs can be tagged to one of these.</small></div>
+      <?php // 1c — deployment GROUPS: split the headcount by who they report to and
+            //  where (e.g. 3 under A, 3 under B, 2 under C). The "reports to" list is
+            //  the CLIENT'S own contacts (fetched, not re-typed); or type one not on file. ?>
+      <div class="ff ff-wide rq-adv">
+        <label>Deployment groups <span class="muted">— split the headcount by reporting person &amp; site; the total sets “How many?”. Leave empty for a simple single group.</span></label>
+        <table class="grid" id="rq_groups" style="width:100%">
+          <thead><tr><th style="width:84px">How many</th><th>Reports to <span class="muted">(client contact)</span></th><th>Site / location</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="rq_groups_body">
+            <?php $gs = $groups ?? []; if (!$gs) $gs = [[]];
+                  foreach ($gs as $g): ?>
+              <tr class="rqg-row">
+                <td><input class="form-control" type="number" min="0" name="group_headcount[]" value="<?= e($g['headcount'] ?? '') ?>" style="width:76px"></td>
+                <td>
+                  <select class="form-control rqg-contact" name="group_contact_id[]">
+                    <option value="">— pick, or type below —</option>
+                    <?php foreach (($clientContacts ?? []) as $cc): ?><option value="<?= (int)$cc['id'] ?>" <?= (int)($g['report_contact_id'] ?? 0)===(int)$cc['id']?'selected':'' ?>><?= e($cc['name']) ?><?= $cc['designation']?' · '.e($cc['designation']):'' ?><?= $cc['mobile']?' · '.e($cc['mobile']):'' ?></option><?php endforeach; ?>
+                  </select>
+                  <input class="form-control rqg-name" name="group_report_name[]" value="<?= e($g['report_name'] ?? '') ?>" placeholder="…or a name not on file" style="margin-top:4px">
+                  <div style="display:flex;gap:4px;margin-top:4px">
+                    <input class="form-control" name="group_report_phone[]" value="<?= e($g['report_phone'] ?? '') ?>" placeholder="phone">
+                    <input class="form-control" name="group_report_email[]" value="<?= e($g['report_email'] ?? '') ?>" placeholder="email">
+                  </div>
+                </td>
+                <td><input class="form-control" name="group_site[]" value="<?= e($g['site'] ?? '') ?>" placeholder="site"></td>
+                <td><input class="form-control" name="group_notes[]" value="<?= e($g['notes'] ?? '') ?>"></td>
+                <td class="num"><button type="button" class="btn small secondary rqg-del" title="Remove">✕</button></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+        <div style="margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button type="button" class="btn small secondary" id="rqg_add">+ Add group</button>
+          <span class="muted" id="rqg_total" style="font-size:12px"></span>
+        </div>
+      </div>
+      <script>(function(){
+        var body=document.getElementById('rq_groups_body'), addBtn=document.getElementById('rqg_add'),
+            totalEl=document.getElementById('rqg_total'), qty=document.getElementById('rq_qty'),
+            clientSel=document.querySelector('select[name="client_id"]');
+        if(!body) return;
+        function rows(){ return [].slice.call(body.querySelectorAll('.rqg-row')); }
+        function recomputeTotal(){
+          var t=0, any=false;
+          rows().forEach(function(r){ var f=r.querySelector('input[name="group_headcount[]"]'); if(f.value!=='') any=true; t+=(parseInt(f.value,10)||0); });
+          if(totalEl) totalEl.textContent = any ? ('Total across groups: '+t+' — sets “How many?”.') : 'No groups — treated as one.';
+          if(any && qty) qty.value = t;
+        }
+        function addRow(){
+          var first=body.querySelector('.rqg-row'); if(!first) return;
+          var clone=first.cloneNode(true);
+          clone.querySelectorAll('input').forEach(function(i){ i.value=''; });
+          var sel=clone.querySelector('.rqg-contact'); if(sel) sel.selectedIndex=0;
+          body.appendChild(clone); recomputeTotal();
+        }
+        addBtn && addBtn.addEventListener('click', addRow);
+        body.addEventListener('click', function(e){ var d=e.target.closest && e.target.closest('.rqg-del'); if(!d) return;
+          if(rows().length>1) d.closest('.rqg-row').remove();
+          else { d.closest('.rqg-row').querySelectorAll('input').forEach(function(i){i.value='';}); var s=d.closest('.rqg-row').querySelector('.rqg-contact'); if(s)s.selectedIndex=0; }
+          recomputeTotal(); });
+        body.addEventListener('input', recomputeTotal);
+        function repopulateContacts(list){
+          rows().forEach(function(r){ var sel=r.querySelector('.rqg-contact'); if(!sel) return; var keep=sel.value;
+            sel.innerHTML='<option value="">— pick, or type below —</option>';
+            (list||[]).forEach(function(c){ var o=document.createElement('option'); o.value=c.id; o.textContent=c.name+(c.designation?' · '+c.designation:'')+(c.mobile?' · '+c.mobile:''); if(String(c.id)===String(keep)) o.selected=true; sel.appendChild(o); }); });
+        }
+        clientSel && clientSel.addEventListener('change', function(){
+          var id=clientSel.value; if(!id){ repopulateContacts([]); return; }
+          fetch('/client-contacts?id='+encodeURIComponent(id),{headers:{'X-Requested-With':'fetch'}}).then(function(r){return r.json();}).then(function(list){ repopulateContacts(list); }).catch(function(){});
+        });
+        recomputeTotal();
+      })();</script>
       <div class="ff rq-adv"><label>Discipline</label><input class="form-control" name="discipline" value="<?= $v('discipline') ?>" placeholder="e.g. Welding, NDT, Coating"></div>
       <div class="ff rq-adv"><label>Category / sub-category</label><input class="form-control" name="category" value="<?= $v('category') ?>" placeholder="e.g. Static equipment"></div>
       <div class="ff rq-adv"><label>Qualification</label><input class="form-control" name="qualification" value="<?= $v('qualification') ?>" placeholder="e.g. B.E. Mechanical"></div>

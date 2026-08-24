@@ -95,6 +95,76 @@ function req_migrate() {
         [$t, $c] = explode('.', $tc);
         try { db()->exec("ALTER TABLE $t MODIFY $c VARCHAR(70)"); } catch (Throwable $e) { /* sqlite / already wide */ }
     }
+    req_groups_migrate();
+}
+
+// 1c — deployment GROUPS on a requisition. One requisition can depute several
+// people who report to DIFFERENT persons at DIFFERENT sites (e.g. 8 inspectors:
+// 3 under A, 3 under B, 2 under C). Each group is a headcount + a reporting contact
+// (picked from the client's own contacts, or typed if not on file) + an optional
+// site. The requisition's total quantity is the sum of the group headcounts.
+function req_groups_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    if (!function_exists('ensure_column')) return;
+    $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
+    try {
+        db()->exec("CREATE TABLE IF NOT EXISTS requisition_groups (
+            id $pk, requisition_id INT, seq INT DEFAULT 0, headcount INT DEFAULT 1,
+            report_contact_id INT NULL, report_name VARCHAR(150) DEFAULT '',
+            report_email VARCHAR(200) DEFAULT '', report_phone VARCHAR(60) DEFAULT '',
+            site VARCHAR(200) DEFAULT '', notes VARCHAR(300) DEFAULT '')");
+        if (function_exists('act_index')) act_index('requisition_groups', 'idx_rg_req', '(requisition_id)');
+    } catch (Throwable $e) { /* never break boot */ }
+}
+
+// The groups on a requisition, resolving the reporting contact's name from the
+// client's contact record when one is linked (else the typed name).
+function req_groups($reqId) {
+    req_groups_migrate();
+    $rows = ops_all("SELECT g.*, c.name c_name, c.designation c_desig, c.mobile c_mobile, c.email c_email
+                     FROM requisition_groups g LEFT JOIN partner_contacts c ON c.id=g.report_contact_id
+                     WHERE g.requisition_id=? ORDER BY g.seq, g.id", [(int)$reqId]) ?: [];
+    foreach ($rows as &$r) {
+        $r['report_display'] = $r['report_contact_id'] ? (string)$r['c_name'] : (string)$r['report_name'];
+        $r['report_phone_display'] = $r['report_contact_id'] ? (string)$r['c_mobile'] : (string)$r['report_phone'];
+    }
+    return $rows;
+}
+function req_groups_total($reqId) {
+    req_groups_migrate();
+    return (int) ops_val("SELECT COALESCE(SUM(headcount),0) FROM requisition_groups WHERE requisition_id=?", [(int)$reqId]);
+}
+
+// Replace-all save from the posted arrays (group_headcount[], group_contact_id[],
+// group_report_name[]/email/phone, group_site[], group_notes[]). Empty rows (no
+// headcount and no contact) are skipped. Returns the total headcount saved.
+function req_groups_save($reqId, array $b) {
+    req_groups_migrate();
+    $reqId = (int)$reqId; if (!$reqId) return 0;
+    $pdo = db();
+    $hc   = (array)($b['group_headcount'] ?? []);
+    $cid  = (array)($b['group_contact_id'] ?? []);
+    $rn   = (array)($b['group_report_name'] ?? []);
+    $re   = (array)($b['group_report_email'] ?? []);
+    $rp   = (array)($b['group_report_phone'] ?? []);
+    $site = (array)($b['group_site'] ?? []);
+    $note = (array)($b['group_notes'] ?? []);
+    $pdo->prepare("DELETE FROM requisition_groups WHERE requisition_id=?")->execute([$reqId]);
+    $ins = $pdo->prepare("INSERT INTO requisition_groups (requisition_id,seq,headcount,report_contact_id,report_name,report_email,report_phone,site,notes) VALUES (?,?,?,?,?,?,?,?,?)");
+    $seq = 0; $total = 0;
+    $n = max(count($hc), count($cid), count($rn), count($site));
+    for ($i = 0; $i < $n; $i++) {
+        $count = (int)($hc[$i] ?? 0);
+        $contactId = (int)($cid[$i] ?? 0) ?: null;
+        $name = trim((string)($rn[$i] ?? ''));
+        $st   = trim((string)($site[$i] ?? ''));
+        // Skip a row that carries nothing meaningful.
+        if ($count <= 0 && !$contactId && $name === '' && $st === '') continue;
+        $ins->execute([$reqId, $seq++, max(0, $count), $contactId, $name,
+                       trim((string)($re[$i] ?? '')), trim((string)($rp[$i] ?? '')), $st, trim((string)($note[$i] ?? ''))]);
+        $total += max(0, $count);
+    }
+    return $total;
 }
 
 // A short, readable code from a name: letters only, upper-cased, first few.

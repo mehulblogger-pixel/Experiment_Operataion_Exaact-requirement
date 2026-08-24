@@ -64,3 +64,44 @@ t_ok(strpos($candForm, 'data-client="') !== false && strpos($candForm, 'data-des
     'the requisition picker carries the prefill fields as data-attributes');
 t_ok(strpos($candForm, 'prefillFromReq') !== false && strpos($candForm, 'setIfEmpty') !== false,
     'the candidate form prefills client/designation/SBU/rate from the chosen requisition (only blank fields)');
+
+t_section('recruitment: deployment groups — headcount + reporting contact + site (1c)');
+req_groups_migrate();
+$pdo = db();
+// A client with two contacts, and a requisition.
+$pdo->prepare("INSERT INTO business_partners (legal_name, display_name, is_client, status) VALUES ('Grp Client','Grp Client',1,'ACTIVE')")->execute();
+$gcid = (int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO partner_contacts (partner_id, name, designation, mobile, is_primary) VALUES (?, 'Mr A','Site Head','9990001111',1)")->execute([$gcid]);
+$ctA = (int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO requisitions (req_code, designation, client_id, quantity, status, created_at) VALUES ('REQ-GRP1','WELDING_INSPECTOR',?, 1, 'OPEN', ?)")->execute([$gcid, date('c')]);
+$grpReq = (int)$pdo->lastInsertId();
+
+// Save three groups: 3 under contact A, 3 under a typed name B, 2 under C — total 8.
+$total = req_groups_save($grpReq, [
+    'group_headcount'    => ['3', '3', '2', ''],   // last row empty → skipped
+    'group_contact_id'   => [(string)$ctA, '', '', ''],
+    'group_report_name'  => ['', 'Mr B', 'Mr C', ''],
+    'group_report_phone' => ['', '8880002222', '', ''],
+    'group_report_email' => ['', '', '', ''],
+    'group_site'         => ['Dahej', 'Hazira', 'Mundra', ''],
+    'group_notes'        => ['', '', '', ''],
+]);
+t_ok($total === 8, 'the group headcounts total correctly (3+3+2)');
+$gs = req_groups($grpReq);
+t_ok(count($gs) === 3, 'three groups were saved (the empty row was skipped)');
+t_ok($gs[0]['report_display'] === 'Mr A' && (int)$gs[0]['headcount'] === 3,
+    'a group linked to a client contact resolves that contact\'s name');
+t_ok($gs[1]['report_display'] === 'Mr B' && $gs[1]['report_phone_display'] === '8880002222',
+    'a group with a typed reporting person keeps the typed name & phone');
+t_ok(req_groups_total($grpReq) === 8, 'the requisition total headcount is the sum of the groups');
+
+// Re-saving replaces (not appends) the groups.
+req_groups_save($grpReq, ['group_headcount' => ['5'], 'group_contact_id' => [''], 'group_report_name' => ['Solo'], 'group_site' => ['One site']]);
+t_ok(count(req_groups($grpReq)) === 1 && req_groups_total($grpReq) === 5, 're-saving groups replaces the previous set');
+
+// Wiring: the client-contacts endpoint, the form group rows, and the detail display.
+t_ok(strpos($ops, "route === 'client-contacts'") !== false, 'a client-contacts JSON endpoint feeds the reporting-contact picker');
+t_ok(strpos($reqForm, 'group_headcount[]') !== false && strpos($reqForm, 'rqg-contact') !== false && strpos($reqForm, '/client-contacts?id=') !== false,
+    'the requisition form has repeatable group rows with a client-contact picker');
+$reqDetail = file_get_contents(__DIR__ . '/../views/ops/requisition_detail.php');
+t_ok(strpos($reqDetail, 'Deployment groups') !== false, 'the requisition detail shows the deployment groups');

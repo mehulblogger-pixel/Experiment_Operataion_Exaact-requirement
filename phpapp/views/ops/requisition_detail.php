@@ -45,6 +45,25 @@ $h = $health ?? null; if ($h): [$hband, $htone] = $h['band']; ?>
   <?php endforeach; ?>
 </div></div>
 
+<?php // 1c — deployment groups: who reports to whom, and where. ?>
+<?php if (!empty($groups)): ?>
+<div class="panel"><h3 class="tab-sub" style="margin-top:0">Deployment groups <span class="muted">— <?= array_sum(array_map(fn($g)=>(int)$g['headcount'], $groups)) ?> people across <?= count($groups) ?> group(s)</span></h3>
+  <table class="dt">
+    <thead><tr><th class="num">How many</th><th>Reports to</th><th>Site / location</th><th>Notes</th></tr></thead>
+    <tbody>
+    <?php foreach ($groups as $g): ?>
+      <tr>
+        <td class="num"><b><?= (int)$g['headcount'] ?></b></td>
+        <td><?= e($g['report_display'] ?: '—') ?><?php if (!empty($g['report_phone_display'])): ?> <span class="muted">· <?= e($g['report_phone_display']) ?></span><?php endif; ?></td>
+        <td><?= e($g['site'] ?: '—') ?></td>
+        <td class="muted"><?= e($g['notes'] ?: '—') ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
+<?php endif; ?>
+
 <?php
 // ---- Phase 2 enrichment panels: only render what has been filled in --------
 $has = fn($k) => isset($req[$k]) && trim((string)$req[$k]) !== '' && (string)$req[$k] !== '0';

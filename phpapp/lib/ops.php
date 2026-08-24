@@ -2305,7 +2305,7 @@ function ops_module_gate($route) {
         // from someone who owns half of it, or show them findings they cannot act on.
         'profitability'=>'profitability','boss-renew'=>'profitability',
         'candidates'=>'hiring','candidate'=>'hiring','candidate-new'=>'hiring','candidate-edit'=>'hiring','candidate-stage'=>'hiring','candidate-cv'=>'hiring','candidate-client'=>'hiring','candidate-credential'=>'hiring','candidate-erase'=>'hiring','candidate-commercial'=>'hiring','candidate-link-person'=>'hiring',
-        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring',
+        'requisitions'=>'hiring','requisition'=>'hiring','requisition-new'=>'hiring','requisition-edit'=>'hiring','recruitment'=>'hiring','recruitment-cc'=>'hiring','req-ai-extract'=>'hiring','recruit-config'=>'hiring','client-contacts'=>'hiring',
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads','opportunity-delete'=>'leads',
         'opportunity-move'=>'leads','opportunity-quote'=>'leads','opportunity-from-lead'=>'leads',
@@ -2763,6 +2763,14 @@ function ops_dispatch($route, $method) {
             return geofence_save_address($route, $method);
         case $route === 'site-geo-capture' && $method === 'POST':
             return geofence_capture_site($route, $method);
+        case $route === 'client-contacts':
+            // JSON contacts for a client — feeds the requisition group "reports to"
+            // picker (1c), so a client's own contacts are offered, not re-typed.
+            header('Content-Type: application/json');
+            $cid = (int)($_GET['id'] ?? 0);
+            $rows = $cid ? ops_all("SELECT id, name, designation, mobile, email FROM partner_contacts WHERE partner_id=? ORDER BY is_primary DESC, name", [$cid]) : [];
+            echo json_encode(array_map(fn($c) => ['id'=>(int)$c['id'], 'name'=>(string)$c['name'], 'designation'=>(string)$c['designation'], 'mobile'=>(string)$c['mobile'], 'email'=>(string)$c['email']], $rows));
+            return true;
         case $route === 'timesheet':
             return ops_timesheet($route, $method);
         case $route === 'ratings' || $route === 'ratings-config':
@@ -4436,6 +4444,8 @@ function ops_requisitions($route, $method) {
                 $vals = array_merge(array_map(fn($f)=>$norm($f, $b[$f] ?? ''), $fields), $extraVals, [$req['id']]);
                 $pdo->prepare("UPDATE requisitions SET $set WHERE id=?")->execute($vals);
                 if (function_exists('custom_save')) custom_save('requisition', (int)$req['id'], $b);
+                // 1c — deployment groups; when present, the total headcount is authoritative.
+                if (function_exists('req_groups_save')) { $gt = req_groups_save((int)$req['id'], $b); if ($gt > 0) $pdo->prepare("UPDATE requisitions SET quantity=? WHERE id=?")->execute([$gt, (int)$req['id']]); }
                 flash("Requisition {$req['req_code']} updated."); redirect('/requisition?id=' . $req['id']);
             } else {
                 $code = function_exists('recruit_req_code')
@@ -4448,6 +4458,7 @@ function ops_requisitions($route, $method) {
                 $pdo->prepare("INSERT INTO requisitions (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
                 if (function_exists('custom_save')) custom_save('requisition', (int)$id, $b);
+                if (function_exists('req_groups_save')) { $gt = req_groups_save((int)$id, $b); if ($gt > 0) $pdo->prepare("UPDATE requisitions SET quantity=? WHERE id=?")->execute([$gt, (int)$id]); }
                 flash("$code created — now add candidates against it."); redirect('/requisition?id=' . $id);
             }
         }
@@ -4455,6 +4466,10 @@ function ops_requisitions($route, $method) {
             'clients' => clients_list(),
             'rccUsers' => function_exists('rcc_users') ? rcc_users() : [],
             'rccDepts' => function_exists('rcc_departments') ? rcc_departments() : [],
+            // 1c — existing deployment groups + the current client's contacts for the picker.
+            'groups' => ($req && function_exists('req_groups')) ? req_groups((int)$req['id']) : [],
+            'clientContacts' => ($req && !empty($req['client_id']))
+                ? ops_all("SELECT id, name, designation, mobile, email FROM partner_contacts WHERE partner_id=? ORDER BY is_primary DESC, name", [(int)$req['client_id']]) : [],
             'cfvals' => $req ? custom_values_map('requisition', $req['id']) : []]); return;
     }
     if ($route === 'requisition') {
@@ -4486,7 +4501,8 @@ function ops_requisitions($route, $method) {
         if (function_exists('assignment_commercials')) {
             foreach ($cands as $c) if (($c['stage'] ?? '') === 'ACCEPTED' || !empty($c['inspector_id'])) $candComm[$c['id']] = assignment_commercials($c, $req);
         }
-        view('ops/requisition_detail', ['req' => $req, 'outgoing' => $outgoing, 'hired' => $hired, 'cands' => $cands, 'health' => $health, 'pool' => $pool, 'rollup' => $rollup, 'candComm' => $candComm]); return;
+        view('ops/requisition_detail', ['req' => $req, 'outgoing' => $outgoing, 'hired' => $hired, 'cands' => $cands, 'health' => $health, 'pool' => $pool, 'rollup' => $rollup, 'candComm' => $candComm,
+            'groups' => function_exists('req_groups') ? req_groups((int)$req['id']) : []]); return;
     }
 }
 

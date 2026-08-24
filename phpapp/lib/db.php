@@ -443,6 +443,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('portal_migrate')) portal_migrate();
     if (function_exists('rcr_migrate')) rcr_migrate();                   // the client's answer to an issued report           // the client's own sign-in, its own table
     if (function_exists('sched_migrate')) sched_migrate();           // engagement shapes, holidays by office, visits
+    if (function_exists('req_groups_migrate')) req_groups_migrate();  // 1c — requisition deployment groups (headcount + reporting contact + site)
     if (function_exists('tally_migrate')) tally_migrate();             // what has already been handed to Tally
     // Register every remaining dropdown as an editable master list. Runs last:
     // it needs the base lists seeded and the CRM/IDEMS constants loaded.
