@@ -151,10 +151,33 @@ function ops_books($route, $method) {
         return true;
     }
 
+    // Set the billing branch on a draft — clears "No branch is set" without
+    // starting the invoice over.
+    if ($route === 'invoice-set-branch' && $method === 'POST') {
+        ops_require($canIssue, 'You cannot change the books.');
+        $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+        $e = books_set_office($id, (int)($_POST['office_id'] ?? 0));
+        flash($e !== '' ? $e : 'Billing branch set — the invoice can be issued now.', $e !== '' ? 'error' : 'success');
+        redirect('/invoice?id=' . $id);
+    }
+
     // ---- One invoice ---------------------------------------------------------
     if ($route === 'invoice') {
         $inv = books_invoice($_GET['id'] ?? 0);
         if (!$inv) { http_response_code(404); view('notfound'); return true; }
+        // When a draft has no branch, offer the picker pre-set to the sensible
+        // guess: the branch the work resolves to, else the one the user is in.
+        $suggestOffice = 0;
+        if ($inv['status'] === 'DRAFT' && empty($inv['office_id'])) {
+            $ln = books_try(fn() => ops_one(
+                "SELECT job_id FROM invoice_lines WHERE invoice_id=? AND job_id IS NOT NULL ORDER BY id LIMIT 1", [(int)$inv['id']]), null);
+            if ($ln && function_exists('invoice_office_for')) {
+                $j = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$ln['job_id']]);
+                $c = $j ? ops_one("SELECT * FROM calls WHERE id=?", [(int)$j['call_id']]) : null;
+                $suggestOffice = $j ? (int)invoice_office_for($j, $c) : 0;
+            }
+            if (!$suggestOffice) $suggestOffice = (int)(current_user()['home_office_id'] ?? 0);
+        }
         view('ops/invoice_detail', [
             'inv' => $inv, 'lines' => books_lines((int)$inv['id']),
             'settled' => books_settled((int)$inv['id']),
@@ -164,6 +187,10 @@ function ops_books($route, $method) {
             'billable' => $inv['status'] === 'DRAFT' ? books_billable_jobs((int)$inv['partner_id'], 60) : [],
             'canIssue' => $canIssue, 'canCancel' => books_can_cancel(),
             'reasons' => CN_REASONS, 'today' => date('Y-m-d'),
+            // For the "set branch" fixer on a draft with no branch.
+            'offices' => ($inv['status'] === 'DRAFT' && empty($inv['office_id']))
+                ? ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name") : [],
+            'suggestOffice' => $suggestOffice,
             // The Books view, when this invoice has been sent there.
             'booksConnected' => function_exists('books_connected') && books_connected(),
             'booksStatus' => function_exists('books_invoice_status') ? books_invoice_status((int)$inv['id']) : null,

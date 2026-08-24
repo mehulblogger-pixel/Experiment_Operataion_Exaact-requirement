@@ -424,6 +424,15 @@ function books_invoice_create(array $b) {
     $pid = (int)($b['partner_id'] ?? 0);
     if (!$pid) return ['err' => 'Choose the customer this invoice is for.'];
     $off = (int)($b['office_id'] ?? 0) ?: null;
+    // A draft with no branch has no numbering series and cannot be issued — the
+    // "No branch is set" dead end. When the caller has not resolved one (a manual
+    // invoice, or a job that carried no office anywhere), fall back to the branch
+    // the user is acting in, so a draft is never born stranded. It stays editable
+    // on the invoice screen, so this is a sensible default, not a lock-in.
+    if (!$off) {
+        $home = (int)(current_user()['home_office_id'] ?? 0);
+        if ($home && books_try(fn() => ops_val("SELECT id FROM offices WHERE id=? AND is_active=1", [$home]), 0)) $off = $home;
+    }
     $p = ops_one("SELECT * FROM business_partners WHERE id=?", [$pid]);
     if (!$p) return ['err' => 'That customer no longer exists.'];
 
@@ -450,6 +459,26 @@ function books_invoice_create(array $b) {
     $id = (int)db()->lastInsertId();
     if (function_exists('act_log')) act_log('INVOICE', $id, 'CREATED', 'Draft invoice started for ' . ($p['display_name'] ?: $p['legal_name']));
     return ['id' => $id];
+}
+
+// Set (or change) the billing branch on a DRAFT invoice. This is what clears
+// "No branch is set": the branch decides the numbering series, and — with the
+// company's own state — whether tax is CGST+SGST or IGST, so both are recomputed
+// here. Refused once the invoice is issued, because the number is already drawn
+// from the old series.
+function books_set_office($invoiceId, $officeId) {
+    books_migrate();
+    $inv = books_invoice($invoiceId);
+    if (!$inv) return 'That invoice no longer exists.';
+    if ($inv['status'] !== 'DRAFT') return 'The branch is fixed once the invoice is issued — its number comes from that branch\'s series.';
+    $off = (int)$officeId;
+    if (!$off || !books_try(fn() => ops_val("SELECT id FROM offices WHERE id=? AND is_active=1", [$off]), 0))
+        return 'Choose an active branch to bill from.';
+    $igst = books_is_igst((int)$inv['partner_id'], $off);
+    db()->prepare("UPDATE invoices SET office_id=?, series=?, is_igst=?, updated_at=? WHERE id=?")
+       ->execute([$off, books_series($off), $igst, date('c'), (int)$inv['id']]);
+    if (function_exists('act_log')) act_log('INVOICE', (int)$inv['id'], 'BRANCH_SET', 'Billing branch set');
+    return '';
 }
 
 function books_line_add($invoiceId, array $b) {

@@ -80,6 +80,19 @@
   <div class="msg msg-warning" style="margin-top:14px">
     <b>Not ready to issue.</b>
     <ul style="margin:6px 0 0 18px;padding:0"><?php foreach ($missing as $m): ?><li><?= e($m) ?></li><?php endforeach; ?></ul>
+    <?php // The one blocker you can clear right here: the billing branch, which
+          // gives the invoice its numbering series. Pre-set to the branch the work
+          // (or you) belongs to — pick a different one if it should bill elsewhere.
+      if (empty($inv['office_id']) && !empty($offices) && !empty($canIssue)): ?>
+      <form method="post" action="/invoice-set-branch?id=<?= (int)$inv['id'] ?>" class="inline-add" style="margin-top:10px;align-items:flex-end">
+        <div class="ff"><label>Bill from branch</label>
+          <select class="form-control searchable" name="office_id" required>
+            <option value="">— choose a branch —</option>
+            <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= (int)$suggestOffice===(int)$o['id']?'selected':'' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
+          </select></div>
+        <button class="btn small" type="submit">Set branch</button>
+      </form>
+    <?php endif; ?>
   </div>
 <?php endif; ?>
 
