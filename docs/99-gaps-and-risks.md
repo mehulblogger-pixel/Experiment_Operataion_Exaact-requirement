@@ -1,8 +1,10 @@
 # 99 — Gaps & Risks
 
-The honest list, ranked by risk. Each item: what it is, where (`file:line`), why it
-matters, and a recommended fix. **Nothing here is implemented in this session — this
-is documentation only.** Fixes require your green light.
+The honest list, ranked by risk. Each item: what it is, where, why it matters, and its
+status. **Update:** R1–R11 have since been implemented (each marked **FIXED** /
+**MITIGATED** / **NOTED** below, with its test); R4 was fixed earlier. **R12 is INFO
+only** (deliberately ungated — no change recommended). Any item still open names what
+remains.
 
 Paths relative to `phpapp/`. "⚠ implicit" = a right that exists only because no check
 blocks it.
