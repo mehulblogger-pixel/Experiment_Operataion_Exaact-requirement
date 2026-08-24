@@ -130,12 +130,18 @@ there was no Reporting rail item; the config screens were reachable only via Adm
 the rail (`access.php`). Tests: `tests/test_bam_idems_view.php`. (Existing BAM logins that
 already carry a custom permission set keep it until re-saved — the per-user override rule.)
 
-## R9 — LOW-MED · Concurrent edit with no record locking
-**What:** a call/job can be edited by a coordinator and a manager with no lock; job-closure
-expenses (coordinator) and the inspector's voucher (`ops.php:5535` vs `voucher_entries`)
-write the same cost picture from two sides.
-**Why it matters:** last-write-wins can quietly overwrite the other party's change.
-**Fix:** optimistic locking (a version/updated_at check on save) on call/job edit.
+## R9 — LOW-MED · Concurrent edit with no record locking — **FIXED (call/job edit)**
+**What:** a call/job could be edited by a coordinator and a manager with no lock, so
+last-write-wins quietly overwrote the other party's change.
+**Fixed this session:** optimistic locking on call and job edit. Each carries a version
+token (`calls.updated_at` / `jobs.updated_at`, stamped by `touch_row_version()` on every
+save); the edit form embeds it as `row_version`, and `stale_edit_block()` refuses a save
+whose baseline no longer matches — the editor is told to reopen, and **nothing is
+overwritten**. An empty baseline (older form) never blocks. Tests:
+`tests/test_optimistic_lock.php`.
+**Still open (noted, not a call/job edit):** the *cost picture* is still written from two
+sides — job-closure expenses (coordinator) and the inspector's voucher — which is a
+data-model overlap rather than a concurrent-edit race; left as-is unless it bites.
 
 ## R10 — LOW · Vestigial statuses/fields the code never advances
 **What:** legacy `calls.status` never reaches `CLOSED` in app flow (only up to ALLOCATED —

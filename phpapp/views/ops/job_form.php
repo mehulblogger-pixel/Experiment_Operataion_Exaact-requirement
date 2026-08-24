@@ -158,6 +158,8 @@
 <?php endif; ?>
 
 <form method="post" id="jobform" action="<?= $job ? '/job-edit?id=' . (int)$job['id'] : '/job-new?call=' . (int)$call['id'] ?>" class="panel">
+<?php // R9 — optimistic-lock baseline: refuse a save if the job changed since it was opened. ?>
+<input type="hidden" name="row_version" value="<?= e($job['updated_at'] ?? '') ?>">
 <div data-tabs data-tabs-key="jobform" class="form-tabs">
 <section class="fs-pane" data-tab="Assignment">
   <h3 class="tab-sub" style="margin-top:0">Assignment</h3>

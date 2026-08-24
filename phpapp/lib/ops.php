@@ -283,6 +283,9 @@ function ops_migrate() {
     // work order, carried to the job, and used to allocate the report format.
     ensure_column('calls', 'service_code', "VARCHAR(40) DEFAULT ''");
     ensure_column('calls', 'site_address_id', 'INT NULL');
+    // R9 — optimistic-lock version token, stamped on every edit save.
+    ensure_column('calls', 'updated_at', "VARCHAR(40) DEFAULT ''");
+    ensure_column('jobs',  'updated_at', "VARCHAR(40) DEFAULT ''");
     // §i — the reporting rhythm and the reports the client wants are agreed on
     // the call, not invented at allocation. Both flow onto the job.
     ensure_column('calls', 'reporting_frequency', "VARCHAR(20) DEFAULT ''");
@@ -546,6 +549,29 @@ function role_label($u = null) { $roles = defined('ORG_ROLES') ? ORG_ROLES : [];
 function is_master() { return ua()['master']; }
 function is_admin_level() { return in_array(user_role(), MGMT_ROLES, true); }
 function is_coordinator_level() { return is_admin_level() || in_array(user_role(), ['ASST_MANAGER','COORDINATOR'], true); }
+// R9 — optimistic locking. A call/job can be edited by a coordinator and a manager at
+// the same time; with last-write-wins the second save silently overwrites the first.
+// The edit form carries the row's `updated_at` as a baseline; on save we compare it
+// with the row's current value and refuse if it moved under us. A fresh version token
+// is stamped on every save. (Second-plus-random granularity — unique per save.)
+function row_version_token() { return date('c') . '.' . bin2hex(random_bytes(2)); }
+function stale_edit_block($table, $id, $postedVersion) {
+    if (!in_array($table, ['calls', 'jobs'], true)) return '';   // allow-list — never interpolate arbitrary names
+    if (function_exists('ensure_column')) ensure_column($table, 'updated_at', "VARCHAR(40) DEFAULT ''");
+    $cur    = (string) ops_val("SELECT updated_at FROM $table WHERE id=?", [(int)$id]);
+    $posted = trim((string)$postedVersion);
+    // No baseline (older form) or no stored version yet → nothing to compare, allow.
+    if ($posted === '' || $cur === '' || $posted === $cur) return '';
+    return 'Someone else saved changes to this record while you had it open. '
+        . 'Reopen it to see the latest version, then re-apply your change — your edit was not saved, '
+        . 'so nothing of theirs was overwritten.';
+}
+function touch_row_version($table, $id) {
+    if (!in_array($table, ['calls', 'jobs'], true)) return;
+    if (function_exists('ensure_column')) ensure_column($table, 'updated_at', "VARCHAR(40) DEFAULT ''");
+    db()->prepare("UPDATE $table SET updated_at=? WHERE id=?")->execute([row_version_token(), (int)$id]);
+}
+
 function is_inspector() { return user_role() === 'INSPECTOR'; }
 // R7 — the field engineer for UI purposes: a plain INSPECTOR, a SR_INSPECTOR (a senior
 // inspector who also does field work), or any non-management login seated on an
@@ -3965,10 +3991,16 @@ function ops_calls($route, $method) {
             if ($vid && $vid === (int)($b['client_id'] ?? 0))
                 $pdo->prepare("UPDATE business_partners SET is_vendor=1 WHERE id=? AND is_vendor=0")->execute([$vid]);
             if ($call) {
+                // R9 — refuse the save if someone else changed this call since it was opened.
+                if (($stale = stale_edit_block('calls', $call['id'], $b['row_version'] ?? '')) !== '') {
+                    view('ops/call_form', array_merge(call_form_vars($call, $b), ['error' => $stale]));
+                    return;
+                }
                 $set = implode(',', array_map(fn($f)=>"$f=?", $fields));
                 $vals = array_map(fn($f)=> nzc_call($f, $b[$f] ?? ''), $fields); $vals[] = $call['id'];
                 $pdo->prepare("UPDATE calls SET $set WHERE id=?")->execute($vals);
                 $pdo->prepare("UPDATE calls SET notify_manager=? WHERE id=?")->execute([$notifyMgr, $call['id']]);
+                touch_row_version('calls', $call['id']);
                 if ($forwardNow) $pdo->prepare("UPDATE calls SET forwarded_at=?, status='FORWARDED' WHERE id=?")->execute([date('c'), $call['id']]);
                 custom_save('call', $call['id'], $b);
                 // Notify on the office forward, and also when a coordinator is
@@ -5460,10 +5492,16 @@ function ops_jobs($route, $method) {
                 return;
             }
             if ($job) {
+                // R9 — refuse the save if someone else changed this job since it was opened.
+                if (($stale = stale_edit_block('jobs', $job['id'], $b['row_version'] ?? '')) !== '') {
+                    view('ops/job_form', array_merge(call_job_form_vars($job, $call), ['error' => $stale]));
+                    return;
+                }
                 $set = implode(',', array_map(fn($f)=>"$f=?", $fields));
                 $vals = array_map(fn($f)=> nzc($f, $b[$f] ?? ''), $fields); $vals[] = $job['id'];
                 $pdo->prepare("UPDATE jobs SET $set WHERE id=?")->execute($vals);
                 $pdo->prepare("UPDATE jobs SET deliverables=? WHERE id=?")->execute([$deliverables, $job['id']]);
+                touch_row_version('jobs', $job['id']);
                 $jobId = $job['id'];
                 flash("Job {$job['job_code']} updated.");
             } else {

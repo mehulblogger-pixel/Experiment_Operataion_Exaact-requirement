@@ -66,6 +66,9 @@ document.addEventListener('DOMContentLoaded', function () {
 <?php endif; ?>
 
 <form method="post" action="<?= $isEdit ? '/call-edit?id=' . (int)$call['id'] : '/call-new' ?>" class="panel">
+<?php // R9 — optimistic-lock baseline: the row version this form was opened against, so
+      // a concurrent save by someone else is refused instead of silently overwritten. ?>
+<input type="hidden" name="row_version" value="<?= e($call['updated_at'] ?? '') ?>">
 
 <div data-tabs data-tabs-key="callform" class="form-tabs">
 <section class="fs-pane" data-tab="<?= e(T('client')) ?> &amp; <?= e(Tl('quote')) ?>">
