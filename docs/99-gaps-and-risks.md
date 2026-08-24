@@ -156,12 +156,23 @@ definition — `JOB_STAGES` (`ops.php`), `IDEMS_STATUS` ARCHIVED (`idems.php`), 
 Values are kept (not removed) to avoid a silent behaviour change; wire the transitions before
 building reporting on them. Tests: `tests/test_vestigial_fields_noted.php`.
 
-## R11 — LOW · Admin area appears for roles with no real admin access
-**What:** ASST_MANAGER and COORDINATOR reach the Admin area only via the coordinator-level
-"SLA targets" tile (`areas.php:216`); MARKETING_MANAGER only via the `crm.template.manage`
-Document-templates tile (`areas.php:222`). They have no users/settings/masters edit.
-**Fix:** move those single tiles under a more accurate heading so "Admin" doesn't imply
-administrative power.
+## R11 — LOW · Admin area appears for roles with no real admin access — **MOSTLY FIXED**
+**What:** ASST_MANAGER reached the Admin area only via the coordinator-level "SLA targets"
+tile; MARKETING_MANAGER only via the `crm.template.manage` "Document templates" tile.
+**Fixed this session (`areas.php`):**
+- **SLA targets** moved to **Quality** (a service-delivery setting), so ASST_MANAGER (and
+  coordinators) reach it there and it no longer pulls them into Admin.
+- **Document templates** moved to **Sales** for `crm.template.manage` holders; the Admin copy
+  is now `idems.type.manage`/master only. A MARKETING_MANAGER reaches templates under Sales
+  and no longer sees Admin.
+- The Admin subtitle now reads "For administrators: …" so the label is honest.
+- ASST_MANAGER and MARKETING_MANAGER no longer see the Admin rail entry. Tests:
+  `tests/test_admin_area_honesty.php`.
+**Residual (documented, not fixed):** COORDINATOR still sees Admin because they hold
+`mod.masters.view` (the read-only Masters tile). Fully separating Masters would either move it
+to Directory — which breaks BRANCH_APP_MANAGER, who edits masters but has no Directory area —
+or drop coordinators' masters-view (a permission change out of scope here). Left as a
+legitimate reference read; revisit if the Masters IA is reworked.
 
 ## R12 — INFO · Deliberately ungated: attendance self-mark
 **What:** `attend-mark` is intentionally ungated beyond "login linked to an inspector"

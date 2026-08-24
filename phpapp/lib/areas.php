@@ -43,11 +43,15 @@ function ops_area_def($area) {
         case 'sales':
             $title = 'Sales'; $icon = '🎯';
             $sub = 'Leads, opportunities, ' . strtolower(THP('inquiry')) . ', ' . strtolower(THP('quote')) . ' and the pipeline.';
-            $routes = ['sales','leads','lead','opportunities','opportunity','inquiries','inquiry','quotes','quote','pipelines','pipeline','approvals','stage-gates','ads-roi','project-costings','project-costing','preorder-checklist'];
+            $routes = ['sales','leads','lead','opportunities','opportunity','inquiries','inquiry','quotes','quote','pipelines','pipeline','approvals','stage-gates','ads-roi','project-costings','project-costing','preorder-checklist','templates'];
             $t($fx('leads_can_view') && leads_can_view(), '🎯', 'Leads', '/leads', 'A company worth pursuing — before any specific job.');
             $t($fx('opp_can_view') && opp_can_view(), '💡', 'Opportunities', '/opportunities', 'A live deal you are working to win or lose.');
             $t(can('mod.inquiries.view'), '📨', THP('inquiry'), '/inquiries', 'A specific request to quote — a ' . strtolower(Tl('quote')) . ' is raised from it.');
             $t(can('mod.quotes.view'), '📝', THP('quote'), '/quotes', 'Quotations, revisions and approvals.');
+            // R11 — document / template library for marketing (crm.template.manage) moved
+            // here from Admin, so a marketing manager reaches it in Sales — where their work
+            // is — instead of via an Admin area that implied administrative power.
+            $t(can('crm.template.manage') || is_master(), '📝', 'Document templates', '/templates', 'The document / report template library.');
             $t(is_master() || can('settings.manage') || can('crm.quote.approve'), '☑', 'Pre-order checklist', '/preorder-checklist', 'Enquiry / tender / contract review before a quote is approved.');
             $t(function_exists('pc_can') && pc_can(), '🧮', 'Project costing', '/project-costings', 'Team cost build-ups → man-month / man-day / lump rates and margin.');
             $t($fx('gate_can_view') && gate_can_view(), '🛂', 'Approvals', '/approvals', 'Deals held at a stage gate.',
@@ -60,7 +64,7 @@ function ops_area_def($area) {
         case 'quality':
             $title = 'Quality & Accreditation'; $icon = '🛡️';
             $sub = 'Two halves: the everyday quality work you touch during jobs, and the accreditation registers an assessor asks for.';
-            $routes = ['quality','equipment','samples','sample','methods','method','drules','drule','cdocs','cdoc','risks','risk','retention','disclosure','competence','impartiality','complaints','complaint','satisfaction','confidentiality','conf-breach','site-docs','report-reviews','ncr','issues','departures','hold-points','capa','internal-audits','internal-audit','management-reviews','management-review','evidence-review','data-control','identity'];
+            $routes = ['quality','equipment','samples','sample','methods','method','drules','drule','cdocs','cdoc','risks','risk','retention','disclosure','competence','impartiality','complaints','complaint','satisfaction','confidentiality','conf-breach','site-docs','report-reviews','ncr','issues','departures','hold-points','capa','internal-audits','internal-audit','management-reviews','management-review','evidence-review','data-control','identity','sla-targets'];
 
             // ── Everyday quality — the things you touch during live jobs. ──
             $sec('Everyday quality');
@@ -105,6 +109,11 @@ function ops_area_def($area) {
             $t(can('mod.confidentiality.view') || can('mod.identity.view') || is_master_of(['confidentiality','identity']), '🔒', 'Confidentiality', '/confidentiality', 'Undertakings, NDAs and breaches.');
             $t($fx('ops_sitedocs') && licence_enabled('operations') && (can('mod.identity.view') || can('mod.clients.view') || is_master_of(['identity','clients'])), '🛂', 'Site entry documents', '/site-docs', 'Papers needed for site access.');
             $t(can('mod.identity.view') && $fx('iddoc_can_view') && iddoc_can_view(), '🪪', 'Identity documents', '/identity', 'ID that gates site access.');
+            // R11 — SLA / turnaround targets moved here from Admin. It is a
+            // service-delivery setting, not core administration, so surfacing it here
+            // stops it forcing coordinators and asst. managers into the Admin area
+            // (which implied administrative power they do not have).
+            $t(can('settings.manage') || is_master() || ($fx('is_coordinator_level') && is_coordinator_level()), '⏳', 'SLA targets', '/sla-targets', 'Turnaround targets for service delivery.');
             // Client & vendor portal administration now lives under Directory (it is
             // portal admin, not a quality register). Analytics lives under Insights;
             // the duplicate that was here is parked in Admin.
@@ -194,8 +203,8 @@ function ops_area_def($area) {
 
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
-            $sub = 'Masters, people, access and the settings that shape the app.';
-            $routes = ['admin','masters','m/','lookups','users','user-new','user-edit','hierarchy','access','adspro','sso','licence','settings','terminology','service-scope','service-formats','sla-targets','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $sub = 'For administrators: masters, people, access, licensing and system configuration.';
+            $routes = ['admin','masters','m/','lookups','users','user-new','user-edit','hierarchy','access','adspro','sso','licence','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             $sec('Masters');
             $t(can('mod.masters.view'), '📋', 'Masters', '/masters', 'The lists behind every dropdown.');
@@ -213,13 +222,16 @@ function ops_area_def($area) {
             $t(can('mod.settings.view') && can('settings.manage'), '⚙️', 'System settings', '/settings', 'Company-wide settings and terminology.');
             $t(can('settings.manage') || is_master(), '🧩', 'Service scope', '/service-scope', 'Which services are offered and where.');
             $t(can('settings.manage') || is_master(), '📄', 'Report formats by service', '/service-formats', 'The report format each service allocates.');
-            $t(can('settings.manage') || is_master() || ($fx('is_coordinator_level') && is_coordinator_level()), '⏳', 'SLA targets', '/sla-targets', 'Turnaround targets.');
+            // R11 — SLA targets moved to Quality (service delivery) so it no longer pulls
+            // coordinators / asst. managers into Admin. See the 'quality' area above.
             $t(can('settings.manage') || is_master(), '🏢', 'Company profile', '/company-profile', 'Legal name, logo and details.');
 
             $sec('Report configuration');
             $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('users.manage.global')), '👤', 'Approver mapping', '/approver-map', 'Who signs which report.');
             $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '🔀', 'Approval rules', '/approval-rules', 'Routing rules for approval.');
-            $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master() || can('crm.template.manage')), '📝', 'Document templates', '/templates', 'The report template library.');
+            // R11 — the crm.template.manage grant moved to Sales (Document templates), so
+            // holding only that permission no longer forces a marketing manager into Admin.
+            $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '📝', 'Document templates', '/templates', 'The report template library.');
             $t(licence_enabled('reporting') && (can('idems.audit.view') || is_master()), '🛡️', 'Report audit trail', '/audit-log', 'Who changed what, and when.');
 
             $sec('Super admin');
