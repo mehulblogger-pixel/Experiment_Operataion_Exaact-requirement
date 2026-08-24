@@ -105,3 +105,20 @@ t_ok(strpos($reqForm, 'group_headcount[]') !== false && strpos($reqForm, 'rqg-co
     'the requisition form has repeatable group rows with a client-contact picker');
 $reqDetail = file_get_contents(__DIR__ . '/../views/ops/requisition_detail.php');
 t_ok(strpos($reqDetail, 'Deployment groups') !== false, 'the requisition detail shows the deployment groups');
+
+t_section('recruitment: tag a candidate to a deployment group + universal back button');
+// candidates carry a group_id, coerced like the other ids, and saved.
+$candCols = array_map(fn($c) => $c['name'], ops_all("PRAGMA table_info(candidates)"));
+t_ok(in_array('group_id', $candCols, true), 'candidates carry a group_id');
+t_ok(nzc_cand('group_id', '') === null && nzc_cand('group_id', '7') === 7, 'group_id is coerced to an int / null');
+t_ok(strpos($candForm, 'name="group_id"') !== false && strpos($candForm, 'REQ_GROUPS') !== false && strpos($candForm, 'fillGroups') !== false,
+    'the candidate form offers the requirement\'s deployment groups');
+t_ok(strpos($reqDetail, "\$grpFilled") !== false && strpos($reqDetail, '>Filled<') !== false,
+    'the requisition detail shows how many of each group are filled');
+
+// Universal "back one step" button on the top bar.
+$layout = file_get_contents(__DIR__ . '/../views/layout_top.php');
+t_ok(strpos($layout, 'id="tbBack"') !== false && strpos($layout, 'history.back()') !== false,
+    'the top bar has a universal back-one-step button');
+t_ok(strpos($layout, 'history.length>1') !== false,
+    'the back button only shows when there is a step to go back to');

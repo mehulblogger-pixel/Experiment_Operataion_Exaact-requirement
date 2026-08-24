@@ -66,6 +66,17 @@
       <input class="form-control" name="proposed_site" id="cand_loc" list="reqLocList" value="<?= e($cand['proposed_site'] ?? '') ?>" placeholder="pick from the requirement, or type">
       <datalist id="reqLocList"></datalist>
       <small class="muted" id="cand_loc_hint"></small></div>
+    <?php // 1c — which deployment group (reporting person / site) this hire fills.
+          //  Shown only when the chosen requirement has groups; populated by JS. ?>
+    <div class="ff" id="cand_group_wrap" style="display:none"><label>Deployment group <span class="muted">— reporting person / site it fills</span></label>
+      <select class="form-control" id="cand_group" name="group_id">
+        <option value="">— none / not split —</option>
+        <?php if (!empty($cand['group_id']) && function_exists('req_groups')):
+          foreach (req_groups((int)($cand['requisition_id'] ?? 0)) as $g): ?>
+            <option value="<?= (int)$g['id'] ?>" <?= (int)($cand['group_id'] ?? 0)===(int)$g['id']?'selected':'' ?>><?= e(((int)$g['headcount']?(int)$g['headcount'].' × ':'').($g['report_display'] ?: 'group').($g['site']?' @ '.$g['site']:'')) ?></option>
+        <?php endforeach; endif; ?>
+      </select>
+      <small class="muted" id="cand_group_hint"></small></div>
 
     <div class="ff"><label>Trade / discipline</label>
       <select class="form-control searchable" id="trade_sel" name="trade_id"><option value="">—</option>
@@ -163,6 +174,19 @@ window.SKILLS = <?= json_encode($skillsByTrade) ?>;
       : 'This requirement has no locations listed.';
   }
   if(reqSel){ reqSel.addEventListener('change', fillLocs); fillLocs(); }
+
+  // 1c — offer the chosen requirement's deployment groups; tag this CV to one.
+  var REQ_GROUPS = <?= json_encode($reqGroups ?? []) ?>;
+  var grpSel = document.getElementById('cand_group'), grpWrap = document.getElementById('cand_group_wrap'), grpHint = document.getElementById('cand_group_hint');
+  function fillGroups(){
+    if(!reqSel || !grpSel) return;
+    var gs = REQ_GROUPS[reqSel.value] || [], keep = grpSel.value;
+    grpSel.innerHTML = '<option value="">— none / not split —</option>';
+    gs.forEach(function(g){ var o=document.createElement('option'); o.value=g.id; o.textContent=g.label; if(String(g.id)===String(keep)) o.selected=true; grpSel.appendChild(o); });
+    if(grpWrap) grpWrap.style.display = gs.length ? '' : 'none';
+    if(grpHint) grpHint.textContent = gs.length ? ('This requirement has ' + gs.length + ' group(s).') : '';
+  }
+  if(reqSel){ reqSel.addEventListener('change', fillGroups); fillGroups(); }
 
   // 1b — carry the requirement's client, designation, SBU and rate onto this CV, so
   //  they are not re-keyed. Only fills fields that are still blank (nothing typed is

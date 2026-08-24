@@ -417,6 +417,7 @@ function ops_migrate() {
     ensure_column('inspectors', 'guarantee_upto', "VARCHAR(20) DEFAULT ''"); // fee is provisional until this date
     ensure_column('agencies', 'guarantee_days', 'INT DEFAULT 90');           // free-replacement window
     ensure_column('candidates', 'requisition_id', 'INT NULL');               // hire is against an approved requisition
+    ensure_column('candidates', 'group_id', 'INT NULL');                     // 1c — which deployment group (reporting person/site) this hire fills
     // CV analysis (keyword extraction for search) + client-submission / interview tracking (§20)
     ensure_column('candidates', 'cv_text', 'MEDIUMTEXT');
     ensure_column('candidates', 'cv_keywords', 'TEXT');
@@ -4511,7 +4512,7 @@ function candidate_name($c) {
     return trim(($c['first_name'] ?? '') . ' ' . ($c['middle_name'] ?? '') . ' ' . ($c['last_name'] ?? '')) ?: '(no name)';
 }
 function nzc_cand($f, $v) {
-    if (in_array($f, ['client_id','call_id','trade_id','skill_id','requisition_id','recruiter_id'], true)) return $v === '' ? null : (int)$v;
+    if (in_array($f, ['client_id','call_id','trade_id','skill_id','requisition_id','recruiter_id','group_id'], true)) return $v === '' ? null : (int)$v;
     if (in_array($f, ['experience_years','expected_rate'], true)) return $v === '' ? 0 : $v;
     return $v;
 }
@@ -4648,8 +4649,8 @@ function ops_candidates($route, $method) {
             $b = $_POST;
             $fields = ['first_name','middle_name','last_name','client_id','call_id','trade_id','skill_id',
                 'designation','source','agency','proposed_site','sbu','experience_years','email','mobile',
-                'cv_link','expected_rate','rate_type','cv_received_date','remarks','requisition_id',
-                'recruiter_id','department','drop_reason','drop_point'];   // Phase 7 — ownership + why/where lost
+                'cv_link','expected_rate','rate_type','cv_received_date','remarks','requisition_id','group_id',
+                'recruiter_id','department','drop_reason','drop_point'];   // Phase 7 — ownership + why/where lost; group_id = which deployment group (1c)
             // §11 duplicate guard — on a NEW candidate, stop and show look-alikes
             // (same mobile / email / name) before creating a second record for the
             // same person. "Save anyway" (dup_ack) proceeds.
@@ -4691,8 +4692,18 @@ function ops_candidates($route, $method) {
             foreach (ops_all("SELECT id, locations FROM requisitions WHERE COALESCE(locations,'')<>''") as $rr)
                 $reqLocations[(int)$rr['id']] = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', (string)$rr['locations']))));
         } catch (Throwable $e) { /* locations column not present on an older install */ }
+        // 1c — each requirement's deployment groups, so a CV can be tagged to the
+        // group (reporting person / site) it fills once the requisition is chosen.
+        $reqGroups = [];
+        if (function_exists('req_groups')) {
+            foreach (requisitions_list(true) as $rr) {
+                $gs = req_groups((int)$rr['id']);
+                if ($gs) $reqGroups[(int)$rr['id']] = array_map(fn($g) => ['id' => (int)$g['id'],
+                    'label' => ((int)$g['headcount'] ? ((int)$g['headcount'] . ' × ') : '') . ($g['report_display'] ?: 'group') . ($g['site'] ? ' @ ' . $g['site'] : '')], $gs);
+            }
+        }
         view('ops/candidate_form', ['cand' => $cand, 'clients' => clients_list(), 'depCalls' => $depCalls, 'agencies' => $agencies,
-            'requisitions' => requisitions_list(true), 'preReq' => $preReq, 'reqLocations' => $reqLocations,
+            'requisitions' => requisitions_list(true), 'preReq' => $preReq, 'reqLocations' => $reqLocations, 'reqGroups' => $reqGroups,
             'cfvals' => $cand ? custom_values_map('candidate', $cand['id']) : [],
             'dupes' => $dupBlock ?? [], 'prefill' => $prefill ?? null,
             'rccUsers' => function_exists('rcc_users') ? rcc_users() : [], 'rccDepts' => function_exists('rcc_departments') ? rcc_departments() : [],

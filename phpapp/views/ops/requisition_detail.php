@@ -47,13 +47,15 @@ $h = $health ?? null; if ($h): [$hband, $htone] = $h['band']; ?>
 
 <?php // 1c — deployment groups: who reports to whom, and where. ?>
 <?php if (!empty($groups)): ?>
+<?php $grpFilled = []; foreach (($cands ?? []) as $cd) { $gg = (int)($cd['group_id'] ?? 0); if ($gg) $grpFilled[$gg] = ($grpFilled[$gg] ?? 0) + 1; } ?>
 <div class="panel"><h3 class="tab-sub" style="margin-top:0">Deployment groups <span class="muted">— <?= array_sum(array_map(fn($g)=>(int)$g['headcount'], $groups)) ?> people across <?= count($groups) ?> group(s)</span></h3>
   <table class="dt">
-    <thead><tr><th class="num">How many</th><th>Reports to</th><th>Site / location</th><th>Notes</th></tr></thead>
+    <thead><tr><th class="num">How many</th><th class="num">Filled</th><th>Reports to</th><th>Site / location</th><th>Notes</th></tr></thead>
     <tbody>
-    <?php foreach ($groups as $g): ?>
+    <?php foreach ($groups as $g): $fil = (int)($grpFilled[(int)$g['id']] ?? 0); ?>
       <tr>
         <td class="num"><b><?= (int)$g['headcount'] ?></b></td>
+        <td class="num"><span class="pill <?= $fil >= (int)$g['headcount'] && (int)$g['headcount'] > 0 ? 'p-ok' : 'p-warn' ?>"><?= $fil ?> / <?= (int)$g['headcount'] ?></span></td>
         <td><?= e($g['report_display'] ?: '—') ?><?php if (!empty($g['report_phone_display'])): ?> <span class="muted">· <?= e($g['report_phone_display']) ?></span><?php endif; ?></td>
         <td><?= e($g['site'] ?: '—') ?></td>
         <td class="muted"><?= e($g['notes'] ?: '—') ?></td>

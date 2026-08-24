@@ -460,6 +460,11 @@
   <div class="main">
     <header class="topbar-slim">
       <button class="nav-toggle" aria-label="Menu" onclick="document.getElementById('side').classList.add('open');document.getElementById('scrim').classList.add('on');">☰</button>
+      <?php // Universal "back one step" — retraces the exact drill-down path (module →
+            //  module → record), one click at a time, back to where you started. Hidden
+            //  when there is nothing to go back to (a fresh tab / deep link, or the home
+            //  screen), so it never dead-ends. Absolute position stays on the breadcrumbs. ?>
+      <button class="nav-toggle tb-back" id="tbBack" type="button" aria-label="Back one step" title="Back one step" onclick="history.back()" hidden style="font-weight:700">←</button>
       <a class="tb-brand" href="/"><?= e(app_name()) ?></a>
       <?php // Records, not screens. The box in the rail below filters the MENU;
             // this one searches what is IN the registers. They were confusable
@@ -488,6 +493,10 @@
         <a class="tb-logout" href="/logout">Logout</a>
       </span>
     </header>
+    <script>(function(){var b=document.getElementById('tbBack');if(!b)return;
+      // Show it once we're at least one step into the app (not a fresh tab), and not on home.
+      try{ if(history.length>1 && location.pathname!=='/' && location.pathname!=='') b.hidden=false; }catch(e){}
+    })();</script>
     <?php // Web-first punch bar: a field engineer punches in/out for today from
           // the very top of the app on any device — no Android app, no job screen.
           // Renders to nothing for anyone who is not a field engineer. ?>
