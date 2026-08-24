@@ -22,9 +22,9 @@ overrides and the Settings→Roles editor can change any of this at runtime.
 | **Jobs** ² | E·C | E·C | Allocate | Allocate | E·C | View | E·C | E·C | Allocate | View ⚠ᵇ | View/Close **own** ᵇ |
 | **Vouchers** ³ | Full | Full | View | View | Approve | — | Approve | Approve | Approve | — | **own** V/E/Submit |
 | **Profitability** ⁴ | View | View | View | View | View | — | View | — | — | View | — |
-| **Business Partners** ⁵ | E | E | View | View | E | E | View | View | View | — | ⚠ Create/Edit anyone |
+| **Business Partners** ⁵ | E | E | E | E | E | E | E | E | E | View | — |
 | **Contracts (open)** ⁶ | Endorse+Approve | Endorse+Approve | Endorse | Endorse | Approve | Approve | Endorse | — | — | Register/Reopen | — |
-| **Purchase Orders** ⁷ | E | E | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ Create/Edit |
+| **Purchase Orders** ⁷ | E | E | E | E | E | E | E | E | E | E | — |
 | **Hiring / Candidates** ⁸ | E | E | View | View | E | — | E | E | — | — | — |
 | **Inspector master** ⁹ | E | E | E | E | E | E | E | — | — | — | — |
 | **Attendance** ¹⁰ | Recon | Recon | Recon | Recon | Recon | Recon | Recon | Recon | Recon | — | self-mark ⁱⁱ |
@@ -58,9 +58,9 @@ overrides and the Settings→Roles editor can change any of this at runtime.
 2. **Jobs** — module gate `mod.jobs.view` (`ops.php:2244`). Allocate/edit `is_coordinator_level()` (`ops.php:5163`) → all admin-level + AM + CO. **Close (`job-close`) is gated on `ops.job.close`** (R2 fixed): `ops_require(is_master() || can('ops.job.close') || job_owned_by_me($id))` (`ops.php` job-close) → CO, BM, OM (hold the permission) + master + the **job-owner inspector** bypass (`ops.php:2384-2388`). Roles that only *view* jobs — **FIN, SBU, BAM, AM** — can no longer close them (none hold `ops.job.close`). Report-approve `can_approve_report()` (`workforce.php:669-677`).
 3. **Vouchers** — register `is_coordinator_level()` (`ops.php:4890`); a voucher's owner sees/edits their own (`can_view_voucher`/`can_edit_voucher` `ops.php:4738,4761`). Submit=owner or coord (`4989`); approve=coord, status SUBMITTED (`4993`); paid=coord (`4998`); reopen=coord, **no source-status guard** (`5002`, gaps §B-2). No segregation of duties on approve (gaps §B-2).
 4. **Profitability** — computed, read-gate only `can('data.profitability')` (`ops.php:6124`); call-profit adds `data.revenue`/admin (`callprofit.php:62`). No lifecycle (see doc 03).
-5. **Business Partners** — list gated `mod.clients/vendors.view` (`index.php:879`), but **create/edit/detail/sub-records have NO guard** and run before the module gate (`index.php:907,997,1031,1140`) → any logged-in user, incl. INSPECTOR. Gaps §A. "E" for BM/BAM reflects their module edit default; the ⚠ is the real story.
+5. **Business Partners** — list gated `mod.clients/vendors.view` (`index.php:879`); create/edit/detail/sub-records are now **guarded (R1 fixed)**: create/edit/add need `mod.clients.edit`/`mod.vendors.edit`/coordinator-level/master; the 360 detail needs the matching view rights. An INSPECTOR can no longer create, edit or read partner records.
 6. **Contracts (open)** — register `can('crm.contract.register')||is_master()` (`crm.php:1830`) → FIN; endorse `can_endorse_contract_open()` (`contracts.php:473-477`) → OM,SBU,BD,ADMIN + `users.manage.branch` (BM,BAM); approve `can_approve_contract_open()` (`contracts.php:478-481`) → BM,BAM; reopen `crm.contract.register` (`contracts.php:690`). **Note:** the *partner-screen* contract-add path (`index.php` partner-add `kind=contract`) is now gated by the **same** `can('crm.contract.register')||is_master()` check (R4 fixed) — so both doors are Accounts-only.
-7. **Purchase Orders** — create/edit/view all via `partner-add kind=po` / `po` with **no permission guard** (`index.php:1049,1164`) → any logged-in user. Gaps §A.
+7. **Purchase Orders** — now **guarded (R1 fixed)**: viewing a PO (`po`) needs `mod.clients/vendors.view` (or coordinator-level/master); mutating one (pull-quote, add line) or adding via `partner-add kind=po` needs the edit right or `finance.reconcile`. No longer open to any logged-in user.
 8. **Hiring** — module gate `mod.hiring.view` (`ops.php:2263`); create/edit & stage-move `is_coordinator_level()` (`ops.php:4317,4486,4557`). Engagement-mode config `is_admin_level()` (`ops.php:2502`).
 9. **Inspector master** — `/m/inspectors`, master config `access='admin'` → `is_admin_level()` (`ops.php:2049,2460`); allowances/rates `is_master()` (`ops.php:3418`); salary field gated `can_see_salary()` (`ops.php:3428`).
 10. **Attendance** — reconcile `is_coordinator_level()` (`ops.php:6177`); **ⁱⁱ** self-mark (`attend-mark`) is intentionally ungated beyond "login linked to an inspector" (`attend.php:189`, gaps §B-4).

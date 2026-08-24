@@ -9,19 +9,25 @@ blocks it.
 
 ---
 
-## R1 — HIGH · Client/Vendor/PO/Contract create & edit have NO permission guard
-**What:** `partner-new` (`index.php:907`), `partner-edit` (`:997`), `partner-add`
-(contact/address/registration/**contract**/relationship/note/**po**) (`:1031`), the
-partner 360 detail `partner` (`:1140`), and PO view/line-add `po` (`:1164`) run **before**
-`ops_dispatch()` (called at `index.php:1221`), so the module gate never touches them and
-none carries an `ops_require`. Only `require_login()` (`index.php:767`) applies.
-**Who reaches it:** *any* authenticated user of *any* role — including an **INSPECTOR**.
-**Why it matters:** anyone can create/edit any client or vendor, **register a contract**,
-create a **purchase order**, and roll up a contract's value — the commercial master data.
-The `clients`/`vendors` *list* is gated (`index.php:879`) but the records behind it are not.
-**Fix (recommended):** add `ops_require(can('mod.clients.edit')||can('mod.vendors.edit')||is_coordinator_level())`
-to the create/edit/add routes, and `can('mod.clients.view')||…` to `partner`/`po` view;
-gate contract-add by `crm.contract.register`/endorse rights and PO-add by an ops/finance right.
+## R1 — HIGH · Client/Vendor/PO/Contract create & edit had NO permission guard — **FIXED**
+**What:** `partner-new`, `partner-edit`, `partner-add`
+(contact/address/registration/**contract**/relationship/note/**po**), the partner 360
+detail `partner`, and PO view/line-add `po` run **before** `ops_dispatch()`, so the module
+gate never touched them and none carried an `ops_require` — only `require_login()`.
+**Who reached it:** *any* authenticated user of *any* role — including an **INSPECTOR** —
+could create/edit any client or vendor, register a contract, create a purchase order, and
+roll up a contract's value.
+**Fixed this session (`index.php`):**
+- **Create / edit / add** (`partner-new`, `partner-edit`, `partner-add`) →
+  `ops_require(is_master() || can('mod.clients.edit') || can('mod.vendors.edit') || is_coordinator_level())`
+  (a coordinator may onboard a party during intake).
+- **View** (`partner` 360, `po`) → the same with the **view** rights.
+- **PO mutations** (pull-quote, add line) → the edit right (or `finance.reconcile`).
+- **Contract sub-form** keeps its stricter Accounts-only gate (`crm.contract.register`, R4).
+An inspector can no longer create/edit or even read partner master data. Tests:
+`tests/test_partner_routes_guarded.php`. **Note:** coordinators are allowed by tier here
+(they lack `mod.clients.edit` by default but must onboard during intake) — grant them the
+edit module explicitly if you prefer ability-only gating.
 
 ## R2 — HIGH · `job-close` had no permission guard (ignored `ops.job.close`) — **FIXED**
 **What:** the `job-close` handler had **no `ops_require`**; it was protected only by the

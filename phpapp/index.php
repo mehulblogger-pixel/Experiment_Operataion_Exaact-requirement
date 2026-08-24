@@ -905,6 +905,12 @@ if ($route === 'clients' || $route === 'vendors') {
 }
 
 if ($route === 'partner-new') {
+    // R1 — client/vendor create runs before the module gate, so guard it here.
+    // Editing commercial master data needs the clients/vendors edit right; a
+    // coordinator may also onboard a party while raising a call (intake).
+    ops_require(is_master() || can('mod.clients.edit') || can('mod.vendors.edit')
+        || (function_exists('is_coordinator_level') && is_coordinator_level()),
+        'You do not have permission to add ' . Tl('client') . ' / ' . Tl('vendor') . ' records.');
     // Picker mode: the form was opened in a small window from a "+ Add new" link
     // beside a dropdown (quote, call, candidate…). On save we hand the new record
     // back to that window instead of redirecting, so it is selected there.
@@ -995,6 +1001,10 @@ if ($route === 'partner-new') {
 }
 
 if ($route === 'partner-edit') {
+    // R1 — client/vendor edit runs before the module gate; guard it here.
+    ops_require(is_master() || can('mod.clients.edit') || can('mod.vendors.edit')
+        || (function_exists('is_coordinator_level') && is_coordinator_level()),
+        'You do not have permission to edit ' . Tl('client') . ' / ' . Tl('vendor') . ' records.');
     $p = find_partner((int)($_GET['id'] ?? 0));
     if (!$p) { http_response_code(404); return view('notfound'); }
     if ($method === 'POST') {
@@ -1033,6 +1043,13 @@ if ($route === 'partner-add' && $method === 'POST') {
     if (!$p) { http_response_code(404); return view('notfound'); }
     $kind = $_GET['kind'] ?? '';
     $b = $_POST;
+    // R1 — every partner-add sub-form (contact / address / registration / relationship /
+    // note / PO) writes commercial master data and ran with no permission check. Guard
+    // the whole route with the clients/vendors edit right (a coordinator may also add
+    // during intake). The contract sub-form has its OWN stricter gate below (R4).
+    ops_require(is_master() || can('mod.clients.edit') || can('mod.vendors.edit')
+        || (function_exists('is_coordinator_level') && is_coordinator_level()),
+        'You do not have permission to change ' . Tl('client') . ' / ' . Tl('vendor') . ' records.');
     // Registering a contract is Accounts/back-office work — the same gate the CRM
     // "register contract" path uses (crm.php:1830). This partner-screen door used
     // to create a partner_contracts row with no permission check at all, so a
@@ -1148,6 +1165,12 @@ if ($route === 'partner-add' && $method === 'POST') {
 }
 
 if ($route === 'partner') {
+    // R1 — the partner 360 (contacts, contracts, POs, commercial data) ran with no
+    // permission check; require at least read on clients or vendors (finance needs it
+    // for billing; a coordinator during intake).
+    ops_require(is_master() || can('mod.clients.view') || can('mod.vendors.view')
+        || can('finance.reconcile') || (function_exists('is_coordinator_level') && is_coordinator_level()),
+        'You do not have permission to view this ' . Tl('client') . ' / ' . Tl('vendor') . ' record.');
     $p = find_partner((int)($_GET['id'] ?? 0));
     if (!$p) { http_response_code(404); return view('notfound'); }
     $subs = $pdo->prepare("SELECT * FROM business_partners WHERE parent_id = ?"); $subs->execute([$p['id']]);
@@ -1172,6 +1195,17 @@ if ($route === 'partner') {
 }
 
 if ($route === 'po') {
+    // R1 — the purchase-order screen (a client's PO, its line items and value roll-up)
+    // ran with no permission check. Reading needs clients/vendors view; any change
+    // (pull-quote, add line) needs the edit right (or coordinator/finance at intake).
+    ops_require(is_master() || can('mod.clients.view') || can('mod.vendors.view')
+        || can('finance.reconcile') || (function_exists('is_coordinator_level') && is_coordinator_level()),
+        'You do not have permission to view purchase orders.');
+    if ($method === 'POST') {
+        ops_require(is_master() || can('mod.clients.edit') || can('mod.vendors.edit')
+            || can('finance.reconcile') || (function_exists('is_coordinator_level') && is_coordinator_level()),
+            'You do not have permission to change a purchase order.');
+    }
     $s = $pdo->prepare("SELECT po.*, b.legal_name pn, b.display_name pdn FROM partner_purchase_orders po LEFT JOIN business_partners b ON b.id=po.partner_id WHERE po.id=?");
     $s->execute([(int)($_GET['id'] ?? 0)]);
     $po = $s->fetch();
