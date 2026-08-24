@@ -12,12 +12,18 @@ Built:
 - **One rate quote → many contracts** for group companies — Accounts register additional
   contracts under the same quote for related subsidiaries (same rates, own numbers); default
   stays one primary contract (`crm_add_group_contract`, `tests/test_quote_group_contracts.php`).
-- **Duplicate branch offices** blocked at both unguarded insert paths
-  (`tests/test_office_no_duplicate.php`). ⚠ existing DB dupes need a manual merge (not auto-run).
+- **Duplicate branch offices** blocked at every application creation path — the "+ Add new"
+  quick-add (`ops.php` kind=office) returns the existing office instead of duplicating, the
+  Masters office-save rejects a duplicate name, and `office_quick_create()` already deduped
+  (`tests/test_office_no_duplicate.php`). A hard DB name-unique index was evaluated and
+  **deliberately not added**: the codebase intentionally seeds the same office name with
+  different codes (main seed `AHM` vs demo `AMD`), so a name-unique constraint breaks the
+  demo/seed reloads — the app-level guards are the right guarantee. **Existing** duplicates
+  are cleaned with the already-built **`office_merge()`** tool (UI on the Organisation &
+  people screen, `orgadmin.php` `office-merge` — re-points calls/jobs/users, then removes the
+  dup; refuses to delete an in-use office).
 - Research memo (real-CRM comparison, edge cases) delivered in chat; not forcing a quote per
   order is deliberate and matches SAP/Salesforce/Oracle rate-contract + call-off practice.
-Follow-up (minor): a tool to **merge existing duplicate offices** (re-point calls/jobs/users)
-is not built — deliberately, since it mutates references; do it by hand or ask for a guarded tool.
 
 ## 🧭 Session wrap-up — screen de-clutter + gap fixes R1–R11 (Aug 2026) — WHAT'S LEFT
 
