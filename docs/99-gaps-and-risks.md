@@ -44,14 +44,20 @@ foot-gun with no in-product warning, and recovery needed server/DB access.
 consider also (a) pre-ticking the effective set so a no-op save preserves access, and
 (b) a confirm when a save would remove a module an admin currently holds.
 
-## R4 — HIGH · Contract registration has two doors, one unguarded
+## R4 — HIGH · Contract registration has two doors, one unguarded — **permission door now closed**
 **What:** the CRM path `quote-contract` requires `crm.contract.register` (`crm.php:1830`),
-but `partner-add kind=contract` (`index.php:1099-1133`) creates a `partner_contracts` row
+but `partner-add kind=contract` (`index.php`) used to create a `partner_contracts` row
 with **no permission check** (only number-uniqueness).
-**Why it matters:** the second door bypasses both the permission and the endorse→approve
-two-signature control (`contracts.php`), so a contract can be created off-book.
-**Fix:** guard the partner-screen contract-add with the same `crm.contract.register`/master
-check, and route new numbers through the PENDING→endorse→approve lifecycle.
+**Why it mattered:** the second door bypassed both the permission and the endorse→approve
+two-signature control (`contracts.php`), so a contract could be created off-book — by a
+salesperson, coordinator or even an inspector.
+**Fixed this session:** the partner-screen contract-add is now gated by
+`ops_require(can('crm.contract.register') || is_master())` — the same permission the CRM
+path uses — so only Accounts/back-office (and master) can register a contract from either
+door (`index.php` partner-add; `tests/test_contract_backdoor_guard.php`).
+**Still open (lower risk):** new numbers created via this door do not yet run through the
+PENDING→endorse→approve lifecycle — a follow-up if the two-signature control is wanted on
+this path too.
 
 ## R5 — MEDIUM · Voucher: reopen from any state + no segregation of duties
 **What:** `voucher` reopen has **no source-status guard** — a coordinator can revert **any**

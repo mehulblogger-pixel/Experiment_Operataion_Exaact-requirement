@@ -1033,6 +1033,16 @@ if ($route === 'partner-add' && $method === 'POST') {
     if (!$p) { http_response_code(404); return view('notfound'); }
     $kind = $_GET['kind'] ?? '';
     $b = $_POST;
+    // Registering a contract is Accounts/back-office work — the same gate the CRM
+    // "register contract" path uses (crm.php:1830). This partner-screen door used
+    // to create a partner_contracts row with no permission check at all, so a
+    // salesperson, coordinator or even an inspector could register a contract
+    // off-book, bypassing the won-quote → Finance handoff. A contract is created
+    // from the won quotation by Accounts, not here by anyone who reaches this form.
+    if ($kind === 'contract') {
+        ops_require(can('crm.contract.register') || is_master(),
+            'Only Accounts / back-office can register a contract. It is created from the won quotation, not here.');
+    }
     $map = [
         'contact' => ['partner_contacts', ['name','designation','department','project','email','mobile','phone','address_id'], 'contacts'],
         'address' => ['partner_addresses', ['address_type','label','line1','line2','town_village','district','city','state','pincode','country'], 'addresses'],
