@@ -2,6 +2,64 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🧭 Session wrap-up — screen de-clutter + gap fixes R1–R11 (Aug 2026) — WHAT'S LEFT
+
+Context: this session decluttered the inspector job view + voucher, hardened the
+Sales→Finance→Operations boundary, and worked through the whole `docs/99-gaps-and-risks.md`
+register (R1–R11). All committed & pushed to `claude/quotation-management-workflow-5dokb2`.
+Test suite 2217 passing / 3 pre-existing unrelated failures. **None of it is live until the
+branch is deployed by the pipeline.** The items below are what remains.
+
+### A. Needs your eyes / verification (nothing to code unless it's wrong)
+- **Deploy the branch and re-test the full flow** end to end. I cannot deploy.
+- **Inspector voucher on a real phone** — the 12-column grid now reflows to one card per
+  day (media query ≤720px). Verified headless (markup + recalc JS intact) but **not seen on
+  a physical phone**. Check: each day reads as a card, number inputs are thumb-friendly,
+  live totals still update. CSS-only to adjust if off.
+- **3 pre-existing test failures** (dependency / Release config) are unrelated to this work
+  and were failing before it — untouched. Fix separately if wanted.
+
+### B. Residuals from the gap fixes (deliberately left; each documented in docs/99)
+- **R4 / contracts** — the partner-screen contract-add is now permission-gated (Accounts
+  only), but a number created via that door still does **not** run through the
+  PENDING→endorse→approve two-signature lifecycle (the CRM quote→contract path does). Wire
+  that door through the lifecycle if the two-signature control is wanted everywhere.
+- **R9 / cost double-write** — optimistic locking now covers call & job *edit*. The *cost
+  picture* is still written from two sides (job-closure expenses by the coordinator vs the
+  inspector's voucher) — a data-model overlap, not a concurrent-edit race. Left as-is.
+- **R10 / vestigial fields** — `jobs.stage`, `report_docs` ARCHIVED and legacy
+  `calls.status`=CLOSED are annotated in-code but **not wired or removed**. The ops-desk
+  `report_pending` metric consequently is always 0 — wire `jobs.stage` (or derive from
+  closed job + report_approval=PENDING) or drop the unused values before relying on them.
+- **R11 / Admin area** — ASST_MANAGER & MARKETING_MANAGER no longer see "Admin", but
+  **COORDINATOR still does** via the read-only Masters tile (`mod.masters.view`). Fully
+  separating Masters would break BRANCH_APP_MANAGER (edits masters, has no Directory area)
+  or require dropping coordinators' masters-view — left until the Masters IA is reworked.
+- **R1 / partner routes** & **R11 / SLA** — coordinators are allowed here by **tier**
+  (`is_coordinator_level`), not by a specific permission, because they must onboard a
+  client/vendor and set SLAs during intake. If you prefer strict ability-only gating,
+  grant coordinators `mod.clients.edit` / `mod.vendors.edit` explicitly and drop the tier
+  clause.
+- **R3** — existing logins that already carry a *custom* permission set keep it until
+  re-saved (the per-user override rule); the effective-pre-tick only helps on the next edit.
+- **R7** — a SR_INSPECTOR with **no linked `inspector_id`** gets the inspector dashboard
+  branch with empty KPIs; link them to an inspector record (edge case).
+
+### C. Guidance given but NOT yet built (awaiting your green light)
+These were the "just guide me" items — advice delivered, no code written:
+- **Sales→Finance→Operations wall (visible handoff)** — beyond closing the off-book door
+  (R4 done), the *visible* half is not built: on an **Accepted/Won** quote show
+  "Won — handed to Accounts for contract registration" and **lock the accepted quote to
+  view-only for sales** (changes go through a revision) so the boundary is unmistakable.
+- **Coordinator screen polish** — the call form and job detail are already tabbed with the
+  management panels folded, so I judged a further pass *marginal* and did not do it. Still
+  offered: collapse the advanced call-form sections (credit / cross-office / patterns)
+  behind one "More options" fold, and fold the coordinator job-detail panels they don't act
+  on. Say the word if you want it.
+
+### D. Standing offer
+- Open a PR for the branch (not opened — you haven't asked).
+
 ## 🗓️ Scheduling board + capacity + best-inspector suggestion (Aug 2026) — SURFACE
 
 The "missing scheduling core" was ~70% already built (availability matrix, office
