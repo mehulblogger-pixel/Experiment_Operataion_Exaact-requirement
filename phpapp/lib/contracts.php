@@ -525,6 +525,62 @@ function contract_pending_summary($c) {
 //  — the owner, the branch manager and back-office — rather than closed silently.
 // ---------------------------------------------------------------------------
 function contract_idle_days() { $d = (int)setting_get('contract_idle_close_days', 60); return $d > 0 ? $d : 60; }
+// How many days before the idle-close a heads-up goes out (and the on-screen
+// warning appears), so a close is never the first anyone hears of it.
+function contract_idle_warn_days() { $d = (int)setting_get('contract_idle_warn_days', 14); return $d > 0 ? $d : 14; }
+
+// How close an OPEN contract is to being auto-closed for inactivity — the SAME
+// rule the cron enforces, exposed so it can be SHOWN before it acts. Returns
+// ['due'=>bool, 'days_left'=>int, 'close_on'=>date, 'last'=>date, 'pending'=>str].
+// 'due' is true once inside the warning window (days_left may be <=0 = overdue).
+function contract_idle_status($c) {
+    $os = strtoupper((string)($c['open_status'] ?? 'OPEN'));
+    if ($os !== 'OPEN' || (int)($c['is_active'] ?? 1) !== 1) return ['due' => false];
+    $last = contract_last_activity_date($c);
+    if ($last === '') return ['due' => false];          // unknown → the cron leaves it too
+    $closeOn  = date('Y-m-d', strtotime($last . ' +' . contract_idle_days() . ' days'));
+    $daysLeft = (int)floor((strtotime($closeOn) - strtotime(date('Y-m-d'))) / 86400);
+    return [
+        'due'       => $daysLeft <= contract_idle_warn_days(),
+        'days_left' => $daysLeft,
+        'close_on'  => $closeOn,
+        'last'      => $last,
+        'pending'   => contract_pending_summary($c),
+    ];
+}
+
+// A heads-up BEFORE the idle auto-close, so a contract is never closed out from
+// under operations unannounced. One email per contract per warning window; it
+// re-arms automatically if activity resumes and pushes the close date out (the
+// flag is keyed on the activity date it was based on).
+function contracts_idle_warn($today = null) {
+    $today = $today ?: date('Y-m-d');
+    $rows = ops_all("SELECT c.*, q.id qid, q.quote_no, q.client_name
+                     FROM partner_contracts c
+                     LEFT JOIN quotations q ON q.contract_id = c.id AND q.is_current=1
+                     WHERE COALESCE(c.open_status,'OPEN')='OPEN' AND COALESCE(c.is_active,1)=1");
+    $warned = 0;
+    foreach ($rows as $c) {
+        $st = contract_idle_status($c);
+        if (empty($st['due']) || $st['days_left'] < 0) continue;    // not in window, or already due to close
+        if ((string)($c['idle_notified'] ?? '') === (string)$st['last']) continue;   // already warned for this window
+        $to = contract_responsible_emails($c);
+        if ($to !== '') {
+            $subj = 'Contract going idle — auto-closes ' . fdate($st['close_on']) . ': ' . $c['contract_number'];
+            $body = "Contract " . $c['contract_number'] . ($c['title'] ? ' — ' . $c['title'] : '')
+                . "\nClient: " . ($c['client_name'] ?: '—')
+                . "\n\nNo activity since " . fdate($st['last']) . ". With no further " . Tlp('call') . " or "
+                . Tlp('job') . " raised against it, it will auto-close on " . fdate($st['close_on'])
+                . " (" . $st['days_left'] . " day(s) away)."
+                . ($st['pending'] !== '' ? "\nStill pending: " . $st['pending'] . "." : "")
+                . "\n\nTo keep it open, raise work against it. To let it close, no action is needed.\n\n" . app_name();
+            ops_mail($to, $subj, $body, '', 'contract_idle_warn');
+        }
+        db()->prepare("UPDATE partner_contracts SET idle_notified=? WHERE id=?")->execute([(string)$st['last'], (int)$c['id']]);
+        $warned++;
+    }
+    return $warned;
+}
 
 function contracts_idle_autoclose($today = null) {
     $today = $today ?: date('Y-m-d');

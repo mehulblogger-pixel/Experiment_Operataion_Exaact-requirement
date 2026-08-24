@@ -11,6 +11,19 @@
   <a class="btn secondary" href="/partner?id=<?= (int)$c['partner_id'] ?>&tab=contracts">← Contracts</a>
 </div>
 
+<?php // ---- Going-idle heads-up: show the same idle rule the cron enforces, BEFORE
+      // it acts, so an auto-close is never the first anyone hears of it. ----------
+  if (function_exists('contract_idle_status')) { $idle = contract_idle_status($c);
+  if (!empty($idle['due']) && (int)$idle['days_left'] >= 0): ?>
+  <div class="msg msg-warning" style="margin-top:14px">
+    <b>Going idle.</b> No activity since <?= e(fdate($idle['last'])) ?>. Unless a <?= e(Tlp('call')) ?> or <?= e(Tlp('job')) ?>
+    is raised against it, this contract auto-closes on <b><?= e(fdate($idle['close_on'])) ?></b>
+    (<?= (int)$idle['days_left'] ?> day<?= (int)$idle['days_left'] === 1 ? '' : 's' ?> away).
+    <?php if (!empty($idle['pending'])): ?><br>Still pending: <?= e($idle['pending']) ?>.<?php endif; ?>
+    Raise work to keep it open, or let it close.
+  </div>
+  <?php endif; } ?>
+
 <?php // ---- Commercial ---------------------------------------------------- ?>
 <?php if ($canSeeMoney): ?>
 <div class="kpi-row" style="margin:16px 0">
