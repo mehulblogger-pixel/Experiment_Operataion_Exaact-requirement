@@ -333,8 +333,11 @@ function module_defaults($role) {
             $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','clients','vendors','masters','reports','users','complaints','capa','audits','datacontrol','portal'];
             $view = ['inquiries','quotes','crm_orders','crm_reports','invoicing','profitability','overheads']; break;
         case 'BRANCH_APP_MANAGER':
+            // R8 — this role holds the IDEMS config permissions (idems.type.manage,
+            // idems.timestamp.edit) but had no mod.idems.view, so there was no Reporting
+            // rail item and the config screens were reachable only via Admin tiles.
             $edit = ['masters','overheads','users'];
-            $view = ['calls','jobs','reports']; break;
+            $view = ['calls','jobs','reports','idems']; break;
         case 'OPERATION_MANAGER':
             $edit = ['calls','jobs','idems','vouchers','hiring','reconcile','complaints','capa','portal'];
             $view = ['crm_orders','clients','vendors','masters','profitability','reports']; break;

@@ -122,12 +122,13 @@ upload (`job_detail.php`, `bills.php`), site-ops (`pdso.php`), and the phone-fir
 declutter (R7 + the inspector declutter share one predicate). `is_inspector()` stays the
 strict literal-role check for strict-role behaviour. Tests: `tests/test_sr_inspector_field_ui.php`.
 
-## R8 — LOW-MED · BRANCH_APP_MANAGER holds IDEMS config perms but not `mod.idems.view`
-**What:** the role has `idems.type.manage`/`idems.timestamp.edit` but no `mod.idems.view`
-(`access.php:335-337,445-447`), so there is no Reporting rail item; the config screens are
-reachable only via Admin tiles.
-**Fix:** grant `mod.idems.view` (read) to this role, or surface the config screens under a
-visible heading.
+## R8 — LOW-MED · BRANCH_APP_MANAGER held IDEMS config perms but not `mod.idems.view` — **FIXED**
+**What:** the role had `idems.type.manage`/`idems.timestamp.edit` but no `mod.idems.view`, so
+there was no Reporting rail item; the config screens were reachable only via Admin tiles.
+**Fixed this session:** `module_defaults('BRANCH_APP_MANAGER')` now includes `idems` in its
+**view** set (read-only — not edit), so the Reporting module and its config screens appear on
+the rail (`access.php`). Tests: `tests/test_bam_idems_view.php`. (Existing BAM logins that
+already carry a custom permission set keep it until re-saved — the per-user override rule.)
 
 ## R9 — LOW-MED · Concurrent edit with no record locking
 **What:** a call/job can be edited by a coordinator and a manager with no lock; job-closure
