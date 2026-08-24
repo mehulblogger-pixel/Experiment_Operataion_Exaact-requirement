@@ -2309,7 +2309,7 @@ function ops_module_gate($route) {
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads','opportunity-delete'=>'leads',
         'opportunity-move'=>'leads','opportunity-quote'=>'leads','opportunity-from-lead'=>'leads',
-        'opportunity-raise-order'=>'leads',
+        'opportunity-raise-order'=>'leads','opportunity-send-to-accounts'=>'leads','opportunity-contract'=>'leads',
         'pipelines'=>'leads','pipeline'=>'leads','pipeline-new'=>'leads','pipeline-save'=>'leads',
         'pipeline-stage-add'=>'leads','pipeline-stage-delete'=>'leads','pipeline-default'=>'leads',
         'industry'=>'settings','industry-apply'=>'settings',

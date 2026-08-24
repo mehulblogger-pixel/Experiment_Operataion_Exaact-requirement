@@ -121,6 +121,11 @@ function opp_migrate() {
     }
     // Added after the table shipped, so an existing install gains it.
     ensure_column('opportunities', 'call_id', 'INT NULL');
+    // A deal WON without a quotation can be handed to Accounts to register a
+    // contract, exactly like a quoted win. sent_to_accounts_at records the handoff
+    // (drives Finance's queue); contract_id links the registered contract back.
+    ensure_column('opportunities', 'sent_to_accounts_at', "VARCHAR(30) DEFAULT ''");
+    ensure_column('opportunities', 'contract_id', 'INT NULL');
     opp_seed_pipeline();
 }
 
@@ -695,6 +700,81 @@ function opp_raise_order($oppId, array $b = []) {
     return ['ok' => true, 'call_id' => $callId, 'code' => $code, 'quote' => $q];
 }
 
+// ---- Direct win (no quotation) → Accounts registers the contract ------------
+//  A deal can be won without ever raising a quotation (an order received direct).
+//  Rather than let it skip Finance and drop straight onto a call, the sales owner
+//  hands it to Accounts here; Accounts then register a contract straight from the
+//  deal, which runs the SAME PENDING → endorse → approve → OPEN lifecycle a quoted
+//  win does. Calls are raised from the OPEN contract, not from the deal.
+
+// Sales hands the won deal to Accounts (no call created; no contract yet).
+function opp_send_to_accounts($oppId) {
+    opp_migrate();
+    $o = opp_row($oppId);
+    if (!$o) return ['err' => 'That opportunity no longer exists.'];
+    if (($o['status'] ?? '') !== 'WON') return ['err' => 'Only a won deal is handed to Accounts.'];
+    if (empty($o['partner_id'])) return ['err' => 'Add the customer to the master first, so the contract has somewhere to point.'];
+    if (!empty($o['call_id'])) return ['err' => 'A work order has already been raised from this deal.'];
+    if (!empty($o['contract_id'])) return ['err' => 'A contract has already been registered for this deal.'];
+    db()->prepare("UPDATE opportunities SET sent_to_accounts_at=?, updated_at=? WHERE id=?")
+        ->execute([date('c'), date('c'), (int)$o['id']]);
+    if (function_exists('act_log')) act_log('OPPORTUNITY', (int)$o['id'], 'SYSTEM',
+        'Handed to Accounts to register the contract (won without a quotation)', ['auto' => 1, 'partner_id' => $o['partner_id'] ?: null]);
+    return ['ok' => true];
+}
+
+// Accounts register the contract from the deal. Mirrors the quote→contract path
+// (crm.php quote-contract): a NEW number is registered PENDING and held for the
+// two-signature endorse→approve before it OPENs; an existing OPEN number for the
+// same client (rate-contract draw-down) is reused. The contract links back to the deal.
+function opp_register_contract($oppId, array $b = []) {
+    opp_migrate();
+    $o = opp_row($oppId);
+    if (!$o) return ['err' => 'That opportunity no longer exists.'];
+    if (($o['status'] ?? '') !== 'WON') return ['err' => 'Only a won deal becomes a contract.'];
+    if (empty($o['partner_id'])) return ['err' => 'Add the customer to the master first.'];
+    if (!empty($o['contract_id'])) return ['err' => 'A contract has already been registered for this deal.'];
+    $pdo = db();
+    $cid = (int)$o['partner_id'];
+    $branchId = (int)($b['branch_id'] ?? 0) ?: (($o['office_id'] ?? null) ?: null);
+    $contractNo = trim((string)($b['contract_number'] ?? ''));
+    if (!empty($b['auto_contract']) || $contractNo === '') {
+        $contractNo = function_exists('gen_contract_number') ? gen_contract_number($branchId) : $contractNo;
+    }
+    if ($contractNo === '') return ['err' => 'Enter the contract number, or tick auto-generate.'];
+    if (function_exists('contract_no_clash')) {
+        $clash = contract_no_clash($contractNo, $cid);
+        if ($clash) return ['err' => 'Contract number ' . $contractNo . ' is already registered against '
+            . ($clash['owner_name'] ?: 'another party') . '. A contract number must identify one contract.'];
+    }
+    $ex = ops_one("SELECT id, open_status FROM partner_contracts WHERE partner_id=? AND contract_number=?", [$cid, $contractNo]);
+    if ($ex) {
+        $contractId = (int)$ex['id']; $openStatus = $ex['open_status'] ?: 'OPEN';
+    } else {
+        $me = user_name(current_user()); $meId = (int)(current_user()['id'] ?? 0);
+        $pdo->prepare("INSERT INTO partner_contracts (partner_id,contract_number,title,value,start_date,end_date,notes,branch_id,open_status,requested_by,requested_by_id,requested_at,is_active) VALUES (?,?,?,?,?,?,?,?, 'PENDING', ?,?,?, 0)")
+            ->execute([$cid, $contractNo, (string)$o['name'], (float)$o['value'], (string)($b['start_date'] ?? ''), (string)($b['end_date'] ?? ''),
+                       'From opportunity ' . $o['ref'] . ' (won without a quotation)', $branchId, $me, $meId, date('c')]);
+        $contractId = (int)$pdo->lastInsertId(); $openStatus = 'PENDING';
+    }
+    $pdo->prepare("UPDATE opportunities SET contract_id=?, updated_at=? WHERE id=?")->execute([$contractId, date('c'), (int)$o['id']]);
+    if (function_exists('act_log')) act_log('OPPORTUNITY', (int)$o['id'], 'SYSTEM',
+        'Contract ' . $contractNo . ' registered from this deal (no quotation)', ['auto' => 1, 'partner_id' => $cid]);
+    return ['ok' => true, 'contract_id' => $contractId, 'contract_no' => $contractNo, 'open_status' => $openStatus, 'partner_id' => $cid];
+}
+
+// Deals WON without a quotation, handed to Accounts, still needing a contract —
+// Finance's queue for the direct-win path (mirrors quotes_awaiting_contract()).
+function opps_awaiting_contract() {
+    opp_migrate();
+    return ops_all(
+        "SELECT o.*, b.legal_name partner_legal, b.display_name partner_disp
+           FROM opportunities o LEFT JOIN business_partners b ON b.id=o.partner_id
+          WHERE o.status='WON' AND COALESCE(o.sent_to_accounts_at,'')<>''
+            AND COALESCE(o.contract_id,0)=0 AND COALESCE(o.call_id,0)=0
+          ORDER BY o.sent_to_accounts_at") ?: [];
+}
+
 // ---- The register's columns -------------------------------------------------
 function opp_dt_columns() {
     return [
@@ -835,6 +915,12 @@ function ops_opportunities($route, $method) {
                 "SELECT id, quote_no, rev, status, total_amount FROM quotations
                  WHERE client_id=? AND id NOT IN (SELECT quotation_id FROM opportunity_quotes WHERE opportunity_id=?)
                  ORDER BY id DESC LIMIT 40", [(int)$o['partner_id'], (int)$o['id']])) : [],
+            // Direct-win → contract path: who may register, and the contract already
+            // registered from this deal (if any) so its state can be shown.
+            'canRegisterContract' => can('crm.contract.register') || is_master(),
+            'contractRow' => !empty($o['contract_id'])
+                ? ops_one("SELECT id, contract_number, open_status FROM partner_contracts WHERE id=?", [(int)$o['contract_id']])
+                : null,
         ]);
         return true;
     }
@@ -911,6 +997,29 @@ function ops_opportunities($route, $method) {
             . ($r['quote'] ? ', carrying quotation ' . $r['quote']['quote_no'] : ', with no quotation attached — set the rate on the order')
             . '. Now allocate the work.');
         redirect('/call?id=' . $r['call_id']);
+    }
+
+    // Sales hand a direct win (no quotation) to Accounts to register the contract.
+    if ($route === 'opportunity-send-to-accounts' && $method === 'POST') {
+        $id = (int)($_POST['id'] ?? 0);
+        $r = opp_send_to_accounts($id);
+        if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id); }
+        flash('Sent to Accounts — they will register the contract for this deal, and the order opens to operations once it is approved. Nothing more for Sales to do here.');
+        redirect('/opportunity?id=' . $id);
+    }
+
+    // Accounts register the contract straight from the won deal (no quotation).
+    if ($route === 'opportunity-contract' && $method === 'POST') {
+        $id = (int)($_POST['id'] ?? 0);
+        ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office can register the contract.');
+        $r = opp_register_contract($id, $_POST);
+        if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id); }
+        if (($r['open_status'] ?? '') === 'PENDING') {
+            flash('Contract ' . $r['contract_no'] . ' registered and awaiting approval — a manager endorses it and the branch manager approves it before it opens and the ' . Tlp('call') . ' can be raised from it.', 'warning');
+        } else {
+            flash('Contract ' . $r['contract_no'] . ' registered against an existing open contract — raise the ' . Tlp('call') . ' from it whenever the work comes in.');
+        }
+        redirect('/opportunity?id=' . $id);
     }
 
     if ($route === 'opportunity-from-lead' && $method === 'POST') {

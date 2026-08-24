@@ -56,6 +56,16 @@ branch is deployed by the pipeline.** The items below are what remains.
   fold, so no change was needed there. On the job detail, the *Hold & witness points* panel
   is now a fold that auto-opens only when a point is OPEN and stays collapsed otherwise.
   `tests/test_job_detail_declutter.php`.
+- **Direct win (no quotation) → Finance contract path** — DONE. A deal Won without a quote
+  used to go straight to a call, skipping Finance. Now the deal offers **"Send to Accounts to
+  register the contract"** (primary): it flags the deal, surfaces it in Finance's dashboard
+  queue ("won deals without a quote waiting for a contract"), and Finance registers the
+  contract straight from `/opportunity?id=…` — same PENDING→endorse→approve→OPEN lifecycle,
+  linked back to the deal, calls raised from the OPEN contract. The quick "raise a work order
+  directly" (no contract) is kept as a secondary, folded option. `opportunities.php`,
+  `views/ops/opportunity_detail.php`, `views/dashboard.php`; `tests/test_opp_direct_win_contract.php`.
+  Follow-up (minor): the "Raise call" link from an OPEN deal-contract points at
+  `/call-new?contract_id=…`; confirm that pre-fills as expected on a phone after deploy.
 
 ### D. Standing offer
 - Open a PR for the branch (not opened — you haven't asked).

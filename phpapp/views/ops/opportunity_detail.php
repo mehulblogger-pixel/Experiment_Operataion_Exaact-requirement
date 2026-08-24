@@ -218,13 +218,30 @@
   <?php endif; ?>
 </div>
 
-<?php // ---- Won: hand it to operations ------------------------------------- ?>
-<?php if ($o['status'] === 'WON' && $canOrder): ?>
+<?php // ---- Won: to Accounts for a contract, or straight to a work order -----
+      // A won deal can go two ways. The governed path (recommended, and the same one
+      // a quoted win takes): hand it to Accounts, who register a contract — it runs
+      // the PENDING → endorse → approve → OPEN lifecycle, and the calls are raised
+      // from the OPEN contract. The quick path (kept for a one-off with no contract):
+      // raise the work order straight onto a call. Shown only when operations is
+      // installed. ?>
+<?php if ($o['status'] === 'WON' && $orderBlock !== 'not-installed'): ?>
   <?php if (!empty($o['call_id'])): ?>
     <div class="msg msg-success" style="margin-top:16px">
       Order raised from this deal — <a href="/call?id=<?= (int)$o['call_id'] ?>"><b>open it</b></a>.
     </div>
-  <?php elseif ($orderBlock !== '' && $orderBlock !== 'not-installed'): ?>
+  <?php elseif (!empty($contractRow)): ?>
+    <?php $cOpen = strtoupper((string)($contractRow['open_status'] ?? 'OPEN')) === 'OPEN'; ?>
+    <div class="msg <?= $cOpen ? 'msg-success' : 'msg-warning' ?>" style="margin-top:16px">
+      <b>Contract <?= e($contractRow['contract_number']) ?></b>
+      <?= $cOpen
+          ? ' is registered and open — raise inspection ' . e(Tlp('call')) . ' from it whenever the work comes in.'
+          : ' is registered and <b>awaiting approval</b> — a manager endorses it and the branch manager approves it, then it opens and the ' . e(Tlp('call')) . ' can be raised from it.' ?>
+      <?php if ($cOpen && (can('ops.call.create') || is_master())): ?>
+        <div style="margin-top:8px"><a class="btn small" href="/call-new?contract_id=<?= (int)$contractRow['id'] ?>">▶ Raise <?= e(Tl('call')) ?></a></div>
+      <?php endif; ?>
+    </div>
+  <?php elseif ($orderBlock !== ''): ?>
     <div class="msg msg-warning" style="margin-top:16px"><?= e($orderBlock) ?>
       <?php if (empty($o['partner_id']) && !empty($o['lead_id'])): ?>
         <a href="/lead?id=<?= (int)$o['lead_id'] ?>"><b>Convert the lead</b></a> — it makes the customer and fills this in.
@@ -244,32 +261,78 @@
       <?php endif; ?>
     </div>
   <?php else: ?>
-    <form method="post" action="/opportunity-raise-order" class="panel" data-tab="Actions" style="margin-top:16px;border-left:3px solid var(--brand)">
-      <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
-      <h3 style="margin-top:0">Raise the work order</h3>
-      <p class="muted" style="font-size:13px;margin:0 0 10px">
-        Carries the customer, the quotation, the agreed value and the branch straight onto the order, so the sale and the work are joined.
-        <?php if ($orderQuote): ?>
-          It will carry <b><?= e($orderQuote['quote_no']) ?><?= (int)$orderQuote['rev'] ? ' r' . (int)$orderQuote['rev'] : '' ?></b>
-          (<?= e($orderQuote['status']) ?>, <?= e(fmoney($orderQuote['total_amount'])) ?>)<?php
-            if (strtoupper((string)$orderQuote['status']) !== 'ACCEPTED'): ?> — <b>not marked accepted</b>, so check it is the right one<?php endif; ?>.
-        <?php else: ?>
-          <b>No quotation is attached</b>, so the order will carry the estimate and somebody will have to set the rate on it.
+    <?php // Won, customer on file, no call and no contract yet. ?>
+    <?php if (!empty($o['sent_to_accounts_at'])): ?>
+      <div class="panel" data-tab="Actions" style="margin-top:16px;border-left:3px solid var(--ok)">
+        <b style="color:var(--ok)">✓ Handed to Accounts — awaiting contract registration</b>
+        <p class="muted" style="font-size:13px;margin:6px 0 0">Sent on <?= e(fdate(substr((string)$o['sent_to_accounts_at'], 0, 10))) ?>.
+          Accounts register the contract, a manager approves it, then Operations raise the <?= e(Tlp('call')) ?> from it.
+          <?php if (!$canRegisterContract): ?>There is nothing more for Sales to do here.<?php endif; ?></p>
+        <?php if ($canRegisterContract): ?>
+          <form method="post" action="/opportunity-contract" style="margin-top:12px">
+            <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+            <div style="font-weight:600;margin-bottom:8px">Register the contract <span class="muted" style="font-weight:400">— for <?= e($o['partner_name'] ?: 'this customer') ?>, agreed value <?= e(fmoney($o['value'])) ?></span></div>
+            <div class="form-grid" style="gap:12px 16px">
+              <div><label>Branch</label>
+                <select class="form-control" name="branch_id">
+                  <option value="">— <?= e($o['office_name'] ?: 'not set') ?> —</option>
+                  <?php foreach ($offices as $f): ?><option value="<?= (int)$f['id'] ?>" <?= (int)$f['id']===(int)$o['office_id']?'selected':'' ?>><?= e($f['name']) ?></option><?php endforeach; ?>
+                </select></div>
+              <div><label>Contract number</label><input class="form-control" name="contract_number" maxlength="80" placeholder="The number they gave, or auto">
+                <label class="ff-check" style="margin-top:4px"><input type="checkbox" name="auto_contract" value="1"> Auto-generate</label></div>
+              <div><label>Start date</label><input class="form-control" type="date" name="start_date"></div>
+              <div><label>End date</label><input class="form-control" type="date" name="end_date"></div>
+            </div>
+            <button class="btn" style="margin-top:12px">Register the contract</button>
+          </form>
         <?php endif; ?>
-      </p>
-      <div class="form-grid" style="gap:12px 16px">
-        <div><label>Executing branch</label>
-          <select class="form-control" name="executing_office_id">
-            <option value="">— <?= e($o['office_name'] ?: 'not set') ?> —</option>
-            <?php foreach ($offices as $f): ?>
-              <option value="<?= (int)$f['id'] ?>" <?= (int)$f['id']===(int)$o['office_id']?'selected':'' ?>><?= e($f['name']) ?></option>
-            <?php endforeach; ?>
-          </select></div>
-        <div><label>Contract number</label><input class="form-control" name="contract_number" maxlength="80" value="<?= e($orderQuote['contract_number'] ?? '') ?>" placeholder="If they gave one"><?php if (!empty($orderQuote['contract_number'])): ?><span class="muted" style="font-size:12px">Carried from the quotation.</span><?php endif; ?></div>
-        <div><label>Wanted by</label><input class="form-control" type="date" name="inspection_required_date"></div>
       </div>
-      <button class="btn" style="margin-top:12px">Raise the work order</button>
-    </form>
+    <?php else: ?>
+      <div class="panel" data-tab="Actions" style="margin-top:16px;border-left:3px solid var(--brand)">
+        <h3 style="margin-top:0">Take this won deal forward</h3>
+        <form method="post" action="/opportunity-send-to-accounts" style="margin:0">
+          <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+          <b>Won directly, or an order received without a quotation?</b>
+          <p class="muted" style="font-size:13px;margin:6px 0 10px">
+            Send it to <b>Accounts</b> to register the contract — no quotation needed. Accounts register it, a manager
+            approves it, then Operations raise the <?= e(Tlp('call')) ?> from the contract. This is the same governed path
+            a quoted win takes, so the sale still passes through Finance.</p>
+          <button class="btn">Send to Accounts to register the contract</button>
+        </form>
+      </div>
+    <?php endif; ?>
+
+    <?php // The quick path — a direct work order with no contract. Kept as a secondary,
+          // folded option; only for someone who can actually raise operations orders. ?>
+    <?php if ($canOrder): ?>
+    <details class="fold" data-tab="Actions" style="margin-top:12px">
+      <summary>Or raise a work order directly <span class="sub">a one-off with no contract — set the rate on the order</span></summary>
+      <div class="fold-body">
+      <form method="post" action="/opportunity-raise-order" style="border-left:3px solid var(--line);padding-left:12px">
+        <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+        <p class="muted" style="font-size:13px;margin:0 0 10px">
+          Carries the customer, the agreed value and the branch straight onto the order.
+          <?php if ($orderQuote): ?>
+            It will carry <b><?= e($orderQuote['quote_no']) ?><?= (int)$orderQuote['rev'] ? ' r' . (int)$orderQuote['rev'] : '' ?></b>
+            (<?= e($orderQuote['status']) ?>, <?= e(fmoney($orderQuote['total_amount'])) ?>).
+          <?php else: ?>
+            <b>No quotation is attached</b>, so the order carries the estimate and somebody sets the rate on it, and it does not pass through Finance.
+          <?php endif; ?>
+        </p>
+        <div class="form-grid" style="gap:12px 16px">
+          <div><label>Executing branch</label>
+            <select class="form-control" name="executing_office_id">
+              <option value="">— <?= e($o['office_name'] ?: 'not set') ?> —</option>
+              <?php foreach ($offices as $f): ?><option value="<?= (int)$f['id'] ?>" <?= (int)$f['id']===(int)$o['office_id']?'selected':'' ?>><?= e($f['name']) ?></option><?php endforeach; ?>
+            </select></div>
+          <div><label>Contract number</label><input class="form-control" name="contract_number" maxlength="80" value="<?= e($orderQuote['contract_number'] ?? '') ?>" placeholder="If they gave one"></div>
+          <div><label>Wanted by</label><input class="form-control" type="date" name="inspection_required_date"></div>
+        </div>
+        <button class="btn secondary" style="margin-top:12px">Raise the work order</button>
+      </form>
+      </div>
+    </details>
+    <?php endif; ?>
   <?php endif; ?>
 <?php endif; ?>
 

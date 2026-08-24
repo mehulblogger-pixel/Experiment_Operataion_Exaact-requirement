@@ -313,6 +313,34 @@
         <?php if (count($noContract) > 8): ?><p class="muted" style="margin:6px 0 0">+<?= count($noContract) - 8 ?> more.</p><?php endif; ?>
       </div>
       <?php endif; ?>
+      <?php // Deals WON without a quotation, handed to Accounts, still needing a
+            //  contract — the direct-win side of the same "register the contract" queue. ?>
+      <?php $noContractDeals = function_exists('opps_awaiting_contract') ? opps_awaiting_contract() : []; ?>
+      <?php if ($noContractDeals): ?>
+      <div class="panel" style="border:1px solid var(--warn);margin-top:22px">
+        <b><?= count($noContractDeals) ?> won deal<?= count($noContractDeals) === 1 ? '' : 's' ?> without a <?= e(Tl('quote')) ?>
+          <?= count($noContractDeals) === 1 ? 'is' : 'are' ?> waiting for a contract</b>
+        <p class="sub" style="margin:6px 0 8px">
+          <?= $canRegisterContract
+              ? 'Won directly / an order received without a ' . e(Tl('quote')) . '. Open the deal and register the contract — it then endorses, approves and opens to operations.'
+              : 'Handed to Accounts to register the contract.' ?>
+        </p>
+        <table class="dt">
+          <thead><tr><th>Deal</th><th><?= e(TH('client')) ?></th><th class="num">Estimate</th><th></th></tr></thead>
+          <tbody>
+          <?php foreach (array_slice($noContractDeals, 0, 8) as $nd): ?>
+            <tr>
+              <td><a href="/opportunity?id=<?= (int)$nd['id'] ?>"><b><?= e($nd['ref']) ?></b></a> <?= e($nd['name']) ?></td>
+              <td><?= e($nd['partner_disp'] ?: $nd['partner_legal'] ?: $nd['partner_name'] ?: '—') ?></td>
+              <td class="num"><?= (float)$nd['value'] ? e(fmoney($nd['value'])) : '—' ?></td>
+              <td class="num"><?php if ($canRegisterContract): ?><a class="btn small" href="/opportunity?id=<?= (int)$nd['id'] ?>">Register</a><?php endif; ?></td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+        <?php if (count($noContractDeals) > 8): ?><p class="muted" style="margin:6px 0 0">+<?= count($noContractDeals) - 8 ?> more.</p><?php endif; ?>
+      </div>
+      <?php endif; ?>
       <div class="ctitle" style="margin-top:22px"><h3>Sales pipeline</h3><a href="/quotes"><?= e(THP('quote')) ?> →</a><?php if (can('mod.crm_reports.view')): ?> <a href="/crm-reports" style="margin-left:8px">Sales dashboard →</a><?php endif; ?></div>
       <div class="qcards">
         <a class="qcard tone-info" href="/quotes?v=open"><div class="qic">📝</div><div class="qn"><?= (int)$qs['open_n'] ?></div><div class="ql">Open quotes</div></a>
