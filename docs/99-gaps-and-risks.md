@@ -143,12 +143,18 @@ overwritten**. An empty baseline (older form) never blocks. Tests:
 sides — job-closure expenses (coordinator) and the inspector's voucher — which is a
 data-model overlap rather than a concurrent-edit race; left as-is unless it bites.
 
-## R10 — LOW · Vestigial statuses/fields the code never advances
-**What:** legacy `calls.status` never reaches `CLOSED` in app flow (only up to ALLOCATED —
-`tosrm.php:75-76`, writes at `ops.php:5440`); `jobs.stage` only ever becomes `CANCELLED`
-(`tosrm.php:656`), never the intermediate `JOB_STAGES`; `report_docs` `ARCHIVED` is never set.
-**Why it matters:** anyone reading the schema will assume lifecycles that don't run.
-**Fix:** either wire them or remove them from the constants; at minimum, note them in-code.
+## R10 — LOW · Vestigial statuses/fields the code never advances — **NOTED IN-CODE**
+**What:** legacy `calls.status` never reaches `CLOSED` in app flow (only up to ALLOCATED);
+`jobs.stage` only ever becomes `CANCELLED` (plus the default ALLOCATED), never the
+intermediate `JOB_STAGES`; `report_docs` `ARCHIVED` is never set.
+**Why it matters:** anyone reading the schema will assume lifecycles that don't run — e.g.
+the ops-desk `report_pending` metric counts `jobs.stage='REPORT_PENDING'`, a value nothing
+ever writes, so it is always 0.
+**Done this session (the doc's "at minimum, note in-code"):** each is annotated at its
+definition — `JOB_STAGES` (`ops.php`), `IDEMS_STATUS` ARCHIVED (`idems.php`), and the legacy
+`calls.status` note (`tosrm.php`) — plus an inline note on the dead `report_pending` read.
+Values are kept (not removed) to avoid a silent behaviour change; wire the transitions before
+building reporting on them. Tests: `tests/test_vestigial_fields_noted.php`.
 
 ## R11 — LOW · Admin area appears for roles with no real admin access
 **What:** ASST_MANAGER and COORDINATOR reach the Admin area only via the coordinator-level

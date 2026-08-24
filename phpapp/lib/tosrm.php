@@ -74,6 +74,11 @@ function tosrm_migrate() {
         // The new lifecycle status lives in its OWN column so the legacy
         // `status` (OPEN/FORWARDED/ALLOCATED/CLOSED) and everything reading it
         // are untouched. Empty op_status => fall back to a derived value.
+        // NOTE (R10 — vestigial value): in normal app flow legacy `calls.status`
+        // only ever reaches OPEN → FORWARDED → ALLOCATED. 'CLOSED' is READ as a
+        // guard in a few places but is never WRITTEN by app code (only by seed
+        // data); the real "is this call finished" signal is its jobs being closed
+        // and op_status. Treat calls.status='CLOSED' as legacy/seed-only.
         ensure_column('calls', 'op_status',   "VARCHAR(24) DEFAULT ''");
         ensure_column('calls', 'priority',    "VARCHAR(20) DEFAULT ''");
         ensure_column('calls', 'criticality', "VARCHAR(20) DEFAULT ''");
@@ -1837,6 +1842,10 @@ function tosrm_ops_metrics($offices = 'ALL') {
     $m['new'] = $one("SELECT COUNT(*) n FROM calls c WHERE (c.op_status IN ('RECEIVED','DRAFT','UNDER_REVIEW') OR (COALESCE(c.op_status,'')='' AND c.status='OPEN')) AND $w");
     $m['today'] = $one("SELECT COUNT(*) n FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.scheduled_date=? AND $w", [$today]);
     $m['overdue'] = $one("SELECT COUNT(*) n FROM calls c WHERE c.status<>'CLOSED' AND COALESCE(c.op_status,'')<>'CLOSED' AND c.inspection_required_date<>'' AND c.inspection_required_date<? AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.call_id=c.id AND j.closed_flag=1) AND $w", [$today]);
+    // NOTE (R10): jobs.stage is vestigial (never advanced past the default/CANCELLED),
+    // so this count is effectively always 0. Left as-is to avoid a silent behaviour
+    // change; drive it from a real signal (closed job + report_approval='PENDING') when
+    // this metric is actually needed.
     $m['report_pending'] = $one("SELECT COUNT(*) n FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.stage='REPORT_PENDING' AND $w");
     $m['critical'] = $one("SELECT COUNT(*) n FROM calls c WHERE c.priority='CRITICAL' AND c.status<>'CLOSED' AND $w");
     return $m;

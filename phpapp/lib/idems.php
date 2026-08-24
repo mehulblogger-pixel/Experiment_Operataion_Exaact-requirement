@@ -56,6 +56,10 @@ const IDEMS_CATEGORIES = ['TPIA_REPORT'=>'TPIA report','ENDORSEMENT'=>'Manufactu
 // Report-instance lifecycle. VETTING is the intermediate state a report sits in,
 // when the vetting gate is on, between the inspector submitting it and the
 // approval chain — it is with the vetting authority.
+// NOTE (R10 — vestigial value): 'ARCHIVED' is defined for completeness but is never
+// written by any app flow — a report_docs row moves DRAFT → … → ISSUED (or REJECTED)
+// and is soft-deleted via the `deleted` flag, not archived. Kept so old data / the label
+// map resolve; wire an archive action or drop the value before relying on it.
 const IDEMS_STATUS = ['DRAFT'=>'Draft','SUBMITTED'=>'Submitted','VETTING'=>'At vetting','UNDER_REVIEW'=>'Under review','APPROVED'=>'Approved','ISSUED'=>'Issued','REJECTED'=>'Sent back','ARCHIVED'=>'Archived'];
 // Technical vetting / debriefing states (distinct from the approval chain).
 const IDEMS_VET_STATUS = ['VETTED'=>'Vetted','RETURNED'=>'Returned for correction','DEBRIEFED'=>'Debriefed'];

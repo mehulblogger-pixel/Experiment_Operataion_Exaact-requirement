@@ -29,6 +29,13 @@ const JOB_TYPES = ['INSPECTION'=>'Day-based inspection','DEPUTATION'=>'Resident 
 const EXPENSE_HEADINGS = ['TRAVEL'=>'Travel','LOCAL'=>'Local conveyance','FOOD'=>'Food','LODGING'=>'Lodging','MISC'=>'Misc'];
 const DEPARTMENTS = ['QUALITY'=>'Quality','PROJECTS'=>'Projects','ENGINEERING'=>'Engineering','DESIGN'=>'Design','INSPECTION'=>'Inspection','PROCUREMENT'=>'Procurement / Purchase','PRODUCTION'=>'Production','MAINTENANCE'=>'Maintenance','SAFETY'=>'Safety / HSE','COMMERCIAL'=>'Commercial / Finance','STORES'=>'Stores','PLANNING'=>'Planning','OWNER'=>'Owner','PARTNER'=>'Partner','DIRECTOR'=>'Director','MANAGEMENT'=>'Management','OTHER'=>'Other'];
 const DESIGNATIONS = ['INSPECTOR'=>'Inspector','SR_INSPECTOR'=>'Sr. Inspector','LEAD_INSPECTOR'=>'Lead Inspector','EXECUTIVE'=>'Executive','SR_EXECUTIVE'=>'Sr. Executive','ENGINEER'=>'Engineer','SR_ENGINEER'=>'Sr. Engineer','LEAD_ENGINEER'=>'Lead Engineer','COORDINATOR'=>'Coordinator','SR_COORDINATOR'=>'Sr. Coordinator','ASST_MANAGER'=>'Asst. Manager','DY_MANAGER'=>'Deputy Manager','MANAGER'=>'Manager','SR_MANAGER'=>'Sr. Manager','BRANCH_MANAGER'=>'Branch Manager','SBU_HEAD'=>'Business Unit Head','GM'=>'General Manager','DIRECTOR'=>'Director','OTHER'=>'Other'];
+// NOTE (R10 — vestigial field): jobs.stage is NOT the real job lifecycle. The live
+// state runs on closed_flag + report_approval + invoice_raised. The only values the
+// app ever WRITES to jobs.stage are the default 'ALLOCATED' and 'CANCELLED' (job cancel,
+// tosrm.php); the intermediate stages here (TRAVELLING / IN_PROGRESS / REPORT_PENDING /
+// SUBMITTED / CLOSED / ON_HOLD) are never set by any code path — they exist only so old
+// rows and the access editor render valid labels. Do NOT build reporting on this field
+// assuming it advances; wire the transitions first, or drop the unused values.
 const JOB_STAGES = ['ALLOCATED'=>'Allocated','TRAVELLING'=>'Travelling','IN_PROGRESS'=>'Inspection in progress','REPORT_PENDING'=>'Report pending','SUBMITTED'=>'Report submitted','CLOSED'=>'Closed','ON_HOLD'=>'On hold','CANCELLED'=>'Cancelled'];
 const EXP_LEVELS = ['JUNIOR'=>'Junior','MID'=>'Mid','SENIOR'=>'Senior','EXPERT'=>'Expert / Lead'];
 // Sub-contractor rate basis — the same charge units, narrowed to the two that apply.
