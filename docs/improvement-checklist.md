@@ -35,7 +35,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 13 | CAPA | P2 | ✅ done & pushed | 2026-08-24 |
 | 14 | Settings | P2 | ⬜ | — |
 | 15 | Clients / Customer 360 | P2 | ✅ done & pushed | 2026-08-24 |
-| 16 | Vendors / Vendor 360 | P2 | ⬜ | — |
+| 16 | Vendors / Vendor 360 | P2 | 🛠️ mapping code → edge-case spec | — |
 | 17 | Leads | P2 | ⬜ | — |
 | 18 | Orders / Contracts (Contract 360) | P1 | ⬜ | — |
 | 19 | Inquiries / Requirements | P2 | ⬜ | — |
