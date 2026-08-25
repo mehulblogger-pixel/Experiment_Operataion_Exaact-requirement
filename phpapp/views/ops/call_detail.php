@@ -216,7 +216,13 @@
     <?php elseif ($seeCredit): ?>
       <div><span class="k">Credit to executing</span><?= fmoney($call['expected_credit']) ?><?= $call['credit_type'] ? ' <small class="muted">('.e(CREDIT_TYPES[$call['credit_type']] ?? '').')</small>' : '' ?></div>
     <?php endif; ?>
-    <div><span class="k">Status</span><?= e($call['status']) ?></div>
+    <?php // Module 04 — the one user-facing lifecycle status (over both status systems).
+          // The raw legacy value is diagnostic only, shown to admins, not leaked to everyone. ?>
+    <?php $cLc = function_exists('call_status_label') ? call_status_label($call) : ['label'=>$call['status'], 'tone'=>'p-mut']; ?>
+    <div><span class="k">Status</span><span class="pill <?= e($cLc['tone']) ?>"><?= e($cLc['label']) ?></span>
+      <?php if ((function_exists('is_admin_level') && is_admin_level()) || (function_exists('is_master') && is_master())): ?>
+        <small class="muted"> · system: <?= e($call['status'] ?: '—') ?><?= trim((string)($call['op_status'] ?? '')) !== '' ? ' / ' . e($call['op_status']) : '' ?></small>
+      <?php endif; ?></div>
     <div class="kv-wide"><span class="k">Notes</span><?= e($call['notes'] ?: '—') ?></div>
     <?php foreach (custom_display('call', $call['id']) as $cf): ?>
       <div><span class="k"><?= e($cf['label']) ?></span><?= e($cf['value']) ?></div>

@@ -132,6 +132,22 @@ function tosrm_call_status($call) {
     return $op !== '' ? $op : tosrm_derive_status($call);
 }
 
+// Module 04 — the ONE user-facing lifecycle label for a call, over the two status
+// systems: op_status when set, else derived from legacy. This is what normal users
+// should see instead of the raw legacy string. Returns ['key','label','tone'].
+function call_status_label($call) {
+    $key = tosrm_call_status($call);
+    $labels = function_exists('lk_options_or') ? lk_options_or('call_status', CALL_STATUSES) : CALL_STATUSES;
+    $label = $labels[$key] ?? (CALL_STATUSES[$key] ?? $key);
+    // Tone by phase: terminal-bad / on-hold / done / in-flight / intake.
+    $tone = 'p-info';
+    if (in_array($key, ['REJECTED', 'CANCELLED'], true)) $tone = 'p-bad';
+    elseif ($key === 'ON_HOLD')                          $tone = 'p-warn';
+    elseif ($key === 'CLOSED' || $key === 'COMPLETED')   $tone = 'p-ok';
+    elseif (in_array($key, ['RECEIVED', 'DRAFT', 'UNDER_REVIEW', 'CLARIFICATION'], true)) $tone = 'p-mut';
+    return ['key' => $key, 'label' => $label, 'tone' => $tone];
+}
+
 // R6 — the lifecycle a call may actually walk. The op_status picker used to let any
 // editor jump to ANY of the 15 statuses (validated only for set-membership), so a
 // call could be CLOSED then moved back to RECEIVED, or a cancelled one silently

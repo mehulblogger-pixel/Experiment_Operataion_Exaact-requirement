@@ -23,7 +23,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 01 | Masters | P2 | ⬜ | — |
 | 02 | Users / Access / Roles | P0 | ⬜ | — |
 | 03 | Quotations | P1 | ⬜ | — |
-| 04 | Calls / Service Requests | P1 | 📝 edge-cases drafted (awaiting 1 decision) | — |
+| 04 | Calls / Service Requests | P1 | ✅ done & pushed | 2026-08-24 |
 | 05 | Jobs (Job 360) | P1 | ✅ done & pushed | 2026-08-24 |
 | 06 | Inspection / IDEMS core + Applicability | P0 | ✅ done & pushed | 2026-08-24 |
 | 07 | Vetting / Technical Review / Approval | P0 | ✅ done & pushed | 2026-08-24 |
@@ -79,6 +79,25 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 04 — Calls (one user-facing lifecycle) · 2026-08-24
+**Decision:** (A) present the unified lifecycle; raw system status for admins only. No writes to
+either status column; R6 transition rules untouched.
+**Found:** calls carry two status systems — legacy `status` (OPEN/FORWARDED/ALLOCATED) and
+operational `op_status` (`CALL_STATUSES` = every spec lifecycle stage). They aren't synced;
+`tosrm_call_status()` already returns the single value (op_status, else derived from legacy).
+But the call detail **leaked the raw legacy status to every user**, the register showed a
+job-count 3-state, and the real lifecycle label only appeared in the manager-gated TOSRM panel.
+**Added (additive, read-only):** `call_status_label($call)` — the one user-facing lifecycle
+label + pill tone, from `tosrm_call_status` over `CALL_STATUSES`. The call detail now shows this
+unified label (raw legacy/op values shown **only to admins** as "system: …"); the register shows
+the unified status pill per row (the existing scheduling chips kept, additive).
+**Preserved (verified by tests):** the two status columns, `tosrm_derive_status`, the R6
+transition rules, the TOSRM panel/playbook/nowband, and the register scheduling chips — all
+unchanged. No new status; no writes; no new permission.
+**Edge cases:** `docs/edge-cases/04-calls.md`.
+**Tests:** `tests/test_module04_calls.php` (18 assertions). Suite 2559 passed / 3 pre-existing
+baseline failures.
 
 ### Module 22 — Complaints (unified workflow + SLA) · 2026-08-24
 **Decision:** (A) surface stage + SLA + tests — no schema change; effectiveness stays on CAPA.

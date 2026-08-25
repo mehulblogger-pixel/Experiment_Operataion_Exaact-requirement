@@ -140,6 +140,10 @@
         <td class="num"><?= (int)$c['job_count'] ?: '<span class="muted">0</span>' ?></td>
         <?php if ($seeCost): ?><td class="num"><?= ((float)($c['cost_incurred'] ?? 0))>0 ? fmoney($c['cost_incurred']) : $dash ?></td><?php endif; ?>
         <td>
+          <?php // Module 04 — the unified lifecycle status (over both status systems). ?>
+          <?php if (function_exists('call_status_label')): $cLc = call_status_label($c); ?>
+            <span class="pill <?= e($cLc['tone']) ?>"><?= e($cLc['label']) ?></span><br>
+          <?php endif; ?>
           <?php if ($closed): ?><span class="pill p-ok">Closed</span>
           <?php elseif ($needs): ?><span class="pill p-warn">To schedule</span>
           <?php else: ?><span class="pill p-info">In progress</span><?php endif; ?>

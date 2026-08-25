@@ -1,7 +1,8 @@
 # Module 04 — Calls (one user-facing lifecycle) · Edge-case analysis (pre-build)
 
-**Status:** edge-cases drafted — **awaiting your go + one decision (§4) before code.** P1.
-Additive; both status systems and the R6 transition rules are preserved.
+**Status:** ✅ BUILT (2026-08-24). Decision: (A) present unified; raw status admin-only. Additive
+`call_status_label()` on detail + register; both status systems and the R6 transition rules
+preserved (asserted by tests in `tests/test_module04_calls.php`). P1.
 
 ---
 
