@@ -702,6 +702,41 @@ if (function_exists('hwp_for_job')):
 </details>
 <?php endif; ?>
 
+<?php // ---- Module 12: Quality — the nonconformities on this job, with their linked
+      // CAPA, so the finding→NCR→CAPA thread is visible in context (not just a chip). ?>
+<?php if (function_exists('ncr_reachable') && ncr_reachable()):
+        $jobNcrs = function_exists('ncr_for_job') ? ncr_for_job((int)$job['id']) : [];
+        $ncrSevPill = ['MAJOR'=>'p-bad', 'MINOR'=>'p-warn', 'OBSERVATION'=>'p-mut'];
+        $ncrStPill  = ['OPEN'=>'p-warn', 'CONTAINED'=>'p-info', 'DISPOSITIONED'=>'p-info', 'CLOSED'=>'p-ok'];
+        $ncrOpenN = count(array_filter($jobNcrs, fn($n) => ($n['status'] ?? '') !== 'CLOSED')); ?>
+<details class="fold" id="ncrs" data-tab="Reports &amp; QA" <?= $ncrOpenN ? 'open' : '' ?>>
+  <summary>Quality — nonconformities <span class="sub">(<?= count($jobNcrs) ?><?= $ncrOpenN ? ', ' . $ncrOpenN . ' open' : '' ?>)</span></summary>
+  <div class="fold-body">
+    <?php if ($jobNcrs): ?>
+    <table class="dt"><thead><tr><th>Ref</th><th>Severity</th><th>Title</th><th>Status</th><th>Owner / due</th><th>CAPA</th><th></th></tr></thead><tbody>
+      <?php foreach ($jobNcrs as $n): ?>
+        <tr>
+          <td><b><?= e($n['ref'] ?: '#' . (int)$n['id']) ?></b></td>
+          <td><span class="pill <?= $ncrSevPill[$n['severity']] ?? 'p-mut' ?>"><?= e(NCR_SEVERITY[$n['severity']] ?? $n['severity']) ?></span></td>
+          <td><?= e($n['title'] ?: '—') ?><?php if (!empty($n['clause'])): ?> <span class="muted">§<?= e($n['clause']) ?></span><?php endif; ?></td>
+          <td><span class="pill <?= $ncrStPill[$n['status']] ?? 'p-mut' ?>"><?= e(NCR_STATUS[$n['status']] ?? $n['status']) ?></span></td>
+          <td class="muted"><?= e($n['owner'] ?: '—') ?><?= !empty($n['due_on']) ? '<br><span style="font-size:11px">due ' . e($n['due_on']) . '</span>' : '' ?></td>
+          <td><?php if (!empty($n['capa_ref'])): ?><span class="pill p-info"><?= e($n['capa_ref']) ?></span><?php else: ?><span class="muted">—</span><?php endif; ?></td>
+          <td class="num"><a class="btn small secondary" href="/ncr-item?id=<?= (int)$n['id'] ?>">Open →</a></td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody></table>
+    <?php else: ?>
+    <p class="muted" style="margin:0 0 8px">No nonconformities on this <?= e(Tl('job')) ?>.</p>
+    <?php endif; ?>
+    <?php if (function_exists('ncr_can_raise') && ncr_can_raise()): ?>
+      <p style="margin:8px 2px 0"><a class="btn small" href="/ncr-new?job=<?= (int)$job['id'] ?><?= !empty($job['call_id']) ? '&partner=' . (int)($jcall['client_id'] ?? 0) : '' ?>">+ Raise a nonconformity</a>
+        <?php if ($jobNcrs): ?><a class="muted" style="font-size:12px;margin-left:8px" href="/ncr?job=<?= (int)$job['id'] ?>">See all in the register →</a><?php endif; ?></p>
+    <?php endif; ?>
+  </div>
+</details>
+<?php endif; ?>
+
 <?php $holds = function_exists('job_hold_reasons') ? job_hold_reasons($job) : []; if ($holds): ?>
 <div class="panel" data-tab="Reports &amp; QA" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent)">
   <b style="color:var(--bad)">🚫 HOLD — do not issue the report / deliverable to the client:</b> <?= e(implode('; ', $holds)) ?>.

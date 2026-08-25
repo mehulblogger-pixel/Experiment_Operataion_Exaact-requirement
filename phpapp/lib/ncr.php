@@ -226,6 +226,22 @@ const NCR_ORDER = "(n.status='CLOSED') ASC,
                       CASE n.severity WHEN 'MAJOR' THEN 0 WHEN 'MINOR' THEN 1 ELSE 2 END,
                       n.detected_on DESC, n.id DESC";
 
+// Module 12 — the nonconformities on one job (open first, then closed), for the
+// Job-360 Quality panel. Office-scoped like the register, so it never widens
+// visibility. Safe (empty) on an un-migrated install.
+function ncr_for_job($jobId) {
+    $jobId = (int)$jobId; if (!$jobId) return [];
+    try { return ncr_all('all', 'n.job_id = ?', [$jobId], '', 'ORDER BY ' . NCR_ORDER); }
+    catch (Throwable $e) { return []; }
+}
+
+// May the current viewer reach the NCR module at all (permission + accreditation pack)?
+function ncr_reachable() {
+    $perm = (function_exists('can') && (can('mod.ncr.view') || can('mod.capa.view'))) || (function_exists('is_master') && is_master());
+    $pack = !function_exists('accredited_pack_on') || accredited_pack_on();
+    return $perm && $pack;
+}
+
 // $tail is built by the register component from its own column whitelist.
 function ncr_all($filter = 'open', $extraWhere = '', $extraArgs = [], $q = '', $tail = '') {
     ncr_migrate();
@@ -449,7 +465,17 @@ function ops_ncr($route, $method) {
     ncr_migrate();
 
     if ($route === 'ncr') {
-        $f = $_GET['f'] ?? 'open';
+        // Default to ALL when scoping to one job/report so the chip shows that entity's
+        // whole history (open + closed), not just its open ones. The register chip on a
+        // job used to link ?job= but this handler ignored it — landing on the full
+        // register. Now it scopes to that job (or report), respecting office scope.
+        $scopeJob    = (int)($_GET['job'] ?? 0);
+        $scopeReport = (int)($_GET['report'] ?? 0);
+        $scoped = $scopeJob || $scopeReport;
+        $f = $_GET['f'] ?? ($scoped ? 'all' : 'open');
+        $extraW = ''; $extraA = [];
+        if ($scopeJob)    { $extraW = 'n.job_id = ?';        $extraA = [$scopeJob]; }
+        elseif ($scopeReport) { $extraW = 'n.report_doc_id = ?'; $extraA = [$scopeReport]; }
         $cols = ncr_dt_columns(date('Y-m-d'));
         // Severity first by default: a major nonconformity that scrolled off the
         // bottom of a date-sorted list is the exact failure this register exists
@@ -458,18 +484,19 @@ function ops_ncr($route, $method) {
 
         if (wants_csv()) {
             $csv = [['Ref','Raised','Severity','Source','Title','Branch',TH('job'),'Owner','Due','Disposition','Corrective action','Status','Closed']];
-            foreach (ncr_all($f, '', [], $dt['q']) as $r)
+            foreach (ncr_all($f, $extraW, $extraA, $dt['q']) as $r)
                 $csv[] = [$r['ref'], $r['detected_on'], $r['severity'], ncr_source_label($r['source']),
                           $r['title'], $r['office_name'], $r['job_code'], $r['owner'], $r['due_on'],
                           NCR_DISPOSITIONS[$r['disposition']] ?? $r['disposition'], $r['capa_ref'],
                           $r['status'], $r['closed_on']];
             csv_download('nonconformities-' . $f . '-' . date('Y-m-d') . '.csv', $csv);
         }
-        $total = ncr_count($f, '', [], $dt['q']);
-        $rows  = ncr_all($f, '', [], $dt['q'], dt_sql_tail($dt, $cols, NCR_ORDER));
+        $total = ncr_count($f, $extraW, $extraA, $dt['q']);
+        $rows  = ncr_all($f, $extraW, $extraA, $dt['q'], dt_sql_tail($dt, $cols, NCR_ORDER));
         view('ops/ncr_list', ['rows' => $rows, 'total' => $total, 'dt' => $dt, 'cols' => $cols,
                               'f' => $f, 'counts' => ncr_counts(),
-                              'canRaise' => ncr_can_raise(), 'today' => date('Y-m-d')]);
+                              'canRaise' => ncr_can_raise(), 'today' => date('Y-m-d'),
+                              'scopeJob' => $scopeJob, 'scopeReport' => $scopeReport]);
         return true;
     }
 

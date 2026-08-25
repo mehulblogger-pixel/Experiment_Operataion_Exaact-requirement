@@ -31,7 +31,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 09 | Invoicing | P0 | ⬜ | — |
 | 10 | Client Portal | P0 | ⬜ | — |
 | 11 | Vendor / Supplier-Inspector Centre | P1 | ⬜ | — |
-| 12 | NCR | P1 | 📝 edge-cases drafted (awaiting 1 decision) | — |
+| 12 | NCR | P1 | ✅ done & pushed | 2026-08-24 |
 | 13 | CAPA | P2 | ⬜ | — |
 | 14 | Settings | P2 | ⬜ | — |
 | 15 | Clients / Customer 360 | P2 | ⬜ | — |
@@ -79,6 +79,26 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 12 — NCR (toward a Quality Case) · 2026-08-24
+**Decision:** (A) surface & fix only — reuse the mature NCR tables; keep RCA/verification on
+CAPA (Module 13).
+**Found:** the NCR subsystem is mature (4-state lifecycle, gated closure, event timeline, six
+auto-origins, bidirectional NCR↔CAPA link). Two concrete gaps: the per-job NCR chip linked
+`/ncr?job=` but the register **ignored** the param (landing on the full register), and the
+Job-360 Quality section was just a count chip.
+**Added (additive):**
+- Fixed the register to honour **`?job=`/`?report=`** (scoped, office-scope respected), so the
+  job/report chip lands on that entity's nonconformities.
+- `ncr_for_job()` + `ncr_reachable()` helpers.
+- A Job-360 **Quality panel** (fold) listing the job's NCRs — ref, severity, status,
+  owner/due, and the **linked CAPA** — each linking to the NCR detail, with a raise-NCR link.
+  Gated on NCR reachability (permission + accreditation pack); auto-opens when any is open.
+**Preserved (verified by tests):** the NCR lifecycle constants, `ncr_close_missing` gate, the
+`ncr_create` funnel and the NCR↔CAPA coupling — all unchanged. No new permission.
+**Edge cases:** `docs/edge-cases/12-ncr.md`.
+**Tests:** `tests/test_module12_ncr.php` (13 assertions). Suite 2503 passed / 3 pre-existing
+baseline failures.
 
 ### Module 25 — Impartiality / Conflict of Interest · 2026-08-24
 **Decision:** (A) familiarity (repeated assignment) is an advisory Review, never a hard block;

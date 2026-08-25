@@ -1,7 +1,6 @@
 # Module 12 — NCR (toward a Quality Case) · Edge-case analysis (pre-build)
 
-**Status:** edge-cases drafted — **awaiting your go + one decision (§4) before code.** P1.
-Additive; the mature NCR lifecycle and its gates are preserved.
+**Status:** ✅ BUILT (2026-08-24). Decision: (A) surface & fix only. Fixed the per-job/report NCR filter + added the Job-360 Quality panel; the mature NCR lifecycle and its gates are preserved (asserted by tests in `tests/test_module12_ncr.php`). P1.
 
 ---
 
