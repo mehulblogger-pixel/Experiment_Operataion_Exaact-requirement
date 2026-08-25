@@ -1,7 +1,7 @@
 # Module 13 — CAPA (configurable RCA) · Edge-case analysis (pre-build)
 
-**Status:** edge-cases drafted — **awaiting your go + one decision (§4) before code.** P2.
-Additive; the effectiveness gate and lifecycle are preserved.
+**Status:** ✅ BUILT (2026-08-24). Decision: (A) configurable methods + gate tests. Additive; the
+effectiveness gate and lifecycle are preserved (asserted by tests in `tests/test_module13_capa.php`). P2.
 
 ---
 

@@ -32,7 +32,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 10 | Client Portal | P0 | ⬜ | — |
 | 11 | Vendor / Supplier-Inspector Centre | P1 | ⬜ | — |
 | 12 | NCR | P1 | ✅ done & pushed | 2026-08-24 |
-| 13 | CAPA | P2 | 📝 edge-cases drafted (awaiting 1 decision) | — |
+| 13 | CAPA | P2 | ✅ done & pushed | 2026-08-24 |
 | 14 | Settings | P2 | ⬜ | — |
 | 15 | Clients / Customer 360 | P2 | ⬜ | — |
 | 16 | Vendors / Vendor 360 | P2 | ⬜ | — |
@@ -79,6 +79,27 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 13 — CAPA (configurable RCA) · 2026-08-24
+**Decision:** (A) configurable methods + gate tests only — the optional structured 5-Why aid is
+deferred.
+**Found:** CAPA is strong — the spec's headline (an effectiveness gate that blocks closure:
+verification required, `effective='NO'` refuses "done") already exists. Gaps: the RCA method list
+was a hardcoded const (not configurable), and the close/verify gates had no unit tests.
+**Added (additive):**
+- `capa_rc_methods()` reads an **editable lookup** (`capa_rc_method`), seeded from the built-in
+  defaults via `lk_ensure_type_map` in `capa_migrate` (its own type — no collision with the
+  NCDCA `rc_method` lookup). The picker and the `capa-cause` validation both read it, so a body
+  can add/rename methods through the masters editor; empty lookup → the const (backward
+  compatible); legacy stored codes keep their labels.
+- Filled the previously-missing behavioural coverage of `capa_close_missing` /
+  `capa_close_block`: every requirement (root cause, method, similar-check, action, completion,
+  verification) blocks closure until met, and a CAPA verified NOT effective cannot be closed.
+**Preserved (verified by tests):** the effectiveness gate, the close checklist, the lifecycle,
+and the NCDCA `rc_method` lookup — all unchanged. No schema change; no new permission.
+**Edge cases:** `docs/edge-cases/13-capa.md`.
+**Tests:** `tests/test_module13_capa.php` (14 assertions). Suite 2517 passed / 3 pre-existing
+baseline failures.
 
 ### Module 12 — NCR (toward a Quality Case) · 2026-08-24
 **Decision:** (A) surface & fix only — reuse the mature NCR tables; keep RCA/verification on

@@ -27,7 +27,7 @@
 <div class="kpi-row">
   <div class="kpi"><span class="kic">🎯</span><div class="k">Root cause</div>
     <div class="v" style="font-size:18px"><?= trim((string)$c['root_cause']) !== '' ? 'recorded' : '<span class="down">not yet</span>' ?></div>
-    <div class="d"><?= e($c['rc_method'] ? CAPA_RC_METHODS[$c['rc_method']] : 'method not stated') ?></div></div>
+    <div class="d"><?= e($c['rc_method'] ? (capa_rc_methods()[$c['rc_method']] ?? $c['rc_method']) : 'method not stated') ?></div></div>
   <div class="kpi"><span class="kic">🔁</span><div class="k">Anywhere else?</div>
     <div class="v" style="font-size:18px"><?= empty($c['similar_checked']) ? '<span class="down">unanswered</span>'
         : ($c['similar_found'] === 'YES' ? 'yes' : 'no') ?></div>
@@ -67,7 +67,7 @@
                 placeholder="the cause, not the person — “the engineer forgot” is a symptom with a name attached"><?= e($c['root_cause']) ?></textarea></div>
     <div class="ff"><label>How it was worked out</label>
       <select class="form-control" name="rc_method"><option value="">— choose —</option>
-        <?php foreach (CAPA_RC_METHODS as $k=>$v): ?><option value="<?= e($k) ?>" <?= $c['rc_method']===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
+        <?php foreach (capa_rc_methods() as $k=>$v): ?><option value="<?= e($k) ?>" <?= $c['rc_method']===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"><label>Has this happened, or could it happen, elsewhere?</label>
       <select class="form-control" name="similar_found"><option value="">— not answered —</option>
@@ -211,7 +211,7 @@
   <div class="ctitle" style="margin-top:0"><h3>What was done</h3></div>
   <table class="dt"><tbody>
     <tr><th style="width:200px">Root cause</th><td style="white-space:pre-wrap"><?= e($c['root_cause'] ?: '—') ?></td></tr>
-    <tr><th>Worked out by</th><td><?= e($c['rc_method'] ? CAPA_RC_METHODS[$c['rc_method']] : '—') ?></td></tr>
+    <tr><th>Worked out by</th><td><?= e($c['rc_method'] ? (capa_rc_methods()[$c['rc_method']] ?? $c['rc_method']) : '—') ?></td></tr>
     <tr><th>Anywhere else?</th><td><?= e($c['similar_found'] ?: 'not answered') ?><?= $c['similar_note'] ? ' — ' . e($c['similar_note']) : '' ?></td></tr>
     <tr><th>Action taken</th><td style="white-space:pre-wrap"><?= e($c['action_plan'] ?: '—') ?></td></tr>
     <tr><th>Did it work?</th><td><?= e($c['effective'] ?: '—') ?><?= $c['effectiveness_note'] ? ' — ' . e($c['effectiveness_note']) : '' ?></td></tr>

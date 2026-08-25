@@ -109,6 +109,12 @@ function capa_migrate() {
     $pdo->exec("CREATE TABLE IF NOT EXISTS capa_events (
         id $pk, capa_id INT, at VARCHAR(30) DEFAULT '',
         action VARCHAR(40) DEFAULT '', actor VARCHAR(150) DEFAULT '', note VARCHAR(1000) DEFAULT '')");
+    // Module 13 — make the RCA method list configurable: seed an editable lookup from
+    // the built-in defaults, so a body can add/rename methods through the masters editor
+    // without a code change. Its own type ('capa_rc_method') so it never collides with the
+    // NCDCA 'rc_method' lookup. Idempotent; a no-op when the lookup engine is absent.
+    if (function_exists('lk_ensure_type_map'))
+        lk_ensure_type_map('capa_rc_method', 'Root-cause method (CAPA)', CAPA_RC_METHODS, 'capa');
 }
 
 function capa_missing_table(Throwable $e) {
@@ -119,6 +125,13 @@ function capa_missing_table(Throwable $e) {
 // ---- Settings ---------------------------------------------------------------
 function capa_due_days()    { $d = (int)setting_get('capa_due_days', (string)CAPA_DUE_DEFAULT);       return $d > 0 ? $d : CAPA_DUE_DEFAULT; }
 function capa_verify_days() { $d = (int)setting_get('capa_verify_days', (string)CAPA_VERIFY_DEFAULT); return $d > 0 ? $d : CAPA_VERIFY_DEFAULT; }
+
+// Module 13 — the RCA methods on offer: the editable lookup when configured, else the
+// built-in defaults. Used by both the picker and the save-time validation so a body's
+// own methods are accepted, not rejected.
+function capa_rc_methods() {
+    return function_exists('lk_options_or') ? lk_options_or('capa_rc_method', CAPA_RC_METHODS) : CAPA_RC_METHODS;
+}
 
 // ---- Reading ----------------------------------------------------------------
 function capa_all($filter = []) {
@@ -450,7 +463,8 @@ function ops_capa($route, $method) {
     if ($route === 'capa-cause' && $method === 'POST') {
         $rc = trim((string)($_POST['root_cause'] ?? ''));
         $m  = (string)($_POST['rc_method'] ?? '');
-        if (!isset(CAPA_RC_METHODS[$m])) $m = '';
+        $rcMethods = capa_rc_methods();
+        if (!isset($rcMethods[$m])) $m = '';
         // "The engineer was careless" is a symptom with a name attached. Saying
         // so here is cheaper than an assessor saying it later.
         if ($rc !== '' && $m === '') {
@@ -468,7 +482,7 @@ function ops_capa($route, $method) {
                        immediate_action=? WHERE id=?")
             ->execute([$rc, $m, $simChecked, $simChecked ? $sim : '', substr($simNote, 0, 1000),
                        (string)($_POST['immediate_action'] ?? $c['immediate_action']), $c['id']]);
-        capa_log($c['id'], 'CAUSE', $m !== '' ? CAPA_RC_METHODS[$m] : '');
+        capa_log($c['id'], 'CAUSE', $m !== '' ? ($rcMethods[$m] ?? $m) : '');
         flash('Saved.');
         redirect('/capa-item?id=' . $c['id']);
     }
