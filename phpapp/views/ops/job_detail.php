@@ -202,6 +202,11 @@
 <div class="panel" id="visit-close" data-tab="Schedule &amp; site">
   <div class="ctitle" style="margin-top:0"><h3>Day-by-day completion
     <span class="muted">— close each visit with its report; the <?= e(Tl('job')) ?> closes once every working day is done</span></h3></div>
+  <?php // Module 21 — don't let a day be closed off while a hold/witness point is open. ?>
+  <?php $vcHwOpen = function_exists('hwp_open_count') ? hwp_open_count((int)$job['id']) : 0; ?>
+  <?php if ($vcHwOpen): ?>
+    <div class="msg msg-error" style="margin:0 0 10px">✋ <?= (int)$vcHwOpen ?> open hold / witness point<?= $vcHwOpen===1?'':'s' ?> — the manufacturer should not proceed / despatch until these are cleared or waived (<a href="#holdpoints">open the panel</a>).</div>
+  <?php endif; ?>
   <table class="grid">
     <tr><th>Date</th><th><?= e(ucfirst(Tl('engineer'))) ?></th><th>Status</th><th>Report &amp; close</th></tr>
     <?php foreach ($vp as $x): ?>

@@ -91,6 +91,39 @@ function hwp_row($id) {
     try { return ops_one("SELECT * FROM hw_points WHERE id=?", [(int)$id]); }
     catch (Throwable $e) { if (hwp_missing_table($e)) return null; throw $e; }
 }
+// Module 21 — an open-points summary for one job: total open, and a breakdown by
+// type (HOLD / WITNESS / …). One query, safe on an un-migrated install. Used to
+// warn — loudly but without a new hard block — wherever an inspection could be
+// completed with a point still open.
+function hwp_job_summary($jobId) {
+    $out = ['open' => 0, 'by_type' => [], 'label' => ''];
+    try {
+        foreach (ops_all("SELECT point_type, COUNT(*) n FROM hw_points WHERE job_id=? AND status='OPEN' GROUP BY point_type", [(int)$jobId]) as $r) {
+            $n = (int)$r['n']; $out['open'] += $n; $out['by_type'][$r['point_type']] = $n;
+        }
+    } catch (Throwable $e) { if (hwp_missing_table($e)) return $out; throw $e; }
+    if ($out['open']) {
+        $bits = [];
+        foreach ($out['by_type'] as $t => $n) $bits[] = $n . ' ' . strtolower(hwp_type_label($t)) . ($n === 1 ? '' : 's');
+        $out['label'] = implode(', ', $bits);
+    }
+    return $out;
+}
+
+// Module 21 — open-point counts for MANY jobs in ONE query, so a list/board can
+// badge rows without a per-row query storm. Returns [job_id => open_count].
+function hwp_open_counts_for_jobs(array $jobIds) {
+    $jobIds = array_values(array_unique(array_filter(array_map('intval', $jobIds))));
+    if (!$jobIds) return [];
+    try {
+        $in = implode(',', array_fill(0, count($jobIds), '?'));
+        $out = [];
+        foreach (ops_all("SELECT job_id, COUNT(*) n FROM hw_points WHERE status='OPEN' AND job_id IN ($in) GROUP BY job_id", $jobIds) as $r)
+            $out[(int)$r['job_id']] = (int)$r['n'];
+        return $out;
+    } catch (Throwable $e) { if (hwp_missing_table($e)) return []; throw $e; }
+}
+
 // Every job that still has an open hold/witness point — for a manager overview.
 function hwp_open_all($officeIds = null) {
     try {

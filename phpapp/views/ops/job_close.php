@@ -13,6 +13,19 @@
     form below — then close.</div>
 </div>
 <?php endif; ?>
+<?php // Module 21 — do not let an inspection be closed by accident while a hold /
+      // witness point is still open. Warns loudly (does not block — clearing/waiving
+      // is done on the job screen). ?>
+<?php $hwSum = function_exists('hwp_job_summary') ? hwp_job_summary((int)$job['id']) : ['open'=>0,'label'=>'']; ?>
+<?php if (!empty($hwSum['open'])): ?>
+<div class="panel" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 7%,transparent)">
+  <b style="color:var(--bad)">✋ <?= (int)$hwSum['open'] ?> open hold / witness point<?= $hwSum['open']===1?'':'s' ?></b>
+  <span class="muted">(<?= e($hwSum['label']) ?>)</span>
+  <div class="muted" style="margin-top:4px">The manufacturer should not proceed / despatch until these are cleared or waived.
+    Closing the <?= e(Tl('job')) ?> now does not clear them — settle them on the
+    <a href="/job?id=<?= (int)$job['id'] ?>#holdpoints">hold &amp; witness panel</a> first if the work is genuinely blocked.</div>
+</div>
+<?php endif; ?>
 <form method="post" action="/job-close?id=<?= (int)$job['id'] ?>" class="panel">
   <?php if (!empty($needAttendanceReason)): // §WO-9 — manager approving a close with a missing site check-in ?>
   <div class="ff ff-wide" style="margin-bottom:12px;border:1px solid var(--bad);border-radius:8px;padding:12px;background:var(--soft)">

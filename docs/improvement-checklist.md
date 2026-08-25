@@ -40,7 +40,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 18 | Orders / Contracts (Contract 360) | P1 | ⬜ | — |
 | 19 | Inquiries / Requirements | P2 | ⬜ | — |
 | 20 | Project Costing | P1 | ⬜ | — |
-| 21 | Hold / Witness Points | P0 | 📝 edge-cases drafted (awaiting 1 decision) | — |
+| 21 | Hold / Witness Points | P0 | ✅ done & pushed | 2026-08-24 |
 | 22 | Complaints | P1 | ⬜ | — |
 | 23 | Equipment (Equipment 360) | P1 | ⬜ | — |
 | 24 | Competence (Competence 360) | P0 | ⬜ | — |
@@ -79,6 +79,25 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 21 — Hold / Witness Points · 2026-08-24
+**Decision:** (A) warn loudly, no new hard blocks — the Release Note stays the one hard gate.
+**Found:** the subsystem already exists (hw_points; HOLD/WITNESS/REVIEW/CLEARANCE;
+OPEN/CLEARED/WAIVED/CANCELLED; auto-derived + manual; audited), hard-blocks the Release Note
+(master override) and is checked at report submit; advisory elsewhere. Shown on job / report /
+release checklist / register / nav. Missing at the completion moments and on lists.
+**Added (additive, advisory):** `hwp_job_summary($jobId)` (open count + by-type + label) and
+`hwp_open_counts_for_jobs($ids)` (batched, no per-row query storm); a prominent open-points
+**warning on the job-close screen** and on the **day-by-day completion panel** — "the
+manufacturer should not proceed/despatch until cleared or waived", explaining that closing does
+not clear them. (The schedule board is a person×day availability matrix — a poor fit for a
+per-job badge — so it was deliberately not badged; managers see open points via the job blockers
+header, the /hold-points register and the nav badge.)
+**Preserved (verified by tests):** the Release Note hard gate, the hw_points model, the job
+hold/witness fold, and the register — all unchanged. No new hard block; no new permission.
+**Edge cases:** `docs/edge-cases/21-hold-witness.md`.
+**Tests:** `tests/test_module21_hold_witness.php` (11 assertions). Suite 2459 passed / 3
+pre-existing baseline failures.
 
 ### Module 05 — Jobs (Job 360) · 2026-08-24
 **Found:** the job screen is already a rich 360 (4 tabs, a nowband next-action heuristic, a
