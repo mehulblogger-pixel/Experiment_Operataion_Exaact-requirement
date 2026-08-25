@@ -49,7 +49,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 27 | Confidentiality | P0 | ⬜ | — |
 | 28 | Audits | P2 | ⬜ | — |
 | 29 | Data Control / Governance | P0 | ⬜ | — |
-| 30 | Vouchers / Expenses | P1 | 🛠️ mapping code → edge-case spec | — |
+| 30 | Vouchers / Expenses | P1 | 📝 edge-cases drafted (awaiting 1 decision) | — |
 | 31 | Attendance / Reconciliation | P1 | ⬜ | — |
 | 32 | Profitability (canonical engine) | P0 | ⬜ | — |
 | 33 | Overheads | P1 | ⬜ | — |
