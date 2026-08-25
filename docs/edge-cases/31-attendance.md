@@ -1,7 +1,6 @@
 # Module 31 — Attendance / Reconciliation · Edge-case analysis (pre-build)
 
-**Status:** edge-cases drafted — **awaiting your go + one decision (§4) before code.** P1.
-Additive; the existing stores, punch flow and entry-time guards are preserved.
+**Status:** ✅ BUILT (2026-08-24). Decision: (A) reconciliation view + flags; separating the stores deferred. Read-only cross-check; the existing stores, punch flow and entry-time guards are preserved (asserted by tests in `tests/test_module31_attendance.php`). P1.
 
 ---
 

@@ -50,7 +50,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 28 | Audits | P2 | ⬜ | — |
 | 29 | Data Control / Governance | P0 | ⬜ | — |
 | 30 | Vouchers / Expenses | P1 | ✅ done & pushed | 2026-08-24 |
-| 31 | Attendance / Reconciliation | P1 | 📝 edge-cases drafted (awaiting 1 decision) | — |
+| 31 | Attendance / Reconciliation | P1 | ✅ done & pushed | 2026-08-24 |
 | 32 | Profitability (canonical engine) | P0 | ⬜ | — |
 | 33 | Overheads | P1 | ⬜ | — |
 | 34 | Dashboards / Command Centre | P2 | ⬜ | — |
@@ -79,6 +79,27 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 31 — Attendance / Reconciliation · 2026-08-24
+**Decision:** (A) reconciliation view + flags; fully separating the conflated stores deferred to
+a deliberate migration.
+**Found:** only site presence (`site_visits`) is a distinct store — working/attendance/billed
+hours all collapse into `voucher_entries.hours`, with a second `attendance` record never
+reconciled to it. The one recon screen only compares to an external HR CSV. Of the five checks,
+**impossible timing was entirely absent** (negative check-in→check-out spans silently dropped).
+**Added (additive, read-only):** `attend_anomalies($inspectorId, $from, $to)` — cross-checks the
+existing data and flags all five: **impossible timing** (EXIT before ENTRY — the new check),
+**excessive hours** (over `hours_cap`), **missing check-out** (ENTRY, no EXIT, past day),
+**overlapping jobs** (two jobs a day), and **presence↔hours mismatch** (on site but no voucher
+hours; hours but no check-in when check-in is expected). Surfaced as a **Reconciliation flags**
+panel + a count card on the timesheet; leave/off days excused.
+**Preserved (verified by tests):** the daily-hours cap at entry, the punch-ordering guards, the
+double-booking soft-stop, `site_visit_close_missing`, the HR-CSV recon, and the timesheet build —
+all unchanged (recon only reads). No schema change; no new permission. First coverage of the
+impossible-timing check.
+**Edge cases:** `docs/edge-cases/31-attendance.md`.
+**Tests:** `tests/test_module31_attendance.php` (11 assertions). Suite 2605 passed / 3 pre-existing
+baseline failures.
 
 ### Module 30 — Vouchers / Expenses (fast field capture) · 2026-08-24
 **Decision:** (A) quick-add expense + receipt photo + job bridge; GPS auto-capture from

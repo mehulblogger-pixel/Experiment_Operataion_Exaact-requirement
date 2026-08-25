@@ -22,7 +22,26 @@
   <div class="qcard"><div class="qn" style="font-size:22px"><?= (int)$ts['days_on_site'] ?></div><div class="ql">Days on site</div></div>
   <div class="qcard"><div class="qn" style="font-size:22px"><?= (int)$ts['total_jobs'] ?></div><div class="ql">Site visits</div></div>
   <div class="qcard"><div class="qn" style="font-size:22px"><?= (int)$ts['days_att'] ?></div><div class="ql">Attendance-marked days</div></div>
+  <?php $anomalies = $anomalies ?? []; ?>
+  <div class="qcard <?= $anomalies ? 'tone-bad' : 'tone-ok' ?>"><div class="qn" style="font-size:22px"><?= count($anomalies) ?></div><div class="ql">Reconciliation flags</div></div>
 </div>
+
+<?php // ---- Module 31: reconciliation — cross-checks presence vs hours and flags anomalies ---- ?>
+<?php if ($anomalies): $anLabel = ['impossible'=>'Impossible timing', 'missing_checkout'=>'Missing check-out', 'overlap'=>'Overlapping jobs', 'excessive'=>'Excessive hours', 'no_hours'=>'On site, no hours', 'no_presence'=>'Hours, no check-in']; ?>
+<div class="panel" style="margin-top:14px;border-left:3px solid var(--bad)">
+  <h3 class="tab-sub" style="margin-top:0">Reconciliation flags <span class="muted" style="font-weight:400;font-size:12px">(<?= count($anomalies) ?>)</span></h3>
+  <p class="muted" style="margin:0 0 8px;font-size:12.5px">Cross-checked from the site punches, the voucher hours and the daily cap. These need a look — nothing is blocked.</p>
+  <table class="dt"><thead><tr><th>Date</th><th>Flag</th><th>Detail</th></tr></thead><tbody>
+    <?php foreach ($anomalies as $a): ?>
+      <tr><td class="muted" style="white-space:nowrap"><?= e(date('d M', strtotime($a['date']))) ?></td>
+        <td><span class="pill <?= in_array($a['type'], ['impossible','excessive'], true) ? 'p-bad' : 'p-warn' ?>"><?= e($anLabel[$a['type']] ?? $a['type']) ?></span></td>
+        <td style="font-size:12.5px"><?= e($a['text']) ?></td></tr>
+    <?php endforeach; ?>
+  </tbody></table>
+</div>
+<?php elseif ($ins): ?>
+<div class="panel" style="margin-top:14px;border-left:3px solid var(--ok)"><p style="margin:0"><b style="color:var(--ok)">✓ Nothing to reconcile</b> — presence, hours and the daily cap all line up this month.</p></div>
+<?php endif; ?>
 
 <div class="panel" style="padding:0;overflow:hidden;margin-top:14px">
   <div class="dt-scroll"><table class="dt">
