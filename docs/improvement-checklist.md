@@ -40,7 +40,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 18 | Orders / Contracts (Contract 360) | P1 | ⬜ | — |
 | 19 | Inquiries / Requirements | P2 | ⬜ | — |
 | 20 | Project Costing | P1 | ⬜ | — |
-| 21 | Hold / Witness Points | P0 | 🛠️ mapping code → edge-case spec | — |
+| 21 | Hold / Witness Points | P0 | 📝 edge-cases drafted (awaiting 1 decision) | — |
 | 22 | Complaints | P1 | ⬜ | — |
 | 23 | Equipment (Equipment 360) | P1 | ⬜ | — |
 | 24 | Competence (Competence 360) | P0 | ⬜ | — |
