@@ -27,7 +27,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 05 | Jobs (Job 360) | P1 | ⬜ | — |
 | 06 | Inspection / IDEMS core + Applicability | P0 | ⬜ | — |
 | 07 | Vetting / Technical Review / Approval | P0 | ✅ done & pushed | 2026-08-24 |
-| 08 | Report Release / Issue | P0 | ⬜ | — |
+| 08 | Report Release / Issue | P0 | ✅ done & pushed | 2026-08-24 |
 | 09 | Invoicing | P0 | ⬜ | — |
 | 10 | Client Portal | P0 | ⬜ | — |
 | 11 | Vendor / Supplier-Inspector Centre | P1 | ⬜ | — |
@@ -79,6 +79,21 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 08 — Report Release / Issue · 2026-08-24
+**Added (additive, read-only):** a **"Ready to issue" panel** on the report screen that
+previews the same gates the finalize handler enforces — approval complete, issuer≠approver
+(viewer-specific), QA-critical, and the instrument-calibration/signer accreditation pack —
+each shown as ✓ ok / ⚠ warn / ⛔ block with its reason, plus an overall ready/not-ready line
+and **immutability/revision** clarity ("issuing locks it; corrections are a new revision").
+Shown only for an APPROVED, not-yet-finalized report to a finalizer.
+**Preserved (verified by tests):** the finalize handler and every gate unchanged — issuer≠
+approver, approval-complete, QA-critical audited override, uncalibrated-instrument hard block,
+unauthorised-signer warn+NCR, immutable seal/snapshot/freeze. `pack_fire` is a pure evaluator,
+reused read-only. No new permission.
+**Edge cases:** `docs/edge-cases/08-report-release-issue.md`.
+**Tests:** `tests/test_module08_issue_readiness.php` (13 assertions). Suite 2421 passed / 3
+pre-existing baseline failures.
 
 ### Module 07 — Vetting / Technical Review / Approval · 2026-08-24
 **Decisions taken:** self-review → soft warning + acknowledge (11.1-A); notify on return →

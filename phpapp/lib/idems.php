@@ -5849,6 +5849,46 @@ function idems_notify_inspector_returned($doc, $kind, $reason) {
     ops_mail($to, "Report returned for correction: {$doc['irn']}", $body, '', 'idems_returned');
 }
 
+// Module 08 — a READ-ONLY preview of the same gates the finalize handler enforces,
+// so an issuer sees what is (or isn't) ready before pressing Finalize. Changes no
+// state; every probe is wrapped so a checker error never breaks the page. Returns
+// ['items'=>[{label,state:ok|warn|block,detail}], 'ready'=>bool].
+function idems_issue_readiness($doc) {
+    $items = [];
+    $add = function ($label, $state, $detail = '') use (&$items) { $items[] = ['label'=>$label, 'state'=>$state, 'detail'=>$detail]; };
+    $id = (int)($doc['id'] ?? 0);
+    $st = strtoupper((string)($doc['status'] ?? ''));
+
+    // 1. Approval chain complete.
+    $chain = (int)ops_val("SELECT COUNT(*) FROM report_approvals WHERE report_doc_id=?", [$id]);
+    if ($chain === 0)               $add('Approval', 'warn',  'No approval chain yet — submit it for approval first.');
+    elseif (in_array($st, ['APPROVED','ISSUED'], true)) $add('Approval', 'ok', 'Fully approved through the chain.');
+    else                            $add('Approval', 'block', 'Still going through the approval chain.');
+
+    // 2. Segregation — the viewer must not issue a report they approved (master exempt).
+    if (!is_master() && function_exists('idems_user_approved_doc') && idems_user_approved_doc($doc, (int)(current_user()['id'] ?? 0)))
+        $add('Segregation of duties', 'block', 'You approved this report — a different person must issue it.');
+
+    // 3. QA auditor — a critical finding blocks (fail-open on any engine error).
+    $crit = [];
+    try { $qa = function_exists('idems_qa_run') ? idems_qa_run($doc) : null; $crit = $qa ? array_values(array_filter($qa['issues'] ?? [], fn($i) => ($i['severity'] ?? '') === 'critical')) : []; }
+    catch (Throwable $e) { $crit = []; }
+    if ($crit) $add('Quality check', 'block', count($crit) . ' critical issue' . (count($crit) === 1 ? '' : 's') . ' — e.g. “' . (string)($crit[0]['title'] ?? '') . '”. An administrator can override with a recorded reason.');
+    else       $add('Quality check', 'ok', 'No critical quality issues.');
+
+    // 4. Accreditation pack (instrument calibration = hard block; signer = warning).
+    try { $fire = function_exists('pack_fire') ? pack_fire('document.issue', ['doc' => $doc]) : ['block'=>[], 'warn'=>[]]; }
+    catch (Throwable $e) { $fire = ['block'=>[], 'warn'=>[]]; }
+    $flat = function ($a) { return array_values(array_filter(array_map(fn($m) => trim(is_array($m) ? (string)($m['why'] ?? '') : (string)$m), (array)$a))); };
+    $blk = $flat($fire['block'] ?? []); $wrn = $flat($fire['warn'] ?? []);
+    if ($blk)      $add('Instruments & authorisation', 'block', implode(' ', $blk) . ' (calibration is not overridable).');
+    elseif ($wrn)  $add('Instruments & authorisation', 'warn',  implode(' ', $wrn) . ' Issue proceeds and raises a nonconformity.');
+    else           $add('Instruments & authorisation', 'ok', 'Calibration and signer authorisation in order.');
+
+    $ready = !array_filter($items, fn($i) => $i['state'] === 'block');
+    return ['items' => $items, 'ready' => $ready];
+}
+
 // ---- Handler: act on an approval step (approve / reject / send-back / delegate) ----
 function ops_idems_approve($method) {
     if ($method !== 'POST') redirect('/documents');

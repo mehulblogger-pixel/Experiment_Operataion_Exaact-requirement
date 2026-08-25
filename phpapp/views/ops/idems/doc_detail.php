@@ -451,6 +451,26 @@
   <?php endif; ?>
 </div>
 
+<?php // ---- Module 08: "Ready to issue" — a read-only preview of the issue gates,
+      // shown at the issue decision point (approved, not yet finalized) to a finalizer. ?>
+<?php if (!$doc['finalized'] && $rSt === 'APPROVED' && (is_master() || can('idems.finalize')) && function_exists('idems_issue_readiness')):
+        $m8 = idems_issue_readiness($doc);
+        $m8ico = ['ok'=>'✓', 'warn'=>'⚠', 'block'=>'⛔'];
+        $m8col = ['ok'=>'var(--ok)', 'warn'=>'var(--warn,#b45309)', 'block'=>'var(--bad)']; ?>
+  <div class="panel" data-tab="Report" style="border:1px solid <?= $m8['ready'] ? 'var(--ok)' : 'var(--bad)' ?>;background:color-mix(in srgb,<?= $m8['ready'] ? 'var(--ok)' : 'var(--bad)' ?> 6%,transparent)">
+    <b style="color:<?= $m8['ready'] ? 'var(--ok)' : 'var(--bad)' ?>"><?= $m8['ready'] ? '✓ Ready to issue' : '⛔ Not ready to issue' ?></b>
+    <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+      <?php foreach ($m8['items'] as $it): ?>
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <span style="color:<?= $m8col[$it['state']] ?? 'var(--ink)' ?>;font-weight:700"><?= $m8ico[$it['state']] ?? '' ?></span>
+          <span style="font-size:13px"><b><?= e($it['label']) ?></b><?= $it['detail'] !== '' ? ' — ' . e($it['detail']) : '' ?></span>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <p class="muted" style="font-size:11.5px;margin:10px 0 0">Issuing locks the report permanently — a later correction is made as a <b>new revision</b>, never by overwriting the issued version.</p>
+  </div>
+<?php endif; ?>
+
 <?php if ($doc['finalized']): ?>
 <div class="panel" data-tab="Report" style="border:1px solid var(--ok);background:color-mix(in srgb,var(--ok) 7%,transparent)">
   <b style="color:var(--ok)">🔒 Finalized &amp; issued</b> — locked on <?= e($doc['finalized_at'] ? date('d M Y H:i', strtotime($doc['finalized_at'])) : '—') ?> by <?= e($doc['finalized_by']) ?>. This report is immutable.
