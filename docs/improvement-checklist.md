@@ -43,7 +43,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 21 | Hold / Witness Points | P0 | ✅ done & pushed | 2026-08-24 |
 | 22 | Complaints | P1 | ⬜ | — |
 | 23 | Equipment (Equipment 360) | P1 | ⬜ | — |
-| 24 | Competence (Competence 360) | P0 | 🛠️ mapping code → edge-case spec | — |
+| 24 | Competence (Competence 360) | P0 | 📝 edge-cases drafted (awaiting 1 decision) | — |
 | 25 | Impartiality | P0 | ⬜ | — |
 | 26 | Identity | P0 | ⬜ | — |
 | 27 | Confidentiality | P0 | ⬜ | — |
