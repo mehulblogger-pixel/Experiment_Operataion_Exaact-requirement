@@ -25,7 +25,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 03 | Quotations | P1 | ⬜ | — |
 | 04 | Calls / Service Requests | P1 | ⬜ | — |
 | 05 | Jobs (Job 360) | P1 | ⬜ | — |
-| 06 | Inspection / IDEMS core + Applicability | P0 | 🛠️ mapping code → edge-case spec | — |
+| 06 | Inspection / IDEMS core + Applicability | P0 | 📝 edge-cases drafted (awaiting 1 decision) | — |
 | 07 | Vetting / Technical Review / Approval | P0 | ✅ done & pushed | 2026-08-24 |
 | 08 | Report Release / Issue | P0 | ✅ done & pushed | 2026-08-24 |
 | 09 | Invoicing | P0 | ⬜ | — |
