@@ -22,7 +22,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 |---|--------|----------|--------|----------------|
 | 01 | Masters | P2 | ⬜ | — |
 | 02 | Users / Access / Roles | P0 | ⬜ | — |
-| 03 | Quotations | P1 | 📝 edge-cases drafted (awaiting go) | — |
+| 03 | Quotations | P1 | ✅ done & pushed | 2026-08-25 |
 | 04 | Calls / Service Requests | P1 | ✅ done & pushed | 2026-08-24 |
 | 05 | Jobs (Job 360) | P1 | ✅ done & pushed | 2026-08-24 |
 | 06 | Inspection / IDEMS core + Applicability | P0 | ✅ done & pushed | 2026-08-24 |
@@ -79,6 +79,40 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 03 — Quotations · 2026-08-25
+**Decision:** (A) expiry awareness + the approval-bypass guard; margin-at-quote (→ Module 20/32)
+and the online client accept/reject portal deferred.
+**Found:** the quotation engine (`lib/crm.php`) is mature — full revision chains (immutable once
+SENT), amount/BU approval chains with maker-checker retract, a pre-order checklist, contract
+conversion with bidirectional FKs, Word/PDF output, a follow-up cadence, a sales handoff wall. Two
+concrete gaps: **`EXPIRED` was a fully-built but unreachable status** — `validity_days` was stored
+and printed but never compared to `sent_at`, no code ever set EXPIRED, no cron expired quotes, so a
+SENT quote sat open (and in the pipeline) forever; and a **direct `quote-status → APPROVED` could
+skip the multi-level approval chain**.
+**Added (additive, non-destructive):**
+- `quote_validity($q)` — read-only: is a SENT/EXPIRED quote past `sent_at + validity_days`?
+  (`validity_days=0`/blank = open-ended; DRAFT/closed never expire). Never blocks.
+- `crm_expire_quotes()` — an opt-in cron (wired into `cron.php`, same shape as the calibration
+  reminder) that stamps the **already-defined** `EXPIRED` status on lapsed open SENT quotes;
+  idempotent; skips accepted/lost and contract-linked quotes; logs the change.
+- **Surfaced:** an Expired KPI + tab on the register, a "past validity" pill on still-SENT rows
+  before the sweep runs, a past-validity/near-expiry banner on the detail, and Accept/Revise
+  actions extended to an EXPIRED quote (accept records "accepted after validity had lapsed").
+- **Analytics:** EXPIRED split out of the "lost" state set into its own count — a lapsed quote is
+  no longer silently counted as a regretted loss.
+- **Guardrail:** `crm_quote_needs_chain` / `crm_quote_chain_satisfied` — when an active approval
+  rule matches the amount/BU, the direct `quote-status → APPROVED` is routed through the chain; a
+  master may override, **logged as a bypass**, not silent. No matching rule ⇒ unchanged.
+- **Docs:** added the full Quotation lifecycle (incl. the SENT→EXPIRED transition) to
+  `docs/03-object-lifecycles.md` in the same commit.
+**Preserved (verified by tests):** the revision chain + sent-quote immutability lock, the approval
+chain + retract, the pre-order checklist, the one-quote→one-contract guard, the contract-registration
+flow, the handoff wall, Word/PDF, and the follow-up cadence — all unchanged. No new status (EXPIRED
+already existed); no new permission; no schema change.
+**Edge cases:** `docs/edge-cases/03-quotations.md`.
+**Tests:** `tests/test_module03_quotations.php` (26 assertions). Suite 2649 passed / 3 pre-existing
+baseline failures.
 
 ### Module 23 — Equipment (Equipment 360) · 2026-08-25
 **Decision:** (A) impact-flagging 360; a maintenance/lifecycle layer and forcing the string-only

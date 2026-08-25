@@ -174,6 +174,20 @@
 </div>
 <?php endif; ?>
 
+<?php // Module 03 — validity/expiry heads-up. A SENT quote past its validity, before
+      // the daily sweep stamps it EXPIRED; or a near-expiry nudge. Read-only, never blocks. ?>
+<?php $qv = quote_validity($q); ?>
+<?php if ($st === 'SENT' && $qv['expired']): ?>
+<div class="panel" style="border:1px solid var(--warn)">
+  <b>⏳ Past validity.</b> <span class="muted">This <?= e(Tl('quote')) ?>'s <?= (int)$q['validity_days'] ?>-day validity lapsed on <?= e(fdate($qv['expires_on'])) ?>.
+  Raise a revision to re-issue it with a fresh validity, or record the <?= e(Tl('client')) ?>'s acceptance (it is noted as accepted after expiry). Nothing is blocked.</span>
+</div>
+<?php elseif ($st === 'SENT' && $qv['days_left'] !== null && $qv['days_left'] >= 0 && $qv['days_left'] <= 7): ?>
+<div class="panel" style="border:1px solid var(--line)">
+  <span class="muted">⏳ Validity ends in <?= (int)$qv['days_left'] ?> day(s) — on <?= e(fdate($qv['expires_on'])) ?>.</span>
+</div>
+<?php endif; ?>
+
 <!-- Status action bar -->
 <div class="panel" id="actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
   <span class="muted"><b>Actions</b> — move this <?= e(Tl('quote')) ?>:</span>
@@ -187,8 +201,8 @@
     <?php endif; ?>
   <?php elseif ($st==='APPROVED'): ?>
     <?php if ($canSend): ?><?= $act('SENT','✉ Send to ' . Tl('client')) ?><?php endif; ?>
-  <?php elseif ($st==='SENT'): ?>
-    <?= $act('ACCEPTED','Mark accepted (won)') ?>
+  <?php elseif ($st==='SENT' || $st==='EXPIRED'): ?>
+    <?= $act('ACCEPTED', $st==='EXPIRED' ? 'Mark accepted (after expiry)' : 'Mark accepted (won)') ?>
     <a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Re-download Word</a>
   <?php endif; ?>
   <?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email'])): ?>
@@ -204,7 +218,7 @@
   <?php // Revising is how a sent quotation is changed, so this is deliberately NOT
         // gated on the edit lock — otherwise the only correct action would be the
         // one greyed out. ?>
-  <?php if (!empty($canRevise) && in_array($st, ['SENT','APPROVED','ACCEPTED','LOST','REJECTED'], true)): ?>
+  <?php if (!empty($canRevise) && in_array($st, ['SENT','APPROVED','ACCEPTED','LOST','REJECTED','EXPIRED'], true)): ?>
     <button class="btn small secondary" type="button" onclick="document.getElementById('revbox').style.display='block'" style="margin-left:auto">Revise (new rev)</button>
   <?php endif; ?>
 </div>

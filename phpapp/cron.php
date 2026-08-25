@@ -99,6 +99,14 @@ if (function_exists('crm_run_followups')) {
     echo "Quote follow-ups sent: $fu\n";
 }
 
+// §14 — a quotation past its validity is no longer a live offer. Turn "past
+// validity" into the EXPIRED status the lifecycle already knows, so a sent quote
+// stops counting as live pipeline once its clock has run out.
+if (function_exists('crm_expire_quotes')) {
+    $exq = crm_expire_quotes();
+    echo "Quotations expired: $exq\n";
+}
+
 // IDEMS — escalate report approvals that have blown their SLA.
 if (function_exists('idems_run_sla_escalations')) {
     $esc = idems_run_sla_escalations();

@@ -983,6 +983,81 @@ function quote_lock_reason($q) {
          . 'Raise a re-edit request — only the Super Admin can grant it.';
 }
 
+// ---- Validity / expiry (§14) ----------------------------------------------
+// A sent quotation carries a validity (default 30 days). Past it, the price it
+// named is no longer a live offer — yet nothing in the app ever noticed: the
+// EXPIRED status the lifecycle defines was never reached, and a quote sat in
+// SENT for ever. This is read-only and NEVER blocks: an expired quote can still
+// be accepted (recorded as accepted-after-expiry) or revised. It only tells the
+// truth about whether the clock has run out.
+function quote_validity($q) {
+    $out = ['expires_on' => null, 'days_left' => null, 'expired' => false];
+    if (!$q) return $out;
+    $status = (string)($q['status'] ?? '');
+    // Only a quotation that actually went to the client (SENT, or already stamped
+    // EXPIRED) has a validity clock. A draft/pending one promised nothing; a
+    // closed one (accepted / lost / rejected) is already resolved.
+    if (!in_array($status, ['SENT', 'EXPIRED'], true)) return $out;
+    $days = (int)($q['validity_days'] ?? 0);
+    if ($days <= 0) return $out;                              // open-ended by intent
+    $base = trim((string)($q['sent_at'] ?? ''));
+    if ($base === '') return $out;                           // no clock to run
+    $expiresOn = date('Y-m-d', strtotime(substr($base, 0, 10) . ' +' . $days . ' days'));
+    $today = date('Y-m-d');
+    $out['expires_on'] = $expiresOn;
+    $out['days_left']  = (int)floor((strtotime($expiresOn) - strtotime($today)) / 86400);
+    $out['expired']    = ($status === 'EXPIRED') || ($today > $expiresOn);
+    return $out;
+}
+
+// The daily sweep that turns "past validity" into the EXPIRED status the
+// lifecycle already knows (§14). Same shape as equipment_run_cal_reminders():
+// safe to run repeatedly (a no-op once stamped), touches only OPEN, sent, current
+// quotes truly past validity, and never one that became a contract.
+function crm_expire_quotes($today = null) {
+    $today = $today ?: date('Y-m-d');
+    $pdo = db(); $n = 0;
+    $rows = ops_all("SELECT * FROM quotations WHERE status='SENT' AND is_current=1
+                     AND validity_days > 0 AND COALESCE(sent_at,'') <> ''") ?: [];
+    foreach ($rows as $q) {
+        if (!empty($q['contract_id'])) continue;             // a quote that became a contract is not "expired"
+        $v = quote_validity($q);
+        if (!$v['expired']) continue;
+        $pdo->prepare("UPDATE quotations SET status='EXPIRED', updated_at=? WHERE id=? AND status='SENT'")
+            ->execute([date('c'), $q['id']]);
+        if (function_exists('crm_log_change'))
+            crm_log_change($q['id'], 'Expired — validity lapsed on ' . fdate($v['expires_on'])
+                . ' (no reply within ' . (int)$q['validity_days'] . ' days). Raise a revision to re-issue.');
+        $n++;
+    }
+    return $n;
+}
+
+// ---- Approval segregation (§ multi-level chain must not be skippable) -------
+// Does this quotation's amount / business unit match a live approval rule? If so
+// a multi-level chain is REQUIRED, and the one-click "set approved" short-cut
+// must route through it rather than skip it. Mirrors crm_build_approvals().
+function crm_quote_needs_chain($q) {
+    $amt = (float)($q['total_amount'] ?? 0); $sbu = (string)($q['sbu'] ?? '');
+    foreach (ops_all("SELECT * FROM quote_approval_rules WHERE active=1") ?: [] as $r) {
+        if (($r['match_type'] ?? 'ANY') === 'Business Unit' && ($r['sbu'] ?? '') !== '' && $r['sbu'] !== $sbu) continue;
+        if ($amt < (float)$r['min_amount']) continue;
+        if ((float)$r['max_amount'] > 0 && $amt > (float)$r['max_amount']) continue;
+        return true;
+    }
+    return false;
+}
+// The chain is satisfied only when steps exist and none is still pending — every
+// required approver has acted. An empty chain is NOT satisfied (nobody acted).
+function crm_quote_chain_satisfied($qid) {
+    $qid = (int)$qid;
+    $total = (int)ops_val("SELECT COUNT(*) FROM quote_approvals WHERE quote_id=?", [$qid]);
+    if ($total === 0) return false;
+    $pending  = (int)ops_val("SELECT COUNT(*) FROM quote_approvals WHERE quote_id=? AND status='PENDING'", [$qid]);
+    $approved = (int)ops_val("SELECT COUNT(*) FROM quote_approvals WHERE quote_id=? AND status='APPROVED'", [$qid]);
+    return $pending === 0 && $approved > 0;
+}
+
 // ---- Taking an approval back (§ approver pressed the wrong button) ---------
 // Everybody approves the wrong thing once. While the quotation is still inside
 // the building that is a mistake, not an event: the approver takes it back and
@@ -1235,8 +1310,10 @@ function ops_crm_quotes($route, $method) {
                 'fy' => current_fy(), 'mineContract' => true]);
             return;
         }
-        $view = $_GET['v'] ?? 'all';   // all | open | pending | closed | lost
-        $stateSets = ['open' => QUOTE_OPEN_STATES, 'pending' => QUOTE_PENDING_STATES, 'closed' => QUOTE_CLOSED_STATES, 'lost' => ['LOST', 'EXPIRED']];
+        $view = $_GET['v'] ?? 'all';   // all | open | pending | closed | lost | expired
+        // EXPIRED is its OWN closed state, not a regretted loss — kept out of "lost"
+        // so the win/loss numbers stay honest (Module 03).
+        $stateSets = ['open' => QUOTE_OPEN_STATES, 'pending' => QUOTE_PENDING_STATES, 'closed' => QUOTE_CLOSED_STATES, 'lost' => ['LOST'], 'expired' => ['EXPIRED']];
         [$scopeW, $args] = scope_clause('q.office_id', 'q.sbu');
         $w = [$scopeW, 'q.is_current=1'];
         if (isset($stateSets[$view])) { $set = $stateSets[$view]; $ph = implode(',', array_fill(0, count($set), '?')); $w[] = "q.status IN ($ph)"; foreach ($set as $s) $args[] = $s; }
@@ -1250,7 +1327,7 @@ function ops_crm_quotes($route, $method) {
             WHERE " . implode(' AND ', $w) . $fyW . " ORDER BY q.id DESC", array_merge($args, $fyA));
         // headline counts (scope-respecting, and within the same FY window)
         $counts = [];
-        foreach (['open', 'pending', 'closed', 'lost'] as $k) {
+        foreach (['open', 'pending', 'closed', 'lost', 'expired'] as $k) {
             [$sw, $sa] = scope_clause('q.office_id', 'q.sbu'); $set = $stateSets[$k]; $ph = implode(',', array_fill(0, count($set), '?'));
             foreach ($set as $s) $sa[] = $s;
             $counts[$k] = (int)ops_val("SELECT COUNT(*) FROM quotations q WHERE $sw AND q.is_current=1 AND q.status IN ($ph)" . $fyW, array_merge($sa, $fyA));
@@ -1545,7 +1622,27 @@ function ops_crm_quotes($route, $method) {
             redirect('/quote?id=' . $q['id']);
         }
         if (!isset(lk_options_or('quote_status', QUOTE_STATUS)[$to])) { flash('Unknown status.', 'error'); redirect('/quote?id=' . $q['id']); }
-        if ($to === 'APPROVED') ops_require(can('crm.quote.approve') || is_master(), 'You cannot approve quotations.');
+        if ($to === 'APPROVED') {
+            ops_require(can('crm.quote.approve') || is_master(), 'You cannot approve quotations.');
+            // Segregation of duties: when the amount / business unit matches an
+            // approval rule, a multi-level chain is REQUIRED — the one-click
+            // "approve" must not skip it. Route it into the chain instead. A master
+            // may still override, but the bypass is logged, never silent.
+            if (crm_quote_needs_chain($q) && !crm_quote_chain_satisfied($q['id'])) {
+                if (is_master()) {
+                    crm_log_change($q['id'], 'Approved directly by ' . user_name(current_user())
+                        . ', bypassing the required approval chain (master override).');
+                } else {
+                    $n = crm_build_approvals($q);
+                    $pdo->prepare("UPDATE quotations SET status='PENDING_APPROVAL', submitted_at=?, rejected_by='', rejected_at='', reject_remarks='' WHERE id=?")
+                        ->execute([date('c'), $q['id']]);
+                    crm_log_change($q['id'], 'Submitted for approval — its amount / business unit requires the approval chain.');
+                    flash('This ' . Tl('quote') . ' needs multi-level approval for its amount / business unit — it has been submitted for approval ('
+                        . $n . ' step(s)) rather than approved directly.', 'warning');
+                    redirect('/quote?id=' . $q['id']);
+                }
+            }
+        }
         if ($to === 'SENT') ops_require(can('crm.quote.send') || is_master(), 'You cannot send quotations.');
         if ($to === 'PENDING_APPROVAL') {
             $n = crm_build_approvals($q);   // build the approval chain from the rules
@@ -1614,7 +1711,12 @@ function ops_crm_quotes($route, $method) {
             flash($sent ? ('Quotation e-mailed to ' . $q['contact_email'] . ' and marked sent — follow-ups scheduled.') : ('Marked sent and follow-ups scheduled; ' . $msg), $sent ? 'success' : 'warning');
             redirect('/quote?id=' . $q['id']);
         } elseif ($to === 'ACCEPTED') {
+            // Honest audit: if the client accepted after the validity had lapsed,
+            // record that — accepting is never blocked, but the trail says so.
+            $expBefore = quote_validity($q);
             $pdo->prepare("UPDATE quotations SET status='ACCEPTED', accepted_date=? WHERE id=?")->execute([date('Y-m-d'), $q['id']]);
+            if ($expBefore['expired'])
+                crm_log_change($q['id'], 'Accepted after validity had lapsed on ' . fdate($expBefore['expires_on']) . '.');
             $pdo->prepare("UPDATE quote_followups SET status='SKIPPED' WHERE quote_id=? AND status='PENDING'")->execute([$q['id']]);
             if ($q['inquiry_id']) $pdo->prepare("UPDATE crm_inquiries SET status='QUOTED' WHERE id=?")->execute([$q['inquiry_id']]);
             // A won order that exists only as a typed name is the point at which

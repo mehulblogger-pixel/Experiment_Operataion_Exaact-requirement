@@ -1,7 +1,7 @@
 <?php
   $stPill = ['DRAFT'=>'p-mut','PENDING_APPROVAL'=>'p-warn','APPROVED'=>'p-info','SENT'=>'p-info',
              'ACCEPTED'=>'p-ok','LOST'=>'p-bad','REJECTED'=>'p-bad','EXPIRED'=>'p-mut'];
-  $tabs = ['all'=>'All','open'=>'Open','pending'=>'Pending','closed'=>'Closed (won)','lost'=>'Lost'];
+  $tabs = ['all'=>'All','open'=>'Open','pending'=>'Pending','closed'=>'Closed (won)','lost'=>'Lost','expired'=>'Expired'];
   $qs = function($v) { return '/quotes?' . http_build_query(array_merge($_GET, ['v'=>$v])); };
 ?>
 <?php $mineApprove = !empty($mineApprove); $mineContract = !empty($mineContract); ?>
@@ -57,7 +57,9 @@
   <a class="kpi tone-ok" href="<?= e($qs('closed')) ?>"><span class="kic">🏆</span>
     <span class="k-lab">Closed (won)</span><span class="k-val"><?= (int)$counts['closed'] ?></span><span class="k-sub">accepted</span></a>
   <a class="kpi tone-bad" href="<?= e($qs('lost')) ?>"><span class="kic">✕</span>
-    <span class="k-lab">Lost</span><span class="k-val"><?= (int)$counts['lost'] ?></span><span class="k-sub">regretted / expired</span></a>
+    <span class="k-lab">Lost</span><span class="k-val"><?= (int)$counts['lost'] ?></span><span class="k-sub">regretted</span></a>
+  <a class="kpi" href="<?= e($qs('expired')) ?>"><span class="kic">⏳</span>
+    <span class="k-lab">Expired</span><span class="k-val"><?= (int)($counts['expired'] ?? 0) ?></span><span class="k-sub">validity lapsed</span></a>
 </div>
 
 <div class="chip-row" style="margin:10px 0">
@@ -91,7 +93,10 @@
         if ($cn !== '') { echo e($cn); }
         elseif (in_array($r['status'], ['ACCEPTED','APPROVED'], true)) { echo '<span class="pill p-warn">pending</span>'; }
         else { echo '<span class="muted">—</span>'; } ?></td>
-      <td><span class="pill <?= $stPill[$r['status']] ?? 'p-mut' ?>"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$r['status']] ?? $r['status']) ?></span></td>
+      <td><span class="pill <?= $stPill[$r['status']] ?? 'p-mut' ?>"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$r['status']] ?? $r['status']) ?></span><?php
+        // Module 03 — a still-SENT quote whose validity has already lapsed, before the
+        // daily sweep stamps it EXPIRED. Show the truth now.
+        if ($r['status']==='SENT') { $rv = quote_validity($r); if ($rv['expired']) echo ' <span class="pill p-mut" title="Past its '.(int)$r['validity_days'].'-day validity — expires on the next sweep">past validity</span>'; } ?></td>
       <td class="num"><a class="btn small secondary" href="/quote?id=<?= (int)$r['id'] ?>">Open</a></td>
     </tr>
     <?php endforeach; ?>

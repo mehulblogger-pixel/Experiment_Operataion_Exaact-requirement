@@ -1,6 +1,11 @@
 # Module 03 — Quotations · Edge-case analysis (pre-build)
 
-**Status:** 📝 SPEC — awaiting decision. P1.
+**Status:** ✅ BUILT (2026-08-25). Decision: (A) expiry awareness + approval-bypass guard;
+margin-at-quote and the online client accept portal deferred. Read-only `quote_validity` + an
+opt-in `crm_expire_quotes()` cron that stamps the already-defined EXPIRED status (never blocking
+accept/revise), EXPIRED split out of LOST analytics, and the direct-approval bypass closed for a
+matching approval chain (master override logged). Asserted by `tests/test_module03_quotations.php`.
+The quotation lifecycle is now documented in `docs/03-object-lifecycles.md`. P1.
 
 ---
 

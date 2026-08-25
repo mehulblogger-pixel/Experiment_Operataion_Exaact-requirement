@@ -110,6 +110,49 @@ stateDiagram-v2
 
 ---
 
+## Quotation (`quotations.status`)
+
+`QUOTE_STATUS` (`crm.php:129-138`) — **DRAFT, PENDING_APPROVAL, APPROVED, SENT, REJECTED,
+ACCEPTED, LOST, EXPIRED**. `QUOTE_OPEN_STATES / PENDING / CLOSED` (`crm.php:140-142`) group
+them for the §14 register views. A sent quotation is **immutable** — the way forward is a new
+**revision** (`parent_id`/`rev`/`is_current`), which is a fresh DRAFT with its own approval.
+
+```mermaid
+stateDiagram-v2
+  [*] --> DRAFT : quote-new / opp-create-quote · crm.quote.create/master (crm.php:1372)
+  DRAFT --> PENDING_APPROVAL : submit · builds the approval chain (crm.php:1550, crm_build_approvals 2588)
+  REJECTED --> PENDING_APPROVAL : re-submit after correction (crm.php:1550)
+  PENDING_APPROVAL --> APPROVED : final chain step acted · crm_can_act_approval (crm.php:1844-1845)
+  PENDING_APPROVAL --> REJECTED : approver rejects, reason required (crm.php:1830-1836)
+  DRAFT --> APPROVED : direct set · crm.quote.approve; if amount/BU matches a rule it is routed to the chain instead (crm.php:1548 guard, Module 03)
+  APPROVED --> PENDING_APPROVAL : retract before it leaves · quote_can_retract (crm.php:1858)
+  APPROVED --> SENT : send · crm.quote.send/master, emails + schedules follow-ups (crm.php:1589-1591)
+  SENT --> ACCEPTED : client accepts (staff-recorded) · lands client + wins deal (crm.php:1616)
+  SENT --> LOST : client declines · reason captured, closes deal (crm.php:1566)
+  SENT --> EXPIRED : validity lapsed · crm_expire_quotes cron, no user (crm.php, Module 03)
+  EXPIRED --> ACCEPTED : accepted after expiry · recorded as accepted-after-expiry (crm.php:1616, Module 03)
+  SENT --> SENT : raise a revision (new rev, new DRAFT; this row stays, is_current moves)
+  EXPIRED --> EXPIRED : raise a revision to re-issue
+  ACCEPTED --> [*] : locked; Accounts registers the contract number separately
+  LOST --> [*]
+```
+
+- **Immutable once SENT / sent_at set** (`quote_is_locked` `crm.php:959-973`) — not even the
+  master edits it; only a revision moves forward (`canRevise` bypasses the lock, `crm.php:1498`).
+- **Validity → EXPIRED** (Module 03): a SENT quote past `sent_at + validity_days` is stamped
+  `EXPIRED` by the `crm_expire_quotes()` cron (`cron.php`); `validity_days=0`/blank never
+  expires; a quote that became a contract is skipped. `quote_validity()` is the read-only
+  computation; expiry never blocks accepting or revising. EXPIRED is its own closed state,
+  counted separately from LOST.
+- **Approval segregation** (Module 03): when an active `quote_approval_rules` row matches the
+  amount/BU, the direct `quote-status → APPROVED` path is routed through the chain
+  (`crm_quote_needs_chain` / `crm_quote_chain_satisfied`); a master may override, logged as a
+  bypass. When no rule matches, the direct set is unchanged.
+- **Closed unlock** — ACCEPTED/LOST are locked; a time-boxed unlock is granted by the master
+  only in answer to a `quote_edit_requests` row (`crm.php:1007`, `quote_is_locked` 968-971).
+
+---
+
 ## Contract opening (`partner_contracts.open_status`)
 
 `CONTRACT_OPEN_STATES` (`contracts.php:462-467`) — **PENDING, OPEN, REJECTED, CLOSED**.
