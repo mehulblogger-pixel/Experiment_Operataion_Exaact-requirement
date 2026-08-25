@@ -34,7 +34,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 12 | NCR | P1 | ✅ done & pushed | 2026-08-24 |
 | 13 | CAPA | P2 | ✅ done & pushed | 2026-08-24 |
 | 14 | Settings | P2 | ⬜ | — |
-| 15 | Clients / Customer 360 | P2 | 📝 edge-cases drafted (awaiting 1 decision) | — |
+| 15 | Clients / Customer 360 | P2 | ✅ done & pushed | 2026-08-24 |
 | 16 | Vendors / Vendor 360 | P2 | ⬜ | — |
 | 17 | Leads | P2 | ⬜ | — |
 | 18 | Orders / Contracts (Contract 360) | P1 | ⬜ | — |
@@ -79,6 +79,27 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 15 — Client / Customer 360 · 2026-08-24
+**Decision:** (A) fill the cheap missing sections; defer per-client margin to the canonical
+profitability engine (Module 32) and a shared 360 scaffold to Module 49.
+**Found:** `/customer` is the canonical Customer 360 and already rich, but missing an
+issued-reports list (only a rejected COUNT existed), the full multi-site list (primary only),
+satisfaction, margin, and forecast demand.
+**Added (additive, read-only, reusing the gated `c360_load` assembly):**
+- `c360_reports()` — the reports actually issued to the client (fills the biggest gap; gated by
+  the reporting module) + an "Reports issued" panel linking to each `/document`.
+- `c360_sites()` — the full site list (was primary-only) shown in the contacts panel.
+- `c360_satisfaction()` — latest + average CSAT from `satisfaction_surveys` when the module is on
+  and permitted; a Satisfaction card, skipped cleanly otherwise.
+**Deferred (noted):** per-client margin → Module 32 (no bespoke profit formula here, per the
+program rule); shared 360 component → Module 49; upcoming-demand forecast.
+**Preserved (verified by tests):** the `c360_on()` gating + `c360_try()` crash-safety, the Money
+section's single-source financials, `/partner` and `/ledger` — all unchanged. No schema change;
+no new permission. First direct automated coverage of the Customer 360 assembly.
+**Edge cases:** `docs/edge-cases/15-client-360.md`.
+**Tests:** `tests/test_module15_client360.php` (12 assertions). Suite 2571 passed / 3 pre-existing
+baseline failures.
 
 ### Module 04 — Calls (one user-facing lifecycle) · 2026-08-24
 **Decision:** (A) present the unified lifecycle; raw system status for admins only. No writes to

@@ -1,7 +1,8 @@
 # Module 15 — Client / Customer 360 · Edge-case analysis (pre-build)
 
-**Status:** edge-cases drafted — **awaiting your go + one decision (§4) before code.** P2.
-Additive; the canonical 360 assembly and its per-section gating are preserved.
+**Status:** ✅ BUILT (2026-08-24). Decision: (A) fill cheap sections; defer margin (Module 32) &
+shared scaffold (Module 49). Additive `c360_reports/_sites/_satisfaction` on the gated 360
+assembly (asserted by tests in `tests/test_module15_client360.php`). P2.
 
 ---
 

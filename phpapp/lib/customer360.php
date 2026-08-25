@@ -153,6 +153,40 @@ function c360_quality($pid) {
     return $out;
 }
 
+// Module 15 — the reports actually issued to this client (the biggest 360 gap: only a
+// rejected-report COUNT existed before). Gated by the reporting module; crash-safe.
+function c360_reports($pid) {
+    if (!c360_on('idems')) return null;
+    $rows = c360_rows("SELECT id, irn, type_code, status, finalized, issue_date
+                       FROM report_docs WHERE client_id=? AND COALESCE(deleted,0)=0 AND COALESCE(finalized,0)=1
+                       ORDER BY id DESC LIMIT 8", [(int)$pid]);
+    $total = (int)c360_try(fn() => ops_val("SELECT COUNT(*) FROM report_docs WHERE client_id=? AND COALESCE(deleted,0)=0 AND COALESCE(finalized,0)=1", [(int)$pid]), 0);
+    return ['rows' => $rows, 'total' => $total];
+}
+
+// Module 15 — every site for the client (the 360 loaded only the primary address).
+function c360_sites($pid) {
+    return c360_rows("SELECT * FROM partner_addresses WHERE partner_id=? ORDER BY is_primary DESC, id", [(int)$pid]);
+}
+
+// Module 15 — the client's satisfaction, when the CSAT module is on and permitted.
+// Returns latest + average score over recent surveys, or null (card is skipped).
+function c360_satisfaction($pid) {
+    if (!function_exists('sat_enabled') || !sat_enabled()) return null;
+    if (function_exists('sat_can_view') && !sat_can_view()) return null;
+    $rows = c360_rows("SELECT score, recommend, received_on FROM satisfaction_surveys
+                       WHERE client_id=? AND score IS NOT NULL ORDER BY received_on DESC, id DESC LIMIT 12", [(int)$pid]);
+    if (!$rows) return null;
+    $scores = array_map(fn($r) => (int)$r['score'], $rows);
+    return [
+        'latest'    => (int)$rows[0]['score'],
+        'avg'       => round(array_sum($scores) / count($scores), 1),
+        'count'     => count($scores),
+        'recommend' => (string)($rows[0]['recommend'] ?? ''),
+        'scale'     => function_exists('sat_scale') ? sat_scale() : 5,
+    ];
+}
+
 function c360_timeline($pid, $limit = 25) {
     if (!function_exists('act_migrate')) return [];
     return c360_rows("SELECT * FROM activities WHERE partner_id=?
@@ -184,6 +218,9 @@ function c360_load($pid) {
         'quotes'   => c360_quotes($pid),
         'work'     => c360_work($pid),
         'quality'  => c360_quality($pid),
+        'reports'  => c360_reports($pid),
+        'sites'    => c360_sites($pid),
+        'csat'     => c360_satisfaction($pid),
         'timeline' => c360_timeline($pid),
         'touch'    => c360_last_touch($pid),
         'group'    => c360_group($pid, $p),

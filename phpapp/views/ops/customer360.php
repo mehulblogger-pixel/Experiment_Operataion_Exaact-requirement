@@ -269,6 +269,26 @@
         <?php endforeach; ?>
       </div>
     <?php endif; ?>
+
+    <?php // ---- Reports issued (Module 15) -------------------------------- ?>
+    <?php if (isset($reports) && $reports !== null): ?>
+      <div class="panel" style="margin-bottom:14px">
+        <h3 style="margin-top:0">Reports issued
+          <?php if (!empty($reports['rows'])): ?><span class="muted" style="font-weight:400;font-size:13px">— <?= (int)$reports['total'] ?> in total<?= $reports['total'] > count($reports['rows']) ? ', newest shown' : '' ?></span><?php endif; ?></h3>
+        <?php if (!empty($reports['rows'])): ?>
+          <table class="dt"><thead><tr><th>IRN</th><th>Format</th><th>Issued</th><th></th></tr></thead><tbody>
+            <?php foreach ($reports['rows'] as $r): ?>
+              <tr><td><b><?= e($r['irn'] ?: '—') ?></b></td>
+                <td><?= e(function_exists('deliverable_options') ? (deliverable_options()[$r['type_code']] ?? $r['type_code']) : $r['type_code']) ?></td>
+                <td class="muted"><?= e($r['issue_date'] ? substr($r['issue_date'], 0, 10) : '') ?></td>
+                <td class="num"><a class="btn small secondary" href="/document?id=<?= (int)$r['id'] ?>">Open →</a></td></tr>
+            <?php endforeach; ?>
+          </tbody></table>
+        <?php else: ?>
+          <p class="muted" style="margin:0">No reports issued to this <?= e(Tl('client')) ?> yet.</p>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
   </div>
 
   <div>
@@ -287,13 +307,34 @@
           </div>
         </div>
       <?php endforeach; endif; ?>
-      <?php if ($address): ?>
-        <p class="muted" style="font-size:12.5px;margin:10px 0 0">
-          <?= e(trim(($address['line1'] ?? '') . ' ' . ($address['line2'] ?? ''))) ?><br>
-          <?= e(trim(($address['city'] ?? '') . ' ' . ($address['state'] ?? '') . ' ' . ($address['pincode'] ?? ''))) ?>
-        </p>
+      <?php // Module 15 — every site, not just the primary (the full list used to live
+            // only on the master record). Compact; deep-links to the addresses tab. ?>
+      <?php $c360Sites = $sites ?? ($address ? [$address] : []); if ($c360Sites): ?>
+        <div style="margin-top:10px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:4px">Sites (<?= count($c360Sites) ?>)</div>
+          <?php foreach (array_slice($c360Sites, 0, 6) as $ad): ?>
+            <p class="muted" style="font-size:12.5px;margin:0 0 6px">
+              <?= !empty($ad['is_primary']) ? '<span class="pill p-ok" style="font-size:10px">main</span> ' : '' ?>
+              <?= e(trim(($ad['label'] ?? '') . ' ' . ($ad['line1'] ?? '') . ' ' . ($ad['line2'] ?? ''))) ?><br>
+              <?= e(trim(($ad['city'] ?? '') . ' ' . ($ad['state'] ?? '') . ' ' . ($ad['pincode'] ?? ''))) ?>
+            </p>
+          <?php endforeach; ?>
+          <?php if (count($c360Sites) > 6): ?><a class="muted" style="font-size:12px" href="/partner?id=<?= (int)$p['id'] ?>&amp;tab=addresses">All <?= count($c360Sites) ?> sites →</a><?php endif; ?>
+        </div>
       <?php endif; ?>
     </div>
+
+    <?php // ---- Satisfaction (Module 15) ---------------------------------- ?>
+    <?php if (!empty($csat)): ?>
+      <div class="panel" style="margin-bottom:14px">
+        <h3 style="margin-top:0">Satisfaction</h3>
+        <div style="display:flex;gap:18px;align-items:baseline">
+          <div><div style="font-size:26px;font-weight:800;color:<?= $csat['latest'] <= (int)ceil($csat['scale']*0.5) ? 'var(--bad)' : 'var(--ok)' ?>"><?= (int)$csat['latest'] ?><span style="font-size:14px;color:var(--muted)">/<?= (int)$csat['scale'] ?></span></div>
+            <div class="muted" style="font-size:11.5px">latest score</div></div>
+          <div><div style="font-size:18px;font-weight:700"><?= e((string)$csat['avg']) ?></div><div class="muted" style="font-size:11.5px">avg of <?= (int)$csat['count'] ?></div></div>
+          <?php if ($csat['recommend'] !== ''): ?><div><div style="font-size:14px;font-weight:700"><?= strtoupper($csat['recommend'])==='Y' ? '👍 would recommend' : '👎 would not' ?></div></div><?php endif; ?>
+        </div>
+      </div>
+    <?php endif; ?>
 
     <?php if ($contracts): ?>
       <div class="panel" style="margin-bottom:14px">
