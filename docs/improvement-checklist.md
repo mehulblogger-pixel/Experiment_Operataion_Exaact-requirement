@@ -50,7 +50,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 28 | Audits | P2 | ⬜ | — |
 | 29 | Data Control / Governance | P0 | ⬜ | — |
 | 30 | Vouchers / Expenses | P1 | ✅ done & pushed | 2026-08-24 |
-| 31 | Attendance / Reconciliation | P1 | ⬜ | — |
+| 31 | Attendance / Reconciliation | P1 | 🛠️ mapping code → edge-case spec | — |
 | 32 | Profitability (canonical engine) | P0 | ⬜ | — |
 | 33 | Overheads | P1 | ⬜ | — |
 | 34 | Dashboards / Command Centre | P2 | ⬜ | — |
