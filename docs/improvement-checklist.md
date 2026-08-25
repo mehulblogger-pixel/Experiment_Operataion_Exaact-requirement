@@ -25,7 +25,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 03 | Quotations | P1 | ⬜ | — |
 | 04 | Calls / Service Requests | P1 | ⬜ | — |
 | 05 | Jobs (Job 360) | P1 | ⬜ | — |
-| 06 | Inspection / IDEMS core + Applicability | P0 | 📝 edge-cases drafted (awaiting 1 decision) | — |
+| 06 | Inspection / IDEMS core + Applicability | P0 | ✅ done & pushed | 2026-08-24 |
 | 07 | Vetting / Technical Review / Approval | P0 | ✅ done & pushed | 2026-08-24 |
 | 08 | Report Release / Issue | P0 | ✅ done & pushed | 2026-08-24 |
 | 09 | Invoicing | P0 | ⬜ | — |
@@ -79,6 +79,24 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 06 — Inspection / IDEMS core + Applicability · 2026-08-24
+**Decision:** (A) surface & formalize only — reuse the existing applicability mechanism, do
+not add a second (inspection-type) mapping engine.
+**Found:** applicability already existed — per-job `deliverables`, a `service_report_map`
+(service→report types, client overrides), a soft-narrowed create form (never to nothing, with
+a "Need a different one?" escape), and a per-job reports panel. So this module surfaces it,
+not rebuilds it.
+**Added (additive, read-only):** `idems_job_applicability($job)` — the applicable formats with
+**where each came from** (service agreement / client-specific / chosen on the call) and the
+**not-applicable** formats (catalogue minus agreed, minus already-written). The job "Reports on
+this job" panel now shows the source note per format and a **collapsed "Other formats — not
+applicable to this job"** list, each still one click to raise anyway (flagged "not allocated").
+**Preserved (verified by tests):** the create form's never-narrow-to-nothing + escape hatch; the
+deliverables/service-map mechanism; no report type ever hidden; no new permission.
+**Edge cases:** `docs/edge-cases/06-applicability.md`.
+**Tests:** `tests/test_module06_applicability.php` (13 assertions). Suite 2434 passed / 3
+pre-existing baseline failures.
 
 ### Module 08 — Report Release / Issue · 2026-08-24
 **Added (additive, read-only):** a **"Ready to issue" panel** on the report screen that

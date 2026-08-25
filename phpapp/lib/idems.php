@@ -9140,6 +9140,52 @@ function deliverable_options() {
         return $opts = ($out ?: DELIVERABLES);
     } catch (Throwable $e) { return $opts = DELIVERABLES; }
 }
+
+// Module 06 — read-only applicability for a job: which report formats apply (with
+// WHERE each one came from), and which active formats do NOT apply. This only
+// reads and annotates the existing deliverables + service→report mapping; it never
+// hides a report type or blocks creating one (the create form keeps its escape
+// hatch). Returns ['applicable'=>[{code,name,source}], 'not_applicable'=>[{code,name}],
+// 'source_labels'=>[...]].
+function idems_job_applicability($job) {
+    $job = (array)$job;
+    $dl = trim((string)($job['deliverables'] ?? '')) !== ''
+        ? array_values(array_filter(array_map('trim', explode(',', (string)$job['deliverables'])))) : [];
+    $svc = trim((string)($job['service_code'] ?? ''));
+    $clientId = (int)($job['client_id'] ?? 0);
+    if (!$clientId && !empty($job['call_id'])) {
+        try { $clientId = (int)ops_val("SELECT client_id FROM calls WHERE id=?", [(int)$job['call_id']]); } catch (Throwable $e) {}
+    }
+    $house  = ($svc !== '' && function_exists('svc_report_codes')) ? (array)svc_report_codes($svc, 0) : [];
+    $client = ($svc !== '' && $clientId && function_exists('svc_report_codes')) ? (array)svc_report_codes($svc, $clientId) : [];
+    $names  = deliverable_options();
+
+    $srcOf = function ($code) use ($house, $client) {
+        if (in_array($code, $house, true))  return 'service';   // the service line's house default
+        if (in_array($code, $client, true)) return 'client';    // a client-specific override
+        return 'manual';                                        // ticked on the call / added at allocation
+    };
+    $applicable = [];
+    foreach ($dl as $code) $applicable[] = ['code'=>$code, 'name'=>$names[$code] ?? $code, 'source'=>$srcOf($code)];
+
+    // Not applicable = the active catalogue minus what's agreed and minus anything
+    // already written against this job (those are shown as "not on the agreed list").
+    $written = [];
+    try {
+        foreach (ops_all("SELECT DISTINCT type_code FROM report_docs WHERE job_id=? AND deleted=0", [(int)($job['id'] ?? 0)]) as $r)
+            $written[] = (string)$r['type_code'];
+    } catch (Throwable $e) {}
+    $notApplicable = [];
+    foreach (idems_types(true) as $t) {
+        if (in_array($t['code'], $dl, true) || in_array($t['code'], $written, true)) continue;
+        $notApplicable[] = ['code'=>$t['code'], 'name'=>$t['name']];
+    }
+    return [
+        'applicable'     => $applicable,
+        'not_applicable' => $notApplicable,
+        'source_labels'  => ['service'=>'from the service agreement', 'client'=>'client-specific', 'manual'=>'chosen on the call'],
+    ];
+}
 // Deliverables are a CSV of codes, so the rewrite is done in PHP rather than in
 // SQL — the string functions needed differ between MySQL and SQLite, and these
 // are small tables. Idempotent: a second run finds nothing left to change.

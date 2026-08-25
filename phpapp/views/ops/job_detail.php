@@ -471,6 +471,11 @@
   // Anything already written under a format nobody ticked, so it is still listed.
   $extraCodes = array_values(array_diff(array_keys($jobDocs), $dlCodes));
   $canWrite = can('mod.idems.edit') || is_master();
+  // §Module06 — applicability: where each agreed format came from, and which
+  // formats do NOT apply to this job (read-only annotation over deliverables).
+  $appl = function_exists('idems_job_applicability') ? idems_job_applicability($job) : ['applicable'=>[], 'not_applicable'=>[], 'source_labels'=>[]];
+  $srcMap = []; foreach ($appl['applicable'] as $a) $srcMap[$a['code']] = $a['source'];
+  $srcLabels = $appl['source_labels'] ?? [];
 ?>
 <?php // §R1-D — Quality Assurance Plans for this job. A PO may bring one QAP or
       // many (one per line item). They are attached as-is (usually PDF), never
@@ -529,7 +534,8 @@
     <tbody>
     <?php foreach ($dlCodes as $code): $docs = $jobDocs[$code] ?? []; ?>
       <tr>
-        <td><b><?= e($dlMap[$code] ?? $code) ?></b> <span class="muted"><?= e($code) ?></span></td>
+        <td><b><?= e($dlMap[$code] ?? $code) ?></b> <span class="muted"><?= e($code) ?></span>
+          <?php if (!empty($srcLabels[$srcMap[$code] ?? ''])): ?><div class="muted" style="font-size:11px"><?= e($srcLabels[$srcMap[$code]]) ?></div><?php endif; ?></td>
         <td><?php if (!$docs): ?><span class="pill p-warn">not started</span>
             <?php else: foreach ($docs as $d): ?>
               <a href="/document?id=<?= (int)$d['id'] ?>"><?= e($d['irn']) ?></a>
@@ -563,6 +569,22 @@
   <?php if ($canWrite && ($dlCodes || $extraCodes)): ?>
     <p class="muted" style="margin:10px 2px 0">Need a format that is not listed?
       <a href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call=' . (int)$job['call_id'] : '' ?>">Write another <?= e(Tl('report')) ?></a>.</p>
+  <?php endif; ?>
+  <?php // §Module06 — the formats that do NOT apply to this job, so the inspector
+        // sees the whole picture. Collapsed and secondary; each is still one click to
+        // raise anyway (the escape hatch), flagged "not allocated" on the form. ?>
+  <?php if ($dlCodes && !empty($appl['not_applicable'])): ?>
+    <details style="margin-top:10px">
+      <summary class="muted" style="cursor:pointer;font-size:12.5px">Other <?= e(Tl('report')) ?> formats — not applicable to this <?= e(Tl('job')) ?> (<?= count($appl['not_applicable']) ?>)</summary>
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
+        <?php foreach ($appl['not_applicable'] as $na): ?>
+          <span style="border:1px solid var(--line);border-radius:7px;padding:4px 8px;font-size:12px;color:var(--muted)">
+            <?= e($na['name']) ?><?php if ($canWrite): ?> · <a href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call=' . (int)$job['call_id'] : '' ?>&type=<?= e(urlencode($na['code'])) ?>">add anyway</a><?php endif; ?>
+          </span>
+        <?php endforeach; ?>
+      </div>
+      <p class="muted" style="font-size:11px;margin:8px 2px 0">These aren’t on this <?= e(Tl('job')) ?>’s agreed deliverables. Raise one only if the scope genuinely calls for it — it will be flagged “not allocated”.</p>
+    </details>
   <?php endif; ?>
 </div>
 

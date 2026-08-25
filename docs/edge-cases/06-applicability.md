@@ -1,7 +1,6 @@
 # Module 06 — Inspection / IDEMS core + Applicability · Edge-case analysis (pre-build)
 
-**Status:** edge-cases drafted — **awaiting your go + one decision (§4) before code.** P0.
-Additive only; the existing soft-narrow contract must be preserved.
+**Status:** ✅ BUILT (2026-08-24). Decision: (A) surface & formalize only. Additive read-only applicability surfacing; existing mechanism + soft-narrow contract preserved (asserted by tests in `tests/test_module06_applicability.php`).
 
 ---
 
