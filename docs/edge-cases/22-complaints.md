@@ -1,7 +1,8 @@
 # Module 22 — Complaints (unified workflow + SLA badge) · Edge-case analysis (pre-build)
 
-**Status:** edge-cases drafted — **awaiting your go + one decision (§4) before code.** P1.
-Additive; the lifecycle, close-gate and impartiality gate are preserved.
+**Status:** ✅ BUILT (2026-08-24). Decision: (A) surface stage + SLA + tests. Additive
+`cmp_stage()` + `cmp_sla()` with detail/register surfacing; lifecycle, close-gate and §7.5.4
+decide gate preserved (asserted by tests in `tests/test_module22_complaints.php`). P1.
 
 ---
 

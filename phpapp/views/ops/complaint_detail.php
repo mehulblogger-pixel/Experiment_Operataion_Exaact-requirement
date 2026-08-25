@@ -15,6 +15,22 @@
   </div>
 </div>
 
+<?php // ---- Module 22: where this complaint is in the flow, and one SLA badge ---- ?>
+<?php $cStage = cmp_stage($c); $cSla = cmp_sla($c); ?>
+<div class="panel" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between">
+  <div style="flex:1 1 320px">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:6px">Stage <?= (int)$cStage['pos'] ?> of <?= (int)$cStage['total'] ?><?= $cStage['next'] !== '' ? ' — next: ' . e($cStage['next']) : '' ?></div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px">
+      <?php $ci = 0; foreach ($cStage['steps'] as $sk => $sl): $ci++;
+        $done = $ci < $cStage['pos']; $here = $ci === $cStage['pos']; ?>
+        <span style="font-size:11.5px;padding:3px 8px;border-radius:7px;border:1px solid var(--line);<?= $here ? 'background:var(--accent,#2b6cff);color:#fff;font-weight:700;border-color:transparent' : ($done ? 'color:var(--ok);border-color:var(--ok)' : 'color:var(--muted)') ?>"><?= $done ? '✓ ' : '' ?><?= e($sl) ?></span>
+      <?php endforeach; ?>
+    </div>
+  </div>
+  <div style="text-align:right"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)">SLA</div>
+    <span class="pill <?= e($cSla['tone']) ?>" style="font-size:13px"><?= e($cSla['label']) ?></span></div>
+</div>
+
 <?php if ($closed): ?>
   <div class="panel" style="border-left:4px solid var(--ok)"><p style="margin:0"><strong>Closed</strong>
     on <?= e(fdate($c['closed_on'])) ?> by <?= e($c['closed_by']) ?>.</p></div>

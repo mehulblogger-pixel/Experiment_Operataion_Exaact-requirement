@@ -41,7 +41,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 19 | Inquiries / Requirements | P2 | ⬜ | — |
 | 20 | Project Costing | P1 | ⬜ | — |
 | 21 | Hold / Witness Points | P0 | ✅ done & pushed | 2026-08-24 |
-| 22 | Complaints | P1 | 📝 edge-cases drafted (awaiting 1 decision) | — |
+| 22 | Complaints | P1 | ✅ done & pushed | 2026-08-24 |
 | 23 | Equipment (Equipment 360) | P1 | ⬜ | — |
 | 24 | Competence (Competence 360) | P0 | ✅ done & pushed | 2026-08-24 |
 | 25 | Impartiality | P0 | ✅ done & pushed | 2026-08-24 |
@@ -79,6 +79,25 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 22 — Complaints (unified workflow + SLA) · 2026-08-24
+**Decision:** (A) surface stage + SLA + tests — no schema change; effectiveness stays on CAPA.
+**Found:** complaints already run the full path (create→ack→triage→investigate→decide→CAPA→
+notify→close) with a real close-gate, plus two configurable SLA clocks with reminders. Gaps: no
+single "where is this?" stage (status is only OPEN/CLOSED), SLA was two clocks not one badge,
+and no lifecycle test coverage.
+**Added (additive, read-only):** `cmp_stage($c)` — a derived stage (Received → Acknowledged →
+Triaged → Investigated → Decided → Corrective action → Complainant told → Closed) with position
+and next step, from the existing columns; and `cmp_sla($c)` — one consolidated SLA badge (On
+track / Ack overdue / Decision overdue / Met / Met-late, the last read from stored dates). A
+**progress strip + SLA badge** on the complaint detail, and a **stage + SLA** in the register's
+State column.
+**Preserved (verified by tests):** the close-gate (incl. upheld⇒CAPA-required), the §7.5.4 decide
+impartiality gate, the SLA clocks/settings, and the portal intake — all unchanged. No schema
+change; no new permission. Also fills the previously-absent lifecycle/SLA/close-gate coverage.
+**Edge cases:** `docs/edge-cases/22-complaints.md`.
+**Tests:** `tests/test_module22_complaints.php` (24 assertions). Suite 2541 passed / 3
+pre-existing baseline failures.
 
 ### Module 13 — CAPA (configurable RCA) · 2026-08-24
 **Decision:** (A) configurable methods + gate tests only — the optional structured 5-Why aid is

@@ -225,6 +225,67 @@ function cmp_decide_overdue($c, $today = null) {
     return $today > $due ? (int)floor((strtotime($today) - strtotime($due)) / 86400) : 0;
 }
 
+// Module 22 — a read-only derived STAGE, so "where is this complaint in the flow" is
+// one glance instead of a stack of forms. Inferred from the columns already filled;
+// no new state field. Returns key/label/pos/total/steps/next.
+function cmp_stage($c) {
+    $steps = [
+        'RECEIVED'     => 'Received',
+        'ACKNOWLEDGED' => 'Acknowledged',
+        'TRIAGED'      => 'Triaged',
+        'INVESTIGATED' => 'Investigated',
+        'DECIDED'      => 'Decided',
+        'CORRECTIVE'   => 'Corrective action',
+        'RESPONDED'    => 'Complainant told',
+        'CLOSED'       => 'Closed',
+    ];
+    $needsCapa = in_array((string)($c['outcome'] ?? ''), ['UPHELD', 'PARTLY'], true);
+    $reached = 'RECEIVED';
+    if (($c['acknowledged_on'] ?? '') !== '')                                   $reached = 'ACKNOWLEDGED';
+    if (strtoupper((string)($c['validity'] ?? 'PENDING')) !== 'PENDING')        $reached = 'TRIAGED';
+    if (trim((string)($c['investigation'] ?? '')) !== '' || trim((string)($c['root_cause'] ?? '')) !== '') $reached = 'INVESTIGATED';
+    if (strtoupper((string)($c['outcome'] ?? 'PENDING')) !== 'PENDING')         $reached = 'DECIDED';
+    if ($needsCapa && trim((string)($c['capa_ref'] ?? '')) !== '')              $reached = 'CORRECTIVE';
+    if (($c['notified_on'] ?? '') !== '')                                       $reached = 'RESPONDED';
+    if (strtoupper((string)($c['status'] ?? 'OPEN')) === 'CLOSED')              $reached = 'CLOSED';
+
+    $keys = array_keys($steps);
+    $pos  = (int)array_search($reached, $keys, true) + 1;
+    $next = [
+        'RECEIVED'     => 'Acknowledge it',
+        'ACKNOWLEDGED' => 'Decide whether it is ours to answer',
+        'TRIAGED'      => 'Investigate and find the cause',
+        'INVESTIGATED' => 'Decide the outcome',
+        'DECIDED'      => $needsCapa ? 'Raise the corrective action' : 'Tell the complainant',
+        'CORRECTIVE'   => 'Tell the complainant',
+        'RESPONDED'    => 'Close it',
+        'CLOSED'       => '',
+    ][$reached] ?? '';
+    return ['key' => $reached, 'label' => $steps[$reached], 'pos' => $pos, 'total' => count($steps), 'steps' => $steps, 'next' => $next];
+}
+
+// Module 22 — one consolidated SLA verdict (the two ack/decide clocks as a single
+// prominent badge). For a closed complaint the verdict is read from the recorded
+// dates (met, or met-late if it had breached), not recomputed against today.
+function cmp_sla($c, $today = null) {
+    $today = $today ?: date('Y-m-d');
+    if (strtoupper((string)($c['status'] ?? 'OPEN')) === 'CLOSED') {
+        $rc = (string)($c['received_on'] ?? '');
+        $ackLateHist = $rc !== '' && ($c['acknowledged_on'] ?? '') !== ''
+            && $c['acknowledged_on'] > date('Y-m-d', strtotime($rc . ' +' . cmp_ack_days() . ' days'));
+        $decLateHist = $rc !== '' && ($c['decided_on'] ?? '') !== ''
+            && $c['decided_on'] > date('Y-m-d', strtotime($rc . ' +' . cmp_decide_days() . ' days'));
+        return ($ackLateHist || $decLateHist)
+            ? ['status' => 'MET_LATE', 'label' => 'SLA met (late)', 'tone' => 'p-warn', 'days' => 0]
+            : ['status' => 'MET', 'label' => 'SLA met', 'tone' => 'p-ok', 'days' => 0];
+    }
+    $ack = (int)cmp_ack_overdue($c, $today);
+    if ($ack > 0) return ['status' => 'ACK_OVERDUE', 'label' => 'Acknowledgement ' . $ack . 'd overdue', 'tone' => 'p-bad', 'days' => $ack];
+    $dec = (int)cmp_decide_overdue($c, $today);
+    if ($dec > 0) return ['status' => 'DECIDE_OVERDUE', 'label' => 'Decision ' . $dec . 'd overdue', 'tone' => 'p-bad', 'days' => $dec];
+    return ['status' => 'ON_TRACK', 'label' => 'On track', 'tone' => 'p-ok', 'days' => 0];
+}
+
 // ---- §7.5.4 — who must not decide this -------------------------------------
 // "Involved in the original inspection activities" is read as: the engineer who
 // did the work, whoever prepared the report, and whoever approved or issued it.

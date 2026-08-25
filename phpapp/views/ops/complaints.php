@@ -40,7 +40,8 @@
     <thead><tr><th>Ref</th><th>Received</th><th>From</th><th>About</th><th>Ours?</th><th>Outcome</th><th>Decided by</th><th>Told</th><th>State</th></tr></thead>
     <tbody>
     <?php foreach ($rows as $c):
-      $ackLate = cmp_ack_overdue($c); $decLate = cmp_decide_overdue($c); ?>
+      $ackLate = cmp_ack_overdue($c); $decLate = cmp_decide_overdue($c);
+      $cStage = cmp_stage($c); $cSla = cmp_sla($c); ?>
       <tr>
         <td><a href="/complaint?id=<?= (int)$c['id'] ?>"><strong><?= e($c['ref']) ?></strong></a>
           <?php if ($c['kind'] === 'APPEAL'): ?><br><span class="pill p-warn">appeal</span><?php endif; ?></td>
@@ -59,7 +60,8 @@
         <td class="muted"><?= e($c['decided_by'] ?: '—') ?></td>
         <td><?= $c['notified_on'] ? e(fdate($c['notified_on']))
               : ($c['outcome'] !== 'PENDING' ? '<span class="pill p-bad">not yet</span>' : '<span class="muted">—</span>') ?></td>
-        <td><?= $c['status'] === 'CLOSED' ? '<span class="pill p-ok">closed</span>' : '<span class="pill p-warn">open</span>' ?></td>
+        <td><span class="pill <?= $c['status'] === 'CLOSED' ? 'p-ok' : 'p-info' ?>"><?= e($cStage['label']) ?></span>
+          <div style="margin-top:3px"><span class="pill <?= e($cSla['tone']) ?>" style="font-size:11px"><?= e($cSla['label']) ?></span></div></td>
       </tr>
     <?php endforeach; ?>
     <?php if (!$rows): ?><tr><td colspan="9">Nothing on the register. That is only good news if people know how to reach you — check the <a href="/complaints-policy">published description</a>.</td></tr><?php endif; ?>
