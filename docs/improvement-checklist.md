@@ -44,7 +44,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 22 | Complaints | P1 | ⬜ | — |
 | 23 | Equipment (Equipment 360) | P1 | ⬜ | — |
 | 24 | Competence (Competence 360) | P0 | ✅ done & pushed | 2026-08-24 |
-| 25 | Impartiality | P0 | 🛠️ mapping code → edge-case spec | — |
+| 25 | Impartiality | P0 | 📝 edge-cases drafted (awaiting 1 decision) | — |
 | 26 | Identity | P0 | ⬜ | — |
 | 27 | Confidentiality | P0 | ⬜ | — |
 | 28 | Audits | P2 | ⬜ | — |
