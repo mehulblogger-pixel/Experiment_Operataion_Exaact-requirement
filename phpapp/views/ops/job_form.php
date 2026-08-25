@@ -267,6 +267,7 @@
               'sbu'             => (string)($jf['sbu'] ?? ''),
               'inspection_type' => (string)($jf['inspection_type'] ?? ''),
               'client_id'       => (isset($call) && is_array($call)) ? (int)($call['client_id'] ?? 0) : 0,
+              'vendor_id'       => (isset($call) && is_array($call)) ? (int)($call['vendor_id'] ?? 0) : 0,
           ]; ?>
     <?php if ($topSugg): ?>
     <div class="ff ff-wide" id="best_insp_panel">
@@ -292,6 +293,14 @@
                 $eTip = implode(' · ', array_map(fn($r) => $r['text'], $elig['reasons'])); ?>
               <span class="pill <?= e($eCls) ?> elig-mark" style="margin-left:6px;" title="<?= e($eTip) ?>"><?= e($eLbl) ?></span>
             <?php endif; ?>
+            <?php // Module 25 — the impartiality verdict, mirroring the declared-threat gate
+              // and flagging familiarity (repeated assignment) for review. Shown only when it
+              // is not simply Clear, to avoid doubling the reassuring ✓ pills.
+              if (function_exists('inspector_impartiality')): $imp = inspector_impartiality((int)$s['id'], $eligCtx);
+                if ($imp['status'] !== 'CLEAR'): [$iLbl, $iCls] = inspector_impartiality_pill($imp['status']);
+                  $iTip = implode(' · ', array_map(fn($r) => $r['text'], $imp['reasons'])); ?>
+                <span class="pill <?= e($iCls) ?> imp-mark" style="margin-left:6px;" title="<?= e($iTip) ?>"><?= e($iLbl) ?></span>
+              <?php endif; endif; ?>
           </button>
         <?php endforeach; ?>
       </div>

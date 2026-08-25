@@ -168,6 +168,70 @@ function imp_block($inspectorId, $partnerIds = [], $onDate = null) {
          . 'before the work is done.';
 }
 
+// Module 25 — the familiarity threshold: how many times the same inspector may serve
+// the same client within 12 months before "consider rotation" is flagged. A setting,
+// so a body can tune it; sensible default of 6.
+function imp_familiarity_threshold() { $n = (int)setting_get('impartiality_familiarity_jobs', 6); return $n > 0 ? $n : 6; }
+
+// Module 25 — a read-only impartiality verdict for choosing an inspector, mirroring the
+// existing hard gate and adding the one COI signal that is genuinely computable from data
+// we hold (repeated assignment / familiarity). Advisory: it never blocks — the declared-
+// threat gate (imp_block) remains the one authoritative stop. Every probe is guarded.
+// $ctx: client_id, vendor_id, on_date. Returns
+// ['status'=>'CLEAR'|'REVIEW'|'CONFLICT', 'reasons'=>[{level,text}]].
+function inspector_impartiality($inspectorId, $ctx = []) {
+    $inspectorId = (int)$inspectorId;
+    $status = 'CLEAR'; $reasons = [];
+    if (!$inspectorId) return ['status' => $status, 'reasons' => $reasons];
+    $rank = ['CLEAR' => 0, 'REVIEW' => 1, 'CONFLICT' => 2];
+    $bump = function ($s) use (&$status, $rank) { if (($rank[$s] ?? 0) > ($rank[$status] ?? 0)) $status = $s; };
+    $add  = function ($level, $text) use (&$reasons) { $reasons[] = ['level' => $level, 'text' => $text]; };
+    $clientId = (int)($ctx['client_id'] ?? 0);
+    $vendorId = (int)($ctx['vendor_id'] ?? 0);
+    $onDate = trim((string)($ctx['on_date'] ?? '')) ?: date('Y-m-d');
+
+    // CONFLICT — a declared blocking threat applies (mirrors imp_block exactly).
+    try {
+        foreach (imp_blocking_for($inspectorId, [$clientId, $vendorId]) as $t) {
+            $bump('CONFLICT');
+            $add('block', 'Declared threat: ' . (IMP_THREATS[$t['threat_kind']] ?? $t['threat_kind'])
+                . ' (' . strtolower(IMP_STATUS[$t['status']] ?? $t['status']) . ')');
+        }
+    } catch (Throwable $e) {}
+
+    // REVIEW — repeated assignment (familiarity) to this client within 12 months.
+    if ($clientId) {
+        try {
+            $since = date('Y-m-d', strtotime($onDate . ' -12 months'));
+            $n = (int)ops_val("SELECT COUNT(DISTINCT j.id) FROM jobs j JOIN calls c ON c.id=j.call_id
+                               WHERE j.inspector_id=? AND c.client_id=? AND COALESCE(j.scheduled_date,'') >= ?",
+                              [$inspectorId, $clientId, $since]);
+            if ($n >= imp_familiarity_threshold()) {
+                $bump('REVIEW');
+                $add('warn', 'Familiarity — on this ' . Tl('client') . ' ' . $n . ' times in 12 months; consider rotation');
+            }
+        } catch (Throwable $e) {}
+    }
+
+    // REVIEW — no current impartiality declaration on file.
+    try {
+        if (function_exists('imp_declaration_due') && imp_declaration_due($inspectorId)) {
+            $bump('REVIEW'); $add('warn', 'Impartiality declaration is due or expired');
+        }
+    } catch (Throwable $e) {}
+
+    return ['status' => $status, 'reasons' => $reasons];
+}
+
+// Pill label + class for a verdict, for the allocation picker / register.
+function inspector_impartiality_pill($status) {
+    return [
+        'CLEAR'    => ['✓ Clear', 'p-ok'],
+        'REVIEW'   => ['⚠ Review', 'p-warn'],
+        'CONFLICT' => ['⛔ Conflict', 'p-bad'],
+    ][$status] ?? ['—', 'p-mut'];
+}
+
 // Is the per-deputation declaration outstanding? Only asked for once somebody
 // is actually on the job — there is nothing to declare about an empty slot.
 function imp_job_declaration_due($job) {

@@ -1,7 +1,9 @@
 # Module 25 — Impartiality / Conflict of Interest · Edge-case analysis (pre-build)
 
-**Status:** edge-cases drafted — **awaiting your go + one decision (§4) before code.** P0.
-Additive; the existing hard gate stays authoritative and unchanged.
+**Status:** ✅ BUILT (2026-08-24). Decision: (A) familiarity is an advisory Review (threshold
+setting, default 6). Additive `inspector_impartiality()` verdict + allocation pill; the
+non-overridable declared-threat gate and the register are unchanged (asserted by tests in
+`tests/test_module25_impartiality.php`, which also fill the gate's missing coverage). P0.
 
 ---
 

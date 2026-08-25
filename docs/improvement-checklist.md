@@ -44,7 +44,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 22 | Complaints | P1 | ⬜ | — |
 | 23 | Equipment (Equipment 360) | P1 | ⬜ | — |
 | 24 | Competence (Competence 360) | P0 | ✅ done & pushed | 2026-08-24 |
-| 25 | Impartiality | P0 | 📝 edge-cases drafted (awaiting 1 decision) | — |
+| 25 | Impartiality | P0 | ✅ done & pushed | 2026-08-24 |
 | 26 | Identity | P0 | ⬜ | — |
 | 27 | Confidentiality | P0 | ⬜ | — |
 | 28 | Audits | P2 | ⬜ | — |
@@ -79,6 +79,28 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 25 — Impartiality / Conflict of Interest · 2026-08-24
+**Decision:** (A) familiarity (repeated assignment) is an advisory Review, never a hard block;
+threshold a setting (`impartiality_familiarity_jobs`, default 6).
+**Found:** impartiality already HARD-blocks allocation on a declared OPEN/UNACCEPTABLE threat
+(non-overridable), with a declare→decide lifecycle — but it computes nothing, has no
+repeated-assignment/rotation logic, and the gate had **no test coverage**.
+**Added (additive, read-only):** `inspector_impartiality($inspectorId, $ctx)` → CLEAR / REVIEW /
+CONFLICT. CONFLICT mirrors `imp_block` (a declared blocking threat, client-scoped or
+person-general); REVIEW adds the one computable COI signal — **repeated assignment to the same
+client ≥ threshold in 12 months** (consider rotation) — plus a due/expired declaration. An
+advisory verdict **pill on the suggested-inspector chips** at allocation (shown next to the
+competence pill, only when not Clear). `imp_familiarity_threshold()` setting.
+**Preserved (verified by tests):** the non-overridable declared-threat hard block, the register,
+the decide lifecycle, the per-job declaration checkbox — all unchanged. No new hard control; no
+new permission. Also fills the previously-missing behavioural coverage of `imp_block` (OPEN
+blocks; client-scoped only blocks that client; a decided threat clears).
+**Noted, not changed:** the impartiality screen is gated on `mod.competence.view` rather than
+`mod.impartiality.view` — flagged for a future permission cleanup, left untouched.
+**Edge cases:** `docs/edge-cases/25-impartiality.md`.
+**Tests:** `tests/test_module25_impartiality.php` (17 assertions). Suite 2490 passed / 3
+pre-existing baseline failures.
 
 ### Module 24 — Competence (eligibility at allocation) · 2026-08-24
 **Decision:** (A) the verdict mirrors the existing gate; wrong-discipline / out-of-SBU are
