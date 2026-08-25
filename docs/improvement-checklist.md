@@ -32,7 +32,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 10 | Client Portal | P0 | ⬜ | — |
 | 11 | Vendor / Supplier-Inspector Centre | P1 | ⬜ | — |
 | 12 | NCR | P1 | ✅ done & pushed | 2026-08-24 |
-| 13 | CAPA | P2 | ⬜ | — |
+| 13 | CAPA | P2 | 🛠️ mapping code → edge-case spec | — |
 | 14 | Settings | P2 | ⬜ | — |
 | 15 | Clients / Customer 360 | P2 | ⬜ | — |
 | 16 | Vendors / Vendor 360 | P2 | ⬜ | — |
