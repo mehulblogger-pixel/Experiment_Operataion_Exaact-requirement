@@ -25,6 +25,52 @@
   <div style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn secondary" href="/vendors">← Register</a></div>
 </div>
 
+<?php // ---- Module 16: one scorecard consolidating the signals that already exist ---- ?>
+<?php if (!empty($scorecard)): $sc = $scorecard;
+  $bandTone = fn($b) => in_array(strtoupper((string)$b), ['A','EXCELLENT','GOOD','LOW'], true) ? 'var(--ok)'
+                      : (in_array(strtoupper((string)$b), ['C','D','POOR','HIGH','CRITICAL'], true) ? 'var(--bad)' : 'var(--warn,#b45309)'); ?>
+<div class="panel" style="margin-bottom:14px">
+  <div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:8px">Scorecard <span style="text-transform:none">— consolidated from performance, delivery, expediting and qualification</span></div>
+  <div style="display:flex;flex-wrap:wrap;gap:14px">
+    <?php // Performance (headline, existing score) ?>
+    <div style="flex:1 1 130px;min-width:120px;border:1px solid var(--line);border-radius:8px;padding:10px 12px">
+      <div style="font-size:11px;color:var(--muted)">Performance</div>
+      <?php if (!empty($sc['performance'])): ?>
+        <div style="font-size:24px;font-weight:800;color:<?= $bandTone($sc['performance']['band'] ?? '') ?>"><?= e((string)$sc['performance']['score']) ?><span style="font-size:13px;color:var(--muted)">/100</span></div>
+        <div style="font-size:11.5px;font-weight:700;color:<?= $bandTone($sc['performance']['band'] ?? '') ?>"><?= e(strtoupper((string)($sc['performance']['band'] ?? ''))) ?></div>
+      <?php else: ?><div class="muted" style="font-size:13px;margin-top:6px">not assessed</div><?php endif; ?>
+    </div>
+    <?php // Delivery risk (existing) ?>
+    <div style="flex:1 1 130px;min-width:120px;border:1px solid var(--line);border-radius:8px;padding:10px 12px">
+      <div style="font-size:11px;color:var(--muted)">Delivery risk</div>
+      <?php if (!empty($sc['delivery'])): ?><div style="font-size:16px;font-weight:700;color:<?= $bandTone($sc['delivery']['band'] ?? '') ?>;margin-top:4px"><?= e(strtoupper((string)($sc['delivery']['band'] ?? ''))) ?></div>
+        <div class="muted" style="font-size:11.5px"><?= (int)($sc['delivery']['open_pos'] ?? 0) ?> open PO(s)</div>
+      <?php else: ?><div class="muted" style="font-size:13px;margin-top:6px">—</div><?php endif; ?>
+    </div>
+    <?php // Expediting reliability (existing) ?>
+    <div style="flex:1 1 130px;min-width:120px;border:1px solid var(--line);border-radius:8px;padding:10px 12px">
+      <div style="font-size:11px;color:var(--muted)">Expediting</div>
+      <?php $rel = $sc['expediting']['commitments']['reliability_pct'] ?? null; ?>
+      <?php if ($rel !== null): ?><div style="font-size:16px;font-weight:700;margin-top:4px"><?= e((string)$rel) ?>%</div><div class="muted" style="font-size:11.5px">on-time commitments</div>
+      <?php else: ?><div class="muted" style="font-size:13px;margin-top:6px">—</div><?php endif; ?>
+    </div>
+    <?php // Qualification currency (from profile) ?>
+    <div style="flex:1 1 130px;min-width:120px;border:1px solid var(--line);border-radius:8px;padding:10px 12px">
+      <div style="font-size:11px;color:var(--muted)">Qualification</div>
+      <div style="font-size:15px;font-weight:700;margin-top:4px;color:<?= !empty($sc['qualification']['overdue']) || strtoupper($sc['qualification']['status'])==='EXPIRED' ? 'var(--bad)' : 'var(--ink)' ?>"><?= e(strtoupper((string)$sc['qualification']['status'])) ?></div>
+      <?php if (!empty($sc['qualification']['overdue'])): ?><div style="font-size:11.5px;color:var(--bad)">re-assessment overdue</div>
+      <?php elseif ($sc['qualification']['reassess_on'] !== ''): ?><div class="muted" style="font-size:11.5px">re-assess by <?= e($sc['qualification']['reassess_on']) ?></div><?php endif; ?>
+    </div>
+    <?php // Open quality items ?>
+    <div style="flex:1 1 130px;min-width:120px;border:1px solid var(--line);border-radius:8px;padding:10px 12px">
+      <div style="font-size:11px;color:var(--muted)">Open quality items</div>
+      <div style="font-size:15px;font-weight:700;margin-top:4px;color:<?= ($sc['quality_open']['ncr_open'] + $sc['quality_open']['complaints_open']) ? 'var(--bad)' : 'var(--ok)' ?>">
+        <?= (int)$sc['quality_open']['ncr_open'] ?> NCR · <?= (int)$sc['quality_open']['complaints_open'] ?> complaint(s)</div>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
 <div class="two-col" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
 
   <?php // ---- Latest assessment result ---- ?>
@@ -133,6 +179,20 @@
       <div style="padding:5px 0;border-bottom:1px solid var(--line);font-size:12.5px">
         <div style="display:flex;justify-content:space-between;gap:8px"><strong><?= e($c['ref']) ?></strong><span class="pill <?= ($c['status']??'')!=='CLOSED'?'p-warn':'p-mut' ?>"><?= e($c['status']) ?></span></div>
         <div class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($c['subject'] ?: $c['kind']) ?></div>
+      </div>
+    <?php endforeach; endif; ?>
+  </div>
+
+  <?php // ---- Module 16: corrective actions linked to this vendor ---- ?>
+  <div class="panel">
+    <h3 style="margin:0 0 8px;font-size:14px">Corrective actions</h3>
+    <?php if (empty($vcapas)): ?><p class="muted" style="margin:0;font-size:12.5px">None linked to this vendor.</p>
+    <?php else: foreach ($vcapas as $ca): ?>
+      <div style="padding:5px 0;border-bottom:1px solid var(--line);font-size:12.5px">
+        <div style="display:flex;justify-content:space-between;gap:8px">
+          <a href="/capa-item?id=<?= (int)$ca['id'] ?>"><strong><?= e($ca['ref'] ?: '#' . (int)$ca['id']) ?></strong></a>
+          <span class="pill <?= in_array($ca['status'] ?? '', ['CLOSED','CLOSED_FAILED'], true) ? 'p-ok' : 'p-warn' ?>"><?= e(strtolower(str_replace('_', ' ', (string)$ca['status']))) ?></span></div>
+        <div class="muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($ca['title'] ?: '—') ?></div>
       </div>
     <?php endforeach; endif; ?>
   </div>

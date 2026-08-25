@@ -2539,6 +2539,50 @@ function idems_vendor_performance($partnerId) {
     ];
 }
 
+// Module 16 — one vendor SCORECARD assembled from the signals that already exist. It
+// computes NO new score: the headline is the existing performance score; the other
+// domains are read from their own engines and the profile. Every part is guarded, so a
+// missing engine drops its tile rather than breaking the card.
+function idems_vendor_scorecard($partnerId) {
+    $partnerId = (int)$partnerId; if (!$partnerId) return null;
+    $g = function ($fn, $arg) { try { return function_exists($fn) ? $fn($arg) : null; } catch (Throwable $e) { return null; } };
+    $perf = $g('idems_vendor_performance', $partnerId);
+    $risk = $g('idems_vendor_delivery_risk', $partnerId);
+    $xp   = $g('idems_vendor_expediting_perf', $partnerId);
+    $vp   = $g('idems_vendor_profile', $partnerId);
+    $today = date('Y-m-d');
+    $reassess = (string)($vp['reassess_on'] ?? '');
+    $qual = [
+        'status'     => (string)($vp['approval_status'] ?? 'PROSPECT'),
+        'valid_until'=> (string)($vp['valid_until'] ?? ''),
+        'reassess_on'=> $reassess,
+        'overdue'    => $reassess !== '' && $reassess < $today,
+    ];
+    return [
+        'performance'   => $perf,                                              // headline score/band (existing)
+        'delivery'      => $risk,                                              // delivery-risk band/score (existing)
+        'expediting'    => $xp,                                                // reliability % (existing)
+        'qualification' => $qual,                                             // from the profile
+        'quality_open'  => ['ncr_open' => (int)($perf['ncr']['open'] ?? 0), 'complaints_open' => (int)($perf['complaints']['open'] ?? 0)],
+    ];
+}
+
+// Module 16 — the corrective actions linked to a vendor: CAPAs whose source NCR or
+// complaint is attributed to this partner. De-duplicated; open first. Safe on an
+// un-migrated install.
+function idems_vendor_capas($partnerId) {
+    $partnerId = (int)$partnerId; if (!$partnerId) return [];
+    try {
+        return ops_all(
+            "SELECT DISTINCT c.id, c.ref, c.title, c.severity, c.status, c.due_on
+             FROM capa c
+             WHERE c.ncr_id IN (SELECT id FROM nonconformities WHERE partner_id=?)
+                OR c.complaint_id IN (SELECT id FROM complaints WHERE partner_id=?)
+             ORDER BY (c.status IN ('CLOSED','CLOSED_FAILED')) ASC, c.id DESC LIMIT 8",
+            [$partnerId, $partnerId]);
+    } catch (Throwable $e) { return []; }
+}
+
 // Build "Customer complaints & resolution" table rows from the vendor's actual
 // complaint register, mapped to the given complaints_review table field. Used to
 // prefill a Vendor Assessment / Audit so complaints & their resolution are part
@@ -4087,8 +4131,11 @@ function ops_idems_vendors($route, $method) {
         $v360 = function_exists('idems_vendor_360') ? idems_vendor_360($pid) : ['reports'=>[],'ncrs'=>[],'complaints'=>[]];
         $xperf = function_exists('idems_vendor_expediting_perf') ? idems_vendor_expediting_perf($pid) : null;
         $xrisk = function_exists('idems_vendor_delivery_risk') ? idems_vendor_delivery_risk($pid) : null;
+        $scorecard = function_exists('idems_vendor_scorecard') ? idems_vendor_scorecard($pid) : null;   // Module 16
+        $vcapas = function_exists('idems_vendor_capas') ? idems_vendor_capas($pid) : [];                // Module 16
         view('ops/idems/vendor_detail', ['partner'=>$partner, 'profile'=>$profile, 'history'=>$history, 'events'=>$events,
             'perf'=>$perf, 'v360'=>$v360, 'xperf'=>$xperf, 'xrisk'=>$xrisk, 'canEdit'=>$canEdit,
+            'scorecard'=>$scorecard, 'vcapas'=>$vcapas,
             'typeOpts'=>lk_options_or('vendor_type', []), 'catOpts'=>lk_options_or('vendor_product_category', []),
             'riskOpts'=>lk_options_or('vendor_risk_class', []), 'statusOpts'=>lk_options_or('vendor_approval_status', [])]);
         return true;

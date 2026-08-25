@@ -1,7 +1,6 @@
 # Module 16 — Vendors / Vendor 360 · Edge-case analysis (pre-build)
 
-**Status:** edge-cases drafted — **awaiting your go + one decision (§4) before code.** P2.
-Additive; the existing scoring engines and qualification lifecycle are preserved.
+**Status:** ✅ BUILT (2026-08-24). Decision: (A) consolidated scorecard + CAPA section, reusing the existing engines (no new score); the scoring engines and qualification lifecycle are preserved (asserted by tests in `tests/test_module16_vendor360.php`). P2.
 
 ---
 

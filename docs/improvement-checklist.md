@@ -35,7 +35,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 13 | CAPA | P2 | ✅ done & pushed | 2026-08-24 |
 | 14 | Settings | P2 | ⬜ | — |
 | 15 | Clients / Customer 360 | P2 | ✅ done & pushed | 2026-08-24 |
-| 16 | Vendors / Vendor 360 | P2 | 📝 edge-cases drafted (awaiting 1 decision) | — |
+| 16 | Vendors / Vendor 360 | P2 | ✅ done & pushed | 2026-08-24 |
 | 17 | Leads | P2 | ⬜ | — |
 | 18 | Orders / Contracts (Contract 360) | P1 | ⬜ | — |
 | 19 | Inquiries / Requirements | P2 | ⬜ | — |
@@ -79,6 +79,27 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 16 — Vendors / Vendor 360 · 2026-08-24
+**Decision:** (A) consolidated scorecard + CAPA section, reusing the existing engines; vendor
+financials deferred (no vendor financial data exists — a module of its own).
+**Found:** the Vendor 360 is mature but its composite signals are scattered (quality performance,
+delivery risk, expediting, qualification currency separately), there's no CAPA section, and no
+vendor financial data.
+**Added (additive, read-only, NO new scoring math):**
+- `idems_vendor_scorecard()` — one card assembling the EXISTING signals: performance score+band
+  (`idems_vendor_performance`, the headline — not recomputed), delivery risk, expediting
+  reliability, qualification currency (status/valid-until/reassess-overdue), and open NCR/
+  complaint counts.
+- `idems_vendor_capas()` — the CAPAs linked to the vendor via its NCRs/complaints, de-duplicated.
+- A **Scorecard card** at the top of the Vendor 360 and a **Corrective actions** panel.
+**Preserved (verified by tests):** the scoring engines (`idems_vendor_performance`/`_delivery_
+risk`/`_expediting_perf`), the qualification lifecycle, the existing panels/register/portal — all
+unchanged. No new score formula; no schema change; no new permission. First automated coverage of
+the composite score.
+**Edge cases:** `docs/edge-cases/16-vendor-360.md`.
+**Tests:** `tests/test_module16_vendor360.php` (12 assertions). Suite 2581 passed / 3 pre-existing
+baseline failures.
 
 ### Module 15 — Client / Customer 360 · 2026-08-24
 **Decision:** (A) fill the cheap missing sections; defer per-client margin to the canonical
