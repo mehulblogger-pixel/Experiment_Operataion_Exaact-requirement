@@ -23,7 +23,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 01 | Masters | P2 | ⬜ | — |
 | 02 | Users / Access / Roles | P0 | ⬜ | — |
 | 03 | Quotations | P1 | ⬜ | — |
-| 04 | Calls / Service Requests | P1 | 🛠️ mapping code → edge-case spec | — |
+| 04 | Calls / Service Requests | P1 | 📝 edge-cases drafted (awaiting 1 decision) | — |
 | 05 | Jobs (Job 360) | P1 | ✅ done & pushed | 2026-08-24 |
 | 06 | Inspection / IDEMS core + Applicability | P0 | ✅ done & pushed | 2026-08-24 |
 | 07 | Vetting / Technical Review / Approval | P0 | ✅ done & pushed | 2026-08-24 |
