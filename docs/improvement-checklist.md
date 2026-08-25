@@ -31,7 +31,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 09 | Invoicing | P0 | ⬜ | — |
 | 10 | Client Portal | P0 | ⬜ | — |
 | 11 | Vendor / Supplier-Inspector Centre | P1 | ⬜ | — |
-| 12 | NCR | P1 | 🛠️ mapping code → edge-case spec | — |
+| 12 | NCR | P1 | 📝 edge-cases drafted (awaiting 1 decision) | — |
 | 13 | CAPA | P2 | ⬜ | — |
 | 14 | Settings | P2 | ⬜ | — |
 | 15 | Clients / Customer 360 | P2 | ⬜ | — |
