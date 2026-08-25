@@ -42,7 +42,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 20 | Project Costing | P1 | ⬜ | — |
 | 21 | Hold / Witness Points | P0 | ✅ done & pushed | 2026-08-24 |
 | 22 | Complaints | P1 | ✅ done & pushed | 2026-08-24 |
-| 23 | Equipment (Equipment 360) | P1 | 📝 edge-cases drafted (awaiting go) | — |
+| 23 | Equipment (Equipment 360) | P1 | ✅ done & pushed | 2026-08-25 |
 | 24 | Competence (Competence 360) | P0 | ✅ done & pushed | 2026-08-24 |
 | 25 | Impartiality | P0 | ✅ done & pushed | 2026-08-24 |
 | 26 | Identity | P0 | ⬜ | — |
@@ -79,6 +79,42 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 23 — Equipment (Equipment 360) · 2026-08-25
+**Decision:** (A) impact-flagging 360; a maintenance/lifecycle layer and forcing the string-only
+IDEMS-JSON instruments through the FK deferred to a deliberate later change.
+**Found:** the measuring-equipment control is already solid — a real master (`equipment`), a
+never-overwritten certificate history (`equipment_calibrations`), a report→instrument link
+(`report_equipment`), a non-overridable at-issue hard block that judges each instrument against
+the certificate in force **on the inspection date**, and a 30-day expiry-reminder cron. The
+forward question ("does this report's instrument have a live certificate?") is fully guarded.
+**The gap:** the **reverse** question was never asked — when a certificate lapses or is later
+found bad, *which already-released reports and jobs rested on this instrument?* No code queried
+`report_equipment WHERE equipment_id=?`, though the FK exists and is indexed (`ix_req_equip`). The
+reminder emailed a human about the instrument but named no affected report; the detail screen was
+a register, not a 360.
+**Added (additive, read-only, NO auto-invalidation):**
+- `reports_using_equipment($eqId)` — the reverse lookup (joins `report_docs`), every report that
+  named the instrument with its status, job, work date and the certificate it was stamped against.
+- `equipment_calibration_impact($eqId)` — a per-report verdict: **Covered** (rested on a valid PASS
+  certificate on the work date — stays Covered even after that certificate later expires) vs
+  **Review** (the certificate it rested on was later marked FAIL or removed/revoked, or no valid
+  certificate covered the work date). Only **released** reports (APPROVED/ISSUED/finalised) count as
+  impact; a draft is listed but not counted (it re-hits the hard block on issue). Ordinary expiry
+  after the work and supersession by a newer certificate do **not** raise Review (no over-flagging).
+- An **"Reports & jobs using this instrument"** panel on the equipment detail with a calibration-
+  impact banner ("N released reports may need a controlled quality review — nothing is
+  auto-invalidated"), honest that string-only (unlinked) instruments aren't covered.
+- The expiry reminder now carries the **blast-radius count** ("Used on N released reports — review
+  at /equip-edit?id=…").
+**Preserved (verified by tests):** the `document.issue` calibration hard block
+(`report_equipment_block` → `equipment_calibration_on`, never overridable), the never-overwritten
+history, the `calibration_id` stamp-at-add-time, the reminder cron and register banner — all
+unchanged. No schema change; no new permission (reuses `equipment_can_manage` / `master.manage`).
+First automated coverage of the reverse impact lookup.
+**Edge cases:** `docs/edge-cases/23-equipment.md`.
+**Tests:** `tests/test_module23_equipment.php` (18 assertions). Suite 2623 passed / 3 pre-existing
+baseline failures.
 
 ### Module 31 — Attendance / Reconciliation · 2026-08-24
 **Decision:** (A) reconciliation view + flags; fully separating the conflated stores deferred to

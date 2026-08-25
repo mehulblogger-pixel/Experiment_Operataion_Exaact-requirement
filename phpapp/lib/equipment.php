@@ -207,6 +207,68 @@ function report_equipment_date($doc) {
     return date('Y-m-d');
 }
 
+// ---- Impact awareness: which released work rested on this instrument -------
+// The register answers "does THIS report's instrument have a live certificate?"
+// (the finalise gate). The reverse question was never asked: when a certificate
+// lapses, or is later found bad, WHICH already-issued reports and jobs rested on
+// this instrument? The foreign key exists and is indexed (report_equipment.
+// equipment_id, ix_req_equip) — this reads it. Read-only: it FLAGS work for a
+// controlled quality review; it never auto-invalidates a report.
+
+// Every report that named this instrument, newest issue first, with its status,
+// its job and the certificate it was stamped against.
+function reports_using_equipment($equipmentId) {
+    try {
+        return ops_all("SELECT re.id link_id, re.used_on, re.calibration_id, re.added_at,
+                               d.id doc_id, d.irn, d.type_code, d.title, d.status, d.finalized,
+                               d.inspection_date, d.issue_date, d.job_id, j.job_code
+                        FROM report_equipment re
+                        JOIN report_docs d ON d.id = re.report_doc_id
+                        LEFT JOIN jobs j ON j.id = d.job_id
+                        WHERE re.equipment_id=? AND COALESCE(d.deleted,0)=0
+                        ORDER BY (d.issue_date <> '') DESC, d.issue_date DESC, d.id DESC",
+                       [(int)$equipmentId]);
+    } catch (Throwable $e) { if (equip_missing_table($e)) return []; throw $e; }
+}
+
+// A read-only verdict per report. REVIEW never means "invalidated" — it means a
+// human should look, per the quality procedure. The two things that raise it:
+//   * the certificate the report rested on is no longer good — it was later
+//     marked FAIL, or the certificate record was removed (revoked); or
+//   * no valid certificate was in force on the work date at all (a coverage gap
+//     the report should never have issued through).
+// Ordinary expiry AFTER the work, and supersession by a newer certificate, do
+// NOT raise REVIEW — correctly-covered past work stays OK (see the tests). Only
+// released work (APPROVED / ISSUED / finalised) is counted as impact; a draft is
+// listed but not counted, because it re-hits the hard block on issue.
+function equipment_calibration_impact($equipmentId) {
+    $equipmentId = (int)$equipmentId;
+    $cals = [];
+    foreach (equipment_calibrations($equipmentId) as $c) $cals[(int)$c['id']] = $c;
+    $out = ['reports' => [], 'review' => 0, 'released' => 0];
+    foreach (reports_using_equipment($equipmentId) as $r) {
+        $released = !empty($r['finalized']) || in_array($r['status'], ['APPROVED', 'ISSUED'], true);
+        $usedOn = $r['used_on'] ?: report_equipment_date([
+            'inspection_date' => $r['inspection_date'], 'issue_date' => $r['issue_date'], 'job_id' => $r['job_id']]);
+        $stampId = (int)($r['calibration_id'] ?? 0);
+        $rested  = ($stampId && isset($cals[$stampId])) ? $cals[$stampId] : null;
+
+        $verdict = 'OK'; $why = '';
+        if ($stampId && !$rested) {
+            $verdict = 'REVIEW'; $why = 'the certificate it was recorded against is no longer on file (revoked or removed)';
+        } elseif ($rested && $rested['result'] !== 'PASS') {
+            $verdict = 'REVIEW'; $why = 'the certificate it was recorded against is now marked ' . $rested['result'];
+        } elseif (!equipment_calibration_on($equipmentId, $usedOn)) {
+            $verdict = 'REVIEW'; $why = 'no valid certificate was in force on ' . fdate($usedOn);
+        }
+
+        if ($released) $out['released']++;
+        if ($verdict === 'REVIEW' && $released) $out['review']++;
+        $out['reports'][] = $r + ['released' => $released, 'verdict' => $verdict, 'why' => $why, 'used_on_eff' => $usedOn];
+    }
+    return $out;
+}
+
 // ---- Reminders -------------------------------------------------------------
 // Same shape as the certificate reminder that already runs from cron.php.
 function equipment_run_cal_reminders($today = null) {
@@ -218,10 +280,18 @@ function equipment_run_cal_reminders($today = null) {
         if ($days === null || $days > 30) continue;
         $cal = equipment_current_calibration($e['id']);
         $when = $days < 0 ? 'expired ' . abs($days) . ' day(s) ago' : "due in $days day(s)";
+        // Blast radius: how many already-released reports rested on this instrument,
+        // so the reader knows what is downstream (review at the equipment screen).
+        $impact = equipment_calibration_impact($e['id']);
+        $blast = (int)$impact['released'] > 0
+            ? "Used on " . (int)$impact['released'] . " released " . Tlp('report')
+              . " — review the calibration impact at /equip-edit?id=" . (int)$e['id'] . ".\n"
+            : '';
         $body = "Calibration follow-up.\n\nInstrument: {$e['code']} {$e['name']}\n"
               . "Serial: " . ($e['serial_no'] ?: '—') . "\n"
               . "Certificate: " . ($cal['cert_no'] ?? '—') . "\n"
-              . "Valid to: " . ($cal['valid_to'] ?? '—') . " — {$when}.\n\n"
+              . "Valid to: " . ($cal['valid_to'] ?? '—') . " — {$when}.\n"
+              . $blast . "\n"
               . "An instrument out of calibration must not be used, and a report naming one will not issue.\n\n"
               . app_name();
         ops_mail($to, "Calibration due: {$e['code']} {$e['name']} ($when)", $body, '', 'calibration');
@@ -352,5 +422,6 @@ function equipment_form_vars($e, $error) {
     return ['e' => $e, 'error' => $error,
             'offices' => offices_list(), 'inspectors' => inspectors_list(),
             'cals' => $e ? equipment_calibrations($e['id']) : [],
-            'block' => $e ? equipment_block($e['id']) : ''];
+            'block' => $e ? equipment_block($e['id']) : '',
+            'impact' => $e ? equipment_calibration_impact($e['id']) : ['reports' => [], 'review' => 0, 'released' => 0]];
 }

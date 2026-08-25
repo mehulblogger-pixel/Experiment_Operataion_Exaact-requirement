@@ -1,6 +1,10 @@
 # Module 23 — Equipment 360 · Edge-case analysis (pre-build)
 
-**Status:** 📝 SPEC — awaiting decision. P1.
+**Status:** ✅ BUILT (2026-08-25). Decision: (A) impact-flagging 360; maintenance/lifecycle layer
+and forcing string-only instruments through the FK deferred. Read-only reverse lookup + a
+flag-not-invalidate calibration-impact verdict on the equipment detail, plus the blast-radius count
+in the expiry reminder; the at-issue hard block is untouched (asserted by
+`tests/test_module23_equipment.php`). P1.
 
 ---
 

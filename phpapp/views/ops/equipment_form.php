@@ -91,4 +91,48 @@
     <button class="btn small" type="submit">File certificate</button>
   </form>
 </div>
+
+<?php // ---- Module 23: Equipment 360 — what released work rests on this instrument ----
+$impact = $impact ?? ['reports' => [], 'review' => 0, 'released' => 0];
+$vLabel = ['OK' => 'Covered', 'REVIEW' => 'Review'];
+?>
+<div class="panel" style="<?= $impact['review'] > 0 ? 'border-left:3px solid var(--bad)' : '' ?>">
+  <h3 class="tab-sub" style="margin-top:0">Reports &amp; jobs using this instrument
+    <span class="muted" style="font-weight:400;font-size:12px">(<?= count($impact['reports']) ?>)</span></h3>
+  <?php if ($impact['review'] > 0): ?>
+    <div class="msg msg-error" style="margin-top:0"><strong>Calibration impact — <?= (int)$impact['review'] ?>
+      released <?= e(Tlp('report')) ?> may need a controlled quality review.</strong>
+      This is a flag, not a verdict: decide per your quality procedure. <strong>Nothing is auto-invalidated.</strong></div>
+  <?php elseif ($impact['released'] > 0): ?>
+    <div class="msg msg-ok" style="margin-top:0">All <?= (int)$impact['released'] ?> released
+      <?= e(Tlp('report')) ?> rested on a certificate that was valid on the work date. No review needed.</div>
+  <?php endif; ?>
+  <p class="sub" style="margin-top:0">When a certificate lapses <em>after</em> the work, correctly-covered
+    past <?= e(Tlp('report')) ?> stay <strong>Covered</strong>. A <strong>Review</strong> flag means the certificate the
+    <?= e(Tl('report')) ?> rested on was later marked FAIL or removed, or no valid certificate covered the work date.</p>
+  <?php if ($impact['reports']): ?>
+  <table class="grid">
+    <tr><th><?= e(TH('report')) ?></th><th>Status</th><th><?= e(TH('job')) ?></th><th>Work date</th><th>Impact</th></tr>
+    <?php foreach ($impact['reports'] as $r): ?>
+      <tr<?= $r['verdict'] === 'REVIEW' && $r['released'] ? '' : ($r['verdict'] === 'REVIEW' ? ' class="muted"' : '') ?>>
+        <td><a href="/document?id=<?= (int)$r['doc_id'] ?>"><strong><?= e($r['irn'] ?: ('#' . $r['doc_id'])) ?></strong></a>
+          <?= $r['title'] ? '<br><span class="muted" style="font-size:12px">' . e($r['title']) . '</span>' : '' ?></td>
+        <td><span class="pill <?= e(idems_status_pill($r['status'] ?? '')) ?>"><?= e(IDEMS_STATUS[$r['status']] ?? $r['status'] ?? '—') ?></span>
+          <?= $r['released'] ? '' : '<br><span class="muted" style="font-size:11px">not released — re-checked on issue</span>' ?></td>
+        <td><?= $r['job_code'] ? '<a href="/job?id=' . (int)$r['job_id'] . '">' . e($r['job_code']) . '</a>' : '<span class="muted">—</span>' ?></td>
+        <td class="muted" style="white-space:nowrap"><?= e($r['used_on_eff'] ? fdate($r['used_on_eff']) : '—') ?></td>
+        <td><?php if ($r['verdict'] === 'REVIEW'): ?>
+            <span class="pill p-bad" title="<?= e($r['why']) ?>">Review</span>
+            <div class="muted" style="font-size:11.5px"><?= e($r['why']) ?></div>
+          <?php else: ?><span class="pill p-ok">Covered</span><?php endif; ?></td>
+      </tr>
+    <?php endforeach; ?>
+  </table>
+  <?php else: ?>
+    <p class="muted" style="margin:0">This instrument has not yet been named on any <?= e(Tl('report') ) ?>.</p>
+  <?php endif; ?>
+  <p class="muted" style="font-size:12px;margin-top:10px">Only <?= e(Tlp('report')) ?> that <strong>link</strong> this
+    instrument (the “measuring &amp; test equipment used” list) are shown. An instrument typed into a report’s
+    instrument table as free text, without linking it here, is not covered by this impact analysis.</p>
+</div>
 <?php endif; ?>
