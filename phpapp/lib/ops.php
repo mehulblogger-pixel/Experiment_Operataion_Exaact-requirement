@@ -1589,6 +1589,43 @@ function job_glance($job) {
         'photos'   => ['n'=>$cnt("SELECT COUNT(*) FROM report_files rf JOIN report_docs d ON d.id=rf.report_doc_id WHERE d.job_id=? AND rf.kind='photo'", [$jid]), 'href'=>'#reports', 'label'=>'photos'],
     ];
 }
+// Module 05 — Job 360 status header: one read-only answer to "where is this job,
+// who owns it now, and what is blocking it", consolidated from data and helpers that
+// already exist (the nowband narrates the next step; this names the stage, the owner
+// and every blocker in one place). Blockers tagged money=true are hidden from a field
+// inspector by the caller. Every probe is guarded so a missing helper never breaks it.
+function job_now($job) {
+    $job = (array)$job;
+    $jid = (int)($job['id'] ?? 0);
+    $stageMap = (function_exists('lk_options_or') ? lk_options_or('job_stage', JOB_STAGES) : JOB_STAGES);
+    $closed = !empty($job['closed_flag']);
+    $stage = $closed ? 'Closed' : ($stageMap[$job['stage'] ?? 'ALLOCATED'] ?? ($job['stage'] ?: 'Allocated'));
+
+    // Report state, to decide the owner and reflect Module 07.
+    $cnt = function ($sql, $a = []) { try { return (int) ops_val($sql, $a); } catch (Throwable $e) { return 0; } };
+    $anyReport = $cnt("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0", [$jid]);
+    $inReview  = $cnt("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND status IN ('VETTING','UNDER_REVIEW')", [$jid]);
+    $issued    = $cnt("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND COALESCE(finalized,0)=1", [$jid]);
+    $sched = trim((string)($job['scheduled_date'] ?? '')) !== '';
+    $ins = trim((string)($job['inspector_name'] ?? '')) ?: 'the inspector';
+
+    if ($closed)          $owner = '—';
+    elseif ($inReview)    $owner = 'Reviewer / approver';
+    elseif ($issued)      $owner = $ins . ' — close the job';
+    elseif ($anyReport)   $owner = $ins . ' — finish the report';
+    elseif ($sched)       $owner = $ins;
+    else                  $owner = 'Coordinator — schedule it';
+
+    // Blockers — consolidated from the existing banners' sources.
+    $blk = [];
+    if (!$closed) {
+        try { if (function_exists('job_lock_state')) { $ls = job_lock_state($job); if (!empty($ls['locked'])) $blk[] = ['label'=>'Locked — edits frozen', 'href'=>'', 'money'=>false]; } } catch (Throwable $e) {}
+        try { if (function_exists('job_hold_reasons')) foreach ((array)job_hold_reasons($job) as $hr) { $t = trim((string)(is_array($hr) ? ($hr['text'] ?? ($hr['reason'] ?? '')) : $hr)); if ($t !== '') $blk[] = ['label'=>$t, 'href'=>'#reports', 'money'=>false]; } } catch (Throwable $e) {}
+        try { if (function_exists('hwp_for_job')) { $open = 0; foreach ((array)hwp_for_job($jid) as $p) if (($p['status'] ?? '') === 'OPEN') $open++; if ($open) $blk[] = ['label'=>$open . ' hold / witness point' . ($open === 1 ? '' : 's') . ' still open', 'href'=>'#holdpoints', 'money'=>false]; } } catch (Throwable $e) {}
+        try { if (function_exists('job_bills_missing') && job_bills_missing($job)) $blk[] = ['label'=>'Client bills still required before invoicing', 'href'=>'#bills', 'money'=>true]; } catch (Throwable $e) {}
+    }
+    return ['stage' => $stage, 'owner' => $owner, 'blockers' => $blk, 'closed' => $closed];
+}
 function job_profit($job, $officeId = null) {
     $mandays = job_mandays($job);
     $office = $job['executing_office_id'] ?? null;

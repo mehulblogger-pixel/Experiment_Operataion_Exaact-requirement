@@ -11,6 +11,34 @@
   </div>
 </div>
 
+<?php // ---- Module 05: Stage · Owner · Blockers — one consolidated status header
+      // above the narrative nowband, answering where the job is / who owns it / what
+      // is blocking it. Money blockers are hidden from a field inspector. ---------- ?>
+<?php if (function_exists('job_now')):
+    $jn = job_now($job);
+    $jnFieldInsp = function_exists('is_field_inspector') && is_field_inspector();
+    $jnBlockers = array_values(array_filter($jn['blockers'], fn($b) => !($jnFieldInsp && !empty($b['money'])))); ?>
+  <div class="panel" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+    <div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)">Stage</div>
+      <div style="font-weight:700"><?= e($jn['stage']) ?></div></div>
+    <div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)">With</div>
+      <div style="font-weight:700"><?= e($jn['owner']) ?></div></div>
+    <div style="flex:1 1 240px;min-width:200px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)">Blockers</div>
+      <?php if (!$jnBlockers): ?>
+        <div style="font-weight:600;color:var(--ok)"><?= $jn['closed'] ? '—' : '✓ None' ?></div>
+      <?php else: ?>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px">
+          <?php foreach ($jnBlockers as $b): ?>
+            <?php if (!empty($b['href'])): ?><a href="<?= e($b['href']) ?>" style="text-decoration:none">
+              <span style="border:1px solid var(--bad);color:var(--bad);border-radius:7px;padding:3px 8px;font-size:12px">⛔ <?= e($b['label']) ?></span></a>
+            <?php else: ?><span style="border:1px solid var(--bad);color:var(--bad);border-radius:7px;padding:3px 8px;font-size:12px">⛔ <?= e($b['label']) ?></span><?php endif; ?>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+  </div>
+<?php endif; ?>
+
 <?php // ---- Where this job stands, and the one next thing ------------------- ?>
 <?php
   $jClosed   = !empty($job['closed_flag']);

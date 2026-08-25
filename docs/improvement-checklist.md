@@ -24,7 +24,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 02 | Users / Access / Roles | P0 | ⬜ | — |
 | 03 | Quotations | P1 | ⬜ | — |
 | 04 | Calls / Service Requests | P1 | ⬜ | — |
-| 05 | Jobs (Job 360) | P1 | 🛠️ mapping code → edge-case spec | — |
+| 05 | Jobs (Job 360) | P1 | ✅ done & pushed | 2026-08-24 |
 | 06 | Inspection / IDEMS core + Applicability | P0 | ✅ done & pushed | 2026-08-24 |
 | 07 | Vetting / Technical Review / Approval | P0 | ✅ done & pushed | 2026-08-24 |
 | 08 | Report Release / Issue | P0 | ✅ done & pushed | 2026-08-24 |
@@ -79,6 +79,23 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 05 — Jobs (Job 360) · 2026-08-24
+**Found:** the job screen is already a rich 360 (4 tabs, a nowband next-action heuristic, a
+glance chip index, and panels for schedule/site/reports/costs/billing). The gap vs the
+universal-UX rule: no single **Stage · Owner · Blockers** header (the nowband gives the next
+step but not the owner, and blockers were scattered across separate banners).
+**Added (additive, read-only):** `job_now($job)` → stage label, current **owner** (Coordinator
+→ Inspector → Reviewer/approver → Inspector-to-close → —, reflecting Module 07 review state),
+and a **consolidated blockers list** (lock, HOLD reasons, open hold/witness points, bills
+required) each linking to its panel. A compact **Stage · With · Blockers** strip now sits above
+the nowband. Money blockers are hidden from a field inspector.
+**Preserved (verified by tests):** the four tabs, every fold pinned by the declutter tests, the
+`job_glance` keys, the `$fieldInspector`/`$canSeeProfit` gates, and the deep-link opener — all
+untouched (the header is a new strip above the tab container). No new permission.
+**Edge cases:** `docs/edge-cases/05-job-360.md`.
+**Tests:** `tests/test_module05_job360.php` (14 assertions). Suite 2448 passed / 3 pre-existing
+baseline failures.
 
 ### Module 06 — Inspection / IDEMS core + Applicability · 2026-08-24
 **Decision:** (A) surface & formalize only — reuse the existing applicability mechanism, do
