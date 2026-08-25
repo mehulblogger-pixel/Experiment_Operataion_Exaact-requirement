@@ -49,7 +49,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 27 | Confidentiality | P0 | ⬜ | — |
 | 28 | Audits | P2 | ⬜ | — |
 | 29 | Data Control / Governance | P0 | ⬜ | — |
-| 30 | Vouchers / Expenses | P1 | 📝 edge-cases drafted (awaiting 1 decision) | — |
+| 30 | Vouchers / Expenses | P1 | ✅ done & pushed | 2026-08-24 |
 | 31 | Attendance / Reconciliation | P1 | ⬜ | — |
 | 32 | Profitability (canonical engine) | P0 | ⬜ | — |
 | 33 | Overheads | P1 | ⬜ | — |
@@ -79,6 +79,32 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 30 — Vouchers / Expenses (fast field capture) · 2026-08-24
+**Decision:** (A) quick-add expense + receipt photo + job bridge; GPS auto-capture from
+check-in deferred. Answered the user's question: the coordinator's job-close `expenses` are
+client-billable job costs (kept separate); the inspector's own expense goes on the monthly
+voucher — and the quick-add's optional job + the job-screen "Log my expense" bridge make a
+job-linked expense land there.
+**Found:** the voucher is a monthly 12-column grid; no per-expense receipt photo (only one
+whole-voucher file); the R5 maker-checker/reopen guards are solid and must be preserved.
+**Added (additive):**
+- Per-line receipt storage (`receipt_data`/`_mime`/`_name` via `ensure_column`, backward
+  compatible).
+- `voucher-quick-add` — one form (amount + type + optional job + note + receipt photo) that
+  auto-fills claimant/date/currency, opens THIS month's voucher, writes one categorised line
+  (catch-all head when none chosen), rolls up the total — all through `can_edit_voucher`, so a
+  submitted/paid/frozen month is refused, never written past.
+- `voucher-line-receipt` — serves a line's receipt to a permitted viewer only; a 📎 on lines
+  that have one.
+- Job bridge: an assigned inspector's "🧾 Log my expense" on the job screen opens the quick-add
+  with the job pre-selected (`/voucher?addjob=…`).
+**Preserved (verified by tests):** the R5 maker≠checker approval guard, the PAID-reopen guard,
+the DRAFT-only edit lock, the month-frozen lock, the monthly grid and pull-from-jobs, and the
+per-job client-billable `expenses` — all unchanged. No new permission.
+**Edge cases:** `docs/edge-cases/30-vouchers.md`.
+**Tests:** `tests/test_module30_vouchers.php` (13 assertions). Suite 2594 passed / 3 pre-existing
+baseline failures.
 
 ### Module 16 — Vendors / Vendor 360 · 2026-08-24
 **Decision:** (A) consolidated scorecard + CAPA section, reusing the existing engines; vendor

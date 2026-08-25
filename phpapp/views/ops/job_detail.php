@@ -8,6 +8,12 @@
     <?php if (can('mod.idems.edit') || is_master()): ?><a class="btn secondary" href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call='.(int)$job['call_id'] : '' ?>" title="Create an inspection report — all known details are filled in">📑 New report</a><?php endif; ?>
     <?php if (is_coordinator_level() && !$job['closed_flag'] && !$lock['locked']): ?><a class="btn secondary" href="/job-edit?id=<?= (int)$job['id'] ?>">Edit</a><?php endif; ?>
     <?php if ($job['call_id']): ?><a class="btn secondary" href="/call?id=<?= (int)$job['call_id'] ?>">View call</a><?php endif; ?>
+    <?php // Module 30 — the assigned inspector logs their own expense for this job straight
+          // onto this month's voucher (job pre-filled), separate from the client-billable
+          // job costs the coordinator records at close. ?>
+    <?php if (function_exists('my_inspector_id') && (int)my_inspector_id() > 0 && (int)my_inspector_id() === (int)($job['inspector_id'] ?? 0)): ?>
+      <a class="btn secondary" href="/voucher?addjob=<?= (int)$job['id'] ?>#quick-add" title="Add your own out-of-pocket expense for this job to your monthly voucher">🧾 Log my expense</a>
+    <?php endif; ?>
   </div>
 </div>
 

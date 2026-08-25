@@ -2593,7 +2593,7 @@ function ops_dispatch($route, $method) {
             ops_require(is_coordinator_level());
             if ($method === 'POST' && function_exists('recruit_ai_extract')) { recruit_ai_extract(); return true; }
             header('Content-Type: application/json'); echo json_encode(['ok' => false, 'error' => 'POST only']); return true;
-        case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry' || $route === 'voucher-save' || $route === 'voucher-header' || $route === 'voucher-status' || $route === 'voucher-print' || $route === 'voucher-file' || $route === 'voucher-csv':
+        case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry' || $route === 'voucher-save' || $route === 'voucher-header' || $route === 'voucher-status' || $route === 'voucher-print' || $route === 'voucher-file' || $route === 'voucher-csv' || $route === 'voucher-quick-add' || $route === 'voucher-line-receipt':
             ops_vouchers($route, $method); return true;
         case $route === 'my-jobs':
             ops_my_jobs(); return true;
@@ -5052,9 +5052,17 @@ function ops_vouchers($route, $method) {
                     ->execute([$insId, current_user()['home_office_id'] ?? null, $month, user_name(current_user()), date('c')]);
                 $id = $pdo->lastInsertId();
             } else { $id = $v['id']; }
-            redirect('/voucher?id=' . $id);
+            // Module 30 — carry a job through so "log my expense for this job" lands on the
+            // right month's voucher with the job pre-selected in the quick-add form.
+            redirect('/voucher?id=' . $id . (isset($_GET['addjob']) ? '&addjob=' . (int)$_GET['addjob'] : ''));
         }
-        if (function_exists('ensure_column')) ensure_column('vouchers', 'submitted_by', "VARCHAR(20) DEFAULT ''");
+        if (function_exists('ensure_column')) {
+            ensure_column('vouchers', 'submitted_by', "VARCHAR(20) DEFAULT ''");
+            // Module 30 — a receipt photo per expense line (additive; old rows just have none).
+            ensure_column('voucher_entries', 'receipt_data', 'LONGTEXT');
+            ensure_column('voucher_entries', 'receipt_mime', "VARCHAR(80) DEFAULT ''");
+            ensure_column('voucher_entries', 'receipt_name', "VARCHAR(200) DEFAULT ''");
+        }
         $v = ops_one("SELECT v.*, i.name inspector_name, i.emp_code, i.sbu FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id WHERE v.id=?", [$id]);
         if (!$v) { http_response_code(404); view('notfound'); return; }
         ops_require(can_view_voucher($v), 'You cannot view this voucher.');
@@ -5065,11 +5073,16 @@ function ops_vouchers($route, $method) {
         $meUid = (int)(current_user()['id'] ?? 0);
         $canApproveThis = is_coordinator_level() && !voucher_owner_is_me($v)
             && ((int)($v['submitted_by'] ?? 0) === 0 || (int)$v['submitted_by'] !== $meUid);
+        // Module 30 — the inspector's recent jobs, for the quick-add "against a job" picker.
+        $qaJobs = ops_all("SELECT j.id, j.job_code, bp.display_name client_name, bp.legal_name legal
+                           FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
+                           WHERE j.inspector_id=? ORDER BY j.id DESC LIMIT 40", [(int)$v['inspector_id']]);
         view('ops/voucher_detail', ['v' => $v, 'entries' => $entries, 'canEdit' => can_edit_voucher($v),
             'leaveOpts' => lk_options_or('leave_type', LEAVE_TYPES), 'dayOpts' => lk_options_or('day_code', DAY_CODES),
             'heads' => voucher_heads_for($v['inspector_id']), 'modes' => voucher_modes_for($v['inspector_id']),
             'rates' => voucher_mode_rates($v['inspector_id']), 'sum' => voucher_summary($v['id']),
             'headLabels' => expense_head_label_map(), 'canApprove' => is_coordinator_level(), 'canApproveThis' => $canApproveThis,
+            'qaJobs' => $qaJobs, 'addJob' => (int)($_GET['addjob'] ?? 0),
             'natureOpts' => ['REVENUE'=>'Revenue','NONREV'=>'Non-Revenue','SUPPORT'=>'Support function','MD'=>'MD']]);
         return;
     }
@@ -5089,6 +5102,70 @@ function ops_vouchers($route, $method) {
         }
         flash('Voucher details saved.');
         redirect('/voucher?id=' . $v['id']);
+    }
+
+    // Module 30 — the fast field path: add ONE expense (amount + type + optional job +
+    // note + receipt photo) to THIS month's voucher, auto-filling claimant/date/currency.
+    // Routes through can_edit_voucher, so every R5 lock (DRAFT-only, owner, month-frozen)
+    // still applies — a submitted/paid month is refused, never silently written past.
+    if ($route === 'voucher-quick-add' && $method === 'POST') {
+        $insId = is_coordinator_level() ? (int)($_POST['inspector_id'] ?? 0) : (int)my_inspector_id();
+        if (!$insId) { flash('No inspector to log the expense against.', 'error'); redirect('/vouchers'); }
+        $month = preg_match('/^\d{4}-\d{2}$/', (string)($_POST['month'] ?? '')) ? $_POST['month'] : date('Y-m');
+        $v = ops_one("SELECT * FROM vouchers WHERE inspector_id=? AND month=?", [$insId, $month]);
+        if (!$v) {
+            $pdo->prepare("INSERT INTO vouchers (inspector_id,office_id,month,status,created_by,created_at) VALUES (?,?,?, 'DRAFT', ?,?)")
+                ->execute([$insId, current_user()['home_office_id'] ?? null, $month, user_name(current_user()), date('c')]);
+            $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)$pdo->lastInsertId()]);
+        }
+        if (!can_edit_voucher($v)) { flash(voucher_lock_reason($v) ?: 'This month\'s voucher can no longer be edited — reopen it to add more.', 'error'); redirect('/voucher?id=' . $v['id']); }
+
+        $amount = round((float)($_POST['amount'] ?? 0), 2);
+        if ($amount <= 0) { flash('Enter the amount of the expense.', 'error'); redirect('/voucher?id=' . $v['id']); }
+        // Categorise: the chosen head if valid, else the "Others (specify)" catch-all every
+        // inspector always has, so a line is never uncategorised.
+        $heads = voucher_heads_for($insId); $headCodes = array_map(fn($h) => $h['code'], $heads);
+        $head = (string)($_POST['head'] ?? '');
+        if (!in_array($head, $headCodes, true)) { $head = in_array('OTHERS', $headCodes, true) ? 'OTHERS' : (string)($headCodes[count($headCodes) - 1] ?? 'OTHERS'); }
+        $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['entry_date'] ?? '')) ? $_POST['entry_date'] : date('Y-m-d');
+        $note = substr(trim((string)($_POST['note'] ?? '')), 0, 255);
+
+        // Optional job: pull its client/site/SBU so the line is tied to the work.
+        $jobId = (int)($_POST['job_id'] ?? 0); $sbu = ''; $site = '';
+        if ($jobId) {
+            $jr = ops_one("SELECT j.sbu, j.call_id, c.client_id, bp.display_name client_name FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id WHERE j.id=?", [$jobId]);
+            if ($jr) { $sbu = (string)($jr['sbu'] ?? ''); $site = (string)($jr['client_name'] ?? ''); }
+        }
+        // Optional receipt photo.
+        $rData = null; $rMime = ''; $rName = '';
+        if (!empty($_FILES['receipt']['tmp_name']) && (int)$_FILES['receipt']['error'] === 0) {
+            if ((int)$_FILES['receipt']['size'] > 6 * 1024 * 1024) { flash('The receipt is larger than 6 MB — please compress it.', 'error'); redirect('/voucher?id=' . $v['id']); }
+            $mime = (string)($_FILES['receipt']['type'] ?: 'application/octet-stream');
+            if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'], true)) { flash('Attach the receipt as a JPG, PNG, WebP or PDF.', 'error'); redirect('/voucher?id=' . $v['id']); }
+            $rData = base64_encode(file_get_contents($_FILES['receipt']['tmp_name'])); $rMime = $mime; $rName = substr((string)$_FILES['receipt']['name'], 0, 200);
+        }
+
+        $pdo->prepare("INSERT INTO voucher_entries (voucher_id,entry_date,day_type,job_id,sbu,site_label,amounts,row_total,notes,receipt_data,receipt_mime,receipt_name,is_auto)
+                       VALUES (?,?, 'WORK', ?,?,?,?,?,?,?,?,?,0)")
+            ->execute([$v['id'], $date, $jobId ?: null, $sbu, $site, json_encode([$head => $amount]), $amount, $note, $rData, $rMime, $rName]);
+        // Roll up the voucher total from ALL its lines (consistent with voucher-save).
+        $grand = (float)ops_val("SELECT COALESCE(SUM(row_total),0) FROM voucher_entries WHERE voucher_id=?", [$v['id']]);
+        $pdo->prepare("UPDATE vouchers SET total=? WHERE id=?")->execute([$grand, $v['id']]);
+        flash('Expense added to your ' . $month . ' ' . Tl('voucher') . ($rData ? ' with its receipt' : '') . '.');
+        redirect('/voucher?id=' . $v['id']);
+    }
+
+    // Module 30 — serve a line's receipt to a permitted viewer only.
+    if ($route === 'voucher-line-receipt') {
+        $e = ops_one("SELECT * FROM voucher_entries WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$e || empty($e['receipt_data'])) { http_response_code(404); view('notfound'); return; }
+        $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)$e['voucher_id']]);
+        if (!$v) { http_response_code(404); view('notfound'); return; }
+        ops_require(can_view_voucher($v), 'You cannot view this receipt.');
+        header('Content-Type: ' . ($e['receipt_mime'] ?: 'application/octet-stream'));
+        header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/', '_', (string)($e['receipt_name'] ?: 'receipt')) . '"');
+        echo base64_decode((string)$e['receipt_data']);
+        return;
     }
 
     if ($route === 'voucher-csv') {

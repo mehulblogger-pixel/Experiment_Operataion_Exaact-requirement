@@ -31,6 +31,26 @@
 
 <div data-tabs data-tabs-key="voucher" data-tabs-order="Entries,Summary">
 <?php if ($canEdit): ?>
+<?php // ---- Module 30: quick add one expense (amount + type + optional job + receipt) ---- ?>
+<div class="panel" data-tab="Entries" id="quick-add" style="border-left:3px solid var(--accent,#2b6cff)">
+  <h3 class="tab-sub" style="margin-top:0">Add an expense</h3>
+  <p class="muted" style="margin:0 0 10px">Amount, what it was for, and a photo of the receipt — the date (<?= e(date('d M Y')) ?>), your name and the currency are filled in for you.</p>
+  <form method="post" action="/voucher-quick-add" enctype="multipart/form-data" class="inline-add" style="align-items:flex-end">
+    <input type="hidden" name="inspector_id" value="<?= (int)$v['inspector_id'] ?>">
+    <input type="hidden" name="month" value="<?= e($v['month']) ?>">
+    <div class="ff"><label>Amount (<?= e(cur_sym()) ?>) *</label><input class="form-control" style="width:120px" type="number" step="0.01" min="0" name="amount" required></div>
+    <div class="ff"><label>What for *</label>
+      <select class="form-control" name="head"><?php foreach ($heads as $h): ?><option value="<?= e($h['code']) ?>"><?= e($h['label'] ?? $h['code']) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Date</label><input class="form-control" type="date" name="entry_date" value="<?= e(date('Y-m-d')) ?>"></div>
+    <div class="ff"><label>Against a <?= e(Tl('job')) ?> <span class="muted">— optional</span></label>
+      <select class="form-control searchable" name="job_id"><option value="">— none —</option>
+        <?php foreach (($qaJobs ?? []) as $jb): ?><option value="<?= (int)$jb['id'] ?>" <?= (int)($addJob ?? 0) === (int)$jb['id'] ? 'selected' : '' ?>><?= e($jb['job_code']) ?><?= $jb['client_name'] ? ' · ' . e($jb['client_name']) : '' ?></option><?php endforeach; ?>
+      </select></div>
+    <div class="ff"><label>Receipt photo <span class="muted">— optional</span></label><input class="form-control" type="file" name="receipt" accept="image/*,.pdf" capture="environment"></div>
+    <div class="ff ff-wide"><label>Note <span class="muted">— optional</span></label><input class="form-control" name="note" placeholder="e.g. taxi from station to plant"></div>
+    <button class="btn" type="submit">Add expense</button>
+  </form>
+</div>
 <div class="panel" data-tab="Entries" style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
   <form method="post" action="/voucher-generate?id=<?= (int)$v['id'] ?>">
     <button class="btn" type="submit">↻ Pull working days from jobs</button>
@@ -147,7 +167,7 @@
     ?>
     <tr data-eid="<?= $eid ?>">
       <td class="v-date"><?= e(date('d-M', strtotime($date))) ?><?= $e['is_auto']?' <span class="badge GREEN" style="font-size:10px">auto</span>':'' ?><?= $mem?' <span class="muted" title="km remembered for this vendor" style="font-size:11px">↺</span>':'' ?></td>
-      <td data-label="Attendance / Site"><?= e($att) ?></td>
+      <td data-label="Attendance / Site"><?= e($att) ?><?php if (!empty($e['receipt_data'])): ?> <a href="/voucher-line-receipt?id=<?= $eid ?>" target="_blank" rel="noopener" title="View the receipt" style="text-decoration:none">📎</a><?php endif; ?></td>
       <?php if ($canEdit): ?>
       <td data-label="File No (<?= e(T('boss')) ?>)"><input form="vform" class="form-control" style="width:110px" name="<?= $P ?>[file_no]" value="<?= e($e['file_no']) ?>" <?= $isWork?'':'readonly' ?>></td>
       <td data-label="Line No"><input form="vform" class="form-control" style="width:80px" name="<?= $P ?>[line_no]" value="<?= e($e['line_no']) ?>" placeholder="acct"></td>

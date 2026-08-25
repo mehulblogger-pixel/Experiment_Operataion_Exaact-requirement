@@ -1,7 +1,6 @@
 # Module 30 — Vouchers / Expenses (fast field capture) · Edge-case analysis (pre-build)
 
-**Status:** edge-cases drafted — **awaiting your go + one decision (§4) before code.** P1.
-Additive; the maker-checker + reopen guards (R5) are preserved verbatim.
+**Status:** ✅ BUILT (2026-08-24). Decision: (A) quick-add expense + receipt photo + job bridge; GPS auto-capture deferred. The maker-checker + reopen guards (R5) are preserved verbatim (asserted by tests in `tests/test_module30_vouchers.php`). P1.
 
 ---
 
