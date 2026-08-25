@@ -82,6 +82,87 @@ function competence_can_override() {
     return can('mod.jobs.edit') && (is_admin_level() || is_master());
 }
 
+// Module 24 — a single per-(inspector × job) eligibility verdict, shown while an
+// inspector is being CHOSEN (the hard gate already fires on save). It MIRRORS that
+// gate — BLOCKED means exactly what the save will block on — and adds advisory
+// signals (expiring certs, wrong discipline, out-of-SBU) that never block. Every
+// probe is guarded; missing data degrades to ELIGIBLE, never an error.
+// $ctx: on_date, req_trade_id, sbu, inspection_type, activity_id, client_id.
+// Returns ['status'=>'ELIGIBLE'|'CHECK'|'EXPIRING'|'BLOCKED', 'reasons'=>[{level,text}]].
+function inspector_eligibility($inspectorId, $ctx = []) {
+    $inspectorId = (int)$inspectorId;
+    $status = 'ELIGIBLE'; $reasons = [];
+    if (!$inspectorId) return ['status' => $status, 'reasons' => $reasons];
+    $rank = ['ELIGIBLE' => 0, 'CHECK' => 1, 'EXPIRING' => 2, 'BLOCKED' => 3];
+    $bump = function ($s) use (&$status, $rank) { if (($rank[$s] ?? 0) > ($rank[$status] ?? 0)) $status = $s; };
+    $add  = function ($level, $text) use (&$reasons) { $reasons[] = ['level' => $level, 'text' => $text]; };
+    $onDate = trim((string)($ctx['on_date'] ?? '')) ?: date('Y-m-d');
+
+    // 1. Lapsed MANDATORY certificate on the work date → BLOCKED (the real hard gate).
+    try {
+        foreach ((array)competence_lapsed($inspectorId, $onDate) as $c) {
+            $bump('BLOCKED');
+            $add('block', 'Required certificate lapsed: ' . $c['name'] . (!empty($c['valid_to']) ? ' (expired ' . $c['valid_to'] . ')' : ''));
+        }
+    } catch (Throwable $e) {}
+
+    // 2. Authorisation coverage — BLOCKED only when enforcement is on (mirrors auth_block);
+    //    advisory CHECK when enforcement is off.
+    try {
+        $it = (string)($ctx['inspection_type'] ?? ''); $act = (int)($ctx['activity_id'] ?? 0); $cli = (int)($ctx['client_id'] ?? 0);
+        if (function_exists('auth_enforced') && auth_enforced()) {
+            if (function_exists('auth_covers') && !auth_covers($inspectorId, $it, $act, $cli, $onDate)) {
+                $bump('BLOCKED'); $add('block', 'Not authorised for this work (authorisation enforcement is on)');
+            }
+        } elseif ($it !== '' && function_exists('auth_covers') && !auth_covers($inspectorId, $it, $act, $cli, $onDate)) {
+            $bump('CHECK'); $add('check', 'No matching authorisation on record for this work');
+        }
+    } catch (Throwable $e) {}
+
+    // 3. Certificate expiring soon (valid, but within 45 days of the work date) → EXPIRING
+    //    (advisory). Computed inline so it never depends on an un-loaded helper.
+    try {
+        $soonBy = date('Y-m-d', strtotime($onDate . ' +45 days'));
+        foreach (ops_all("SELECT name, valid_to FROM inspector_certs WHERE inspector_id=? AND COALESCE(valid_to,'')<>''", [$inspectorId]) as $c) {
+            $vt = substr((string)$c['valid_to'], 0, 10);
+            if ($vt >= $onDate && $vt <= $soonBy) { $bump('EXPIRING'); $add('warn', 'Certificate expiring soon: ' . $c['name'] . ' (' . $vt . ')'); }
+        }
+    } catch (Throwable $e) {}
+
+    // 4. Discipline (trade) mismatch → CHECK (advisory; a single trade field under-describes
+    //    a multi-skilled inspector, so it never blocks).
+    $reqTrade = (int)($ctx['req_trade_id'] ?? 0);
+    if ($reqTrade) {
+        try {
+            $t = (int)ops_val("SELECT trade_id FROM inspectors WHERE id=?", [$inspectorId]);
+            if ($t && $t !== $reqTrade) { $bump('CHECK'); $add('check', 'Different discipline than the job asks for'); }
+        } catch (Throwable $e) {}
+    }
+
+    // 5. Out-of-SBU scope → CHECK (advisory).
+    $sbu = trim((string)($ctx['sbu'] ?? ''));
+    if ($sbu !== '') {
+        try {
+            $row = ops_one("SELECT sbu, sbus FROM inspectors WHERE id=?", [$inspectorId]);
+            $scope = array_values(array_filter(array_map('trim', explode(',', (string)($row['sbus'] ?? '')))));
+            if (trim((string)($row['sbu'] ?? '')) !== '') $scope[] = trim((string)$row['sbu']);
+            if ($scope && !in_array($sbu, $scope, true)) { $bump('CHECK'); $add('check', 'Outside their usual ' . $sbu . ' business unit'); }
+        } catch (Throwable $e) {}
+    }
+
+    return ['status' => $status, 'reasons' => $reasons];
+}
+
+// The pill label + class for a verdict, for the picker / profile surfaces.
+function inspector_eligibility_pill($status) {
+    return [
+        'ELIGIBLE' => ['✓ Eligible', 'p-ok'],
+        'EXPIRING' => ['⏳ Expiring', 'p-warn'],
+        'CHECK'    => ['⚠ Check', 'p-warn'],
+        'BLOCKED'  => ['⛔ Blocked', 'p-bad'],
+    ][$status] ?? ['—', 'p-mut'];
+}
+
 // ============================================================================
 //  THE AUTHORISATION SPINE  (roadmap 3.2a)
 //

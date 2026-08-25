@@ -256,7 +256,18 @@
           //   recommendation, not a lock: click a chip to pick that person, or
           //   choose freely from the full list below.
           $sugg = $suggestions ?? []; $topSugg = array_slice($sugg, 0, 6);
-          $clashCount = count(array_filter($sugg, fn($s) => !$s['available'])); ?>
+          $clashCount = count(array_filter($sugg, fn($s) => !$s['available']));
+          // Module 24 — eligibility verdict context for the suggested candidates, so the
+          // "Eligible / Expiring / Check / Blocked" call is visible while choosing, not only
+          // as a save error. Kept to the small suggested set for performance.
+          $jf = (isset($job) && is_array($job)) ? $job : [];
+          $eligCtx = [
+              'on_date'         => $certDate ?? date('Y-m-d'),
+              'req_trade_id'    => (int)($jf['req_trade_id'] ?? 0),
+              'sbu'             => (string)($jf['sbu'] ?? ''),
+              'inspection_type' => (string)($jf['inspection_type'] ?? ''),
+              'client_id'       => (isset($call) && is_array($call)) ? (int)($call['client_id'] ?? 0) : 0,
+          ]; ?>
     <?php if ($topSugg): ?>
     <div class="ff ff-wide" id="best_insp_panel">
       <label>Suggested <?= e(Tlp('engineer')) ?> <span class="muted">— best fit for this <?= e(Tl('call')) ?> first. Click to pick.</span></label>
@@ -275,6 +286,12 @@
             <?php if (!$s['available']): ?><span class="pill p-warn" style="margin-left:6px;">busy <?= e(implode(', ', $s['clash'])) ?></span>
             <?php else: ?><span class="pill p-ok" style="margin-left:6px;">free</span><?php endif; ?>
             <?php if ($lapsedS): ?><span class="pill p-warn" style="margin-left:6px;">cert lapsed</span><?php endif; ?>
+            <?php // Module 24 — the headline eligibility verdict, mirroring the save-time gate.
+              if (function_exists('inspector_eligibility')): $elig = inspector_eligibility((int)$s['id'], $eligCtx);
+                [$eLbl, $eCls] = inspector_eligibility_pill($elig['status']);
+                $eTip = implode(' · ', array_map(fn($r) => $r['text'], $elig['reasons'])); ?>
+              <span class="pill <?= e($eCls) ?> elig-mark" style="margin-left:6px;" title="<?= e($eTip) ?>"><?= e($eLbl) ?></span>
+            <?php endif; ?>
           </button>
         <?php endforeach; ?>
       </div>

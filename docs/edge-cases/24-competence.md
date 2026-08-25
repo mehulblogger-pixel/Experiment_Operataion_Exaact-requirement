@@ -1,7 +1,9 @@
 # Module 24 — Competence (eligibility at allocation) · Edge-case analysis (pre-build)
 
-**Status:** edge-cases drafted — **awaiting your go + one decision (§4) before code.** P0.
-Additive; the existing hard gate stays authoritative and unchanged.
+**Status:** ✅ BUILT (2026-08-24). Decision: (A) verdict mirrors the gate; trade/SBU advisory.
+Additive `inspector_eligibility()` verdict + allocation-picker pill; the existing hard gate,
+override authority and enforcement toggle are unchanged (asserted by tests in
+`tests/test_module24_competence.php`). P0.
 
 ---
 

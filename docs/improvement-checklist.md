@@ -43,7 +43,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 21 | Hold / Witness Points | P0 | ✅ done & pushed | 2026-08-24 |
 | 22 | Complaints | P1 | ⬜ | — |
 | 23 | Equipment (Equipment 360) | P1 | ⬜ | — |
-| 24 | Competence (Competence 360) | P0 | 📝 edge-cases drafted (awaiting 1 decision) | — |
+| 24 | Competence (Competence 360) | P0 | ✅ done & pushed | 2026-08-24 |
 | 25 | Impartiality | P0 | ⬜ | — |
 | 26 | Identity | P0 | ⬜ | — |
 | 27 | Confidentiality | P0 | ⬜ | — |
@@ -79,6 +79,25 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 24 — Competence (eligibility at allocation) · 2026-08-24
+**Decision:** (A) the verdict mirrors the existing gate; wrong-discipline / out-of-SBU are
+advisory "Check", not new hard blocks.
+**Found:** allocation already hard-blocks a lapsed **mandatory** cert (manager override), with an
+opt-in authorisation gate; advisory `tosrm_competence_warn` for assigned jobs. But there was no
+single per-(inspector × job) verdict shown **while choosing**, `skill_ids`/`sbus` were unused,
+and the competence spine had **no automated test coverage**.
+**Added (additive, read-only):** `inspector_eligibility($inspectorId, $ctx)` → a verdict
+ELIGIBLE / EXPIRING / CHECK / BLOCKED that mirrors the save-time gate (lapsed mandatory cert =
+BLOCKED; authorisation = BLOCKED only when enforcement is on) and adds advisory signals
+(expiring cert = EXPIRING; wrong discipline / out-of-SBU = CHECK). A verdict **pill on the
+suggested-inspector chips** at allocation, so the call is visible before submit — nobody hidden.
+**Preserved (verified by tests):** the `pack_fire('work.assign')` hard gate, the override
+authority, and the enforcement toggle — all unchanged. No new hard control; no new permission.
+Also fills the previously-missing behavioural coverage of the gate (mandatory vs non-mandatory).
+**Edge cases:** `docs/edge-cases/24-competence.md`.
+**Tests:** `tests/test_module24_competence.php` (15 assertions). Suite 2473 passed / 3
+pre-existing baseline failures.
 
 ### Module 21 — Hold / Witness Points · 2026-08-24
 **Decision:** (A) warn loudly, no new hard blocks — the Release Note stays the one hard gate.
