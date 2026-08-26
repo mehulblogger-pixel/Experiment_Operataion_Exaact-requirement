@@ -30,7 +30,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 08 | Report Release / Issue | P0 | ✅ done & pushed | 2026-08-24 |
 | 09 | Invoicing | P0 | ✅ done & pushed | 2026-08-25 |
 | 10 | Client Portal | P0 | ✅ done & pushed | 2026-08-25 |
-| 11 | Vendor / Supplier-Inspector Centre | P1 | ⬜ | — |
+| 11 | Vendor / Supplier-Inspector Centre | P1 | ✅ done & pushed | 2026-08-26 |
 | 12 | NCR | P1 | ✅ done & pushed | 2026-08-24 |
 | 13 | CAPA | P2 | ✅ done & pushed | 2026-08-24 |
 | 14 | Settings | P2 | ⬜ | — |
@@ -79,6 +79,36 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 11 — Vendor / Supplier-Inspector Portal · 2026-08-26
+**Decision:** (A) vendor qualification visibility + expiry alert. Vendor-perms admin UI and a vendor
+billing/payable view deferred.
+**Found:** the vendor portal's confidentiality and scoping are already sound (own `vendor_users`/`vuid`
+identity, confidentiality-first visibility gate, `vendor_visible` share flag, both single-fetches
+already scoped, no cost/margin selected). The standout gap: a vendor **could not see their own
+qualification standing** — `vendor_profiles` (approval_status, valid_until, reassess_on) +
+`vendor_status_events` are staff-maintained but had **no vendor consumer**, and there was **no
+expiry warning**.
+**Added (additive, read-only, confidentiality-first):**
+- `cvp_vendor_qualification()` — the session vendor's own profile reduced to **safe fields**
+  (status + label, vendor type/category, approved-on, valid-until, reassess-on, days-to-expiry,
+  expiring/expired flags). **Never** selects `last_score`, `vendor_rating`, `last_band`, `risk_class`,
+  `notes` or `updated_by`. Null-safe when no profile exists.
+- `cvp_vendor_qualification_events()` — the status timeline reduced to new-status + date + source;
+  the internal score, reason and actor are omitted.
+- A **"Your qualification"** route/view (status pill, expiry line, safe history) + a dashboard status
+  card + a nav entry, behind a new additive `VENDOR_PERMS` key `qualification` (blank perms =
+  everything, so every existing vendor sees it).
+- A `QUALIFICATION_EXPIRING` alert emitted by the existing state-derived `cvp_notify_sync('VENDOR')`
+  when `valid_until` is within `idems_vendor_reminder_days()` or already past — idempotent via the
+  existing notify natural key.
+**Preserved (verified by tests):** the vendor identity model, the confidentiality visibility gate,
+the `vendor_visible` share flag, the single-fetch scope, the NCR respond loop, and every existing
+vendor read — all unchanged. No numeric grade exposed; no schema change; no hard control; nothing
+deleted.
+**Edge cases:** `docs/edge-cases/11-vendor-portal.md`.
+**Tests:** `tests/test_module11_vendor.php` (18 assertions). Suite 2725 passed / 3 pre-existing
+baseline failures.
 
 ### Module 02 — Users / Access / Roles · 2026-08-26
 **Decision:** **A + B** — the user explicitly approved the hard guards alongside the observability

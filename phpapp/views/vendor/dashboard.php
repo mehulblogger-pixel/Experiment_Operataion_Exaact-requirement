@@ -27,6 +27,21 @@
     <a href="/vendor/issues">See which</a>.</div>
 <?php endif; ?>
 
+<?php // Module 11 — your own approval standing, at a glance.
+$vq = $d['qualification'] ?? null; ?>
+<?php if ($vq): ?>
+<div class="pcard" style="border-left:5px solid <?= $vq['expired'] ? 'var(--bad)' : ($vq['expiring'] ? 'var(--warn)' : 'var(--ok)') ?>;margin-top:14px">
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <span style="font-weight:600">Your approval status:</span>
+    <span class="pill <?= ['APPROVED'=>'p-ok','CONDITIONAL'=>'p-warn','EXPIRED'=>'p-bad','SUSPENDED'=>'p-bad','BLACKLISTED'=>'p-bad'][$vq['status']] ?? 'p-mut' ?>"><?= e($vq['status_label']) ?></span>
+    <?php if ($vq['expired']): ?><span style="color:var(--bad)">approval lapsed</span>
+    <?php elseif ($vq['expiring']): ?><span style="color:var(--warn)">expires in <?= (int)$vq['days_to_expiry'] ?> day(s)</span>
+    <?php elseif ($vq['valid_until'] !== ''): ?><span class="muted">valid until <?= e(fdate($vq['valid_until'])) ?></span><?php endif; ?>
+    <a href="/vendor/qualification" style="margin-left:auto">Details →</a>
+  </div>
+</div>
+<?php endif; ?>
+
 <?php if (vcan('reports')): ?>
 <h3 class="ptitle" style="font-size:16px;margin-top:26px">Latest reports</h3>
 <?php if (!$d['recent']): ?>

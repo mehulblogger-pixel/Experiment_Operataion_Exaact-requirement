@@ -117,7 +117,8 @@ function cvp_access_live_sql($col = 'access_expires') {
 
 // Minimal, extensible permission set. Blank perms = everything (so an existing
 // vendor account is never locked out by a new key). Slice 3 adds 'issues'.
-const VENDOR_PERMS = ['reports' => 'Their reports', 'issues' => 'Nonconformities raised to them'];
+const VENDOR_PERMS = ['reports' => 'Their reports', 'issues' => 'Nonconformities raised to them',
+    'qualification' => 'Their own approval / qualification status'];
 
 function cvp_vendor_enabled() { return setting_get('vendor_portal_enabled', '0') === '1'; }
 
@@ -264,7 +265,65 @@ function cvp_vendor_dashboard() {
     }
     return ['reports' => $reports, 'recent' => $recent, 'issues_open' => $issues,
             'actions' => cvp_action_centre('VENDOR', $vid, 'vcan'),
-            'unread'  => cvp_notify_count('VENDOR', $vid)];
+            'unread'  => cvp_notify_count('VENDOR', $vid),
+            'qualification' => vcan('qualification') ? cvp_vendor_qualification() : null];
+}
+
+// ---- The vendor's OWN qualification standing (Module 11) --------------------
+// A supplier-inspector's loudest question — "am I still approved, and when must I
+// re-qualify?" — answered from the staff-maintained vendor_profiles row, scoped by
+// the session vendor id. Shows STATUS and DATES only: never the numeric score,
+// rating, band, risk class, internal notes or who edited it. Null when the vendor
+// has no profile yet (simply "not yet assessed").
+function cvp_vendor_qualification() {
+    $vid = cvp_vendor_id();
+    if (!$vid || !function_exists('idems_vendor_profile')) return null;
+    $p = idems_vendor_profile($vid);
+    if (!$p) return null;
+    $labels = function_exists('lk_options_or')
+        ? lk_options_or('vendor_approval_status', ['PROSPECT'=>'Prospect','UNDER_ASSESSMENT'=>'Under assessment',
+            'APPROVED'=>'Approved','CONDITIONAL'=>'Approved with conditions','EXPIRED'=>'Approval expired',
+            'SUSPENDED'=>'Suspended','BLACKLISTED'=>'Blacklisted'])
+        : [];
+    $status = (string)($p['approval_status'] ?? 'PROSPECT');
+    $validTo = trim((string)($p['valid_until'] ?? ''));
+    $today = date('Y-m-d');
+    $days = $validTo !== '' ? (int)floor((strtotime($validTo) - strtotime($today)) / 86400) : null;
+    $reminder = function_exists('idems_vendor_reminder_days') ? idems_vendor_reminder_days() : 30;
+    $expired = $status === 'EXPIRED' || ($validTo !== '' && $validTo < $today);
+    return [
+        'status'       => $status,
+        'status_label' => $labels[$status] ?? $status,
+        'vendor_type'  => (string)($p['vendor_type'] ?? ''),
+        'category'     => (string)($p['product_category'] ?? ''),
+        'approved_on'  => trim((string)($p['approved_on'] ?? '')),
+        'valid_until'  => $validTo,
+        'reassess_on'  => trim((string)($p['reassess_on'] ?? '')),
+        'days_to_expiry' => $days,
+        'expired'      => $expired,
+        'expiring'     => !$expired && $days !== null && $days <= $reminder,
+    ];
+}
+
+// The vendor's status timeline, reduced to what is theirs to see: the new status
+// and when it changed, and by what kind of event — never the internal score,
+// reason text or the staff member who made the change.
+function cvp_vendor_qualification_events($limit = 50) {
+    $vid = cvp_vendor_id();
+    if (!$vid || !function_exists('idems_vendor_status_events')) return [];
+    $labels = function_exists('lk_options_or') ? lk_options_or('vendor_approval_status', []) : [];
+    $out = [];
+    foreach (idems_vendor_status_events($vid) as $e) {
+        $ns = (string)($e['new_status'] ?? '');
+        $out[] = [
+            'new_status'  => $ns,
+            'label'       => $labels[$ns] ?? $ns,
+            'source'      => (string)($e['source'] ?? ''),
+            'at'          => trim((string)($e['at'] ?? '')),
+        ];
+        if (count($out) >= (int)$limit) break;
+    }
+    return $out;
 }
 
 // ---- Vendor onboarding (staff invite; vendor sets own password) ------------
@@ -444,6 +503,14 @@ function cvp_vendor_route($route, $method) {
             cvp_vendor_report_pdf($d);
             exit;
 
+        case 'vendor/qualification':
+            cvp_vendor_need('qualification', 'your qualification status');
+            cvp_vendor_view('qualification', [
+                'q' => cvp_vendor_qualification(),
+                'events' => cvp_vendor_qualification_events(),
+            ]);
+            exit;
+
         case 'vendor/assistant':
             $q = ''; $ans = ''; $aerr = '';
             if ($method === 'POST') {
@@ -615,6 +682,7 @@ const CVP_EVENTS = [
     'REPORT_SHARED'  => 'A report was shared with you',
     'NCR_RAISED'     => 'A nonconformity needs your response',
     'NCR_DECIDED'    => 'We reviewed your response',
+    'QUALIFICATION_EXPIRING' => 'Your approval is due for renewal',
 ];
 
 // Insert a notification once. The natural key stops the sync duplicating it.
@@ -648,6 +716,19 @@ function cvp_notify_sync($audience, $partnerId) {
                  AND COALESCE(vendor_visible,0)=1 ORDER BY id DESC LIMIT 100", [$partnerId]), []) as $r)
                 cvp_notify_once('VENDOR', $partnerId, 'REPORT_SHARED', 'report', (int)$r['id'],
                     'Report ' . $r['irn'] . ' shared with you', '/vendor/report?id=' . (int)$r['id']);
+            // Module 11 — warn the vendor their approval is lapsing (or has lapsed),
+            // from the same state-derived feed. The natural key keys on the expiry
+            // date, so a fresh re-qualification raises a new alert next time.
+            if (function_exists('cvp_vendor_qualification')) {
+                $q = cvp_vendor_qualification();
+                if ($q && ($q['expiring'] || $q['expired'])) {
+                    $when = $q['valid_until'] !== '' ? (int)strtotime($q['valid_until']) : 0;
+                    $msg = $q['expired'] ? 'Your approval has lapsed — please contact us to re-qualify'
+                                         : 'Your approval expires on ' . $q['valid_until'] . ' — renewal is due';
+                    cvp_notify_once('VENDOR', $partnerId, 'QUALIFICATION_EXPIRING', 'qualification', $when,
+                        $msg, '/vendor/qualification');
+                }
+            }
         }
         // Nonconformities visible to this audience (open ones need a response).
         $issueUrl = $audience === 'VENDOR' ? '/vendor/issue?id=' : '/portal/issue?id=';
