@@ -75,6 +75,16 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — §32 inter-office settlement matrix (read-only).** `job_money()` already computes the
+  cross-office split per job (the executing office is owed a credit by the contracting office) and each
+  job carries a `credit_received` flag, but there was no roll-up. Added `lib/settlement.php`:
+  `settlement_matrix()` aggregates per (contracting→executing) office pair the owed / settled /
+  outstanding totals + open-job counts, from the SAME fields and the SAME cross rule job_money() uses;
+  `settlement_outstanding_total()` and a `settlement_render()` panel on the invoicing screen. Read-only —
+  no new number, no row changed; same-office leftovers and open jobs excluded. Test
+  `test_p2_settlement.php` (13 assertions: per-pair owed/settled/outstanding, reverse direction is a
+  distinct pair, same-office + open excluded, totals, render + wiring). Suite **3544 passed, 0 failed**.
+
 - **2026-08-26 — §47 settings governance registry (read-only).** Module 14 already audits WHO changed
   WHICH setting; the gap was the WHY / WHAT-IT-AFFECTS an approver needs. Added `lib/settingmeta.php`:
   `setting_meta_all()` — a curated registry over the ~19 behavioural settings (report gates, financial

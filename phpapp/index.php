@@ -224,6 +224,7 @@ try {
     require __DIR__ . '/lib/bulk.php';             // Phase 2 §48 — server-side preview/dry-run for bulk actions
     require __DIR__ . '/lib/revrecon.php';         // Phase 2 §29 — recognised-revenue reconciliation (read-only)
     require __DIR__ . '/lib/settingmeta.php';      // Phase 2 §47 — settings governance registry (read-only)
+    require __DIR__ . '/lib/settlement.php';       // Phase 2 §32 — inter-office settlement matrix (read-only)
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);

@@ -73,4 +73,7 @@
   <?php endif; ?>
 </div>
 
+<?php // Phase 2 §32 — roll-up of inter-office credit owed and still unsettled, per office pair. ?>
+<?php if (function_exists('settlement_render')) settlement_render(); ?>
+
 <style>.qcard.on{outline:2px solid var(--brand);outline-offset:1px}</style>
