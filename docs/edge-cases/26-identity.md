@@ -1,5 +1,8 @@
 # Module 26 — Identity (DPDP documents) · Edge-case analysis
 
+> **Phase-2 update:** encryption-at-rest (§53 — AES-256-GCM, env key, `enc:v1:` ciphertext, legacy
+> plaintext coexistence + backfill) is catalogued in [`51-phase-2-controls.md`](51-phase-2-controls.md#53--identity-encryption-at-rest-module-26--libsecurityphp--libidentityphp).
+
 **Status:** ✅ BUILT (2026-08-26). Autonomous run — recommended additive option built.
 
 ---

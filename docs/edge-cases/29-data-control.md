@@ -1,5 +1,9 @@
 # Module 29 — Data Control / Governance (ISO 17020 §7.11) · Edge-case analysis
 
+> **Phase-2 update:** call status-agreement (§46 — legacy-vs-canonical terminality mismatch) and
+> audit-chain protection (§54 — trim anchor, wipe evidence) are catalogued in
+> [`51-phase-2-controls.md`](51-phase-2-controls.md#54--audit-chain-protection-module-29--libcompliancephp--libresetphp).
+
 **Status:** ✅ BUILT (2026-08-26). Autonomous run — recommended additive option built. (Module 02
 already added the access-audit / effective-access / toxic-combo work here; not re-done.)
 

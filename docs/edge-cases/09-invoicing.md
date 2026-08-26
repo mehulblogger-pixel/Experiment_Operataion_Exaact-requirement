@@ -1,5 +1,8 @@
 # Module 09 — Invoicing · Edge-case analysis (pre-build)
 
+> **Phase-2 update:** invoice-readiness (§33 — report-issued / release-accepted / contract-value checks,
+> advisory unless `invoice_gate_strict`) is catalogued in [`51-phase-2-controls.md`](51-phase-2-controls.md#33--invoice-readiness-module-09--libinvreadyphp).
+
 **Status:** ✅ BUILT (2026-08-25). Decision: (A) invoice-number integrity + overdue reminder; SoD
 maker-checker and the invoice↔report gate deferred. A DB-enforced UNIQUE on the money-document
 numbers (unissued drafts held as NULL / partial index on SQLite; defensive — skips + surfaces
