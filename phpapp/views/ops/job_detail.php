@@ -1058,6 +1058,9 @@ if (function_exists('hwp_for_job')):
 <?php endif; /* !$fieldInspector — expenses/profitability fold */ ?>
 
 <?php if (can('data.credit') || can('finance.reconcile')): ?>
+<?php // Phase 2 §33 — before the billing controls, the readiness verdict (reports issued, release accepted, PO, contract value). ?>
+<?php if (!empty($job['closed_flag']) && function_exists('invoice_readiness_render')) { echo '<div data-tab="Money">'; invoice_readiness_render($job); echo '</div>'; } ?>
+
 <div class="panel" id="invoice" data-tab="Money">
   <h3 class="tab-sub">Invoice &amp; payment / credit</h3>
   <?php // One click raises a real GST invoice in the Money module from this closed

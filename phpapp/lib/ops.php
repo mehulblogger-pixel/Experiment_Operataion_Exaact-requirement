@@ -5851,6 +5851,10 @@ function ops_jobs($route, $method) {
         if (!$job) { http_response_code(404); view('notfound'); return; }
         if (!function_exists('books_invoice_create')) { flash('The Money module is not enabled on this installation.', 'error'); redirect('/job?id=' . $job['id']); }
         if (empty($job['closed_flag'])) { flash('Close the ' . Tl('job') . ' before raising its invoice.', 'error'); redirect('/job?id=' . $job['id']); }
+        // §33 — when the installation runs a strict invoice gate, a failing readiness
+        // check (report not issued, release not accepted, …) blocks billing. Advisory
+        // by default: with the gate off this is a no-op and the readiness panel just informs.
+        if (function_exists('invoice_readiness_block') && ($why = invoice_readiness_block($job)) !== '') { flash($why, 'error'); redirect('/job?id=' . $job['id']); }
         // Already invoiced? Open THAT invoice instead of raising a second, empty one.
         // Pressing the button again used to create a fresh invoice whose job line was
         // then refused (a job bills once), leaving a blank draft — which read as

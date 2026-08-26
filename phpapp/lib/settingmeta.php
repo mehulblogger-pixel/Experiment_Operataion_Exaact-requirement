@@ -16,6 +16,7 @@ function setting_meta_all() {
         'vetting_gate_required'      => ['Vetting required before approval', 'Whether technical vetting is a mandatory step before a report can be approved.', ['Report vetting (Module 07)'], 'forward', 'high'],
         'vetting_checklist_require'  => ['Vetting checklist mandatory', 'Whether the vetting checklist must be completed, not just present.', ['Report vetting (Module 07)'], 'forward', 'medium'],
         'rn_require_client_acceptance' => ['Release needs client acceptance', 'Whether a Release/IRN requires recorded client acceptance before issue.', ['Report issue (Module 08)'], 'forward', 'high'],
+        'invoice_gate_strict'        => ['Strict invoice gate', 'Turns the invoice-readiness checks (reports issued, release accepted, contract value) from advisory into a hard block on raising the invoice.', ['Invoicing / billing (Module 33)'], 'live', 'high'],
         'report_escalate_days'       => ['Report escalation window (days)', 'How long a report may sit before it is escalated on the attention band.', ['My Work / attention (Module 39)'], 'live', 'medium'],
         // --- Financial norms (feed the ONE profit engine) -------------------------
         'fy_start_month'             => ['Financial-year start month', 'The month the financial year begins. Re-buckets every FY-filtered figure in the app.', ['All financial screens', 'MIS', 'Profitability'], 'live', 'high'],

@@ -75,6 +75,16 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — §33 invoice readiness (advisory; strict-gated).** Raising an invoice can go wrong
+  quietly — billed before the report is issued, before a release is accepted, or beyond the contract
+  value. Added `lib/invready.php`: `invoice_readiness($job)` assembles a READY/NOT-READY verdict from
+  existing signals (report_docs status, the rn-acceptance setting, `calls.po_id`, `partner_contracts.value`,
+  the books ledger) — closed + reports-issued + client-acceptance as blockers, PO + contract-value as
+  warnings. Advisory by default (`invoice_readiness_render()` panel on the job Money tab); blocks the
+  `/job-bill` action only when the new `invoice_gate_strict` setting is on (mirrors the §10 issuance gate,
+  now in the §47 governance registry). Completes the financial-control trio with §10 and §29. Test
+  `test_p2_invoice_readiness.php` (15 assertions). Suite **3559 passed, 0 failed**.
+
 - **2026-08-26 — §32 inter-office settlement matrix (read-only).** `job_money()` already computes the
   cross-office split per job (the executing office is owed a credit by the contracting office) and each
   job carries a `credit_received` flag, but there was no roll-up. Added `lib/settlement.php`:
