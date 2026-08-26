@@ -430,6 +430,48 @@ function lk_options_or($key, $const) {
     return $out ?: $const;
 }
 
+// Module 01 — where a dropdown's values are actually stored. A curated, verified
+// map of lookup key → [table, column, const-fallback], for the lists that back a
+// single clean code column on a real register. Used to answer "is this value safe
+// to remove?" (a usage count) and to detect a stored code no dropdown recognises.
+// Read-only; conservative (only 1:1 mappings we are sure of).
+function lk_usage_map() {
+    return [
+        'quote_status'            => ['table' => 'quotations',      'col' => 'status',           'const' => defined('QUOTE_STATUS') ? QUOTE_STATUS : []],
+        'inquiry_status'          => ['table' => 'crm_inquiries',   'col' => 'status',           'const' => defined('INQUIRY_STATUS') ? INQUIRY_STATUS : []],
+        'inquiry_source'          => ['table' => 'crm_inquiries',   'col' => 'source',           'const' => defined('INQUIRY_SOURCES') ? INQUIRY_SOURCES : []],
+        'lead_source'            => ['table' => 'leads',            'col' => 'source',           'const' => defined('LEAD_SOURCES') ? LEAD_SOURCES : []],
+        'vendor_approval_status'  => ['table' => 'vendor_profiles',  'col' => 'approval_status',  'const' => []],
+        'vendor_type'             => ['table' => 'vendor_profiles',  'col' => 'vendor_type',      'const' => []],
+        'vendor_risk_class'       => ['table' => 'vendor_profiles',  'col' => 'risk_class',       'const' => []],
+        'vendor_product_category' => ['table' => 'vendor_profiles',  'col' => 'product_category', 'const' => []],
+    ];
+}
+
+// How many records currently store this value's code. null = this list is not in
+// the usage map (so "unknown", never shown as 0-and-safe). Best-effort.
+function lk_value_usage($key, $code) {
+    $m = lk_usage_map()[$key] ?? null;
+    if (!$m || (string)$code === '') return null;
+    try { return (int)ops_val("SELECT COUNT(*) FROM {$m['table']} WHERE {$m['col']}=?", [$code]); }
+    catch (Throwable $e) { return null; }
+}
+
+// Records whose stored code exists in no option of its list (nor the const
+// fallback) — they render as a raw code to everyone. Summed across the usage map.
+function lk_dangling_total() {
+    $total = 0;
+    foreach (lk_usage_map() as $key => $m) {
+        $valid = array_map('strval', array_keys(lk_options_or($key, $m['const'])));
+        if (!$valid) continue;
+        try {
+            $ph = implode(',', array_fill(0, count($valid), '?'));
+            $total += (int)ops_val("SELECT COUNT(*) FROM {$m['table']} WHERE COALESCE({$m['col']},'')<>'' AND {$m['col']} NOT IN ($ph)", $valid);
+        } catch (Throwable $e) { /* table not present on this install — skip */ }
+    }
+    return $total;
+}
+
 // The chain of types from root to this leaf type (for cascading render).
 function lk_chain($typeId) {
     $chain = []; $t = lk_type_by_id($typeId); $guard = 0;

@@ -218,6 +218,11 @@ function integrity_checks() {
     $add('invline_invoice', 'Every invoice line belongs to a real invoice',
         'An invoice line with no header cannot appear on any bill or in any tax return.',
         "SELECT COUNT(*) FROM invoice_lines WHERE invoice_id IS NOT NULL AND invoice_id NOT IN (SELECT id FROM invoices)");
+    // Module 01 — master-data quality: no dropdown list has two options sharing a
+    // code (one would silently shadow the other in every label lookup).
+    $add('lk_dupe_code', 'No dropdown list has a duplicate code',
+        'Two options sharing a code make one silently shadow the other wherever the code is turned back into a label.',
+        "SELECT COUNT(*) FROM (SELECT 1 FROM lookup_values WHERE COALESCE(code,'')<>'' GROUP BY type_id, code HAVING COUNT(*) > 1) t");
 
     // ---- Records that must not contradict themselves ----------------------
     $add('report_final', 'No report is marked issued without a date and a name against it',
@@ -299,6 +304,18 @@ function integrity_checks() {
                   'what' => 'No expense bill carries a negative amount',
                   'why'  => 'A negative bill quietly reduces what the client is charged.'];
     } catch (Throwable $e) { }
+
+    // ---- Master data: every stored dropdown code still exists in its list ----
+    // A record showing a code no dropdown recognises renders as a raw code to
+    // everyone. Summed across the curated lookup usage map (Module 01).
+    if (function_exists('lk_dangling_total')) {
+        try {
+            $dang = lk_dangling_total();
+            $out[] = ['key' => 'lk_dangling', 'ok' => $dang === 0, 'found' => $dang, 'skipped' => false,
+                      'what' => 'Every stored dropdown code still exists in its list',
+                      'why'  => 'A record storing a code that has been removed from its master list shows as a raw code, not a label.'];
+        } catch (Throwable $e) { }
+    }
 
     return $out;
 }

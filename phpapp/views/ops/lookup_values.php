@@ -18,20 +18,23 @@
 </details>
 
 <table class="grid">
-  <tr><th>Value</th><?php if ($parentType): ?><th>Under (<?= e($parentType['label']) ?>)</th><?php endif; ?><th>Code</th><th>Active</th><th>Actions</th></tr>
-  <?php foreach ($values as $v): ?>
+  <?php // Module 01 — is this value safe to remove? Show how many records use it. ?>
+  <?php $tracked = function_exists('lk_value_usage') && isset(lk_usage_map()[$t['type_key']]); ?>
+  <tr><th>Value</th><?php if ($parentType): ?><th>Under (<?= e($parentType['label']) ?>)</th><?php endif; ?><th>Code</th><th>Active</th><?php if ($tracked): ?><th>Used by</th><?php endif; ?><th>Actions</th></tr>
+  <?php foreach ($values as $v): $use = $tracked ? lk_value_usage($t['type_key'], $v['code']) : null; ?>
   <tr>
     <td><strong><?= e($v['label']) ?></strong></td>
     <?php if ($parentType): ?><td><?= e($v['parent_value_id'] ? lk_value($v['parent_value_id'])['label'] ?? '—' : '—') ?></td><?php endif; ?>
     <td><?= $v['code'] !== '' ? '<code>' . e($v['code']) . '</code>' : '—' ?></td>
     <td><?= $v['active'] ? 'Yes' : 'No' ?></td>
+    <?php if ($tracked): ?><td><?= $use === null ? '<span class="muted">—</span>' : ($use > 0 ? '<span class="pill p-warn">' . (int)$use . ' record' . ($use==1?'':'s') . '</span>' : '<span class="muted">0</span>') ?></td><?php endif; ?>
     <td class="row-actions">
       <a class="btn small" href="/lookup?key=<?= e($t['type_key']) ?>&edit=<?= (int)$v['id'] ?>">Edit</a>
-      <a class="btn small danger" href="/lookup?key=<?= e($t['type_key']) ?>&del=<?= (int)$v['id'] ?>" onclick="return confirm('Remove this value?')">Delete</a>
+      <a class="btn small danger" href="/lookup?key=<?= e($t['type_key']) ?>&del=<?= (int)$v['id'] ?>" onclick="return confirm(<?= ((int)$use > 0) ? "'" . (int)$use . " record(s) still use this value — they will show a raw code if you remove it. Remove anyway?'" : "'Remove this value?'" ?>)">Delete</a>
     </td>
   </tr>
   <?php endforeach; ?>
-  <?php if (!$values): ?><tr><td colspan="<?= $parentType ? 5 : 4 ?>">No values yet — add one below.</td></tr><?php endif; ?>
+  <?php if (!$values): ?><tr><td colspan="<?= ($parentType ? 5 : 4) + ($tracked ? 1 : 0) ?>">No values yet — add one below.</td></tr><?php endif; ?>
 </table>
 
 <h3 class="tab-sub"><?= $editRow ? 'Edit value' : 'Add a value' ?></h3>

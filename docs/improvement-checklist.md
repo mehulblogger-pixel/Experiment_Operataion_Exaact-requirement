@@ -20,7 +20,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 
 | # | Module | Priority | Status | Commit / date |
 |---|--------|----------|--------|----------------|
-| 01 | Masters | P2 | ⬜ | — |
+| 01 | Masters | P2 | ✅ done & pushed | 2026-08-26 |
 | 02 | Users / Access / Roles | P0 | ✅ done & pushed | 2026-08-26 |
 | 03 | Quotations | P1 | ✅ done & pushed | 2026-08-25 |
 | 04 | Calls / Service Requests | P1 | ✅ done & pushed | 2026-08-24 |
@@ -79,6 +79,29 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 01 — Masters (editable-lookup engine) · 2026-08-26
+**Decision:** (A) lookup usage counter + dangling/duplicate integrity detectors + delete warning.
+Exposing the dormant `active` flag (deactivate-instead-of-delete) deferred (blocking-delete-in-use is
+a hard control).
+**Found:** the lookup engine is used 364× but has **no usage counts and no data-quality detection**;
+the only removal is a hard DELETE that silently orphans records into raw codes (a single deleted value
+has no per-value fallback). The `active` flag is dead in the UI.
+**Added (additive, read-only, no hard control):**
+- `lk_usage_map()` (curated 1:1 key→[table,col,const]) + `lk_value_usage($key,$code)` — how many
+  records use a value; null for an untracked list (never a misleading "0 = safe").
+- A **"Used by N records"** column on the value editor + a stronger delete confirm when N>0 —
+  **advisory** (delete warned, never blocked).
+- `lk_dangling_total()` + a **dangling-value** integrity check ("every stored dropdown code still
+  exists in its list") and a **duplicate-code** integrity check, in the `integrity_checks()`
+  framework (surfaced on Data Control + the Module 29 nightly run).
+- The **first tests** over lookup usage / dangling / duplicate detection.
+**Preserved (verified by tests):** `lk_options_or` and the seeding/fallback engine, the admin
+screens, the routes — all unchanged. No new permission; no schema change; delete warned not blocked;
+nothing deleted.
+**Edge cases:** `docs/edge-cases/01-masters.md`.
+**Tests:** `tests/test_module01_masters.php` (16 assertions). Suite 2881 passed / 3 pre-existing
+baseline failures.
 
 ### Module 41 — Document Control (ISO 17020 §8.3) · 2026-08-26
 **Decision:** (A) review-due readiness + compliance-board row + cron reminder + supersede audit log.
