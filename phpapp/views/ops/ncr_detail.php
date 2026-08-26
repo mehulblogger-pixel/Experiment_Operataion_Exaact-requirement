@@ -152,3 +152,6 @@
   </table>
   <?php endif; ?>
 </div>
+
+<?php // Module 40 — the nonconformity's own activity timeline (logged to the spine, never surfaced).
+if (function_exists('act_render_timeline')) act_render_timeline('NCR', (int)$n['id'], 'History of this nonconformity'); ?>

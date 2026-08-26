@@ -277,6 +277,31 @@ function act_entity_label($a) {
     return isset($m[$k]) ? $m[$k][0] : '';
 }
 
+// Module 40 — a read-only activity-timeline panel for any entity that already logs
+// to the spine but had no timeline of its own (a complaint, an NCR, a report). It
+// only reads act_for_entity() and echoes a panel — no write form, no new data, and
+// only this entity's own history (nothing cross-entity or cross-office). Marks
+// system vs person-typed, and names the actor.
+function act_render_timeline($entityKind, $entityId, $title = 'History', $limit = 100) {
+    $rows = act_for_entity($entityKind, (int)$entityId, (int)$limit);
+    echo '<div class="panel"><h3 class="tab-sub" style="margin-top:0">' . e($title)
+       . ' <span class="muted" style="font-weight:400;font-size:12px">(' . count($rows) . ')</span></h3>';
+    if (!$rows) { echo '<p class="muted" style="margin:0">Nothing recorded yet.</p></div>'; return; }
+    echo '<div class="dt-scroll"><table class="dt"><tbody>';
+    foreach ($rows as $r) {
+        echo '<tr><td class="muted" style="white-space:nowrap;width:104px">'
+           . e(fdate(substr((string)$r['occurred_at'], 0, 10)))
+           . '<br><span style="font-size:11px">' . e(substr((string)$r['occurred_at'], 11, 5)) . '</span></td>'
+           . '<td><span class="pill ' . ($r['auto'] ? 'p-mut' : 'p-ok') . '" style="font-size:10px">'
+           . e(ACT_KINDS[$r['kind']] ?? $r['kind']) . '</span> <strong>' . e($r['subject']) . '</strong>'
+           . (trim((string)$r['body']) !== '' ? '<div class="muted" style="font-size:12.5px;white-space:pre-wrap">' . e($r['body']) . '</div>' : '')
+           . (trim((string)($r['with_whom'] ?? '')) !== '' ? '<div class="muted" style="font-size:11.5px">with ' . e($r['with_whom']) . '</div>' : '')
+           . '</td><td class="muted" style="font-size:11.5px;white-space:nowrap">'
+           . e($r['created_by'] ?: ($r['owner'] ?? '')) . '</td></tr>';
+    }
+    echo '</tbody></table></div></div>';
+}
+
 // ---- The screen ------------------------------------------------------------
 function act_can_view()  { return can('mod.clients.view') || can('mod.calls.view') || is_master_of(['clients','calls']); }
 function act_can_write() { return can('mod.clients.edit') || can('mod.calls.edit') || is_master_of(['clients','calls']); }

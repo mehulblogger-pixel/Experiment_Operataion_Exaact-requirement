@@ -59,7 +59,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 37 | Global Search | P1 | ✅ done & pushed | 2026-08-26 |
 | 38 | Notification Centre | P2 | ⬜ | — |
 | **39** | **My Work** | **P1** | **✅ done & pushed** | 2026-08-24 |
-| 40 | Activity Timeline | P2 | ⬜ | — |
+| 40 | Activity Timeline | P2 | ✅ done & pushed | 2026-08-26 |
 | 41 | Document Control | P1 | ✅ done & pushed | 2026-08-26 |
 | 42 | Change Control | P2 | ⬜ | — |
 | 43 | Training | P2 | ⬜ | — |
@@ -79,6 +79,27 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 40 — Activity Timeline · 2026-08-26
+**Decision:** (A) surface the already-logged timeline on the Complaint + NCR detail screens.
+**Flagged, NOT changed:** the `act_log` kind-coercion attribution bug (system events render as
+person-typed) and the unscoped global feed (office/SBU stored but never filtered) — both are
+behaviour/access-affecting and left for a deliberate decision.
+**Found:** the activity spine is well-built (denormalised partner_id, auto flag, indexed reads, global
+feed, timelines on Customer/Lead/Opportunity/Call/Job) but **Complaint, NCR, Report and Invoice write
+to it yet never surface it** on their own detail — the readers exist, just aren't called.
+**Added (additive, read-only, no write, no access change):**
+- `act_render_timeline($kind,$id,$title)` — a reusable read-only panel reusing `act_for_entity()`
+  (date, kind pill grey=system/green=person, subject, body, actor); only this entity's own history.
+- Wired onto the **Complaint** and **NCR** detail screens (the ISO records people most need a history
+  on).
+- The **first tests** of the per-entity timeline surfacing.
+**Preserved (verified by tests):** `act_log`, the `activities` table, the global feed and the existing
+lead/opportunity/call/job timelines — all unchanged. No new permission; no schema change; no write
+path touched; the attribution coercion and feed scoping flagged not modified; nothing deleted.
+**Edge cases:** `docs/edge-cases/40-activity-timeline.md`.
+**Tests:** `tests/test_module40_activity.php` (13 assertions). Suite 2938 passed / 3 pre-existing
+baseline failures.
 
 ### Module 48 — Report Template Builder (URFE) · 2026-08-26
 **Decision:** (A) form-schema integrity validator (the missing twin of the .docx template validator)

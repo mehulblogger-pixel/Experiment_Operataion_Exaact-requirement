@@ -260,3 +260,6 @@
   </table>
 </div>
 </div><!-- /data-tabs (complaint) -->
+
+<?php // Module 40 — the complaint's own activity timeline (it logs to the spine but never showed it).
+if (function_exists('act_render_timeline')) act_render_timeline('COMPLAINT', (int)$c['id'], 'History of this complaint'); ?>
