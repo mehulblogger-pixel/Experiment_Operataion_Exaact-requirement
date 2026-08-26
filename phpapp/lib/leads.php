@@ -793,16 +793,44 @@ function leads_dt_columns() {
 // Acting on a handful of leads at once. Both of these are things somebody does
 // after a sales meeting — "these six are mine now", "these four went quiet" —
 // and doing them one screen at a time is why they don't get done at all.
+// The ONE eligibility rule for a bulk action on one lead, used by BOTH the preview
+// (leads_bulk_plan) and the executor (leads_bulk) so the two can never disagree.
+// Returns ['ok'=>bool, 'reason'=>string]. Assumes the id is already scope-allowed.
+function leads_bulk_eligible($action, $id) {
+    if ($action === 'lost') {
+        // Already closed one way or another — skip rather than overwrite a
+        // conversion with a loss.
+        $st = (string)ops_val("SELECT status FROM leads WHERE id=?", [(int)$id]);
+        if ($st !== 'OPEN') return ['ok' => false, 'reason' => 'already closed'];
+    }
+    return ['ok' => true, 'reason' => ''];
+}
+
+// The scope-allowed subset of the ticked ids — a row hidden by branch scope must
+// not become reachable by posting its id. Shared by preview and executor.
+function leads_bulk_allowed(array $ids) {
+    $ids = array_values(array_filter(array_map('intval', $ids)));
+    if (!$ids) return [];
+    [$w, $a] = leads_where([]);
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    return array_map('intval', array_column(
+        leads_try(fn() => ops_all("SELECT l.id " . LEADS_FROM . " WHERE ($w) AND l.id IN ($in)",
+                                  array_merge($a, $ids))), 'id'));
+}
+
+// §48 preview: what a bulk action WOULD do, before it is committed. Same scope and
+// same eligibility as the executor.
+function leads_bulk_plan($action, array $ids) {
+    $allowed = leads_bulk_allowed($ids);
+    return bulk_plan($allowed, fn($id) => leads_bulk_eligible($action, $id));
+}
+
 function leads_bulk($action, array $ids) {
     $ids = array_values(array_filter(array_map('intval', $ids)));
     if (!$ids) return 'Nothing was ticked.';
     // Only leads this person can already see. A row hidden by branch scope must
     // not become reachable by posting its id.
-    [$w, $a] = leads_where([]);
-    $in = implode(',', array_fill(0, count($ids), '?'));
-    $allowed = array_map('intval', array_column(
-        leads_try(fn() => ops_all("SELECT l.id " . LEADS_FROM . " WHERE ($w) AND l.id IN ($in)",
-                                  array_merge($a, $ids))), 'id'));
+    $allowed = leads_bulk_allowed($ids);
     if (!$allowed) return 'None of those are yours to change.';
     $u = current_user();
     $now = date('c');
@@ -829,10 +857,9 @@ function leads_bulk($action, array $ids) {
                ->execute([(int)$u['id'], substr(user_name($u), 0, 150), $now, $id]);
             $n++;
         } elseif ($action === 'lost') {
-            // Already closed one way or another — skip rather than overwrite a
-            // conversion with a loss.
-            $st = (string)ops_val("SELECT status FROM leads WHERE id=?", [$id]);
-            if ($st !== 'OPEN') continue;
+            // Same eligibility the preview showed: skip a lead that is already
+            // closed rather than overwrite a conversion with a loss.
+            if (!leads_bulk_eligible('lost', $id)['ok']) continue;
             db()->prepare("UPDATE leads SET status='LOST', lost_reason=?, updated_at=? WHERE id=?")
                ->execute([(string)($_POST['lost_reason'] ?? 'NO_RESPONSE'), $now, $id]);
             if (function_exists('act_log')) act_log('LEAD', $id, 'STATUS', 'Marked lost in a bulk update');
@@ -853,7 +880,17 @@ function ops_leads($route, $method) {
 
     if ($route === 'leads-bulk' && $method === 'POST') {
         ops_require($canEdit, 'You cannot change a lead.');
-        $msg = leads_bulk((string)($_POST['bulk'] ?? ''), (array)($_POST['ids'] ?? []));
+        $action = (string)($_POST['bulk'] ?? '');
+        // §48 — a dry-run: show exactly what would change, and what would be left
+        // alone and why, WITHOUT committing anything. Same scope + eligibility as
+        // the real run, so the preview and the result cannot disagree.
+        if (!empty($_POST['preview'])) {
+            $plan = leads_bulk_plan($action, (array)($_POST['ids'] ?? []));
+            $verb = $action === 'lost' ? 'marked lost' : 'reassigned';
+            flash('Preview — nothing changed yet. ' . bulk_plan_summary($plan, $verb, Tl('lead')), 'info');
+            redirect_back('/leads?v=list');
+        }
+        $msg = leads_bulk($action, (array)($_POST['ids'] ?? []));
         // 'ok' is not one of the styled tags — it renders as an unstyled strip.
         flash($msg, strpos($msg, 'updated') === false ? 'error' : 'success');
         redirect_back('/leads?v=list');

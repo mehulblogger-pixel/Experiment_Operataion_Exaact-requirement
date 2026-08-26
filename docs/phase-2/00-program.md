@@ -75,6 +75,16 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — §48 bulk action preview / dry-run.** The bulk framework ran CONFIRM→EXECUTE with no
+  way to see which rows would be skipped and why before committing. Added `lib/bulk.php`: `bulk_plan()`
+  partitions the ticked ids into will-apply / will-skip(reason) from a classifier, `bulk_plan_summary()`
+  renders the confirm sentence. Made **leads** the reference adopter by extracting one shared eligibility
+  rule (`leads_bulk_eligible`/`leads_bulk_allowed`) used by BOTH the new `leads_bulk_plan()` preview and
+  the `leads_bulk()` executor, so preview and result can never disagree; wired a `preview` mode on the
+  leads-bulk route. Test `test_p2_bulk_preview.php` (16 assertions) proves the preview count equals the
+  executed count and the already-closed rows are untouched. Non-destructive (executor behaviour
+  preserved). Suite **3486 passed, 0 failed**.
+
 - **2026-08-26 — §25 engagement grouping.** The sales→ops→finance spine already threads one string
   (`contract_number`) through quotations/calls/jobs/invoices (reports hang off jobs), but "show the whole
   engagement behind this contract" was assembled ad-hoc. Added `lib/engagement.php`: `engagement($contractNumber)`

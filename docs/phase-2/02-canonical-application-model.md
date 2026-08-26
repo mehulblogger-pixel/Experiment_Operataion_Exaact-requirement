@@ -68,6 +68,14 @@ a second table, a second calculation, or a second status system.**
   read-time aggregators over the owning modules. There is **no** persisted task table (§26 deferred);
   new task-like signals should feed one of these aggregators, not a new store.
 
+## 6a. Canonical bulk actions
+
+- Bulk actions run CONFIRM → **PREVIEW** → EXECUTE → AUDIT. The preview is `bulk_plan($ids, $classify)`
+  (`lib/bulk.php`, §48) — a pure partition into will-apply / will-skip(reason) — computed from the **same
+  eligibility rule the executor uses**, so the two can never disagree. Leads are the reference adopter
+  (`leads_bulk_eligible`/`leads_bulk_plan`/`leads_bulk`). **Rule:** a new bulk action extracts one
+  `*_eligible()` used by both its `*_plan()` preview and its executor; never write the skip rule twice.
+
 ## 7. Canonical permissions
 
 - One catalogue: `all_permissions()` / `role_defaults()` (`lib/access.php`); enforced through `can()`

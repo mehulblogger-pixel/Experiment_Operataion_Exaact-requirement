@@ -221,6 +221,7 @@ try {
     require __DIR__ . '/lib/qualitycase.php';     // Phase 2 §39 — quality-case umbrella (read-only)
     require __DIR__ . '/lib/visibility.php';       // Phase 2 §72 — canonical visibility vocabulary + single-record gate
     require __DIR__ . '/lib/engagement.php';       // Phase 2 §25 — engagement grouping (read-only view over contract_number)
+    require __DIR__ . '/lib/bulk.php';             // Phase 2 §48 — server-side preview/dry-run for bulk actions
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);
