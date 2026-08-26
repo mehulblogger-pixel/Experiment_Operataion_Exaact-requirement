@@ -57,7 +57,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 35 | Recruitment / Workforce | P1 | ✅ done & pushed | 2026-08-26 |
 | 36 | Licensing / SaaS Admin | P1 | ✅ done & pushed | 2026-08-26 |
 | 37 | Global Search | P1 | ✅ done & pushed | 2026-08-26 |
-| 38 | Notification Centre | P2 | ⬜ | — |
+| 38 | Notification Centre | P2 | ✅ done & pushed | 2026-08-26 |
 | **39** | **My Work** | **P1** | **✅ done & pushed** | 2026-08-24 |
 | 40 | Activity Timeline | P2 | ✅ done & pushed | 2026-08-26 |
 | 41 | Document Control | P1 | ✅ done & pushed | 2026-08-26 |
@@ -79,6 +79,27 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 38 — Notification Centre · 2026-08-26
+**Decision:** (A) a read-only notification/outbox log over the existing `email_log`. The real
+behaviour bugs (CC-only digests never sent; throttle armed on failed sends) are surfaced by the log
+and flagged for explicit decision, not silently changed.
+**Found:** every `ops_mail()` call is logged to `email_log` (recipient/subject/kind/sent_ok/error),
+but the table was rendered nowhere — "did the client get the report-issued email?" and "did last
+night's reminders go out?" needed raw SQL; cron SMTP failures vanished silently.
+**Added (additive, read-only; no sender/schema touched):**
+- `ops_notifications()` — route `/notifications` (core `admin` module), gated by
+  `notifications_can_view()` (master / idems.audit.view / settings.manage / admin). Recent 400 sends
+  with recipient, category, subject, outcome; filters by category, failed-only, and search; 30-day
+  KPIs (sent / failed / no-recipient).
+- `email_failed_count()` helper; `views/ops/notifications.php`; a link from the Settings screen.
+**Preserved:** `ops_mail`, `email_log`, every sender and cron reminder — unchanged. No new permission;
+no schema change; nothing deleted.
+**Deferred (flagged):** CC-only-never-sent fix (`if ($to)` gate), honouring sent_ok before arming
+throttles, retry/dead-letter/bounce handling, per-user preferences, a staff in-app bell.
+**Tests:** `test_module38_notifications.php` (20 assertions). Suite 3116 passing (only the 3
+pre-existing baseline failures remain).
+**Spec:** `docs/edge-cases/38-notifications.md`.
 
 ### Module 36 — Licensing / SaaS Admin · 2026-08-26
 **Decision:** (A) surface licence/subscription health ambiently (dashboard banner + weekly cron

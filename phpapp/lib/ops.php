@@ -2373,6 +2373,8 @@ function ops_module_gate($route) {
         'vendors'=>'idems','vendor-profile'=>'idems','vendor-profile-save'=>'idems',
         'expediting'=>'idems','expediting-projects'=>'idems',
         'report-types'=>'idems','report-type-edit'=>'idems','report-builder'=>'idems','report-field-edit'=>'idems','report-file'=>'idems','irn-rules'=>'idems','audit-log'=>'idems',
+        'notifications'=>'admin', // Module 38 — the notification/outbox log over email_log
+
         'document-approve'=>'idems','document-vet'=>'idems','document-vet-review'=>'idems','vetting-checklist'=>'idems','approver-map'=>'idems','idems-approval-rules'=>'idems','idems-approval-rule-edit'=>'idems',
         'document-pdf'=>'idems','document-timestamp'=>'idems','document-docx'=>'idems','report-type-preview'=>'idems','report-template-preview'=>'idems',
         'report-templates'=>'idems','report-template-edit'=>'idems','report-template-download'=>'idems','report-form-from-template'=>'idems','report-autoform'=>'idems',
@@ -3059,6 +3061,8 @@ function ops_dispatch($route, $method) {
             return ops_idems_numbering($method);
         case $route === 'audit-log':
             return ops_idems_audit($method);
+        case $route === 'notifications':
+            return ops_notifications($method);
         case $route === 'report-approve':
             ops_report_approve($method); return true;
         case $route === 'office-finance':
@@ -6780,6 +6784,56 @@ function attention_summary() {
     }
     return $out;
 }
+// Module 38 — who can read the notification log (the outbox over email_log).
+function notifications_can_view() {
+    return is_master()
+        || (function_exists('can') && (can('idems.audit.view') || can('settings.manage')))
+        || (function_exists('is_admin_level') && is_admin_level());
+}
+// Module 38 — count of failed sends in the last N days (for a surface/alert).
+function email_failed_count($days = 7) {
+    try {
+        $since = date('c', strtotime('-' . max(1, (int)$days) . ' days'));
+        return (int)ops_val("SELECT COUNT(*) FROM email_log WHERE sent_ok=0 AND created_at >= ?", [$since]);
+    } catch (Throwable $e) { return 0; }
+}
+// Module 38 — the notification / outbox log. Every ops_mail() call is already
+// written to email_log (recipient, subject, kind, sent_ok, error) — but it was
+// displayed NOWHERE, so "did the client actually get the report-issued email?" and
+// "did last night's reminders go out, or did SMTP fail?" were answerable only by
+// raw SQL. This is the read-only view over that existing table. It touches no
+// sender and stores nothing new.
+function ops_notifications($method) {
+    ops_require(notifications_can_view(), 'You cannot view the notification log.');
+    $kind   = trim((string)($_GET['kind'] ?? ''));
+    $failed = ($_GET['failed'] ?? '') === '1';
+    $q      = trim((string)($_GET['q'] ?? ''));
+    $w = ['1=1']; $a = [];
+    if ($kind !== '')  { $w[] = 'kind = ?';    $a[] = $kind; }
+    if ($failed)       { $w[] = 'sent_ok = 0'; }
+    if ($q !== '')     { $w[] = '(to_addr LIKE ? OR cc_addr LIKE ? OR subject LIKE ?)';
+                         $like = '%' . $q . '%'; array_push($a, $like, $like, $like); }
+    $where = implode(' AND ', $w);
+    $rows = [];
+    try { $rows = ops_all("SELECT id, to_addr, cc_addr, subject, kind, sent_ok, error, created_at
+                           FROM email_log WHERE $where ORDER BY id DESC LIMIT 400", $a) ?: []; }
+    catch (Throwable $e) { $rows = []; }
+    $since30 = date('c', strtotime('-30 days'));
+    $stats = ['total'=>0, 'sent'=>0, 'failed'=>0, 'norecip'=>0];
+    try {
+        $stats['total']  = (int)ops_val("SELECT COUNT(*) FROM email_log WHERE created_at >= ?", [$since30]);
+        $stats['sent']   = (int)ops_val("SELECT COUNT(*) FROM email_log WHERE created_at >= ? AND sent_ok=1", [$since30]);
+        $stats['failed'] = (int)ops_val("SELECT COUNT(*) FROM email_log WHERE created_at >= ? AND sent_ok=0", [$since30]);
+        $stats['norecip']= (int)ops_val("SELECT COUNT(*) FROM email_log WHERE created_at >= ? AND sent_ok=0 AND error LIKE '%recipient%'", [$since30]);
+    } catch (Throwable $e) {}
+    $kinds = [];
+    try { $kinds = array_column(ops_all("SELECT DISTINCT kind FROM email_log WHERE COALESCE(kind,'')<>'' ORDER BY kind") ?: [], 'kind'); }
+    catch (Throwable $e) {}
+    view('ops/notifications', ['rows'=>$rows, 'stats'=>$stats, 'kinds'=>$kinds,
+        'kind'=>$kind, 'failed'=>$failed, 'q'=>$q]);
+    return true;
+}
+
 function ops_reports() {
     ops_require(can('dash.operations') || can('dash.financial') || can('dash.utilization') || can('dash.people'), 'You do not have dashboard access.');
     $seeFin = can('dash.financial'); $seeSalary = can('data.salary');
