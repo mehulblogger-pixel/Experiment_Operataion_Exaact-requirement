@@ -46,6 +46,30 @@
 </div>
 <?php endif; ?>
 
+<?php // Module 43 — Training & certification watch: the actionable "who + which ticket"
+      // drill-down the matrix counts don't give. Read-only.
+$tw = $trainWatch ?? []; if ($tw): $twL = count(array_filter($tw, fn($x) => $x['state']==='lapsed')); ?>
+<div class="panel" style="border-left:3px solid var(--<?= $twL ? 'bad' : 'warn' ?>)">
+  <div class="ctitle" style="margin-top:0"><h3>Training &amp; certification watch <span class="muted">(<?= count($tw) ?>)</span></h3></div>
+  <p class="sub" style="margin-top:0">Certificates and training tickets that have lapsed or come up for refresh within 45 days — the
+    exact person and ticket to chase. Certificates already remind on their own expiry; this is the worklist.</p>
+  <div class="dt-scroll"><table class="dt">
+    <thead><tr><th><?= e(TH('engineer')) ?></th><th>Certificate / ticket</th><th>Valid to</th><th>State</th></tr></thead>
+    <tbody>
+    <?php foreach ($tw as $x): ?>
+      <tr>
+        <td><a href="/competence?ins=<?= (int)$x['inspector_id'] ?>"><?= e($x['inspector']) ?></a><?= $x['emp_code'] ? ' <span class="muted" style="font-size:11px">'.e($x['emp_code']).'</span>' : '' ?></td>
+        <td><?= e($x['cert']) ?><?= $x['number'] ? ' <span class="muted" style="font-size:11px">'.e($x['number']).'</span>' : '' ?><?= !empty($x['is_mandatory']) ? ' <span class="pill p-bad" style="font-size:10px">mandatory</span>' : '' ?></td>
+        <td class="muted" style="white-space:nowrap"><?= e(fdate($x['valid_to'])) ?></td>
+        <td><?php if ($x['state']==='lapsed'): ?><span class="pill p-bad">lapsed <?= abs((int)$x['days']) ?>d ago</span>
+          <?php else: ?><span class="pill p-warn">in <?= (int)$x['days'] ?>d</span><?php endif; ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table></div>
+</div>
+<?php endif; ?>
+
 <div class="panel">
   <div class="ctitle" style="margin-top:0"><h3>The matrix <span class="muted">(<?= count($matrix) ?>)</span></h3></div>
   <table class="dt">

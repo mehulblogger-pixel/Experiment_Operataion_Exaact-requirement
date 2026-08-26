@@ -390,6 +390,36 @@ function competence_matrix() {
     return $rows;
 }
 
+// Module 43 — the ACTIONABLE drill-down the matrix counts don't give: exactly which
+// person and which certificate/training ticket is lapsed or coming up for refresh,
+// across every active inspector, in one worklist. Read-only over inspector_certs;
+// it changes nothing (certs already remind on their own expiry — this is the "who +
+// what" a manager works from).
+function competence_training_watch($withinDays = 45, $today = null) {
+    $today = $today ?: date('Y-m-d');
+    $soon = date('Y-m-d', strtotime($today . ' +' . max(0, (int)$withinDays) . ' days'));
+    $out = [];
+    try {
+        $rows = ops_all(
+            "SELECT c.inspector_id, i.name inspector, i.emp_code, c.name cert, c.number, c.valid_to, c.is_mandatory
+             FROM inspector_certs c JOIN inspectors i ON i.id = c.inspector_id
+             WHERE i.status='ACTIVE' AND COALESCE(c.valid_to,'') <> '' AND c.valid_to <= ?
+             ORDER BY c.valid_to", [$soon]) ?: [];
+    } catch (Throwable $e) { return []; }   // pre-migration
+    foreach ($rows as $r) {
+        $vt = (string)$r['valid_to'];
+        $out[] = $r + ['state' => $vt < $today ? 'lapsed' : 'expiring',
+                       'days' => (int)floor((strtotime($vt) - strtotime($today)) / 86400)];
+    }
+    usort($out, fn($a, $b) => [$a['state'] !== 'lapsed', $a['days']] <=> [$b['state'] !== 'lapsed', $b['days']]);
+    return $out;
+}
+function competence_training_watch_counts($withinDays = 45) {
+    $l = 0; $e = 0;
+    foreach (competence_training_watch($withinDays) as $x) { if ($x['state'] === 'lapsed') $l++; else $e++; }
+    return ['lapsed' => $l, 'expiring' => $e, 'total' => $l + $e];
+}
+
 // Human label for what an authorisation covers.
 function auth_scope_label($a) {
     switch ($a['scope_kind']) {
@@ -451,7 +481,8 @@ function ops_competence($route, $method) {
 
     if ($route === 'competence') {
         view('ops/competence', ['matrix' => competence_matrix(), 'ready' => competence_readiness(),
-                                'canEdit' => competence_can_authorise()]);
+                                'canEdit' => competence_can_authorise(),
+                                'trainWatch' => competence_training_watch()]);   // Module 43
         return true;
     }
     ops_require(competence_can_authorise(), 'Only a manager can grant or withdraw an authorisation.');

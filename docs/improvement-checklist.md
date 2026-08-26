@@ -62,7 +62,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 40 | Activity Timeline | P2 | ✅ done & pushed | 2026-08-26 |
 | 41 | Document Control | P1 | ✅ done & pushed | 2026-08-26 |
 | 42 | Change Control | P2 | ⬜ | — |
-| 43 | Training | P2 | ⬜ | — |
+| 43 | Training | P2 | ✅ done & pushed | 2026-08-26 |
 | 44 | Evidence | P1 | ✅ done & pushed | 2026-08-26 |
 | 45 | AI / Intelligence | P3 | ⬜ | — |
 | 46 | Integrations | P2 | ⬜ | — |
@@ -79,6 +79,26 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 43 — Training · 2026-08-26
+**Decision:** (A) an actionable training/certification watch drill-down on the competence screen. A
+true training-attendance register, the dormant `qualifications`+`renewal_months` activation, and an
+induction record deferred (larger write-heavy additions).
+**Found:** there is no dedicated training register — competence (certs/authorisations/witness) is the
+spine; certs already remind on expiry and the matrix shows per-inspector **counts**, but there was no
+cross-inspector **who + which ticket** worklist.
+**Added (additive, read-only, no access change):**
+- `competence_training_watch($withinDays=45)` + `_counts()` — a ranked worklist across active
+  inspectors of each cert/ticket lapsed or up for refresh within the window, naming the exact person
+  and ticket. Reuses `inspector_certs`.
+- A **"Training & certification watch"** panel on `/competence` (lapsed-first, linking to the person).
+- The **first tests** of this surface.
+**Preserved (verified by tests):** `competence_matrix`, the cert reminder cron, the authorisation/
+witness engine, and the Module 24 eligibility verdict — all unchanged. No new permission (reuses the
+`/competence` manager gate); no schema change; nothing deleted.
+**Edge cases:** `docs/edge-cases/43-training.md`.
+**Tests:** `tests/test_module43_training.php` (16 assertions). Suite 2954 passed / 3 pre-existing
+baseline failures.
 
 ### Module 40 — Activity Timeline · 2026-08-26
 **Decision:** (A) surface the already-logged timeline on the Complaint + NCR detail screens.
