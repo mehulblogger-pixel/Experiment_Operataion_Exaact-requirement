@@ -251,11 +251,15 @@ function portal_call($id) {
     // The partner id is in the WHERE clause, not checked afterwards — an id
     // belonging to somebody else simply does not exist as far as this is
     // concerned, which is the only version of this that cannot be got wrong.
+    // The partner id is in the WHERE clause, not checked afterwards. The SAME
+    // site restriction the list applies is applied here too, so a site-limited
+    // user cannot open a same-company record at a site they were not scoped to
+    // (Module 10 — the list hid it; the single fetch must not reveal it).
     return portal_try(fn() => ops_one(
-        "SELECT id, call_code, call_received_date, inspection_required_date, status,
-                inspection_type, inspection_type_other, product_category, contract_number,
-                inspection_dates, allocated_at, client_id
-         FROM calls WHERE id = ? AND client_id = ?", [(int)$id, $pid]), null) ?: null;
+        "SELECT c.id, c.call_code, c.call_received_date, c.inspection_required_date, c.status,
+                c.inspection_type, c.inspection_type_other, c.product_category, c.contract_number,
+                c.inspection_dates, c.allocated_at, c.client_id
+         FROM calls c WHERE c.id = ? AND c.client_id = ? AND " . portal_site_sql('c'), [(int)$id, $pid]), null) ?: null;
 }
 
 function portal_jobs($callId) {
@@ -294,6 +298,8 @@ function portal_reports($limit = 200) {
 function portal_report($id) {
     $pid = portal_partner_id();
     if (!$pid) return null;
+    // Site scope, exactly as portal_reports() applies it: a report tied to a call
+    // at a site outside this user's scope is not opened (Module 10).
     return portal_try(fn() => ops_one(
         "SELECT d.*, bp.display_name client_disp, bp.legal_name client_name,
                 v.display_name vendor_disp, v.legal_name vendor_name, rt.name type_name
@@ -301,7 +307,9 @@ function portal_report($id) {
          LEFT JOIN business_partners bp ON bp.id = d.client_id
          LEFT JOIN business_partners v  ON v.id  = d.vendor_id
          LEFT JOIN report_types rt      ON rt.id = d.report_type_id
-         WHERE d.id = ? AND d.client_id = ? AND d.finalized = 1 AND COALESCE(d.deleted,0) = 0",
+         LEFT JOIN calls c              ON c.id  = d.call_id
+         WHERE d.id = ? AND d.client_id = ? AND d.finalized = 1 AND COALESCE(d.deleted,0) = 0
+           AND (d.call_id IS NULL OR " . portal_site_sql('c') . ")",
         [(int)$id, $pid]), null) ?: null;
 }
 
@@ -319,20 +327,84 @@ function portal_report_pdf($doc) {
     echo $pdf;
 }
 
-// Invoices live on the deputation, and the deputation reaches the client
-// through its call — so the join is what scopes this, and the client id still
-// sits in the WHERE clause.
+// The real invoices register, scoped to this client (Module 09/10). Reads only
+// client-safe columns — number, dates, gross, and the true outstanding from the
+// books (so a part-payment reads as half, and a TDS-settled invoice reads as
+// paid) — never a cost, margin, credit term or internal note. A DRAFT is never
+// shown; the client only ever sees issued money.
+function portal_invoices_register() {
+    $pid = portal_partner_id();
+    if (!$pid || !function_exists('books_migrate')) return [];
+    books_migrate();
+    $rows = portal_try(fn() => ops_all(
+        "SELECT i.id, i.invoice_no, i.invoice_date, i.due_date, i.total, i.status, i.contract_number
+         FROM invoices i
+         WHERE i.partner_id = ? AND i.status IN ('ISSUED','PART_PAID','PAID')
+         ORDER BY i.invoice_date DESC, i.id DESC", [$pid]), []) ?: [];
+    $out = [];
+    foreach ($rows as $r) {
+        $s = function_exists('books_settled') ? books_settled((int)$r['id']) : ['outstanding' => (float)$r['total']];
+        $outst = max(0.0, (float)($s['outstanding'] ?? 0));
+        $out[] = [
+            'source'           => 'register',
+            'id'               => (int)$r['id'],
+            'invoice_number'   => (string)$r['invoice_no'],
+            'invoice_date'     => (string)$r['invoice_date'],
+            'invoice_due_date' => (string)$r['due_date'],
+            'invoice_amount'   => (float)$r['total'],
+            'outstanding'      => $outst,
+            'payment_received' => $outst <= 1.0 ? 1 : 0,
+            'payment_date'     => '',
+            'job_code'         => (string)$r['contract_number'],
+            'call_code'        => '',
+            'status'           => (string)$r['status'],
+        ];
+    }
+    return $out;
+}
+
+// What the client sees under "Invoices". PREFERS the real register (consolidated
+// and manual invoices, honest part-payments), then adds any legacy jobs-mirror
+// invoice the register does not already cover, de-duplicated by number — so a
+// company mid-migration loses nothing it saw before, and nothing is shown twice.
+// The client id / partner id stays in the WHERE clause; only safe columns are read.
 function portal_invoices() {
     $pid = portal_partner_id();
     if (!$pid) return [];
-    // Amount and dates only. What the branch keeps on it is our business.
-    return portal_try(fn() => ops_all(
+    $reg = portal_invoices_register();
+    $seen = [];
+    foreach ($reg as $r) { $n = strtoupper(trim((string)$r['invoice_number'])); if ($n !== '') $seen[$n] = true; }
+    // The legacy mirror tail: a job with an invoice number the register has not
+    // (yet) absorbed — a pre-Books invoice. Amount and dates only.
+    $mirror = portal_try(fn() => ops_all(
         "SELECT j.id, j.job_code, j.invoice_number, j.invoice_date, j.invoice_due_date,
                 j.invoice_amount, j.payment_received, j.payment_date, c.call_code
          FROM jobs j JOIN calls c ON c.id = j.call_id
          WHERE c.client_id = ? AND COALESCE(j.invoice_raised,0) = 1
            AND COALESCE(j.invoice_number,'') <> '' AND " . portal_site_sql('c') . "
-         ORDER BY j.invoice_date DESC, j.id DESC", [$pid]));
+         ORDER BY j.invoice_date DESC, j.id DESC", [$pid]), []) ?: [];
+    $out = $reg;
+    foreach ($mirror as $m) {
+        $num = strtoupper(trim((string)$m['invoice_number']));
+        if ($num !== '' && isset($seen[$num])) continue;      // already shown from the register
+        $paid = !empty($m['payment_received']);
+        $out[] = [
+            'source'           => 'mirror',
+            'id'               => (int)$m['id'],
+            'invoice_number'   => (string)$m['invoice_number'],
+            'invoice_date'     => (string)$m['invoice_date'],
+            'invoice_due_date' => (string)$m['invoice_due_date'],
+            'invoice_amount'   => (float)$m['invoice_amount'],
+            'outstanding'      => $paid ? 0.0 : (float)$m['invoice_amount'],
+            'payment_received' => $paid ? 1 : 0,
+            'payment_date'     => (string)$m['payment_date'],
+            'job_code'         => (string)$m['job_code'],
+            'call_code'        => (string)$m['call_code'],
+            'status'           => $paid ? 'PAID' : 'ISSUED',
+        ];
+    }
+    usort($out, fn($a, $b) => strcmp((string)$b['invoice_date'], (string)$a['invoice_date']));
+    return $out;
 }
 
 // Our internal stage names are ours. ALLOCATED, REPORT_PENDING and the rest
@@ -383,7 +455,9 @@ function portal_dashboard() {
     $outstanding = 0.0; $overdue = 0;
     foreach ($inv as $i) {
         if (!empty($i['payment_received'])) continue;
-        $outstanding += (float)$i['invoice_amount'];
+        // The true remaining balance from the books (Module 10), so a part-payment
+        // reduces the outstanding shown rather than counting the whole invoice.
+        $outstanding += (float)($i['outstanding'] ?? $i['invoice_amount']);
         if (portal_invoice_overdue($i)) $overdue++;
     }
     $reqOpen = 0;
@@ -783,7 +857,8 @@ function portal_route($route, $method) {
                 'jobs' => portal_try(fn() => ops_all(
                     "SELECT j.id, j.job_code, j.scheduled_date FROM jobs j
                      LEFT JOIN calls c ON c.id = j.call_id
-                     WHERE c.client_id = ? ORDER BY j.id DESC LIMIT 100", [portal_partner_id()])),
+                     WHERE c.client_id = ? AND " . portal_site_sql('c') . "
+                     ORDER BY j.id DESC LIMIT 100", [portal_partner_id()])),
                 'prefill' => $_GET,
             ]);
             exit;

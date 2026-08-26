@@ -2,7 +2,7 @@
 $out = 0.0; $overdue = 0;
 foreach ($rows as $i) {
     if (!empty($i['payment_received'])) continue;
-    $out += (float)$i['invoice_amount'];
+    $out += (float)($i['outstanding'] ?? $i['invoice_amount']);   // true remaining balance (Module 10)
     if (portal_invoice_overdue($i)) $overdue++;
 }
 ?>
@@ -32,9 +32,16 @@ foreach ($rows as $i) {
       <td><?= e(fdate($i['invoice_date'])) ?></td>
       <td><?= e(fdate($i['invoice_due_date'])) ?><?= $late ? ' <span class="pill p-warn">overdue</span>' : '' ?></td>
       <td style="text-align:right"><?= e(fmoney($i['invoice_amount'])) ?></td>
-      <td><?= !empty($i['payment_received'])
-            ? 'Yes' . ($i['payment_date'] ? ' · ' . e(fdate($i['payment_date'])) : '')
-            : '<span class="muted">Not yet</span>' ?></td>
+      <td><?php
+        $outst = (float)($i['outstanding'] ?? ($i['invoice_amount'] ?? 0));
+        if (!empty($i['payment_received'])) {
+            echo 'Yes' . ($i['payment_date'] ? ' · ' . e(fdate($i['payment_date'])) : '');
+        } elseif ($outst > 1 && $outst < (float)$i['invoice_amount'] - 1) {
+            // A part-payment: show what is still outstanding, not just "not yet".
+            echo '<span class="pill p-info">Part-paid</span> <span class="muted">' . e(fmoney($outst)) . ' outstanding</span>';
+        } else {
+            echo '<span class="muted">Not yet</span>';
+        } ?></td>
     </tr>
   <?php endforeach; ?>
   </tbody>

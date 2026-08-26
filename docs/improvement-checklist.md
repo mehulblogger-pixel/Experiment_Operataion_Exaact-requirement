@@ -29,7 +29,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 07 | Vetting / Technical Review / Approval | P0 | ✅ done & pushed | 2026-08-24 |
 | 08 | Report Release / Issue | P0 | ✅ done & pushed | 2026-08-24 |
 | 09 | Invoicing | P0 | ✅ done & pushed | 2026-08-25 |
-| 10 | Client Portal | P0 | 📝 edge-cases drafted (awaiting go) | — |
+| 10 | Client Portal | P0 | ✅ done & pushed | 2026-08-25 |
 | 11 | Vendor / Supplier-Inspector Centre | P1 | ⬜ | — |
 | 12 | NCR | P1 | ✅ done & pushed | 2026-08-24 |
 | 13 | CAPA | P2 | ✅ done & pushed | 2026-08-24 |
@@ -79,6 +79,38 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 10 — Client Portal · 2026-08-25
+**Decision:** (A) register-backed portal invoices + close the intra-client site-scope hole; a
+satisfaction-survey portal surface and an "invoice raised" email deferred (§5-C).
+**Found:** the portal is the most disciplined subsystem (own identity `client_users`/`cuid` that can
+never be a staff user, dispatch before the auth gate, IDOR avoided by `client_id` in the WHERE
+clause, finalized-only reports, PDFs served from the authorised row, cost/margin never selected —
+**no cross-client leak**). Two gaps: (1) **it showed the client the wrong money** — `portal_invoices()`
+read the legacy `jobs` mirror, not the `invoices` register, so a **consolidated** invoice showed once
+per job, a **manual (no-`job_id`) invoice was invisible**, and a **part-payment read as unpaid**;
+(2) intra-client **site scope** was applied on list views but omitted on single-record fetches
+(`portal_call`, `portal_report`, the complaint job-picker).
+**Added (additive, non-destructive):**
+- `portal_invoices_register()` — reads the real `invoices` scoped by `partner_id`
+  (`ISSUED/PART_PAID/PAID`, never a draft), outstanding from `books_settled` (so a part-payment reads
+  as half, a TDS-settled invoice reads as paid), **only client-safe columns** (number/date/due/gross/
+  outstanding/status) — never a cost, margin, credit term or internal note.
+- `portal_invoices()` now returns the **superset**: register rows first, then any legacy `jobs`-mirror
+  invoice the register doesn't cover, **de-duplicated by number** — so consolidated and manual
+  invoices appear and nothing a client saw before disappears. The dashboard outstanding/overdue and
+  the invoices view now show the true remaining balance (a "Part-paid" pill).
+- **Least privilege:** `portal_call()`, `portal_report()` and the complaint job-picker now apply the
+  **same** `portal_site_sql` the list views already apply, so a site-restricted user can't open a
+  same-company record outside their site by id. A blank `site_ids` still sees everything.
+**Preserved (verified by tests):** the identity model, the finalized-only report gate + secure PDF
+serving, the invite-token lifecycle, the CVP visibility gate, and every partner-scoped read — all
+unchanged; the `jobs.invoice_*` mirror and its non-portal readers (profitability, MIS, money desk)
+untouched. No new permission; no schema change; no confidential column newly exposed. First automated
+coverage of portal invoice correctness.
+**Edge cases:** `docs/edge-cases/10-client-portal.md`.
+**Tests:** `tests/test_module10_portal.php` (18 assertions). Suite 2686 passed / 3 pre-existing
+baseline failures.
 
 ### Module 09 — Invoicing · 2026-08-25
 **Decision:** (A) invoice-number integrity + overdue-receivables reminder; SoD maker-checker

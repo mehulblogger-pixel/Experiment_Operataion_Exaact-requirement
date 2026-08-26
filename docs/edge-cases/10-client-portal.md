@@ -1,6 +1,12 @@
 # Module 10 — Client Portal · Edge-case analysis (pre-build)
 
-**Status:** 📝 SPEC — awaiting decision. P0.
+**Status:** ✅ BUILT (2026-08-25). Decision: (A) register-backed portal invoices + close the
+intra-client site-scope hole; the survey surface / invoice-raised email deferred. `portal_invoices()`
+now returns an additive superset (register rows via `portal_invoices_register()` with
+`books_settled` outstanding, then legacy mirror rows the register doesn't cover, de-duped);
+single-record `portal_call()`/`portal_report()`/complaint job-picker now scope by site like the
+lists. Asserted by `tests/test_module10_portal.php`. Client-safe columns only; partner scope in the
+WHERE clause. P0.
 
 ---
 
