@@ -60,7 +60,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 38 | Notification Centre | P2 | ⬜ | — |
 | **39** | **My Work** | **P1** | **✅ done & pushed** | 2026-08-24 |
 | 40 | Activity Timeline | P2 | ⬜ | — |
-| 41 | Document Control | P1 | ⬜ | — |
+| 41 | Document Control | P1 | ✅ done & pushed | 2026-08-26 |
 | 42 | Change Control | P2 | ⬜ | — |
 | 43 | Training | P2 | ⬜ | — |
 | 44 | Evidence | P1 | ⬜ | — |
@@ -79,6 +79,29 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 41 — Document Control (ISO 17020 §8.3) · 2026-08-26
+**Decision:** (A) review-due readiness + compliance-board row + cron reminder + supersede audit log.
+Read-acknowledgement register, enforced approval, and a distinct `mod.doccontrol.*` permission
+deferred.
+**Found:** a real controlled-document register exists (`lib/controldocs.php`) with versioning,
+supersession and review-due dates — but it was an island: the review-due signal was computed yet
+**never reached the cron dispatcher or the compliance board** (the two surfaces every other
+accreditation register uses), and supersession was the one lifecycle event not on the sealed trail.
+**Added (additive, read-mostly, no hard control):**
+- `cdoc_readiness()` — current / review-overdue / never-approved counts.
+- A **§8.3 compliance-board row** ("the document in use is the current, approved revision").
+- `cdoc_run_reminders()` — e-mails the quality owner about overdue/unapproved documents, wired into
+  `cron.php` **weekly-guarded**. Notifies; changes no document.
+- **Supersession now writes a `SUPERSEDED` `idems_log` entry** (the previously-missing sealed-trail
+  event), completing the evidence chain.
+- The **first tests** over readiness/reminder and the supersede audit write.
+**Preserved (verified by tests):** the register, versioning/supersession chain, obsolete-control
+unambiguity, routes/views — all unchanged. No new permission (reuses `cdoc_can_*`); no schema change;
+no hard control (approval still not enforced before CURRENT — noted); nothing deleted.
+**Edge cases:** `docs/edge-cases/41-document-control.md`.
+**Tests:** `tests/test_module41_doccontrol.php` (13 assertions). Suite 2865 passed / 3 pre-existing
+baseline failures.
 
 ### Module 37 — Global Search · 2026-08-26
 **Decision:** (A) add the missing spine entities (opportunities, invoices) as scope-respecting

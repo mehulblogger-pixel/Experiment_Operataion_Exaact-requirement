@@ -312,6 +312,19 @@ if ((function_exists('audits_run_reminders') || function_exists('reviews_run_rem
     }
 }
 
+// Module 41 — chase a controlled document past its review date, at most weekly
+// (a year-scale review cycle needs no daily nudge). §8.3 was the one accreditation
+// register whose review-due signal was computed but never dispatched.
+if (function_exists('cdoc_run_reminders') && (string)setting_get('cdoc_reminder_week', '') !== date('o-W')) {
+    try {
+        $cd = cdoc_run_reminders();
+        setting_set('cdoc_reminder_week', date('o-W'));
+        echo "Controlled-document reminders sent: $cd\n";
+    } catch (Throwable $e) {
+        echo "Controlled-document reminders: failed — " . $e->getMessage() . "\n";
+    }
+}
+
 // Module 29 — the §7.11 data-integrity self-test, once a day. integrity_run()
 // runs the referential + consistency checks and writes ONE dated pass/fail row to
 // data_check_runs — the evidence the Data Control console reads. Exactly like

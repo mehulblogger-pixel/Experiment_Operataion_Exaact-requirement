@@ -418,6 +418,18 @@ function compliance_status() {
                 ? 'Open the confidentiality register. §4.2 wants a signed, current commitment from everyone with access to client information.'
                 : ($breaches > 0 ? 'Close out the open confidentiality breach(es) — each carries a §4.2 nonconformity.' : ''));
     }
+    // Module 41 — §8.3 control of documents was absent from the readiness board,
+    // though the review-due signal was already computed. Surface it beside its peers.
+    if (function_exists('cdoc_readiness') && (!function_exists('cdoc_pack_on') || cdoc_pack_on())) {
+        $cd = cdoc_readiness();
+        $add((accreditation_std_name() . ' §8.3'), 'The document in use is the current, approved revision',
+            ($cd['review_overdue'] > 0) ? 'bad' : ($cd['never_approved'] > 0 ? 'warn' : 'ok'),
+            $cd['current'] . ' current; ' . $cd['review_overdue'] . ' past their review date, '
+            . $cd['never_approved'] . ' current with no recorded approval.',
+            ($cd['review_overdue'] > 0)
+                ? 'Open Controlled documents. A procedure past its review date is a document nobody has confirmed still describes what you actually do.'
+                : ($cd['never_approved'] > 0 ? 'Some current documents were never approved — record the approval, or take them out of use.' : ''));
+    }
     if (function_exists('competence_readiness')) {
         $cr = competence_readiness();
         $add((accreditation_std_name() . ' §' . accreditation_clause_or('competence')), 'People are authorised for the work they are given',

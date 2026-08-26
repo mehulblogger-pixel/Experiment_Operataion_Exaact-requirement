@@ -77,6 +77,43 @@ function cdoc_counts() {
     return ['current' => (int)ops_val("SELECT COUNT(*) FROM controlled_docs WHERE status='CURRENT'"),
             'review_due' => (int)ops_val("SELECT COUNT(*) FROM controlled_docs WHERE status='CURRENT' AND review_due<>'' AND review_due < ?", [date('Y-m-d')])];
 }
+// Module 41 — the §8.3 readiness rollup, for the compliance board. Built on the
+// same query cdoc_counts() already uses; adds a "never approved but current" count
+// (a document in use that was never signed off). Pure read.
+function cdoc_readiness($today = null) {
+    cdocs_migrate();
+    $today = $today ?: date('Y-m-d');
+    return [
+        'current'        => (int)ops_val("SELECT COUNT(*) FROM controlled_docs WHERE status='CURRENT'"),
+        'review_overdue' => (int)ops_val("SELECT COUNT(*) FROM controlled_docs WHERE status='CURRENT' AND review_due<>'' AND review_due < ?", [$today]),
+        'never_approved' => (int)ops_val("SELECT COUNT(*) FROM controlled_docs WHERE status='CURRENT' AND COALESCE(approved_on,'')=''"),
+    ];
+}
+
+// Module 41 — chase a controlled document past its review date, the way every
+// other accreditation register is chased. Reads only the readiness; e-mails the
+// quality owner; returns a count. Notifies, never changes a document.
+function cdoc_run_reminders($today = null) {
+    cdocs_migrate();
+    $r = cdoc_readiness($today);
+    if ((int)$r['review_overdue'] === 0 && (int)$r['never_approved'] === 0) return 0;
+    $to = getenv('QAC_EMAIL') ?: (function_exists('coordinator_emails') ? coordinator_emails() : '');
+    if (trim((string)$to) === '') return 0;
+    $body = "Controlled documents (§8.3) — attention needed.\n\n";
+    if ((int)$r['review_overdue'] > 0) {
+        $body .= (int)$r['review_overdue'] . " current document(s) are past their review date:\n";
+        foreach (ops_all("SELECT doc_code, title, review_due FROM controlled_docs WHERE status='CURRENT' AND review_due<>'' AND review_due < ? ORDER BY review_due LIMIT 40", [$today ?: date('Y-m-d')]) ?: [] as $d)
+            $body .= '  - ' . $d['doc_code'] . ' ' . $d['title'] . ' (review was due ' . fdate($d['review_due']) . ")\n";
+        $body .= "\n";
+    }
+    if ((int)$r['never_approved'] > 0)
+        $body .= (int)$r['never_approved'] . " current document(s) have no recorded approval.\n\n";
+    $body .= "Open Controlled documents in " . app_name() . " to review or re-approve them.\n";
+    try { ops_mail($to, 'Controlled documents: ' . (int)$r['review_overdue'] . ' past review date', $body, '', 'controldoc'); }
+    catch (Throwable $e) { /* a failed reminder must never break the run */ }
+    return 1;
+}
+
 function cdoc_next_code() {
     $n = (int)ops_val("SELECT COUNT(*) FROM controlled_docs WHERE supersedes_id IS NULL") + 1;
     do { $code = sprintf('DOC-%04d', $n); $n++; }
@@ -155,6 +192,13 @@ function cdoc_supersede($id, $newRevision) {
     $newId = (int)db()->lastInsertId();
     db()->prepare("UPDATE controlled_docs SET status='SUPERSEDED', superseded_by_id=?, updated_at=? WHERE id=?")
         ->execute([$newId, date('c'), (int)$d['id']]);
+    // Module 41 — supersession is a controlled-document lifecycle event and belongs
+    // on the sealed trail like CREATED / STATUS_CURRENT already are (it was the one
+    // event that was not logged).
+    if (function_exists('idems_log'))
+        idems_log('controlled_doc', $newId, 'SUPERSEDED',
+            ['field' => $d['doc_code'], 'old' => $d['revision'], 'new' => $cols['revision'],
+             'reason' => 'supersedes ' . $d['doc_code'] . ' (#' . (int)$d['id'] . ')']);
     return [$newId, ''];
 }
 
