@@ -62,3 +62,11 @@ try {
 // The settings screen links to the new board.
 $settings = file_get_contents(__DIR__ . '/../views/ops/settings.php');
 t_ok(strpos($settings, '/system-status') !== false, 'the settings screen links to system status');
+
+// Resilience: view() degrades a missing view file to a message, not a fatal; and the
+// defensive views/admin.php fallback exists so a legacy view('admin') call never crashes.
+$idx = file_get_contents(__DIR__ . '/../index.php');
+t_ok(strpos($idx, 'is_file($viewFile)') !== false, 'view() guards a missing view file instead of a bare require');
+t_ok(is_file(__DIR__ . '/../views/admin.php'), 'the defensive views/admin.php fallback exists');
+$adm = file_get_contents(__DIR__ . '/../views/admin.php');
+t_ok(strpos($adm, "ops/area_home.php") !== false, 'views/admin.php forwards to the Admin area home');
