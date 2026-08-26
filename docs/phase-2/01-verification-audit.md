@@ -300,6 +300,28 @@ CANONICAL APPLICATION MODEL + legacy-compat docs.
 
 ---
 
+## DELIVERED (see `00-program.md` Done log for commits + test counts)
+
+Non-destructive, tested, pushed on `claude/quotation-management-workflow-5dokb2`. Suite grew to 3544, 0 failed.
+
+- **P0:** §30 (frozen cost basis), §10 (issuance readiness probes), §11 (seal fail-closed).
+- **P1 security:** §51 (IDOR scope on job/document/pdf/invoice/file), §53 (identity encryption at rest),
+  §54 (audit-chain trim anchor + wipe evidence), §22 (global-search cross-SBU leak closed).
+- **P1 report-workflow:** §6 (applicability override audit), §4 (four report roles on PDF), §9 (structured
+  return-to-inspector), §46 (call-status disagreement integrity check).
+- **P2 consolidation layers:** §23/24 (canonical person `party.php`), §39 (quality-case umbrella),
+  §68 (evidence reuse across jobs), §72 (visibility gate), §25 (engagement grouping), §48 (bulk
+  preview/dry-run), §17 (CANDIDATE/RECEIPT on the activity spine), §29 (revenue reconciliation, read-only),
+  §47 (settings governance registry), §32 (inter-office settlement matrix).
+- **P2/P3 architecture:** §79/§80 (`02-canonical-application-model.md`).
+
+**Still open / needs your decision:** §28 (profit-engine convergence — changes displayed numbers, sign-off
+gated; §29 is its evidence base) · §31/§33 (overhead versioning done via §30; invoice-readiness panel
+pending) · §19/§20/§26/§50 (net-new subsystems — held under STOP FEATURE CREEP) · §8/§34/§35/§16/§49 (larger
+UX/lifecycle builds).
+
+---
+
 # EXECUTIVE SUMMARY (W1 audit)
 
 **Solid / verified IMPLEMENTED:** CSRF (global fail-closed), portal tenant isolation (id in WHERE incl.
