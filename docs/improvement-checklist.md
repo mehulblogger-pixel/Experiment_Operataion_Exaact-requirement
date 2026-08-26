@@ -53,7 +53,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 31 | Attendance / Reconciliation | P1 | ✅ done & pushed | 2026-08-24 |
 | 32 | Profitability (canonical engine) | P0 | ✅ done & pushed | 2026-08-26 |
 | 33 | Overheads | P1 | ✅ done & pushed | 2026-08-26 |
-| 34 | Dashboards / Command Centre | P2 | ⬜ | — |
+| 34 | Dashboards / Command Centre | P2 | ✅ done & pushed | 2026-08-26 |
 | 35 | Recruitment / Workforce | P1 | ⬜ | — |
 | 36 | Licensing / SaaS Admin | P1 | ⬜ | — |
 | 37 | Global Search | P1 | ✅ done & pushed | 2026-08-26 |
@@ -79,6 +79,29 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 34 — Dashboards / Command Centre · 2026-08-26
+**Decision:** (A) a home "Needs attention" band that fans the already-computed due/overdue/expiring
+counts into one gated surface. Header notification badge, a visible My Work rail entry, and retiring
+the home view's inline-SQL tiles deferred (global chrome / refactor).
+**Found:** the home shows open *totals*, but leads_due/inquiries_due/contract-expiry/expired-quote/
+AR-overdue/cert-lapsed counts already exist and are surfaced on no dashboard — each only on its own
+register. A BDM sees open deals, not what's due; Finance sees a job-level money desk, not the ledger
+overdue figure.
+**Added (additive, read-only; reuses canonical counts; gated per item):**
+- `attention_summary()` (beside `ops_pending_tasks`) — one list of leads-due, inquiries-due,
+  contracts-expiring, quotes-lapsed, overdue-receivables (ledger `ar_*`) and certs-lapsed, each gated
+  by its destination's own right, each linking to its list, included only when count > 0.
+- `contracts_expiring_count()` (reuses `contract_warn_days`) and `quotes_expired_count()`
+  (`is_current`-scoped) — the two missing canonical counts.
+- A **"Needs attention"** band on the home desk dashboard (existing `qcards` markup), after "Waiting
+  on somebody", before the role-ordered sections. Empty ⇒ hidden.
+**Preserved:** the inspector phone-first branch, the compliance band, `ops_pending_tasks`, money desk,
+charts, exec board, role ordering — all unchanged. No displayed figure altered; no new permission; no
+schema change; nothing deleted.
+**Tests:** `test_module34_dashboard.php` (12+ assertions). Suite 3051 passing (only the 3 pre-existing
+baseline failures remain).
+**Spec:** `docs/edge-cases/34-dashboards.md`.
 
 ### Module 32 — Profitability (canonical engine) · 2026-08-26
 **Decision:** (A) an additive profit-engine consistency check that measures every job against the

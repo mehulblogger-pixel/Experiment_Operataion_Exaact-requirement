@@ -151,6 +151,26 @@
     <?php endif;
     $secCompliance = ob_get_clean();
 
+    // ---------- section: needs attention (business SLA / expiry / cash) ----------
+    // The counts each module already computes for its own register, fanned into
+    // one band so the home page shows what is DUE, not just open totals. Each tile
+    // is gated by attention_summary() and links to its list. Empty band = hidden.
+    ob_start();
+    $attn = function_exists('attention_summary') ? attention_summary() : [];
+    if ($attn):
+      $atone = ['cash'=>'bad', 'risk'=>'bad', 'speed'=>'warn']; ?>
+      <h3 class="sec-title" style="margin-top:22px">Needs attention</h3>
+      <div class="qcards">
+        <?php foreach ($attn as $a): $tn = $atone[$a['sev']] ?? 'warn'; ?>
+          <a class="qcard tone-<?= e($tn) ?>" href="<?= e($a['url']) ?>">
+            <div class="qic"><?= $a['sev']==='cash' ? e(cur_sym()) : ($a['sev']==='risk' ? '⏳' : '◷') ?></div>
+            <div class="qn"><?= $a['value'] !== null ? e($a['value']) : (int)$a['n'] ?></div>
+            <div class="ql"><?= e($a['label']) ?></div></a>
+        <?php endforeach; ?>
+      </div>
+    <?php endif;
+    $secAttention = ob_get_clean();
+
     // ---------- section: money desk ----------
     ob_start();
     if ($showMoney): ?>
@@ -416,6 +436,7 @@
     // the role (quotes/contracts/vouchers to approve, reports to vet/approve, …).
     if (function_exists('ops_render_pending_tasks')) echo ops_render_pending_tasks();
     echo $secCompliance;
+    echo $secAttention;
     if ($isExec)          { echo $secExec; echo $secCrm; echo $secMoney; echo $secCharts; echo $secAvail; echo $secRepAppr; echo $secQuick; echo $secSched; }
     elseif (in_array($role, ['BUSINESS_DEV_MANAGER','KEY_ACCOUNTS_MANAGER','MARKETING_MANAGER','MARKETING_EXECUTIVE'], true))
                           { echo $secCrm; echo $secQuick; echo $secMoney; echo $secCharts; }

@@ -1010,6 +1010,15 @@ function quote_validity($q) {
     return $out;
 }
 
+// Module 34 — a canonical count of current quotations that lapsed without a
+// decision (the EXPIRED status the sweep below stamps), so a dashboard can surface
+// them. Scoped to is_current so superseded revisions are not double-counted.
+function quotes_expired_count() {
+    try {
+        return (int)ops_val("SELECT COUNT(*) FROM quotations WHERE status='EXPIRED' AND COALESCE(is_current,1)=1");
+    } catch (Throwable $e) { return 0; }
+}
+
 // The daily sweep that turns "past validity" into the EXPIRED status the
 // lifecycle already knows (§14). Same shape as equipment_run_cal_reminders():
 // safe to run repeatedly (a no-op once stamped), touches only OPEN, sent, current

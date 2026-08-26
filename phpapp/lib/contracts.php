@@ -223,6 +223,19 @@ function contract_state_row($c) {
     return contract_classify($out);
 }
 function contract_state_blocks($state) { return in_array($state, ['EXPIRED', 'EXHAUSTED'], true); }
+// Module 34 — a canonical count of OPEN contracts inside the expiry warning window,
+// so a dashboard can surface "expiring soon" without re-deriving the rule. Reuses
+// contract_warn_days(). Advisory count (company-wide, like the rest of this file).
+function contracts_expiring_count($withinDays = null) {
+    $warn  = $withinDays !== null ? (int)$withinDays : (function_exists('contract_warn_days') ? contract_warn_days() : 30);
+    $today = date('Y-m-d');
+    $limit = date('Y-m-d', strtotime('+' . max(0, $warn) . ' days'));
+    try {
+        return (int)ops_val("SELECT COUNT(*) FROM partner_contracts
+            WHERE COALESCE(open_status,'OPEN')='OPEN' AND COALESCE(end_date,'')<>''
+              AND end_date >= ? AND end_date <= ?", [$today, $limit]);
+    } catch (Throwable $e) { return 0; }
+}
 // A short human label + severity for a contract state, for the 360 banner.
 function contract_state_label($state) {
     return [

@@ -6728,6 +6728,53 @@ function ops_render_pending_tasks() {
     </div>
     <?php return ob_get_clean();
 }
+
+// Module 34 — the business "needs attention" aggregation. Several modules already
+// COMPUTE a due/overdue/expiring count, but each lived only on its own register
+// screen, so a desk user's home showed open *totals* and never what was actually
+// due. This fans those existing, canonical counts into one place — each item
+// permission-gated by the same right its destination screen uses, each linking to
+// its list, and the whole thing empty when nothing is outstanding. It is distinct
+// from ops_pending_tasks() (personal approvals): this is the business signal.
+// Read-only; reuses helpers, so it never re-implements a count with fresh SQL.
+function attention_summary() {
+    $out = [];
+    $push = function ($key, $label, $n, $url, $sev = 'warn', $value = null, $sub = '') use (&$out) {
+        if ((int)$n <= 0 && $value === null) return;
+        $out[] = ['key' => $key, 'label' => $label, 'n' => (int)$n, 'url' => $url,
+                  'sev' => $sev, 'value' => $value, 'sub' => $sub];
+    };
+    // Sales service-level: leads and inquiries past their agreed follow-up window.
+    if (function_exists('leads_can_view') && leads_can_view()) {
+        if (function_exists('leads_due_count'))     $push('leads_due', 'Leads due for follow-up', leads_due_count(), '/leads', 'speed', null, 'past their service level');
+        if (function_exists('inquiries_due_count')) $push('inq_due', 'Inquiries awaiting a quote', inquiries_due_count(), '/inquiries', 'speed', null, 'past their service level');
+    }
+    // Commercial cover lapsing.
+    if ((function_exists('can') && (can('crm.contract.register') || can('mod.clients.view'))) || is_master()) {
+        if (function_exists('contracts_expiring_count')) $push('con_exp', 'Contracts expiring soon', contracts_expiring_count(), '/contract-openings', 'risk', null, 'within the warning window');
+    }
+    if ((function_exists('can') && (can('crm.quote.create') || can('mod.quotes.edit'))) || is_master()) {
+        if (function_exists('quotes_expired_count')) $push('q_exp', 'Quotations lapsed', quotes_expired_count(), '/quotes', 'speed', null, 'expired without a decision');
+    }
+    // Money: real overdue receivables from the ledger (not the job-level proxy).
+    if (function_exists('ar_can') && ar_can() && function_exists('ar_rows')) {
+        try {
+            $clients = ar_by_client(ar_rows('DUE', date('Y-m-d')));
+            $t = ar_totals($clients);
+            $od = (float)($t['overdue'] ?? 0);
+            $odn = 0; foreach ($clients as $c) if ((float)$c['total'] - (float)$c['notdue'] > 0) $odn++;
+            if ($od > 0) $push('ar_overdue', 'Overdue receivables', $odn, '/receivables', 'cash', fmoney_short($od), 'past due date');
+        } catch (Throwable $e) {}
+    }
+    // Competence: certificates lapsed across the workforce.
+    if ((function_exists('can') && can('mod.users.view')) || (function_exists('is_admin_level') && is_admin_level()) || (function_exists('is_master_of') && is_master_of('users'))) {
+        if (function_exists('competence_training_watch_counts')) {
+            $c = competence_training_watch_counts();
+            if (!empty($c['lapsed'])) $push('cert_lapsed', 'Certifications lapsed', (int)$c['lapsed'], '/competence', 'risk', null, 'inspectors need a refresh');
+        }
+    }
+    return $out;
+}
 function ops_reports() {
     ops_require(can('dash.operations') || can('dash.financial') || can('dash.utilization') || can('dash.people'), 'You do not have dashboard access.');
     $seeFin = can('dash.financial'); $seeSalary = can('data.salary');
