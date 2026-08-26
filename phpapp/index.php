@@ -578,7 +578,21 @@ function view($name, $vars = []) {
     // out — one place, rather than 141 forms each relying on somebody remembering.
     ob_start();
     require __DIR__ . '/views/layout_top.php';
-    require __DIR__ . "/views/$name.php";
+    // A missing view file must never white-screen the whole app with a fatal
+    // "Failed opening required" — that almost always means a stale or partial
+    // deployment (the code asked for a page whose file is not on the server).
+    // Show a contained message with a way back instead of taking the app down.
+    $viewFile = __DIR__ . "/views/$name.php";
+    if (is_file($viewFile)) {
+        require $viewFile;
+    } else {
+        http_response_code(500);
+        echo '<div class="panel" style="border-left:4px solid var(--bad)">'
+           . '<h2 style="margin-top:0">This screen could not be loaded</h2>'
+           . '<p class="muted">The page <code>' . htmlspecialchars((string)$name, ENT_QUOTES) . '</code> is not available on the server. '
+           . 'This usually means the app files are out of date — a full redeploy of the application usually fixes it.</p>'
+           . '<p style="margin-bottom:0"><a class="btn" href="/">← Back to dashboard</a></p></div>';
+    }
     require __DIR__ . '/views/layout_bottom.php';
     echo csrf_stamp_forms((string)ob_get_clean());
 }
