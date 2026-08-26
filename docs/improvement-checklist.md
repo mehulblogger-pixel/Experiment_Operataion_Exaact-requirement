@@ -29,7 +29,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 07 | Vetting / Technical Review / Approval | P0 | ✅ done & pushed | 2026-08-24 |
 | 08 | Report Release / Issue | P0 | ✅ done & pushed | 2026-08-24 |
 | 09 | Invoicing | P0 | ✅ done & pushed | 2026-08-25 |
-| 10 | Client Portal | P0 | ⬜ | — |
+| 10 | Client Portal | P0 | 📝 edge-cases drafted (awaiting go) | — |
 | 11 | Vendor / Supplier-Inspector Centre | P1 | ⬜ | — |
 | 12 | NCR | P1 | ✅ done & pushed | 2026-08-24 |
 | 13 | CAPA | P2 | ✅ done & pushed | 2026-08-24 |
