@@ -52,7 +52,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 30 | Vouchers / Expenses | P1 | ✅ done & pushed | 2026-08-24 |
 | 31 | Attendance / Reconciliation | P1 | ✅ done & pushed | 2026-08-24 |
 | 32 | Profitability (canonical engine) | P0 | ⬜ | — |
-| 33 | Overheads | P1 | ⬜ | — |
+| 33 | Overheads | P1 | ✅ done & pushed | 2026-08-26 |
 | 34 | Dashboards / Command Centre | P2 | ⬜ | — |
 | 35 | Recruitment / Workforce | P1 | ⬜ | — |
 | 36 | Licensing / SaaS Admin | P1 | ⬜ | — |
@@ -79,6 +79,30 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 33 — Overheads · 2026-08-26
+**Decision:** (A) overhead-recovery reconciliation (pool vs recovered) + first overhead-engine tests.
+Reconciling/retiring the two overhead models and the OVERHEAD-head vs contingency% double-count
+deferred (deliberate finance decisions).
+**Found:** two parallel overhead models that never meet — the per-job oh%/contingency% (Model A,
+canonical `job_profit`/`boss_profit`) and the real monthly `office_expenses` pool allocated to SBUs
+(Model B) — and the actual pool was **never reconciled against the overhead recovered** through the
+oh%. No under/over-recovery figure existed. The real-cost engine had **zero tests**.
+**Added (additive, read-only, one canonical engine):**
+- `overhead_recovery($officeId,$yr,$mon)` — pool (`office_expense_total`) vs recovered (sum of the
+  `overhead`+`contingency` lines the canonical `job_profit` already loads onto the office's jobs that
+  month) vs variance. **No second cost formula** — variance is subtraction, like `pc_estimate_vs_actual`.
+- An **"Overhead recovery"** panel on the `/cost-run` screen (per office+month, salary-gated).
+- **Confidentiality:** recovered is salary-derived → withheld from a viewer without `can_see_salary()`;
+  the pool is always shown.
+- The **first tests** over the overhead engine.
+**Preserved (verified by tests):** `job_profit`/`boss_profit`, the oh%/contingency% settings, the cost
+run, `office_expenses`, the SBU P&L — all unchanged. No new permission (reuses the cost-run salary
+gate); no schema change; no second cost formula; nothing deleted. Makes the two-model divergence
+visible for the first time.
+**Edge cases:** `docs/edge-cases/33-overheads.md`.
+**Tests:** `tests/test_module33_overheads.php` (14 assertions). Suite 2895 passed / 3 pre-existing
+baseline failures.
 
 ### Module 01 — Masters (editable-lookup engine) · 2026-08-26
 **Decision:** (A) lookup usage counter + dangling/duplicate integrity detectors + delete warning.

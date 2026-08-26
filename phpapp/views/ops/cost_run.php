@@ -69,6 +69,37 @@ $basisLabel = [
   <div class="kpi"><span class="k-lab"><?= e(TH('office')) ?> costs</span><span class="k-val">₹<?= number_format($byKind['OFFICE_EXPENSE'], 2) ?></span></div>
 </div>
 
+<?php // Module 33 — overhead recovery: did the per-job oh% recover the actual office
+      // overhead pool this month? Pool from office_expenses; recovered from the canonical
+      // engine (job_profit oh% + contingency). Recovered is salary-derived → salary-gated. ?>
+<?php $ovr = $ovhRecovery ?? null; if ($ovr): ?>
+<div class="panel" style="<?= ($ovr['salary_visible'] && $ovr['variance'] !== null) ? 'border-left:3px solid var(--' . ($ovr['variance'] >= 0 ? 'ok' : 'bad') . ')' : '' ?>">
+  <h3 class="tab-sub" style="margin-top:0">Overhead recovery — did this month's work cover the office overhead?</h3>
+  <p class="sub" style="margin-top:0">The actual overhead pool entered for the month, against the overhead the jobs recovered through
+    the per-job overhead % (the same figures as the profitability screen). Recovered figures come from salaries, so they show only to those who may see cost.</p>
+  <div class="tbl-scroll" style="overflow-x:auto">
+  <table class="dt">
+    <tbody>
+      <tr><td><b>Overhead pool entered</b> <span class="muted" style="font-size:11px">(office_expenses)</span></td>
+        <td class="num">₹<?= number_format($ovr['pool'], 2) ?></td></tr>
+      <tr><td><b>Overhead recovered</b> <span class="muted" style="font-size:11px">(oh% + contingency across <?= (int)$ovr['jobs'] ?> job(s))</span></td>
+        <td class="num"><?= $ovr['recovered'] === null ? '<span class="muted">salary hidden</span>' : '₹' . number_format($ovr['recovered'], 2) ?></td></tr>
+      <?php if ($ovr['variance'] !== null): ?>
+      <tr style="font-weight:600;border-top:2px solid var(--line)">
+        <td><?= $ovr['variance'] >= 0 ? '✓ Over-recovered' : '⚠ Under-recovered' ?> (recovered − pool)</td>
+        <td class="num <?= $ovr['variance'] >= 0 ? 'up' : 'down' ?>">₹<?= number_format($ovr['variance'], 2) ?><?= $ovr['pct'] !== null ? ' <span class="muted" style="font-weight:400">(' . ($ovr['pct'] >= 0 ? '+' : '') . e($ovr['pct']) . '%)</span>' : '' ?></td></tr>
+      <?php endif; ?>
+    </tbody>
+  </table></div>
+  <?php if ($ovr['variance'] !== null && $ovr['pool'] > 0): ?>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">
+      <?= $ovr['variance'] < 0
+        ? 'The jobs this month recovered less overhead than the branch actually spent — the per-job overhead % may be set too low, or the month was quiet. This is not pushed onto any job; it is here to see.'
+        : 'The jobs recovered at least the overhead the branch spent this month.' ?></p>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php if ($preview['warnings']): ?>
 <div class="panel">
   <h3 class="tab-sub">Worth looking at before you close the month</h3>

@@ -188,6 +188,40 @@ function office_expense_total($officeId, $yr, $mon) {
                           [(int)$officeId, (int)$yr, (int)$mon]);
 }
 
+// Module 33 — overhead RECOVERY: the office's actual overhead pool entered for the
+// month, against the overhead the ONE canonical engine (job_profit) loaded onto
+// that office's jobs in the month via the per-job oh% + contingency%. No second
+// cost formula — the recovered figure is a sum of job_profit lines; the variance is
+// subtraction, exactly like the estimate-vs-actual reconciliation in project costing.
+// Read-only. The recovered figure is salary-derived (from CTC), so it is withheld
+// from a viewer without can_see_salary(); the pool (office running costs, salary is
+// forbidden as an expense head) is not.
+function overhead_recovery($officeId, $yr, $mon) {
+    costing_migrate();
+    $officeId = (int)$officeId; $yr = (int)$yr; $mon = (int)$mon;
+    $ym = sprintf('%04d-%02d', $yr, $mon);
+    $pool = (float)office_expense_total($officeId, $yr, $mon);
+    $seeSal = function_exists('can_see_salary') ? can_see_salary() : false;
+    $recovered = null; $variance = null; $pct = null; $n = 0;
+    if ($seeSal && function_exists('job_profit')) {
+        $recovered = 0.0;
+        $jobs = ops_all("SELECT * FROM jobs WHERE executing_office_id=? AND
+            substr(COALESCE(NULLIF(inspection_start_date,''), NULLIF(scheduled_date,''), created_at),1,7)=?",
+            [$officeId, $ym]) ?: [];
+        foreach ($jobs as $j) {
+            $p = job_profit($j, $officeId);
+            $recovered += (float)($p['overhead'] ?? 0) + (float)($p['contingency'] ?? 0);
+            $n++;
+        }
+        $recovered = round($recovered, 2);
+        $variance = round($recovered - $pool, 2);          // positive = over-recovered
+        $pct = $pool > 0 ? round($variance / $pool * 100, 1) : null;
+    }
+    return ['month' => $ym, 'office_id' => $officeId, 'pool' => round($pool, 2),
+            'recovered' => $recovered, 'variance' => $variance, 'pct' => $pct,
+            'jobs' => $n, 'salary_visible' => $seeSal];
+}
+
 // Save a whole month in one go: [head_id => amount]. A blank or zero amount
 // removes the row rather than storing a zero, so "nothing spent" and "not yet
 // entered" do not look the same on the screen.
@@ -807,6 +841,7 @@ function ops_cost_run($method) {
         'preview'=>$preview, 'byKind'=>$kinds, 'bySbu'=>$bySbu,
         'run'=>['status'=>$status['status'] ?? '', 'run_by'=>$status['run_by'] ?? '', 'run_at'=>$status['run_at'] ?? ''],
         'sbuLabels'=>lk_options_or('sbu', OPS_SBUS), 'bossCodes'=>$bossCodes, 'canRun'=>$canRun,
+        'ovhRecovery'=>$sel ? overhead_recovery($sel, $yr, $mon) : null,   // Module 33
     ]);
 }
 
