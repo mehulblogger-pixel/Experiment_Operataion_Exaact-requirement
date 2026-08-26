@@ -385,6 +385,9 @@
   <div style="margin-top:16px;"><button class="btn" type="submit">Save settings</button></div>
 </form>
 
+<?php // Phase 2 §47 — governance reference: what the behavioural settings are for and what they affect. ?>
+<?php if (function_exists('setting_meta_render') && (is_admin_level() || is_master())) setting_meta_render(); ?>
+
 <?php if (is_master()): ?>
 <div class="settings-cards">
 <?php if (function_exists('lk_console_allowed') && lk_console_allowed()): ?>

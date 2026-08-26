@@ -75,6 +75,16 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — §47 settings governance registry (read-only).** Module 14 already audits WHO changed
+  WHICH setting; the gap was the WHY / WHAT-IT-AFFECTS an approver needs. Added `lib/settingmeta.php`:
+  `setting_meta_all()` — a curated registry over the ~19 behavioural settings (report gates, financial
+  norms, lifecycle timers, check-in controls, licensing) giving each a purpose, the modules it affects,
+  whether it applies live or only forward, and an impact level; `setting_meta_render()` shows a governance
+  reference panel on the settings screen (admin-gated). Read-only — defines no new setting, changes no
+  behaviour; cosmetic/seed keys deliberately excluded. Test `test_p2_setting_meta.php` (16 assertions:
+  coverage, well-formedness, live-vs-forward marking, exclusions, render + wiring). Suite **3531 passed,
+  0 failed**.
+
 - **2026-08-26 — §29 recognised-revenue reconciliation (read-only).** The legacy per-job invoice
   snapshot (`jobs.invoice_amount`, read by MIS/boss_profit) and the books ledger
   (`invoices→invoice_lines.job_id`) coexist (the §80 dual-truth) and can drift. Added `lib/revrecon.php`:
