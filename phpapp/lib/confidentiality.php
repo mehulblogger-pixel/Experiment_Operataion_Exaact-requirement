@@ -180,6 +180,43 @@ function conf_nda_obligation_ends($n) {
     return $sur > 0 ? date('Y-m-d', strtotime($to . ' +' . $sur . ' months')) : $to;
 }
 
+// Module 27 — how many confidentiality breaches are still open (not closed), for
+// the compliance readiness board. Read-only.
+function conf_open_breach_count() {
+    conf_migrate();
+    return (int)conf_try(fn() => ops_val("SELECT COUNT(*) FROM confidentiality_breaches WHERE status <> 'CLOSED'"), 0);
+}
+
+// Module 27 — the §4.2 confidentiality picture FOR A JOB: does the person doing
+// the work have a current confidentiality undertaking, and what is the client's
+// own NDA obligation on this work? Read-only — it surfaces the existing
+// undertaking/NDA registers at the point of work, it blocks nothing, and it shows
+// only this job's own inspector and client (never another client's terms).
+function conf_job_status($job) {
+    conf_migrate();
+    $out = ['inspector' => null, 'nda' => null];
+    $insId = (int)($job['inspector_id'] ?? 0);
+    if ($insId) {
+        $mine = conf_undertakings($insId, 'INSPECTOR');
+        $live = null; foreach ($mine as $u) if (conf_undertaking_live($u)) { $live = $u; break; }
+        $lapsed = (!$live && $mine) ? $mine[0] : null;
+        $out['inspector'] = ['state' => $live ? 'ok' : ($lapsed ? 'lapsed' : 'none'),
+                             'live' => $live, 'lapsed' => $lapsed];
+    }
+    $clientId = (int)($job['client_id'] ?? 0);
+    if (!$clientId && !empty($job['call_id']))
+        $clientId = (int)conf_try(fn() => ops_val("SELECT client_id FROM calls WHERE id=?", [(int)$job['call_id']]), 0);
+    if ($clientId) {
+        $ndas = conf_ndas($clientId);
+        if ($ndas) {
+            $n = $ndas[0];
+            $out['nda'] = ['ends' => conf_nda_obligation_ends($n), 'title' => (string)($n['title'] ?? ''),
+                           'name' => (string)($n['display_name'] ?: $n['legal_name'] ?? '')];
+        }
+    }
+    return $out;
+}
+
 // ---- Breaches ---------------------------------------------------------------
 function conf_breach_ref_next() {
     $y = date('Y');

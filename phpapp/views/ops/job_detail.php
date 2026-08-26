@@ -441,6 +441,35 @@
   if (!$site && !empty($clientInfo['addresses'])) $site = $clientInfo['addresses'][0];
   $siteTxt = $addrLine($site);
 ?>
+<?php // ---- Module 27: §4.2 confidentiality at the point of work — does the assigned
+      // person have a current undertaking, and what is the client's NDA obligation?
+      // Read-only; blocks nothing. Shown to managers/coordinators, not field inspectors. ?>
+<?php if (!$fieldInspector && function_exists('conf_job_status') && function_exists('conf_can_view') && conf_can_view()):
+    $cf = conf_job_status($job); $ci = $cf['inspector']; $nda = $cf['nda'];
+    if ($ci || $nda): ?>
+<div class="panel" data-tab="Overview" style="border-left:3px solid var(--<?= ($ci && $ci['state']!=='ok') ? 'warn' : 'line' ?>)">
+  <h3 class="tab-sub" style="margin-top:0">Confidentiality (§4.2)</h3>
+  <?php if ($ci): ?>
+    <div style="margin:2px 0">
+      <?php if ($ci['state']==='ok'): ?>
+        <span class="pill p-ok">Undertaking current</span>
+        <span class="muted" style="font-size:12.5px">signed <?= e(fdate($ci['live']['signed_on'])) ?><?= trim((string)$ci['live']['valid_to'])!=='' ? ', valid to '.e(fdate($ci['live']['valid_to'])) : '' ?></span>
+      <?php elseif ($ci['state']==='lapsed'): ?>
+        <span class="pill p-warn">Undertaking lapsed</span>
+        <span class="muted" style="font-size:12.5px">last signed <?= e(fdate($ci['lapsed']['signed_on'])) ?> — <a href="/confidentiality">renew it</a></span>
+      <?php else: ?>
+        <span class="pill p-bad">No confidentiality undertaking on file</span>
+        <span class="muted" style="font-size:12.5px">for the assigned <?= e(Tl('inspector')) ?> — <a href="/confidentiality">record one</a></span>
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
+  <?php if ($nda && trim((string)$nda['ends'])!==''): ?>
+    <div style="margin:4px 0;font-size:12.5px" class="muted">🔒 <?= e(TH('client')) ?> NDA<?= $nda['title']!=='' ? ' ('.e($nda['title']).')' : '' ?> — obligation runs to <strong><?= e(fdate($nda['ends'])) ?></strong>, including after this <?= e(Tl('job')) ?> closes.</div>
+  <?php endif; ?>
+  <p class="muted" style="font-size:11.5px;margin:6px 0 0">Advisory — the record of who committed to confidentiality for this work; nothing here blocks the <?= e(Tl('job')) ?>.</p>
+</div>
+<?php endif; endif; ?>
+
 <div class="panel" data-tab="Overview">
   <h3 class="tab-sub" style="margin-top:0">Who to contact, and where to go</h3>
   <div class="panel-split">

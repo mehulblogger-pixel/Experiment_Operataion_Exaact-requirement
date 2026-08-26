@@ -46,7 +46,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 24 | Competence (Competence 360) | P0 | ✅ done & pushed | 2026-08-24 |
 | 25 | Impartiality | P0 | ✅ done & pushed | 2026-08-24 |
 | 26 | Identity | P0 | ✅ done & pushed | 2026-08-26 |
-| 27 | Confidentiality | P0 | ⬜ | — |
+| 27 | Confidentiality | P0 | ✅ done & pushed | 2026-08-26 |
 | 28 | Audits | P2 | ⬜ | — |
 | 29 | Data Control / Governance | P0 | ⬜ | — |
 | 30 | Vouchers / Expenses | P1 | ✅ done & pushed | 2026-08-24 |
@@ -79,6 +79,33 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 27 — Confidentiality (ISO 17020 §4.2) · 2026-08-26
+**Decision:** (A) connect the governance pillar to the work + the readiness board; a hard allocation
+gate and a per-job acknowledgement write-stamp deferred (would change who-can-do-what / add a write
+path).
+**Found:** confidentiality has two pillars that never meet — a complete governance pillar
+(`lib/confidentiality.php`: undertakings, client NDAs, a breach register auto-raising a §4.2 NCR) and
+a strong runtime disclosure gate (`cvp_visibility_sql`, fail-closed). But the undertaking an inspector
+signs was **never surfaced at the job**, `conf_readiness()` was **never on the compliance board**, and
+the whole governance pillar was **untested**.
+**Added (additive, read-only, no hard control):**
+- `conf_job_status($job)` — the §4.2 picture for a job: the assigned inspector's undertaking state
+  (ok / lapsed / none) + the client's own NDA obligation-end. Shows only this job's inspector and
+  client; blocks nothing.
+- `conf_open_breach_count()` — open confidentiality breaches, for the board.
+- A read-only **Confidentiality (§4.2)** panel on the job Overview (management/assessor evidence, not
+  field inspectors), explicitly advisory.
+- **`conf_readiness()` registered on the compliance readiness board** (`lib/compliance.php`), beside
+  impartiality and competence — §4.2 is finally visible where accreditation posture is reviewed.
+- The **first tests** for the governance pillar (undertaking in-force logic, coverage states, NDA
+  obligation math, job status, breach count).
+**Preserved (verified by tests):** the disclosure gate, the undertaking/NDA/breach registers, the
+impartiality gate, and the rest of the compliance board — all unchanged. No new permission; no schema
+change; no hard control; nothing deleted; the board row is additive beside impartiality.
+**Edge cases:** `docs/edge-cases/27-confidentiality.md`.
+**Tests:** `tests/test_module27_confidentiality.php` (21 assertions). Suite 2784 passed / 3
+pre-existing baseline failures.
 
 ### Module 26 — Identity (DPDP documents) · 2026-08-26
 **Decision:** (A) a company-wide DPO access-review surface + the first safeguard tests. Sealing the

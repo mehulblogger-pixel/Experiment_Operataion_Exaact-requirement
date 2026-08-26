@@ -404,6 +404,20 @@ function compliance_status() {
             $bad ? 'Open the impartiality register. An undecided threat stops the work it touches from being allocated, so this is costing you ' . Tlp('job') . ' as well as marks.'
                  : ($ir['declaration_due'] ? 'Chase the outstanding declarations. A statement made once and never renewed is not a current statement.' : ''));
     }
+    // Module 27 — §4.2 confidentiality was invisible on the readiness board, though
+    // the undertaking / NDA / breach registers all exist. Surface it beside its peers.
+    if (function_exists('conf_readiness')) {
+        $cf = conf_readiness();
+        $breaches = function_exists('conf_open_breach_count') ? conf_open_breach_count() : 0;
+        $add((accreditation_std_name() . ' §4.2'), 'Everyone doing the work has a current confidentiality undertaking',
+            ($breaches > 0 || $cf['none'] > 0) ? 'bad' : ($cf['lapsed'] ? 'warn' : 'ok'),
+            $cf['covered'] . ' of ' . $cf['people'] . ' covered; ' . $cf['lapsed'] . ' lapsed, '
+            . $cf['none'] . ' with none on file'
+            . ($breaches > 0 ? '; ' . $breaches . ' open confidentiality breach(es)' : '') . '.',
+            ($cf['none'] || $cf['lapsed'])
+                ? 'Open the confidentiality register. §4.2 wants a signed, current commitment from everyone with access to client information.'
+                : ($breaches > 0 ? 'Close out the open confidentiality breach(es) — each carries a §4.2 nonconformity.' : ''));
+    }
     if (function_exists('competence_readiness')) {
         $cr = competence_readiness();
         $add((accreditation_std_name() . ' §' . accreditation_clause_or('competence')), 'People are authorised for the work they are given',
