@@ -152,6 +152,11 @@ function identity_migrate() {
         redacted_at VARCHAR(30) DEFAULT '', redacted_by VARCHAR(150) DEFAULT '',
         note VARCHAR(400) DEFAULT '',
         uploaded_by VARCHAR(150) DEFAULT '', uploaded_at VARCHAR(30) DEFAULT '')");
+    // Phase 2 §53 — the full document number, encrypted at rest (VARCHAR(80) is too
+    // small for ciphertext, and file_data (LONGTEXT) holds the encrypted scan). The
+    // legacy plaintext doc_number column is kept for backward compatibility and is
+    // blanked as each row is migrated.
+    if (function_exists('ensure_column')) ensure_column('person_documents', 'doc_number_enc', 'TEXT');
     // Who looked, when, from where, and — where it matters — why.
     $pdo->exec("CREATE TABLE IF NOT EXISTS person_document_access (
         id $pk, document_id INT, person_id INT,
@@ -163,6 +168,50 @@ function identity_migrate() {
 function iddoc_missing_table(Throwable $e) {
     $m = $e->getMessage();
     return stripos($m, 'no such table') !== false || stripos($m, "doesn't exist") !== false;
+}
+
+// Phase 2 §53 — the full document number for a row: the encrypted column decrypted
+// when present, else the legacy plaintext. One choke point, so every reader is
+// consistent and no caller has to know about encryption.
+function iddoc_number_read($row) {
+    $enc = (string)($row['doc_number_enc'] ?? '');
+    if ($enc !== '' && function_exists('app_decrypt')) return app_decrypt($enc);
+    return (string)($row['doc_number'] ?? '');
+}
+// The raw scanned-document bytes for a row: file_data is stored base64, optionally
+// wrapped in encryption. Decrypt (no-op for legacy) then base64-decode.
+function iddoc_file_bytes($row) {
+    $fd = (string)($row['file_data'] ?? '');
+    if ($fd === '') return '';
+    if (function_exists('app_decrypt')) $fd = app_decrypt($fd);
+    return base64_decode($fd);
+}
+// Encrypt any identity documents still at rest in plaintext, once a key is set. Uses
+// the encrypted column for the number and blanks the legacy plaintext. Idempotent and
+// bounded; safe to run nightly. No-op when APP_ENCRYPTION_KEY is not configured.
+function iddoc_encrypt_backfill($limit = 200) {
+    if (!function_exists('app_enc_available') || !app_enc_available()) return 0;
+    $n = 0;
+    try {
+        $rows = ops_all("SELECT id, doc_number, file_data FROM person_documents
+                         WHERE (COALESCE(doc_number,'') <> '' OR (COALESCE(file_data,'') <> '' AND file_data NOT LIKE 'enc:v1:%'))
+                         LIMIT " . max(1, (int)$limit)) ?: [];
+        foreach ($rows as $r) {
+            $encNum = ((string)($r['doc_number'] ?? '') !== '') ? app_encrypt((string)$r['doc_number']) : '';
+            $fd = (string)($r['file_data'] ?? '');
+            $encFd = ($fd !== '' && !app_is_encrypted($fd)) ? app_encrypt($fd) : $fd;
+            db()->prepare("UPDATE person_documents SET doc_number_enc = CASE WHEN ?<>'' THEN ? ELSE doc_number_enc END, doc_number='', file_data=? WHERE id=?")
+                ->execute([$encNum, $encNum, $encFd, (int)$r['id']]);
+            $n++;
+        }
+    } catch (Throwable $e) {}
+    return $n;
+}
+function iddoc_plaintext_count() {
+    try {
+        return (int)ops_val("SELECT COUNT(*) FROM person_documents
+            WHERE COALESCE(doc_number,'') <> '' OR (COALESCE(file_data,'') <> '' AND file_data NOT LIKE 'enc:v1:%')");
+    } catch (Throwable $e) { return 0; }
 }
 
 // ---- The company's own answers ---------------------------------------------
@@ -348,17 +397,25 @@ function iddoc_add($personId, $post, $file, $kind = 'INSPECTOR') {
     $expires = (string)($post['expires_on'] ?? '');
     if ($expires === '' && iddoc_kind_expires($docKind))
         return 'Enter the expiry date. Without it this copy can never be retired on time.';
+    // Phase 2 §53 — encrypt at rest when a key is configured. The number goes into the
+    // encrypted column (plaintext left blank); number_last4 stays plaintext for masking;
+    // the scan is base64 then encrypted. With no key the behaviour is exactly as before.
+    $encOn   = function_exists('app_enc_available') && app_enc_available();
+    $numPlain = $encOn ? '' : substr($number, 0, 80);
+    $numEnc   = ($encOn && $number !== '') ? app_encrypt($number) : '';
+    $fileB64  = $bytes !== '' ? base64_encode($bytes) : '';
+    $fileStore = ($encOn && $fileB64 !== '') ? app_encrypt($fileB64) : $fileB64;
     db()->prepare("INSERT INTO person_documents
-        (person_kind,person_id,doc_kind,doc_number,number_last4,issuing_authority,issuing_country,
+        (person_kind,person_id,doc_kind,doc_number,doc_number_enc,number_last4,issuing_authority,issuing_country,
          issued_on,expires_on,file_name,mime,file_data,purpose,consent_on,consent_note,retain_until,note,uploaded_by,uploaded_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-        ->execute([$kind, (int)$personId, $docKind, substr($number, 0, 80), substr($number, -4),
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+        ->execute([$kind, (int)$personId, $docKind, $numPlain, $numEnc, substr($number, -4),
                    substr(trim((string)($post['issuing_authority'] ?? '')), 0, 150),
                    substr(trim((string)($post['issuing_country'] ?? '')), 0, 80),
                    (string)($post['issued_on'] ?? ''), $expires,
                    $bytes !== '' ? substr((string)($file['name'] ?? 'document'), 0, 255) : '',
                    $bytes !== '' ? (string)($file['type'] ?? '') : '',
-                   $bytes !== '' ? base64_encode($bytes) : '',
+                   $fileStore,
                    substr(iddoc_purpose(), 0, 400),
                    (string)($post['consent_on'] ?? date('Y-m-d')),
                    substr(trim((string)($post['consent_note'] ?? '')), 0, 400),
@@ -375,7 +432,7 @@ function iddoc_add($personId, $post, $file, $kind = 'INSPECTOR') {
 function iddoc_redact($id, $why = 'Retention period reached') {
     $d = iddoc_row($id);
     if (!$d || !empty($d['redacted_at'])) return false;
-    db()->prepare("UPDATE person_documents SET doc_number='', file_data=NULL, file_name='', mime='',
+    db()->prepare("UPDATE person_documents SET doc_number='', doc_number_enc='', file_data=NULL, file_name='', mime='',
                    redacted_at=?, redacted_by=? WHERE id=?")
         ->execute([date('c'), user_name(current_user()) ?: 'system', (int)$id]);
     iddoc_log((int)$id, (int)$d['person_id'], 'REDACT', $why);
@@ -526,7 +583,7 @@ function ops_identity($route, $method) {
         }
         iddoc_log((int)$d['id'], (int)$d['person_id'], 'DOWNLOAD',
                   trim((string)($_GET['why'] ?? '')) ?: 'Not stated');
-        send_uploaded_file(base64_decode((string)$d['file_data']),
+        send_uploaded_file(iddoc_file_bytes($d),
                            $d['file_name'] ?: 'document', $d['mime'] ?: 'application/octet-stream');
         return true;
     }
@@ -554,7 +611,7 @@ function ops_identity($route, $method) {
             redirect('/identity?i=' . (int)$d['person_id']);
         }
         iddoc_log((int)$d['id'], (int)$d['person_id'], 'REVEAL', $reason);
-        iddoc_flash_number((string)$d['doc_number'], (int)$d['id']);
+        iddoc_flash_number(iddoc_number_read($d), (int)$d['id']);
         redirect('/identity?i=' . (int)$d['person_id'] . '&reveal=' . (int)$d['id']);
     }
 

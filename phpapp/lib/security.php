@@ -661,6 +661,36 @@ function user_reactivate($id) {
     return true;
 }
 
+// ---- Phase 2 §53 — application-level encryption at rest -------------------
+// A small AES-256-GCM helper for the few genuinely sensitive fields (identity /
+// tax / government numbers and scanned documents). The key comes ONLY from the
+// APP_ENCRYPTION_KEY environment variable, so it is not in the database — a DB
+// dump alone cannot decrypt. Ciphertext is self-describing (an "enc:v1:" prefix)
+// so encrypted and legacy-plaintext values coexist during migration, and every
+// path degrades safely: with no key set the app behaves exactly as before
+// (plaintext), and a value that cannot be decrypted is returned untouched.
+const APP_ENC_PREFIX = 'enc:v1:';
+function app_enc_key() { $k = (string)getenv('APP_ENCRYPTION_KEY'); return trim($k); }
+function app_enc_available() { return app_enc_key() !== '' && function_exists('openssl_encrypt'); }
+function app_is_encrypted($v) { return is_string($v) && strncmp($v, APP_ENC_PREFIX, strlen(APP_ENC_PREFIX)) === 0; }
+function app_encrypt($plain) {
+    if ($plain === null || $plain === '' || app_is_encrypted($plain) || !app_enc_available()) return $plain;
+    $key = hash('sha256', app_enc_key(), true);           // 32-byte key
+    $iv  = random_bytes(12); $tag = '';
+    $ct  = openssl_encrypt((string)$plain, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+    if ($ct === false) return $plain;                     // never lose data — keep plaintext on failure
+    return APP_ENC_PREFIX . base64_encode($iv . $tag . $ct);
+}
+function app_decrypt($stored) {
+    if (!app_is_encrypted($stored)) return $stored;       // legacy plaintext — unchanged
+    if (!app_enc_available()) return $stored;             // no key here — cannot decrypt; return as-is
+    $raw = base64_decode(substr((string)$stored, strlen(APP_ENC_PREFIX)), true);
+    if ($raw === false || strlen($raw) < 28) return $stored;
+    $iv = substr($raw, 0, 12); $tag = substr($raw, 12, 16); $ct = substr($raw, 28);
+    $pt = openssl_decrypt($ct, 'aes-256-gcm', hash('sha256', app_enc_key(), true), OPENSSL_RAW_DATA, $iv, $tag);
+    return $pt === false ? $stored : $pt;
+}
+
 function security_migrate() {
     static $done = false; if ($done) return; $done = true;
     ensure_column('users', 'deactivated_at', "VARCHAR(30) DEFAULT ''");

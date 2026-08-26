@@ -370,3 +370,10 @@ if (function_exists('jobs_backfill_cost_basis')) {
     try { $bf = jobs_backfill_cost_basis(); if ($bf) echo "Job cost bases frozen: $bf\n"; }
     catch (Throwable $e) { echo "Cost-basis backfill: failed — " . $e->getMessage() . "\n"; }
 }
+
+// Phase 2 §53 — encrypt any identity documents still at rest in plaintext, once
+// APP_ENCRYPTION_KEY is configured. No-op when the key is not set. Bounded per run.
+if (function_exists('iddoc_encrypt_backfill')) {
+    try { $ie = iddoc_encrypt_backfill(); if ($ie) echo "Identity documents encrypted: $ie\n"; }
+    catch (Throwable $e) { echo "Identity encryption: failed — " . $e->getMessage() . "\n"; }
+}

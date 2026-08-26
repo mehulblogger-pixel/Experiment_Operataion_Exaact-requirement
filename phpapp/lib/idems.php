@@ -10255,6 +10255,16 @@ function idems_compliance_checks() {
     // failing and needs attention (the seal is what /verify uses to prove integrity).
     if (function_exists('idems_seal_failed_count')) { $sf = idems_seal_failed_count();
         if ($sf) $out[] = ['sev'=>'high', 'text'=>$sf . ' issued report(s) could not be content-sealed — verification cannot prove them unaltered until re-sealed.', 'link'=>'/documents']; }
+    // Phase 2 §53 — identity/tax/government numbers and scans held in plaintext at rest.
+    if (function_exists('iddoc_plaintext_count')) { $pt = iddoc_plaintext_count();
+        if ($pt > 0) {
+            $keyed = function_exists('app_enc_available') && app_enc_available();
+            $out[] = ['sev' => $keyed ? 'medium' : 'high',
+                      'text' => $pt . ' identity document(s) are stored unencrypted at rest — '
+                              . ($keyed ? 'they will be encrypted on the next nightly run.'
+                                        : 'set the APP_ENCRYPTION_KEY environment variable to encrypt them.'),
+                      'link' => '/iddoc-access']; }
+    }
     return $out;
 }
 // Module 42 — Change control. There is no single change-control register: each controlled
