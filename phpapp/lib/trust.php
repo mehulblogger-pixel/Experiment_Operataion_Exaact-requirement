@@ -903,6 +903,8 @@ function ops_trust($route, $method) {
             'rows' => $rows, 'docId' => $docId,
             'chain' => chain_verify($docId),
             'summary' => trust_readiness(),
+            // §68 — evidence reused across jobs, shown only on the whole-queue view.
+            'reuse' => $docId ? [] : evidence_reuse_groups(30),
         ]);
         return true;
     }
@@ -936,6 +938,57 @@ function ops_trust($route, $method) {
     return true;
 }
 
+// ============================================================================
+//  §68 — evidence reuse across jobs
+//
+//  De-duplication at upload only catches the SAME photo used twice in the SAME
+//  report. The stronger signal is the same bytes (same sha1) appearing under two
+//  DIFFERENT jobs — a photo carried over from one inspection to another. It is
+//  not proof of anything on its own (a genuine re-shoot, a logo, a form scan),
+//  so this only surfaces it for a human to look at; it never blocks or deletes.
+//  Read-only, and it reuses the sha1 already stored on every file.
+// ============================================================================
+function evidence_reuse_groups($limit = 50) {
+    // sha1 values that appear under more than one distinct job.
+    $rows = trust_try(fn() => ops_all(
+        "SELECT f.sha1 AS sha1, COUNT(DISTINCT d.job_id) AS jobs, COUNT(*) AS files
+           FROM report_files f
+           JOIN report_docs d ON d.id = f.report_doc_id
+          WHERE COALESCE(f.sha1,'') <> '' AND COALESCE(d.job_id,0) > 0
+                AND COALESCE(d.deleted,0) = 0
+          GROUP BY f.sha1
+         HAVING COUNT(DISTINCT d.job_id) > 1
+          ORDER BY jobs DESC, files DESC
+          LIMIT " . (int)$limit, []), []);
+    $groups = [];
+    foreach ($rows as $r) {
+        $members = trust_try(fn() => ops_all(
+            "SELECT f.id AS file_id, f.file_name, f.report_doc_id, d.job_id, d.irn, f.created_by, f.taken_at
+               FROM report_files f
+               JOIN report_docs d ON d.id = f.report_doc_id
+              WHERE f.sha1 = ? AND COALESCE(d.job_id,0) > 0 AND COALESCE(d.deleted,0) = 0
+              ORDER BY d.job_id", [(string)$r['sha1']]), []);
+        $groups[] = ['sha1' => (string)$r['sha1'], 'jobs' => (int)$r['jobs'],
+                     'files' => (int)$r['files'], 'members' => $members];
+    }
+    return $groups;
+}
+
+// How many distinct pieces of evidence are shared across jobs (for the integrity
+// check and the readiness surface). One count, cheap, no member load.
+function evidence_reuse_count() {
+    return (int)trust_try(fn() => ops_val(
+        "SELECT COUNT(*) FROM (
+            SELECT f.sha1
+              FROM report_files f
+              JOIN report_docs d ON d.id = f.report_doc_id
+             WHERE COALESCE(f.sha1,'') <> '' AND COALESCE(d.job_id,0) > 0
+                   AND COALESCE(d.deleted,0) = 0
+             GROUP BY f.sha1
+            HAVING COUNT(DISTINCT d.job_id) > 1
+         ) t", []), 0);
+}
+
 function trust_readiness() {
     $tot = (int)trust_try(fn() => ops_val("SELECT COUNT(*) FROM report_files WHERE kind='photo'"), 0);
     $exif = (int)trust_try(fn() => ops_val("SELECT COUNT(*) FROM report_files WHERE geo_source='EXIF'"), 0);
@@ -944,5 +997,6 @@ function trust_readiness() {
     $visits = (int)trust_try(fn() => ops_val("SELECT COUNT(*) FROM site_visits"), 0);
     return ['photos' => $tot, 'on_site' => $exif, 'pending' => $pending,
             'chain' => $chain, 'visits' => $visits,
+            'reuse' => evidence_reuse_count(),   // §68 — evidence shared across jobs
             'pct' => $tot ? (int)round($exif / $tot * 100) : 0];
 }

@@ -75,6 +75,14 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — §68 evidence reuse across jobs.** Upload de-duplication only catches the same photo
+  twice in ONE report (`report_doc_id`+`sha1`). Added `evidence_reuse_groups()`/`evidence_reuse_count()`
+  (`lib/trust.php`): the same bytes under two DIFFERENT jobs — a photo carried from one inspection to
+  another — surfaced on the evidence-review screen as an **advisory** panel (logos/form-scans/re-shoots
+  are legitimate, so never a hard block or delete), plus a count on the readiness KPIs. Reuses the sha1
+  already stored; read-only. Test `test_p2_evidence_reuse.php` (9 assertions: cross-job counts, same-job
+  does not, deleted drops out, wiring). Suite **3434 passed, 0 failed**.
+
 - **2026-08-26 — W5 CONSOLIDATION batch (§23/24, §46, §39) + CANONICAL MODEL (§79/80).**
   Non-destructive convergence layers over the existing modules (no table merges, nothing deleted):
   - **§23/24** canonical person — `lib/party.php` resolves one human across the six identity stores

@@ -44,6 +44,30 @@
 </div>
 <?php endif; ?>
 
+<?php // §68 — the same photo (same bytes) appearing under more than one job. Advisory, not proof. ?>
+<?php if (!empty($reuse)): ?>
+<div class="panel" style="border-left:4px solid var(--warn,#d08700)">
+  <h3 class="tab-sub" style="margin-top:0">Evidence used on more than one <?= Tl('job') ?>
+    <span class="muted">(<?= count($reuse) ?>)</span></h3>
+  <p class="muted" style="margin:0 0 10px;font-size:12.5px">The same image bytes are attached to more than one
+    <?= Tl('job') ?>. Often innocent — a logo, a form scan, a genuine re-shoot — but a photo carried over from one
+    inspection to another is worth a look. Nothing here is changed or removed.</p>
+  <?php foreach ($reuse as $g): ?>
+  <div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--line,#eee)">
+    <div style="font-size:12.5px"><strong><?= (int)$g['jobs'] ?> <?= Tlp('job') ?></strong>
+      share this file <span class="muted">(<?= (int)$g['files'] ?> copies · sha1 <?= htmlspecialchars(substr($g['sha1'],0,10)) ?>…)</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+      <?php foreach ($g['members'] as $m): ?>
+        <a class="pill p-mut" href="/evidence-review?doc=<?= (int)$m['report_doc_id'] ?>">
+          <?= Tl('job') ?> #<?= (int)$m['job_id'] ?><?= $m['irn'] ? ' · ' . htmlspecialchars($m['irn']) : '' ?>
+          <?= $m['file_name'] ? ' · ' . htmlspecialchars($m['file_name']) : '' ?></a>
+      <?php endforeach; ?>
+    </div>
+  </div>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
 <?php if (is_admin_level() || is_master()): ?>
 <div class="panel">
   <h3 class="tab-sub" style="margin-top:0">Arriving and leaving</h3>
