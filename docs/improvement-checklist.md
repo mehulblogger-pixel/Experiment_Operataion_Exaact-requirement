@@ -65,7 +65,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 43 | Training | P2 | ✅ done & pushed | 2026-08-26 |
 | 44 | Evidence | P1 | ✅ done & pushed | 2026-08-26 |
 | 45 | AI / Intelligence | P3 | ✅ done & pushed | 2026-08-26 |
-| 46 | Integrations | P2 | ⬜ | — |
+| 46 | Integrations | P2 | ✅ done & pushed | 2026-08-26 |
 | 47 | Mobile / PWA | P1 | ⬜ | — |
 | 48 | Report Template Builder | P1 | ✅ done & pushed | 2026-08-26 |
 | 49 | Entity 360 Standard | P2 | ⬜ | — |
@@ -79,6 +79,28 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 46 — Integrations · 2026-08-26
+**Decision:** (A) a read-only integration-health surface aggregating each integration's own last-sync/
+error/stuck signals, parallel to licence_health() (M36) and the notification log (M38); plus the
+licence_key secret-classification fix (M14 tie-in). Books sync-log, connection tests, SMTP env-override
+banner and a Razorpay webhook deferred.
+**Found:** each integration tracks its own health, but only on its own screen — a sync that fails
+quietly is invisible. And `licence_key` didn't match the M14 secret regex, so its value was written to
+the audit trail on change.
+**Added (additive, read-only, passive — no external call on page load):**
+- `integration_health()` / `_attention()` — aggregates Ads Pro (gave-up outbox), Books (stuck/queued),
+  licence auto-renew (check-in error), SMTP (failed sends) + presence rows for Razorpay/AI, each
+  guarded.
+- `/integrations` route (core admin module), gated by `notifications_can_view()`; a health table with
+  a needs-attention strip.
+- A home attention-band tile (M34) when an integration is failing/stuck; a Settings-screen link.
+- Classified `licence_key`/`licence_install` as secret in `setting_change_class()`.
+**Preserved:** every integration's config, sync, outbox, retry and _try() wrappers — unchanged. No
+external call added to any page load. No new permission; no schema change; nothing deleted.
+**Tests:** `test_module46_integrations.php` (21 assertions). Suite 3149 passing (only the 3 pre-existing
+baseline failures remain).
+**Spec:** `docs/edge-cases/46-integrations.md`.
 
 ### Module 45 — AI / Intelligence (governance) · 2026-08-26
 **Decision:** (A) complete the AI-use provenance on the sealed audit chain (which external

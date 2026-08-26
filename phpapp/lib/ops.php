@@ -2374,6 +2374,7 @@ function ops_module_gate($route) {
         'expediting'=>'idems','expediting-projects'=>'idems',
         'report-types'=>'idems','report-type-edit'=>'idems','report-builder'=>'idems','report-field-edit'=>'idems','report-file'=>'idems','irn-rules'=>'idems','audit-log'=>'idems',
         'notifications'=>'admin', // Module 38 — the notification/outbox log over email_log
+        'integrations'=>'admin',  // Module 46 — the integration health surface
 
         'document-approve'=>'idems','document-vet'=>'idems','document-vet-review'=>'idems','vetting-checklist'=>'idems','approver-map'=>'idems','idems-approval-rules'=>'idems','idems-approval-rule-edit'=>'idems',
         'document-pdf'=>'idems','document-timestamp'=>'idems','document-docx'=>'idems','report-type-preview'=>'idems','report-template-preview'=>'idems',
@@ -3063,6 +3064,8 @@ function ops_dispatch($route, $method) {
             return ops_idems_audit($method);
         case $route === 'notifications':
             return ops_notifications($method);
+        case $route === 'integrations':
+            return ops_integrations($method);
         case $route === 'report-approve':
             ops_report_approve($method); return true;
         case $route === 'office-finance':
@@ -6782,8 +6785,69 @@ function attention_summary() {
         if (function_exists('recruit_overdue_interviews_count'))
             $push('iv_overdue', 'Interviews awaiting an outcome', recruit_overdue_interviews_count(), '/recruitment', 'speed', null, 'the interview date has passed');
     }
+    // Integrations: a connection that is failing or stuck (admin observability).
+    if (function_exists('notifications_can_view') && notifications_can_view() && function_exists('integration_health_attention')) {
+        $ib = integration_health_attention();
+        if ($ib > 0) $push('integrations', 'Integrations need attention', $ib, '/integrations', 'risk', null, 'a sync is failing or stuck');
+    }
     return $out;
 }
+// Module 46 — one passive (no network) health read across every external integration.
+// Each integration already tracks its own last-sync / error / stuck-outbox, but those
+// signals live only on that integration's own screen; there is no cross-integration
+// view. This aggregates the existing signals (no sender/sync touched, no live API call)
+// so a "did the sync break?" question is answerable in one place — the parallel of
+// licence_health() (Module 36) and the notification log (Module 38).
+function integration_health() {
+    $out = [];
+    $row = function ($key, $label, $sev, $last, $detail, $url) use (&$out) {
+        $out[] = ['key'=>$key, 'label'=>$label, 'severity'=>$sev, 'last'=>(string)$last, 'detail'=>$detail, 'url'=>$url];
+    };
+    // Ads Pro — last successful sync + any changes that gave up retrying.
+    if (function_exists('ads_on') && ads_on()) {
+        $last = ''; $given = 0;
+        try { $c = ads_counts(); $last = (string)($c['last'] ?? ''); } catch (Throwable $e) {}
+        try { $ob = ads_outbox_counts(); $given = (int)($ob['GIVEN_UP'] ?? 0); } catch (Throwable $e) {}
+        $row('adspro', 'Ads Pro', $given > 0 ? 'bad' : 'ok', $last,
+             $given > 0 ? $given . ' change(s) failed to sync (gave up retrying)' : 'Syncing', '/adspro');
+    }
+    // MGH Books — stuck / queued outbox.
+    if (function_exists('books_connected') && books_connected()) {
+        $stuck = 0; $pending = 0;
+        try { $b = books_outbox_counts(); $stuck = (int)($b['stuck'] ?? 0); $pending = (int)($b['PENDING'] ?? 0); } catch (Throwable $e) {}
+        $row('books', 'MGH Books', $stuck > 0 ? 'bad' : ($pending > 0 ? 'warn' : 'ok'), '',
+             $stuck > 0 ? $stuck . ' stuck in the outbox' : ($pending > 0 ? $pending . ' queued to push' : 'Up to date'), '/books-bridge');
+    }
+    // Licence auto-renew — last check-in + any error.
+    if (function_exists('licsync_on') && licsync_on()) {
+        $st = []; try { $st = licsync_status(); } catch (Throwable $e) {}
+        $err = trim((string)($st['error'] ?? ''));
+        $row('licence', 'Licence auto-renew', $err !== '' ? 'bad' : 'ok', (string)($st['last'] ?? ''),
+             $err !== '' ? $err : 'Checking in', '/licence');
+    }
+    // Email (SMTP) — recent failed sends (from the Module 38 log).
+    $smtpOn = false;
+    try { $smtpOn = (bool)(function_exists('smtp_config') && smtp_config()); } catch (Throwable $e) {}
+    if (!$smtpOn && getenv('OPS_MAIL_ENABLED')) $smtpOn = true;
+    if ($smtpOn) {
+        $failed = function_exists('email_failed_count') ? email_failed_count(7) : 0;
+        $row('smtp', 'Email (SMTP)', $failed > 0 ? 'warn' : 'ok', '',
+             $failed > 0 ? $failed . ' send(s) failed in the last 7 days' : 'Sending', '/notifications');
+    }
+    // Presence-only integrations (no passive failure signal).
+    if (function_exists('billing_configured') && billing_configured()) $row('billing', 'Razorpay billing', 'ok', '', 'Connected', '/billing');
+    if (function_exists('ai_enabled') && ai_enabled())                 $row('ai', 'AI provider', 'ok', '', 'Enabled', '/ai-settings');
+    return $out;
+}
+function integration_health_attention() {
+    $n = 0; foreach (integration_health() as $r) if ($r['severity'] !== 'ok') $n++; return $n;
+}
+function ops_integrations($method) {
+    ops_require(notifications_can_view(), 'You cannot view integration health.');
+    view('ops/integrations', ['rows' => integration_health()]);
+    return true;
+}
+
 // Module 38 — who can read the notification log (the outbox over email_log).
 function notifications_can_view() {
     return is_master()
