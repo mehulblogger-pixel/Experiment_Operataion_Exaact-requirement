@@ -75,6 +75,15 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — §25 engagement grouping.** The sales→ops→finance spine already threads one string
+  (`contract_number`) through quotations/calls/jobs/invoices (reports hang off jobs), but "show the whole
+  engagement behind this contract" was assembled ad-hoc. Added `lib/engagement.php`: `engagement($contractNumber)`
+  returns the full spine (quotes→calls→jobs→reports→invoices) as one normalised member list + rollup
+  (counts, open calls/jobs, billed total excl. cancelled); `engagement_render()` panel on the contract detail.
+  Read-only **view over `contract_number`** — no new table/status. Test `test_p2_engagement.php` (14
+  assertions incl. cross-contract isolation, report-via-job_id, cancelled-invoice exclusion). Suite **3471
+  passed, 0 failed**.
+
 - **2026-08-26 — §72 canonical visibility gate.** Visibility was enforced by several per-record
   mechanisms (report `vendor_visible`, NCR `visibility` code, site-log `client_visible`) filtered at each
   portal query, with no single-record answer to "who may see this?" and no shared vocabulary. Added

@@ -16,7 +16,7 @@ a second table, a second calculation, or a second status system.**
 |---|---|---|---|
 | **Party / Person** | `party_key()`, `party_records_for()`, `party_key_of()` (`lib/party.php`, §23/24) | `users`, `inspectors`, `candidates`, `partner_contacts`, `client_users`, `vendor_users` | One human resolved across stores by ref→mobile→email. **Mapping layer, never a merge.** New code reads a person via `party_*`. |
 | **Organisation** | `business_partners` + `dedupe.php` | `business_partners` (client/vendor flags) | One org record; `partner_contacts` are its people. |
-| **Engagement → Contract → Call → Job → Visit → Report** | the operational spine | `partner_contracts`/`quotations`, `calls`, `jobs`, `site_visits`, `report_docs` | Contract linkage is the string `contract_number` (retained). *Engagement* is a future grouping (§25, not built) — do NOT add a new module for it; use `contract_number` today. |
+| **Engagement → Contract → Call → Job → Visit → Report** | `engagement()` (`lib/engagement.php`, §25) over the spine | `partner_contracts`/`quotations`, `calls`, `jobs`, `site_visits`, `report_docs`, `invoices` | Contract linkage is the string `contract_number` (retained). `engagement($contractNumber)` is the **read-only grouping** that returns the whole spine (quotes→calls→jobs→reports→invoices) + rollup. **View over `contract_number`, not a new table.** Do not add an engagement module. |
 | **Report** | `lib/idems.php` (URFE) | `report_docs` + `report_files`/`report_fields`/… | The Universal Report Foundation Engine is authoritative; every report type reuses it. No per-type mini-engines. |
 | **Evidence** | `report_files` + trust chain (`lib/trust.php`) | `report_files`, `site_visits` | First-class object with hash chain; served only through access-checked handlers. |
 | **Equipment** | `lib/equipment.php` | `equipment`, `equipment_calibrations` | Calibration impact is *review*, never auto-invalidation. |
@@ -115,10 +115,10 @@ For each retained legacy concept: why kept, where it lives, its canonical replac
 | Per-integration bespoke outboxes | Each integration works | `ads_outbox`/`books_outbox`/… | generic webhook/queue (§50) | **Deferred (P2).** |
 | Contract linkage by `contract_number` string | Whole spine matches on it | `calls`/`jobs`/`quotations`/`partner_contracts` | canonical Engagement (§25) | **Deferred (P2/P3).** Use the string today. |
 
-**Deferred canonical work (do NOT build ad-hoc; schedule as its own change):** §25 Engagement,
-§26 persisted Task, §27 Financial-event stream, §28 profit-engine convergence (needs sign-off — changes
-displayed numbers), §50 generic integration layer, §68 anomaly-flag surface, §72 field/evidence
-visibility classification.
+**Deferred canonical work (do NOT build ad-hoc; schedule as its own change):**
+§26 persisted Task entity, §27 Financial-event stream, §28 profit-engine convergence (needs sign-off —
+changes displayed numbers), §50 generic integration layer. *(§25 engagement view, §68 anomaly-flag
+surface and §72 visibility gate are now delivered as read-only layers — see above.)*
 
 ---
 

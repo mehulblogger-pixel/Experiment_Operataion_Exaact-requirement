@@ -145,3 +145,6 @@
   </tbody></table>
 </div>
 <?php endif; ?>
+
+<?php // Phase 2 §25 — the whole engagement (quotes → calls → jobs → reports → invoices) under this contract_number. ?>
+<?php if (function_exists('engagement_render')) engagement_render($c['contract_number'] ?? '', (int)($c['partner_id'] ?? 0)); ?>
