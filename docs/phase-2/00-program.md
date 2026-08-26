@@ -75,6 +75,22 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — W5 CONSOLIDATION batch (§23/24, §46, §39) + CANONICAL MODEL (§79/80).**
+  Non-destructive convergence layers over the existing modules (no table merges, nothing deleted):
+  - **§23/24** canonical person — `lib/party.php` resolves one human across the six identity stores
+    (users/inspectors/candidates/partner_contacts/client_users/vendor_users) by ref→mobile→email via a
+    UNION matcher; "also appears as" panel on candidate detail.
+  - **§46** status standardisation — `call_status_disagrees()` detects a legacy-vs-canonical call
+    terminality mismatch and surfaces it as a Module 29 §7.11 integrity check (read-only; auto-repairs nothing).
+  - **§39** quality-case umbrella — `lib/qualitycase.php` assembles complaint+NCR+CAPA into one read-only
+    "full story" view from the FKs those modules already carry, with the corrective-action outcome
+    (root cause / effectiveness / closure); panel on NCR + CAPA details.
+  - **§79/80** `docs/phase-2/02-canonical-application-model.md` — the authoritative canonical model
+    (entities, statuses, workflows, the one profit engine, evidence, tasks, permissions, terminology,
+    observability) + the legacy-compatibility register (why each legacy concept is retained, its canonical
+    replacement, and deprecation status). Every future change must read through the canonical engine named there.
+  - Suite **3425 passed, 0 failed**. (§28 profit-engine convergence still held for explicit sign-off.)
+
 - **2026-08-26 — W0 slice: test truth.** Investigated the 3 long-standing failures
   (`test_services.php:86/87/95`). Root cause: `seed_demo_c.php` seeded a GLOBAL
   `RELEASE→INSPECTION` service dependency, violating the module's "none by default; configured =
