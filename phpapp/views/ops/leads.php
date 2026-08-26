@@ -18,7 +18,18 @@
   <div class="qcard tone-ok"><div class="qic">₹</div><div class="qn" style="font-size:20px"><?= fmoney_short($c['value']) ?></div><div class="ql">Open pipeline value</div></div>
   <div class="qcard <?= $c['stalled'] ? 'tone-bad' : '' ?>"><div class="qic">◷</div><div class="qn"><?= (int)$c['stalled'] ?></div><div class="ql">Past their stage's service level</div></div>
   <div class="qcard tone-warn"><div class="qic">✓</div><div class="qn"><?= (int)$c['converted'] ?></div><div class="ql">Converted</div></div>
+  <?php // Module 17 — leads needing attention now (past stage SLA, or an overdue follow-up date). ?>
+  <?php $dueCount = $dueCount ?? 0; ?>
+  <div class="qcard <?= $dueCount ? 'tone-bad' : '' ?>"><div class="qic">🔔</div><div class="qn"><?= (int)$dueCount ?></div><div class="ql">Need attention now</div></div>
 </div>
+<?php if (!empty($dueCount)): ?>
+<div class="panel" style="border-left:3px solid var(--bad);margin-top:12px">
+  <b><?= (int)$dueCount ?> lead<?= $dueCount==1?'':'s' ?> need attention</b>
+  <span class="muted" style="font-size:12.5px">— past their stage's service level, or with a follow-up date that has passed.
+  A lead left silent is the cheapest deal in the funnel to lose. See the ranked list on the
+  <a href="/advisor">business advisor</a>, or sort the register by <em>Days in stage</em> below.</span>
+</div>
+<?php endif; ?>
 
 <div class="panel" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
   <a class="btn small<?= $view==='board'?'':' secondary' ?>" href="/leads?v=board">Board</a>

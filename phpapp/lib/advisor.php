@@ -270,6 +270,40 @@ function adv_stalled_deals() {
     ];
 }
 
+// Module 17 — the top of the funnel gets the same "nothing rots silently"
+// treatment the deals below it already have (adv_stalled_deals). Reuses leads_due().
+function adv_cold_leads() {
+    if (!adv_on('leads') || !function_exists('leads_due')) return null;
+    $due = adv_try(fn() => leads_due(), []) ?: [];
+    if (!$due) return null;
+    $rows = []; $total = 0.0;
+    foreach ($due as $l) {
+        $rows[] = ['id' => $l['id'], 'ref' => $l['ref'],
+                   'who' => $l['company_name'] ?: ($l['contact_name'] ?: $l['ref']),
+                   'd' => $l['stage_since'] ?: $l['created_at'], 'amount' => (float)$l['value'],
+                   'extra' => implode('; ', $l['due_reasons'])];
+        $total += (float)$l['value'];
+    }
+    usort($rows, fn($x, $y) => $y['amount'] <=> $x['amount']);
+    return [
+        'key' => 'cold_leads', 'severity' => 'SPEED',
+        'title' => 'Leads going cold',
+        'n' => count($rows), 'value' => $total,
+        'cost' => fmoney($total) . ' of early pipeline is past its stage service level or overdue a follow-up.',
+        'why' => 'A lead nobody has touched since its stage clock ran out, or whose own follow-up date has passed, '
+               . 'is the cheapest deal in the funnel to lose — and until now the top of the funnel had no reminder at all.',
+        'steps' => [
+            'Open the biggest. Make the call or send the note its follow-up date promised.',
+            'Record the next action and a date, move it on, or mark it lost <b>with a reason</b> — do not leave it silent.',
+            'If a whole stage is full of cold leads, its service level (days allowed) may be wrong — fix it on the pipeline.',
+        ],
+        'stop' => 'Nothing automatic — a lead is never closed for you. This is the weekly working list, kept to a handful.',
+        'who' => 'The lead owner, reviewed by the sales manager',
+        'link' => '/leads', 'link_label' => 'Open the leads register',
+        'rows' => array_slice($rows, 0, 12), 'row_url' => '/lead?id=',
+    ];
+}
+
 function adv_order_no_quote() {
     if (!adv_on('calls')) return null;
     [$w, $a] = scope_clause('c.executing_office_id', 'c.sbu');
@@ -532,7 +566,7 @@ function adv_ad_spend_dry() {
 // ---- Assembly ---------------------------------------------------------------
 function adv_all() {
     $checks = ['adv_unbilled_work', 'adv_overdue_invoices', 'adv_unmatched_receipts',
-               'adv_won_not_ordered', 'adv_draft_invoices', 'adv_stalled_deals',
+               'adv_won_not_ordered', 'adv_draft_invoices', 'adv_stalled_deals', 'adv_cold_leads',
                'adv_silent_customers', 'adv_order_no_quote', 'adv_closed_no_report',
                'adv_customers_untaxable', 'adv_ad_spend_dry'];
     $out = [];

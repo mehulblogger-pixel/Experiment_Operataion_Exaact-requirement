@@ -36,7 +36,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 14 | Settings | P2 | ⬜ | — |
 | 15 | Clients / Customer 360 | P2 | ✅ done & pushed | 2026-08-24 |
 | 16 | Vendors / Vendor 360 | P2 | ✅ done & pushed | 2026-08-24 |
-| 17 | Leads | P2 | ⬜ | — |
+| 17 | Leads | P2 | ✅ done & pushed | 2026-08-26 |
 | 18 | Orders / Contracts (Contract 360) | P1 | ⬜ | — |
 | 19 | Inquiries / Requirements | P2 | ⬜ | — |
 | 20 | Project Costing | P1 | ✅ done & pushed | 2026-08-26 |
@@ -79,6 +79,32 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 17 — Leads · 2026-08-26
+**Decision:** (A) cold-lead / overdue-follow-up detector (advisor check + register tile) + first
+lifecycle-guard tests. Source-attribution funnel, first-response SLA, bulk-lost reason, and
+transactional conversion deferred.
+**Found:** the leads subsystem is rich (board, score, dedupe, conversion with `lead_id` carried
+through the spine) but the top of the funnel rotted silently: `next_action_on` was **stored and
+advertised as "drives your follow-up list" yet no query read it**, and `lead_stalled()` was
+surfaced only in-page — no advisor check, no cron, no follow-ups-due list. A cold lead produced zero
+proactive signal (the pre-Module-03 quote problem).
+**Added (additive, read-only, no hard control):**
+- `leads_due()` / `leads_due_count()` — the open leads past their stage service level, or with an
+  overdue `next_action_on` (finally reading the dead field), each with plain-English reasons;
+  converted/lost leads never chased.
+- `adv_cold_leads()` — a business-advisor "Leads going cold" card mirroring the existing
+  `adv_stalled_deals()` opportunity check, registered in `adv_all()`, explicitly advisory ("a lead
+  is never closed for you").
+- A **"Need attention now"** tile + banner on the leads register.
+- The **first tests** over the subsystem — cold-lead detection + the previously-untested WON-forces-
+  convert / LOST-needs-reason guards.
+**Preserved (verified by tests):** the board, score engine, dedupe, conversion, `lead_move` guards,
+every route — unchanged. No new permission; no schema change; no access changed; no lead auto-closed;
+nothing deleted.
+**Edge cases:** `docs/edge-cases/17-leads.md`.
+**Tests:** `tests/test_module17_leads.php` (14 assertions). Suite 2827 passed / 3 pre-existing
+baseline failures.
 
 ### Module 28 — Internal Audits (§8.8) + Management Review (§8.9) · 2026-08-26
 **Decision:** (A) overdue reminders + MR-decision→CAPA link + per-clause next-due + first gate tests.

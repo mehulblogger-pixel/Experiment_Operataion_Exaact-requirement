@@ -282,6 +282,29 @@ function lead_stalled($l, $today = null) {
     return ($l['status'] ?? '') === 'OPEN' && $sla > 0 && lead_days_in_stage($l, $today) > $sla;
 }
 
+// Module 17 — the open leads that need attention NOW: past their stage service
+// level, or with a follow-up date (next_action_on) that has come and gone. The
+// second signal finally reads next_action_on, which was stored and shown as "it
+// drives your follow-up list" but which no query anywhere actually read. Read-only;
+// a lead is never auto-closed — this is the weekly working list the owner clears.
+function leads_due($today = null) {
+    $today = $today ?: date('Y-m-d');
+    $out = [];
+    foreach (leads_all(['open' => 1]) as $l) {
+        $reasons = [];
+        if (lead_stalled($l, $today))
+            $reasons[] = 'past its ' . (int)$l['sla_days'] . '-day stage service level';
+        $na = substr(trim((string)($l['next_action_on'] ?? '')), 0, 10);
+        if ($na !== '' && $na < $today)
+            $reasons[] = 'follow-up was due ' . fdate($na) . (trim((string)($l['next_action'] ?? '')) !== '' ? ' — ' . $l['next_action'] : '');
+        if (!$reasons) continue;
+        $out[] = $l + ['due_reasons' => $reasons, 'due_days' => lead_days_in_stage($l, $today)];
+    }
+    usort($out, fn($a, $b) => (int)$b['due_days'] <=> (int)$a['due_days']);   // most urgent first
+    return $out;
+}
+function leads_due_count($today = null) { return count(leads_due($today)); }
+
 // ---- Scoring — a rules engine that shows its working ------------------------
 // Deliberately not "AI". There is no outcome history to learn from yet, and a
 // score whose reasoning cannot be read is a score nobody acts on. Every rule
@@ -866,7 +889,7 @@ function ops_leads($route, $method) {
         }
         view('ops/leads', [
             'view' => $view, 'rows' => $rows ?: [], 'total' => (int)$total, 'fy' => $fy['fy'],
-            'dt' => $dt, 'cols' => $cols, 'counts' => leads_counts(),
+            'dt' => $dt, 'cols' => $cols, 'counts' => leads_counts(), 'dueCount' => leads_due_count(),
             'board' => $view === 'list' ? ['pipeline' => null, 'stages' => [], 'columns' => []]
                                         : lead_board((int)($_GET['pipeline'] ?? 0)),
             'pipelines' => pipelines_all(), 'canEdit' => $canEdit,
