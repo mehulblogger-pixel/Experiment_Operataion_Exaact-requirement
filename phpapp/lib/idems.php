@@ -4728,7 +4728,11 @@ function ops_idems_report_types($route, $method) {
     // How many finished reports already exist per type — a type in real use
     // should never be presented as if it were an empty draft to design.
     $docCounts = []; foreach (ops_all("SELECT report_type_id tid, COUNT(*) c FROM report_docs WHERE COALESCE(deleted,0)=0 GROUP BY report_type_id") as $dc) $docCounts[(int)$dc['tid']] = (int)$dc['c'];
-    view('ops/idems/report_types', ['rows'=>idems_types(false), 'edit'=>$edit, 'fieldCounts'=>$fieldCounts, 'docCounts'=>$docCounts]);
+    // Module 48 — format integrity per type (only for types that have a designed form).
+    $rows = idems_types(false);
+    $formChecks = [];
+    foreach ($rows as $t) { $tid = (int)$t['id']; if (($fieldCounts[$tid] ?? 0) > 0) $formChecks[$tid] = idems_format_validate($tid); }
+    view('ops/idems/report_types', ['rows'=>$rows, 'edit'=>$edit, 'fieldCounts'=>$fieldCounts, 'docCounts'=>$docCounts, 'formChecks'=>$formChecks]);
     return true;
 }
 
@@ -5131,7 +5135,7 @@ function ops_idems_builder($route, $method) {
     }
     view('ops/idems/builder', ['type'=>$type, 'sections'=>idems_sections($typeId), 'fields'=>idems_fields($typeId),
         'editField'=>($route==='report-field-edit') ? ops_one("SELECT * FROM report_fields WHERE id=?", [(int)($_GET['id'] ?? 0)]) : null,
-        'fieldTypes'=>IDEMS_FIELD_TYPES, 'condOps'=>IDEMS_COND_OPS]);
+        'fieldTypes'=>IDEMS_FIELD_TYPES, 'condOps'=>IDEMS_COND_OPS, 'formCheck'=>idems_format_validate($typeId)]);
     return true;
 }
 // Swap sort_order with the previous/next sibling.
@@ -7800,6 +7804,47 @@ function idems_template_validate($tpl) {
     if (trim((string)($tpl['document_number'] ?? '')) === '') $add('WARNING', 'No document-control number is set for this format.');
     $level = 'PASS'; foreach ($issues as $i) { if ($i['level']==='ERROR') { $level='ERROR'; break; } if ($i['level']==='WARNING') $level='WARNING'; }
     return ['level'=>$level, 'issues'=>$issues];
+}
+
+// Module 48 — the missing twin of idems_template_validate() for the FORM SCHEMA.
+// Validation, versioning and approval exist for the .docx template but the form
+// schema (the thing that actually breaks report ENTRY) had none: a duplicate field
+// key or an option-less choice could go live silently. Same {level, issues} shape.
+// Read-only; warn/preview — it blocks nothing.
+function idems_format_validate($typeId) {
+    $typeId = (int)$typeId;
+    $issues = [];
+    $add = function ($lvl, $msg) use (&$issues) { $issues[] = ['level' => $lvl, 'msg' => $msg]; };
+    $fields = function_exists('idems_fields') ? idems_fields($typeId) : [];
+
+    // Duplicate field keys — the ungated, index-less hole. Two fields sharing an
+    // fkey collide on data storage and on {{token}} rendering, silently.
+    $seen = []; $dupes = [];
+    foreach ($fields as $f) {
+        $k = trim((string)($f['fkey'] ?? '')); if ($k === '') continue;
+        if (isset($seen[$k])) $dupes[$k] = true; else $seen[$k] = true;
+    }
+    foreach (array_keys($dupes) as $k)
+        $add('ERROR', 'Two fields share the key “' . $k . '” — one silently overwrites the other on save and on the printed report.');
+
+    $keys = array_flip(array_map(fn($f) => (string)($f['fkey'] ?? ''), $fields));
+    foreach ($fields as $f) {
+        $t = (string)($f['ftype'] ?? '');
+        $label = (string)(($f['label'] ?? '') !== '' ? $f['label'] : ($f['fkey'] ?? 'a field'));
+        if (in_array($t, ['select', 'radio', 'multiselect'], true) && trim((string)($f['options'] ?? '')) === '')
+            $add('WARNING', 'The “' . $label . '” choice field has no options to pick from.');
+        if ($t === 'table' && trim((string)($f['table_cols'] ?? '')) === '')
+            $add('WARNING', 'The “' . $label . '” table has no columns defined.');
+        if (in_array($t, ['heading', 'note'], true) && !empty($f['required']))
+            $add('WARNING', 'The “' . $label . '” is a heading/note yet is marked required — it collects no answer.');
+        $cf = trim((string)($f['cond_field'] ?? ''));
+        if ($cf !== '' && !isset($keys[$cf]))
+            $add('WARNING', 'The “' . $label . '” shows only when “' . $cf . '” has a value, but no field with that key exists.');
+    }
+    if (!$fields) $add('WARNING', 'This format has no fields yet — it opens a blank “no form designed” screen.');
+
+    $level = 'PASS'; foreach ($issues as $i) { if ($i['level'] === 'ERROR') { $level = 'ERROR'; break; } if ($i['level'] === 'WARNING') $level = 'WARNING'; }
+    return ['level' => $level, 'issues' => $issues];
 }
 // Publishing a template retires any other active template of the SAME scope
 // (report type + client + office) — that is what "supersede" means (§32).

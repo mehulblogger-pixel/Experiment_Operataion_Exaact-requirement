@@ -92,6 +92,10 @@
         <td>
           <?php if ($ready): ?><span class="pill p-ok" title="This report has a designed form">✓ Ready · <?= (int)$nf ?> field<?= $nf==1?'':'s' ?></span>
           <?php else: ?><span class="pill p-warn" title="No form designed — opens a blank screen">⚠ No form yet</span><?php endif; ?>
+          <?php // Module 48 — format integrity for a designed form.
+          $fchk = ($formChecks ?? [])[(int)$r['id']] ?? null;
+          if ($fchk && $fchk['level'] === 'ERROR') echo ' <a href="/report-builder?type=' . (int)$r['id'] . '"><span class="pill p-bad" title="' . e($fchk['issues'][0]['msg'] ?? '') . '">⛔ ' . count($fchk['issues']) . ' issue' . (count($fchk['issues'])==1?'':'s') . '</span></a>';
+          elseif ($fchk && $fchk['level'] === 'WARNING') echo ' <a href="/report-builder?type=' . (int)$r['id'] . '"><span class="pill p-warn" title="' . e($fchk['issues'][0]['msg'] ?? '') . '">⚠ check</span></a>'; ?>
         </td>
         <td><?= $r['active'] ? '<span class="pill p-ok">Active</span>' : '<span class="pill p-mut">Inactive</span>' ?></td>
         <td style="white-space:nowrap">

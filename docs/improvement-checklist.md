@@ -67,7 +67,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 45 | AI / Intelligence | P3 | ⬜ | — |
 | 46 | Integrations | P2 | ⬜ | — |
 | 47 | Mobile / PWA | P1 | ⬜ | — |
-| 48 | Report Template Builder | P1 | ⬜ | — |
+| 48 | Report Template Builder | P1 | ✅ done & pushed | 2026-08-26 |
 | 49 | Entity 360 Standard | P2 | ⬜ | — |
 | 50 | Cross-module Consistency & Regression | P0 | ⬜ | — |
 
@@ -79,6 +79,28 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 48 — Report Template Builder (URFE) · 2026-08-26
+**Decision:** (A) form-schema integrity validator (the missing twin of the .docx template validator)
++ first tests. Making duplicate-fkey a hard stop / a `(report_type_id, fkey)` unique index, and a
+form-schema approval lifecycle, deferred (hard controls / governance).
+**Found:** the .docx template has validation + a draft→review→approve lifecycle, but the **form
+schema had neither** — a duplicate field key (index-less, ungated in the hand-edit path) silently
+collides on storage and `{{token}}` rendering; an option-less choice / empty table / dangling
+condition can go live and break report entry. No format-validity test coverage existed.
+**Added (additive, read-only, no hard block):**
+- `idems_format_validate($typeId)` — the twin of `idems_template_validate`, same `{level,issues}`
+  shape: duplicate fkey → ERROR; option-less choice / empty table / required heading / dangling
+  cond_field / no-fields → WARNING.
+- A **"Format integrity"** panel on the form builder + a per-type **integrity pill** on the
+  report-types list, both explicitly advisory.
+- The **first tests** over format validity (none existed for either validator).
+**Preserved (verified by tests):** the .docx template validator + lifecycle, freeze-at-issue,
+`idems_fields`/`idems_sections`, the builder — all unchanged. No new permission (reuses
+`idems.type.manage`); no schema change; no hard block; nothing deleted.
+**Edge cases:** `docs/edge-cases/48-report-template-builder.md`.
+**Tests:** `tests/test_module48_format.php` (15 assertions). Suite 2925 passed / 3 pre-existing
+baseline failures.
 
 ### Module 44 — Evidence · 2026-08-26
 **Decision:** (A) evidence & on-site readiness row + verify on-site line + first chain-tamper test.

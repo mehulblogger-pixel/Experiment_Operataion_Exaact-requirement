@@ -17,6 +17,19 @@
   </div>
 </div>
 
+<?php // Module 48 — format integrity (the form-schema twin of the .docx template validator).
+$fc = $formCheck ?? null; if ($fc && $fc['level'] !== 'PASS' && !empty($fc['issues'])): ?>
+<div class="panel" style="margin-bottom:14px;border-left:3px solid var(--<?= $fc['level'] === 'ERROR' ? 'bad' : 'warn' ?>)">
+  <h3 class="tab-sub" style="margin-top:0"><?= $fc['level'] === 'ERROR' ? '⛔' : '⚠' ?> Format integrity <span class="muted" style="font-weight:400;font-size:12px">(<?= count($fc['issues']) ?>)</span></h3>
+  <p class="muted" style="margin:0 0 8px;font-size:12.5px">These would break report entry or the printed report. Nothing is blocked — fix them before this format is relied on.</p>
+  <ul style="margin:0 0 0 18px">
+    <?php foreach ($fc['issues'] as $i): ?>
+      <li style="margin:3px 0"><span class="pill <?= $i['level'] === 'ERROR' ? 'p-bad' : 'p-warn' ?>" style="font-size:10px"><?= e($i['level']) ?></span> <?= e($i['msg']) ?></li>
+    <?php endforeach; ?>
+  </ul>
+</div>
+<?php endif; ?>
+
 <div class="panel" style="margin-bottom:14px;border:1px solid var(--brand);background:color-mix(in srgb,var(--brand) 6%,transparent)">
   <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between">
     <div>
