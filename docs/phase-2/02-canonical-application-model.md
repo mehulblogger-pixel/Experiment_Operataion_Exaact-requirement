@@ -81,6 +81,17 @@ a second table, a second calculation, or a second status system.**
 - `T()/TP()/Tl()/Tlp()` over `TERM_PACKS` + overrides (`lib/terms.php`). Internal acronyms
   (URFE/IDEMS/PDSO/TAPI) are route/capability keys only — **never** user-facing labels.
 
+## 8a. Canonical visibility
+
+- One vocabulary — `VIS_CLASSES` (PUBLIC / SHARED / CLIENT / VENDOR / INTERNAL / CONFIDENTIAL) and
+  `VIS_AUDIENCES` (INTERNAL / CLIENT / VENDOR / PUBLIC) in `lib/visibility.php` (§72). `visibility_can_see($class,$audience)`
+  is the single **single-record** gate (the scalar twin of `cvp_visibility_sql`), fail-closed by default; it
+  **delegates** to `cvp_can_see()` for every code cvp owns so the two can never diverge. `visibility_class_of($kind,$row)`
+  reads a record's existing flag (`report_docs.vendor_visible`, `nonconformities.visibility`, `*_client_visible`)
+  and returns its canonical class. Per-record flags are retained; this is a reading layer over them, not a merge.
+- **Rule:** classify with `visibility_normalize()`/`visibility_class_of()` and gate a single record with
+  `visibility_can_see()`; keep filtering lists with `cvp_visibility_sql()`. Do not invent a new per-record flag.
+
 ## 9. Canonical observability
 
 - **Business:** `attention_summary()` band + role dashboards. **Platform health:** `/system-status`

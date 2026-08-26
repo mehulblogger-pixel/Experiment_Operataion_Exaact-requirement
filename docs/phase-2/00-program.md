@@ -75,6 +75,15 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — §72 canonical visibility gate.** Visibility was enforced by several per-record
+  mechanisms (report `vendor_visible`, NCR `visibility` code, site-log `client_visible`) filtered at each
+  portal query, with no single-record answer to "who may see this?" and no shared vocabulary. Added
+  `lib/visibility.php`: one vocabulary (`VIS_CLASSES`/`VIS_AUDIENCES`), `visibility_can_see()` (the scalar
+  twin of `cvp_visibility_sql`, fail-closed) which **delegates to `cvp_can_see()`** so it can never diverge,
+  and `visibility_class_of()` reading each record's existing flag. Reading layer over the existing flags —
+  none changed or removed. Test `test_p2_visibility.php` (23 assertions incl. the no-divergence property
+  across every cvp code × audience). Suite **3457 passed, 0 failed**.
+
 - **2026-08-26 — §68 evidence reuse across jobs.** Upload de-duplication only catches the same photo
   twice in ONE report (`report_doc_id`+`sha1`). Added `evidence_reuse_groups()`/`evidence_reuse_count()`
   (`lib/trust.php`): the same bytes under two DIFFERENT jobs — a photo carried from one inspection to
