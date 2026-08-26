@@ -5850,7 +5850,9 @@ function idems_provenance($doc) {
     $insName = trim((string)($doc['inspector_name'] ?? ''));
     if ($insName === '' && !empty($doc['inspector_id']))
         $insName = (string)ops_val("SELECT name FROM inspectors WHERE id=?", [(int)$doc['inspector_id']]);
-    $out[] = ['role'=>'Prepared', 'name'=>$insName ?: '—', 'at'=>'', 'state'=>$insName ? 'done' : 'pending'];
+    // Phase 2 §4 — the Prepared role now carries a timestamp (when it was submitted, else created).
+    $prepAt = trim((string)($doc['submitted_at'] ?? '')) ?: trim((string)($doc['created_at'] ?? ''));
+    $out[] = ['role'=>'Prepared', 'name'=>$insName ?: '—', 'at'=>$prepAt, 'state'=>$insName ? 'done' : 'pending'];
     // Vetted
     $vetReq = !function_exists('idems_vetting_required') || idems_vetting_required($doc);
     $vetBy = trim((string)($doc['vet_by'] ?? '')); $vetSt = strtoupper((string)($doc['vet_status'] ?? ''));
@@ -7196,7 +7198,16 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         };
         $y1 = $drawSig($ml, $sy, 'Inspected by', $sigs['inspector'] ?? []);
         $y2 = $drawSig($ml + $colW2, $sy, 'Approved by', $sigs['approver'] ?? []);
-        $p->y = max($y1, $y2) + 6;
+        $rowBottom = max($y1, $y2) + 6;
+        // Phase 2 §4 — a second sign-off row for Vetted-by / Issued-by, rendered only when
+        // those roles actually apply (so a draft or an unvetted report shows no empty blocks).
+        if (!empty($sigs['vetter']) || !empty($sigs['issuer'])) {
+            $p->needSpace(70); $sy2 = $rowBottom + 8;
+            $y3 = !empty($sigs['vetter']) ? $drawSig($ml, $sy2, 'Vetted by', $sigs['vetter']) : $sy2;
+            $y4 = !empty($sigs['issuer']) ? $drawSig($ml + $colW2, $sy2, 'Issued by', $sigs['issuer']) : $sy2;
+            $rowBottom = max($y3, $y4) + 6;
+        }
+        $p->y = $rowBottom;
     }
     // Verification block on an issued report: the recipient can confirm it is
     // genuine and unaltered at the public /verify page using the code below, with
@@ -7561,6 +7572,18 @@ function idems_report_signatures($doc) {
             'meta'  => 'Approved',
             'time'  => ($ap['acted_at'] ?? $doc['approved_at'] ?? '') ? 'Approved: ' . date('d M Y H:i', strtotime($ap['acted_at'] ?? $doc['approved_at'])) : '',
         ];
+    }
+    // Phase 2 §4 — Vetted-by (when the report was vetted) and Issued-by (when issued),
+    // so the printed report shows ALL FOUR accreditation roles, not just inspector +
+    // approver. Names + role + timestamp over a signature line (image if one is on file).
+    $out['vetter'] = []; $out['issuer'] = [];
+    if (strtoupper((string)($doc['vet_status'] ?? '')) === 'VETTED' && trim((string)($doc['vet_by'] ?? '')) !== '') {
+        $out['vetter'] = ['img' => '', 'name' => (string)$doc['vet_by'], 'desig' => 'Technical vetting', 'meta' => 'Vetted',
+                          'time' => ($doc['vet_at'] ?? '') ? 'Vetted: ' . date('d M Y H:i', strtotime($doc['vet_at'])) : ''];
+    }
+    if (!empty($doc['finalized']) && trim((string)($doc['finalized_by'] ?? '')) !== '') {
+        $out['issuer'] = ['img' => '', 'name' => (string)$doc['finalized_by'], 'desig' => 'Authorised issuer', 'meta' => 'Issued',
+                          'time' => ($doc['finalized_at'] ?? '') ? 'Issued: ' . date('d M Y H:i', strtotime($doc['finalized_at'])) : ''];
     }
     return $out;
 }
