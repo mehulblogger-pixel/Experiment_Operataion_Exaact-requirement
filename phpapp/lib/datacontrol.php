@@ -346,6 +346,37 @@ const DC_POWERS = [
     'capa.close'          => 'Close corrective actions',
 ];
 
+// Module 02 — segregation-of-duties conflicts, at the PERMISSION level. SoD is
+// already enforced pointwise at each action (a person cannot approve their own
+// voucher, an approver cannot issue their own report); this flags a USER who
+// holds BOTH sides of such a pair, so an access review can see the concentration
+// of power that the runtime checks would only catch one transaction at a time.
+// Advisory only — it blocks nothing and grants nothing.
+function access_sod_pairs() {
+    return [
+        ['key' => 'quote_self_approve',  'need' => ['crm.quote.create', 'crm.quote.approve'],
+         'label' => 'Creates quotations and approves them'],
+        ['key' => 'report_approve_issue','need' => ['workforce.report.approve', 'idems.finalize'],
+         'label' => 'Approves reports and also issues / locks them'],
+        ['key' => 'complaint_and_capa',  'need' => ['complaints.decide', 'capa.close'],
+         'label' => 'Decides complaints and closes the corrective actions that answer them'],
+        ['key' => 'grant_and_settings',  'need' => ['users.manage.global', 'settings.manage'],
+         'label' => 'Can grant anyone access and change system settings'],
+        ['key' => 'self_grant',          'need' => ['users.manage.global'],
+         'label' => 'Holds global user management — can grant themselves any permission'],
+    ];
+}
+function access_toxic_combos($perms) {
+    $set = array_flip($perms);
+    $out = [];
+    foreach (access_sod_pairs() as $c) {
+        $all = true;
+        foreach ($c['need'] as $p) if (!isset($set[$p])) { $all = false; break; }
+        if ($all) $out[] = ['key' => $c['key'], 'label' => $c['label']];
+    }
+    return $out;
+}
+
 function access_report() {
     $rows = [];
     $valid = array_keys(all_permissions());
@@ -364,6 +395,11 @@ function access_report() {
             'id' => (int)$u['id'], 'username' => $u['username'], 'name' => user_name($u),
             'role' => ORG_ROLES[$role] ?? $role, 'master' => $master,
             'powers' => $has, 'power_count' => count(array_filter($has)),
+            // Module 02 — the FULL resolved permission set (not just the 8 powers)
+            // and the SoD conflicts it holds. A master holds everything by design,
+            // so it is never listed as an anomaly.
+            'perms' => $perms, 'perm_count' => count($perms),
+            'toxic' => $master ? [] : access_toxic_combos($perms),
             'last_login' => $last, 'days_idle' => $days,
             'dormant' => $days === null || $days > 90,
             'two_step' => !empty($u['totp_enabled']),
@@ -371,6 +407,11 @@ function access_report() {
     }
     return $rows;
 }
+
+// Module 02 — the same per-user resolved access, named for an access review. A
+// thin alias over access_report() so callers reading it as "effective access"
+// don't have to know it is assembled by the Data Control report.
+function access_effective_all() { return access_report(); }
 
 function access_summary() {
     $rows = access_report();

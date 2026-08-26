@@ -155,7 +155,7 @@
     <?php foreach ($access as $u): ?>
       <tr>
         <td><strong><?= e($u['name']) ?></strong><div class="muted" style="font-size:12px"><?= e($u['username']) ?></div></td>
-        <td class="muted"><?= e($u['role']) ?><?= $u['master'] ? ' <span class="pill p-warn">everything</span>' : '' ?></td>
+        <td class="muted"><?= e($u['role']) ?><?= $u['master'] ? ' <span class="pill p-warn">everything</span>' : ' <span style="font-size:11px">· ' . (int)($u['perm_count'] ?? 0) . ' perms</span>' ?><?= !empty($u['toxic']) ? ' <span class="pill p-bad" title="Holds both sides of a maker/checker pair">SoD</span>' : '' ?></td>
         <td><?= $u['last_login'] === '' ? '<span class="pill p-warn">never</span>'
               : ($u['dormant'] ? '<span class="pill p-bad">' . (int)$u['days_idle'] . 'd ago</span>'
                                : e(substr($u['last_login'], 0, 10))) ?></td>
@@ -167,8 +167,26 @@
     <?php endforeach; ?>
     </tbody>
   </table>
+  <?php // Module 02 — segregation-of-duties flags: non-master people holding both sides of a maker/checker pair.
+        $sod = array_values(array_filter($access, fn($u) => !empty($u['toxic']))); ?>
+  <?php if ($sod): ?>
+  <div class="panel" style="border-left:3px solid var(--bad);margin-top:12px">
+    <h4 class="tab-sub" style="margin-top:0">Segregation-of-duties flags <span class="muted" style="font-weight:400;font-size:12px">(<?= count($sod) ?>)</span></h4>
+    <p class="muted" style="margin:0 0 8px;font-size:12.5px">These people hold <strong>both sides</strong> of a maker/checker
+      pair. Nothing is blocked — the runtime still stops a self-approval one transaction at a time; this is for an access
+      review to decide whether the concentration of power is acceptable (a small office may have to double-hat).</p>
+    <table class="dt"><thead><tr><th>Who</th><th>Holds both</th></tr></thead><tbody>
+      <?php foreach ($sod as $u): ?>
+        <tr><td><strong><?= e($u['name']) ?></strong> <span class="muted" style="font-size:12px"><?= e($u['username']) ?></span></td>
+          <td><?php foreach ($u['toxic'] as $t): ?><div style="margin:2px 0"><span class="pill p-bad"><?= e($t['label']) ?></span></div><?php endforeach; ?></td></tr>
+      <?php endforeach; ?>
+    </tbody></table>
+  </div>
+  <?php endif; ?>
+
   <small class="muted">Change any of it under <a href="/access">Settings → Roles &amp; access</a> or on the person’s
-    own account. Fewer people holding each power is the whole point of the column.</small>
+    own account. Fewer people holding each power is the whole point of the column. Every access change is now recorded in
+    the compliance audit log.</small>
 </div>
 
 <?php // ---- 4 · Failures ----------------------------------------------- ?>

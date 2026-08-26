@@ -2499,10 +2499,21 @@ function ops_access($method) {
         $sel = $_POST['role'] ?? $sel;
         if (!isset($roles[$sel])) $sel = array_key_first($roles);
         $store = json_decode(setting_get('role_access', ''), true); if (!is_array($store)) $store = [];
+        $before = role_perms($sel);   // Module 02 — the role's resolved default, to diff for the audit
+        // Records a role-default change on the sealed audit chain (Module 02).
+        $logRoleAccess = function ($after) use ($sel, $before) {
+            $granted = array_values(array_diff($after, $before));
+            $revoked = array_values(array_diff($before, $after));
+            if (($granted || $revoked) && function_exists('idems_log'))
+                idems_log('role', null, 'ROLE_DEFAULTS_CHANGED',
+                    ['field' => $sel, 'reason' => 'by ' . user_name(current_user()),
+                     'new' => ['role' => $sel, 'granted' => $granted, 'revoked' => $revoked]]);
+        };
         // One-click preset: apply the built-in recommended set for this role.
         if (($_POST['_do'] ?? '') === 'preset') {
             $store[$sel] = role_recommended_perms($sel);
             setting_set('role_access', json_encode($store));
+            $logRoleAccess($store[$sel]);
             flash('Recommended permissions applied for ' . ORG_ROLES[$sel] . '. Review and Save, or adjust as needed.');
             redirect('/access?role=' . $sel);
         }
@@ -2510,6 +2521,7 @@ function ops_access($method) {
         if (($_POST['_do'] ?? '') === 'reset') {
             unset($store[$sel]);
             setting_set('role_access', json_encode($store));
+            $logRoleAccess(role_perms($sel));
             flash('Access for ' . ORG_ROLES[$sel] . ' reset to the built-in default.');
             redirect('/access?role=' . $sel);
         }
@@ -2520,6 +2532,7 @@ function ops_access($method) {
         $checked = array_values(array_unique($checked));
         $store[$sel] = $checked;
         setting_set('role_access', json_encode($store));
+        $logRoleAccess($checked);
         // Remember which modules existed at this moment, so a module added in a
         // later version is known to be new rather than deliberately untieked.
         stamp_modules_at_save();
@@ -6920,6 +6933,15 @@ function ops_users($route, $method) {
             $allowedRoles = $globalMgr ? array_keys(ORG_ROLES) : ['OPERATION_MANAGER','ASST_MANAGER','COORDINATOR','INSPECTOR'];
             $role = in_array($b['role'] ?? '', $allowedRoles, true) ? $b['role'] : 'COORDINATOR';
             $isSuper = $role === 'MASTER_ADMIN' ? 1 : 0;
+            // Module 02 (hard guard, B) — only a Master Admin may create or change a
+            // Master Admin. A non-master user-manager can neither promote anyone
+            // (including themselves) to Master Admin, nor edit an existing master's
+            // account. Refused, not silently down-graded to another role.
+            $targetWasMaster = $user && ((($user['role'] ?? '') === 'MASTER_ADMIN') || !empty($user['is_superuser']));
+            if (!is_master() && ($isSuper || $targetWasMaster)) {
+                flash('Only a Master Admin can create or change a Master Admin account.', 'error');
+                redirect($user ? '/user-edit?id=' . (int)$user['id'] : '/users');
+            }
             // An existing team member picked from the list; '__new__' or blank is
             // resolved below, once the home office is known, into either a newly
             // created team member or a blocking error (a login must belong to
@@ -7050,8 +7072,34 @@ function ops_users($route, $method) {
             // they must replace it the moment they sign in, so it stops being shared.
             $mustChange = !empty($b['must_change_pwd']) ? 1 : 0;
             if ($user) {
+                // Module 02 (hard guard, B) — never demote the last active Master Admin
+                // on the edit form (the deactivate path already guards this; extend it to
+                // a role change), and never let anyone strip their OWN user-management.
+                $wasMaster = (($user['role'] ?? '') === 'MASTER_ADMIN') || !empty($user['is_superuser']);
+                if ($wasMaster && !$isSuper) {
+                    $otherMasters = (int)ops_val("SELECT COUNT(*) FROM users WHERE is_superuser=1 AND is_active=1 AND id<>?", [(int)$user['id']]);
+                    if ($otherMasters < 1) {
+                        flash('This is the last active Master Admin — create another Master Admin before changing this one\'s role.', 'error');
+                        redirect('/user-edit?id=' . (int)$user['id']);
+                    }
+                }
+                $meId = (int)(current_user()['id'] ?? 0);
+                if ((int)$user['id'] === $meId && !is_master() && $perms !== ''
+                    && !in_array('users.manage.branch', explode(',', $perms), true)
+                    && !in_array('users.manage.global', explode(',', $perms), true)) {
+                    flash('You cannot remove your own user-management access — ask another administrator to change it.', 'error');
+                    redirect('/user-edit?id=' . (int)$user['id']);
+                }
                 $pdo->prepare("UPDATE users SET username=?,first_name=?,last_name=?,email=?,role=?,is_superuser=?,is_active=?,inspector_id=?,home_office_id=?,scope_offices=?,scope_sbus=?,permissions=?,reports_to_id=?,reports_to_name=?,reports_to_position=?,reports_to_email=?,position_title=?,weekly_working_days=?,daily_hours=?,half_day_hours=? WHERE id=?")
                     ->execute([$b['username'], $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, !empty($b['is_active'])?1:0, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, $hHours, $user['id']]);
+                // Module 02 (A) — record the access change on the sealed audit chain:
+                // who granted whom which permission / role / scope, and when. Only when
+                // something that affects authorization actually changed.
+                $newRow = ['role' => $role, 'permissions' => $perms, 'is_superuser' => $isSuper,
+                    'is_active' => !empty($b['is_active']) ? 1 : 0, 'scope_offices' => $scopeOffices, 'scope_sbus' => $scopeSbus];
+                $adiff = function_exists('access_diff') ? access_diff($user, $newRow) : [];
+                if ($adiff) idems_log('user', (int)$user['id'], 'ACCESS_CHANGED',
+                    ['field' => $user['username'], 'reason' => 'by ' . user_name(current_user()), 'new' => $adiff]);
                 if ($canSalary) {
                     $pdo->prepare("UPDATE users SET monthly_ctc=?, is_production=? WHERE id=?")
                         ->execute([$ctc, $isProd, $user['id']]);
@@ -7081,8 +7129,14 @@ function ops_users($route, $method) {
                 $hash = password_hash($newPw !== '' ? $newPw : bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
                 $pdo->prepare("INSERT INTO users (username,password_hash,first_name,last_name,email,role,is_superuser,is_active,inspector_id,home_office_id,scope_offices,scope_sbus,permissions,reports_to_id,reports_to_name,reports_to_position,reports_to_email,position_title,weekly_working_days,daily_hours,half_day_hours,pwd_changed_at,must_change_pwd)
                     VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, $hHours, date('c'), $newPw === '' ? 1 : $mustChange]);
+                $newId = (int)$pdo->lastInsertId();
+                // Module 02 (A) — record the new login's initial access on the audit chain.
+                $adiff = function_exists('access_diff') ? access_diff(null,
+                    ['role' => $role, 'permissions' => $perms, 'is_superuser' => $isSuper, 'is_active' => 1,
+                     'scope_offices' => $scopeOffices, 'scope_sbus' => $scopeSbus]) : [];
+                if ($adiff) idems_log('user', $newId, 'ACCESS_CHANGED',
+                    ['field' => $b['username'], 'reason' => 'created by ' . user_name(current_user()), 'new' => $adiff]);
                 if ($canSalary) {
-                    $newId = (int)$pdo->lastInsertId();
                     $pdo->prepare("UPDATE users SET monthly_ctc=?, is_production=? WHERE id=?")
                         ->execute([$ctc, $isProd, $newId]);
                     if (!$isProd)

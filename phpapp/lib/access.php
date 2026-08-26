@@ -453,6 +453,29 @@ function user_effective_perms($u) {
     return role_perms($role);
 }
 
+// Module 02 — a plain-English diff of two users' RESOLVED access, for the audit
+// trail. Returns [] when nothing that matters to authorization changed, so a save
+// that touched only a name or a phone number writes no access-audit entry.
+function access_diff($oldRow, $newRow) {
+    $oldP = $oldRow ? user_effective_perms($oldRow) : [];
+    $newP = user_effective_perms($newRow);
+    $out = [];
+    if ((string)($oldRow['role'] ?? '') !== (string)($newRow['role'] ?? ''))
+        $out['role'] = [(string)($oldRow['role'] ?? ''), (string)($newRow['role'] ?? '')];
+    $granted = array_values(array_diff($newP, $oldP));
+    $revoked = array_values(array_diff($oldP, $newP));
+    if ($granted) $out['granted'] = $granted;
+    if ($revoked) $out['revoked'] = $revoked;
+    foreach (['scope_offices' => 'offices', 'scope_sbus' => 'business units'] as $k => $lbl)
+        if ((string)($oldRow[$k] ?? '') !== (string)($newRow[$k] ?? ''))
+            $out['scope_' . $lbl] = [(string)($oldRow[$k] ?? ''), (string)($newRow[$k] ?? '')];
+    if ((int)($oldRow['is_superuser'] ?? 0) !== (int)($newRow['is_superuser'] ?? 0))
+        $out['master'] = [(int)($oldRow['is_superuser'] ?? 0), (int)($newRow['is_superuser'] ?? 0)];
+    if ((int)($oldRow['is_active'] ?? 1) !== (int)($newRow['is_active'] ?? 1))
+        $out['active'] = [(int)($oldRow['is_active'] ?? 1), (int)($newRow['is_active'] ?? 1)];
+    return $out;
+}
+
 // The permissions an administrator is allowed to TOGGLE on the access editor. A
 // global user-manager may set anything; a branch-level manager may set only a safe
 // operational subset (never salary / global-user / settings). Used by BOTH the form

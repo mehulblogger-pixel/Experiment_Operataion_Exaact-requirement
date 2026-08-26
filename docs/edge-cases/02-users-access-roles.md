@@ -1,6 +1,10 @@
 # Module 02 — Users / Access / Roles · Edge-case analysis (pre-build)
 
-**Status:** 📝 SPEC — awaiting decision. P0.
+**Status:** ✅ BUILT (2026-08-26). Decision: **A + B** (observability AND the hard guards, on the
+user's explicit go). Permission-change audit on the sealed `idems_log` chain, a full effective-access
+review + toxic-combination detector, plus the "only a master mints/changes a master" and
+last-master/self-lockout-on-edit guards. Asserted by `tests/test_module02_access.php`. Matrix
+doc/UI reconciliation (§5-C) deferred. P0.
 
 ---
 

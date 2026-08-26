@@ -21,7 +21,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | # | Module | Priority | Status | Commit / date |
 |---|--------|----------|--------|----------------|
 | 01 | Masters | P2 | ⬜ | — |
-| 02 | Users / Access / Roles | P0 | 📝 edge-cases drafted (awaiting go) | — |
+| 02 | Users / Access / Roles | P0 | ✅ done & pushed | 2026-08-26 |
 | 03 | Quotations | P1 | ✅ done & pushed | 2026-08-25 |
 | 04 | Calls / Service Requests | P1 | ✅ done & pushed | 2026-08-24 |
 | 05 | Jobs (Job 360) | P1 | ✅ done & pushed | 2026-08-24 |
@@ -79,6 +79,40 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 02 — Users / Access / Roles · 2026-08-26
+**Decision:** **A + B** — the user explicitly approved the hard guards alongside the observability
+work. Matrix doc/UI reconciliation (§5-C) deferred.
+**Found:** the authorization model is clean (one `can()` choke point, master short-circuit → per-user
+CSV override → role default; pointwise SoD already enforced) with good dormant/2FA visibility. Gaps:
+(1) **no audit of permission/role/scope changes** — the sealed `idems_log` chain exists but the
+user-save logged only passwords; (2) **no full effective-permissions view** (only 8 powers shown)
+and **no toxic-combination detector**; (3) a **privilege-escalation hole** — a non-master global
+manager could set anyone's (incl. their own) role to `MASTER_ADMIN`; (4) the last-master/self-lockout
+guard existed only on *deactivate*, not on the *edit* save.
+**Added (A — observability, purely additive, no gate change):**
+- `access_diff($old,$new)` — a plain-English diff of two users' **resolved** access (role, granted/
+  revoked permissions, scope, master/active), empty when nothing authorization-relevant changed.
+- **Permission-change audit** — the per-user save (`ops_users`) now logs `ACCESS_CHANGED` and the
+  role-default editor (`ops_access`) logs `ROLE_DEFAULTS_CHANGED` to the sealed `idems_log` chain,
+  finally recording who granted whom what, when. Viewable where every other audit already is.
+- `access_toxic_combos()` + enriched `access_report()`/`access_effective_all()` — the Data Control
+  "Who can get at it" table now shows each user's **full** resolved permission count and a
+  **segregation-of-duties flags** panel: non-master users holding both sides of a maker/checker pair
+  (create+approve quotes, approve+issue reports, decide-complaint+close-CAPA, global-user-manage).
+  Advisory only — a master is never listed (holds all by design).
+**Added (B — hard guards, on the user's explicit go, changes who-can-do-what):**
+- **Only a master mints or changes a master** — a non-master user-manager can no longer promote
+  anyone (incl. themselves) to `MASTER_ADMIN`, nor edit an existing master's account. Closes the
+  privilege-escalation hole.
+- **Last-master / self-lockout guard on the edit save** — the last active master can't be demoted by
+  a role change on the edit form, and a user can't strip their own `users.manage.*`.
+**Preserved (verified by tests):** `can()` and the resolution order, `ua()`, `user_effective_perms`,
+`assignable_permissions`, the R3 preserve-unseen/reset-to-default behaviour, and every existing SoD
+gate — all unchanged. No permission granted or revoked; no new permission constant; no schema change.
+**Edge cases:** `docs/edge-cases/02-users-access-roles.md`.
+**Tests:** `tests/test_module02_access.php` (21 assertions). Suite 2707 passed / 3 pre-existing
+baseline failures.
 
 ### Module 10 — Client Portal · 2026-08-25
 **Decision:** (A) register-backed portal invoices + close the intra-client site-scope hole; a
