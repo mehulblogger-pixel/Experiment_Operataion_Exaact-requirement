@@ -333,6 +333,12 @@ function ops_migrate() {
     ensure_column('jobs', 'inspection_dates', "VARCHAR(600) DEFAULT ''");
     ensure_column('jobs', 'folder_link', "VARCHAR(500) DEFAULT ''");
     ensure_column('jobs', 'contract_number', "VARCHAR(80) DEFAULT ''");
+    // Phase 2 §30 — frozen cost basis, so a closed job's profit is reproducible and
+    // does not drift with today's salary / office % / holidays / calendar month.
+    ensure_column('jobs', 'cost_daily_base', "DECIMAL(18,6) DEFAULT 0");
+    ensure_column('jobs', 'cost_oh_pct', "DECIMAL(8,4) DEFAULT 0");
+    ensure_column('jobs', 'cost_contingency_pct', "DECIMAL(8,4) DEFAULT 0");
+    ensure_column('jobs', 'cost_basis_at', "VARCHAR(30) DEFAULT ''");
     // §WO-9 — a job closed without both site check-ins carries the manager's
     // override on the record, and the lapse feeds the inspector's rating.
     ensure_column('jobs', 'attendance_missing', 'INT DEFAULT 0');
@@ -1640,12 +1646,26 @@ function job_profit($job, $officeId = null) {
     // overhead inside "salary" and there is then no line to point at. Here the
     // salary is the salary and the overhead is its own line, and the two add up
     // to exactly what the loaded rate would have given.
-    $salary_ctc = $job['inspector_id']
-        ? (float)ops_val("SELECT salary_ctc + COALESCE(agency_cost,0) FROM inspectors WHERE id=?", [$job['inspector_id']])
-        : 0;
-    $wd = working_days_in_month((int)date('Y'), (int)date('n'));
-    $dailyBase = ($salary_ctc && $wd > 0) ? ($salary_ctc / 12) / $wd : 0;
-    $ohPct = office_overhead_pct($office);
+    // Phase 2 §30 — historical reproducibility. The only rate-volatile inputs are the
+    // unloaded daily base (salary ÷ 12 ÷ working-days), the office overhead % and the
+    // contingency %. A CLOSED job freezes these onto itself (cost_basis_at set), so its
+    // profit is reproducible and does NOT drift when today's salary, office %, holidays,
+    // or the calendar month change. An open / un-snapshotted job computes live exactly as
+    // before — nothing changes for it, and a snapshot equals the live value at snapshot
+    // time (so freezing an old job changes no displayed number, only stops future drift).
+    if (trim((string)($job['cost_basis_at'] ?? '')) !== '') {
+        $dailyBase = (float)($job['cost_daily_base'] ?? 0);
+        $ohPct     = (float)($job['cost_oh_pct'] ?? 0);
+        $contPct   = (float)($job['cost_contingency_pct'] ?? 0);
+    } else {
+        $salary_ctc = $job['inspector_id']
+            ? (float)ops_val("SELECT salary_ctc + COALESCE(agency_cost,0) FROM inspectors WHERE id=?", [$job['inspector_id']])
+            : 0;
+        $wd = working_days_in_month((int)date('Y'), (int)date('n'));
+        $dailyBase = ($salary_ctc && $wd > 0) ? ($salary_ctc / 12) / $wd : 0;
+        $ohPct   = office_overhead_pct($office);
+        $contPct = office_contingency_pct($office);
+    }
     $labour   = $bearsCost ? round($dailyBase * $mandays, 2) : 0;
     $overhead = $bearsCost ? round($labour * $ohPct / 100, 2) : 0;
     $daily    = $dailyBase * (1 + $ohPct / 100);          // the loaded rate, for display
@@ -1671,7 +1691,7 @@ function job_profit($job, $officeId = null) {
         ? min(job_recovered_total($job), $expenses + $voucher) : 0;
 
     $direct = $labour + $overhead + $expenses + $voucher + $subcon + $other - $recovered;
-    $contingency = round($direct * office_contingency_pct($office) / 100, 2);
+    $contingency = round($direct * $contPct / 100, 2);
     $cost = round($direct + $contingency, 2);
     $profit = round($revenue - $cost, 2);
 
@@ -1681,7 +1701,7 @@ function job_profit($job, $officeId = null) {
         'expenses' => $expenses, 'voucher' => $voucher, 'subcon' => $subcon, 'other' => $other,
         'recovered' => $recovered,
         'chargeable' => function_exists('chargeable_head_labels') ? chargeable_head_labels($job) : [],
-        'contingency' => $contingency, 'contingency_pct' => office_contingency_pct($office),
+        'contingency' => $contingency, 'contingency_pct' => $contPct,
         'cost' => $cost,
         'revenue' => $revenue,
         'invoice' => $m['invoice'], 'billed' => $m['billed'], 'own_credit' => $m['credit'],
@@ -1692,6 +1712,40 @@ function job_profit($job, $officeId = null) {
         'profit' => $profit,
         'margin' => $revenue > 0 ? round($profit / $revenue * 100, 1) : null,
     ];
+}
+
+// Phase 2 §30 — freeze a job's rate basis so its profit is reproducible. Captures the
+// CURRENT live daily-base / overhead% / contingency% (identical to job_profit's live
+// path) onto the job. Idempotent: a job already frozen is left alone (so a re-close or a
+// backfill never re-freezes at a later, different rate). Called at job close and by the
+// nightly backfill. Freezing equals the live value at freeze time, so it changes no
+// displayed number — it only stops future drift.
+function job_cost_snapshot($jobId, $force = false) {
+    $jobId = (int)$jobId;
+    $job = ops_one("SELECT id, executing_office_id, inspector_id, cost_basis_at FROM jobs WHERE id=?", [$jobId]);
+    if (!$job) return false;
+    if (!$force && trim((string)($job['cost_basis_at'] ?? '')) !== '') return false;
+    $office = $job['executing_office_id'] ?? null;
+    $salary = $job['inspector_id']
+        ? (float)ops_val("SELECT salary_ctc + COALESCE(agency_cost,0) FROM inspectors WHERE id=?", [$job['inspector_id']]) : 0;
+    $wd = working_days_in_month((int)date('Y'), (int)date('n'));
+    $dailyBase = ($salary && $wd > 0) ? ($salary / 12) / $wd : 0;
+    try {
+        db()->prepare("UPDATE jobs SET cost_daily_base=?, cost_oh_pct=?, cost_contingency_pct=?, cost_basis_at=? WHERE id=?")
+            ->execute([round($dailyBase, 6), office_overhead_pct($office), office_contingency_pct($office), date('c'), $jobId]);
+    } catch (Throwable $e) { return false; }
+    return true;
+}
+// Freeze already-closed jobs that have no basis yet, using their CURRENT live value —
+// today's displayed profit is unchanged, but from now on it cannot drift. Bounded; safe
+// to run repeatedly (nightly). Returns the count frozen.
+function jobs_backfill_cost_basis($limit = 500) {
+    $n = 0;
+    try {
+        $rows = ops_all("SELECT id FROM jobs WHERE closed_flag=1 AND COALESCE(cost_basis_at,'')='' LIMIT " . max(1, (int)$limit)) ?: [];
+        foreach ($rows as $r) if (job_cost_snapshot((int)$r['id'])) $n++;
+    } catch (Throwable $e) {}
+    return $n;
 }
 
 // What the engineer claimed on their monthly voucher against this job. Kept
@@ -5959,6 +6013,8 @@ function ops_jobs($route, $method) {
             $needsApproval = ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate !== '') ? 'PENDING' : '';
             $pdo->prepare("UPDATE jobs SET closed_flag=1, closed_at=?, report_upload_date=?, report_link=?, tat_days=?, report_approval=? WHERE id=?")
                 ->execute([date('c'), $reportDate, $b['report_link'] ?? '', $tat, $needsApproval, $job['id']]);
+            // Phase 2 §30 — freeze this job's cost basis at close so its profit is reproducible.
+            if (function_exists('job_cost_snapshot')) job_cost_snapshot((int)$job['id']);
             send_closure_email($job['id']);
             if ($needsApproval === 'PENDING') report_approval_notify($job['id']);
             flash("Job {$job['job_code']} closed. TAT " . ($tat === null ? '—' : $tat) . " day(s). Closure email sent.");

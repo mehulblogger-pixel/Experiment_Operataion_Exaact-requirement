@@ -362,3 +362,11 @@ if (function_exists('idems_reseal_failed')) {
     try { $rs = idems_reseal_failed(); if ($rs) echo "Report seals repaired: $rs\n"; }
     catch (Throwable $e) { echo "Seal repair: failed — " . $e->getMessage() . "\n"; }
 }
+
+// Phase 2 §30 — freeze the cost basis of any closed job that has none yet (a close
+// path that did not snapshot, or a pre-feature job). Uses the CURRENT live value, so
+// today's displayed profit is unchanged and future drift stops. Bounded per run.
+if (function_exists('jobs_backfill_cost_basis')) {
+    try { $bf = jobs_backfill_cost_basis(); if ($bf) echo "Job cost bases frozen: $bf\n"; }
+    catch (Throwable $e) { echo "Cost-basis backfill: failed — " . $e->getMessage() . "\n"; }
+}
