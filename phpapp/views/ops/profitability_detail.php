@@ -24,6 +24,43 @@
   <?php endif; ?>
 </div>
 
+<?php // Module 20 — did this contract make its bid margin? Estimated (the pre-award
+      // costing) vs Actual (boss_profit — the one canonical actuals engine).
+$eva = function_exists('pc_estimate_vs_actual') ? pc_estimate_vs_actual((int)$boss['id']) : null; ?>
+<?php if ($eva): $v = $eva['var']; ?>
+<div class="panel" style="margin-top:16px;border-left:3px solid var(--<?= ($seeSal && $v['pct']!==null) ? ($v['pct']>=0?'ok':'bad') : 'line' ?>)">
+  <h3 class="tab-sub" style="margin-top:0">Estimated vs actual — did it make its bid margin?</h3>
+  <p class="sub" style="margin-top:0">The pre-award costing<?= !empty($eva['costing']['code']) ? ' (' . e($eva['costing']['code']) . ')' : '' ?> against what the contract actually delivered.
+    Actuals are the same figures as the tiles above; the estimate is the approved bid.</p>
+  <div class="tbl-scroll" style="overflow-x:auto">
+  <table class="dt">
+    <thead><tr><th></th><th class="num">Revenue</th><th class="num">Cost</th><th class="num">Profit</th><th class="num">Margin %</th></tr></thead>
+    <tbody>
+      <tr><td><b>Estimated (bid)</b></td>
+        <td class="num"><?= fmoney_short($eva['est']['revenue']) ?></td>
+        <td class="num"><?= fmoney_short($eva['est']['cost']) ?></td>
+        <td class="num"><?= fmoney_short($eva['est']['profit']) ?></td>
+        <td class="num"><?= $eva['est']['pct']!==null ? e($eva['est']['pct']).'%' : '—' ?></td></tr>
+      <tr><td><b>Actual</b> <?= $seeSal ? '' : '<span class="muted" style="font-size:11px">(labour hidden)</span>' ?></td>
+        <td class="num"><?= fmoney_short($eva['act']['revenue']) ?></td>
+        <td class="num"><?= $seeSal ? fmoney_short($eva['act']['cost']) : '—' ?></td>
+        <td class="num"><?= $seeSal ? fmoney_short($eva['act']['profit']) : '—' ?></td>
+        <td class="num"><?= ($seeSal && $eva['act']['pct']!==null) ? e($eva['act']['pct']).'%' : '—' ?></td></tr>
+      <?php if ($seeSal): ?>
+      <tr style="font-weight:600;border-top:2px solid var(--line)"><td>Variance (actual − bid)</td>
+        <td class="num">—</td><td class="num">—</td>
+        <td class="num <?= $v['profit']>=0?'up':'down' ?>"><?= fmoney_short($v['profit']) ?></td>
+        <td class="num"><?= $v['pct']!==null ? (($v['pct']>=0?'+':'').e($v['pct'])).' pts' : '—' ?></td></tr>
+      <?php endif; ?>
+    </tbody>
+  </table></div>
+  <?php if ($seeSal && $eva['est']['pct']!==null && $eva['act']['pct']!==null): ?>
+    <p style="margin:8px 0 0"><b><?= $v['pct']>=0 ? '✓ Beat' : '⚠ Missed' ?></b> its bid margin by <?= e(abs($v['pct'])) ?> point(s) —
+      bid <?= e($eva['est']['pct']) ?>%, actual <?= e($eva['act']['pct']) ?>%. <span class="muted">Actuals still accrue until the contract closes.</span></p>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <div class="panel" style="padding:0;overflow:hidden;margin-top:16px">
   <h3 class="tab-sub" style="padding:14px 18px 0;margin-top:0">Expense lines — who visited which vendor, and the cost</h3>
   <div class="tbl-scroll" style="overflow-x:auto">

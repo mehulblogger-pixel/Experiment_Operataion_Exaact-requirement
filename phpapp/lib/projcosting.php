@@ -145,6 +145,49 @@ function pc_all($limit = 200) {
 // The costing linked to a given quotation / opportunity (or null).
 function pc_for_quote($qid) { pc_migrate(); return $qid ? (ops_one("SELECT * FROM project_costings WHERE quote_id=? ORDER BY id DESC LIMIT 1", [(int)$qid]) ?: null) : null; }
 function pc_for_opportunity($oid) { pc_migrate(); return $oid ? (ops_one("SELECT * FROM project_costings WHERE opportunity_id=? ORDER BY id DESC LIMIT 1", [(int)$oid]) ?: null) : null; }
+
+// Module 20 — the bid estimate behind a CONTRACT (a boss number). A boss number
+// IS the contract number (created from the winning quotation), so the estimate is
+// found by matching the boss number to the contract number carried on the quote
+// the costing is linked to. Derived on read — no stored column, works for existing
+// data — and prefers the APPROVED costing, then the latest. Null when a contract
+// was won without a pre-award costing (a direct win, or legacy).
+function pc_for_boss($bossId) {
+    pc_migrate();
+    $bossId = (int)$bossId; if (!$bossId) return null;
+    $boss = ops_one("SELECT boss_number, client_id FROM boss_numbers WHERE id=?", [$bossId]);
+    $num = trim((string)($boss['boss_number'] ?? ''));
+    if ($num === '') return null;
+    return ops_one(
+        "SELECT pc.* FROM project_costings pc
+         JOIN quotations q ON q.id = pc.quote_id
+         WHERE q.contract_number = ?
+         ORDER BY (pc.status='APPROVED') DESC, pc.id DESC LIMIT 1", [$num]) ?: null;
+}
+
+// Module 20 — Estimated (the bid) vs Actual (the delivered contract), side by
+// side. Reuses the ONE canonical actuals engine (boss_profit) and the estimate's
+// own rollup (exp_*); it invents no new margin number — variance is subtraction.
+// Null when no bid estimate is linked to the contract.
+function pc_estimate_vs_actual($bossId) {
+    $pc = pc_for_boss($bossId);
+    if (!$pc || !function_exists('boss_profit')) return null;
+    $act = boss_profit((int)$bossId);
+    $estRev = (float)($pc['exp_revenue'] ?? 0);
+    $estCost = (float)($pc['exp_cost'] ?? 0);
+    $estProfit = (float)($pc['exp_profit'] ?? ($estRev - $estCost));
+    $estPct = $estRev > 0 ? round($estProfit / $estRev * 100, 1) : null;
+    $actRev = (float)($act['revenue'] ?? 0);
+    $actProfit = (float)($act['margin'] ?? 0);
+    $actPct = $act['pct'] ?? null;
+    return [
+        'costing' => $pc,
+        'est' => ['revenue' => $estRev, 'cost' => $estCost, 'profit' => $estProfit, 'pct' => $estPct],
+        'act' => ['revenue' => $actRev, 'cost' => round($actRev - $actProfit, 2), 'profit' => $actProfit, 'pct' => $actPct],
+        'var' => ['profit' => round($actProfit - $estProfit, 2),
+                  'pct' => ($actPct !== null && $estPct !== null) ? round($actPct - $estPct, 1) : null],
+    ];
+}
 // Costings not yet linked to any quote/opportunity — the "attach existing" list.
 function pc_unlinked($limit = 100) {
     pc_migrate();

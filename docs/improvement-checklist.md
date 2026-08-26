@@ -39,7 +39,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 17 | Leads | P2 | ⬜ | — |
 | 18 | Orders / Contracts (Contract 360) | P1 | ⬜ | — |
 | 19 | Inquiries / Requirements | P2 | ⬜ | — |
-| 20 | Project Costing | P1 | ⬜ | — |
+| 20 | Project Costing | P1 | ✅ done & pushed | 2026-08-26 |
 | 21 | Hold / Witness Points | P0 | ✅ done & pushed | 2026-08-24 |
 | 22 | Complaints | P1 | ✅ done & pushed | 2026-08-24 |
 | 23 | Equipment (Equipment 360) | P1 | ✅ done & pushed | 2026-08-25 |
@@ -79,6 +79,33 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 20 — Project Costing · 2026-08-26
+**Decision:** (A) estimate-vs-actual reconciliation + the first estimate-math tests. Margin-floor
+guard and CTC-derived manpower deferred.
+**Found:** project costing (`lib/projcosting.php`) is a **pre-award estimate only** — nothing rolls
+**actual** cost up against the bid, and structurally the estimate couldn't even be joined to the
+contract (no `boss_id`/`contract_number` on `project_costings`). So "did this project make its bid
+margin?" was unanswerable. The actuals engine (`boss_profit`) never reads the estimate.
+**Added (additive, read-only, one canonical engine):**
+- `pc_for_boss($bossId)` — links a contract (a `boss_numbers` row) to its bid costing by matching the
+  boss number to `quotations.contract_number` (a boss number **is** the contract number). Implemented
+  **derive-on-read** — no schema change at all, works for existing data — preferring the APPROVED
+  costing. Null when a contract was won without a pre-award costing.
+- `pc_estimate_vs_actual($bossId)` — Estimated (`exp_revenue/cost/profit` from `pc_rollup`) vs Actual
+  (`boss_profit` — the sole actuals engine) with a variance. **Invents no new margin formula.**
+- An **"Estimated vs actual — did it make its bid margin?"** panel on the `data.profitability`-gated
+  profitability detail, with a "beat/missed by N points" line. Actual cost/profit stay behind
+  `can_see_salary()` exactly as the rest of the screen does — no cost/margin reaches a role that
+  couldn't already see contract profitability.
+- The **first unit tests** over the estimate math (`pc_line_calc`/`pc_rollup`) — the seed's
+  "hand-checkable" numbers are finally checked.
+**Preserved (verified by tests):** the estimate engine, the actuals engine (`boss_profit`), the
+profitability gate and `pc_can()` — all unchanged. No new permission; no schema change; no widened
+exposure; nothing deleted.
+**Edge cases:** `docs/edge-cases/20-project-costing.md`.
+**Tests:** `tests/test_module20_costing.php` (20 assertions). Suite 2745 passed / 3 pre-existing
+baseline failures.
 
 ### Module 11 — Vendor / Supplier-Inspector Portal · 2026-08-26
 **Decision:** (A) vendor qualification visibility + expiry alert. Vendor-perms admin UI and a vendor
