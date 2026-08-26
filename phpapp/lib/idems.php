@@ -9056,23 +9056,61 @@ function idems_content_payload($doc) {
 }
 function idems_content_seal_compute($doc) { return hash('sha256', idems_content_payload($doc)); }
 
-// Freeze the seal at issue. Wrapped: sealing is defence-in-depth and must never
-// be what stops a report being issued.
+// Sentinel written when the seal COULD NOT be computed/stored at issue, so a
+// failed seal is never indistinguishable from a legitimately-old (pre-feature)
+// report. Phase 2 §11: the seal was fail-open — an error here left the report
+// looking "unsealed / ok", masking that it should have been sealed.
+const IDEMS_SEAL_FAILED = 'SEAL_FAILED';
+
+// Freeze the seal at issue. Sealing must never STOP a report being issued (that
+// would strand issuance), but a failure must be VISIBLE and self-heal, not
+// silent. Returns true on success. On failure it marks the report SEAL_FAILED
+// (only when currently empty) so verification flags it and cron re-seals it.
 function idems_seal_content($docId) {
     try {
         $d = ops_one("SELECT * FROM report_docs WHERE id=?", [(int)$docId]);
-        if ($d) db()->prepare("UPDATE report_docs SET content_seal=? WHERE id=?")
+        if (!$d) return false;
+        db()->prepare("UPDATE report_docs SET content_seal=? WHERE id=?")
             ->execute([idems_content_seal_compute($d), (int)$docId]);
-    } catch (Throwable $e) { /* never block issue */ }
+        return true;
+    } catch (Throwable $e) {
+        try {
+            db()->prepare("UPDATE report_docs SET content_seal=? WHERE id=? AND COALESCE(content_seal,'')=''")
+                ->execute([IDEMS_SEAL_FAILED, (int)$docId]);
+        } catch (Throwable $e2) { /* if even the marker cannot be written, issue still proceeds */ }
+        return false;
+    }
 }
 
-// At verification: is the sealed content still intact? A report issued before
-// this feature has no seal and cannot be judged, so it is reported unsealed
-// rather than failed.
+// At verification: is the sealed content still intact?
+//  - empty seal  → pre-feature report (issued before sealing existed): unsealed, not a failure.
+//  - SEAL_FAILED → the seal could not be written at issue: NOT ok (needs re-seal), but it is a
+//    seal problem, not "content altered" — the public /verify page (which only shows the row when
+//    sealed=true) stays silent; internal surfaces read `problem` to flag it.
+//  - real hash   → compare; mismatch means the content was altered.
 function idems_content_check($doc) {
     $seal = (string)($doc['content_seal'] ?? '');
     if ($seal === '') return ['sealed' => false, 'ok' => true];
+    if ($seal === IDEMS_SEAL_FAILED) return ['sealed' => false, 'ok' => false, 'problem' => 'seal_failed'];
     return ['sealed' => true, 'ok' => hash_equals($seal, idems_content_seal_compute($doc))];
+}
+
+// Phase 2 §11 — re-seal any issued report whose seal failed to write at issue.
+// Issued content is edit-locked/immutable, so a later re-seal computes the same
+// hash it would have at issue. Safe to run repeatedly (cron); returns the count
+// re-sealed. Also lets an admin heal a transient DB hiccup without reissuing.
+function idems_reseal_failed($limit = 200) {
+    $n = 0;
+    try {
+        $rows = ops_all("SELECT id FROM report_docs WHERE content_seal=? LIMIT " . max(1, (int)$limit),
+                        [IDEMS_SEAL_FAILED]) ?: [];
+        foreach ($rows as $r) if (idems_seal_content((int)$r['id'])) $n++;
+    } catch (Throwable $e) {}
+    return $n;
+}
+function idems_seal_failed_count() {
+    try { return (int)ops_val("SELECT COUNT(*) FROM report_docs WHERE content_seal=?", [IDEMS_SEAL_FAILED]); }
+    catch (Throwable $e) { return 0; }
 }
 
 // Who at the client should be told a report is ready. Portal users the client
@@ -10144,6 +10182,11 @@ function idems_compliance_checks() {
     if ($fails >= 5) $out[] = ['sev'=>'medium', 'text'=>$fails . ' failed login attempt(s) in the last 7 days.', 'link'=>'/audit-log?action=LOGIN_FAILED'];
     $del = $n("SELECT COUNT(*) FROM report_docs WHERE deleted=1");
     if ($del) $out[] = ['sev'=>'low', 'text'=>$del . ' report(s) are soft-deleted (retained for audit; never removed).', 'link'=>'/audit-log?action=DELETE'];
+    // Phase 2 §11 — an issued report whose content seal failed to write. The nightly
+    // cron re-seals these automatically; a lingering count means the DB write keeps
+    // failing and needs attention (the seal is what /verify uses to prove integrity).
+    if (function_exists('idems_seal_failed_count')) { $sf = idems_seal_failed_count();
+        if ($sf) $out[] = ['sev'=>'high', 'text'=>$sf . ' issued report(s) could not be content-sealed — verification cannot prove them unaltered until re-sealed.', 'link'=>'/documents']; }
     return $out;
 }
 // Module 42 — Change control. There is no single change-control register: each controlled

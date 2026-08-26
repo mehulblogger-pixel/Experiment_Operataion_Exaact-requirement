@@ -354,3 +354,11 @@ if (function_exists('integrity_run') && (string)setting_get('integrity_run_day',
         echo "Data integrity: run failed — " . $e->getMessage() . "\n";
     }
 }
+
+// Phase 2 §11 — re-seal any issued report whose content seal failed to write at
+// issue (transient DB hiccup). Issued content is immutable, so the re-seal hash
+// equals what it would have been at issue. Self-healing; no-op when none pending.
+if (function_exists('idems_reseal_failed')) {
+    try { $rs = idems_reseal_failed(); if ($rs) echo "Report seals repaired: $rs\n"; }
+    catch (Throwable $e) { echo "Seal repair: failed — " . $e->getMessage() . "\n"; }
+}
