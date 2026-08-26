@@ -21,7 +21,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | # | Module | Priority | Status | Commit / date |
 |---|--------|----------|--------|----------------|
 | 01 | Masters | P2 | ⬜ | — |
-| 02 | Users / Access / Roles | P0 | ⬜ | — |
+| 02 | Users / Access / Roles | P0 | 📝 edge-cases drafted (awaiting go) | — |
 | 03 | Quotations | P1 | ✅ done & pushed | 2026-08-25 |
 | 04 | Calls / Service Requests | P1 | ✅ done & pushed | 2026-08-24 |
 | 05 | Jobs (Job 360) | P1 | ✅ done & pushed | 2026-08-24 |
