@@ -688,11 +688,52 @@ function setting_get($k, $def = null) {
     $cache = &settings_cache();
     return array_key_exists($k, $cache) ? $cache[$k] : $def;
 }
+// Module 14 — is a settings change a controlled, auditable event, and is its
+// value a secret? System/bootstrap markers (schema/seed/cfg signatures) are NOT
+// user configuration — logging them would flood the chain and fire during
+// migration — so they are skipped. Secrets (passwords, API keys, tokens) are
+// audited as an event, but the value itself is never written to the trail.
+function setting_change_class($k) {
+    $k = (string)$k;
+    // Internal bootstrap / cache markers — not configuration.
+    if (preg_match('/(_seeded(_v\d+)?|_repaired(_v\d+)?|_sig|_checked_at)$/', $k)) return ['audit' => false, 'secret' => false];
+    if (in_array($k, ['setup_done', 'schema_sig', 'admin_cfg_sig', 'partners_seeded',
+                      'demo_seed_last_fail', 'demo_removed', 'billing_paid_until'], true)) return ['audit' => false, 'secret' => false];
+    $secret = (bool)preg_match('/(pass|secret|token|api_?key|ai_config|rzp_key)/i', $k);
+    return ['audit' => true, 'secret' => $secret];
+}
 function setting_set($k, $v) {
+    $cache = &settings_cache();
+    $prev  = array_key_exists($k, $cache) ? $cache[$k] : null; // capture BEFORE the overwrite
     $pdo = db();
     if (db_driver() === 'sqlite') $pdo->prepare("INSERT INTO settings (skey,svalue) VALUES (?,?) ON CONFLICT(skey) DO UPDATE SET svalue=excluded.svalue")->execute([$k, $v]);
     else $pdo->prepare("INSERT INTO settings (skey,svalue) VALUES (?,?) ON DUPLICATE KEY UPDATE svalue=VALUES(svalue)")->execute([$k, $v]);
-    $cache = &settings_cache(); $cache[$k] = $v; // keep in-memory cache fresh
+    $cache[$k] = $v; // keep in-memory cache fresh
+    // Module 14 — record WHO changed WHICH setting, on the sealed audit chain that
+    // already supports a 'setting' entity. Additive: the write above is unchanged;
+    // logging never blocks it (guarded, and skipped for system keys / no-op writes).
+    static $inLog = false;
+    if (!$inLog && (string)$prev !== (string)$v && function_exists('idems_log')) {
+        $cls = setting_change_class($k);
+        if ($cls['audit']) {
+            $inLog = true;
+            try {
+                if ($cls['secret']) {
+                    // Log the event, never the value.
+                    $old = ($prev === null || $prev === '') ? '(unset)' : '(set)';
+                    $new = ($v === '' || $v === null) ? '(cleared)' : '(updated)';
+                } else {
+                    // Keep the trail lean: summarise very large values (logo base64,
+                    // role_access JSON) rather than copying them into every entry.
+                    $cap = function ($s) { $s = (string)$s; return strlen($s) > 200 ? '(' . strlen($s) . ' chars changed)' : $s; };
+                    $old = ($prev === null) ? '(unset)' : $cap($prev);
+                    $new = $cap($v);
+                }
+                idems_log('setting', 0, 'SETTING_CHANGED', ['field' => $k, 'old' => $old, 'new' => $new]);
+            } catch (Throwable $e) { /* logging must never break a save */ }
+            $inLog = false;
+        }
+    }
 }
 
 // ---- Financial year (start month is a setting; default April) --------------

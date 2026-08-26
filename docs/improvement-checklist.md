@@ -33,7 +33,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 11 | Vendor / Supplier-Inspector Centre | P1 | ✅ done & pushed | 2026-08-26 |
 | 12 | NCR | P1 | ✅ done & pushed | 2026-08-24 |
 | 13 | CAPA | P2 | ✅ done & pushed | 2026-08-24 |
-| 14 | Settings | P2 | ⬜ | — |
+| 14 | Settings | P2 | ✅ done & pushed | 2026-08-26 |
 | 15 | Clients / Customer 360 | P2 | ✅ done & pushed | 2026-08-24 |
 | 16 | Vendors / Vendor 360 | P2 | ✅ done & pushed | 2026-08-24 |
 | 17 | Leads | P2 | ✅ done & pushed | 2026-08-26 |
@@ -79,6 +79,33 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 14 — Settings · 2026-08-26
+**Decision:** (A) record every settings change on the sealed audit chain at the one choke-point every
+surface shares — `setting_set()`. Env-var-override transparency banners, a key registry/orphan
+detector, and per-office setting scope deferred (separate concerns / schema change).
+**Found:** ~219 settings keys, 616 call sites, multiple admin surfaces (primary screen, company
+profile, AI keys, module toggles, `role_access`) — **all funnel through `setting_set()` and none
+left an audit trace**, even though the sealed chain already supports a `'setting'` entity (used
+exactly once). Security-relevant config (password policy, session timeouts, 2FA roles, audit
+retention, job-lock disable, module on/off) changed untracked.
+**Added (additive; one choke-point; no access change):**
+- `setting_set()` now logs `idems_log('setting', 0, 'SETTING_CHANGED', [field, old, new])` after its
+  unchanged write — covering every settings surface at once.
+- `setting_change_class($key)` — auditable vs system/bootstrap (`*_seeded*`, `*_sig`, `*_checked_at`,
+  `schema_sig`, `setup_done`, …, never audited) vs secret (`pass`/`secret`/`token`/`api_key`/
+  `ai_config`/`rzp_key` → event recorded, value never written).
+- No-op writes log nothing; oversized values (logo base64, role_access JSON) summarised as
+  `(N chars changed)`; reentrancy guard + try/catch so logging never blocks a save.
+- A 🛡️ note on `/settings` linking to `/audit-log?action=SETTING_CHANGED`.
+**Preserved:** the `settings` table, `setting_get`, the UPSERT, `ops_settings`, `licence_save`,
+company/AI screens and their `settings.manage`/`is_master` gates — all unchanged. No new permission;
+no schema change; nothing deleted.
+**Edge cases:** old value captured before overwrite; secrets never leak to the trail; system churn
+kept off the chain; safe during bootstrap (idems_log self-degrades before the audit table exists).
+**Tests:** `test_module14_settings.php` (24 assertions). Suite 2996 passing (only the 3 pre-existing
+baseline failures remain).
+**Spec:** `docs/edge-cases/14-settings.md`.
 
 ### Module 42 — Change control · 2026-08-26
 **Decision:** (A) seal the one supersede that fell off the chain + a consolidated read-only "recent

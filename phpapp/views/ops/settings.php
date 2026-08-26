@@ -3,6 +3,13 @@
 <p class="sub">Company-wide options — financial year, branding and dashboards.
   <a href="/preflight">Server check &amp; version <?= e(APP_VERSION) ?> →</a></p>
 
+<?php // Module 14 — every configuration change is now recorded on the sealed audit
+      // chain (who, when, old → new). Secrets record the event, never the value. ?>
+<?php if (is_master() || can('idems.audit.view')): ?>
+<p class="muted" style="font-size:12px;margin:-4px 0 10px">🛡️ Changes here are recorded on the audit trail —
+  <a href="/audit-log?action=SETTING_CHANGED">see who changed what →</a></p>
+<?php endif; ?>
+
 <?php // Which parts of the product this installation runs. Its own form, because
       // switching a module off changes what everybody can see and should not be
       // saved by accident alongside a logo upload. ?>
