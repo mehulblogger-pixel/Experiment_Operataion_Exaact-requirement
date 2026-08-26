@@ -229,6 +229,12 @@ function idems_migrate() {
         action VARCHAR(20) DEFAULT '', note VARCHAR(600) DEFAULT '',
         acted_by VARCHAR(150) DEFAULT '', acted_at VARCHAR(30) DEFAULT '')");
     if (function_exists('ensure_column')) {
+        // Phase 2 §9 — structured return-to-inspector detail (which section/field + a deadline)
+        // alongside the free-text note, on both the vetting return and the approver reject/sendback.
+        ensure_column('report_vetting', 'correction_area', "VARCHAR(200) DEFAULT ''");
+        ensure_column('report_vetting', 'correction_deadline', "VARCHAR(20) DEFAULT ''");
+        ensure_column('report_approvals', 'correction_area', "VARCHAR(200) DEFAULT ''");
+        ensure_column('report_approvals', 'correction_deadline', "VARCHAR(20) DEFAULT ''");
         ensure_column('report_docs', 'vet_status', "VARCHAR(20) DEFAULT ''");
         ensure_column('report_docs', 'vet_at', "VARCHAR(30) DEFAULT ''");
         ensure_column('report_docs', 'vet_by', "VARCHAR(150) DEFAULT ''");
@@ -5892,10 +5898,12 @@ function idems_provenance($doc) {
 function idems_latest_return($doc) {
     $id = (int)($doc['id'] ?? 0); if (!$id) return null;
     $cands = [];
-    $v = ops_one("SELECT note, acted_by, acted_at FROM report_vetting WHERE report_doc_id=? AND action='RETURNED' ORDER BY id DESC LIMIT 1", [$id]);
-    if ($v) $cands[] = ['kind'=>'vetting', 'reason'=>(string)$v['note'], 'by'=>(string)$v['acted_by'], 'at'=>(string)$v['acted_at']];
-    $a = ops_one("SELECT remarks, acted_by, acted_at, status FROM report_approvals WHERE report_doc_id=? AND status IN ('REJECTED','SENTBACK') ORDER BY COALESCE(acted_at,'') DESC, id DESC LIMIT 1", [$id]);
-    if ($a) $cands[] = ['kind'=>($a['status'] === 'REJECTED' ? 'reject' : 'sendback'), 'reason'=>(string)$a['remarks'], 'by'=>(string)$a['acted_by'], 'at'=>(string)$a['acted_at']];
+    $v = ops_one("SELECT note, acted_by, acted_at, correction_area, correction_deadline FROM report_vetting WHERE report_doc_id=? AND action='RETURNED' ORDER BY id DESC LIMIT 1", [$id]);
+    if ($v) $cands[] = ['kind'=>'vetting', 'reason'=>(string)$v['note'], 'by'=>(string)$v['acted_by'], 'at'=>(string)$v['acted_at'],
+                        'area'=>(string)($v['correction_area'] ?? ''), 'deadline'=>(string)($v['correction_deadline'] ?? '')];
+    $a = ops_one("SELECT remarks, acted_by, acted_at, status, correction_area, correction_deadline FROM report_approvals WHERE report_doc_id=? AND status IN ('REJECTED','SENTBACK') ORDER BY COALESCE(acted_at,'') DESC, id DESC LIMIT 1", [$id]);
+    if ($a) $cands[] = ['kind'=>($a['status'] === 'REJECTED' ? 'reject' : 'sendback'), 'reason'=>(string)$a['remarks'], 'by'=>(string)$a['acted_by'], 'at'=>(string)$a['acted_at'],
+                        'area'=>(string)($a['correction_area'] ?? ''), 'deadline'=>(string)($a['correction_deadline'] ?? '')];
     if (!$cands) return null;
     usort($cands, fn($x, $y) => strcmp((string)$y['at'], (string)$x['at']));
     return $cands[0];
@@ -6066,6 +6074,9 @@ function ops_idems_approve($method) {
     ops_require(idems_can_act_step($step), 'You are not the current approver for this report.');
     $decision = $_POST['decision'] ?? '';
     $remarks = trim($_POST['remarks'] ?? '');
+    // Phase 2 §9 — structured correction detail: which section/field, and by when.
+    $corrArea = substr(trim((string)($_POST['correction_area'] ?? '')), 0, 200);
+    $corrDeadline = trim((string)($_POST['correction_deadline'] ?? ''));
     $pdo = db();
     // Soft segregation acknowledgement: if you prepared this report, approving your
     // own work needs a one-tick confirmation. It never blocks (you may still proceed)
@@ -6089,14 +6100,14 @@ function ops_idems_approve($method) {
         }
     } elseif ($decision === 'reject') {
         if ($remarks === '') { flash('A remark is mandatory when rejecting.', 'error'); redirect('/document?id=' . $doc['id']); }
-        $pdo->prepare("UPDATE report_approvals SET status='REJECTED', acted_by=?, acted_at=?, remarks=? WHERE id=?")->execute([user_name(current_user()), date('c'), $remarks, $step['id']]);
+        $pdo->prepare("UPDATE report_approvals SET status='REJECTED', acted_by=?, acted_at=?, remarks=?, correction_area=?, correction_deadline=? WHERE id=?")->execute([user_name(current_user()), date('c'), $remarks, $corrArea, $corrDeadline, $step['id']]);
         $pdo->prepare("UPDATE report_docs SET status='REJECTED', updated_at=? WHERE id=?")->execute([date('c'), $doc['id']]);
         idems_log('report_doc', $doc['id'], 'REJECT', ['irn'=>$doc['irn'], 'reason'=>$remarks]);
         try { idems_notify_inspector_returned($doc, 'reject', $remarks); } catch (Throwable $e) {}
         flash('Report rejected and returned to the inspector.');
     } elseif ($decision === 'sendback') {
         if ($remarks === '') { flash('A remark is mandatory when sending back for correction.', 'error'); redirect('/document?id=' . $doc['id']); }
-        $pdo->prepare("UPDATE report_approvals SET status='SENTBACK', acted_by=?, acted_at=?, remarks=? WHERE id=?")->execute([user_name(current_user()), date('c'), $remarks, $step['id']]);
+        $pdo->prepare("UPDATE report_approvals SET status='SENTBACK', acted_by=?, acted_at=?, remarks=?, correction_area=?, correction_deadline=? WHERE id=?")->execute([user_name(current_user()), date('c'), $remarks, $corrArea, $corrDeadline, $step['id']]);
         $pdo->prepare("UPDATE report_docs SET status='DRAFT', updated_at=? WHERE id=?")->execute([date('c'), $doc['id']]);
         idems_log('report_doc', $doc['id'], 'SENDBACK', ['irn'=>$doc['irn'], 'reason'=>$remarks]);
         try { idems_notify_inspector_returned($doc, 'sendback', $remarks); } catch (Throwable $e) {}
@@ -6215,8 +6226,11 @@ function ops_idems_vet($method) {
         $pdo->prepare("UPDATE report_docs SET vet_checklist=? WHERE id=?")->execute([json_encode($vc), $doc['id']]);
     }
     $stage = ($action === 'DEBRIEFED') ? 'DEBRIEF' : 'VET';
-    $pdo->prepare("INSERT INTO report_vetting (report_doc_id,stage,action,note,acted_by,acted_at) VALUES (?,?,?,?,?,?)")
-        ->execute([$doc['id'], $stage, $action, $note, user_name(current_user()), date('c')]);
+    // Phase 2 §9 — structured correction detail on a vetting return (section/field + deadline).
+    $vCorrArea = substr(trim((string)($_POST['correction_area'] ?? '')), 0, 200);
+    $vCorrDeadline = trim((string)($_POST['correction_deadline'] ?? ''));
+    $pdo->prepare("INSERT INTO report_vetting (report_doc_id,stage,action,note,correction_area,correction_deadline,acted_by,acted_at) VALUES (?,?,?,?,?,?,?,?)")
+        ->execute([$doc['id'], $stage, $action, $note, $vCorrArea, $vCorrDeadline, user_name(current_user()), date('c')]);
     $pdo->prepare("UPDATE report_docs SET vet_status=?, vet_at=?, vet_by=?, updated_at=? WHERE id=?")
         ->execute([$action, date('c'), user_name(current_user()), date('c'), $doc['id']]);
     // Returning for correction routes the report back to the inspector as a draft

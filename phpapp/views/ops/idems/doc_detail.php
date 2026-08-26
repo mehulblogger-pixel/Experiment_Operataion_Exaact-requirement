@@ -405,7 +405,10 @@
     <b style="color:var(--bad)">↩ Returned for correction</b> —
     <?= e(['reject'=>'rejected', 'vetting'=>'returned at vetting', 'sendback'=>'sent back by the approver'][$m7ret['kind']] ?? 'returned') ?>
     by <b><?= e($m7ret['by'] ?: '—') ?></b><?= $m7ret['at'] ? ' on ' . e(date('d M Y', strtotime($m7ret['at']))) : '' ?>.
+    <?php // Phase 2 §9 — the structured correction detail: which section/field, and by when. ?>
+    <?php if (trim((string)($m7ret['area'] ?? '')) !== ''): ?><div style="margin-top:6px">What to correct: <b><?= e($m7ret['area']) ?></b></div><?php endif; ?>
     <div style="margin-top:6px">Reason: <b><?= e($m7ret['reason'] !== '' ? $m7ret['reason'] : '(none recorded)') ?></b></div>
+    <?php if (trim((string)($m7ret['deadline'] ?? '')) !== ''): ?><div style="margin-top:4px;color:var(--bad)">Correct by: <b><?= e(date('d M Y', strtotime($m7ret['deadline']))) ?></b></div><?php endif; ?>
   </div>
 <?php endif; ?>
 
@@ -556,6 +559,11 @@
         </div>
       <?php endif; ?>
       <input class="form-control" name="note" placeholder="Note (required to return for correction)" style="margin-bottom:8px">
+      <?php // Phase 2 §9 — structured correction detail, so the inspector sees exactly what and by when. ?>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input class="form-control" name="correction_area" placeholder="Which section / field to correct? (optional)" style="flex:2">
+        <input class="form-control" name="correction_deadline" type="date" title="Correct by (optional)" style="flex:1">
+      </div>
       <?php if (idems_is_self_review($doc)): ?>
         <label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;font-size:12.5px;color:var(--bad)">
           <input type="checkbox" name="self_ack" value="1" style="margin-top:2px">
@@ -595,6 +603,11 @@
     <form method="post" action="/document-approve" class="appr-act" style="margin-top:10px">
       <input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
       <input class="form-control" name="remarks" placeholder="Remarks (required to reject / send back)" style="margin-bottom:8px">
+      <?php // Phase 2 §9 — structured correction detail (used when sending back / rejecting). ?>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input class="form-control" name="correction_area" placeholder="Which section / field to correct? (optional)" style="flex:2">
+        <input class="form-control" name="correction_deadline" type="date" title="Correct by (optional)" style="flex:1">
+      </div>
       <?php if (idems_is_self_review($doc)): ?>
         <label class="chk" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;font-size:12.5px;color:var(--bad)">
           <input type="checkbox" name="self_ack" value="1" style="margin-top:2px">
