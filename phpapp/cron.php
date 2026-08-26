@@ -296,3 +296,19 @@ if (function_exists('audit_trim_old') && (string)setting_get('audit_trim_day', '
         echo "Audit trail: trim failed — " . $e->getMessage() . "\n";
     }
 }
+
+// Module 29 — the §7.11 data-integrity self-test, once a day. integrity_run()
+// runs the referential + consistency checks and writes ONE dated pass/fail row to
+// data_check_runs — the evidence the Data Control console reads. Exactly like
+// audit_trim_old() above, it was only ever reached by somebody pressing "Run them
+// now", so the history was starved and "run_stale" always red. Guarded per day.
+if (function_exists('integrity_run') && (string)setting_get('integrity_run_day', '') !== date('Y-m-d')) {
+    try {
+        $ir = integrity_run();
+        setting_set('integrity_run_day', date('Y-m-d'));
+        echo "Data integrity: {$ir['total']} checks, {$ir['failed']} failed, {$ir['skipped']} not in use\n";
+    } catch (Throwable $e) {
+        // A failed self-test must never stop the rest of the nightly run.
+        echo "Data integrity: run failed — " . $e->getMessage() . "\n";
+    }
+}

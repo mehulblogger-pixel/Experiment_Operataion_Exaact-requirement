@@ -211,6 +211,13 @@ function integrity_checks() {
     $add('mr_input_review', 'Every management-review input belongs to a real review',
         'Otherwise the review record is incomplete without anything saying so.',
         "SELECT COUNT(*) FROM mr_inputs WHERE review_id NOT IN (SELECT id FROM mgmt_reviews)");
+    // Module 29 — the money tables were missing from the orphan detectors.
+    $add('ventry_voucher', 'Every voucher expense line belongs to a real voucher',
+        'A voucher line whose voucher has gone is money attributed to nobody.',
+        "SELECT COUNT(*) FROM voucher_entries WHERE voucher_id IS NOT NULL AND voucher_id NOT IN (SELECT id FROM vouchers)");
+    $add('invline_invoice', 'Every invoice line belongs to a real invoice',
+        'An invoice line with no header cannot appear on any bill or in any tax return.',
+        "SELECT COUNT(*) FROM invoice_lines WHERE invoice_id IS NOT NULL AND invoice_id NOT IN (SELECT id FROM invoices)");
 
     // ---- Records that must not contradict themselves ----------------------
     $add('report_final', 'No report is marked issued without a date and a name against it',

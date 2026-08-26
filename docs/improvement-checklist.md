@@ -48,7 +48,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 26 | Identity | P0 | ✅ done & pushed | 2026-08-26 |
 | 27 | Confidentiality | P0 | ✅ done & pushed | 2026-08-26 |
 | 28 | Audits | P2 | ⬜ | — |
-| 29 | Data Control / Governance | P0 | ⬜ | — |
+| 29 | Data Control / Governance | P0 | ✅ done & pushed | 2026-08-26 |
 | 30 | Vouchers / Expenses | P1 | ✅ done & pushed | 2026-08-24 |
 | 31 | Attendance / Reconciliation | P1 | ✅ done & pushed | 2026-08-24 |
 | 32 | Profitability (canonical engine) | P0 | ⬜ | — |
@@ -79,6 +79,30 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 29 — Data Control / Governance (§7.11) · 2026-08-26
+**Decision:** (A) scheduled integrity self-test + money orphan detectors + audit-chain banner.
+(Module 02 already added the access-audit / effective-access / toxic-combo work here.)
+**Found:** the §7.11 console has a real integrity-check registry that writes dated pass/fail evidence
+to `data_check_runs` via `integrity_run()` — but **nothing fired it on a schedule**, so the history
+was starved and `run_stale` permanently red (the same "records only what someone remembered" pattern
+that moved `audit_trim_old()` to nightly cron). The money tables had no orphan detector, and the
+sealed audit chain was verified in the console's own check but **not surfaced on `/audit-log`** where
+the trail is read.
+**Added (additive, evidence-only — no access/data change):**
+- A **per-day-guarded `integrity_run()`** block in `cron.php` (mirroring `audit_trim_old`) — writes
+  one dated pass/fail evidence row a day; a failed run never stops the nightly job.
+- Two **money orphan detectors** in `integrity_checks()`: `ventry_voucher` (voucher line → real
+  voucher) and `invline_invoice` (invoice line → real invoice) — COUNT-only, skipped-safe.
+- An **audit-chain-intact banner** on `/audit-log` surfacing `idems_audit_verify()` — "chain intact"
+  / "chain broken (first at #id)".
+- The **first tests** over the integrity registry, `integrity_run()`, and the new detectors.
+**Preserved (verified by tests):** the check registry, `data_check_runs`, the failure log, the access
+matrix, the retention/DSAR surfaces — all unchanged. No new permission; no schema change (reuses
+`data_check_runs` + a setting); no access or data changed; nothing deleted.
+**Edge cases:** `docs/edge-cases/29-data-control.md`.
+**Tests:** `tests/test_module29_datacontrol.php` (14 assertions). Suite 2798 passed / 3 pre-existing
+baseline failures.
 
 ### Module 27 — Confidentiality (ISO 17020 §4.2) · 2026-08-26
 **Decision:** (A) connect the governance pillar to the work + the readiness board; a hard allocation

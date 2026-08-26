@@ -10089,6 +10089,8 @@ function ops_idems_audit($method) {
         'offices'=>ops_all("SELECT id, name FROM offices ORDER BY name"),
         'stats'=>$stats, 'byAction'=>$byAction, 'byUser'=>array_slice($byUser, 0, 8), 'byOffice'=>$byOffice,
         'checks'=>idems_compliance_checks(),
+        // Module 29 — the chain-intact signal, shown where the trail is actually read.
+        'chain'=>function_exists('idems_audit_verify') ? idems_audit_verify() : null,
     ]);
     return true;
 }

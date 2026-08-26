@@ -12,6 +12,22 @@
   <a class="btn secondary" href="<?= e($qs(['export'=>'csv'])) ?>">⭳ Export CSV</a>
 </div>
 
+<?php // Module 29 — the tamper-evidence signal, where the trail is read. The chain is
+      // hash-sealed; this recomputes it and says plainly whether it is intact. ?>
+<?php $chain = $chain ?? null; if ($chain && empty($chain['skipped'])): ?>
+<div class="panel" style="margin-top:12px;border-left:4px solid var(--<?= $chain['ok'] ? 'ok' : 'bad' ?>)">
+  <?php if ($chain['ok']): ?>
+    <b style="color:var(--ok)">🔗 Chain intact.</b>
+    <span class="muted">All <?= (int)$chain['checked'] ?> sealed entries verify against the one before — the trail has not been altered.</span>
+  <?php else: ?>
+    <b style="color:var(--bad)">⚠ Chain broken.</b>
+    <span class="muted"><?= (int)$chain['broken'] ?> of <?= (int)$chain['checked'] ?> sealed entries failed
+      (<?= (int)$chain['content'] ?> content, <?= (int)$chain['links'] ?> link)<?= $chain['first_break'] ? ', first at #' . (int)$chain['first_break'] : '' ?>.
+      A record was changed or removed after it was written — investigate before relying on the trail.</span>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <div class="kpi-row">
   <div class="kpi"><span class="kic">🛡️</span><div class="k">Total events</div><div class="v"><?= number_format($stats['total']) ?></div><div class="d">since go-live</div></div>
   <div class="kpi"><span class="kic">📅</span><div class="k">Today</div><div class="v"><?= number_format($stats['today']) ?></div><div class="d">events logged</div></div>
