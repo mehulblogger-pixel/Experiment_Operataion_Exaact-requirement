@@ -6470,7 +6470,11 @@ function ops_profitability() {
         }
         csv_download('boss-numbers-' . date('Y-m-d') . '.csv', $csv);
     }
-    view('ops/profitability_list', ['rows' => $rows, 'seeSal' => $seeSal]);
+    // Module 32 — the profit-engine consistency check, shown on the canonical
+    // profitability screen. Salary-gated (it exposes overhead/contingency, which
+    // are labour-derived). Guarded so a missing MIS lib never breaks the screen.
+    $reconcile = ($seeSal && function_exists('profit_reconciliation')) ? profit_reconciliation() : null;
+    view('ops/profitability_list', ['rows' => $rows, 'seeSal' => $seeSal, 'reconcile' => $reconcile]);
 }
 
 // P6 — Attendance reconciliation. Upload the HR payroll export (CSV); it is

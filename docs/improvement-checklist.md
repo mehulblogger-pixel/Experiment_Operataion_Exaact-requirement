@@ -51,7 +51,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 29 | Data Control / Governance | P0 | ✅ done & pushed | 2026-08-26 |
 | 30 | Vouchers / Expenses | P1 | ✅ done & pushed | 2026-08-24 |
 | 31 | Attendance / Reconciliation | P1 | ✅ done & pushed | 2026-08-24 |
-| 32 | Profitability (canonical engine) | P0 | ⬜ | — |
+| 32 | Profitability (canonical engine) | P0 | ✅ done & pushed | 2026-08-26 |
 | 33 | Overheads | P1 | ✅ done & pushed | 2026-08-26 |
 | 34 | Dashboards / Command Centre | P2 | ⬜ | — |
 | 35 | Recruitment / Workforce | P1 | ⬜ | — |
@@ -79,6 +79,32 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 32 — Profitability (canonical engine) · 2026-08-26
+**Decision:** (A) an additive profit-engine consistency check that measures every job against the
+canonical `job_profit()` and quantifies where screens drift — changing no displayed figure. The actual
+formula corrections (DRIFT A–E) are flagged for explicit decision because they alter existing
+financial numbers.
+**Found:** `job_profit()` is the canonical per-job P&L (its profit/cost include overhead, voucher,
+other, contingency and client-recovered credit). MIS (`mis.php:118-119,140-141`) and the SBU-P&L
+contract table (`costing.php:754-762`) re-derive `profit = credit − labour − expenses − subcon`,
+dropping the rest — so screens on the SAME engine show a systematically higher profit than
+`/profitability` and the management-report total, which read `$p['profit']`.
+**Added (additive, read-only; no figure changed):**
+- `profit_reconciliation($F)` — enumerates the MIS job population (`mis_jobs`, scope-honouring),
+  computes canonical vs partial profit/cost per job + the omitted components, returns `overstatement`,
+  `drifting` and a `consistent` verdict. `overstatement = partial − canonical =` omitted net cost.
+- A **"Profit-figure consistency"** panel on `/profitability` (data.profitability-gated, salary-gated)
+  — when screens disagree it names them, the omitted cost lines and the exact ₹ overstatement, and
+  states the reconciliation is a pending decision.
+**Deferred (flagged):** reconcile MIS + SBU-P&L to `job_profit` (DRIFT A/B); unify `boss_profit` vs
+Σ`job_profit` (C); home-dashboard raw-`expected_credit` revenue (D); reports byClient revenue variant
+(E); canonical by-client/by-SBU views; job/office estimate-vs-actual; loss flagging.
+**Preserved:** every profit/revenue engine and every profitability screen — unchanged. No displayed
+number altered; no new permission; no schema change; nothing deleted.
+**Tests:** `test_module32_profitability.php` (20 assertions — incl. asserting the MIS partial figure is
+unchanged). Suite 3039 passing (only the 3 pre-existing baseline failures remain).
+**Spec:** `docs/edge-cases/32-profitability.md`.
 
 ### Module 18 — Orders / Contracts 360 · 2026-08-26
 **Decision:** (A) surface the live `contract_state()` verdict + `value − invoiced` on the Contract

@@ -40,6 +40,33 @@
   <?php endif; ?>
 </div>
 
+<?php // Module 32 — profit-engine consistency: does every screen's profit reconcile to
+      // the canonical job_profit() engine? Read-only; changes no displayed figure.
+  if (!empty($reconcile)): $rc = $reconcile; $om = $rc['omitted']; $overstate = (float)$rc['overstatement']; ?>
+<div class="msg <?= $rc['consistent'] ? 'msg-ok' : 'msg-warning' ?>" style="margin-bottom:14px">
+  <?php if ($rc['consistent']): ?>
+    <b>Profit figures reconcile.</b> Across <?= (int)$rc['jobs'] ?> job<?= $rc['jobs']===1?'':'s' ?>, every screen's profit matches the canonical <code>job_profit()</code> engine.
+  <?php else: ?>
+    <b>Profit figures differ between screens.</b>
+    The <a href="/mis">Management dashboard</a> and the <a href="/sbu-pl"><?= e(T('sbu')) ?> P&amp;L</a> contract table compute
+    profit as <em>revenue − labour − expenses − sub-contractor</em> — which omits overhead, vouchers, contingency, other cost
+    and client-recovered credit. Across <?= (int)$rc['drifting'] ?> of <?= (int)$rc['jobs'] ?> job<?= $rc['jobs']===1?'':'s' ?>
+    that <strong>overstates profit by <?= fmoney_short($overstate) ?></strong> versus the canonical engine this screen and the
+    management-report total use.
+    <table class="tbl" style="max-width:520px;margin-top:8px;background:var(--card)">
+      <tr><td>Canonical profit (this screen's engine)</td><td style="text-align:right"><?= fmoney_short($rc['canonical_profit']) ?></td></tr>
+      <tr><td>Partial profit (MIS / <?= e(T('sbu')) ?>-P&amp;L formula)</td><td style="text-align:right"><?= fmoney_short($rc['partial_profit']) ?></td></tr>
+      <tr><td class="muted">— omitted: overhead</td><td class="muted" style="text-align:right"><?= fmoney_short($om['overhead']) ?></td></tr>
+      <tr><td class="muted">— omitted: vouchers</td><td class="muted" style="text-align:right"><?= fmoney_short($om['voucher']) ?></td></tr>
+      <tr><td class="muted">— omitted: contingency</td><td class="muted" style="text-align:right"><?= fmoney_short($om['contingency']) ?></td></tr>
+      <tr><td class="muted">— omitted: other cost</td><td class="muted" style="text-align:right"><?= fmoney_short($om['other']) ?></td></tr>
+      <tr><td class="muted">— less client-recovered</td><td class="muted" style="text-align:right">(<?= fmoney_short($om['recovered']) ?>)</td></tr>
+    </table>
+    <span class="muted" style="font-size:12px">Reconciling those two screens to the canonical engine is a pending decision — this check only surfaces the gap.</span>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <div class="panel" style="padding:0;overflow:hidden">
   <?php if (!$rows): ?>
     <div style="text-align:center;padding:34px"><div style="font-size:32px">📄</div>

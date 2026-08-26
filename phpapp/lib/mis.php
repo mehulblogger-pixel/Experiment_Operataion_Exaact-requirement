@@ -93,6 +93,48 @@ function mis_schedule_delay($j) {
     return (int)round(($b - $a) / 86400);
 }
 
+// Module 32 — the profit-engine consistency check. job_profit() is the canonical
+// per-job P&L; its 'profit'/'cost' include overhead, voucher, other, contingency
+// and the client-recovered credit. Two dashboards (this MIS screen and the SBU
+// P&L contract table) re-derive a PARTIAL profit inline — credit − labour −
+// expenses − subcon — dropping the rest, so they overstate profit versus the
+// canonical engine and the management-reports screen (which reads $p['profit']).
+// This measures every job both ways over the same population and reports the gap.
+// It changes no displayed figure — it surfaces and quantifies the drift, honestly,
+// the way the audit-chain verify surfaces a broken seal. Read-only.
+function profit_reconciliation($F = null) {
+    if (!is_array($F)) $F = [];
+    $F += ['from' => '2000-01-01', 'to' => '2100-12-31', 'sbu' => '', 'activity' => '',
+           'office' => 0, 'inspector' => 0, 'ibo' => 0, 'client' => 0];
+    $jobs  = function_exists('mis_jobs') ? mis_jobs($F) : [];
+    $scope = (int)($F['office'] ?: 0) ?: null;
+    $out = ['jobs' => 0, 'drifting' => 0,
+            'canonical_profit' => 0.0, 'partial_profit' => 0.0,
+            'canonical_cost' => 0.0, 'partial_cost' => 0.0,
+            'omitted' => ['overhead' => 0.0, 'voucher' => 0.0, 'other' => 0.0,
+                          'contingency' => 0.0, 'recovered' => 0.0]];
+    foreach ($jobs as $j) {
+        $p = job_profit($j, $scope);
+        $partialCost   = $p['labour'] + $p['expenses'] + $p['subcon'];   // the MIS / SBU-PL formula
+        $partialProfit = $p['credit'] - $partialCost;
+        $out['jobs']++;
+        $out['canonical_profit'] += $p['profit'];
+        $out['partial_profit']   += $partialProfit;
+        $out['canonical_cost']   += $p['cost'];
+        $out['partial_cost']     += $partialCost;
+        $out['omitted']['overhead']    += $p['overhead'];
+        $out['omitted']['voucher']     += $p['voucher'];
+        $out['omitted']['other']       += $p['other'];
+        $out['omitted']['contingency'] += $p['contingency'];
+        $out['omitted']['recovered']   += $p['recovered'];
+        if (round($p['profit'], 2) !== round($partialProfit, 2)) $out['drifting']++;
+    }
+    // The partial formula overstates profit by exactly the omitted net cost.
+    $out['overstatement'] = round($out['partial_profit'] - $out['canonical_profit'], 2);
+    $out['consistent']    = $out['drifting'] === 0;
+    return $out;
+}
+
 // Everything the dashboard shows, from the one set of jobs.
 function mis_summary(array $F) {
     $jobs = mis_jobs($F);
