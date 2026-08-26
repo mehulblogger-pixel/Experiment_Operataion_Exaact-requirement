@@ -90,6 +90,53 @@ $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); 
   <p class="muted" style="margin-top:8px">A <?= e(Tl('sbu')) ?> can show a loss while the branch as a whole is profitable — that is the point of the split. Revenue counts a <?= e(Tl('job')) ?> in the month its inspection finished, and this view adds those months together.</p>
 </div>
 
+<?php // Phase 2 §28 Option 3 — reconcile the two profit bases this screen sits between. No number
+      // above or below changes; this only shows both, side by side, and the gap between them.
+      if (!empty($jobBasis) || !empty($rows)):
+        $keys = array_unique(array_merge(array_keys($rows ?: []), array_keys($jobBasis ?: [])));
+        $rP = 0; $jP = 0;
+      ?>
+<div class="panel">
+  <h3 class="tab-sub">Two ways of counting cost — reconciled <span class="muted">— no figure here changes either table</span></h3>
+  <p class="muted" style="margin:0 0 8px;font-size:12.5px">
+    The <strong>By <?= e(Tl('sbu')) ?></strong> table above is <strong>period-costing</strong>: every rupee the
+    <?= e(Tl('office')) ?> actually spent this period, allocated to <?= e(Tlp('sbu')) ?> — including idle time, unbilled
+    capacity and all overhead. The <strong>contract table</strong> and the <a href="/mis">management dashboard</a> are
+    <strong>job-costing</strong> (the canonical <code>job_profit()</code> engine): only the cost a <?= e(Tl('job')) ?>
+    carried. They answer different questions, so they differ; the <strong>gap</strong> is the <?= e(Tl('office')) ?> cost
+    <em>no <?= e(Tl('job')) ?> carried this period</em>.
+  </p>
+  <div class="tbl-scroll" style="overflow-x:auto">
+  <table class="grid">
+    <tr><th><?= e(T('sbu')) ?></th>
+        <th style="text-align:right">Period-costing profit</th>
+        <th style="text-align:right">Job-costing profit</th>
+        <th style="text-align:right">Gap (unabsorbed)</th></tr>
+    <?php foreach ($keys as $s):
+        $rp = isset($rows[$s]) ? (float)$rows[$s]['revenue'] - (float)$rows[$s]['cost'] : 0.0;
+        $jp = isset($jobBasis[$s]) ? (float)$jobBasis[$s]['profit'] : 0.0;
+        $rP += $rp; $jP += $jp; $g = $rp - $jp; ?>
+    <tr>
+      <td><strong><?= e($sbuLabels[$s] ?? ($s === '' ? 'No ' . Tl('sbu') : $s)) ?></strong></td>
+      <td style="text-align:right"><?= $money($rp) ?></td>
+      <td style="text-align:right"><?= $money($jp) ?></td>
+      <td style="text-align:right" class="muted"><?= $money($g) ?></td>
+    </tr>
+    <?php endforeach; ?>
+    <tr style="border-top:2px solid var(--line)">
+      <td><strong>Total</strong></td>
+      <td style="text-align:right"><strong><?= $money($rP) ?></strong></td>
+      <td style="text-align:right"><strong><?= $money($jP) ?></strong></td>
+      <td style="text-align:right"><strong><?= $money($rP - $jP) ?></strong></td>
+    </tr>
+  </table>
+  </div>
+  <p class="muted" style="margin-top:8px;font-size:12px">A positive gap means the <?= e(Tl('office') ) ?> carried more cost this period than its
+    <?= e(Tlp('job')) ?> absorbed — idle or unbilled capacity. A large gap is a utilisation signal, not an error. The two
+    bases are meant to differ; this reconciliation makes the difference explicit instead of leaving two unexplained profit numbers.</p>
+</div>
+<?php endif; ?>
+
 <div class="panel">
   <h3 class="tab-sub">By activity code</h3>
   <div class="tbl-scroll" style="overflow-x:auto">

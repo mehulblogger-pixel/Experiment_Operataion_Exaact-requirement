@@ -769,6 +769,33 @@ function costing_boss_lines($officeId, $yr, $mon) {
     return array_values($out);
 }
 
+// Phase 2 §28 Option 3 — reconcile the two profit BASES this screen sits between, without changing
+// either number. The "By SBU" table above is PERIOD-costing: every rupee the office actually spent in
+// the month, allocated to SBUs (idle time, unbilled capacity and all overhead included). The contract
+// table and MIS are JOB-costing: only the cost attributable to jobs. They answer different questions,
+// so they legitimately differ; this returns both, per SBU, plus the gap — the office cost that no job
+// carried this period. Read-only; the canonical engine (job_profit, frozen §30) supplies the job side.
+function costing_basis_reconciliation($officeId, array $months) {
+    $job = [];   // sbu => [revenue, cost, profit]
+    foreach ($months as [$y, $m]) {
+        $from = sprintf('%04d-%02d-01', $y, $m);
+        $to   = date('Y-m-t', strtotime($from));
+        $jobs = ops_all("SELECT j.* FROM jobs j
+                         WHERE j.executing_office_id = ?
+                           AND COALESCE(j.inspection_end_date, j.inspection_start_date, j.scheduled_date) >= ?
+                           AND COALESCE(j.inspection_end_date, j.inspection_start_date, j.scheduled_date) <= ?",
+                        [(int)$officeId, $from, $to]) ?: [];
+        foreach ($jobs as $jrow) {
+            $p = job_profit($jrow, $officeId);
+            $s = (string)($jrow['sbu'] ?? '');
+            $job[$s]['revenue'] = ($job[$s]['revenue'] ?? 0) + (float)$p['credit'];
+            $job[$s]['cost']    = ($job[$s]['cost']    ?? 0) + (float)$p['cost'];
+            $job[$s]['profit']  = ($job[$s]['profit']  ?? 0) + (float)$p['profit'];
+        }
+    }
+    return $job;
+}
+
 // Offices this person may look at, newest schema first.
 function costing_offices_for_user() {
     $global = is_master() || can('users.manage.global') || can('settings.manage') || can('data.profitability');
@@ -902,6 +929,9 @@ function ops_sbu_pl() {
         }
         if (cost_run_status($y, $m, $sel)) $storedMonths++;
     }
+    // §28 Option 3 — the job-costing side of the same span, per SBU, for the basis reconciliation.
+    $jobBasis = $sel ? costing_basis_reconciliation($sel, $months) : [];
+
     uasort($byActivity, function ($a, $b) { return ($b['revenue'] - $b['cost']) <=> ($a['revenue'] - $a['cost']); });
     uasort($byBoss, function ($a, $b) {
         return (($b['revenue'] - $b['labour'] - $b['expenses'] - $b['subcon'])
@@ -912,7 +942,7 @@ function ops_sbu_pl() {
         'offices'=>$offices, 'sel'=>$sel, 'yr'=>$yr, 'mon'=>$mon,
         'span'=>$span, 'fy'=>$fy, 'fyOpts'=>$fyOpts, 'months'=>$months,
         'spanLabel'=>costing_span_label($span, $fy, $yr, $mon),
-        'rows'=>$rows, 'tot'=>$tot,
+        'rows'=>$rows, 'tot'=>$tot, 'jobBasis'=>$jobBasis,
         'byActivity'=>$byActivity, 'byBoss'=>array_values($byBoss),
         'stored'=>$storedMonths > 0, 'storedMonths'=>$storedMonths, 'monthCount'=>count($months),
         'sbuLabels'=>lk_options_or('sbu', OPS_SBUS),

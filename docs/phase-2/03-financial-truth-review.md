@@ -76,7 +76,7 @@ displayed number moves and how much sign-off each needs.
 | **0. Do nothing** | nothing; the drift stays, now *quantified* on `/system-status` (§29) | none | — |
 | **1. Converge B → A** (MIS + SBU-PL contract table read `$p['profit']`/`$p['cost']`) | MIS & SBU-PL profit **drops** to the true figure (−₹74k on the demo); 92 jobs' shown profit corrects downward | low code (swap the inline formula for the engine's fields); **numbers move** — every dashboard reader sees lower, correct margins | **REQUIRED** |
 | **2. Converge C → A** (boss view uses `job_profit` with the frozen basis) | owner P&L becomes reproducible and matches reports; small shifts per boss | low-med; **numbers move** | **REQUIRED** |
-| **3. Reconcile D ↔ A** (show the job-costing vs period-costing gap on the SBU-PL screen, both bases labelled) | adds a reconciliation line; **no existing number changes** | low; additive | recommended, no sign-off needed |
+| **3. Reconcile D ↔ A** (show the job-costing vs period-costing gap on the SBU-PL screen, both bases labelled) | adds a reconciliation line; **no existing number changes** | low; additive | ✅ **BUILT** — additive panel, no sign-off needed |
 
 ## 6. My recommendation
 

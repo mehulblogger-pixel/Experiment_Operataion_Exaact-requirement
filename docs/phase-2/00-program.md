@@ -75,6 +75,14 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — §28 Option 3: profit-basis reconciliation on SBU-P&L (additive, no number moves).**
+  The SBU-P&L screen sits between two legitimate bases: period-costing (the "By SBU" table — all office
+  spend allocated) and job-costing (the contract table / MIS / canonical engine). Added
+  `costing_basis_reconciliation()` (job side per SBU over the span, from `job_profit`) and a
+  "Two ways of counting cost — reconciled" panel showing both profits + the gap (office cost no job
+  carried this period — a utilisation signal). No existing figure changes. Verified by
+  `test_p2_basis_reconcile.php` (job side = canonical engine per SBU; empty span → nothing). Suite **3579/0**.
+
 - **2026-08-26 — §28 financial-truth convergence, BUILT default-OFF (sign-off approved for the build,
   not yet the flip).** Review in `docs/phase-2/03-financial-truth-review.md`, grounded in a measured
   104-job demo run (92 jobs drift; MIS overstates profit by ₹74,302.72 = overhead+contingency+voucher).
