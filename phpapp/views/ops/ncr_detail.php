@@ -155,3 +155,6 @@
 
 <?php // Module 40 — the nonconformity's own activity timeline (logged to the spine, never surfaced).
 if (function_exists('act_render_timeline')) act_render_timeline('NCR', (int)$n['id'], 'History of this nonconformity'); ?>
+
+<?php // Phase 2 §39 — the full quality case (complaint + NCR + CAPA), linked across modules. ?>
+<?php if (function_exists('quality_case_render')) quality_case_render('NCR', (int)$n['id']); ?>

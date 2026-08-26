@@ -235,3 +235,6 @@
   </table>
 </div>
 </div><!-- /data-tabs (capa) -->
+
+<?php // Phase 2 §39 — the full quality case (complaint + NCR + CAPA), linked across modules. ?>
+<?php if (function_exists('quality_case_render')) quality_case_render('CAPA', (int)$c['id']); ?>
