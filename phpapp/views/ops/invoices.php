@@ -18,6 +18,22 @@
   </div>
 </div>
 
+<?php // Module 09 — a UNIQUE index now forbids a duplicate invoice number, but a
+      // database that already held one before that rule could not build the index.
+      // Those legacy duplicates are named here rather than hidden — a duplicate
+      // number in a filed GST return is the one thing that cannot be undone.
+      $dupInv = function_exists('books_duplicate_numbers') ? books_duplicate_numbers('invoices', 'invoice_no') : []; ?>
+<?php if ($dupInv): ?>
+<div class="panel" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 7%,transparent);margin-top:16px">
+  <b style="color:var(--bad)">⚠ Invoice numbers used more than once</b>
+  <div class="muted" style="margin-top:4px">New duplicates are now refused by the database, but these were recorded before that rule
+    existed. A duplicate invoice number in a filed GST return must be corrected — raise a credit note and re-issue one of them.</div>
+  <div style="margin-top:6px;font-size:13px">
+    <?php foreach ($dupInv as $d): ?><span class="pill p-bad"><?= e($d['num']) ?> × <?= (int)$d['n'] ?></span> <?php endforeach; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <div class="qcards" style="margin-top:16px">
   <?php foreach ($cards as $key=>$q): ?>
     <a class="qcard <?= $q['tone'] ?><?= $f===$key?' on':'' ?>" href="/invoices?f=<?= e($key) ?>">

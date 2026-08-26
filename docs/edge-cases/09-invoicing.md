@@ -1,6 +1,10 @@
 # Module 09 — Invoicing · Edge-case analysis (pre-build)
 
-**Status:** 📝 SPEC — awaiting decision. P0.
+**Status:** ✅ BUILT (2026-08-25). Decision: (A) invoice-number integrity + overdue reminder; SoD
+maker-checker and the invoice↔report gate deferred. A DB-enforced UNIQUE on the money-document
+numbers (unissued drafts held as NULL / partial index on SQLite; defensive — skips + surfaces
+legacy duplicates), a hardened `books_issue` that re-allocates on a collision, and an opt-in
+`ar_overdue_reminders()` cron. Asserted by `tests/test_module09_invoicing.php`. P0.
 
 ---
 

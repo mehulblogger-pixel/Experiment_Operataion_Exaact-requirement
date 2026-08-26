@@ -137,6 +137,51 @@ function ar_rows($basis = 'DUE', $today = null) {
     return $out;
 }
 
+// Module 09 — chase overdue invoices. Ageing was view-only; nothing followed up.
+// This is the cron that does, in the same shape as the calibration reminder:
+// find ISSUED / PART_PAID invoices past their due date with money still owed,
+// e-mail a concise list to finance, and stamp each so a daily run does not re-nag
+// the same one (a genuinely newly-overdue invoice still triggers next window).
+// Read-only over the register — it chases, it never changes an invoice's money.
+function ar_overdue_reminders($today = null, $renagDays = 7) {
+    if (!function_exists('books_migrate')) return 0;
+    books_migrate();
+    $today = $today ?: date('Y-m-d');
+    $rows = books_try(fn() => ops_all(
+        "SELECT * FROM invoices WHERE status IN ('ISSUED','PART_PAID')
+         AND COALESCE(due_date,'') <> '' AND due_date < ? ORDER BY due_date, id", [$today]), []) ?: [];
+    $due = [];
+    foreach ($rows as $r) {
+        $s = books_settled((int)$r['id']);
+        if (($s['outstanding'] ?? 0) <= 1) continue;                    // settled — nothing to chase
+        $last = trim((string)($r['reminded_at'] ?? ''));
+        if ($last !== '' && strtotime($last) > strtotime($today . ' -' . (int)$renagDays . ' days')) continue; // chased recently
+        $r['_out'] = $s['outstanding'];
+        $due[] = $r;
+    }
+    if (!$due) return 0;
+
+    $total = 0; $lines = [];
+    foreach ($due as $r) {
+        $d = (int)floor((strtotime($today) - strtotime((string)$r['due_date'])) / 86400);
+        $total += $r['_out'];
+        $lines[] = ($r['invoice_no'] ?: ('#' . $r['id'])) . '  ' . ($r['partner_name'] ?: '—')
+                 . '  due ' . fdate($r['due_date']) . '  (' . $d . ' day(s) overdue)  outstanding ' . fmoney($r['_out']);
+    }
+    $to = getenv('QAC_EMAIL') ?: (function_exists('coordinator_emails') ? coordinator_emails() : '');
+    if (trim((string)$to) !== '') {
+        $body = "Overdue invoices to follow up.\n\n" . implode("\n", $lines)
+              . "\n\nTotal overdue outstanding: " . fmoney($total) . "\n\n"
+              . "Open Receivables in " . app_name() . " to chase these.\n";
+        books_try(fn() => ops_mail($to, count($due) . ' overdue invoice(s) — ' . fmoney($total) . ' outstanding', $body, '', 'receivables'));
+    }
+    // Stamp what we processed, so the next daily run does not re-list the same set.
+    $ids = array_map(fn($r) => (int)$r['id'], $due);
+    $ph  = implode(',', array_fill(0, count($ids), '?'));
+    books_try(fn() => db()->prepare("UPDATE invoices SET reminded_at=? WHERE id IN ($ph)")->execute(array_merge([date('c')], $ids)));
+    return count($due);
+}
+
 // Rolled up the way it is read: one line per client, one column per bucket.
 function ar_by_client(array $rows) {
     $by = [];

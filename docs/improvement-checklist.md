@@ -28,7 +28,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 06 | Inspection / IDEMS core + Applicability | P0 | ✅ done & pushed | 2026-08-24 |
 | 07 | Vetting / Technical Review / Approval | P0 | ✅ done & pushed | 2026-08-24 |
 | 08 | Report Release / Issue | P0 | ✅ done & pushed | 2026-08-24 |
-| 09 | Invoicing | P0 | 📝 edge-cases drafted (awaiting go) | — |
+| 09 | Invoicing | P0 | ✅ done & pushed | 2026-08-25 |
 | 10 | Client Portal | P0 | ⬜ | — |
 | 11 | Vendor / Supplier-Inspector Centre | P1 | ⬜ | — |
 | 12 | NCR | P1 | ✅ done & pushed | 2026-08-24 |
@@ -79,6 +79,40 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 09 — Invoicing · 2026-08-25
+**Decision:** (A) invoice-number integrity + overdue-receivables reminder; SoD maker-checker
+(§5-B) and the invoice↔report-issued gate (§5-C) and unifying profitability/portal onto the
+register deferred.
+**Found:** invoicing is two systems bridged — a mature relational **Books register**
+(`invoices/invoice_lines/receipts/receipt_allocations/credit_notes`, GST/IGST frozen at create,
+TDS on the receipt, part-payment, round-off, ledger, ageing, credit notes, Tally export, gapless
+numbering **allocated at issue**) plus a legacy per-job flag mirror kept in sync for older screens.
+The register is solid; the standout gap was a **safety** one: `invoices.invoice_no` had only a
+plain index, and numbering is a read-max-then-write with a retry loop — so two simultaneous "Issue"
+clicks had a genuine TOCTOU window to mint a **duplicate invoice number** (legally unrecoverable in
+a filed GST return). Plus ageing was view-only — nothing chased an overdue invoice.
+**Added (additive, non-destructive):**
+- **DB-enforced uniqueness** on the money-document numbers — unissued drafts now carry **NULL**
+  (a UNIQUE index allows many NULLs; SQLite gets a **partial** unique index that also exempts any
+  legacy `''`), built **defensively**: `books_unique_number_index` skips the index when legacy
+  duplicates exist (surfaced by `books_duplicate_numbers` as a red banner on the invoice register)
+  rather than crashing the boot; `books_backfill_null_numbers` normalises existing empties.
+- **Hardened `books_issue`** — allocate + write under a retry, so a concurrent Issue that grabbed
+  the number makes this write fail on the UNIQUE index and **re-allocate** the next one instead of
+  committing a duplicate. The read-max numbering and the gapless-at-issue behaviour are unchanged.
+- **`ar_overdue_reminders()` cron** (wired into `cron.php`, same shape as the calibration reminder)
+  — chases ISSUED/PART_PAID invoices past due with money still owed, e-mails finance a concise
+  list, and stamps a new additive `reminded_at` so a daily run doesn't re-nag; skips paid,
+  within-terms and cancelled invoices; idempotent.
+**Preserved (verified by tests):** the numbering-at-issue (gapless), GST/IGST + round-off, the
+receipt→allocation decoupling, overpayment refusal, the double-billing guard, the closed-job line
+gate, cancel/credit-note logic, the job mirror/un-mirror and the Tally export — all unchanged. No
+new permission; only additive schema (one column + indexes). `test_bill_by_project` and the other
+billing tests stay green.
+**Edge cases:** `docs/edge-cases/09-invoicing.md`.
+**Tests:** `tests/test_module09_invoicing.php` (19 assertions). Suite 2668 passed / 3 pre-existing
+baseline failures.
 
 ### Module 03 — Quotations · 2026-08-25
 **Decision:** (A) expiry awareness + the approval-bypass guard; margin-at-quote (→ Module 20/32)

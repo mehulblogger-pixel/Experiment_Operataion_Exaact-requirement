@@ -165,6 +165,10 @@ function books_migrate() {
         status VARCHAR(20) DEFAULT 'ISSUED', tally_ref VARCHAR(40) DEFAULT '',
         created_by VARCHAR(150) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
 
+    // Module 09 — the overdue-invoice reminder marks each invoice it has chased,
+    // so a daily sweep does not re-nag the same one every morning.
+    if (function_exists('ensure_column')) ensure_column('invoices', 'reminded_at', "VARCHAR(30) DEFAULT ''");
+
     if (function_exists('act_index')) {
         act_index('invoices', 'idx_inv_partner', '(partner_id, status)');
         act_index('invoices', 'idx_inv_date',    '(invoice_date)');
@@ -176,6 +180,58 @@ function books_migrate() {
         act_index('receipt_allocations', 'idx_ra_inv', '(invoice_id)');
         act_index('credit_notes', 'idx_cn_inv', '(invoice_id)');
     }
+
+    // Module 09 — the invoice number is the one value a duplicate of which is
+    // legally unrecoverable in a filed GST return. Enforce it in the DATABASE, not
+    // only in the read-max-then-write retry loop that two simultaneous "Issue"
+    // clicks can slip through. Unissued drafts carry NULL (a UNIQUE index allows
+    // many NULLs on both MySQL and SQLite); an issued/cancelled invoice carries a
+    // real, unique number. Built defensively: if legacy data already holds a
+    // duplicate, the index is SKIPPED (and the duplicate surfaced on the register)
+    // rather than crashing the boot.
+    books_backfill_null_numbers();
+    books_unique_number_index('invoices', 'invoice_no', 'uq_invoices_no');
+    books_unique_number_index('receipts', 'receipt_no', 'uq_receipts_no');
+    books_unique_number_index('credit_notes', 'cn_no', 'uq_credit_notes_no');
+}
+
+// Empty money-document numbers become NULL, so a UNIQUE index can allow many
+// unissued drafts (many NULLs) while still forbidding a duplicate real number.
+function books_backfill_null_numbers() {
+    foreach ([['invoices', 'invoice_no'], ['receipts', 'receipt_no'], ['credit_notes', 'cn_no']] as [$t, $c]) {
+        books_try(fn() => db()->exec("UPDATE $t SET $c=NULL WHERE COALESCE($c,'')=''"));
+    }
+}
+
+// Create a UNIQUE index on a money-document number — but only when the existing
+// data has no duplicate in that column (a UNIQUE index cannot build over one, and
+// aborting the boot for it would be worse than the gap). Returns true if the
+// index is now in place (or already was), false if it was skipped for duplicates.
+function books_unique_number_index($table, $col, $name) {
+    $dups = books_duplicate_numbers($table, $col);
+    if ($dups) return false;                       // legacy duplicates — surfaced, not enforced
+    $driver = (string)books_try(fn() => db()->getAttribute(PDO::ATTR_DRIVER_NAME), '');
+    try {
+        if ($driver === 'sqlite') {
+            // A partial unique index: only real, issued numbers are constrained, so any
+            // number of unissued drafts (NULL or '') coexist. This is the exact semantics.
+            db()->exec("CREATE UNIQUE INDEX $name ON $table ($col) WHERE $col IS NOT NULL AND $col <> ''");
+        } else {
+            // MySQL has no partial index; it relies on unissued drafts being NULL (a UNIQUE
+            // index allows many NULLs). After the NULL back-fill, production carries no ''.
+            db()->exec("CREATE UNIQUE INDEX $name ON $table ($col)");
+        }
+    } catch (Throwable $e) { /* already exists, a benign race, or a stray '' on MySQL — never fatal */ }
+    return true;
+}
+
+// The real, non-empty numbers that appear on more than one row — the ones a
+// UNIQUE index would reject. Used both to decide whether to build the index and
+// to surface the offenders on the register.
+function books_duplicate_numbers($table, $col) {
+    return books_try(fn() => ops_all(
+        "SELECT $col AS num, COUNT(*) n FROM $table WHERE COALESCE($col,'')<>''
+         GROUP BY $col HAVING COUNT(*) > 1 ORDER BY $col", []), []) ?: [];
 }
 
 // ---- Numbering --------------------------------------------------------------
@@ -447,7 +503,7 @@ function books_invoice_create(array $b) {
         (invoice_no,series,fy,kind,partner_id,partner_name,office_id,sbu,invoice_date,due_date,
          payment_terms,credit_days,place_of_supply,supplier_state,gstin,is_igst,
          po_number,contract_number,quotation_id,status,notes,created_by,created_at,updated_at)
-        VALUES ('',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DRAFT',?,?,?,?)")
+        VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DRAFT',?,?,?,?)")
       ->execute([
         books_series($off), current_fy(), (string)($b['kind'] ?? 'TAX'), $pid,
         (string)($p['display_name'] ?: $p['legal_name']), $off, (string)($b['sbu'] ?? ''),
@@ -585,10 +641,25 @@ function books_issue($invoiceId) {
     $why = books_issue_missing($inv);
     if ($why) return implode(' ', $why);
 
-    $no = books_next_number('invoices', 'invoice_no', (string)$inv['series'] ?: books_series((int)$inv['office_id']), (string)$inv['fy'] ?: current_fy());
+    $series = (string)$inv['series'] ?: books_series((int)$inv['office_id']);
+    $fy = (string)$inv['fy'] ?: current_fy();
     $u = current_user();
-    db()->prepare("UPDATE invoices SET invoice_no=?, status='ISSUED', issued_at=?, issued_by=?, updated_at=? WHERE id=?")
-       ->execute([$no, date('c'), $u ? user_name($u) : '', date('c'), (int)$invoiceId]);
+    // Allocate + write under a retry: with the UNIQUE index on invoice_no now in
+    // place, a concurrent Issue that grabbed the same number makes THIS write fail
+    // — so we re-allocate (books_next_number will see the winner's row and take the
+    // next) rather than commit a duplicate. Read-max alone could not guarantee this.
+    $no = '';
+    for ($attempt = 0; ; $attempt++) {
+        $no = books_next_number('invoices', 'invoice_no', $series, $fy);
+        try {
+            db()->prepare("UPDATE invoices SET invoice_no=?, status='ISSUED', issued_at=?, issued_by=?, updated_at=? WHERE id=?")
+               ->execute([$no, date('c'), $u ? user_name($u) : '', date('c'), (int)$invoiceId]);
+            break;                                  // committed with a unique number
+        } catch (Throwable $e) {
+            if ($attempt >= 8) return 'Could not allocate a unique invoice number — the series is busy. Please try again.';
+            // else: another Issue won this number; loop to re-allocate the next one.
+        }
+    }
     books_mirror_to_jobs($invoiceId);
     // If the customer has connected MGH Books, the issued invoice is the billable
     // event that flows across. A no-op when not connected — the ERP keeps its own.

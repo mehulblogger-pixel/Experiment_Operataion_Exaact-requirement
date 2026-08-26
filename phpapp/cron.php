@@ -107,6 +107,13 @@ if (function_exists('crm_expire_quotes')) {
     echo "Quotations expired: $exq\n";
 }
 
+// Module 09 — chase overdue invoices. Ageing was view-only; this follows up the
+// money, marking each so a daily run does not re-nag the same invoice.
+if (function_exists('ar_overdue_reminders')) {
+    $od = ar_overdue_reminders();
+    echo "Overdue invoices chased: $od\n";
+}
+
 // IDEMS — escalate report approvals that have blown their SLA.
 if (function_exists('idems_run_sla_escalations')) {
     $esc = idems_run_sla_escalations();
