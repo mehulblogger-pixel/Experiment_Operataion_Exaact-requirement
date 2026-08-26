@@ -81,8 +81,18 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
   scoped" design and forcing the workflow on every client. Fixed non-destructively by scoping the two
   demo dependencies to the demo client (`CL-NIL`). Suite → **3240 passed, 0 failed**. Commit `17f8254`.
 
+- **2026-08-26 — W1 Verification Audit COMPLETE** (`docs/phase-2/01-verification-audit.md`). All 84
+  points mapped to Implemented/Partial/Missing with code evidence (four read-only investigations +
+  Phase-1 grounding) and §81 classification. Headline: **§30 historical financial reproducibility is
+  MISSING (P0 Critical)**; systemic **§51 IDOR on single-record/PDF/file reads (P1)**; **§53 identity
+  not encrypted at rest (P1)**; **§54 audit chain master-wipeable (P1)**; **§10 issue gate omits
+  vetting/competence/impartiality/NCR/client-acceptance (P0/P1)**; **§11 seal fail-open**. Consolidation
+  (canonical person/engagement/financial-event, quality-case umbrella) genuinely absent but P2/P3
+  convergence-layer work. Full defect register + exec summary in the audit doc.
+
 ## Open decisions
 
-- Workstream sequencing (which of W1–W8 first). Recommendation: **W1 Verification Audit** next (it is
-  what Phase 2 opens with and it prevents feature creep by proving what already exists), then **W2
-  Security P0**. Awaiting confirmation.
+- **Fix scope/order** (per "audit-first, then confirm fixes"). Recommended first fixes:
+  **P0 §30 (financial reproducibility snapshot) + §10 (issue-gate completeness) + §11 (seal fail-closed)**,
+  then **P1 security §51/§53/§54**, then report-workflow P1s (§4/§6/§9). **Item #7 (financial
+  convergence, §28) changes displayed numbers → needs explicit sign-off.** Awaiting your selection.

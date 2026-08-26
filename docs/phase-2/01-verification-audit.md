@@ -117,3 +117,215 @@ consolidation/platform sections are pending their agents and will be inserted wi
 - **Evidence:** builder has a single sample-data preview + PDF preview (`builder.php:13-14,47-52`; `idems.php:7582`). `idems_template_validate` (.docx, **blocks** on ERROR `:7768-7807`); `idems_format_validate` (schema, **advisory only**, Module 48, `:7814-48`).
 - **Gap:** **persona previews (Inspector/Vetter/Approver/Client/Issuer) do not exist.** Publish validation covers ~3/14 §8 checks; absent: unreachable sections, contradictory rules, missing approval path, invalid signature/evidence config, visibility conflict, page/table overflow. Schema validator never blocks.
 - **Class:** Medium · P2 · Effort L · Business impact Medium.
+
+## W2 — Security & tenant isolation (§51–54) — investigated, evidence-grounded
+
+### §51 Authorization / IDOR — **PARTIAL (systemic)**
+- **Evidence:** the dispatcher checks only a module permission (`ops_module_gate()` `ops.php:2465-95`); the scope helper `scope_clause()` (`access.php:604-21`) is applied on **list** queries (jobs list `ops.php:5399`; evidence files `idems_file_authorized()` `idems.php:5532-40` — the correct pattern) but **dropped on single-record/PDF/file reads**: job detail (`ops.php:6000-08`, no scope vs the scoped list), report detail (`idems.php:4372-78`), **report PDF** (`idems.php:7501-06`), invoice detail/print (`books.php:346-53` via `booksui.php:165-213`), **check-in photo** (`trust.php:853-58`), endorsement file (`idems.php:8392-97`). Partners/contracts are company-wide master data (no office column) — arguably by design.
+- **Gap:** any authenticated user holding the module permission can open/download ANY id cross-office for jobs, reports, report PDFs, invoices, endorsement files, check-in photos. The correct scoped pattern already exists (`idems_file_authorized`) but is applied unevenly. Corroborated by the team's own checklist (lines 454/469/547).
+- **Class:** **High · P1 · Effort M · Business impact High** (confidentiality / cross-office data exposure; §52-adjacent for internal users).
+
+### §51 CSRF — **IMPLEMENTED**
+- **Evidence:** session-bound token, `hash_equals`, empty-rejecting (`helpers.php:185-236`); auto-stamped into every POST form (`:238-52`); **global fail-closed gate** before handlers (`index.php:836-45`, logs `CSRF_REJECTED`); portals + login carry their own checks; public payment uses Razorpay signature (correct). No unprotected authenticated POST found.
+- **Class:** — (no gap).
+
+### §52 Portal tenant isolation — **IMPLEMENTED**
+- **Evidence:** both portals put the tenant id **in the WHERE clause** on every fetch incl. single records + PDF: client `portal_call/portal_report` (`portal.php:248-313`, `WHERE …client_id=? AND site_sql`), invoices (`:335-43`), complaints; vendor `cvp_vendor_report` (`cvp.php:228-40`, `WHERE …vendor_id=? AND vendor_visible=1`). The former intra-client site-scope hole was closed. Client A cannot reach client B by id.
+- **Class:** — (no gap). *(W2 active pentest will still attempt id-tampering to confirm at runtime.)*
+
+### §53 Identity security — **PARTIAL**
+- **Evidence:** reveal requires a reason & is logged `REVEAL` (`identity.php:544-58`); download gated + logged `DOWNLOAD` (`:518-31`) via hardened `send_uploaded_file` (nosniff + `CSP sandbox`); company-wide access review (Module 26, `iddoc_access_review` `:293`). **But** `person_documents.doc_number` is **plaintext** (schema `:145`, insert `:351-67`) and `file_data` is **base64 plaintext** (`:148`); **no encryption anywhere** (zero `openssl_encrypt`/`sodium` matches). Masking is display-only.
+- **Gap:** §53 "encrypt at rest" **not met** — government/tax/ID numbers and scanned documents are cleartext in the DB; a dump exposes them. Access is well-governed; the data at rest is not protected.
+- **Class:** **High · P1 · Effort M–L · Business impact High** (DPDP / identity-doc breach exposure).
+
+### §54 Audit integrity — **PARTIAL**
+- **Evidence:** sealed chain `entry_hash=sha256(prev|payload)` (`idems.php:3338-47`); `idems_audit_verify()` detects edits AND in-band deletions (`:3377-95`; `test_audit_chain.php`). No surgical edit/delete handler exists.
+- **Gap:** not tamper-*proof* — `reset_run()` (`reset.php:105-25`, master-gated) can `DELETE FROM idems_audit` wholesale; the nightly retention purge `audit_trim_old()` (`compliance.php:143-50`, `cron.php:288`) deletes the chain head and **trips its own verifier** (broken-link) without re-sealing/marking, so retention is indistinguishable from tampering. No append-only constraint / external anchoring.
+- **Class:** Medium–High · P1 · Effort M · Business impact High (evidential defensibility of the trail).
+
+### File / PDF access — **PARTIAL** (same root as §51)
+- **Evidence:** uploads held in DB not disk (`security.php:511-25`), content-vs-extension sniff (`:549-89`), served with nosniff + `CSP sandbox` (`helpers.php:322-33`) — not executable, not at a guessable URL. But the **access check is module-level only** on `/document-pdf`, `/endorsement-file`, `/checkin-photo`, `/iddoc-file` (record scope missing).
+- **Class:** folded into §51.
+
+### §Session / invitation / 2FA — **IMPLEMENTED**
+- **Evidence:** idle+absolute session caps (`security.php:157-66`, `index.php:793-801`), id-regeneration on login (fixation defence), password policy + default-password detection + max-age, TOTP 2FA + hashed recovery codes + role-required 2FA, per-user/per-IP lockout, expiring portal invitations, reversible deactivation preserving audit authorship. Minor: `client_ip()` trusts first XFF (rate-limit attribution only).
+- **Class:** — (no gap; XFF note Low/P3).
+
+## W5 — Consolidation & platform capability (§23–27, §39, §45, §46, §48–50, §68, §72) — investigated
+
+### §23–24 Canonical party/person model — **MISSING** (ad-hoc pairwise links only)
+- **Evidence:** a human lives in 7 independent stores — `users`, `business_partners`, `partner_contacts`, `inspectors`, `candidates`, `client_users`, `vendor_users`. Hire spawns a NEW inspectors row (`ops.php:4666-90`) + `candidates.inspector_id`; portal accounts link by email match. `person_ref`/`person_key` (`recruit.php:871-938`) threads only candidate rows; `identity.php` is a doc vault, not a registry; `dedupe.php` is org-only.
+- **Gap:** no `party`/`person` table, no shared `person_id` across stores, no cross-store identity resolution.
+- **Class:** High · P1 (architectural) · Effort XL · Business impact High (but non-destructive convergence only — mapping layer, not table merge).
+
+### §25 Canonical engagement model — **MISSING**
+- **Evidence:** highest grouping is the **string** `contract_number VARCHAR` (`ops.php:321/335`, matched not FK'd `:1206/1223-55`). call→job→report are integer FKs; nothing groups multiple contracts/calls into an engagement/project/program.
+- **Class:** Medium · P2 · Effort XL · Business impact Medium (future canonical grouping; not blocking).
+
+### §26 Canonical task model — **PARTIAL**
+- **Evidence:** `ops_pending_tasks()` (`ops.php:6600-6714`) + `attention_summary()` aggregate COUNTs across engines at read time; **no `tasks`/`reminders`/`work_item` table** exists; some matching is fragile free-text name-match (`:6675-82`).
+- **Gap:** no persisted task entity (no assignment/lifecycle/due/reminder object); tasks are recomputed each load.
+- **Class:** Medium · P2 · Effort L · Business impact Medium.
+
+### §27 Canonical financial event — **MISSING**
+- **Evidence:** no `financial_event`/`ledger`/`journal` table; each of quotations/invoices/receipts/vouchers/expenses/credit_recon owns its own money. books is an outbound Zoho bridge, not an internal event ledger.
+- **Class:** High · P1 (architectural, pairs with §28/§30) · Effort XL · Business impact High.
+
+### §39 Quality case — **PARTIAL / effectively MISSING**
+- **Evidence:** NCR/CAPA/Complaints/Audits/Risks are separate modules/tables; the only convergence is CAPA as a downstream hub (typed origin FKs `complaint_id`/`audit_finding_id`/`review_id`, `capa.php:32/80/323`; `capa_from_complaint`).
+- **Gap:** no single case record linking finding→NCR→complaint→risk→RCA→CAPA→evidence→effectiveness→closure; no shared case id / umbrella lifecycle.
+- **Class:** Medium · P2 · Effort L · Business impact Medium (umbrella *view* over existing modules is the non-destructive path).
+
+### §45 Terminology — **IMPLEMENTED**
+- **Evidence:** `T/TP/Tl/Tlp/TH` term engine over `TERM_PACKS` + overrides (`terms.php:255-301`), editable at Settings→Terminology (`:329`). Acronyms (IDEMS/URFE/PDSO/TAPI) are internal route/capability keys, not UI labels. — (minor: internal identifiers stay acronymic by design).
+
+### §46 Status standardisation — **PARTIAL**
+- **Evidence:** calls have a canonical layer — dual `status`/`op_status`, `tosrm_call_status()` deterministic derive (`tosrm.php:122-49`), rank-validated transitions logged to `call_status_events`. 
+- **Gap:** (a) **no disagreement detection** — once `op_status` set, legacy `status` is ignored; nothing flags/repairs when they diverge. (b) **not generalized** — jobs still carry vestigial `stage` + `closed_flag` with no canonical-status layer.
+- **Class:** Medium · P1 · Effort M · Business impact Medium (per §46 "flag the record for repair" is currently missing).
+
+### §48 Bulk operations — **PARTIAL**
+- **Evidence:** bulk framework in `datatable.php:141-265` (declared actions, select-all, POST-only, count-stated confirm); `leads_bulk()` (`leads.php:796-854`) with per-row `act_log` audit — but **only leads adopt it**, and the flow is CONFIRM→EXECUTE→AUDIT with **no server PREVIEW/dry-run**.
+- **Class:** Medium · P2 · Effort M · Business impact Medium.
+
+### §49 Import/export — **IMPLEMENTED (2 domains) / PARTIAL (platform)**
+- **Evidence:** validated preview→apply import for partners (`partnerimport.php:395-443`) and org/users (`orgadmin.php:857/965`); broad `csv_download()` export. **Gap:** not generalized to calls/jobs/inspectors/candidates/contracts; no reusable template-import service.
+- **Class:** Low–Medium · P3 · Effort M · Business impact Medium.
+
+### §50 API / integration — **PARTIAL**
+- **Evidence:** mature per-integration outboxes with retry + idempotency (`ads_outbox`/`ads_sync_log` `adssync.php`; `books_outbox` payload-hash loop-breaker `booksbridge.php:14-24`); `api.php` is a single-purpose licence endpoint. **Gap:** no inbound webhook framework, no generic integration-log/retry-queue/idempotency abstraction, no authenticated public API.
+- **Class:** Medium · P2 · Effort L · Business impact Medium.
+
+### §68 Field-quality anomaly detection — **MISSING**
+- **Evidence:** building blocks exist but unflagged — Module 44 SHA1 dedup is **same-report upload-time only** (`idems.php:5461/5501`), skips silently, no cross-report reuse detection; EXIF time + GPS stored (`:5400-5466`) but never compared/flagged; geofence is punch-only.
+- **Gap:** no detection of identical responses / impossible time / cross-report duplicate photos / unusual GPS / missing evidence; no QUALITY REVIEW FLAG artifact.
+- **Class:** Medium · P2 · Effort M · Business impact Medium (fraud/quality assurance).
+
+### §72 Internal/external visibility — **PARTIAL**
+- **Evidence:** record-level audience model — `CVP_AUDIENCE`/`CVP_VISIBILITY_AUDIENCE` (`cvp.php:29-41`, enforced `:1004-37`), `NCDCA_VISIBILITY` (`ncdca.php:65`), `report_docs.vendor_visible`, PDSO `client_visible`.
+- **Gap:** no single universal PUBLIC/CLIENT/VENDOR/INTERNAL/CONFIDENTIAL classification across **fields/comments/evidence/documents**; per-record-type flags only; validation is per-portal-query, not one gate.
+- **Class:** Medium · P2 · Effort L · Business impact Medium.
+
+## W6/UX & observability (§15–22, §44, §47, §67) — Phase-1-grounded
+
+| § | Point | Verdict | Evidence / Gap |
+|---|---|---|---|
+| §15 | Job 360 decision-first | **PARTIAL** | `job_now()` status/owner/next-action/blocker header + tabs (Module 05). Gap: not the full §15 first-screen (quick-actions row, reports-required inline, due). |
+| §16 | Entity 360 standard | **PARTIAL** | Client/Vendor/Job/Contract/Report/Equipment 360s exist; consistency uneven (Module 49). Gap: no shared 360 shell / uniform tab set. |
+| §17 | Universal activity timeline | **PARTIAL** | `act_render_timeline()` on complaint/NCR/lead/call/opportunity/invoice/customer. Gap: 4 incompatible renderers; job/contract/candidate/report off the spine; CANDIDATE/RECEIPT kinds unregistered. |
+| §18 | My Work as operational inbox | **PARTIAL** | `ops_pending_tasks()`/`my_work` (Module 39). Gap: no SLA/priority/due per item; no snooze/delegate/mark-done. |
+| §19 | Notification centre (action vs system) | **PARTIAL** | `/notifications` outbox (Module 38) + attention band. Gap: no user **Action Centre** (Open/Mark-done/Snooze/Delegate). |
+| §20/21 | Command Centre vs System Health | **PARTIAL** | attention band + `/system-status` (Module 50) separated. Gap: no dedicated **Business Command Centre** KPI board with per-KPI drill (WHAT/WHY/WHO/WHEN/ACTION). |
+| §22 | Global search | **PARTIAL** | permission-gated sources incl. opportunities/invoices (Module 37). Gap: contracts/inquiries sources not office-scoped; not all §22 entities. |
+| §44 | Role desks | **PARTIAL** | dashboard role-orders + area homes. Gap: not explicit named persona desks. |
+| §47 | Settings governance | **PARTIAL** | tabbed settings + audit + secret redaction (Module 14). Gap: no per-setting purpose/affected-modules/records-affected/before-after panel. |
+| §67 | AI governance | **IMPLEMENTED (mostly)** | advisory-marked, never auto-acts, provenance on chain (Module 45). Gap: pre-send §4.2 confidentiality/redaction (flagged). |
+
+## Compliance/quality & intelligence (§34–40, §76–78) — Phase-1-grounded
+
+| § | Point | Verdict | Note |
+|---|---|---|---|
+| §34 | Change control | **PARTIAL** | `controlled_changes()` view (Module 42); no CR→impact→risk→approval→…→closure lifecycle object. |
+| §35 | Training lifecycle | **PARTIAL** | cert watch (Module 43); no attendance/assessment/result flow. |
+| §36 | Competence eligibility | **IMPLEMENTED** | server-side verdict + `work.assign` gate (Module 24). |
+| §37 | Impartiality | **IMPLEMENTED (assign)** | verdict + assign gate (Module 25); not at issue (see §10). |
+| §38 | Equipment impact | **IMPLEMENTED** | review-not-invalidate (Module 23). |
+| §40 | QMS doc control | **IMPLEMENTED** | cdoc lifecycle + readiness (Module 41). |
+| §76-78 | Contract/Client/Vendor 360 intelligence | **PARTIAL** | Modules 18/15/16; several KPIs partial; margin depends on §28/§30 truth. |
+
+## Process / validation points (§55–66, §69–75, §79–84) — scheduled in later workstreams
+- §55/56 Test harness + honest reporting: **PARTIAL** (`tests/run.php` 3240/0). Gap: single `qa/run-all-tests` with runtime/extension/env checks + categorized PASS/FAIL/SKIPPED/ENV. → W0.
+- §57 E2E simulation (5→50→500→5,000): **MISSING** as executed. → W7.
+- §58–60 Persona / click-tax: **MISSING** as executed. → W6.
+- §61–64 Form/error/empty/filter audits: **PARTIAL**. → W6.
+- §65/66 Performance & scale: **not measured**. → W7.
+- §69 Competitor-learning: **MISSING**. → W6.
+- §70/71 No-clutter / target IA: **process rule** — honored. N/A-OK.
+- §73/74 Client/Vendor experience: **PARTIAL**. → W6.
+- §75 Workforce/recruitment intelligence: **PARTIAL** (no capacity-vs-projected-demand answer).
+- §79 CANONICAL APPLICATION MODEL doc / §80 legacy-compat doc: **MISSING** → W5/W9.
+- §82 No premature "complete": **honored**. §83 final deliverable → W9.
+
+---
+
+# DEFECT REGISTER — prioritized fix backlog (for your approval)
+
+Non-destructive only: each fix adds a guard/surface, versions data forward, or consolidates via a
+canonical layer + mapping. Nothing deletes functionality.
+
+### P0 — Critical
+1. **§30 Historical financial reproducibility** (Critical/VeryHigh/L). `job_profit()` uses today's
+   working-days/salary/office-% for old jobs. Fix (additive): snapshot the rate basis onto a job at
+   close (effective-dated: working-days, daily-base, oh%, contingency%); `job_profit()` prefers the
+   snapshot when present, else computes live (open jobs unchanged). Reproducible forward + backfillable.
+2. **§10 Issuance readiness completeness** (High/VeryHigh/M). Add vetting-complete / report-completeness
+   / competence / impartiality / blocking-NCR / client-acceptance probes to `idems_issue_readiness()`
+   as advisory rows first, then configurable block/warn per contract/service. Reuses existing verdicts.
+3. **§11 Seal fail-open** (Medium/High/S). Seal failure must **flag** the issued report as "unsealed —
+   needs re-seal" and `idems_content_check()` must report unsealed as a problem, not `ok`.
+
+### P1 — High
+4. **§51 IDOR scope** (High/High/M) — apply `scope_clause`/`idems_file_authorized` to `/job`,
+   `/document`, `/document-pdf`, `/invoice`, `/endorsement-file`, `/checkin-photo`; fail-closed.
+5. **§53 Identity encryption at rest** (High/High/M–L) — encrypt `doc_number` + `file_data`; keep
+   masking + access log.
+6. **§54 Audit chain protection** (Med-High/High/M) — re-anchor the retention-trim head with a signed
+   checkpoint; require typed confirmation + audit event before `reset_run()` touches `idems_audit`.
+7. **§28 Financial one-engine convergence** (High/High/M) — point MIS + SBU-PL at `job_profit()`'s
+   profit/cost; reconcile `boss_profit` to Σ`job_profit`. **Changes displayed figures → explicit sign-off.**
+8. **§31 Overhead versioning** (High/High/M) — store per-job overhead/contingency % at close (part of #1).
+9. **§33 Invoice readiness** (High/High/M) — READY/NOT-READY panel with blockers (reports issued/
+   accepted, PO, previous-billing vs contract value, milestone), configurable, advisory-first.
+10. **§6 Applicability override audit** (High/High/M) — capture reason+person+time, audit event, set
+    the promised "not allocated" flag.
+11. **§4 PDF role model** (High/High/S–M) — print Vetted-by + Issued-by; stamp Prepared timestamp.
+12. **§9 Return-to-inspector detail** (Med/High/M) — structured section/field/evidence-ref/correction/
+    deadline alongside the free-text note.
+13. **§46 Status disagreement detection** (Med/Med/M) — integrity check flagging legacy vs op_status divergence.
+
+### P2 — Medium (additive consolidation layers)
+14. §26 Task entity + §18 SLA/priority/snooze/delegate. 15. §19 Action Centre. 16. §20 Business Command
+Centre. 17. §68 anomaly-flag surface. 18. §39 Quality Case umbrella. 19. §72 field/evidence visibility.
+20. §48 bulk preview + adoption. 21. §50 webhook/integration-log layer. 22. §29 recognised revenue +
+two-invoice-truth reconcile. 23. §32 inter-office settle states. 24. §8 builder persona previews.
+25. §35 training attendance/assessment.
+
+### P2/P3 — Architectural (non-destructive convergence, staged)
+26. §23/24 canonical person/party **mapping layer** (shared id, no merge). 27. §25 engagement grouping
+(view over contract_number). 28. §27 financial-event stream (gradual consumer migration). 29. §79/§80
+CANONICAL APPLICATION MODEL + legacy-compat docs.
+
+### P3 — Minor
+30. §5 submit-wording. 31. XFF note. 32. §49 generalized import.
+
+---
+
+# EXECUTIVE SUMMARY (W1 audit)
+
+**Solid / verified IMPLEMENTED:** CSRF (global fail-closed), portal tenant isolation (id in WHERE incl.
+PDF), session/2FA/lockout/invitations, issued-report immutability record + controlled revision,
+terminology engine, competence/impartiality *assignment* gates, equipment impact-review, QMS doc
+control, AI advisory-only governance with provenance, DB-held un-executable hardened file storage, and
+the canonical per-job `job_profit()` engine.
+
+**Critical (P0):** historical financial reproducibility is missing — profit for any past job/contract
+silently changes when today's salary, office %, holidays, or the month change; every financial screen
+inherits it. Fix first.
+
+**Systemic security (P1):** the correct office/SBU scope pattern exists but is applied on lists and
+dropped on single-record/PDF/file reads → cross-office IDOR on jobs/reports/report-PDFs/invoices/
+endorsement-files/check-in-photos. Identity docs are masked+logged but **not encrypted at rest**. The
+audit chain is tamper-evident but master-wipeable.
+
+**Report workflow (P1):** the issue gate omits vetting/competence/impartiality/blocking-NCR/client-
+acceptance; the content seal is fail-open; the PDF shows only 2 of 4 roles; applicability overrides
+aren't audited.
+
+**Consolidation:** canonical person / engagement / financial-event models and a quality-case umbrella
+are genuinely absent — but per the non-destructive rule these are convergence layers (mapping/views),
+not rewrites, and are P2/P3.
+
+**Nothing rebuilt or claimed done from memory** — every verdict is code-grounded (file:line) or
+executed. **Fixes are not yet applied.** Recommended order: P0 §30 + §10 + §11, then P1 security
+(§51/§53/§54), then report-workflow P1s. Item #7 (financial convergence) changes displayed numbers and
+needs explicit sign-off before I touch it.
