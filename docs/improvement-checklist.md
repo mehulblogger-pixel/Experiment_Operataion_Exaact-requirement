@@ -47,7 +47,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 25 | Impartiality | P0 | ✅ done & pushed | 2026-08-24 |
 | 26 | Identity | P0 | ✅ done & pushed | 2026-08-26 |
 | 27 | Confidentiality | P0 | ✅ done & pushed | 2026-08-26 |
-| 28 | Audits | P2 | ⬜ | — |
+| 28 | Audits | P2 | ✅ done & pushed | 2026-08-26 |
 | 29 | Data Control / Governance | P0 | ✅ done & pushed | 2026-08-26 |
 | 30 | Vouchers / Expenses | P1 | ✅ done & pushed | 2026-08-24 |
 | 31 | Attendance / Reconciliation | P1 | ✅ done & pushed | 2026-08-24 |
@@ -79,6 +79,30 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 28 — Internal Audits (§8.8) + Management Review (§8.9) · 2026-08-26
+**Decision:** (A) overdue reminders + MR-decision→CAPA link + per-clause next-due + first gate tests.
+**Found:** the subsystem (`lib/audits.php`) is mature (coverage board, auto-gathered MR inputs,
+§8.8.2 independence gate, close/complete gates, finding→CAPA loop) but had three holes: **no overdue
+reminder** (the only accreditation registers with a readiness signal but no cron nudge); **MR
+decisions never reached the CAPA register** (`mr_actions.capa_ref` dead in the live path); and **zero
+tests**.
+**Added (additive, read-mostly, no hard control):**
+- `audits_run_reminders()` + `reviews_run_reminders()` — read only the existing readiness and e-mail
+  the audit/quality owner about uncovered clauses, unactioned findings, an overdue review or open
+  decisions. Wired into `cron.php`, **weekly-guarded**. They notify; they change no record.
+- **MR-decision → CAPA**: a `review-action-capa` route + "🛠 Raise CAPA" button raising a corrective
+  action from a management-review decision (`source='MGMT_REVIEW'`), writing `capa_ref`/`capa_id`
+  back (new additive `mr_actions.capa_id`). Closes the asymmetry with the §8.8 finding→CAPA loop.
+- **Per-clause days-since + next-due** added to `audit_coverage()` (additive keys).
+- The **first tests** over the subsystem — reminders, the §8.8.2 independence refusal, the
+  close-block, the coverage enrichment, the MR→CAPA link.
+**Preserved (verified by tests):** the coverage board, the MR auto-gather, the independence gate, the
+close/complete gates, every route — unchanged. No new permission; one additive nullable column; no
+access or data changed; nothing deleted.
+**Edge cases:** `docs/edge-cases/28-audits.md`.
+**Tests:** `tests/test_module28_audits.php` (15 assertions). Suite 2813 passed / 3 pre-existing
+baseline failures.
 
 ### Module 29 — Data Control / Governance (§7.11) · 2026-08-26
 **Decision:** (A) scheduled integrity self-test + money orphan detectors + audit-chain banner.

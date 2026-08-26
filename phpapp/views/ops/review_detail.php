@@ -88,14 +88,25 @@
         <td><?= e($x['owner'] ?: '—') ?></td>
         <td><?= e($x['due_on'] ? fdate($x['due_on']) : '—') ?></td>
         <td><?= $x['status'] === 'DONE' ? '<span class="pill p-ok">done ' . e(fdate($x['done_on'])) . '</span>'
-              : '<span class="pill p-warn">open</span>' ?></td>
+              : '<span class="pill p-warn">open</span>' ?>
+          <?php // Module 28 — the corrective action this decision raised, if any.
+          if (trim((string)($x['capa_ref'] ?? '')) !== ''): ?>
+            <div style="font-size:12px;margin-top:2px"><?php if (!empty($x['capa_id'])): ?><a href="/capa-item?id=<?= (int)$x['capa_id'] ?>">🛠 <?= e($x['capa_ref']) ?></a><?php else: ?>🛠 <?= e($x['capa_ref']) ?><?php endif; ?></div>
+          <?php endif; ?></td>
         <?php if ($canEdit && !$done): ?>
         <td><?php if ($x['status'] !== 'DONE'): ?>
-          <form method="post" action="/review-action-done" style="display:flex;gap:4px;margin:0">
+          <form method="post" action="/review-action-done" style="display:flex;gap:4px;margin:0 0 4px">
             <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
             <input type="hidden" name="action_id" value="<?= (int)$x['id'] ?>">
             <input class="form-control" style="width:150px" name="done_note" placeholder="what was done">
             <button class="btn small secondary" type="submit">Done</button></form>
+          <?php // Module 28 — send a decision into the corrective-action register (§8.9.3 → §8.7).
+          if (trim((string)($x['capa_ref'] ?? '')) === '' && function_exists('capa_create')): ?>
+            <form method="post" action="/review-action-capa" style="margin:0" onsubmit="return confirm('Raise a corrective action from this decision?')">
+              <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+              <input type="hidden" name="action_id" value="<?= (int)$x['id'] ?>">
+              <button class="btn small secondary" type="submit" title="Track this decision in the corrective-action register">🛠 Raise CAPA</button></form>
+          <?php endif; ?>
         <?php endif; ?></td>
         <?php endif; ?>
       </tr>

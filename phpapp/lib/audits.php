@@ -135,6 +135,9 @@ function audits_migrate() {
         decision TEXT, owner VARCHAR(150) DEFAULT '', due_on VARCHAR(20) DEFAULT '',
         status VARCHAR(20) DEFAULT 'OPEN', done_on VARCHAR(20) DEFAULT '', done_note VARCHAR(1000) DEFAULT '',
         capa_ref VARCHAR(40) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // Module 28 — link a management-review decision to the corrective-action it
+    // raised, mirroring audit_findings.capa_id. Additive.
+    if (function_exists('ensure_column')) ensure_column('mr_actions', 'capa_id', 'INT NULL');
 }
 
 function aud_missing_table(Throwable $e) {
@@ -201,8 +204,15 @@ function audit_coverage($today = null) {
             if (!isset($seen[$cl]) || $seen[$cl] < $when) $seen[$cl] = $when;
     }
     $out = [];
-    foreach (audit_clause_options() as $k => $label)
-        $out[$k] = ['label' => $label, 'last' => $seen[$k] ?? '', 'covered' => isset($seen[$k])];
+    $cycle = audit_cycle_days();
+    foreach (audit_clause_options() as $k => $label) {
+        $last = $seen[$k] ?? '';
+        // Module 28 — additive: days since last covered and the next-due date, so the
+        // coverage board and the reminder can name a specific clause and when it's due.
+        $out[$k] = ['label' => $label, 'last' => $last, 'covered' => isset($seen[$k]),
+            'days_since' => $last !== '' ? (int)floor((strtotime($today) - strtotime($last)) / 86400) : null,
+            'next_due'   => $last !== '' ? date('Y-m-d', strtotime($last . ' +' . $cycle . ' days')) : ''];
+    }
     return $out;
 }
 
@@ -418,6 +428,53 @@ function reviews_readiness() {
         'overdue' => $daysSince === null || $daysSince > 365,
         'open_actions' => $openActions,
     ];
+}
+
+// ---- Reminders (Module 28) -------------------------------------------------
+// Every other accreditation register (NCR, CAPA, complaints, calibration, vendor
+// re-qualification) is chased by cron; internal audits and management review were
+// the only ones the compliance board flagged as overdue but nobody was told. These
+// read ONLY the already-computed readiness and push the same nudge. Read-only over
+// the registers; they notify, they never change a record.
+function audits_run_reminders($today = null) {
+    if (!function_exists('audits_readiness')) return 0;
+    $today = $today ?: date('Y-m-d');
+    $r = audits_readiness($today);
+    if ((int)$r['uncovered'] === 0 && (int)$r['nc_without_capa'] === 0) return 0;
+    $to = getenv('QAC_EMAIL') ?: (function_exists('coordinator_emails') ? coordinator_emails() : '');
+    if (trim((string)$to) === '') return 0;
+    $uncovered = [];
+    foreach (audit_coverage($today) as $c) if (!$c['covered']) $uncovered[] = $c['label'];
+    $body = "Internal audit programme — attention needed.\n\n";
+    if ($uncovered) $body .= count($uncovered) . " clause(s) not audited in the current "
+        . audit_cycle_days() . "-day cycle:\n  - " . implode("\n  - ", array_slice($uncovered, 0, 40)) . "\n\n";
+    if ((int)$r['nc_without_capa'] > 0) $body .= (int)$r['nc_without_capa']
+        . " nonconformity finding(s) with no corrective action raised.\n\n";
+    $body .= "Open Internal audits in " . app_name() . " to plan the audit or raise the action.\n";
+    aud_try(fn() => ops_mail($to, 'Internal audit programme: '
+        . ((int)$r['uncovered'] ? (int)$r['uncovered'] . ' clause(s) uncovered' : '')
+        . ((int)$r['uncovered'] && (int)$r['nc_without_capa'] ? ', ' : '')
+        . ((int)$r['nc_without_capa'] ? (int)$r['nc_without_capa'] . ' finding(s) unactioned' : ''),
+        $body, '', 'audit'), null);
+    return 1;
+}
+function reviews_run_reminders($today = null) {
+    if (!function_exists('reviews_readiness')) return 0;
+    $r = reviews_readiness();
+    if (empty($r['overdue']) && (int)$r['open_actions'] === 0) return 0;
+    $to = getenv('QAC_EMAIL') ?: (function_exists('coordinator_emails') ? coordinator_emails() : '');
+    if (trim((string)$to) === '') return 0;
+    $body = "Management review — attention needed.\n\n";
+    if (!empty($r['overdue'])) $body .= $r['days_since'] === null
+        ? "No management review has been recorded yet — one is due.\n\n"
+        : "The last management review was " . (int)$r['days_since'] . " days ago (over a year).\n\n";
+    if ((int)$r['open_actions'] > 0) $body .= (int)$r['open_actions']
+        . " management-review decision(s) are still open.\n\n";
+    $body .= "Open Management reviews in " . app_name() . " to hold the review or close the decisions.\n";
+    aud_try(fn() => ops_mail($to, 'Management review '
+        . (!empty($r['overdue']) ? 'is due' : 'has ' . (int)$r['open_actions'] . ' open decision(s)'),
+        $body, '', 'review'), null);
+    return 1;
 }
 
 function aud_can_view()  { return can('mod.audits.view'); }
@@ -652,6 +709,28 @@ function ops_reviews($route, $method) {
                        (int)($_POST['action_id'] ?? 0), $r['id']]);
         flash('Marked done.');
         redirect('/management-review?id=' . $r['id']);
+    }
+
+    // Module 28 — raise a corrective action from a management-review decision, so an
+    // MR output reaches the same CAPA register a §8.8 audit finding does (the finding
+    // → CAPA loop was wired; the review → CAPA loop was not). Mirrors audit-finding-capa.
+    if ($route === 'review-action-capa' && $method === 'POST') {
+        $act = ops_one("SELECT * FROM mr_actions WHERE id=? AND review_id=?", [(int)($_POST['action_id'] ?? 0), $r['id']]);
+        if (!$act || !function_exists('capa_create')) redirect('/management-review?id=' . $r['id']);
+        if (trim((string)$act['capa_ref']) !== '') { flash('That decision already has a corrective action.', 'error'); redirect('/management-review?id=' . $r['id']); }
+        $id = capa_create([
+            'source' => 'MGMT_REVIEW', 'source_ref' => 'MR-' . (int)$r['id'],
+            'title' => 'Management-review decision: ' . substr(strip_tags((string)$act['decision']), 0, 160),
+            'description' => "Raised from a management-review decision (§8.9.3).\n\nDecision:\n" . $act['decision']
+                           . (trim((string)$act['owner']) !== '' ? "\n\nOwner: " . $act['owner'] : '')
+                           . (trim((string)$act['due_on']) !== '' ? "\nDue: " . $act['due_on'] : ''),
+            'office_id' => $r['office_id'] ?? null, 'severity' => 'MINOR',
+        ]);
+        if (!$id) { flash('Could not raise a corrective action.', 'error'); redirect('/management-review?id=' . $r['id']); }
+        $ref = capa_row($id)['ref'] ?? '';
+        db()->prepare("UPDATE mr_actions SET capa_ref=?, capa_id=? WHERE id=?")->execute([$ref, $id, (int)$act['id']]);
+        flash('Raised ' . $ref . ' from that decision.');
+        redirect('/capa-item?id=' . $id);
     }
 
     if ($route === 'review-complete' && $method === 'POST') {

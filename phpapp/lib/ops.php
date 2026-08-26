@@ -2440,6 +2440,7 @@ function ops_module_gate($route) {
         'management-reviews'=>'audits','management-review'=>'audits','management-review-new'=>'audits',
         'review-refresh'=>'audits','review-header'=>'audits','review-input'=>'audits',
         'review-action-add'=>'audits','review-action-done'=>'audits','review-complete'=>'audits',
+        'review-action-capa'=>'audits',
         'complaints'=>'complaints','complaint'=>'complaints','complaint-new'=>'complaints',
         'complaint-ack'=>'complaints','complaint-validity'=>'complaints','complaint-investigate'=>'complaints',
         'complaint-decide'=>'complaints','complaint-notify'=>'complaints','complaint-capa'=>'complaints',

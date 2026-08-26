@@ -297,6 +297,21 @@ if (function_exists('audit_trim_old') && (string)setting_get('audit_trim_day', '
     }
 }
 
+// Module 28 — chase an overdue internal audit / management review, at most weekly
+// (a year-long cycle does not need a daily nudge). The only accreditation registers
+// that had a readiness signal but no reminder.
+if ((function_exists('audits_run_reminders') || function_exists('reviews_run_reminders'))
+    && (string)setting_get('audit_reminder_week', '') !== date('o-W')) {
+    try {
+        $a = function_exists('audits_run_reminders') ? audits_run_reminders() : 0;
+        $r = function_exists('reviews_run_reminders') ? reviews_run_reminders() : 0;
+        setting_set('audit_reminder_week', date('o-W'));
+        echo "Audit / review reminders sent: " . ($a + $r) . "\n";
+    } catch (Throwable $e) {
+        echo "Audit / review reminders: failed — " . $e->getMessage() . "\n";
+    }
+}
+
 // Module 29 — the §7.11 data-integrity self-test, once a day. integrity_run()
 // runs the referential + consistency checks and writes ONE dated pass/fail row to
 // data_check_runs — the evidence the Data Control console reads. Exactly like
