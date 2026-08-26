@@ -98,6 +98,16 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
     `job_profit()` prefers the snapshot; freezing changes no number today, stops all future drift. **P0 Critical closed.**
   - Suite 3270 → **3288 passed, 0 failed**.
 
+- **2026-08-26 — P1 SECURITY batch COMPLETE** (approved; decisions: env-key `APP_ENCRYPTION_KEY`,
+  fail-closed IDOR). Non-destructive, tested, pushed:
+  - **§51** cross-office IDOR closed on /job, /document, /document-pdf, /invoice(+print),
+    /endorsement-file, /checkin-photo via `scope_allows()` (scalar twin of scope_clause; masters/ALL exempt).
+  - **§54** audit chain: retention trim re-anchored (legitimate purge no longer reads as tampering, real
+    tampering still caught); wholesale wipe leaves durable evidence + needs a distinct "ERASE AUDIT" phrase.
+  - **§53** identity docs encrypted at rest (AES-256-GCM, env key), self-describing ciphertext, legacy
+    plaintext coexists, nightly backfill, compliance nudge. No key ⇒ unchanged behaviour.
+  - Suite **3343 passed, 0 failed**.
+
 ## Open decisions
 
 - **Fix scope/order** (per "audit-first, then confirm fixes"). Recommended first fixes:
