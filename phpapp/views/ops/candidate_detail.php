@@ -472,3 +472,7 @@ $erasePv = function_exists('candidate_erase_preview') ? candidate_erase_preview(
   <?php endif; ?>
 </div>
 <?php endif; ?>
+
+<?php // Phase 2 §23/24 — the same human may also be an inspector, a portal user or a contact.
+      // The canonical mapping layer links them (no merge); this shows the other records. ?>
+<?php if (function_exists('party_render_also')) party_render_also('CANDIDATE', (int)$cand['id'], 'This person elsewhere in the system'); ?>
