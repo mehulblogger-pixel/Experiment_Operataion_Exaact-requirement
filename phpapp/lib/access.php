@@ -695,8 +695,8 @@ function setting_get($k, $def = null) {
 // audited as an event, but the value itself is never written to the trail.
 function setting_change_class($k) {
     $k = (string)$k;
-    // Internal bootstrap / cache markers — not configuration.
-    if (preg_match('/(_seeded(_v\d+)?|_repaired(_v\d+)?|_sig|_checked_at)$/', $k)) return ['audit' => false, 'secret' => false];
+    // Internal bootstrap / cache / cron-reminder markers — not configuration.
+    if (preg_match('/(_seeded(_v\d+)?|_repaired(_v\d+)?|_sig|_checked_at|_week|_last_weekly|_last_monthly)$/', $k)) return ['audit' => false, 'secret' => false];
     if (in_array($k, ['setup_done', 'schema_sig', 'admin_cfg_sig', 'partners_seeded',
                       'demo_seed_last_fail', 'demo_removed', 'billing_paid_until'], true)) return ['audit' => false, 'secret' => false];
     $secret = (bool)preg_match('/(pass|secret|token|api_?key|ai_config|rzp_key)/i', $k);

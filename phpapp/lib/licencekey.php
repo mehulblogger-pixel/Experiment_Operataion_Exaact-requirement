@@ -377,6 +377,80 @@ function lk_summary() {
     return $out;
 }
 
+// Module 36 — one normalized "does the licence/subscription need attention" verdict,
+// derived from lk_summary() (state, days_left, seats) + the auto-renew status. It
+// exists so a lapse can be surfaced BEFORE it forces read-only — an ambient admin
+// banner and a cron nudge both read this, instead of each re-deriving the rules.
+// Advisory only; it blocks nothing.
+function licence_health() {
+    $s    = lk_summary();
+    $sync = function_exists('licsync_status') ? licsync_status() : [];
+    $state = (string)$s['state'];
+    $days  = $s['days_left'];
+    $seats = (int)$s['seats']; $used = (int)$s['used'];
+    $overSeat = $seats > 0 && $used > $seats;
+    $atSeat   = $seats > 0 && $used >= $seats && !$overSeat;
+    $syncErr  = trim((string)($sync['error'] ?? ''));
+
+    $sev = 'ok'; $head = ''; $detail = ''; $url = '/licence';
+    if ($state === 'READONLY' || $state === 'INVALID') {
+        $sev = 'bad'; $url = '/billing';
+        $head = $state === 'INVALID' ? 'Licence key not accepted' : 'Subscription expired — the app is read-only';
+        $detail = (string)$s['err'];
+    } elseif ($state === 'GRACE') {
+        $sev = 'bad'; $url = '/billing';
+        $head = 'Subscription expired — still working during a short grace period';
+        $detail = 'Renew now to avoid the app going read-only.' . ($s['expires'] ? ' Ended ' . fdate((string)$s['expires']) . '.' : '');
+    } elseif ($state === 'TRIAL') {
+        if ($days !== null && (int)$days <= 5) { $sev = 'warn'; $url = '/billing';
+            $head = 'Trial ending in ' . max(0, (int)$days) . ' day(s)';
+            $detail = 'Add a licence or subscription to keep working.'; }
+    } elseif ($state === 'VALID') {
+        if ($days !== null && (int)$days <= 30) { $sev = 'warn'; $url = '/billing';
+            $head = 'Subscription renews in ' . max(0, (int)$days) . ' day(s)';
+            $detail = 'Renew before it lapses to avoid any interruption.'; }
+    }
+    // Seat pressure — independent of the expiry state.
+    if ($overSeat) {
+        if ($sev !== 'bad') { $sev = 'bad'; $url = '/billing'; }
+        $head = ($head ? $head . ' · ' : '') . 'Over the licensed seat count';
+        $detail = trim($detail . ' ' . $used . ' active users against ' . $seats . ' seats.');
+    } elseif ($atSeat && $sev === 'ok') {
+        $sev = 'warn'; $url = '/billing';
+        $head = 'At the licensed seat limit';
+        $detail = $used . ' of ' . $seats . ' seats used — the next new user will be refused.';
+    }
+    // Auto-renew failing (never downgrade a bad verdict, but add the note).
+    if ($syncErr !== '') {
+        if ($sev === 'ok') { $sev = 'warn'; $head = 'Automatic licence renewal is failing'; $url = '/licence'; }
+        $detail = trim($detail . ' Auto-renew error: ' . $syncErr);
+    }
+
+    return ['needs_attention' => $sev !== 'ok', 'severity' => $sev, 'state' => $state,
+            'headline' => $head, 'detail' => $detail, 'url' => $url,
+            'days_left' => $days, 'used' => $used, 'seats' => $seats,
+            'over_seat' => $overSeat, 'at_seat' => $atSeat, 'sync_error' => $syncErr];
+}
+
+// Module 36 — a nudge before a licence/subscription lapse forces read-only or the
+// next new user is refused. Reads the already-computed licence_health() verdict and
+// pushes the same message; it emails, it never changes enforcement. The at-most-
+// weekly guard lives in cron.php, like the audit and controlled-doc reminders.
+function licence_run_reminders($today = null) {
+    if (!function_exists('licence_health')) return 0;
+    $h = licence_health();
+    $approaching = in_array($h['state'], ['VALID', 'TRIAL'], true)
+                 && $h['days_left'] !== null && (int)$h['days_left'] <= 14;
+    if (empty($h['needs_attention']) && !$approaching) return 0;
+    $to = getenv('QAC_EMAIL') ?: (function_exists('coordinator_emails') ? coordinator_emails() : '');
+    if (trim((string)$to) === '') return 0;
+    $body = ($h['headline'] ?: 'Licence / subscription attention') . "\n\n" . ($h['detail'] ?: '')
+          . "\n\nOpen Licence & billing in " . (function_exists('app_name') ? app_name() : 'the app')
+          . " to renew or adjust seats.\n";
+    lk_try(fn() => ops_mail($to, 'Licence & subscription: ' . ($h['headline'] ?: 'attention needed'), $body, '', 'licence'), null);
+    return 1;
+}
+
 function ops_licence($route, $method) {
     ops_require(lk_can_manage(), 'You cannot see the licence.');
 

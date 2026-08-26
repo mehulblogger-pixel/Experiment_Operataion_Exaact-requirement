@@ -43,6 +43,17 @@
   <?= function_exists('ops_render_pending_tasks') ? ops_render_pending_tasks() : '' ?>
 
 <?php else: ?>
+  <?php // Module 36 — ambient licence/subscription health, so an admin sees a lapse or
+        // seat-limit BEFORE it forces the app read-only or refuses the next user. Shown
+        // only to someone who can act on it; hidden when nothing needs attention.
+    if (function_exists('licence_health') && function_exists('lk_can_manage') && lk_can_manage()) {
+      $lh = licence_health();
+      if (!empty($lh['needs_attention'])): ?>
+      <div class="msg <?= $lh['severity']==='bad' ? 'msg-error' : 'msg-warning' ?>" style="margin-top:14px">
+        <b><?= e($lh['headline']) ?>.</b> <?= e($lh['detail']) ?>
+        <a href="<?= e($lh['url']) ?>">Manage licence &amp; billing →</a>
+      </div>
+  <?php endif; } ?>
   <?php
     [$jw, $ja] = scope_clause('j.executing_office_id', 'j.sbu');
     [$cw, $ca] = scope_clause('c.executing_office_id', 'c.sbu');

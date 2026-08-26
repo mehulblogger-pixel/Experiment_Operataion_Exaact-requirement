@@ -325,6 +325,20 @@ if (function_exists('cdoc_run_reminders') && (string)setting_get('cdoc_reminder_
     }
 }
 
+// Module 36 — nudge an admin before a licence/subscription lapse forces read-only
+// or the next new user is refused, at most weekly. lk_state() already knows the
+// days-left and seat pressure; nothing dispatched it, so a self-service install got
+// no pre-lapse notice. Advisory email only — it never changes enforcement.
+if (function_exists('licence_run_reminders') && (string)setting_get('licence_reminder_week', '') !== date('o-W')) {
+    try {
+        $lc = licence_run_reminders();
+        setting_set('licence_reminder_week', date('o-W'));
+        if ($lc) echo "Licence/subscription reminder sent.\n";
+    } catch (Throwable $e) {
+        echo "Licence reminder: failed — " . $e->getMessage() . "\n";
+    }
+}
+
 // Module 29 — the §7.11 data-integrity self-test, once a day. integrity_run()
 // runs the referential + consistency checks and writes ONE dated pass/fail row to
 // data_check_runs — the evidence the Data Control console reads. Exactly like

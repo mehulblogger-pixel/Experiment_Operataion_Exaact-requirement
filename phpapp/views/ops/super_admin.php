@@ -6,7 +6,10 @@ $lic = $d['lic'] ?? []; $bill = $d['bill'] ?? []; $C = $d['counts'] ?? [];
 $sym = function_exists('cur_sym') ? cur_sym() : '₹';
 $seats = (int)($d['seats'] ?? 0); $used = (int)($d['used'] ?? 0);
 $seatPct = $seats > 0 ? min(100, round($used / $seats * 100)) : 0;
-$stateTone = ['OPEN'=>'p-info','ACTIVE'=>'p-ok','GRACE'=>'p-warn','EXPIRED'=>'p-bad','INVALID'=>'p-bad','READ_ONLY'=>'p-bad'];
+// Module 36 — key on the states lk_state() actually emits (VALID/READONLY/…), not the
+// never-emitted legacy names, so a healthy licence shows green and an expired
+// read-only one shows red on the operator's panel.
+$stateTone = ['OPEN'=>'p-info','TRIAL'=>'p-info','VALID'=>'p-ok','GRACE'=>'p-warn','READONLY'=>'p-bad','INVALID'=>'p-bad','MISSING'=>'p-warn'];
 ?>
 <style>
   .sa{--band:var(--soft,#f1f5f9)}
@@ -58,7 +61,7 @@ $stateTone = ['OPEN'=>'p-info','ACTIVE'=>'p-ok','GRACE'=>'p-warn','EXPIRED'=>'p-
 
   <!-- OVERVIEW -->
   <div class="kpis">
-    <div class="kpi <?= ($lic['state'] ?? 'OPEN')==='ACTIVE' ? 'ok' : (in_array($lic['state'] ?? '', ['EXPIRED','INVALID','READ_ONLY'],true)?'bad':'') ?>">
+    <div class="kpi <?= ($lic['state'] ?? 'OPEN')==='VALID' ? 'ok' : (in_array($lic['state'] ?? '', ['READONLY','INVALID'],true)?'bad':'') ?>">
       <div class="l">Licence</div><div class="v" style="font-size:18px"><?= $e($lic['label'] ?? 'Open (unlicensed)') ?></div>
       <div class="dd"><?= isset($lic['days_left']) && $lic['days_left']!==null ? (int)$lic['days_left'].' days left' : 'no expiry set' ?></div></div>
     <div class="kpi <?= $seats>0 && $seatPct>=90 ? 'warn' : '' ?>"><div class="l">Seats used</div><div class="v tnum"><?= $used ?><?= $seats>0 ? '<span style="font-size:14px;color:var(--muted)">/'.$seats.'</span>' : '' ?></div><div class="dd"><?= $seats>0 ? $seatPct.'% of licensed' : (int)$d['active_users'].' active users' ?></div></div>

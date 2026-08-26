@@ -55,7 +55,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 33 | Overheads | P1 | ✅ done & pushed | 2026-08-26 |
 | 34 | Dashboards / Command Centre | P2 | ✅ done & pushed | 2026-08-26 |
 | 35 | Recruitment / Workforce | P1 | ✅ done & pushed | 2026-08-26 |
-| 36 | Licensing / SaaS Admin | P1 | ⬜ | — |
+| 36 | Licensing / SaaS Admin | P1 | ✅ done & pushed | 2026-08-26 |
 | 37 | Global Search | P1 | ✅ done & pushed | 2026-08-26 |
 | 38 | Notification Centre | P2 | ⬜ | — |
 | **39** | **My Work** | **P1** | **✅ done & pushed** | 2026-08-24 |
@@ -79,6 +79,30 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 36 — Licensing / SaaS Admin · 2026-08-26
+**Decision:** (A) surface licence/subscription health ambiently (dashboard banner + weekly cron
+reminder) before a lapse forces read-only, and fix the super-admin state-name mis-render. Over-seat-
+via-reactivation guard, billing_paid_until audit, per-tenant seat counts and dunning deferred (control
+change / bigger).
+**Found:** `lk_state()`/`lk_summary()` compute state, days-left and seat pressure, but they were shown
+only on screens an admin must open — a GRACE install got no warning until read-only, and a
+subscription lapsed with no cron reminder. Also the super-admin health KPI keyed on
+ACTIVE/EXPIRED/READ_ONLY (names lk_state never emits) so a healthy VALID licence never showed green.
+And the Module-14 audit was logging weekly cron markers (`*_reminder_week`) as SETTING_CHANGED noise.
+**Added (additive, advisory; no hard control; no new permission):**
+- `licence_health()` — one normalized attention verdict (state, severity, headline, detail, days-left,
+  seat use, sync error) from `lk_summary()` + `licsync_status()`.
+- An admin-gated, self-hiding licence banner on the home dashboard.
+- `licence_run_reminders()` + a weekly-guarded cron block (mirrors Module 28/41) — pre-lapse email.
+- Fixed `super_admin.php` to key tone/KPI on the real states (VALID→green, READONLY/INVALID→red).
+- Extended `setting_change_class()` to class `*_week`/`*_last_weekly`/`*_last_monthly` cron markers as
+  system (off the audit chain) — also cleans the existing audit_reminder_week/mis_last_weekly noise.
+**Preserved:** the state machine, seat block, read-only gate, `can()` module scoping, billing and the
+tenant model — all unchanged. No enforcement added or removed; no schema change; nothing deleted.
+**Tests:** `test_module36_licensing.php` (27 assertions). Suite 3096 passing (only the 3 pre-existing
+baseline failures remain).
+**Spec:** `docs/edge-cases/36-licensing.md`.
 
 ### Module 35 — Recruitment / Workforce · 2026-08-26
 **Decision:** (A) surface interviews whose date has passed with no outcome — a worklist chased
