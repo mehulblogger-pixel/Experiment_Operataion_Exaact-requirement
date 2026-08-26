@@ -1,7 +1,10 @@
 # §28 — Financial Truth Engine · convergence review (for sign-off)
 
-**Status:** ANALYSIS — no code changed. This is the delta review the phase requires before any §28
-convergence, because §28 **changes displayed profit numbers** and therefore needs explicit sign-off.
+**Status:** ANALYSIS + **BUILT default-OFF (2026-08-26).** Options 1 + 2 are implemented behind the
+`finance_truth_unified` setting (**default OFF — no displayed number has changed**). The before/after
+preview is live on `/profitability`. Flipping the switch ON is the remaining step and still needs your
+explicit sign-off against the preview. This is the delta review the phase requires, because §28
+**changes displayed profit numbers**.
 
 Measured on the demo dataset (104 jobs) via `profit_reconciliation()` — the §29/Module-32 read-only
 consistency engine — with all closed jobs' cost basis frozen (§30).

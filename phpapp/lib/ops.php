@@ -1748,6 +1748,14 @@ function jobs_backfill_cost_basis($limit = 500) {
     return $n;
 }
 
+// Phase 2 §28 — the financial-truth switch. OFF (default) leaves every dashboard exactly as it
+// was: MIS, the SBU-PL contract table and the boss/owner view each re-derive their own partial
+// profit. ON makes all three read the ONE canonical engine (`job_profit`, frozen per §30), so a
+// job shows the same profit everywhere. Because turning it ON moves displayed numbers (downward,
+// to the true figure — overhead/voucher/other/contingency were being dropped), it is default-OFF
+// and flipped only with explicit sign-off, after the before/after preview on /system-status.
+function finance_truth_unified() { return (string)setting_get('finance_truth_unified', '') === '1'; }
+
 // What the engineer claimed on their monthly voucher against this job. Kept
 // apart from the closure expenses because they are entered by different people
 // at different times, and a manager asking "why is this job thin" needs to see
@@ -6381,14 +6389,32 @@ function chart_relabel_sbu($data) {
 function boss_profit($bossId) {
     $seeSal = can_see_salary();
     $jobs = ops_all("SELECT * FROM jobs WHERE boss_id=?", [$bossId]);
-    $revenue = 0; $labour = 0; $subcon = 0; $jobExp = 0; $invoiced = 0; $paid = 0; $contingency = 0;
+    // Phase 2 §28 — with the financial-truth switch ON, the owner view reads the ONE canonical engine
+    // (frozen per §30) instead of recomputing a loaded-labour, no-recovered, non-frozen figure of its
+    // own. The engine's components map onto this view's lines so they still add up to the margin, the
+    // margin becomes the canonical profit, and a closed job's owner P&L stops drifting when today's
+    // rates change. OFF (default) is the exact historical calculation, unchanged.
+    $unified = function_exists('finance_truth_unified') ? finance_truth_unified() : false;
+    $revenue = 0; $labour = 0; $subcon = 0; $jobExp = 0; $invoiced = 0; $paid = 0; $contingency = 0; $vExp = 0;
     foreach ($jobs as $j) {
         $office = $j['executing_office_id'] ?? null;
+        $invoiced += (float)($j['invoice_amount'] ?? 0);
+        $paid += !empty($j['payment_received']) ? (float)($j['payment_amount'] ?? 0) : 0;
+        if ($unified) {
+            // The whole per-job P&L from the canonical engine (full client charge = null office scope).
+            $p = job_profit($j, null);
+            $revenue     += (float)$p['revenue'];
+            if ($seeSal) $labour += (float)$p['labour'] + (float)$p['overhead'];   // loaded, as this view always showed it
+            $jobExp      += (float)$p['expenses'];
+            $vExp        += (float)$p['voucher'];
+            $subcon      += (float)$p['subcon'] + (float)$p['other'];
+            $contingency += (float)$p['contingency'];
+            $jobExp      -= (float)$p['recovered'];   // client-reimbursed expenses net off, as the engine does
+            continue;
+        }
         // The order is judged on what the client is charged for it, whichever
         // branch of ours did the work.
         $revenue += job_money($j)['invoice'];
-        $invoiced += (float)($j['invoice_amount'] ?? 0);
-        $paid += !empty($j['payment_received']) ? (float)($j['payment_amount'] ?? 0) : 0;
         $jSub = (float)($j['subcon_cost'] ?? 0); $subcon += $jSub;
         $jLab = 0;
         if ($seeSal) {
@@ -6399,7 +6425,7 @@ function boss_profit($bossId) {
         $jExp = job_expenses_total($j['id']); $jobExp += $jExp;
         $contingency += round(($jLab + $jExp + $jSub) * office_contingency_pct($office) / 100, 2);
     }
-    $vExp = (float)ops_val("SELECT COALESCE(SUM(row_total),0) FROM voucher_entries WHERE boss_id=?", [$bossId]);
+    if (!$unified) $vExp = (float)ops_val("SELECT COALESCE(SUM(row_total),0) FROM voucher_entries WHERE boss_id=?", [$bossId]);
     $expenses = $jobExp + $vExp;
     $margin = $revenue - $labour - $expenses - $subcon - $contingency;
     return ['jobs' => count($jobs), 'revenue' => $revenue, 'labour' => $labour, 'expenses' => $expenses,
@@ -6547,7 +6573,8 @@ function ops_profitability() {
     // profitability screen. Salary-gated (it exposes overhead/contingency, which
     // are labour-derived). Guarded so a missing MIS lib never breaks the screen.
     $reconcile = ($seeSal && function_exists('profit_reconciliation')) ? profit_reconciliation() : null;
-    view('ops/profitability_list', ['rows' => $rows, 'seeSal' => $seeSal, 'reconcile' => $reconcile]);
+    view('ops/profitability_list', ['rows' => $rows, 'seeSal' => $seeSal, 'reconcile' => $reconcile,
+        'unified' => function_exists('finance_truth_unified') ? finance_truth_unified() : false]);
 }
 
 // P6 — Attendance reconciliation. Upload the HR payroll export (CSV); it is

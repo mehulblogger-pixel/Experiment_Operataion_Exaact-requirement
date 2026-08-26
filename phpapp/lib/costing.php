@@ -752,9 +752,14 @@ function costing_boss_lines($officeId, $yr, $mon) {
             'client' => trim((string)($j['display_name'] ?: $j['legal_name'])) ?: '—',
             'sbu' => (string)($j['sbu'] ?? ''), 'revenue'=>0, 'labour'=>0, 'expenses'=>0, 'subcon'=>0];
         $p = job_profit($j, $officeId);
+        // Phase 2 §28 — with the financial-truth switch ON, the contract table reads the ONE canonical
+        // engine: overhead folds into labour and voucher/other/contingency (net of the client-recovered
+        // credit) fold into expenses, so revenue − labour − expenses − subcon equals the engine's profit
+        // exactly. OFF (default) leaves the historical partial figures untouched.
+        $unified = function_exists('finance_truth_unified') ? finance_truth_unified() : false;
         $out[$key]['revenue']  += (float)$p['credit'];
-        $out[$key]['labour']   += (float)$p['labour'];
-        $out[$key]['expenses'] += (float)$p['expenses'];
+        $out[$key]['labour']   += (float)$p['labour'] + ($unified ? (float)$p['overhead'] : 0);
+        $out[$key]['expenses'] += (float)$p['expenses'] + ($unified ? ((float)$p['voucher'] + (float)$p['other'] + (float)$p['contingency'] - (float)$p['recovered']) : 0);
         $out[$key]['subcon']   += (float)$p['subcon'];
     }
     uasort($out, function ($a, $b) {

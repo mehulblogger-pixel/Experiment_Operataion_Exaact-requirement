@@ -75,6 +75,21 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — §28 financial-truth convergence, BUILT default-OFF (sign-off approved for the build,
+  not yet the flip).** Review in `docs/phase-2/03-financial-truth-review.md`, grounded in a measured
+  104-job demo run (92 jobs drift; MIS overstates profit by ₹74,302.72 = overhead+contingency+voucher).
+  Implemented Options 1+2 behind a new `finance_truth_unified` setting (**default OFF — no displayed
+  number changes until flipped**): MIS (`mis_summary`), the SBU-P&L contract table (`costing_boss_lines`)
+  and the owner/boss view (`boss_profit`) all read the one canonical `job_profit` engine (frozen §30)
+  when ON, with columns that still sum to the canonical profit. Before/after preview live on
+  `/profitability`; setting documented in the §47 governance registry. Verified by
+  `test_p2_finance_truth.php` — OFF = the historical partial formula byte-for-byte, ON = the canonical
+  engine (profit + cost), boss margin = canonical. Suite **3570 passed, 0 failed**. **Remaining: your
+  explicit go to flip the switch ON** after reviewing the preview.
+  *(Noted, not fixed: `mis_shared_by_sbu` builds one month-OR-clause per month in the filter window, so
+  a multi-decade span exceeds SQLite's expression-tree depth — a pre-existing scalability quirk,
+  unrelated to §28; out of scope here.)*
+
 - **2026-08-26 — §33 invoice readiness (advisory; strict-gated).** Raising an invoice can go wrong
   quietly — billed before the report is issued, before a release is accepted, or beyond the contract
   value. Added `lib/invready.php`: `invoice_readiness($job)` assembles a READY/NOT-READY verdict from

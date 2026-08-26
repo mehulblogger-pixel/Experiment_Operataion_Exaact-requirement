@@ -145,8 +145,13 @@ function mis_summary(array $F) {
     $bySbu = []; $byActivity = []; $byOffice = []; $byInspector = []; $byIbo = [];
     $byClient = []; $byMonth = []; $byBoss = [];
     $seeSalary = function_exists('can_see_salary') ? can_see_salary() : false;
+    // Phase 2 §28 — when the financial-truth switch is ON, cost/profit are the canonical engine's
+    // (overhead, voucher, other, contingency and the client-recovered credit all included); when OFF
+    // (default) they are the historical partial formula, unchanged. Only the two derived totals move —
+    // the labour/expenses/subcon component columns stay the direct figures either way.
+    $unified = function_exists('finance_truth_unified') ? finance_truth_unified() : false;
 
-    $add = function (&$bucket, $key, $label, $j, $p, $delay) use ($blank) {
+    $add = function (&$bucket, $key, $label, $j, $p, $delay) use ($blank, $unified) {
         if ($key === '' || $key === null) { $key = '—'; $label = $label ?: '—'; }
         if (!isset($bucket[$key])) $bucket[$key] = $blank + ['label' => $label];
         $b = &$bucket[$key];
@@ -157,8 +162,8 @@ function mis_summary(array $F) {
         $b['labour']   += $p['labour'];
         $b['expenses'] += $p['expenses'];
         $b['subcon']   += $p['subcon'];
-        $b['cost']     += $p['labour'] + $p['expenses'] + $p['subcon'];
-        $b['profit']   += $p['credit'] - $p['labour'] - $p['expenses'] - $p['subcon'];
+        $b['cost']     += $unified ? $p['cost']   : ($p['labour'] + $p['expenses'] + $p['subcon']);
+        $b['profit']   += $unified ? $p['profit'] : ($p['credit'] - $p['labour'] - $p['expenses'] - $p['subcon']);
         $b['invoiced'] += (float)($j['invoice_amount'] ?? 0);
         $b['paid']     += (float)($j['payment_amount'] ?? 0);
         if ($delay !== null) { $b['delayCounted']++; $b['delayDays'] += $delay; if ($delay > 0) $b['late']++; }
@@ -179,8 +184,8 @@ function mis_summary(array $F) {
         $tot['labour']   += $p['labour'];
         $tot['expenses'] += $p['expenses'];
         $tot['subcon']   += $p['subcon'];
-        $tot['cost']     += $p['labour'] + $p['expenses'] + $p['subcon'];
-        $tot['profit']   += $p['credit'] - $p['labour'] - $p['expenses'] - $p['subcon'];
+        $tot['cost']     += $unified ? $p['cost']   : ($p['labour'] + $p['expenses'] + $p['subcon']);
+        $tot['profit']   += $unified ? $p['profit'] : ($p['credit'] - $p['labour'] - $p['expenses'] - $p['subcon']);
         $tot['invoiced'] += (float)($j['invoice_amount'] ?? 0);
         $tot['paid']     += (float)($j['payment_amount'] ?? 0);
         if ($delay !== null) { $tot['delayCounted']++; $tot['delayDays'] += $delay; if ($delay > 0) $tot['late']++; }
