@@ -2375,6 +2375,7 @@ function ops_module_gate($route) {
         'report-types'=>'idems','report-type-edit'=>'idems','report-builder'=>'idems','report-field-edit'=>'idems','report-file'=>'idems','irn-rules'=>'idems','audit-log'=>'idems',
         'notifications'=>'admin', // Module 38 — the notification/outbox log over email_log
         'integrations'=>'admin',  // Module 46 — the integration health surface
+        'system-status'=>'admin', // Module 50 — the aggregated platform-health board
 
         'document-approve'=>'idems','document-vet'=>'idems','document-vet-review'=>'idems','vetting-checklist'=>'idems','approver-map'=>'idems','idems-approval-rules'=>'idems','idems-approval-rule-edit'=>'idems',
         'document-pdf'=>'idems','document-timestamp'=>'idems','document-docx'=>'idems','report-type-preview'=>'idems','report-template-preview'=>'idems',
@@ -3066,6 +3067,8 @@ function ops_dispatch($route, $method) {
             return ops_notifications($method);
         case $route === 'integrations':
             return ops_integrations($method);
+        case $route === 'system-status':
+            return ops_system_status($method);
         case $route === 'report-approve':
             ops_report_approve($method); return true;
         case $route === 'office-finance':
@@ -6845,6 +6848,90 @@ function integration_health_attention() {
 function ops_integrations($method) {
     ops_require(notifications_can_view(), 'You cannot view integration health.');
     view('ops/integrations', ['rows' => integration_health()]);
+    return true;
+}
+
+// Module 50 — one read-only "is the platform OK?" board. Every health/verdict helper
+// built across the programme lives on its own screen; this fans them all into one
+// place — the system-health parallel of attention_summary() (business tasks) and the
+// regulatory compliance board. It calls each helper read-only and guards every one,
+// so a missing subsystem is skipped, never fatal. It touches no engine and stores nothing.
+function system_status() {
+    $out = [];
+    $add = function ($key, $label, $sev, $headline, $detail, $url) use (&$out) {
+        $out[] = ['key'=>$key, 'label'=>$label, 'severity'=>$sev, 'headline'=>$headline, 'detail'=>$detail, 'url'=>$url];
+    };
+    // Sealed audit chain.
+    if (function_exists('idems_audit_verify')) {
+        try { $c = idems_audit_verify();
+            if (!empty($c['skipped'])) $add('audit_chain', 'Audit trail', 'warn', 'Chain check unavailable', 'The tamper-evidence columns are not migrated yet.', '/audit-log');
+            elseif (!empty($c['ok']))  $add('audit_chain', 'Audit trail', 'ok', 'Sealed and intact', ((int)($c['checked'] ?? 0)) . ' entries verify against the one before.', '/audit-log');
+            else $add('audit_chain', 'Audit trail', 'bad', 'Chain broken', (int)($c['broken'] ?? 0) . ' sealed entries failed verification.', '/audit-log');
+        } catch (Throwable $e) {}
+    }
+    // §7.11 data-integrity checks.
+    if (function_exists('integrity_summary')) {
+        try { $s = integrity_summary();
+            $stale = function_exists('integrity_run_stale') && integrity_run_stale();
+            if ((int)($s['failed'] ?? 0) > 0) $add('integrity', 'Data integrity', 'bad', (int)$s['failed'] . ' check(s) failing', 'Referential / consistency checks found a problem.', '/data-control');
+            elseif ($stale)                   $add('integrity', 'Data integrity', 'warn', 'Checks are stale', 'The self-test has not run recently.', '/data-control');
+            else                              $add('integrity', 'Data integrity', 'ok', 'All checks pass', (int)($s['total'] ?? 0) . ' checks, none failing.', '/data-control');
+        } catch (Throwable $e) {}
+    }
+    // ISO / legal compliance readiness.
+    if (function_exists('compliance_status') && function_exists('compliance_counts')) {
+        try { $cc = compliance_counts(compliance_status());
+            $sev = (int)($cc['bad'] ?? 0) > 0 ? 'bad' : ((int)($cc['warn'] ?? 0) > 0 ? 'warn' : 'ok');
+            $add('compliance', 'Compliance readiness', $sev,
+                 $sev === 'ok' ? 'On track' : ((int)($cc['bad'] ?? 0)) . ' need attention',
+                 (int)($cc['ok'] ?? 0) . ' ok · ' . (int)($cc['warn'] ?? 0) . ' watch · ' . (int)($cc['bad'] ?? 0) . ' attention', '/compliance');
+        } catch (Throwable $e) {}
+    }
+    // Licence / subscription.
+    if (function_exists('licence_health')) {
+        try { $h = licence_health();
+            $add('licence', 'Licence & subscription', $h['severity'] ?? 'ok',
+                 !empty($h['needs_attention']) ? ($h['headline'] ?: 'Needs attention') : 'Active',
+                 (string)($h['detail'] ?? ''), (string)($h['url'] ?? '/licence'));
+        } catch (Throwable $e) {}
+    }
+    // External integrations (worst severity across the connected ones).
+    if (function_exists('integration_health')) {
+        try { $rows = integration_health();
+            if ($rows) {
+                $bad = 0; $warn = 0; foreach ($rows as $r) { if ($r['severity'] === 'bad') $bad++; elseif ($r['severity'] === 'warn') $warn++; }
+                $sev = $bad > 0 ? 'bad' : ($warn > 0 ? 'warn' : 'ok');
+                $add('integrations', 'Integrations', $sev,
+                     $sev === 'ok' ? 'All syncing' : (($bad + $warn) . ' need attention'),
+                     count($rows) . ' connected', '/integrations');
+            }
+        } catch (Throwable $e) {}
+    }
+    // Email delivery.
+    if (function_exists('email_failed_count')) {
+        try { $f = email_failed_count(7);
+            $add('email', 'Email delivery', $f > 0 ? 'warn' : 'ok',
+                 $f > 0 ? $f . ' failed in 7 days' : 'Sending', 'From the notification log.', '/notifications');
+        } catch (Throwable $e) {}
+    }
+    // Profit-engine consistency (salary-gated, like /profitability).
+    if (function_exists('profit_reconciliation') && function_exists('can_see_salary') && can_see_salary()) {
+        try { $pr = profit_reconciliation();
+            $add('profit', 'Profit-figure consistency', empty($pr['consistent']) ? 'warn' : 'ok',
+                 empty($pr['consistent']) ? 'Screens disagree' : 'Reconciled',
+                 empty($pr['consistent']) ? 'Some screens overstate profit vs the canonical engine.' : 'Every screen matches the canonical engine.', '/profitability');
+        } catch (Throwable $e) {}
+    }
+    return $out;
+}
+function system_status_worst() {
+    $rank = ['ok'=>0, 'warn'=>1, 'bad'=>2]; $w = 'ok';
+    foreach (system_status() as $r) if (($rank[$r['severity']] ?? 0) > $rank[$w]) $w = $r['severity'];
+    return $w;
+}
+function ops_system_status($method) {
+    ops_require(notifications_can_view(), 'You cannot view system status.');
+    view('ops/system_status', ['rows' => system_status()]);
     return true;
 }
 

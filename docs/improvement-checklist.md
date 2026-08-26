@@ -69,7 +69,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 47 | Mobile / PWA | P1 | ✅ done & pushed | 2026-08-26 |
 | 48 | Report Template Builder | P1 | ✅ done & pushed | 2026-08-26 |
 | 49 | Entity 360 Standard | P2 | ✅ done & pushed | 2026-08-26 |
-| 50 | Cross-module Consistency & Regression | P0 | ⬜ | — |
+| 50 | Cross-module Consistency & Regression | P0 | ✅ done & pushed | 2026-08-26 |
 
 ---
 
@@ -79,6 +79,34 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 50 — Cross-module Consistency & Regression (capstone) · 2026-08-26
+**Decision:** (A) a read-only `/system-status` board aggregating every health verdict built across the
+programme, plus (B) a cross-module invariant/regression test. Both pure aggregation over existing
+helpers — no engine or surface touched.
+**Found:** each health verdict (audit-chain verify, data integrity, compliance readiness, licence,
+integration, email failures, profit drift) lived only on its own screen; nothing answered "is the
+platform OK?" (attention_summary = business tasks; compliance_status = regulatory). And nothing
+asserted the canonical engines stay single-source.
+**Added (additive, read-only; no engine touched):**
+- `system_status()` / `system_status_worst()` — fans the seven verdicts into one severity-ranked
+  list, each guarded; salary-gated profit row.
+- `/system-status` route (core admin module) → `ops_system_status()`, gated by
+  `notifications_can_view()`; a board with a worst-severity banner. Linked from Settings.
+- `test_module50_consistency.php` (64 assertions): single-definition invariant for 11 canonical
+  engines, health-helper shape invariants, the Module-32 identity, and the aggregator wiring.
+**Preserved:** every aggregated helper, engine and health screen — unchanged. No new permission; no
+schema change; nothing deleted.
+**Tests:** suite **3234 passing** (only the 3 pre-existing baseline failures — the `test_services.php`
+Release-dependency seed-vs-test drift — remain).
+**Spec:** `docs/edge-cases/50-consistency-capstone.md`.
+
+---
+
+## Programme complete — all 50 modules done & pushed on `claude/quotation-management-workflow-5dokb2`.
+Every change additive/non-destructive; access- or control-changing fixes were flagged for explicit
+decision, not silently applied. Suite grew from ~2954 to 3234 passing (3 pre-existing baseline
+failures throughout).
 
 ### Module 49 — Entity 360 Standard · 2026-08-26
 **Decision:** (A) extend the shared act_render_timeline() (Module 40) onto the peer detail views whose

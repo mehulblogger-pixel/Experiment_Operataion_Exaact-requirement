@@ -9,7 +9,8 @@
 <p class="muted" style="font-size:12px;margin:-4px 0 10px">🛡️ Changes here are recorded on the audit trail —
   <a href="/audit-log?action=SETTING_CHANGED">see who changed what →</a>
   &nbsp;·&nbsp; 📨 <a href="/notifications">Notification log</a> (what email went out)
-  &nbsp;·&nbsp; 🔌 <a href="/integrations">Integration health</a> (are the syncs working)</p>
+  &nbsp;·&nbsp; 🔌 <a href="/integrations">Integration health</a> (are the syncs working)
+  &nbsp;·&nbsp; 🩺 <a href="/system-status">System status</a> (is the platform healthy)</p>
 <?php endif; ?>
 
 <?php // Which parts of the product this installation runs. Its own form, because
