@@ -108,6 +108,14 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
     plaintext coexists, nightly backfill, compliance nudge. No key ⇒ unchanged behaviour.
   - Suite **3343 passed, 0 failed**.
 
+- **2026-08-26 — REPORT-WORKFLOW P1 batch COMPLETE** (approved). Non-destructive, tested, pushed:
+  - **§6** applicability overrides audited + `not_allocated` flag stored + reason captured.
+  - **§4** all four report roles printed (Vetted-by + Issued-by PDF blocks) + Prepared timestamp.
+  - **§9** structured return-to-inspector detail (section/field + deadline) on both return paths.
+  - Suite **3381 passed, 0 failed**.
+  - **First-tranche recommendation fully delivered: P0 (§30/§10/§11) + P1 security (§51/§54/§53) +
+    report-workflow P1s (§6/§4/§9) — 9 fixes, suite 3240 → 3381, 0 failures throughout.**
+
 ## Open decisions
 
 - **Fix scope/order** (per "audit-first, then confirm fixes"). Recommended first fixes:
