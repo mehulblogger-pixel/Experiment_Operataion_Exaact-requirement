@@ -37,7 +37,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 15 | Clients / Customer 360 | P2 | ✅ done & pushed | 2026-08-24 |
 | 16 | Vendors / Vendor 360 | P2 | ✅ done & pushed | 2026-08-24 |
 | 17 | Leads | P2 | ✅ done & pushed | 2026-08-26 |
-| 18 | Orders / Contracts (Contract 360) | P1 | ⬜ | — |
+| 18 | Orders / Contracts (Contract 360) | P1 | ✅ done & pushed | 2026-08-26 |
 | 19 | Inquiries / Requirements | P2 | ✅ done & pushed | 2026-08-26 |
 | 20 | Project Costing | P1 | ✅ done & pushed | 2026-08-26 |
 | 21 | Hold / Witness Points | P0 | ✅ done & pushed | 2026-08-24 |
@@ -79,6 +79,29 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 18 — Orders / Contracts 360 · 2026-08-26
+**Decision:** (A) surface the live `contract_state()` verdict + `value − invoiced` on the Contract
+360, reusing the engine that already gates scheduling. Audit of open_status/override transitions and
+office-scoping the approval queues deferred (own change / a visibility-control change to be decided).
+**Found:** `contract_state()` computes EXPIRING/EXPIRED/QTY_LOW/EXHAUSTED (+ days-left, quantity
+used) and **blocks scheduling** on EXPIRED/EXHAUSTED — but the Contract 360 never called it, showing
+only the idle-close warning. And the money row never showed value-minus-invoiced (under/over-billed).
+**Added (additive, read-only, no access change; one shared formula):**
+- Extracted `contract_classify($out)` — the pure verdict; `contract_state()` now delegates to it
+  (behaviour identical, all existing tests green) so the gate and the 360 read ONE formula.
+- `contract_state_row($c)` — the contract-keyed state (canonical engine when a quote drives the gate;
+  the row's own end_date/qty through the same classifier when a contract has no quote).
+- `contract_state_label()` + a state banner on the 360 (EXPIRED/EXHAUSTED red with an override link;
+  EXPIRING/QTY_LOW amber; OK green), with days-left and quantity detail.
+- A "Left to invoice" / "Over-billed" KPI = value − invoiced (money-gated with the row).
+**Preserved:** `contract_state()` behaviour, the scheduling gate, `contract_idle_status` + its
+banner, the rollup, the 360's gate — all unchanged. No new permission; no schema change; nothing
+deleted. Refactor is behaviour-preserving (extract method); the old view props are `??`-guarded so the
+existing `test_contract_360.php` still renders.
+**Tests:** `test_module18_contract360.php` (24 assertions). Suite 3019 passing (only the 3 pre-existing
+baseline failures remain).
+**Spec:** `docs/edge-cases/18-contracts-360.md`.
 
 ### Module 14 — Settings · 2026-08-26
 **Decision:** (A) record every settings change on the sealed audit chain at the one choke-point every

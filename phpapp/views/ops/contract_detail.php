@@ -24,6 +24,27 @@
   </div>
   <?php endif; } ?>
 
+<?php // ---- Live expiry / quantity verdict: the SAME state the scheduling gate reads,
+      //      shown where the contract is actually looked at. Read-only. ------------
+  $st = $state ?? null;
+  if ($st && function_exists('contract_state_label') && ($st['state'] ?? 'NONE') !== 'NONE'):
+    [$tone, $lbl, $desc] = contract_state_label($st['state']);
+    $cls = ['bad'=>'msg-error','warn'=>'msg-warning','ok'=>'msg-ok','mut'=>'msg'][$tone] ?? 'msg'; ?>
+  <div class="msg <?= $cls ?>" style="margin-top:14px">
+    <b><?= e($lbl) ?>.</b> <?= e($desc) ?>
+    <?php $bits = [];
+      if ($st['days_left'] !== null) $bits[] = $st['days_left'] < 0
+          ? 'ended ' . abs((int)$st['days_left']) . ' day' . (abs((int)$st['days_left']) === 1 ? '' : 's') . ' ago'
+          : (int)$st['days_left'] . ' day' . ((int)$st['days_left'] === 1 ? '' : 's') . ' left';
+      if ($st['qty_total'] !== null) $bits[] = 'quantity ' . rtrim(rtrim(number_format((float)$st['qty_used'], 2, '.', ''), '0'), '.')
+          . ' of ' . rtrim(rtrim(number_format((float)$st['qty_total'], 2, '.', ''), '0'), '.') . ' used';
+      if ($bits): ?><br><span class="muted"><?= e(implode(' · ', $bits)) ?></span><?php endif; ?>
+    <?php if (contract_state_blocks($st['state'])): ?>
+      <br><a href="/contract-overrides">Request an override →</a>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
+
 <?php // ---- Commercial ---------------------------------------------------- ?>
 <?php if ($canSeeMoney): ?>
 <div class="kpi-row" style="margin:16px 0">
@@ -31,6 +52,12 @@
   <div class="kpi"><div class="k">Invoiced</div><div class="v"><?= e(cur_sym()) ?><?= number_format($money['invoiced'],0) ?></div></div>
   <div class="kpi"><div class="k">Received</div><div class="v"><?= e(cur_sym()) ?><?= number_format($money['received'],0) ?></div></div>
   <div class="kpi"><div class="k">Outstanding</div><div class="v"><?= e(cur_sym()) ?><?= number_format($money['outstanding'],0) ?></div></div>
+  <?php // Module 18 — value minus invoiced: is the contract under- or over-billed?
+    if ((float)$money['value'] > 0): $rem = (float)($money['remaining'] ?? 0); ?>
+  <div class="kpi"><div class="k"><?= $rem < 0 ? 'Over-billed' : 'Left to invoice' ?></div>
+    <div class="v <?= $rem < 0 ? 'down' : '' ?>"><?= e(cur_sym()) ?><?= number_format(abs($rem),0) ?></div>
+    <div class="d"><?= $rem < 0 ? 'billed beyond value' : 'of contract value' ?></div></div>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 

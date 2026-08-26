@@ -185,24 +185,55 @@ function contract_state($quoteId, $today = null) {
     $out['qty_used']  = quote_qty_used($quoteId);
     if ($qtyTotal !== null) $out['qty_left'] = round($qtyTotal - $out['qty_used'], 2);
 
+    if ($out['end_date'] !== '') $out['days_left'] = days_between($today, $out['end_date']);
+    return contract_classify($out);
+}
+// The pure verdict — extracted so every surface (the scheduling gate via
+// contract_state(), and the Contract 360 via contract_state_row()) reads the
+// SAME classification from the same thresholds. No second formula. $out must
+// already carry end_date, days_left, qty_total and qty_left.
+function contract_classify($out) {
     // Dates decide first — an expired contract is expired regardless of quantity.
-    if ($out['end_date'] !== '') {
-        $left = days_between($today, $out['end_date']);
-        $out['days_left'] = $left;
-        if ($left !== null && $left < 0)  { $out['state'] = 'EXPIRED';  return $out; }
-        if ($left !== null && $left <= contract_warn_days()) $out['state'] = 'EXPIRING';
+    if ($out['end_date'] !== '' && $out['days_left'] !== null) {
+        if ($out['days_left'] < 0)  { $out['state'] = 'EXPIRED';  return $out; }
+        if ($out['days_left'] <= contract_warn_days()) $out['state'] = 'EXPIRING';
     }
-    if ($qtyTotal !== null) {
+    if ($out['qty_total'] !== null) {
         if ($out['qty_left'] !== null && $out['qty_left'] <= 0) { $out['state'] = 'EXHAUSTED'; return $out; }
         if ($out['state'] === 'NONE' || $out['state'] === 'OK') {
-            $pct = $qtyTotal > 0 ? ($out['qty_left'] / $qtyTotal) : 1;
+            $pct = $out['qty_total'] > 0 ? ($out['qty_left'] / $out['qty_total']) : 1;
             if ($pct <= 0.1) $out['state'] = 'QTY_LOW';
         }
     }
-    if ($out['state'] === 'NONE' && ($out['end_date'] !== '' || $qtyTotal !== null)) $out['state'] = 'OK';
+    if ($out['state'] === 'NONE' && ($out['end_date'] !== '' || $out['qty_total'] !== null)) $out['state'] = 'OK';
     return $out;
 }
+// Module 18 — the contract's live state for the 360, keyed off the contract ROW.
+// When a quotation drives the gate we return the canonical engine's verdict (the
+// exact one scheduling uses); a contract recorded directly on the client has no
+// quote, so we feed the row's own end_date/qty through the SAME classifier.
+function contract_state_row($c) {
+    if (!empty($c['quotation_id'])) return contract_state((int)$c['quotation_id']);
+    $out = ['state' => 'NONE', 'end_date' => (string)($c['end_date'] ?? ''), 'days_left' => null,
+            'qty_total' => null, 'qty_used' => 0.0, 'qty_left' => null,
+            'contract_id' => (int)($c['id'] ?? 0), 'contract_number' => (string)($c['contract_number'] ?? ''), 'quotation_id' => 0];
+    $qt = $c['qty_total'] ?? null;
+    if ($qt !== null && $qt !== '') { $out['qty_total'] = (float)$qt; $out['qty_left'] = (float)$qt; }
+    if ($out['end_date'] !== '') $out['days_left'] = days_between(date('Y-m-d'), $out['end_date']);
+    return contract_classify($out);
+}
 function contract_state_blocks($state) { return in_array($state, ['EXPIRED', 'EXHAUSTED'], true); }
+// A short human label + severity for a contract state, for the 360 banner.
+function contract_state_label($state) {
+    return [
+        'EXPIRED'   => ['bad',  'Expired',        'This contract has passed its end date — scheduling is blocked until it is renewed or an override is granted.'],
+        'EXHAUSTED' => ['bad',  'Quantity used up','The agreed quantity is fully consumed — scheduling is blocked until it is extended or an override is granted.'],
+        'EXPIRING'  => ['warn', 'Expiring soon',  'This contract is within its expiry window — plan the renewal before it lapses.'],
+        'QTY_LOW'   => ['warn', 'Quantity low',   'Less than 10% of the agreed quantity remains.'],
+        'OK'        => ['ok',   'In force',       'Within its term and quantity.'],
+        'NONE'      => ['mut',  'No term set',    'No end date or quantity is recorded, so no expiry/quantity gate applies.'],
+    ][$state] ?? ['mut', $state, ''];
+}
 
 // ---------------------------------------------------------------------------
 //  A contract and the quotation it came from are two views of one agreement
@@ -893,11 +924,17 @@ function ops_contract_360() {
         if (!empty($j['invoice_raised'])) $invoiced += (float)$j['invoice_amount'];
         if (!empty($j['payment_received'])) $received += (float)$j['payment_amount'];
     }
-    $money = ['value' => (float)($c['value'] ?? 0), 'invoiced' => $invoiced, 'received' => $received,
-              'outstanding' => max(0, $invoiced - $received)];
+    $value = (float)($c['value'] ?? 0);
+    $money = ['value' => $value, 'invoiced' => $invoiced, 'received' => $received,
+              'outstanding' => max(0, $invoiced - $received),
+              // Module 18 — the one figure that says a contract is under- or over-billed.
+              'remaining' => round($value - $invoiced, 2)];
 
     view('ops/contract_detail', ['c' => $c, 'quote' => $quote, 'pos' => $pos, 'calls' => $calls,
         'jobs' => $jobs, 'reports' => $reports, 'money' => $money,
+        // Module 18 — the live expiry/quantity verdict the scheduling gate already uses,
+        // now shown where the contract is actually read.
+        'state' => contract_state_row($c),
         'canSeeMoney' => is_master() || (function_exists('can') && (can('data.credit') || can('data.revenue') || can('finance.reconcile')))]);
     return true;
 }
