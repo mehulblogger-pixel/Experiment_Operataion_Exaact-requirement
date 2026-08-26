@@ -1544,8 +1544,13 @@ function demo_seed_c7($pdo, $x, $has, $ins) {
     if ($has('service_dependencies')) {
         $isd = "INSERT INTO service_dependencies (service_code,requires_code,condition_note,requires_approval,effective_on,level,ref_id,scope_note,active,is_system,set_by,set_at)
                 VALUES (?,?,?,?,?,?,?,?,?,0, 'demo', ?)";
-        $ins($isd, ['RELEASE','INSPECTION','A Release Note can only be raised after an accepted inspection.',1,$d(-120),'GLOBAL',0,'DEMO — applies to all clients.',1,$now]);
-        $ins($isd, ['NCR_CAPA','INSPECTION','NCR / CAPA follows from an inspection finding.',0,$d(-120),'GLOBAL',0,'DEMO',1,$now]);
+        // Phase 2 — the service-dependency design is "none by default; configured = scoped".
+        // A GLOBAL demo dependency silently forced a Release→Inspection workflow on EVERY
+        // client (and made the default state non-empty). Scope the demo dependencies to the
+        // demo client that actually has these services enabled (Narmada / CL-NIL), so the
+        // feature is still demonstrated but the default stays clean, per the design principle.
+        $ins($isd, ['RELEASE','INSPECTION','A Release Note can only be raised after an accepted inspection.',1,$d(-120),'CLIENT',$cid['CL-NIL'],'DEMO — Narmada TPI contract.',1,$now]);
+        $ins($isd, ['NCR_CAPA','INSPECTION','NCR / CAPA follows from an inspection finding.',0,$d(-120),'CLIENT',$cid['CL-NIL'],'DEMO — Narmada TPI contract.',1,$now]);
         $n['service_dependencies'] = 2;
     }
 
