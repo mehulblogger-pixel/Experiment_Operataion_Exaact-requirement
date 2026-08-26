@@ -332,7 +332,11 @@
       <?= e(Tl('job')) ?> can be closed it needs <?= e(implode(' and ', $ciMiss)) ?>.</p>
   <?php endif; ?>
   <?php if ($canCheckIn): ?>
+  <?php // Module 47 — draft-protect the note on a flaky field connection. offline.js
+        // saves only the visible text (GPS/photo/hidden fields are never persisted), so
+        // an inspector who loses signal mid-check-in keeps what they typed. ?>
   <form method="post" action="/site-checkin" id="ciForm" enctype="multipart/form-data"
+        data-autosave="checkin-<?= (int)$job['id'] ?>"
         style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:8px">
     <input type="hidden" name="job_id" value="<?= (int)$job['id'] ?>">
     <input type="hidden" name="gps" id="ciGps">

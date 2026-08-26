@@ -80,7 +80,8 @@
   $tTravel = 0; $tHead = []; foreach ($heads as $h) $tHead[$h['code']] = 0; $grand = 0;
   $ncol = 8 + count($heads) + ($canEdit ? 2 : 1); // Date,Site,File,Line,Hrs,Mode,KM,Travel + heads + Row(+✕)
 ?>
-<?php if ($canEdit): ?><form method="post" action="/voucher-save?id=<?= (int)$v['id'] ?>" id="vform"><?php endif; ?>
+<?php // Module 47 — draft-protect the expense lines an inspector types in the field. ?>
+<?php if ($canEdit): ?><form method="post" action="/voucher-save?id=<?= (int)$v['id'] ?>" id="vform" data-autosave="voucher-<?= (int)$v['id'] ?>"><?php endif; ?>
 <style>
   <?php /* Sticky header: it must fully COVER the rows scrolling under it. var(--soft)
            was not opaque, so the first rows bled through and read as an overlap.

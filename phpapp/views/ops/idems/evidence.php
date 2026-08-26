@@ -34,7 +34,9 @@
 <div class="panel">
   <div class="ctitle" style="margin-top:0"><h3>Attach a supporting document</h3></div>
   <p class="muted" style="margin:0 0 10px">Anything that backs up this <?= e(Tl('report')) ?> — a test or mill certificate, a calibration record, a signed gate pass, the <?= e(Tl('client')) ?>'s own checklist, a scan or a photograph. Up to 12 MB each; pictures are compressed and the same file is never stored twice.</p>
-  <form method="post" action="/document-evidence?id=<?= (int)$doc['id'] ?>" enctype="multipart/form-data" class="form-grid">
+  <?php // Module 47 — keep the caption if the field connection drops mid-upload (the
+        // files themselves still need a live upload; offline.js saves only the text). ?>
+  <form method="post" action="/document-evidence?id=<?= (int)$doc['id'] ?>" enctype="multipart/form-data" class="form-grid" data-autosave="evidence-<?= (int)$doc['id'] ?>">
     <input type="hidden" name="_do" value="upload"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
     <div class="ff"><label>Document(s)</label>
       <input class="form-control" type="file" name="doc[]" multiple required></div>

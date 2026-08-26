@@ -66,7 +66,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 44 | Evidence | P1 | ✅ done & pushed | 2026-08-26 |
 | 45 | AI / Intelligence | P3 | ✅ done & pushed | 2026-08-26 |
 | 46 | Integrations | P2 | ✅ done & pushed | 2026-08-26 |
-| 47 | Mobile / PWA | P1 | ⬜ | — |
+| 47 | Mobile / PWA | P1 | ✅ done & pushed | 2026-08-26 |
 | 48 | Report Template Builder | P1 | ✅ done & pushed | 2026-08-26 |
 | 49 | Entity 360 Standard | P2 | ⬜ | — |
 | 50 | Cross-module Consistency & Regression | P0 | ⬜ | — |
@@ -79,6 +79,26 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 47 — Mobile / PWA · 2026-08-26
+**Decision:** (A) extend the already-shipped offline draft-autosave (offline.js, keyed on
+form[data-autosave]) to the remaining phone-first inspector forms. Web push, PNG maskable icons, and
+forcing camera on the evidence input deferred (heavier / would break PDF attach).
+**Found:** the app already ships a complete PWA (manifest, service worker, offline queue, camera
+capture, GPS, dictation). But `data-autosave` — the attribute offline.js keys on — was on exactly ONE
+form (report fill), so site check-in, voucher entry and evidence lost typed text on a flaky field
+connection.
+**Added (additive; one attribute per form; no route/JS/CSS change):**
+- `data-autosave` on the site check-in (`checkin-<job_id>`), evidence (`evidence-<doc_id>`) and
+  voucher edit (`voucher-<voucher_id>`) forms — per-record keys so drafts never collide.
+**Preserved:** offline.js snapshot already skips hidden/file fields (GPS + photos never persisted),
+restore is explicit, and the offline queue is skipped when files are present — so the live-upload/GPS
+paths are untouched. The evidence document input stays generic (accepts PDF certs, not camera-only).
+The manifest, service worker, queue engine and report-fill autosave — all unchanged. No route,
+permission, schema or behaviour change; nothing deleted.
+**Tests:** `test_module47_mobile.php` (10 assertions). Suite 3159 passing (only the 3 pre-existing
+baseline failures remain).
+**Spec:** `docs/edge-cases/47-mobile-pwa.md`.
 
 ### Module 46 — Integrations · 2026-08-26
 **Decision:** (A) a read-only integration-health surface aggregating each integration's own last-sync/
