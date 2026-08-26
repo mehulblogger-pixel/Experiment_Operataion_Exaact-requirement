@@ -4,6 +4,7 @@
   <div><h1>Identity documents</h1>
     <p class="sub" style="margin:2px 0 0">Held for one stated reason, for a limited time, and every look is recorded.</p></div>
   <div style="display:flex;gap:8px">
+    <?php if (!empty($canManage)): ?><a class="btn secondary" href="/iddoc-access">🔎 Access review (DPO)</a><?php endif; ?>
     <a class="btn secondary" href="/agency-staff">Agency-staff roster →</a>
     <a class="btn secondary" href="/">← Back</a>
   </div>

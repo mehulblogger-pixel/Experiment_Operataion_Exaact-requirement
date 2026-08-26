@@ -283,6 +283,42 @@ function iddoc_access_log($documentId = 0, $personId = 0, $limit = 200) {
     } catch (Throwable $e) { if (iddoc_missing_table($e)) return []; throw $e; }
 }
 
+// Module 26 — the company-wide access review a Data Protection Officer needs:
+// every look / reveal / copy-out / redact ACROSS ALL PEOPLE, with the person's
+// name and the document kind, filterable by action and date. Reads the same
+// person_document_access log that is already written on every access — it exposes
+// reasons, recipients, actors and IPs, but NEVER a document number (the log never
+// stored one). So this widens nobody's sight of a number; it only lets the DPO see,
+// in one place, what was already recorded one person at a time.
+function iddoc_access_review($action = '', $from = '', $to = '', $limit = 500) {
+    $w = ['1=1']; $a = [];
+    if ($action !== '') { $w[] = 'x.action=?'; $a[] = $action; }
+    if ($from !== '')   { $w[] = 'substr(x.at,1,10) >= ?'; $a[] = $from; }
+    if ($to !== '')     { $w[] = 'substr(x.at,1,10) <= ?'; $a[] = $to; }
+    try {
+        return ops_all("SELECT x.*, i.name person_name, d.doc_kind
+                        FROM person_document_access x
+                        LEFT JOIN inspectors i ON i.id = x.person_id
+                        LEFT JOIN person_documents d ON d.id = x.document_id
+                        WHERE " . implode(' AND ', $w) . "
+                        ORDER BY x.id DESC LIMIT " . max(1, (int)$limit), $a);
+    } catch (Throwable $e) { if (iddoc_missing_table($e)) return []; throw $e; }
+}
+
+// A count-by-action summary over the same window, for the DPO screen header.
+function iddoc_access_summary($from = '', $to = '') {
+    $w = ['1=1']; $a = [];
+    if ($from !== '') { $w[] = 'substr(at,1,10) >= ?'; $a[] = $from; }
+    if ($to !== '')   { $w[] = 'substr(at,1,10) <= ?'; $a[] = $to; }
+    $out = [];
+    try {
+        foreach (ops_all("SELECT action, COUNT(*) n FROM person_document_access WHERE "
+                        . implode(' AND ', $w) . " GROUP BY action", $a) as $r)
+            $out[(string)$r['action']] = (int)$r['n'];
+    } catch (Throwable $e) { if (!iddoc_missing_table($e)) throw $e; }
+    return $out;
+}
+
 // When this copy stops being kept. Counted from whichever comes later — the
 // document's own expiry or the day it was filed — so a passport valid for
 // another eight years is not thrown away next year.
@@ -462,6 +498,22 @@ function ops_identity($route, $method) {
     ops_require(iddoc_can_manage(),
         'You may see that a document is on file. Adding, revealing or removing one needs '
       . '“Hold identity documents”.');
+
+    // Module 26 — the DPO's company-wide access review. Read-only over the log that
+    // is already written on every access; shows no document number.
+    if ($route === 'iddoc-access') {
+        $action = trim((string)($_GET['action'] ?? ''));
+        $from = trim((string)($_GET['from'] ?? ''));
+        $to   = trim((string)($_GET['to'] ?? ''));
+        view('ops/identity_access', [
+            'rows'    => iddoc_access_review($action, $from, $to),
+            'summary' => iddoc_access_summary($from, $to),
+            'holders' => iddoc_holders(),
+            'actions' => IDDOC_ACTIONS,
+            'f'       => ['action' => $action, 'from' => $from, 'to' => $to],
+        ]);
+        return true;
+    }
 
     if ($route === 'iddoc-file') {
         $d = iddoc_row((int)($_GET['id'] ?? 0), true);

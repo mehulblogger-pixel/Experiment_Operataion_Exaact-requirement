@@ -45,7 +45,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 23 | Equipment (Equipment 360) | P1 | ✅ done & pushed | 2026-08-25 |
 | 24 | Competence (Competence 360) | P0 | ✅ done & pushed | 2026-08-24 |
 | 25 | Impartiality | P0 | ✅ done & pushed | 2026-08-24 |
-| 26 | Identity | P0 | ⬜ | — |
+| 26 | Identity | P0 | ✅ done & pushed | 2026-08-26 |
 | 27 | Confidentiality | P0 | ⬜ | — |
 | 28 | Audits | P2 | ⬜ | — |
 | 29 | Data Control / Governance | P0 | ⬜ | — |
@@ -79,6 +79,32 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 26 — Identity (DPDP documents) · 2026-08-26
+**Decision:** (A) a company-wide DPO access-review surface + the first safeguard tests. Sealing the
+access log into the `idems_audit` chain (secondary) deferred (touches the write path).
+**Found:** the identity subsystem is already very DPDP-mature — numbers masked by storage design
+(only `number_last4` ever selected), reveals require a reason and are logged, the scan is
+permission-checked, the retention sweep runs nightly, expiry reminders email the engineer, and
+consent/purpose are recorded. The one real gap: the access log (`person_document_access`) was only
+ever queried **per person** — a DPO could not answer "show me every reveal/copy-out this quarter
+across all people" from a screen.
+**Added (additive, read-only, loosens nothing):**
+- `iddoc_access_review($action,$from,$to)` + `iddoc_access_summary()` — the company-wide log across
+  all people, joined to the person's name and document kind, filterable by action/date. Exposes
+  reasons/recipients/actors/IPs — **never a document number** (the log never stored one).
+- A manage-gated **"Access review (DPO)"** route/view (filters + a count-by-action header + the
+  `iddoc_holders()` "who can open a document" roster), linked from the identity register.
+- The **first tests** over the security-critical behaviours that had no coverage: masking, the
+  list-reader never selecting the full number, reveal/share logging, and redaction preserving the
+  record while wiping the number/file.
+**Preserved (verified by tests):** the masking discipline, the reveal-reason gate, the
+permission-checked scan, the retention sweep, and both `person.iddoc.*` gates — all unchanged. No new
+permission (reuses `iddoc_can_manage`); no schema change; no document number exposed to anyone who
+couldn't already reveal it; nothing deleted.
+**Edge cases:** `docs/edge-cases/26-identity.md`.
+**Tests:** `tests/test_module26_identity.php` (18 assertions). Suite 2763 passed / 3 pre-existing
+baseline failures.
 
 ### Module 20 — Project Costing · 2026-08-26
 **Decision:** (A) estimate-vs-actual reconciliation + the first estimate-math tests. Margin-floor

@@ -2446,7 +2446,7 @@ function ops_module_gate($route) {
         'complaint-close'=>'complaints','complaint-reopen'=>'complaints','complaint-settings'=>'complaints',
         'identity'=>'identity','iddoc-add'=>'identity','iddoc-file'=>'identity','agency-staff'=>'identity',
         'iddoc-reveal'=>'identity','iddoc-share'=>'identity','iddoc-redact'=>'identity',
-        'iddoc-retention'=>'identity',
+        'iddoc-retention'=>'identity','iddoc-access'=>'identity',
         'impartiality'=>'impartiality','imp-type'=>'impartiality','imp-declare'=>'impartiality',
         'imp-threat-add'=>'impartiality','imp-threat-decide'=>'impartiality',
         'competence'=>'competence','auth-add'=>'competence','auth-status'=>'competence',
