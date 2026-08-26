@@ -158,6 +158,51 @@ function search_sources() {
                 array_merge($sa, [$l, $l, $l, $l, $l, $l])));
         });
 
+    // ---- Opportunities (Module 37) -----------------------------------------
+    // A CRM spine record with its own OPP- reference and register, previously
+    // reachable but not findable by its own number. Permission-gated AND office+SBU
+    // scoped from day one — a correctly-scoped new path, nothing loosened.
+    $add('opportunities', 'Opportunities', '📈', function_exists('opp_can_view') && opp_can_view(),
+        function ($q, $n) use ($like) {
+            $l = $like($q);
+            [$sw, $sa] = scope_clause('o.office_id', 'o.sbu');
+            return array_map(fn($r) => [
+                'title'    => ($r['ref'] ?: ('#' . $r['id'])) . ' — ' . ($r['name'] ?: ($r['partner_name'] ?: 'opportunity')),
+                'subtitle' => $r['partner_name'] ?: '',
+                'meta'     => trim(($r['status'] ?: '') . ((float)$r['value'] ? ' · ' . fmoney($r['value']) : '')
+                              . ($r['owner_name'] ? ' · ' . $r['owner_name'] : ''), ' ·'),
+                'url'      => '/opportunity?id=' . (int)$r['id'],
+                'dim'      => ($r['status'] ?? '') !== 'OPEN',
+            ], ops_all(
+                "SELECT o.id, o.ref, o.name, o.partner_name, o.status, o.value, o.owner_name
+                 FROM opportunities o
+                 WHERE $sw AND (o.ref LIKE ? OR o.name LIKE ? OR o.partner_name LIKE ? OR o.contact_name LIKE ?)
+                 ORDER BY (o.status='OPEN') DESC, o.id DESC LIMIT $n",
+                array_merge($sa, [$l, $l, $l, $l])));
+        });
+
+    // ---- Invoices (Module 37) ----------------------------------------------
+    // The finance spine record findable before only via a job's invoice_number.
+    // Gated by books_can() and office+SBU scoped, exactly like the register.
+    $add('invoices', 'Invoices', '🧾', function_exists('books_can') && books_can(),
+        function ($q, $n) use ($like) {
+            $l = $like($q);
+            [$sw, $sa] = scope_clause('i.office_id', 'i.sbu');
+            return array_map(fn($r) => [
+                'title'    => $r['invoice_no'] ?: ('draft #' . $r['id']),
+                'subtitle' => $r['partner_name'] ?: '',
+                'meta'     => trim(($r['status'] ?: '') . ((float)$r['total'] ? ' · ' . fmoney($r['total']) : '')
+                              . ($r['contract_number'] ? ' · ' . $r['contract_number'] : ''), ' ·'),
+                'url'      => '/invoice?id=' . (int)$r['id'],
+                'dim'      => ($r['status'] ?? '') === 'CANCELLED',
+            ], ops_all(
+                "SELECT i.id, i.invoice_no, i.partner_name, i.status, i.total, i.po_number, i.contract_number
+                 FROM invoices i
+                 WHERE $sw AND (i.invoice_no LIKE ? OR i.partner_name LIKE ? OR i.po_number LIKE ? OR i.contract_number LIKE ?)
+                 ORDER BY i.id DESC LIMIT $n",
+                array_merge($sa, [$l, $l, $l, $l])));
+        });
+
     // ---- Contracts ----------------------------------------------------------
     // Search a contract by number, title or client and open its 360 — the whole
     // thread (quote, POs, calls, jobs, reports, money) on one screen.

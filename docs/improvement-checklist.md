@@ -56,7 +56,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 34 | Dashboards / Command Centre | P2 | ⬜ | — |
 | 35 | Recruitment / Workforce | P1 | ⬜ | — |
 | 36 | Licensing / SaaS Admin | P1 | ⬜ | — |
-| 37 | Global Search | P1 | ⬜ | — |
+| 37 | Global Search | P1 | ✅ done & pushed | 2026-08-26 |
 | 38 | Notification Centre | P2 | ⬜ | — |
 | **39** | **My Work** | **P1** | **✅ done & pushed** | 2026-08-24 |
 | 40 | Activity Timeline | P2 | ⬜ | — |
@@ -79,6 +79,29 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 37 — Global Search · 2026-08-26
+**Decision:** (A) add the missing spine entities (opportunities, invoices) as scope-respecting
+sources + first search test. Vouchers/POs deferred (weak/unclear searchability). **Flagged, NOT
+changed:** the existing contracts/inquiries sources are permission-gated but not office-scoped —
+tightening it is access-changing, so it is left as-is and flagged for a deliberate decision.
+**Found:** global search is well-built (permission-gated registry, no query-then-filter leak), but
+several spine records were reachable-but-unfindable by their own reference — invoices (only via a
+job's invoice_number), opportunities, vouchers, POs. No executable search test existed.
+**Added (additive, scope-respecting, no access change):**
+- An **Opportunities** source (gated `opp_can_view()`, office+SBU scoped, matches OPP ref/name/
+  partner/contact, deep-links `/opportunity?id=`).
+- An **Invoices** source (gated `books_can()`, office+SBU scoped, matches invoice no/partner/PO/
+  contract number, deep-links `/invoice?id=`).
+- The **first executable search test** — pinning the permission-gate-before-query and scope-clause
+  behaviour.
+**Preserved (verified by tests):** every existing source, the `if(!$can)return` gate, the scope
+clauses, the omnibox, the command palette, the reference-jump — all unchanged. No new permission; no
+schema change; no access changed; the contracts/inquiries scoping untouched (flagged); nothing
+deleted.
+**Edge cases:** `docs/edge-cases/37-global-search.md`.
+**Tests:** `tests/test_module37_search.php` (11 assertions). Suite 2852 passed / 3 pre-existing
+baseline failures.
 
 ### Module 19 — Inquiries / Requirements · 2026-08-26
 **Decision:** (A) stale/un-quoted inquiry detector + advisor worklist + surface the dead
