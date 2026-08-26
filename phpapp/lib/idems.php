@@ -5955,6 +5955,57 @@ function idems_issue_readiness($doc) {
         $add('Evidence & on-site', $bad ? 'warn' : 'ok', implode(' · ', $bits) . '. Advisory — does not block issue.');
     }
 
+    // ---- Phase 2 §10 — accreditation completeness probes, reusing the canonical
+    // verdicts (competence/impartiality/completeness/vetting/NCR/client-acceptance).
+    // Default posture is ADVISORY (warn) so issuance is never newly blocked — EXCEPT
+    // vetting, which hard-blocks only when the body has ENABLED the vetting workflow
+    // (honouring its own configuration, not forcing a new step). A body can escalate
+    // competence / impartiality / NCR to hard blocks with the 'issue_gate_strict'
+    // setting. Everything is shown, per §10 "NOT READY → show every blocker".
+    $strict = function_exists('setting_get') && (string)setting_get('issue_gate_strict', '') === '1';
+    $sev = fn($critical) => $critical ? 'block' : 'warn';
+
+    // 6. Technical vetting (only when the body runs vetting).
+    if (function_exists('idems_vetting_required') && idems_vetting_required($doc)) {
+        $vet = strtoupper((string)($doc['vet_status'] ?? ''));
+        if ($vet === 'VETTED') $add('Technical vetting', 'ok', 'Vetted before approval.');
+        else $add('Technical vetting', 'block', 'Vetting is required for this report and is not yet cleared.');
+    }
+
+    // 7. Report completeness (enforced at submit; advisory re-check at issue).
+    try { if (function_exists('idems_completeness_check')) { $cc = idems_completeness_check($doc);
+        if (!empty($cc['ok'])) $add('Report completeness', 'ok', 'All required fields and attachments present.');
+        else $add('Report completeness', 'warn', (int)($cc['failed'] ?? 0) . ' required item(s) missing (checked at submit).'); }
+    } catch (Throwable $e) {}
+
+    $insId  = (int)($doc['inspector_id'] ?? 0);
+    $onDate = substr((string)($doc['inspection_date'] ?? ''), 0, 10) ?: date('Y-m-d');
+
+    // 8. Competence valid on the inspection date (hard-blocked already at assignment; belt-and-braces here).
+    if ($insId && function_exists('competence_block')) { $cb = competence_block($insId, $onDate);
+        if ($cb === '') $add('Competence', 'ok', 'Inspector competence valid on the inspection date.');
+        else            $add('Competence', $sev($strict), $cb); }
+
+    // 9. Impartiality clear for this client.
+    if ($insId && function_exists('imp_block')) { $ib = imp_block($insId, array_filter([(int)($doc['client_id'] ?? 0)]), $onDate);
+        if ($ib === '') $add('Impartiality', 'ok', 'No unresolved impartiality threat for this work.');
+        else            $add('Impartiality', $sev($strict), $ib); }
+
+    // 10. Blocking nonconformities raised against this report.
+    try { $openNcr = (int)ops_val("SELECT COUNT(*) FROM nonconformities WHERE report_doc_id=? AND status<>'CLOSED'", [$id]);
+        if ($openNcr > 0) $add('Nonconformities', $sev($strict), $openNcr . ' open nonconformity/NCR(s) raised against this report.'); }
+    catch (Throwable $e) {}
+
+    // 11. Client acceptance where the body requires it (release notes).
+    $tc = strtoupper((string)($doc['type_code'] ?? ''));
+    if (in_array($tc, ['RN', 'IRN'], true) && function_exists('setting_get')
+        && (string)setting_get('rn_require_client_acceptance', '') === '1') {
+        $cd = strtoupper(trim((string)($doc['client_decision'] ?? '')));
+        if ($cd === 'REJECTED')      $add('Client acceptance', 'block', 'The client rejected this report — it cannot be released.');
+        elseif ($cd === 'ACCEPTED')  $add('Client acceptance', 'ok', 'Client accepted.');
+        else                         $add('Client acceptance', 'warn', 'Client acceptance is required and not yet recorded.');
+    }
+
     $ready = !array_filter($items, fn($i) => $i['state'] === 'block');
     return ['items' => $items, 'ready' => $ready];
 }
