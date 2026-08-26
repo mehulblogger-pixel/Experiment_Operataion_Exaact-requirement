@@ -144,7 +144,18 @@ function audit_trim_old() {
     $cut = date('c', time() - audit_retain_days() * 86400);
     try {
         $n = (int)ops_val("SELECT COUNT(*) FROM idems_audit WHERE created_at < ?", [$cut]);
-        if ($n > 0) db()->prepare("DELETE FROM idems_audit WHERE created_at < ?")->execute([$cut]);
+        if ($n > 0) {
+            db()->prepare("DELETE FROM idems_audit WHERE created_at < ?")->execute([$cut]);
+            // Phase 2 §54 — a legitimate retention purge deletes the chain HEAD, after
+            // which the new earliest row's prev_hash points at a now-gone seal. Record
+            // that boundary hash so idems_audit_verify() recognises the trim instead of
+            // reporting it as tampering (and so real tampering is still caught).
+            try {
+                $head = ops_val("SELECT prev_hash FROM idems_audit WHERE entry_hash<>'' ORDER BY id LIMIT 1");
+                if ($head !== null && (string)$head !== '' && function_exists('setting_set'))
+                    setting_set('audit_trim_anchor', (string)$head);
+            } catch (Throwable $e) {}
+        }
         return $n;
     } catch (Throwable $e) { return 0; }
 }

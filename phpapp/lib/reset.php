@@ -106,6 +106,23 @@ function reset_run(array $keys) {
     $groups = reset_groups();
     $me = (int)(current_user()['id'] ?? 0);
     $done = []; $total = 0;
+    // Phase 2 §54 — wiping the audit trail wholesale is the one path that can erase the
+    // sealed chain. It stays possible (a master's deliberate "start again"), but leaves a
+    // DURABLE record OUTSIDE the audit tables — in settings, which this reset never touches —
+    // of what was erased, by whom and when, plus a final audit event before the delete.
+    if (in_array('audit', $keys, true)) {
+        try {
+            $cnt = (int)ops_val("SELECT COUNT(*) FROM idems_audit");
+            $lastHash = (string)(ops_val("SELECT entry_hash FROM idems_audit WHERE entry_hash<>'' ORDER BY id DESC LIMIT 1") ?: '');
+            if (function_exists('idems_log')) idems_log('audit', 0, 'AUDIT_RESET', ['field' => 'idems_audit', 'reason' => 'reset of ' . $cnt . ' sealed entries']);
+            if (function_exists('setting_set')) {
+                $who = function_exists('user_name') ? user_name(current_user()) : 'master';
+                $entry = date('c') . ' — ' . $who . ' erased ' . $cnt . ' audit entries (last seal ' . substr($lastHash, 0, 12) . ')';
+                $prev = (string)setting_get('audit_reset_log', '');
+                setting_set('audit_reset_log', substr(trim($prev === '' ? $entry : ($entry . "\n" . $prev)), 0, 4000));
+            }
+        } catch (Throwable $e) { /* evidence is best-effort; never block a deliberate reset */ }
+    }
     foreach ($keys as $k) {
         if (!isset($groups[$k])) continue;
         foreach ($groups[$k]['tables'] as $t) {
@@ -162,6 +179,13 @@ function ops_reset_data($method) {
         if (!$keys) { flash('Nothing was ticked, so nothing was deleted.', 'warning'); redirect('/reset-data'); }
         if (strtoupper($typed) !== 'DELETE') {
             flash('Type DELETE in the box to confirm. Nothing was deleted.', 'error');
+            redirect('/reset-data');
+        }
+        // Phase 2 §54 — erasing the sealed audit trail is irreversible and destroys the
+        // evidence that the system was used properly. Require a second, distinct phrase for
+        // that group specifically, so it can never be wiped by ticking a box in passing.
+        if (in_array('audit', $keys, true) && strtoupper(trim((string)($_POST['confirm_audit'] ?? ''))) !== 'ERASE AUDIT') {
+            flash('To erase the audit trail you must also type ERASE AUDIT in the second box. Nothing was deleted.', 'error');
             redirect('/reset-data');
         }
         $res = reset_run($keys);

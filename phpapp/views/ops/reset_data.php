@@ -40,7 +40,15 @@
   <div class="form-grid">
     <div class="ff"><label>Type <strong>DELETE</strong> to allow it</label>
       <input class="form-control" type="text" name="confirm_word" autocomplete="off" placeholder="DELETE" required></div>
+    <?php // Phase 2 §54 — a second, distinct phrase specifically for erasing the sealed
+          // audit trail. It is the evidence the system was used properly; it must never be
+          // wiped by ticking a box in passing. Only needed if the Audit group is selected. ?>
+    <div class="ff" id="ff_audit" style="display:none">
+      <label style="color:var(--bad)">Also type <strong>ERASE AUDIT</strong> to erase the audit trail</label>
+      <input class="form-control" type="text" name="confirm_audit" autocomplete="off" placeholder="ERASE AUDIT"></div>
   </div>
+  <script>(function(){var a=document.getElementById('g_audit'),f=document.getElementById('ff_audit');
+    if(a&&f){var t=function(){f.style.display=a.checked?'':'none';};a.addEventListener('change',t);t();}})();</script>
   <div style="margin-top:12px">
     <button class="btn danger" type="submit"
       onclick="return confirm('Last check. The records you ticked will be permanently removed. Continue?')">Delete the ticked records</button>

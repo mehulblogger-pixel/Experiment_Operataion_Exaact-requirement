@@ -721,7 +721,7 @@ function setting_change_class($k) {
     // Internal bootstrap / cache / cron-reminder markers — not configuration.
     if (preg_match('/(_seeded(_v\d+)?|_repaired(_v\d+)?|_sig|_checked_at|_week|_last_weekly|_last_monthly)$/', $k)) return ['audit' => false, 'secret' => false];
     if (in_array($k, ['setup_done', 'schema_sig', 'admin_cfg_sig', 'partners_seeded',
-                      'demo_seed_last_fail', 'demo_removed', 'billing_paid_until'], true)) return ['audit' => false, 'secret' => false];
+                      'demo_seed_last_fail', 'demo_removed', 'billing_paid_until', 'audit_trim_anchor'], true)) return ['audit' => false, 'secret' => false];
     // Module 46 — the signed licence key and install id are sensitive entitlement
     // artifacts; without this they were audited on the non-secret path (value on the trail).
     $secret = (bool)preg_match('/(pass|secret|token|api_?key|ai_config|rzp_key|licence_key|licence_install)/i', $k);

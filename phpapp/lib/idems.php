@@ -3381,18 +3381,26 @@ function idems_audit_verify() {
         return ['ok' => true, 'skipped' => true, 'checked' => 0, 'broken' => 0,
                 'content' => 0, 'links' => 0, 'first_break' => null];
     }
-    $seen = []; $brokenContent = 0; $brokenLink = 0; $firstBreak = null;
+    // Phase 2 §54 — the recorded retention-trim boundary. The one unresolved prev_hash
+    // left by a legitimate purge (the new chain head) is allowed to match this anchor;
+    // any OTHER missing link is still a real deletion/tamper and is reported.
+    $anchor = function_exists('setting_get') ? (string)setting_get('audit_trim_anchor', '') : '';
+    $seen = []; $brokenContent = 0; $brokenLink = 0; $firstBreak = null; $trimBoundary = false;
     foreach ($rows as $r) {
         $calc = hash('sha256', (string)$r['prev_hash'] . '|' . idems_audit_payload($r));
         $bad = false;
         if (!hash_equals((string)$r['entry_hash'], $calc)) { $brokenContent++; $bad = true; }
-        if ((string)$r['prev_hash'] !== '' && !isset($seen[(string)$r['prev_hash']])) { $brokenLink++; $bad = true; }
+        if ((string)$r['prev_hash'] !== '' && !isset($seen[(string)$r['prev_hash']])) {
+            if ($anchor !== '' && (string)$r['prev_hash'] === $anchor) { $trimBoundary = true; }  // legitimate retention purge
+            else { $brokenLink++; $bad = true; }
+        }
         if ($bad && $firstBreak === null) $firstBreak = (int)$r['id'];
         $seen[(string)$r['entry_hash']] = true;
     }
     $broken = $brokenContent + $brokenLink;
     return ['ok' => $broken === 0, 'skipped' => count($rows) === 0, 'checked' => count($rows),
-            'broken' => $broken, 'content' => $brokenContent, 'links' => $brokenLink, 'first_break' => $firstBreak];
+            'broken' => $broken, 'content' => $brokenContent, 'links' => $brokenLink, 'first_break' => $firstBreak,
+            'trim_boundary' => $trimBoundary];
 }
 
 // ---------------------------------------------------------------------------
