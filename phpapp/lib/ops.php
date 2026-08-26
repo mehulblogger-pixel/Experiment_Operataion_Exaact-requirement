@@ -6773,6 +6773,11 @@ function attention_summary() {
             if (!empty($c['lapsed'])) $push('cert_lapsed', 'Certifications lapsed', (int)$c['lapsed'], '/competence', 'risk', null, 'inspectors need a refresh');
         }
     }
+    // Recruitment: interviews whose date passed with no outcome recorded.
+    if ((function_exists('can') && can('mod.hiring.view')) || is_master()) {
+        if (function_exists('recruit_overdue_interviews_count'))
+            $push('iv_overdue', 'Interviews awaiting an outcome', recruit_overdue_interviews_count(), '/recruitment', 'speed', null, 'the interview date has passed');
+    }
     return $out;
 }
 function ops_reports() {

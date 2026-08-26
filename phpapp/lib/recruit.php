@@ -528,6 +528,45 @@ function recruit_sbu_clause($col = 'c.sbu') {
 }
 
 // ---- Data ------------------------------------------------------------------
+// Module 35 — interviews whose date has PASSED with no outcome recorded. Every
+// other interview query in this module filters interview_date >= today (upcoming
+// only), so a past interview with no interview_done_date and no interview_outcome
+// was surfaced NOWHERE — the outcome simply never got chased. Read-only worklist,
+// oldest first, scoped like every other candidate read. Only chases candidates
+// still in play (a terminal/hired candidate's stale interview is not a task).
+function recruit_overdue_interviews($limit = 50) {
+    if (function_exists('req_migrate')) req_migrate();
+    $today = date('Y-m-d');
+    [$cw, $ca] = recruit_sbu_clause('c.sbu');
+    $lim = max(1, min(500, (int)$limit));
+    try {
+        return ops_all(
+            "SELECT c.id, c.cand_code, (c.first_name||' '||c.last_name) nm, c.designation, c.stage,
+                    c.interview_date, r.req_code
+             FROM candidates c LEFT JOIN requisitions r ON r.id=c.requisition_id
+             WHERE COALESCE(c.interview_required,0)=1
+               AND COALESCE(c.interview_date,'')<>'' AND c.interview_date < ?
+               AND COALESCE(c.interview_done_date,'')='' AND COALESCE(c.interview_outcome,'')=''
+               AND c.stage IN ('RECEIVED','SUBMITTED','SHORTLISTED','INTERVIEW','OFFERED','HOLD')
+               AND $cw
+             ORDER BY c.interview_date LIMIT $lim", array_merge([$today], $ca)) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+function recruit_overdue_interviews_count() {
+    if (function_exists('req_migrate')) req_migrate();
+    $today = date('Y-m-d');
+    [$cw, $ca] = recruit_sbu_clause('c.sbu');
+    try {
+        return (int)(ops_one(
+            "SELECT COUNT(*) n FROM candidates c
+             WHERE COALESCE(c.interview_required,0)=1
+               AND COALESCE(c.interview_date,'')<>'' AND c.interview_date < ?
+               AND COALESCE(c.interview_done_date,'')='' AND COALESCE(c.interview_outcome,'')=''
+               AND c.stage IN ('RECEIVED','SUBMITTED','SHORTLISTED','INTERVIEW','OFFERED','HOLD')
+               AND $cw", array_merge([$today], $ca))['n'] ?? 0);
+    } catch (Throwable $e) { return 0; }
+}
+
 function recruit_data() {
     req_migrate();   // ensure the Phase-2 columns exist before we read them
     $today = date('Y-m-d');
@@ -588,6 +627,8 @@ function recruit_data() {
                               ORDER BY endd LIMIT 6", array_merge([$today,$in30], $ja));
 
     // ---------- RISKS ----------
+    // Interviews whose date has passed with no outcome — chased nowhere else.
+    $d['r_interviews'] = function_exists('recruit_overdue_interviews') ? recruit_overdue_interviews(6) : [];
     $d['r_reqs'] = $rows("SELECT r.id, r.req_code, r.designation, o.name office, r.created_at,
                                  (SELECT COUNT(*) FROM candidates c WHERE c.requisition_id=r.id) cands
                           FROM requisitions r LEFT JOIN offices o ON o.id=r.office_id

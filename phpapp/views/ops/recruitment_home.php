@@ -130,7 +130,11 @@ $grp = function ($icon, $title, $n) use ($e) {
   <!-- ============ RISKS ============ -->
   <section class="rc-col risk">
     <div class="rc-head"><h2>Risks</h2><span class="sub">slipping</span></div>
-    <?php $anyRisk = ($d['counts']['risks'] ?? 0) > 0; ?>
+    <?php $anyRisk = (($d['counts']['risks'] ?? 0) > 0) || !empty($d['r_interviews']); ?>
+    <?php // Module 35 — interviews whose date passed with no outcome recorded (chased nowhere else).
+      if (!empty($d['r_interviews'])): $grp('🎤', 'Interviews awaiting an outcome', count($d['r_interviews']));
+      foreach ($d['r_interviews'] as $r) $row('/candidate?id=' . (int)$r['id'], $r['nm'] ?: $r['cand_code'],
+             ($r['stage'] . ' · interview ' . $fdate($r['interview_date'])), ['no outcome', 'p-bad']); endif; ?>
     <?php if (!empty($d['r_reqs'])): $grp('⚠️', 'Requirements at risk (14d+, no pipeline)', count($d['r_reqs']));
       foreach ($d['r_reqs'] as $r) $row('/requisition?id=' . (int)$r['id'], $r['req_code'] . ' · ' . $desig($r['designation']),
              ($r['office'] ?: '') . ' · ' . (int)$r['cands'] . ' candidate' . ((int)$r['cands'] === 1 ? '' : 's'), ['aging', 'p-bad']); endif; ?>

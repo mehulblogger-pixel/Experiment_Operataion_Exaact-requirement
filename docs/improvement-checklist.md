@@ -54,7 +54,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 32 | Profitability (canonical engine) | P0 | ✅ done & pushed | 2026-08-26 |
 | 33 | Overheads | P1 | ✅ done & pushed | 2026-08-26 |
 | 34 | Dashboards / Command Centre | P2 | ✅ done & pushed | 2026-08-26 |
-| 35 | Recruitment / Workforce | P1 | ⬜ | — |
+| 35 | Recruitment / Workforce | P1 | ✅ done & pushed | 2026-08-26 |
 | 36 | Licensing / SaaS Admin | P1 | ⬜ | — |
 | 37 | Global Search | P1 | ✅ done & pushed | 2026-08-26 |
 | 38 | Notification Centre | P2 | ⬜ | — |
@@ -79,6 +79,29 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 35 — Recruitment / Workforce · 2026-08-26
+**Decision:** (A) surface interviews whose date has passed with no outcome — a worklist chased
+nowhere. WAIVED-fee resolution, placement-fee → payable, per-agency performance, requisition audit
+and a transactional/deduped conversion deferred (state-changing or bigger builds).
+**Found:** every interview query filters `interview_date >= today` (upcoming only), so a past-date
+interview with no `interview_done_date` and no `interview_outcome` was surfaced on no screen — the
+outcome never got chased and the candidate stalled silently.
+**Added (additive, read-only, scoped; no access change):**
+- `recruit_overdue_interviews()` + `_count()` — past-date, no-outcome, still-in-play interviews,
+  oldest first, SBU-scoped, guarded.
+- An **"Interviews awaiting an outcome"** risk group on the `/recruitment` risks board
+  (`recruit_data()['r_interviews']`), included in the board's any-risk test.
+- A hiring-gated tile in the home **"Needs attention"** band (Module 34 `attention_summary()`).
+**Preserved:** `recruit_data`, the upcoming-interview KPIs/cards, `candidate_events`, the
+fee/guarantee engine, the command centre — all unchanged. No new permission (reuses `mod.hiring.view`);
+no schema change; nothing deleted.
+**Edge cases:** upcoming / done / outcome-recorded / terminal candidates correctly excluded; guarded
+against pre-migration tables. Test note: migrations run before the test transaction so `req_migrate`'s
+ALTERs are not rolled back (a static-guard/DDL-in-transaction foot-gun caught and handled).
+**Tests:** `test_module35_recruitment.php` (18 assertions). Suite 3069 passing (only the 3 pre-existing
+baseline failures remain).
+**Spec:** `docs/edge-cases/35-recruitment.md`.
 
 ### Module 34 — Dashboards / Command Centre · 2026-08-26
 **Decision:** (A) a home "Needs attention" band that fans the already-computed due/overdue/expiring
