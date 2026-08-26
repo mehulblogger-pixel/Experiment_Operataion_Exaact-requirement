@@ -75,6 +75,14 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — §17 register spine entities already being logged (CANDIDATE / RECEIPT).** RECEIPT and
+  CANDIDATE activities were already written to the shared activity spine (`act_log`) but the entities
+  weren't in `ACT_ENTITIES`, so the universal timeline could neither label nor link them and their detail
+  screens had no history panel. Registered CANDIDATE / RECEIPT / CONTRACT (additive) and wired
+  `act_render_timeline()` onto the candidate and receipt details. Non-destructive — no existing entry,
+  route or renderer changed. Test `test_p2_timeline_entities.php` (11 assertions: registration, round-trip
+  through `act_for_entity`, per-entity isolation, view wiring). Suite **3497 passed, 0 failed**.
+
 - **2026-08-26 — §48 bulk action preview / dry-run.** The bulk framework ran CONFIRM→EXECUTE with no
   way to see which rows would be skipped and why before committing. Added `lib/bulk.php`: `bulk_plan()`
   partitions the ticked ids into will-apply / will-skip(reason) from a classifier, `bulk_plan_summary()`

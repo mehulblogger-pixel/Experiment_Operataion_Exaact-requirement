@@ -89,6 +89,14 @@ a second table, a second calculation, or a second status system.**
 - `T()/TP()/Tl()/Tlp()` over `TERM_PACKS` + overrides (`lib/terms.php`). Internal acronyms
   (URFE/IDEMS/PDSO/TAPI) are route/capability keys only — **never** user-facing labels.
 
+## 7a. Canonical activity timeline
+
+- One spine: `act_log($entityKind,$id,$kind,$subject)` writes, `act_for_entity()` / `act_render_timeline()`
+  read. Entities are registered in `ACT_ENTITIES` (label + route), including CANDIDATE / RECEIPT / CONTRACT
+  (§17). **Rule:** record an event with `act_log` against a registered entity and show it with
+  `act_render_timeline()`; do not build a module-private history renderer. New entity → add it to
+  `ACT_ENTITIES`, don't invent a parallel log.
+
 ## 8a. Canonical visibility
 
 - One vocabulary — `VIS_CLASSES` (PUBLIC / SHARED / CLIENT / VENDOR / INTERNAL / CONFIDENTIAL) and

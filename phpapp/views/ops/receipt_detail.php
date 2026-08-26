@@ -93,3 +93,6 @@
   </form>
   <?php endif; ?>
 <?php endif; ?>
+
+<?php // Phase 2 §17 — this receipt's own activity, from the universal spine (now that RECEIPT is registered). ?>
+<?php if (function_exists('act_render_timeline')) act_render_timeline('RECEIPT', (int)$r['id'], 'History'); ?>

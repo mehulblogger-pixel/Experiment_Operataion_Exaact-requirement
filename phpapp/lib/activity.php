@@ -59,6 +59,11 @@ const ACT_ENTITIES = [
     'COMPLAINT' => ['Complaint',       '/complaint?id='],
     'NCR'       => ['Nonconformity',   '/ncr-item?id='],
     'CAPA'      => ['Corrective action','/capa-item?id='],
+    // Phase 2 §17 — entities that already log to the spine (act_log) but were not
+    // registered here, so the universal timeline could neither label nor link them.
+    'CANDIDATE' => ['Candidate',       '/candidate?id='],
+    'RECEIPT'   => ['Receipt',         '/receipt?id='],
+    'CONTRACT'  => ['Contract',        '/contract?id='],
 ];
 
 // A constant cannot call T(), so the two entries that name a business noun are
