@@ -63,7 +63,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 41 | Document Control | P1 | ✅ done & pushed | 2026-08-26 |
 | 42 | Change Control | P2 | ⬜ | — |
 | 43 | Training | P2 | ⬜ | — |
-| 44 | Evidence | P1 | ⬜ | — |
+| 44 | Evidence | P1 | ✅ done & pushed | 2026-08-26 |
 | 45 | AI / Intelligence | P3 | ⬜ | — |
 | 46 | Integrations | P2 | ⬜ | — |
 | 47 | Mobile / PWA | P1 | ⬜ | — |
@@ -79,6 +79,28 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 44 — Evidence · 2026-08-26
+**Decision:** (A) evidence & on-site readiness row + verify on-site line + first chain-tamper test.
+**Flagged, NOT changed:** `/checkin-photo` serves a site-visit photo by id with no per-job scope check
+(access-affecting — left for a deliberate decision).
+**Found:** the evidence subsystem is strong (per-photo hash chain, EXIF/upload fact-separation,
+server-time capture, geofenced check-ins, permission-checked file serving, `/verify`) but the report
+never "knew about" its own evidence: it was **issuable with zero photos and no site check-in**
+undetected; the verify page never stated somebody was on site; and `chain_verify` was untested.
+**Added (additive, read-only, no hard control):**
+- `idems_evidence_readiness($doc)` — photos, EXIF on-site count, arrival/departure check-in, chain
+  intact — reusing `report_files`, `site_visits`, `chain_verify`.
+- An **"Evidence & on-site" row** on the issue-readiness preview — warns on no photos / no check-in /
+  broken chain; **never blocks** issue.
+- An **"On-site check-in"** line on the public `/verify` page (the strongest evidence it omitted).
+- The **first tamper test** of the `evidence_chain` (CONTENT detection).
+**Preserved (verified by tests):** the hash chain, fact-separation, freeze-at-issue write-gate, the
+report-file permission serving, the geofence — all unchanged. No new permission; no schema change;
+advisory/read-only; `/checkin-photo` scope untouched (flagged); nothing deleted.
+**Edge cases:** `docs/edge-cases/44-evidence.md`.
+**Tests:** `tests/test_module44_evidence.php` (15 assertions). Suite 2910 passed / 3 pre-existing
+baseline failures.
 
 ### Module 33 — Overheads · 2026-08-26
 **Decision:** (A) overhead-recovery reconciliation (pool vs recovered) + first overhead-engine tests.

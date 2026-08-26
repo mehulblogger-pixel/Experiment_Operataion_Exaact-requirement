@@ -5932,8 +5932,44 @@ function idems_issue_readiness($doc) {
     elseif ($wrn)  $add('Instruments & authorisation', 'warn',  implode(' ', $wrn) . ' Issue proceeds and raises a nonconformity.');
     else           $add('Instruments & authorisation', 'ok', 'Calibration and signer authorisation in order.');
 
+    // 5. Evidence & on-site (Module 44) — advisory. The report finally "knows about"
+    //    its own supporting evidence and site check-in, which lived in separate gates
+    //    (submit-completeness vs job-close). Warn only; it never blocks issue.
+    if (function_exists('idems_evidence_readiness')) {
+        $ev = idems_evidence_readiness($doc);
+        $bits = [$ev['photos'] . ' photo' . ($ev['photos'] === 1 ? '' : 's')
+                 . ($ev['onsite'] ? ' (' . $ev['onsite'] . ' located on site)' : '')];
+        if ($ev['job_id']) {
+            if ($ev['has_entry'] && $ev['has_exit']) $bits[] = 'arrival + departure recorded';
+            elseif ($ev['has_entry'] || $ev['has_exit']) $bits[] = 'only a partial site check-in';
+            else $bits[] = 'no site check-in recorded';
+        }
+        if ($ev['chain_entries'] > 0) $bits[] = $ev['chain_ok'] ? 'evidence chain intact' : 'evidence chain BROKEN';
+        $bad = ($ev['chain_entries'] > 0 && !$ev['chain_ok'])
+            || $ev['photos'] === 0
+            || ($ev['job_id'] && !($ev['has_entry'] && $ev['has_exit']));
+        $add('Evidence & on-site', $bad ? 'warn' : 'ok', implode(' · ', $bits) . '. Advisory — does not block issue.');
+    }
+
     $ready = !array_filter($items, fn($i) => $i['state'] === 'block');
     return ['items' => $items, 'ready' => $ready];
+}
+
+// Module 44 — what a report can show for itself: its photos (and how many were
+// located on site by EXIF), whether the job has an arrival+departure check-in, and
+// whether the tamper-evident evidence chain still verifies. Read-only; reuses
+// report_files, site_visits and the trust chain — no new table, no new gate.
+function idems_evidence_readiness($doc) {
+    $id = (int)($doc['id'] ?? 0);
+    $jobId = (int)($doc['job_id'] ?? 0);
+    $photos = (int)ops_val("SELECT COUNT(*) FROM report_files WHERE report_doc_id=? AND kind='photo'", [$id]);
+    $files  = (int)ops_val("SELECT COUNT(*) FROM report_files WHERE report_doc_id=? AND kind='file'", [$id]);
+    $onsite = (int)ops_val("SELECT COUNT(*) FROM report_files WHERE report_doc_id=? AND geo_source='EXIF'", [$id]);
+    $kinds = ($jobId && function_exists('site_visit_kinds_done')) ? site_visit_kinds_done($jobId) : [];
+    $chain = function_exists('chain_verify') ? chain_verify($id) : ['entries' => 0, 'ok' => true];
+    return ['job_id' => $jobId, 'photos' => $photos, 'files' => $files, 'onsite' => $onsite,
+            'has_entry' => in_array('ENTRY', $kinds, true), 'has_exit' => in_array('EXIT', $kinds, true),
+            'chain_ok' => !empty($chain['ok']), 'chain_entries' => (int)($chain['entries'] ?? 0)];
 }
 
 // ---- Handler: act on an approval step (approve / reject / send-back / delegate) ----

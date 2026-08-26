@@ -101,6 +101,16 @@ $v = $code !== '' ? verify_lookup($code) : null;
       <tr><th>Located on site</th><td><?= (int)$v['on_site'] ?> of <?= (int)$v['evidence'] ?>
         <br><span class="note">Counted from the location the camera recorded inside each photograph at the moment
         it was taken — not from where the file was later uploaded.</span></td></tr>
+      <?php // Module 44 — was somebody actually on site? The arrival/departure check-in. ?>
+      <?php if (!empty($v['checkin'])): $ci = $v['checkin']; ?>
+      <tr><th>On-site check-in</th><td><?php
+        if ($ci['entry'] && $ci['exit']) {
+            echo 'Arrival and departure recorded';
+            if ($ci['minutes']) echo ' — on site about ' . (int)round($ci['minutes'] / 60) . 'h ' . ((int)$ci['minutes'] % 60) . 'm';
+        } elseif ($ci['entry']) echo 'Arrival recorded';
+        else echo 'Departure recorded';
+        ?><br><span class="note">A GPS check-in taken on site, with the server's own clock — evidence somebody attended.</span></td></tr>
+      <?php endif; ?>
       <?php if ((int)$v['flagged'] > 0): ?>
       <tr><th>Flagged for review</th><td><?= (int)$v['flagged'] ?>
         <br><span class="note">Our supervisor reviews anything the system questions. Ask us and we will tell you what

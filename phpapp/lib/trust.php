@@ -818,6 +818,15 @@ function verify_lookup_inner($code) {
 
     $content = function_exists('idems_content_check') ? idems_content_check($doc) : ['sealed' => false, 'ok' => true];
 
+    // Module 44 — the strongest piece of evidence the verify page omitted: was
+    // somebody actually on site? Read the job's arrival/departure check-in window.
+    $checkin = null;
+    if (!empty($doc['job_id']) && function_exists('site_visit_window')) {
+        $w = site_visit_window((int)$doc['job_id']);
+        if (($w['in'] ?? null) || ($w['out'] ?? null))
+            $checkin = ['entry' => !empty($w['in']), 'exit' => !empty($w['out']), 'minutes' => $w['minutes']];
+    }
+
     return [
         'state' => 'issued',
         'irn' => $doc['irn'],
@@ -827,6 +836,7 @@ function verify_lookup_inner($code) {
         'authorised' => $authorised,
         'result' => $doc['result'],
         'evidence' => $photos, 'on_site' => $onSite, 'flagged' => $flagged,
+        'checkin' => $checkin,
         'chain' => $chain,
         'content' => $content,
         'body' => app_name(),
