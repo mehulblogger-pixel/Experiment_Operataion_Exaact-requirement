@@ -409,6 +409,15 @@
   </div>
 <?php endif; ?>
 
+<?php // ---- Phase 2 §6: raised outside the agreed deliverables (applicability override) ---- ?>
+<?php if (!empty($doc['not_allocated'])): ?>
+  <div class="panel" data-tab="Report" style="border:1px solid var(--warn,#b45309);background:color-mix(in srgb,var(--warn,#b45309) 8%,transparent)">
+    <b>⚠ Not on the agreed deliverables.</b> This report type was raised via “add anyway”, outside this <?= e(Tl('job')) ?>’s agreed scope.
+    <?php if (trim((string)($doc['applic_override_reason'] ?? '')) !== ''): ?><div style="margin-top:6px">Reason given: <b><?= e($doc['applic_override_reason']) ?></b></div><?php endif; ?>
+    <div class="muted" style="font-size:12px;margin-top:4px">The override is recorded on the audit trail.</div>
+  </div>
+<?php endif; ?>
+
 <?php // ---- Module 07: provenance strip — Prepared / Vetted / Approved / Issued ---- ?>
 <?php $m7prov = idems_provenance($doc);
   $m7ico = ['done'=>'✓', 'pending'=>'…', 'returned'=>'↩', 'na'=>'—'];

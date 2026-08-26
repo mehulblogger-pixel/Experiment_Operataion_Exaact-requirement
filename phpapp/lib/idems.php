@@ -129,6 +129,10 @@ function idems_migrate() {
         // Content seal: a hash of the report's own content, frozen at issue, so a
         // later change to the report (not just its evidence) is detectable at /verify.
         ensure_column('report_docs', 'content_seal', "VARCHAR(64) DEFAULT ''");
+        // Phase 2 §6 — a report raised for a type NOT on the job's agreed deliverables
+        // (an "add anyway" override). Flagged and reason-captured, per accreditation.
+        ensure_column('report_docs', 'not_allocated', "INT DEFAULT 0");
+        ensure_column('report_docs', 'applic_override_reason', "VARCHAR(400) DEFAULT ''");
         // §33 — presentation frozen at issue. So editing a form or a company Word
         // template later can NEVER change how an already-issued report looks. We
         // keep the exact form schema (sections+fields) and the exact template used.
@@ -4322,6 +4326,19 @@ function ops_idems_documents($route, $method) {
                 $id = (int)$pdo->lastInsertId();
                 idems_log('report_doc', $id, 'CREATE', ['irn'=>$irn]);
                 idems_log('report_doc', $id, 'IRN_GEN', ['irn'=>$irn, 'new'=>$irn]);
+                // Phase 2 §6 — if this report type is NOT on the job's agreed deliverables,
+                // it was raised via "add anyway": flag it "not allocated", keep the reason,
+                // and record the override on the audit trail (reason/person/time). This makes
+                // good the UI's promise, which previously stored nothing.
+                if (!empty($fields['job_id']) && function_exists('idems_applicability_is_override')
+                    && idems_applicability_is_override((int)$fields['job_id'], (string)($fields['type_code'] ?? ''))) {
+                    $ovReason = trim((string)($_GET['override_reason'] ?? $_POST['override_reason'] ?? ''));
+                    try { $pdo->prepare("UPDATE report_docs SET not_allocated=1, applic_override_reason=? WHERE id=?")
+                        ->execute([substr($ovReason, 0, 400), $id]); } catch (Throwable $e) {}
+                    idems_log('report_doc', $id, 'APPLICABILITY_OVERRIDE',
+                        ['irn'=>$irn, 'field'=>(string)($fields['type_code'] ?? ''),
+                         'reason'=>($ovReason !== '' ? $ovReason : 'not stated — raised outside the agreed deliverables')]);
+                }
                 // For a Vendor Assessment / Audit raised against a vendor, prefill
                 // the "Customer complaints & resolution" table from the complaint
                 // register, so complaints & their resolutions are part of the report.
@@ -9387,6 +9404,19 @@ function deliverable_options() {
 // hides a report type or blocks creating one (the create form keeps its escape
 // hatch). Returns ['applicable'=>[{code,name,source}], 'not_applicable'=>[{code,name}],
 // 'source_labels'=>[...]].
+// Phase 2 §6 — is this report type OUTSIDE the job's agreed deliverables? True only
+// when the type is explicitly on the "not applicable" list (active catalogue minus
+// agreed minus already-written). Used to flag an "add anyway" override at create.
+function idems_applicability_is_override($jobId, $typeCode) {
+    $typeCode = strtoupper(trim((string)$typeCode));
+    if ($typeCode === '' || !$jobId) return false;
+    $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$jobId]);
+    if (!$job) return false;
+    try { $appl = idems_job_applicability($job); } catch (Throwable $e) { return false; }
+    foreach ((array)($appl['not_applicable'] ?? []) as $na)
+        if (strtoupper((string)($na['code'] ?? '')) === $typeCode) return true;
+    return false;
+}
 function idems_job_applicability($job) {
     $job = (array)$job;
     $dl = trim((string)($job['deliverables'] ?? '')) !== ''
@@ -10200,7 +10230,7 @@ function ops_idems_learning($method) {
 
 // ---- Actions that a compliance reviewer should always look at ----
 // Shipped default; the company can change the list in Settings → Reporting controls.
-const AUDIT_HIGH_RISK = ['TIMESTAMP_EDIT','DELETE','EVIDENCE_DELETE','REJECT','SENDBACK','SIGNATURE_SET','LOGIN_FAILED','AI_REVIEW','AI_POLISH','SCOPE_FROM_QAP','ITEMS_FROM_QAP','DELEGATE'];
+const AUDIT_HIGH_RISK = ['TIMESTAMP_EDIT','DELETE','EVIDENCE_DELETE','REJECT','SENDBACK','SIGNATURE_SET','LOGIN_FAILED','AI_REVIEW','AI_POLISH','SCOPE_FROM_QAP','ITEMS_FROM_QAP','APPLICABILITY_OVERRIDE','DELEGATE'];
 function audit_high_risk() {
     $s = (string)setting_get('audit_high_risk', '');
     if ($s === '') return AUDIT_HIGH_RISK;
@@ -10213,7 +10243,7 @@ const AUDIT_ACTION_LABELS = [
     'REJECT'=>'Rejected','SENDBACK'=>'Sent back','DELEGATE'=>'Approval delegated','FINALIZE'=>'Finalized / issued',
     'DELETE'=>'Deleted (soft)','EVIDENCE'=>'Evidence added','EVIDENCE_CAPTION'=>'Evidence caption','EVIDENCE_DELETE'=>'Evidence removed',
     'PDF'=>'PDF generated','DOCX'=>'Client format generated','CERT_PDF'=>'Endorsement certificate','SOURCE_DOC'=>'Source document added',
-    'AI_REVIEW'=>'AI review run','AI_POLISH'=>'AI text polish','SCOPE_FROM_QAP'=>'Scope auto-filled from QAP (AI)','ITEMS_FROM_QAP'=>'Items auto-filled from QAP (AI)','SMART_REMARKS'=>'Suggested remarks applied','TIMESTAMP_EDIT'=>'Date/timestamp changed',
+    'AI_REVIEW'=>'AI review run','AI_POLISH'=>'AI text polish','SCOPE_FROM_QAP'=>'Scope auto-filled from QAP (AI)','ITEMS_FROM_QAP'=>'Items auto-filled from QAP (AI)','APPLICABILITY_OVERRIDE'=>'Report raised outside agreed deliverables','SMART_REMARKS'=>'Suggested remarks applied','TIMESTAMP_EDIT'=>'Date/timestamp changed',
     'SIGNATURE_SET'=>'Signature changed','ENDORSE'=>'Document endorsed','RELEASE_NOTE_DRAFT'=>'Release Note drafted',
     'RELEASE_NOTE_CREATED'=>'Release Note created from report','LOGIN'=>'Login','LOGOUT'=>'Logout','LOGIN_FAILED'=>'Failed login',
     'CSRF_REJECTED'=>'Save refused — not sent from this site',
@@ -10227,7 +10257,7 @@ const AUDIT_ACTION_LABELS = [
 ];
 const AUDIT_ACTIONS_ALL = [
     'CREATE','EDIT','IRN_GEN','SUBMIT','APPROVE','REJECT','SENDBACK','DELEGATE','FINALIZE','DELETE','EVIDENCE',
-    'EVIDENCE_CAPTION','EVIDENCE_DELETE','PDF','DOCX','CERT_PDF','SOURCE_DOC','AI_REVIEW','AI_POLISH','SCOPE_FROM_QAP','ITEMS_FROM_QAP','SMART_REMARKS',
+    'EVIDENCE_CAPTION','EVIDENCE_DELETE','PDF','DOCX','CERT_PDF','SOURCE_DOC','AI_REVIEW','AI_POLISH','SCOPE_FROM_QAP','ITEMS_FROM_QAP','APPLICABILITY_OVERRIDE','SMART_REMARKS',
     'TIMESTAMP_EDIT','SIGNATURE_SET','ENDORSE','RELEASE_NOTE_DRAFT','RELEASE_NOTE_CREATED','LOGIN','LOGOUT','LOGIN_FAILED',
     'CSRF_REJECTED','PASSWORD_CHANGED','TWOFA_ON','TWOFA_OFF','TWOFA_RESET','ACCOUNT_UNLOCKED',
     'PERSON_EXPORT','PERSON_ERASED','INCIDENT','CONSENT','CONSENT_WITHDRAWN','UPLOAD_REFUSED',

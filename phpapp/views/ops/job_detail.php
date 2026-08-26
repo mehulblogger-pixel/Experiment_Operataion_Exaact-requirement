@@ -651,7 +651,11 @@
       <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">
         <?php foreach ($appl['not_applicable'] as $na): ?>
           <span style="border:1px solid var(--line);border-radius:7px;padding:4px 8px;font-size:12px;color:var(--muted)">
-            <?= e($na['name']) ?><?php if ($canWrite): ?> · <a href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call=' . (int)$job['call_id'] : '' ?>&type=<?= e(urlencode($na['code'])) ?>">add anyway</a><?php endif; ?>
+            <?php // Phase 2 §6 — "add anyway" is an applicability override: capture the reason,
+                  // which is stored and recorded on the audit trail, and the report is flagged
+                  // "not allocated". ?>
+            <?= e($na['name']) ?><?php if ($canWrite): ?> · <a href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call=' . (int)$job['call_id'] : '' ?>&type=<?= e(urlencode($na['code'])) ?>"
+                  onclick="var r=prompt('This report type is not on the agreed deliverables. Why is it being raised anyway? (recorded)');if(r===null){return false;}this.href+='&override_reason='+encodeURIComponent(r);">add anyway</a><?php endif; ?>
           </span>
         <?php endforeach; ?>
       </div>
