@@ -75,6 +75,16 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — §29 recognised-revenue reconciliation (read-only).** The legacy per-job invoice
+  snapshot (`jobs.invoice_amount`, read by MIS/boss_profit) and the books ledger
+  (`invoices→invoice_lines.job_id`) coexist (the §80 dual-truth) and can drift. Added `lib/revrecon.php`:
+  `revrecon_job()`/`revrecon_scan()`/`revrecon_count()` surface jobs whose legacy figure matches **neither**
+  the net nor the gross ledger total (robust to the legacy field's ambiguous tax basis; cancelled invoices
+  excluded). Surfaced as an advisory tile on `/system-status` (salary-gated). **Changes no displayed
+  number and touches no row** — which is exactly why it needs no §28 sign-off; it is the evidence base for
+  that later decision. Test `test_p2_rev_recon.php` (10 assertions: gross/net match reconcile, neither-match
+  flags, cancelled-only flags, counts, scan). Suite **3515 passed, 0 failed**.
+
 - **2026-08-26 — §22/§51 global-search scope leak closed.** Every global-search source scoped by
   office/SBU except two — **inquiries** (`crm_inquiries`) and **contracts** (`partner_contracts`) — which
   have an `sbu` column but were queried LIKE-only, so a user could find another SBU's inquiry/contract

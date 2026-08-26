@@ -6981,6 +6981,17 @@ function system_status() {
                  empty($pr['consistent']) ? 'Some screens overstate profit vs the canonical engine.' : 'Every screen matches the canonical engine.', '/profitability');
         } catch (Throwable $e) {}
     }
+    // §29 — recognised-revenue reconciliation: where a job's legacy invoice figure
+    // matches neither the net nor the gross books-ledger total. Advisory only; it
+    // changes no number (converging the readers is §28, sign-off-gated).
+    if (function_exists('revrecon_count') && function_exists('can_see_salary') && can_see_salary()) {
+        try { $rc = revrecon_count();
+            $add('rev_recon', 'Revenue reconciliation', $rc > 0 ? 'warn' : 'ok',
+                 $rc > 0 ? $rc . ' job(s) disagree' : 'Ledger reconciled',
+                 $rc > 0 ? 'The legacy per-job invoice figure differs from the books ledger — review before it is trusted.'
+                         : 'Every job\'s legacy invoice figure matches the books ledger.', '/data-control');
+        } catch (Throwable $e) {}
+    }
     return $out;
 }
 function system_status_worst() {
