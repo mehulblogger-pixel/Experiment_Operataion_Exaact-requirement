@@ -473,3 +473,7 @@
 </details>
 <?php endif; ?>
 </div><!-- /data-tabs (opp) -->
+
+<?php // Module 49 — the activity spine, shown where the record is read (as on lead / call /
+      // complaint / NCR). The controller already fetched this timeline; it was never rendered. ?>
+<?php if (function_exists('act_render_timeline')) act_render_timeline('OPPORTUNITY', (int)$o['id'], 'Activity'); ?>

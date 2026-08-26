@@ -68,7 +68,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 46 | Integrations | P2 | ✅ done & pushed | 2026-08-26 |
 | 47 | Mobile / PWA | P1 | ✅ done & pushed | 2026-08-26 |
 | 48 | Report Template Builder | P1 | ✅ done & pushed | 2026-08-26 |
-| 49 | Entity 360 Standard | P2 | ⬜ | — |
+| 49 | Entity 360 Standard | P2 | ✅ done & pushed | 2026-08-26 |
 | 50 | Cross-module Consistency & Regression | P0 | ⬜ | — |
 
 ---
@@ -79,6 +79,25 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 49 — Entity 360 Standard · 2026-08-26
+**Decision:** (A) extend the shared act_render_timeline() (Module 40) onto the peer detail views whose
+spine data already exists but wasn't shown — opportunity and invoice. Consolidating the four
+incompatible timeline renderers, surfacing candidate/receipt (needs kind registration), and a
+universal Back/header component deferred.
+**Found:** the activity spine + act_render_timeline give every record a history panel, but it was wired
+onto only complaint + NCR. Opportunity 360 FETCHED its timeline and never rendered it; invoice 360
+(which logs CREATED/ISSUED/CANCELLED/CREDIT) showed no history — both kinds already registered and
+written.
+**Added (additive; the shared helper; no schema/write-path change):**
+- `act_render_timeline('OPPORTUNITY', …)` on opportunity_detail (after the preserved stage-move fold).
+- `act_render_timeline('INVOICE', …)` on invoice_detail. Both function_exists-guarded.
+**Preserved:** the helper, the spine, the complaint/NCR timelines, and both views' existing content —
+unchanged. No new permission; no schema change; no new activity kind; nothing deleted.
+**Edge cases:** safe empty state for a record with no history; existing sections untouched.
+**Tests:** `test_module49_entity360.php` (11 assertions). Suite 3170 passing (only the 3 pre-existing
+baseline failures remain).
+**Spec:** `docs/edge-cases/49-entity-360.md`.
 
 ### Module 47 — Mobile / PWA · 2026-08-26
 **Decision:** (A) extend the already-shipped offline draft-autosave (offline.js, keyed on

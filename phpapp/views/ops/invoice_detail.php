@@ -304,3 +304,7 @@
   <button class="btn danger" style="margin-top:12px" onclick="return confirm('Cancel this invoice?')">Cancel this invoice</button>
 </form>
 <?php endif; ?>
+
+<?php // Module 49 — the activity spine (created / issued / cancelled / credit), shown where the
+      // invoice is read, matching lead / call / complaint / NCR. Spine data already exists. ?>
+<?php if (function_exists('act_render_timeline')) act_render_timeline('INVOICE', (int)$inv['id'], 'Activity'); ?>
