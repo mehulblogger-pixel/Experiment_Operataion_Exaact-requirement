@@ -304,6 +304,42 @@ function adv_cold_leads() {
     ];
 }
 
+// Module 19 — the inquiry rung of the funnel, instrumented like the leads above it
+// (adv_cold_leads) and the quotes below it (crm_expire_quotes). Reuses inquiries_due().
+function adv_inquiries_unquoted() {
+    if (!adv_on('inquiries') || !function_exists('inquiries_due')) return null;
+    $due = adv_try(fn() => inquiries_due(), []) ?: [];
+    if (!$due) return null;
+    $rows = [];
+    foreach ($due as $i) {
+        $rows[] = ['id' => $i['id'], 'ref' => $i['inquiry_no'],
+                   'who' => $i['client_disp'] ?: ($i['client_name'] ?: $i['subject']),
+                   'd' => $i['received_date'] ?: $i['created_at'], 'amount' => 0,
+                   'extra' => (int)$i['age_days'] . ' days open, no quotation'
+                            . (trim((string)($i['owner_name'] ?? '')) !== '' ? ' · ' . $i['owner_name'] : '')];
+    }
+    usort($rows, fn($x, $y) => strtotime((string)$x['d']) <=> strtotime((string)$y['d']));   // oldest first
+    $sla = function_exists('inquiry_sla_days') ? inquiry_sla_days() : 7;
+    return [
+        'key' => 'unquoted_inquiries', 'severity' => 'SPEED',
+        'title' => 'Inquiries waiting for a quotation',
+        'n' => count($rows), 'value' => 0,
+        'cost' => count($rows) . ' customer ' . (count($rows) === 1 ? 'inquiry has' : 'inquiries have')
+                . ' sat open past the ' . $sla . '-day response service level with no quotation raised.',
+        'why' => 'A customer who asked for a price and heard nothing is the fastest lost sale there is — and until now '
+               . 'the inquiry rung of the funnel had no reminder at all, unlike the leads above it and the quotes below.',
+        'steps' => [
+            'Open the oldest. Raise the quotation, or drop the inquiry with a reason — do not leave it silent.',
+            'If several sit with the same person, the work is not being picked up — reassign or add capacity.',
+            'If the ' . $sla . '-day service level is wrong for your business, change it in Settings.',
+        ],
+        'stop' => 'Nothing automatic — an inquiry is never dropped for you. This is the daily working list for whoever quotes.',
+        'who' => 'Whoever prepares quotations, reviewed by the sales manager',
+        'link' => '/inquiries', 'link_label' => 'Open the inquiries register',
+        'rows' => array_slice($rows, 0, 12), 'row_url' => '/inquiry-edit?id=',
+    ];
+}
+
 function adv_order_no_quote() {
     if (!adv_on('calls')) return null;
     [$w, $a] = scope_clause('c.executing_office_id', 'c.sbu');
@@ -567,6 +603,7 @@ function adv_ad_spend_dry() {
 function adv_all() {
     $checks = ['adv_unbilled_work', 'adv_overdue_invoices', 'adv_unmatched_receipts',
                'adv_won_not_ordered', 'adv_draft_invoices', 'adv_stalled_deals', 'adv_cold_leads',
+               'adv_inquiries_unquoted',
                'adv_silent_customers', 'adv_order_no_quote', 'adv_closed_no_report',
                'adv_customers_untaxable', 'adv_ad_spend_dry'];
     $out = [];

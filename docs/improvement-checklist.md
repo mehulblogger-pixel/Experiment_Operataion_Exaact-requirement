@@ -38,7 +38,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 16 | Vendors / Vendor 360 | P2 | ✅ done & pushed | 2026-08-24 |
 | 17 | Leads | P2 | ✅ done & pushed | 2026-08-26 |
 | 18 | Orders / Contracts (Contract 360) | P1 | ⬜ | — |
-| 19 | Inquiries / Requirements | P2 | ⬜ | — |
+| 19 | Inquiries / Requirements | P2 | ✅ done & pushed | 2026-08-26 |
 | 20 | Project Costing | P1 | ✅ done & pushed | 2026-08-26 |
 | 21 | Hold / Witness Points | P0 | ✅ done & pushed | 2026-08-24 |
 | 22 | Complaints | P1 | ✅ done & pushed | 2026-08-24 |
@@ -79,6 +79,29 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 19 — Inquiries / Requirements · 2026-08-26
+**Decision:** (A) stale/un-quoted inquiry detector + advisor worklist + surface the dead
+`assigned_to`. Inquiry-level conversion reporting, response-SLA analytics, and the QUOTED-reverse
+deferred.
+**Found:** the inquiry rung of the funnel was blind to time — an OPEN inquiry sat un-quoted forever
+(no aging, reminder or worklist) though `received_date`/`created_at` were captured; the same pattern
+was already built for leads (Module 17) and quotes (Module 03). `assigned_to` was dead data.
+**Added (additive, read-only, no hard control):**
+- `inquiry_sla_days()` (setting, default 7) + `inquiries_due()` / `inquiries_due_count()` — OPEN
+  inquiries older than the service level, SBU-scoped, carrying the owner; QUOTED/DROPPED never chased;
+  never changes a status.
+- `adv_inquiries_unquoted()` — a business-advisor "Inquiries waiting for a quotation" card mirroring
+  `adv_cold_leads()`, registered in `adv_all()`, explicitly advisory.
+- Register surfacing: a waiting-for-quote banner + an **Owner column** (finally reading the dead
+  `assigned_to`) + a ⏳ Nd pill on overdue OPEN rows.
+- The **first tests** over the aging behaviour.
+**Preserved (verified by tests):** the register, form, create/edit/delete guards, the auto-QUOTED
+flip, the lead↔inquiry↔quote links — all unchanged. No new permission; no schema change (a setting +
+reading existing columns); no access changed; no inquiry auto-dropped; nothing deleted.
+**Edge cases:** `docs/edge-cases/19-inquiries.md`.
+**Tests:** `tests/test_module19_inquiries.php` (14 assertions). Suite 2841 passed / 3 pre-existing
+baseline failures.
 
 ### Module 17 — Leads · 2026-08-26
 **Decision:** (A) cold-lead / overdue-follow-up detector (advisor check + register tile) + first

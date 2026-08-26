@@ -1167,6 +1167,47 @@ function crm_schedule_followups($qid) {
     foreach (FOLLOWUP_OFFSETS as $k => $days) $ins->execute([(int)$qid, $k, date('Y-m-d', strtotime("$base +$days days")), date('c')]);
 }
 
+// Module 19 — the response service level for an inquiry (days from received to a
+// quotation going out), editable via a setting. Default 7.
+function inquiry_sla_days() {
+    $d = function_exists('setting_get') ? (int)setting_get('inquiry_sla_days', '') : 0;
+    return $d > 0 ? $d : 7;
+}
+
+// Module 19 — inquiries left OPEN (un-quoted) past the response service level. The
+// one un-instrumented rung of the funnel: leads got leads_due() (Module 17) and
+// quotes got quote_validity() (Module 03); an inquiry sat forever. Read-only — it
+// never changes a status. Age from received_date, falling back to created_at;
+// SBU-scoped exactly as the register is.
+function inquiries_due($today = null) {
+    $today = $today ?: date('Y-m-d');
+    $sla = inquiry_sla_days();
+    $w = ["i.status='OPEN'"]; $a = [];
+    $sb = function_exists('scope_sbus') ? scope_sbus() : 'ALL';
+    if ($sb !== 'ALL' && is_array($sb) && $sb) {
+        $ph = implode(',', array_fill(0, count($sb), '?')); $w[] = "(i.sbu IN ($ph) OR i.sbu='')";
+        foreach ($sb as $s) $a[] = $s;
+    }
+    $rows = ops_all("SELECT i.*, bp.display_name client_disp, u.first_name owner_first, u.last_name owner_last, u.username owner_username
+                     FROM crm_inquiries i
+                     LEFT JOIN business_partners bp ON bp.id=i.client_id
+                     LEFT JOIN users u ON u.id=i.assigned_to
+                     WHERE " . implode(' AND ', $w) . " ORDER BY i.id", $a) ?: [];
+    $out = [];
+    foreach ($rows as $r) {
+        $base = trim((string)($r['received_date'] ?? '')) ?: substr((string)($r['created_at'] ?? ''), 0, 10);
+        if ($base === '') continue;
+        $age = (int)floor((strtotime($today) - strtotime($base)) / 86400);
+        if ($age <= $sla) continue;
+        $r['age_days'] = $age; $r['sla_days'] = $sla;
+        $r['owner_name'] = trim((string)($r['owner_first'] ?? '') . ' ' . (string)($r['owner_last'] ?? '')) ?: (string)($r['owner_username'] ?? '');
+        $out[] = $r;
+    }
+    usort($out, fn($x, $y) => (int)$y['age_days'] <=> (int)$x['age_days']);   // oldest first
+    return $out;
+}
+function inquiries_due_count($today = null) { return count(inquiries_due($today)); }
+
 // ---------------------------------------------------------------------------
 //  Handlers — Inquiries (§1)
 // ---------------------------------------------------------------------------
@@ -1184,12 +1225,15 @@ function ops_crm_inquiries($route, $method) {
         if (!$fy['all']) { $w[] = 'i.created_at >= ?'; $args[] = $fy['from']; $w[] = 'i.created_at < ?'; $args[] = $fy['to_excl']; }
         // origin_ref = the lead this inquiry was converted from (if any), so the
         // register shows where it came from.
-        $rows = ops_all("SELECT i.*, bp.display_name client_disp, l.ref origin_ref
+        $rows = ops_all("SELECT i.*, bp.display_name client_disp, l.ref origin_ref,
+                                u.first_name owner_first, u.last_name owner_last, u.username owner_username
                          FROM crm_inquiries i
                          LEFT JOIN business_partners bp ON bp.id=i.client_id
                          LEFT JOIN leads l ON l.id=i.lead_id
+                         LEFT JOIN users u ON u.id=i.assigned_to
                          WHERE " . implode(' AND ', $w) . " ORDER BY i.id DESC", $args);
-        view('ops/crm/inquiry_list', ['rows' => $rows, 'q' => $q, 'st' => $st, 'fy' => $fy['fy']]); return;
+        view('ops/crm/inquiry_list', ['rows' => $rows, 'q' => $q, 'st' => $st, 'fy' => $fy['fy'],
+            'dueCount' => inquiries_due_count(), 'sla' => inquiry_sla_days()]); return;
     }
     if ($route === 'inquiry-new' || $route === 'inquiry-edit') {
         ops_require(can('mod.inquiries.edit'), 'You cannot add or edit inquiries.');
