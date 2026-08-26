@@ -4432,7 +4432,7 @@ function ops_idems_documents($route, $method) {
         $dt = json_decode($doc['data'] ?: '[]', true) ?: [];
         [$text, $err] = idems_ai_review($doc, $fx, $dt, function_exists('idems_source_docs') ? idems_source_docs($doc['id']) : []);
         if ($err) flash('AI review unavailable: ' . $err, 'warning');
-        else { $_SESSION['idems_ai_' . $doc['id']] = $text; idems_log('report_doc', (int)$doc['id'], 'AI_REVIEW', ['irn'=>$doc['irn']]); flash('AI review completed — the suggestions are advisory. You remain the approving authority.'); }
+        else { $_SESSION['idems_ai_' . $doc['id']] = $text; idems_log('report_doc', (int)$doc['id'], 'AI_REVIEW', ['irn'=>$doc['irn'], 'reason'=>idems_ai_provenance()]); flash('AI review completed — the suggestions are advisory. You remain the approving authority.'); }
         redirect('/document?id=' . $doc['id']);
         return true;
     }
@@ -8798,7 +8798,7 @@ function tech_note_usage($ids) {
 // AJAX: turn a rough / regional-language dictation into clean inspection-report
 // English. AI-gated (ai_enabled) and token-thrifty (short field, capped output).
 // Preserves every fact/number/finding; never invents. Returns JSON {ok, text}.
-function idems_polish_text($text, $fieldLabel = '') {
+function idems_polish_text($text, $fieldLabel = '', $docId = 0) {
     if (!function_exists('ai_enabled') || !ai_enabled() || !function_exists('ai_chat')) return ['ok' => false, 'error' => 'AI is not enabled. Add a provider under Settings → AI.'];
     $text = trim((string)$text);
     if ($text === '') return ['ok' => false, 'error' => 'Nothing to polish.'];
@@ -8813,6 +8813,12 @@ function idems_polish_text($text, $fieldLabel = '') {
     if (!is_string($out) || trim($out) === '') return ['ok' => false, 'error' => $err ?: 'The AI did not respond.'];
     $clean = trim($out);
     $clean = trim(preg_replace('/^\s*["“\'‘]|["”\'’]\s*$/u', '', $clean));   // drop any wrapping quotes
+    // Module 45 — a text-polish is an AI touch on accredited report content and was
+    // the one report AI feature that recorded nothing. Log it on the sealed chain
+    // with the same provenance as the review (which provider saw the text, how much).
+    if (function_exists('idems_log'))
+        idems_log('report_doc', (int)$docId, 'AI_POLISH',
+            ['field' => substr((string)$fieldLabel, 0, 60), 'reason' => idems_ai_provenance(strlen($text))]);
     return ['ok' => true, 'text' => $clean];
 }
 function ops_idems_polish_text($method) {
@@ -8820,7 +8826,7 @@ function ops_idems_polish_text($method) {
     if (!current_user()) { echo json_encode(['ok' => false, 'error' => 'Please log in.']); return true; }
     if ($method !== 'POST') { echo json_encode(['ok' => false, 'error' => 'POST only.']); return true; }
     if (function_exists('csrf_ok') && !csrf_ok($_POST['_csrf'] ?? '')) { echo json_encode(['ok' => false, 'error' => 'Session expired — reload the page.']); return true; }
-    echo json_encode(idems_polish_text($_POST['text'] ?? '', (string)($_POST['field'] ?? '')));
+    echo json_encode(idems_polish_text($_POST['text'] ?? '', (string)($_POST['field'] ?? ''), (int)($_POST['doc'] ?? 0)));
     return true;
 }
 function ops_idems_writing($method) {
@@ -9519,7 +9525,9 @@ function idems_scope_from_qap($doc, $qapId) {
     $data[$key] = array_merge($existing, $mapped);
     db()->prepare("UPDATE report_docs SET data=?, updated_at=? WHERE id=?")->execute([json_encode($data), date('c'), (int)$doc['id']]);
     if (function_exists('idems_log')) idems_log('report_doc', (int)$doc['id'], 'SCOPE_FROM_QAP',
-        ['irn' => $doc['irn'] ?? '', 'field' => $key, 'reason' => count($mapped) . ' scope rows from QAP #' . (int)$qapId . ' (' . $source . ')']);
+        ['irn' => $doc['irn'] ?? '', 'field' => $key,
+         'reason' => count($mapped) . ' scope rows from QAP #' . (int)$qapId . ' (' . $source . ')'
+                   . ($source !== 'heuristic' && function_exists('idems_ai_provenance') ? ' · ' . idems_ai_provenance(null, 1) : '')]);
     return ['n' => count($mapped), 'source' => $source, 'err' => ''];
 }
 // ---- Item / product particulars (the PO-items table) -----------------------
@@ -9659,7 +9667,9 @@ function idems_items_from_qap($doc, $qapId) {
     $data[$key] = $mapped;
     db()->prepare("UPDATE report_docs SET data=?, updated_at=? WHERE id=?")->execute([json_encode($data), date('c'), (int)$doc['id']]);
     if (function_exists('idems_log')) idems_log('report_doc', (int)$doc['id'], 'ITEMS_FROM_QAP',
-        ['irn' => $doc['irn'] ?? '', 'field' => $key, 'reason' => count($mapped) . ' item rows (' . $source . ')']);
+        ['irn' => $doc['irn'] ?? '', 'field' => $key,
+         'reason' => count($mapped) . ' item rows (' . $source . ')'
+                   . ($source !== 'heuristic' && function_exists('idems_ai_provenance') ? ' · ' . idems_ai_provenance(null, 1) : '')]);
     return ['n' => count($mapped), 'source' => $source, 'err' => ''];
 }
 
@@ -9821,6 +9831,18 @@ function idems_source_text_bundle($docId, $perDoc = 6000) {
     return implode("\n\n", $parts);
 }
 // ---- AI review (optional layer on top of the rule checks) ----
+// Module 45 — a consistent provenance note for an AI touch on a report: WHICH external
+// provider/model received data, and how much. Recorded on the sealed audit chain alongside
+// the AI action, so a §4.2/DPDP reviewer can see what left the tenant, not just that a call
+// happened. Never records the content itself (that is the confidential payload).
+function idems_ai_provenance($chars = null, $files = 0) {
+    $a = function_exists('ai_active') ? ai_active() : null;
+    $prov = $a ? ($a['provider'] . '/' . $a['model']) : 'unknown provider';
+    $bits = ['sent to ' . $prov];
+    if ($chars !== null) $bits[] = number_format((int)$chars) . ' chars';
+    if ((int)$files > 0)  $bits[] = (int)$files . ' file(s)';
+    return implode(' · ', $bits);
+}
 function idems_ai_review($doc, $fields, $data, $srcDocs) {
     if (!function_exists('ai_enabled') || !ai_enabled()) return [null, 'No AI provider is enabled — the rule-based checks above still apply.'];
     $bundle = idems_source_text_bundle($doc['id'], 6000);
@@ -9902,7 +9924,7 @@ function ops_idems_review($route, $method) {
             $data = json_decode($doc['data'] ?: '[]', true) ?: [];
             [$text, $err] = idems_ai_review($doc, $fields, $data, idems_source_docs($doc['id']));
             if ($err) flash('AI review unavailable: ' . $err, 'warning');
-            else { $_SESSION['idems_ai_' . $doc['id']] = $text; idems_log('report_doc', $doc['id'], 'AI_REVIEW', ['irn'=>$doc['irn']]); flash('AI review completed — suggestions below are for your consideration; you remain the approving authority.'); }
+            else { $_SESSION['idems_ai_' . $doc['id']] = $text; idems_log('report_doc', $doc['id'], 'AI_REVIEW', ['irn'=>$doc['irn'], 'reason'=>idems_ai_provenance()]); flash('AI review completed — suggestions below are for your consideration; you remain the approving authority.'); }
             redirect('/document-review?id=' . $doc['id']);
         }
     }
@@ -10072,7 +10094,7 @@ function ops_idems_learning($method) {
 
 // ---- Actions that a compliance reviewer should always look at ----
 // Shipped default; the company can change the list in Settings → Reporting controls.
-const AUDIT_HIGH_RISK = ['TIMESTAMP_EDIT','DELETE','EVIDENCE_DELETE','REJECT','SENDBACK','SIGNATURE_SET','LOGIN_FAILED','AI_REVIEW','DELEGATE'];
+const AUDIT_HIGH_RISK = ['TIMESTAMP_EDIT','DELETE','EVIDENCE_DELETE','REJECT','SENDBACK','SIGNATURE_SET','LOGIN_FAILED','AI_REVIEW','AI_POLISH','SCOPE_FROM_QAP','ITEMS_FROM_QAP','DELEGATE'];
 function audit_high_risk() {
     $s = (string)setting_get('audit_high_risk', '');
     if ($s === '') return AUDIT_HIGH_RISK;
@@ -10085,7 +10107,7 @@ const AUDIT_ACTION_LABELS = [
     'REJECT'=>'Rejected','SENDBACK'=>'Sent back','DELEGATE'=>'Approval delegated','FINALIZE'=>'Finalized / issued',
     'DELETE'=>'Deleted (soft)','EVIDENCE'=>'Evidence added','EVIDENCE_CAPTION'=>'Evidence caption','EVIDENCE_DELETE'=>'Evidence removed',
     'PDF'=>'PDF generated','DOCX'=>'Client format generated','CERT_PDF'=>'Endorsement certificate','SOURCE_DOC'=>'Source document added',
-    'AI_REVIEW'=>'AI review run','SMART_REMARKS'=>'Suggested remarks applied','TIMESTAMP_EDIT'=>'Date/timestamp changed',
+    'AI_REVIEW'=>'AI review run','AI_POLISH'=>'AI text polish','SCOPE_FROM_QAP'=>'Scope auto-filled from QAP (AI)','ITEMS_FROM_QAP'=>'Items auto-filled from QAP (AI)','SMART_REMARKS'=>'Suggested remarks applied','TIMESTAMP_EDIT'=>'Date/timestamp changed',
     'SIGNATURE_SET'=>'Signature changed','ENDORSE'=>'Document endorsed','RELEASE_NOTE_DRAFT'=>'Release Note drafted',
     'RELEASE_NOTE_CREATED'=>'Release Note created from report','LOGIN'=>'Login','LOGOUT'=>'Logout','LOGIN_FAILED'=>'Failed login',
     'CSRF_REJECTED'=>'Save refused — not sent from this site',
@@ -10099,7 +10121,7 @@ const AUDIT_ACTION_LABELS = [
 ];
 const AUDIT_ACTIONS_ALL = [
     'CREATE','EDIT','IRN_GEN','SUBMIT','APPROVE','REJECT','SENDBACK','DELEGATE','FINALIZE','DELETE','EVIDENCE',
-    'EVIDENCE_CAPTION','EVIDENCE_DELETE','PDF','DOCX','CERT_PDF','SOURCE_DOC','AI_REVIEW','SMART_REMARKS',
+    'EVIDENCE_CAPTION','EVIDENCE_DELETE','PDF','DOCX','CERT_PDF','SOURCE_DOC','AI_REVIEW','AI_POLISH','SCOPE_FROM_QAP','ITEMS_FROM_QAP','SMART_REMARKS',
     'TIMESTAMP_EDIT','SIGNATURE_SET','ENDORSE','RELEASE_NOTE_DRAFT','RELEASE_NOTE_CREATED','LOGIN','LOGOUT','LOGIN_FAILED',
     'CSRF_REJECTED','PASSWORD_CHANGED','TWOFA_ON','TWOFA_OFF','TWOFA_RESET','ACCOUNT_UNLOCKED',
     'PERSON_EXPORT','PERSON_ERASED','INCIDENT','CONSENT','CONSENT_WITHDRAWN','UPLOAD_REFUSED',

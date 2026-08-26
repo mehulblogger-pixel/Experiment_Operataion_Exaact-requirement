@@ -64,7 +64,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | 42 | Change Control | P2 | ✅ done & pushed | 2026-08-26 |
 | 43 | Training | P2 | ✅ done & pushed | 2026-08-26 |
 | 44 | Evidence | P1 | ✅ done & pushed | 2026-08-26 |
-| 45 | AI / Intelligence | P3 | ⬜ | — |
+| 45 | AI / Intelligence | P3 | ✅ done & pushed | 2026-08-26 |
 | 46 | Integrations | P2 | ⬜ | — |
 | 47 | Mobile / PWA | P1 | ⬜ | — |
 | 48 | Report Template Builder | P1 | ✅ done & pushed | 2026-08-26 |
@@ -79,6 +79,29 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 45 — AI / Intelligence (governance) · 2026-08-26
+**Decision:** (A) complete the AI-use provenance on the sealed audit chain (which external
+provider/model received data, how much) and log text-polish (the one report AI touch that recorded
+nothing). A pre-send §4.2 confidentiality notice, redaction, per-feature off-switch, key encryption
+and per-row auto-write markers deferred (heavier / behaviour changes).
+**Found:** AI_REVIEW/SCOPE_FROM_QAP/ITEMS_FROM_QAP logged only THAT a call happened, not which
+provider got the confidential report/QAP content; and text-polish sent report field text externally
+and logged nothing — an AI touch on an accredited report with no provenance.
+**Added (additive; no AI behaviour or data flow changed):**
+- `idems_ai_provenance()` — a note naming the provider/model and payload size; never the content.
+- Text-polish now logs `AI_POLISH` with provenance (idems_polish_text gained $docId; fill form +
+  AJAX handler pass the report id).
+- Enriched the AI_REVIEW / SCOPE_FROM_QAP / ITEMS_FROM_QAP log entries with provenance (heuristic
+  no-AI path not tagged as AI).
+- Registered AI_POLISH / SCOPE_FROM_QAP / ITEMS_FROM_QAP in AUDIT_ACTIONS_ALL, AUDIT_ACTION_LABELS
+  and AUDIT_HIGH_RISK (alongside AI_REVIEW), so every AI touch shows on the high-risk filter.
+**Preserved:** ai.php, idems_ai_review, the advisory markers, the never-written review output, the
+setting-secret redaction, graceful-when-off — all unchanged. No new permission; no schema change;
+nothing deleted.
+**Tests:** `test_module45_ai_governance.php` (17 assertions). Suite 3133 passing (only the 3
+pre-existing baseline failures remain).
+**Spec:** `docs/edge-cases/45-ai-governance.md`.
 
 ### Module 38 — Notification Centre · 2026-08-26
 **Decision:** (A) a read-only notification/outbox log over the existing `email_log`. The real

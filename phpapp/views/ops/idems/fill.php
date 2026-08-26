@@ -451,7 +451,7 @@ function idemsImprove(k){
   };
   window.idemsPolish = function(k, btn){
     var ta = document.getElementById('ta_'+k); if (!ta || !ta.value.trim()) return;
-    var body = new URLSearchParams({ text: ta.value, field: k, _csrf: '<?= e(csrf_token()) ?>' });
+    var body = new URLSearchParams({ text: ta.value, field: k, doc: '<?= (int)$doc['id'] ?>', _csrf: '<?= e(csrf_token()) ?>' });
     var old = btn.textContent; btn.disabled = true; btn.textContent = 'Polishing…';
     fetch('/document-polish-text', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: body.toString()})
       .then(function(r){ return r.json(); })
