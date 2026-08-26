@@ -90,6 +90,14 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
   (canonical person/engagement/financial-event, quality-case umbrella) genuinely absent but P2/P3
   convergence-layer work. Full defect register + exec summary in the audit doc.
 
+- **2026-08-26 — P0 fix batch COMPLETE** (approved). Non-destructive, tested, pushed:
+  - **§11** seal fail-closed / self-healing (commit adds SEAL_FAILED sentinel + cron re-seal + compliance flag).
+  - **§10** issuance-readiness completeness (vetting/completeness/competence/impartiality/NCR/client-acceptance
+    probes; advisory by default, vetting hard-blocks only when the body enabled vetting; `issue_gate_strict`).
+  - **§30** historical financial reproducibility — frozen job cost basis (snapshot at close + nightly backfill);
+    `job_profit()` prefers the snapshot; freezing changes no number today, stops all future drift. **P0 Critical closed.**
+  - Suite 3270 → **3288 passed, 0 failed**.
+
 ## Open decisions
 
 - **Fix scope/order** (per "audit-first, then confirm fixes"). Recommended first fixes:
