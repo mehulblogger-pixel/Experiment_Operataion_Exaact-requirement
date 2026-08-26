@@ -853,6 +853,13 @@ function ops_trust($route, $method) {
     if ($route === 'checkin-photo') {
         $v = trust_try(fn() => ops_one("SELECT * FROM site_visits WHERE id=?", [(int)($_GET['id'] ?? 0)]), null);
         if (!$v || empty($v['photo_data'])) { http_response_code(404); view('notfound'); return true; }
+        // Phase 2 §51 — a check-in photo carries no office of its own; scope it to the
+        // office/SBU of the job it belongs to (closes the long-flagged /checkin-photo IDOR).
+        if (function_exists('scope_allows') && !empty($v['job_id'])) {
+            $vj = ops_one("SELECT executing_office_id, sbu FROM jobs WHERE id=?", [(int)$v['job_id']]);
+            ops_require(!$vj || scope_allows($vj['executing_office_id'] ?? null, $vj['sbu'] ?? null),
+                'This check-in photo is outside your office / branch scope.');
+        }
         send_uploaded_file(base64_decode((string)$v['photo_data']),
                            $v['photo_name'] ?: 'checkin.jpg', $v['photo_mime'] ?: 'image/jpeg');
         return true;

@@ -4376,6 +4376,9 @@ function ops_idems_documents($route, $method) {
             LEFT JOIN inspectors i ON i.id=d.inspector_id LEFT JOIN offices o ON o.id=d.office_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
             WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? 0)]);
         if (!$doc) { http_response_code(404); view('notfound'); return true; }
+        // Phase 2 §51 — scope the fetch-by-id to the viewer's office/SBU, like the register.
+        ops_require(scope_allows($doc['office_id'] ?? null, $doc['sbu'] ?? null),
+            'This ' . Tl('report') . ' is outside your office / branch scope.');
         $approver = $doc['approver_user_id'] ? ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$doc['approver_user_id']]) : null;
         $audit = ops_all("SELECT * FROM idems_audit WHERE entity='report_doc' AND entity_id=? ORDER BY id DESC", [$doc['id']]);
         $sections = idems_sections($doc['report_type_id']);
@@ -7555,6 +7558,10 @@ function ops_idems_pdf($method) {
         WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? 0)]);
     if (!$doc) { http_response_code(404); echo 'Not found'; return true; }
     ops_require(is_master() || can('mod.idems.view'), 'You cannot view this report.');
+    // Phase 2 §51 — scope the PDF to the viewer's office/SBU (the evidence-file path
+    // was already scoped via idems_file_authorized; the full report PDF was not).
+    ops_require(scope_allows($doc['office_id'] ?? null, $doc['sbu'] ?? null),
+        'This report is outside your office / branch scope.');
     // Original / Duplicate / Triplicate — only meaningful once the report is
     // finalized; a draft always prints as DRAFT regardless.
     $copyMap = ['original' => 'ORIGINAL', 'duplicate' => 'DUPLICATE', 'triplicate' => 'TRIPLICATE'];
@@ -8441,9 +8448,11 @@ function ops_idems_endorsements($route, $method) {
     $pdo = db();
     // ---- stream a file (original / supporting) ----
     if ($route === 'endorsement-file') {
-        $f = ops_one("SELECT ef.*, e.deleted FROM endorsement_files ef JOIN endorsements e ON e.id=ef.endorsement_id WHERE ef.id=?", [(int)($_GET['id'] ?? 0)]);
+        $f = ops_one("SELECT ef.*, e.deleted, e.office_id e_office, e.sbu e_sbu FROM endorsement_files ef JOIN endorsements e ON e.id=ef.endorsement_id WHERE ef.id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$f || $f['deleted']) { http_response_code(404); echo 'Not found'; return true; }
         ops_require(is_master() || can('mod.idems.view'), 'Access denied.');
+        // Phase 2 §51 — scope the endorsement file to the viewer's office/SBU.
+        ops_require(scope_allows($f['e_office'] ?? null, $f['e_sbu'] ?? null), 'This file is outside your office / branch scope.');
         $data = (string)$f['data']; if (strpos($data,'base64,')!==false) $data = base64_decode(substr($data, strpos($data,'base64,')+7));
         send_uploaded_file($data, $f['file_name'] ?: 'file', $f['mime'] ?? '');
         return true;

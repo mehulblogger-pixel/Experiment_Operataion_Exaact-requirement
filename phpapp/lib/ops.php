@@ -6062,6 +6062,9 @@ function ops_jobs($route, $method) {
             LEFT JOIN boss_numbers bn ON bn.id=j.boss_id LEFT JOIN offices o ON o.id=j.executing_office_id
             WHERE j.id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$job) { http_response_code(404); view('notfound'); return; }
+        // Phase 2 §51 — the list layer is office/SBU-scoped; scope the fetch-by-id too.
+        ops_require(scope_allows($job['executing_office_id'] ?? null, $job['sbu'] ?? null),
+            'This ' . Tl('job') . ' is outside your office / branch scope.');
         $expenses = ops_all("SELECT * FROM expenses WHERE job_id=? ORDER BY id", [$job['id']]);
         // The engineer standing at the gate needs to know who to ask for and where
         // to go. None of it was on this screen, so it lived in the assignment

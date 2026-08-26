@@ -620,6 +620,29 @@ function scope_clause($officeCol, $sbuCol) {
     return [$w ? implode(' AND ', $w) : '1=1', $args];
 }
 
+// Phase 2 §51 — the SCALAR twin of scope_clause(), for guarding a single record
+// fetched by id (detail / PDF / file-stream handlers). The list layer scopes with
+// scope_clause(); this closes the matching cross-office IDOR on the fetch-by-id
+// layer by applying the SAME rule to one record: a non-master whose office/SBU
+// scope does not include the record cannot open it either. Masters and ALL-scope
+// roles are unaffected; a NULL office is treated as Ahmedabad, exactly as
+// scope_clause() does, and a record with no SBU is not SBU-filtered.
+function scope_allows($officeId, $sbu = null) {
+    if (function_exists('is_master') && is_master()) return true;
+    $off = function_exists('scope_offices') ? scope_offices() : 'ALL';
+    if ($off !== 'ALL' && is_array($off) && $off) {
+        static $ahm = null;
+        if ($ahm === null) $ahm = (int)(ops_val("SELECT id FROM offices WHERE is_ahmedabad=1 LIMIT 1") ?: 0);
+        $rowOff = (int)($officeId ?: $ahm);            // null office → Ahmedabad, like scope_clause()
+        if (!in_array($rowOff, array_map('intval', $off), true)) return false;
+    }
+    if ($sbu !== null && (string)$sbu !== '') {
+        $sc = function_exists('scope_sbus') ? scope_sbus() : 'ALL';
+        if ($sc !== 'ALL' && is_array($sc) && $sc && !in_array((string)$sbu, array_map('strval', $sc), true)) return false;
+    }
+    return true;
+}
+
 // ---- Settings (key/value) --------------------------------------------------
 function ensure_settings_schema() {
     db()->exec("CREATE TABLE IF NOT EXISTS settings (skey VARCHAR(60) PRIMARY KEY, svalue TEXT)");

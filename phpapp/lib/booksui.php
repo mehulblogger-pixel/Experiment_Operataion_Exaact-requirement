@@ -165,6 +165,11 @@ function ops_books($route, $method) {
     if ($route === 'invoice') {
         $inv = books_invoice($_GET['id'] ?? 0);
         if (!$inv) { http_response_code(404); view('notfound'); return true; }
+        // Phase 2 §51 — scope an invoice that belongs to an office to the viewer's
+        // office scope. A draft with no office yet is finance's in-progress work and
+        // is not scoped; finance/ALL-scope roles are unaffected.
+        if (function_exists('scope_allows') && !empty($inv['office_id']))
+            ops_require(scope_allows((int)$inv['office_id']), 'This invoice is outside your office / branch scope.');
         // When a draft has no branch, offer the picker pre-set to the sensible
         // guess: the branch the work resolves to, else the one the user is in.
         $suggestOffice = 0;
@@ -203,6 +208,9 @@ function ops_books($route, $method) {
     if ($route === 'invoice-print') {
         $inv = books_invoice($_GET['id'] ?? 0);
         if (!$inv) { http_response_code(404); view('notfound'); return true; }
+        // Phase 2 §51 — scope the printable invoice PDF the same as the detail view.
+        if (function_exists('scope_allows') && !empty($inv['office_id']))
+            ops_require(scope_allows((int)$inv['office_id']), 'This invoice is outside your office / branch scope.');
         // A standalone printable document — rendered directly, not through view(),
         // so it is not wrapped in the app chrome (same pattern as voucher-print).
         $lines     = books_lines((int)$inv['id']);
