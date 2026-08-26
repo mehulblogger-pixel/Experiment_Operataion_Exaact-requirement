@@ -75,6 +75,15 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — §22/§51 global-search scope leak closed.** Every global-search source scoped by
+  office/SBU except two — **inquiries** (`crm_inquiries`) and **contracts** (`partner_contracts`) — which
+  have an `sbu` column but were queried LIKE-only, so a user could find another SBU's inquiry/contract
+  through the search box even though the register hides it. Added `search_sbu_clause()` mirroring those
+  modules' own list scope (`sbu IN (mine) OR sbu=''`, master/ALL unrestricted, blank stays visible) and
+  applied it to both sources. Fail-closed, consistent with the §51 posture. Test `test_p2_search_scope.php`
+  (8 assertions: master pass-through, in-scope found, blank visible, other SBU NOT found, both sources).
+  Suite **3505 passed, 0 failed**.
+
 - **2026-08-26 — §17 register spine entities already being logged (CANDIDATE / RECEIPT).** RECEIPT and
   CANDIDATE activities were already written to the shared activity spine (`act_log`) but the entities
   weren't in `ACT_ENTITIES`, so the universal timeline could neither label nor link them and their detail

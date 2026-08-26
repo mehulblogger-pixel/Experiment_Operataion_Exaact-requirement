@@ -44,6 +44,18 @@ const SEARCH_PER_1 = 60;   // rows when the person has narrowed to one source
 
 // A source's SQL is written here, in this file, by us. The only thing that
 // comes from the person searching is the bound term.
+// Phase 2 §22/§51 — an SBU-only scope fragment for the two search sources whose tables carry `sbu`
+// but no office_id (crm_inquiries, partner_contracts). Mirrors EXACTLY how those modules' own list
+// views scope (e.g. crm.php inquiries: `sbu IN (...) OR sbu=''`) so global search can never surface a
+// row the register itself would hide. Master / ALL scope is unrestricted; a blank sbu stays visible
+// (an unassigned row is not hidden from anyone), matching the list. Returns [sqlFragment, args].
+function search_sbu_clause($col) {
+    $sb = function_exists('scope_sbus') ? scope_sbus() : 'ALL';
+    if ($sb === 'ALL' || !is_array($sb) || !$sb) return ['1=1', []];
+    $ph = implode(',', array_fill(0, count($sb), '?'));
+    return ["($col IN ($ph) OR COALESCE($col,'')='')", array_values($sb)];
+}
+
 function search_sources() {
     $sources = [];
 
@@ -122,6 +134,7 @@ function search_sources() {
     $add('inquiries', THP('inquiry'), '📨', can('mod.inquiries.view') || is_master_of('inquiries'),
         function ($q, $n) use ($like) {
             $l = $like($q);
+            [$sw, $sa] = search_sbu_clause('sbu');
             return array_map(fn($r) => [
                 'title'    => $r['inquiry_no'] . ' — ' . ($r['subject'] ?: 'no subject'),
                 'subtitle' => $r['client_name'] ?: '',
@@ -130,10 +143,10 @@ function search_sources() {
             ], ops_all(
                 "SELECT id, inquiry_no, subject, client_name, contact_name, status
                  FROM crm_inquiries
-                 WHERE inquiry_no LIKE ? OR subject LIKE ? OR client_name LIKE ?
-                       OR contact_name LIKE ? OR service_requirement LIKE ?
+                 WHERE $sw AND (inquiry_no LIKE ? OR subject LIKE ? OR client_name LIKE ?
+                       OR contact_name LIKE ? OR service_requirement LIKE ?)
                  ORDER BY id DESC LIMIT $n",
-                [$l, $l, $l, $l, $l]));
+                array_merge($sa, [$l, $l, $l, $l, $l])));
         });
 
     // ---- Quotations ---------------------------------------------------------
@@ -210,6 +223,7 @@ function search_sources() {
         can('mod.clients.view') || can('crm.contract.register') || can('data.credit') || is_master() || (function_exists('is_coordinator_level') && is_coordinator_level()),
         function ($q, $n) use ($like) {
             $l = $like($q);
+            [$sw, $sa] = search_sbu_clause('pc.sbu');
             return array_map(fn($r) => [
                 'title'    => $r['contract_number'] ?: ('#' . (int)$r['id']),
                 'subtitle' => $r['client_name'] ?: '',
@@ -219,9 +233,9 @@ function search_sources() {
                 "SELECT pc.id, pc.contract_number, pc.title, pc.open_status,
                         COALESCE(bp.display_name, bp.legal_name) client_name
                  FROM partner_contracts pc LEFT JOIN business_partners bp ON bp.id=pc.partner_id
-                 WHERE pc.contract_number LIKE ? OR pc.title LIKE ? OR bp.legal_name LIKE ? OR bp.display_name LIKE ?
+                 WHERE $sw AND (pc.contract_number LIKE ? OR pc.title LIKE ? OR bp.legal_name LIKE ? OR bp.display_name LIKE ?)
                  ORDER BY pc.id DESC LIMIT $n",
-                [$l, $l, $l, $l]));
+                array_merge($sa, [$l, $l, $l, $l])));
         });
 
     // ---- Inspection calls ---------------------------------------------------
