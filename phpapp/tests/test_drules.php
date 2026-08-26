@@ -34,6 +34,11 @@ t_eq($old['status'], 'SUPERSEDED', 'old rule superseded');
 t_eq((int)$new['supersedes_id'], $id, 'new revision links back');
 t_eq($new['accept_criteria'], 'x >= 6.0', 'criteria carried into the new revision');
 
+// Module 42 — a change to the accept/reject criteria is a controlled change and must now be on
+// the sealed audit trail, exactly like method_supersede and cdoc_supersede already are.
+$logged = (int)ops_val("SELECT COUNT(*) FROM idems_audit WHERE entity='decision_rule' AND entity_id=? AND action='REVISION_OF'", [$newId]);
+t_ok($logged >= 1, 'the decision-rule revision is sealed on the audit chain (was the one supersede that did not log)');
+
 $currentIds = array_column(drules_all(['current' => 1]), 'id');
 t_ok(!in_array($id, $currentIds, true) && !in_array($newId, $currentIds, true),
     'superseded and draft revisions are excluded from the current list');

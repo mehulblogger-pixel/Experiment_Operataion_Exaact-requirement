@@ -61,7 +61,7 @@ edge-case analyses live in **`docs/edge-cases/`**.
 | **39** | **My Work** | **P1** | **✅ done & pushed** | 2026-08-24 |
 | 40 | Activity Timeline | P2 | ✅ done & pushed | 2026-08-26 |
 | 41 | Document Control | P1 | ✅ done & pushed | 2026-08-26 |
-| 42 | Change Control | P2 | ⬜ | — |
+| 42 | Change Control | P2 | ✅ done & pushed | 2026-08-26 |
 | 43 | Training | P2 | ✅ done & pushed | 2026-08-26 |
 | 44 | Evidence | P1 | ✅ done & pushed | 2026-08-26 |
 | 45 | AI / Intelligence | P3 | ⬜ | — |
@@ -79,6 +79,33 @@ _Each module, once done, gets a dated entry here: what was added, what was prese
 which edge cases were handled, and the commit._
 
 <!-- Append entries below as modules complete. -->
+
+### Module 42 — Change control · 2026-08-26
+**Decision:** (A) seal the one supersede that fell off the chain + a consolidated read-only "recent
+controlled changes" list on `/audit-log`. A true accreditation-scope register, a generalised
+impact-assessment artefact, and a formal change-request workflow object deferred (new state).
+**Found:** change control is emergent per object — report reissue, controlled-doc / method /
+decision-rule supersede, quote revision. Four already seal the change on the tamper-evident chain;
+**`drule_supersede()` was the only supersede that never called `idems_log`** (a change to the
+accept/reject criteria — exactly what an assessor wants on the chain). And there was no single
+"what controlled thing changed, and why" view.
+**Added (additive; one-line seal + read-only surface; no access change):**
+- `drule_supersede()` now logs `idems_log('decision_rule', $newId, 'REVISION_OF', …)`, mirroring
+  `method_supersede()` exactly. Existing behaviour (new DRAFT + old→SUPERSEDED + carry-forward) intact.
+- `controlled_changes($days=90,$limit=200)` + `controlled_changes_count()` — a consolidated list
+  unioning report reissues, controlled-doc/method/decision-rule supersessions (sealed chain) and
+  quote revisions (`quote_revisions`); object, reference, change, who, when, deep link.
+- A **"Recent controlled changes"** panel on `/audit-log` (rides its `idems.audit.view` gate — no new
+  route, no new permission).
+**Preserved:** `ops_idems_audit`, the chain-verify banner, `method_supersede`, `cdoc_supersede`,
+`quote_revisions` — all unchanged. No schema change; nothing deleted.
+**Edge cases:** each source in its own try/catch (missing table → empty, never a crash); newest-first
+across heterogeneous timestamps; codes/refs shown, never a leaked document number; `days` window and
+row caps bound every source.
+**Tests:** `test_drules.php` (revision now sealed on the chain) + `test_module42_changecontrol.php`
+(18 assertions — the seal fix present, all five domains surfaced, row shape, ordering, wiring, screen
+preserved). Suite 2972 passing (only the 3 pre-existing baseline failures remain).
+**Spec:** `docs/edge-cases/42-change-control.md`.
 
 ### Module 43 — Training · 2026-08-26
 **Decision:** (A) an actionable training/certification watch drill-down on the competence screen. A

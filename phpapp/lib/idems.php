@@ -10124,6 +10124,70 @@ function idems_compliance_checks() {
     if ($del) $out[] = ['sev'=>'low', 'text'=>$del . ' report(s) are soft-deleted (retained for audit; never removed).', 'link'=>'/audit-log?action=DELETE'];
     return $out;
 }
+// Module 42 — Change control. There is no single change-control register: each controlled
+// object versions itself (a report is reissued at a new revision, a controlled doc / method /
+// decision rule is superseded, a quotation is revised). Four of those five already write to the
+// sealed chain and the fifth now does too (drule_supersede, above). This is the consolidated,
+// read-only "what changed and why" view over the change events that ALREADY exist — it invents
+// no new state and grants no new permission (it rides the /audit-log gate).
+function controlled_changes($days = 90, $limit = 200) {
+    $since = date('c', strtotime('-' . max(1, (int)$days) . ' days'));
+    $lim   = max(1, min(2000, (int)$limit));
+    $out   = [];
+    $label = ['report_doc' => 'Report', 'controlled_doc' => 'Controlled document',
+              'method' => 'Method', 'decision_rule' => 'Decision rule'];
+    $url   = ['report_doc' => '/document?id=', 'controlled_doc' => '/cdoc?id=',
+              'method' => '/method?id=', 'decision_rule' => '/drule?id='];
+    $what  = ['REVISED' => 'Reissued at a new revision', 'SUPERSEDED' => 'Superseded',
+              'REVISION_OF' => 'New revision issued'];
+    // The supersede / reissue events already sealed on the audit chain.
+    try {
+        $rows = ops_all(
+            "SELECT entity, entity_id, action, field, old_value, new_value, reason, username, created_at
+               FROM idems_audit
+              WHERE created_at >= ?
+                AND ( (entity='report_doc'    AND action='REVISED')
+                   OR (entity='controlled_doc' AND action='SUPERSEDED')
+                   OR (entity='method'         AND action='REVISION_OF')
+                   OR (entity='decision_rule'  AND action='REVISION_OF') )
+              ORDER BY id DESC", [$since]) ?: [];
+        foreach ($rows as $a) {
+            $ref = trim((string)($a['field'] ?: $a['reason'])) ?: ('#' . (int)$a['entity_id']);
+            $out[] = [
+                'domain'    => $label[$a['entity']] ?? $a['entity'],
+                'ref'       => $ref,
+                'change'    => $a['new_value'] ? ($ref . ' → ' . $a['new_value']) : ($what[$a['action']] ?? $a['action']),
+                'what'      => $what[$a['action']] ?? $a['action'],
+                'who'       => $a['username'],
+                'at'        => $a['created_at'],
+                'url'       => ($url[$a['entity']] ?? '') ? ($url[$a['entity']] . (int)$a['entity_id']) : '',
+            ];
+        }
+    } catch (Throwable $e) {}
+    // Quotation revisions keep their own change log (not the sealed chain).
+    try {
+        $rows = ops_all(
+            "SELECT r.quote_id, r.rev, r.summary, r.changed_by, r.changed_at, q.quote_no
+               FROM quote_revisions r LEFT JOIN quotations q ON q.id = r.quote_id
+              WHERE r.changed_at >= ? ORDER BY r.id DESC", [$since]) ?: [];
+        foreach ($rows as $r) {
+            $ref = ($r['quote_no'] ?: ('#' . (int)$r['quote_id'])) . ((int)$r['rev'] ? ' R' . (int)$r['rev'] : '');
+            $out[] = [
+                'domain'    => 'Quotation',
+                'ref'       => $ref,
+                'change'    => trim((string)$r['summary']) ?: 'Revised',
+                'what'      => 'Revised',
+                'who'       => $r['changed_by'],
+                'at'        => $r['changed_at'],
+                'url'       => '/quote?id=' . (int)$r['quote_id'],
+            ];
+        }
+    } catch (Throwable $e) {}
+    usort($out, fn($a, $b) => strcmp((string)$b['at'], (string)$a['at']));
+    return array_slice($out, 0, $lim);
+}
+function controlled_changes_count($days = 30) { return count(controlled_changes($days, 2000)); }
+
 function ops_idems_audit($method) {
     ops_require(is_master() || can('idems.audit.view'), 'You cannot view the audit log.');
     // ---- filters (Part 23) ----
@@ -10172,6 +10236,8 @@ function ops_idems_audit($method) {
         'checks'=>idems_compliance_checks(),
         // Module 29 — the chain-intact signal, shown where the trail is actually read.
         'chain'=>function_exists('idems_audit_verify') ? idems_audit_verify() : null,
+        // Module 42 — the consolidated "what controlled thing changed, and why" list.
+        'controlledChanges'=>function_exists('controlled_changes') ? controlled_changes(90, 60) : [],
     ]);
     return true;
 }

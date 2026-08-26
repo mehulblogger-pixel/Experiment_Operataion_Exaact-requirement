@@ -151,6 +151,13 @@ function drule_supersede($id) {
     $newId = (int)db()->lastInsertId();
     db()->prepare("UPDATE decision_rules SET status='SUPERSEDED', superseded_by_id=?, updated_at=? WHERE id=?")
         ->execute([$newId, date('c'), (int)$r['id']]);
+    // Module 42 — a change to how conformity is decided (the accept/reject criteria)
+    // is a controlled change and belongs on the sealed trail, like every other
+    // supersede (method_supersede, cdoc_supersede). This was the one that did not log.
+    if (function_exists('idems_log'))
+        idems_log('decision_rule', $newId, 'REVISION_OF',
+            ['field' => $r['rule_code'], 'old' => $r['rule_code'] . ' (#' . (int)$r['id'] . ')',
+             'reason' => 'supersedes decision rule ' . $r['rule_code']]);
     return [$newId, ''];
 }
 

@@ -28,6 +28,29 @@
 </div>
 <?php endif; ?>
 
+<?php // Module 42 — controlled changes: one place to read what versioned thing changed and why.
+      // Rides this screen's gate; every row already exists in a per-object log or the sealed chain.
+      $controlledChanges = $controlledChanges ?? []; if ($controlledChanges): ?>
+<div class="panel" style="margin-top:12px">
+  <div class="ctitle" style="margin-top:0"><h3>Recent controlled changes <span class="muted">(<?= count($controlledChanges) ?>, last 90 days)</span></h3></div>
+  <p class="muted" style="margin-top:0">Reissues and supersessions of reports, controlled documents, methods, decision rules and quotations — the controlled changes, in one list.</p>
+  <table class="tbl">
+    <thead><tr><th>What</th><th>Change</th><th>Reason / action</th><th>By</th><th>When</th></tr></thead>
+    <tbody>
+    <?php foreach (array_slice($controlledChanges, 0, 40) as $c): ?>
+      <tr>
+        <td><?php if (!empty($c['url'])): ?><a href="<?= e($c['url']) ?>"><?= e($c['domain']) ?></a><?php else: ?><?= e($c['domain']) ?><?php endif; ?></td>
+        <td><?= e($c['ref']) ?></td>
+        <td><?= e($c['change']) ?></td>
+        <td class="muted"><?= e($c['who']) ?></td>
+        <td class="muted"><?= e(substr((string)$c['at'], 0, 16)) ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+</div>
+<?php endif; ?>
+
 <div class="kpi-row">
   <div class="kpi"><span class="kic">🛡️</span><div class="k">Total events</div><div class="v"><?= number_format($stats['total']) ?></div><div class="d">since go-live</div></div>
   <div class="kpi"><span class="kic">📅</span><div class="k">Today</div><div class="v"><?= number_format($stats['today']) ?></div><div class="d">events logged</div></div>
