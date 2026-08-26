@@ -132,6 +132,27 @@ function tosrm_call_status($call) {
     return $op !== '' ? $op : tosrm_derive_status($call);
 }
 
+// Phase 2 §46 — "do not allow two statuses to silently disagree." A call carries a
+// legacy `status` and a canonical `op_status`; once op_status is set the legacy value
+// is ignored, so the two can drift (one system says CLOSED while the other says OPEN).
+// A genuine disagreement is a TERMINALITY mismatch: op_status is set, and exactly one
+// of the two says the call is finished (CLOSED/CANCELLED). That is the record to flag
+// for repair — a benign in-progress difference is not flagged.
+function tosrm_status_terminal($s) { return in_array(strtoupper((string)$s), ['CLOSED', 'CANCELLED'], true); }
+function call_status_disagrees($call) {
+    $op = trim((string)($call['op_status'] ?? ''));
+    if ($op === '') return false;                                  // no canonical value → nothing to disagree with
+    return tosrm_status_terminal($op) !== tosrm_status_terminal($call['status'] ?? '');
+}
+function calls_status_disagreement_count() {
+    try {
+        $n = 0;
+        foreach (ops_all("SELECT status, op_status FROM calls WHERE COALESCE(op_status,'') <> ''") ?: [] as $c)
+            if (call_status_disagrees($c)) $n++;
+        return $n;
+    } catch (Throwable $e) { return 0; }
+}
+
 // Module 04 — the ONE user-facing lifecycle label for a call, over the two status
 // systems: op_status when set, else derived from legacy. This is what normal users
 // should see instead of the raw legacy string. Returns ['key','label','tone'].

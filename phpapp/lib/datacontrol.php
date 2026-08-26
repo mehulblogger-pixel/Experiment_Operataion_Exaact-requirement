@@ -205,6 +205,14 @@ function integrity_checks() {
     $add('cal_equip', 'Every calibration certificate belongs to a real instrument',
         'Calibration is what makes a measurement defensible; it has to attach to the instrument used.',
         "SELECT COUNT(*) FROM equipment_calibrations WHERE equipment_id NOT IN (SELECT id FROM equipment)");
+    // Phase 2 §46 — the two call statuses must not silently disagree. Flag a call whose
+    // canonical op_status and legacy status disagree on whether it is finished (one says
+    // CLOSED/CANCELLED, the other does not), so the record can be repaired.
+    $add('call_status_agree', 'The two ' . Tl('call') . ' statuses agree on whether it is finished',
+        'A ' . Tl('call') . ' that reads CLOSED in one status system and OPEN in the other is a record nobody can trust — one of them is wrong.',
+        "SELECT COUNT(*) FROM calls WHERE COALESCE(op_status,'') <> '' AND "
+        . "(CASE WHEN UPPER(op_status) IN ('CLOSED','CANCELLED') THEN 1 ELSE 0 END) <> "
+        . "(CASE WHEN UPPER(COALESCE(status,'')) IN ('CLOSED','CANCELLED') THEN 1 ELSE 0 END)");
     $add('finding_audit', 'Every audit finding belongs to a real audit',
         'A finding with no audit behind it cannot be shown to have come from anywhere.',
         "SELECT COUNT(*) FROM audit_findings WHERE audit_id NOT IN (SELECT id FROM internal_audits)");
