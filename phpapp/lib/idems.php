@@ -5401,13 +5401,25 @@ function idems_sigblock_rows($f, $data, $sigs = []) {
     $stored = $data[$f['fkey']] ?? [];
     if (!is_array($stored)) $stored = [];
     $ins = $sigs['inspector'] ?? []; $ap = $sigs['approver'] ?? [];
+    $vet = $sigs['vetter'] ?? []; $iss = $sigs['issuer'] ?? [];
     $rows = [];
     foreach (idems_sigblock_roles($f) as $role) {
         $s = is_array($stored[$role] ?? null) ? $stored[$role] : [];
         $lc = strtolower($role);
+        // Map each sign-off role to the workflow actor that fills it, so "Reviewed by"
+        // and "Approved by" auto-fill from the accreditation workflow (not the inspector).
+        //   Approved/Authorised/Endorsed → the approval chain's approver
+        //   Reviewed/Vetted/Checked/Scrutinised → the technical VETTER (Field #15:
+        //     this used to fall through to the inspector, so "Reviewed by" wrongly
+        //     showed the same person as "Prepared by" — it now shows the reviewer)
+        //   Issued/Released → the authorised issuer
+        //   Prepared/Inspected/Assessed/Audited/Witnessed/… → the inspector
+        // A role whose workflow actor has not acted yet stays blank (never a wrong name).
         $sys = null;
         if (strpos($lc, 'approv') !== false || strpos($lc, 'author') !== false || strpos($lc, 'endors') !== false) $sys = $ap;
-        elseif (preg_match('/prepar|review|inspect|witness|carried|verif/', $lc)) $sys = $ins;
+        elseif (preg_match('/review|vet|checked|scrutin/', $lc)) $sys = $vet;
+        elseif (preg_match('/issue|release/', $lc)) $sys = $iss;
+        elseif (preg_match('/prepar|inspect|assess|audit|witness|carried|verif/', $lc)) $sys = $ins;
         $name  = trim((string)($s['name']  ?? '')) ?: trim((string)($sys['name']  ?? ''));
         $desig = trim((string)($s['desig'] ?? '')) ?: trim((string)($sys['desig'] ?? ''));
         $date  = trim((string)($s['date']  ?? ''));
