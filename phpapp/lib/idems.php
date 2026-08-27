@@ -7682,6 +7682,41 @@ function ops_idems_pdf($method) {
     echo $pdf; return true;
 }
 
+// ---- Field #17 — public report download from the genuineness /verify page ----
+// A person who scans the QR (or types the code) can download the report itself,
+// not only its verdict. PUBLIC BY DESIGN (the caller has no account): access is
+// gated solely by the 16-character verify code printed on the report, and only an
+// ISSUED report is served — a draft carries no code that "verifies", and must
+// never be pulled. Every download is logged on the sealed audit chain with the
+// requester's IP, because this is report content leaving the confidentiality
+// boundary. Dispatched from index.php BEFORE the login gate, like /verify itself.
+function ops_verify_pdf() {
+    $code = strtoupper(trim((string)($_GET['c'] ?? '')));
+    if ($code === '') { http_response_code(400); header('Content-Type: text/plain'); echo 'Missing verification code.'; return true; }
+    $doc = ops_one("SELECT d.*, bp.display_name client_disp, bp.legal_name client_name, v.display_name vendor_disp, v.legal_name vendor_name, rt.name type_name
+        FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
+        WHERE d.verify_code=? AND COALESCE(d.deleted,0)=0", [$code]);
+    // Only a genuine, ISSUED report is downloadable by code. A draft, or an unknown
+    // code, gets the same neutral answer as the verify page — never a stack trace.
+    if (!$doc || empty($doc['finalized'])) {
+        http_response_code(404); header('Content-Type: text/plain');
+        echo 'No issued report carries that code.'; return true;
+    }
+    $lh = function_exists('quote_letterhead') ? quote_letterhead() : ['name' => app_name()];
+    [$secs, $flds] = idems_render_schema($doc);           // §33 frozen schema for an issued report
+    $pdf = report_pdf_build($doc, $secs, $flds,
+        json_decode($doc['data'] ?: '[]', true) ?: [], idems_doc_files($doc['id']), $lh, idems_report_signatures($doc), '');
+    // Report content is leaving the confidentiality boundary — record who pulled it.
+    if (function_exists('idems_log')) {
+        try { idems_log('report_doc', (int)$doc['id'], 'PUBLIC_PDF',
+            ['irn' => $doc['irn'], 'reason' => 'downloaded from the public /verify page',
+             'ip' => substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45)]); } catch (Throwable $e) {}
+    }
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/','_',$doc['irn']) . '.pdf"');
+    echo $pdf; return true;
+}
+
 // ===========================================================================
 //  Template / form PREVIEW with sample data  (§spec-60)
 //  A designer sees, in one click, how the finished report looks — filled with

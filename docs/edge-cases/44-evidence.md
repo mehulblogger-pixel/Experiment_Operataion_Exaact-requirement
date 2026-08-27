@@ -35,6 +35,23 @@ tamper-detection was **untested**.
 4. The **first tamper test** of `evidence_chain` (`chain_verify` CONTENT detection) — the subsystem's
    core integrity claim was untested.
 
+### Field #17 — public report download from `/verify` (access-posture change)
+
+The public `/verify` page previously answered **only** the genuineness verdict and deliberately
+withheld the report ("a competitor holding a leaked code" could otherwise mine it). Per an explicit
+product decision it now **also offers the report itself for download**: a **"Download the report
+(PDF)"** link on the verdict, backed by the public route **`/verify-pdf?c=<code>`** (`ops_verify_pdf`,
+`idems.php`; dispatched before `require_login`).
+
+- **Key = the printed verify code** (16 chars, `verify_code`). No account, no other check — whoever
+  holds the code that travels on the report may pull the PDF.
+- **Issued reports only.** A draft (or unknown/blank code) is refused with a neutral message; a draft
+  carries no code that "verifies" and must never be downloadable.
+- **Every download is logged** on the sealed audit chain as `PUBLIC_PDF` with the requester's IP —
+  report content is leaving the confidentiality boundary, so the access is recorded.
+- This **reverses** the page's former "never reveal contents" stance; the page's own copy and header
+  comment were reconciled in the same change. Tests: `tests/test_field17_verify_download.php`.
+
 ---
 
 ## 2. Edge cases handled

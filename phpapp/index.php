@@ -756,6 +756,15 @@ if ($route === 'verify') {
     exit;
 }
 
+// Field #17 — the report itself, downloadable from the public verification page.
+// Public like /verify: gated only by the printed verify code, issued reports only,
+// every access logged. Dispatched here, in front of require_login().
+if ($route === 'verify-pdf') {
+    if (function_exists('ops_verify_pdf')) ops_verify_pdf();
+    else { http_response_code(404); echo 'Not available.'; }
+    exit;
+}
+
 // Self-hosted self-service: a customer on their own server pays for users on
 // THIS licence server. Public, because the caller has no account here — they are
 // identified by their install id, and the only thing they can walk away with is

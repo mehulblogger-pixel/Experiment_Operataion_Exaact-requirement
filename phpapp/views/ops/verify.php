@@ -1,13 +1,13 @@
 <?php
-// The one page a client opens without an account, without asking us, and
-// without seeing anything confidential. It answers three questions and stops:
-// is this report genuine, has it been altered, and was the evidence behind it
-// captured on site.
+// The one page a client opens without an account, without asking us. It answers
+// three questions — is this report genuine, has it been altered, and was the
+// evidence behind it captured on site — and, for an issued report, offers the
+// report itself for download (Field #17).
 //
-// What it deliberately does NOT show: the client's name, the findings, the
-// prices, or anything a competitor holding a leaked code could mine. A
-// verification page that leaks the report defeats the report's confidentiality
-// clause, which would be a strange way to prove trustworthiness.
+// The verify CODE printed on the report is the key: whoever holds it may pull the
+// PDF (issued reports only; every download logged, see ops_verify_pdf). The PAGE
+// itself still stays a summary — it does not inline the findings or the commercial
+// terms; the full report travels as the signed PDF, released to the code-holder.
 $code = strtoupper(trim((string)($_GET['c'] ?? '')));
 $v = $code !== '' ? verify_lookup($code) : null;
 ?><!doctype html>
@@ -86,6 +86,15 @@ $v = $code !== '' ? verify_lookup($code) : null;
       <p><?php if ($ok): ?>We issued this report, and both the report and every piece of evidence behind it still match what was recorded when it was issued.<?php elseif (!$contentOk): ?>We issued this report, but its content no longer matches what was recorded when it was issued. Please contact us before relying on it — and please quote this code.<?php else: ?>We issued this report, but the evidence behind it no longer matches what was recorded when it was issued. Please contact us before relying on it — and please quote this code.<?php endif; ?></p>
     </div>
 
+    <?php // Field #17 — offer the report itself, not only the verdict. The code
+          //   printed on the report is the key; the download serves the issued PDF
+          //   and every access is logged. Shown as soon as the page confirms the
+          //   report is genuine, so a holder can pull a clean digital copy. ?>
+    <p style="margin:-6px 0 22px">
+      <a class="btn" href="/verify-pdf?c=<?= e($code) ?>" target="_blank" rel="noopener">⬇ Download the report (PDF)</a>
+      <span class="note" style="margin-left:8px">The official issued report, downloadable with the code you were given.</span>
+    </p>
+
     <table class="f">
       <tr><th>Report number</th><td><?= e($v['irn']) ?></td></tr>
       <tr><th>Issued</th><td><?= e($v['issued_on'] ? fdate(substr((string)$v['issued_on'], 0, 10)) : '—') ?></td></tr>
@@ -120,10 +129,10 @@ $v = $code !== '' ? verify_lookup($code) : null;
         : 'Broken — ' . count($v['chain']['problems']) . ' problem(s)' ?></td></tr>
     </table>
 
-    <p class="note"><strong>What this page does not show.</strong> Not the client, not the findings, not the
-      commercial terms. A verification page that gave those away would breach the confidentiality every inspection
-      report is issued under — so it answers whether the report is real and leaves the contents to the parties
-      entitled to them.</p>
+    <p class="note"><strong>About the download.</strong> The report is released to whoever holds the code printed on
+      it — the key travels with the paper. This page itself stays a summary; the full report, with its findings, comes
+      as the signed PDF above. Every download is logged. If you were given a code you should not have, or a report you
+      did not expect, that is worth <a href="/complaints-policy">telling us</a>.</p>
   <?php endif; ?>
 
   <div class="foot">

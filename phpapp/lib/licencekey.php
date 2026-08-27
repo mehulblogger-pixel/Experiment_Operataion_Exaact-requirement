@@ -338,6 +338,7 @@ const LICENCE_ALWAYS_ALLOW = [
     'logout', 'login',
     'change-password', 'my-signature',
     'verify',                        // public report verification
+    'verify-pdf',                    // …and the public report download it offers
 ];
 
 function lk_blocks_write($route) {
