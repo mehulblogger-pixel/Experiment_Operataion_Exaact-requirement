@@ -1,0 +1,73 @@
+# Exaact TPIA OS — Phase 3 program (the deferred builds)
+
+**Purpose.** Phase 2 deliberately held back a set of items under its "no feature creep" rule — they are
+genuine new builds, not hardening. Phase 3 builds them, each as its own change, under the **same rules**
+that governed Phase 2.
+
+## Rules carried forward (unchanged)
+
+- **Non-destructive.** Never delete modules, routes, tables, fields, permissions, reports, workflows,
+  records or APIs. Add; converge; retain.
+- **Reuse before rebuild.** Read `docs/02-permission-matrix.md`, `docs/03-object-lifecycles.md` and the
+  canonical model (`docs/phase-2/02-canonical-application-model.md`) first. Extend the canonical engine;
+  never fork a second table/calculation/status.
+- **No new permission without asking.** If a feature needs a permission not in the matrix, stop and ask.
+  Prefer gating on existing checks (`current_user`, `is_coordinator_level`, `scope_allows`).
+- **Advisory-first.** New gates surface a verdict; they hard-block only behind an opt-in setting
+  (documented in the §47 governance registry).
+- **Test-backed + docs in lockstep.** Every build ships with `tests/test_p3_*.php` and updates the docs
+  in the same commit. The suite stays green (currently **3,584 passing, 0 failed**).
+- **Sign-off for anything that moves displayed numbers.** (None of the Wave A–C items should; Wave D
+  items are flagged individually.)
+
+## The pathway — four waves, sequenced by dependency
+
+Foundations first, because the management surfaces consume them.
+
+### Wave A — Foundations  *(start here)*
+| # | Item | What it is | Reuses / builds on | Sign-off |
+|---|---|---|---|---|
+| **§26** | **Canonical task** | A persisted, human-authored task (create / assign / due / done) — the thing the read-time aggregators (`ops_pending_tasks`, `attention_summary`) **cannot** hold. The aggregators keep emitting derived counts; §26 adds the individual, mutable items and feeds one count back into the aggregator. | `ops_pending_tasks` shape; `scope_allows` (§51); activity spine (§17) | none |
+| §27 | Financial-event stream | A canonical, append-only money-event log (quote→invoice→receipt→credit) that dashboards can read instead of re-deriving. | `job_profit` (§28), revenue reconciliation (§29) as its first consumer/validator | none (read model) |
+
+### Wave B — Surfaces (consume Wave A)
+| # | Item | What it is | Reuses |
+|---|---|---|---|
+| §19 | Action Centre | One personal "everything waiting on me" screen — approvals, returns, my §26 tasks — in priority order. | `ops_pending_tasks`, §26 |
+| §20 | Command Centre | One management "state of the business" board — attention band, health, financial truth, §27 events. | `attention_summary`, `system_status`, §27 |
+
+### Wave C — Platform
+| # | Item | What it is | Reuses |
+|---|---|---|---|
+| §50 | Generic integration layer | One webhook/queue abstraction over the per-integration outboxes (`ads_outbox`, `books_outbox`, …), which keep working during migration. | existing outboxes (retained, wrapped) |
+
+### Wave D — Larger UX / lifecycle builds (each its own change; schedule individually)
+| # | Item | Note |
+|---|---|---|
+| §8  | Builder persona previews | Preview a report template as each role/persona sees it. |
+| §34 | Dashboard expansion | Deeper role dashboards on top of §20. |
+| §35 | Training attendance | Attendance capture + competence linkage. |
+| §16 | Vendor-360 depth | Bring vendor-360 to client-360 parity. |
+| §49 | Entity-360 | A uniform 360 shell across entities. |
+
+**Not in Phase 3 without explicit sign-off:** anything that changes displayed financial figures (the §28
+engine is already the one truth; Wave D must read it, never re-derive).
+
+## Sequencing rationale
+
+1. **§26 → §19:** the Action Centre is mostly a *view* of tasks; the task model must exist first.
+2. **§27 → §20:** the Command Centre's financial band reads the event stream; the stream comes first.
+3. **§50 and Wave D** are independent of A/B and can run in parallel or after, by appetite.
+
+## Done log
+
+- **2026-08-27 — §26 canonical persisted task (Wave A, item 1).** `lib/tasks.php` adds the one thing the
+  read-time aggregators can't hold: a human-authored, assignable, due-dated item you tick off — with a
+  new `user_tasks` table (additive; wired into `boot()`'s migrate chain). Create / mark-done / reopen;
+  assign to yourself always, to another user only at coordinator level and within branch scope
+  (`scope_clause`); optional link to a record (job/report/NCR/…) with an activity-spine `TASK_ADDED`
+  entry (§17). A `/tasks` screen (my open tasks + create form + recently-done) and a
+  `task_render_for_entity()` panel for record pages. **No new permission** — gated on `current_user` and
+  `is_coordinator_level`. The aggregators are untouched; §26 feeds **one** derived "my tasks" count back
+  into `ops_pending_tasks`, so My Work stays unified. Test `test_p3_tasks.php` (19 assertions).
+  Suite **3603 passed, 0 failed**. *Next: §27 financial-event stream, then Wave B (§19 Action Centre reads §26).*

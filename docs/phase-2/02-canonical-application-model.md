@@ -65,10 +65,15 @@ a second table, a second calculation, or a second status system.**
 
 ## 6. Canonical tasks
 
-- **"Waiting on me":** `ops_pending_tasks()` (personal approvals/actions). **Business "needs attention":**
-  `attention_summary()` (leads/inquiries due, expiries, AR, certs, interviews, integrations). Both are
-  read-time aggregators over the owning modules. There is **no** persisted task table (§26 deferred);
-  new task-like signals should feed one of these aggregators, not a new store.
+- **Derived "waiting on me":** `ops_pending_tasks()` (personal approvals/actions). **Business "needs
+  attention":** `attention_summary()` (leads/inquiries due, expiries, AR, certs, interviews, integrations).
+  Both are read-time aggregators over the owning modules — a new *derived* task-like signal feeds one of
+  these, not a new store.
+- **Human-authored tasks (§26 — Phase 3):** `lib/tasks.php` / `user_tasks` — the persisted, assignable,
+  due-dated items a person writes down and ticks off (which the aggregators cannot represent). Create via
+  `task_create()`, read via `task_mine()` / `task_for_entity()`; assigning to others is coordinator-level +
+  branch scope. It feeds **one** derived count back into `ops_pending_tasks`; it does not replace the
+  aggregators. New task UIs read `task_*`; do not add a second task store.
 
 ## 6a. Canonical bulk actions
 

@@ -3131,6 +3131,8 @@ function ops_dispatch($route, $method) {
             return ops_integrations($method);
         case $route === 'system-status':
             return ops_system_status($method);
+        case $route === 'tasks':               // Phase 3 §26 — my persisted tasks
+            return ops_tasks($method);
         case $route === 'report-approve':
             ops_report_approve($method); return true;
         case $route === 'office-finance':
@@ -6702,6 +6704,12 @@ function ops_pending_tasks() {
     $insId  = (int)($u['inspector_id'] ?? 0);
     // Name/username, used to match the free-text owner fields on CAPA & complaints.
     $myName = function_exists('user_name') ? trim((string)user_name($u)) : trim((string)($u['username'] ?? ''));
+
+    // ---- My own written-down tasks (Phase 3 §26) ---------------------------
+    // The one derived count fed back from the persisted task store, so a person's
+    // own follow-ups sit alongside the system-derived approvals on My Work.
+    if (function_exists('task_open_count'))
+        $add(task_open_count($myId), '✅', 'my tasks', 'follow-ups you added and haven\'t ticked off', '/tasks', 'info', 'do');
 
     // ---- Approvals waiting on ME -------------------------------------------
     // Quotations — the current step is mine to sign (named, by role, or generic).
