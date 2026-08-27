@@ -2434,7 +2434,7 @@ function ops_module_gate($route) {
         'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems','release-notes'=>'idems','document-ai-review'=>'idems','document-rn-flag'=>'idems','document-scope-from-qap'=>'idems','document-polish-text'=>'idems',
         'vendors'=>'idems','vendor-profile'=>'idems','vendor-profile-save'=>'idems',
         'expediting'=>'idems','expediting-projects'=>'idems',
-        'report-types'=>'idems','report-type-edit'=>'idems','report-builder'=>'idems','report-field-edit'=>'idems','report-file'=>'idems','irn-rules'=>'idems','audit-log'=>'idems',
+        'report-types'=>'idems','report-type-edit'=>'idems','report-builder'=>'idems','report-preview'=>'idems','report-field-edit'=>'idems','report-file'=>'idems','irn-rules'=>'idems','audit-log'=>'idems',
         'notifications'=>'admin', // Module 38 — the notification/outbox log over email_log
         'integrations'=>'admin',  // Module 46 — the integration health surface
         'system-status'=>'admin', // Module 50 — the aggregated platform-health board
@@ -3065,6 +3065,8 @@ function ops_dispatch($route, $method) {
             return ops_idems_report_types($route, $method);
         case $route === 'report-builder' || $route === 'report-field-edit':
             return ops_idems_builder($route, $method);
+        case $route === 'report-preview':        // Phase 3 §8 — persona preview of a report template
+            return ops_template_preview($method);
         case $route === 'document-fill':
             return ops_idems_fill($route, $method);
         case $route === 'document-scope-from-qap':

@@ -44,7 +44,7 @@ Foundations first, because the management surfaces consume them.
 ### Wave D — Larger UX / lifecycle builds (each its own change; schedule individually)
 | # | Item | Note |
 |---|---|---|
-| §8  | Builder persona previews | Preview a report template as each role/persona sees it. |
+| §8  | Builder persona previews | ✅ **done** — preview a report type split into what the recipient sees vs internal-only, flagging conditional/scored fields. |
 | §34 | Dashboard expansion | Deeper role dashboards on top of §20. |
 | §35 | Training attendance | Attendance capture + competence linkage. |
 | §16 | Vendor-360 depth | ✅ **done** — contacts (recognised across the system, §23/24) + full activity history, to client-360 parity. |
@@ -60,6 +60,18 @@ engine is already the one truth; Wave D must read it, never re-derive).
 3. **§50 and Wave D** are independent of A/B and can run in parallel or after, by appetite.
 
 ## Done log
+
+- **2026-08-27 — §8 report-template persona preview (Wave D, item 2).** The builder showed a flat field
+  list and a dummy-data preview, but not *who sees what*. `lib/tmplpreview.php` + `/report-preview?type=`
+  lay a report type out section by section, classifying each field by persona from the columns the
+  template already stores: **Recipient + staff** (not `hidden`) vs **Internal-only** (`hidden` — calc/
+  working fields), flagging **conditional** (`cond_field`) and **scored** (`weight`/`max_score`) fields —
+  framed with the §72 visibility vocabulary. Catches the leak where a field the author thinks clients see
+  is actually internal (or vice-versa) before the template is used. Read-only; no template change; linked
+  from the builder; gated on the existing `idems.type.manage`/`master.manage` (no new permission). Test
+  `test_p3_template_preview.php` (16 assertions — per-field classification, counts, the hidden-calc-not-
+  recipient case). Suite **3687 passed, 0 failed**. *Remaining Wave D: §34 dashboard expansion, §49
+  entity-360 (unblocked by §16), §35 training.*
 
 - **2026-08-27 — §16 Vendor-360 depth (Wave D, item 1).** The vendor detail was already rich on quality
   (assessments, audits, scorecard, CAPAs, expediting, delivery risk) but lacked the two things client-360

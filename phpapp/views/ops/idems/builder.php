@@ -11,7 +11,8 @@
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <?php if (!empty($fields)): ?><a class="btn" href="/document-new?type=<?= e($type['code']) ?>">Create a report with this form →</a>
     <button type="button" class="btn secondary" id="bld-preview-toggle" title="Show the finished report next to the designer — it refreshes as you arrange fields">🔍 Live preview</button>
-    <a class="btn secondary" href="/report-type-preview?type=<?= (int)$type['id'] ?>" target="_blank" title="Open the finished report filled with dummy data in a new tab">👁 Open preview</a><?php endif; ?>
+    <a class="btn secondary" href="/report-type-preview?type=<?= (int)$type['id'] ?>" target="_blank" title="Open the finished report filled with dummy data in a new tab">👁 Open preview</a>
+    <a class="btn secondary" href="/report-preview?type=<?= (int)$type['id'] ?>" title="See who sees what — which fields the recipient gets vs internal-only">👥 Persona preview</a><?php endif; ?>
     <a class="btn<?= empty($fields) ? '' : ' secondary' ?>" href="/report-autoform?type=<?= (int)$type['id'] ?>">🪄 Build from my Word file (no codes)</a>
     <a class="btn secondary" href="/report-types">← Report types</a>
   </div>
