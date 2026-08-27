@@ -1,8 +1,8 @@
 # Slice P4 — Billable Event Ledger
 
 **Change-control record (directive Part 25). Classification: BUILD (the one
-genuine new table; additive, non-destructive). Status: DELIVERED (P4a). P4b
-(inline hooks + more sources) staged.**
+genuine new table; additive, non-destructive). Status: DELIVERED (P4a + P4b
+inline job-close hook). Remaining P4b sources (report/timesheet/candidate) staged.**
 
 Priority 4 / the headline differentiator in `03-target-architecture.md` §4 & §8;
 directive Part 16 (the Billable Event Engine). Lifecycle recorded in
@@ -84,16 +84,42 @@ table is inert additive data (drop it to fully revert). No existing data touched
 **Shipped (P4a):** the ledger, lifecycle, sync (derive + reconcile), and the
 Commercial-cockpit board — populated from the `JOB_CLOSED` source.
 
-**Staged (P4b):**
-1. **Inline hooks** so events are created the moment work is approved (job close,
-   report/IRN issue, timesheet/OT approval, candidate joined) instead of only by
-   the sync pass — reusing `billable_event_upsert()`. (Touches those write paths,
-   so done as its own validated slice.)
-2. **More sources** (`REPORT_ISSUED`, `TIMESHEET_APPROVED`, `CANDIDATE_JOINED`…).
-3. **Generalize `books_billable_jobs()` → `books_billable_events()`** so the
+## Delivery record (P4b — inline job-close hook)
+
+**Shipped (P4b):**
+- **`billable_on_job_closed($jobId)`** (`lib/billable.php`) — an idempotent,
+  fully self-guarded hook (a `try/catch` that swallows every error) so queuing a
+  billable candidate can **never** affect whether a job closes. Reuses
+  `billable_event_upsert()`; skips a job already invoiced.
+- Wired into the **job-close success path** (`lib/ops.php`, right after the cost
+  snapshot) so the candidate appears the moment work is closed — no wait for a
+  sync run.
+- **Cron call** to `billable_events_sync()` (`cron.php`) as a backstop derive +
+  hands-off reconciliation to BILLED.
+- Report-issue is **deliberately NOT** a separate money-bearing source: the
+  job/call is the billable unit, so a per-report event would double-count.
+
+**Validation:** new `tests/test_billable_hook.php` = **10/10** (no-op on bad id,
+never throws, queues one PENDING candidate with the right value/client,
+idempotent re-fire, never overwrites an approved decision, skips an
+already-invoiced job). php -l clean; **full suite 3817 passed, 0 failed.**
+
+> **Pre-existing caveat (not introduced by P4, not fixed here):** `cron.php`'s
+> require list is incomplete — it omits `lib/assets.php`, `lib/licence.php` and
+> likely others, so `boot()` and several tasks fail on this instance
+> (`Undefined constant ASSET_TYPES`, then `PRODUCT_MODULES`). This predates the
+> revamp and kills *all* cron tasks, not just the billable sync. The billable
+> feature does **not** depend on cron: the inline hook creates events in real
+> time, and reconciliation runs from the board's "Sync from closed work" button
+> in-app. Fixing cron's require list is a separate maintenance task (reconcile it
+> with `index.php`'s list); flagged here for the backlog.
+
+**Remaining P4b, still staged:**
+1. **More sources** (`TIMESHEET_APPROVED`, `OT_APPROVED`, `CANDIDATE_JOINED`…),
+   each with its own approval-point hook reusing `billable_event_upsert()`.
+2. **Generalize `books_billable_jobs()` → `books_billable_events()`** so the
    existing invoice flow lists all billable candidates, and stamp `invoice_line_id`
    at `books_line_add()` for line-level reconciliation.
-4. A cron call to `billable_events_sync()` for hands-off freshness.
 
 **RT3 note:** the first-class `Engagement` entity was parked "until after P4"
 (`00-program.md` D3). P4 is now delivered — Engagement can be revisited if the

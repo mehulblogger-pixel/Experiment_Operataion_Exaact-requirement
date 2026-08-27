@@ -41,6 +41,7 @@ require __DIR__ . '/lib/licencesync.php';
 require __DIR__ . '/lib/security.php';
 require __DIR__ . '/lib/compliance.php';
 require __DIR__ . '/lib/books.php';
+require __DIR__ . '/lib/billable.php';   // Revamp P4 — billable-event derive + reconcile
 require __DIR__ . '/lib/booksbridge.php';
 
 // When invoked over HTTP, require a matching key so strangers can't trigger it.
@@ -124,6 +125,14 @@ if (function_exists('idems_run_sla_escalations')) {
 if (function_exists('tosrm_run_recurring')) {
     $gen = tosrm_run_recurring();
     if ($gen > 0) echo "TOSRM recurring: $gen call(s) generated.\n";
+}
+
+// Revamp P4 — keep the billable-event ledger fresh: backstop-derive any closed
+// work not yet queued, and reconcile events whose job has since been invoiced.
+if (function_exists('billable_events_sync')) {
+    $be = billable_events_sync();
+    if (($be['created'] ?? 0) + ($be['billed'] ?? 0) > 0)
+        echo "Billable events: {$be['created']} derived, {$be['billed']} reconciled.\n";
 }
 
 // Automated MIS digest to leadership — weekly on Monday, monthly on the 1st.

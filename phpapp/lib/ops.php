@@ -6043,6 +6043,9 @@ function ops_jobs($route, $method) {
                 ->execute([date('c'), $reportDate, $b['report_link'] ?? '', $tat, $needsApproval, $job['id']]);
             // Phase 2 §30 — freeze this job's cost basis at close so its profit is reproducible.
             if (function_exists('job_cost_snapshot')) job_cost_snapshot((int)$job['id']);
+            // Revamp P4b — queue this closed work as a billable candidate the moment
+            // it closes (idempotent, and self-guarded so it can never block the close).
+            if (function_exists('billable_on_job_closed')) billable_on_job_closed((int)$job['id']);
             send_closure_email($job['id']);
             if ($needsApproval === 'PENDING') report_approval_notify($job['id']);
             flash("Job {$job['job_code']} closed. TAT " . ($tat === null ? '—' : $tat) . " day(s). Closure email sent.");

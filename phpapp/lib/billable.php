@@ -130,6 +130,43 @@ function billable_event_upsert($module, $kind, $sourceId, array $d) {
     return (int)db()->lastInsertId();
 }
 
+// ---- Inline hook (P4b) — create the candidate the moment a job closes ------
+// The field map for a JOB_CLOSED event, read from the job + its call (same shape
+// the sync derives, so the hook and the sync produce identical rows).
+function billable_job_fields($jobId) {
+    $j = ops_one("SELECT j.id, j.executing_office_id, j.sbu, j.inspection_type, j.invoice_value,
+                         c.client_id, c.contract_number, c.billable_value, c.billable_rate, c.billable_qty
+                  FROM jobs j LEFT JOIN calls c ON c.id = j.call_id WHERE j.id=?", [(int)$jobId]);
+    if (!$j) return null;
+    $amount = (float)($j['billable_value'] ?? 0);
+    if ($amount <= 0 && (float)($j['invoice_value'] ?? 0) > 0) $amount = (float)$j['invoice_value'];
+    return [
+        'party_id'        => (int)($j['client_id'] ?? 0),
+        'contract_number' => (string)($j['contract_number'] ?? ''),
+        'office_id'       => (int)($j['executing_office_id'] ?? 0),
+        'sbu'             => (string)($j['sbu'] ?? ''),
+        'service_type'    => (string)($j['inspection_type'] ?? ''),
+        'qty'             => (float)($j['billable_qty'] ?? 0),
+        'rate'            => (float)($j['billable_rate'] ?? 0),
+        'amount'          => $amount,
+        'calc_rule'       => 'call.billable_value',
+    ];
+}
+
+// Called from the job-close handler. Idempotent, and DELIBERATELY swallows every
+// error: queuing a billable candidate must never affect whether a job can close.
+function billable_on_job_closed($jobId) {
+    try {
+        billable_migrate();
+        $jobId = (int)$jobId; if (!$jobId) return 0;
+        // Nothing to queue if it is already invoiced.
+        if (function_exists('books_job_invoiced') && books_job_invoiced($jobId)) return 0;
+        $f = billable_job_fields($jobId);
+        if ($f === null) return 0;
+        return billable_event_upsert('job', 'JOB_CLOSED', $jobId, $f);
+    } catch (Throwable $e) { return 0; }
+}
+
 // ---- The sync pass (derive + reconcile) ------------------------------------
 // 1. Derive a PENDING event for every closed, not-yet-invoiced billable job.
 // 2. Reconcile: any event whose source job is now invoiced → BILLED + linkage,
