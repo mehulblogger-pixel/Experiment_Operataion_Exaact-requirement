@@ -149,9 +149,15 @@ save); the edit form embeds it as `row_version`, and `stale_edit_block()` refuse
 whose baseline no longer matches — the editor is told to reopen, and **nothing is
 overwritten**. An empty baseline (older form) never blocks. Tests:
 `tests/test_optimistic_lock.php`.
-**Still open (noted, not a call/job edit):** the *cost picture* is still written from two
-sides — job-closure expenses (coordinator) and the inspector's voucher — which is a
-data-model overlap rather than a concurrent-edit race; left as-is unless it bites.
+**Cost dual-write — DETECTOR delivered (Revamp R9):** the *cost picture* is written from
+two doors — job-closure `expenses` (coordinator) and the inspector's `voucher` — for the
+same reimbursable category, and `job_profit()` sums both. A read-only detector now surfaces
+the overlap so it can be reconciled: `cost_sources()` / `cost_dualwrite_flag()` /
+`cost_dualwrite_scan()` (`costing.php`), and a warning on the job-detail Money fold when
+reimbursables sit on both sides (`cost_dualwrite_render()`; `tests/test_cost_dualwrite.php`).
+It changes **no figure**. **Convergence** (making one door authoritative, or netting the
+overlap) is a separate, deliberate data-model decision, still open — the detector is the
+safe first step before that.
 
 ## R10 — LOW · Vestigial statuses/fields the code never advances — **NOTED IN-CODE**
 **What:** legacy `calls.status` never reaches `CLOSED` in app flow (only up to ALLOCATED);

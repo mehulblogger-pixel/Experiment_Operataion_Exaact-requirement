@@ -975,3 +975,54 @@ function costing_span_label($span, $fy, $yr, $mon) {
     if ($span === 'ytd') return 'FY ' . $fy . ' to date';
     return date('F Y', mktime(0, 0, 0, (int)$mon, 1, (int)$yr));
 }
+
+// ===========================================================================
+//  R9 — cost dual-write detector (read-only; Revamp)
+// ---------------------------------------------------------------------------
+//  Reimbursables (travel / lodging / food) have TWO data-entry doors for one
+//  job: the coordinator's closure `expenses` and the inspector's monthly
+//  `voucher`. job_profit() sums BOTH (ops.php), which is correct when they record
+//  DIFFERENT costs — but if the same trip is keyed on both sides it is
+//  double-counted. This surfaces such jobs so a human can reconcile them; it
+//  changes no figure. Convergence (making one side authoritative) is a separate,
+//  deliberate decision and is NOT done here.
+// ===========================================================================
+function cost_sources($jobId) {
+    $exp = function_exists('job_expenses_total') ? round((float)job_expenses_total((int)$jobId), 2) : 0.0;
+    $vou = function_exists('job_voucher_total')  ? round((float)job_voucher_total((int)$jobId), 2)  : 0.0;
+    $both = ($exp > 0 && $vou > 0);
+    return ['expenses' => $exp, 'voucher' => $vou, 'total' => round($exp + $vou, 2),
+            'both_sided' => $both, 'overlap' => $both ? round(min($exp, $vou), 2) : 0.0];
+}
+
+// True when reimbursables are recorded on both doors for this job (a likely
+// double-entry that job_profit() sums).
+function cost_dualwrite_flag($jobId) { return cost_sources($jobId)['both_sided']; }
+
+// The reconciliation worklist: closed jobs with reimbursables on both sides,
+// largest likely-overlap first. Read-only.
+function cost_dualwrite_scan($limit = 200) {
+    $rows = [];
+    try {
+        foreach (ops_all("SELECT id, job_code, call_id FROM jobs WHERE closed_flag=1 ORDER BY id DESC LIMIT " . max(1, (int)$limit)) ?: [] as $j) {
+            $c = cost_sources((int)$j['id']);
+            if ($c['both_sided']) $rows[] = ['job_id' => (int)$j['id'], 'job_code' => (string)$j['job_code']] + $c;
+        }
+    } catch (Throwable $e) {}
+    usort($rows, fn($a, $b) => $b['overlap'] <=> $a['overlap']);
+    return $rows;
+}
+
+// A per-job warning for the job-detail Money fold (managers/coordinators only).
+function cost_dualwrite_render($jobId) {
+    $c = cost_sources((int)$jobId);
+    if (!$c['both_sided']) return;
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : number_format((float)$n, 2);
+    $eng = function_exists('Tl') ? Tl('engineer') : 'engineer';
+    $job = function_exists('Tl') ? Tl('job') : 'job';
+    echo '<div class="msg msg-warning" style="margin:0 0 10px">⚠ Reimbursables are recorded on <strong>both</strong> the closure expenses ('
+       . $e($m($c['expenses'])) . ') and the ' . $e($eng) . '’s voucher (' . $e($m($c['voucher']))
+       . ') for this ' . $e($job) . '. Profit sums both, so up to <strong>' . $e($m($c['overlap']))
+       . '</strong> may be double-counted — confirm the two sides record different costs, not the same trip twice.</div>';
+}

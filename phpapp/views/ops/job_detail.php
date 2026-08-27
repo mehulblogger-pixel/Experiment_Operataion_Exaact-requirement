@@ -976,6 +976,8 @@ if (function_exists('hwp_for_job')):
 <details class="fold" data-tab="Money">
   <summary><?= $canSeeProfit ? 'Expenses &amp; profitability' : 'Expenses' ?> <span class="sub"><?= $canSeeProfit ? 'what it cost, and what the ' . e(Tl('job')) . ' made' : 'what it cost' ?></span></summary>
   <div class="fold-body">
+  <?php // R9 — warn if reimbursables are keyed on both the closure expenses and the voucher.
+    if (function_exists('cost_dualwrite_render')) cost_dualwrite_render((int)$job['id']); ?>
   <div class="panel-split">
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0">Expenses</h3>
