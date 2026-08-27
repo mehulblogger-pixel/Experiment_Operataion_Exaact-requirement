@@ -149,7 +149,7 @@ function ops_area_def($area) {
         case 'money':
             $title = 'Money'; $icon = '💰';
             $sub = 'From what is waiting to be billed, through invoices and money in, to the profit each ' . strtolower(Tl('sbu')) . ' makes.';
-            $routes = ['money','invoicing','to-bill','invoices','invoice','receipts','receipt','receivables','tally','profitability','sbu-pl','office-finance','cost-run','call-profit','billable-events'];
+            $routes = ['money','invoicing','to-bill','invoices','invoice','receipts','receipt','receivables','tally','profitability','sbu-pl','office-finance','cost-run','call-profit','billable-events','revenue-reconciliation'];
             $sec('Billing');
             // Revamp P4 — the operational→commercial bridge: approved work on its
             // way to an invoice, so nothing done is lost before it is billed.
@@ -167,6 +167,9 @@ function ops_area_def($area) {
                 $t(true, '🧾', 'Billing workspace', '/to-bill', 'Bill, invoice, collect, age and export — one screen with tabs.');
             }
             $t($fx('books_switch_ready') && books_switch_ready(), '📗', 'Accounts & GST ↗', ($fx('books_app_url') ? books_app_url() : '#'), 'Open MGH Books, already signed in.', null, '', true);
+            // Revamp §29 — where the legacy invoice snapshot disagrees with the ledger.
+            $t(($fx('can_see_salary') && can_see_salary()) || can('finance.reconcile') || is_master(), '⚖️', 'Revenue reconciliation', '/revenue-reconciliation', 'Where a job’s legacy invoice figure disagrees with the books ledger.',
+                $num(fn() => $fx('revrecon_count') ? revrecon_count() : 0), 'amber');
 
             // Costs & margins — moved here from Admin so all of money lives together.
             $sec('Costs & margins');

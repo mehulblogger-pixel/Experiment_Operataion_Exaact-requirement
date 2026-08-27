@@ -20,6 +20,8 @@ Read the program charter (`00-program.md`), the audit/architecture
 | **P5b** Contract control (R4) | Partner-screen contract door now enters the two-signature PENDING→endorse→approve lifecycle | control-integrity | `test_contract_backdoor_guard.php` (+2) |
 | **P6** Product packages | One-click TPIA / Staffing / Recruitment / Enterprise presets over packs + licence bundles | CONFIGURE (no new mechanism) | `test_product_package.php` (44) |
 | **P7** Engagement entity (groundwork) | First-class `engagements` (keyed to `contract_number`) + nullable `engagement_id` on calls/jobs/quotes/invoices + backfill + dual-read; string never dropped | BUILD (additive, no status) | `test_engagement_entity.php` (16) |
+| **P8** Cost dual-write detector (R9) | Surfaces jobs with reimbursables on both the closure `expenses` and the `voucher` (job_profit sums both); job-detail warning + scan | detector (read-only) | `test_cost_dualwrite.php` (11) |
+| **P9** Revenue reconciliation (§29) | Read-only worklist + summary + `/revenue-reconciliation` screen where the legacy invoice snapshot disagrees with the books ledger; drives to green before a §28 reader switch | diagnostic (read-only) | `test_revrecon_worklist.php` (10) |
 | **Infra** cron require list | cron.php now derives its lib list from index.php — every nightly task runs again (was all silently dead) | maintenance | verified end-to-end |
 | **Infra** module46 isolation | Fixed a latent test leak (bogus `licence_key` left set globally) | test hygiene | suite order-independent |
 
@@ -43,7 +45,7 @@ Read the program charter (`00-program.md`), the audit/architecture
 | Item | Why deferred | Plan |
 |---|---|---|
 | **R9 — cost dual-write** | Job-close expenses and the inspector voucher both write cost; converging touches the profit engine | Introduce a canonical read (prefer `job_profit()` snapshot everywhere) with a `*_disagrees()` detector first; migrate readers only after parity is shown. A focused slice. |
-| **§29/§80 — financial dual-truth** | `jobs.invoice_amount`/`payment_received` legacy vs books ledger; switching a reader before reconciliation proves parity risks wrong money | Run the §29 reconciliation to green across the dataset, then switch remaining legacy readers one at a time. Money-critical — dedicated session. |
+| **§29/§80 — financial dual-truth** | **Worklist delivered (P9)** — read-only `revrecon_summary()`/`revrecon_list()` + `/revenue-reconciliation` screen + Money tile; drives divergences toward green. | Remaining (§28, sign-off): once green, switch the legacy revenue readers (`mis`, contract-360, `crm` order, money dashboard) onto the ledger one at a time — *changes displayed figures*, so deliberate + validated per reader. |
 | **Engagement entity** | ~~deferred~~ **Groundwork delivered (P7)** — additive `engagements` + `engagement_id` + backfill + dual-read; string never dropped. | Remaining (future): stamp `engagement_id` on write; prefer the id in 360/rollup reads; engagement-level attributes. Not required now. |
 
 These three are financial-truth / structural changes where haste is the enemy;

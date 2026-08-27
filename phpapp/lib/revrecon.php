@@ -59,3 +59,75 @@ function revrecon_scan($limit = 100) {
 
 // How many jobs diverge (for a health/advisory count). Cheap-ish: reuses the scan with a high cap.
 function revrecon_count() { return count(revrecon_scan(100000)); }
+
+// ---------------------------------------------------------------------------
+//  Revamp — the reconciliation worklist & health summary (read-only)
+//  §29 already surfaces a divergence COUNT on the attention band. To actually
+//  reach "green" (the prerequisite before §28 switches any revenue reader onto
+//  the ledger) finance needs to see WHICH jobs disagree and by how much. This
+//  adds that drill-down. It changes no figure and switches no reader.
+// ---------------------------------------------------------------------------
+function revrecon_candidate_ids() {
+    $all = function ($sql, $a = []) { try { return ops_all($sql, $a) ?: []; } catch (Throwable $e) { return []; } };
+    $ids = [];
+    foreach ($all("SELECT id FROM jobs WHERE COALESCE(invoice_amount,0) <> 0 OR COALESCE(invoice_raised,0)=1") as $r) $ids[(int)$r['id']] = 1;
+    foreach ($all("SELECT DISTINCT job_id FROM invoice_lines WHERE COALESCE(job_id,0) > 0") as $r) $ids[(int)$r['job_id']] = 1;
+    return array_keys($ids);
+}
+
+// Health summary across all candidate jobs: how many reconcile vs diverge, the
+// legacy-only / ledger-only splits, and the two running totals. `green` is true
+// when nothing diverges — the signal that readers could safely be switched (§28).
+function revrecon_summary($limit = 100000) {
+    $s = ['candidates' => 0, 'reconciled' => 0, 'diverging' => 0, 'legacy_only' => 0, 'ledger_only' => 0,
+          'legacy_total' => 0.0, 'ledger_net_total' => 0.0];
+    $n = 0;
+    foreach (revrecon_candidate_ids() as $jid) {
+        if (++$n > $limit) break;
+        $rc = revrecon_job($jid);
+        $s['candidates']++;
+        $s['legacy_total']     += $rc['legacy'];
+        $s['ledger_net_total'] += $rc['ledger_net'];
+        if ($rc['diverges']) $s['diverging']++; else $s['reconciled']++;
+        if ($rc['legacy_only']) $s['legacy_only']++;
+        if ($rc['ledger_only']) $s['ledger_only']++;
+    }
+    $s['legacy_total']     = round($s['legacy_total'], 2);
+    $s['ledger_net_total'] = round($s['ledger_net_total'], 2);
+    $s['green'] = ($s['diverging'] === 0);
+    return $s;
+}
+
+// The diverging jobs, enriched with a code / client / plain-language reason, for
+// the worklist screen. Read-only.
+function revrecon_list($limit = 200) {
+    $rows = revrecon_scan($limit);
+    foreach ($rows as &$r) {
+        $j = null;
+        try {
+            $j = ops_one("SELECT j.job_code, COALESCE(NULLIF(bp.display_name,''), bp.legal_name) client_name
+                          FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
+                          LEFT JOIN business_partners bp ON bp.id=c.client_id WHERE j.id=?", [(int)$r['job_id']]);
+        } catch (Throwable $e) {}
+        $r['job_code']    = (string)($j['job_code'] ?? ('#' . $r['job_id']));
+        $r['client_name'] = (string)($j['client_name'] ?? '');
+        $r['reason'] = $r['legacy_only'] ? 'Legacy figure recorded, but no ledger invoice exists'
+                     : ($r['ledger_only'] ? 'Invoiced in the ledger, but the legacy figure is blank'
+                     : 'Legacy figure matches neither the net nor the gross ledger total');
+    }
+    unset($r);
+    return $rows;
+}
+
+// The read-only worklist screen. Gated to finance / figure-holders.
+function ops_revrecon($method) {
+    ops_require((function_exists('can_see_salary') && can_see_salary())
+        || (function_exists('can') && (can('finance.reconcile') || can('data.revenue'))) || is_master(),
+        'You cannot open the revenue reconciliation.');
+    view('ops/revenue_reconciliation', [
+        'summary' => revrecon_summary(),
+        'rows'    => revrecon_list(200),
+        'tol'     => revrecon_tolerance(),
+    ]);
+    return true;
+}

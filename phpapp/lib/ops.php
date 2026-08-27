@@ -2865,6 +2865,8 @@ function ops_dispatch($route, $method) {
             return ops_licence($route, $method);
         case $route === 'product-package' || $route === 'product-package-apply':   // Revamp P6 — product-package chooser
             return ops_product_package($route, $method);
+        case $route === 'revenue-reconciliation':   // Revamp §29 — revenue reconciliation worklist (read-only)
+            return ops_revrecon($method);
         case $route === 'vendor' || $route === 'signing-setup':
             ops_vendor($route, $method); return true;
         case $route === 'agreement':
