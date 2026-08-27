@@ -88,6 +88,10 @@
               <div style="font-size:11.5px;margin-top:4px">
                 <span class="pill <?= $sc['score']>=60?'p-ok':($sc['score']>=35?'p-warn':'p-mut') ?>" style="font-size:10.5px"><?= (int)$sc['score'] ?></span>
                 <?php if ($st): ?><span class="pill p-bad" style="font-size:10.5px"><?= lead_days_in_stage($l) ?>d</span><?php endif; ?>
+                <?php // Field #5 — this lead has been worked as a deal. Show it on the
+                      //   board so the transfer is visible here; the card opens the lead,
+                      //   which carries "Open the deal →". ?>
+                <?php if (!empty($l['deal_id'])): ?><span class="pill p-info" style="font-size:10.5px" title="A deal has been opened from this lead — open the lead to jump to it">◆ deal</span><?php endif; ?>
               </div>
             </a>
           <?php endforeach; ?>

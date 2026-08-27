@@ -781,6 +781,27 @@ function lead_board($pipelineId = 0) {
         $by[$sid]['leads'][] = $r;
         $by[$sid]['value'] += (float)$r['value'];
     }
+    // Field #5 — which of these leads has already been "worked as a deal" (an
+    // opportunity opened from it). Opening a deal correctly lands it on the
+    // opportunity board, but the LEADS board — where the person is standing —
+    // showed no sign of it, so the transfer looked like it had not happened.
+    // Mark each card that has a deal, linking straight to it. One query for the
+    // whole board (never per-card), and off the register's hot list path.
+    if (function_exists('opp_try')) {
+        $ids = [];
+        foreach ($by as $col) foreach ($col['leads'] as $r) $ids[] = (int)$r['id'];
+        if ($ids) {
+            $ph = implode(',', array_fill(0, count($ids), '?'));
+            $deals = opp_try(fn() => ops_all(
+                "SELECT lead_id, MAX(id) AS deal_id FROM opportunities
+                 WHERE lead_id IN ($ph) GROUP BY lead_id", $ids), []);
+            $map = [];
+            foreach ($deals as $d) $map[(int)$d['lead_id']] = (int)$d['deal_id'];
+            foreach ($by as $sid => $col)
+                foreach ($col['leads'] as $i => $r)
+                    $by[$sid]['leads'][$i]['deal_id'] = $map[(int)$r['id']] ?? 0;
+        }
+    }
     return ['pipeline' => $pipe, 'stages' => $stages, 'columns' => $by];
 }
 
