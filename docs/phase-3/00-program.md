@@ -45,7 +45,7 @@ Foundations first, because the management surfaces consume them.
 | # | Item | Note |
 |---|---|---|
 | §8  | Builder persona previews | ✅ **done** — preview a report type split into what the recipient sees vs internal-only, flagging conditional/scored fields. |
-| §34 | Dashboard expansion | Deeper role dashboards on top of §20. |
+| §34 | Dashboard expansion | ✅ **done** — a role-aware "at a glance" strip (your next actions + a manager pulse) atop the area landings. |
 | §35 | Training attendance | Attendance capture + competence linkage. |
 | §16 | Vendor-360 depth | ✅ **done** — contacts (recognised across the system, §23/24) + full activity history, to client-360 parity. |
 | §49 | Entity-360 | ✅ **done** — one uniform 360 route composing tasks/history/quality/party per entity kind. |
@@ -60,6 +60,17 @@ engine is already the one truth; Wave D must read it, never re-derive).
 3. **§50 and Wave D** are independent of A/B and can run in parallel or after, by appetite.
 
 ## Done log
+
+- **2026-08-27 — §34 role-aware dashboard "at a glance" strip (Wave D, item 4).** Dashboards already exist
+  (Operations home, MIS, the §20 Command Centre), but the plain area landings were navigation tiles with
+  no live state. `dashboard_glance()` (`lib/ops.php`) composes what the viewer may see into one role-aware
+  summary rendered above the tiles: **their own next actions** (the §19 `action_centre`, capped at 4) for
+  everyone, and for a manager a compact **pulse** — attention count, money outstanding, platform health —
+  from `attention_summary` / `financial_rollup` (§27) / `system_status_worst`, each already
+  permission-aware. Computes nothing new; a non-manager sees no management pulse. Read-only; no new
+  permission. Test `test_p3_dashboard_glance.php` (11 assertions — inspector sees actions but no pulse,
+  manager sees the full pulse incl. outstanding + health, the cap). Suite **3722 passed, 0 failed**.
+  *Remaining Wave D: §35 training (the one genuinely new-domain build).*
 
 - **2026-08-27 — §49 uniform Entity-360 shell (Wave D, item 3).** Client-360 and vendor-360 are rich,
   bespoke screens; most other entities had a detail page but no consistent "whole story" view. `/entity-360?

@@ -6883,6 +6883,29 @@ function action_centre($limit = 12) {
     return $limit > 0 ? array_slice($out, 0, $limit) : $out;
 }
 
+// Phase 3 §34 — the "at a glance" strip for a landing page. Dashboards already exist (Operations home,
+// MIS, the §20 Command Centre); what the plain area landings lacked was any LIVE state above the
+// navigation tiles. This composes what a viewer may see — their own next actions (§19), and, for a
+// manager, a compact business pulse (attention count, money outstanding, platform health) — into one
+// role-aware summary. It computes nothing new: it reuses action_centre / attention_summary /
+// financial_rollup / system_status_worst, each already permission-aware. Read-only.
+function dashboard_glance() {
+    $out = ['actions' => function_exists('action_centre') ? action_centre(4) : [], 'mgmt' => null];
+    $canFin = function_exists('can') && (can('dash.financial') || (function_exists('is_master') && is_master()));
+    $canOps = function_exists('can') && (can('dash.operations') || (function_exists('is_admin_level') && is_admin_level()));
+    if ($canFin || $canOps) {
+        $attn = function_exists('attention_summary') ? attention_summary() : [];
+        $hi = 0; foreach ($attn as $a) if (in_array($a['sev'] ?? '', ['bad', 'warn', 'risk'], true)) $hi++;
+        $out['mgmt'] = [
+            'attention'    => count($attn),
+            'attention_hi' => $hi,
+            'outstanding'  => ($canFin && function_exists('financial_rollup')) ? (float)(financial_rollup([])['outstanding'] ?? 0) : null,
+            'health'       => function_exists('system_status_worst') ? system_status_worst() : 'ok',
+        ];
+    }
+    return $out;
+}
+
 // Module 34 — the business "needs attention" aggregation. Several modules already
 // COMPUTE a due/overdue/expiring count, but each lived only on its own register
 // screen, so a desk user's home showed open *totals* and never what was actually

@@ -39,6 +39,42 @@ $multi = count($d['sections']) > 1 || ($d['sections'] && $d['sections'][0]['labe
   </div>
 </div>
 
+<?php // Phase 3 §34 — a role-aware "at a glance" strip: your next actions, and (for managers) the pulse. ?>
+<?php $glance = function_exists('dashboard_glance') ? dashboard_glance() : ['actions'=>[], 'mgmt'=>null];
+      if ($glance['actions'] || $glance['mgmt']): ?>
+<div class="panel" style="margin-top:14px">
+  <?php if ($glance['mgmt']): $g = $glance['mgmt'];
+        $hc = ['ok'=>'#15803d','warn'=>'#b45309','bad'=>'var(--bad,#c0392b)'][$g['health']] ?? '#15803d';
+        $hl = ['ok'=>'Healthy','warn'=>'Needs attention','bad'=>'Action needed'][$g['health']] ?? 'Healthy'; ?>
+    <div style="display:flex;flex-wrap:wrap;gap:22px;align-items:center;margin-bottom:<?= $glance['actions'] ? '12px' : '0' ?>">
+      <a href="/command-centre" style="text-decoration:none;color:inherit"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">Needs attention</div>
+        <div style="font-weight:700;font-size:20px"><?= (int)$g['attention'] ?><?php if ($g['attention_hi']): ?> <span style="font-size:12px;color:var(--warn,#b45309);font-weight:600"><?= (int)$g['attention_hi'] ?> pressing</span><?php endif; ?></div></a>
+      <?php if ($g['outstanding'] !== null): ?>
+        <a href="/command-centre" style="text-decoration:none;color:inherit"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">Outstanding</div>
+          <div style="font-weight:700;font-size:20px;font-variant-numeric:tabular-nums"><?= e(function_exists('fmoney_short') ? fmoney_short($g['outstanding']) : number_format($g['outstanding'])) ?></div></a>
+      <?php endif; ?>
+      <a href="/system-status" style="text-decoration:none;color:inherit"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">Platform</div>
+        <div style="font-weight:700;font-size:15px;color:<?= $hc ?>">● <?= e($hl) ?></div></a>
+      <a href="/command-centre" class="btn small secondary" style="margin-left:auto">Command Centre →</a>
+    </div>
+  <?php endif; ?>
+  <?php if ($glance['actions']): ?>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+      <h3 class="tab-sub" style="margin:0">Your next actions</h3><a href="/my-work" class="muted" style="font-size:12px;text-decoration:none">My Work →</a>
+    </div>
+    <div style="display:flex;flex-direction:column;margin-top:6px">
+      <?php foreach ($glance['actions'] as $a): $c = ['info'=>'#2563eb','warn'=>'#b45309','bad'=>'var(--bad,#c0392b)'][$a['tone']] ?? '#2563eb'; ?>
+        <a href="<?= e($a['href']) ?>" style="display:flex;align-items:center;gap:10px;padding:7px 2px;border-top:1px solid var(--line,#e5e7eb);text-decoration:none;color:inherit">
+          <span style="width:7px;height:7px;border-radius:50%;background:<?= $c ?>;flex:none"></span>
+          <span style="flex:1;font-size:13.5px;font-weight:600"><?= e($a['title']) ?></span>
+          <?php if (!empty($a['overdue'])): ?><span style="font-size:11px;font-weight:700;color:var(--bad,#c0392b)">overdue</span><?php endif; ?>
+        </a>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php
   // Two or more sections become tabs at the top (app.js → initSectionTabs),
   // so a big area like Quality is a few short tabs instead of one long scroll.
