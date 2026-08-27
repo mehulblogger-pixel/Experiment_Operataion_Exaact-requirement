@@ -1005,7 +1005,10 @@ function inspectors_list($activeOnly = true) {
     link_inspector_users();
     $rows = ops_all("SELECT id, name, emp_code, sbu, salary_ctc, staff_kind, home_office_id, trade_id,
                             COALESCE(team_role,'FIELD') team_role
-                     FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name");
+                     FROM inspectors" . ($activeOnly ? " WHERE COALESCE(NULLIF(status,''),'ACTIVE')='ACTIVE'" : "") . " ORDER BY name");
+    // Field-finding #26 — a blank status counts as ACTIVE (a person with no explicit status is
+    // deputable, not hidden). This surfaces a contractor created before the insert fix; deactivation
+    // sets a real non-empty status, so the genuinely-inactive are still excluded.
     $rank = ['FIELD' => 0, 'COORD' => 1, 'OFFICE' => 2];
     usort($rows, fn($a, $b) => ($rank[$a['team_role']] ?? 0) <=> ($rank[$b['team_role']] ?? 0)
         ?: strcasecmp((string)$a['name'], (string)$b['name']));
@@ -3685,7 +3688,11 @@ function ops_inspectors($action, $method) {
             } else {
                 $pdo->prepare("INSERT INTO inspectors (first_name,middle_name,last_name,name,emp_code,designation,staff_kind,trade_id,sbus,sbu,skill_ids,email,mobile,agency_id,agency_name,home_office_id,weekly_working_days,reports_to_id,team_role,agency_cost,salary_ctc,status,created_at)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyId, $agencyName, $homeOff, $wwd, $reportTo, $teamRole, $agencyCost ?: 0, $salary ?: 0, $b['status'] ?? 'ACTIVE', date('c')]);
+                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyId, $agencyName, $homeOff, $wwd, $reportTo, $teamRole, $agencyCost ?: 0, $salary ?: 0, ($b['status'] ?? '') ?: 'ACTIVE', date('c')]);
+                // Field-finding #26 — a new team member (incl. a contractor) is ACTIVE unless a real
+                // status is chosen. Before, an empty status field created a blank status, and the person
+                // then vanished from the allocate picker and the operational dashboard (which filter on
+                // status='ACTIVE'). `?: 'ACTIVE'` coalesces the empty string, not just null.
                 $id = $pdo->lastInsertId();
                 // §WO-7 — a first certificate (with its scan and validity) can be
                 // attached right here while adding the team member.
@@ -7329,7 +7336,7 @@ function ops_reports() {
     $fin['costBySbu']=[]; $fin['costBySbuTotal']=0;
     if ($seeSalary) {
         $scopeSbuSet = scope_sbus();
-        foreach (ops_all("SELECT id, sbus, sbu, home_office_id, salary_ctc + COALESCE(agency_cost,0) salary_ctc FROM inspectors WHERE status='ACTIVE'") as $ins) {
+        foreach (ops_all("SELECT id, sbus, sbu, home_office_id, salary_ctc + COALESCE(agency_cost,0) salary_ctc FROM inspectors WHERE COALESCE(NULLIF(status,''),'ACTIVE')='ACTIVE'") as $ins) {
             if ($F['insp']!=='' && (int)$ins['id']!==(int)$F['insp']) continue;
             $ctc=(float)($ins['salary_ctc'] ?? 0); if ($ctc<=0) continue;
             // The engineer's own office decides its overhead %, exactly as the
@@ -7357,7 +7364,7 @@ function ops_reports() {
     // ---- PEOPLE & COMPLIANCE ----
     $certExp = ops_all("SELECT c.*, i.name inspector_name FROM inspector_certs c JOIN inspectors i ON i.id=c.inspector_id WHERE c.valid_to<>'' ORDER BY c.valid_to");
     $certSoon=[]; foreach ($certExp as $c){ $dleft=days_between($today,$c['valid_to']); if ($dleft!==null && $dleft<=90){ $c['days']=$dleft; $certSoon[]=$c; } }
-    $byTrade=[]; foreach (ops_all("SELECT trade_id, COUNT(*) n FROM inspectors WHERE status='ACTIVE' GROUP BY trade_id") as $r){ $byTrade[trade_label($r['trade_id'])]=$r['n']; }
+    $byTrade=[]; foreach (ops_all("SELECT trade_id, COUNT(*) n FROM inspectors WHERE COALESCE(NULLIF(status,''),'ACTIVE')='ACTIVE' GROUP BY trade_id") as $r){ $byTrade[trade_label($r['trade_id'])]=$r['n']; }
 
     // ---- top-10 customers by revenue + revenue by project (contract number) ----
     arsort($fin['byClient']); $fin['byClientTop'] = array_slice($fin['byClient'], 0, 10, true);
