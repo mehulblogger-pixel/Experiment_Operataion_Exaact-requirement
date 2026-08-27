@@ -117,6 +117,14 @@ if (function_exists('billable_events_sync')) {
         echo "Billable events: {$be['created']} derived, {$be['billed']} reconciled.\n";
 }
 
+// Revamp — Engagement entity: backfill the engagement per contract_number and
+// stamp engagement_id onto any records still carrying only the string.
+if (function_exists('engagement_backfill')) {
+    $eng = engagement_backfill();
+    if (($eng['engagements'] ?? 0) + ($eng['stamped'] ?? 0) > 0)
+        echo "Engagements: {$eng['engagements']} created, {$eng['stamped']} records stamped.\n";
+}
+
 // Automated MIS digest to leadership — weekly on Monday, monthly on the 1st.
 // A per-day guard prevents duplicates if cron runs more than once a day.
 if (function_exists('ops_run_mis_digest')) {

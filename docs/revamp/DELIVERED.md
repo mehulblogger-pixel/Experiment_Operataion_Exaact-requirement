@@ -19,6 +19,7 @@ Read the program charter (`00-program.md`), the audit/architecture
 | **P5a** Metric consolidation (R10) | Ops-desk `report_pending` now reads real state (was always 0) | REFACTOR (read-side) | `test_report_pending_metric.php` (3) |
 | **P5b** Contract control (R4) | Partner-screen contract door now enters the two-signature PENDING→endorse→approve lifecycle | control-integrity | `test_contract_backdoor_guard.php` (+2) |
 | **P6** Product packages | One-click TPIA / Staffing / Recruitment / Enterprise presets over packs + licence bundles | CONFIGURE (no new mechanism) | `test_product_package.php` (44) |
+| **P7** Engagement entity (groundwork) | First-class `engagements` (keyed to `contract_number`) + nullable `engagement_id` on calls/jobs/quotes/invoices + backfill + dual-read; string never dropped | BUILD (additive, no status) | `test_engagement_entity.php` (16) |
 | **Infra** cron require list | cron.php now derives its lib list from index.php — every nightly task runs again (was all silently dead) | maintenance | verified end-to-end |
 | **Infra** module46 isolation | Fixed a latent test leak (bogus `licence_key` left set globally) | test hygiene | suite order-independent |
 
@@ -43,7 +44,7 @@ Read the program charter (`00-program.md`), the audit/architecture
 |---|---|---|
 | **R9 — cost dual-write** | Job-close expenses and the inspector voucher both write cost; converging touches the profit engine | Introduce a canonical read (prefer `job_profit()` snapshot everywhere) with a `*_disagrees()` detector first; migrate readers only after parity is shown. A focused slice. |
 | **§29/§80 — financial dual-truth** | `jobs.invoice_amount`/`payment_received` legacy vs books ledger; switching a reader before reconciliation proves parity risks wrong money | Run the §29 reconciliation to green across the dataset, then switch remaining legacy readers one at a time. Money-critical — dedicated session. |
-| **Engagement entity** | Replacing the `contract_number` string thread with a first-class entity is a large structural change (nullable FK across calls/jobs/quotes/invoices, backfill, dual-read) | Additive: add `engagements` + nullable `engagement_id`, backfill from `contract_number`, dual-read until parity, never drop the string. Its own multi-step slice. |
+| **Engagement entity** | ~~deferred~~ **Groundwork delivered (P7)** — additive `engagements` + `engagement_id` + backfill + dual-read; string never dropped. | Remaining (future): stamp `engagement_id` on write; prefer the id in 360/rollup reads; engagement-level attributes. Not required now. |
 
 These three are financial-truth / structural changes where haste is the enemy;
 each deserves its own validated slice rather than a tail-end addition.

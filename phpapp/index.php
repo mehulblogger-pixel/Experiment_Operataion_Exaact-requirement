@@ -337,6 +337,7 @@ try {
     db()->query("SELECT billable_value FROM calls LIMIT 1");
     db()->query("SELECT verify_status FROM inspector_certs LIMIT 1");   // Slice P1 — Credential Vault
     db()->query("SELECT bill_ref FROM billable_events LIMIT 1");         // Revamp P4 — Billable Event ledger (+P4c bill_ref)
+    db()->query("SELECT engagement_id FROM calls LIMIT 1");              // Revamp — Engagement entity (additive engagement_id)
     db()->query("SELECT id FROM agencies LIMIT 1");
     db()->query("SELECT agency_id FROM inspectors LIMIT 1");
     db()->query("SELECT id FROM requisitions LIMIT 1");

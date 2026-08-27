@@ -60,6 +60,95 @@ function engagement_empty_rollup() {
     return ['quotes'=>0,'calls'=>0,'jobs'=>0,'reports'=>0,'invoices'=>0,'open_calls'=>0,'open_jobs'=>0,'billed'=>0.0];
 }
 
+// ===========================================================================
+//  Revamp — the first-class Engagement entity (additive groundwork)
+// ---------------------------------------------------------------------------
+//  §80 deferred a real Engagement entity and threaded the spine by the
+//  contract_number STRING. This introduces the entity WITHOUT abandoning the
+//  string: `engagements` is keyed 1:1 to a contract_number, and a nullable
+//  engagement_id is stamped onto calls/jobs/quotations/invoices. Everything is
+//  additive and DUAL-READ — the string still links everything (engagement()
+//  above is unchanged); the id is a stable, FK-able handle the string can't be.
+//  The string is never dropped. There is deliberately NO status column, so no
+//  new lifecycle is introduced.
+// ===========================================================================
+function engagement_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    $pk = function_exists('pk_clause') ? pk_clause() : 'INTEGER PRIMARY KEY AUTOINCREMENT';
+    db()->exec("CREATE TABLE IF NOT EXISTS engagements (
+        id $pk, engagement_key VARCHAR(120) DEFAULT '', partner_id INT DEFAULT 0,
+        title VARCHAR(200) DEFAULT '', opened_at VARCHAR(20) DEFAULT '', created_at VARCHAR(30) DEFAULT '')");
+    // One engagement per contract_number. Plain CREATE UNIQUE INDEX (MySQL rejects
+    // IF NOT EXISTS on an index) inside a guard, so the retry is harmlessly caught.
+    try { db()->exec("CREATE UNIQUE INDEX ux_engagement_key ON engagements (engagement_key)"); } catch (Throwable $e) {}
+    if (function_exists('ensure_column')) {
+        foreach (['calls', 'jobs', 'quotations', 'invoices'] as $t) ensure_column($t, 'engagement_id', 'INT NULL');
+    }
+}
+
+// Get-or-create the engagement for a contract_number. Idempotent (unique key).
+function engagement_ensure($contractNumber, $partnerId = 0, $title = '') {
+    engagement_migrate();
+    $key = trim((string)$contractNumber); if ($key === '') return 0;
+    $ex = ops_one("SELECT id FROM engagements WHERE engagement_key=?", [$key]);
+    if ($ex) return (int)$ex['id'];
+    try {
+        db()->prepare("INSERT INTO engagements (engagement_key, partner_id, title, opened_at, created_at) VALUES (?,?,?,?,?)")
+            ->execute([$key, (int)$partnerId, substr((string)$title, 0, 200), date('Y-m-d'), date('c')]);
+        return (int)db()->lastInsertId();
+    } catch (Throwable $e) {
+        // A concurrent insert lost the unique-key race — read the winner back.
+        return (int)(ops_val("SELECT id FROM engagements WHERE engagement_key=?", [$key]) ?: 0);
+    }
+}
+
+function engagement_id_for($contractNumber) {
+    engagement_migrate();
+    $key = trim((string)$contractNumber); if ($key === '') return 0;
+    return (int)(ops_val("SELECT id FROM engagements WHERE engagement_key=?", [$key]) ?: 0);
+}
+
+// Dual-read: resolve an engagement_id back to the full spine (via its string key),
+// so callers can hold the stable id and still get the same read-view.
+function engagement_by_id($id) {
+    engagement_migrate();
+    $row = ops_one("SELECT * FROM engagements WHERE id=?", [(int)$id]);
+    if (!$row) return null;
+    return engagement((string)$row['engagement_key'], (int)$row['partner_id']);
+}
+
+// Backfill: create an engagement per distinct contract_number and stamp
+// engagement_id onto the records that carry that number but have none yet.
+// Idempotent and self-guarded — safe to run repeatedly (nightly from cron).
+function engagement_backfill($limit = 2000) {
+    engagement_migrate();
+    $made = 0; $stamped = 0;
+    $keys = [];
+    foreach (['calls', 'jobs', 'quotations', 'invoices'] as $t) {
+        try {
+            foreach (ops_all("SELECT DISTINCT contract_number cn FROM $t WHERE COALESCE(contract_number,'')<>'' LIMIT " . max(1, (int)$limit)) ?: [] as $r)
+                $keys[trim((string)$r['cn'])] = true;
+        } catch (Throwable $e) {}
+    }
+    foreach (array_keys($keys) as $key) {
+        if ($key === '') continue;
+        $c = null;
+        try { $c = ops_one("SELECT partner_id, title FROM partner_contracts WHERE contract_number=? ORDER BY id DESC LIMIT 1", [$key]); } catch (Throwable $e) {}
+        $before = engagement_id_for($key);
+        $eid = engagement_ensure($key, (int)($c['partner_id'] ?? 0), (string)($c['title'] ?? ''));
+        if (!$eid) continue;
+        if (!$before) $made++;
+        foreach (['calls', 'jobs', 'quotations', 'invoices'] as $t) {
+            try {
+                $st = db()->prepare("UPDATE $t SET engagement_id=? WHERE contract_number=? AND (engagement_id IS NULL OR engagement_id=0)");
+                $st->execute([$eid, $key]);
+                $stamped += $st->rowCount();
+            } catch (Throwable $e) {}
+        }
+    }
+    return ['engagements' => $made, 'stamped' => $stamped];
+}
+
 // A drop-in "Engagement" panel for the contract detail — the whole spine under this contract_number,
 // grouped by kind, each row a link into its own module. Read-only; renders nothing without a number.
 function engagement_render($contractNumber, $partnerId = 0) {
