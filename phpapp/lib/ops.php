@@ -1748,13 +1748,13 @@ function jobs_backfill_cost_basis($limit = 500) {
     return $n;
 }
 
-// Phase 2 §28 — the financial-truth switch. OFF (default) leaves every dashboard exactly as it
-// was: MIS, the SBU-PL contract table and the boss/owner view each re-derive their own partial
-// profit. ON makes all three read the ONE canonical engine (`job_profit`, frozen per §30), so a
-// job shows the same profit everywhere. Because turning it ON moves displayed numbers (downward,
-// to the true figure — overhead/voucher/other/contingency were being dropped), it is default-OFF
-// and flipped only with explicit sign-off, after the before/after preview on /system-status.
-function finance_truth_unified() { return (string)setting_get('finance_truth_unified', '') === '1'; }
+// Phase 2 §28 — the financial-truth switch. Unified is now the shipped DEFAULT (sign-off given
+// 2026-08-26, after the before/after preview): MIS, the SBU-PL contract table and the boss/owner
+// view all read the ONE canonical engine (`job_profit`, frozen per §30), so a job shows the same
+// profit everywhere. The change was downward, to the true figure — overhead/voucher/other/
+// contingency were being dropped by the old partial formula. An installation can revert to the
+// legacy partial dashboards by setting `finance_truth_unified` to '0'.
+function finance_truth_unified() { return (string)setting_get('finance_truth_unified', '1') !== '0'; }
 
 // What the engineer claimed on their monthly voucher against this job. Kept
 // apart from the closure expenses because they are entered by different people
@@ -7007,9 +7007,15 @@ function system_status() {
     // Profit-engine consistency (salary-gated, like /profitability).
     if (function_exists('profit_reconciliation') && function_exists('can_see_salary') && can_see_salary()) {
         try { $pr = profit_reconciliation();
-            $add('profit', 'Profit-figure consistency', empty($pr['consistent']) ? 'warn' : 'ok',
-                 empty($pr['consistent']) ? 'Screens disagree' : 'Reconciled',
-                 empty($pr['consistent']) ? 'Some screens overstate profit vs the canonical engine.' : 'Every screen matches the canonical engine.', '/profitability');
+            // §28 — when unified truth is on, every screen reads the canonical engine, so the drift the
+            // partial formula would have shown is no longer live: report reconciled.
+            $unified = function_exists('finance_truth_unified') && finance_truth_unified();
+            $ok = $unified || !empty($pr['consistent']);
+            $add('profit', 'Profit-figure consistency', $ok ? 'ok' : 'warn',
+                 $ok ? ($unified ? 'Unified' : 'Reconciled') : 'Screens disagree',
+                 $unified ? 'Every dashboard reads the one canonical engine (§28 unified truth is on).'
+                          : (!empty($pr['consistent']) ? 'Every screen matches the canonical engine.' : 'Some screens overstate profit vs the canonical engine.'),
+                 '/profitability');
         } catch (Throwable $e) {}
     }
     // §29 — recognised-revenue reconciliation: where a job's legacy invoice figure

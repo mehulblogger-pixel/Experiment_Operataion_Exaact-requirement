@@ -75,6 +75,14 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — §28 FLIPPED ON (sign-off given).** `finance_truth_unified` is now the shipped **default
+  (ON)**: MIS, the SBU-P&L contract table and the owner/boss view all read the one canonical `job_profit`
+  engine, so a job shows the same profit everywhere — the true (lower) figure (the ~₹74k demo overstatement
+  is gone). `/system-status` now reads "Unified" for profit consistency; `/profitability` reads "unified is
+  ON". Reversible with `finance_truth_unified='0'`. Blast radius checked first: no existing test asserts the
+  old partial-formula numbers (module20 uses `boss_profit` with 0 jobs; simplify/module50 assert no values).
+  Docs updated to match (canonical model, review, runbook). Suite **3584 passed, 0 failed**.
+
 - **2026-08-26 — Verification runbook + test-runner filter + honest self-correction.** Added
   `docs/phase-2/04-verification-runbook.md` (four layers: full suite → single control → self-reporting
   screens → manual UI) and an optional substring filter to `tests/run.php` (`php tests/run.php <name>`;

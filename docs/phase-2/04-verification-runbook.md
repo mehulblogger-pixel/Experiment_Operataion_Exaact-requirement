@@ -99,8 +99,9 @@ MIS/SBU-PL (partial):     profit 5,821,590.00
 Overstatement:               +74,302.72   (overhead 59,168 + contingency 11,304.72 + voucher 3,830)
 ```
 
-This is what `/profitability` previews and what turning `finance_truth_unified` ON would correct —
-downward, to the canonical figure. Default is OFF; nothing has changed until you flip it.
+This overstatement is now **corrected**: `finance_truth_unified` is the shipped default (ON), so every
+dashboard shows the canonical (lower, true) figure. `/system-status` reads "Unified"; `/profitability`
+reads "Unified financial truth is ON". Revert with `finance_truth_unified='0'` if ever needed.
 
 ## The paper trail
 

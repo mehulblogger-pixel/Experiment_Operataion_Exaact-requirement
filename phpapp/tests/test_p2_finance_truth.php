@@ -21,7 +21,9 @@ try {
     $_SESSION['uid'] = (int)$pdo->lastInsertId();
     if (function_exists('current_user')) current_user(true); if (function_exists('ua')) ua(true);
 
-    t_ok(finance_truth_unified() === false, 'the switch defaults OFF (no key set)');
+    t_ok(finance_truth_unified() === true, 'unified is the shipped default (ON) after §28 sign-off');
+    setting_set('finance_truth_unified', '0');
+    t_ok(finance_truth_unified() === false, "an installation can revert with '0'");
 
     // Our own office + two closed jobs with a cost the partial formula drops (other_cost), so the two
     // bases genuinely differ and the switch has something to move.
@@ -43,8 +45,8 @@ try {
     }
     t_ok(round($canonProfit, 2) !== round($partialProfit, 2), 'the two bases genuinely differ (other_cost is dropped by the partial formula)');
 
-    // OFF — MIS shows the historical partial figure, unchanged. (The totals live under ['tot'].)
-    setting_set('finance_truth_unified', '');
+    // OFF ('0') — MIS shows the historical partial figure, unchanged. (The totals live under ['tot'].)
+    setting_set('finance_truth_unified', '0');
     $off = mis_summary($F)['tot'];
     t_eq(round((float)$off['profit'], 2), round($partialProfit, 2), 'OFF: MIS total profit is the historical partial formula');
 

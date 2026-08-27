@@ -1,10 +1,10 @@
 # §28 — Financial Truth Engine · convergence review (for sign-off)
 
-**Status:** ANALYSIS + **BUILT default-OFF (2026-08-26).** Options 1 + 2 are implemented behind the
-`finance_truth_unified` setting (**default OFF — no displayed number has changed**). The before/after
-preview is live on `/profitability`. Flipping the switch ON is the remaining step and still needs your
-explicit sign-off against the preview. This is the delta review the phase requires, because §28
-**changes displayed profit numbers**.
+**Status:** ✅ **DONE — flipped ON (2026-08-26, sign-off given).** Options 1 + 2 are live: unified is the
+shipped **default**, so MIS, the SBU-P&L contract table and the owner/boss view now all show the canonical
+`job_profit` figure. Option 3 (basis reconciliation) is live too. An installation can revert to the legacy
+partial dashboards with `finance_truth_unified='0'`. Displayed profit is now the true (lower) figure —
+the ₹74k demo overstatement is gone. This was the delta review the phase required before the flip.
 
 Measured on the demo dataset (104 jobs) via `profit_reconciliation()` — the §29/Module-32 read-only
 consistency engine — with all closed jobs' cost basis frozen (§30).

@@ -49,9 +49,11 @@ a second table, a second calculation, or a second status system.**
 - **Reproducibility (§30):** a closed job freezes its rate basis (`cost_daily_base`/`cost_oh_pct`/
   `cost_contingency_pct`/`cost_basis_at`); `job_profit` prefers the snapshot, so historical profit does
   **not** drift. `job_cost_snapshot()` at close + `jobs_backfill_cost_basis()` nightly.
-- **Consistency check:** `profit_reconciliation()` (§32/Module 32) measures where a screen re-derives a
-  partial profit. **Deferred / needs sign-off (§28):** converging MIS/SBU-PL and `boss_profit` onto the
-  engine changes displayed numbers — do not do it without explicit approval.
+- **One truth across every screen (§28 — DONE):** MIS, the SBU-PL contract table and the owner/boss view
+  all read `job_profit` — `finance_truth_unified` is the shipped **default (ON)** (sign-off 2026-08-26),
+  so a job shows the same profit everywhere. Revert to the legacy partial dashboards with
+  `finance_truth_unified='0'`. `profit_reconciliation()` (§32/Module 32) still measures the canonical-vs-
+  partial gap for the SBU-PL basis reconciliation (§28 Option 3) and reports "unified" on `/system-status`.
 - **Overhead:** period-locked pool (`cost_runs`/`office_expenses`) + `overhead_recovery()`; the per-job
   rate is now frozen at close (§30).
 
