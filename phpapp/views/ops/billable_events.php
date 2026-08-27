@@ -67,7 +67,11 @@
                 <?php if ($st === 'PENDING'): ?>
                   <form method="post" action="/billable-approve" style="display:inline;margin:0"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><button class="btn small" type="submit">Approve</button></form>
                 <?php elseif ($st === 'APPROVED'): ?>
-                  <form method="post" action="/billable-bill" style="display:inline-flex;gap:4px;margin:0 0 4px"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input name="invoice_ref" placeholder="invoice #" style="width:100px"><button class="btn small" type="submit">Mark billed</button></form>
+                  <?php if ($r['source_module'] !== 'job'): ?>
+                    <form method="post" action="/billable-bill" style="display:inline-flex;gap:4px;margin:0 0 4px"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input name="invoice_ref" placeholder="invoice #" style="width:100px"><button class="btn small" type="submit">Mark billed</button></form>
+                  <?php else: ?>
+                    <span class="muted" style="font-size:11px;display:block;margin-bottom:4px" title="A job-sourced event is marked billed automatically when its books invoice is issued.">bills via invoice</span>
+                  <?php endif; ?>
                   <form method="post" action="/billable-dispute" style="display:inline-flex;gap:4px;margin:0"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input name="reason" placeholder="reason" style="width:100px"><button class="btn small secondary" type="submit">Dispute</button></form>
                 <?php elseif ($st === 'DISPUTED'): ?>
                   <form method="post" action="/billable-approve" style="display:inline;margin:0"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><button class="btn small" type="submit">Re-approve</button></form>

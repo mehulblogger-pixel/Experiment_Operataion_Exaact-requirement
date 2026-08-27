@@ -263,7 +263,17 @@ function mobilization_readiness($jobId) {
     $job = $jobId ? ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]) : null;
     if (!$job) return null;
     $insp   = (int)($job['inspector_id'] ?? 0);
-    $onDate = substr((string)($job['inspection_start_date'] ?? ($job['scheduled_date'] ?? '')), 0, 10) ?: date('Y-m-d');
+    // The work date the gates check must be the posting's real start. A blank
+    // inspection_start_date column is '' (not null), so a plain ?? would skip the
+    // scheduled_date fallback and drop through to today — running competence /
+    // authorisation / site-doc / expiry checks against the wrong date. Take the
+    // first non-empty date, exactly like allocation does.
+    $onDate = '';
+    foreach (['inspection_start_date', 'scheduled_date'] as $k) {
+        $d = substr((string)($job[$k] ?? ''), 0, 10);
+        if ($d !== '') { $onDate = $d; break; }
+    }
+    if ($onDate === '') $onDate = date('Y-m-d');
 
     // Client + site come from the originating call (never re-stored on the job).
     $clientId = 0; $siteAddr = 0;

@@ -116,6 +116,11 @@ function billable_mark_billed($id, $ref) {
     if (!$id || $ref === '') return false;
     $e = ops_one("SELECT * FROM billable_events WHERE id=?", [$id]);
     if (!$e || ($e['status'] ?? '') !== 'APPROVED') return false;
+    // Attestation is only for sources with no automatic invoice linkage (timesheet,
+    // placement). A JOB_CLOSED event must reconcile via its real books invoice
+    // (books_invoices_for_job), so it stays on the unbilled board until an invoice
+    // actually exists — never billed on a typed reference alone.
+    if (($e['source_module'] ?? '') === 'job') return false;
     db()->prepare("UPDATE billable_events SET status='BILLED', bill_ref=?, updated_at=? WHERE id=?")
         ->execute([substr($ref, 0, 80), date('c'), $id]);
     return true;
@@ -260,11 +265,19 @@ function billable_events_sync($limit = 500) {
 
     if (function_exists('books_invoices_for_job')) {
         foreach (ops_all("SELECT * FROM billable_events WHERE source_module='job' AND status IN ('PENDING','APPROVED')") ?: [] as $e) {
-            $inv = books_invoices_for_job((int)$e['source_id']);
-            if ($inv) {
-                $i = $inv[0];
+            // Reconcile to BILLED only against an ISSUED invoice. books_invoices_for_job()
+            // deliberately returns DRAFT invoices too, and a draft line can still be
+            // deleted before issue — marking BILLED off a draft would wrongly drop the
+            // event from unbilled work and leave it stuck terminal if the draft is
+            // removed or never issued.
+            $issued = null;
+            foreach ((books_invoices_for_job((int)$e['source_id']) ?: []) as $iv) {
+                $st = strtoupper((string)($iv['status'] ?? ''));
+                if ($st !== '' && $st !== 'DRAFT' && $st !== 'CANCELLED') { $issued = $iv; break; }
+            }
+            if ($issued) {
                 db()->prepare("UPDATE billable_events SET status='BILLED', invoice_id=?, amount=?, updated_at=? WHERE id=?")
-                    ->execute([(int)$i['id'], (float)($i['total'] ?? $e['amount']), date('c'), (int)$e['id']]);
+                    ->execute([(int)$issued['id'], (float)($issued['total'] ?? $e['amount']), date('c'), (int)$e['id']]);
                 $billed++;
             }
         }
