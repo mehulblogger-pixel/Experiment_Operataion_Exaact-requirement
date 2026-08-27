@@ -242,6 +242,139 @@ function pdso_mob_readiness($jobId, $phase = 'MOB') {
             'required_open'=>$req-$reqDone,'ready'=>($req-$reqDone) === 0];
 }
 
+// ---------------------------------------------------------------------------
+//  Slice P2 — Mobilization readiness (person-centric, read-only CONNECT)
+//
+//  "What is preventing THIS PERSON from mobilizing to THIS posting?" — one
+//  answer that composes the gates that already exist, instead of making the
+//  coordinator open five screens: the deputation checklist (above), the
+//  competence gate (competence_block / auth_block), the site-document
+//  requirements (sitedoc_check), general identity readiness, credential expiry
+//  (Slice P1's credential_status), and outstanding assets.
+//
+//  Additive & non-destructive: no table, no status, no permission. Every probe
+//  is function_exists-guarded and try-safe, so a client running only some of the
+//  modules still gets a correct, narrower answer. Mandatory-cert and
+//  authorisation blocks mirror the real allocation gate exactly — this reads it,
+//  it does not re-implement or change it.
+// ---------------------------------------------------------------------------
+function mobilization_readiness($jobId) {
+    $jobId = (int)$jobId;
+    $job = $jobId ? ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]) : null;
+    if (!$job) return null;
+    $insp   = (int)($job['inspector_id'] ?? 0);
+    $onDate = substr((string)($job['inspection_start_date'] ?? ($job['scheduled_date'] ?? '')), 0, 10) ?: date('Y-m-d');
+
+    // Client + site come from the originating call (never re-stored on the job).
+    $clientId = 0; $siteAddr = 0;
+    if (!empty($job['call_id'])) {
+        try {
+            $call = ops_one("SELECT client_id, site_address_id FROM calls WHERE id=?", [(int)$job['call_id']]);
+            if ($call) { $clientId = (int)($call['client_id'] ?? 0); $siteAddr = (int)($call['site_address_id'] ?? 0); }
+        } catch (Throwable $e) {}
+    }
+
+    $block = []; $warn = [];
+    $addB = function ($src, $txt) use (&$block) { $t = trim((string)$txt); if ($t !== '') $block[] = ['source' => $src, 'text' => ucfirst($t)]; };
+    $addW = function ($src, $txt) use (&$warn)  { $t = trim((string)$txt); if ($t !== '') $warn[]  = ['source' => $src, 'text' => ucfirst($t)]; };
+
+    // 1. Deputation mobilization checklist — required items still open.
+    $chk = ['total' => 0, 'required_open' => 0];
+    if (function_exists('pdso_mob_readiness')) {
+        $chk = pdso_mob_readiness($jobId, 'MOB');
+        if ((int)($chk['total'] ?? 0) === 0)          $addW('Checklist', 'No mobilization checklist has been started.');
+        elseif ((int)($chk['required_open'] ?? 0) > 0) $addB('Checklist', (int)$chk['required_open'] . ' required checklist item(s) still open.');
+    }
+
+    if ($insp) {
+        // 2. Competence — a required certificate lapsed by the work date (the real gate).
+        if (function_exists('competence_block')) { try { $addB('Competence', competence_block($insp, $onDate)); } catch (Throwable $e) {} }
+        // 2b. Authorisation — only blocks when enforcement is switched on (mirrors auth_block).
+        if (function_exists('auth_block')) {
+            try { $addB('Authorisation', auth_block($insp, (string)($job['inspection_type'] ?? ''), (int)($job['activity_id'] ?? 0), $clientId, $onDate)); }
+            catch (Throwable $e) {}
+        }
+        // 3. Site documents required by this client/site on this date.
+        if ($clientId && function_exists('sitedoc_check')) {
+            try {
+                $sc = sitedoc_check($insp, $clientId, $siteAddr ?: null, $onDate);
+                foreach (($sc['block'] ?? []) as $t) $addB('Site documents', $t);
+                foreach (($sc['warn'] ?? [])  as $t) $addW('Site documents', $t);
+            } catch (Throwable $e) {}
+        }
+        // 3b. General identity readiness — required docs missing (advisory).
+        if (function_exists('person_docs_summary')) {
+            try { $ds = person_docs_summary($insp, 'INSPECTOR');
+                  if (!empty($ds['missing'])) $addW('Identity', 'Missing identity document(s): ' . implode(', ', $ds['missing']) . '.'); }
+            catch (Throwable $e) {}
+        }
+        // 4. Credential expiry / rejection (Slice P1). Mandatory-expired is already a
+        //    competence block, so only surface expiring-soon (warn) and rejected (block) here.
+        if (function_exists('credential_status')) {
+            try {
+                $exp = [];
+                foreach (ops_all("SELECT * FROM inspector_certs WHERE inspector_id=?", [$insp]) ?: [] as $c) {
+                    $st = credential_status($c, $onDate);
+                    if ($st === 'REJECTED')      $addB('Credential', 'Credential rejected on verification: ' . $c['name'] . '.');
+                    elseif ($st === 'EXPIRING')  $exp[] = $c['name'];
+                }
+                if ($exp) $addW('Credential', 'Expiring soon: ' . implode(', ', array_values(array_unique($exp))) . '.');
+            } catch (Throwable $e) {}
+        }
+        // 5. Outstanding assets — issued but not acknowledged (advisory).
+        if (function_exists('person_assets_summary')) {
+            try { $as = person_assets_summary($insp);
+                  if ((int)($as['noack'] ?? 0) > 0) $addW('Assets', (int)$as['noack'] . ' issued asset(s) not yet acknowledged.'); }
+            catch (Throwable $e) {}
+        }
+    } else {
+        $addW('Allocation', 'No ' . (function_exists('Tl') ? Tl('engineer') : 'engineer') . ' is allocated to this posting yet.');
+    }
+
+    return ['job_id' => $jobId, 'inspector_id' => $insp, 'on_date' => $onDate,
+            'ready' => count($block) === 0, 'blockers' => $block, 'warnings' => $warn,
+            'checklist' => $chk];
+}
+
+// A compact badge for a board row: ✓ Ready, or "n blocker(s)".
+function mobilization_readiness_badge($jobId) {
+    $r = mobilization_readiness($jobId);
+    if (!$r) return '';
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    if ($r['ready']) {
+        $w = count($r['warnings']);
+        return '<span class="pill p-ok">✓ Ready</span>' . ($w ? ' <span class="muted" style="font-size:11px">' . $w . ' note' . ($w > 1 ? 's' : '') . '</span>' : '');
+    }
+    $n = count($r['blockers']);
+    return '<span class="pill p-bad" title="' . $e($r['blockers'][0]['source'] . ': ' . $r['blockers'][0]['text']) . '">⛔ ' . $n . ' blocker' . ($n > 1 ? 's' : '') . '</span>';
+}
+
+// The full readiness panel for the deputation detail (included from
+// _deputation_panel.php). Read-only; renders nothing for a non-deputation.
+function mobilization_readiness_render($jobId) {
+    $r = mobilization_readiness($jobId);
+    if (!$r) return;
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    echo '<div class="panel" id="mobilization-readiness"><div class="ctitle" style="margin-top:0"><h3>🚦 Mobilization readiness '
+       . ($r['ready'] ? '<span class="pill p-ok" style="margin-left:6px">✓ Ready to mobilize</span>'
+                      : '<span class="pill p-bad" style="margin-left:6px">⛔ Blocked</span>')
+       . '</h3></div>';
+    echo '<p class="muted" style="margin:0 0 8px;font-size:12px">What is preventing this '
+       . $e(function_exists('Tl') ? Tl('engineer') : 'engineer') . ' from mobilizing, for work dated ' . $e($r['on_date']) . '.</p>';
+    if ($r['blockers']) {
+        echo '<div style="font-weight:600;margin:6px 0 2px">Blockers</div><ul style="margin:0 0 8px">';
+        foreach ($r['blockers'] as $b) echo '<li><span class="pill p-bad" style="font-size:10px">' . $e($b['source']) . '</span> ' . $e($b['text']) . '</li>';
+        echo '</ul>';
+    }
+    if ($r['warnings']) {
+        echo '<div style="font-weight:600;margin:6px 0 2px">Notes</div><ul style="margin:0">';
+        foreach ($r['warnings'] as $w) echo '<li><span class="pill p-warn" style="font-size:10px">' . $e($w['source']) . '</span> ' . $e($w['text']) . '</li>';
+        echo '</ul>';
+    }
+    if (!$r['blockers'] && !$r['warnings']) echo '<p class="muted" style="margin:0">Everything required for mobilization is in place.</p>';
+    echo '</div>';
+}
+
 // ---- Manpower plan & gap (§45/§46) -----------------------------------------
 function pdso_manpower($clientId = 0, $project = null) {
     $w = "1=1"; $a = [];

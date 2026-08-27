@@ -136,7 +136,7 @@
     <div class="tbl-wrap">
       <table class="tbl">
         <thead><tr><th><?= e(function_exists('THP') ? THP('job') : 'Deputation') ?></th><th>Person</th><th>Client</th>
-          <th>Site</th><th>Period</th><th>Status</th></tr></thead>
+          <th>Site</th><th>Period</th><th>Status</th><th>Readiness</th></tr></thead>
         <tbody>
         <?php foreach ($rows as $r): $st = (string)($r['dep_status'] ?? ''); ?>
           <tr>
@@ -146,6 +146,7 @@
             <td><?= e($r['dep_site'] ?: '—') ?></td>
             <td style="white-space:nowrap"><?= e($fmtDate($r['inspection_start_date'] ?? '')) ?> – <?= e($fmtDate($r['inspection_end_date'] ?? '')) ?></td>
             <td><?php if ($st !== ''): ?><span class="pill <?= $tone($st) ?>"><?= e($lbl($st)) ?></span><?php else: ?><span class="muted">—</span><?php endif; ?></td>
+            <td><?= function_exists('mobilization_readiness_badge') ? mobilization_readiness_badge((int)$r['id']) : '' ?></td>
           </tr>
         <?php endforeach; ?>
         </tbody>

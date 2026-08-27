@@ -20,6 +20,9 @@
       <?= e($fmt($dep['conflicts'][0]['from'])) ?> – <?= e($fmt($dep['conflicts'][0]['to'])) ?>. Nobody has been moved.</div>
   <?php endif; ?>
 
+  <?php // Slice P2 — the "what is blocking this person from mobilizing?" summary.
+    if (function_exists('mobilization_readiness_render')) mobilization_readiness_render($jid); ?>
+
   <!-- Lifecycle -->
   <div class="ctitle"><h3 style="font-size:14px">Lifecycle</h3></div>
   <?php if ($depCanEdit): ?>
