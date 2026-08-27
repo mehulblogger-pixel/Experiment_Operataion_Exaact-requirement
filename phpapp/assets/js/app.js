@@ -1381,6 +1381,55 @@
     initTabAnchors();
     initModuleCrumb();
     initResponsiveTables();
+    initEmbedModals();
+  }
+
+  // ---- In-page popups (Field #9/#10) --------------------------------------
+  // A [data-embed="/url"] trigger opens the existing screen at that URL in a modal iframe ON TOP of the
+  // current page — so a coordinator can add a site address or raise a call without leaving where they are.
+  // The embedded screen renders bare (embed=1); when it saves, its redirect posts {embedDone} back here and
+  // the popup closes and refreshes the host so the new record shows. No page you were working on is lost.
+  function initEmbedModals() {
+    if (window.__embedInit) return; window.__embedInit = 1;
+    document.addEventListener('click', function (e) {
+      var t = e.target.closest ? e.target.closest('[data-embed]') : null;
+      if (!t) return;
+      e.preventDefault();
+      openEmbed(t.getAttribute('data-embed'), t.getAttribute('data-embed-title') || t.textContent.trim());
+    });
+    window.addEventListener('message', function (ev) {
+      if (ev.data && ev.data.embedDone) closeEmbed(true);
+    });
+  }
+  function openEmbed(url, title) {
+    if (!url) return;
+    closeEmbed(false);
+    var src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'embed=1';
+    var back = document.createElement('div');
+    back.className = 'embed-backdrop'; back.id = 'embed-backdrop';
+    var dlg = document.createElement('div'); dlg.className = 'embed-dialog';
+    var head = document.createElement('div'); head.className = 'embed-head';
+    var h = document.createElement('span'); h.textContent = title || 'Add';
+    var x = document.createElement('button'); x.type = 'button'; x.className = 'embed-x'; x.setAttribute('aria-label', 'Close'); x.innerHTML = '&times;';
+    var frame = document.createElement('iframe'); frame.className = 'embed-frame'; frame.src = src; frame.title = title || 'Add';
+    head.appendChild(h); head.appendChild(x);
+    dlg.appendChild(head); dlg.appendChild(frame);
+    back.appendChild(dlg);
+    document.body.appendChild(back);
+    document.body.style.overflow = 'hidden';
+    back.addEventListener('click', function (e) { if (e.target === back) closeEmbed(false); });
+    x.addEventListener('click', function () { closeEmbed(false); });
+    document.addEventListener('keydown', embedEsc);
+    setTimeout(function () { try { x.focus(); } catch (_) {} }, 40);
+  }
+  function embedEsc(e) { if (e.key === 'Escape') closeEmbed(false); }
+  function closeEmbed(done) {
+    var b = document.getElementById('embed-backdrop');
+    if (b) b.parentNode.removeChild(b);
+    document.body.style.overflow = '';
+    document.removeEventListener('keydown', embedEsc);
+    // A save closes AND refreshes the host so the just-added record is on screen.
+    if (done) { try { location.reload(); } catch (_) {} }
   }
 
   // The breadcrumb on a register read "Home › Opportunities" — nothing took you

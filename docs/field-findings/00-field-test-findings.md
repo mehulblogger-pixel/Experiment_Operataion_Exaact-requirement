@@ -32,7 +32,7 @@ original list.
 | # | Type | Sev | Finding | Status |
 |---|---|---|---|---|
 | 3 | 🎯 | P1 | **Add a contract:** "Qty sold" must be **multi-line** (multiple items — mandays / man-month / other); if **no quotation/line item exists, allow adding it inline**. Also add **Edit / Delete a contract** once created. | ☐ |
-| 9 | 🧭 | P1 | After OM + BM **endorse the contract → jump to site address → no way back**; flow is confusing. Proposal: either add **"Raise new inspection call" under Jobs** in client registration, or (preferred) **open the other module as a modal/pop-up on the same screen** and, on save, show the added details **without a page refresh**. *Is inline/modal add feasible? (architecture decision).* | ☐ |
+| 9 | 🧭 | P1 | After OM + BM **endorse the contract → jump to site address → no way back**; flow confusing. **✅ FIXED (framework + 2 flows).** *Approach (your pick):* **in-page popup (iframe modal)**. Built a reusable, **zero-per-screen** framework: a `[data-embed="/url"]` trigger opens the existing target screen in a modal iframe rendered **bare** (`embed=1`, no chrome); forms are stamped with `_embed=1` so a post-save **`redirect()` posts `{embedDone}` to the host** which **closes the popup and refreshes** — so the page you were on is never lost and every screen works in the popup untouched. Wired both named flows on **client-360**: **Raise inspection call** (`/call-new`) and **Edit / add address** (`/partner-edit`), each with a plain `href` fallback for JS-off. Test `test_field09_embed_modal.php` (15 assertions). Suite **3821/0**. *(Same framework resolves #10 — see that row.)* | ✅ |
 
 ## D. Inspection call / job allocation
 

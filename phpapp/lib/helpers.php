@@ -3,7 +3,29 @@
 
 function e($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
-function redirect($path) { header("Location: $path"); exit; }
+// Field-finding #9/#10 — the in-page popup ("embed") framework. A screen opened inside the modal iframe
+// carries embed=1 (in the URL) or _embed=1 (stamped into every form on the way out), so it renders bare and,
+// crucially, a post-save redirect signals the PARENT page to close the popup and refresh — instead of
+// navigating the little iframe. Any existing add/edit screen works in the popup with no change of its own.
+function is_embed() { return (($_GET['embed'] ?? $_POST['_embed'] ?? '') === '1'); }
+
+function redirect($path) {
+    if (function_exists('is_embed') && is_embed()) {
+        // Inside the popup: tell the host to close + refresh (it knows where we ended up), and fall back to
+        // navigating the iframe itself if the message can't be posted (opened outside a modal).
+        header('Content-Type: text/html; charset=utf-8');
+        $j = json_encode((string)$path);
+        echo '<!doctype html><meta charset="utf-8"><script>try{parent.postMessage({embedDone:1,url:' . $j . '},"*");}catch(e){location.href=' . $j . ';}</script>';
+        exit;
+    }
+    header("Location: $path"); exit;
+}
+
+// Stamp a hidden _embed flag into every form, so a POST from inside the popup is recognised as embedded even
+// though it posts to its own action URL (which carries no query string). Mirrors csrf_stamp_forms().
+function embed_stamp_forms($html) {
+    return preg_replace('/(<form\b[^>]*>)/i', '$1<input type="hidden" name="_embed" value="1">', (string)$html);
+}
 
 // Back to the screen they were on, when a submission is turned away.
 //
