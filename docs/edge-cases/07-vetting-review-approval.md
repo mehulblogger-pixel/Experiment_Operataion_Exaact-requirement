@@ -239,3 +239,42 @@ correction" (display only, stored status unchanged). Default: **yes, do it** (pu
    hidden Finalize; §11.1 behaviour matches the chosen option.
 5. No new permission constant; no transition/gate function modified (diff-scoped assertion).
 6. Every button's shown-when and reason-mandatory conditions unchanged (regression).
+
+---
+
+## 13. Turning vetting on/off — the switch (Field-finding #16)
+
+**Question from the field walkthrough:** *how is vetting turned on/off in the system?*
+
+**Answer — one admin toggle, off by default.**
+
+- **Screen:** **Settings → Vetting checklist** (`/vetting-checklist`, handler
+  `ops_idems_vetting_checklist`, `idems.php:6303`). Who may set it: **master**, or a user
+  with `idems.type.manage` or `idems.finalize`.
+- **The switch:** the **"Require technical vetting before approval"** checkbox
+  (`gate_required` → stored as the `vetting_gate_required` setting;
+  read by `idems_vetting_gate_on()` / `idems_vetting_required()`, `idems.php:6152-6160`).
+  - **OFF (default):** a submitted report goes **straight to the approval chain**
+    (`DRAFT → SUBMITTED → UNDER_REVIEW → APPROVED → ISSUED`). Nothing changes for a tenant
+    that never enables it.
+  - **ON:** every report must be **technically vetted first**
+    (`DRAFT → SUBMITTED → VETTING → (vetted) → UNDER_REVIEW → APPROVED → ISSUED`); the issue
+    readiness gate hard-blocks until vetting is cleared (`idems.php:6019-6022`).
+  - **Exclusion:** **Release Notes (`RN`/`IRN`) never need vetting** even when the gate is on
+    — they go straight to the approver (`idems_vetting_required()` returns false for them).
+- **Two related, independent sub-settings on the same screen** (each off by default):
+  - **`vetting_checklist_on`** — show the vetting authority a checklist of points to tick
+    before clearing (`idems_vetting_checklist_enabled()`).
+  - **`vetting_checklist_require`** — require **every applicable** point ticked before a
+    report can be vetted (`idems_vetting_checklist_require_all()`).
+  - **`vetting_checklist_items`** — the check points, one per line
+    (`idems_vetting_checklist_items()`; a starter list is offered, never applied unless saved).
+- **Vetter identity flows to the sign-off block** as **"Reviewed by"** (Field #15):
+  `vet_by`/`vet_at` → `idems_report_signatures()['vetter']` → the report's Reviewed-by row.
+
+**Draft copy before approval (Field #16, part 1).** The inspector can download the report as
+a **draft at any point before it is issued** — the report detail's primary **"📄 Download
+draft"** button (and *More ▾ → PDF (draft)*) serve the current PDF, printed **watermarked
+DRAFT** with a `_DRAFT` filename (`ops_idems_pdf`, `idems.php:7648`). No submit or approval is
+required to pull it; it is the same PDF the workflow will carry, so "read it over, then submit"
+needs no separate export.
