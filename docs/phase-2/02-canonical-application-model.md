@@ -21,7 +21,7 @@ a second table, a second calculation, or a second status system.**
 | **Evidence** | `report_files` + trust chain (`lib/trust.php`) | `report_files`, `site_visits` | First-class object with hash chain; served only through access-checked handlers. |
 | **Equipment** | `lib/equipment.php` | `equipment`, `equipment_calibrations` | Calibration impact is *review*, never auto-invalidation. |
 | **Quality Case** (view) | `quality_case()` (`lib/qualitycase.php`, §39) | `nonconformities`, `capa`, `complaints`, audits, risks | A read-only umbrella over the existing modules via their FKs. Not a new table. |
-| **Financial event** | *not yet canonical* (§27) | `quotations`, `invoices`, `receipts`, `vouchers`, `expenses`, `credit_recon` | Deferred (P2/P3). Until built, dashboards consume the per-job engine (below), not their own money truth. |
+| **Financial event** | `financial_events()` / `financial_rollup()` (`lib/finevent.php`, §27) | `quotations`, `invoices`, `receipts`, `credit_notes` | A **read-only projection** over the existing money records into one uniform, time-ordered stream (accepted quote → invoice → receipt → credit) + rollup. Reads the books ledger, so it cannot drift. **Not a new event table** — dashboards read `financial_events`, they do not re-shape the money tables themselves. |
 
 ## 2. Canonical statuses
 

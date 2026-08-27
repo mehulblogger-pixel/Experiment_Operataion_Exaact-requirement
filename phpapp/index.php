@@ -227,6 +227,7 @@ try {
     require __DIR__ . '/lib/settlement.php';       // Phase 2 §32 — inter-office settlement matrix (read-only)
     require __DIR__ . '/lib/invready.php';         // Phase 2 §33 — invoice readiness (advisory; strict-gated)
     require __DIR__ . '/lib/tasks.php';            // Phase 3 §26 — canonical persisted task
+    require __DIR__ . '/lib/finevent.php';         // Phase 3 §27 — financial-event stream (read-only projection)
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
     ops_fatal('A program file is missing or has an error', 'Re-upload the app — make sure <b>lib/ops.php</b> and the <b>views/ops/</b> folder are present.', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine(), true);

@@ -70,6 +70,9 @@
   <?= geofence_editor('partner-geo', (int)$p['id'], ['lat'=>$p['site_lat'] ?? null, 'lon'=>$p['site_lon'] ?? null, 'rad'=>(int)($p['geofence_m'] ?? 0)]) ?>
 </details>
 <?php endif; ?>
+<?php // Phase 3 §27 — this client's money as one time-ordered stream (quotes → invoices → receipts → credits). ?>
+<?php if (function_exists('financial_events_render')) financial_events_render(['partner_id' => (int)$p['id']], 'Money timeline'); ?>
+
 <?php $g = $group ?? ['parent'=>null,'subs'=>[],'opts'=>[]]; ?>
 <?php if ($g['parent'] || $g['subs'] || !empty($canWrite)): ?>
 <div class="panel" style="margin-top:16px">

@@ -70,4 +70,16 @@ engine is already the one truth; Wave D must read it, never re-derive).
   `task_render_for_entity()` panel for record pages. **No new permission** — gated on `current_user` and
   `is_coordinator_level`. The aggregators are untouched; §26 feeds **one** derived "my tasks" count back
   into `ops_pending_tasks`, so My Work stays unified. Test `test_p3_tasks.php` (19 assertions).
-  Suite **3603 passed, 0 failed**. *Next: §27 financial-event stream, then Wave B (§19 Action Centre reads §26).*
+  Suite **3603 passed, 0 failed**.
+
+- **2026-08-27 — §27 financial-event stream (Wave A, item 2).** `lib/finevent.php` — a **read-only
+  projection** that turns the existing money records (accepted quotations, issued/cancelled invoices,
+  receipts, credit notes) into one uniform, time-ordered stream (`financial_events()`) with a rollup
+  (`financial_rollup()`: committed · billed · cancelled · received · credited · net-billed · outstanding).
+  It reads the books ledger + quotations, so it **cannot drift** from them (unlike a parallel event
+  table — the mistake §29 exists to catch); every projection is guarded and office-scoped (fail-closed).
+  A `financial_events_render()` panel wired onto the **client-360** screen (a client's money story), and
+  reusable by the coming §20 Command Centre. Filters: partner / contract / office / date / limit.
+  Test `test_p3_finevent.php` (19 assertions — every kind projected, DRAFT excluded, rollup arithmetic,
+  date + partner filters). Suite **3622 passed, 0 failed**. *Wave A complete. Next: Wave B — §19 Action
+  Centre (reads §26 tasks), then §20 Command Centre (reads §27 stream + attention band).*
