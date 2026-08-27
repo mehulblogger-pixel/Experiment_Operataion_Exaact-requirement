@@ -48,7 +48,7 @@ Foundations first, because the management surfaces consume them.
 | §34 | Dashboard expansion | Deeper role dashboards on top of §20. |
 | §35 | Training attendance | Attendance capture + competence linkage. |
 | §16 | Vendor-360 depth | ✅ **done** — contacts (recognised across the system, §23/24) + full activity history, to client-360 parity. |
-| §49 | Entity-360 | A uniform 360 shell across entities. |
+| §49 | Entity-360 | ✅ **done** — one uniform 360 route composing tasks/history/quality/party per entity kind. |
 
 **Not in Phase 3 without explicit sign-off:** anything that changes displayed financial figures (the §28
 engine is already the one truth; Wave D must read it, never re-derive).
@@ -60,6 +60,18 @@ engine is already the one truth; Wave D must read it, never re-derive).
 3. **§50 and Wave D** are independent of A/B and can run in parallel or after, by appetite.
 
 ## Done log
+
+- **2026-08-27 — §49 uniform Entity-360 shell (Wave D, item 3).** Client-360 and vendor-360 are rich,
+  bespoke screens; most other entities had a detail page but no consistent "whole story" view. `/entity-360?
+  kind=&id=` (`lib/entity360.php`) assembles ONE consistent panel set for any registered entity —
+  reusing the cross-cutting engines already built: tasks (§26), the activity spine (§17), quality case
+  (§39), the person matcher (§23/24). A registry declares which panels apply per kind (quality only for
+  NCR/CAPA/complaint; party only for a person; tasks+history for all). Fail-closed: an unregistered kind,
+  zero id, or non-existent record is refused; gated to management (no new permission). Portable title
+  resolution (no SQLite-only `||` concat). Read-only; the bespoke 360s are untouched. A `entity_360_link()`
+  helper drops a "360 view" button on a detail page (wired on NCR as the reference host). Test
+  `test_p3_entity360.php` (24 assertions — registry per-kind panels, load + title + back-link, fail-closed
+  cases, render). Suite **3711 passed, 0 failed**. *Remaining Wave D: §34 dashboard expansion, §35 training.*
 
 - **2026-08-27 — §8 report-template persona preview (Wave D, item 2).** The builder showed a flat field
   list and a dummy-data preview, but not *who sees what*. `lib/tmplpreview.php` + `/report-preview?type=`

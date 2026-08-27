@@ -7,6 +7,8 @@
     <span class="pill <?= $closed?'p-ok':'p-warn' ?>"><?= e(NCR_STATUS[$n['status']] ?? $n['status']) ?></span>
     <?= e(ncr_source_label($n['source'])) ?><?= $n['source_note'] ? ' — ' . e($n['source_note']) : '' ?>
   </p></div>
+  <?php // Phase 3 §49 — the uniform 360 shell for this record. ?>
+  <?php if (function_exists('entity_360_link')) echo entity_360_link('NCR', (int)$n['id']); ?>
 </div>
 
 <?php if (!$closed && $missing): ?>

@@ -3137,6 +3137,8 @@ function ops_dispatch($route, $method) {
             return ops_tasks($method);
         case $route === 'command-centre':      // Phase 3 §20 — management state-of-the-business board
             return ops_command_centre($method);
+        case $route === 'entity-360':          // Phase 3 §49 — uniform 360 shell for any entity
+            return ops_entity_360($method);
         case $route === 'report-approve':
             ops_report_approve($method); return true;
         case $route === 'office-finance':
