@@ -823,6 +823,10 @@ function idems_install_inspection_sections($typeId) {
     $s = $addSection('Reference documents', 'The QAP/ITP, drawings, specifications and standards inspected against — one row per document.');
     $addField($s, 'reference_documents', 'Reference documents', 'table', '', "Document Name\nDocument Number\nRevision No.\nApproval Code\nApproved / Issued by\nDate of Approval|date", 2);
 
+    // 2b) Applicable Standards — the published codes/standards, as a list (Field #18).
+    $s = $addSection('Applicable Standards', 'The standards, codes and specifications the inspection was carried out against — one row per standard, with its edition/year and the clauses applied.');
+    $addField($s, 'applicable_standards', 'Applicable Standards', 'table', '', "Standard No.|merge\nTitle / Subject\nEdition / Year\nClause(s) applied", 2);
+
     // 3) PO line items & quantities (unit chosen once per line).
     $s = $addSection('PO items & quantities', 'One row per PO line item — quantities and the unit chosen once per line.');
     $addField($s, 'po_items', 'PO line items', 'table', '',
@@ -929,6 +933,10 @@ function idems_install_fire_extinguisher_sections($typeId) {
     $s = $addSection('Reference documents', 'The standards, specifications, drawings and layout inspected against — one row per document.');
     $addField($s, 'reference_documents', 'Reference documents', 'table', '',
         "Document Name\nDocument Number\nRevision No.\nApproval Code\nApproved / Issued by\nDate of Approval|date", 2);
+
+    // 2b) Applicable Standards — the published codes/standards, as a list (Field #18).
+    $s = $addSection('Applicable Standards', 'The standards, codes and specifications the inspection was carried out against — one row per standard, with its edition/year and the clauses applied.');
+    $addField($s, 'applicable_standards', 'Applicable Standards', 'table', '', "Standard No.|merge\nTitle / Subject\nEdition / Year\nClause(s) applied", 2);
 
     // 3) Fire extinguisher schedule — one row per extinguisher (identity).
     $s = $addSection('Fire extinguisher schedule', 'One row per extinguisher — type, capacity, make, serial, manufacturing date, location and quantity.');
@@ -4872,6 +4880,29 @@ function ops_idems_builder($route, $method) {
                     'Add one row per controlling document — QAP/ITP, drawing, specification, standard, customer instruction.',
                     (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId])]);
             flash('Added a “Reference documents” section — a repeatable table: Document Name, Number, Revision, Approval code and Date of approval (date picker).');
+            redirect('/report-builder?type=' . $typeId);
+        }
+        // Field #18 — one click adds an "Applicable Standards" table: the published
+        // standards/codes the inspection was carried out against, as a LIST — Standard
+        // Number, Title, Edition/Year and the clause(s) applied. Distinct from Reference
+        // documents (controlled QAP/ITP/drawings with approval codes): this is the
+        // codes-and-editions block ISO-17020 reports are expected to carry.
+        if ($do === 'add_standards') {
+            $title = 'Applicable Standards';
+            if ((int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=? AND title=?", [$typeId, $title])) {
+                flash('This report type already has an Applicable Standards section.', 'warning'); redirect('/report-builder?type=' . $typeId);
+            }
+            $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, $title, 'The standards, codes and specifications the inspection was carried out against — one row per standard, with its edition/year and the clauses applied.',
+                    (int)ops_val("SELECT COALESCE(MIN(sort_order),10)-2 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $secId = (int)$pdo->lastInsertId();
+            $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span)
+                           VALUES (?,?,?,?,?,?,?,?,2)")
+                ->execute([$typeId, $secId, 'applicable_standards', 'Applicable Standards', 'table',
+                    "Standard No.|merge\nTitle / Subject\nEdition / Year\nClause(s) applied",
+                    'Add one row per standard/code — e.g. IS 2062, ASME Sec VIII Div 1, API 650 — with its edition or year and the clauses applied.',
+                    (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId])]);
+            flash('Added an “Applicable Standards” section — a repeatable list: Standard Number, Title, Edition / Year and the clauses applied.');
             redirect('/report-builder?type=' . $typeId);
         }
         // One click adds the header fields for previous / current hold-point status
