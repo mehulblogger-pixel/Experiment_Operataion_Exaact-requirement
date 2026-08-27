@@ -7471,6 +7471,21 @@ function ops_users($route, $method) {
                     'defaults' => role_defaults($role)] + user_cost_vars(user_row_from_post($b, $user)));
                 return;
             }
+            // Field-finding #22 — one team member = one login. Picking a team member who is ALREADY the
+            // person behind another active login would point two logins at the same inspector record, so
+            // both would see that inspector's jobs/schedule (a segregation leak). Refuse it and tell the
+            // admin to add a distinct team member instead.
+            if ($insId && function_exists('inspector_login_conflict')) {
+                $conf = inspector_login_conflict((int)$insId, $user ? (int)$user['id'] : 0);
+                if ($conf) {
+                    flash('That team member is already the person behind the login “' . $conf . '”. Each person maps to one login — add a separate team member for this user instead of sharing one.', 'error');
+                    $mgrsE = ops_all("SELECT id, first_name, last_name, username, role, position_title FROM users WHERE is_active=1" . ($user ? " AND id<>" . (int)$user['id'] : "") . " ORDER BY first_name, last_name");
+                    view('ops/user_form', ['user' => user_row_from_post($b, $user), 'inspectors' => inspectors_list(false), 'offices' => offices_list(),
+                        'sbuOpts' => lk_options_or('sbu', OPS_SBUS), 'globalMgr' => $globalMgr, 'managers' => $mgrsE,
+                        'defaults' => role_defaults($role)] + user_cost_vars(user_row_from_post($b, $user)));
+                    return;
+                }
+            }
             // Both scopes arrive as tick-lists now. "Every…" wins over the
             // individual ticks, and is stored as ALL so an office added next
             // year is included without anybody revisiting this person.
