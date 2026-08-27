@@ -63,6 +63,14 @@ const LEAD_DEFAULT_STAGES = [
     ['Lost',          'LOST', 0,   0],
 ];
 
+// Field #7 — how manpower is deputed on a lead. Man-day = a short assignment
+// billed by the day, no fixed site; man-month = people placed at the customer's
+// site for a period, so the site details are required.
+const LEAD_DEPUTATION = [
+    'MANDAY'   => 'Man-day (short assignment)',
+    'MANMONTH' => 'Man-month (site deputation)',
+];
+
 const LEAD_SOURCES = [
     'REFERRAL'   => 'Referral',
     'WEBSITE'    => 'Website',
@@ -141,8 +149,16 @@ function leads_migrate() {
     // Preferred way to reach them. A lead you keep ringing who only ever answers
     // on WhatsApp is a lead you are annoying, not chasing. Added on an existing
     // database, so ensure_column, not a schema change nobody would re-run.
-    if (function_exists('ensure_column'))
+    if (function_exists('ensure_column')) {
         ensure_column('leads', 'pref_contact', "VARCHAR(20) DEFAULT ''");
+        // Field #7 — manpower-deputation intake. A lead can be for man-day work
+        // (a short assignment, no fixed site) or a man-month deputation (people
+        // placed at the customer's site, which therefore needs the site details).
+        ensure_column('leads', 'deputation_kind', "VARCHAR(10) DEFAULT ''");   // '' | MANDAY | MANMONTH
+        ensure_column('leads', 'manpower_count',  "INT DEFAULT 0");
+        ensure_column('leads', 'manpower_skills', "TEXT");                     // skills / qualifications sought
+        ensure_column('leads', 'site_location',   "VARCHAR(300) DEFAULT ''");  // required for a man-month deputation
+    }
     if (function_exists('act_index')) {
         act_index('leads', 'idx_lead_stage', '(stage_id, status)');
         act_index('leads', 'idx_lead_owner', '(owner_user_id, status)');
@@ -384,6 +400,17 @@ function lead_create(array $b) {
     if (!$stages) return ['err' => 'That pipeline has no stages. Add some first.'];
     $stage = (int)($b['stage_id'] ?? 0) ?: (int)$stages[0]['id'];
 
+    // Field #7 — manpower deputation. Man-month places people on the customer's
+    // site, so the site details are required; man-day (or none) needs no site.
+    $dep  = strtoupper(trim((string)($b['deputation_kind'] ?? '')));
+    if (!isset(LEAD_DEPUTATION[$dep])) $dep = '';
+    $site = trim((string)($b['site_location'] ?? ''));
+    if ($dep === 'MANMONTH' && $site === '')
+        return ['err' => 'A man-month deputation places people on the customer’s site, so the site details are required. Add them, or choose man-day.'];
+    if ($dep !== 'MANMONTH') $site = '';   // man-day / none carries no site
+    $count = max(0, (int)($b['manpower_count'] ?? 0));
+    $skills = trim((string)($b['manpower_skills'] ?? ''));
+
     $u = current_user();
     $ref = lead_ref_next();
     // Who it is allocated to. A posted id wins; otherwise it belongs to whoever
@@ -398,8 +425,9 @@ function lead_create(array $b) {
     db()->prepare("INSERT INTO leads
         (ref,pipeline_id,stage_id,company_name,partner_id,contact_name,contact_email,contact_phone,
          source,source_note,requirement,value,expected_close,owner_user_id,owner_name,office_id,sbu,
+         deputation_kind,manpower_count,manpower_skills,site_location,
          status,stage_since,next_action_on,next_action,created_by,created_at,updated_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'OPEN', ?,?,?,?,?,?)")
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'OPEN', ?,?,?,?,?,?)")
         ->execute([$ref, $pipe, $stage, substr($company, 0, 200),
             (int)($b['partner_id'] ?? 0) ?: null,
             substr(trim((string)($b['contact_name'] ?? '')), 0, 150),
@@ -413,6 +441,7 @@ function lead_create(array $b) {
             $ownerId, substr($ownerNm, 0, 150),
             ($b['office_id'] ?? '') !== '' ? (int)$b['office_id'] : (($u['home_office_id'] ?? null) ?: null),
             (string)($b['sbu'] ?? ''),
+            $dep, $count, $skills, substr($site, 0, 300),
             date('c'),
             (string)($b['next_action_on'] ?? ''), substr(trim((string)($b['next_action'] ?? '')), 0, 255),
             $u ? user_name($u) : 'system', date('c'), date('c')]);
@@ -1162,9 +1191,20 @@ function ops_leads($route, $method) {
             $ownerNm = user_name($ou);
         }
         $pref = isset(LEAD_PREF_CONTACT[$_POST['pref_contact'] ?? '']) ? (string)$_POST['pref_contact'] : '';
+        // Field #7 — manpower deputation, same rule as create: a man-month needs the site.
+        $dep = strtoupper(trim((string)($_POST['deputation_kind'] ?? '')));
+        if (!isset(LEAD_DEPUTATION[$dep])) $dep = '';
+        $site = trim((string)($_POST['site_location'] ?? ''));
+        if ($dep === 'MANMONTH' && $site === '') {
+            flash('A man-month deputation places people on the customer’s site, so the site details are required. Add them, or choose man-day.', 'error');
+            redirect('/lead-edit?id=' . $id);
+        }
+        if ($dep !== 'MANMONTH') $site = '';
         db()->prepare("UPDATE leads SET company_name=?, contact_name=?, contact_email=?, contact_phone=?,
                        source=?, requirement=?, value=?, expected_close=?, owner_user_id=?, owner_name=?,
-                       next_action_on=?, next_action=?, pref_contact=?, updated_at=? WHERE id=?")
+                       next_action_on=?, next_action=?, pref_contact=?,
+                       deputation_kind=?, manpower_count=?, manpower_skills=?, site_location=?,
+                       updated_at=? WHERE id=?")
             ->execute([substr(trim((string)($_POST['company_name'] ?? '')), 0, 200),
                 substr(trim((string)($_POST['contact_name'] ?? '')), 0, 150),
                 substr(trim((string)($_POST['contact_email'] ?? '')), 0, 200),
@@ -1174,7 +1214,10 @@ function ops_leads($route, $method) {
                 $ownerId, substr($ownerNm, 0, 150),
                 (string)($_POST['next_action_on'] ?? ''),
                 substr(trim((string)($_POST['next_action'] ?? '')), 0, 255),
-                $pref, date('c'), $id]);
+                $pref,
+                $dep, max(0, (int)($_POST['manpower_count'] ?? 0)),
+                trim((string)($_POST['manpower_skills'] ?? '')), substr($site, 0, 300),
+                date('c'), $id]);
         if (function_exists('ads_queue_lead')) ads_queue_lead($id, 'Details edited');
         flash('Saved.');
         redirect('/lead?id=' . $id);

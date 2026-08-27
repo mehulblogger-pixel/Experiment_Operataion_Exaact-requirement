@@ -81,6 +81,46 @@ $me  = current_user();
       <input class="form-control" type="date" name="expected_close" value="<?= e($val('expected_close')) ?>"></div>
   </div>
 
+  <?php // Field #7 — manpower-deputation intake. Man-day needs no site; man-month
+        //   places people on the customer's site, so the site details become required.
+        //   The site block is shown/hidden and required-toggled by the type (JS below,
+        //   and re-enforced on the server in lead_create/lead-edit). ?>
+  <div class="form-sec"><h3>Manpower deputation <span class="muted" style="font-weight:400">— if this lead is for deputing people</span></h3></div>
+  <div class="form-grid">
+    <div class="ff"><label for="dep-kind">Type of deputation</label>
+      <select class="form-control" name="deputation_kind" id="dep-kind">
+        <option value="">— not a manpower deputation —</option>
+        <?php foreach (LEAD_DEPUTATION as $k => $lbl): ?>
+          <option value="<?= e($k) ?>" <?= (string)$val('deputation_kind') === $k ? 'selected' : '' ?>><?= e($lbl) ?></option>
+        <?php endforeach; ?>
+      </select></div>
+    <div class="ff"><label>How many people</label>
+      <input class="form-control" type="number" inputmode="numeric" step="1" min="0" name="manpower_count"
+             value="<?= e($val('manpower_count') ?: '') ?>" placeholder="e.g. 3"></div>
+    <div class="ff ff-wide"><label>Skills / qualifications needed</label>
+      <textarea class="form-control" name="manpower_skills" rows="2"
+        placeholder="Disciplines, certifications, experience — e.g. 2× NDT Level II (UT/RT), 1× welding inspector CSWIP"><?= e($val('manpower_skills')) ?></textarea></div>
+    <div class="ff ff-wide" id="dep-site" style="display:none">
+      <label>Site details <span class="muted">(where the people will be placed)</span> <span id="dep-site-req" class="msg-error" style="display:none">— required for a man-month deputation</span></label>
+      <input class="form-control" name="site_location" id="dep-site-input" maxlength="300"
+             value="<?= e($val('site_location')) ?>" placeholder="Plant / location, city — where the deputation is based"></div>
+  </div>
+  <script>
+    (function(){
+      var sel = document.getElementById('dep-kind'), site = document.getElementById('dep-site'),
+          inp = document.getElementById('dep-site-input'), req = document.getElementById('dep-site-req');
+      if (!sel || !site) return;
+      function sync(){
+        var mm = sel.value === 'MANMONTH';
+        // Man-month → the site is shown and required; man-day / none → hidden and optional.
+        site.style.display = mm ? '' : 'none';
+        if (req) req.style.display = mm ? '' : 'none';
+        if (inp) inp.required = mm;
+      }
+      sel.addEventListener('change', sync); sync();
+    })();
+  </script>
+
   <div class="form-sec"><h3>Who chases it, and what happens next</h3>
     <p>A lead nobody owns is a lead nobody rings.</p></div>
   <div class="form-grid">
