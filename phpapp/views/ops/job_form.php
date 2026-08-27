@@ -337,6 +337,9 @@
       <select class="form-control searchable" name="subcon_id"><option value="">—</option>
         <?php foreach ($subcons as $s): ?><option value="<?= (int)$s['id'] ?>" <?= ($job && $job['subcon_id']==$s['id'])?'selected':'' ?>><?= e($s['agency']) ?><?= $s['inspector_name']?' — '.e($s['inspector_name']):'' ?></option><?php endforeach; ?>
       </select></div>
+    <?php // Field-finding #11 — the who-carries-it-out message lives ON this (Engineer) tab, and the
+          // script below jumps here when it's missing, instead of bouncing to the first tab. ?>
+    <p id="who-msg" class="msg msg-error" hidden style="margin:0 0 8px">Choose an <?= e(Tl('engineer')) ?> / engineer, or a sub-contracting agency, before allocating.</p>
     <div class="ff"><label>Sub-con cost (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="subcon_cost" value="<?= e($job['subcon_cost'] ?? '') ?>"></div>
     <?php // Anything else this one cost that is not salary, a claimed expense or
           // a sub-contractor — a hired instrument, a permit, a courier. Without
@@ -633,6 +636,51 @@
     <a class="btn secondary" href="/call?id=<?= (int)$call['id'] ?>">Cancel</a>
   </div>
 </form>
+<?php // Field-finding #11 — a missing required choice must send the person to the field's own tab, not
+      // the first one. The who-carries-it-out rule is an either/or (an inspector OR a sub-contractor), so a
+      // plain `required` can't express it; this small guard blocks the submit, opens the Engineer tab and
+      // focuses the picker. It also handles a server round-trip (error_field) the same way. ?>
+<script>
+(function(){
+  var form = document.getElementById('jobform');
+  if (!form) return;
+  function jumpTo(el){
+    if (!el) return;
+    var pane = el.closest ? el.closest('[data-tab]') : null;
+    if (pane){
+      var wrap = pane.closest('[data-tabs]');
+      var bar  = wrap ? wrap.previousElementSibling : null;
+      if (bar && bar.classList && bar.classList.contains('tabbar')){
+        var want = (pane.getAttribute('data-tab')||'').replace(/\s+/g,' ').trim();
+        Array.prototype.forEach.call(bar.querySelectorAll('.tabbtn'), function(b){
+          var t = (b.textContent||'').replace(/\s+/g,' ').trim();
+          if (t === want || t.indexOf(want) === 0){ if (!b.classList.contains('on')) b.click(); }
+        });
+      }
+    }
+    try { el.scrollIntoView({ behavior:'smooth', block:'center' }); el.focus(); } catch(e){}
+    if (el.classList) el.classList.add('field-error');
+  }
+  // Either/or: an inspector OR a sub-contractor must be chosen before allocating.
+  form.addEventListener('submit', function(e){
+    var insp = form.querySelector('[name="inspector_id"]');
+    var sub  = form.querySelector('[name="subcon_id"]');
+    var hasWho = (insp && insp.value) || (sub && sub.value);
+    if (!hasWho){
+      e.preventDefault();
+      var msg = document.getElementById('who-msg'); if (msg) msg.hidden = false;
+      jumpTo(insp || sub);
+    }
+  });
+  // Server round-trip fallback: land on the field the server flagged (opens its tab too).
+  var ef = <?= json_encode($error_field ?? '') ?>;
+  if (ef){
+    var run = function(){ jumpTo(form.querySelector('[name="' + ef + '"]')); };
+    if (document.readyState !== 'loading') setTimeout(run, 150);
+    else document.addEventListener('DOMContentLoaded', function(){ setTimeout(run, 150); });
+  }
+})();
+</script>
 <script>
 window.ACTIVITY = <?= json_encode($act) ?>;
 window.TERM_SBU = <?= json_encode(Tl('sbu')) ?>;

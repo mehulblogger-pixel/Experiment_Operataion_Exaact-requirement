@@ -5570,9 +5570,13 @@ function ops_jobs($route, $method) {
             // engineer (any staff kind) or a sub-contracting agency. Allowing a
             // job to be raised with nobody on it left calls "allocated" to no one.
             if (empty($b['inspector_id']) && empty($b['subcon_id'])) {
+                // Field-finding #11 — on a re-render, land on the field that failed (the who-carries-it-out
+                // picker on the Engineer tab), not the first tab. `error_field` tells the form which field
+                // to open its tab on and focus.
                 view('ops/job_form', array_merge(call_job_form_vars($job, $call),
                     ['error' => 'Choose who will carry out this ' . Tl('job') . ' — an inspector / engineer, or a '
-                              . 'sub-contracting agency — before it can be allocated.']));
+                              . 'sub-contracting agency — before it can be allocated.',
+                     'error_field' => 'inspector_id']));
                 return;
             }
             $fields = job_save_fields();
