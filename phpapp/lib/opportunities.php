@@ -196,10 +196,21 @@ function opp_row($id) {
 
 function opp_quotes($oppId) {
     opp_migrate();
+    // A quotation belongs to a deal two ways: an explicit opportunity_quotes link,
+    // OR — the common case — it was raised off the same lead this deal came from
+    // (quotations.lead_id = the deal's lead_id). The explicit link is only written
+    // when the quote is ACCEPTED (crm.php sync-on-accept), so a merely submitted
+    // lead-quote used to be invisible here: the deal still said "still to quote"
+    // and offered "Generate quotation" while its own activity log showed the quote
+    // submitted/won. quote_linked_deal_id() already resolves the deal from the lead;
+    // this makes the deal's quote list agree with it, so one definition of "which
+    // quotes are on this deal" is used everywhere (list, delete-guard, order-of-record).
     return opp_try(fn() => ops_all(
         "SELECT q.id, q.quote_no, q.rev, q.status, q.total_amount, q.is_current, q.created_at, q.contract_number
-         FROM opportunity_quotes oq JOIN quotations q ON q.id = oq.quotation_id
-         WHERE oq.opportunity_id=? ORDER BY q.quote_no, q.rev", [(int)$oppId]));
+         FROM quotations q
+         WHERE q.id IN (SELECT quotation_id FROM opportunity_quotes WHERE opportunity_id=?)
+            OR q.lead_id = (SELECT lead_id FROM opportunities WHERE id=?)
+         ORDER BY q.quote_no, q.rev", [(int)$oppId, (int)$oppId]));
 }
 
 function opp_history($oppId) {
@@ -938,10 +949,16 @@ function ops_opportunities($route, $method) {
             'effort' => function_exists('act_effort')
                 ? act_effort([['OPPORTUNITY', (int)$o['id']], ['LEAD', (int)($o['lead_id'] ?? 0)]])
                 : ['mins' => 0, 'touches' => 0],
+            // "Attach an existing quotation": the client's quotes that are NOT already
+            // on this deal — neither explicitly linked nor already shown via the shared
+            // lead (opp_quotes now includes those), so we never offer to attach a quote
+            // the deal already lists.
             'openQuotes' => $o['partner_id'] ? opp_try(fn() => ops_all(
                 "SELECT id, quote_no, rev, status, total_amount FROM quotations
                  WHERE client_id=? AND id NOT IN (SELECT quotation_id FROM opportunity_quotes WHERE opportunity_id=?)
-                 ORDER BY id DESC LIMIT 40", [(int)$o['partner_id'], (int)$o['id']])) : [],
+                   AND (CAST(? AS INTEGER) = 0 OR COALESCE(lead_id,0) <> CAST(? AS INTEGER))
+                 ORDER BY id DESC LIMIT 40",
+                [(int)$o['partner_id'], (int)$o['id'], (int)($o['lead_id'] ?? 0), (int)($o['lead_id'] ?? 0)])) : [],
             // Direct-win → contract path: who may register, and the contract already
             // registered from this deal (if any) so its state can be shown.
             'canRegisterContract' => can('crm.contract.register') || is_master(),
