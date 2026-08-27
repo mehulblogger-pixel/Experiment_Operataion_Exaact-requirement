@@ -48,6 +48,10 @@
 <?php // ---- Where this job stands, and the one next thing ------------------- ?>
 <?php
   $jClosed   = !empty($job['closed_flag']);
+  // Field-finding #12 — on a cross-office job the executing office sees only its inter-office credit +
+  // an invoiced/not capsule; all other commercial is the contracting office's. 'FULL' vs 'CREDIT_ONLY'.
+  $commView  = function_exists('job_commercial_view') ? job_commercial_view($job) : 'FULL';
+  $jMoney    = function_exists('job_money') ? job_money($job) : ['cross'=>false,'credit'=>0,'invoice'=>0];
   $jSched    = trim((string)($job['scheduled_date'] ?? '')) !== '';
   $jReports  = (int) ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND deleted=0", [(int)$job['id']]);
   $jOnSite   = false;
@@ -894,7 +898,7 @@ if (function_exists('hwp_for_job')):
       $canBill  = job_bill_can_upload($job); ?>
 <?php // Client-billable bills are coordinator/finance work — hidden from the field
       // inspector (their own out-of-pocket expenses go on the monthly voucher, not here).
-      if (($chgHeads || $byHead) && !$fieldInspector): ?>
+      if (($chgHeads || $byHead) && !$fieldInspector && $commView === 'FULL'): ?>
 <div class="panel" id="bills" data-tab="Money">
   <div class="ctitle" style="margin-top:0"><h3>Charged to the <?= e(Tl('client')) ?> — bills required
     <span class="muted">(<?= count($chgHeads) ?>)</span></h3></div>
@@ -972,7 +976,9 @@ if (function_exists('hwp_for_job')):
       // concern, so the whole fold is hidden from the inspector. Their own travel and
       // out-of-pocket expenses go on the monthly voucher (pointed to from the Site
       // check-in panel above), so no inspector-facing guidance is lost.
-      if (!$fieldInspector): ?>
+      // Field-finding #12 — the cost/profit fold is contracting-office commercial; hidden from an
+      // executing-office viewer on a cross-office job (they see only their credit + the invoiced capsule).
+      if (!$fieldInspector && $commView === 'FULL'): ?>
 <details class="fold" data-tab="Money">
   <summary><?= $canSeeProfit ? 'Expenses &amp; profitability' : 'Expenses' ?> <span class="sub"><?= $canSeeProfit ? 'what it cost, and what the ' . e(Tl('job')) . ' made' : 'what it cost' ?></span></summary>
   <div class="fold-body">
@@ -1060,6 +1066,9 @@ if (function_exists('hwp_for_job')):
 <?php endif; /* !$fieldInspector — expenses/profitability fold */ ?>
 
 <?php if (can('data.credit') || can('finance.reconcile')): ?>
+<?php // Field-finding #12 — the full billing controls are contracting-office commercial. An executing-office
+      // viewer on a cross-office job sees the credit capsule instead (below). ?>
+<?php if ($commView === 'FULL'): ?>
 <?php // Phase 2 §33 — before the billing controls, the readiness verdict (reports issued, release accepted, PO, contract value). ?>
 <?php if (!empty($job['closed_flag']) && function_exists('invoice_readiness_render')) { echo '<div data-tab="Money">'; invoice_readiness_render($job); echo '</div>'; } ?>
 
@@ -1118,6 +1127,22 @@ if (function_exists('hwp_for_job')):
   </form>
   </details>
 </div>
+<?php else: /* Field-finding #12 — executing office on a cross-office job: credit + invoiced capsule only */ ?>
+<div class="panel" id="invoice" data-tab="Money">
+  <h3 class="tab-sub">Your inter-office credit</h3>
+  <p class="muted" style="margin:0 0 10px;font-size:12.5px">This <?= e(Tl('job')) ?> is contracted by another <?= e(Tl('office')) ?>. Your <?= e(Tl('office')) ?> earns the inter-office credit for the work done here — the client billing, invoice value and profit sit with the contracting <?= e(Tl('office')) ?>.</p>
+  <div style="display:flex;gap:26px;align-items:baseline;flex-wrap:wrap">
+    <div>
+      <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">Inter-office credit</div>
+      <div style="font-weight:700;font-size:20px;font-variant-numeric:tabular-nums"><?= e(function_exists('fmoney_short') ? fmoney_short($jMoney['credit'] ?? 0) : number_format((float)($jMoney['credit'] ?? 0))) ?></div>
+    </div>
+    <div>
+      <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">Client invoice</div>
+      <span class="pill <?= !empty($job['invoice_raised']) ? 'p-ok' : 'p-warn' ?>" style="font-size:12px"><?= !empty($job['invoice_raised']) ? 'Invoiced' : 'Not invoiced' ?></span>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
 <?php endif; ?>
 </div><!-- /data-tabs (job record) -->
 

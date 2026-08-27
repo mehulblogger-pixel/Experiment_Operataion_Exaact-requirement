@@ -1900,7 +1900,16 @@ function tosrm_ops_backlog($offices = 'ALL', $limit = 100) {
                             (SELECT COUNT(*) FROM call_clarifications cc WHERE cc.call_id=c.id AND cc.status='OPEN') open_clar,
                             (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id AND j.inspector_id IS NOT NULL) has_res
                      FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id
-                     WHERE c.status<>'CLOSED' AND COALESCE(c.op_status,'')<>'CLOSED' AND COALESCE(c.op_status,'')<>'CANCELLED' AND $w
+                     WHERE c.status<>'CLOSED' AND COALESCE(c.op_status,'')<>'CLOSED' AND COALESCE(c.op_status,'')<>'CANCELLED'
+                       -- Field-finding #25 — a call already allocated AND scheduled for a FUTURE date is in
+                       -- hand (it shows under the Schedule / Assignment registers), not backlog. The backlog
+                       -- is work needing attention: unscheduled, unassigned, awaiting clarification, or
+                       -- overdue. Overdue (scheduled in the past) and today's stay; only future-scheduled,
+                       -- assigned work is excluded here.
+                       AND NOT EXISTS (SELECT 1 FROM jobs j2 WHERE j2.call_id=c.id
+                                       AND j2.inspector_id IS NOT NULL AND COALESCE(j2.closed_flag,0)=0
+                                       AND COALESCE(j2.scheduled_date,'')<>'' AND j2.scheduled_date > '$today')
+                       AND $w
                      ORDER BY CASE WHEN c.inspection_required_date='' THEN 1 ELSE 0 END, c.inspection_required_date, c.id
                      LIMIT " . (int)$limit) ?: [];
     foreach ($rows as &$r) {

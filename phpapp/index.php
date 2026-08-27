@@ -597,7 +597,10 @@ function view($name, $vars = []) {
     // Buffered so every POST form on the page can be given its token on the way
     // out — one place, rather than 141 forms each relying on somebody remembering.
     ob_start();
-    require __DIR__ . '/views/layout_top.php';
+    // Field-finding #9/#10 — a screen requested inside the in-page popup renders bare (no chrome) and every
+    // form on it carries the _embed flag, so its post-save redirect closes the popup instead of navigating it.
+    $embed = function_exists('is_embed') && is_embed();
+    require __DIR__ . ($embed ? '/views/layout_embed_top.php' : '/views/layout_top.php');
     // A missing view file must never white-screen the whole app with a fatal
     // "Failed opening required" — that almost always means a stale or partial
     // deployment (the code asked for a page whose file is not on the server).
@@ -613,8 +616,10 @@ function view($name, $vars = []) {
            . 'This usually means the app files are out of date — a full redeploy of the application usually fixes it.</p>'
            . '<p style="margin-bottom:0"><a class="btn" href="/">← Back to dashboard</a></p></div>';
     }
-    require __DIR__ . '/views/layout_bottom.php';
-    echo csrf_stamp_forms((string)ob_get_clean());
+    require __DIR__ . ($embed ? '/views/layout_embed_bottom.php' : '/views/layout_bottom.php');
+    $out = csrf_stamp_forms((string)ob_get_clean());
+    if ($embed && function_exists('embed_stamp_forms')) $out = embed_stamp_forms($out);
+    echo $out;
 }
 
 function find_partner($id) {
@@ -752,6 +757,15 @@ if ($route === 'complaints-policy') {
 // nothing confidential.
 if ($route === 'verify') {
     require __DIR__ . '/views/ops/verify.php';
+    exit;
+}
+
+// Field #17 — the report itself, downloadable from the public verification page.
+// Public like /verify: gated only by the printed verify code, issued reports only,
+// every access logged. Dispatched here, in front of require_login().
+if ($route === 'verify-pdf') {
+    if (function_exists('ops_verify_pdf')) ops_verify_pdf();
+    else { http_response_code(404); echo 'Not available.'; }
     exit;
 }
 

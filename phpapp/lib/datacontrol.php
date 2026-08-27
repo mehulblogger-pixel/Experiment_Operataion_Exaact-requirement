@@ -196,6 +196,11 @@ function integrity_checks() {
     $add('job_inspector', 'Every allocated ' . Tl('job') . ' names a person who exists',
         'The name on the report has to resolve to somebody on the register.',
         "SELECT COUNT(*) FROM jobs WHERE inspector_id IS NOT NULL AND inspector_id NOT IN (SELECT id FROM inspectors)");
+    // Field-finding #22 — one team member, one login. Two active logins sharing an inspector_id would
+    // each see that person's jobs/schedule (a segregation leak). Flag any that predate the save-time guard.
+    $add('inspector_one_login', 'Each ' . Tl('engineer') . ' belongs to one login',
+        'If two logins share one person, both see that person\'s work — allocations would leak between them.',
+        "SELECT COALESCE(SUM(n-1),0) FROM (SELECT COUNT(*) n FROM users WHERE is_active=1 AND COALESCE(inspector_id,0)<>0 GROUP BY inspector_id HAVING COUNT(*)>1) t");
     $add('bill_job', 'Every expense bill belongs to a real ' . Tl('job'),
         'A bill with no ' . Tl('job') . ' cannot be charged to anybody.',
         "SELECT COUNT(*) FROM job_bills WHERE job_id NOT IN (SELECT id FROM jobs)");

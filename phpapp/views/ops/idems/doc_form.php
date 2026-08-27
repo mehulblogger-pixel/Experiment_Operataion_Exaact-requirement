@@ -150,7 +150,10 @@
   </div>
 
   <div style="margin-top:16px">
-    <button class="btn" type="submit"><?= $doc ? 'Save report' : 'Create report &amp; generate IRN' ?></button>
+    <?php // Field #13 — lead with the action the inspector came to do: "Generate report".
+          //   The IRN is minted automatically on save (said in the subtitle above and the
+          //   button's tooltip), so it need not crowd the button label. ?>
+    <button class="btn" type="submit"<?= $doc ? '' : ' title="Creates the report and mints its IRN automatically"' ?>><?= $doc ? 'Save report' : 'Generate report' ?></button>
     <a class="btn secondary" href="<?= $doc ? '/document?id='.(int)$doc['id'] : '/documents' ?>">Cancel</a>
   </div>
 </form>

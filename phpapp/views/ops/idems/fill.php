@@ -408,7 +408,11 @@ function idemsGps(k){ if(!navigator.geolocation){alert('GPS not available');retu
 // Technical writing assistant: convert shorthand in this box to engineering language.
 function idemsImprove(k){
   var ta=document.getElementById('ta_'+k); if(!ta||!ta.value.trim())return;
-  var body=new URLSearchParams({text:ta.value, ajax:'1'});
+  // Field #14 — this POST must carry the CSRF token like every other. Without it the
+  // global CSRF gate (index.php) rejected the request and redirected to the HTML page,
+  // so `r.json()` threw and the button reported "could not reach the writing assistant"
+  // — which read as an AI failure, though this rule-based helper never touches AI.
+  var body=new URLSearchParams({text:ta.value, ajax:'1', _csrf:'<?= e(csrf_token()) ?>'});
   fetch('/writing-assistant',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body.toString()})
     .then(function(r){return r.json();}).then(function(d){ if(d&&d.text) ta.value=d.text; })
     .catch(function(){ alert('Could not reach the writing assistant.'); });

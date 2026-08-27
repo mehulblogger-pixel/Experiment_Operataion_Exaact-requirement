@@ -18,6 +18,14 @@
       · last contact <span class="pill <?= $silence[0] ?>"><?= e($silence[1]) ?></span>
     </p></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <?php // Field-finding #9/#10 — add in place, without leaving this screen. The popup opens the existing
+          // form; on save it closes and this page refreshes to show the new record. ?>
+    <?php if (function_exists('can') && (can('ops.call.create') || is_master())): ?>
+      <a class="btn" href="/call-new?client_id=<?= (int)$p['id'] ?>" data-embed="/call-new?client_id=<?= (int)$p['id'] ?>" data-embed-title="Raise inspection <?= e(Tl('call')) ?>">➕ Raise inspection <?= e(Tl('call')) ?></a>
+    <?php endif; ?>
+    <?php if (!empty($canWrite)): ?>
+      <a class="btn secondary" href="/partner-edit?id=<?= (int)$p['id'] ?>" data-embed="/partner-edit?id=<?= (int)$p['id'] ?>" data-embed-title="Edit <?= e(Tl('client')) ?> &amp; addresses">✎ Edit / add address</a>
+    <?php endif; ?>
     <a class="btn secondary" href="/partner?id=<?= (int)$p['id'] ?>">Master record</a>
     <?php if ($money !== null): ?><a class="btn secondary" href="/ledger?id=<?= (int)$p['id'] ?>">Ledger</a><?php endif; ?>
     <a class="btn secondary" href="/customer?id=<?= (int)$p['id'] ?>&amp;export=csv">⬇ Timeline CSV</a>

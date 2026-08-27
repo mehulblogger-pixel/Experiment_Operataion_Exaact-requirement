@@ -144,6 +144,7 @@ $fc = $formCheck ?? null; if ($fc && $fc['level'] !== 'PASS' && !empty($fc['issu
           ['add_scope','📋 Inspection scope (ITP)','ITP/clause, activity, quantum of check, inspection type, observation, disposition'],
           ['add_po_items','📦 PO items &amp; quantities','Sr.No, description, size, unit, PO/offered/passed/rejected/hold/balance qty'],
           ['add_refdocs','📑 Reference documents','Document name, number, revision, approval code, approved / issued by, date of approval'],
+          ['add_standards','📐 Applicable Standards','Standard number, title, edition / year and the clauses applied — one row per standard/code'],
           ['add_instruments','🔧 Instruments &amp; calibration','Pick from the equipment register — serial &amp; calibration dates auto-fill'],
           ['add_iso17020','🛡️ ISO 17020 identification','Item, method, acceptance criteria, statement of conformity, limitations'],
           ['add_holdstatus','⏸️ Order &amp; hold-point status','P.O. status (Completed/Balance/Hold) + previous &amp; current hold points'],

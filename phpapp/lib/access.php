@@ -643,6 +643,29 @@ function scope_allows($officeId, $sbu = null) {
     return true;
 }
 
+// Field-finding #22 — segregation of inspectors. A "team member" (an `inspectors` row) must belong to at
+// most ONE active login: two logins sharing one inspector_id would each see that inspector's jobs and
+// schedule (a leak between people). This returns the username of a DIFFERENT active login already linked
+// to the given inspector, or '' if none — the guard the user-save form checks before saving a link.
+function inspector_login_conflict($inspectorId, $exceptUserId = 0) {
+    $inspectorId = (int)$inspectorId; if (!$inspectorId) return '';
+    try {
+        $u = ops_one("SELECT username FROM users WHERE inspector_id=? AND is_active=1 AND id<>? LIMIT 1",
+                     [$inspectorId, (int)$exceptUserId]);
+        return $u ? (string)($u['username'] ?? '') : '';
+    } catch (Throwable $e) { return ''; }
+}
+// How many team members are (wrongly) shared by 2+ active logins — for the §7.11 data-integrity board, so
+// any existing collision from before the guard surfaces for repair rather than leaking silently.
+function inspector_shared_login_count() {
+    try {
+        return (int) ops_val("SELECT COUNT(*) FROM (
+                    SELECT inspector_id FROM users
+                    WHERE is_active=1 AND COALESCE(inspector_id,0)<>0
+                    GROUP BY inspector_id HAVING COUNT(*) > 1) t");
+    } catch (Throwable $e) { return 0; }
+}
+
 // ---- Settings (key/value) --------------------------------------------------
 function ensure_settings_schema() {
     db()->exec("CREATE TABLE IF NOT EXISTS settings (skey VARCHAR(60) PRIMARY KEY, svalue TEXT)");

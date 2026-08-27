@@ -823,6 +823,10 @@ function idems_install_inspection_sections($typeId) {
     $s = $addSection('Reference documents', 'The QAP/ITP, drawings, specifications and standards inspected against — one row per document.');
     $addField($s, 'reference_documents', 'Reference documents', 'table', '', "Document Name\nDocument Number\nRevision No.\nApproval Code\nApproved / Issued by\nDate of Approval|date", 2);
 
+    // 2b) Applicable Standards — the published codes/standards, as a list (Field #18).
+    $s = $addSection('Applicable Standards', 'The standards, codes and specifications the inspection was carried out against — one row per standard, with its edition/year and the clauses applied.');
+    $addField($s, 'applicable_standards', 'Applicable Standards', 'table', '', "Standard No.|merge\nTitle / Subject\nEdition / Year\nClause(s) applied", 2);
+
     // 3) PO line items & quantities (unit chosen once per line).
     $s = $addSection('PO items & quantities', 'One row per PO line item — quantities and the unit chosen once per line.');
     $addField($s, 'po_items', 'PO line items', 'table', '',
@@ -929,6 +933,10 @@ function idems_install_fire_extinguisher_sections($typeId) {
     $s = $addSection('Reference documents', 'The standards, specifications, drawings and layout inspected against — one row per document.');
     $addField($s, 'reference_documents', 'Reference documents', 'table', '',
         "Document Name\nDocument Number\nRevision No.\nApproval Code\nApproved / Issued by\nDate of Approval|date", 2);
+
+    // 2b) Applicable Standards — the published codes/standards, as a list (Field #18).
+    $s = $addSection('Applicable Standards', 'The standards, codes and specifications the inspection was carried out against — one row per standard, with its edition/year and the clauses applied.');
+    $addField($s, 'applicable_standards', 'Applicable Standards', 'table', '', "Standard No.|merge\nTitle / Subject\nEdition / Year\nClause(s) applied", 2);
 
     // 3) Fire extinguisher schedule — one row per extinguisher (identity).
     $s = $addSection('Fire extinguisher schedule', 'One row per extinguisher — type, capacity, make, serial, manufacturing date, location and quantity.');
@@ -4874,6 +4882,29 @@ function ops_idems_builder($route, $method) {
             flash('Added a “Reference documents” section — a repeatable table: Document Name, Number, Revision, Approval code and Date of approval (date picker).');
             redirect('/report-builder?type=' . $typeId);
         }
+        // Field #18 — one click adds an "Applicable Standards" table: the published
+        // standards/codes the inspection was carried out against, as a LIST — Standard
+        // Number, Title, Edition/Year and the clause(s) applied. Distinct from Reference
+        // documents (controlled QAP/ITP/drawings with approval codes): this is the
+        // codes-and-editions block ISO-17020 reports are expected to carry.
+        if ($do === 'add_standards') {
+            $title = 'Applicable Standards';
+            if ((int)ops_val("SELECT COUNT(*) FROM report_sections WHERE report_type_id=? AND title=?", [$typeId, $title])) {
+                flash('This report type already has an Applicable Standards section.', 'warning'); redirect('/report-builder?type=' . $typeId);
+            }
+            $pdo->prepare("INSERT INTO report_sections (report_type_id,title,help,sort_order) VALUES (?,?,?,?)")
+                ->execute([$typeId, $title, 'The standards, codes and specifications the inspection was carried out against — one row per standard, with its edition/year and the clauses applied.',
+                    (int)ops_val("SELECT COALESCE(MIN(sort_order),10)-2 FROM report_sections WHERE report_type_id=?", [$typeId])]);
+            $secId = (int)$pdo->lastInsertId();
+            $pdo->prepare("INSERT INTO report_fields (report_type_id,section_id,fkey,label,ftype,table_cols,help,sort_order,col_span)
+                           VALUES (?,?,?,?,?,?,?,?,2)")
+                ->execute([$typeId, $secId, 'applicable_standards', 'Applicable Standards', 'table',
+                    "Standard No.|merge\nTitle / Subject\nEdition / Year\nClause(s) applied",
+                    'Add one row per standard/code — e.g. IS 2062, ASME Sec VIII Div 1, API 650 — with its edition or year and the clauses applied.',
+                    (int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM report_fields WHERE report_type_id=?", [$typeId])]);
+            flash('Added an “Applicable Standards” section — a repeatable list: Standard Number, Title, Edition / Year and the clauses applied.');
+            redirect('/report-builder?type=' . $typeId);
+        }
         // One click adds the header fields for previous / current hold-point status
         // and the PO status dropdown that the company formats carry.
         if ($do === 'add_holdstatus') {
@@ -5401,13 +5432,25 @@ function idems_sigblock_rows($f, $data, $sigs = []) {
     $stored = $data[$f['fkey']] ?? [];
     if (!is_array($stored)) $stored = [];
     $ins = $sigs['inspector'] ?? []; $ap = $sigs['approver'] ?? [];
+    $vet = $sigs['vetter'] ?? []; $iss = $sigs['issuer'] ?? [];
     $rows = [];
     foreach (idems_sigblock_roles($f) as $role) {
         $s = is_array($stored[$role] ?? null) ? $stored[$role] : [];
         $lc = strtolower($role);
+        // Map each sign-off role to the workflow actor that fills it, so "Reviewed by"
+        // and "Approved by" auto-fill from the accreditation workflow (not the inspector).
+        //   Approved/Authorised/Endorsed → the approval chain's approver
+        //   Reviewed/Vetted/Checked/Scrutinised → the technical VETTER (Field #15:
+        //     this used to fall through to the inspector, so "Reviewed by" wrongly
+        //     showed the same person as "Prepared by" — it now shows the reviewer)
+        //   Issued/Released → the authorised issuer
+        //   Prepared/Inspected/Assessed/Audited/Witnessed/… → the inspector
+        // A role whose workflow actor has not acted yet stays blank (never a wrong name).
         $sys = null;
         if (strpos($lc, 'approv') !== false || strpos($lc, 'author') !== false || strpos($lc, 'endors') !== false) $sys = $ap;
-        elseif (preg_match('/prepar|review|inspect|witness|carried|verif/', $lc)) $sys = $ins;
+        elseif (preg_match('/review|vet|checked|scrutin/', $lc)) $sys = $vet;
+        elseif (preg_match('/issue|release/', $lc)) $sys = $iss;
+        elseif (preg_match('/prepar|inspect|assess|audit|witness|carried|verif/', $lc)) $sys = $ins;
         $name  = trim((string)($s['name']  ?? '')) ?: trim((string)($sys['name']  ?? ''));
         $desig = trim((string)($s['desig'] ?? '')) ?: trim((string)($sys['desig'] ?? ''));
         $date  = trim((string)($s['date']  ?? ''));
@@ -7636,6 +7679,41 @@ function ops_idems_pdf($method) {
     $suffix = $copy !== '' ? '_' . $copy : (empty($doc['finalized']) ? '_DRAFT' : '');
     header('Content-Type: application/pdf');
     header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/','_',$doc['irn']) . $suffix . '.pdf"');
+    echo $pdf; return true;
+}
+
+// ---- Field #17 — public report download from the genuineness /verify page ----
+// A person who scans the QR (or types the code) can download the report itself,
+// not only its verdict. PUBLIC BY DESIGN (the caller has no account): access is
+// gated solely by the 16-character verify code printed on the report, and only an
+// ISSUED report is served — a draft carries no code that "verifies", and must
+// never be pulled. Every download is logged on the sealed audit chain with the
+// requester's IP, because this is report content leaving the confidentiality
+// boundary. Dispatched from index.php BEFORE the login gate, like /verify itself.
+function ops_verify_pdf() {
+    $code = strtoupper(trim((string)($_GET['c'] ?? '')));
+    if ($code === '') { http_response_code(400); header('Content-Type: text/plain'); echo 'Missing verification code.'; return true; }
+    $doc = ops_one("SELECT d.*, bp.display_name client_disp, bp.legal_name client_name, v.display_name vendor_disp, v.legal_name vendor_name, rt.name type_name
+        FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
+        WHERE d.verify_code=? AND COALESCE(d.deleted,0)=0", [$code]);
+    // Only a genuine, ISSUED report is downloadable by code. A draft, or an unknown
+    // code, gets the same neutral answer as the verify page — never a stack trace.
+    if (!$doc || empty($doc['finalized'])) {
+        http_response_code(404); header('Content-Type: text/plain');
+        echo 'No issued report carries that code.'; return true;
+    }
+    $lh = function_exists('quote_letterhead') ? quote_letterhead() : ['name' => app_name()];
+    [$secs, $flds] = idems_render_schema($doc);           // §33 frozen schema for an issued report
+    $pdf = report_pdf_build($doc, $secs, $flds,
+        json_decode($doc['data'] ?: '[]', true) ?: [], idems_doc_files($doc['id']), $lh, idems_report_signatures($doc), '');
+    // Report content is leaving the confidentiality boundary — record who pulled it.
+    if (function_exists('idems_log')) {
+        try { idems_log('report_doc', (int)$doc['id'], 'PUBLIC_PDF',
+            ['irn' => $doc['irn'], 'reason' => 'downloaded from the public /verify page',
+             'ip' => substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45)]); } catch (Throwable $e) {}
+    }
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/','_',$doc['irn']) . '.pdf"');
     echo $pdf; return true;
 }
 

@@ -1005,7 +1005,10 @@ function inspectors_list($activeOnly = true) {
     link_inspector_users();
     $rows = ops_all("SELECT id, name, emp_code, sbu, salary_ctc, staff_kind, home_office_id, trade_id,
                             COALESCE(team_role,'FIELD') team_role
-                     FROM inspectors" . ($activeOnly ? " WHERE status='ACTIVE'" : "") . " ORDER BY name");
+                     FROM inspectors" . ($activeOnly ? " WHERE COALESCE(NULLIF(status,''),'ACTIVE')='ACTIVE'" : "") . " ORDER BY name");
+    // Field-finding #26 — a blank status counts as ACTIVE (a person with no explicit status is
+    // deputable, not hidden). This surfaces a contractor created before the insert fix; deactivation
+    // sets a real non-empty status, so the genuinely-inactive are still excluded.
     $rank = ['FIELD' => 0, 'COORD' => 1, 'OFFICE' => 2];
     usort($rows, fn($a, $b) => ($rank[$a['team_role']] ?? 0) <=> ($rank[$b['team_role']] ?? 0)
         ?: strcasecmp((string)$a['name'], (string)$b['name']));
@@ -1551,6 +1554,25 @@ function job_money($job) {
 
 // What one branch books on this job — or, with no branch named, what the
 // company books, which is the invoice value itself.
+// Field-finding #12 — commercial visibility on a CROSS-OFFICE job (executed by one office, contracted by
+// another). The executing office may see ONLY its own inter-office credit for the call plus whether the job
+// is invoiced (a capsule, no amount); every other commercial figure — invoice value, client billing,
+// revenue, profit — belongs to the contracting/owning office. Returns:
+//   'FULL'        — master, ALL-scope, a same-office job, or a viewer whose scope includes the CONTRACTING office
+//   'CREDIT_ONLY' — a viewer whose scope covers the EXECUTING office but not the contracting one (cross-office)
+// Same-office jobs are always FULL for anyone who can open them. Fail-closed: never FULL for an outsider.
+function job_commercial_view($job) {
+    if (function_exists('is_master') && is_master()) return 'FULL';
+    $off = function_exists('scope_offices') ? scope_offices() : 'ALL';
+    if ($off === 'ALL') return 'FULL';
+    $m = job_money($job);
+    if (empty($m['cross'])) return 'FULL';                                   // one office does it all
+    $scope = is_array($off) ? array_map('intval', $off) : [];
+    $contract = (int)($m['contracting_office_id'] ?? 0);
+    if ($contract && in_array($contract, $scope, true)) return 'FULL';       // the owning office sees all
+    return 'CREDIT_ONLY';                                                    // executing-office (or outsider) view
+}
+
 function job_revenue_for($job, $officeId = null) {
     $m = job_money($job);
     if (!$officeId) return $m['invoice'];
@@ -3676,7 +3698,11 @@ function ops_inspectors($action, $method) {
             } else {
                 $pdo->prepare("INSERT INTO inspectors (first_name,middle_name,last_name,name,emp_code,designation,staff_kind,trade_id,sbus,sbu,skill_ids,email,mobile,agency_id,agency_name,home_office_id,weekly_working_days,reports_to_id,team_role,agency_cost,salary_ctc,status,created_at)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyId, $agencyName, $homeOff, $wwd, $reportTo, $teamRole, $agencyCost ?: 0, $salary ?: 0, $b['status'] ?? 'ACTIVE', date('c')]);
+                    ->execute([$b['first_name'] ?? '', $b['middle_name'] ?? '', $b['last_name'] ?? '', $full, $empCode, $desig, $kind, $trade, $sbus, explode(',', $sbus)[0] ?? '', $skills, $b['email'] ?? '', $b['mobile'] ?? '', $agencyId, $agencyName, $homeOff, $wwd, $reportTo, $teamRole, $agencyCost ?: 0, $salary ?: 0, ($b['status'] ?? '') ?: 'ACTIVE', date('c')]);
+                // Field-finding #26 — a new team member (incl. a contractor) is ACTIVE unless a real
+                // status is chosen. Before, an empty status field created a blank status, and the person
+                // then vanished from the allocate picker and the operational dashboard (which filter on
+                // status='ACTIVE'). `?: 'ACTIVE'` coalesces the empty string, not just null.
                 $id = $pdo->lastInsertId();
                 // §WO-7 — a first certificate (with its scan and validity) can be
                 // attached right here while adding the team member.
@@ -5554,9 +5580,13 @@ function ops_jobs($route, $method) {
             // engineer (any staff kind) or a sub-contracting agency. Allowing a
             // job to be raised with nobody on it left calls "allocated" to no one.
             if (empty($b['inspector_id']) && empty($b['subcon_id'])) {
+                // Field-finding #11 — on a re-render, land on the field that failed (the who-carries-it-out
+                // picker on the Engineer tab), not the first tab. `error_field` tells the form which field
+                // to open its tab on and focus.
                 view('ops/job_form', array_merge(call_job_form_vars($job, $call),
                     ['error' => 'Choose who will carry out this ' . Tl('job') . ' — an inspector / engineer, or a '
-                              . 'sub-contracting agency — before it can be allocated.']));
+                              . 'sub-contracting agency — before it can be allocated.',
+                     'error_field' => 'inspector_id']));
                 return;
             }
             $fields = job_save_fields();
@@ -5939,23 +5969,26 @@ function ops_jobs($route, $method) {
         // to someone who cannot act on it.
         ops_require(is_master() || can('ops.job.close') || job_owned_by_me((int)$job['id']),
             'You do not have permission to close this ' . Tl('job') . '. Ask a coordinator.');
+        // Field-finding #24 — a job closes ONCE. This guard covers BOTH the GET (so the close/expense form
+        // never re-appears for a job that is already closed — the "it let me enter expenses again"
+        // confusion) and the POST (so a re-post / back-and-resend / offline re-send never files a second set
+        // of expenses against the same day's work). To change a closed job, edit its expenses below or
+        // Unlock it first; the close button is hidden on every list/detail once closed, and this closes the
+        // one door those buttons don't cover (a stale page, the back button, a bookmarked form, a 2nd tab).
+        if (!empty($job['closed_flag'])) {
+            flash(ucfirst(Tl('job')) . ' ' . $job['job_code'] . ' is already closed'
+                . (!empty($job['closed_at']) ? ' (' . fdate(substr((string)$job['closed_at'], 0, 10)) . ')' : '')
+                . '. Nothing was recorded twice. To correct the expenses, edit them on the '
+                . Tl('job') . ' below; to reopen it, use Unlock.', 'warning');
+            redirect('/job?id=' . $job['id']);
+        }
         if ($method === 'POST') {
             $b = $_POST;
             // Past the deadline the engineer can no longer close it themselves —
             // the whole point of the lock is that late figures are not simply
             // typed in later as if nothing happened.
             if (($why = job_lock_block($job)) !== '') { flash($why, 'error'); redirect('/job?id=' . $job['id']); }
-            // A job closes once. Without this, every re-post of the closure form —
-            // a refresh, a back-and-resend, the offline queue re-sending an entry
-            // the server had already taken — filed another set of expenses against
-            // the same day's work, and the engineer's claim read double.
-            if (!empty($job['closed_flag'])) {
-                flash(ucfirst(Tl('job')) . ' ' . $job['job_code'] . ' was already closed'
-                    . (!empty($job['closed_at']) ? ' on ' . fdate(substr((string)$job['closed_at'], 0, 10)) : '')
-                    . '. Nothing was recorded twice. To correct the expenses, edit them on the '
-                    . Tl('job') . ' below.', 'warning');
-                redirect('/job?id=' . $job['id']);
-            }
+            // (the already-closed guard above the POST branch covers the double-close / double-expense case)
             $reportDate = $b['report_upload_date'] ?? '';
             if ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate === '') {
                 view('ops/job_close', ['job'=>$job,'error'=>'A report upload date is required before closing this job.']); return;
@@ -6034,12 +6067,20 @@ function ops_jobs($route, $method) {
                 $amt = num($_POST['extra'][$code] ?? 0);
                 if ($amt != 0) $extra[$code] = $amt;
             }
-            // save expenses row (same-day at closure)
-            $pdo->prepare("INSERT INTO expenses (job_id,inspector_id,sbu,travel,local,food,lodging,misc,extra,exp_date,notes,created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")->execute([
-                $job['id'], $job['inspector_id'], $b['sbu'] ?: $job['sbu'],
-                num($b['travel']), num($b['local']), num($b['food']), num($b['lodging']), num($b['misc']),
-                $extra ? json_encode($extra) : '', $reportDate ?: date('Y-m-d'), $b['exp_notes'] ?? '', date('c')]);
+            // save expenses row (same-day at closure).
+            // Field-finding #21 — record the day's closure expenses EXACTLY ONCE per job. The UI can no
+            // longer re-show the close form for a closed job (#24), and the close is refused once closed;
+            // this is the data-layer belt: if a closure-expense row already exists for this job we do not
+            // add a second (so no path — a race, a re-submit that slipped the UI guard — can double the
+            // engineer's claim). To change what was recorded, the expenses are edited on the job below.
+            $hasExp = (int) ops_val("SELECT COUNT(*) FROM expenses WHERE job_id=?", [$job['id']]);
+            if (!$hasExp) {
+                $pdo->prepare("INSERT INTO expenses (job_id,inspector_id,sbu,travel,local,food,lodging,misc,extra,exp_date,notes,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")->execute([
+                    $job['id'], $job['inspector_id'], $b['sbu'] ?: $job['sbu'],
+                    num($b['travel']), num($b['local']), num($b['food']), num($b['lodging']), num($b['misc']),
+                    $extra ? json_encode($extra) : '', $reportDate ?: date('Y-m-d'), $b['exp_notes'] ?? '', date('c')]);
+            }
             $tat = days_between($job['inspection_end_date'], $reportDate);
             // If a report was produced, route it to the inspector's reporting manager for sign-off.
             $needsApproval = ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate !== '') ? 'PENDING' : '';
@@ -7312,7 +7353,7 @@ function ops_reports() {
     $fin['costBySbu']=[]; $fin['costBySbuTotal']=0;
     if ($seeSalary) {
         $scopeSbuSet = scope_sbus();
-        foreach (ops_all("SELECT id, sbus, sbu, home_office_id, salary_ctc + COALESCE(agency_cost,0) salary_ctc FROM inspectors WHERE status='ACTIVE'") as $ins) {
+        foreach (ops_all("SELECT id, sbus, sbu, home_office_id, salary_ctc + COALESCE(agency_cost,0) salary_ctc FROM inspectors WHERE COALESCE(NULLIF(status,''),'ACTIVE')='ACTIVE'") as $ins) {
             if ($F['insp']!=='' && (int)$ins['id']!==(int)$F['insp']) continue;
             $ctc=(float)($ins['salary_ctc'] ?? 0); if ($ctc<=0) continue;
             // The engineer's own office decides its overhead %, exactly as the
@@ -7340,7 +7381,7 @@ function ops_reports() {
     // ---- PEOPLE & COMPLIANCE ----
     $certExp = ops_all("SELECT c.*, i.name inspector_name FROM inspector_certs c JOIN inspectors i ON i.id=c.inspector_id WHERE c.valid_to<>'' ORDER BY c.valid_to");
     $certSoon=[]; foreach ($certExp as $c){ $dleft=days_between($today,$c['valid_to']); if ($dleft!==null && $dleft<=90){ $c['days']=$dleft; $certSoon[]=$c; } }
-    $byTrade=[]; foreach (ops_all("SELECT trade_id, COUNT(*) n FROM inspectors WHERE status='ACTIVE' GROUP BY trade_id") as $r){ $byTrade[trade_label($r['trade_id'])]=$r['n']; }
+    $byTrade=[]; foreach (ops_all("SELECT trade_id, COUNT(*) n FROM inspectors WHERE COALESCE(NULLIF(status,''),'ACTIVE')='ACTIVE' GROUP BY trade_id") as $r){ $byTrade[trade_label($r['trade_id'])]=$r['n']; }
 
     // ---- top-10 customers by revenue + revenue by project (contract number) ----
     arsort($fin['byClient']); $fin['byClientTop'] = array_slice($fin['byClient'], 0, 10, true);
@@ -7483,6 +7524,21 @@ function ops_users($route, $method) {
                     'sbuOpts' => lk_options_or('sbu', OPS_SBUS), 'globalMgr' => $globalMgr, 'managers' => $mgrsE,
                     'defaults' => role_defaults($role)] + user_cost_vars(user_row_from_post($b, $user)));
                 return;
+            }
+            // Field-finding #22 — one team member = one login. Picking a team member who is ALREADY the
+            // person behind another active login would point two logins at the same inspector record, so
+            // both would see that inspector's jobs/schedule (a segregation leak). Refuse it and tell the
+            // admin to add a distinct team member instead.
+            if ($insId && function_exists('inspector_login_conflict')) {
+                $conf = inspector_login_conflict((int)$insId, $user ? (int)$user['id'] : 0);
+                if ($conf) {
+                    flash('That team member is already the person behind the login “' . $conf . '”. Each person maps to one login — add a separate team member for this user instead of sharing one.', 'error');
+                    $mgrsE = ops_all("SELECT id, first_name, last_name, username, role, position_title FROM users WHERE is_active=1" . ($user ? " AND id<>" . (int)$user['id'] : "") . " ORDER BY first_name, last_name");
+                    view('ops/user_form', ['user' => user_row_from_post($b, $user), 'inspectors' => inspectors_list(false), 'offices' => offices_list(),
+                        'sbuOpts' => lk_options_or('sbu', OPS_SBUS), 'globalMgr' => $globalMgr, 'managers' => $mgrsE,
+                        'defaults' => role_defaults($role)] + user_cost_vars(user_row_from_post($b, $user)));
+                    return;
+                }
             }
             // Both scopes arrive as tick-lists now. "Every…" wins over the
             // individual ticks, and is stored as ALL so an office added next

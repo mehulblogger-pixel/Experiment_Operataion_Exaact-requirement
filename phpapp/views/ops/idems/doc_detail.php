@@ -45,11 +45,16 @@
       <form method="post" action="/document-finalize?id=<?= (int)$doc['id'] ?>" style="display:inline" onsubmit="return confirm('Finalize &amp; issue this report? It becomes permanently locked (immutable).')"><button class="btn" type="submit">Finalize &amp; issue</button></form>
       <?php endif; ?>
     <?php endif; ?>
-    <?php // ---- ONE download button ---- ?>
+    <?php // ---- ONE download button. Before a report is issued this IS the draft
+          //   copy (printed watermarked DRAFT), so the inspector can pull it, read it
+          //   over, and only then submit for review — Field #16. After issue it is the
+          //   final copy. Labelled so pre-submit it plainly says "draft". ?>
+    <?php $isDraftDl = empty($doc['finalized']);
+          $dlTitle = $isDraftDl ? 'Download a draft copy to read over before submitting it for review' : 'Download the issued report'; ?>
     <?php if ($yourFmt): ?>
-      <a class="btn secondary" href="/document-docx?id=<?= (int)$doc['id'] ?>">📄 Download report</a>
+      <a class="btn secondary" href="/document-docx?id=<?= (int)$doc['id'] ?>" title="<?= e($dlTitle) ?>">📄 Download <?= $isDraftDl ? 'draft' : 'report' ?></a>
     <?php else: ?>
-      <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>" target="_blank">📄 Download PDF</a>
+      <a class="btn secondary" href="/document-pdf?id=<?= (int)$doc['id'] ?>" target="_blank" title="<?= e($dlTitle) ?>">📄 Download <?= $isDraftDl ? 'draft PDF' : 'PDF' ?></a>
     <?php endif; ?>
     <?php // ---- Everything else lives here ---- ?>
     <details class="more-menu">

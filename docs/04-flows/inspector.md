@@ -57,7 +57,8 @@ coordinator, manager or anyone holding the money permissions still sees the full
 
 **Decision points:**
 - **Job close is gated by business rules:** report upload date required unless NOREPORT (`ops.php:5581`); the chargeable bill must be on file (`ops.php:5602`); both site check-ins must exist or the close is bounced (a manager can override with a recorded reason that dents the rating, §WO-9 `ops.php:5609-5628`).
-- **Report path forks on the vetting gate:** Submit → `VETTING` (to a vetter first) if the gate is on, else straight to the approval chain (`idems.php:4428-4436`).
+- **Report path forks on the vetting gate:** Submit → `VETTING` (to a vetter first) if the gate is on, else straight to the approval chain (`idems.php:4428-4436`). The gate is a single admin switch — **Settings → Vetting checklist** (`/vetting-checklist`), "Require technical vetting before approval" (`vetting_gate_required`, off by default; Release Notes are always exempt). See `docs/edge-cases/07-vetting-review-approval.md §13`.
+- **Read the draft before you submit:** the report detail's primary **"📄 Download draft"** button (and *More ▾ → PDF (draft)*) gives the inspector the report as a PDF **watermarked DRAFT** at any point before it is issued — no submit or approval needed. Read it over, then submit for review (`ops_idems_pdf`, `idems.php:7648`).
 
 **Handoff points (named):**
 - **Inspector → Vetter/Approver:** on submit the report leaves the inspector and shows on the approver's dashboard "Reports awaiting your approval" and their pending tasks (`dashboard.php:253`, `ops.php:6336`). A rejected report returns as "to fix & resubmit" (`ops.php:6370`).

@@ -230,7 +230,9 @@
       if (['LEAVE','TRAINING','WFH','TRAVEL','HALF_DAY','OFFICE'].indexOf(status) >= 0) {
         note = prompt('Note for this status (optional):', document.getElementById('av-note-'+id).textContent.trim()) || '';
       }
-      var body = new URLSearchParams({inspector_id:id, status:status, note:note, ajax:'1', day:day});
+      // Field #14 (same root cause) — carry the CSRF token, or the global CSRF gate
+      // rejects this POST and redirects to HTML, so r.json() throws and the pill never updates.
+      var body = new URLSearchParams({inspector_id:id, status:status, note:note, ajax:'1', day:day, _csrf:'<?= e(csrf_token()) ?>'});
       fetch('/availability?day='+encodeURIComponent(day), {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:body.toString()})
         .then(function(r){ return r.json(); })
         .then(function(d){

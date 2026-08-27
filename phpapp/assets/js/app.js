@@ -459,9 +459,21 @@
           if (cE) url += '&contact_email=' + encodeURIComponent(cE);
           if (cM) url += '&contact_mobile=' + encodeURIComponent(cM);
         }
-        win = window.open(url, 'exaactPartnerPicker', 'width=900,height=920,menubar=no,toolbar=no,scrollbars=yes');
-        if (win) win.focus();
-        else window.location.href = url;         // popups blocked → just navigate
+        // Field #10 — open the add form as an in-page popup (iframe modal) rather
+        // than a separate browser window. You never leave the call/quote form you
+        // were filling, so nothing you typed is lost; on save the picker posts
+        // {exaact:partner-added} to this page (window.parent) and the dropdown
+        // selects it (see the message handler below). Falls back to a window only
+        // if the modal helper is somehow unavailable (old cached script).
+        var title = kind === 'vendor' ? 'Add vendor' : (kind === 'client' ? 'Add client' : 'Add');
+        if (typeof openEmbed === 'function') {
+          pending.embed = true;
+          openEmbed(url, title);
+        } else {
+          win = window.open(url, 'exaactPartnerPicker', 'width=900,height=920,menubar=no,toolbar=no,scrollbars=yes');
+          if (win) win.focus();
+          else window.location.href = url;       // popups blocked → just navigate
+        }
       });
     });
 
@@ -485,7 +497,13 @@
           if (!has) { var op = document.createElement('option'); op.value = id; op.textContent = name; s.appendChild(op); }
         });
       });
+      // Close the in-page popup (if that is how it was opened) WITHOUT reloading —
+      // the host is a form in progress, so a reload would throw away what the user
+      // has typed. The dropdown was already updated above, so there is nothing to
+      // refresh. A separate window (fallback path) is simply closed.
+      var wasEmbed = pending && pending.embed;
       pending = null;
+      if (wasEmbed && typeof closeEmbed === 'function') { closeEmbed(false); }
       try { if (win && !win.closed) win.close(); } catch (e2) {}
     });
   }
@@ -1381,6 +1399,55 @@
     initTabAnchors();
     initModuleCrumb();
     initResponsiveTables();
+    initEmbedModals();
+  }
+
+  // ---- In-page popups (Field #9/#10) --------------------------------------
+  // A [data-embed="/url"] trigger opens the existing screen at that URL in a modal iframe ON TOP of the
+  // current page — so a coordinator can add a site address or raise a call without leaving where they are.
+  // The embedded screen renders bare (embed=1); when it saves, its redirect posts {embedDone} back here and
+  // the popup closes and refreshes the host so the new record shows. No page you were working on is lost.
+  function initEmbedModals() {
+    if (window.__embedInit) return; window.__embedInit = 1;
+    document.addEventListener('click', function (e) {
+      var t = e.target.closest ? e.target.closest('[data-embed]') : null;
+      if (!t) return;
+      e.preventDefault();
+      openEmbed(t.getAttribute('data-embed'), t.getAttribute('data-embed-title') || t.textContent.trim());
+    });
+    window.addEventListener('message', function (ev) {
+      if (ev.data && ev.data.embedDone) closeEmbed(true);
+    });
+  }
+  function openEmbed(url, title) {
+    if (!url) return;
+    closeEmbed(false);
+    var src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'embed=1';
+    var back = document.createElement('div');
+    back.className = 'embed-backdrop'; back.id = 'embed-backdrop';
+    var dlg = document.createElement('div'); dlg.className = 'embed-dialog';
+    var head = document.createElement('div'); head.className = 'embed-head';
+    var h = document.createElement('span'); h.textContent = title || 'Add';
+    var x = document.createElement('button'); x.type = 'button'; x.className = 'embed-x'; x.setAttribute('aria-label', 'Close'); x.innerHTML = '&times;';
+    var frame = document.createElement('iframe'); frame.className = 'embed-frame'; frame.src = src; frame.title = title || 'Add';
+    head.appendChild(h); head.appendChild(x);
+    dlg.appendChild(head); dlg.appendChild(frame);
+    back.appendChild(dlg);
+    document.body.appendChild(back);
+    document.body.style.overflow = 'hidden';
+    back.addEventListener('click', function (e) { if (e.target === back) closeEmbed(false); });
+    x.addEventListener('click', function () { closeEmbed(false); });
+    document.addEventListener('keydown', embedEsc);
+    setTimeout(function () { try { x.focus(); } catch (_) {} }, 40);
+  }
+  function embedEsc(e) { if (e.key === 'Escape') closeEmbed(false); }
+  function closeEmbed(done) {
+    var b = document.getElementById('embed-backdrop');
+    if (b) b.parentNode.removeChild(b);
+    document.body.style.overflow = '';
+    document.removeEventListener('keydown', embedEsc);
+    // A save closes AND refreshes the host so the just-added record is on screen.
+    if (done) { try { location.reload(); } catch (_) {} }
   }
 
   // The breadcrumb on a register read "Home › Opportunities" — nothing took you
@@ -1592,7 +1659,22 @@
       var want = 0;
       var m = (location.hash || '').match(new RegExp(key + '=([^&]+)'));
       if (m) { groups.forEach(function (g, j) { if (slug(g.label) === m[1]) want = j; }); }
+      // Field-finding #20 — also honour a bare element-id hash (e.g. /job?id=5#holdpoints). The hold /
+      // witness handler, and other in-page links, redirect to an element that lives ON a tab; without this
+      // the page opened on the first tab (Overview) and the target panel stayed hidden — reading as "it
+      // went back to the main screen" and the change "not reflected". Find which tab contains the target
+      // and open that one, then bring it into view.
+      var hashEl = null;
+      if (!m && location.hash && location.hash.length > 1) {
+        try { hashEl = wrap.querySelector(location.hash); } catch (e) { hashEl = null; }
+        if (hashEl) groups.forEach(function (g, j) {
+          g.panels.forEach(function (p) { if (p === hashEl || p.contains(hashEl)) want = j; });
+        });
+      }
       show(want, false);
+      if (hashEl) setTimeout(function () {
+        try { if (hashEl.tagName === 'DETAILS') hashEl.open = true; hashEl.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+      }, 80);
     });
   }
 

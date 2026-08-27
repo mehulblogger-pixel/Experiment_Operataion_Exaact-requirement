@@ -31,13 +31,15 @@ foreach ([
 // The comms log guard specifically carries the !$fieldInspector clause.
 t_ok(preg_match('/tosrm_render_comms\'\)\s*&&\s*!\$fieldInspector/', $src) === 1,
     'the communication log is hidden from the inspector');
-// The expenses/profitability fold is wrapped in an if (!$fieldInspector) … endif.
-t_ok(strpos($src, 'if (!$fieldInspector):') !== false
+// The expenses/profitability fold is wrapped in an if (!$fieldInspector …) … endif.
+// (Field #12 also gates it on $commView === 'FULL' so a cross-office executing viewer doesn't see profit;
+// the !$fieldInspector clause is retained, so the inspector is still excluded.)
+t_ok(strpos($src, 'if (!$fieldInspector && $commView === \'FULL\'):') !== false
     && strpos($src, 'expenses/profitability fold') !== false,
     'the expenses/profitability fold is hidden from the inspector');
 
 // Every guard sits after the predicate definition.
-foreach (['$jgap && !$fieldInspector', '($chgHeads || $byHead) && !$fieldInspector', 'if (!$fieldInspector):'] as $g) {
+foreach (['$jgap && !$fieldInspector', '($chgHeads || $byHead) && !$fieldInspector', 'if (!$fieldInspector && $commView === \'FULL\'):'] as $g) {
     t_ok(strpos($src, $g) > $gatePos, "guard [$g] is in scope of the predicate");
 }
 
