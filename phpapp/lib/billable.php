@@ -30,10 +30,11 @@ const BILLABLE_STATUS = [
     'DISPUTED'  => 'Disputed',
 ];
 
-// Where a billable event came from. Only JOB_CLOSED is wired in P4a; the rest
-// are the roadmap (report issue, timesheet/OT approval, candidate joined…).
+// Where a billable event came from.
 const BILLABLE_SOURCES = [
-    'JOB_CLOSED' => 'Closed job',
+    'JOB_CLOSED'         => 'Closed job',
+    'TIMESHEET_APPROVED' => 'Approved deputation timesheet',
+    'PLACEMENT_FEE'      => 'Confirmed placement fee',
 ];
 
 function billable_migrate() {
@@ -55,6 +56,9 @@ function billable_migrate() {
     // IF NOT EXISTS, which MySQL rejects) inside a guard, so it is created once
     // and the retry is harmlessly caught. The upsert also guards in code.
     try { db()->exec("CREATE UNIQUE INDEX ux_billable_source ON billable_events (source_module, source_kind, source_id)"); } catch (Throwable $e) {}
+    // P4c — the invoice reference for an event billed by finance's attestation
+    // (non-job sources have no auto invoice linkage). Additive for existing DBs.
+    if (function_exists('ensure_column')) ensure_column('billable_events', 'bill_ref', "VARCHAR(80) DEFAULT ''");
 }
 
 // ---- Access (reuses finance rights — no new permission, D1) ----------------
@@ -99,6 +103,21 @@ function billable_set_status($id, $to, $reason = '') {
         db()->prepare("UPDATE billable_events SET status=?, status_reason=?, updated_at=? WHERE id=?")
             ->execute([$to, (string)$reason, date('c'), $id]);
     }
+    return true;
+}
+
+// P4c — the attested "billed" path for events with no automatic invoice linkage
+// (timesheet, placement). Finance records the real invoice number they raised, so
+// the ledger still never claims BILLED without an invoice behind it — the
+// attestation IS the evidence. Only an APPROVED event can be billed this way.
+function billable_mark_billed($id, $ref) {
+    billable_migrate();
+    $id = (int)$id; $ref = trim((string)$ref);
+    if (!$id || $ref === '') return false;
+    $e = ops_one("SELECT * FROM billable_events WHERE id=?", [$id]);
+    if (!$e || ($e['status'] ?? '') !== 'APPROVED') return false;
+    db()->prepare("UPDATE billable_events SET status='BILLED', bill_ref=?, updated_at=? WHERE id=?")
+        ->execute([substr($ref, 0, 80), date('c'), $id]);
     return true;
 }
 
@@ -167,6 +186,34 @@ function billable_on_job_closed($jobId) {
     } catch (Throwable $e) { return 0; }
 }
 
+// P4c — inline hook: an APPROVED deputation timesheet is the manpower billable
+// occurrence. Amount is left advisory (0) — the rate is applied when finance
+// invoices/attests — but the qty (man-days) and client are captured so the work
+// cannot vanish before billing. Self-guarded; never throws to the caller.
+function billable_on_timesheet_approved($approvalId) {
+    try {
+        billable_migrate();
+        $approvalId = (int)$approvalId; if (!$approvalId) return 0;
+        $a = ops_one("SELECT * FROM dep_att_approval WHERE id=?", [$approvalId]);
+        if (!$a || ($a['status'] ?? '') !== 'APPROVED') return 0;
+        $contract = ''; $office = 0; $sbu = '';
+        if (!empty($a['job_id'])) {
+            $j = ops_one("SELECT j.executing_office_id, j.sbu, c.contract_number
+                          FROM jobs j LEFT JOIN calls c ON c.id=j.call_id WHERE j.id=?", [(int)$a['job_id']]);
+            if ($j) { $contract = (string)($j['contract_number'] ?? ''); $office = (int)($j['executing_office_id'] ?? 0); $sbu = (string)($j['sbu'] ?? ''); }
+        }
+        $days = (float)($a['billable_days'] ?? 0);
+        $qty  = $days > 0 ? $days : (float)($a['billable_hours'] ?? 0);
+        $unit = (string)($a['basis'] ?? '') ?: ($days > 0 ? 'MANDAY' : 'HOUR');
+        return billable_event_upsert('pdso', 'TIMESHEET_APPROVED', $approvalId, [
+            'party_id'        => (int)($a['client_id'] ?? 0),
+            'contract_number' => $contract, 'office_id' => $office, 'sbu' => $sbu,
+            'service_type'    => 'DEPUTATION', 'qty' => $qty, 'unit' => $unit,
+            'rate'            => 0, 'amount' => 0, 'calc_rule' => 'timesheet.approved (priced at invoice)',
+        ]);
+    } catch (Throwable $e) { return 0; }
+}
+
 // ---- The sync pass (derive + reconcile) ------------------------------------
 // 1. Derive a PENDING event for every closed, not-yet-invoiced billable job.
 // 2. Reconcile: any event whose source job is now invoiced → BILLED + linkage,
@@ -193,6 +240,23 @@ function billable_events_sync($limit = 500) {
             if ($id) $created++;
         }
     }
+
+    // Placement fees — a confirmed (payable) one-time recruitment fee for a hired
+    // candidate is a billable occurrence with a real amount. WAIVED/PROVISIONAL
+    // are not billable yet, so only CONFIRMED is derived.
+    try {
+        foreach (ops_all("SELECT i.id, i.placement_fee,
+                                 (SELECT c.client_id FROM candidates c WHERE c.inspector_id=i.id AND COALESCE(c.client_id,0)>0 ORDER BY c.id DESC LIMIT 1) client_id
+                          FROM inspectors i
+                          WHERE COALESCE(i.fee_status,'')='CONFIRMED' AND COALESCE(i.placement_fee,0) > 0") ?: [] as $r) {
+            $id = billable_event_upsert('recruit', 'PLACEMENT_FEE', (int)$r['id'], [
+                'party_id'     => (int)($r['client_id'] ?? 0),
+                'service_type' => 'PLACEMENT', 'qty' => 1, 'unit' => 'placement',
+                'amount'       => (float)$r['placement_fee'], 'calc_rule' => 'inspector.placement_fee',
+            ]);
+            if ($id) $created++;
+        }
+    } catch (Throwable $e) {}
 
     if (function_exists('books_invoices_for_job')) {
         foreach (ops_all("SELECT * FROM billable_events WHERE source_module='job' AND status IN ('PENDING','APPROVED')") ?: [] as $e) {
@@ -274,6 +338,15 @@ function ops_billable($route, $method) {
         ops_require(billable_can_manage(), 'You cannot run the billable sync.');
         $r = billable_events_sync();
         flash('Billable events synced — ' . $r['created'] . ' derived, ' . $r['billed'] . ' reconciled to invoices.');
+        redirect('/billable-events');
+    }
+    if ($route === 'billable-bill' && $method === 'POST') {
+        ops_require(billable_can_manage(), 'You cannot bill a billable event.');
+        $id = (int)($_POST['id'] ?? 0);
+        $ref = trim((string)($_POST['invoice_ref'] ?? ''));
+        if ($ref === '') { flash('Enter the invoice number this was billed on.', 'error'); redirect('/billable-events'); }
+        if (billable_mark_billed($id, $ref)) flash('Billable event marked billed against ' . $ref . '.');
+        else flash('Only an approved event can be marked billed.', 'error');
         redirect('/billable-events');
     }
     if (in_array($route, ['billable-approve', 'billable-cancel', 'billable-dispute'], true) && $method === 'POST') {

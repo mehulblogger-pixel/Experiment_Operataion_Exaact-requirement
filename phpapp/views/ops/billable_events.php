@@ -52,12 +52,14 @@
         <tbody>
         <?php foreach ($rows as $r): $st = (string)$r['status']; ?>
           <tr>
-            <td><?php if ($r['source_module'] === 'job'): ?><a href="/job?id=<?= (int)$r['source_id'] ?>">Job #<?= (int)$r['source_id'] ?></a><?php else: ?><?= e($r['source_kind']) ?> #<?= (int)$r['source_id'] ?><?php endif; ?></td>
+            <?php $srcLabel = (defined('BILLABLE_SOURCES') && isset(BILLABLE_SOURCES[$r['source_kind']])) ? BILLABLE_SOURCES[$r['source_kind']] : $r['source_kind']; ?>
+            <td><?php if ($r['source_module'] === 'job'): ?><a href="/job?id=<?= (int)$r['source_id'] ?>"><?= e($srcLabel) ?> #<?= (int)$r['source_id'] ?></a><?php else: ?><?= e($srcLabel) ?> #<?= (int)$r['source_id'] ?><?php endif; ?></td>
             <td><?= e($r['party_name'] ?: '—') ?></td>
             <td><?= e($r['contract_number'] ?: '—') ?></td>
             <td><?= e($r['service_type'] ?: '—') ?></td>
             <td style="text-align:right;font-variant-numeric:tabular-nums"><?= e($m($r['amount'])) ?>
-              <?php if ($st === 'BILLED' && (int)$r['invoice_id']): ?><a href="/invoice?id=<?= (int)$r['invoice_id'] ?>" class="muted" style="font-size:11px">· inv</a><?php endif; ?></td>
+              <?php if ($st === 'BILLED' && (int)$r['invoice_id']): ?><a href="/invoice?id=<?= (int)$r['invoice_id'] ?>" class="muted" style="font-size:11px">· inv</a>
+              <?php elseif ($st === 'BILLED' && !empty($r['bill_ref'])): ?><span class="muted" style="font-size:11px">· <?= e($r['bill_ref']) ?></span><?php endif; ?></td>
             <td><span class="pill <?= $tone[$st] ?? 'p-mut' ?>"><?= e($statuses[$st] ?? $st) ?></span>
               <?php if (!empty($r['status_reason'])): ?><span class="muted" style="font-size:11px" title="<?= e($r['status_reason']) ?>">ⓘ</span><?php endif; ?></td>
             <?php if ($canManage): ?>
@@ -65,7 +67,8 @@
                 <?php if ($st === 'PENDING'): ?>
                   <form method="post" action="/billable-approve" style="display:inline;margin:0"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><button class="btn small" type="submit">Approve</button></form>
                 <?php elseif ($st === 'APPROVED'): ?>
-                  <form method="post" action="/billable-dispute" style="display:inline-flex;gap:4px;margin:0"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input name="reason" placeholder="reason" style="width:120px"><button class="btn small secondary" type="submit">Dispute</button></form>
+                  <form method="post" action="/billable-bill" style="display:inline-flex;gap:4px;margin:0 0 4px"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input name="invoice_ref" placeholder="invoice #" style="width:100px"><button class="btn small" type="submit">Mark billed</button></form>
+                  <form method="post" action="/billable-dispute" style="display:inline-flex;gap:4px;margin:0"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><input name="reason" placeholder="reason" style="width:100px"><button class="btn small secondary" type="submit">Dispute</button></form>
                 <?php elseif ($st === 'DISPUTED'): ?>
                   <form method="post" action="/billable-approve" style="display:inline;margin:0"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><button class="btn small" type="submit">Re-approve</button></form>
                 <?php else: ?>

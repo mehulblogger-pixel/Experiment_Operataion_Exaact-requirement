@@ -268,16 +268,25 @@ stateDiagram-v2
   APPROVED --> CANCELLED : billable-cancel (reason required)
   DISPUTED --> APPROVED : billable-approve (re-approve)
   DISPUTED --> CANCELLED : billable-cancel
-  APPROVED --> BILLED : reconciliation only — the source job becomes invoiced (books_invoices_for_job); amount taken from the invoice
-  PENDING --> BILLED : reconciliation only (same path, if invoiced before review)
-  BILLED --> [*] : terminal, linked to invoice_id
+  APPROVED --> BILLED : (job source) reconciliation — the source job becomes invoiced (books_invoices_for_job); amount taken from the invoice
+  PENDING --> BILLED : (job source) reconciliation, if invoiced before review
+  APPROVED --> BILLED : (non-job source) billable-bill — finance attests the invoice number (bill_ref); P4c
+  BILLED --> [*] : terminal, linked to invoice_id (reconciled) or bill_ref (attested)
   CANCELLED --> [*] : terminal
 ```
 
-- **BILLED is never a manual transition** (`billable_allowed_next()` excludes it);
-  it is set solely by `billable_events_sync()` when `books_invoices_for_job()`
-  shows a non-cancelled invoice for the source, so the ledger can never claim
-  something is billed without an invoice behind it.
+- **BILLED for a job source is never a manual transition** (`billable_allowed_next()`
+  excludes it); it is set by `billable_events_sync()` when `books_invoices_for_job()`
+  shows a non-cancelled invoice, taking the amount from the invoice.
+- **BILLED for a non-job source (P4c)** — timesheet / placement, which have no
+  automatic invoice linkage — is set by `billable_mark_billed()` via the
+  `billable-bill` action, and **requires the invoice number** (`bill_ref`): finance
+  attests the real invoice they raised, so the ledger still never claims BILLED
+  without an invoice behind it. Only an APPROVED event can be billed this way.
+- **Sources (`BILLABLE_SOURCES`):** `JOB_CLOSED` (inline hook + sync, job-invoice
+  reconciled), `TIMESHEET_APPROVED` (inline hook on `pdso_att_approval_set_status`
+  APPROVED; qty=man-days, amount priced at invoice), `PLACEMENT_FEE` (sync-derived
+  from inspectors with `fee_status='CONFIRMED'` and a real `placement_fee`).
 - **Permission:** reuses **`finance.reconcile`** (decision D1) via
   `billable_can_manage()`; viewing via `billable_can()` (`finance.reconcile` /
   `data.credit` / master). **No new permission** → `docs/02-permission-matrix.md`

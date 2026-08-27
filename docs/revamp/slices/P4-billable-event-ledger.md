@@ -120,22 +120,35 @@ already-invoiced job). php -l clean; **full suite 3817 passed, 0 failed.**
 board filtered by client via a new `?party=` filter). Read-only, additive.
 Test: `tests/test_billable_party.php` (6 assertions). Full suite 3870/0.
 
-**Remaining P4b — needs a design decision (blocked, flagged for sign-off):**
-Adding non-job sources (`TIMESHEET_APPROVED`, `CANDIDATE_JOINED`/placement fee)
-is **not** a safe drop-in: reconciliation to BILLED currently matches per-**job**
-invoices (`books_invoices_for_job`), and invoices carry no
-inspector/timesheet-period/placement linkage — so those events would have **no
-path to BILLED** and would sit forever in PENDING/APPROVED. Closing this cleanly
-needs one of:
-1. **Generalize invoicing to consume billable events** — let finance pick the
-   billable event(s) a line bills and stamp `invoice_line_id` at
-   `books_line_add()`; then reconciliation works for every source. (Touches the
-   money write-path — its own validated slice.)
-2. **A manual "billed, invoice #…" action** for non-job events — which changes the
-   "BILLED is reconciliation-only" rule and so needs your sign-off.
+## Delivery record (P4c — non-job sources + attested billing)
 
-Until one is chosen, the timesheet/placement sources are held so the ledger never
-strands events. The `JOB_CLOSED` source (real-time hook + sync) is complete.
+The reconciliation blocker (invoices carry no timesheet/placement linkage) was
+closed with the **attested-billing** approach (chosen over touching the invoicing
+write-path):
+
+- **Attested BILLED path** — `billable_mark_billed($id, $ref)` + the
+  `billable-bill` action: an APPROVED event is billed by finance **recording the
+  real invoice number** (`bill_ref`, additive column). The ledger still never
+  claims BILLED without an invoice behind it — the attestation *is* the evidence.
+  Job sources keep their automatic `books_invoices_for_job` reconciliation.
+- **`TIMESHEET_APPROVED`** — inline hook on `pdso_att_approval_set_status(...,
+  'APPROVED')`: qty = man-days, client + contract carried, amount left advisory
+  (priced at invoice). Self-guarded; never affects the approval.
+- **`PLACEMENT_FEE`** — sync-derived from inspectors with `fee_status='CONFIRMED'`
+  and a real `placement_fee`; attributed to the hiring client
+  (`candidates.inspector_id → client_id`). PROVISIONAL/WAIVED are not derived.
+- Lifecycle recorded in `docs/03-object-lifecycles.md` (the new attested BILLED
+  transition + the three sources).
+
+**Validation:** `tests/test_billable_sources.php` (timesheet hook, attested
+billing guards, placement derive, provisional excluded). All billable tests
+**55/55**; **full suite 3884 passed, 0 failed.**
+
+**Still open (a bigger, optional slice, not required):** generalizing the
+invoicing screen to *consume* billable events line-by-line (stamp
+`invoice_line_id` at `books_line_add`) would let job invoices auto-consume all
+source types. Not needed now — attested billing closes the lifecycle for every
+source; this is a future refinement of the money write-path.
 
 **RT3 note:** the first-class `Engagement` entity was parked "until after P4"
 (`00-program.md` D3). P4 is now delivered — Engagement can be revisited if the

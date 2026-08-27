@@ -512,6 +512,9 @@ function pdso_att_approval_set_status($id, $status, $clientRep = '', $comments =
     db()->prepare("UPDATE dep_att_approval SET status=?, client_rep=COALESCE(NULLIF(?,''),client_rep), approved_on=COALESCE(NULLIF(?,''),approved_on), comments=?, source=?, updated_at=? WHERE id=?")
         ->execute([$status, (string)$clientRep, $approvedOn, (string)$comments, $status==='APPROVED'?'CLIENT':'TPIA', date('c'), $id]);
     if (function_exists('idems_log')) { try { idems_log('dep_att_approval', $id, 'STATUS', ['new'=>$status]); } catch (Throwable $e) {} }
+    // Revamp P4c — an approved timesheet is the manpower billable occurrence.
+    // Guarded so it can never affect the approval.
+    if ($status === 'APPROVED' && function_exists('billable_on_timesheet_approved')) billable_on_timesheet_approved($id);
     return true;
 }
 function pdso_att_approvals($jobId) { return ops_all("SELECT * FROM dep_att_approval WHERE job_id=? ORDER BY period_from DESC, id DESC", [(int)$jobId]) ?: []; }
