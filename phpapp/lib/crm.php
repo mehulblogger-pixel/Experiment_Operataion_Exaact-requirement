@@ -1827,6 +1827,23 @@ function ops_crm_quotes($route, $method) {
                 }
             } catch (Throwable $e) { /* never block the acceptance */ }
 
+            // The answer travels back to the LEAD too. A quotation raised straight
+            // off a lead (its lead_id set), now accepted, IS that lead becoming a
+            // customer — but nothing converted it, so it stayed "Qualified/Open"
+            // while its own quote was won, and the deal never showed it converted.
+            // Convert it now: idempotent, and best-effort so a hiccup here never
+            // blocks the acceptance. Resolve the lead from the quote, or — for a
+            // quote linked to a deal that itself came from a lead — from the deal.
+            try {
+                if (function_exists('lead_convert_on_quote_win') && !empty($res['client_id'])) {
+                    $leadId = (int)($q['lead_id'] ?? 0);
+                    if (!$leadId && !empty($oid))
+                        $leadId = (int)(ops_val("SELECT lead_id FROM opportunities WHERE id=?", [(int)$oid]) ?: 0);
+                    if ($leadId)
+                        lead_convert_on_quote_win($leadId, (int)$res['client_id'], (int)($q['inquiry_id'] ?? 0) ?: null);
+                }
+            } catch (Throwable $e) { /* never block the acceptance */ }
+
             // If MGH Books is connected, the accepted quotation (and its client)
             // flow across so Books can convert it — best-effort, never blocking the
             // acceptance, a clean no-op when Books is not connected.

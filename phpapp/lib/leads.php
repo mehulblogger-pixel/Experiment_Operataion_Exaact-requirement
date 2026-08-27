@@ -704,6 +704,56 @@ function lead_convert($leadId, array $b = []) {
     return ['ok' => true, 'partner_id' => $partnerId, 'inquiry_id' => $inqId];
 }
 
+// A quotation raised straight off a lead (its lead_id set) that is now ACCEPTED
+// IS the moment that lead became a customer — but nothing sent the outcome back
+// to the lead, so it sat at "Qualified/Open" forever while its own quote was won,
+// and every screen that judges conversion by status='CONVERTED' / converted_*
+// showed it as still in play. The quote's acceptance already landed the customer
+// and (if there was a deal) won it; this closes the lead the same way lead_convert
+// does — WITHOUT creating a second customer or raising a duplicate inquiry, because
+// by acceptance time the customer exists and the quote already carries the work.
+// Idempotent (a lead already CONVERTED/LOST is left alone) and best-effort: this
+// must never block the acceptance it rides on.
+function lead_convert_on_quote_win($leadId, $partnerId, $inquiryId = null) {
+    $leadId = (int)$leadId; $partnerId = (int)$partnerId;
+    if (!$leadId || !$partnerId) return false;
+    $l = lead_row($leadId);
+    if (!$l) return false;
+    if (in_array(($l['status'] ?? ''), ['CONVERTED', 'LOST'], true)) return false; // already settled
+    $pdo = db();
+    // Move to the lead pipeline's WON stage if it has one, so the board shows it
+    // left the funnel — otherwise keep whatever stage it is on.
+    $stageId = (int)($l['stage_id'] ?? 0);
+    if (function_exists('pipeline_stages')) {
+        foreach (pipeline_stages((int)($l['pipeline_id'] ?? 0)) as $st)
+            if (($st['kind'] ?? '') === 'WON') { $stageId = (int)$st['id']; break; }
+    }
+    $who = user_name(current_user()) ?: 'System (quotation won)';
+    $pdo->prepare("UPDATE leads SET status='CONVERTED', stage_id=?,
+                       partner_id=COALESCE(NULLIF(partner_id,0),?),
+                       converted_partner_id=?,
+                       converted_inquiry_id=COALESCE(converted_inquiry_id,?),
+                       converted_at=?, converted_by=?, stage_since=?, updated_at=? WHERE id=?")
+        ->execute([$stageId ?: null, $partnerId, $partnerId,
+                   $inquiryId ? (int)$inquiryId : null,
+                   date('c'), $who, date('c'), date('c'), $leadId]);
+    // The deal opened from this lead needs the customer too (mirrors lead_convert).
+    try {
+        $pdo->prepare("UPDATE opportunities SET partner_id=?, partner_name=?, updated_at=?
+                       WHERE lead_id=? AND (partner_id IS NULL OR partner_id=0)")
+            ->execute([$partnerId, (string)($l['company_name'] ?? ''), date('c'), $leadId]);
+    } catch (Throwable $e) { /* opportunities not built on this install */ }
+    // A converted lead is a customer now — stop advertising to it as a prospect.
+    if (function_exists('ads_queue_lead')) ads_queue_lead($leadId, 'Converted — its quotation was won');
+    $to = function_exists('stage_row') ? stage_row($stageId) : null;
+    if ($to) lead_record_move($l, $to);
+    if (function_exists('act_log'))
+        act_log('LEAD', $leadId, 'SYSTEM',
+                'Lead ' . ($l['ref'] ?? '') . ' converted — its quotation was accepted',
+                ['auto' => 1, 'partner_id' => $partnerId, 'outcome' => 'won']);
+    return true;
+}
+
 // ---- The board -------------------------------------------------------------
 // Grouped by stage, which is how a pipeline is read.
 function lead_board($pipelineId = 0) {

@@ -127,7 +127,7 @@ stateDiagram-v2
   DRAFT --> APPROVED : direct set · crm.quote.approve; if amount/BU matches a rule it is routed to the chain instead (crm.php:1548 guard, Module 03)
   APPROVED --> PENDING_APPROVAL : retract before it leaves · quote_can_retract (crm.php:1858)
   APPROVED --> SENT : send · crm.quote.send/master, emails + schedules follow-ups (crm.php:1589-1591)
-  SENT --> ACCEPTED : client accepts (staff-recorded) · lands client + wins deal (crm.php:1616)
+  SENT --> ACCEPTED : client accepts (staff-recorded) · lands client + wins deal + converts originating lead (crm.php:1616)
   SENT --> LOST : client declines · reason captured, closes deal (crm.php:1566)
   SENT --> EXPIRED : validity lapsed · crm_expire_quotes cron, no user (crm.php, Module 03)
   EXPIRED --> ACCEPTED : accepted after expiry · recorded as accepted-after-expiry (crm.php:1616, Module 03)
@@ -150,6 +150,15 @@ stateDiagram-v2
   bypass. When no rule matches, the direct set is unchanged.
 - **Closed unlock** — ACCEPTED/LOST are locked; a time-boxed unlock is granted by the master
   only in answer to a `quote_edit_requests` row (`crm.php:1007`, `quote_is_locked` 968-971).
+- **On acceptance the outcome propagates back up the funnel** (Field #8): the sync lands the
+  client on the master (`quote_land_on_client`), wins the linked deal (`opp_move` → the pipeline's
+  WON stage), and — when the quote was raised straight off a lead (`quotations.lead_id` set), or is
+  linked to a deal that itself came from a lead — **converts that lead**
+  (`lead_convert_on_quote_win`, `leads.php`): lead `OPEN → CONVERTED` with the customer,
+  `converted_partner_id` and `converted_at` stamped, and the deal filled with the customer. No
+  duplicate customer or inquiry is created (both already exist by acceptance time). A lead already
+  `CONVERTED`/`LOST` is left alone (idempotent), and the whole propagation is best-effort — it
+  never blocks the acceptance it rides on.
 
 ---
 
