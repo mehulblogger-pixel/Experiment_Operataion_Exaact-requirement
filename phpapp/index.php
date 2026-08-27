@@ -1194,6 +1194,14 @@ if ($route === 'partner-add' && $method === 'POST') {
         }
         $pdo->prepare("INSERT INTO $table (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
         $newId = (int)$pdo->lastInsertId();
+        // R4 (Revamp P5b) — a contract registered through this partner-screen door
+        // must enter the SAME two-signature lifecycle as the CRM registration path,
+        // not go straight to the default OPEN. Register it as PENDING (awaiting a
+        // manager's endorsement, then the branch manager's approval) so no single
+        // person can put a live contract on the books unchecked.
+        if ($kind === 'contract') {
+            try { $pdo->prepare("UPDATE partner_contracts SET open_status='PENDING', is_active=0 WHERE id=?")->execute([$newId]); } catch (Throwable $e) {}
+        }
         // A contract recorded here against one of our own quotations is the same
         // agreement seen from the other end: write the number back onto that
         // quotation so it stops reading "contract number pending", and point the
@@ -1202,11 +1210,11 @@ if ($route === 'partner-add' && $method === 'POST') {
             $qid = (int)($b['quotation_id'] ?? 0);
             if ($qid && contract_link_quotation($newId, $qid)) {
                 $qn = ops_val("SELECT quote_no FROM quotations WHERE id=?", [$qid]);
-                flash('Contract added, and ' . ($qn ?: Tl('quote')) . ' now carries this contract number.');
+                flash('Contract registered (awaiting endorsement), and ' . ($qn ?: Tl('quote')) . ' now carries this contract number.');
                 redirect("/partner?id={$p['id']}&tab=contracts");
             }
         }
-        flash('Added.');
+        flash($kind === 'contract' ? 'Contract registered — it is awaiting endorsement, then approval, before it goes live.' : 'Added.');
         redirect("/partner?id={$p['id']}&tab=$tab");
     }
     redirect("/partner?id={$p['id']}");

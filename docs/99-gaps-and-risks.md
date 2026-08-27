@@ -70,7 +70,7 @@ not even see.
    Plus the existing "Reset to role default" control. Tests: `tests/test_perms_no_lockout.php`.
    (`MASTER_ADMIN` remains un-lockable via `is_superuser` — keep one, per the recovery note below.)
 
-## R4 — HIGH · Contract registration has two doors, one unguarded — **permission door now closed**
+## R4 — HIGH · Contract registration has two doors, one unguarded — **FULLY CLOSED**
 **What:** the CRM path `quote-contract` requires `crm.contract.register` (`crm.php:1830`),
 but `partner-add kind=contract` (`index.php`) used to create a `partner_contracts` row
 with **no permission check** (only number-uniqueness).
@@ -81,9 +81,11 @@ salesperson, coordinator or even an inspector.
 `ops_require(can('crm.contract.register') || is_master())` — the same permission the CRM
 path uses — so only Accounts/back-office (and master) can register a contract from either
 door (`index.php` partner-add; `tests/test_contract_backdoor_guard.php`).
-**Still open (lower risk):** new numbers created via this door do not yet run through the
-PENDING→endorse→approve lifecycle — a follow-up if the two-signature control is wanted on
-this path too.
+**Lifecycle door closed (Revamp P5b):** a contract created through this door is now
+registered as **PENDING** (`open_status='PENDING', is_active=0`) — the same two-signature
+lifecycle as the CRM path — so it must be endorsed by a manager and approved by the branch
+manager before it goes live. No single person can put a live contract on the books from
+either door. (`index.php` partner-add; `tests/test_contract_backdoor_guard.php`.)
 
 ## R5 — MEDIUM · Voucher: reopen from any state + no segregation of duties — **FIXED**
 **What:** `voucher` reopen had **no source-status guard** — a coordinator could revert **any**
