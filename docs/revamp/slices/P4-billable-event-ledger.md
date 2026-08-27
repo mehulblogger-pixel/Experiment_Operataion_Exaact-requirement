@@ -104,15 +104,16 @@ never throws, queues one PENDING candidate with the right value/client,
 idempotent re-fire, never overwrites an approved decision, skips an
 already-invoiced job). php -l clean; **full suite 3817 passed, 0 failed.**
 
-> **Pre-existing caveat (not introduced by P4, not fixed here):** `cron.php`'s
-> require list is incomplete — it omits `lib/assets.php`, `lib/licence.php` and
-> likely others, so `boot()` and several tasks fail on this instance
-> (`Undefined constant ASSET_TYPES`, then `PRODUCT_MODULES`). This predates the
-> revamp and kills *all* cron tasks, not just the billable sync. The billable
-> feature does **not** depend on cron: the inline hook creates events in real
-> time, and reconciliation runs from the board's "Sync from closed work" button
-> in-app. Fixing cron's require list is a separate maintenance task (reconcile it
-> with `index.php`'s list); flagged here for the backlog.
+> **Pre-existing cron bug — now FIXED (follow-up commit).** `cron.php`'s hardcoded
+> require list had drifted to 27 of index.php's 135 libs, so `boot()` and every
+> nightly task failed on this instance (`Undefined constant ASSET_TYPES`, then
+> `PRODUCT_MODULES`). This predated the revamp and killed *all* cron tasks, not
+> just the billable sync. **Fix:** `cron.php` now derives its library list from
+> `index.php` at load time (the same mechanism the test bootstrap uses), so it can
+> never drift again. Verified end-to-end: cron boots and runs every task (exit 0),
+> including retention/audit/competence tasks that were also silently dead, and the
+> billable `sync` now runs nightly. (The billable feature never depended on cron —
+> the inline hook creates events in real time — but the sync backstop now works.)
 
 **Remaining P4b, still staged:**
 1. **More sources** (`TIMESHEET_APPROVED`, `OT_APPROVED`, `CANDIDATE_JOINED`…),
