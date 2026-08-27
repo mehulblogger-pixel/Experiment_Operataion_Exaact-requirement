@@ -120,7 +120,7 @@ Classification tags used in `02-gap-and-reuse-map.md`:
 | **A — Discovery** | Inventory engines, tables, screens, roles, lifecycles, config switches | `01-current-state-inventory.md` | **This step** |
 | **B — Gap analysis** | Map existing → target ITOP; classify every capability | `02-gap-and-reuse-map.md` | **This step** |
 | **C — Consolidation** | Duplicate data, vestigial state, disconnected workflows to converge | §"Disconnects" in `02` | **This step (identified)** |
-| **D — Target architecture** | Person master lifecycle, spine, Billable Event model over existing tables + additive migration sketch | `03-target-architecture.md` | Next |
+| **D — Target architecture** | Person master lifecycle, spine, Billable Event model over existing tables + additive migration sketch | `03-target-architecture.md` | **Drafted (Step 2)** |
 | **E — UX revamp** | Role cockpits over existing area homes / dashboards | `04-ux-cockpits.md` | Later |
 | **F — Strategic development** | Priority 1→5 vertical slices, one reversible commit each | per-slice change-control docs | Later |
 | **G — Testing** | Regression + positive/negative/boundary/offline/permission cases | test additions | Continuous |
@@ -145,11 +145,11 @@ automation, 5) Integrations.
 | 8 | Market Gap Analysis | `02` §Target spine vs existing | Drafted (this step) |
 | 9 | Product-Market-Fit Mapping | `02` §Packages | Drafted (this step) |
 | 10 | Build/Extend/Integrate/Avoid Matrix | `02` §Classification | Drafted (this step) |
-| 11 | Target Architecture | `03-target-architecture.md` | Pending (Phase D) |
+| 11 | Target Architecture | `03-target-architecture.md` | Drafted (Step 2) |
 | 12 | UX/UI Revamp Plan | `04-ux-cockpits.md` | Pending (Phase E) |
-| 13 | Database Migration Plan | with each slice | Pending (Phase F) |
-| 14 | Integration Plan | `03`/`05` | Pending |
-| 15 | Implementation Roadmap | `03` | Pending (Phase D) |
+| 13 | Database Migration Plan | `03` §7 + per slice | Sketched (Step 2); detailed per slice |
+| 14 | Integration Plan | `03` §6 | Sketched (Step 2) |
+| 15 | Implementation Roadmap | `03` §8 | Drafted (Step 2) |
 | 16 | Regression Testing Plan | `phpapp/tests/` + `docs/testing/` | Continuous |
 | 17 | Final Gap Closure Report | end of program | Pending |
 
