@@ -91,16 +91,19 @@ are inert if unreferenced. No data touched.
 board Readiness column — the directive's "what's blocking this person" answer and
 the Mobilization-Officer cockpit view.
 
-**Staged (P2b), pending your go — and note the scope shrank:**
-1. **Gate pass:** the target architecture proposed a *minimal gate-pass record*.
-   On inspection, a gate pass is **already a default checklist item** ("Site
-   access / gate pass", category Access). So P2b's gate pass is likely just a
-   small **status/approval on that checklist item** (or a dedicated
-   `gate_pass` row only if you want a separate request/approval trail). Either
-   introduces a **new status lifecycle** (REQUESTED → APPROVED / REJECTED), which
-   the guardrails require me to **confirm with you before building**.
-2. **Dedicated `/mobilization` board** filtered to pre-active postings (the board
-   column already delivers most of this on `/deputations`).
+**P2b — RESOLVED as reuse (no new lifecycle built), Revamp P5b review:**
+A gate pass is **already** a mobilization checklist item ("Site access / gate
+pass", category Access) with a request/approve status (`pdso_mob_statuses`:
+REQUIRED → SUBMITTED → APPROVED / REJECTED / …) set via `pdso_checklist_set()`,
+and it already feeds `mobilization_readiness()` (P2a). Building a *separate*
+`gate_pass` table + REQUESTED→APPROVED lifecycle would **duplicate** that — which
+the revamp's own "no duplicate systems / configure-reuse-first" rule forbids. So
+the correct resolution is **reuse the checklist item**; no new status, table, or
+permission is added. If a client needs a distinct gate-pass evidence trail beyond
+the checklist item, the no-code `customforms` builder covers it without code.
+
+**Still optional (not required):** a dedicated `/mobilization` board filtered to
+pre-active postings — the Readiness column already delivers this on `/deputations`.
 
 **RT1 re-check at delivery:** the operational→commercial gap does not yet
 dominate; **next slice stays P3 (Inspection execution polish)** unless you decide
