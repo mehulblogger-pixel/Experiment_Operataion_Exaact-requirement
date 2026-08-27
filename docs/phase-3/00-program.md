@@ -47,7 +47,7 @@ Foundations first, because the management surfaces consume them.
 | §8  | Builder persona previews | Preview a report template as each role/persona sees it. |
 | §34 | Dashboard expansion | Deeper role dashboards on top of §20. |
 | §35 | Training attendance | Attendance capture + competence linkage. |
-| §16 | Vendor-360 depth | Bring vendor-360 to client-360 parity. |
+| §16 | Vendor-360 depth | ✅ **done** — contacts (recognised across the system, §23/24) + full activity history, to client-360 parity. |
 | §49 | Entity-360 | A uniform 360 shell across entities. |
 
 **Not in Phase 3 without explicit sign-off:** anything that changes displayed financial figures (the §28
@@ -60,6 +60,17 @@ engine is already the one truth; Wave D must read it, never re-derive).
 3. **§50 and Wave D** are independent of A/B and can run in parallel or after, by appetite.
 
 ## Done log
+
+- **2026-08-27 — §16 Vendor-360 depth (Wave D, item 1).** The vendor detail was already rich on quality
+  (assessments, audits, scorecard, CAPAs, expediting, delivery risk) but lacked the two things client-360
+  has: the vendor's people and its full history. `lib/vendor360.php` adds both, reusing existing engines —
+  a **Contacts** panel where each contact is recognised as one person across the system (the §23/24
+  `party_records_for` matcher — "also appears as" a candidate/user/etc.), and the **full activity
+  timeline** (`act_render_timeline('PARTNER')`, the §17 spine, same as client-360). Read-only; no vendor
+  data-model change; no payables domain invented (none exists). Wired onto `/vendor-profile`. Test
+  `test_p3_vendor360.php` (11 assertions — contacts listed/ordered, §23/24 cross-link found and self
+  excluded, no-link case, render output). Suite **3671 passed, 0 failed**. *Remaining Wave D: §8 builder
+  previews, §34 dashboard expansion, §49 entity-360 (now unblocked), §35 training.*
 
 - **2026-08-27 — §50 generic integration queue (Wave C).** `lib/webhookq.php` — one reusable outbox
   (`integration_outbox`) any new integration can enqueue onto: `webhookq_enqueue()` (with dedupe against

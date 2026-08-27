@@ -282,3 +282,7 @@
   </div>
 </div>
 <?php endif; ?>
+
+<?php // Phase 3 §16 — vendor-360 parity: the vendor's people (recognised across the system, §23/24)
+      // and the full activity history (the one spine), mirroring client-360. ?>
+<?php if (function_exists('vendor360_render')) vendor360_render((int)$partner['id']); ?>
