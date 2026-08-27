@@ -18,6 +18,7 @@ function entity_360_registry() {
         'CAPA'      => ['capa',            'ref',                          ['quality', 'tasks', 'history']],
         'COMPLAINT' => ['complaints',      'ref',                          ['quality', 'tasks', 'history']],
         'CANDIDATE' => ['candidates',      'first_name',                   ['party', 'tasks', 'history']],  // single column — portable across SQLite/MySQL
+        'INSPECTOR' => ['inspectors',      'name',                         ['credential', 'party', 'tasks', 'history']],  // Slice P1 — Credential Vault
     ];
 }
 
@@ -49,7 +50,8 @@ function entity_360_load($kind, $id) {
 // guarded so a missing engine simply omits its panel.
 function entity_360_render_panels($kind, $id, array $panels) {
     foreach ($panels as $p) {
-        if ($p === 'quality' && function_exists('quality_case_render'))      quality_case_render($kind, $id);
+        if ($p === 'credential' && function_exists('credential_vault_render')) credential_vault_render($kind, $id, ['editable' => function_exists('competence_can_authorise') && competence_can_authorise()]);
+        elseif ($p === 'quality' && function_exists('quality_case_render'))   quality_case_render($kind, $id);
         elseif ($p === 'party' && function_exists('party_render_also'))      party_render_also($kind, $id);
         elseif ($p === 'money' && function_exists('financial_events_render')) financial_events_render(['partner_id' => (int)$id], 'Money timeline');
         elseif ($p === 'tasks' && function_exists('task_render_for_entity')) task_render_for_entity($kind, $id, 'Tasks');

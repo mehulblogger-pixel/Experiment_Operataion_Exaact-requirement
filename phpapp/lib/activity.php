@@ -64,6 +64,7 @@ const ACT_ENTITIES = [
     'CANDIDATE' => ['Candidate',       '/candidate?id='],
     'RECEIPT'   => ['Receipt',         '/receipt?id='],
     'CONTRACT'  => ['Contract',        '/contract?id='],
+    'INSPECTOR' => ['Inspector',       '/inspector-profile?id='],   // Slice P1 — Credential Vault 360
 ];
 
 // A constant cannot call T(), so the two entries that name a business noun are

@@ -2518,6 +2518,7 @@ function ops_module_gate($route) {
         'imp-threat-add'=>'impartiality','imp-threat-decide'=>'impartiality',
         'competence'=>'competence','auth-add'=>'competence','auth-status'=>'competence',
         'auth-enforce'=>'competence','witness-add'=>'competence',
+        'cert-verify'=>'competence','credential-req-init'=>'competence',
         'equipment'=>'equipment','equip-new'=>'equipment','equip-edit'=>'equipment',
         'equip-cal-add'=>'equipment','equip-cal-del'=>'equipment','equip-cert'=>'equipment',
         'report-equip-add'=>'equipment','report-equip-del'=>'equipment',
@@ -2941,7 +2942,8 @@ function ops_dispatch($route, $method) {
             return ops_assets($route, $method);
         case $route === 'impartiality' || strncmp($route, 'imp-', 4) === 0:
             return ops_impartiality($route, $method);
-        case $route === 'competence' || strncmp($route, 'auth-', 5) === 0 || $route === 'witness-add':
+        case $route === 'competence' || strncmp($route, 'auth-', 5) === 0 || $route === 'witness-add'
+             || $route === 'cert-verify' || $route === 'credential-req-init':
             return ops_competence($route, $method);
         case strncmp($route, 'equip', 5) === 0 || $route === 'report-equip-add' || $route === 'report-equip-del':
             return ops_equipment($route, $method);

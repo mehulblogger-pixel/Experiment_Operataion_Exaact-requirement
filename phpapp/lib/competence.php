@@ -34,6 +34,14 @@ function competence_migrate() {
     // that is the record an assessor will be looking at.
     ensure_column('jobs', 'cert_override_note', "VARCHAR(400) DEFAULT ''");
     ensure_column('jobs', 'cert_override_by', "VARCHAR(150) DEFAULT ''");
+    // Slice P1 — verification state for a held credential (additive; a blank
+    // value reproduces the previous date-only behaviour exactly). Lets the
+    // Credential Vault show Under verification / Rejected / Superseded, which a
+    // valid_to date alone cannot express.
+    ensure_column('inspector_certs', 'verify_status', "VARCHAR(20) DEFAULT ''");
+    ensure_column('inspector_certs', 'verified_by',   "VARCHAR(150) DEFAULT ''");
+    ensure_column('inspector_certs', 'verified_at',   "VARCHAR(30) DEFAULT ''");
+    ensure_column('inspector_certs', 'verify_note',   "VARCHAR(400) DEFAULT ''");
 }
 
 // Certificates that are required and had already lapsed on $onDate.
@@ -487,6 +495,27 @@ function ops_competence($route, $method) {
     }
     ops_require(competence_can_authorise(), 'Only a manager can grant or withdraw an authorisation.');
 
+    // Slice P1 — set a held credential's verification verdict.
+    if ($route === 'cert-verify' && $method === 'POST') {
+        $cid  = (int)($_POST['id'] ?? 0);
+        $cert = $cid ? ops_one("SELECT * FROM inspector_certs WHERE id=?", [$cid]) : null;
+        if (!$cert) { flash('Certificate not found.', 'error'); redirect('/competence'); }
+        $vs = strtoupper(trim((string)($_POST['verify_status'] ?? '')));
+        if (!isset(CREDENTIAL_VERIFY_STATES[$vs])) $vs = '';
+        db()->prepare("UPDATE inspector_certs SET verify_status=?, verified_by=?, verified_at=?, verify_note=? WHERE id=?")
+            ->execute([$vs, user_name(current_user()), date('c'),
+                       substr(trim((string)($_POST['verify_note'] ?? '')), 0, 400), $cid]);
+        flash('Credential verification updated.');
+        redirect('/entity-360?kind=INSPECTOR&id=' . (int)$cert['inspector_id']);
+    }
+    // Slice P1 — create the customforms register that holds requirement sets.
+    if ($route === 'credential-req-init' && $method === 'POST') {
+        $f = credential_req_form_ensure();
+        if ($f) { flash('Competency requirement register created. Add its fields, then create sets.'); redirect('/custom-fields?entity=' . $f['slug']); }
+        flash('Could not create the register.', 'error');
+        redirect('/competence');
+    }
+
     if ($route === 'auth-enforce' && $method === 'POST') {
         $on = !empty($_POST['on']) ? '1' : '0';
         // Refuse to switch it on while nobody is authorised — that would stop
@@ -711,4 +740,232 @@ function report_signatory_warning($doc) {
     if ($why === '') return '';
     return 'The engineer named on this ' . (function_exists('Tl') ? Tl('report') : 'report')
          . ' was not authorised for this work on ' . $on . '. ' . $why;
+}
+
+// ============================================================================
+//  Slice P1 — the Credential Vault
+//
+//  Certificates, qualifications, authorisations, witness records and identity
+//  documents already exist, on separate screens. This adds ONE per-person view
+//  that reads them together and names each credential's status in a single
+//  vocabulary — Valid / Expiring soon / Expired / Under verification / Rejected /
+//  Superseded / Missing. Read-first; it composes the engines above and the
+//  identity summary, and adds no data of its own beyond the optional verify state.
+//
+//  Non-destructive: the status derivation is a pure function; a blank
+//  verify_status reproduces the old date-only behaviour exactly; the allocation
+//  gate (competence_lapsed / auth_block) is untouched — the vault only reads it.
+// ============================================================================
+
+const CREDENTIAL_STATUS = [
+    'VALID'              => 'Valid',
+    'EXPIRING'           => 'Expiring soon',
+    'EXPIRED'            => 'Expired',
+    'UNDER_VERIFICATION' => 'Under verification',
+    'REJECTED'           => 'Rejected',
+    'SUPERSEDED'         => 'Superseded',
+    'MISSING'            => 'Missing',
+];
+
+// The verification verdicts a manager may set on a held credential. '' = the
+// default (not verified), which classifies by date exactly as before.
+const CREDENTIAL_VERIFY_STATES = [
+    ''                   => 'Not verified',
+    'UNDER_VERIFICATION' => 'Under verification',
+    'VERIFIED'           => 'Verified',
+    'REJECTED'           => 'Rejected',
+    'SUPERSEDED'         => 'Superseded',
+];
+
+// The "expiring soon" window, shared with the training watch so the two agree.
+function credential_window_days() { return 45; }
+
+// Derive one credential's status from its stored fields. Pure/read-only.
+// A REJECTED/SUPERSEDED verdict stands whatever the dates say; otherwise the
+// date decides, with UNDER_VERIFICATION surfaced when nothing worse applies.
+function credential_status($cert, $onDate = null) {
+    $onDate = $onDate ?: date('Y-m-d');
+    $vs = strtoupper(trim((string)($cert['verify_status'] ?? '')));
+    if ($vs === 'REJECTED')   return 'REJECTED';
+    if ($vs === 'SUPERSEDED') return 'SUPERSEDED';
+    $vt = substr(trim((string)($cert['valid_to'] ?? '')), 0, 10);
+    if ($vt !== '') {
+        if ($vt < $onDate) return 'EXPIRED';
+        $soon = date('Y-m-d', strtotime($onDate . ' +' . credential_window_days() . ' days'));
+        if ($vt <= $soon) return ($vs === 'UNDER_VERIFICATION') ? 'UNDER_VERIFICATION' : 'EXPIRING';
+    }
+    return ($vs === 'UNDER_VERIFICATION') ? 'UNDER_VERIFICATION' : 'VALID';
+}
+
+// Label + pill class for a credential status.
+function credential_status_pill($status) {
+    return [
+        'VALID'              => ['✓ Valid', 'p-ok'],
+        'EXPIRING'           => ['⏳ Expiring soon', 'p-warn'],
+        'EXPIRED'            => ['⛔ Expired', 'p-bad'],
+        'UNDER_VERIFICATION' => ['🔍 Under verification', 'p-warn'],
+        'REJECTED'           => ['✗ Rejected', 'p-bad'],
+        'SUPERSEDED'         => ['↩ Superseded', 'p-mut'],
+        'MISSING'            => ['— Missing', 'p-mut'],
+    ][$status] ?? ['—', 'p-mut'];
+}
+
+// ---- Client competency requirement sets (Option A: reuse customforms) -------
+// The requirement sets live in a normal customforms register, so an admin builds
+// and edits them with the no-code builder. A setting points the vault at that
+// register; the vault reads its records. No new table.
+function credential_req_form_slug() { return function_exists('setting_get') ? setting_get('competency_req_form_slug', '') : ''; }
+
+function credential_req_form() {
+    $slug = credential_req_form_slug();
+    if ($slug === '' || !function_exists('cform_by_slug')) return null;
+    return cform_by_slug($slug);
+}
+
+// Manager one-click: create the register (reusing customforms) and remember it.
+// Field definition stays admin-driven — exactly how customforms works.
+function credential_req_form_ensure() {
+    if (!function_exists('cforms_migrate')) return null;
+    cforms_migrate();
+    if ($f = credential_req_form()) return $f;
+    $slug = function_exists('cform_make_slug') ? cform_make_slug('Competency requirement set') : 'f_competency_req';
+    db()->prepare("INSERT INTO custom_forms (name,slug,nav_group,icon,help,active,sort_order,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
+        ->execute(['Competency requirement set', $slug, 'Quality & accreditation', '🎓',
+                   'Per-client / per-scope required credentials, surfaced in the Credential Vault.', 1, 50,
+                   function_exists('user_name') ? user_name(current_user()) : '', date('c')]);
+    if (function_exists('setting_set')) setting_set('competency_req_form_slug', $slug);
+    return credential_req_form();
+}
+
+function credential_req_sets() {
+    $f = credential_req_form();
+    if (!$f) return [];
+    try { return ops_all("SELECT * FROM custom_records WHERE form_id=? ORDER BY title", [(int)$f['id']]) ?: []; }
+    catch (Throwable $e) { return []; }
+}
+
+// ---- The vault panel --------------------------------------------------------
+// Rendered by the Entity-360 'credential' tab and reusable anywhere. INSPECTOR
+// only for now (id = inspectors.id). $opts['editable'] shows the manager verify
+// control; identity is always masked unless the viewer holds person.iddoc.view.
+function credential_vault_render($kind, $id, array $opts = []) {
+    $kind = strtoupper((string)$kind); $id = (int)$id;
+    if ($kind !== 'INSPECTOR' || !$id) return;
+    $ins = ops_one("SELECT * FROM inspectors WHERE id=?", [$id]);
+    if (!$ins) return;
+    $editable = !empty($opts['editable']);
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $today = date('Y-m-d');
+
+    echo '<div class="panel"><h3 class="tab-sub" style="margin-top:0">🎓 Credential vault'
+       . ' <span class="muted" style="font-weight:400;font-size:12px">— what this ' . $e(function_exists('Tl') ? Tl('engineer') : 'engineer')
+       . ' holds, and whether it stands</span></h3>';
+
+    // Eligibility headline (reuses the allocation-gate mirror).
+    if (function_exists('inspector_eligibility') && function_exists('inspector_eligibility_pill')) {
+        $elig = inspector_eligibility($id, ['on_date' => $today]);
+        [$elLbl, $elCls] = inspector_eligibility_pill($elig['status']);
+        echo '<p style="margin:2px 0 12px"><span class="pill ' . $elCls . '">' . $e($elLbl) . '</span>'
+           . ' <span class="muted" style="font-size:12px">today’s allocation verdict</span></p>';
+    }
+
+    // Certificates & tickets, with derived status.
+    $certs = [];
+    try { $certs = ops_all("SELECT * FROM inspector_certs WHERE inspector_id=? ORDER BY valid_to", [$id]) ?: []; } catch (Throwable $ex) {}
+    echo '<div class="tab-sub" style="font-weight:600;margin:8px 0 4px">Certificates &amp; tickets</div>';
+    if (!$certs) echo '<p class="muted">No certificates on record.</p>';
+    else {
+        echo '<table class="grid"><thead><tr><th>Certificate</th><th>Number</th><th>Valid to</th><th>Status</th><th>Required</th>'
+           . ($editable ? '<th>Verification</th>' : '') . '</tr></thead><tbody>';
+        foreach ($certs as $c) {
+            $st = credential_status($c, $today); [$lbl, $cls] = credential_status_pill($st);
+            echo '<tr><td>' . $e($c['name']) . '</td><td>' . $e($c['number'] ?: '—') . '</td><td>' . $e($c['valid_to'] ?: '—')
+               . '</td><td><span class="pill ' . $cls . '">' . $e($lbl) . '</span></td>'
+               . '<td>' . (!empty($c['is_mandatory']) ? 'Required' : '—') . '</td>';
+            if ($editable) {
+                echo '<td><form method="post" action="/cert-verify" style="display:flex;gap:4px;align-items:center;margin:0">'
+                   . '<input type="hidden" name="id" value="' . (int)$c['id'] . '">'
+                   . '<select class="form-control" style="width:150px" name="verify_status">';
+                foreach (CREDENTIAL_VERIFY_STATES as $k => $v) {
+                    $sel = (strtoupper((string)($c['verify_status'] ?? '')) === $k) ? ' selected' : '';
+                    echo '<option value="' . $e($k) . '"' . $sel . '>' . $e($v) . '</option>';
+                }
+                echo '</select><button class="btn small secondary" type="submit">Save</button></form></td>';
+            }
+            echo '</tr>';
+        }
+        echo '</tbody></table>';
+    }
+
+    // Qualifications the person holds (library-linked), if the spine is present.
+    try {
+        $quals = ops_all("SELECT q.name, q.scheme, q.issuing_body FROM inspector_certs c
+                          JOIN qualifications q ON q.id = c.qualification_id
+                          WHERE c.inspector_id=? AND c.qualification_id IS NOT NULL ORDER BY q.name", [$id]) ?: [];
+        if ($quals) {
+            echo '<div class="tab-sub" style="font-weight:600;margin:12px 0 4px">Recognised qualifications</div><ul style="margin:0">';
+            foreach ($quals as $q) echo '<li>' . $e($q['name']) . ($q['scheme'] ? ' <span class="muted">(' . $e($q['scheme']) . ')</span>' : '') . '</li>';
+            echo '</ul>';
+        }
+    } catch (Throwable $ex) {}
+
+    // Authorisations — what the body permits.
+    if (function_exists('authorisations_for') && function_exists('auth_live') && function_exists('auth_scope_label')) {
+        $auths = authorisations_for($id, true);
+        echo '<div class="tab-sub" style="font-weight:600;margin:12px 0 4px">Authorisations</div>';
+        if (!$auths) echo '<p class="muted">None recorded.</p>';
+        else {
+            echo '<ul style="margin:0">';
+            foreach ($auths as $a) {
+                $live = auth_live($a, $today);
+                $cls = $live ? 'p-ok' : (($a['status'] ?? '') === 'ACTIVE' ? 'p-warn' : 'p-mut');
+                $stLbl = $live ? 'Live' : (AUTH_STATUS[$a['status']] ?? $a['status']);
+                echo '<li><span class="pill ' . $cls . '">' . $e($stLbl) . '</span> ' . $e(auth_scope_label($a))
+                   . ($a['valid_to'] ? ' <span class="muted">to ' . $e($a['valid_to']) . '</span>' : '') . '</li>';
+            }
+            echo '</ul>';
+        }
+    }
+
+    // Witness assessment — last watched doing the job.
+    if (function_exists('witness_latest') && function_exists('witness_overdue')) {
+        $w = witness_latest($id); $overdue = witness_overdue($id);
+        echo '<div class="tab-sub" style="font-weight:600;margin:12px 0 4px">Witnessed assessment</div>';
+        if (!$w) echo '<p class="muted">Never witnessed. <span class="pill p-warn">Due</span></p>';
+        else echo '<p>Last on ' . $e($w['assessed_on'] ?: '—') . ' — ' . $e(WITNESS_OUTCOME[$w['outcome']] ?? $w['outcome'])
+                . ($overdue ? ' <span class="pill p-warn">Re-assessment due</span>' : '') . '</p>';
+    }
+
+    // Identity documents — masked unless the viewer holds the DPDP right.
+    if (function_exists('person_docs_summary')) {
+        echo '<div class="tab-sub" style="font-weight:600;margin:12px 0 4px">Identity documents</div>';
+        if (function_exists('iddoc_can_view') && iddoc_can_view()) {
+            try {
+                $s = person_docs_summary($id, 'INSPECTOR');
+                $cls = $s['complete'] ? 'p-ok' : 'p-warn';
+                echo '<p><span class="pill ' . $cls . '">' . (int)$s['have'] . ' / ' . (int)$s['total'] . ' held</span>'
+                   . ($s['missing'] ? ' <span class="muted">missing: ' . $e(implode(', ', $s['missing'])) . '</span>' : '') . '</p>';
+            } catch (Throwable $ex) { echo '<p class="muted">Not available.</p>'; }
+        } else {
+            echo '<p class="muted">🔒 Restricted — needs the identity-documents permission.</p>';
+        }
+    }
+
+    // Client competency requirement sets (from the customforms register, if wired).
+    $sets = credential_req_sets();
+    echo '<div class="tab-sub" style="font-weight:600;margin:12px 0 4px">Client competency requirements</div>';
+    if ($sets) {
+        echo '<ul style="margin:0">';
+        foreach ($sets as $r)
+            echo '<li><a href="/cform-view?id=' . (int)$r['id'] . '">' . $e($r['title'] ?: ('Set #' . $r['id'])) . '</a></li>';
+        echo '</ul><p class="muted" style="font-size:12px;margin-top:4px">Requirement sets are defined in the '
+           . '“Competency requirement set” register. Per-person automated matching lands in the next slice.</p>';
+    } else {
+        echo '<p class="muted">No requirement register configured yet.'
+           . ($editable ? ' <form method="post" action="/credential-req-init" style="display:inline;margin:0">'
+                        . '<button class="btn small secondary" type="submit">Create the requirement register</button></form>' : '')
+           . '</p>';
+    }
+
+    echo '</div>';
 }

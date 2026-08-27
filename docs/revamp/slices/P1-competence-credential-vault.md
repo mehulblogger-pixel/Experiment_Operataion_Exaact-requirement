@@ -1,8 +1,14 @@
 # Slice P1 — Technical Competence / Credential Vault
 
 **Change-control record (directive Part 25). Classification: EXTEND / CONNECT
-(additive, non-destructive). Status: PROPOSED — awaiting approval. No code is
-written until this record is approved.**
+(additive, non-destructive). Status: DELIVERED (P1a) — verify_status column +
+credential-status derivation + Credential Vault panel + Entity-360 INSPECTOR tab
++ customforms requirement register wired. P1b (automated person↔requirement
+matching) is staged (see Delivery record).**
+
+> Approved choices: (1) include the additive `inspector_certs.verify_status`
+> column; (2) requirement sets via `customforms` (Option A); (3) add the
+> Entity-360 tab.
 
 Priority 1 in `03-target-architecture.md` §8. This is the *lowest-risk* first
 slice: ~70% of it already exists; the new work is additive read-models plus one
@@ -230,10 +236,50 @@ manual migration command; no data backfill needed (derivation is read-time).
 
 ---
 
-### Open questions for you before coding P1
-1. **Verification states (3b):** include the additive `inspector_certs.verify_status`
-   column now (recommended — it's what enables *Under Verification / Rejected /
-   Superseded*), or defer it and ship P1 with zero schema change first?
-2. **Requirement sets (3c):** Option A (reuse `customforms`, zero new tables —
-   recommended) or Option B (small dedicated table)?
-3. **Vault placement:** person/inspector profile only, or also as an Entity-360 tab?
+### Open questions for you before coding P1 — ANSWERED
+1. **Verification states (3b):** ✅ include `inspector_certs.verify_status` now.
+2. **Requirement sets (3c):** ✅ Option A — reuse `customforms` (zero new tables).
+3. **Vault placement:** ✅ Entity-360 tab (plus a link on the inspector profile).
+
+---
+
+## Delivery record (P1a)
+
+**What shipped, all additive:**
+- `inspector_certs.verify_status` (+ `verified_by/at/verify_note`) via
+  `competence_migrate()`; one bootstrap probe in `index.php`.
+- `credential_status()` / `credential_status_pill()` — the single canonical
+  derivation of the Valid/Expiring/Expired/Under-verification/Rejected/Superseded
+  vocabulary (read-only, pure).
+- `credential_vault_render()` — composes certs (derived status), qualifications,
+  authorisations, witness, identity summary (masked unless `person.iddoc.view`),
+  eligibility verdict, and the requirement-set list.
+- `/cert-verify` POST (manager-gated) to set a credential's verdict;
+  `/credential-req-init` POST to create the customforms "Competency requirement
+  set" register and point a setting at it.
+- Entity-360: `INSPECTOR` kind + `credential` panel (the tab); `INSPECTOR`
+  registered in the activity spine for the back-link; a "Credential vault" link on
+  the inspector profile.
+
+**Validation:** `php -l` clean on all changed files; new
+`tests/test_credential_vault.php` = 27/27; entity360 36/36, competence 14/14,
+identity 48/48; **full suite 3768 passed, 0 failed.**
+
+**Acceptance criteria (§10) — result:** positive/negative/boundary/expired/
+verification cases all covered by the new test; permission masking of the identity
+block preserved (reuses `iddoc_can_view()`); allocation gate untouched (competence
+suite green); read-only/offline-safe.
+
+**Staged to P1b (not in this commit):** *automated* person↔requirement matching
+(Fully/Partially/Missing/Expiring per requirement). Reason: it needs a credential
+**category** dimension to match a person's held credentials against a requirement
+set's required categories; the customforms fields are admin-defined, so structured
+matching needs that small additive column first. P1a delivers the register and
+surfaces defined sets; P1b adds the category + the matcher.
+
+**RT1 re-check (per `00-program.md` §9):** *Does the operational→commercial gap now
+dominate?* — **No.** P1a closed real competence-vault gaps and is a prerequisite
+source for P4 (competence-gated billing). The gap remains open but is addressed by
+P4 on the roadmap. **Next slice stays P2 (Mobilization readiness)** unless you
+direct otherwise. If at any point you judge the billing gap the biggest blocker,
+RT1 pulls **P4** forward.

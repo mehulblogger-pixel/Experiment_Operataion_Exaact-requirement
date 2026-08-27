@@ -220,3 +220,28 @@ table (grep for a profitability `CREATE TABLE` is empty). Access is a **read gat
 (`data.profitability` / `data.revenue` / admin, `callprofit.php:62`). The only related
 persisted state is the month-end **cost freeze** (`cost_month_frozen()`, `costing.php:282`),
 which locks voucher/cost editing for a frozen month — an editing lock, not a status.
+
+---
+
+## Credential (held certificate) — verification & derived status (Slice P1)
+
+A held credential (`inspector_certs`) now carries an **additive** verification
+verdict `verify_status` (`competence.php` `competence_migrate()`), set by a
+manager via `/cert-verify` (gated by `competence_can_authorise()` — admin-level or
+master). It is **not** a workflow with transitions so much as a manager-set flag;
+a blank value (the default on every existing row) reproduces the previous
+date-only behaviour exactly.
+
+- **`verify_status` values** (`CREDENTIAL_VERIFY_STATES`): `''` (not verified),
+  `UNDER_VERIFICATION`, `VERIFIED`, `REJECTED`, `SUPERSEDED`.
+- **Derived display status** (`credential_status()`, read-only —
+  `CREDENTIAL_STATUS`): `VALID`, `EXPIRING` (within 45 days), `EXPIRED`,
+  `UNDER_VERIFICATION`, `REJECTED`, `SUPERSEDED`, `MISSING`. `REJECTED` /
+  `SUPERSEDED` stand regardless of dates; an expired certificate reads `EXPIRED`
+  even while `UNDER_VERIFICATION`; `VERIFIED` classifies by date like a normal
+  in-date credential.
+- **No gate change.** The allocation gate (`competence_lapsed()` /
+  `auth_block()`) is untouched — it still reads `is_mandatory` + `valid_to`. The
+  derived status is display-only (the Credential Vault), not a new block.
+- **No new permission** — reuses `competence_can_authorise()` for setting the
+  verdict and `mod.competence.view` / `person.iddoc.view` for viewing.
