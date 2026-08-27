@@ -1551,6 +1551,25 @@ function job_money($job) {
 
 // What one branch books on this job — or, with no branch named, what the
 // company books, which is the invoice value itself.
+// Field-finding #12 — commercial visibility on a CROSS-OFFICE job (executed by one office, contracted by
+// another). The executing office may see ONLY its own inter-office credit for the call plus whether the job
+// is invoiced (a capsule, no amount); every other commercial figure — invoice value, client billing,
+// revenue, profit — belongs to the contracting/owning office. Returns:
+//   'FULL'        — master, ALL-scope, a same-office job, or a viewer whose scope includes the CONTRACTING office
+//   'CREDIT_ONLY' — a viewer whose scope covers the EXECUTING office but not the contracting one (cross-office)
+// Same-office jobs are always FULL for anyone who can open them. Fail-closed: never FULL for an outsider.
+function job_commercial_view($job) {
+    if (function_exists('is_master') && is_master()) return 'FULL';
+    $off = function_exists('scope_offices') ? scope_offices() : 'ALL';
+    if ($off === 'ALL') return 'FULL';
+    $m = job_money($job);
+    if (empty($m['cross'])) return 'FULL';                                   // one office does it all
+    $scope = is_array($off) ? array_map('intval', $off) : [];
+    $contract = (int)($m['contracting_office_id'] ?? 0);
+    if ($contract && in_array($contract, $scope, true)) return 'FULL';       // the owning office sees all
+    return 'CREDIT_ONLY';                                                    // executing-office (or outsider) view
+}
+
 function job_revenue_for($job, $officeId = null) {
     $m = job_money($job);
     if (!$officeId) return $m['invoice'];
