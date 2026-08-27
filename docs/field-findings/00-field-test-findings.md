@@ -63,7 +63,7 @@ original list.
 | 19 | 🧭 | P2 | Once a report is **submitted, approved and locked**, the screen must offer **"Close the job"**. | ☐ |
 | 20 | 🐞 | P1 | After issue, the job shows **hold points**; opening one asks close/waiver with a comment (good) — but on close/waive it **jumps back to the job main screen / inspector dashboard**, and **closing one of several hold points isn't reflected** even after submit. Should **stay on the hold-points screen** and reflect the change. | ☐ |
 | 21 | 🐞 | P1 | Clicking **"Close the job"** shows the **expense sheet again**, letting you **re-enter expenses** — confusing/duplicative. | ☐ |
-| 24 | 🐞 | P1 | Even when a job is **already closed and expenses booked**, the **"Close job" button is not greyed out** and lets you **close again and re-enter expenses** (idempotency). | ☐ |
+| 24 | 🐞 | P1 | Even when a job is **already closed and expenses booked**, the **"Close job" button is not greyed out** and lets you **close again and re-enter expenses**. **✅ FIXED.** *Diagnosis:* the close buttons on every list/detail were already hidden by `closed_flag`, and the POST already refused a double-close — but the **GET `/job-close` form had no closed guard**, so reaching it on a closed job (stale page, back button, bookmarked form, 2nd tab, offline re-send) re-showed the expense sheet. *Fix:* one `closed_flag` guard **before the POST branch** short-circuits both GET and POST — a closed job never shows the form and never re-files expenses; message points to edit-expenses / Unlock. Test `test_field24_job_close_once.php` (9 assertions). Suite **3760/0**. | ✅ |
 
 ## G. Attendance / Mark IN–OUT
 

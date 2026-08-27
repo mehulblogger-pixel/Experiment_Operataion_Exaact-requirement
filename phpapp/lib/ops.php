@@ -5929,23 +5929,26 @@ function ops_jobs($route, $method) {
         // to someone who cannot act on it.
         ops_require(is_master() || can('ops.job.close') || job_owned_by_me((int)$job['id']),
             'You do not have permission to close this ' . Tl('job') . '. Ask a coordinator.');
+        // Field-finding #24 — a job closes ONCE. This guard covers BOTH the GET (so the close/expense form
+        // never re-appears for a job that is already closed — the "it let me enter expenses again"
+        // confusion) and the POST (so a re-post / back-and-resend / offline re-send never files a second set
+        // of expenses against the same day's work). To change a closed job, edit its expenses below or
+        // Unlock it first; the close button is hidden on every list/detail once closed, and this closes the
+        // one door those buttons don't cover (a stale page, the back button, a bookmarked form, a 2nd tab).
+        if (!empty($job['closed_flag'])) {
+            flash(ucfirst(Tl('job')) . ' ' . $job['job_code'] . ' is already closed'
+                . (!empty($job['closed_at']) ? ' (' . fdate(substr((string)$job['closed_at'], 0, 10)) . ')' : '')
+                . '. Nothing was recorded twice. To correct the expenses, edit them on the '
+                . Tl('job') . ' below; to reopen it, use Unlock.', 'warning');
+            redirect('/job?id=' . $job['id']);
+        }
         if ($method === 'POST') {
             $b = $_POST;
             // Past the deadline the engineer can no longer close it themselves —
             // the whole point of the lock is that late figures are not simply
             // typed in later as if nothing happened.
             if (($why = job_lock_block($job)) !== '') { flash($why, 'error'); redirect('/job?id=' . $job['id']); }
-            // A job closes once. Without this, every re-post of the closure form —
-            // a refresh, a back-and-resend, the offline queue re-sending an entry
-            // the server had already taken — filed another set of expenses against
-            // the same day's work, and the engineer's claim read double.
-            if (!empty($job['closed_flag'])) {
-                flash(ucfirst(Tl('job')) . ' ' . $job['job_code'] . ' was already closed'
-                    . (!empty($job['closed_at']) ? ' on ' . fdate(substr((string)$job['closed_at'], 0, 10)) : '')
-                    . '. Nothing was recorded twice. To correct the expenses, edit them on the '
-                    . Tl('job') . ' below.', 'warning');
-                redirect('/job?id=' . $job['id']);
-            }
+            // (the already-closed guard above the POST branch covers the double-close / double-expense case)
             $reportDate = $b['report_upload_date'] ?? '';
             if ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate === '') {
                 view('ops/job_close', ['job'=>$job,'error'=>'A report upload date is required before closing this job.']); return;
