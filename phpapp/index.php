@@ -232,6 +232,7 @@ try {
     require __DIR__ . '/lib/vendor360.php';        // Phase 3 §16 — vendor-360 depth (contacts + party + history)
     require __DIR__ . '/lib/tmplpreview.php';      // Phase 3 §8 — report-template persona preview
     require __DIR__ . '/lib/entity360.php';        // Phase 3 §49 — uniform Entity-360 shell
+    require __DIR__ . '/lib/billable.php';          // Revamp P4 — the Billable Event ledger (operational→commercial bridge)
     require __DIR__ . '/lib/attendreview.php';     // Phase 3 §35 — attendance review (anomaly + send-back)
 } catch (Throwable $e) {
     // Setup-time: nobody can be signed in yet, so the detail has to be visible.
@@ -335,6 +336,7 @@ try {
     db()->query("SELECT supersedes FROM boss_numbers LIMIT 1");
     db()->query("SELECT billable_value FROM calls LIMIT 1");
     db()->query("SELECT verify_status FROM inspector_certs LIMIT 1");   // Slice P1 — Credential Vault
+    db()->query("SELECT id FROM billable_events LIMIT 1");               // Revamp P4 — Billable Event ledger
     db()->query("SELECT id FROM agencies LIMIT 1");
     db()->query("SELECT agency_id FROM inspectors LIMIT 1");
     db()->query("SELECT id FROM requisitions LIMIT 1");

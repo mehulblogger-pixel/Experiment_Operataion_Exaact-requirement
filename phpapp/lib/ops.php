@@ -2461,6 +2461,8 @@ function ops_module_gate($route) {
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
         'service-scope'=>'settings','service-formats'=>'settings',
         'deputations'=>'jobs',
+        'billable-events'=>'invoicing','billable-sync'=>'invoicing','billable-approve'=>'invoicing',
+        'billable-cancel'=>'invoicing','billable-dispute'=>'invoicing',
         'call-status'=>'calls','call-attrs'=>'calls','call-override'=>'calls',
         'call-clar-new'=>'calls','call-clar-respond'=>'calls','call-clar-status'=>'calls',
         'assign-hold'=>'jobs','assign-accept'=>'jobs','assign-reassign'=>'jobs',
@@ -3137,6 +3139,8 @@ function ops_dispatch($route, $method) {
             return ops_system_status($method);
         case $route === 'tasks':               // Phase 3 §26 — my persisted tasks
             return ops_tasks($method);
+        case $route === 'billable-events' || strncmp($route, 'billable-', 9) === 0:   // Revamp P4 — Billable Event ledger
+            return ops_billable($route, $method);
         case $route === 'command-centre':      // Phase 3 §20 — management state-of-the-business board
             return ops_command_centre($method);
         case $route === 'entity-360':          // Phase 3 §49 — uniform 360 shell for any entity

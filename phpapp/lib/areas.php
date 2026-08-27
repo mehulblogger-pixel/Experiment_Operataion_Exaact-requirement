@@ -149,8 +149,14 @@ function ops_area_def($area) {
         case 'money':
             $title = 'Money'; $icon = '💰';
             $sub = 'From what is waiting to be billed, through invoices and money in, to the profit each ' . strtolower(Tl('sbu')) . ' makes.';
-            $routes = ['money','invoicing','to-bill','invoices','invoice','receipts','receipt','receivables','tally','profitability','sbu-pl','office-finance','cost-run','call-profit'];
+            $routes = ['money','invoicing','to-bill','invoices','invoice','receipts','receipt','receivables','tally','profitability','sbu-pl','office-finance','cost-run','call-profit','billable-events'];
             $sec('Billing');
+            // Revamp P4 — the operational→commercial bridge: approved work on its
+            // way to an invoice, so nothing done is lost before it is billed.
+            if (can('mod.invoicing.view') && $fx('billable_can') && billable_can()) {
+                $t(true, '🧾', 'Billable events', '/billable-events', 'Approved operational work waiting to be invoiced.',
+                    $num(fn() => $fx('billable_pending_count') ? billable_pending_count() : 0), 'amber');
+            }
             // A quick per-job tracker (invoiced? paid? credit received?) that feeds
             // profitability — kept as its own tile because everyone uses it.
             $t(can('mod.invoicing.view'), '💳', 'Invoice tracker', '/invoicing', 'Tick each job: invoiced, paid, inter-office credit.');

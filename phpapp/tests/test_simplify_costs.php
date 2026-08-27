@@ -4,8 +4,12 @@
 t_section('cost screens moved to Money (simplify step 4)');
 
 $a = (string)file_get_contents(__DIR__ . '/../lib/areas.php');
-$money = substr($a, strpos($a, "case 'money':"), 2600);
-$admin = substr($a, strpos($a, "case 'admin':"), 2200);
+// Slice each case to its real boundary (the next case), so the assertions cover
+// the whole section and don't break when a tile is added within it.
+$mS = strpos($a, "case 'money':");
+$money = substr($a, $mS, strpos($a, "case 'insights':") - $mS);
+$adS = strpos($a, "case 'admin':");
+$admin = substr($a, $adS, strpos($a, "default:") - $adS);
 
 foreach ([['/office-finance'], ['/cost-run'], ['/sbu-pl'], ['/call-profit']] as [$rt]) {
     t_ok(strpos($money, "'$rt'") !== false, "$rt now lives under Money");

@@ -245,3 +245,46 @@ date-only behaviour exactly.
   derived status is display-only (the Credential Vault), not a new block.
 - **No new permission** — reuses `competence_can_authorise()` for setting the
   verdict and `mod.competence.view` / `person.iddoc.view` for viewing.
+
+---
+
+## Billable event (`billable_events.status`) — Revamp P4
+
+The operational→commercial bridge (`lib/billable.php`). One additive record per
+approved operational occurrence, keyed idempotently by
+`(source_module, source_kind, source_id)`. The **books ledger stays the money
+truth**: a billed event is reconciled to the invoice that consumed it and never
+invents money.
+
+`BILLABLE_STATUS`: **PENDING → APPROVED → BILLED**, plus **CANCELLED** and
+**DISPUTED**.
+
+```mermaid
+stateDiagram-v2
+  [*] --> PENDING : derived by billable_events_sync() from a closed, not-yet-invoiced billable job (idempotent upsert)
+  PENDING --> APPROVED : billable-approve · billable_can_manage (finance.reconcile / master)
+  PENDING --> CANCELLED : billable-cancel (reason required)
+  APPROVED --> DISPUTED : billable-dispute (reason required)
+  APPROVED --> CANCELLED : billable-cancel (reason required)
+  DISPUTED --> APPROVED : billable-approve (re-approve)
+  DISPUTED --> CANCELLED : billable-cancel
+  APPROVED --> BILLED : reconciliation only — the source job becomes invoiced (books_invoices_for_job); amount taken from the invoice
+  PENDING --> BILLED : reconciliation only (same path, if invoiced before review)
+  BILLED --> [*] : terminal, linked to invoice_id
+  CANCELLED --> [*] : terminal
+```
+
+- **BILLED is never a manual transition** (`billable_allowed_next()` excludes it);
+  it is set solely by `billable_events_sync()` when `books_invoices_for_job()`
+  shows a non-cancelled invoice for the source, so the ledger can never claim
+  something is billed without an invoice behind it.
+- **Permission:** reuses **`finance.reconcile`** (decision D1) via
+  `billable_can_manage()`; viewing via `billable_can()` (`finance.reconcile` /
+  `data.credit` / master). **No new permission** → `docs/02-permission-matrix.md`
+  unchanged. Route gate maps to the existing `invoicing` module.
+- **Idempotent:** re-running the sync refreshes only the derived fields while an
+  event is still PENDING; a human decision (APPROVED/BILLED/CANCELLED/DISPUTED) is
+  never overwritten.
+- **P4a scope:** only the `JOB_CLOSED` source is wired, populated by the sync
+  pass. Inline hooks at job-close / report-issue / timesheet-approval and more
+  sources are P4b.

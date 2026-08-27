@@ -399,6 +399,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('po_migrate')) po_migrate();                 // an order remembers its quotation
     widen_file_columns();                                            // uploads need LONGTEXT, not MEDIUMTEXT
     if (function_exists('bills_migrate')) bills_migrate();             // chargeable expenses + their bills
+    if (function_exists('billable_migrate')) billable_migrate();       // Revamp P4 — Billable Event ledger (operational→commercial bridge)
     if (function_exists('competence_migrate')) competence_migrate();   // required certificates gate allocation
     if (function_exists('equipment_migrate')) equipment_migrate();     // measuring & test equipment, §6.2
     if (function_exists('samples_migrate')) samples_migrate();         // §7.2 inspection items & samples
