@@ -164,6 +164,14 @@ definition — `JOB_STAGES` (`ops.php`), `IDEMS_STATUS` ARCHIVED (`idems.php`), 
 Values are kept (not removed) to avoid a silent behaviour change; wire the transitions before
 building reporting on them. Tests: `tests/test_vestigial_fields_noted.php`.
 
+**Revamp P5 (the always-0 reader fixed):** the ops-desk `report_pending` metric
+(`tosrm_ops_metrics`, `tosrm.php`) now reads the **real** signal — a CLOSED job whose report
+is awaiting the reporting manager's sign-off (`closed_flag=1 AND report_approval='PENDING'`) —
+instead of the vestigial `jobs.stage='REPORT_PENDING'`. It is no longer always 0.
+The vestigial `jobs.stage` / `calls.status=CLOSED` / `report_docs.ARCHIVED` *fields* are still
+kept-and-noted (removing or advancing them would add transitions — out of scope without sign-off);
+only the misleading reader was corrected. Test: `tests/test_report_pending_metric.php`.
+
 ## R11 — LOW · Admin area appears for roles with no real admin access — **MOSTLY FIXED**
 **What:** ASST_MANAGER reached the Admin area only via the coordinator-level "SLA targets"
 tile; MARKETING_MANAGER only via the `crm.template.manage` "Document templates" tile.
