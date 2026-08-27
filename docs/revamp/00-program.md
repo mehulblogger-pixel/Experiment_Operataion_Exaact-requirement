@@ -161,3 +161,36 @@ This step delivers items 1–10 as the *contract* for everything after. Nothing 
 built until it is on the map in `02-gap-and-reuse-map.md`. The recommended first
 real slice (Priority 1, Technical Competence) is proposed at the end of `02`, with
 a change-control skeleton — to be approved before any code is written.
+
+---
+
+## 8. Decision log (durable memory across sessions)
+
+This is the authoritative record of decisions taken. Any future session (or any
+future Claude reading `docs/revamp/`) must honour these unless the user changes
+them here. Newest at the bottom.
+
+| Date | ID | Decision | Rationale | Status |
+|---|---|---|---|---|
+| 2026-08-27 | D1 | The Billable Event **APPROVED** step reuses the existing `finance.reconcile` permission. A dedicated `billing.approve` permission is **not** created now. | Avoids adding a permission (respects the "no new permission without asking" guardrail); `finance.reconcile` already gates commercial review. Revisit only if segregation-of-duties later demands a distinct approver. | Active |
+| 2026-08-27 | D2 | Build in **lowest-risk-first** order, starting with **P1 — Technical Competence / Credential Vault**. | P1 is highest directive priority, purely additive, ~70% reuse of existing `competence`/`identity` engines. | Active |
+| 2026-08-27 | D3 | The first-class **Engagement** entity stays **deferred until after P4** (Billable Event). Keep threading the spine by `contract_number` until then. | Matches §80; avoids a structural change before the higher-value Billable Event work. | Active |
+
+## 9. Parking lot & revisit triggers (so nothing is forgotten)
+
+Written triggers that survive across sessions. Each is checked at the named
+checkpoint; if its condition is met, we act on it — it does not rely on anyone
+remembering.
+
+| ID | Parked item | Revisit **trigger** (when to act) | Checkpoint that enforces it |
+|---|---|---|---|
+| **RT1** | **Escalate to the Billable Event headline (P4).** The user's explicit concern: if the lowest-risk EXTEND/CONNECT slices do **not** close the core promise — *"operational work must never disappear before reaching billing"* — pull **P4 (Billable Event ledger)** forward as the next slice instead of continuing down the priority list. | At **every slice's acceptance review** (each `docs/revamp/slices/*.md`), answer the standing question: *"Does the operational→commercial gap still exist and is it now the biggest blocker to value?"* If **yes**, the next slice becomes **P4**, regardless of the roadmap order. | The "Revisit-trigger check" section that every slice change-control record must contain (see the P1 record). The answer is recorded in the slice doc, so the decision is visible in the repo, not held in memory. |
+| **RT2** | Dedicated `billing.approve` permission (see D1). | When a slice introduces a real segregation-of-duties need between "who reconciles finance" and "who approves a billable event." | Billable Event (P4) acceptance review. |
+| **RT3** | First-class `Engagement` entity (see D3). | After P4 ships, if the `contract_number` string proves limiting (e.g. cannot model multi-contract engagements). | P4 post-implementation review. |
+
+**How the user "remembers":** you don't have to. RT1 lives here in the repo and
+is re-checked at the top of every slice's acceptance review. If P1 (or any slice)
+leaves the billing gap open and it's the biggest blocker, the very next planning
+step switches to P4 automatically — and the reason is written into that slice's
+doc. Optionally, the user may also ask for a scheduled check-in reminder; the repo
+record is the primary, session-independent memory.
