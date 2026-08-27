@@ -446,6 +446,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('req_groups_migrate')) req_groups_migrate();  // 1c — requisition deployment groups (headcount + reporting contact + site)
     if (function_exists('tally_migrate')) tally_migrate();             // what has already been handed to Tally
     if (function_exists('tasks_migrate')) tasks_migrate();             // Phase 3 §26 — persisted user tasks
+    if (function_exists('webhookq_migrate')) webhookq_migrate();       // Phase 3 §50 — generic integration queue
     // Register every remaining dropdown as an editable master list. Runs last:
     // it needs the base lists seeded and the CRM/IDEMS constants loaded.
     if ($withSeeds && function_exists('lk_register_module_lists')) lk_register_module_lists();

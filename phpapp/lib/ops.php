@@ -6977,6 +6977,18 @@ function integration_health() {
         $row('smtp', 'Email (SMTP)', $failed > 0 ? 'warn' : 'ok', '',
              $failed > 0 ? $failed . ' send(s) failed in the last 7 days' : 'Sending', '/notifications');
     }
+    // The generic integration queue (§50) — any channel routed through it. Reports the same way the
+    // bespoke outboxes do: given-up items are bad, a backlog is a warning.
+    if (function_exists('webhookq_counts')) {
+        try {
+            $q = webhookq_counts();
+            $queued = (int)($q['PENDING'] ?? 0) + (int)($q['FAILED'] ?? 0);
+            $stuck  = (int)($q['stuck'] ?? 0);
+            if ($stuck > 0 || $queued > 0)
+                $row('webhookq', 'Integration queue', $stuck > 0 ? 'bad' : 'warn', '',
+                     $stuck > 0 ? $stuck . ' gave up delivering' : $queued . ' waiting to deliver', '/integrations');
+        } catch (Throwable $e) {}
+    }
     // Presence-only integrations (no passive failure signal).
     if (function_exists('billing_configured') && billing_configured()) $row('billing', 'Razorpay billing', 'ok', '', 'Connected', '/billing');
     if (function_exists('ai_enabled') && ai_enabled())                 $row('ai', 'AI provider', 'ok', '', 'Enabled', '/ai-settings');

@@ -37,9 +37,9 @@ Foundations first, because the management surfaces consume them.
 | §20 | Command Centre | One management "state of the business" board — attention band, money (§27), platform health — kept as separate bands (§20/§21). | `attention_summary`, `system_status`, §27 | ✅ **done** |
 
 ### Wave C — Platform
-| # | Item | What it is | Reuses |
-|---|---|---|---|
-| §50 | Generic integration layer | One webhook/queue abstraction over the per-integration outboxes (`ads_outbox`, `books_outbox`, …), which keep working during migration. | existing outboxes (retained, wrapped) |
+| # | Item | What it is | Reuses | Status |
+|---|---|---|---|---|
+| §50 | Generic integration queue | One reusable outbox (`integration_outbox`) with dedupe + bounded retry/backoff + injectable delivery, so a NEW integration writes a delivery callback, not a table + loop. The bespoke `books_outbox`/`ads_outbox` are untouched; the generic queue reports into the existing `integration_health()` (Module 46). | existing outboxes (retained); `integration_health` | ✅ **done** |
 
 ### Wave D — Larger UX / lifecycle builds (each its own change; schedule individually)
 | # | Item | Note |
@@ -60,6 +60,19 @@ engine is already the one truth; Wave D must read it, never re-derive).
 3. **§50 and Wave D** are independent of A/B and can run in parallel or after, by appetite.
 
 ## Done log
+
+- **2026-08-27 — §50 generic integration queue (Wave C).** `lib/webhookq.php` — one reusable outbox
+  (`integration_outbox`) any new integration can enqueue onto: `webhookq_enqueue()` (with dedupe against
+  an identical still-pending item), `webhookq_dispatch($limit, $deliver)` (one loop with bounded retries
+  and exponential backoff — 2/4/8… min, cap 60; FAILED → GIVEN_UP at the attempt cap), `webhookq_counts()`.
+  **Delivery is injectable and OFF by default** — with no deliverer wired, an item stays queued rather
+  than sent to a fabricated endpoint (real outbound HTTP is a per-install concern with its own config +
+  security review; this ships the durable queue, not an unreviewed sender). The bespoke `books_outbox` /
+  `ads_outbox` are untouched; the generic queue reports into the existing `integration_health()`
+  (Module 46, already on system-status + Command Centre). Wired into `boot()`. Test `test_p3_webhookq.php`
+  (17 assertions — enqueue/dedupe, no-op default, success, retry→give-up, backoff parking, channel scope).
+  Suite **3660 passed, 0 failed**. *Wave C complete. Remaining: Wave D — larger UX/lifecycle builds
+  (§8/§34/§35/§16/§49), each its own change.*
 
 - **2026-08-27 — §20 Command Centre (Wave B, item 2) — Wave B complete.** `command_centre()` +
   `/command-centre` (`lib/ops.php`, `views/ops/command_centre.php`) COMPOSE the three aggregators that

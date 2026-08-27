@@ -135,7 +135,7 @@ For each retained legacy concept: why kept, where it lives, its canonical replac
 | `jobs.stage` (vestigial) | Old data; some views show history | `jobs.stage` | `closed_flag` + `job_now()` | **Deprecated** (display-only; not the lifecycle). |
 | `jobs.invoice_amount`/`payment_received` (legacy invoice) | `boss_profit`/MIS/dashboard read them | `jobs.*` | books ledger (`invoices`/`receipts`) | **Dual-truth (flagged §29).** Reconcile before switching readers. |
 | Plaintext `person_documents.doc_number` | Rows filed before encryption | `person_documents.doc_number` | `doc_number_enc` (§53) | **Migrating** (nightly `iddoc_encrypt_backfill`, key-gated). |
-| Per-integration bespoke outboxes | Each integration works | `ads_outbox`/`books_outbox`/… | generic webhook/queue (§50) | **Deferred (P2).** |
+| Per-integration bespoke outboxes | Each integration works | `ads_outbox`/`books_outbox`/… | generic queue `integration_outbox` (`lib/webhookq.php`, §50) | **Active-compat.** New integrations use `webhookq_enqueue`/`webhookq_dispatch` (dedupe + retry/backoff, injectable delivery); the bespoke outboxes are retained and both report into `integration_health()`. |
 | Contract linkage by `contract_number` string | Whole spine matches on it | `calls`/`jobs`/`quotations`/`partner_contracts` | canonical Engagement (§25) | **Deferred (P2/P3).** Use the string today. |
 
 **Deferred canonical work (do NOT build ad-hoc; schedule as its own change):**
