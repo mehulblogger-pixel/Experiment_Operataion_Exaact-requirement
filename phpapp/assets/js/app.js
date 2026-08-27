@@ -1592,7 +1592,22 @@
       var want = 0;
       var m = (location.hash || '').match(new RegExp(key + '=([^&]+)'));
       if (m) { groups.forEach(function (g, j) { if (slug(g.label) === m[1]) want = j; }); }
+      // Field-finding #20 — also honour a bare element-id hash (e.g. /job?id=5#holdpoints). The hold /
+      // witness handler, and other in-page links, redirect to an element that lives ON a tab; without this
+      // the page opened on the first tab (Overview) and the target panel stayed hidden — reading as "it
+      // went back to the main screen" and the change "not reflected". Find which tab contains the target
+      // and open that one, then bring it into view.
+      var hashEl = null;
+      if (!m && location.hash && location.hash.length > 1) {
+        try { hashEl = wrap.querySelector(location.hash); } catch (e) { hashEl = null; }
+        if (hashEl) groups.forEach(function (g, j) {
+          g.panels.forEach(function (p) { if (p === hashEl || p.contains(hashEl)) want = j; });
+        });
+      }
       show(want, false);
+      if (hashEl) setTimeout(function () {
+        try { if (hashEl.tagName === 'DETAILS') hashEl.open = true; hashEl.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {}
+      }, 80);
     });
   }
 
