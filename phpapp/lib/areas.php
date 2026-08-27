@@ -210,7 +210,7 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'For administrators: masters, people, access, licensing and system configuration.';
-            $routes = ['admin','masters','m/','lookups','users','user-new','user-edit','hierarchy','access','adspro','sso','licence','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $routes = ['admin','masters','m/','lookups','users','user-new','user-edit','hierarchy','access','adspro','sso','licence','product-package','settings','terminology','service-scope','service-formats','company-profile','books-bridge','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             $sec('Masters');
             $t(can('mod.masters.view'), '📋', 'Masters', '/masters', 'The lists behind every dropdown.');
@@ -242,6 +242,8 @@ function ops_area_def($area) {
 
             $sec('Super admin');
             $t(is_master(), '🛰️', 'Control panel', '/super-admin', 'Licence, seats, modules, subscription, tenants and system tools in one place.');
+            // Revamp P6 — pick which EXAACT this install is (TPIA / Staffing / Recruitment / Enterprise).
+            $t($fx('product_package_can') && product_package_can(), '📦', 'Product package', '/product-package', 'TPIA, Staffing, Recruitment or Enterprise — set the pack & bundles in one click.');
 
             $sec('Connections');
             $t($fx('ads_can_manage') && ads_can_manage(), '📢', 'Ads Pro connection', '/adspro', 'Connect the advertising source.');

@@ -2863,6 +2863,8 @@ function ops_dispatch($route, $method) {
         // Who arrived here from a sibling application, and who was turned away.
         case $route === 'licence' || $route === 'licence-save' || $route === 'licence-check' || $route === 'licence-pubkey':
             return ops_licence($route, $method);
+        case $route === 'product-package' || $route === 'product-package-apply':   // Revamp P6 — product-package chooser
+            return ops_product_package($route, $method);
         case $route === 'vendor' || $route === 'signing-setup':
             ops_vendor($route, $method); return true;
         case $route === 'agreement':
