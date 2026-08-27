@@ -34,7 +34,7 @@ Foundations first, because the management surfaces consume them.
 | # | Item | What it is | Reuses | Status |
 |---|---|---|---|---|
 | §19 | Action Centre | One personal "everything waiting on me" — approvals + my §26 tasks — in priority order. Delivered as the **"Next actions" band on My Work**, not a competing screen (non-destructive: My Work already IS the personal action page). | `ops_pending_tasks`, `task_mine` (§26) | ✅ **done** |
-| §20 | Command Centre | One management "state of the business" board — attention band, health, financial truth, §27 events. | `attention_summary`, `system_status`, §27 | next |
+| §20 | Command Centre | One management "state of the business" board — attention band, money (§27), platform health — kept as separate bands (§20/§21). | `attention_summary`, `system_status`, §27 | ✅ **done** |
 
 ### Wave C — Platform
 | # | Item | What it is | Reuses |
@@ -60,6 +60,16 @@ engine is already the one truth; Wave D must read it, never re-derive).
 3. **§50 and Wave D** are independent of A/B and can run in parallel or after, by appetite.
 
 ## Done log
+
+- **2026-08-27 — §20 Command Centre (Wave B, item 2) — Wave B complete.** `command_centre()` +
+  `/command-centre` (`lib/ops.php`, `views/ops/command_centre.php`) COMPOSE the three aggregators that
+  already exist into one management board with three **separate** bands — Business "needs attention"
+  (`attention_summary`), Money (the §27 `financial_rollup` — committed/billed/received/outstanding), and
+  Platform health (`system_status`) — keeping business KPIs and technical health apart on purpose
+  (§20/§21). Computes nothing new. Gated to management (`dash.operations`/`dash.financial`/admin — no new
+  permission). Nav entries added for Command Centre (management) and My tasks (§26, everyone). Test
+  `test_p3_command_centre.php` (10 assertions — composition, band separation, routing/nav). Suite
+  **3643 passed, 0 failed**. *Next: Wave C — §50 generic integration layer (independent), then Wave D.*
 
 - **2026-08-27 — §19 Action Centre (Wave B, item 1).** `action_centre($limit)` (`lib/ops.php`) merges the
   derived "waiting on me" buckets (`ops_pending_tasks`) with my individual §26 tasks (`task_mine`) into

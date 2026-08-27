@@ -48,6 +48,9 @@ function ops_nav_index() {
     // ---- Always-there, cross-module destinations ---------------------------
     $add('Dashboard', '/', 'Home', '🏠', 'Your landing dashboard.');
     $add('My Work', '/my-work', 'Home', '📌', 'Everything waiting on you, in one place.');
+    $add('My tasks', '/tasks', 'Home', '✅', 'Follow-ups you write down and tick off.');   // Phase 3 §26
+    if (($can('dash.operations') || $can('dash.financial')) || ($fx('is_admin_level') && is_admin_level()))
+        $add('Command Centre', '/command-centre', 'Home', '🛰️', 'The state of the business — attention, money, health.');  // Phase 3 §20
     $add('Search records', '/search', 'Home', '🔍', 'Search across every register.');
     if ($fx('adv_can') && adv_can())        $add('What to fix', '/advisor', 'Home', '🧭', 'The one action list, money attached.');
     if ($fx('chain_can') && chain_can())    $add('Where the flow is broken', '/flow-gaps', 'Home', '🔗', 'Hand-offs that were skipped.');

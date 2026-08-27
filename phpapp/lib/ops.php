@@ -3133,6 +3133,8 @@ function ops_dispatch($route, $method) {
             return ops_system_status($method);
         case $route === 'tasks':               // Phase 3 §26 — my persisted tasks
             return ops_tasks($method);
+        case $route === 'command-centre':      // Phase 3 §20 — management state-of-the-business board
+            return ops_command_centre($method);
         case $route === 'report-approve':
             ops_report_approve($method); return true;
         case $route === 'office-finance':
@@ -7087,6 +7089,28 @@ function system_status_worst() {
 function ops_system_status($method) {
     ops_require(notifications_can_view(), 'You cannot view system status.');
     view('ops/system_status', ['rows' => system_status()]);
+    return true;
+}
+
+// Phase 3 §20 — the Command Centre. The management counterpart to My Work's §19 Action Centre: one
+// "state of the business" board that COMPOSES the three aggregators that already exist — the business
+// "needs attention" band (attention_summary, Module 34), the money movement (financial_rollup, §27) and
+// the platform health (system_status, Module 50) — into distinct sections. It keeps business and
+// technical health SEPARATE (the §20/§21 rule) rather than blending them into one score. It computes
+// nothing new; it reads the three and lays them out. Read-only.
+function command_centre() {
+    return [
+        'business'     => function_exists('attention_summary') ? attention_summary() : [],
+        'money'        => function_exists('financial_rollup') ? financial_rollup([]) : null,
+        'health'       => function_exists('system_status') ? system_status() : [],
+        'health_worst' => function_exists('system_status_worst') ? system_status_worst() : 'ok',
+    ];
+}
+function ops_command_centre($method) {
+    // Management surface — the same audience as the operations/financial dashboards.
+    ops_require((function_exists('can') && (can('dash.operations') || can('dash.financial'))) || is_admin_level(),
+                'You cannot open the command centre.');
+    view('ops/command_centre', command_centre());
     return true;
 }
 
