@@ -214,6 +214,7 @@ function c360_load($pid) {
         'address'  => c360_one("SELECT * FROM partner_addresses WHERE partner_id=? ORDER BY is_primary DESC, id LIMIT 1", [$pid]),
         'contracts'=> c360_rows("SELECT * FROM partner_contracts WHERE partner_id=? AND is_active=1 ORDER BY end_date DESC LIMIT 5", [$pid]),
         'money'    => c360_money($pid),
+        'billable' => (c360_on('invoicing') && function_exists('billable_party_rollup')) ? billable_party_rollup($pid) : null,
         'pipeline' => c360_pipeline($pid),
         'quotes'   => c360_quotes($pid),
         'work'     => c360_work($pid),

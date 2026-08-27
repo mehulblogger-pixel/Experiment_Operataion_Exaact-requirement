@@ -115,12 +115,27 @@ already-invoiced job). php -l clean; **full suite 3817 passed, 0 failed.**
 > billable `sync` now runs nightly. (The billable feature never depended on cron —
 > the inline hook creates events in real time — but the sync backstop now works.)
 
-**Remaining P4b, still staged:**
-1. **More sources** (`TIMESHEET_APPROVED`, `OT_APPROVED`, `CANDIDATE_JOINED`…),
-   each with its own approval-point hook reusing `billable_event_upsert()`.
-2. **Generalize `books_billable_jobs()` → `books_billable_events()`** so the
-   existing invoice flow lists all billable candidates, and stamp `invoice_line_id`
-   at `books_line_add()` for line-level reconciliation.
+**Delivered (P4b — Customer-360 unbilled figure):** `billable_party_rollup($pid)`
++ a Customer-360 "Unbilled work" qcard (₹ pending+approved, linking to the
+board filtered by client via a new `?party=` filter). Read-only, additive.
+Test: `tests/test_billable_party.php` (6 assertions). Full suite 3870/0.
+
+**Remaining P4b — needs a design decision (blocked, flagged for sign-off):**
+Adding non-job sources (`TIMESHEET_APPROVED`, `CANDIDATE_JOINED`/placement fee)
+is **not** a safe drop-in: reconciliation to BILLED currently matches per-**job**
+invoices (`books_invoices_for_job`), and invoices carry no
+inspector/timesheet-period/placement linkage — so those events would have **no
+path to BILLED** and would sit forever in PENDING/APPROVED. Closing this cleanly
+needs one of:
+1. **Generalize invoicing to consume billable events** — let finance pick the
+   billable event(s) a line bills and stamp `invoice_line_id` at
+   `books_line_add()`; then reconciliation works for every source. (Touches the
+   money write-path — its own validated slice.)
+2. **A manual "billed, invoice #…" action** for non-job events — which changes the
+   "BILLED is reconciliation-only" rule and so needs your sign-off.
+
+Until one is chosen, the timesheet/placement sources are held so the ledger never
+strands events. The `JOB_CLOSED` source (real-time hook + sync) is complete.
 
 **RT3 note:** the first-class `Engagement` entity was parked "until after P4"
 (`00-program.md` D3). P4 is now delivered — Engagement can be revisited if the

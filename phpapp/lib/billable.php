@@ -246,6 +246,26 @@ function billable_pending_count() {
     catch (Throwable $e) { return 0; }
 }
 
+// Per-client unbilled figure for Customer-360: pending + approved candidates not
+// yet invoiced. Read-only; honours office scope.
+function billable_party_rollup($partyId) {
+    billable_migrate();
+    $partyId = (int)$partyId; if (!$partyId) return ['pending' => 0, 'approved' => 0, 'unbilled_amt' => 0.0];
+    [$w, $a] = billable_scope();
+    $t = ['pending' => 0, 'approved' => 0, 'unbilled_amt' => 0.0];
+    try {
+        foreach (ops_all("SELECT status, COUNT(*) n, COALESCE(SUM(amount),0) amt
+                          FROM billable_events WHERE party_id=? AND status IN ('PENDING','APPROVED') AND $w
+                          GROUP BY status", array_merge([$partyId], $a)) ?: [] as $r) {
+            $k = strtolower((string)$r['status']);
+            if (isset($t[$k])) $t[$k] = (int)$r['n'];
+            $t['unbilled_amt'] += (float)$r['amt'];
+        }
+    } catch (Throwable $e) {}
+    $t['unbilled_amt'] = round($t['unbilled_amt'], 2);
+    return $t;
+}
+
 // ---- Screen ----------------------------------------------------------------
 function ops_billable($route, $method) {
     ops_require(billable_can(), 'You cannot open the billable events board.');
@@ -271,8 +291,12 @@ function ops_billable($route, $method) {
     }
 
     $status = (string)($_GET['status'] ?? '');
+    $party  = (int)($_GET['party'] ?? 0);
+    $filter = [];
+    if ($status !== '') $filter['status'] = $status;
+    if ($party) $filter['party_id'] = $party;
     view('ops/billable_events', [
-        'rows'      => billable_list($status !== '' ? ['status' => $status] : []),
+        'rows'      => billable_list($filter),
         'roll'      => billable_rollup(),
         'statuses'  => BILLABLE_STATUS,
         'status'    => $status,

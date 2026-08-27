@@ -36,6 +36,14 @@
         <div class="ql">Received, not yet matched</div></div>
     <?php endif; ?>
   <?php endif; ?>
+  <?php // Revamp P4 — unbilled operational work captured as billable events (not yet invoiced).
+    $bill = $billable ?? null;
+    if ($bill !== null && (($bill['pending'] ?? 0) + ($bill['approved'] ?? 0)) > 0): ?>
+    <a class="qcard tone-warn" href="/billable-events?party=<?= (int)$p['id'] ?>">
+      <div class="qic">🧾</div><div class="qn" style="font-size:20px"><?= fmoney_short($bill['unbilled_amt']) ?></div>
+      <div class="ql">Unbilled work<?= ($bill['approved'] ?? 0) ? ' · ' . (int)$bill['approved'] . ' approved' : '' ?></div>
+    </a>
+  <?php endif; ?>
   <?php if ($pipeline !== null): ?>
     <a class="qcard tone-info" href="/opportunities?v=list&amp;q=<?= e(urlencode($name)) ?>">
       <div class="qic">💡</div><div class="qn"><?= count($pipeline['open']) ?></div>
