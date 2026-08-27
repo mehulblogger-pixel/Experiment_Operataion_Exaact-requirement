@@ -75,6 +75,17 @@ Findings classified per §81 (Critical/High/Medium/Low · P0-P3 · effort XS-XL 
 
 ## Done
 
+- **2026-08-26 — Verification runbook + test-runner filter + honest self-correction.** Added
+  `docs/phase-2/04-verification-runbook.md` (four layers: full suite → single control → self-reporting
+  screens → manual UI) and an optional substring filter to `tests/run.php` (`php tests/run.php <name>`;
+  no argument = full suite, unchanged). Running `test_p2_finance_truth` in isolation exposed that it was
+  **not self-contained** (depended on ambient seeded jobs) and — worse — asserted `mis_summary()['profit']`
+  when the totals live under `['tot']`, so its MIS assertions were **vacuously passing (0==0)**. Rewrote it
+  self-contained (seeds its own office + jobs in a rolled-back transaction) and against the correct keys;
+  it now genuinely proves OFF = the partial formula, ON = the canonical engine (79,000 → 72,500 on its own
+  data), plus real numeric checks for the SBU-P&L contract table and the boss view. The §28 gating CODE was
+  correct all along; the test was weak — now it isn't. Suite **3583 passed, 0 failed**.
+
 - **2026-08-26 — §28 Option 3: profit-basis reconciliation on SBU-P&L (additive, no number moves).**
   The SBU-P&L screen sits between two legitimate bases: period-costing (the "By SBU" table — all office
   spend allocated) and job-costing (the contract table / MIS / canonical engine). Added
