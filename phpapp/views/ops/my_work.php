@@ -30,7 +30,32 @@
   </div>
 <?php endif; ?>
 
-<?php if ($total === 0): ?>
+<?php // Phase 3 §19 — Action Centre: the one prioritised "do this next" list, my written-down tasks
+      // and the derived approvals merged, most urgent first (an overdue task out-ranks a routine approval). ?>
+<?php if (!empty($actions)): ?>
+  <div class="panel" style="margin-top:16px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+      <h3 class="tab-sub" style="margin:0">Next actions</h3>
+      <a href="/tasks" class="muted" style="font-size:12.5px;text-decoration:none">My tasks →</a>
+    </div>
+    <p class="muted" style="margin:2px 0 10px;font-size:12px">Your written-down tasks and everything the system is waiting on you for, most urgent first.</p>
+    <div style="display:flex;flex-direction:column">
+      <?php foreach ($actions as $a): $c = $tone[$a['tone']] ?? $tone['info']; ?>
+        <a href="<?= e($a['href']) ?>" style="display:flex;align-items:center;gap:12px;padding:9px 4px;border-top:1px solid var(--line,#e5e7eb);text-decoration:none;color:inherit">
+          <span style="width:8px;height:8px;border-radius:50%;background:<?= $c ?>;flex:none"></span>
+          <span style="flex:1;min-width:0">
+            <span style="font-weight:600;font-size:14px"><?= e($a['title']) ?></span>
+            <?php if ($a['kind'] === 'task'): ?><span class="muted" style="font-size:11px;border:1px solid var(--line,#e5e7eb);border-radius:4px;padding:0 5px;margin-left:6px">task</span><?php endif; ?>
+            <span class="muted" style="display:block;font-size:11.5px"><?= e($a['sub']) ?></span>
+          </span>
+          <?php if (!empty($a['overdue'])): ?><span style="font-size:11px;font-weight:700;color:var(--bad,#c0392b)">overdue</span><?php endif; ?>
+        </a>
+      <?php endforeach; ?>
+    </div>
+  </div>
+<?php endif; ?>
+
+<?php if ($total === 0 && empty($actions)): ?>
   <div class="panel" style="margin-top:16px;text-align:center;padding:34px 16px">
     <div style="font-size:34px;line-height:1">✓</div>
     <h3 style="margin:8px 0 4px">You’re all caught up</h3>

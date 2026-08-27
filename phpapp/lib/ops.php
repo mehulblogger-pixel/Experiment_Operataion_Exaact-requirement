@@ -6311,6 +6311,7 @@ function ops_my_work() {
     view('ops/my_work', [
         'lanes'             => $lanes,
         'total'             => count($tasks),
+        'actions'           => function_exists('action_centre') ? action_centre(10) : [],  // §19 — prioritised do-next list
         'isInspector'       => function_exists('is_field_inspector') && is_field_inspector(),
         'inspectorUnlinked' => function_exists('is_field_inspector') && is_field_inspector() && !my_inspector_id(),
         'name'              => function_exists('user_name') ? user_name($u) : '',
@@ -6835,6 +6836,45 @@ function ops_render_pending_tasks() {
       <?php endif; ?>
     </div>
     <?php return ob_get_clean();
+}
+
+// Phase 3 §19 — the Action Centre. My Work already shows the derived "waiting on me" buckets as count
+// cards; this unifies them with my individual §26 tasks into ONE priority-ordered "do this next" list —
+// the thing the count cards cannot do (an overdue written-down task should out-rank a routine approval).
+// It reuses ops_pending_tasks() and task_mine(); it computes no new counts of its own. Read-only.
+function action_centre($limit = 12) {
+    $today = date('Y-m-d');
+    $soon  = date('Y-m-d', strtotime('+3 day'));
+    $out = [];
+    // My own written-down tasks (§26), each an individual actionable item.
+    if (function_exists('task_mine')) foreach (task_mine() as $t) {
+        $due = trim((string)($t['due_on'] ?? ''));
+        $overdue = $due !== '' && $due < $today;
+        $dueToday = $due === $today;
+        // 0 overdue · 1 due today · 3 due soon · 5 dated later · 6 undated.
+        $pri = $overdue ? 0 : ($dueToday ? 1 : ($due === '' ? 6 : ($due <= $soon ? 3 : 5)));
+        $href = (!empty($t['entity_kind']) && !empty($t['entity_id']) && function_exists('route_for_entity'))
+            ? route_for_entity($t['entity_kind'], (int)$t['entity_id']) : '/tasks';
+        $out[] = ['kind'=>'task', 'priority'=>$pri, 'title'=>(string)$t['title'],
+                  'sub'=>($due !== '' ? ('due ' . $due . ($overdue ? ' · overdue' : ($dueToday ? ' · today' : ''))) : 'no due date'),
+                  'href'=>$href, 'tone'=>($overdue ? 'bad' : ($dueToday ? 'warn' : 'info')),
+                  'due'=>$due, 'overdue'=>$overdue, 'n'=>1];
+    }
+    // The derived approval/action buckets, minus the §26 count (its individual items are already above).
+    if (function_exists('ops_pending_tasks')) foreach (ops_pending_tasks() as $a) {
+        if (($a['href'] ?? '') === '/tasks') continue;
+        $tone = $a['tone'] ?? 'info';
+        // A blocking/warning approval sits at 2 (below overdue/today tasks, above routine info at 4).
+        $pri = ($tone === 'bad' || $tone === 'warn') ? 2 : 4;
+        $out[] = ['kind'=>'approval', 'priority'=>$pri, 'title'=>trim((int)$a['n'] . ' ' . strip_tags((string)$a['label'])),
+                  'sub'=>(string)($a['sub'] ?? ''), 'href'=>(string)$a['href'], 'tone'=>$tone,
+                  'due'=>'', 'overdue'=>false, 'n'=>(int)$a['n'], 'icon'=>(string)($a['icon'] ?? '')];
+    }
+    // Priority first; within a priority, the more numerous / more overdue rises. Stable in PHP 8.
+    usort($out, function ($x, $y) {
+        return [$x['priority'], -(int)($x['n'] ?? 0)] <=> [$y['priority'], -(int)($y['n'] ?? 0)];
+    });
+    return $limit > 0 ? array_slice($out, 0, $limit) : $out;
 }
 
 // Module 34 — the business "needs attention" aggregation. Several modules already

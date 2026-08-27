@@ -31,10 +31,10 @@ Foundations first, because the management surfaces consume them.
 | §27 | Financial-event stream | A canonical, append-only money-event log (quote→invoice→receipt→credit) that dashboards can read instead of re-deriving. | `job_profit` (§28), revenue reconciliation (§29) as its first consumer/validator | none (read model) |
 
 ### Wave B — Surfaces (consume Wave A)
-| # | Item | What it is | Reuses |
-|---|---|---|---|
-| §19 | Action Centre | One personal "everything waiting on me" screen — approvals, returns, my §26 tasks — in priority order. | `ops_pending_tasks`, §26 |
-| §20 | Command Centre | One management "state of the business" board — attention band, health, financial truth, §27 events. | `attention_summary`, `system_status`, §27 |
+| # | Item | What it is | Reuses | Status |
+|---|---|---|---|---|
+| §19 | Action Centre | One personal "everything waiting on me" — approvals + my §26 tasks — in priority order. Delivered as the **"Next actions" band on My Work**, not a competing screen (non-destructive: My Work already IS the personal action page). | `ops_pending_tasks`, `task_mine` (§26) | ✅ **done** |
+| §20 | Command Centre | One management "state of the business" board — attention band, health, financial truth, §27 events. | `attention_summary`, `system_status`, §27 | next |
 
 ### Wave C — Platform
 | # | Item | What it is | Reuses |
@@ -60,6 +60,16 @@ engine is already the one truth; Wave D must read it, never re-derive).
 3. **§50 and Wave D** are independent of A/B and can run in parallel or after, by appetite.
 
 ## Done log
+
+- **2026-08-27 — §19 Action Centre (Wave B, item 1).** `action_centre($limit)` (`lib/ops.php`) merges the
+  derived "waiting on me" buckets (`ops_pending_tasks`) with my individual §26 tasks (`task_mine`) into
+  one priority-ordered "do this next" list: overdue task (0) → due-today (1) → blocking/warning approval
+  (2) → due-soon (3) → dated-later (5) → undated (6). Reuses both aggregators; computes no new counts.
+  Delivered **non-destructively as the "Next actions" band at the top of My Work** — not a competing new
+  screen, since My Work already IS the personal action page (the count-card lanes stay below). The
+  "all caught up" state now also accounts for open tasks. Test `test_p3_action_centre.php` (11 assertions —
+  ordering, overdue flag, record-linked routing, limit). Suite **3633 passed, 0 failed**.
+  *Next: §20 Command Centre (management board over attention_summary + system_status + §27).*
 
 - **2026-08-27 — §26 canonical persisted task (Wave A, item 1).** `lib/tasks.php` adds the one thing the
   read-time aggregators can't hold: a human-authored, assignable, due-dated item you tick off — with a
