@@ -459,9 +459,21 @@
           if (cE) url += '&contact_email=' + encodeURIComponent(cE);
           if (cM) url += '&contact_mobile=' + encodeURIComponent(cM);
         }
-        win = window.open(url, 'exaactPartnerPicker', 'width=900,height=920,menubar=no,toolbar=no,scrollbars=yes');
-        if (win) win.focus();
-        else window.location.href = url;         // popups blocked → just navigate
+        // Field #10 — open the add form as an in-page popup (iframe modal) rather
+        // than a separate browser window. You never leave the call/quote form you
+        // were filling, so nothing you typed is lost; on save the picker posts
+        // {exaact:partner-added} to this page (window.parent) and the dropdown
+        // selects it (see the message handler below). Falls back to a window only
+        // if the modal helper is somehow unavailable (old cached script).
+        var title = kind === 'vendor' ? 'Add vendor' : (kind === 'client' ? 'Add client' : 'Add');
+        if (typeof openEmbed === 'function') {
+          pending.embed = true;
+          openEmbed(url, title);
+        } else {
+          win = window.open(url, 'exaactPartnerPicker', 'width=900,height=920,menubar=no,toolbar=no,scrollbars=yes');
+          if (win) win.focus();
+          else window.location.href = url;       // popups blocked → just navigate
+        }
       });
     });
 
@@ -485,7 +497,13 @@
           if (!has) { var op = document.createElement('option'); op.value = id; op.textContent = name; s.appendChild(op); }
         });
       });
+      // Close the in-page popup (if that is how it was opened) WITHOUT reloading —
+      // the host is a form in progress, so a reload would throw away what the user
+      // has typed. The dropdown was already updated above, so there is nothing to
+      // refresh. A separate window (fallback path) is simply closed.
+      var wasEmbed = pending && pending.embed;
       pending = null;
+      if (wasEmbed && typeof closeEmbed === 'function') { closeEmbed(false); }
       try { if (win && !win.closed) win.close(); } catch (e2) {}
     });
   }
