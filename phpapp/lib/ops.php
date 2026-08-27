@@ -3139,6 +3139,8 @@ function ops_dispatch($route, $method) {
             return ops_command_centre($method);
         case $route === 'entity-360':          // Phase 3 §49 — uniform 360 shell for any entity
             return ops_entity_360($method);
+        case $route === 'attendance-review':   // Phase 3 §35 — coordinator/manager attendance review
+            return ops_attendance_review($method);
         case $route === 'report-approve':
             ops_report_approve($method); return true;
         case $route === 'office-finance':
@@ -6959,6 +6961,11 @@ function attention_summary() {
     if (function_exists('notifications_can_view') && notifications_can_view() && function_exists('integration_health_attention')) {
         $ib = integration_health_attention();
         if ($ib > 0) $push('integrations', 'Integrations need attention', $ib, '/integrations', 'risk', null, 'a sync is failing or stuck');
+    }
+    // Phase 3 §35 — self-marked attendance that looks off, for a coordinator/manager to review.
+    if (function_exists('attend_review_can') && attend_review_can() && function_exists('attend_review_count')) {
+        $ar = attend_review_count();
+        if ($ar > 0) $push('attendance_review', 'Attendance to review', $ar, '/attendance-review', 'warn', null, 'self-marked entries that look off');
     }
     return $out;
 }

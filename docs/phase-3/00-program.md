@@ -46,7 +46,7 @@ Foundations first, because the management surfaces consume them.
 |---|---|---|
 | §8  | Builder persona previews | ✅ **done** — preview a report type split into what the recipient sees vs internal-only, flagging conditional/scored fields. |
 | §34 | Dashboard expansion | ✅ **done** — a role-aware "at a glance" strip (your next actions + a manager pulse) atop the area landings. |
-| §35 | Training attendance | Attendance capture + competence linkage. |
+| §35 | Attendance review | ✅ **done** — inspector self-marks; anomalous entries flagged for coordinator/manager to send back (advisory). Scoped to your rules, not training. |
 | §16 | Vendor-360 depth | ✅ **done** — contacts (recognised across the system, §23/24) + full activity history, to client-360 parity. |
 | §49 | Entity-360 | ✅ **done** — one uniform 360 route composing tasks/history/quality/party per entity kind. |
 
@@ -60,6 +60,21 @@ engine is already the one truth; Wave D must read it, never re-derive).
 3. **§50 and Wave D** are independent of A/B and can run in parallel or after, by appetite.
 
 ## Done log
+
+- **2026-08-27 — §35 attendance review (Wave D, item 5) — Phase 3 Wave D complete.** Re-scoped from
+  "training attendance" to the attendance-oversight workflow the owner described. An inspector already
+  self-marks attendance (office/site, geofenced — `lib/attend.php`); this adds the review your rules ask
+  for, per four decisions: **coordinator first-line / manager on escalation**, **only anomalous entries
+  surface**, reviewer **sends back to the inspector**, and it is **advisory** (attendance still counts).
+  `lib/attendreview.php`: `attend_anomaly()` flags a self-mark that looks off — SITE marked outside the
+  job's geofence (via `geo_distance_m`/`geofence_target`), a past day checked-in-but-never-out, or a mark
+  back-dated >2 days; `attend_review_scan()`/`_count()` (office-scoped) is the queue; `attend_review_return/
+  clear/escalate()` are the reviewer actions (audited); `attend_review_reset()` clears the flag when the
+  inspector re-marks (hooked into the capture path). Additive columns on `attendance`; no capture path or
+  timesheet read changed. `/attendance-review` screen; the count feeds `attention_summary`; gated on the
+  existing role helpers (no new permission). Test `test_p3_attend_review.php` (18 assertions — all three
+  anomaly kinds, clean-not-flagged, advisory row untouched, send-back leaves queue + shows to inspector,
+  re-mark resets). Suite **3740 passed, 0 failed**. **Wave D complete — all Phase-3 items delivered.**
 
 - **2026-08-27 — §34 role-aware dashboard "at a glance" strip (Wave D, item 4).** Dashboards already exist
   (Operations home, MIS, the §20 Command Centre), but the plain area landings were navigation tiles with

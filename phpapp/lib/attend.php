@@ -91,6 +91,9 @@ function attend_punch($inspectorId, $date, $kind, $status, $data = []) {
         $id = attend_row($inspectorId, $date);
         db()->prepare("UPDATE attendance SET status=?, check_in_at=?, in_lat=?, in_lon=?, in_acc=?, marked_at=?, marked_by=? WHERE id=?")
             ->execute([$status, $now, $lat !== '' ? $lat : null, $lon !== '' ? $lon : null, $acc, $now, $actor, $id]);
+        // Phase 3 §35 — re-marking an entry that a reviewer sent back clears the review flag, so it is
+        // re-checked afresh.
+        if (function_exists('attend_review_reset')) { try { attend_review_reset($id); } catch (Throwable $e) {} }
         // Mirror onto the availability board.
         $avail = attend_avail_map($status);
         db()->prepare("DELETE FROM inspector_day_status WHERE inspector_id=? AND day=?")->execute([$inspectorId, $date]);
