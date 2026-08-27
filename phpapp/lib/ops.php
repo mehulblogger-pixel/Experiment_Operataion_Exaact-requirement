@@ -6027,12 +6027,20 @@ function ops_jobs($route, $method) {
                 $amt = num($_POST['extra'][$code] ?? 0);
                 if ($amt != 0) $extra[$code] = $amt;
             }
-            // save expenses row (same-day at closure)
-            $pdo->prepare("INSERT INTO expenses (job_id,inspector_id,sbu,travel,local,food,lodging,misc,extra,exp_date,notes,created_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")->execute([
-                $job['id'], $job['inspector_id'], $b['sbu'] ?: $job['sbu'],
-                num($b['travel']), num($b['local']), num($b['food']), num($b['lodging']), num($b['misc']),
-                $extra ? json_encode($extra) : '', $reportDate ?: date('Y-m-d'), $b['exp_notes'] ?? '', date('c')]);
+            // save expenses row (same-day at closure).
+            // Field-finding #21 — record the day's closure expenses EXACTLY ONCE per job. The UI can no
+            // longer re-show the close form for a closed job (#24), and the close is refused once closed;
+            // this is the data-layer belt: if a closure-expense row already exists for this job we do not
+            // add a second (so no path — a race, a re-submit that slipped the UI guard — can double the
+            // engineer's claim). To change what was recorded, the expenses are edited on the job below.
+            $hasExp = (int) ops_val("SELECT COUNT(*) FROM expenses WHERE job_id=?", [$job['id']]);
+            if (!$hasExp) {
+                $pdo->prepare("INSERT INTO expenses (job_id,inspector_id,sbu,travel,local,food,lodging,misc,extra,exp_date,notes,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")->execute([
+                    $job['id'], $job['inspector_id'], $b['sbu'] ?: $job['sbu'],
+                    num($b['travel']), num($b['local']), num($b['food']), num($b['lodging']), num($b['misc']),
+                    $extra ? json_encode($extra) : '', $reportDate ?: date('Y-m-d'), $b['exp_notes'] ?? '', date('c')]);
+            }
             $tat = days_between($job['inspection_end_date'], $reportDate);
             // If a report was produced, route it to the inspector's reporting manager for sign-off.
             $needsApproval = ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate !== '') ? 'PENDING' : '';
