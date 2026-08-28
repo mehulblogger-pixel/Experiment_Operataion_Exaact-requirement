@@ -300,12 +300,22 @@
     <?php foreach ($qaps as $q): ?>
       <span style="display:inline-flex;gap:4px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:3px 4px 3px 8px;background:var(--card)">
         <a href="/job-qap?id=<?= (int)$q['id'] ?>" target="_blank" rel="noopener" title="<?= e($q['note'] ?: '') ?>" style="text-decoration:none">📄 <?= e($q['po_line'] ? $q['po_line'].' — ' : '') ?><?= e($q['file_name'] ?: 'QAP') ?></a>
-        <?php if ($autoTarget): ?>
+        <?php if ($autoTarget):
+              // Field #27 (stage c) — if the scope table already has rows, a fresh QAP
+              // OVERWRITES them (a revised QAP / added item on the inspection day). That
+              // is destructive to the typed scope, so it is only done after an explicit
+              // pop-up confirmation, and it sends overwrite=1. Hold/witness points are
+              // kept regardless (they live on hw_points, not in the scope table). An empty
+              // scope just fills (append), with the lighter confirmation. ?>
+          <?php $scopeHasRows = $scopeField && !empty($data[$scopeField['fkey']] ?? null) && is_array($data[$scopeField['fkey']]); ?>
           <form method="post" action="/document-scope-from-qap?id=<?= (int)$doc['id'] ?>" style="margin:0"
-                onsubmit="return confirm('Read the inspection scope (and items, where available) from this QAP and add them to the report? You can edit or remove any row afterwards.');">
+                onsubmit="return confirm(<?= $scopeHasRows
+                    ? "'⚠ This will OVERWRITE the current inspection scope with the scope read from this (revised) QAP. Your hold / witness points are KEPT. This cannot be undone — continue?'"
+                    : "'Read the inspection scope (and items, where available) from this QAP and add them to the report? You can edit or remove any row afterwards.'" ?>);">
             <input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
             <input type="hidden" name="qap_id" value="<?= (int)$q['id'] ?>">
-            <button class="btn small" type="submit" title="<?= $aiOn ? 'AI reads the QAP and fills the scope (and items) tables' : 'Reads the numbered clauses from the QAP into the scope table' ?>">✨ Auto-fill from QAP</button>
+            <?php if ($scopeHasRows): ?><input type="hidden" name="overwrite" value="1"><?php endif; ?>
+            <button class="btn small<?= $scopeHasRows ? ' secondary' : '' ?>" type="submit" title="<?= $scopeHasRows ? 'Replace the current scope with a revised QAP (hold points kept)' : ($aiOn ? 'AI reads the QAP and fills the scope (and items) tables' : 'Reads the numbered clauses from the QAP into the scope table') ?>"><?= $scopeHasRows ? '♻️ Overwrite scope from revised QAP' : '✨ Auto-fill from QAP' ?></button>
           </form>
         <?php endif; ?>
       </span>

@@ -9862,7 +9862,7 @@ function idems_scope_map_rows($rows, $field) {
 }
 // Orchestrate: read the QAP, extract (cache → AI → heuristic), map, append.
 // Returns ['n'=>int, 'source'=>'cache|ai|heuristic', 'err'=>''].
-function idems_scope_from_qap($doc, $qapId) {
+function idems_scope_from_qap($doc, $qapId, $overwrite = false) {
     $field = idems_scope_target_field((int)($doc['report_type_id'] ?? 0));
     if (!$field) return ['n' => 0, 'source' => '', 'err' => 'This report type has no inspection-scope table to fill. Use the standard Inspection Report, or add a scope table under Form builder.'];
     $qap = ops_one("SELECT * FROM job_qaps WHERE id=?", [(int)$qapId]);
@@ -9903,13 +9903,21 @@ function idems_scope_from_qap($doc, $qapId) {
     $key = $field['fkey'];
     $data = json_decode(($doc['data'] ?? '') ?: '[]', true); if (!is_array($data)) $data = [];
     $existing = (isset($data[$key]) && is_array($data[$key])) ? $data[$key] : [];
-    $data[$key] = array_merge($existing, $mapped);
+    // Field #27 (stage c) — a revised QAP OVERWRITES the scope (replaces the rows);
+    // otherwise it APPENDS. Either way HOLD POINTS ARE RETAINED — they live on the
+    // hw_points table (job-scoped), not in this report body, so replacing the scope
+    // rows does not remove them. Overwrite is only ever reached after the on-screen
+    // pop-up confirmation (see fill.php).
+    $replaced = $overwrite ? count($existing) : 0;
+    $data[$key] = $overwrite ? $mapped : array_merge($existing, $mapped);
     db()->prepare("UPDATE report_docs SET data=?, updated_at=? WHERE id=?")->execute([json_encode($data), date('c'), (int)$doc['id']]);
     if (function_exists('idems_log')) idems_log('report_doc', (int)$doc['id'], 'SCOPE_FROM_QAP',
         ['irn' => $doc['irn'] ?? '', 'field' => $key,
-         'reason' => count($mapped) . ' scope rows from QAP #' . (int)$qapId . ' (' . $source . ')'
+         'reason' => ($overwrite ? 'OVERWROTE ' . $replaced . ' row(s) with ' : 'added ')
+                   . count($mapped) . ' scope rows from QAP #' . (int)$qapId . ' (' . $source . ')'
+                   . ($overwrite ? ' · hold points retained' : '')
                    . ($source !== 'heuristic' && function_exists('idems_ai_provenance') ? ' · ' . idems_ai_provenance(null, 1) : '')]);
-    return ['n' => count($mapped), 'source' => $source, 'err' => ''];
+    return ['n' => count($mapped), 'source' => $source, 'overwrote' => $replaced, 'err' => ''];
 }
 // ---- Item / product particulars (the PO-items table) -----------------------
 // Same "fill it for me" idea for the second big table: the items offered for
@@ -10061,7 +10069,11 @@ function ops_idems_scope_from_qap($method) {
     if (!$doc) { http_response_code(404); view('notfound'); return true; }
     ops_require(function_exists('idems_can_edit_doc') ? idems_can_edit_doc($doc) : true, 'This report can no longer be changed.');
     $qapId = (int)($_POST['qap_id'] ?? 0);
-    $scope = idems_scope_from_qap($doc, $qapId);
+    // Field #27 (stage c) — a revised QAP may OVERWRITE the existing scope. This is only
+    // reached after the on-screen pop-up confirmation (fill.php sends overwrite=1). Hold
+    // points are retained (they live on hw_points, not in the report body).
+    $overwrite = !empty($_POST['overwrite']);
+    $scope = idems_scope_from_qap($doc, $qapId, $overwrite);
     // Items are a best-effort bonus — a fresh $doc so the item fill sees the rows
     // the scope fill just wrote (they persist independently to the same column set).
     $doc2 = ops_one("SELECT * FROM report_docs WHERE id=?", [(int)$doc['id']]) ?: $doc;
@@ -10069,7 +10081,9 @@ function ops_idems_scope_from_qap($method) {
     if (!empty($scope['err'])) { flash($scope['err'], 'error'); redirect('/document-fill?id=' . (int)$doc['id']); }
     $how = $scope['source'] === 'cache' ? ' (reused from a previous QAP — no AI used)'
          : ($scope['source'] === 'ai' ? ' with AI' : ' (basic extraction — enable AI for richer results)');
-    $msg = 'Filled in ' . (int)$scope['n'] . ' inspection-scope ' . ((int)$scope['n'] === 1 ? 'activity' : 'activities') . ' from the QAP' . $how . '.';
+    $msg = ($overwrite && (int)($scope['overwrote'] ?? 0) > 0
+              ? 'Replaced the scope with ' . (int)$scope['n'] . ' inspection-scope ' . ((int)$scope['n'] === 1 ? 'activity' : 'activities') . ' from the revised QAP' . $how . ' — hold points kept.'
+              : 'Filled in ' . (int)$scope['n'] . ' inspection-scope ' . ((int)$scope['n'] === 1 ? 'activity' : 'activities') . ' from the QAP' . $how . '.');
     if ((int)$items['n'] > 0) {
         $isrc = $items['source'] === 'po' ? ' from the linked purchase order' : ' from the QAP';
         $msg .= ' Also added ' . (int)$items['n'] . ' item ' . ((int)$items['n'] === 1 ? 'row' : 'rows') . $isrc . '.';
