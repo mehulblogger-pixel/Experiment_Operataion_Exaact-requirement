@@ -255,9 +255,16 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
   <?php $poQuotes = function_exists('quotations_for_po') ? quotations_for_po($id) : []; ?>
   <p class="muted">Pick the <?= e(Tl('quote')) ?> this order answers — the contract number, <?= e(Tl('sbu')) ?>,
     value and all its line items come across with it. For an order that arrived without a
-    <?= e(Tl('quote')) ?>, leave it blank and fill the boxes yourself.</p>
+    <?= e(Tl('quote')) ?>, leave it blank and fill the boxes yourself — or
+    <?php if (can('crm.quote.create') || can('mod.quotes.edit') || is_master()): ?><strong>raise one now</strong> with <em>+ New <?= e(Tl('quote')) ?></em> below<?php else: ?>ask sales to raise one<?php endif; ?>.</p>
   <form method="post" action="/partner-add?id=<?= $id ?>&kind=po" class="inline-add">
-    <div class="ff ff-wide"><label><?= e(T('quote')) ?> this order answers</label>
+    <div class="ff ff-wide"><label><?= e(T('quote')) ?> this order answers
+      <?php // Field #2 — no quote for this client? Raise one in-page (opens the quote form
+            //   in a popup, pre-set to this client); on save this page refreshes and the new
+            //   quote appears in the list, ready to pick. Plain href fallback for JS-off. ?>
+      <?php if (can('crm.quote.create') || can('mod.quotes.edit') || is_master()): ?>
+        <a href="/quote-new?client=<?= $id ?>" data-embed="/quote-new?client=<?= $id ?>" data-embed-title="New <?= e(Tl('quote')) ?>" class="addlink">+ New <?= e(Tl('quote')) ?></a>
+      <?php endif; ?></label>
       <select class="form-control searchable" id="po_quote" name="quotation_id">
         <option value="">— none / arrived directly —</option>
         <?php foreach ($poQuotes as $pq): ?>

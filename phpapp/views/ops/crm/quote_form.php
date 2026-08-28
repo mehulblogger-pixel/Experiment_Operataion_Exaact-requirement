@@ -1,11 +1,13 @@
 <?php
   $isEdit = (bool)$q;
   $preLead = $preLead ?? null;
+  $preClient = $preClient ?? null;   // Field #2 — pre-selected client (e.g. from the PO tab)
   $inqId  = $q['inquiry_id'] ?? ($preInq['id'] ?? '');
-  $g = function($k, $d = '') use ($q, $preInq, $preLead) {
+  $g = function($k, $d = '') use ($q, $preInq, $preLead, $preClient) {
     if ($q && isset($q[$k])) return $q[$k];
     if ($preInq && isset($preInq[$k])) return $preInq[$k];
     if ($preLead && isset($preLead[$k]) && $preLead[$k] !== '') return $preLead[$k];
+    if ($preClient && isset($preClient[$k]) && $preClient[$k] !== '') return $preClient[$k];
     return $d;
   };
   $rows    = $lines ?: [[]];
