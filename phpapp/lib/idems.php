@@ -126,6 +126,9 @@ function idems_migrate() {
     if (function_exists('ensure_column')) {
         ensure_column('report_docs', 'revises_id', "INT NULL");
         ensure_column('report_docs', 'revised_by_id', "INT NULL");
+        // Field #27 (stage b) — the past report a coordinator forwarded to the inspector
+        // as the basis for this repeat inspection (they may continue from it, or start fresh).
+        ensure_column('jobs', 'prior_report_id', "INT NULL");
         // Content seal: a hash of the report's own content, frozen at issue, so a
         // later change to the report (not just its evidence) is detectable at /verify.
         ensure_column('report_docs', 'content_seal', "VARCHAR(64) DEFAULT ''");
@@ -4340,6 +4343,15 @@ function ops_idems_documents($route, $method) {
                 $id = (int)$pdo->lastInsertId();
                 idems_log('report_doc', $id, 'CREATE', ['irn'=>$irn]);
                 idems_log('report_doc', $id, 'IRN_GEN', ['irn'=>$irn, 'new'=>$irn]);
+                // Field #27 (stage b) — "continue from" a prior inspection: seed this new
+                // report's body from it and carry its QAPs forward. Guarded to a genuine
+                // prior inspection for this job (same client + vendor + contract, issued).
+                $continueFrom = (int)($b['continue_from'] ?? $_GET['continue_from'] ?? 0);
+                if ($continueFrom && !empty($fields['job_id']) && function_exists('idems_seed_from_prior')) {
+                    $pj = ops_one("SELECT id, call_id FROM jobs WHERE id=?", [(int)$fields['job_id']]);
+                    if ($pj && function_exists('job_prior_report_ok') && job_prior_report_ok($pj, $continueFrom))
+                        idems_seed_from_prior($id, $continueFrom, (int)$fields['job_id']);
+                }
                 // Phase 2 §6 — if this report type is NOT on the job's agreed deliverables,
                 // it was raised via "add anyway": flag it "not allocated", keep the reason,
                 // and record the override on the audit trail (reason/person/time). This makes
@@ -4381,6 +4393,21 @@ function ops_idems_documents($route, $method) {
         if (!$doc) {
             $ctx = idems_context_for((int)($_GET['call'] ?? 0), (int)($_GET['job'] ?? 0));
             if ($ctx) $pre = $ctx;
+            // Field #27 (stage b) — arriving via "Continue from" a prior inspection:
+            // preselect its report type and carry the source id, so on create the new
+            // report seeds its body from that inspection and carries its QAPs forward.
+            $cf = (int)($_GET['continue_from'] ?? 0);
+            if ($cf) {
+                $jobId = (int)($_GET['job'] ?? 0);
+                $pj = $jobId ? ops_one("SELECT id, call_id FROM jobs WHERE id=?", [$jobId]) : null;
+                $prior = ($pj && function_exists('job_prior_report_ok')) ? job_prior_report_ok($pj, $cf) : null;
+                if ($prior) {
+                    $priorDoc = ops_one("SELECT report_type_id, irn FROM report_docs WHERE id=?", [$cf]);
+                    $pre['continue_from'] = $cf;
+                    $pre['continue_irn']  = (string)($prior['irn'] ?? ($priorDoc['irn'] ?? ''));
+                    if ($priorDoc && $priorDoc['report_type_id']) $pre['report_type_id'] = (int)$priorDoc['report_type_id'];
+                }
+            }
         }
         // Narrow the report-type dropdown to the deliverables this inspection was
         // actually allocated. Offering the whole catalogue is how an engineer files
@@ -5669,6 +5696,72 @@ function job_prior_inspections($job, $limit = 8) {
     if (!$call || empty($call['vendor_id'])) return [];
     return inspection_history_for((int)$call['client_id'], (int)$call['vendor_id'],
         (string)($call['contract_number'] ?? ''), (int)($job['id'] ?? 0), $limit);
+}
+
+// Field #27 (stage b) — is $priorId a genuine prior inspection this $job may continue
+// from? (Same client + vendor + contract, issued, not this job.) Returns the prior row
+// or null. Guards the "continue from" and "forward" actions against an arbitrary id.
+function job_prior_report_ok($job, $priorId) {
+    $priorId = (int)$priorId;
+    if (!$priorId) return null;
+    foreach (job_prior_inspections($job, 50) as $r) if ((int)$r['id'] === $priorId) return $r;
+    return null;
+}
+
+// Field #27 (stage b) — the coordinator forwards a past report to the inspector as the
+// basis for this repeat inspection (stored on jobs.prior_report_id). Posting id 0 clears
+// it. Validated against the same client+vendor+contract prior-inspection set.
+function ops_job_forward_report($method) {
+    if ($method !== 'POST') redirect('/');
+    $jobId   = (int)($_POST['job_id'] ?? 0);
+    $priorId = (int)($_POST['prior_report_id'] ?? 0);
+    $job = $jobId ? ops_one("SELECT id, call_id FROM jobs WHERE id=?", [$jobId]) : null;
+    if (!$job) { flash('That ' . Tl('job') . ' no longer exists.', 'error'); redirect('/'); }
+    ops_require(is_master() || (function_exists('is_coordinator_level') && is_coordinator_level()) || can('ops.job.allocate'),
+        'Only a coordinator can forward a past report to the inspector.');
+    if ($priorId === 0) {
+        db()->prepare("UPDATE jobs SET prior_report_id=NULL WHERE id=?")->execute([$jobId]);
+        flash('Forwarded report cleared.');
+        redirect('/job?id=' . $jobId . '#prior-inspections');
+    }
+    if (!job_prior_report_ok($job, $priorId)) {
+        flash('That report is not a prior inspection at the same ' . Tl('client') . ', vendor and contract.', 'error');
+        redirect('/job?id=' . $jobId . '#prior-inspections');
+    }
+    db()->prepare("UPDATE jobs SET prior_report_id=? WHERE id=?")->execute([$priorId, $jobId]);
+    $irn = (string) ops_val("SELECT irn FROM report_docs WHERE id=?", [$priorId]);
+    if (function_exists('idems_log')) idems_log('report_doc', $priorId, 'FORWARDED',
+        ['irn' => $irn, 'reason' => 'forwarded to the inspector as the basis for ' . Tl('job') . ' #' . $jobId]);
+    flash('Forwarded ' . $irn . ' to the inspector as the basis for this inspection.');
+    redirect('/job?id=' . $jobId . '#prior-inspections');
+}
+
+// Seed a freshly-created report from a prior inspection: carry its filled body (scope,
+// reference documents, standards — the whole data blob, like a revision), and carry the
+// prior job's QAP files forward onto this job (once each). The new report keeps its OWN
+// IRN/header; only the body seeds. Hold points are untouched (they live on hw_points).
+function idems_seed_from_prior($newDocId, $priorDocId, $newJobId) {
+    $prior = ops_one("SELECT id, irn, job_id, data FROM report_docs WHERE id=? AND deleted=0", [(int)$priorDocId]);
+    if (!$prior) return false;
+    db()->prepare("UPDATE report_docs SET data=?, updated_at=? WHERE id=?")
+        ->execute([(string)($prior['data'] ?? ''), date('c'), (int)$newDocId]);
+    $copied = 0;
+    $priorJob = (int)($prior['job_id'] ?? 0);
+    if ($newJobId && $priorJob && $priorJob !== (int)$newJobId) {
+        $src = ops_all("SELECT po_line, file_name, mime, data, note FROM job_qaps WHERE job_id=?", [$priorJob]);
+        $ins = db()->prepare("INSERT INTO job_qaps (job_id,po_line,file_name,mime,data,note,uploaded_by,uploaded_at) VALUES (?,?,?,?,?,?,?,?)");
+        foreach ($src as $q) {
+            // Do not duplicate a QAP already on this job (by file name).
+            if ((int) ops_val("SELECT COUNT(*) FROM job_qaps WHERE job_id=? AND file_name=?", [(int)$newJobId, (string)$q['file_name']])) continue;
+            $ins->execute([(int)$newJobId, $q['po_line'], $q['file_name'], $q['mime'], $q['data'],
+                           trim('Carried forward — ' . (string)($q['note'] ?? '')), user_name(current_user()), date('c')]);
+            $copied++;
+        }
+    }
+    if (function_exists('idems_log'))
+        idems_log('report_doc', (int)$newDocId, 'CONTINUED_FROM',
+            ['irn' => (string)$prior['irn'], 'reason' => 'continued from a prior inspection; scope and ' . $copied . ' QAP(s) carried forward']);
+    return true;
 }
 // Upload one or more QAP files against a job.
 // Who may attach / remove a QAP / ITP on a job: anyone who runs the job

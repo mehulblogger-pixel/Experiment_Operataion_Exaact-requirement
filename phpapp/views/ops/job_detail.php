@@ -557,19 +557,44 @@
       // contract, so the next inspector sees the history and can open the past report.
       // Read-only here; forwarding / continuing come next. Only issued reports show. ?>
 <?php $priorInsp = function_exists('job_prior_inspections') ? job_prior_inspections($job) : []; ?>
-<?php if ($priorInsp && (is_master() || can('mod.idems.view') || can('mod.idems.edit'))): ?>
+<?php if ($priorInsp && (is_master() || can('mod.idems.view') || can('mod.idems.edit'))):
+        $canMakeReport = can('mod.idems.edit') || is_master();
+        $canForward    = is_master() || (function_exists('is_coordinator_level') && is_coordinator_level()) || can('ops.job.allocate');
+        $fwdId         = (int)($job['prior_report_id'] ?? 0);
+        $fwdIrn        = ''; foreach ($priorInsp as $pi) if ((int)$pi['id'] === $fwdId) $fwdIrn = (string)$pi['irn']; ?>
 <div class="panel" id="prior-inspections" data-tab="Reports &amp; QA">
   <div class="ctitle" style="margin-top:0"><h3>Previous inspections at this vendor <span class="muted">(<?= count($priorInsp) ?>)</span></h3></div>
-  <p class="muted" style="margin:0 0 10px">Earlier issued reports for the <b>same <?= e(Tl('client')) ?>, vendor and contract</b> — newest first. Open the latest to carry its scope and QAP forward for this repeat inspection.</p>
+  <p class="muted" style="margin:0 0 10px">Earlier issued reports for the <b>same <?= e(Tl('client')) ?>, vendor and contract</b> — newest first. <b>Continue</b> starts this report from that inspection (its scope and QAP carried; hold points kept), or use <em>New report</em> for a fresh one.</p>
+  <?php if ($fwdId): ?>
+    <div class="msg msg-ok" style="margin:0 0 10px">★ The coordinator forwarded <b><?= e($fwdIrn ?: ('#'.$fwdId)) ?></b> as the basis for this inspection.</div>
+  <?php endif; ?>
   <table class="grid"><tr><th>Report</th><th>Type</th><th>Inspector</th><th>Date</th><th></th></tr>
-    <?php foreach ($priorInsp as $pi): ?>
+    <?php foreach ($priorInsp as $pi): $isFwd = ((int)$pi['id'] === $fwdId); ?>
       <tr>
-        <td><b><?= e($pi['irn']) ?></b></td>
+        <td><?php if ($isFwd): ?>★ <?php endif; ?><b><?= e($pi['irn']) ?></b></td>
         <td><?= e($pi['type_code'] ?: '—') ?></td>
         <td><?= e($pi['inspector_name'] ?: '—') ?></td>
         <td><?= e(($pi['on_date'] ?? '') !== '' ? fdate(substr((string)$pi['on_date'], 0, 10)) : '—') ?></td>
-        <td class="num"><a class="btn small secondary" href="/document?id=<?= (int)$pi['id'] ?>">Open →</a>
-          <a class="btn small secondary" href="/document-pdf?id=<?= (int)$pi['id'] ?>" target="_blank" rel="noopener">PDF</a></td>
+        <td class="num" style="white-space:nowrap">
+          <a class="btn small secondary" href="/document?id=<?= (int)$pi['id'] ?>">Open</a>
+          <a class="btn small secondary" href="/document-pdf?id=<?= (int)$pi['id'] ?>" target="_blank" rel="noopener">PDF</a>
+          <?php if ($canMakeReport): ?>
+            <a class="btn small" href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call='.(int)$job['call_id'] : '' ?>&continue_from=<?= (int)$pi['id'] ?>&type=<?= e($pi['type_code']) ?>" title="Start this inspection's report from this one — scope &amp; QAP carried">↩ Continue</a>
+          <?php endif; ?>
+          <?php if ($canForward && !$isFwd): ?>
+            <form method="post" action="/job-forward-report" style="display:inline">
+              <input type="hidden" name="job_id" value="<?= (int)$job['id'] ?>">
+              <input type="hidden" name="prior_report_id" value="<?= (int)$pi['id'] ?>">
+              <button class="btn small secondary" type="submit" title="Recommend this report to the inspector as the basis">Forward</button>
+            </form>
+          <?php elseif ($canForward && $isFwd): ?>
+            <form method="post" action="/job-forward-report" style="display:inline">
+              <input type="hidden" name="job_id" value="<?= (int)$job['id'] ?>">
+              <input type="hidden" name="prior_report_id" value="0">
+              <button class="btn small secondary" type="submit" title="Stop forwarding this report">Unforward</button>
+            </form>
+          <?php endif; ?>
+        </td>
       </tr>
     <?php endforeach; ?>
   </table>

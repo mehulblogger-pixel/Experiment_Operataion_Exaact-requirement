@@ -32,6 +32,12 @@
 <form method="post" action="<?= $doc ? '/document-edit?id='.(int)$doc['id'] : '/document-new' ?>" class="panel">
   <input type="hidden" name="call_id" value="<?= (int)$v('call_id') ?>">
   <input type="hidden" name="job_id" value="<?= (int)$v('job_id') ?>">
+  <?php // Field #27 (stage b) — continuing from a prior inspection: carry the source id
+        //   so the created report seeds its scope from it and pulls its QAPs forward. ?>
+  <?php if (!$doc && (int)$v('continue_from')): ?>
+    <input type="hidden" name="continue_from" value="<?= (int)$v('continue_from') ?>">
+    <div class="msg msg-ok" style="margin:0 0 12px">↩ <b>Continuing from <?= e($v('continue_irn')) ?></b> — its scope and QAP will be carried onto this report when you create it. You can edit everything after. To start blank instead, use <a href="/document-new?job=<?= (int)$v('job_id') ?><?= (int)$v('call_id') ? '&call='.(int)$v('call_id') : '' ?>">New report</a>.</div>
+  <?php endif; ?>
   <h3 class="tab-sub" style="margin-top:0">Report</h3>
   <div class="form-grid">
     <?php
