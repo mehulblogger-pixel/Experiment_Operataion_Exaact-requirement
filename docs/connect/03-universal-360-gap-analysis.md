@@ -79,8 +79,19 @@ Delivers "freelancers build rich profiles; the pool is discoverable by agencies/
 > as themselves (`/pro/jobs`, one application per job, deduped on
 > `applicant_professional_id`) and **tracks their applications** with live status
 > (`/pro/applications`); those applications reach the client/staff side on the
-> requirement. 8 tests. **A3 (talent search over the pool for orgs)** next, then
-> the **award → engagement → invoice bridge** (Scenario 3).
+> requirement. 8 tests.
+>
+> **A3 ✅ delivered** — **talent search over the shared pool** for org accounts
+> (`/connect-talent`, a Marketplace tile): filter self-listed professionals by
+> discipline / work type / location / availability / free text, open their
+> Passport, and **invite** one onto an open requirement. Proven never to return an
+> org's private staff. 9 tests. **Next: the award → engagement → invoice bridge**
+> (Scenario 3).
+
+**Phase A is complete** (A1 profile · A2 apply · A3 talent search): freelancers
+build rich profiles, find and apply to jobs, and are discoverable by
+organisations — the shared pool, exactly as specified. Scenarios 1 & 2 are fully
+real; Scenario 3 needs the award→invoice bridge next.
 - **A1 — Freelancer preference profile (M4).** Additive columns on the pool
   (work types: per-visit / day-rate / man-day / long deployment / shutdown;
   base + preferred locations; pan-India / overseas willingness; travel radius;

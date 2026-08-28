@@ -128,6 +128,66 @@ function connect_pro_profile_pct($u) {
     return (int)round($done / count($keys) * 100);
 }
 
+/**
+ * A3 — search the SHARED pool (self-listed professionals only). Filters on the
+ * M4 profile: discipline, work type, location, availability, and free text.
+ * Read-only; returns professional cards. Never touches an org's private staff.
+ */
+function connect_pro_search(array $f = [], $limit = 60) {
+    connect_pro_migrate();
+    $w = ['is_active=1']; $a = [];
+    $disc = trim((string)($f['discipline'] ?? ''));
+    if ($disc !== '') { $w[] = 'disciplines LIKE ?'; $a[] = '%' . $disc . '%'; }
+    $wt = trim((string)($f['work_type'] ?? ''));
+    if ($wt !== '') { $w[] = 'work_types LIKE ?'; $a[] = '%' . $wt . '%'; }
+    $loc = trim((string)($f['location'] ?? ''));
+    if ($loc !== '') { $w[] = '(base_city LIKE ? OR preferred_locations LIKE ? OR pan_india=1)'; $a[] = '%' . $loc . '%'; $a[] = '%' . $loc . '%'; }
+    if (!empty($f['available_only'])) { $w[] = "availability='AVAILABLE'"; }
+    $q = trim((string)($f['q'] ?? ''));
+    if ($q !== '') { $w[] = '(name LIKE ? OR headline LIKE ? OR skills LIKE ?)'; $a[] = '%' . $q . '%'; $a[] = '%' . $q . '%'; $a[] = '%' . $q . '%'; }
+    $sql = "SELECT * FROM cx_professionals WHERE " . implode(' AND ', $w)
+         . " ORDER BY CASE WHEN availability='AVAILABLE' THEN 0 ELSE 1 END, name LIMIT " . max(1, (int)$limit);
+    try { return ops_all($sql, $a) ?: []; } catch (Throwable $e) { return []; }
+}
+
+/** Count of active professionals in the shared pool. */
+function connect_pro_pool_count() {
+    connect_pro_migrate();
+    try { return (int)ops_val("SELECT COUNT(*) FROM cx_professionals WHERE is_active=1"); } catch (Throwable $e) { return 0; }
+}
+
+/** Staff/org talent-search screen over the shared pool. */
+function ops_connect_talent($method) {
+    ops_require(function_exists('connect_market_can') && connect_market_can(),
+        'The talent pool is available to coordinators, managers and admins.');
+    $f = [
+        'q'              => (string)($_GET['q'] ?? ''),
+        'discipline'     => (string)($_GET['discipline'] ?? ''),
+        'work_type'      => (string)($_GET['work_type'] ?? ''),
+        'location'       => (string)($_GET['location'] ?? ''),
+        'available_only' => !empty($_GET['available_only']),
+    ];
+    // Invite a professional onto an open requirement (records an application).
+    if ($method === 'POST' && ($_POST['action'] ?? '') === 'invite' && function_exists('cx_application_add')) {
+        $rid = (int)($_POST['requirement_id'] ?? 0); $pid = (int)($_POST['professional_id'] ?? 0);
+        if ($rid && $pid) {
+            $nm = (string)ops_val("SELECT name FROM cx_professionals WHERE id=?", [$pid]);
+            $newId = cx_application_add($rid, ['applicant_professional_id' => $pid, 'applicant_name' => $nm]);
+            flash($newId ? ($nm . ' added to the requirement.') : ($nm . ' has already applied to that requirement.'), $newId ? 'success' : 'error');
+        }
+        redirect('/connect-talent' . (($_POST['qs'] ?? '') !== '' ? '?' . $_POST['qs'] : ''));
+    }
+    view('ops/connect_talent', [
+        'f'           => $f,
+        'rows'        => connect_pro_search($f),
+        'pool'        => connect_pro_pool_count(),
+        'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
+        'work_types'  => cx_pro_work_types(),
+        'open_reqs'   => function_exists('cx_open_requirements') ? cx_open_requirements() : [],
+    ]);
+    return true;
+}
+
 /** requirement_id => true for the requirements this professional already applied to. */
 function connect_pro_applied_map($proId) {
     $out = [];

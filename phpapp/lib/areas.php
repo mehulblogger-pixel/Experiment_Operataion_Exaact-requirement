@@ -47,13 +47,15 @@ function ops_area_def($area) {
             // area, cleanly optional.
             $title = 'Marketplace'; $icon = '🧑‍🏭';
             $sub = 'Post technical-manpower requirements, match and shortlist professionals, and their public passports.';
-            $routes = ['connect-requirements','connect-requirement','connect-concierge','passport-share','connect-taxonomy'];
+            $routes = ['connect-requirements','connect-requirement','connect-concierge','connect-talent','passport-share','connect-taxonomy'];
             $on = $fx('connect_market_can') && connect_market_can();
             if ($on) {
                 $sec('');
                 $t(true, '📋', 'Requirements', '/connect-requirements', 'Post a manpower requirement and manage who applies.',
                     $num(fn() => $fx('cx_market_summary') ? (cx_market_summary()['open'] ?? 0) : 0), 'green');
                 $t(true, '💬', 'Guided post', '/connect-concierge', 'Build a requirement by answering a few questions.');
+                $t(true, '🔎', 'Talent search', '/connect-talent', 'Search the shared pool of self-listed professionals.',
+                    $num(fn() => $fx('connect_pro_pool_count') ? connect_pro_pool_count() : 0));
                 $t(true, '🪪', 'Passports', '/passport-share', 'A professional\'s public, verifiable credential page.');
                 $t(true, '🏭', 'Industry taxonomy', '/connect-taxonomy', 'Sectors, equipment, materials, disciplines, standards, certifications.');
             }
